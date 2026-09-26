@@ -107,7 +107,7 @@ export { spatialGrid };
  * A Doppelganger with living illusions counts as effectively alive even if its own HP is 0.
  */
 export function isFighterEffectivelyAlive(fighter) {
-  if (!fighter) return false;
+  if (!fighter || fighter.isTurret || fighter.isDispenser || fighter.isMinion || fighter.isEndCrystal || fighter.isDeployable) return false;
   if (typeof fighter.isEffectivelyAlive === 'function') {
     return fighter.isEffectivelyAlive();
   }
@@ -159,6 +159,9 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
+  // Servants of Cthulhu and End Crystals phase through fighters without physical collision or pushback
+  if (a.isServantOfCthulhu || b.isServantOfCthulhu || a.isEndCrystal || b.isEndCrystal) return;
+
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
   const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
   const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive || b._wasFinalBlowSpin || (b.postUltimateRecoveryTimer && b.postUltimateRecoveryTimer > 0));
@@ -202,7 +205,17 @@ export function resolveFighterCollision(a, b) {
   if ((a.soulPhaseDashTimer && a.soulPhaseDashTimer > 0) || (b.soulPhaseDashTimer && b.soulPhaseDashTimer > 0)) return;
 
   // Zenitsu phases directly through entities during godspeed lightning dashes (Hekireki Issen)
-  if (a.isDashingThunderclap || b.isDashingThunderclap) return;
+  // Ender Dragon hyper-velocity divebomb strafe: Dragon is an unstoppable freight train, dragging victims along its flight path without deflection or speed loss
+  const aIsDragonDive = (a.characterId === 'ender_dragon' || a.type === 'ender_dragon') && (a.isDivebombing || a.aiState === 'DIVEBOMB_STRIKE');
+  const bIsDragonDive = (b.characterId === 'ender_dragon' || b.type === 'ender_dragon') && (b.isDivebombing || b.aiState === 'DIVEBOMB_STRIKE');
+  if (aIsDragonDive || bIsDragonDive) {
+    const dragon = aIsDragonDive ? a : b;
+    const victim = aIsDragonDive ? b : a;
+    if (victim && !victim.isEndCrystal && !victim.isBoss && typeof dragon._catchAndDragVictim === 'function') {
+      dragon._catchAndDragVictim(victim);
+    }
+    return; // Skip standard elastic bounce and separation physics
+  }
 
   const dx = b.x - a.x;
   const dy = b.y - a.y;
@@ -1065,6 +1078,9 @@ export function updateFighters() {
         if (!entity || entity === fighter) continue;
         if (!entity.isIllusion) continue; // Skip fighter-fighter collisions (already handled)
         if (!entity.hp || entity.hp <= 0 || entity.isSubmerged || entity.isErupting) continue;
+        
+        // Servants of Cthulhu and End Crystals phase through fighters without physical collision or pushback
+        if (entity.isServantOfCthulhu || fighter.isServantOfCthulhu || entity.isEndCrystal || fighter.isEndCrystal) continue;
         
         // Illusions inside Cronos sphere must never be pushed
         const isIllusionInSphere = entity._frozenByCronosSphere || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(entity.x - f.sphereX, entity.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + entity.r)));

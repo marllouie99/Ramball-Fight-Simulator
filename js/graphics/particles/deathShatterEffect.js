@@ -6,7 +6,7 @@ import { state, triggerGlobalScreenShake } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { getEyePhase1Image, getEyePhase2Image, getEyeShatterImage, EOC_SHATTER_SPRITES } from '../fighters/eyeOfCthulhuSkin.js';
-import { getEnderDragonDisintegrationImages } from '../fighters/enderDragonSkin.js';
+import { drawEnderDragonDeathDisintegration } from '../fighters/enderDragonSkin.js';
 import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
 
 /**
@@ -267,7 +267,10 @@ export function spawnMachineCorpse(x, y, angle) {
 }
 
 export function spawnEnderDragonDisintegrationDeath(fighter) {
-  triggerGlobalScreenShake(12, 35);
+  triggerGlobalScreenShake(14, 40);
+  if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+    audioSystem.playSFX('Assets/Sound Effects/Skills/purpledeploy.mp3', 0.9);
+  }
   const baseR = fighter.r || 36;
   const aimAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
   const facingLeft = (fighter.vx < -0.4) || (Math.abs(aimAngle) > Math.PI / 2);
@@ -275,17 +278,65 @@ export function spawnEnderDragonDisintegrationDeath(fighter) {
     x: fighter.x,
     y: fighter.y,
     vx: 0,
-    vy: -0.35, // Slow majestic upward ascension
+    vy: -0.40, // Slow majestic upward ascension
     r: baseR,
-    rotation: 0, // Strictly upright at all times
+    rotation: aimAngle,
     facingLeft,
     life: 1.0,
     maxLife: 1.0,
     frameTimer: 0,
-    totalFrames: 90,
-    decay: 1.0 / 90,
+    totalFrames: 130, // Authentic Minecraft duration
+    decay: 1.0 / 130,
     isEnderDragonDeath: true,
   });
+}
+
+/**
+ * Spawns an authentic Minecraft Experience (XP) Orb fountain explosion upon Ender Dragon death.
+ * Orbs burst outward in an arc, bounce on arena boundaries with realistic restitution,
+ * pulse through iconic multi-color tiers (lime, emerald, gold, cyan), and linger.
+ * @param {number} x - Center X position
+ * @param {number} y - Center Y position
+ * @param {number} count - Total XP orbs to spawn (default 40)
+ */
+export function spawnEnderDragonXPFountain(x, y, count = 40) {
+  const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const finalCount = Math.floor(Math.max(16, count * qualityMultiplier));
+
+  for (let i = 0; i < finalCount; i++) {
+    // Upward fountain burst with horizontal spread
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5;
+    const speed = 6.0 + Math.random() * 8.5;
+    const vx = Math.cos(angle) * speed + (Math.random() - 0.5) * 4.0;
+    const vy = Math.sin(angle) * speed - (3.0 + Math.random() * 5.0);
+
+    // Minecraft XP Orb tiers: 0: small, 1: medium, 2: large, 3: giant
+    const xpTier = Math.random() < 0.15 ? 3 : (Math.random() < 0.35 ? 2 : (Math.random() < 0.65 ? 1 : 0));
+    const pixelSize = 1.5 + xpTier * 0.5; // Discrete pixel unit: 1.5, 2.0, 2.5, 3.0px
+
+    state.deathEffects.push({
+      x: x + (Math.random() - 0.5) * 20,
+      y: y + (Math.random() - 0.5) * 20,
+      vx,
+      vy,
+      gravity: 0.34,
+      restitution: 0.45 + Math.random() * 0.12,
+      friction: 0.76,
+      size: pixelSize * 5.0,
+      pixelSize,
+      xpTier,
+      colorPhase: Math.random() * 20,
+      rotOffset: Math.random() * 4,
+      life: 1.0,
+      maxLife: 1.0,
+      decay: 0,
+      settleHoldTimer: 180 + Math.floor(Math.random() * 120), // Lingers 3-5 seconds
+      isSettled: false,
+      isEnderDragonXPOrb: true,
+      groundFrames: 0,
+      bobOffset: Math.random() * Math.PI * 2,
+    });
+  }
 }
 
 /**
@@ -308,12 +359,198 @@ export function updateDeathEffects() {
       effect.y += effect.vy;
       effect.frameTimer = (effect.frameTimer || 0) + 1;
       effect.life -= effect.decay;
-      if (Math.random() < 0.35) {
-        spawnSparks(effect.x + (Math.random() - 0.5) * effect.r * 2, effect.y + (Math.random() - 0.5) * effect.r * 2, '#D946EF', 2, 2.5);
+      if (Math.random() < 0.40) {
+        spawnSparks(effect.x + (Math.random() - 0.5) * effect.r * 2.2, effect.y + (Math.random() - 0.5) * effect.r * 2.2, '#D946EF', 2, 2.5);
       }
       if (effect.life <= 0) {
-        spawnImpactFlash(effect.x, effect.y, effect.r * 2.5, '#F5D0FE');
-        spawnSparks(effect.x, effect.y, '#C026D3', 24, 7.5);
+        triggerGlobalScreenShake(18, 45);
+        spawnImpactFlash(effect.x, effect.y, effect.r * 4.2, '#F5D0FE');
+        spawnSparks(effect.x, effect.y, 42, '#C026D3', 10.0);
+        spawnSparks(effect.x, effect.y, 28, '#F5D0FE', 8.5);
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+          audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 1.0);
+          audioSystem.playSFX('Assets/Sound Effects/Skills/thunderstrike.mp3', 0.85);
+        }
+        spawnEnderDragonXPFountain(effect.x, effect.y, 40);
+        state.deathEffects.splice(i, 1);
+      }
+      continue;
+    }
+
+    // 0.5 Ender Dragon Experience (XP) Orbs
+    if (effect.isEnderDragonXPOrb) {
+      // Check for nearby alive player within magnetism radius
+      const aliveFighters = (state.fighters || []).filter(f => f && f.hp > 0 && !f.isDead && !f.dead && !f.isTurret && !f.isDispenser);
+      let targetFighter = effect.hoverTargetFighter || null;
+
+      if (!targetFighter || targetFighter.hp <= 0 || targetFighter.isDead || targetFighter.dead) {
+        let minDist = 190; // Magnetic attraction radius (190px)
+        targetFighter = null;
+        for (let fIdx = 0; fIdx < aliveFighters.length; fIdx++) {
+          const f = aliveFighters[fIdx];
+          const dist = Math.hypot(f.x - effect.x, f.y - effect.y);
+          if (dist < minDist) {
+            minDist = dist;
+            targetFighter = f;
+          }
+        }
+      }
+
+      if (targetFighter) {
+        effect.isSettled = false;
+        const dx = targetFighter.x - effect.x;
+        const dy = targetFighter.y - effect.y;
+        const dist = Math.hypot(dx, dy);
+
+        // Check if entered close hovering/swarming radius around the player
+        const playerR = targetFighter.r || 30;
+        const hoverTriggerDist = playerR * 0.95 + 12;
+
+        if (effect.isHovering || dist <= hoverTriggerDist) {
+          if (!effect.isHovering) {
+            // Initiate hovering & swirling around the player
+            effect.isHovering = true;
+            effect.hoverTargetFighter = targetFighter;
+            // Hover duration: 12 to 34 frames of buzzing/swarming around player body before consumption
+            effect.hoverTimer = 12 + Math.floor(Math.random() * 22);
+            effect.hoverOrbitRadius = playerR * 0.35 + Math.random() * (playerR * 0.75);
+            effect.hoverOrbitAngle = Math.atan2(effect.y - targetFighter.y, effect.x - targetFighter.x);
+            effect.hoverOrbitSpeed = (Math.random() < 0.5 ? 1 : -1) * (0.16 + Math.random() * 0.14);
+            effect.hoverBobOffset = Math.random() * Math.PI * 2;
+          }
+
+          effect.hoverTimer--;
+          effect.hoverOrbitAngle += effect.hoverOrbitSpeed;
+          // Slowly spiral closer to player center as timer counts down
+          effect.hoverOrbitRadius *= 0.96;
+
+          const orbitX = targetFighter.x + Math.cos(effect.hoverOrbitAngle) * effect.hoverOrbitRadius;
+          const orbitY = targetFighter.y + Math.sin(effect.hoverOrbitAngle) * (effect.hoverOrbitRadius * 0.85) + Math.sin((state.frameCount || 0) * 0.2 + effect.hoverBobOffset) * 2;
+
+          effect.x += (orbitX - effect.x) * 0.40;
+          effect.y += (orbitY - effect.y) * 0.40;
+
+          // Tiny sparkling motes while swirling around player
+          if (Math.random() < 0.25) {
+            spawnSparks(effect.x + (Math.random() - 0.5) * 4, effect.y + (Math.random() - 0.5) * 4, 1, 'lime', '#84CC16');
+          }
+
+          // When hover timer reaches 0, the XP orb is completely consumed!
+          if (effect.hoverTimer <= 0) {
+            playMinecraftXPChime();
+
+            // Minecraft XP pickup sparkle pop explosion
+            const sparkleCount = 6 + Math.floor(Math.random() * 4);
+            const sparkleColors = ['#BAF74E', '#76D813', '#FEF08A', '#8DF222', '#FFFFFF'];
+            for (let s = 0; s < sparkleCount; s++) {
+              const sAngle = (Math.PI * 2 * s) / sparkleCount + (Math.random() - 0.5) * 0.6;
+              const sSpeed = 1.8 + Math.random() * 3.6;
+              state.deathEffects.push({
+                x: effect.x + (Math.random() - 0.5) * 6,
+                y: effect.y + (Math.random() - 0.5) * 6,
+                vx: Math.cos(sAngle) * sSpeed,
+                vy: Math.sin(sAngle) * sSpeed - (1.2 + Math.random() * 1.5),
+                pixelSize: Math.random() < 0.5 ? 2.0 : 2.5,
+                color: sparkleColors[s % sparkleColors.length],
+                life: 1.0,
+                maxLife: 1.0,
+                decay: 0.05 + Math.random() * 0.03, // Crisp ~15 frame pop
+                isXPSparkle: true,
+              });
+            }
+            state.deathEffects.splice(i, 1);
+            continue;
+          }
+        } else {
+          // Magnetism flight towards player before reaching hover distance
+          effect.homingSpeed = Math.min(20.0, (effect.homingSpeed || 4.0) + 1.20);
+          const targetVx = (dx / dist) * effect.homingSpeed;
+          const targetVy = (dy / dist) * effect.homingSpeed;
+
+          // Smooth parabolic blend towards player
+          effect.vx = (effect.vx || 0) * 0.78 + targetVx * 0.22;
+          effect.vy = (effect.vy || 0) * 0.78 + targetVy * 0.22;
+          effect.x += effect.vx;
+          effect.y += effect.vy;
+
+          // Trailing luminous XP motes while in flight
+          if (Math.random() < 0.28) {
+            spawnSparks(effect.x + (Math.random() - 0.5) * 4, effect.y + (Math.random() - 0.5) * 4, 1, 'lime', '#84CC16');
+          }
+        }
+      } else if (!effect.isSettled) {
+        effect.x += effect.vx;
+        effect.y += effect.vy;
+        effect.vy += effect.gravity;
+        effect.vx *= 0.988;
+        effect.vy *= 0.992;
+
+        const orbMargin = effect.size * 0.6;
+        const leftBound = arenaLeft + orbMargin;
+        const rightBound = arenaRight - orbMargin;
+        const bottomBound = arenaBottom - orbMargin;
+
+        // Wall horizontal bounce clamp
+        if (effect.x <= leftBound) {
+          effect.x = leftBound;
+          effect.vx = Math.abs(effect.vx) * effect.restitution;
+        } else if (effect.x >= rightBound) {
+          effect.x = rightBound;
+          effect.vx = -Math.abs(effect.vx) * effect.restitution;
+        }
+
+        // Ceiling bounce
+        if (effect.y <= arenaTop + orbMargin) {
+          effect.y = arenaTop + orbMargin;
+          if (effect.vy < 0) effect.vy = -effect.vy * 0.35;
+        }
+
+        // Arena floor bounce & settling
+        if (effect.y >= bottomBound) {
+          effect.y = bottomBound;
+          effect.groundFrames = (effect.groundFrames || 0) + 1;
+
+          if (effect.vy > 0) {
+            if (effect.vy > 1.2 && effect.groundFrames < 12) {
+              effect.vy = -effect.vy * effect.restitution;
+              effect.vx *= effect.friction;
+              if (Math.random() < 0.3) {
+                spawnSparks(effect.x, effect.y, 2, 'lime', '#84CC16');
+              }
+            } else {
+              effect.vy = 0;
+              effect.vx *= 0.70;
+              if (Math.abs(effect.vx) < 0.08 || effect.groundFrames > 20) {
+                effect.vx = 0;
+                effect.isSettled = true;
+                effect.settleY = bottomBound;
+              }
+            }
+          }
+        }
+      } else {
+        // Settled: gentle floating/bobbing oscillation until picked up or timeout
+        if (effect.settleHoldTimer > 0) {
+          effect.settleHoldTimer--;
+        } else {
+          effect.life -= 0.012; // Smooth fade out
+          if (effect.life <= 0) {
+            state.deathEffects.splice(i, 1);
+            continue;
+          }
+        }
+      }
+      continue;
+    }
+
+    // 0.6 Minecraft XP Sparkle Pop Particles
+    if (effect.isXPSparkle) {
+      effect.x += effect.vx;
+      effect.y += effect.vy;
+      effect.vy -= 0.04; // Gentle upward drift
+      effect.vx *= 0.90;
+      effect.life -= (effect.decay || 0.05);
+      if (effect.life <= 0) {
         state.deathEffects.splice(i, 1);
       }
       continue;
@@ -521,35 +758,17 @@ export function drawDeathEffects() {
     ctx.globalAlpha = Math.min(1, Math.max(0, effect.life));
 
     if (effect.isEnderDragonDeath) {
-      const { dis1, dis2 } = getEnderDragonDisintegrationImages();
-      const img = dis1 || dis2;
-      const progress = Math.min(0.99, (effect.frameTimer || 0) / (effect.totalFrames || 90));
-      const frameIdx = Math.floor(progress * 6);
-      const row = Math.floor(frameIdx / 3);
-      const col = frameIdx % 3;
-      const sx = col * 512;
-      const sy = row * 512;
-      const drawSize = effect.r * 3.8;
-
-      if (effect.facingLeft) {
-        ctx.scale(-1, 1);
-      }
-
-      if (img && img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, sx, sy, 512, 512, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
-      }
-
-      // Radiating purple void beams
-      const beamCount = 8;
-      const beamLength = effect.r * (1.8 + progress * 2.8);
-      ctx.strokeStyle = progress > 0.5 ? '#F5D0FE' : '#D946EF';
-      ctx.lineWidth = Math.max(1, 3.5 * (1 - progress));
-      for (let b = 0; b < beamCount; b++) {
-        const bAngle = (b / beamCount) * Math.PI * 2 + progress * 2.0;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(bAngle) * beamLength, Math.sin(bAngle) * beamLength);
-        ctx.stroke();
+      drawEnderDragonDeathDisintegration(ctx, effect);
+    } else if (effect.isEnderDragonXPOrb) {
+      drawMinecraftXPOrb(ctx, effect);
+    } else if (effect.isXPSparkle) {
+      const P = effect.pixelSize || 2.0;
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = effect.color || '#BAF74E';
+      ctx.fillRect(-Math.round(P / 2), -Math.round(P / 2), P, P);
+      if (effect.life > 0.45) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(-Math.round(P / 4), -Math.round(P / 4), Math.max(1, P / 2), Math.max(1, P / 2));
       }
     } else if (effect.isEyeOfCthulhuGore) {
       drawTerrariaEyeGore(ctx, effect);
@@ -749,4 +968,185 @@ export function drawTerrariaEyeGore(ctx, effect) {
   ctx.strokeStyle = '#111114';
   ctx.lineWidth = 1.2;
   ctx.stroke();
+}
+
+// Authentic Minecraft Experience (XP) Orb Rounded Pixel Matrix (8x8 circular pixel cluster)
+// B = Dark Outline Pixel, O = Outer Vibrant Color, I = Inner Bright Tier, W = Core White Highlight
+const MC_XP_SPRITE_FRAMES = [
+  // Frame 0: Standard Round Spherical Orb (8x8 round circle)
+  [
+    '  BBBB  ',
+    ' BOOOOB ',
+    'BOIIIIOB',
+    'BOIWWIOB',
+    'BOIWWIOB',
+    'BOIIIIOB',
+    ' BOOOOB ',
+    '  BBBB  ',
+  ],
+  // Frame 1: Pulsating Diamond Round
+  [
+    '   BB   ',
+    ' BOOOOB ',
+    'BOIIIIOB',
+    'BOIWWIOB',
+    'BOIWWIOB',
+    'BOIIIIOB',
+    ' BOOOOB ',
+    '   BB   ',
+  ],
+  // Frame 2: Core Glint Expansion (Internal breathing pulse)
+  [
+    '  BBBB  ',
+    ' BOOOOB ',
+    'BOIWWIOB',
+    'BOWWWWOB',
+    'BOWWWWOB',
+    'BOIWWIOB',
+    ' BOOOOB ',
+    '  BBBB  ',
+  ],
+  // Frame 3: Secondary Core Pulse
+  [
+    '   BB   ',
+    ' BOOOOB ',
+    'BOIIIIOB',
+    'BOIWWIOB',
+    'BOIWWIOB',
+    'BOIIIIOB',
+    ' BOOOOB ',
+    '   BB   ',
+  ],
+];
+
+// 11-step pulsating color sequence matching vanilla Minecraft Experience Orb shader
+const MC_XP_COLOR_SEQUENCE = [
+  { base: '#76D813', inner: '#BAF74E', core: '#FFFFFF', border: '#143806' }, // Chartreuse
+  { base: '#8DF222', inner: '#CEFB6E', core: '#FFFFFF', border: '#1B4A07' }, // Bright Lime
+  { base: '#C4E818', inner: '#E6FA6E', core: '#FFFFFF', border: '#2B3E03' }, // Lemon Lime
+  { base: '#EAC918', inner: '#FEF08A', core: '#FFFFFF', border: '#423403' }, // Gold
+  { base: '#F59E0B', inner: '#FDE68A', core: '#FFFFFF', border: '#451A03' }, // Amber
+  { base: '#10B981', inner: '#6EE7B7', core: '#FFFFFF', border: '#04361C' }, // Emerald
+  { base: '#22C55E', inner: '#A7F3D0', core: '#FFFFFF', border: '#053A14' }, // Green
+  { base: '#14B8A6', inner: '#99F6E4', core: '#FFFFFF', border: '#043834' }, // Seafoam
+  { base: '#06B6D4', inner: '#A5F3FC', core: '#FFFFFF', border: '#063C4A' }, // Vivid Cyan
+  { base: '#0EA5E9', inner: '#BAE6FD', core: '#FFFFFF', border: '#073B56' }, // Sky Blue
+  { base: '#34D399', inner: '#D1FAE5', core: '#FFFFFF', border: '#063A24' }, // Mint Jade
+];
+
+/**
+ * Renders an authentic Minecraft Experience (XP) Orb in genuine 2D discrete grid pixel art.
+ * - Pure round spherical pixel cluster (no rectangular bounding box)
+ * - Solid square pixel rasterization (ctx.fillRect) with imageSmoothingEnabled = false
+ * - 4-frame breathing/glowing pixel pulse
+ * - 11-step pulsating color cycle from lime to gold to cyan to emerald
+ * - Stepped arcade hover bobbing when settled
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} effect
+ */
+export function drawMinecraftXPOrb(ctx, effect) {
+  if (!ctx || !effect) return;
+
+  const time = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : 0;
+  
+  // Rotating/breathing frame animation (4-frame cycle)
+  const frameIdx = Math.floor((time * 0.14 + (effect.rotOffset || 0)) % MC_XP_SPRITE_FRAMES.length);
+  const sprite = MC_XP_SPRITE_FRAMES[frameIdx] || MC_XP_SPRITE_FRAMES[0];
+
+  // 11-step color palette cycling
+  const colorIdx = Math.floor((time * 0.16 + (effect.colorPhase || 0)) % MC_XP_COLOR_SEQUENCE.length);
+  const palette = MC_XP_COLOR_SEQUENCE[colorIdx] || MC_XP_COLOR_SEQUENCE[0];
+
+  // Pixel unit size based on XP size tier
+  const P = effect.pixelSize || (1.5 + (effect.xpTier || 0) * 0.5); // 1.5px to 3.0px solid square pixels
+
+  // Stepped pixel bobbing when landed on arena floor
+  const bobY = effect.isSettled ? Math.round(Math.sin(time * 0.08 + (effect.bobOffset || 0)) * (P * 1.5)) : 0;
+
+  const rows = sprite.length;
+  const cols = sprite[0].length;
+  const totalW = cols * P;
+  const totalH = rows * P;
+  const startX = -Math.round(totalW / 2);
+  const startY = -Math.round(totalH / 2) + bobY;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false; // Authentic crisp pixel art (Rule 19 & 3.5)
+
+  // Discrete rasterized square pixel matrix with zero rectangular bounding box
+  for (let r = 0; r < rows; r++) {
+    const rowStr = sprite[r];
+    for (let c = 0; c < cols; c++) {
+      const char = rowStr[c];
+      if (char === ' ') continue;
+
+      if (char === 'B') {
+        ctx.fillStyle = palette.border;
+      } else if (char === 'O') {
+        ctx.fillStyle = palette.base;
+      } else if (char === 'I') {
+        ctx.fillStyle = palette.inner;
+      } else if (char === 'W') {
+        ctx.fillStyle = palette.core;
+      }
+
+      ctx.fillRect(startX + c * P, startY + r * P, P, P);
+    }
+  }
+
+  ctx.restore();
+}
+
+let _xpAudioCtx = null;
+let _lastXpPickupFrame = 0;
+let _xpPickupStreak = 0;
+
+/**
+ * Synthesizes the authentic Minecraft Experience Orb pickup bell chime (random.orb).
+ * Successive rapid pickups climb in pitch up the chromatic scale.
+ */
+export function playMinecraftXPChime() {
+  const nowFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : Date.now();
+  if (nowFrame - _lastXpPickupFrame < 28) {
+    _xpPickupStreak = Math.min(16, _xpPickupStreak + 1);
+  } else {
+    _xpPickupStreak = 0;
+  }
+  _lastXpPickupFrame = nowFrame;
+
+  if (typeof window === 'undefined') return;
+
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    if (!_xpAudioCtx) {
+      _xpAudioCtx = new AudioContextClass();
+    }
+    if (_xpAudioCtx.state === 'suspended') {
+      _xpAudioCtx.resume().catch(() => {});
+    }
+
+    const actx = _xpAudioCtx;
+    const osc = actx.createOscillator();
+    const gain = actx.createGain();
+
+    // Minecraft XP chime pitch scale: starts at ~860Hz and steps up with each collected orb
+    const semitone = Math.pow(2, _xpPickupStreak / 12);
+    const baseFreq = 860 * semitone;
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(baseFreq, actx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.12, actx.currentTime + 0.10);
+
+    const sfxVol = (typeof state !== 'undefined' && state.sfxVolume !== undefined) ? state.sfxVolume : 0.75;
+    gain.gain.setValueAtTime(0.20 * sfxVol, actx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.12);
+
+    osc.connect(gain);
+    gain.connect(actx.destination);
+
+    osc.start();
+    osc.stop(actx.currentTime + 0.13);
+  } catch (e) {}
 }

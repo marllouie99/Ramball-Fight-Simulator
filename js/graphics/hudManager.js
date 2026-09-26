@@ -360,12 +360,13 @@ export function drawHUD() {
     const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
     containerBottom.classList.toggle('ffa-hud', isFfaMode && !isTactical);
     containerBottom.classList.toggle('tactical-hud', isTactical);
-    const is1v1Mode = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && fighters && fighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
+    const mainFighters = (fighters || []).filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
+    const is1v1Mode = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && mainFighters && mainFighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
     const isStandOffMode = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
     const is2v2Mode = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
     const isTLFSMode = mode === GAME_MODES.TLFS || mode === 'TLFS';
     const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
-    const isTeamMode = is2v2Mode || is1v2Mode || isTLFSMode || (fighters && fighters.length > 2 && !isFfaMode);
+    const isTeamMode = is2v2Mode || is1v2Mode || isTLFSMode || (mainFighters && mainFighters.length > 2 && !isFfaMode);
     const isSingleColMode = (!isTactical && (is1v1Mode || isStandOffMode)) || (isCameraTracking && isTeamMode && !isTactical);
     containerBottom.classList.toggle('single-column-hud', isSingleColMode);
     containerBottom.style.opacity = hudOpacity;
@@ -1156,17 +1157,18 @@ function updateHealthHud() {
 
   // OPTIMIZATION: Throttling HUD updates to prevent extreme DOM reflow lag from progress bars.
   const isTactical = isTacticalMatch(state);
-  const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && fighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
+  const mainFighters = fighters.filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
+  const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && mainFighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
   const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2';
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
-  const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isTLFS || (fighters && fighters.length > 2 && mode !== GAME_MODES.FFA && mode !== 'FFA' && mode !== GAME_MODES.TACTICAL_FFA && mode !== 'Tactical FFA'));
+  const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isTLFS || (mainFighters.length > 2 && mode !== GAME_MODES.FFA && mode !== 'FFA' && mode !== GAME_MODES.TACTICAL_FFA && mode !== 'Tactical FFA'));
   const isSingleColumnMode = ((is1v1 || isStandOff) && !isTactical) || isTeamSingleColumn;
-  const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
+  const currentHpStr = mainFighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
-  const currentSkillsStr = fighters.map(f => {
+  const currentSkillsStr = mainFighters.map(f => {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
@@ -2587,9 +2589,9 @@ function updateHealthHud() {
 
     if (is1v2) {
       // BOSS BATTLE MODE:
-      // Boss (fighters[0]) is rendered at the top of the arena (#hudTopContainer) with NO skill bars
-      const bossFighter = fighters[0];
-      if (bossFighter && !bossFighter.isTurret && _cachedTopContainer) {
+      // Boss is rendered at the top of the arena (#hudTopContainer) with NO skill bars
+      const bossFighter = fighters.find(f => f && f.isBoss) || fighters[0];
+      if (bossFighter && !bossFighter.isTurret && !bossFighter.isEndCrystal && !bossFighter.isMinion && !bossFighter.isDeployable && _cachedTopContainer) {
         const isDark = (state.arenaTheme === 'dark');
         const curHp = (typeof bossFighter.getDisplayHp === 'function') ? bossFighter.getDisplayHp() : bossFighter.hp;
         const maxHp = bossFighter._originalMaxHp || bossFighter.maxHp || 440;
@@ -2654,9 +2656,9 @@ function updateHealthHud() {
         });
       }
 
-      // 2 Challengers (fighters[1], fighters[2]) placed side-by-side at bottom (#healthHud)
+      // 2 Challengers placed side-by-side at bottom (#healthHud)
       // Names are drawn on canvas by drawArenaMatchNames; cards hold healthbar, skills, and info.
-      const challengers = [fighters[1], fighters[2]].filter(f => f && !f.isTurret);
+      const challengers = fighters.filter(f => f && !f.isBoss && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable).slice(0, 2);
       containerBottom.classList.add('boss-battle-hud');
 
       challengers.forEach((chFighter, chIdx) => {
@@ -2824,7 +2826,7 @@ function updateHealthHud() {
     } else {
       // 1v1 / FFA Individual Mode
       fighters.forEach((fighter, index) => {
-        if (!fighter || fighter.isTurret) return;
+        if (!fighter || fighter.isTurret || fighter.isEndCrystal || fighter.isMinion || fighter.isDeployable) return;
         const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
         const color = fighter.color || '#fff';
         const isYutaFighter = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
@@ -2891,7 +2893,7 @@ function updateHealthHud() {
         tempDiv.innerHTML = cardHTML;
         const cardElement = tempDiv.firstElementChild;
 
-        if (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA' || is1v1 || isStandOff || isTLFS || isTactical || fighters.length <= 4) {
+        if (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA' || is1v1 || isStandOff || isTLFS || isTactical || mainFighters.length <= 4) {
           containerBottom.appendChild(cardElement);
         } else if (index % 2 === 0) {
           containerLeft.appendChild(cardElement);
@@ -3141,7 +3143,7 @@ function updateHealthHud() {
   }
   if (_hudCache.fighters.size > 0) {
     fighters.forEach((fighter, index) => {
-      if (!fighter || fighter.isTurret) return;
+      if (!fighter || fighter.isTurret || fighter.isEndCrystal || fighter.isMinion || fighter.isDeployable) return;
       const cachedCard = _hudCache.fighters.get(fighter);
       if (!cachedCard) return;
 

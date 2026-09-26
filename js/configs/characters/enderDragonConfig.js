@@ -24,7 +24,9 @@ export const enderDragonConfig = {
   desc: 'Colossal flying draconic leviathan. Bypasses terrain with void flight, shoots lingering Dragon Breath acid pools, executes kinetic wing swoops, and unleashes cataclysmic void shockwaves.',
 
   // ── Asset Paths ──
+  textureSkinSrc: 'Assets/model/Sprites/dragon-texture-skin.png',
   wingsSpriteSrc: 'Assets/model/Sprites/Dragon-wings-sprite-sheet.png',
+  tailsSpriteSrc: 'Assets/model/Sprites/Dragon-tail-segmented-sheet.png',
   movementSpriteSrc: 'Assets/model/Sprites/Dragon-wings-sprite-sheet.png',
   disintegrationSrc1: 'Assets/model/Sprites/Ender-dragon-Disintegration-Sequence.png',
   disintegrationSrc2: 'Assets/model/Sprites/Ender-dragon-Disintegration-Sequence2.png',
@@ -39,18 +41,57 @@ export const enderDragonConfig = {
   spriteFrameCount: 6,
   spriteTicksPerFrame: 5,
   swoopTicksPerFrame: 3,
+  tailScale: 2.25,
+  wingScale: 5.2,
 
-  // ── Passive: Flight & Arena Physics ──
-  isGhostTerrain: false,
+  // ── Passive: Flight & Arena Physics (Window Screen Hovering & Free Arena Clipping) ──
+  isGhostTerrain: true,
   immuneToKnockback: false,
   immuneToPush: false,
-  hoverOscillationAmp: 7.0,
-  hoverOscillationFreq: 0.05,
-  hoverAcceleration: 0.22,
+  hoverOscillationAmp: 25.0,
+  hoverOscillationFreq: 0.04,
+  hoverAcceleration: 0.28,
   hoverFriction: 0.93,
-  hoverTargetDistanceY: 180,
-  hoverOrbitWobbleAmp: 40,
-  softLeashRadius: 440,
+  hoverTargetDistanceY: 220,
+  hoverOrbitWobbleAmp: 65,
+  softLeashRadius: 280,
+
+  // ── General Movement Behavior (Pillars 1-4) ──
+  // 1. Dynamic Flight Paths (Perimeter Patrol & Altitude Shifts)
+  patrolSpeed: 5.6,
+  patrolAngularSpeed: 0.016,
+  patrolRadiusRatio: 1.10,
+  patrolWobbleFreq: 0.03,
+  patrolWobbleAmp: 45,
+  altitudeShiftInterval: 300,
+  cruiseAltitude: 1.0,
+  highAltitude: 1.7,
+  lowAltitude: 0.4,
+
+  // 2. Target Interception (Momentum & Kinetic Space Control)
+  interceptCooldown: 360,
+  interceptSpeed: 16.5,
+  interceptLeadFrames: 14,
+  interceptGaleReach: 75,
+  interceptGaleDamage: 16,
+  interceptGaleKnockback: 16.0,
+
+  // 3. Grounded Intermissions (Perching at Central Anchor)
+  perchInterval: 1200,
+  perchGroundedDuration: 150,
+  perchDescentSpeed: 3.5,
+  perchBreathCooldown: 40,
+  perchTakeoffShockwaveRadius: 160,
+  perchTakeoffDamage: 24,
+  perchTakeoffKnockback: 18.0,
+
+  // 4. Environmental Reactivity & Phase Multipliers
+  phase2HpThreshold: 0.75,
+  phase3HpThreshold: 0.50,
+  phase4HpThreshold: 0.25,
+  phase2SpeedMult: 1.12,
+  phase3SpeedMult: 1.25,
+  phase4SpeedMult: 1.45,
 
   // ── Skill 1: Dragon's Breath / Fireball (dragonsBreath) ──
   fireballCooldown: 480, // 8.0s
@@ -86,6 +127,17 @@ export const enderDragonConfig = {
   cataclysmSecondaryFireballs: 6,
   cataclysmSecondarySpeed: 7.5,
   cataclysmSecondaryDamage: 18,
+
+  // ── Skill 4: Off-Screen Telegraphed Divebomb Strafe (divebombStrafe) ──
+  divebombCooldown: 600, // 10.0s
+  divebombTelegraphFrames: 55, // ~0.91s ground danger corridor warning
+  divebombDurationFrames: 22,
+  divebombSpeed: 24.5,
+  divebombCorridorWidth: 95,
+  divebombDamage: 45,
+  divebombKnockback: 22.0,
+  divebombReach: 95,
+  divebombAcidDeployInterval: 4,
 
   // ── Death Sequence ──
   deathAscentFrames: 90,

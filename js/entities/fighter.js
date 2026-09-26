@@ -1420,6 +1420,7 @@ export class Fighter {
       this.isGrabbedByMahoraga ||
       this.isWallSlammed ||
       this.isTargetOfAmbush ||
+      this.isDraggedByDragon ||
       (this.statusEffects && (
         (this.statusEffects.electricStunTimer && this.statusEffects.electricStunTimer > 0)
       ))
@@ -2514,7 +2515,7 @@ export class Fighter {
 
     // Helper: an entity is "in play" if alive, a doppelganger with copies, evading Mahito, or shivering in Soul Disfigurement
     const _isEffectivelyAlive = (f) => {
-      if (!f || f.isTurret || f.isDispenser) return false;
+      if (!f || f.isTurret || f.isDispenser || f.isMinion || f.isEndCrystal || f.isDeployable) return false;
       if (typeof f.isEffectivelyAlive === 'function') return f.isEffectivelyAlive();
       return f.hp > 0 && !f.dead;
     };

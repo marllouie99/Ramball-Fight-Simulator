@@ -72,8 +72,9 @@ export function renderGame() {
 
     let stateDim = 0;
     if (Boolean(state._isChampionLayoutActive)) {
+      const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath));
       const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-      const dimStartFrame = hasMissionOverlay ? 160 : 60;
+      const dimStartFrame = hasMissionOverlay ? 160 : (isDragonDying ? 135 : 60);
       if (state.gameState === 'matchEnd') {
         const timer = state.matchEndTimer || 0;
         const delayedTimer = Math.max(0, timer - dimStartFrame);

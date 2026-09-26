@@ -684,6 +684,7 @@ export function updateIllusions() {
       if (!entity || entity === illusion) continue;
       if (entity.isIllusion) continue; // Skip illusions here, handled separately
       if (!entity.hp || entity.hp <= 0) continue;
+      if (illusion.isServantOfCthulhu || entity.isServantOfCthulhu) continue;
       // Cronos phases through illusions while inside his own sphere; Mahito phases during Phantom Soul Slip
       if (entity._isInsideOwnSphere?.() || (entity.soulPhaseDashTimer && entity.soulPhaseDashTimer > 0)) continue;
 
@@ -717,6 +718,7 @@ export function updateIllusions() {
       if (!entity || entity === illusion) continue;
       if (!entity.isIllusion) continue; // Skip fighters here
       if (!entity.hp || entity.hp <= 0) continue;
+      if (illusion.isServantOfCthulhu || entity.isServantOfCthulhu) continue;
       if (illusion.isSplitChild && entity.isSplitChild) continue; // Skip collision between small clumped children
 
       const dx = illusion.x - entity.x;

@@ -855,8 +855,8 @@ export function clearAllBattleEffects() {
     state.sparkEffects.length = 0;
   }
   if (state.deathEffects) {
-    // Retain permanent Eye of Cthulhu gore pieces and permanent death shatters so they remain on the arena floor during win reveals!
-    state.deathEffects = state.deathEffects.filter(e => e && (e.isEyeOfCthulhuGore || e.isPermanentGore));
+    // Retain permanent Eye of Cthulhu gore pieces, Ender Dragon death animation, and XP fountain orbs during win reveals!
+    state.deathEffects = state.deathEffects.filter(e => e && (e.isEyeOfCthulhuGore || e.isPermanentGore || e.isEnderDragonDeath || e.isEnderDragonXPOrb));
   }
   if (state.doppelgangerDeathEffects) state.doppelgangerDeathEffects.length = 0;
   if (state.illusionDeathEffects) state.illusionDeathEffects.length = 0;

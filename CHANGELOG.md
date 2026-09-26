@@ -3,8 +3,4 @@
 
 ---
 
-## 🥊 Fighter Stat Modifications
-
-### CJ
-* **🟢 BUFF** `minigunBulletDamage`: `1` ➔ `2` (+100.0%)
-
+*No balance parameter modifications detected in `js/configs/`.*

@@ -334,6 +334,12 @@ export function updateFocMap(dt = 1, map) {
 export function drawFocMap(ctx, map) {
   if (!map) return;
 
+  // Render Ender Dragon "The End Dimension" Map Features
+  if (map.id === 'foc_ender_dragon_map') {
+    _drawEnderDragonMap(ctx, map);
+    return;
+  }
+
   const sheetImg = getBushSpriteSheet(map);
   const singleImg = getBushSprite(map);
   const hasSheet = Boolean(sheetImg && sheetImg.complete && sheetImg.naturalWidth > 0);
@@ -423,6 +429,137 @@ export function drawFocMap(ctx, map) {
   }
 
   ctx.restore();
+}
+
+/**
+ * Renders the Ender Dragon's "The End Dimension" Boss Map
+ */
+function _drawEnderDragonMap(ctx, map) {
+  const arena = map.arena || (typeof state !== 'undefined' ? state.arena : null);
+  if (!arena) return;
+
+  // 1. Bedrock Portal / Fountain Decal at Central Anchor
+  const center = map.centerAnchor || { x: arena.x + arena.width / 2, y: arena.y + arena.height / 2, radius: 42 };
+  _drawBedrockPortalFountain(ctx, center.x, center.y, center.radius);
+
+  // 2. Glowing Amethyst Crystal Healing Tether Beams
+  _drawCrystalHealingTetherBeams(ctx, map);
+}
+
+/**
+ * Draws the Central Bedrock Portal Fountain at the Perch Anchor
+ */
+function _drawBedrockPortalFountain(ctx, cx, cy, r) {
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Outer Bedrock Ring
+  ctx.fillStyle = '#101014';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#27272A';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Stepped Bedrock Rim Blocks
+  const blockCount = 8;
+  const time = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : 0;
+  for (let i = 0; i < blockCount; i++) {
+    const angle = (i / blockCount) * Math.PI * 2;
+    const bx = Math.cos(angle) * (r * 0.85);
+    const by = Math.sin(angle) * (r * 0.85);
+    ctx.fillStyle = (i % 2 === 0) ? '#18181B' : '#27272A';
+    ctx.fillRect(bx - 4, by - 4, 8, 8);
+  }
+
+  // Swirling Void Portal Pool Core
+  const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, r * 0.65);
+  grad.addColorStop(0, '#581C87');
+  grad.addColorStop(0.5, '#3B0764');
+  grad.addColorStop(1, '#0D0E15');
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 0.65, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Swirling Portal Energy Motes
+  const moteCount = 6;
+  ctx.fillStyle = '#E879F9';
+  for (let i = 0; i < moteCount; i++) {
+    const mAngle = (i / moteCount) * Math.PI * 2 + time * 0.04;
+    const mDist = (r * 0.35) + Math.sin(time * 0.1 + i) * 8;
+    ctx.fillRect(Math.cos(mAngle) * mDist - 1.5, Math.sin(mAngle) * mDist - 1.5, 3, 3);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Animated Glowing Amethyst Healing Tether Beams
+ */
+function _drawCrystalHealingTetherBeams(ctx, map) {
+  if (typeof state === 'undefined' || !state.fighters) return;
+
+  const dragon = state.fighters.find(f => f && (f.characterId === 'ender_dragon' || f.type === 'ender_dragon') && f.hp > 0);
+  if (!dragon) return;
+
+  const crystals = state.fighters.filter(f => f && f.isEndCrystal && f.hp > 0 && f.isTetheredToDragon);
+  if (crystals.length === 0) return;
+
+  const time = state.frameCount || 0;
+
+  for (let crystal of crystals) {
+    const startX = crystal.x;
+    const startY = crystal.y + (crystal._visualBobY || 0) - 12; // Beam emerges from floating crystal core
+    const endX = dragon.x;
+    const endY = dragon.y - (dragon.z || 0);
+
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 10) continue;
+
+    const angle = Math.atan2(dy, dx);
+    const perpAngle = angle + Math.PI / 2;
+
+    ctx.save();
+
+    // 1. Outer Amethyst Corona Beam
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    const segments = 8;
+    for (let s = 1; s < segments; s++) {
+      const t = s / segments;
+      const wave = Math.sin(time * 0.25 + s * 1.2) * 5.0 * Math.sin(t * Math.PI);
+      const px = startX + dx * t + Math.cos(perpAngle) * wave;
+      const py = startY + dy * t + Math.sin(perpAngle) * wave;
+      ctx.lineTo(px, py);
+    }
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = 'rgba(217, 70, 239, 0.45)';
+    ctx.lineWidth = 4.0;
+    ctx.stroke();
+
+    // 2. White-Hot Core Filament
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    for (let s = 1; s < segments; s++) {
+      const t = s / segments;
+      const wave = Math.sin(time * 0.25 + s * 1.2) * 2.5 * Math.sin(t * Math.PI);
+      const px = startX + dx * t + Math.cos(perpAngle) * wave;
+      const py = startY + dy * t + Math.sin(perpAngle) * wave;
+      ctx.lineTo(px, py);
+    }
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = '#F5D0FE';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.restore();
+  }
 }
 
 /**

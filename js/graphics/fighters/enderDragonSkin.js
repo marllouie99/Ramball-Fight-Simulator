@@ -11,11 +11,13 @@ import { enderDragonConfig } from '../../configs/characters/enderDragonConfig.js
 
 let _wingsSheet = null;
 let _tailsSheet = null;
+let _textureSkinImage = null;
 let _disintegration1 = null;
 let _disintegration2 = null;
 
 let _wingsLoaded = false;
 let _tailsLoaded = false;
+let _textureSkinLoaded = false;
 let _dis1Loaded = false;
 let _dis2Loaded = false;
 
@@ -29,8 +31,22 @@ const WING_FRAMES = [
   { sx: 1024, sy: 512, sw: 512, sh: 512 }, // Frame 5: Cresting Upstroke
 ];
 
-// Single Bird's-Eye View Tail Frame (Dragon-tail-birdeyeview-sprite-sheet1.png: 309x526, base anchor at 117,20, length 484px)
-const TAIL_FRAME = { sx: 0, sy: 0, sw: 309, sh: 526, ax: 117.0, ay: 20.0, h: 484.0 };
+// 8 Articulated Vertebrae Segments Grid for Dragon-tail-segmented-sheet.png
+// (1280x140 sheet: 8 columns x 1 row, 160x140 cell per vertebra, anchor at 80,15)
+const TAIL_SEGMENTS = [
+  { id: 0, name: 'Root Base (Horns & Crown)', sx: 0,    sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 118 },
+  { id: 1, name: 'Vertebra 1',                sx: 160,  sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 40 },
+  { id: 2, name: 'Vertebra 2',                sx: 320,  sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 48 },
+  { id: 3, name: 'Vertebra 3',                sx: 480,  sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 48 },
+  { id: 4, name: 'Vertebra 4',                sx: 640,  sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 48 },
+  { id: 5, name: 'Vertebra 5',                sx: 800,  sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 46 },
+  { id: 6, name: 'Vertebra 6',                sx: 960,  sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 46 },
+  { id: 7, name: 'Crystalline Tail Tip',      sx: 1120, sy: 0, sw: 160, sh: 140, ax: 80, ay: 15, jointDist: 94 },
+];
+const TOTAL_TAIL_JOINT_LENGTH = 488.0;
+
+// Single Bird's-Eye View Tail Frame Legacy Fallback
+const TAIL_FRAME_LEGACY = { sx: 0, sy: 0, sw: 309, sh: 526, ax: 117.0, ay: 20.0, h: 484.0 };
 
 export function getEnderDragonWingsSheet() {
   if (!_wingsSheet && typeof Image !== 'undefined') {
@@ -46,10 +62,20 @@ export function getEnderDragonTailsSheet() {
   if (!_tailsSheet && typeof Image !== 'undefined') {
     _tailsSheet = new Image();
     _tailsSheet.onload = () => { _tailsLoaded = true; };
-    _tailsSheet.onerror = (e) => { console.warn('Failed to load Dragon Tails Sheet at Assets/model/Sprites/Dragon-tail-birdeyeview-sprite-sheet1.png', e); };
-    _tailsSheet.src = encodeURI('Assets/model/Sprites/Dragon-tail-birdeyeview-sprite-sheet1.png?v=1');
+    _tailsSheet.onerror = (e) => { console.warn('Failed to load Dragon Tails Sheet at Assets/model/Sprites/Dragon-tail-segmented-sheet.png', e); };
+    _tailsSheet.src = encodeURI(enderDragonConfig.tailsSpriteSrc || 'Assets/model/Sprites/Dragon-tail-segmented-sheet.png?v=1');
   }
   return _tailsSheet;
+}
+
+export function getEnderDragonTextureSkinImage() {
+  if (!_textureSkinImage && typeof Image !== 'undefined') {
+    _textureSkinImage = new Image();
+    _textureSkinImage.onload = () => { _textureSkinLoaded = true; };
+    _textureSkinImage.onerror = (e) => { console.warn('Failed to load Dragon Texture Skin at Assets/model/Sprites/dragon-texture-skin.png', e); };
+    _textureSkinImage.src = encodeURI(enderDragonConfig.textureSkinSrc || 'Assets/model/Sprites/dragon-texture-skin.png?v=1');
+  }
+  return _textureSkinImage;
 }
 
 // Backward-compatibility aliases
@@ -76,6 +102,7 @@ export function getEnderDragonDisintegrationImages() {
 
 // Pre-initialize on load if in browser environment
 if (typeof window !== 'undefined') {
+  getEnderDragonTextureSkinImage();
   getEnderDragonWingsSheet();
   getEnderDragonTailsSheet();
   getEnderDragonDisintegrationImages();
@@ -86,7 +113,9 @@ if (typeof window !== 'undefined') {
  */
 function _drawProceduralWings(ctx, r, isSwooping = false) {
   ctx.save();
-  const wingSpan = r * 2.2;
+  const custom = (typeof state !== 'undefined' && state.skinCustomizations?.enderDragon) || {};
+  const wingScaleMult = custom.wingScale ?? (enderDragonConfig.wingScale || 5.2);
+  const wingSpan = r * (wingScaleMult * 0.6);
   ctx.fillStyle = '#27272A';
   ctx.strokeStyle = '#581C87';
   ctx.lineWidth = 2.0;
@@ -115,66 +144,85 @@ function _drawProceduralWings(ctx, r, isSwooping = false) {
 /**
  * Procedural fallback tail if tail sheet is loading
  */
-function _drawProceduralTail(ctx, r, tailRotation = 0) {
+function _drawProceduralTail(ctx, r, segmentAngles = []) {
   ctx.save();
-  ctx.translate(-r * 0.65, 0);
-  ctx.rotate(tailRotation);
-  const tailSegments = 4;
-  const segLen = r * 0.45;
-  let currX = 0;
-  let currY = 0;
+  ctx.translate(-r * 0.70, 0);
+  const tailSegments = 8;
+  const segLen = (r * 2.25) / tailSegments;
 
   ctx.fillStyle = '#18181B';
   ctx.strokeStyle = '#0E0F14';
   ctx.lineWidth = 2.0;
 
   for (let i = 0; i < tailSegments; i++) {
-    const nextX = currX - segLen;
-    const nextY = currY;
-    const halfW = (r * 0.22) * (1 - (i / tailSegments) * 0.6);
+    const rot = (segmentAngles && segmentAngles[i] !== undefined) ? segmentAngles[i] : 0;
+    ctx.rotate(rot);
+    const halfW = (r * 0.32) * (1 - (i / tailSegments) * 0.55);
 
     ctx.beginPath();
-    ctx.moveTo(currX, currY - halfW);
-    ctx.lineTo(nextX, nextY - halfW * 0.7);
-    ctx.lineTo(nextX, nextY + halfW * 0.7);
-    ctx.lineTo(currX, currY + halfW);
+    ctx.moveTo(0, -halfW);
+    ctx.lineTo(-segLen, -halfW * 0.75);
+    ctx.lineTo(-segLen, halfW * 0.75);
+    ctx.lineTo(0, halfW);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
     // Purple spine on dorsal side
     ctx.fillStyle = '#A21CAF';
-    ctx.fillRect(currX - 3, currY - halfW - 2, 4, 3);
+    ctx.fillRect(-segLen * 0.5 - 2, -halfW - 2, 4, 3);
+    ctx.fillStyle = '#18181B';
 
-    currX = nextX;
-    currY = nextY;
+    ctx.translate(-segLen, 0);
   }
   ctx.restore();
 }
 
 /**
- * Renders Animated Bird's-Eye View Dragon Tail from Dragon-tail-birdeyeview-sprite-sheet1.png
+ * Renders Animated Articulated Multi-Segment Dragon Tail from Dragon-tail-segmented-sheet.png
  */
-function _drawEnderDragonTail(ctx, r, tailImg, tBox, tailRotation = 0) {
-  const tailLength = r * 1.55; // Proportional sleek & compact dragon tail scale
-  const scale = tailLength / (tBox?.h || 484.0);
-  const attachX = -r * 0.65; // Base attaches beneath dragon rear circle
+function _drawEnderDragonTail(ctx, r, tailImg, tailSegments, segmentAngles, attachOffsetX = 0) {
+  const custom = (typeof state !== 'undefined' && state.skinCustomizations?.enderDragon) || {};
+  const tailScaleMult = custom.tailScale ?? (enderDragonConfig.tailScale || 2.25);
+  const tailLength = r * tailScaleMult; // Proportional prominent & powerful dragon tail scale
+  const scale = tailLength / TOTAL_TAIL_JOINT_LENGTH;
+  const attachX = -r * 0.70 + attachOffsetX; // Base attaches beneath dragon rear circle with breath heave coupling
 
-  if (tailImg && tailImg.complete && tailImg.naturalWidth > 0 && tBox) {
+  if (tailImg && tailImg.complete && tailImg.naturalWidth > 0) {
     ctx.save();
     ctx.translate(attachX, 0);
-    ctx.rotate(tailRotation); // Retro arcade 4.5° quantized rotational flex & sway
     ctx.rotate(Math.PI / 2);  // Rotate 90° so vertical downward (+Y) sprite extends straight backward (-X)
     ctx.imageSmoothingEnabled = false; // Authentic pixel art
-    ctx.drawImage(
-      tailImg,
-      tBox.sx, tBox.sy, tBox.sw, tBox.sh,
-      -tBox.ax * scale, -tBox.ay * scale,
-      tBox.sw * scale, tBox.sh * scale
-    );
+
+    const isSegmented = tailImg.naturalWidth >= 1000 && Array.isArray(tailSegments);
+    if (isSegmented) {
+      for (let i = 0; i < tailSegments.length; i++) {
+        const seg = tailSegments[i];
+        const relAngle = (segmentAngles && segmentAngles[i] !== undefined) ? segmentAngles[i] : 0;
+        ctx.rotate(relAngle);
+        ctx.drawImage(
+          tailImg,
+          seg.sx, seg.sy, seg.sw, seg.sh,
+          -seg.ax * scale, -seg.ay * scale,
+          seg.sw * scale, seg.sh * scale
+        );
+        ctx.translate(0, seg.jointDist * scale);
+      }
+    } else {
+      const tBox = TAIL_FRAME_LEGACY;
+      const legScale = tailLength / (tBox.h || 484.0);
+      const rot = (segmentAngles && segmentAngles[0] !== undefined) ? segmentAngles[0] : 0;
+      ctx.rotate(rot);
+      ctx.drawImage(
+        tailImg,
+        tBox.sx, tBox.sy, tBox.sw, tBox.sh,
+        -tBox.ax * legScale, -tBox.ay * legScale,
+        tBox.sw * legScale, tBox.sh * legScale
+      );
+    }
     ctx.restore();
   } else {
-    _drawProceduralTail(ctx, r, tailRotation);
+    _drawProceduralTail(ctx, r, segmentAngles);
   }
 }
 
@@ -347,10 +395,114 @@ function _renderEnderDragonPixelBodyToCanvas(destCtx, r) {
 }
 
 /**
- * Authentic Obsidian Ender Dragon Pixel Art Engine (Offscreen Cached)
+ * Renders Retro Arcade Pixel Exhale Vapor Mist Puffs from Snout Nostrils (Zenitsu / Arcade Style)
+ */
+function _drawRetroBreathVapor(ctx, r, exhaleStep, nostrilShiftX = 0, nostrilShiftY = 0) {
+  if (exhaleStep < 0 || exhaleStep > 3) return;
+
+  // Snout nostril anchor coordinates (+X forward, +/-Y lateral nostrils)
+  const baseNx = r * 0.84 + nostrilShiftX;
+  const baseNy = r * 0.20 + nostrilShiftY;
+
+  // Stepped pixel clusters for authentic 16-bit arcade exhale mist
+  const steps = [
+    // Step 0: Subtle ignition spark at nostril opening
+    [
+      { dx: 3, dy: 0, w: 3, h: 3, c: '#F5D0FE' },
+      { dx: 6, dy: -1, w: 2, h: 2, c: '#E879F9' },
+    ],
+    // Step 1: Expanding pixel vapor cloud
+    [
+      { dx: 5, dy: 0, w: 3, h: 3, c: '#FFFFFF' },
+      { dx: 8, dy: -2, w: 4, h: 3, c: '#F5D0FE' },
+      { dx: 12, dy: -3, w: 3, h: 3, c: '#E879F9' },
+      { dx: 9, dy: 1, w: 2, h: 2, c: '#C026D3' },
+    ],
+    // Step 2: Drifting void mist cloud
+    [
+      { dx: 11, dy: -2, w: 3, h: 3, c: '#F5D0FE' },
+      { dx: 14, dy: -4, w: 4, h: 4, c: '#E879F9' },
+      { dx: 18, dy: -6, w: 3, h: 3, c: '#C026D3' },
+      { dx: 21, dy: -7, w: 2, h: 2, c: '#701A75' },
+    ],
+    // Step 3: Dissipating pixel crumbs
+    [
+      { dx: 18, dy: -5, w: 3, h: 3, c: '#E879F9' },
+      { dx: 22, dy: -7, w: 3, h: 2, c: '#C026D3' },
+      { dx: 25, dy: -9, w: 2, h: 2, c: '#701A75' },
+    ],
+  ];
+
+  const pixels = steps[exhaleStep];
+  if (!pixels) return;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  for (let i = 0; i < pixels.length; i++) {
+    const p = pixels[i];
+    ctx.fillStyle = p.c;
+
+    // Upper nostril (-Y)
+    const ux = Math.round(baseNx + p.dx);
+    const uy = Math.round(-baseNy + p.dy);
+    ctx.fillRect(ux, uy, p.w, p.h);
+
+    // Lower nostril (+Y)
+    const lx = Math.round(baseNx + p.dx);
+    const ly = Math.round(baseNy - p.dy);
+    ctx.fillRect(lx, ly, p.w, p.h);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Authentic Obsidian Ender Dragon Pixel Art Engine (Texture PNG + Offscreen Cached Fallback)
  * Upright Front POV, Faceless Minimalist Aesthetic (Rule 19, 20 & 35)
  */
-export function drawEnderDragonPixelBody(ctx, r, isPreview = false) {
+export function drawEnderDragonPixelBody(ctx, r, isPreview = false, breathScaleX = 1.0, breathScaleY = 1.0, heaveX = 0, heaveY = 0) {
+  if (!ctx) return;
+
+  const skinImg = getEnderDragonTextureSkinImage();
+  if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Authentic nearest-neighbor pixel art (Rule 19 & 3.5)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.enderDragon) || {};
+    const scaleMult = custom.scale ?? 1.0;
+    const offX = (custom.offsetX ?? 0) + heaveX;
+    const offY = (custom.offsetY ?? 0) + heaveY;
+
+    // Exact true geometric & feature center of the dragon model in 1254x1254 texture is (627.0, 710.0)
+    // Nominal circular radius is 433.0px
+    const drawRadius = r * 1.05 * scaleMult;
+    const scale = drawRadius / 433.0;
+    const drawW = 1254.0 * scale * breathScaleX;
+    const drawH = 1254.0 * scale * breathScaleY;
+    const drawX = -627.0 * scale * breathScaleX + offX;
+    const drawY = -710.0 * scale * breathScaleY + offY;
+
+    // Clip to clean boundary with anisotropic chest expansion (Rule 19 & 3.5)
+    ctx.beginPath();
+    ctx.ellipse(offX, offY, drawRadius * breathScaleX, drawRadius * breathScaleY, 0, 0, Math.PI * 2);
+    ctx.clip();
+
+    ctx.drawImage(skinImg, 0, 0, 1254, 1254, drawX, drawY, drawW, drawH);
+    ctx.restore();
+
+    // Clean dark manga ink outline ring for crisp retro arcade silhouette (Rule 19 & 3.5)
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(offX, offY, drawRadius * breathScaleX, drawRadius * breathScaleY, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // Fallback to procedural discrete pixel art cache if image is still loading or running headless
   if (typeof document === 'undefined') return;
 
   if (!_cachedDragonCanvas || _cachedDragonR !== r) {
@@ -369,6 +521,8 @@ export function drawEnderDragonPixelBody(ctx, r, isPreview = false) {
   if (_cachedDragonCanvas) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
+    ctx.translate(heaveX, heaveY);
+    ctx.scale(breathScaleX, breathScaleY);
     ctx.drawImage(_cachedDragonCanvas, -_cachedDragonCanvas.width / 2, -_cachedDragonCanvas.height / 2);
     ctx.restore();
   }
@@ -380,12 +534,8 @@ export const _drawEnderDragonCircleBody = drawEnderDragonPixelBody;
 /**
  * Renders trailing swooping afterimages in world space
  */
-function _drawSwoopAfterImages(ctx, afterImages, r, fBox, wingsImg, tBox, tailsImg, totalFlex = 0) {
+function _drawSwoopAfterImages(ctx, afterImages, r, fBox, wingsImg, tailSegments, tailsImg, segmentAngles) {
   if (!afterImages || afterImages.length === 0) return;
-  const wingDrawSize = r * 3.8;
-  const tailDrawSize = r * 3.2;
-  const scale = tailDrawSize / 512;
-  const attachX = -r * 0.65;
 
   for (let i = 0; i < afterImages.length; i++) {
     const ai = afterImages[i];
@@ -402,27 +552,14 @@ function _drawSwoopAfterImages(ctx, afterImages, r, fBox, wingsImg, tBox, tailsI
     }
     ctx.globalAlpha = alpha * 0.5;
 
-    // Draw fading tail with fluid rotation
-    if (tailsImg && tailsImg.complete && tailsImg.naturalWidth > 0 && tBox) {
-      const tailLength = r * 1.55;
-      const tailScale = tailLength / (tBox?.h || 484.0);
-      const aiTailRot = facingLeft ? -totalFlex : totalFlex;
-      ctx.save();
-      ctx.translate(attachX, 0);
-      ctx.rotate(aiTailRot);
-      ctx.rotate(Math.PI / 2);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(
-        tailsImg,
-        tBox.sx, tBox.sy, tBox.sw, tBox.sh,
-        -tBox.ax * tailScale, -tBox.ay * tailScale,
-        tBox.sw * tailScale, tBox.sh * tailScale
-      );
-      ctx.restore();
-    }
+    // Draw fading tail with fluid multi-segment chain
+    _drawEnderDragonTail(ctx, r, tailsImg, tailSegments, segmentAngles);
 
     // Draw fading wings
     if (wingsImg && wingsImg.complete && wingsImg.naturalWidth > 0 && fBox) {
+      const custom = (typeof state !== 'undefined' && state.skinCustomizations?.enderDragon) || {};
+      const wingScaleMult = custom.wingScale ?? (enderDragonConfig.wingScale || 5.2);
+      const wingDrawSize = r * wingScaleMult;
       ctx.save();
       ctx.translate(-r * 0.15, 0);
       ctx.rotate(-Math.PI / 2);
@@ -477,7 +614,7 @@ function _drawCataclysmLightning(ctx, r, channelProgress) {
 
 /**
  * Main Ender Dragon Skin Renderer
- * Renders Upright Minimalist Circle Body + Animated Flapping Wings + Animated Articulated Tail
+ * Renders Upright Minimalist Circle Body + Animated Flapping Wings + Fluid Articulated Multi-Segment Tail
  */
 export function drawEnderDragonSkin(ctx, fighter) {
   if (!ctx || !fighter) return;
@@ -488,94 +625,114 @@ export function drawEnderDragonSkin(ctx, fighter) {
   const wingsImg = getEnderDragonWingsSheet();
   const tailsImg = getEnderDragonTailsSheet();
 
-  // Frame timing: speed up during swoops and high-velocity flight
-  const isSwooping = Boolean(fighter.isSwooping || fighter.aiState === 'SWOOP_DASH');
+  // Frame timing: speed up during swoops and high-velocity flight, or lock to resting frame when grounded
+  const isSwooping = Boolean(fighter.isSwooping || fighter.aiState === 'SWOOP_DASH' || fighter.aiState === 'INTERCEPT');
+  const isGrounded = Boolean(fighter.isGrounded || fighter.aiState === 'PERCH_GROUNDED');
   const ticksPerFrame = isSwooping
     ? enderDragonConfig.swoopTicksPerFrame || 3
-    : enderDragonConfig.spriteTicksPerFrame || 5;
+    : (isGrounded ? 8 : (enderDragonConfig.spriteTicksPerFrame || 5));
 
   const frameCounter = (typeof state !== 'undefined' && state.frameCount !== undefined)
     ? state.frameCount
     : Math.floor(Date.now() / 16);
 
-  const frameIdx = Math.floor(frameCounter / ticksPerFrame) % WING_FRAMES.length;
+  // When grounded, cycle slowly between bottom resting/folded wing frames
+  const frameIdx = isGrounded
+    ? (2 + Math.floor((frameCounter / 12) % 2))
+    : (Math.floor(frameCounter / ticksPerFrame) % WING_FRAMES.length);
   const fBox = WING_FRAMES[frameIdx] || WING_FRAMES[0];
-  const tBox = TAIL_FRAME;
 
-  // ── Continuous 360° World-Space Spring-Damper Tail Physics Engine ──
+  // ── Multi-Dimensional Altitude Ground Shadow Engine ──
+  const alt = (fighter.altitude !== undefined) ? fighter.altitude : (isGrounded ? 0 : 1.0);
+  if (!isPreview && alt > 0.06) {
+    const shadowAlpha = Math.max(0.08, 0.36 - alt * 0.12);
+    const shadowScaleX = Math.max(0.60, 1.05 - alt * 0.16);
+    const shadowScaleY = Math.max(0.35, 0.55 - alt * 0.10);
+    ctx.save();
+    ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(fighter.x, fighter.y + alt * 14, r * 1.0 * shadowScaleX, r * 0.6 * shadowScaleY, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // ── Retro Arcade Multi-Segment Articulated Vertebrae Trailing Ribbon Engine ──
+  // Creates authentic 16-bit / Neo-Geo arcade boss trailing physics:
+  // 1. Each vertebra smoothly trails the previous vertebra in world space along flight curves.
+  // 2. Discrete 4.5° arcade angular notch quantization snaps joint rotations to clean pixel-art angles.
+  // 3. Fluid trailing C-curves and S-curves form dynamically as the dragon turns and glides.
   const angle = isPreview ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const numSegs = TAIL_SEGMENTS.length;
+  const spineWorldAngle = angle + Math.PI;
 
-  // Initialize or reset tracking angles
-  if (fighter._tailWorldAngle === undefined || isNaN(fighter._tailWorldAngle)) {
-    fighter._tailWorldAngle = angle + Math.PI;
-    fighter._tailAngularVel = 0;
+  // Initialize or reset tracking world angles for all 8 vertebrae
+  if (!fighter._tailSegWorldAngles || fighter._tailSegWorldAngles.length !== numSegs || isNaN(fighter._tailSegWorldAngles[0])) {
+    fighter._tailSegWorldAngles = new Array(numSegs).fill(spineWorldAngle);
   }
 
-  // Target tail world angle points directly opposite to dragon facing direction (along dorsal spine)
-  const targetTailWorld = angle + Math.PI;
+  // Shortest angular difference helper
+  const angleDiff = (target, current) => {
+    let d = target - current;
+    while (d > Math.PI) d -= Math.PI * 2;
+    while (d < -Math.PI) d += Math.PI * 2;
+    return d;
+  };
 
-  // Shortest angular difference from current tail angle to target angle
-  let dAngle = targetTailWorld - fighter._tailWorldAngle;
-  while (dAngle > Math.PI) dAngle -= Math.PI * 2;
-  while (dAngle < -Math.PI) dAngle += Math.PI * 2;
+  // 1. Segment 0 (Root Base) tracks the dragon's spine
+  const rootDiff = angleDiff(spineWorldAngle, fighter._tailSegWorldAngles[0]);
+  const rootFollowRate = isPreview ? 0.60 : (isSwooping ? 0.44 : 0.36);
+  fighter._tailSegWorldAngles[0] += rootDiff * rootFollowRate;
 
-  // Spring-damper physics simulation for fluid, responsive tail trailing
-  const springK = isPreview ? 0.35 : (isSwooping ? 0.28 : 0.20);
-  const damping = isPreview ? 0.70 : (isSwooping ? 0.75 : 0.78);
+  while (fighter._tailSegWorldAngles[0] > Math.PI) fighter._tailSegWorldAngles[0] -= Math.PI * 2;
+  while (fighter._tailSegWorldAngles[0] < -Math.PI) fighter._tailSegWorldAngles[0] += Math.PI * 2;
 
-  fighter._tailAngularVel = ((fighter._tailAngularVel || 0) * damping) + (dAngle * springK);
-  fighter._tailWorldAngle += fighter._tailAngularVel;
+  // 2. Downstream Vertebrae 1..7 trail their respective parent vertebrae
+  const segFollowRate = isPreview ? 0.55 : (isSwooping ? 0.40 : 0.32);
+  const maxJointBend = isPreview ? (10 * Math.PI / 180) : (24 * Math.PI / 180); // max 24° bend per joint
 
-  // CRITICAL: Normalize world tail angle to [-PI, PI] to prevent unbounded accumulation
-  while (fighter._tailWorldAngle > Math.PI) fighter._tailWorldAngle -= Math.PI * 2;
-  while (fighter._tailWorldAngle < -Math.PI) fighter._tailWorldAngle += Math.PI * 2;
+  for (let i = 1; i < numSegs; i++) {
+    const parentAngle = fighter._tailSegWorldAngles[i - 1];
+    const diff = angleDiff(parentAngle, fighter._tailSegWorldAngles[i]);
 
-  // Calculate relative flex angle of the tail relative to the spine (targetTailWorld)
-  // ALWAYS strictly normalized to [-PI, PI] to guarantee zero angle wrapping or sticking bugs!
-  let relFlex = fighter._tailWorldAngle - targetTailWorld;
-  while (relFlex > Math.PI) relFlex -= Math.PI * 2;
-  while (relFlex < -Math.PI) relFlex += Math.PI * 2;
+    fighter._tailSegWorldAngles[i] += diff * segFollowRate;
 
-  // Clamp natural anatomical spine bend to ±30 degrees
-  const maxFlex = Math.PI / 6.0;
-  relFlex = Math.max(-maxFlex, Math.min(maxFlex, relFlex));
+    while (fighter._tailSegWorldAngles[i] > Math.PI) fighter._tailSegWorldAngles[i] -= Math.PI * 2;
+    while (fighter._tailSegWorldAngles[i] < -Math.PI) fighter._tailSegWorldAngles[i] += Math.PI * 2;
 
-  // Dynamic Velocity Aerodynamic Draft (Air drag pushes tail away from flight direction)
-  let velPush = 0;
-  const speed = Math.hypot(fighter.vx || 0, fighter.vy || 0);
-  if (speed > 0.4 && !isPreview) {
-    const moveAngle = Math.atan2(fighter.vy, fighter.vx);
-    let relMoveAngle = moveAngle - angle;
-    while (relMoveAngle > Math.PI) relMoveAngle -= Math.PI * 2;
-    while (relMoveAngle < -Math.PI) relMoveAngle += Math.PI * 2;
-    velPush = -Math.sin(relMoveAngle) * Math.min(0.22, speed * 0.038);
+    // Safety anatomical clamp relative to parent vertebra
+    const relToParent = angleDiff(fighter._tailSegWorldAngles[i], parentAngle);
+    if (Math.abs(relToParent) > maxJointBend) {
+      const clampedRel = Math.sign(relToParent) * maxJointBend;
+      fighter._tailSegWorldAngles[i] = parentAngle + clampedRel;
+      while (fighter._tailSegWorldAngles[i] > Math.PI) fighter._tailSegWorldAngles[i] -= Math.PI * 2;
+      while (fighter._tailSegWorldAngles[i] < -Math.PI) fighter._tailSegWorldAngles[i] += Math.PI * 2;
+    }
   }
 
-  // ── Retro Arcade Dragon Tail Animation Engine (8-Step Wave + 4.5° Quantization) ──
-  // 8-step retro arcade rhythmic sway wave (Classic 16-bit / Neo-Geo boss cadence)
-  const swayTicks = isSwooping ? 2 : 4;
-  const retroPhase = Math.floor(frameCounter / swayTicks) % 8;
-  const ARCADE_SWAY_TABLE = [0, 0.45, 0.90, 0.55, 0, -0.45, -0.90, -0.55];
-  const arcadeSway = (ARCADE_SWAY_TABLE[retroPhase] || 0) * (isSwooping ? 0.07 : 0.13);
-
-  // Combine lag, velocity drag, and arcade sway
-  const rawFlex = relFlex + velPush + arcadeSway;
-
-  // Discrete 4.5° arcade angular quantization (16-bit directional notch snapping)
-  const ARCADE_NOTCH = Math.PI / 40; // 4.5 degrees per discrete step
-  const totalFlex = Math.round(rawFlex / ARCADE_NOTCH) * ARCADE_NOTCH;
-
-  // When facing left, context scale(1, -1) inverts local Y, so invert rotation angle
+  // 3. Retro Arcade 4.5° Angular Notch Snapping & Relative Joint Calculations
+  const RETRO_ARCADE_NOTCH = Math.PI / 40; // 4.5° discrete arcade step
   const facingLeft = Math.abs(angle) > Math.PI / 2;
-  const tailRotation = facingLeft ? -totalFlex : totalFlex;
+  const segmentRelAngles = new Array(numSegs);
+
+  // Segment 0 relative to dragon spine
+  const rawRel0 = angleDiff(fighter._tailSegWorldAngles[0], spineWorldAngle);
+  const qRel0 = Math.round(rawRel0 / RETRO_ARCADE_NOTCH) * RETRO_ARCADE_NOTCH;
+  segmentRelAngles[0] = facingLeft ? -qRel0 : qRel0;
+
+  // Segments 1..7 relative to previous vertebra
+  for (let i = 1; i < numSegs; i++) {
+    const rawRel_i = angleDiff(fighter._tailSegWorldAngles[i], fighter._tailSegWorldAngles[i - 1]);
+    const qRel_i = Math.round(rawRel_i / RETRO_ARCADE_NOTCH) * RETRO_ARCADE_NOTCH;
+    segmentRelAngles[i] = facingLeft ? -qRel_i : qRel_i;
+  }
 
   // Render afterimages in world space behind fighter
   if (fighter.afterImages && fighter.afterImages.length > 0) {
-    _drawSwoopAfterImages(ctx, fighter.afterImages, r, fBox, wingsImg, tBox, tailsImg, totalFlex);
+    _drawSwoopAfterImages(ctx, fighter.afterImages, r, fBox, wingsImg, TAIL_SEGMENTS, tailsImg, segmentRelAngles);
   }
 
   ctx.save();
-  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+  ctx.translate(fighter.x, fighter.y - (fighter.z || (fighter.altitude ? fighter.altitude * 18 : 0)));
 
   // ── Upright Aim Angle Transform Standard (Rule 19) ──
   ctx.rotate(angle);
@@ -583,20 +740,46 @@ export function drawEnderDragonSkin(ctx, fighter) {
     ctx.scale(1, -1); // Upright orientation: top horn/wing stays on -Y and bottom on +Y!
   }
 
+  // Multi-dimensional altitude depth scale
+  const altScale = !isPreview ? (1.0 + (alt - 1.0) * 0.08) : 1.0;
+  if (altScale !== 1.0) {
+    ctx.scale(altScale, altScale);
+  }
+
   // Draw Void Cataclysm channeling lightning
   if (fighter.isChannelingCataclysm) {
     _drawCataclysmLightning(ctx, r, fighter.cataclysmProgress || 0);
   }
 
-  // ── LAYER 1: Animated Articulated Dragon Tail (Single Frame with Fluid Angular Physics) ──
-  _drawEnderDragonTail(ctx, r, tailsImg, tBox, tailRotation);
+  // ── Retro Arcade Character Breathing Animation (Stepped Body Expansion & Chest Rhythm like Zenitsu) ──
+  // Discrete 3-tier stepped breath cycle: Inhale (+1), Rest/Neutral (0), Exhale (-1)
+  const isChanneling = Boolean(fighter.isChannelingCataclysm);
+  const breathFreq = isPreview ? 0.08 : (isSwooping ? 0.24 : 0.12);
+  const cycleAngle = (frameCounter * breathFreq) % (Math.PI * 2);
+  const rawBreath = isChanneling ? 1.0 : Math.sin(cycleAngle);
+  const breathQuantized = (rawBreath > 0.35 ? 1.0 : (rawBreath < -0.35 ? -1.0 : 0.0));
+  const easeBreathing = (isSwooping ? 0.4 : 1.0);
+
+  // Anisotropic chest expansion along facing axis (+X) & discrete heave lift
+  const chestExpansionX = Math.max(0, breathQuantized) * 1.5 * easeBreathing;
+  const heaveX = Math.round(breathQuantized * 1.5 * easeBreathing);
+  const heaveY = Math.round(Math.cos(cycleAngle) * 0.8 * (breathQuantized !== 0 ? 1 : 0) * easeBreathing);
+
+  // Volume-conserving squash & stretch (chest expands forward on inhale, contracts on exhale)
+  const breathScaleX = 1.0 + (breathQuantized * 0.035 * easeBreathing);
+  const breathScaleY = 1.0 - (breathQuantized * 0.018 * easeBreathing);
+
+  // ── LAYER 1: Fluid Articulated Multi-Segment Dragon Tail (8 Vertebrae Chain) ──
+  _drawEnderDragonTail(ctx, r, tailsImg, TAIL_SEGMENTS, segmentRelAngles, -heaveX * 0.4);
 
   // ── LAYER 2: Animated Dragon Wings Attached to Back (Dragon-wings-sprite-sheet.png) ──
-  const wingDrawSize = r * 3.8;
+  const customSkin = (typeof state !== 'undefined' && state.skinCustomizations?.enderDragon) || {};
+  const wingScaleMult = customSkin.wingScale ?? (enderDragonConfig.wingScale || 5.2);
+  const wingDrawSize = r * wingScaleMult * (1.0 + breathQuantized * 0.02 * easeBreathing); // Prominent wide dragon wingspan
   if (wingsImg && wingsImg.complete && wingsImg.naturalWidth > 0) {
     ctx.save();
-    ctx.translate(-r * 0.15, 0); // Attach wings to back spine
-    ctx.rotate(-Math.PI / 2);    // Align lateral wing spread perpendicular to spine
+    ctx.translate(-r * 0.15 - heaveX * 0.8, -heaveY * 0.4); // Attach wings to back spine with discrete breath heave
+    ctx.rotate(-Math.PI / 2 + breathQuantized * 0.04 * easeBreathing); // Align lateral wing spread with subtle pitch flare
     ctx.imageSmoothingEnabled = false; // Authentic pixel art
     ctx.drawImage(
       wingsImg,
@@ -609,7 +792,14 @@ export function drawEnderDragonSkin(ctx, fighter) {
   }
 
   // ── LAYER 3: Obsidian Circle Body Model (Head & Eyes at +X, Spine at -X) ──
-  _drawEnderDragonCircleBody(ctx, r, isPreview);
+  _drawEnderDragonCircleBody(ctx, r, isPreview, breathScaleX, breathScaleY, heaveX + chestExpansionX * 0.4, heaveY);
+
+  // ── LAYER 4: Retro Arcade Exhale Void Vapor Mist Puffs ──
+  if (!isSwooping && !isChanneling && cycleAngle >= Math.PI) {
+    const exhaleProgress = (cycleAngle - Math.PI) / Math.PI;
+    const exhaleStep = Math.min(3, Math.floor(exhaleProgress * 4));
+    _drawRetroBreathVapor(ctx, r, exhaleStep, heaveX + chestExpansionX, heaveY);
+  }
 
   // Status overlays & hit flash
   FighterRenderer.drawStatusOverlays(ctx, fighter);
@@ -654,6 +844,237 @@ export function drawDragonAcidPool(ctx, pool) {
     ctx.beginPath();
     ctx.arc(bx, by, bSize, 0, Math.PI * 2);
     ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// Pre-seeded 24 Minecraft Lightshow Ray Beams (Reference: Minecraft Ender Dragon Death Animation)
+const MC_DEATH_BEAMS = [
+  { baseAngle: 0.10, rotSpeed: 0.015, width: 0.20, lenMult: 1.1, startT: 0.00 },
+  { baseAngle: 1.15, rotSpeed: -0.012, width: 0.24, lenMult: 1.2, startT: 0.04 },
+  { baseAngle: 2.20, rotSpeed: 0.018, width: 0.18, lenMult: 1.0, startT: 0.08 },
+  { baseAngle: 3.35, rotSpeed: -0.014, width: 0.25, lenMult: 1.3, startT: 0.11 },
+  { baseAngle: 4.40, rotSpeed: 0.020, width: 0.22, lenMult: 1.1, startT: 0.14 },
+  { baseAngle: 5.50, rotSpeed: -0.016, width: 0.19, lenMult: 1.0, startT: 0.17 },
+  { baseAngle: 0.65, rotSpeed: 0.022, width: 0.26, lenMult: 1.3, startT: 0.20 },
+  { baseAngle: 1.70, rotSpeed: -0.018, width: 0.21, lenMult: 1.1, startT: 0.24 },
+  { baseAngle: 2.80, rotSpeed: 0.016, width: 0.23, lenMult: 1.2, startT: 0.28 },
+  { baseAngle: 3.90, rotSpeed: -0.020, width: 0.22, lenMult: 1.2, startT: 0.32 },
+  { baseAngle: 4.95, rotSpeed: 0.014, width: 0.25, lenMult: 1.1, startT: 0.36 },
+  { baseAngle: 5.95, rotSpeed: -0.022, width: 0.20, lenMult: 1.3, startT: 0.40 },
+  { baseAngle: 0.35, rotSpeed: 0.019, width: 0.27, lenMult: 1.4, startT: 0.44 },
+  { baseAngle: 1.45, rotSpeed: -0.015, width: 0.22, lenMult: 1.2, startT: 0.48 },
+  { baseAngle: 2.50, rotSpeed: 0.021, width: 0.24, lenMult: 1.3, startT: 0.52 },
+  { baseAngle: 3.60, rotSpeed: -0.017, width: 0.21, lenMult: 1.3, startT: 0.56 },
+  { baseAngle: 4.70, rotSpeed: 0.023, width: 0.28, lenMult: 1.4, startT: 0.60 },
+  { baseAngle: 5.75, rotSpeed: -0.019, width: 0.23, lenMult: 1.2, startT: 0.64 },
+  { baseAngle: 0.90, rotSpeed: 0.025, width: 0.29, lenMult: 1.5, startT: 0.68 },
+  { baseAngle: 1.95, rotSpeed: -0.021, width: 0.25, lenMult: 1.3, startT: 0.72 },
+  { baseAngle: 3.05, rotSpeed: 0.024, width: 0.27, lenMult: 1.4, startT: 0.75 },
+  { baseAngle: 4.15, rotSpeed: -0.022, width: 0.26, lenMult: 1.4, startT: 0.78 },
+  { baseAngle: 5.20, rotSpeed: 0.026, width: 0.28, lenMult: 1.5, startT: 0.81 },
+  { baseAngle: 6.10, rotSpeed: -0.024, width: 0.26, lenMult: 1.3, startT: 0.84 },
+];
+
+/**
+ * Renders Authentic Minecraft Ender Dragon Death Sequence (Reference: Minecraft Ender Dragon Death Animation)
+ * 1. Stationary Hover / Ascension with steady rhythmic wing flapping
+ * 2. Rapidly multiplying distinct piercing purple/magenta/white searchlight rays ("The Lightshow")
+ * 3. Billowing dark purple square smoke clusters
+ * 4. Progressive white overexposure engulfment
+ * 5. Culminating in supernova flash and XP Orb explosion
+ */
+export function drawEnderDragonDeathDisintegration(ctx, effect) {
+  if (!ctx || !effect) return;
+
+  const r = effect.r || enderDragonConfig.r || 36;
+  const progress = Math.min(1.0, Math.max(0, (effect.frameTimer || 0) / (effect.totalFrames || 130)));
+  const facingLeft = Boolean(effect.facingLeft);
+  const angle = effect.rotation || 0;
+
+  // Gentle death tremor increasing at final stages
+  const tremor = (progress > 0.6 ? (progress - 0.6) * 4.0 : 0);
+  const jx = (Math.random() - 0.5) * tremor;
+  const jy = (Math.random() - 0.5) * tremor;
+
+  ctx.save();
+  ctx.translate(jx, jy);
+
+  // ── LAYER -1: Distinct Piercing Minecraft Volumetric Light Rays ──
+  const maxReach = r * (2.2 + progress * 5.5);
+  ctx.save();
+
+  for (let i = 0; i < MC_DEATH_BEAMS.length; i++) {
+    const beam = MC_DEATH_BEAMS[i];
+    if (progress < beam.startT) continue;
+
+    const beamProg = (progress - beam.startT) / (1.0 - beam.startT);
+    const beamAngle = beam.baseAngle + (effect.frameTimer || 0) * beam.rotSpeed;
+    const beamLen = maxReach * beam.lenMult * Math.min(1.0, beamProg * 1.4);
+    const alpha = Math.min(1.0, beamProg * 1.5);
+
+    // Sleek expanding beam widths (narrow anchor at body -> crisp tapered ray)
+    const baseW = beam.width * (0.28 + beamProg * 0.15);
+    const outerW = beam.width * (0.55 + beamProg * 0.45);
+    const baseR = r * 0.25;
+
+    const cosBaseL = Math.cos(beamAngle - baseW * 0.5);
+    const sinBaseL = Math.sin(beamAngle - baseW * 0.5);
+    const cosBaseR = Math.cos(beamAngle + baseW * 0.5);
+    const sinBaseR = Math.sin(beamAngle + baseW * 0.5);
+
+    const cosOuterL = Math.cos(beamAngle - outerW * 0.5);
+    const sinOuterL = Math.sin(beamAngle - outerW * 0.5);
+    const cosOuterR = Math.cos(beamAngle + outerW * 0.5);
+    const sinOuterR = Math.sin(beamAngle + outerW * 0.5);
+
+    // 1. Outer Deep Magenta Corona Flare
+    const coronaOuterW = outerW * 1.25;
+    const cosCoronaL = Math.cos(beamAngle - coronaOuterW * 0.5);
+    const sinCoronaL = Math.sin(beamAngle - coronaOuterW * 0.5);
+    const cosCoronaR = Math.cos(beamAngle + coronaOuterW * 0.5);
+    const sinCoronaR = Math.sin(beamAngle + coronaOuterW * 0.5);
+
+    ctx.fillStyle = `rgba(162, 28, 175, ${alpha * 0.30})`;
+    ctx.beginPath();
+    ctx.moveTo(cosBaseL * (baseR * 1.3), sinBaseL * (baseR * 1.3));
+    ctx.lineTo(cosCoronaL * (beamLen * 1.03), sinCoronaL * (beamLen * 1.03));
+    ctx.lineTo(cosCoronaR * (beamLen * 1.03), sinCoronaR * (beamLen * 1.03));
+    ctx.lineTo(cosBaseR * (baseR * 1.3), sinBaseR * (baseR * 1.3));
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Mid Radiant Violet Searchlight Shaft
+    ctx.fillStyle = `rgba(232, 121, 249, ${alpha * 0.55})`;
+    ctx.beginPath();
+    ctx.moveTo(cosBaseL * baseR, sinBaseL * baseR);
+    ctx.lineTo(cosOuterL * beamLen, sinOuterL * beamLen);
+    ctx.lineTo(cosOuterR * beamLen, sinOuterR * beamLen);
+    ctx.lineTo(cosBaseR * baseR, sinBaseR * baseR);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Inner White-Hot Core Shaft
+    const coreBaseW = baseW * 0.40;
+    const coreOuterW = outerW * 0.40;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.90})`;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(beamAngle - coreBaseW * 0.5) * (baseR * 0.5), Math.sin(beamAngle - coreBaseW * 0.5) * (baseR * 0.5));
+    ctx.lineTo(Math.cos(beamAngle - coreOuterW * 0.5) * (beamLen * 0.97), Math.sin(beamAngle - coreOuterW * 0.5) * (beamLen * 0.97));
+    ctx.lineTo(Math.cos(beamAngle + coreOuterW * 0.5) * (beamLen * 0.97), Math.sin(beamAngle + coreOuterW * 0.5) * (beamLen * 0.97));
+    ctx.lineTo(Math.cos(beamAngle + coreBaseW * 0.5) * (baseR * 0.5), Math.sin(beamAngle + coreBaseW * 0.5) * (baseR * 0.5));
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // ── LAYER 0: The Dragon Model (Wings Flapping + Body + Tail) ──
+  const bodyAlpha = Math.max(0, 1.0 - Math.pow(progress, 3.2));
+  if (bodyAlpha > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = bodyAlpha;
+    ctx.rotate(angle);
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+
+    const wingsImg = getEnderDragonWingsSheet();
+    const tailsImg = getEnderDragonTailsSheet();
+
+    // 1. Tail (Remains attached and extends backward)
+    const segmentRelAngles = new Array(TAIL_SEGMENTS.length).fill(0);
+    _drawEnderDragonTail(ctx, r, tailsImg, TAIL_SEGMENTS, segmentRelAngles, 0);
+
+    // 2. Wings (Flapping steadily at majestic pace like in Minecraft death animation)
+    const wingTicks = 4;
+    const frameIdx = Math.floor((effect.frameTimer || 0) / wingTicks) % WING_FRAMES.length;
+    const fBox = WING_FRAMES[frameIdx] || WING_FRAMES[0];
+
+    const customSkin = (typeof state !== 'undefined' && state.skinCustomizations?.enderDragon) || {};
+    const wingScaleMult = customSkin.wingScale ?? (enderDragonConfig.wingScale || 5.2);
+    const wingDrawSize = r * wingScaleMult;
+
+    if (wingsImg && wingsImg.complete && wingsImg.naturalWidth > 0) {
+      ctx.save();
+      ctx.translate(-r * 0.15, 0);
+      ctx.rotate(-Math.PI / 2);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(
+        wingsImg,
+        fBox.sx, fBox.sy, fBox.sw, fBox.sh,
+        -wingDrawSize / 2, -wingDrawSize / 2, wingDrawSize, wingDrawSize
+      );
+      ctx.restore();
+    } else {
+      _drawProceduralWings(ctx, r, false);
+    }
+
+    // 3. Dragon Circle Body Model
+    drawEnderDragonPixelBody(ctx, r, true, 1.0, 1.0, 0, 0);
+
+    // 4. White-Out Flash Overexposure as Light Engulfs Body
+    if (progress > 0.30) {
+      const flashAlpha = Math.min(0.95, (progress - 0.30) * 1.5);
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.06, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  // ── LAYER 1: Billowing Minecraft Purple Smoke Particles ──
+  const smokeCount = Math.floor(8 + progress * 24);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+
+  for (let s = 0; s < smokeCount; s++) {
+    const seed = s * 37.1 + (effect.frameTimer || 0) * 0.12;
+    const smokeLife = ((seed % 1.0) + 1.0) % 1.0;
+    const spawnAngle = (s / smokeCount) * Math.PI * 2 + (Math.sin(s * 7) * 0.8);
+    const spawnDist = r * (0.3 + (s % 4) * 0.18);
+
+    const initX = Math.cos(spawnAngle) * spawnDist;
+    const initY = Math.sin(spawnAngle) * spawnDist;
+
+    // Billow upward and expand outward
+    const posX = Math.round(initX + Math.sin(seed * 3) * (r * 0.9));
+    const posY = Math.round(initY - smokeLife * (r * 2.4 + (s % 3) * 12));
+    const size = Math.round(3 + smokeLife * 6);
+
+    const smokePalette = ['#3B0764', '#581C87', '#701A75', '#A21CAF', '#C026D3', '#E879F9'];
+    ctx.fillStyle = smokePalette[s % smokePalette.length];
+    ctx.globalAlpha = Math.max(0, 0.85 * (1.0 - smokeLife));
+    ctx.fillRect(posX - size / 2, posY - size / 2, size, size);
+  }
+  ctx.restore();
+
+  // ── LAYER 2: Core Supernova Detonation Flare ──
+  if (progress > 0.70) {
+    ctx.save();
+    const novaProg = (progress - 0.70) / 0.30;
+    const novaR = r * (0.5 + novaProg * 1.6);
+    const novaAlpha = Math.min(1.0, novaProg * 1.8);
+
+    ctx.fillStyle = `rgba(162, 28, 175, ${novaAlpha * 0.50})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, novaR * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(245, 208, 254, ${novaAlpha * 0.80})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, novaR * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(255, 255, 255, ${novaAlpha * 0.98})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, novaR * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   ctx.restore();

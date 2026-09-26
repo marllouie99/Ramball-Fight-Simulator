@@ -865,6 +865,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     f &&
     !f.isTurret &&
     !f.isMinion &&
+    !f.isEndCrystal &&
     !f.isDeployable &&
     !f.isIceWall &&
     !f.isIllusion &&

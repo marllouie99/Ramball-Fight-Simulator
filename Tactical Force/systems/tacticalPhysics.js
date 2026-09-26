@@ -166,7 +166,7 @@ export function resolveTacticalGunCollisions(fighters, illusions) {
     if (illusions && illusions.length > 0) {
       for (let k = 0; k < illusions.length; k++) {
         const ill = illusions[k];
-        if (!ill || ill.hp <= 0) continue;
+        if (!ill || ill.hp <= 0 || ill.isServantOfCthulhu) continue;
 
         const illOwnerIdx = ill.owner?.fighterIndex ?? (state.fighters ? state.fighters.indexOf(ill.owner) : -1);
         if (illOwnerIdx === i || ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && state.getFighterTeam(i) === state.getFighterTeam(illOwnerIdx))) continue;

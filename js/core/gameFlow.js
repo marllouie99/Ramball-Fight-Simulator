@@ -34,6 +34,7 @@ import { tacticalProjectileSystem } from '../../Tactical Force/systems/tacticalP
 import { resetCamera } from '../systems/cameraSystem.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 import { getFocMapForBoss } from '../../FOC Maps/index.js';
+import { EndCrystalEntity } from '../entities/EndCrystalEntity.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -325,12 +326,22 @@ export function reinitFighters(isNewMatch = false) {
     state.arenaTheme = 'dark';
     CONFIG.arenaTheme = 'dark';
   } else {
-    // Resolve dedicated FOC Boss Map if active boss exists (e.g. Yuta's Cursed Grove)
+    // Resolve dedicated FOC Boss Map if active boss exists (e.g. Yuta's Cursed Grove, Ender Dragon's The End)
     const isBoss = Boolean(state.fighters && state.fighters[0]?.isBoss);
     const bossMap = isBoss ? getFocMapForBoss(state.fighters[0]) : null;
     if (bossMap) {
       state.activeFocMap = bossMap;
       state.arena = { ...bossMap.arena };
+
+      // Spawn End Crystal Minion Entities if Ender Dragon Boss Map
+      if (bossMap.id === 'foc_ender_dragon_map' && Array.isArray(bossMap.crystals)) {
+        // Clear any existing crystals first
+        state.fighters = state.fighters.filter(f => !f.isEndCrystal);
+        for (let cDef of bossMap.crystals) {
+          const crystal = new EndCrystalEntity(cDef.x, cDef.y, cDef.id, cDef.name);
+          state.fighters.push(crystal);
+        }
+      }
     } else {
       state.activeFocMap = null;
       if (!state.arena || state.arena.width === STARTER_MAP.arena.width) {

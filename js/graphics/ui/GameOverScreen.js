@@ -793,10 +793,9 @@ function drawRoundEndScreen() {
     state._hasPlayedChampionVictoryVoice = false;
   }
 
-  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
-  // Announcer audio & voicelines start immediately (0 frames delay) without pausing!
+  const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = hasMissionOverlay ? 180 : 0;
+  const displayDelay = hasMissionOverlay ? 180 : (isDragonDying ? 135 : 0);
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
@@ -863,10 +862,9 @@ function drawMatchEndScreen() {
     state._hasPlayedChampionVictoryVoice = false;
   }
 
-  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
-  // Announcer audio & voicelines start immediately (0 frames delay) without pausing!
+  const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = hasMissionOverlay ? 180 : 0;
+  const displayDelay = hasMissionOverlay ? 180 : (isDragonDying ? 135 : 0);
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 
   // Determine Match Winner Entity

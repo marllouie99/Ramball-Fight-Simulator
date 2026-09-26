@@ -47,7 +47,7 @@ export function modUpdateBoogieWoogie(targets) {
   }
 
   // 2. Otherwise swap with potential target
-  let potentialTargets = targets && targets.length > 0 ? targets : state.fighters.filter(f => f.id !== this.id && !f.isDead);
+  let potentialTargets = targets && targets.length > 0 ? targets.filter(f => f && !f.isDead && !f.isEndCrystal && !f.isImmovable && !f.cannotBeSwapped) : state.fighters.filter(f => f.id !== this.id && !f.isDead && !f.isEndCrystal && !f.isImmovable && !f.cannotBeSwapped);
 
   let swapTarget = null;
   if (potentialTargets.length > 0) {

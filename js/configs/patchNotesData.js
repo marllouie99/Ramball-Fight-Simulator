@@ -28,20 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "CJ",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "minigunBulletDamage",
-                "oldVal": 1,
-                "newVal": 2,
-                "pct": "+100.0%"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

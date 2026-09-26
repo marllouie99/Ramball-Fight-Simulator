@@ -8,6 +8,7 @@ export { drawFloatingJetpacks, spawnDroppedJetpack, updateFloatingJetpacks, clea
 export { drawDroppedMiniguns, spawnDroppedMinigun, updateDroppedMiniguns, clearDroppedMiniguns } from './particles/cjDroppedMinigun.js';
 export { drawDroppedMahoragaWheels, spawnDroppedMahoragaWheel, updateDroppedMahoragaWheels, clearDroppedMahoragaWheels } from './particles/mahoragaDroppedWheel.js';
 export { drawCarExplosions, drawCarScorchMarks, spawnCarExplosion, updateCarExplosions, clearCarExplosions } from './particles/cjCarExplosion.js';
+export { spawnDeathShatter, spawnEnderDragonDisintegrationDeath, spawnEnderDragonXPFountain, drawMinecraftXPOrb } from './particles/deathShatterEffect.js';
 // ——————————————————————————————————————————————————————
 // DRAW — ARENA
 // ——————————————————————————————————————————————————————
@@ -72,7 +73,7 @@ export { drawNanamiSkin, drawNanamiPixelBody, _drawNanamiHair, _getNanamiHairIma
 export { drawMahitoSkin, drawMahitoPixelBody, _drawMahitoHair, _getMahitoHairImage } from './fighters/mahitoSkin.js';
 export { drawEmberSkin, drawEmberPixelBody, drawFlamewardenSkin } from './fighters/flamewardenSkin.js';
 export { drawEyeOfCthulhuSkin, drawServantOfCthulhuProjectile } from './fighters/eyeOfCthulhuSkin.js';
-export { drawEnderDragonSkin, drawEnderDragonPixelBody, drawDragonAcidPool, getEnderDragonWingsSheet, getEnderDragonTailsSheet } from './fighters/enderDragonSkin.js';
+export { drawEnderDragonSkin, drawEnderDragonPixelBody, drawDragonAcidPool, drawEnderDragonDeathDisintegration, getEnderDragonWingsSheet, getEnderDragonTailsSheet, getEnderDragonTextureSkinImage } from './fighters/enderDragonSkin.js';
 export { drawOrangeFlamethrowerGun, drawPixelFlameProjectile } from './weapons/flamewardenWeaponGraphics.js';
 export { drawDivineAxeRhitta, drawRhittaSlashArc, _getEscanorSlashEffectImage, drawRhittaSolarFlash, drawPixelCruelSunSphere, drawCruelSunOrb, drawCruelSunChargingExpansion, drawPrideFlareShockwave, drawDivineSwordEscanorBlade, _getEscanorCruelSunSpriteImage, ESCANOR_CRUEL_SUN_FRAMES, _getEscanorSunExplosionSpriteImage, ESCANOR_SUN_EXPLOSION_FRAMES, drawProceduralPixelCruelSunExplosion, drawPixelCruelSunExplosion, drawCruelSunFloorLighting, drawCruelSunProximityEntityLighting, spawnCruelSunHitImpact, updateCruelSunHitImpacts, drawCruelSunHitImpacts, clearCruelSunHitImpacts, spawnCruelSunExplosion, updateCruelSunExplosions, drawCruelSunExplosions, clearCruelSunExplosions } from './weapons/escanorWeaponGraphics.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';

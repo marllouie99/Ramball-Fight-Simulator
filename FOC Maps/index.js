@@ -4,12 +4,16 @@
 // ─────────────────────────────────────────────
 
 import { YUTA_BUSH_MAP } from './yutaBushMap.js';
+import { ENDER_DRAGON_MAP } from './enderDragonMap.js';
 import { drawFocMap, updateFocMap, getBushSprite, resetFocMapState } from './focMapRenderer.js';
 import { state } from '../js/core/state.js';
 
 export const FOC_MAPS = {
   foc_yuta_bush_map: YUTA_BUSH_MAP,
-  yuta: YUTA_BUSH_MAP
+  yuta: YUTA_BUSH_MAP,
+  foc_ender_dragon_map: ENDER_DRAGON_MAP,
+  ender_dragon: ENDER_DRAGON_MAP,
+  enderdragon: ENDER_DRAGON_MAP,
 };
 
 /**
@@ -23,6 +27,9 @@ export function getFocMapForBoss(bossIdOrFighter) {
 
   if (characterId === 'yuta' || characterId === 'yuta_okkotsu') {
     return YUTA_BUSH_MAP;
+  }
+  if (characterId === 'ender_dragon' || characterId === 'enderdragon') {
+    return ENDER_DRAGON_MAP;
   }
 
   return FOC_MAPS[characterId] || null;
