@@ -92,9 +92,9 @@ export function isDarkModeActive() {
 export function getFighterHealthBarColor(fighter, ratio, isDark = null) {
   if (!fighter) return '#22c55e';
   const isDarkTheme = isDark !== null ? isDark : isDarkModeActive();
-  const isCj = !isDarkTheme && (fighter.characterId === 'cj' || fighter.type === 'cj');
+  const isCj = fighter.characterId === 'cj' || fighter.type === 'cj';
   if (isCj) {
-    return '#FFFFFF';
+    return '#DC2626';
   }
 
   // Derive color theme directly from the fighter's HUD skill bar color theme
@@ -2249,7 +2249,7 @@ function updateHealthHud() {
     if (!skills || skills.length === 0) return '';
 
     const isDarkTheme = isDarkModeActive();
-    const isCj = !isDarkTheme && f && (f.characterId === 'cj' || f.type === 'cj');
+    const isCj = f && (f.characterId === 'cj' || f.type === 'cj');
     const cjSkillClass = isCj ? ' hud-skill-box-cj' : '';
 
     return skills.map((s, index) => {
@@ -2445,7 +2445,7 @@ function updateHealthHud() {
       if (isTactical) {
         return `color: ${color || '#ffffff'}; font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; line-height: 1.15; `;
       }
-      const useCj = !isDarkTheme && isCj;
+      const useCj = isCj;
       const fontFamily = useCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
       const fontSize = useCj ? (baseFontSize + 2) : baseFontSize;
       const letterSpacing = useCj ? '1.2px' : '0.8px';
@@ -2455,10 +2455,10 @@ function updateHealthHud() {
     let barsHTML = '';
     if (members && members.length > 0) {
       barsHTML = members.map((m, mIndex) => {
-        const isMemberCj = !isDarkTheme && m && (m.characterId === 'cj' || m.type === 'cj');
+        const isMemberCj = m && (m.characterId === 'cj' || m.type === 'cj');
         const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = isMemberCj ? '#FFFFFF' : getFighterHealthBarColor(m, ratio, isDarkTheme);
+        const barColor = isMemberCj ? '#DC2626' : getFighterHealthBarColor(m, ratio, isDarkTheme);
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
@@ -2502,7 +2502,7 @@ function updateHealthHud() {
         `;
       }).join('');
     } else {
-      const isTargetCj = !isDarkTheme && targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
+      const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
       const percent = Math.round(safeRatio * 100);
       const barColor = isTargetCj ? '#DC2626' : getFighterHealthBarColor(targetFighter, safeRatio, isDarkTheme);
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
@@ -2551,7 +2551,7 @@ function updateHealthHud() {
       }
     }
 
-    const isCardCj = !isDarkTheme && targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
+    const isCardCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
     const cjStackHTML = '';
     const winsBullets = (maxBullets > 0) ? Array.from({ length: maxBullets }, (_, i) => {
       const filled = i < wins;
@@ -2719,6 +2719,10 @@ function updateHealthHud() {
         const hpBarText = cardElement.querySelector('.health-card__bar-text');
         const starsContainer = cardElement.querySelector('.hud-cj-stars');
         const moneyTextEl = cardElement.querySelector('.hud-cj-money-text');
+        const weaponIconEl = cardElement.querySelector('.hud-cj-weapon-icon');
+        const weaponAmmoEl = cardElement.querySelector('.hud-cj-weapon-ammo');
+        const clockTextEl = cardElement.querySelector('.hud-cj-clock-text');
+        const armorFillEl = cardElement.querySelector('.hud-cj-armor-fill');
         const winBullets = Array.from(cardElement.querySelectorAll('.health-card__win-bullet'));
         const infoContainer = cardElement.querySelector('.health-card__info');
         const checkbox = cardElement.querySelector('input[type="checkbox"]');
@@ -2746,8 +2750,17 @@ function updateHealthHud() {
           lastChOpacity: 1,
           starsContainer,
           moneyTextEl,
+          weaponIconEl,
+          weaponAmmoEl,
+          clockTextEl,
+          armorFillEl,
           lastMoneyText: '',
           lastStarCount: -1,
+          lastWeaponIcon: '',
+          lastWeaponAmmo: '',
+          lastClockText: '',
+          lastStaminaPct: -1,
+          lastIsExhausted: null,
           winBullets,
           infoContainer,
           checkbox,
@@ -2967,12 +2980,12 @@ function updateHealthHud() {
         }
 
         const isDarkTheme = isDarkModeActive();
-        const isCj = !isDarkTheme && fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
+        const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
         const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
         const maxHp = fighter._originalMaxHp || fighter.maxHp;
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = isCj ? '#FFFFFF' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
+        const barColor = isCj ? '#DC2626' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
         const glow = getGlowStyles(fighter);
         
         if (m.lastHpPct !== percent) {
@@ -3153,12 +3166,12 @@ function updateHealthHud() {
       }
 
       const isDarkTheme = isDarkModeActive();
-      const isCj = !isDarkTheme && fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
+      const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
       const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
       const maxHp = fighter._originalMaxHp || fighter.maxHp;
       const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-      const barColor = isCj ? '#FFFFFF' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
+      const barColor = isCj ? '#DC2626' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
       const glow = getGlowStyles(fighter);
 
       if (cachedCard.hpBarFill) {

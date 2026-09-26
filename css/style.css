@@ -2365,6 +2365,12 @@ canvas {
   overflow: hidden !important;
 }
 
+.arena-dark-mode .hud-cj-armor-bar,
+.health-card.arena-dark-mode .hud-cj-armor-bar {
+  border: 1.5px solid #FFFFFF !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+}
+
 .hud-cj-armor-fill {
   position: absolute !important;
   left: 0 !important;

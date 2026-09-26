@@ -1,5 +1,5 @@
 # ⚔️ Ramball Fight Simulator — Balance Patch Notes
-**Generated:** September 26, 2026 | **Source:** Latest Commit (HEAD~1 ➔ HEAD)
+**Generated:** September 26, 2026 | **Source:** Working Directory (Uncommitted Changes)
 
 ---
 

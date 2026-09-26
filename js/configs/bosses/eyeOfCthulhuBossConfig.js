@@ -22,8 +22,8 @@ export const eyeOfCthulhuBossConfig = {
   enrageAuraColor: '#DC2626',
 
   // ── Boss Scaling Attributes ──
-  hp: 1000,
-  defaultHp: 1000,
+  hp: 2000,
+  defaultHp: 2000,
   sizeMultiplier: 1.25,
   damageMultiplier: 0.00,
   speedMultiplier: 0.00,
