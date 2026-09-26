@@ -27,8 +27,9 @@ export function initCameraState() {
     shakeX: 0,
     shakeY: 0,
     smoothing: CONFIG.camera?.smoothing ?? 0.085,
-    zoomSmoothing: CONFIG.camera?.zoomSmoothing ?? 0.055,
-    minZoom: CONFIG.camera?.minZoom ?? 0.78,
+    zoomSmoothing: CONFIG.camera?.zoomSmoothing ?? 0.048,
+    zoomOutSmoothing: CONFIG.camera?.zoomOutSmoothing ?? 0.085,
+    minZoom: CONFIG.camera?.minZoom ?? 0.65,
     maxZoom: CONFIG.camera?.maxZoom ?? 1.18,
     cinematicOverride: false,
     toastText: '',
@@ -103,6 +104,7 @@ export function updateCamera() {
   }
 
   const camera = state.camera;
+  const camCfg = CONFIG.camera || {};
   const arena = state.arena || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
   const arenaCenterX = arena.x + arena.width / 2;
   const arenaCenterY = arena.y + arena.height / 2;
@@ -181,15 +183,14 @@ export function updateCamera() {
       );
 
       const aliveFighters = (state.fighters || []).filter(isPrimaryCombatant);
-      const camCfg = CONFIG.camera || {};
-      const minZ = camera.minZoom ?? camCfg.minZoom ?? 0.78;
+      const minZ = camera.minZoom ?? camCfg.minZoom ?? 0.65;
       const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.18;
 
       // Soft camera pan limits (allows expansive tracking beyond arena perimeter for airborne/edge entities)
-      const minCamX = arena.x - arena.width * 0.5;
-      const maxCamX = arena.x + arena.width * 1.5;
-      const minCamY = arena.y - arena.height * 0.5;
-      const maxCamY = arena.y + arena.height * 1.5;
+      const minCamX = arena.x - arena.width * 0.6;
+      const maxCamX = arena.x + arena.width * 1.6;
+      const minCamY = arena.y - arena.height * 0.6;
+      const maxCamY = arena.y + arena.height * 1.6;
 
       if (aliveFighters.length >= 2) {
         // Compute full bounding envelope across all active combatants
@@ -210,8 +211,9 @@ export function updateCamera() {
 
         const envelopeMidX = (minX + maxX) / 2;
         const envelopeMidY = (minY + maxY) / 2;
-        const spanX = Math.max(120, maxX - minX);
-        const spanY = Math.max(120, maxY - minY);
+        const spanX = Math.max(60, maxX - minX);
+        const spanY = Math.max(60, maxY - minY);
+        const diagDist = Math.hypot(spanX, spanY);
 
         let midX = envelopeMidX;
         let midY = envelopeMidY;
@@ -250,16 +252,25 @@ export function updateCamera() {
         // Ensures all entities remain inside the safe window screen area with generous margins
         const screenW = state.canvas ? state.canvas.width : 540;
         const screenH = state.canvas ? state.canvas.height : 960;
-        const safeW = screenW - 110; // 55px safe padding on left/right screen edges
-        const safeH = Math.min(screenH - 260, 620); // 130px safe padding top/bottom for HUD & timer
-        const padX = 70; // World padding around entity box for hitboxes & auras
-        const padY = 70;
+        const safeW = screenW - 90; // 45px safe padding on left/right screen edges
+        const safeH = Math.min(screenH - 240, 640); // 120px safe padding top/bottom for HUD & timer
+        const padX = 60; // World padding around entity box for hitboxes & auras
+        const padY = 60;
 
         const fitZoomX = safeW / (spanX + padX);
         const fitZoomY = safeH / (spanY + padY);
-        const fitZoom = Math.min(fitZoomX, fitZoomY);
+        const envelopeFit = Math.min(fitZoomX, fitZoomY);
 
-        camera.targetZoom = Math.max(minZ, Math.min(maxZ, fitZoom));
+        // Distance curve mapping (Smooth Hermite from close melee to wide spread)
+        const minD = camCfg.minDist ?? 70;
+        const maxD = camCfg.maxDist ?? 520;
+        const normDist = Math.max(0, Math.min(1, (diagDist - minD) / (maxD - minD)));
+        const smoothT = normDist * normDist * (3 - 2 * normDist);
+        const distanceZoom = maxZ - smoothT * (maxZ - minZ);
+
+        // Blend: dynamic smooth distance zoom constrained by envelope viewport fit
+        const calculatedZoom = Math.min(distanceZoom, envelopeFit);
+        camera.targetZoom = Math.max(minZ, Math.min(maxZ, calculatedZoom));
 
         // Smoothly pan camera to track combat centroid
         camera.targetX = Math.max(minCamX, Math.min(maxCamX, midX));
@@ -285,7 +296,12 @@ export function updateCamera() {
   // Smooth exponential interpolation (lerp)
   camera.x += (camera.targetX - camera.x) * camera.smoothing;
   camera.y += (camera.targetY - camera.y) * camera.smoothing;
-  camera.zoom += (camera.targetZoom - camera.zoom) * camera.zoomSmoothing;
+
+  // Asymmetric zoom rate: responsive quick zoom-out when spreading, smooth cinematic zoom-in
+  const zoomLerpRate = (camera.targetZoom < camera.zoom)
+    ? (camera.zoomOutSmoothing ?? camCfg.zoomOutSmoothing ?? 0.085)
+    : (camera.zoomSmoothing ?? camCfg.zoomSmoothing ?? 0.048);
+  camera.zoom += (camera.targetZoom - camera.zoom) * zoomLerpRate;
 }
 
 export function applyCameraToCtx(ctx) {

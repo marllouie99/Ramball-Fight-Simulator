@@ -105,14 +105,15 @@ export const CONFIG = {
   Barrett: barrettConfig,
   barrett50cal: barrettConfig,
   camera: {
-    minZoom: 0.78,
+    minZoom: 0.65,
     maxZoom: 1.18,
     winnerZoom: 1.10,
     smoothing: 0.085,
-    zoomSmoothing: 0.055,
+    zoomSmoothing: 0.048,
+    zoomOutSmoothing: 0.085,
     maxPanRatio: 0.85,
-    minDist: 80,
-    maxDist: 500
+    minDist: 70,
+    maxDist: 520
   },
   arena: { x: 40, y: 170, width: 460, height: 460, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
