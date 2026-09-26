@@ -136,6 +136,7 @@
               <div id="menu-view-main" class="menu-view-pane active">
                 <div class="subview-header">
                   <span class="subview-heading" id="main-subview-heading">MAIN MENU</span>
+                  <button class="menu-whatsnew-pill" data-action="open-patchnotes" id="btn-whatsnew" title="View Patch Notes">✨ WHAT'S NEW (v2.5)</button>
                 </div>
                 <div class="menu-grid-container">
                   <!-- Row 1, Col 1: BATTLE -->
@@ -588,6 +589,58 @@
                       </div>
                     </div>
                   </div>
+
+                  <!-- Category 6: What's New & Patch Notes -->
+                  <div class="tactical-card system-card" data-action="open-patchnotes">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 1h10v2h2v10H4v2H2V1z" fill="#ffffff"/>
+                        <path d="M4 3h7v1h1v8H4V3z" fill="#ffd1dc"/>
+                        <path d="M5 5h5v1H5V5z M5 7h5v1H5V7z M5 9h3v1H5V9z" fill="#21050c"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">WHAT'S NEW // PATCH NOTES</span>
+                        <button class="tactical-chip-btn">v2.5 ▶</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Category 7: Default / Skinless Pixel Model PNG Export -->
+                  <div class="tactical-card system-card" data-action="open-pixelmodel-settings" id="card-pixelmodel-wrap">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M5 2h6v2H5V2z M4 4h8v2H4V4z M3 6h10v3H3V6z M2 9h12v2H2V9z M4 11h2v3H4v-3z M10 11h2v3h-2v-3z" fill="#f97316"/>
+                        <path d="M6 5h4v2H6V5z" fill="#ffffff"/>
+                        <path d="M5 7h6v2H5V7z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">DEFAULT PIXEL MODEL (PNG)</span>
+                        <button class="tactical-chip-btn">EXPORT ▶</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Category 8: Image BG Remover / Transparent PNG Converter -->
+                  <div class="tactical-card system-card" data-action="open-bgremover-settings" id="card-bgremover-wrap">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M2 2h12v12H2V2z" fill="#ffffff"/>
+                        <path d="M4 4h8v8H4V4z" fill="#38bdf8"/>
+                        <path d="M6 6h4v4H6V6z" fill="#21050c"/>
+                        <path d="M7 3h2v2H7V3z M3 7h2v2H3V7z M11 7h2v2h-2V7z M7 11h2v2H7v-2z" fill="#f43f5e"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">IMAGE BG REMOVER (TRANSPARENT PNG)</span>
+                        <button class="tactical-chip-btn">TOOL ▶</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -978,6 +1031,335 @@
                   </div>
                 </div>
               </div>
+
+              <!-- PANE 10: WHAT'S NEW & PATCH NOTES SUB-VIEW -->
+              <div id="menu-view-patchnotes" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="main">◀ BACK</button>
+                  <span class="subview-heading">WHAT'S NEW // v2.5.0</span>
+                </div>
+                <div class="subview-cards-list patchnotes-container">
+                  
+                  <!-- Hero Banner Card -->
+                  <div class="patchnotes-hero-card">
+                    <div class="patchnotes-version-row">
+                      <span class="patchnotes-ver-badge">v2.5.0 PROD</span>
+                      <span class="patchnotes-date-badge">SEPTEMBER 2026</span>
+                    </div>
+                    <div class="patchnotes-hero-title">VOID TITAN & COMBAT OPTIMIZATIONS</div>
+                    <div class="patchnotes-hero-desc">Ender Dragon Boss Battle, Zenitsu modular Katana assembly, Escanor Cruel Sun VFX rework, and 60 FPS zero-layout-thrashing engine.</div>
+                  </div>
+
+                  <!-- Section 1: Major Highlights -->
+                  <div class="patchnotes-section">
+                    <div class="patchnotes-section-header">
+                      <span class="patchnotes-section-title">🌟 MAJOR HIGHLIGHTS</span>
+                    </div>
+                    <div id="patchnotes-highlights-card" class="patchnotes-card">
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-new">NEW</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">Ender Dragon Articulated Tail & Flight Animation</strong>
+                          <p class="patchnote-desc">Added 6-frame articulated tail sprite sheet with rear spine socket anchoring, dynamic swishing physics, and swooping afterimages.</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-rework">REWORK</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">Modular Katana Assembly (Weapon Studio)</strong>
+                          <p class="patchnote-desc">Granular sub-part tuning for Zenitsu's Nichirin blade across Nagasa (Blade), Tsuba (Guard), Habaki (Collar), Tsuka (Handle), and grip spacing.</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-vfx">VFX</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">Escanor Cruel Sun & Solar Poise</strong>
+                          <p class="patchnote-desc">6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Section 2: Balance & Mechanics -->
+                  <div class="patchnotes-section">
+                    <div class="patchnotes-section-header">
+                      <span class="patchnotes-section-title">🥊 FIGHTER BALANCE & MECHANICS</span>
+                    </div>
+                    <div id="patchnotes-balance-card" class="patchnotes-card">
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-buff">BUFF</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">CJ</strong>
+                          <p class="patchnote-desc"><code>minigunBulletDamage</code>: <code>1</code> ➔ <code>2</code> (+100.0%)</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Section 3: Engine & Performance -->
+                  <div class="patchnotes-section">
+                    <div class="patchnotes-section-header">
+                      <span class="patchnotes-section-title">🚀 ENGINE, UI & PERFORMANCE</span>
+                    </div>
+                    <div id="patchnotes-engine-card" class="patchnotes-card">
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-perf">PERF</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">Zero Layout Thrashing (Weapon & Skin Studio)</strong>
+                          <p class="patchnote-desc">Cached DOM bounding rects during dragging; fixed 13px vertical discrepancy in drag handle registration for butter-smooth 60 FPS live tuning.</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-ai">SYSTEM</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">AI Agent Design & Quality Skills</strong>
+                          <p class="patchnote-desc">Configured workspace playbooks: <code>improve-ui</code>, <code>fixing-motion-performance</code>, <code>baseline-ui</code>, and <code>patch-notes-generator</code>.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Verification Badge Footer -->
+                  <div class="patchnotes-footer-card">
+                    <div class="patchnotes-footer-status">✅ TEST VERIFICATION STATUS: 55/55 FIGHTERS PASSING</div>
+                    <div class="patchnotes-footer-sub">All automated interaction matrices & Canvas 2D transform stacks balanced (Depth: 0).</div>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- PANE 11: DEFAULT / SKINLESS PIXEL ART MODEL EXPORT SUB-VIEW -->
+              <div id="menu-view-pixelmodel-settings" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="settings">◀ BACK</button>
+                  <span class="subview-heading">DEFAULT PIXEL MODEL EXPORT</span>
+                </div>
+                <div class="subview-cards-list pixelmodel-export-pane">
+
+                  <!-- Live Canvas Preview Box -->
+                  <div class="pixelmodel-preview-card">
+                    <div class="pixelmodel-canvas-box">
+                      <canvas id="pixelModelPreviewCanvas" width="128" height="128"></canvas>
+                      <div class="pixelmodel-format-badge">32-BIT RGBA PNG</div>
+                    </div>
+                    <div class="pixelmodel-preview-info">
+                      <div class="pixelmodel-title">BASE FIGHTER MODEL TEMPLATE</div>
+                      <div class="pixelmodel-subtitle">2D Discrete Rasterization ($P = 2.0\text{px}$) & Upright Anatomy</div>
+                    </div>
+                  </div>
+
+                  <!-- Control Section 1: Palette Tone -->
+                  <div class="pixelmodel-control-card">
+                    <div class="pixelmodel-control-header">
+                      <span class="pixelmodel-control-title">🎨 BASE PALETTE / SKIN TONE:</span>
+                      <span id="pixelModelPaletteLabel" class="pixelmodel-control-val">ANIME PEACH</span>
+                    </div>
+                    <div id="pixelModelPaletteList" class="pixelmodel-swatches-grid"></div>
+                  </div>
+
+                  <!-- Control Section 2: Combat Stance & Hands -->
+                  <div class="pixelmodel-control-card">
+                    <div class="pixelmodel-control-header">
+                      <span class="pixelmodel-control-title">🥊 COMBAT HANDS / STANCE</span>
+                    </div>
+                    <div class="pixelmodel-chip-row">
+                      <button class="pixelmodel-pill-btn" data-handmode="both">BOTH HANDS</button>
+                      <button class="pixelmodel-pill-btn active" data-handmode="none">BODY ONLY (SKINLESS)</button>
+                      <button class="pixelmodel-pill-btn" data-handmode="front">FRONT GUARD ONLY</button>
+                    </div>
+                  </div>
+
+                  <!-- Control Section 3: Style & Outlines -->
+                  <div class="pixelmodel-control-card">
+                    <div class="pixelmodel-control-header">
+                      <span class="pixelmodel-control-title">✒️ OUTLINE & BACKGROUND</span>
+                    </div>
+                    <div class="pixelmodel-chip-row">
+                      <button id="btnPixelModelOutline" class="pixelmodel-pill-btn active">INK OUTLINE: ON</button>
+                      <button class="pixelmodel-pill-btn active" data-bgmode="transparent">ALPHA TRANSPARENT</button>
+                      <button class="pixelmodel-pill-btn" data-bgmode="dark">DARK GRID</button>
+                      <button class="pixelmodel-pill-btn" data-bgmode="black">PURE BLACK</button>
+                      <button class="pixelmodel-pill-btn" data-bgmode="white">PURE WHITE</button>
+                    </div>
+                  </div>
+
+                  <!-- Control Section 4: Export Resolution -->
+                  <div class="pixelmodel-control-card">
+                    <div class="pixelmodel-control-header">
+                      <span class="pixelmodel-control-title">📐 EXPORT RESOLUTION:</span>
+                      <span id="pixelModelResLabel" class="pixelmodel-control-val">256 x 256 PX</span>
+                    </div>
+                    <div class="pixelmodel-chip-row">
+                      <button class="pixelmodel-pill-btn" data-resolution="64">64x64 (1x RETRO)</button>
+                      <button class="pixelmodel-pill-btn" data-resolution="128">128x128 (2x HD)</button>
+                      <button class="pixelmodel-pill-btn active" data-resolution="256">256x256 (4x MASTER)</button>
+                      <button class="pixelmodel-pill-btn" data-resolution="512">512x512 (8x UHD)</button>
+                    </div>
+                  </div>
+
+                  <!-- Action Buttons: Download PNG, Copy to Clipboard, Open in Tab / Folder -->
+                  <div class="pixelmodel-download-card">
+                    <a id="btnPixelModelDownload" class="pixelmodel-download-btn" href="#" download="circle-pixel-model.png">
+                      <span class="download-icon" style="pointer-events: none;">💾</span> DOWNLOAD PIXEL MODEL PNG
+                    </a>
+                    <div class="pixelmodel-aux-actions">
+                      <button id="btnPixelModelSaveAssets" class="pixelmodel-aux-btn">
+                        <span>📥</span> SAVE TO ASSETS
+                      </button>
+                      <button id="btnPixelModelCopy" class="pixelmodel-aux-btn">
+                        <span>📋</span> COPY PNG
+                      </button>
+                      <button id="btnPixelModelOpenFolder" class="pixelmodel-aux-btn">
+                        <span>📁</span> OPEN FOLDER
+                      </button>
+                    </div>
+                    <div id="pixelModelToast" class="pixelmodel-toast-msg"></div>
+                  </div>
+
+                </div>
+              </div>
+
+              <!-- PANE 12: IMAGE BG REMOVER & TRANSPARENT PNG SUB-VIEW -->
+              <div id="menu-view-bgremover-settings" class="menu-view-pane">
+                <div class="subview-header">
+                  <button class="menu-back-btn" data-back="settings">◀ BACK</button>
+                  <span class="subview-heading">IMAGE BG REMOVER (TRANSPARENT PNG)</span>
+                </div>
+                <div class="subview-cards-list bg-remover-pane">
+
+                  <!-- Card 1: Hero Large Preview Box & Quick Inspection Tools -->
+                  <div class="bg-remover-hero-card">
+                    <div class="bg-remover-hero-header">
+                      <div class="bg-remover-hero-titles">
+                        <div class="bg-remover-title">⚡ CHROMA KEY TRANSPARENCY</div>
+                        <div class="bg-remover-subtitle">Pixel Alpha Cutout, Outer Flood-Fill &amp; Smoothing</div>
+                      </div>
+                      <div id="bgRemoverDimLabel" class="bg-remover-hero-dim-badge">0 x 0 PX</div>
+                    </div>
+
+                    <!-- Enlarged Full-Width Preview Canvas Frame -->
+                    <div class="bg-remover-canvas-box">
+                      <canvas id="bgRemoverPreviewCanvas" width="360" height="220"></canvas>
+                    </div>
+
+                    <!-- Quick Inspection & Sampling Toolbar -->
+                    <div class="bg-remover-hero-toolbar">
+                      <button id="btnBgRemoverEyedropper" class="bg-remover-tool-btn" title="Sample color directly from image">
+                        <span>🎯</span> EYEDROPPER
+                      </button>
+                      <button id="btnBgRemoverAutoCorner" class="bg-remover-tool-btn" title="Auto-detect border color">
+                        <span>🪄</span> AUTO CORNER
+                      </button>
+                      <button id="btnBgRemoverAutoCrop" class="bg-remover-tool-btn" title="Trim outer empty transparent margins">
+                        <span>✂️</span> TRIM: OFF
+                      </button>
+                      <div class="bg-remover-bgmode-group">
+                        <span class="bg-remover-bgmode-label">VIEW:</span>
+                        <button class="bg-remover-bg-pill active" data-bgrbg="checker" title="Checkerboard">🏁</button>
+                        <button class="bg-remover-bg-pill" data-bgrbg="dark" title="Dark Grid">⬛</button>
+                        <button class="bg-remover-bg-pill" data-bgrbg="white" title="Pure White">⬜</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Card 2: File Importer & Quick Load -->
+                  <div class="pixelmodel-control-card">
+                    <div class="pixelmodel-control-header">
+                      <span class="pixelmodel-control-title">📁 IMPORT IMAGE FILE:</span>
+                      <span class="pixelmodel-control-val">PNG / JPG / WEBP / BMP</span>
+                    </div>
+                    <label id="bgRemoverDropZone" for="bgRemoverFileInput" class="bg-remover-drop-zone" style="cursor: pointer; position: relative;">
+                      <input type="file" id="bgRemoverFileInput" accept="image/png, image/jpeg, image/webp, image/bmp, image/gif, image/*" class="bg-remover-native-input" />
+                      <div class="drop-zone-content">
+                        <span class="drop-icon">📂</span>
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                          <span class="drop-text">Click to Browse File Manager or Drag &amp; Drop Image</span>
+                          <span style="font-family: 'Rajdhani', sans-serif; font-size: 10px; color: #64748b; font-weight: 600;">Supports PNG, JPG, JPEG, WEBP, BMP, GIF</span>
+                        </div>
+                      </div>
+                    </label>
+                    <div class="bg-remover-action-grid" style="margin-top: 4px;">
+                      <button type="button" id="btnBgRemoverBrowse" class="pixelmodel-pill-btn active">📁 BROWSE FILE MANAGER</button>
+                      <button type="button" id="btnBgRemoverOpenAssets" class="pixelmodel-pill-btn">📂 OPEN ASSETS FOLDER</button>
+                      <button type="button" id="btnBgRemoverPaste" class="pixelmodel-pill-btn">📋 PASTE CLIPBOARD</button>
+                      <button type="button" id="btnBgRemoverSample" class="pixelmodel-pill-btn">✨ SAMPLE SPRITE</button>
+                    </div>
+                    <div class="bg-remover-quickload-row" style="margin-top: 6px;">
+                      <span class="bg-remover-quickload-label">⚡ QUICK LOAD:</span>
+                      <select id="bgRemoverAssetSelect" class="bg-remover-select">
+                        <option value="">-- Load Existing Character Asset --</option>
+                        <option value="Assets/model/Saturo Gojo.png">Saturo Gojo.png</option>
+                        <option value="Assets/model/SUKUNA.png">SUKUNA.png</option>
+                        <option value="Assets/model/Toji-skin.png">Toji-skin.png</option>
+                        <option value="Assets/model/Nanami-SKIN.png">Nanami-SKIN.png</option>
+                        <option value="Assets/model/Yuji-SKIN.png">Yuji-SKIN.png</option>
+                        <option value="Assets/model/Makima-model-skin.png">Makima-model-skin.png</option>
+                        <option value="Assets/model/POWER-MODEL-SKIN.png">POWER-MODEL-SKIN.png</option>
+                        <option value="Assets/model/REZE-MODEL-SKIN.png">REZE-MODEL-SKIN.png</option>
+                        <option value="Assets/model/Escanor-skin-model.png">Escanor-skin-model.png</option>
+                        <option value="Assets/model/john-wick-model.png">john-wick-model.png</option>
+                        <option value="Assets/model/Ender-Dragon-Model.png">Ender-Dragon-Model.png</option>
+                        <option value="Assets/model/Eye of Cthulhu.png">Eye of Cthulhu.png</option>
+                        <option value="Assets/model/ICHIGO-SHIKAI.png">ICHIGO-SHIKAI.png</option>
+                        <option value="Assets/model/Uryu-ishida.png">Uryu-ishida.png</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Card 3: Target Color & Algorithm -->
+                  <div class="pixelmodel-control-card">
+                    <div class="pixelmodel-control-header">
+                      <span class="pixelmodel-control-title">🎨 TARGET BACKGROUND COLOR:</span>
+                      <div class="bg-remover-color-preview">
+                        <span id="bgRemoverColorSwatch" class="color-swatch-box" style="background-color: #ffffff;"></span>
+                        <span id="bgRemoverColorLabel" class="pixelmodel-control-val">#FFFFFF</span>
+                      </div>
+                    </div>
+                    <div class="bg-remover-color-row">
+                      <input type="color" id="bgRemoverColorInput" value="#ffffff" class="bg-remover-color-picker" />
+                      <div class="pixelmodel-chip-row" style="flex: 1;">
+                        <button class="pixelmodel-pill-btn active" data-bgrmode="contiguous">FLOOD FILL (OUTER BORDER)</button>
+                        <button class="pixelmodel-pill-btn" data-bgrmode="global">GLOBAL (ALL COLOR)</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Card 4: Precision Sliders (Tolerance & Edge Feathering) -->
+                  <div class="pixelmodel-control-card">
+                    <div class="pixelmodel-control-header">
+                      <span class="pixelmodel-control-title">🎚️ COLOR TOLERANCE / THRESHOLD:</span>
+                      <span id="bgRemoverToleranceVal" class="pixelmodel-control-val">18%</span>
+                    </div>
+                    <input type="range" id="bgRemoverToleranceSlider" min="0" max="100" value="18" class="bg-remover-range-slider" />
+
+                    <div class="pixelmodel-control-header" style="margin-top: 6px;">
+                      <span class="pixelmodel-control-title">✨ EDGE FEATHER / SMOOTHING:</span>
+                      <span id="bgRemoverFeatherVal" class="pixelmodel-control-val">1px</span>
+                    </div>
+                    <input type="range" id="bgRemoverFeatherSlider" min="0" max="5" value="1" class="bg-remover-range-slider" />
+                  </div>
+
+                  <!-- Card 5: Action Buttons: Download Transparent PNG, Save to Assets, Copy, Open Folder -->
+                  <div class="pixelmodel-download-card">
+                    <a id="btnBgRemoverDownload" class="pixelmodel-download-btn" href="#" download="transparent-sprite.png">
+                      <span class="download-icon" style="pointer-events: none;">💾</span> DOWNLOAD TRANSPARENT PNG
+                    </a>
+                    <div class="pixelmodel-aux-actions">
+                      <button id="btnBgRemoverSaveAssets" class="pixelmodel-aux-btn">
+                        <span>📥</span> SAVE TO ASSETS
+                      </button>
+                      <button id="btnBgRemoverCopy" class="pixelmodel-aux-btn">
+                        <span>📋</span> COPY PNG
+                      </button>
+                      <button id="btnBgRemoverOpenFolder" class="pixelmodel-aux-btn">
+                        <span>📁</span> OPEN FOLDER
+                      </button>
+                    </div>
+                    <div id="bgRemoverToast" class="pixelmodel-toast-msg"></div>
+                  </div>
+
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1060,7 +1442,7 @@
   <!-- Hidden Font Preloader for Pricedown GTA Font -->
   <span style="font-family: 'Pricedown'; position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true">mission passed! RESPECT +</span>
 
-  <script type="module" src="js/core/main.js?v=77"></script>
+  <script type="module" src="js/core/main.js?v=79"></script>
   <script>
     // Enable frameless drag handle only when running inside Electron
     if (typeof window !== 'undefined' && (window.electronAPI || navigator.userAgent.toLowerCase().includes('electron'))) {

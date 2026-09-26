@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, shell, dialog, session } from 'electron';
 import path from 'path';
 import os from 'os';
 import fs from 'fs';
@@ -35,6 +35,138 @@ ipcMain.handle('scan-bgm-folder', () => {
 ipcMain.handle('open-bgm-folder', () => {
   const bgmDir = path.join(__dirname, 'Assets', 'Sound Effects', 'ARENA-BGMUSIC');
   shell.openPath(bgmDir);
+  return true;
+});
+
+// Native PNG Image Saving IPC Handlers for Desktop Electron App
+ipcMain.handle('save-image-file', async (event, { fileName, base64Data, defaultPath }) => {
+  try {
+    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    const targetDir = defaultPath || app.getPath('downloads');
+    const targetPath = path.join(targetDir, fileName);
+    fs.writeFileSync(targetPath, buffer);
+    return { success: true, filePath: targetPath };
+  } catch (err) {
+    console.error('Error in save-image-file:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('show-open-image-dialog', async (event) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow() || (BrowserWindow.getAllWindows().length > 0 ? BrowserWindow.getAllWindows()[0] : null);
+    const dialogOptions = {
+      title: 'Select Image File to Import',
+      properties: ['openFile'],
+      filters: [
+        { name: 'All Supported Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'bmp', 'gif'] },
+        { name: 'PNG Images (*.png)', extensions: ['png'] },
+        { name: 'JPEG Images (*.jpg; *.jpeg)', extensions: ['jpg', 'jpeg'] },
+        { name: 'WebP Images (*.webp)', extensions: ['webp'] },
+        { name: 'All Files (*.*)', extensions: ['*'] }
+      ]
+    };
+
+    const { canceled, filePaths } = win
+      ? await dialog.showOpenDialog(win, dialogOptions)
+      : await dialog.showOpenDialog(dialogOptions);
+
+    if (canceled || !filePaths || filePaths.length === 0) {
+      return { canceled: true };
+    }
+
+    const filePath = filePaths[0];
+    const buffer = fs.readFileSync(filePath);
+    const ext = path.extname(filePath).toLowerCase().replace('.', '') || 'png';
+    const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/png';
+    const base64Data = `data:${mimeType};base64,${buffer.toString('base64')}`;
+    const fileName = path.basename(filePath);
+
+    return { success: true, filePath, fileName, base64Data };
+  } catch (err) {
+    console.error('Error in show-open-image-dialog:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('show-save-image-dialog', async (event, { defaultName, base64Data }) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow() || (BrowserWindow.getAllWindows().length > 0 ? BrowserWindow.getAllWindows()[0] : null);
+    const dialogOptions = {
+      title: 'Save Pixel Model PNG',
+      defaultPath: path.join(app.getPath('downloads'), defaultName),
+      filters: [{ name: 'PNG Images (*.png)', extensions: ['png'] }]
+    };
+
+    const { canceled, filePath } = win 
+      ? await dialog.showSaveDialog(win, dialogOptions)
+      : await dialog.showSaveDialog(dialogOptions);
+
+    if (canceled || !filePath) {
+      return { canceled: true };
+    }
+
+    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    fs.writeFileSync(filePath, buffer);
+
+    try {
+      shell.showItemInFolder(filePath);
+    } catch (e) {
+      // ignore
+    }
+
+    return { success: true, filePath };
+  } catch (err) {
+    console.error('Error in show-save-image-dialog:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('open-path', async (event, fullPath) => {
+  return shell.openPath(fullPath);
+});
+
+ipcMain.handle('open-downloads-folder', async () => {
+  const dl = app.getPath('downloads');
+  shell.openPath(dl);
+  return true;
+});
+
+ipcMain.handle('open-assets-folder', async () => {
+  const assetsDir = path.join(__dirname, 'Assets', 'model');
+  if (!fs.existsSync(assetsDir)) {
+    fs.mkdirSync(assetsDir, { recursive: true });
+  }
+  shell.openPath(assetsDir);
+  return true;
+});
+
+ipcMain.handle('save-to-assets-model', async (event, { fileName, base64Data }) => {
+  try {
+    const assetsDir = path.join(__dirname, 'Assets', 'model');
+    if (!fs.existsSync(assetsDir)) {
+      fs.mkdirSync(assetsDir, { recursive: true });
+    }
+    const targetPath = path.join(assetsDir, fileName);
+    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(cleanBase64, 'base64');
+    fs.writeFileSync(targetPath, buffer);
+    try {
+      shell.showItemInFolder(targetPath);
+    } catch (e) {
+      // ignore
+    }
+    return { success: true, filePath: targetPath };
+  } catch (err) {
+    console.error('Error in save-to-assets-model:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('show-item-in-folder', async (event, fullPath) => {
+  shell.showItemInFolder(fullPath);
   return true;
 });
 

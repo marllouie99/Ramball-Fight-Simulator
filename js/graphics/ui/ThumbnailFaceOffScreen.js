@@ -217,11 +217,23 @@ export function captureFaceOffScreenshot() {
   if (!canvas) return;
   try {
     const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
     const currentDefs = getActiveFighterDefs();
     const p1Name = currentDefs[state.p1Index]?.name || 'Fighter-1';
     const p2Name = currentDefs[state.p2Index]?.name || 'Fighter-2';
-    link.download = `circle-battle-thumbnail-${p1Name}-vs-${p2Name}.png`.toLowerCase().replace(/\s+/g, '-');
+    const fileName = `circle-battle-thumbnail-${p1Name}-vs-${p2Name}.png`.toLowerCase().replace(/\s+/g, '-');
+
+    if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.showSaveImageDialog === 'function') {
+      window.electronAPI.showSaveImageDialog({ defaultName: fileName, base64Data: dataUrl }).then((res) => {
+        if (res && res.success) {
+          state.faceOffSavedToastTimer = 140;
+          triggerFaceOffSFX('skill_dash5', 0.25);
+        }
+      });
+      return;
+    }
+
+    const link = document.createElement('a');
+    link.download = fileName;
     link.href = dataUrl;
     link.click();
 

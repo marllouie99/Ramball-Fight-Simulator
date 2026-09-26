@@ -25,7 +25,8 @@ At the end of `update()`:
 super.update(opponent, ownerIndex, arena);
 ```
 
-### 2. Upright Minimalist Skin Standard (Front POV)
+### 2. Upright Minimalist Skin Standard (Front POV) & Offscreen Caching (Rule 19 & 3.5)
+- **Offscreen Canvas Caching (Gojo / Yuji / Sukuna Pattern)**: When rendering procedural pixel art bodies, ALWAYS rasterize once to an offscreen canvas (`_cachedFighterCanvas`) and blit via `ctx.drawImage`. NEVER call per-pixel `ctx.fillRect` loops inside the rotated game loop.
 - **Local Space Transform**: Rotate by `gunAngle` (or 0 during winner reveal), and flip Y when facing left:
   ```javascript
   const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);

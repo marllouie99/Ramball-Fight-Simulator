@@ -40,10 +40,10 @@ export const enderDragonConfig = {
   spriteTicksPerFrame: 5,
   swoopTicksPerFrame: 3,
 
-  // ── Passive: Flight & Terrain Intangibility ──
-  isGhostTerrain: true,
-  immuneToKnockback: true,
-  immuneToPush: true,
+  // ── Passive: Flight & Arena Physics ──
+  isGhostTerrain: false,
+  immuneToKnockback: false,
+  immuneToPush: false,
   hoverOscillationAmp: 7.0,
   hoverOscillationFreq: 0.05,
   hoverAcceleration: 0.22,

@@ -40,3 +40,77 @@ Use this skill when designing or coding character skins, hair silhouettes, headw
    - **Layer 2 (Middle)**: Body circle, clothing, hair, and headwear.
    - **Layer 3 (Front)**: Front hand at guard center `(0, 0)` in idle stance.
    - **Layer 4 (Top-Most)**: Active held weapon and attack effects.
+
+## Phase 4: Mandatory Offscreen Canvas Caching Pattern (Rule 3.5)
+- **STRICT PROHIBITION**: NEVER call per-pixel `ctx.fillRect(px, py, P, P)` loops directly in the game loop while the canvas is rotated (`ctx.rotate(angle)`). Rotated sub-pixel rectangles create ugly "crisscross white grid lines / screen-door artifacts" and cause severe frame drops.
+- **The Canonical Architecture (Gojo / Yuji / Sukuna Standard)**:
+  ```javascript
+  let _cachedCanvas = null;
+  let _cachedR = 0;
+
+  function _renderPixelBodyToCanvas(destCtx, r) {
+    destCtx.imageSmoothingEnabled = false;
+    const P = 2.0;
+    const steps = Math.ceil((r + P) / P);
+    const cx = destCtx.canvas.width / 2;
+    const cy = destCtx.canvas.height / 2;
+
+    destCtx.save();
+    destCtx.translate(cx, cy);
+
+    for (let gy = -steps; gy <= steps; gy++) {
+      for (let gx = -steps; gx <= steps; gx++) {
+        const rx = gx * P;
+        const ry = gy * P;
+        if (Math.hypot(rx, ry) > r) continue;
+
+        const px = rx - P / 2;
+        const py = ry - P / 2;
+
+        // 4-neighbor attached border test for solid dark manga ink outline
+        const isBorder = (
+          Math.hypot((gx + 1) * P, gy * P) > r ||
+          Math.hypot((gx - 1) * P, gy * P) > r ||
+          Math.hypot(gx * P, (gy + 1) * P) > r ||
+          Math.hypot(gx * P, (gy - 1) * P) > r
+        );
+
+        if (isBorder) {
+          destCtx.fillStyle = '#0E0F14';
+          destCtx.fillRect(px, py, P, P);
+          continue;
+        }
+
+        // Apply clean solid stepped color zones (NO modulo dither noise)
+        // ...
+        destCtx.fillStyle = '#262039';
+        destCtx.fillRect(px, py, P, P);
+      }
+    }
+    destCtx.restore();
+  }
+
+  export function drawCharacterPixelBody(ctx, r) {
+    if (typeof document === 'undefined') return;
+
+    if (!_cachedCanvas || _cachedR !== r) {
+      _cachedR = r;
+      const P = 2.0;
+      const steps = Math.ceil((r + P) / P);
+      const size = (steps * 2 + 1) * P;
+
+      _cachedCanvas = document.createElement('canvas');
+      _cachedCanvas.width = size;
+      _cachedCanvas.height = size;
+      const offCtx = _cachedCanvas.getContext('2d');
+      _renderPixelBodyToCanvas(offCtx, r);
+    }
+
+    if (_cachedCanvas) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(_cachedCanvas, -_cachedCanvas.width / 2, -_cachedCanvas.height / 2);
+      ctx.restore();
+    }
+  }
+  ```

@@ -17,6 +17,8 @@ import { GAME_MODES } from './modeConfig.js';
 import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
 import { toggleCameraMode } from '../systems/cameraSystem.js';
 import { BalanceManager } from '../configs/balanceManager.js';
+import { initPixelModelExportUI, updatePixelModelPreview } from '../graphics/ui/PixelModelExportScreen.js';
+import { initImageBgRemoverUI, processAndRenderImage } from '../graphics/ui/ImageBgRemoverScreen.js';
 import { BossEntranceSequence } from '../bosses/index.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
@@ -669,6 +671,105 @@ export function toggleBalanceDebugOverlay() {
   if (isHidden) syncBalanceButtons();
 }
 
+// ─────────────────────────────────────────────
+// WHAT'S NEW / PATCH NOTES RENDERER
+// ─────────────────────────────────────────────
+export function renderPatchNotesPane() {
+  const container = document.getElementById('menu-view-patchnotes');
+  if (!container || typeof patchNotesData === 'undefined') return;
+
+  // 1. Update Version & Date Badges
+  const verBadge = container.querySelector('.patchnotes-ver-badge');
+  const dateBadge = container.querySelector('.patchnotes-date-badge');
+  const heroTitle = container.querySelector('.patchnotes-hero-title');
+  const heroDesc = container.querySelector('.patchnotes-hero-desc');
+  const heading = container.querySelector('.subview-heading');
+
+  if (patchNotesData.version) {
+    if (verBadge) verBadge.innerText = `${patchNotesData.version} PROD`;
+    if (heading) heading.innerText = `WHAT'S NEW // ${patchNotesData.version}`;
+  }
+  if (patchNotesData.date && dateBadge) dateBadge.innerText = patchNotesData.date;
+  if (patchNotesData.title && heroTitle) heroTitle.innerText = patchNotesData.title;
+  if (patchNotesData.description && heroDesc) heroDesc.innerText = patchNotesData.description;
+
+  // 2. Render Major Highlights
+  const highlightsCard = document.getElementById('patchnotes-highlights-card');
+  if (highlightsCard && patchNotesData.highlights && patchNotesData.highlights.length > 0) {
+    let hHtml = '';
+    for (const h of patchNotesData.highlights) {
+      const tagClass = `tag-${h.type || 'new'}`;
+      hHtml += `
+        <div class="patchnote-item">
+          <span class="patchnote-tag ${tagClass}">${h.tag || 'NEW'}</span>
+          <div class="patchnote-content">
+            <strong class="patchnote-heading">${h.title}</strong>
+            <p class="patchnote-desc">${h.desc}</p>
+          </div>
+        </div>`;
+    }
+    highlightsCard.innerHTML = hHtml;
+  }
+
+  // 3. Render Balance Changes
+  const balanceCard = document.getElementById('patchnotes-balance-card');
+  if (balanceCard) {
+    if (!patchNotesData.balanceChanges || patchNotesData.balanceChanges.length === 0) {
+      balanceCard.innerHTML = `
+        <div class="patchnote-item">
+          <span class="patchnote-tag tag-adj">INFO</span>
+          <div class="patchnote-content">
+            <strong class="patchnote-heading">No Uncommitted Balance Changes</strong>
+            <p class="patchnote-desc">Fighter attributes are currently running on baseline defaults.</p>
+          </div>
+        </div>`;
+    } else {
+      let html = '';
+      for (const item of patchNotesData.balanceChanges) {
+        const charName = item.character;
+        if (item.deltas && item.deltas.length > 0) {
+          for (const d of item.deltas) {
+            const tagClass = d.type === 'BUFF' ? 'tag-buff' : d.type === 'NERF' ? 'tag-nerf' : 'tag-adj';
+            const tagText = d.type || 'ADJUST';
+            const oldValStr = typeof d.oldVal !== 'undefined' ? d.oldVal : '';
+            const newValStr = typeof d.newVal !== 'undefined' ? d.newVal : '';
+            const pctStr = d.pct ? ` (${d.pct})` : '';
+            const descText = d.desc || `<code>${d.key}</code>: <code>${oldValStr}</code> ➔ <code>${newValStr}</code>${pctStr}`;
+
+            html += `
+              <div class="patchnote-item">
+                <span class="patchnote-tag ${tagClass}">${tagText}</span>
+                <div class="patchnote-content">
+                  <strong class="patchnote-heading">${charName}</strong>
+                  <p class="patchnote-desc">${descText}</p>
+                </div>
+              </div>`;
+          }
+        }
+      }
+      balanceCard.innerHTML = html;
+    }
+  }
+
+  // 4. Render Engine & System Notes
+  const engineCard = document.getElementById('patchnotes-engine-card');
+  if (engineCard && patchNotesData.engineNotes && patchNotesData.engineNotes.length > 0) {
+    let eHtml = '';
+    for (const e of patchNotesData.engineNotes) {
+      const tagClass = `tag-${e.type || 'perf'}`;
+      eHtml += `
+        <div class="patchnote-item">
+          <span class="patchnote-tag ${tagClass}">${e.tag || 'SYS'}</span>
+          <div class="patchnote-content">
+            <strong class="patchnote-heading">${e.title}</strong>
+            <p class="patchnote-desc">${e.desc}</p>
+          </div>
+        </div>`;
+    }
+    engineCard.innerHTML = eHtml;
+  }
+}
+
 // Tactical Terminal & Menu Navigation State
 export function showMenuView(paneId, playAudio = true) {
   const panes = document.querySelectorAll('.menu-view-pane');
@@ -699,7 +800,19 @@ export function showMenuView(paneId, playAudio = true) {
       badge.innerText = 'Combat Tuner';
     } else if (paneId === 'menu-view-system-settings') {
       badge.innerText = 'System & Perf';
+    } else if (paneId === 'menu-view-patchnotes') {
+      badge.innerText = 'Patch Notes v2.5';
+    } else if (paneId === 'menu-view-pixelmodel-settings') {
+      badge.innerText = 'Base Pixel Model';
+      updatePixelModelPreview();
+    } else if (paneId === 'menu-view-bgremover-settings') {
+      badge.innerText = 'Image BG Remover';
+      processAndRenderImage();
     }
+  }
+
+  if (paneId === 'menu-view-patchnotes') {
+    renderPatchNotesPane();
   }
 
   if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
@@ -812,7 +925,13 @@ export function executeTacticalAction(action) {
   }
 
   // System Configurations
-  else if (action === 'open-graphics-settings') {
+  else if (action === 'open-pixelmodel-settings') {
+    showMenuView('menu-view-pixelmodel-settings');
+    updatePixelModelPreview();
+  } else if (action === 'open-bgremover-settings') {
+    showMenuView('menu-view-bgremover-settings');
+    processAndRenderImage();
+  } else if (action === 'open-graphics-settings') {
     showMenuView('menu-view-graphics-settings');
   } else if (action === 'open-audio-settings') {
     showMenuView('menu-view-audio-settings');
@@ -1072,6 +1191,8 @@ export function switchGameHub(hub, playAudio = true) {
     applyArenaTheme(localStorage.getItem('arenaTheme') || 'light');
   }
 
+  initPixelModelExportUI();
+  initImageBgRemoverUI();
   showMenuView('menu-view-main', false);
 
   if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
@@ -1094,6 +1215,8 @@ document.querySelectorAll('.tactical-card, .menu-tile-3d').forEach(card => {
       showMenuView('menu-view-arsenal');
     } else if (action === 'open-settings') {
       showMenuView('menu-view-settings');
+    } else if (action === 'open-patchnotes') {
+      showMenuView('menu-view-patchnotes');
     } else if (action === 'toggle-hub') {
       const nextHub = (state.gameCategory === 'tactical') ? 'foc' : 'tactical';
       switchGameHub(nextHub);
@@ -1120,6 +1243,12 @@ document.querySelectorAll('.menu-back-btn').forEach(btn => {
 // Titlebar close box returns to main menu if in subview
 document.querySelector('.retro-close-box')?.addEventListener('click', () => {
   showMenuView('menu-view-main');
+});
+
+// What's New Pill Button Handler
+document.getElementById('btn-whatsnew')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  showMenuView('menu-view-patchnotes');
 });
 
 // System Buttons Handlers
@@ -1250,7 +1379,9 @@ document.getElementById('btn-todobgm')?.addEventListener('click', (e) => {
   e.target.innerText = (!isEnabled) ? 'ON' : 'OFF';
 });
 
-// Initialize initial menu view on boot
+// Initialize initial UI screens and menu view on boot
+initPixelModelExportUI();
+initImageBgRemoverUI();
 showMenuView('menu-view-main', false);
 
 // Keyboard Navigation

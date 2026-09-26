@@ -198,13 +198,17 @@ After completing ANY code modification, update, or fix in the project, the agent
 - Procedural hair must be defined as discrete lock coordinate arrays with staggered strand lengths and sharp triangular tips.
 - Hair uses a 4-tier palette: Tier 1 Undercut/Root, Tier 2 Base Tone, Tier 3 Mid-Lock Shadow, Tier 4 Specular Crown Glint.
 
-### 3.5 Authentic 2D Discrete Grid Rasterization Engine ($P = 2.0\text{px}$)
-- When converting skins, weapon slashes, or VFX to pixel art style:
-  1. `ctx.imageSmoothingEnabled = false;` in save/restore blocks.
-  2. Fixed discrete grid unit ($P = 2.0\text{px}$) with coordinate snapping (`snap = (v) => Math.round(v / P) * P`).
-  3. Iterate over a 2D integer bounding grid with continuous inside-shape testing (`ctx.fillRect(px, py, P, P)`).
-  4. 4-neighbor attached boundary shell test (`!isInsideShape(gx + P, gy) ...`) to render solid dark manga ink outline (`#111114` / `#0E0F14`) with zero floating crumbs.
-  5. 4-tier stepped shading hierarchy (Leading Glint Core `#FFFFFF`, Base Energy Rim, Burning Shadow, Void Ambient Occlusion).
+### 3.5 Authentic 2D Discrete Grid Rasterization Engine ($P = 2.0\text{px}$) & Offscreen Canvas Cache
+- **MANDATORY OFFSCREEN CACHE (CRITICAL)**: NEVER execute per-pixel `ctx.fillRect(px, py, P, P)` loops directly inside rotated gameplay render loops (`ctx.rotate(angle)`). Rotated sub-pixel quads cause anti-aliasing seams (the "crisscross white grid lines" artifact) and severe FPS drops.
+- **The Gojo / Yuji / Sukuna Pattern**:
+  1. Rasterize the discrete pixel art model ONCE into an axis-aligned in-memory canvas (`_cachedFighterCanvas`) using `_render[Fighter]PixelBodyToCanvas(destCtx, r)`.
+  2. In the gameplay render loop, blit the cached canvas using a single `ctx.drawImage(_cachedFighterCanvas, -width / 2, -height / 2)` with `ctx.imageSmoothingEnabled = false;`.
+  3. Invalidate/re-render the cache ONLY when `_cachedFighterR !== fighter.r`.
+- **Discrete Rasterization Rules (Inside Offscreen Buffer)**:
+  1. Fixed discrete grid unit ($P = 2.0\text{px}$) with integer coordinate snapping (`px = rx - P / 2`, `py = ry - P / 2`).
+  2. 4-neighbor attached boundary shell test (`!isInsideShape((gx + 1) * P, gy * P) ...`) to render solid dark manga ink outline (`#0E0F14`) with zero floating crumbs.
+  3. Clean solid stepped color bands (NO modulo dither noise like `(gx + gy) % 4` which resembles grid noise).
+  4. 4-tier stepped shading hierarchy (Leading Glint Core `#FFFFFF`, Base Energy Rim, Burning Shadow, Void Ambient Occlusion).
 
 ### 3.6 Hand Layering & `drawPixelHand` Engine (Rule 20)
 - Guard with `const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;`.

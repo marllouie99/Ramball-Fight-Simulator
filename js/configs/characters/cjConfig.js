@@ -117,7 +117,7 @@ export const cjConfig = {
   baguvixDuration: 800,        // 5.0s (300 frames) invulnerability
   baguvixSpeedMultiplier: 0.28,// Significantly reduced slow walking speed (~1.54 px/frame) while wielding heavy minigun
   minigunFireRate: 5,          // Ultra-fast fire (every 2 frames = 30-45 rounds/sec)
-  minigunBulletDamage: 1,     // 12 damage per armor-piercing round
+  minigunBulletDamage: 2,     // 12 damage per armor-piercing round
   minigunBulletSpeed: 26.0,    // Supersonic armor-piercing projectile speed
   minigunKnockback: 0.0,       // Physical bullet pushback impulse (removed)
   minigunSpread: 0.05,         // Tight high-velocity spread

@@ -34,19 +34,19 @@ export class EnderDragonFighter extends Fighter {
     this.themeColor = cfg.themeColor || '#C026D3';
     this.damageNumberColor = cfg.themeColor || '#C026D3';
 
-    // Circle Fighter Model: Hide generic firearms, enable draconic claws
-    this.hideHands = false;
+    // Circle Fighter Model: Hide generic firearms and humanoid hands (pure draconic form)
+    this.hideHands = true;
     this.hideGun = true;
-    this.hideFrontHand = false;
-    this.hideBackHand = false;
+    this.hideFrontHand = true;
+    this.hideBackHand = true;
     this.gunAngle = Math.PI / 2;
     this.angle = Math.PI / 2;
 
-    // Void Flight Intangibility & Poise
-    this.isGhostTerrain = true;
-    this.immuneToKnockback = true;
-    this.immuneToPush = true;
-    this.immuneToCC = true;
+    // Arena Physics & Entity Collisions (Rule 1.2)
+    this.isGhostTerrain = false;
+    this.immuneToKnockback = false;
+    this.immuneToPush = false;
+    this.immuneToCC = false;
 
     // AI State Machine
     this.aiState = DRAGON_STATE.HOVER;
@@ -76,55 +76,109 @@ export class EnderDragonFighter extends Fighter {
     this._registerSkills();
   }
 
-  // ── Unyielding Boss Poise: Zero Hit-Pause, Zero Flinch & Zero Knockback ──
-  get knockbackVx() {
-    return 0;
-  }
-  set knockbackVx(_) {}
+  resolveWallBounce(arena, opponent) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
+    if (!arena) return false;
 
-  get knockbackVy() {
-    return 0;
-  }
-  set knockbackVy(_) {}
-
-  get basicAttackHitPauseTimer() {
-    return 0;
-  }
-  set basicAttackHitPauseTimer(_) {}
-
-  get knockbackStunTimer() {
-    return 0;
-  }
-  set knockbackStunTimer(_) {}
-
-  get hitStunTimer() {
-    return 0;
-  }
-  set hitStunTimer(_) {}
-
-  applyKnockback(vx, vy, stunFrames = 0, opts = {}) {
-    const options = (typeof stunFrames === 'object' && stunFrames !== null)
-      ? stunFrames
-      : (typeof opts === 'object' && opts !== null ? opts : {});
-
-    // Preserve pulling / dragging / suction beam mechanics (Gojo Purple/Blue, Escanor Cruel Sun, Yuta Pure Love Beam)
-    const isPullOrDrag = Boolean(
-      options.isPull ||
-      options.isDrag ||
-      options.isSuction ||
-      options.isBlackHole ||
-      options.isBeamDrag ||
-      options.sourceSkill === 'Hollow Purple' ||
-      options.sourceSkill === 'Lapse Blue' ||
-      options.sourceSkill === 'Cruel Sun' ||
-      options.sourceSkill === 'Pure Love Beam' ||
-      options.sourceSkill === 'Getsuga Tensho'
-    );
-
-    if (isPullOrDrag) {
-      this.vx += (vx || 0) * 0.40;
-      this.vy += (vy || 0) * 0.40;
+    // Rule 1.2: Standard CC trapping delegates to super
+    if (typeof this.isCaughtInBeam === 'function' && (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama)) {
+      return super.resolveWallBounce(arena, opponent);
     }
+
+    const r = this.r || 36;
+    let bounced = false;
+    let nx = 0;
+    let ny = 0;
+
+    // Handle Circular Arenas
+    if (arena.shape === 'circle') {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      const d = Math.hypot(this.x - cx, this.y - cy);
+
+      if (d + r >= ar && d > 0) {
+        // Inward normal pointing towards circle center
+        nx = -(this.x - cx) / d;
+        ny = -(this.y - cy) / d;
+        this.x = cx - nx * (ar - r);
+        this.y = cy - ny * (ar - r);
+        bounced = true;
+      }
+    } else {
+      // Handle Rectangular Arenas
+      const minX = arena.x + r;
+      const maxX = arena.x + arena.width - r;
+      const minY = arena.y + r;
+      const maxY = arena.y + arena.height - r;
+
+      if (this.x < minX) {
+        this.x = minX;
+        nx += 1;
+        bounced = true;
+      } else if (this.x > maxX) {
+        this.x = maxX;
+        nx -= 1;
+        bounced = true;
+      }
+
+      if (this.y < minY) {
+        this.y = minY;
+        ny += 1;
+        bounced = true;
+      } else if (this.y > maxY) {
+        this.y = maxY;
+        ny -= 1;
+        bounced = true;
+      }
+
+      // Normalize normal vector if corner collision occurred
+      const nLen = Math.hypot(nx, ny);
+      if (nLen > 0) {
+        nx /= nLen;
+        ny /= nLen;
+      }
+    }
+
+    if (bounced) {
+      // Calculate dot product of velocity with inward normal
+      const vDotN = this.vx * nx + this.vy * ny;
+
+      // If velocity is pointing outwards (towards wall), reflect cleanly
+      if (vDotN < 0) {
+        if (this.isSwooping) {
+          // High-velocity kinetic swoop reflection (0.75 restitution)
+          const restitution = 0.75;
+          this.vx = this.vx - (1 + restitution) * vDotN * nx;
+          this.vy = this.vy - (1 + restitution) * vDotN * ny;
+
+          // Align committed flight direction and skin angle with reflected velocity vector
+          this.committedAimAngle = Math.atan2(this.vy, this.vx);
+          this.gunAngle = this.committedAimAngle;
+          this.angle = this.committedAimAngle;
+
+          // Visual & Audio Impact Feedback
+          triggerGlobalScreenShake(6, 12);
+          spawnImpactFlash(this.x, this.y, 45, '#F5D0FE');
+          spawnSparks(this.x - nx * r * 0.7, this.y - ny * r * 0.7, '#C026D3', 14, 4.5);
+          this._playAudio('swoopHit', 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 0.65);
+        } else {
+          // Smooth aerial hover flight reflection (0.60 restitution)
+          const restitution = 0.60;
+          this.vx = this.vx - (1 + restitution) * vDotN * nx;
+          this.vy = this.vy - (1 + restitution) * vDotN * ny;
+
+          // Ensure minimum inward glide so it rebounds gracefully into open arena space
+          const newVDotN = this.vx * nx + this.vy * ny;
+          if (newVDotN < 1.2) {
+            this.vx += nx * 1.2;
+            this.vy += ny * 1.2;
+          }
+        }
+      }
+    }
+
+    return bounced;
   }
 
   _getConfig() {
@@ -268,11 +322,14 @@ export class EnderDragonFighter extends Fighter {
     this.x += this.vx;
     this.y += this.vy;
 
-    // Friction & Leash
-    this.vx *= (cfg.hoverFriction || 0.93);
-    this.vy *= (cfg.hoverFriction || 0.93);
+    // Apply hover friction when not in high-speed swoop
+    if (!this.isSwooping) {
+      this.vx *= (cfg.hoverFriction || 0.93);
+      this.vy *= (cfg.hoverFriction || 0.93);
+    }
 
-    this._enforceArenaLeash(arena, cfg);
+    // Resolve Arena Wall Bouncing & Obstacle Collisions (Rule 1.2)
+    this.resolveWallBounce(arena, opponent);
   }
 
   // ── Hover & Circling State ──
@@ -285,8 +342,52 @@ export class EnderDragonFighter extends Fighter {
       const wobble = Math.sin(this.hoverOrbitTime) * (cfg.hoverOrbitWobbleAmp || 40);
       const floatY = Math.sin(this.hoverPhase) * (cfg.hoverOscillationAmp || 7.0);
 
-      const desiredX = opponent.x + wobble;
-      const desiredY = opponent.y - targetDistY + floatY;
+      let desiredX = opponent.x + wobble;
+      let desiredY = opponent.y - targetDistY + floatY;
+
+      // Smart Arena Airspace Clamping: Ensure target hover position remains safely inside arena
+      const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+      if (curArena) {
+        const margin = (this.r || 36) + 40;
+        if (curArena.shape === 'circle') {
+          const cx = curArena.x + curArena.width / 2;
+          const cy = curArena.y + curArena.height / 2;
+          const maxR = (curArena.radius || (curArena.width / 2)) - margin;
+          const distFromCenter = Math.hypot(desiredX - cx, desiredY - cy);
+          if (distFromCenter > maxR && distFromCenter > 0) {
+            desiredX = cx + ((desiredX - cx) / distFromCenter) * maxR;
+            desiredY = cy + ((desiredY - cy) / distFromCenter) * maxR;
+          }
+        } else {
+          desiredX = Math.max(curArena.x + margin, Math.min(curArena.x + curArena.width - margin, desiredX));
+          desiredY = Math.max(curArena.y + margin, Math.min(curArena.y + curArena.height - margin, desiredY));
+        }
+
+        // Soft Boundary Repulsion: Aerodynamic wall avoidance steering to prevent sticking
+        const buffer = 75;
+        if (curArena.shape === 'circle') {
+          const cx = curArena.x + curArena.width / 2;
+          const cy = curArena.y + curArena.height / 2;
+          const ar = curArena.radius || (curArena.width / 2);
+          const d = Math.hypot(this.x - cx, this.y - cy);
+          const distToWall = (ar - this.r) - d;
+          if (distToWall < buffer && d > 0) {
+            const push = (1.0 - Math.max(0, distToWall) / buffer) * 0.28;
+            this.vx += -((this.x - cx) / d) * push;
+            this.vy += -((this.y - cy) / d) * push;
+          }
+        } else {
+          const leftDist = this.x - (curArena.x + this.r);
+          const rightDist = (curArena.x + curArena.width - this.r) - this.x;
+          const topDist = this.y - (curArena.y + this.r);
+          const botDist = (curArena.y + curArena.height - this.r) - this.y;
+
+          if (leftDist < buffer) this.vx += (1.0 - Math.max(0, leftDist) / buffer) * 0.28;
+          if (rightDist < buffer) this.vx -= (1.0 - Math.max(0, rightDist) / buffer) * 0.28;
+          if (topDist < buffer) this.vy += (1.0 - Math.max(0, topDist) / buffer) * 0.28;
+          if (botDist < buffer) this.vy -= (1.0 - Math.max(0, botDist) / buffer) * 0.28;
+        }
+      }
 
       const dx = desiredX - this.x;
       const dy = desiredY - this.y;

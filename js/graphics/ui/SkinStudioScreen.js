@@ -1944,15 +1944,30 @@ export function drawSkinStudioScreen() {
 // ─────────────────────────────────────────────
 // MOUSE & TOUCH INTERACTION LISTENERS
 // ─────────────────────────────────────────────
+let _cachedSkinStudioRect = null;
+function invalidateSkinStudioRect() {
+  _cachedSkinStudioRect = null;
+}
+function getSkinStudioRect(target) {
+  if (!_cachedSkinStudioRect) {
+    _cachedSkinStudioRect = target.getBoundingClientRect();
+  }
+  return _cachedSkinStudioRect;
+}
+
 if (typeof window !== 'undefined') {
+  window.addEventListener('resize', invalidateSkinStudioRect);
+  window.addEventListener('scroll', invalidateSkinStudioRect, { passive: true });
+
   const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
   if (eventTarget && typeof eventTarget.addEventListener === 'function') {
     eventTarget.addEventListener('mousedown', (e) => {
       if (state.gameState !== 'skinStudio' || state.studioSkinModalOpen) return;
 
-      const rect = eventTarget.getBoundingClientRect();
-      const scaleX = state.canvas.width / rect.width;
-      const scaleY = state.canvas.height / rect.height;
+      invalidateSkinStudioRect();
+      const rect = getSkinStudioRect(eventTarget);
+      const scaleX = state.canvas.width / (rect.width || state.canvas.width);
+      const scaleY = state.canvas.height / (rect.height || state.canvas.height);
       const mx = (e.clientX - rect.left) * scaleX;
       const my = (e.clientY - rect.top) * scaleY;
 
@@ -2007,10 +2022,13 @@ if (typeof window !== 'undefined') {
 
     window.addEventListener('mousemove', (e) => {
       if (state.gameState !== 'skinStudio' || state.studioSkinModalOpen) return;
+      if (!isDraggingHairCenter && !isDraggingHairWidth && !isDraggingHairHeight && !isDraggingHairScale && !isDraggingHairRotate) {
+        return;
+      }
 
-      const rect = eventTarget.getBoundingClientRect();
-      const scaleX = state.canvas.width / rect.width;
-      const scaleY = state.canvas.height / rect.height;
+      const rect = getSkinStudioRect(eventTarget);
+      const scaleX = state.canvas.width / (rect.width || state.canvas.width);
+      const scaleY = state.canvas.height / (rect.height || state.canvas.height);
       const mx = (e.clientX - rect.left) * scaleX;
       const my = (e.clientY - rect.top) * scaleY;
 

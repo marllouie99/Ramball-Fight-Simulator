@@ -170,6 +170,11 @@ async function verifyAll() {
       execSync('node scripts/testAllFighters.mjs', { stdio: 'inherit' });
       execSync('node scripts/testTagMatch.mjs', { stdio: 'inherit' });
       execSync('node scripts/testInteractions.mjs', { stdio: 'inherit' });
+      
+      // 4. Automatically synchronize patch notes & live in-game data store
+      console.log('\n📝 Synchronizing Live Patch Notes & Changelogs...');
+      execSync('node scripts/generatePatchNotes.mjs', { stdio: 'inherit' });
+
       process.exit(0);
     } catch (err) {
       console.error('🚨 Simulation tests failed!');

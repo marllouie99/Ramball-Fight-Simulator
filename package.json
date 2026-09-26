@@ -15,6 +15,7 @@
     "test:interactions": "node scripts/testInteractions.mjs",
     "scaffold:fighter": "node scripts/scaffoldFighter.mjs",
     "scaffold:boss": "node scripts/scaffoldBossConfig.mjs",
+    "patch-notes": "node scripts/generatePatchNotes.mjs",
     "build": "electron-builder --win"
   },
   "author": "",

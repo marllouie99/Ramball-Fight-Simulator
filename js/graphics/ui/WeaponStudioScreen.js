@@ -14,11 +14,28 @@ const ZOOM_DEFAULT = 2.4;
 if (state.studioSelectedDetail === undefined) state.studioSelectedDetail = null;
 if (state.studioZenitsuPart === undefined) state.studioZenitsuPart = 'overall';
 
+// Precision Viewport Layout Constants (Unified for rendering and mouse math)
+const VIEWPORT_X = 16;
+const VIEWPORT_Y = 168;
+const VIEWPORT_H = 346;
+
 // Interactive Drag States
 let isDraggingBase = false;
 let isDraggingTip = false;
 let activeDragFinger = -1;
 let activeDragType = null; // 'knuckle' | 'tip'
+
+// Cached Event Target Bounding Rect to eliminate DOM reflows / layout thrashing on mousemove
+let _cachedStudioTargetRect = null;
+function getCachedTargetRect(target) {
+  if (!_cachedStudioTargetRect) {
+    _cachedStudioTargetRect = target.getBoundingClientRect();
+  }
+  return _cachedStudioTargetRect;
+}
+function invalidateCachedTargetRect() {
+  _cachedStudioTargetRect = null;
+}
 
 // Helper to initialize custom settings in state
 function initCustomizations() {
@@ -230,10 +247,10 @@ export function drawWeaponStudioScreen() {
   renderRow(row3, 140);
 
   // ── Tier 2: Precision Viewport Stage ──
-  const viewportX = 16;
-  const viewportY = 168;
+  const viewportX = VIEWPORT_X;
+  const viewportY = VIEWPORT_Y;
   const viewportW = canvas.width - 32; // 508px
-  const viewportH = 346;
+  const viewportH = VIEWPORT_H;
   const heroX = canvas.width / 2;
   const heroY = viewportY + viewportH / 2;
 
@@ -1089,206 +1106,209 @@ export function drawWeaponStudioScreen() {
 // mouse down, move, up event listeners
 // ─────────────────────────────────────────────
 if (typeof window !== 'undefined') {
+  window.addEventListener('resize', invalidateCachedTargetRect);
+  window.addEventListener('scroll', invalidateCachedTargetRect, { passive: true });
+
   const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
   if (eventTarget && typeof eventTarget.addEventListener === 'function') {
     eventTarget.addEventListener('mousedown', (e) => {
       if (state.gameState !== 'weaponStudio' || state.studioSelectedDetail === null) return;
 
-    const rect = eventTarget.getBoundingClientRect();
-    const scaleX = state.canvas.width / rect.width;
-    const scaleY = state.canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+      invalidateCachedTargetRect();
+      const rect = getCachedTargetRect(eventTarget);
+      const scaleX = state.canvas.width / (rect.width || state.canvas.width);
+      const scaleY = state.canvas.height / (rect.height || state.canvas.height);
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
 
-    const currentScale = state.studioPreviewScale;
-    const viewportY = 142;
-    const viewportH = 372;
-    const heroY = viewportY + viewportH / 2;
-    const activeWeaponKey = state.studioSelectedWeapon;
+      const currentScale = state.studioPreviewScale;
+      const heroY = VIEWPORT_Y + VIEWPORT_H / 2;
+      const activeWeaponKey = state.studioSelectedWeapon;
 
-    // Convert mouse position to local hero display space
-    const localX = (mx - state.canvas.width / 2) / currentScale;
-    const localY = (my - heroY) / currentScale;
+      // Convert mouse position to local hero display space
+      const localX = (mx - state.canvas.width / 2) / currentScale;
+      const localY = (my - heroY) / currentScale;
 
-    if (activeWeaponKey === 'mahito') {
-      if (state.studioSelectedDetail !== 'finger') return;
-      const handX = 25;
-      const blades = state.weaponCustomizations.mahito.blades;
-      const i = state.studioClawFinger;
-      const b = blades[i];
-      if (!b) return;
+      if (activeWeaponKey === 'mahito') {
+        if (state.studioSelectedDetail !== 'finger') return;
+        const handX = 25;
+        const blades = state.weaponCustomizations.mahito.blades;
+        const i = state.studioClawFinger;
+        const b = blades[i];
+        if (!b) return;
 
-      const kx = handX + b.knuckleX;
-      const ky = b.knuckleY;
+        const kx = handX + b.knuckleX;
+        const ky = b.knuckleY;
 
-      const cosAngle = Math.cos(b.fanAngle);
-      const sinAngle = Math.sin(b.fanAngle);
-      const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
-      const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
+        const cosAngle = Math.cos(b.fanAngle);
+        const sinAngle = Math.sin(b.fanAngle);
+        const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
+        const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
 
-      // Knuckle click check
-      if (Math.hypot(localX - kx, localY - ky) < 14) {
-        activeDragFinger = i;
-        activeDragType = 'knuckle';
-        return;
-      }
-
-      // Tip click check
-      if (Math.hypot(localX - tx, localY - ty) < 14) {
-        activeDragFinger = i;
-        activeDragType = 'tip';
-        return;
-      }
-    } else if (activeWeaponKey === 'zenitsu') {
-      const custom = state.weaponCustomizations.zenitsu;
-      const partKey = state.studioZenitsuPart || 'overall';
-      const target = (partKey === 'overall')
-        ? custom
-        : ((custom.parts && custom.parts[partKey]) ? custom.parts[partKey] : custom);
-
-      const baseLx = -64 + custom.offsetX + (partKey !== 'overall' ? (target.offsetX || 0) : 0);
-      const baseLy = custom.offsetY + (partKey !== 'overall' ? (target.offsetY || 0) : 0);
-
-      if (state.studioSelectedDetail === 'position') {
-        if (Math.hypot(localX - baseLx, localY - baseLy) < 16) {
-          isDraggingBase = true;
+        // Knuckle click check
+        if (Math.hypot(localX - kx, localY - ky) < 14) {
+          activeDragFinger = i;
+          activeDragType = 'knuckle';
           return;
         }
-      } else if (state.studioSelectedDetail === 'scale_angle' || state.studioSelectedDetail === 'hands_size') {
-        const lineLen = 70;
-        const curScale = target.scale ?? 1.0;
-        const curAngle = target.angleOffset ?? 0;
-        const tipLx = baseLx + lineLen * curScale * Math.cos(curAngle);
-        const tipLy = baseLy + lineLen * curScale * Math.sin(curAngle);
-        if (Math.hypot(localX - tipLx, localY - tipLy) < 16) {
-          isDraggingTip = true;
+
+        // Tip click check
+        if (Math.hypot(localX - tx, localY - ty) < 14) {
+          activeDragFinger = i;
+          activeDragType = 'tip';
           return;
         }
-      }
-    } else {
-      const custom = state.weaponCustomizations[activeWeaponKey];
-      let offsetX = -40;
-      if (activeWeaponKey === 'cronos') offsetX = -55;
-      else if (activeWeaponKey === 'ruby') offsetX = -75;
-      else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
+      } else if (activeWeaponKey === 'zenitsu') {
+        const custom = state.weaponCustomizations.zenitsu;
+        const partKey = state.studioZenitsuPart || 'overall';
+        const target = (partKey === 'overall')
+          ? custom
+          : ((custom.parts && custom.parts[partKey]) ? custom.parts[partKey] : custom);
 
-      const baseLx = offsetX + custom.offsetX;
-      const baseLy = custom.offsetY;
+        const baseLx = -64 + custom.offsetX + (partKey !== 'overall' ? (target.offsetX || 0) : 0);
+        const baseLy = custom.offsetY + (partKey !== 'overall' ? (target.offsetY || 0) : 0);
 
-      if (state.studioSelectedDetail === 'position') {
-        // Grip anchor check
-        if (Math.hypot(localX - baseLx, localY - baseLy) < 14) {
-          isDraggingBase = true;
-          return;
+        if (state.studioSelectedDetail === 'position') {
+          if (Math.hypot(localX - baseLx, localY - baseLy) < 16) {
+            isDraggingBase = true;
+            return;
+          }
+        } else if (state.studioSelectedDetail === 'scale_angle' || state.studioSelectedDetail === 'hands_size') {
+          const lineLen = 70;
+          const curScale = target.scale ?? 1.0;
+          const curAngle = target.angleOffset ?? 0;
+          const tipLx = baseLx + lineLen * curScale * Math.cos(curAngle);
+          const tipLy = baseLy + lineLen * curScale * Math.sin(curAngle);
+          if (Math.hypot(localX - tipLx, localY - tipLy) < 16) {
+            isDraggingTip = true;
+            return;
+          }
         }
-      } else if (state.studioSelectedDetail === 'scale_angle') {
-        const lineLen = 70;
-        const tipLx = baseLx + lineLen * custom.scale * Math.cos(custom.angleOffset);
-        const tipLy = baseLy + lineLen * custom.scale * Math.sin(custom.angleOffset);
+      } else {
+        const custom = state.weaponCustomizations[activeWeaponKey];
+        let offsetX = -40;
+        if (activeWeaponKey === 'cronos') offsetX = -55;
+        else if (activeWeaponKey === 'ruby') offsetX = -75;
+        else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
 
-        // Tip handle check
-        if (Math.hypot(localX - tipLx, localY - tipLy) < 14) {
-          isDraggingTip = true;
-          return;
+        const baseLx = offsetX + custom.offsetX;
+        const baseLy = custom.offsetY;
+
+        if (state.studioSelectedDetail === 'position') {
+          // Grip anchor check
+          if (Math.hypot(localX - baseLx, localY - baseLy) < 14) {
+            isDraggingBase = true;
+            return;
+          }
+        } else if (state.studioSelectedDetail === 'scale_angle') {
+          const lineLen = 70;
+          const tipLx = baseLx + lineLen * custom.scale * Math.cos(custom.angleOffset);
+          const tipLy = baseLy + lineLen * custom.scale * Math.sin(custom.angleOffset);
+
+          // Tip handle check
+          if (Math.hypot(localX - tipLx, localY - tipLy) < 14) {
+            isDraggingTip = true;
+            return;
+          }
         }
       }
-    }
-  });
+    });
 
-  window.addEventListener('mousemove', (e) => {
-    if (state.gameState !== 'weaponStudio' || state.studioSelectedDetail === null) return;
+    window.addEventListener('mousemove', (e) => {
+      if (state.gameState !== 'weaponStudio' || state.studioSelectedDetail === null) return;
+      const isDraggingMahito = (activeDragFinger >= 0 && state.studioSelectedDetail === 'finger');
+      const isDraggingNormal = isDraggingBase || isDraggingTip;
+      if (!isDraggingMahito && !isDraggingNormal) return;
 
-    const rect = eventTarget.getBoundingClientRect();
-    const scaleX = state.canvas.width / rect.width;
-    const scaleY = state.canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+      const rect = getCachedTargetRect(eventTarget);
+      const scaleX = state.canvas.width / (rect.width || state.canvas.width);
+      const scaleY = state.canvas.height / (rect.height || state.canvas.height);
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
 
-    const currentScale = state.studioPreviewScale;
-    const viewportY = 142;
-    const viewportH = 372;
-    const heroY = viewportY + viewportH / 2;
-    const activeWeaponKey = state.studioSelectedWeapon;
+      const currentScale = state.studioPreviewScale;
+      const heroY = VIEWPORT_Y + VIEWPORT_H / 2;
+      const activeWeaponKey = state.studioSelectedWeapon;
 
-    const localX = (mx - state.canvas.width / 2) / currentScale;
-    const localY = (my - heroY) / currentScale;
+      const localX = (mx - state.canvas.width / 2) / currentScale;
+      const localY = (my - heroY) / currentScale;
 
-    if (activeWeaponKey === 'mahito') {
-      if (activeDragFinger < 0 || state.studioSelectedDetail !== 'finger') return;
-      const handX = 25;
-      const b = state.weaponCustomizations.mahito.blades[activeDragFinger];
+      if (activeWeaponKey === 'mahito') {
+        if (activeDragFinger < 0 || state.studioSelectedDetail !== 'finger') return;
+        const handX = 25;
+        const b = state.weaponCustomizations.mahito.blades[activeDragFinger];
 
-      if (activeDragType === 'knuckle') {
-        b.knuckleX = localX - handX;
-        b.knuckleY = localY;
-      } else if (activeDragType === 'tip') {
-        const dx = localX - (handX + b.knuckleX);
-        const dy = localY - b.knuckleY;
-        b.length = Math.max(15, Math.hypot(dx, dy));
-        b.fanAngle = Math.atan2(dy, dx);
-      }
-    } else if (activeWeaponKey === 'zenitsu') {
-      const custom = state.weaponCustomizations.zenitsu;
-      const partKey = state.studioZenitsuPart || 'overall';
-      const target = (partKey === 'overall')
-        ? custom
-        : ((custom.parts && custom.parts[partKey]) ? custom.parts[partKey] : custom);
+        if (activeDragType === 'knuckle') {
+          b.knuckleX = localX - handX;
+          b.knuckleY = localY;
+        } else if (activeDragType === 'tip') {
+          const dx = localX - (handX + b.knuckleX);
+          const dy = localY - b.knuckleY;
+          b.length = Math.max(15, Math.hypot(dx, dy));
+          b.fanAngle = Math.atan2(dy, dx);
+        }
+      } else if (activeWeaponKey === 'zenitsu') {
+        const custom = state.weaponCustomizations.zenitsu;
+        const partKey = state.studioZenitsuPart || 'overall';
+        const target = (partKey === 'overall')
+          ? custom
+          : ((custom.parts && custom.parts[partKey]) ? custom.parts[partKey] : custom);
 
-      if (isDraggingBase && state.studioSelectedDetail === 'position') {
-        if (partKey === 'overall') {
-          custom.offsetX = localX - (-64);
+        if (isDraggingBase && state.studioSelectedDetail === 'position') {
+          if (partKey === 'overall') {
+            custom.offsetX = localX - (-64);
+            custom.offsetY = localY;
+          } else {
+            target.offsetX = localX - (-64 + custom.offsetX);
+            target.offsetY = localY - custom.offsetY;
+          }
+        } else if (isDraggingTip && (state.studioSelectedDetail === 'scale_angle' || state.studioSelectedDetail === 'hands_size')) {
+          const parentX = -64 + custom.offsetX + (partKey !== 'overall' ? (target.offsetX || 0) : 0);
+          const parentY = custom.offsetY + (partKey !== 'overall' ? (target.offsetY || 0) : 0);
+          const dx = localX - parentX;
+          const dy = localY - parentY;
+          const lineLen = 70;
+          target.scale = Math.max(0.2, Math.hypot(dx, dy) / lineLen);
+          if (partKey !== 'hands') {
+            target.angleOffset = Math.atan2(dy, dx);
+          }
+        }
+      } else {
+        const custom = state.weaponCustomizations[activeWeaponKey];
+        let offsetX = -40;
+        if (activeWeaponKey === 'cronos') offsetX = -55;
+        else if (activeWeaponKey === 'ruby') offsetX = -75;
+        else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
+
+        if (isDraggingBase && state.studioSelectedDetail === 'position') {
+          custom.offsetX = localX - offsetX;
           custom.offsetY = localY;
-        } else {
-          target.offsetX = localX - (-64 + custom.offsetX);
-          target.offsetY = localY - custom.offsetY;
-        }
-      } else if (isDraggingTip && (state.studioSelectedDetail === 'scale_angle' || state.studioSelectedDetail === 'hands_size')) {
-        const parentX = -64 + custom.offsetX + (partKey !== 'overall' ? (target.offsetX || 0) : 0);
-        const parentY = custom.offsetY + (partKey !== 'overall' ? (target.offsetY || 0) : 0);
-        const dx = localX - parentX;
-        const dy = localY - parentY;
-        const lineLen = 70;
-        target.scale = Math.max(0.2, Math.hypot(dx, dy) / lineLen);
-        if (partKey !== 'hands') {
-          target.angleOffset = Math.atan2(dy, dx);
+        } else if (isDraggingTip && state.studioSelectedDetail === 'scale_angle') {
+          const dx = localX - (offsetX + custom.offsetX);
+          const dy = localY - custom.offsetY;
+          const lineLen = 70;
+          custom.scale = Math.max(0.3, Math.hypot(dx, dy) / lineLen);
+          custom.angleOffset = Math.atan2(dy, dx);
         }
       }
-    } else {
-      const custom = state.weaponCustomizations[activeWeaponKey];
-      let offsetX = -40;
-      if (activeWeaponKey === 'cronos') offsetX = -55;
-      else if (activeWeaponKey === 'ruby') offsetX = -75;
-      else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
+    });
 
-      if (isDraggingBase && state.studioSelectedDetail === 'position') {
-        custom.offsetX = localX - offsetX;
-        custom.offsetY = localY;
-      } else if (isDraggingTip && state.studioSelectedDetail === 'scale_angle') {
-        const dx = localX - (offsetX + custom.offsetX);
-        const dy = localY - custom.offsetY;
-        const lineLen = 70;
-        custom.scale = Math.max(0.3, Math.hypot(dx, dy) / lineLen);
-        custom.angleOffset = Math.atan2(dy, dx);
+    window.addEventListener('mouseup', () => {
+      if (isDraggingBase || isDraggingTip || activeDragFinger >= 0) {
+        saveWeaponCustomizations();
       }
-    }
-  });
+      isDraggingBase = false;
+      isDraggingTip = false;
+      activeDragFinger = -1;
+      activeDragType = null;
+    });
 
-  window.addEventListener('mouseup', () => {
-    if (isDraggingBase || isDraggingTip || activeDragFinger >= 0) {
-      saveWeaponCustomizations();
-    }
-    isDraggingBase = false;
-    isDraggingTip = false;
-    activeDragFinger = -1;
-    activeDragType = null;
-  });
-
-  // Mouse Wheel Zoom
-  eventTarget.addEventListener('wheel', (e) => {
-    if (state.gameState !== 'weaponStudio') return;
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -ZOOM_STEP * 0.5 : ZOOM_STEP * 0.5;
-    state.studioPreviewScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, state.studioPreviewScale + delta));
-  }, { passive: false });
+    // Mouse Wheel Zoom
+    eventTarget.addEventListener('wheel', (e) => {
+      if (state.gameState !== 'weaponStudio') return;
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -ZOOM_STEP * 0.5 : ZOOM_STEP * 0.5;
+      state.studioPreviewScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, state.studioPreviewScale + delta));
+    }, { passive: false });
   }
 }
