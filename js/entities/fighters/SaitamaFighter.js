@@ -4,6 +4,7 @@ import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenSh
 import { MODE_SETTINGS } from '../../core/modeConfig.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnPunchWindSpeedLines, spawnSaitamaCounterFrontalBlast } from '../../graphics/particles/sparkEffect.js';
+import { triggerSaitamaWallShatter } from '../../graphics/particles/saitamaWallShatter.js';
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { fadeOutSound } from '../../systems/soundSystem.js';
@@ -1407,6 +1408,12 @@ export class SaitamaFighter extends Fighter {
         spawnSaitamaCounterFrontalBlast(this.x, this.y, pushAngle, frontalReach, frontalArc);
       }
 
+      // Unique Interaction: Shatter the arena line wall and HUD in the punch direction
+      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+      if (arena && typeof triggerSaitamaWallShatter === 'function') {
+        triggerSaitamaWallShatter(this.x, this.y, pushAngle, arena);
+      }
+
       // Screen Shake & Sakuga Impact FX
       if (typeof triggerGlobalScreenShake === 'function') {
         const shakeIntensity = CONFIG.saitama?.counterPunchScreenShakeIntensity ?? 100.0;
@@ -1932,6 +1939,12 @@ export class SaitamaFighter extends Fighter {
     const fistY = this.y + Math.sin(aimAngle) * (this.r + 15);
     if (typeof spawnSaitamaCounterFrontalBlast === 'function') {
       spawnSaitamaCounterFrontalBlast(fistX, fistY, aimAngle, punchBlastReach, punchBlastArc);
+    }
+
+    // Unique Interaction: Shatter the arena line wall and HUD in normal punch trajectory
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    if (arena && typeof triggerSaitamaWallShatter === 'function') {
+      triggerSaitamaWallShatter(fistX, fistY, aimAngle, arena);
     }
 
     const validHits = [];
@@ -2578,6 +2591,12 @@ export class SaitamaFighter extends Fighter {
           this._flurryFinalPunchReleaseOriginX = this.x;
           this._flurryFinalPunchReleaseOriginY = this.y - (this.z || 0);
           this._flurryAccumulatedDamage = 0;
+
+          // Unique Interaction: Shatter the arena line wall and HUD on flurry final blow
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          if (arena && typeof triggerSaitamaWallShatter === 'function') {
+            triggerSaitamaWallShatter(this.x, this.y, this._flurryFinalPunchReleaseAngle, arena);
+          }
           if (this.flurryTarget) {
             this.flurryTarget.caughtInSaitamaFlurry = false;
             this.flurryTarget.timeStopTimer = 0;

@@ -512,31 +512,33 @@ export function triggerSaitamaWallShatter(originX, originY, punchAngle, arena, c
     state.shatteredWalls = [];
   }
 
-  // ── Re-blast & Accelerate Existing Wall Segments & Shards in the Blast Cone ──
+  // ── 1. Re-blast & Accelerate Existing Wall Segments & Shards in the Blast Cone ──
   if (state.shatteredWalls.length > 0) {
     for (const existingSW of state.shatteredWalls) {
       if (existingSW.segments) {
         for (const seg of existingSW.segments) {
-          if (isInsideSaitamaFrontalBlast(seg.x, seg.y, originX, originY, punchAngle, halfArc, 35)) {
-            const isHangingOrDangling = seg.state === 'hanging' || seg.state === 'dangling';
+          const inBlast = isInsideSaitamaFrontalBlast(seg.x, seg.y, originX, originY, punchAngle, halfArc, 45) ||
+                          isInsideSaitamaFrontalBlast(seg.originX, seg.originY, originX, originY, punchAngle, halfArc, 45);
+          if (inBlast) {
             seg.state = 'falling';
             seg.hangTimer = 0;
             seg.dangleTimer = 0;
             seg.isBlownAway = true;
-            const reBlastSpeed = isHangingOrDangling ? (16 + Math.random() * 14) : (12 + Math.random() * 10);
+            const reBlastSpeed = 22 + Math.random() * 16;
             const spread = (Math.random() - 0.5) * 0.6;
             const outwardDir = punchAngle + spread;
             seg.vx += Math.cos(outwardDir) * reBlastSpeed;
             seg.vy += Math.sin(outwardDir) * reBlastSpeed;
-            seg.rotSpeed = (Math.random() - 0.5) * 0.42;
+            seg.rotSpeed = (Math.random() - 0.5) * 0.5;
             seg.alpha = 1.0;
           }
         }
       }
       if (existingSW.fastShards) {
         for (const shard of existingSW.fastShards) {
-          if (isInsideSaitamaFrontalBlast(shard.x, shard.y, originX, originY, punchAngle, halfArc, 35)) {
-            const shardBoost = 14 + Math.random() * 16;
+          const inBlast = isInsideSaitamaFrontalBlast(shard.x, shard.y, originX, originY, punchAngle, halfArc, 45);
+          if (inBlast) {
+            const shardBoost = 18 + Math.random() * 16;
             const spread = (Math.random() - 0.5) * 0.7;
             shard.vx += Math.cos(punchAngle + spread) * shardBoost;
             shard.vy += Math.sin(punchAngle + spread) * shardBoost;
@@ -545,114 +547,178 @@ export function triggerSaitamaWallShatter(originX, originY, punchAngle, arena, c
         }
       }
       // Refresh life of existing shattered walls if re-hit
-      existingSW.life = Math.max(existingSW.life, 260);
+      existingSW.life = Math.max(existingSW.life, 320);
     }
   }
 
   const maxLife = 380; // ~6.3 seconds duration before complete restoration
 
+  // ── 2. Process Hits: Merge with overlapping existing breaches OR create new breach ──
   for (const hit of hits) {
     const span = Math.min(300, Math.max(70, hit.span || 140));
     const tanX = Math.cos(hit.tangentAngle);
     const tanY = Math.sin(hit.tangentAngle);
 
-    // 1. Generate structural hanging & blown-away wall segments
-    const segments = generateWallSegments(hit, span, punchAngle);
+    // Check if there is already an existing breach at or near this hit location
+    const existingSW = state.shatteredWalls.find(sw => {
+      if (sw.wallType !== hit.wallType) return false;
+      const dist = Math.hypot(sw.x - hit.x, sw.y - hit.y);
+      return dist <= (sw.halfSpan + span / 2 + 60);
+    });
 
-    // 2. Generate immediate epicentral blast shards (flying needle fragments)
-    const fastShards = [];
-    const shardCount = 20;
-    for (let i = 0; i < shardCount; i++) {
-      const posAlong = (Math.random() - 0.5) * (span * 0.7);
-      const startX = hit.x + tanX * posAlong;
-      const startY = hit.y + tanY * posAlong;
+    if (existingSW) {
+      // Widen the existing breach and blow out all remaining pieces!
+      existingSW.halfSpan = Math.min((arena.width || 800) * 0.45, existingSW.halfSpan + span * 0.35);
+      existingSW.x = (existingSW.x + hit.x) / 2;
+      existingSW.y = (existingSW.y + hit.y) / 2;
 
-      const speed = 10 + Math.random() * 20;
-      const angleSpread = (Math.random() - 0.5) * 0.9;
-      const shardAngle = punchAngle + angleSpread;
+      // Force all remaining segments of this existing breach to blow away instantly with zero hang time
+      if (existingSW.segments) {
+        for (const seg of existingSW.segments) {
+          seg.state = 'falling';
+          seg.hangTimer = 0;
+          seg.dangleTimer = 0;
+          seg.isBlownAway = true;
+          const reBlastSpeed = 24 + Math.random() * 14;
+          const spread = (Math.random() - 0.5) * 0.6;
+          seg.vx += Math.cos(punchAngle + spread) * reBlastSpeed;
+          seg.vy += Math.sin(punchAngle + spread) * reBlastSpeed;
+          seg.rotSpeed = (Math.random() - 0.5) * 0.45;
+          seg.alpha = 1.0;
+        }
+      }
 
-      fastShards.push({
-        x: startX,
-        y: startY,
-        vx: Math.cos(shardAngle) * speed,
-        vy: Math.sin(shardAngle) * speed,
-        rot: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.45,
-        length: 8 + Math.random() * 24,
-        thickness: 2.0 + Math.random() * 3.5,
-        isChunk: Math.random() < 0.50,
-        drag: 0.95 + Math.random() * 0.03,
-        alpha: 1.0,
-        colorVariant: Math.random() < 0.25 ? '#FFD700' : (Math.random() < 0.20 ? '#FF3300' : null)
-      });
+      // Spawn extra high-speed blast shards flying out from the widened breach
+      const extraShardCount = 18;
+      if (!existingSW.fastShards) existingSW.fastShards = [];
+      for (let i = 0; i < extraShardCount; i++) {
+        const posAlong = (Math.random() - 0.5) * (existingSW.halfSpan * 1.5);
+        const startX = existingSW.x + tanX * posAlong;
+        const startY = existingSW.y + tanY * posAlong;
+        const speed = 16 + Math.random() * 22;
+        const angleSpread = (Math.random() - 0.5) * 0.85;
+        const shardAngle = punchAngle + angleSpread;
+
+        existingSW.fastShards.push({
+          x: startX,
+          y: startY,
+          vx: Math.cos(shardAngle) * speed,
+          vy: Math.sin(shardAngle) * speed,
+          rot: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.5,
+          length: 10 + Math.random() * 25,
+          thickness: 2.0 + Math.random() * 3.5,
+          isChunk: Math.random() < 0.50,
+          drag: 0.96 + Math.random() * 0.02,
+          alpha: 1.0,
+          colorVariant: Math.random() < 0.25 ? '#FFD700' : (Math.random() < 0.20 ? '#FF3300' : null)
+        });
+      }
+
+      // Add fresh shockwave and feedback
+      if (!existingSW.shockwaves) existingSW.shockwaves = [];
+      existingSW.shockwaves.push({ radius: 8, maxRadius: 220, speed: 10.0, alpha: 0.90, width: 3.5 });
+      spawnImpactFlash(hit.x, hit.y, 80, '#FFFFFF');
+      spawnSparks(hit.x, hit.y, 45, 'impact', '#FFD700');
+    } else {
+      // 1. Generate structural hanging & blown-away wall segments
+      const segments = generateWallSegments(hit, span, punchAngle);
+
+      // 2. Generate immediate epicentral blast shards (flying needle fragments)
+      const fastShards = [];
+      const shardCount = 20;
+      for (let i = 0; i < shardCount; i++) {
+        const posAlong = (Math.random() - 0.5) * (span * 0.7);
+        const startX = hit.x + tanX * posAlong;
+        const startY = hit.y + tanY * posAlong;
+
+        const speed = 10 + Math.random() * 20;
+        const angleSpread = (Math.random() - 0.5) * 0.9;
+        const shardAngle = punchAngle + angleSpread;
+
+        fastShards.push({
+          x: startX,
+          y: startY,
+          vx: Math.cos(shardAngle) * speed,
+          vy: Math.sin(shardAngle) * speed,
+          rot: Math.random() * Math.PI * 2,
+          rotSpeed: (Math.random() - 0.5) * 0.45,
+          length: 8 + Math.random() * 24,
+          thickness: 2.0 + Math.random() * 3.5,
+          isChunk: Math.random() < 0.50,
+          drag: 0.95 + Math.random() * 0.03,
+          alpha: 1.0,
+          colorVariant: Math.random() < 0.25 ? '#FFD700' : (Math.random() < 0.20 ? '#FF3300' : null)
+        });
+      }
+
+      // 3. Generate branching fissures into the intact wall
+      const leftEnd = { x: hit.x - tanX * (span / 2), y: hit.y - tanY * (span / 2) };
+      const rightEnd = { x: hit.x + tanX * (span / 2), y: hit.y + tanY * (span / 2) };
+      const fissures = [
+        ...generateBranchingFissures(leftEnd.x, leftEnd.y, hit.tangentAngle + Math.PI, 80, 2),
+        ...generateBranchingFissures(rightEnd.x, rightEnd.y, hit.tangentAngle, 80, 2)
+      ];
+
+      // 4. Concrete dust puffs
+      const dustParticles = [];
+      const dustCount = 22;
+      for (let d = 0; d < dustCount; d++) {
+        const posAlong = (Math.random() - 0.5) * span;
+        const startX = hit.x + tanX * posAlong;
+        const startY = hit.y + tanY * posAlong;
+        const dSpeed = 2.5 + Math.random() * 8.5;
+        const dAngle = punchAngle + (Math.random() - 0.5) * 1.3;
+
+        dustParticles.push({
+          x: startX,
+          y: startY,
+          vx: Math.cos(dAngle) * dSpeed,
+          vy: Math.sin(dAngle) * dSpeed,
+          radius: 4 + Math.random() * 12,
+          maxRadius: 18 + Math.random() * 26,
+          alpha: 0.85,
+          life: 50 + Math.floor(Math.random() * 35),
+          maxLife: 85
+        });
+      }
+
+      // 5. Broken teeth at the breach ends
+      const leftTeeth = generateBrokenTeeth(hit.tangentAngle, true);
+      const rightTeeth = generateBrokenTeeth(hit.tangentAngle, false);
+
+      const shatteredWall = {
+        x: hit.x,
+        y: hit.y,
+        wallType: hit.wallType,
+        punchAngle,
+        tangentAngle: hit.tangentAngle,
+        normalAngle: hit.normalAngle,
+        span,
+        halfSpan: span / 2,
+        life: maxLife,
+        maxLife,
+        segments,
+        shards: fastShards,
+        fastShards,
+        fissures,
+        dustParticles,
+        crumbs: [],
+        shockwaves: [
+          { radius: 10, maxRadius: 170, speed: 8.5, alpha: 0.95, width: 3.5 },
+          { radius: 5, maxRadius: 250, speed: 11.0, alpha: 0.80, width: 2.5 }
+        ],
+        leftTeeth,
+        rightTeeth,
+        seed: Math.random() * 1000
+      };
+
+      state.shatteredWalls.push(shatteredWall);
+
+      // Audiovisual feedback per breached wall
+      spawnImpactFlash(hit.x, hit.y, 80, '#FFFFFF');
+      spawnSparks(hit.x, hit.y, 45, 'impact', '#FFD700');
     }
-
-    // 3. Generate branching fissures into the intact wall
-    const leftEnd = { x: hit.x - tanX * (span / 2), y: hit.y - tanY * (span / 2) };
-    const rightEnd = { x: hit.x + tanX * (span / 2), y: hit.y + tanY * (span / 2) };
-    const fissures = [
-      ...generateBranchingFissures(leftEnd.x, leftEnd.y, hit.tangentAngle + Math.PI, 80, 2),
-      ...generateBranchingFissures(rightEnd.x, rightEnd.y, hit.tangentAngle, 80, 2)
-    ];
-
-    // 4. Concrete dust puffs
-    const dustParticles = [];
-    const dustCount = 22;
-    for (let d = 0; d < dustCount; d++) {
-      const posAlong = (Math.random() - 0.5) * span;
-      const startX = hit.x + tanX * posAlong;
-      const startY = hit.y + tanY * posAlong;
-      const dSpeed = 2.5 + Math.random() * 8.5;
-      const dAngle = punchAngle + (Math.random() - 0.5) * 1.3;
-
-      dustParticles.push({
-        x: startX,
-        y: startY,
-        vx: Math.cos(dAngle) * dSpeed,
-        vy: Math.sin(dAngle) * dSpeed,
-        radius: 4 + Math.random() * 12,
-        maxRadius: 18 + Math.random() * 26,
-        alpha: 0.85,
-        life: 50 + Math.floor(Math.random() * 35),
-        maxLife: 85
-      });
-    }
-
-    // 5. Broken teeth at the breach ends
-    const leftTeeth = generateBrokenTeeth(hit.tangentAngle, true);
-    const rightTeeth = generateBrokenTeeth(hit.tangentAngle, false);
-
-    const shatteredWall = {
-      x: hit.x,
-      y: hit.y,
-      wallType: hit.wallType,
-      punchAngle,
-      tangentAngle: hit.tangentAngle,
-      normalAngle: hit.normalAngle,
-      span,
-      halfSpan: span / 2,
-      life: maxLife,
-      maxLife,
-      segments,
-      shards: fastShards,
-      fastShards,
-      fissures,
-      dustParticles,
-      crumbs: [],
-      shockwaves: [
-        { radius: 10, maxRadius: 170, speed: 8.5, alpha: 0.95, width: 3.5 },
-        { radius: 5, maxRadius: 250, speed: 11.0, alpha: 0.80, width: 2.5 }
-      ],
-      leftTeeth,
-      rightTeeth,
-      seed: Math.random() * 1000
-    };
-
-    state.shatteredWalls.push(shatteredWall);
-
-    // Audiovisual feedback per breached wall
-    spawnImpactFlash(hit.x, hit.y, 80, '#FFFFFF');
-    spawnSparks(hit.x, hit.y, 45, 'impact', '#FFD700');
   }
 
   // Trigger Top Names or Bottom HUD Shatter FX (passes all hits)

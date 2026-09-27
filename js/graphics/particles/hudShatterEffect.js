@@ -12,6 +12,7 @@ import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { findArenaWallIntersection } from './saitamaWallShatter.js';
 import { getSkillDataForFighter, shouldShowFighterSkill, shouldShowHudSkillBars, shouldShowHudStats } from '../ui/hudSkillProviders.js';
+import { getFighterHealthBarColor } from '../hudManager.js';
 
 /**
  * Checks whether a given point (px, py) is strictly inside the frontal supersonic cone / corridor
@@ -92,21 +93,23 @@ export function triggerHudShatter(originX, originY, punchAngle, arena, hits = nu
     if (!topNameShatter) {
       topNameShatter = generateTopNameShatters(arena, punchAngle, topHit.x, maxLife, originX, originY);
     } else {
-      // Re-trigger additional intact letters inside the new punch cone
+      // Re-trigger & violently re-accelerate all glyph shards inside the new punch cone
       const halfArc = (CONFIG.saitama?.counterFrontalArc ?? ((28 * Math.PI) / 180)) / 2;
       const cosA = Math.cos(punchAngle);
       for (let i = 0; i < topNameShatter.glyphShards.length; i++) {
         const g = topNameShatter.glyphShards[i];
-        if (g.isBlownAway) continue;
-        if (isInsideSaitamaFrontalBlast(g.originX, g.originY, originX, originY, punchAngle, halfArc, 38)) {
+        const inCone = isInsideSaitamaFrontalBlast(g.x, g.y, originX, originY, punchAngle, halfArc, 45) ||
+                       isInsideSaitamaFrontalBlast(g.originX, g.originY, originX, originY, punchAngle, halfArc, 45);
+        if (inCone) {
           const dx = g.originX - topHit.x;
           const dist = Math.abs(dx);
           const pushDir = Math.abs(dx) < 6 ? (i % 2 === 0 ? 1 : -1) : (dx > 0 ? 1 : -1);
           const intensity = 1.0 / (1.0 + dist * 0.005);
           g.isBlownAway = true;
-          g.vx = pushDir * (4.5 + 7.5 * intensity) + cosA * (3.0 * intensity);
-          g.vy = - (5.0 + 7.5 * intensity + Math.random() * 2.0);
-          g.rotSpeed = pushDir * (0.05 + 0.10 * intensity);
+          g.delay = 0;
+          g.vx += pushDir * (6.0 + 9.0 * intensity) + cosA * (4.0 * intensity);
+          g.vy -= (6.5 + 9.5 * intensity + Math.random() * 2.5);
+          g.rotSpeed += pushDir * (0.08 + 0.12 * intensity);
           g.gravity = 0.22;
           g.drag = 0.968;
         }
@@ -126,20 +129,23 @@ export function triggerHudShatter(originX, originY, punchAngle, arena, hits = nu
     if (!bottomHudShatter) {
       bottomHudShatter = generateBottomHudShatters(arena, punchAngle, bottomHit.x, maxLife, originX, originY);
     } else {
-      // Re-trigger additional intact bottom components inside the new punch cone
+      // Re-trigger & violently re-accelerate all bottom components inside the new punch cone
       const halfArc = (CONFIG.saitama?.counterFrontalArc ?? ((28 * Math.PI) / 180)) / 2;
       const cosA = Math.cos(punchAngle);
       const applyHit = (item) => {
-        if (!item || item.isBlownAway) return;
-        if (isInsideSaitamaFrontalBlast(item.originX, item.originY, originX, originY, punchAngle, halfArc, 36)) {
+        if (!item) return;
+        const inCone = isInsideSaitamaFrontalBlast(item.x, item.y, originX, originY, punchAngle, halfArc, 45) ||
+                       isInsideSaitamaFrontalBlast(item.originX, item.originY, originX, originY, punchAngle, halfArc, 45);
+        if (inCone) {
           const dx = item.originX - bottomHit.x;
           const dist = Math.abs(dx);
           const pushDir = dx >= 0 ? 1 : -1;
           const intensity = 1.0 / (1.0 + dist * 0.005);
           item.isBlownAway = true;
-          item.vx = pushDir * (4.5 + 7.5 * intensity) + cosA * (2.5 * intensity);
-          item.vy = (5.5 + 8.5 * intensity) + Math.random() * 2.0;
-          item.rotSpeed = pushDir * (0.05 + 0.10 * intensity);
+          item.delay = 0;
+          item.vx += pushDir * (6.0 + 9.5 * intensity) + cosA * (3.5 * intensity);
+          item.vy += (6.5 + 10.5 * intensity) + Math.random() * 2.5;
+          item.rotSpeed += pushDir * (0.06 + 0.12 * intensity);
           item.gravity = 0.24;
           item.drag = 0.965;
         }
@@ -660,8 +666,8 @@ function generateTopNameShatters(arena, punchAngle, hitX, maxLife, originX, orig
 }
 
 /**
- * Generates natural, physics-driven shatter debris for HUD Health Bars, Skill Bars, Stats, and Win Bullets.
- * Faithfully matches the exact rectangular arcade HUD style of the DOM.
+ * Generates natural, physics-driven shatter debris for HUD Health Bars, Skill Bars, and Stats.
+ * Faithfully matches the exact modern styled HUD of the DOM (rounded pill bars, accurate typography, proper themes).
  */
 function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, originY) {
   const mainFighters = getPrimaryFighters();
@@ -693,8 +699,7 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
     const cardCenterX = cardLeftX + cardW / 2;
 
     const hpRatio = f.maxHp > 0 ? Math.max(0, Math.min(1, Number(f.hp) / Number(f.maxHp))) : 0;
-    const isCj = (f.characterId === 'cj' || f.type === 'cj');
-    const hpColor = isCj ? '#DC2626' : (f.themeColor || f._def?.themeColor || f.color || '#FFCC00');
+    const hpColor = getFighterHealthBarColor(f, hpRatio, isDark);
     const hpText = `${Math.floor(Math.max(0, Number(f.hp) || 0))}`;
 
     const dx = cardCenterX - hitX;
@@ -703,11 +708,11 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
     const delay = Math.min(12, Math.floor(dist / 32));
     const intensity = 1.0 / (1.0 + dist * 0.005);
 
-    // 1. Health Bar (Rectangular box with white border, yellow fill, right-side HP box)
+    // 1. Health Bar (Modern rounded track + inner pill fill + right-aligned HP number text)
     if (showHealthBars) {
-      const hbY = baseY + 10;
+      const hbY = baseY + 12;
       const hbW = cardW;
-      const hbH = 18;
+      const hbH = 16;
       const isHbHit = isInsideSaitamaFrontalBlast(cardCenterX, hbY, originX, originY, punchAngle, halfArc, cardW * 0.45);
 
       healthBars.push({
@@ -732,7 +737,7 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
       });
     }
 
-    // 2. Skill Bars (Fighter's actual active skills filtered strictly by shouldShowFighterSkill)
+    // 2. Skill Bars (Modern rounded box + 55% fill + clean label)
     let skills = [];
     if (showSkillBars) {
       try {
@@ -743,7 +748,7 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
       }
     }
 
-    const skillsStartY = showHealthBars ? (baseY + 36) : (baseY + 10);
+    const skillsStartY = showHealthBars ? (baseY + 36) : (baseY + 12);
     for (let sIdx = 0; sIdx < skills.length; sIdx++) {
       const s = skills[sIdx];
       const sY = skillsStartY + sIdx * 24;
@@ -765,6 +770,7 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
         label: sLabel,
         color: sColor,
         fillRatio: sFill,
+        ready: Boolean(s.ready),
         vx: isSkillHit ? (pushDir * (4.0 + 7.0 * intensity) + cosA * (2.2 * intensity)) : 0,
         vy: isSkillHit ? ((5.0 + 8.0 * intensity) + sIdx * 0.8 + Math.random() * 1.5) : 0,
         rot: 0,
@@ -777,28 +783,28 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
       });
     }
 
-    // 3. Stats Rows (Plain stacked text rows matching DOM)
+    // 3. Stats Rows (Muted Label + White/Accent Value)
     if (showStats) {
       const statsList = [];
       const baseDmg = Math.round(Number(f.damage !== undefined ? f.damage : (f._def && f._def.damage)) || 15);
-      statsList.push(`DMG: ${baseDmg}`);
+      statsList.push({ label: 'DMG:', val: `${baseDmg}` });
       if (f.regenRate || f.rctActive || f.characterId === 'yuta') {
-        statsList.push(`REGEN: ${(f.regenRate || 0).toFixed(0)}%`);
+        statsList.push({ label: 'REGEN:', val: `${(f.regenRate || 0).toFixed(0)}%` });
       }
       const defVal = Math.round((Number(f.defense !== undefined ? f.defense : (f._def && f._def.defense)) || 0) * 100);
-      if (defVal >= 0) statsList.push(`DEF: ${defVal}%`);
+      if (defVal >= 0) statsList.push({ label: 'DEF:', val: `${defVal}%` });
       if (f.evadeChance) {
-        statsList.push(`DODGE: ${Math.round(f.evadeChance * 100)}%`);
+        statsList.push({ label: 'DODGE:', val: `${Math.round(f.evadeChance * 100)}%` });
       } else if (f.parryPassiveChance || f.parryChance) {
-        statsList.push(`PARRY: ${Math.round((f.parryPassiveChance || f.parryChance || 0.5) * 100)}%`);
+        statsList.push({ label: 'PARRY:', val: `${Math.round((f.parryPassiveChance || f.parryChance || 0.5) * 100)}%` });
       }
 
       const statsBaseY = showHealthBars 
         ? (skills.length > 0 ? (baseY + 38 + skills.length * 24) : (baseY + 36))
-        : (skills.length > 0 ? (baseY + 12 + skills.length * 24) : (baseY + 10));
+        : (skills.length > 0 ? (baseY + 14 + skills.length * 24) : (baseY + 12));
 
       for (let stIdx = 0; stIdx < statsList.length; stIdx++) {
-        const stText = statsList[stIdx];
+        const st = statsList[stIdx];
         const stY = statsBaseY + stIdx * 18;
         const isStatHit = isInsideSaitamaFrontalBlast(cardCenterX, stY, originX, originY, punchAngle, halfArc, cardW * 0.45);
 
@@ -808,7 +814,9 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
           originX: cardCenterX,
           originY: stY,
           w: cardW,
-          text: stText,
+          label: st.label,
+          value: st.val,
+          text: `${st.label} ${st.val}`,
           vx: isStatHit ? (pushDir * (3.8 + 6.5 * intensity)) : 0,
           vy: isStatHit ? ((4.5 + 7.5 * intensity) + Math.random() * 1.5) : 0,
           rot: 0,
@@ -1008,8 +1016,8 @@ export function drawTopHudNameShatters(ctx, isDark, arena) {
 }
 
 /**
- * Draws the shattered Bottom HUD components (Health Bars, Skill Bars, Stats) in camera space.
- * Exactly replicates the clean rectangular arcade DOM HUD style with 1.5px solid white borders.
+ * Draws the shattered Bottom HUD components (Health Bars, Skill Bars, Stats, Win Bullets) in camera space.
+ * Faithfully matches the modern DOM HUD card styling (rounded pill bars, accurate typography, proper themes).
  * @param {CanvasRenderingContext2D} ctx - Canvas context
  * @param {boolean} isDark - Dark mode active
  * @param {object} arena - Arena object
@@ -1023,7 +1031,7 @@ export function drawBottomHudShatters(ctx, isDark, arena) {
 
   ctx.save();
 
-  // 1. Draw Flying Health Bars (Exact 1:1 match with DOM style in Image 1)
+  // 1. Draw Flying Health Bars (Exact 1:1 match with modern DOM .health-card__bar style)
   if (bhs.healthBars) {
     for (const hb of bhs.healthBars) {
       ctx.save();
@@ -1031,42 +1039,40 @@ export function drawBottomHudShatters(ctx, isDark, arena) {
       ctx.rotate(hb.rot);
       ctx.globalAlpha = 1.0;
 
-      // Outer black chassis with 1.5px solid white border (sharp 90-degree rectangle)
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(-hb.w / 2, -hb.h / 2, hb.w, hb.h);
-      ctx.strokeStyle = '#FFFFFF';
+      // Outer Rounded Track (matching DOM .health-card__bar)
+      const trackBg = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.12)';
+      const trackBorder = isDark ? 'rgba(255, 255, 255, 0.60)' : '#222222';
+      ctx.fillStyle = trackBg;
+      drawRoundedRect(ctx, -hb.w / 2, -hb.h / 2, hb.w, hb.h, 3);
+      ctx.fill();
+      ctx.strokeStyle = trackBorder;
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(-hb.w / 2, -hb.h / 2, hb.w, hb.h);
+      ctx.stroke();
 
-      // Yellow/theme color HP bar fill
-      const numBoxW = 34;
-      const fillMaxW = hb.w - numBoxW - 4;
+      // Inner Health Fill (matching DOM .health-card__fill)
+      const fillMaxW = hb.w - 3;
       const fillW = Math.max(0, fillMaxW * hb.fillRatio);
       if (fillW > 0) {
-        ctx.fillStyle = hb.color || '#FFCC00';
-        ctx.fillRect(-hb.w / 2 + 2, -hb.h / 2 + 2, fillW, hb.h - 4);
+        ctx.fillStyle = hb.color || '#22C55E';
+        drawRoundedRect(ctx, -hb.w / 2 + 1.5, -hb.h / 2 + 1.5, fillW, hb.h - 3, 2);
+        ctx.fill();
       }
 
-      // Small black HP number box on the right with white border
-      const numBoxX = hb.w / 2 - numBoxW;
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(numBoxX, -hb.h / 2, numBoxW, hb.h);
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(numBoxX, -hb.h / 2, numBoxW, hb.h);
-
-      // HP number text in Silkscreen font
-      ctx.font = '700 11px "Silkscreen", "Press Start 2P", monospace';
-      ctx.fillStyle = '#FFFFFF';
-      ctx.textAlign = 'center';
+      // Floating HP Number Text (right-aligned inside the bar matching DOM .health-card__bar-text)
+      ctx.font = '700 11.5px "Rajdhani", "Outfit", "Segoe UI", -apple-system, BlinkMacSystemFont, "Roboto", "Inter", sans-serif';
+      ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(hb.hpText, numBoxX + numBoxW / 2, 0.5);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+      ctx.lineWidth = 2.5;
+      ctx.strokeText(hb.hpText, hb.w / 2 - 6, 0.5);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(hb.hpText, hb.w / 2 - 6, 0.5);
 
       ctx.restore();
     }
   }
 
-  // 2. Draw Flying Skill Bars (Exact 1:1 match with DOM style in Image 1)
+  // 3. Draw Flying Skill Bars (Exact 1:1 match with modern DOM .hud-skill-box style)
   if (bhs.skillBars) {
     for (const sb of bhs.skillBars) {
       ctx.save();
@@ -1074,34 +1080,40 @@ export function drawBottomHudShatters(ctx, isDark, arena) {
       ctx.rotate(sb.rot);
       ctx.globalAlpha = 1.0;
 
-      // Outer black box with 1.5px solid white border
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(-sb.w / 2, -sb.h / 2, sb.w, sb.h);
-      ctx.strokeStyle = '#FFFFFF';
+      // Outer Rounded Box (matching DOM .hud-skill-box)
+      const boxBg = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+      const boxBorder = isDark ? 'rgba(255, 255, 255, 0.60)' : '#222222';
+      ctx.fillStyle = boxBg;
+      drawRoundedRect(ctx, -sb.w / 2, -sb.h / 2, sb.w, sb.h, 3);
+      ctx.fill();
+      ctx.strokeStyle = boxBorder;
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(-sb.w / 2, -sb.h / 2, sb.w, sb.h);
+      ctx.stroke();
 
-      // Inner progress fill bar with 50% opacity
-      const fillW = Math.max(0, (sb.w - 4) * sb.fillRatio);
+      // Inner Progress Fill (55% opacity matching DOM .hud-skill-box-fill)
+      const fillMaxW = sb.w - 3;
+      const fillW = Math.max(0, fillMaxW * sb.fillRatio);
       if (fillW > 0) {
+        ctx.save();
+        ctx.globalAlpha = 0.55;
         ctx.fillStyle = sb.color || '#FFCC00';
-        ctx.globalAlpha = 0.50;
-        ctx.fillRect(-sb.w / 2 + 2, -sb.h / 2 + 2, fillW, sb.h - 4);
-        ctx.globalAlpha = 1.0;
+        drawRoundedRect(ctx, -sb.w / 2 + 1.5, -sb.h / 2 + 1.5, fillW, sb.h - 3, 2);
+        ctx.fill();
+        ctx.restore();
       }
 
-      // Skill name text in Silkscreen font
-      ctx.font = '700 11.5px "Silkscreen", "Press Start 2P", monospace';
-      ctx.fillStyle = '#FFFFFF';
+      // Skill Name Text (matching DOM .hud-skill-box-text)
+      ctx.font = '14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+      ctx.fillStyle = isDark ? '#FFFFFF' : '#000000';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(sb.label, -sb.w / 2 + 6, 0.5);
+      ctx.fillText(sb.label, -sb.w / 2 + 8, 0.5);
 
       ctx.restore();
     }
   }
 
-  // 3. Draw Plain Stacked Stats Text Rows (Exact 1:1 match with DOM style in Image 1)
+  // 4. Draw Flying Stats Rows (Exact 1:1 match with modern DOM .health-card__info style)
   if (bhs.statRows) {
     for (const st of bhs.statRows) {
       ctx.save();
@@ -1109,17 +1121,25 @@ export function drawBottomHudShatters(ctx, isDark, arena) {
       ctx.rotate(st.rot);
       ctx.globalAlpha = 1.0;
 
-      ctx.font = '700 11px "Silkscreen", "Press Start 2P", monospace';
-      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(st.text, -st.w / 2, 0);
+      if (st.label && st.value) {
+        ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.70)' : '#444444';
+        ctx.fillText(st.label, -st.w / 2, 0);
+        const labelW = ctx.measureText(st.label).width;
+        ctx.fillStyle = isDark ? '#FFFFFF' : '#000000';
+        ctx.fillText(` ${st.value}`, -st.w / 2 + labelW, 0);
+      } else {
+        ctx.fillStyle = isDark ? '#FFFFFF' : '#000000';
+        ctx.fillText(st.text || '', -st.w / 2, 0);
+      }
 
       ctx.restore();
     }
   }
 
-  // 4. Draw Falling Sparks / Crumbs
+  // 5. Draw Falling Sparks / Crumbs
   if (bhs.crumbs) {
     for (const cr of bhs.crumbs) {
       if (cr.alpha <= 0.01) continue;
