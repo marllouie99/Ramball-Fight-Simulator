@@ -1574,10 +1574,10 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
  * @param {number} x - Origin X (fist position)
  * @param {number} y - Origin Y (fist position)
  * @param {number} angle - Facing/Punch trajectory angle in radians
- * @param {number} reach - Length of the frontal shockwave (default 1000px)
- * @param {number} arcAngle - Wide frontal cone angle in radians (default 120 deg)
+ * @param {number} reach - Length of the frontal shockwave (default 1500px)
+ * @param {number} arcAngle - Focused frontal cone angle in radians (default 28 deg)
  */
-export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 1000, arcAngle = (120 * Math.PI) / 180) {
+export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 1500, arcAngle = (28 * Math.PI) / 180) {
   const blast = ParticleSystem.getParticle();
   blast.x = x;
   blast.y = y;

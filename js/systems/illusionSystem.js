@@ -703,13 +703,25 @@ export function updateIllusions() {
         const ny = dy / dist;
         const overlap = minDist - dist;
 
-        illusion.x += nx * overlap * 0.5;
-        illusion.y += ny * overlap * 0.5;
+        const isEntityCounterLocked = Boolean(entity.isCountering || (entity._counterPunchTimer && entity._counterPunchTimer > 0) || (entity._postCounterRecoveryTimer && entity._postCounterRecoveryTimer > 0) || (entity._counterWindupTimer && entity._counterWindupTimer > 0));
+        if (isEntityCounterLocked) {
+          entity.vx = 0; entity.vy = 0; entity.knockbackVx = 0; entity.knockbackVy = 0;
+          illusion.x += nx * overlap * 2;
+          illusion.y += ny * overlap * 2;
+          const dotIll = illusion.vx * nx + illusion.vy * ny;
+          if (dotIll < 0) {
+            illusion.vx -= dotIll * nx;
+            illusion.vy -= dotIll * ny;
+          }
+        } else {
+          illusion.x += nx * overlap * 0.5;
+          illusion.y += ny * overlap * 0.5;
 
-        // Bounce velocity
-        const dotProduct = illusion.vx * nx + illusion.vy * ny;
-        illusion.vx -= 2 * dotProduct * nx;
-        illusion.vy -= 2 * dotProduct * ny;
+          // Bounce velocity
+          const dotProduct = illusion.vx * nx + illusion.vy * ny;
+          illusion.vx -= 2 * dotProduct * nx;
+          illusion.vy -= 2 * dotProduct * ny;
+        }
       }
     }
 

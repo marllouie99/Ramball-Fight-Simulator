@@ -28,7 +28,34 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "SAITAMA",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "punchMaxTime",
+                "oldVal": 22,
+                "newVal": 28,
+                "pct": "+27.3%"
+            },
+            {
+                "type": "NERF",
+                "key": "flurryDamage",
+                "oldVal": 50,
+                "newVal": 20,
+                "pct": "-60.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "flurryCooldown",
+                "oldVal": 1200,
+                "newVal": 200,
+                "pct": "-83.3%"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

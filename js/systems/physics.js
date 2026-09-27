@@ -261,9 +261,12 @@ export function resolveFighterCollision(a, b) {
   const ty = nx;
 
   const overlap = (minDist - distance) / 2;
+  const aIsCounterLocked = (a._counterPunchTimer && a._counterPunchTimer > 0) || a.isCountering || (a._postCounterRecoveryTimer && a._postCounterRecoveryTimer > 0) || (a._counterWindupTimer && a._counterWindupTimer > 0);
+  const bIsCounterLocked = (b._counterPunchTimer && b._counterPunchTimer > 0) || b.isCountering || (b._postCounterRecoveryTimer && b._postCounterRecoveryTimer > 0) || (b._counterWindupTimer && b._counterWindupTimer > 0);
+
   const isBrawlerCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0) || ((a.comboHitsLeft || 0) > 0) || ((b.comboHitsLeft || 0) > 0) || a.isMeleeMode || b.isMeleeMode;
-  const effectiveOverlap = isBrawlerCombo ? overlap * 0.1 : overlap;
-  
+  const effectiveOverlap = (isBrawlerCombo && !aIsCounterLocked && !bIsCounterLocked) ? overlap * 0.1 : overlap;
+
   // Pause circle-circle physical push response during Nanami or Escanor Hit-Pause
   if (isGlobalHitPauseActive(state)) {
     return;
@@ -364,17 +367,39 @@ export function resolveFighterCollision(a, b) {
     return; // Complete immunity to circle-circle overlap separation and bounce during Mahoraga's Wall Slam & Execution Flurry!
   }
 
-  const aIsFlurrying = a.isFlurrying || ((a.characterId === 'genos' || a.type === 'genos') && b.caughtInGenosFlurry) || ((a.characterId === 'saitama' || a.type === 'saitama') && b.caughtInSaitamaFlurry);
-  const bIsFlurrying = b.isFlurrying || ((b.characterId === 'genos' || b.type === 'genos') && a.caughtInGenosFlurry) || ((b.characterId === 'saitama' || b.type === 'saitama') && a.caughtInSaitamaFlurry);
-
-  const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
-  const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
-
-  const aIsCounterLocked = (a._counterPunchTimer && a._counterPunchTimer > 0) || a.isCountering || (a._postCounterRecoveryTimer && a._postCounterRecoveryTimer > 0);
-  const bIsCounterLocked = (b._counterPunchTimer && b._counterPunchTimer > 0) || b.isCountering || (b._postCounterRecoveryTimer && b._postCounterRecoveryTimer > 0);
-
+  // Solid immovable barrier during counter punch windup & execution (zero clipping/pass-through)
   if (aIsCounterLocked && bIsCounterLocked) {
-    return; // Neither moves or bounces during counter execution
+    a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0;
+    b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0;
+    return;
+  }
+  if (aIsCounterLocked && !bIsCounterLocked) {
+    a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0;
+    b.x += nx * overlap * 2;
+    b.y += ny * overlap * 2;
+    const dvx = b.vx || 0;
+    const dvy = b.vy || 0;
+    const dotN = dvx * nx + dvy * ny;
+    if (dotN < 0) {
+      b.vx -= dotN * nx;
+      b.vy -= dotN * ny;
+    }
+    if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
+    return;
+  }
+  if (bIsCounterLocked && !aIsCounterLocked) {
+    b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0;
+    a.x -= nx * overlap * 2;
+    a.y -= ny * overlap * 2;
+    const dvx = a.vx || 0;
+    const dvy = a.vy || 0;
+    const dotN = dvx * nx + dvy * ny;
+    if (dotN > 0) {
+      a.vx -= dotN * nx;
+      a.vy -= dotN * ny;
+    }
+    if (state && state.arena && typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
+    return;
   }
 
   const aIsGojoInfinity = isEnemy && (typeof a.hasActiveInfinity === 'function') && a.hasActiveInfinity() && !b.isMeleeMode;
@@ -397,6 +422,12 @@ export function resolveFighterCollision(a, b) {
 
   const aIsGenosBeam = Boolean(a && (a.characterId === 'genos' || a.type === 'genos') && (a.isFiringUlt || a.isChargingUlt));
   const bIsGenosBeam = Boolean(b && (b.characterId === 'genos' || b.type === 'genos') && (b.isFiringUlt || b.isChargingUlt));
+
+  const aIsFlurrying = a.isFlurrying || ((a.characterId === 'genos' || a.type === 'genos') && b.caughtInGenosFlurry) || ((a.characterId === 'saitama' || a.type === 'saitama') && b.caughtInSaitamaFlurry);
+  const bIsFlurrying = b.isFlurrying || ((b.characterId === 'genos' || b.type === 'genos') && a.caughtInGenosFlurry) || ((b.characterId === 'saitama' || b.type === 'saitama') && a.caughtInSaitamaFlurry);
+
+  const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
+  const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
   const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon;
   const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon;
@@ -1131,6 +1162,7 @@ export function updateFighters() {
           const fighterIsMakimaShatter = Boolean(fighter && (fighter.isRevivingFromContract || fighter.isShatterReviving || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0) || (fighter.characterId === 'makima' && (fighter.isDead || fighter.dead || fighter.hp <= 0))));
           const entityIsMakimaShatter = Boolean(entity && (entity.isRevivingFromContract || entity.isShatterReviving || (entity.shatteredPieces && entity.shatteredPieces.length > 0) || (entity.characterId === 'makima' && (entity.isDead || entity.dead || entity.hp <= 0))));
 
+          const fighterIsCounterLocked = Boolean(fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0) || (fighter._counterWindupTimer && fighter._counterWindupTimer > 0));
           if (fighterIsMakimaShatter) {
             fighter.vx = 0; fighter.vy = 0; fighter.knockbackVx = 0; fighter.knockbackVy = 0;
             if (typeof fighter._shatterLockedX === 'number' && typeof fighter._shatterLockedY === 'number') {
@@ -1145,9 +1177,17 @@ export function updateFighters() {
             }
             fighter.x -= nx * overlap * 2;
             fighter.y -= ny * overlap * 2;
-          } else if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter.isGhostTerrain || fighter.characterId === 'eye_of_cthulhu' || fighter.type === 'eye_of_cthulhu') {
-            entity.x += nx * overlap;
-            entity.y += ny * overlap;
+          } else if (fighterIsCounterLocked || fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter.isGhostTerrain || fighter.characterId === 'eye_of_cthulhu' || fighter.type === 'eye_of_cthulhu') {
+            if (fighterIsCounterLocked) {
+              fighter.vx = 0; fighter.vy = 0; fighter.knockbackVx = 0; fighter.knockbackVy = 0;
+            }
+            entity.x += nx * overlap * 2;
+            entity.y += ny * overlap * 2;
+            const dotIll = (entity.vx || 0) * nx + (entity.vy || 0) * ny;
+            if (dotIll < 0) {
+              entity.vx -= dotIll * nx;
+              entity.vy -= dotIll * ny;
+            }
           } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai || (entity.bankaiBurstTimer && entity.bankaiBurstTimer > 0) || (entity.isChannelingGetsuga && entity.isFinalMassiveGetsuga) || (entity.hollowMaskFormationTimer && entity.hollowMaskFormationTimer > 0) || (entity.hollowBurstTimer && entity.hollowBurstTimer > 0) || entity.isGhostTerrain || entity.isServantOfCthulhu) {
             fighter.x -= nx * overlap;
             fighter.y -= ny * overlap;

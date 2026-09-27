@@ -4,6 +4,7 @@ import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenSh
 import { MODE_SETTINGS } from '../../core/modeConfig.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnPunchWindSpeedLines, spawnSaitamaCounterFrontalBlast } from '../../graphics/particles/sparkEffect.js';
+import { triggerSaitamaWallShatter } from '../../graphics/particles/saitamaWallShatter.js';
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { fadeOutSound } from '../../systems/soundSystem.js';
@@ -37,7 +38,7 @@ export class SaitamaFighter extends Fighter {
     this.isMeleeMode = true;
     this.isBrawler = true;
     this.punchAnimTimer = 0;
-    this.punchMaxTime = CONFIG.saitama?.punchMaxTime || 22; // Smooth 22-frame punch animation cycle
+    this.punchMaxTime = CONFIG.saitama?.punchMaxTime || 28; // Smooth 28-frame punch animation cycle
     this.isRightPunch = true;
     this.hideFrontHand = false;
     this.hideBackHand = false;
@@ -1076,12 +1077,32 @@ export class SaitamaFighter extends Fighter {
 
     this._counterPunchTimer--;
 
-    // Keep Saitama locked in place and strictly hold the committed aim angle without auto-tracking or snapping to the enemy
+    // Keep Saitama locked in place
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
     this.knockbackVy = 0;
-    if (this._counterAimAngle !== undefined) {
+
+    // Smooth, weighted auto-aim tracking towards counter target during wind-up (controlled, non-fast turn rate)
+    const autoAimEnabled = CONFIG.saitama?.enableCounterAutoAim !== false;
+    if (autoAimEnabled && this._counterPunchTarget && this._counterPunchTarget.hp > 0) {
+      const target = this._counterPunchTarget;
+      const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+      const myY = this.y - (this.z || 0);
+      const targetAngle = Math.atan2(targetY - myY, (target.x !== undefined ? target.x : this.x) - this.x);
+
+      let angleDiff = targetAngle - (this.gunAngle || 0);
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+      const maxTurnRate = CONFIG.saitama?.counterAutoAimTurnRate ?? 0.045; // ~2.5 deg/frame (controlled smooth turn, not fast)
+      const turnStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), maxTurnRate);
+      const newAngle = (this.gunAngle || 0) + turnStep;
+
+      this.gunAngle = newAngle;
+      this.angle = newAngle;
+      this._counterAimAngle = newAngle;
+    } else if (this._counterAimAngle !== undefined) {
       this.gunAngle = this._counterAimAngle;
       this.angle = this._counterAimAngle;
     }
@@ -1110,6 +1131,9 @@ export class SaitamaFighter extends Fighter {
       this.gunAngle = pushAngle;
       this.angle = pushAngle;
       this._counterAimAngle = pushAngle;
+      this._counterReleaseAngle = pushAngle;
+      this._counterReleaseOriginX = this.x;
+      this._counterReleaseOriginY = this.y - (this.z || 0);
 
       // Clear punchAnimTimer so _postCounterRecoveryTimer solely drives the single unified punch follow-through
       this.punchAnimTimer = 0;
@@ -1117,8 +1141,8 @@ export class SaitamaFighter extends Fighter {
       const fistX = this.x + Math.cos(pushAngle) * (this.r + 15);
       const fistY = this.y + Math.sin(pushAngle) * (this.r + 15);
 
-      const frontalReach = CONFIG.saitama?.counterFrontalReach ?? 1000;
-      const frontalArc = CONFIG.saitama?.counterFrontalArc ?? ((120 * Math.PI) / 180); // 120-degree wide frontal cone
+      const frontalReach = CONFIG.saitama?.counterFrontalReach ?? 1500;
+      const frontalArc = CONFIG.saitama?.counterFrontalArc ?? ((28 * Math.PI) / 180); // 28-degree focused frontal supersonic cone
       const halfArc = frontalArc / 2;
       const punchReach = this.r + (target?.r || 20) + (CONFIG.saitama?.punchReach || 90);
       const knockbackForce = CONFIG.saitama?.counterPunchKnockback || 55;
@@ -1287,6 +1311,12 @@ export class SaitamaFighter extends Fighter {
         spawnSaitamaCounterFrontalBlast(this.x, this.y, pushAngle, frontalReach, frontalArc);
       }
 
+      // Unique Interaction: Shatter the arena line wall in the punch direction
+      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+      if (arena && typeof triggerSaitamaWallShatter === 'function') {
+        triggerSaitamaWallShatter(this.x, this.y, pushAngle, arena);
+      }
+
       // Screen Shake & Sakuga Impact FX
       if (typeof triggerGlobalScreenShake === 'function') {
         const shakeIntensity = CONFIG.saitama?.counterPunchScreenShakeIntensity ?? 100.0;
@@ -1445,6 +1475,7 @@ export class SaitamaFighter extends Fighter {
     if (this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.sideHopsCooldown > 0) this.sideHopsCooldown--;
     if (this.seriousPunchCooldown > 0) this.seriousPunchCooldown--;
+    if (this._flurryFinalPunchTimer > 0) this._flurryFinalPunchTimer--;
   }
 
   aim(target) {
@@ -1796,6 +1827,9 @@ export class SaitamaFighter extends Fighter {
         this.aim(nearestTarget);
       }
     }
+    this._normalPunchReleaseAngle = aimAngle;
+    this._normalPunchReleaseOriginX = this.x;
+    this._normalPunchReleaseOriginY = this.y - (this.z || 0);
 
     // Spawn Frontal Supersonic Shockwave Blast (Death Punch style) on Normal Punch
     const fistX = this.x + Math.cos(aimAngle) * (this.r + 15);
@@ -2436,6 +2470,10 @@ export class SaitamaFighter extends Fighter {
 
         // Conclude flurry on final hit
         if (isFinalHit) {
+          this._flurryFinalPunchTimer = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.flurryFinalPunchRecoveryFrames) || 24;
+          this._flurryFinalPunchReleaseAngle = this.gunAngle || this.angle || 0;
+          this._flurryFinalPunchReleaseOriginX = this.x;
+          this._flurryFinalPunchReleaseOriginY = this.y - (this.z || 0);
           this._flurryAccumulatedDamage = 0;
           if (this.flurryTarget) {
             this.flurryTarget.caughtInSaitamaFlurry = false;

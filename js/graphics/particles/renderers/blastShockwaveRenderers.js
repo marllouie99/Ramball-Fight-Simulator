@@ -855,7 +855,7 @@ export function drawSaitamaCounterFrontalBlast(ctx, effect) {
   const startX = effect.x;
   const startY = effect.y;
   const angle = effect.angle || 0;
-  const reach = effect.reach || (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterFrontalReach) || 1000;
+  const reach = effect.reach || (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterFrontalReach) || 1500;
   const progress = 1.0 - effect.life;
   const alpha = Math.sin(effect.life * Math.PI);
 
@@ -869,16 +869,18 @@ export function drawSaitamaCounterFrontalBlast(ctx, effect) {
   const snap = (v) => Math.round(v / P) * P;
 
   const currentReach = reach * Math.min(1.0, progress * 4.5);
-  const arcAngle = effect.arcAngle || (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterFrontalArc) || ((120 * Math.PI) / 180);
+  const arcAngle = effect.arcAngle || (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterFrontalArc) || ((28 * Math.PI) / 180);
   const halfArc = arcAngle / 2;
   const stepSize = P * 2;
-  const numSteps = Math.ceil(currentReach / stepSize);
+  const backOffset = P * 3; // 12px inner arc base behind center as shown in diagram
+  const numSteps = Math.ceil((currentReach + backOffset) / stepSize);
 
   for (let s = 0; s < numSteps; s++) {
-    const gx = s * stepSize;
+    const gx = -backOffset + s * stepSize;
     if (gx > currentReach) break;
 
-    const halfW = Math.max(P * 2, snap(gx * Math.tan(halfArc)));
+    const effDist = Math.max(P * 2, gx + backOffset);
+    const halfW = Math.max(P * 2, snap(effDist * Math.tan(halfArc)));
 
     ctx.fillStyle = `rgba(255, 235, 59, ${(0.18 * alpha).toFixed(3)})`;
     ctx.fillRect(gx, -halfW - P * 2, stepSize, halfW * 2 + P * 4);
@@ -905,6 +907,13 @@ export function drawSaitamaCounterFrontalBlast(ctx, effect) {
       : `rgba(255, 250, 190, ${(0.92 * alpha).toFixed(3)})`;
     ctx.fillRect(gx, -centerW * 0.5, stepSize, centerW);
   }
+
+  // Inner Base Arc Cap (Curving around the origin inside the circle)
+  const baseArcHalfW = snap(backOffset * Math.tan(halfArc));
+  ctx.fillStyle = '#111114';
+  ctx.fillRect(-backOffset - P, -baseArcHalfW, P, baseArcHalfW * 2);
+  ctx.fillStyle = `rgba(255, 238, 0, ${(0.96 * alpha).toFixed(3)})`;
+  ctx.fillRect(-backOffset, -baseArcHalfW, P, baseArcHalfW * 2);
 
   ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
   ctx.fillRect(-P, -P * 2, P * 2, P * 4);

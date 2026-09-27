@@ -2,6 +2,98 @@ import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 
+// ─── Saitama Red Glove Sprite Asset Loader (Assets/model/Sprites/Glove-punch.png) ───
+let _saitamaGloveSpriteImage = null;
+let _saitamaGloveSpriteCanvas = null;
+let _saitamaGloveSpriteLoading = false;
+
+export function _getSaitamaGloveSpriteCanvas() {
+  if (_saitamaGloveSpriteCanvas) {
+    return _saitamaGloveSpriteCanvas;
+  }
+  if (_saitamaGloveSpriteImage && _saitamaGloveSpriteImage.complete && _saitamaGloveSpriteImage.naturalWidth > 0) {
+    if (typeof document !== 'undefined') {
+      try {
+        const nw = _saitamaGloveSpriteImage.naturalWidth;
+        const nh = _saitamaGloveSpriteImage.naturalHeight;
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = nw;
+        offCanvas.height = nh;
+        const offCtx = offCanvas.getContext('2d');
+        offCtx.imageSmoothingEnabled = false;
+        offCtx.drawImage(_saitamaGloveSpriteImage, 0, 0);
+
+        // Alpha Cut: Remove solid white / light background pixels (R, G, B > 230)
+        const imgData = offCtx.getImageData(0, 0, nw, nh);
+        const data = imgData.data;
+        let minX = nw, minY = nh, maxX = 0, maxY = 0;
+        let hasForeground = false;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+
+          if (a === 0 || (r > 230 && g > 230 && b > 230)) {
+            data[i + 3] = 0;
+          } else {
+            const pixelIdx = i / 4;
+            const px = pixelIdx % nw;
+            const py = Math.floor(pixelIdx / nw);
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
+            hasForeground = true;
+          }
+        }
+        offCtx.putImageData(imgData, 0, 0);
+
+        if (hasForeground && maxX >= minX && maxY >= minY) {
+          const trimW = maxX - minX + 1;
+          const trimH = maxY - minY + 1;
+          const trimmedCanvas = document.createElement('canvas');
+          trimmedCanvas.width = trimW;
+          trimmedCanvas.height = trimH;
+          const trimCtx = trimmedCanvas.getContext('2d');
+          trimCtx.imageSmoothingEnabled = false;
+          trimCtx.drawImage(offCanvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+          _saitamaGloveSpriteCanvas = trimmedCanvas;
+          return _saitamaGloveSpriteCanvas;
+        }
+
+        _saitamaGloveSpriteCanvas = offCanvas;
+        return _saitamaGloveSpriteCanvas;
+      } catch (e) {
+        console.warn('Failed to process Saitama glove sprite canvas', e);
+        return null;
+      }
+    }
+  }
+
+  if (!_saitamaGloveSpriteLoading && typeof Image !== 'undefined') {
+    _saitamaGloveSpriteLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _saitamaGloveSpriteImage = img;
+      _saitamaGloveSpriteLoading = false;
+      _getSaitamaGloveSpriteCanvas();
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Saitama glove sprite at Assets/model/Sprites/Glove-punch.png', e);
+      _saitamaGloveSpriteLoading = false;
+    };
+    img.src = 'Assets/model/Sprites/Glove-punch.png?v=1';
+    _saitamaGloveSpriteImage = img;
+  }
+  return _saitamaGloveSpriteCanvas;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getSaitamaGloveSpriteCanvas();
+}
+
 /**
  * Visual Skin Renderer for Saitama (The Caped Baldy)
  * Recreated precisely matching Yuji/Todo punch animation standards & anime flowing cape folds.
@@ -54,41 +146,40 @@ export function drawSaitamaSkin(ctx, fighter) {
   // Smooth sinusoidal punch progress or counter punch post-punch follow-through
   const isNormalPunching = !isPodiumPreview && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
   const isFlurrying = !isPodiumPreview && Boolean(fighter.isFlurrying);
-  const isPunching = isNormalPunching || isPostCounter || isFlurrying;
+  const isFlurryFinalPunch = !isPodiumPreview && Boolean(fighter._flurryFinalPunchTimer && fighter._flurryFinalPunchTimer > 0);
+  const isPunching = isNormalPunching || isPostCounter || isFlurrying || isFlurryFinalPunch;
 
   let rawProgress = 0;
   let easePunch = 0;
   if (isPunching) {
-    if (isFlurrying) {
+    if (isFlurryFinalPunch) {
+      // Consecutive Normal Punches Final Slam: Matches Serious Counter Punch animation dynamics (+3.40r reach)
+      const maxFinalT = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.flurryFinalPunchRecoveryFrames) || 45;
+      const p = Math.min(1.0, Math.max(0.0, 1.0 - (fighter._flurryFinalPunchTimer / maxFinalT)));
+      const thrustT = Math.min(1.0, p / 0.08); // Hyper-explosive snap in first ~5 frames
+      const easeThrust = 1.0 - Math.pow(1.0 - thrustT, 4);
+      easePunch = easeThrust + p * 0.45; // forward cruising drift
+      rawProgress = p;
+    } else if (isFlurrying) {
       // 4-frame fast alternating flurry cycle
       const cycleFrame = (fighter.flurryTimer || 0) % 4;
       rawProgress = cycleFrame / 4;
       easePunch = Math.sin(rawProgress * Math.PI);
     } else if (isPostCounter) {
-      // Serious Skill Counter Punch Single Unified Follow-Through:
-      // - First 12% of recovery (p < 0.12): Explosive forward punch extension
-      // - Middle 58% (0.12 <= p <= 0.70): Heroic follow-through hold at max reach in the air while shockwaves blast & target flies/dies
-      // - Final 30% (p > 0.70): Smooth cosine ease-out retraction back to guard
+      // Serious Skill Counter Punch: Blistering hypersonic warp launch (+3.40r) cutting across the arena (One-Shot Kill Presence)
       const maxRec = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterPunchRecoveryFrames) || 65;
       const p = Math.min(1.0, Math.max(0.0, 1.0 - (fighter._postCounterRecoveryTimer / maxRec)));
-      if (p < 0.12) {
-        easePunch = Math.sin((p / 0.12) * (Math.PI / 2));
-      } else if (p <= 0.70) {
-        easePunch = 1.0;
-      } else {
-        const retractT = (p - 0.70) / 0.30;
-        easePunch = 0.5 * (1 + Math.cos(retractT * Math.PI));
-      }
+      const thrustT = Math.min(1.0, p / 0.08); // Hyper-explosive snap in first ~5 frames
+      const easeThrust = 1.0 - Math.pow(1.0 - thrustT, 4);
+      easePunch = easeThrust + p * 0.45; // forward cruising drift
       rawProgress = p;
     } else if (isNormalPunching) {
-      const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 14;
+      // Normal Punch: Snappy forward punch thrust (+2.10r) drifting forward and fading out in the air (NEVER pulled back)
+      const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || (typeof CONFIG !== 'undefined' && CONFIG.saitama?.punchMaxTime) || 28;
       rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-      if (rawProgress < 0.28) {
-        easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
-      } else {
-        const retractT = (rawProgress - 0.28) / 0.72;
-        easePunch = Math.cos(retractT * (Math.PI / 2));
-      }
+      const thrustT = Math.min(1.0, rawProgress / 0.28);
+      const easeThrust = 1.0 - Math.pow(1.0 - thrustT, 3);
+      easePunch = easeThrust + rawProgress * 0.25;
     }
   }
 
@@ -112,10 +203,23 @@ export function drawSaitamaSkin(ctx, fighter) {
     const stroke2 = (Math.sin(t * cycleFreq + Math.PI) + 1) / 2; // 1.0 -> 0.0 -> 1.0
     frontHandX = -r * 0.20 + stroke2 * (r * 2.45);
     frontHandY = r * 0.40 - Math.cos(t * cycleFreq) * (r * 0.06);
+  } else if (isFlurryFinalPunch || isPostCounter) {
+    // Serious Counter & Flurry Final Slam: Glove snaps cleanly from cocked core position to forward strike guard
+    const ext = Math.min(1.0, easePunch);
+    frontHandX = r * 0.95 + ext * (r * 0.15);
+    frontHandY = r * 0.25;
+    backHandX  = -r * 0.25;
+    backHandY  = r * 0.25;
+  } else if (isNormalPunching) {
+    // Normal Punch: Crisp forward jab at body perimeter
+    frontHandX = r * 0.95 + Math.min(1.0, easePunch) * (r * 0.15);
+    frontHandY = r * 0.25;
+    backHandX  = -r * 0.25;
+    backHandY  = r * 0.25;
   } else if (isPunching) {
-    // All punches executed with the front hand extending forward from right edge
-    frontHandX = r * 0.95 + lungeExtension * 1.40;
-    frontHandY = r * 0.25 + (isPostCounter ? 0 : Math.sin(rawProgress * Math.PI) * (r * 0.15));
+    // All punches executed with the front hand at the right edge
+    frontHandX = r * 0.95;
+    frontHandY = r * 0.25;
     backHandX  = 0; backHandY  = 0;
   } else {
     // Idle brawler guard stance: front hand at the right edge of body circle lowered to chest level
@@ -180,23 +284,6 @@ export function drawSaitamaSkin(ctx, fighter) {
 
   drawSaitamaPixelCape(ctx, r, inertiaX, inertiaY, gentleSway1, gentleSway2, waveRipple, false);
 
-  // ─────────────────────────────────────────────
-  // 2. BOREDOM / POWER AURA (No shadowBlur - Rule #11)
-  // ─────────────────────────────────────────────
-  const boredomStacks = fighter.boredomStacks || 0;
-  if (boredomStacks > 0 && !isLowQuality) {
-    ctx.save();
-    for (let i = 1; i <= boredomStacks; i++) {
-      const pulseR = r + 4 + i * 5 + Math.sin(now * 0.006 + i) * 2;
-      const alpha = 0.15 + (i / boredomStacks) * 0.2;
-      ctx.beginPath();
-      ctx.arc(0, 0, pulseR, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 235, 120, ${alpha})`;
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
 
   // ─────────────────────────────────────────────
   // 3. SERIOUS PUNCH CHARGING PRESSURE RIPPLE
@@ -221,7 +308,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   // ── Render Back Hand (Back Layer - Active during Consecutive Normal Punches Flurry) ──
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isPodiumPreview;
   if (!shouldHideHands && !fighter.hideBackHand && isFlurrying) {
-    drawSaitamaArm(ctx, r, backHandX, backHandY, handRadius, r * 0.12, false);
+    drawSaitamaPixelGlove(ctx, r * 0.35, r * 0.15, handRadius);
   }
 
   // ─────────────────────────────────────────────
@@ -231,21 +318,21 @@ export function drawSaitamaSkin(ctx, fighter) {
 
   // ── Render Front Hand (Front Layer - On Top of Body Circle) ──
   if (!shouldHideHands && !fighter.hideFrontHand) {
-    const isPunchHandFront = isFlurrying ? true : fighter.isRightPunch;
+    const isPunchHandFront = (isFlurrying || isFlurryFinalPunch || isPostCounter || isNormalPunching) ? true : fighter.isRightPunch;
     if (isChargingAny && isPunchHandFront) {
       drawSeriousChargeGlow(ctx, frontHandX, frontHandY, handRadius, chargeScale);
     }
     if (isFlurrying) {
-      drawSaitamaArm(ctx, r, frontHandX, frontHandY, handRadius, r * 0.40, true);
+      drawSaitamaPixelGlove(ctx, r * 0.35, r * 0.40, handRadius);
     } else {
-      // Crisp stepped pixel-art brawler glove
+      // Drawn pixel-art glove cleanly at frontHand position
       drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
     }
   }
 
   // ── Consecutive Normal Punches: Multi-Fist Barrage (Anime Ghost Fists) ──
   if (isFlurrying && !shouldHideHands) {
-    drawConsecutivePunchesBarrage(ctx, r, handRadius, fighter.flurryTimer || 0);
+    drawConsecutivePunchesBarrage(ctx, r, handRadius, fighter.flurryTimer || 0, fighter);
   }
 
   // Draw counter punch charging overlay effects (spark arcs, star lines)
@@ -259,6 +346,209 @@ export function drawSaitamaSkin(ctx, fighter) {
   // Status Overlays (stun, slow, burn, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
     fighter.drawStatusOverlays(ctx, r);
+  }
+
+  ctx.restore();
+
+  // ─────────────────────────────────────────────
+  // 5. FLOATING PUNCH PROJECTILE & SHOCKWAVES (WORLD SPACE)
+  // Decoupled from Saitama's body coordinates so moving/rotating does not pivot or drag the released punch!
+  // ─────────────────────────────────────────────
+  if (!shouldHideHands) {
+    if (isPostCounter) {
+      const counterScale = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterPunchSpriteScale) || 3.40;
+      // Explosive forced-perspective scaling pop: starts at 1.8x and bursts instantly to full 3.40x
+      const thrustT = Math.min(1.0, rawProgress / 0.08);
+      const easeThrust = 1.0 - Math.pow(1.0 - thrustT, 4);
+      const currentScale = 1.80 + easeThrust * (counterScale - 1.80);
+
+      // Punch holds solid full opacity through the explosive blast, then dissolves in distant air
+      const punchAlpha = rawProgress < 0.50 ? 1.0 : Math.max(0.0, 1.0 - (rawProgress - 0.50) / 0.50);
+
+      const releaseOriginX = fighter._counterReleaseOriginX !== undefined ? fighter._counterReleaseOriginX : fighter.x;
+      const releaseOriginY = fighter._counterReleaseOriginY !== undefined ? fighter._counterReleaseOriginY : (fighter.y - (fighter.z || 0));
+      const releaseAngle = fighter._counterReleaseAngle !== undefined ? fighter._counterReleaseAngle : (fighter.gunAngle || fighter.angle || 0);
+      const releaseFacingLeft = Math.abs(releaseAngle) > Math.PI / 2;
+
+      const punchReach = r * 0.95 + easePunch * (r * 3.40);
+      const punchLateral = r * 0.20;
+
+      ctx.save();
+      ctx.translate(releaseOriginX, releaseOriginY);
+      ctx.rotate(releaseAngle);
+      if (releaseFacingLeft) ctx.scale(1, -1);
+
+      // Supersonic Manga Shockwave Blast & Conical Air-Blast VFX (One-Shot Death Punch)
+      if (punchAlpha > 0.05) {
+        drawSeriousCounterImpactVFX(ctx, r, punchReach, punchLateral, handRadius * currentScale, rawProgress, punchAlpha);
+      }
+      if (punchAlpha > 0.01) {
+        drawSaitamaGloveSprite(ctx, punchReach, punchLateral, handRadius * currentScale, punchAlpha, currentScale);
+      }
+      ctx.restore();
+    } else if (isFlurryFinalPunch) {
+      const finalScale = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.flurryFinalPunchSpriteScale) || 3.40;
+      // Explosive forced-perspective scaling pop: starts at 1.8x and bursts instantly to full 3.40x (matches Serious Counter)
+      const thrustT = Math.min(1.0, rawProgress / 0.08);
+      const easeThrust = 1.0 - Math.pow(1.0 - thrustT, 4);
+      const currentScale = 1.80 + easeThrust * (finalScale - 1.80);
+
+      // Punch holds solid full opacity through the explosive blast, then dissolves in distant air
+      const punchAlpha = rawProgress < 0.50 ? 1.0 : Math.max(0.0, 1.0 - (rawProgress - 0.50) / 0.50);
+
+      const releaseOriginX = fighter._flurryFinalPunchReleaseOriginX !== undefined ? fighter._flurryFinalPunchReleaseOriginX : fighter.x;
+      const releaseOriginY = fighter._flurryFinalPunchReleaseOriginY !== undefined ? fighter._flurryFinalPunchReleaseOriginY : (fighter.y - (fighter.z || 0));
+      const releaseAngle = fighter._flurryFinalPunchReleaseAngle !== undefined ? fighter._flurryFinalPunchReleaseAngle : (fighter.gunAngle || fighter.angle || 0);
+      const releaseFacingLeft = Math.abs(releaseAngle) > Math.PI / 2;
+
+      const punchReach = r * 0.95 + easePunch * (r * 3.40);
+      const punchLateral = r * 0.20;
+
+      ctx.save();
+      ctx.translate(releaseOriginX, releaseOriginY);
+      ctx.rotate(releaseAngle);
+      if (releaseFacingLeft) ctx.scale(1, -1);
+
+      // Supersonic Manga Concussive Pressure Rings & Impact VFX (One-Shot Death Punch Style)
+      if (punchAlpha > 0.05) {
+        drawSeriousCounterImpactVFX(ctx, r, punchReach, punchLateral, handRadius * currentScale, rawProgress, punchAlpha);
+      }
+      if (punchAlpha > 0.01) {
+        drawSaitamaGloveSprite(ctx, punchReach, punchLateral, handRadius * currentScale, punchAlpha, currentScale);
+      }
+      ctx.restore();
+    } else if (isNormalPunching) {
+      const normalScale = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.normalPunchSpriteScale) || 1.65;
+      const currentScale = 1.0 + Math.min(1.0, easePunch) * (normalScale - 1.0);
+      // Floating Normal Punch Glove Sprite fades away smoothly out in the air as it travels forward (never pulling back)
+      const punchAlpha = rawProgress < 0.38 ? 1.0 : Math.max(0.0, 1.0 - (rawProgress - 0.38) / 0.62);
+
+      const releaseOriginX = fighter._normalPunchReleaseOriginX !== undefined ? fighter._normalPunchReleaseOriginX : fighter.x;
+      const releaseOriginY = fighter._normalPunchReleaseOriginY !== undefined ? fighter._normalPunchReleaseOriginY : (fighter.y - (fighter.z || 0));
+      const releaseAngle = fighter._normalPunchReleaseAngle !== undefined ? fighter._normalPunchReleaseAngle : (fighter.gunAngle || fighter.angle || 0);
+      const releaseFacingLeft = Math.abs(releaseAngle) > Math.PI / 2;
+
+      const punchReach = r * 0.95 + easePunch * (r * 2.10);
+      const punchLateral = r * 0.25;
+
+      ctx.save();
+      ctx.translate(releaseOriginX, releaseOriginY);
+      ctx.rotate(releaseAngle);
+      if (releaseFacingLeft) ctx.scale(1, -1);
+
+      if (punchAlpha > 0.01) {
+        drawSaitamaGloveSprite(ctx, punchReach, punchLateral, handRadius * currentScale, punchAlpha, currentScale);
+      }
+      ctx.restore();
+    }
+  }
+}
+
+/**
+ * Draws a punching arm sleeve with yellow hero suit fabric (Pixel Art)
+ */
+export function drawSaitamaArmSleeve(ctx, r, startX, startY, endX, endY, sleeveRadius) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  const dist = Math.hypot(dx, dy);
+
+  // Hard distance limit: never stretch like rubber across open space
+  if (dist <= sleeveRadius * 0.3 || dist > r * 2.2) return;
+
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const angle = Math.atan2(dy, dx);
+  const perpAngle = angle + Math.PI / 2;
+  const sleeveW = sleeveRadius * 0.72;
+  const px = Math.cos(perpAngle) * sleeveW;
+  const py = Math.sin(perpAngle) * sleeveW;
+
+  const sleevePts = [
+    { x: startX + px * 0.75, y: startY + py * 0.75 },
+    { x: endX - Math.cos(angle) * (sleeveRadius * 0.3) + px, y: endY - Math.sin(angle) * (sleeveRadius * 0.3) + py },
+    { x: endX - Math.cos(angle) * (sleeveRadius * 0.3) - px, y: endY - Math.sin(angle) * (sleeveRadius * 0.3) - py },
+    { x: startX - px * 0.75, y: startY - py * 0.75 }
+  ];
+
+  ctx.save();
+  // Stepped pixel outline
+  ctx.fillStyle = '#111114';
+  for (let j = 0; j < sleevePts.length; j++) {
+    const p1 = sleevePts[j];
+    const p2 = sleevePts[(j + 1) % sleevePts.length];
+    const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const steps = Math.max(2, Math.round(len / P));
+    for (let st = 0; st <= steps; st++) {
+      const rx = p1.x + (p2.x - p1.x) * (st / steps);
+      const ry = p1.y + (p2.y - p1.y) * (st / steps);
+      ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
+    }
+  }
+
+  // Stepped pixel sleeve fill
+  ctx.fillStyle = '#FFEB94';
+  ctx.beginPath();
+  sleevePts.forEach((pt, idx) => {
+    if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
+    else ctx.lineTo(snap(pt.x), snap(pt.y));
+  });
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Draws epic supersonic concussive pressure rings and impact stars
+ * for Saitama's one-shot Serious Counter Death Punch & Flurry Finisher Slam.
+ */
+function drawSeriousCounterImpactVFX(ctx, r, fistX, fistY, fRadius, rawProgress, alpha = 1.0) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // 1. Dual Supersonic Concussive Pressure Rings expanding ahead of knuckles
+  const ringOffsets = [fRadius * 0.30, fRadius * 0.65];
+  ringOffsets.forEach((offset, idx) => {
+    ctx.fillStyle = idx === 0 ? '#FFFFFF' : 'rgba(255, 230, 90, 0.95)';
+    const ringThick = idx === 0 ? P * 1.5 : P;
+    for (let a = -Math.PI * 0.46; a <= Math.PI * 0.46; a += 0.16) {
+      const rx = fistX + Math.cos(a) * (fRadius + offset);
+      const ry = fistY + Math.sin(a) * (fRadius + offset);
+      ctx.fillRect(snap(rx), snap(ry), ringThick, ringThick);
+    }
+  });
+
+  // 2. Radiant 4-Point Manga Impact Star on initial thrust explosion (rawProgress < 0.22)
+  if (rawProgress < 0.22) {
+    const starProg = rawProgress / 0.22;
+    const starScale = Math.sin(starProg * Math.PI);
+    const starR = fRadius * (1.2 + starScale * 1.2);
+    
+    ctx.save();
+    ctx.translate(fistX + fRadius * 0.4, fistY);
+    
+    // White core diamond / star spikes
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+    // Horizontal blast spikes
+    ctx.beginPath();
+    ctx.moveTo(-starR * 1.4, 0);
+    ctx.lineTo(0, -P * 2.5);
+    ctx.lineTo(starR * 1.8, 0);
+    ctx.lineTo(0, P * 2.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Vertical blast spikes
+    ctx.beginPath();
+    ctx.moveTo(0, -starR * 1.3);
+    ctx.lineTo(-P * 2.5, 0);
+    ctx.lineTo(0, starR * 1.3);
+    ctx.lineTo(P * 2.5, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
   }
 
   ctx.restore();
@@ -308,7 +598,7 @@ function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
     }
   }
 
-  // 4. Specular Knuckle Highlight Pixels
+  // Specular Knuckle Highlight Pixels
   ctx.fillStyle = '#FF9999';
   const hx = handX - P / 2;
   const hy = handY - gridR * 0.45 - P / 2;
@@ -323,61 +613,10 @@ function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
  */
 function drawSaitamaArm(ctx, r, handX, handY, handRadius, shoulderY, isFront = false) {
   ctx.save();
-  
   // 1. Pixel-Art Arm Sleeve extending from torso to glove
-  const startX = r * 0.15;
-  const startY = shoulderY;
-  const endX = handX;
-  const endY = handY;
-
-  const dx = endX - startX;
-  const dy = endY - startY;
-  const dist = Math.hypot(dx, dy);
-
-  if (dist > handRadius * 0.4) {
-    const P = 2.0;
-    const snap = (v) => Math.round(v / P) * P;
-    const angle = Math.atan2(dy, dx);
-    const perpAngle = angle + Math.PI / 2;
-    const sleeveW = handRadius * 0.72;
-    const px = Math.cos(perpAngle) * sleeveW;
-    const py = Math.sin(perpAngle) * sleeveW;
-
-    const sleevePts = [
-      { x: startX + px * 0.75, y: startY + py * 0.75 },
-      { x: endX - Math.cos(angle) * (handRadius * 0.3) + px, y: endY - Math.sin(angle) * (handRadius * 0.3) + py },
-      { x: endX - Math.cos(angle) * (handRadius * 0.3) - px, y: endY - Math.sin(angle) * (handRadius * 0.3) - py },
-      { x: startX - px * 0.75, y: startY - py * 0.75 }
-    ];
-
-    // Stepped pixel outline
-    ctx.fillStyle = '#111114';
-    for (let j = 0; j < sleevePts.length; j++) {
-      const p1 = sleevePts[j];
-      const p2 = sleevePts[(j + 1) % sleevePts.length];
-      const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      const steps = Math.max(2, Math.round(len / P));
-      for (let st = 0; st <= steps; st++) {
-        const rx = p1.x + (p2.x - p1.x) * (st / steps);
-        const ry = p1.y + (p2.y - p1.y) * (st / steps);
-        ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
-      }
-    }
-
-    // Stepped pixel sleeve fill
-    ctx.fillStyle = '#FFEB94';
-    ctx.beginPath();
-    sleevePts.forEach((pt, idx) => {
-      if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
-      else ctx.lineTo(snap(pt.x), snap(pt.y));
-    });
-    ctx.closePath();
-    ctx.fill();
-  }
-
+  drawSaitamaArmSleeve(ctx, r, r * 0.15, shoulderY, handX, handY, handRadius);
   // 2. Stepped Pixel-Art Red Glove
   drawSaitamaPixelGlove(ctx, handX, handY, handRadius);
-
   ctx.restore();
 }
 
@@ -385,14 +624,17 @@ function drawSaitamaArm(ctx, r, handX, handY, handRadius, shoulderY, isFront = f
  * Draws the iconic multi-fist optical illusion barrage during Consecutive Normal Punches
  * Fists continuously animate back-and-forth in staggered phases.
  */
-function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer) {
+function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer, fighter = null) {
+  const isFinalHitPhase = Boolean(fighter && (fighter.flurryHitsLeft <= 2 || (fighter._flurryFinalPunchTimer && fighter._flurryFinalPunchTimer > 0)));
+  const finalScale = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.flurryFinalPunchSpriteScale) || 3.20;
+
   const lanes = [
-    { y: -r * 0.30, phase: 0 },
-    { y: -r * 0.10, phase: Math.PI * 0.66 },
-    { y:  r * 0.10, phase: Math.PI * 1.33 },
-    { y:  r * 0.30, phase: Math.PI * 0.33 },
+    { y: -r * 0.70, phase: 0 },
+    { y: -r * 0.40, phase: Math.PI * 0.66 },
+    { y: -r * 0.10, phase: Math.PI * 1.33 },
+    { y:  r * 0.20, phase: Math.PI * 0.33 },
     { y:  r * 0.50, phase: Math.PI * 1.0 },
-    { y:  r * 0.65, phase: Math.PI * 1.66 }
+    { y:  r * 0.80, phase: Math.PI * 1.66 }
   ];
 
   const cycleFreq = (Math.PI * 2) / 5; // ~5 frames per full forward/backward cycle
@@ -406,75 +648,56 @@ function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer) {
     const stroke = (Math.sin(curPhase) + 1) / 2; // 0.0 to 1.0
     const forwardVel = Math.cos(curPhase); // > 0 moving forward, < 0 pulling backward
 
-    const fistX = -r * 0.10 + stroke * (r * 2.40);
+    // Final punch scale multiplier: on final hit phase, the main central slam punch is significantly larger!
+    const isMainFinisherLane = (i === 2 || i === 3);
+    const scaleMult = (isFinalHitPhase && isMainFinisherLane) ? finalScale : 1.0;
+
+    const reachMult = (isFinalHitPhase && isMainFinisherLane) ? (r * 3.35) : (r * 2.75);
+    const fistX = -r * 0.10 + stroke * reachMult;
     const fistY = lane.y + Math.sin(curPhase * 0.5) * (r * 0.05);
-    const fRadius = handRadius * (0.80 + stroke * 0.22);
+    const fRadius = handRadius * (0.95 + stroke * 0.30) * scaleMult;
     const alpha = 0.40 + stroke * 0.55;
 
-    ctx.save();
-    ctx.globalAlpha = alpha;
-
-    // 1. Pixel-Art Arm Sleeve Streak connecting from body to punching glove
-    const P = 2.0;
-    const snap = (v) => Math.round(v / P) * P;
-    const perpY = handRadius * 0.55;
-    const sleevePts = [
-      { x: r * 0.25, y: r * 0.20 + fistY * 0.4 - perpY * 0.6 },
-      { x: fistX - fRadius * 0.4, y: fistY - perpY },
-      { x: fistX - fRadius * 0.4, y: fistY + perpY },
-      { x: r * 0.25, y: r * 0.20 + fistY * 0.4 + perpY * 0.6 }
-    ];
-
-    // Stepped pixel outline
-    ctx.fillStyle = '#111114';
-    for (let j = 0; j < sleevePts.length; j++) {
-      const p1 = sleevePts[j];
-      const p2 = sleevePts[(j + 1) % sleevePts.length];
-      const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-      const steps = Math.max(2, Math.round(len / P));
-      for (let st = 0; st <= steps; st++) {
-        const rx = p1.x + (p2.x - p1.x) * (st / steps);
-        const ry = p1.y + (p2.y - p1.y) * (st / steps);
-        ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
-      }
-    }
-
-    // Stepped pixel sleeve fill
-    ctx.fillStyle = 'rgba(255, 235, 148, 0.85)';
-    ctx.beginPath();
-    sleevePts.forEach((pt, idx) => {
-      if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
-      else ctx.lineTo(snap(pt.x), snap(pt.y));
-    });
-    ctx.closePath();
-    ctx.fill();
-
-    // 2. Forward punch wind / motion blur speed lines (only while thrusting forward)
+    // 1. Golden concussive pressure ring at tip (only while thrusting forward)
     if (forwardVel > 0) {
-      ctx.fillStyle = '#FFFFFF';
-      for (let st = 0; st <= 6; st++) {
-        const sx = fistX - fRadius * 1.3 + (st / 6) * (fRadius * 2.1);
-        const sy1 = fistY - fRadius * 0.8 + (st / 6) * (fRadius * 0.8);
-        const sy2 = fistY + fRadius * 0.8 - (st / 6) * (fRadius * 0.8);
-        ctx.fillRect(snap(sx), snap(sy1), P, P);
-        ctx.fillRect(snap(sx), snap(sy2), P, P);
-      }
-
-      // Golden concussive pressure ring at tip (Pixel Art)
-      ctx.fillStyle = 'rgba(255, 220, 80, 0.9)';
+      ctx.fillStyle = (isFinalHitPhase && isMainFinisherLane) ? 'rgba(255, 240, 120, 0.95)' : 'rgba(255, 220, 80, 0.9)';
+      const ringOffset = (isFinalHitPhase && isMainFinisherLane) ? 8 : 4;
       for (let a = -Math.PI * 0.45; a <= Math.PI * 0.45; a += 0.2) {
-        const rx = fistX + Math.cos(a) * (fRadius + 3);
-        const ry = fistY + Math.sin(a) * (fRadius + 3);
+        const rx = fistX + Math.cos(a) * (fRadius + ringOffset);
+        const ry = fistY + Math.sin(a) * (fRadius + ringOffset);
         ctx.fillRect(snap(rx), snap(ry), P, P);
       }
     }
 
-    // 3. Stepped Pixel-Art Ghost Red Glove
-    drawSaitamaPixelGlove(ctx, fistX, fistY, fRadius, alpha);
+    // 2. Authentic Floating Sprite Glove (Assets/model/Sprites/Glove-punch.png) with Procedural Fallback
+    drawSaitamaGloveSprite(ctx, fistX, fistY, fRadius, alpha, scaleMult);
 
     ctx.restore();
   }
   ctx.restore();
+}
+
+/**
+ * Draws Saitama's authentic Glove-punch.png sprite (or stepped procedural fallback)
+ */
+export function drawSaitamaGloveSprite(ctx, fistX, fistY, fRadius, alpha = 1.0, scaleMultiplier = 1.0) {
+  const spriteCanvas = _getSaitamaGloveSpriteCanvas();
+  if (spriteCanvas && spriteCanvas.width > 0 && spriteCanvas.height > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = alpha;
+    ctx.translate(fistX, fistY);
+    ctx.rotate(Math.PI * 0.5); // Rotate 90 deg clockwise so knuckles point forward along +X
+    const sw = spriteCanvas.width;
+    const sh = spriteCanvas.height;
+    const scale = (fRadius * 3.85) / sh;
+    const dw = sw * scale;
+    const dh = sh * scale;
+    ctx.drawImage(spriteCanvas, -dw * 0.5, -dh * 0.5, dw, dh);
+    ctx.restore();
+  } else {
+    drawSaitamaPixelGlove(ctx, fistX, fistY, fRadius * 1.35, alpha);
+  }
 }
 
 /**
@@ -771,7 +994,7 @@ function drawSaitamaGhostModel(ctx, r) {
   // 1. Cape (Pixel Art)
   drawSaitamaPixelCape(ctx, r, 0, 0, 0, 0, 0, true);
 
-  // 2. Hands (Back & Front - Pixel Art)
+  // 2. Hands (Back & Front - Pixel Art Drawing)
   const handRadius = Math.max(r * 0.38, 8.5);
   const backHandX = 0, backHandY = r * 0.10;
 
@@ -781,7 +1004,7 @@ function drawSaitamaGhostModel(ctx, r) {
   // 3. Body Circle (Pixel Art)
   drawSaitamaPixelBody(ctx, r, true);
 
-  // Front Hand (Pixel Art)
+  // Front Hand
   const frontHandX = r * 0.95, frontHandY = r * 0.25;
   drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
 

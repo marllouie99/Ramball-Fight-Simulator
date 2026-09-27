@@ -37,7 +37,7 @@ export const saitamaConfig = {
   punchCooldown: 2000, // ~0.6s cooldown at 60fps
   punchWindup: 0,
   punchWindupFrames: 0,
-  punchMaxTime: 22,                // Smooth punch animation frames
+  punchMaxTime: 28,                // Smooth punch animation frames (~0.46s at 60fps)
   shockwaveRadius: 60,
   shockwaveKnockback: 12,          // Concussive shockwave knockback force
   wallPinDurationFrames: 20,       // Duration (frames) enemy stays pinned to wall on hit (~1.0s at 60fps)
@@ -52,6 +52,7 @@ export const saitamaConfig = {
   punchFrontalArc: Math.PI * 0.35, // Frontal shockwave blast cone angle on normal punch
   punchFrontalDamage: 0.95,        // Damage dealt across the long frontal supersonic shockwave blast cone (% of mode fixed HP)
   punchTriggerDistance: 50,       // AI trigger distance threshold for initiating Normal Punch (px)
+  normalPunchSpriteScale: 1.65,    // Scale multiplier for Normal Punch sprite on release/extension
   wallPinScreenShakeIntensity: 30,  // Arena screen shake intensity on wall pin impact
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
 
@@ -59,7 +60,7 @@ export const saitamaConfig = {
   consecutivePunchesEnabled: 0, // Set to false to disable Consecutive Normal Punches (Skill 1)
   flurryEnabled: true,             // Alias toggle
   disableConsecutivePunches: false, // If true, disables Consecutive Normal Punches
-  flurryDamage: 50,                 // Damage per rapid punch hit
+  flurryDamage: 20,                 // Damage per rapid punch hit
   flurryHitCount: 10,               // 10 rapid consecutive normal punches
   flurryHitInterval: 4,             // Frames between consecutive punch hits (~0.066s)
   flurryReach: 95,                  // Range of flurry punches
@@ -71,9 +72,11 @@ export const saitamaConfig = {
   flurryPushbackPerHit: 7.0,        // Backward push distance (px) applied to enemy on each punch
   flurryFinalSlamDamage: 100,        // Final devastating finisher punch
   flurryFinalSlamKnockback: 65,     // Heavy knockback on final blow
+  flurryFinalPunchSpriteScale: 3.40, // Scale multiplier for the giant final finisher punch sprite in Consecutive Normal Punches (matches Serious Counter)
+  flurryFinalPunchRecoveryFrames: 45, // Frames final punch stays extended in follow-through (matches Serious Counter)
   flurryFinalFrontalReach: 560,     // Frontal supersonic shockwave blast reach (px) on flurry final punch
   flurryFinalFrontalArc: Math.PI * 0.70, // Frontal shockwave blast cone angle on flurry final punch
-  flurryCooldown: 1200,              // Cooldown frames at 60fps
+  flurryCooldown: 200,              // Cooldown frames at 60fps
   flurryTriggerDistance: 260,       // AI trigger distance threshold
   flurryInitialHitPauseFrames: 20,  // Target hit-pause on flurry start
   flurryHoldHitPauseFrames: 8,      // Target hit-pause during flurry cycle
@@ -107,11 +110,14 @@ export const saitamaConfig = {
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)
   enableSeriousCounter: true,    // Master toggle for Serious Skill Counter
+  enableCounterAutoAim: true,    // Master toggle for smooth auto-aim tracking during counter wind-up
+  counterAutoAimTurnRate: 0.045, // Controlled turn rate (radians/frame) for smooth, non-fast rotation during counter wind-up (~2.5 deg/frame)
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
-  counterPunchDamageMultiplier: 5.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
-  counterFrontalReach: 1000,        // Long frontal shockwave blast reach (px)
-  counterFrontalArc: (50 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
-  counterFrontalCollateralDamage: 2000, // Damage dealt to collateral enemies caught in the wide long frontal blast
+  counterPunchDamageMultiplier: 999.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
+  counterPunchSpriteScale: 2.60,    // Scale multiplier for Serious Skill Counter punch sprite on release/extension
+  counterFrontalReach: 1500,        // Long frontal shockwave blast reach (px) spanning across the arena
+  counterFrontalArc: (50 * Math.PI) / 180, // Focused 28-degree frontal shockwave cone arc
+  counterFrontalCollateralDamage: 1000000, // Damage dealt to collateral enemies caught in the wide long frontal blast
   counterWindupFrames: 50,        // Frames Saitama waits before teleporting (reaction delay)
   counterTeleportIdleFrames: 10,  // Frames Saitama stands completely still (staring) after teleporting before starting the charge
   counterTeleportDistanceOffset: 35, // Distance offset behind enemy (guarantees Saitama never overlaps the enemy's body)

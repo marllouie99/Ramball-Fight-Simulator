@@ -6,7 +6,7 @@ import { drawPanel } from './ui.js';
 import { getFighterPreview } from './ui/FighterPreviewCache.js';
 
 import { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking } from './ui/hudLayout.js';
-import { getSkillDataForFighter } from './ui/hudSkillProviders.js';
+import { getSkillDataForFighter, isSkillExceptionInDarkMode, shouldShowFighterSkill, shouldShowHudSkillBars, shouldShowHudStats } from './ui/hudSkillProviders.js';
 import { applyCameraToCtx } from '../systems/cameraSystem.js';
 import { getBossConfig } from '../configs/bosses/bossConfigRegistry.js';
 
@@ -328,11 +328,16 @@ export function drawHUD() {
   const is1v2Mode = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2';
 
   // FOC & Tactical modes HUD visibility
+  let topHudOpacity = hudOpacity;
+  if (state.hudShatters && state.hudShatters.topNameShatter) {
+    topHudOpacity = 0;
+  }
+
   if (topContainer) {
-    if (is1v2Mode && hudOpacity > 0 && !CONFIG.hudHideAll && !CONFIG.hudHideHealthBars) {
+    if (is1v2Mode && topHudOpacity > 0 && !CONFIG.hudHideAll && !CONFIG.hudHideHealthBars) {
       topContainer.style.display = 'flex';
       topContainer.style.visibility = 'visible';
-      topContainer.style.opacity = hudOpacity;
+      topContainer.style.opacity = topHudOpacity;
       topContainer.style.pointerEvents = 'none';
       updateTopHudCameraTracking(topContainer);
     } else {
@@ -357,6 +362,11 @@ export function drawHUD() {
       hudOpacity = 0;
     }
 
+    let bottomHudOpacity = hudOpacity;
+    if (state.hudShatters && state.hudShatters.bottomHudShatter) {
+      bottomHudOpacity = 0;
+    }
+
     const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
     containerBottom.classList.toggle('ffa-hud', isFfaMode && !isTactical);
     containerBottom.classList.toggle('tactical-hud', isTactical);
@@ -369,8 +379,8 @@ export function drawHUD() {
     const isTeamMode = is2v2Mode || is1v2Mode || isTLFSMode || (mainFighters && mainFighters.length > 2 && !isFfaMode);
     const isSingleColMode = (!isTactical && (is1v1Mode || isStandOffMode)) || (isCameraTracking && isTeamMode && !isTactical);
     containerBottom.classList.toggle('single-column-hud', isSingleColMode);
-    containerBottom.style.opacity = hudOpacity;
-    if (hudOpacity <= 0) {
+    containerBottom.style.opacity = bottomHudOpacity;
+    if (bottomHudOpacity <= 0) {
       containerBottom.style.visibility = 'hidden';
       containerBottom.style.pointerEvents = 'none';
       containerBottom.style.display = 'none';
@@ -382,24 +392,26 @@ export function drawHUD() {
     }
   }
   if (containerLeft) {
-    if (hudOpacity <= 0 || !containerLeft.children || !containerLeft.children.length) {
+    const bottomHudOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
+    if (bottomHudOpacity <= 0 || !containerLeft.children || !containerLeft.children.length) {
       containerLeft.style.visibility = 'hidden';
       containerLeft.style.pointerEvents = 'none';
       containerLeft.style.display = 'none';
     } else {
-      containerLeft.style.opacity = hudOpacity;
+      containerLeft.style.opacity = bottomHudOpacity;
       containerLeft.style.display = 'block';
       containerLeft.style.visibility = 'visible';
       containerLeft.style.pointerEvents = 'auto';
     }
   }
   if (containerRight) {
-    if (hudOpacity <= 0 || !containerRight.children || !containerRight.children.length) {
+    const bottomHudOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
+    if (bottomHudOpacity <= 0 || !containerRight.children || !containerRight.children.length) {
       containerRight.style.visibility = 'hidden';
       containerRight.style.pointerEvents = 'none';
       containerRight.style.display = 'none';
     } else {
-      containerRight.style.opacity = hudOpacity;
+      containerRight.style.opacity = bottomHudOpacity;
       containerRight.style.display = 'block';
       containerRight.style.visibility = 'visible';
       containerRight.style.pointerEvents = 'auto';
@@ -1235,90 +1247,7 @@ function updateHealthHud() {
     return false;
   };
 
-  const isSkillExceptionInDarkMode = (fighter, skill) => {
-    if (!fighter || !skill) return false;
-    if (skill.isSignature || skill.isUltimate || skill.isDomain || skill.signature) {
-      return true;
-    }
-    const fId = String(fighter.characterId || fighter.type || (fighter._def && fighter._def.type) || '').toLowerCase();
-    const sId = String(skill.id || '').toLowerCase();
-    const sLabel = String(skill.label || '').toUpperCase();
-
-    // Specific character signature skill mapping
-    const signatureMap = {
-      ichigo: ['bankai'],
-      toji: ['ult', 'ultimate', 'CURSE INVENTORY', 'INVENTORY'],
-      gojo: ['uv', 'domain', 'UNLIMITED VOID', 'VOID'],
-      sukuna: ['ms', 'domain', 'MALEVOLENT SHRINE', 'SHRINE'],
-      yuta: ['domain', 'AUTHENTIC MUTUAL LOVE', 'MUTUAL LOVE'],
-      mahito: ['domain_expansion', 'domain', 'SELF-EMBODIMENT', 'PERFECTION'],
-      saitama: ['punish', 'counter', 'SERIOUS PUNCH', 'SERIOUS'],
-      genos: ['ult', 'ultimate', 'INCINERATION CANNON', 'INCINERATION'],
-      yuji: ['bf_threshold', 'black_flash', 'BLACK FLASH'],
-      todo: ['clap', 'boogie', 'BOOGIE'],
-      nanami: ['lunge', 'decisive', 'DECISIVE'],
-      mahoraga: ['wheel', 'adaptation', 'WHEEL', 'ADAPTATION', 'WOA'],
-      cj: ['baguvix', 'godmode', 'BAGUVIX', 'GODMODE'],
-      engineer: ['turret', 'sentry', 'SENTRY', 'TURRET'],
-      john_wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
-      johnwick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
-      wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
-      makima: ['chains', 'shrine', 'contract', 'CHAINS', 'SHRINE', 'CONTRACT'],
-      escanor: ['cruel_sun', 'cruel sun', 'CRUEL SUN', 'SUN'],
-      zenitsu: ['thunderclap', 'hekireki', 'THUNDERCLAP', 'FLASH', 'THUNDER'],
-      zeus: ['storm', 'thunder_storm', 'THUNDER STORM', 'STORM']
-    };
-
-    const keys = signatureMap[fId];
-    if (keys) {
-      return keys.some(k => sId === k.toLowerCase() || sLabel.includes(k.toUpperCase()));
-    }
-    return false;
-  };
-
-
-  const shouldShowFighterSkill = (fighter, skill) => {
-    if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
-      return false; // 100% hide all skill bars, with zero exceptions!
-    }
-    if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
-      return isSkillExceptionInDarkMode(fighter, skill);
-    }
-    if (CONFIG.hudSkillBarsMode === 'all' || CONFIG.darkModeShowHudSkillBars === 1) {
-      return true;
-    }
-    const showAll = (CONFIG.darkModeShowHudSkillBars !== undefined)
-      ? Boolean(CONFIG.darkModeShowHudSkillBars)
-      : ((CONFIG.darkModeShowSkillBars !== undefined) ? Boolean(CONFIG.darkModeShowSkillBars) : true);
-    
-    if (!showAll) {
-      return isSkillExceptionInDarkMode(fighter, skill);
-    }
-    return true;
-  };
-
-  const shouldShowHudSkillBars = () => {
-    if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
-      return false;
-    }
-    if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
-      return true;
-    }
-    if (CONFIG.darkModeShowHudSkillBars !== undefined) return Boolean(CONFIG.darkModeShowHudSkillBars);
-    if (CONFIG.darkModeShowSkillBars !== undefined) return Boolean(CONFIG.darkModeShowSkillBars);
-    return true;
-  };
-
-  const shouldShowHudStats = () => {
-    if (CONFIG.hudHideAll || CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0) {
-      return false;
-    }
-    if (CONFIG.darkModeShowHudStats !== undefined) return Boolean(CONFIG.darkModeShowHudStats);
-    if (CONFIG.darkModeShowStats !== undefined) return Boolean(CONFIG.darkModeShowStats);
-    return true;
-  };
-
-  // getSkillDataForFighter is imported from ./ui/hudSkillProviders.js
+  // getSkillDataForFighter and shouldShowFighterSkill are imported from ./ui/hudSkillProviders.js
 
   const getAdditionalInfoForFighter = (f) => {
     const info = [];

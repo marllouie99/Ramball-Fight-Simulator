@@ -350,6 +350,9 @@ export const state = {
   // Wall crack decals (from knockback collisions)
   wallCracks: [],
 
+  // Shattered arena line wall breaches (from Saitama Serious Counter punches)
+  shatteredWalls: [],
+
   // Illusions (for Doppleganger fighter)
   illusions: [],
 

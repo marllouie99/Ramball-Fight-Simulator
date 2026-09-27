@@ -3465,3 +3465,16 @@ canvas {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 }
 
+.hud-shattered-shock {
+  animation: hud-shatter-recoil 1.8s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
+}
+
+@keyframes hud-shatter-recoil {
+  0% { transform: scale(1); filter: brightness(1); }
+  4% { transform: scale(1.025) translateY(-3px); filter: brightness(1.4); }
+  18% { transform: scale(1.008) translateY(-1px); filter: brightness(1.15); }
+  45% { transform: scale(1.002) translateY(-0.3px); filter: brightness(1.03); }
+  100% { transform: scale(1) translateY(0); filter: brightness(1); }
+}
+
+

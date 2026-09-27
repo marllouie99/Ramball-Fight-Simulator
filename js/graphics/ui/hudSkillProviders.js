@@ -2199,3 +2199,111 @@ export function getSkillDataForFighter(f, getProjectiles) {
     { id: 'skill', pct: skillPct, ready: skillPct >= 99, color: color, label: label }
   ];
 }
+
+/**
+ * Checks if a specific skill qualifies as a signature/ultimate exception under Dark Mode or Signature Only HUD mode.
+ * @param {Object} fighter Fighter instance
+ * @param {Object} skill Skill descriptor object
+ * @returns {boolean}
+ */
+export function isSkillExceptionInDarkMode(fighter, skill) {
+  if (!fighter || !skill) return false;
+  if (skill.isSignature || skill.isUltimate || skill.isDomain || skill.signature) {
+    return true;
+  }
+  const fId = String(fighter.characterId || fighter.type || (fighter._def && fighter._def.type) || '').toLowerCase();
+  const sId = String(skill.id || '').toLowerCase();
+  const sLabel = String(skill.label || '').toUpperCase();
+
+  // Specific character signature skill mapping
+  const signatureMap = {
+    ichigo: ['bankai'],
+    toji: ['ult', 'ultimate', 'CURSE INVENTORY', 'INVENTORY'],
+    gojo: ['uv', 'domain', 'UNLIMITED VOID', 'VOID'],
+    sukuna: ['ms', 'domain', 'MALEVOLENT SHRINE', 'SHRINE'],
+    yuta: ['domain', 'AUTHENTIC MUTUAL LOVE', 'MUTUAL LOVE'],
+    mahito: ['domain_expansion', 'domain', 'SELF-EMBODIMENT', 'PERFECTION'],
+    saitama: ['punish', 'counter', 'SERIOUS PUNCH', 'SERIOUS'],
+    genos: ['ult', 'ultimate', 'INCINERATION CANNON', 'INCINERATION'],
+    yuji: ['bf_threshold', 'black_flash', 'BLACK FLASH'],
+    todo: ['clap', 'boogie', 'BOOGIE'],
+    nanami: ['lunge', 'decisive', 'DECISIVE'],
+    mahoraga: ['wheel', 'adaptation', 'WHEEL', 'ADAPTATION', 'WOA'],
+    cj: ['baguvix', 'godmode', 'BAGUVIX', 'GODMODE'],
+    engineer: ['turret', 'sentry', 'SENTRY', 'TURRET'],
+    john_wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
+    johnwick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
+    wick: ['ultimate', 'excommunicado', 'EXCOMMUNICADO'],
+    makima: ['chains', 'shrine', 'contract', 'CHAINS', 'SHRINE', 'CONTRACT'],
+    escanor: ['cruel_sun', 'cruel sun', 'CRUEL SUN', 'SUN'],
+    zenitsu: ['thunderclap', 'hekireki', 'THUNDERCLAP', 'FLASH', 'THUNDER'],
+    zeus: ['storm', 'thunder_storm', 'THUNDER STORM', 'STORM'],
+    uryu: ['letzt_stil', 'letzt stil', 'LETZT STIL', 'SANREI'],
+    nobara: ['hairpin', 'resonance', 'RESONANCE', 'HAIRPIN'],
+    reze: ['bomb', 'explosion', 'BOMB', 'EXPLOSION'],
+    power: ['blood_hammer', 'blood hammer', 'HAMMER', 'BLOOD'],
+    megumi: ['chimera', 'shadow', 'SHADOW GARDEN', 'GARDEN']
+  };
+
+  const keys = signatureMap[fId];
+  if (keys) {
+    return keys.some(k => sId === k.toLowerCase() || sLabel.includes(k.toUpperCase()));
+  }
+  return false;
+}
+
+/**
+ * Evaluates whether an individual skill bar should be rendered in the HUD based on current configuration and skill mode.
+ * @param {Object} fighter Fighter instance
+ * @param {Object} skill Skill descriptor object
+ * @returns {boolean}
+ */
+export function shouldShowFighterSkill(fighter, skill) {
+  if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+    return false; // 100% hide all skill bars, with zero exceptions!
+  }
+  if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
+    return isSkillExceptionInDarkMode(fighter, skill);
+  }
+  if (CONFIG.hudSkillBarsMode === 'all' || CONFIG.darkModeShowHudSkillBars === 1) {
+    return true;
+  }
+  const showAll = (CONFIG.darkModeShowHudSkillBars !== undefined)
+    ? Boolean(CONFIG.darkModeShowHudSkillBars)
+    : ((CONFIG.darkModeShowSkillBars !== undefined) ? Boolean(CONFIG.darkModeShowSkillBars) : true);
+  
+  if (!showAll) {
+    return isSkillExceptionInDarkMode(fighter, skill);
+  }
+  return true;
+}
+
+/**
+ * Checks if skill bars should be shown at all in the HUD.
+ * @returns {boolean}
+ */
+export function shouldShowHudSkillBars() {
+  if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
+    return false;
+  }
+  if (CONFIG.hudSkillBarsMode === 'signature' || CONFIG.darkModeShowHudSkillBars === 0) {
+    return true;
+  }
+  if (CONFIG.darkModeShowHudSkillBars !== undefined) return Boolean(CONFIG.darkModeShowHudSkillBars);
+  if (CONFIG.darkModeShowSkillBars !== undefined) return Boolean(CONFIG.darkModeShowSkillBars);
+  return true;
+}
+
+/**
+ * Checks if stat rows should be shown in the HUD.
+ * @returns {boolean}
+ */
+export function shouldShowHudStats() {
+  if (CONFIG.hudHideAll || CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0) {
+    return false;
+  }
+  if (CONFIG.darkModeShowHudStats !== undefined) return Boolean(CONFIG.darkModeShowHudStats);
+  if (CONFIG.darkModeShowStats !== undefined) return Boolean(CONFIG.darkModeShowStats);
+  return true;
+}
+

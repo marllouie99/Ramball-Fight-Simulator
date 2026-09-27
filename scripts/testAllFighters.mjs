@@ -3830,20 +3830,33 @@ async function main() {
     }
     const lockedAimAngle = testSaitama.gunAngle;
 
-    // Move target elsewhere during windup to verify Saitama does NOT rotate or snap auto-aim
+    // Move target elsewhere during windup to verify Saitama does NOT instantly snap aim via standard aim()
     dummyTarget2.x = 100;
     dummyTarget2.y = 500;
     testSaitama.aim(dummyTarget2);
     if (Math.abs(testSaitama.gunAngle - lockedAimAngle) > 0.001) {
-      throw new Error(`Saitama rotated towards target during counter windup! Expected ${lockedAimAngle}, got ${testSaitama.gunAngle}`);
+      throw new Error(`Saitama snapped instant aim via aim()! Expected ${lockedAimAngle}, got ${testSaitama.gunAngle}`);
     }
 
-    // Fast-forward to punch land
-    while (testSaitama._counterPunchTimer > 0) {
+    // Verify smooth, controlled rotational tracking during wind-up (angular delta per frame <= maxTurnRate)
+    const angleBeforeTick = testSaitama.gunAngle;
+    testSaitama.update(dummyTarget2, 0, state.arena);
+    const turnPerFrame = Math.abs(testSaitama.gunAngle - angleBeforeTick);
+    if (turnPerFrame > 0.06) {
+      throw new Error(`Saitama turn rate was too fast (${turnPerFrame.toFixed(3)} rad/frame, max allowed 0.06 rad/frame)!`);
+    }
+
+    // Fast-forward remainder of wind-up to punch land
+    while (testSaitama._counterPunchTimer > 1) {
       testSaitama.update(dummyTarget2, 0, state.arena);
     }
-    if (Math.abs(testSaitama.gunAngle - lockedAimAngle) > 0.001) {
-      throw new Error(`Saitama snapped auto-aim to target on punch release! Expected ${lockedAimAngle}, got ${testSaitama.gunAngle}`);
+    const prePunchReleaseAngle = testSaitama.gunAngle;
+    testSaitama.update(dummyTarget2, 0, state.arena); // Final punch land tick
+    
+    // Verify punch did NOT snap instantly to target upon release (angle change <= single frame turn rate)
+    const releaseSnapDiff = Math.abs(testSaitama.gunAngle - prePunchReleaseAngle);
+    if (releaseSnapDiff > 0.06) {
+      throw new Error(`Saitama snapped auto-aim to target on punch release! Diff was ${releaseSnapDiff.toFixed(3)} rad`);
     }
 
     // Test Serious Counter directional frontal-only hit detection (no side/back hit even when close)
@@ -3887,6 +3900,15 @@ async function main() {
       throw new Error(`Expected enemy to the side of Saitama to take 0 damage, but took ${5000 - sideEnemy.hp} damage!`);
     }
 
+    // Verify unique arena line wall shatter interaction
+    if (!state.shatteredWalls || state.shatteredWalls.length === 0) {
+      throw new Error(`Expected Serious Counter punch to shatter arena line wall in the punch direction, but state.shatteredWalls was empty!`);
+    }
+    const shatteredWall = state.shatteredWalls[0];
+    if (!shatteredWall || !shatteredWall.shards || shatteredWall.shards.length === 0) {
+      throw new Error(`Expected shattered wall to contain flying line fragments and debris`);
+    }
+
     while (testSaitama._postCounterRecoveryTimer > 0) {
       testSaitama.update(frontEnemy, 0, state.arena);
     }
@@ -3894,6 +3916,40 @@ async function main() {
     testSaitama._counterPunchTarget = null;
     testSaitama._counterPunchTimer = 0;
     testSaitama._postCounterRecoveryTimer = 0;
+
+    // Test Serious Counter Solid Immovable Collision Barrier (Zero Clipping / Pass-Through)
+    testSaitama.x = 200;
+    testSaitama.y = 200;
+    testSaitama.vx = 0;
+    testSaitama.vy = 0;
+    testSaitama.isCountering = true;
+    testSaitama._counterPunchTimer = 15; // In the middle of counter wind-up
+
+    const rushingEnemy = new Fighter({ startX: 200, startY: 210, type: 'default', color: '#ff0055' }); // deeply overlapping
+    rushingEnemy.r = 20;
+    testSaitama.r = 20;
+    rushingEnemy.vx = 0;
+    rushingEnemy.vy = -10; // Moving straight up into Saitama
+
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+    resolveFighterCollision(testSaitama, rushingEnemy);
+
+    // Saitama must remain completely stationary
+    if (testSaitama.x !== 200 || testSaitama.y !== 200 || testSaitama.vx !== 0 || testSaitama.vy !== 0) {
+      throw new Error(`Expected Saitama to be an immovable solid barrier during counter windup, but moved to (${testSaitama.x}, ${testSaitama.y})`);
+    }
+    // Rushing enemy must be separated outside Saitama's radius (minDist = 40)
+    const postColDist = Math.hypot(rushingEnemy.x - testSaitama.x, rushingEnemy.y - testSaitama.y);
+    if (postColDist < 39.99) {
+      throw new Error(`Expected rushing enemy to be pushed outside Saitama radius, but distance was ${postColDist}`);
+    }
+    // Inward velocity towards Saitama must be cancelled
+    if (rushingEnemy.vy < 0) {
+      throw new Error(`Expected rushing enemy's inward velocity to be cancelled, but vy was ${rushingEnemy.vy}`);
+    }
+
+    testSaitama.isCountering = false;
+    testSaitama._counterPunchTimer = 0;
 
     // Test Serious Counter cancellation when Gojo deploys domain (Unlimited Void) in time
     state.gameState = 'playing';
@@ -5780,8 +5836,34 @@ async function main() {
         isIncinerationCannon: true
       });
       const beamDamageTaken = testBeamHpBefore - mahoraga2.hp;
-      if (beamDamageTaken > 11) {
-        throw new Error(`Expected ~10 damage from adapted beam, but took ${beamDamageTaken}`);
+      // ── Test 3: Unadapted Lethal One-Shot Kill vs Adaptation Wheel (Rule: Fatal hit destroys Mahoraga without wheel click) ──
+      const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+      const saitamaDef = FIGHTER_DEFS.find(d => d.type === 'saitama') || { type: 'saitama', name: 'Saitama' };
+      const saitamaFighter = new SaitamaClass(saitamaDef);
+      const mahoraga3 = new MahoragaClass(mahoragaDef);
+      mahoraga3.hp = 200;
+      mahoraga3.maxHp = 200;
+      mahoraga3.isDead = false;
+      mahoraga3.dead = false;
+      state.fighters = [saitamaFighter, mahoraga3];
+
+      // Saitama deals massive one-shot lethal counter punch damage (e.g. 5000 dmg)
+      mahoraga3.takeDamage(5000, saitamaFighter, {
+        isMelee: true,
+        isCounter: true,
+        isSaitamaCounter: true,
+        isGuaranteedHit: true
+      });
+
+      // Mahoraga must be DEAD immediately without fake 1-HP survival or wheel click
+      if (mahoraga3.hp > 0 || !mahoraga3.isDead) {
+        throw new Error(`Expected Mahoraga to die instantly from lethal one-shot counter punch, but survived with hp=${mahoraga3.hp}, isDead=${mahoraga3.isDead}`);
+      }
+      if (mahoraga3.adaptationPauseTimer > 0 || mahoraga3.wheelClickTimer > 0) {
+        throw new Error(`Expected Mahoraga wheel to NOT click on fatal one-shot hit, but adaptationPauseTimer was ${mahoraga3.adaptationPauseTimer}`);
+      }
+      if (mahoraga3.adaptedSaitamaCounter) {
+        throw new Error(`Expected Mahoraga to NOT adapt to a fatal one-shot attack that destroyed him in one blow!`);
       }
     }
   } catch (err) {

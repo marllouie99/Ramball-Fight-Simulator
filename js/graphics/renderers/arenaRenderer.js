@@ -3,6 +3,8 @@ import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index.js';
 import { applyCameraToCtx, worldToScreen } from '../../systems/cameraSystem.js';
+import { updateSaitamaWallShatters, drawSaitamaWallShatters } from '../particles/saitamaWallShatter.js';
+import { drawTopHudNameShatters } from '../particles/hudShatterEffect.js';
 
 // ──────────────────────────────────────────
 // SKETCHY BORDER HELPERS
@@ -621,6 +623,12 @@ export function drawArena() {
       ctx.restore();
     }
 
+    // ── Draw Saitama Shattered Wall Breaches & Flying Line Shards ──
+    if ((state.shatteredWalls && state.shatteredWalls.length > 0) || (state.hudShatters && state.hudShatters.bottomHudShatter)) {
+      updateSaitamaWallShatters();
+      drawSaitamaWallShatters(ctx, isDark, arena);
+    }
+
     ctx.restore();
   }
 
@@ -891,6 +899,13 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   ctx.save();
   if (!alreadyInCameraSpace) {
     applyCameraToCtx(ctx);
+  }
+
+  // If Top HUD Name Shatter is active, render the natural hanging/falling letter shards
+  const isShattered = drawTopHudNameShatters(ctx, isDark, arena);
+  if (isShattered) {
+    ctx.restore();
+    return;
   }
 
   const nameFont = '700 42px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';

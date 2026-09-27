@@ -358,22 +358,15 @@ export class MahoragaFighter extends Fighter {
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
     );
 
-    // CRITICAL: If adaptation is triggered by this hit (fatal hit or accumulated damage threshold reached),
-    // cap finalDmg so it does not drop Mahoraga's HP to 0 or trigger onDeath() / roundEnd before he adapts & heals!
-    // EXCEPTION: Inside Gojo's Domain, adaptation and RCT healing are frozen/held, so Mahoraga can take fatal damage and die.
-    if (pendingAdaptation && !isInsideGojoDomain) {
-      finalDmg = Math.min(finalDmg, Math.max(0, this.hp - 1));
+    // If incoming damage is lethal (deals >= current HP), Mahoraga is destroyed in one blow before adapting!
+    const isLethalHit = finalDmg >= this.hp;
+    if (isLethalHit) {
+      pendingAdaptation = null;
     }
 
     const result = super.takeDamage(finalDmg, attacker, opts);
 
-    if (pendingAdaptation && !isInsideGojoDomain) {
-      if (this.hp <= 0) {
-        this.dead = false;
-        this.isDead = false;
-        this._hasDied = false;
-        this._hp = 1;
-      }
+    if (pendingAdaptation && !isInsideGojoDomain && this.hp > 0 && !this.isDead && !this.dead) {
       if (pendingAdaptation.isPureLoveBeam) {
         adaptToPureLoveBeam(this);
       } else if (pendingAdaptation.isSaitamaCounter) {

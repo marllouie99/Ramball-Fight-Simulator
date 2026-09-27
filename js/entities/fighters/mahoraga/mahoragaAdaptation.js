@@ -289,6 +289,13 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
       fighter._lastSkillShotColor = skillShotColor;
     }
 
+    // If incoming damage is lethal (deals >= fighter's remaining hp) before adapting,
+    // Mahoraga is destroyed in one blow before he can adapt!
+    const isLethalHit = finalAmount >= fighter.hp;
+    if (isLethalHit) {
+      return { finalAmount, type, pendingAdaptation: null };
+    }
+
     // ── FATAL DAMAGE THRESHOLD EVALUATION ──
     // The Wheel of Adaptation clicks IMMEDIATELY as soon as accumulated damage meets or exceeds fatalDamageThresholdPct!
     const threshold = fighter.maxHp * thresholdPct;
@@ -349,7 +356,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
  * freezes enemies, heals via RCT, and checks for Level 8 awakening.
  */
 export function triggerAdaptation(fighter, type, attacker) {
-  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableAdaptation, true)) return;
+  if (!fighter || fighter.hp <= 0 || fighter.dead || fighter.isDead || !fighter.isSkillEnabled(CONFIG.mahoraga?.enableAdaptation, true)) return;
   // If caught in Pure Love Beam or beam stasis, unfreeze immediately upon adaptation click!
   if (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0) {
     fighter.caughtInPureLoveBeam = false;
@@ -1163,17 +1170,12 @@ export function adaptToSoulDisfigurement(fighter) {
  * - Wheel sphere glows fiery crimson red (#FF3300).
  */
 export function adaptToSaitamaCounter(fighter, attacker) {
-  if (!fighter) return;
+  if (!fighter || fighter.hp <= 0 || fighter.dead || fighter.isDead) return;
   if (fighter.adaptedSaitamaCounter) return; // Already adapted
 
   const threshold = fighter.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
   if ((fighter.totalAccumDamage || 0) < threshold) return; // Must fill WOA skill bar to adapt!
   if ((fighter.fatalAdaptCooldown || 0) > 0) return;
-
-  fighter.dead = false;
-  fighter.isDead = false;
-  fighter._hasDied = false;
-  if (fighter.hp <= 0) fighter._hp = 1;
 
   fighter.adaptedSaitamaCounter = true;
   if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
@@ -1233,14 +1235,8 @@ export function adaptToSaitamaCounter(fighter, attacker) {
 }
 
 export function applyRCTHeal(fighter) {
-  if (!fighter || !fighter.isSkillEnabled(CONFIG.mahoraga?.enableRCTHeal, true)) return;
+  if (!fighter || !fighter.isSkillEnabled(CONFIG.mahoraga?.enableRCTHeal, true) || fighter.hp <= 0 || fighter.dead || fighter.isDead) return;
 
-  fighter.dead = false;
-  fighter.isDead = false;
-  fighter._hasDied = false;
-  if (fighter.hp <= 0) {
-    fighter._hp = 1;
-  }
   const maxHp = fighter.maxHp || 100;
   let healAmount = 0;
   if (CONFIG.mahoraga?.rctHealPercent !== undefined) {
