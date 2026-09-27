@@ -3985,6 +3985,47 @@ async function main() {
     testGojo.domainActive = false;
     state.fighters = [testSaitama, dummyTarget2];
 
+    // Test Saitama Drawing in All Combat Animation States (Flurry, Finisher, Counter, Idle)
+    const mockCtx = state.ctx;
+    const initialStack = mockCtx.__stackDepth || 0;
+
+    // 1. Idle state draw
+    testSaitama.isFlurrying = false;
+    testSaitama.isCountering = false;
+    testSaitama.draw(mockCtx);
+    if ((mockCtx.__stackDepth || 0) !== initialStack) {
+      throw new Error(`Saitama idle draw corrupted Canvas stack! Expected depth ${initialStack}, got ${mockCtx.__stackDepth}`);
+    }
+
+    // 2. Flurry normal punches barrage state draw
+    testSaitama.isFlurrying = true;
+    testSaitama.flurryTimer = 10;
+    testSaitama.flurryHitsLeft = 6;
+    testSaitama.draw(mockCtx);
+    if ((mockCtx.__stackDepth || 0) !== initialStack) {
+      throw new Error(`Saitama flurry barrage draw corrupted Canvas stack! Expected depth ${initialStack}, got ${mockCtx.__stackDepth}`);
+    }
+
+    // 3. Flurry final finisher slam state draw
+    testSaitama.flurryHitsLeft = 1;
+    testSaitama._flurryFinalPunchTimer = 5;
+    testSaitama.draw(mockCtx);
+    if ((mockCtx.__stackDepth || 0) !== initialStack) {
+      throw new Error(`Saitama flurry finisher draw corrupted Canvas stack! Expected depth ${initialStack}, got ${mockCtx.__stackDepth}`);
+    }
+    testSaitama.isFlurrying = false;
+    testSaitama._flurryFinalPunchTimer = 0;
+
+    // 4. Serious Counter charging state draw
+    testSaitama.isCountering = true;
+    testSaitama._counterPunchTimer = 12;
+    testSaitama.draw(mockCtx);
+    if ((mockCtx.__stackDepth || 0) !== initialStack) {
+      throw new Error(`Saitama counter charge draw corrupted Canvas stack! Expected depth ${initialStack}, got ${mockCtx.__stackDepth}`);
+    }
+    testSaitama.isCountering = false;
+    testSaitama._counterPunchTimer = 0;
+
     // Test Yuji Divergent Fist Dash execution and punch arrival
     const { YujiFighter } = await import('../js/entities/fighters/YujiFighter.js');
     const testYuji = new YujiFighter({ startX: 100, startY: 100, type: 'yuji', color: '#D95C7E' });

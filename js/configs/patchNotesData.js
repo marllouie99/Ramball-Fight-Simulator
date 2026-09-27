@@ -33,25 +33,32 @@ export const patchNotesData = {
         "character": "SAITAMA",
         "deltas": [
             {
+                "type": "NERF",
+                "key": "normalPunchEnabled",
+                "oldVal": 1,
+                "newVal": 0,
+                "pct": "-100.0%"
+            },
+            {
                 "type": "BUFF",
-                "key": "punchMaxTime",
-                "oldVal": 22,
-                "newVal": 28,
-                "pct": "+27.3%"
+                "key": "punchCooldown",
+                "oldVal": 2000,
+                "newVal": 500,
+                "pct": "-75.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "consecutivePunchesEnabled",
+                "oldVal": 0,
+                "newVal": 1,
+                "pct": "+0%"
             },
             {
                 "type": "NERF",
-                "key": "flurryDamage",
-                "oldVal": 50,
-                "newVal": 20,
-                "pct": "-60.0%"
-            },
-            {
-                "type": "BUFF",
                 "key": "flurryCooldown",
-                "oldVal": 1200,
-                "newVal": 200,
-                "pct": "-83.3%"
+                "oldVal": 200,
+                "newVal": 500,
+                "pct": "+150.0%"
             }
         ]
     }

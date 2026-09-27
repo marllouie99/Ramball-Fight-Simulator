@@ -6,7 +6,8 @@
 ## 🥊 Fighter Stat Modifications
 
 ### SAITAMA
-* **🟢 BUFF** `punchMaxTime`: `22` ➔ `28` (+27.3%)
-* **🔴 NERF** `flurryDamage`: `50` ➔ `20` (-60.0%)
-* **🟢 BUFF** `flurryCooldown`: `1200` ➔ `200` (-83.3%)
+* **🔴 NERF** `normalPunchEnabled`: `1` ➔ `0` (-100.0%)
+* **🟢 BUFF** `punchCooldown`: `2000` ➔ `500` (-75.0%)
+* **🟢 BUFF** `consecutivePunchesEnabled`: `0` ➔ `1` (+0%)
+* **🔴 NERF** `flurryCooldown`: `200` ➔ `500` (+150.0%)
 

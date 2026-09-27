@@ -638,6 +638,8 @@ function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer, fighter 
   ];
 
   const cycleFreq = (Math.PI * 2) / 5; // ~5 frames per full forward/backward cycle
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
   ctx.save();
   for (let i = 0; i < lanes.length; i++) {
@@ -671,8 +673,6 @@ function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer, fighter 
 
     // 2. Authentic Floating Sprite Glove (Assets/model/Sprites/Glove-punch.png) with Procedural Fallback
     drawSaitamaGloveSprite(ctx, fistX, fistY, fRadius, alpha, scaleMult);
-
-    ctx.restore();
   }
   ctx.restore();
 }
