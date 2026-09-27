@@ -412,7 +412,6 @@ export function firePurple(fighter, ownerIndex) {
 
   // When Gojo fires Purple, disable his Limitless Infinity barrier until the Purple life expires and Gojo lands
   fighter.infinityActive = false;
-  fighter.infinityCooldown = 0;
   fighter.infinityActiveTimer = 0;
   fighter.infinityFadeOpacity = 0;
   fighter.infinityBlockTimer = 0;

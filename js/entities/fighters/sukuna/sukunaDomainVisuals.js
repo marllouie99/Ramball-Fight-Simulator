@@ -1,6 +1,7 @@
 import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
+import { spawnEyeOfCthulhuDomainSlashGore } from '../../../graphics/particles/deathShatterEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 
 export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = false) {
@@ -492,6 +493,21 @@ export function spawnDomainSlashLines(fighter, count) {
           // Standard crimson slash hit sparks & impact flash (no ricochet / parry effect)
           spawnSparks(target.x, target.y, 8, 'crimsonSniper', '#8B0000');
           spawnImpactFlash(target.x, target.y, 20, 'crimsonSniper');
+
+          // Special Interaction: Eye of Cthulhu / Servants drop sprite sheet shatter pieces on domain slash hits
+          const isTargetEye = Boolean(
+            target && (
+              target.characterId === 'eye_of_cthulhu' ||
+              target.type === 'eye_of_cthulhu' ||
+              target.isServantOfCthulhu ||
+              target.type === 'servant_of_cthulhu' ||
+              target.characterId === 'servant_of_cthulhu' ||
+              (target.owner && (target.owner.characterId === 'eye_of_cthulhu' || target.owner.type === 'eye_of_cthulhu'))
+            )
+          );
+          if (isTargetEye && typeof spawnEyeOfCthulhuDomainSlashGore === 'function') {
+            spawnEyeOfCthulhuDomainSlashGore(target, target.x, target.y, angle, Boolean(target.isServantOfCthulhu));
+          }
         } else {
           hitTargetsThisWave.add(target);
         }

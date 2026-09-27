@@ -357,9 +357,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           ownerFighter.aim(target);
         }
       }
-      if (!ownerFighter.isMeleeMode && !ownerFighter.isTargetOfAmbush && ownerFighter.hp > 0) {
+      if (!ownerFighter.isMeleeMode && !ownerFighter.isTargetOfAmbush && ownerFighter.hp > 0 && (ownerFighter.infinityCooldown || 0) <= 0) {
         ownerFighter.infinityActive = true;
-        ownerFighter.infinityCooldown = 0;
         ownerFighter.infinityActiveTimer = 0;
       }
     }

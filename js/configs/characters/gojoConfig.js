@@ -39,6 +39,8 @@ export const gojoConfig = {
   infinityShockwaveCooldownFrames: 6,      // Minimum frames (~100ms) between barrier rebound shockwave ring spawns to prevent FPS drops
   infinityMaxActiveShockwaves: 2,          // Max limit of concurrent active barrier shockwave rings
   infinityBounceForce: 5,                 // Knockback velocity force applied to enemies on Infinity barrier collision (higher = stronger rebound push)
+  infinityBarrierMaxHp: 350,               // Total structural durability of Limitless Infinity barrier before cracking and shattering under heavy assault (e.g. Saitama)
+  infinityBrokenCooldown: 360,             // Broken lockout cooldown in frames (~6.0s at 60fps) when Infinity barrier is completely shattered
   
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
   enableBlue: true,                        // Master toggle for Basic Attack: Lapse Blue

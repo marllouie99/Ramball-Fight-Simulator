@@ -263,7 +263,10 @@ export function reinitFighters(isNewMatch = false) {
   } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4) {
     // Arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
-  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2') {
+  } else if (state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2') {
+    // 1v2 Regular Mode: Team 0 is p1 (Solo), Team 1 is p2 and p3 (Duo)
+    fighterIndexes = [state.p1Index, state.p2Index, state.p3Index];
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2') {
     // 1v2 / Boss Battle mode: Team 0 is p1 (Boss), Team 1 is p2 and p3 (Challengers) or solo p2
     fighterIndexes = state.bossBattleNoTeammate ? [state.p1Index, state.p2Index] : [state.p1Index, state.p2Index, state.p3Index];
   }
@@ -295,7 +298,7 @@ export function reinitFighters(isNewMatch = false) {
       f.maxHp = hp;
       f.hp = hp;
     }
-  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2') {
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2') {
     const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
     state.fighters.forEach((f, idx) => {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
@@ -475,7 +478,49 @@ export function reinitFighters(isNewMatch = false) {
     const angle3 = Math.random() * Math.PI * 2;
     state.fighters[3].vx = Math.cos(angle3) * state.fighters[3].speed;
     state.fighters[3].vy = Math.sin(angle3) * state.fighters[3].speed;
-  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === 'Stand Off 1v2') {
+  } else if (state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2') {
+    // Regular 1v2 Formation: Solo Fighter on Left, Duo Opponents on Right (Top-Right & Bottom-Right)
+    const leftX = arena.x + arena.width * 0.25;
+    const rightX = arena.x + arena.width * 0.75;
+    const centerY = arena.y + arena.height * 0.5;
+    const verticalSpread = arena.height * 0.22;
+
+    if (state.fighters[0]) {
+      state.fighters[0].x = leftX;
+      state.fighters[0].y = centerY;
+      state.fighters[0].angle = 0;
+      state.fighters[0].gunAngle = 0;
+      state.fighters[0].rightGunAngle = 0;
+      state.fighters[0].leftGunAngle = 0;
+      const angle0 = Math.random() * Math.PI * 2;
+      state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
+      state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
+    }
+
+    if (state.fighters[1]) {
+      state.fighters[1].x = rightX;
+      state.fighters[1].y = centerY - verticalSpread;
+      state.fighters[1].angle = Math.PI;
+      state.fighters[1].gunAngle = Math.PI;
+      state.fighters[1].rightGunAngle = Math.PI;
+      state.fighters[1].leftGunAngle = Math.PI;
+      const angle1 = Math.random() * Math.PI * 2;
+      state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
+      state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
+    }
+
+    if (state.fighters[2]) {
+      state.fighters[2].x = rightX;
+      state.fighters[2].y = centerY + verticalSpread;
+      state.fighters[2].angle = Math.PI;
+      state.fighters[2].gunAngle = Math.PI;
+      state.fighters[2].rightGunAngle = Math.PI;
+      state.fighters[2].leftGunAngle = Math.PI;
+      const angle2 = Math.random() * Math.PI * 2;
+      state.fighters[2].vx = Math.cos(angle2) * state.fighters[2].speed;
+      state.fighters[2].vy = Math.sin(angle2) * state.fighters[2].speed;
+    }
+  } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2' || state.mode === 'Stand Off 1v2') {
     // Boss Battle Formation: Boss at top center, Solo Challenger at bottom center (or Challengers at bottom-left and bottom-right in Duo)
     const centerX = arena.x + arena.width * 0.5;
     const topY = arena.y + arena.height * 0.28;

@@ -291,7 +291,7 @@ export const state = {
   getFighterTeam(fighterIndex) {
     const is4v4 = state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4';
     const is2v2 = state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2';
-    const is1v2 = state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2';
+    const is1v2 = state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2' || state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2';
     const isTagMatch = state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match' || state.mode === 'TAG_MATCH';
     if (is4v4) {
       if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;

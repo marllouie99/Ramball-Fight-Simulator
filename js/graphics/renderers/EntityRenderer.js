@@ -34,17 +34,20 @@ export function drawFighters() {
     mode === 'Boss Battle' || 
     mode === GAME_MODES.BOSS_BATTLE || 
     mode === '1v2 Stand Off' || 
-    mode === '1v2' || 
     mode === GAME_MODES.STAND_OFF_1V2 || 
     mode === 'STAND_OFF_1V2' || 
     state.mode === 'Boss Battle' || 
     state.mode === GAME_MODES.BOSS_BATTLE || 
     state.mode === '1v2 Stand Off' || 
-    state.mode === '1v2' || 
     state.mode === GAME_MODES.STAND_OFF_1V2 || 
     state.mode === 'STAND_OFF_1V2'
   );
-  const isTeamMode = !isBossBattleMode && (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === '4v4' || mode === 'Tactical 4v4');
+  const isTeamMode = !isBossBattleMode && (
+    mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || 
+    mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2 || 
+    mode === '4v4' || mode === GAME_MODES.TACTICAL_4V4 ||
+    mode === '1v2' || mode === GAME_MODES.ONE_VS_TWO
+  );
 
   const drawTeamRing = (fighter, fi) => {
     if (!isTeamMode || isBossBattleMode || !fighter || fighter.hp <= 0 || fighter.isDead || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;

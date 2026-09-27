@@ -30,35 +30,14 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "SAITAMA",
+        "character": "EYEOFCTHULHU",
         "deltas": [
             {
-                "type": "NERF",
-                "key": "normalPunchEnabled",
-                "oldVal": 1,
-                "newVal": 0,
-                "pct": "-100.0%"
-            },
-            {
                 "type": "BUFF",
-                "key": "punchCooldown",
-                "oldVal": 2000,
-                "newVal": 500,
-                "pct": "-75.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "consecutivePunchesEnabled",
-                "oldVal": 0,
-                "newVal": 1,
-                "pct": "+0%"
-            },
-            {
-                "type": "NERF",
-                "key": "flurryCooldown",
-                "oldVal": 200,
-                "newVal": 500,
-                "pct": "+150.0%"
+                "key": "radius",
+                "oldVal": 32,
+                "newVal": 40,
+                "pct": "+25.0%"
             }
         ]
     }

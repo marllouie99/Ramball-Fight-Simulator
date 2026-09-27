@@ -245,6 +245,285 @@ export function spawnEyeOfCthulhuTerrariaDeath(fighter, isMinion = false) {
       isSettled: false,
     });
   }
+
+  // When the main Eye of Cthulhu dies, instantly shatter and kill all of its active allies/minions as well!
+  if (!isMinion) {
+    shatterEyeOfCthulhuActiveAllies(fighter);
+  }
+}
+
+/**
+ * Spawns dynamic Terraria sprite sheet shatter pieces/gore when Eye of Cthulhu or its Servants
+ * are struck by Sukuna's Malevolent Shrine domain line slashes.
+ * @param {Object} fighter - The Eye of Cthulhu or Servant entity struck
+ * @param {number} [hitX] - Specific impact X coordinate (optional, defaults to fighter.x)
+ * @param {number} [hitY] - Specific impact Y coordinate (optional, defaults to fighter.y)
+ * @param {number} [slashAngle] - Angle of the domain slash line
+ * @param {boolean} [isMinion] - True if struck entity is a Servant of Cthulhu minion
+ */
+export function spawnEyeOfCthulhuDomainSlashGore(fighter, hitX, hitY, slashAngle = null, isMinion = false) {
+  if (!fighter) return;
+  if (!state.deathEffects) state.deathEffects = [];
+
+  const currentFrame = (typeof state !== 'undefined' && typeof state.frameCount === 'number') ? state.frameCount : 0;
+  if (fighter._lastDomainGoreFrame === currentFrame && currentFrame !== 0) return;
+  fighter._lastDomainGoreFrame = currentFrame;
+
+  const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 60 : 120) * qualityMultiplier);
+
+  const isMinionEntity = Boolean(
+    isMinion ||
+    fighter.isServantOfCthulhu ||
+    fighter.type === 'servant_of_cthulhu' ||
+    fighter.characterId === 'servant_of_cthulhu'
+  );
+
+  const isPhase2 = Boolean(
+    fighter.isPhase2 ||
+    fighter._isPhase2 ||
+    fighter.aiState === 'P2_CHASE' ||
+    fighter.aiState === 'P2_CHAIN_DASH' ||
+    fighter.aiState === 'P2_ROAR' ||
+    fighter.hasTransformed
+  );
+
+  const baseR = fighter.r || (isMinionEntity ? 10 : 32);
+  const cx = typeof hitX === 'number' ? hitX : fighter.x;
+  const cy = typeof hitY === 'number' ? hitY : fighter.y;
+
+  // Impact blood flash & sparks
+  try {
+    spawnImpactFlash(cx, cy, isMinionEntity ? 18 : 30, 'crimsonSniper');
+    spawnSparks(cx, cy, isMinionEntity ? 4 : 8, 'bloodSpark', '#E11D48');
+    spawnSparks(cx, cy, isMinionEntity ? 3 : 6, 'bloodSpark', '#881337');
+  } catch (e) {}
+
+  // Determine drop count: 2-3 pieces per slash hit on boss, 1-2 for minion
+  const baseCount = isMinionEntity ? (Math.random() < 0.5 ? 1 : 2) : (2 + Math.floor(Math.random() * 2));
+  const count = Math.max(1, Math.floor(baseCount * qualityMultiplier));
+
+  const gibColors = ['#DC2626', '#991B1B', '#881337', '#06B6D4', '#F8FAFC', '#4C0519', '#7F1D1D'];
+
+  for (let i = 0; i < count; i++) {
+    // Manage max particle cap
+    if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
+      const nonPermIndex = state.deathEffects.findIndex(e => !e.isPermanentGore);
+      if (nonPermIndex !== -1) {
+        state.deathEffects.splice(nonPermIndex, 1);
+      } else {
+        state.deathEffects.shift();
+      }
+    }
+
+    let def = null;
+    const roll = Math.random();
+
+    if (isPhase2) {
+      if (roll < 0.35 && EOC_SHATTER_SPRITES?.fangedMaws?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.fangedMaws.length);
+        def = {
+          type: 'eoc_fanged_maw',
+          spriteFrame: EOC_SHATTER_SPRITES.fangedMaws[frameIdx],
+          scale: (baseR * 0.55) / 55,
+          size: baseR * 0.28,
+          color: '#7F1D1D',
+          speedMult: 1.2,
+        };
+      } else if (roll < 0.60 && EOC_SHATTER_SPRITES?.scleraShells?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.scleraShells.length);
+        def = {
+          type: 'eoc_sclera_shell',
+          spriteFrame: EOC_SHATTER_SPRITES.scleraShells[frameIdx],
+          scale: (baseR * 0.60) / 75,
+          size: baseR * 0.30,
+          color: '#F8FAFC',
+          speedMult: 1.1,
+        };
+      } else if (roll < 0.80 && EOC_SHATTER_SPRITES?.fleshRibbons?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.fleshRibbons.length);
+        def = {
+          type: 'eoc_flesh_ribbon',
+          spriteFrame: EOC_SHATTER_SPRITES.fleshRibbons[frameIdx],
+          scale: (baseR * 0.50) / 65,
+          size: baseR * 0.22,
+          color: '#991B1B',
+          speedMult: 1.05,
+        };
+      } else if (EOC_SHATTER_SPRITES?.debrisChunks?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.debrisChunks.length);
+        def = {
+          type: 'eoc_visceral_chunk',
+          spriteFrame: EOC_SHATTER_SPRITES.debrisChunks[frameIdx],
+          scale: (baseR * 0.45) / 20,
+          size: baseR * (0.10 + Math.random() * 0.10),
+          color: gibColors[Math.floor(Math.random() * gibColors.length)],
+          speedMult: 0.95,
+        };
+      }
+    } else {
+      if (roll < 0.40 && EOC_SHATTER_SPRITES?.scleraShells?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.scleraShells.length);
+        def = {
+          type: 'eoc_sclera_shell',
+          spriteFrame: EOC_SHATTER_SPRITES.scleraShells[frameIdx],
+          scale: (baseR * 0.60) / 75,
+          size: baseR * 0.30,
+          color: '#F8FAFC',
+          speedMult: 1.1,
+        };
+      } else if (roll < 0.65 && EOC_SHATTER_SPRITES?.tendrils?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.tendrils.length);
+        def = {
+          type: 'eoc_nerve_tendril',
+          spriteFrame: EOC_SHATTER_SPRITES.tendrils[frameIdx],
+          scale: (baseR * 0.55) / 65,
+          size: baseR * 0.26,
+          color: '#881337',
+          speedMult: 1.08,
+        };
+      } else if (roll < 0.85 && EOC_SHATTER_SPRITES?.fleshRibbons?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.fleshRibbons.length);
+        def = {
+          type: 'eoc_flesh_ribbon',
+          spriteFrame: EOC_SHATTER_SPRITES.fleshRibbons[frameIdx],
+          scale: (baseR * 0.50) / 65,
+          size: baseR * 0.22,
+          color: '#991B1B',
+          speedMult: 1.05,
+        };
+      } else if (EOC_SHATTER_SPRITES?.debrisChunks?.length) {
+        const frameIdx = Math.floor(Math.random() * EOC_SHATTER_SPRITES.debrisChunks.length);
+        def = {
+          type: 'eoc_visceral_chunk',
+          spriteFrame: EOC_SHATTER_SPRITES.debrisChunks[frameIdx],
+          scale: (baseR * 0.45) / 20,
+          size: baseR * (0.10 + Math.random() * 0.10),
+          color: gibColors[Math.floor(Math.random() * gibColors.length)],
+          speedMult: 0.95,
+        };
+      }
+    }
+
+    if (!def) continue;
+
+    let popAngle;
+    if (typeof slashAngle === 'number') {
+      const perpSign = Math.random() < 0.5 ? 1 : -1;
+      popAngle = slashAngle + (perpSign * Math.PI * 0.5) + (Math.random() - 0.5) * 0.7;
+    } else {
+      popAngle = Math.random() * Math.PI * 2;
+    }
+
+    const speed = (isMinionEntity ? (4.0 + Math.random() * 3.5) : (5.5 + Math.random() * 5.0)) * (def.speedMult || 1.0);
+    const vx = Math.cos(popAngle) * speed + (fighter.vx || 0) * 0.25;
+    const vy = Math.sin(popAngle) * speed - (isMinionEntity ? (2.0 + Math.random() * 2.5) : (3.5 + Math.random() * 4.5));
+
+    state.deathEffects.push({
+      x: cx + (Math.random() - 0.5) * (baseR * 0.5),
+      y: cy + (Math.random() - 0.5) * (baseR * 0.5),
+      vx,
+      vy,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.75,
+      size: def.size,
+      scale: def.scale || 1.0,
+      spriteFrame: def.spriteFrame || null,
+      color: def.color,
+      goreType: def.type,
+      isEyeOfCthulhuGore: true,
+      isPermanentGore: false,
+      life: 1.0,
+      maxLife: 1.0,
+      gravity: isMinionEntity ? 0.35 : 0.42,
+      restitution: 0.32 + Math.random() * 0.15,
+      isSettled: false,
+      settleHoldTimer: 75,
+      decay: 0.005,
+    });
+  }
+}
+
+/**
+ * Automatically destroys and shatters all active Servants of Cthulhu and allied minions
+ * whenever the parent Eye of Cthulhu dies.
+ * @param {Object} fighter - The parent Eye of Cthulhu entity
+ */
+export function shatterEyeOfCthulhuActiveAllies(fighter) {
+  if (!fighter || typeof state === 'undefined') return;
+
+  // 1. Destroy and shatter all active Servants of Cthulhu / minion illusions in state.illusions
+  if (state.illusions && state.illusions.length > 0) {
+    for (let i = state.illusions.length - 1; i >= 0; i--) {
+      const ill = state.illusions[i];
+      if (!ill) continue;
+      const isMyServant = (
+        ill.isServantOfCthulhu ||
+        ill.owner === fighter ||
+        (fighter.fighterIndex !== undefined && ill.ownerIndex === fighter.fighterIndex) ||
+        (ill.owner && (ill.owner.characterId === 'eye_of_cthulhu' || ill.owner.type === 'eye_of_cthulhu'))
+      );
+
+      if (isMyServant && !ill.isDead && (ill.hp > 0 || ill.hp === undefined)) {
+        ill.hp = 0;
+        ill.dead = true;
+        ill.isDead = true;
+        spawnEyeOfCthulhuTerrariaDeath(ill, true);
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(ill.x, ill.y, 14, 'bloodSpark', '#E11D48');
+        }
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(ill.x, ill.y, 28, '#E11D48');
+        }
+        state.illusions.splice(i, 1);
+      }
+    }
+  }
+
+  // 2. Destroy and shatter any active Servant projectiles in flight
+  if (state.projectiles && state.projectiles.length > 0) {
+    for (let i = state.projectiles.length - 1; i >= 0; i--) {
+      const p = state.projectiles[i];
+      if (!p) continue;
+      const isMyProjectile = (
+        p.isServantOfCthulhu ||
+        p.visual === 'servantOfCthulhu' ||
+        p.type === 'servantOfCthulhu' ||
+        p.owner === fighter ||
+        (fighter.fighterIndex !== undefined && p.ownerIndex === fighter.fighterIndex) ||
+        (p.ownerObject && (p.ownerObject.characterId === 'eye_of_cthulhu' || p.ownerObject.type === 'eye_of_cthulhu'))
+      );
+
+      if (isMyProjectile && !p.dead) {
+        p.dead = true;
+        p.life = 0;
+        spawnEyeOfCthulhuTerrariaDeath(p, true);
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(p.x, p.y, 12, 'bloodSpark', '#E11D48');
+        }
+      }
+    }
+  }
+
+  // 3. In team / boss modes, if any companion minions are in state.fighters
+  if (state.fighters && state.fighters.length > 0) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (f && f !== fighter && (f.owner === fighter || (fighter.fighterIndex !== undefined && f.ownerIndex === fighter.fighterIndex)) && (f.isMinion || f.isServantOfCthulhu)) {
+        if (!f.isDead && f.hp > 0) {
+          f.hp = 0;
+          f.dead = true;
+          f.isDead = true;
+          if (typeof f.onDeath === 'function') {
+            f.onDeath();
+          } else {
+            spawnEyeOfCthulhuTerrariaDeath(f, true);
+          }
+        }
+      }
+    }
+  }
 }
 
 export function spawnMachineCorpse(x, y, angle) {
@@ -810,6 +1089,32 @@ export function drawDeathEffects() {
         ctx.arc(-s * 0.3, s * 0.3, 1.5, 0, Math.PI * 2);
         ctx.fill();
       }
+    } else if (effect.isInfinityGlassShard) {
+      const s = effect.size || 8;
+      // Draw sharp polygonal glass crystal shard
+      ctx.beginPath();
+      ctx.moveTo(0, -s);
+      ctx.lineTo(s * 0.75, s * 0.25);
+      ctx.lineTo(0, s * 0.85);
+      ctx.lineTo(-s * 0.65, s * 0.2);
+      ctx.closePath();
+
+      // Semi-transparent luminous cyan glass fill
+      ctx.fillStyle = effect.color || 'rgba(0, 229, 255, 0.85)';
+      ctx.fill();
+
+      // Inner white specular edge highlight
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(0, -s);
+      ctx.lineTo(s * 0.75, s * 0.25);
+      ctx.stroke();
+
+      // Crisp dark border outline
+      ctx.strokeStyle = 'rgba(8, 18, 32, 0.90)';
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
     } else if (effect.isMachineCorpse) {
       const s = effect.size / 15; // default size is 15
       ctx.scale(s, s);
@@ -1149,4 +1454,54 @@ export function playMinecraftXPChime() {
     osc.start();
     osc.stop(actx.currentTime + 0.13);
   } catch (e) {}
+}
+
+/**
+ * Spawns an explosion of flying geometric glass shards when Gojo's Limitless Infinity barrier is shattered.
+ * @param {number} x - Center X coordinate
+ * @param {number} y - Center Y coordinate
+ * @param {number} [radius=60] - Explosion spawn radius
+ * @param {number} [count=20] - Total shard particles
+ */
+export function spawnInfinityGlassShards(x, y, radius = 60, count = 20) {
+  if (!state.deathEffects) state.deathEffects = [];
+  const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 60 : 120) * qualityMultiplier);
+  const finalCount = Math.floor(Math.max(10, count * qualityMultiplier));
+
+  for (let i = 0; i < finalCount; i++) {
+    if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
+      const nonPermIndex = state.deathEffects.findIndex(e => !e.isPermanentGore);
+      if (nonPermIndex !== -1) {
+        state.deathEffects.splice(nonPermIndex, 1);
+      } else {
+        state.deathEffects.shift();
+      }
+    }
+
+    const angle = (Math.PI * 2 * i) / finalCount + (Math.random() - 0.5) * 0.5;
+    const speed = 6.0 + Math.random() * 8.5;
+    const shardSize = 6 + Math.random() * 8;
+    const colors = ['rgba(0, 229, 255, 0.90)', 'rgba(224, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.98)', 'rgba(128, 240, 255, 0.85)'];
+
+    state.deathEffects.push({
+      x: x + Math.cos(angle) * (radius * 0.4),
+      y: y + Math.sin(angle) * (radius * 0.4),
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - (3.5 + Math.random() * 5.0), // Explosive upward pop
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.9,
+      size: shardSize,
+      color: colors[i % colors.length],
+      isInfinityGlassShard: true,
+      life: 1.0,
+      maxLife: 1.0,
+      gravity: 0.38,
+      restitution: 0.35 + Math.random() * 0.15,
+      isSettled: false,
+      settleHoldTimer: 60,
+      decay: 0.008,
+    });
+  }
 }

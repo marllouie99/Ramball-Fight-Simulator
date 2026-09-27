@@ -98,19 +98,14 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     return false;
   }
 
-  // Adapted Mahoraga & Saitama during Serious Skill Counter immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
+  // Adapted Mahoraga & Toji Stealth Ambush immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
   if (attacker && attacker !== fighter) {
-    const isSaitamaCountering = (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
-      ((attacker._counterPunchTimer && attacker._counterPunchTimer > 0) ||
-       (attacker._counterWindupTimer && attacker._counterWindupTimer > 0) ||
-       (attacker._postCounterRecoveryTimer && attacker._postCounterRecoveryTimer > 0) ||
-       attacker.isCountering);
     const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
     const isAdaptedMahoraga = (attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga') && 
                               (attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8);
     const isTojiAssaultBypassing = (attacker.characterId === 'toji' || attacker.type === 'toji') &&
       (attacker.isAmbushing || attacker.ultimateActive);
-    if (isAdaptedMahoraga || isSaitamaCountering || isTojiAssaultBypassing) {
+    if (isAdaptedMahoraga || isTojiAssaultBypassing) {
       attacker.infinityFreezeTimer = 0;
       attacker.isFrozenByInfinity = false;
       attacker.adaptationPauseTimer = 0;
@@ -119,16 +114,14 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
   }
 
   const isDomainChanneling = fighter.isDomainPreSlide || fighter.isChannelingDomainExpansion;
-  if (!isPurpleInFlight && !fighter.isChainedByMakima && isDomainChanneling) {
+  if (!isPurpleInFlight && !fighter.isChainedByMakima && isDomainChanneling && (fighter.infinityCooldown || 0) <= 0) {
     fighter.infinityActive = true;
-    fighter.infinityCooldown = 0;
     fighter.isMeleeMode = false;
   }
 
   const isInsideEnemyDomain = !fighter.domainActive && state.fighters && state.fighters.some(f => f && f !== fighter && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
-  if (isInsideEnemyDomain && !fighter.isMeleeMode && !isPurpleInFlight && !fighter.isChainedByMakima) {
+  if (isInsideEnemyDomain && !fighter.isMeleeMode && !isPurpleInFlight && !fighter.isChainedByMakima && (fighter.infinityCooldown || 0) <= 0) {
     fighter.infinityActive = true;
-    fighter.infinityCooldown = 0;
   }
   if (fighter.isMeleeMode || fighter.isChannelingPurple || isPurpleInFlight || fighter.domainActive) return false;
 

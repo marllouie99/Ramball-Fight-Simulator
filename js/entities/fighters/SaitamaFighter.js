@@ -4,7 +4,6 @@ import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenSh
 import { MODE_SETTINGS } from '../../core/modeConfig.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnPunchWindSpeedLines, spawnSaitamaCounterFrontalBlast } from '../../graphics/particles/sparkEffect.js';
-import { triggerSaitamaWallShatter } from '../../graphics/particles/saitamaWallShatter.js';
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { fadeOutSound } from '../../systems/soundSystem.js';
@@ -68,6 +67,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this._flurryAimAngle = undefined;
+    this._flurryBreatherTimer = 0; // Stationary breather stance timer after final punch
 
     // Skill 2: Serious Side Hops
     this.sideHopsCooldown = 0;
@@ -246,7 +246,7 @@ export class SaitamaFighter extends Fighter {
       (this._counterPunchTimer && this._counterPunchTimer > 0) || 
       (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0)
     );
-    if (isCounterActive || this.isFlurrying) {
+    if (isCounterActive || this.isFlurrying || (this._flurryBreatherTimer && this._flurryBreatherTimer > 0)) {
       return false;
     }
     return super.canAim();
@@ -453,6 +453,7 @@ export class SaitamaFighter extends Fighter {
       this.isFlurrying ||
       (this.flurryHitsLeft > 0) ||
       (this.flurryTimer > 0) ||
+      (this._flurryBreatherTimer && this._flurryBreatherTimer > 0) ||
       (this._counterPunchTimer && this._counterPunchTimer > 0) ||
       (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) ||
       this.isChargingSeriousPunch ||
@@ -543,13 +544,16 @@ export class SaitamaFighter extends Fighter {
     }
 
     const isCounterCharging = Boolean(this._counterPunchTimer && this._counterPunchTimer > 0);
+    const isFlurryActive = Boolean(this.isFlurrying);
+    const isStationaryDodge = isCounterCharging || isFlurryActive;
     const isPostCounterRecovery = Boolean(this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0);
     const isExecutingSeriousCounter = isPostCounterRecovery; // Post-counter recovery blocks dodge
+    const isFlurryBreather = Boolean(this._flurryBreatherTimer && this._flurryBreatherTimer > 0);
 
     // Check if Nanami or Escanor is currently executing a hit-pause
     const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
 
-    if (!this.isSkillEnabled(CONFIG.saitama?.enableDodge, true) || this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isGlobalHitPausing) {
+    if (!this.isSkillEnabled(CONFIG.saitama?.enableDodge, true) || this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isFlurryBreather || isGlobalHitPausing) {
       return false;
     }
     // Block dodge if time-stopped by non-domain effects
@@ -566,10 +570,10 @@ export class SaitamaFighter extends Fighter {
     const oldX = this.x;
     const oldY = this.y;
 
-    if (isCounterCharging) {
-      // During Serious Skill Counter charging state:
+    if (isStationaryDodge) {
+      // During Serious Skill Counter charging state or Consecutive Normal Punches:
       // Dodge mechanic is ENABLED (negates damage, shows "MISS!", plays SFX/grunt, spawns impact flash),
-      // but teleportation / sidestep is DISABLED (Saitama stays in place charging his counter punch).
+      // but teleportation / sidestep is DISABLED (Saitama stays in place executing his skill/counter punch).
       
       // Clear any hitStun, hit-pause, or beam/purple/flurry trap state on dodge so Saitama breaks free cleanly
       const savedTimeStop = this.timeStopTimer;
@@ -602,13 +606,18 @@ export class SaitamaFighter extends Fighter {
         this.timeStopTimer = savedTimeStop;
       }
 
-      // Maintain stationary position and locked counter aim direction
-      this.vx = 0;
-      this.vy = 0;
+      // Maintain stationary position (or ongoing flurry advance) and locked aim direction
+      if (!isFlurryActive) {
+        this.vx = 0;
+        this.vy = 0;
+      }
       this.dodgeStallTimer = 0;
-      if (this._counterAimAngle !== undefined) {
+      if (this._counterAimAngle !== undefined && isCounterCharging) {
         this.gunAngle = this._counterAimAngle;
         this.angle = this._counterAimAngle;
+      } else if (this._flurryAimAngle !== undefined && isFlurryActive) {
+        this.gunAngle = this._flurryAimAngle;
+        this.angle = this._flurryAimAngle;
       }
 
       // Clean impact flash at current coordinates
@@ -840,35 +849,116 @@ export class SaitamaFighter extends Fighter {
   }
 
   /**
-   * Passive: Serious Skill Counter — Phase 1 (Teleport + Freeze)
-   * Saitama instantly teleports behind the channeling enemy and freezes them.
-   * The actual punch damage lands after _counterPunchTimer counts down (Phase 2).
+   * Helper to check if an entity is a minion, summon, deployable, illusion, or companion entity.
    */
-  executeSkillCounterPunish(target) {
-    if (!this.isSkillEnabled(CONFIG.saitama?.enableSeriousCounter, true)) return false;
-    if (this.hp <= 0 || !target || target.hp <= 0 || target === this) return false;
-    if (this.skillPunishCooldown > 0) return false;
-    const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
-    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
-    if (this.timeStopTimer > 0 || this.isChainedByMakima || isGlobalHitPausing || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain()) return false;
+  _isMinionEntity(target) {
+    if (!target) return false;
+    return Boolean(
+      target.isMinion ||
+      target.isTurret ||
+      target.isDispenser ||
+      target.isEndCrystal ||
+      target.isDeployable ||
+      target.isServantOfCthulhu ||
+      target.isIllusion ||
+      target.isClone ||
+      target.isIceWall ||
+      target.isRika ||
+      target.isEvasionMinion ||
+      target.isTransfiguredHuman ||
+      target.owner ||
+      target.type === 'Turret' ||
+      target.type === 'turret' ||
+      target.type === 'Dispenser' ||
+      target.type === 'dispenser' ||
+      target._def?.isMinion ||
+      target._def?.isTurret ||
+      target._def?.isDeployable
+    );
+  }
 
-    // Check team alignment in 2v2/team modes ONLY.
-    // getFighterTeam returns null in 1v1/FFA — null===null would falsely match as teammates, so guard with myTeam !== null.
-    if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
+  /**
+   * Check team alignment in 2v2 / team battle modes.
+   */
+  _isSameTeam(target) {
+    if (!target || target === this) return true;
+    if (typeof state !== 'undefined' && state.getFighterTeam && Array.isArray(state.fighters)) {
       const myIdx = state.fighters.indexOf(this);
       const targetIdx = state.fighters.indexOf(target);
       if (myIdx >= 0 && targetIdx >= 0) {
         const myTeam = state.getFighterTeam(myIdx);
         const targetTeam = state.getFighterTeam(targetIdx);
-        if (myTeam !== null && myTeam === targetTeam) {
-          return false; // Same team — skip
+        if (myTeam !== null && targetTeam !== null && myTeam === targetTeam) {
+          return true;
         }
       }
     }
+    return false;
+  }
+
+  /**
+   * Resolves candidate target to the true primary enemy fighter, ignoring minions and summons.
+   */
+  _resolveTrueFighterTarget(candidateTarget) {
+    // 1. If candidate is a valid true enemy fighter, return candidate
+    if (candidateTarget && candidateTarget !== this && candidateTarget.hp > 0 && !this._isMinionEntity(candidateTarget)) {
+      if (!this._isSameTeam(candidateTarget)) {
+        return candidateTarget;
+      }
+    }
+
+    // 2. If candidate has an owner that is a valid true enemy fighter, prioritize the owner
+    if (candidateTarget && candidateTarget.owner && candidateTarget.owner !== this && candidateTarget.owner.hp > 0 && !this._isMinionEntity(candidateTarget.owner)) {
+      if (!this._isSameTeam(candidateTarget.owner)) {
+        return candidateTarget.owner;
+      }
+    }
+
+    // 3. Search state.fighters for the nearest alive, non-teammate true fighter
+    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      let bestFighter = null;
+      let minDist = Infinity;
+      for (const f of state.fighters) {
+        if (!f || f === this || f.hp <= 0 || this._isMinionEntity(f) || this._isSameTeam(f)) continue;
+        const dist = Math.hypot(f.x - this.x, f.y - this.y);
+        if (dist < minDist) {
+          minDist = dist;
+          bestFighter = f;
+        }
+      }
+      if (bestFighter) return bestFighter;
+    }
+
+    // 4. Fallback: if candidateTarget is alive and not a teammate, return candidateTarget
+    if (candidateTarget && candidateTarget.hp > 0 && !this._isSameTeam(candidateTarget)) {
+      return candidateTarget;
+    }
+
+    return null;
+  }
+
+  /**
+   * Passive: Serious Skill Counter — Phase 1 (Teleport + Freeze)
+   * Saitama instantly teleports behind the enemy fighter and initiates counter windup.
+   * The actual punch damage lands after _counterPunchTimer counts down (Phase 2).
+   */
+  executeSkillCounterPunish(target) {
+    if (!this.isSkillEnabled(CONFIG.saitama?.enableSeriousCounter, true)) return false;
+    // Resolve candidate to the true enemy fighter (ignoring minions)
+    const trueTarget = this._resolveTrueFighterTarget(target);
+    const resolvedTarget = trueTarget || target;
+    if (this.hp <= 0 || !resolvedTarget || resolvedTarget.hp <= 0 || resolvedTarget === this) return false;
+    if (this.skillPunishCooldown > 0) return false;
+    const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
+    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
+    if (this.timeStopTimer > 0 || this.isChainedByMakima || isGlobalHitPausing || this.isFrozenByInfinity || this.isTargetOfAmbush || isInsideDomain || this._isInsideGojoDomain() || this.isFlurrying) return false;
+
+    // Check team alignment in 2v2/team modes ONLY.
+    if (this._isSameTeam(resolvedTarget)) return false;
 
     // Range guard: Prevent triggering passive counter if target is not within counter range
     const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
-    const currentDist = Math.hypot(target.x - this.x, target.y - this.y);
+    const currentDist = Math.hypot(resolvedTarget.x - this.x, resolvedTarget.y - this.y);
     if (currentDist > maxRange) {
       return false; // Target is out of range
     }
@@ -877,14 +967,14 @@ export class SaitamaFighter extends Fighter {
     const oldY = this.y;
 
     // Calculate position directly behind the target relative to the target's facing direction
-    const targetAngle = target.gunAngle !== undefined ? target.gunAngle : (target.angle || 0);
+    const targetAngle = resolvedTarget.gunAngle !== undefined ? resolvedTarget.gunAngle : (resolvedTarget.angle || 0);
     const spacing = CONFIG.saitama?.counterTeleportDistanceOffset ?? 35;
-    const offsetDist = this.r + target.r + spacing;
+    const offsetDist = this.r + resolvedTarget.r + spacing;
     const behindAngle = targetAngle + Math.PI;
 
     const arena = CONFIG.arena;
-    let chosenX = target.x + Math.cos(behindAngle) * offsetDist;
-    let chosenY = target.y + Math.sin(behindAngle) * offsetDist;
+    let chosenX = resolvedTarget.x + Math.cos(behindAngle) * offsetDist;
+    let chosenY = resolvedTarget.y + Math.sin(behindAngle) * offsetDist;
 
     if (arena) {
       const minX = arena.x + this.r + 10;
@@ -901,8 +991,8 @@ export class SaitamaFighter extends Fighter {
         let foundClearAngle = false;
         for (const off of candidateOffsets) {
           const candAngle = behindAngle + off;
-          const candX = target.x + Math.cos(candAngle) * offsetDist;
-          const candY = target.y + Math.sin(candAngle) * offsetDist;
+          const candX = resolvedTarget.x + Math.cos(candAngle) * offsetDist;
+          const candY = resolvedTarget.y + Math.sin(candAngle) * offsetDist;
           if (isInside(candX, candY)) {
             chosenX = candX;
             chosenY = candY;
@@ -916,18 +1006,18 @@ export class SaitamaFighter extends Fighter {
           chosenX = Math.max(minX, Math.min(maxX, chosenX));
           chosenY = Math.max(minY, Math.min(maxY, chosenY));
           
-          const curDist = Math.hypot(chosenX - target.x, chosenY - target.y);
-          const minRequiredDist = this.r + target.r + 25;
+          const curDist = Math.hypot(chosenX - resolvedTarget.x, chosenY - resolvedTarget.y);
+          const minRequiredDist = this.r + resolvedTarget.r + 25;
           if (curDist < minRequiredDist) {
             // Push Saitama along the vector pointing from target towards arena center or open space
-            let pushDir = Math.atan2(chosenY - target.y, chosenX - target.x);
+            let pushDir = Math.atan2(chosenY - resolvedTarget.y, chosenX - resolvedTarget.x);
             if (curDist < 0.001) {
               const arenaCenterX = arena.x + arena.width / 2;
               const arenaCenterY = arena.y + arena.height / 2;
-              pushDir = Math.atan2(arenaCenterY - target.y, arenaCenterX - target.x);
+              pushDir = Math.atan2(arenaCenterY - resolvedTarget.y, arenaCenterX - resolvedTarget.x);
             }
-            chosenX = target.x + Math.cos(pushDir) * minRequiredDist;
-            chosenY = target.y + Math.sin(pushDir) * minRequiredDist;
+            chosenX = resolvedTarget.x + Math.cos(pushDir) * minRequiredDist;
+            chosenY = resolvedTarget.y + Math.sin(pushDir) * minRequiredDist;
             chosenX = Math.max(minX, Math.min(maxX, chosenX));
             chosenY = Math.max(minY, Math.min(maxY, chosenY));
           }
@@ -936,8 +1026,8 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Verify the teleport destination is within melee reach of the target
-    const punchReach = this.r + target.r + (CONFIG.saitama?.punchReach || 80);
-    const destDist = Math.hypot(chosenX - target.x, chosenY - target.y);
+    const punchReach = this.r + resolvedTarget.r + (CONFIG.saitama?.punchReach || 80);
+    const destDist = Math.hypot(chosenX - resolvedTarget.x, chosenY - resolvedTarget.y);
     if (destDist > punchReach + 40) {
       return false; // Chosen teleport position is not within reach
     }
@@ -972,9 +1062,9 @@ export class SaitamaFighter extends Fighter {
     this.isParalyzed = false;
 
     // Aim facing direction directly towards the target at any 360 angle upon teleport arrival
-    const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+    const targetY = (resolvedTarget.y !== undefined ? resolvedTarget.y : this.y) - (resolvedTarget.z || 0);
     const myY = this.y - (this.z || 0);
-    const aimAngle = Math.atan2(targetY - myY, (target.x !== undefined ? target.x : this.x) - this.x);
+    const aimAngle = Math.atan2(targetY - myY, (resolvedTarget.x !== undefined ? resolvedTarget.x : this.x) - this.x);
     this.gunAngle = aimAngle;
     this.angle = aimAngle;
     this._counterAimAngle = aimAngle;
@@ -1016,7 +1106,7 @@ export class SaitamaFighter extends Fighter {
 
     // Store target and start Phase 2 wind-up countdown (Idle stare + charging pose)
     // NOTE: Enemies and arena entities are NOT frozen, giving them the chance to react, move, or escape!
-    this._counterPunchTarget = target;
+    this._counterPunchTarget = resolvedTarget;
     this._counterPunchTimer = counterWindupDuration;
 
     // Play charging voice line and background audio
@@ -1044,7 +1134,7 @@ export class SaitamaFighter extends Fighter {
   /**
    * Passive: Serious Skill Counter — Phase 2 (Punch Landing)
    * Called from update() when _counterPunchTimer reaches 0.
-   * Releases the frozen target and delivers the massive counter punch.
+   * Delivers the massive counter punch strictly directed toward the locked aim angle.
    */
   _tickCounterPunch() {
     if (this._isInsideGojoDomain()) {
@@ -1060,6 +1150,12 @@ export class SaitamaFighter extends Fighter {
         this.dodgeCooldown = 0;
       }
       return;
+    }
+
+    // Continuously resolve aim target to the true enemy fighter (ignoring minions)
+    const aimTarget = this._resolveTrueFighterTarget(this._counterPunchTarget);
+    if (aimTarget) {
+      this._counterPunchTarget = aimTarget;
     }
 
     // If target became invalid or was removed while timer was active, cleanly reset counter state
@@ -1083,7 +1179,7 @@ export class SaitamaFighter extends Fighter {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
 
-    // Smooth, weighted auto-aim tracking towards counter target during wind-up (controlled, non-fast turn rate)
+    // Smooth, weighted auto-aim tracking towards the true enemy fighter during wind-up (ignoring minions)
     const autoAimEnabled = CONFIG.saitama?.enableCounterAutoAim !== false;
     if (autoAimEnabled && this._counterPunchTarget && this._counterPunchTarget.hp > 0) {
       const target = this._counterPunchTarget;
@@ -1311,12 +1407,6 @@ export class SaitamaFighter extends Fighter {
         spawnSaitamaCounterFrontalBlast(this.x, this.y, pushAngle, frontalReach, frontalArc);
       }
 
-      // Unique Interaction: Shatter the arena line wall in the punch direction
-      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-      if (arena && typeof triggerSaitamaWallShatter === 'function') {
-        triggerSaitamaWallShatter(this.x, this.y, pushAngle, arena);
-      }
-
       // Screen Shake & Sakuga Impact FX
       if (typeof triggerGlobalScreenShake === 'function') {
         const shakeIntensity = CONFIG.saitama?.counterPunchScreenShakeIntensity ?? 100.0;
@@ -1487,6 +1577,9 @@ export class SaitamaFighter extends Fighter {
       } else if (this.isFlurrying && this._flurryAimAngle !== undefined) {
         this.gunAngle = this._flurryAimAngle;
         this.angle = this._flurryAimAngle;
+      } else if (this._flurryBreatherTimer > 0 && this._flurryFinalPunchReleaseAngle !== undefined) {
+        this.gunAngle = this._flurryFinalPunchReleaseAngle;
+        this.angle = this._flurryFinalPunchReleaseAngle;
       }
       return false;
     }
@@ -1551,6 +1644,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryTarget = null;
     this._flurryAccumulatedDamage = 0;
     this._flurryAimAngle = undefined;
+    this._flurryBreatherTimer = 0;
 
     if (this._counterPunchChargeSound) {
       fadeOutSound(this._counterPunchChargeSound, 150);
@@ -1621,11 +1715,12 @@ export class SaitamaFighter extends Fighter {
 
     // If incoming damage is from a skill/ultimate/channeling attack and counter is ready, execute counter punch!
     const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isChanneling;
-    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0) {
+    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0 && !this.isFlurrying) {
+      const primaryTarget = this._resolveTrueFighterTarget(attacker) || attacker;
       const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
-      const distToAttacker = Math.hypot(attacker.x - this.x, attacker.y - this.y);
+      const distToAttacker = Math.hypot(primaryTarget.x - this.x, primaryTarget.y - this.y);
       if (distToAttacker <= maxRange) {
-        const countered = this.executeSkillCounterPunish(attacker);
+        const countered = this.executeSkillCounterPunish(primaryTarget);
         if (countered) {
           return false;
         }
@@ -1670,6 +1765,7 @@ export class SaitamaFighter extends Fighter {
   onProjectileApproach(projectile, attacker) {
     if (this._isInsideGojoDomain() || this.isChainedByMakima) return;
     if (this._counterPunchTimer && this._counterPunchTimer > 0) return; // Sidestep disabled while charging Serious Skill Counter
+    if (this.isFlurrying) return; // Sidestep disabled while performing Consecutive Normal Punches
     const src = projectile || attacker;
     this.executeDodgeTeleport(src, true);
   }
@@ -1963,6 +2059,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this._flurryAimAngle = undefined;
+    this._flurryBreatherTimer = 0;
     this.caughtInGenosFlurry = false;
     this.caughtInGenosBeamTimer = 0;
     this.caughtInSaitamaFlurry = false;
@@ -2045,31 +2142,35 @@ export class SaitamaFighter extends Fighter {
     this._tickCounterPunch();
 
     // Trigger Serious Counter (Teleport Behind Punch) when ability is ready
-    if (this.skillPunishCooldown <= 0 && this.hp > 0 && !isInsideGojoDomain && !this.isFrozenByInfinity && !this.isTargetOfAmbush && !isGlobalHitPausingFighter && (!this._counterPunchTimer || this._counterPunchTimer <= 0) && !this.isFlurrying) {
+    if (this.skillPunishCooldown <= 0 && this.hp > 0 && !isInsideGojoDomain && !this.isFrozenByInfinity && !this.isTargetOfAmbush && !isGlobalHitPausingFighter && (!this._counterPunchTimer || this._counterPunchTimer <= 0) && !this.isFlurrying && (!this._flurryBreatherTimer || this._flurryBreatherTimer <= 0)) {
       const targetsToScan = [];
       if (typeof state !== 'undefined') {
-        if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0 && !f.isIllusion) targetsToScan.push(f); });
-        if (state.illusions) state.illusions.forEach(ill => { if (ill && ill !== this && ill.hp > 0) targetsToScan.push(ill); });
+        if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0 && !this._isSameTeam(f)) targetsToScan.push(f); });
+        if (state.illusions) state.illusions.forEach(ill => { if (ill && ill !== this && ill.hp > 0 && !this._isSameTeam(ill)) targetsToScan.push(ill); });
       }
 
       let bestTarget = null;
       let minDist = Infinity;
       const maxCounterRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
+
+      // Pass 1: Prioritize true enemy fighters (excluding minions, turrets, dispensers, end crystals, illusions, servants)
       for (const target of targetsToScan) {
-        if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
-          const myIdx = state.fighters.indexOf(this);
-          const targetIdx = state.fighters.indexOf(target);
-          if (myIdx >= 0 && targetIdx >= 0) {
-            const myTeam = state.getFighterTeam(myIdx);
-            const targetTeam = state.getFighterTeam(targetIdx);
-            if (myTeam !== null && myTeam === targetTeam) continue;
-          }
-        }
+        if (this._isMinionEntity(target)) continue;
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        // Only target enemies strictly within Saitama's passive counter range
         if (dist <= maxCounterRange && dist < minDist) {
           minDist = dist;
           bestTarget = target;
+        }
+      }
+
+      // Pass 2: Fallback if no true fighter in range (e.g. minion-only test scenarios)
+      if (!bestTarget) {
+        for (const target of targetsToScan) {
+          const dist = Math.hypot(target.x - this.x, target.y - this.y);
+          if (dist <= maxCounterRange && dist < minDist) {
+            minDist = dist;
+            bestTarget = target;
+          }
         }
       }
 
@@ -2470,7 +2571,9 @@ export class SaitamaFighter extends Fighter {
 
         // Conclude flurry on final hit
         if (isFinalHit) {
-          this._flurryFinalPunchTimer = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.flurryFinalPunchRecoveryFrames) || 24;
+          const breatherFrames = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.flurryBreatherFrames) ?? 36;
+          this._flurryFinalPunchTimer = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.flurryFinalPunchRecoveryFrames) || 45;
+          this._flurryBreatherTimer = breatherFrames;
           this._flurryFinalPunchReleaseAngle = this.gunAngle || this.angle || 0;
           this._flurryFinalPunchReleaseOriginX = this.x;
           this._flurryFinalPunchReleaseOriginY = this.y - (this.z || 0);
@@ -2502,17 +2605,30 @@ export class SaitamaFighter extends Fighter {
           this.flurryTimer = 0; // Reset flurryTimer to 0 so isPerformingSkill() doesn't freeze Saitama!
           this._flurryAimAngle = undefined;
 
-          // Give Saitama immediate movement velocity after the final punch
-          const opp = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving)) : null);
-          const chaseAngle = opp ? Math.atan2(opp.y - this.y, opp.x - this.x) : aimAngle;
-          const spd = this.moveSpeed || this.speed || 6.0;
-          this.vx = Math.cos(chaseAngle) * (spd * 0.75);
-          this.vy = Math.sin(chaseAngle) * (spd * 0.75);
+          // Post-flurry breather: keep Saitama completely motionless (zero velocity)
+          this.vx = 0;
+          this.vy = 0;
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
         }
       }
 
       // Flurry update consumes this frame's action
       return;
+    }
+
+    // ── Post-Flurry Breather Window: Saitama stands completely motionless in a short breather stance ──
+    if (this._flurryBreatherTimer > 0) {
+      this._flurryBreatherTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      if (this._flurryFinalPunchReleaseAngle !== undefined) {
+        this.gunAngle = this._flurryFinalPunchReleaseAngle;
+        this.angle = this._flurryFinalPunchReleaseAngle;
+      }
+      return; // Do not move, aim, or initiate other actions during breather
     }
 
     if (isDodgeStalling) {
@@ -2562,7 +2678,7 @@ export class SaitamaFighter extends Fighter {
     if (this.isCaughtInBeam()) {
       this.basicPunchChargeTimer = 0;
     }
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isExecutingCounter && !this.isCaughtInBeam() && !this.isFlurrying;
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isExecutingCounter && !this.isCaughtInBeam() && !this.isFlurrying && (!this._flurryBreatherTimer || this._flurryBreatherTimer <= 0);
 
     // ── AI: Skill 1 Consecutive Normal Punches Trigger ──
     if (this.isConsecutivePunchesEnabled() && canAct && this.flurryCooldown <= 0) {

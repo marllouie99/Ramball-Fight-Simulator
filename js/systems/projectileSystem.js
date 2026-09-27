@@ -12,6 +12,7 @@ import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch, spawnMahitoSoulExplosion } from '../graphics/particles/sparkEffect.js';
+import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
 import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
 import { ProjectileBehaviorManager } from './projectiles/ProjectileBehaviorManager.js';
@@ -3204,6 +3205,16 @@ class ProjectileSystem {
       // ── SERVANT OF CTHULHU TRACKING & GHOST FLIGHT (Terraria Minion AI) ──
       if (p.isServantOfCthulhu || p.visual === 'servantOfCthulhu' || p.type === 'servantOfCthulhu') {
         const ownerIndex = p.owner;
+        const ownerFighter = (typeof ownerIndex === 'number' && fighters) ? fighters[ownerIndex] : (p.ownerObject || (typeof p.owner === 'object' ? p.owner : null));
+        if (ownerFighter && (ownerFighter.isDead || ownerFighter.dead || ownerFighter.hp <= 0 || ownerFighter._hasDied)) {
+          p.dead = true;
+          p.life = 0;
+          if (typeof spawnDeathShatter === 'function') {
+            spawnDeathShatter(p);
+          }
+          continue;
+        }
+
         let target = null;
         let minDist = Infinity;
         if (fighters && fighters.length > 0) {

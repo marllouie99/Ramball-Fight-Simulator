@@ -1430,9 +1430,10 @@ export class TojiFighter extends Fighter {
               }
               if (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') {
                 f.isMeleeMode = false;
-                f.infinityActive = true;
-                f.infinityCooldown = 0;
-                f.infinityFadeOpacity = 1.0;
+                if ((f.infinityCooldown || 0) <= 0) {
+                  f.infinityActive = true;
+                  f.infinityFadeOpacity = 1.0;
+                }
               }
             });
           }

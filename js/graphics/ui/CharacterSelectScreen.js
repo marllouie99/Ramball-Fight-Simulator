@@ -810,6 +810,7 @@ function drawSelectScreen() {
   const isTac1v1 = isTactical && (mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === '1v1');
   const isTacFFA = isTactical && (mode === 'Tactical FFA' || mode === GAME_MODES.TACTICAL_FFA);
   const isTag = mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH';
+  const isRegular1v2 = !isTactical && (mode === '1v2' || mode === GAME_MODES.ONE_VS_TWO);
 
   // Screen Title: FIGHT OF LARPERS 101
   ctx.save();
@@ -817,7 +818,7 @@ function drawSelectScreen() {
     ? '[ 1 VS 1 DUEL ]'
     : (isTacFFA
       ? '[ 4-PLAYER FFA ]'
-      : (isTactical ? '[ 2 VS 2 FIREFIGHT ]' : (isTag ? '[ 3 VS 3 TAG MATCH ]' : '[ FIGHT OF LARPERS 101 ]')));
+      : (isTactical ? '[ 2 VS 2 FIREFIGHT ]' : (isTag ? '[ 3 VS 3 TAG MATCH ]' : (isRegular1v2 ? '[ 1 VS 2 BATTLE ]' : '[ FIGHT OF LARPERS 101 ]'))));
   
   ctx.fillStyle = '#21050c';
   ctx.font = '700 12px "Press Start 2P", monospace';
@@ -829,7 +830,7 @@ function drawSelectScreen() {
   ctx.restore();
 
   // Tactical Sub-Controls (Map Selector & Arena BGM) & Boss Battle Team Toggle
-  const isBossBattleMode = !isTactical && (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
+  const isBossBattleMode = !isTactical && (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
   const mapW = isTactical ? 130 : 0;
   const teamToggleW = isBossBattleMode ? 140 : 0;
   const bgmW = 130;
@@ -966,6 +967,52 @@ function drawSelectScreen() {
     // Bottom Command Dock
     const btnText = isTac1v1 ? 'START TACTICAL DUEL' : 'START BATTLE';
     drawBottomCommandDeck(btnText, () => startGame(), () => randomize1v1Fighters());
+
+  } else if (isRegular1v2) {
+    const leftX = margin;
+    const rightX = margin + cardW + cardGap;
+    const stackedH = Math.floor((fullCardH - cardGap) / 2);
+    const bottomY = topY + stackedH + cardGap;
+
+    drawPlayerCard('p1Index', 'PLAYER 1 // RED', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
+    drawPlayerCard('p2Index', 'PLAYER 2 // BLUE', rightX, topY, cardW, stackedH, '#38bdf8', true);
+    drawPlayerCard('p3Index', 'PLAYER 3 // BLUE', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+
+    // Center Retro Pixel VS Crest
+    const vsX = canvas.width / 2;
+    const vsY = topY + fullCardH / 2 - 10;
+    
+    ctx.save();
+    // 3D Shadow
+    ctx.fillStyle = '#5e0d1f';
+    ctx.beginPath();
+    ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Center berry badge
+    ctx.fillStyle = '#b81c3b';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Inset highlight
+    ctx.strokeStyle = '#ffaec0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('VS', vsX, vsY + 0.5);
+    ctx.restore();
+
+    drawBottomCommandDeck('START 1V2 BATTLE', () => startGame(), () => randomize1v2Fighters());
 
   } else if (isBossBattleMode) {
     const leftX = margin;
@@ -1359,7 +1406,7 @@ export function getFighterWeaponInfo(def) {
 
 function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLarge = false) {
   const { ctx, mode } = state;
-  const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
+  const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
   const isAnyModalOpen = (selectingSlot !== null || isTacticalMapModalOpen || isArenaBgmModalOpen());
   const isInteractive = enabled && !isAnyModalOpen;
 

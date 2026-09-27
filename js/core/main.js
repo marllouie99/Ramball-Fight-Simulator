@@ -133,7 +133,7 @@ window.addEventListener('keydown', (e) => {
     else if (state.gameState === 'select') startGame();
     else if (state.gameState === 'roundEnd') startNextRound();
     else if (state.gameState === 'matchEnd') {
-      if (state.mode === 'Boss Battle' || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.STAND_OFF_1V2) resetMatchWithRandom1v2Fighters();
+      if (state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2' || state.mode === 'Boss Battle' || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.STAND_OFF_1V2) resetMatchWithRandom1v2Fighters();
       else if (state.mode === '1v1' || state.mode === 'Stand Off') resetMatchWithRandom1v1Fighters();
       else resetMatch();
     }
@@ -840,6 +840,12 @@ export function executeTacticalAction(action) {
     state.gameCategory = 'foc';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     startRandomStandoffBattle();
+  } else if (action === 'mode-1v2') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.ONE_VS_TWO || '1v2';
+    state.p3Index = state.p3Index ?? 2;
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
   } else if (action === 'mode-2v2') {
     state.gameCategory = 'foc';
     state.mode = GAME_MODES.TWO_VS_TWO || '2v2';

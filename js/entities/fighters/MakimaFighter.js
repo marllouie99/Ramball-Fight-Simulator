@@ -1169,9 +1169,10 @@ export class MakimaFighter extends Fighter {
     delete target._timeStopFrozenGunAngle;
 
     if (target.characterId === 'gojo' || target.type === 'gojo') {
-      target.infinityActive = true;
-      target.infinityCooldown = 0;
-      target.infinityFadeOpacity = 1.0;
+      if ((target.infinityCooldown || 0) <= 0) {
+        target.infinityActive = true;
+        target.infinityFadeOpacity = 1.0;
+      }
     }
 
     if (Object.prototype.hasOwnProperty.call(target, '_makimaOriginalOwner')) {

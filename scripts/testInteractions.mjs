@@ -1411,6 +1411,227 @@ async function runInteractionTests() {
     console.log('      ✅ Gojo 300-frame post-skill cooldown and anti-spam lockout verified.');
   }
 
+  // ── TEST 23: Eye of Cthulhu Death Shatters & Kills Active Servants/Allies ──
+  console.log('   23. Testing Eye of Cthulhu Death Shatters & Kills Active Allies/Servants...');
+  {
+    const EyeClass = FIGHTER_CLASS_MAP.eye_of_cthulhu;
+    const DummyClass = FIGHTER_CLASS_MAP.default || FIGHTER_CLASS_MAP.gojo;
+    const eye = new EyeClass({ radius: 32, x: 300, y: 300, hp: 480, maxHp: 480, color: '#E11D48' });
+    const dummy = new DummyClass({ radius: 25, x: 500, y: 300, hp: 500, color: '#00E5FF' });
+    state.fighters = [eye, dummy];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+    state.gameState = 'playing';
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+
+    // 1. Eye spawns Servants of Cthulhu minion illusions
+    eye._spawnServantMinion(0, {
+      servantCountPerSpawn: 3,
+      servantMaxActive: 4,
+      servantHp: 120,
+      servantRadius: 10,
+      servantScale: 1.5
+    });
+
+    assert(state.illusions.length === 3, `Expected 3 active Servants in state.illusions, got ${state.illusions.length}`);
+    assert(state.illusions.every(ill => ill.isServantOfCthulhu && ill.hp > 0), 'All spawned Servants must be active Servants of Cthulhu with > 0 HP');
+
+    // 2. Also add a Servant projectile to state.projectiles
+    state.projectiles.push({
+      x: 320,
+      y: 320,
+      r: 10,
+      isServantOfCthulhu: true,
+      owner: 0,
+      dead: false,
+      life: 100
+    });
+    assert(state.projectiles.length === 1, 'Expected 1 active Servant projectile');
+
+    // 3. Eye dies!
+    eye.hp = 0;
+    eye.onDeath();
+
+    // 4. Verify all active Servants in state.illusions are shattered and removed
+    assert(state.illusions.length === 0, `Expected all Servants in state.illusions to be destroyed and shattered on Eye death, but ${state.illusions.length} remained!`);
+    
+    // 5. Verify active Servant projectiles are shattered and marked dead
+    assert(state.projectiles.every(p => p.dead || p.life <= 0), 'Expected all Servant projectiles to be marked dead on Eye death');
+
+    // 6. Verify Terraria minion gore chunks were created in state.deathEffects
+    const hasMinionGore = state.deathEffects.some(e => e.isEyeOfCthulhuGore);
+    assert(hasMinionGore, 'Expected Terraria death gore chunks to be spawned for the shattered minions and Eye');
+
+    // Clean up
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+    console.log('      ✅ Eye of Cthulhu active ally & servant death shatter verified.');
+  }
+
+  // ── TEST 24: Eye of Cthulhu & Sukuna Domain Slash Lines Shatter Gore Dropping Interaction ──
+  console.log('   24. Testing Eye of Cthulhu & Sukuna Domain Slash Lines Shatter Gore Interaction...');
+  {
+    const SukunaClass = FIGHTER_CLASS_MAP.sukuna;
+    const EyeClass = FIGHTER_CLASS_MAP.eye_of_cthulhu;
+    const { spawnDomainSlashLines, renderSukunaDomainSlashLines } = await import('../js/entities/fighters/sukuna/sukunaDomainVisuals.js');
+    const { drawDeathEffects } = await import('../js/graphics/particles/deathShatterEffect.js');
+
+    const sukuna = new SukunaClass({ radius: 25, x: 200, y: 300, hp: 500, color: '#DC2626' });
+    const eye = new EyeClass({ radius: 32, x: 205, y: 300, hp: 480, maxHp: 480, color: '#E11D48' });
+
+    state.fighters = [sukuna, eye];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+    state.gameState = 'playing';
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+    state.getFighterTeam = (idx) => idx; // Opposing teams
+
+    // 1. Sukuna opens Domain Expansion
+    sukuna.domainActive = true;
+    sukuna.domainDuration = 600;
+    state.activeDomain = 'malevolent_shrine';
+
+    // 2. Sukuna's domain slash lines tick and strike Eye of Cthulhu
+    state.frameCount = 10;
+    const hitAny = spawnDomainSlashLines(sukuna, 3);
+    assert(hitAny, 'Expected domain slash lines to intersect and hit Eye of Cthulhu');
+
+    // 3. Verify Eye of Cthulhu dropped Terraria sprite sheet shatter pieces in state.deathEffects
+    const eyeGorePieces = state.deathEffects.filter(e => e.isEyeOfCthulhuGore);
+    assert(eyeGorePieces.length > 0, `Expected shatter gore pieces to drop when Eye of Cthulhu is hit by Sukuna domain slashes (got ${eyeGorePieces.length})`);
+    
+    // 4. Verify gore properties: valid spriteFrame, velocity, rotation, gravity
+    const firstPiece = eyeGorePieces[0];
+    assert(firstPiece.spriteFrame !== undefined, 'Dropped piece must have a valid spriteFrame from the Terraria sprite sheet');
+    assert(typeof firstPiece.vx === 'number' && typeof firstPiece.vy === 'number', 'Dropped piece must have physical velocity');
+    assert(typeof firstPiece.gravity === 'number' && firstPiece.gravity > 0, 'Dropped piece must have downward gravity acceleration');
+
+    // 5. Verify render passes execute cleanly with 0 canvas stack leaks
+    mockCtx.resetStackDepth();
+    renderSukunaDomainSlashLines(sukuna, mockCtx);
+    assert(mockCtx.getStackDepth() === 0, `renderSukunaDomainSlashLines canvas stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+
+    drawDeathEffects();
+    assert(mockCtx.getStackDepth() === 0, `drawDeathEffects canvas stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+
+    // 6. Test Phase 2 Eye of Cthulhu and Servants also drop gore pieces on domain slash hits
+    eye.isPhase2 = true;
+    state.frameCount = 25;
+    const initialGoreCount = state.deathEffects.length;
+    spawnDomainSlashLines(sukuna, 3);
+    assert(state.deathEffects.length > initialGoreCount, 'Phase 2 Eye must also continuously drop shatter pieces on domain slash hits');
+
+    // Clean up
+    sukuna.domainActive = false;
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+    console.log('      ✅ Eye of Cthulhu & Sukuna domain slash shatter gore drop verified.');
+  }
+
+  // ── TEST 25: Saitama vs Gojo Limitless Infinity Barrier Crack & Shatter Interaction ──
+  console.log('   25. Testing Saitama vs Gojo Limitless Infinity Barrier Crack & Shatter Interaction...');
+  {
+    const SaitamaClass = FIGHTER_CLASS_MAP.saitama;
+    const GojoClass = FIGHTER_CLASS_MAP.gojo;
+    const { drawDeathEffects } = await import('../js/graphics/particles/deathShatterEffect.js');
+
+    const saitama = new SaitamaClass({ radius: 25, x: 200, y: 300, hp: 500, maxHp: 500, color: '#F5C400' });
+    const gojo = new GojoClass({ radius: 25, x: 250, y: 300, hp: 200, maxHp: 200, color: '#00E5FF' });
+
+    state.fighters = [saitama, gojo];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+    state.gameState = 'playing';
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+    state.getFighterTeam = (idx) => idx; // Opposing teams
+
+    // Initial state verification: Gojo has full HP and active Limitless Infinity
+    assert(gojo.hasActiveInfinity(), 'Gojo must start with an active Limitless Infinity barrier');
+    assert(gojo.infinityBarrierHp === 350, `Expected full barrier HP of 350, got ${gojo.infinityBarrierHp}`);
+    assert(gojo.infinityCrackLevel === 0, `Expected 0 crack level at start, got ${gojo.infinityCrackLevel}`);
+
+    const initialGojoHp = gojo.hp;
+
+    // 1. Saitama executes Normal Punch against Gojo while Infinity is active
+    const hit1Result = gojo.takeDamage(75, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true, undodgeable: true });
+    assert(hit1Result === false, 'Gojo takeDamage must return false (blocked 100% by Infinity)');
+    assert(gojo.hp === initialGojoHp, `Gojo must take strictly 0 direct HP damage while Infinity is active (HP: ${gojo.hp}/${initialGojoHp})`);
+    assert(gojo.infinityBarrierHp === 280, `Infinity barrier HP must take 70 damage from Saitama punch (got ${gojo.infinityBarrierHp})`);
+    assert(gojo.infinityCrackLevel === 1, `Infinity barrier must develop Tier 1 cracks (crackLevel: ${gojo.infinityCrackLevel})`);
+
+    // 2. Saitama delivers Consecutive Normal Punches flurry hits
+    gojo.takeDamage(35, saitama, { isSkill: true, isMelee: true, isMachineGunBlow: true, isSaitamaPunch: true, bypassShield: true });
+    assert(gojo.hp === initialGojoHp, 'Gojo HP must remain untouched during flurry hits');
+    assert(gojo.infinityBarrierHp === 245, `Infinity barrier HP must reduce by 35 to 245 (got ${gojo.infinityBarrierHp})`);
+    assert(gojo.infinityCrackLevel === 2, `Infinity barrier must develop Tier 2 cracks (crackLevel: ${gojo.infinityCrackLevel})`);
+
+    // 3. Render Gojo body with cracks to ensure zero Canvas stack leaks
+    mockCtx.resetStackDepth();
+    gojo.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, `Gojo draw with barrier cracks must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 4. Saitama lands Serious Counter punch (200 barrier damage) -> brings barrier to critical 45 HP
+    gojo.takeDamage(350, saitama, { isSkill: true, isCounter: true, isCritical: true, bypassShield: true, isSaitamaCounter: true, bypassEvade: true, undodgeable: true, isGuaranteedHit: true });
+    assert(gojo.hp === initialGojoHp, 'Gojo HP must still be untouched');
+    assert(gojo.infinityBarrierHp === 45, `Barrier HP must be at 45 (got ${gojo.infinityBarrierHp})`);
+    assert(gojo.infinityCrackLevel === 3, `Crack level must be 3 (Critical stress) at 45 HP (got ${gojo.infinityCrackLevel})`);
+
+    // 5. Final Normal Punch lands to shatter the remaining 45 HP of the barrier!
+    gojo.takeDamage(75, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true, undodgeable: true });
+    
+    // Barrier must be completely shattered!
+    assert(gojo.infinityBarrierHp === 0, `Barrier HP must be 0 after shatter (got ${gojo.infinityBarrierHp})`);
+    assert(gojo.infinityActive === false, 'Infinity must be deactivated after being shattered');
+    assert(gojo.infinityCooldown === (CONFIG.gojo?.infinityBrokenCooldown ?? 360), `Infinity must be placed on broken lockout cooldown (got ${gojo.infinityCooldown})`);
+
+    // 6. Verify flying glass shard particles spawned in state.deathEffects
+    const glassShards = state.deathEffects.filter(e => e.isInfinityGlassShard);
+    assert(glassShards.length > 0, `Expected infinity glass shards to spawn on barrier shatter (got ${glassShards.length})`);
+    
+    // Verify shard rendering passes with 0 canvas stack leaks
+    mockCtx.resetStackDepth();
+    drawDeathEffects();
+    assert(mockCtx.getStackDepth() === 0, `drawDeathEffects with glass shards must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 7. Next Saitama attack while Infinity is shattered MUST deal direct HP damage to Gojo
+    const hpBeforeDirectHit = gojo.hp;
+    const directHitResult = gojo.takeDamage(50, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true });
+    assert(directHitResult !== false, 'takeDamage must succeed and apply damage when Infinity is shattered');
+    assert(gojo.hp < hpBeforeDirectHit, `Gojo must take direct HP damage while Infinity is broken (HP: ${gojo.hp} < ${hpBeforeDirectHit})`);
+
+    // 8. Verify cooldown decrements cleanly across update ticks while remaining inactive
+    state.frameCount = 1;
+    const cdBeforeTick = gojo.infinityCooldown;
+    state.frameCount++;
+    gojo.update(saitama, 1, state.arena);
+    assert(gojo.infinityCooldown === cdBeforeTick - 1, `infinityCooldown must decrement on update tick (was ${cdBeforeTick}, now ${gojo.infinityCooldown})`);
+    assert(gojo.infinityActive === false, 'Infinity must remain inactive while cooldown > 0');
+    assert(gojo.hasActiveInfinity() === false, 'hasActiveInfinity must return false while on cooldown');
+
+    // 9. Fast-forward remaining cooldown frames and verify automatic re-arming and restoration in Ranged Mode
+    while (gojo.infinityCooldown > 0) {
+      state.frameCount++;
+      gojo.isMeleeMode = false;
+      gojo.update(saitama, 1, state.arena);
+    }
+    assert(gojo.infinityCooldown === 0, 'infinityCooldown must reach 0');
+    assert(gojo.infinityActive === true, 'Infinity must automatically re-arm when cooldown reaches 0');
+    assert(gojo.infinityBarrierHp === 350, `Infinity barrier HP must be fully restored to 350 (got ${gojo.infinityBarrierHp})`);
+    assert(gojo.infinityCrackLevel === 0, `Infinity crack level must be reset to 0 (got ${gojo.infinityCrackLevel})`);
+    assert(gojo.hasActiveInfinity() === true, 'hasActiveInfinity must return true once cooldown expires');
+
+    // Clean up
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+    console.log('      ✅ Saitama vs Gojo Infinity barrier crack, shatter & direct damage verified.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

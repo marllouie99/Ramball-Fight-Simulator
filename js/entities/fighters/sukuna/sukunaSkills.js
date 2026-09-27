@@ -6,6 +6,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../cor
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash, spawnAnimePunchImpactFrame } from '../../../graphics/particles/sparkEffect.js';
+import { spawnEyeOfCthulhuDomainSlashGore } from '../../../graphics/particles/deathShatterEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
@@ -224,6 +225,21 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     spawnFloatingText(fighter.x, fighter.y - 30, 'CLEAVE!', '#E0E8FF');
     spawnSparks(target.x, target.y, 16, 'crimsonSniper', '#8B0000');
     triggerGlobalScreenShake(5, 6);
+
+    // Special Interaction: Eye of Cthulhu / Servants drop sprite sheet shatter pieces on domain slashes
+    const isTargetEye = Boolean(
+      target && (
+        target.characterId === 'eye_of_cthulhu' ||
+        target.type === 'eye_of_cthulhu' ||
+        target.isServantOfCthulhu ||
+        target.type === 'servant_of_cthulhu' ||
+        target.characterId === 'servant_of_cthulhu' ||
+        (target.owner && (target.owner.characterId === 'eye_of_cthulhu' || target.owner.type === 'eye_of_cthulhu'))
+      )
+    );
+    if (isTargetEye && typeof spawnEyeOfCthulhuDomainSlashGore === 'function') {
+      spawnEyeOfCthulhuDomainSlashGore(target, target.x, target.y, slashAngle, Boolean(target.isServantOfCthulhu));
+    }
 
     fighter.punchAnimTimer = 0;
     fighter.slashGlowTimer = 25;

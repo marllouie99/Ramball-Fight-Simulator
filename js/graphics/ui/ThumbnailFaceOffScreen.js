@@ -278,7 +278,7 @@ export function drawFaceOffThumbnailScreen() {
   let leftThemeColor = getFaceOffThemeColor(p1Def, '#38bdf8');
   let rightThemeColor = getFaceOffThemeColor(p2Def, '#e51a2e');
 
-  if (mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
+  if (mode === GAME_MODES.ONE_VS_TWO || mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
     const t1 = Math.min(1.0, timer / 36);
     const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
     const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
@@ -351,7 +351,7 @@ export function drawFaceOffThumbnailScreen() {
     drawAnimeGrungeSplitBackground(ctx, canvas.width, canvas.height, leftThemeColor, rightThemeColor, timer);
 
     // 2. Render Mode-Specific Side-by-Side Face-Off Layout with "VS" to Countdown Transition
-    if (mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
+    if (mode === GAME_MODES.ONE_VS_TWO || mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
       if (state.bossBattleNoTeammate) {
         draw1v1FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
       } else {

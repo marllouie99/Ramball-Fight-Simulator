@@ -325,7 +325,8 @@ export function drawHUD() {
   const topContainer = _cachedTopContainer;
   const bottomContainer = _cachedBottomContainer;
 
-  const is1v2Mode = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2';
+  const isBossBattleMode = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === 'STAND_OFF_1V2';
+  const is1v2Mode = mode === GAME_MODES.ONE_VS_TWO || mode === '1v2' || isBossBattleMode;
 
   // FOC & Tactical modes HUD visibility
   let topHudOpacity = hudOpacity;
@@ -334,7 +335,7 @@ export function drawHUD() {
   }
 
   if (topContainer) {
-    if (is1v2Mode && topHudOpacity > 0 && !CONFIG.hudHideAll && !CONFIG.hudHideHealthBars) {
+    if (isBossBattleMode && topHudOpacity > 0 && !CONFIG.hudHideAll && !CONFIG.hudHideHealthBars) {
       topContainer.style.display = 'flex';
       topContainer.style.visibility = 'visible';
       topContainer.style.opacity = topHudOpacity;
@@ -1172,7 +1173,9 @@ function updateHealthHud() {
   const mainFighters = fighters.filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
   const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && mainFighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
   const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
-  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2';
+  const isRegular1v2 = mode === GAME_MODES.ONE_VS_TWO || mode === '1v2';
+  const isBossBattle = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === 'STAND_OFF_1V2';
+  const is1v2 = isRegular1v2 || isBossBattle;
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
@@ -2508,7 +2511,8 @@ function updateHealthHud() {
     `;
   };
 
-  const isCacheEmpty = is2v2 ? (_hudCache.teams.size === 0) : (_hudCache.fighters.size === 0);
+  const isTeamHudMode = is2v2 || isRegular1v2;
+  const isCacheEmpty = isTeamHudMode ? (_hudCache.teams.size === 0) : (_hudCache.fighters.size === 0);
 
   if (isCacheEmpty) {
     syncHudPosition();
@@ -2516,7 +2520,7 @@ function updateHealthHud() {
     if (containerLeft) containerLeft.innerHTML = '';
     if (containerRight) containerRight.innerHTML = '';
 
-    if (is1v2) {
+    if (isBossBattle) {
       // BOSS BATTLE MODE:
       // Boss is rendered at the top of the arena (#hudTopContainer) with NO skill bars
       const bossFighter = fighters.find(f => f && f.isBoss) || fighters[0];
@@ -2701,9 +2705,12 @@ function updateHealthHud() {
           lastChecked: null
         });
       });
-    } else if (is2v2) {
-      // 2v2 Pure Team Mode
-      const teamLabels = [
+    } else if (is2v2 || isRegular1v2) {
+      // 2v2 / Regular 1v2 Team Mode
+      const teamLabels = isRegular1v2 ? [
+        { title: 'RED TEAM', color: '#ff4d4d', indexes: [0], key: 'red' },
+        { title: 'BLUE TEAM', color: '#4da3ff', indexes: [1, 2], key: 'blue' },
+      ] : [
         { title: 'RED TEAM', color: '#ff4d4d', indexes: [0, 1], key: 'red' },
         { title: 'BLUE TEAM', color: '#4da3ff', indexes: [2, 3], key: 'blue' },
       ];

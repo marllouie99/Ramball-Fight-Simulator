@@ -8,6 +8,7 @@ import { eyeOfCthulhuConfig } from '../../configs/characters/eyeOfCthulhuConfig.
 import { drawEyeOfCthulhuSkin, EOC_SHATTER_SPRITES } from '../../graphics/fighters/eyeOfCthulhuSkin.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
+import { shatterEyeOfCthulhuActiveAllies } from '../../graphics/particles/deathShatterEffect.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -258,6 +259,15 @@ export class EyeOfCthulhuFighter extends Fighter {
         } catch (e) {}
       }
     }
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.isTransforming ||
+      this.aiState === EOC_STATE.TRANSFORMATION ||
+      this.aiState === EOC_STATE.TRIPLE_RAM_WINDUP ||
+      super.isStationarySkillActive()
+    );
   }
 
   update(opponent, ownerIndex, arena) {
@@ -1094,7 +1104,17 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (typeof spawnFloatingText === 'function') {
       spawnFloatingText(this.x, this.y - this.r - 20, 'EYE DEFEATED! 👁️💀', '#E11D48');
     }
+
+    // Instantly shatter and kill all active Servants of Cthulhu and minions
+    this.shatterActiveAllies();
+
     super.onDeath();
+  }
+
+  shatterActiveAllies() {
+    if (typeof shatterEyeOfCthulhuActiveAllies === 'function') {
+      shatterEyeOfCthulhuActiveAllies(this);
+    }
   }
 
   drawSkin(ctx) {

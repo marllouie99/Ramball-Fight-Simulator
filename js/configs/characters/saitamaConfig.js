@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -74,6 +74,7 @@ export const saitamaConfig = {
   flurryFinalSlamKnockback: 65,     // Heavy knockback on final blow
   flurryFinalPunchSpriteScale: 3.40, // Scale multiplier for the giant final finisher punch sprite in Consecutive Normal Punches (matches Serious Counter)
   flurryFinalPunchRecoveryFrames: 45, // Frames final punch stays extended in follow-through (matches Serious Counter)
+  flurryBreatherFrames: 36,         // Frames Saitama stands completely motionless in a short breather stance after the final punch
   flurryFinalFrontalReach: 560,     // Frontal supersonic shockwave blast reach (px) on flurry final punch
   flurryFinalFrontalArc: Math.PI * 0.70, // Frontal shockwave blast cone angle on flurry final punch
   flurryCooldown: 500,              // Cooldown frames at 60fps

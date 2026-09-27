@@ -404,14 +404,14 @@ function generateWallSegments(hit, span, punchAngle) {
     const halfT = thickness / 2;
 
     // BLOWN AWAY vs HANGING / DANGLING PHYSICS:
-    // - Core blast zone (normDist < 0.55): Blown away violently along punch vector!
-    // - Outer flank zone (normDist >= 0.55): Structural hanging / dangler strain before snapping.
-    const isBlownAway = normDist < 0.55;
-    let isDangler = !isBlownAway && (i === danglerIdx && normDist > 0.45);
+    // - Core & intermediate blast zone (normDist < 0.70): Blown away violently along punch vector!
+    // - Outer flank zone (normDist >= 0.70): Structural hanging / dangler strain before snapping.
+    const isBlownAway = normDist < 0.70;
+    let isDangler = !isBlownAway && (i === danglerIdx && normDist > 0.50);
     let hangFrames = 0;
 
     if (!isBlownAway && !isDangler) {
-      hangFrames = 30 + Math.floor((normDist - 0.5) * 120);
+      hangFrames = 25 + Math.floor((normDist - 0.5) * 90);
     }
 
     // Local polygon shape with jagged break edges
@@ -437,13 +437,13 @@ function generateWallSegments(hit, span, punchAngle) {
 
     // High explosive blown-away physical properties
     const blastSpeed = isBlownAway
-      ? (12 + (1.0 - normDist) * 16 + Math.random() * 8)
-      : ((1.0 - normDist * 0.5) * (4 + Math.random() * 6));
+      ? (14 + (1.0 - normDist) * 20 + Math.random() * 10)
+      : ((1.0 - normDist * 0.5) * (5 + Math.random() * 7));
     const blastAngleSpread = (Math.random() - 0.5) * 0.65;
     const outwardDir = punchAngle + blastAngleSpread;
     const fallVx = Math.cos(outwardDir) * blastSpeed + (Math.random() - 0.5) * 2.0;
     const fallVy = Math.sin(outwardDir) * blastSpeed + (Math.random() - 0.5) * 2.0;
-    const rotSpeed = (Math.random() - 0.5) * (isBlownAway ? 0.35 : 0.12);
+    const rotSpeed = (Math.random() - 0.5) * (isBlownAway ? 0.38 : 0.14);
 
     // Dangler hinge properties
     const hingeOnLeft = s0 < 0;
@@ -492,23 +492,61 @@ function generateWallSegments(hit, span, punchAngle) {
 }
 
 /**
- * Triggers a massive line wall shatter effect when Saitama lands his Serious Counter punch.
+ * Triggers a massive line wall shatter effect when Saitama lands his Serious Counter punch or Consecutive Normal Punches finisher.
  * Supports simultaneous multi-wall breaches across all walls intersecting the supersonic blast cone.
  * @param {number} originX - Saitama punch X
  * @param {number} originY - Saitama punch Y
- * @param {number} punchAngle - Serious Punch release angle
+ * @param {number} punchAngle - Punch release angle
  * @param {object} arena - Arena bounds
+ * @param {number} [customHalfArc] - Optional custom frontal half arc (defaults to counterFrontalArc / 2)
  */
-export function triggerSaitamaWallShatter(originX, originY, punchAngle, arena) {
+export function triggerSaitamaWallShatter(originX, originY, punchAngle, arena, customHalfArc) {
   if (!arena && typeof state !== 'undefined') arena = state.arena;
   if (!arena) return;
 
-  const halfArc = (CONFIG.saitama?.counterFrontalArc ?? ((28 * Math.PI) / 180)) / 2;
+  const halfArc = customHalfArc !== undefined ? customHalfArc : ((CONFIG.saitama?.counterFrontalArc ?? ((28 * Math.PI) / 180)) / 2);
   const hits = findAllArenaWallIntersections(originX, originY, punchAngle, arena, halfArc);
   if (!hits || hits.length === 0) return;
 
   if (!state.shatteredWalls) {
     state.shatteredWalls = [];
+  }
+
+  // ── Re-blast & Accelerate Existing Wall Segments & Shards in the Blast Cone ──
+  if (state.shatteredWalls.length > 0) {
+    for (const existingSW of state.shatteredWalls) {
+      if (existingSW.segments) {
+        for (const seg of existingSW.segments) {
+          if (isInsideSaitamaFrontalBlast(seg.x, seg.y, originX, originY, punchAngle, halfArc, 35)) {
+            const isHangingOrDangling = seg.state === 'hanging' || seg.state === 'dangling';
+            seg.state = 'falling';
+            seg.hangTimer = 0;
+            seg.dangleTimer = 0;
+            seg.isBlownAway = true;
+            const reBlastSpeed = isHangingOrDangling ? (16 + Math.random() * 14) : (12 + Math.random() * 10);
+            const spread = (Math.random() - 0.5) * 0.6;
+            const outwardDir = punchAngle + spread;
+            seg.vx += Math.cos(outwardDir) * reBlastSpeed;
+            seg.vy += Math.sin(outwardDir) * reBlastSpeed;
+            seg.rotSpeed = (Math.random() - 0.5) * 0.42;
+            seg.alpha = 1.0;
+          }
+        }
+      }
+      if (existingSW.fastShards) {
+        for (const shard of existingSW.fastShards) {
+          if (isInsideSaitamaFrontalBlast(shard.x, shard.y, originX, originY, punchAngle, halfArc, 35)) {
+            const shardBoost = 14 + Math.random() * 16;
+            const spread = (Math.random() - 0.5) * 0.7;
+            shard.vx += Math.cos(punchAngle + spread) * shardBoost;
+            shard.vy += Math.sin(punchAngle + spread) * shardBoost;
+            shard.alpha = 1.0;
+          }
+        }
+      }
+      // Refresh life of existing shattered walls if re-hit
+      existingSW.life = Math.max(existingSW.life, 260);
+    }
   }
 
   const maxLife = 380; // ~6.3 seconds duration before complete restoration
@@ -650,6 +688,10 @@ export function updateSaitamaWallShatters() {
 
   for (let i = 0; i < state.shatteredWalls.length; i++) {
     const sw = state.shatteredWalls[i];
+
+    // NOTE: The shattered wall breach gap, jagged fracture teeth, and wall fissures
+    // are permanent structural destruction that stays broken throughout the match and victory screen!
+    // They are ONLY cleared when a new round or match is initialized.
 
     // ── Update Structural Wall Segments (Hang, Dangle, Snap, Fall) ──
     for (let s = 0; s < sw.segments.length; s++) {
@@ -823,80 +865,90 @@ export function updateSaitamaWallShatters() {
  */
 export function drawSaitamaWallShatters(ctx, isDark, arena) {
   if (state.shatteredWalls && state.shatteredWalls.length > 0) {
-    const wallBgColor = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+    const hasActiveDomain = state.fighters && state.fighters.some(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
+    const isStorming = Boolean(
+      (state.fighters && state.fighters.some(f => 
+        f && f.hp > 0 && (
+          ((f.characterId === 'zeus' || f.type === 'zeus' || f._def?.id === 'zeus') && (f.isChargingStorm || f.stormActive)) ||
+          (f.characterId === 'rubbick' && f.stormActive)
+        )
+      )) || (state.previewFighter && (state.previewFighter.isChargingStorm || state.previewFighter.stormActive))
+    );
+    const suppressArenaFloor = hasActiveDomain || isStorming;
+    const wallBgColor = isDark ? '#000000' : (suppressArenaFloor ? '#080808' : (CONFIG.arenaOuterBgColor || '#fff8ceff'));
     const inkColor = isDark ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 15, 18, 0.95)';
     const crackAccentColor = isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(40, 40, 45, 0.75)';
 
-  for (let i = 0; i < state.shatteredWalls.length; i++) {
-    const sw = state.shatteredWalls[i];
-    const globalAlpha = 1.0;
+    for (let i = 0; i < state.shatteredWalls.length; i++) {
+      const sw = state.shatteredWalls[i];
+      const globalAlpha = 1.0;
 
-    const tanX = Math.cos(sw.tangentAngle);
-    const tanY = Math.sin(sw.tangentAngle);
-    const normX = Math.cos(sw.normalAngle);
-    const normY = Math.sin(sw.normalAngle);
+      const tanX = Math.cos(sw.tangentAngle);
+      const tanY = Math.sin(sw.tangentAngle);
+      const normX = Math.cos(sw.normalAngle);
+      const normY = Math.sin(sw.normalAngle);
 
-    ctx.save();
+      ctx.save();
 
-    // ── 1. Draw Breach Cutout / Eraser Gap over the Wall Line ──
-    const startX = sw.x - tanX * sw.halfSpan;
-    const startY = sw.y - tanY * sw.halfSpan;
-    const endX = sw.x + tanX * sw.halfSpan;
-    const endY = sw.y + tanY * sw.halfSpan;
+      // ── 1. Draw Breach Cutout / Eraser Gap over the Wall Line ──
+      const startX = sw.x - tanX * sw.halfSpan;
+      const startY = sw.y - tanY * sw.halfSpan;
+      const endX = sw.x + tanX * sw.halfSpan;
+      const endY = sw.y + tanY * sw.halfSpan;
 
-    const maskWidth = 16;
-    ctx.strokeStyle = wallBgColor;
-    ctx.lineWidth = maskWidth;
-    ctx.lineCap = 'butt';
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(endX, endY);
-    ctx.stroke();
+      const maskWidth = 16;
+      ctx.strokeStyle = wallBgColor;
+      ctx.lineWidth = maskWidth;
+      ctx.lineCap = 'butt';
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
 
-    // ── 2. Draw Branching Fissure Decals on Intact Wall Borders ──
-    for (const fissure of sw.fissures) {
-      if (fissure.nodes && fissure.nodes.length >= 2) {
-        ctx.save();
-        ctx.strokeStyle = inkColor;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'miter';
-        ctx.beginPath();
-        for (let n = 0; n < fissure.nodes.length; n++) {
-          const node = fissure.nodes[n];
-          if (n === 0) ctx.moveTo(node.x, node.y);
-          else ctx.lineTo(node.x, node.y);
+      // ── 2. Draw Branching Fissure Decals on Intact Wall Borders ──
+      for (const fissure of sw.fissures) {
+        if (fissure.nodes && fissure.nodes.length >= 2) {
+          ctx.save();
+          ctx.strokeStyle = inkColor;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'miter';
+          ctx.beginPath();
+          for (let n = 0; n < fissure.nodes.length; n++) {
+            const node = fissure.nodes[n];
+            if (n === 0) ctx.moveTo(node.x, node.y);
+            else ctx.lineTo(node.x, node.y);
+          }
+          ctx.lineWidth = 2.0;
+          ctx.stroke();
+          ctx.restore();
         }
-        ctx.lineWidth = 2.0 * globalAlpha;
-        ctx.stroke();
-        ctx.restore();
       }
-    }
 
-    // ── 3. Draw Jagged Fracture Teeth at Gap Edges ──
-    const drawTeeth = (cx, cy, teeth, dirSign) => {
-      ctx.fillStyle = inkColor;
-      for (let t = 0; t < teeth.length; t++) {
-        const tooth = teeth[t];
-        const toothLen = tooth.len * globalAlpha;
-        const tipX = cx + tanX * (dirSign * toothLen) + normX * tooth.perp;
-        const tipY = cy + tanY * (dirSign * toothLen) + normY * tooth.perp;
+      // ── 3. Draw Jagged Fracture Teeth at Gap Edges ──
+      const drawTeeth = (cx, cy, teeth, dirSign) => {
+        ctx.fillStyle = inkColor;
+        for (let t = 0; t < teeth.length; t++) {
+          const tooth = teeth[t];
+          const toothLen = tooth.len;
+          const tipX = cx + tanX * (dirSign * toothLen) + normX * tooth.perp;
+          const tipY = cy + tanY * (dirSign * toothLen) + normY * tooth.perp;
 
-        const base1X = cx + normX * 4;
-        const base1Y = cy + normY * 4;
-        const base2X = cx - normX * 4;
-        const base2Y = cy - normY * 4;
+          const base1X = cx + normX * 4;
+          const base1Y = cy + normY * 4;
+          const base2X = cx - normX * 4;
+          const base2Y = cy - normY * 4;
 
-        ctx.beginPath();
-        ctx.moveTo(base1X, base1Y);
-        ctx.lineTo(tipX, tipY);
-        ctx.lineTo(base2X, base2Y);
-        ctx.closePath();
-        ctx.fill();
-      }
-    };
+          ctx.beginPath();
+          ctx.moveTo(base1X, base1Y);
+          ctx.lineTo(tipX, tipY);
+          ctx.lineTo(base2X, base2Y);
+          ctx.closePath();
+          ctx.fill();
+        }
+      };
 
-    drawTeeth(startX, startY, sw.leftTeeth, 1);
-    drawTeeth(endX, endY, sw.rightTeeth, -1);
+      drawTeeth(startX, startY, sw.leftTeeth, 1);
+      drawTeeth(endX, endY, sw.rightTeeth, -1);
 
     // ── 4. Draw Structural Hanging / Dangling / Falling Wall Line Segments ──
     for (const seg of sw.segments) {

@@ -178,6 +178,8 @@ async function main() {
     environment: { addChild: () => {} }
   };
 
+  const defaultGetFighterTeam = state.getFighterTeam;
+
   let totalTested = 0;
   let errors = 0;
   const errorList = [];
@@ -190,6 +192,9 @@ async function main() {
     if (!FighterClass) continue;
 
     try {
+      state.mode = '1v1';
+      state.gameState = 'playing';
+      state.getFighterTeam = defaultGetFighterTeam;
       const fighter = new FighterClass({
         ...def,
         startX: 270,
@@ -1606,6 +1611,7 @@ async function main() {
 
         const testSukuna = new SukunaFighter({ startX: 300, startY: 200, type: 'sukuna' });
         testSukuna.isChainedByMakima = true;
+        testSukuna.reverseCursedTechniqueCooldown = 1000;
         testSukuna.hp = 100;
         const sukunaDamageRes = testSukuna.takeDamage(20, fighter, { isMelee: true });
         if (sukunaDamageRes === false || testSukuna.hp !== 80) {
@@ -2514,8 +2520,8 @@ async function main() {
           throw new Error(`Expected Saitama 1v1 mode punchDamage to be 180 (90% of 200 HP), got ${fighter.getBasePunchDamage()}`);
         }
         state.mode = 'Stand Off';
-        if (fighter.getBasePunchDamage() !== 450) {
-          throw new Error(`Expected Saitama Stand Off mode punchDamage to be 450 (90% of 500 HP), got ${fighter.getBasePunchDamage()}`);
+        if (fighter.getBasePunchDamage() !== 900) {
+          throw new Error(`Expected Saitama Stand Off mode punchDamage to be 900 (90% of 1000 HP), got ${fighter.getBasePunchDamage()}`);
         }
         state.mode = '2v2';
         if (fighter.getBasePunchDamage() !== 2700) {
@@ -2529,8 +2535,8 @@ async function main() {
         // Test with 0.15 (15% of mode fixed HP)
         CONFIG.saitama.punchDamage = 0.15;
         state.mode = 'Stand Off';
-        if (fighter.getBasePunchDamage() !== 75) {
-          throw new Error(`Expected Saitama Stand Off mode punchDamage at 0.15 to be 75 (15% of 500 HP), got ${fighter.getBasePunchDamage()}`);
+        if (fighter.getBasePunchDamage() !== 150) {
+          throw new Error(`Expected Saitama Stand Off mode punchDamage at 0.15 to be 150 (15% of 1000 HP), got ${fighter.getBasePunchDamage()}`);
         }
 
         state.mode = origMode;
@@ -2541,6 +2547,89 @@ async function main() {
         CONFIG.saitama.disableConsecutivePunches = origDisConsecutive;
         CONFIG.saitama.normalPunchEnabled = origNormal;
         CONFIG.saitama.consecutivePunchesEnabled = origConsecutive;
+
+        // Test Consecutive Normal Punches breather window: Saitama stays motionless after the final punch
+        fighter.reset();
+        dummyOpponent.reset();
+        dummyOpponent.x = fighter.x + 80;
+        dummyOpponent.y = fighter.y;
+        fighter.flurryCooldown = 0;
+        fighter.executeConsecutiveNormalPunches(dummyOpponent);
+        if (!fighter.isFlurrying) {
+          throw new Error('Saitama failed to start Consecutive Normal Punches');
+        }
+        let flurryFrames = 0;
+        while (fighter.isFlurrying && flurryFrames < 100) {
+          fighter.update(dummyOpponent, 0, null);
+          flurryFrames++;
+        }
+        if (fighter.isFlurrying) {
+          throw new Error('Saitama Consecutive Normal Punches failed to complete within 100 frames');
+        }
+        if (fighter._flurryBreatherTimer <= 0) {
+          throw new Error('Saitama failed to enter _flurryBreatherTimer breather window after final punch');
+        }
+        if (fighter.vx !== 0 || fighter.vy !== 0) {
+          throw new Error(`Saitama must be stationary (vx=0, vy=0) immediately after final punch, got vx=${fighter.vx}, vy=${fighter.vy}`);
+        }
+        if (fighter.canAim() !== false) {
+          throw new Error('Saitama must not be able to auto-aim while in breather stance');
+        }
+        const preBreatherX = fighter.x;
+        const preBreatherY = fighter.y;
+        fighter.update(dummyOpponent, 0, null);
+        if (fighter.vx !== 0 || fighter.vy !== 0 || fighter.x !== preBreatherX || fighter.y !== preBreatherY) {
+          throw new Error('Saitama moved during breather window');
+        }
+
+        // Test Serious Counter Wind-up Auto-Aim Minion Filter: Auto-aim locks onto true enemy fighter and ignores minions
+        fighter.reset();
+        dummyOpponent.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 400; // True enemy fighter is to the right at angle 0
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 100;
+        dummyOpponent.characterId = 'genos';
+
+        // Spawn a minion directly above Saitama (closer than the fighter, at angle -PI/2)
+        const mockMinion = {
+          x: 200,
+          y: 100, // Distance 100 (closer than dummyOpponent at distance 200)
+          hp: 50,
+          isMinion: true,
+          owner: dummyOpponent
+        };
+        const prevFightersState = state.fighters;
+        state.fighters = [fighter, dummyOpponent, mockMinion];
+
+        fighter.skillPunishCooldown = 0;
+        fighter.executeSkillCounterPunish(mockMinion); // Initiated with minion candidate
+
+        // Saitama should have redirected counter punch target to dummyOpponent (the true fighter)
+        if (fighter._counterPunchTarget !== dummyOpponent) {
+          throw new Error('Saitama counter punch should have redirected target to the true fighter instead of the minion');
+        }
+
+        // Tick counter wind-up and verify auto-aim turns towards dummyOpponent and NOT the minion
+        fighter.gunAngle = Math.PI / 4; // Start at 45 deg
+        fighter._counterAimAngle = Math.PI / 4;
+        const initialAngleToFighter = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        let initialDiff = Math.abs(fighter.gunAngle - initialAngleToFighter);
+        while (initialDiff > Math.PI) initialDiff = Math.abs(initialDiff - Math.PI * 2);
+
+        fighter.update(dummyOpponent, 0, state.arena);
+
+        const currentAngleToFighter = Math.atan2(dummyOpponent.y - fighter.y, dummyOpponent.x - fighter.x);
+        let currentDiff = Math.abs(fighter.gunAngle - currentAngleToFighter);
+        while (currentDiff > Math.PI) currentDiff = Math.abs(currentDiff - Math.PI * 2);
+
+        if (currentDiff >= initialDiff) {
+          throw new Error(`Saitama counter wind-up did not turn toward true fighter: currentDiff=${currentDiff}, initialDiff=${initialDiff}`);
+        }
+
+        state.fighters = prevFightersState;
+        fighter.interruptAttacks(true);
       }
 
       // 9. CJ specific non-chase movement tests
@@ -3666,9 +3755,40 @@ async function main() {
     const testSaitama = new SaitamaFighter({ startX: 200, startY: 200, type: 'saitama', color: '#FFD700' });
     state.fighters = [testSaitama, dummyTarget2];
     dummyTarget2.hp = 1000;
-    dummyTarget2.isDead = false;
+    // Test Consecutive Normal Punches Stationary Miss Dodge (Dodge enabled, Teleport disabled)
     testSaitama.flurryCooldown = 0;
     testSaitama.executeConsecutiveNormalPunches(dummyTarget2);
+    if (!testSaitama.isFlurrying) {
+      throw new Error('Expected Saitama to be flurrying');
+    }
+    const flurryPosX = testSaitama.x;
+    const flurryPosY = testSaitama.y;
+    const flurryAngle = testSaitama.gunAngle;
+    const flurryHp = testSaitama.hp;
+    testSaitama.dodgeCooldown = 0;
+
+    const origRand = Math.random;
+    Math.random = () => 0.1; // Force 100% dodge success
+    try {
+      const flurryDodgeResult = testSaitama.takeDamage(75, dummyTarget2, { isDirect: true, isMelee: true });
+      if (flurryDodgeResult !== false) {
+        throw new Error('Expected takeDamage to return false on successful dodge during Consecutive Normal Punches');
+      }
+      if (testSaitama.hp !== flurryHp) {
+        throw new Error('Expected Saitama HP to remain full after dodging during flurry');
+      }
+      if (testSaitama.x !== flurryPosX || testSaitama.y !== flurryPosY) {
+        throw new Error(`Expected Saitama to NOT teleport on dodge during flurry (was ${testSaitama.x},${testSaitama.y}, expected ${flurryPosX},${flurryPosY})`);
+      }
+      if (testSaitama.gunAngle !== flurryAngle) {
+        throw new Error('Expected Saitama gunAngle to remain locked on flurry vector during flurry dodge');
+      }
+      if (!testSaitama.isFlurrying) {
+        throw new Error('Expected Saitama to remain in flurry state after dodging');
+      }
+    } finally {
+      Math.random = origRand;
+    }
 
     while (testSaitama.isFlurrying) {
       testSaitama.update(dummyTarget2, 0, state.arena);
@@ -3900,15 +4020,6 @@ async function main() {
       throw new Error(`Expected enemy to the side of Saitama to take 0 damage, but took ${5000 - sideEnemy.hp} damage!`);
     }
 
-    // Verify unique arena line wall shatter interaction
-    if (!state.shatteredWalls || state.shatteredWalls.length === 0) {
-      throw new Error(`Expected Serious Counter punch to shatter arena line wall in the punch direction, but state.shatteredWalls was empty!`);
-    }
-    const shatteredWall = state.shatteredWalls[0];
-    if (!shatteredWall || !shatteredWall.shards || shatteredWall.shards.length === 0) {
-      throw new Error(`Expected shattered wall to contain flying line fragments and debris`);
-    }
-
     while (testSaitama._postCounterRecoveryTimer > 0) {
       testSaitama.update(frontEnemy, 0, state.arena);
     }
@@ -3950,6 +4061,13 @@ async function main() {
 
     testSaitama.isCountering = false;
     testSaitama._counterPunchTimer = 0;
+    testSaitama._counterPunchTarget = null;
+    testSaitama._postCounterRecoveryTimer = 0;
+    testSaitama.timeStopTimer = 0;
+    testSaitama.hitStunTimer = 0;
+    testSaitama.isFrozenByInfinity = false;
+    testSaitama._flurryBreatherTimer = 0;
+    testSaitama.isFlurrying = false;
 
     // Test Serious Counter cancellation when Gojo deploys domain (Unlimited Void) in time
     state.gameState = 'playing';
@@ -11131,6 +11249,75 @@ async function main() {
     console.error('❌ [ENDER DRAGON TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[ENDER DRAGON TEST]: ${err.stack || err.message}`);
+  }
+
+  // ── Regular 1v2 Game Mode Test Suite ──
+  console.log('Testing Regular 1v2 Game Mode (GAME_MODES.ONE_VS_TWO)...');
+  try {
+    const { GAME_MODES, MODE_SETTINGS, MODE_TEAM_COLORS } = await import('../js/core/modeConfig.js');
+    if (!GAME_MODES.ONE_VS_TWO || GAME_MODES.ONE_VS_TWO !== '1v2') {
+      throw new Error(`GAME_MODES.ONE_VS_TWO is not '1v2': got ${GAME_MODES.ONE_VS_TWO}`);
+    }
+    const modeSetting = MODE_SETTINGS[GAME_MODES.ONE_VS_TWO];
+    if (!modeSetting || modeSetting.rounds !== 3 || modeSetting.fixedHp !== 200) {
+      throw new Error(`Invalid MODE_SETTINGS for 1v2: ${JSON.stringify(modeSetting)}`);
+    }
+
+    state.mode = GAME_MODES.ONE_VS_TWO;
+    state.getFighterTeam = defaultGetFighterTeam;
+    state.p1Index = 0;
+    state.p2Index = 1;
+    state.p3Index = 2;
+    state.bossBattleNoTeammate = false;
+    
+    // Reinit fighters
+    reinitFighters(true);
+
+    if (state.fighters.length !== 3) {
+      throw new Error(`Expected 3 fighters in 1v2 mode, got ${state.fighters.length}`);
+    }
+
+    // Check teams
+    const team0 = state.getFighterTeam(0);
+    const team1 = state.getFighterTeam(1);
+    const team2 = state.getFighterTeam(2);
+    if (team0 !== 0 || team1 !== 1 || team2 !== 1) {
+      throw new Error(`Invalid team assignments: p1=${team0}, p2=${team1}, p3=${team2}`);
+    }
+
+    // Ensure p1 is NOT a boss (regular 1v2 mode)
+    if (state.fighters[0].isBoss) {
+      throw new Error('Fighter 0 in regular 1v2 mode should NOT be a Boss!');
+    }
+    if (state.fighters[0].maxHp !== 200 || state.fighters[1].maxHp !== 200 || state.fighters[2].maxHp !== 200) {
+      throw new Error(`Expected 200 HP for all fighters, got: f0=${state.fighters[0].maxHp}, f1=${state.fighters[1].maxHp}, f2=${state.fighters[2].maxHp}`);
+    }
+
+    // Test UI Screen renders for 1v2 mode
+    const { drawFaceOffThumbnailScreen } = await import('../js/graphics/ui/ThumbnailFaceOffScreen.js');
+    mockCtx.resetStackDepth();
+    drawSelectScreen(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] CharacterSelectScreen in 1v2 mode stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawFaceOffThumbnailScreen(mockCtx, 100);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] ThumbnailFaceOffScreen in 1v2 mode stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawRoundEndScreen(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] RoundEndScreen in 1v2 mode stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    console.log('✅ [Regular 1v2 Mode Test] Successfully verified modeConfig, fighter counts, 200 HP, team resolution, and UI renders with 100% balanced Canvas 2D stacks!');
+  } catch (err) {
+    console.error('❌ [REGULAR 1V2 MODE TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[REGULAR 1V2 MODE TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

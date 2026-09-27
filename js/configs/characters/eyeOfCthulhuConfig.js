@@ -7,7 +7,7 @@ export const eyeOfCthulhuConfig = {
   speed: 4.6,
   moveSpeed: 4.6,
   r: 32,
-  radius: 32,
+  radius: 40,
   color: '#E11D48', // Crimson Rose
   themeColor: '#E11D48',
   secondaryColor: '#06B6D4', // Iris Cyan

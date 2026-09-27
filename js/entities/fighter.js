@@ -8,7 +8,7 @@ import { MODE_HP_MULTIPLIER, MODE_SPEED_MULTIPLIER, MODE_SETTINGS, GAME_MODES } 
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
-import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
+import { spawnDeathShatter, spawnEyeOfCthulhuDomainSlashGore } from '../graphics/particles/deathShatterEffect.js';
 import { spawnDroppedMahoragaWheel } from '../graphics/particles/mahoragaDroppedWheel.js';
 import { spawnBloodEffect, spawnFatalBloodSplash } from '../graphics/particles/bloodEffect.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
@@ -1872,37 +1872,6 @@ export class Fighter {
     if (typeof spawnMeleeClashShockwave === 'function') {
       spawnMeleeClashShockwave(this.x, this.y, 120, 'gold');
     }
-
-    // Create a persistent wall crack decal
-    if (typeof state !== 'undefined' && arena) {
-      if (!state.wallCracks) state.wallCracks = [];
-
-      const dLeft = Math.abs((this.x - this.r) - arena.x);
-      const dRight = Math.abs((this.x + this.r) - (arena.x + arena.width));
-      const dTop = Math.abs((this.y - this.r) - arena.y);
-      const dBottom = Math.abs((this.y + this.r) - (arena.y + arena.height));
-      const minDist = Math.min(dLeft, dRight, dTop, dBottom);
-
-      let angle = 0;
-      let crackX = this.x;
-      let crackY = this.y;
-
-      if (minDist === dLeft) { angle = 0; crackX = arena.x; crackY = this.y; }
-      else if (minDist === dRight) { angle = Math.PI; crackX = arena.x + arena.width; crackY = this.y; }
-      else if (minDist === dTop) { angle = Math.PI / 2; crackX = this.x; crackY = arena.y; }
-      else { angle = -Math.PI / 2; crackX = this.x; crackY = arena.y + arena.height; }
-
-      state.wallCracks.push({
-        x: crackX,
-        y: crackY,
-        angle: angle,
-        life: 600, // 10 seconds
-        maxLife: 600,
-        seed: Math.random() * 1000,
-        scale: CONFIG.saitama?.wallCrackScale ?? 0.45,
-        thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
-      });
-    }
   }
 
   _triggerMakimaWallPin(arena) {
@@ -2309,6 +2278,23 @@ export class Fighter {
       }
     }
 
+    // Special Interaction: Eye of Cthulhu / Servants drop sprite sheet shatter pieces on domain slash hits
+    const isDomainSlashHit = Boolean(
+      opts.isDomainSlash ||
+      opts.isSukunaDomainSliceLine ||
+      (opts.isDomain && (opts.isSukunaSlash || opts.isCleave || (attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna'))))
+    );
+    const isEyeEntity = Boolean(
+      this.characterId === 'eye_of_cthulhu' ||
+      this.type === 'eye_of_cthulhu' ||
+      this.isServantOfCthulhu ||
+      this.type === 'servant_of_cthulhu' ||
+      this.characterId === 'servant_of_cthulhu'
+    );
+    if (isDomainSlashHit && isEyeEntity && typeof spawnEyeOfCthulhuDomainSlashGore === 'function') {
+      spawnEyeOfCthulhuDomainSlashGore(this, this.x, this.y, damageAngle, Boolean(this.isServantOfCthulhu));
+    }
+
     // Apply physical directional knockback whenever taking hit damage
     const isDomainHazard = opts.isDomainDPS || opts.isDomain || opts.isDomainSlash || opts.fromDomain || opts.isDomainEmpowered || (opts.projectile && (opts.projectile.isDomainDPS || opts.projectile.fromDomain || opts.projectile.isDomainEmpowered));
     if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isDivineFlame && !opts.isContinuous && !isDomainHazard && !opts.fromBlackHole && !this.isTurret && !this.isDispenser && !isInsideRubbickStolenVoid(this)) {
@@ -2527,7 +2513,7 @@ export class Fighter {
 
     const isTagMatch = (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH || state.mode === 'TAG_MATCH');
     const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
-    const is1v2 = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
+    const is1v2 = (state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2' || state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
     const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2);
 
     if (isTagMatch) {
@@ -2627,7 +2613,8 @@ export class Fighter {
         state.roundWinner = winnerFighter;
         state.roundEndTimer = 0;
 
-        const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 1;
+        const modeRounds = MODE_SETTINGS[state.mode]?.rounds ?? 1;
+        const winThreshold = modeRounds === 1 ? 1 : Math.ceil(modeRounds / 2);
         const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
 
         if (!isMatchEnd) {

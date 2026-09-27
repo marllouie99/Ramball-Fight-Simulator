@@ -13,6 +13,7 @@ import {
 export const GAME_MODES = {
   ONE_VS_ONE: '1v1',
   STAND_OFF: 'Stand Off',
+  ONE_VS_TWO: '1v2',
   STAND_OFF_1V2: 'Boss Battle',
   BOSS_BATTLE: 'Boss Battle',
   TWO_VS_TWO: '2v2',
@@ -46,6 +47,22 @@ const _bossBattleSettings = {
   },
 };
 
+const _regular1v2Settings = {
+  label: '1v2',
+  rounds: 3,
+  hpMultiplier: 1.0,
+  fixedHp: 200,
+  speedMultiplier: 1.0,
+  initialFuelPickups: 2,
+  supportFourFighters: false,
+  maxAfterimages: 3,
+  afterimageDecayMultiplier: 1.0,
+  teamColors: {
+    team0: '#ff4d4d',
+    team1: '#4da3ff',
+  },
+};
+
 export const MODE_SETTINGS = {
   [GAME_MODES.ONE_VS_ONE]: {
     label: '1v1',
@@ -62,13 +79,15 @@ export const MODE_SETTINGS = {
     label: 'Stand Off',
     rounds: 1, // Only 1 round in Stand Off
     hpMultiplier: 1.0,
-    fixedHp: 500, // 1000 HP for both fighters
+    fixedHp: 1000, // 1000 HP for both fighters
     speedMultiplier: 1.00,
     initialFuelPickups: 2,
     supportFourFighters: false,
     maxAfterimages: 6, // Configurable limit for afterimages in 1v1 Stand Off mode
     afterimageDecayMultiplier: 1.2,
   },
+  [GAME_MODES.ONE_VS_TWO]: _regular1v2Settings,
+  '1v2': _regular1v2Settings,
   [GAME_MODES.STAND_OFF_1V2]: _bossBattleSettings,
   '1v2 Stand Off': _bossBattleSettings,
   'Boss Battle': _bossBattleSettings,
@@ -143,6 +162,8 @@ export const MODE_MAX_AFTERIMAGES = Object.fromEntries(
 );
 
 export const MODE_TEAM_COLORS = {
+  [GAME_MODES.ONE_VS_TWO]: MODE_SETTINGS[GAME_MODES.ONE_VS_TWO]?.teamColors,
+  '1v2': MODE_SETTINGS[GAME_MODES.ONE_VS_TWO]?.teamColors,
   [GAME_MODES.TWO_VS_TWO]: MODE_SETTINGS[GAME_MODES.TWO_VS_TWO]?.teamColors,
   [GAME_MODES.STAND_OFF_1V2]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,
   [GAME_MODES.BOSS_BATTLE]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,

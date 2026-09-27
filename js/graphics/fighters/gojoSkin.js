@@ -46,6 +46,101 @@ function _getGojoInfinityArcadeBuffer(size, scale = 2.5) {
   return { canvas: _gojoInfinityArcadeCanvas, ctx: _gojoInfinityArcadeCtx, lowSize, scale };
 }
 
+function _drawInfinityGlassCracks(lowCtx, lowCenter, lowRadius, crackLevel, fighter) {
+  const maxHp = fighter.infinityBarrierMaxHp || 350;
+  const currentHp = (typeof fighter.infinityBarrierHp === 'number') ? fighter.infinityBarrierHp : maxHp;
+  if (crackLevel <= 0 && currentHp >= maxHp) return;
+
+  const tier = Math.min(3, Math.max(1, crackLevel || (currentHp < maxHp * 0.35 ? 3 : (currentHp < maxHp * 0.70 ? 2 : 1))));
+  const branchCount = tier === 1 ? 4 : (tier === 2 ? 7 : 11);
+  const time = Date.now();
+  const pulseAlpha = tier === 3 ? (0.85 + Math.sin(time * 0.02) * 0.15) : 1.0;
+
+  lowCtx.save();
+  lowCtx.imageSmoothingEnabled = false;
+
+  for (let b = 0; b < branchCount; b++) {
+    const baseAngle = (Math.PI * 2 * b) / branchCount + (b % 2 === 0 ? 0.18 : -0.18);
+    const startR = lowRadius * 0.96;
+    const endR = lowRadius * (tier === 1 ? 0.45 : (tier === 2 ? 0.22 : 0.05));
+
+    let currX = lowCenter + Math.cos(baseAngle) * startR;
+    let currY = lowCenter + Math.sin(baseAngle) * startR;
+
+    const segments = tier === 1 ? 3 : (tier === 2 ? 5 : 7);
+    const points = [{ x: currX, y: currY }];
+
+    for (let s = 1; s <= segments; s++) {
+      const progress = s / segments;
+      const currentR = startR - (startR - endR) * progress;
+      const zigZag = ((b * 3 + s * 7) % 5 - 2) * 0.12;
+      const segAngle = baseAngle + zigZag;
+      currX = lowCenter + Math.cos(segAngle) * currentR;
+      currY = lowCenter + Math.sin(segAngle) * currentR;
+      points.push({ x: currX, y: currY });
+    }
+
+    // 1. Dark Shadow Fracture Trace
+    lowCtx.strokeStyle = 'rgba(8, 18, 32, 0.95)';
+    lowCtx.lineWidth = tier === 3 ? 1.6 : 1.3;
+    lowCtx.beginPath();
+    lowCtx.moveTo(points[0].x, points[0].y);
+    for (let p = 1; p < points.length; p++) {
+      lowCtx.lineTo(points[p].x, points[p].y);
+    }
+    lowCtx.stroke();
+
+    // 2. White-Hot Luminous Core Trace
+    const coreColor = (tier === 3)
+      ? `rgba(255, 90, 95, ${pulseAlpha})`
+      : (tier === 2 ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 229, 255, 0.95)');
+    lowCtx.strokeStyle = coreColor;
+    lowCtx.lineWidth = 0.85;
+    lowCtx.beginPath();
+    lowCtx.moveTo(points[0].x, points[0].y);
+    for (let p = 1; p < points.length; p++) {
+      lowCtx.lineTo(points[p].x, points[p].y);
+    }
+    lowCtx.stroke();
+
+    // 3. Webbed Cross-Bars (Tiers 2 & 3)
+    if (tier >= 2 && b % 2 === 0 && points.length >= 3) {
+      const midPoint = points[Math.floor(points.length / 2)];
+      const nextAngle = baseAngle + (Math.PI * 2) / branchCount;
+      const crossR = lowRadius * 0.55;
+      const crossX = lowCenter + Math.cos(nextAngle) * crossR;
+      const crossY = lowCenter + Math.sin(nextAngle) * crossR;
+
+      lowCtx.strokeStyle = 'rgba(8, 18, 32, 0.90)';
+      lowCtx.lineWidth = 1.2;
+      lowCtx.beginPath();
+      lowCtx.moveTo(midPoint.x, midPoint.y);
+      lowCtx.lineTo(crossX, crossY);
+      lowCtx.stroke();
+
+      lowCtx.strokeStyle = coreColor;
+      lowCtx.lineWidth = 0.75;
+      lowCtx.beginPath();
+      lowCtx.moveTo(midPoint.x, midPoint.y);
+      lowCtx.lineTo(crossX, crossY);
+      lowCtx.stroke();
+    }
+  }
+
+  // 4. Critical fracture stress glints
+  if (tier >= 2) {
+    lowCtx.fillStyle = '#FFFFFF';
+    for (let g = 0; g < branchCount; g++) {
+      const glintAngle = (Math.PI * 2 * g) / branchCount;
+      const gx = Math.round(lowCenter + Math.cos(glintAngle) * (lowRadius * 0.55));
+      const gy = Math.round(lowCenter + Math.sin(glintAngle) * (lowRadius * 0.55));
+      lowCtx.fillRect(gx - 0.5, gy - 0.5, 1, 1);
+    }
+  }
+
+  lowCtx.restore();
+}
+
 export function drawGojoBody(ctx, fighter) {
     const z = fighter.z || 0;
     
@@ -98,15 +193,8 @@ export function drawGojoBody(ctx, fighter) {
     }
 
     // === PIXEL ART GOJO LIMITLESS (INFINITY) SPATIAL DISTORTION BARRIER (Arcade Buffer) ===
-    const isSaitamaCounterActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-      f && (f.characterId === 'saitama' || f.type === 'saitama') && 
-      ((f._counterPunchTimer && f._counterPunchTimer > 0) || 
-       (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || 
-       (f._counterWindupTimer && f._counterWindupTimer > 0) ||
-       f.isCountering)
-    );
     const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0);
-    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode);
+    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode || (fighter.infinityCooldown || 0) > 0 || !fighter.infinityActive);
     const fadeOpacity = isBarrierSuppressed ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();
@@ -131,7 +219,9 @@ export function drawGojoBody(ctx, fighter) {
       // 1. Soft Pixel Atmosphere Aura Fill
       lowCtx.beginPath();
       lowCtx.arc(lowCenter, lowCenter, lowRadius, 0, Math.PI * 2);
-      lowCtx.fillStyle = 'rgba(0, 229, 255, 0.18)';
+      lowCtx.fillStyle = (fighter.infinityCrackLevel >= 3)
+        ? 'rgba(255, 69, 58, 0.22)'
+        : 'rgba(0, 229, 255, 0.18)';
       lowCtx.fill();
 
       // 2. Dark Outer Spatial Outline Ring
@@ -143,7 +233,9 @@ export function drawGojoBody(ctx, fighter) {
 
       // 3. Electric Cyan Primary Pixel Ring
       lowCtx.lineWidth = 1.2;
-      lowCtx.strokeStyle = 'rgba(0, 229, 255, 0.98)';
+      lowCtx.strokeStyle = (fighter.infinityCrackLevel >= 3)
+        ? 'rgba(255, 90, 95, 0.98)'
+        : 'rgba(0, 229, 255, 0.98)';
       lowCtx.beginPath();
       lowCtx.arc(lowCenter, lowCenter, lowRadius, 0, Math.PI * 2);
       lowCtx.stroke();
@@ -155,12 +247,28 @@ export function drawGojoBody(ctx, fighter) {
       lowCtx.arc(lowCenter, lowCenter, lowRadius - lowPx, 0, Math.PI * 2);
       lowCtx.stroke();
 
-      // 5. Blit Low-Res Native Arcade Buffer to Main Canvas via Nearest-Neighbor Upscaling
+      // 5. Authentic Geometric Glass Cracks & Stress Fractures when Damaged (e.g. by Saitama)
+      const crackLevel = fighter.infinityCrackLevel || 0;
+      if (crackLevel > 0 || (typeof fighter.infinityBarrierHp === 'number' && fighter.infinityBarrierHp < (fighter.infinityBarrierMaxHp || 350))) {
+        _drawInfinityGlassCracks(lowCtx, lowCenter, lowRadius, crackLevel, fighter);
+      }
+
+      // 6. Blit Low-Res Native Arcade Buffer to Main Canvas via Nearest-Neighbor Upscaling
       ctx.save();
       ctx.globalAlpha = (ctx.globalAlpha || 1.0) * fadeOpacity;
       ctx.imageSmoothingEnabled = false; // Chunky stepped retro arcade pixel circles!
+      
+      // Crack shudder / stress vibration jitter
+      let jitterX = 0;
+      let jitterY = 0;
+      if (fighter.infinityCrackShakeTimer && fighter.infinityCrackShakeTimer > 0) {
+        fighter.infinityCrackShakeTimer--;
+        jitterX = (Math.random() - 0.5) * 2.2;
+        jitterY = (Math.random() - 0.5) * 2.2;
+      }
+
       const drawSize = lowSize * ARCADE_SCALE;
-      ctx.drawImage(lowCanvas, 0, 0, lowSize, lowSize, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+      ctx.drawImage(lowCanvas, 0, 0, lowSize, lowSize, -drawSize / 2 + jitterX, -drawSize / 2 + jitterY, drawSize, drawSize);
       ctx.restore();
     }
 
