@@ -2002,7 +2002,50 @@ async function runInteractionTests() {
     const directHit = backPlant.takeDamage(20, gojo);
     assert(directHit === true && backPlant.hp === hpBeforeDot - 20, 'Direct attacks must still successfully damage plants');
 
-    // 12. Verify isCrazyDavePresent returns false when no Dave is present
+    // 12. Test Audio SFX Triggers (Sun Pickup, Peashooter Shot, Pea Splat Hit)
+    const { HitImpactSystem } = await import('../js/systems/hitImpactSystem.js');
+    const { AUDIO_CONFIG } = await import('../js/configs/audioConfig.js');
+    assert(AUDIO_CONFIG['crazydave_sun_pickup'] === 'Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3', 'AUDIO_CONFIG must register crazydave_sun_pickup');
+    assert(AUDIO_CONFIG['crazydave_peashooter_shot'] === 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3', 'AUDIO_CONFIG must register crazydave_peashooter_shot');
+    assert(AUDIO_CONFIG['crazydave_pea_splat'] === 'Assets/Sound Effects/SkillEffects/splat3.ogg', 'AUDIO_CONFIG must register crazydave_pea_splat');
+
+    const playedSfxList = [];
+    const origPlaySFX = audioSystem.playSFX;
+    audioSystem.playSFX = (src, vol) => {
+      playedSfxList.push({ src, vol });
+      return null;
+    };
+
+    // 12a. Peashooter shooting sound
+    backPlant._firePea(0, 1);
+    assert(playedSfxList.some(s => s.src.includes('crazydave-peashooter-shot.mp3')), 'Peashooter must play crazydave-peashooter-shot.mp3 when firing');
+
+    // 12b. Pea projectile impact sound
+    const testPeaForHit = {
+      x: gojo.x,
+      y: gojo.y,
+      vx: 10,
+      vy: 0,
+      damage: 10,
+      visual: 'peaBullet',
+      isPlantProjectile: true,
+      owner: 1,
+      r: 6
+    };
+    HitImpactSystem.processProjectileHit(gojo, testPeaForHit, backPlant, state.fighters);
+    assert(playedSfxList.some(s => s.src.includes('splat3.ogg')), 'Peashooter projectile hit must play splat3.ogg upon hitting enemy');
+
+    // 12c. Sun pickup sound
+    dave.sunCount = 50;
+    dave.x = 300; dave.y = 300;
+    dave.suns = [{ x: 300, y: 300, targetX: 300, targetY: 300, r: 30, value: 25, life: 100, isLanding: false }];
+    dave._updateSunDrops(state.arena, { maxSun: 500 });
+    assert(playedSfxList.some(s => s.src.includes('crazydave-sun-pickup.mp3')), 'Crazy Dave must play crazydave-sun-pickup.mp3 on collecting a sun drop');
+
+    // Restore audioSystem.playSFX
+    audioSystem.playSFX = origPlaySFX;
+
+    // 13. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
     assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
@@ -2011,7 +2054,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, planting movement pause, pass-through collision, minion immovability & complete debuff immunity verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX & complete debuff immunity verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

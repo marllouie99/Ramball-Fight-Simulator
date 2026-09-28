@@ -97,6 +97,7 @@ export const zenitsuConfig = {
     katanaSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     slashHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     parry: 'Assets/Sound Effects/Skills/parry.mp3',
+    dashSFX: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
 
     // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
     stance: 'Assets/Sound Effects/Skills/dash1.mp3',
@@ -117,9 +118,7 @@ export const zenitsuConfig = {
       'Assets/Sound Effects/Skills/Zenitsu-electric-noise2.mp3',
       'Assets/Sound Effects/Skills/Zenitsu-electric-noise3.mp3'
     ],
-    dashSFX: 'Assets/Sound Effects/Skills/dash1.mp3',
     dashNoise: 'Assets/Sound Effects/Skills/Zenitsu-dash-noise.mp3',
-    dashWhoosh: 'Assets/Sound Effects/Skills/dash1.mp3',
     thunderStrike: 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
 
     // Skill 2: Sixfold (Rokuren)

@@ -26,6 +26,10 @@ export const AUDIO_CONFIG = {
   'walk_on_grass': 'Assets/Sound Effects/Sprites SFX/walk-on-grass.mp3',
   'bush_rustle': 'Assets/Sound Effects/Sprites SFX/walk-on-grass.mp3',
   'yuta_boss_entrance_voiceline': 'Assets/Sound Effects/Boss Voiceline SFX/yuta-boss-entrance-voiceline.mp3',
+  'crazydave_sun_pickup': 'Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3',
+  'crazydave_peashooter_shot': 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',
+  'crazydave_pea_splat': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
+  'splat3': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
 
   // Skills
   'skill_backstab': 'Assets/Sound Effects/Skills/backstab.mp3',

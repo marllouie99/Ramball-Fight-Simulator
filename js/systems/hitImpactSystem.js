@@ -842,6 +842,51 @@ export const HitImpactSystem = {
       }
     }
 
+    // ── Crazy Dave Plant Projectile Impact (Peashooter / Snow Pea) ──
+    const isPlantPea = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet';
+    if (isPlantPea) {
+      // 1. Kinetic pea pushback
+      if (shouldApplyPhysicalPush(target)) {
+        const knockbackForce = projectile.knockbackForce || projectile.knockback || 4.5;
+        const hitAngle = Math.atan2(projectile.vy || 0, projectile.vx || 0.001);
+        target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
+        target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
+        target.x += Math.cos(hitAngle) * (knockbackForce * 0.35);
+        target.y += Math.sin(hitAngle) * (knockbackForce * 0.35);
+
+        if (state && state.arena) {
+          const minX = state.arena.x + (target.r || 20);
+          const maxX = state.arena.x + state.arena.width - (target.r || 20);
+          const minY = state.arena.y + (target.r || 20);
+          const maxY = state.arena.y + state.arena.height - (target.r || 20);
+          target.x = Math.max(minX, Math.min(maxX, target.x));
+          target.y = Math.max(minY, Math.min(maxY, target.y));
+        }
+      }
+
+      // 2. Juicy pea splatter sparks & flash
+      const isSnow = projectile.visual === 'snowPeaBullet';
+      const peaColor = isSnow ? '#38BDF8' : '#22C55E';
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 22, peaColor);
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 8, isSnow ? 'cyan' : 'gold', peaColor);
+      }
+
+      // 3. Play authentic PVZ splat sound on projectile hit
+      if (audioSystem && typeof audioSystem.playSFX === 'function') {
+        audioSystem.playSFX('Assets/Sound Effects/SkillEffects/splat3.ogg', 0.85);
+      }
+
+      // 4. Trigger onHit callback (e.g. Snow Pea chill slow)
+      if (typeof projectile.onHit === 'function') {
+        projectile.onHit(target);
+      }
+
+      return true; // Pea squashes and is destroyed on impact
+    }
+
     // Default standard projectile physical pushback & kinetic impulse
     if (shouldApplyPhysicalPush(target)) {
       const knockbackForce = projectile.knockback || Math.min(5.5, Math.max(1.8, (projectile.damage || 15) * 0.12));

@@ -368,8 +368,10 @@ export class PeashooterEntity extends Fighter {
       state.projectiles.push(peaProj);
     }
 
-    if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound('punch', 0.45);
+    if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3', 0.80);
+    } else if (audioSystem && typeof audioSystem.playSound === 'function') {
+      audioSystem.playSound('Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3', 0.80);
     }
   }
 
@@ -1195,8 +1197,10 @@ export class CrazyDaveFighter extends Fighter {
         this.sunCount = Math.min(cfg.maxSun || 500, this.sunCount + (sun.value || 25));
         spawnFloatingText(this.x, this.y - 20, `+${sun.value || 25} ☀️`, '#FEF08A');
         spawnSparks(sun.x, sun.y, 8, '#FACC15');
-        if (audioSystem && typeof audioSystem.playSound === 'function') {
-          audioSystem.playSound('powerup', 0.4);
+        if (audioSystem && typeof audioSystem.playSFX === 'function') {
+          audioSystem.playSFX('Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3', 0.85);
+        } else if (audioSystem && typeof audioSystem.playSound === 'function') {
+          audioSystem.playSound('Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3', 0.85);
         }
         this.suns.splice(i, 1);
       }
