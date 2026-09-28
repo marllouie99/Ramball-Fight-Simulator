@@ -50,7 +50,7 @@ export const crazyDaveConfig = {
   peashooterRange: 460,      // Firing range
   plantLaneTolerance: 85,    // Straight horizontal lane detection width
   peashooterCooldown: 500,   // 2.0s skill cooldown
-  maxPeashooters: 3,         // Maximum simultaneous active Peashooters
+  maxPeashooters: 10,         // Maximum simultaneous active Peashooters
 
   // Skill 2: Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)
   enableSnowPea: true,
@@ -65,7 +65,7 @@ export const crazyDaveConfig = {
   snowPeaFreezeChance: 0.25, // 25% chance to completely freeze enemy on hit
   snowPeaFreezeDuration: 60, // 1.0s (60 frames) full freeze stasis duration
   snowPeaCooldown: 500,      // 3.0s skill cooldown
-  maxSnowPeas: 3,            // Maximum simultaneous active Snow Peas
+  maxSnowPeas: 10,            // Maximum simultaneous active Snow Peas
 
   // Audio Sources
   peashooterAttackAudioSrc: 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',

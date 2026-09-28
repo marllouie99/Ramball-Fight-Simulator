@@ -98,6 +98,9 @@ function initCustomizations() {
   if (!state.weaponCustomizations.engineer) {
     state.weaponCustomizations.engineer = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
+  if (!state.weaponCustomizations.crazydave) {
+    state.weaponCustomizations.crazydave = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+  }
   if (!state.weaponCustomizations.zenitsu) {
     state.weaponCustomizations.zenitsu = {
       offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0, widthScale: 1.0, lengthScale: 1.0,

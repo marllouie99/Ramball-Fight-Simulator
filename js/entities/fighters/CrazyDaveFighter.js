@@ -378,7 +378,8 @@ export class PeashooterEntity extends Fighter {
   draw(ctx) {
     drawPeashooter(ctx, this);
     if (this.hp < this.maxHp && this.hp > 0) {
-      drawMinionHealthBar(ctx, this.x, this.y - this.r - 8, 34, 5, this.hp, this.maxHp);
+      const topY = this.y - Math.round(this.r * 2.1 + 8);
+      drawMinionHealthBar(ctx, this.x, topY, 34, 5, this.hp, this.maxHp);
     }
   }
 }
@@ -761,7 +762,8 @@ export class SnowPeaEntity extends Fighter {
   draw(ctx) {
     drawSnowPea(ctx, this);
     if (this.hp < this.maxHp && this.hp > 0) {
-      drawMinionHealthBar(ctx, this.x, this.y - this.r - 8, 34, 5, this.hp, this.maxHp);
+      const topY = this.y - Math.round(this.r * 2.1 + 8);
+      drawMinionHealthBar(ctx, this.x, topY, 34, 5, this.hp, this.maxHp);
     }
   }
 }
@@ -802,7 +804,12 @@ export class CrazyDaveFighter extends Fighter {
     this.shovelSwingTimer = 0;
 
     // Sun Economy State
-    this.sunCount = cfg.initialSun || 50;
+    this.sunPickupValue = (def && def.sunPickupValue !== undefined)
+      ? def.sunPickupValue
+      : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50);
+    this.sunCount = (def && def.sunCount !== undefined)
+      ? def.sunCount
+      : (cfg.initialSun !== undefined ? cfg.initialSun : 50);
     this.maxSun = cfg.maxSun || 500;
     this.suns = [];
     this.ambientSunTimer = 0;
@@ -881,7 +888,8 @@ export class CrazyDaveFighter extends Fighter {
   reset() {
     super.reset();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    this.sunCount = cfg.initialSun || 50;
+    this.sunPickupValue = cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50;
+    this.sunCount = cfg.initialSun !== undefined ? cfg.initialSun : 50;
     this.suns = [];
     this.ambientSunTimer = 0;
     this.peashooterCooldown = 0;
@@ -953,7 +961,7 @@ export class CrazyDaveFighter extends Fighter {
   /**
    * Spawns a Sun drop outside the top of the arena that falls down to land on the center of a grass tile.
    */
-  spawnSunDrop(targetX, targetY, value = 25) {
+  spawnSunDrop(targetX, targetY, value) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
 
@@ -968,6 +976,10 @@ export class CrazyDaveFighter extends Fighter {
     // Spawn at the top outside of the arena and drop down to the grass tile center
     const startY = (arena && arena.y !== undefined) ? (arena.y - 45) : (destY - 220);
     const fallSpeed = cfg.sunFallSpeed || 2.2;
+    const defaultVal = (this.sunPickupValue !== undefined)
+      ? this.sunPickupValue
+      : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50);
+    const resolvedValue = (value !== undefined && value !== null) ? value : defaultVal;
 
     const sun = {
       x: destX,
@@ -978,7 +990,7 @@ export class CrazyDaveFighter extends Fighter {
       vy: fallSpeed,
       isLanding: true,
       r: cfg.sunRadius || 30,
-      value: value,
+      value: resolvedValue,
       life: cfg.sunDecayFrames || 720,
       pulse: 0,
       rotAngle: Math.random() * Math.PI,
@@ -1163,7 +1175,10 @@ export class CrazyDaveFighter extends Fighter {
     if (this.ambientSunTimer >= this.ambientSunInterval) {
       this.ambientSunTimer = 0;
       const tile = getRandomGrassTileCenter(arena);
-      this.spawnSunDrop(tile.x, tile.y, 25);
+      const sunVal = (this.sunPickupValue !== undefined)
+        ? this.sunPickupValue
+        : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50);
+      this.spawnSunDrop(tile.x, tile.y, sunVal);
     }
 
     // 2. Sun Drops Physics & Magnetic Pickup Loop
@@ -1213,8 +1228,13 @@ export class CrazyDaveFighter extends Fighter {
 
       // Pickup Collision
       if (dist < (this.r + sun.r + 8)) {
-        this.sunCount = Math.min(cfg.maxSun || 500, this.sunCount + (sun.value || 25));
-        spawnFloatingText(this.x, this.y - 20, `+${sun.value || 25} ☀️`, '#FEF08A');
+        const pickupVal = (sun.value !== undefined && sun.value !== null)
+          ? sun.value
+          : ((this.sunPickupValue !== undefined)
+            ? this.sunPickupValue
+            : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50));
+        this.sunCount = Math.min(cfg.maxSun || 500, this.sunCount + pickupVal);
+        spawnFloatingText(this.x, this.y - 20, `+${pickupVal} ☀️`, '#FEF08A');
         spawnSparks(sun.x, sun.y, 8, '#FACC15');
         if (audioSystem && typeof audioSystem.playSFX === 'function') {
           audioSystem.playSFX('Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3', 0.85);

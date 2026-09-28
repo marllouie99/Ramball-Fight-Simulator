@@ -33,11 +33,18 @@ export const patchNotesData = {
         "character": "CRAZYDAVE",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "2",
-                "oldVal": "Plant Snow Pea (Ice Damage + Enemy Slow)",
-                "newVal": "Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)",
-                "pct": "Mod"
+                "type": "BUFF",
+                "key": "maxPeashooters",
+                "oldVal": 3,
+                "newVal": 10,
+                "pct": "+233.3%"
+            },
+            {
+                "type": "BUFF",
+                "key": "maxSnowPeas",
+                "oldVal": 3,
+                "newVal": 10,
+                "pct": "+233.3%"
             }
         ]
     }

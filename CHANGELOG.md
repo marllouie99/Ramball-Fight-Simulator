@@ -6,5 +6,6 @@
 ## 🥊 Fighter Stat Modifications
 
 ### CRAZYDAVE
-* **🔄 ADJUST** `2`: `Plant Snow Pea (Ice Damage + Enemy Slow)` ➔ `Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)` (Mod)
+* **🟢 BUFF** `maxPeashooters`: `3` ➔ `10` (+233.3%)
+* **🟢 BUFF** `maxSnowPeas`: `3` ➔ `10` (+233.3%)
 

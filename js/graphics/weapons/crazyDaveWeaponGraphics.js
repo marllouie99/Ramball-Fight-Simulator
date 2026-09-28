@@ -114,16 +114,33 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   getSnowPeaProjSprite();
 }
 
+import { state } from '../../core/state.js';
+
 export const CrazyDave_WEAPON_GRAPHICS = {
   shovel: {
     name: 'Garden Shovel',
     id: 'crazydave_shovel',
-    desc: 'Crazy Dave\'s trusty steel garden trowel/shovel.',
+    category: 'Gardening / Melee',
+    desc: 'Crazy Dave\'s trusty high-carbon steel garden trowel/shovel with an ergonomic walnut D-grip and sharpened spade scoop.',
+    handleWood: '#78350F',
+    handleHighlight: '#D97706',
+    collarSteel: '#475569',
+    bladeSteel: '#94A3B8',
+    bladeHighlight: '#FFFFFF',
+    dirtLoam: '#451A03'
+  },
+  positioning: {
+    offsetX: 0,
+    offsetY: 0,
+    scale: 1.0,
+    angleOffset: 0
   }
 };
 
 /**
- * Draws Crazy Dave's Shovel in hand or stowed.
+ * Draws Crazy Dave's Shovel in 100% discrete Pixel Art style.
+ * Features an authentic walnut D-grip, grained wooden shaft, reinforced steel socket,
+ * and a faceted metallic spade scoop with subtle PvZ gardener earth stains.
  */
 export function drawCrazyDaveShovel(
   ctx,
@@ -137,70 +154,160 @@ export function drawCrazyDaveShovel(
   color = '#84CC16',
   shouldHideHands = false
 ) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
+
+  const custom = (!isStowed && typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.crazydave)
+    ? state.weaponCustomizations.crazydave
+    : null;
+  const customOffsetX = custom?.offsetX || 0;
+  const customOffsetY = custom?.offsetY || 0;
+  const customScale = custom?.scale ?? 1.0;
+  const customAngle = custom?.angleOffset || 0;
+
   ctx.save();
-  ctx.translate(x, y);
-  if (angle !== 0) ctx.rotate(angle);
+  ctx.translate(x + customOffsetX, y + customOffsetY);
+  if (angle !== 0 || customAngle !== 0) ctx.rotate(angle + customAngle);
+  if (customScale !== 1.0) ctx.scale(customScale, customScale);
 
-  const shaftLength = r * 1.5;
-  const shaftWidth = 3.2;
+  // Position shovel relative to character body scale
+  const scale = (r / 25) * 0.95;
+  ctx.scale(scale, scale);
 
-  // 1. Wooden Shaft
-  ctx.fillStyle = '#78350F'; // Dark walnut wood
-  ctx.fillRect(r * 0.2, -shaftWidth / 2, shaftLength, shaftWidth);
+  // 1. D-GRIP HANDLE (X: 0..8, Y: -7..7)
+  // Outer Manga Dark Ink Outline (#0E0F14)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(0, -7, 3, 14);
+  ctx.fillRect(2, -8, 6, 3);
+  ctx.fillRect(2, 5, 6, 3);
+  ctx.fillRect(6, -4, 2, 8);
 
-  ctx.fillStyle = '#92400E'; // Wood grain highlight
-  ctx.fillRect(r * 0.2, -shaftWidth / 2 + 0.8, shaftLength, 1.2);
-
-  // 2. Triangular Wooden / Plastic D-Grip at base
-  const gripX = r * 0.2;
+  // Deep Mahogany Base (#451A03)
   ctx.fillStyle = '#451A03';
-  ctx.fillRect(gripX - 4, -4, 4, 8);
+  ctx.fillRect(1, -6, 2, 12);
+
+  // Rich Walnut Wood Body (#78350F)
   ctx.fillStyle = '#78350F';
-  ctx.fillRect(gripX - 3, -3, 2, 6);
+  ctx.fillRect(2, -6, 4, 2);
+  ctx.fillRect(2, 4, 4, 2);
+  ctx.fillRect(1, -4, 1, 8);
 
-  // 3. Metallic Steel Shovel Scoop Head
-  const scoopX = r * 0.2 + shaftLength;
-  const scoopW = 12;
-  const scoopH = 14;
+  // Amber Wood Grain Highlights (#B45309 / #D97706)
+  ctx.fillStyle = '#B45309';
+  ctx.fillRect(2, -7, 4, 1);
+  ctx.fillRect(1, -5, 1, 5);
+  ctx.fillStyle = '#FEF08A'; // Specular top glint
+  ctx.fillRect(3, -7, 2, 1);
 
-  // Metallic Collar
-  ctx.fillStyle = '#475569';
-  ctx.fillRect(scoopX - 2, -3.5, 3, 7);
+  // 2. WOODEN SHAFT (X: 7..37, Y: -3..3)
+  // Top & Bottom Manga Ink Borders
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(7, -3, 30, 1);
+  ctx.fillRect(7, 2, 30, 1);
 
-  // Steel Blade Head
-  ctx.fillStyle = '#94A3B8'; // Slate Steel
-  ctx.beginPath();
-  ctx.moveTo(scoopX, -scoopH / 2);
-  ctx.lineTo(scoopX + scoopW * 0.7, -scoopH / 2);
-  ctx.lineTo(scoopX + scoopW, 0);
-  ctx.lineTo(scoopX + scoopW * 0.7, scoopH / 2);
-  ctx.lineTo(scoopX, scoopH / 2);
-  ctx.closePath();
-  ctx.fill();
+  // Walnut Wood Core (#78350F)
+  ctx.fillStyle = '#78350F';
+  ctx.fillRect(7, -2, 30, 4);
 
-  // Dark Outline
-  ctx.strokeStyle = '#0E0F14';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
+  // Upper Wood Grain Highlight (#B45309)
+  ctx.fillStyle = '#B45309';
+  ctx.fillRect(7, -2, 30, 1);
 
-  // Blade Metallic Highlight Core
+  // Tactile Grain Streaks (#D97706 & #9A3412)
+  ctx.fillStyle = '#D97706';
+  ctx.fillRect(12, -2, 5, 1);
+  ctx.fillRect(22, -2, 7, 1);
+  ctx.fillRect(32, -2, 3, 1);
+  ctx.fillStyle = '#9A3412';
+  ctx.fillRect(16, -1, 4, 1);
+  ctx.fillRect(27, -1, 4, 1);
+
+  // Underside Shadow Band (#451A03)
+  ctx.fillStyle = '#451A03';
+  ctx.fillRect(7, 1, 30, 1);
+
+  // 3. REINFORCED STEEL SOCKET COLLAR (X: 36..42, Y: -5..5)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(36, -5, 6, 10);
+
+  ctx.fillStyle = '#334155'; // Dark Parkerized Steel
+  ctx.fillRect(37, -4, 4, 8);
+
+  // Socket Upper Chamfer Highlight (#64748B & #E2E8F0)
+  ctx.fillStyle = '#64748B';
+  ctx.fillRect(37, -4, 4, 2);
   ctx.fillStyle = '#E2E8F0';
-  ctx.beginPath();
-  ctx.moveTo(scoopX + 2, -scoopH / 3);
-  ctx.lineTo(scoopX + scoopW * 0.5, -scoopH / 3);
-  ctx.lineTo(scoopX + scoopW * 0.75, 0);
-  ctx.lineTo(scoopX + 2, 0);
-  ctx.closePath();
-  ctx.fill();
+  ctx.fillRect(38, -4, 2, 1);
 
-  // Specular Edge
+  // Hardened Rivet Pin
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(38, -1, 2, 2);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillRect(38, -1, 1, 1);
+
+  // 4. METALLIC STEEL SPADE SCOOP HEAD (X: 42..66, Y: -9..9)
+  // Step 4a: Outer Dark Manga Ink Shell (#0E0F14)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(42, -9, 8, 2);
+  ctx.fillRect(42, 7, 8, 2);
+  ctx.fillRect(50, -8, 6, 2);
+  ctx.fillRect(50, 6, 6, 2);
+  ctx.fillRect(55, -6, 5, 2);
+  ctx.fillRect(55, 4, 5, 2);
+  ctx.fillRect(59, -4, 4, 2);
+  ctx.fillRect(59, 2, 4, 2);
+  ctx.fillRect(62, -2, 3, 2);
+  ctx.fillRect(62, 0, 3, 2);
+  ctx.fillRect(65, -1, 2, 2); // Pointed Spade Tip
+
+  // Step 4b: Polished Slate Steel Base Body (#94A3B8)
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillRect(42, -7, 8, 14);
+  ctx.fillRect(50, -6, 6, 12);
+  ctx.fillRect(55, -4, 5, 8);
+  ctx.fillRect(59, -2, 4, 4);
+  ctx.fillRect(62, -1, 3, 2);
+
+  // Step 4c: Concave Dish / Hollow Depth Shadow (#475569 & #334155)
+  ctx.fillStyle = '#475569';
+  ctx.fillRect(44, -4, 6, 8);
+  ctx.fillRect(51, -2, 4, 4);
+  ctx.fillStyle = '#334155';
+  ctx.fillRect(45, -2, 4, 4);
+
+  // Step 4d: Specular Blade Ridge & Top Edge Glint (#CBD5E1, #E2E8F0, #FFFFFF)
+  ctx.fillStyle = '#CBD5E1';
+  ctx.fillRect(43, -7, 6, 2);
+  ctx.fillStyle = '#FFFFFF'; // Pure Specular Highlight
+  ctx.fillRect(43, -7, 4, 1);
+  ctx.fillRect(50, -6, 4, 1);
+  ctx.fillRect(55, -4, 3, 1);
+  ctx.fillRect(59, -2, 2, 1);
+
+  // Central Spine Ridge
+  ctx.fillStyle = '#E2E8F0';
+  ctx.fillRect(52, -1, 7, 1);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(scoopX + 2, -1, scoopW * 0.5, 1.5);
+  ctx.fillRect(55, 0, 6, 1);
 
-  // 4. Hand gripping shaft
+  // Step 4e: Underside Bevel Shadow (#1E293B)
+  ctx.fillStyle = '#1E293B';
+  ctx.fillRect(43, 5, 6, 2);
+  ctx.fillRect(50, 4, 4, 2);
+  ctx.fillRect(55, 2, 3, 2);
+
+  // Step 4f: PvZ Gardener Soil & Lawn Grass Stains on Edge
+  ctx.fillStyle = '#78350F'; // Earthy Loam
+  ctx.fillRect(61, 0, 2, 1);
+  ctx.fillRect(58, 2, 2, 1);
+  ctx.fillStyle = '#451A03'; // Deep Soil
+  ctx.fillRect(63, -1, 2, 1);
+  ctx.fillStyle = '#15803D'; // Grass Stain
+  ctx.fillRect(53, 5, 2, 1);
+
+  // 5. HAND GRIP (When rendered standalone or in preview)
   if (!shouldHideHands) {
     const handRadius = getHandSize(4.0);
-    drawPixelHand(ctx, r * 0.65, 0, handRadius, '#FFE0BD', '#0E0F14');
+    drawPixelHand(ctx, 22, 0, handRadius, '#FFE0BD', '#0E0F14');
   }
 
   ctx.restore();

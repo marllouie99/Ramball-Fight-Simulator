@@ -2208,7 +2208,7 @@ async function runInteractionTests() {
     CONFIG.darkModeShowHudStats = origStatsToggle;
 
     // 14. Snow Pea Attack SFX & Freeze Stasis Mechanic Test
-    const { SnowPeaEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { PeashooterEntity, SnowPeaEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
     const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
     const snowPeaPlayedSfxList = [];
     const origPlaySFXTest = audioSystem.playSFX;
@@ -2264,11 +2264,64 @@ async function runInteractionTests() {
     const zenitsuSound = getBasicAttackSound(44, 'zenitsu');
     assert(zenitsuSound && zenitsuSound.src, 'Zenitsu must have a valid basic attack sound');
 
+    // 16. Test Plant Floating Healthbar Positioning & Dynamic sunPickupValue
+    const peashooterTest = new PeashooterEntity(200, 200, dave, 1);
+    peashooterTest.hp = 100; // Damaged to trigger health bar
+    mockCtx.resetStackDepth();
+    peashooterTest.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Peashooter draw with healthbar must maintain 0 canvas stack depth');
+
+    // Verify sunPickupValue default from config (50) and custom value pickup
+    dave.reset();
+    dave.sunCount = 0;
+    const defaultSun = dave.spawnSunDrop(250, 250);
+    assert(defaultSun.value === 50, `Default spawned sun drop must inherit sunPickupValue 50 (got ${defaultSun.value})`);
+    
+    // Land sun on Dave's coordinates to test collision pickup
+    defaultSun.isLanding = false;
+    defaultSun.y = 250;
+    dave.x = 250; dave.y = 250;
+    dave.suns = [defaultSun];
+    dave._updateSunDrops(state.arena, { sunPickupValue: 50, maxSun: 500 });
+    assert(dave.sunCount === 50, `Crazy Dave must collect 50 sun with default sunPickupValue (got ${dave.sunCount})`);
+
+    // Simulate collection with custom sunPickupValue (e.g. 75)
+    dave.sunCount = 0;
+    dave.sunPickupValue = 75;
+    const customSun = dave.spawnSunDrop(250, 250);
+    assert(customSun.value === 75, `Spawned sun with custom sunPickupValue must have value 75 (got ${customSun.value})`);
+    customSun.isLanding = false;
+    customSun.y = 250;
+    dave.suns = [customSun];
+    dave._updateSunDrops(state.arena, { sunPickupValue: 75, maxSun: 500 });
+    assert(dave.sunCount === 75, `Crazy Dave must collect 75 sun with custom sunPickupValue (got ${dave.sunCount})`);
+
+    // 17. Test Crazy Dave Pixel Art Garden Shovel Weapon
+    const { drawCrazyDaveShovel, drawCrazyDaveWeapon, CrazyDave_WEAPON_GRAPHICS } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
+    const { drawWeaponPreview } = await import('../js/graphics/ui/WeaponIndexScreen.js');
+
+    assert(CrazyDave_WEAPON_GRAPHICS.shovel && CrazyDave_WEAPON_GRAPHICS.shovel.name === 'Garden Shovel', 'CrazyDave_WEAPON_GRAPHICS must register Garden Shovel');
+    
+    // In-hand shovel render
+    mockCtx.resetStackDepth();
+    drawCrazyDaveShovel(mockCtx, 0, 0, 0, 25, true, 0, false, '#84CC16', false);
+    assert(mockCtx.getStackDepth() === 0, `drawCrazyDaveShovel must maintain 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // Standalone Weapon Studio render
+    mockCtx.resetStackDepth();
+    drawCrazyDaveWeapon(mockCtx, { r: 25, angle: 0, color: '#84CC16' });
+    assert(mockCtx.getStackDepth() === 0, `drawCrazyDaveWeapon must maintain 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // Weapon Index / Studio Preview dispatch
+    mockCtx.resetStackDepth();
+    drawWeaponPreview(mockCtx, 'crazydave', '#84CC16');
+    assert(mockCtx.getStackDepth() === 0, `drawWeaponPreview('crazydave') must maintain 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
     // Clean up
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI, $UN: XX HUD stats, Snow Pea freeze mechanic, freeze audio & basic attack sounds verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, pixel art garden shovel weapon, sun pickup SFX, dynamic sunPickupValue, plant floating healthbars, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI, $UN: XX HUD stats, Snow Pea freeze mechanic, freeze audio & basic attack sounds verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');
