@@ -2242,7 +2242,9 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     nobara: ['hairpin', 'resonance', 'RESONANCE', 'HAIRPIN'],
     reze: ['bomb', 'explosion', 'BOMB', 'EXPLOSION'],
     power: ['blood_hammer', 'blood hammer', 'HAMMER', 'BLOOD'],
-    megumi: ['chimera', 'shadow', 'SHADOW GARDEN', 'GARDEN']
+    megumi: ['chimera', 'shadow', 'SHADOW GARDEN', 'GARDEN'],
+    megumin: ['explosion', 'EXPLOSION', 'EXPLOSION MAGIC'],
+    crazydave: ['lawnmower', 'lawn_mower', 'LAWN MOWER', 'cherrybomb', 'cherry_bomb', 'CHERRY BOMB']
   };
 
   const keys = signatureMap[fId];
