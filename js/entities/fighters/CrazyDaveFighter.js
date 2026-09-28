@@ -119,7 +119,14 @@ export class PeashooterEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    // Friendly fire check: ignore damage from other plants or Crazy Dave
+    if (attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+      return false;
+    }
     if (opts) {
+      if (opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
+        return false;
+      }
       opts.knockback = false;
       opts.skipKnockback = true;
       opts.skipInterrupt = true;
@@ -234,6 +241,7 @@ export class PeashooterEntity extends Fighter {
       damage: dmg,
       owner: ownerIndex !== undefined ? ownerIndex : 0,
       ownerFighter: this.owner || this,
+      isPlantProjectile: true,
       color: '#22C55E',
       visual: 'peaBullet',
       life: 60,
@@ -360,7 +368,14 @@ export class SnowPeaEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    // Friendly fire check: ignore damage from other plants or Crazy Dave
+    if (attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+      return false;
+    }
     if (opts) {
+      if (opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
+        return false;
+      }
       opts.knockback = false;
       opts.skipKnockback = true;
       opts.skipInterrupt = true;
@@ -475,6 +490,7 @@ export class SnowPeaEntity extends Fighter {
       damage: dmg,
       owner: ownerIndex !== undefined ? ownerIndex : 0,
       ownerFighter: this.owner || this,
+      isPlantProjectile: true,
       color: '#38BDF8',
       visual: 'snowPeaBullet',
       life: 60,
@@ -714,7 +730,7 @@ export class CrazyDaveFighter extends Fighter {
       vx: 0,
       vy: fallSpeed,
       isLanding: true,
-      r: cfg.sunRadius || 22,
+      r: cfg.sunRadius || 30,
       value: value,
       life: cfg.sunDecayFrames || 720,
       pulse: 0,

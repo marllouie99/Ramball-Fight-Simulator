@@ -213,7 +213,7 @@ export function drawSunDrop(ctx, sun) {
   if (!sun) return;
   const x = sun.x || 0;
   const y = sun.y || 0;
-  const r = sun.r || 22;
+  const r = sun.r || 30;
   const pulse = sun.pulse || (Math.sin(Date.now() * 0.006) * 1.5);
   const rotAngle = sun.rotAngle || (Date.now() * 0.002);
 
@@ -226,7 +226,7 @@ export function drawSunDrop(ctx, sun) {
   // 1. Soft Warm Ambient Pixel Halo Ring (Zero shadowBlur - Rule 2.2)
   const P = 2.0;
   ctx.fillStyle = 'rgba(254, 240, 138, 0.22)';
-  const haloR = r + 7 + pulse;
+  const haloR = r + 4 + pulse;
   const haloSteps = Math.ceil(haloR / P);
   for (let gy = -haloSteps; gy <= haloSteps; gy++) {
     for (let gx = -haloSteps; gx <= haloSteps; gx++) {
@@ -242,7 +242,7 @@ export function drawSunDrop(ctx, sun) {
     ctx.save();
     ctx.rotate(rotAngle);
     ctx.imageSmoothingEnabled = false;
-    const drawSize = r * 2.5 + (pulse * 0.8);
+    const drawSize = r * 2.45 + (pulse * 0.8);
     ctx.drawImage(sunImg, 0, 0, sunImg.naturalWidth, sunImg.naturalHeight, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
     ctx.restore();
   } else {

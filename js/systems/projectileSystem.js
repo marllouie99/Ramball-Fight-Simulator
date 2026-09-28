@@ -1306,6 +1306,19 @@ class ProjectileSystem {
         if (illOwnerIdx !== -1 && areOnSameTeam(projectile.owner, illOwnerIdx)) continue;
       }
 
+      // Plant projectiles (Peashooter / Snow Pea peas) pass freely through all other plants and Crazy Dave
+      const isPlantProj = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet';
+      if (isPlantProj && (fighter.isPlant || fighter.isPlantMinion || fighter === projectile.ownerFighter?.owner || fighter.characterId === 'crazydave')) {
+        continue;
+      }
+
+      // Friendly plants of the same owner / team skip incoming friendly projectiles
+      if (fighter.isPlant || fighter.isPlantMinion) {
+        if (projectile.ownerFighter && (projectile.ownerFighter === fighter.owner || projectile.ownerFighter.owner === fighter.owner || projectile.ownerFighter.isPlant || projectile.ownerFighter.characterId === 'crazydave')) {
+          continue;
+        }
+      }
+
       // Skip if this projectile has piercing and already hit this fighter
       if (projectile.hitFighters && projectile.hitFighters.has(fighter)) continue;
 

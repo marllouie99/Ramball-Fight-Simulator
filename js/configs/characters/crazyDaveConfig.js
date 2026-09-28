@@ -32,7 +32,7 @@ export const crazyDaveConfig = {
   // Sun Economy System
   initialSun: 50,
   maxSun: 500,
-  sunRadius: 22,             // Sized to fit prominent and centered in 76.6px grass tiles
+  sunRadius: 30,             // Sized large and prominent to fill 76.6px grass tiles
   sunPickupValue: 25,
   sunDropInterval: 110,      // Natural ambient sun falls every 110 frames (~1.8s at 60fps)
   sunFallSpeed: 2.2,         // Smooth vertical descent speed

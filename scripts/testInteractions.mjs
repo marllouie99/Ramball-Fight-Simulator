@@ -1919,6 +1919,32 @@ async function runInteractionTests() {
     assert(livingPlant.vx === 0 && livingPlant.vy === 0, 'Plant velocity must stay 0 under heavy knockback');
     assert(livingPlant.x === initialPlantX && livingPlant.y === initialPlantY, 'Plant must not be displaced by attacks');
 
+    // Test plant-to-plant projectile pass-through & zero friendly fire
+    dave.sunCount = 400;
+    dave.peashooterCooldown = 0;
+    dave.snowPeaCooldown = 0;
+    dave.plantSnowPea(gojo);
+    const frontPlant = dave.activeSnowPeas[dave.activeSnowPeas.length - 1];
+    const backPlant = livingPlant;
+
+    // Position backPlant at x=200, frontPlant at x=260, enemy at x=400 (same horizontal line y=300)
+    backPlant.x = 200; backPlant.y = 300; backPlant._fixedX = 200; backPlant._fixedY = 300;
+    frontPlant.x = 260; frontPlant.y = 300; frontPlant._fixedX = 260; frontPlant._fixedY = 300;
+    gojo.x = 400; gojo.y = 300;
+    const initialFrontHp = frontPlant.hp;
+
+    // Back plant fires pea directly towards the right (passing through frontPlant at x=260)
+    backPlant._firePea(0, 1);
+    const projsList = (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) ? projectileSystem.projectiles : state.projectiles;
+    const testPea = projsList[projsList.length - 1];
+    assert(testPea !== undefined, 'Pea projectile must exist');
+
+    // Move testPea directly across frontPlant
+    testPea.x = frontPlant.x;
+    testPea.y = frontPlant.y;
+    projectileSystem.checkProjectileHits(testPea, state.fighters);
+    assert(frontPlant.hp === initialFrontHp, `Front plant must take 0 damage from passing friendly pea (HP: ${frontPlant.hp}/${initialFrontHp})`);
+
     // 10. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
