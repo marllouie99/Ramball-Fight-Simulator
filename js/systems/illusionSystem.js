@@ -25,6 +25,7 @@ export function updateIllusions() {
 
   for (let i = state.illusions.length - 1; i >= 0; i--) {
     const illusion = state.illusions[i];
+    if (!illusion || illusion.isPlant || illusion.isPlantMinion || illusion.isTurret || illusion.isDeployable) continue;
 
     // Transfigured Human & Evasion Minion expanding death animation & explosion
     if (illusion.isDying) {

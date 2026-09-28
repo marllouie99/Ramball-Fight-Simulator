@@ -1685,6 +1685,7 @@ async function runInteractionTests() {
 
     const plantEntities = state.fighters.filter(f => f && f.owner === dave && (f.isDeployable || f.isMinion));
     assert(plantEntities.length === 2, `Expected 2 deployed plant entities for Crazy Dave (got ${plantEntities.length})`);
+    assert(state.illusions.length === 0, 'Plants must NEVER be added to state.illusions (which triggers Doppelganger clone visuals)');
     for (const plant of plantEntities) {
       assert(plant.isMinion === true, `Plant ${plant.name} must have isMinion === true`);
       assert(plant.isPlant === true, `Plant ${plant.name} must have isPlant === true`);

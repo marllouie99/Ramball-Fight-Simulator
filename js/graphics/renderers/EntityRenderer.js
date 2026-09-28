@@ -1265,8 +1265,8 @@ export function drawIllusions() {
 
   for (const illusion of illusions) {
     if (!illusion || (illusion.hp <= 0 && !illusion.isDying)) continue;
-    // Skip Rika - she is injected into the illusions array for AI targeting, but draws herself!
-    if (illusion.isRika) continue;
+    // Skip Rika and Plant/Deployable entities - they draw via their own dedicated renderers!
+    if (illusion.isRika || illusion.isPlant || illusion.isPlantMinion || illusion.isDeployable || illusion.isTurret) continue;
 
     updateEntityVisualScale(illusion);
     const scale = illusion.visualScale !== undefined ? illusion.visualScale : 1.0;

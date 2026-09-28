@@ -520,8 +520,28 @@ export class CrazyDaveFighter extends Fighter {
     this.peashooterCooldown = 0;
     this.snowPeaCooldown = 0;
 
-    if (this.activePeashooters) this.activePeashooters.forEach(p => { if (p) p.hp = 0; });
-    if (this.activeSnowPeas) this.activeSnowPeas.forEach(s => { if (s) s.hp = 0; });
+    if (this.activePeashooters) {
+      this.activePeashooters.forEach(p => {
+        if (p) {
+          p.hp = 0;
+          if (state && Array.isArray(state.fighters)) {
+            const idx = state.fighters.indexOf(p);
+            if (idx !== -1) state.fighters.splice(idx, 1);
+          }
+        }
+      });
+    }
+    if (this.activeSnowPeas) {
+      this.activeSnowPeas.forEach(s => {
+        if (s) {
+          s.hp = 0;
+          if (state && Array.isArray(state.fighters)) {
+            const idx = state.fighters.indexOf(s);
+            if (idx !== -1) state.fighters.splice(idx, 1);
+          }
+        }
+      });
+    }
     this.activePeashooters = [];
     this.activeSnowPeas = [];
   }
@@ -529,13 +549,30 @@ export class CrazyDaveFighter extends Fighter {
   takeDamage(amount, attacker, opts = {}) {
     const applied = super.takeDamage(amount, attacker, opts);
     if (this.hp <= 0) {
-      if (this.activePeashooters) this.activePeashooters.forEach(p => { if (p) p.hp = 0; });
-      if (this.activeSnowPeas) this.activeSnowPeas.forEach(s => { if (s) s.hp = 0; });
+      if (this.activePeashooters) {
+        this.activePeashooters.forEach(p => {
+          if (p) {
+            p.hp = 0;
+            if (state && Array.isArray(state.fighters)) {
+              const idx = state.fighters.indexOf(p);
+              if (idx !== -1) state.fighters.splice(idx, 1);
+            }
+          }
+        });
+      }
+      if (this.activeSnowPeas) {
+        this.activeSnowPeas.forEach(s => {
+          if (s) {
+            s.hp = 0;
+            if (state && Array.isArray(state.fighters)) {
+              const idx = state.fighters.indexOf(s);
+              if (idx !== -1) state.fighters.splice(idx, 1);
+            }
+          }
+        });
+      }
       this.activePeashooters = [];
       this.activeSnowPeas = [];
-      if (state && Array.isArray(state.illusions)) {
-        state.illusions = state.illusions.filter(f => !(f && f.owner === this));
-      }
     }
     return applied;
   }
@@ -575,7 +612,13 @@ export class CrazyDaveFighter extends Fighter {
     this.activePeashooters = this.activePeashooters.filter(p => p && p.hp > 0);
     if (this.activePeashooters.length >= (cfg.maxPeashooters || 3)) {
       const oldest = this.activePeashooters.shift();
-      if (oldest) oldest.hp = 0;
+      if (oldest) {
+        oldest.hp = 0;
+        if (state && Array.isArray(state.fighters)) {
+          const idx = state.fighters.indexOf(oldest);
+          if (idx !== -1) state.fighters.splice(idx, 1);
+        }
+      }
     }
 
     const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
@@ -587,12 +630,8 @@ export class CrazyDaveFighter extends Fighter {
     const peashooter = new PeashooterEntity(tileCenter.x, tileCenter.y, this);
     this.activePeashooters.push(peashooter);
 
-    if (state) {
-      if (!state.illusions) state.illusions = [];
-      if (!state.illusions.includes(peashooter)) state.illusions.push(peashooter);
-      if (Array.isArray(state.fighters) && !state.fighters.includes(peashooter)) {
-        state.fighters.push(peashooter);
-      }
+    if (state && Array.isArray(state.fighters) && !state.fighters.includes(peashooter)) {
+      state.fighters.push(peashooter);
     }
 
     spawnFloatingText(this.x, this.y - 25, '-100 ☀️ Peashooter!', '#4ADE80');
@@ -618,7 +657,13 @@ export class CrazyDaveFighter extends Fighter {
     this.activeSnowPeas = this.activeSnowPeas.filter(s => s && s.hp > 0);
     if (this.activeSnowPeas.length >= (cfg.maxSnowPeas || 3)) {
       const oldest = this.activeSnowPeas.shift();
-      if (oldest) oldest.hp = 0;
+      if (oldest) {
+        oldest.hp = 0;
+        if (state && Array.isArray(state.fighters)) {
+          const idx = state.fighters.indexOf(oldest);
+          if (idx !== -1) state.fighters.splice(idx, 1);
+        }
+      }
     }
 
     const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
@@ -630,12 +675,8 @@ export class CrazyDaveFighter extends Fighter {
     const snowpea = new SnowPeaEntity(tileCenter.x, tileCenter.y, this);
     this.activeSnowPeas.push(snowpea);
 
-    if (state) {
-      if (!state.illusions) state.illusions = [];
-      if (!state.illusions.includes(snowpea)) state.illusions.push(snowpea);
-      if (Array.isArray(state.fighters) && !state.fighters.includes(snowpea)) {
-        state.fighters.push(snowpea);
-      }
+    if (state && Array.isArray(state.fighters) && !state.fighters.includes(snowpea)) {
+      state.fighters.push(snowpea);
     }
 
     spawnFloatingText(this.x, this.y - 25, '-175 ☀️ Snow Pea!', '#38BDF8');
