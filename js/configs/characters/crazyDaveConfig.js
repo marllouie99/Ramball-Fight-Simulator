@@ -46,6 +46,7 @@ export const crazyDaveConfig = {
   peashooterDamage: 10,      // Regular damage per pea
   peashooterSpeed: 9.5,      // Pea projectile speed
   peashooterRange: 460,      // Firing range
+  plantLaneTolerance: 85,    // Straight horizontal lane detection width
   peashooterCooldown: 120,   // 2.0s skill cooldown
   maxPeashooters: 3,         // Maximum simultaneous active Peashooters
 

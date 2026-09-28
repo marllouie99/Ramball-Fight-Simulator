@@ -277,7 +277,7 @@ export function drawPeashooter(ctx, peashooter) {
   const y = peashooter.y || 0;
   const r = peashooter.r || 18;
   const angle = peashooter.gunAngle || peashooter.angle || 0;
-  const isFacingLeft = Math.abs(angle) > Math.PI / 2;
+  const isFacingLeft = (peashooter.facingDirection === -1) || (Math.abs(angle) > Math.PI / 2);
   const isHit = peashooter.hitFlashTimer > 0;
   const windupTimer = peashooter.shootWindupTimer || 0;
   const windupMax = peashooter.shootWindupMax || 12;
@@ -348,7 +348,7 @@ export function drawSnowPea(ctx, snowpea) {
   const y = snowpea.y || 0;
   const r = snowpea.r || 18;
   const angle = snowpea.gunAngle || snowpea.angle || 0;
-  const isFacingLeft = Math.abs(angle) > Math.PI / 2;
+  const isFacingLeft = (snowpea.facingDirection === -1) || (Math.abs(angle) > Math.PI / 2);
   const isHit = snowpea.hitFlashTimer > 0;
   const windupTimer = snowpea.shootWindupTimer || 0;
   const windupMax = snowpea.shootWindupMax || 12;

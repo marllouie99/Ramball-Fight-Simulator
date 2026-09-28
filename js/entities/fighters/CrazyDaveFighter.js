@@ -24,7 +24,7 @@ import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 // PLANT ENTITY: PEASHOOTER (Fires rapid kinetic pea projectiles dealing regular damage)
 // ─────────────────────────────────────────────────────────────────────────────
 export class PeashooterEntity extends Fighter {
-  constructor(x, y, ownerFighter) {
+  constructor(x, y, ownerFighter, facingDirection = 1) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const maxHp = cfg.peashooterHp || 180;
     const def = {
@@ -71,10 +71,9 @@ export class PeashooterEntity extends Fighter {
     this.vy = 0;
     this.angle = 0;
 
-    // Initial horizontal facing based on arena position
-    const arenaW = (state && state.arena && state.arena.width) ? state.arena.width : 460;
-    const arenaMidX = (state && state.arena && state.arena.x !== undefined) ? (state.arena.x + arenaW / 2) : 230;
-    this.gunAngle = (x > arenaMidX) ? Math.PI : 0;
+    // Committed 1-direction facing: never changes angle once planted
+    this.facingDirection = (facingDirection === -1 || facingDirection === Math.PI) ? -1 : 1;
+    this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
 
     this.shootCooldown = 15;
     this.shootCooldownMax = cfg.peashooterFireRate || 22;
@@ -83,6 +82,15 @@ export class PeashooterEntity extends Fighter {
     this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
+  }
+
+  canAim() {
+    return false;
+  }
+
+  aim() {
+    // Strictly locked to committed 1-direction facing; no auto-aim
+    this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
   }
 
   applyKnockback(vx, vy) {
@@ -116,8 +124,9 @@ export class PeashooterEntity extends Fighter {
     this.animTick++;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
-    // Strict immovable anchor & locked angle: plants never drift, bounce, or tilt
+    // Strict immovable anchor & committed angle: plants NEVER drift, bounce, or tilt
     this.angle = 0;
+    this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
@@ -131,45 +140,61 @@ export class PeashooterEntity extends Fighter {
       return;
     }
 
-    // Target acquisition: nearest enemy fighter
-    let target = opponent;
-    if (!target || target.hp <= 0 || target === this.owner || target.isDeployable || target.isMinion) {
-      if (state && state.fighters) {
-        target = state.fighters.find(f => f && f !== this && f !== this.owner && !f.isMinion && !f.isDeployable && f.hp > 0);
+    // Lane Target acquisition: only detect enemies in the 1 straight committed direction in front
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    const range = cfg.peashooterRange || 460;
+    const laneTolerance = cfg.plantLaneTolerance || 85;
+
+    let targetInLane = null;
+    let closestDist = Infinity;
+
+    const evaluateTarget = (f) => {
+      if (!f || f === this || f === this.owner || f.isDeployable || f.isMinion || f.hp <= 0 || f.dead) return;
+      const dx = f.x - this.x;
+      const dy = f.y - this.y;
+
+      // Check if enemy is ahead in the straight committed direction
+      const isAhead = (this.facingDirection === 1) ? (dx > 0) : (dx < 0);
+      if (!isAhead) return; // Behind the plant!
+
+      const forwardDist = Math.abs(dx);
+      const laneDist = Math.abs(dy);
+
+      if (forwardDist <= range && laneDist <= laneTolerance) {
+        if (forwardDist < closestDist) {
+          closestDist = forwardDist;
+          targetInLane = f;
+        }
       }
+    };
+
+    if (state && Array.isArray(state.fighters)) {
+      for (const f of state.fighters) evaluateTarget(f);
+    } else if (opponent) {
+      evaluateTarget(opponent);
     }
 
-    if (target && target.hp > 0) {
-      const dx = target.x - this.x;
-      const dy = target.y - this.y;
-      const dist = Math.hypot(dx, dy);
-
-      // Plants ONLY aim straight left (Math.PI) or straight right (0)
-      this.gunAngle = (target.x < this.x) ? Math.PI : 0;
-
-      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-      const range = cfg.peashooterRange || 460;
-
-      if (dist <= range) {
-        if (this.shootWindupTimer > 0) {
-          this.shootWindupTimer--;
-          if (this.shootWindupTimer === 0) {
-            this.shootCooldown = this.shootCooldownMax;
-            this.postShootTimer = 4;
-            this._firePea(this.gunAngle, ownerIndex);
-          }
-        } else if (this.postShootTimer > 0) {
-          this.postShootTimer--;
-        } else if (this.shootCooldown > 0) {
-          this.shootCooldown--;
-        } else {
-          // Start "about to shoot" windup swell animation
-          this.shootWindupTimer = this.shootWindupMax;
+    // Only shoot if a valid enemy is detected in the straight forward direction
+    if (targetInLane) {
+      if (this.shootWindupTimer > 0) {
+        this.shootWindupTimer--;
+        if (this.shootWindupTimer === 0) {
+          this.shootCooldown = this.shootCooldownMax;
+          this.postShootTimer = 4;
+          this._firePea(this.gunAngle, ownerIndex);
         }
+      } else if (this.postShootTimer > 0) {
+        this.postShootTimer--;
+      } else if (this.shootCooldown > 0) {
+        this.shootCooldown--;
       } else {
-        if (this.shootCooldown > 0) this.shootCooldown--;
-        this.shootWindupTimer = 0;
+        // Start "about to shoot" windup swell animation
+        this.shootWindupTimer = this.shootWindupMax;
       }
+    } else {
+      if (this.shootCooldown > 0) this.shootCooldown--;
+      this.shootWindupTimer = 0;
+      if (this.postShootTimer > 0) this.postShootTimer--;
     }
   }
 
@@ -177,9 +202,10 @@ export class PeashooterEntity extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const speed = cfg.peashooterSpeed || 9.5;
     const dmg = cfg.peashooterDamage || 10;
-    const isLeft = Math.abs(angle) > Math.PI / 2;
-    const spawnX = this.x + (isLeft ? -1 : 1) * (this.r + 10);
-    const spawnY = this.y - 4;
+    const isLeft = this.facingDirection === -1;
+    // Snout mouth position on sprite: x offset +-22px, y offset -17px
+    const spawnX = this.x + (isLeft ? -22 : 22);
+    const spawnY = this.y - 17;
 
     const peaProj = {
       x: spawnX,
@@ -223,7 +249,7 @@ export class PeashooterEntity extends Fighter {
 // PLANT ENTITY: SNOW PEA (Fires frozen ice pea projectiles dealing damage + slowing foes)
 // ─────────────────────────────────────────────────────────────────────────────
 export class SnowPeaEntity extends Fighter {
-  constructor(x, y, ownerFighter) {
+  constructor(x, y, ownerFighter, facingDirection = 1) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const maxHp = cfg.snowPeaHp || 200;
     const def = {
@@ -270,10 +296,9 @@ export class SnowPeaEntity extends Fighter {
     this.vy = 0;
     this.angle = 0;
 
-    // Initial horizontal facing based on arena position
-    const arenaW = (state && state.arena && state.arena.width) ? state.arena.width : 460;
-    const arenaMidX = (state && state.arena && state.arena.x !== undefined) ? (state.arena.x + arenaW / 2) : 230;
-    this.gunAngle = (x > arenaMidX) ? Math.PI : 0;
+    // Committed 1-direction facing: never changes angle once planted
+    this.facingDirection = (facingDirection === -1 || facingDirection === Math.PI) ? -1 : 1;
+    this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
 
     this.shootCooldown = 15;
     this.shootCooldownMax = cfg.snowPeaFireRate || 24;
@@ -282,6 +307,15 @@ export class SnowPeaEntity extends Fighter {
     this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
+  }
+
+  canAim() {
+    return false;
+  }
+
+  aim() {
+    // Strictly locked to committed 1-direction facing; no auto-aim
+    this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
   }
 
   applyKnockback(vx, vy) {
@@ -315,8 +349,9 @@ export class SnowPeaEntity extends Fighter {
     this.animTick++;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
-    // Strict immovable anchor & locked angle: plants never drift, bounce, or tilt
+    // Strict immovable anchor & committed angle: plants NEVER drift, bounce, or tilt
     this.angle = 0;
+    this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
@@ -330,45 +365,61 @@ export class SnowPeaEntity extends Fighter {
       return;
     }
 
-    // Target acquisition: nearest enemy fighter
-    let target = opponent;
-    if (!target || target.hp <= 0 || target === this.owner || target.isDeployable || target.isMinion) {
-      if (state && state.fighters) {
-        target = state.fighters.find(f => f && f !== this && f !== this.owner && !f.isMinion && !f.isDeployable && f.hp > 0);
+    // Lane Target acquisition: only detect enemies in the 1 straight committed direction in front
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    const range = cfg.snowPeaRange || 460;
+    const laneTolerance = cfg.plantLaneTolerance || 85;
+
+    let targetInLane = null;
+    let closestDist = Infinity;
+
+    const evaluateTarget = (f) => {
+      if (!f || f === this || f === this.owner || f.isDeployable || f.isMinion || f.hp <= 0 || f.dead) return;
+      const dx = f.x - this.x;
+      const dy = f.y - this.y;
+
+      // Check if enemy is ahead in the straight committed direction
+      const isAhead = (this.facingDirection === 1) ? (dx > 0) : (dx < 0);
+      if (!isAhead) return; // Behind the plant!
+
+      const forwardDist = Math.abs(dx);
+      const laneDist = Math.abs(dy);
+
+      if (forwardDist <= range && laneDist <= laneTolerance) {
+        if (forwardDist < closestDist) {
+          closestDist = forwardDist;
+          targetInLane = f;
+        }
       }
+    };
+
+    if (state && Array.isArray(state.fighters)) {
+      for (const f of state.fighters) evaluateTarget(f);
+    } else if (opponent) {
+      evaluateTarget(opponent);
     }
 
-    if (target && target.hp > 0) {
-      const dx = target.x - this.x;
-      const dy = target.y - this.y;
-      const dist = Math.hypot(dx, dy);
-
-      // Plants ONLY aim straight left (Math.PI) or straight right (0)
-      this.gunAngle = (target.x < this.x) ? Math.PI : 0;
-
-      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-      const range = cfg.snowPeaRange || 460;
-
-      if (dist <= range) {
-        if (this.shootWindupTimer > 0) {
-          this.shootWindupTimer--;
-          if (this.shootWindupTimer === 0) {
-            this.shootCooldown = this.shootCooldownMax;
-            this.postShootTimer = 4;
-            this._fireSnowPea(this.gunAngle, ownerIndex);
-          }
-        } else if (this.postShootTimer > 0) {
-          this.postShootTimer--;
-        } else if (this.shootCooldown > 0) {
-          this.shootCooldown--;
-        } else {
-          // Start "about to shoot" windup swell animation
-          this.shootWindupTimer = this.shootWindupMax;
+    // Only shoot if a valid enemy is detected in the straight forward direction
+    if (targetInLane) {
+      if (this.shootWindupTimer > 0) {
+        this.shootWindupTimer--;
+        if (this.shootWindupTimer === 0) {
+          this.shootCooldown = this.shootCooldownMax;
+          this.postShootTimer = 4;
+          this._fireSnowPea(this.gunAngle, ownerIndex);
         }
+      } else if (this.postShootTimer > 0) {
+        this.postShootTimer--;
+      } else if (this.shootCooldown > 0) {
+        this.shootCooldown--;
       } else {
-        if (this.shootCooldown > 0) this.shootCooldown--;
-        this.shootWindupTimer = 0;
+        // Start "about to shoot" windup swell animation
+        this.shootWindupTimer = this.shootWindupMax;
       }
+    } else {
+      if (this.shootCooldown > 0) this.shootCooldown--;
+      this.shootWindupTimer = 0;
+      if (this.postShootTimer > 0) this.postShootTimer--;
     }
   }
 
@@ -376,9 +427,10 @@ export class SnowPeaEntity extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const speed = cfg.snowPeaSpeed || 9.5;
     const dmg = cfg.snowPeaDamage || 12;
-    const isLeft = Math.abs(angle) > Math.PI / 2;
-    const spawnX = this.x + (isLeft ? -1 : 1) * (this.r + 10);
-    const spawnY = this.y - 4;
+    const isLeft = this.facingDirection === -1;
+    // Snout mouth position on sprite: x offset +-22px, y offset -19px
+    const spawnX = this.x + (isLeft ? -22 : 22);
+    const spawnY = this.y - 19;
 
     const snowPeaProj = {
       x: spawnX,
@@ -627,7 +679,31 @@ export class CrazyDaveFighter extends Fighter {
     const activePlants = [...(this.activePeashooters || []), ...(this.activeSnowPeas || [])].filter(p => p && p.hp > 0);
     const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
 
-    const peashooter = new PeashooterEntity(tileCenter.x, tileCenter.y, this);
+    // Compute committed 1-direction facing (Left = -1, Right = +1)
+    let facingDirection = 1;
+    let targetEnemy = (opponent && opponent.hp > 0 && opponent !== this) ? opponent : null;
+    if (!targetEnemy && state && Array.isArray(state.fighters)) {
+      let closestDist = Infinity;
+      for (const f of state.fighters) {
+        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead) {
+          const d = Math.hypot(f.x - tileCenter.x, f.y - tileCenter.y);
+          if (d < closestDist) {
+            closestDist = d;
+            targetEnemy = f;
+          }
+        }
+      }
+    }
+    if (targetEnemy) {
+      facingDirection = (targetEnemy.x < tileCenter.x) ? -1 : 1;
+    } else if (this.gunAngle !== undefined) {
+      facingDirection = (Math.abs(this.gunAngle) > Math.PI / 2) ? -1 : 1;
+    } else {
+      const arenaMidX = arena.x + arena.width / 2;
+      facingDirection = (tileCenter.x > arenaMidX) ? -1 : 1;
+    }
+
+    const peashooter = new PeashooterEntity(tileCenter.x, tileCenter.y, this, facingDirection);
     this.activePeashooters.push(peashooter);
 
     if (state && Array.isArray(state.fighters) && !state.fighters.includes(peashooter)) {
@@ -672,7 +748,31 @@ export class CrazyDaveFighter extends Fighter {
     const activePlants = [...(this.activePeashooters || []), ...(this.activeSnowPeas || [])].filter(p => p && p.hp > 0);
     const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
 
-    const snowpea = new SnowPeaEntity(tileCenter.x, tileCenter.y, this);
+    // Compute committed 1-direction facing (Left = -1, Right = +1)
+    let facingDirection = 1;
+    let targetEnemy = (opponent && opponent.hp > 0 && opponent !== this) ? opponent : null;
+    if (!targetEnemy && state && Array.isArray(state.fighters)) {
+      let closestDist = Infinity;
+      for (const f of state.fighters) {
+        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead) {
+          const d = Math.hypot(f.x - tileCenter.x, f.y - tileCenter.y);
+          if (d < closestDist) {
+            closestDist = d;
+            targetEnemy = f;
+          }
+        }
+      }
+    }
+    if (targetEnemy) {
+      facingDirection = (targetEnemy.x < tileCenter.x) ? -1 : 1;
+    } else if (this.gunAngle !== undefined) {
+      facingDirection = (Math.abs(this.gunAngle) > Math.PI / 2) ? -1 : 1;
+    } else {
+      const arenaMidX = arena.x + arena.width / 2;
+      facingDirection = (tileCenter.x > arenaMidX) ? -1 : 1;
+    }
+
+    const snowpea = new SnowPeaEntity(tileCenter.x, tileCenter.y, this, facingDirection);
     this.activeSnowPeas.push(snowpea);
 
     if (state && Array.isArray(state.fighters) && !state.fighters.includes(snowpea)) {

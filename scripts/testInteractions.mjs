@@ -1750,27 +1750,56 @@ async function runInteractionTests() {
     assert(peashooter.vx === 0 && peashooter.vy === 0, 'Peashooter velocities must remain 0');
     assert(peashooter.x === peashooter._fixedX && peashooter.y === peashooter._fixedY, 'Peashooter must not be displaced');
     assert(peashooter.angle === 0, 'Peashooter angle must remain strictly 0');
+    assert(peashooter.canAim() === false, 'Plant canAim() must return false to prevent external aim overrides');
 
-    // Straight left / right aiming test:
-    // Move gojo to the left of peashooter
-    gojo.x = peashooter.x - 100;
-    gojo.y = peashooter.y + 50; // Diagonal offset
-    peashooter.update(gojo, 0, state.arena);
-    assert(peashooter.gunAngle === Math.PI, `Plant must aim straight LEFT (Math.PI) when target is on left (got ${peashooter.gunAngle})`);
-    assert(peashooter.angle === 0, 'Plant body angle must stay 0');
+    // Committed 1-direction facing & straight lane enemy detection test:
+    // Peashooter was planted facing RIGHT (+1) towards Gojo (at x=400)
+    assert(peashooter.facingDirection === 1, 'Peashooter must be committed to facing RIGHT (+1)');
+    assert(peashooter.gunAngle === 0, 'Peashooter gunAngle must be committed to 0');
 
-    // Move gojo to the right of peashooter
+    // Test 1: Enemy in front (right) within lane tolerance (dy <= 85) -> triggers windup
     gojo.x = peashooter.x + 100;
-    gojo.y = peashooter.y - 60; // Diagonal offset
+    gojo.y = peashooter.y + 40;
+    peashooter.shootCooldown = 0;
+    peashooter.shootWindupTimer = 0;
     peashooter.update(gojo, 0, state.arena);
-    assert(peashooter.gunAngle === 0, `Plant must aim straight RIGHT (0) when target is on right (got ${peashooter.gunAngle})`);
-    assert(peashooter.angle === 0, 'Plant body angle must stay 0');
+    assert(peashooter.shootWindupTimer > 0, 'Plant must detect enemy in straight forward lane and start windup');
 
-    // Straight horizontal projectile firing test
+    // Test 2: Enemy behind (left) -> IGNORED, no windup, NO angle change
+    gojo.x = peashooter.x - 100;
+    gojo.y = peashooter.y;
+    peashooter.shootCooldown = 0;
+    peashooter.shootWindupTimer = 0;
+    peashooter.aim(gojo); // Attempt external aim
+    peashooter.update(gojo, 0, state.arena);
+    assert(peashooter.gunAngle === 0, 'Plant must NOT change angle when enemy moves behind it');
+    assert(peashooter.facingDirection === 1, 'Plant must retain committed facing direction');
+    assert(peashooter.shootWindupTimer === 0, 'Plant must NOT target or shoot enemies behind it');
+
+    // Test 3: Enemy in front but outside lane tolerance (dy > 85) -> IGNORED
+    gojo.x = peashooter.x + 100;
+    gojo.y = peashooter.y + 120; // dy = 120 > 85
+    peashooter.shootCooldown = 0;
+    peashooter.shootWindupTimer = 0;
+    peashooter.update(gojo, 0, state.arena);
+    assert(peashooter.shootWindupTimer === 0, 'Plant must NOT target enemies outside its straight horizontal lane');
+
+    // Test 4: Projectile Mouth Spawn Position
+    // Peashooter mouth spawn: x + 22, y - 17
     peashooter._firePea(peashooter.gunAngle, 0);
     const firedPea = projs[projs.length - 1];
+    assert(Math.abs(firedPea.x - (peashooter.x + 22)) < 0.001, `Peashooter projectile must spawn at mouth x+22 (got x=${firedPea.x}, expected ${peashooter.x + 22})`);
+    assert(Math.abs(firedPea.y - (peashooter.y - 17)) < 0.001, `Peashooter projectile must spawn at mouth y-17 (got y=${firedPea.y}, expected ${peashooter.y - 17})`);
     assert(firedPea.vy === 0, 'Peashooter projectile vy must be strictly 0 (straight horizontal)');
     assert(firedPea.vx > 0, 'Peashooter projectile vx must be positive when aiming right');
+
+    // Snow Pea mouth spawn: x + 22, y - 19
+    snowPea._fireSnowPea(snowPea.gunAngle, 0);
+    const firedSnow = projs[projs.length - 1];
+    assert(Math.abs(firedSnow.x - (snowPea.x + 22)) < 0.001, `Snow Pea projectile must spawn at mouth x+22 (got x=${firedSnow.x}, expected ${snowPea.x + 22})`);
+    assert(Math.abs(firedSnow.y - (snowPea.y - 19)) < 0.001, `Snow Pea projectile must spawn at mouth y-19 (got y=${firedSnow.y}, expected ${snowPea.y - 19})`);
+    assert(firedSnow.vy === 0, 'Snow Pea projectile vy must be strictly 0 (straight horizontal)');
+    assert(firedSnow.vx > 0, 'Snow Pea projectile vx must be positive when aiming right');
 
     // 6. Verify 1v1 Match Initialization & createFighterInstance for Crazy Dave
     const { FIGHTER_DEFS } = await import('../js/core/config.js');
