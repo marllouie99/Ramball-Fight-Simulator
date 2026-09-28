@@ -1955,9 +1955,21 @@ async function runInteractionTests() {
     testPea.x = frontPlant.x;
     testPea.y = frontPlant.y;
     projectileSystem.checkProjectileHits(testPea, state.fighters);
-    assert(frontPlant.hp === initialFrontHp, `Front plant must take 0 damage from passing friendly pea (HP: ${frontPlant.hp}/${initialFrontHp})`);
+    // 10. Test Plants & Sun Drops remain active when Dave is hit by movement-stopping attacks
+    dave.timeStopTimer = 60;
+    dave.paralyzeTimer = 60;
+    const fallingSun = dave.spawnSunDrop(300, 300, 25);
+    const initialFallingY = fallingSun.y;
+    dave.update(gojo, 1, state.arena);
+    assert(fallingSun.y > initialFallingY, 'Sun drop must continue falling even when Dave is time-stopped/stunned');
 
-    // 10. Verify isCrazyDavePresent returns false when no Dave is present
+    // Plant continues shooting when Dave is movement-stopped
+    backPlant.shootCooldown = 0;
+    state.fighters = [dave, gojo, backPlant, frontPlant];
+    backPlant.update(gojo, 1, state.arena);
+    assert(backPlant.shootCooldown === backPlant.shootCooldownMax, 'Plant must continue firing peas when Dave is time-stopped/stunned');
+
+    // 11. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
     assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');

@@ -100,6 +100,26 @@ export class PeashooterEntity extends Fighter {
     // Entities pass through plants without collision push
   }
 
+  _handleTimeStop() {
+    // Plants are rooted autonomous flora and are unaffected by owner or general movement-stopping effects
+    return false;
+  }
+
+  applyHitStun(duration) {
+    // Plants are immovable flora and never suffer hit-stun or movement stops
+    return;
+  }
+
+  applyTimeStop(duration) {
+    // Plants ignore hit pauses
+    return;
+  }
+
+  applySlow(duration, mult) {
+    // Plants have 0 movement speed anyway and ignore slow debuffs
+    return;
+  }
+
   applyKnockback(vx, vy) {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
@@ -347,6 +367,26 @@ export class SnowPeaEntity extends Fighter {
 
   onCollide(opponent) {
     // Entities pass through plants without collision push
+  }
+
+  _handleTimeStop() {
+    // Plants are rooted autonomous flora and are unaffected by owner or general movement-stopping effects
+    return false;
+  }
+
+  applyHitStun(duration) {
+    // Plants are immovable flora and never suffer hit-stun or movement stops
+    return;
+  }
+
+  applyTimeStop(duration) {
+    // Plants ignore hit pauses
+    return;
+  }
+
+  applySlow(duration, mult) {
+    // Plants have 0 movement speed anyway and ignore slow debuffs
+    return;
   }
 
   applyKnockback(vx, vy) {
@@ -908,56 +948,12 @@ export class CrazyDaveFighter extends Fighter {
     return true;
   }
 
-  update(opponent, ownerIndex, arena) {
-    // 1. Freeze / Time-Stop Guard (Rule 1.1)
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
-      return;
+  _updateSunDrops(arena, cfg) {
+    if (!cfg) {
+      cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     }
 
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-
-    // Enforce strictly zero angular rotation and update horizontal facing direction
-    this.angle = 0;
-    if (Math.abs(this.vx) > 0.3) {
-      this.facingLeft = this.vx < 0;
-      this.gunAngle = this.facingLeft ? Math.PI : 0;
-    } else if (opponent && opponent.x !== undefined && opponent.hp > 0) {
-      this.facingLeft = opponent.x < this.x;
-      this.gunAngle = this.facingLeft ? Math.PI : 0;
-    }
-    this.shootCooldown = 999999;
-
-    // Shovel planting animation timer & dirt particle puff
-    if (this.plantingAnimTimer > 0) {
-      this.plantingAnimTimer--;
-      this.shovelSwingTimer = this.plantingAnimTimer;
-      if (this.plantingAnimTimer === 10) {
-        // Shovel scoops dirt: spawn small soil particles
-        const dirtX = this.x + (this.facingLeft ? -this.r * 1.2 : this.r * 1.2);
-        const dirtY = this.y + this.r * 0.55;
-        spawnSparks(dirtX, dirtY, 4, '#15803D');
-        spawnSparks(dirtX, dirtY, 4, '#78350F');
-      }
-    }
-
-    // Cooldown updates
-    if (this.peashooterCooldown > 0) this.peashooterCooldown--;
-    if (this.snowPeaCooldown > 0) this.snowPeaCooldown--;
-
-    // Planting Pause: stop Dave's movement for a moment when planting
-    if (this.plantingPauseTimer > 0) {
-      this.plantingPauseTimer--;
-      this.vx = 0;
-      this.vy = 0;
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      this.resolveWallBounce(arena, opponent);
-      return;
-    }
-
-    // 2. Ambient Sun Falling from the Sky
+    // 1. Ambient Sun Falling from the Sky
     this.ambientSunTimer++;
     if (this.ambientSunTimer >= this.ambientSunInterval) {
       this.ambientSunTimer = 0;
@@ -965,7 +961,7 @@ export class CrazyDaveFighter extends Fighter {
       this.spawnSunDrop(tile.x, tile.y, 25);
     }
 
-    // 3. Sun Drops Physics & Magnetic Pickup Loop
+    // 2. Sun Drops Physics & Magnetic Pickup Loop
     const magnetRadius = cfg.sunAttractionRadius || 95;
     const magnetSpeed = cfg.sunAttractionSpeed || 7.0;
 
@@ -1020,6 +1016,59 @@ export class CrazyDaveFighter extends Fighter {
         }
         this.suns.splice(i, 1);
       }
+    }
+  }
+
+  update(opponent, ownerIndex, arena) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+
+    // Environmental sun drops physics & ambient falling loop MUST update even if Dave is frozen or CC'd
+    this._updateSunDrops(arena, cfg);
+
+    // 1. Freeze / Time-Stop Guard (Rule 1.1)
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return;
+    }
+
+    // Enforce strictly zero angular rotation and update horizontal facing direction
+    this.angle = 0;
+    if (Math.abs(this.vx) > 0.3) {
+      this.facingLeft = this.vx < 0;
+      this.gunAngle = this.facingLeft ? Math.PI : 0;
+    } else if (opponent && opponent.x !== undefined && opponent.hp > 0) {
+      this.facingLeft = opponent.x < this.x;
+      this.gunAngle = this.facingLeft ? Math.PI : 0;
+    }
+    this.shootCooldown = 999999;
+
+    // Shovel planting animation timer & dirt particle puff
+    if (this.plantingAnimTimer > 0) {
+      this.plantingAnimTimer--;
+      this.shovelSwingTimer = this.plantingAnimTimer;
+      if (this.plantingAnimTimer === 10) {
+        // Shovel scoops dirt: spawn small soil particles
+        const dirtX = this.x + (this.facingLeft ? -this.r * 1.2 : this.r * 1.2);
+        const dirtY = this.y + this.r * 0.55;
+        spawnSparks(dirtX, dirtY, 4, '#15803D');
+        spawnSparks(dirtX, dirtY, 4, '#78350F');
+      }
+    }
+
+    // Cooldown updates
+    if (this.peashooterCooldown > 0) this.peashooterCooldown--;
+    if (this.snowPeaCooldown > 0) this.snowPeaCooldown--;
+
+    // Planting Pause: stop Dave's movement for a moment when planting
+    if (this.plantingPauseTimer > 0) {
+      this.plantingPauseTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.resolveWallBounce(arena, opponent);
+      return;
     }
 
     // 4. AI Planting Decisions
