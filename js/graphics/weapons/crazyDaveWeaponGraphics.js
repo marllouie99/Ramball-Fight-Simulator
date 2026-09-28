@@ -1,14 +1,117 @@
 // CRAZY DAVE WEAPONS & PLANT VISUALS (Plants vs. Zombies)
-// Authentic Discrete Pixel Art Aesthetics (100% Balanced Canvas 2D Stacks, Zero shadowBlur)
+// Authentic Discrete Pixel Art Aesthetics & Multi-Frame Animated Plant Sprite Sheets
+// Adheres strictly to: 100% Balanced Canvas 2D Stacks, Zero shadowBlur (Rule 2.2)
 
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { getHandSize } from '../../core/config.js';
+
+// Pre-computed Sprite Frame Bounding Boxes
+export const PEASHOOTER_IDLE_RECTS = [
+  { sx: 14,   sy: 218, sw: 371, sh: 358 },
+  { sx: 456,  sy: 193, sw: 361, sh: 380 },
+  { sx: 858,  sy: 230, sw: 368, sh: 348 },
+  { sx: 1288, sy: 206, sw: 347, sh: 550 },
+  { sx: 1697, sy: 231, sw: 368, sh: 525 },
+];
+
+export const PEASHOOTER_SHOOT_RECTS = [
+  { sx: 11,   sy: 185, sw: 441, sh: 426 },
+  { sx: 547,  sy: 172, sw: 475, sh: 440 },
+  { sx: 1069, sy: 177, sw: 545, sh: 435 },
+  { sx: 1619, sy: 189, sw: 537, sh: 421 },
+];
+
+export const SNOWPEA_IDLE_RECTS = [
+  { sx: 26,   sy: 145, sw: 461, sh: 495 },
+  { sx: 564,  sy: 158, sw: 458, sh: 481 },
+  { sx: 1065, sy: 115, sw: 463, sh: 520 },
+  { sx: 1634, sy: 164, sw: 477, sh: 474 },
+];
+
+export const SNOWPEA_SHOOT_RECTS = [
+  { sx: 37,   sy: 127, sw: 443, sh: 487 },
+  { sx: 543,  sy: 116, sw: 471, sh: 499 },
+  { sx: 1027, sy: 118, sw: 542, sh: 497 },
+  { sx: 1625, sy: 116, sw: 522, sh: 499 },
+];
+
+export const PEA_PROJ_RECTS = [
+  { sx: 12,   sy: 43, sw: 181, sh: 179 },
+  { sx: 347,  sy: 40, sw: 204, sh: 199 },
+  { sx: 704,  sy: 39, sw: 198, sh: 197 },
+  { sx: 1080, sy: 36, sw: 204, sh: 200 },
+  { sx: 1436, sy: 19, sw: 212, sh: 213 },
+];
+
+export const SNOWPEA_PROJ_RECTS = [
+  { sx: 53,   sy: 39, sw: 196, sh: 195 },
+  { sx: 401,  sy: 30, sw: 206, sh: 202 },
+  { sx: 761,  sy: 30, sw: 208, sh: 209 },
+  { sx: 1130, sy: 24, sw: 210, sh: 214 },
+  { sx: 1491, sy: 17, sw: 222, sh: 222 },
+];
+
+// Lazy-loaded sprite images
+let _peashooterIdleImg = null;
+let _peashooterShootImg = null;
+let _snowPeaIdleImg = null;
+let _snowPeaShootImg = null;
+let _peaProjImg = null;
+let _snowPeaProjImg = null;
+
+function _loadPlantImage(src, current) {
+  if (current && current.complete && current.naturalWidth > 0) return current;
+  if (typeof Image === 'undefined') return null;
+  const img = new Image();
+  img.src = encodeURI(src);
+  return img;
+}
+
+export function getPeashooterIdleSprite() {
+  if (!_peashooterIdleImg) _peashooterIdleImg = _loadPlantImage('Assets/model/Sprites/Peashooter-sprite-sheet.png', _peashooterIdleImg);
+  return _peashooterIdleImg;
+}
+
+export function getPeashooterShootSprite() {
+  if (!_peashooterShootImg) _peashooterShootImg = _loadPlantImage('Assets/model/Sprites/peashooter-about2shoot-sprite-sheet.png', _peashooterShootImg);
+  return _peashooterShootImg;
+}
+
+export function getSnowPeaIdleSprite() {
+  if (!_snowPeaIdleImg) _snowPeaIdleImg = _loadPlantImage('Assets/model/Sprites/Snowpea-sprite-sheet.png', _snowPeaIdleImg);
+  return _snowPeaIdleImg;
+}
+
+export function getSnowPeaShootSprite() {
+  if (!_snowPeaShootImg) _snowPeaShootImg = _loadPlantImage('Assets/model/Sprites/snowpea-about2shoot-sprite-sheet.png', _snowPeaShootImg);
+  return _snowPeaShootImg;
+}
+
+export function getPeaProjSprite() {
+  if (!_peaProjImg) _peaProjImg = _loadPlantImage('Assets/model/Sprites/Peashooter-projectile.png', _peaProjImg);
+  return _peaProjImg;
+}
+
+export function getSnowPeaProjSprite() {
+  if (!_snowPeaProjImg) _snowPeaProjImg = _loadPlantImage('Assets/model/Sprites/snowpea-projectile.png', _snowPeaProjImg);
+  return _snowPeaProjImg;
+}
+
+// Preload on startup
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  getPeashooterIdleSprite();
+  getPeashooterShootSprite();
+  getSnowPeaIdleSprite();
+  getSnowPeaShootSprite();
+  getPeaProjSprite();
+  getSnowPeaProjSprite();
+}
 
 export const CrazyDave_WEAPON_GRAPHICS = {
   shovel: {
     name: 'Garden Shovel',
     id: 'crazydave_shovel',
-    desc: 'Crazy Dave\'s trusty steel garden trowel/shovel. Swings in a wide arc and pops Sun out of enemies.',
+    desc: 'Crazy Dave\'s trusty steel garden trowel/shovel.',
   }
 };
 
@@ -30,12 +133,6 @@ export function drawCrazyDaveShovel(
   ctx.save();
   ctx.translate(x, y);
   if (angle !== 0) ctx.rotate(angle);
-
-  const swingProgress = swingTimer > 0 ? Math.min(1.0, swingTimer / 16) : 0;
-  const swingOffset = Math.sin(swingProgress * Math.PI) * 0.45;
-
-  ctx.save();
-  ctx.rotate(swingOffset);
 
   const shaftLength = r * 1.5;
   const shaftWidth = 3.2;
@@ -100,7 +197,6 @@ export function drawCrazyDaveShovel(
   }
 
   ctx.restore();
-  ctx.restore();
 }
 
 /**
@@ -158,8 +254,8 @@ export function drawSunDrop(ctx, sun) {
   ctx.lineWidth = 1.4;
   ctx.stroke();
 
-  // 4. Inner Specular Glint & Happy Core
-  ctx.fillStyle = '#FEF08A'; // Pale Sun Glint
+  // 4. Inner Specular Glint & Core
+  ctx.fillStyle = '#FEF08A';
   ctx.beginPath();
   ctx.arc(-r * 0.25, -r * 0.25, r * 0.45, 0, Math.PI * 2);
   ctx.fill();
@@ -169,20 +265,11 @@ export function drawSunDrop(ctx, sun) {
   ctx.arc(-r * 0.35, -r * 0.35, r * 0.22, 0, Math.PI * 2);
   ctx.fill();
 
-  // Sun value mini badge if defined
-  if (sun.value) {
-    ctx.fillStyle = '#78350F';
-    ctx.font = 'bold 9px monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`${sun.value}`, 0, r * 0.1);
-  }
-
   ctx.restore();
 }
 
 /**
- * Draws a cute, authentic green Peashooter turret entity.
+ * Draws an animated green Peashooter turret using the official sprite sheets.
  */
 export function drawPeashooter(ctx, peashooter) {
   if (!peashooter) return;
@@ -190,108 +277,121 @@ export function drawPeashooter(ctx, peashooter) {
   const y = peashooter.y || 0;
   const r = peashooter.r || 18;
   const angle = peashooter.gunAngle || peashooter.angle || 0;
-  const isHit = peashooter.hitFlashTimer > 0;
+  const isFacingLeft = Math.abs(angle) > Math.PI / 2;
   const shootTimer = peashooter.shootAnimTimer || 0;
-  const recoilOffset = shootTimer > 0 ? Math.sin((shootTimer / 10) * Math.PI) * 4.0 : 0;
+  const isHit = peashooter.hitFlashTimer > 0;
+  const drawSize = r * 2.5;
+
+  const idleImg = getPeashooterIdleSprite();
+  const shootImg = getPeashooterShootSprite();
+  const hasIdle = Boolean(idleImg && idleImg.complete && idleImg.naturalWidth > 0);
+  const hasShoot = Boolean(shootImg && shootImg.complete && shootImg.naturalWidth > 0);
 
   ctx.save();
   ctx.translate(x, y);
 
-  // 1. Root Base / Leaf Skirt on floor
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#15803D'; // Deep leaf green
-  ctx.strokeStyle = '#0E0F14';
-  ctx.lineWidth = 1.2;
+  // Ground leaf base shadow
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.7, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+  ctx.fill();
 
-  for (let i = 0; i < 4; i++) {
-    const leafAngle = (i * Math.PI) / 2 + Math.PI / 4;
-    ctx.save();
-    ctx.rotate(leafAngle);
-    ctx.beginPath();
-    ctx.ellipse(r * 0.85, 0, r * 0.5, r * 0.25, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+  // Horizontal flip if facing left
+  if (isFacingLeft) {
+    ctx.scale(-1, 1);
   }
 
-  // 2. Stem Neck
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#22C55E';
-  ctx.fillRect(-3, -r * 0.6, 6, r * 0.8);
-  ctx.strokeStyle = '#0E0F14';
-  ctx.strokeRect(-3, -r * 0.6, 6, r * 0.8);
-
-  // 3. Directional Head & Snout (Rotated by aim angle)
-  ctx.save();
-  ctx.rotate(angle);
-  ctx.translate(-recoilOffset, 0);
-
-  // Back Leaf Pod
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#16A34A';
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.9, -2, r * 0.35, r * 0.2, -0.3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Round Head Body
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#4ADE80'; // Vivid pea green
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.75, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Snout Cylinder (Fires the peas)
-  const snoutLen = r * 0.75 + (shootTimer > 0 ? 3 : 0);
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#22C55E';
-  ctx.fillRect(r * 0.3, -r * 0.35, snoutLen, r * 0.7);
-  ctx.strokeStyle = '#0E0F14';
-  ctx.strokeRect(r * 0.3, -r * 0.35, snoutLen, r * 0.7);
-
-  // Snout Opening (Dark Void Barrel)
-  ctx.fillStyle = '#064E3B';
-  ctx.beginPath();
-  ctx.ellipse(r * 0.3 + snoutLen, 0, 3.5, r * 0.35, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Head Highlight
-  if (!isHit) {
-    ctx.fillStyle = '#BBF7D0';
-    ctx.beginPath();
-    ctx.arc(-r * 0.2, -r * 0.25, r * 0.25, 0, Math.PI * 2);
-    ctx.fill();
+  // Render sprite sheet frame
+  if (shootTimer > 0 && hasShoot) {
+    const frameIdx = Math.min(PEASHOOTER_SHOOT_RECTS.length - 1, Math.floor((1 - shootTimer / 8) * PEASHOOTER_SHOOT_RECTS.length));
+    const frame = PEASHOOTER_SHOOT_RECTS[frameIdx] || PEASHOOTER_SHOOT_RECTS[0];
+    ctx.drawImage(
+      shootImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
+    );
+  } else if (hasIdle) {
+    const tick = peashooter.animTick || 0;
+    const frameIdx = Math.floor(tick / 8) % PEASHOOTER_IDLE_RECTS.length;
+    const frame = PEASHOOTER_IDLE_RECTS[frameIdx] || PEASHOOTER_IDLE_RECTS[0];
+    ctx.drawImage(
+      idleImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
+    );
+  } else {
+    // Procedural Fallback
+    _drawProceduralPeashooter(ctx, r, isHit, shootTimer);
   }
 
-  ctx.restore();
   ctx.restore();
 }
 
 /**
- * Draws a vibrant dancing Sunflower entity.
+ * Draws an animated icy Snow Pea turret using the official sprite sheets.
  */
-export function drawSunflower(ctx, sunflower) {
-  if (!sunflower) return;
-  const x = sunflower.x || 0;
-  const y = sunflower.y || 0;
-  const r = sunflower.r || 18;
-  const isHit = sunflower.hitFlashTimer > 0;
-  const danceTime = Date.now() * 0.004;
-  const bobY = Math.sin(danceTime) * 2.0;
-  const swayAngle = Math.cos(danceTime) * 0.12;
+export function drawSnowPea(ctx, snowpea) {
+  if (!snowpea) return;
+  const x = snowpea.x || 0;
+  const y = snowpea.y || 0;
+  const r = snowpea.r || 18;
+  const angle = snowpea.gunAngle || snowpea.angle || 0;
+  const isFacingLeft = Math.abs(angle) > Math.PI / 2;
+  const shootTimer = snowpea.shootAnimTimer || 0;
+  const isHit = snowpea.hitFlashTimer > 0;
+  const drawSize = r * 2.5;
+
+  const idleImg = getSnowPeaIdleSprite();
+  const shootImg = getSnowPeaShootSprite();
+  const hasIdle = Boolean(idleImg && idleImg.complete && idleImg.naturalWidth > 0);
+  const hasShoot = Boolean(shootImg && shootImg.complete && shootImg.naturalWidth > 0);
 
   ctx.save();
   ctx.translate(x, y);
 
-  // 1. Solar Warmth Ambient Pulse
-  const glowR = r + 8 + (Math.sin(danceTime * 2) * 2);
-  const glow = ctx.createRadialGradient(0, 0, r * 0.5, 0, 0, glowR);
-  glow.addColorStop(0, 'rgba(250, 204, 21, 0.4)');
-  glow.addColorStop(1, 'rgba(250, 204, 21, 0)');
-  ctx.fillStyle = glow;
+  // Ground frost shadow
   ctx.beginPath();
-  ctx.arc(0, 0, glowR, 0, Math.PI * 2);
+  ctx.ellipse(0, r * 0.7, r * 0.95, r * 0.32, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(14, 116, 144, 0.42)';
   ctx.fill();
 
-  // 2. Base Leaves
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#16A34A';
+  // Horizontal flip if facing left
+  if (isFacingLeft) {
+    ctx.scale(-1, 1);
+  }
+
+  // Render sprite sheet frame
+  if (shootTimer > 0 && hasShoot) {
+    const frameIdx = Math.min(SNOWPEA_SHOOT_RECTS.length - 1, Math.floor((1 - shootTimer / 8) * SNOWPEA_SHOOT_RECTS.length));
+    const frame = SNOWPEA_SHOOT_RECTS[frameIdx] || SNOWPEA_SHOOT_RECTS[0];
+    ctx.drawImage(
+      shootImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
+    );
+  } else if (hasIdle) {
+    const tick = snowpea.animTick || 0;
+    const frameIdx = Math.floor(tick / 8) % SNOWPEA_IDLE_RECTS.length;
+    const frame = SNOWPEA_IDLE_RECTS[frameIdx] || SNOWPEA_IDLE_RECTS[0];
+    ctx.drawImage(
+      idleImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
+    );
+  } else {
+    // Procedural Fallback
+    _drawProceduralSnowPea(ctx, r, isHit, shootTimer);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural fallback for Peashooter
+ */
+function _drawProceduralPeashooter(ctx, r, isHit, shootTimer) {
+  // Leaf Skirt
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#15803D';
   ctx.strokeStyle = '#0E0F14';
   ctx.lineWidth = 1.2;
   for (let i = 0; i < 4; i++) {
@@ -299,251 +399,83 @@ export function drawSunflower(ctx, sunflower) {
     ctx.save();
     ctx.rotate(leafAngle);
     ctx.beginPath();
-    ctx.ellipse(r * 0.8, 0, r * 0.45, r * 0.22, 0, 0, Math.PI * 2);
+    ctx.ellipse(r * 0.7, 0, r * 0.4, r * 0.2, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
     ctx.restore();
   }
 
-  // 3. Stem with Sway
-  ctx.save();
-  ctx.translate(0, bobY);
-  ctx.rotate(swayAngle);
+  // Stem
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#22C55E';
+  ctx.fillRect(-2.5, -r * 0.6, 5, r * 0.7);
+  ctx.strokeRect(-2.5, -r * 0.6, 5, r * 0.7);
 
-  // 4. Yellow Sunflower Petals (12 petals)
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#FACC15'; // Sunny Yellow
-  ctx.strokeStyle = '#B45309';
-  ctx.lineWidth = 1.0;
-  for (let i = 0; i < 12; i++) {
-    const petalAngle = (i * Math.PI) / 6;
+  // Head
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#4ADE80';
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.5, r * 0.65, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Snout
+  const snoutLen = r * 0.65 + (shootTimer > 0 ? 3 : 0);
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#22C55E';
+  ctx.fillRect(r * 0.2, -r * 0.75, snoutLen, r * 0.5);
+  ctx.strokeRect(r * 0.2, -r * 0.75, snoutLen, r * 0.5);
+}
+
+/**
+ * Procedural fallback for Snow Pea
+ */
+function _drawProceduralSnowPea(ctx, r, isHit, shootTimer) {
+  // Leaf Skirt
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#0E7490';
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 4; i++) {
+    const leafAngle = (i * Math.PI) / 2 + Math.PI / 4;
     ctx.save();
-    ctx.rotate(petalAngle);
+    ctx.rotate(leafAngle);
     ctx.beginPath();
-    ctx.moveTo(r * 0.45, -3.0);
-    ctx.lineTo(r * 1.0, 0);
-    ctx.lineTo(r * 0.45, 3.0);
+    ctx.ellipse(r * 0.7, 0, r * 0.4, r * 0.2, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Stem
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#06B6D4';
+  ctx.fillRect(-2.5, -r * 0.6, 5, r * 0.7);
+  ctx.strokeRect(-2.5, -r * 0.6, 5, r * 0.7);
+
+  // Ice Crystals on Head Back
+  ctx.fillStyle = '#E0F2FE';
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.6, -r * 0.8 + i * 5);
+    ctx.lineTo(-r * 1.0, -r * 0.9 + i * 5);
+    ctx.lineTo(-r * 0.6, -r * 0.6 + i * 5);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    ctx.restore();
   }
 
-  // 5. Brown Seed Center Face
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#78350F';
+  // Head
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#38BDF8'; // Icy Sky Blue
   ctx.beginPath();
-  ctx.arc(0, 0, r * 0.55, 0, Math.PI * 2);
+  ctx.arc(0, -r * 0.5, r * 0.65, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#0E0F14';
-  ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  // Face Highlight
-  if (!isHit) {
-    ctx.fillStyle = '#92400E';
-    ctx.beginPath();
-    ctx.arc(-2, -2, r * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
-  ctx.restore();
+  // Snout
+  const snoutLen = r * 0.65 + (shootTimer > 0 ? 3 : 0);
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#0284C7';
+  ctx.fillRect(r * 0.2, -r * 0.75, snoutLen, r * 0.5);
+  ctx.strokeRect(r * 0.2, -r * 0.75, snoutLen, r * 0.5);
 }
 
 /**
- * Draws a sturdy Wall-nut barricade entity.
- */
-export function drawWallNut(ctx, wallnut) {
-  if (!wallnut) return;
-  const x = wallnut.x || 0;
-  const y = wallnut.y || 0;
-  const r = wallnut.r || 20;
-  const isHit = wallnut.hitFlashTimer > 0;
-  const hpRatio = (wallnut.hp !== undefined && wallnut.maxHp) ? (wallnut.hp / wallnut.maxHp) : 1.0;
-
-  ctx.save();
-  ctx.translate(x, y);
-
-  // 1. Oval Walnut Shell
-  ctx.fillStyle = isHit ? '#FFFFFF' : '#854D0E'; // Golden brown shell
-  ctx.strokeStyle = '#0E0F14';
-  ctx.lineWidth = 1.5;
-
-  ctx.beginPath();
-  ctx.ellipse(0, 0, r * 0.85, r * 1.05, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // 2. Shell Textures & Shading
-  if (!isHit) {
-    ctx.fillStyle = '#A16207'; // Shell Highlight
-    ctx.beginPath();
-    ctx.ellipse(-r * 0.25, -r * 0.2, r * 0.45, r * 0.65, -0.15, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#713F12'; // Base Shadow
-    ctx.beginPath();
-    ctx.ellipse(r * 0.3, r * 0.3, r * 0.35, r * 0.55, 0.15, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 3. Crack / Bandaid overlay if damaged (<60% HP)
-  if (hpRatio < 0.65) {
-    ctx.strokeStyle = '#0E0F14';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.3, -r * 0.4);
-    ctx.lineTo(-r * 0.1, -r * 0.1);
-    ctx.lineTo(-r * 0.35, r * 0.2);
-    ctx.stroke();
-
-    if (hpRatio < 0.35) {
-      // White/Cream Bandaid
-      ctx.fillStyle = '#FEF08A';
-      ctx.save();
-      ctx.translate(r * 0.1, r * 0.1);
-      ctx.rotate(0.4);
-      ctx.fillRect(-8, -3, 16, 6);
-      ctx.strokeStyle = '#A16207';
-      ctx.strokeRect(-8, -3, 16, 6);
-      ctx.restore();
-    }
-  }
-
-  ctx.restore();
-}
-
-/**
- * Draws an agitated ticking Cherry Bomb entity.
- */
-export function drawCherryBomb(ctx, cherrybomb) {
-  if (!cherrybomb) return;
-  const x = cherrybomb.x || 0;
-  const y = cherrybomb.y || 0;
-  const r = cherrybomb.r || 16;
-  const fuseTimer = cherrybomb.fuseTimer || 45;
-  const maxFuse = cherrybomb.maxFuse || 45;
-  const fuseRatio = 1.0 - (fuseTimer / maxFuse);
-  const swellScale = 1.0 + fuseRatio * 0.4;
-  const isFlashing = Math.floor(Date.now() / 80) % 2 === 0;
-
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(swellScale, swellScale);
-
-  // 1. Green Stem connecting twin cherries
-  ctx.strokeStyle = '#15803D';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.5, -r * 0.2);
-  ctx.quadraticCurveTo(0, -r * 1.1, 0, -r * 1.1);
-  ctx.quadraticCurveTo(0, -r * 1.1, r * 0.5, -r * 0.2);
-  ctx.stroke();
-
-  // Fuse Spark at apex
-  ctx.fillStyle = isFlashing ? '#FACC15' : '#EF4444';
-  ctx.beginPath();
-  ctx.arc(0, -r * 1.15, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. Left Cherry Sphere
-  ctx.fillStyle = isFlashing ? '#F87171' : '#DC2626';
-  ctx.strokeStyle = '#0E0F14';
-  ctx.lineWidth = 1.4;
-
-  ctx.beginPath();
-  ctx.arc(-r * 0.5, 0, r * 0.65, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // 3. Right Cherry Sphere
-  ctx.beginPath();
-  ctx.arc(r * 0.5, 0, r * 0.65, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Specular Highlights
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(-r * 0.65, -r * 0.2, 2.5, 0, Math.PI * 2);
-  ctx.arc(r * 0.35, -r * 0.2, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-}
-
-/**
- * Draws a charging motorized Lawn Mower entity.
- */
-export function drawLawnMower(ctx, mower) {
-  if (!mower) return;
-  const x = mower.x || 0;
-  const y = mower.y || 0;
-  const r = mower.r || 24;
-  const angle = mower.angle || 0;
-  const bladeRot = (Date.now() * 0.04) % (Math.PI * 2);
-
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-
-  const mW = r * 1.6;
-  const mH = r * 1.1;
-
-  // 1. Wheels (4 black rubber tires)
-  ctx.fillStyle = '#1E293B';
-  ctx.fillRect(-mW * 0.45, -mH * 0.65, 8, 5);
-  ctx.fillRect(mW * 0.25, -mH * 0.65, 8, 5);
-  ctx.fillRect(-mW * 0.45, mH * 0.55, 8, 5);
-  ctx.fillRect(mW * 0.25, mH * 0.55, 8, 5);
-
-  // 2. Red Metal Chassis
-  ctx.fillStyle = '#DC2626'; // Bright Mower Red
-  ctx.fillRect(-mW * 0.5, -mH * 0.5, mW, mH);
-  ctx.strokeStyle = '#0E0F14';
-  ctx.lineWidth = 1.4;
-  ctx.strokeRect(-mW * 0.5, -mH * 0.5, mW, mH);
-
-  // Chassis Highlight
-  ctx.fillStyle = '#EF4444';
-  ctx.fillRect(-mW * 0.45, -mH * 0.45, mW * 0.9, mH * 0.4);
-
-  // 3. Motor Block / Engine
-  ctx.fillStyle = '#475569';
-  ctx.fillRect(-mW * 0.2, -mH * 0.35, mW * 0.4, mH * 0.7);
-  ctx.strokeStyle = '#0E0F14';
-  ctx.strokeRect(-mW * 0.2, -mH * 0.35, mW * 0.4, mH * 0.7);
-
-  // 4. Spinning Front Blades
-  ctx.save();
-  ctx.translate(mW * 0.5, 0);
-  ctx.rotate(bladeRot);
-  ctx.strokeStyle = '#E2E8F0';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(-6, -6);
-  ctx.lineTo(6, 6);
-  ctx.moveTo(6, -6);
-  ctx.lineTo(-6, 6);
-  ctx.stroke();
-  ctx.restore();
-
-  // 5. Chrome Handlebars
-  ctx.strokeStyle = '#94A3B8';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.moveTo(-mW * 0.4, -mH * 0.3);
-  ctx.lineTo(-mW * 0.85, -mH * 0.2);
-  ctx.moveTo(-mW * 0.4, mH * 0.3);
-  ctx.lineTo(-mW * 0.85, mH * 0.2);
-  ctx.moveTo(-mW * 0.85, -mH * 0.2);
-  ctx.lineTo(-mW * 0.85, mH * 0.2);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-/**
- * Draws a crisp spherical green Pea projectile.
+ * Draws a kinetic green Pea projectile.
  */
 export function drawPeaBullet(ctx, p) {
   if (!p) return;
@@ -551,38 +483,88 @@ export function drawPeaBullet(ctx, p) {
   const y = p.y || 0;
   const r = p.r || 5.5;
 
+  const projImg = getPeaProjSprite();
+  const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
+
   ctx.save();
   ctx.translate(x, y);
 
-  // 1. Subtle green speed halo
-  const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, r + 4);
-  halo.addColorStop(0, 'rgba(134, 239, 172, 0.7)');
-  halo.addColorStop(1, 'rgba(34, 197, 94, 0)');
-  ctx.fillStyle = halo;
-  ctx.beginPath();
-  ctx.arc(0, 0, r + 4, 0, Math.PI * 2);
-  ctx.fill();
+  if (hasImg) {
+    const frame = PEA_PROJ_RECTS[0];
+    const size = r * 2.2;
+    ctx.drawImage(projImg, frame.sx, frame.sy, frame.sw, frame.sh, -size / 2, -size / 2, size, size);
+  } else {
+    // Glowing Pea Sphere
+    const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, r + 4);
+    halo.addColorStop(0, 'rgba(134, 239, 172, 0.7)');
+    halo.addColorStop(1, 'rgba(34, 197, 94, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 4, 0, Math.PI * 2);
+    ctx.fill();
 
-  // 2. Solid Pea Sphere
-  ctx.fillStyle = '#22C55E'; // Vibrant Pea Green
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = '#22C55E';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
 
-  ctx.strokeStyle = '#065F46'; // Dark Emerald Outline
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
+    ctx.strokeStyle = '#065F46';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
 
-  // 3. Specular Glint
-  ctx.fillStyle = '#DCFCE7';
-  ctx.beginPath();
-  ctx.arc(-r * 0.35, -r * 0.35, r * 0.4, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(-r * 0.4, -r * 0.4, r * 0.2, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Draws an icy cyan Snow Pea projectile with frost trail.
+ */
+export function drawSnowPeaBullet(ctx, p) {
+  if (!p) return;
+  const x = p.x || 0;
+  const y = p.y || 0;
+  const r = p.r || 5.5;
+
+  const projImg = getSnowPeaProjSprite();
+  const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  if (hasImg) {
+    const frame = SNOWPEA_PROJ_RECTS[0];
+    const size = r * 2.2;
+    ctx.drawImage(projImg, frame.sx, frame.sy, frame.sw, frame.sh, -size / 2, -size / 2, size, size);
+  } else {
+    // Chilling Frost Halo
+    const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, r + 5);
+    halo.addColorStop(0, 'rgba(186, 230, 253, 0.8)');
+    halo.addColorStop(0.5, 'rgba(56, 189, 248, 0.4)');
+    halo.addColorStop(1, 'rgba(2, 132, 199, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#38BDF8'; // Vivid Ice Blue
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#0369A1';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore();
 }

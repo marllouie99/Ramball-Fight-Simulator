@@ -1675,26 +1675,45 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, `renderCrazyDaveGrassFloor (circular arena) canvas stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
     state.arena.shape = 'rectangle';
 
-    // 4. Verify Plant Minion Entity flags across all flora types
-    dave.sunCount = 1000; // Unlimited sun for test
-    dave.plantSunflower();
-    dave.plantPeashooter();
-    dave.plantWallNut();
-    dave.plantCherryBomb(gojo);
-    dave.launchLawnMower(gojo);
+    // 4. Verify Zero Basic Attack and 2 Plant Abilities (Peashooter & Snow Pea)
+    assert(dave.damage === 0, 'Crazy Dave must have 0 basic attack damage');
+    assert(dave.canShoot === false, 'Crazy Dave must have canShoot === false');
+
+    dave.sunCount = 1000; // Sufficient sun for testing
+    dave.plantPeashooter(gojo);
+    dave.plantSnowPea(gojo);
 
     const plantEntities = state.fighters.filter(f => f && f.owner === dave && (f.isDeployable || f.isMinion));
-    assert(plantEntities.length === 5, `Expected 5 deployed plant entities for Crazy Dave (got ${plantEntities.length})`);
+    assert(plantEntities.length === 2, `Expected 2 deployed plant entities for Crazy Dave (got ${plantEntities.length})`);
     for (const plant of plantEntities) {
-      assert(plant.isMinion === true, `Plant ${plant.characterId || plant.name} must have isMinion === true`);
-      assert(plant.isPlant === true, `Plant ${plant.characterId || plant.name} must have isPlant === true`);
-      assert(plant.isDeployable === true, `Plant ${plant.characterId || plant.name} must have isDeployable === true`);
-      assert(plant.isPlantMinion === true, `Plant ${plant.characterId || plant.name} must have isPlantMinion === true`);
-      assert(plant.owner === dave, `Plant ${plant.characterId || plant.name} must have owner === dave`);
+      assert(plant.isMinion === true, `Plant ${plant.name} must have isMinion === true`);
+      assert(plant.isPlant === true, `Plant ${plant.name} must have isPlant === true`);
+      assert(plant.isDeployable === true, `Plant ${plant.name} must have isDeployable === true`);
+      assert(plant.isPlantMinion === true, `Plant ${plant.name} must have isPlantMinion === true`);
+      assert(plant.owner === dave, `Plant ${plant.name} must have owner === dave`);
     }
 
-    const illusionPlants = state.illusions.filter(f => f && f.owner === dave);
-    assert(illusionPlants.length === 5, `Expected 5 plant entities in state.illusions (got ${illusionPlants.length})`);
+    // Verify Snow Pea projectile slow on hit
+    const snowPea = plantEntities.find(p => p.type === 'SnowPea');
+    assert(snowPea !== undefined, 'Snow Pea entity must exist in active plants');
+    snowPea._fireSnowPea(0, 0);
+    const projs = (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) ? projectileSystem.projectiles : state.projectiles;
+    const snowProj = projs.find(p => p.visual === 'snowPeaBullet');
+    assert(snowProj !== undefined, 'Snow Pea projectile must be created with visual snowPeaBullet');
+    let slowApplied = false;
+    let appliedFrames = 0;
+    let appliedMult = 0;
+    const testTarget = {
+      applySlow: (frames, mult) => {
+        slowApplied = true;
+        appliedFrames = frames;
+        appliedMult = mult;
+      }
+    };
+    snowProj.onHit(testTarget);
+    assert(slowApplied === true, 'Snow Pea onHit must call target.applySlow()');
+    assert(appliedFrames === 90, `Snow Pea must apply 90 frames of slow (got ${appliedFrames})`);
+    assert(appliedMult === 0.45, `Snow Pea must apply 0.45 speed multiplier (got ${appliedMult})`);
 
 
 
