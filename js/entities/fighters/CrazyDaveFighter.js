@@ -550,7 +550,7 @@ export class CrazyDaveFighter extends Fighter {
     this.speed = cfg.speed || 5.2;
     this.baseSpeed = cfg.speed || 5.2;
 
-    // Zero basic attack (Dave does not attack directly, aim rotation disabled)
+    // Zero basic attack (Dave does not attack directly; orientation flips horizontally without rotation)
     this.damage = 0;
     this.cooldown = 999999;
     this.shootCooldown = 999999;
@@ -558,6 +558,7 @@ export class CrazyDaveFighter extends Fighter {
     this.canShoot = false;
     this.angle = 0;
     this.gunAngle = 0;
+    this.facingLeft = false;
     this.plantingPauseTimer = 0;
 
     // Sun Economy State
@@ -580,13 +581,17 @@ export class CrazyDaveFighter extends Fighter {
   }
 
   canAim() {
-    return false;
+    return true;
   }
 
   aim(opponent) {
-    // Dave does not do basic attacks; aim rotation is disabled
-    this.gunAngle = 0;
+    if (!opponent) return;
+    // Dave does NOT rotate at diagonal angles; body orientation is strictly horizontal (0 or PI)
     this.angle = 0;
+    if (opponent.x !== undefined) {
+      this.facingLeft = opponent.x < this.x;
+      this.gunAngle = this.facingLeft ? Math.PI : 0;
+    }
   }
 
   shoot(ownerIndex) {
@@ -904,9 +909,15 @@ export class CrazyDaveFighter extends Fighter {
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
 
-    // Enforce no aim rotation and zero projectile shooting
+    // Enforce strictly zero angular rotation and update horizontal facing direction
     this.angle = 0;
-    this.gunAngle = 0;
+    if (Math.abs(this.vx) > 0.3) {
+      this.facingLeft = this.vx < 0;
+      this.gunAngle = this.facingLeft ? Math.PI : 0;
+    } else if (opponent && opponent.x !== undefined && opponent.hp > 0) {
+      this.facingLeft = opponent.x < this.x;
+      this.gunAngle = this.facingLeft ? Math.PI : 0;
+    }
     this.shootCooldown = 999999;
 
     // Cooldown updates

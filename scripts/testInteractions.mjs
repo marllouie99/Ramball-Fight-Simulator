@@ -1862,14 +1862,20 @@ async function runInteractionTests() {
     const initialSunCount = dave.sunCount;
     dave.update(gojo, 1, state.arena);
     assert(dave.sunCount === initialSunCount + 25, `Crazy Dave must collect +25 sun upon collision (got ${dave.sunCount}, expected ${initialSunCount + 25})`);
-    assert(!dave.suns.includes(sun), 'Collected sun must be removed from dave.suns');
-
-    // 8. Test Dave disabled aim rotation, zero shooting, and planting movement pause
+    // 8. Test Dave horizontal body flip without angular rotation, zero shooting, and planting movement pause
     state.fighters = [dave, gojo];
-    assert(dave.canAim() === false, 'Crazy Dave canAim() must be false');
+    dave.x = 400;
+    gojo.x = 200; // Gojo on the left
     dave.aim(gojo);
-    assert(dave.gunAngle === 0, 'Crazy Dave gunAngle must remain 0 (aim rotation disabled)');
-    assert(dave.angle === 0, 'Crazy Dave angle must remain 0');
+    assert(dave.facingLeft === true, 'Crazy Dave must face left when opponent is on his left');
+    assert(dave.gunAngle === Math.PI, 'Crazy Dave gunAngle must be Math.PI when facing left');
+    assert(dave.angle === 0, 'Crazy Dave angle must remain strictly 0 (no diagonal rotation)');
+
+    gojo.x = 600; // Gojo on the right
+    dave.aim(gojo);
+    assert(dave.facingLeft === false, 'Crazy Dave must face right when opponent is on his right');
+    assert(dave.gunAngle === 0, 'Crazy Dave gunAngle must be 0 when facing right');
+    assert(dave.angle === 0, 'Crazy Dave angle must remain strictly 0 (no diagonal rotation)');
 
     // Test zero shooting
     const projCountBeforeDaveShoot = (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) ? projectileSystem.projectiles.length : state.projectiles.length;

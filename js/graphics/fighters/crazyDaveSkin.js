@@ -246,44 +246,45 @@ export function drawCrazyDaveSkin(ctx, fighter) {
   if (!fighter) return;
 
   const r = fighter.r || 25;
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
-  const isFacingLeft = Math.abs(angle) > Math.PI / 2;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  let isFacingLeft = false;
+  if (!isPodiumPreview) {
+    if (fighter.facingLeft !== undefined) {
+      isFacingLeft = Boolean(fighter.facingLeft);
+    } else if (fighter.gunAngle !== undefined && fighter.gunAngle !== 0) {
+      isFacingLeft = Math.abs(fighter.gunAngle) > Math.PI / 2;
+    } else if (fighter.vx !== undefined && Math.abs(fighter.vx) > 0.1) {
+      isFacingLeft = fighter.vx < 0;
+    }
+  }
+
   const swingTimer = fighter.shovelSwingTimer || 0;
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
 
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
+  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
-  // 1. Draw Active Sun Drops managed by Dave if in standalone mode
-  if (Array.isArray(fighter.suns) && fighter.suns.length > 0) {
-    fighter.suns.forEach(sun => {
-      // Sun positions are relative to world coordinates, rendered at their world pos
-      // Since we already translated to fighter.x, fighter.y, we render them in world space below
-    });
-  }
-
-  // 2. Rotate to aim angle and handle left-facing mirror
-  ctx.rotate(angle);
+  // Dave stays strictly upright with ZERO angular rotation (no ctx.rotate); flips horizontally via scale(-1, 1)
   if (isFacingLeft) {
-    ctx.scale(1, -1);
+    ctx.scale(-1, 1);
   }
 
-  // 3. Back Hand (Positioned behind body)
+  // 1. Back Hand (Positioned behind body)
   if (!shouldHideHands) {
     const backHandRadius = getHandSize(3.8);
     drawPixelHand(ctx, r * 0.6, -r * 0.45, backHandRadius, '#FFE0BD', '#0E0F14');
   }
 
-  // 4. Core Pixel Body
+  // 2. Core Pixel Body
   drawCrazyDavePixelBody(ctx, r);
 
-  // 5. Hair / Pan Asset Overlay if loaded
+  // 3. Hair / Pan Asset Overlay if loaded
   _drawCrazyDaveHair(ctx, r, isFacingLeft);
 
-  // 6. In-Hand Weapon: Garden Shovel
-  drawCrazyDaveShovel(ctx, 0, 0, 0, r, !isFacingLeft, swingTimer, false, fighter.color || '#84CC16', shouldHideHands);
+  // 4. In-Hand Weapon: Garden Shovel
+  drawCrazyDaveShovel(ctx, 0, 0, 0, r, true, swingTimer, false, fighter.color || '#84CC16', shouldHideHands);
 
-  // 7. Front Hand (Holding shovel handle)
+  // 5. Front Hand (Holding shovel handle)
   if (!shouldHideHands) {
     const frontHandRadius = getHandSize(4.2);
     drawPixelHand(ctx, r * 0.7, 0, frontHandRadius, '#FFE0BD', '#0E0F14');
