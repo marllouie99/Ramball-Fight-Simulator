@@ -75,11 +75,8 @@ export class PeashooterEntity extends Fighter {
     this.facingDirection = (facingDirection === -1 || facingDirection === Math.PI) ? -1 : 1;
     this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
 
-    this.shootCooldown = 15;
+    this.shootCooldown = 0;
     this.shootCooldownMax = cfg.peashooterFireRate || 22;
-    this.shootWindupTimer = 0;
-    this.shootWindupMax = 12;
-    this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
   }
@@ -176,25 +173,14 @@ export class PeashooterEntity extends Fighter {
 
     // Only shoot if a valid enemy is detected in the straight forward direction
     if (targetInLane) {
-      if (this.shootWindupTimer > 0) {
-        this.shootWindupTimer--;
-        if (this.shootWindupTimer === 0) {
-          this.shootCooldown = this.shootCooldownMax;
-          this.postShootTimer = 4;
-          this._firePea(this.gunAngle, ownerIndex);
-        }
-      } else if (this.postShootTimer > 0) {
-        this.postShootTimer--;
-      } else if (this.shootCooldown > 0) {
+      if (this.shootCooldown > 0) {
         this.shootCooldown--;
       } else {
-        // Start "about to shoot" windup swell animation
-        this.shootWindupTimer = this.shootWindupMax;
+        this.shootCooldown = this.shootCooldownMax;
+        this._firePea(this.gunAngle, ownerIndex);
       }
     } else {
       if (this.shootCooldown > 0) this.shootCooldown--;
-      this.shootWindupTimer = 0;
-      if (this.postShootTimer > 0) this.postShootTimer--;
     }
   }
 
@@ -300,11 +286,8 @@ export class SnowPeaEntity extends Fighter {
     this.facingDirection = (facingDirection === -1 || facingDirection === Math.PI) ? -1 : 1;
     this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
 
-    this.shootCooldown = 15;
+    this.shootCooldown = 0;
     this.shootCooldownMax = cfg.snowPeaFireRate || 24;
-    this.shootWindupTimer = 0;
-    this.shootWindupMax = 12;
-    this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
   }
@@ -401,25 +384,14 @@ export class SnowPeaEntity extends Fighter {
 
     // Only shoot if a valid enemy is detected in the straight forward direction
     if (targetInLane) {
-      if (this.shootWindupTimer > 0) {
-        this.shootWindupTimer--;
-        if (this.shootWindupTimer === 0) {
-          this.shootCooldown = this.shootCooldownMax;
-          this.postShootTimer = 4;
-          this._fireSnowPea(this.gunAngle, ownerIndex);
-        }
-      } else if (this.postShootTimer > 0) {
-        this.postShootTimer--;
-      } else if (this.shootCooldown > 0) {
+      if (this.shootCooldown > 0) {
         this.shootCooldown--;
       } else {
-        // Start "about to shoot" windup swell animation
-        this.shootWindupTimer = this.shootWindupMax;
+        this.shootCooldown = this.shootCooldownMax;
+        this._fireSnowPea(this.gunAngle, ownerIndex);
       }
     } else {
       if (this.shootCooldown > 0) this.shootCooldown--;
-      this.shootWindupTimer = 0;
-      if (this.postShootTimer > 0) this.postShootTimer--;
     }
   }
 

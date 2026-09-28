@@ -1714,21 +1714,20 @@ async function runInteractionTests() {
     snowProj.onHit(testTarget);
     assert(slowApplied === true, 'Snow Pea onHit must call target.applySlow()');
     assert(appliedFrames === 90, `Snow Pea must apply 90 frames of slow (got ${appliedFrames})`);
-    // Verify Peashooter and Snow Pea "about to shoot" windup animation cycle
+    // Verify Peashooter and Snow Pea direct firing without windup animation
     const peashooter = plantEntities.find(p => p.type === 'Peashooter');
     assert(peashooter !== undefined, 'Peashooter entity must exist in active plants');
     peashooter.shootCooldown = 0;
-    peashooter.shootWindupTimer = 0;
+    const initialPeaCount = projs.length;
     peashooter.update(gojo, 0, state.arena);
-    assert(peashooter.shootWindupTimer > 0, `Peashooter must enter windup when about to shoot (got windup ${peashooter.shootWindupTimer})`);
+    assert(projs.length > initialPeaCount, 'Peashooter must fire directly when enemy is detected in lane and cooldown is ready');
 
-    // Verify drawing during windup and idle passes with 0 canvas stack depth
+    // Verify drawing passes with 0 canvas stack depth
     mockCtx.resetStackDepth();
     peashooter.draw(mockCtx);
-    assert(mockCtx.getStackDepth() === 0, 'peashooter.draw during windup must maintain 0 canvas stack depth');
-    snowPea.shootWindupTimer = 6;
+    assert(mockCtx.getStackDepth() === 0, 'peashooter.draw must maintain 0 canvas stack depth');
     snowPea.draw(mockCtx);
-    assert(mockCtx.getStackDepth() === 0, 'snowPea.draw during windup must maintain 0 canvas stack depth');
+    assert(mockCtx.getStackDepth() === 0, 'snowPea.draw must maintain 0 canvas stack depth');
 
     // Verify projectile drawing
     const { drawPeaBullet, drawSnowPeaBullet } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
@@ -1736,6 +1735,8 @@ async function runInteractionTests() {
     drawPeaBullet(mockCtx, { x: 100, y: 100, r: 6, life: 30 });
     assert(mockCtx.getStackDepth() === 0, 'drawPeaBullet must maintain 0 canvas stack depth');
     drawSnowPeaBullet(mockCtx, { x: 100, y: 100, r: 6, life: 30 });
+    assert(mockCtx.getStackDepth() === 0, 'drawSnowPeaBullet must maintain 0 canvas stack depth');
+
     // 5. Verify Grass Tile Centering, Immovable Positioning, and Straight Left/Right Aiming
     const { getNearestGrassTileCenter } = await import('../js/graphics/renderers/grassFloorRenderer.js');
     const expectedTileCenter = getNearestGrassTileCenter(dave.x + Math.cos(dave.gunAngle || 0) * 32, dave.y + Math.sin(dave.gunAngle || 0) * 32, state.arena);
@@ -1757,32 +1758,32 @@ async function runInteractionTests() {
     assert(peashooter.facingDirection === 1, 'Peashooter must be committed to facing RIGHT (+1)');
     assert(peashooter.gunAngle === 0, 'Peashooter gunAngle must be committed to 0');
 
-    // Test 1: Enemy in front (right) within lane tolerance (dy <= 85) -> triggers windup
+    // Test 1: Enemy in front (right) within lane tolerance (dy <= 85) -> fires pea directly
     gojo.x = peashooter.x + 100;
     gojo.y = peashooter.y + 40;
     peashooter.shootCooldown = 0;
-    peashooter.shootWindupTimer = 0;
+    const countBeforeFront = projs.length;
     peashooter.update(gojo, 0, state.arena);
-    assert(peashooter.shootWindupTimer > 0, 'Plant must detect enemy in straight forward lane and start windup');
+    assert(projs.length > countBeforeFront, 'Plant must detect enemy in straight forward lane and shoot directly');
 
-    // Test 2: Enemy behind (left) -> IGNORED, no windup, NO angle change
+    // Test 2: Enemy behind (left) -> IGNORED, no shoot, NO angle change
     gojo.x = peashooter.x - 100;
     gojo.y = peashooter.y;
     peashooter.shootCooldown = 0;
-    peashooter.shootWindupTimer = 0;
+    const countBeforeBehind = projs.length;
     peashooter.aim(gojo); // Attempt external aim
     peashooter.update(gojo, 0, state.arena);
     assert(peashooter.gunAngle === 0, 'Plant must NOT change angle when enemy moves behind it');
     assert(peashooter.facingDirection === 1, 'Plant must retain committed facing direction');
-    assert(peashooter.shootWindupTimer === 0, 'Plant must NOT target or shoot enemies behind it');
+    assert(projs.length === countBeforeBehind, 'Plant must NOT target or shoot enemies behind it');
 
     // Test 3: Enemy in front but outside lane tolerance (dy > 85) -> IGNORED
     gojo.x = peashooter.x + 100;
     gojo.y = peashooter.y + 120; // dy = 120 > 85
     peashooter.shootCooldown = 0;
-    peashooter.shootWindupTimer = 0;
+    const countBeforeOffLane = projs.length;
     peashooter.update(gojo, 0, state.arena);
-    assert(peashooter.shootWindupTimer === 0, 'Plant must NOT target enemies outside its straight horizontal lane');
+    assert(projs.length === countBeforeOffLane, 'Plant must NOT target enemies outside its straight horizontal lane');
 
     // Test 4: Projectile Mouth Spawn Position
     // Peashooter mouth spawn: x + 22, y - 17
