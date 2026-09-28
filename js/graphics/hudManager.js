@@ -1224,8 +1224,9 @@ function updateHealthHud() {
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)));
   const throttleInterval = isLowQuality ? 8 : 4;
   const isCriticalState = ['roundEnd', 'matchEnd', 'countdown'].includes(state.gameState);
+  const isInitialCacheEmpty = (_hudCache.fighters.size === 0 && _hudCache.teams.size === 0);
   
-  if (!isCriticalState && (state._hudFrameCount % throttleInterval !== 0)) {
+  if (!isCriticalState && !isInitialCacheEmpty && (state._hudFrameCount % throttleInterval !== 0)) {
     return; // Skip DOM update this frame to preserve CPU and lock 60 FPS
   }
 
@@ -1541,6 +1542,12 @@ function updateHealthHud() {
       } else {
         info.push(`<b>PRIDE:</b> ${f.prideStacks || 0}/${f.prideMaxStacks || 5}`);
       }
+    } else if (f.characterId === 'crazydave' || f.type === 'crazydave' || f._def?.id === 'crazydave' || f._def?.type === 'crazydave' || f.isCrazyDave) {
+      const sun = Math.max(0, Math.round(f.sunCount || 0));
+      info.push(`<b>$UN:</b> ${sun}`);
+      const activePeas = (f.activePeashooters || []).filter(p => p && p.hp > 0).length;
+      const activeSnow = (f.activeSnowPeas || []).filter(s => s && s.hp > 0).length;
+      info.push(`<b>Plants:</b> ${activePeas + activeSnow}/6`);
     } else {
       const isTacticalChar = ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType);
       if (!isTacticalChar) {
@@ -2249,7 +2256,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>') || line.includes('<b>$UN:</b>') || line.includes('<b>SUN:</b>') || line.includes('<b>Plants:</b>'));
     }
     if (info.length === 0) return '';
     
@@ -2781,7 +2788,7 @@ function updateHealthHud() {
         const isYutaFighter = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
         let nameColor = (state.arenaTheme === 'dark') ? (isYutaFighter ? '#FF1493' : '#ffffff') : '#000000';
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
-        const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
+        const fighterStats = state.leaderboard ? (state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 }) : { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
         const losses = fighterStats.losses;
         const totalGames = careerWins + losses;

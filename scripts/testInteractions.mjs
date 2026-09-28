@@ -45,20 +45,54 @@ globalThis.devicePixelRatio = 1;
 globalThis.matchMedia = () => ({ addEventListener: () => {}, removeEventListener: () => {}, matches: false });
 globalThis.addEventListener = () => {};
 globalThis.removeEventListener = () => {};
+const _mockElements = new Map();
 globalThis.document = {
   addEventListener: () => {},
   removeEventListener: () => {},
   getElementById: (id) => {
     if (id === 'arena') return mockCanvas;
-    const el = { style: {}, classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false }, textContent: '', innerHTML: '', addEventListener: () => {}, appendChild: () => ({}), removeChild: () => ({}), children: [], querySelector: () => null, querySelectorAll: () => [] };
-    el.firstElementChild = el;
-    return el;
+    if (!_mockElements.has(id)) {
+      const el = globalThis.document.createElement('div');
+      el.id = id;
+      _mockElements.set(id, el);
+    }
+    return _mockElements.get(id);
   },
   querySelector: () => null,
   querySelectorAll: () => [],
   createElement: (tag) => {
     if (tag === 'canvas') return mockCanvas;
-    const el = { style: {}, classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false }, textContent: '', innerHTML: '', addEventListener: () => {}, appendChild: () => ({}), removeChild: () => ({}), children: [], querySelector: () => null, querySelectorAll: () => [] };
+    const el = {
+      id: '',
+      tagName: tag.toUpperCase(),
+      style: {},
+      classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+      textContent: '',
+      _innerHTML: '',
+      get innerHTML() { return this._innerHTML; },
+      set innerHTML(val) {
+        this._innerHTML = val;
+        if (this.firstElementChild && this.firstElementChild !== this) {
+          this.firstElementChild._innerHTML = val;
+        }
+      },
+      addEventListener: () => {},
+      appendChild: (child) => {
+        el.children.push(child);
+        if (child) {
+          el._innerHTML = (el._innerHTML || '') + (child._innerHTML || child.innerHTML || '');
+        }
+        return child;
+      },
+      removeChild: (child) => {
+        const idx = el.children.indexOf(child);
+        if (idx !== -1) el.children.splice(idx, 1);
+        return child;
+      },
+      children: [],
+      querySelector: () => null,
+      querySelectorAll: () => []
+    };
     el.firstElementChild = el;
     return el;
   },
@@ -2087,6 +2121,25 @@ async function runInteractionTests() {
     dave.update(gojo, 1, state.arena);
     assert(dave.lastPlantedType === 'snowpea', 'Dave AI must alternate back to Snow Pea to maintain balanced flora arsenal');
 
+    // 12e. HUD Stats Amount of Sun ($UN: XX)
+    const origStatsToggle = CONFIG.darkModeShowHudStats;
+    CONFIG.darkModeShowHudStats = 1;
+    dave.sunCount = 275;
+    state.fighters = [dave, gojo];
+    state.mode = '1v1';
+    state.ctx = mockCtx;
+    state.canvas = mockCanvas;
+    const { drawHUD, clearHealthHud } = await import('../js/graphics/hudManager.js');
+    clearHealthHud();
+    drawHUD();
+    const leftContainer = document.getElementById('healthHudLeft');
+    const rightContainer = document.getElementById('healthHudRight');
+    const bottomContainer = document.getElementById('healthHud');
+    const hudContent = (leftContainer?.innerHTML || '') + (rightContainer?.innerHTML || '') + (bottomContainer?.innerHTML || '');
+    assert(hudContent.includes('$UN:') && hudContent.includes('275'), 'HUD Stats HTML must display $UN: 275 for Crazy Dave');
+    assert(hudContent.includes('Plants:'), 'HUD Stats HTML must display Plants: count for Crazy Dave');
+    CONFIG.darkModeShowHudStats = origStatsToggle;
+
     // Restore audioSystem.playSFX
     audioSystem.playSFX = origPlaySFX;
 
@@ -2099,7 +2152,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI & complete debuff immunity verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI, $UN: XX HUD stats & complete debuff immunity verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');
