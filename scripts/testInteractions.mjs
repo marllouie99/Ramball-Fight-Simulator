@@ -1864,7 +1864,39 @@ async function runInteractionTests() {
     assert(dave.sunCount === initialSunCount + 25, `Crazy Dave must collect +25 sun upon collision (got ${dave.sunCount}, expected ${initialSunCount + 25})`);
     assert(!dave.suns.includes(sun), 'Collected sun must be removed from dave.suns');
 
-    // 8. Verify isCrazyDavePresent returns false when no Dave is present
+    // 8. Test Dave disabled aim rotation, zero shooting, and planting movement pause
+    state.fighters = [dave, gojo];
+    assert(dave.canAim() === false, 'Crazy Dave canAim() must be false');
+    dave.aim(gojo);
+    assert(dave.gunAngle === 0, 'Crazy Dave gunAngle must remain 0 (aim rotation disabled)');
+    assert(dave.angle === 0, 'Crazy Dave angle must remain 0');
+
+    // Test zero shooting
+    const projCountBeforeDaveShoot = (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) ? projectileSystem.projectiles.length : state.projectiles.length;
+    const shootResult = dave.shoot(1);
+    assert(shootResult === false, 'dave.shoot() must return false');
+    const projCountAfterDaveShoot = (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) ? projectileSystem.projectiles.length : state.projectiles.length;
+    assert(projCountAfterDaveShoot === projCountBeforeDaveShoot, 'Crazy Dave must never spawn basic attack projectiles');
+
+    // Test planting movement pause
+    dave.sunCount = 200;
+    dave.peashooterCooldown = 0;
+    dave.vx = 5;
+    dave.vy = 5;
+    dave.plantPeashooter(gojo);
+    assert(dave.plantingPauseTimer > 0, 'Crazy Dave must enter planting movement pause on plant');
+    assert(dave.vx === 0 && dave.vy === 0, 'Crazy Dave velocity must immediately stop upon planting');
+    dave.update(gojo, 1, state.arena);
+    assert(dave.vx === 0 && dave.vy === 0, 'Crazy Dave must remain stationary while plantingPauseTimer > 0');
+
+    // Test plant death does NOT throw and marks dead cleanly without faah
+    const activePlant = dave.activePeashooters[dave.activePeashooters.length - 1];
+    if (activePlant) {
+      activePlant.takeDamage(9999, gojo);
+      assert(activePlant.hp === 0 && activePlant.dead === true, 'Plant must be dead after taking fatal damage');
+    }
+
+    // 9. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
     assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
@@ -1873,7 +1905,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, 1v1 match initialization & minion entity flags verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, planting movement pause, disabled aim rotation & minion death safety verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

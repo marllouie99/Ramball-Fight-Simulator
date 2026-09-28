@@ -2378,7 +2378,7 @@ export class Fighter {
     }
     this.onDeath();
     
-    if (this.isTurret || this.isDispenser) {
+    if (this.isTurret || this.isDispenser || this.isPlant || this.isMinion || this.isPlantMinion || this.isDeployable) {
       return;
     }
 

@@ -116,6 +116,13 @@ export class PeashooterEntity extends Fighter {
     return applied;
   }
 
+  _processFighterDeath(attacker, opts) {
+    this._hasDied = true;
+    this.dead = true;
+    this.isDead = true;
+    this.onDeath();
+  }
+
   update(opponent, ownerIndex, arena) {
     if (this.hp <= 0) return;
     this.animTick++;
@@ -327,6 +334,13 @@ export class SnowPeaEntity extends Fighter {
     return applied;
   }
 
+  _processFighterDeath(attacker, opts) {
+    this._hasDied = true;
+    this.dead = true;
+    this.isDead = true;
+    this.onDeath();
+  }
+
   update(opponent, ownerIndex, arena) {
     if (this.hp <= 0) return;
     this.animTick++;
@@ -474,10 +488,15 @@ export class CrazyDaveFighter extends Fighter {
     this.speed = cfg.speed || 5.2;
     this.baseSpeed = cfg.speed || 5.2;
 
-    // Zero basic attack (Dave does not attack directly)
+    // Zero basic attack (Dave does not attack directly, aim rotation disabled)
     this.damage = 0;
-    this.cooldown = 0;
+    this.cooldown = 999999;
+    this.shootCooldown = 999999;
+    this.shootCooldownMax = 999999;
     this.canShoot = false;
+    this.angle = 0;
+    this.gunAngle = 0;
+    this.plantingPauseTimer = 0;
 
     // Sun Economy State
     this.sunCount = cfg.initialSun || 50;
@@ -496,6 +515,22 @@ export class CrazyDaveFighter extends Fighter {
 
     // Register Declarative Skills for HUD
     this._registerSkills();
+  }
+
+  canAim() {
+    return false;
+  }
+
+  aim(opponent) {
+    // Dave does not do basic attacks; aim rotation is disabled
+    this.gunAngle = 0;
+    this.angle = 0;
+  }
+
+  shoot(ownerIndex) {
+    // Dave has NO basic attack and never shoots projectiles
+    this.shootCooldown = 999999;
+    return false;
   }
 
   _registerSkills() {
@@ -543,6 +578,11 @@ export class CrazyDaveFighter extends Fighter {
     this.ambientSunTimer = 0;
     this.peashooterCooldown = 0;
     this.snowPeaCooldown = 0;
+    this.plantingPauseTimer = 0;
+    this.shootCooldown = 999999;
+    this.shootCooldownMax = 999999;
+    this.angle = 0;
+    this.gunAngle = 0;
 
     if (this.activePeashooters) {
       this.activePeashooters.forEach(p => {
@@ -704,6 +744,14 @@ export class CrazyDaveFighter extends Fighter {
     if (audioSystem && typeof audioSystem.playSound === 'function') {
       audioSystem.playSound('powerup', 0.8);
     }
+
+    // Stop Dave's movement momentarily upon planting
+    this.plantingPauseTimer = 18;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
     return true;
   }
 
@@ -773,6 +821,14 @@ export class CrazyDaveFighter extends Fighter {
     if (audioSystem && typeof audioSystem.playSound === 'function') {
       audioSystem.playSound('powerup', 0.8);
     }
+
+    // Stop Dave's movement momentarily upon planting
+    this.plantingPauseTimer = 18;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
     return true;
   }
 
@@ -786,9 +842,25 @@ export class CrazyDaveFighter extends Fighter {
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
 
+    // Enforce no aim rotation and zero projectile shooting
+    this.angle = 0;
+    this.gunAngle = 0;
+    this.shootCooldown = 999999;
+
     // Cooldown updates
     if (this.peashooterCooldown > 0) this.peashooterCooldown--;
     if (this.snowPeaCooldown > 0) this.snowPeaCooldown--;
+
+    // Planting Pause: stop Dave's movement for a moment when planting
+    if (this.plantingPauseTimer > 0) {
+      this.plantingPauseTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.resolveWallBounce(arena, opponent);
+      return;
+    }
 
     // 2. Ambient Sun Falling from the Sky
     this.ambientSunTimer++;
