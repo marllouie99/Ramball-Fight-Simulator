@@ -1049,6 +1049,80 @@ function drawTelekinesisDebris(ctx, effect) {
   ctx.restore();
 }
 
+function drawPeaShatter(ctx, effect) {
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  if (effect.rotation) ctx.rotate(effect.rotation);
+  const alpha = Math.max(0, Math.min(1.0, effect.life * 1.2));
+  const s = Math.max(1.0, (effect.size || 3.0) * Math.min(1.0, effect.life * 1.1));
+  const col = effect.color || '#22C55E';
+
+  ctx.globalAlpha = alpha;
+
+  // Dark organic plant rim
+  ctx.fillStyle = '#064E3B';
+  ctx.beginPath();
+  ctx.moveTo(-s * 1.1, -s * 0.4);
+  ctx.lineTo(s * 0.4, -s * 1.1);
+  ctx.lineTo(s * 1.1, s * 0.4);
+  ctx.lineTo(-s * 0.4, s * 1.1);
+  ctx.closePath();
+  ctx.fill();
+
+  // Vibrant juicy pea body
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(-s * 0.9, -s * 0.3);
+  ctx.lineTo(s * 0.3, -s * 0.9);
+  ctx.lineTo(s * 0.9, s * 0.3);
+  ctx.lineTo(-s * 0.3, s * 0.9);
+  ctx.closePath();
+  ctx.fill();
+
+  // Highlight glint
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-s * 0.3, -s * 0.3, s * 0.4, s * 0.4);
+
+  ctx.restore();
+}
+
+function drawSnowPeaShatter(ctx, effect) {
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  if (effect.rotation) ctx.rotate(effect.rotation);
+  const alpha = Math.max(0, Math.min(1.0, effect.life * 1.25));
+  const s = Math.max(1.0, (effect.size || 3.2) * Math.min(1.0, effect.life * 1.1));
+  const col = effect.color || '#38BDF8';
+
+  ctx.globalAlpha = alpha;
+
+  // Glacial dark ice rim
+  ctx.fillStyle = '#0369A1';
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 1.3);
+  ctx.lineTo(s * 0.75, 0);
+  ctx.lineTo(0, s * 1.3);
+  ctx.lineTo(-s * 0.75, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Ice crystal body
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(0, -s * 1.05);
+  ctx.lineTo(s * 0.55, 0);
+  ctx.lineTo(0, s * 1.05);
+  ctx.lineTo(-s * 0.55, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Crystalline specular flash
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-s * 0.25, -s * 0.45, s * 0.5, s * 0.5);
+
+  ctx.restore();
+}
+
 function drawArcaneSparkle(ctx, effect) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -1185,6 +1259,8 @@ const SPARK_RENDERERS = {
   telekinesisDebris: drawTelekinesisDebris,
   telekinesisDebrisScattered: drawTelekinesisDebris,
   arcane: drawArcaneSparkle,
+  peaShatter: drawPeaShatter,
+  snowPeaShatter: drawSnowPeaShatter,
 };
 
 /**

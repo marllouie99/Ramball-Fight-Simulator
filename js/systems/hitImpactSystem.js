@@ -864,14 +864,15 @@ export const HitImpactSystem = {
         }
       }
 
-      // 2. Juicy pea splatter sparks & flash
+      // 2. Juicy pea shatter burst & flash
       const isSnow = projectile.visual === 'snowPeaBullet';
       const peaColor = isSnow ? '#38BDF8' : '#22C55E';
+      const shatterType = isSnow ? 'snowPeaShatter' : 'peaShatter';
       if (typeof spawnImpactFlash === 'function') {
         spawnImpactFlash(target.x, target.y, 22, peaColor);
       }
       if (typeof spawnSparks === 'function') {
-        spawnSparks(target.x, target.y, 8, isSnow ? 'cyan' : 'gold', peaColor);
+        spawnSparks(target.x, target.y, 14, shatterType);
       }
 
       // 3. Play authentic PVZ splat sound on projectile hit

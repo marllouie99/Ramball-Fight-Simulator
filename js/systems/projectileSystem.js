@@ -3597,6 +3597,47 @@ class ProjectileSystem {
           audioSystem.playSFX('attack_groundsmash', 0.5);
         }
 
+        const isPlantPea = p.isPlantProjectile || p.visual === 'peaBullet' || p.visual === 'snowPeaBullet';
+        if (isPlantPea && expired && !hit) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          if (arena) {
+            if (arena.shape === 'circle') {
+              const cx = arena.x + arena.width / 2;
+              const cy = arena.y + arena.height / 2;
+              const ar = arena.radius || (arena.width / 2);
+              const d = Math.hypot(p.x - cx, p.y - cy);
+              if (d > ar) {
+                const angle = Math.atan2(p.y - cy, p.x - cx);
+                wallX = cx + Math.cos(angle) * (ar - 2);
+                wallY = cy + Math.sin(angle) * (ar - 2);
+              }
+            } else {
+              wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+              wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+            }
+          }
+
+          const isSnow = p.visual === 'snowPeaBullet';
+          const shatterType = isSnow ? 'snowPeaShatter' : 'peaShatter';
+          const flashColor = isSnow ? '#38BDF8' : '#22C55E';
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(wallX, wallY, 14, shatterType);
+          }
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(wallX, wallY, 18, flashColor);
+          }
+          if (audioSystem && typeof audioSystem.playSFX === 'function') {
+            audioSystem.playSFX('Assets/Sound Effects/SkillEffects/splat3.ogg', 0.65);
+          }
+
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
         const isCrimson = p.visual === 'crimsonSniperBullet';
         const isCrimsonEnhanced = p.visual === 'crimsonSniperBullet_enhanced';
         

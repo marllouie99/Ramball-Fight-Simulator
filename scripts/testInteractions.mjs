@@ -2055,7 +2055,11 @@ async function runInteractionTests() {
     backPlant._firePea(0, 1);
     assert(playedSfxList.some(s => s.src.includes('crazydave-peashooter-shot.mp3')), 'Peashooter must play crazydave-peashooter-shot.mp3 when firing');
 
-    // 12b. Pea projectile impact sound
+    // 12b. Pea & Snow Pea projectile impact sound and shatter particles
+    const { drawSparkEffects } = await import('../js/graphics/particles/sparkEffect.js');
+    state.sparkEffects = [];
+
+    // Test Peashooter kinetic pea hitting enemy
     const testPeaForHit = {
       x: gojo.x,
       y: gojo.y,
@@ -2069,6 +2073,69 @@ async function runInteractionTests() {
     };
     HitImpactSystem.processProjectileHit(gojo, testPeaForHit, backPlant, state.fighters);
     assert(playedSfxList.some(s => s.src.includes('splat3.ogg')), 'Peashooter projectile hit must play splat3.ogg upon hitting enemy');
+    assert(state.sparkEffects.some(p => p.type === 'peaShatter'), 'Peashooter projectile hit must spawn peaShatter particles');
+
+    // Test Snow Pea frost pea hitting enemy
+    state.sparkEffects = [];
+    const testSnowPeaForHit = {
+      x: gojo.x,
+      y: gojo.y,
+      vx: 10,
+      vy: 0,
+      damage: 10,
+      visual: 'snowPeaBullet',
+      isPlantProjectile: true,
+      owner: 1,
+      r: 6
+    };
+    HitImpactSystem.processProjectileHit(gojo, testSnowPeaForHit, backPlant, state.fighters);
+    assert(state.sparkEffects.some(p => p.type === 'snowPeaShatter'), 'Snow Pea projectile hit must spawn snowPeaShatter particles');
+
+    // Test Peashooter pea colliding with arena wall
+    state.sparkEffects = [];
+    const wallPea = {
+      x: state.arena.x + state.arena.width + 50,
+      y: state.arena.y + 200,
+      vx: 10,
+      vy: 0,
+      damage: 10,
+      visual: 'peaBullet',
+      isPlantProjectile: true,
+      owner: 1,
+      r: 6,
+      life: 100,
+      maxLife: 100
+    };
+    projectileSystem.projectiles = [wallPea];
+    projectileSystem.update(state.fighters);
+    assert(state.sparkEffects.some(p => p.type === 'peaShatter'), 'Peashooter projectile wall collision must spawn peaShatter particles');
+    assert(projectileSystem.projectiles.length === 0, 'Wall-collided pea projectile must be removed');
+
+    // Test Snow Pea colliding with arena wall
+    state.sparkEffects = [];
+    const wallSnowPea = {
+      x: state.arena.x + state.arena.width + 50,
+      y: state.arena.y + 200,
+      vx: 10,
+      vy: 0,
+      damage: 10,
+      visual: 'snowPeaBullet',
+      isPlantProjectile: true,
+      owner: 1,
+      r: 6,
+      life: 100,
+      maxLife: 100
+    };
+    projectileSystem.projectiles = [wallSnowPea];
+    projectileSystem.update(state.fighters);
+    assert(state.sparkEffects.some(p => p.type === 'snowPeaShatter'), 'Snow Pea projectile wall collision must spawn snowPeaShatter particles');
+    assert(projectileSystem.projectiles.length === 0, 'Wall-collided snow pea projectile must be removed');
+
+    // Verify canvas rendering of peaShatter & snowPeaShatter particles
+    state.ctx = mockCtx;
+    mockCtx.resetStackDepth();
+    drawSparkEffects();
+    assert(mockCtx.getStackDepth() === 0, 'Particle spark renderer stack depth must be 0 after rendering pea shatter particles');
 
     // 12c. Sun pickup sound
     dave.sunCount = 50;

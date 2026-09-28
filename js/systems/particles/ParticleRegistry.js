@@ -304,5 +304,36 @@ export const ParticleRegistry = {
     friction: 0,
     isFlash: true,
     isGlow: true
-  })
+  }),
+
+  // ─── CRAZY DAVE PLANT PROJECTILE SHATTER PARTICLES ───
+  peaShatter: () => {
+    const peaColors = ['#22C55E', '#4ADE80', '#16A34A', '#84CC16', '#FFFFFF'];
+    return {
+      color: peaColors[Math.floor(Math.random() * peaColors.length)],
+      decay: 0.04 + Math.random() * 0.05,
+      size: 2.2 + Math.random() * 3.4,
+      speed: 3.5 + Math.random() * 7.5,
+      friction: 0.88,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.45,
+      isFlash: false,
+      type: 'peaShatter'
+    };
+  },
+  snowPeaShatter: () => {
+    const snowColors = ['#38BDF8', '#BAE6FD', '#0284C7', '#E0F2FE', '#FFFFFF'];
+    return {
+      color: snowColors[Math.floor(Math.random() * snowColors.length)],
+      decay: 0.035 + Math.random() * 0.045,
+      size: 2.4 + Math.random() * 3.6,
+      speed: 3.8 + Math.random() * 8.0,
+      friction: 0.89,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.50,
+      isFlash: false,
+      type: 'snowPeaShatter'
+    };
+  }
 };
+

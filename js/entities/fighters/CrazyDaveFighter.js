@@ -732,7 +732,7 @@ export class SnowPeaEntity extends Fighter {
             { isChill: true, isSnowPea: true }
           );
         }
-        spawnSparks(target.x || spawnX, target.y || spawnY, 10, '#38BDF8');
+        spawnSparks(target.x || spawnX, target.y || spawnY, 14, 'snowPeaShatter');
       }
     };
 
