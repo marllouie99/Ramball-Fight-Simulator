@@ -327,6 +327,16 @@ export function drawSunDrop(ctx, sun) {
   ctx.save();
   ctx.translate(x, y);
 
+  const bloomRadius = r * 1.85 + pulse;
+  const bloom = ctx.createRadialGradient(0, 0, r * 0.12, 0, 0, bloomRadius);
+  bloom.addColorStop(0, 'rgba(255, 250, 205, 0.42)');
+  bloom.addColorStop(0.38, 'rgba(255, 205, 45, 0.20)');
+  bloom.addColorStop(1, 'rgba(255, 174, 0, 0)');
+  ctx.fillStyle = bloom;
+  ctx.beginPath();
+  ctx.arc(0, 0, bloomRadius, 0, Math.PI * 2);
+  ctx.fill();
+
   const sunImg = getSunSprite();
   const hasImg = Boolean(sunImg && sunImg.complete && sunImg.naturalWidth > 0);
 
@@ -355,6 +365,19 @@ export function drawSunDrop(ctx, sun) {
   } else {
     _drawProceduralPixelSun(ctx, r, pulse, rotAngle);
   }
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const lightRadius = r * 1.15;
+  const lighting = ctx.createRadialGradient(-r * 0.34, -r * 0.42, 0, -r * 0.12, -r * 0.12, lightRadius);
+  lighting.addColorStop(0, 'rgba(255, 255, 238, 0.50)');
+  lighting.addColorStop(0.42, 'rgba(255, 240, 160, 0.17)');
+  lighting.addColorStop(1, 'rgba(255, 220, 90, 0)');
+  ctx.fillStyle = lighting;
+  ctx.beginPath();
+  ctx.arc(0, 0, lightRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 
   ctx.restore();
 }

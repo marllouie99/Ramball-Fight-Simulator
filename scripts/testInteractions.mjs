@@ -155,6 +155,33 @@ async function runInteractionTests() {
     // Test Infinity bypass check
     const isBypassed = (toji.characterId === 'toji' || toji.type === 'toji');
     assert(isBypassed, 'Toji must bypass Limitless Infinity barrier (Rule 9)');
+
+    // Dead companions remain in state.illusions during their death animation and must not contact Infinity.
+    const deadCompanion = {
+      x: gojo.x + 10,
+      y: gojo.y,
+      r: 20,
+      hp: 0,
+      owner: toji,
+      isIllusion: true,
+      isDying: true
+    };
+    state.fighters = [];
+    state.illusions = [deadCompanion];
+    state.cjDriveBys = [];
+    state.arena = { x: 0, y: 0, width: 540, height: 960 };
+    state.gameState = 'playing';
+    gojo.infinityBlockTimer = 0;
+    gojo._checkInfinityCollisions();
+    assert(deadCompanion._inInfinityContact !== true, 'Gojo Infinity must ignore a dead companion still present during its death animation');
+    assert(gojo.infinityBlockTimer === 0, 'A dead companion must not trigger an Infinity block or shockwave');
+
+    state.fighters = [gojo];
+    state.illusions = [];
+    gojo.infinityBlockTimer = 0;
+    gojo._checkInfinityCollisions();
+    assert(gojo.infinityBlockTimer === 0, 'Gojo Infinity must not treat Gojo himself as an arena collision target');
+    state.illusions = [];
     console.log('      ✅ Toji ISOH Infinity bypass verified.');
   }
 
@@ -1677,6 +1704,7 @@ async function runInteractionTests() {
 
     let dave = new CrazyDaveClass({ radius: 25, x: 200, y: 300, hp: 390, maxHp: 390, color: '#84CC16' });
     let gojo = new GojoClass({ radius: 25, x: 400, y: 300, hp: 200, maxHp: 200, color: '#00E5FF' });
+    assert(dave.ambientSunInterval === CONFIG.crazydave.sunSpawnRate, 'Dave ambient Sun spawn interval must use sunSpawnRate from his config');
 
     state.fighters = [dave, gojo];
     state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
@@ -1726,6 +1754,21 @@ async function runInteractionTests() {
       assert(plant.isDeployable === true, `Plant ${plant.name} must have isDeployable === true`);
       assert(plant.isPlantMinion === true, `Plant ${plant.name} must have isPlantMinion === true`);
       assert(plant.owner === dave, `Plant ${plant.name} must have owner === dave`);
+    }
+
+    const capTestDave = new CrazyDaveClass({ radius: 25, x: 120, y: 120, color: '#84CC16' });
+    capTestDave.sunCount = 10000;
+    for (let i = 0; i < 11; i++) {
+      assert(capTestDave.plantPeashooter(gojo) === true, 'Dave must plant Peashooters beyond the previous cap');
+      assert(capTestDave.plantSnowPea(gojo) === true, 'Dave must plant Snow Peas beyond the previous cap');
+    }
+    assert(capTestDave.activePeashooters.length === 11, 'All 11 Peashooters must remain active');
+    assert(capTestDave.activeSnowPeas.length === 11, 'All 11 Snow Peas must remain active');
+    for (const plant of [...capTestDave.activePeashooters, ...capTestDave.activeSnowPeas]) {
+      assert(plant.hp > 0, 'Planting beyond the previous cap must not kill older plants');
+      plant.hp = 0;
+      const plantIndex = state.fighters.indexOf(plant);
+      if (plantIndex !== -1) state.fighters.splice(plantIndex, 1);
     }
 
     // Verify Snow Pea projectile slow on hit
@@ -1979,6 +2022,8 @@ async function runInteractionTests() {
 
     // Position backPlant at x=200, frontPlant at x=260, enemy at x=400 (same horizontal line y=300)
     backPlant.x = 200; backPlant.y = 300; backPlant._fixedX = 200; backPlant._fixedY = 300;
+    backPlant.facingDirection = 1;
+    backPlant.gunAngle = 0;
     frontPlant.x = 260; frontPlant.y = 300; frontPlant._fixedX = 260; frontPlant._fixedY = 300;
     gojo.x = 400; gojo.y = 300;
     const initialFrontHp = frontPlant.hp;
@@ -2033,8 +2078,10 @@ async function runInteractionTests() {
     assert(backPlant.hp === hpBeforeDot, 'Plant HP must not decrease from debuff DoT damage');
 
     // Direct attacks still damage plants
+    state.bloodEffects = [];
     const directHit = backPlant.takeDamage(20, gojo);
     assert(directHit === true && backPlant.hp === hpBeforeDot - 20, 'Direct attacks must still successfully damage plants');
+    assert(state.bloodEffects.length === 0, 'Dave plants must not emit blood particles when hit');
 
     // 12. Test Audio SFX Triggers (Sun Pickup, Peashooter Shot, Pea Splat Hit, Planting)
     const { HitImpactSystem } = await import('../js/systems/hitImpactSystem.js');
@@ -2043,6 +2090,8 @@ async function runInteractionTests() {
     assert(AUDIO_CONFIG['crazydave_peashooter_shot'] === 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3', 'AUDIO_CONFIG must register crazydave_peashooter_shot');
     assert(AUDIO_CONFIG['crazydave_pea_splat'] === 'Assets/Sound Effects/SkillEffects/splat3.ogg', 'AUDIO_CONFIG must register crazydave_pea_splat');
     assert(AUDIO_CONFIG['crazydave_planting'] === 'Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 'AUDIO_CONFIG must register crazydave_planting');
+    const plantingVoiceLines = CONFIG.crazydave.sounds.plantingVoiceLines;
+    assert(plantingVoiceLines.length === 3, 'Dave config must include all three planting voice lines');
 
     const playedSfxList = [];
     const origPlaySFX = audioSystem.playSFX;
@@ -2151,7 +2200,11 @@ async function runInteractionTests() {
     dave.sunCount = 300;
     dave.plantPeashooter(gojo);
     assert(playedSfxList.some(s => s.src.includes('crazydave-Planting.ogg')), 'Crazy Dave must play crazydave-Planting.ogg when planting plants');
+    assert(playedSfxList.some(s => plantingVoiceLines.includes(s.src)), 'Peashooter planting must play a configured Crazy Dave voice line');
     assert(dave.lastPlantedType === 'peashooter', 'Dave must record lastPlantedType as peashooter');
+    const voiceLineCountAfterPeashooter = playedSfxList.filter(s => plantingVoiceLines.includes(s.src)).length;
+    dave.plantSnowPea(gojo);
+    assert(playedSfxList.filter(s => plantingVoiceLines.includes(s.src)).length > voiceLineCountAfterPeashooter, 'Snow Pea planting must play a configured Crazy Dave voice line');
 
     // Reset Dave to clean state with 0 active plants to test pure alternating sequence
     dave.reset();
@@ -2203,8 +2256,9 @@ async function runInteractionTests() {
     const rightContainer = document.getElementById('healthHudRight');
     const bottomContainer = document.getElementById('healthHud');
     const hudContent = (leftContainer?.innerHTML || '') + (rightContainer?.innerHTML || '') + (bottomContainer?.innerHTML || '');
-    assert(hudContent.includes('$UN:') && hudContent.includes('275'), 'HUD Stats HTML must display $UN: 275 for Crazy Dave');
-    assert(hudContent.includes('Plants:'), 'HUD Stats HTML must display Plants: count for Crazy Dave');
+    const hudText = hudContent.replace(/<[^>]*>/g, '');
+    assert(hudText.includes('$UN:') && hudText.includes('275'), 'HUD Stats HTML must display $UN: 275 for Crazy Dave');
+    assert(!hudText.includes('Plants:'), 'HUD Stats must not display plant counts for Crazy Dave');
     CONFIG.darkModeShowHudStats = origStatsToggle;
 
     // 14. Snow Pea Attack SFX & Freeze Stasis Mechanic Test

@@ -3,9 +3,4 @@
 
 ---
 
-## 🥊 Fighter Stat Modifications
-
-### CRAZYDAVE
-* **🟢 BUFF** `maxPeashooters`: `3` ➔ `10` (+233.3%)
-* **🟢 BUFF** `maxSnowPeas`: `3` ➔ `10` (+233.3%)
-
+*No balance parameter modifications detected in `js/configs/`.*

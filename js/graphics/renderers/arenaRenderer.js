@@ -7,84 +7,6 @@ import { updateSaitamaWallShatters, drawSaitamaWallShatters } from '../particles
 import { drawTopHudNameShatters } from '../particles/hudShatterEffect.js';
 import { isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet, getGrassTileSpriteSheet } from './grassFloorRenderer.js';
 
-// ──────────────────────────────────────────
-// SKETCHY BORDER HELPERS
-// ──────────────────────────────────────────
-function drawSketchyLine(ctx, x1, y1, x2, y2, seed, color = 'rgba(20,20,25,0.85)', width = 2) {
-  ctx.save();
-  ctx.strokeStyle = color;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  
-  let currentSeed = seed;
-  const nextRand = () => {
-    const x = Math.sin(currentSeed++) * 10000;
-    return x - Math.floor(x);
-  };
-
-  // Base bow amount (set to 0 for straight sketch lines)
-  const baseBowAmt = 0;
-
-  const strokeCount = 4; // Extra strokes for a penciled look
-  for (let s = 0; s < strokeCount; s++) {
-    ctx.lineWidth = width * (0.5 + nextRand() * 0.4);
-    ctx.beginPath();
-    
-    const length = Math.hypot(x2 - x1, y2 - y1);
-    const segmentLength = 12;
-    const segments = Math.max(2, Math.floor(length / segmentLength));
-    
-    // Each pencil stroke gets a slightly different curve/displacement (subtle wobbles instead of bowing)
-    const strokeBowVar = (nextRand() - 0.5) * 2.5;
-    const totalBow = baseBowAmt + strokeBowVar;
-    
-    ctx.moveTo(x1, y1);
-    for (let i = 1; i <= segments; i++) {
-      const t = i / segments;
-      let targetX = x1 + (x2 - x1) * t;
-      let targetY = y1 + (y2 - y1) * t;
-      
-      const angle = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
-      
-      // Calculate smooth quadratic/sine bow that peaks in the middle (t = 0.5)
-      const bowOffset = Math.sin(t * Math.PI) * totalBow;
-      
-      // Micro-wobbles for rough pencil texture
-      let noise = 0;
-      if (i < segments) {
-        noise = (nextRand() - 0.5) * 2.2;
-      }
-      
-      const totalOffset = bowOffset + noise;
-      targetX += Math.cos(angle) * totalOffset;
-      targetY += Math.sin(angle) * totalOffset;
-      
-      ctx.lineTo(targetX, targetY);
-    }
-    
-    // Corner overshoot for hand-drawn feel
-    const extendAngle = Math.atan2(y2 - y1, x2 - x1);
-    const extension = (nextRand() * 6) + 1;
-    ctx.lineTo(x2 + Math.cos(extendAngle) * extension, y2 + Math.sin(extendAngle) * extension);
-    
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-function drawSketchyArenaBorders(ctx, arena, wallWidth, color = 'rgba(15,15,18,0.85)') {
-  const x = arena.x;
-  const y = arena.y;
-  const w = arena.width;
-  const h = arena.height;
-
-  // Draw outside walls with pencil effect
-  drawSketchyLine(ctx, x, y, x + w, y, 100, color, wallWidth); // Top
-  drawSketchyLine(ctx, x + w, y, x + w, y + h, 200, color, wallWidth); // Right
-  drawSketchyLine(ctx, x + w, y + h, x, y + h, 300, color, wallWidth); // Bottom
-  drawSketchyLine(ctx, x, y + h, x, y, 400, color, wallWidth); // Left
-}
-
 /**
  * Renders a solid vector fissure crack (matching manga comic / PNG crack art).
  */
@@ -540,29 +462,19 @@ export function drawArena() {
 
   // 4. Draw Arena Borders
   {
-    const wallWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
-      ? state.config.arena.wallWidth 
-      : 4;
-
     const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
-    const borderKey = `${arena.width}_${arena.height}_${wallWidth}_${isDark ? 'dark_clean' : 'light'}`;
+    const borderKey = `${arena.width}_${arena.height}_${isDark ? 'dark_clean' : 'light_clean'}`;
     if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
       const padding = 60;
       const offCanvas = document.createElement('canvas');
       offCanvas.width = arena.width + padding * 2;
       offCanvas.height = arena.height + padding * 2;
       const oc = offCanvas.getContext('2d');
-      if (isDark) {
-        // Clean straight-line borders for Dark Mode strictly calibrated to match Light Mode visual thickness and bounds
-        const strokeW = 2.5; // Match the 2.5px average sketchy border line width to prevent optical enlargement
-        oc.strokeStyle = borderColor;
-        oc.lineWidth = strokeW;
-        oc.lineJoin = 'miter';
-        oc.lineCap = 'square';
-        oc.strokeRect(padding, padding, arena.width, arena.height);
-      } else {
-        drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth, borderColor);
-      }
+      oc.strokeStyle = borderColor;
+      oc.lineWidth = 2.5;
+      oc.lineJoin = 'miter';
+      oc.lineCap = 'square';
+      oc.strokeRect(padding, padding, arena.width, arena.height);
       offCanvas._key = borderKey;
       state._arenaBorderCanvas = offCanvas;
     }

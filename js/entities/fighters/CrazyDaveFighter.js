@@ -20,30 +20,56 @@ import {
 import { getNearestGrassTileCenter, getRandomGrassTileCenter } from '../../graphics/renderers/grassFloorRenderer.js';
 import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 
+function getCrazyDaveSetting(config, key) {
+  return config?.[key] ?? crazyDaveConfig[key];
+}
+
+function getCrazyDaveSound(config, key) {
+  return config?.sounds?.[key] ?? crazyDaveConfig.sounds[key];
+}
+
+function getCrazyDaveSoundVolume(config, key) {
+  return config?.soundVolumes?.[key] ?? crazyDaveConfig.soundVolumes[key];
+}
+
+function playDavePlantingAudio(config) {
+  const playSfx = typeof audioSystem.playSFX === 'function'
+    ? audioSystem.playSFX
+    : audioSystem.playSound;
+  if (typeof playSfx !== 'function') return;
+
+  playSfx.call(audioSystem, getCrazyDaveSound(config, 'planting'), getCrazyDaveSoundVolume(config, 'planting'));
+
+  const voiceLines = getCrazyDaveSound(config, 'plantingVoiceLines');
+  if (!Array.isArray(voiceLines) || voiceLines.length === 0) return;
+  const voiceLine = voiceLines[Math.floor(Math.random() * voiceLines.length)];
+  playSfx.call(audioSystem, voiceLine, getCrazyDaveSoundVolume(config, 'plantingVoiceLines'));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PLANT ENTITY: PEASHOOTER (Fires rapid kinetic pea projectiles dealing regular damage)
 // ─────────────────────────────────────────────────────────────────────────────
 export class PeashooterEntity extends Fighter {
   constructor(x, y, ownerFighter, facingDirection = 1) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const maxHp = cfg.peashooterHp || 180;
+    const maxHp = getCrazyDaveSetting(cfg, 'peashooterHp');
     const def = {
       id: 993,
       name: 'Peashooter',
-      color: '#4ADE80',
+      color: getCrazyDaveSetting(cfg, 'peashooterColor'),
       startX: x,
       startY: y,
       startVx: 0,
       startVy: 0,
-      radius: 18,
+      radius: getCrazyDaveSetting(cfg, 'peashooterRadius'),
       type: 'Peashooter',
       isDeployable: true,
       isMinion: true,
       isPlant: true,
       isPlantMinion: true,
       hp: maxHp,
-      damage: cfg.peashooterDamage || 10,
-      cooldown: cfg.peashooterFireRate || 22,
+      damage: getCrazyDaveSetting(cfg, 'peashooterDamage'),
+      cooldown: getCrazyDaveSetting(cfg, 'peashooterFireRate'),
       moveSpeed: 0,
       spinRate: 0,
     };
@@ -128,7 +154,7 @@ export class PeashooterEntity extends Fighter {
     this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
 
     this.shootCooldown = 0;
-    this.shootCooldownMax = cfg.peashooterFireRate || 22;
+    this.shootCooldownMax = getCrazyDaveSetting(cfg, 'peashooterFireRate');
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
   }
@@ -288,8 +314,8 @@ export class PeashooterEntity extends Fighter {
 
     // Lane Target acquisition: only detect enemies in the 1 straight committed direction in front
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const range = cfg.peashooterRange || 460;
-    const laneTolerance = cfg.plantLaneTolerance || 85;
+    const range = getCrazyDaveSetting(cfg, 'peashooterRange');
+    const laneTolerance = getCrazyDaveSetting(cfg, 'plantLaneTolerance');
 
     let targetInLane = null;
     let closestDist = Infinity;
@@ -335,12 +361,12 @@ export class PeashooterEntity extends Fighter {
 
   _firePea(angle, ownerIndex) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const speed = cfg.peashooterSpeed || 9.5;
-    const dmg = cfg.peashooterDamage || 10;
+    const speed = getCrazyDaveSetting(cfg, 'peashooterSpeed');
+    const dmg = getCrazyDaveSetting(cfg, 'peashooterDamage');
     const isLeft = this.facingDirection === -1;
-    // Snout mouth position on sprite: x offset +-22px, y offset -17px
-    const spawnX = this.x + (isLeft ? -22 : 22);
-    const spawnY = this.y - 17;
+    const muzzleOffsetX = getCrazyDaveSetting(cfg, 'peashooterMuzzleOffsetX');
+    const spawnX = this.x + (isLeft ? -muzzleOffsetX : muzzleOffsetX);
+    const spawnY = this.y + getCrazyDaveSetting(cfg, 'peashooterMuzzleOffsetY');
 
     const peaProj = {
       x: spawnX,
@@ -348,18 +374,18 @@ export class PeashooterEntity extends Fighter {
       vx: (isLeft ? -1 : 1) * speed,
       vy: 0, // Straight horizontal flight
       angle: isLeft ? Math.PI : 0,
-      r: 6.0,
-      radius: 6.0,
+      r: getCrazyDaveSetting(cfg, 'peashooterProjectileRadius'),
+      radius: getCrazyDaveSetting(cfg, 'peashooterProjectileRadius'),
       damage: dmg,
       owner: ownerIndex !== undefined ? ownerIndex : 0,
       ownerFighter: this.owner || this,
       isPlantProjectile: true,
       color: '#22C55E',
       visual: 'peaBullet',
-      life: 60,
-      maxLife: 60,
+      life: getCrazyDaveSetting(cfg, 'peashooterProjectileLife'),
+      maxLife: getCrazyDaveSetting(cfg, 'peashooterProjectileLife'),
       penetration: 1,
-      knockbackForce: 4.5,
+      knockbackForce: getCrazyDaveSetting(cfg, 'peashooterKnockback'),
     };
 
     if (typeof projectileSystem !== 'undefined' && Array.isArray(projectileSystem.projectiles)) {
@@ -369,9 +395,9 @@ export class PeashooterEntity extends Fighter {
     }
 
     if (audioSystem && typeof audioSystem.playSFX === 'function') {
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3', 0.80);
+      audioSystem.playSFX(getCrazyDaveSound(cfg, 'peashooterAttack'), getCrazyDaveSoundVolume(cfg, 'peashooterAttack'));
     } else if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound('Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3', 0.80);
+      audioSystem.playSound(getCrazyDaveSound(cfg, 'peashooterAttack'), getCrazyDaveSoundVolume(cfg, 'peashooterAttack'));
     }
   }
 
@@ -390,24 +416,24 @@ export class PeashooterEntity extends Fighter {
 export class SnowPeaEntity extends Fighter {
   constructor(x, y, ownerFighter, facingDirection = 1) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const maxHp = cfg.snowPeaHp || 200;
+    const maxHp = getCrazyDaveSetting(cfg, 'snowPeaHp');
     const def = {
       id: 995,
       name: 'Snow Pea',
-      color: '#38BDF8',
+      color: getCrazyDaveSetting(cfg, 'snowPeaColor'),
       startX: x,
       startY: y,
       startVx: 0,
       startVy: 0,
-      radius: 18,
+      radius: getCrazyDaveSetting(cfg, 'snowPeaRadius'),
       type: 'SnowPea',
       isDeployable: true,
       isMinion: true,
       isPlant: true,
       isPlantMinion: true,
       hp: maxHp,
-      damage: cfg.snowPeaDamage || 12,
-      cooldown: cfg.snowPeaFireRate || 24,
+      damage: getCrazyDaveSetting(cfg, 'snowPeaDamage'),
+      cooldown: getCrazyDaveSetting(cfg, 'snowPeaFireRate'),
       moveSpeed: 0,
       spinRate: 0,
     };
@@ -492,7 +518,7 @@ export class SnowPeaEntity extends Fighter {
     this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
 
     this.shootCooldown = 0;
-    this.shootCooldownMax = cfg.snowPeaFireRate || 24;
+    this.shootCooldownMax = getCrazyDaveSetting(cfg, 'snowPeaFireRate');
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
   }
@@ -652,8 +678,8 @@ export class SnowPeaEntity extends Fighter {
 
     // Lane Target acquisition: only detect enemies in the 1 straight committed direction in front
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const range = cfg.snowPeaRange || 460;
-    const laneTolerance = cfg.plantLaneTolerance || 85;
+    const range = getCrazyDaveSetting(cfg, 'snowPeaRange');
+    const laneTolerance = getCrazyDaveSetting(cfg, 'plantLaneTolerance');
 
     let targetInLane = null;
     let closestDist = Infinity;
@@ -699,12 +725,12 @@ export class SnowPeaEntity extends Fighter {
 
   _fireSnowPea(angle, ownerIndex) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const speed = cfg.snowPeaSpeed || 9.5;
-    const dmg = cfg.snowPeaDamage || 12;
+    const speed = getCrazyDaveSetting(cfg, 'snowPeaSpeed');
+    const dmg = getCrazyDaveSetting(cfg, 'snowPeaDamage');
     const isLeft = this.facingDirection === -1;
-    // Snout mouth position on sprite: x offset +-22px, y offset -19px
-    const spawnX = this.x + (isLeft ? -22 : 22);
-    const spawnY = this.y - 19;
+    const muzzleOffsetX = getCrazyDaveSetting(cfg, 'snowPeaMuzzleOffsetX');
+    const spawnX = this.x + (isLeft ? -muzzleOffsetX : muzzleOffsetX);
+    const spawnY = this.y + getCrazyDaveSetting(cfg, 'snowPeaMuzzleOffsetY');
 
     const snowPeaProj = {
       x: spawnX,
@@ -712,33 +738,33 @@ export class SnowPeaEntity extends Fighter {
       vx: (isLeft ? -1 : 1) * speed,
       vy: 0, // Straight horizontal flight
       angle: isLeft ? Math.PI : 0,
-      r: 5.5,
-      radius: 5.5,
+      r: getCrazyDaveSetting(cfg, 'snowPeaProjectileRadius'),
+      radius: getCrazyDaveSetting(cfg, 'snowPeaProjectileRadius'),
       damage: dmg,
       owner: ownerIndex !== undefined ? ownerIndex : 0,
       ownerFighter: this.owner || this,
       isPlantProjectile: true,
       color: '#38BDF8',
       visual: 'snowPeaBullet',
-      life: 60,
-      maxLife: 60,
+      life: getCrazyDaveSetting(cfg, 'snowPeaProjectileLife'),
+      maxLife: getCrazyDaveSetting(cfg, 'snowPeaProjectileLife'),
       penetration: 1,
-      knockbackForce: 4.0,
+      knockbackForce: getCrazyDaveSetting(cfg, 'snowPeaKnockback'),
       // Special Snow Pea Hit Callback: applies 1.5s Chill Slow + chance to Freeze
       onHit: (target) => {
         if (target) {
           if (typeof target.applySlow === 'function') {
             target.applySlow(
-              cfg.snowPeaSlowDuration || 90,
-              cfg.snowPeaSlowMultiplier || 0.45,
+              getCrazyDaveSetting(cfg, 'snowPeaSlowDuration'),
+              getCrazyDaveSetting(cfg, 'snowPeaSlowMultiplier'),
               { isChill: true, isSnowPea: true }
             );
           }
 
           // Chance to completely freeze enemy into ice stasis
-          const freezeChance = (cfg.snowPeaFreezeChance !== undefined) ? cfg.snowPeaFreezeChance : 0.25;
+          const freezeChance = getCrazyDaveSetting(cfg, 'snowPeaFreezeChance');
           if (Math.random() < freezeChance && typeof target.applyFreeze === 'function') {
-            target.applyFreeze(cfg.snowPeaFreezeDuration || 60, this.owner || this, { isSnowPea: true });
+            target.applyFreeze(getCrazyDaveSetting(cfg, 'snowPeaFreezeDuration'), this.owner || this, { isSnowPea: true });
           }
         }
         spawnSparks(target?.x || spawnX, target?.y || spawnY, 14, 'snowPeaShatter');
@@ -751,11 +777,11 @@ export class SnowPeaEntity extends Fighter {
       state.projectiles.push(snowPeaProj);
     }
 
-    const shootSfx = cfg.snowPeaAttackAudioSrc || 'Assets/Sound Effects/Attacks/crazydave-snow_pea_sparkles.ogg';
+    const shootSfx = getCrazyDaveSound(cfg, 'snowPeaAttack');
     if (audioSystem && typeof audioSystem.playSFX === 'function') {
-      audioSystem.playSFX(shootSfx, 0.85);
+      audioSystem.playSFX(shootSfx, getCrazyDaveSoundVolume(cfg, 'snowPeaAttack'));
     } else if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound(shootSfx, 0.85);
+      audioSystem.playSound(shootSfx, getCrazyDaveSoundVolume(cfg, 'snowPeaAttack'));
     }
   }
 
@@ -779,18 +805,18 @@ export class CrazyDaveFighter extends Fighter {
     this.name = 'Crazy Dave';
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    this.color = def?.color || cfg.color || '#84CC16';
-    this.themeColor = def?.themeColor || cfg.themeColor || '#84CC16';
-    this.secondaryColor = def?.secondaryColor || cfg.secondaryColor || '#F59E0B';
-    this.damageNumberColor = '#84CC16';
+    this.color = def?.color ?? getCrazyDaveSetting(cfg, 'color');
+    this.themeColor = def?.themeColor ?? getCrazyDaveSetting(cfg, 'themeColor');
+    this.secondaryColor = def?.secondaryColor ?? getCrazyDaveSetting(cfg, 'secondaryColor');
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'color');
 
-    this.hp = cfg.hp || 390;
-    this.maxHp = cfg.hp || 390;
-    this.speed = cfg.speed || 5.2;
-    this.baseSpeed = cfg.speed || 5.2;
+    this.hp = getCrazyDaveSetting(cfg, 'hp');
+    this.maxHp = getCrazyDaveSetting(cfg, 'maxHp');
+    this.speed = getCrazyDaveSetting(cfg, 'speed');
+    this.baseSpeed = getCrazyDaveSetting(cfg, 'speed');
 
     // Zero basic attack (Dave does not attack directly; orientation flips horizontally without rotation)
-    this.damage = 0;
+    this.damage = getCrazyDaveSetting(cfg, 'damage');
     this.cooldown = 999999;
     this.shootCooldown = 999999;
     this.shootCooldownMax = 999999;
@@ -800,20 +826,16 @@ export class CrazyDaveFighter extends Fighter {
     this.facingLeft = false;
     this.plantingPauseTimer = 0;
     this.plantingAnimTimer = 0;
-    this.plantingAnimDuration = 20;
+    this.plantingAnimDuration = getCrazyDaveSetting(cfg, 'plantingDuration');
     this.shovelSwingTimer = 0;
 
     // Sun Economy State
-    this.sunPickupValue = (def && def.sunPickupValue !== undefined)
-      ? def.sunPickupValue
-      : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50);
-    this.sunCount = (def && def.sunCount !== undefined)
-      ? def.sunCount
-      : (cfg.initialSun !== undefined ? cfg.initialSun : 50);
-    this.maxSun = cfg.maxSun || 500;
+    this.sunPickupValue = def?.sunPickupValue ?? getCrazyDaveSetting(cfg, 'sunPickupValue');
+    this.sunCount = def?.sunCount ?? getCrazyDaveSetting(cfg, 'initialSun');
+    this.maxSun = getCrazyDaveSetting(cfg, 'maxSun');
     this.suns = [];
     this.ambientSunTimer = 0;
-    this.ambientSunInterval = cfg.sunDropInterval || 110;
+    this.ambientSunInterval = getCrazyDaveSetting(cfg, 'sunSpawnRate');
 
     // Skill Cooldowns (2 Flora Abilities)
     this.peashooterCooldown = 0;
@@ -855,11 +877,11 @@ export class CrazyDaveFighter extends Fighter {
     if (isSkillEnabled(cfg.enablePeashooter, true)) {
       skills.push({
         id: 'peashooter',
-        name: 'Peashooter (100☀️)',
+        name: `Peashooter (${getCrazyDaveSetting(cfg, 'peashooterCost')}☀️)`,
         type: 'basic',
         cooldownKey: 'peashooterCooldown',
-        cooldownMax: () => cfg.peashooterCooldown || 120,
-        color: '#4ADE80',
+        cooldownMax: () => getCrazyDaveSetting(cfg, 'peashooterCooldown'),
+        color: getCrazyDaveSetting(cfg, 'peashooterColor'),
         onActivate: (fighter, opponent) => {
           fighter.plantPeashooter(opponent);
         }
@@ -869,11 +891,11 @@ export class CrazyDaveFighter extends Fighter {
     if (isSkillEnabled(cfg.enableSnowPea, true)) {
       skills.push({
         id: 'snowPea',
-        name: 'Snow Pea (175☀️)',
+        name: `Snow Pea (${getCrazyDaveSetting(cfg, 'snowPeaCost')}☀️)`,
         type: 'ultimate',
         cooldownKey: 'snowPeaCooldown',
-        cooldownMax: () => cfg.snowPeaCooldown || 180,
-        color: '#38BDF8',
+        cooldownMax: () => getCrazyDaveSetting(cfg, 'snowPeaCooldown'),
+        color: getCrazyDaveSetting(cfg, 'snowPeaColor'),
         onActivate: (fighter, opponent) => {
           fighter.plantSnowPea(opponent);
         }
@@ -888,8 +910,8 @@ export class CrazyDaveFighter extends Fighter {
   reset() {
     super.reset();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    this.sunPickupValue = cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50;
-    this.sunCount = cfg.initialSun !== undefined ? cfg.initialSun : 50;
+    this.sunPickupValue = getCrazyDaveSetting(cfg, 'sunPickupValue');
+    this.sunCount = getCrazyDaveSetting(cfg, 'initialSun');
     this.suns = [];
     this.ambientSunTimer = 0;
     this.peashooterCooldown = 0;
@@ -963,7 +985,7 @@ export class CrazyDaveFighter extends Fighter {
    */
   spawnSunDrop(targetX, targetY, value) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
+    const arena = (state && state.arena) ? state.arena : CONFIG.arena;
 
     let destX = targetX;
     let destY = targetY;
@@ -974,11 +996,11 @@ export class CrazyDaveFighter extends Fighter {
     }
 
     // Spawn at the top outside of the arena and drop down to the grass tile center
-    const startY = (arena && arena.y !== undefined) ? (arena.y - 45) : (destY - 220);
-    const fallSpeed = cfg.sunFallSpeed || 2.2;
-    const defaultVal = (this.sunPickupValue !== undefined)
-      ? this.sunPickupValue
-      : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50);
+    const startY = (arena && arena.y !== undefined)
+      ? arena.y - getCrazyDaveSetting(cfg, 'sunDropSpawnOffset')
+      : destY - getCrazyDaveSetting(cfg, 'sunDropFallbackOffset');
+    const fallSpeed = getCrazyDaveSetting(cfg, 'sunFallSpeed');
+    const defaultVal = this.sunPickupValue ?? getCrazyDaveSetting(cfg, 'sunPickupValue');
     const resolvedValue = (value !== undefined && value !== null) ? value : defaultVal;
 
     const sun = {
@@ -989,9 +1011,9 @@ export class CrazyDaveFighter extends Fighter {
       vx: 0,
       vy: fallSpeed,
       isLanding: true,
-      r: cfg.sunRadius || 30,
+      r: getCrazyDaveSetting(cfg, 'sunRadius'),
       value: resolvedValue,
-      life: cfg.sunDecayFrames || 720,
+      life: getCrazyDaveSetting(cfg, 'sunDecayFrames'),
       pulse: 0,
       rotAngle: Math.random() * Math.PI,
     };
@@ -1004,29 +1026,20 @@ export class CrazyDaveFighter extends Fighter {
    */
   plantPeashooter(opponent) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const peashooterCost = cfg.peashooterCost || 100;
+    const peashooterCost = getCrazyDaveSetting(cfg, 'peashooterCost');
     if (this.sunCount < peashooterCost) {
       spawnFloatingText(this.x, this.y - 25, `Need ${peashooterCost}☀️!`, '#EF4444');
       return false;
     }
     this.sunCount -= peashooterCost;
-    this.peashooterCooldown = cfg.peashooterCooldown || 120;
+    this.peashooterCooldown = getCrazyDaveSetting(cfg, 'peashooterCooldown');
 
     this.activePeashooters = this.activePeashooters.filter(p => p && p.hp > 0);
-    if (this.activePeashooters.length >= (cfg.maxPeashooters || 3)) {
-      const oldest = this.activePeashooters.shift();
-      if (oldest) {
-        oldest.hp = 0;
-        if (state && Array.isArray(state.fighters)) {
-          const idx = state.fighters.indexOf(oldest);
-          if (idx !== -1) state.fighters.splice(idx, 1);
-        }
-      }
-    }
 
-    const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
-    const rawX = this.x + Math.cos(this.gunAngle || 0) * 32;
-    const rawY = this.y + Math.sin(this.gunAngle || 0) * 32;
+    const arena = (state && state.arena) ? state.arena : CONFIG.arena;
+    const plantSpawnOffset = getCrazyDaveSetting(cfg, 'plantSpawnOffset');
+    const rawX = this.x + Math.cos(this.gunAngle || 0) * plantSpawnOffset;
+    const rawY = this.y + Math.sin(this.gunAngle || 0) * plantSpawnOffset;
     const activePlants = [...(this.activePeashooters || []), ...(this.activeSnowPeas || [])].filter(p => p && p.hp > 0);
     const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
 
@@ -1061,19 +1074,16 @@ export class CrazyDaveFighter extends Fighter {
       state.fighters.push(peashooter);
     }
 
-    spawnFloatingText(this.x, this.y - 25, '-100 ☀️ Peashooter!', '#4ADE80');
-    if (audioSystem && typeof audioSystem.playSFX === 'function') {
-      audioSystem.playSFX('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
-    } else if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
-    }
+    spawnFloatingText(this.x, this.y - 25, `-${peashooterCost} ☀️ Peashooter!`, getCrazyDaveSetting(cfg, 'peashooterColor'));
+    playDavePlantingAudio(cfg);
 
     // Stop Dave's movement momentarily upon planting and play shovel dig animation
     this.lastPlantedType = 'peashooter';
-    this.plantingPauseTimer = 20;
-    this.plantingAnimTimer = 20;
-    this.plantingAnimDuration = 20;
-    this.shovelSwingTimer = 20;
+    const plantingDuration = getCrazyDaveSetting(cfg, 'plantingDuration');
+    this.plantingPauseTimer = plantingDuration;
+    this.plantingAnimTimer = plantingDuration;
+    this.plantingAnimDuration = plantingDuration;
+    this.shovelSwingTimer = plantingDuration;
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
@@ -1087,29 +1097,20 @@ export class CrazyDaveFighter extends Fighter {
    */
   plantSnowPea(opponent) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
-    const snowPeaCost = cfg.snowPeaCost || 175;
+    const snowPeaCost = getCrazyDaveSetting(cfg, 'snowPeaCost');
     if (this.sunCount < snowPeaCost) {
       spawnFloatingText(this.x, this.y - 25, `Need ${snowPeaCost}☀️!`, '#EF4444');
       return false;
     }
     this.sunCount -= snowPeaCost;
-    this.snowPeaCooldown = cfg.snowPeaCooldown || 180;
+    this.snowPeaCooldown = getCrazyDaveSetting(cfg, 'snowPeaCooldown');
 
     this.activeSnowPeas = this.activeSnowPeas.filter(s => s && s.hp > 0);
-    if (this.activeSnowPeas.length >= (cfg.maxSnowPeas || 3)) {
-      const oldest = this.activeSnowPeas.shift();
-      if (oldest) {
-        oldest.hp = 0;
-        if (state && Array.isArray(state.fighters)) {
-          const idx = state.fighters.indexOf(oldest);
-          if (idx !== -1) state.fighters.splice(idx, 1);
-        }
-      }
-    }
 
-    const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
-    const rawX = this.x + Math.cos(this.gunAngle || 0) * 32;
-    const rawY = this.y + Math.sin(this.gunAngle || 0) * 32;
+    const arena = (state && state.arena) ? state.arena : CONFIG.arena;
+    const plantSpawnOffset = getCrazyDaveSetting(cfg, 'plantSpawnOffset');
+    const rawX = this.x + Math.cos(this.gunAngle || 0) * plantSpawnOffset;
+    const rawY = this.y + Math.sin(this.gunAngle || 0) * plantSpawnOffset;
     const activePlants = [...(this.activePeashooters || []), ...(this.activeSnowPeas || [])].filter(p => p && p.hp > 0);
     const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
 
@@ -1144,19 +1145,16 @@ export class CrazyDaveFighter extends Fighter {
       state.fighters.push(snowpea);
     }
 
-    spawnFloatingText(this.x, this.y - 25, '-175 ☀️ Snow Pea!', '#38BDF8');
-    if (audioSystem && typeof audioSystem.playSFX === 'function') {
-      audioSystem.playSFX('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
-    } else if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
-    }
+    spawnFloatingText(this.x, this.y - 25, `-${snowPeaCost} ☀️ Snow Pea!`, getCrazyDaveSetting(cfg, 'snowPeaColor'));
+    playDavePlantingAudio(cfg);
 
     // Stop Dave's movement momentarily upon planting and play shovel dig animation
     this.lastPlantedType = 'snowpea';
-    this.plantingPauseTimer = 20;
-    this.plantingAnimTimer = 20;
-    this.plantingAnimDuration = 20;
-    this.shovelSwingTimer = 20;
+    const plantingDuration = getCrazyDaveSetting(cfg, 'plantingDuration');
+    this.plantingPauseTimer = plantingDuration;
+    this.plantingAnimTimer = plantingDuration;
+    this.plantingAnimDuration = plantingDuration;
+    this.shovelSwingTimer = plantingDuration;
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
@@ -1175,15 +1173,13 @@ export class CrazyDaveFighter extends Fighter {
     if (this.ambientSunTimer >= this.ambientSunInterval) {
       this.ambientSunTimer = 0;
       const tile = getRandomGrassTileCenter(arena);
-      const sunVal = (this.sunPickupValue !== undefined)
-        ? this.sunPickupValue
-        : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50);
+      const sunVal = this.sunPickupValue ?? getCrazyDaveSetting(cfg, 'sunPickupValue');
       this.spawnSunDrop(tile.x, tile.y, sunVal);
     }
 
     // 2. Sun Drops Physics & Magnetic Pickup Loop
-    const magnetRadius = cfg.sunAttractionRadius || 95;
-    const magnetSpeed = cfg.sunAttractionSpeed || 7.0;
+    const magnetRadius = getCrazyDaveSetting(cfg, 'sunAttractionRadius');
+    const magnetSpeed = getCrazyDaveSetting(cfg, 'sunAttractionSpeed');
 
     for (let i = this.suns.length - 1; i >= 0; i--) {
       const sun = this.suns[i];
@@ -1210,7 +1206,7 @@ export class CrazyDaveFighter extends Fighter {
         sun.y += sun.vy;
       } else if (sun.isLanding) {
         // Falling down from the sky outside the top of the arena
-        sun.y += (sun.vy || cfg.sunFallSpeed || 2.2);
+        sun.y += sun.vy ?? getCrazyDaveSetting(cfg, 'sunFallSpeed');
         sun.x = sun.targetX;
         if (sun.y >= sun.targetY) {
           sun.y = sun.targetY;
@@ -1228,18 +1224,14 @@ export class CrazyDaveFighter extends Fighter {
 
       // Pickup Collision
       if (dist < (this.r + sun.r + 8)) {
-        const pickupVal = (sun.value !== undefined && sun.value !== null)
-          ? sun.value
-          : ((this.sunPickupValue !== undefined)
-            ? this.sunPickupValue
-            : (cfg.sunPickupValue !== undefined ? cfg.sunPickupValue : 50));
-        this.sunCount = Math.min(cfg.maxSun || 500, this.sunCount + pickupVal);
+        const pickupVal = sun.value ?? this.sunPickupValue ?? getCrazyDaveSetting(cfg, 'sunPickupValue');
+        this.sunCount = Math.min(getCrazyDaveSetting(cfg, 'maxSun'), this.sunCount + pickupVal);
         spawnFloatingText(this.x, this.y - 20, `+${pickupVal} ☀️`, '#FEF08A');
         spawnSparks(sun.x, sun.y, 8, '#FACC15');
         if (audioSystem && typeof audioSystem.playSFX === 'function') {
-          audioSystem.playSFX('Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3', 0.85);
+          audioSystem.playSFX(getCrazyDaveSound(cfg, 'sunPickup'), getCrazyDaveSoundVolume(cfg, 'sunPickup'));
         } else if (audioSystem && typeof audioSystem.playSound === 'function') {
-          audioSystem.playSound('Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3', 0.85);
+          audioSystem.playSound(getCrazyDaveSound(cfg, 'sunPickup'), getCrazyDaveSoundVolume(cfg, 'sunPickup'));
         }
         this.suns.splice(i, 1);
       }
@@ -1300,26 +1292,20 @@ export class CrazyDaveFighter extends Fighter {
 
     // 4. AI Planting Decisions (Anti-Repetition & Balanced Flora Arsenal Standard)
     if (opponent && opponent.hp > 0) {
-      const peashooterCost = cfg.peashooterCost || 100;
-      const snowPeaCost = cfg.snowPeaCost || 175;
+      const peashooterCost = getCrazyDaveSetting(cfg, 'peashooterCost');
+      const snowPeaCost = getCrazyDaveSetting(cfg, 'snowPeaCost');
       const peashooterEnabled = isSkillEnabled(cfg.enablePeashooter, true);
       const snowPeaEnabled = isSkillEnabled(cfg.enableSnowPea, true);
 
       const activePeas = (this.activePeashooters || []).filter(p => p && p.hp > 0).length;
       const activeSnow = (this.activeSnowPeas || []).filter(s => s && s.hp > 0).length;
-      const maxPeas = cfg.maxPeashooters || 3;
-      const maxSnow = cfg.maxSnowPeas || 3;
 
       let chooseType = null;
 
       if (peashooterEnabled && snowPeaEnabled) {
         // Both flora skills enabled: Ensure Dave does NOT repeatedly choose the same plant.
         // Balances field composition and strictly alternates selections.
-        if (activePeas >= maxPeas && activeSnow < maxSnow) {
-          chooseType = 'snowpea';
-        } else if (activeSnow >= maxSnow && activePeas < maxPeas) {
-          chooseType = 'peashooter';
-        } else if (activePeas > activeSnow) {
+        if (activePeas > activeSnow) {
           // More Peashooters than Snow Peas -> prioritize Snow Pea
           chooseType = 'snowpea';
         } else if (activeSnow > activePeas) {
@@ -1336,9 +1322,9 @@ export class CrazyDaveFighter extends Fighter {
             chooseType = 'peashooter';
           }
         }
-      } else if (peashooterEnabled && activePeas < maxPeas) {
+      } else if (peashooterEnabled) {
         chooseType = 'peashooter';
-      } else if (snowPeaEnabled && activeSnow < maxSnow) {
+      } else if (snowPeaEnabled) {
         chooseType = 'snowpea';
       }
 

@@ -34,7 +34,7 @@ export const crazyDaveConfig = {
   maxSun: 500,
   sunRadius: 30,             // Sized large and prominent to fill 76.6px grass tiles
   sunPickupValue: 50,
-  sunDropInterval: 110,      // Natural ambient sun falls every 110 frames (~1.8s at 60fps)
+  sunSpawnRate: 70,         // Frames between ambient Sun drops (~1.8s at 60fps)
   sunFallSpeed: 2.2,         // Smooth vertical descent speed
   sunAttractionRadius: 95,   // Magnetic pull radius for Dave towards suns
   sunAttractionSpeed: 7.0,   // Speed at which sun moves toward Dave
@@ -43,35 +43,70 @@ export const crazyDaveConfig = {
   // Skill 1: Plant Peashooter (Regular Damage)
   enablePeashooter: true,
   peashooterCost: 100,       // Costs 100 Sun
+  peashooterColor: '#4ADE80',
   peashooterHp: 180,
   peashooterFireRate: 22,    // Fires a pea every 22 frames (~0.36s)
   peashooterDamage: 10,      // Regular damage per pea
   peashooterSpeed: 9.5,      // Pea projectile speed
   peashooterRange: 460,      // Firing range
+  peashooterRadius: 18,
+  peashooterProjectileRadius: 6,
+  peashooterProjectileLife: 60,
+  peashooterKnockback: 0.5,
+  peashooterMuzzleOffsetX: 22,
+  peashooterMuzzleOffsetY: -17,
   plantLaneTolerance: 85,    // Straight horizontal lane detection width
   peashooterCooldown: 500,   // 2.0s skill cooldown
-  maxPeashooters: 10,         // Maximum simultaneous active Peashooters
 
   // Skill 2: Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)
   enableSnowPea: true,
   snowPeaCost: 175,          // Costs 175 Sun
+  snowPeaColor: '#38BDF8',
   snowPeaHp: 200,
   snowPeaFireRate: 24,       // Fires a frozen pea every 24 frames (~0.40s)
   snowPeaDamage: 12,         // Ice damage per frozen pea
   snowPeaSpeed: 9.5,         // Snow pea projectile speed
   snowPeaRange: 460,         // Firing range
+  snowPeaRadius: 18,
+  snowPeaProjectileRadius: 5.5,
+  snowPeaProjectileLife: 60,
+  snowPeaKnockback: 0.0,
+  snowPeaMuzzleOffsetX: 22,
+  snowPeaMuzzleOffsetY: -19,
   snowPeaSlowDuration: 90,   // 1.5s slow debuff on hit
   snowPeaSlowMultiplier: 0.45, // Slows enemy move speed down to 45%
   snowPeaFreezeChance: 0.25, // 25% chance to completely freeze enemy on hit
   snowPeaFreezeDuration: 60, // 1.0s (60 frames) full freeze stasis duration
   snowPeaCooldown: 500,      // 3.0s skill cooldown
-  maxSnowPeas: 10,            // Maximum simultaneous active Snow Peas
 
-  // Audio Sources
-  peashooterAttackAudioSrc: 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',
-  snowPeaAttackAudioSrc: 'Assets/Sound Effects/Attacks/crazydave-snow_pea_sparkles.ogg',
-  snowPeaFreezeAudioSrc: 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3',
-  plantHitAudioSrc: 'Assets/Sound Effects/SkillEffects/splat3.ogg',
+  // Shared plant deployment and audio tuning
+  plantingDuration: 20,
+  plantSpawnOffset: 32,
+  sunDropSpawnOffset: 45,
+  sunDropFallbackOffset: 220,
+
+  sounds: {
+    planting: 'Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg',
+    plantingVoiceLines: [
+      'Assets/Sound Effects/Boss Voiceline SFX/crazydave-noise1 (1).ogg',
+      'Assets/Sound Effects/Boss Voiceline SFX/crazydave-noise1 (2).ogg',
+      'Assets/Sound Effects/Boss Voiceline SFX/crazydave-noise1 (3).ogg'
+    ],
+    sunPickup: 'Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3',
+    peashooterAttack: 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',
+    snowPeaAttack: 'Assets/Sound Effects/Attacks/crazydave-snow_pea_sparkles.ogg',
+    snowPeaFreeze: 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3',
+    plantHit: 'Assets/Sound Effects/SkillEffects/splat3.ogg'
+  },
+  soundVolumes: {
+    planting: 0.85,
+    plantingVoiceLines: 0.85,
+    sunPickup: 0.85,
+    peashooterAttack: 0.80,
+    snowPeaAttack: 0.85,
+    snowPeaFreeze: 0.85,
+    plantHit: 0.85
+  },
 
   // Sprite Asset Sources
   sunSpriteSrc: 'Assets/model/Sprites/Sun-economy-sprite.png',

@@ -28,27 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "CRAZYDAVE",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "maxPeashooters",
-                "oldVal": 3,
-                "newVal": 10,
-                "pct": "+233.3%"
-            },
-            {
-                "type": "BUFF",
-                "key": "maxSnowPeas",
-                "oldVal": 3,
-                "newVal": 10,
-                "pct": "+233.3%"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

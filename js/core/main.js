@@ -392,9 +392,9 @@ startGameLoop();
 // ─────────────────────────────────────────────
 
 // Capture initial light mode colors from CONFIG so custom user configuration is preserved
-const _initialLightCanvasBg = CONFIG.canvasBgColor || '#ffffffff';
-const _initialLightArenaOuterBg = CONFIG.arenaOuterBgColor || '#fff8ceff';
-const _initialLightArenaInnerBg = CONFIG.arenaInnerBgColor || '#ffffffff';
+const _initialLightCanvasBg = CONFIG.lightCanvasBgColor || CONFIG.canvasBgColor || '#F5EEDC';
+const _initialLightArenaOuterBg = CONFIG.lightArenaOuterBgColor || CONFIG.arenaOuterBgColor || '#F5EEDC';
+const _initialLightArenaInnerBg = CONFIG.lightArenaInnerBgColor || CONFIG.arenaInnerBgColor || '#F5EEDC';
 const _initialLightHudTextColor = CONFIG.hudTextColor || '#131313ff';
 
 // Function to apply Arena Theme (Dark / Light)
@@ -420,6 +420,8 @@ export function applyArenaTheme(theme) {
 
   // Toggle DOM classes
   const _themeEls = [
+    document.documentElement,
+    document.body,
     document.querySelector('.game-container'),
     document.querySelector('.game-box'),
     document.getElementById('hudBottomContainer'),

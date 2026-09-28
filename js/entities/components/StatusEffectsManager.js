@@ -86,11 +86,12 @@ export class StatusEffectsManager {
       this.fighter.lastFreezeAttacker = attacker;
 
       // Play freeze audio
-      const sfx = CONFIG.crazydave?.snowPeaFreezeAudioSrc || 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3';
+      const sfx = CONFIG.crazydave?.sounds?.snowPeaFreeze || 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3';
+      const volume = CONFIG.crazydave?.soundVolumes?.snowPeaFreeze ?? 0.85;
       if (audioSystem && typeof audioSystem.playSFX === 'function') {
-        audioSystem.playSFX(sfx, 0.85);
+        audioSystem.playSFX(sfx, volume);
       } else if (audioSystem && typeof audioSystem.playSound === 'function') {
-        audioSystem.playSound(sfx, 0.85);
+        audioSystem.playSound(sfx, volume);
       }
 
       if (typeof this.fighter.interruptAttacks === 'function') {

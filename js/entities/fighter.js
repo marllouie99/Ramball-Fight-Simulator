@@ -1647,7 +1647,7 @@ export class Fighter {
     const isMahitoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && f.domainActive);
 
     // Fatal Blood Splash explosion! Splashes to death with visceral blood
-    if (typeof spawnFatalBloodSplash === 'function' && !this.isTurret && !this.isDispenser) {
+    if (typeof spawnFatalBloodSplash === 'function' && !this.isTurret && !this.isDispenser && !this.isPlant && !this.isPlantMinion) {
       spawnFatalBloodSplash(this);
     }
 
@@ -2279,7 +2279,7 @@ export class Fighter {
 
     const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
     const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isRatioPauseActive;
-    if (!this.isTurret && !isExplosionOrFlame && !isSecondTurretHit) {
+    if (!this.isTurret && !this.isPlant && !this.isPlantMinion && !isExplosionOrFlame && !isSecondTurretHit) {
       const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
       if (typeof spawnBloodEffect === 'function') {
         spawnBloodEffect(this, bloodAmount, damageAngle, opts);

@@ -1545,9 +1545,6 @@ function updateHealthHud() {
     } else if (f.characterId === 'crazydave' || f.type === 'crazydave' || f._def?.id === 'crazydave' || f._def?.type === 'crazydave' || f.isCrazyDave) {
       const sun = Math.max(0, Math.round(f.sunCount || 0));
       info.push(`<b>$UN:</b> ${sun}`);
-      const activePeas = (f.activePeashooters || []).filter(p => p && p.hp > 0).length;
-      const activeSnow = (f.activeSnowPeas || []).filter(s => s && s.hp > 0).length;
-      info.push(`<b>Plants:</b> ${activePeas + activeSnow}/6`);
     } else {
       const isTacticalChar = ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType);
       if (!isTacticalChar) {
