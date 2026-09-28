@@ -1831,7 +1831,40 @@ async function runInteractionTests() {
     state.fighters[1].draw(mockCtx);
     assert(mockCtx.getStackDepth() === 0, 'Both fighters in 1v1 must draw cleanly with 0 stack depth');
 
-    // 6. Verify isCrazyDavePresent returns false when no Dave is present
+    // 7. Test Sun drop spawning outside top of arena and landing on grass tile center
+    const { getRandomGrassTileCenter } = await import('../js/graphics/renderers/grassFloorRenderer.js');
+    state.arena = { x: 50, y: 50, width: 800, height: 600, shape: 'rectangle' };
+    const randomTile = getRandomGrassTileCenter(state.arena);
+    const sun = dave.spawnSunDrop(randomTile.x, randomTile.y, 25);
+    assert(sun.x === randomTile.x, 'Sun x must be set to target grass tile center x');
+    assert(sun.y < state.arena.y, `Sun spawn y must be above top arena border (got y=${sun.y}, arena.y=${state.arena.y})`);
+    assert(sun.targetX === randomTile.x, 'Sun targetX must equal grass tile center x');
+    assert(sun.targetY === randomTile.y, 'Sun targetY must equal grass tile center y');
+    assert(sun.isLanding === true, 'Sun must start with isLanding === true');
+
+    // Simulate descent (keep Dave stationed away from targetTile to avoid magnetizing during fall)
+    dave.x = (randomTile.x > state.arena.x + 400) ? (state.arena.x + 100) : (state.arena.x + 700);
+    dave.y = (randomTile.y > state.arena.y + 300) ? (state.arena.y + 100) : (state.arena.y + 500);
+    dave.vx = 0;
+    dave.vy = 0;
+    while (sun.isLanding) {
+      dave.update(gojo, 1, state.arena);
+    }
+    assert(sun.isLanding === false, 'Sun isLanding must be false once landed');
+    assert(Math.abs(sun.x - randomTile.x) < 0.001, 'Landed sun x must be precisely at grass tile center');
+    assert(Math.abs(sun.y - randomTile.y) < 0.001, 'Landed sun y must be precisely at grass tile center');
+    assert(sun.vy === 0, 'Landed sun vy must be 0');
+
+    // Test magnetic attraction and pickup by Dave
+    dave.sunCount = 100;
+    dave.x = randomTile.x + 30;
+    dave.y = randomTile.y;
+    const initialSunCount = dave.sunCount;
+    dave.update(gojo, 1, state.arena);
+    assert(dave.sunCount === initialSunCount + 25, `Crazy Dave must collect +25 sun upon collision (got ${dave.sunCount}, expected ${initialSunCount + 25})`);
+    assert(!dave.suns.includes(sun), 'Collected sun must be removed from dave.suns');
+
+    // 8. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
     assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
@@ -1840,7 +1873,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, 1v1 match initialization & minion entity flags verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, 1v1 match initialization & minion entity flags verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

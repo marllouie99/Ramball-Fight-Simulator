@@ -17,7 +17,7 @@ import {
   drawSnowPea,
   drawSunDrop
 } from '../../graphics/weapons/crazyDaveWeaponGraphics.js';
-import { getNearestGrassTileCenter } from '../../graphics/renderers/grassFloorRenderer.js';
+import { getNearestGrassTileCenter, getRandomGrassTileCenter } from '../../graphics/renderers/grassFloorRenderer.js';
 import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -602,15 +602,32 @@ export class CrazyDaveFighter extends Fighter {
   }
 
   /**
-   * Spawns a bouncing Sun drop at (x, y) with the given value.
+   * Spawns a Sun drop outside the top of the arena that falls down to land on the center of a grass tile.
    */
-  spawnSunDrop(x, y, value = 25) {
+  spawnSunDrop(targetX, targetY, value = 25) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
+
+    let destX = targetX;
+    let destY = targetY;
+    if (destX === undefined || destX === null || destY === undefined || destY === null) {
+      const tile = getRandomGrassTileCenter(arena);
+      destX = tile.x;
+      destY = tile.y;
+    }
+
+    // Spawn at the top outside of the arena and drop down to the grass tile center
+    const startY = (arena && arena.y !== undefined) ? (arena.y - 45) : (destY - 220);
+    const fallSpeed = cfg.sunFallSpeed || 2.2;
+
     const sun = {
-      x: x,
-      y: y,
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: -1.5 - Math.random() * 1.5, // Initial float-up bounce
+      x: destX,
+      y: startY,
+      targetX: destX,
+      targetY: destY,
+      vx: 0,
+      vy: fallSpeed,
+      isLanding: true,
       r: 14,
       value: value,
       life: cfg.sunDecayFrames || 720,
@@ -618,6 +635,7 @@ export class CrazyDaveFighter extends Fighter {
       rotAngle: Math.random() * Math.PI,
     };
     this.suns.push(sun);
+    return sun;
   }
 
   /**
@@ -776,11 +794,8 @@ export class CrazyDaveFighter extends Fighter {
     this.ambientSunTimer++;
     if (this.ambientSunTimer >= this.ambientSunInterval) {
       this.ambientSunTimer = 0;
-      if (arena) {
-        const dropX = arena.x + 30 + Math.random() * (arena.width - 60);
-        const dropY = arena.y + 30 + Math.random() * (arena.height - 60);
-        this.spawnSunDrop(dropX, dropY, 25);
-      }
+      const tile = getRandomGrassTileCenter(arena);
+      this.spawnSunDrop(tile.x, tile.y, 25);
     }
 
     // 3. Sun Drops Physics & Magnetic Pickup Loop
@@ -795,11 +810,6 @@ export class CrazyDaveFighter extends Fighter {
         continue;
       }
 
-      // Drag / float physics
-      sun.x += sun.vx;
-      sun.y += sun.vy;
-      sun.vx *= 0.92;
-      sun.vy *= 0.92;
       sun.rotAngle += 0.03;
 
       // Distance to Crazy Dave
@@ -807,11 +817,30 @@ export class CrazyDaveFighter extends Fighter {
       const dy = this.y - sun.y;
       const dist = Math.hypot(dx, dy);
 
-      // Magnetic Attraction
+      // Magnetic Attraction (pulls toward Dave and interrupts landing descent)
       if (dist < magnetRadius && dist > 0.001) {
+        sun.isLanding = false;
         const pull = (1.0 - dist / magnetRadius) * magnetSpeed;
-        sun.vx += (dx / dist) * pull;
-        sun.vy += (dy / dist) * pull;
+        sun.vx = (sun.vx || 0) * 0.92 + (dx / dist) * pull;
+        sun.vy = (sun.vy || 0) * 0.92 + (dy / dist) * pull;
+        sun.x += sun.vx;
+        sun.y += sun.vy;
+      } else if (sun.isLanding) {
+        // Falling down from the sky outside the top of the arena
+        sun.y += (sun.vy || cfg.sunFallSpeed || 2.2);
+        sun.x = sun.targetX;
+        if (sun.y >= sun.targetY) {
+          sun.y = sun.targetY;
+          sun.vy = 0;
+          sun.vx = 0;
+          sun.isLanding = false;
+        }
+      } else {
+        // Settled on grass tile center
+        sun.x = sun.targetX;
+        sun.y = sun.targetY;
+        sun.vx = 0;
+        sun.vy = 0;
       }
 
       // Pickup Collision

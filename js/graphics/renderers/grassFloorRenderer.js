@@ -335,3 +335,37 @@ export function getNearestGrassTileCenter(targetX, targetY, arena, existingOccup
   };
 }
 
+/**
+ * Picks a random grass tile center within the arena bounds.
+ */
+export function getRandomGrassTileCenter(arena, existingOccupants = []) {
+  arena = arena || (typeof state !== 'undefined' && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
+  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
+  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
+  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cellW = arena.width / cols;
+  const cellH = arena.height / rows;
+
+  const validTiles = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cx = arena.x + (c + 0.5) * cellW;
+      const cy = arena.y + (r + 0.5) * cellH;
+      // In circular arenas, ensure tile center is within arena radius
+      if (arena.shape === 'circle') {
+        const arenaMidX = arena.x + arena.width / 2;
+        const arenaMidY = arena.y + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - 25;
+        if (Math.hypot(cx - arenaMidX, cy - arenaMidY) > ar) continue;
+      }
+      validTiles.push({ x: cx, y: cy, col: c, row: r });
+    }
+  }
+
+  if (validTiles.length === 0) {
+    return { x: arena.x + arena.width / 2, y: arena.y + arena.height / 2, col: 0, row: 0 };
+  }
+
+  return validTiles[Math.floor(Math.random() * validTiles.length)];
+}
+
