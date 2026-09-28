@@ -1,8 +1,31 @@
 // CRAZY DAVE PVZ GRASS TILES ARENA FLOOR RENDERER
-// Sourced from Assets/model/Sprites/Grass-tiles-sprite-sheet.png (1536 x 1024, 6 cols x 4 rows of 256x256 tiles)
+// Sourced from Assets/model/Sprites/Grass-tiles-sprite-sheet.png (1536 x 1024)
+// Features pixel-perfect source rect cropping (2 rows of 6 tiles), solid PvZ checkerboard underlay,
+// and seamless scale-fitting across the battle arena matching tactical bush sprite precision.
 
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+
+// Pre-computed default frame bounding boxes from Grass-tiles-sprite-sheet.png (1536x1024)
+export const DEFAULT_GRASS_TILE_RECTS = [
+  // Row 0 (Y: 230..505, Height: 276)
+  { id: 'plain_1',   sx: 15,   sy: 230, sw: 239, sh: 276 },
+  { id: 'daisy_1',   sx: 268,  sy: 230, sw: 243, sh: 276 },
+  { id: 'clover_1',  sx: 524,  sy: 230, sw: 237, sh: 276 },
+  { id: 'yellow_1',  sx: 775,  sy: 230, sw: 237, sh: 276 },
+  { id: 'dirt_1',    sx: 1025, sy: 230, sw: 242, sh: 276 },
+  { id: 'sunbeam_1', sx: 1281, sy: 230, sw: 241, sh: 276 },
+  // Row 1 (Y: 533..807, Height: 275)
+  { id: 'plain_2',   sx: 15,   sy: 533, sw: 239, sh: 275 },
+  { id: 'daisy_2',   sx: 268,  sy: 533, sw: 243, sh: 275 },
+  { id: 'clover_2',  sx: 524,  sy: 533, sw: 237, sh: 275 },
+  { id: 'yellow_2',  sx: 775,  sy: 533, sw: 237, sh: 275 },
+  { id: 'dirt_2',    sx: 1025, sy: 533, sw: 242, sh: 275 },
+  { id: 'sunbeam_2', sx: 1281, sy: 533, sw: 241, sh: 275 },
+];
+
+// Natural organic pool for authentic PvZ lawn composition (lush grass, clovers, daisies, yellow flowers & sunbeams)
+const LUSH_GRASS_POOL = [0, 1, 2, 6, 7, 8, 1, 3, 5, 7, 9, 11];
 
 let _grassTileSpriteImg = null;
 let _grassTileSpriteLoading = false;
@@ -29,9 +52,8 @@ export function loadGrassTileSpriteSheet() {
     _grassTileSpriteImg = null;
   };
   const src = CONFIG.crazydave?.grassTilesSpriteSrc || 'Assets/model/Sprites/Grass-tiles-sprite-sheet.png';
-  _grassTileSpriteImg.src = encodeURI(`${src}?v=1`);
+  _grassTileSpriteImg.src = encodeURI(`${src}?v=2`);
 }
-
 
 /**
  * Returns the loaded Grass Tiles sprite sheet image if ready.
@@ -44,6 +66,10 @@ export function getGrassTileSpriteSheet() {
     loadGrassTileSpriteSheet();
   }
   return _grassTileSpriteImg;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  getGrassTileSpriteSheet();
 }
 
 /**
@@ -98,14 +124,15 @@ export function isCrazyDavePresent() {
 }
 
 /**
- * Retrieves or builds an axis-aligned cached offscreen canvas containing tiled grass sprites.
- * Slices 256x256 tiles from the 6x4 sprite sheet and tiles them across the arena floor.
+ * Retrieves or builds an axis-aligned cached offscreen canvas containing perfectly scaled grass tiles.
+ * 1. Fills arena with solid PvZ alternating checkered green lawn base (zero gaps or black background).
+ * 2. Overlays pixel-perfect cropped grass sprites with subtle edge interlocking.
  */
-export function getOrCreateGrassFloorCanvas(arena, isDark = false) {
+export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
   if (typeof document === 'undefined') return null;
 
-  const width = Math.max(64, Math.ceil(arena.width + 32));
-  const height = Math.max(64, Math.ceil(arena.height + 32));
+  const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
+  const height = Math.max(64, Math.ceil(arena.height + fBleed * 2));
   const shape = arena.shape || 'rect';
   const key = `${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}`;
 
@@ -125,43 +152,69 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false) {
 
   oc.imageSmoothingEnabled = false;
 
-  const tileSize = CONFIG.crazydave?.grassTileSize || 64; // PvZ lawn grid tile size (fits ~7-8 columns per arena width)
-  const cols = Math.ceil(width / tileSize) + 1;
+  // Grid calculation: standard 6x6 tiles for 460x460 arena (or dynamic ~76px per tile)
+  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
+  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
+  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cellW = width / cols;
+  const cellH = height / rows;
 
-  const rows = Math.ceil(height / tileSize) + 1;
+  // 1. Solid PvZ Checkered Lawn Base (100% gapless green underlay)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const isAlternate = ((r + c) % 2 === 0);
+      oc.fillStyle = isAlternate ? '#4db827' : '#3da01f';
+      oc.fillRect(
+        Math.floor(c * cellW),
+        Math.floor(r * cellH),
+        Math.ceil(cellW + 1),
+        Math.ceil(cellH + 1)
+      );
+    }
+  }
 
+  // 2. High-Resolution PvZ Grass Sprite Sheet Overlay
   if (imgLoaded) {
+    const overlap = 2; // subtle interlocking bleed so grass blade fringes blend smoothly
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        // Deterministic pseudo-random variant selector across the 24 tiles (6 cols x 4 rows)
-        const tileIdx = Math.abs((Math.imul(c * 17 + 7, r * 31 + 13) ^ (c + r * 5)) >>> 0) % 24;
-        const srcCol = tileIdx % 6;
-        const srcRow = Math.floor(tileIdx / 6) % 4;
-        const sx = srcCol * 256;
-        const sy = srcRow * 256;
-        const dx = c * tileSize;
-        const dy = r * tileSize;
+        const poolIdx = (r * 5 + c * 3 + (r % 2) * 2) % LUSH_GRASS_POOL.length;
+        const tileIdx = LUSH_GRASS_POOL[poolIdx];
+        const rect = DEFAULT_GRASS_TILE_RECTS[tileIdx] || DEFAULT_GRASS_TILE_RECTS[0];
 
-        oc.drawImage(grassImg, sx, sy, 256, 256, dx, dy, tileSize, tileSize);
+        const dx = Math.floor(c * cellW) - overlap;
+        const dy = Math.floor(r * cellH) - overlap;
+        const dw = Math.ceil(cellW) + overlap * 2;
+        const dh = Math.ceil(cellH) + overlap * 2;
+
+        oc.drawImage(grassImg, rect.sx, rect.sy, rect.sw, rect.sh, dx, dy, dw, dh);
       }
     }
   } else {
-    // High-quality procedural lush green lawn fallback (PvZ checkered alternating lawn stripes)
+    // High-quality procedural grass blade tufts & daisy highlights fallback
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const isAlternate = ((r + c) % 2 === 0);
-        oc.fillStyle = isAlternate ? '#48a82d' : '#3e9925';
-        oc.fillRect(c * tileSize, r * tileSize, tileSize, tileSize);
+        const bx = Math.floor(c * cellW);
+        const by = Math.floor(r * cellH);
 
-        // Subtle grass blade highlights
+        // Blade accents
         oc.fillStyle = isAlternate ? '#5bc337' : '#34861f';
-        oc.fillRect(c * tileSize + 8, r * tileSize + 8, 4, 4);
-        oc.fillRect(c * tileSize + tileSize - 14, r * tileSize + tileSize - 14, 4, 4);
+        oc.fillRect(bx + 10, by + 12, 5, 5);
+        oc.fillRect(bx + cellW - 18, by + cellH - 16, 5, 5);
+
+        // Subtle flower accent on alternating cells
+        if ((r * 3 + c * 7) % 5 === 0) {
+          oc.fillStyle = '#FFFFFF';
+          oc.fillRect(bx + cellW * 0.48, by + cellH * 0.45, 4, 4);
+          oc.fillStyle = '#FBBF24';
+          oc.fillRect(bx + cellW * 0.48 + 1, by + cellH * 0.45 + 1, 2, 2);
+        }
       }
     }
   }
 
-  // Dark Mode / Night Lawn subtle atmosphere tint
+  // 3. Dark Mode / Night Lawn Atmosphere Tint
   if (isDark) {
     oc.fillStyle = 'rgba(6, 20, 16, 0.42)';
     oc.fillRect(0, 0, width, height);
@@ -179,7 +232,7 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false) {
 export function renderCrazyDaveGrassFloor(ctx, arena, isDark = false, fBleed = 4) {
   if (!ctx || !arena) return;
 
-  const grassCanvas = getOrCreateGrassFloorCanvas(arena, isDark);
+  const grassCanvas = getOrCreateGrassFloorCanvas(arena, isDark, fBleed);
   if (!grassCanvas) return;
 
   ctx.save();
@@ -194,7 +247,8 @@ export function renderCrazyDaveGrassFloor(ctx, arena, isDark = false, fBleed = 4
   }
   ctx.clip();
 
-  // Blit cached grass canvas seamlessly with sub-pixel alignment offset
-  ctx.drawImage(grassCanvas, arena.x - 16, arena.y - 16);
+  // Blit cached grass canvas seamlessly across the clipped arena bounds
+  ctx.drawImage(grassCanvas, arena.x - fBleed, arena.y - fBleed);
   ctx.restore();
 }
+
