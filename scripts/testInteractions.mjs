@@ -1842,12 +1842,18 @@ async function runInteractionTests() {
     assert(sun.targetY === randomTile.y, 'Sun targetY must equal grass tile center y');
     assert(sun.isLanding === true, 'Sun must start with isLanding === true');
 
-    // Simulate descent (keep Dave stationed away from targetTile to avoid magnetizing during fall)
-    dave.x = (randomTile.x > state.arena.x + 400) ? (state.arena.x + 100) : (state.arena.x + 700);
-    dave.y = (randomTile.y > state.arena.y + 300) ? (state.arena.y + 100) : (state.arena.y + 500);
+    // Simulate descent (keep Dave stationed far away from targetTile to avoid magnetizing during fall)
+    const safeX = (randomTile.x > state.arena.x + 400) ? (state.arena.x + 50) : (state.arena.x + 750);
+    const safeY = (randomTile.y > state.arena.y + 300) ? (state.arena.y + 50) : (state.arena.y + 550);
+    dave.x = safeX;
+    dave.y = safeY;
     dave.vx = 0;
     dave.vy = 0;
     while (sun.isLanding) {
+      dave.x = safeX;
+      dave.y = safeY;
+      dave.vx = 0;
+      dave.vy = 0;
       dave.update(gojo, 1, state.arena);
     }
     assert(sun.isLanding === false, 'Sun isLanding must be false once landed');

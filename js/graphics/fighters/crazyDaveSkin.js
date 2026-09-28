@@ -12,20 +12,81 @@ import { state } from '../../core/state.js';
 import { drawCrazyDaveShovel, drawSunDrop, getSunSprite } from '../weapons/crazyDaveWeaponGraphics.js';
 
 let _crazyDaveHairImage = null;
+let _crazyDaveHairImageLoading = false;
 
 /**
- * Crazy Dave's model and iconic cooking pot are 100% procedural pixel art.
- * Returns null as no external PNG hair asset is needed.
+ * Lazy-loads and caches the Crazy Dave hair/pan PNG asset.
+ * @returns {HTMLImageElement|null}
  */
 export function _getCrazyDaveHairImage() {
-  return null;
+  if (_crazyDaveHairImage && _crazyDaveHairImage.complete && _crazyDaveHairImage.naturalWidth > 0) {
+    return _crazyDaveHairImage;
+  }
+  if (!_crazyDaveHairImageLoading && typeof Image !== 'undefined') {
+    _crazyDaveHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _crazyDaveHairImage = img;
+      _crazyDaveHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Crazy Dave hair image at Assets/model/Hair/crazydave-hair.png', e);
+      _crazyDaveHairImageLoading = false;
+    };
+    img.src = 'Assets/model/Hair/crazydave-hair.png?v=1';
+    _crazyDaveHairImage = img;
+  }
+  return _crazyDaveHairImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getCrazyDaveHairImage();
 }
 
 /**
- * Draws Crazy Dave's hair/pan asset if present.
+ * Draws Crazy Dave's cooking pot from Assets/model/Hair/crazydave-hair.png.
+ * Overlaid on top of the procedural pixel body circle.
+ * Uses nearest-neighbor scaling for crisp pixel art fidelity (Rule 19 / Rule 3.5).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
  */
 export function _drawCrazyDaveHair(ctx, r, facingLeft = false) {
-  // Crazy Dave uses authentic procedural pixel art for his pot and hair
+  const hairImg = _getCrazyDaveHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule 19)
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.crazydave) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+
+    // crazydave-hair.png (1536x1024). Main Pan Dome Bounding Box:
+    // X: [184, 1038] (width 855, horizontal center of pan dome at 611)
+    // Y: [301, 814] (height 514, top crown at 301, bottom rim at 814)
+    // Full visible range with handle: X: [133, 1495]
+    const targetDomeWidth = r * 2.25 * wMult;
+    const targetDomeHeight = r * 1.30 * hMult;
+    const scaleX = targetDomeWidth / 855;
+    const scaleY = targetDomeHeight / 514;
+    const drawW = 1536 * scaleX;
+    const drawH = 1024 * scaleY;
+    const drawX = -611 * scaleX + offX;
+    const drawY = -r * 1.15 - 301 * scaleY + offY;
+
+    if (rot !== 0) {
+      ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
+      ctx.rotate(rot);
+      ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
+    }
+
+    ctx.restore();
+  }
 }
 
 let _cachedCrazyDaveBodyCanvas = null;

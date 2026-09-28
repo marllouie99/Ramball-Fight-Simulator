@@ -3,8 +3,4 @@
 
 ---
 
-## 🥊 Fighter Stat Modifications
-
-### CRAZYDAVE
-* **🟢 BUFF** `sunRadius`: `22` ➔ `30` (+36.4%)
-
+*No balance parameter modifications detected in `js/configs/`.*

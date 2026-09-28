@@ -146,15 +146,15 @@ export const SKIN_STUDIO_FIGHTERS = [
   {
     key: 'crazydave',
     label: 'CRAZY DAVE',
-    asset: 'Procedural Pixel Art',
-    assetDims: 'Procedural Model',
-    baseW: 2.40,
-    baseH: 2.20,
-    baseCrownY: -1.25,
-    visW: 300,
-    visH: 300,
-    centerX: 250,
-    topY: 50,
+    asset: 'crazydave-hair.png',
+    assetDims: '1536 x 1024',
+    baseW: 2.25,
+    baseH: 1.30,
+    baseCrownY: -1.15,
+    visW: 855,
+    visH: 514,
+    centerX: 611,
+    topY: 301,
     themeColor: '#84cc16',
     forms: [
       { id: 'default', label: 'COOKING POT' }
@@ -623,15 +623,15 @@ function generateJsCode(fDef, custom) {
            `const drawX = -250 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 60 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'crazydave') {
-    return `// Calibrated Hair/Pan for Crazy Dave (Assets/model/Hair/Crazydave-hair.png)\n` +
-           `const targetHairWidth = r * ${targetW};\n` +
-           `const targetHairHeight = r * ${targetH};\n` +
-           `const scaleX = targetHairWidth / 300;\n` +
-           `const scaleY = targetHairHeight / 300;\n` +
-           `const drawW = 500 * scaleX;\n` +
-           `const drawH = 500 * scaleY;\n` +
-           `const drawX = -250 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
-           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 50 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+    return `// Calibrated Hair/Pan for Crazy Dave (Assets/model/Hair/crazydave-hair.png)\n` +
+           `const targetDomeWidth = r * ${targetW};\n` +
+           `const targetDomeHeight = r * ${targetH};\n` +
+           `const scaleX = targetDomeWidth / 855;\n` +
+           `const scaleY = targetDomeHeight / 514;\n` +
+           `const drawW = 1536 * scaleX;\n` +
+           `const drawH = 1024 * scaleY;\n` +
+           `const drawX = -611 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 301 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'reze') {
     return `// Calibrated Hair for Reze (Assets/model/Reze-hair.png)\n` +
            `const targetDomeWidth = r * ${targetW};\n` +
