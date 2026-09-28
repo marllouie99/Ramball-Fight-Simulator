@@ -213,7 +213,7 @@ export function drawSunDrop(ctx, sun) {
   if (!sun) return;
   const x = sun.x || 0;
   const y = sun.y || 0;
-  const r = sun.r || 14;
+  const r = sun.r || 22;
   const pulse = sun.pulse || (Math.sin(Date.now() * 0.006) * 1.5);
   const rotAngle = sun.rotAngle || (Date.now() * 0.002);
 

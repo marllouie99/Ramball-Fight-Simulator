@@ -628,7 +628,7 @@ export class CrazyDaveFighter extends Fighter {
       vx: 0,
       vy: fallSpeed,
       isLanding: true,
-      r: 14,
+      r: cfg.sunRadius || 22,
       value: value,
       life: cfg.sunDecayFrames || 720,
       pulse: 0,
