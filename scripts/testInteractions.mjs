@@ -1641,8 +1641,8 @@ async function runInteractionTests() {
     const { isCrazyDavePresent, renderCrazyDaveGrassFloor } = await import('../js/graphics/renderers/grassFloorRenderer.js');
     const { drawArena } = await import('../js/graphics/renderers/arenaRenderer.js');
 
-    const dave = new CrazyDaveClass({ radius: 25, x: 200, y: 300, hp: 390, maxHp: 390, color: '#84CC16' });
-    const gojo = new GojoClass({ radius: 25, x: 400, y: 300, hp: 200, maxHp: 200, color: '#00E5FF' });
+    let dave = new CrazyDaveClass({ radius: 25, x: 200, y: 300, hp: 390, maxHp: 390, color: '#84CC16' });
+    let gojo = new GojoClass({ radius: 25, x: 400, y: 300, hp: 200, maxHp: 200, color: '#00E5FF' });
 
     state.fighters = [dave, gojo];
     state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
@@ -1824,6 +1824,8 @@ async function runInteractionTests() {
     assert(state.fighters.length === 2, `1v1 Match with Gojo vs Crazy Dave must have 2 active fighters (got ${state.fighters.length})`);
     assert(state.fighters[0] && state.fighters[0].characterId === 'gojo', 'P1 must be Gojo');
     assert(state.fighters[1] && state.fighters[1].characterId === 'crazydave', 'P2 must be Crazy Dave');
+    gojo = state.fighters[0];
+    dave = state.fighters[1];
     assert(state.fighters[1].x > state.fighters[0].x, 'P2 (Crazy Dave) must be positioned on the right side of arena');
 
     mockCtx.resetStackDepth();
@@ -1863,6 +1865,8 @@ async function runInteractionTests() {
 
     // Test magnetic attraction and pickup by Dave
     dave.sunCount = 100;
+    dave.peashooterCooldown = 999;
+    dave.snowPeaCooldown = 999;
     dave.x = randomTile.x + 30;
     dave.y = randomTile.y;
     const initialSunCount = dave.sunCount;
@@ -1969,7 +1973,36 @@ async function runInteractionTests() {
     backPlant.update(gojo, 1, state.arena);
     assert(backPlant.shootCooldown === backPlant.shootCooldownMax, 'Plant must continue firing peas when Dave is time-stopped/stunned');
 
-    // 11. Verify isCrazyDavePresent returns false when no Dave is present
+    // 11. Test Plant Complete Debuff Immunity & DoT Resistance
+    backPlant.applyBurn(gojo, 180);
+    backPlant.applyPoison(gojo);
+    backPlant.applyBleed(gojo, 180, 5, 30);
+    backPlant.applySlow(90, 0.45);
+    backPlant.applyParalyze(60);
+    backPlant.applyHitStun(60);
+    backPlant.applyTimeStop(60);
+    assert(backPlant.burnTimer === 0, 'Plant burnTimer must remain 0 (immune to burn)');
+    assert(backPlant.poisonTicks === 0, 'Plant poisonTicks must remain 0 (immune to poison)');
+    assert(backPlant.bleedTimer === 0, 'Plant bleedTimer must remain 0 (immune to bleed)');
+    assert(backPlant.slowTimer === 0, 'Plant slowTimer must remain 0 (immune to slow)');
+    assert(backPlant.paralyzeTimer === 0, 'Plant paralyzeTimer must remain 0 (immune to paralyze)');
+    assert(backPlant.hitStunTimer === 0, 'Plant hitStunTimer must remain 0 (immune to hitstun)');
+    assert(backPlant.timeStopTimer === 0, 'Plant timeStopTimer must remain 0 (immune to time stop)');
+
+    // Plants ignore debuff DoT tick damages
+    const hpBeforeDot = backPlant.hp;
+    const dotTakenBurn = backPlant.takeDamage(10, gojo, { isBurn: true });
+    const dotTakenPoison = backPlant.takeDamage(10, gojo, { isPoison: true });
+    const dotTakenBleed = backPlant.takeDamage(10, gojo, { isBleed: true });
+    const dotTakenElectrified = backPlant.takeDamage(10, gojo, { isElectrified: true });
+    assert(dotTakenBurn === false && dotTakenPoison === false && dotTakenBleed === false && dotTakenElectrified === false, 'Plants must ignore all debuff DoT damage instances');
+    assert(backPlant.hp === hpBeforeDot, 'Plant HP must not decrease from debuff DoT damage');
+
+    // Direct attacks still damage plants
+    const directHit = backPlant.takeDamage(20, gojo);
+    assert(directHit === true && backPlant.hp === hpBeforeDot - 20, 'Direct attacks must still successfully damage plants');
+
+    // 12. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
     assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
@@ -1978,7 +2011,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, planting movement pause, pass-through collision & minion immovability verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, planting movement pause, pass-through collision, minion immovability & complete debuff immunity verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

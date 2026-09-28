@@ -62,11 +62,57 @@ export class PeashooterEntity extends Fighter {
     this.immuneToPull = true;
     this.immuneToPush = true;
     this.cannotBeDisplaced = true;
+    this.immuneToCC = true;
+    this.domainImmunity = true;
+    this.immuneToBurn = true;
+    this.immuneToPoison = true;
+    this.immuneToBleed = true;
+    this.isDebuffImmune = true;
+    this.gojoBlueDragImmune = true;
+    this.gojoInfinityImmune = true;
     this.phasesThroughEntities = true;
     this.ignoreFighterCollisions = true;
     this.hideHpText = true;
     this.maxHp = maxHp;
     this.hp = maxHp;
+
+    // Complete debuff timer suppression
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
+    this.poisonTicks = 0;
+    this.poisonTimer = 0;
+    this.bleedTimer = 0;
+    this.bleedDamageTimer = 0;
+    this.paralyzeTimer = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+    this.hitStunTimer = 0;
+    this.timeStopTimer = 0;
+    this.silenceTimer = 0;
+    this.electricStunTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this.dubstepStunTimer = 0;
+    this.dubstepStunVisualTimer = 0;
+    this.thunderRootsTimer = 0;
+    this.staticDebuffTimer = 0;
+    this.nanamiArmorFractureTimer = 0;
+    this.blackFlashDebuffTimer = 0;
+    this.voidMarkTimer = 0;
+    this.isParalyzed = false;
+    this.isParalyzedByMahito = false;
+    this.isParalyzedByMahoraga = false;
+    this.isFrozenByInfinity = false;
+    this.isChainedByMakima = false;
+    this.isWallPinnedByMakima = false;
+    this.isWallPinnedBySaitama = false;
+    this.isDraggedByGetsuga = false;
+    this.caughtInSaitamaCounter = false;
+    this.caughtInGenosFlurry = false;
+    this.caughtInJohnWickCombo = false;
+    this.frozenByCronos = false;
+    this.isCronosStasis = false;
+    this._hitByFugaTimer = 0;
+    this._hitByDivineFlameTimer = 0;
 
     // Anchor plant immovably to centered grass tile position
     this._fixedX = x;
@@ -100,32 +146,74 @@ export class PeashooterEntity extends Fighter {
     // Entities pass through plants without collision push
   }
 
-  _handleTimeStop() {
-    // Plants are rooted autonomous flora and are unaffected by owner or general movement-stopping effects
-    return false;
-  }
+  // ── Complete Debuff & Status Effect Neutralization ──
+  _handleTimeStop() { return false; }
+  applyHitStun() { this.hitStunTimer = 0; return; }
+  applyTimeStop() { this.timeStopTimer = 0; return; }
+  applySlow() { this.slowTimer = 0; this.slowMultiplier = 1.0; return; }
+  applyParalyze() { this.paralyzeTimer = 0; this.isParalyzed = false; return; }
+  applyBurn() { this.burnTimer = 0; this.burnDamageTimer = 0; return; }
+  applyPoison() { this.poisonTicks = 0; this.poisonTimer = 0; return; }
+  applyBleed() { this.bleedTimer = 0; this.bleedDamageTimer = 0; return; }
+  applyStatusEffect() { return; }
+  applySoulDisfigurement() { return; }
+  applyTelekinesis() { return; }
+  applyChain() { return; }
+  applyRatioCrit() { return; }
+  applyDomainStasis() { return; }
+  applyGetsugaDrag() { return; }
+  applySilence() { this.silenceTimer = 0; return; }
+  isSilenced() { return false; }
+  isParalyzedDebuffActive() { return false; }
+  suppressCombatAndVisuals() { return; }
+  interruptAttacks() { return; }
 
-  applyHitStun(duration) {
-    // Plants are immovable flora and never suffer hit-stun or movement stops
-    return;
-  }
+  // ── Complete Movement & Physics Neutralization ──
+  applyKnockback() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyPush() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyPull() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applySuction() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyDrag() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
 
-  applyTimeStop(duration) {
-    // Plants ignore hit pauses
-    return;
+  // ── Master Debuff Ticks Override ──
+  handleStatusEffects() {
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
+    this.poisonTicks = 0;
+    this.poisonTimer = 0;
+    this.bleedTimer = 0;
+    this.bleedDamageTimer = 0;
+    this.paralyzeTimer = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+    this.hitStunTimer = 0;
+    this.timeStopTimer = 0;
+    this.silenceTimer = 0;
+    this.electricStunTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this.dubstepStunTimer = 0;
+    this.thunderRootsTimer = 0;
+    this.staticDebuffTimer = 0;
+    this.nanamiArmorFractureTimer = 0;
+    this.blackFlashDebuffTimer = 0;
+    this.voidMarkTimer = 0;
   }
+  handlePoison() { return; }
+  handleBurn() { return; }
+  handleBleed() { return; }
 
-  applySlow(duration, mult) {
-    // Plants have 0 movement speed anyway and ignore slow debuffs
-    return;
-  }
-
-  applyKnockback(vx, vy) {
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
-    this.vx = 0;
-    this.vy = 0;
-  }
+  // ── Overhead & Status Renderers ──
+  drawStatusOverlays() { /* Plants are immune to debuffs & overlays */ }
+  drawFreezeTimer() { /* Plants are immune to freeze */ }
+  drawSlowEffect() { return; }
+  drawPoisonEffect() { return; }
+  drawBurnEffect() { return; }
+  drawBleedEffect() { return; }
+  drawElectricStunEffect() { return; }
+  drawCrimsonElectrifiedEffect() { return; }
+  drawDubstepStunEffect() { return; }
+  drawThunderRootsEffect() { return; }
+  drawSilenceEffect() { return; }
 
   resolveWallBounce(arena, opponent) {
     this.vx = 0;
@@ -143,7 +231,11 @@ export class PeashooterEntity extends Fighter {
     if (attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
       return false;
     }
+    // Ignore debuff DoT tick damages (poison ticks, burn ticks, bleed ticks, electrified ticks)
     if (opts) {
+      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
+        return false;
+      }
       if (opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
         return false;
       }
@@ -331,11 +423,57 @@ export class SnowPeaEntity extends Fighter {
     this.immuneToPull = true;
     this.immuneToPush = true;
     this.cannotBeDisplaced = true;
+    this.immuneToCC = true;
+    this.domainImmunity = true;
+    this.immuneToBurn = true;
+    this.immuneToPoison = true;
+    this.immuneToBleed = true;
+    this.isDebuffImmune = true;
+    this.gojoBlueDragImmune = true;
+    this.gojoInfinityImmune = true;
     this.phasesThroughEntities = true;
     this.ignoreFighterCollisions = true;
     this.hideHpText = true;
     this.maxHp = maxHp;
     this.hp = maxHp;
+
+    // Complete debuff timer suppression
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
+    this.poisonTicks = 0;
+    this.poisonTimer = 0;
+    this.bleedTimer = 0;
+    this.bleedDamageTimer = 0;
+    this.paralyzeTimer = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+    this.hitStunTimer = 0;
+    this.timeStopTimer = 0;
+    this.silenceTimer = 0;
+    this.electricStunTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this.dubstepStunTimer = 0;
+    this.dubstepStunVisualTimer = 0;
+    this.thunderRootsTimer = 0;
+    this.staticDebuffTimer = 0;
+    this.nanamiArmorFractureTimer = 0;
+    this.blackFlashDebuffTimer = 0;
+    this.voidMarkTimer = 0;
+    this.isParalyzed = false;
+    this.isParalyzedByMahito = false;
+    this.isParalyzedByMahoraga = false;
+    this.isFrozenByInfinity = false;
+    this.isChainedByMakima = false;
+    this.isWallPinnedByMakima = false;
+    this.isWallPinnedBySaitama = false;
+    this.isDraggedByGetsuga = false;
+    this.caughtInSaitamaCounter = false;
+    this.caughtInGenosFlurry = false;
+    this.caughtInJohnWickCombo = false;
+    this.frozenByCronos = false;
+    this.isCronosStasis = false;
+    this._hitByFugaTimer = 0;
+    this._hitByDivineFlameTimer = 0;
 
     // Anchor plant immovably to centered grass tile position
     this._fixedX = x;
@@ -369,32 +507,74 @@ export class SnowPeaEntity extends Fighter {
     // Entities pass through plants without collision push
   }
 
-  _handleTimeStop() {
-    // Plants are rooted autonomous flora and are unaffected by owner or general movement-stopping effects
-    return false;
-  }
+  // ── Complete Debuff & Status Effect Neutralization ──
+  _handleTimeStop() { return false; }
+  applyHitStun() { this.hitStunTimer = 0; return; }
+  applyTimeStop() { this.timeStopTimer = 0; return; }
+  applySlow() { this.slowTimer = 0; this.slowMultiplier = 1.0; return; }
+  applyParalyze() { this.paralyzeTimer = 0; this.isParalyzed = false; return; }
+  applyBurn() { this.burnTimer = 0; this.burnDamageTimer = 0; return; }
+  applyPoison() { this.poisonTicks = 0; this.poisonTimer = 0; return; }
+  applyBleed() { this.bleedTimer = 0; this.bleedDamageTimer = 0; return; }
+  applyStatusEffect() { return; }
+  applySoulDisfigurement() { return; }
+  applyTelekinesis() { return; }
+  applyChain() { return; }
+  applyRatioCrit() { return; }
+  applyDomainStasis() { return; }
+  applyGetsugaDrag() { return; }
+  applySilence() { this.silenceTimer = 0; return; }
+  isSilenced() { return false; }
+  isParalyzedDebuffActive() { return false; }
+  suppressCombatAndVisuals() { return; }
+  interruptAttacks() { return; }
 
-  applyHitStun(duration) {
-    // Plants are immovable flora and never suffer hit-stun or movement stops
-    return;
-  }
+  // ── Complete Movement & Physics Neutralization ──
+  applyKnockback() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyPush() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyPull() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applySuction() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyDrag() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
 
-  applyTimeStop(duration) {
-    // Plants ignore hit pauses
-    return;
+  // ── Master Debuff Ticks Override ──
+  handleStatusEffects() {
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
+    this.poisonTicks = 0;
+    this.poisonTimer = 0;
+    this.bleedTimer = 0;
+    this.bleedDamageTimer = 0;
+    this.paralyzeTimer = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+    this.hitStunTimer = 0;
+    this.timeStopTimer = 0;
+    this.silenceTimer = 0;
+    this.electricStunTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this.dubstepStunTimer = 0;
+    this.thunderRootsTimer = 0;
+    this.staticDebuffTimer = 0;
+    this.nanamiArmorFractureTimer = 0;
+    this.blackFlashDebuffTimer = 0;
+    this.voidMarkTimer = 0;
   }
+  handlePoison() { return; }
+  handleBurn() { return; }
+  handleBleed() { return; }
 
-  applySlow(duration, mult) {
-    // Plants have 0 movement speed anyway and ignore slow debuffs
-    return;
-  }
-
-  applyKnockback(vx, vy) {
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
-    this.vx = 0;
-    this.vy = 0;
-  }
+  // ── Overhead & Status Renderers ──
+  drawStatusOverlays() { /* Plants are immune to debuffs & overlays */ }
+  drawFreezeTimer() { /* Plants are immune to freeze */ }
+  drawSlowEffect() { return; }
+  drawPoisonEffect() { return; }
+  drawBurnEffect() { return; }
+  drawBleedEffect() { return; }
+  drawElectricStunEffect() { return; }
+  drawCrimsonElectrifiedEffect() { return; }
+  drawDubstepStunEffect() { return; }
+  drawThunderRootsEffect() { return; }
+  drawSilenceEffect() { return; }
 
   resolveWallBounce(arena, opponent) {
     this.vx = 0;
@@ -412,7 +592,11 @@ export class SnowPeaEntity extends Fighter {
     if (attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
       return false;
     }
+    // Ignore debuff DoT tick damages (poison ticks, burn ticks, bleed ticks, electrified ticks)
     if (opts) {
+      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
+        return false;
+      }
       if (opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
         return false;
       }
