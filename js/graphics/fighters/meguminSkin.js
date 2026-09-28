@@ -21,34 +21,13 @@ import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 let _meguminHairImage = null;
-let _meguminHairImageLoading = false;
 
 /**
- * Image loader for Megumin's upcoming hair asset (Assets/model/Megumin-hair.png).
+ * Megumin's model features authentic procedural wizard hat and robes.
+ * Returns null as no external PNG hair asset is needed.
  */
 export function _getMeguminHairImage() {
-  if (_meguminHairImage && _meguminHairImage.complete && _meguminHairImage.naturalWidth > 0) {
-    return _meguminHairImage;
-  }
-  if (!_meguminHairImageLoading && typeof Image !== 'undefined') {
-    _meguminHairImageLoading = true;
-    const img = new Image();
-    img.onload = () => {
-      _meguminHairImage = img;
-      _meguminHairImageLoading = false;
-    };
-    img.onerror = () => {
-      // Gracefully silent if asset is not yet added to workspace
-      _meguminHairImageLoading = false;
-    };
-    img.src = 'Assets/model/Megumin-hair.png?v=1';
-    _meguminHairImage = img;
-  }
-  return _meguminHairImage;
-}
-
-if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getMeguminHairImage();
+  return null;
 }
 
 /**

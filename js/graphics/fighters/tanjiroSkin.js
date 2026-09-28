@@ -30,13 +30,10 @@ export function _getTanjiroSkinImage() {
       _tanjiroSkinImage = img;
       _tanjiroSkinImageLoading = false;
     };
-    img.onerror = (e) => {
-      console.warn('Failed to load Tanjiro pixel skin image from Assets/model/Tanjiro-PIXEL-SKIN.png, using embedded URI fallback', e);
-      img.src = _TANJIRO_DATA_URI;
-      _tanjiroSkinImage = img;
+    img.onerror = () => {
       _tanjiroSkinImageLoading = false;
     };
-    img.src = 'Assets/model/Tanjiro-PIXEL-SKIN.png?v=5';
+    img.src = _TANJIRO_DATA_URI;
     _tanjiroSkinImage = img;
   }
   return _tanjiroSkinImage;

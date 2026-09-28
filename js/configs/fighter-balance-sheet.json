@@ -619,6 +619,46 @@
           "cooldown": 360
         }
       }
+    },
+    "crazydave": {
+      "name": "Crazy Dave",
+      "archetype": "zoner",
+      "hp": 390,
+      "speed": 5.2,
+      "radius": 25,
+      "baseDamage": 22,
+      "baseCooldown": 28,
+      "themeColor": "#84CC16",
+      "keySkills": {
+        "sunflower": {
+          "cost": 50,
+          "hp": 140,
+          "interval": 130,
+          "cooldown": 180
+        },
+        "peashooter": {
+          "cost": 100,
+          "hp": 180,
+          "damage": 9,
+          "fireRate": 22
+        },
+        "wallNut": {
+          "cost": 50,
+          "hp": 380
+        },
+        "cherryBomb": {
+          "cost": 150,
+          "damage": 110,
+          "radius": 115,
+          "fuse": 45
+        },
+        "lawnMower": {
+          "cost": 250,
+          "damage": 85,
+          "speed": 14.0,
+          "cooldown": 800
+        }
+      }
     }
   }
 }

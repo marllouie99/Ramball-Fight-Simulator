@@ -17,6 +17,7 @@ import { nanamiConfig } from '../configs/characters/nanamiConfig.js';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
+import { crazyDaveConfig } from '../configs/characters/crazyDaveConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
@@ -56,6 +57,9 @@ export const CONFIG = {
   nobara: nobaraConfig,
   megumi: megumiConfig,
   megumin: meguminConfig,
+  crazydave: crazyDaveConfig,
+  crazy_dave: crazyDaveConfig,
+  CrazyDave: crazyDaveConfig,
   gojo: gojoConfig,
   sukuna: sukunaConfig,
   yuta: yutaConfig,
@@ -1686,6 +1690,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: meguminConfig.projectileSpeedMultiplier || 1.0,
     ability: meguminConfig.ability || 'Explosion Magic (爆裂魔法)',
     desc: meguminConfig.desc || 'The Crimson Demon Archmage. Specializes in a single apocalyptic offensive spell: EXPLOSION! Recites an extended dramatic chanting incantation with committed aim lock, unleashing cataclysmic true damage before suffering total mana burnout and collapsing into a helpless faceplant.',
+  },
+  {
+    id: 50,
+    name: 'CRAZY DAVE',
+    category: 'Gaming',
+    color: crazyDaveConfig.color || '#84CC16',
+    themeColor: crazyDaveConfig.themeColor || '#84CC16',
+    secondaryColor: crazyDaveConfig.secondaryColor || '#F59E0B',
+    startX: crazyDaveConfig.startX || 300,
+    startY: crazyDaveConfig.startY || 250,
+    startVx: crazyDaveConfig.startVx || 1.0,
+    startVy: crazyDaveConfig.startVy || 0.9,
+    radius: crazyDaveConfig.radius || crazyDaveConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'crazydave',
+    hp: crazyDaveConfig.hp || 390,
+    damage: crazyDaveConfig.damage || 22,
+    cooldown: crazyDaveConfig.cooldown || 28,
+    moveSpeed: crazyDaveConfig.moveSpeed || crazyDaveConfig.speed || 5.2,
+    projectileSpeedMultiplier: crazyDaveConfig.projectileSpeedMultiplier || 1.0,
+    ability: crazyDaveConfig.ability || 'Solar Economy & Flora Arsenal ("WABBI WABBO!")',
+    desc: crazyDaveConfig.desc || 'The eccentric neighbor from Plants vs. Zombies. Gathers Sun drops from the sky, basic hits, and Sunflowers. Accumulates solar energy to plant Peashooters, sturdy Wall-nuts, explosive Cherry Bombs, and deploys the devastating Lawn Mower Cataclysm!',
   }
 ];
 

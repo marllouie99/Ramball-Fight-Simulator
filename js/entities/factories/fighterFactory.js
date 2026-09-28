@@ -38,6 +38,7 @@ import { NanamiFighter } from '../fighters/NanamiFighter.js';
 import { NobaraFighter } from '../fighters/NobaraFighter.js';
 import { MegumiFighter } from '../fighters/MegumiFighter.js';
 import { MeguminFighter } from '../fighters/MeguminFighter.js';
+import { CrazyDaveFighter } from '../fighters/CrazyDaveFighter.js';
 import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 import { CJFighter } from '../fighters/CJFighter.js';
 import { UryuFighter } from '../fighters/UryuFighter.js';
@@ -95,6 +96,9 @@ export const FIGHTER_CLASS_MAP = {
   'megumi': MegumiFighter,
   'megumin': MeguminFighter,
   'megumin_konosuba': MeguminFighter,
+  'crazydave': CrazyDaveFighter,
+  'crazy_dave': CrazyDaveFighter,
+  'crazydave_pvz': CrazyDaveFighter,
   'john_wick': JohnWickFighter,
   'johnwick':  JohnWickFighter,
   'cj':        CJFighter,

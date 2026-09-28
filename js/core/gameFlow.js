@@ -242,7 +242,7 @@ export function reinitFighters(isNewMatch = false) {
   // Clear any lingering last-kill badges from previous rounds
   state.fighters.forEach((f) => { if (f) f.lastKilledDef = null; });
  
-  let fighterIndexes = [state.p1Index, state.p2Index];
+  let fighterIndexes = [state.p1Index ?? 0, state.p2Index ?? 1];
   if (state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match') {
     if (isNewMatch || !state.tagMatch || !state.tagMatch.team0Roster || state.tagMatch.team0Roster.length === 0) {
       state.tagMatch = {
@@ -454,30 +454,38 @@ export function reinitFighters(isNewMatch = false) {
     const verticalSpread = arena.height * 0.25;
 
     // Team 1: top-left and bottom-left
-    state.fighters[0].x = leftX;
-    state.fighters[0].y = centerY - verticalSpread;
-    const angle0 = Math.random() * Math.PI * 2;
-    state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
-    state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
+    if (state.fighters[0]) {
+      state.fighters[0].x = leftX;
+      state.fighters[0].y = centerY - verticalSpread;
+      const angle0 = Math.random() * Math.PI * 2;
+      state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
+      state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
+    }
 
-    state.fighters[1].x = leftX;
-    state.fighters[1].y = centerY + verticalSpread;
-    const angle1 = Math.random() * Math.PI * 2;
-    state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
-    state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
+    if (state.fighters[1]) {
+      state.fighters[1].x = leftX;
+      state.fighters[1].y = centerY + verticalSpread;
+      const angle1 = Math.random() * Math.PI * 2;
+      state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
+      state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
+    }
 
     // Team 2: top-right and bottom-right
-    state.fighters[2].x = rightX;
-    state.fighters[2].y = centerY - verticalSpread;
-    const angle2 = Math.random() * Math.PI * 2;
-    state.fighters[2].vx = Math.cos(angle2) * state.fighters[2].speed;
-    state.fighters[2].vy = Math.sin(angle2) * state.fighters[2].speed;
+    if (state.fighters[2]) {
+      state.fighters[2].x = rightX;
+      state.fighters[2].y = centerY - verticalSpread;
+      const angle2 = Math.random() * Math.PI * 2;
+      state.fighters[2].vx = Math.cos(angle2) * state.fighters[2].speed;
+      state.fighters[2].vy = Math.sin(angle2) * state.fighters[2].speed;
+    }
 
-    state.fighters[3].x = rightX;
-    state.fighters[3].y = centerY + verticalSpread;
-    const angle3 = Math.random() * Math.PI * 2;
-    state.fighters[3].vx = Math.cos(angle3) * state.fighters[3].speed;
-    state.fighters[3].vy = Math.sin(angle3) * state.fighters[3].speed;
+    if (state.fighters[3]) {
+      state.fighters[3].x = rightX;
+      state.fighters[3].y = centerY + verticalSpread;
+      const angle3 = Math.random() * Math.PI * 2;
+      state.fighters[3].vx = Math.cos(angle3) * state.fighters[3].speed;
+      state.fighters[3].vy = Math.sin(angle3) * state.fighters[3].speed;
+    }
   } else if (state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2') {
     // Regular 1v2 Formation: Solo Fighter on Left, Duo Opponents on Right (Top-Right & Bottom-Right)
     const leftX = arena.x + arena.width * 0.25;
@@ -590,28 +598,33 @@ export function reinitFighters(isNewMatch = false) {
     const leftX = arena.x + arena.width * 0.25;
     const rightX = arena.x + arena.width * 0.75;
 
-    state.fighters[0].x = leftX;
-    state.fighters[0].y = centerY;
-    // Face right (toward opponent) - angle 0 points right
-    state.fighters[0].angle = 0;
-    state.fighters[0].gunAngle = 0;
-    state.fighters[0].rightGunAngle = 0;
-    state.fighters[0].leftGunAngle = 0;
-    const angle0 = Math.random() * Math.PI * 2;
-    state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
-    state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
+    if (state.fighters[0]) {
+      state.fighters[0].x = leftX;
+      state.fighters[0].y = centerY;
+      // Face right (toward opponent) - angle 0 points right
+      state.fighters[0].angle = 0;
+      state.fighters[0].gunAngle = 0;
+      state.fighters[0].rightGunAngle = 0;
+      state.fighters[0].leftGunAngle = 0;
+      const angle0 = Math.random() * Math.PI * 2;
+      state.fighters[0].vx = Math.cos(angle0) * state.fighters[0].speed;
+      state.fighters[0].vy = Math.sin(angle0) * state.fighters[0].speed;
+    }
 
-    state.fighters[1].x = rightX;
-    state.fighters[1].y = centerY;
-    // Face left (toward opponent)
-    state.fighters[1].angle = Math.PI;
-    state.fighters[1].gunAngle = Math.PI;
-    state.fighters[1].rightGunAngle = Math.PI;
-    state.fighters[1].leftGunAngle = Math.PI;
-    const angle1 = Math.random() * Math.PI * 2;
-    state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
-    state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
+    if (state.fighters[1]) {
+      state.fighters[1].x = rightX;
+      state.fighters[1].y = centerY;
+      // Face left (toward opponent)
+      state.fighters[1].angle = Math.PI;
+      state.fighters[1].gunAngle = Math.PI;
+      state.fighters[1].rightGunAngle = Math.PI;
+      state.fighters[1].leftGunAngle = Math.PI;
+      const angle1 = Math.random() * Math.PI * 2;
+      state.fighters[1].vx = Math.cos(angle1) * state.fighters[1].speed;
+      state.fighters[1].vy = Math.sin(angle1) * state.fighters[1].speed;
+    }
   }
+
 }
 
 export function randomize1v1Fighters() {

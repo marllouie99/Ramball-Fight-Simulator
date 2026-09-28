@@ -38,6 +38,7 @@ import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.j
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawArena, drawArenaMatchNames } from './renderers/arenaRenderer.js';
+import { isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet, getGrassTileSpriteSheet } from './renderers/grassFloorRenderer.js';
 import { drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, loadNanamiOvertimeOverlayImage, getNanamiOvertimeOverlayImage, drawGenosUltimateArenaOverlay, loadGenosUltimateOverlayImage, getGenosUltimateOverlayImage, drawMahoragaAdaptationDimScreen, drawMahoragaWheelArenaOverlay, loadMahoragaWheelOverlayImage, getMahoragaWheelOverlayImage, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen, applyDomainArenaVignetteCutout } from './renderers/domainDimOverlays.js';
 import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen, renderCjBaguvixBackground, getCjBaguvixOverlayImage } from './renderers/environmentalRenderer.js';
 import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
@@ -48,6 +49,8 @@ export { drawJohnWickSkin, drawJohnWickPixelBody, _drawJohnWickHair, _getJohnWic
 export { drawTojiSkin, drawTojiGhostSkin, drawTojiPixelBody, _drawTojiHair, _getTojiHairImage } from './fighters/tojiSkin.js';
 export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
 export { drawMeguminSkin, drawMeguminPixelBody, _drawMeguminHair, _getMeguminHairImage } from './fighters/meguminSkin.js';
+export { drawCrazyDaveSkin, drawCrazyDavePixelBody, _drawCrazyDaveHair, _getCrazyDaveHairImage } from './fighters/crazyDaveSkin.js';
+export { drawCrazyDaveShovel, drawSunDrop, drawPeashooter, drawSunflower, drawWallNut, drawCherryBomb, drawLawnMower, drawPeaBullet, drawCrazyDaveWeapon, CrazyDave_WEAPON_GRAPHICS } from './weapons/crazyDaveWeaponGraphics.js';
 export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';
 export { drawUryuSkin, drawUryuGhostSkin } from './fighters/uryuSkin.js';
 export { drawUryuBow, drawSeeleSchneider, drawUryuSeeleSlashArc } from './weapons/uryuWeaponGraphics.js';
@@ -104,7 +107,7 @@ export function getNow() {
 
 export { drawDivineFlameArrowConstruct };
 export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen, renderCjBaguvixBackground, getCjBaguvixOverlayImage };
-export { drawArena, drawArenaMatchNames, applyDomainArenaVignetteCutout, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, loadNanamiOvertimeOverlayImage, getNanamiOvertimeOverlayImage, drawGenosUltimateArenaOverlay, loadGenosUltimateOverlayImage, getGenosUltimateOverlayImage, drawMahoragaAdaptationDimScreen, drawMahoragaWheelArenaOverlay, loadMahoragaWheelOverlayImage, getMahoragaWheelOverlayImage, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen };
+export { drawArena, drawArenaMatchNames, applyDomainArenaVignetteCutout, isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet, getGrassTileSpriteSheet, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, loadNanamiOvertimeOverlayImage, getNanamiOvertimeOverlayImage, drawGenosUltimateArenaOverlay, loadGenosUltimateOverlayImage, getGenosUltimateOverlayImage, drawMahoragaAdaptationDimScreen, drawMahoragaWheelArenaOverlay, loadMahoragaWheelOverlayImage, getMahoragaWheelOverlayImage, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawDroppedMagazines, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 export { drawGenosSelfDestructDimScreen };
 export { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter } from './statusEffects.js';

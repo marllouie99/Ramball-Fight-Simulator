@@ -1614,6 +1614,7 @@ async function runInteractionTests() {
     assert(gojo.hasActiveInfinity() === false, 'hasActiveInfinity must return false while on cooldown');
 
     // 9. Fast-forward remaining cooldown frames and verify automatic re-arming and restoration in Ranged Mode
+    saitama.x = 9999;
     while (gojo.infinityCooldown > 0) {
       state.frameCount++;
       gojo.isMeleeMode = false;
@@ -1632,9 +1633,87 @@ async function runInteractionTests() {
     console.log('      ✅ Saitama vs Gojo Infinity barrier crack, shatter & direct damage verified.');
   }
 
+  // ── TEST 26: Crazy Dave PvZ Grass Tiles Arena Floor & Plant Minion Entity Flags ──
+  console.log('   26. Testing Crazy Dave PvZ Grass Tiles Arena Floor & Plant Minion Entity Flags...');
+  {
+    const CrazyDaveClass = FIGHTER_CLASS_MAP.crazydave;
+    const GojoClass = FIGHTER_CLASS_MAP.gojo;
+    const { isCrazyDavePresent, renderCrazyDaveGrassFloor } = await import('../js/graphics/renderers/grassFloorRenderer.js');
+    const { drawArena } = await import('../js/graphics/renderers/arenaRenderer.js');
+
+    const dave = new CrazyDaveClass({ radius: 25, x: 200, y: 300, hp: 390, maxHp: 390, color: '#84CC16' });
+    const gojo = new GojoClass({ radius: 25, x: 400, y: 300, hp: 200, maxHp: 200, color: '#00E5FF' });
+
+    state.fighters = [dave, gojo];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+    state.gameState = 'playing';
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+
+    // 1. Verify isCrazyDavePresent evaluates true when Crazy Dave is active
+    assert(isCrazyDavePresent() === true, 'isCrazyDavePresent() must return true when Crazy Dave is in the arena');
+
+    // 2. Test Canvas 2D Grass Floor rendering & stack balance (Light & Dark modes)
+    mockCtx.resetStackDepth();
+    renderCrazyDaveGrassFloor(mockCtx, state.arena, false, 4);
+    assert(mockCtx.getStackDepth() === 0, `renderCrazyDaveGrassFloor (light mode) canvas stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+
+    mockCtx.resetStackDepth();
+    renderCrazyDaveGrassFloor(mockCtx, state.arena, true, 4);
+    assert(mockCtx.getStackDepth() === 0, `renderCrazyDaveGrassFloor (dark mode) canvas stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+
+    mockCtx.resetStackDepth();
+    drawArena();
+    assert(mockCtx.getStackDepth() === 0, `drawArena() with Crazy Dave grass floor must maintain 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 3. Test circular arena grass floor clipping
+    state.arena.shape = 'circle';
+    state.arena.radius = 300;
+    mockCtx.resetStackDepth();
+    renderCrazyDaveGrassFloor(mockCtx, state.arena, false, 4);
+    assert(mockCtx.getStackDepth() === 0, `renderCrazyDaveGrassFloor (circular arena) canvas stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+    state.arena.shape = 'rectangle';
+
+    // 4. Verify Plant Minion Entity flags across all flora types
+    dave.sunCount = 1000; // Unlimited sun for test
+    dave.plantSunflower();
+    dave.plantPeashooter();
+    dave.plantWallNut();
+    dave.plantCherryBomb(gojo);
+    dave.launchLawnMower(gojo);
+
+    const plantEntities = state.fighters.filter(f => f && f.owner === dave && (f.isDeployable || f.isMinion));
+    assert(plantEntities.length === 5, `Expected 5 deployed plant entities for Crazy Dave (got ${plantEntities.length})`);
+    for (const plant of plantEntities) {
+      assert(plant.isMinion === true, `Plant ${plant.characterId || plant.name} must have isMinion === true`);
+      assert(plant.isPlant === true, `Plant ${plant.characterId || plant.name} must have isPlant === true`);
+      assert(plant.isDeployable === true, `Plant ${plant.characterId || plant.name} must have isDeployable === true`);
+      assert(plant.isPlantMinion === true, `Plant ${plant.characterId || plant.name} must have isPlantMinion === true`);
+      assert(plant.owner === dave, `Plant ${plant.characterId || plant.name} must have owner === dave`);
+    }
+
+    const illusionPlants = state.illusions.filter(f => f && f.owner === dave);
+    assert(illusionPlants.length === 5, `Expected 5 plant entities in state.illusions (got ${illusionPlants.length})`);
+
+
+
+    // 5. Verify isCrazyDavePresent returns false when no Dave is present
+    state.fighters = [gojo];
+    state.previewFighter = null;
+    assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
+
+    // Clean up
+    state.deathEffects = [];
+    state.illusions = [];
+    state.projectiles = [];
+    console.log('      ✅ Crazy Dave PvZ grass floor & minion entity flags verified.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }
+
 
 runInteractionTests().catch(err => {
   console.error('🚨 Interaction Test Suite Encountered an Error:', err);

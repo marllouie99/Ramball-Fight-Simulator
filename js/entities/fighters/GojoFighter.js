@@ -2009,6 +2009,11 @@ export class GojoFighter extends Fighter {
     }
 
     this.resolveWallBounce(arena);
+
+    // Re-arm Limitless Infinity immediately if cooldown reached 0 on this frame
+    if ((this.infinityCooldown || 0) <= 0 && (!this.infinityActive || (this.infinityBarrierHp || 0) <= 0) && !this.isMeleeMode && this.hp > 0 && !this.isPurpleActive() && !this.isChainedByMakima) {
+      this.restoreInfinityBarrier();
+    }
   }
 
   /**

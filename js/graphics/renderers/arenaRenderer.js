@@ -5,6 +5,7 @@ import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index
 import { applyCameraToCtx, worldToScreen } from '../../systems/cameraSystem.js';
 import { updateSaitamaWallShatters, drawSaitamaWallShatters } from '../particles/saitamaWallShatter.js';
 import { drawTopHudNameShatters } from '../particles/hudShatterEffect.js';
+import { isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet, getGrassTileSpriteSheet } from './grassFloorRenderer.js';
 
 // ──────────────────────────────────────────
 // SKETCHY BORDER HELPERS
@@ -488,7 +489,7 @@ export function drawArena() {
       g.endFill();
     }
 
-    // 2. Draw Floor Background (Original Colors)
+    // 2. Draw Floor Background (Original Colors or PvZ Grass Tiles)
     if (!suppressArenaFloor) {
       if (!state.floorGraphics && pixiLayers?.environment) {
         state.floorGraphics = new window.PIXI.Graphics();
@@ -497,7 +498,9 @@ export function drawArena() {
       if (state.floorGraphics) {
         const fg = state.floorGraphics;
         fg.clear();
-        fg.beginFill(innerBg.color, innerBg.alpha);
+        const daveActive = isCrazyDavePresent();
+        const floorColor = daveActive ? (isDark ? 0x14321c : 0x3e9925) : innerBg.color;
+        fg.beginFill(floorColor, innerBg.alpha);
         const fBleed = 4;
         if (arena.shape === 'circle') {
           const cx = arena.x + arena.width / 2;
@@ -568,17 +571,21 @@ export function drawArena() {
     if (!suppressArenaFloor) {
       ctx.save();
       applyCameraToCtx(ctx);
-      ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff');
       const fBleed = 4;
-      if (arena.shape === 'circle') {
-        const cx = arena.x + arena.width / 2;
-        const cy = arena.y + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + fBleed;
-        ctx.beginPath();
-        ctx.arc(cx, cy, ar, 0, Math.PI * 2);
-        ctx.fill();
+      if (isCrazyDavePresent()) {
+        renderCrazyDaveGrassFloor(ctx, arena, isDark, fBleed);
       } else {
-        ctx.fillRect(arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
+        ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff');
+        if (arena.shape === 'circle') {
+          const cx = arena.x + arena.width / 2;
+          const cy = arena.y + arena.height / 2;
+          const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + fBleed;
+          ctx.beginPath();
+          ctx.arc(cx, cy, ar, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.fillRect(arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
+        }
       }
       ctx.restore();
     } else if (hasActiveDomain && !state.pixiApp) {
