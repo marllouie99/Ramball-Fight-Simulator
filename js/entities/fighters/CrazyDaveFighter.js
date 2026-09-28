@@ -62,7 +62,9 @@ export class PeashooterEntity extends Fighter {
     this.hp = maxHp;
     this.shootCooldown = 15;
     this.shootCooldownMax = cfg.peashooterFireRate || 22;
-    this.shootAnimTimer = 0;
+    this.shootWindupTimer = 0;
+    this.shootWindupMax = 12;
+    this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
     this.gunAngle = 0;
@@ -83,7 +85,6 @@ export class PeashooterEntity extends Fighter {
     if (this.hp <= 0) return;
     this.animTick++;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
-    if (this.shootAnimTimer > 0) this.shootAnimTimer--;
 
     // Target acquisition: nearest enemy fighter
     let target = opponent;
@@ -103,13 +104,24 @@ export class PeashooterEntity extends Fighter {
       const range = cfg.peashooterRange || 460;
 
       if (dist <= range) {
-        if (this.shootCooldown > 0) {
+        if (this.shootWindupTimer > 0) {
+          this.shootWindupTimer--;
+          if (this.shootWindupTimer === 0) {
+            this.shootCooldown = this.shootCooldownMax;
+            this.postShootTimer = 4;
+            this._firePea(this.gunAngle, ownerIndex);
+          }
+        } else if (this.postShootTimer > 0) {
+          this.postShootTimer--;
+        } else if (this.shootCooldown > 0) {
           this.shootCooldown--;
         } else {
-          this.shootCooldown = this.shootCooldownMax;
-          this.shootAnimTimer = 8;
-          this._firePea(this.gunAngle, ownerIndex);
+          // Start "about to shoot" windup swell animation
+          this.shootWindupTimer = this.shootWindupMax;
         }
+      } else {
+        if (this.shootCooldown > 0) this.shootCooldown--;
+        this.shootWindupTimer = 0;
       }
     }
   }
@@ -126,8 +138,8 @@ export class PeashooterEntity extends Fighter {
       y: spawnY,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      r: 5.5,
-      radius: 5.5,
+      r: 6.0,
+      radius: 6.0,
       damage: dmg,
       owner: ownerIndex !== undefined ? ownerIndex : 0,
       ownerFighter: this.owner || this,
@@ -201,7 +213,9 @@ export class SnowPeaEntity extends Fighter {
     this.hp = maxHp;
     this.shootCooldown = 15;
     this.shootCooldownMax = cfg.snowPeaFireRate || 24;
-    this.shootAnimTimer = 0;
+    this.shootWindupTimer = 0;
+    this.shootWindupMax = 12;
+    this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
     this.gunAngle = 0;
@@ -222,7 +236,6 @@ export class SnowPeaEntity extends Fighter {
     if (this.hp <= 0) return;
     this.animTick++;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
-    if (this.shootAnimTimer > 0) this.shootAnimTimer--;
 
     // Target acquisition: nearest enemy fighter
     let target = opponent;
@@ -242,13 +255,24 @@ export class SnowPeaEntity extends Fighter {
       const range = cfg.snowPeaRange || 460;
 
       if (dist <= range) {
-        if (this.shootCooldown > 0) {
+        if (this.shootWindupTimer > 0) {
+          this.shootWindupTimer--;
+          if (this.shootWindupTimer === 0) {
+            this.shootCooldown = this.shootCooldownMax;
+            this.postShootTimer = 4;
+            this._fireSnowPea(this.gunAngle, ownerIndex);
+          }
+        } else if (this.postShootTimer > 0) {
+          this.postShootTimer--;
+        } else if (this.shootCooldown > 0) {
           this.shootCooldown--;
         } else {
-          this.shootCooldown = this.shootCooldownMax;
-          this.shootAnimTimer = 8;
-          this._fireSnowPea(this.gunAngle, ownerIndex);
+          // Start "about to shoot" windup swell animation
+          this.shootWindupTimer = this.shootWindupMax;
         }
+      } else {
+        if (this.shootCooldown > 0) this.shootCooldown--;
+        this.shootWindupTimer = 0;
       }
     }
   }

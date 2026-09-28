@@ -28,34 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "CRAZYDAVE",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "accentColor",
-                "oldVal": "#22C55E",
-                "newVal": "#38BDF8",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "desc",
-                "oldVal": "The eccentric neighbor from Plants vs. Zombies. Gathers Sun drops from the sky",
-                "newVal": "Crazy Dave has no direct basic attack! He navigates the arena collecting falling Sun drops to deploy rapid-fire Peashooters and chilling Snow Peas that fight on his behalf.",
-                "pct": "Mod"
-            },
-            {
-                "type": "BUFF",
-                "key": "grassTileSize",
-                "oldVal": 64,
-                "newVal": 76.6,
-                "pct": "+19.7%"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

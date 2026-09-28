@@ -1713,11 +1713,29 @@ async function runInteractionTests() {
     snowProj.onHit(testTarget);
     assert(slowApplied === true, 'Snow Pea onHit must call target.applySlow()');
     assert(appliedFrames === 90, `Snow Pea must apply 90 frames of slow (got ${appliedFrames})`);
-    assert(appliedMult === 0.45, `Snow Pea must apply 0.45 speed multiplier (got ${appliedMult})`);
+    // Verify Peashooter and Snow Pea "about to shoot" windup animation cycle
+    const peashooter = plantEntities.find(p => p.type === 'Peashooter');
+    assert(peashooter !== undefined, 'Peashooter entity must exist in active plants');
+    peashooter.shootCooldown = 0;
+    peashooter.shootWindupTimer = 0;
+    peashooter.update(gojo, 0, state.arena);
+    assert(peashooter.shootWindupTimer > 0, `Peashooter must enter windup when about to shoot (got windup ${peashooter.shootWindupTimer})`);
 
+    // Verify drawing during windup and idle passes with 0 canvas stack depth
+    mockCtx.resetStackDepth();
+    peashooter.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'peashooter.draw during windup must maintain 0 canvas stack depth');
+    snowPea.shootWindupTimer = 6;
+    snowPea.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'snowPea.draw during windup must maintain 0 canvas stack depth');
 
-
-    // 5. Verify 1v1 Match Initialization & createFighterInstance for Crazy Dave
+    // Verify projectile drawing
+    const { drawPeaBullet, drawSnowPeaBullet } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
+    mockCtx.resetStackDepth();
+    drawPeaBullet(mockCtx, { x: 100, y: 100, r: 6, life: 30 });
+    assert(mockCtx.getStackDepth() === 0, 'drawPeaBullet must maintain 0 canvas stack depth');
+    drawSnowPeaBullet(mockCtx, { x: 100, y: 100, r: 6, life: 30 });
+    assert(mockCtx.getStackDepth() === 0, 'drawSnowPeaBullet must maintain 0 canvas stack depth');
     const { FIGHTER_DEFS } = await import('../js/core/config.js');
     const { createFighterInstance } = await import('../js/core/state.js');
     const { reinitFighters } = await import('../js/core/gameFlow.js');

@@ -278,9 +278,12 @@ export function drawPeashooter(ctx, peashooter) {
   const r = peashooter.r || 18;
   const angle = peashooter.gunAngle || peashooter.angle || 0;
   const isFacingLeft = Math.abs(angle) > Math.PI / 2;
-  const shootTimer = peashooter.shootAnimTimer || 0;
   const isHit = peashooter.hitFlashTimer > 0;
-  const drawSize = r * 2.5;
+  const windupTimer = peashooter.shootWindupTimer || 0;
+  const windupMax = peashooter.shootWindupMax || 12;
+  const postShootTimer = peashooter.postShootTimer || 0;
+  const isAboutToShoot = windupTimer > 0 || postShootTimer > 0;
+  const drawSize = r * 2.6;
 
   const idleImg = getPeashooterIdleSprite();
   const shootImg = getPeashooterShootSprite();
@@ -301,16 +304,24 @@ export function drawPeashooter(ctx, peashooter) {
     ctx.scale(-1, 1);
   }
 
-  // Render sprite sheet frame
-  if (shootTimer > 0 && hasShoot) {
-    const frameIdx = Math.min(PEASHOOTER_SHOOT_RECTS.length - 1, Math.floor((1 - shootTimer / 8) * PEASHOOTER_SHOOT_RECTS.length));
+  // 1. "About to Shoot" Swell / Recoil Animation Frame
+  if (isAboutToShoot && hasShoot) {
+    let frameIdx = 0;
+    if (windupTimer > 0) {
+      const progress = 1.0 - (windupTimer / windupMax);
+      frameIdx = Math.min(PEASHOOTER_SHOOT_RECTS.length - 1, Math.floor(progress * PEASHOOTER_SHOOT_RECTS.length));
+    } else {
+      frameIdx = PEASHOOTER_SHOOT_RECTS.length - 1; // peak firing frame
+    }
     const frame = PEASHOOTER_SHOOT_RECTS[frameIdx] || PEASHOOTER_SHOOT_RECTS[0];
     ctx.drawImage(
       shootImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
       -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
     );
-  } else if (hasIdle) {
+  }
+  // 2. Idle Swaying Animation Frame
+  else if (hasIdle) {
     const tick = peashooter.animTick || 0;
     const frameIdx = Math.floor(tick / 8) % PEASHOOTER_IDLE_RECTS.length;
     const frame = PEASHOOTER_IDLE_RECTS[frameIdx] || PEASHOOTER_IDLE_RECTS[0];
@@ -319,9 +330,10 @@ export function drawPeashooter(ctx, peashooter) {
       frame.sx, frame.sy, frame.sw, frame.sh,
       -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
     );
-  } else {
-    // Procedural Fallback
-    _drawProceduralPeashooter(ctx, r, isHit, shootTimer);
+  }
+  // 3. High-Quality Procedural Fallback
+  else {
+    _drawProceduralPeashooter(ctx, r, isHit, isAboutToShoot ? 8 : 0);
   }
 
   ctx.restore();
@@ -337,9 +349,12 @@ export function drawSnowPea(ctx, snowpea) {
   const r = snowpea.r || 18;
   const angle = snowpea.gunAngle || snowpea.angle || 0;
   const isFacingLeft = Math.abs(angle) > Math.PI / 2;
-  const shootTimer = snowpea.shootAnimTimer || 0;
   const isHit = snowpea.hitFlashTimer > 0;
-  const drawSize = r * 2.5;
+  const windupTimer = snowpea.shootWindupTimer || 0;
+  const windupMax = snowpea.shootWindupMax || 12;
+  const postShootTimer = snowpea.postShootTimer || 0;
+  const isAboutToShoot = windupTimer > 0 || postShootTimer > 0;
+  const drawSize = r * 2.6;
 
   const idleImg = getSnowPeaIdleSprite();
   const shootImg = getSnowPeaShootSprite();
@@ -360,16 +375,24 @@ export function drawSnowPea(ctx, snowpea) {
     ctx.scale(-1, 1);
   }
 
-  // Render sprite sheet frame
-  if (shootTimer > 0 && hasShoot) {
-    const frameIdx = Math.min(SNOWPEA_SHOOT_RECTS.length - 1, Math.floor((1 - shootTimer / 8) * SNOWPEA_SHOOT_RECTS.length));
+  // 1. "About to Shoot" Swell / Ice Blast Animation Frame
+  if (isAboutToShoot && hasShoot) {
+    let frameIdx = 0;
+    if (windupTimer > 0) {
+      const progress = 1.0 - (windupTimer / windupMax);
+      frameIdx = Math.min(SNOWPEA_SHOOT_RECTS.length - 1, Math.floor(progress * SNOWPEA_SHOOT_RECTS.length));
+    } else {
+      frameIdx = SNOWPEA_SHOOT_RECTS.length - 1; // peak ice firing frame
+    }
     const frame = SNOWPEA_SHOOT_RECTS[frameIdx] || SNOWPEA_SHOOT_RECTS[0];
     ctx.drawImage(
       shootImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
       -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
     );
-  } else if (hasIdle) {
+  }
+  // 2. Idle Swaying Animation Frame
+  else if (hasIdle) {
     const tick = snowpea.animTick || 0;
     const frameIdx = Math.floor(tick / 8) % SNOWPEA_IDLE_RECTS.length;
     const frame = SNOWPEA_IDLE_RECTS[frameIdx] || SNOWPEA_IDLE_RECTS[0];
@@ -378,9 +401,10 @@ export function drawSnowPea(ctx, snowpea) {
       frame.sx, frame.sy, frame.sw, frame.sh,
       -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
     );
-  } else {
-    // Procedural Fallback
-    _drawProceduralSnowPea(ctx, r, isHit, shootTimer);
+  }
+  // 3. High-Quality Procedural Fallback
+  else {
+    _drawProceduralSnowPea(ctx, r, isHit, isAboutToShoot ? 8 : 0);
   }
 
   ctx.restore();
@@ -475,13 +499,13 @@ function _drawProceduralSnowPea(ctx, r, isHit, shootTimer) {
 }
 
 /**
- * Draws a kinetic green Pea projectile.
+ * Draws a kinetic green Pea projectile using Peashooter-projectile.png.
  */
 export function drawPeaBullet(ctx, p) {
   if (!p) return;
   const x = p.x || 0;
   const y = p.y || 0;
-  const r = p.r || 5.5;
+  const r = p.r || 6.0;
 
   const projImg = getPeaProjSprite();
   const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
@@ -490,11 +514,12 @@ export function drawPeaBullet(ctx, p) {
   ctx.translate(x, y);
 
   if (hasImg) {
-    const frame = PEA_PROJ_RECTS[0];
-    const size = r * 2.2;
+    const frameIdx = Math.floor(Math.abs(p.life || 0) / 3) % PEA_PROJ_RECTS.length;
+    const frame = PEA_PROJ_RECTS[frameIdx] || PEA_PROJ_RECTS[0];
+    const size = r * 2.4;
     ctx.drawImage(projImg, frame.sx, frame.sy, frame.sw, frame.sh, -size / 2, -size / 2, size, size);
   } else {
-    // Glowing Pea Sphere
+    // Glowing Pea Sphere Fallback
     const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, r + 4);
     halo.addColorStop(0, 'rgba(134, 239, 172, 0.7)');
     halo.addColorStop(1, 'rgba(34, 197, 94, 0)');
@@ -522,13 +547,13 @@ export function drawPeaBullet(ctx, p) {
 }
 
 /**
- * Draws an icy cyan Snow Pea projectile with frost trail.
+ * Draws an icy cyan Snow Pea projectile using snowpea-projectile.png.
  */
 export function drawSnowPeaBullet(ctx, p) {
   if (!p) return;
   const x = p.x || 0;
   const y = p.y || 0;
-  const r = p.r || 5.5;
+  const r = p.r || 6.0;
 
   const projImg = getSnowPeaProjSprite();
   const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
@@ -537,11 +562,12 @@ export function drawSnowPeaBullet(ctx, p) {
   ctx.translate(x, y);
 
   if (hasImg) {
-    const frame = SNOWPEA_PROJ_RECTS[0];
-    const size = r * 2.2;
+    const frameIdx = Math.floor(Math.abs(p.life || 0) / 3) % SNOWPEA_PROJ_RECTS.length;
+    const frame = SNOWPEA_PROJ_RECTS[frameIdx] || SNOWPEA_PROJ_RECTS[0];
+    const size = r * 2.4;
     ctx.drawImage(projImg, frame.sx, frame.sy, frame.sw, frame.sh, -size / 2, -size / 2, size, size);
   } else {
-    // Chilling Frost Halo
+    // Chilling Frost Halo Fallback
     const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, r + 5);
     halo.addColorStop(0, 'rgba(186, 230, 253, 0.8)');
     halo.addColorStop(0.5, 'rgba(56, 189, 248, 0.4)');
