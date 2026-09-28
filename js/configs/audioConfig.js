@@ -30,6 +30,7 @@ export const AUDIO_CONFIG = {
   'crazydave_peashooter_shot': 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',
   'crazydave_pea_splat': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
   'splat3': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
+  'crazydave_planting': 'Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg',
 
   // Skills
   'skill_backstab': 'Assets/Sound Effects/Skills/backstab.mp3',

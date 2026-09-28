@@ -1037,8 +1037,10 @@ export class CrazyDaveFighter extends Fighter {
     }
 
     spawnFloatingText(this.x, this.y - 25, '-100 ☀️ Peashooter!', '#4ADE80');
-    if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound('powerup', 0.8);
+    if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
+    } else if (audioSystem && typeof audioSystem.playSound === 'function') {
+      audioSystem.playSound('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
     }
 
     // Stop Dave's movement momentarily upon planting and play shovel dig animation
@@ -1117,8 +1119,10 @@ export class CrazyDaveFighter extends Fighter {
     }
 
     spawnFloatingText(this.x, this.y - 25, '-175 ☀️ Snow Pea!', '#38BDF8');
-    if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound('powerup', 0.8);
+    if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
+    } else if (audioSystem && typeof audioSystem.playSound === 'function') {
+      audioSystem.playSound('Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg', 0.85);
     }
 
     // Stop Dave's movement momentarily upon planting and play shovel dig animation
