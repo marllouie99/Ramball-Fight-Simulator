@@ -17,6 +17,7 @@ import {
   drawSnowPea,
   drawSunDrop
 } from '../../graphics/weapons/crazyDaveWeaponGraphics.js';
+import { getNearestGrassTileCenter } from '../../graphics/renderers/grassFloorRenderer.js';
 import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -60,6 +61,21 @@ export class PeashooterEntity extends Fighter {
     this.hideHpText = true;
     this.maxHp = maxHp;
     this.hp = maxHp;
+
+    // Anchor plant immovably to centered grass tile position
+    this._fixedX = x;
+    this._fixedY = y;
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.angle = 0;
+
+    // Initial horizontal facing based on arena position
+    const arenaW = (state && state.arena && state.arena.width) ? state.arena.width : 460;
+    const arenaMidX = (state && state.arena && state.arena.x !== undefined) ? (state.arena.x + arenaW / 2) : 230;
+    this.gunAngle = (x > arenaMidX) ? Math.PI : 0;
+
     this.shootCooldown = 15;
     this.shootCooldownMax = cfg.peashooterFireRate || 22;
     this.shootWindupTimer = 0;
@@ -67,7 +83,13 @@ export class PeashooterEntity extends Fighter {
     this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
-    this.gunAngle = 0;
+  }
+
+  applyKnockback(vx, vy) {
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.vx = 0;
+    this.vy = 0;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -77,6 +99,14 @@ export class PeashooterEntity extends Fighter {
       opts.knockbackVy = 0;
     }
     const applied = super.takeDamage(amount, attacker, opts);
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
     if (applied) this.hitFlashTimer = 6;
     return applied;
   }
@@ -85,6 +115,21 @@ export class PeashooterEntity extends Fighter {
     if (this.hp <= 0) return;
     this.animTick++;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+
+    // Strict immovable anchor & locked angle: plants never drift, bounce, or tilt
+    this.angle = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
+
+    if (this._handleTimeStop() || this.isTargetOfAmbush) {
+      return;
+    }
 
     // Target acquisition: nearest enemy fighter
     let target = opponent;
@@ -98,7 +143,9 @@ export class PeashooterEntity extends Fighter {
       const dx = target.x - this.x;
       const dy = target.y - this.y;
       const dist = Math.hypot(dx, dy);
-      this.gunAngle = Math.atan2(dy, dx);
+
+      // Plants ONLY aim straight left (Math.PI) or straight right (0)
+      this.gunAngle = (target.x < this.x) ? Math.PI : 0;
 
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
       const range = cfg.peashooterRange || 460;
@@ -130,14 +177,16 @@ export class PeashooterEntity extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const speed = cfg.peashooterSpeed || 9.5;
     const dmg = cfg.peashooterDamage || 10;
-    const spawnX = this.x + Math.cos(angle) * (this.r + 10);
-    const spawnY = this.y + Math.sin(angle) * (this.r + 10);
+    const isLeft = Math.abs(angle) > Math.PI / 2;
+    const spawnX = this.x + (isLeft ? -1 : 1) * (this.r + 10);
+    const spawnY = this.y - 4;
 
     const peaProj = {
       x: spawnX,
       y: spawnY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vx: (isLeft ? -1 : 1) * speed,
+      vy: 0, // Straight horizontal flight
+      angle: isLeft ? Math.PI : 0,
       r: 6.0,
       radius: 6.0,
       damage: dmg,
@@ -211,6 +260,21 @@ export class SnowPeaEntity extends Fighter {
     this.hideHpText = true;
     this.maxHp = maxHp;
     this.hp = maxHp;
+
+    // Anchor plant immovably to centered grass tile position
+    this._fixedX = x;
+    this._fixedY = y;
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.angle = 0;
+
+    // Initial horizontal facing based on arena position
+    const arenaW = (state && state.arena && state.arena.width) ? state.arena.width : 460;
+    const arenaMidX = (state && state.arena && state.arena.x !== undefined) ? (state.arena.x + arenaW / 2) : 230;
+    this.gunAngle = (x > arenaMidX) ? Math.PI : 0;
+
     this.shootCooldown = 15;
     this.shootCooldownMax = cfg.snowPeaFireRate || 24;
     this.shootWindupTimer = 0;
@@ -218,7 +282,13 @@ export class SnowPeaEntity extends Fighter {
     this.postShootTimer = 0;
     this.hitFlashTimer = 0;
     this.animTick = Math.floor(Math.random() * 30);
-    this.gunAngle = 0;
+  }
+
+  applyKnockback(vx, vy) {
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.vx = 0;
+    this.vy = 0;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -228,6 +298,14 @@ export class SnowPeaEntity extends Fighter {
       opts.knockbackVy = 0;
     }
     const applied = super.takeDamage(amount, attacker, opts);
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
     if (applied) this.hitFlashTimer = 6;
     return applied;
   }
@@ -236,6 +314,21 @@ export class SnowPeaEntity extends Fighter {
     if (this.hp <= 0) return;
     this.animTick++;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+
+    // Strict immovable anchor & locked angle: plants never drift, bounce, or tilt
+    this.angle = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
+
+    if (this._handleTimeStop() || this.isTargetOfAmbush) {
+      return;
+    }
 
     // Target acquisition: nearest enemy fighter
     let target = opponent;
@@ -249,7 +342,9 @@ export class SnowPeaEntity extends Fighter {
       const dx = target.x - this.x;
       const dy = target.y - this.y;
       const dist = Math.hypot(dx, dy);
-      this.gunAngle = Math.atan2(dy, dx);
+
+      // Plants ONLY aim straight left (Math.PI) or straight right (0)
+      this.gunAngle = (target.x < this.x) ? Math.PI : 0;
 
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
       const range = cfg.snowPeaRange || 460;
@@ -281,14 +376,16 @@ export class SnowPeaEntity extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const speed = cfg.snowPeaSpeed || 9.5;
     const dmg = cfg.snowPeaDamage || 12;
-    const spawnX = this.x + Math.cos(angle) * (this.r + 10);
-    const spawnY = this.y + Math.sin(angle) * (this.r + 10);
+    const isLeft = Math.abs(angle) > Math.PI / 2;
+    const spawnX = this.x + (isLeft ? -1 : 1) * (this.r + 10);
+    const spawnY = this.y - 4;
 
     const snowPeaProj = {
       x: spawnX,
       y: spawnY,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vx: (isLeft ? -1 : 1) * speed,
+      vy: 0, // Straight horizontal flight
+      angle: isLeft ? Math.PI : 0,
       r: 5.5,
       radius: 5.5,
       damage: dmg,
@@ -481,9 +578,13 @@ export class CrazyDaveFighter extends Fighter {
       if (oldest) oldest.hp = 0;
     }
 
-    const plantX = this.x + Math.cos(this.gunAngle || 0) * 28;
-    const plantY = this.y + Math.sin(this.gunAngle || 0) * 28;
-    const peashooter = new PeashooterEntity(plantX, plantY, this);
+    const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
+    const rawX = this.x + Math.cos(this.gunAngle || 0) * 32;
+    const rawY = this.y + Math.sin(this.gunAngle || 0) * 32;
+    const activePlants = [...(this.activePeashooters || []), ...(this.activeSnowPeas || [])].filter(p => p && p.hp > 0);
+    const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
+
+    const peashooter = new PeashooterEntity(tileCenter.x, tileCenter.y, this);
     this.activePeashooters.push(peashooter);
 
     if (state) {
@@ -520,9 +621,13 @@ export class CrazyDaveFighter extends Fighter {
       if (oldest) oldest.hp = 0;
     }
 
-    const plantX = this.x + Math.cos(this.gunAngle || 0) * 28;
-    const plantY = this.y + Math.sin(this.gunAngle || 0) * 28;
-    const snowpea = new SnowPeaEntity(plantX, plantY, this);
+    const arena = (state && state.arena) ? state.arena : { x: 0, y: 0, width: 460, height: 460 };
+    const rawX = this.x + Math.cos(this.gunAngle || 0) * 32;
+    const rawY = this.y + Math.sin(this.gunAngle || 0) * 32;
+    const activePlants = [...(this.activePeashooters || []), ...(this.activeSnowPeas || [])].filter(p => p && p.hp > 0);
+    const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
+
+    const snowpea = new SnowPeaEntity(tileCenter.x, tileCenter.y, this);
     this.activeSnowPeas.push(snowpea);
 
     if (state) {

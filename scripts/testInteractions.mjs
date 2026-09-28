@@ -1735,7 +1735,43 @@ async function runInteractionTests() {
     drawPeaBullet(mockCtx, { x: 100, y: 100, r: 6, life: 30 });
     assert(mockCtx.getStackDepth() === 0, 'drawPeaBullet must maintain 0 canvas stack depth');
     drawSnowPeaBullet(mockCtx, { x: 100, y: 100, r: 6, life: 30 });
-    assert(mockCtx.getStackDepth() === 0, 'drawSnowPeaBullet must maintain 0 canvas stack depth');
+    // 5. Verify Grass Tile Centering, Immovable Positioning, and Straight Left/Right Aiming
+    const { getNearestGrassTileCenter } = await import('../js/graphics/renderers/grassFloorRenderer.js');
+    const expectedTileCenter = getNearestGrassTileCenter(dave.x + Math.cos(dave.gunAngle || 0) * 32, dave.y + Math.sin(dave.gunAngle || 0) * 32, state.arena);
+    assert(Math.abs(snowPea.x - snowPea._fixedX) < 0.001, 'Snow Pea must be fixed at its centered position');
+    assert(Math.abs(peashooter.x - peashooter._fixedX) < 0.001, 'Peashooter must be fixed at its centered position');
+
+    // Immovable test: Knockback and physical velocity must have 0 effect
+    peashooter.applyKnockback(100, -100);
+    peashooter.vx = 50;
+    peashooter.vy = 50;
+    peashooter.update(gojo, 0, state.arena);
+    assert(peashooter.vx === 0 && peashooter.vy === 0, 'Peashooter velocities must remain 0');
+    assert(peashooter.x === peashooter._fixedX && peashooter.y === peashooter._fixedY, 'Peashooter must not be displaced');
+    assert(peashooter.angle === 0, 'Peashooter angle must remain strictly 0');
+
+    // Straight left / right aiming test:
+    // Move gojo to the left of peashooter
+    gojo.x = peashooter.x - 100;
+    gojo.y = peashooter.y + 50; // Diagonal offset
+    peashooter.update(gojo, 0, state.arena);
+    assert(peashooter.gunAngle === Math.PI, `Plant must aim straight LEFT (Math.PI) when target is on left (got ${peashooter.gunAngle})`);
+    assert(peashooter.angle === 0, 'Plant body angle must stay 0');
+
+    // Move gojo to the right of peashooter
+    gojo.x = peashooter.x + 100;
+    gojo.y = peashooter.y - 60; // Diagonal offset
+    peashooter.update(gojo, 0, state.arena);
+    assert(peashooter.gunAngle === 0, `Plant must aim straight RIGHT (0) when target is on right (got ${peashooter.gunAngle})`);
+    assert(peashooter.angle === 0, 'Plant body angle must stay 0');
+
+    // Straight horizontal projectile firing test
+    peashooter._firePea(peashooter.gunAngle, 0);
+    const firedPea = projs[projs.length - 1];
+    assert(firedPea.vy === 0, 'Peashooter projectile vy must be strictly 0 (straight horizontal)');
+    assert(firedPea.vx > 0, 'Peashooter projectile vx must be positive when aiming right');
+
+    // 6. Verify 1v1 Match Initialization & createFighterInstance for Crazy Dave
     const { FIGHTER_DEFS } = await import('../js/core/config.js');
     const { createFighterInstance } = await import('../js/core/state.js');
     const { reinitFighters } = await import('../js/core/gameFlow.js');

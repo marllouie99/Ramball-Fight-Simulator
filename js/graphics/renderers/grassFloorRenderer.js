@@ -275,3 +275,63 @@ export function renderCrazyDaveGrassFloor(ctx, arena, isDark = false, fBleed = 4
   ctx.restore();
 }
 
+/**
+ * Calculates the exact world coordinates for the center of the grass tile nearest to (targetX, targetY).
+ * Optionally accepts a list of existing occupants (e.g. active plants) to find the nearest unoccupied tile.
+ */
+export function getNearestGrassTileCenter(targetX, targetY, arena, existingOccupants = []) {
+  arena = arena || (typeof state !== 'undefined' && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
+  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
+  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
+  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cellW = arena.width / cols;
+  const cellH = arena.height / rows;
+
+  const baseCol = Math.max(0, Math.min(cols - 1, Math.floor((targetX - arena.x) / cellW)));
+  const baseRow = Math.max(0, Math.min(rows - 1, Math.floor((targetY - arena.y) / cellH)));
+
+  const isOccupied = (c, r) => {
+    const cx = arena.x + (c + 0.5) * cellW;
+    const cy = arena.y + (r + 0.5) * cellH;
+    return existingOccupants.some(occ => {
+      if (!occ || occ.hp <= 0) return false;
+      return Math.hypot(occ.x - cx, occ.y - cy) < Math.min(cellW, cellH) * 0.45;
+    });
+  };
+
+  if (!isOccupied(baseCol, baseRow)) {
+    return {
+      x: arena.x + (baseCol + 0.5) * cellW,
+      y: arena.y + (baseRow + 0.5) * cellH,
+      col: baseCol,
+      row: baseRow
+    };
+  }
+
+  // Find nearest unoccupied tile center
+  let bestCenter = null;
+  let minD = Infinity;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (isOccupied(c, r)) continue;
+      const cx = arena.x + (c + 0.5) * cellW;
+      const cy = arena.y + (r + 0.5) * cellH;
+      const d = Math.hypot(cx - targetX, cy - targetY);
+      if (d < minD) {
+        minD = d;
+        bestCenter = { x: cx, y: cy, col: c, row: r };
+      }
+    }
+  }
+
+  if (bestCenter) return bestCenter;
+
+  return {
+    x: arena.x + (baseCol + 0.5) * cellW,
+    y: arena.y + (baseRow + 0.5) * cellH,
+    col: baseCol,
+    row: baseRow
+  };
+}
+
