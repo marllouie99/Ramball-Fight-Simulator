@@ -52,7 +52,7 @@ export function isSuppressedByFuga(fighter) {
  */
 export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple') {
   if (!entity) return true;
-  if (entity.isBaguvixActive || entity.isGodModeActive) return true;
+  if (entity.isBaguvixActive || entity.isGodModeActive || entity.isPlant || entity.isPlantMinion || entity.isImmovable) return true;
 
   // Makima contract reformation stasis
   if (entity.isRevivingFromContract || entity.isShatterReviving || (entity.shatteredPieces && entity.shatteredPieces.length > 0) || (entity.characterId === 'makima' && (entity.isDead || entity.dead || entity.hp <= 0))) {

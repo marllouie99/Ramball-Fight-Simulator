@@ -58,6 +58,12 @@ export class PeashooterEntity extends Fighter {
     this.isPlantMinion = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
+    this.immuneToKnockback = true;
+    this.immuneToPull = true;
+    this.immuneToPush = true;
+    this.cannotBeDisplaced = true;
+    this.phasesThroughEntities = true;
+    this.ignoreFighterCollisions = true;
     this.hideHpText = true;
     this.maxHp = maxHp;
     this.hp = maxHp;
@@ -90,6 +96,10 @@ export class PeashooterEntity extends Fighter {
     this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
   }
 
+  onCollide(opponent) {
+    // Entities pass through plants without collision push
+  }
+
   applyKnockback(vx, vy) {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
@@ -97,9 +107,22 @@ export class PeashooterEntity extends Fighter {
     this.vy = 0;
   }
 
+  resolveWallBounce(arena, opponent) {
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     if (opts) {
       opts.knockback = false;
+      opts.skipKnockback = true;
+      opts.skipInterrupt = true;
       opts.knockbackVx = 0;
       opts.knockbackVy = 0;
     }
@@ -276,6 +299,12 @@ export class SnowPeaEntity extends Fighter {
     this.isPlantMinion = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
+    this.immuneToKnockback = true;
+    this.immuneToPull = true;
+    this.immuneToPush = true;
+    this.cannotBeDisplaced = true;
+    this.phasesThroughEntities = true;
+    this.ignoreFighterCollisions = true;
     this.hideHpText = true;
     this.maxHp = maxHp;
     this.hp = maxHp;
@@ -308,6 +337,10 @@ export class SnowPeaEntity extends Fighter {
     this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
   }
 
+  onCollide(opponent) {
+    // Entities pass through plants without collision push
+  }
+
   applyKnockback(vx, vy) {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
@@ -315,9 +348,22 @@ export class SnowPeaEntity extends Fighter {
     this.vy = 0;
   }
 
+  resolveWallBounce(arena, opponent) {
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     if (opts) {
       opts.knockback = false;
+      opts.skipKnockback = true;
+      opts.skipInterrupt = true;
       opts.knockbackVx = 0;
       opts.knockbackVy = 0;
     }

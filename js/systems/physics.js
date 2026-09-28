@@ -159,8 +159,8 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
-  // Servants of Cthulhu and End Crystals phase through fighters without physical collision or pushback
-  if (a.isServantOfCthulhu || b.isServantOfCthulhu || a.isEndCrystal || b.isEndCrystal) return;
+  // Servants of Cthulhu, End Crystals, and Plant Minions (Peashooter / Snow Pea) phase through fighters without physical collision or pushback
+  if (a.isServantOfCthulhu || b.isServantOfCthulhu || a.isEndCrystal || b.isEndCrystal || a.isPlant || b.isPlant || a.isPlantMinion || b.isPlantMinion) return;
 
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
   const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
@@ -1132,8 +1132,8 @@ export function updateFighters() {
         if (!entity.isIllusion) continue; // Skip fighter-fighter collisions (already handled)
         if (!entity.hp || entity.hp <= 0 || entity.isSubmerged || entity.isErupting) continue;
         
-        // Servants of Cthulhu and End Crystals phase through fighters without physical collision or pushback
-        if (entity.isServantOfCthulhu || fighter.isServantOfCthulhu || entity.isEndCrystal || fighter.isEndCrystal) continue;
+        // Servants of Cthulhu, End Crystals, and Plant Minions phase through fighters without physical collision or pushback
+        if (entity.isServantOfCthulhu || fighter.isServantOfCthulhu || entity.isEndCrystal || fighter.isEndCrystal || entity.isPlant || fighter.isPlant || entity.isPlantMinion || fighter.isPlantMinion) continue;
         
         // Illusions inside Cronos sphere must never be pushed
         const isIllusionInSphere = entity._frozenByCronosSphere || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(entity.x - f.sphereX, entity.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + entity.r)));

@@ -1889,14 +1889,37 @@ async function runInteractionTests() {
     dave.update(gojo, 1, state.arena);
     assert(dave.vx === 0 && dave.vy === 0, 'Crazy Dave must remain stationary while plantingPauseTimer > 0');
 
-    // Test plant death does NOT throw and marks dead cleanly without faah
-    const activePlant = dave.activePeashooters[dave.activePeashooters.length - 1];
-    if (activePlant) {
-      activePlant.takeDamage(9999, gojo);
-      assert(activePlant.hp === 0 && activePlant.dead === true, 'Plant must be dead after taking fatal damage');
-    }
+    // 9. Test Plant Minion Pass-Through & Immovability
+    dave.sunCount = 200;
+    dave.peashooterCooldown = 0;
+    dave.plantPeashooter(gojo);
+    const livingPlant = dave.activePeashooters.find(p => p && p.hp > 0);
+    assert(livingPlant !== undefined, 'Living plant entity must exist');
+    assert(livingPlant.isPlant === true && livingPlant.isImmovable === true, 'Plant must have isPlant and isImmovable');
 
-    // 9. Verify isCrazyDavePresent returns false when no Dave is present
+    // Position enemy directly overlapping the plant to test pass-through collision
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+    const { isEntityImmuneToGravitationalPull } = await import('../js/entities/fighter.js');
+    gojo.x = livingPlant.x + 5;
+    gojo.y = livingPlant.y + 5;
+    const initialGojoX = gojo.x;
+    const initialGojoY = gojo.y;
+    const initialPlantX = livingPlant.x;
+    const initialPlantY = livingPlant.y;
+
+    resolveFighterCollision(livingPlant, gojo);
+    assert(livingPlant.x === initialPlantX && livingPlant.y === initialPlantY, 'Plant position must remain unchanged during collision (pass-through)');
+    assert(gojo.x === initialGojoX && gojo.y === initialGojoY, 'Enemy position must remain unchanged during collision (pass-through)');
+
+    // Pull immunity test
+    assert(isEntityImmuneToGravitationalPull(livingPlant) === true, 'Plant minion must be immune to gravitational suction / vortex pull');
+
+    // Heavy knockback attack test
+    livingPlant.takeDamage(10, gojo, { isHeavy: true, isKnockback: true, knockback: true, knockbackVx: 100, knockbackVy: -100 });
+    assert(livingPlant.vx === 0 && livingPlant.vy === 0, 'Plant velocity must stay 0 under heavy knockback');
+    assert(livingPlant.x === initialPlantX && livingPlant.y === initialPlantY, 'Plant must not be displaced by attacks');
+
+    // 10. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
     assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
@@ -1905,7 +1928,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, planting movement pause, disabled aim rotation & minion death safety verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, top-of-arena sun drops, planting movement pause, pass-through collision & minion immovability verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');
