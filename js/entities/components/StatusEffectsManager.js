@@ -1,4 +1,5 @@
 import { CONFIG } from '../../core/config.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { fastCleanArray } from '../../graphics/particles/visualTrailSystem.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { isInsideRubbickStolenVoid } from '../fighters/rubbick/rubbickThemes.js';
@@ -40,6 +41,20 @@ export class StatusEffectsManager {
     this.fighter.timeStopTimer = val;
   }
 
+  get iceFreezeTimer() {
+    return this.fighter.iceFreezeTimer || 0;
+  }
+  set iceFreezeTimer(val) {
+    this.fighter.iceFreezeTimer = val;
+  }
+
+  get isFrozenBySnowPea() {
+    return Boolean(this.fighter.isFrozenBySnowPea || (this.fighter.iceFreezeTimer && this.fighter.iceFreezeTimer > 0));
+  }
+  set isFrozenBySnowPea(val) {
+    this.fighter.isFrozenBySnowPea = Boolean(val);
+  }
+
   get slowTimer() {
     return this.fighter.slowTimer || 0;
   }
@@ -56,6 +71,35 @@ export class StatusEffectsManager {
 
   isSilenced() {
     return (this.fighter.silenceTimer || 0) > 0;
+  }
+
+  applyFreeze(frames, attacker, opts = {}) {
+    if (!this.fighter) return;
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isCountering || (this.fighter._counterPunchTimer && this.fighter._counterPunchTimer > 0) || (this.fighter._postCounterRecoveryTimer && this.fighter._postCounterRecoveryTimer > 0)) return;
+    if (this.fighter.isDashingThunderclap || (this.fighter.thunderclapDashPauseTimer && this.fighter.thunderclapDashPauseTimer > 0)) return;
+    if (this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.isDebuffImmune || this.fighter.isPlant || this.fighter.isPlantMinion || this.fighter.characterId === 'toji' || this.fighter.type === 'toji' || this.fighter.characterId === 'escanor' || this.fighter.type === 'escanor') return;
+
+    const duration = frames ?? (CONFIG.crazydave?.snowPeaFreezeDuration || 60);
+    if ((this.fighter.iceFreezeTimer || 0) < duration) {
+      this.fighter.iceFreezeTimer = duration;
+      this.fighter.isFrozenBySnowPea = true;
+      this.fighter.lastFreezeAttacker = attacker;
+
+      // Play freeze audio
+      const sfx = CONFIG.crazydave?.snowPeaFreezeAudioSrc || 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3';
+      if (audioSystem && typeof audioSystem.playSFX === 'function') {
+        audioSystem.playSFX(sfx, 0.85);
+      } else if (audioSystem && typeof audioSystem.playSound === 'function') {
+        audioSystem.playSound(sfx, 0.85);
+      }
+
+      if (typeof this.fighter.interruptAttacks === 'function') {
+        this.fighter.interruptAttacks();
+      }
+      if (typeof this.fighter.suppressCombatAndVisuals === 'function') {
+        this.fighter.suppressCombatAndVisuals({ isIceFreeze: true, timer: duration });
+      }
+    }
   }
 
   applySlow(frames, multiplier, opts = {}) {
@@ -264,9 +308,11 @@ export class StatusEffectsManager {
       fighter.dubstepStunTimer = 0;
       fighter.hitStunTimer = 0;
       fighter.paralyzeTimer = 0;
+      fighter.iceFreezeTimer = 0;
+      fighter.isFrozenBySnowPea = false;
       return false;
     }
-    const isFrozen = (fighter.crimsonElectrifiedTimer > 0) || (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || (fighter.timeStopTimer > 0);
+    const isFrozen = (fighter.crimsonElectrifiedTimer > 0) || (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || (fighter.timeStopTimer > 0) || ((fighter.iceFreezeTimer || 0) > 0) || fighter.isFrozenBySnowPea;
 
     if (isFrozen) {
       fighter.mahoragaAdaptationFreezeTimer = 0;
@@ -295,6 +341,25 @@ export class StatusEffectsManager {
       if (fighter.trailHistory && fighter.trailHistory.length > 0) {
         fighter.trailHistory.pop();
       }
+    }
+
+    // Snow Pea Ice Freeze Stasis (Plants vs Zombies)
+    if (fighter.iceFreezeTimer > 0) {
+      fighter.iceFreezeTimer--;
+      fighter.vx = 0;
+      fighter.vy = 0;
+      fighter.knockbackVx = 0;
+      fighter.knockbackVy = 0;
+      if (typeof fighter._handleFrozenSkillCooldowns === 'function') {
+        fighter._handleFrozenSkillCooldowns();
+      }
+      if (fighter.iceFreezeTimer <= 0) {
+        fighter.iceFreezeTimer = 0;
+        fighter.isFrozenBySnowPea = false;
+      }
+      return true;
+    } else {
+      fighter.isFrozenBySnowPea = false;
     }
 
     // Crimson Execution Stun & DoT
@@ -451,6 +516,7 @@ export class StatusEffectsManager {
       case 'hitStun': return this.applyHitStun(...args);
       case 'paralyze': return this.applyParalyze(...args);
       case 'timeStop': return this.applyTimeStop(...args);
+      case 'freeze': return this.applyFreeze(...args);
       default:
         console.warn(`[StatusEffectsManager] Unknown status effect: ${effectName}`);
     }

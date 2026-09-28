@@ -531,6 +531,8 @@ export class Fighter {
     this.pureLoveBeamRegenDebuffTimer = 0;
     this.tojiRegenDebuffTimer = 0;
     this.paralyzeTimer = 0;
+    this.iceFreezeTimer = 0;
+    this.isFrozenBySnowPea = false;
     this.isParalyzedByMahito = false;
     this.isGrabbedByMahoraga = false;
     this.invincibilityTimer = 0;
@@ -604,6 +606,8 @@ export class Fighter {
     if (this.crimsonElectrifiedTimer && this.crimsonElectrifiedTimer > 0) return true;
     if (this.dubstepStunTimer && this.dubstepStunTimer > 0) return true;
     if (this.freezeTimer && this.freezeTimer > 0) return true;
+    if (this.iceFreezeTimer && this.iceFreezeTimer > 0) return true;
+    if (this.isFrozenBySnowPea) return true;
     
     // Unstoppable hyper-armored channeling abilities (e.g. Gojo Red/Purple/Domain) are exempt from minor hit flinches
     const isHyperArmoredChannel = Boolean(
@@ -969,6 +973,10 @@ export class Fighter {
 
   applyParalyze(frames, opts = {}) {
     this.statusEffects.applyParalyze(frames, opts);
+  }
+
+  applyFreeze(frames, attacker, opts = {}) {
+    this.statusEffects.applyFreeze(frames, attacker, opts);
   }
 
   /**

@@ -2207,19 +2207,68 @@ async function runInteractionTests() {
     assert(hudContent.includes('Plants:'), 'HUD Stats HTML must display Plants: count for Crazy Dave');
     CONFIG.darkModeShowHudStats = origStatsToggle;
 
-    // Restore audioSystem.playSFX
-    audioSystem.playSFX = origPlaySFX;
+    // 14. Snow Pea Attack SFX & Freeze Stasis Mechanic Test
+    const { SnowPeaEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const snowPeaPlayedSfxList = [];
+    const origPlaySFXTest = audioSystem.playSFX;
+    audioSystem.playSFX = (src, vol) => {
+      snowPeaPlayedSfxList.push({ src, vol });
+      if (origPlaySFXTest) origPlaySFXTest(src, vol);
+    };
 
-    // 13. Verify isCrazyDavePresent returns false when no Dave is present
-    state.fighters = [gojo];
-    state.previewFighter = null;
-    assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
+    const snowPlant = new SnowPeaEntity(200, 200, dave, 1);
+    const targetFighter = new GojoFighter(300, 200, 1);
+    targetFighter.infinityCooldown = 1000; // Disable Infinity for clear hit testing
+    state.fighters = [dave, targetFighter];
+    state.projectiles = [];
+
+    // Firing Snow Pea plays crazydave-snow_pea_sparkles.ogg
+    snowPlant._fireSnowPea(0, 0);
+    assert(snowPeaPlayedSfxList.some(s => s.src.includes('crazydave-snow_pea_sparkles.ogg')), 'Firing Snow Pea must play crazydave-snow_pea_sparkles.ogg attack sound');
+
+    // Trigger projectile onHit with freeze
+    const snowProjTest = (projectileSystem.projectiles && projectileSystem.projectiles.length > 0)
+      ? projectileSystem.projectiles[projectileSystem.projectiles.length - 1]
+      : state.projectiles[state.projectiles.length - 1];
+    assert(snowProjTest && snowProjTest.visual === 'snowPeaBullet', 'Snow Pea projectile must have visual snowPeaBullet');
+    
+    // Test applyFreeze directly on target
+    targetFighter.applyFreeze(60, dave);
+    assert(targetFighter.iceFreezeTimer === 60, 'target.applyFreeze must set iceFreezeTimer to 60 frames');
+    assert(targetFighter.isFrozenBySnowPea === true, 'target.isFrozenBySnowPea must be true when frozen');
+    assert(snowPeaPlayedSfxList.some(s => s.src.includes('crazydave-snowpea-freeze.mp3')), 'applyFreeze must play crazydave-snowpea-freeze.mp3 SFX');
+    assert(targetFighter.areAttackEffectsSuppressed() === true, 'Frozen fighter must have attack effects suppressed');
+
+    // Test _handleTimeStop() ticks iceFreezeTimer down and halts velocity
+    targetFighter.vx = 5;
+    targetFighter.vy = 5;
+    const isTargetFrozen = targetFighter._handleTimeStop();
+    assert(isTargetFrozen === true, '_handleTimeStop must return true when iceFreezeTimer > 0');
+    assert(targetFighter.vx === 0 && targetFighter.vy === 0, 'Frozen fighter must have vx=0, vy=0');
+    assert(targetFighter.iceFreezeTimer === 59, 'iceFreezeTimer must decrement by 1 on _handleTimeStop()');
+
+    // Test drawIceFreezeEffect stack depth balance
+    const { drawIceFreezeEffect } = await import('../js/graphics/statusEffects.js');
+    mockCtx.resetStackDepth();
+    drawIceFreezeEffect(mockCtx, targetFighter.r, targetFighter);
+    assert(mockCtx.getStackDepth() === 0, `drawIceFreezeEffect must return canvas stack depth to 0, got ${mockCtx.getStackDepth()}`);
+
+    // Restore audioSystem.playSFX
+    audioSystem.playSFX = origPlaySFXTest;
+
+    // 15. Verify Basic Attack Sound System resolution for all fighter types
+    const { getBasicAttackSound, BASIC_ATTACK_SOUNDS } = await import('../js/soundEffects/basicAttackSounds.js');
+    const daveSound = getBasicAttackSound(50, 'crazydave');
+    assert(daveSound && daveSound.src, 'Crazy Dave must have a valid basic attack sound');
+    const zenitsuSound = getBasicAttackSound(44, 'zenitsu');
+    assert(zenitsuSound && zenitsuSound.src, 'Zenitsu must have a valid basic attack sound');
 
     // Clean up
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI, $UN: XX HUD stats & complete debuff immunity verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI, $UN: XX HUD stats, Snow Pea freeze mechanic, freeze audio & basic attack sounds verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

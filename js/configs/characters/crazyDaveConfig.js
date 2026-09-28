@@ -52,7 +52,7 @@ export const crazyDaveConfig = {
   peashooterCooldown: 500,   // 2.0s skill cooldown
   maxPeashooters: 3,         // Maximum simultaneous active Peashooters
 
-  // Skill 2: Plant Snow Pea (Ice Damage + Enemy Slow)
+  // Skill 2: Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)
   enableSnowPea: true,
   snowPeaCost: 175,          // Costs 175 Sun
   snowPeaHp: 200,
@@ -62,8 +62,16 @@ export const crazyDaveConfig = {
   snowPeaRange: 460,         // Firing range
   snowPeaSlowDuration: 90,   // 1.5s slow debuff on hit
   snowPeaSlowMultiplier: 0.45, // Slows enemy move speed down to 45%
+  snowPeaFreezeChance: 0.25, // 25% chance to completely freeze enemy on hit
+  snowPeaFreezeDuration: 60, // 1.0s (60 frames) full freeze stasis duration
   snowPeaCooldown: 500,      // 3.0s skill cooldown
   maxSnowPeas: 3,            // Maximum simultaneous active Snow Peas
+
+  // Audio Sources
+  peashooterAttackAudioSrc: 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',
+  snowPeaAttackAudioSrc: 'Assets/Sound Effects/Attacks/crazydave-snow_pea_sparkles.ogg',
+  snowPeaFreezeAudioSrc: 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3',
+  plantHitAudioSrc: 'Assets/Sound Effects/SkillEffects/splat3.ogg',
 
   // Sprite Asset Sources
   sunSpriteSrc: 'Assets/model/Sprites/Sun-economy-sprite.png',
@@ -73,6 +81,7 @@ export const crazyDaveConfig = {
   snowPeaIdleSpriteSrc: 'Assets/model/Sprites/Snowpea-sprite-sheet.png',
   snowPeaShootSpriteSrc: 'Assets/model/Sprites/snowpea-about2shoot-sprite-sheet.png',
   snowPeaProjSpriteSrc: 'Assets/model/Sprites/snowpea-projectile.png',
+  iceFreezeSpriteSrc: 'Assets/model/Sprites/ice-freeze-sprite.png',
 
   // Arena Grass Tiles (PvZ Front Lawn)
   grassTilesSpriteSrc: 'Assets/model/Sprites/Grass-tiles-sprite-sheet.png',

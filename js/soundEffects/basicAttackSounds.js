@@ -380,6 +380,48 @@ export const BASIC_ATTACK_SOUNDS = {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
     volume: 0.6,
     delay: 0,
+  },
+
+  // ── Tanjiro (ID 42) ───────────────────
+  42: {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // ── Nezuko (ID 43) ────────────────────
+  43: {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // ── Zenitsu (ID 44) ───────────────────
+  44: {
+    src: 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
+
+  // ── Inosuke (ID 45) ───────────────────
+  45: {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // ── Crazy Dave (ID 50) ────────────────
+  50: {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // ── Barrett .50 Cal (ID 105) ──────────
+  105: {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
   }
 };
 
@@ -417,6 +459,11 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
   // Engineer — high-rate-of-fire automatic weapon
+  'engineer': {
+    src: 'Assets/Sound Effects/Attacks/revolvershot.mp3',
+    volume: 0.35,
+    delay: -1,
+  },
   'Engineer': {
     src: 'Assets/Sound Effects/Attacks/revolvershot.mp3',
     volume: 0.35,
@@ -782,6 +829,267 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   'ender_dragon': {
     src: 'Assets/Sound Effects/Skills/redblast.mp3',
     volume: 0.85,
+    delay: 0,
+  },
+  'enderdragon': {
+    src: 'Assets/Sound Effects/Skills/redblast.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
+  'ender dragon': {
+    src: 'Assets/Sound Effects/Skills/redblast.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
+  'eyeofcthulhu': {
+    src: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
+  'eye of cthulhu': {
+    src: 'Assets/Sound Effects/SkillEffects/EyeOfCthulhu-noise2.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
+
+  // Crazy Dave (Plants vs Zombies)
+  'crazydave': {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'crazy_dave': {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'crazydave_pvz': {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // Demon Slayer Corps
+  'tanjiro': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'nezuko': {
+    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'zenitsu': {
+    src: 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
+  'inosuke': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // Megumin (KonoSuba)
+  'megumin': {
+    src: 'Assets/Sound Effects/Attacks/explosion.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+  'megumin_konosuba': {
+    src: 'Assets/Sound Effects/Attacks/explosion.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+
+  // Classic Arcade Archetypes
+  'normal': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 1.1,
+    delay: -3,
+  },
+  'aimbot': {
+    src: [
+      'Assets/Sound Effects/Attacks/do.mp3',
+      'Assets/Sound Effects/Attacks/ri.mp3',
+      'Assets/Sound Effects/Attacks/mi.mp3',
+      'Assets/Sound Effects/Attacks/fa.mp3',
+      'Assets/Sound Effects/Attacks/so.mp3'
+    ],
+    volume: 0.8,
+    delay: -2,
+  },
+  'melee': {
+    src: 'Assets/Sound Effects/Attacks/Spikestab.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'laser': {
+    src: 'Assets/Sound Effects/Attacks/laserbeam.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+  'knight': {
+    src: 'Assets/Sound Effects/Attacks/energysword2.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'darkslategray': {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.6,
+    delay: -2,
+  },
+  'black': {
+    src: 'Assets/Sound Effects/Attacks/shurikenthrow.mp3',
+    volume: 0.6,
+    delay: -2,
+  },
+  'orange': {
+    src: 'Assets/Sound Effects/Attacks/flamespray1.mp3',
+    volume: 0.4,
+    delay: -3,
+  },
+  'berserker': {
+    src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'cronos': {
+    src: 'Assets/Sound Effects/Attacks/energysword.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'bomber': {
+    src: 'Assets/Sound Effects/Attacks/explosion.mp3',
+    volume: 0.6,
+    delay: -2,
+  },
+  'gunslinger': {
+    src: 'Assets/Sound Effects/Attacks/revolvershot.mp3',
+    volume: 0.5,
+    delay: -2,
+  },
+  'doppleganger': {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.5,
+    delay: 0,
+  },
+  'targetdummy': {
+    src: 'Assets/Sound Effects/Attacks/Spikestab.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'ruby': {
+    src: 'Assets/Sound Effects/Attacks/syctheattack.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // Tactical Force Weapon Arsenal
+  'rifle': {
+    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    volume: 0.65,
+    delay: 0,
+  },
+  'm4a1': {
+    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    volume: 0.65,
+    delay: 0,
+  },
+  'shotgun': {
+    src: 'Assets/Sound Effects/Attacks/shootgunshot.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'spas12': {
+    src: 'Assets/Sound Effects/Attacks/shootgunshot.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'spas_12': {
+    src: 'Assets/Sound Effects/Attacks/shootgunshot.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'pistol': {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'desert_eagle': {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'deserteagle': {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'sniper': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  'awp': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  'barrett': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  'barrett50cal': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  'tactical_barrett': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  'tactical_sniper': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  'tactical_gunslinger': {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'tactical_commando': {
+    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    volume: 0.65,
+    delay: 0,
+  },
+  'tactical_guerilla': {
+    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    volume: 0.65,
+    delay: 0,
+  },
+  'tactical_breacher': {
+    src: 'Assets/Sound Effects/Attacks/shootgunshot.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'tactical_heavy': {
+    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    volume: 0.65,
+    delay: 0,
+  },
+  'tactical_infiltrator': {
+    src: 'Assets/Sound Effects/Attacks/desert-eagle-fire.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+  'tactical_marksman': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
     delay: 0,
   }
 };

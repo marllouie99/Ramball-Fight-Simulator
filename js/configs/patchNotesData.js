@@ -28,7 +28,20 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "CRAZYDAVE",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "2",
+                "oldVal": "Plant Snow Pea (Ice Damage + Enemy Slow)",
+                "newVal": "Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)",
+                "pct": "Mod"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

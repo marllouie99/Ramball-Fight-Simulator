@@ -723,16 +723,24 @@ export class SnowPeaEntity extends Fighter {
       maxLife: 60,
       penetration: 1,
       knockbackForce: 4.0,
-      // Special Snow Pea Hit Callback: applies 1.5s Chill Slow
+      // Special Snow Pea Hit Callback: applies 1.5s Chill Slow + chance to Freeze
       onHit: (target) => {
-        if (target && typeof target.applySlow === 'function') {
-          target.applySlow(
-            cfg.snowPeaSlowDuration || 90,
-            cfg.snowPeaSlowMultiplier || 0.45,
-            { isChill: true, isSnowPea: true }
-          );
+        if (target) {
+          if (typeof target.applySlow === 'function') {
+            target.applySlow(
+              cfg.snowPeaSlowDuration || 90,
+              cfg.snowPeaSlowMultiplier || 0.45,
+              { isChill: true, isSnowPea: true }
+            );
+          }
+
+          // Chance to completely freeze enemy into ice stasis
+          const freezeChance = (cfg.snowPeaFreezeChance !== undefined) ? cfg.snowPeaFreezeChance : 0.25;
+          if (Math.random() < freezeChance && typeof target.applyFreeze === 'function') {
+            target.applyFreeze(cfg.snowPeaFreezeDuration || 60, this.owner || this, { isSnowPea: true });
+          }
         }
-        spawnSparks(target.x || spawnX, target.y || spawnY, 14, 'snowPeaShatter');
+        spawnSparks(target?.x || spawnX, target?.y || spawnY, 14, 'snowPeaShatter');
       }
     };
 
@@ -742,8 +750,11 @@ export class SnowPeaEntity extends Fighter {
       state.projectiles.push(snowPeaProj);
     }
 
-    if (audioSystem && typeof audioSystem.playSound === 'function') {
-      audioSystem.playSound('ice_shard', 0.55);
+    const shootSfx = cfg.snowPeaAttackAudioSrc || 'Assets/Sound Effects/Attacks/crazydave-snow_pea_sparkles.ogg';
+    if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX(shootSfx, 0.85);
+    } else if (audioSystem && typeof audioSystem.playSound === 'function') {
+      audioSystem.playSound(shootSfx, 0.85);
     }
   }
 

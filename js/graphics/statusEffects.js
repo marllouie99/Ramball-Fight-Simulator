@@ -1505,8 +1505,119 @@ export function drawMinionHealthBar(ctx, x, y, width = 38, height = 7, hp = 100,
   ctx.restore();
 }
 
+let _iceFreezeSpriteImage = null;
+let _iceFreezeSpriteImageLoading = false;
+
+/**
+ * Lazy loads and caches the ground ice freeze sprite.
+ * @returns {HTMLImageElement|null}
+ */
+export function getIceFreezeSprite() {
+  if (_iceFreezeSpriteImage && _iceFreezeSpriteImage.complete && _iceFreezeSpriteImage.naturalWidth > 0) {
+    return _iceFreezeSpriteImage;
+  }
+  if (!_iceFreezeSpriteImageLoading && typeof Image !== 'undefined') {
+    _iceFreezeSpriteImageLoading = true;
+    const img = new Image();
+    img.src = 'Assets/model/Sprites/ice-freeze-sprite.png';
+    img.onload = () => {
+      _iceFreezeSpriteImage = img;
+      _iceFreezeSpriteImageLoading = false;
+    };
+    img.onerror = () => {
+      _iceFreezeSpriteImageLoading = false;
+    };
+    _iceFreezeSpriteImage = img;
+  }
+  return _iceFreezeSpriteImage;
+}
+
+/**
+ * Renders the ice freeze sprite anchored under the enemy model with subtle body frost aura.
+ * Counteracts fighter aim rotation so the ice block remains flat on the arena floor.
+ * 
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} baseRadius
+ * @param {Object} [fighter]
+ */
+export function drawIceFreezeEffect(ctx, baseRadius, fighter = null) {
+  if (!fighter || ((fighter.iceFreezeTimer || 0) <= 0 && !fighter.isFrozenBySnowPea)) return;
+
+  ctx.save();
+
+  // 1. Glacial Frost Body Halo
+  const t = Date.now();
+  const pulse = Math.sin(t * 0.008) * 0.5 + 0.5;
+  const frostGrad = ctx.createRadialGradient(0, 0, baseRadius * 0.2, 0, 0, baseRadius * 1.15);
+  frostGrad.addColorStop(0, `rgba(186, 230, 253, ${0.35 + 0.15 * pulse})`);
+  frostGrad.addColorStop(0.65, `rgba(56, 189, 248, ${0.25 + 0.10 * pulse})`);
+  frostGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+  ctx.fillStyle = frostGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Counteract fighter rotation so ice crystal cluster sits flat on the ground
+  ctx.save();
+  if (typeof ctx.getTransform === 'function') {
+    const m = ctx.getTransform();
+    const currentAngle = Math.atan2(m.b, m.a);
+    const isFlipped = (m.a * m.d - m.b * m.c) < 0;
+    if (isFlipped) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(-currentAngle);
+  } else if (fighter) {
+    const appliedAngle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+    const facingLeft = Math.abs(appliedAngle) > Math.PI / 2;
+    if (facingLeft && !fighter.isSpinning) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(-appliedAngle);
+  }
+
+  // 3. Draw Bottom Ice Sprite (ice-freeze-sprite.png)
+  const img = getIceFreezeSprite();
+  const imgW = (img && img.naturalWidth) ? img.naturalWidth : 2103;
+  const imgH = (img && img.naturalHeight) ? img.naturalHeight : 748;
+  const aspect = imgH / imgW;
+
+  const targetW = baseRadius * 3.4;
+  const targetH = targetW * aspect;
+  const drawX = -targetW / 2;
+  const drawY = baseRadius * 0.35;
+
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.drawImage(img, drawX, drawY, targetW, targetH);
+  } else {
+    // Procedural ice crystals fallback
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.75)';
+    ctx.strokeStyle = '#BAE6FD';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(-targetW * 0.45, drawY + targetH);
+    ctx.lineTo(-targetW * 0.30, drawY + targetH * 0.2);
+    ctx.lineTo(-targetW * 0.10, drawY + targetH * 0.6);
+    ctx.lineTo(0, drawY);
+    ctx.lineTo(targetW * 0.15, drawY + targetH * 0.5);
+    ctx.lineTo(targetW * 0.35, drawY + targetH * 0.15);
+    ctx.lineTo(targetW * 0.45, drawY + targetH);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+  ctx.restore();
+}
+
 /** Declarative registry for all global status overlays rendered on fighters */
 export const STATUS_OVERLAY_REGISTRY = [
+  {
+    id: 'iceFreeze',
+    isActive: (f) => Boolean((f.iceFreezeTimer || 0) > 0 || f.isFrozenBySnowPea),
+    render: (ctx, baseRadius, f) => drawIceFreezeEffect(ctx, baseRadius, f)
+  },
   {
     id: 'slow',
     isActive: (f) => false, // Slow movement visual disabled
