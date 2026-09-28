@@ -330,10 +330,10 @@ export function drawCrazyDaveSkin(ctx, fighter) {
     ctx.scale(-1, 1);
   }
 
-  // 1. Back Hand (Positioned behind body)
+  // 1. Back Hand (Positioned behind body at lower chest / waist height)
   if (!shouldHideHands) {
     const backHandRadius = getHandSize(3.8);
-    drawPixelHand(ctx, r * 0.6, -r * 0.45, backHandRadius, '#FFE0BD', '#0E0F14');
+    drawPixelHand(ctx, r * 0.50, r * 0.22, backHandRadius, '#FFE0BD', '#0E0F14');
   }
 
   // 2. Core Pixel Body
@@ -342,13 +342,13 @@ export function drawCrazyDaveSkin(ctx, fighter) {
   // 3. Hair / Pan Asset Overlay if loaded
   _drawCrazyDaveHair(ctx, r, isFacingLeft);
 
-  // 4. In-Hand Weapon: Garden Shovel
-  drawCrazyDaveShovel(ctx, 0, 0, 0, r, true, swingTimer, false, fighter.color || '#84CC16', shouldHideHands);
+  // 4. In-Hand Weapon: Garden Shovel (Lowered to waist height y = r * 0.38)
+  drawCrazyDaveShovel(ctx, 0, r * 0.38, 0, r, true, swingTimer, false, fighter.color || '#84CC16', true);
 
-  // 5. Front Hand (Holding shovel handle)
+  // 5. Front Hand (Holding shovel handle at lowered position y = r * 0.38)
   if (!shouldHideHands) {
     const frontHandRadius = getHandSize(4.2);
-    drawPixelHand(ctx, r * 0.7, 0, frontHandRadius, '#FFE0BD', '#0E0F14');
+    drawPixelHand(ctx, r * 0.65, r * 0.38, frontHandRadius, '#FFE0BD', '#0E0F14');
   }
 
   ctx.restore();
