@@ -16,6 +16,7 @@ import { mahitoConfig } from '../configs/characters/mahitoConfig.js';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
+import { meguminConfig } from '../configs/characters/meguminConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
@@ -54,6 +55,7 @@ export const CONFIG = {
   nanami: nanamiConfig,
   nobara: nobaraConfig,
   megumi: megumiConfig,
+  megumin: meguminConfig,
   gojo: gojoConfig,
   sukuna: sukunaConfig,
   yuta: yutaConfig,
@@ -1661,6 +1663,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: enderDragonConfig.projectileSpeedMultiplier || 1.0,
     ability: enderDragonConfig.ability || 'Ruler of The End',
     desc: enderDragonConfig.desc || 'Colossal flying draconic leviathan. Bypasses terrain with void flight, shoots lingering Dragon Breath acid pools, executes kinetic wing swoops, and unleashes cataclysmic void shockwaves.',
+  },
+  {
+    id: 49,
+    name: 'MEGUMIN',
+    category: 'Anime',
+    color: meguminConfig.color || '#C81D25',
+    themeColor: meguminConfig.themeColor || '#C81D25',
+    secondaryColor: meguminConfig.secondaryColor || '#FFD166',
+    startX: meguminConfig.startX || 300,
+    startY: meguminConfig.startY || 250,
+    startVx: meguminConfig.startVx || 1.0,
+    startVy: meguminConfig.startVy || 0.9,
+    radius: meguminConfig.radius || meguminConfig.r || 24,
+    aimbot: false,
+    spinRate: 0,
+    type: 'megumin',
+    hp: meguminConfig.hp || 280,
+    damage: meguminConfig.damage || 420,
+    cooldown: meguminConfig.cooldown || 60,
+    moveSpeed: meguminConfig.moveSpeed || meguminConfig.speed || 2.45,
+    projectileSpeedMultiplier: meguminConfig.projectileSpeedMultiplier || 1.0,
+    ability: meguminConfig.ability || 'Explosion Magic (爆裂魔法)',
+    desc: meguminConfig.desc || 'The Crimson Demon Archmage. Specializes in a single apocalyptic offensive spell: EXPLOSION! Recites an extended dramatic chanting incantation with committed aim lock, unleashing cataclysmic true damage before suffering total mana burnout and collapsing into a helpless faceplant.',
   }
 ];
 

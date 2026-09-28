@@ -37,6 +37,7 @@ import { MahitoFighter } from '../fighters/MahitoFighter.js';
 import { NanamiFighter } from '../fighters/NanamiFighter.js';
 import { NobaraFighter } from '../fighters/NobaraFighter.js';
 import { MegumiFighter } from '../fighters/MegumiFighter.js';
+import { MeguminFighter } from '../fighters/MeguminFighter.js';
 import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 import { CJFighter } from '../fighters/CJFighter.js';
 import { UryuFighter } from '../fighters/UryuFighter.js';
@@ -92,6 +93,8 @@ export const FIGHTER_CLASS_MAP = {
   'nanami': NanamiFighter,
   'nobara': NobaraFighter,
   'megumi': MegumiFighter,
+  'megumin': MeguminFighter,
+  'megumin_konosuba': MeguminFighter,
   'john_wick': JohnWickFighter,
   'johnwick':  JohnWickFighter,
   'cj':        CJFighter,

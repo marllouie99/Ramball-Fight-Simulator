@@ -28,20 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "EYEOFCTHULHU",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "radius",
-                "oldVal": 32,
-                "newVal": 40,
-                "pct": "+25.0%"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

@@ -5,6 +5,7 @@ import { getFighterPreview } from './FighterPreviewCache.js';
 import { drawIchigoSkin, _drawIchigoHair, _getIchigoHairImage } from '../fighters/ichigoSkin.js';
 import { drawGojoBody, _drawGojoHair, _getGojoHairImage } from '../fighters/gojoSkin.js';
 import { drawMakimaSkin, _drawMakimaHair, _getMakimaHairImage } from '../fighters/makimaSkin.js';
+import { drawMeguminSkin, _drawMeguminHair, _getMeguminHairImage } from '../fighters/meguminSkin.js';
 import { drawRezeSkin, _drawRezeHair, _getRezeHairImage } from '../fighters/rezeSkin.js';
 import { drawSukunaBody, _drawSukunaHair, _getSukunaHairImage } from '../fighters/sukunaSkin.js';
 import { drawYujiSkin, _drawYujiHair, _getYujiHairImage } from '../fighters/yujiSkin.js';
@@ -122,6 +123,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     themeColor: '#f43f5e',
     forms: [
       { id: 'default', label: 'STANDARD' }
+    ]
+  },
+  {
+    key: 'megumin',
+    label: 'MEGUMIN',
+    asset: 'Megumin-hair.png',
+    assetDims: '500 x 500',
+    baseW: 2.50,
+    baseH: 2.00,
+    baseCrownY: -1.30,
+    visW: 300,
+    visH: 300,
+    centerX: 250,
+    topY: 60,
+    themeColor: '#c81d25',
+    forms: [
+      { id: 'default', label: 'WIZARD ROBES' }
     ]
   },
   {
@@ -576,6 +594,16 @@ function generateJsCode(fDef, custom) {
            `const drawH = 478 * scaleY;\n` +
            `const drawX = -249.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 43 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'megumin') {
+    return `// Calibrated Hair for Megumin (Assets/model/Megumin-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 300;\n` +
+           `const scaleY = targetHairHeight / 300;\n` +
+           `const drawW = 500 * scaleX;\n` +
+           `const drawH = 500 * scaleY;\n` +
+           `const drawX = -250 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 60 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'reze') {
     return `// Calibrated Hair for Reze (Assets/model/Reze-hair.png)\n` +
            `const targetDomeWidth = r * ${targetW};\n` +
@@ -878,6 +906,8 @@ export function drawSkinStudioScreen() {
         drawGojoBody(ctx, dummyFighter);
       } else if (fDef.key === 'makima') {
         drawMakimaSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'megumin') {
+        drawMeguminSkin(ctx, dummyFighter);
       } else if (fDef.key === 'reze') {
         drawRezeSkin(ctx, dummyFighter);
       } else if (fDef.key === 'sukuna') {
@@ -959,6 +989,7 @@ export function drawSkinStudioScreen() {
     if (fDef.key === 'ichigo') _drawIchigoHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'gojo') _drawGojoHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'makima') _drawMakimaHair(ctx, baseRadius, isFacingLeft);
+    else if (fDef.key === 'megumin') _drawMeguminHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'reze') _drawRezeHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'sukuna') _drawSukunaHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'yuji') {

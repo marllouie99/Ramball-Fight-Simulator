@@ -47,6 +47,7 @@ export { drawCjSkin } from './fighters/cjSkin.js';
 export { drawJohnWickSkin, drawJohnWickPixelBody, _drawJohnWickHair, _getJohnWickHairImage } from './fighters/johnWickSkin.js';
 export { drawTojiSkin, drawTojiGhostSkin, drawTojiPixelBody, _drawTojiHair, _getTojiHairImage } from './fighters/tojiSkin.js';
 export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
+export { drawMeguminSkin, drawMeguminPixelBody, _drawMeguminHair, _getMeguminHairImage } from './fighters/meguminSkin.js';
 export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';
 export { drawUryuSkin, drawUryuGhostSkin } from './fighters/uryuSkin.js';
 export { drawUryuBow, drawSeeleSchneider, drawUryuSeeleSlashArc } from './weapons/uryuWeaponGraphics.js';
