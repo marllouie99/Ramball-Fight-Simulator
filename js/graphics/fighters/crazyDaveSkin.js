@@ -9,7 +9,7 @@
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
-import { drawCrazyDaveShovel, drawSunDrop } from '../weapons/crazyDaveWeaponGraphics.js';
+import { drawCrazyDaveShovel, drawSunDrop, getSunSprite } from '../weapons/crazyDaveWeaponGraphics.js';
 
 let _crazyDaveHairImage = null;
 
@@ -321,18 +321,28 @@ function _drawOverheadSunCounter(ctx, fighter) {
   ctx.fill();
   ctx.stroke();
 
-  // Mini Pixel Art Golden Sun Icon
+  // Mini Golden Sun Icon
+  const sunImg = getSunSprite();
+  const hasImg = Boolean(sunImg && sunImg.complete && sunImg.naturalWidth > 0);
   const miniX = Math.round(-pillW / 2 + 8);
   const miniY = 0;
-  ctx.fillStyle = '#B45309';
-  ctx.fillRect(miniX - 4, miniY - 4, 8, 8);
-  ctx.fillStyle = '#FACC15';
-  ctx.fillRect(miniX - 3, miniY - 3, 6, 6);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(miniX - 2, miniY - 2, 2, 2);
-  ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(miniX - 5, miniY - 1, 10, 2);
-  ctx.fillRect(miniX - 1, miniY - 5, 2, 10);
+
+  if (hasImg) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sunImg, 0, 0, sunImg.naturalWidth, sunImg.naturalHeight, miniX - 5.5, miniY - 5.5, 11, 11);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#B45309';
+    ctx.fillRect(miniX - 4, miniY - 4, 8, 8);
+    ctx.fillStyle = '#FACC15';
+    ctx.fillRect(miniX - 3, miniY - 3, 6, 6);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(miniX - 2, miniY - 2, 2, 2);
+    ctx.fillStyle = '#F59E0B';
+    ctx.fillRect(miniX - 5, miniY - 1, 10, 2);
+    ctx.fillRect(miniX - 1, miniY - 5, 2, 10);
+  }
 
   // Sun Count Text
   ctx.fillStyle = '#FEF08A';

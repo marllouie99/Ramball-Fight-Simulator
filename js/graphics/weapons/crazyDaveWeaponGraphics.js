@@ -58,6 +58,7 @@ let _snowPeaIdleImg = null;
 let _snowPeaShootImg = null;
 let _peaProjImg = null;
 let _snowPeaProjImg = null;
+let _sunEconomyImg = null;
 
 function _loadPlantImage(src, current) {
   if (current && current.complete && current.naturalWidth > 0) return current;
@@ -65,6 +66,11 @@ function _loadPlantImage(src, current) {
   const img = new Image();
   img.src = encodeURI(src);
   return img;
+}
+
+export function getSunSprite() {
+  if (!_sunEconomyImg) _sunEconomyImg = _loadPlantImage('Assets/model/Sprites/Sun-economy-sprite.png', _sunEconomyImg);
+  return _sunEconomyImg;
 }
 
 export function getPeashooterIdleSprite() {
@@ -99,6 +105,7 @@ export function getSnowPeaProjSprite() {
 
 // Preload on startup
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  getSunSprite();
   getPeashooterIdleSprite();
   getPeashooterShootSprite();
   getSnowPeaIdleSprite();
@@ -200,7 +207,7 @@ export function drawCrazyDaveShovel(
 }
 
 /**
- * Draws an authentic discrete Pixel Art Sun drop on the arena floor (Plants vs. Zombies style).
+ * Draws an authentic discrete Pixel Art Sun drop on the arena floor using Sun-economy-sprite.png.
  */
 export function drawSunDrop(ctx, sun) {
   if (!sun) return;
@@ -213,9 +220,11 @@ export function drawSunDrop(ctx, sun) {
   ctx.save();
   ctx.translate(x, y);
 
-  const P = 2.0; // Discrete pixel grid unit
+  const sunImg = getSunSprite();
+  const hasImg = Boolean(sunImg && sunImg.complete && sunImg.naturalWidth > 0);
 
-  // 1. Soft Warm Halo Ring in pixel art blocks (Zero shadowBlur - Rule 2.2)
+  // 1. Soft Warm Ambient Pixel Halo Ring (Zero shadowBlur - Rule 2.2)
+  const P = 2.0;
   ctx.fillStyle = 'rgba(254, 240, 138, 0.22)';
   const haloR = r + 7 + pulse;
   const haloSteps = Math.ceil(haloR / P);
@@ -228,7 +237,28 @@ export function drawSunDrop(ctx, sun) {
     }
   }
 
-  // 2. Rotating Pixel Art Ray Petals (8 tapered diamond rays)
+  // 2. Render Official Sun Sprite or Procedural Pixel Fallback
+  if (hasImg) {
+    ctx.save();
+    ctx.rotate(rotAngle);
+    ctx.imageSmoothingEnabled = false;
+    const drawSize = r * 2.5 + (pulse * 0.8);
+    ctx.drawImage(sunImg, 0, 0, sunImg.naturalWidth, sunImg.naturalHeight, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+    ctx.restore();
+  } else {
+    _drawProceduralPixelSun(ctx, r, pulse, rotAngle);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural pixel art sun fallback
+ */
+function _drawProceduralPixelSun(ctx, r, pulse, rotAngle) {
+  const P = 2.0;
+
+  // Rotating Ray Petals
   ctx.save();
   ctx.rotate(rotAngle);
   for (let i = 0; i < 8; i++) {
@@ -253,8 +283,8 @@ export function drawSunDrop(ctx, sun) {
         const isEdge = Math.abs(w) >= halfW - 0.8;
 
         let col = '#FBBF24'; // Warm Gold
-        if (isTip || isEdge) col = '#B45309'; // Dark golden amber outline
-        else if (t < 0.4) col = '#FDE047'; // Bright base
+        if (isTip || isEdge) col = '#B45309';
+        else if (t < 0.4) col = '#FDE047';
 
         ctx.fillStyle = col;
         ctx.fillRect(px - P / 2, py - P / 2, P, P);
@@ -263,7 +293,7 @@ export function drawSunDrop(ctx, sun) {
   }
   ctx.restore();
 
-  // 3. Central Pixel Art Sun Disk Body (Snapping to discrete P = 2.0px grid)
+  // Central Sun Disk
   const steps = Math.ceil((r + P) / P);
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -275,7 +305,6 @@ export function drawSunDrop(ctx, sun) {
       const px = Math.round(rx - P / 2);
       const py = Math.round(ry - P / 2);
 
-      // 4-neighbor boundary test for clean 1-pixel outer dark outline
       const isBorder = (
         Math.hypot((gx + 1) * P, gy * P) > r ||
         Math.hypot((gx - 1) * P, gy * P) > r ||
@@ -284,22 +313,20 @@ export function drawSunDrop(ctx, sun) {
       );
 
       if (isBorder) {
-        ctx.fillStyle = '#78350F'; // Dark Amber Outline
+        ctx.fillStyle = '#78350F';
       } else if (rx >= -r * 0.55 && rx <= -r * 0.25 && ry >= -r * 0.55 && ry <= -r * 0.25) {
-        ctx.fillStyle = '#FFFFFF'; // Specular White Highlight
+        ctx.fillStyle = '#FFFFFF';
       } else if (rx < 0 && ry < 0 && dist < r * 0.75) {
-        ctx.fillStyle = '#FEF08A'; // Pale Sunshine Yellow
+        ctx.fillStyle = '#FEF08A';
       } else if (rx > r * 0.35 || ry > r * 0.35) {
-        ctx.fillStyle = '#EAB308'; // Warm Honey Amber
+        ctx.fillStyle = '#EAB308';
       } else {
-        ctx.fillStyle = '#FACC15'; // Vivid Sunshine Gold
+        ctx.fillStyle = '#FACC15';
       }
 
       ctx.fillRect(px, py, P, P);
     }
   }
-
-  ctx.restore();
 }
 
 /**

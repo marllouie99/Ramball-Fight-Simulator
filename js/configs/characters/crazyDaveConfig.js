@@ -64,6 +64,7 @@ export const crazyDaveConfig = {
   maxSnowPeas: 3,            // Maximum simultaneous active Snow Peas
 
   // Sprite Asset Sources
+  sunSpriteSrc: 'Assets/model/Sprites/Sun-economy-sprite.png',
   peashooterIdleSpriteSrc: 'Assets/model/Sprites/Peashooter-sprite-sheet.png',
   peashooterShootSpriteSrc: 'Assets/model/Sprites/peashooter-about2shoot-sprite-sheet.png',
   peashooterProjSpriteSrc: 'Assets/model/Sprites/Peashooter-projectile.png',
