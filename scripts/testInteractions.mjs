@@ -1698,7 +1698,36 @@ async function runInteractionTests() {
 
 
 
-    // 5. Verify isCrazyDavePresent returns false when no Dave is present
+    // 5. Verify 1v1 Match Initialization & createFighterInstance for Crazy Dave
+    const { FIGHTER_DEFS } = await import('../js/core/config.js');
+    const { createFighterInstance } = await import('../js/core/state.js');
+    const { reinitFighters } = await import('../js/core/gameFlow.js');
+    const daveDef = FIGHTER_DEFS.find(d => d.type === 'crazydave');
+    assert(daveDef !== undefined, 'FIGHTER_DEFS must include crazydave');
+    const createdDave = createFighterInstance(daveDef, 1);
+    assert(createdDave !== null, 'createFighterInstance must return a valid instance for crazydave');
+    assert(createdDave instanceof CrazyDaveClass, 'createdDave must be an instance of CrazyDaveClass');
+
+    mockCtx.resetStackDepth();
+    createdDave.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'createdDave.draw must maintain balanced canvas stack depth of 0');
+
+    state.p1Index = FIGHTER_DEFS.findIndex(d => d.type === 'gojo');
+    state.p2Index = FIGHTER_DEFS.findIndex(d => d.type === 'crazydave');
+    state.mode = '1v1';
+    reinitFighters(true);
+
+    assert(state.fighters.length === 2, `1v1 Match with Gojo vs Crazy Dave must have 2 active fighters (got ${state.fighters.length})`);
+    assert(state.fighters[0] && state.fighters[0].characterId === 'gojo', 'P1 must be Gojo');
+    assert(state.fighters[1] && state.fighters[1].characterId === 'crazydave', 'P2 must be Crazy Dave');
+    assert(state.fighters[1].x > state.fighters[0].x, 'P2 (Crazy Dave) must be positioned on the right side of arena');
+
+    mockCtx.resetStackDepth();
+    state.fighters[0].draw(mockCtx);
+    state.fighters[1].draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Both fighters in 1v1 must draw cleanly with 0 stack depth');
+
+    // 6. Verify isCrazyDavePresent returns false when no Dave is present
     state.fighters = [gojo];
     state.previewFighter = null;
     assert(isCrazyDavePresent() === false, 'isCrazyDavePresent() must return false when Crazy Dave is not in match');
@@ -1707,7 +1736,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor & minion entity flags verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, 1v1 match initialization & minion entity flags verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

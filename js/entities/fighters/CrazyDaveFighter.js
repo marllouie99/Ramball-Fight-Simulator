@@ -2,7 +2,7 @@
 // Mechanics: Gathers Sun drops from the sky, basic hits, and Sunflowers.
 // Spends accumulated Sun to plant Peashooters, Wall-nuts, Cherry Bombs, and deploys Lawn Mowers.
 
-import { Fighter, applyDamageToTarget } from '../fighter.js';
+import { Fighter, applyDamageToTarget, isSkillEnabled } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { crazyDaveConfig } from '../../configs/characters/crazyDaveConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
@@ -613,7 +613,7 @@ export class CrazyDaveFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const skills = [];
 
-    if (this.isSkillEnabled(cfg.enableSunflower, true)) {
+    if (isSkillEnabled(cfg.enableSunflower, true)) {
       skills.push({
         id: 'sunflower',
         name: 'Sunflower (50☀️)',
@@ -627,7 +627,7 @@ export class CrazyDaveFighter extends Fighter {
       });
     }
 
-    if (this.isSkillEnabled(cfg.enableCombatFlora, true)) {
+    if (isSkillEnabled(cfg.enableCombatFlora, true)) {
       skills.push({
         id: 'combatFlora',
         name: 'Combat Flora (Pea/Nut)',
@@ -641,7 +641,7 @@ export class CrazyDaveFighter extends Fighter {
       });
     }
 
-    if (this.isSkillEnabled(cfg.enableCherryBomb, true)) {
+    if (isSkillEnabled(cfg.enableCherryBomb, true)) {
       skills.push({
         id: 'cherryBomb',
         name: 'Cherry Bomb (150☀️)',
@@ -655,7 +655,7 @@ export class CrazyDaveFighter extends Fighter {
       });
     }
 
-    if (this.isSkillEnabled(cfg.enableLawnMower, true)) {
+    if (isSkillEnabled(cfg.enableLawnMower, true)) {
       skills.push({
         id: 'lawnMower',
         name: 'WABBI WABBO! (250☀️)',
@@ -686,22 +686,9 @@ export class CrazyDaveFighter extends Fighter {
     this.cherryBombCooldown = 0;
     this.lawnMowerCooldown = 0;
 
-    // Clean up active deployed plant entities from state.fighters and state.illusions
-    if (state) {
-      if (Array.isArray(state.fighters)) {
-        state.fighters = state.fighters.filter(f => {
-          if (!f) return false;
-          return !(f.owner === this && (f.isDeployable || f.isMinion));
-        });
-      }
-      if (Array.isArray(state.illusions)) {
-        state.illusions = state.illusions.filter(f => {
-          if (!f) return false;
-          return !(f.owner === this && (f.isDeployable || f.isMinion));
-        });
-      }
-    }
-
+    if (this.activeSunflowers) this.activeSunflowers.forEach(s => { if (s) s.hp = 0; });
+    if (this.activePeashooters) this.activePeashooters.forEach(p => { if (p) p.hp = 0; });
+    if (this.activeWallNuts) this.activeWallNuts.forEach(w => { if (w) w.hp = 0; });
     this.activeSunflowers = [];
     this.activePeashooters = [];
     this.activeWallNuts = [];
