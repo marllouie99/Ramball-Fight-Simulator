@@ -560,6 +560,9 @@ export class CrazyDaveFighter extends Fighter {
     this.gunAngle = 0;
     this.facingLeft = false;
     this.plantingPauseTimer = 0;
+    this.plantingAnimTimer = 0;
+    this.plantingAnimDuration = 20;
+    this.shovelSwingTimer = 0;
 
     // Sun Economy State
     this.sunCount = cfg.initialSun || 50;
@@ -812,8 +815,11 @@ export class CrazyDaveFighter extends Fighter {
       audioSystem.playSound('powerup', 0.8);
     }
 
-    // Stop Dave's movement momentarily upon planting
-    this.plantingPauseTimer = 18;
+    // Stop Dave's movement momentarily upon planting and play shovel dig animation
+    this.plantingPauseTimer = 20;
+    this.plantingAnimTimer = 20;
+    this.plantingAnimDuration = 20;
+    this.shovelSwingTimer = 20;
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
@@ -889,8 +895,11 @@ export class CrazyDaveFighter extends Fighter {
       audioSystem.playSound('powerup', 0.8);
     }
 
-    // Stop Dave's movement momentarily upon planting
-    this.plantingPauseTimer = 18;
+    // Stop Dave's movement momentarily upon planting and play shovel dig animation
+    this.plantingPauseTimer = 20;
+    this.plantingAnimTimer = 20;
+    this.plantingAnimDuration = 20;
+    this.shovelSwingTimer = 20;
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;
@@ -919,6 +928,19 @@ export class CrazyDaveFighter extends Fighter {
       this.gunAngle = this.facingLeft ? Math.PI : 0;
     }
     this.shootCooldown = 999999;
+
+    // Shovel planting animation timer & dirt particle puff
+    if (this.plantingAnimTimer > 0) {
+      this.plantingAnimTimer--;
+      this.shovelSwingTimer = this.plantingAnimTimer;
+      if (this.plantingAnimTimer === 10) {
+        // Shovel scoops dirt: spawn small soil particles
+        const dirtX = this.x + (this.facingLeft ? -this.r * 1.2 : this.r * 1.2);
+        const dirtY = this.y + this.r * 0.55;
+        spawnSparks(dirtX, dirtY, 4, '#15803D');
+        spawnSparks(dirtX, dirtY, 4, '#78350F');
+      }
+    }
 
     // Cooldown updates
     if (this.peashooterCooldown > 0) this.peashooterCooldown--;

@@ -319,8 +319,37 @@ export function drawCrazyDaveSkin(ctx, fighter) {
     }
   }
 
-  const swingTimer = fighter.shovelSwingTimer || 0;
+  const swingTimer = fighter.shovelSwingTimer || fighter.plantingAnimTimer || 0;
+  const swingMax = fighter.plantingAnimDuration || 20;
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+
+  // Compute shovel dig swing angle & offsets during planting
+  let shovelAngle = 0;
+  let shovelOffsetX = 0;
+  let shovelOffsetY = r * 0.38;
+
+  if (swingTimer > 0) {
+    const p = Math.max(0, Math.min(1.0, 1.0 - (swingTimer / swingMax)));
+    if (p <= 0.45) {
+      // Phase 1: Dig Down into soil (~41° downward tilt and forward push)
+      const digP = p / 0.45;
+      shovelAngle = digP * 0.72;
+      shovelOffsetX = digP * r * 0.18;
+      shovelOffsetY = r * 0.38 + digP * r * 0.20;
+    } else if (p <= 0.75) {
+      // Phase 2: Scoop Upward & Dirt Toss
+      const scoopP = (p - 0.45) / 0.30;
+      shovelAngle = 0.72 - scoopP * 1.05; // scoops up to -0.33 rad (~-19°)
+      shovelOffsetX = r * 0.18 - scoopP * r * 0.12;
+      shovelOffsetY = r * 0.58 - scoopP * r * 0.26;
+    } else {
+      // Phase 3: Settle back to resting waist pose
+      const recP = (p - 0.75) / 0.25;
+      shovelAngle = -0.33 * (1.0 - recP);
+      shovelOffsetX = (r * 0.06) * (1.0 - recP);
+      shovelOffsetY = (r * 0.32) + recP * (r * 0.06);
+    }
+  }
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
@@ -330,10 +359,12 @@ export function drawCrazyDaveSkin(ctx, fighter) {
     ctx.scale(-1, 1);
   }
 
-  // 1. Back Hand (Positioned behind body at lower chest / waist height)
+  // 1. Back Hand (Follows shovel animation smoothly)
   if (!shouldHideHands) {
     const backHandRadius = getHandSize(3.8);
-    drawPixelHand(ctx, r * 0.50, r * 0.22, backHandRadius, '#FFE0BD', '#0E0F14');
+    const backHandX = r * 0.50 + shovelOffsetX * 0.5;
+    const backHandY = r * 0.22 + (shovelOffsetY - r * 0.38) * 0.5;
+    drawPixelHand(ctx, backHandX, backHandY, backHandRadius, '#FFE0BD', '#0E0F14');
   }
 
   // 2. Core Pixel Body
@@ -342,13 +373,17 @@ export function drawCrazyDaveSkin(ctx, fighter) {
   // 3. Hair / Pan Asset Overlay if loaded
   _drawCrazyDaveHair(ctx, r, isFacingLeft);
 
-  // 4. In-Hand Weapon: Garden Shovel (Lowered to waist height y = r * 0.38)
-  drawCrazyDaveShovel(ctx, 0, r * 0.38, 0, r, true, swingTimer, false, fighter.color || '#84CC16', true);
+  // 4. In-Hand Weapon: Garden Shovel (Animated with dig & scoop motion)
+  drawCrazyDaveShovel(ctx, shovelOffsetX, shovelOffsetY, shovelAngle, r, true, swingTimer, false, fighter.color || '#84CC16', true);
 
-  // 5. Front Hand (Holding shovel handle at lowered position y = r * 0.38)
+  // 5. Front Hand (Holding shovel handle at animated angle and position)
   if (!shouldHideHands) {
     const frontHandRadius = getHandSize(4.2);
-    drawPixelHand(ctx, r * 0.65, r * 0.38, frontHandRadius, '#FFE0BD', '#0E0F14');
+    const cosA = Math.cos(shovelAngle);
+    const sinA = Math.sin(shovelAngle);
+    const frontHandX = shovelOffsetX + (r * 0.65) * cosA;
+    const frontHandY = shovelOffsetY + (r * 0.65) * sinA;
+    drawPixelHand(ctx, frontHandX, frontHandY, frontHandRadius, '#FFE0BD', '#0E0F14');
   }
 
   ctx.restore();
