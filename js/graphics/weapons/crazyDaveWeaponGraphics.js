@@ -7,11 +7,11 @@ import { getHandSize } from '../../core/config.js';
 
 // Pre-computed Sprite Frame Bounding Boxes
 export const PEASHOOTER_IDLE_RECTS = [
-  { sx: 14,   sy: 218, sw: 371, sh: 358 },
-  { sx: 456,  sy: 193, sw: 361, sh: 380 },
-  { sx: 858,  sy: 230, sw: 368, sh: 348 },
-  { sx: 1288, sy: 206, sw: 347, sh: 550 },
-  { sx: 1697, sy: 231, sw: 368, sh: 525 },
+  { sx: 15,   sy: 218, sw: 370, sh: 358 },
+  { sx: 459,  sy: 193, sw: 358, sh: 379 },
+  { sx: 861,  sy: 230, sw: 362, sh: 348 },
+  { sx: 1288, sy: 206, sw: 346, sh: 373 },
+  { sx: 1697, sy: 231, sw: 364, sh: 349 },
 ];
 
 export const PEASHOOTER_SHOOT_RECTS = [
@@ -22,10 +22,10 @@ export const PEASHOOTER_SHOOT_RECTS = [
 ];
 
 export const SNOWPEA_IDLE_RECTS = [
-  { sx: 26,   sy: 145, sw: 461, sh: 495 },
-  { sx: 564,  sy: 158, sw: 458, sh: 481 },
-  { sx: 1065, sy: 115, sw: 463, sh: 520 },
-  { sx: 1634, sy: 164, sw: 477, sh: 474 },
+  { sx: 27,   sy: 145, sw: 459, sh: 494 },
+  { sx: 565,  sy: 158, sw: 456, sh: 481 },
+  { sx: 1066, sy: 116, sw: 461, sh: 518 },
+  { sx: 1635, sy: 165, sw: 476, sh: 473 },
 ];
 
 export const SNOWPEA_SHOOT_RECTS = [
