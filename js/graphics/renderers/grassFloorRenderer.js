@@ -24,8 +24,15 @@ export const DEFAULT_GRASS_TILE_RECTS = [
   { id: 'sunbeam_2', sx: 1281, sy: 533, sw: 241, sh: 275 },
 ];
 
-// Natural organic pool for authentic PvZ lawn composition (lush grass, clovers, daisies, yellow flowers & sunbeams)
-const LUSH_GRASS_POOL = [0, 1, 2, 6, 7, 8, 1, 3, 5, 7, 9, 11];
+// Full 12-variant pool featuring prominent dirt path patches (4 & 10), clovers, daisies, yellow flowers & solar sunbeams
+const ALL_GRASS_VARIANTS_POOL = [
+  0, 1, 4, 2, 5, 3,
+  6, 7, 10, 8, 11, 9,
+  2, 4, 0, 1, 3, 5,
+  8, 10, 6, 7, 9, 11,
+  4, 0, 1, 5, 2, 3,
+  10, 6, 7, 9, 8, 11
+];
 
 let _grassTileSpriteImg = null;
 let _grassTileSpriteLoading = false;
@@ -52,7 +59,7 @@ export function loadGrassTileSpriteSheet() {
     _grassTileSpriteImg = null;
   };
   const src = CONFIG.crazydave?.grassTilesSpriteSrc || 'Assets/model/Sprites/Grass-tiles-sprite-sheet.png';
-  _grassTileSpriteImg.src = encodeURI(`${src}?v=2`);
+  _grassTileSpriteImg.src = encodeURI(`${src}?v=3`);
 }
 
 /**
@@ -126,7 +133,7 @@ export function isCrazyDavePresent() {
 /**
  * Retrieves or builds an axis-aligned cached offscreen canvas containing perfectly scaled grass tiles.
  * 1. Fills arena with solid PvZ alternating checkered green lawn base (zero gaps or black background).
- * 2. Overlays pixel-perfect cropped grass sprites with subtle edge interlocking.
+ * 2. Overlays pixel-perfect cropped grass sprites (including dirt path tiles 4 and 10) with subtle edge interlocking.
  */
 export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
   if (typeof document === 'undefined') return null;
@@ -173,13 +180,13 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
     }
   }
 
-  // 2. High-Resolution PvZ Grass Sprite Sheet Overlay
+  // 2. High-Resolution PvZ Grass Sprite Sheet Overlay (Including Dirt Patches 4 & 10)
   if (imgLoaded) {
     const overlap = 2; // subtle interlocking bleed so grass blade fringes blend smoothly
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
-        const poolIdx = (r * 5 + c * 3 + (r % 2) * 2) % LUSH_GRASS_POOL.length;
-        const tileIdx = LUSH_GRASS_POOL[poolIdx];
+        const gridIndex = (r * cols + c) % ALL_GRASS_VARIANTS_POOL.length;
+        const tileIdx = ALL_GRASS_VARIANTS_POOL[gridIndex];
         const rect = DEFAULT_GRASS_TILE_RECTS[tileIdx] || DEFAULT_GRASS_TILE_RECTS[0];
 
         const dx = Math.floor(c * cellW) - overlap;
@@ -191,24 +198,40 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
       }
     }
   } else {
-    // High-quality procedural grass blade tufts & daisy highlights fallback
+    // High-quality procedural grass blade tufts, daisy highlights & dirt patches fallback
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const isAlternate = ((r + c) % 2 === 0);
         const bx = Math.floor(c * cellW);
         const by = Math.floor(r * cellH);
+        const gridIndex = (r * cols + c) % ALL_GRASS_VARIANTS_POOL.length;
+        const tileIdx = ALL_GRASS_VARIANTS_POOL[gridIndex];
 
-        // Blade accents
-        oc.fillStyle = isAlternate ? '#5bc337' : '#34861f';
-        oc.fillRect(bx + 10, by + 12, 5, 5);
-        oc.fillRect(bx + cellW - 18, by + cellH - 16, 5, 5);
+        // Dirt Patch Fallback for Tile 4 & 10
+        if (tileIdx === 4 || tileIdx === 10) {
+          oc.fillStyle = '#78350F'; // Rich Earth Brown
+          oc.beginPath();
+          oc.ellipse(bx + cellW * 0.28, by + cellH * 0.28, cellW * 0.22, cellH * 0.18, 0.2, 0, Math.PI * 2);
+          oc.ellipse(bx + cellW * 0.72, by + cellH * 0.72, cellW * 0.20, cellH * 0.16, -0.2, 0, Math.PI * 2);
+          oc.fill();
 
-        // Subtle flower accent on alternating cells
-        if ((r * 3 + c * 7) % 5 === 0) {
-          oc.fillStyle = '#FFFFFF';
-          oc.fillRect(bx + cellW * 0.48, by + cellH * 0.45, 4, 4);
-          oc.fillStyle = '#FBBF24';
-          oc.fillRect(bx + cellW * 0.48 + 1, by + cellH * 0.45 + 1, 2, 2);
+          // Pebbles / Rocks
+          oc.fillStyle = '#94A3B8';
+          oc.fillRect(bx + cellW * 0.22, by + cellH * 0.24, 4, 3);
+          oc.fillRect(bx + cellW * 0.76, by + cellH * 0.70, 3, 3);
+        } else {
+          // Blade accents
+          oc.fillStyle = isAlternate ? '#5bc337' : '#34861f';
+          oc.fillRect(bx + 10, by + 12, 5, 5);
+          oc.fillRect(bx + cellW - 18, by + cellH - 16, 5, 5);
+
+          // Subtle flower accent on alternating cells
+          if ((r * 3 + c * 7) % 5 === 0) {
+            oc.fillStyle = '#FFFFFF';
+            oc.fillRect(bx + cellW * 0.48, by + cellH * 0.45, 4, 4);
+            oc.fillStyle = '#FBBF24';
+            oc.fillRect(bx + cellW * 0.48 + 1, by + cellH * 0.45 + 1, 2, 2);
+          }
         }
       }
     }
