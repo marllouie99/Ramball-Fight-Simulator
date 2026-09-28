@@ -200,7 +200,7 @@ export function drawCrazyDaveShovel(
 }
 
 /**
- * Draws a radiant bouncing Sun drop on the arena floor.
+ * Draws an authentic discrete Pixel Art Sun drop on the arena floor (Plants vs. Zombies style).
  */
 export function drawSunDrop(ctx, sun) {
   if (!sun) return;
@@ -213,57 +213,91 @@ export function drawSunDrop(ctx, sun) {
   ctx.save();
   ctx.translate(x, y);
 
-  // 1. Concentric Golden Halo (Rule 2.2: Zero shadowBlur)
-  const haloGrad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r + 9 + pulse);
-  haloGrad.addColorStop(0, 'rgba(254, 240, 138, 0.85)');
-  haloGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
-  haloGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-  ctx.fillStyle = haloGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, r + 9 + pulse, 0, Math.PI * 2);
-  ctx.fill();
+  const P = 2.0; // Discrete pixel grid unit
 
-  // 2. Rotating Sun Rays (8 triangular solar petals)
+  // 1. Soft Warm Halo Ring in pixel art blocks (Zero shadowBlur - Rule 2.2)
+  ctx.fillStyle = 'rgba(254, 240, 138, 0.22)';
+  const haloR = r + 7 + pulse;
+  const haloSteps = Math.ceil(haloR / P);
+  for (let gy = -haloSteps; gy <= haloSteps; gy++) {
+    for (let gx = -haloSteps; gx <= haloSteps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist >= r + 2 && dist <= haloR) {
+        ctx.fillRect(gx * P - P / 2, gy * P - P / 2, P, P);
+      }
+    }
+  }
+
+  // 2. Rotating Pixel Art Ray Petals (8 tapered diamond rays)
   ctx.save();
   ctx.rotate(rotAngle);
-  ctx.fillStyle = '#F59E0B'; // Solar Amber
-  ctx.strokeStyle = '#D97706';
-  ctx.lineWidth = 1.0;
   for (let i = 0; i < 8; i++) {
-    const rayAngle = (i * Math.PI) / 4;
-    ctx.save();
-    ctx.rotate(rayAngle);
-    ctx.beginPath();
-    ctx.moveTo(r * 0.7, -3.5);
-    ctx.lineTo(r * 1.45 + (pulse * 0.5), 0);
-    ctx.lineTo(r * 0.7, 3.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    const angle = (i * Math.PI) / 4;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const perpX = -sinA;
+    const perpY = cosA;
+
+    const tipDist = r + 6 + (pulse * 0.5);
+    const baseDist = r - 2;
+
+    for (let d = baseDist; d <= tipDist; d += P) {
+      const t = (d - baseDist) / (tipDist - baseDist);
+      const halfW = (1.0 - t * 0.75) * 2.8;
+
+      for (let w = -halfW; w <= halfW; w += 1.0) {
+        const px = Math.round(cosA * d + perpX * w);
+        const py = Math.round(sinA * d + perpY * w);
+
+        const isTip = t > 0.8;
+        const isEdge = Math.abs(w) >= halfW - 0.8;
+
+        let col = '#FBBF24'; // Warm Gold
+        if (isTip || isEdge) col = '#B45309'; // Dark golden amber outline
+        else if (t < 0.4) col = '#FDE047'; // Bright base
+
+        ctx.fillStyle = col;
+        ctx.fillRect(px - P / 2, py - P / 2, P, P);
+      }
+    }
   }
   ctx.restore();
 
-  // 3. Central Golden Disk Body
-  ctx.fillStyle = '#FACC15'; // Bright Sunshine Yellow
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+  // 3. Central Pixel Art Sun Disk Body (Snapping to discrete P = 2.0px grid)
+  const steps = Math.ceil((r + P) / P);
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
 
-  ctx.strokeStyle = '#B45309'; // Dark golden outline
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
+      const px = Math.round(rx - P / 2);
+      const py = Math.round(ry - P / 2);
 
-  // 4. Inner Specular Glint & Core
-  ctx.fillStyle = '#FEF08A';
-  ctx.beginPath();
-  ctx.arc(-r * 0.25, -r * 0.25, r * 0.45, 0, Math.PI * 2);
-  ctx.fill();
+      // 4-neighbor boundary test for clean 1-pixel outer dark outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(-r * 0.35, -r * 0.35, r * 0.22, 0, Math.PI * 2);
-  ctx.fill();
+      if (isBorder) {
+        ctx.fillStyle = '#78350F'; // Dark Amber Outline
+      } else if (rx >= -r * 0.55 && rx <= -r * 0.25 && ry >= -r * 0.55 && ry <= -r * 0.25) {
+        ctx.fillStyle = '#FFFFFF'; // Specular White Highlight
+      } else if (rx < 0 && ry < 0 && dist < r * 0.75) {
+        ctx.fillStyle = '#FEF08A'; // Pale Sunshine Yellow
+      } else if (rx > r * 0.35 || ry > r * 0.35) {
+        ctx.fillStyle = '#EAB308'; // Warm Honey Amber
+      } else {
+        ctx.fillStyle = '#FACC15'; // Vivid Sunshine Gold
+      }
+
+      ctx.fillRect(px, py, P, P);
+    }
+  }
 
   ctx.restore();
 }

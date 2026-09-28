@@ -321,11 +321,18 @@ function _drawOverheadSunCounter(ctx, fighter) {
   ctx.fill();
   ctx.stroke();
 
-  // Mini Golden Sun Icon
+  // Mini Pixel Art Golden Sun Icon
+  const miniX = Math.round(-pillW / 2 + 8);
+  const miniY = 0;
+  ctx.fillStyle = '#B45309';
+  ctx.fillRect(miniX - 4, miniY - 4, 8, 8);
   ctx.fillStyle = '#FACC15';
-  ctx.beginPath();
-  ctx.arc(-pillW / 2 + 8, 0, 3.8, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillRect(miniX - 3, miniY - 3, 6, 6);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(miniX - 2, miniY - 2, 2, 2);
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(miniX - 5, miniY - 1, 10, 2);
+  ctx.fillRect(miniX - 1, miniY - 5, 2, 10);
 
   // Sun Count Text
   ctx.fillStyle = '#FEF08A';
