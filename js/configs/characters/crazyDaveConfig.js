@@ -33,7 +33,7 @@ export const crazyDaveConfig = {
   initialSun: 50,
   maxSun: 500,
   sunRadius: 30,             // Sized large and prominent to fill 76.6px grass tiles
-  sunPickupValue: 25,
+  sunPickupValue: 50,
   sunDropInterval: 110,      // Natural ambient sun falls every 110 frames (~1.8s at 60fps)
   sunFallSpeed: 2.2,         // Smooth vertical descent speed
   sunAttractionRadius: 95,   // Magnetic pull radius for Dave towards suns
@@ -49,7 +49,7 @@ export const crazyDaveConfig = {
   peashooterSpeed: 9.5,      // Pea projectile speed
   peashooterRange: 460,      // Firing range
   plantLaneTolerance: 85,    // Straight horizontal lane detection width
-  peashooterCooldown: 120,   // 2.0s skill cooldown
+  peashooterCooldown: 500,   // 2.0s skill cooldown
   maxPeashooters: 3,         // Maximum simultaneous active Peashooters
 
   // Skill 2: Plant Snow Pea (Ice Damage + Enemy Slow)
@@ -62,7 +62,7 @@ export const crazyDaveConfig = {
   snowPeaRange: 460,         // Firing range
   snowPeaSlowDuration: 90,   // 1.5s slow debuff on hit
   snowPeaSlowMultiplier: 0.45, // Slows enemy move speed down to 45%
-  snowPeaCooldown: 180,      // 3.0s skill cooldown
+  snowPeaCooldown: 500,      // 3.0s skill cooldown
   maxSnowPeas: 3,            // Maximum simultaneous active Snow Peas
 
   // Sprite Asset Sources

@@ -801,9 +801,10 @@ export class CrazyDaveFighter extends Fighter {
     this.peashooterCooldown = 0;
     this.snowPeaCooldown = 0;
 
-    // Plant Roster References
+    // Plant Roster References & Selection History
     this.activePeashooters = [];
     this.activeSnowPeas = [];
+    this.lastPlantedType = null;
 
     // Register Declarative Skills for HUD
     this._registerSkills();
@@ -904,6 +905,7 @@ export class CrazyDaveFighter extends Fighter {
     }
     this.activePeashooters = [];
     this.activeSnowPeas = [];
+    this.lastPlantedType = null;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -1044,6 +1046,7 @@ export class CrazyDaveFighter extends Fighter {
     }
 
     // Stop Dave's movement momentarily upon planting and play shovel dig animation
+    this.lastPlantedType = 'peashooter';
     this.plantingPauseTimer = 20;
     this.plantingAnimTimer = 20;
     this.plantingAnimDuration = 20;
@@ -1126,6 +1129,7 @@ export class CrazyDaveFighter extends Fighter {
     }
 
     // Stop Dave's movement momentarily upon planting and play shovel dig animation
+    this.lastPlantedType = 'snowpea';
     this.plantingPauseTimer = 20;
     this.plantingAnimTimer = 20;
     this.plantingAnimDuration = 20;
@@ -1263,12 +1267,59 @@ export class CrazyDaveFighter extends Fighter {
       return;
     }
 
-    // 4. AI Planting Decisions
+    // 4. AI Planting Decisions (Anti-Repetition & Balanced Flora Arsenal Standard)
     if (opponent && opponent.hp > 0) {
-      if (this.snowPeaCooldown <= 0 && this.sunCount >= (cfg.snowPeaCost || 175)) {
-        this.plantSnowPea(opponent);
-      } else if (this.peashooterCooldown <= 0 && this.sunCount >= (cfg.peashooterCost || 100)) {
-        this.plantPeashooter(opponent);
+      const peashooterCost = cfg.peashooterCost || 100;
+      const snowPeaCost = cfg.snowPeaCost || 175;
+      const peashooterEnabled = isSkillEnabled(cfg.enablePeashooter, true);
+      const snowPeaEnabled = isSkillEnabled(cfg.enableSnowPea, true);
+
+      const activePeas = (this.activePeashooters || []).filter(p => p && p.hp > 0).length;
+      const activeSnow = (this.activeSnowPeas || []).filter(s => s && s.hp > 0).length;
+      const maxPeas = cfg.maxPeashooters || 3;
+      const maxSnow = cfg.maxSnowPeas || 3;
+
+      let chooseType = null;
+
+      if (peashooterEnabled && snowPeaEnabled) {
+        // Both flora skills enabled: Ensure Dave does NOT repeatedly choose the same plant.
+        // Balances field composition and strictly alternates selections.
+        if (activePeas >= maxPeas && activeSnow < maxSnow) {
+          chooseType = 'snowpea';
+        } else if (activeSnow >= maxSnow && activePeas < maxPeas) {
+          chooseType = 'peashooter';
+        } else if (activePeas > activeSnow) {
+          // More Peashooters than Snow Peas -> prioritize Snow Pea
+          chooseType = 'snowpea';
+        } else if (activeSnow > activePeas) {
+          // More Snow Peas than Peashooters -> prioritize Peashooter
+          chooseType = 'peashooter';
+        } else {
+          // Equal counts on field: strictly alternate from last planted plant
+          if (this.lastPlantedType === 'peashooter') {
+            chooseType = 'snowpea';
+          } else if (this.lastPlantedType === 'snowpea') {
+            chooseType = 'peashooter';
+          } else {
+            // Initial plant of match: Peashooter for early defense
+            chooseType = 'peashooter';
+          }
+        }
+      } else if (peashooterEnabled && activePeas < maxPeas) {
+        chooseType = 'peashooter';
+      } else if (snowPeaEnabled && activeSnow < maxSnow) {
+        chooseType = 'snowpea';
+      }
+
+      // Execute planting for chosen plant
+      if (chooseType === 'snowpea') {
+        if (this.snowPeaCooldown <= 0 && this.sunCount >= snowPeaCost) {
+          this.plantSnowPea(opponent);
+        }
+      } else if (chooseType === 'peashooter') {
+        if (this.peashooterCooldown <= 0 && this.sunCount >= peashooterCost) {
+          this.plantPeashooter(opponent);
+        }
       }
     }
 

@@ -28,7 +28,34 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "CRAZYDAVE",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "sunPickupValue",
+                "oldVal": 25,
+                "newVal": 50,
+                "pct": "+100.0%"
+            },
+            {
+                "type": "NERF",
+                "key": "peashooterCooldown",
+                "oldVal": 120,
+                "newVal": 500,
+                "pct": "+316.7%"
+            },
+            {
+                "type": "NERF",
+                "key": "snowPeaCooldown",
+                "oldVal": 180,
+                "newVal": 500,
+                "pct": "+177.8%"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

@@ -2043,10 +2043,49 @@ async function runInteractionTests() {
     dave._updateSunDrops(state.arena, { maxSun: 500 });
     assert(playedSfxList.some(s => s.src.includes('crazydave-sun-pickup.mp3')), 'Crazy Dave must play crazydave-sun-pickup.mp3 on collecting a sun drop');
 
-    // 12d. Planting sound
-    dave.sunCount = 200;
+    // 12d. Planting sound & Anti-Repetition Flora Selection Standard
+    dave.timeStopTimer = 0;
+    dave.paralyzeTimer = 0;
+    dave.hitStunTimer = 0;
+    dave.sunCount = 300;
     dave.plantPeashooter(gojo);
     assert(playedSfxList.some(s => s.src.includes('crazydave-Planting.ogg')), 'Crazy Dave must play crazydave-Planting.ogg when planting plants');
+    assert(dave.lastPlantedType === 'peashooter', 'Dave must record lastPlantedType as peashooter');
+
+    // Reset Dave to clean state with 0 active plants to test pure alternating sequence
+    dave.reset();
+    dave.timeStopTimer = 0;
+    dave.paralyzeTimer = 0;
+    dave.hitStunTimer = 0;
+    dave.sunCount = 300;
+
+    // First AI plant: starts with Peashooter
+    dave.update(gojo, 1, state.arena);
+    assert(dave.lastPlantedType === 'peashooter', 'Dave AI must start with Peashooter for early defense');
+
+    // Second AI plant: alternates to Snow Pea
+    dave.peashooterCooldown = 0;
+    dave.snowPeaCooldown = 0;
+    dave.sunCount = 300;
+    dave.plantingPauseTimer = 0;
+    dave.update(gojo, 1, state.arena);
+    assert(dave.lastPlantedType === 'snowpea', 'Dave AI must choose Snow Pea after Peashooter to avoid choosing the same plant repeatedly');
+
+    // Third AI plant: alternates back to Peashooter
+    dave.peashooterCooldown = 0;
+    dave.snowPeaCooldown = 0;
+    dave.sunCount = 300;
+    dave.plantingPauseTimer = 0;
+    dave.update(gojo, 1, state.arena);
+    assert(dave.lastPlantedType === 'peashooter', 'Dave AI must alternate back to Peashooter to maintain balanced flora arsenal');
+
+    // Fourth AI plant: alternates back to Snow Pea
+    dave.peashooterCooldown = 0;
+    dave.snowPeaCooldown = 0;
+    dave.sunCount = 300;
+    dave.plantingPauseTimer = 0;
+    dave.update(gojo, 1, state.arena);
+    assert(dave.lastPlantedType === 'snowpea', 'Dave AI must alternate back to Snow Pea to maintain balanced flora arsenal');
 
     // Restore audioSystem.playSFX
     audioSystem.playSFX = origPlaySFX;
@@ -2060,7 +2099,7 @@ async function runInteractionTests() {
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
-    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX, planting SFX & complete debuff immunity verified.');
+    console.log('      ✅ Crazy Dave PvZ grass floor, sun pickup SFX, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI & complete debuff immunity verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');
