@@ -826,26 +826,7 @@ export class CrazyDaveFighter extends Fighter {
       }
     }
 
-    // 4. Tactical AI Navigation (Collects suns, avoids close-range enemy melee)
-    if (this.suns.length > 0) {
-      // Find closest sun drop
-      let closestSun = null;
-      let minDist = Infinity;
-      for (let s of this.suns) {
-        const d = Math.hypot(s.x - this.x, s.y - this.y);
-        if (d < minDist) {
-          minDist = d;
-          closestSun = s;
-        }
-      }
-      if (closestSun && minDist > 10) {
-        const toSunAngle = Math.atan2(closestSun.y - this.y, closestSun.x - this.x);
-        this.vx += Math.cos(toSunAngle) * 0.45;
-        this.vy += Math.sin(toSunAngle) * 0.45;
-      }
-    }
-
-    // AI Planting Decisions
+    // 4. AI Planting Decisions
     if (opponent && opponent.hp > 0) {
       if (this.snowPeaCooldown <= 0 && this.sunCount >= (cfg.snowPeaCost || 175)) {
         this.plantSnowPea(opponent);
