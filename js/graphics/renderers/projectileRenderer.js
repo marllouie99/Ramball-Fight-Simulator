@@ -20,7 +20,7 @@ import { drawGetsugaSlash, drawCeroBeam } from '../weapons/ichigoWeaponGraphics.
 import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjUziBullet, drawCjMinigunBullet } from '../weapons/cjWeaponGraphics.js';
-import { drawPeaBullet, drawSnowPeaBullet } from '../weapons/crazyDaveWeaponGraphics.js';
+import { drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet } from '../weapons/crazyDaveWeaponGraphics.js';
 import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeaponGraphics.js';
 import { tacticalProjectileSystem } from '../../../Tactical Force/systems/tacticalProjectileSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -579,6 +579,12 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     // Crazy Dave / Snow Pea frozen ice projectile
     if (p.visual === 'snowPeaBullet' || p.visual === 'icePeaBullet') {
       drawSnowPeaBullet(ctx, p);
+      return;
+    }
+
+    // Crazy Dave / Torchwood ignited fire pea projectile
+    if (p.visual === 'firePeaBullet') {
+      drawFirePeaBullet(ctx, p);
       return;
     }
 

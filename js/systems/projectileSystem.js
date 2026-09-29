@@ -1312,8 +1312,8 @@ class ProjectileSystem {
         if (illOwnerIdx !== -1 && areOnSameTeam(projectile.owner, illOwnerIdx)) continue;
       }
 
-      // Plant projectiles (Peashooter / Snow Pea peas) pass freely through all other plants and Crazy Dave
-      const isPlantProj = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet';
+      // Plant projectiles (Peashooter / Snow Pea / Fire peas) pass freely through all other plants and Crazy Dave
+      const isPlantProj = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet' || projectile.visual === 'firePeaBullet';
       const isMindControlledPlantProjectile = Boolean(projectile.ownerFighter?.isChainedByMakima && projectile.ownerFighter?.isMindControlledByMakima);
       const isMindControlledPlantTarget = Boolean(fighter.isChainedByMakima && fighter.isMindControlledByMakima);
       if (isPlantProj && !isMindControlledPlantProjectile && !isMindControlledPlantTarget && (fighter.isPlant || fighter.isPlantMinion || fighter === projectile.ownerFighter?.owner || fighter.characterId === 'crazydave')) {
@@ -1332,6 +1332,9 @@ class ProjectileSystem {
 
       // Skip submerged or erupting entities (e.g. Megumi Shadow Sink) - projectiles pass freely over the floor shadow
       if (fighter.isSubmerged || fighter.isErupting) continue;
+
+      // Lawnmowers and untargetable entities phase through projectiles (projectiles pass freely over them)
+      if (fighter.isLawnmower || fighter.isUntargetable || fighter.untargetable) continue;
 
       // ── Swept Continuous Collision Detection (CCD) for high-speed projectiles ──
       const isTactical = projectile.visual === 'tacticalBullet';
@@ -3605,7 +3608,7 @@ class ProjectileSystem {
           audioSystem.playSFX('attack_groundsmash', 0.5);
         }
 
-        const isPlantPea = p.isPlantProjectile || p.visual === 'peaBullet' || p.visual === 'snowPeaBullet';
+        const isPlantPea = p.isPlantProjectile || p.visual === 'peaBullet' || p.visual === 'snowPeaBullet' || p.visual === 'firePeaBullet';
         if (isPlantPea && expired && !hit) {
           const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
           let wallX = p.x;

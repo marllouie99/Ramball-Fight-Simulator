@@ -51,7 +51,44 @@ export const SNOWPEA_PROJ_RECTS = [
   { sx: 1491, sy: 17, sw: 222, sh: 222 },
 ];
 
+export const WALLNUT_RECTS = [
+  { sx: 12,   sy: 194, sw: 294, sh: 356 }, // Frame 0: Healthy & Alert
+  { sx: 342,  sy: 181, sw: 298, sh: 369 }, // Frame 1: Slight shell crack
+  { sx: 675,  sy: 181, sw: 303, sh: 369 }, // Frame 2: Minor shell fracture
+  { sx: 1012, sy: 181, sw: 304, sh: 369 }, // Frame 3: Moderate crack / Sad face
+  { sx: 1342, sy: 168, sw: 392, sh: 382 }, // Frame 4: Heavy break / Shell chunks falling
+  { sx: 1778, sy: 194, sw: 381, sh: 408 }, // Frame 5: Severe crumble into pile
+];
+
+export const TORCHWOOD_RECTS = [
+  { sx: 15,   sy: 207, sw: 273, sh: 405 }, // Frame 0: Burning idle
+  { sx: 361,  sy: 174, sw: 269, sh: 438 }, // Frame 1: Flame flicker A
+  { sx: 725,  sy: 176, sw: 269, sh: 435 }, // Frame 2: Flame flicker B
+  { sx: 1080, sy: 179, sw: 274, sh: 433 }, // Frame 3: Flame flicker C
+  { sx: 1453, sy: 218, sw: 272, sh: 394 }, // Frame 4: Flame dip
+  { sx: 1810, sy: 174, sw: 272, sh: 438 }, // Frame 5: Flame flicker D
+];
+
+export const FIRE_PEA_RECTS = [
+  { sx: 13,  sy: 50, sw: 244, sh: 180 }, // Frame 0: Compact fireball burst
+  { sx: 344, sy: 43, sw: 291, sh: 193 }, // Frame 1: Extended flame tongue
+  { sx: 699, sy: 26, sw: 327, sh: 216 }, // Frame 2: Blazing roaring fireball
+];
+
+export const FIRE_PEA_FRAME_SEQUENCE = [0, 1, 2, 2, 1, 0];
+
+export const LAWNMOWER_RECTS = [
+  { sx: 13,   sy: 218, sw: 345, sh: 302 }, // Frame 0: Idle parked
+  { sx: 372,  sy: 218, sw: 341, sh: 302 }, // Frame 1: Blade spin A
+  { sx: 749,  sy: 218, sw: 342, sh: 301 }, // Frame 2: Blade spin B
+  { sx: 1099, sy: 218, sw: 340, sh: 301 }, // Frame 3: Blade spin C
+  { sx: 1450, sy: 218, sw: 345, sh: 301 }, // Frame 4: Blade spin D
+  { sx: 1807, sy: 218, sw: 341, sh: 301 }, // Frame 5: Blade spin E
+];
+
 // Lazy-loaded sprite images
+let _wallnutImg = null;
+let _torchwoodImg = null;
 let _peashooterIdleImg = null;
 let _peashooterShootImg = null;
 let _snowPeaIdleImg = null;
@@ -103,9 +140,37 @@ export function getSnowPeaProjSprite() {
   return _snowPeaProjImg;
 }
 
+export function getWallnutSprite() {
+  if (!_wallnutImg) _wallnutImg = _loadPlantImage('Assets/model/Sprites/Wallnut-sprite-sheet.png', _wallnutImg);
+  return _wallnutImg;
+}
+
+export function getTorchwoodSprite() {
+  if (!_torchwoodImg) _torchwoodImg = _loadPlantImage('Assets/model/Sprites/torchwood-sprite-sheet.png', _torchwoodImg);
+  return _torchwoodImg;
+}
+
+let _firePeaProjImg = null;
+
+export function getFirePeaProjSprite() {
+  if (!_firePeaProjImg) _firePeaProjImg = _loadPlantImage('Assets/model/Sprites/Six-Frame Pixel Fireball Animation.png', _firePeaProjImg);
+  return _firePeaProjImg;
+}
+
+let _lawnmowerImg = null;
+
+export function getLawnmowerSprite() {
+  if (!_lawnmowerImg) _lawnmowerImg = _loadPlantImage('Assets/model/Sprites/lawnmower-sprite-sheet.png', _lawnmowerImg);
+  return _lawnmowerImg;
+}
+
 // Preload on startup
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   getSunSprite();
+  getWallnutSprite();
+  getTorchwoodSprite();
+  getFirePeaProjSprite();
+  getLawnmowerSprite();
   getPeashooterIdleSprite();
   getPeashooterShootSprite();
   getSnowPeaIdleSprite();
@@ -646,6 +711,193 @@ function _drawProceduralSnowPea(ctx, r, isHit, shootTimer) {
 }
 
 /**
+ * Draws an animated / degrading Wall-nut defense barrier using the official sprite sheet.
+ * Frames degrade smoothly based on remaining HP ratio across 6 damage stages.
+ */
+export function drawWallnut(ctx, wallnut) {
+  if (!wallnut) return;
+  const x = wallnut.x || 0;
+  const y = wallnut.y || 0;
+  const r = wallnut.r || 24;
+  const angle = wallnut.gunAngle || wallnut.angle || 0;
+  const isFacingLeft = (wallnut.facingDirection === -1) || (Math.abs(angle) > Math.PI / 2);
+  const isHit = wallnut.hitFlashTimer > 0;
+  const hpRatio = Math.max(0, Math.min(1, (wallnut.hp || 0) / (wallnut.maxHp || 1)));
+
+  // Calculate damage stage: 6 stages (0: 100-83%, 1: 83-66%, 2: 66-50%, 3: 50-33%, 4: 33-16%, 5: 16-0%)
+  let frameIdx = 0;
+  if (hpRatio <= 0.166) frameIdx = 5;
+  else if (hpRatio <= 0.333) frameIdx = 4;
+  else if (hpRatio <= 0.500) frameIdx = 3;
+  else if (hpRatio <= 0.666) frameIdx = 2;
+  else if (hpRatio <= 0.833) frameIdx = 1;
+  else frameIdx = 0;
+
+  const drawSize = r * 2.8;
+  const wallnutImg = getWallnutSprite();
+  const hasImg = Boolean(wallnutImg && wallnutImg.complete && wallnutImg.naturalWidth > 0);
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Ground soil shadow
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.72, r * 1.05, r * 0.35, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
+  ctx.fill();
+
+  // Horizontal flip if facing left
+  if (isFacingLeft) {
+    ctx.scale(-1, 1);
+  }
+
+  // Hit vibration bob
+  const hitShakeY = isHit ? -2 : 0;
+
+  if (hasImg) {
+    const frame = WALLNUT_RECTS[frameIdx] || WALLNUT_RECTS[0];
+    const aspect = frame.sw / (frame.sh || 1);
+    const drawHeight = drawSize;
+    const drawWidth = drawHeight * aspect;
+    ctx.drawImage(
+      wallnutImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawWidth * 0.5, -drawHeight * 0.82 + hitShakeY, drawWidth, drawHeight
+    );
+  } else {
+    _drawProceduralWallnut(ctx, r, isHit, hpRatio);
+  }
+
+  // Subtle hit flash overlay
+  if (isHit) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.2, r * 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural fallback for Wall-nut in case sprite sheet is loading or missing.
+ */
+function _drawProceduralWallnut(ctx, r, isHit, hpRatio) {
+  const baseColor = isHit ? '#FFFFFF' : '#A16207';
+  const highlightColor = isHit ? '#FFFFFF' : '#CA8A04';
+  const shadowColor = isHit ? '#E2E8F0' : '#78350F';
+  const outlineColor = '#0E0F14';
+
+  ctx.save();
+  // Draw walnut egg-shaped shell
+  ctx.beginPath();
+  ctx.ellipse(0, -r * 0.2, r * 0.85, r * 1.05, 0, 0, Math.PI * 2);
+  ctx.fillStyle = baseColor;
+  ctx.fill();
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = outlineColor;
+  ctx.stroke();
+
+  // Shell highlight
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.25, -r * 0.45, r * 0.45, r * 0.65, -0.2, 0, Math.PI * 2);
+  ctx.fillStyle = highlightColor;
+  ctx.fill();
+
+  // Shell shading bottom
+  ctx.beginPath();
+  ctx.ellipse(r * 0.2, r * 0.35, r * 0.5, r * 0.4, 0.2, 0, Math.PI * 2);
+  ctx.fillStyle = shadowColor;
+  ctx.fill();
+
+  // Eyes (Classic PvZ Wallnut eyes)
+  if (hpRatio > 0.33) {
+    const eyeY = -r * 0.25;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.22, eyeY, r * 0.22, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(r * 0.22, eyeY, r * 0.22, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#0E0F14';
+    ctx.beginPath();
+    ctx.arc(-r * 0.15, eyeY, r * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(r * 0.29, eyeY, r * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-r * 0.17, eyeY - 2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(r * 0.27, eyeY - 2, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, eyeY + r * 0.42, r * 0.15, 0.2, Math.PI - 0.2);
+    ctx.stroke();
+  } else {
+    const eyeY = -r * 0.2;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.22, eyeY, r * 0.20, r * 0.24, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.ellipse(r * 0.22, eyeY, r * 0.20, r * 0.24, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#0E0F14';
+    ctx.beginPath();
+    ctx.arc(-r * 0.20, eyeY + 2, r * 0.10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(r * 0.20, eyeY + 2, r * 0.10, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = outlineColor;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(0, eyeY + r * 0.52, r * 0.16, Math.PI + 0.3, -0.3);
+    ctx.stroke();
+  }
+
+  // Crack lines if damaged
+  if (hpRatio <= 0.66) {
+    ctx.strokeStyle = '#451A03';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 1.0);
+    ctx.lineTo(-r * 0.15, -r * 0.6);
+    ctx.lineTo(r * 0.1, -r * 0.45);
+    ctx.stroke();
+  }
+  if (hpRatio <= 0.33) {
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.65, -r * 0.3);
+    ctx.lineTo(-r * 0.4, -r * 0.1);
+    ctx.lineTo(-r * 0.55, r * 0.2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws a kinetic green Pea projectile using Peashooter-projectile.png.
  */
 export function drawPeaBullet(ctx, p) {
@@ -738,6 +990,341 @@ export function drawSnowPeaBullet(ctx, p) {
     ctx.arc(-r * 0.35, -r * 0.35, r * 0.35, 0, Math.PI * 2);
     ctx.fill();
   }
+
+  ctx.restore();
+}
+
+/**
+ * Draws an animated blazing Torchwood stump using the official sprite sheet.
+ * Fire-topped tree stump that ignites passing Peashooter peas and melts Snow Pea peas.
+ */
+export function drawTorchwood(ctx, torchwood) {
+  if (!torchwood) return;
+  const x = torchwood.x || 0;
+  const y = torchwood.y || 0;
+  const r = torchwood.r || 22;
+  const angle = torchwood.gunAngle || torchwood.angle || 0;
+  const isFacingLeft = (torchwood.facingDirection === -1) || (Math.abs(angle) > Math.PI / 2);
+  const isHit = torchwood.hitFlashTimer > 0;
+  // Scaled up to authentic robust PvZ tree stump proportions (height ~85px, width ~57px)
+  const drawHeight = r * 3.85;
+
+  const torchImg = getTorchwoodSprite();
+  const hasImg = Boolean(torchImg && torchImg.complete && torchImg.naturalWidth > 0);
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Warm ambient fire glow centered on the upper flaming crown (Zero shadowBlur - Rule 2.2)
+  const glowRadius = r * 2.8;
+  const fireGlow = ctx.createRadialGradient(0, -drawHeight * 0.45, r * 0.25, 0, -drawHeight * 0.45, glowRadius);
+  fireGlow.addColorStop(0, 'rgba(251, 146, 60, 0.32)');
+  fireGlow.addColorStop(0.45, 'rgba(249, 115, 22, 0.14)');
+  fireGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
+  ctx.fillStyle = fireGlow;
+  ctx.beginPath();
+  ctx.arc(0, -drawHeight * 0.45, glowRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ground ember shadow underneath tree stump roots
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.72, r * 1.25, r * 0.42, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(120, 53, 15, 0.45)';
+  ctx.fill();
+
+  // Horizontal flip if facing left
+  if (isFacingLeft) {
+    ctx.scale(-1, 1);
+  }
+
+  // Hit vibration bob
+  const hitShakeY = isHit ? -2 : 0;
+
+  if (hasImg) {
+    const tick = torchwood.animTick || 0;
+    const frameIdx = Math.floor(tick / 7) % TORCHWOOD_RECTS.length;
+    const frame = TORCHWOOD_RECTS[frameIdx] || TORCHWOOD_RECTS[0];
+    const aspect = frame.sw / (frame.sh || 1);
+    const drawWidth = drawHeight * aspect;
+    ctx.drawImage(
+      torchImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawWidth * 0.5, -drawHeight * 0.82 + hitShakeY, drawWidth, drawHeight
+    );
+  } else {
+    _drawProceduralTorchwood(ctx, r, isHit);
+  }
+
+  // Subtle hit flash overlay
+  if (isHit) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.beginPath();
+    ctx.arc(0, -drawHeight * 0.35, r * 1.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural fallback for Torchwood in case sprite sheet is loading or missing.
+ */
+function _drawProceduralTorchwood(ctx, r, isHit) {
+  const stumpColor = isHit ? '#FFFFFF' : '#78350F';
+  const barkColor = isHit ? '#FFFFFF' : '#92400E';
+  const outlineColor = '#0E0F14';
+
+  ctx.save();
+  ctx.scale(1.35, 1.35);
+
+  // Tree stump body
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.65, -r * 0.3);
+  ctx.lineTo(-r * 0.55, r * 0.7);
+  ctx.lineTo(r * 0.55, r * 0.7);
+  ctx.lineTo(r * 0.65, -r * 0.3);
+  ctx.closePath();
+  ctx.fillStyle = stumpColor;
+  ctx.fill();
+  ctx.lineWidth = 1.8;
+  ctx.strokeStyle = outlineColor;
+  ctx.stroke();
+
+  // Bark texture highlight
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.4, -r * 0.1);
+  ctx.lineTo(-r * 0.35, r * 0.5);
+  ctx.lineTo(r * 0.0, r * 0.5);
+  ctx.lineTo(r * 0.05, -r * 0.1);
+  ctx.closePath();
+  ctx.fillStyle = barkColor;
+  ctx.fill();
+
+  // Roots
+  ctx.fillStyle = isHit ? '#FFFFFF' : '#451A03';
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.5, r * 0.65, r * 0.35, r * 0.18, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(r * 0.45, r * 0.65, r * 0.3, r * 0.15, 0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Fire flames on top
+  const flameColors = ['#FDE047', '#FBBF24', '#F97316', '#EA580C'];
+  for (let i = 0; i < 5; i++) {
+    const flameX = (i - 2) * r * 0.28;
+    const flameH = r * (0.6 + Math.random() * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(flameX - r * 0.12, -r * 0.3);
+    ctx.quadraticCurveTo(flameX + Math.random() * 4 - 2, -r * 0.3 - flameH, flameX + r * 0.12, -r * 0.3);
+    ctx.closePath();
+    ctx.fillStyle = flameColors[i % flameColors.length];
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws an animated blazing Fire Pea projectile (ignited by Torchwood).
+ * Uses Six-Frame Pixel Fireball Animation.png sprite sheet with 6-stage frame sequence.
+ */
+export function drawFirePeaBullet(ctx, p) {
+  if (!p) return;
+  const x = p.x || 0;
+  const y = p.y || 0;
+  const r = p.r || 6.0;
+
+  // Determine trajectory angle
+  let angle = 0;
+  if (p.angle !== undefined) {
+    angle = p.angle;
+  } else if (p.vx !== undefined && p.vy !== undefined && (p.vx !== 0 || p.vy !== 0)) {
+    angle = Math.atan2(p.vy, p.vx);
+  }
+
+  const projImg = getFirePeaProjSprite();
+  const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Fiery ambient halo (Zero shadowBlur - Rule 2.2)
+  const haloR = r + 8;
+  const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, haloR);
+  halo.addColorStop(0, 'rgba(251, 191, 36, 0.85)');
+  halo.addColorStop(0.35, 'rgba(249, 115, 22, 0.5)');
+  halo.addColorStop(0.7, 'rgba(239, 68, 68, 0.2)');
+  halo.addColorStop(1, 'rgba(220, 38, 38, 0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rotate to align with trajectory
+  ctx.rotate(angle);
+
+  if (hasImg) {
+    // 6-step animated pulse cycle (2 frames per step)
+    const tick = (p.animTick !== undefined) ? p.animTick : (p.life !== undefined ? Math.abs(1000 - p.life) : 0);
+    const stepIdx = Math.floor(tick / 2) % FIRE_PEA_FRAME_SEQUENCE.length;
+    const frameIdx = FIRE_PEA_FRAME_SEQUENCE[stepIdx];
+    const frame = FIRE_PEA_RECTS[frameIdx] || FIRE_PEA_RECTS[0];
+
+    const aspect = frame.sw / (frame.sh || 1);
+    const drawHeight = r * 4.4;
+    const drawWidth = drawHeight * aspect;
+
+    // Flip horizontally so the round fireball head leads forward (+X) and flame trail trails behind (-X)
+    ctx.scale(-1, 1);
+
+    // In the raw sprite, the head center is around 26% from the left edge.
+    // Offsetting X by -drawWidth * 0.26 anchors the head center precisely at (0, 0).
+    ctx.drawImage(
+      projImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawWidth * 0.26, -drawHeight * 0.5, drawWidth, drawHeight
+    );
+  } else {
+    _drawProceduralFirePeaBullet(ctx, r);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural fallback for Fire Pea bullet in case sprite sheet is loading or missing.
+ */
+function _drawProceduralFirePeaBullet(ctx, r) {
+  const coreGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, 0, 0, 0, r);
+  coreGrad.addColorStop(0, '#FEF08A');
+  coreGrad.addColorStop(0.3, '#FBBF24');
+  coreGrad.addColorStop(0.65, '#F97316');
+  coreGrad.addColorStop(1, '#DC2626');
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.strokeStyle = '#7C2D12';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(-r * 0.3, -r * 0.35, r * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/**
+ * Draws an authentic Plants vs. Zombies Lawnmower.
+ * Sits parked at the baseline while idle, and spins blades with engine vibration when charging.
+ */
+export function drawLawnmower(ctx, mower) {
+  if (!mower) return;
+  const x = mower.x || 0;
+  const y = mower.y || 0;
+  const r = mower.r || 18;
+  const isFacingLeft = (mower.facingDirection === -1);
+  const isCharging = (mower.state === 'charging');
+  const drawHeight = r * 2.7;
+
+  const mowerImg = getLawnmowerSprite();
+  const hasImg = Boolean(mowerImg && mowerImg.complete && mowerImg.naturalWidth > 0);
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Ground wheel shadow
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.65, r * 1.35, r * 0.38, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
+  ctx.fill();
+
+  // Flip if facing left
+  if (isFacingLeft) {
+    ctx.scale(-1, 1);
+  }
+
+  // Engine vibration when active / charging
+  const shakeY = isCharging ? ((mower.animTick % 2 === 0) ? -1.5 : 1.5) : 0;
+
+  if (hasImg) {
+    const frameIdx = isCharging ? (Math.floor((mower.animTick || 0) / 3) % LAWNMOWER_RECTS.length) : 0;
+    const frame = LAWNMOWER_RECTS[frameIdx] || LAWNMOWER_RECTS[0];
+    const aspect = frame.sw / (frame.sh || 1);
+    const drawWidth = drawHeight * aspect;
+    ctx.drawImage(
+      mowerImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -drawWidth * 0.5, -drawHeight * 0.78 + shakeY, drawWidth, drawHeight
+    );
+  } else {
+    _drawProceduralLawnmower(ctx, r, isCharging);
+  }
+
+  // Speed lines behind mower when charging
+  if (isCharging) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.fillRect(-r * 2.2, -r * 0.2, r * 0.8, 2);
+    ctx.fillRect(-r * 2.6, r * 0.2, r * 1.0, 1.5);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Procedural fallback for Lawnmower.
+ */
+function _drawProceduralLawnmower(ctx, r, isCharging) {
+  const redColor = '#DC2626';
+  const darkRed = '#991B1B';
+  const metalColor = '#CBD5E1';
+  const wheelColor = '#1E293B';
+  const outlineColor = '#0E0F14';
+
+  ctx.save();
+  // Chassis
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(-r * 0.8, -r * 0.5, r * 1.6, r * 0.85, 4);
+  } else {
+    ctx.rect(-r * 0.8, -r * 0.5, r * 1.6, r * 0.85);
+  }
+  ctx.fillStyle = redColor;
+  ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Engine block
+  ctx.fillStyle = metalColor;
+  ctx.fillRect(-r * 0.2, -r * 0.8, r * 0.8, r * 0.4);
+  ctx.strokeRect(-r * 0.2, -r * 0.8, r * 0.8, r * 0.4);
+
+  // Handle
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.7, -r * 0.3);
+  ctx.lineTo(-r * 1.4, -r * 1.0);
+  ctx.lineTo(-r * 1.2, -r * 1.2);
+  ctx.stroke();
+
+  // Wheels
+  ctx.fillStyle = wheelColor;
+  ctx.beginPath();
+  ctx.arc(-r * 0.6, r * 0.45, r * 0.32, 0, Math.PI * 2);
+  ctx.arc(r * 0.6, r * 0.45, r * 0.32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
 
   ctx.restore();
 }

@@ -27,7 +27,7 @@ export const crazyDaveConfig = {
 
   // Ability & Lore Description
   ability: 'Solar Economy & Flora Arsenal ("WABBI WABBO!")',
-  desc: 'Crazy Dave has no direct basic attack! He navigates the arena collecting falling Sun drops to deploy rapid-fire Peashooters and chilling Snow Peas that fight on his behalf.',
+  desc: 'Crazy Dave has no direct basic attack! He navigates the arena collecting falling Sun drops to deploy sturdy Wall-nut barriers, rapid-fire Peashooters, and chilling Snow Peas that fight on his behalf.',
 
   // Sun Economy System
   initialSun: 50,
@@ -40,7 +40,16 @@ export const crazyDaveConfig = {
   sunAttractionSpeed: 7.0,   // Speed at which sun moves toward Dave
   sunDecayFrames: 720,       // 12 seconds before uncollected sun despawns
 
-  // Skill 1: Plant Peashooter (Regular Damage)
+  // Skill 1: Plant Wall-nut (Barrier Shield Defense Mechanism — Solid Immovable Obstacle)
+  enableWallnut: true,
+  wallnutCost: 50,           // Costs 50 Sun (PvZ authentic cost)
+  wallnutColor: '#CA8A04',   // Nut Amber / Gold
+  wallnutHp: 200,            // Massive barrier HP to absorb attacks and block melee charges
+  wallnutRadius: 24,         // Solid collision barrier radius
+  wallnutCooldown: 500,      // Cooldown for planting next Wall-nut
+  wallnutSpriteSrc: 'Assets/model/Sprites/Wallnut-sprite-sheet.png',
+
+  // Skill 2: Plant Peashooter (Regular Damage)
   enablePeashooter: true,
   peashooterCost: 100,       // Costs 100 Sun
   peashooterColor: '#4ADE80',
@@ -58,7 +67,7 @@ export const crazyDaveConfig = {
   plantLaneTolerance: 85,    // Straight horizontal lane detection width
   peashooterCooldown: 500,   // 2.0s skill cooldown
 
-  // Skill 2: Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)
+  // Skill 3: Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)
   enableSnowPea: true,
   snowPeaCost: 175,          // Costs 175 Sun
   snowPeaColor: '#38BDF8',
@@ -79,6 +88,29 @@ export const crazyDaveConfig = {
   snowPeaFreezeDuration: 60, // 1.0s (60 frames) full freeze stasis duration
   snowPeaCooldown: 500,      // 3.0s skill cooldown
 
+  // Skill 4: Plant Torchwood (Ignites passing peas / melts ice peas)
+  enableTorchwood: true,
+  torchwoodCost: 175,         // Costs 175 Sun (PvZ authentic cost)
+  torchwoodColor: '#F97316',  // Blazing Orange
+  torchwoodHp: 220,           // Moderate barrier HP for the burning stump
+  torchwoodRadius: 22,        // Robust tree stump radius matching authentic PvZ proportions
+  torchwoodCooldown: 600,     // 10s skill cooldown
+  torchwoodInterceptRadius: 42,  // Radius around torchwood that intercepts passing peas
+  torchwoodFireDamageMultiplier: 2.0,  // Fire peas deal 2x damage
+  torchwoodFirePeaSplashRadius: 45,    // Fire pea splash AoE radius on hit
+  torchwoodFirePeaSplashDamage: 0.5,   // Splash deals 50% of fire pea damage
+  torchwoodFirePeaColor: '#EF4444',    // Fiery Red
+  torchwoodSpriteSrc: 'Assets/model/Sprites/torchwood-sprite-sheet.png',
+
+  // Lawnmower Baseline Defense System (PvZ Signature Final Defense)
+  enableLawnmower: true,
+  lawnmowerDamage: 180,        // Devastating steamroller damage (PvZ 1800 damage equivalent)
+  lawnmowerSpeed: 11.5,        // Fast horizontal charging speed across the lawn
+  lawnmowerRadius: 18,         // Collision hitbox radius
+  lawnmowerTriggerRadius: 38,  // Proximity trigger distance from baseline
+  lawnmowerColor: '#DC2626',   // Classic cherry red mower
+  lawnmowerSpriteSrc: 'Assets/model/Sprites/lawnmower-sprite-sheet.png',
+
   // Shared plant deployment and audio tuning
   plantingDuration: 20,
   plantSpawnOffset: 32,
@@ -96,7 +128,11 @@ export const crazyDaveConfig = {
     peashooterAttack: 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',
     snowPeaAttack: 'Assets/Sound Effects/Attacks/crazydave-snow_pea_sparkles.ogg',
     snowPeaFreeze: 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3',
-    plantHit: 'Assets/Sound Effects/SkillEffects/splat3.ogg'
+    plantHit: 'Assets/Sound Effects/SkillEffects/splat3.ogg',
+    wallnutHit: 'Assets/Sound Effects/Skills/shieldblock.mp3',
+    wallnutCrumble: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+    lawnmowerEngine: 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',
+    lawnmowerHit: 'Assets/Sound Effects/Skills/spinslash.mp3'
   },
   soundVolumes: {
     planting: 0.85,
@@ -105,17 +141,25 @@ export const crazyDaveConfig = {
     peashooterAttack: 0.80,
     snowPeaAttack: 0.85,
     snowPeaFreeze: 0.85,
-    plantHit: 0.85
+    plantHit: 0.85,
+    wallnutHit: 0.85,
+    wallnutCrumble: 0.90,
+    lawnmowerEngine: 0.85,
+    lawnmowerHit: 0.90
   },
 
   // Sprite Asset Sources
   sunSpriteSrc: 'Assets/model/Sprites/Sun-economy-sprite.png',
+  wallnutSpriteSrc: 'Assets/model/Sprites/Wallnut-sprite-sheet.png',
   peashooterIdleSpriteSrc: 'Assets/model/Sprites/Peashooter-sprite-sheet.png',
   peashooterShootSpriteSrc: 'Assets/model/Sprites/peashooter-about2shoot-sprite-sheet.png',
   peashooterProjSpriteSrc: 'Assets/model/Sprites/Peashooter-projectile.png',
   snowPeaIdleSpriteSrc: 'Assets/model/Sprites/Snowpea-sprite-sheet.png',
   snowPeaShootSpriteSrc: 'Assets/model/Sprites/snowpea-about2shoot-sprite-sheet.png',
   snowPeaProjSpriteSrc: 'Assets/model/Sprites/snowpea-projectile.png',
+  torchwoodSpriteSrc: 'Assets/model/Sprites/torchwood-sprite-sheet.png',
+  firePeaProjSpriteSrc: 'Assets/model/Sprites/Six-Frame Pixel Fireball Animation.png',
+  lawnmowerSpriteSrc: 'Assets/model/Sprites/lawnmower-sprite-sheet.png',
   iceFreezeSpriteSrc: 'Assets/model/Sprites/ice-freeze-sprite.png',
 
   // Arena Grass Tiles (PvZ Front Lawn)

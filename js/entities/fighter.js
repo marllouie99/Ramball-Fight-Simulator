@@ -132,6 +132,7 @@ export function suppressAfterimagesAndAttackEffects(target) {
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
+  if (target.isLawnmower || target.isUntargetable || target.untargetable) return false;
   if (typeof opts === 'string') {
     opts = { source: opts, isBleed: opts === 'bleed', isCurse: opts === 'curse' };
   } else if (!opts || typeof opts !== 'object') {
@@ -2945,6 +2946,7 @@ export class Fighter {
    */
   isValidAimTarget(target) {
     if (!target || target === this) return false;
+    if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted) return false;
     const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
     const isAlive = (target.hp > 0 && !target.isDead && !target._hasDied) || isReforming || (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive());
     if (!isAlive) return false;

@@ -1737,16 +1737,17 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, `renderCrazyDaveGrassFloor (circular arena) canvas stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
     state.arena.shape = 'rectangle';
 
-    // 4. Verify Zero Basic Attack and 2 Plant Abilities (Peashooter & Snow Pea)
+    // 4. Verify Zero Basic Attack and 3 Plant Abilities (Wall-nut, Peashooter & Snow Pea)
     assert(dave.damage === 0, 'Crazy Dave must have 0 basic attack damage');
     assert(dave.canShoot === false, 'Crazy Dave must have canShoot === false');
 
     dave.sunCount = 1000; // Sufficient sun for testing
+    dave.plantWallnut(gojo);
     dave.plantPeashooter(gojo);
     dave.plantSnowPea(gojo);
 
     const plantEntities = state.fighters.filter(f => f && f.owner === dave && (f.isDeployable || f.isMinion));
-    assert(plantEntities.length === 2, `Expected 2 deployed plant entities for Crazy Dave (got ${plantEntities.length})`);
+    assert(plantEntities.length === 3, `Expected 3 deployed plant entities for Crazy Dave (got ${plantEntities.length})`);
     assert(state.illusions.length === 0, 'Plants must NEVER be added to state.illusions (which triggers Doppelganger clone visuals)');
     for (const plant of plantEntities) {
       assert(plant.isMinion === true, `Plant ${plant.name} must have isMinion === true`);
@@ -1755,6 +1756,13 @@ async function runInteractionTests() {
       assert(plant.isPlantMinion === true, `Plant ${plant.name} must have isPlantMinion === true`);
       assert(plant.owner === dave, `Plant ${plant.name} must have owner === dave`);
     }
+
+    const wallnutEntity = plantEntities.find(p => p.type === 'Wallnut');
+    assert(wallnutEntity !== undefined, 'Wall-nut entity must exist in active plants');
+    assert(wallnutEntity.isWallnut === true, 'Wall-nut must have isWallnut === true');
+    assert(wallnutEntity.isPlantBarrier === true, 'Wall-nut must have isPlantBarrier === true');
+    assert(wallnutEntity.isImmovable === true, 'Wall-nut must have isImmovable === true');
+    assert(wallnutEntity.phasesThroughEntities === false, 'Wall-nut must have phasesThroughEntities === false (solid barrier)');
 
     const capTestDave = new CrazyDaveClass({ radius: 25, x: 120, y: 120, color: '#84CC16' });
     capTestDave.sunCount = 10000;
@@ -1805,6 +1813,18 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, 'peashooter.draw must maintain 0 canvas stack depth');
     snowPea.draw(mockCtx);
     assert(mockCtx.getStackDepth() === 0, 'snowPea.draw must maintain 0 canvas stack depth');
+    wallnutEntity.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'wallnutEntity.draw must maintain 0 canvas stack depth');
+
+    // Test Wall-nut drawing across all 6 damage degradation stages
+    const { drawWallnut } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
+    for (const hpRatio of [1.0, 0.8, 0.6, 0.4, 0.2, 0.05]) {
+      wallnutEntity.hp = wallnutEntity.maxHp * hpRatio;
+      mockCtx.resetStackDepth();
+      drawWallnut(mockCtx, wallnutEntity);
+      assert(mockCtx.getStackDepth() === 0, `drawWallnut at hpRatio ${hpRatio} must maintain 0 stack depth`);
+    }
+    wallnutEntity.hp = wallnutEntity.maxHp;
 
     // Verify projectile drawing
     const { drawPeaBullet, drawSnowPeaBullet } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
@@ -1990,7 +2010,7 @@ async function runInteractionTests() {
     assert(livingPlant !== undefined, 'Living plant entity must exist');
     assert(livingPlant.isPlant === true && livingPlant.isImmovable === true, 'Plant must have isPlant and isImmovable');
 
-    // Position enemy directly overlapping the plant to test pass-through collision
+    // Position enemy directly overlapping the non-barrier plant to test pass-through collision
     const { resolveFighterCollision } = await import('../js/systems/physics.js');
     const { isEntityImmuneToGravitationalPull } = await import('../js/entities/fighter.js');
     gojo.x = livingPlant.x + 5;
@@ -2001,8 +2021,30 @@ async function runInteractionTests() {
     const initialPlantY = livingPlant.y;
 
     resolveFighterCollision(livingPlant, gojo);
-    assert(livingPlant.x === initialPlantX && livingPlant.y === initialPlantY, 'Plant position must remain unchanged during collision (pass-through)');
-    assert(gojo.x === initialGojoX && gojo.y === initialGojoY, 'Enemy position must remain unchanged during collision (pass-through)');
+    assert(livingPlant.x === initialPlantX && livingPlant.y === initialPlantY, 'Shooter plant position must remain unchanged during collision (pass-through)');
+    assert(gojo.x === initialGojoX && gojo.y === initialGojoY, 'Enemy position must remain unchanged during non-barrier plant collision (pass-through)');
+
+    // Wall-nut Barrier Collision Test: Enemies CANNOT pass through; Wall-nut blocks and pushes enemy!
+    dave.sunCount = 200;
+    dave.wallnutCooldown = 0;
+    dave.plantWallnut(gojo);
+    const testWallnut = dave.activeWallnuts.find(w => w && w.hp > 0);
+    assert(testWallnut !== undefined, 'Wall-nut barrier entity must exist');
+    gojo.x = testWallnut.x + 5;
+    gojo.y = testWallnut.y + 5;
+    const preGojoX = gojo.x;
+    const preGojoY = gojo.y;
+    resolveFighterCollision(testWallnut, gojo);
+    assert(testWallnut.x === testWallnut._fixedX && testWallnut.y === testWallnut._fixedY, 'Wall-nut must remain strictly immovable during collision');
+    assert(gojo.x !== preGojoX || gojo.y !== preGojoY, 'Enemy must be physically pushed and blocked by Wall-nut barrier');
+
+    // Friendly Dave pass-through test: Dave passes freely through his own Wall-nuts
+    dave.x = testWallnut.x + 5;
+    dave.y = testWallnut.y + 5;
+    const preDaveX = dave.x;
+    const preDaveY = dave.y;
+    resolveFighterCollision(testWallnut, dave);
+    assert(dave.x === preDaveX && dave.y === preDaveY, 'Friendly Dave must pass through Wall-nut without being pushed');
 
     // Pull immunity test
     assert(isEntityImmuneToGravitationalPull(livingPlant) === true, 'Plant minion must be immune to gravitational suction / vortex pull');
@@ -2206,40 +2248,56 @@ async function runInteractionTests() {
     dave.plantSnowPea(gojo);
     assert(playedSfxList.filter(s => plantingVoiceLines.includes(s.src)).length > voiceLineCountAfterPeashooter, 'Snow Pea planting must play a configured Crazy Dave voice line');
 
-    // Reset Dave to clean state with 0 active plants to test pure alternating sequence
+    // Reset Dave to clean state with 0 active plants to test AI sequence
     dave.reset();
     dave.timeStopTimer = 0;
     dave.paralyzeTimer = 0;
     dave.hitStunTimer = 0;
-    dave.sunCount = 300;
+    dave.sunCount = 500;
 
-    // First AI plant: starts with Peashooter
+    // First AI plant: starts with Wall-nut barrier to establish frontline defense
     dave.update(gojo, 1, state.arena);
-    assert(dave.lastPlantedType === 'peashooter', 'Dave AI must start with Peashooter for early defense');
+    assert(dave.lastPlantedType === 'wallnut', 'Dave AI must start with Wall-nut to establish defensive frontline');
 
-    // Second AI plant: alternates to Snow Pea
+    // Second AI plant: deploys Peashooter behind the Wall-nut
+    dave.wallnutCooldown = 999; // Wallnut on cooldown
+    dave.torchwoodCooldown = 999; // Torchwood on cooldown
     dave.peashooterCooldown = 0;
     dave.snowPeaCooldown = 0;
-    dave.sunCount = 300;
+    dave.sunCount = 500;
     dave.plantingPauseTimer = 0;
     dave.update(gojo, 1, state.arena);
-    assert(dave.lastPlantedType === 'snowpea', 'Dave AI must choose Snow Pea after Peashooter to avoid choosing the same plant repeatedly');
+    assert(dave.lastPlantedType === 'peashooter', 'Dave AI must deploy Peashooter behind active Wall-nut barrier');
 
-    // Third AI plant: alternates back to Peashooter
+    // Third AI plant: alternates to Snow Pea
+    dave.wallnutCooldown = 999;
+    dave.torchwoodCooldown = 999;
     dave.peashooterCooldown = 0;
     dave.snowPeaCooldown = 0;
-    dave.sunCount = 300;
+    dave.sunCount = 500;
     dave.plantingPauseTimer = 0;
     dave.update(gojo, 1, state.arena);
-    assert(dave.lastPlantedType === 'peashooter', 'Dave AI must alternate back to Peashooter to maintain balanced flora arsenal');
+    assert(dave.lastPlantedType === 'snowpea', 'Dave AI must alternate to Snow Pea to maintain balanced flora arsenal');
 
-    // Fourth AI plant: alternates back to Snow Pea
+    // Fourth AI plant: alternates back to Peashooter
+    dave.wallnutCooldown = 999;
+    dave.torchwoodCooldown = 999;
     dave.peashooterCooldown = 0;
     dave.snowPeaCooldown = 0;
-    dave.sunCount = 300;
+    dave.sunCount = 500;
     dave.plantingPauseTimer = 0;
     dave.update(gojo, 1, state.arena);
-    assert(dave.lastPlantedType === 'snowpea', 'Dave AI must alternate back to Snow Pea to maintain balanced flora arsenal');
+    assert(dave.lastPlantedType === 'peashooter', 'Dave AI must alternate back to Peashooter');
+
+    // Fifth AI plant: deploys Torchwood when Peashooters are present to ignite them into Fire Peas
+    dave.wallnutCooldown = 999;
+    dave.peashooterCooldown = 999;
+    dave.snowPeaCooldown = 999;
+    dave.torchwoodCooldown = 0;
+    dave.sunCount = 500;
+    dave.plantingPauseTimer = 0;
+    dave.update(gojo, 1, state.arena);
+    assert(dave.lastPlantedType === 'torchwood', 'Dave AI must deploy Torchwood when Peashooters are active');
 
     // 12e. HUD Stats Amount of Sun ($UN: XX)
     const origStatsToggle = CONFIG.darkModeShowHudStats;
@@ -2376,6 +2434,281 @@ async function runInteractionTests() {
     state.illusions = [];
     state.projectiles = [];
     console.log('      ✅ Crazy Dave PvZ grass floor, pixel art garden shovel weapon, sun pickup SFX, dynamic sunPickupValue, plant floating healthbars, peashooter shot SFX, pea splat hit SFX, planting SFX, anti-repetition AI, $UN: XX HUD stats, Snow Pea freeze mechanic, freeze audio & basic attack sounds verified.');
+  }
+
+  // ── 27. Testing Wall-nut Sprite Sheet Frame Bounds & Natural Collision Rebounce Physics ──
+  {
+    console.log('   27. Testing Wall-nut Multi-Stage Degradation Bounds & Natural Collision Rebounce...');
+    const { WALLNUT_RECTS, drawWallnut } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
+    const { WallnutEntity, CrazyDaveFighter } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+
+    // 1. Verify all 6 damage stage frames have strict non-overlapping X spans
+    assert(WALLNUT_RECTS.length === 6, `WALLNUT_RECTS must contain 6 discrete damage stages (got ${WALLNUT_RECTS.length})`);
+    for (let i = 0; i < WALLNUT_RECTS.length; i++) {
+      const f = WALLNUT_RECTS[i];
+      assert(f.sx >= 0 && f.sy >= 0 && f.sw > 0 && f.sh > 0, `Frame ${i} must have valid positive dimensions: ${JSON.stringify(f)}`);
+      if (i < WALLNUT_RECTS.length - 1) {
+        const nextF = WALLNUT_RECTS[i + 1];
+        const rightEdge = f.sx + f.sw;
+        assert(rightEdge <= nextF.sx, `Frame ${i} right edge (${rightEdge}) must NOT overlap or exceed Frame ${i + 1} start (${nextF.sx})`);
+      }
+    }
+
+    // 2. Test Canvas 2D Stack Depths across all 6 HP degradation thresholds
+    const dave = new CrazyDaveFighter({ startX: 100, startY: 100 });
+    const wallnut = new WallnutEntity(250, 250, dave, 1);
+    const hpRatios = [1.0, 0.75, 0.60, 0.40, 0.20, 0.05];
+    for (const ratio of hpRatios) {
+      wallnut.hp = wallnut.maxHp * ratio;
+      mockCtx.resetStackDepth();
+      drawWallnut(mockCtx, wallnut);
+      assert(mockCtx.getStackDepth() === 0, `drawWallnut at hpRatio ${ratio} must return canvas stack depth to 0, got ${mockCtx.getStackDepth()}`);
+    }
+
+    // 3. Test Natural Elastic Collision Rebounce Physics
+    const enemy = new FIGHTER_CLASS_MAP.normal({ x: 300, y: 250, radius: 24, speed: 5 });
+    enemy.vx = -4.0; // Charging left directly into Wall-nut
+    enemy.vy = 0;
+    wallnut.x = 250;
+    wallnut.y = 250;
+    wallnut.vx = 0;
+    wallnut.vy = 0;
+
+    state.fighters = [wallnut, enemy];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+
+    // Resolve collision
+    resolveFighterCollision(wallnut, enemy);
+
+    // Wall-nut must remain 100% anchored at (250, 250) with zero velocity
+    assert(wallnut.x === 250 && wallnut.y === 250, `Wall-nut must remain anchored during collision (got ${wallnut.x}, ${wallnut.y})`);
+    assert(wallnut.vx === 0 && wallnut.vy === 0, `Wall-nut velocity must remain 0 (got ${wallnut.vx}, ${wallnut.vy})`);
+
+    // Enemy must be pushed out and have velocity reflected away from Wall-nut (vx > 0)
+    assert(enemy.x >= 250 + wallnut.r + enemy.r - 0.1, `Enemy must be separated outside Wall-nut radius (got ${enemy.x}, min: ${250 + wallnut.r + enemy.r})`);
+    assert(enemy.vx > 0, `Enemy must bounce back with positive X velocity away from Wall-nut (got vx=${enemy.vx})`);
+
+    // 4. Friendly pass-through verification (Crazy Dave passes freely through Wall-nut)
+    dave.x = 260; // Overlapping Wall-nut
+    dave.y = 250;
+    dave.vx = -2;
+    dave.vy = 0;
+    resolveFighterCollision(wallnut, dave);
+    // Dave should not be pushed out or bounced
+    assert(dave.x === 260, `Friendly Crazy Dave must pass freely through Wall-nut without push (got x=${dave.x})`);
+
+    console.log('      ✅ Wall-nut 6-stage non-overlapping bounds, canvas stack balance, natural elastic rebounce & friendly pass-through verified.');
+  }
+
+  // ── 28. Testing Torchwood Sprite Bounds, Stack Balance & Pea Projectile Interception ──
+  {
+    const { TORCHWOOD_RECTS, FIRE_PEA_RECTS, drawTorchwood, drawFirePeaBullet } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
+    const { TorchwoodEntity, PeashooterEntity, SnowPeaEntity, CrazyDaveFighter } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    // 1. Verify Torchwood sprite sheet frames are valid and non-overlapping
+    assert(TORCHWOOD_RECTS.length === 6, `TORCHWOOD_RECTS must contain 6 idle frames (got ${TORCHWOOD_RECTS.length})`);
+    for (let i = 0; i < TORCHWOOD_RECTS.length; i++) {
+      const f = TORCHWOOD_RECTS[i];
+      assert(f.sx >= 0 && f.sy >= 0 && f.sw > 0 && f.sh > 0, `Frame ${i} must have valid positive dimensions: ${JSON.stringify(f)}`);
+      if (i < TORCHWOOD_RECTS.length - 1) {
+        const nextF = TORCHWOOD_RECTS[i + 1];
+        assert(f.sx + f.sw <= nextF.sx, `Frame ${i} (${f.sx}+${f.sw}) must not overlap next frame (${nextF.sx})`);
+      }
+    }
+
+    // 1b. Verify Fireball projectile sprite sheet frames are valid and non-overlapping
+    assert(FIRE_PEA_RECTS.length === 3, `FIRE_PEA_RECTS must contain 3 animation keyframes (got ${FIRE_PEA_RECTS.length})`);
+    for (let i = 0; i < FIRE_PEA_RECTS.length; i++) {
+      const f = FIRE_PEA_RECTS[i];
+      assert(f.sx >= 0 && f.sy >= 0 && f.sw > 0 && f.sh > 0, `Fire pea frame ${i} must have valid dimensions: ${JSON.stringify(f)}`);
+      if (i < FIRE_PEA_RECTS.length - 1) {
+        const nextF = FIRE_PEA_RECTS[i + 1];
+        assert(f.sx + f.sw <= nextF.sx, `Fire pea frame ${i} (${f.sx}+${f.sw}) must not overlap next frame (${nextF.sx})`);
+      }
+    }
+
+    // 2. Test Canvas 2D Stack Depths for Torchwood and Fire Pea Bullet
+    const dave = new CrazyDaveFighter({ startX: 100, startY: 100 });
+    const torchwood = new TorchwoodEntity(250, 250, dave, 1);
+    mockCtx.resetStackDepth();
+    drawTorchwood(mockCtx, torchwood);
+    assert(mockCtx.getStackDepth() === 0, `drawTorchwood must return canvas stack depth to 0, got ${mockCtx.getStackDepth()}`);
+
+    const firePea = { x: 250, y: 250, r: 6.5, visual: 'firePeaBullet', color: '#EF4444' };
+    mockCtx.resetStackDepth();
+    drawFirePeaBullet(mockCtx, firePea);
+    assert(mockCtx.getStackDepth() === 0, `drawFirePeaBullet must return canvas stack depth to 0, got ${mockCtx.getStackDepth()}`);
+
+    // 3. Test Peashooter Pea → Fire Pea Ignition (2x Damage + Fire Visual + Splash AoE)
+    const baseDamage = 10;
+    const greenPea = {
+      x: 252,
+      y: 250,
+      r: 6.0,
+      damage: baseDamage,
+      visual: 'peaBullet',
+      color: '#22C55E',
+      isPlantProjectile: true,
+      owner: 0,
+      ownerFighter: dave
+    };
+    projectileSystem.projectiles = [greenPea];
+    state.projectiles = projectileSystem.projectiles;
+
+    torchwood.update(null, 0, state.arena);
+
+    assert(greenPea.visual === 'firePeaBullet', `Peashooter pea passing through Torchwood must become firePeaBullet (got ${greenPea.visual})`);
+    assert(greenPea.isFirePea === true, 'Ignited pea must have isFirePea flag set to true');
+    assert(greenPea.damage === baseDamage * 2.0, `Ignited pea must deal 2x damage (${baseDamage * 2.0}), got ${greenPea.damage}`);
+    assert(typeof greenPea.onHit === 'function', 'Ignited fire pea must have an onHit callback for splash AoE');
+
+    // 4. Test Fire Pea does NOT double-ignite when passing through another Torchwood
+    const torchwood2 = new TorchwoodEntity(260, 250, dave, 1);
+    torchwood2.update(null, 0, state.arena);
+    assert(greenPea.damage === baseDamage * 2.0, `Fire pea passing through second Torchwood must not double-multiply damage (got ${greenPea.damage})`);
+
+    // 5. Test Snow Pea (Ice Pea) → Standard Pea (Melted / Reverted, No Ice)
+    const icePea = {
+      x: 251,
+      y: 250,
+      r: 6.5,
+      damage: 12,
+      visual: 'snowPeaBullet',
+      color: '#38BDF8',
+      isSnowPea: true,
+      isPlantProjectile: true,
+      onHit: () => { /* chill freeze */ },
+      owner: 0,
+      ownerFighter: dave
+    };
+    projectileSystem.projectiles = [icePea];
+    state.projectiles = projectileSystem.projectiles;
+
+    torchwood.update(null, 0, state.arena);
+
+    assert(icePea.visual === 'peaBullet', `Snow Pea ice projectile passing through Torchwood must revert to peaBullet (got ${icePea.visual})`);
+    assert(icePea.isSnowPea === false, 'Melted ice pea must have isSnowPea set to false');
+    assert(icePea.onHit === null, 'Melted ice pea must lose its chill/freeze onHit callback');
+    assert(icePea.damage === 10, `Melted ice pea must revert to standard peashooter damage (10), got ${icePea.damage}`);
+
+    // 6. Test Crazy Dave Skill 4 Registration & AI planting decision
+    assert(dave.skillManager.skills.has('torchwood'), 'Crazy Dave must register Torchwood skill in skillManager');
+    
+    // Clear projectiles
+    projectileSystem.projectiles = [];
+    state.projectiles = [];
+
+    console.log('      ✅ Torchwood 6-frame bounds, canvas stack balance, green pea fire ignition (2x dmg + splash), ice pea melting & skill registration verified.');
+  }
+
+  // ── 29. Testing Lawnmower Sprite Bounds, Stack Balance, Baseline Defense & Steamroller Shred ──
+  {
+    const { LAWNMOWER_RECTS, drawLawnmower } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
+    const { LawnmowerEntity, CrazyDaveFighter } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+
+    // 1. Verify Lawnmower sprite sheet frames are valid and non-overlapping
+    assert(LAWNMOWER_RECTS.length === 6, `LAWNMOWER_RECTS must contain 6 discrete animation frames (got ${LAWNMOWER_RECTS.length})`);
+    for (let i = 0; i < LAWNMOWER_RECTS.length; i++) {
+      const f = LAWNMOWER_RECTS[i];
+      assert(f.sx >= 0 && f.sy >= 0 && f.sw > 0 && f.sh > 0, `Lawnmower frame ${i} must have valid positive dimensions: ${JSON.stringify(f)}`);
+      if (i < LAWNMOWER_RECTS.length - 1) {
+        const nextF = LAWNMOWER_RECTS[i + 1];
+        assert(f.sx + f.sw <= nextF.sx, `Lawnmower frame ${i} (${f.sx}+${f.sw}) must not overlap next frame (${nextF.sx})`);
+      }
+    }
+
+    // 2. Test Canvas 2D Stack Depths for Lawnmower (idle and charging)
+    const dave = new CrazyDaveFighter({ startX: 100, startY: 200 });
+    const mower = new LawnmowerEntity(22, 200, dave, 1, 0);
+    mockCtx.resetStackDepth();
+    drawLawnmower(mockCtx, mower);
+    assert(mockCtx.getStackDepth() === 0, `drawLawnmower (idle) must return canvas stack depth to 0, got ${mockCtx.getStackDepth()}`);
+
+    mower.state = 'charging';
+    mockCtx.resetStackDepth();
+    drawLawnmower(mockCtx, mower);
+    assert(mockCtx.getStackDepth() === 0, `drawLawnmower (charging) must return canvas stack depth to 0, got ${mockCtx.getStackDepth()}`);
+
+    // 3. Test Lawnmower baseline initialization across rows for Crazy Dave (Always on LEFT side)
+    const testArena = { x: 0, y: 0, width: 600, height: 400 };
+    dave.x = 550; // Even if Dave is far on the right, lawnmowers must ALWAYS be on the LEFT
+    dave.initLawnmowers(testArena);
+    assert(dave.lawnmowers.length > 0, `Crazy Dave must initialize lawnmowers across arena rows (got ${dave.lawnmowers.length})`);
+    for (const m of dave.lawnmowers) {
+      assert(m.x === testArena.x + 22, `Lawnmowers must always be parked on the left baseline (got ${m.x}, expected ${testArena.x + 22})`);
+      assert(m.facingDirection === 1, 'Lawnmowers must face right (+1)');
+      assert(m.state === 'idle', 'Lawnmowers must start in idle state');
+      assert(m.hp === 99999, 'Lawnmower must have invulnerable HP pool');
+      assert(m.isLawnmower === true, 'Lawnmower must set isLawnmower flag');
+      assert(m.isDeployable === true && m.isMinion === true, 'Lawnmower must be marked deployable minion');
+      assert(m.isUntargetable === true && m.untargetable === true, 'Lawnmower must be untargetable');
+      assert(m.phasesThroughEntities === true && m.ignoreFighterCollisions === true, 'Lawnmower must have entity phase-through flags');
+    }
+
+    // 4. Test Untargetable status: isValidAimTarget and getClosestOpponent ignore Lawnmowers
+    const { getClosestOpponent, resolveFighterCollision } = await import('../js/systems/physics.js');
+    const sampleMower = dave.lawnmowers[0];
+    const testEnemy = new FIGHTER_CLASS_MAP.gojo({ radius: 25, x: 200, y: 200, hp: 350 });
+    assert(testEnemy.isValidAimTarget(sampleMower) === false, 'Fighter isValidAimTarget must return false for Lawnmower');
+    state.fighters = [dave, testEnemy, ...dave.lawnmowers];
+    state.arena = testArena;
+    const closestTarget = getClosestOpponent(testEnemy);
+    assert(closestTarget === dave, `Closest opponent must be Crazy Dave, NOT the lawnmower (got ${closestTarget?.name})`);
+
+    // 5. Test Entities Pass Through: resolveFighterCollision leaves both entities unaffected
+    const prevEnemyX = testEnemy.x;
+    const prevEnemyY = testEnemy.y;
+    testEnemy.x = sampleMower.x;
+    testEnemy.y = sampleMower.y;
+    testEnemy.vx = -3;
+    resolveFighterCollision(sampleMower, testEnemy);
+    assert(testEnemy.x === sampleMower.x, 'Entities must pass directly through Lawnmower without collision displacement');
+    assert(sampleMower.x === testArena.x + 22, 'Lawnmower must not be displaced by colliding entity');
+
+    // 6. Test Lawnmower breach trigger when enemy penetrates baseline
+    const targetMower = dave.lawnmowers[0];
+    const enemy = {
+      x: targetMower.x + 30, // Within breach trigger radius
+      y: targetMower.y,
+      r: 20,
+      hp: 250,
+      maxHp: 250,
+      dead: false,
+      owner: null,
+      takeDamage: function(dmg) { this.hp -= dmg; return dmg; },
+      applyKnockback: function() {}
+    };
+    state.fighters = [dave, enemy, ...dave.lawnmowers];
+
+    // Before update, mower is idle
+    assert(targetMower.state === 'idle', 'Mower should be idle before enemy breach');
+    targetMower.update(null, 0, testArena);
+    assert(targetMower.state === 'charging', 'Mower must transition to charging state upon enemy breach');
+
+    // 7. Test Steamroller shred damage and knockback
+    const prevHp = enemy.hp;
+    targetMower.update(null, 0, testArena);
+    assert(enemy.hp < prevHp, `Enemy must take steamroller shred damage from charging mower (expected < ${prevHp}, got ${enemy.hp})`);
+    assert(enemy.hp === prevHp - 180, `Lawnmower must deal 180 damage (got ${prevHp - enemy.hp})`);
+    assert(enemy.knockbackVx > 0, `Enemy must receive knockback push from charging mower (got ${enemy.knockbackVx})`);
+
+    // 8. Test Enemy does NOT get shredded multiple times on the same pass
+    const hpAfterFirstHit = enemy.hp;
+    targetMower.update(null, 0, testArena);
+    assert(enemy.hp === hpAfterFirstHit, `Enemy must not take duplicate shred damage in the same mower pass (got ${enemy.hp})`);
+
+    // 9. Test Mower despawn upon driving past arena boundary
+    targetMower.x = testArena.x + testArena.width + 100;
+    targetMower.update(null, 0, testArena);
+    assert(targetMower.state === 'despawned', 'Lawnmower must despawn when past arena boundary');
+
+    // Clean up
+    dave.clearLawnmowers();
+    state.fighters = [];
+
+    console.log('      ✅ Lawnmower 6-frame bounds, canvas stack balance, baseline deployment, breach triggering & steamroller shred verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

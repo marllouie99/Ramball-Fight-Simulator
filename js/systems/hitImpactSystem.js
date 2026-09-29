@@ -842,8 +842,8 @@ export const HitImpactSystem = {
       }
     }
 
-    // ── Crazy Dave Plant Projectile Impact (Peashooter / Snow Pea) ──
-    const isPlantPea = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet';
+    // ── Crazy Dave Plant Projectile Impact (Peashooter / Snow Pea / Fire Pea) ──
+    const isPlantPea = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet' || projectile.visual === 'firePeaBullet';
     if (isPlantPea) {
       // 1. Kinetic pea pushback
       if (shouldApplyPhysicalPush(target)) {
@@ -864,15 +864,21 @@ export const HitImpactSystem = {
         }
       }
 
-      // 2. Juicy pea shatter burst & flash
+      // 2. Juicy pea shatter burst & flash (fire pea uses orange/red fire VFX)
       const isSnow = projectile.visual === 'snowPeaBullet';
-      const peaColor = isSnow ? '#38BDF8' : '#22C55E';
-      const shatterType = isSnow ? 'snowPeaShatter' : 'peaShatter';
+      const isFire = projectile.visual === 'firePeaBullet' || projectile.isFirePea;
+      const peaColor = isFire ? '#F97316' : (isSnow ? '#38BDF8' : '#22C55E');
+      const shatterType = isFire ? 'fireShatter' : (isSnow ? 'snowPeaShatter' : 'peaShatter');
       if (typeof spawnImpactFlash === 'function') {
-        spawnImpactFlash(target.x, target.y, 22, peaColor);
+        spawnImpactFlash(target.x, target.y, isFire ? 30 : 22, peaColor);
       }
       if (typeof spawnSparks === 'function') {
-        spawnSparks(target.x, target.y, 14, shatterType);
+        spawnSparks(target.x, target.y, isFire ? 18 : 14, shatterType);
+        if (isFire) {
+          // Extra ember sparks for fire peas
+          spawnSparks(target.x, target.y, 8, '#FBBF24');
+          spawnSparks(target.x, target.y, 6, '#EF4444');
+        }
       }
 
       // 3. Play authentic PVZ splat sound on projectile hit
@@ -880,7 +886,7 @@ export const HitImpactSystem = {
         audioSystem.playSFX('Assets/Sound Effects/SkillEffects/splat3.ogg', 0.85);
       }
 
-      // 4. Trigger onHit callback (e.g. Snow Pea chill slow)
+      // 4. Trigger onHit callback (e.g. Snow Pea chill slow, Fire Pea splash damage)
       if (typeof projectile.onHit === 'function') {
         projectile.onHit(target);
       }

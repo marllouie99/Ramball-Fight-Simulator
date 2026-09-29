@@ -159,8 +159,23 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
-  // Servants of Cthulhu, End Crystals, and Plant Minions (Peashooter / Snow Pea) phase through fighters without physical collision or pushback
-  if (a.isServantOfCthulhu || b.isServantOfCthulhu || a.isEndCrystal || b.isEndCrystal || a.isPlant || b.isPlant || a.isPlantMinion || b.isPlantMinion) return;
+  // Servants of Cthulhu, End Crystals, Lawnmowers, and non-barrier Plant Minions phase through fighters without physical collision or pushback
+  if (a.isServantOfCthulhu || b.isServantOfCthulhu || a.isEndCrystal || b.isEndCrystal || a.isLawnmower || b.isLawnmower) return;
+  const aIsPlant = a.isPlant || a.isPlantMinion;
+  const bIsPlant = b.isPlant || b.isPlantMinion;
+  const aIsBarrier = a.isPlantBarrier || a.isWallnut;
+  const bIsBarrier = b.isPlantBarrier || b.isWallnut;
+
+  // Non-barrier plants (Peashooter / Snow Pea) phase through all entities
+  if ((aIsPlant && !aIsBarrier) || (bIsPlant && !bIsBarrier)) return;
+
+  // Plant barriers (Wall-nut) allow friendly Dave and friendly plants to pass freely, but physically block enemies!
+  if (aIsBarrier || bIsBarrier) {
+    const barrier = aIsBarrier ? a : b;
+    const other = aIsBarrier ? b : a;
+    const isFriendly = (other === barrier.owner) || (barrier.owner && other.owner === barrier.owner) || (other.characterId === 'crazydave') || (other.isPlant || other.isPlantMinion) || (typeof barrier.isTeammate === 'function' && barrier.isTeammate(other));
+    if (isFriendly) return;
+  }
 
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
   const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
@@ -429,8 +444,8 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon;
-  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon;
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon;
 
   const aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
   const bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
@@ -494,9 +509,17 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  if (!a.isTurret && !a.isDispenser) {
+  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isImmovable;
+  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isImmovable;
+
+  if (aIsAnchor) {
+    a.vx = 0;
+    a.vy = 0;
+    a.knockbackVx = 0;
+    a.knockbackVy = 0;
+  } else {
     // Fighters in melee mode, rage, active Infinity, counter-lock, or Genos ultimate beam ignore bounce impulse so they hold their ground
-    // When bouncing off an immovable entity (e.g. counter lock, Genos beam, or turret), the mobile entity does not damp the bounce
+    // When bouncing off an immovable entity (e.g. counter lock, Genos beam, or barrier), the mobile entity does not damp the bounce
     if (a.isMeleeMode || aIsGenosBeam) {
       a.vx = 0;
       a.vy = 0;
@@ -534,7 +557,12 @@ export function resolveFighterCollision(a, b) {
     }
   }
   
-  if (!b.isTurret && !b.isDispenser) {
+  if (bIsAnchor) {
+    b.vx = 0;
+    b.vy = 0;
+    b.knockbackVx = 0;
+    b.knockbackVy = 0;
+  } else {
     if (b.isMeleeMode || bIsGenosBeam) {
       b.vx = 0;
       b.vy = 0;
@@ -624,6 +652,7 @@ export function getClosestOpponent(fighter) {
     const other = state.fighters[i];
     const isOtherAlive = other && (other.hp > 0 || other.isRevivingFromContract || other.isShatterReviving || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(other)));
     if (!other || other === fighter || !isOtherAlive) continue;
+    if (other.isLawnmower || other.isUntargetable || other.untargetable || other.cannotBeTargeted) continue;
     if (fighter.isTeammate(other)) continue;
     if (!fighter.isChainedByMakima && !other.isChainedByMakima && isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;
     
