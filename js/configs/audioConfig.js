@@ -157,5 +157,7 @@ export const AUDIO_CONFIG = {
   'crazydave_peashooter_shot': 'Assets/Sound Effects/Attacks/crazydave-peashooter-shot.mp3',
   'crazydave_snowpea_shot': 'Assets/Sound Effects/Attacks/crazydave-snow_pea_sparkles.ogg',
   'crazydave_snowpea_freeze': 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3',
-  'crazydave_splat': 'Assets/Sound Effects/SkillEffects/splat3.ogg'
+  'crazydave_splat': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
+  'crazydave_lawnmower_engine': 'Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3',
+  'lawnmower_engine': 'Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3'
 };

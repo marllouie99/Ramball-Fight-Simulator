@@ -28,7 +28,20 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "CRAZYDAVE",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "lawnmowerEngine",
+                "oldVal": "Assets/Sound Effects/Skills/cj-carroam-noise.mp3",
+                "newVal": "Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3",
+                "pct": "Mod"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

@@ -134,7 +134,7 @@ export const crazyDaveConfig = {
     plantHit: 'Assets/Sound Effects/SkillEffects/splat3.ogg',
     wallnutHit: 'Assets/Sound Effects/Skills/shieldblock.mp3',
     wallnutCrumble: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
-    lawnmowerEngine: 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',
+    lawnmowerEngine: 'Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3',
     lawnmowerHit: 'Assets/Sound Effects/Skills/spinslash.mp3'
   },
   soundVolumes: {
