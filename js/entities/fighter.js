@@ -52,7 +52,10 @@ export function isSuppressedByFuga(fighter) {
  */
 export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple') {
   if (!entity) return true;
-  if (entity.isBaguvixActive || entity.isGodModeActive || entity.isPlant || entity.isPlantMinion || entity.isImmovable) return true;
+  const isPlantEntity = entity.isPlant || entity.isPlantMinion;
+  if (entity.isBaguvixActive || entity.isGodModeActive) return true;
+  if ((isPlantEntity || entity.isImmovable) && vortexType !== 'purple') return true;
+  if (entity.isImmovable && !isPlantEntity) return true;
 
   // Makima contract reformation stasis
   if (entity.isRevivingFromContract || entity.isShatterReviving || (entity.shatteredPieces && entity.shatteredPieces.length > 0) || (entity.characterId === 'makima' && (entity.isDead || entity.dead || entity.hp <= 0))) {
@@ -60,7 +63,7 @@ export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple')
   }
 
   // Escanor is completely immune to any gravitational/vortex suction & pull mechanics
-  if (entity.characterId === 'escanor' || entity.type === 'escanor' || entity.immuneToPull) {
+  if (entity.characterId === 'escanor' || entity.type === 'escanor' || (entity.immuneToPull && !(vortexType === 'purple' && isPlantEntity))) {
     return true;
   }
 

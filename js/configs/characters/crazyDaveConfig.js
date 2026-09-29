@@ -96,6 +96,8 @@ export const crazyDaveConfig = {
   torchwoodRadius: 22,        // Robust tree stump radius matching authentic PvZ proportions
   torchwoodCooldown: 600,     // 10s skill cooldown
   torchwoodInterceptRadius: 42,  // Radius around torchwood that intercepts passing peas
+  torchwoodBurnRadius: 70,     // Enemies entering this radius are ignited
+  torchwoodBurnDuration: 180,  // Reapply the burn when the current burn expires
   torchwoodFireDamageMultiplier: 2.0,  // Fire peas deal 2x damage
   torchwoodFirePeaSplashRadius: 45,    // Fire pea splash AoE radius on hit
   torchwoodFirePeaSplashDamage: 0.5,   // Splash deals 50% of fire pea damage
@@ -108,6 +110,7 @@ export const crazyDaveConfig = {
   lawnmowerSpeed: 11.5,        // Fast horizontal charging speed across the lawn
   lawnmowerRadius: 18,         // Collision hitbox radius
   lawnmowerTriggerRadius: 38,  // Proximity trigger distance from baseline
+  lawnmowerBaselineOffset: 2,  // Keep parked mowers tucked against the arena wall
   lawnmowerColor: '#DC2626',   // Classic cherry red mower
   lawnmowerSpriteSrc: 'Assets/model/Sprites/lawnmower-sprite-sheet.png',
 

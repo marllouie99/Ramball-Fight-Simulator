@@ -240,6 +240,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           ent.x = Math.max(_purpleArena.x + _er, Math.min(_purpleArena.x + _purpleArena.width - _er, ent.x));
           ent.y = Math.max(_purpleArena.y + _er, Math.min(_purpleArena.y + _purpleArena.height - _er, ent.y));
         }
+        if (ent.isPlant || ent.isPlantMinion) {
+          ent._fixedX = ent.x;
+          ent._fixedY = ent.y;
+        }
       }
     }
 

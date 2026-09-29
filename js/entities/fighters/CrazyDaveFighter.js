@@ -1258,6 +1258,8 @@ export class TorchwoodEntity extends Fighter {
 
     // Torchwood-specific: intercept radius for catching passing peas
     this._interceptRadius = getCrazyDaveSetting(cfg, 'torchwoodInterceptRadius') || 38;
+    this._burnRadius = getCrazyDaveSetting(cfg, 'torchwoodBurnRadius') || 70;
+    this._burnDuration = getCrazyDaveSetting(cfg, 'torchwoodBurnDuration') || 180;
     this._ignitedSet = new WeakSet(); // Track already-ignited projectiles to avoid re-processing
   }
 
@@ -1505,6 +1507,23 @@ export class TorchwoodEntity extends Fighter {
     }
   }
 
+  _applyProximityBurn() {
+    if (!state || !Array.isArray(state.fighters)) return;
+
+    for (const fighter of state.fighters) {
+      if (!fighter || fighter === this || fighter.hp <= 0 || fighter.dead) continue;
+      if (fighter.isPlant || fighter.isPlantMinion || fighter.characterId === 'crazydave') continue;
+
+      const dx = fighter.x - this.x;
+      const dy = fighter.y - this.y;
+      if (Math.hypot(dx, dy) > this._burnRadius) continue;
+      if ((fighter.burnTimer || 0) > 0 || typeof fighter.applyBurn !== 'function') continue;
+
+      fighter.applyBurn(this, this._burnDuration);
+      spawnSparks(fighter.x, fighter.y, 4, '#F97316');
+    }
+  }
+
   update(opponent, ownerIndex, arena) {
     if (this.hp <= 0) return;
     this.animTick++;
@@ -1521,6 +1540,9 @@ export class TorchwoodEntity extends Fighter {
       this.x = this._fixedX;
       this.y = this._fixedY;
     }
+
+    // Enemies that approach the burning stump are ignited.
+    this._applyProximityBurn();
 
     // Core mechanic: intercept and transform passing pea projectiles
     this._interceptProjectiles();
@@ -2066,7 +2088,7 @@ export class CrazyDaveFighter extends Fighter {
 
     // Lawnmowers ALWAYS parked on the LEFT side of the arena, facing RIGHT (+1)
     const facingDirection = 1;
-    const baselineOffset = 22;
+    const baselineOffset = getCrazyDaveSetting(cfg, 'lawnmowerBaselineOffset') ?? 2;
     const baselineX = arena.x + baselineOffset;
 
     this.lawnmowers = [];

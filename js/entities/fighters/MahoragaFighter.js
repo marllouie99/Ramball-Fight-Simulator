@@ -74,6 +74,8 @@ export class MahoragaFighter extends Fighter {
     this.sukunaAdapted = { divineFlame: false };
     this.sukunaFugaDodgeReady = false;
     this._lastSukunaHitType = null;
+    this.adaptedTorchwood = false;
+    this.isImmuneToBurn = false;
 
     // General Skill Shot Adaptation Tracking
     this.adaptedSkills = {};
@@ -162,6 +164,8 @@ export class MahoragaFighter extends Fighter {
     this.sukunaAdapted = { divineFlame: false };
     this.sukunaFugaDodgeReady = false;
     this._lastSukunaHitType = null;
+    this.adaptedTorchwood = false;
+    this.isImmuneToBurn = false;
     this.wheelGlowColor = null;
 
     // General Skill Shot Adaptation Reset

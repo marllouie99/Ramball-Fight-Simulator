@@ -343,6 +343,18 @@ async function runInteractionTests() {
 
     const gojo = new GojoClass({ x: 100, y: 300, color: '#00F3FF', controls: {} });
     const yuta = new YutaClass({ x: 300, y: 300, color: '#FFFFFF', controls: {} });
+    const plant = {
+      x: 300,
+      y: 350,
+      _fixedX: 300,
+      _fixedY: 350,
+      r: 18,
+      hp: 100,
+      isPlant: true,
+      isPlantMinion: true,
+      isImmovable: true,
+      immuneToPull: true
+    };
     gojo.domainActive = true;
     gojo.domainTimer = 200;
 
@@ -353,7 +365,7 @@ async function runInteractionTests() {
     yuta.rika.hp = 100;
     yuta.rika.spawnTimer = 0;
 
-    state.fighters = [gojo, yuta];
+    state.fighters = [gojo, yuta, plant];
     state.illusions = [yuta.rika];
     state.arena = { x: 0, y: 0, width: 800, height: 600 };
     state.gameState = 'playing';
@@ -366,12 +378,15 @@ async function runInteractionTests() {
 
     const initialYutaX = yuta.x;
     const initialRikaX = yuta.rika.x;
+    const initialPlantX = plant.x;
 
     // Run behavior update
     new GojoPurpleBehavior().update(purple, state.fighters, projectileSystem);
 
     assert(yuta.x < initialYutaX, `Yuta must be pulled toward Purple (x changed from ${initialYutaX} to ${yuta.x})`);
     assert(yuta.rika.x < initialRikaX, `Rika must be pulled toward Purple (x changed from ${initialRikaX} to ${yuta.rika.x})`);
+    assert(plant.x < initialPlantX, `Plants must be pulled toward Purple (x changed from ${initialPlantX} to ${plant.x})`);
+    assert(plant._fixedX === plant.x && plant._fixedY === plant.y, 'Pulled plants must retain their new fixed position');
 
     // Clean up
     projectileSystem.projectiles = [];
@@ -2046,8 +2061,9 @@ async function runInteractionTests() {
     resolveFighterCollision(testWallnut, dave);
     assert(dave.x === preDaveX && dave.y === preDaveY, 'Friendly Dave must pass through Wall-nut without being pushed');
 
-    // Pull immunity test
-    assert(isEntityImmuneToGravitationalPull(livingPlant) === true, 'Plant minion must be immune to gravitational suction / vortex pull');
+    // Pull immunity test: Hollow Purple can pull plants, while other vortices retain plant immunity
+    assert(isEntityImmuneToGravitationalPull(livingPlant, 'purple') === false, 'Plant minion must be vulnerable to Hollow Purple suction');
+    assert(isEntityImmuneToGravitationalPull(livingPlant, 'blue') === true, 'Plant minion must remain immune to Blue gravitational pull');
 
     // Heavy knockback attack test
     livingPlant.takeDamage(10, gojo, { isHeavy: true, isKnockback: true, knockback: true, knockbackVx: 100, knockbackVy: -100 });
@@ -2593,7 +2609,71 @@ async function runInteractionTests() {
     assert(icePea.onHit === null, 'Melted ice pea must lose its chill/freeze onHit callback');
     assert(icePea.damage === 10, `Melted ice pea must revert to standard peashooter damage (10), got ${icePea.damage}`);
 
-    // 6. Test Crazy Dave Skill 4 Registration & AI planting decision
+    // 6. Test Torchwood proximity burn without refreshing the burn every frame
+    const nearbyEnemy = {
+      x: 290,
+      y: 250,
+      hp: 100,
+      dead: false,
+      burnTimer: 0,
+      applyBurn(attacker, duration) {
+        this.burnTimer = duration;
+        this.burnAttacker = attacker;
+      }
+    };
+    const distantEnemy = {
+      x: 400,
+      y: 250,
+      hp: 100,
+      dead: false,
+      burnTimer: 0,
+      applyBurn() {
+        this.burnTimer = 999;
+      }
+    };
+    const plantTarget = {
+      x: 290,
+      y: 250,
+      hp: 100,
+      dead: false,
+      isPlant: true,
+      burnTimer: 0,
+      applyBurn() {
+        this.burnTimer = 999;
+      }
+    };
+    const previousFighters = state.fighters;
+    state.fighters = [torchwood, nearbyEnemy, distantEnemy, plantTarget];
+    torchwood.update(null, 0, state.arena);
+    assert(nearbyEnemy.burnTimer === CONFIG.crazydave.torchwoodBurnDuration, 'Enemy near Torchwood must receive the configured burn duration');
+    assert(nearbyEnemy.burnAttacker === torchwood, 'Torchwood proximity burn must identify Torchwood as the attacker');
+    assert(distantEnemy.burnTimer === 0, 'Enemy outside Torchwood burn radius must not be burned');
+    assert(plantTarget.burnTimer === 0, 'Plant allies must not be burned by Torchwood');
+    nearbyEnemy.burnTimer = 30;
+    torchwood.update(null, 0, state.arena);
+    assert(nearbyEnemy.burnTimer === 30, 'Torchwood must not reset an active burn timer every frame');
+    state.fighters = previousFighters;
+
+    // 7. Test Mahoraga adapts to Torchwood burn and becomes immune
+    const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
+    const mahoraga = new MahoragaClass({ type: 'mahoraga', x: 320, y: 250, hp: 250, maxHp: 250 });
+    const previousTorchwoodFighters = state.fighters;
+    state.fighters = [torchwood, mahoraga];
+    mahoraga.applyBurn(torchwood, 180);
+    assert(mahoraga.burnTimer === 180, 'Mahoraga must receive the first Torchwood burn exposure');
+    const adaptationThreshold = mahoraga.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
+    const burnHitDamage = Math.max(1, adaptationThreshold / 4);
+    for (let i = 0; i < 4; i++) {
+      mahoraga.takeDamage(burnHitDamage, torchwood, { isBurn: true });
+    }
+    assert(mahoraga.adaptedTorchwood === true, 'Mahoraga must adapt after the Torchwood burn threshold is reached');
+    assert(mahoraga.isImmuneToBurn === true, 'Mahoraga must become immune to burn after adapting to Torchwood');
+    assert(mahoraga.burnTimer === 0, 'Mahoraga active Torchwood burn must clear upon adaptation');
+    mahoraga.applyBurn(torchwood, 180);
+    assert(mahoraga.burnTimer === 0, 'Adapted Mahoraga must ignore future Torchwood burn applications');
+    state.fighters = previousTorchwoodFighters;
+
+    // 8. Test Crazy Dave Skill 4 Registration & AI planting decision
     assert(dave.skillManager.skills.has('torchwood'), 'Crazy Dave must register Torchwood skill in skillManager');
     
     // Clear projectiles
@@ -2637,7 +2717,7 @@ async function runInteractionTests() {
     dave.initLawnmowers(testArena);
     assert(dave.lawnmowers.length > 0, `Crazy Dave must initialize lawnmowers across arena rows (got ${dave.lawnmowers.length})`);
     for (const m of dave.lawnmowers) {
-      assert(m.x === testArena.x + 22, `Lawnmowers must always be parked on the left baseline (got ${m.x}, expected ${testArena.x + 22})`);
+      assert(m.x === testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset, `Lawnmowers must always be tucked against the left wall (got ${m.x}, expected ${testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset})`);
       assert(m.facingDirection === 1, 'Lawnmowers must face right (+1)');
       assert(m.state === 'idle', 'Lawnmowers must start in idle state');
       assert(m.hp === 99999, 'Lawnmower must have invulnerable HP pool');
@@ -2665,7 +2745,7 @@ async function runInteractionTests() {
     testEnemy.vx = -3;
     resolveFighterCollision(sampleMower, testEnemy);
     assert(testEnemy.x === sampleMower.x, 'Entities must pass directly through Lawnmower without collision displacement');
-    assert(sampleMower.x === testArena.x + 22, 'Lawnmower must not be displaced by colliding entity');
+    assert(sampleMower.x === testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset, 'Lawnmower must not be displaced by colliding entity');
 
     // 6. Test Lawnmower breach trigger when enemy penetrates baseline
     const targetMower = dave.lawnmowers[0];

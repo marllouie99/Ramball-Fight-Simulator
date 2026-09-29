@@ -555,11 +555,36 @@ export function triggerAdaptation(fighter, type, attacker) {
     applySkillShotAdaptation(fighter, fighter._lastSkillShotId, fighter._lastSkillShotColor);
   }
 
+  if (attacker?.isTorchwood && fighter.lastBurnAttacker === attacker) {
+    adaptToTorchwood(fighter);
+  }
+
   // Clear hit memory after adaptation triggers
   fighter._lastGojoHitType = null;
   fighter._lastSukunaHitType = null;
   fighter._lastSkillShotId = null;
   fighter._lastSkillShotColor = null;
+}
+
+function adaptToTorchwood(fighter) {
+  if (fighter.adaptedTorchwood) return;
+
+  fighter.adaptedTorchwood = true;
+  fighter.isImmuneToBurn = true;
+  fighter.burnTimer = 0;
+  fighter.burnDamageTimer = 0;
+  fighter.lastBurnAttacker = null;
+
+  const adaptColor = '#F97316';
+  fighter.wheelGlowColor = adaptColor;
+  if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+  if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+    fighter.gojoAdaptColorHistory.push(adaptColor);
+  }
+
+  const wheelY = fighter.y - fighter.r - 28;
+  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: TORCHWOOD!', adaptColor);
+  spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Immune to Torchwood burn!', '#FFFFFF');
 }
 
 /**
