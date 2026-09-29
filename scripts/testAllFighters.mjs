@@ -1502,6 +1502,65 @@ async function main() {
         dummyOpponent.isDead = false;
         state.fighters = [fighter, dummyOpponent];
 
+        // Mind-controlled Crazy Dave plants should attack Dave and his other plants.
+        const { CrazyDaveFighter, PeashooterEntity, SnowPeaEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+        const savedFighters = state.fighters;
+        const savedMode = state.mode;
+        const savedProjectileCount = projectileSystem.projectiles.length;
+        try {
+          state.mode = 'FFA';
+          const dave = new CrazyDaveFighter({ startX: 270, startY: 200 });
+          const pea = new PeashooterEntity(200, 200, dave, 1);
+          const snowPea = new SnowPeaEntity(400, 200, dave, -1);
+          const otherPlant = new PeashooterEntity(80, 200, dave, -1);
+          state.fighters = [fighter, dave, pea, snowPea, otherPlant];
+
+          for (const plant of [pea, snowPea]) {
+            plant.isChainedByMakima = true;
+            plant.isMindControlledByMakima = true;
+            plant._makimaChainer = fighter;
+            plant.shootCooldown = 0;
+          }
+
+          pea.update(dave, 2, state.arena);
+          const peaShot = projectileSystem.projectiles.slice(savedProjectileCount).find(p => p?.visual === 'peaBullet');
+          if (!peaShot || peaShot.ownerFighter !== pea || peaShot.owner !== state.fighters.indexOf(pea)) {
+            throw new Error('Expected chained Peashooter to fire with its own attacker identity');
+          }
+
+          const daveHp = dave.hp;
+          peaShot.x = dave.x;
+          peaShot.y = dave.y;
+          peaShot.vx = 0;
+          peaShot.vy = 0;
+          projectileSystem.checkProjectileHits(peaShot, state.fighters);
+          if (dave.hp >= daveHp) {
+            throw new Error('Expected chained Peashooter to damage Crazy Dave');
+          }
+
+          pea._firePea(pea.gunAngle, 2);
+          const plantShot = projectileSystem.projectiles[projectileSystem.projectiles.length - 1];
+          const otherPlantHp = otherPlant.hp;
+          plantShot.x = otherPlant.x;
+          plantShot.y = otherPlant.y;
+          plantShot.vx = 0;
+          plantShot.vy = 0;
+          projectileSystem.checkProjectileHits(plantShot, state.fighters);
+          if (otherPlant.hp >= otherPlantHp) {
+            throw new Error('Expected chained Peashooter to damage another Dave plant');
+          }
+
+          snowPea.update(dave, 3, state.arena);
+          const snowPeaShot = projectileSystem.projectiles.slice(savedProjectileCount).find(p => p?.visual === 'snowPeaBullet');
+          if (!snowPeaShot || snowPeaShot.ownerFighter !== snowPea || snowPea.facingDirection !== -1) {
+            throw new Error('Expected chained Snow Pea to turn toward and fire at Dave behind it');
+          }
+        } finally {
+          state.fighters = savedFighters;
+          state.mode = savedMode;
+          projectileSystem.projectiles.length = savedProjectileCount;
+        }
+
         fighter._castChainsOfDomination(dummyOpponent);
         if (!fighter.isChainingActive || fighter.chainedTargets.length === 0) {
           throw new Error("Makima failed to activate Chains of Domination on cast!");
@@ -3964,6 +4023,19 @@ async function main() {
     const turnPerFrame = Math.abs(testSaitama.gunAngle - angleBeforeTick);
     if (turnPerFrame > 0.06) {
       throw new Error(`Saitama turn rate was too fast (${turnPerFrame.toFixed(3)} rad/frame, max allowed 0.06 rad/frame)!`);
+    }
+
+    // Lock aim for the final counter frames so the target can dodge the lethal punch.
+    const aimLockFrames = CONFIG.saitama?.counterAimLockFrames ?? 30;
+    while (testSaitama._counterPunchTimer > aimLockFrames) {
+      testSaitama.update(dummyTarget2, 0, state.arena);
+    }
+    const lockedReleaseAim = testSaitama.gunAngle;
+    dummyTarget2.x = 500;
+    dummyTarget2.y = 100;
+    testSaitama.update(dummyTarget2, 0, state.arena);
+    if (Math.abs(testSaitama.gunAngle - lockedReleaseAim) > 0.001) {
+      throw new Error(`Saitama counter aim followed the target during the final ${aimLockFrames}-frame lock window`);
     }
 
     // Fast-forward remainder of wind-up to punch land
@@ -10586,6 +10658,48 @@ async function main() {
   // ─────────────────────────────────────────────────────────────
   // Mahoraga Wheel Arena Overlay & Animated Rotation Test
   // ─────────────────────────────────────────────────────────────
+  try {
+    console.log('❄️ [Mahoraga Snow Pea Adaptation Test] Verifying wheel adaptation clears and prevents Snow Pea freeze...');
+    const { MahoragaFighter } = await import('../js/entities/fighters/MahoragaFighter.js');
+    const mahoraga = new MahoragaFighter({ color: '#FFD700', name: 'Mahoraga' });
+    const dave = { characterId: 'crazydave', type: 'crazydave', hp: 100, x: 100, y: 100 };
+    const snowPeaProjectile = {
+      isAdaptableSkillShot: true,
+      skillShotId: 'crazyDaveSnowPea',
+      skillShotColor: '#38BDF8',
+      isSnowPea: true,
+    };
+    state.fighters = [mahoraga, dave];
+    mahoraga.hp = mahoraga.maxHp;
+    mahoraga.fatalAdaptCooldown = 0;
+    mahoraga.totalAccumDamage = 0;
+    mahoraga.iceFreezeTimer = 60;
+    mahoraga.isFrozenBySnowPea = true;
+
+    const adaptationDamage = Math.ceil(mahoraga.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15));
+    mahoraga.takeDamage(adaptationDamage, dave, { isProjectile: true, projectile: snowPeaProjectile });
+    if (!mahoraga.adaptedSnowPea || mahoraga.iceFreezeTimer !== 0 || mahoraga.isFrozenBySnowPea || mahoraga.skillDodgeReady?.crazyDaveSnowPea) {
+      throw new Error('Expected Snow Pea wheel adaptation to grant freeze immunity and clear the active freeze');
+    }
+
+    mahoraga.applyFreeze(90, dave, { isSnowPea: true });
+    if (mahoraga.iceFreezeTimer > 0 || mahoraga.isFrozenBySnowPea) {
+      throw new Error('Expected Mahoraga to reject Snow Pea freeze after adapting');
+    }
+
+    mahoraga.skillDodgeReady.crazyDaveSnowPea = true;
+    const startX = mahoraga.x;
+    const startY = mahoraga.y;
+    mahoraga._generalSkillShotTeleportDodge(dave, { ...snowPeaProjectile, x: startX, y: startY, dodgeRadius: 140 });
+    if (mahoraga.x !== startX || mahoraga.y !== startY || mahoraga.adaptationDashTimer > 0) {
+      throw new Error('Expected adapted Snow Pea not to trigger Mahoraga teleport-away');
+    }
+  } catch (err) {
+    console.error('❌ [MAHORAGA SNOW PEA ADAPTATION TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[MAHORAGA SNOW PEA ADAPTATION TEST]: ${err.stack || err.message}`);
+  }
+
   try {
     console.log('⚙️ [Mahoraga Wheel Arena Overlay Test] Verifying Mahoraga-wheel-overlay.png image loader, pop animation, rotation, and Canvas stack balance...');
     const { getMahoragaWheelOverlayImage, drawMahoragaWheelArenaOverlay, drawMahoragaAdaptationDimScreen } = await import('../js/graphics/draw.js');

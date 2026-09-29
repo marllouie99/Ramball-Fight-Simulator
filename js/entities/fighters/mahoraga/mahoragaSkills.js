@@ -339,7 +339,7 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
  */
 export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
   if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
-  if (projectile && (projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
+  if (projectile && (projectile.skillShotId === 'crazyDaveSnowPea' || projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
   const fromX = fighter.x;
   const fromY = fighter.y;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;

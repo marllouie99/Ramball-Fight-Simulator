@@ -1227,5 +1227,6 @@ export class ZenitsuFighter extends Fighter {
 
   draw(ctx) {
     drawZenitsuSkin(ctx, this);
+    this.drawHealth(ctx);
   }
 }

@@ -299,7 +299,7 @@ export class MahoragaFighter extends Fighter {
       return false;
     }
 
-    if (opts.isAdaptableSkillShot && opts.skillShotId !== 'tojiAmbush' && opts.skillShotId !== 'purple' && !opts.isPurpleDPS && !opts.isPurple && opts.skillShotId !== 'getsugaTensho' && opts.skillShotId !== 'getsuga' && !opts.isGetsuga && this.adaptedSkills && this.adaptedSkills[opts.skillShotId] && this.skillDodgeReady && this.skillDodgeReady[opts.skillShotId]) {
+    if (opts.isAdaptableSkillShot && opts.skillShotId !== 'crazyDaveSnowPea' && opts.projectile?.skillShotId !== 'crazyDaveSnowPea' && opts.skillShotId !== 'tojiAmbush' && opts.skillShotId !== 'purple' && !opts.isPurpleDPS && !opts.isPurple && opts.skillShotId !== 'getsugaTensho' && opts.skillShotId !== 'getsuga' && !opts.isGetsuga && this.adaptedSkills && this.adaptedSkills[opts.skillShotId] && this.skillDodgeReady && this.skillDodgeReady[opts.skillShotId]) {
       const registryEntry = SKILL_REGISTRY[opts.skillShotId];
       const mockProj = opts.projectile || {
         skillShotId: opts.skillShotId,
@@ -1097,7 +1097,7 @@ export class MahoragaFighter extends Fighter {
     // ── PROACTIVE GENERAL SKILL SHOT DODGE TRIGGERS ──
     if (projectileSystem && projectileSystem.projectiles) {
       for (const p of projectileSystem.projectiles) {
-        if (p && p.isAdaptableSkillShot && p.skillShotId !== 'purple' && !p.isGojoPurple && !p.isGojoPurpleOrb && p.behaviorType !== 'gojo_purple' && p.skillShotId !== 'getsugaTensho' && p.skillShotId !== 'getsuga' && !p.isGetsuga && (p.life || 0) > 0) {
+        if (p && p.isAdaptableSkillShot && p.skillShotId !== 'crazyDaveSnowPea' && p.skillShotId !== 'purple' && !p.isGojoPurple && !p.isGojoPurpleOrb && p.behaviorType !== 'gojo_purple' && p.skillShotId !== 'getsugaTensho' && p.skillShotId !== 'getsuga' && !p.isGetsuga && (p.life || 0) > 0) {
           const skillId = p.skillShotId;
           if (this.adaptedSkills && this.adaptedSkills[skillId] && this.skillDodgeReady && this.skillDodgeReady[skillId]) {
             if ((this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
@@ -1112,7 +1112,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // ── PROACTIVE GENERAL SKILL SHOT DODGE TRIGGERS (OPPONENT CHARGING/FIRING STATE) ──
-    if (opponent && opponent.isFiringSkillShot && opponent.isFiringSkillShot !== 'purple' && opponent.isFiringSkillShot !== 'getsugaTensho' && opponent.isFiringSkillShot !== 'getsuga') {
+    if (opponent && opponent.isFiringSkillShot && opponent.isFiringSkillShot !== 'crazyDaveSnowPea' && opponent.isFiringSkillShot !== 'purple' && opponent.isFiringSkillShot !== 'getsugaTensho' && opponent.isFiringSkillShot !== 'getsuga') {
       const skillId = opponent.isFiringSkillShot;
       if (this.adaptedSkills && this.adaptedSkills[skillId] && this.skillDodgeReady && this.skillDodgeReady[skillId]) {
         if ((this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {

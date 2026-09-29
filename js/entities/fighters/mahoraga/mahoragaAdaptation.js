@@ -737,7 +737,7 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   if (fighter.adaptedSkills[skillShotId]) return;
 
   fighter.adaptedSkills[skillShotId] = true;
-  if (skillShotId !== 'getsugaTensho' && skillShotId !== 'getsuga') {
+  if (skillShotId !== 'getsugaTensho' && skillShotId !== 'getsuga' && skillShotId !== 'crazyDaveSnowPea') {
     fighter.skillDodgeReady[skillShotId] = true;
   }
 
@@ -774,7 +774,13 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   }
 
   const wheelY = fighter.y - fighter.r - 28;
-  if (skillShotId === 'genosBeam' || skillShotId === 'incinerationCannon') {
+  if (skillShotId === 'crazyDaveSnowPea') {
+    fighter.adaptedSnowPea = true;
+    fighter.iceFreezeTimer = 0;
+    fighter.isFrozenBySnowPea = false;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: SNOW PEA!', color || '#38BDF8');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Immune to Snow Pea freeze!', '#FFFFFF');
+  } else if (skillShotId === 'genosBeam' || skillShotId === 'incinerationCannon') {
     fighter.adaptedGenosBeam = true;
     fighter.adaptedSkills['genosBeam'] = true;
     if (!fighter.adapted) fighter.adapted = {};

@@ -32,6 +32,22 @@ function getCrazyDaveSoundVolume(config, key) {
   return config?.soundVolumes?.[key] ?? crazyDaveConfig.soundVolumes[key];
 }
 
+function isMakimaControlledPlant(plant) {
+  return Boolean(plant?.isChainedByMakima && plant?.isMindControlledByMakima && plant?._makimaChainer);
+}
+
+function getPlantProjectileOwnership(plant, ownerIndex) {
+  if (!isMakimaControlledPlant(plant)) {
+    return { owner: ownerIndex !== undefined ? ownerIndex : 0, ownerFighter: plant.owner || plant };
+  }
+
+  const plantIndex = state.fighters?.indexOf(plant) ?? -1;
+  return {
+    owner: plantIndex >= 0 ? plantIndex : (ownerIndex !== undefined ? ownerIndex : 0),
+    ownerFighter: plant,
+  };
+}
+
 function playDavePlantingAudio(config) {
   const playSfx = typeof audioSystem.playSFX === 'function'
     ? audioSystem.playSFX
@@ -254,7 +270,9 @@ export class PeashooterEntity extends Fighter {
 
   takeDamage(amount, attacker, opts = {}) {
     // Friendly fire check: ignore damage from other plants or Crazy Dave
-    if (attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+    const isMindControlled = isMakimaControlledPlant(this);
+    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
+    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
       return false;
     }
     // Ignore debuff DoT tick damages (poison ticks, burn ticks, bleed ticks, electrified ticks)
@@ -262,7 +280,7 @@ export class PeashooterEntity extends Fighter {
       if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
         return false;
       }
-      if (opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
+      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
         return false;
       }
       opts.knockback = false;
@@ -320,14 +338,16 @@ export class PeashooterEntity extends Fighter {
     let targetInLane = null;
     let closestDist = Infinity;
 
+    const isMindControlled = isMakimaControlledPlant(this);
     const evaluateTarget = (f) => {
-      if (!f || f === this || f === this.owner || f.isDeployable || f.isMinion || f.hp <= 0 || f.dead) return;
+      if (!f || f === this || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
+      if (typeof this.isTeammate === 'function' && this.isTeammate(f)) return;
       const dx = f.x - this.x;
       const dy = f.y - this.y;
 
       // Check if enemy is ahead in the straight committed direction
       const isAhead = (this.facingDirection === 1) ? (dx > 0) : (dx < 0);
-      if (!isAhead) return; // Behind the plant!
+      if (!isMindControlled && !isAhead) return; // Behind the plant!
 
       const forwardDist = Math.abs(dx);
       const laneDist = Math.abs(dy);
@@ -348,6 +368,10 @@ export class PeashooterEntity extends Fighter {
 
     // Only shoot if a valid enemy is detected in the straight forward direction
     if (targetInLane) {
+      if (isMindControlled) {
+        this.facingDirection = targetInLane.x < this.x ? -1 : 1;
+        this.gunAngle = this.facingDirection === -1 ? Math.PI : 0;
+      }
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
       } else {
@@ -361,6 +385,7 @@ export class PeashooterEntity extends Fighter {
 
   _firePea(angle, ownerIndex) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    const ownership = getPlantProjectileOwnership(this, ownerIndex);
     const speed = getCrazyDaveSetting(cfg, 'peashooterSpeed');
     const dmg = getCrazyDaveSetting(cfg, 'peashooterDamage');
     const isLeft = this.facingDirection === -1;
@@ -377,8 +402,8 @@ export class PeashooterEntity extends Fighter {
       r: getCrazyDaveSetting(cfg, 'peashooterProjectileRadius'),
       radius: getCrazyDaveSetting(cfg, 'peashooterProjectileRadius'),
       damage: dmg,
-      owner: ownerIndex !== undefined ? ownerIndex : 0,
-      ownerFighter: this.owner || this,
+      owner: ownership.owner,
+      ownerFighter: ownership.ownerFighter,
       isPlantProjectile: true,
       color: '#22C55E',
       visual: 'peaBullet',
@@ -618,7 +643,9 @@ export class SnowPeaEntity extends Fighter {
 
   takeDamage(amount, attacker, opts = {}) {
     // Friendly fire check: ignore damage from other plants or Crazy Dave
-    if (attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+    const isMindControlled = isMakimaControlledPlant(this);
+    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
+    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
       return false;
     }
     // Ignore debuff DoT tick damages (poison ticks, burn ticks, bleed ticks, electrified ticks)
@@ -626,7 +653,7 @@ export class SnowPeaEntity extends Fighter {
       if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
         return false;
       }
-      if (opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
+      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
         return false;
       }
       opts.knockback = false;
@@ -684,14 +711,16 @@ export class SnowPeaEntity extends Fighter {
     let targetInLane = null;
     let closestDist = Infinity;
 
+    const isMindControlled = isMakimaControlledPlant(this);
     const evaluateTarget = (f) => {
-      if (!f || f === this || f === this.owner || f.isDeployable || f.isMinion || f.hp <= 0 || f.dead) return;
+      if (!f || f === this || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
+      if (typeof this.isTeammate === 'function' && this.isTeammate(f)) return;
       const dx = f.x - this.x;
       const dy = f.y - this.y;
 
       // Check if enemy is ahead in the straight committed direction
       const isAhead = (this.facingDirection === 1) ? (dx > 0) : (dx < 0);
-      if (!isAhead) return; // Behind the plant!
+      if (!isMindControlled && !isAhead) return; // Behind the plant!
 
       const forwardDist = Math.abs(dx);
       const laneDist = Math.abs(dy);
@@ -712,6 +741,10 @@ export class SnowPeaEntity extends Fighter {
 
     // Only shoot if a valid enemy is detected in the straight forward direction
     if (targetInLane) {
+      if (isMindControlled) {
+        this.facingDirection = targetInLane.x < this.x ? -1 : 1;
+        this.gunAngle = this.facingDirection === -1 ? Math.PI : 0;
+      }
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
       } else {
@@ -725,6 +758,7 @@ export class SnowPeaEntity extends Fighter {
 
   _fireSnowPea(angle, ownerIndex) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    const ownership = getPlantProjectileOwnership(this, ownerIndex);
     const speed = getCrazyDaveSetting(cfg, 'snowPeaSpeed');
     const dmg = getCrazyDaveSetting(cfg, 'snowPeaDamage');
     const isLeft = this.facingDirection === -1;
@@ -741,9 +775,13 @@ export class SnowPeaEntity extends Fighter {
       r: getCrazyDaveSetting(cfg, 'snowPeaProjectileRadius'),
       radius: getCrazyDaveSetting(cfg, 'snowPeaProjectileRadius'),
       damage: dmg,
-      owner: ownerIndex !== undefined ? ownerIndex : 0,
-      ownerFighter: this.owner || this,
+      owner: ownership.owner,
+      ownerFighter: ownership.ownerFighter,
       isPlantProjectile: true,
+      isSnowPea: true,
+      isAdaptableSkillShot: true,
+      skillShotId: 'crazyDaveSnowPea',
+      skillShotColor: '#38BDF8',
       color: '#38BDF8',
       visual: 'snowPeaBullet',
       life: getCrazyDaveSetting(cfg, 'snowPeaProjectileLife'),
@@ -1357,5 +1395,6 @@ export class CrazyDaveFighter extends Fighter {
 
     // 2. Draw Dave's Body, Pot & Overhead Sun Pill
     drawCrazyDaveSkin(ctx, this);
+    this.drawHealth(ctx);
   }
 }

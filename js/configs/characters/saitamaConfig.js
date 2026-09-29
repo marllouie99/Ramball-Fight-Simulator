@@ -113,6 +113,7 @@ export const saitamaConfig = {
   enableSeriousCounter: true,    // Master toggle for Serious Skill Counter
   enableCounterAutoAim: true,    // Master toggle for smooth auto-aim tracking during counter wind-up
   counterAutoAimTurnRate: 0.045, // Controlled turn rate (radians/frame) for smooth, non-fast rotation during counter wind-up (~2.5 deg/frame)
+  counterAimLockFrames: 30,      // Lock aim for the final 0.5s, giving enemies time to dodge the lethal counter punch
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
   counterPunchDamageMultiplier: 999.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
   counterPunchSpriteScale: 2.60,    // Scale multiplier for Serious Skill Counter punch sprite on release/extension

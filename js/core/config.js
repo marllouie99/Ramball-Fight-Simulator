@@ -187,7 +187,7 @@ export const CONFIG = {
   canvasHeight: 960,                 // Logical height of the game screen (standard 9:16 portrait)
   internalScale: 1.0,                // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container
   arenaXOffset: 0,                   // Horizontal offset shift (px) from center (negative = left, positive = right)
-  arenaYOffset: -70,                 // Vertical offset shift (px) from center (negative = up, positive = down)
+  arenaYOffset: -50,                 // Vertical offset shift (px) from center (negative = up, positive = down)
   arenaXOverride: null,              // Absolute X override (px) - set to a number (e.g. 50) to skip centering
   arenaYOverride: null,              // Absolute Y override (px) - set to a number (e.g. 120) to skip centering
   arenaTheme: 'light',               // Arena visual theme: 'light' | 'dark'

@@ -75,6 +75,7 @@ export class StatusEffectsManager {
 
   applyFreeze(frames, attacker, opts = {}) {
     if (!this.fighter) return;
+    if (opts.isSnowPea && this.fighter.adaptedSnowPea) return;
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isCountering || (this.fighter._counterPunchTimer && this.fighter._counterPunchTimer > 0) || (this.fighter._postCounterRecoveryTimer && this.fighter._postCounterRecoveryTimer > 0)) return;
     if (this.fighter.isDashingThunderclap || (this.fighter.thunderclapDashPauseTimer && this.fighter.thunderclapDashPauseTimer > 0)) return;
     if (this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.isDebuffImmune || this.fighter.isPlant || this.fighter.isPlantMinion || this.fighter.characterId === 'toji' || this.fighter.type === 'toji' || this.fighter.characterId === 'escanor' || this.fighter.type === 'escanor') return;

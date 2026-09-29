@@ -42,6 +42,12 @@ function areOnSameTeam(ownerIndex, targetIndex) {
     }
     return false;
   }
+  if (targetFighter && targetFighter.isChainedByMakima) {
+    if (ownerFighter === targetFighter._makimaChainer || (targetFighter._makimaChainer && targetFighter._makimaChainer.isTeammate(ownerFighter))) {
+      return true;
+    }
+    return false;
+  }
 
   const mode = state.mode;
   const isTeamMode = (
@@ -1308,13 +1314,15 @@ class ProjectileSystem {
 
       // Plant projectiles (Peashooter / Snow Pea peas) pass freely through all other plants and Crazy Dave
       const isPlantProj = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet';
-      if (isPlantProj && (fighter.isPlant || fighter.isPlantMinion || fighter === projectile.ownerFighter?.owner || fighter.characterId === 'crazydave')) {
+      const isMindControlledPlantProjectile = Boolean(projectile.ownerFighter?.isChainedByMakima && projectile.ownerFighter?.isMindControlledByMakima);
+      const isMindControlledPlantTarget = Boolean(fighter.isChainedByMakima && fighter.isMindControlledByMakima);
+      if (isPlantProj && !isMindControlledPlantProjectile && !isMindControlledPlantTarget && (fighter.isPlant || fighter.isPlantMinion || fighter === projectile.ownerFighter?.owner || fighter.characterId === 'crazydave')) {
         continue;
       }
 
       // Friendly plants of the same owner / team skip incoming friendly projectiles
       if (fighter.isPlant || fighter.isPlantMinion) {
-        if (projectile.ownerFighter && (projectile.ownerFighter === fighter.owner || projectile.ownerFighter.owner === fighter.owner || projectile.ownerFighter.isPlant || projectile.ownerFighter.characterId === 'crazydave')) {
+        if (!isMindControlledPlantProjectile && !isMindControlledPlantTarget && projectile.ownerFighter && (projectile.ownerFighter === fighter.owner || projectile.ownerFighter.owner === fighter.owner || projectile.ownerFighter.isPlant || projectile.ownerFighter.characterId === 'crazydave')) {
           continue;
         }
       }

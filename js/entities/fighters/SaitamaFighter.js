@@ -1182,7 +1182,8 @@ export class SaitamaFighter extends Fighter {
 
     // Smooth, weighted auto-aim tracking towards the true enemy fighter during wind-up (ignoring minions)
     const autoAimEnabled = CONFIG.saitama?.enableCounterAutoAim !== false;
-    if (autoAimEnabled && this._counterPunchTarget && this._counterPunchTarget.hp > 0) {
+    const aimLockFrames = CONFIG.saitama?.counterAimLockFrames ?? 30;
+    if (autoAimEnabled && this._counterPunchTimer > aimLockFrames && this._counterPunchTarget && this._counterPunchTarget.hp > 0) {
       const target = this._counterPunchTarget;
       const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
       const myY = this.y - (this.z || 0);
