@@ -149,40 +149,6 @@ export class GenosFighter extends Fighter {
     }
   }
 
-  /**
-   * Finds the closest valid enemy target in the arena.
-   */
-  _findClosestEnemy(preferredOpponent) {
-    const isPreferredAlive = preferredOpponent && preferredOpponent !== this && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
-    if (isPreferredAlive) {
-      return preferredOpponent;
-    }
-    let bestTarget = null;
-    let bestDist = Infinity;
-    const allEntities = [];
-    if (typeof state !== 'undefined') {
-      if (state.fighters) allEntities.push(...state.fighters);
-      if (state.illusions) allEntities.push(...state.illusions);
-    }
-    for (const e of allEntities) {
-      const isEntReforming = Boolean(e && (e.isRevivingFromContract || e.isShatterReviving));
-      if (!e || e === this) continue;
-      if (!isEntReforming && (e.isDead || e.hp <= 0)) continue;
-      if (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') {
-        const rootEntity = e.owner || e;
-        const myTeam = state.getFighterTeam(state.fighters?.indexOf(this));
-        const otherTeam = state.getFighterTeam(state.fighters?.indexOf(rootEntity));
-        if (myTeam !== null && myTeam !== undefined && otherTeam !== null && otherTeam !== undefined && myTeam === otherTeam) continue;
-      }
-      const d = Math.hypot(e.x - this.x, e.y - this.y);
-      if (d < bestDist) {
-        bestDist = d;
-        bestTarget = e;
-      }
-    }
-    return bestTarget;
-  }
-
   isStationarySkillActive() {
     return Boolean(
       (this.incinerateChargeTimer > 0) ||
@@ -876,8 +842,8 @@ export class GenosFighter extends Fighter {
 
       // ── Scan targets FIRST before committing to the attack ──
       const targetsToScan = [];
-      if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0) targetsToScan.push(f); });
-      if (state.illusions) state.illusions.forEach(ill => { if (ill && ill.hp > 0) targetsToScan.push(ill); });
+      if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0 && !f.isLawnmower && !f.isUntargetable && !f.untargetable && !f.cannotBeTargeted && f.isTargetable !== false) targetsToScan.push(f); });
+      if (state.illusions) state.illusions.forEach(ill => { if (ill && ill.hp > 0 && !ill.isLawnmower && !ill.isUntargetable && !ill.untargetable && !ill.cannotBeTargeted && ill.isTargetable !== false) targetsToScan.push(ill); });
 
       let hitAny = false;
       for (const target of targetsToScan) {

@@ -311,6 +311,7 @@ export class YujiFighter extends Fighter {
 
   isValidAimTarget(target) {
     if (!target || target === this) return false;
+    if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
     const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
     const isAlive = (target.hp > 0 && !target.isDead && !target._hasDied) || isReforming || (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive());
     if (!isAlive) return false;
@@ -322,60 +323,6 @@ export class YujiFighter extends Fighter {
     }
 
     return super.isValidAimTarget(target);
-  }
-
-  _getValidEnemyTargets(opponent = null) {
-    const enemies = [];
-    if (opponent) {
-      if (Array.isArray(opponent)) {
-        for (const op of opponent) {
-          const isOpReforming = Boolean(op && (op.isRevivingFromContract || op.isShatterReviving));
-          if (op && (!op.isDead || isOpReforming) && (op.hp > 0 || isOpReforming) && !this.isTeammate(op)) enemies.push(op);
-        }
-      } else {
-        const isOpReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
-        if (opponent && (!opponent.isDead || isOpReforming) && (opponent.hp > 0 || isOpReforming) && !this.isTeammate(opponent)) {
-          enemies.push(opponent);
-        }
-      }
-    }
-
-    if (typeof state !== 'undefined') {
-      if (state.fighters) {
-        for (let i = 0; i < state.fighters.length; i++) {
-          const f = state.fighters[i];
-          const isFReforming = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving));
-          if (!f || f === this) continue;
-          if (!isFReforming && (f.hp <= 0 || f.isDead || f._hasDied)) continue;
-          if (this.isTeammate(f)) continue;
-          if (!enemies.includes(f)) enemies.push(f);
-        }
-      }
-      if (state.illusions) {
-        for (const ill of state.illusions) {
-          if (!ill || ill === this || ill.hp <= 0 || ill.isDead) continue;
-          if (ill.owner && this.isTeammate(ill.owner)) continue;
-          if (ill.ownerIndex !== undefined && typeof state.getFighterTeam === 'function' && state.getFighterTeam(state.fighters.indexOf(this)) === state.getFighterTeam(ill.ownerIndex)) continue;
-          if (!enemies.includes(ill)) enemies.push(ill);
-        }
-      }
-    }
-    return enemies;
-  }
-
-  _findClosestEnemy() {
-    const enemies = this._getValidEnemyTargets();
-    if (enemies.length === 0) return null;
-    let closest = null;
-    let minDist = Infinity;
-    for (const e of enemies) {
-      const d = Math.hypot((e.x || 0) - this.x, (e.y || 0) - this.y);
-      if (d < minDist) {
-        minDist = d;
-        closest = e;
-      }
-    }
-    return closest || enemies[0];
   }
 
   update(opponent, ownerIndex, arena) {

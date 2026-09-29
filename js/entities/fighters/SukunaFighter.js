@@ -2184,44 +2184,6 @@ export class SukunaFighter extends Fighter {
     }
   }
 
-  _findClosestEnemy(preferredOpponent = null) {
-    const isPreferredAlive = preferredOpponent && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
-    if (isPreferredAlive) {
-      return preferredOpponent;
-    }
-    let closest = null;
-    let minDist = Infinity;
-    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
-    const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
-
-    const allTargets = [];
-    if (typeof state !== 'undefined') {
-      if (state.fighters) allTargets.push(...state.fighters);
-      if (state.illusions) allTargets.push(...state.illusions);
-      if (state.cjDriveBys) allTargets.push(...state.cjDriveBys);
-    }
-
-    for (const ent of allTargets) {
-      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
-      if (!ent || ent === this) continue;
-      if (!isEntReforming && (ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable)) continue;
-      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
-      if (ent.owner === this) continue;
-      if (myTeam !== null && myTeam !== undefined) {
-        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
-        if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
-        if (ent.team !== undefined && ent.team === myTeam) continue;
-      }
-
-      const dist = Math.hypot(ent.x - this.x, ent.y - this.y);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = ent;
-      }
-    }
-    return closest;
-  }
-
   _findAlignedEnemyForFuga(preferredOpponent = null) {
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
     const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);

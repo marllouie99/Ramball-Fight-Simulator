@@ -344,7 +344,7 @@ export class PeashooterEntity extends Fighter {
 
     const isMindControlled = isMakimaControlledPlant(this);
     const evaluateTarget = (f) => {
-      if (!f || f === this || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
+      if (!f || f === this || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
       if (typeof this.isTeammate === 'function' && this.isTeammate(f)) return;
       const dx = f.x - this.x;
       const dy = f.y - this.y;
@@ -717,7 +717,7 @@ export class SnowPeaEntity extends Fighter {
 
     const isMindControlled = isMakimaControlledPlant(this);
     const evaluateTarget = (f) => {
-      if (!f || f === this || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
+      if (!f || f === this || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
       if (typeof this.isTeammate === 'function' && this.isTeammate(f)) return;
       const dx = f.x - this.x;
       const dy = f.y - this.y;
@@ -1575,7 +1575,12 @@ export class LawnmowerEntity extends Fighter {
       type: 'Lawnmower',
       isDeployable: true,
       isMinion: true,
+      isMinionEntity: true,
       isLawnmower: true,
+      isUntargetable: true,
+      untargetable: true,
+      cannotBeTargeted: true,
+      isTargetable: false,
       hp: 99999,
       damage: getCrazyDaveSetting(cfg, 'lawnmowerDamage') || 180,
       cooldown: 999999,
@@ -1589,6 +1594,7 @@ export class LawnmowerEntity extends Fighter {
     this.characterId = 'crazydave_lawnmower';
     this.isDeployable = true;
     this.isMinion = true;
+    this.isMinionEntity = true;
     this.isLawnmower = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
@@ -1636,6 +1642,10 @@ export class LawnmowerEntity extends Fighter {
     return false;
   }
 
+  isValidAimTarget() {
+    return false;
+  }
+
   aim() {
     this.angle = 0;
     this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
@@ -1677,10 +1687,15 @@ export class LawnmowerEntity extends Fighter {
         return;
       }
 
-      // Lane breach trigger: enemy is within mower's lane and crosses left baseline zone
-      if (dy <= halfRowH && f.x <= this.x + this._triggerRadius + 12) {
-        this.trigger();
-        return;
+      // Lane breach trigger: enemy is within mower's lane and crosses baseline zone
+      if (dy <= halfRowH) {
+        if (this.facingDirection === 1 && f.x <= this.x + this._triggerRadius + 12) {
+          this.trigger();
+          return;
+        } else if (this.facingDirection === -1 && f.x >= this.x - this._triggerRadius - 12) {
+          this.trigger();
+          return;
+        }
       }
     }
   }
@@ -2086,10 +2101,18 @@ export class CrazyDaveFighter extends Fighter {
     const rows = Math.max(3, Math.round(arena.height / targetTileSize));
     const cellH = arena.height / rows;
 
-    // Lawnmowers ALWAYS parked on the LEFT side of the arena, facing RIGHT (+1)
-    const facingDirection = 1;
+    // Lawnmowers parked on the side based on where Dave spawns
+    const arenaMidX = arena.x + arena.width / 2;
+    const spawnX = (typeof this.startX === 'number' && !isNaN(this.startX))
+      ? this.startX
+      : ((this._def && typeof this._def.startX === 'number' && !isNaN(this._def.startX)) ? this._def.startX : this.x);
+
+    const isRightSpawn = spawnX > arenaMidX;
+    const facingDirection = isRightSpawn ? -1 : 1;
     const baselineOffset = getCrazyDaveSetting(cfg, 'lawnmowerBaselineOffset') ?? 2;
-    const baselineX = arena.x + baselineOffset;
+    const baselineX = isRightSpawn
+      ? (arena.x + arena.width - baselineOffset)
+      : (arena.x + baselineOffset);
 
     this.lawnmowers = [];
     for (let r = 0; r < rows; r++) {

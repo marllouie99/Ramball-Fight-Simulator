@@ -135,7 +135,7 @@ export function suppressAfterimagesAndAttackEffects(target) {
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
-  if (target.isLawnmower || target.isUntargetable || target.untargetable) return false;
+  if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
   if (typeof opts === 'string') {
     opts = { source: opts, isBleed: opts === 'bleed', isCurse: opts === 'curse' };
   } else if (!opts || typeof opts !== 'object') {
@@ -2949,7 +2949,7 @@ export class Fighter {
    */
   isValidAimTarget(target) {
     if (!target || target === this) return false;
-    if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted) return false;
+    if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
     const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
     const isAlive = (target.hp > 0 && !target.isDead && !target._hasDied) || isReforming || (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive());
     if (!isAlive) return false;
@@ -2967,6 +2967,88 @@ export class Fighter {
       }
     }
     return true;
+  }
+
+  /**
+   * Universal helper: Queries all valid enemy targets (fighters & illusions) in the arena.
+   * Centralized Single Source of Truth for all characters.
+   */
+  _getAllValidEnemyTargets(opponent = null) {
+    const targets = [];
+    if (typeof state === 'undefined') return targets;
+
+    const myIndex = (state.fighters || []).indexOf(this);
+    const myTeam = (typeof state.getFighterTeam === 'function' && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
+
+    const candidates = [];
+    if (state.fighters) candidates.push(...state.fighters);
+    if (state.illusions) candidates.push(...state.illusions);
+    if (state.cjDriveBys) candidates.push(...state.cjDriveBys);
+
+    for (let i = 0; i < candidates.length; i++) {
+      const ent = candidates[i];
+      if (!ent || ent === this) continue;
+      if (!this.isValidAimTarget(ent)) continue;
+      if (ent.owner === this) continue;
+      if (typeof this.isTeammate === 'function' && this.isTeammate(ent)) continue;
+
+      if (myTeam !== null && myTeam !== undefined) {
+        if (ent.owner) {
+          const ownerIdx = state.fighters ? state.fighters.indexOf(ent.owner) : -1;
+          const ownerTeam = (typeof state.getFighterTeam === 'function' && ownerIdx >= 0) ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+          if (ownerTeam !== null && ownerTeam !== undefined && ownerTeam === myTeam) continue;
+        } else {
+          const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+          const enemyTeam = (typeof state.getFighterTeam === 'function' && entIdx >= 0) ? state.getFighterTeam(entIdx) : ent.team;
+          if (enemyTeam !== null && enemyTeam !== undefined && enemyTeam === myTeam) continue;
+        }
+      }
+
+      if (!targets.includes(ent)) {
+        targets.push(ent);
+      }
+    }
+
+    return targets;
+  }
+
+  /**
+   * Alias for _getAllValidEnemyTargets.
+   */
+  _getValidEnemyTargets(opponent = null) {
+    return this._getAllValidEnemyTargets(opponent);
+  }
+
+  /**
+   * Universal helper: Finds the closest valid enemy target in the arena.
+   * Subclasses inherit this centralized method with 0 boilerplate.
+   */
+  _findClosestEnemy(preferredOpponent = null) {
+    if (preferredOpponent && preferredOpponent !== this && this.isValidAimTarget(preferredOpponent) && (!this.isTeammate || !this.isTeammate(preferredOpponent))) {
+      return preferredOpponent;
+    }
+
+    const targets = this._getAllValidEnemyTargets();
+    if (targets.length === 0) return null;
+
+    let closest = null;
+    let minDist = Infinity;
+    for (let i = 0; i < targets.length; i++) {
+      const ent = targets[i];
+      const dist = Math.hypot((ent.x || 0) - this.x, (ent.y || 0) - this.y);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = ent;
+      }
+    }
+    return closest;
+  }
+
+  /**
+   * Universal alias for _findClosestEnemy.
+   */
+  _findNearestEnemy(preferredOpponent = null) {
+    return this._findClosestEnemy(preferredOpponent);
   }
 
   /**

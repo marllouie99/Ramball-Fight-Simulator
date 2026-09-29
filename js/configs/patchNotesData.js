@@ -28,27 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "CRAZYDAVE",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "desc",
-                "oldVal": "Crazy Dave has no direct basic attack! He navigates the arena collecting falling Sun drops to deploy rapid-fire Peashooters and chilling Snow Peas that fight on his behalf.",
-                "newVal": "Crazy Dave has no direct basic attack! He navigates the arena collecting falling Sun drops to deploy sturdy Wall-nut barriers",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "1",
-                "oldVal": "Plant Peashooter (Regular Damage)",
-                "newVal": "Plant Wall-nut (Barrier Shield Defense Mechanism — Solid Immovable Obstacle)",
-                "pct": "Mod"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

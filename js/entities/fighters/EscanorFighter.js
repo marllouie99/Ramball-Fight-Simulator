@@ -2417,38 +2417,6 @@ export class EscanorFighter extends Fighter {
     return nearest;
   }
 
-  /**
-   * Helper: Queries all valid enemy targets (fighters & illusions) per Rule 6
-   */
-  _getAllValidEnemyTargets() {
-    const targets = [];
-    if (typeof state === 'undefined') return targets;
-
-    const myIndex = (state.fighters || []).indexOf(this);
-    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : null;
-
-    // 1. Check state.fighters
-    if (state.fighters) {
-      for (let i = 0; i < state.fighters.length; i++) {
-        const f = state.fighters[i];
-        if (!f || f === this || f.isDead || (f.hp || 0) <= 0) continue;
-        if (myTeam !== null && typeof state.getFighterTeam === 'function' && state.getFighterTeam(i) === myTeam) continue;
-        targets.push(f);
-      }
-    }
-
-    // 2. Check state.illusions (Rule 6)
-    if (state.illusions) {
-      for (let i = 0; i < state.illusions.length; i++) {
-        const ill = state.illusions[i];
-        if (!ill || ill.isDead || (ill.hp || 0) <= 0 || ill.owner === this) continue;
-        targets.push(ill);
-      }
-    }
-
-    return targets;
-  }
-
   interruptAttacks(forceCancelAll = false) {
     // Divine Solar Poise: Never interrupt or reset basic attack or Cruel Sun while Escanor is alive
     if (this.hp > 0 && !this.dead && !this.isDead) {

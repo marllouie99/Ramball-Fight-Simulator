@@ -496,49 +496,6 @@ export class NanamiFighter extends Fighter {
     // Nanami wields his blunt cleaver, not a standard gun barrel.
   }
 
-  _getAllValidEnemyTargets() {
-    const targets = [];
-    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
-    const myTeam = (typeof state !== 'undefined' && state.getFighterTeam) ? state.getFighterTeam(myIndex) : this.team;
-
-    const allEntities = [];
-    if (typeof state !== 'undefined') {
-      if (state.fighters) allEntities.push(...state.fighters);
-      if (state.illusions) allEntities.push(...state.illusions);
-    }
-
-    for (const ent of allEntities) {
-      if (!ent || ent === this) continue;
-      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
-      if (!isEntReforming && (ent.hp <= 0 || ent.isDead || ent.isInvulnerable)) continue;
-      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
-      if (ent.owner === this) continue;
-      if (myTeam !== null && myTeam !== undefined) {
-        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
-        if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
-        if (ent.team !== undefined && ent.team === myTeam) continue;
-      }
-      targets.push(ent);
-    }
-    return targets;
-  }
-
-  _findClosestEnemy() {
-    let closest = null;
-    let minDist = Infinity;
-    const targets = this._getAllValidEnemyTargets();
-
-    for (const ent of targets) {
-      const dist = Math.hypot(ent.x - this.x, ent.y - this.y);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = ent;
-      }
-    }
-
-    return closest;
-  }
-
   /**
    * Resolves arena boundary collisions.
    * Naturally reflects velocity off arena walls.

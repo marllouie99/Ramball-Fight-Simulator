@@ -652,7 +652,7 @@ export function getClosestOpponent(fighter) {
     const other = state.fighters[i];
     const isOtherAlive = other && (other.hp > 0 || other.isRevivingFromContract || other.isShatterReviving || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(other)));
     if (!other || other === fighter || !isOtherAlive) continue;
-    if (other.isLawnmower || other.isUntargetable || other.untargetable || other.cannotBeTargeted) continue;
+    if (other.isLawnmower || other.isUntargetable || other.untargetable || other.cannotBeTargeted || other.isTargetable === false) continue;
     if (fighter.isTeammate(other)) continue;
     if (!fighter.isChainedByMakima && !other.isChainedByMakima && isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;
     

@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
+import { areOnSameTeam as areOnSameTeamByIndex, isTeamModeEnabled } from '../core/teamUtils.js';
 import { state, isGlobalHitPauseActive, registerProjectileSystem, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound, fadeOutSound, fadeOutSoundBySrc } from './soundSystem.js';
@@ -19,6 +20,8 @@ import { ProjectileBehaviorManager } from './projectiles/ProjectileBehaviorManag
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { getRubbickStaffTip } from '../graphics/weapons/rubbickWeaponGraphics.js';
 import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
+import { collectProjectileCollisionCandidates, isFugaProjectile, shouldSkipProjectileTarget } from './projectileTargeting.js';
+import { getSweptProjectileCollision } from './projectileCollision.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -49,17 +52,7 @@ function areOnSameTeam(ownerIndex, targetIndex) {
     return false;
   }
 
-  const mode = state.mode;
-  const isTeamMode = (
-    mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' ||
-    mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' ||
-    mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' ||
-    mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4' || mode === '4v4'
-  );
-  if (!isTeamMode) return false;
-  const ownerTeam = typeof state.getFighterTeam === 'function' ? state.getFighterTeam(ownerIndex) : null;
-  const targetTeam = typeof state.getFighterTeam === 'function' ? state.getFighterTeam(targetIndex) : null;
-  return ownerTeam !== null && targetTeam !== null && ownerTeam === targetTeam;
+  return areOnSameTeamByIndex(state, ownerIndex, targetIndex);
 }
 
 /**
@@ -1278,103 +1271,18 @@ class ProjectileSystem {
     if (projectile.isGetsuga || projectile.behaviorType === 'getsuga_tensho') return false; // Getsuga handles multi-target piercing in GetsugaBehavior
 
     // Query all active fighters and illusions directly to prevent spatial grid misses
-    const candidateEntities = [];
-    if (fighters && fighters.length > 0) {
-      for (let fi = 0; fi < fighters.length; fi++) {
-        if (fighters[fi]) candidateEntities.push({ fighter: fighters[fi], fi, isIllusion: false });
-      }
-    }
-    if (typeof state !== 'undefined' && state.illusions && state.illusions.length > 0) {
-      for (let ii = 0; ii < state.illusions.length; ii++) {
-        if (state.illusions[ii]) candidateEntities.push({ fighter: state.illusions[ii], fi: -1, isIllusion: true });
-      }
-    }
+    const candidateEntities = collectProjectileCollisionCandidates(fighters, state);
 
     for (const { fighter, fi, isIllusion } of candidateEntities) {
       if (!fighter || fighter.isAmbushing) continue;
 
-      const isFuga = projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace';
-
-      // Normal projectiles skip targets with active iframes or vanish.
-      // However, Fuga is a massive thermobaric missile: if it intersects a target's space,
-      // it must detonate and never pass through their body like a ghost.
-      if (!isFuga && ((fighter.vanishTimer && fighter.vanishTimer > 0) || (fighter.invincibilityTimer && fighter.invincibilityTimer > 0))) continue;
-
-      // Skip projectile owner
-      if (projectile.ownerFighter && projectile.ownerFighter === fighter) continue;
-      if (typeof projectile.owner === 'number' && fi !== -1 && projectile.owner === fi) continue;
-      if (isIllusion && fighter.owner && projectile.ownerFighter && fighter.owner === projectile.ownerFighter) continue;
-
-      // Skip teammates in 2v2 mode
-      if (fi !== -1 && areOnSameTeam(projectile.owner, fi)) continue;
-      if (isIllusion && fighter.owner) {
-        const illOwnerIdx = (typeof fighter.ownerIndex === 'number') ? fighter.ownerIndex : (fighters ? fighters.indexOf(fighter.owner) : -1);
-        if (illOwnerIdx !== -1 && areOnSameTeam(projectile.owner, illOwnerIdx)) continue;
-      }
-
-      // Plant projectiles (Peashooter / Snow Pea / Fire peas) pass freely through all other plants and Crazy Dave
-      const isPlantProj = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet' || projectile.visual === 'firePeaBullet';
-      const isMindControlledPlantProjectile = Boolean(projectile.ownerFighter?.isChainedByMakima && projectile.ownerFighter?.isMindControlledByMakima);
-      const isMindControlledPlantTarget = Boolean(fighter.isChainedByMakima && fighter.isMindControlledByMakima);
-      if (isPlantProj && !isMindControlledPlantProjectile && !isMindControlledPlantTarget && (fighter.isPlant || fighter.isPlantMinion || fighter === projectile.ownerFighter?.owner || fighter.characterId === 'crazydave')) {
-        continue;
-      }
-
-      // Friendly plants of the same owner / team skip incoming friendly projectiles
-      if (fighter.isPlant || fighter.isPlantMinion) {
-        if (!isMindControlledPlantProjectile && !isMindControlledPlantTarget && projectile.ownerFighter && (projectile.ownerFighter === fighter.owner || projectile.ownerFighter.owner === fighter.owner || projectile.ownerFighter.isPlant || projectile.ownerFighter.characterId === 'crazydave')) {
-          continue;
-        }
-      }
-
-      // Skip if this projectile has piercing and already hit this fighter
-      if (projectile.hitFighters && projectile.hitFighters.has(fighter)) continue;
-
-      // Skip submerged or erupting entities (e.g. Megumi Shadow Sink) - projectiles pass freely over the floor shadow
-      if (fighter.isSubmerged || fighter.isErupting) continue;
-
-      // Lawnmowers and untargetable entities phase through projectiles (projectiles pass freely over them)
-      if (fighter.isLawnmower || fighter.isUntargetable || fighter.untargetable) continue;
+      const isFuga = isFugaProjectile(projectile);
+      if (shouldSkipProjectileTarget(projectile, fighter, fi, isIllusion, fighters, state, areOnSameTeam)) continue;
 
       // ── Swept Continuous Collision Detection (CCD) for high-speed projectiles ──
-      const isTactical = projectile.visual === 'tacticalBullet';
-      const projRadius = isFuga ? Math.max(18, (projectile.r || 18) + 4) : (isTactical ? Math.max(9, (projectile.r || 5) + 3) : (projectile.r || (projectile.bulletRadius || 5)));
-      const hitRadius = (fighter.r || 25) + projRadius;
-
-      // Calculate distance from fighter center to the line segment traveled by the projectile this frame
-      const segVx = projectile.vx || 0;
-      const segVy = projectile.vy || 0;
-      const prevX = projectile.x - segVx;
-      const prevY = projectile.y - segVy;
-      const segLenSq = segVx * segVx + segVy * segVy;
-
-      // Fast broad-phase AABB test
-      const minX = Math.min(prevX, projectile.x) - hitRadius;
-      const maxX = Math.max(prevX, projectile.x) + hitRadius;
-      const minY = Math.min(prevY, projectile.y) - hitRadius;
-      const maxY = Math.max(prevY, projectile.y) + hitRadius;
-
-      if (fighter.x < minX || fighter.x > maxX || fighter.y < minY || fighter.y > maxY) continue;
-
-      let distSq;
-      let closestX = projectile.x;
-      let closestY = projectile.y;
-      if (segLenSq > 0.001) {
-        const t = Math.max(0, Math.min(1, ((fighter.x - prevX) * segVx + (fighter.y - prevY) * segVy) / segLenSq));
-        closestX = prevX + t * segVx;
-        closestY = prevY + t * segVy;
-        const cdx = fighter.x - closestX;
-        const cdy = fighter.y - closestY;
-        distSq = cdx * cdx + cdy * cdy;
-      } else {
-        const dx = fighter.x - projectile.x;
-        const dy = fighter.y - projectile.y;
-        distSq = dx * dx + dy * dy;
-      }
-
-      const hitRadiusSq = hitRadius * hitRadius;
-      const proximityRadius = hitRadius + (CONFIG.darkslategray?.proximityTriggerRadius || 0);
-      const proxRadiusSq = proximityRadius * proximityRadius;
+      const collision = getSweptProjectileCollision(projectile, fighter, CONFIG, isFuga);
+      if (!collision) continue;
+      const { distSq, closestX, closestY, hitRadiusSq, proximityRadiusSq: proxRadiusSq } = collision;
 
       if (distSq < hitRadiusSq) {
         if (projectile.isBlackHole && projectile.hitTargets && projectile.hitTargets.has(fi)) {

@@ -3,26 +3,11 @@ import { state } from '../../../core/state.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnPurpleShockwaveRings, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { triggerGlobalScreenShake } from '../../../core/state.js';
-import { GAME_MODES } from '../../../core/modeConfig.js';
+import { areOnSameTeam as areOnSameTeamByIndex } from '../../../core/teamUtils.js';
 import { isEntityImmuneToGravitationalPull } from '../../../entities/fighter.js';
 
 // Re-implement areOnSameTeam locally or export it from a shared utils
-function areOnSameTeam(ownerIndex, targetIndex) {
-  if (ownerIndex === targetIndex && ownerIndex !== undefined && ownerIndex !== null && ownerIndex !== -1) return true;
-  if (!state || !state.mode) return false;
-  if (typeof ownerIndex !== 'number' || typeof targetIndex !== 'number' || ownerIndex < 0 || targetIndex < 0) return false;
-  const mode = state.mode;
-  const isTeamMode = (
-    mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' ||
-    mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' ||
-    mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' ||
-    mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4' || mode === '4v4'
-  );
-  if (!isTeamMode) return false;
-  const team1 = state.getFighterTeam ? state.getFighterTeam(ownerIndex) : null;
-  const team2 = state.getFighterTeam ? state.getFighterTeam(targetIndex) : null;
-  return team1 !== null && team2 !== null && team1 === team2;
-}
+const areOnSameTeam = (ownerIndex, targetIndex) => areOnSameTeamByIndex(state, ownerIndex, targetIndex);
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 

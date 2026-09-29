@@ -340,40 +340,6 @@ export class MahitoFighter extends Fighter {
     return res;
   }
 
-  _findClosestEnemy(preferredOpponent = null) {
-    const isPreferredAlive = preferredOpponent && (!preferredOpponent.isDead || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving) && (preferredOpponent.hp > 0 || preferredOpponent.isRevivingFromContract || preferredOpponent.isShatterReviving);
-    if (isPreferredAlive) {
-      return preferredOpponent;
-    }
-    if (typeof state === 'undefined' || !state.fighters) return null;
-    const myIdx = state.fighters.indexOf(this);
-    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIdx) : this.team;
-    let closest = null;
-    let minDist = Infinity;
-    const candidates = [...state.fighters, ...(state.illusions || [])];
-    for (let i = 0; i < candidates.length; i++) {
-      const ent = candidates[i];
-      const isEntReforming = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving));
-      if (!ent || ent === this) continue;
-      if (!isEntReforming && (ent.isDead || ent.hp <= 0)) continue;
-      const entIdx = state.fighters.indexOf(ent);
-      if (entIdx !== -1) {
-        const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(entIdx) : ent.team;
-        if (myTeam !== null && enemyTeam === myTeam) continue;
-      } else if (ent.owner) {
-        const ownerIdx = state.fighters.indexOf(ent.owner);
-        const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
-        if (myTeam !== null && ownerTeam === myTeam) continue;
-      }
-      const dist = Math.hypot(ent.x - this.x, ent.y - this.y);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = ent;
-      }
-    }
-    return closest;
-  }
-
   /**
    * Overrides aim to disable body & gunAngle rotation during active skill channeling until finished.
    */

@@ -313,30 +313,6 @@ export class UryuFighter extends Fighter {
     return true;
   }
 
-  _findNearestEnemy() {
-    if (typeof state === 'undefined') return null;
-    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
-    let nearest = null;
-    let minDist = Infinity;
-
-    for (let i = 0; i < allTargets.length; i++) {
-      const t = allTargets[i];
-      if (!t || t === this || t.hp <= 0 || t.isDead || t.invulnerable) continue;
-      // Exclude teammates
-      if (typeof state.getFighterTeam === 'function') {
-        const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-        const theirTeam = state.getFighterTeam(state.fighters.indexOf(t));
-        if (myTeam !== null && myTeam === theirTeam) continue;
-      }
-      const d = Math.hypot(t.x - this.x, t.y - this.y);
-      if (d < minDist) {
-        minDist = d;
-        nearest = t;
-      }
-    }
-    return nearest;
-  }
-
   isParalyzedDebuffActive() {
     return Boolean(
       this.isParalyzed ||
