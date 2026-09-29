@@ -21,7 +21,7 @@ import {
   drawCarScorchMarks,
   clearCarExplosions
 } from '../graphics/particles/cjCarExplosion.js';
-import { drawMinionHealthBar } from '../graphics/statusEffects.js';
+import { drawMinionHealthBar, drawBurnEffect } from '../graphics/statusEffects.js';
 import {
   drawGroveStreetCar,
   drawCarHeadlights,
@@ -280,6 +280,13 @@ export function spawnGroveStreetDriveBy(cjFighter) {
       this.homie2Flash = 0;
     },
 
+    applyBurn(attacker, duration) {
+      const finalDuration = duration ?? ((typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDuration) || 180);
+      this.burnTimer = Math.max(this.burnTimer || 0, finalDuration);
+      this.burnDamageTimer = 0;
+      this.lastBurnAttacker = attacker;
+    },
+
     takeDamage(amount, attacker, opts = {}) {
       if (this.dead || this.hp <= 0) return false;
 
@@ -422,6 +429,19 @@ export function updateDriveBys() {
       if (car.electricStunTimer && car.electricStunTimer > 0) car.electricStunTimer--;
       if (car.hitStunTimer && car.hitStunTimer > 0) car.hitStunTimer--;
       if (car.slowTimer && car.slowTimer > 0) car.slowTimer--;
+      if (car.burnTimer && car.burnTimer > 0) {
+        car.burnTimer--;
+        car.burnDamageTimer = (car.burnDamageTimer || 0) + 1;
+        const damageInterval = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamageInterval) || 30;
+        if (car.burnDamageTimer >= damageInterval) {
+          const damage = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamagePerSecond) || 5;
+          car.takeDamage(damage, car.lastBurnAttacker || null, { isBurn: true });
+          car.burnDamageTimer = 0;
+          if (typeof spawnSparks === 'function' && Math.random() < 0.6) {
+            spawnSparks(car.x, car.y, 4, '#F97316');
+          }
+        }
+      }
       if (car.purpleHitTimer && car.purpleHitTimer > 0) {
         car.purpleHitTimer--;
         if (car.purpleHitTimer <= 0) car.isCaughtInPurple = false;
@@ -570,7 +590,9 @@ export function updateDriveBys() {
         ];
 
         for (const ent of allCandidates) {
-          if (!ent || ent === car.owner || ent.dead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.owner === car.owner) continue;
+          if (!ent || ent === car.owner || ent.dead || ent.isDead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.owner === car.owner) continue;
+          if (ent.isLawnmower || ent.isUntargetable || ent.untargetable || ent.cannotBeTargeted || ent.isTargetable === false) continue;
+          if (car.owner && typeof car.owner.isValidAimTarget === 'function' && !car.owner.isValidAimTarget(ent)) continue;
 
           if (typeof state.getFighterTeam === 'function') {
             if (ent.owner) {
@@ -1134,6 +1156,14 @@ export function drawDriveBys(ctx) {
         if (car.hp > 0) {
           const barY = car.y - (car.width * 0.5 + 16);
           drawMinionHealthBar(ctx, car.x, barY, 48, 7, car.hp, car.maxHp, '#16A34A');
+        }
+
+        // Render burn status visual effect (fiery aura & flickering embers)
+        if (car.burnTimer > 0) {
+          ctx.save();
+          ctx.translate(car.x, car.y);
+          drawBurnEffect(ctx, car.width * 0.55);
+          ctx.restore();
         }
       }
     }

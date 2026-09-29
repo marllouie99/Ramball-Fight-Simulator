@@ -191,6 +191,12 @@ export class DopplegangerFighter extends Fighter {
         this.knockbackVx = vx;
         this.knockbackVy = vy;
       },
+      applyBurn(attacker, duration) {
+        const finalDuration = duration ?? ((typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDuration) || 180);
+        this.burnTimer = Math.max(this.burnTimer || 0, finalDuration);
+        this.burnDamageTimer = 0;
+        this.lastBurnAttacker = attacker;
+      },
       takeDamage(amount, attacker, opts = {}) {
         return applyDamageToTarget(this, amount, attacker, opts);
       },

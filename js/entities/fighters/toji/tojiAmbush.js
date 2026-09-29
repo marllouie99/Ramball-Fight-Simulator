@@ -13,6 +13,7 @@ import { tojiGetTargetsInFrontalArc } from './tojiWeapons.js';
 
 export function tojiIsTargetDeadOrRemoved(fighter, target) {
   if (!target) return true;
+  if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return true;
 
   // Demo preview uses a fake target which is not in the state list
   if (fighter && fighter.isDemoFighter) {

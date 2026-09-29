@@ -38,7 +38,7 @@ export function triggerRikaDeathShatter(rk, fighter) {
     const dispersionHitStun = CONFIG.yuta?.rikaDeathExplosionHitStun || 20;
 
     state.fighters.forEach((enemy, idx) => {
-      if (enemy && enemy !== owner && enemy.hp > 0) {
+      if (enemy && enemy !== owner && enemy.hp > 0 && !enemy.isLawnmower && !enemy.isUntargetable && !enemy.untargetable && !enemy.cannotBeTargeted && enemy.isTargetable !== false) {
         const isEnemy = myTeam === null || (typeof state.getFighterTeam === 'function' ? state.getFighterTeam(idx) !== myTeam : (enemy.team !== myTeam));
         if (isEnemy) {
           const dx = enemy.x - rk.x;
@@ -270,7 +270,13 @@ export function initRika(fighter) {
       if (typeof vx === 'number') this.knockbackVx = (this.knockbackVx || 0) + vx;
       if (typeof vy === 'number') this.knockbackVy = (this.knockbackVy || 0) + vy;
     },
-    applyBurn: function() {},
+    applyBurn: function(attacker, duration) {
+      const finalDuration = duration ?? ((typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDuration) || 180);
+      this.burnTimer = Math.max(this.burnTimer || 0, finalDuration);
+      this.burnDamageTimer = 0;
+      this.lastBurnAttacker = attacker;
+      this.burnAttacker = attacker;
+    },
     applyPoison: function() {},
     applyShock: function() {},
     takeDamage: function(amount, attacker, opts = {}) {
@@ -390,6 +396,21 @@ export function updateRika(fighter, arena) {
   }
 
   clampRikaToArena(rk, currentArena);
+
+  // Handle burn status effect ticks on Rika
+  if (rk.burnTimer && rk.burnTimer > 0) {
+    rk.burnTimer--;
+    rk.burnDamageTimer = (rk.burnDamageTimer || 0) + 1;
+    const damageInterval = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamageInterval) || 30;
+    if (rk.burnDamageTimer >= damageInterval) {
+      const damage = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamagePerSecond) || 5;
+      rk.takeDamage(damage, rk.lastBurnAttacker || rk.burnAttacker || null, { isBurn: true });
+      rk.burnDamageTimer = 0;
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(rk.x, rk.y, 4, '#F97316');
+      }
+    }
+  }
 
   // If Yuta or Rika is chained or mind-controlled by Makima, ensure Rika is NOT in time-stop stasis so she can act!
   if ((fighter && (fighter.isChainedByMakima || fighter.isMindControlledByMakima)) || rk.isChainedByMakima || rk.isMindControlledByMakima) {
@@ -947,6 +968,10 @@ export function updateRika(fighter, arena) {
   }
 
   // Steer toward target (gradual heading adjustment, not instant)
+  if (rk.target && (rk.target.isLawnmower || rk.target.isUntargetable || rk.target.untargetable || rk.target.cannotBeTargeted || rk.target.isTargetable === false || rk.target.hp <= 0 || rk.target.isDead)) {
+    rk.target = null;
+  }
+
   if (rk.target) {
     const dx = rk.target.x - rk.x;
     const dy = rk.target.y - rk.y;
@@ -976,7 +1001,7 @@ export function updateRika(fighter, arena) {
       if (state.fighters) {
         for (let i = 0; i < state.fighters.length; i++) {
           const enemy = state.fighters[i];
-          if (!enemy || enemy.hp <= 0 || enemy.invincibilityTimer > 0 || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+          if (!enemy || enemy.hp <= 0 || enemy.invincibilityTimer > 0 || (enemy.vanishTimer && enemy.vanishTimer > 0) || enemy.isLawnmower || enemy.isUntargetable || enemy.untargetable || enemy.cannotBeTargeted || enemy.isTargetable === false) continue;
           
           if (isRikaDominated) {
             if (enemy === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(enemy))) continue;
@@ -996,7 +1021,7 @@ export function updateRika(fighter, arena) {
       // Collect all enemy illusions/minions in AOE radius
       if (state.illusions) {
         for (const ill of state.illusions) {
-          if (!ill || ill.hp <= 0 || ill.isRika) continue;
+          if (!ill || ill.hp <= 0 || ill.isRika || ill.isLawnmower || ill.isUntargetable || ill.untargetable || ill.cannotBeTargeted || ill.isTargetable === false) continue;
           if (isRikaDominated) {
             if (ill.owner === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(ill.owner))) continue;
           } else {
@@ -1252,7 +1277,7 @@ function findRikaTarget(fighter, rk) {
   // Check main enemy fighters
   for (let i = 0; i < state.fighters.length; i++) {
     const enemy = state.fighters[i];
-    if (!enemy || enemy.hp <= 0 || enemy.invincibilityTimer > 0 || enemy.isStealthed || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+    if (!enemy || enemy.hp <= 0 || enemy.invincibilityTimer > 0 || enemy.isStealthed || (enemy.vanishTimer && enemy.vanishTimer > 0) || enemy.isLawnmower || enemy.isUntargetable || enemy.untargetable || enemy.cannotBeTargeted || enemy.isTargetable === false) continue;
     
     if (isRikaDominated) {
       if (enemy === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(enemy))) continue;
@@ -1272,7 +1297,7 @@ function findRikaTarget(fighter, rk) {
   // Also check illusions and summoned minions (Doppelganger illusions, Hydra copies, etc.)
   if (state.illusions) {
     for (const ill of state.illusions) {
-      if (!ill || ill.hp <= 0 || ill.isRika) continue;
+      if (!ill || ill.hp <= 0 || ill.isRika || ill.isLawnmower || ill.isUntargetable || ill.untargetable || ill.cannotBeTargeted || ill.isTargetable === false) continue;
       
       if (isRikaDominated) {
         if (ill.owner === rk._makimaChainer || (rk._makimaChainer && typeof rk._makimaChainer.isTeammate === 'function' && rk._makimaChainer.isTeammate(ill.owner))) continue;

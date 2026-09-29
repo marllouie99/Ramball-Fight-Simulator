@@ -2675,12 +2675,139 @@ async function runInteractionTests() {
 
     // 8. Test Crazy Dave Skill 4 Registration & AI planting decision
     assert(dave.skillManager.skills.has('torchwood'), 'Crazy Dave must register Torchwood skill in skillManager');
-    
-    // Clear projectiles
+
+    // 9. Test Torchwood Proximity Burn on Enemy Minions / Illusions
+    const enemyMinion = {
+      x: 270,
+      y: 250,
+      hp: 80,
+      maxHp: 80,
+      dead: false,
+      isIllusion: true,
+      owner: nearbyEnemy,
+      burnTimer: 0,
+      applyBurn(attacker, duration) {
+        this.burnTimer = duration;
+        this.burnAttacker = attacker;
+      }
+    };
+    state.illusions = [enemyMinion];
+    torchwood.update(null, 0, state.arena);
+    assert(enemyMinion.burnTimer === CONFIG.crazydave.torchwoodBurnDuration, 'Enemy illusion/minion near Torchwood must receive proximity burn');
+    state.illusions = [];
+
+    // 10. Test Offensive Plant (Peashooter) targeting and firing at Enemy Minion/Illusion
+    const peashooter = new PeashooterEntity(100, 250, dave, 1);
+    const laneIllusion = {
+      x: 220,
+      y: 250,
+      hp: 100,
+      maxHp: 100,
+      dead: false,
+      isIllusion: true,
+      owner: nearbyEnemy,
+    };
+    state.illusions = [laneIllusion];
+    projectileSystem.projectiles = [];
+    peashooter.shootCooldown = 0;
+    peashooter.update(null, 0, state.arena);
+    assert(projectileSystem.projectiles.length > 0, 'Peashooter must target and shoot at enemy minion/illusion in lane');
+    assert(projectileSystem.projectiles[0].visual === 'peaBullet', 'Fired projectile must be peaBullet');
+    projectileSystem.projectiles = [];
+    state.illusions = [];
+
+    // 11. Test Fire Pea Splash AoE damages and burns enemy minion/illusion
+    const splashMinion = {
+      x: 255,
+      y: 252,
+      hp: 100,
+      maxHp: 100,
+      dead: false,
+      isIllusion: true,
+      owner: nearbyEnemy,
+      burnTimer: 0,
+      takeDamage(amount) { this.hp -= amount; return amount; },
+      applyBurn(attacker, duration) { this.burnTimer = duration; }
+    };
+    state.illusions = [splashMinion];
+    const directTarget = { x: 250, y: 250, hp: 200, dead: false };
+    greenPea.onHit(directTarget);
+    assert(splashMinion.hp < 100, 'Enemy minion in splash radius must take Fire Pea splash damage');
+    assert(splashMinion.burnTimer > 0, 'Enemy minion in splash radius must be ignited with burn');
+    state.illusions = [];
+
+    // 12. Test TurretEntity Proximity Burn & DoT Damage Ticking
+    const { TurretEntity } = await import('../js/entities/TurretEntity.js');
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    const enemyTurret = new TurretEntity(270, 250, nearbyEnemy, 1);
+    state.fighters = [torchwood, enemyTurret];
+    torchwood.update(null, 0, state.arena);
+    assert(enemyTurret.burnTimer > 0, 'Enemy Turret near Torchwood must receive proximity burn');
+    const initialTurretHp = enemyTurret.hp;
+    enemyTurret.burnDamageTimer = (CONFIG.orange?.burnDamageInterval || 60); // Force DoT tick
+    enemyTurret.update(null, 0, state.arena);
+    assert(enemyTurret.hp < initialTurretHp, 'Burning Turret must take burn DoT damage on update');
+
+    // 13. Test Rika Companion Proximity Burn & DoT Damage Ticking
+    const { updateRika } = await import('../js/entities/fighters/yuta/rikaLogic.js');
+    const mockYuta = {
+      characterId: 'yuta',
+      hp: 200,
+      isSkillEnabled: () => true,
+      rika: {
+        x: 275,
+        y: 250,
+        r: 30,
+        hp: 300,
+        maxHp: 300,
+        active: true,
+        burnTimer: 0,
+        applyBurn(attacker, duration) {
+          this.burnTimer = duration;
+          this.lastBurnAttacker = attacker;
+        },
+        takeDamage(amount) {
+          this.hp -= amount;
+        }
+      }
+    };
+    state.fighters = [torchwood, mockYuta];
+    torchwood.update(null, 0, state.arena);
+    assert(mockYuta.rika.burnTimer > 0, 'Enemy Rika companion near Torchwood must receive proximity burn');
+    const initialRikaHp = mockYuta.rika.hp;
+    mockYuta.rika.burnDamageTimer = (CONFIG.orange?.burnDamageInterval || 60);
+    updateRika(mockYuta, state.arena);
+    assert(mockYuta.rika.hp < initialRikaHp, 'Burning Rika must take burn DoT damage on update');
+
+    // 14. Test Illusion burn DoT damage in updateIllusions
+    const { updateIllusions } = await import('../js/systems/illusionSystem.js');
+    const burningIllusion = {
+      x: 100,
+      y: 100,
+      hp: 50,
+      maxHp: 50,
+      burnTimer: 180,
+      burnDamageTimer: (CONFIG.orange?.burnDamageInterval || 60),
+      dead: false,
+      isIllusion: true,
+      owner: nearbyEnemy,
+      takeDamage(amount) {
+        this.hp -= amount;
+      }
+    };
+    state.illusions = [burningIllusion];
+    state.gameState = 'playing';
+    updateIllusions();
+    assert(burningIllusion.hp < 50, 'Burning illusion must take burn DoT damage in updateIllusions');
+    state.illusions = [];
+
+    // Clear projectiles & state
     projectileSystem.projectiles = [];
     state.projectiles = [];
+    state.fighters = [];
 
-    console.log('      ✅ Torchwood 6-frame bounds, canvas stack balance, green pea fire ignition (2x dmg + splash), ice pea melting & skill registration verified.');
+    console.log('      ✅ Torchwood 6-frame bounds, canvas stack balance, green pea fire ignition (2x dmg + splash), ice pea melting, all minion burns (Turrets/Rika/Illusions/Cars) & skill registration verified.');
   }
 
   // ── 29. Testing Lawnmower Sprite Bounds, Stack Balance, Baseline Defense & Steamroller Shred ──
@@ -2778,6 +2905,30 @@ async function runInteractionTests() {
     const hpAfterFirstHit = enemy.hp;
     targetMower.update(null, 0, testArena);
     assert(enemy.hp === hpAfterFirstHit, `Enemy must not take duplicate shred damage in the same mower pass (got ${enemy.hp})`);
+
+    // 8b. Test Minion / Illusion Shredding: Lawnmower trips on and damages enemy minions
+    const minionMower = dave.lawnmowers[1];
+    const enemyIllusion = {
+      x: minionMower.x + 25,
+      y: minionMower.y,
+      r: 18,
+      hp: 100,
+      maxHp: 100,
+      dead: false,
+      isIllusion: true,
+      owner: testEnemy,
+      takeDamage: function(dmg) { this.hp -= dmg; return dmg; },
+      applyKnockback: function(vx, vy) { this.knockbackVx = vx; this.knockbackVy = vy; }
+    };
+    state.illusions = [enemyIllusion];
+    assert(minionMower.state === 'idle', 'Minion mower should start idle');
+    minionMower.update(null, 0, testArena);
+    assert(minionMower.state === 'charging', 'Lawnmower must trigger when enemy minion/illusion breaches baseline');
+    const prevIllHp = enemyIllusion.hp;
+    minionMower.update(null, 0, testArena);
+    assert(enemyIllusion.hp < prevIllHp, `Enemy illusion must take shred damage from lawnmower (expected < ${prevIllHp}, got ${enemyIllusion.hp})`);
+    assert(enemyIllusion.knockbackVx > 0, `Enemy illusion must receive knockback from lawnmower (got ${enemyIllusion.knockbackVx})`);
+    state.illusions = [];
 
     // 9. Test Mower despawn upon driving past arena boundary
     targetMower.x = testArena.x + testArena.width + 100;

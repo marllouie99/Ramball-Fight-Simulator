@@ -8,7 +8,7 @@ import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { drawTurret } from '../graphics/weaponVisuals.js';
 import { spawnSparks } from '../graphics/particles/sparkEffect.js';
 import { spawnDeathShatter, spawnMachineCorpse } from '../graphics/particles/deathShatterEffect.js';
-import { drawMinionHealthBar } from '../graphics/statusEffects.js';
+import { drawMinionHealthBar, drawBurnEffect } from '../graphics/statusEffects.js';
 
 export class TurretEntity extends Fighter {
   constructor(x, y, ownerFighter, level = 1) {
@@ -165,6 +165,10 @@ export class TurretEntity extends Fighter {
     if (this.hp <= 0) return;
     const cfg = CONFIG.Engineer || {};
 
+    if (this.burnTimer > 0) {
+      this.handleBurn();
+    }
+
     if (this.healCooldownTimer > 0) this.healCooldownTimer--;
     if (this.shootCooldown > 0) this.shootCooldown--;
     if (this.recoilTimer > 0) this.recoilTimer--;
@@ -260,7 +264,9 @@ export class TurretEntity extends Fighter {
       const myOwnerIndex = state.fighters.indexOf(this.owner);
 
       const evaluateTarget = (f) => {
-        if (!f || f === this || f === this.owner || f.hp <= 0) return;
+        if (!f || f === this || f === this.owner || f.hp <= 0 || f.dead || f.isDead) return;
+        if (f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false) return;
+        if (this.owner && typeof this.owner.isValidAimTarget === 'function' && !this.owner.isValidAimTarget(f)) return;
 
         // Skip stealthed & vanished targets
         if (f.invincibilityTimer > 0 || f.flashStepTimer > 0 || f.isStealthed || (f.vanishTimer && f.vanishTimer > 0)) return;
@@ -499,6 +505,14 @@ export class TurretEntity extends Fighter {
     if (this.hp <= 0) return;
 
     drawTurret(ctx, this);
+
+    // Render burn status visual effect (fiery aura & flickering embers)
+    if (this.burnTimer > 0) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      drawBurnEffect(ctx, this.r);
+      ctx.restore();
+    }
 
     // Draw smoke particles (Discrete Pixel Art)
     if (this.smokeParticles && this.smokeParticles.length > 0) {

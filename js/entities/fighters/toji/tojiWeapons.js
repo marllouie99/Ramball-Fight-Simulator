@@ -16,7 +16,8 @@ export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, 
   const halfArc = arcAngle * 0.5;
 
   const checkTarget = (target) => {
-    if (!target || target === fighter || target.hp <= 0) return false;
+    if (!target || target === fighter || target.hp <= 0 || target.dead || target.isDead) return false;
+    if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
     const dx = target.x - fighter.x;
     const dy = target.y - fighter.y;
     const dist = Math.hypot(dx, dy);

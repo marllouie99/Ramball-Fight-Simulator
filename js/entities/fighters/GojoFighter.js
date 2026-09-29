@@ -2573,7 +2573,7 @@ export class GojoFighter extends Fighter {
     ];
 
     for (const entity of allTargets) {
-      if (!entity || entity === this || entity.hp <= 0 || entity.isDead || entity.dead || entity.isDying) continue;
+      if (!entity || entity === this || entity.hp <= 0 || entity.isDead || entity.dead || entity.isDying || entity.isLawnmower || entity.isUntargetable || entity.untargetable || entity.cannotBeTargeted || entity.isTargetable === false) continue;
       if (entity.owner === this) continue;
       const myIdx = (state.fighters) ? state.fighters.indexOf(this) : -1;
       const entIdx = (state.fighters) ? state.fighters.indexOf(entity) : -1;

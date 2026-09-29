@@ -6,7 +6,7 @@ import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { drawDispenser, drawDispenserTetherBeam, drawDispenserHealingRing } from '../graphics/weapons/engineerWeaponGraphics.js';
 import { spawnSparks } from '../graphics/particles/sparkEffect.js';
 import { spawnMachineCorpse } from '../graphics/particles/deathShatterEffect.js';
-import { drawMinionHealthBar } from '../graphics/statusEffects.js';
+import { drawMinionHealthBar, drawBurnEffect } from '../graphics/statusEffects.js';
 
 export class DispenserEntity extends Fighter {
   constructor(x, y, ownerFighter) {
@@ -126,6 +126,10 @@ export class DispenserEntity extends Fighter {
   update(opponent, ownerIndex, arena) {
     if (this.hp <= 0) return;
 
+    if (this.burnTimer > 0) {
+      this.handleBurn();
+    }
+
     if (this.healCooldownTimer > 0) this.healCooldownTimer--;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
     if (this.healTimer > 0) this.healTimer--;
@@ -212,7 +216,7 @@ export class DispenserEntity extends Fighter {
         const isTeammate = (ownerTeam !== null && state.getFighterTeam(i) === ownerTeam);
 
         // Tether to Engineer and teammates (exclude enemy fighters and non-allied entities)
-        if ((isOwner || isTeammate) && !f.isTurret && !f.isDispenser) {
+        if ((isOwner || isTeammate) && !f.isTurret && !f.isDispenser && !f.isLawnmower && !f.isUntargetable && !f.untargetable && !f.cannotBeTargeted && f.isTargetable !== false) {
           const dx = f.x - this.x;
           const dy = (f.y - (f.z || 0)) - this.y;
           const distSq = dx * dx + dy * dy;
@@ -292,6 +296,14 @@ export class DispenserEntity extends Fighter {
 
     // 2. Draw Dispenser cabinet & components
     drawDispenser(ctx, this);
+
+    // Render burn status visual effect (fiery aura & flickering embers)
+    if (this.burnTimer > 0) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      drawBurnEffect(ctx, this.r);
+      ctx.restore();
+    }
 
     // 3. Draw smoke particles (Discrete Pixel Art)
     if (this.smokeParticles && this.smokeParticles.length > 0) {

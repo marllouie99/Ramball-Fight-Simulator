@@ -4,7 +4,7 @@ import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
 import { drawSketchyCircle, FighterRenderer } from './fighterRenderer.js';
-import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal, drawParalyzeEffect, drawMinionHealthBar } from '../statusEffects.js';
+import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal, drawParalyzeEffect, drawMinionHealthBar, drawBurnEffect } from '../statusEffects.js';
 import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 import { drawCursedRocks } from '../fighters/todoSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
@@ -1324,6 +1324,11 @@ export function drawIllusions() {
         drawMahitoFleshBubblyDeformLocal(ctx, illusion.r, illusion.paralyzeTimer, '#A855F7', illusion);
       }
 
+      // Render burn status visual effect (fiery aura & flickering embers)
+      if (illusion.burnTimer > 0) {
+        drawBurnEffect(ctx, illusion.r);
+      }
+
       // Draw floating minion healthbar above head
       ctx.rotate(-drawAngle);
       drawMinionHealthBar(ctx, 0, -illusion.r - 14, Math.max(32, illusion.r * 1.4), 6, illusion.hp, illusion.maxHp || 100, illusion.color || '#D946EF');
@@ -1345,6 +1350,12 @@ export function drawIllusions() {
 
     if (illusion.isServantOfCthulhu) {
       drawServantOfCthulhuMinion(ctx, illusion);
+      if (illusion.burnTimer > 0) {
+        ctx.save();
+        ctx.translate(illusion.x, illusion.y);
+        drawBurnEffect(ctx, illusion.r || 10);
+        ctx.restore();
+      }
       continue;
     }
 
@@ -1384,6 +1395,11 @@ export function drawIllusions() {
 
     // Draw the swirling violet smoke OVER the body
     drawDopplegangerBodyEffect(ctx, 0, 0, illusion.r, 0, 'over', animTime);
+
+    // Render burn status visual effect
+    if (illusion.burnTimer > 0) {
+      drawBurnEffect(ctx, illusion.r);
+    }
 
     if (typeof illusion.drawStatusOverlays === 'function') {
       illusion.drawStatusOverlays(ctx, illusion.r);

@@ -11,6 +11,7 @@ import { renderYutaDomainBackground } from '../../entities/fighters/yuta/yutaDom
 import { updateRika, hasDodgingMechanic } from '../../entities/fighters/yuta/rikaLogic.js';
 import { drawYutaGhostSkin } from './yutaSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
+import { drawBurnEffect } from '../statusEffects.js';
 import { YutaBushEntrance } from '../../bosses/animations/YutaBushEntrance.js';
 
 // Pre-seeded static data for Yuta Domain Channeling VFX (0 GC per Rule #12 & #16)
@@ -868,6 +869,10 @@ export class YutaRenderer {
       ctx.fillStyle = `rgba(255, 255, 255, ${rk.hitFlashTimer / 8})`;
       ctx.fill();
       ctx.restore();
+    }
+
+    if (rk && rk.burnTimer > 0) {
+      drawBurnEffect(ctx, r);
     }
 
     ctx.restore(); // Restore main transform

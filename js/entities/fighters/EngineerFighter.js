@@ -503,13 +503,19 @@ export class EngineerFighter extends Fighter {
     const candidates = [];
     if (state.fighters) {
       for (const f of state.fighters) {
-        if (f && f !== this && f.hp > 0 && !this.isTeammate(f) && !f.isTurret && !f.isDispenser) candidates.push(f);
+        if (f && f !== this && f.hp > 0 && !f.isDead && !f.dead && !this.isTeammate(f) && !f.isTurret && !f.isDispenser && !f.isLawnmower && !f.isUntargetable && !f.untargetable && !f.cannotBeTargeted && f.isTargetable !== false) {
+          if (typeof this.isValidAimTarget === 'function' && !this.isValidAimTarget(f)) continue;
+          candidates.push(f);
+        }
       }
     }
     if (state.illusions) {
       const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
       for (const ill of state.illusions) {
-        if (ill && ill.hp > 0 && ill.owner !== myIdx && !this.isTeammate(ill.owner)) candidates.push(ill);
+        if (ill && ill.hp > 0 && !ill.isDead && !ill.dead && ill.owner !== myIdx && !this.isTeammate(ill.owner) && !ill.isLawnmower && !ill.isUntargetable && !ill.untargetable && !ill.cannotBeTargeted && ill.isTargetable !== false) {
+          if (typeof this.isValidAimTarget === 'function' && !this.isValidAimTarget(ill)) continue;
+          candidates.push(ill);
+        }
       }
     }
 

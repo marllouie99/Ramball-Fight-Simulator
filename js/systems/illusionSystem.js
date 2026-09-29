@@ -91,7 +91,7 @@ export function updateIllusions() {
         const _candidateCount = _fighters.length + _illusions.length;
         for (let ci = 0; ci < _candidateCount; ci++) {
           const target = ci < _fighters.length ? _fighters[ci] : _illusions[ci - _fighters.length];
-          if (!target || target === illusion || target === owner || target.hp <= 0 || target.isDead) continue;
+          if (!target || target === illusion || target === owner || target.hp <= 0 || target.isDead || target.dead || target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) continue;
           
           // Team check to make sure we don't hurt teammates or ourselves
           if (myTeam !== null) {
@@ -166,6 +166,27 @@ export function updateIllusions() {
       );
       if (isOwnerDead) {
         illusion.hp = 0;
+      }
+    }
+
+    // Burn DoT ticking for active illusions and minions
+    if (illusion.burnTimer && illusion.burnTimer > 0 && illusion.hp > 0 && !illusion.isDying) {
+      illusion.burnTimer--;
+      illusion.burnDamageTimer = (illusion.burnDamageTimer || 0) + 1;
+      const damageInterval = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamageInterval) || 30;
+      if (illusion.burnDamageTimer >= damageInterval) {
+        const damage = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamagePerSecond) || 5;
+        if (typeof applyDamageToTarget === 'function') {
+          applyDamageToTarget(illusion, damage, illusion.lastBurnAttacker || null, { isBurn: true });
+        } else if (typeof illusion.takeDamage === 'function') {
+          illusion.takeDamage(damage, illusion.lastBurnAttacker || null, { isBurn: true });
+        } else if (typeof illusion.hp === 'number') {
+          illusion.hp = Math.max(0, illusion.hp - damage);
+        }
+        illusion.burnDamageTimer = 0;
+        if (typeof spawnSparks === 'function' && Math.random() < 0.6) {
+          spawnSparks(illusion.x, illusion.y, 3, '#F97316');
+        }
       }
     }
 
@@ -267,6 +288,12 @@ export function updateIllusions() {
             applyTimeStop(duration) { this.timeStopTimer = Math.max(this.timeStopTimer || 0, duration); },
             applyHitStun(duration)  { this.hitStunTimer  = Math.max(this.hitStunTimer  || 0, duration); },
             applyKnockback(vx, vy) { this.knockbackVx = vx; this.knockbackVy = vy; },
+            applyBurn(attacker, duration) {
+              const finalDuration = duration ?? ((typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDuration) || 180);
+              this.burnTimer = Math.max(this.burnTimer || 0, finalDuration);
+              this.burnDamageTimer = 0;
+              this.lastBurnAttacker = attacker;
+            },
             takeDamage(amount, attacker, opts = {}) {
               return applyDamageToTarget(this, amount, attacker, opts);
             },
@@ -332,6 +359,37 @@ export function updateIllusions() {
       }
     }
 
+    // Universal burn status effect handling for illusions / summons / minions
+    if (!illusion.applyBurn) {
+      illusion.applyBurn = function(attacker, duration) {
+        const finalDuration = duration ?? ((typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDuration) || 180);
+        this.burnTimer = Math.max(this.burnTimer || 0, finalDuration);
+        this.burnDamageTimer = 0;
+        this.lastBurnAttacker = attacker;
+        this.burnAttacker = attacker;
+      };
+    }
+    if (illusion.burnTimer && illusion.burnTimer > 0) {
+      illusion.burnTimer--;
+      illusion.burnDamageTimer = (illusion.burnDamageTimer || 0) + 1;
+      const damageInterval = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamageInterval) || 30;
+      if (illusion.burnDamageTimer >= damageInterval) {
+        const damage = (typeof CONFIG !== 'undefined' && CONFIG.orange?.burnDamagePerSecond) || 5;
+        if (typeof illusion.takeDamage === 'function') {
+          illusion.takeDamage(damage, illusion.lastBurnAttacker || illusion.burnAttacker || null, { isBurn: true });
+        } else {
+          illusion.hp -= damage;
+          if (typeof spawnFloatingText === 'function') {
+            spawnFloatingText(illusion.x, illusion.y - (illusion.r || 15) - 10, `-${damage}`, '#FF4500');
+          }
+        }
+        illusion.burnDamageTimer = 0;
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(illusion.x, illusion.y, 4, '#F97316');
+        }
+      }
+    }
+
     // MANDATORY RULE 1: TimeStop & HitStun Freeze Guard
     if (illusion.timeStopTimer > 0 || illusion.isTargetOfAmbush) {
       if (illusion.timeStopTimer > 0) illusion.timeStopTimer--;
@@ -376,8 +434,10 @@ export function updateIllusions() {
       let nearestDist = forcedSummonerTarget ? -Infinity : Infinity;
       if (forcedSummonerTarget) nearestTarget = forcedSummonerTarget;
       const isTargetValid = (entity) => {
-        if (!entity || !entity.hp || entity.hp <= 0) return false;
+        if (!entity || !entity.hp || entity.hp <= 0 || entity.dead || entity.isDead) return false;
         if (entity === illusion) return false;
+        if (entity.isLawnmower || entity.isUntargetable || entity.untargetable || entity.cannotBeTargeted || entity.isTargetable === false) return false;
+        if (illusion.owner && typeof illusion.owner.isValidAimTarget === 'function' && !illusion.owner.isValidAimTarget(entity)) return false;
         
         const targetOwner = entity.isIllusion ? entity.owner : entity;
         if (!targetOwner) return false;
@@ -880,8 +940,10 @@ export function updateIllusions() {
     if (illusion.isEvasionMinion) continue;
     const attackCandidates = forcedSummonerTarget ? [forcedSummonerTarget] : nearbyEntities;
     for (const entity of attackCandidates) {
-      if (!entity || !entity.hp || entity.hp <= 0) continue;
+      if (!entity || !entity.hp || entity.hp <= 0 || entity.dead || entity.isDead) continue;
       if (entity === illusion) continue;
+      if (entity.isLawnmower || entity.isUntargetable || entity.untargetable || entity.cannotBeTargeted || entity.isTargetable === false) continue;
+      if (illusion.owner && typeof illusion.owner.isValidAimTarget === 'function' && !illusion.owner.isValidAimTarget(entity)) continue;
       
       const targetOwner = entity.isIllusion ? entity.owner : entity;
       if (!targetOwner) continue;

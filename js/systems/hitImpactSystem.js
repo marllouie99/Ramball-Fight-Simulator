@@ -886,7 +886,17 @@ export const HitImpactSystem = {
         audioSystem.playSFX('Assets/Sound Effects/SkillEffects/splat3.ogg', 0.85);
       }
 
-      // 4. Trigger onHit callback (e.g. Snow Pea chill slow, Fire Pea splash damage)
+      // 4. Fire Pea direct burn ignition
+      if (isFire && target) {
+        if (typeof target.applyBurn === 'function') {
+          target.applyBurn(projectile.ownerFighter || null, 180);
+        } else {
+          target.burnTimer = Math.max(target.burnTimer || 0, 180);
+          target.lastBurnAttacker = projectile.ownerFighter || null;
+        }
+      }
+
+      // 5. Trigger onHit callback (e.g. Snow Pea chill slow, Fire Pea splash damage)
       if (typeof projectile.onHit === 'function') {
         projectile.onHit(target);
       }

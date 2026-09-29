@@ -686,7 +686,8 @@ export function getClosestOpponent(fighter) {
   if (state.illusions) {
     for (let i = 0; i < state.illusions.length; i++) {
       const illusion = state.illusions[i];
-      if (!illusion || illusion.hp <= 0 || (illusion.vanishTimer && illusion.vanishTimer > 0)) continue;
+      if (!illusion || illusion.hp <= 0 || (illusion.vanishTimer && illusion.vanishTimer > 0) || illusion.isLawnmower || illusion.isUntargetable || illusion.untargetable || illusion.cannotBeTargeted || illusion.isTargetable === false) continue;
+      if (typeof illusion.isValidAimTarget === 'function' && !illusion.isValidAimTarget()) continue;
       if (fighter.isTeammate(illusion)) continue;
       if (!fighter.isChainedByMakima && !illusion.isChainedByMakima && illusion.owner === fighter) continue;
       if (!fighter.isChainedByMakima && !illusion.isChainedByMakima && isTeamMode && fighterTeam !== null && illusion.owner) {

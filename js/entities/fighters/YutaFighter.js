@@ -395,7 +395,7 @@ export class YutaFighter extends Fighter {
     if (state && state.fighters) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
-        if (!f || f === this || f.hp <= 0 || f.isDead || (f.vanishTimer && f.vanishTimer > 0)) continue;
+        if (!f || f === this || f.hp <= 0 || f.isDead || f.dead || (f.vanishTimer && f.vanishTimer > 0) || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || !this.isValidAimTarget(f)) continue;
         const eTeam = state.getFighterTeam ? state.getFighterTeam(i) : f.team;
         if (myTeam !== null && eTeam !== null && myTeam === eTeam) continue;
         candidates.push(f);
@@ -404,7 +404,7 @@ export class YutaFighter extends Fighter {
     if (state && state.illusions) {
       for (const ill of state.illusions) {
         const isControlledRika = this.isMakimaControlledRikaTarget?.(ill);
-        if (!ill || ill.hp <= 0 || ill.isDead || (!isControlledRika && (ill.owner === this || ill.isRika)) || (ill.vanishTimer && ill.vanishTimer > 0)) continue;
+        if (!ill || ill.hp <= 0 || ill.isDead || ill.dead || (!isControlledRika && (ill.owner === this || ill.isRika)) || (ill.vanishTimer && ill.vanishTimer > 0) || ill.isLawnmower || ill.isUntargetable || ill.untargetable || ill.cannotBeTargeted || ill.isTargetable === false || !this.isValidAimTarget(ill)) continue;
         if (!isControlledRika && myTeam !== null && ill.owner && state.getFighterTeam && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
         candidates.push(ill);
       }
@@ -1014,7 +1014,7 @@ export class YutaFighter extends Fighter {
       if (!aimTarget || aimTarget.isDead || (aimTarget.hp || 0) <= 0) {
         const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
         aimTarget = (state && state.fighters) ? state.fighters.find((f, idx) => {
-          if (!f || f.hp <= 0 || f === this || f.isDead) return false;
+          if (!f || f.hp <= 0 || f === this || f.isDead || f.dead || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || !this.isValidAimTarget(f)) return false;
           const eTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
           return myTeam === null || eTeam === null || myTeam !== eTeam;
         }) : null;
@@ -1407,7 +1407,7 @@ export class YutaFighter extends Fighter {
       if (!targetEnemy || targetEnemy.isDead || (targetEnemy.hp || 0) <= 0) {
         const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
         targetEnemy = (state && state.fighters) ? state.fighters.find((f, idx) => {
-          if (!f || f.hp <= 0 || f === this || f.isDead) return false;
+          if (!f || f.hp <= 0 || f === this || f.isDead || f.dead || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || !this.isValidAimTarget(f)) return false;
           const eTeam = state.getFighterTeam ? state.getFighterTeam(idx) : f.team;
           return myTeam === null || eTeam === null || myTeam !== eTeam;
         }) : null;
@@ -1465,7 +1465,7 @@ export class YutaFighter extends Fighter {
         if (!targetEnemy || targetEnemy.isDead) {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
           targetEnemy = state.fighters.find((f, idx) => {
-            if (!f || f.hp <= 0 || f === this) return false;
+            if (!f || f.hp <= 0 || f === this || f.isDead || f.dead || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || !this.isValidAimTarget(f)) return false;
             const eTeam = state.getFighterTeam(idx);
             return myTeam === null || eTeam === null || myTeam !== eTeam;
           });
@@ -1582,7 +1582,7 @@ export class YutaFighter extends Fighter {
       for (let i = 0; i < allTargets.length; i++) {
         const enemy = allTargets[i];
         const isControlledRika = this.isMakimaControlledRikaTarget(enemy);
-        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed || (!isControlledRika && (enemy.isRika || enemy.owner === this))) continue;
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || enemy.isLawnmower || enemy.isUntargetable || enemy.untargetable || enemy.cannotBeTargeted || enemy.isTargetable === false || !this.isValidAimTarget(enemy)) continue;
 
         if (enemy.owner) {
           const ownerTeam = state.getFighterTeam(state.fighters.indexOf(enemy.owner));
@@ -2091,7 +2091,7 @@ export class YutaFighter extends Fighter {
     // Give Yuta an immediate movement burst into action upon domain deployment
     const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
     const targetEnemy = (state && state.fighters) ? state.fighters.find((f, idx) => {
-      if (!f || f === this || f.hp <= 0) return false;
+      if (!f || f === this || f.hp <= 0 || f.isDead || f.dead || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || !this.isValidAimTarget(f)) return false;
       const enemyTeam = state.getFighterTeam(idx);
       return myTeam === null || enemyTeam === null || myTeam !== enemyTeam;
     }) : null;
@@ -2239,7 +2239,7 @@ export class YutaFighter extends Fighter {
     for (let i = 0; i < allTargets.length; i++) {
       const enemy = allTargets[i];
       const isControlledRika = this.isMakimaControlledRikaTarget(enemy);
-      if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+      if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || (enemy.vanishTimer && enemy.vanishTimer > 0) || enemy.isLawnmower || enemy.isUntargetable || enemy.untargetable || enemy.cannotBeTargeted || enemy.isTargetable === false || !this.isValidAimTarget(enemy)) continue;
 
       if (enemy.owner) {
         const ownerTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy.owner)) : enemy.owner.team;
@@ -2277,7 +2277,7 @@ export class YutaFighter extends Fighter {
       for (let i = 0; i < allTargets.length; i++) {
         const enemy = allTargets[i];
         const isControlledRika = this.isMakimaControlledRikaTarget(enemy);
-        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || (enemy.vanishTimer && enemy.vanishTimer > 0) || enemy.isLawnmower || enemy.isUntargetable || enemy.untargetable || enemy.cannotBeTargeted || enemy.isTargetable === false || !this.isValidAimTarget(enemy)) continue;
         if (enemy.owner) {
           const ownerTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy.owner)) : enemy.owner.team;
           if (!isControlledRika && myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;

@@ -66,6 +66,121 @@ function playDavePlantingAudio(config) {
   playSfx.call(audioSystem, voiceLine, getCrazyDaveSoundVolume(config, 'plantingVoiceLines'));
 }
 
+/**
+ * Universal candidate query for all Crazy Dave plants and offensive mechanisms.
+ * Collects active candidates from state.fighters, state.illusions, and state.cjDriveBys.
+ */
+export function getAllPlantTargetCandidates() {
+  if (!state) return [];
+  const list = [];
+  if (Array.isArray(state.fighters)) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (!f) continue;
+      list.push(f);
+      // Include companion summons/minions attached directly to fighters (e.g. Yuta's Rika, Engineer's Turret/Dispenser)
+      if (f.rika && f.rika.active && f.rika.hp > 0 && !list.includes(f.rika)) {
+        list.push(f.rika);
+      }
+      if (f.turretEntity && f.turretEntity.hp > 0 && !list.includes(f.turretEntity)) {
+        list.push(f.turretEntity);
+      }
+      if (f.dispenserEntity && f.dispenserEntity.hp > 0 && !list.includes(f.dispenserEntity)) {
+        list.push(f.dispenserEntity);
+      }
+    }
+  }
+  if (Array.isArray(state.illusions)) {
+    for (let i = 0; i < state.illusions.length; i++) {
+      const ill = state.illusions[i];
+      if (ill && !list.includes(ill)) list.push(ill);
+    }
+  }
+  if (Array.isArray(state.cjDriveBys)) {
+    for (let i = 0; i < state.cjDriveBys.length; i++) {
+      const car = state.cjDriveBys[i];
+      if (car && !list.includes(car)) list.push(car);
+    }
+  }
+  return list;
+}
+
+/**
+ * Centralized enemy verification for plants and plant projectiles.
+ * Correctly identifies enemy minions, summons, companions, turrets, illusions, and cars while protecting allies.
+ */
+export function isEnemyPlantTarget(plant, f) {
+  if (!f || f === plant || f.dead || f.isDead || f.hp <= 0) return false;
+  if (f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false) return false;
+
+  const isMindControlled = isMakimaControlledPlant(plant);
+
+  // If plant is mind-controlled by Makima, allegiances invert to Makima's side
+  if (isMindControlled) {
+    const chainer = plant._makimaChainer;
+    if (f === chainer || (f.owner && f.owner === chainer)) return false;
+    return true;
+  }
+
+  const myOwner = plant.owner;
+  let myOwnerIdx = (typeof plant.ownerIndex === 'number') ? plant.ownerIndex : -1;
+  if (myOwnerIdx === -1 && myOwner && state && state.fighters) {
+    myOwnerIdx = state.fighters.indexOf(myOwner);
+  }
+
+  // Resolve target f's owner
+  let fOwner = f.owner || null;
+  let fOwnerIdx = (typeof f.ownerIndex === 'number') ? f.ownerIndex : null;
+  if (typeof fOwner === 'number') {
+    fOwnerIdx = fOwner;
+    fOwner = (state && state.fighters && state.fighters[fOwner]) || null;
+  } else if (fOwner && fOwnerIdx === null && state && state.fighters) {
+    fOwnerIdx = state.fighters.indexOf(fOwner);
+  }
+
+  // Same owner / Dave's own plants or self
+  if (f === myOwner || (fOwner && fOwner === myOwner) || (fOwnerIdx !== null && myOwnerIdx !== -1 && fOwnerIdx === myOwnerIdx)) {
+    return false;
+  }
+
+  // Friendly teammate check
+  if (myOwner && typeof myOwner.isTeammate === 'function') {
+    if (myOwner.isTeammate(fOwner || f)) return false;
+  }
+  if (typeof plant.isTeammate === 'function' && plant.isTeammate(fOwner || f)) {
+    return false;
+  }
+
+  // Plants do not target or burn other plants unless one is mind-controlled by Makima or on an opposing team
+  if (f.isPlant || f.isPlantMinion) {
+    if (!isMindControlled && !isMakimaControlledPlant(f)) {
+      if (state && typeof state.getFighterTeam === 'function' && myOwnerIdx !== -1 && fOwnerIdx !== null && fOwnerIdx !== -1) {
+        const myTeam = state.getFighterTeam(myOwnerIdx);
+        const targetTeam = state.getFighterTeam(fOwnerIdx);
+        if (myTeam === null || targetTeam === null || myTeam === targetTeam) {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
+  }
+
+  // Team index resolution in team modes
+  if (state && typeof state.getFighterTeam === 'function' && myOwnerIdx !== -1) {
+    const myTeam = state.getFighterTeam(myOwnerIdx);
+    const targetIdx = (fOwnerIdx !== null && fOwnerIdx !== -1) ? fOwnerIdx : (state.fighters ? state.fighters.indexOf(f) : -1);
+    if (myTeam !== null && targetIdx !== -1) {
+      const targetTeam = state.getFighterTeam(targetIdx);
+      if (targetTeam !== null && myTeam === targetTeam) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // PLANT ENTITY: PEASHOOTER (Fires rapid kinetic pea projectiles dealing regular damage)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -344,8 +459,7 @@ export class PeashooterEntity extends Fighter {
 
     const isMindControlled = isMakimaControlledPlant(this);
     const evaluateTarget = (f) => {
-      if (!f || f === this || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
-      if (typeof this.isTeammate === 'function' && this.isTeammate(f)) return;
+      if (!isEnemyPlantTarget(this, f)) return;
       const dx = f.x - this.x;
       const dy = f.y - this.y;
 
@@ -364,8 +478,9 @@ export class PeashooterEntity extends Fighter {
       }
     };
 
-    if (state && Array.isArray(state.fighters)) {
-      for (const f of state.fighters) evaluateTarget(f);
+    const candidates = getAllPlantTargetCandidates();
+    if (candidates.length > 0) {
+      for (const f of candidates) evaluateTarget(f);
     } else if (opponent) {
       evaluateTarget(opponent);
     }
@@ -717,8 +832,7 @@ export class SnowPeaEntity extends Fighter {
 
     const isMindControlled = isMakimaControlledPlant(this);
     const evaluateTarget = (f) => {
-      if (!f || f === this || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || (!isMindControlled && (f === this.owner || f.isDeployable || f.isMinion)) || f.hp <= 0 || f.dead) return;
-      if (typeof this.isTeammate === 'function' && this.isTeammate(f)) return;
+      if (!isEnemyPlantTarget(this, f)) return;
       const dx = f.x - this.x;
       const dy = f.y - this.y;
 
@@ -737,8 +851,9 @@ export class SnowPeaEntity extends Fighter {
       }
     };
 
-    if (state && Array.isArray(state.fighters)) {
-      for (const f of state.fighters) evaluateTarget(f);
+    const candidates = getAllPlantTargetCandidates();
+    if (candidates.length > 0) {
+      for (const f of candidates) evaluateTarget(f);
     } else if (opponent) {
       evaluateTarget(opponent);
     }
@@ -1460,22 +1575,31 @@ export class TorchwoodEntity extends Fighter {
           // Call existing onHit if present
           if (typeof existingOnHit === 'function') existingOnHit(target);
 
-          // Fire pea splash AoE: damage nearby enemies
-          if (state && Array.isArray(state.fighters)) {
-            const splashDmg = baseDmg * splashDamageMult;
-            for (const f of state.fighters) {
-              if (!f || f === target || f.hp <= 0 || f.dead) continue;
-              if (f.isPlant || f.isPlantMinion || f.characterId === 'crazydave') continue;
-              if (typeof target?.isTeammate === 'function' && target.isTeammate(f)) continue;
-              const sdx = f.x - (target?.x || p.x);
-              const sdy = f.y - (target?.y || p.y);
-              const sDist = Math.hypot(sdx, sdy);
-              if (sDist <= splashRadius) {
-                if (typeof f.takeDamage === 'function') {
-                  f.takeDamage(splashDmg, p.ownerFighter || null, { isFirePea: true, skipKnockback: true });
-                }
-                spawnSparks(f.x, f.y, 6, '#F97316');
+          // Fire pea splash AoE: damage and burn nearby enemies & enemy minions
+          const splashDmg = baseDmg * splashDamageMult;
+          const candidates = getAllPlantTargetCandidates();
+          for (const f of candidates) {
+            if (!f || f === target || f.hp <= 0 || f.dead) continue;
+            if (!isEnemyPlantTarget(this, f)) continue;
+            const sdx = f.x - (target?.x || p.x);
+            const sdy = f.y - (target?.y || p.y);
+            const sDist = Math.hypot(sdx, sdy);
+            if (sDist <= splashRadius) {
+              if (typeof applyDamageToTarget === 'function') {
+                applyDamageToTarget(f, splashDmg, p.ownerFighter || this.owner || this, { isFirePea: true, isBurn: true, skipKnockback: true });
+              } else if (typeof f.takeDamage === 'function') {
+                f.takeDamage(splashDmg, p.ownerFighter || this.owner || this, { isFirePea: true, isBurn: true, skipKnockback: true });
+              } else if (typeof f.hp === 'number') {
+                f.hp = Math.max(0, f.hp - splashDmg);
               }
+
+              if (typeof f.applyBurn === 'function') {
+                f.applyBurn(p.ownerFighter || this.owner || this, this._burnDuration);
+              } else {
+                f.burnTimer = Math.max(f.burnTimer || 0, this._burnDuration);
+                f.lastBurnAttacker = p.ownerFighter || this.owner || this;
+              }
+              spawnSparks(f.x, f.y, 6, '#F97316');
             }
           }
         };
@@ -1508,18 +1632,26 @@ export class TorchwoodEntity extends Fighter {
   }
 
   _applyProximityBurn() {
-    if (!state || !Array.isArray(state.fighters)) return;
+    if (!state) return;
+    const candidates = getAllPlantTargetCandidates();
 
-    for (const fighter of state.fighters) {
-      if (!fighter || fighter === this || fighter.hp <= 0 || fighter.dead) continue;
-      if (fighter.isPlant || fighter.isPlantMinion || fighter.characterId === 'crazydave') continue;
+    for (const fighter of candidates) {
+      if (!isEnemyPlantTarget(this, fighter)) continue;
 
       const dx = fighter.x - this.x;
       const dy = fighter.y - this.y;
-      if (Math.hypot(dx, dy) > this._burnRadius) continue;
-      if ((fighter.burnTimer || 0) > 0 || typeof fighter.applyBurn !== 'function') continue;
+      const targetR = fighter.r || (fighter.width ? fighter.width * 0.5 : 16);
+      if (Math.hypot(dx, dy) > this._burnRadius + targetR) continue;
 
-      fighter.applyBurn(this, this._burnDuration);
+      if ((fighter.burnTimer || 0) > 0) continue;
+
+      if (typeof fighter.applyBurn === 'function') {
+        fighter.applyBurn(this, this._burnDuration);
+      } else {
+        fighter.burnTimer = this._burnDuration;
+        fighter.burnDamageTimer = fighter.burnDamageTimer || 0;
+        fighter.lastBurnAttacker = this;
+      }
       spawnSparks(fighter.x, fighter.y, 4, '#F97316');
     }
   }
@@ -1541,7 +1673,7 @@ export class TorchwoodEntity extends Fighter {
       this.y = this._fixedY;
     }
 
-    // Enemies that approach the burning stump are ignited.
+    // Enemies and enemy minions that approach the burning stump are ignited.
     this._applyProximityBurn();
 
     // Core mechanic: intercept and transform passing pea projectiles
@@ -1591,6 +1723,7 @@ export class LawnmowerEntity extends Fighter {
 
     this.owner = ownerFighter;
     this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.team = ownerFighter?.team;
     this.characterId = 'crazydave_lawnmower';
     this.isDeployable = true;
     this.isMinion = true;
@@ -1666,16 +1799,14 @@ export class LawnmowerEntity extends Fighter {
   }
 
   _checkTripCondition(arena, cfg) {
-    if (!state || !Array.isArray(state.fighters)) return;
+    if (!state) return;
 
     const rowH = arena.height / Math.max(3, Math.round(arena.height / (getCrazyDaveSetting(cfg, 'grassTileSize') || 76.6)));
     const halfRowH = rowH * 0.55;
+    const allCandidates = getAllPlantTargetCandidates();
 
-    for (const f of state.fighters) {
-      if (!f || f === this || f === this.owner || f.dead || f.hp <= 0) continue;
-      if (f.owner && f.owner === this.owner) continue;
-      if (f.isLawnmower) continue;
-      if (typeof this.isTeammate === 'function' && this.isTeammate(f)) continue;
+    for (const f of allCandidates) {
+      if (!isEnemyPlantTarget(this, f)) continue;
 
       const dy = Math.abs(f.y - this.y);
       const dx = Math.abs(f.x - this.x);
@@ -1701,24 +1832,34 @@ export class LawnmowerEntity extends Fighter {
   }
 
   _shredEnemies(cfg) {
-    if (!state || !Array.isArray(state.fighters)) return;
+    if (!state) return;
     const playSfx = typeof audioSystem.playSFX === 'function' ? audioSystem.playSFX : audioSystem.playSound;
+    const allCandidates = getAllPlantTargetCandidates();
 
-    for (const f of state.fighters) {
-      if (!f || f === this || f === this.owner || f.dead || f.hp <= 0) continue;
-      if (f.owner && f.owner === this.owner) continue;
-      if (f.isLawnmower) continue;
-      if (typeof this.isTeammate === 'function' && this.isTeammate(f)) continue;
+    for (const f of allCandidates) {
+      if (!isEnemyPlantTarget(this, f)) continue;
 
-      const hitDist = this.r + (f.r || 18) + 6;
+      const hitDist = this.r + (f.r || f.hitRadius || 18) + 8;
       if (Math.hypot(f.x - this.x, f.y - this.y) <= hitDist) {
         if (!this._shreddedTargets.has(f)) {
           this._shreddedTargets.add(f);
 
           // Devastating steamroller shred damage
-          applyDamageToTarget(f, this._damage, this, { isLawnmower: true, damageType: 'crush' });
-          f.knockbackVx = this.facingDirection * 10;
-          f.knockbackVy = (Math.random() - 0.5) * 6;
+          if (typeof applyDamageToTarget === 'function') {
+            applyDamageToTarget(f, this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush' });
+          } else if (typeof f.takeDamage === 'function') {
+            f.takeDamage(this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush' });
+          } else if (typeof f.hp === 'number') {
+            f.hp = Math.max(0, f.hp - this._damage);
+          }
+
+          const kbX = this.facingDirection * 10;
+          const kbY = (Math.random() - 0.5) * 6;
+          f.knockbackVx = kbX;
+          f.knockbackVy = kbY;
+          if (typeof f.applyKnockback === 'function') {
+            f.applyKnockback(kbX, kbY);
+          }
 
           // Splat sparks, text & SFX
           spawnSparks(f.x, f.y, 16, '#DC2626');
