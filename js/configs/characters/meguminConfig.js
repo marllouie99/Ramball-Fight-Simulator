@@ -13,8 +13,8 @@ export const meguminConfig = {
   maxHpRatio: 1.0,
   speed: 2.45,
   moveSpeed: 2.45,
-  r: 24,
-  radius: 24,
+  r: 25,
+  radius: 25,
   color: '#C81D25',            // Crimson Red
   themeColor: '#C81D25',
   secondaryColor: '#FFD166',   // Arcane Gold
@@ -32,11 +32,11 @@ export const meguminConfig = {
   desc: 'The Crimson Demon Archmage. Specializes in a single apocalyptic offensive spell: EXPLOSION! Recites an extended dramatic chanting incantation with committed aim lock, unleashing cataclysmic true damage before suffering total mana burnout and collapsing into a helpless faceplant.',
 
   // ──────────────────────────────────────────
-  // ABILITY TOGGLES (ALL DISABLED FIRST BY DEFAULT)
+  // ABILITY TOGGLES (EXPLOSION IS THE DEFAULT OFFENSIVE ABILITY)
   // ──────────────────────────────────────────
 
   // Passive 1: The One True Path (Single-Spell Constraint)
-  enableOneTruePath: 0,             // Master toggle for Single Offensive Spell Constraint
+  enableOneTruePath: 1,             // Master toggle for Single Offensive Spell Constraint
 
   // Passive 2: Incantation Resonance (Chant Scaling)
   enableIncantationResonance: 0,    // Master toggle for Chant Power & Radius Scaling
@@ -79,17 +79,22 @@ export const meguminConfig = {
   capeDashInvulnFrames: 12,         // 12 i-frames during dash
 
   // THE SOLE OFFENSIVE SPELL / ULTIMATE: "EXPLOSION!"
-  enableExplosion: 0,               // Master toggle for Ultimate: Apocalyptic Explosion
+  enableExplosion: 1,               // Master toggle for Ultimate: Apocalyptic Explosion
   enableUltimate: 0,                // Master ultimate registration flag
   explosionCooldown: 2400,          // 40.0s cooldown
   explosionWindupFrames: 240,       // 4.0s chant windup
   explosionSingularityPullFrames: 30, // 0.5s pre-blast vortex suction
   explosionSingularityRadius: 200,  // Gravitational pull radius
+  explosionPullSpeed: 6,            // Maximum inward vortex speed in pixels per frame
   explosionBlastRadius: 260,        // Core blast radius
+  explosionCoreRadius: 120,         // Epicenter radius for the stronger blast
   explosionTrueDamage: 420,         // Direct epicenter True Damage
   explosionOuterDamage: 260,        // Outer shockwave damage
   explosionKnockbackForce: 45,      // Wall-bounce impact force
+  explosionDetonationFrames: 24,    // Blast visual duration
   explosionLingeringFireFrames: 180,// 3.0s ground crater burning
+  explosionFireRadius: 120,         // Radius of the lingering crater
+  explosionFireTickIntervalFrames: 30, // Fire damage interval
   explosionFireTickDamage: 8,       // Crater burn tick damage
 
   // ──────────────────────────────────────────

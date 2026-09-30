@@ -3629,7 +3629,7 @@ class ProjectileSystem {
           continue;
         }
 
-        const isCjBullet = (p.visual === 'cjUziBullet' || p.visual === 'cjMinigunBullet' || (p.visual && p.visual.includes('cj')));
+        const isCjBullet = p.isCjBullet || p.visual === 'cjUziBullet' || p.visual === 'cjMinigunBullet' || (p.visual && p.visual.includes('cj'));
         if (isCjBullet && expired && !hit) {
           const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
           let wallX = p.x;
@@ -3651,7 +3651,7 @@ class ProjectileSystem {
             }
           }
 
-          if (p.visual === 'cjMinigunBullet') {
+          if (p.isCjMinigunBullet || p.visual === 'cjMinigunBullet') {
             if (typeof spawnSparks === 'function') {
               spawnSparks(wallX, wallY, 8, 'gold', '#FEF08A');
               spawnSparks(wallX, wallY, 5, 'silverStreak', '#CBD5E1');

@@ -28,6 +28,18 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableAdaptation, true)) {
     return { finalAmount: amount, type, pendingAdaptation: null };
   }
+
+  // ── General / Skill Shot Adaptation Detection ──
+  let skillShotId = null;
+  let skillShotColor = null;
+
+  // ── Lawnmower Physical Defense / Crush Hazard Check ──
+  const isLawnmowerHit = Boolean(opts.isLawnmower || attacker?.isLawnmower || opts.damageType === 'crush' || attacker?.characterId === 'crazydave_lawnmower');
+  if (isLawnmowerHit) {
+    skillShotId = 'lawnmower';
+    skillShotColor = '#DC2626';
+  }
+
   const reductionPerStage = CONFIG.mahoraga?.adaptationReductionPerStage || 0.12;
 
   // ── Gojo-Specific Attack Detection ──
@@ -50,9 +62,6 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     }
   }
 
-  // ── General / Skill Shot Adaptation Detection ──
-  let skillShotId = null;
-  let skillShotColor = null;
   if (opts.isAdaptableSkillShot) {
     skillShotId = opts.skillShotId;
     skillShotColor = opts.skillShotColor || (skillShotId && SKILL_REGISTRY[skillShotId]?.skillShotColor) || '#FFD700';
@@ -189,6 +198,16 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   const isSaitamaCounterHit = opts.isSaitamaCounter || (opts.isCounter && attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama'));
   if (isSaitamaCounterHit && fighter.adaptedSaitamaCounter) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Saitama's Serious Counter!
+  }
+
+  // ── 50% Damage Reduction when Adapted to Lawnmower ──
+  const isLawnmowerAdapted = Boolean(
+    fighter.adaptedLawnmower || 
+    (fighter.adaptedSkills && (fighter.adaptedSkills['lawnmower'] || fighter.adaptedSkills['crazydave_lawnmower'])) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#DC2626'))
+  );
+  if (isLawnmowerHit && isLawnmowerAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Lawnmower crush!
   }
 
   // ── General Defense Buff per Wheel Click ──
@@ -486,12 +505,12 @@ export function triggerAdaptation(fighter, type, attacker) {
 
   triggerMahoragaGammaRayRainbow(fighter);
 
-  // Freeze all enemy targets on screen
+  // Freeze all enemy targets on screen (excluding Lawnmowers)
   const targetsToFreeze = [];
-  if (attacker && attacker !== fighter && attacker.hp > 0) targetsToFreeze.push(attacker);
+  if (attacker && attacker !== fighter && attacker.hp > 0 && !attacker.isLawnmower && !attacker.isUntargetable && attacker.characterId !== 'crazydave_lawnmower') targetsToFreeze.push(attacker);
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
-      if (f && f !== fighter && f.hp > 0 && !targetsToFreeze.includes(f)) {
+      if (f && f !== fighter && f.hp > 0 && !f.isLawnmower && !f.isUntargetable && f.characterId !== 'crazydave_lawnmower' && !targetsToFreeze.includes(f)) {
         targetsToFreeze.push(f);
       }
     });
@@ -530,12 +549,12 @@ export function triggerAdaptation(fighter, type, attacker) {
     }
   }
 
-  // Save attacker for smooth divine flash-dash counter (strictly disabled when dragged or pulled by any attack)
+  // Save attacker for smooth divine flash-dash counter (strictly disabled when dragged or pulled by any attack, or against Lawnmowers)
   if (!fighter.isDraggedByGetsuga && !(typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) {
-    if (attacker && !attacker.isDead && attacker !== fighter) {
+    if (attacker && !attacker.isDead && attacker !== fighter && !attacker.isLawnmower && !attacker.isUntargetable && attacker.characterId !== 'crazydave_lawnmower') {
       fighter._pendingCounterTarget = attacker;
     } else if (typeof state !== 'undefined' && state.fighters) {
-      const liveEnemy = state.fighters.find(f => f && f !== fighter && !f.isDead && f.hp > 0);
+      const liveEnemy = state.fighters.find(f => f && f !== fighter && !f.isDead && f.hp > 0 && !f.isLawnmower && !f.isUntargetable && f.characterId !== 'crazydave_lawnmower');
       if (liveEnemy) fighter._pendingCounterTarget = liveEnemy;
     }
   }
@@ -762,7 +781,7 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   if (fighter.adaptedSkills[skillShotId]) return;
 
   fighter.adaptedSkills[skillShotId] = true;
-  if (skillShotId !== 'getsugaTensho' && skillShotId !== 'getsuga' && skillShotId !== 'crazyDaveSnowPea') {
+  if (skillShotId !== 'getsugaTensho' && skillShotId !== 'getsuga' && skillShotId !== 'crazyDaveSnowPea' && skillShotId !== 'lawnmower' && skillShotId !== 'crazydave_lawnmower') {
     fighter.skillDodgeReady[skillShotId] = true;
   }
 
@@ -799,7 +818,17 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   }
 
   const wheelY = fighter.y - fighter.r - 28;
-  if (skillShotId === 'crazyDaveSnowPea') {
+  if (skillShotId === 'lawnmower' || skillShotId === 'crazydave_lawnmower') {
+    fighter.adaptedLawnmower = true;
+    fighter.adaptedSkills['lawnmower'] = true;
+    fighter.adaptedSkills['crazydave_lawnmower'] = true;
+    fighter.skillDodgeReady['lawnmower'] = false;
+    fighter.skillDodgeReady['crazydave_lawnmower'] = false;
+    if (!fighter.adapted) fighter.adapted = {};
+    fighter.adapted.melee = true;
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: LAWNMOWER!', color || '#DC2626');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Lawnmower Damage Reduction!', '#FFFFFF');
+  } else if (skillShotId === 'crazyDaveSnowPea') {
     fighter.adaptedSnowPea = true;
     fighter.iceFreezeTimer = 0;
     fighter.isFrozenBySnowPea = false;

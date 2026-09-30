@@ -524,6 +524,61 @@ function _drawProceduralPixelSun(ctx, r, pulse, rotAngle) {
   }
 }
 
+// High-performance reusable offscreen buffer for sprite silhouette hit-flashes (Zero GC / Rule 2.2 compliant)
+let _plantFlashCanvas = null;
+let _plantFlashCtx = null;
+
+function _getPlantFlashBuffer(width, height) {
+  if (typeof document === 'undefined') return null;
+  if (!_plantFlashCanvas) {
+    _plantFlashCanvas = document.createElement('canvas');
+    _plantFlashCtx = _plantFlashCanvas.getContext('2d', { willReadFrequently: false });
+  }
+  const targetW = Math.max(64, Math.ceil(width));
+  const targetH = Math.max(64, Math.ceil(height));
+  if (_plantFlashCanvas.width < targetW || _plantFlashCanvas.height < targetH) {
+    _plantFlashCanvas.width = Math.max(_plantFlashCanvas.width || 0, targetW);
+    _plantFlashCanvas.height = Math.max(_plantFlashCanvas.height || 0, targetH);
+  }
+  return { canvas: _plantFlashCanvas, ctx: _plantFlashCtx };
+}
+
+/**
+ * Renders a sprite frame with an exact-silhouette white hit-flash overlay when damaged.
+ * Avoids generic circle overlays by alpha-masking the flash to the non-transparent sprite pixels.
+ */
+export function drawSpriteWithHitFlash(ctx, img, sx, sy, sw, sh, dx, dy, dw, dh, isHit, flashAlpha = 0.85) {
+  if (!img) return;
+  if (!isHit || flashAlpha <= 0) {
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+    return;
+  }
+
+  // Exact-silhouette white hit-flash:
+  // 1. Draw sprite frame into isolated offscreen buffer
+  // 2. Use source-atop to fill non-transparent pixels with pure white
+  // 3. Blit flash-tinted sprite to main canvas with pristine alpha edges
+  const buf = _getPlantFlashBuffer(dw, dh);
+  if (buf && buf.ctx) {
+    const bCtx = buf.ctx;
+    const w = Math.ceil(dw);
+    const h = Math.ceil(dh);
+
+    bCtx.clearRect(0, 0, w, h);
+    bCtx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    bCtx.save();
+    bCtx.globalCompositeOperation = 'source-atop';
+    bCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(2)})`;
+    bCtx.fillRect(0, 0, w, h);
+    bCtx.restore();
+
+    ctx.drawImage(buf.canvas, 0, 0, w, h, dx, dy, dw, dh);
+  } else {
+    // Fallback if canvas buffer unavailable
+    ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+  }
+}
+
 /**
  * Draws an animated green Peashooter turret using the official sprite sheets.
  */
@@ -559,10 +614,14 @@ export function drawPeashooter(ctx, peashooter) {
     const tick = peashooter.animTick || 0;
     const frameIdx = Math.floor(tick / 8) % PEASHOOTER_IDLE_RECTS.length;
     const frame = PEASHOOTER_IDLE_RECTS[frameIdx] || PEASHOOTER_IDLE_RECTS[0];
-    ctx.drawImage(
+    const flashAlpha = isHit ? Math.min(0.90, (peashooter.hitFlashTimer / 6) * 0.90) : 0;
+    drawSpriteWithHitFlash(
+      ctx,
       idleImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
-      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
+      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize,
+      isHit,
+      flashAlpha
     );
   }
   // 2. High-Quality Procedural Fallback
@@ -608,10 +667,14 @@ export function drawSnowPea(ctx, snowpea) {
     const tick = snowpea.animTick || 0;
     const frameIdx = Math.floor(tick / 8) % SNOWPEA_IDLE_RECTS.length;
     const frame = SNOWPEA_IDLE_RECTS[frameIdx] || SNOWPEA_IDLE_RECTS[0];
-    ctx.drawImage(
+    const flashAlpha = isHit ? Math.min(0.90, (snowpea.hitFlashTimer / 6) * 0.90) : 0;
+    drawSpriteWithHitFlash(
+      ctx,
       idleImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
-      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize
+      -drawSize * 0.5, -drawSize * 0.8, drawSize, drawSize,
+      isHit,
+      flashAlpha
     );
   }
   // 2. High-Quality Procedural Fallback
@@ -759,24 +822,17 @@ export function drawWallnut(ctx, wallnut) {
     const aspect = frame.sw / (frame.sh || 1);
     const drawHeight = drawSize;
     const drawWidth = drawHeight * aspect;
-    ctx.drawImage(
+    const flashAlpha = isHit ? Math.min(0.90, (wallnut.hitFlashTimer / 6) * 0.90) : 0;
+    drawSpriteWithHitFlash(
+      ctx,
       wallnutImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
-      -drawWidth * 0.5, -drawHeight * 0.82 + hitShakeY, drawWidth, drawHeight
+      -drawWidth * 0.5, -drawHeight * 0.82 + hitShakeY, drawWidth, drawHeight,
+      isHit,
+      flashAlpha
     );
   } else {
     _drawProceduralWallnut(ctx, r, isHit, hpRatio);
-  }
-
-  // Subtle hit flash overlay
-  if (isHit) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.beginPath();
-    ctx.arc(0, -r * 0.2, r * 1.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
   }
 
   ctx.restore();
@@ -1046,24 +1102,17 @@ export function drawTorchwood(ctx, torchwood) {
     const frame = TORCHWOOD_RECTS[frameIdx] || TORCHWOOD_RECTS[0];
     const aspect = frame.sw / (frame.sh || 1);
     const drawWidth = drawHeight * aspect;
-    ctx.drawImage(
+    const flashAlpha = isHit ? Math.min(0.90, (torchwood.hitFlashTimer / 6) * 0.90) : 0;
+    drawSpriteWithHitFlash(
+      ctx,
       torchImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
-      -drawWidth * 0.5, -drawHeight * 0.82 + hitShakeY, drawWidth, drawHeight
+      -drawWidth * 0.5, -drawHeight * 0.82 + hitShakeY, drawWidth, drawHeight,
+      isHit,
+      flashAlpha
     );
   } else {
     _drawProceduralTorchwood(ctx, r, isHit);
-  }
-
-  // Subtle hit flash overlay
-  if (isHit) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.beginPath();
-    ctx.arc(0, -drawHeight * 0.35, r * 1.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
   }
 
   ctx.restore();
@@ -1259,10 +1308,15 @@ export function drawLawnmower(ctx, mower) {
     const frame = LAWNMOWER_RECTS[frameIdx] || LAWNMOWER_RECTS[0];
     const aspect = frame.sw / (frame.sh || 1);
     const drawWidth = drawHeight * aspect;
-    ctx.drawImage(
+    const isHit = (mower.hitFlashTimer || 0) > 0;
+    const flashAlpha = isHit ? Math.min(0.90, (mower.hitFlashTimer / 6) * 0.90) : 0;
+    drawSpriteWithHitFlash(
+      ctx,
       mowerImg,
       frame.sx, frame.sy, frame.sw, frame.sh,
-      -drawWidth * 0.5, -drawHeight * 0.78 + shakeY, drawWidth, drawHeight
+      -drawWidth * 0.5, -drawHeight * 0.78 + shakeY, drawWidth, drawHeight,
+      isHit,
+      flashAlpha
     );
   } else {
     _drawProceduralLawnmower(ctx, r, isCharging);

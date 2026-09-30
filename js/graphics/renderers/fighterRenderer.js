@@ -157,10 +157,22 @@ export class FighterRenderer {
     
     // Suppress white hit-flash during Yuji's soul-swap transformation or on match end / winner reveal; the
     // 'lighter' composite at full opacity would completely wash the body white.
+    // Also suppress generic circular hit-flash on sprite-based entities (plants, turrets, vehicles, deployables) that manage their own exact-silhouette hit-flashes.
     const isSoulSwapTransitioning = (fighter.soulSwapTransitionTimer || 0) > 0 || fighter.soulSwapActive;
     const isUltimateActive = Boolean(fighter.ultimateActive || fighter.isChannelingDomainExpansion || fighter.isChannelingDomain);
     const isMatchEnded = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) || Boolean(fighter._isWinnerReveal);
-    if (fighter.hitFlashTimer > 0 && !isSoulSwapTransitioning && !isUltimateActive && !isMatchEnded) {
+    const hasCustomHitFlash = Boolean(
+      fighter.customHitFlash ||
+      fighter.isPlant ||
+      fighter.isPlantMinion ||
+      fighter.isTurret ||
+      fighter.isBuilding ||
+      fighter.isCar ||
+      fighter.isDeployable ||
+      fighter.characterId === 'crazydave_plant' ||
+      fighter.characterId === 'crazydave_lawnmower'
+    );
+    if (fighter.hitFlashTimer > 0 && !isSoulSwapTransitioning && !isUltimateActive && !isMatchEnded && !hasCustomHitFlash) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.beginPath();

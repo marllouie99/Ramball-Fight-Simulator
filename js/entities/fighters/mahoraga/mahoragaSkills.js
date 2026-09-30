@@ -185,7 +185,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
  */
 export function startAdaptationFlashDash(fighter, attacker) {
   if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
-  if (!attacker || attacker.isDead || attacker === fighter) return;
+  if (!attacker || attacker.isDead || attacker === fighter || attacker.isLawnmower || attacker.isUntargetable || attacker.characterId === 'crazydave_lawnmower') return;
   const isInsideDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && !fighter.domainImmunity && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
@@ -339,7 +339,8 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
  */
 export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
   if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
-  if (projectile && (projectile.skillShotId === 'crazyDaveSnowPea' || projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
+  if (attacker && (attacker.isLawnmower || attacker.isUntargetable || attacker.characterId === 'crazydave_lawnmower')) return;
+  if (projectile && (projectile.isLawnmower || projectile.skillShotId === 'lawnmower' || projectile.skillShotId === 'crazyDaveSnowPea' || projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
   const fromX = fighter.x;
   const fromY = fighter.y;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;

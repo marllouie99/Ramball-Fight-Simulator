@@ -1,3 +1,8 @@
+---
+description: Global session development standards, verification protocols, and repository hygiene rules.
+alwaysApply: true
+---
+
 # Global Development Standards
 
 These rules apply to ALL agent conversations on this project. They ensure consistency, cleanliness, and reliability across every session.

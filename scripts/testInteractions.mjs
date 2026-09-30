@@ -1657,13 +1657,16 @@ async function runInteractionTests() {
     assert(gojo.infinityBarrierHp === 45, `Barrier HP must be at 45 (got ${gojo.infinityBarrierHp})`);
     assert(gojo.infinityCrackLevel === 3, `Crack level must be 3 (Critical stress) at 45 HP (got ${gojo.infinityCrackLevel})`);
 
-    // 5. Final Normal Punch lands to shatter the remaining 45 HP of the barrier!
-    gojo.takeDamage(75, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true, undodgeable: true });
+    // 5. Final Normal Punch lands to shatter the remaining 45 HP of the barrier and penetrate directly!
+    const breakHitResult = gojo.takeDamage(75, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true, undodgeable: true });
     
     // Barrier must be completely shattered!
     assert(gojo.infinityBarrierHp === 0, `Barrier HP must be 0 after shatter (got ${gojo.infinityBarrierHp})`);
     assert(gojo.infinityActive === false, 'Infinity must be deactivated after being shattered');
     assert(gojo.infinityCooldown === (CONFIG.gojo?.infinityBrokenCooldown ?? 360), `Infinity must be placed on broken lockout cooldown (got ${gojo.infinityCooldown})`);
+    assert(breakHitResult !== false, 'Shattering punch must penetrate barrier and deal direct HP damage');
+    assert(gojo.hp < initialGojoHp, `Gojo must take direct HP damage on the barrier shattering punch (HP: ${gojo.hp} < ${initialGojoHp})`);
+    assert(!saitama.isFrozenByInfinity, 'Saitama must NOT be frozen in Infinity when shattering the barrier');
 
     // 6. Verify flying glass shard particles spawned in state.deathEffects
     const glassShards = state.deathEffects.filter(e => e.isInfinityGlassShard);
@@ -1679,6 +1682,7 @@ async function runInteractionTests() {
     const directHitResult = gojo.takeDamage(50, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true });
     assert(directHitResult !== false, 'takeDamage must succeed and apply damage when Infinity is shattered');
     assert(gojo.hp < hpBeforeDirectHit, `Gojo must take direct HP damage while Infinity is broken (HP: ${gojo.hp} < ${hpBeforeDirectHit})`);
+    assert(!saitama.isFrozenByInfinity, 'Saitama must NOT be frozen in Infinity on subsequent hits while barrier is broken');
 
     // 8. Verify cooldown decrements cleanly across update ticks while remaining inactive
     state.frameCount = 1;
@@ -1707,6 +1711,57 @@ async function runInteractionTests() {
     state.illusions = [];
     state.projectiles = [];
     console.log('      ✅ Saitama vs Gojo Infinity barrier crack, shatter & direct damage verified.');
+  }
+
+  // ── TEST 25B: Saitama Consecutive Punches Must Not Hit a Minion's Owner ──
+  console.log('   25B. Testing Saitama consecutive punches against an enemy minion owner...');
+  {
+    const SaitamaClass = FIGHTER_CLASS_MAP.saitama;
+    const { CrazyDaveFighter, LawnmowerEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const saitama = new SaitamaClass({ radius: 25, x: 100, y: 300, hp: 500, maxHp: 500, color: '#F5C400' });
+    const enemyOwner = { x: 220, y: 300, r: 25, hp: 500, maxHp: 500, type: 'enemy_owner' };
+    const enemyMinion = {
+      x: 180,
+      y: 300,
+      r: 18,
+      hp: 200,
+      maxHp: 200,
+      isMinion: true,
+      isDeployable: true,
+      owner: enemyOwner,
+      takeDamage(amount) {
+        this.hp -= amount;
+        return amount;
+      },
+      applyKnockback() {}
+    };
+
+    state.mode = '1v1';
+    state.gameState = 'playing';
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+    state.fighters = [saitama, enemyOwner, enemyMinion];
+    saitama.isFlurrying = true;
+    saitama.flurryTarget = enemyMinion;
+    saitama.flurryHitsLeft = 1;
+    saitama.flurryTimer = (CONFIG.saitama.flurryHitInterval || 4) - 1;
+    saitama._flurryAimAngle = 0;
+    saitama.skillPunishCooldown = 9999;
+    const ownerHpBefore = enemyOwner.hp;
+    const minionHpBefore = enemyMinion.hp;
+
+    saitama.update(enemyMinion, 0, state.arena);
+
+    assert(enemyMinion.hp < minionHpBefore, 'Saitama consecutive punch must damage the selected enemy minion');
+    assert(enemyOwner.hp === ownerHpBefore, 'Saitama consecutive punch must not damage the selected minion owner');
+
+    const dave = new CrazyDaveFighter({ startX: 300, startY: 300, radius: 25, hp: 390, maxHp: 390 });
+    const mower = new LawnmowerEntity(180, 300, dave, -1, 0);
+    state.fighters = [saitama, dave, mower];
+    saitama._blowAwayCrazyDaveLawnmowers(100, 300, 0, 320, Math.PI * 0.35);
+    assert(mower.state === 'charging', 'Saitama punch must blow a Crazy Dave lawnmower into its charging path');
+    assert(mower.facingDirection === 1, 'Saitama punch must send the lawnmower in the punch direction');
+    assert(mower.saitamaBlownAway === true, 'Lawnmower must record that Saitama blew it away');
+    state.fighters = [];
   }
 
   // ── TEST 26: Crazy Dave PvZ Grass Tiles Arena Floor & Plant Minion Entity Flags ──
@@ -1771,6 +1826,56 @@ async function runInteractionTests() {
       assert(plant.isPlantMinion === true, `Plant ${plant.name} must have isPlantMinion === true`);
       assert(plant.owner === dave, `Plant ${plant.name} must have owner === dave`);
     }
+
+    const cappedDave = new CrazyDaveClass({ radius: 25, x: 200, y: 300, hp: 390, maxHp: 390 });
+    cappedDave.sunCount = 10000;
+    state.fighters = [cappedDave, gojo];
+    assert(cappedDave.plantWallnut(gojo) === true, 'Crazy Dave must plant the first Wall-nut');
+    assert(cappedDave.plantWallnut(gojo) === true, 'Crazy Dave must plant the second Wall-nut');
+    assert(cappedDave.plantWallnut(gojo) === false, 'Crazy Dave must reject a third active Wall-nut');
+    assert(cappedDave.activeWallnuts.filter(w => w && w.hp > 0).length === 2, 'Crazy Dave must keep at most 2 active Wall-nuts');
+    assert(cappedDave.plantTorchwood(gojo) === true, 'Crazy Dave must plant the first Torchwood');
+    assert(cappedDave.plantTorchwood(gojo) === true, 'Crazy Dave must plant the second Torchwood');
+    assert(cappedDave.plantTorchwood(gojo) === false, 'Crazy Dave must reject a third active Torchwood');
+    assert(cappedDave.activeTorchwoods.filter(t => t && t.hp > 0).length === 2, 'Crazy Dave must keep at most 2 active Torchwoods');
+    state.fighters = [dave, gojo];
+
+    const priorFighters = state.fighters;
+    const firstTeamDave = new CrazyDaveClass({ radius: 25, x: dave.x, y: dave.y, hp: 390, maxHp: 390 });
+    const teammateDave = new CrazyDaveClass({ radius: 25, x: dave.x, y: dave.y, hp: 390, maxHp: 390 });
+    firstTeamDave.team = 0;
+    teammateDave.team = 0;
+    firstTeamDave.sunCount = 1000;
+    teammateDave.sunCount = 1000;
+    state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+    state.fighters = [firstTeamDave, teammateDave, gojo];
+    assert(firstTeamDave.plantWallnut(gojo), 'First Crazy Dave must plant on an open tile');
+    const teammateSharedTile = firstTeamDave.activeWallnuts[0];
+    assert(teammateDave.plantPeashooter(gojo), 'Teammate Crazy Dave must find another open tile');
+    const teammateNewPlant = teammateDave.activePeashooters[0];
+    assert(Math.hypot(teammateNewPlant.x - teammateSharedTile.x, teammateNewPlant.y - teammateSharedTile.y) > 1, 'Teammate Daves must not plant on the same grass tile');
+
+    const savedSun = teammateDave.sunCount;
+    const grassTileSize = CONFIG.crazydave.grassTileSize;
+    const grassCols = Math.max(3, Math.round(state.arena.width / grassTileSize));
+    const grassRows = Math.max(3, Math.round(state.arena.height / grassTileSize));
+    const cellW = state.arena.width / grassCols;
+    const cellH = state.arena.height / grassRows;
+    state.fighters = [firstTeamDave, teammateDave, gojo];
+    for (let row = 0; row < grassRows; row++) {
+      for (let col = 0; col < grassCols; col++) {
+        state.fighters.push({
+          isPlant: true,
+          hp: 1,
+          owner: firstTeamDave,
+          x: state.arena.x + (col + 0.5) * cellW,
+          y: state.arena.y + (row + 0.5) * cellH
+        });
+      }
+    }
+    assert(teammateDave.plantSnowPea(gojo) === false, 'Crazy Dave must not plant when every grass tile is occupied by an ally plant');
+    assert(teammateDave.sunCount === savedSun, 'Failed planting on a full lawn must not consume Sun');
+    state.fighters = priorFighters;
 
     const wallnutEntity = plantEntities.find(p => p.type === 'Wallnut');
     assert(wallnutEntity !== undefined, 'Wall-nut entity must exist in active plants');
@@ -2813,7 +2918,7 @@ async function runInteractionTests() {
   // ── 29. Testing Lawnmower Sprite Bounds, Stack Balance, Baseline Defense & Steamroller Shred ──
   {
     const { LAWNMOWER_RECTS, drawLawnmower } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
-    const { LawnmowerEntity, CrazyDaveFighter } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { LawnmowerEntity, CrazyDaveFighter, getAllPlantTargetCandidates, isEnemyPlantTarget } = await import('../js/entities/fighters/CrazyDaveFighter.js');
 
     // 1. Verify Lawnmower sprite sheet frames are valid and non-overlapping
     assert(LAWNMOWER_RECTS.length === 6, `LAWNMOWER_RECTS must contain 6 discrete animation frames (got ${LAWNMOWER_RECTS.length})`);
@@ -2838,14 +2943,14 @@ async function runInteractionTests() {
     drawLawnmower(mockCtx, mower);
     assert(mockCtx.getStackDepth() === 0, `drawLawnmower (charging) must return canvas stack depth to 0, got ${mockCtx.getStackDepth()}`);
 
-    // 3. Test Lawnmower baseline initialization across rows for Crazy Dave (Always on LEFT side)
+    // 3. Test Lawnmower baseline initialization follows Crazy Dave's spawn side
     const testArena = { x: 0, y: 0, width: 600, height: 400 };
-    dave.x = 550; // Even if Dave is far on the right, lawnmowers must ALWAYS be on the LEFT
+    dave.x = 550;
     dave.initLawnmowers(testArena);
     assert(dave.lawnmowers.length > 0, `Crazy Dave must initialize lawnmowers across arena rows (got ${dave.lawnmowers.length})`);
     for (const m of dave.lawnmowers) {
-      assert(m.x === testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset, `Lawnmowers must always be tucked against the left wall (got ${m.x}, expected ${testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset})`);
-      assert(m.facingDirection === 1, 'Lawnmowers must face right (+1)');
+      assert(m.x === testArena.x + testArena.width - CONFIG.crazydave.lawnmowerBaselineOffset, `Right-spawn lawnmowers must be tucked against the right wall (got ${m.x})`);
+      assert(m.facingDirection === -1, 'Right-spawn lawnmowers must face left (-1)');
       assert(m.state === 'idle', 'Lawnmowers must start in idle state');
       assert(m.hp === 99999, 'Lawnmower must have invulnerable HP pool');
       assert(m.isLawnmower === true, 'Lawnmower must set isLawnmower flag');
@@ -2853,6 +2958,11 @@ async function runInteractionTests() {
       assert(m.isUntargetable === true && m.untargetable === true, 'Lawnmower must be untargetable');
       assert(m.phasesThroughEntities === true && m.ignoreFighterCollisions === true, 'Lawnmower must have entity phase-through flags');
     }
+
+    const leftSpawnDave = new CrazyDaveFighter({ startX: 100, startY: 200 });
+    leftSpawnDave.initLawnmowers(testArena);
+    assert(leftSpawnDave.lawnmowers.every(m => m.x === testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset), 'Left-spawn lawnmowers must be tucked against the left wall');
+    assert(leftSpawnDave.lawnmowers.every(m => m.facingDirection === 1), 'Left-spawn lawnmowers must face right (+1)');
 
     // 4. Test Untargetable status: isValidAimTarget and getClosestOpponent ignore Lawnmowers
     const { getClosestOpponent, resolveFighterCollision } = await import('../js/systems/physics.js');
@@ -2872,12 +2982,12 @@ async function runInteractionTests() {
     testEnemy.vx = -3;
     resolveFighterCollision(sampleMower, testEnemy);
     assert(testEnemy.x === sampleMower.x, 'Entities must pass directly through Lawnmower without collision displacement');
-    assert(sampleMower.x === testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset, 'Lawnmower must not be displaced by colliding entity');
+    assert(sampleMower.x === testArena.x + testArena.width - CONFIG.crazydave.lawnmowerBaselineOffset, 'Lawnmower must not be displaced by colliding entity');
 
     // 6. Test Lawnmower breach trigger when enemy penetrates baseline
     const targetMower = dave.lawnmowers[0];
     const enemy = {
-      x: targetMower.x + 30, // Within breach trigger radius
+      x: targetMower.x + targetMower.facingDirection * 30, // Approach from the arena interior
       y: targetMower.y,
       r: 20,
       hp: 250,
@@ -2898,8 +3008,9 @@ async function runInteractionTests() {
     const prevHp = enemy.hp;
     targetMower.update(null, 0, testArena);
     assert(enemy.hp < prevHp, `Enemy must take steamroller shred damage from charging mower (expected < ${prevHp}, got ${enemy.hp})`);
-    assert(enemy.hp === prevHp - 180, `Lawnmower must deal 180 damage (got ${prevHp - enemy.hp})`);
-    assert(enemy.knockbackVx > 0, `Enemy must receive knockback push from charging mower (got ${enemy.knockbackVx})`);
+    const expectedMowerDmg = (CONFIG.crazyDave?.lawnmowerDamage ?? 100);
+    assert(enemy.hp === prevHp - expectedMowerDmg, `Lawnmower must deal ${expectedMowerDmg} damage (got ${prevHp - enemy.hp})`);
+    assert(targetMower.facingDirection * enemy.knockbackVx > 0, `Enemy must receive knockback push in the mower's travel direction (got ${enemy.knockbackVx})`);
 
     // 8. Test Enemy does NOT get shredded multiple times on the same pass
     const hpAfterFirstHit = enemy.hp;
@@ -2927,11 +3038,41 @@ async function runInteractionTests() {
     const prevIllHp = enemyIllusion.hp;
     minionMower.update(null, 0, testArena);
     assert(enemyIllusion.hp < prevIllHp, `Enemy illusion must take shred damage from lawnmower (expected < ${prevIllHp}, got ${enemyIllusion.hp})`);
-    assert(enemyIllusion.knockbackVx > 0, `Enemy illusion must receive knockback from lawnmower (got ${enemyIllusion.knockbackVx})`);
-    state.illusions = [];
+    assert(minionMower.facingDirection * enemyIllusion.knockbackVx > 0, `Enemy illusion must receive knockback in the mower's travel direction (got ${enemyIllusion.knockbackVx})`);
+    // 8c. Test Mahoraga vs Lawnmower: Mahoraga adapts to Lawnmower and takes 50% reduced damage on subsequent hits without teleporting
+    const MahoragaClass = FIGHTER_CLASS_MAP.mahoraga;
+    const mahoragaTest = new MahoragaClass({ radius: 30, x: 200, y: 200, hp: 450, maxHp: 450 });
+    const mahoMower = new LawnmowerEntity(200, 200, dave, 1, 0);
+    mahoMower.state = 'charging';
+    mahoMower.x = mahoragaTest.x;
+    mahoMower.y = mahoragaTest.y;
+    state.fighters = [dave, mahoragaTest, mahoMower];
+    const mahoPrevHp = mahoragaTest.hp;
+    const prevDamageReceived = mahoragaTest.damageReceived || 0;
+    mahoMower.update(null, 0, testArena);
+    assert(mahoragaTest.damageReceived > prevDamageReceived || mahoragaTest.hp < mahoPrevHp, `Mahoraga must take crush damage on first Lawnmower hit`);
+    assert(mahoragaTest.adaptedLawnmower === true, 'Mahoraga must adapt to Lawnmower after taking fatal damage threshold');
+    assert(mahoragaTest.adaptationDashTimer === 0, 'Mahoraga must NOT trigger adaptation dash/teleport on Lawnmower');
+    assert(mahoragaTest._pendingCounterTarget !== mahoMower, 'Mahoraga must NOT set Lawnmower as pending counter target');
+    assert(mahoMower.mahoragaAdaptationFreezeTimer === undefined || mahoMower.mahoragaAdaptationFreezeTimer === 0, 'Lawnmower must NOT be frozen by Mahoraga adaptation');
+
+    // Second hit with new Lawnmower: Mahoraga takes 50% reduced damage (90 dmg, minus wheel stage defense = 85.5 dmg)
+    const mahoMower2 = new LawnmowerEntity(200, 200, dave, 1, 0);
+    mahoMower2.state = 'charging';
+    mahoMower2.x = mahoragaTest.x;
+    mahoMower2.y = mahoragaTest.y;
+    state.fighters = [dave, mahoragaTest, mahoMower2];
+    const hpBeforeSecondHit = mahoragaTest.hp;
+    mahoMower2.update(null, 0, testArena);
+    const damageTaken = hpBeforeSecondHit - mahoragaTest.hp;
+    assert(damageTaken <= 90 && damageTaken > 0, `Adapted Mahoraga must take 50% reduced damage from Lawnmower (expected <= 90, got ${damageTaken})`);
+    assert(mahoragaTest.adaptationDashTimer === 0, 'Adapted Mahoraga must NOT trigger adaptation dash/teleport on Lawnmower');
+    state.fighters = [];
 
     // 9. Test Mower despawn upon driving past arena boundary
-    targetMower.x = testArena.x + testArena.width + 100;
+    targetMower.x = targetMower.facingDirection === 1
+      ? testArena.x + testArena.width + 100
+      : testArena.x - 100;
     targetMower.update(null, 0, testArena);
     assert(targetMower.state === 'despawned', 'Lawnmower must despawn when past arena boundary');
 
@@ -2940,6 +3081,165 @@ async function runInteractionTests() {
     state.fighters = [];
 
     console.log('      ✅ Lawnmower 6-frame bounds, canvas stack balance, baseline deployment, breach triggering & steamroller shred verified.');
+  }
+
+  console.log('   28. Testing Engineer sentry placement on Crazy Dave center grass tile...');
+  {
+    const EngineerClass = FIGHTER_CLASS_MAP.Engineer;
+    const CrazyDaveClass = FIGHTER_CLASS_MAP.crazydave;
+    const { getNearestGrassTileCenter } = await import('../js/graphics/renderers/grassFloorRenderer.js');
+    assert(EngineerClass && CrazyDaveClass, 'Engineer and Crazy Dave classes must exist');
+
+    const testArena = { x: 40, y: 170, width: 437, height: 437, shape: 'rectangle' };
+    const engineer = new EngineerClass({ startX: 100, startY: 300, radius: 25, hp: 400 });
+    const daveOpponent = new CrazyDaveClass({ startX: 360, startY: 300, radius: 25, hp: 390 });
+    const davePlantTarget = { owner: daveOpponent, type: 'Peashooter', x: 360, y: 300, hp: 180 };
+    state.arena = testArena;
+    state.fighters = [engineer, daveOpponent];
+    engineer.update(davePlantTarget, 0, testArena);
+
+    const expectedBuildTile = getNearestGrassTileCenter(
+      engineer.x + (CONFIG.Engineer.turretSpawnDistance ?? -40),
+      engineer.y,
+      testArena
+    );
+    assert(engineer.turretEntity !== null, 'Engineer must deploy a sentry when its skill is ready');
+    assert(Math.abs(engineer.turretEntity.x - expectedBuildTile.x) < 0.001, 'Engineer sentry must use the grass tile nearest Engineer against Crazy Dave');
+    assert(Math.abs(engineer.turretEntity.y - expectedBuildTile.y) < 0.001, 'Engineer sentry must use Engineer-side grass tile y against Crazy Dave');
+
+    const normalEngineer = new EngineerClass({ startX: 100, startY: 300, radius: 25, hp: 400 });
+    const normalOpponent = { characterId: 'gojo', type: 'gojo', x: 360, y: 300, hp: 200 };
+    state.fighters = [normalEngineer, normalOpponent];
+    normalEngineer.update(normalOpponent, 0, testArena);
+    assert(normalEngineer.turretEntity !== null, 'Engineer must still deploy a sentry against normal opponents');
+    assert(
+      Math.hypot(normalEngineer.turretEntity.x - expectedBuildTile.x, normalEngineer.turretEntity.y - expectedBuildTile.y) > 1,
+      'Engineer sentry must retain normal offset placement against non-Crazy-Dave opponents'
+    );
+
+    state.fighters = [];
+    state.arena = null;
+    console.log('      ✅ Engineer sentry center grass-tile placement against Crazy Dave verified.');
+  }
+
+  console.log('   29. Testing Megumin Explosion phases, team filtering, crater, and burnout...');
+  {
+    const { Fighter } = await import('../js/entities/fighter.js');
+    const { drawMeguminExplosionScreenOverlay } = await import('../js/graphics/fighters/meguminSkin.js');
+    const MeguminClass = FIGHTER_CLASS_MAP.megumin;
+    assert(MeguminClass, 'Megumin class must exist');
+
+    const previousFighters = state.fighters;
+    const previousMode = state.mode;
+    const previousGameState = state.gameState;
+    const previousArena = state.arena;
+    const previousPlaySFX = audioSystem.playSFX;
+    const previousProjectiles = projectileSystem.projectiles;
+    try {
+      state.mode = '1v1';
+      state.gameState = 'playing';
+      state.arena = { x: 0, y: 0, width: 540, height: 960 };
+      audioSystem.playSFX = () => null;
+
+      const megumin = new MeguminClass({
+        id: 49,
+        type: 'megumin',
+        name: 'MEGUMIN',
+        startX: 100,
+        startY: 200,
+        radius: 25,
+        hp: 280,
+        moveSpeed: 0
+      });
+      const makeTarget = (id, name, x, team) => {
+        const target = new Fighter({
+          id,
+          type: 'explosion_test',
+          name,
+          startX: x,
+          startY: 200,
+          radius: 25,
+          hp: 1000,
+          moveSpeed: 0
+        });
+        target.maxHp = 1000;
+        target.hp = 1000;
+        target.team = team;
+        return target;
+      };
+      const coreTarget = makeTarget(9001, 'Core Target', 300, 1);
+      const outerTarget = makeTarget(9002, 'Outer Target', 480, 1);
+      const ally = makeTarget(9003, 'Ally', 310, 0);
+      const distantTarget = makeTarget(9004, 'Distant Target', 600, 1);
+      const actors = [megumin, coreTarget, outerTarget, ally, distantTarget];
+      state.fighters = actors;
+      megumin.team = 0;
+      let coreDamageCalls = 0;
+      const originalCoreTakeDamage = coreTarget.takeDamage.bind(coreTarget);
+      coreTarget.takeDamage = (amount, attacker, options) => {
+        coreDamageCalls++;
+        return originalCoreTakeDamage(amount, attacker, options);
+      };
+      megumin.speed = 0;
+      megumin.baseSpeed = 0;
+      megumin.vx = 0;
+      megumin.vy = 0;
+
+      const projectileCount = projectileSystem.projectiles.length;
+      megumin.update(coreTarget, 0, state.arena);
+      assert(megumin.isChantingExplosion, 'Megumin should autonomously begin Explosion while its ultimate is ready');
+      assert(megumin._getExplosionTargets().length === 3, 'Explosion should include only the three living enemy targets');
+      assert(projectileSystem.projectiles.length === projectileCount, 'One True Path must suppress generic basic projectiles');
+
+      const committedAngle = megumin.committedCastAngle;
+      coreTarget.x += 40;
+      megumin.aim(coreTarget);
+      assert(megumin.gunAngle === committedAngle, 'Explosion chant must retain its committed cast angle');
+      coreTarget.x -= 40;
+
+      megumin.explosionTimer = megumin.chantMaxTimer - CONFIG.megumin.explosionSingularityPullFrames - 1;
+      megumin.update(coreTarget, 0, state.arena);
+      assert(megumin.explosionPhase === 'SINGULARITY', 'The final 30 chant frames should enter the singularity phase');
+      assert(outerTarget.vx < 0, 'The singularity should pull nearby enemies toward the impact point');
+      assert(ally.vx === 0, 'The singularity must not pull Megumin’s teammate');
+
+      megumin.explosionTimer = megumin.chantMaxTimer - 1;
+      megumin.update(coreTarget, 0, state.arena);
+      assert(megumin.explosionPhase === 'DETONATION' && megumin.isDepleted, `Final chant frame should detonate and begin burnout (phase=${megumin.explosionPhase}, timer=${megumin.explosionTimer})`);
+      assert(coreDamageCalls === 1, `Core epicenter should receive exactly one blast hit (got ${coreDamageCalls})`);
+      assert(coreTarget.hp === 580, `Core epicenter should deal 420 damage once (got ${1000 - coreTarget.hp})`);
+      assert(outerTarget.hp === 740, `Outer blast should deal 260 damage (got ${1000 - outerTarget.hp})`);
+      assert(ally.hp === 1000, 'Explosion must not damage Megumin’s teammate');
+      assert(distantTarget.hp === 1000, 'Explosion must not damage targets beyond the blast radius');
+      assert(megumin.isDepleted && megumin.faceplantTimer === megumin.faceplantMaxTimer, 'Detonation should immediately begin the faceplant burnout');
+      assert(megumin.explosionCooldown === CONFIG.megumin.explosionCooldown, 'Detonation should start the configured ultimate cooldown');
+
+      megumin.explosionFireTickTimer = 1;
+      megumin._updateExplosionCrater(CONFIG.megumin);
+      assert(coreTarget.hp === 572, 'The crater should apply one configured fire tick after its interval');
+      assert(ally.hp === 1000, 'Crater fire must continue to exclude teammates');
+
+      mockCtx.resetStackDepth();
+      megumin.drawGroundTelegraph(mockCtx);
+      drawMeguminExplosionScreenOverlay(mockCtx, actors);
+      assert(mockCtx.getStackDepth() === 0, 'Megumin Explosion telegraphs and screen overlay must balance Canvas state');
+
+      megumin.reset();
+      assert(!megumin.isDepleted && megumin.explosionPhase === 'IDLE' && megumin.explosionCraterTimer === 0, 'Round reset must clear burnout, phase, and crater state');
+
+      const interruptedMegumin = new MeguminClass({ id: 49, type: 'megumin', name: 'MEGUMIN', radius: 25, hp: 280, moveSpeed: 0 });
+      interruptedMegumin._beginExplosion(coreTarget, CONFIG.megumin);
+      interruptedMegumin.interruptAttacks(true);
+      assert(!interruptedMegumin.isChantingExplosion && interruptedMegumin.explosionPhase === 'IDLE', 'Hard interruption should cancel the active chant before detonation');
+      assert(coreTarget.hp === 572, 'Interrupting a chant must not apply blast damage');
+    } finally {
+      state.fighters = previousFighters;
+      state.mode = previousMode;
+      state.gameState = previousGameState;
+      state.arena = previousArena;
+      audioSystem.playSFX = previousPlaySFX;
+      projectileSystem.projectiles = previousProjectiles;
+    }
   }
 
   console.log('───────────────────────────────────────────────────────');

@@ -10,8 +10,22 @@ import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { spawnSpentCasing } from '../../graphics/particles/johnWickDroppedMagazine.js';
 import { TurretEntity } from '../TurretEntity.js';
 import { DispenserEntity } from '../DispenserEntity.js';
+import { getNearestGrassTileCenter } from '../../graphics/renderers/grassFloorRenderer.js';
 import { drawEngineer } from '../../graphics/weaponVisuals.js';
 import { drawEngineerSkin } from '../../graphics/fighters/engineerSkin.js';
+
+function isCrazyDaveFighter(fighter) {
+  const candidates = [fighter, fighter?.owner];
+  return candidates.some(candidate => candidate && (
+    candidate.characterId === 'crazydave' ||
+    candidate.characterId === 'crazy_dave' ||
+    candidate.type === 'crazydave' ||
+    candidate.type === 'crazy_dave' ||
+    candidate._def?.id === 'crazydave' ||
+    candidate._def?.id === 'crazy_dave' ||
+    candidate.name === 'Crazy Dave'
+  ));
+}
 
 export class EngineerFighter extends Fighter {
   constructor(def) {
@@ -243,6 +257,16 @@ export class EngineerFighter extends Fighter {
       const offset = cfg.turretSpawnDistance ?? -40;
       let spawnX = this.x + Math.cos(spawnAngle) * offset;
       let spawnY = this.y + Math.sin(spawnAngle) * offset;
+
+      if (arena && isCrazyDaveFighter(opponent)) {
+        const centerTile = getNearestGrassTileCenter(
+          spawnX,
+          spawnY,
+          arena
+        );
+        spawnX = centerTile.x;
+        spawnY = centerTile.y;
+      }
 
       // Ensure turret stays fully within arena limits, accounting for its radius (approx 20)
       if (arena) {

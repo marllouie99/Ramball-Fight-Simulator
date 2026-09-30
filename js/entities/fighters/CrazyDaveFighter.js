@@ -36,6 +36,47 @@ function getCrazyDaveSoundVolume(config, key) {
   return config?.soundVolumes?.[key] ?? crazyDaveConfig.soundVolumes[key];
 }
 
+function getCrazyDavePlantOccupants(dave) {
+  const plants = new Set();
+  const ownPlantLists = [
+    dave.activeWallnuts,
+    dave.activePeashooters,
+    dave.activeSnowPeas,
+    dave.activeTorchwoods
+  ];
+
+  for (const plantList of ownPlantLists) {
+    for (const plant of plantList || []) {
+      if (plant && plant.hp > 0) plants.add(plant);
+    }
+  }
+
+  for (const plant of state.fighters || []) {
+    const owner = plant?.owner;
+    const isCrazyDave = owner?.characterId === 'crazydave' || owner?.type === 'crazydave' || owner?._def?.id === 'crazydave';
+    if (!plant?.isPlant || plant.hp <= 0 || !isCrazyDave) continue;
+    if (owner !== dave && !dave.isTeammate(owner)) continue;
+    plants.add(plant);
+  }
+
+  return [...plants];
+}
+
+function getAvailableCrazyDavePlantTile(dave, targetX, targetY, arena) {
+  const activePlants = getCrazyDavePlantOccupants(dave);
+  const tileCenter = getNearestGrassTileCenter(targetX, targetY, arena, activePlants);
+  const targetTileSize = getCrazyDaveSetting(CONFIG.crazydave, 'grassTileSize') || 76.6;
+  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
+  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const occupiedRadius = Math.min(arena.width / cols, arena.height / rows) * 0.45;
+
+  if (activePlants.some(plant => Math.hypot(plant.x - tileCenter.x, plant.y - tileCenter.y) < occupiedRadius)) {
+    return null;
+  }
+
+  return tileCenter;
+}
+
 function isMakimaControlledPlant(plant) {
   return Boolean(plant?.isChainedByMakima && plant?.isMindControlledByMakima && plant?._makimaChainer);
 }
@@ -217,6 +258,7 @@ export class PeashooterEntity extends Fighter {
     this.isMinion = true;
     this.isPlant = true;
     this.isPlantMinion = true;
+    this.customHitFlash = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.immuneToKnockback = true;
@@ -364,7 +406,10 @@ export class PeashooterEntity extends Fighter {
   handleBleed() { return; }
 
   // ── Overhead & Status Renderers ──
-  drawStatusOverlays() { /* Plants are immune to debuffs & overlays */ }
+  drawStatusOverlays() {
+    // Synchronize frame marker so EntityRenderer fallback knows overlays were handled
+    this._statusOverlaysRenderedFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+  }
   drawFreezeTimer() { /* Plants are immune to freeze */ }
   drawSlowEffect() { return; }
   drawPoisonEffect() { return; }
@@ -590,6 +635,7 @@ export class SnowPeaEntity extends Fighter {
     this.isMinion = true;
     this.isPlant = true;
     this.isPlantMinion = true;
+    this.customHitFlash = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.immuneToKnockback = true;
@@ -737,7 +783,9 @@ export class SnowPeaEntity extends Fighter {
   handleBleed() { return; }
 
   // ── Overhead & Status Renderers ──
-  drawStatusOverlays() { /* Plants are immune to debuffs & overlays */ }
+  drawStatusOverlays() {
+    this._statusOverlaysRenderedFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+  }
   drawFreezeTimer() { /* Plants are immune to freeze */ }
   drawSlowEffect() { return; }
   drawPoisonEffect() { return; }
@@ -989,6 +1037,7 @@ export class WallnutEntity extends Fighter {
     this.isMinion = true;
     this.isPlant = true;
     this.isPlantMinion = true;
+    this.customHitFlash = true;
     this.isWallnut = true;
     this.isPlantBarrier = true;
     this.isImmovable = true;
@@ -1149,7 +1198,9 @@ export class WallnutEntity extends Fighter {
   handleBleed() { return; }
 
   // ── Overhead & Status Renderers ──
-  drawStatusOverlays() { /* Plants are immune to debuffs & overlays */ }
+  drawStatusOverlays() {
+    this._statusOverlaysRenderedFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+  }
   drawFreezeTimer() { /* Plants are immune to freeze */ }
   drawSlowEffect() { return; }
   drawPoisonEffect() { return; }
@@ -1296,6 +1347,7 @@ export class TorchwoodEntity extends Fighter {
     this.isMinion = true;
     this.isPlant = true;
     this.isPlantMinion = true;
+    this.customHitFlash = true;
     this.isTorchwood = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
@@ -1447,7 +1499,9 @@ export class TorchwoodEntity extends Fighter {
   handleBleed() { return; }
 
   // ── Overhead & Status Renderers ──
-  drawStatusOverlays() { /* Plants are immune to debuffs & overlays */ }
+  drawStatusOverlays() {
+    this._statusOverlaysRenderedFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+  }
   drawFreezeTimer() { /* Plants are immune to freeze */ }
   drawSlowEffect() { return; }
   drawPoisonEffect() { return; }
@@ -1728,6 +1782,9 @@ export class LawnmowerEntity extends Fighter {
     this.isDeployable = true;
     this.isMinion = true;
     this.isMinionEntity = true;
+    this.isPlant = true;
+    this.isPlantMinion = true;
+    this.customHitFlash = true;
     this.isLawnmower = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
@@ -1846,9 +1903,9 @@ export class LawnmowerEntity extends Fighter {
 
           // Devastating steamroller shred damage
           if (typeof applyDamageToTarget === 'function') {
-            applyDamageToTarget(f, this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush' });
+            applyDamageToTarget(f, this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
           } else if (typeof f.takeDamage === 'function') {
-            f.takeDamage(this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush' });
+            f.takeDamage(this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
           } else if (typeof f.hp === 'number') {
             f.hp = Math.max(0, f.hp - this._damage);
           }
@@ -1930,6 +1987,10 @@ export class LawnmowerEntity extends Fighter {
         this.despawn();
       }
     }
+  }
+
+  drawStatusOverlays() {
+    this._statusOverlaysRenderedFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
   }
 
   draw(ctx) {
@@ -2244,9 +2305,11 @@ export class CrazyDaveFighter extends Fighter {
 
     // Lawnmowers parked on the side based on where Dave spawns
     const arenaMidX = arena.x + arena.width / 2;
-    const spawnX = (typeof this.startX === 'number' && !isNaN(this.startX))
-      ? this.startX
-      : ((this._def && typeof this._def.startX === 'number' && !isNaN(this._def.startX)) ? this._def.startX : this.x);
+    const spawnX = Number.isFinite(this.x)
+      ? this.x
+      : ((typeof this.startX === 'number' && !isNaN(this.startX))
+        ? this.startX
+        : ((this._def && typeof this._def.startX === 'number' && !isNaN(this._def.startX)) ? this._def.startX : 0));
 
     const isRightSpawn = spawnX > arenaMidX;
     const facingDirection = isRightSpawn ? -1 : 1;
@@ -2336,22 +2399,24 @@ export class CrazyDaveFighter extends Fighter {
       spawnFloatingText(this.x, this.y - 25, `Need ${wallnutCost}☀️!`, '#EF4444');
       return false;
     }
-    this.sunCount -= wallnutCost;
-    this.wallnutCooldown = getCrazyDaveSetting(cfg, 'wallnutCooldown');
-
     this.activeWallnuts = this.activeWallnuts.filter(w => w && w.hp > 0);
+    const maxActiveWallnuts = getCrazyDaveSetting(cfg, 'maxActiveWallnuts') || 2;
+    if (this.activeWallnuts.length >= maxActiveWallnuts) {
+      spawnFloatingText(this.x, this.y - 25, `Max ${maxActiveWallnuts} Wall-nuts active!`, '#EF4444');
+      return false;
+    }
 
     const arena = (state && state.arena) ? state.arena : CONFIG.arena;
     const plantSpawnOffset = getCrazyDaveSetting(cfg, 'plantSpawnOffset');
     const rawX = this.x + Math.cos(this.gunAngle || 0) * plantSpawnOffset;
     const rawY = this.y + Math.sin(this.gunAngle || 0) * plantSpawnOffset;
-    const activePlants = [
-      ...(this.activePeashooters || []),
-      ...(this.activeSnowPeas || []),
-      ...(this.activeWallnuts || []),
-      ...(this.activeTorchwoods || [])
-    ].filter(p => p && p.hp > 0);
-    const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
+    const tileCenter = getAvailableCrazyDavePlantTile(this, rawX, rawY, arena);
+    if (!tileCenter) {
+      spawnFloatingText(this.x, this.y - 25, 'No open grass tile!', '#EF4444');
+      return false;
+    }
+    this.sunCount -= wallnutCost;
+    this.wallnutCooldown = getCrazyDaveSetting(cfg, 'wallnutCooldown');
 
     // Compute committed 1-direction facing (Left = -1, Right = +1)
     let facingDirection = 1;
@@ -2412,22 +2477,19 @@ export class CrazyDaveFighter extends Fighter {
       spawnFloatingText(this.x, this.y - 25, `Need ${peashooterCost}☀️!`, '#EF4444');
       return false;
     }
-    this.sunCount -= peashooterCost;
-    this.peashooterCooldown = getCrazyDaveSetting(cfg, 'peashooterCooldown');
-
     this.activePeashooters = this.activePeashooters.filter(p => p && p.hp > 0);
 
     const arena = (state && state.arena) ? state.arena : CONFIG.arena;
     const plantSpawnOffset = getCrazyDaveSetting(cfg, 'plantSpawnOffset');
     const rawX = this.x + Math.cos(this.gunAngle || 0) * plantSpawnOffset;
     const rawY = this.y + Math.sin(this.gunAngle || 0) * plantSpawnOffset;
-    const activePlants = [
-      ...(this.activePeashooters || []),
-      ...(this.activeSnowPeas || []),
-      ...(this.activeWallnuts || []),
-      ...(this.activeTorchwoods || [])
-    ].filter(p => p && p.hp > 0);
-    const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
+    const tileCenter = getAvailableCrazyDavePlantTile(this, rawX, rawY, arena);
+    if (!tileCenter) {
+      spawnFloatingText(this.x, this.y - 25, 'No open grass tile!', '#EF4444');
+      return false;
+    }
+    this.sunCount -= peashooterCost;
+    this.peashooterCooldown = getCrazyDaveSetting(cfg, 'peashooterCooldown');
 
     // Compute committed 1-direction facing (Left = -1, Right = +1)
     let facingDirection = 1;
@@ -2488,22 +2550,19 @@ export class CrazyDaveFighter extends Fighter {
       spawnFloatingText(this.x, this.y - 25, `Need ${snowPeaCost}☀️!`, '#EF4444');
       return false;
     }
-    this.sunCount -= snowPeaCost;
-    this.snowPeaCooldown = getCrazyDaveSetting(cfg, 'snowPeaCooldown');
-
     this.activeSnowPeas = this.activeSnowPeas.filter(s => s && s.hp > 0);
 
     const arena = (state && state.arena) ? state.arena : CONFIG.arena;
     const plantSpawnOffset = getCrazyDaveSetting(cfg, 'plantSpawnOffset');
     const rawX = this.x + Math.cos(this.gunAngle || 0) * plantSpawnOffset;
     const rawY = this.y + Math.sin(this.gunAngle || 0) * plantSpawnOffset;
-    const activePlants = [
-      ...(this.activePeashooters || []),
-      ...(this.activeSnowPeas || []),
-      ...(this.activeWallnuts || []),
-      ...(this.activeTorchwoods || [])
-    ].filter(p => p && p.hp > 0);
-    const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
+    const tileCenter = getAvailableCrazyDavePlantTile(this, rawX, rawY, arena);
+    if (!tileCenter) {
+      spawnFloatingText(this.x, this.y - 25, 'No open grass tile!', '#EF4444');
+      return false;
+    }
+    this.sunCount -= snowPeaCost;
+    this.snowPeaCooldown = getCrazyDaveSetting(cfg, 'snowPeaCooldown');
 
     // Compute committed 1-direction facing (Left = -1, Right = +1)
     let facingDirection = 1;
@@ -2566,22 +2625,24 @@ export class CrazyDaveFighter extends Fighter {
       spawnFloatingText(this.x, this.y - 25, `Need ${torchwoodCost}☀️!`, '#EF4444');
       return false;
     }
-    this.sunCount -= torchwoodCost;
-    this.torchwoodCooldown = getCrazyDaveSetting(cfg, 'torchwoodCooldown');
-
     this.activeTorchwoods = (this.activeTorchwoods || []).filter(t => t && t.hp > 0);
+    const maxActiveTorchwoods = getCrazyDaveSetting(cfg, 'maxActiveTorchwoods') || 2;
+    if (this.activeTorchwoods.length >= maxActiveTorchwoods) {
+      spawnFloatingText(this.x, this.y - 25, `Max ${maxActiveTorchwoods} Torchwoods active!`, '#EF4444');
+      return false;
+    }
 
     const arena = (state && state.arena) ? state.arena : CONFIG.arena;
     const plantSpawnOffset = getCrazyDaveSetting(cfg, 'plantSpawnOffset');
     const rawX = this.x + Math.cos(this.gunAngle || 0) * plantSpawnOffset;
     const rawY = this.y + Math.sin(this.gunAngle || 0) * plantSpawnOffset;
-    const activePlants = [
-      ...(this.activePeashooters || []),
-      ...(this.activeSnowPeas || []),
-      ...(this.activeWallnuts || []),
-      ...(this.activeTorchwoods || [])
-    ].filter(p => p && p.hp > 0);
-    const tileCenter = getNearestGrassTileCenter(rawX, rawY, arena, activePlants);
+    const tileCenter = getAvailableCrazyDavePlantTile(this, rawX, rawY, arena);
+    if (!tileCenter) {
+      spawnFloatingText(this.x, this.y - 25, 'No open grass tile!', '#EF4444');
+      return false;
+    }
+    this.sunCount -= torchwoodCost;
+    this.torchwoodCooldown = getCrazyDaveSetting(cfg, 'torchwoodCooldown');
 
     // Compute committed 1-direction facing (Left = -1, Right = +1)
     let facingDirection = 1;
@@ -2781,14 +2842,16 @@ export class CrazyDaveFighter extends Fighter {
       const livingTorchwoods = (this.activeTorchwoods || []).filter(t => t && t.hp > 0);
       const activePeas = (this.activePeashooters || []).filter(p => p && p.hp > 0).length;
       const activeSnow = (this.activeSnowPeas || []).filter(s => s && s.hp > 0).length;
+      const maxActiveWallnuts = getCrazyDaveSetting(cfg, 'maxActiveWallnuts') || 2;
+      const maxActiveTorchwoods = getCrazyDaveSetting(cfg, 'maxActiveTorchwoods') || 2;
 
       let chooseType = null;
 
       // 1. Establish/replenish Wall-nut barrier if none exists or if existing wallnut is heavily cracked (<30% HP)
-      const needsWallnut = wallnutEnabled && this.wallnutCooldown <= 0 && this.sunCount >= wallnutCost && (livingWallnuts.length === 0 || livingWallnuts.every(w => w.hp < w.maxHp * 0.3));
+      const needsWallnut = wallnutEnabled && livingWallnuts.length < maxActiveWallnuts && this.wallnutCooldown <= 0 && this.sunCount >= wallnutCost && (livingWallnuts.length === 0 || livingWallnuts.every(w => w.hp < w.maxHp * 0.3));
 
       // 2. Deploy Torchwood if Peashooters are active and firing, and no Torchwood is currently deployed
-      const needsTorchwood = torchwoodEnabled && this.torchwoodCooldown <= 0 && this.sunCount >= torchwoodCost && activePeas >= 1 && livingTorchwoods.length === 0;
+      const needsTorchwood = torchwoodEnabled && livingTorchwoods.length < maxActiveTorchwoods && this.torchwoodCooldown <= 0 && this.sunCount >= torchwoodCost && activePeas >= 1;
 
       if (needsWallnut) {
         chooseType = 'wallnut';

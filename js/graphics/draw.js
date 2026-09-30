@@ -48,7 +48,7 @@ export { drawCjSkin } from './fighters/cjSkin.js';
 export { drawJohnWickSkin, drawJohnWickPixelBody, _drawJohnWickHair, _getJohnWickHairImage } from './fighters/johnWickSkin.js';
 export { drawTojiSkin, drawTojiGhostSkin, drawTojiPixelBody, _drawTojiHair, _getTojiHairImage } from './fighters/tojiSkin.js';
 export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
-export { drawMeguminSkin, drawMeguminPixelBody, _drawMeguminHair, _getMeguminHairImage } from './fighters/meguminSkin.js';
+export { drawMeguminSkin, drawMeguminPixelBody, _drawMeguminHair, _getMeguminHairImage, drawMeguminMagicCircle, drawCrimsonDemonRune, drawMeguminExplosionScreenOverlay } from './fighters/meguminSkin.js';
 export { drawCrazyDaveSkin, drawCrazyDavePixelBody, _drawCrazyDaveHair, _getCrazyDaveHairImage } from './fighters/crazyDaveSkin.js';
 export { drawCrazyDaveShovel, drawSunDrop, drawWallnut, drawPeashooter, drawSnowPea, drawTorchwood, drawLawnmower, drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet, drawCrazyDaveWeapon, CrazyDave_WEAPON_GRAPHICS } from './weapons/crazyDaveWeaponGraphics.js';
 export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';

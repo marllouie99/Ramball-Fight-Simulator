@@ -1,3 +1,8 @@
+---
+description: Enforce clean architecture, function size limits, and early-return guard clauses across the codebase.
+globs: ["**/*.js", "**/*.mjs"]
+---
+
 # Anti-Spaghetti & Clean Code Standards
 
 All code created, edited, or refactored in this repository MUST strictly follow these clean architecture principles:

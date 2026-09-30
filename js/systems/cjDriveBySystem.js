@@ -1010,7 +1010,7 @@ export function updateDriveBys() {
               false,
               bSpeed,
               false,
-              'cjUziBullet',
+              'turretBullet',
               spawnX,
               spawnY,
               bulletAngle
@@ -1018,6 +1018,7 @@ export function updateDriveBys() {
             if (p) {
               p.life = 75;
               p.maxLife = 75;
+              p.isCjBullet = true;
             }
           }
 

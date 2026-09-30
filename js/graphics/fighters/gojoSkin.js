@@ -194,7 +194,7 @@ export function drawGojoBody(ctx, fighter) {
 
     // === PIXEL ART GOJO LIMITLESS (INFINITY) SPATIAL DISTORTION BARRIER (Arcade Buffer) ===
     const isPurpleInFlight = (typeof fighter.isPurpleActive === 'function' && fighter.isPurpleActive()) || ((fighter.purpleRecoveryTimer || 0) > 0);
-    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode || (fighter.infinityCooldown || 0) > 0 || !fighter.infinityActive);
+    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode || (fighter.infinityCooldown || 0) > 0 || !fighter.infinityActive || (fighter.infinityBarrierHp !== undefined && fighter.infinityBarrierHp <= 0));
     const fadeOpacity = isBarrierSuppressed ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();

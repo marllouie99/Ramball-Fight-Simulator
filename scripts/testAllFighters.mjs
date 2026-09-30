@@ -128,6 +128,7 @@ function assertCanvasStackBalance(locationTag) {
 
 async function main() {
   const { CONFIG, FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS } = await import('../js/core/config.js');
+  const { MODE_SETTINGS, GAME_MODES } = await import('../js/core/modeConfig.js');
   const { FIGHTER_CLASS_MAP } = await import('../js/entities/factories/fighterFactory.js');
   const { state, triggerGlobalScreenShake, saveSkinCustomizations, loadSkinCustomizations } = await import('../js/core/state.js');
   const { renderGame } = await import('../js/systems/renderSystem.js');
@@ -185,6 +186,19 @@ async function main() {
   const errorList = [];
 
   const allDefs = [...FIGHTER_DEFS, ...(TACTICAL_FIGHTER_DEFS || [])];
+
+  const meguminDef = allDefs.find((def) => def.type === 'megumin');
+  const originalSizeMultiplier = CONFIG.globalFighter.sizeMultiplier;
+  try {
+    CONFIG.globalFighter.sizeMultiplier = originalSizeMultiplier + 0.5;
+    const scaledMegumin = new FIGHTER_CLASS_MAP.megumin(meguminDef);
+    const expectedMeguminRadius = meguminDef.radius * CONFIG.globalFighter.sizeMultiplier * (CONFIG.internalScale ?? 1.0);
+    if (scaledMegumin.r !== expectedMeguminRadius) {
+      throw new Error(`Megumin radius should respect global size scaling: expected ${expectedMeguminRadius}, got ${scaledMegumin.r}`);
+    }
+  } finally {
+    CONFIG.globalFighter.sizeMultiplier = originalSizeMultiplier;
+  }
 
   for (const def of allDefs) {
     const fType = def.type || def.characterId || def.id;
@@ -2579,8 +2593,9 @@ async function main() {
           throw new Error(`Expected Saitama 1v1 mode punchDamage to be 180 (90% of 200 HP), got ${fighter.getBasePunchDamage()}`);
         }
         state.mode = 'Stand Off';
-        if (fighter.getBasePunchDamage() !== 900) {
-          throw new Error(`Expected Saitama Stand Off mode punchDamage to be 900 (90% of 1000 HP), got ${fighter.getBasePunchDamage()}`);
+        const expectedStandOffDmg = Math.round((MODE_SETTINGS['Stand Off']?.fixedHp || 1000) * 0.90);
+        if (fighter.getBasePunchDamage() !== expectedStandOffDmg) {
+          throw new Error(`Expected Saitama Stand Off mode punchDamage to be ${expectedStandOffDmg}, got ${fighter.getBasePunchDamage()}`);
         }
         state.mode = '2v2';
         if (fighter.getBasePunchDamage() !== 2700) {
@@ -2594,8 +2609,9 @@ async function main() {
         // Test with 0.15 (15% of mode fixed HP)
         CONFIG.saitama.punchDamage = 0.15;
         state.mode = 'Stand Off';
-        if (fighter.getBasePunchDamage() !== 150) {
-          throw new Error(`Expected Saitama Stand Off mode punchDamage at 0.15 to be 150 (15% of 1000 HP), got ${fighter.getBasePunchDamage()}`);
+        const expectedStandOffDmg15 = Math.round((MODE_SETTINGS['Stand Off']?.fixedHp || 1000) * 0.15);
+        if (fighter.getBasePunchDamage() !== expectedStandOffDmg15) {
+          throw new Error(`Expected Saitama Stand Off mode punchDamage at 0.15 to be ${expectedStandOffDmg15}, got ${fighter.getBasePunchDamage()}`);
         }
 
         state.mode = origMode;
@@ -2831,7 +2847,7 @@ async function main() {
         fighter.purpleRecoveryTimer = 1;
         fighter.x = 250;
         fighter.y = 250;
-        dummyOpponent.x = 350;
+        dummyOpponent.x = 450;
         dummyOpponent.y = 250;
         fighter.update(dummyOpponent, 0, state.arena);
         if (fighter.purpleRecoveryTimer !== 0) {
@@ -3812,11 +3828,13 @@ async function main() {
     // Test Saitama Flurry cleanup across all fighters
     const { SaitamaFighter } = await import('../js/entities/fighters/SaitamaFighter.js');
     const testSaitama = new SaitamaFighter({ startX: 200, startY: 200, type: 'saitama', color: '#FFD700' });
-    state.fighters = [testSaitama, dummyTarget2];
-    dummyTarget2.hp = 1000;
-    // Test Consecutive Normal Punches Stationary Miss Dodge (Dodge enabled, Teleport disabled)
+    const dummySaitamaTarget = new YutaFighter({ startX: 250, startY: 200, type: 'yuta', color: '#555555', hp: 1000, maxHp: 1000 });
+    state.fighters = [testSaitama, dummySaitamaTarget];
+    state.activeDomain = false;
+    state.domainActive = false;
+    testSaitama.reset();
     testSaitama.flurryCooldown = 0;
-    testSaitama.executeConsecutiveNormalPunches(dummyTarget2);
+    testSaitama.executeConsecutiveNormalPunches(dummySaitamaTarget);
     if (!testSaitama.isFlurrying) {
       throw new Error('Expected Saitama to be flurrying');
     }
@@ -3829,7 +3847,7 @@ async function main() {
     const origRand = Math.random;
     Math.random = () => 0.1; // Force 100% dodge success
     try {
-      const flurryDodgeResult = testSaitama.takeDamage(75, dummyTarget2, { isDirect: true, isMelee: true });
+      const flurryDodgeResult = testSaitama.takeDamage(75, dummySaitamaTarget, { isDirect: true, isMelee: true });
       if (flurryDodgeResult !== false) {
         throw new Error('Expected takeDamage to return false on successful dodge during Consecutive Normal Punches');
       }

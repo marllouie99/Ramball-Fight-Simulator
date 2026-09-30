@@ -1547,9 +1547,13 @@ export class CJFighter extends Fighter {
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : 0;
 
     if (typeof projectileSystem !== 'undefined' && projectileSystem) {
-      projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'cjMinigunBullet', spawnX, spawnY, bulletAngle, {
+      const projectile = projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'turretBullet', spawnX, spawnY, bulletAngle, {
         knockback: cfg.minigunKnockback !== undefined ? cfg.minigunKnockback : 0.0
       });
+      if (projectile) {
+        projectile.isCjBullet = true;
+        projectile.isCjMinigunBullet = true;
+      }
     }
 
     // Heavy alternating minigun gunfire sounds with John Wick M4 rifle crack
@@ -1741,9 +1745,10 @@ export class CJFighter extends Fighter {
 
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : 0;
     if (typeof projectileSystem !== 'undefined' && projectileSystem) {
-      projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'cjUziBullet', spawnX, spawnY, bulletAngle, {
+      const projectile = projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'turretBullet', spawnX, spawnY, bulletAngle, {
         knockback: cfg.jetpackUziKnockback !== undefined ? cfg.jetpackUziKnockback : 0.0
       });
+      if (projectile) projectile.isCjBullet = true;
     }
 
     if (isFront) {

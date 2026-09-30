@@ -9,6 +9,7 @@ import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 import { drawCursedRocks } from '../fighters/todoSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
+import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
 
 let _sortedFightersBuffer = [];
 
@@ -114,6 +115,9 @@ export function drawFighters() {
 
     ctx.restore();
   };
+
+  // Megumin Explosion dim and detonation flash are drawn before fighters.
+  drawMeguminExplosionScreenOverlay(ctx, fighters);
 
   // Genos Ultimate Screen Dimming (drawn BEFORE fighters so Genos & opponents are never dimmed)
   const genosUltFighter = fighters ? fighters.find(f => f && (f.characterId === 'genos' || f.type === 'genos') && (f.isChargingUlt || f.isFiringUlt || f.isUltRecovering)) : null;

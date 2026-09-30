@@ -421,7 +421,7 @@ export function drawArena() {
         const fg = state.floorGraphics;
         fg.clear();
         const daveActive = isCrazyDavePresent();
-        const floorColor = daveActive ? (isDark ? 0x14321c : 0x3e9925) : innerBg.color;
+        const floorColor = daveActive ? 0x3e9925 : innerBg.color;
         fg.beginFill(floorColor, innerBg.alpha);
         const fBleed = 4;
         if (arena.shape === 'circle') {
@@ -843,6 +843,20 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
   };
 
+  const getHudNameColor = (f, fallbackColor) => {
+    const color = getFighterThemeColor(f, fallbackColor);
+    if (isDark || typeof color !== 'string' || !color.startsWith('#')) return color;
+
+    const hex = color.slice(1);
+    const normalized = hex.length === 3
+      ? hex.split('').map(channel => channel + channel).join('')
+      : hex;
+    if (normalized.length !== 6) return color;
+
+    const darken = channel => Math.round(parseInt(channel, 16) * 0.78).toString(16).padStart(2, '0');
+    return `#${darken(normalized.slice(0, 2))}${darken(normalized.slice(2, 4))}${darken(normalized.slice(4, 6))}`;
+  };
+
   const is1v2 = (state.mode === 'Boss Battle' || state.mode === GAME_MODES?.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
   const is2v2 = (state.mode === '2v2' || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES?.TWO_VS_TWO || state.mode === GAME_MODES?.TACTICAL_2V2);
   const is4v4 = (state.mode === '4v4' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES?.TACTICAL_4V4);
@@ -881,17 +895,17 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   if (isTeamMatch) {
     const team0Data = team0.map(f => ({
       name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-      color: getFighterThemeColor(f, '#38BDF8')
+      color: getHudNameColor(f, '#38BDF8')
     }));
 
     const team1Data = team1.map(f => ({
       name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-      color: getFighterThemeColor(f, '#F87171'),
+      color: getHudNameColor(f, '#F87171'),
       fighter: f
     }));
 
     const hasStackedTeam = team0.length > 1 || team1.length > 1;
-    const nameFontSize = hasStackedTeam ? 34 : 42;
+    const nameFontSize = hasStackedTeam ? 44 : 60;
     const customNameFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
     const vsFontSize = hasStackedTeam ? 22 : 24;
     const customVsFont = `700 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
@@ -941,18 +955,24 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     const team1X = vsX + wVs + pad;
 
     ctx.textAlign = 'left';
+    const drawHudName = (name, x, y, color) => {
+      ctx.fillStyle = color;
+      if (!isDark) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 0.5;
+        ctx.strokeText(name, x, y);
+      }
+      ctx.fillText(name, x, y);
+    };
 
     // Render Team 0 (Left Side)
     ctx.font = customNameFont;
     if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
     if (team0Data.length === 1) {
-      ctx.fillStyle = team0Data[0].color;
-      ctx.fillText(team0Data[0].name, startX, hasStackedTeam ? midY : bottomY);
+      drawHudName(team0Data[0].name, startX, hasStackedTeam ? midY : bottomY, team0Data[0].color);
     } else {
-      ctx.fillStyle = team0Data[0].color;
-      ctx.fillText(team0Data[0].name, startX, topY);
-      ctx.fillStyle = team0Data[1].color;
-      ctx.fillText(team0Data[1].name, startX, bottomY);
+      drawHudName(team0Data[0].name, startX, topY, team0Data[0].color);
+      drawHudName(team0Data[1].name, startX, bottomY, team0Data[1].color);
     }
 
     // Render Center "vs"
@@ -965,13 +985,10 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     ctx.font = customNameFont;
     if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
     if (team1Data.length === 1) {
-      ctx.fillStyle = team1Data[0].color;
-      ctx.fillText(team1Data[0].name, team1X, hasStackedTeam ? midY : bottomY);
+      drawHudName(team1Data[0].name, team1X, hasStackedTeam ? midY : bottomY, team1Data[0].color);
     } else {
-      ctx.fillStyle = team1Data[0].color;
-      ctx.fillText(team1Data[0].name, team1X, topY);
-      ctx.fillStyle = team1Data[1].color;
-      ctx.fillText(team1Data[1].name, team1X, bottomY);
+      drawHudName(team1Data[0].name, team1X, topY, team1Data[0].color);
+      drawHudName(team1Data[1].name, team1X, bottomY, team1Data[1].color);
     }
 
     ctx.restore();
@@ -982,7 +999,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     const textY = arena.y - 12;
     const fighterData = mainFighters.map(f => ({
       name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-      color: getFighterThemeColor(f, '#F8FAFC')
+      color: getHudNameColor(f, '#F8FAFC')
     }));
 
     let totalW = 0;
@@ -1011,6 +1028,11 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       ctx.font = nameFont;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
       ctx.fillStyle = fd.color;
+      if (!isDark) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.5;
+        ctx.strokeText(fd.name, startX, textY);
+      }
       ctx.fillText(fd.name, startX, textY);
       startX += ctx.measureText(fd.name).width;
 

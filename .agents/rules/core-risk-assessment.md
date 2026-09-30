@@ -1,3 +1,8 @@
+---
+description: Mandatory risk assessment protocol when modifying core engine and shared system files.
+globs: ["js/entities/fighter.js", "js/core/state.js", "js/systems/projectileSystem.js", "js/systems/physics.js", "js/systems/renderSystem.js", "js/graphics/hudManager.js", "js/systems/updateSystem.js", "gameLoop.js", "js/core/main.js"]
+---
+
 # Core Changes Risk Assessment Standard
 
 Whenever the agent modifies or refactors any **core engine or shared systems file**, the agent MUST include a **"⚠️ Risk Assessment"** section in its response to outline the potential blast radius, identify vulnerable downstream components, and detail the verification taken.

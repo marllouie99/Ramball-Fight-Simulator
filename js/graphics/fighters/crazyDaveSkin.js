@@ -359,21 +359,44 @@ export function drawCrazyDaveSkin(ctx, fighter) {
     ctx.scale(-1, 1);
   }
 
-  // 1. Back Hand (Follows shovel animation smoothly)
+  // ── Retro Arcade Character Breathing Animation when Moving (Zenitsu Breathing Rhythm Standard) ──
+  const isMoving = !isPodiumPreview && (Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.1 || Boolean(fighter.isMoving));
+  if (isMoving) {
+    fighter._daveWalkTick = (fighter._daveWalkTick || 0) + 1;
+  }
+  const moveTick = fighter._daveWalkTick || 0;
+  const breathFreq = 0.16; // Exact Zenitsu breathing cadence (Rule 19/Zenitsu Standard)
+  const rawBreath = Math.sin(moveTick * breathFreq);
+  const breathQuantized = isMoving ? (rawBreath > 0.3 ? 1.0 : (rawBreath < -0.3 ? -1.0 : 0.0)) : 0.0;
+  const breathLiftY = breathQuantized * 1.5;
+  const chestExpansionX = Math.max(0, breathQuantized) * 1.0;
+
+  // 1. Back Hand (Follows shovel animation and breathing lift smoothly)
   if (!shouldHideHands) {
+    ctx.save();
+    ctx.translate(chestExpansionX * 0.3, breathLiftY * 0.4);
     const backHandRadius = getHandSize(3.8);
     const backHandX = r * 0.50 + shovelOffsetX * 0.5;
     const backHandY = r * 0.22 + (shovelOffsetY - r * 0.38) * 0.5;
     drawPixelHand(ctx, backHandX, backHandY, backHandRadius, '#FFE0BD', '#0E0F14');
+    ctx.restore();
   }
 
-  // 2. Core Pixel Body
+  // 2. Core Pixel Body (Applies chest expansion & breathing lift)
+  ctx.save();
+  ctx.translate(chestExpansionX * 0.3, breathLiftY * 0.4);
   drawCrazyDavePixelBody(ctx, r);
+  ctx.restore();
 
-  // 3. Hair / Pan Asset Overlay if loaded
+  // 3. Hair / Pan Asset Overlay if loaded (Upper head secondary breathing motion)
+  ctx.save();
+  ctx.translate(chestExpansionX * 0.5, breathLiftY * 0.6);
   _drawCrazyDaveHair(ctx, r, isFacingLeft);
+  ctx.restore();
 
-  // 4. In-Hand Weapon: Garden Shovel (Animated with dig & scoop motion)
+  // 4. In-Hand Weapon: Garden Shovel (Animated with dig & scoop motion + breathing sway)
+  ctx.save();
+  ctx.translate(chestExpansionX * 0.4, breathLiftY * 0.5);
   drawCrazyDaveShovel(ctx, shovelOffsetX, shovelOffsetY, shovelAngle, r, true, swingTimer, false, fighter.color || '#84CC16', true);
 
   // 5. Front Hand (Holding shovel handle at animated angle and position)
@@ -385,6 +408,7 @@ export function drawCrazyDaveSkin(ctx, fighter) {
     const frontHandY = shovelOffsetY + (r * 0.65) * sinA;
     drawPixelHand(ctx, frontHandX, frontHandY, frontHandRadius, '#FFE0BD', '#0E0F14');
   }
+  ctx.restore();
 
   ctx.restore();
 }

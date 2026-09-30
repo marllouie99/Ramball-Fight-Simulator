@@ -104,7 +104,8 @@ export class GojoFighter extends Fighter {
         type: 'buff',
         cooldownKey: 'infinityCooldown',
         cooldownMax: () => CONFIG.gojo?.infinityBrokenCooldown || 360,
-        activeKey: 'infinityActive'
+        activeKey: 'infinityActive',
+        canTickCooldownInFreeze: true
       });
     }
     if (this.isSkillEnabled(CONFIG.gojo?.enableRed, true)) {
@@ -640,6 +641,7 @@ export class GojoFighter extends Fighter {
     if (typeof this.isPurpleActive === 'function' && this.isPurpleActive()) return false;
     if (isInsideRubbickStolenVoid(this)) return false;
     if (this.hp <= 0 || this.isDead) return false;
+    if (this.infinityBarrierHp !== undefined && this.infinityBarrierHp <= 0) return false;
     return Boolean(this.infinityActive && (this.infinityCooldown || 0) <= 0);
   }
 
@@ -736,6 +738,7 @@ export class GojoFighter extends Fighter {
   }
 
   restoreInfinityBarrier() {
+    if ((this.infinityCooldown || 0) > 0) return;
     this.infinityActive = true;
     this.infinityBarrierHp = this.infinityBarrierMaxHp || 350;
     this.infinityCrackLevel = 0;
@@ -796,7 +799,7 @@ export class GojoFighter extends Fighter {
     // SPECIAL INTERACTION (Saitama vs Gojo): Saitama's offensive attacks are stopped cold by Infinity (Gojo takes 0 direct HP damage),
     // but crack the Infinity barrier's structural durability until it shatters!
     const isInfinityEnabled = this.isSkillEnabled(CONFIG.gojo?.enableInfinity, true);
-    const isInfinityBarrierReady = isInfinityEnabled && !inRubbickVoid && !this.isMeleeMode && !this.isChainedByMakima && !isPurple && !isPurpleInFlight && !this.isTargetOfAmbush && !isTojiUltimateAssault && this.infinityActive && (this.infinityCooldown || 0) <= 0 && !this.isChannelingPurple && !isAttackerChannelingDomain && attacker && attacker !== this && !(attacker.isAmbushing) && !(attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')) && this.hp > 0 && !opts.isStorm && !opts.isDomain && (!opts.bypassShield || isSaitamaAttacker) && !opts.isBang && !opts?.projectile?.infinityBypassed && !opts.isRatioCrit && !opts.isNanamiPause && !opts.isSureKill && (!opts.isSaitamaCounter || isSaitamaAttacker) && (!isSaitamaCountering || isSaitamaAttacker) && !opts.isDomainSlash && !opts.isRed && !opts.isDivineFlame && !opts.isFuga;
+    const isInfinityBarrierReady = isInfinityEnabled && !inRubbickVoid && !this.isMeleeMode && !this.isChainedByMakima && !isPurple && !isPurpleInFlight && !this.isTargetOfAmbush && !isTojiUltimateAssault && this.infinityActive && (this.infinityCooldown || 0) <= 0 && (this.infinityBarrierHp === undefined || this.infinityBarrierHp > 0) && !this.isChannelingPurple && !isAttackerChannelingDomain && attacker && attacker !== this && !(attacker.isAmbushing) && !(attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')) && this.hp > 0 && !opts.isStorm && !opts.isDomain && (!opts.bypassShield || isSaitamaAttacker) && !opts.isBang && !opts?.projectile?.infinityBypassed && !opts.isRatioCrit && !opts.isNanamiPause && !opts.isSureKill && (!opts.isSaitamaCounter || isSaitamaAttacker) && (!isSaitamaCountering || isSaitamaAttacker) && !opts.isDomainSlash && !opts.isRed && !opts.isDivineFlame && !opts.isFuga;
     if (isInfinityBarrierReady) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
@@ -840,6 +843,13 @@ export class GojoFighter extends Fighter {
             barrierDmg = Math.max(35, Math.min(250, Math.round(amount * 0.5)));
           }
           this.damageInfinityBarrier(barrierDmg, attacker, opts);
+
+          // If the barrier was shattered by this hit:
+          if (!this.infinityActive || (this.infinityBarrierHp || 0) <= 0 || (this.infinityCooldown || 0) > 0) {
+            // Barrier shattered! Do NOT trigger infinity block or freeze attacker in stasis.
+            // Penetrate barrier and apply direct HP damage to Gojo!
+            return super.takeDamage(amount, attacker, opts);
+          }
         }
 
         this.triggerInfinityBlock(contactX, contactY, physicalAttacker);
@@ -1278,7 +1288,7 @@ export class GojoFighter extends Fighter {
         this.infinityActive = false;
         this.infinityFadeOpacity = 0;
         this.infinityBlockTimer = 0;
-      } else if (!inRubbickVoid && !this.isTargetOfAmbush && !this.isMeleeMode && this.hp > 0 && (this.infinityCooldown || 0) <= 0) {
+      } else if (!inRubbickVoid && !this.isTargetOfAmbush && !this.isMeleeMode && this.hp > 0 && (this.infinityCooldown || 0) <= 0 && (this.infinityBarrierHp === undefined || this.infinityBarrierHp > 0)) {
         if (!this.infinityActive || (this.infinityBarrierHp || 0) <= 0) {
           this.restoreInfinityBarrier();
         } else {
@@ -1346,9 +1356,9 @@ export class GojoFighter extends Fighter {
     const isPurpleInFlight = (typeof this.isPurpleActive === 'function' && this.isPurpleActive()) || isPurpleBreather || ((this.z || 0) > 0 && !this.isChannelingPurple) || this.isChannelingPurple;
 
     // In Ranged Mode (when not in melee mode), Gojo's Limitless Infinity barrier is ALWAYS active (unless trapped in Rubbick's stolen Unlimited Void, Purple is in flight/breather, chained by Makima, or on broken cooldown)!
-    if (inRubbickVoid || isPurpleInFlight || this.isChainedByMakima || this.isMeleeMode || (this.infinityCooldown || 0) > 0) {
+    if (inRubbickVoid || isPurpleInFlight || this.isChainedByMakima || this.isMeleeMode || (this.infinityCooldown || 0) > 0 || (this.infinityBarrierHp !== undefined && this.infinityBarrierHp <= 0)) {
       this.infinityActive = false;
-      if ((this.infinityCooldown || 0) > 0) {
+      if ((this.infinityCooldown || 0) > 0 || (this.infinityBarrierHp !== undefined && this.infinityBarrierHp <= 0)) {
         this.infinityFadeOpacity = 0;
         this.infinityBlockTimer = 0;
       }
@@ -1362,7 +1372,7 @@ export class GojoFighter extends Fighter {
     }
 
     const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
-    if (!inRubbickVoid && !isPurpleInFlight && !this.isChainedByMakima && isDomainChanneling && (this.infinityCooldown || 0) <= 0) {
+    if (!inRubbickVoid && !isPurpleInFlight && !this.isChainedByMakima && isDomainChanneling && (this.infinityCooldown || 0) <= 0 && (this.infinityBarrierHp === undefined || this.infinityBarrierHp > 0)) {
       this.infinityActive = true;
       this.isMeleeMode = false;
     }
@@ -1381,18 +1391,18 @@ export class GojoFighter extends Fighter {
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
 
     // Force Infinity active inside enemy domains only when NOT in melee mode and Purple is not in flight/breather
-    if (!inRubbickVoid && isInsideEnemyDomain && !isUnderAmbush && !this.isMeleeMode && !isPurpleInFlight && !this.isChainedByMakima && (this.infinityCooldown || 0) <= 0) {
+    if (!inRubbickVoid && isInsideEnemyDomain && !isUnderAmbush && !this.isMeleeMode && !isPurpleInFlight && !this.isChainedByMakima && (this.infinityCooldown || 0) <= 0 && (this.infinityBarrierHp === undefined || this.infinityBarrierHp > 0)) {
       this.infinityActive = true;
     }
 
-    const barrierShouldBeActive = !inRubbickVoid && !isUnderAmbush && !isPurpleInFlight && !this.isChainedByMakima && (!this.isMeleeMode || isDomainChanneling) && !this.isChannelingPurple && !this.domainActive && this.hp > 0 && (this.infinityCooldown || 0) <= 0 && this.infinityActive;
+    const barrierShouldBeActive = !inRubbickVoid && !isUnderAmbush && !isPurpleInFlight && !this.isChainedByMakima && (!this.isMeleeMode || isDomainChanneling) && !this.isChannelingPurple && !this.domainActive && this.hp > 0 && (this.infinityCooldown || 0) <= 0 && (this.infinityBarrierHp === undefined || this.infinityBarrierHp > 0) && this.infinityActive;
     if (barrierShouldBeActive) {
       this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05); // ~20 frames smooth fade-in
     } else {
-      this.infinityFadeOpacity = (isUnderAmbush || inRubbickVoid || isPurpleInFlight || this.isChainedByMakima || this.isMeleeMode || (this.infinityCooldown || 0) > 0) ? 0 : Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
+      this.infinityFadeOpacity = (isUnderAmbush || inRubbickVoid || isPurpleInFlight || this.isChainedByMakima || this.isMeleeMode || (this.infinityCooldown || 0) > 0 || (this.infinityBarrierHp !== undefined && this.infinityBarrierHp <= 0)) ? 0 : Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
     }
 
-    if (isUnderAmbush || inRubbickVoid || isPurpleInFlight || this.isChainedByMakima || this.isMeleeMode) {
+    if (isUnderAmbush || inRubbickVoid || isPurpleInFlight || this.isChainedByMakima || this.isMeleeMode || (this.infinityCooldown || 0) > 0 || (this.infinityBarrierHp !== undefined && this.infinityBarrierHp <= 0)) {
       this.infinityBlockTimer = 0;
       this.infinityActive = false;
     }
@@ -2560,7 +2570,7 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    if (this.isMeleeMode || this.hp <= 0 || this.isChannelingPurple || isPurpleInFlight || this.domainActive || (this.infinityCooldown || 0) > 0 || !this.infinityActive) return;
+    if (this.isMeleeMode || this.hp <= 0 || this.isChannelingPurple || isPurpleInFlight || this.domainActive || (this.infinityCooldown || 0) > 0 || !this.infinityActive || (this.infinityBarrierHp !== undefined && this.infinityBarrierHp <= 0)) return;
 
     const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
     const slowRange = CONFIG.gojo?.infinitySlowRange || 140;

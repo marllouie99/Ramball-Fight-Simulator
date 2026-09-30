@@ -878,6 +878,39 @@ export class SaitamaFighter extends Fighter {
     );
   }
 
+  _blowAwayCrazyDaveLawnmowers(originX, originY, punchAngle, reach, halfArc = Math.PI * 0.35) {
+    if (typeof state === 'undefined' || !Array.isArray(state.fighters)) return;
+
+    const cosA = Math.cos(punchAngle);
+    const sinA = Math.sin(punchAngle);
+    for (const mower of state.fighters) {
+      if (!mower || !mower.isLawnmower || mower.state === 'despawned' || mower.hp <= 0) continue;
+      const owner = mower.owner;
+      const isCrazyDave = owner && (owner.characterId === 'crazydave' || owner.type === 'crazydave' || owner._def?.id === 'crazydave');
+      if (!isCrazyDave) continue;
+
+      const dx = mower.x - originX;
+      const dy = mower.y - originY;
+      const distance = Math.hypot(dx, dy);
+      if (distance > reach + (mower.r || 18)) continue;
+
+      let angleDiff = Math.atan2(dy, dx) - punchAngle;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      if (Math.abs(angleDiff) > halfArc) continue;
+
+      mower.facingDirection = Math.abs(cosA) > 0.15
+        ? (cosA >= 0 ? 1 : -1)
+        : (mower.x >= originX ? 1 : -1);
+      if (mower.state === 'idle' && typeof mower.trigger === 'function') {
+        mower.trigger();
+      }
+      mower.saitamaBlownAway = true;
+      mower.vx = cosA * 18;
+      mower.vy = sinA * 18;
+    }
+  }
+
   /**
    * Check team alignment in 2v2 / team battle modes.
    */
@@ -1414,6 +1447,7 @@ export class SaitamaFighter extends Fighter {
       if (arena && typeof triggerSaitamaWallShatter === 'function') {
         triggerSaitamaWallShatter(this.x, this.y, pushAngle, arena);
       }
+      this._blowAwayCrazyDaveLawnmowers(this._counterReleaseOriginX, this._counterReleaseOriginY, pushAngle, frontalReach, halfArc);
 
       // Screen Shake & Sakuga Impact FX
       if (typeof triggerGlobalScreenShake === 'function') {
@@ -1947,6 +1981,7 @@ export class SaitamaFighter extends Fighter {
     if (arena && typeof triggerSaitamaWallShatter === 'function') {
       triggerSaitamaWallShatter(fistX, fistY, aimAngle, arena);
     }
+    this._blowAwayCrazyDaveLawnmowers(this._normalPunchReleaseOriginX, this._normalPunchReleaseOriginY, aimAngle, punchBlastReach, halfBlastArc);
 
     const validHits = [];
     for (const target of targetsToScan) {
@@ -2312,12 +2347,13 @@ export class SaitamaFighter extends Fighter {
 
       // Query all valid targets (fighters & illusions) in the arena (Rule #6)
       const targetsToScan = [];
+      const protectedMinionOwner = this._isMinionEntity(this.flurryTarget) ? this.flurryTarget.owner : null;
       if (typeof state !== 'undefined') {
         if (state.fighters) {
           const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
           for (let i = 0; i < state.fighters.length; i++) {
             const f = state.fighters[i];
-            if (!f || f === this || f.hp <= 0 || f.isIllusion) continue;
+            if (!f || f === this || f === protectedMinionOwner || f.hp <= 0 || f.isIllusion) continue;
             const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
             if (myTeam !== null && myTeam === targetTeam) continue;
             targetsToScan.push(f);
@@ -2477,6 +2513,7 @@ export class SaitamaFighter extends Fighter {
         const slamDmg = CONFIG.saitama?.flurryFinalSlamDamage || 200;
         const rapidDamage = Math.round(baseDmg * boredomMult);
         const finalDamage = Math.round(slamDmg * boredomMult);
+        this._blowAwayCrazyDaveLawnmowers(this.x, this.y, aimAngle, currentReach, currentHalfArc);
 
         for (const target of targetsToScan) {
           const dist = Math.hypot(target.x - this.x, target.y - this.y);

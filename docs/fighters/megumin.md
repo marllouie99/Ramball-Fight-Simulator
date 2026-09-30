@@ -24,9 +24,8 @@ In the *Circle Mini-Battle* arena, Megumin is the ultimate high-stakes archetype
 
 ### 1. Upright Fighter Body Model (Rule 19 Front POV Standard)
 Megumin’s body model, hat, hair silhouette, and wizard robes strictly adhere to the front-profile camera orientation standard:
-- **Head & Wizard Hat (`-Y` to `Y ~ 0`)**:
-  - **Archmage Hat**: Oversized pointed wizard hat in dark crimson-plum (`#4A192C` to `#7B0828`) featuring a gold brim buckle, decorative smiling face pin decals on the crown, and a wide circular brim shading the upper face.
-  - **Hair Silhouette**: Dark brunette shoulder-length bob (`#24141E` to `#3B2232`) with distinct discrete pointed locks framing both sides of the face and layered bangs terminating neatly at `y = -0.18r`.
+- **Head & Brunette Bob (`-Y` to `Y ~ 0`)**:
+  - **Hair Silhouette**: Voluminous dark brunette anime bob (`#22121E` to `#3B2032`) with distinct discrete pointed locks framing both sides of the face, sweeping fringe bangs across the forehead, and a signature cute crown tuft/ahoge at `y = -1.22r`.
   - **Eyepatch & Seal**: Iconic black rectangular eyepatch with gold cross trim covering her right eye (`Y ~ 0`). During chant overcharge, the eyepatch pulses with a glowing ruby cross glint.
   - **Faceless Minimalist Aesthetic (Rule 19)**: Clean faceless circle body (zero eyes, pupils, mouth, or nose).
 - **Robes & Attire (`+Y`)**:
@@ -61,7 +60,7 @@ Megumin’s body model, hat, hair silhouette, and wizard robes strictly adhere t
 | :--- | :--- | :--- | :--- | :--- |
 | **HP** | `280` | `280` | `280` | Fragile glass cannon health pool |
 | **Base Speed** | `2.45` | `0.40` (`-84%`) | `0.00` (Immobile) | High evasion while free; slow while chanting |
-| **Body Radius** | `24px` | `24px` | `24px` | Standard fighter hitbox size |
+| **Body Radius** | `25px` | `25px` | `25px` | Standard fighter hitbox size |
 | **Offensive Attacks** | **1 Only** | **1 Only** | **0** | **Explosion is her sole damaging ability** |
 | **Chant Duration** | `240 frames` (4.0s) | — | — | Can be accelerated via Chuunibyou Focus |
 | **Explosion True Damage**| `420 True Dmg` | Scaling | — | Bypasses shields and damage reduction |

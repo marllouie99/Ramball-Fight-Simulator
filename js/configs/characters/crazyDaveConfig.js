@@ -46,7 +46,8 @@ export const crazyDaveConfig = {
   wallnutColor: '#CA8A04',   // Nut Amber / Gold
   wallnutHp: 200,            // Massive barrier HP to absorb attacks and block melee charges
   wallnutRadius: 24,         // Solid collision barrier radius
-  wallnutCooldown: 500,      // Cooldown for planting next Wall-nut
+  maxActiveWallnuts: 2,      // Maximum living Wall-nuts Dave can keep active
+  wallnutCooldown: 1000,      // Cooldown for planting next Wall-nut
   wallnutSpriteSrc: 'Assets/model/Sprites/Wallnut-sprite-sheet.png',
 
   // Skill 2: Plant Peashooter (Regular Damage)
@@ -94,6 +95,7 @@ export const crazyDaveConfig = {
   torchwoodColor: '#F97316',  // Blazing Orange
   torchwoodHp: 220,           // Moderate barrier HP for the burning stump
   torchwoodRadius: 22,        // Robust tree stump radius matching authentic PvZ proportions
+  maxActiveTorchwoods: 2,     // Maximum living Torchwoods Dave can keep active
   torchwoodCooldown: 600,     // 10s skill cooldown
   torchwoodInterceptRadius: 42,  // Radius around torchwood that intercepts passing peas
   torchwoodBurnRadius: 70,     // Enemies entering this radius are ignited
@@ -106,7 +108,7 @@ export const crazyDaveConfig = {
 
   // Lawnmower Baseline Defense System (PvZ Signature Final Defense)
   enableLawnmower: true,
-  lawnmowerDamage: 180,        // Devastating steamroller damage (PvZ 1800 damage equivalent)
+  lawnmowerDamage: 100,        // Devastating steamroller damage (PvZ 1800 damage equivalent)
   lawnmowerSpeed: 11.5,        // Fast horizontal charging speed across the lawn
   lawnmowerRadius: 18,         // Collision hitbox radius
   lawnmowerTriggerRadius: 38,  // Proximity trigger distance from baseline

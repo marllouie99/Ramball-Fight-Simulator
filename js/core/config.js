@@ -185,7 +185,7 @@ export const CONFIG = {
   },
   canvasWidth: 540,                 // Logical width of the game screen
   canvasHeight: 960,                 // Logical height of the game screen (standard 9:16 portrait)
-  internalScale: 1.0,                // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container
+  internalScale: 0.95,               // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container
   arenaXOffset: 0,                   // Horizontal offset shift (px) from center (negative = left, positive = right)
   arenaYOffset: -50,                 // Vertical offset shift (px) from center (negative = up, positive = down)
   arenaXOverride: null,              // Absolute X override (px) - set to a number (e.g. 50) to skip centering
@@ -1682,7 +1682,7 @@ export const FIGHTER_DEFS = [
     startY: meguminConfig.startY || 250,
     startVx: meguminConfig.startVx || 1.0,
     startVy: meguminConfig.startVy || 0.9,
-    radius: meguminConfig.radius || meguminConfig.r || 24,
+    radius: meguminConfig.radius || meguminConfig.r || 25,
     aimbot: false,
     spinRate: 0,
     type: 'megumin',

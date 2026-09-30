@@ -141,7 +141,7 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
   const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
   const height = Math.max(64, Math.ceil(arena.height + fBleed * 2));
   const shape = arena.shape || 'rect';
-  const key = `${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}`;
+  const key = `${width}_${height}_${shape}`;
 
   const grassImg = getGrassTileSpriteSheet();
   const imgLoaded = Boolean(grassImg && grassImg.complete && grassImg.naturalWidth > 0);
@@ -235,12 +235,6 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
         }
       }
     }
-  }
-
-  // 3. Dark Mode / Night Lawn Atmosphere Tint
-  if (isDark) {
-    oc.fillStyle = 'rgba(6, 20, 16, 0.42)';
-    oc.fillRect(0, 0, width, height);
   }
 
   offCanvas._key = fullKey;

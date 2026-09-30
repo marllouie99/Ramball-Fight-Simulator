@@ -126,7 +126,7 @@ export const sukunaConfig = {
     sounds: {
       punch: 'Assets/Sound Effects/Attacks/punch.mp3',
       swordSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
-      fleshSlice: 'Assets/Sound Effects/Skills/backstab.mp3',
+      fleshSlice: 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3',
       teleportDash: 'Assets/Sound Effects/Skills/dash3.mp3',
       ricochetHit: 'Assets/Sound Effects/Skills/parry.mp3',
       fugaChant: 'Assets/Sound Effects/Skills/fuga.mp3',

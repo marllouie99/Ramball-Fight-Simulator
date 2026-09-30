@@ -364,9 +364,9 @@ export const HitImpactSystem = {
     }
 
     // Carl "CJ" Johnson Gunshots (Drive-By Tec-9, Dual Micro-Uzis, Riot Minigun) — Ballistic impact flash
-    const isCjBullet = projectile.visual === 'cjUziBullet' || projectile.visual === 'cjMinigunBullet' || (attacker && (attacker.characterId === 'cj' || attacker.type === 'cj') && projectile.visual && projectile.visual.includes('cj'));
+    const isCjBullet = projectile.isCjBullet || projectile.visual === 'cjUziBullet' || projectile.visual === 'cjMinigunBullet' || (attacker && (attacker.characterId === 'cj' || attacker.type === 'cj') && projectile.visual && projectile.visual.includes('cj'));
     if (isCjBullet) {
-      const isMinigun = projectile.visual === 'cjMinigunBullet';
+      const isMinigun = projectile.isCjMinigunBullet || projectile.visual === 'cjMinigunBullet';
       const knockbackForce = projectile.knockback !== undefined ? projectile.knockback : (CONFIG.cj?.gunHitPushback ?? 0.0);
       const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
 

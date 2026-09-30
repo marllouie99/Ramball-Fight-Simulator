@@ -35,7 +35,7 @@ Whenever modifying or refactoring any core engine or shared systems file (`js/en
 - **Mitigation & Verification**: [Specific automated tests or manual test scenarios executed to guarantee zero regressions]
 ```
 
-### 0.7 Mandatory Post-Change Suggestions (Why, Pros, Cons, Don't)
+### 0.7 Mandatory Post-Change Suggestions (Why, Pros, Cons, Don't, Example Scenario)
 After completing ANY code modification, update, or fix in the project, the agent MUST ALWAYS conclude the final response with a **"💡 Suggestions"** section containing 2–4 specific, actionable follow-up improvements formatted strictly as:
 ```markdown
 ---
@@ -47,12 +47,14 @@ After completing ANY code modification, update, or fix in the project, the agent
    - **Pros**: [Key benefits, capabilities unlocked, developer or gameplay improvements]
    - **Cons**: [Trade-offs, limitations, added complexity, or maintenance considerations]
    - **Don't**: [Specific anti-pattern, common trap, or breaking mistake to strictly avoid when implementing this]
+  - **Example Scenario**: [A concrete situation where this follow-up would help]
 
 2. **[Another Suggestion Title]**
    - **Why**: ...
    - **Pros**: ...
    - **Cons**: ...
    - **Don't**: ...
+  - **Example Scenario**: ...
 ```
 
 ---

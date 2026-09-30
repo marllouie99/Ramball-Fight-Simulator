@@ -1,3 +1,8 @@
+---
+description: Baseline HP, damage scaling, knockback, and stasis balance standards for fighters.
+globs: ["js/configs/characters/*.js", "js/entities/*.js"]
+---
+
 # Combat Balance & Frame Data Standards
 
 ## 1. Baseline Health & Effective HP Pools

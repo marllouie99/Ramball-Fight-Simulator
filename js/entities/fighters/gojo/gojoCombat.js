@@ -81,8 +81,8 @@ export function clampEntityToArenaBounds(ent, arena, radius = null) {
 }
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects = true) {
-  // If Gojo is paralyzed in Telekinesis, Limitless Infinity cannot trigger reactive blocks
-  if (fighter.isCaughtInTelekinesis) {
+  // If Gojo is dead, paralyzed in Telekinesis, Infinity is on cooldown, barrier is shattered, or inactive, do not block
+  if (!fighter || fighter.hp <= 0 || fighter.isDead || fighter.isCaughtInTelekinesis || (fighter.infinityCooldown || 0) > 0 || !fighter.infinityActive || (fighter.infinityBarrierHp !== undefined && fighter.infinityBarrierHp <= 0)) {
     return false;
   }
 
@@ -114,16 +114,16 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
   }
 
   const isDomainChanneling = fighter.isDomainPreSlide || fighter.isChannelingDomainExpansion;
-  if (!isPurpleInFlight && !fighter.isChainedByMakima && isDomainChanneling && (fighter.infinityCooldown || 0) <= 0) {
+  if (!isPurpleInFlight && !fighter.isChainedByMakima && isDomainChanneling && (fighter.infinityCooldown || 0) <= 0 && (fighter.infinityBarrierHp === undefined || fighter.infinityBarrierHp > 0)) {
     fighter.infinityActive = true;
     fighter.isMeleeMode = false;
   }
 
   const isInsideEnemyDomain = !fighter.domainActive && state.fighters && state.fighters.some(f => f && f !== fighter && f.domainActive && !f.stolenDomainActive && f.stolenType !== 'gojo_domain' && f.hp > 0);
-  if (isInsideEnemyDomain && !fighter.isMeleeMode && !isPurpleInFlight && !fighter.isChainedByMakima && (fighter.infinityCooldown || 0) <= 0) {
+  if (isInsideEnemyDomain && !fighter.isMeleeMode && !isPurpleInFlight && !fighter.isChainedByMakima && (fighter.infinityCooldown || 0) <= 0 && (fighter.infinityBarrierHp === undefined || fighter.infinityBarrierHp > 0)) {
     fighter.infinityActive = true;
   }
-  if (fighter.isMeleeMode || fighter.isChannelingPurple || isPurpleInFlight || fighter.domainActive) return false;
+  if (fighter.isMeleeMode || fighter.isChannelingPurple || isPurpleInFlight || fighter.domainActive || (fighter.infinityCooldown || 0) > 0 || !fighter.infinityActive || (fighter.infinityBarrierHp !== undefined && fighter.infinityBarrierHp <= 0)) return false;
 
   const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
   const gojoY = fighter.y - (fighter.z || 0);
