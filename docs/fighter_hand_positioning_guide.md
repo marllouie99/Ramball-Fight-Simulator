@@ -4,6 +4,16 @@ This guide documents how the hand positioning, guard stances, and punch/skill an
 
 ---
 
+## 0. Canonical Default Model Hand Positioning Standard (Rule 20)
+
+For all new fighters and model skins, the approved canonical default hand positioning is:
+- **Left Hand**: Symmetrically positioned at lower-left flank `(x: -r * 0.82, y: +r * 0.38)` with radius `r * 0.30`.
+- **Right Hand**: Symmetrically positioned at lower-right flank `(x: +r * 0.82, y: +r * 0.38)` with radius `r * 0.30`.
+- **Front Layer Overlap**: Both hands are drawn on the **front layer** (after rendering the central body circle), overlapping the lower perimeter boundary of the body circle with roughly half of each hand circle overlapping the body and half extending outward.
+- **Weapon Wielding**: Main-hand weapon hilt/grip anchors directly at `(+r * 0.82, +r * 0.38)` during idle/rest, with the right hand drawn over the grip.
+
+---
+
 ## 1. The Core Stance Coordinate Frame (Front POV)
 
 All hand and arm positions are calculated inside a **local coordinate space** centered on the fighter. The rendering flow translates and rotates the context so that:

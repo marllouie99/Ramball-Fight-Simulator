@@ -972,17 +972,17 @@ export function _getEscanorChopAnimationState(fighter) {
     backHandX = overheadBackHandX + ease * (strikeEndBackHandX - overheadBackHandX);
     backHandY = overheadBackHandY + ease * (strikeEndBackHandY - overheadBackHandY);
   } else {
-    // 4. RECOVERY: Smoothly return from ground cleave follow-through to resting pose
+    // 4. RECOVERY (BREATHER): Divine Axe Rhitta STAYS completely planted in the downward chop slam pose!
+    // NO lift-up animation during recovery — stays grounded in follow-through pose while taking a breather!
     phase = 'recovery';
     const recElapsed = elapsed - (liftFrames + holdFrames + strikeFrames);
     recP = Math.min(1.0, recElapsed / Math.max(1, recFrames));
     strikeP = 1.0;
-    const ease = recP * (2 - recP);
-    axeAngle = strikeEndAngle + (idleAxeAngle - strikeEndAngle) * ease;
-    handX = strikeEndHandX + (idleHandX - strikeEndHandX) * ease;
-    handY = strikeEndHandY + (idleHandY - strikeEndHandY) * ease;
-    backHandX = strikeEndBackHandX + (idleBackHandX - strikeEndBackHandX) * ease;
-    backHandY = strikeEndBackHandY + (idleBackHandY - strikeEndBackHandY) * ease;
+    axeAngle = strikeEndAngle;
+    handX = strikeEndHandX;
+    handY = strikeEndHandY;
+    backHandX = strikeEndBackHandX;
+    backHandY = strikeEndBackHandY;
   }
 
   return { isSwinging: true, phase, axeAngle, handX, handY, backHandX, backHandY, strikeP, pauseP: 0, recP, hitConnected: Boolean(fighter._chopHitConnected) };

@@ -11383,6 +11383,188 @@ async function main() {
     errorList.push(`[ENDER DRAGON TEST]: ${err.stack || err.message}`);
   }
 
+  // ── TEST: P.E.K.K.A Fighter Mechanics & Canvas Stack Balance ──
+  try {
+    console.log('🤖 [P.E.K.K.A Test] Verifying heavy armor deflection, momentum cleaves, butterfly overdrive, EMP overload & stack balance...');
+    const PekkaClass = FIGHTER_CLASS_MAP.pekka;
+    if (!PekkaClass) {
+      throw new Error('PekkaFighter class not found in FIGHTER_CLASS_MAP.pekka');
+    }
+    const { drawPekkaSkin, drawPekkaPixelBody } = await import('../js/graphics/fighters/pekkaSkin.js');
+    const { drawPekkaBlade, drawPekkaWeapon } = await import('../js/graphics/weapons/pekkaWeaponGraphics.js');
+
+    const pekka = new PekkaClass({ startX: 250, startY: 250, radius: 28 });
+    const dummyTarget = new PekkaClass({ startX: 280, startY: 250, radius: 28 });
+
+    state.mode = '1v1';
+    state.gameState = 'playing';
+    state.fighters = [pekka, dummyTarget];
+    state.getFighterTeam = defaultGetFighterTeam;
+
+    // 1. Canvas 2D Transform Stack Integrity
+    mockCtx.resetStackDepth();
+    pekka.draw(mockCtx);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] pekka.draw stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawPekkaSkin(mockCtx, pekka);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] drawPekkaSkin stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawPekkaBlade(mockCtx, 0, 0, 0, 28, { momentumStage: 3, isSwinging: true });
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] drawPekkaBlade stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawPekkaWeapon(mockCtx, { r: 28, angle: 0 });
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] drawPekkaWeapon stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    // 2. Passive: Heavy Titanium Plating (25% damage deflection & basic knockback immunity)
+    const initialHp = pekka.hp;
+    pekka.takeDamage(100, dummyTarget, { isTrueDamage: false });
+    const damageTaken = initialHp - pekka.hp;
+    if (damageTaken !== 75) {
+      throw new Error(`Expected 75 damage taken after 25% deflection on 100 dmg, got ${damageTaken}`);
+    }
+    if (pekka.knockbackVx !== 0 || pekka.knockbackVy !== 0) {
+      throw new Error(`Expected zero knockback velocity for poise against basic attack, got vx=${pekka.knockbackVx}, vy=${pekka.knockbackVy}`);
+    }
+
+    // 3. Kinetic Momentum 3-Stage Attack Cleave & 4-Phase Sequence: Stop -> Wind Up -> Release -> Breather -> Move
+    pekka.kineticMomentum = 0;
+    pekka.cleaveCooldown = 0;
+    pekka.vx = 2.5;
+    pekka.vy = 2.5;
+
+    // Phase 1: Stop Movement & Wind Up
+    pekka.startCleaveWindup(dummyTarget, CONFIG.pekka);
+    if (!pekka.isCleaveWindingUp) {
+      throw new Error('Expected isCleaveWindingUp=true after startCleaveWindup');
+    }
+    if (pekka.vx !== 0 || pekka.vy !== 0) {
+      throw new Error(`Expected vx=0 and vy=0 upon wind-up, got vx=${pekka.vx}, vy=${pekka.vy}`);
+    }
+    if (pekka.canAim()) {
+      throw new Error('Expected canAim()=false during wind-up');
+    }
+    if (pekka.canPerformBasicAttack()) {
+      throw new Error('Expected canPerformBasicAttack()=false during wind-up');
+    }
+
+    // Verify canvas stack balance during windup
+    mockCtx.resetStackDepth();
+    drawPekkaSkin(mockCtx, pekka);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] drawPekkaSkin during wind-up stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    // Phase 2: Release the Attack & Trigger Escanor-Style Hit-Pause
+    pekka.cleaveWindupTimer = 1;
+    pekka.update(dummyTarget, 0, { x: 0, y: 0, width: 800, height: 600 });
+    if (!pekka.isCleaveSwinging && pekka.cleaveHitPauseTimer <= 0) {
+      throw new Error('Expected isCleaveSwinging=true or cleaveHitPauseTimer > 0 after windup timer expires');
+    }
+    if (pekka.kineticMomentum !== 1) {
+      throw new Error(`Expected kineticMomentum=1 after 1st cleave release, got ${pekka.kineticMomentum}`);
+    }
+    if (pekka.vx !== 0 || pekka.vy !== 0) {
+      throw new Error(`Expected vx=0 and vy=0 during swing/hit-pause, got vx=${pekka.vx}, vy=${pekka.vy}`);
+    }
+
+    // Verify Escanor-style Hit-Pause stasis on dummyTarget
+    if (pekka.cleaveHitPauseTimer <= 0) {
+      throw new Error(`Expected positive cleaveHitPauseTimer on target impact, got ${pekka.cleaveHitPauseTimer}`);
+    }
+    if (!dummyTarget.suppressFreezeOverlay) {
+      throw new Error('Expected suppressFreezeOverlay=true on target during cinematic hit-pause');
+    }
+    if (dummyTarget.timeStopTimer <= 0) {
+      throw new Error(`Expected timeStopTimer > 0 on target during hit-pause, got ${dummyTarget.timeStopTimer}`);
+    }
+
+    // Verify canvas stack balance during active hit-pause
+    mockCtx.resetStackDepth();
+    drawPekkaSkin(mockCtx, pekka);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] drawPekkaSkin during hit-pause stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    // Phase 3: Unpause Resolution -> Breather Before Moving Again
+    pekka.cleaveHitPauseTimer = 1;
+    pekka.update(dummyTarget, 0, { x: 0, y: 0, width: 800, height: 600 });
+    if (!pekka.isCleaveBreather) {
+      throw new Error('Expected isCleaveBreather=true after unpause resolution');
+    }
+    if (dummyTarget.suppressFreezeOverlay) {
+      throw new Error('Expected suppressFreezeOverlay=false on target after unpause');
+    }
+    if (dummyTarget.timeStopTimer !== 0) {
+      throw new Error(`Expected timeStopTimer=0 on target after unpause release, got ${dummyTarget.timeStopTimer}`);
+    }
+    if (dummyTarget.knockbackVx === 0 && dummyTarget.knockbackVy === 0) {
+      throw new Error('Expected non-zero knockback on target after unpause release');
+    }
+    if (pekka.vx !== 0 || pekka.vy !== 0) {
+      throw new Error(`Expected vx=0 and vy=0 during breather, got vx=${pekka.vx}, vy=${pekka.vy}`);
+    }
+
+    // Verify canvas stack balance during breather
+    mockCtx.resetStackDepth();
+    drawPekkaSkin(mockCtx, pekka);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] drawPekkaSkin during breather stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    // Phase 4: Resume Moving
+    pekka.cleaveBreatherTimer = 1;
+    pekka.update(dummyTarget, 0, { x: 0, y: 0, width: 800, height: 600 });
+    if (pekka.isCleaveBreather) {
+      throw new Error('Expected isCleaveBreather=false after breather timer expires');
+    }
+    if (pekka.cleaveCooldown <= 0) {
+      throw new Error(`Expected positive cleaveCooldown after breather, got ${pekka.cleaveCooldown}`);
+    }
+
+    // Verify direct executeColossalCleave backwards compatibility and momentum scaling to Stage 3 Overclock
+    pekka.cleaveCooldown = 0;
+    pekka.executeColossalCleave(dummyTarget, CONFIG.pekka);
+    if (pekka.kineticMomentum !== 2) {
+      throw new Error(`Expected kineticMomentum=2 after 2nd cleave, got ${pekka.kineticMomentum}`);
+    }
+    pekka.cleaveCooldown = 0;
+    pekka.executeColossalCleave(dummyTarget, CONFIG.pekka);
+    if (pekka.kineticMomentum !== 3) {
+      throw new Error(`Expected kineticMomentum=3 (Overclock) after 3rd cleave, got ${pekka.kineticMomentum}`);
+    }
+
+    // 4. Skill 1: Butterfly Chase
+    pekka.butterflyCooldown = 0;
+    pekka.triggerButterflyChase(dummyTarget);
+    if (!pekka.isChasingButterfly) {
+      throw new Error('Expected isChasingButterfly=true after triggerButterflyChase');
+    }
+
+    // 5. Skill 2: Electric Overload EMP Blast
+    pekka.overloadCooldown = 0;
+    pekka.triggerElectricOverload();
+    if (!pekka.isChargingOverload) {
+      throw new Error('Expected isChargingOverload=true after triggerElectricOverload');
+    }
+
+    console.log('✅ [P.E.K.K.A Test] Successfully verified heavy armor deflection, momentum cleaves, butterfly chase, electric overload, and 100% balanced Canvas 2D stacks!');
+  } catch (err) {
+    console.error('❌ [P.E.K.K.A TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[P.E.K.K.A TEST]: ${err.stack || err.message}`);
+  }
+
   // ── Regular 1v2 Game Mode Test Suite ──
   console.log('Testing Regular 1v2 Game Mode (GAME_MODES.ONE_VS_TWO)...');
   try {

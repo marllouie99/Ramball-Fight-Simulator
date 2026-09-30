@@ -28,70 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "CRAZYDAVE",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "lawnmowerDamage",
-                "oldVal": 180,
-                "newVal": 100,
-                "pct": "-44.4%"
-            }
-        ]
-    },
-    {
-        "character": "MEGUMIN",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "enableOneTruePath",
-                "oldVal": 0,
-                "newVal": 1,
-                "pct": "+0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "enableExplosion",
-                "oldVal": 0,
-                "newVal": 1,
-                "pct": "+0%"
-            }
-        ]
-    },
-    {
-        "character": "SAITAMA",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "flurryCooldown",
-                "oldVal": 500,
-                "newVal": 1000,
-                "pct": "+100.0%"
-            },
-            {
-                "type": "NERF",
-                "key": "initialSkillPunishCooldown",
-                "oldVal": 1000,
-                "newVal": 2000,
-                "pct": "+100.0%"
-            }
-        ]
-    },
-    {
-        "character": "SUKUNA",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "fleshSlice",
-                "oldVal": "Assets/Sound Effects/Skills/backstab.mp3",
-                "newVal": "Assets/Sound Effects/Attacks/Sukuna-slice.mp3",
-                "pct": "Mod"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

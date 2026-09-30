@@ -18,6 +18,7 @@ import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
 import { crazyDaveConfig } from '../configs/characters/crazyDaveConfig.js';
+import { pekkaConfig } from '../configs/characters/pekkaConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
@@ -60,6 +61,7 @@ export const CONFIG = {
   crazydave: crazyDaveConfig,
   crazy_dave: crazyDaveConfig,
   CrazyDave: crazyDaveConfig,
+  pekka: pekkaConfig,
   gojo: gojoConfig,
   sukuna: sukunaConfig,
   yuta: yutaConfig,
@@ -1716,6 +1718,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: crazyDaveConfig.projectileSpeedMultiplier || 1.0,
     ability: crazyDaveConfig.ability || 'Solar Economy & Flora Arsenal ("WABBI WABBO!")',
     desc: crazyDaveConfig.desc || 'The eccentric neighbor from Plants vs. Zombies. Gathers Sun drops from the sky, basic hits, and Sunflowers. Accumulates solar energy to plant Peashooters, sturdy Wall-nuts, explosive Cherry Bombs, and deploys the devastating Lawn Mower Cataclysm!',
+  },
+  {
+    id: 51,
+    name: 'P.E.K.K.A',
+    category: 'Gaming',
+    color: pekkaConfig.color || '#8B5CF6',
+    themeColor: pekkaConfig.themeColor || '#8B5CF6',
+    secondaryColor: pekkaConfig.secondaryColor || '#06B6D4',
+    startX: pekkaConfig.startX || 300,
+    startY: pekkaConfig.startY || 250,
+    startVx: pekkaConfig.startVx || 1.0,
+    startVy: pekkaConfig.startVy || 0.9,
+    radius: pekkaConfig.radius || pekkaConfig.r || 28,
+    aimbot: false,
+    spinRate: 0,
+    type: 'pekka',
+    hp: pekkaConfig.hp || 480,
+    damage: pekkaConfig.damage || 38,
+    cooldown: pekkaConfig.cooldown || 48,
+    moveSpeed: pekkaConfig.moveSpeed || pekkaConfig.speed || 4.4,
+    projectileSpeedMultiplier: pekkaConfig.projectileSpeedMultiplier || 1.0,
+    ability: pekkaConfig.ability || 'Kinetic Momentum & Butterfly Overdrive',
+    desc: pekkaConfig.desc || 'Heavy armored samurai robot. Passive: Heavy Titanium Plating deflects 25% of all incoming damage and resists basic knockback pushes. Attacks with wide 140° Colossal Cleaves that build Kinetic Momentum up to an Overclock 3rd smash. Chases fluttering butterflies with unstoppable hyper-armor sprint and detonates an electric EMP overload.',
   }
 ];
 

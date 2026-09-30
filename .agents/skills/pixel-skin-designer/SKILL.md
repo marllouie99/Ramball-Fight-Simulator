@@ -35,11 +35,14 @@ Use this skill when designing or coding character skins, hair silhouettes, headw
      ctx.scale(1, -1); // Keep hair on top and body on bottom when facing left
    }
    ```
-2. **Layering Order**:
-   - **Layer 1 (Behind Body)**: Back hand at `(r * 1.05, 0)` in idle stance.
-   - **Layer 2 (Middle)**: Body circle, clothing, hair, and headwear.
-   - **Layer 3 (Front)**: Front hand at guard center `(0, 0)` in idle stance.
-   - **Layer 4 (Top-Most)**: Active held weapon and attack effects.
+2. **Canonical Default Hand Positioning Standard**:
+   - **Layer 1 (Body)**: Body circle, clothing, hair, and headwear rendered at `(0, 0)` with radius `r`.
+   - **Layer 2 (Front Hands Overlap)**:
+     - **Left Hand**: Symmetrically positioned at lower-left flank `(x: -r * 0.82, y: +r * 0.38)` with radius `r * 0.30`.
+     - **Right Hand**: Symmetrically positioned at lower-right flank `(x: +r * 0.82, y: +r * 0.38)` with radius `r * 0.30`.
+     - Both hands sit on the front layer, overlapping the lower-left and lower-right perimeter boundary.
+   - **Layer 3 (Weapon Anchor)**: Main-hand weapon hilt anchors at `(+r * 0.82, +r * 0.38)` during idle/rest, with the right hand drawn over the grip.
+
 
 ## Phase 4: Mandatory Offscreen Canvas Caching Pattern (Rule 3.5)
 - **STRICT PROHIBITION**: NEVER call per-pixel `ctx.fillRect(px, py, P, P)` loops directly in the game loop while the canvas is rotated (`ctx.rotate(angle)`). Rotated sub-pixel rectangles create ugly "crisscross white grid lines / screen-door artifacts" and cause severe frame drops.

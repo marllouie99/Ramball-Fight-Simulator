@@ -3,19 +3,4 @@
 
 ---
 
-## 🥊 Fighter Stat Modifications
-
-### CRAZYDAVE
-* **🔴 NERF** `lawnmowerDamage`: `180` ➔ `100` (-44.4%)
-
-### MEGUMIN
-* **🟢 BUFF** `enableOneTruePath`: `0` ➔ `1` (+0%)
-* **🟢 BUFF** `enableExplosion`: `0` ➔ `1` (+0%)
-
-### SAITAMA
-* **🔴 NERF** `flurryCooldown`: `500` ➔ `1000` (+100.0%)
-* **🔴 NERF** `initialSkillPunishCooldown`: `1000` ➔ `2000` (+100.0%)
-
-### SUKUNA
-* **🔄 ADJUST** `fleshSlice`: `Assets/Sound Effects/Skills/backstab.mp3` ➔ `Assets/Sound Effects/Attacks/Sukuna-slice.mp3` (Mod)
-
+*No balance parameter modifications detected in `js/configs/`.*

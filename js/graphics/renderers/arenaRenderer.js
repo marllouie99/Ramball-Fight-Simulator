@@ -6,6 +6,7 @@ import { applyCameraToCtx, worldToScreen } from '../../systems/cameraSystem.js';
 import { updateSaitamaWallShatters, drawSaitamaWallShatters } from '../particles/saitamaWallShatter.js';
 import { drawTopHudNameShatters } from '../particles/hudShatterEffect.js';
 import { isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet, getGrassTileSpriteSheet } from './grassFloorRenderer.js';
+import { renderActiveArenaFloor } from '../../systems/arenaTileSystem.js';
 
 /**
  * Renders a solid vector fissure crack (matching manga comic / PNG crack art).
@@ -420,8 +421,7 @@ export function drawArena() {
       if (state.floorGraphics) {
         const fg = state.floorGraphics;
         fg.clear();
-        const daveActive = isCrazyDavePresent();
-        const floorColor = daveActive ? 0x3e9925 : innerBg.color;
+        const floorColor = innerBg.color;
         fg.beginFill(floorColor, innerBg.alpha);
         const fBleed = 4;
         if (arena.shape === 'circle') {
@@ -484,21 +484,7 @@ export function drawArena() {
       ctx.save();
       applyCameraToCtx(ctx);
       const fBleed = 4;
-      if (isCrazyDavePresent()) {
-        renderCrazyDaveGrassFloor(ctx, arena, isDark, fBleed);
-      } else {
-        ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff');
-        if (arena.shape === 'circle') {
-          const cx = arena.x + arena.width / 2;
-          const cy = arena.y + arena.height / 2;
-          const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + fBleed;
-          ctx.beginPath();
-          ctx.arc(cx, cy, ar, 0, Math.PI * 2);
-          ctx.fill();
-        } else {
-          ctx.fillRect(arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
-        }
-      }
+      renderActiveArenaFloor(ctx, arena, isDark, fBleed);
       ctx.restore();
     } else if (hasActiveDomain && !state.pixiApp) {
       // In native Canvas 2D mode, render active domain background under camera transform

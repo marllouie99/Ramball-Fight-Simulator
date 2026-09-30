@@ -3,7 +3,6 @@ import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
 import { spawnEyeOfCthulhuDomainSlashGore } from '../../../graphics/particles/deathShatterEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
-import { isCrazyDavePresent, renderCrazyDaveGrassFloor } from '../../../graphics/renderers/grassFloorRenderer.js';
 
 export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = false) {
   if (!fighter || !fighter.domainActive) return;
@@ -53,57 +52,29 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   const localSkullBaseY = -195 + (389 / 408) * drawH; // ~46.54px (exact bottom of non-transparent skulls)
   const waterLineY = (sy - 120) + localSkullBaseY;   // ~sy - 73.46px (exact contact line)
 
-  const isDavePresent = typeof isCrazyDavePresent === 'function' && isCrazyDavePresent();
-
   // 1a. Upper Dark Crimson Cursed Sky (Pitch Black with Sinister Dark-Crimson Cloud Formations)
-  if (!fighter._cachedSkyGrad || fighter._cachedSkyGradH !== waterLineY || fighter._cachedSkyGradScreenH !== screenH || fighter._cachedSkyGradDave !== isDavePresent) {
+  if (!fighter._cachedSkyGrad || fighter._cachedSkyGradH !== waterLineY || fighter._cachedSkyGradScreenH !== screenH) {
     fighter._cachedSkyGradH = waterLineY;
     fighter._cachedSkyGradScreenH = screenH;
-    fighter._cachedSkyGradDave = isDavePresent;
     fighter._cachedSkyGrad = ctx.createLinearGradient(0, 0, 0, Math.max(1, waterLineY));
-    if (isDavePresent) {
-      // Atmospheric translucent cursed crimson sky allowing upper grass tiles to remain visible
-      fighter._cachedSkyGrad.addColorStop(0.0, 'rgba(6, 0, 3, 0.74)');     // Dark void crown tint
-      fighter._cachedSkyGrad.addColorStop(0.20, 'rgba(25, 1, 6, 0.70)');   // Dark crimson transition
-      fighter._cachedSkyGrad.addColorStop(0.45, 'rgba(65, 4, 12, 0.66)');  // Cursed burgundy tint
-      fighter._cachedSkyGrad.addColorStop(0.70, 'rgba(95, 6, 18, 0.62)');  // Crimson cloud band tint
-      fighter._cachedSkyGrad.addColorStop(0.88, 'rgba(50, 3, 10, 0.68)');  // Dark crimson under-horizon
-      fighter._cachedSkyGrad.addColorStop(1.0, 'rgba(10, 2, 8, 0.74)');    // Horizon haze
-    } else {
-      fighter._cachedSkyGrad.addColorStop(0.0, 'rgba(1, 0, 1, 0.99)');     // Pitch black void crown
-      fighter._cachedSkyGrad.addColorStop(0.20, 'rgba(4, 0, 2, 0.99)');    // Deep dark void
-      fighter._cachedSkyGrad.addColorStop(0.45, 'rgba(55, 3, 10, 0.96)');   // Dark cursed burgundy
-      fighter._cachedSkyGrad.addColorStop(0.70, 'rgba(95, 6, 18, 0.93)');   // Intense crimson cloud band
-      fighter._cachedSkyGrad.addColorStop(0.88, 'rgba(45, 2, 8, 0.96)');    // Dark crimson under-horizon
-      fighter._cachedSkyGrad.addColorStop(1.0, 'rgba(5, 1, 6, 0.99)');     // Dark horizon haze
-    }
+    fighter._cachedSkyGrad.addColorStop(0.0, 'rgba(1, 0, 1, 0.99)');     // Pitch black void crown
+    fighter._cachedSkyGrad.addColorStop(0.20, 'rgba(4, 0, 2, 0.99)');    // Deep dark void
+    fighter._cachedSkyGrad.addColorStop(0.45, 'rgba(55, 3, 10, 0.96)');   // Dark cursed burgundy
+    fighter._cachedSkyGrad.addColorStop(0.70, 'rgba(95, 6, 18, 0.93)');   // Intense crimson cloud band
+    fighter._cachedSkyGrad.addColorStop(0.88, 'rgba(45, 2, 8, 0.96)');    // Dark crimson under-horizon
+    fighter._cachedSkyGrad.addColorStop(1.0, 'rgba(5, 1, 6, 0.99)');     // Dark horizon haze
   }
 
   // 1b. Lower Dark Abyssal Teal Water Floor (Anime-Authentic Dark Chamber)
-  if (!fighter._cachedWaterGrad || fighter._cachedWaterGradH !== screenH || fighter._cachedWaterGradY !== waterLineY || fighter._cachedWaterGradDave !== isDavePresent) {
+  if (!fighter._cachedWaterGrad || fighter._cachedWaterGradH !== screenH || fighter._cachedWaterGradY !== waterLineY) {
     fighter._cachedWaterGradY = waterLineY;
     fighter._cachedWaterGradH = screenH;
-    fighter._cachedWaterGradDave = isDavePresent;
     fighter._cachedWaterGrad = ctx.createLinearGradient(0, waterLineY, 0, screenH);
-    if (isDavePresent) {
-      // Atmospheric flooded dark teal cursed water with PvZ grass tiles subtly visible beneath
-      fighter._cachedWaterGrad.addColorStop(0.0, 'rgba(2, 18, 26, 0.72)');    // Dark teal surface
-      fighter._cachedWaterGrad.addColorStop(0.15, 'rgba(3, 28, 38, 0.70)');   // Teal depth
-      fighter._cachedWaterGrad.addColorStop(0.40, 'rgba(2, 22, 32, 0.74)');   // Murky aquatic depth
-      fighter._cachedWaterGrad.addColorStop(0.70, 'rgba(1, 14, 22, 0.78)');   // Deep dark abyss
-      fighter._cachedWaterGrad.addColorStop(1.0, 'rgba(1, 6, 10, 0.82)');     // Dark floor
-    } else {
-      fighter._cachedWaterGrad.addColorStop(0.0, 'rgba(2, 18, 26, 0.97)');    // Very dark teal surface
-      fighter._cachedWaterGrad.addColorStop(0.15, 'rgba(3, 28, 38, 0.96)');   // Dark teal depth
-      fighter._cachedWaterGrad.addColorStop(0.40, 'rgba(2, 22, 32, 0.97)');   // Murky aquatic depth
-      fighter._cachedWaterGrad.addColorStop(0.70, 'rgba(1, 14, 22, 0.98)');   // Deep dark abyss
-      fighter._cachedWaterGrad.addColorStop(1.0, 'rgba(1, 6, 10, 0.99)');     // Pitch dark floor
-    }
-  }
-
-  // When Crazy Dave is present, draw the grass tiles floor underneath the domain sky and water
-  if (isDavePresent && arena && typeof renderCrazyDaveGrassFloor === 'function') {
-    renderCrazyDaveGrassFloor(ctx, arena, _isDarkMode, 4);
+    fighter._cachedWaterGrad.addColorStop(0.0, 'rgba(2, 18, 26, 0.97)');    // Very dark teal surface
+    fighter._cachedWaterGrad.addColorStop(0.15, 'rgba(3, 28, 38, 0.96)');   // Dark teal depth
+    fighter._cachedWaterGrad.addColorStop(0.40, 'rgba(2, 22, 32, 0.97)');   // Murky aquatic depth
+    fighter._cachedWaterGrad.addColorStop(0.70, 'rgba(1, 14, 22, 0.98)');   // Deep dark abyss
+    fighter._cachedWaterGrad.addColorStop(1.0, 'rgba(1, 6, 10, 0.99)');     // Pitch dark floor
   }
 
   // Draw Sky & Water Floor
@@ -120,7 +91,7 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
       const ccy = (waterLineY * (0.30 + (c % 3) * 0.12)) + Math.sin(time * 0.001 + c * 1.3) * 10;
       const rx = 160 + (c % 4) * 35;
       const ry = 40 + (c % 3) * 18;
-      const baseAlpha = isDavePresent ? (0.16 + (c % 3) * 0.04) : (0.35 + (c % 3) * 0.08);
+      const baseAlpha = (0.35 + (c % 3) * 0.08);
       ctx.fillStyle = `rgba(0, 0, 0, ${baseAlpha.toFixed(2)})`;
       ctx.beginPath();
       ctx.ellipse(ccx, ccy, rx, ry, 0, 0, Math.PI * 2);
@@ -132,7 +103,7 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
       const ccy = (waterLineY * (0.35 + (c % 3) * 0.10)) + Math.sin(time * 0.001 + c * 1.3) * 10;
       const rx = 120 + (c % 3) * 30;
       const ry = 25 + (c % 2) * 12;
-      const rimAlpha = isDavePresent ? (0.08 + (c % 2) * 0.04) : (0.12 + (c % 2) * 0.06);
+      const rimAlpha = (0.12 + (c % 2) * 0.06);
       ctx.fillStyle = `rgba(160, 10, 25, ${rimAlpha.toFixed(2)})`;
       ctx.beginPath();
       ctx.ellipse(ccx, ccy, rx, ry, 0, 0, Math.PI * 2);

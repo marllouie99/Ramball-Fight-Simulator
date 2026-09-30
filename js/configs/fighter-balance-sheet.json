@@ -659,6 +659,36 @@
           "cooldown": 800
         }
       }
+    },
+    "pekka": {
+      "name": "P.E.K.K.A",
+      "archetype": "brawler",
+      "hp": 480,
+      "speed": 4.4,
+      "radius": 28,
+      "baseDamage": 38,
+      "baseCooldown": 52,
+      "themeColor": "#8B5CF6",
+      "keySkills": {
+        "kineticMomentum": {
+          "hit1Damage": 38,
+          "hit2Damage": 54,
+          "hit3Damage": 96,
+          "hit3StunFrames": 24
+        },
+        "butterflyChase": {
+          "cooldown": 520,
+          "speedMultiplier": 1.85,
+          "slamDamage": 75
+        },
+        "electricOverload": {
+          "cooldown": 720,
+          "chargeFrames": 38,
+          "radius": 210,
+          "damage": 62,
+          "paralyzeFrames": 45
+        }
+      }
     }
   }
 }

@@ -903,6 +903,30 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
 
+  // P.E.K.K.A — Heavy Titanium Cleave Swing
+  'pekka': {
+    get src() {
+      return CONFIG.pekka?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.pekka?.soundVolumes?.swordSwing !== undefined ? CONFIG.pekka.soundVolumes.swordSwing : 0.85;
+    },
+    get delay() {
+      return CONFIG.pekka?.soundDelays?.swordSwing || 0;
+    }
+  },
+  'pekka_cleave': {
+    get src() {
+      return CONFIG.pekka?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.pekka?.soundVolumes?.swordSwing !== undefined ? CONFIG.pekka.soundVolumes.swordSwing : 0.85;
+    },
+    get delay() {
+      return CONFIG.pekka?.soundDelays?.swordSwing || 0;
+    }
+  },
+
   // Classic Arcade Archetypes
   'normal': {
     src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',

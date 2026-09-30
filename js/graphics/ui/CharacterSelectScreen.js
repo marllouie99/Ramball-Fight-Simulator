@@ -11,6 +11,7 @@ import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
+import { drawArenaFloorSelector, isArenaFloorModalOpen, drawArenaFloorModal, closeArenaFloorModal } from '../../systems/arenaTileSystem.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { STARTER_MAP, MONOLITH_MAP } from '../../../Tactical Force/maps/index.js';
 import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
@@ -829,14 +830,15 @@ function drawSelectScreen() {
   ctx.fillText(titleText, canvas.width / 2, 64);
   ctx.restore();
 
-  // Tactical Sub-Controls (Map Selector & Arena BGM) & Boss Battle Team Toggle
+  // Tactical Sub-Controls (Map Selector & Arena BGM) & Boss Battle Team Toggle & Arena Floor Selector
   const isBossBattleMode = !isTactical && (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
-  const mapW = isTactical ? 130 : 0;
-  const teamToggleW = isBossBattleMode ? 140 : 0;
-  const bgmW = 130;
+  const mapW = isTactical ? 120 : 0;
+  const teamToggleW = isBossBattleMode ? 135 : 0;
+  const bgmW = 115;
+  const floorW = 115;
   const ctrlH = 24;
-  const gap = 10;
-  const totalCtrlW = (isTactical ? mapW + gap : 0) + (isBossBattleMode ? teamToggleW + gap : 0) + bgmW;
+  const gap = 8;
+  const totalCtrlW = (isTactical ? mapW + gap : 0) + (isBossBattleMode ? teamToggleW + gap : 0) + bgmW + gap + floorW;
   const startCtrlX = canvas.width / 2 - totalCtrlW / 2;
   
   const tmY = 96;
@@ -859,7 +861,7 @@ function drawSelectScreen() {
     ctx.stroke();
 
     ctx.fillStyle = '#21050c';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(mapLabel, curCtrlX + mapW / 2, tmY + ctrlH / 2);
@@ -875,7 +877,7 @@ function drawSelectScreen() {
     curCtrlX += mapW + gap;
   } else if (isBossBattleMode) {
     const isSolo = Boolean(state.bossBattleNoTeammate);
-    const toggleLabel = isSolo ? '👤 TEAM: SOLO (1v1)' : '👥 TEAM: DUO (1v2)';
+    const toggleLabel = isSolo ? '👤 SOLO (1v1)' : '👥 DUO (1v2)';
 
     ctx.save();
     ctx.fillStyle = '#baa88c';
@@ -909,6 +911,10 @@ function drawSelectScreen() {
 
   // Arena BGM Selector Button
   drawArenaBgmSelector(ctx, curCtrlX, tmY, bgmW, ctrlH);
+  curCtrlX += bgmW + gap;
+
+  // Arena Floor / Tiles Selector Button
+  drawArenaFloorSelector(ctx, curCtrlX, tmY, floorW, ctrlH);
 
   // ── Main Combatant Grid ──
   const topY = 134;
@@ -1212,6 +1218,10 @@ function drawSelectScreen() {
   if (isArenaBgmModalOpen()) {
     drawArenaBgmModal(state.ctx);
   }
+
+  if (isArenaFloorModalOpen()) {
+    drawArenaFloorModal(state.ctx);
+  }
 }
 
 function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
@@ -1407,7 +1417,7 @@ export function getFighterWeaponInfo(def) {
 function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLarge = false) {
   const { ctx, mode } = state;
   const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
-  const isAnyModalOpen = (selectingSlot !== null || isTacticalMapModalOpen || isArenaBgmModalOpen());
+  const isAnyModalOpen = (selectingSlot !== null || isTacticalMapModalOpen || isArenaBgmModalOpen() || isArenaFloorModalOpen());
   const isInteractive = enabled && !isAnyModalOpen;
 
   // Track card bounds for direct mouse wheel cycling (only when interactive)
@@ -1806,6 +1816,13 @@ window.addEventListener('keydown', (e) => {
         return;
       }
     }
+    if (isArenaFloorModalOpen()) {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        closeArenaFloorModal();
+        e.preventDefault();
+        return;
+      }
+    }
     if (selectingSlot !== null) {
       if (e.key === 'Escape') {
         selectingSlot = null;
@@ -1868,8 +1885,8 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('wheel', (e) => {
   if (state.gameState !== 'select') return;
 
-  // Block card wheel cycling when Arena BGM or Tactical Map modal is active
-  if (isArenaBgmModalOpen() || isTacticalMapModalOpen) {
+  // Block card wheel cycling when Arena BGM, Arena Floor, or Tactical Map modal is active
+  if (isArenaBgmModalOpen() || isArenaFloorModalOpen() || isTacticalMapModalOpen) {
     return;
   }
 

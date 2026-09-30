@@ -214,10 +214,13 @@ After completing ANY code modification, update, or fix in the project, the agent
 
 ### 3.6 Hand Layering & `drawPixelHand` Engine (Rule 20)
 - Guard with `const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;`.
-- **Back Hand**: Positioned on forward side at `(r * 1.05, 0)` behind body circle.
-- **Body Circle**: Drawn at `(0, 0)` with upright head (`-Y`) and torso (`+Y`).
-- **Front Hand**: Positioned at guard center `(0, 0)` on top of body.
+- **Canonical Default Hand Positioning**: In local coordinate space (`(0, 0)` body center, radius `r`):
+  - **Left Hand**: Symmetrically positioned at lower-left flank `(x: -r * 0.82, y: +r * 0.38)` with radius `r * 0.30`.
+  - **Right Hand**: Symmetrically positioned at lower-right flank `(x: +r * 0.82, y: +r * 0.38)` with radius `r * 0.30`.
+  - **Front Layer Overlap**: Both hands MUST be drawn on the **front layer** (after the body circle), overlapping the lower perimeter boundary of the body circle with roughly half of each hand circle overlapping the body and half extending outward.
+  - **Weapon Anchor**: Main-hand weapon hilt anchors at `(+r * 0.82, +r * 0.38)` during idle/rest, with the right hand drawn over the grip.
 - All hands render via `drawPixelHand(ctx, cx, cy, radius, color, outlineColor)` with stepped dark ink outline and volumetric glint.
+
 
 ### 3.7 PNG Character Model Pixel Art Pipeline
 - When using PNG skins (`Assets/model/<Name>-PIXEL-SKIN.png`):

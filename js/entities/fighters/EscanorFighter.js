@@ -698,10 +698,12 @@ export class EscanorFighter extends Fighter {
     }
     targetSpeed *= extraMultiplier;
 
+    const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 28);
     const isStationaryState = Boolean(
       this.isChannelingCruelSun ||
       (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0) ||
-      (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)
+      (this.chopHitPauseTimer && this.chopHitPauseTimer > 0) ||
+      (this.slashSwingTimer > 0 && this.slashSwingTimer <= recFrames)
     );
 
     if (isStationaryState) {
@@ -789,10 +791,12 @@ export class EscanorFighter extends Fighter {
     };
     const res = super.takeDamage(finalAmount, attacker, damageOpts);
 
+    const recFrames = (typeof this.chopRecoveryFrames === 'number') ? this.chopRecoveryFrames : (CONFIG.escanor?.chopRecoveryFrames || 28);
     const isStationaryState = Boolean(
       this.isChannelingCruelSun ||
       (this.cruelSunRecoveryTimer && this.cruelSunRecoveryTimer > 0) ||
-      (this.chopHitPauseTimer && this.chopHitPauseTimer > 0)
+      (this.chopHitPauseTimer && this.chopHitPauseTimer > 0) ||
+      (this.slashSwingTimer > 0 && this.slashSwingTimer <= recFrames)
     );
     if (!isStationaryState && Math.hypot(prevVx, prevVy) > 0.05) {
       this.vx = prevVx;
@@ -1148,11 +1152,13 @@ export class EscanorFighter extends Fighter {
         }
       }
 
-      // At the exact moment the downward chop strike reaches follow-through (slashSwingTimer === recFrames):
-      if (this.slashSwingTimer === recFrames) {
+      // At the exact moment the downward chop strike reaches follow-through (slashSwingTimer <= recFrames):
+      if (this.slashSwingTimer <= recFrames) {
         this.vx = 0;
         this.vy = 0;
-        this._onChopStrikeFinished();
+        if (this.slashSwingTimer === recFrames) {
+          this._onChopStrikeFinished();
+        }
       }
 
       // If strike window passed without connecting, mark as delivered (miss)

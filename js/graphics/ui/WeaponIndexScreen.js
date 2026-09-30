@@ -36,6 +36,7 @@ import { drawTanjiroNichirinKatana, drawNezukoDemonClaws, drawZenitsuLightningKa
 import { drawDivineAxeRhitta } from '../weapons/escanorWeaponGraphics.js';
 import { drawRezeTacticalKnife, drawRezeWeaponPreview } from '../weapons/rezeWeaponGraphics.js';
 import { drawCrazyDaveWeapon, drawCrazyDaveShovel } from '../weapons/crazyDaveWeaponGraphics.js';
+import { drawPekkaWeapon } from '../weapons/pekkaWeaponGraphics.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -2274,6 +2275,10 @@ function drawWeaponPreview(ctx, type, color) {
       case 'crazydave':
       case 'crazy_dave':
         drawCrazyDaveWeapon(ctx, { r, angle: gunAngle, color: color || '#84CC16' });
+        return;
+
+      case 'pekka':
+        drawPekkaWeapon(ctx, { r, angle: gunAngle, color: color || '#8B5CF6' });
         return;
 
       default:

@@ -1,8 +1,14 @@
 # AI Coding Agent Instructions
 
-## New Character Hand Positioning
+## Canonical Default Model Hand Positioning (Rule 20)
 
-When creating a new character, position the hands as two distinct circular side elements beside the central body, matching the approved reference: clean spacing, clear separation from the body, and no hand overlap unless explicitly requested.
+When creating or rendering new characters and model skins, ALWAYS use the approved default hand positioning standard:
+- **Symmetrical Lower-Flank Placement**: Both hands are circular elements (`drawPixelHand`) positioned symmetrically at the lower-left and lower-right flanks of the central body circle in local coordinate space:
+  - **Left Hand**: `(x: -r * 0.82, y: +r * 0.38)`
+  - **Right Hand**: `(x: +r * 0.82, y: +r * 0.38)`
+- **Hand Radius**: `handRadius = r * 0.30` (or `getHandSize(r * 0.30)`).
+- **Layering & Overlap**: Both hands MUST be rendered on the **front layer** (after rendering the central body circle), overlapping the lower perimeter of the body circle so approximately half of each hand circle overlaps the body edge and half protrudes outward as a distinct side fist.
+- **Weapon Wielding**: For weapon users, the main-hand weapon hilt/grip anchors directly at `(x: +r * 0.82, y: +r * 0.38)` during idle/rest, with the hand drawn over the grip.
 
 ## Post-Change Suggestions
 

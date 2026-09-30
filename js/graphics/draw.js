@@ -51,6 +51,8 @@ export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
 export { drawMeguminSkin, drawMeguminPixelBody, _drawMeguminHair, _getMeguminHairImage, drawMeguminMagicCircle, drawCrimsonDemonRune, drawMeguminExplosionScreenOverlay } from './fighters/meguminSkin.js';
 export { drawCrazyDaveSkin, drawCrazyDavePixelBody, _drawCrazyDaveHair, _getCrazyDaveHairImage } from './fighters/crazyDaveSkin.js';
 export { drawCrazyDaveShovel, drawSunDrop, drawWallnut, drawPeashooter, drawSnowPea, drawTorchwood, drawLawnmower, drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet, drawCrazyDaveWeapon, CrazyDave_WEAPON_GRAPHICS } from './weapons/crazyDaveWeaponGraphics.js';
+export { drawPekkaSkin, drawPekkaPixelBody } from './fighters/pekkaSkin.js';
+export { drawPekkaBlade, drawPekkaWeapon, PEKKA_WEAPON_GRAPHICS } from './weapons/pekkaWeaponGraphics.js';
 export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';
 export { drawUryuSkin, drawUryuGhostSkin } from './fighters/uryuSkin.js';
 export { drawUryuBow, drawSeeleSchneider, drawUryuSeeleSlashArc } from './weapons/uryuWeaponGraphics.js';

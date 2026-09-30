@@ -3242,6 +3242,77 @@ async function runInteractionTests() {
     }
   }
 
+  // ─────────────────────────────────────────────
+  // 30. Testing Modular Arena Tile & Floor System (ARENA_FLOORS, Snapping Math, Render Stack Integrity)
+  // ─────────────────────────────────────────────
+  {
+    console.log('   30. Testing Arena Tile & Floor System, Registry, Math API & Canvas Stack Balance...');
+    const { 
+      ARENA_FLOORS, 
+      getSelectedArenaFloor, 
+      setSelectedArenaFloor, 
+      resolveActiveFloorId,
+      getActiveArenaFloorDef,
+      getTileGridInfo,
+      getNearestTileCenter,
+      getRandomTileCenter,
+      renderActiveArenaFloor,
+      drawArenaFloorSelector,
+      drawArenaFloorModal
+    } = await import('../js/systems/arenaTileSystem.js');
+
+    assert(Array.isArray(ARENA_FLOORS) && ARENA_FLOORS.length >= 7, 'ARENA_FLOORS should contain all selectable floor themes');
+    
+    // Test persistence & selection
+    setSelectedArenaFloor('cyber_grid');
+    assert(getSelectedArenaFloor() === 'cyber_grid', 'getSelectedArenaFloor should reflect cyber_grid');
+    assert(resolveActiveFloorId() === 'cyber_grid', 'resolveActiveFloorId should return chosen cyber_grid');
+    
+    setSelectedArenaFloor('pvz_grass');
+    assert(getSelectedArenaFloor() === 'pvz_grass', 'getSelectedArenaFloor should reflect pvz_grass');
+    assert(resolveActiveFloorId() === 'pvz_grass', 'resolveActiveFloorId should return chosen pvz_grass');
+    
+    setSelectedArenaFloor('classic_clean');
+    assert(resolveActiveFloorId() === 'classic_clean', 'resolveActiveFloorId should return classic_clean');
+    
+    // Test grid info math
+    const testArena = { x: 40, y: 240, width: 460, height: 460, shape: 'rect' };
+    const gridInfo = getTileGridInfo(testArena);
+    assert(gridInfo.cols > 0 && gridInfo.rows > 0 && gridInfo.cellW > 0, 'getTileGridInfo should calculate valid dimensions');
+    
+    const nearest = getNearestTileCenter(100, 300, testArena);
+    assert(nearest && typeof nearest.x === 'number' && typeof nearest.y === 'number', 'getNearestTileCenter should return valid coordinates');
+    
+    const random = getRandomTileCenter(testArena);
+    assert(random && typeof random.x === 'number' && typeof random.y === 'number', 'getRandomTileCenter should return valid coordinates');
+    
+    // Test renderActiveArenaFloor on all themes with 100% balanced stack depth
+    for (const floor of ARENA_FLOORS) {
+      setSelectedArenaFloor(floor.id);
+      mockCtx.resetStackDepth();
+      renderActiveArenaFloor(mockCtx, testArena, false, 4);
+      assert(mockCtx.getStackDepth() === 0, `Floor ${floor.id} must balance Canvas state on rectangular arena`);
+      
+      const circArena = { x: 40, y: 240, width: 460, height: 460, shape: 'circle', radius: 230 };
+      mockCtx.resetStackDepth();
+      renderActiveArenaFloor(mockCtx, circArena, true, 4);
+      assert(mockCtx.getStackDepth() === 0, `Floor ${floor.id} must balance Canvas state on circular arena`);
+    }
+    
+    // Test modal & selector rendering
+    mockCtx.resetStackDepth();
+    drawArenaFloorSelector(mockCtx, 10, 10, 115, 24);
+    assert(mockCtx.getStackDepth() === 0, 'drawArenaFloorSelector must balance Canvas state');
+    
+    mockCtx.resetStackDepth();
+    drawArenaFloorModal(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'drawArenaFloorModal must balance Canvas state');
+    
+    // Restore auto
+    setSelectedArenaFloor('auto');
+    console.log('      ✅ Arena Tile System, themes, snapping math & 100% balanced Canvas 2D stacks verified.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

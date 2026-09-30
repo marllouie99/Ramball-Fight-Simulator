@@ -238,6 +238,8 @@ export const state = {
   activeFocMap: null, // Active FOC battleground map (e.g. Yuta's Cursed Grove)
   mode: GAME_MODES.ONE_VS_ONE,
   arenaTheme: 'light', // 'light' | 'dark'
+  selectedArenaFloor: (typeof localStorage !== 'undefined' && localStorage.getItem('circle_selected_arena_floor')) || 'classic_clean',
+  _arenaFloorCanvasCache: {},
   testMode: false, // Disables leaderboard recording
   cinefilmFilter: false, // Retro Cinefilm 35mm filter toggle
   disableDimEffects: (typeof localStorage !== 'undefined' && localStorage.getItem('disableDimEffects') === 'true') || false, // Global dim effects toggle
@@ -1118,6 +1120,7 @@ export function isGlobalHitPauseActive(stateObj = state, excludeFighter = null) 
     if (f && f !== excludeFighter && f.hp > 0) {
       if ((f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0) return true;
       if ((f.characterId === 'escanor' || f.type === 'escanor') && (f.chopHitPauseTimer || 0) > 0) return true;
+      if ((f.characterId === 'pekka' || f.type === 'pekka') && (f.cleaveHitPauseTimer || 0) > 0) return true;
     }
   }
   return false;

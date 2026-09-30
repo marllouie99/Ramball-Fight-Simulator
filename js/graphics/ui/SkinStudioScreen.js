@@ -7,6 +7,7 @@ import { drawGojoBody, _drawGojoHair, _getGojoHairImage } from '../fighters/gojo
 import { drawMakimaSkin, _drawMakimaHair, _getMakimaHairImage } from '../fighters/makimaSkin.js';
 import { drawMeguminSkin, _drawMeguminHair, _getMeguminHairImage } from '../fighters/meguminSkin.js';
 import { drawCrazyDaveSkin, _drawCrazyDaveHair, _getCrazyDaveHairImage } from '../fighters/crazyDaveSkin.js';
+import { drawPekkaSkin } from '../fighters/pekkaSkin.js';
 import { drawRezeSkin, _drawRezeHair, _getRezeHairImage } from '../fighters/rezeSkin.js';
 import { drawSukunaBody, _drawSukunaHair, _getSukunaHairImage } from '../fighters/sukunaSkin.js';
 import { drawYujiSkin, _drawYujiHair, _getYujiHairImage } from '../fighters/yujiSkin.js';
@@ -67,7 +68,7 @@ export const SKIN_STUDIO_CATEGORIES = [
   { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka'].includes(f.key) }
 ];
 
 // Fighter Definitions in Skin Studio
@@ -550,6 +551,19 @@ export const SKIN_STUDIO_FIGHTERS = [
       { id: 'default', label: 'PHASE 1 (OCULAR)' },
       { id: 'phase2', label: 'PHASE 2 (FANGED MAW)' }
     ]
+  },
+  {
+    key: 'pekka',
+    label: 'P.E.K.K.A',
+    asset: 'Procedural Pixel Art',
+    assetDims: '60 x 60 Discrete Armor Model',
+    baseW: 2.40,
+    baseH: 2.20,
+    baseCrownY: -1.25,
+    themeColor: '#8B5CF6',
+    forms: [
+      { id: 'default', label: 'HEAVY JUGGERNAUT' }
+    ]
   }
 ];
 
@@ -938,6 +952,8 @@ export function drawSkinStudioScreen() {
         drawMeguminSkin(ctx, dummyFighter);
       } else if (fDef.key === 'crazydave') {
         drawCrazyDaveSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'pekka') {
+        drawPekkaSkin(ctx, dummyFighter);
       } else if (fDef.key === 'reze') {
         drawRezeSkin(ctx, dummyFighter);
       } else if (fDef.key === 'sukuna') {
