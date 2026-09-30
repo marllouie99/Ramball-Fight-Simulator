@@ -135,7 +135,7 @@ export function isCrazyDavePresent() {
  * 1. Fills arena with solid PvZ alternating checkered green lawn base (zero gaps or black background).
  * 2. Overlays pixel-perfect cropped grass sprites (including dirt path tiles 4 and 10) with subtle edge interlocking.
  */
-export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
+export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 0) {
   if (typeof document === 'undefined') return null;
 
   const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
@@ -161,8 +161,8 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
 
   // Grid calculation: standard 6x6 tiles for 460x460 arena (or dynamic ~76px per tile)
   const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
-  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = arena.cols || Math.max(3, Math.round(arena.width / targetTileSize));
+  const rows = arena.rows || Math.max(3, Math.round(arena.height / targetTileSize));
   const cellW = width / cols;
   const cellH = height / rows;
 
@@ -246,7 +246,7 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 4) {
  * Renders the full Grass Tiles arena floor onto the provided canvas 2D context.
  * Strictly adheres to arena boundary clipping (both rectangular and circular arenas).
  */
-export function renderCrazyDaveGrassFloor(ctx, arena, isDark = false, fBleed = 4) {
+export function renderCrazyDaveGrassFloor(ctx, arena, isDark = false, fBleed = 0) {
   if (!ctx || !arena) return;
 
   const grassCanvas = getOrCreateGrassFloorCanvas(arena, isDark, fBleed);
@@ -265,7 +265,7 @@ export function renderCrazyDaveGrassFloor(ctx, arena, isDark = false, fBleed = 4
   ctx.clip();
 
   // Blit cached grass canvas seamlessly across the clipped arena bounds
-  ctx.drawImage(grassCanvas, arena.x - fBleed, arena.y - fBleed);
+  ctx.drawImage(grassCanvas, arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
   ctx.restore();
 }
 

@@ -423,7 +423,7 @@ export function drawArena() {
         fg.clear();
         const floorColor = innerBg.color;
         fg.beginFill(floorColor, innerBg.alpha);
-        const fBleed = 4;
+        const fBleed = 0;
         if (arena.shape === 'circle') {
           const cx = arena.x + arena.width / 2;
           const cy = arena.y + arena.height / 2;
@@ -463,7 +463,8 @@ export function drawArena() {
   // 4. Draw Arena Borders
   {
     const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
-    const borderKey = `${arena.width}_${arena.height}_${isDark ? 'dark_clean' : 'light_clean'}`;
+    const shape = arena.shape || 'rect';
+    const borderKey = `${arena.width}_${arena.height}_${shape}_${isDark ? 'dark_clean' : 'light_clean'}`;
     if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
       const padding = 60;
       const offCanvas = document.createElement('canvas');
@@ -474,7 +475,16 @@ export function drawArena() {
       oc.lineWidth = 2.5;
       oc.lineJoin = 'miter';
       oc.lineCap = 'square';
-      oc.strokeRect(padding, padding, arena.width, arena.height);
+      if (arena.shape === 'circle') {
+        const cx = padding + arena.width / 2;
+        const cy = padding + arena.height / 2;
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2));
+        oc.beginPath();
+        oc.arc(cx, cy, ar, 0, Math.PI * 2);
+        oc.stroke();
+      } else {
+        oc.strokeRect(padding, padding, arena.width, arena.height);
+      }
       offCanvas._key = borderKey;
       state._arenaBorderCanvas = offCanvas;
     }
@@ -483,7 +493,7 @@ export function drawArena() {
     if (!suppressArenaFloor) {
       ctx.save();
       applyCameraToCtx(ctx);
-      const fBleed = 4;
+      const fBleed = 0;
       renderActiveArenaFloor(ctx, arena, isDark, fBleed);
       ctx.restore();
     } else if (hasActiveDomain && !state.pixiApp) {

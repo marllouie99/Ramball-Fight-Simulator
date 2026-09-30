@@ -711,7 +711,7 @@ function _renderPixelTatamiFloor(oc, width, height, cols, rows, cellW, cellH, is
 // PROCEDURAL OFFSCREEN CANVAS TEXTURE GENERATOR
 // ─────────────────────────────────────────────
 
-export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 4) {
+export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 0) {
   if (typeof document === 'undefined') return null;
 
   if (floorId === 'pvz_grass') {
@@ -740,8 +740,8 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
 
   const floorDef = ARENA_FLOORS.find(f => f.id === floorId) || ARENA_FLOORS[0];
   const targetTileSize = floorDef.gridSize || 76.6;
-  const cols = Math.max(2, Math.round(arena.width / targetTileSize));
-  const rows = Math.max(2, Math.round(arena.height / targetTileSize));
+  const cols = arena.cols || Math.max(2, Math.round(arena.width / targetTileSize));
+  const rows = arena.rows || Math.max(2, Math.round(arena.height / targetTileSize));
   const cellW = width / cols;
   const cellH = height / rows;
 
@@ -784,26 +784,11 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
 // GAMEPLAY RENDER INTEGRATION
 // ─────────────────────────────────────────────
 
-export function renderActiveArenaFloor(ctx, arena, isDark = false, fBleed = 4) {
+export function renderActiveArenaFloor(ctx, arena, isDark = false, fBleed = 0) {
   if (!ctx || !arena) return;
 
   const floorId = resolveActiveFloorId();
   const floorCanvas = getOrCreateFloorCanvas(floorId, arena, isDark, fBleed);
-
-  if (!floorCanvas) {
-    ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff');
-    if (arena.shape === 'circle') {
-      const cx = arena.x + arena.width / 2;
-      const cy = arena.y + arena.height / 2;
-      const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + fBleed;
-      ctx.beginPath();
-      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.fillRect(arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
-    }
-    return;
-  }
 
   ctx.save();
   ctx.beginPath();
@@ -817,7 +802,22 @@ export function renderActiveArenaFloor(ctx, arena, isDark = false, fBleed = 4) {
   }
   ctx.clip();
 
-  ctx.drawImage(floorCanvas, arena.x - fBleed, arena.y - fBleed);
+  if (floorCanvas) {
+    ctx.drawImage(floorCanvas, arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
+  } else {
+    ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff');
+    if (arena.shape === 'circle') {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) + fBleed;
+      ctx.beginPath();
+      ctx.arc(cx, cy, ar, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillRect(arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
+    }
+  }
+
   ctx.restore();
 }
 
