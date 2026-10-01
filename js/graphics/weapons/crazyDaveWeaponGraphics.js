@@ -86,6 +86,17 @@ export const LAWNMOWER_RECTS = [
   { sx: 1807, sy: 218, sw: 341, sh: 301 }, // Frame 5: Blade spin E
 ];
 
+export const POTATO_MINE_RECTS = [
+  { sx: 28,   sy: 274, sw: 241, sh: 230 }, // Frame 0: Idle alert (unarmed)
+  { sx: 281,  sy: 274, sw: 236, sh: 230 }, // Frame 1: Idle blink (unarmed)
+  { sx: 529,  sy: 274, sw: 235, sh: 229 }, // Frame 2: Armed idle (ready to blow)
+  { sx: 776,  sy: 247, sw: 237, sh: 259 }, // Frame 3: Triggered! Sparking fuse flash
+  { sx: 1044, sy: 267, sw: 292, sh: 244 }, // Frame 4: Explosion start (SPUDOW burst)
+  { sx: 1358, sy: 269, sw: 299, sh: 254 }, // Frame 5: Explosion mid (debris scatter)
+  { sx: 1665, sy: 316, sw: 244, sh: 207 }, // Frame 6: Explosion end (settling mash)
+  { sx: 1923, sy: 344, sw: 235, sh: 179 }, // Frame 7: Aftermath (fading remnants)
+];
+
 // Lazy-loaded sprite images
 let _wallnutImg = null;
 let _torchwoodImg = null;
@@ -164,6 +175,13 @@ export function getLawnmowerSprite() {
   return _lawnmowerImg;
 }
 
+let _potatoMineImg = null;
+
+export function getPotatoMineSprite() {
+  if (!_potatoMineImg) _potatoMineImg = _loadPlantImage('Assets/model/Sprites/potato-mine-sprite-sheet.png', _potatoMineImg);
+  return _potatoMineImg;
+}
+
 // Preload on startup
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   getSunSprite();
@@ -177,6 +195,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   getSnowPeaShootSprite();
   getPeaProjSprite();
   getSnowPeaProjSprite();
+  getPotatoMineSprite();
 }
 
 import { state } from '../../core/state.js';
@@ -1394,4 +1413,221 @@ export function drawCrazyDaveWeapon(ctx, options = {}) {
   const color = options.color || '#84CC16';
 
   drawCrazyDaveShovel(ctx, x, y, angle, r, true, 0, false, color, false);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POTATO MINE RENDERER (Sprite Sheet + Procedural Fallback)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Draws an animated Potato Mine plant using the official sprite sheet.
+ * Shows different frames based on arming state and explosion phase.
+ *
+ * Frame mapping:
+ *   - Frames 0-1: Unarmed idle (cycling blink animation)
+ *   - Frame 2: Armed and ready (glowing red detonator)
+ *   - Frame 3: Triggered fuse spark
+ *   - Frames 4-7: Explosion sequence (SPUDOW!)
+ */
+export function drawPotatoMine(ctx, mine) {
+  if (!mine) return;
+  const x = mine.x || 0;
+  const y = mine.y || 0;
+  const r = mine.r || 20;
+  const isHit = mine.hitFlashTimer > 0;
+  const drawSize = r * 2.8;
+
+  const spriteImg = getPotatoMineSprite();
+  const hasSprite = Boolean(spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0);
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // Ground dirt shadow
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.65, r * 0.85, r * 0.28, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(60, 30, 10, 0.45)';
+  ctx.fill();
+
+  // Determine which sprite frame to use based on mine state
+  let frameIdx = 0;
+  if (mine.isExploding) {
+    // Explosion sequence: frames 3-7 over the explosion duration
+    const explodeProg = mine.explodeAnimProgress || 0; // 0.0 to 1.0
+    if (explodeProg < 0.1) {
+      frameIdx = 3; // Triggered fuse flash
+    } else if (explodeProg < 0.35) {
+      frameIdx = 4; // Explosion start
+    } else if (explodeProg < 0.60) {
+      frameIdx = 5; // Explosion mid
+    } else if (explodeProg < 0.85) {
+      frameIdx = 6; // Explosion end
+    } else {
+      frameIdx = 7; // Aftermath remnants
+    }
+  } else if (mine.isArmed) {
+    // Armed: use frame 2 (armed idle with glowing detonator)
+    frameIdx = 2;
+  } else {
+    // Unarmed: cycle between frames 0 and 1
+    const tick = mine.animTick || 0;
+    frameIdx = Math.floor(tick / 20) % 2;
+  }
+
+  if (hasSprite) {
+    // Render dynamic explosion aura and shockwave behind sprite when detonating
+    if (mine.isExploding) {
+      _drawPotatoMineExplosionVFX(ctx, r, mine.explodeAnimProgress || 0);
+    }
+
+    const frame = POTATO_MINE_RECTS[frameIdx] || POTATO_MINE_RECTS[0];
+    const flashAlpha = isHit ? Math.min(0.90, (mine.hitFlashTimer / 6) * 0.90) : 0;
+    const explosionScale = mine.isExploding ? 1.6 : 1.0;
+    const dw = drawSize * explosionScale;
+    const dh = drawSize * explosionScale;
+    drawSpriteWithHitFlash(
+      ctx,
+      spriteImg,
+      frame.sx, frame.sy, frame.sw, frame.sh,
+      -dw * 0.5, -dh * 0.7, dw, dh,
+      isHit,
+      flashAlpha
+    );
+  } else {
+    // Procedural fallback
+    _drawProceduralPotatoMine(ctx, r, mine.isArmed, mine.isExploding, isHit, mine.explodeAnimProgress || 0);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Dynamic multi-layer explosion visual effect for Potato Mine ("SPUDOW!").
+ * Renders expanding fireball bursts, comic starburst spikes, ground dirt blast puffs, and flying potato shards.
+ * Strictly 0 shadowBlur (Rule 2.2) and 100% balanced Canvas 2D stack (Rule 2.4).
+ */
+function _drawPotatoMineExplosionVFX(ctx, r, explodeProg) {
+  const p = Math.max(0, Math.min(1.0, explodeProg));
+  const alpha = Math.max(0, 1.0 - p);
+  if (alpha <= 0.001) return;
+
+  // ── 1. Ground Dirt Eruption Puffs (Base Layer) ──
+  const dirtAlpha = (alpha * 0.85).toFixed(3);
+  ctx.fillStyle = `rgba(92, 51, 23, ${dirtAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(-r * 0.8 * (1 + p * 0.5), r * 0.4, r * 0.6 * (1 + p * 0.4), r * 0.35, 0, 0, Math.PI * 2);
+  ctx.ellipse(r * 0.8 * (1 + p * 0.5), r * 0.4, r * 0.6 * (1 + p * 0.4), r * 0.35, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, r * 0.5, r * 0.9 * (1 + p * 0.6), r * 0.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 2. Comic-Style 10-Point Jagged Starburst Shockwave ──
+  const spikeCount = 10;
+  const starR = r * (1.4 + p * 2.2);
+  const starAlpha = (alpha * 0.90).toFixed(3);
+  ctx.fillStyle = `rgba(255, 102, 0, ${starAlpha})`;
+  ctx.beginPath();
+  for (let i = 0; i < spikeCount * 2; i++) {
+    const angle = (i * Math.PI) / spikeCount + (p * 0.15);
+    const radius = (i % 2 === 0) ? starR : starR * 0.52;
+    const px = Math.cos(angle) * radius;
+    const py = Math.sin(angle) * radius * 0.85 - r * 0.2; // slight perspective squish
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+
+  // ── 3. Concentric Multi-Tier Fireball Core ──
+  // Outer fiery orange blast
+  const outerR = r * (1.1 + p * 1.6);
+  ctx.fillStyle = `rgba(255, 140, 0, ${(alpha * 0.95).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.25, outerR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Mid golden solar burst
+  const midR = r * (0.75 + p * 1.1);
+  ctx.fillStyle = `rgba(255, 220, 0, ${(alpha * 0.98).toFixed(3)})`;
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.25, midR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner superheated white flash core
+  const coreAlpha = Math.max(0, (1.0 - p * 2.2)).toFixed(3);
+  if (parseFloat(coreAlpha) > 0.01) {
+    const innerR = r * (0.45 + p * 0.6);
+    ctx.fillStyle = `rgba(255, 255, 255, ${coreAlpha})`;
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.25, innerR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── 4. Flying Golden Potato Tuber Shards ──
+  const chunkCount = 6;
+  const chunkAlpha = (alpha * 0.95).toFixed(3);
+  ctx.fillStyle = `rgba(245, 158, 11, ${chunkAlpha})`;
+  ctx.strokeStyle = `rgba(14, 15, 20, ${chunkAlpha})`;
+  ctx.lineWidth = 1.0;
+  for (let k = 0; k < chunkCount; k++) {
+    const chunkAngle = (k / chunkCount) * Math.PI * 2 + 0.35;
+    const chunkDist = r * (0.8 + p * 2.6);
+    const cx = Math.cos(chunkAngle) * chunkDist;
+    const cy = Math.sin(chunkAngle) * chunkDist * 0.75 - (p * r * 1.4); // upward trajectory
+    const cSize = Math.max(2, r * 0.18 * (1 - p * 0.4));
+
+    ctx.beginPath();
+    ctx.rect(cx - cSize * 0.5, cy - cSize * 0.5, cSize, cSize);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+/**
+ * Procedural fallback for Potato Mine when sprite sheet is unavailable.
+ */
+function _drawProceduralPotatoMine(ctx, r, isArmed, isExploding, isHit, explodeProg = 0) {
+  const bodyColor = isHit ? '#FFFFFF' : '#B8860B';
+  const dirtColor = isHit ? '#FFFFFF' : '#5C3317';
+  const outlineColor = '#0E0F14';
+
+  if (isExploding) {
+    _drawPotatoMineExplosionVFX(ctx, r, explodeProg);
+    return;
+  }
+
+  // Dirt mound base
+  ctx.beginPath();
+  ctx.ellipse(0, r * 0.4, r * 1.0, r * 0.4, 0, 0, Math.PI * 2);
+  ctx.fillStyle = dirtColor;
+  ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Potato body (dome shape)
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.1, r * 0.7, 0, Math.PI * 2);
+  ctx.fillStyle = bodyColor;
+  ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Red detonator cap on top
+  const capColor = isArmed ? '#FF0000' : '#CC4444';
+  ctx.beginPath();
+  ctx.arc(0, -r * 0.75, r * 0.22, 0, Math.PI * 2);
+  ctx.fillStyle = isHit ? '#FFFFFF' : capColor;
+  ctx.fill();
+  ctx.strokeStyle = outlineColor;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // Glint on detonator cap
+  if (isArmed) {
+    ctx.beginPath();
+    ctx.arc(-r * 0.06, -r * 0.82, r * 0.07, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+  }
 }

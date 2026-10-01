@@ -1,14 +1,16 @@
 // CRAZY DAVE FIGHTER ENTITY (Plants vs. Zombies)
 // Mechanics: Dave has NO direct basic attack. He navigates the arena collecting falling Sun drops.
-// Spends accumulated Sun on 3 flora abilities:
+// Spends accumulated Sun on 5 flora abilities:
 // 1. Plant Wall-nut (50 ☀️): Solid immovable barrier defense mechanism blocking enemy advance & absorbing damage.
 // 2. Plant Peashooter (100 ☀️): Rapid-fire kinetic pea projectiles dealing regular damage.
 // 3. Plant Snow Pea (175 ☀️): Chilling frozen pea projectiles dealing ice damage and slowing enemies.
+// 4. Plant Torchwood (175 ☀️): Ignites passing peas into fire peas.
+// 5. Plant Potato Mine (75 ☀️): Proximity explosive trap that arms after a delay, then detonates on enemy contact.
 
 import { Fighter, applyDamageToTarget, isSkillEnabled } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { crazyDaveConfig } from '../../configs/characters/crazyDaveConfig.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawCrazyDaveSkin } from '../../graphics/fighters/crazyDaveSkin.js';
@@ -19,10 +21,16 @@ import {
   drawSnowPea,
   drawTorchwood,
   drawLawnmower,
-  drawSunDrop
+  drawSunDrop,
+  drawPotatoMine
 } from '../../graphics/weapons/crazyDaveWeaponGraphics.js';
 import { getNearestGrassTileCenter, getRandomGrassTileCenter } from '../../graphics/renderers/grassFloorRenderer.js';
-import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
+import {
+  spawnSparks,
+  spawnImpactFlash,
+  spawnMeleeClashShockwave,
+  spawnGroundScorch
+} from '../../graphics/particles/sparkEffect.js';
 
 function getCrazyDaveSetting(config, key) {
   return config?.[key] ?? crazyDaveConfig[key];
@@ -42,7 +50,8 @@ function getCrazyDavePlantOccupants(dave) {
     dave.activeWallnuts,
     dave.activePeashooters,
     dave.activeSnowPeas,
-    dave.activeTorchwoods
+    dave.activeTorchwoods,
+    dave.activePotatoMines
   ];
 
   for (const plantList of ownPlantLists) {
@@ -60,6 +69,24 @@ function getCrazyDavePlantOccupants(dave) {
   }
 
   return [...plants];
+}
+
+export function getTeammateCrazyDaves(dave) {
+  const daves = new Set();
+  if (dave && dave.hp > 0 && !dave.dead && !dave.isDead) {
+    daves.add(dave);
+  }
+  if (state && Array.isArray(state.fighters)) {
+    for (const f of state.fighters) {
+      if (!f || f.hp <= 0 || f.dead || f.isDead) continue;
+      const isCrazyDave = f.characterId === 'crazydave' || f.type === 'crazydave' || f._def?.id === 'crazydave';
+      if (!isCrazyDave) continue;
+      if (f === dave || (typeof dave.isTeammate === 'function' && dave.isTeammate(f)) || (typeof f.isTeammate === 'function' && f.isTeammate(dave))) {
+        daves.add(f);
+      }
+    }
+  }
+  return [...daves];
 }
 
 function getAvailableCrazyDavePlantTile(dave, targetX, targetY, arena) {
@@ -1744,6 +1771,398 @@ export class TorchwoodEntity extends Fighter {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PLANT ENTITY: POTATO MINE (Proximity Explosive Trap — PvZ Classic Area Denial)
+// Arms after a delay, then detonates when an enemy fighter enters its trigger radius.
+// Deals massive AOE explosion damage in a blast radius. Single use — destroyed on detonation.
+// ─────────────────────────────────────────────────────────────────────────────
+export class PotatoMineEntity extends Fighter {
+  constructor(x, y, ownerFighter) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    const maxHp = getCrazyDaveSetting(cfg, 'potatoMineHp');
+    const def = {
+      id: 997,
+      name: 'Potato Mine',
+      color: getCrazyDaveSetting(cfg, 'potatoMineColor'),
+      startX: x,
+      startY: y,
+      startVx: 0,
+      startVy: 0,
+      radius: getCrazyDaveSetting(cfg, 'potatoMineRadius'),
+      type: 'PotatoMine',
+      isDeployable: true,
+      isMinion: true,
+      isPlant: true,
+      isPlantMinion: true,
+      hp: maxHp,
+      damage: 0,
+      cooldown: 0,
+      moveSpeed: 0,
+      spinRate: 0,
+    };
+    super(def);
+
+    this.owner = ownerFighter;
+    this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.characterId = 'crazydave_plant';
+    this.isDeployable = true;
+    this.isMinion = true;
+    this.isPlant = true;
+    this.isPlantMinion = true;
+    this.customHitFlash = true;
+    this.isImmovable = true;
+    this.cannotBeKnockbacked = true;
+    this.immuneToKnockback = true;
+    this.immuneToPull = true;
+    this.immuneToPush = true;
+    this.cannotBeDisplaced = true;
+    this.immuneToCC = true;
+    this.domainImmunity = true;
+    this.immuneToBurn = true;
+    this.immuneToPoison = true;
+    this.immuneToBleed = true;
+    this.isDebuffImmune = true;
+    this.gojoBlueDragImmune = true;
+    this.gojoInfinityImmune = true;
+    this.phasesThroughEntities = true;
+    this.ignoreFighterCollisions = true;
+    this.hideHpText = true;
+    this.maxHp = maxHp;
+    this.hp = maxHp;
+
+    // Complete debuff timer suppression
+    this.burnTimer = 0;
+    this.burnDamageTimer = 0;
+    this.poisonTicks = 0;
+    this.poisonTimer = 0;
+    this.bleedTimer = 0;
+    this.bleedDamageTimer = 0;
+    this.paralyzeTimer = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+    this.hitStunTimer = 0;
+    this.timeStopTimer = 0;
+    this.silenceTimer = 0;
+    this.electricStunTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this.dubstepStunTimer = 0;
+    this.dubstepStunVisualTimer = 0;
+    this.thunderRootsTimer = 0;
+    this.staticDebuffTimer = 0;
+    this.nanamiArmorFractureTimer = 0;
+    this.blackFlashDebuffTimer = 0;
+    this.voidMarkTimer = 0;
+    this.isParalyzed = false;
+    this.isParalyzedByMahito = false;
+    this.isParalyzedByMahoraga = false;
+    this.isFrozenByInfinity = false;
+    this.isChainedByMakima = false;
+    this.isWallPinnedByMakima = false;
+    this.isWallPinnedBySaitama = false;
+    this.isDraggedByGetsuga = false;
+    this.caughtInSaitamaCounter = false;
+    this.caughtInGenosFlurry = false;
+    this.caughtInJohnWickCombo = false;
+    this.frozenByCronos = false;
+    this.isCronosStasis = false;
+    this._hitByFugaTimer = 0;
+    this._hitByDivineFlameTimer = 0;
+
+    // Anchor plant immovably to centered grass tile position
+    this._fixedX = x;
+    this._fixedY = y;
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.angle = 0;
+    this.gunAngle = 0;
+
+    // Potato Mine specific state
+    const armDelay = getCrazyDaveSetting(cfg, 'potatoMineArmDelay') ?? 0;
+    this.armTimer = armDelay;
+    this.isArmed = armDelay <= 0;
+    this.isExploding = false;
+    this.explodeAnimTimer = 0;
+    this.explodeAnimDuration = 45; // ~0.75s explosion animation
+    this.explodeAnimProgress = 0;
+    this.hasDetonated = false;
+    this.hitFlashTimer = 0;
+    this.animTick = Math.floor(Math.random() * 40);
+  }
+
+  canAim() { return false; }
+  aim() { this.gunAngle = 0; }
+  onCollide(opponent) { /* Entities pass through */ }
+
+  // ── Complete Debuff & Status Effect Neutralization ──
+  _handleTimeStop() { return false; }
+  applyHitStun() { this.hitStunTimer = 0; return; }
+  applyTimeStop() { this.timeStopTimer = 0; return; }
+  applySlow() { this.slowTimer = 0; this.slowMultiplier = 1.0; return; }
+  applyParalyze() { this.paralyzeTimer = 0; this.isParalyzed = false; return; }
+  applyBurn() { this.burnTimer = 0; this.burnDamageTimer = 0; return; }
+  applyPoison() { this.poisonTicks = 0; this.poisonTimer = 0; return; }
+  applyBleed() { this.bleedTimer = 0; this.bleedDamageTimer = 0; return; }
+  applyStatusEffect() { return; }
+  applySoulDisfigurement() { return; }
+  applyTelekinesis() { return; }
+  applyChain() { return; }
+  applyRatioCrit() { return; }
+  applyDomainStasis() { return; }
+  applyGetsugaDrag() { return; }
+  applySilence() { this.silenceTimer = 0; return; }
+  isSilenced() { return false; }
+  isParalyzedDebuffActive() { return false; }
+  suppressCombatAndVisuals() { return; }
+  interruptAttacks() { return; }
+
+  // ── Complete Movement & Physics Neutralization ──
+  applyKnockback() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyPush() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyPull() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applySuction() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+  applyDrag() { this.knockbackVx = 0; this.knockbackVy = 0; this.vx = 0; this.vy = 0; return; }
+
+  // ── Master Debuff Ticks Override ──
+  handleStatusEffects() {
+    this.burnTimer = 0; this.burnDamageTimer = 0;
+    this.poisonTicks = 0; this.poisonTimer = 0;
+    this.bleedTimer = 0; this.bleedDamageTimer = 0;
+    this.paralyzeTimer = 0; this.slowTimer = 0; this.slowMultiplier = 1.0;
+    this.hitStunTimer = 0; this.timeStopTimer = 0; this.silenceTimer = 0;
+    this.electricStunTimer = 0; this.crimsonElectrifiedTimer = 0;
+    this.dubstepStunTimer = 0; this.thunderRootsTimer = 0;
+    this.staticDebuffTimer = 0; this.nanamiArmorFractureTimer = 0;
+    this.blackFlashDebuffTimer = 0; this.voidMarkTimer = 0;
+  }
+  handlePoison() { return; }
+  handleBurn() { return; }
+  handleBleed() { return; }
+
+  // ── Overhead & Status Renderers ──
+  drawStatusOverlays() {
+    this._statusOverlaysRenderedFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+  }
+  drawFreezeTimer() { }
+  drawSlowEffect() { return; }
+  drawPoisonEffect() { return; }
+  drawBurnEffect() { return; }
+  drawBleedEffect() { return; }
+  drawElectricStunEffect() { return; }
+  drawCrimsonElectrifiedEffect() { return; }
+  drawDubstepStunEffect() { return; }
+  drawThunderRootsEffect() { return; }
+  drawSilenceEffect() { return; }
+
+  resolveWallBounce(arena, opponent) {
+    this.vx = 0; this.vy = 0;
+    this.knockbackVx = 0; this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    // Friendly fire check
+    const isMindControlled = isMakimaControlledPlant(this);
+    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
+    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+      return false;
+    }
+    if (opts) {
+      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) return false;
+      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
+        return false;
+      }
+      opts.knockback = false;
+      opts.skipKnockback = true;
+      opts.skipInterrupt = true;
+      opts.knockbackVx = 0;
+      opts.knockbackVy = 0;
+    }
+    const applied = super.takeDamage(amount, attacker, opts);
+    this.vx = 0; this.vy = 0;
+    this.knockbackVx = 0; this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
+    if (applied) this.hitFlashTimer = 6;
+    return applied;
+  }
+
+  _processFighterDeath(attacker, opts) {
+    this._hasDied = true;
+    this.dead = true;
+    this.isDead = true;
+    this.onDeath();
+  }
+
+  /**
+   * Core update: Handles arming countdown, proximity detection, and explosion sequence.
+   */
+  update(opponent, ownerIndex, arena) {
+    if (this.hp <= 0 || this.hasDetonated) return;
+    this.animTick++;
+    if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+
+    // Strict immovable anchor
+    this.angle = 0;
+    this.gunAngle = 0;
+    this.vx = 0; this.vy = 0;
+    this.knockbackVx = 0; this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
+
+    if (this._handleTimeStop() || this.isTargetOfAmbush) return;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+
+    // Phase 1: Explosion animation playback (already detonated, playing VFX)
+    if (this.isExploding) {
+      this.explodeAnimTimer++;
+      this.explodeAnimProgress = Math.min(1.0, this.explodeAnimTimer / this.explodeAnimDuration);
+      if (this.explodeAnimTimer >= this.explodeAnimDuration) {
+        // Explosion animation complete — self-destruct
+        this.hp = 0;
+        this.hasDetonated = true;
+        this._processFighterDeath(null, {});
+      }
+      return;
+    }
+
+    // Phase 2: Arming countdown (if arm delay is configured)
+    if (!this.isArmed && this.armTimer > 0) {
+      this.armTimer--;
+      if (this.armTimer <= 0) {
+        this.isArmed = true;
+        // Play arming sound
+        if (audioSystem && typeof audioSystem.playSFX === 'function') {
+          audioSystem.playSFX(getCrazyDaveSound(cfg, 'potatoMineArm'), getCrazyDaveSoundVolume(cfg, 'potatoMineArm'));
+        }
+        spawnFloatingText(this.x, this.y - 30, 'ARMED!', '#FF4444');
+      }
+    }
+
+    // Phase 3: Proximity detection — the moment an enemy gets close, detonate immediately!
+    const triggerRadius = getCrazyDaveSetting(cfg, 'potatoMineTriggerRadius') || 55;
+    const candidates = getAllPlantTargetCandidates();
+
+    for (const f of candidates) {
+      if (!isEnemyPlantTarget(this, f)) continue;
+      // Only trigger on actual fighters, not on other plants or deployables
+      if (f.isPlant || f.isPlantMinion || f.isLawnmower) continue;
+
+      const dist = Math.hypot(f.x - this.x, f.y - this.y);
+      const combinedRadius = triggerRadius + (f.r || 20);
+
+      if (dist <= combinedRadius) {
+        // SPUDOW! Detonate!
+        this._detonate(cfg, ownerIndex);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Detonates the Potato Mine: deals massive AOE damage to all enemies in blast radius.
+   */
+  _detonate(cfg, ownerIndex) {
+    this.isExploding = true;
+    this.explodeAnimTimer = 0;
+    this.explodeAnimProgress = 0;
+
+    const explosionDamage = getCrazyDaveSetting(cfg, 'potatoMineExplosionDamage');
+    const explosionRadius = getCrazyDaveSetting(cfg, 'potatoMineExplosionRadius');
+    const explosionKnockback = getCrazyDaveSetting(cfg, 'potatoMineExplosionKnockback');
+
+    // SPUDOW! floating text
+    spawnFloatingText(this.x, this.y - 40, 'SPUDOW!', '#FF6600');
+
+    // Tactile screen shake punch
+    if (typeof triggerGlobalScreenShake === 'function') {
+      triggerGlobalScreenShake(10, 16);
+    }
+
+    // Play explosion sound
+    if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX(getCrazyDaveSound(cfg, 'potatoMineExplode'), getCrazyDaveSoundVolume(cfg, 'potatoMineExplode'));
+    } else if (audioSystem && typeof audioSystem.playSound === 'function') {
+      audioSystem.playSound(getCrazyDaveSound(cfg, 'potatoMineExplode'), getCrazyDaveSoundVolume(cfg, 'potatoMineExplode'));
+    }
+
+    // Spawn dual-tier impact flash (outer fiery orange + superheated white core)
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 110, '#FF5500');
+      spawnImpactFlash(this.x, this.y, 50, '#FFFFFF');
+    }
+
+    // Spawn expanding SPUDOW! shockwave rings (earthy ground-level blast wave)
+    if (typeof spawnMeleeClashShockwave === 'function') {
+      spawnMeleeClashShockwave(this.x, this.y, explosionRadius * 1.15, 'spudow');
+      spawnMeleeClashShockwave(this.x, this.y, explosionRadius * 0.70, 'spudow');
+    }
+
+    // Spawn persistent charred ground scorch crater on arena floor
+    if (typeof spawnGroundScorch === 'function') {
+      spawnGroundScorch(this.x, this.y, 45, 200, 'orange');
+    }
+
+    // Spawn multi-layered particle debris (flame embers, potato chunks, soil clumps, core sparks)
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(this.x, this.y, 24, 'crimson', '#FF5500'); // Hot flame sparks
+      spawnSparks(this.x, this.y, 20, 'crimson', '#F59E0B'); // Golden potato tuber chunks
+      spawnSparks(this.x, this.y, 16, 'crimson', '#78350F'); // Volcanic soil and dirt debris
+      spawnSparks(this.x, this.y, 12, 'crimson', '#FFFFFF'); // Superheated white core sparks
+    }
+
+    // Deal AOE damage to all enemies within blast radius
+    const candidates = getAllPlantTargetCandidates();
+    const ownership = getPlantProjectileOwnership(this, ownerIndex);
+
+    for (const f of candidates) {
+      if (!isEnemyPlantTarget(this, f)) continue;
+      const dist = Math.hypot(f.x - this.x, f.y - this.y);
+      if (dist > explosionRadius) continue;
+
+      // Distance-based damage falloff: full damage at center, 40% at edge
+      const falloff = 1.0 - (dist / explosionRadius) * 0.6;
+      const finalDamage = Math.round(explosionDamage * falloff);
+
+      // Apply damage
+      if (typeof applyDamageToTarget === 'function') {
+        applyDamageToTarget(f, finalDamage, this.owner || this, {
+          knockback: true,
+          skipInterrupt: false,
+        });
+      } else if (typeof f.takeDamage === 'function') {
+        f.takeDamage(finalDamage, this.owner || this, {});
+      }
+
+      // Apply explosion knockback push away from mine center
+      if (f && typeof f.applyKnockback === 'function' && !f.isImmovable && !f.cannotBeKnockbacked) {
+        const angle = Math.atan2(f.y - this.y, f.x - this.x);
+        const kbForce = explosionKnockback * falloff;
+        f.knockbackVx = (f.knockbackVx || 0) + Math.cos(angle) * kbForce;
+        f.knockbackVy = (f.knockbackVy || 0) + Math.sin(angle) * kbForce;
+      }
+    }
+  }
+
+  draw(ctx) {
+    if (this.hasDetonated && !this.isExploding) return;
+    drawPotatoMine(ctx, this);
+    if (!this.isExploding && this.hp < this.maxHp && this.hp > 0) {
+      const topY = this.y - Math.round(this.r * 2.2 + 8);
+      drawMinionHealthBar(ctx, this.x, topY, 30, 5, this.hp, this.maxHp);
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // BASELINE DEFENSE ENTITY: LAWNMOWER (PvZ Signature Last Line of Defense)
 // ─────────────────────────────────────────────────────────────────────────────
 export class LawnmowerEntity extends Fighter {
@@ -1901,6 +2320,52 @@ export class LawnmowerEntity extends Fighter {
         if (!this._shreddedTargets.has(f)) {
           this._shreddedTargets.add(f);
 
+          // ── Special Interaction: Gojo Limitless Infinity Barrier ──
+          // Lawnmower is a physical object — Infinity halts it and the mower self-destructs on impact.
+          // 0 damage to Gojo. The barrier is impenetrable to mechanical entities.
+          const isGojoInfinityActive = (
+            (f.characterId === 'gojo' || f.type === 'gojo') &&
+            f.infinityActive &&
+            (f.infinityCooldown || 0) <= 0 &&
+            (f.infinityBarrierHp === undefined || f.infinityBarrierHp > 0)
+          );
+
+          if (isGojoInfinityActive) {
+            // Lawnmower slams into Infinity and explodes — 0 damage to Gojo
+            const midX = (this.x + f.x) * 0.5;
+            const midY = (this.y + f.y) * 0.5;
+
+            spawnFloatingText(midX, midY - 30, 'INFINITY!', '#00E5FF');
+            spawnFloatingText(this.x, this.y - 20, 'DESTROYED!', '#DC2626');
+
+            // Infinity barrier clash shockwave
+            if (typeof spawnMeleeClashShockwave === 'function') {
+              spawnMeleeClashShockwave(midX, midY, 65, 'gojo_infinity');
+            }
+
+            // Mower wreckage sparks and debris
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(this.x, this.y, 60, '#FF5500');
+            }
+            spawnSparks(this.x, this.y, 20, 'crimson', '#DC2626');
+            spawnSparks(this.x, this.y, 14, 'crimson', '#475569');
+            spawnSparks(midX, midY, 10, 'crimson', '#00E5FF');
+
+            // Screen shake from the collision impact
+            if (typeof triggerGlobalScreenShake === 'function') {
+              triggerGlobalScreenShake(8, 12);
+            }
+
+            // Play destruction SFX
+            if (typeof playSfx === 'function') {
+              playSfx.call(audioSystem, getCrazyDaveSound(cfg, 'lawnmowerHit'), getCrazyDaveSoundVolume(cfg, 'lawnmowerHit'));
+            }
+
+            // Self-destruct the lawnmower
+            this.despawn();
+            return;
+          }
+
           // Devastating steamroller shred damage
           if (typeof applyDamageToTarget === 'function') {
             applyDamageToTarget(f, this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
@@ -1922,6 +2387,13 @@ export class LawnmowerEntity extends Fighter {
           spawnSparks(f.x, f.y, 16, '#DC2626');
           spawnSparks(f.x, f.y, 10, '#15803D');
           spawnFloatingText(f.x, f.y - 25, 'SPLAT!', '#DC2626');
+
+          // Apply stun effect — steamroller impact freezes the target
+          const stunDuration = getCrazyDaveSetting(cfg, 'lawnmowerStunDuration') || 45;
+          if (typeof f.applyTimeStop === 'function') {
+            f.applyTimeStop(stunDuration);
+            spawnFloatingText(f.x, f.y - 45, 'STUNNED!', '#FBBF24');
+          }
 
           if (typeof playSfx === 'function') {
             playSfx.call(audioSystem, getCrazyDaveSound(cfg, 'lawnmowerHit'), getCrazyDaveSoundVolume(cfg, 'lawnmowerHit'));
@@ -2042,17 +2514,19 @@ export class CrazyDaveFighter extends Fighter {
     this.ambientSunTimer = 0;
     this.ambientSunInterval = getCrazyDaveSetting(cfg, 'sunSpawnRate');
 
-    // Skill Cooldowns (4 Flora Abilities)
+    // Skill Cooldowns (5 Flora Abilities)
     this.wallnutCooldown = 0;
     this.peashooterCooldown = 0;
     this.snowPeaCooldown = 0;
     this.torchwoodCooldown = 0;
+    this.potatoMineCooldown = 0;
 
     // Plant Roster References & Selection History
     this.activeWallnuts = [];
     this.activePeashooters = [];
     this.activeSnowPeas = [];
     this.activeTorchwoods = [];
+    this.activePotatoMines = [];
     this.lastPlantedType = null;
 
     // Lawnmower Baseline Defense System (PvZ Signature Final Defense)
@@ -2151,6 +2625,20 @@ export class CrazyDaveFighter extends Fighter {
       });
     }
 
+    if (isSkillEnabled(cfg.enablePotatoMine, true)) {
+      skills.push({
+        id: 'potatoMine',
+        name: `Potato Mine (${getCrazyDaveSetting(cfg, 'potatoMineCost')}☀️)`,
+        type: 'passive',
+        cooldownKey: 'potatoMineCooldown',
+        cooldownMax: () => getCrazyDaveSetting(cfg, 'potatoMineCooldown'),
+        color: getCrazyDaveSetting(cfg, 'potatoMineColor') || '#A16207',
+        onActivate: (fighter, opponent) => {
+          fighter.plantPotatoMine(opponent);
+        }
+      });
+    }
+
     if (skills.length > 0 && this.skillManager) {
       this.skillManager.registerSkills(skills);
     }
@@ -2167,6 +2655,7 @@ export class CrazyDaveFighter extends Fighter {
     this.peashooterCooldown = 0;
     this.snowPeaCooldown = 0;
     this.torchwoodCooldown = 0;
+    this.potatoMineCooldown = 0;
     this.plantingPauseTimer = 0;
     this.shootCooldown = 999999;
     this.shootCooldownMax = 999999;
@@ -2217,10 +2706,22 @@ export class CrazyDaveFighter extends Fighter {
         }
       });
     }
+    if (this.activePotatoMines) {
+      this.activePotatoMines.forEach(m => {
+        if (m) {
+          m.hp = 0;
+          if (state && Array.isArray(state.fighters)) {
+            const idx = state.fighters.indexOf(m);
+            if (idx !== -1) state.fighters.splice(idx, 1);
+          }
+        }
+      });
+    }
     this.activeWallnuts = [];
     this.activePeashooters = [];
     this.activeSnowPeas = [];
     this.activeTorchwoods = [];
+    this.activePotatoMines = [];
     this.lastPlantedType = null;
 
     // Clear lawnmowers on reset
@@ -2231,6 +2732,13 @@ export class CrazyDaveFighter extends Fighter {
   takeDamage(amount, attacker, opts = {}) {
     const applied = super.takeDamage(amount, attacker, opts);
     if (this.hp <= 0) {
+      // Transfer uncollected sun drops to living teammate Daves so none are lost
+      const livingTeammates = getTeammateCrazyDaves(this).filter(d => d !== this && d.hp > 0);
+      if (livingTeammates.length > 0 && Array.isArray(this.suns) && this.suns.length > 0) {
+        livingTeammates[0].suns.push(...this.suns);
+        this.suns = [];
+      }
+
       if (this.lawnmowers) {
         this.lawnmowers.forEach(m => {
           if (m && m.state === 'idle') {
@@ -2282,10 +2790,22 @@ export class CrazyDaveFighter extends Fighter {
           }
         });
       }
+      if (this.activePotatoMines) {
+        this.activePotatoMines.forEach(m => {
+          if (m) {
+            m.hp = 0;
+            if (state && Array.isArray(state.fighters)) {
+              const idx = state.fighters.indexOf(m);
+              if (idx !== -1) state.fighters.splice(idx, 1);
+            }
+          }
+        });
+      }
       this.activeWallnuts = [];
       this.activePeashooters = [];
       this.activeSnowPeas = [];
       this.activeTorchwoods = [];
+      this.activePotatoMines = [];
     }
     return applied;
   }
@@ -2693,6 +3213,62 @@ export class CrazyDaveFighter extends Fighter {
     return true;
   }
 
+  /**
+   * Plant Ability 5: Potato Mine (Costs 75 ☀️) — Proximity Explosive Trap
+   * Plants a Potato Mine on the nearest available grass tile. Arms after a delay, then detonates
+   * when an enemy fighter enters its trigger radius, dealing massive AOE damage. Single use.
+   */
+  plantPotatoMine(opponent) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    const mineCost = getCrazyDaveSetting(cfg, 'potatoMineCost');
+    if (this.sunCount < mineCost) {
+      spawnFloatingText(this.x, this.y - 25, `Need ${mineCost}☀️!`, '#EF4444');
+      return false;
+    }
+    this.activePotatoMines = (this.activePotatoMines || []).filter(m => m && m.hp > 0 && !m.hasDetonated);
+    const maxActiveMines = getCrazyDaveSetting(cfg, 'maxActivePotatoMines') || 2;
+    if (this.activePotatoMines.length >= maxActiveMines) {
+      spawnFloatingText(this.x, this.y - 25, `Max ${maxActiveMines} Potato Mines!`, '#EF4444');
+      return false;
+    }
+
+    const arena = (state && state.arena) ? state.arena : CONFIG.arena;
+    const plantSpawnOffset = getCrazyDaveSetting(cfg, 'plantSpawnOffset');
+    const rawX = this.x + Math.cos(this.gunAngle || 0) * plantSpawnOffset;
+    const rawY = this.y + Math.sin(this.gunAngle || 0) * plantSpawnOffset;
+    const tileCenter = getAvailableCrazyDavePlantTile(this, rawX, rawY, arena);
+    if (!tileCenter) {
+      spawnFloatingText(this.x, this.y - 25, 'No open grass tile!', '#EF4444');
+      return false;
+    }
+    this.sunCount -= mineCost;
+    this.potatoMineCooldown = getCrazyDaveSetting(cfg, 'potatoMineCooldown');
+
+    const mine = new PotatoMineEntity(tileCenter.x, tileCenter.y, this);
+    this.activePotatoMines.push(mine);
+
+    if (state && Array.isArray(state.fighters) && !state.fighters.includes(mine)) {
+      state.fighters.push(mine);
+    }
+
+    spawnFloatingText(this.x, this.y - 25, `-${mineCost} ☀️ Potato Mine!`, getCrazyDaveSetting(cfg, 'potatoMineColor') || '#A16207');
+    playDavePlantingAudio(cfg);
+
+    // Stop Dave's movement momentarily upon planting and play shovel dig animation
+    this.lastPlantedType = 'potatoMine';
+    const plantingDuration = getCrazyDaveSetting(cfg, 'plantingDuration');
+    this.plantingPauseTimer = plantingDuration;
+    this.plantingAnimTimer = plantingDuration;
+    this.plantingAnimDuration = plantingDuration;
+    this.shovelSwingTimer = plantingDuration;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
+    return true;
+  }
+
   _updateSunDrops(arena, cfg) {
     if (!cfg) {
       cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
@@ -2707,9 +3283,10 @@ export class CrazyDaveFighter extends Fighter {
       this.spawnSunDrop(tile.x, tile.y, sunVal);
     }
 
-    // 2. Sun Drops Physics & Magnetic Pickup Loop
+    // 2. Sun Drops Physics & Teammate Magnetic Pickup Loop
     const magnetRadius = getCrazyDaveSetting(cfg, 'sunAttractionRadius');
     const magnetSpeed = getCrazyDaveSetting(cfg, 'sunAttractionSpeed');
+    const teammateDaves = getTeammateCrazyDaves(this);
 
     for (let i = this.suns.length - 1; i >= 0; i--) {
       const sun = this.suns[i];
@@ -2721,12 +3298,27 @@ export class CrazyDaveFighter extends Fighter {
 
       sun.rotAngle += 0.03;
 
-      // Distance to Crazy Dave
-      const dx = this.x - sun.x;
-      const dy = this.y - sun.y;
-      const dist = Math.hypot(dx, dy);
+      // Find closest living teammate Dave for magnetic attraction and pickup
+      let closestDave = this;
+      let closestDist = Math.hypot(this.x - sun.x, this.y - sun.y);
+      let collectingDave = null;
 
-      // Magnetic Attraction (pulls toward Dave and interrupts landing descent)
+      for (const tDave of teammateDaves) {
+        const d = Math.hypot(tDave.x - sun.x, tDave.y - sun.y);
+        if (d < closestDist) {
+          closestDist = d;
+          closestDave = tDave;
+        }
+        if (d < (tDave.r + sun.r + 8)) {
+          collectingDave = tDave;
+        }
+      }
+
+      const dx = closestDave.x - sun.x;
+      const dy = closestDave.y - sun.y;
+      const dist = closestDist;
+
+      // Magnetic Attraction (pulls toward closest teammate Dave and interrupts landing descent)
       if (dist < magnetRadius && dist > 0.001) {
         sun.isLanding = false;
         const pull = (1.0 - dist / magnetRadius) * magnetSpeed;
@@ -2752,11 +3344,17 @@ export class CrazyDaveFighter extends Fighter {
         sun.vy = 0;
       }
 
-      // Pickup Collision
-      if (dist < (this.r + sun.r + 8)) {
+      // Pickup Collision by ANY living teammate Dave
+      if (collectingDave || dist < (closestDave.r + sun.r + 8)) {
         const pickupVal = sun.value ?? this.sunPickupValue ?? getCrazyDaveSetting(cfg, 'sunPickupValue');
-        this.sunCount = Math.min(getCrazyDaveSetting(cfg, 'maxSun'), this.sunCount + pickupVal);
-        spawnFloatingText(this.x, this.y - 20, `+${pickupVal} ☀️`, '#FEF08A');
+        const maxSun = getCrazyDaveSetting(cfg, 'maxSun');
+
+        // Award Sun to ALL teammate Daves on the team so they can collaboratively power flora skills
+        for (const tDave of teammateDaves) {
+          tDave.sunCount = Math.min(maxSun, (tDave.sunCount || 0) + pickupVal);
+          spawnFloatingText(tDave.x, tDave.y - 20, `+${pickupVal} ☀️`, '#FEF08A');
+        }
+
         spawnSparks(sun.x, sun.y, 8, '#FACC15');
         if (audioSystem && typeof audioSystem.playSFX === 'function') {
           audioSystem.playSFX(getCrazyDaveSound(cfg, 'sunPickup'), getCrazyDaveSoundVolume(cfg, 'sunPickup'));
@@ -2815,6 +3413,7 @@ export class CrazyDaveFighter extends Fighter {
     if (this.peashooterCooldown > 0) this.peashooterCooldown--;
     if (this.snowPeaCooldown > 0) this.snowPeaCooldown--;
     if (this.torchwoodCooldown > 0) this.torchwoodCooldown--;
+    if (this.potatoMineCooldown > 0) this.potatoMineCooldown--;
 
     // Planting Pause: stop Dave's movement for a moment when planting
     if (this.plantingPauseTimer > 0) {
@@ -2833,17 +3432,21 @@ export class CrazyDaveFighter extends Fighter {
       const peashooterCost = getCrazyDaveSetting(cfg, 'peashooterCost');
       const snowPeaCost = getCrazyDaveSetting(cfg, 'snowPeaCost');
       const torchwoodCost = getCrazyDaveSetting(cfg, 'torchwoodCost');
+      const potatoMineCost = getCrazyDaveSetting(cfg, 'potatoMineCost');
       const wallnutEnabled = isSkillEnabled(cfg.enableWallnut, true);
       const peashooterEnabled = isSkillEnabled(cfg.enablePeashooter, true);
       const snowPeaEnabled = isSkillEnabled(cfg.enableSnowPea, true);
       const torchwoodEnabled = isSkillEnabled(cfg.enableTorchwood, true);
+      const potatoMineEnabled = isSkillEnabled(cfg.enablePotatoMine, true);
 
       const livingWallnuts = (this.activeWallnuts || []).filter(w => w && w.hp > 0);
       const livingTorchwoods = (this.activeTorchwoods || []).filter(t => t && t.hp > 0);
+      const livingMines = (this.activePotatoMines || []).filter(m => m && m.hp > 0 && !m.hasDetonated);
       const activePeas = (this.activePeashooters || []).filter(p => p && p.hp > 0).length;
       const activeSnow = (this.activeSnowPeas || []).filter(s => s && s.hp > 0).length;
       const maxActiveWallnuts = getCrazyDaveSetting(cfg, 'maxActiveWallnuts') || 2;
       const maxActiveTorchwoods = getCrazyDaveSetting(cfg, 'maxActiveTorchwoods') || 2;
+      const maxActiveMines = getCrazyDaveSetting(cfg, 'maxActivePotatoMines') || 2;
 
       let chooseType = null;
 
@@ -2853,36 +3456,45 @@ export class CrazyDaveFighter extends Fighter {
       // 2. Deploy Torchwood if Peashooters are active and firing, and no Torchwood is currently deployed
       const needsTorchwood = torchwoodEnabled && livingTorchwoods.length < maxActiveTorchwoods && this.torchwoodCooldown <= 0 && this.sunCount >= torchwoodCost && activePeas >= 1;
 
+      // 3. Plant Potato Mine as proximity trap when shooters are on cooldown or when area denial is needed
+      const canPlantPeashooter = peashooterEnabled && this.peashooterCooldown <= 0 && this.sunCount >= peashooterCost;
+      const canPlantSnowPea = snowPeaEnabled && this.snowPeaCooldown <= 0 && this.sunCount >= snowPeaCost;
+      const distToEnemy = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+      const needsPotatoMine = potatoMineEnabled && livingMines.length < maxActiveMines && this.potatoMineCooldown <= 0 && this.sunCount >= potatoMineCost && (
+        (!canPlantPeashooter && !canPlantSnowPea) ||
+        (activePeas >= 1 && activeSnow >= 1 && distToEnemy < 160 && this.lastPlantedType !== 'potatoMine')
+      );
+
       if (needsWallnut) {
         chooseType = 'wallnut';
       } else if (needsTorchwood) {
         chooseType = 'torchwood';
-      } else if (peashooterEnabled && snowPeaEnabled) {
-        // Both flora skills enabled: Ensure Dave does NOT repeatedly choose the same plant.
-        // Balances field composition and strictly alternates selections.
+      } else if (canPlantPeashooter && canPlantSnowPea) {
+        // Both flora skills enabled and ready: Ensure Dave alternates selections to balance field
         if (activePeas > activeSnow) {
           chooseType = 'snowpea';
         } else if (activeSnow > activePeas) {
           chooseType = 'peashooter';
         } else {
-          if (this.lastPlantedType === 'peashooter') {
-            chooseType = 'snowpea';
-          } else if (this.lastPlantedType === 'snowpea') {
-            chooseType = 'peashooter';
-          } else {
-            chooseType = 'peashooter';
-          }
+          chooseType = (this.lastPlantedType === 'peashooter') ? 'snowpea' : 'peashooter';
         }
-      } else if (peashooterEnabled) {
+      } else if (canPlantPeashooter) {
         chooseType = 'peashooter';
-      } else if (snowPeaEnabled) {
+      } else if (canPlantSnowPea) {
         chooseType = 'snowpea';
+      } else if (needsPotatoMine) {
+        // Potato Mine: Proximity trap deployed when shooters are on cooldown or under close pressure
+        chooseType = 'potatoMine';
       }
 
       // Execute planting for chosen plant
       if (chooseType === 'wallnut') {
         if (this.wallnutCooldown <= 0 && this.sunCount >= wallnutCost) {
           this.plantWallnut(opponent);
+        }
+      } else if (chooseType === 'potatoMine') {
+        if (this.potatoMineCooldown <= 0 && this.sunCount >= potatoMineCost) {
+          this.plantPotatoMine(opponent);
         }
       } else if (chooseType === 'torchwood') {
         if (this.torchwoodCooldown <= 0 && this.sunCount >= torchwoodCost) {

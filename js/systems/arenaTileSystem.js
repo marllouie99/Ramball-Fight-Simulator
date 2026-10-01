@@ -6,10 +6,25 @@ import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { _registerButton, drawChamferedRect, drawPanel, fitSingleLineText, wrapText } from '../graphics/ui/uiFramework.js';
 import { getOrCreateGrassFloorCanvas } from '../graphics/renderers/grassFloorRenderer.js';
+import { getOrCreateSandBeachFloorCanvas } from '../graphics/renderers/sandBeachFloorRenderer.js';
+import { getOrCreateDungeonFloorCanvas } from '../graphics/renderers/dungeonFloorRenderer.js';
+import { getOrCreateEndStoneFloorCanvas } from '../graphics/renderers/endStoneFloorRenderer.js';
+import { getOrCreateEndStoneBricksFloorCanvas } from '../graphics/renderers/endStoneBricksFloorRenderer.js';
+import { getOrCreateMossyStoneFloorCanvas } from '../graphics/renderers/mossyStoneFloorRenderer.js';
 
 export const ARENA_FLOOR_STORAGE_KEY = 'circle_selected_arena_floor';
 
 export const ARENA_FLOORS = [
+  {
+    id: 'none',
+    name: 'NO TILES',
+    shortName: 'NO TILES',
+    icon: '🚫',
+    themeColor: '#64748b',
+    gridSize: 76.6,
+    features: 'CLEAN RING • NO TILES / NO GRID',
+    desc: 'Pure clean minimalist fighting ring with a solid backdrop and zero floor tiles, grid lines, or ground sprites.'
+  },
   {
     id: 'classic_clean',
     name: 'PIXEL TOURNAMENT',
@@ -68,7 +83,7 @@ export const ARENA_FLOORS = [
     themeColor: '#78716c',
     gridSize: 76.6,
     features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Ancient carved dungeon flagstones with deep mortar channels, staircase pixel fractures, rune etchings, and moss tufts.'
+    desc: '6x6 Authentic carved dungeon stone tiles with 6 discrete sprite variants, iron sewer grates, mossy slabs, and rubble masonry.'
   },
   {
     id: 'tatami_dojo',
@@ -79,6 +94,46 @@ export const ARENA_FLOORS = [
     gridSize: 76.6,
     features: '6x6 TILES • 6 COLS x 6 ROWS',
     desc: '6x6 Traditional martial arts dojo with discrete woven straw reed striations, deep indigo cloth borders, and pixel cross-stitches.'
+  },
+  {
+    id: 'sand_beach',
+    name: 'SAND BEACH',
+    shortName: 'SAND BEACH',
+    icon: '🏖️',
+    themeColor: '#f59e0b',
+    gridSize: 76.6,
+    features: '6x6 TILES • 6 COLS x 6 ROWS',
+    desc: '6x6 Authentic tropical sand tiles with 6 discrete sprite variants, pixel beach pebbles, sunlit dunes, and seamless interlocking.'
+  },
+  {
+    id: 'end_stone',
+    name: 'MINECRAFT END STONE',
+    shortName: 'END STONE',
+    icon: '🟨',
+    themeColor: '#ca8a04',
+    gridSize: 76.6,
+    features: '6x6 TILES • MINECRAFT THEME',
+    desc: 'Authentic 16-bit Minecraft End Stone terrain with pale yellowish-tan cobblestone texture and dark olive pitting.'
+  },
+  {
+    id: 'end_stone_bricks',
+    name: 'END STONE BRICKS',
+    shortName: 'END BRICKS',
+    icon: '🧱',
+    themeColor: '#ca8a04',
+    gridSize: 76.6,
+    features: '6x6 TILES • MINECRAFT BRICKS',
+    desc: 'Authentic 16-bit Minecraft End Stone Bricks masonry with pale cream brick courses, dark olive mortar grooves, and seamless bond.'
+  },
+  {
+    id: 'mossy_stone',
+    name: 'ANCIENT STONE SLABS',
+    shortName: 'STONE SLABS',
+    icon: '🪨',
+    themeColor: '#64748b',
+    gridSize: 76.6,
+    features: '6x6 TILES • 2 PURE STONE TILES',
+    desc: 'Weathered flagstone cobblestones and 4-square carved stone paver slabs with zero grass, deep mortar grooves, and seamless interlocking.'
   }
 ];
 
@@ -311,6 +366,11 @@ function _pixelLBracket(ctx, x, y, len, thick, dirX, dirY, color) {
 // ─────────────────────────────────────────────
 // MODULAR PIXEL ART THEME GENERATORS
 // ─────────────────────────────────────────────
+
+function _renderNoTilesFloor(oc, width, height, isDark) {
+  const bgColor = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff');
+  _pixelRect(oc, 0, 0, width, height, bgColor);
+}
 
 function _renderPixelCleanFloor(oc, width, height, cols, rows, cellW, cellH, isDark) {
   const bgColor = isDark ? '#070a13' : '#f8fafc';
@@ -707,6 +767,136 @@ function _renderPixelTatamiFloor(oc, width, height, cols, rows, cellW, cellH, is
   }
 }
 
+function _renderPixelSandBeachFloor(oc, width, height, cols, rows, cellW, cellH, isDark) {
+  const sandBaseA = isDark ? '#1e293b' : '#fde047'; // Sunlit gold / moonlit slate
+  const sandBaseB = isDark ? '#0f172a' : '#facc15'; // Warm beach sand / deep night slate
+  const sandHi = isDark ? '#334155' : '#fef9c3';    // Pale sunny glint
+  const sandSh = isDark ? '#020617' : '#ca8a04';    // Dune shadow crease
+  const seamColor = isDark ? '#020617' : '#b45309'; // Wet sand border seam
+
+  const waveWater = isDark ? '#0369a1' : '#0284c7';
+  const waveShallow = isDark ? '#0891b2' : '#38bdf8';
+  const waveFoam = isDark ? '#e0f2fe' : '#ffffff';
+
+  const starfishColor = isDark ? '#c084fc' : '#ef4444';
+  const starfishHi = isDark ? '#f3e8ff' : '#fca5a5';
+  const starfishDark = isDark ? '#581c87' : '#991b1b';
+
+  const shellPink = isDark ? '#94a3b8' : '#f43f5e';
+  const shellWhite = isDark ? '#f1f5f9' : '#fff1f2';
+  const shellDark = isDark ? '#475569' : '#881337';
+
+  const jadeStone = isDark ? '#0e7490' : '#059669';
+  const jadeStoneHi = isDark ? '#67e8f9' : '#6ee7b7';
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const bx = Math.round(c * cellW);
+      const by = Math.round(r * cellH);
+      const bw = Math.round((c + 1) * cellW) - bx;
+      const bh = Math.round((r + 1) * cellH) - by;
+      const isAlt = ((r + c) % 2 === 0);
+
+      // Base Sand Fill
+      _pixelRect(oc, bx, by, bw, bh, isAlt ? sandBaseA : sandBaseB);
+
+      // Tile 3D Stepped Bevels
+      _pixelRect(oc, bx + 1, by + 1, bw - 2, 1, sandHi);
+      _pixelRect(oc, bx + 1, by + 1, 1, bh - 2, sandHi);
+      _pixelRect(oc, bx + 1, by + bh - 2, bw - 2, 1, sandSh);
+      _pixelRect(oc, bx + bw - 2, by + 1, 1, bh - 2, sandSh);
+
+      // Discrete Grid Seams
+      _pixelRect(oc, bx, by, bw, 1, seamColor);
+      _pixelRect(oc, bx, by + bh - 1, bw, 1, seamColor);
+      _pixelRect(oc, bx, by, 1, bh, seamColor);
+      _pixelRect(oc, bx + bw - 1, by, 1, bh, seamColor);
+
+      // Wind-blown Dune Ripples (2 wave lines per tile)
+      const rip1Y = by + Math.round(bh * 0.28);
+      _pixelRect(oc, bx + 6, rip1Y, bw - 12, 1, sandHi);
+      _pixelRect(oc, bx + 7, rip1Y + 1, bw - 14, 1, sandSh);
+
+      const rip2Y = by + Math.round(bh * 0.70);
+      _pixelRect(oc, bx + 10, rip2Y, bw - 20, 1, sandHi);
+      _pixelRect(oc, bx + 11, rip2Y + 1, bw - 22, 1, sandSh);
+
+      // Shoreline Ocean Surf on Top (r = 0) and Bottom (r = rows - 1)
+      if (r === 0) {
+        _pixelRect(oc, bx, by + 1, bw, 3, waveWater);
+        _pixelRect(oc, bx, by + 4, bw, 2, waveShallow);
+        _pixelRect(oc, bx + (c % 2 === 0 ? 3 : 7), by + 6, bw - 10, 1, waveFoam);
+        _pixelRect(oc, bx + 4, by + 8, 2, 2, waveFoam);
+        _pixelRect(oc, bx + bw - 8, by + 8, 2, 2, waveFoam);
+      } else if (r === rows - 1) {
+        _pixelRect(oc, bx, by + bh - 4, bw, 3, waveWater);
+        _pixelRect(oc, bx, by + bh - 6, bw, 2, waveShallow);
+        _pixelRect(oc, bx + (c % 2 === 0 ? 7 : 3), by + bh - 7, bw - 10, 1, waveFoam);
+        _pixelRect(oc, bx + 6, by + bh - 10, 2, 2, waveFoam);
+        _pixelRect(oc, bx + bw - 8, by + bh - 10, 2, 2, waveFoam);
+      }
+
+      // Procedural Beach Props (Starfish, Scallop Shells, Pebbles, Sun Glints)
+      const propSeed = (r * 11 + c * 17) % 6;
+
+      if (propSeed === 0) {
+        // 5-Pointed Starfish
+        const sx = bx + Math.round(bw * 0.50);
+        const sy = by + Math.round(bh * 0.48);
+        _pixelRect(oc, sx - 2, sy - 2, 5, 5, starfishColor);
+        _pixelRect(oc, sx - 1, sy - 4, 3, 2, starfishColor); // Top arm
+        _pixelRect(oc, sx - 4, sy - 1, 2, 3, starfishColor); // Left arm
+        _pixelRect(oc, sx + 3, sy - 1, 2, 3, starfishColor); // Right arm
+        _pixelRect(oc, sx - 3, sy + 3, 2, 2, starfishColor); // Bottom-left arm
+        _pixelRect(oc, sx + 2, sy + 3, 2, 2, starfishColor); // Bottom-right arm
+        _pixelRect(oc, sx, sy, 1, 1, starfishHi);           // Center glint
+        _pixelRect(oc, sx - 1, sy - 1, 1, 1, starfishDark);
+      } else if (propSeed === 1) {
+        // Pink/Coral Scallop Fan Shell
+        const fx = bx + Math.round(bw * 0.45);
+        const fy = by + Math.round(bh * 0.46);
+        _pixelRect(oc, fx - 2, fy - 2, 5, 4, shellPink);
+        _pixelRect(oc, fx - 1, fy - 3, 3, 1, shellWhite);
+        _pixelRect(oc, fx - 3, fy, 1, 2, shellDark);
+        _pixelRect(oc, fx + 3, fy, 1, 2, shellDark);
+        _pixelRect(oc, fx, fy - 1, 1, 3, shellWhite); // Fan ridge
+        _pixelRect(oc, fx - 1, fy + 2, 3, 1, shellDark); // Bottom hinge
+      } else if (propSeed === 2) {
+        // Polished Jade & Slate Beach Pebbles
+        const px = bx + Math.round(bw * 0.38);
+        const py = by + Math.round(bh * 0.52);
+        _pixelRect(oc, px, py, 4, 3, jadeStone);
+        _pixelRect(oc, px + 1, py, 2, 1, jadeStoneHi);
+        _pixelRect(oc, px + 5, py + 2, 3, 2, isDark ? '#475569' : '#64748b');
+        _pixelRect(oc, px + 6, py + 2, 1, 1, '#ffffff');
+      } else if (propSeed === 3) {
+        // Spiral Nautilus Shell
+        const nx = bx + Math.round(bw * 0.60);
+        const ny = by + Math.round(bh * 0.42);
+        _pixelRect(oc, nx - 2, ny - 2, 4, 4, isDark ? '#67e8f9' : '#fef08a');
+        _pixelRect(oc, nx - 1, ny - 1, 2, 2, isDark ? '#0284c7' : '#d97706');
+        _pixelRect(oc, nx, ny - 2, 2, 1, '#ffffff');
+      } else if (propSeed === 4) {
+        // Sparkling Sand Glints
+        const gx = bx + Math.round(bw * 0.55);
+        const gy = by + Math.round(bh * 0.44);
+        _pixelCross(oc, gx, gy, 2, 1, '#ffffff');
+        _pixelRect(oc, gx, gy, 1, 1, isDark ? '#67e8f9' : '#fef08a');
+      }
+    }
+  }
+
+  // Center Tropical Sunburst & Nautical Reticle
+  const cx = Math.round(width / 2);
+  const cy = Math.round(height / 2);
+  _pixelDiamond(oc, cx, cy, 8, isDark ? '#020617' : '#b45309');
+  _pixelDiamond(oc, cx, cy, 6, isDark ? '#0891b2' : '#f59e0b');
+  _pixelDiamond(oc, cx, cy, 4, isDark ? '#06b6d4' : '#fde047');
+  _pixelCross(oc, cx, cy, 10, 1, isDark ? '#38bdf8' : '#f97316');
+  _pixelRect(oc, cx - 1, cy - 1, 3, 3, isDark ? '#040711' : '#ffffff');
+  _pixelRect(oc, cx, cy, 1, 1, isDark ? '#38bdf8' : '#ea580c');
+}
+
 // ─────────────────────────────────────────────
 // PROCEDURAL OFFSCREEN CANVAS TEXTURE GENERATOR
 // ─────────────────────────────────────────────
@@ -714,8 +904,43 @@ function _renderPixelTatamiFloor(oc, width, height, cols, rows, cellW, cellH, is
 export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 0) {
   if (typeof document === 'undefined') return null;
 
+  if (floorId === 'none') {
+    const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
+    const height = Math.max(64, Math.ceil(arena.height + fBleed * 2));
+    const shape = arena.shape || 'rect';
+    const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}`;
+    if (state._arenaFloorCanvasCache && state._arenaFloorCanvasCache[key]) {
+      return state._arenaFloorCanvasCache[key];
+    }
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = width;
+    offCanvas.height = height;
+    const oc = offCanvas.getContext('2d');
+    if (!oc) return null;
+    oc.imageSmoothingEnabled = false;
+    _renderNoTilesFloor(oc, width, height, isDark);
+    if (!state._arenaFloorCanvasCache) state._arenaFloorCanvasCache = {};
+    state._arenaFloorCanvasCache[key] = offCanvas;
+    return offCanvas;
+  }
+
   if (floorId === 'pvz_grass') {
     return getOrCreateGrassFloorCanvas(arena, isDark, fBleed);
+  }
+  if (floorId === 'sand_beach') {
+    return getOrCreateSandBeachFloorCanvas(arena, isDark, fBleed);
+  }
+  if (floorId === 'stone_dungeon') {
+    return getOrCreateDungeonFloorCanvas(arena, isDark, fBleed);
+  }
+  if (floorId === 'end_stone') {
+    return getOrCreateEndStoneFloorCanvas(arena, isDark, fBleed);
+  }
+  if (floorId === 'end_stone_bricks') {
+    return getOrCreateEndStoneBricksFloorCanvas(arena, isDark, fBleed);
+  }
+  if (floorId === 'mossy_stone') {
+    return getOrCreateMossyStoneFloorCanvas(arena, isDark, fBleed);
   }
 
   const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
@@ -748,6 +973,10 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
   switch (floorId) {
     case 'pvz_grass':
       _renderPixelPvzGrassFloor(oc, width, height, cols, rows, cellW, cellH, isDark);
+      break;
+
+    case 'sand_beach':
+      _renderPixelSandBeachFloor(oc, width, height, cols, rows, cellW, cellH, isDark);
       break;
 
     case 'clash_arena':
@@ -837,15 +1066,29 @@ function getOrCreateMiniPreviewCanvas(floorDef, w, h) {
 
   oc.imageSmoothingEnabled = false;
 
-  const mockArena = { x: 0, y: 0, width: 460, height: 460, shape: 'rect' };
-  const targetId = floorDef.id;
-  const fullCanvas = getOrCreateFloorCanvas(targetId, mockArena, false, 0);
-
-  if (fullCanvas) {
-    oc.drawImage(fullCanvas, 0, 0, w, h);
-  } else {
-    oc.fillStyle = floorDef.themeColor;
+  if (floorDef.id === 'none') {
+    oc.fillStyle = '#ffffff';
     oc.fillRect(0, 0, w, h);
+    oc.strokeStyle = '#94a3b8';
+    oc.lineWidth = 1.4;
+    oc.beginPath();
+    oc.arc(w / 2, h / 2, Math.min(w, h) * 0.30, 0, Math.PI * 2);
+    oc.stroke();
+    oc.beginPath();
+    oc.moveTo(w / 2 - Math.min(w, h) * 0.20, h / 2 - Math.min(w, h) * 0.20);
+    oc.lineTo(w / 2 + Math.min(w, h) * 0.20, h / 2 + Math.min(w, h) * 0.20);
+    oc.stroke();
+  } else {
+    const mockArena = { x: 0, y: 0, width: 460, height: 460, shape: 'rect' };
+    const targetId = floorDef.id;
+    const fullCanvas = getOrCreateFloorCanvas(targetId, mockArena, false, 0);
+
+    if (fullCanvas) {
+      oc.drawImage(fullCanvas, 0, 0, w, h);
+    } else {
+      oc.fillStyle = floorDef.themeColor;
+      oc.fillRect(0, 0, w, h);
+    }
   }
 
   oc.strokeStyle = 'rgba(33, 5, 12, 0.4)';
@@ -906,8 +1149,8 @@ export function drawArenaFloorModal(ctx) {
   if (!ctx || !state.canvas) return;
 
   const canvas = state.canvas;
-  const modalW = Math.min(canvas.width - 24, 510);
-  const modalH = 640;
+  const modalW = Math.min(canvas.width - 24, 520);
+  const modalH = Math.min(canvas.height - 24, 650);
   const mx = (canvas.width - modalW) / 2;
   const my = (canvas.height - modalH) / 2;
 
@@ -932,17 +1175,17 @@ export function drawArenaFloorModal(ctx) {
   ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('ARENA ENVIRONMENT // CUSTOM FLOOR TILES // SYS.v3.0', mx + 18, my + 14);
+  ctx.fillText('ARENA ENVIRONMENT // CUSTOM FLOOR TILES // SYS.v3.0', mx + 18, my + 12);
 
   ctx.fillStyle = '#21050c';
-  ctx.font = '900 14.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText('CHOOSE ARENA FLOOR & TILES', mx + 18, my + 27);
+  ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
+  ctx.fillText('CHOOSE ARENA FLOOR & TILES', mx + 18, my + 24);
 
   // Close Button (Top-Right "X")
   const closeBtnW = 24;
   const closeBtnH = 22;
   const closeBtnX = mx + modalW - closeBtnW - 16;
-  const closeBtnY = my + 14;
+  const closeBtnY = my + 12;
 
   ctx.fillStyle = '#baa88c';
   drawChamferedRect(ctx, closeBtnX, closeBtnY + 2, closeBtnW, closeBtnH, 3);
@@ -967,16 +1210,18 @@ export function drawArenaFloorModal(ctx) {
 
   // Header Accent Line
   ctx.fillStyle = '#21050c';
-  ctx.fillRect(mx + 18, my + 46, modalW - 36, 2);
+  ctx.fillRect(mx + 18, my + 42, modalW - 36, 2);
 
-  // 3. Floor Option Cards (2 Columns x 4 Rows)
+  // 3. Floor Option Cards (2 Columns x Rows)
   const cols = 2;
-  const padX = 18;
-  const gapX = 12;
-  const gapY = 10;
-  const cardW = Math.floor((modalW - padX * 2 - gapX) / cols); // ~225px
-  const cardH = 126;
-  const startCardsY = my + 56;
+  const padX = 16;
+  const gapX = 10;
+  const gapY = 6;
+  const numRows = Math.ceil(ARENA_FLOORS.length / cols);
+  const availHeight = modalH - 46 - 28; // Header & footer space
+  const cardH = Math.min(94, Math.floor((availHeight - (numRows - 1) * gapY) / numRows));
+  const cardW = Math.floor((modalW - padX * 2 - gapX) / cols);
+  const startCardsY = my + 46;
 
   const currentSelection = getSelectedArenaFloor();
 
@@ -990,26 +1235,26 @@ export function drawArenaFloorModal(ctx) {
 
     // Card 3D Shadow
     ctx.fillStyle = isSelected ? '#5e0d1f' : '#baa88c';
-    drawChamferedRect(ctx, cx, cy + 3, cardW, cardH, 4);
+    drawChamferedRect(ctx, cx, cy + 2, cardW, cardH, 3);
     ctx.fill();
 
     // Card Background
     ctx.fillStyle = isSelected ? '#fff5f7' : '#faedf0';
     ctx.strokeStyle = isSelected ? '#b81c3b' : '#21050c';
     ctx.lineWidth = isSelected ? 2.0 : 1.4;
-    drawChamferedRect(ctx, cx, cy, cardW, cardH, 4);
+    drawChamferedRect(ctx, cx, cy, cardW, cardH, 3);
     ctx.fill();
     ctx.stroke();
 
     // Left Pip Accent Bar
     ctx.fillStyle = floorDef.themeColor;
-    ctx.fillRect(cx + 4, cy + 4, 3.5, cardH - 8);
+    ctx.fillRect(cx + 3, cy + 3, 3, cardH - 6);
 
     // Mini Live Preview Box on Left
-    const prevW = 46;
-    const prevH = 46;
-    const prevX = cx + 12;
-    const prevY = cy + 12;
+    const prevW = Math.min(36, cardH - 16);
+    const prevH = prevW;
+    const prevX = cx + 8;
+    const prevY = cy + 7;
 
     const miniPreview = getOrCreateMiniPreviewCanvas(floorDef, prevW, prevH);
     if (miniPreview) {
@@ -1018,46 +1263,46 @@ export function drawArenaFloorModal(ctx) {
 
     // Mini preview border
     ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.2;
+    ctx.lineWidth = 1.0;
     ctx.strokeRect(prevX, prevY, prevW, prevH);
 
     // Title & Icon on Right of Preview
-    const textX = prevX + prevW + 8;
-    const maxTextW = cardW - (textX - cx) - 8;
+    const textX = prevX + prevW + 7;
+    const maxTextW = cardW - (textX - cx) - 6;
 
     ctx.fillStyle = isSelected ? '#b81c3b' : '#21050c';
-    ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `${floorDef.icon} ${floorDef.name}`, maxTextW), textX, cy + 12);
+    ctx.fillText(fitSingleLineText(ctx, `${floorDef.icon} ${floorDef.name}`, maxTextW), textX, cy + 6);
 
     // Feature Tag
     ctx.fillStyle = '#8b1524';
-    ctx.font = '800 8px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(fitSingleLineText(ctx, floorDef.features, maxTextW), textX, cy + 28);
+    ctx.font = '800 7px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText(fitSingleLineText(ctx, floorDef.features, maxTextW), textX, cy + 18);
 
     // Equipped / Select Status Badge
-    const statusY = cy + 42;
+    const statusY = cy + 29;
     ctx.fillStyle = isSelected ? '#b81c3b' : '#64748b';
-    ctx.font = '900 8px "Press Start 2P", monospace';
+    ctx.font = '900 7px "Press Start 2P", monospace';
     ctx.fillText(isSelected ? '★ EQUIPPED' : '○ SELECT', textX, statusY);
 
     // Description text across bottom
     ctx.fillStyle = '#21050c';
-    ctx.font = '800 8.5px "Outfit", "Rajdhani", sans-serif';
-    wrapText(ctx, floorDef.desc, cx + 12, cy + 66, cardW - 24, 11, 4);
+    ctx.font = '800 7.5px "Outfit", "Rajdhani", sans-serif';
+    wrapText(ctx, floorDef.desc, cx + 8, cy + 44, cardW - 16, 9, 3);
 
     // Card Selection Click Handler
-    _registerButton(cx, cy, cardW, cardH + 3, () => {
+    _registerButton(cx, cy, cardW, cardH + 2, () => {
       setSelectedArenaFloor(floorDef.id);
       if (state.audioSystem?.playSFX) state.audioSystem.playSFX('skill_dash1', 0.3);
     });
   });
 
   // Footer Instructions
-  const footY = my + modalH - 22;
+  const footY = my + modalH - 16;
   ctx.fillStyle = '#8b1524';
-  ctx.font = '800 9px "Outfit", sans-serif';
+  ctx.font = '800 8.5px "Outfit", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('CLICK ANY FLOOR TO EQUIP • SELECTION AUTOMATICALLY SAVED TO STORAGE', mx + modalW / 2, footY);

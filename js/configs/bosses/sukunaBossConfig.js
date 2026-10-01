@@ -145,7 +145,7 @@ export const sukunaBossConfig = {
   soundVolumes: {
     punch: 1.40,
     swordSwing: 0.50,
-    fleshSlice: 0.40,
+    fleshSlice: 0.80,
     teleportDash: 0.45,
     ricochetHit: 0.0,
     fugaChant: 2.0,

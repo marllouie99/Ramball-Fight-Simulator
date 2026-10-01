@@ -218,6 +218,8 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
         isSukunaSlash: true,
         isCleave: true,
         isDomain: true,
+        isDomainSlash: true,
+        noHitSound: true,
         isCrit
       });
     }
@@ -254,11 +256,8 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     if (target.knockbackVy !== undefined) target.knockbackVy = Math.sin(cleaveAngle) * cleaveForce;
 
     if ((fighter._slashSoundCooldown || 0) <= 0) {
-      const swingSnd = CONFIG.sukuna?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
-      const swingVol = CONFIG.sukuna?.soundVolumes?.swordSwing ?? 0.9;
-      const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3';
+      const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3';
       const sliceVol = CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7;
-      audioSystem.playSFX(swingSnd, swingVol);
       audioSystem.playSFX(sliceSnd, sliceVol);
       fighter._slashSoundCooldown = 10;
     }
@@ -331,18 +330,11 @@ export function applyDomainEffect(fighter, arena) {
   fighter._domainFrame = (fighter._domainFrame || 0) + 1;
 
   if (fighter._domainFrame % domainDamageInterval === 0) {
-    if (fighter._slashSoundCooldown === undefined || fighter._slashSoundCooldown <= 0) {
-      const swingSnd = CONFIG.sukuna?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
-      const swingVol = (CONFIG.sukuna?.soundVolumes?.swordSwing ?? 0.9) * 0.55;
-      audioSystem.playSFX(swingSnd, swingVol);
-      fighter._slashSoundCooldown = 12;
-    }
-
     // Spawn arena-clipped spatial cut lines and execute physical hits for each line
     const hitAny = spawnDomainSlashLines(fighter, slashesPerTick);
     if (hitAny) {
-      const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Skills/backstab.mp3';
-      const sliceVol = (CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7) * 0.65;
+      const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3';
+      const sliceVol = (CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7) * 0.85;
       audioSystem.playSFX(sliceSnd, sliceVol);
     }
   }

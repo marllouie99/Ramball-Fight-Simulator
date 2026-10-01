@@ -70,7 +70,7 @@ export const crazyDaveConfig = {
 
   // Skill 3: Plant Snow Pea (Ice Damage + Enemy Slow & Freeze Chance)
   enableSnowPea: true,
-  snowPeaCost: 175,          // Costs 175 Sun
+  snowPeaCost: 100,          // Costs 175 Sun
   snowPeaColor: '#38BDF8',
   snowPeaHp: 200,
   snowPeaFireRate: 24,       // Fires a frozen pea every 24 frames (~0.40s)
@@ -106,6 +106,21 @@ export const crazyDaveConfig = {
   torchwoodFirePeaColor: '#EF4444',    // Fiery Red
   torchwoodSpriteSrc: 'Assets/model/Sprites/torchwood-sprite-sheet.png',
 
+  // Skill 5: Plant Potato Mine (Proximity Explosive Trap — PvZ Classic Area Denial)
+  enablePotatoMine: true,
+  potatoMineCost: 75,              // Costs 75 Sun (balanced mid-range)
+  potatoMineColor: '#A16207',      // Earthy Ochre Brown
+  potatoMineHp: 80,                // Low HP — fragile
+  potatoMineRadius: 20,            // Modest visual radius on the grass tile
+  maxActivePotatoMines: 2,         // Maximum living Potato Mines on field
+  potatoMineCooldown: 600,         // 10s skill cooldown between plantings
+  potatoMineArmDelay: 0,           // 0 delay — instant arming, explodes immediately when enemy gets close
+  potatoMineTriggerRadius: 55,     // Proximity detection radius for enemy fighters
+  potatoMineExplosionDamage: 150,  // Massive single-burst explosion damage (SPUDOW!)
+  potatoMineExplosionRadius: 120,  // Blast radius for splash AOE damage
+  potatoMineExplosionKnockback: 14, // Strong knockback impulse on detonation
+  potatoMineSpriteSrc: 'Assets/model/Sprites/potato-mine-sprite-sheet.png',
+
   // Lawnmower Baseline Defense System (PvZ Signature Final Defense)
   enableLawnmower: true,
   lawnmowerDamage: 100,        // Devastating steamroller damage (PvZ 1800 damage equivalent)
@@ -114,6 +129,7 @@ export const crazyDaveConfig = {
   lawnmowerTriggerRadius: 38,  // Proximity trigger distance from baseline
   lawnmowerBaselineOffset: 2,  // Keep parked mowers tucked against the arena wall
   lawnmowerColor: '#DC2626',   // Classic cherry red mower
+  lawnmowerStunDuration: 45,   // Stun frames applied to enemies hit by mower (≈0.75s at 60fps)
   lawnmowerSpriteSrc: 'Assets/model/Sprites/lawnmower-sprite-sheet.png',
 
   // Shared plant deployment and audio tuning
@@ -137,7 +153,9 @@ export const crazyDaveConfig = {
     wallnutHit: 'Assets/Sound Effects/Skills/shieldblock.mp3',
     wallnutCrumble: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
     lawnmowerEngine: 'Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3',
-    lawnmowerHit: 'Assets/Sound Effects/Skills/spinslash.mp3'
+    lawnmowerHit: 'Assets/Sound Effects/Skills/spinslash.mp3',
+    potatoMineArm: 'Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg',
+    potatoMineExplode: 'Assets/Sound Effects/Skills/fugaexplode.mp3'
   },
   soundVolumes: {
     planting: 0.85,
@@ -150,7 +168,9 @@ export const crazyDaveConfig = {
     wallnutHit: 0.85,
     wallnutCrumble: 0.90,
     lawnmowerEngine: 0.85,
-    lawnmowerHit: 0.90
+    lawnmowerHit: 0.90,
+    potatoMineArm: 0.75,
+    potatoMineExplode: 0.95
   },
 
   // Sprite Asset Sources
@@ -166,8 +186,9 @@ export const crazyDaveConfig = {
   firePeaProjSpriteSrc: 'Assets/model/Sprites/Six-Frame Pixel Fireball Animation.png',
   lawnmowerSpriteSrc: 'Assets/model/Sprites/lawnmower-sprite-sheet.png',
   iceFreezeSpriteSrc: 'Assets/model/Sprites/ice-freeze-sprite.png',
+  potatoMineSpriteSrc: 'Assets/model/Sprites/potato-mine-sprite-sheet.png',
 
   // Arena Grass Tiles (PvZ Front Lawn)
-  grassTilesSpriteSrc: 'Assets/model/Sprites/Grass-tiles-sprite-sheet.png',
+  grassTilesSpriteSrc: 'Assets/model/Tiles/Grass-tiles-sprite-sheet.png',
   grassTileSize: 76.6
 };

@@ -5,7 +5,7 @@
 
 export const patchNotesData = {
   version: 'v2.5.0',
-  date: 'SEPTEMBER 2026',
+  date: 'OCTOBER 2026',
   title: 'VOID TITAN & LIVE BALANCE UPDATES',
   description: 'Ender Dragon Boss Battle, modular Katana assembly, Escanor Cruel Sun VFX, and live combat tuning.',
   highlights: [
@@ -28,7 +28,39 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "CRAZYDAVE",
+        "deltas": [
+            {
+                "type": "NERF",
+                "key": "snowPeaCost",
+                "oldVal": 175,
+                "newVal": 100,
+                "pct": "-42.9%"
+            },
+            {
+                "type": "ADJUST",
+                "key": "grassTilesSpriteSrc",
+                "oldVal": "Assets/model/Sprites/Grass-tiles-sprite-sheet.png",
+                "newVal": "Assets/model/Tiles/Grass-tiles-sprite-sheet.png",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "SUKUNA",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "fleshSlice",
+                "oldVal": "0.40",
+                "newVal": "0.80",
+                "pct": "Mod"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

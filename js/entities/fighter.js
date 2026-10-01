@@ -2356,15 +2356,24 @@ export class Fighter {
       }
     }
 
-    // Play hit sound and trigger hit flash (exclude DoT ticks)
-    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse') {
+    // Play hit sound and trigger hit flash (exclude DoT ticks and domain slashes / custom sound effects)
+    const isDomainHit = Boolean(
+      opts.isDomain ||
+      opts.isDomainSlash ||
+      opts.isSukunaDomainSliceLine ||
+      opts.isDomainDPS ||
+      opts.fromDomain ||
+      opts.noHitSound ||
+      (opts.projectile && (opts.projectile.isDomainDPS || opts.projectile.fromDomain))
+    );
+    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse' && !opts.noHitSound && !isDomainHit) {
       if (!this.isTurret && !this.isDispenser) {
         if (!isSecondTurretHit) {
           audioSystem.playSFX('attack_fleshhit', 0.6);
         }
         this.hitFlashTimer = 8;
       }
-    } else if (opts.isPurpleDPS || opts.isDomainDPS) {
+    } else if (opts.isPurpleDPS) {
       if (!this.isTurret && !this.isDispenser) {
         this.hitFlashTimer = 6;
         const now = Date.now();
@@ -2372,6 +2381,10 @@ export class Fighter {
           this._lastPurpleHitSoundTime = now;
           audioSystem.playSFX('attack_fleshhit', 0.5);
         }
+      }
+    } else if (isDomainHit) {
+      if (!this.isTurret && !this.isDispenser) {
+        this.hitFlashTimer = 6;
       }
     }
   }

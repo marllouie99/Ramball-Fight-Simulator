@@ -54,11 +54,11 @@ export function loadGrassTileSpriteSheet() {
     }
   };
   _grassTileSpriteImg.onerror = (e) => {
-    console.warn('Failed to load Grass Tiles sprite sheet at Assets/model/Sprites/Grass-tiles-sprite-sheet.png', e);
+    console.warn('Failed to load Grass Tiles sprite sheet at Assets/model/Tiles/Grass-tiles-sprite-sheet.png', e);
     _grassTileSpriteLoading = false;
     _grassTileSpriteImg = null;
   };
-  const src = CONFIG.crazydave?.grassTilesSpriteSrc || 'Assets/model/Sprites/Grass-tiles-sprite-sheet.png';
+  const src = CONFIG.crazydave?.grassTilesSpriteSrc || 'Assets/model/Tiles/Grass-tiles-sprite-sheet.png';
   _grassTileSpriteImg.src = encodeURI(`${src}?v=3`);
 }
 

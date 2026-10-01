@@ -1875,6 +1875,57 @@ async function runInteractionTests() {
     }
     assert(teammateDave.plantSnowPea(gojo) === false, 'Crazy Dave must not plant when every grass tile is occupied by an ally plant');
     assert(teammateDave.sunCount === savedSun, 'Failed planting on a full lawn must not consume Sun');
+
+    // ── Teammate Multi-Dave Shared Sun Collection & Magnetic Attraction Tests ──
+    const teamDaveA = new CrazyDaveClass({ radius: 25, x: 100, y: 300, hp: 390, maxHp: 390 });
+    const teamDaveB = new CrazyDaveClass({ radius: 25, x: 500, y: 300, hp: 390, maxHp: 390 });
+    const enemyDaveC = new CrazyDaveClass({ radius: 25, x: 700, y: 300, hp: 390, maxHp: 390 });
+    teamDaveA.team = 0;
+    teamDaveB.team = 0;
+    enemyDaveC.team = 1;
+    teamDaveA.sunCount = 50;
+    teamDaveB.sunCount = 50;
+    enemyDaveC.sunCount = 50;
+    state.fighters = [teamDaveA, teamDaveB, enemyDaveC];
+
+    // 1. Team Dave A spawns a Sun in range of Team Dave B (x: 425, y: 300, 75px from Dave B at 500, 300)
+    const sunNearB = teamDaveA.spawnSunDrop(425, 300, 25);
+    sunNearB.y = 300; // settled at ground level
+    sunNearB.isLanding = false;
+    assert(teamDaveA.suns.length === 1, 'Team Dave A must have 1 active sun');
+
+    // Update Sun drops: Sun should magnetically pull towards Team Dave B (closest teammate)
+    const initialSunX = sunNearB.x;
+    teamDaveA._updateSunDrops(state.arena, CONFIG.crazydave);
+    assert(sunNearB.x > initialSunX || teamDaveA.suns.length === 0, 'Sun drop near Dave B must be pulled towards or collected by teammate Dave B');
+
+    // Move Dave B directly over the sun and update
+    teamDaveB.x = sunNearB.x || 425;
+    teamDaveB.y = sunNearB.y || 300;
+    teamDaveA._updateSunDrops(state.arena, CONFIG.crazydave);
+
+    // Both Team Dave A and Team Dave B must receive +25 Sun points!
+    assert(teamDaveA.suns.length === 0, 'Sun drop must be collected');
+    assert(teamDaveA.sunCount === 75, `Teammate Dave A sunCount must increase to 75 (got ${teamDaveA.sunCount})`);
+    assert(teamDaveB.sunCount === 75, `Teammate Dave B sunCount must increase to 75 (got ${teamDaveB.sunCount})`);
+    assert(enemyDaveC.sunCount === 50, `Enemy Dave C sunCount must remain 50 (got ${enemyDaveC.sunCount})`);
+
+    // 2. Verify Enemy Dave cannot collect or attract Team Dave A's Sun
+    const sunNearEnemy = teamDaveA.spawnSunDrop(690, 300, 25);
+    sunNearEnemy.y = 300;
+    sunNearEnemy.isLanding = false;
+    enemyDaveC.x = 690;
+    enemyDaveC.y = 300;
+    teamDaveA._updateSunDrops(state.arena, CONFIG.crazydave);
+    assert(teamDaveA.suns.length === 1, 'Enemy Dave must NOT collect teammate Dave A Sun');
+    assert(enemyDaveC.sunCount === 50, 'Enemy Dave sunCount must NOT increase when touching opposing team Sun');
+
+    // 3. Verify uncollected suns are transferred to surviving teammate Dave on death
+    teamDaveA.takeDamage(9999, gojo);
+    assert(teamDaveA.hp <= 0, 'Dave A must be dead');
+    assert(teamDaveA.suns.length === 0, 'Dead Dave A suns must be transferred');
+    assert(teamDaveB.suns.length === 1, 'Living teammate Dave B must inherit uncollected suns from dead Dave A');
+
     state.fighters = priorFighters;
 
     const wallnutEntity = plantEntities.find(p => p.type === 'Wallnut');
@@ -2082,8 +2133,11 @@ async function runInteractionTests() {
 
     // Test magnetic attraction and pickup by Dave
     dave.sunCount = 100;
+    dave.wallnutCooldown = 999;
     dave.peashooterCooldown = 999;
     dave.snowPeaCooldown = 999;
+    dave.torchwoodCooldown = 999;
+    dave.potatoMineCooldown = 999;
     dave.x = randomTile.x + 30;
     dave.y = randomTile.y;
     const initialSunCount = dave.sunCount;
@@ -2415,10 +2469,59 @@ async function runInteractionTests() {
     dave.peashooterCooldown = 999;
     dave.snowPeaCooldown = 999;
     dave.torchwoodCooldown = 0;
+    dave.potatoMineCooldown = 999;
     dave.sunCount = 500;
     dave.plantingPauseTimer = 0;
     dave.update(gojo, 1, state.arena);
     assert(dave.lastPlantedType === 'torchwood', 'Dave AI must deploy Torchwood when Peashooters are active');
+
+    // Sixth AI plant: deploys Potato Mine as proximity explosive trap
+    dave.wallnutCooldown = 999;
+    dave.peashooterCooldown = 999;
+    dave.snowPeaCooldown = 999;
+    dave.torchwoodCooldown = 999;
+    dave.potatoMineCooldown = 0;
+    dave.sunCount = 500;
+    dave.plantingPauseTimer = 0;
+    dave.update(gojo, 1, state.arena);
+    assert(dave.lastPlantedType === 'potatoMine', 'Dave AI must deploy Potato Mine when available');
+
+    // Test Potato Mine Entity Mechanics: Instant Arming, Proximity Trigger, Detonation & Canvas Stack Depth
+    const { PotatoMineEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { drawPotatoMine } = await import('../js/graphics/weapons/crazyDaveWeaponGraphics.js');
+    const testMine = new PotatoMineEntity(200, 200, dave);
+    assert(testMine.isPlant === true, 'PotatoMineEntity must have isPlant === true');
+    assert(testMine.isImmovable === true, 'PotatoMineEntity must be immovable');
+    assert(testMine.isArmed === true, 'PotatoMineEntity must be instantly armed on spawn');
+
+    // Position enemy outside trigger radius: should not detonate
+    gojo.x = 500; gojo.y = 500;
+    testMine.update(gojo, 1, state.arena);
+    assert(testMine.isExploding === false, 'PotatoMineEntity must not detonate when enemy is far');
+
+    // Position enemy inside trigger radius: should detonate immediately (SPUDOW!)
+    gojo.x = 220; gojo.y = 200;
+    state.fighters = [dave, gojo, testMine];
+    testMine.update(gojo, 1, state.arena);
+    assert(testMine.isExploding === true, 'PotatoMineEntity must detonate into isExploding immediately when enemy enters proximity');
+
+    // Test PotatoMine draw stack depth balance across unarmed, armed, and exploding states
+    mockCtx.resetStackDepth();
+    testMine.isExploding = false;
+    testMine.isArmed = false;
+    drawPotatoMine(mockCtx, testMine);
+    assert(mockCtx.getStackDepth() === 0, 'drawPotatoMine (unarmed) must maintain 0 canvas stack depth');
+
+    mockCtx.resetStackDepth();
+    testMine.isArmed = true;
+    drawPotatoMine(mockCtx, testMine);
+    assert(mockCtx.getStackDepth() === 0, 'drawPotatoMine (armed) must maintain 0 canvas stack depth');
+
+    mockCtx.resetStackDepth();
+    testMine.isExploding = true;
+    testMine.explodeAnimProgress = 0.5;
+    drawPotatoMine(mockCtx, testMine);
+    assert(mockCtx.getStackDepth() === 0, 'drawPotatoMine (exploding) must maintain 0 canvas stack depth');
 
     // 12e. HUD Stats Amount of Sun ($UN: XX)
     const origStatsToggle = CONFIG.darkModeShowHudStats;
@@ -3271,6 +3374,26 @@ async function runInteractionTests() {
     setSelectedArenaFloor('pvz_grass');
     assert(getSelectedArenaFloor() === 'pvz_grass', 'getSelectedArenaFloor should reflect pvz_grass');
     assert(resolveActiveFloorId() === 'pvz_grass', 'resolveActiveFloorId should return chosen pvz_grass');
+    
+    setSelectedArenaFloor('sand_beach');
+    assert(getSelectedArenaFloor() === 'sand_beach', 'getSelectedArenaFloor should reflect sand_beach');
+    assert(resolveActiveFloorId() === 'sand_beach', 'resolveActiveFloorId should return chosen sand_beach');
+    
+    setSelectedArenaFloor('none');
+    assert(getSelectedArenaFloor() === 'none', 'getSelectedArenaFloor should reflect none (NO TILES)');
+    assert(resolveActiveFloorId() === 'none', 'resolveActiveFloorId should return chosen none');
+    
+    setSelectedArenaFloor('end_stone');
+    assert(getSelectedArenaFloor() === 'end_stone', 'getSelectedArenaFloor should reflect end_stone');
+    assert(resolveActiveFloorId() === 'end_stone', 'resolveActiveFloorId should return chosen end_stone');
+    
+    setSelectedArenaFloor('end_stone_bricks');
+    assert(getSelectedArenaFloor() === 'end_stone_bricks', 'getSelectedArenaFloor should reflect end_stone_bricks');
+    assert(resolveActiveFloorId() === 'end_stone_bricks', 'resolveActiveFloorId should return chosen end_stone_bricks');
+    
+    setSelectedArenaFloor('mossy_stone');
+    assert(getSelectedArenaFloor() === 'mossy_stone', 'getSelectedArenaFloor should reflect mossy_stone');
+    assert(resolveActiveFloorId() === 'mossy_stone', 'resolveActiveFloorId should return chosen mossy_stone');
     
     setSelectedArenaFloor('classic_clean');
     assert(resolveActiveFloorId() === 'classic_clean', 'resolveActiveFloorId should return classic_clean');

@@ -495,6 +495,7 @@ export function spawnDomainSlashLines(fighter, count) {
             isGuaranteedHit: true,
             undodgeable: true,
             alreadyCheckedDodge: true,
+            noHitSound: true,
             angle,
             normalX,
             normalY,

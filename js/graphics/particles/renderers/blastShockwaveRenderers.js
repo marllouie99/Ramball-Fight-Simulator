@@ -99,13 +99,14 @@ export function drawMeleeClashShockwave(ctx, effect) {
   const isTodoClap = (effect.clashType === 'todo');
   const isGenosClash = (effect.clashType === 'genos' || effect.clashType === 'orange');
   const isInfinityClash = (effect.clashType === 'gojo_infinity');
+  const isSpudowBlast = (effect.clashType === 'spudow');
 
   const isDark = _isDarkMode();
 
   ctx.globalCompositeOperation = 'source-over';
   ctx.fillStyle = isDark 
-    ? `rgba(0, 0, 0, 0)` 
-    : (isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isInfinityClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(0, 0, 0, 0)` : `rgba(30, 10, 40, ${effect.life * 0.4})`))))));
+    ? (isSpudowBlast ? `rgba(60, 30, 10, ${effect.life * 0.55})` : `rgba(0, 0, 0, 0)`)
+    : (isSpudowBlast ? `rgba(60, 30, 10, ${effect.life * 0.55})` : (isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isInfinityClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(0, 0, 0, 0)` : `rgba(30, 10, 40, ${effect.life * 0.4})`)))))));
   if (!isMahoragaClash) {
     ctx.beginPath();
     ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
@@ -396,6 +397,65 @@ export function drawMeleeClashShockwave(ctx, effect) {
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.size * 0.6, 0, Math.PI * 2);
       ctx.stroke();
+    }
+  } else if (isSpudowBlast) {
+    // ── PvZ SPUDOW! Potato Mine Ground-Level Expanding Shockwave ──
+    // Thick earthy brown-to-orange expanding blast ring with perspective squish and radial debris rays
+    const alpha = effect.life;
+
+    // Outer dark earthy rim (dirt explosion edge)
+    ctx.strokeStyle = `rgba(92, 51, 23, ${(alpha * 0.90).toFixed(3)})`;
+    ctx.lineWidth = 14 * alpha;
+    ctx.beginPath();
+    ctx.ellipse(effect.x, effect.y, effect.size * 1.05, effect.size * 0.38, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Mid fiery orange blast ring
+    ctx.strokeStyle = `rgba(255, 102, 0, ${(alpha * 0.95).toFixed(3)})`;
+    ctx.lineWidth = 10 * alpha;
+    ctx.beginPath();
+    ctx.ellipse(effect.x, effect.y, effect.size * 0.88, effect.size * 0.32, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner golden solar ring
+    ctx.strokeStyle = `rgba(255, 200, 0, ${(alpha * 0.98).toFixed(3)})`;
+    ctx.lineWidth = 7 * alpha;
+    ctx.beginPath();
+    ctx.ellipse(effect.x, effect.y, effect.size * 0.65, effect.size * 0.24, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Superheated white core flash ring
+    ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.98).toFixed(3)})`;
+    ctx.lineWidth = 4 * alpha;
+    ctx.beginPath();
+    ctx.ellipse(effect.x, effect.y, effect.size * 0.38, effect.size * 0.14, 0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 8 radial debris rays shooting outward from blast center (earthy brown + orange)
+    const rayCount = 8;
+    ctx.lineWidth = 2.5 * alpha;
+    for (let i = 0; i < rayCount; i++) {
+      const rayAngle = (Math.PI * 2 * i / rayCount) + (1 - alpha) * 0.3;
+      const innerR = effect.size * 0.30;
+      const outerR = effect.size * 1.12;
+      const cosR = Math.cos(rayAngle);
+      const sinR = Math.sin(rayAngle);
+
+      // Brown outer ray
+      ctx.strokeStyle = `rgba(120, 53, 15, ${(alpha * 0.80).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(effect.x + cosR * innerR, effect.y + sinR * innerR * 0.36);
+      ctx.lineTo(effect.x + cosR * outerR, effect.y + sinR * outerR * 0.36);
+      ctx.stroke();
+
+      // Orange inner ray
+      ctx.strokeStyle = `rgba(255, 140, 0, ${(alpha * 0.90).toFixed(3)})`;
+      ctx.lineWidth = 1.5 * alpha;
+      ctx.beginPath();
+      ctx.moveTo(effect.x + cosR * innerR * 0.8, effect.y + sinR * innerR * 0.29);
+      ctx.lineTo(effect.x + cosR * outerR * 0.85, effect.y + sinR * outerR * 0.31);
+      ctx.stroke();
+      ctx.lineWidth = 2.5 * alpha;
     }
   } else {
     const isHex = typeof effect.clashType === 'string' && effect.clashType.startsWith('#');
