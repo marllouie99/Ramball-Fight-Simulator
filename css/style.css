@@ -1242,6 +1242,18 @@ body.arena-dark-mode {
   font-family: 'Pricedown', 'Impact', 'Arial Black', sans-serif !important;
 }
 
+/* Sans Custom Undertale Lowercase Comic Sans Typography */
+.hud-sans-name,
+.boss-card__name.hud-sans-name,
+.challenger-name.hud-sans-name,
+.health-card__title.hud-sans-name,
+.health-card .hud-sans-name {
+  font-family: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive, monospace !important;
+  text-transform: lowercase !important;
+  letter-spacing: 0.5px !important;
+  font-weight: bold !important;
+}
+
 .arena-dark-mode .health-card__info,
 .arena-dark-mode .health-card__info > div,
 .arena-dark-mode .health-card__info b,

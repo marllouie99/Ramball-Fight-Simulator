@@ -57,6 +57,7 @@ import { InosukeFighter } from '../fighters/InosukeFighter.js';
 import { EscanorFighter } from '../fighters/EscanorFighter.js';
 import { EyeOfCthulhuFighter } from '../fighters/EyeOfCthulhuFighter.js';
 import { EnderDragonFighter } from '../fighters/EnderDragonFighter.js';
+import { SansFighter } from '../fighters/SansFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -106,6 +107,10 @@ export const FIGHTER_CLASS_MAP = {
   'Pekka': PekkaFighter,
   'PEKKA': PekkaFighter,
   'p.e.k.k.a': PekkaFighter,
+  'sans': SansFighter,
+  'Sans': SansFighter,
+  'SANS': SansFighter,
+  'sans_undertale': SansFighter,
   'namelessdeity': NamelessDeityFighter,
   'nameless_deity': NamelessDeityFighter,
   'nameless': NamelessDeityFighter,

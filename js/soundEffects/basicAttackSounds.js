@@ -927,6 +927,30 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     }
   },
 
+  // SANS — Undertale Bone Stab / Throw
+  'sans': {
+    get src() {
+      return CONFIG.sans?.sounds?.boneStab || 'Assets/Sound Effects/Sans/BoneStab.ogg';
+    },
+    get volume() {
+      return CONFIG.sans?.soundVolumes?.boneStab !== undefined ? CONFIG.sans.soundVolumes.boneStab : 0.85;
+    },
+    get delay() {
+      return CONFIG.sans?.soundDelays?.boneStab || 0;
+    }
+  },
+  'sans_bone': {
+    get src() {
+      return CONFIG.sans?.sounds?.boneStab || 'Assets/Sound Effects/Sans/BoneStab.ogg';
+    },
+    get volume() {
+      return CONFIG.sans?.soundVolumes?.boneStab !== undefined ? CONFIG.sans.soundVolumes.boneStab : 0.85;
+    },
+    get delay() {
+      return CONFIG.sans?.soundDelays?.boneStab || 0;
+    }
+  },
+
   // Classic Arcade Archetypes
   'normal': {
     src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',

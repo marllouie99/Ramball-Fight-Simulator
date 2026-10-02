@@ -19,6 +19,7 @@ import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
 import { crazyDaveConfig } from '../configs/characters/crazyDaveConfig.js';
 import { pekkaConfig } from '../configs/characters/pekkaConfig.js';
+import { sansConfig } from '../configs/characters/sansConfig.js';
 import { namelessDeityConfig } from '../configs/characters/namelessDeityConfig.js';
 import { draedonConfig } from '../configs/characters/draedonConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
@@ -64,6 +65,8 @@ export const CONFIG = {
   crazy_dave: crazyDaveConfig,
   CrazyDave: crazyDaveConfig,
   pekka: pekkaConfig,
+  sans: sansConfig,
+  Sans: sansConfig,
   namelessdeity: namelessDeityConfig,
   namelessDeity: namelessDeityConfig,
   nameless_deity: namelessDeityConfig,
@@ -1800,6 +1803,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: draedonConfig.projectileSpeedMultiplier || 1.0,
     ability: draedonConfig.ability || 'Exo Electric Disintegrator & Ares Artillery',
     desc: draedonConfig.desc || 'The supreme cybernetic mastermind from Terraria: Calamity Mod. Wields twin Exo-Pulse Blasters, commands Ares Gauss Artillery, activates Thanatos Refractive Shields, and incinerates enemies with the apocalyptic "Exo Electric Disintegrator" plasma melting ray.',
+  },
+  {
+    id: 54,
+    name: 'SANS',
+    category: 'Gaming',
+    color: sansConfig.color || '#00F5FF',
+    themeColor: sansConfig.themeColor || '#00F5FF',
+    secondaryColor: sansConfig.secondaryColor || '#FFE600',
+    startX: 300,
+    startY: 250,
+    startVx: 1.0,
+    startVy: 0.9,
+    radius: sansConfig.radius || sansConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'sans',
+    hp: sansConfig.hp || 240,
+    damage: sansConfig.damage || 8,
+    cooldown: sansConfig.cooldown || 26,
+    moveSpeed: sansConfig.moveSpeed || sansConfig.speed || 5.2,
+    projectileSpeedMultiplier: sansConfig.projectileSpeedMultiplier || 1.0,
+    ability: sansConfig.ability || 'Gaster Blasters, Bone Zone & Blue Soul Gravity ("Bad Time")',
+    desc: sansConfig.desc || 'The laid-back skeleton judge from Undertale. Dodges incoming attacks with instant teleportation afterimages. Attacks with rapid bone barrages, summons heavy Gaster Blaster laser cannons, applies Karmic Retribution (KR) damage over time, and controls battlefield gravity with Blue Soul telekinesis slams.',
   }
 ];
 

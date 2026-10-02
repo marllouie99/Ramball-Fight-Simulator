@@ -8,6 +8,7 @@ import { drawMakimaSkin, _drawMakimaHair, _getMakimaHairImage } from '../fighter
 import { drawMeguminSkin, _drawMeguminHair, _getMeguminHairImage } from '../fighters/meguminSkin.js';
 import { drawCrazyDaveSkin, _drawCrazyDaveHair, _getCrazyDaveHairImage } from '../fighters/crazyDaveSkin.js';
 import { drawPekkaSkin } from '../fighters/pekkaSkin.js';
+import { drawSansSkin } from '../fighters/sansSkin.js';
 import { drawRezeSkin, _drawRezeHair, _getRezeHairImage } from '../fighters/rezeSkin.js';
 import { drawSukunaBody, _drawSukunaHair, _getSukunaHairImage } from '../fighters/sukunaSkin.js';
 import { drawYujiSkin, _drawYujiHair, _getYujiHairImage } from '../fighters/yujiSkin.js';
@@ -89,7 +90,7 @@ export const SKIN_STUDIO_CATEGORIES = [
   { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'nameless_deity', 'eye_of_cthulhu'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'eye_of_cthulhu'].includes(f.key) }
 ];
 
 
@@ -1030,6 +1031,8 @@ export function drawSkinStudioScreen() {
         drawCrazyDaveSkin(ctx, dummyFighter);
       } else if (fDef.key === 'pekka') {
         drawPekkaSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'sans') {
+        drawSansSkin(ctx, dummyFighter);
       } else if (fDef.key === 'reze') {
         drawRezeSkin(ctx, dummyFighter);
       } else if (fDef.key === 'sukuna') {

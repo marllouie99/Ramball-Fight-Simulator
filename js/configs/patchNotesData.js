@@ -28,67 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "CJ",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "jetpackUziBulletDamage",
-                "oldVal": 5,
-                "newVal": 2,
-                "pct": "-60.0%"
-            },
-            {
-                "type": "NERF",
-                "key": "driveByBulletDamage",
-                "oldVal": 5,
-                "newVal": 2,
-                "pct": "-60.0%"
-            }
-        ]
-    },
-    {
-        "character": "NAMELESSDEITY",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "dartDamage",
-                "oldVal": 14,
-                "newVal": 3,
-                "pct": "-78.6%"
-            },
-            {
-                "type": "BUFF",
-                "key": "dartHomingStrength",
-                "oldVal": 0.06,
-                "newVal": 0.075,
-                "pct": "+25.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "enableSuperclusterStars",
-                "oldVal": 0,
-                "newVal": 1,
-                "pct": "+0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "superclusterCooldown",
-                "oldVal": 400,
-                "newVal": 300,
-                "pct": "-25.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "destroyerTickInterval",
-                "oldVal": 10,
-                "newVal": 50,
-                "pct": "+400.0%"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

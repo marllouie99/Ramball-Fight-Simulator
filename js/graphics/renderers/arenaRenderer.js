@@ -889,35 +889,43 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   const isTeamMatch = (team0.length > 0 && team1.length > 0 && (team0.length + team1.length === mainFighters.length));
 
   if (isTeamMatch) {
+    const isSansFighter = (f) => Boolean(f && (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')));
+
     const team0Data = team0.map(f => ({
-      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-      color: getHudNameColor(f, '#38BDF8')
+      name: isSansFighter(f) ? 'sans' : (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      color: getHudNameColor(f, '#38BDF8'),
+      isSans: isSansFighter(f),
+      fighter: f
     }));
 
     const team1Data = team1.map(f => ({
-      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      name: isSansFighter(f) ? 'sans' : (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
       color: getHudNameColor(f, '#F87171'),
+      isSans: isSansFighter(f),
       fighter: f
     }));
 
     const hasStackedTeam = team0.length > 1 || team1.length > 1;
     const nameFontSize = hasStackedTeam ? 44 : 60;
-    const customNameFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-    const vsFontSize = hasStackedTeam ? 22 : 24;
-    const customVsFont = `700 ${vsFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-
-    ctx.font = customNameFont;
-    if ('letterSpacing' in ctx) {
-      ctx.letterSpacing = '2px';
-    }
+    const getFighterFont = (isSansMember, fontSize) => {
+      if (isSansMember) {
+        return `700 ${fontSize}px "Comic Sans MS", "Comic Neue", "Chalkboard SE", monospace, sans-serif`;
+      }
+      return `700 ${fontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+    };
+    const customVsFont = `700 ${hasStackedTeam ? 22 : 24}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
 
     let wTeam0 = 0;
     team0Data.forEach(td => {
+      ctx.font = getFighterFont(td.isSans, nameFontSize);
+      if ('letterSpacing' in ctx) ctx.letterSpacing = td.isSans ? '0.5px' : '2px';
       wTeam0 = Math.max(wTeam0, ctx.measureText(td.name).width);
     });
 
     let wTeam1 = 0;
     team1Data.forEach(td => {
+      ctx.font = getFighterFont(td.isSans, nameFontSize);
+      if ('letterSpacing' in ctx) ctx.letterSpacing = td.isSans ? '0.5px' : '2px';
       wTeam1 = Math.max(wTeam1, ctx.measureText(td.name).width);
     });
 
@@ -951,24 +959,24 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     const team1X = vsX + wVs + pad;
 
     ctx.textAlign = 'left';
-    const drawHudName = (name, x, y, color) => {
-      ctx.fillStyle = color;
+    const drawHudName = (td, x, y) => {
+      ctx.font = getFighterFont(td.isSans, nameFontSize);
+      if ('letterSpacing' in ctx) ctx.letterSpacing = td.isSans ? '0.5px' : '2px';
+      ctx.fillStyle = td.color;
       if (!isDark) {
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 0.5;
-        ctx.strokeText(name, x, y);
+        ctx.strokeText(td.name, x, y);
       }
-      ctx.fillText(name, x, y);
+      ctx.fillText(td.name, x, y);
     };
 
     // Render Team 0 (Left Side)
-    ctx.font = customNameFont;
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
     if (team0Data.length === 1) {
-      drawHudName(team0Data[0].name, startX, hasStackedTeam ? midY : bottomY, team0Data[0].color);
+      drawHudName(team0Data[0], startX, hasStackedTeam ? midY : bottomY);
     } else {
-      drawHudName(team0Data[0].name, startX, topY, team0Data[0].color);
-      drawHudName(team0Data[1].name, startX, bottomY, team0Data[1].color);
+      drawHudName(team0Data[0], startX, topY);
+      drawHudName(team0Data[1], startX, bottomY);
     }
 
     // Render Center "vs"
@@ -978,13 +986,11 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     ctx.fillText(vsText, vsX, (hasStackedTeam ? midY : bottomY) - 1.5);
 
     // Render Team 1 (Right Side)
-    ctx.font = customNameFont;
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
     if (team1Data.length === 1) {
-      drawHudName(team1Data[0].name, team1X, hasStackedTeam ? midY : bottomY, team1Data[0].color);
+      drawHudName(team1Data[0], team1X, hasStackedTeam ? midY : bottomY);
     } else {
-      drawHudName(team1Data[0].name, team1X, topY, team1Data[0].color);
-      drawHudName(team1Data[1].name, team1X, bottomY, team1Data[1].color);
+      drawHudName(team1Data[0], team1X, topY);
+      drawHudName(team1Data[1], team1X, bottomY);
     }
 
     ctx.restore();
@@ -993,20 +999,22 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     const pad = 10;
     const vsText = 'vs';
     const textY = arena.y - 12;
+    const isSansFighter = (f) => Boolean(f && (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')));
     const fighterData = mainFighters.map(f => ({
-      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
-      color: getHudNameColor(f, '#F8FAFC')
+      name: isSansFighter(f) ? 'sans' : (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      color: getHudNameColor(f, '#F8FAFC'),
+      isSans: isSansFighter(f)
     }));
 
     let totalW = 0;
-    ctx.font = nameFont;
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
     fighterData.forEach((fd, i) => {
+      ctx.font = fd.isSans ? '700 42px "Comic Sans MS", "Comic Neue", "Chalkboard SE", monospace, sans-serif' : nameFont;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = fd.isSans ? '0.5px' : '2px';
       totalW += ctx.measureText(fd.name).width;
       if (i < fighterData.length - 1) {
         ctx.font = vsFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
         totalW += pad + ctx.measureText(vsText).width + pad;
-        ctx.font = nameFont;
       }
     });
 

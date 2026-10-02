@@ -3503,6 +3503,18 @@ async function runInteractionTests() {
       assert(mockCtx.getStackDepth() === 0, `Draedon draw stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
     }
 
+    // Test Nameless Deity Beam Aim Lock-In before release (Hold Frames)
+    nameless.destroyerWindupTimer = 100; // Phase 2: tracking active
+    assert(nameless.canAim() === true, 'Nameless Deity must allow auto-aim tracking during early/mid windup');
+    
+    nameless.destroyerWindupTimer = 30; // Phase 3: lock-in hold phase before beam release
+    assert(nameless.canAim() === false, 'Nameless Deity must disable auto-aim during lock-in hold frames before beam release');
+    const lockedAngle = nameless.destroyerCastAngle;
+    draedon.x = 400;
+    draedon.y = 400;
+    nameless.aim(draedon);
+    assert(nameless.gunAngle === lockedAngle, 'Nameless Deity aim must remain locked to committed cast angle during lock-in phase');
+
     // Test Skin 2 (Golden Seraph with Wings9.png, wheel9.png, sideflower9.png, arm9.png, forearm9.png, hands9.png, deitybody9.png, antlers9.png & vines9.png) rendering & canvas stack depth
     nameless.skinVariant = 'skin2';
     mockCtx.resetStackDepth();
@@ -3538,6 +3550,182 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, 'drawExoDisintegratorPreview must maintain 0 canvas stack depth');
 
     console.log('      ✅ Nameless Destroyer & Exo Electric Disintegrator super-beams, skills & 100% balanced Canvas 2D stacks verified.');
+  }
+
+  // ─────────────────────────────────────────────
+  // TEST 32: Sans Undertale Speech Bubbles, Warning Trap Telegraphs & Custom HUD Typography
+  // ─────────────────────────────────────────────
+  {
+    console.log('\n[TEST 32] SANS: Undertale Speech Bubbles, Bone Warning Indicators & Lowercase HUD Names...');
+    const { SansFighter } = await import('../js/entities/fighters/SansFighter.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { drawArenaMatchNames } = await import('../js/graphics/renderers/arenaRenderer.js');
+
+    const sans = new SansFighter({ name: 'SANS' });
+    const opponent = new GojoFighter({ name: 'GOJO' });
+
+    state.fighters = [sans, opponent];
+    state.arena = { x: 50, y: 50, width: 500, height: 500 };
+    state.gameState = 'playing';
+
+    // 1. Verify Speech Bubble initialization and lowercase speech conversion
+    sans.speak('Ready?');
+    assert(sans.speechBubble && sans.speechBubble.fullText === 'ready?', 'Sans speech must be strictly converted to lowercase');
+    assert(sans.speechBubble.timer > 0, 'Sans speech bubble must have an active lifetime timer');
+
+    // 2. Verify Typewriter progress & Canvas 2D stack depth during speech
+    for (let i = 0; i < 20; i++) {
+      sans.update(opponent, 0, state.arena);
+      mockCtx.resetStackDepth();
+      sans.draw(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, `Sans draw stack depth during speech must be 0 (got ${mockCtx.getStackDepth()})`);
+    }
+    assert(sans.speechBubble.text.length > 0, 'Sans speech bubble must progressively reveal characters via typewriter engine');
+
+    // 3. Verify Bone Zone Warning Indicator and (!) Trap phase
+    sans.boneTraps = [];
+    sans.castBoneZone(opponent);
+    assert(sans.boneTraps.length > 0, 'Sans must spawn ground bone stab traps');
+    const trap = sans.boneTraps[0];
+    assert(trap.isWarning === true, 'Ground bone trap must start in telegraph warning phase');
+    assert(trap.warnTimer > 0, 'Ground bone trap must have warning frames');
+
+    // Render warning phase on canvas
+    mockCtx.resetStackDepth();
+    sans.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during bone warning trap must be 0');
+
+    // 4. Verify Bad Time Gravity Slam speech trigger
+    sans.castBadTimeGravitySlam(opponent);
+    assert(sans.speechBubble.fullText.includes('bad time'), 'Sans Bad Time ultimate must trigger iconic speech bubble');
+    assert(sans.isBadTimeActive === true, 'Bad Time mode must be activated');
+
+    // 5. Verify Undertale Red SOUL Heart Split & Shatter Game-Over Defeat VFX
+    opponent.hp = 0;
+    sans.update(opponent, 0, state.arena);
+    assert(sans.heartShatters.length > 0, 'Sans must spawn Undertale Heart Shatter effect when opponent is defeated');
+    const heartFx = sans.heartShatters[0];
+    assert(heartFx.timer === 85, 'Heart Shatter must initialize with 85-frame sequence');
+
+    // Step through Phase 1 (Reveal & Levitate)
+    mockCtx.resetStackDepth();
+    sans.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during Heart Reveal phase must be 0');
+
+    // Step into Phase 2 (Heart Split)
+    heartFx.timer = 65;
+    sans._updateHeartShatters();
+    assert(heartFx.soundPlayedSplit === true, 'Heart Split sound must play during Phase 2');
+    mockCtx.resetStackDepth();
+    sans.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during Heart Split phase must be 0');
+
+    // Step into Phase 3 (Heart Shatter into Shards)
+    heartFx.timer = 50;
+    sans._updateHeartShatters();
+    assert(heartFx.soundPlayedShatter === true, 'Heart Shatter sound must play during Phase 3');
+    assert(heartFx.shards && heartFx.shards.length === 8, 'Heart Shatter must generate 8 flying pixel shards');
+    mockCtx.resetStackDepth();
+    sans.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during Heart Shatter Shards phase must be 0');
+
+    // 6. Verify global death sfx "faah" suppression when killed by Sans
+    let faahPlayed = false;
+    const origPlaySFX = (await import('../js/systems/audioSystem.js')).audioSystem.playSFX;
+    (await import('../js/systems/audioSystem.js')).audioSystem.playSFX = (src) => {
+      if (typeof src === 'string' && src.includes('faah')) faahPlayed = true;
+    };
+    opponent.hp = 10;
+    opponent.takeDamage(100, sans);
+    (await import('../js/systems/audioSystem.js')).audioSystem.playSFX = origPlaySFX;
+    assert(faahPlayed === false, 'Global death sfx faah must be suppressed when defeated by Sans');
+
+    // 7. Verify Arena Canvas Match Header renders "sans" in lowercase Comic Sans
+    mockCtx.resetStackDepth();
+    drawArenaMatchNames(mockCtx, false);
+    assert(mockCtx.getStackDepth() === 0, 'drawArenaMatchNames must maintain 0 canvas stack depth');
+
+    // 8. Verify Sans in-arena overhead HP overlay rendering
+    const { FighterRenderer } = await import('../js/graphics/renderers/fighterRenderer.js');
+    mockCtx.resetStackDepth();
+    FighterRenderer.drawHealth(mockCtx, sans);
+    assert(mockCtx.getStackDepth() === 0, 'Sans drawHealth must maintain 0 canvas stack depth');
+
+    // 9. Verify Sans HUD skill providers (Gaster Blaster, Bone Zone, Bad Time)
+    const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
+    const sansSkills = getSkillDataForFighter(sans);
+    assert(sansSkills && sansSkills.length === 3, `Sans must have 3 HUD skill providers (got ${sansSkills.length})`);
+    assert(sansSkills.some(s => s.id === 'blaster'), 'Sans must have Gaster Blaster skill bar');
+    assert(sansSkills.some(s => s.id === 'bone_zone'), 'Sans must have Bone Zone skill bar');
+    assert(sansSkills.some(s => s.id === 'bad_time'), 'Sans must have Bad Time skill bar');
+    assert(sansSkills.every(s => s.color === '#00F5FF'), 'All Sans HUD skill progress bars must use the unified themeColor (#00F5FF)');
+    // 10. Verify Sans Teleport Dodge & Stamina in Sukuna Domain Slash Lines
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const sukuna = new SukunaFighter({ name: 'SUKUNA' });
+    sans.stamina = 100;
+    sans.dodgeCooldown = 0;
+    const initialSansHp = sans.hp;
+
+    // Dodge slice line 1 (100 -> 80 stamina) with deterministic random mock
+    const origRandom = Math.random;
+    Math.random = () => 0.1;
+    const dodged1 = sans.dodgeSliceLine({
+      angle: Math.PI / 4,
+      cx: sans.x,
+      cy: sans.y,
+      normalX: 0.707,
+      normalY: 0.707,
+      thickness: 4,
+      attacker: sukuna
+    });
+    Math.random = origRandom;
+
+    assert(dodged1 === true, 'Sans must successfully dodge Sukuna domain slice line when stamina is available');
+    assert(sans.stamina === 80, `Expected 80 stamina after dodge (got ${sans.stamina})`);
+    assert(sans.hp === initialSansHp, 'Sans HP must remain untouched after dodging domain slice line');
+    assert(sans.afterImages && sans.afterImages.length > 0, 'Sans must leave afterimage when dodging domain slice line');
+
+    // Test failed dodge roll when random check fails (0.95 >= 0.80)
+    sans.stamina = 80;
+    sans.dodgeCooldown = 0;
+    Math.random = () => 0.95;
+    const dodgedRollFailed = sans.dodgeSliceLine({
+      angle: 0,
+      cx: sans.x,
+      cy: sans.y,
+      normalX: 0,
+      normalY: 1,
+      thickness: 4,
+      attacker: sukuna
+    });
+    Math.random = origRandom;
+    assert(dodgedRollFailed === false, 'Sans must fail dodge when dodge chance roll fails');
+
+    // Simulate depleting Sans's stamina down to 0
+    sans.stamina = 10;
+    sans.dodgeCooldown = 0;
+    const dodgedExhausted = sans.dodgeSliceLine({
+      angle: 0,
+      cx: sans.x,
+      cy: sans.y,
+      normalX: 0,
+      normalY: 1,
+      thickness: 4,
+      attacker: sukuna
+    });
+    assert(dodgedExhausted === false, 'Sans must NOT be able to dodge domain slice line when stamina is insufficient');
+
+    // 11. Verify Sans dodge chance configuration (85% standard, 80% domain cuts)
+    const { sansConfig } = await import('../js/configs/characters/sansConfig.js');
+    assert(sansConfig.dodgeChance === 0.85, `Expected 0.85 dodgeChance (got ${sansConfig.dodgeChance})`);
+    assert(sansConfig.domainDodgeChance === 0.80, `Expected 0.80 domainDodgeChance (got ${sansConfig.domainDodgeChance})`);
+
+    // Verify canvas stack depth during dodge state
+    mockCtx.resetStackDepth();
+    sans.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during domain slice dodge state must be 0');
+
+    console.log('      ✅ Sans Undertale speech bubbles, warning box, Heart Shatter defeat VFX, faah suppression, in-arena overlay HP, skill bars & Sukuna domain slice line dodges verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

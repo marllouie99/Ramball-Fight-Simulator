@@ -723,6 +723,31 @@
           "beamWidth": 42
         }
       }
+    },
+    "sans": {
+      "name": "Sans",
+      "archetype": "zoner",
+      "hp": 240,
+      "speed": 5.2,
+      "radius": 25,
+      "baseDamage": 8,
+      "baseCooldown": 26,
+      "themeColor": "#00F5FF",
+      "keySkills": {
+        "gasterBlaster": {
+          "beamDamage": 8,
+          "cooldown": 320,
+          "beamWidth": 38
+        },
+        "boneZone": {
+          "boneDamage": 5,
+          "cooldown": 240
+        },
+        "gravitySlam": {
+          "slamDamage": 22,
+          "cooldown": 580
+        }
+      }
     }
   }
 }

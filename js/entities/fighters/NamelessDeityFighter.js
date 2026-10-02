@@ -93,8 +93,11 @@ export class NamelessDeityFighter extends Fighter {
   }
 
   canAim() {
-    // Disable auto-aim tracking strictly during active super-beam firing (Rule 1.4)
-    if (this.destroyerFireTimer > 0) {
+    if (this.hp <= 0 || this.isDead || this.dead) return false;
+    // Disable auto-aim when Deity is about to release the beam (during lock-in hold frames), during active firing, and recovery (Rule 1.4)
+    const holdFrames = (typeof this.destroyerHoldFrames === 'number' && this.destroyerHoldFrames > 0) ? this.destroyerHoldFrames : 43;
+    const isLockInPhase = (this.destroyerWindupTimer > 0 && this.destroyerWindupTimer <= holdFrames);
+    if (isLockInPhase || this.destroyerFireTimer > 0 || this.destroyerRecoveryTimer > 0) {
       return false;
     }
     return super.canAim ? super.canAim() : true;
@@ -121,15 +124,21 @@ export class NamelessDeityFighter extends Fighter {
   }
 
   aim(opponent) {
-    if (this.destroyerFireTimer > 0) {
-      // Locked committed aim while firing beam (no tracking, no snapping)
-      this.gunAngle = this.destroyerCastAngle;
-      this.angle = this.destroyerCastAngle;
+    const holdFrames = (typeof this.destroyerHoldFrames === 'number' && this.destroyerHoldFrames > 0) ? this.destroyerHoldFrames : 43;
+    const isLockInPhase = (this.destroyerWindupTimer > 0 && this.destroyerWindupTimer <= holdFrames);
+
+    if (this.destroyerFireTimer > 0 || isLockInPhase || this.destroyerRecoveryTimer > 0) {
+      // Locked committed aim: strictly clamped to committed cast angle (no auto-aim tracking, no snap jumping)
+      if (this.destroyerCastAngle !== undefined) {
+        this.gunAngle = this.destroyerCastAngle;
+        this.angle = this.destroyerCastAngle;
+      }
       return;
     }
+
     if (this.destroyerWindupTimer > 0) {
-      // Smooth tracking auto-aim while channeling/winding up the flare and magic circle
-      if (opponent && opponent.hp > 0 && !this.isTeammate(opponent)) {
+      // Smooth tracking auto-aim while channeling/winding up the flare and magic circle (before lock-in hold phase)
+      if (opponent && opponent.hp > 0 && !this.isTeammate(opponent) && this.canAim()) {
         const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
         let angleDiff = targetAngle - (this.gunAngle || 0);
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -770,9 +779,14 @@ export class NamelessDeityFighter extends Fighter {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
 
-      // Smooth auto-aim tracking towards opponent while channeling windup
-      if (opponent && opponent.hp > 0 && !this.isTeammate(opponent)) {
+      // Smooth auto-aim tracking towards opponent while channeling windup (until lock-in hold phase before beam release)
+      const holdFrames = (typeof this.destroyerHoldFrames === 'number' && this.destroyerHoldFrames > 0) ? this.destroyerHoldFrames : 43;
+      const isLockInPhase = (this.destroyerWindupTimer <= holdFrames);
+      if (!isLockInPhase && opponent && opponent.hp > 0 && !this.isTeammate(opponent) && this.canAim()) {
         this.aim(opponent);
+      } else if (isLockInPhase && this.destroyerCastAngle !== undefined) {
+        this.gunAngle = this.destroyerCastAngle;
+        this.angle = this.destroyerCastAngle;
       }
 
       // Smooth building cosmic vibration during the final phase of windup charge
@@ -788,8 +802,10 @@ export class NamelessDeityFighter extends Fighter {
       }
 
       if (this.destroyerWindupTimer === 0) {
-        // Wind-up complete: SNAP spawn the super-beam along current aimed direction without snap jumping!
-        this.destroyerCastAngle = this.gunAngle || 0;
+        // Wind-up complete: SNAP spawn the super-beam along locked committed direction without snap jumping!
+        this.destroyerCastAngle = (this.destroyerCastAngle !== undefined) ? this.destroyerCastAngle : (this.gunAngle || 0);
+        this.gunAngle = this.destroyerCastAngle;
+        this.angle = this.destroyerCastAngle;
         this.destroyerFireTimer = (typeof this.destroyerFireFrames === 'number' && this.destroyerFireFrames > 0)
           ? this.destroyerFireFrames
           : (getNamelessSetting(cfg, 'destroyerFireFrames') ?? 800);

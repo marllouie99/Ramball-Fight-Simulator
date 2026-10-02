@@ -83,6 +83,8 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('toji-ultimate') ||
          s.includes('finalblow') ||
          s.includes('zenitsu') ||
+         s.includes('sansspeak') ||
+         s.includes('sans') ||
          s.includes('ui');
 }
 

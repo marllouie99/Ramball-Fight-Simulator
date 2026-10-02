@@ -59,6 +59,48 @@ export function getSkillDataForFighter(f, getProjectiles) {
   if (!f) return [];
 
   // ─────────────────────────────────────────────
+  // SANS (The Judge of the Underground)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.sans) ? CONFIG.sans : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#00F5FF';
+    const skills = [];
+
+    // 1. Gaster Blaster (Skill 1)
+    if (isSkillEnabled(cfg.enableGasterBlaster, true)) {
+      const blasterMax = cfg.blasterCooldown || 500;
+      const blasterTimer = f.blasterCooldown !== undefined ? f.blasterCooldown : 0;
+      const blasterPct = Math.max(0, Math.min(100, (1 - (blasterTimer / blasterMax)) * 100));
+      skills.push({ id: 'blaster', pct: blasterPct, ready: blasterPct >= 99 && blasterTimer <= 0, color: themeColor, label: 'GASTER BLASTER' });
+    }
+
+    // 2. Bone Zone & Traps (Skill 2)
+    if (isSkillEnabled(cfg.enableBoneZone, true)) {
+      const boneMax = cfg.boneZoneCooldown || 240;
+      const boneTimer = f.boneZoneCooldown !== undefined ? f.boneZoneCooldown : 0;
+      const bonePct = Math.max(0, Math.min(100, (1 - (boneTimer / boneMax)) * 100));
+      skills.push({ id: 'bone_zone', pct: bonePct, ready: bonePct >= 99 && boneTimer <= 0, color: themeColor, label: 'BONE ZONE' });
+    }
+
+    // 3. Bad Time & Blue Soul Gravity Slam (Ultimate)
+    if (isSkillEnabled(cfg.enableGravitySlam, true)) {
+      const slamMax = cfg.gravitySlamCooldown || 580;
+      const slamTimer = f.gravitySlamCooldown !== undefined ? f.gravitySlamCooldown : 0;
+      let slamPct = 0;
+      if (f.isBadTimeActive) {
+        const btDur = cfg.badTimeDuration || 360;
+        const btRemaining = f.badTimeTimer || 0;
+        slamPct = Math.max(0, Math.min(100, (btRemaining / btDur) * 100));
+      } else {
+        slamPct = Math.max(0, Math.min(100, (1 - (slamTimer / slamMax)) * 100));
+      }
+      skills.push({ id: 'bad_time', pct: slamPct, ready: (slamPct >= 99 && slamTimer <= 0) || f.isBadTimeActive, color: themeColor, label: 'BAD TIME' });
+    }
+
+    return skills;
+  }
+
+  // ─────────────────────────────────────────────
   // NAMELESS DEITY (Wrath of the Gods)
   // ─────────────────────────────────────────────
   if (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity' || f.type === 'nameless_deity' || f.name === 'Nameless Deity') {

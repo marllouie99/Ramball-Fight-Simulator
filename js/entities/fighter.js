@@ -2423,7 +2423,7 @@ export class Fighter {
       return;
     }
 
-    // Play death sound (suppressed if disintegrating in Nameless Deity beam or flagged silent)
+    // Play death sound (suppressed if disintegrating in Nameless Deity beam, defeated by/as Sans, or flagged silent)
     const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
     const isNamelessBeamDeath = Boolean(
       (opts && (opts.isNamelessBeam || opts.isBeamDPS || opts.noDeathSound || opts.suppressDeathSound)) ||
@@ -2433,7 +2433,13 @@ export class Fighter {
       (realAttacker && (realAttacker.characterId === 'namelessdeity' || realAttacker.characterId === 'nameless_deity' || realAttacker.type === 'namelessdeity') && ((realAttacker.destroyerFireTimer || 0) > 0 || (realAttacker.destroyerWindupTimer || 0) > 0 || (realAttacker.destroyerRecoveryTimer || 0) > 0))
     );
 
-    if (!isNamelessBeamDeath) {
+    const isSansDeath = Boolean(
+      this.characterId === 'sans' ||
+      this.type === 'sans' ||
+      (realAttacker && (realAttacker.characterId === 'sans' || realAttacker.type === 'sans'))
+    );
+
+    if (!isNamelessBeamDeath && !isSansDeath) {
       const faah = getAnnouncerSound('faah');
       if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
     }

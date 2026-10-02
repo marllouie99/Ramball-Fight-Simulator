@@ -178,6 +178,7 @@ const BOSS_SUB_NAMES = {
   musashi: 'Legendary Swordsman',
   knight: 'Iron Paladin',
   berserker: 'Untamed Warrior',
+  sans: 'The Judge of the Underground',
   darkslategray: 'Obsidian Vanguard',
   grenadier: 'Heavy Artillery',
   gunslinger: 'Rapid Outlaw',
@@ -1258,7 +1259,36 @@ function updateHealthHud() {
     const baseDmg = parseFloat(Math.max(0, Number(f.damage) || 0).toFixed(1));
     const fType = (f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
 
-    if (f.characterId === 'yuta' || f.type === 'yuta') {
+    if (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')) {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.sans) ? CONFIG.sans : {};
+      const baseBoneDmg = cfg.damage || 8;
+      const isBadTime = Boolean(f.isBadTimeActive);
+
+      // 1. DMG Stat Line (with Bad Time boost)
+      if (isBadTime) {
+        info.push(`<b>DMG:</b> ${baseBoneDmg} <span style="color: #FFE600; font-size: 10px;">(BAD TIME)</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseBoneDmg}`);
+      }
+
+      // 2. KR (Karmic Retribution) Poison Info
+      const activeKarmaTargets = (f.karmaTargets && f.karmaTargets.size > 0) ? f.karmaTargets.size : 0;
+      if (activeKarmaTargets > 0) {
+        info.push(`<b>KR:</b> Active (${activeKarmaTargets}) <span style="color: #A855F7; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>KR:</b> 1/tick`);
+      }
+
+      // 3. DODGE / Stamina Info
+      const curStam = Math.round(f.stamina !== undefined ? f.stamina : 100);
+      const dodgeCount = Math.floor(curStam / (cfg.dodgeStaminaCost || 20));
+      const dodgeRate = Math.round((cfg.dodgeChance ?? 0.85) * 100);
+      if (curStam <= 0) {
+        info.push(`<b>DODGE:</b> 0% <span style="color: #EF4444; font-size: 10px;">(TIRED)</span>`);
+      } else {
+        info.push(`<b>DODGE:</b> ${dodgeRate}% (${dodgeCount}x)`);
+      }
+    } else if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
       const baseDmg = CONFIG.yuta?.meleeDamage || CONFIG.yuta?.damage || 15;
       const baseRegen = CONFIG.yuta?.regenRate || 0.05;
@@ -2393,9 +2423,12 @@ function updateHealthHud() {
     }
 
     const isDarkTheme = isDarkModeActive();
-    const getTitleStyle = (color, isCj = false) => {
+    const getTitleStyle = (color, isCj = false, isSans = false) => {
       if (isTactical) {
         return `color: ${color || '#ffffff'}; font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; line-height: 1.15; `;
+      }
+      if (isSans) {
+        return `color: ${color || '#ffffff'}; font-size: ${baseFontSize + 1}px; text-transform: lowercase; font-family: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive, monospace; letter-spacing: 0.5px; font-weight: bold; `;
       }
       const useCj = isCj;
       const fontFamily = useCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
@@ -2427,8 +2460,9 @@ function updateHealthHud() {
         const infoGridStyle = isSingleCol ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; grid-template-columns: 1fr;` : `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;`;
 
         const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta' || (m.name && m.name.toUpperCase().includes('YUTA')));
+        const isMemberSans = m && (m.characterId === 'sans' || m.type === 'sans' || (m.name && m.name.toLowerCase() === 'sans'));
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
-        const memberName = (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
+        const memberName = isMemberSans ? 'sans' : (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
 
         if (isMemberCj) {
           return `
@@ -2551,15 +2585,17 @@ function updateHealthHud() {
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const barColor = getFighterHealthBarColor(bossFighter, ratio, isDark);
-        const bossName = (bossFighter.name || bossFighter.characterId || 'BOSS').toUpperCase();
+        const isBossSans = Boolean(bossFighter.characterId === 'sans' || bossFighter.type === 'sans' || (bossFighter.name && bossFighter.name.toLowerCase() === 'sans'));
+        const bossName = isBossSans ? 'sans' : (bossFighter.name || bossFighter.characterId || 'BOSS').toUpperCase();
         const bossSubname = getBossSubName(bossFighter);
         const bossColor = getFighterThemeColor(bossFighter, '#ef4444');
         const hpValText = `${Math.floor(Math.max(0, Number(curHp) || 0))} / ${Math.floor(maxHp)}`;
+        const bossNameClass = isBossSans ? 'boss-card__name hud-sans-name' : 'boss-card__name';
 
         const bossCardHTML = `
           <div class="boss-card">
             <div class="boss-card__header">
-              <span class="boss-card__name" style="color: ${bossColor};">${bossName}</span>
+              <span class="${bossNameClass}" style="color: ${bossColor};">${bossName}</span>
               <span class="boss-card__subname" style="color: ${bossColor};">${bossSubname}</span>
             </div>
             <div class="health-card__bar boss-bar">
@@ -2623,7 +2659,8 @@ function updateHealthHud() {
         const fighterThemeColor = getFighterThemeColor(chFighter, chIdx === 0 ? '#38bdf8' : '#f43f5e');
         const chColor = chFighter.color || fighterThemeColor;
         let nameColor = isDark ? (fighterThemeColor || '#ffffff') : '#000000';
-        const fighterName = (chFighter.name || chFighter.characterId || `CHALLENGER ${chIdx + 1}`).toUpperCase();
+        const isChSans = Boolean(chFighter.characterId === 'sans' || chFighter.type === 'sans' || (chFighter.name && chFighter.name.toLowerCase() === 'sans'));
+        const fighterName = isChSans ? 'sans' : (chFighter.name || chFighter.characterId || `CHALLENGER ${chIdx + 1}`).toUpperCase();
         const fighterStats = state.leaderboard ? (state.leaderboard[chFighter.fighterIndex] || { wins: 0, losses: 0 }) : { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
         const losses = fighterStats.losses;
@@ -2633,10 +2670,11 @@ function updateHealthHud() {
         const shakeTimer = chFighter._healthBarShakeTimer || 0;
         const matchWins = (state.scores && fighterIndex >= 0 && state.scores[fighterIndex]) ? state.scores[fighterIndex] : 0;
         const cardDesc = (fighterDef && mode !== GAME_MODES.FFA) ? fighterDef.desc : '';
+        const chNameClass = isChSans ? 'challenger-name hud-sans-name' : 'challenger-name';
 
         const chHeaderHTML = `
           <div class="challenger-header">
-            <span class="challenger-name" style="color: ${fighterThemeColor};">${fighterName}</span>
+            <span class="${chNameClass}" style="color: ${fighterThemeColor};">${fighterName}</span>
           </div>
         `;
 
@@ -3181,7 +3219,8 @@ function updateHealthHud() {
             cachedCard.lastBossNameOpacity = 1;
           }
         }
-        const bossName = (fighter.name || fighter.characterId || 'BOSS').toUpperCase();
+        const isBossSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        const bossName = isBossSans ? 'sans' : (fighter.name || fighter.characterId || 'BOSS').toUpperCase();
         if (cachedCard.lastBossName !== bossName) {
           cachedCard.bossCardName.textContent = bossName;
           cachedCard.lastBossName = bossName;
@@ -3211,7 +3250,8 @@ function updateHealthHud() {
             cachedCard.lastChOpacity = 1;
           }
         }
-        const chName = (fighter.name || fighter.characterId || 'CHALLENGER').toUpperCase();
+        const isChSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        const chName = isChSans ? 'sans' : (fighter.name || fighter.characterId || 'CHALLENGER').toUpperCase();
         if (cachedCard.lastChName !== chName) {
           cachedCard.chCardName.textContent = chName;
           cachedCard.lastChName = chName;
