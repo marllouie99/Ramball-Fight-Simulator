@@ -594,6 +594,12 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
 
+    // Nameless Deity - Prismatic Light Darts (Homing Starlight Needles)
+    if (p.visual === 'starlightDart' || p.isStarlightDart) {
+      drawStarlightDart(ctx, p);
+      return;
+    }
+
     // Layla Steampunk Cannon - Streamlined Cyan Laser Bolt (Compressed Plasma & Wind Drill)
     if (p.visual === 'layla_basic_bullet') {
       // Rendered on Canvas 2D (top layer over PixiJS WebGL)
@@ -2039,6 +2045,454 @@ function drawHeiligPfeil(ctx, p) {
   ctx.beginPath();
   ctx.arc(-halfLen, 0, 1.8, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.restore();
+}
+
+let _rawLightDaggerImg = null;
+let _rawLightDaggerAfterimageImg = null;
+let _rawLightDaggerBloomImg = null;
+let _rawLightDaggerGlowmaskImg = null;
+let _rawStarburstImg = null;
+
+let _cachedLightDaggerCanvas = null;
+let _cachedLightDaggerAfterimageCanvas = null;
+let _cachedLightDaggerBloomCanvas = null;
+let _cachedLightDaggerGlowmaskCanvas = null;
+let _cachedStarburstCanvas = null;
+
+function _processTransparentCanvas(img, isAdditiveGlow = false) {
+  if (!img || !img.complete || img.naturalWidth <= 0 || typeof document === 'undefined') return null;
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth;
+    canvas.height = img.naturalHeight;
+    const offCtx = canvas.getContext('2d');
+    offCtx.drawImage(img, 0, 0);
+
+    const imgData = offCtx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+      if (isAdditiveGlow) {
+        if (lum < 15) {
+          data[i + 3] = 0;
+        } else {
+          data[i + 3] = Math.min(255, Math.round(lum * 1.5));
+        }
+      } else {
+        if (r < 25 && g < 25 && b < 25) {
+          data[i + 3] = 0;
+        }
+      }
+    }
+    offCtx.putImageData(imgData, 0, 0);
+    return canvas;
+  } catch (e) {
+    return null;
+  }
+}
+
+function _getLightDaggerCanvas() {
+  if (_cachedLightDaggerCanvas) return _cachedLightDaggerCanvas;
+  if (!_rawLightDaggerImg && typeof Image !== 'undefined') {
+    const img = new Image();
+    img.src = 'Assets/model/NamelessDeity/LightDagger.png';
+    img.onload = () => { _cachedLightDaggerCanvas = _processTransparentCanvas(img, false); };
+    _rawLightDaggerImg = img;
+  }
+  if (_rawLightDaggerImg && _rawLightDaggerImg.complete && _rawLightDaggerImg.naturalWidth > 0) {
+    _cachedLightDaggerCanvas = _processTransparentCanvas(_rawLightDaggerImg, false);
+  }
+  return _cachedLightDaggerCanvas;
+}
+
+function _getLightDaggerAfterimageCanvas() {
+  if (_cachedLightDaggerAfterimageCanvas) return _cachedLightDaggerAfterimageCanvas;
+  if (!_rawLightDaggerAfterimageImg && typeof Image !== 'undefined') {
+    const img = new Image();
+    img.src = 'Assets/model/NamelessDeity/LightDaggerAfterimage.png';
+    img.onload = () => { _cachedLightDaggerAfterimageCanvas = _processTransparentCanvas(img, true); };
+    _rawLightDaggerAfterimageImg = img;
+  }
+  if (_rawLightDaggerAfterimageImg && _rawLightDaggerAfterimageImg.complete && _rawLightDaggerAfterimageImg.naturalWidth > 0) {
+    _cachedLightDaggerAfterimageCanvas = _processTransparentCanvas(_rawLightDaggerAfterimageImg, true);
+  }
+  return _cachedLightDaggerAfterimageCanvas;
+}
+
+function _getLightDaggerBloomCanvas() {
+  if (_cachedLightDaggerBloomCanvas) return _cachedLightDaggerBloomCanvas;
+  if (!_rawLightDaggerBloomImg && typeof Image !== 'undefined') {
+    const img = new Image();
+    img.src = 'Assets/model/NamelessDeity/LightDaggerBloom.png';
+    img.onload = () => { _cachedLightDaggerBloomCanvas = _processTransparentCanvas(img, true); };
+    _rawLightDaggerBloomImg = img;
+  }
+  if (_rawLightDaggerBloomImg && _rawLightDaggerBloomImg.complete && _rawLightDaggerBloomImg.naturalWidth > 0) {
+    _cachedLightDaggerBloomCanvas = _processTransparentCanvas(_rawLightDaggerBloomImg, true);
+  }
+  return _cachedLightDaggerBloomCanvas;
+}
+
+function _getLightDaggerGlowmaskCanvas() {
+  if (_cachedLightDaggerGlowmaskCanvas) return _cachedLightDaggerGlowmaskCanvas;
+  if (!_rawLightDaggerGlowmaskImg && typeof Image !== 'undefined') {
+    const img = new Image();
+    img.src = 'Assets/model/NamelessDeity/LightDaggerGlowmask.png';
+    img.onload = () => { _cachedLightDaggerGlowmaskCanvas = _processTransparentCanvas(img, true); };
+    _rawLightDaggerGlowmaskImg = img;
+  }
+  if (_rawLightDaggerGlowmaskImg && _rawLightDaggerGlowmaskImg.complete && _rawLightDaggerGlowmaskImg.naturalWidth > 0) {
+    _cachedLightDaggerGlowmaskCanvas = _processTransparentCanvas(_rawLightDaggerGlowmaskImg, true);
+  }
+  return _cachedLightDaggerGlowmaskCanvas;
+}
+
+function _getStarburstCanvas() {
+  if (_cachedStarburstCanvas) return _cachedStarburstCanvas;
+  if (!_rawStarburstImg && typeof Image !== 'undefined') {
+    const img = new Image();
+    img.src = 'Assets/model/NamelessDeity/Starburst.png';
+    img.onload = () => { _cachedStarburstCanvas = _processTransparentCanvas(img, true); };
+    _rawStarburstImg = img;
+  }
+  if (_rawStarburstImg && _rawStarburstImg.complete && _rawStarburstImg.naturalWidth > 0) {
+    _cachedStarburstCanvas = _processTransparentCanvas(_rawStarburstImg, true);
+  }
+  return _cachedStarburstCanvas;
+}
+
+/**
+ * Renders Nameless Deity's Prismatic Light Darts (Homing Starlight Needles).
+ * Terraria: Wrath of the Gods transcendent celestial light needle aesthetic:
+ * 1. Multi-stream Chromatic Aberration Ribbon Trail (Cyan, Magenta/Violet, White).
+ * 2. Radial Celestial Starlight Corona.
+ * 3. Authentic Sprite overlay (LightDagger.png) + Stepped Crystalline Vector Needle.
+ * 4. 8-Point Cruciform Diamond Starburst Flare at piercing tip.
+ * 5. Orbiting solar starlight sparks.
+ */
+export function drawStarlightDart(ctx, p) {
+  if (p.vx !== 0 || p.vy !== 0) {
+    p.lastAngle = Math.atan2(p.vy, p.vx);
+  }
+  const angle = (p.lastAngle !== undefined)
+    ? p.lastAngle
+    : (p.angle !== undefined ? p.angle : (Math.atan2(p.vy || 0, p.vx || 0) || 0));
+
+  const alpha = (p.fadingAlpha !== undefined)
+    ? Math.max(0, p.fadingAlpha)
+    : (p.life < 20 ? Math.max(0, p.life / 20) : 1.0);
+
+  if (alpha <= 0) return;
+
+  const now = Date.now();
+  const dartId = p.dartIndex || 0;
+  const pulse = Math.sin(now * 0.012 + dartId * 1.5) * 0.15 + 1.0;
+
+  // ─────────────────────────────────────────────────────────────
+  // 1. CHROMATIC STARLIGHT RIBBON TRAIL & 7-LAYER AFTERIMAGES (World Coordinates)
+  // ─────────────────────────────────────────────────────────────
+  if (p.history && p.history.length > 1) {
+    const hist = p.history;
+    const len = hist.length;
+
+    // 2A. 7-Layer Trailing Afterimages during Hyper-Acceleration (Phase 3)
+    if (p.flightTime !== undefined && p.flightTime >= 16) {
+      const afterCanvas = _getLightDaggerAfterimageCanvas();
+      const numAfterimages = Math.min(7, len - 1);
+      const step = Math.max(1, Math.floor((len - 1) / numAfterimages));
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < numAfterimages; k++) {
+        const hIdx = Math.max(0, len - 1 - (k + 1) * step);
+        const pt = hist[hIdx];
+        if (!pt) continue;
+
+        const afterProgress = (numAfterimages - k) / (numAfterimages + 1); // 1.0 (near) -> 0.1 (far)
+        const afterAlpha = alpha * afterProgress * 0.45;
+        if (afterAlpha <= 0.02) continue;
+
+        ctx.save();
+        ctx.translate(pt.x, pt.y);
+        ctx.rotate(angle);
+        ctx.globalAlpha = afterAlpha;
+
+        if (afterCanvas) {
+          const aScale = 0.50 * afterProgress;
+          const aw = afterCanvas.width * aScale;
+          const ah = afterCanvas.height * aScale;
+          ctx.drawImage(afterCanvas, -aw / 2, -ah / 2, aw, ah);
+        } else {
+          // Vector afterimage fallback silhouette
+          ctx.fillStyle = (k % 2 === 0) ? '#00F0FF' : '#A17FE0';
+          ctx.beginPath();
+          ctx.moveTo(14 * afterProgress, 0);
+          ctx.lineTo(-10 * afterProgress, -3 * afterProgress);
+          ctx.lineTo(-6 * afterProgress, 0);
+          ctx.lineTo(-10 * afterProgress, 3 * afterProgress);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    // 2B. Outer Chromatic Nebula Violet Aura Ribbon (Batched Continuous Path)
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.45;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#A17FE0';
+    ctx.lineWidth = 6.8 * pulse;
+    ctx.beginPath();
+    ctx.moveTo(hist[0].x, hist[0].y);
+    for (let i = 1; i < len; i++) {
+      ctx.lineTo(hist[i].x, hist[i].y);
+    }
+    ctx.stroke();
+
+    // 2C. Luminous Cyan Starlight Beam Core Ribbon (Batched Continuous Path)
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.strokeStyle = '#00F0FF';
+    ctx.lineWidth = 3.6 * pulse;
+    ctx.beginPath();
+    ctx.moveTo(hist[0].x, hist[0].y);
+    for (let i = 1; i < len; i++) {
+      ctx.lineTo(hist[i].x, hist[i].y);
+    }
+    ctx.stroke();
+
+    // 2D. Blinding White-Hot Center Spine (Batched Continuous Path)
+    ctx.globalAlpha = alpha * 0.95;
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(hist[0].x, hist[0].y);
+    for (let i = 1; i < len; i++) {
+      ctx.lineTo(hist[i].x, hist[i].y);
+    }
+    ctx.stroke();
+
+    // 2E. Trailing Floating Starlight Micro-Sparks along wake
+    ctx.globalAlpha = alpha * 0.80;
+    for (let i = 0; i < len; i += 3) {
+      const pt = hist[i];
+      const prog = (i + 1) / len;
+      const sparkR = (1.0 + prog * 1.6) * pulse;
+      const sparkColor = (i % 2 === 0) ? '#00F0FF' : '#FFE600';
+      ctx.fillStyle = sparkColor;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, sparkR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 3. TRANSFORMED STARLIGHT NEEDLE DAGGER BODY
+  // ─────────────────────────────────────────────────────────────
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(angle);
+  ctx.globalAlpha = alpha;
+
+  // 3A. Dual Counter-Rotating Celestial Bloom Halos (BloomFlare from ArcingStarburst.cs)
+  const haloR = 24 * pulse;
+  const rot1 = now * 0.006 + dartId;
+  const rot2 = -now * 0.006 + dartId * 1.5;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Halo 1 (Clockwise Cyan / Mint Starlight Halo)
+  ctx.rotate(rot1);
+  const haloGrad1 = ctx.createRadialGradient(0, 0, 1, 0, 0, haloR);
+  haloGrad1.addColorStop(0.0, 'rgba(255, 255, 255, 0.75)');
+  haloGrad1.addColorStop(0.35, 'rgba(0, 240, 255, 0.45)');
+  haloGrad1.addColorStop(0.75, 'rgba(108, 255, 188, 0.20)');
+  haloGrad1.addColorStop(1.0, 'rgba(0, 240, 255, 0.00)');
+  ctx.fillStyle = haloGrad1;
+  ctx.beginPath();
+  ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Halo 2 (Counter-Clockwise Cosmic Violet / Azure Starlight Halo)
+  ctx.rotate(rot2 - rot1);
+  const haloGrad2 = ctx.createRadialGradient(0, 0, 1, 0, 0, haloR * 1.15);
+  haloGrad2.addColorStop(0.0, 'rgba(255, 255, 255, 0.50)');
+  haloGrad2.addColorStop(0.40, 'rgba(161, 127, 224, 0.35)');
+  haloGrad2.addColorStop(1.0, 'rgba(161, 127, 224, 0.00)');
+  ctx.fillStyle = haloGrad2;
+  ctx.beginPath();
+  ctx.arc(0, 0, haloR * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // 3B. Authentic Transparent Terraria Sprite Textures
+  const daggerCanvas = _getLightDaggerCanvas();
+  const bloomCanvas = _getLightDaggerBloomCanvas();
+  const glowmaskCanvas = _getLightDaggerGlowmaskCanvas();
+
+  if (bloomCanvas || glowmaskCanvas) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    if (bloomCanvas) {
+      const scale = 0.50 * pulse;
+      const bw = bloomCanvas.width * scale;
+      const bh = bloomCanvas.height * scale;
+      ctx.globalAlpha = alpha * 0.70;
+      ctx.drawImage(bloomCanvas, -bw / 2, -bh / 2, bw, bh);
+    }
+    if (glowmaskCanvas) {
+      const scale = 0.48;
+      const gw = glowmaskCanvas.width * scale;
+      const gh = glowmaskCanvas.height * scale;
+      ctx.globalAlpha = alpha * 0.90;
+      ctx.drawImage(glowmaskCanvas, -gw / 2, -gh / 2, gw, gh);
+    }
+    ctx.restore();
+  }
+
+  if (daggerCanvas) {
+    const scale = 0.48;
+    const dw = daggerCanvas.width * scale;
+    const dh = daggerCanvas.height * scale;
+    ctx.drawImage(daggerCanvas, -dw / 2, -dh / 2, dw, dh);
+  }
+
+  // 3C. Double-Tapered Crystalline Starlight Needle (High-Fidelity Vector Geometric Core)
+  // Sharp piercing diamond needle geometry: -16px hilt to +22px diamond tip
+  const tipX = 22;
+  const hiltX = -16;
+  const midX = 3;
+  const midHalfH = 4.5 * pulse;
+  const hiltHalfH = 2.8;
+
+  // Dark Manga Obsidian Contour
+  ctx.strokeStyle = '#0D0B18';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(tipX + 3, 0);
+  ctx.lineTo(midX, -midHalfH - 0.8);
+  ctx.lineTo(hiltX, -hiltHalfH - 0.8);
+  ctx.lineTo(hiltX - 4, 0);
+  ctx.lineTo(hiltX, hiltHalfH + 0.8);
+  ctx.lineTo(midX, midHalfH + 0.8);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Prismatic Violet / Magenta Outer Energy Mantle
+  const needleGrad = ctx.createLinearGradient(hiltX, 0, tipX, 0);
+  needleGrad.addColorStop(0.0, '#A17FE0'); // Cosmic Violet
+  needleGrad.addColorStop(0.4, '#00F0FF'); // Celestial Cyan
+  needleGrad.addColorStop(0.85, '#FFFFFF'); // Blinding White Tip
+  needleGrad.addColorStop(1.0, '#FFFFFF');
+
+  ctx.fillStyle = needleGrad;
+  ctx.beginPath();
+  ctx.moveTo(tipX + 2, 0);
+  ctx.lineTo(midX, -midHalfH);
+  ctx.lineTo(hiltX, -hiltHalfH);
+  ctx.lineTo(hiltX - 3, 0);
+  ctx.lineTo(hiltX, hiltHalfH);
+  ctx.lineTo(midX, midHalfH);
+  ctx.closePath();
+  ctx.fill();
+
+  // Cross-Guard Celestial Starlight Wings / Fins
+  ctx.fillStyle = '#00F0FF';
+  ctx.beginPath();
+  ctx.moveTo(-4, -6.5 * pulse);
+  ctx.lineTo(0, -hiltHalfH);
+  ctx.lineTo(-7, 0);
+  ctx.lineTo(0, hiltHalfH);
+  ctx.lineTo(-4, 6.5 * pulse);
+  ctx.lineTo(-8, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Pure White-Hot Center Spine Line
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(hiltX + 2, 0);
+  ctx.lineTo(tipX + 1, 0);
+  ctx.stroke();
+
+  // 3D. 8-Point Cruciform Diamond Starflare Lens at Piercing Tip (+22px, 0)
+  const starburstCanvas = _getStarburstCanvas();
+  if (starburstCanvas) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = alpha * 0.80;
+    const sScale = 0.35 * pulse;
+    const sw = starburstCanvas.width * sScale;
+    const sh = starburstCanvas.height * sScale;
+    ctx.drawImage(starburstCanvas, tipX - sw / 2, -sh / 2, sw, sh);
+    ctx.restore();
+  }
+
+  // Vector Diamond Starlight Flare at Tip
+  const flareLenH = 20 * pulse;
+  const flareLenV = 11 * pulse;
+  const flareDiag = 7 * pulse;
+
+  // Primary Horizontal & Vertical Piercing Needles
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(tipX - flareLenH * 0.4, 0);
+  ctx.lineTo(tipX + flareLenH, 0);
+  ctx.moveTo(tipX, -flareLenV);
+  ctx.lineTo(tipX, flareLenV);
+  ctx.stroke();
+
+  // Cyan Flare Glow Contour
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.moveTo(tipX - flareLenH * 0.5, 0);
+  ctx.lineTo(tipX + flareLenH * 1.15, 0);
+  ctx.moveTo(tipX, -flareLenV * 1.15);
+  ctx.lineTo(tipX, flareLenV * 1.15);
+  ctx.stroke();
+
+  // 45° Diagonal Diamond Star Rays
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.90)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(tipX - flareDiag, -flareDiag);
+  ctx.lineTo(tipX + flareDiag, flareDiag);
+  ctx.moveTo(tipX - flareDiag, flareDiag);
+  ctx.lineTo(tipX + flareDiag, -flareDiag);
+  ctx.stroke();
+
+  // Central Blinding Tip Core
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(tipX, 0, 2.4 * pulse, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2E. Orbiting Solar Micro-Sparks
+  const orbitTime = now * 0.008 + dartId * 2.0;
+  const numSparks = 2;
+  for (let s = 0; s < numSparks; s++) {
+    const sAng = orbitTime + s * Math.PI;
+    const sDistX = Math.cos(sAng) * (10 * pulse);
+    const sDistY = Math.sin(sAng) * (6 * pulse);
+    ctx.fillStyle = (s === 0) ? '#FFE600' : '#00F0FF';
+    ctx.beginPath();
+    ctx.arc(sDistX, sDistY, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore();
 }

@@ -5,15 +5,14 @@
 
 ## 🥊 Fighter Stat Modifications
 
-### CRAZYDAVE
-* **🟢 BUFF** `wallnutCost`: `50` ➔ `100` (+100.0%)
-* **🔴 NERF** `peashooterHp`: `180` ➔ `100` (-44.4%)
-* **🔴 NERF** `snowPeaHp`: `200` ➔ `100` (-50.0%)
-* **🔴 NERF** `torchwoodCost`: `175` ➔ `100` (-42.9%)
-* **🔴 NERF** `torchwoodHp`: `220` ➔ `100` (-54.5%)
+### CJ
+* **🔴 NERF** `jetpackUziBulletDamage`: `5` ➔ `2` (-60.0%)
+* **🔴 NERF** `driveByBulletDamage`: `5` ➔ `2` (-60.0%)
 
-### MAHORAGA
-* **🔴 NERF** `throwCooldown`: `1000` ➔ `1500` (+50.0%)
-* **🟢 BUFF** `throwDamage`: `6` ➔ `12` (+100.0%)
-* **🔄 ADJUST** `wheelEnhance`: `0.50` ➔ `0.0` (Mod)
+### NAMELESSDEITY
+* **🔴 NERF** `dartDamage`: `14` ➔ `3` (-78.6%)
+* **🟢 BUFF** `dartHomingStrength`: `0.06` ➔ `0.075` (+25.0%)
+* **🟢 BUFF** `enableSuperclusterStars`: `0` ➔ `1` (+0%)
+* **🟢 BUFF** `superclusterCooldown`: `400` ➔ `300` (-25.0%)
+* **🟢 BUFF** `destroyerTickInterval`: `10` ➔ `50` (+400.0%)
 

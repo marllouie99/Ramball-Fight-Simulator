@@ -1117,12 +1117,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
   'namelessdeity': {
-    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    src: 'Assets/Sound Effects/NamelessDeity/SunBeamShoot.ogg',
     volume: 0.85,
     delay: 0,
   },
   'nameless': {
-    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    src: 'Assets/Sound Effects/NamelessDeity/SunBeamShoot.ogg',
     volume: 0.85,
     delay: 0,
   },

@@ -58,10 +58,60 @@ export function isSkillEnabled(...args) {
 export function getSkillDataForFighter(f, getProjectiles) {
   if (!f) return [];
 
-  // Nameless Deity only has a health bar and stats, no skill bars on HUD
+  // ─────────────────────────────────────────────
+  // NAMELESS DEITY (Wrath of the Gods)
+  // ─────────────────────────────────────────────
   if (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity' || f.type === 'nameless_deity' || f.name === 'Nameless Deity') {
-    return [];
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : {};
+    const themeColor = f.themeColor || cfg.superclusterColor || '#00F0FF';
+    const skills = [];
+
+    // 1. Star Mandala (Skill 1: Supercluster Star Mandala)
+    if (isSkillEnabled(cfg.enableSuperclusterStars, true)) {
+      const mandalaMax = cfg.superclusterCooldown || 300;
+      const mandalaTimer = f.superclusterCooldown !== undefined ? f.superclusterCooldown : 0;
+      let mandalaPct = 0;
+      let mandalaReady = false;
+
+      if ((f.superclusterActiveTimer || 0) > 0) {
+        const durMax = f.superclusterDurationMax || cfg.superclusterDuration || 180;
+        mandalaPct = Math.max(0, Math.min(100, (f.superclusterActiveTimer / durMax) * 100));
+        mandalaReady = true;
+      } else if ((f.superclusterDetonationTimer || 0) > 0) {
+        mandalaPct = 100;
+        mandalaReady = true;
+      } else {
+        mandalaPct = Math.max(0, Math.min(100, (1 - (mandalaTimer / mandalaMax)) * 100));
+        mandalaReady = (mandalaPct >= 99 && mandalaTimer <= 0);
+      }
+      skills.push({ id: 'supercluster', pct: mandalaPct, ready: mandalaReady, color: themeColor, label: 'STAR MANDALA' });
+    }
+
+    // 2. Nameless Destroyer (Ultimate Super-Beam)
+    if (isSkillEnabled(cfg.enableNamelessDestroyer, true)) {
+      const beamMax = cfg.destroyerCooldown || 2000;
+      const beamTimer = f.destroyerCooldown !== undefined ? f.destroyerCooldown : 0;
+      let beamPct = 0;
+      let beamReady = false;
+
+      if ((f.destroyerWindupTimer || 0) > 0) {
+        const windupMax = f.destroyerWindupMax || cfg.destroyerWindupFrames || 393;
+        beamPct = Math.max(0, Math.min(100, ((windupMax - f.destroyerWindupTimer) / windupMax) * 100));
+        beamReady = true;
+      } else if ((f.destroyerFireTimer || 0) > 0) {
+        const fireMax = f.destroyerFireFrames || cfg.destroyerFireFrames || 800;
+        beamPct = Math.max(0, Math.min(100, (f.destroyerFireTimer / fireMax) * 100));
+        beamReady = true;
+      } else {
+        beamPct = Math.max(0, Math.min(100, (1 - (beamTimer / beamMax)) * 100));
+        beamReady = (beamPct >= 99 && beamTimer <= 0);
+      }
+      skills.push({ id: 'destroyer', pct: beamPct, ready: beamReady, color: themeColor, label: 'NAMELESS DESTROYER' });
+    }
+
+    return skills;
   }
+
 
   // ─────────────────────────────────────────────
   // GOJO SATORU (Limitless & Six Eyes)
@@ -2249,7 +2299,10 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     power: ['blood_hammer', 'blood hammer', 'HAMMER', 'BLOOD'],
     megumi: ['chimera', 'shadow', 'SHADOW GARDEN', 'GARDEN'],
     megumin: ['explosion', 'EXPLOSION', 'EXPLOSION MAGIC'],
-    crazydave: ['lawnmower', 'lawn_mower', 'LAWN MOWER', 'cherrybomb', 'cherry_bomb', 'CHERRY BOMB']
+    crazydave: ['lawnmower', 'lawn_mower', 'LAWN MOWER', 'cherrybomb', 'cherry_bomb', 'CHERRY BOMB'],
+    namelessdeity: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
+    nameless_deity: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
+    nameless: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER']
   };
 
   const keys = signatureMap[fId];

@@ -526,6 +526,21 @@ export function renderGame() {
         drawHUD();
       }
 
+      // ── Super-Beam Absolute Top Layer (Rendered ON TOP of World Entities & In-Game HUD, behind Match-End Overlays) ──
+      const topBeamCtx = state.topLevelUiCtx || state.ctx;
+      if (topBeamCtx) {
+        topBeamCtx.save();
+        applyCameraToCtx(topBeamCtx);
+        if (state.fighters) {
+          for (const f of state.fighters) {
+            if (f && f.hp > 0 && typeof f.drawTopLayerBeams === 'function') {
+              f.drawTopLayerBeams(topBeamCtx);
+            }
+          }
+        }
+        topBeamCtx.restore();
+      }
+
       if (state.gameState === 'playing') {
         const isDarkPlaying = (state.arenaTheme === 'dark');
 
@@ -575,21 +590,6 @@ export function renderGame() {
 
       // Render Camera Mode Toggle Notification Banner
       drawCameraToast(state.topLevelUiCtx || state.ctx);
-
-      // ── Super-Beam Absolute Top Layer (Rendered ON TOP of Top HUD Names, Bottom HUD & All Canvas UI) ──
-      const topBeamCtx = state.topLevelUiCtx || state.ctx;
-      if (topBeamCtx) {
-        topBeamCtx.save();
-        applyCameraToCtx(topBeamCtx);
-        if (state.fighters) {
-          for (const f of state.fighters) {
-            if (f && f.hp > 0 && typeof f.drawTopLayerBeams === 'function') {
-              f.drawTopLayerBeams(topBeamCtx);
-            }
-          }
-        }
-        topBeamCtx.restore();
-      }
 
       // Restore original context and canvas
       state.ctx = originalCtx;

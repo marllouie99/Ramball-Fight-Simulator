@@ -30,68 +30,61 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "CRAZYDAVE",
+        "character": "CJ",
         "deltas": [
             {
-                "type": "BUFF",
-                "key": "wallnutCost",
-                "oldVal": 50,
-                "newVal": 100,
-                "pct": "+100.0%"
+                "type": "NERF",
+                "key": "jetpackUziBulletDamage",
+                "oldVal": 5,
+                "newVal": 2,
+                "pct": "-60.0%"
             },
             {
                 "type": "NERF",
-                "key": "peashooterHp",
-                "oldVal": 180,
-                "newVal": 100,
-                "pct": "-44.4%"
-            },
-            {
-                "type": "NERF",
-                "key": "snowPeaHp",
-                "oldVal": 200,
-                "newVal": 100,
-                "pct": "-50.0%"
-            },
-            {
-                "type": "NERF",
-                "key": "torchwoodCost",
-                "oldVal": 175,
-                "newVal": 100,
-                "pct": "-42.9%"
-            },
-            {
-                "type": "NERF",
-                "key": "torchwoodHp",
-                "oldVal": 220,
-                "newVal": 100,
-                "pct": "-54.5%"
+                "key": "driveByBulletDamage",
+                "oldVal": 5,
+                "newVal": 2,
+                "pct": "-60.0%"
             }
         ]
     },
     {
-        "character": "MAHORAGA",
+        "character": "NAMELESSDEITY",
         "deltas": [
             {
                 "type": "NERF",
-                "key": "throwCooldown",
-                "oldVal": 1000,
-                "newVal": 1500,
-                "pct": "+50.0%"
+                "key": "dartDamage",
+                "oldVal": 14,
+                "newVal": 3,
+                "pct": "-78.6%"
             },
             {
                 "type": "BUFF",
-                "key": "throwDamage",
-                "oldVal": 6,
-                "newVal": 12,
-                "pct": "+100.0%"
+                "key": "dartHomingStrength",
+                "oldVal": 0.06,
+                "newVal": 0.075,
+                "pct": "+25.0%"
             },
             {
-                "type": "ADJUST",
-                "key": "wheelEnhance",
-                "oldVal": "0.50",
-                "newVal": "0.0",
-                "pct": "Mod"
+                "type": "BUFF",
+                "key": "enableSuperclusterStars",
+                "oldVal": 0,
+                "newVal": 1,
+                "pct": "+0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "superclusterCooldown",
+                "oldVal": 400,
+                "newVal": 300,
+                "pct": "-25.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "destroyerTickInterval",
+                "oldVal": 10,
+                "newVal": 50,
+                "pct": "+400.0%"
             }
         ]
     }

@@ -219,10 +219,11 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       } else if (opts.damageAngle !== undefined) {
         damageAngle = opts.damageAngle;
       }
-      if (typeof spawnBloodEffect === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive && !isSecondTurretHit) {
+      const isTargetBloodImmune = target.noBlood || target.suppressBlood || target.bleedImmune || target.characterId === 'namelessdeity' || target.type === 'namelessdeity';
+      if (typeof spawnBloodEffect === 'function' && !opts.noBlood && !opts.suppressBlood && !isTargetBloodImmune && !isRatioPauseActive && !isSecondTurretHit) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(effectiveAmount * 0.16)) : effectiveAmount;
         spawnBloodEffect(target, bloodAmount, damageAngle);
-      } else if (typeof spawnSparks === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive && !isSecondTurretHit) {
+      } else if (typeof spawnSparks === 'function' && !opts.noBlood && !opts.suppressBlood && !isTargetBloodImmune && !isRatioPauseActive && !isSecondTurretHit) {
         spawnSparks(target.x, target.y, 6, 'crimsonSniper');
       }
 
@@ -2294,8 +2295,8 @@ export class Fighter {
     }
 
     const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
-    const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isRatioPauseActive;
-    if (!this.isTurret && !this.isPlant && !this.isPlantMinion && !isExplosionOrFlame && !isSecondTurretHit) {
+    const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || this.noBlood || this.suppressBlood || this.bleedImmune || this.characterId === 'namelessdeity' || isRatioPauseActive;
+    if (!this.isTurret && !this.isPlant && !this.isPlantMinion && !this.noBlood && !this.suppressBlood && !this.bleedImmune && this.characterId !== 'namelessdeity' && !isExplosionOrFlame && !isSecondTurretHit) {
       const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
       if (typeof spawnBloodEffect === 'function') {
         spawnBloodEffect(this, bloodAmount, damageAngle, opts);

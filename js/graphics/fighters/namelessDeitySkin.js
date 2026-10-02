@@ -1077,6 +1077,24 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     }
   }
 
+  // 4.6 LAYER 2.6 (CENTRAL EYE STARLIGHT FLASH): Authentic Eye Flare during Attack Cast
+  if (fighter && fighter.attackCastTimer > 0) {
+    const castProgress = fighter.attackCastTimer / 18; // 1.0 -> 0.0
+    const flashR = r * 1.15 * castProgress;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const flashGrad = ctx.createRadialGradient(0, hoverBob - (r * 0.12 * heightScale), 0, 0, hoverBob - (r * 0.12 * heightScale), flashR);
+    flashGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85 * castProgress})`);
+    flashGrad.addColorStop(0.4, `rgba(0, 240, 255, ${0.55 * castProgress})`);
+    flashGrad.addColorStop(0.8, `rgba(161, 127, 224, ${0.25 * castProgress})`);
+    flashGrad.addColorStop(1, 'rgba(0, 240, 255, 0)');
+    ctx.fillStyle = flashGrad;
+    ctx.beginPath();
+    ctx.arc(0, hoverBob - (r * 0.12 * heightScale), flashR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   // 4. LAYER 3 (FRONT - LIMBS): Authentic Arm + Forearm + Hand IK Chain (Arm.png/arm9.png + Forearm.png/forearm9.png + Hand.png/hands9.png)
   const arm = isSkin2 ? _getArm5Image() : _getArmImage();
   const forearm = isSkin2 ? _getForearm2Image() : _getForearmImage();
@@ -1086,8 +1104,9 @@ export function drawNamelessDeitySkin(ctx, fighter) {
 
   // Natural outstretched hover anchors based on DefaultUniversalHandMotion in WOTG
   const handBob = Math.sin(gameTimer * 0.05) * (r * 0.08);
-  const defaultHandX = r * 2.10 * widthScale;
-  const defaultHandY = hoverBob + r * 0.12 * heightScale + handBob;
+  const handCastOffset = (fighter && fighter.attackCastTimer > 0) ? (r * 0.35 * (fighter.attackCastTimer / 18)) : 0;
+  const defaultHandX = (r * 2.10 * widthScale) + handCastOffset;
+  const defaultHandY = hoverBob + r * 0.12 * heightScale + handBob - handCastOffset * 0.20;
 
   let leftWristPos = { x: -defaultHandX, y: defaultHandY };
   let rightWristPos = { x: defaultHandX, y: defaultHandY };

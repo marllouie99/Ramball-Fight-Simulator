@@ -1535,12 +1535,13 @@ export class CJFighter extends Fighter {
     this.minigunFlashTimer = 2;
 
     const angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    // Exact M134 Minigun 6-barrel cluster muzzle tip (posX = r * 1.67, barrel tip = 56.0 * scale 1.15)
+    // Exact M134 Minigun 6-barrel cluster muzzle tip (posX = r * 1.67, barrel tip = 56.0 * scale 1.15, lowered to r * 0.70)
     const forwardDist = (this.r * 1.67 - (this.minigunRecoil || 0) * 0.8) + (56.0 * 1.15);
+    const lateralDist = this.r * 0.70 * (Math.abs(angle) > Math.PI / 2 ? -1 : 1);
     const spread = (Math.random() - 0.5) * (cfg.minigunSpread || 0.05);
     const bulletAngle = angle + spread;
-    const spawnX = this.x + Math.cos(angle) * forwardDist;
-    const spawnY = this.y + Math.sin(angle) * forwardDist;
+    const spawnX = this.x + Math.cos(angle) * forwardDist - Math.sin(angle) * lateralDist;
+    const spawnY = this.y + Math.sin(angle) * forwardDist + Math.cos(angle) * lateralDist;
 
     const dmg = cfg.minigunBulletDamage || 12;
     const speed = cfg.minigunBulletSpeed || 28.0;

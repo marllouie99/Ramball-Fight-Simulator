@@ -80,7 +80,7 @@ export const cjConfig = {
   jetpackThrusterBurnDamage: 2,// Burning damage per frame in thruster fire
   jetpackDiveDashSpeed: 5.0,   // Controlled knuckle dive boost speed
   jetpackUziFireInterval: 5,   // Rapid dual alternating fire cadence (every 5 frames = 12 bullets/sec)
-  jetpackUziBulletDamage: 5,   // 8 damage per 9mm full metal jacket round
+  jetpackUziBulletDamage: 2,   // 8 damage per 9mm full metal jacket round
   jetpackUziBulletSpeed: 23.0, // High velocity strafe bullet speed
   jetpackUziSpread: 0.07,      // Natural Micro-SMG bullet spray spread
   jetpackUziRange: 320,        // Effective firing range while hovering
@@ -98,7 +98,7 @@ export const cjConfig = {
   driveByPasses: 2,            // 2 repeated drive-by sweeps per Skill 3 activation
   driveByReenterDelay: 60,     // 1.0s (60 frames) pause between passes
   driveByBulletCount: 16,      // 16 rounds per pass (32 total across both passes)
-  driveByBulletDamage: 5,      // 8 damage per bullet
+  driveByBulletDamage: 2,      // 8 damage per bullet
   driveByBulletSpeed: 30.0,    // High-velocity supersonic tracer bullet speed (~28 px/frame)
   driveByBurstInterval: 22,    // Paced rhythmic fire cadence (~2.7 shots/sec alternating between homies)
   driveByCarSpeed: 6.5,        // Cinematic lowrider cruise & drift speed

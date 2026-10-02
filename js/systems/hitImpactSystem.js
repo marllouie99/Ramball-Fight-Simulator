@@ -414,6 +414,42 @@ export const HitImpactSystem = {
       return true; // Bullet spent on impact
     }
 
+    // Nameless Deity: Prismatic Light Darts (Homing Starlight Needles)
+    const isStarlightDart = projectile.isStarlightDart || projectile.visual === 'starlightDart';
+    if (isStarlightDart) {
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      // 1. Luminous celestial starlight flash & multi-color chromatic sparks (Iridescence Palette)
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 26, '#00F0FF');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 8, 'cyan', '#00F0FF');
+        spawnSparks(target.x, target.y, 6, 'violet', '#A17FE0');
+        spawnSparks(target.x, target.y, 4, 'mint', '#6CFFBC');
+        spawnSparks(target.x, target.y, 4, 'gold', '#FFFFFF');
+      }
+
+      // 2. Subtle directional starlight blood effect
+      if (typeof spawnBloodEffect === 'function') {
+        spawnBloodEffect(target, 8, hitAngle, { minSize: 1.8, maxSize: 3.2, count: 2 });
+      }
+
+      // 3. Audio & screen shake
+      audioSystem.playSFX('attack_fleshhit', 0.45);
+      if (typeof playSound === 'function') {
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : null;
+        const hitSound = cfg?.sounds?.supernova || 'Assets/Sound Effects/NamelessDeity/Supernova.ogg';
+        const hitVol = cfg?.supernovaVolume ?? 0.60;
+        playSound(hitSound, hitVol);
+      }
+      if (typeof triggerGlobalScreenShake === 'function') {
+        triggerGlobalScreenShake(1.4, 2);
+      }
+
+      return true; // Dart consumed on impact
+    }
+
     // Engineer 12-Gauge Buckshot Pellets — Heavy ballistic buckshot impact
     const isEngineerShotgun = projectile.visual === 'EngineerBullet' || (attacker && (attacker.characterId === 'engineer' || attacker.type === 'engineer') && projectile.visual === 'EngineerBullet');
     if (isEngineerShotgun) {

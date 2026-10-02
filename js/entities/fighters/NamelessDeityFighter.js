@@ -13,7 +13,8 @@ import { drawNamelessDeitySkin } from '../../graphics/fighters/namelessDeitySkin
 import {
   drawNamelessDestroyerWeapon,
   drawNamelessDestroyerBeam,
-  drawNamelessDestroyerCharge
+  drawNamelessDestroyerCharge,
+  drawSuperclusterStarMandala
 } from '../../graphics/weapons/namelessDeityWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 
@@ -51,6 +52,10 @@ export class NamelessDeityFighter extends Fighter {
     // Skill Cooldowns
     this.superclusterCooldown = 0;
     this.superclusterActiveTimer = 0;
+    this.superclusterDetonationTimer = 0;
+    this.superclusterDetonationMax = 0;
+    this.superclusterDetonationX = 0;
+    this.superclusterDetonationY = 0;
     this.dimensionCleaveCooldown = 0;
     this.singularityCooldown = 0;
     this.activeSingularities = [];
@@ -79,6 +84,10 @@ export class NamelessDeityFighter extends Fighter {
     this.cannotBeKnockbacked = true;
     this.cannotBePushed = true;
     this.isSuperArmorActive = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
 
     this._registerSkills();
   }
@@ -270,11 +279,36 @@ export class NamelessDeityFighter extends Fighter {
     super.onDeath?.();
   }
 
+  onCountdown(opponent) {
+    if (this.hp > 0 && !this.dead && !this.isDead) {
+      this.wingAnimationTimer = (this.wingAnimationTimer || 0) + 1;
+      const flapCycleDuration = 48;
+      if (this.wingAnimationTimer % flapCycleDuration === 24) {
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
+        playSound(getNamelessSetting(cfg, 'sounds')?.wingFlap || 'Assets/Sound Effects/NamelessDeity/WingFlap2.ogg', getNamelessSetting(cfg, 'wingFlapVolume') || 0.70);
+      }
+    }
+    if (opponent && !opponent.isSubmerged) {
+      this.aim(opponent, null);
+    }
+    super.onCountdown?.(opponent);
+  }
+
+  update(opponent, ownerIndex, arena) {
+    if (this.attackCastTimer > 0) {
+      this.attackCastTimer--;
+    }
+    super.update(opponent, ownerIndex, arena);
+  }
+
   reset() {
     this._stopDestroyerLoopSounds(0);
     super.reset();
+    this.attackCastTimer = 0;
     this.superclusterCooldown = 0;
     this.superclusterActiveTimer = 0;
+    this.superclusterDetonationTimer = 0;
+    this.superclusterDetonationMax = 0;
     this.dimensionCleaveCooldown = 0;
     this.singularityCooldown = 0;
     this.activeSingularities = [];
@@ -292,65 +326,227 @@ export class NamelessDeityFighter extends Fighter {
       return; // Suppress basic star darts while channeling transcendent super-beam
     }
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
-    if (!isSkillEnabled(cfg.enableStarDarts, true)) {
+    if (!isSkillEnabled(getNamelessSetting(cfg, 'enableStarDarts'), true)) {
       return super.shoot(ownerIndex);
     }
+
+    const resolvedOwner = (typeof ownerIndex === 'number')
+      ? ownerIndex
+      : (this._stateIdx ?? (state?.fighters ? state.fighters.indexOf(this) : 0));
 
     const dartCount = getNamelessSetting(cfg, 'dartCount') || 3;
     const spread = getNamelessSetting(cfg, 'dartSpreadAngle') || 0.35;
     const speed = getNamelessSetting(cfg, 'dartSpeed') || 10.5;
     const baseAngle = this.gunAngle || 0;
+    const damage = getNamelessSetting(cfg, 'dartDamage') || 14;
+    const homingStrength = getNamelessSetting(cfg, 'dartHomingStrength') || 0.075;
+    const dartLife = getNamelessSetting(cfg, 'dartLife') || 140;
+    const dartRadius = getNamelessSetting(cfg, 'dartRadius') || 6;
+    const dartColor = getNamelessSetting(cfg, 'dartColor') || '#00F0FF';
 
     for (let i = 0; i < dartCount; i++) {
       const offsetAngle = (i - (dartCount - 1) / 2) * spread;
       const angle = baseAngle + offsetAngle;
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
-      const spawnX = this.x + Math.cos(angle) * (this.r + 12);
-      const spawnY = this.y + Math.sin(angle) * (this.r + 12);
+      const spawnX = this.x + Math.cos(angle) * (this.r + 14);
+      const spawnY = this.y + Math.sin(angle) * (this.r + 14);
 
       const proj = {
+        id: `starlight_dart_${this.characterId}_${Date.now()}_${i}_${Math.random()}`,
         x: spawnX,
         y: spawnY,
         vx,
         vy,
-        radius: 5,
-        damage: getNamelessSetting(cfg, 'dartDamage') || 14,
-        color: '#00F0FF',
-        owner: ownerIndex !== undefined ? ownerIndex : 0,
+        speed,
+        baseSpeed: speed,
+        r: dartRadius,
+        radius: dartRadius,
+        damage,
+        color: dartColor,
+        owner: resolvedOwner,
         ownerFighter: this,
         visual: 'starlightDart',
-        life: 120,
+        isStarlightDart: true,
+        life: dartLife,
+        maxLife: dartLife,
+        flightTime: 0,
+        currentSpeed: speed * 0.75,
         isHoming: true,
-        homingStrength: getNamelessSetting(cfg, 'dartHomingStrength') || 0.06,
-        draw: (ctx) => {
-          ctx.save();
-          ctx.fillStyle = '#FFFFFF';
-          ctx.strokeStyle = '#00F0FF';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(proj.x, proj.y, 5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-          ctx.restore();
-        }
+        homingStrength,
+        dartIndex: i,
+        totalDarts: dartCount,
+        wobblePhase: i * (Math.PI * 2 / dartCount) + Math.random() * 0.5,
+        history: [{ x: spawnX, y: spawnY }],
+        historyMax: 18,
+        angle,
+        lastAngle: angle,
+        initialAngle: angle,
+        telegraphActive: true,
       };
 
-      if (typeof projectileSystem !== 'undefined' && projectileSystem.addProjectile) {
+      if (typeof projectileSystem !== 'undefined' && typeof projectileSystem.addProjectile === 'function') {
         projectileSystem.addProjectile(proj);
       } else if (state && Array.isArray(state.projectiles)) {
         state.projectiles.push(proj);
       }
     }
 
-    spawnSparks(this.x + Math.cos(baseAngle) * this.r, this.y + Math.sin(baseAngle) * this.r, 5, '#00F0FF');
+    // Play celestial starlight shoot SFX (SunFireballShootSound from ArcingEyeStarbursts.cs)
+    const shootSound = cfg?.sounds?.sunFireballShoot || cfg?.sounds?.sunBeamShoot || namelessDeityConfig.sounds.sunFireballShoot;
+    const shootVol = getNamelessSetting(cfg, 'sunFireballShootVolume') ?? getNamelessSetting(cfg, 'sunBeamShootVolume') ?? 0.85;
+    playSound(shootSound, shootVol);
+
+    // Trigger deity eye dilation pulse & wing animation surge
+    this.attackCastTimer = 18;
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 28, '#00F0FF');
+    }
+
+    // Prismatic starlight muzzle burst at deity perimeter
+    spawnSparks(this.x + Math.cos(baseAngle) * (this.r + 12), this.y + Math.sin(baseAngle) * (this.r + 12), 6, 'cyan', '#00F0FF');
+    spawnSparks(this.x + Math.cos(baseAngle) * (this.r + 12), this.y + Math.sin(baseAngle) * (this.r + 12), 4, 'violet', '#A17FE0');
     return true;
   }
 
-  castSuperclusterStars(opponent) {
+  /**
+   * Unified target gathering helper: queries all hostile entities across fighters,
+   * deployables, turrets, plants, illusions, and minions/vehicles (e.g. CJ's Greenwood sedan).
+   */
+  _getValidHostileTargets() {
+    const targets = [];
+    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+    const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : null;
+
+    // 1. Primary fighters, turrets, dispensers, plants
+    if (state && Array.isArray(state.fighters)) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0 || f.dead || f.isDead) continue;
+        if (f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false) continue;
+        if (typeof this.isTeammate === 'function' && this.isTeammate(f)) continue;
+        if (f.owner && typeof this.isTeammate === 'function' && this.isTeammate(f.owner)) continue;
+        if (myTeam !== null && typeof state.getFighterTeam === 'function') {
+          const fTeam = state.getFighterTeam(i);
+          if (fTeam !== null && fTeam === myTeam) continue;
+        }
+        targets.push(f);
+      }
+    }
+
+    // 2. Illusions & summons
+    if (state && Array.isArray(state.illusions)) {
+      for (const ill of state.illusions) {
+        if (!ill || ill.hp <= 0 || ill.dead || ill.isDead || ill.owner === this) continue;
+        if (ill.isLawnmower || ill.isUntargetable || ill.untargetable || ill.cannotBeTargeted || ill.isTargetable === false) continue;
+        if (typeof this.isTeammate === 'function' && this.isTeammate(ill)) continue;
+        if (ill.owner && typeof this.isTeammate === 'function' && this.isTeammate(ill.owner)) continue;
+        if (myTeam !== null && typeof state.getFighterTeam === 'function') {
+          let illOwnerIdx = -1;
+          if (ill.ownerIndex !== undefined) illOwnerIdx = ill.ownerIndex;
+          else if (ill.owner && state.fighters) illOwnerIdx = state.fighters.indexOf(ill.owner);
+          if (illOwnerIdx !== -1) {
+            const illTeam = state.getFighterTeam(illOwnerIdx);
+            if (illTeam !== null && illTeam === myTeam) continue;
+          }
+        }
+        targets.push(ill);
+      }
+    }
+
+    // 3. Vehicles / Cars / Minions (e.g. CJ's Greenwood sedan)
+    if (state && Array.isArray(state.cjDriveBys)) {
+      for (const car of state.cjDriveBys) {
+        if (!car || car.hp <= 0 || car.dead || car.owner === this) continue;
+        if (typeof this.isTeammate === 'function' && this.isTeammate(car)) continue;
+        if (car.owner && typeof this.isTeammate === 'function' && this.isTeammate(car.owner)) continue;
+        if (myTeam !== null && typeof state.getFighterTeam === 'function' && car.owner && state.fighters) {
+          const carOwnerIdx = state.fighters.indexOf(car.owner);
+          if (carOwnerIdx !== -1) {
+            const carTeam = state.getFighterTeam(carOwnerIdx);
+            if (carTeam !== null && carTeam === myTeam) continue;
+          }
+        }
+        targets.push(car);
+      }
+    }
+
+    return targets;
+  }
+
+  triggerSupernovaDetonation() {
+    if (this.superclusterActiveTimer <= 0 && this.superclusterDetonationTimer > 0) return;
+    this.superclusterActiveTimer = 0;
+
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
-    this.superclusterCooldown = getNamelessSetting(cfg, 'superclusterCooldown');
-    this.superclusterActiveTimer = getNamelessSetting(cfg, 'superclusterDuration');
+    this.superclusterDetonationTimer = 30;
+    this.superclusterDetonationMax = 30;
+    this.superclusterDetonationX = this.x;
+    this.superclusterDetonationY = this.y;
+
+    const novaDmg = getNamelessSetting(cfg, 'superclusterDamage') || 32;
+    const novaSound = cfg?.sounds?.supernova || 'Assets/Sound Effects/NamelessDeity/Supernova.ogg';
+    const novaVol = getNamelessSetting(cfg, 'supernovaVolume') ?? 0.85;
+    playSound(novaSound, novaVol);
+
+    triggerGlobalScreenShake(7.5, 18);
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 85, '#FFFFFF');
+    }
+    spawnSparks(this.x, this.y, 24, 'cyan', '#00F0FF');
+    spawnSparks(this.x, this.y, 18, 'violet', '#A17FE0');
+    spawnSparks(this.x, this.y, 14, 'gold', '#FFFFFF');
+
+    const baseOrbitRadius = getNamelessSetting(cfg, 'superclusterOrbitRadius') || 85;
+    const blastReach = baseOrbitRadius * 2.2;
+
+    const targets = this._getValidHostileTargets();
+
+    // AOE detonation damage & radial knockback blast
+    for (const target of targets) {
+      const targetR = target.hitRadius || target.r || (target.width ? target.width * 0.5 : 20);
+      const d = Math.hypot(target.x - this.x, target.y - this.y);
+      if (d < blastReach + targetR) {
+        applyDamageToTarget(target, novaDmg, this);
+        if (!target.isImmovable && !target.cannotBePushed && !target.isCarMinion && !target.isDriveByCar) {
+          const blastAngle = Math.atan2(target.y - this.y, target.x - this.x);
+          target.vx = Math.cos(blastAngle) * 9.5;
+          target.vy = Math.sin(blastAngle) * 9.5;
+        }
+      }
+    }
+    spawnFloatingText(this.x, this.y - 25, 'SUPERNOVA!', '#FFFFFF');
+  }
+
+  castSuperclusterStars(opponent) {
+    if (this.superclusterActiveTimer > 0) {
+      return false; // Already active in automatic battle simulation
+    }
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
+    this.superclusterCooldown = getNamelessSetting(cfg, 'superclusterCooldown') || 300;
+    const dur = getNamelessSetting(cfg, 'superclusterDuration') || 180;
+    this.superclusterActiveTimer = dur;
+    this.superclusterDurationMax = dur;
+    this.superclusterOrbitAngle = 0;
+
+    // 1. Play Authentic FingerSnap & StarConvergence SFX from Wrath of the Gods
+    const snapSound = cfg?.sounds?.fingerSnap || 'Assets/Sound Effects/NamelessDeity/FingerSnap.ogg';
+    const snapVol = getNamelessSetting(cfg, 'fingerSnapVolume') ?? 0.95;
+    playSound(snapSound, snapVol);
+
+    const convSound = cfg?.sounds?.starConvergence || 'Assets/Sound Effects/NamelessDeity/StarConvergence.ogg';
+    const convVol = getNamelessSetting(cfg, 'starConvergenceVolume') ?? 0.75;
+    playSound(convSound, convVol);
+
+    // 2. Screen Shake, Starlight Muzzle Flash & Chromatic Sparks
+    triggerGlobalScreenShake(3.5, 8);
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(this.x, this.y, 35, '#00F0FF');
+    }
+    spawnSparks(this.x, this.y, 12, 'cyan', '#00F0FF');
+    spawnSparks(this.x, this.y, 8, 'violet', '#A17FE0');
+
     spawnFloatingText(this.x, this.y - 25, 'Supercluster Mandala!', '#00F0FF');
     return true;
   }
@@ -366,25 +562,14 @@ export class NamelessDeityFighter extends Fighter {
     const aimAngle = this.gunAngle || 0;
 
     // Multi-target Frontal Arc Query (Rule 1.6)
-    const targets = [];
-    if (state && Array.isArray(state.fighters)) {
-      for (const f of state.fighters) {
-        if (f && f !== this && f.hp > 0 && !f.dead && !f.isDead && !this.isTeammate(f)) {
-          targets.push(f);
-        }
-      }
-    }
-    if (state && Array.isArray(state.illusions)) {
-      for (const ill of state.illusions) {
-        if (ill && ill.hp > 0 && !this.isTeammate(ill)) targets.push(ill);
-      }
-    }
+    const targets = this._getValidHostileTargets();
 
     for (const target of targets) {
       const dx = target.x - this.x;
       const dy = target.y - this.y;
       const dist = Math.hypot(dx, dy);
-      if (dist <= reach + (target.r || 20)) {
+      const targetR = target.hitRadius || target.r || (target.width ? target.width * 0.5 : 20);
+      if (dist <= reach + targetR) {
         const targetAngle = Math.atan2(dy, dx);
         let angleDiff = targetAngle - aimAngle;
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -392,8 +577,10 @@ export class NamelessDeityFighter extends Fighter {
 
         if (Math.abs(angleDiff) <= arc / 2) {
           applyDamageToTarget(target, dmg, this);
-          target.vx = Math.cos(targetAngle) * kb;
-          target.vy = Math.sin(targetAngle) * kb;
+          if (!target.isImmovable && !target.cannotBePushed && !target.isCarMinion && !target.isDriveByCar) {
+            target.vx = Math.cos(targetAngle) * kb;
+            target.vy = Math.sin(targetAngle) * kb;
+          }
           spawnImpactFlash(target.x, target.y, '#A17FE0');
           spawnSparks(target.x, target.y, 10, '#00F0FF');
         }
@@ -477,28 +664,66 @@ export class NamelessDeityFighter extends Fighter {
     if (this.hp > 0 && !this.dead && !this.isDead) {
       this.wingAnimationTimer = (this.wingAnimationTimer || 0) + 1;
       const flapCycleDuration = 48;
-      const isFiringBeam = (this.destroyerFireTimer > 0);
-      if (this.wingAnimationTimer % flapCycleDuration === 24 && !isFiringBeam) {
+      const isChannelingBeam = (this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.destroyerRecoveryTimer > 0);
+      if (this.wingAnimationTimer % flapCycleDuration === 24 && !isChannelingBeam) {
         playSound(getNamelessSetting(cfg, 'sounds')?.wingFlap || 'Assets/Sound Effects/NamelessDeity/WingFlap2.ogg', getNamelessSetting(cfg, 'wingFlapVolume') || 0.70);
       }
     }
 
     // Cooldown decrements
     if (this.superclusterCooldown > 0) this.superclusterCooldown--;
+    if (this.superclusterDetonationTimer > 0) this.superclusterDetonationTimer--;
     if (this.dimensionCleaveCooldown > 0) this.dimensionCleaveCooldown--;
     if (this.singularityCooldown > 0) this.singularityCooldown--;
     if (this.destroyerCooldown > 0) this.destroyerCooldown--;
 
-    // Active Supercluster Star Mandala
+    // Active Supercluster Star Mandala (Orbiting Stars & Inward Nova Detonation)
     if (this.superclusterActiveTimer > 0) {
       this.superclusterActiveTimer--;
-      // Periodic contact burst
-      if (opponent && opponent.hp > 0 && !this.isTeammate(opponent)) {
-        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-        if (dist < 85) {
-          applyDamageToTarget(opponent, 3, this);
-          spawnSparks(opponent.x, opponent.y, 2, '#00F0FF');
+      const starCount = getNamelessSetting(cfg, 'superclusterStarCount') || 6;
+      const baseOrbitSpeed = getNamelessSetting(cfg, 'superclusterOrbitSpeed') || 0.035;
+      const baseOrbitRadius = getNamelessSetting(cfg, 'superclusterOrbitRadius') || 85;
+      const contactDmg = Math.max(1, Math.floor((getNamelessSetting(cfg, 'superclusterDamage') || 28) / 8));
+
+      // Final 50 frames: Inward star convergence & rapid acceleration towards epicenter
+      let orbitRadius = baseOrbitRadius;
+      let speedMult = 1.0;
+      if (this.superclusterActiveTimer < 50) {
+        const convergeP = this.superclusterActiveTimer / 50; // 1 down to 0
+        orbitRadius = baseOrbitRadius * (0.15 + 0.85 * Math.pow(convergeP, 1.8));
+        speedMult = 1.0 + (1.0 - convergeP) * 2.5;
+      }
+
+      this.superclusterOrbitAngle = (this.superclusterOrbitAngle || 0) + baseOrbitSpeed * speedMult;
+
+      // Contact hit detection on orbiting stars
+      const targets = this._getValidHostileTargets();
+
+      for (let s = 0; s < starCount; s++) {
+        const a = this.superclusterOrbitAngle + (s * Math.PI * 2 / starCount);
+        const starX = this.x + Math.cos(a) * orbitRadius;
+        const starY = this.y + Math.sin(a) * orbitRadius;
+
+        for (const target of targets) {
+          const targetR = target.hitRadius || target.r || (target.width ? target.width * 0.5 : 20);
+          const d = Math.hypot(target.x - starX, target.y - starY);
+          if (d < targetR + 16) {
+            // Star contact hit
+            if (this.superclusterActiveTimer % 8 === 0) {
+              applyDamageToTarget(target, contactDmg, this);
+              if (!target.isImmovable && !target.cannotBePushed && !target.isCarMinion && !target.isDriveByCar) {
+                target.vx += Math.cos(a) * 1.5;
+                target.vy += Math.sin(a) * 1.5;
+              }
+              spawnSparks(starX, starY, 3, 'cyan', '#00F0FF');
+            }
+          }
         }
+      }
+
+      // Detonation on final frame (Supernova Blast from Wrath of the Gods)
+      if (this.superclusterActiveTimer === 0) {
+        this.triggerSupernovaDetonation();
       }
     }
 
@@ -507,17 +732,17 @@ export class NamelessDeityFighter extends Fighter {
       const sing = this.activeSingularities[i];
       sing.timer--;
 
+      const targets = this._getValidHostileTargets();
+
       // Gravitational suction on non-teammates
-      if (state && Array.isArray(state.fighters)) {
-        for (const f of state.fighters) {
-          if (f && f !== this && f.hp > 0 && !f.dead && !this.isTeammate(f)) {
-            const dx = sing.x - f.x;
-            const dy = sing.y - f.y;
-            const d = Math.hypot(dx, dy);
-            if (d < sing.radius && d > 1) {
-              f.x += (dx / d) * sing.pullForce * 4.0;
-              f.y += (dy / d) * sing.pullForce * 4.0;
-            }
+      for (const f of targets) {
+        if (!f.isImmovable && !f.cannotBePushed && !f.isCarMinion && !f.isDriveByCar) {
+          const dx = sing.x - f.x;
+          const dy = sing.y - f.y;
+          const d = Math.hypot(dx, dy);
+          if (d < sing.radius && d > 1) {
+            f.x += (dx / d) * sing.pullForce * 4.0;
+            f.y += (dy / d) * sing.pullForce * 4.0;
           }
         }
       }
@@ -527,14 +752,10 @@ export class NamelessDeityFighter extends Fighter {
         triggerGlobalScreenShake(5.0, 10);
         spawnImpactFlash(sing.x, sing.y, '#00F0FF');
         spawnSparks(sing.x, sing.y, 16, '#00F0FF');
-        if (state && Array.isArray(state.fighters)) {
-          for (const f of state.fighters) {
-            if (f && f !== this && f.hp > 0 && !f.dead && !this.isTeammate(f)) {
-              const d = Math.hypot(f.x - sing.x, f.y - sing.y);
-              if (d < sing.radius * 0.75) {
-                applyDamageToTarget(f, sing.collapseDamage, this);
-              }
-            }
+        for (const f of targets) {
+          const d = Math.hypot(f.x - sing.x, f.y - sing.y);
+          if (d < sing.radius * 0.75) {
+            applyDamageToTarget(f, sing.collapseDamage, this);
           }
         }
         this.activeSingularities.splice(i, 1);
@@ -651,19 +872,7 @@ export class NamelessDeityFighter extends Fighter {
       const forwardImpulse = getNamelessSetting(cfg, 'destroyerForwardImpulse') ?? 2.5;
       const paralyzeDur = getNamelessSetting(cfg, 'destroyerParalyzeDuration') ?? 12;
 
-      const targets = [];
-      if (state && Array.isArray(state.fighters)) {
-        for (const f of state.fighters) {
-          if (f && f !== this && f.hp > 0 && !f.dead && !f.isDead && !this.isTeammate(f)) {
-            targets.push(f);
-          }
-        }
-      }
-      if (state && Array.isArray(state.illusions)) {
-        for (const ill of state.illusions) {
-          if (ill && ill.hp > 0 && !this.isTeammate(ill)) targets.push(ill);
-        }
-      }
+      const targets = this._getValidHostileTargets();
 
       for (const f of targets) {
         // Project target onto beam ray
@@ -672,22 +881,27 @@ export class NamelessDeityFighter extends Fighter {
         const projLen = dx * Math.cos(this.destroyerCastAngle) + dy * Math.sin(this.destroyerCastAngle);
         if (projLen >= 0 && projLen <= beamLen) {
           const perpDist = Math.abs(-dx * Math.sin(this.destroyerCastAngle) + dy * Math.cos(this.destroyerCastAngle));
-          if (perpDist <= beamHalfWidth + (f.r || 20)) {
+          const hitRadius = (f.hitRadius || f.r || (f.width ? f.width * 0.5 : 20));
+          if (perpDist <= beamHalfWidth + hitRadius) {
             // 1. Cosmic Gravitational Suction: Pull target directly into the beam's central axis
             const lineX = startX + Math.cos(this.destroyerCastAngle) * projLen;
             const lineY = startY + Math.sin(this.destroyerCastAngle) * projLen;
-            f.x += (lineX - f.x) * pullFactor;
-            f.y += (lineY - f.y) * pullFactor;
+            if (!f.isImmovable && !f.cannotBePushed && !f.isCarMinion && !f.isDriveByCar) {
+              f.x += (lineX - f.x) * pullFactor;
+              f.y += (lineY - f.y) * pullFactor;
 
-            // 2. Forward stream push / drag along the beam length
-            f.x += Math.cos(this.destroyerCastAngle) * forwardImpulse;
-            f.y += Math.sin(this.destroyerCastAngle) * forwardImpulse;
+              // 2. Forward stream push / drag along the beam length
+              f.x += Math.cos(this.destroyerCastAngle) * forwardImpulse;
+              f.y += Math.sin(this.destroyerCastAngle) * forwardImpulse;
+            }
 
             // 3. Absolute Paralyze / Beam Stasis: Lock velocities and disable movement/actions
-            f.vx = 0;
-            f.vy = 0;
-            f.knockbackVx = 0;
-            f.knockbackVy = 0;
+            if (!f.isImmovable && !f.isCarMinion && !f.isDriveByCar) {
+              f.vx = 0;
+              f.vy = 0;
+              f.knockbackVx = 0;
+              f.knockbackVy = 0;
+            }
             f.caughtInNamelessBeamTimer = paralyzeDur;
             f.isCaughtInNamelessBeam = true;
             if (typeof f.applyParalyze === 'function') {
@@ -776,7 +990,12 @@ export class NamelessDeityFighter extends Fighter {
     drawNamelessDeitySkin(ctx, this);
     drawNamelessDestroyerWeapon(ctx, this);
 
-    // 3. Draw Nameless Destroyer Charging Portal or Super-Beam (Fallback for standalone test runners)
+    // 3. Draw Supercluster Star Mandala (Sacred Geometric Star Constellation & Supernova Blast)
+    if ((this.superclusterActiveTimer && this.superclusterActiveTimer > 0) || (this.superclusterDetonationTimer && this.superclusterDetonationTimer > 0)) {
+      drawSuperclusterStarMandala(ctx, this);
+    }
+
+    // 4. Draw Nameless Destroyer Charging Portal or Super-Beam (Fallback for standalone test runners)
     const isRenderGameActive = (typeof state !== 'undefined' && state.gameState && state.gameState !== 'test');
     if (!isRenderGameActive) {
       if (this.destroyerWindupTimer > 0) {

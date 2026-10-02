@@ -249,6 +249,19 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
   }
 
   if (!entity || dmgAmount <= 0) return;
+  if (
+    entity.noBlood ||
+    entity.suppressBlood ||
+    entity.bleedImmune ||
+    entity.isBloodImmune ||
+    entity.characterId === 'namelessdeity' ||
+    entity.type === 'namelessdeity' ||
+    entity.characterId === 'nameless_deity' ||
+    entity.name === 'Nameless Deity' ||
+    (opts && (opts.noBlood || opts.suppressBlood || opts.target?.noBlood || opts.target?.characterId === 'namelessdeity'))
+  ) {
+    return;
+  }
   if (!state.bloodEffects) state.bloodEffects = [];
 
   // Infer impact angle if still not provided

@@ -34,6 +34,7 @@ function _getCosmicSpaceImage() {
 }
 
 let _beamTexture2Image = null;
+let _cachedBlueBeamTexture2Canvas = null;
 const _BEAM_TEXTURE2_PATH = 'Assets/model/NamelessDeity/beam-texture2.png';
 
 function _getBeamTexture2Image() {
@@ -44,6 +45,57 @@ function _getBeamTexture2Image() {
     _beamTexture2Image = img;
   }
   return _beamTexture2Image;
+}
+
+function _getBlueBeamTexture2Canvas() {
+  const img = _getBeamTexture2Image();
+  if (!_isImageReady(img)) return null;
+  if (_cachedBlueBeamTexture2Canvas) return _cachedBlueBeamTexture2Canvas;
+  if (typeof document === 'undefined') return img;
+
+  try {
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = img.naturalWidth || 1254;
+    offCanvas.height = img.naturalHeight || 1254;
+    const offCtx = offCanvas.getContext('2d');
+    offCtx.drawImage(img, 0, 0);
+
+    const imgData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+    const data = imgData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a === 0) continue;
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+
+      if (lum > 220) {
+        // Pure blinding starlight diamond core (brilliant white to ice cyan core)
+        const t = (lum - 220) / 35;
+        data[i] = Math.min(255, Math.round(180 + 75 * t));
+        data[i + 1] = Math.min(255, Math.round(230 + 25 * t));
+        data[i + 2] = 255;
+      } else if (lum > 100) {
+        // Radiant Cyan & Azure celestial nebula stream
+        const t = (lum - 100) / 120;
+        data[i] = Math.round(15 + 165 * t * 0.85);
+        data[i + 1] = Math.round(110 + 120 * t);
+        data[i + 2] = Math.min(255, Math.round(200 + 55 * t));
+      } else {
+        // Deep sapphire & cosmic dark space background
+        const t = lum / 100;
+        data[i] = Math.round(5 * t);
+        data[i + 1] = Math.round(75 * t);
+        data[i + 2] = Math.round(160 * t + 25);
+      }
+    }
+    offCtx.putImageData(imgData, 0, 0);
+    _cachedBlueBeamTexture2Canvas = offCanvas;
+    return _cachedBlueBeamTexture2Canvas;
+  } catch (e) {
+    return img;
+  }
 }
 
 // Reusable offscreen buffer for seamless alpha-dissolved beam texture
@@ -731,7 +783,7 @@ export function drawNamelessDestroyerBeam(ctx, fighter, targetAngle, arena) {
   // ──────────────────────────────────────────
   // 6. Soft Alpha-Dissolved Cosmic Space Galaxy Stream (Full Length, Overlays Magic Circle)
   // ──────────────────────────────────────────
-  const spaceImg = isSkin2 ? _getBeamTexture2Image() : _getCosmicSpaceImage();
+  const spaceImg = isSkin2 ? _getBlueBeamTexture2Canvas() : _getCosmicSpaceImage();
   if (_isImageReady(spaceImg)) {
     const bufW = 1400;
     const bufH = totalBeamHeight;
@@ -1021,7 +1073,7 @@ export function drawNamelessDestroyerPreview(ctx, cx, cy, size = 48) {
   ctx.arc(0, 0, size * 0.7, 0, Math.PI * 2);
   ctx.fill();
 
-  const spaceImg = isSkin2 ? _getBeamTexture2Image() : _getCosmicSpaceImage();
+  const spaceImg = isSkin2 ? _getBlueBeamTexture2Canvas() : _getCosmicSpaceImage();
   if (_isImageReady(spaceImg)) {
     ctx.save();
     ctx.beginPath();
@@ -1083,3 +1135,299 @@ export function drawNamelessDestroyerPreview(ctx, cx, cy, size = 48) {
 
   ctx.restore();
 }
+
+/**
+ * Renders Nameless Deity's Skill 1: Supercluster Star Mandala.
+ * Sacred geometric starlight polygon constellation with 6 orbiting stars,
+ * dual counter-rotating BloomFlare halos, and glowing connector rays.
+ */
+export function drawSuperclusterStarMandala(ctx, fighter) {
+  if (!fighter || fighter.hp <= 0) return;
+
+  const isMandalaActive = Boolean(fighter.superclusterActiveTimer && fighter.superclusterActiveTimer > 0);
+  const isDetonationActive = Boolean(fighter.superclusterDetonationTimer && fighter.superclusterDetonationTimer > 0);
+  if (!isMandalaActive && !isDetonationActive) return;
+
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
+  const now = Date.now();
+
+  // ──────────────────────────────────────────
+  // 1. Orbiting Constellation Mandala Phase
+  // ──────────────────────────────────────────
+  if (isMandalaActive) {
+    const durMax = fighter.superclusterDurationMax || 300;
+    const currentTimer = fighter.superclusterActiveTimer;
+    const fadeIn = Math.min(1.0, (durMax - currentTimer) / 15 + 0.2);
+    const alpha = Math.min(1.0, fadeIn);
+
+    if (alpha > 0.01) {
+      const starCount = cfg?.superclusterStarCount || 6;
+      const baseOrbitRadius = cfg?.superclusterOrbitRadius || 85;
+      let orbitRadius = baseOrbitRadius;
+      let whiteHotOverload = 0;
+
+      if (currentTimer < 50) {
+        const convergeP = currentTimer / 50; // 1 down to 0
+        orbitRadius = baseOrbitRadius * (0.15 + 0.85 * Math.pow(convergeP, 1.8));
+        whiteHotOverload = (1.0 - convergeP);
+      }
+
+      const orbitAngle = fighter.superclusterOrbitAngle || 0;
+      const cx = fighter.x;
+      const cy = fighter.y;
+      const starPositions = [];
+
+      for (let i = 0; i < starCount; i++) {
+        const a = orbitAngle + (i * Math.PI * 2 / starCount);
+        const sx = cx + Math.cos(a) * orbitRadius;
+        const sy = cy + Math.sin(a) * orbitRadius;
+        starPositions.push({ x: sx, y: sy, angle: a });
+      }
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      // 1A. Sacred Geometric Mandala Polygon Lines connecting each star to next
+      ctx.globalAlpha = alpha * (0.55 + whiteHotOverload * 0.45);
+      ctx.strokeStyle = whiteHotOverload > 0.5 ? '#FFFFFF' : '#00F0FF';
+      ctx.lineWidth = 1.8 + whiteHotOverload * 1.5;
+      ctx.beginPath();
+      for (let i = 0; i < starCount; i++) {
+        const p1 = starPositions[i];
+        const p2 = starPositions[(i + 1) % starCount];
+        if (i === 0) ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // 1B. Cross-Chord Star Hexagram lines across vertices
+      ctx.globalAlpha = alpha * (0.35 + whiteHotOverload * 0.40);
+      ctx.strokeStyle = whiteHotOverload > 0.5 ? '#00F0FF' : '#A17FE0';
+      ctx.lineWidth = 1.2 + whiteHotOverload * 1.2;
+      ctx.beginPath();
+      for (let i = 0; i < starCount; i++) {
+        const p1 = starPositions[i];
+        const p2 = starPositions[(i + 2) % starCount];
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+      }
+      ctx.stroke();
+
+      // 1C. Central Starlight Rays connecting Deity center to each star
+      ctx.globalAlpha = alpha * (0.45 + whiteHotOverload * 0.55);
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.0 + whiteHotOverload * 2.0;
+      ctx.beginPath();
+      for (let i = 0; i < starCount; i++) {
+        const p = starPositions[i];
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+
+      // 1D. Draw each of the 6 Orbiting Supercluster Stars
+      const starPulse = (1.0 + Math.sin(now * 0.008) * 0.12) * (1.0 + whiteHotOverload * 0.4);
+      for (let i = 0; i < starCount; i++) {
+        const p = starPositions[i];
+        const rot1 = now * 0.005 + i;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+
+        // BloomFlare Halos
+        const haloR = 20 * starPulse;
+        const haloGrad1 = ctx.createRadialGradient(0, 0, 1, 0, 0, haloR);
+        haloGrad1.addColorStop(0.0, 'rgba(255, 255, 255, 0.95)');
+        haloGrad1.addColorStop(0.35, 'rgba(0, 240, 255, 0.60)');
+        haloGrad1.addColorStop(0.80, 'rgba(161, 127, 224, 0.25)');
+        haloGrad1.addColorStop(1.0, 'rgba(0, 240, 255, 0.00)');
+        ctx.fillStyle = haloGrad1;
+        ctx.beginPath();
+        ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 8-Point Crystalline Diamond Star
+        const starR = 12 * starPulse;
+        const starH = 3.5;
+        ctx.rotate(rot1);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.moveTo(0, -starR * 1.3);
+        ctx.lineTo(starH, 0);
+        ctx.lineTo(0, starR * 1.3);
+        ctx.lineTo(-starH, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(-starR * 1.3, 0);
+        ctx.lineTo(0, starH);
+        ctx.lineTo(starR * 1.3, 0);
+        ctx.lineTo(0, -starH);
+        ctx.closePath();
+        ctx.fill();
+
+        // Secondary Diagonal Flares
+        ctx.fillStyle = '#00F0FF';
+        const diagR = starR * 0.75;
+        ctx.beginPath();
+        ctx.moveTo(-diagR, -diagR);
+        ctx.lineTo(starH * 0.7, 0);
+        ctx.lineTo(diagR, diagR);
+        ctx.lineTo(-starH * 0.7, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(diagR, -diagR);
+        ctx.lineTo(0, starH * 0.7);
+        ctx.lineTo(-diagR, diagR);
+        ctx.lineTo(0, -starH * 0.7);
+        ctx.closePath();
+        ctx.fill();
+
+        // Pure White-Hot Core Diamond
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // ──────────────────────────────────────────
+  // 2. Supernova Detonation Shockwave & Starburst Blast Phase (Terraria: Wrath of the Gods)
+  // ──────────────────────────────────────────
+  if (isDetonationActive) {
+    const detTimer = fighter.superclusterDetonationTimer || 0;
+    const detMax = fighter.superclusterDetonationMax || 30;
+    const detP = 1.0 - (detTimer / detMax); // 0.0 (start of blast) -> 1.0 (fully expanded/dissipated)
+    const blastX = fighter.superclusterDetonationX ?? fighter.x;
+    const blastY = fighter.superclusterDetonationY ?? fighter.y;
+    const blastAlpha = Math.max(0, 1.0 - detP);
+    const maxBlastRadius = (cfg?.superclusterOrbitRadius || 85) * 2.4; // ~205px blast radius
+    const curRadius = maxBlastRadius * Math.sin(detP * Math.PI * 0.5);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(blastX, blastY);
+
+    // 2A. Layer 1: Expanding Solar Fire Plasma Sphere (ExplodingStar.cs FireExplosionShader)
+    const fireR = Math.max(16, curRadius * 0.85);
+    const fireGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, fireR);
+    fireGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(blastAlpha * 0.98).toFixed(3)})`);
+    fireGrad.addColorStop(0.20, `rgba(255, 230, 140, ${(blastAlpha * 0.90).toFixed(3)})`);
+    fireGrad.addColorStop(0.45, `rgba(255, 120, 30, ${(blastAlpha * 0.70).toFixed(3)})`);
+    fireGrad.addColorStop(0.75, `rgba(0, 240, 255, ${(blastAlpha * 0.45).toFixed(3)})`);
+    fireGrad.addColorStop(0.92, `rgba(161, 127, 224, ${(blastAlpha * 0.20).toFixed(3)})`);
+    fireGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = fireGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, fireR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2B. Layer 2: LightWave Double Shockwave Rings (LightWave.cs)
+    ctx.strokeStyle = `rgba(0, 240, 255, ${(blastAlpha * 0.95).toFixed(3)})`;
+    ctx.lineWidth = Math.max(1, 6.0 * (1 - detP));
+    ctx.beginPath();
+    ctx.arc(0, 0, curRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    if (curRadius > 20) {
+      ctx.strokeStyle = `rgba(255, 200, 80, ${(blastAlpha * 0.80).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, 3.5 * (1 - detP));
+      ctx.beginPath();
+      ctx.arc(0, 0, curRadius * 0.82, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(161, 127, 224, ${(blastAlpha * 0.65).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, 2.5 * (1 - detP));
+      ctx.beginPath();
+      ctx.arc(0, 0, curRadius * 0.60, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // 2C. Layer 3: Ejected Flying Prismatic Starburst Shards (Starburst.cs)
+    const shardCount = 8;
+    const shardDist = curRadius * 1.12;
+    const shardAlpha = blastAlpha * 0.95;
+    for (let s = 0; s < shardCount; s++) {
+      const sAngle = (s * Math.PI * 2 / shardCount) + (detP * 0.6);
+      const shardX = Math.cos(sAngle) * shardDist;
+      const shardY = Math.sin(sAngle) * shardDist;
+      const tailX = Math.cos(sAngle) * (shardDist - 22 * (1 - detP));
+      const tailY = Math.sin(sAngle) * (shardDist - 22 * (1 - detP));
+
+      // Shard trailing starlight ray
+      ctx.strokeStyle = `rgba(0, 240, 255, ${(shardAlpha * 0.65).toFixed(3)})`;
+      ctx.lineWidth = Math.max(1, 3.0 * (1 - detP));
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(shardX, shardY);
+      ctx.stroke();
+
+      // Shard diamond head
+      ctx.save();
+      ctx.translate(shardX, shardY);
+      ctx.rotate(sAngle + Math.PI / 4 + detP * 2.5);
+      const shSize = Math.max(1, 7.5 * (1 - detP * 0.6));
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-shSize * 0.5, -shSize * 0.5, shSize, shSize);
+      ctx.restore();
+    }
+
+    // 2D. Layer 4: Radiant 8-Point Starlight Twinkle Diamond Flare (TwinkleParticle.cs)
+    const spikeLen = maxBlastRadius * 1.45 * (0.30 + 0.70 * Math.sin(detP * Math.PI * 0.70));
+    const spikeThick = Math.max(0.5, 7.5 * (1 - detP));
+    const rot = detP * 0.9;
+
+    ctx.save();
+    ctx.rotate(rot);
+    ctx.fillStyle = `rgba(255, 255, 255, ${(blastAlpha * 0.95).toFixed(3)})`;
+
+    // Major Cardinal Spikes
+    ctx.beginPath();
+    ctx.moveTo(0, -spikeLen);
+    ctx.lineTo(spikeThick, 0);
+    ctx.lineTo(0, spikeLen);
+    ctx.lineTo(-spikeThick, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-spikeLen, 0);
+    ctx.lineTo(0, spikeThick);
+    ctx.lineTo(spikeLen, 0);
+    ctx.lineTo(0, -spikeThick);
+    ctx.closePath();
+    ctx.fill();
+
+    // Secondary Diagonal Spikes
+    ctx.fillStyle = `rgba(0, 240, 255, ${(blastAlpha * 0.85).toFixed(3)})`;
+    const diagLen = spikeLen * 0.72;
+    ctx.beginPath();
+    ctx.moveTo(-diagLen * 0.707, -diagLen * 0.707);
+    ctx.lineTo(spikeThick * 0.7, 0);
+    ctx.lineTo(diagLen * 0.707, diagLen * 0.707);
+    ctx.lineTo(-spikeThick * 0.7, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(diagLen * 0.707, -diagLen * 0.707);
+    ctx.lineTo(0, spikeThick * 0.7);
+    ctx.lineTo(-diagLen * 0.707, diagLen * 0.707);
+    ctx.lineTo(0, -spikeThick * 0.7);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+    ctx.restore();
+  }
+}
+

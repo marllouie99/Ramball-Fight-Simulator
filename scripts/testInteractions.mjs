@@ -3449,8 +3449,31 @@ async function runInteractionTests() {
     draedon.team = 1;
     state.fighters = [nameless, draedon];
 
-    // 1. Basic attacks
+    // 1. Basic attacks & Starlight Darts
+    const { getProjectiles, clearProjectiles } = await import('../js/core/state.js');
+    const { drawProjectiles } = await import('../js/graphics/renderers/projectileRenderer.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+    clearProjectiles();
+
     assert(nameless.shoot(0) === true, 'Nameless Deity must fire homing Prismatic Light Darts');
+    const darts = getProjectiles().filter(p => p && (p.isStarlightDart || p.visual === 'starlightDart'));
+    const { namelessDeityConfig } = await import('../js/configs/characters/namelessDeityConfig.js');
+    const expectedDartDmg = namelessDeityConfig?.dartDamage ?? 14;
+    assert(darts[0].damage === expectedDartDmg, `Starlight Darts must deal configured dartDamage (${expectedDartDmg})`);
+
+    // Verify homing physics step towards enemy Draedon
+    const initialDartX = darts[0].x;
+    const initialDartY = darts[0].y;
+    projectileSystem.update([nameless, draedon]);
+    assert(darts[0].x !== initialDartX || darts[0].y !== initialDartY, 'Starlight Darts must update position in update loop');
+
+    // Verify Canvas 2D render and transform stack balance for Starlight Darts
+    mockCtx.resetStackDepth();
+    drawProjectiles();
+    assert(mockCtx.getStackDepth() === 0, `drawProjectiles with Starlight Darts must balance Canvas 2D stack (got ${mockCtx.getStackDepth()})`);
+
+    clearProjectiles();
+
     assert(draedon.shoot(1) === true, 'Draedon must fire twin Exo-Pulse Blasters');
 
     // 2. Skills

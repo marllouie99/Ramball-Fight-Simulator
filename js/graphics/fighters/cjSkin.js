@@ -1349,31 +1349,33 @@ export function drawCjSkin(ctx, fighter) {
   const easePunch = isPunching ? Math.sin(rawProgress * Math.PI) : 0;
   const lungeExtension = easePunch * (r * 1.35);
 
-  // Hand Position Coordinates (positioned in the lower torso/waist area)
+  // Hand Position Coordinates (positioned in the lower torso/waist area per Rule 20)
   const customHand = (typeof state !== 'undefined' && state.skinCustomizations?.cj_hand) || {};
-  const baseHandY = customHand.offsetY !== undefined ? customHand.offsetY : (r * 0.35);
-  const baseHandX = customHand.offsetX !== undefined ? (r * 0.95 + customHand.offsetX) : (r * 0.95);
+  const baseHandY = customHand.offsetY !== undefined ? customHand.offsetY : (r * 0.38);
+  const baseHandX = customHand.offsetX !== undefined ? (r * 0.82 + customHand.offsetX) : (r * 0.82);
 
   let frontX = baseHandX, frontY = baseHandY;
   let backX = 0, backY = baseHandY;
   let hideFrontHand = false;
   let hideBackHand = true;
 
+  const minigunY = r * 0.70;
+
   if (isMinigunActive) {
     hideBackHand = false; // Both hands grip the heavy M134 Minigun
     const mgScale = 1.15 * scaleMult;
     const mgAnchorX = r * 1.67;
-    // Back hand grips the forward upright carry handle loop in front
-    backX = mgAnchorX + (6.0 * mgScale);
-    backY = -14.0 * mgScale;
-    // Front hand grips the rear chainsaw spade grip holder at the back
-    frontX = mgAnchorX + (-36.5 * mgScale);
-    frontY = -12.5 * mgScale;
+    // Back hand grips the top carry handle loop from above
+    backX = mgAnchorX + (8.0 * mgScale);
+    backY = minigunY - (10.0 * mgScale);
+    // Front hand grips the rear chainsaw spade trigger at the hip
+    frontX = mgAnchorX - (36.0 * mgScale);
+    frontY = minigunY - (8.0 * mgScale);
   } else if (isJetpackActive && isUziActive) {
     hideBackHand = false; // Both hands active during Jetpack Dual Uzi mode
-    backX = r * 0.88;
+    backX = r * 0.82;
     backY = -r * 0.38;
-    frontX = r * 0.96;
+    frontX = r * 0.82;
     frontY = r * 0.38;
   } else if (isJetpackActive && !isUziActive) {
     hideBackHand = true;
@@ -1411,12 +1413,10 @@ export function drawCjSkin(ctx, fighter) {
   _drawCjCheatAura(ctx, r, isHesoyamActive, isRespectAura);
   _drawCjJetpack(ctx, r, isJetpackActive);
 
-  // ── LAYER 1: BACK HAND (Behind Body Layer — Left Micro-Uzi / Minigun Forward Grip / Fist) ──
+  // ── LAYER 1: BACK HAND (Behind Body Layer — Left Micro-Uzi / Fist) ──
   if (!hideBackHand) {
     if (isMinigunActive) {
-      const minigunRecoil = (fighter.minigunRecoil || 0) * scaleMult;
-      // Back hand grips forward upright support handle loop
-      drawCjPixelHand(ctx, backX - minigunRecoil, backY, handRadius * 0.92, skinColor, 0, true);
+      // Handled in Layer 3 over top carry handle
     } else if (isJetpackActive && isUziActive) {
       const recoilB = (fighter.uziRecoilBack || 0) * scaleMult;
       const flashB = fighter.uziFlashTimerBack || 0;
@@ -1432,7 +1432,7 @@ export function drawCjSkin(ctx, fighter) {
   // ── LAYER 2: PROCEDURAL PIXEL ART BODY (SAITAMA TECH & RULE 19 COMPLIANT) ──
   drawCjPixelBody(ctx, r, isJetpackActive);
 
-  // ── LAYER 3: FRONT HAND (Front Layer — On Top of Body Circle — Minigun / Right Micro-Uzi / Fist) ──
+  // ── LAYER 3: FRONT HAND & WEAPONS (Front Layer — On Top of Body Circle) ──
   if (!hideFrontHand) {
     if (isMinigunActive) {
       const minigunRecoil = (fighter.minigunRecoil || 0) * scaleMult;
@@ -1440,8 +1440,8 @@ export function drawCjSkin(ctx, fighter) {
       const minigunHeat = (previewIdx === 3) ? 0.35 : (fighter.minigunHeat || 0);
       const minigunSpin = (previewIdx === 3) ? (Date.now() * 0.004) : (fighter.minigunSpinAngle || 0);
 
-      // 1. Draw M134 Heavy Minigun centered at fighter forward anchor
-      drawCjMinigun(ctx, r * 0.92, 0, 0, r, {
+      // 1. Draw M134 Heavy Minigun lowered to waist/hip level
+      drawCjMinigun(ctx, r * 0.92, minigunY, 0, r, {
         scale: 1.15 * scaleMult,
         recoil: minigunRecoil,
         flashTimer: minigunFlash,
@@ -1449,7 +1449,10 @@ export function drawCjSkin(ctx, fighter) {
         spinAngle: minigunSpin
       });
 
-      // 2. Draw front hand gripping the rear trigger spade housing holder at the back
+      // 2. Draw support hand gripping top carry handle from above
+      drawCjPixelHand(ctx, backX - minigunRecoil, backY, handRadius * 0.92, skinColor, 0, true);
+
+      // 3. Draw trigger hand gripping rear chainsaw spade housing
       drawCjPixelHand(ctx, frontX - minigunRecoil, frontY, handRadius, skinColor, 0, true);
     } else if (isTec9Active) {
       const recoilTec = (fighter.tec9Recoil || 0) * scaleMult;

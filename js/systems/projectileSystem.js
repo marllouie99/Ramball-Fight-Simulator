@@ -243,8 +243,16 @@ class ProjectileSystem {
     p.trailPoints = null;
     p.trail = null;
     p.particles = null;
-    p.maxR = undefined;
-    p.baseAngle = undefined;
+    p.isStarlightDart = false;
+    p.isHoming = false;
+    p.homingStrength = undefined;
+    p.dartIndex = undefined;
+    p.totalDarts = undefined;
+    p.flightTime = undefined;
+    p.currentSpeed = undefined;
+    p.telegraphActive = false;
+    p.initialAngle = undefined;
+    p.lockedTargetAngle = undefined;
 
     if (p.history) p.history.length = 0;
     else p.history = [];
@@ -272,6 +280,18 @@ class ProjectileSystem {
 
   _getPooledProjectile() {
     return this._getProjectile();
+  }
+
+  /**
+   * Adds an external or custom projectile to the active projectile pool.
+   */
+  addProjectile(proj) {
+    if (!proj) return null;
+    if (!proj.id) proj.id = `proj_custom_${Date.now()}_${Math.random()}`;
+    if (!proj.history) proj.history = [{ x: proj.x, y: proj.y }];
+    if (!proj.r && proj.radius) proj.r = proj.radius;
+    this.projectiles.push(proj);
+    return proj;
   }
 
   _returnProjectile(proj) {
@@ -3206,6 +3226,131 @@ class ProjectileSystem {
         }
       }
 
+      // ── NAMELESS DEITY: PRISMATIC LIGHT DARTS (Homing Starlight Needles) ──
+      // Terraria: Wrath of the Gods 3-Phase State Machine (LightDagger.cs / ArcingStarburst.cs)
+      if (p.isStarlightDart || p.visual === 'starlightDart') {
+        const ownerIndex = p.owner;
+        p.flightTime = (p.flightTime || 0) + 1;
+
+        let target = null;
+        let minDist = Infinity;
+
+        // Query active enemy fighters
+        if (fighters && fighters.length > 0) {
+          for (let fi = 0; fi < fighters.length; fi++) {
+            if (fi === ownerIndex) continue;
+            if (areOnSameTeam(ownerIndex, fi)) continue;
+            const f = fighters[fi];
+            if (f && !f.isDead && !f.dead && f.hp > 0 && !f.isSubmerged && !f.isUntargetable && f.isTargetable !== false) {
+              const d = Math.hypot(f.x - p.x, f.y - p.y);
+              if (d < minDist) {
+                minDist = d;
+                target = f;
+              }
+            }
+          }
+        }
+
+        // Query illusions if no active fighter target
+        if (!target && typeof state !== 'undefined' && state.illusions) {
+          for (const ill of state.illusions) {
+            if (!ill || ill.hp <= 0) continue;
+            const illOwnerIdx = (typeof ill.ownerIndex === 'number') ? ill.ownerIndex : (fighters ? fighters.indexOf(ill.owner) : -1);
+            if (illOwnerIdx !== -1 && (ownerIndex === illOwnerIdx || areOnSameTeam(ownerIndex, illOwnerIdx))) continue;
+            const d = Math.hypot(ill.x - p.x, ill.y - p.y);
+            if (d < minDist) {
+              minDist = d;
+              target = ill;
+            }
+          }
+        }
+
+        // Query CJ drive-by vehicles / minions if no active fighter target
+        if (!target && typeof state !== 'undefined' && state.cjDriveBys) {
+          for (const car of state.cjDriveBys) {
+            if (!car || car.hp <= 0 || car.dead || car.phase === 'WAITING_REENTER') continue;
+            const carOwnerIdx = (typeof car.ownerIndex === 'number') ? car.ownerIndex : (fighters && car.owner ? fighters.indexOf(car.owner) : -1);
+            if (carOwnerIdx !== -1 && (ownerIndex === carOwnerIdx || areOnSameTeam(ownerIndex, carOwnerIdx))) continue;
+            const d = Math.hypot(car.x - p.x, car.y - p.y);
+            if (d < minDist) {
+              minDist = d;
+              target = car;
+            }
+          }
+        }
+
+        const maxSpeed = (p.baseSpeed || p.speed || 10.5) * 1.35;
+        let curAngle = (p.angle !== undefined) ? p.angle : ((Math.abs(p.vx) > 0.01 || Math.abs(p.vy) > 0.01) ? Math.atan2(p.vy, p.vx) : (p.initialAngle || 0));
+
+        if (target) {
+          const targetX = target.x;
+          const targetY = target.y - (target.z || 0);
+          p.lockedTargetAngle = Math.atan2(targetY - p.y, targetX - p.x);
+        }
+
+        if (p.flightTime <= 12) {
+          // ── PHASE 1: Outward Fan Ejection & Hover Deceleration ──
+          p.telegraphActive = true;
+          p.vx *= 0.88;
+          p.vy *= 0.88;
+          p.currentSpeed = Math.hypot(p.vx, p.vy);
+          p.angle = curAngle;
+          p.lastAngle = curAngle;
+        } else if (p.flightTime <= 24) {
+          // ── PHASE 2: Aim Realignment & Iridescent Telegraph Laser Lock ──
+          p.telegraphActive = true;
+          p.vx *= 0.75;
+          p.vy *= 0.75;
+
+          if (p.lockedTargetAngle !== undefined) {
+            let diff = p.lockedTargetAngle - curAngle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            curAngle += diff * 0.22;
+            p.angle = curAngle;
+            p.lastAngle = curAngle;
+          }
+
+          if (p.flightTime === 24) {
+            // Telegraph lock snap audio cue
+            if (typeof playSound === 'function') {
+              const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : null;
+              const teleSound = cfg?.sounds?.sliceTelegraph || 'Assets/Sound Effects/NamelessDeity/SliceTelegraph.ogg';
+              const teleVol = cfg?.sliceTelegraphVolume ?? 0.55;
+              playSound(teleSound, teleVol);
+            }
+          }
+        } else {
+          // ── PHASE 3: Hyper-Acceleration Homing Strike ──
+          p.telegraphActive = false;
+          p.currentSpeed = Math.min(maxSpeed, (p.currentSpeed || 3.0) + 1.1);
+
+          if (p.lockedTargetAngle !== undefined) {
+            let diff = p.lockedTargetAngle - curAngle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            const homingStrength = p.homingStrength || 0.085;
+            curAngle += diff * homingStrength;
+          }
+
+          p.angle = curAngle;
+          p.lastAngle = curAngle;
+          p.vx = Math.cos(curAngle) * p.currentSpeed;
+          p.vy = Math.sin(curAngle) * p.currentSpeed;
+
+          // Subtle serpentine shimmer
+          if (p.wobblePhase === undefined || Number.isNaN(p.wobblePhase)) {
+            p.wobblePhase = (p.dartIndex || 0) * 1.5;
+          }
+          p.wobblePhase += 0.22;
+          const perpX = -p.vy / (p.currentSpeed || 1);
+          const perpY = p.vx / (p.currentSpeed || 1);
+          const wobbleAmp = 0.95;
+          p.x += perpX * Math.sin(p.wobblePhase) * wobbleAmp;
+          p.y += perpY * Math.sin(p.wobblePhase) * wobbleAmp;
+        }
+      }
+
       // Normal projectile movement
       p.x += p.vx;
       p.y += p.vy;
@@ -3877,6 +4022,49 @@ class ProjectileSystem {
           if (typeof spawnSparks === 'function') {
             spawnSparks(p.x, p.y, 8, 'orange');
           }
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
+        const isStarlightDart = (p.isStarlightDart || p.visual === 'starlightDart');
+        if (isStarlightDart && expired && !hit) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          if (arena) {
+            if (arena.shape === 'circle') {
+              const cx = arena.x + arena.width / 2;
+              const cy = arena.y + arena.height / 2;
+              const ar = arena.radius || (arena.width / 2);
+              const d = Math.hypot(p.x - cx, p.y - cy);
+              if (d > ar) {
+                const angle = Math.atan2(p.y - cy, p.x - cx);
+                wallX = cx + Math.cos(angle) * (ar - 2);
+                wallY = cy + Math.sin(angle) * (ar - 2);
+              }
+            } else {
+              wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+              wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+            }
+          }
+
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(wallX, wallY, 8, 'cyan', '#00F0FF');
+            spawnSparks(wallX, wallY, 5, 'violet', '#A17FE0');
+            spawnSparks(wallX, wallY, 3, 'gold', '#FFFFFF');
+          }
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(wallX, wallY, 18, '#00F0FF');
+          }
+          if (typeof playSound === 'function') {
+            const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : null;
+            const hitSound = cfg?.sounds?.supernova || 'Assets/Sound Effects/NamelessDeity/Supernova.ogg';
+            const hitVol = (cfg?.supernovaVolume ?? 0.60) * 0.55;
+            playSound(hitSound, hitVol);
+          }
+
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
