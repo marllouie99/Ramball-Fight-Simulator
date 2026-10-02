@@ -325,8 +325,35 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
     );
 
+    const isCaughtInNamelessBeam = Boolean(
+      opts.isNamelessBeam ||
+      (fighter.caughtInNamelessBeamTimer && fighter.caughtInNamelessBeamTimer > 0) ||
+      fighter.isCaughtInNamelessBeam ||
+      (attacker && (attacker.characterId === 'namelessdeity' || attacker.characterId === 'nameless_deity' || attacker.type === 'namelessdeity') && ((attacker.destroyerFireTimer || 0) > 0 || (attacker.destroyerWindupTimer || 0) > 0)) ||
+      (typeof state !== 'undefined' && state.fighters && state.fighters.some(f =>
+        f && (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity') &&
+        f.hp > 0 && !f.dead && !f.isDead &&
+        ((f.destroyerFireTimer || 0) > 0 || (f.destroyerWindupTimer || 0) > 0) &&
+        (!fighter.isTeammate || !fighter.isTeammate(f)) &&
+        ((fighter.caughtInNamelessBeamTimer || 0) > 0 || (fighter._hitByNamelessBeamTimer || 0) > 0)
+      ))
+    );
+
     if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
-      if (isInsideGojoDomain) {
+      if (isCaughtInNamelessBeam) {
+        // While caught in the Nameless Deity's active super-beam, the wheel MUST NOT trigger until the beam finishes!
+        if (!fighter.pendingNamelessBeamAdaptation) {
+          fighter.pendingNamelessBeamAdaptation = {
+            type: type || 'skill',
+            attacker: attacker || null,
+            lastSkillShotId: 'namelessDestroyer',
+            lastSkillShotColor: '#00F0FF'
+          };
+        }
+        fighter.totalAccumDamage = 0;
+        fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+        fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
+      } else if (isInsideGojoDomain) {
         // Inside Gojo's Unlimited Void, active adaptation and RCT healing are frozen/held!
         // Queue pending domain adaptation for release if Mahoraga survives when domain ends.
         if (!fighter.pendingDomainAdaptation) {
@@ -395,6 +422,35 @@ export function triggerAdaptation(fighter, type, attacker) {
     return;
   }
   if (!isInfinityAdaptation && !isDomainAdaptation && (fighter.fatalAdaptCooldown || 0) > 0) {
+    return;
+  }
+
+  // Hold adaptation ticks while caught in Nameless Deity's active super-beam!
+  const isCaughtInNamelessBeam = Boolean(
+    (fighter.caughtInNamelessBeamTimer && fighter.caughtInNamelessBeamTimer > 0) ||
+    fighter.isCaughtInNamelessBeam ||
+    (attacker && (attacker.characterId === 'namelessdeity' || attacker.characterId === 'nameless_deity' || attacker.type === 'namelessdeity') && ((attacker.destroyerFireTimer || 0) > 0 || (attacker.destroyerWindupTimer || 0) > 0)) ||
+    (typeof state !== 'undefined' && state.fighters && state.fighters.some(f =>
+      f && (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity') &&
+      f.hp > 0 && !f.dead && !f.isDead &&
+      ((f.destroyerFireTimer || 0) > 0 || (f.destroyerWindupTimer || 0) > 0) &&
+      (!fighter.isTeammate || !fighter.isTeammate(f)) &&
+      ((fighter.caughtInNamelessBeamTimer || 0) > 0 || (fighter._hitByNamelessBeamTimer || 0) > 0)
+    ))
+  );
+
+  if (isCaughtInNamelessBeam) {
+    if (!fighter.pendingNamelessBeamAdaptation) {
+      fighter.pendingNamelessBeamAdaptation = {
+        type: type || 'skill',
+        attacker: attacker || null,
+        lastSkillShotId: 'namelessDestroyer',
+        lastSkillShotColor: '#00F0FF'
+      };
+    }
+    fighter.totalAccumDamage = 0;
+    fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 180;
+    fighter.fatalAdaptCooldownMax = fighter.fatalAdaptCooldown;
     return;
   }
 

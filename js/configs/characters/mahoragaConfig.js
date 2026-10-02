@@ -133,11 +133,11 @@ export const mahoragaConfig = {
     shoutSlowMultiplier: 0.50,       // Slow speed multiplier (0.50 = 50% slow movement)
 
     // ── Cursed Energy Debris Throw (Rapid Barrage Ranged Skill) ──
-    throwCooldown: 1000,             // Cooldown between rapid throw barrages
+    throwCooldown: 1600,             // Cooldown between rapid throw barrages
     throwMinDistance: 240,           // Minimum distance required to trigger rapid throw skill
     throwBarrageCount: 10,           // Number of rapid projectiles hurled in a single barrage
     throwBarrageInterval: 10,        // Frames between each rapid throw in the barrage (~0.16s)
-    throwDamage: 6,                 // Damage per thrown projectile in barrage
+    throwDamage: 12,                 // Damage per thrown projectile in barrage
     throwSpeed: 20,                  // Projectile velocity
     throwKnockback: 7.0,             // Physical pushback force per projectile impact
     throwAimRotationSpeed: 0.06,     // Aim tracking rotation speed during throw barrage
@@ -235,7 +235,7 @@ export const mahoragaConfig = {
     },
     soundVolumes: {
         wheelClick: 0.50,
-        wheelEnhance: 0.50,
+        wheelEnhance: 0.0,
         swordSwing: 0.50,
         throwSound: 0.65,
         throwImpact: 0.50,

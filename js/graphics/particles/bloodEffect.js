@@ -559,7 +559,7 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
   }
 
   // Also trigger physical meaty flesh burst sound
-  if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+  if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function' && !opts?.noHitSound && !opts?.suppressHitSound && !opts?.isNamelessBeam && !opts?.isSilent) {
     audioSystem.playSFX('attack_fleshhit', 1.4);
   }
 }

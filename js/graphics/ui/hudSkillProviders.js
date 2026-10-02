@@ -58,6 +58,11 @@ export function isSkillEnabled(...args) {
 export function getSkillDataForFighter(f, getProjectiles) {
   if (!f) return [];
 
+  // Nameless Deity only has a health bar and stats, no skill bars on HUD
+  if (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity' || f.type === 'nameless_deity' || f.name === 'Nameless Deity') {
+    return [];
+  }
+
   // ─────────────────────────────────────────────
   // GOJO SATORU (Limitless & Six Eyes)
   // ─────────────────────────────────────────────
@@ -261,10 +266,10 @@ export function getSkillDataForFighter(f, getProjectiles) {
       let wheelLabel = `WOA - LVL ${lvlStr}`;
       let wheelReady = false;
 
-      if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0 || f.pendingDomainAdaptation) {
+      if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0 || f.pendingDomainAdaptation || f.pendingNamelessBeamAdaptation) {
         wheelPct = 100;
         wheelReady = true;
-        wheelLabel = 'ADAPTING...';
+        wheelLabel = (f.pendingDomainAdaptation) ? 'HELD' : 'ADAPTING...';
       } else if (isCoolingDown) {
         wheelPct = Math.max(0, Math.min(100, (1 - (f.fatalAdaptCooldown / cdMax)) * 100));
         wheelReady = false;
@@ -2168,7 +2173,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
-  if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
+  if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
     return [];
   }
 

@@ -40,6 +40,8 @@ import { MegumiFighter } from '../fighters/MegumiFighter.js';
 import { MeguminFighter } from '../fighters/MeguminFighter.js';
 import { CrazyDaveFighter } from '../fighters/CrazyDaveFighter.js';
 import { PekkaFighter } from '../fighters/PekkaFighter.js';
+import { NamelessDeityFighter } from '../fighters/NamelessDeityFighter.js';
+import { DraedonFighter } from '../fighters/DraedonFighter.js';
 import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 import { CJFighter } from '../fighters/CJFighter.js';
 import { UryuFighter } from '../fighters/UryuFighter.js';
@@ -104,6 +106,12 @@ export const FIGHTER_CLASS_MAP = {
   'Pekka': PekkaFighter,
   'PEKKA': PekkaFighter,
   'p.e.k.k.a': PekkaFighter,
+  'namelessdeity': NamelessDeityFighter,
+  'nameless_deity': NamelessDeityFighter,
+  'nameless': NamelessDeityFighter,
+  'draedon': DraedonFighter,
+  'exomech': DraedonFighter,
+  'exo_mech': DraedonFighter,
   'john_wick': JohnWickFighter,
   'johnwick':  JohnWickFighter,
   'cj':        CJFighter,
@@ -180,7 +188,23 @@ function wrapFighterDraw(FighterClass) {
       if (fighter.hitFlameWisps) fighter.hitFlameWisps.length = 0;
     }
 
-    const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || Boolean(fighter.hideHands) || fighter.characterId === 'zeus' || fighter.type === 'zeus';
+    const isNamelessDeity = Boolean(
+      fighter.characterId === 'namelessdeity' ||
+      fighter.characterId === 'nameless_deity' ||
+      fighter.characterId === 'nameless' ||
+      fighter.type === 'namelessdeity' ||
+      fighter.type === 'nameless_deity' ||
+      fighter.type === 'nameless'
+    );
+    const shouldHideHands = Boolean(
+      (typeof state !== 'undefined' && state.showSkinOnly) ||
+      fighter.hideHands ||
+      fighter.usesCustomHands ||
+      fighter.hasCustomHands ||
+      fighter.characterId === 'zeus' ||
+      fighter.type === 'zeus' ||
+      isNamelessDeity
+    );
 
     const originalArc = ctx.arc;
     const originalStroke = ctx.stroke;

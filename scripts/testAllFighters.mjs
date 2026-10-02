@@ -79,7 +79,7 @@ globalThis.document = {
   addEventListener: () => {},
   removeEventListener: () => {},
   getElementById: (id) => {
-    if (id === 'arena') return mockCanvas;
+    if (id === 'arena' || id === 'topLevelUiCanvas') return mockCanvas;
     const el = { style: {}, classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false }, textContent: '', innerHTML: '', addEventListener: () => {}, appendChild: () => ({}), removeChild: () => ({}), children: [], querySelector: () => null, querySelectorAll: () => [] };
     el.firstElementChild = el;
     return el;

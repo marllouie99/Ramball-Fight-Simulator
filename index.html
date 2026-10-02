@@ -107,6 +107,9 @@
 
       <div id="healthHud" class="health-hud" aria-live="polite" style="display: none;"></div>
 
+      <!-- Top-Level UI Canvas: Overlays all DOM HUD elements (health bars, skill bars, stats) during Super-Beams, Overlays, and Mission Banners -->
+      <canvas id="topLevelUiCanvas" width="540" height="960"></canvas>
+
       <!-- Mobile / Multi-Device Floating Quick Action Bar (Combat Controls) -->
       <div id="mobileQuickBar" class="mobile-quick-bar" style="display: none;">
         <button id="quickBtnPause" class="quick-btn" title="Pause / Resume" aria-label="Pause / Resume">
@@ -1110,24 +1113,59 @@
                     </div>
                     <div id="patchnotes-balance-card" class="patchnotes-card">
                       <div class="patchnote-item">
+                        <span class="patchnote-tag tag-buff">BUFF</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">CRAZYDAVE</strong>
+                          <p class="patchnote-desc"><code>wallnutCost</code>: <code>50</code> ➔ <code>100</code> (+100.0%)</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
                         <span class="patchnote-tag tag-nerf">NERF</span>
                         <div class="patchnote-content">
                           <strong class="patchnote-heading">CRAZYDAVE</strong>
-                          <p class="patchnote-desc"><code>snowPeaCost</code>: <code>175</code> ➔ <code>100</code> (-42.9%)</p>
+                          <p class="patchnote-desc"><code>peashooterHp</code>: <code>180</code> ➔ <code>100</code> (-44.4%)</p>
                         </div>
                       </div>
                       <div class="patchnote-item">
-                        <span class="patchnote-tag tag-adj">ADJUST</span>
+                        <span class="patchnote-tag tag-nerf">NERF</span>
                         <div class="patchnote-content">
                           <strong class="patchnote-heading">CRAZYDAVE</strong>
-                          <p class="patchnote-desc"><code>grassTilesSpriteSrc</code>: <code>Assets/model/Sprites/Grass-tiles-sprite-sheet.png</code> ➔ <code>Assets/model/Tiles/Grass-tiles-sprite-sheet.png</code> (Mod)</p>
+                          <p class="patchnote-desc"><code>snowPeaHp</code>: <code>200</code> ➔ <code>100</code> (-50.0%)</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-nerf">NERF</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">CRAZYDAVE</strong>
+                          <p class="patchnote-desc"><code>torchwoodCost</code>: <code>175</code> ➔ <code>100</code> (-42.9%)</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-nerf">NERF</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">CRAZYDAVE</strong>
+                          <p class="patchnote-desc"><code>torchwoodHp</code>: <code>220</code> ➔ <code>100</code> (-54.5%)</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-nerf">NERF</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">MAHORAGA</strong>
+                          <p class="patchnote-desc"><code>throwCooldown</code>: <code>1000</code> ➔ <code>1500</code> (+50.0%)</p>
+                        </div>
+                      </div>
+                      <div class="patchnote-item">
+                        <span class="patchnote-tag tag-buff">BUFF</span>
+                        <div class="patchnote-content">
+                          <strong class="patchnote-heading">MAHORAGA</strong>
+                          <p class="patchnote-desc"><code>throwDamage</code>: <code>6</code> ➔ <code>12</code> (+100.0%)</p>
                         </div>
                       </div>
                       <div class="patchnote-item">
                         <span class="patchnote-tag tag-adj">ADJUST</span>
                         <div class="patchnote-content">
-                          <strong class="patchnote-heading">SUKUNA</strong>
-                          <p class="patchnote-desc"><code>fleshSlice</code>: <code>0.40</code> ➔ <code>0.80</code> (Mod)</p>
+                          <strong class="patchnote-heading">MAHORAGA</strong>
+                          <p class="patchnote-desc"><code>wheelEnhance</code>: <code>0.50</code> ➔ <code>0.0</code> (Mod)</p>
                         </div>
                       </div>
                     </div>

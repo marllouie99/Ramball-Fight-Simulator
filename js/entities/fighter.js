@@ -201,7 +201,8 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       }
 
       // Play flesh hit audio effect unless it's a continuous DPS/dot effect or duplicate turret pair hit
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified && !opts.isBleed && opts.source !== 'bleed' && !isSecondTurretHit) {
+      const isSilentHit = Boolean(opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isPurpleDPS || opts.isDomainDPS || opts.isElectrified || opts.isBleed || opts.source === 'bleed' || opts.noHitSound || opts.suppressHitSound || opts.isNamelessBeam || opts.isSilent);
+      if (!isSilentHit && !isSecondTurretHit) {
         audioSystem.playSFX('attack_fleshhit', 0.6);
       } else if (opts.isPurpleDPS || opts.isDomainDPS) {
         const now = Date.now();
@@ -535,6 +536,10 @@ export class Fighter {
     this.pureLoveBeamRegenDebuffTimer = 0;
     this.tojiRegenDebuffTimer = 0;
     this.paralyzeTimer = 0;
+    this.caughtInLaserBeamTimer = 0;
+    this.caughtInLaylaBeamTimer = 0;
+    this.caughtInNamelessBeamTimer = 0;
+    this.isCaughtInNamelessBeam = false;
     this.iceFreezeTimer = 0;
     this.isFrozenBySnowPea = false;
     this.isParalyzedByMahito = false;
@@ -957,13 +962,14 @@ export class Fighter {
     return false;
   }
 
-  /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Laser Beam, Layla Beam). */
+  /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Laser Beam, Layla Beam, Nameless Destroyer). */
   isCaughtInBeam() {
     return !!(
       this.caughtInGenosFlurry ||
       this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
-      (this.caughtInLaylaBeamTimer || 0) > 0
+      (this.caughtInLaylaBeamTimer || 0) > 0 ||
+      (this.caughtInNamelessBeamTimer || 0) > 0
     );
   }
 
@@ -1758,6 +1764,12 @@ export class Fighter {
     if (this.hitStunTimer > 0) this.hitStunTimer--;
     if (this.caughtInLaserBeamTimer > 0) this.caughtInLaserBeamTimer--;
     if (this.caughtInLaylaBeamTimer > 0) this.caughtInLaylaBeamTimer--;
+    if (this.caughtInNamelessBeamTimer > 0) {
+      this.caughtInNamelessBeamTimer--;
+      if (this.caughtInNamelessBeamTimer <= 0) {
+        this.isCaughtInNamelessBeam = false;
+      }
+    }
     if (this.electricStunTimer > 0) this.electricStunTimer--;
     if (this.dubstepStunTimer > 0) this.dubstepStunTimer--;
     if (this.crimsonElectrifiedTimer > 0) this.crimsonElectrifiedTimer--;
@@ -2076,9 +2088,9 @@ export class Fighter {
             this._triggerMakimaWallPin(arena);
           } else if (wasEscanorPin) {
             this._triggerEscanorWallPinAndCrack(arena);
-          } else if (this.preventKnockbackBounce) {
+          } else if (this.preventKnockbackBounce || isBeamTrapped || this.isDraggedByGetsuga) {
             this.preventKnockbackBounce = false;
-            // Non-Saitama wall contact (e.g. Getsuga drag) - cleanly stop knockback without spawning wall crack decals
+            // Non-Saitama wall contact (e.g. Getsuga drag, beam stasis) - cleanly stop knockback without spawning wall crack decals or fleshhit SFX
             this.knockbackVx = 0;
             this.knockbackVy = 0;
             this.vx = 0;
@@ -2364,9 +2376,12 @@ export class Fighter {
       opts.isDomainDPS ||
       opts.fromDomain ||
       opts.noHitSound ||
+      opts.suppressHitSound ||
+      opts.isNamelessBeam ||
+      opts.isSilent ||
       (opts.projectile && (opts.projectile.isDomainDPS || opts.projectile.fromDomain))
     );
-    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse' && !opts.noHitSound && !isDomainHit) {
+    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse' && !opts.noHitSound && !opts.suppressHitSound && !opts.isNamelessBeam && !opts.isSilent && !isDomainHit) {
       if (!this.isTurret && !this.isDispenser) {
         if (!isSecondTurretHit) {
           audioSystem.playSFX('attack_fleshhit', 0.6);
@@ -2407,11 +2422,20 @@ export class Fighter {
       return;
     }
 
-    // Play death sound
-    const faah = getAnnouncerSound('faah');
-    if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
-
+    // Play death sound (suppressed if disintegrating in Nameless Deity beam or flagged silent)
     const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
+    const isNamelessBeamDeath = Boolean(
+      (opts && (opts.isNamelessBeam || opts.isBeamDPS || opts.noDeathSound || opts.suppressDeathSound)) ||
+      (this.caughtInNamelessBeamTimer && this.caughtInNamelessBeamTimer > 0) ||
+      this.isCaughtInNamelessBeam ||
+      this.isDraggedByNamelessBeam ||
+      (realAttacker && (realAttacker.characterId === 'namelessdeity' || realAttacker.characterId === 'nameless_deity' || realAttacker.type === 'namelessdeity') && ((realAttacker.destroyerFireTimer || 0) > 0 || (realAttacker.destroyerWindupTimer || 0) > 0 || (realAttacker.destroyerRecoveryTimer || 0) > 0))
+    );
+
+    if (!isNamelessBeamDeath) {
+      const faah = getAnnouncerSound('faah');
+      if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
+    }
     const recordKill = () => {
       if (realAttacker && realAttacker !== this) {
         const victimDef = this._def || { name: this.name, color: this.color, type: this.type };

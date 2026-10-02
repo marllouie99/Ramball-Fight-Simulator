@@ -159,5 +159,29 @@ export const AUDIO_CONFIG = {
   'crazydave_snowpea_freeze': 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3',
   'crazydave_splat': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
   'crazydave_lawnmower_engine': 'Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3',
-  'lawnmower_engine': 'Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3'
+  'lawnmower_engine': 'Assets/Sound Effects/Sprites SFX/Lawn Mower.mp3',
+
+  // Nameless Deity (Terraria: Wrath of the Gods)
+  'nameless_laser_charge': 'Assets/Sound Effects/NamelessDeity/CosmicLaserChargeUp.ogg',
+  'nameless_laser_start': 'Assets/Sound Effects/NamelessDeity/CosmicLaserStart.ogg',
+  'nameless_laser_loop': 'Assets/Sound Effects/NamelessDeity/CosmicLaserLoop.ogg',
+  'nameless_laser_hit': 'Assets/Sound Effects/NamelessDeity/CosmicLaserObliteration.ogg',
+  'nameless_chant1': 'Assets/Sound Effects/NamelessDeity/ChantLoop1.ogg',
+  'nameless_chant2': 'Assets/Sound Effects/NamelessDeity/ChantLoop2.ogg',
+  'nameless_mumble1': 'Assets/Sound Effects/NamelessDeity/Mumble1.ogg',
+  'nameless_mumble2': 'Assets/Sound Effects/NamelessDeity/Mumble2.ogg',
+  'nameless_mumble3': 'Assets/Sound Effects/NamelessDeity/Mumble3.ogg',
+  'nameless_mumble4': 'Assets/Sound Effects/NamelessDeity/Mumble4.ogg',
+  'nameless_mumble5': 'Assets/Sound Effects/NamelessDeity/Mumble5.ogg',
+  'nameless_dart_shoot': 'Assets/Sound Effects/NamelessDeity/SunBeamShoot.ogg',
+  'nameless_portal_laser': 'Assets/Sound Effects/NamelessDeity/PortalLaserShoot.ogg',
+  'nameless_dimension_cleave': 'Assets/Sound Effects/NamelessDeity/RealityTear.ogg',
+  'nameless_slice_telegraph': 'Assets/Sound Effects/NamelessDeity/SliceTelegraph.ogg',
+  'nameless_star_convergence': 'Assets/Sound Effects/NamelessDeity/StarConvergence.ogg',
+  'nameless_star_convergence_fast': 'Assets/Sound Effects/NamelessDeity/StarConvergenceFast.ogg',
+  'nameless_supernova': 'Assets/Sound Effects/NamelessDeity/Supernova.ogg',
+  'nameless_big_supernova': 'Assets/Sound Effects/NamelessDeity/BigSupernova.ogg',
+  'nameless_moment_of_creation': 'Assets/Sound Effects/NamelessDeity/MomentOfCreation.ogg',
+  'nameless_chuckle': 'Assets/Sound Effects/NamelessDeity/Chuckle.ogg',
+  'nameless_wing_flap': 'Assets/Sound Effects/NamelessDeity/WingFlap2.ogg'
 };

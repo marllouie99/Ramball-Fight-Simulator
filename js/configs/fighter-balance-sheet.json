@@ -689,6 +689,40 @@
           "paralyzeFrames": 45
         }
       }
+    },
+    "namelessdeity": {
+      "name": "Nameless Deity",
+      "archetype": "zoner",
+      "hp": 420,
+      "speed": 4.8,
+      "radius": 28,
+      "baseDamage": 16,
+      "baseCooldown": 35,
+      "themeColor": "#00F0FF",
+      "keySkills": {
+        "namelessDestroyer": {
+          "totalDamage": 130,
+          "cooldown": 850,
+          "beamWidth": 46
+        }
+      }
+    },
+    "draedon": {
+      "name": "Draedon",
+      "archetype": "zoner",
+      "hp": 430,
+      "speed": 4.6,
+      "radius": 28,
+      "baseDamage": 18,
+      "baseCooldown": 32,
+      "themeColor": "#06B6D4",
+      "keySkills": {
+        "exoDisintegrator": {
+          "totalDamage": 135,
+          "cooldown": 820,
+          "beamWidth": 42
+        }
+      }
     }
   }
 }

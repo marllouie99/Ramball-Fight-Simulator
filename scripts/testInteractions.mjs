@@ -3436,6 +3436,87 @@ async function runInteractionTests() {
     console.log('      ✅ Arena Tile System, themes, snapping math & 100% balanced Canvas 2D stacks verified.');
   }
 
+  {
+    console.log('   31. Testing Nameless Destroyer & Exo Electric Disintegrator Super-Beams, Skills & Canvas Stack Balance...');
+    const { NamelessDeityFighter } = await import('../js/entities/fighters/NamelessDeityFighter.js');
+    const { DraedonFighter } = await import('../js/entities/fighters/DraedonFighter.js');
+    const { drawNamelessDestroyerPreview } = await import('../js/graphics/weapons/namelessDeityWeaponGraphics.js');
+    const { drawExoDisintegratorPreview } = await import('../js/graphics/weapons/draedonWeaponGraphics.js');
+
+    const nameless = new NamelessDeityFighter({ radius: 28, x: 150, y: 300, hp: 420, maxHp: 420 });
+    const draedon = new DraedonFighter({ radius: 28, x: 450, y: 300, hp: 430, maxHp: 430 });
+    nameless.team = 0;
+    draedon.team = 1;
+    state.fighters = [nameless, draedon];
+
+    // 1. Basic attacks
+    assert(nameless.shoot(0) === true, 'Nameless Deity must fire homing Prismatic Light Darts');
+    assert(draedon.shoot(1) === true, 'Draedon must fire twin Exo-Pulse Blasters');
+
+    // 2. Skills
+    assert(nameless.castSuperclusterStars(draedon) === true, 'Nameless Deity must cast Supercluster Stars');
+    assert(nameless.castDimensionCleave(draedon) === true, 'Nameless Deity must cast Dimension Cleave');
+    assert(nameless.castCosmicSingularity(draedon) === true, 'Nameless Deity must cast Cosmic Singularity');
+    assert(draedon.castAresArtillery(nameless) === true, 'Draedon must cast Ares Artillery');
+    assert(draedon.castThanatosMatrix(nameless) === true, 'Draedon must cast Thanatos Matrix');
+    assert(draedon.castArtemisApolloLasers(nameless) === true, 'Draedon must cast Exo Cross-Lasers');
+
+    // 3. Super-Beams
+    assert(nameless.castNamelessDestroyer(draedon) === true, 'Nameless Deity must cast Nameless Destroyer Super-Beam');
+    assert(draedon.castExoDisintegrator(nameless) === true, 'Draedon must cast Exo Electric Disintegrator Super-Beam');
+
+    // Update through wind-up and active firing phases
+    for (let i = 0; i < 60; i++) {
+      nameless.update(draedon, 0, state.arena);
+      draedon.update(nameless, 1, state.arena);
+
+      // Verify Canvas 2D Stack Depth during active beam and charging renders
+      mockCtx.resetStackDepth();
+      nameless.draw(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, `Nameless Deity draw stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+
+      mockCtx.resetStackDepth();
+      draedon.draw(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, `Draedon draw stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+    }
+
+    // Test Skin 2 (Golden Seraph with Wings9.png, wheel9.png, sideflower9.png, arm9.png, forearm9.png, hands9.png, deitybody9.png, antlers9.png & vines9.png) rendering & canvas stack depth
+    nameless.skinVariant = 'skin2';
+    mockCtx.resetStackDepth();
+    nameless.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, `Nameless Deity skin2 (Golden Seraph) draw stack depth must be 0 (got ${mockCtx.getStackDepth()})`);
+    
+    // Test Body, Antlers (with gap spread), Antler Vines (Vines1.png), Flowers, Vines and Arm customizations in Skin Studio
+    state.skinCustomizations = state.skinCustomizations || {};
+    state.skinCustomizations.nameless_deity_body = { widthScale: 1.1, heightScale: 1.1, offsetX: 0, offsetY: -2, angleOffset: 0.05 };
+    state.skinCustomizations.nameless_deity_antlers = { widthScale: 1.2, heightScale: 1.1, offsetX: 0, offsetY: -5, gap: 15, angleOffset: 0.02 };
+    state.skinCustomizations.nameless_deity_antler_vines = { widthScale: 1.15, heightScale: 1.05, offsetX: -2, offsetY: 4, angleOffset: 0.03 };
+    state.skinCustomizations.nameless_deity_flowers = { widthScale: 1.4, heightScale: 1.2, offsetX: 8, offsetY: 15, angleOffset: 0.04 };
+    state.skinCustomizations.nameless_deity_vines = { widthScale: 1.3, heightScale: 1.2, offsetX: -5, offsetY: 2, angleOffset: 0.05 };
+    state.skinCustomizations.nameless_deity_arm = { widthScale: 1.25, heightScale: 1.5, offsetX: 10, offsetY: 5, angleOffset: 0.1 };
+    mockCtx.resetStackDepth();
+    nameless.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Nameless Deity with custom body, antlers, antler vines, flowers, vines, and arm must render with 0 stack depth');
+    delete state.skinCustomizations.nameless_deity_body;
+    delete state.skinCustomizations.nameless_deity_antlers;
+    delete state.skinCustomizations.nameless_deity_antler_vines;
+    delete state.skinCustomizations.nameless_deity_flowers;
+    delete state.skinCustomizations.nameless_deity_vines;
+    delete state.skinCustomizations.nameless_deity_arm;
+    nameless.skinVariant = 'skin1';
+
+    // Weapon Studio Previews
+    mockCtx.resetStackDepth();
+    drawNamelessDestroyerPreview(mockCtx, 50, 50, 48);
+    assert(mockCtx.getStackDepth() === 0, 'drawNamelessDestroyerPreview must maintain 0 canvas stack depth');
+
+    mockCtx.resetStackDepth();
+    drawExoDisintegratorPreview(mockCtx, 50, 50, 48);
+    assert(mockCtx.getStackDepth() === 0, 'drawExoDisintegratorPreview must maintain 0 canvas stack depth');
+
+    console.log('      ✅ Nameless Destroyer & Exo Electric Disintegrator super-beams, skills & 100% balanced Canvas 2D stacks verified.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

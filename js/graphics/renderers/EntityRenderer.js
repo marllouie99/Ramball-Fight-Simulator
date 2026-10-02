@@ -326,7 +326,11 @@ export function drawFighters() {
       (f.cleaveCutTimer && f.cleaveCutTimer > 0) ||
       (f.fugaTimer && f.fugaTimer > 0) ||
       (f._counterPunchTimer && f._counterPunchTimer > 0) ||
-      (f.isFlurrying)
+      (f.isFlurrying) ||
+      (f.destroyerFireTimer && f.destroyerFireTimer > 0) ||
+      (f.destroyerWindupTimer && f.destroyerWindupTimer > 0) ||
+      (f.disintegratorFireTimer && f.disintegratorFireTimer > 0) ||
+      (f.disintegratorWindupTimer && f.disintegratorWindupTimer > 0)
     );
     const aPunching = isAttacking(a.f);
     const bPunching = isAttacking(b.f);

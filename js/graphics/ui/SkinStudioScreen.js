@@ -34,6 +34,9 @@ import { drawGunslingerSkin, _drawGunslingerHair, _getGunslingerHairImage } from
 import { drawDoppelgangerSkin, drawDoppelgangerPixelBody } from '../fighters/doppelgangerSkin.js';
 import { drawEmberSkin } from '../fighters/flamewardenSkin.js';
 import { drawEyeOfCthulhuSkin } from '../fighters/eyeOfCthulhuSkin.js';
+import { drawNamelessDeitySkin, NAMELESS_DEITY_DEFAULT_CONFIGS, NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS } from '../fighters/namelessDeitySkin.js';
+
+
 
 // Studio State Initializers
 if (state.studioSelectedSkinFighter === undefined) state.studioSelectedSkinFighter = 'ichigo';
@@ -47,6 +50,24 @@ if (state.studioSkinDetailTab === undefined) state.studioSkinDetailTab = 'scale'
 if (state.studioSkinModalOpen === undefined) state.studioSkinModalOpen = false;
 if (state.studioSkinModalPage === undefined) state.studioSkinModalPage = 0;
 if (state.studioSkinCategory === undefined) state.studioSkinCategory = 'ALL';
+if (state.studioSkinNamelessPart === undefined) state.studioSkinNamelessPart = 'overall';
+
+export const NAMELESS_DEITY_PARTS = [
+  { id: 'overall', label: '⭐ ALL', fullLabel: 'ALL / OVERALL', asset: 'Body + Antlers + Cicada + Censor + Vines + Flowers + Wings + Halo + Wheel + Limbs', desc: 'Overall model scale & shift' },
+  { id: 'body', label: '🫀 BODY', shortLabel: 'BODY', fullLabel: 'DIVINE BODY TORSO', asset: 'Assets/model/NamelessDeity/DivineBody.png', desc: 'Torso scale, shift & angle' },
+  { id: 'antlers', label: '🦌 ANTLERS', shortLabel: 'ANTLERS', fullLabel: 'SACRED DEITY ANTLERS', asset: 'Assets/model/NamelessDeity/antlers9.png', desc: 'Antler crown scale, shift & angle' },
+  { id: 'antler_vines', label: '🌿 A-VINES', shortLabel: 'A-VINES', fullLabel: 'ANTLER HANGING VINES', asset: 'Assets/model/NamelessDeity/Vines1.png', desc: 'Vines draped from antler branches' },
+  { id: 'cicada', label: '🪲 CICADA', shortLabel: 'CICADA', fullLabel: 'CICADA CROWN / BROOCH', asset: 'Assets/model/NamelessDeity/Cicada.png', desc: 'Head crown / chest cicada moth' },
+  { id: 'censor', label: '📜 CENSOR', shortLabel: 'CENSOR', fullLabel: 'TAPED CENSOR SKETCH', asset: 'Assets/model/NamelessDeity/Censor.png', desc: 'Face/torso taped censor paper note' },
+  { id: 'vines', label: '🌿 VINES', shortLabel: 'VINES', fullLabel: 'HANGING VINES / ROBES', asset: 'Assets/model/NamelessDeity/Vines.png', desc: 'Lower vines scale, shift & angle' },
+  { id: 'flowers', label: '🩶 FLOWERS', shortLabel: 'FLOWERS', fullLabel: 'GRAY CELESTIAL FLOWERS', asset: 'Assets/model/NamelessDeity/SideFlower2.png', desc: 'Dual gray flanking lotus flowers' },
+  { id: 'wings', label: '🪽 WINGS', fullLabel: 'WINGS', asset: 'Assets/model/NamelessDeity/Wings.png', desc: 'Wing span & flap attachment' },
+  { id: 'halo', label: '☀️ HALO', shortLabel: 'HALO', fullLabel: 'COSMIC LIGHT HALO', asset: 'Assets/model/NamelessDeity/CosmicLightCircleCenter1.png', desc: 'Back starburst halo ring' },
+  { id: 'wheel', label: '☸️ WHEEL', shortLabel: 'WHEEL', fullLabel: 'CELESTIAL CLOCK WHEEL', asset: 'Assets/model/NamelessDeity/Wheel.png', desc: 'Back clockwork wheel' },
+  { id: 'arm', label: '💪 ARM', fullLabel: 'UPPER ARM', asset: 'Assets/model/NamelessDeity/Arm.png', desc: 'Upper arm length & shoulder shift' },
+  { id: 'forearm', label: '🦾 FOREARM', fullLabel: 'FOREARM', asset: 'Assets/model/NamelessDeity/Forearm.png', desc: 'Forearm length, elbow & wrist alignment' },
+  { id: 'hand', label: '✋ HAND', fullLabel: 'HAND', asset: 'Assets/model/NamelessDeity/Hand.png', desc: 'Hand size, wrist angle & offset' }
+];
 
 const ZOOM_MIN = 0.6;
 const ZOOM_MAX = 6.0;
@@ -68,8 +89,9 @@ export const SKIN_STUDIO_CATEGORIES = [
   { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'nameless_deity', 'eye_of_cthulhu'].includes(f.key) }
 ];
+
 
 // Fighter Definitions in Skin Studio
 export const SKIN_STUDIO_FIGHTERS = [
@@ -564,13 +586,49 @@ export const SKIN_STUDIO_FIGHTERS = [
     forms: [
       { id: 'default', label: 'HEAVY JUGGERNAUT' }
     ]
+  },
+  {
+    key: 'nameless_deity',
+    label: 'NAMELESS DEITY',
+    category: 'boss',
+    asset: 'NamelessDeity (Wings/Arm/Forearm/Hand)',
+    assetDims: 'Paper Collage Multi-Limb Model',
+    baseW: 2.40,
+    baseH: 2.40,
+    baseCrownY: -1.20,
+    themeColor: '#00F0FF',
+    forms: [
+      { id: 'default', label: 'DIVINE FORM' }
+    ]
   }
 ];
+
+
+const NAMELESS_KEY_MAP = {
+  nameless_deity: 'overall',
+  nameless_deity_body: 'body',
+  nameless_deity_antlers: 'antlers',
+  nameless_deity_antler_vines: 'antler_vines',
+  nameless_deity_antlerVines: 'antler_vines',
+  nameless_deity_cicada: 'cicada',
+  nameless_deity_censor: 'censor',
+  nameless_deity_vines: 'vines',
+  nameless_deity_flowers: 'flowers',
+  nameless_deity_wings: 'wings',
+  nameless_deity_halo: 'halo',
+  nameless_deity_wheel: 'wheel',
+  nameless_deity_arm: 'arm',
+  nameless_deity_forearm: 'forearm',
+  nameless_deity_hand: 'hand'
+};
 
 function ensureFighterCustom(key) {
   if (!state.skinCustomizations) state.skinCustomizations = {};
   if (!state.skinCustomizations[key]) {
-    state.skinCustomizations[key] = {
+    const isSkin2 = (state.selectedNamelessDeitySkin === 'skin2');
+    const configMap = isSkin2 ? NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS : NAMELESS_DEITY_DEFAULT_CONFIGS;
+    const deityPart = NAMELESS_KEY_MAP[key];
+    const def = deityPart ? configMap[deityPart] : {
       widthScale: 1.0,
       heightScale: 1.0,
       offsetX: 0,
@@ -578,6 +636,7 @@ function ensureFighterCustom(key) {
       angleOffset: 0,
       flipX: false
     };
+    state.skinCustomizations[key] = { ...def };
   }
   return state.skinCustomizations[key];
 }
@@ -755,6 +814,16 @@ function generateJsCode(fDef, custom) {
            `const drawH = 1024 * scaleY;\n` +
            `const drawX = -758 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 7 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'nameless_deity') {
+    const part = state.studioSkinNamelessPart || 'overall';
+    const activeKey = (part !== 'overall') ? `nameless_deity_${part}` : 'nameless_deity';
+    return `// Calibrated Nameless Deity Asset [${part.toUpperCase()}]\n` +
+           `// Storage Key: state.skinCustomizations.${activeKey}\n` +
+           `widthScale: ${(custom.widthScale ?? 1.0).toFixed(2)},\n` +
+           `heightScale: ${(custom.heightScale ?? 1.0).toFixed(2)},\n` +
+           `offsetX: ${Math.round(custom.offsetX ?? 0)},\n` +
+           `offsetY: ${Math.round(custom.offsetY ?? 0)},\n` +
+           `angleOffset: ${((custom.angleOffset ?? 0) * (180 / Math.PI)).toFixed(1)}° (${(custom.angleOffset ?? 0).toFixed(4)} rad)`;
   }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
@@ -787,7 +856,14 @@ export function drawSkinStudioScreen() {
   const activeKey = state.studioSelectedSkinFighter || 'ichigo';
   const fDef = SKIN_STUDIO_FIGHTERS.find(f => f.key === activeKey) || SKIN_STUDIO_FIGHTERS[0];
   const themeColor = fDef.themeColor || '#f97316';
-  const custom = ensureFighterCustom(fDef.key);
+
+  const isNamelessDeity = (fDef.key === 'nameless_deity');
+  const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
+  const activePartDef = isNamelessDeity ? (NAMELESS_DEITY_PARTS.find(p => p.id === activePartId) || NAMELESS_DEITY_PARTS[0]) : null;
+  const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
+    ? `nameless_deity_${activePartId}`
+    : fDef.key;
+  const custom = ensureFighterCustom(activeCustomKey);
 
   // ── Tier 1: Header Section ──
   ctx.fillStyle = '#64748b';
@@ -1024,6 +1100,9 @@ export function drawSkinStudioScreen() {
         dummyFighter.isPhase2 = (state.studioSkinForm === 'phase2');
         dummyFighter._isPhase2 = (state.studioSkinForm === 'phase2');
         drawEyeOfCthulhuSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'nameless_deity') {
+        dummyFighter.skinVariant = (typeof state !== 'undefined' ? state.selectedNamelessDeitySkin : 'skin1') || 'skin1';
+        drawNamelessDeitySkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -1067,17 +1146,23 @@ export function drawSkinStudioScreen() {
       _drawMusashiHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'gunslinger') {
       _drawGunslingerHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'nameless_deity') {
+      drawNamelessDeitySkin(ctx, dummyFighter);
     } else if (fDef.key === 'zeus') {
       _drawZeusHair(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
       _drawZeusCrown(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
     }
+
     ctx.restore();
   }
 
   // Interactive Drag Handles & Guide Overlays on Hero Hair
   if (state.studioSkinShowGuides) {
+    const baseCrownY = (isNamelessDeity && activePartId !== 'overall')
+      ? 0
+      : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
     const handleCenterX = custom.offsetX;
-    const handleCenterY = (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3) + custom.offsetY;
+    const handleCenterY = baseCrownY + custom.offsetY;
 
     // Center Anchor Drag Handle (Cyan Diamond)
     ctx.save();
@@ -1134,6 +1219,31 @@ export function drawSkinStudioScreen() {
     ctx.fill();
     ctx.stroke();
     ctx.restore();
+
+    // Rotation Angle Drag Handle (Rose Circle on orbit stalk)
+    const curAngle = custom.angleOffset ?? 0;
+    const rotStalkLen = baseRadius * 1.6;
+    const rotHandleX = handleCenterX + Math.cos(curAngle - Math.PI / 2) * rotStalkLen;
+    const rotHandleY = handleCenterY + Math.sin(curAngle - Math.PI / 2) * rotStalkLen;
+
+    ctx.save();
+    ctx.strokeStyle = '#f43f5e';
+    ctx.lineWidth = 1.2 / currentScale;
+    ctx.setLineDash([2 / currentScale, 2 / currentScale]);
+    ctx.beginPath();
+    ctx.moveTo(handleCenterX, handleCenterY);
+    ctx.lineTo(rotHandleX, rotHandleY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#f43f5e';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5 / currentScale;
+    ctx.beginPath();
+    ctx.arc(rotHandleX, rotHandleY, 4.5 / currentScale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
   }
 
   ctx.restore(); // Exit Viewport transform
@@ -1161,6 +1271,19 @@ export function drawSkinStudioScreen() {
     drawButton('🦷 PHASE 2', topBarX + 44, topBarY + 10, () => {
       state.studioSkinForm = 'phase2';
     }, 88, 20, isP2 ? '#e11d48' : null, 3);
+    topBarX += 94;
+  } else if (fDef.key === 'nameless_deity') {
+    const isSkin2 = (state.selectedNamelessDeitySkin === 'skin2');
+    drawButton('🌌 COSMIC', topBarX + 44, topBarY + 10, () => {
+      state.selectedNamelessDeitySkin = 'skin1';
+      try { localStorage.setItem('selectedNamelessDeitySkin', 'skin1'); } catch (e) {}
+    }, 88, 20, !isSkin2 ? '#00F0FF' : null, 3);
+    topBarX += 94;
+
+    drawButton('👑 GOLDEN', topBarX + 44, topBarY + 10, () => {
+      state.selectedNamelessDeitySkin = 'skin2';
+      try { localStorage.setItem('selectedNamelessDeitySkin', 'skin2'); } catch (e) {}
+    }, 88, 20, isSkin2 ? '#FFD700' : null, 3);
     topBarX += 94;
   } else if (fDef.forms && fDef.forms.length > 1) {
     const currentFormDef = fDef.forms.find(fm => fm.id === state.studioSkinForm) || fDef.forms[0];
@@ -1195,6 +1318,52 @@ export function drawSkinStudioScreen() {
   drawButton(guidesLabel, topBarX + 40, topBarY + 10, () => {
     state.studioSkinShowGuides = !state.studioSkinShowGuides;
   }, 80, 20, null, 3);
+
+  // ── Nameless Deity Multi-Asset Part Selector Bar (Inside Viewport) ──
+  if (isNamelessDeity) {
+    const totalParts = NAMELESS_DEITY_PARTS.length;
+    const maxCols = 7;
+    const partBtnH = 19;
+    const partGapX = 5;
+    const partGapY = 3;
+    const partStartX = viewportX + 10;
+    const availableW = viewportW - 20;
+    const partBtnW = Math.floor((availableW - (partGapX * (maxCols - 1))) / maxCols);
+    const startY = viewportY + 34;
+
+    NAMELESS_DEITY_PARTS.forEach((part, idx) => {
+      const isPartSelected = (activePartId === part.id);
+      const row = Math.floor(idx / maxCols);
+      const col = idx % maxCols;
+      const bx = partStartX + col * (partBtnW + partGapX);
+      const by = startY + row * (partBtnH + partGapY);
+
+      ctx.save();
+      if (isPartSelected) {
+        ctx.fillStyle = '#21050c';
+        ctx.strokeStyle = '#FFE259';
+        ctx.lineWidth = 1.8;
+      } else {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, bx, by, partBtnW, partBtnH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isPartSelected ? '#FFE259' : '#94a3b8';
+      ctx.font = isPartSelected ? '900 9.5px "Rajdhani", sans-serif' : '700 9px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(part.label, bx + partBtnW / 2, by + partBtnH / 2);
+      ctx.restore();
+
+      _registerButton(bx, by, partBtnW, partBtnH, () => {
+        state.studioSkinNamelessPart = part.id;
+      });
+    });
+  }
 
   // ── Viewport Zoom Controls (Bottom of Viewport) ──
   const zoomY = viewportY + viewportH - 22;
@@ -1333,10 +1502,21 @@ export function drawSkinStudioScreen() {
   ctx.textBaseline = 'top';
   ctx.fillStyle = '#64748b';
   ctx.font = '900 8.5px "Rajdhani", monospace';
-  ctx.fillText(`MODEL: ${fDef.label}`, infoCardX + 8, infoCardY + 8);
-  ctx.fillText(`ASSET: ${fDef.asset}`, infoCardX + 8, infoCardY + 24);
-  ctx.fillText(`DIMS: ${fDef.assetDims || 'Standard'}`, infoCardX + 8, infoCardY + 40);
-  ctx.fillText(`BASE: ${fDef.baseW}r W | ${fDef.baseH}r H`, infoCardX + 8, infoCardY + 56);
+  if (isNamelessDeity && activePartDef) {
+    ctx.fillText(`MODEL: ${fDef.label}`, infoCardX + 8, infoCardY + 8);
+    ctx.fillStyle = '#FFE259';
+    ctx.fillText(`ACTIVE ASSET: [ ${activePartDef.fullLabel} ]`, infoCardX + 8, infoCardY + 24);
+    ctx.fillStyle = '#94a3b8';
+    const displayPartAsset = activePartDef.asset.length > 22 ? activePartDef.asset.slice(0, 20) + '…' : activePartDef.asset;
+    ctx.fillText(`ASSET: ${displayPartAsset}`, infoCardX + 8, infoCardY + 40);
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(`TARGET: ${activeCustomKey}`, infoCardX + 8, infoCardY + 56);
+  } else {
+    ctx.fillText(`MODEL: ${fDef.label}`, infoCardX + 8, infoCardY + 8);
+    ctx.fillText(`ASSET: ${fDef.asset}`, infoCardX + 8, infoCardY + 24);
+    ctx.fillText(`DIMS: ${fDef.assetDims || 'Standard'}`, infoCardX + 8, infoCardY + 40);
+    ctx.fillText(`BASE: ${fDef.baseW}r W | ${fDef.baseH}r H`, infoCardX + 8, infoCardY + 56);
+  }
 
   // Right Console: Parameter Controls
   let curY = consoleY + 32;
@@ -1456,10 +1636,47 @@ export function drawSkinStudioScreen() {
     }, 18, btnSize, null, 2);
     curY += 46;
 
+    if (isNamelessDeity && activePartId === 'antlers') {
+      // ── ANTLER GAP / SPREAD ROW ──
+      ctx.save();
+      ctx.fillStyle = 'rgba(18, 22, 32, 0.92)';
+      ctx.strokeStyle = 'rgba(255, 226, 89, 0.35)';
+      ctx.lineWidth = 1.2;
+      drawChamferedRect(ctx, rowX, curY, rowW, rowH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FFE259';
+      ctx.font = '900 10.5px "Rajdhani", sans-serif';
+      ctx.fillText(`ANTLER GAP: ${Math.round(custom.gap ?? 0)}px`, rowX + 8, curY + rowH / 2);
+
+      drawButton('−−', rowX + rowW - 74, curY + rowH / 2, () => {
+        custom.gap = Math.max(-50, (custom.gap ?? 0) - 5);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('−', rowX + rowW - 52, curY + rowH / 2, () => {
+        custom.gap = Math.max(-50, (custom.gap ?? 0) - 1);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('+', rowX + rowW - 30, curY + rowH / 2, () => {
+        custom.gap = Math.min(120, (custom.gap ?? 0) + 1);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('++', rowX + rowW - 8, curY + rowH / 2, () => {
+        custom.gap = Math.min(120, (custom.gap ?? 0) + 5);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      curY += 46;
+    }
+
     // Scale Reset button & Tip
     drawButton('RESET SCALE (1.0x, 1.0x)', rowX + rowW / 2, curY + 12, () => {
       custom.widthScale = 1.0;
       custom.heightScale = 1.0;
+      if (isNamelessDeity && activePartId === 'antlers') custom.gap = 0;
       saveSkinCustomizations();
     }, rowW, 22, null, 3);
     curY += 34;
@@ -1541,10 +1758,47 @@ export function drawSkinStudioScreen() {
     }, 18, btnSize, null, 2);
     curY += 46;
 
+    if (isNamelessDeity && activePartId === 'antlers') {
+      // ── ANTLER GAP / SPREAD ROW (Position Tab) ──
+      ctx.save();
+      ctx.fillStyle = 'rgba(18, 22, 32, 0.92)';
+      ctx.strokeStyle = 'rgba(255, 226, 89, 0.35)';
+      ctx.lineWidth = 1.2;
+      drawChamferedRect(ctx, rowX, curY, rowW, rowH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FFE259';
+      ctx.font = '900 10.5px "Rajdhani", sans-serif';
+      ctx.fillText(`ANTLER GAP: ${Math.round(custom.gap ?? 0)}px`, rowX + 8, curY + rowH / 2);
+
+      drawButton('−−', rowX + rowW - 74, curY + rowH / 2, () => {
+        custom.gap = Math.max(-50, (custom.gap ?? 0) - 5);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('−', rowX + rowW - 52, curY + rowH / 2, () => {
+        custom.gap = Math.max(-50, (custom.gap ?? 0) - 1);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('+', rowX + rowW - 30, curY + rowH / 2, () => {
+        custom.gap = Math.min(120, (custom.gap ?? 0) + 1);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('++', rowX + rowW - 8, curY + rowH / 2, () => {
+        custom.gap = Math.min(120, (custom.gap ?? 0) + 5);
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      curY += 46;
+    }
+
     // Quick Reset Position Button
     drawButton('CENTER POSITION (0, 0)', rowX + rowW / 2, curY + 12, () => {
       custom.offsetX = 0;
       custom.offsetY = 0;
+      if (isNamelessDeity && activePartId === 'antlers') custom.gap = 0;
       saveSkinCustomizations();
     }, rowW, 22, null, 3);
     curY += 38;
@@ -1641,32 +1895,68 @@ export function drawSkinStudioScreen() {
 
     curY += codeBoxH + 10;
 
-    // Single click Copy Code Button
+    // Single click Copy Code Buttons
     const halfBtnW = Math.floor((rowW - 8) / 2);
-    drawButton('📋 COPY JS', rowX + halfBtnW / 2, curY + 10, () => {
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        navigator.clipboard.writeText(jsCode).then(() => {
-          _copyToastText = '✓ COPIED JS CODE!';
-          _copyToastTimer = 90;
-        }).catch(() => {
-          _copyToastText = 'COPIED!';
-          _copyToastTimer = 60;
-        });
-      }
-    }, halfBtnW, 22, null, 3);
+    if (isNamelessDeity) {
+      const allDeityParts = {
+        overall: state.skinCustomizations?.nameless_deity || {},
+        body: state.skinCustomizations?.nameless_deity_body || {},
+        cicada: state.skinCustomizations?.nameless_deity_cicada || {},
+        censor: state.skinCustomizations?.nameless_deity_censor || {},
+        vines: state.skinCustomizations?.nameless_deity_vines || {},
+        flowers: state.skinCustomizations?.nameless_deity_flowers || {},
+        wings: state.skinCustomizations?.nameless_deity_wings || {},
+        halo: state.skinCustomizations?.nameless_deity_halo || {},
+        wheel: state.skinCustomizations?.nameless_deity_wheel || {},
+        arm: state.skinCustomizations?.nameless_deity_arm || {},
+        forearm: state.skinCustomizations?.nameless_deity_forearm || {},
+        hand: state.skinCustomizations?.nameless_deity_hand || {}
+      };
+      const allPartsJson = JSON.stringify(allDeityParts, null, 2);
 
-    drawButton('📋 COPY JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
-      const jsonStr = JSON.stringify(custom, null, 2);
-      if (typeof navigator !== 'undefined' && navigator.clipboard) {
-        navigator.clipboard.writeText(jsonStr).then(() => {
-          _copyToastText = '✓ COPIED JSON CONFIG!';
-          _copyToastTimer = 90;
-        }).catch(() => {
-          _copyToastText = 'COPIED!';
-          _copyToastTimer = 60;
-        });
-      }
-    }, halfBtnW, 22, null, 3);
+      drawButton(`📋 COPY ${activePartDef?.shortLabel || 'PART'}`, rowX + halfBtnW / 2, curY + 10, () => {
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(jsCode).then(() => {
+            _copyToastText = `✓ COPIED ${activePartDef?.shortLabel || 'PART'}!`;
+            _copyToastTimer = 90;
+          });
+        }
+      }, halfBtnW, 22, null, 3);
+
+      drawButton('📋 ALL PARTS JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(allPartsJson).then(() => {
+            _copyToastText = '✓ COPIED ALL 12 PARTS JSON!';
+            _copyToastTimer = 90;
+          });
+        }
+      }, halfBtnW, 22, '#FFE259', 3);
+    } else {
+      drawButton('📋 COPY JS', rowX + halfBtnW / 2, curY + 10, () => {
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(jsCode).then(() => {
+            _copyToastText = '✓ COPIED JS CODE!';
+            _copyToastTimer = 90;
+          }).catch(() => {
+            _copyToastText = 'COPIED!';
+            _copyToastTimer = 60;
+          });
+        }
+      }, halfBtnW, 22, null, 3);
+
+      drawButton('📋 COPY JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+        const jsonStr = JSON.stringify(custom, null, 2);
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(jsonStr).then(() => {
+            _copyToastText = '✓ COPIED JSON CONFIG!';
+            _copyToastTimer = 90;
+          }).catch(() => {
+            _copyToastText = 'COPIED!';
+            _copyToastTimer = 60;
+          });
+        }
+      }, halfBtnW, 22, null, 3);
+    }
   }
 
   // Toast Notification Overlay if active
@@ -1697,15 +1987,25 @@ export function drawSkinStudioScreen() {
   const bottomY = canvas.height - 30;
 
   drawButton('RESET DEFAULTS', 75, bottomY, () => {
-    if (confirm(`Reset ${fDef.label} skin customizations to code defaults?`)) {
-      custom.widthScale = 1.0;
-      custom.heightScale = 1.0;
-      custom.offsetX = 0;
-      custom.offsetY = 0;
-      custom.angleOffset = 0;
-      custom.flipX = false;
+    const targetDesc = isNamelessDeity ? `Nameless Deity [${activePartDef?.fullLabel || 'Overall'}]` : fDef.label;
+    if (confirm(`Reset ${targetDesc} customizations to code defaults?`)) {
+      const deityPart = isNamelessDeity ? NAMELESS_KEY_MAP[activeCustomKey] : null;
+      const def = deityPart ? NAMELESS_DEITY_DEFAULT_CONFIGS[deityPart] : {
+        widthScale: 1.0,
+        heightScale: 1.0,
+        offsetX: 0,
+        offsetY: 0,
+        angleOffset: 0,
+        flipX: false
+      };
+      custom.widthScale = def.widthScale;
+      custom.heightScale = def.heightScale;
+      custom.offsetX = def.offsetX;
+      custom.offsetY = def.offsetY;
+      custom.angleOffset = def.angleOffset;
+      custom.flipX = def.flipX ?? false;
       saveSkinCustomizations();
-      _copyToastText = '✓ RESET TO DEFAULTS!';
+      _copyToastText = `✓ RESET ${isNamelessDeity ? activePartDef?.fullLabel : 'DEFAULTS'}!`;
       _copyToastTimer = 75;
     }
   }, 105, 26, null, 4);
@@ -1716,11 +2016,30 @@ export function drawSkinStudioScreen() {
     _copyToastTimer = 90;
   }, 110, 26, '#10b981', 4);
 
-  drawButton('COPY CODE', 315, bottomY, () => {
-    const code = generateJsCode(fDef, custom);
+  drawButton(isNamelessDeity ? 'COPY ALL JSON' : 'COPY CODE', 315, bottomY, () => {
+    let code = '';
+    if (isNamelessDeity) {
+      const allDeityParts = {
+        overall: state.skinCustomizations?.nameless_deity || {},
+        body: state.skinCustomizations?.nameless_deity_body || {},
+        cicada: state.skinCustomizations?.nameless_deity_cicada || {},
+        censor: state.skinCustomizations?.nameless_deity_censor || {},
+        vines: state.skinCustomizations?.nameless_deity_vines || {},
+        flowers: state.skinCustomizations?.nameless_deity_flowers || {},
+        wings: state.skinCustomizations?.nameless_deity_wings || {},
+        halo: state.skinCustomizations?.nameless_deity_halo || {},
+        wheel: state.skinCustomizations?.nameless_deity_wheel || {},
+        arm: state.skinCustomizations?.nameless_deity_arm || {},
+        forearm: state.skinCustomizations?.nameless_deity_forearm || {},
+        hand: state.skinCustomizations?.nameless_deity_hand || {}
+      };
+      code = JSON.stringify(allDeityParts, null, 2);
+    } else {
+      code = generateJsCode(fDef, custom);
+    }
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(code).then(() => {
-        _copyToastText = '✓ COPIED JS CODE TO CLIPBOARD!';
+        _copyToastText = isNamelessDeity ? '✓ COPIED ALL 12 PARTS JSON!' : '✓ COPIED JS CODE!';
         _copyToastTimer = 90;
       });
     }
@@ -1925,6 +2244,9 @@ export function drawSkinStudioScreen() {
       _registerButton(cx, cy, cardW, cardH, () => {
         state.studioSelectedSkinFighter = f.key;
         state.studioSkinForm = f.forms?.[0]?.id || 'default';
+        if (f.key === 'nameless_deity' && !state.studioSkinNamelessPart) {
+          state.studioSkinNamelessPart = 'overall';
+        }
         state.studioSkinModalOpen = false;
         isDraggingHairCenter = false;
         isDraggingHairScale = false;
@@ -2058,14 +2380,22 @@ if (typeof window !== 'undefined') {
 
       const activeKey = state.studioSelectedSkinFighter || 'ichigo';
       const fDef = SKIN_STUDIO_FIGHTERS.find(f => f.key === activeKey) || SKIN_STUDIO_FIGHTERS[0];
-      const custom = ensureFighterCustom(fDef.key);
+      const isNamelessDeity = (fDef.key === 'nameless_deity');
+      const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
+      const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
+        ? `nameless_deity_${activePartId}`
+        : fDef.key;
+      const custom = ensureFighterCustom(activeCustomKey);
 
       // Local hero coordinate space
       const localX = (mx - heroX) / currentScale;
       const localY = (my - heroY) / currentScale;
 
+      const baseCrownY = (isNamelessDeity && activePartId !== 'overall')
+        ? 0
+        : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
       const handleCenterX = custom.offsetX;
-      const handleCenterY = (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3) + custom.offsetY;
+      const handleCenterY = baseCrownY + custom.offsetY;
 
       // Check center handle click (radius ~14px screen space)
       if (Math.hypot(localX - handleCenterX, localY - handleCenterY) < 14 / currentScale) {
@@ -2096,6 +2426,16 @@ if (typeof window !== 'undefined') {
         isDraggingHairScale = true;
         return;
       }
+
+      // Check rotation handle click (rose stalk knob)
+      const curAngle = custom.angleOffset ?? 0;
+      const rotStalkLen = baseRadius * 1.6;
+      const rotHandleX = handleCenterX + Math.cos(curAngle - Math.PI / 2) * rotStalkLen;
+      const rotHandleY = handleCenterY + Math.sin(curAngle - Math.PI / 2) * rotStalkLen;
+      if (Math.hypot(localX - rotHandleX, localY - rotHandleY) < 14 / currentScale) {
+        isDraggingHairRotate = true;
+        return;
+      }
     });
 
     window.addEventListener('mousemove', (e) => {
@@ -2119,13 +2459,20 @@ if (typeof window !== 'undefined') {
 
       const activeKey = state.studioSelectedSkinFighter || 'ichigo';
       const fDef = SKIN_STUDIO_FIGHTERS.find(f => f.key === activeKey) || SKIN_STUDIO_FIGHTERS[0];
-      const custom = ensureFighterCustom(fDef.key);
+      const isNamelessDeity = (fDef.key === 'nameless_deity');
+      const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
+      const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
+        ? `nameless_deity_${activePartId}`
+        : fDef.key;
+      const custom = ensureFighterCustom(activeCustomKey);
 
       const localX = (mx - heroX) / currentScale;
       const localY = (my - heroY) / currentScale;
+      const baseCrownY = (isNamelessDeity && activePartId !== 'overall')
+        ? 0
+        : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
 
       if (isDraggingHairCenter) {
-        const baseCrownY = fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3;
         custom.offsetX = Math.round(localX);
         custom.offsetY = Math.round(localY - baseCrownY);
       } else if (isDraggingHairWidth) {
@@ -2133,16 +2480,22 @@ if (typeof window !== 'undefined') {
         const dx = Math.abs(localX - handleCenterX);
         custom.widthScale = Math.max(0.2, Math.min(3.5, Number((dx / (baseRadius * 1.4)).toFixed(2))));
       } else if (isDraggingHairHeight) {
-        const handleCenterY = (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3) + custom.offsetY;
+        const handleCenterY = baseCrownY + custom.offsetY;
         const dy = Math.abs(localY - handleCenterY);
         custom.heightScale = Math.max(0.2, Math.min(3.5, Number((dy / (baseRadius * 0.8)).toFixed(2))));
       } else if (isDraggingHairScale) {
         const handleCenterX = custom.offsetX;
-        const handleCenterY = (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3) + custom.offsetY;
+        const handleCenterY = baseCrownY + custom.offsetY;
         const dx = Math.abs(localX - handleCenterX);
         const dy = Math.abs(localY - handleCenterY);
         custom.widthScale = Math.max(0.2, Math.min(3.5, Number((dx / (baseRadius * 1.4)).toFixed(2))));
         custom.heightScale = Math.max(0.2, Math.min(3.5, Number((dy / (baseRadius * 0.8)).toFixed(2))));
+      } else if (isDraggingHairRotate) {
+        const handleCenterX = custom.offsetX;
+        const handleCenterY = baseCrownY + custom.offsetY;
+        const dragAngle = Math.atan2(localY - handleCenterY, localX - handleCenterX) + Math.PI / 2;
+        let normAng = Math.atan2(Math.sin(dragAngle), Math.cos(dragAngle));
+        custom.angleOffset = Number(normAng.toFixed(3));
       }
     });
 

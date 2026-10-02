@@ -179,7 +179,12 @@ export function updateGame() {
         f.hp > 0 && !f.isDead && !f.dead &&
         ((f.takadaUltTimer > 0) || f.isTakadaUltActive || f.isTakadaChanneling || f.isTakadaBackgroundPlaying || f.takadaSongStarted)
       ));
-      if (state.roundEndTimer >= autoDelay && !state._isRespectMusicPlaying && !isTodoUltPlaying) {
+      const isNamelessBeamActive = Boolean(state.fighters && state.fighters.some(f => 
+        f && (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity') &&
+        f.hp > 0 && !f.isDead && !f.dead &&
+        (((f.destroyerFireTimer || 0) > 0) || ((f.destroyerWindupTimer || 0) > 0) || ((f.destroyerRecoveryTimer || 0) > 0))
+      ));
+      if (state.roundEndTimer >= autoDelay && !state._isRespectMusicPlaying && !isTodoUltPlaying && !isNamelessBeamActive) {
         startNextRound();
       }
     } else if (state.gameState === 'matchEnd') {
@@ -197,8 +202,13 @@ export function updateGame() {
       const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && (e.isEnderDragonDeath || (e.isEnderDragonXPOrb && !e.isSettled))));
       const isRespectPlaying = Boolean(state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active));
       const hasOverlay = Boolean(state._hadMissionOverlay || isRespectPlaying || (state.wastedOverlay && state.wastedOverlay.active));
+      const isNamelessBeamActive = Boolean(state.fighters && state.fighters.some(f => 
+        f && (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity') &&
+        f.hp > 0 && !f.isDead && !f.dead &&
+        (((f.destroyerFireTimer || 0) > 0) || ((f.destroyerWindupTimer || 0) > 0) || ((f.destroyerRecoveryTimer || 0) > 0))
+      ));
       const blackoutFrame = hasOverlay ? 160 : (isDragonDying ? 140 : 60);
-      if (state.matchEndTimer === blackoutFrame) {
+      if (state.matchEndTimer === blackoutFrame && !isNamelessBeamActive) {
         clearAllBattleEffects();
       }
 
@@ -209,7 +219,7 @@ export function updateGame() {
         f.hp > 0 && !f.isDead && !f.dead &&
         ((f.takadaUltTimer > 0) || f.isTakadaUltActive || f.isTakadaChanneling || f.isTakadaBackgroundPlaying || f.takadaSongStarted)
       ));
-      if (state.matchEndTimer >= matchEndAutoDelay && !state._isRespectMusicPlaying && !isTodoUltPlaying) {
+      if (state.matchEndTimer >= matchEndAutoDelay && !state._isRespectMusicPlaying && !isTodoUltPlaying && !isNamelessBeamActive) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();
         } else if (state.mode === 'Tag Match' || state.mode === GAME_MODES.TAG_MATCH) {

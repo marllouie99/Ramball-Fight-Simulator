@@ -68,6 +68,9 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('purelove') ||
          s.includes('lovebeam') ||
          s.includes('yuta-lovebeam') ||
+         s.includes('cosmiclaser') ||
+         s.includes('namelessdeity') ||
+         s.includes('nameless') ||
          s.includes('lovebeam-fires') ||
          s.includes('lovebeam-background') ||
          s.includes('finalflash') ||

@@ -1115,6 +1115,26 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
     volume: 0.8,
     delay: 0,
+  },
+  'namelessdeity': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
+  'nameless': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
+  'draedon': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  'exomech': {
+    src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
+    volume: 0.8,
+    delay: 0,
   }
 };
 

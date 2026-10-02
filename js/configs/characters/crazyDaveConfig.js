@@ -42,7 +42,7 @@ export const crazyDaveConfig = {
 
   // Skill 1: Plant Wall-nut (Barrier Shield Defense Mechanism — Solid Immovable Obstacle)
   enableWallnut: true,
-  wallnutCost: 50,           // Costs 50 Sun (PvZ authentic cost)
+  wallnutCost: 100,           // Costs 50 Sun (PvZ authentic cost)
   wallnutColor: '#CA8A04',   // Nut Amber / Gold
   wallnutHp: 200,            // Massive barrier HP to absorb attacks and block melee charges
   wallnutRadius: 24,         // Solid collision barrier radius
@@ -54,7 +54,7 @@ export const crazyDaveConfig = {
   enablePeashooter: true,
   peashooterCost: 100,       // Costs 100 Sun
   peashooterColor: '#4ADE80',
-  peashooterHp: 180,
+  peashooterHp: 100,
   peashooterFireRate: 22,    // Fires a pea every 22 frames (~0.36s)
   peashooterDamage: 10,      // Regular damage per pea
   peashooterSpeed: 9.5,      // Pea projectile speed
@@ -72,7 +72,7 @@ export const crazyDaveConfig = {
   enableSnowPea: true,
   snowPeaCost: 100,          // Costs 175 Sun
   snowPeaColor: '#38BDF8',
-  snowPeaHp: 200,
+  snowPeaHp: 100,
   snowPeaFireRate: 24,       // Fires a frozen pea every 24 frames (~0.40s)
   snowPeaDamage: 12,         // Ice damage per frozen pea
   snowPeaSpeed: 9.5,         // Snow pea projectile speed
@@ -91,9 +91,9 @@ export const crazyDaveConfig = {
 
   // Skill 4: Plant Torchwood (Ignites passing peas / melts ice peas)
   enableTorchwood: true,
-  torchwoodCost: 175,         // Costs 175 Sun (PvZ authentic cost)
+  torchwoodCost: 100,         // Costs 175 Sun (PvZ authentic cost)
   torchwoodColor: '#F97316',  // Blazing Orange
-  torchwoodHp: 220,           // Moderate barrier HP for the burning stump
+  torchwoodHp: 100,           // Moderate barrier HP for the burning stump
   torchwoodRadius: 22,        // Robust tree stump radius matching authentic PvZ proportions
   maxActiveTorchwoods: 2,     // Maximum living Torchwoods Dave can keep active
   torchwoodCooldown: 600,     // 10s skill cooldown

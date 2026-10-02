@@ -59,10 +59,14 @@ floatingTextCanvas.height = CONFIG.canvasHeight || 960;
 const floatingTextCtx = floatingTextCanvas.getContext('2d');
 let floatingTextSprite = null;
 
-const topLevelUiCanvas = document.createElement('canvas');
-topLevelUiCanvas.width = CONFIG.canvasWidth || 540;
-topLevelUiCanvas.height = CONFIG.canvasHeight || 960;
-const topLevelUiCtx = topLevelUiCanvas.getContext('2d');
+const topLevelUiCanvas = (typeof document !== 'undefined' && document.getElementById('topLevelUiCanvas') && typeof document.getElementById('topLevelUiCanvas').getContext === 'function')
+  ? document.getElementById('topLevelUiCanvas')
+  : ((typeof document !== 'undefined' && typeof document.createElement === 'function') ? document.createElement('canvas') : null);
+if (topLevelUiCanvas) {
+  topLevelUiCanvas.width = CONFIG.canvasWidth || 540;
+  topLevelUiCanvas.height = CONFIG.canvasHeight || 960;
+}
+const topLevelUiCtx = (topLevelUiCanvas && typeof topLevelUiCanvas.getContext === 'function') ? topLevelUiCanvas.getContext('2d') : null;
 let topLevelUiSprite = null;
 
 let baseCircleTexture = null;
@@ -429,8 +433,22 @@ export const state = {
     zenitsu: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
     nezuko: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
     power: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    engineer: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false }
+    engineer: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    nameless_deity: { widthScale: 0.76, heightScale: 1.03, offsetX: 1, offsetY: -4, angleOffset: 0, flipX: false },
+    nameless_deity_body: { widthScale: 1.0, heightScale: 0.86, offsetX: 0, offsetY: 1, angleOffset: 0, flipX: false },
+    nameless_deity_cicada: { widthScale: 1.0, heightScale: 0.7, offsetX: 0, offsetY: -6, angleOffset: 0, flipX: false },
+    nameless_deity_censor: { widthScale: 1.02, heightScale: 0.72, offsetX: 0, offsetY: -4, angleOffset: 0, flipX: false },
+    nameless_deity_vines: { widthScale: 1.3, heightScale: 0.86, offsetX: -11, offsetY: 0, angleOffset: 0, flipX: false },
+    nameless_deity_flowers: { widthScale: 1.5, heightScale: 1.04, offsetX: 6, offsetY: 19, angleOffset: 0, flipX: false },
+    nameless_deity_wings: { widthScale: 1.2, heightScale: 1.32, offsetX: -22, offsetY: -19, angleOffset: 0, flipX: false },
+    nameless_deity_halo: { widthScale: 2.16, heightScale: 1.52, offsetX: 0, offsetY: 13, angleOffset: 0, flipX: false },
+    nameless_deity_wheel: { widthScale: 0.84, heightScale: 0.56, offsetX: 0, offsetY: -34, angleOffset: 0, flipX: false },
+    nameless_deity_arm: { widthScale: 1.0, heightScale: 1.0, offsetX: 13, offsetY: 6, angleOffset: 0, flipX: false },
+    nameless_deity_forearm: { widthScale: 0.82, heightScale: 1.86, offsetX: 0, offsetY: -15, angleOffset: 1.1868238913561435, flipX: false },
+    nameless_deity_hand: { widthScale: 0.94, heightScale: 1.0, offsetX: 7, offsetY: -11, angleOffset: 0.05235987755982989, flipX: false }
   },
+  selectedNamelessDeitySkin: (typeof localStorage !== 'undefined' && localStorage.getItem('selectedNamelessDeitySkin')) || 'skin1',
+  selectedIchigoSkin: (typeof localStorage !== 'undefined' && localStorage.getItem('selectedIchigoSkin')) || 'shikai',
   matchTimer: 0,
 };
 

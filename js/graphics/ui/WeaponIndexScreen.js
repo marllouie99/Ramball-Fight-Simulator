@@ -37,6 +37,7 @@ import { drawDivineAxeRhitta } from '../weapons/escanorWeaponGraphics.js';
 import { drawRezeTacticalKnife, drawRezeWeaponPreview } from '../weapons/rezeWeaponGraphics.js';
 import { drawCrazyDaveWeapon, drawCrazyDaveShovel } from '../weapons/crazyDaveWeaponGraphics.js';
 import { drawPekkaWeapon } from '../weapons/pekkaWeaponGraphics.js';
+import { drawNamelessDeitySkin } from '../fighters/namelessDeitySkin.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -968,6 +969,34 @@ function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, curre
         }
       });
     });
+  } else if (def.type === 'namelessdeity' || def.type === 'nameless_deity' || def.type === 'NamelessDeity') {
+    const isSkin2 = (state.selectedNamelessDeitySkin === 'skin2');
+    buttons.push({
+      text: '🌌 COSMIC SERAPH',
+      active: !isSkin2,
+      width: 155,
+      action: () => {
+        state.selectedNamelessDeitySkin = 'skin1';
+        try { localStorage.setItem('selectedNamelessDeitySkin', 'skin1'); } catch (e) {}
+        if (state.previewFighter) {
+          state.previewFighter.skinVariant = 'skin1';
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '👑 GOLDEN SERAPH',
+      active: isSkin2,
+      width: 155,
+      action: () => {
+        state.selectedNamelessDeitySkin = 'skin2';
+        try { localStorage.setItem('selectedNamelessDeitySkin', 'skin2'); } catch (e) {}
+        if (state.previewFighter) {
+          state.previewFighter.skinVariant = 'skin2';
+        }
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95); } catch (e) {}
+      }
+    });
   }
 
   if (buttons.length === 0) return;
@@ -1031,6 +1060,15 @@ function drawWeaponInfoCard(ctx, def) {
       descText = isMask
         ? 'Bankai augmented by the Visored Hollow Mask! Unleashes supersonic 6-strike Shunpo blazes and devastating Kuroi Getsuga crescent arcs.'
         : 'Wields sleek Kurotsuba Tensa Zangetsu with high-frequency frontal-arc slashes. Fires Kuroi Getsuga waves and dashes with supersonic Shunpo flurries.';
+    }
+  } else if (def.type === 'namelessdeity' || def.type === 'nameless_deity' || def.type === 'NamelessDeity') {
+    const isSkin2 = (state.selectedNamelessDeitySkin === 'skin2');
+    if (isSkin2) {
+      nameText = 'Nameless Deity (Golden Seraph Form)';
+      descText = 'Ascended Radiant Golden Seraph form of the Supreme Creator! Adorned with sacred golden clockwork rings (Wheel III), gilded celestial wings, radiant flowering lotus crests, and divine golden hand armaments. Channels the primordial Nameless Destroyer super-beam and cosmic singularities.';
+    } else {
+      nameText = 'Nameless Deity (Cosmic Seraph Form)';
+      descText = 'Wrath of the Gods supreme cosmic entity. Wields the clockwork Wheel of Time, celestial wings, hovering multi-jointed divine armaments, and the primordial Nameless Destroyer super-beam with infinite destruction potential.';
     }
   }
 
@@ -1391,6 +1429,8 @@ function drawWeaponDetailScreen() {
       previewFighter.hideHands = Boolean(state.hideDenjiChainsaws);
       previewFighter.hideFrontHand = Boolean(state.hideDenjiChainsaws);
       previewFighter.hideBackHand = Boolean(state.hideDenjiChainsaws);
+    } else if (def.type === 'namelessdeity' || def.type === 'nameless_deity' || def.type === 'NamelessDeity') {
+      previewFighter.skinVariant = state.selectedNamelessDeitySkin || 'skin1';
     }
 
     try {
@@ -2280,6 +2320,20 @@ function drawWeaponPreview(ctx, type, color) {
       case 'pekka':
         drawPekkaWeapon(ctx, { r, angle: gunAngle, color: color || '#8B5CF6' });
         return;
+
+      case 'namelessdeity':
+      case 'nameless_deity': {
+        const mockFighter = {
+          x: 0,
+          y: 0,
+          r: r,
+          gunAngle: gunAngle,
+          color: color || '#00F0FF',
+          skinVariant: (typeof state !== 'undefined' ? state.selectedNamelessDeitySkin : 'skin1') || 'skin1'
+        };
+        drawNamelessDeitySkin(ctx, mockFighter);
+        return;
+      }
 
       default:
         ctx.save();

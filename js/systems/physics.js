@@ -435,6 +435,9 @@ export function resolveFighterCollision(a, b) {
   const aIsEye = Boolean(a && (a.characterId === 'eye_of_cthulhu' || a.type === 'eye_of_cthulhu'));
   const bIsEye = Boolean(b && (b.characterId === 'eye_of_cthulhu' || b.type === 'eye_of_cthulhu'));
 
+  const aIsNameless = Boolean(a && (a.characterId === 'namelessdeity' || a.type === 'namelessdeity'));
+  const bIsNameless = Boolean(b && (b.characterId === 'namelessdeity' || b.type === 'namelessdeity'));
+
   const aIsGenosBeam = Boolean(a && (a.characterId === 'genos' || a.type === 'genos') && (a.isFiringUlt || a.isChargingUlt));
   const bIsGenosBeam = Boolean(b && (b.characterId === 'genos' || b.type === 'genos') && (b.isFiringUlt || b.isChargingUlt));
 
@@ -444,8 +447,8 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon;
-  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon;
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless;
 
   const aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
   const bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
@@ -509,8 +512,8 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isImmovable;
-  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isImmovable;
+  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isImmovable || aIsNameless;
+  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isImmovable || bIsNameless;
 
   if (aIsAnchor) {
     a.vx = 0;
@@ -525,12 +528,11 @@ export function resolveFighterCollision(a, b) {
       a.vy = 0;
       a.knockbackVx = 0;
       a.knockbackVy = 0;
-    } else if (aIsEscanor) {
-      // Unyielding Solar Poise: never zero out velocity or redirect movement on body collision while moving!
+    } else if (aIsEscanor || aIsNameless) {
       const isStationary = Boolean(
-        (typeof a.isCruelSunActive === 'function' && a.isCruelSunActive()) ||
-        (a.chopHitPauseTimer && a.chopHitPauseTimer > 0) ||
-        (a.isChannelingCruelSun)
+        a.isStationarySkillActive?.() ||
+        (a.destroyerWindupTimer && a.destroyerWindupTimer > 0) ||
+        (a.destroyerFireTimer && a.destroyerFireTimer > 0)
       );
       if (isStationary) {
         a.vx = 0;

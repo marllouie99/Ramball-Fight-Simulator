@@ -210,9 +210,14 @@ export function renderGame() {
         if (state.pixiLayers.environment) state.pixiLayers.environment.visible = true;
 
         const cam = state.camera;
-        const isCamActive = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
+        const isDynamic = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
+        const isZooming = Boolean(cam && Math.abs((cam.zoom || 1.0) - 1.0) > 0.0005);
+        const isCamActive = isDynamic || isZooming;
+        const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+        const arenaCenterX = arena.x + arena.width / 2;
+        const arenaCenterY = arena.y + arena.height / 2;
         const screenCenterX = state.canvas.width / 2;
-        const screenCenterY = state.arena ? (state.arena.y + state.arena.height / 2) : (state.canvas.height / 2);
+        const screenCenterY = arenaCenterY;
 
         // Synchronize WebGL arena floor graphics (resets local transform since environment container will be transformed)
         if (state.floorGraphics?.position?.set) {
@@ -225,7 +230,9 @@ export function renderGame() {
         const applyCamToPixiLayer = (layer, isWorldLayer = true) => {
           if (!layer || !layer.position?.set) return;
           if (isCamActive) {
-            layer.pivot.set(cam.x, cam.y);
+            const camX = isDynamic ? cam.x : arenaCenterX;
+            const camY = isDynamic ? cam.y : arenaCenterY;
+            layer.pivot.set(camX, camY);
             layer.position.set(screenCenterX + (cam.shakeX || 0), screenCenterY + (cam.shakeY || 0));
             layer.scale.set(cam.zoom, cam.zoom);
           } else if (isWorldLayer) {
@@ -569,6 +576,21 @@ export function renderGame() {
       // Render Camera Mode Toggle Notification Banner
       drawCameraToast(state.topLevelUiCtx || state.ctx);
 
+      // ── Super-Beam Absolute Top Layer (Rendered ON TOP of Top HUD Names, Bottom HUD & All Canvas UI) ──
+      const topBeamCtx = state.topLevelUiCtx || state.ctx;
+      if (topBeamCtx) {
+        topBeamCtx.save();
+        applyCameraToCtx(topBeamCtx);
+        if (state.fighters) {
+          for (const f of state.fighters) {
+            if (f && f.hp > 0 && typeof f.drawTopLayerBeams === 'function') {
+              f.drawTopLayerBeams(topBeamCtx);
+            }
+          }
+        }
+        topBeamCtx.restore();
+      }
+
       // Restore original context and canvas
       state.ctx = originalCtx;
       state.canvas = originalCanvas;
@@ -591,19 +613,31 @@ export function renderGame() {
       }
     }
     if (state.topLevelUiSprite && state.topLevelUiSprite.texture) {
-      const hasTopUi = Boolean(
-        (state.battleStartFadeTimer && state.battleStartFadeTimer > 0) ||
-        (state.countdownTimer !== undefined && state.countdownTimer < 14) ||
-        (state.missionPassedOverlay && state.missionPassedOverlay.active) ||
-        (state.wastedOverlay && state.wastedOverlay.active) ||
-        (state.killFeed && state.killFeed.length > 0) ||
-        (state.cameraToast && state.cameraToast.timer > 0) ||
-        BossEntranceSequence.isActive ||
-        ['boss_intro', 'countdown', 'paused', 'roundEnd', 'matchEnd'].includes(state.gameState)
-      );
-      state.topLevelUiSprite.visible = hasTopUi;
-      if (hasTopUi) {
-        state.topLevelUiSprite.texture.update();
+      const isDomAttached = Boolean(state.topLevelUiCanvas && state.topLevelUiCanvas.parentNode);
+      if (isDomAttached) {
+        state.topLevelUiSprite.visible = false;
+      } else {
+        const hasSuperBeam = Boolean(state.fighters && state.fighters.some(f => f && f.hp > 0 && (
+          (f.destroyerFireTimer && f.destroyerFireTimer > 0) ||
+          (f.destroyerWindupTimer && f.destroyerWindupTimer > 0) ||
+          (f.disintegratorFireTimer && f.disintegratorFireTimer > 0) ||
+          (f.disintegratorWindupTimer && f.disintegratorWindupTimer > 0)
+        )));
+        const hasTopUi = Boolean(
+          hasSuperBeam ||
+          (state.battleStartFadeTimer && state.battleStartFadeTimer > 0) ||
+          (state.countdownTimer !== undefined && state.countdownTimer < 14) ||
+          (state.missionPassedOverlay && state.missionPassedOverlay.active) ||
+          (state.wastedOverlay && state.wastedOverlay.active) ||
+          (state.killFeed && state.killFeed.length > 0) ||
+          (state.cameraToast && state.cameraToast.timer > 0) ||
+          BossEntranceSequence.isActive ||
+          ['boss_intro', 'countdown', 'paused', 'roundEnd', 'matchEnd'].includes(state.gameState)
+        );
+        state.topLevelUiSprite.visible = hasTopUi;
+        if (hasTopUi) {
+          state.topLevelUiSprite.texture.update();
+        }
       }
     }
 }

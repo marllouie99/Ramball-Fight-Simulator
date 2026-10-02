@@ -86,7 +86,8 @@ body {
 }
 
 .game-box canvas,
-#arena {
+#arena,
+#topLevelUiCanvas {
   display: block;
   width: 540px;
   height: 960px;
@@ -98,6 +99,14 @@ body {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
   image-rendering: pixelated;
+}
+
+#topLevelUiCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 25;
 }
 
 /* ─────────────────────────────────────────────
@@ -203,10 +212,9 @@ canvas {
   margin: 0 auto;
   padding: 0;
   width: 100%;
-  max-width: 460px;
   box-sizing: border-box;
   transform-origin: top center;
-  will-change: top;
+  will-change: top, transform;
 }
 
 .health-card {

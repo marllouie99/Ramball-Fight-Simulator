@@ -898,6 +898,70 @@ export const SKILL_SOUNDS = {
       volume: 1.0,
       delay: 0
     }
+  },
+
+  // ── Nameless Deity ─────────────────────────
+  namelessdeity: {
+    lasercharge: {
+      src: 'Assets/Sound Effects/NamelessDeity/CosmicLaserChargeUp.ogg',
+      volume: 1.15,
+      delay: 0
+    },
+    laserstart: {
+      src: 'Assets/Sound Effects/NamelessDeity/CosmicLaserStart.ogg',
+      volume: 1.30,
+      delay: 0
+    },
+    laserloop: {
+      src: 'Assets/Sound Effects/NamelessDeity/CosmicLaserLoop.ogg',
+      volume: 0.95,
+      delay: 0
+    },
+    chuckle: {
+      src: 'Assets/Sound Effects/NamelessDeity/Chuckle.ogg',
+      volume: 1.10,
+      delay: 0
+    },
+    wingflap: {
+      src: 'Assets/Sound Effects/NamelessDeity/WingFlap2.ogg',
+      volume: 0.70,
+      delay: 0
+    },
+    laserhit: {
+      src: 'Assets/Sound Effects/NamelessDeity/CosmicLaserObliteration.ogg',
+      volume: 0.75,
+      delay: 0
+    },
+    chantloop1: {
+      src: 'Assets/Sound Effects/NamelessDeity/ChantLoop1.ogg',
+      volume: 0.75,
+      delay: 0
+    },
+    dimensioncleave: {
+      src: 'Assets/Sound Effects/NamelessDeity/RealityTear.ogg',
+      volume: 0.90,
+      delay: 0
+    },
+    singularitypull: {
+      src: 'Assets/Sound Effects/NamelessDeity/StarConvergenceFast.ogg',
+      volume: 0.85,
+      delay: 0
+    },
+    singularitycollapse: {
+      src: 'Assets/Sound Effects/NamelessDeity/Supernova.ogg',
+      volume: 1.05,
+      delay: 0
+    },
+    supercluster: {
+      src: 'Assets/Sound Effects/NamelessDeity/StarConvergence.ogg',
+      volume: 0.85,
+      delay: 0
+    },
+    dartshoot: {
+      src: 'Assets/Sound Effects/NamelessDeity/SunBeamShoot.ogg',
+      volume: 0.65,
+      delay: 0
+    }
   }
 };
 
@@ -942,6 +1006,8 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS[18] || SKILL_SOUNDS['rubbick'];
     } else if (strKey.includes('reze')) {
       fighterConfig = SKILL_SOUNDS['reze'];
+    } else if (strKey.includes('nameless')) {
+      fighterConfig = SKILL_SOUNDS['namelessdeity'];
     }
   }
 
@@ -1010,6 +1076,8 @@ export function getFighterSkillSoundPaths(idOrType) {
       fighterConfig = SKILL_SOUNDS[18] || SKILL_SOUNDS['rubbick'];
     } else if (strKey.includes('reze')) {
       fighterConfig = SKILL_SOUNDS['reze'];
+    } else if (strKey.includes('nameless')) {
+      fighterConfig = SKILL_SOUNDS['namelessdeity'];
     }
   }
 

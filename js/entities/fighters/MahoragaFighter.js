@@ -153,6 +153,7 @@ export class MahoragaFighter extends Fighter {
     this.gojoDomainAdapted = false;
     this.domainExposureCount = 0;
     this.pendingDomainAdaptation = null;
+    this.pendingNamelessBeamAdaptation = null;
     this.totalAccumDamage = 0;
     this.accumTimer = 0;
     this.fatalAdaptCooldown = 0;
@@ -838,6 +839,18 @@ export class MahoragaFighter extends Fighter {
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
     );
 
+    const isCaughtInNamelessBeam = Boolean(
+      (this.caughtInNamelessBeamTimer && this.caughtInNamelessBeamTimer > 0) ||
+      this.isCaughtInNamelessBeam ||
+      (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+        f && (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity') &&
+        f.hp > 0 && !f.dead && !f.isDead &&
+        ((f.destroyerFireTimer || 0) > 0 || (f.destroyerWindupTimer || 0) > 0) &&
+        (!this.isTeammate || !this.isTeammate(f)) &&
+        ((this.caughtInNamelessBeamTimer || 0) > 0 || (this._hitByNamelessBeamTimer || 0) > 0)
+      ))
+    );
+
     if (this.hp > 0 && !this.dead && !this.isDead) {
       if (isInsideGojoDomain) {
         this.domainExposureCount = (this.domainExposureCount || 0) + 1;
@@ -853,13 +866,21 @@ export class MahoragaFighter extends Fighter {
 
         const gojoAttacker = queued?.attacker || (state.fighters ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo')) : null);
         this._triggerAdaptation('skill', gojoAttacker);
+      } else if (!isCaughtInNamelessBeam && this.pendingNamelessBeamAdaptation) {
+        // Nameless Deity's beam has finished! Release held adaptation & click wheel!
+        const queued = this.pendingNamelessBeamAdaptation;
+        this.pendingNamelessBeamAdaptation = null;
+        this._lastSkillShotId = 'namelessDestroyer';
+        this._lastSkillShotColor = '#00F0FF';
+        const deityAttacker = queued?.attacker || (state.fighters ? state.fighters.find(f => f && (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity')) : null);
+        this._triggerAdaptation(queued?.type || 'skill', deityAttacker);
       }
     }
 
     // ── WHEEL OF ADAPTATION (WOA) TIMERS TICKING (Unstoppable celestial passive progress under all CC/paralyze) ──
     if (this.fatalAdaptCooldown > 0) {
       this.fatalAdaptCooldown--;
-    } else {
+    } else if (!isInsideGojoDomain && !isCaughtInNamelessBeam) {
       const threshold = this.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
       if ((this.totalAccumDamage || 0) >= threshold) {
         this._triggerAdaptation('skill', null);
@@ -1961,6 +1982,7 @@ export class MahoragaFighter extends Fighter {
     this.wheelClickTimer = 0;
     this.adaptationPauseTimer = 0;
     this.pendingDomainAdaptation = null;
+    this.pendingNamelessBeamAdaptation = null;
     this.domainExposureCount = 0;
     this.totalAccumDamage = 0;
     this.fatalAdaptCooldown = 0;

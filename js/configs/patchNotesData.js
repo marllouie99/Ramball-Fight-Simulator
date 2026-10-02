@@ -33,29 +33,64 @@ export const patchNotesData = {
         "character": "CRAZYDAVE",
         "deltas": [
             {
+                "type": "BUFF",
+                "key": "wallnutCost",
+                "oldVal": 50,
+                "newVal": 100,
+                "pct": "+100.0%"
+            },
+            {
                 "type": "NERF",
-                "key": "snowPeaCost",
+                "key": "peashooterHp",
+                "oldVal": 180,
+                "newVal": 100,
+                "pct": "-44.4%"
+            },
+            {
+                "type": "NERF",
+                "key": "snowPeaHp",
+                "oldVal": 200,
+                "newVal": 100,
+                "pct": "-50.0%"
+            },
+            {
+                "type": "NERF",
+                "key": "torchwoodCost",
                 "oldVal": 175,
                 "newVal": 100,
                 "pct": "-42.9%"
             },
             {
-                "type": "ADJUST",
-                "key": "grassTilesSpriteSrc",
-                "oldVal": "Assets/model/Sprites/Grass-tiles-sprite-sheet.png",
-                "newVal": "Assets/model/Tiles/Grass-tiles-sprite-sheet.png",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "torchwoodHp",
+                "oldVal": 220,
+                "newVal": 100,
+                "pct": "-54.5%"
             }
         ]
     },
     {
-        "character": "SUKUNA",
+        "character": "MAHORAGA",
         "deltas": [
             {
+                "type": "NERF",
+                "key": "throwCooldown",
+                "oldVal": 1000,
+                "newVal": 1500,
+                "pct": "+50.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "throwDamage",
+                "oldVal": 6,
+                "newVal": 12,
+                "pct": "+100.0%"
+            },
+            {
                 "type": "ADJUST",
-                "key": "fleshSlice",
-                "oldVal": "0.40",
-                "newVal": "0.80",
+                "key": "wheelEnhance",
+                "oldVal": "0.50",
+                "newVal": "0.0",
                 "pct": "Mod"
             }
         ]

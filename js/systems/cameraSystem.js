@@ -137,6 +137,37 @@ export function updateCamera() {
     return;
   }
 
+  const isPrimaryCombatant = (f) => Boolean(
+    f &&
+    !f.isDead &&
+    (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0)) &&
+    !f.isIllusion &&
+    !f.isTurret &&
+    !f.isMinion &&
+    !f.isClone &&
+    !f.isEndCrystal &&
+    !f.isDeployable &&
+    !f.isIceWall &&
+    !f.isEvasionMinion &&
+    !f.isTransfiguredHuman
+  );
+
+  const aliveFighters = (state.fighters || []).filter(isPrimaryCombatant);
+  const minZ = camera.minZoom ?? camCfg.minZoom ?? 0.65;
+  const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.18;
+
+  // Soft camera pan limits (allows expansive tracking beyond arena perimeter for airborne/edge entities)
+  const minCamX = arena.x - arena.width * 0.6;
+  const maxCamX = arena.x + arena.width * 1.6;
+  const minCamY = arena.y - arena.height * 0.6;
+  const maxCamY = arena.y + arena.height * 1.6;
+
+  const castingDeity = (state.fighters || []).find(f => 
+    f && (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity') &&
+    f.hp > 0 && !f.dead && !f.isDead &&
+    (((f.destroyerWindupTimer || 0) > 0) || ((f.destroyerFireTimer || 0) > 0) || ((f.destroyerRecoveryTimer || 0) > 0))
+  );
+
   const cinematicTarget = state.cameraFocusTarget;
 
   // Check for Boss Entrance Cinematic Sequence
@@ -147,16 +178,109 @@ export function updateCamera() {
     camera.cinematicOverride = true;
 
     // Center camera on the victim with soft arena boundary clamp
-    const minCamX = arena.x - arena.width * 0.3;
-    const maxCamX = arena.x + arena.width * 1.3;
-    const minCamY = arena.y - arena.height * 0.3;
-    const maxCamY = arena.y + arena.height * 1.3;
+    const minVictimCamX = arena.x - arena.width * 0.3;
+    const maxVictimCamX = arena.x + arena.width * 1.3;
+    const minVictimCamY = arena.y - arena.height * 0.3;
+    const maxVictimCamY = arena.y + arena.height * 1.3;
 
-    camera.targetX = Math.max(minCamX, Math.min(maxCamX, cinematicTarget.x));
-    camera.targetY = Math.max(minCamY, Math.min(maxCamY, cinematicTarget.y));
+    camera.targetX = Math.max(minVictimCamX, Math.min(maxVictimCamX, cinematicTarget.x));
+    camera.targetY = Math.max(minVictimCamY, Math.min(maxVictimCamY, cinematicTarget.y));
 
     const makimaCfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     camera.targetZoom = makimaCfg.crucifixionCameraZoom ?? 1.15;
+  } else if (castingDeity && state.gameState !== 'countdown') {
+    // Nameless Deity casting / firing the Nameless Destroyer super-beam:
+    // Support smooth gradual zoom out in BOTH dynamic tracking mode and fixed camera mode!
+    const deityCfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : {};
+    const finalDeityZoom = deityCfg.destroyerCameraZoom ?? 0.93;
+
+    const isFixed = (!camera.enabled || camera.mode === 'fixed');
+
+    let startCombatZoom = 1.0;
+    if (!isFixed && aliveFighters.length >= 2) {
+      // Base envelope zoom for combatants in dynamic mode
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const f of aliveFighters) {
+        const fx = f.x;
+        const fy = f.y - (f.z ? f.z * 0.35 : 0);
+        const r = f.r || 22;
+        if (fx - r < minX) minX = fx - r;
+        if (fx + r > maxX) maxX = fx + r;
+        if (fy - r < minY) minY = fy - r;
+        if (fy + r > maxY) maxY = fy + r;
+      }
+      const spanX = Math.max(60, maxX - minX);
+      const spanY = Math.max(60, maxY - minY);
+      const diagDist = Math.hypot(spanX, spanY);
+
+      const screenW = state.canvas ? state.canvas.width : 540;
+      const screenH = state.canvas ? state.canvas.height : 960;
+      const safeW = screenW - 90;
+      const safeH = Math.min(screenH - 240, 640);
+      const padX = 60, padY = 60;
+      const envelopeFit = Math.min(safeW / (spanX + padX), safeH / (spanY + padY));
+
+      const minD = camCfg.minDist ?? 70;
+      const maxD = camCfg.maxDist ?? 520;
+      const normDist = Math.max(0, Math.min(1, (diagDist - minD) / (maxD - minD)));
+      const smoothDist = normDist * normDist * (3 - 2 * normDist);
+      startCombatZoom = Math.max(minZ, Math.min(maxZ, Math.min(maxZ - smoothDist * (maxZ - minZ), envelopeFit)));
+    }
+
+    // Phase 1: Channeling & Charging Windup (slowly and smoothly zoom out over the full windup duration)
+    if ((castingDeity.destroyerWindupTimer || 0) > 0) {
+      const windupMax = castingDeity.destroyerWindupMax || 393;
+      const elapsed = Math.max(0, windupMax - castingDeity.destroyerWindupTimer);
+      const rawT = Math.max(0, Math.min(1, elapsed / windupMax));
+      // Hermite S-curve easing for silky-smooth gradual zoom out
+      const smoothProgress = rawT * rawT * (3 - 2 * rawT);
+      camera.targetZoom = startCombatZoom + (finalDeityZoom - startCombatZoom) * smoothProgress;
+    } else if ((castingDeity.destroyerFireTimer || 0) > 0) {
+      // Phase 2: Active Super-Beam Firing (held at target deity framing)
+      camera.targetZoom = finalDeityZoom;
+    } else if ((castingDeity.destroyerRecoveryTimer || 0) > 0) {
+      // Phase 3: Post-Beam Recovery & Chuckle (smoothly ease back to standard combat/winner zoom)
+      const recMax = castingDeity.destroyerRecoveryMax || 25;
+      const recElapsed = Math.max(0, recMax - castingDeity.destroyerRecoveryTimer);
+      const recT = Math.max(0, Math.min(1, recElapsed / recMax));
+      const smoothRecT = recT * recT * (3 - 2 * recT);
+      const endZoom = isFixed ? 1.0 : ((aliveFighters.length <= 1) ? (camCfg.winnerZoom ?? 1.10) : startCombatZoom);
+      camera.targetZoom = finalDeityZoom + (endZoom - finalDeityZoom) * smoothRecT;
+    } else {
+      camera.targetZoom = finalDeityZoom;
+    }
+
+    if (isFixed) {
+      // In fixed mode, camera stays firmly anchored at the arena center while smoothly scaling
+      camera.targetX = arenaCenterX;
+      camera.targetY = arenaCenterY;
+    } else {
+      // In dynamic tracking mode, pan between combatants
+      const aliveOpponents = aliveFighters.filter(f => f !== castingDeity);
+      let focusX = castingDeity.x;
+      let focusY = castingDeity.y - (castingDeity.z ? castingDeity.z * 0.35 : 0);
+
+      if (aliveOpponents.length > 0) {
+        let avgOppX = 0;
+        let avgOppY = 0;
+        for (const opp of aliveOpponents) {
+          avgOppX += opp.x;
+          avgOppY += opp.y - (opp.z ? opp.z * 0.35 : 0);
+        }
+        avgOppX /= aliveOpponents.length;
+        avgOppY /= aliveOpponents.length;
+        focusX = (castingDeity.x + avgOppX) / 2;
+        focusY = (castingDeity.y + avgOppY) / 2;
+      } else {
+        const aimAngle = castingDeity.destroyerCastAngle || castingDeity.gunAngle || 0;
+        const beamFocusDist = Math.min(180, (castingDeity.destroyerBeamLength || 1400) * 0.15);
+        focusX = (castingDeity.x + Math.cos(aimAngle) * beamFocusDist + arenaCenterX) / 2;
+        focusY = (castingDeity.y + Math.sin(aimAngle) * beamFocusDist + arenaCenterY) / 2;
+      }
+
+      camera.targetX = Math.max(minCamX, Math.min(maxCamX, focusX));
+      camera.targetY = Math.max(minCamY, Math.min(maxCamY, focusY));
+    }
   } else {
     camera.cinematicOverride = false;
 
@@ -164,132 +288,103 @@ export function updateCamera() {
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
       camera.targetZoom = 1.0;
-    } else {
-      // Dynamic tracking mode
-      // NOTE: In this game engine, fighter health is stored in `f.hp` (NOT `f.health`)!
-      const isPrimaryCombatant = (f) => Boolean(
-        f &&
-        !f.isDead &&
-        (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0)) &&
-        !f.isIllusion &&
-        !f.isTurret &&
-        !f.isMinion &&
-        !f.isClone &&
-        !f.isEndCrystal &&
-        !f.isDeployable &&
-        !f.isIceWall &&
-        !f.isEvasionMinion &&
-        !f.isTransfiguredHuman
+    } else if (aliveFighters.length >= 2) {
+      // Compute full bounding envelope across all active combatants
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+
+      for (const f of aliveFighters) {
+        const fx = f.x;
+        const fy = f.y - (f.z ? f.z * 0.35 : 0);
+        const r = f.r || 22;
+        if (fx - r < minX) minX = fx - r;
+        if (fx + r > maxX) maxX = fx + r;
+        if (fy - r < minY) minY = fy - r;
+        if (fy + r > maxY) maxY = fy + r;
+      }
+
+      const envelopeMidX = (minX + maxX) / 2;
+      const envelopeMidY = (minY + maxY) / 2;
+      const spanX = Math.max(60, maxX - minX);
+      const spanY = Math.max(60, maxY - minY);
+      const diagDist = Math.hypot(spanX, spanY);
+
+      let midX = envelopeMidX;
+      let midY = envelopeMidY;
+
+      const is1v2 = Boolean(
+        state.mode === 'Boss Battle' ||
+        state.mode === '1v2 Stand Off' ||
+        state.mode === '1v2' ||
+        state.mode === 'Stand Off 1v2' ||
+        (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2))
       );
 
-      const aliveFighters = (state.fighters || []).filter(isPrimaryCombatant);
-      const minZ = camera.minZoom ?? camCfg.minZoom ?? 0.65;
-      const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.18;
-
-      // Soft camera pan limits (allows expansive tracking beyond arena perimeter for airborne/edge entities)
-      const minCamX = arena.x - arena.width * 0.6;
-      const maxCamX = arena.x + arena.width * 1.6;
-      const minCamY = arena.y - arena.height * 0.6;
-      const maxCamY = arena.y + arena.height * 1.6;
-
-      if (aliveFighters.length >= 2) {
-        // Compute full bounding envelope across all active combatants
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-
-        for (const f of aliveFighters) {
-          const fx = f.x;
-          const fy = f.y - (f.z ? f.z * 0.35 : 0);
-          const r = f.r || 22;
-          if (fx - r < minX) minX = fx - r;
-          if (fx + r > maxX) maxX = fx + r;
-          if (fy - r < minY) minY = fy - r;
-          if (fy + r > maxY) maxY = fy + r;
-        }
-
-        const envelopeMidX = (minX + maxX) / 2;
-        const envelopeMidY = (minY + maxY) / 2;
-        const spanX = Math.max(60, maxX - minX);
-        const spanY = Math.max(60, maxY - minY);
-        const diagDist = Math.hypot(spanX, spanY);
-
-        let midX = envelopeMidX;
-        let midY = envelopeMidY;
-
-        const is1v2 = Boolean(
-          state.mode === 'Boss Battle' ||
-          state.mode === '1v2 Stand Off' ||
-          state.mode === '1v2' ||
-          state.mode === 'Stand Off 1v2' ||
-          (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2))
-        );
-
-        if (is1v2) {
-          const boss = aliveFighters.find(f => f === state.fighters?.[0] || f.isBoss || f.fighterIndex === 0) || aliveFighters[0];
-          const challengers = aliveFighters.filter(f => f !== boss);
-          if (boss && challengers.length > 0) {
-            let closestCh = challengers[0];
-            let minDistSq = Infinity;
-            for (const ch of challengers) {
-              const dSq = (ch.x - boss.x) ** 2 + (ch.y - boss.y) ** 2;
-              if (dSq < minDistSq) {
-                minDistSq = dSq;
-                closestCh = ch;
-              }
+      if (is1v2) {
+        const boss = aliveFighters.find(f => f === state.fighters?.[0] || f.isBoss || f.fighterIndex === 0) || aliveFighters[0];
+        const challengers = aliveFighters.filter(f => f !== boss);
+        if (boss && challengers.length > 0) {
+          let closestCh = challengers[0];
+          let minDistSq = Infinity;
+          for (const ch of challengers) {
+            const dSq = (ch.x - boss.x) ** 2 + (ch.y - boss.y) ** 2;
+            if (dSq < minDistSq) {
+              minDistSq = dSq;
+              closestCh = ch;
             }
-            const clashMidX = (boss.x + closestCh.x) / 2;
-            const clashMidY = ((boss.y - (boss.z ? boss.z * 0.35 : 0)) + (closestCh.y - (closestCh.z ? closestCh.z * 0.35 : 0))) / 2;
-
-            // Keep the full envelope firmly centered while adding subtle focus to active clash point
-            midX = envelopeMidX * 0.85 + clashMidX * 0.15;
-            midY = envelopeMidY * 0.85 + clashMidY * 0.15;
           }
+          const clashMidX = (boss.x + closestCh.x) / 2;
+          const clashMidY = ((boss.y - (boss.z ? boss.z * 0.35 : 0)) + (closestCh.y - (closestCh.z ? closestCh.z * 0.35 : 0))) / 2;
+
+          // Keep the full envelope firmly centered while adding subtle focus to active clash point
+          midX = envelopeMidX * 0.85 + clashMidX * 0.15;
+          midY = envelopeMidY * 0.85 + clashMidY * 0.15;
         }
-
-        // Viewport-adaptive zoom calculation:
-        // Ensures all entities remain inside the safe window screen area with generous margins
-        const screenW = state.canvas ? state.canvas.width : 540;
-        const screenH = state.canvas ? state.canvas.height : 960;
-        const safeW = screenW - 90; // 45px safe padding on left/right screen edges
-        const safeH = Math.min(screenH - 240, 640); // 120px safe padding top/bottom for HUD & timer
-        const padX = 60; // World padding around entity box for hitboxes & auras
-        const padY = 60;
-
-        const fitZoomX = safeW / (spanX + padX);
-        const fitZoomY = safeH / (spanY + padY);
-        const envelopeFit = Math.min(fitZoomX, fitZoomY);
-
-        // Distance curve mapping (Smooth Hermite from close melee to wide spread)
-        const minD = camCfg.minDist ?? 70;
-        const maxD = camCfg.maxDist ?? 520;
-        const normDist = Math.max(0, Math.min(1, (diagDist - minD) / (maxD - minD)));
-        const smoothT = normDist * normDist * (3 - 2 * normDist);
-        const distanceZoom = maxZ - smoothT * (maxZ - minZ);
-
-        // Blend: dynamic smooth distance zoom constrained by envelope viewport fit
-        const calculatedZoom = Math.min(distanceZoom, envelopeFit);
-        camera.targetZoom = Math.max(minZ, Math.min(maxZ, calculatedZoom));
-
-        // Smoothly pan camera to track combat centroid
-        camera.targetX = Math.max(minCamX, Math.min(maxCamX, midX));
-        camera.targetY = Math.max(minCamY, Math.min(maxCamY, midY));
-
-      } else if (aliveFighters.length === 1) {
-        // Winner focus during victory or solo stance
-        const winner = aliveFighters[0];
-        const winX = winner.x;
-        const winY = winner.y - (winner.z ? winner.z * 0.35 : 0);
-
-        camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
-        camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));
-        camera.targetZoom = camCfg.winnerZoom ?? 1.10;
-      } else {
-        camera.targetX = arenaCenterX;
-        camera.targetY = arenaCenterY;
-        camera.targetZoom = 1.0;
       }
+
+      // Viewport-adaptive zoom calculation:
+      // Ensures all entities remain inside the safe window screen area with generous margins
+      const screenW = state.canvas ? state.canvas.width : 540;
+      const screenH = state.canvas ? state.canvas.height : 960;
+      const safeW = screenW - 90; // 45px safe padding on left/right screen edges
+      const safeH = Math.min(screenH - 240, 640); // 120px safe padding top/bottom for HUD & timer
+      const padX = 60; // World padding around entity box for hitboxes & auras
+      const padY = 60;
+
+      const fitZoomX = safeW / (spanX + padX);
+      const fitZoomY = safeH / (spanY + padY);
+      const envelopeFit = Math.min(fitZoomX, fitZoomY);
+
+      // Distance curve mapping (Smooth Hermite from close melee to wide spread)
+      const minD = camCfg.minDist ?? 70;
+      const maxD = camCfg.maxDist ?? 520;
+      const normDist = Math.max(0, Math.min(1, (diagDist - minD) / (maxD - minD)));
+      const smoothT = normDist * normDist * (3 - 2 * normDist);
+      const distanceZoom = maxZ - smoothT * (maxZ - minZ);
+
+      // Blend: dynamic smooth distance zoom constrained by envelope viewport fit
+      const calculatedZoom = Math.min(distanceZoom, envelopeFit);
+      camera.targetZoom = Math.max(minZ, Math.min(maxZ, calculatedZoom));
+
+      // Smoothly pan camera to track combat centroid
+      camera.targetX = Math.max(minCamX, Math.min(maxCamX, midX));
+      camera.targetY = Math.max(minCamY, Math.min(maxCamY, midY));
+
+    } else if (aliveFighters.length === 1) {
+      // Winner focus during victory or solo stance
+      const winner = aliveFighters[0];
+      const winX = winner.x;
+      const winY = winner.y - (winner.z ? winner.z * 0.35 : 0);
+
+      camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
+      camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));
+      camera.targetZoom = camCfg.winnerZoom ?? 1.10;
+    } else {
+      camera.targetX = arenaCenterX;
+      camera.targetY = arenaCenterY;
+      camera.targetZoom = 1.0;
     }
   }
 
@@ -307,13 +402,21 @@ export function updateCamera() {
 export function applyCameraToCtx(ctx) {
   const cam = state.camera;
   const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+  const arenaCenterX = arena.x + arena.width / 2;
+  const arenaCenterY = arena.y + arena.height / 2;
   const screenCenterX = state.canvas.width / 2;
-  const screenCenterY = arena.y + arena.height / 2;
+  const screenCenterY = arenaCenterY;
 
-  if (cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride)) {
-    ctx.translate(screenCenterX + (cam.shakeX || 0), screenCenterY + (cam.shakeY || 0));
-    ctx.scale(cam.zoom, cam.zoom);
-    ctx.translate(-cam.x, -cam.y);
+  const isDynamic = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
+  const isZooming = Boolean(cam && Math.abs((cam.zoom || 1.0) - 1.0) > 0.0005);
+
+  if (isDynamic || isZooming) {
+    const camX = cam ? cam.x : arenaCenterX;
+    const camY = cam ? cam.y : arenaCenterY;
+    const camZoom = cam ? cam.zoom : 1.0;
+    ctx.translate(screenCenterX + (cam?.shakeX || 0), screenCenterY + (cam?.shakeY || 0));
+    ctx.scale(camZoom, camZoom);
+    ctx.translate(-camX, -camY);
   } else {
     // Fixed camera mode (still supports screen shake)
     const shakeX = (cam ? cam.shakeX : state.shakeX) || 0;
@@ -332,12 +435,20 @@ export function applyCameraToCtx(ctx) {
 export function worldToScreen(worldX, worldY) {
   const cam = state.camera;
   const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+  const arenaCenterX = arena.x + arena.width / 2;
+  const arenaCenterY = arena.y + arena.height / 2;
   const screenCenterX = state.canvas ? (state.canvas.width / 2) : 270;
-  const screenCenterY = arena.y + arena.height / 2;
+  const screenCenterY = arenaCenterY;
 
-  if (cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride)) {
-    const sx = screenCenterX + (worldX - cam.x) * cam.zoom;
-    const sy = screenCenterY + (worldY - cam.y) * cam.zoom;
+  const isDynamic = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
+  const isZooming = Boolean(cam && Math.abs((cam.zoom || 1.0) - 1.0) > 0.0005);
+
+  if (isDynamic || isZooming) {
+    const camX = cam ? cam.x : arenaCenterX;
+    const camY = cam ? cam.y : arenaCenterY;
+    const camZoom = cam ? cam.zoom : 1.0;
+    const sx = screenCenterX + (worldX - camX) * camZoom;
+    const sy = screenCenterY + (worldY - camY) * camZoom;
     return { x: sx, y: sy };
   } else {
     return { x: worldX, y: worldY };

@@ -19,6 +19,8 @@ import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
 import { crazyDaveConfig } from '../configs/characters/crazyDaveConfig.js';
 import { pekkaConfig } from '../configs/characters/pekkaConfig.js';
+import { namelessDeityConfig } from '../configs/characters/namelessDeityConfig.js';
+import { draedonConfig } from '../configs/characters/draedonConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
 import { uryuConfig } from '../configs/characters/uryuConfig.js';
@@ -62,6 +64,10 @@ export const CONFIG = {
   crazy_dave: crazyDaveConfig,
   CrazyDave: crazyDaveConfig,
   pekka: pekkaConfig,
+  namelessdeity: namelessDeityConfig,
+  namelessDeity: namelessDeityConfig,
+  nameless_deity: namelessDeityConfig,
+  draedon: draedonConfig,
   gojo: gojoConfig,
   sukuna: sukunaConfig,
   yuta: yutaConfig,
@@ -653,6 +659,13 @@ export const CONFIG = {
   /** John Wick — The Baba Yaga */
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
+
+  /** Nameless Deity — Transcendent Cosmic Entity */
+  namelessdeity: namelessDeityConfig,
+  namelessDeity: namelessDeityConfig,
+
+  /** Draedon — Architect of the Exo Mechs */
+  draedon: draedonConfig,
 };
 
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -1741,6 +1754,52 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: pekkaConfig.projectileSpeedMultiplier || 1.0,
     ability: pekkaConfig.ability || 'Kinetic Momentum & Butterfly Overdrive',
     desc: pekkaConfig.desc || 'Heavy armored samurai robot. Passive: Heavy Titanium Plating deflects 25% of all incoming damage and resists basic knockback pushes. Attacks with wide 140° Colossal Cleaves that build Kinetic Momentum up to an Overclock 3rd smash. Chases fluttering butterflies with unstoppable hyper-armor sprint and detonates an electric EMP overload.',
+  },
+  {
+    id: 52,
+    name: 'NAMELESS DEITY',
+    category: 'Gaming',
+    color: namelessDeityConfig.color || '#00F0FF',
+    themeColor: namelessDeityConfig.themeColor || '#00F0FF',
+    secondaryColor: namelessDeityConfig.secondaryColor || '#A17FE0',
+    startX: 300,
+    startY: 250,
+    startVx: 1.0,
+    startVy: 0.9,
+    radius: namelessDeityConfig.radius || namelessDeityConfig.r || 28,
+    aimbot: false,
+    spinRate: 0,
+    type: 'namelessdeity',
+    hp: namelessDeityConfig.hp || 420,
+    damage: namelessDeityConfig.damage || 16,
+    cooldown: namelessDeityConfig.cooldown || 35,
+    moveSpeed: namelessDeityConfig.moveSpeed || namelessDeityConfig.speed || 4.8,
+    projectileSpeedMultiplier: namelessDeityConfig.projectileSpeedMultiplier || 1.0,
+    ability: namelessDeityConfig.ability || 'Nameless Destroyer & Cosmic Singularity',
+    desc: namelessDeityConfig.desc || 'The transcendent cosmic entity from Terraria: Wrath of the Gods. Fires homing Prismatic Light Darts, creates Supercluster Star Mandalas, summons Gravitational Cosmic Singularities, and channels the devastating "Nameless Destroyer" cosmic death ray.',
+  },
+  {
+    id: 53,
+    name: 'DRAEDON',
+    category: 'Gaming',
+    color: draedonConfig.color || '#06B6D4',
+    themeColor: draedonConfig.themeColor || '#06B6D4',
+    secondaryColor: draedonConfig.secondaryColor || '#F59E0B',
+    startX: 300,
+    startY: 250,
+    startVx: 1.0,
+    startVy: 0.9,
+    radius: draedonConfig.radius || draedonConfig.r || 28,
+    aimbot: false,
+    spinRate: 0,
+    type: 'draedon',
+    hp: draedonConfig.hp || 430,
+    damage: draedonConfig.damage || 18,
+    cooldown: draedonConfig.cooldown || 32,
+    moveSpeed: draedonConfig.moveSpeed || draedonConfig.speed || 4.6,
+    projectileSpeedMultiplier: draedonConfig.projectileSpeedMultiplier || 1.0,
+    ability: draedonConfig.ability || 'Exo Electric Disintegrator & Ares Artillery',
+    desc: draedonConfig.desc || 'The supreme cybernetic mastermind from Terraria: Calamity Mod. Wields twin Exo-Pulse Blasters, commands Ares Gauss Artillery, activates Thanatos Refractive Shields, and incinerates enemies with the apocalyptic "Exo Electric Disintegrator" plasma melting ray.',
   }
 ];
 

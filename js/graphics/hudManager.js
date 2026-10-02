@@ -1545,6 +1545,22 @@ function updateHealthHud() {
     } else if (f.characterId === 'crazydave' || f.type === 'crazydave' || f._def?.id === 'crazydave' || f._def?.type === 'crazydave' || f.isCrazyDave) {
       const sun = Math.max(0, Math.round(f.sunCount || 0));
       info.push(`<b>$UN:</b> ${sun}`);
+    } else if (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || fType === 'namelessdeity' || fType === 'nameless_deity') {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : {};
+      const baseDmg = Math.round(cfg.damage || 14);
+      const currentDmg = Math.round(Number(f.damage) || baseDmg);
+      let dmgDisplay = '';
+      if (currentDmg >= 1e12) {
+        dmgDisplay = currentDmg.toExponential(0).toUpperCase();
+      } else {
+        dmgDisplay = currentDmg.toLocaleString('en-US');
+      }
+
+      if (currentDmg > baseDmg) {
+        info.push(`<b>DMG:</b> ${dmgDisplay} <span style="color: #00F0FF; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${dmgDisplay}`);
+      }
     } else {
       const isTacticalChar = ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType);
       if (!isTacticalChar) {
