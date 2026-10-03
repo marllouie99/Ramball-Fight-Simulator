@@ -293,8 +293,9 @@ export function reinitFighters(isNewMatch = false) {
     const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 500;
     if (!state.fighters[0].isTurret && !state.fighters[0].isMinion) {
       const f = state.fighters[0];
+      const isSans = (f.characterId === 'sans' || f.type === 'sans');
       const isMakima = (f.characterId === 'makima' || f.type === 'makima');
-      const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
+      const hp = isSans ? ((typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : 1) : (isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp);
       f.maxHp = hp;
       f.hp = hp;
     }
@@ -305,8 +306,9 @@ export function reinitFighters(isNewMatch = false) {
         if (idx === 0) {
           BossManager.initializeBoss(f);
         } else {
+          const isSans = (f.characterId === 'sans' || f.type === 'sans');
           const isMakima = (f.characterId === 'makima' || f.type === 'makima');
-          const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
+          const hp = isSans ? ((typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : 1) : (isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp);
           f.maxHp = hp;
           f.hp = hp;
         }
@@ -316,8 +318,9 @@ export function reinitFighters(isNewMatch = false) {
     const fixedHp = MODE_SETTINGS[state.mode].fixedHp;
     state.fighters.forEach((f) => {
       if (f && !f.isTurret && !f.isMinion && !f.isDeployable && !f.isIceWall && !f.isIllusion) {
+        const isSans = (f.characterId === 'sans' || f.type === 'sans');
         const isMakima = (f.characterId === 'makima' || f.type === 'makima');
-        const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
+        const hp = isSans ? ((typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : 1) : (isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp);
         f.maxHp = hp;
         f.hp = hp;
       }
@@ -802,8 +805,9 @@ export function spawnTagInFighter(teamIndex) {
   newFighter.reset();
 
   const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
+  const isSans = (newFighter.characterId === 'sans' || newFighter.type === 'sans');
   const isMakima = (newFighter.characterId === 'makima' || newFighter.type === 'makima');
-  const hp = isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp;
+  const hp = isSans ? ((typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : 1) : (isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp);
   newFighter.maxHp = hp;
   newFighter.hp = hp;
 

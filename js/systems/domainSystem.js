@@ -2,6 +2,7 @@ import { spawnFloatingText } from '../core/state.js';
 import { spawnSparks } from '../graphics/particles/sparkEffect.js';
 import { clearDomainSlashLines } from '../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { projectileSystem } from './projectileSystem.js';
+import { CONFIG } from '../core/config.js';
 
 /**
  * Checks if a fighter is immune to Domain Expansions (e.g. Toji Heavenly Restriction / Zero Cursed Energy).
@@ -162,6 +163,10 @@ export function clearFighterDomain(fighter, state) {
     if (fighter.slashHitVisuals) {
       fighter.slashHitVisuals.length = 0;
     }
+    fighter._hasFiredFugaInDomain = false;
+    fighter._isFiringDomainFuga = false;
+    const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+    fighter.divineFlameCooldown = Math.max(fighter.divineFlameCooldown, normalCd);
   }
 
   // YUTA: Clear spawned domain swords

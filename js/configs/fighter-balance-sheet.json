@@ -732,7 +732,7 @@
       "radius": 25,
       "baseDamage": 8,
       "baseCooldown": 26,
-      "themeColor": "#00F5FF",
+      "themeColor": "#2c4de0ff",
       "keySkills": {
         "gasterBlaster": {
           "beamDamage": 8,

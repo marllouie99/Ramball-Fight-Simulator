@@ -1020,21 +1020,8 @@ class ProjectileSystem {
           const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
           const splashDmg = explosionDmg * splashRatio;
 
-          // 1. Interrupt and cancel any active skill channeling or attack
-          if (typeof f.interruptAttacks === 'function') {
-            f.interruptAttacks(true);
-          }
-
-          // 2. Hide and suppress active attack effects on the hit target
-          if (typeof f.suppressCombatAndVisuals === 'function') {
-            f.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
-          } else {
-            if (typeof f.clearAllAfterimages === 'function') f.clearAllAfterimages();
-            if (typeof f.clearAllAttackEffects === 'function') f.clearAllAttackEffects();
-            f._hitByFugaTimer = Math.max(f._hitByFugaTimer || 0, 45);
-          }
-
-          f.takeDamage(splashDmg, attacker, {
+          const hpBefore = f.hp;
+          const dmgDealt = f.takeDamage(splashDmg, attacker, {
             isExplosion: true,
             isDivineFlame: true,
             isFuga: true,
@@ -1044,13 +1031,32 @@ class ProjectileSystem {
             undodgeable: true,
             isGuaranteedHit: true
           });
-          
-          // Apply burn effect to targets hit by Fuga
-          if (typeof f.applyBurn === 'function') {
-            f.applyBurn(attacker, CONFIG.sukuna?.divineFlameBurnDuration || (CONFIG.orange && CONFIG.orange.burnDuration) || 180);
+
+          // Only apply on-hit effects (burn, attack suppression) if the target actually took damage (did not dodge)
+          const tookDamage = (typeof dmgDealt === 'number') ? (dmgDealt > 0) : (f.hp < hpBefore);
+
+          if (tookDamage) {
+            // 1. Interrupt and cancel any active skill channeling or attack
+            if (typeof f.interruptAttacks === 'function') {
+              f.interruptAttacks(true);
+            }
+
+            // 2. Hide and suppress active attack effects on the hit target
+            if (typeof f.suppressCombatAndVisuals === 'function') {
+              f.suppressCombatAndVisuals({ isDivineFlame: true, isFuga: true, timer: 45 });
+            } else {
+              if (typeof f.clearAllAfterimages === 'function') f.clearAllAfterimages();
+              if (typeof f.clearAllAttackEffects === 'function') f.clearAllAttackEffects();
+              f._hitByFugaTimer = Math.max(f._hitByFugaTimer || 0, 45);
+            }
+
+            // 3. Apply burn effect only when damage was actually taken from Fuga
+            if (typeof f.applyBurn === 'function') {
+              f.applyBurn(attacker, CONFIG.sukuna?.divineFlameBurnDuration || (CONFIG.orange && CONFIG.orange.burnDuration) || 180);
+            }
           }
-          
-          // 3. Blast off target with strong outward kinetic blast knockback
+
+          // 4. Blast off target with strong outward kinetic blast knockback from shockwave
           let angle;
           if (dist > 15) {
             angle = Math.atan2(f.y - y, f.x - x);

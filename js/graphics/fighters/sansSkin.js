@@ -392,7 +392,8 @@ export function drawSansAfterImages(ctx, fighter) {
     const ai = fighter.afterImages[i];
     if (!ai || ai.timer <= 0) continue;
     const progress = ai.timer / (ai.maxTimer || 14);
-    const alpha = progress * 0.40;
+    const maxAlpha = (ai.alpha !== undefined) ? ai.alpha : 0.40;
+    const alpha = progress * maxAlpha;
     const angle = ai.gunAngle !== undefined ? ai.gunAngle : (ai.angle || 0);
 
     ctx.save();

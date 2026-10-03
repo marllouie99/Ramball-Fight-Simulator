@@ -18,6 +18,8 @@ export const AUDIO_CONFIG = {
   'attack_groundsmash': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'attack_swordswing': 'Assets/Sound Effects/Attacks/swordswing.mp3',
   'attack_escanor': 'Assets/Sound Effects/Attacks/Escanor-attack.mp3',
+  'attack_sukunaslice': 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3',
+  'sukuna_slice': 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3',
   
   // Effects
   'effect_flare': 'Assets/Sound Effects/SkillEffects/flare.mp3',

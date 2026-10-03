@@ -8,18 +8,18 @@ export const sansConfig = {
   title: 'The Judge of the Underground',
 
   // Baseline Attributes
-  hp: 240,                     // Balanced glass-cannon HP pool
+  hp: 1,                     // Balanced glass-cannon HP pool
   maxHpRatio: 1.0,
-  speed: 5.2,
+  speed: 4.0,
   moveSpeed: 5.2,
   r: 35,
   radius: 25,
-  color: '#00F5FF',           // Electric Cyan / Bad Time Eye Glow
-  themeColor: '#00F5FF',
+  color: '#03d5f1ff',           // Electric Cyan / Bad Time Eye Glow
+  themeColor: '#03d5f1ff',
   secondaryColor: '#FFE600',   // Flashing Bad Time Eye Yellow
   accentDark: '#0E0F14',       // Manga Ink Outline
   accentPink: '#F472B6',       // Fluffy Slippers
-  damageNumberColor: '#00F5FF',
+  damageNumberColor: '#03d5f1ff',
   startX: 300,
   startY: 250,
   startVx: 1.0,
@@ -39,14 +39,20 @@ export const sansConfig = {
 
   // Passive 2: Teleport Dodge & Stamina
   enableTeleportDodge: true,
-  dodgeChance: 0.85,           // Probability (0-1) of dodging incoming attacks when stamina is available (85%)
-  domainDodgeChance: 0.80,     // Probability (0-1) of dodging spatial slice lines inside enemy Domain Expansions (80%)
-  dodgeStaminaMax: 100,
-  dodgeStaminaCost: 20,        // 5 dodges from full pool
-  dodgeStaminaRegen: 0.20,     // Stamina recovery per frame (~12/sec)
-  dodgeCooldown: 16,           // Min frames between consecutive dodges
-  dodgeDistance: 85,           // Distance in pixels jumped during teleport
-  dodgeAfterimageDuration: 14,
+  dodgeChance: 1.0,           // Probability (0-1) of dodging incoming attacks (100%)
+  domainDodgeChance: 1.00,     // Probability (0-1) of dodging spatial slice lines inside enemy Domain Expansions (100%)
+  dodgeStaminaMax: 100,       // Max dodge stamina pool (replaces HP bar in HUD)
+  dodgeStaminaCost: 5,        // Standard dodge stamina cost
+  domainDodgeStaminaCost: 2,  // Special Interaction: Stamina/Mana cost is 1 only when Sukuna's domain is open!
+  dodgeStaminaRegen: 0.17,    // Stamina recovery per frame (~12/sec)
+  dodgeCooldown: 0,           // Min frames between consecutive dodges
+  dodgeDistance: 150,         // Distance in pixels jumped during teleport
+  dodgeAfterimageCount: 2,    // Number of afterimage silhouettes spawned per teleport dodge
+  dodgeAfterimages: 2,        // Alias for dodgeAfterimageCount
+  dodgeMaxAfterimages: 16,    // Maximum simultaneous active afterimages in arena buffer
+  dodgeAfterimageDuration: 20,// Lifespan of each dodge afterimage ghost (frames)
+  dodgeAfterimageAlpha: 0.40, // Base opacity / visibility of afterimage ghosts
+  dodgeStallDuration: 12,     // Frames movement stops during a dodge (repositioning is done solely by teleport)
   dodgeText: 'MISS',
 
   // Basic Attack: Bone Toss (Disabled)
@@ -59,7 +65,15 @@ export const sansConfig = {
   // Skill 1: Gaster Blaster Arsenal (3 Authentic Undertale Patterns)
   enableGasterBlaster: true,
   blasterCooldown: 320,        // ~5.3s cooldown
+  blasterHpCost: 100,           // HP self-exhaustion cost per Gaster Blaster barrage (drains down to min 1 HP)
   
+  // General Beam Dimension & Height Tuning
+  blasterBeamHeight: 36,       // Standard Gaster Blaster beam thickness / vertical height (pixels)
+  blasterBeamWidth: 36,        // Alias for blasterBeamHeight
+  blasterLaserHeight: 1500,     // Standard Gaster Blaster beam corridor length / reach (pixels)
+  blasterLaserReach: 800,      // Alias for blasterLaserHeight
+  blasterKnockback: 0,
+
   // Pattern 1: Sequential Orbiting Carousel (Arena Perimeter Circle)
   blasterCircleChainCount: 10, // Total blasters in sequential orbiting chain (10 blasters)
   blasterBadTimeChainCount: 10,// Total blasters during Bad Time (10 blasters)
@@ -68,28 +82,28 @@ export const sansConfig = {
   blasterSpawnInterval: 4,     // Frames between consecutive blaster spawns (~0.066s)
   blasterCarouselChargeTime: 16,// Rapid telegraph charge frames (~0.26s)
   blasterCarouselFireDuration: 22,// Active beam firing frames (~0.36s)
-  blasterCarouselDamage: 9,    // Damage per beam tick
-  blasterCarouselBeamWidth: 32,// Beam thickness
+  blasterCarouselDamage: 30,    // Damage per beam tick
+  blasterCarouselBeamHeight: 32,// Pattern 1 Carousel beam thickness / height (pixels)
+  blasterCarouselBeamWidth: 32, // Alias for blasterCarouselBeamHeight
 
   // Pattern 2: 360° Simultaneous Radial Ring (Arena Perimeter Ring)
   blasterRingCount: 8,         // 8 blasters surrounding arena simultaneously
   blasterRingRadius: 215,      // Distance from arena center in pixels (encircles the arena)
   blasterRingChargeTime: 28,   // Synchronized pre-fire telegraph (~0.46s)
   blasterRingFireDuration: 28, // Inward beam firing frames (~0.46s)
-  blasterRingDamage: 11,       // Damage per beam tick
-  blasterRingBeamWidth: 36,    // Beam thickness
+  blasterRingDamage: 30,       // Damage per beam tick
+  blasterRingBeamHeight: 36,   // Pattern 2 Ring beam thickness / height (pixels)
+  blasterRingBeamWidth: 36,    // Alias for blasterRingBeamHeight
 
   // Pattern 3: Colossal Titan Gigablaster (Massive 2.6x Super Laser)
   blasterGigaScale: 2.6,        // Massive skull sprite scale
   blasterGigaChargeTime: 32,    // Heavy charge telegraph build-up (~0.53s)
   blasterGigaFireDuration: 36,  // Prolonged apocalyptic laser beam (~0.60s)
-  blasterGigaDamage: 20,        // High devastating beam damage per tick
-  blasterGigaBeamWidth: 120,    // Giant 120px-wide laser beam
-  blasterGigaReach: 1000,       // Full arena corridor reach
-
-  // General Laser Tuning
-  blasterLaserReach: 800,      // Max laser length
-  blasterKnockback: 0,
+  blasterGigaDamage: 50,        // High devastating beam damage per tick
+  blasterGigaBeamHeight: 120,   // Pattern 3 Giant titan laser beam thickness / height (pixels)
+  blasterGigaBeamWidth: 120,    // Alias for blasterGigaBeamHeight
+  blasterGigaLaserHeight: 1000, // Giant titan laser corridor length / reach (pixels)
+  blasterGigaReach: 1000,       // Alias for blasterGigaLaserHeight
 
   // Skill 2: Bone Zone & Rising Spears
   enableBoneZone: true,

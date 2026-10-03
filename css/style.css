@@ -3500,3 +3500,119 @@ body.arena-dark-mode {
 }
 
 
+
+
+/* ─────────────────────────────────────────────
+   Sans Pixel-Art 5-Segment Dodge Stamina Bar HUD
+───────────────────────────────────────────── */
+.hud-bar-sans-stamina,
+.health-card__bar.hud-bar-sans-stamina,
+.arena-dark-mode .health-card__bar.hud-bar-sans-stamina,
+.health-card.arena-dark-mode .health-card__bar.hud-bar-sans-stamina,
+.hud-dimmed .health-card__bar.hud-bar-sans-stamina,
+.health-card.hud-dimmed .health-card__bar.hud-bar-sans-stamina {
+  position: relative !important;
+  width: 100% !important;
+  height: 22px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  margin: 6px 0 4px !important;
+  padding: 0 !important;
+}
+
+.sans-bolt-wrapper,
+.health-card__bar.hud-bar-sans-stamina .sans-bolt-wrapper {
+  position: absolute !important;
+  left: -4px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 22px !important;
+  height: 30px !important;
+  max-width: 22px !important;
+  max-height: 30px !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 0 5px rgba(44, 77, 224, 0.95)) drop-shadow(0 0 1px #000) !important;
+}
+
+.sans-bolt-icon,
+.health-card__bar.hud-bar-sans-stamina .sans-bolt-icon {
+  width: 22px !important;
+  height: 30px !important;
+  max-width: 22px !important;
+  max-height: 30px !important;
+  display: block !important;
+}
+
+.sans-stamina-pixel-track,
+.health-card__bar.hud-bar-sans-stamina .sans-stamina-pixel-track {
+  position: relative !important;
+  width: calc(100% - 14px) !important;
+  margin-left: 14px !important;
+  height: 18px !important;
+  background: #080c18 !important;
+  border: 2px solid #000000 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  clip-path: polygon(0% 0%, calc(100% - 8px) 0%, 100% 50%, calc(100% - 8px) 100%, 0% 100%) !important;
+  box-shadow: 0 0 8px rgba(44, 77, 224, 0.4), inset 0 0 4px rgba(0, 0, 0, 0.8) !important;
+}
+
+.sans-stamina-pixel-track .health-card__fill,
+.health-card__bar.hud-bar-sans-stamina .health-card__fill {
+  height: 100% !important;
+  max-width: 100% !important;
+  border-radius: 0px !important;
+  background: linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%) !important;
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 -1.5px 0 rgba(0, 0, 0, 0.6) !important;
+  position: relative !important;
+  transition: width 80ms ease-out !important;
+}
+
+.sans-stamina-pixel-track .health-card__fill::after {
+  display: none !important;
+}
+
+.sans-stamina-dividers,
+.health-card__bar.hud-bar-sans-stamina .sans-stamina-dividers {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+  z-index: 5 !important;
+}
+
+.sans-stamina-divider,
+.health-card__bar.hud-bar-sans-stamina .sans-stamina-divider {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 2.5px !important;
+  background: #000000 !important;
+  box-shadow: 0 0 1px #000000 !important;
+}
+
+.sans-stamina-pixel-track .health-card__bar-text,
+.health-card__bar.hud-bar-sans-stamina .health-card__bar-text {
+  position: absolute !important;
+  right: 14px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-family: 'Rajdhani', 'Outfit', 'Segoe UI', monospace, sans-serif !important;
+  font-size: 11.5px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.5px !important;
+  color: #ffffff !important;
+  text-shadow: 0 1px 2px #000000, 0 0 4px #000000, 0 0 8px rgba(44, 77, 224, 0.95) !important;
+  pointer-events: none !important;
+  z-index: 6 !important;
+  line-height: 1 !important;
+}

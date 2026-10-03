@@ -264,26 +264,28 @@ async function main() {
       if (typeof fighter.resumeMovement !== 'function') {
         throw new Error(`Fighter '${fType}' missing resumeMovement method!`);
       }
-      // Test direct resumeMovement handoff
-      fighter.vx = 0;
-      fighter.vy = 0;
-      fighter.resumeMovement(dummyOpponent);
-      const resumedSpeed = Math.hypot(fighter.vx, fighter.vy);
-      if (resumedSpeed < 0.1) {
-        throw new Error(`Fighter '${fType}' resumeMovement failed to produce initial velocity: got speed ${resumedSpeed}`);
-      }
+      // Test direct resumeMovement handoff and stall watchdog for non-stationary fighters
+      if (!fighter.isStationaryFighter) {
+        fighter.vx = 0;
+        fighter.vy = 0;
+        fighter.resumeMovement(dummyOpponent);
+        const resumedSpeed = Math.hypot(fighter.vx, fighter.vy);
+        if (resumedSpeed < 0.1) {
+          throw new Error(`Fighter '${fType}' resumeMovement failed to produce initial velocity: got speed ${resumedSpeed}`);
+        }
 
-      // Test stall watchdog recovery from zero velocity when not stationary
-      fighter.vx = 0;
-      fighter.vy = 0;
-      fighter._stationaryStallFrames = 0;
-      // Allow up to 16 frames to trigger movement recovery or stall watchdog
-      for (let f = 0; f < 16; f++) {
-        fighter.update(dummyOpponent, 0, state.arena);
-      }
-      const stallRecoveredSpeed = Math.hypot(fighter.vx, fighter.vy);
-      if (!fighter.isStationarySkillActive() && stallRecoveredSpeed < 0.05) {
-        throw new Error(`Fighter '${fType}' failed movement stall watchdog recovery (still at 0 velocity after 16 frames)! Details: speed=${fighter.speed}, baseSpeed=${fighter.baseSpeed}, isStationary=${fighter.isStationarySkillActive()}, hp=${fighter.hp}, dummyHp=${dummyOpponent.hp}, stallFrames=${fighter._stationaryStallFrames}`);
+        // Test stall watchdog recovery from zero velocity when not stationary
+        fighter.vx = 0;
+        fighter.vy = 0;
+        fighter._stationaryStallFrames = 0;
+        // Allow up to 16 frames to trigger movement recovery or stall watchdog
+        for (let f = 0; f < 16; f++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+        const stallRecoveredSpeed = Math.hypot(fighter.vx, fighter.vy);
+        if (!fighter.isStationarySkillActive() && stallRecoveredSpeed < 0.05) {
+          throw new Error(`Fighter '${fType}' failed movement stall watchdog recovery (still at 0 velocity after 16 frames)! Details: speed=${fighter.speed}, baseSpeed=${fighter.baseSpeed}, isStationary=${fighter.isStationarySkillActive()}, hp=${fighter.hp}, dummyHp=${dummyOpponent.hp}, stallFrames=${fighter._stationaryStallFrames}`);
+        }
       }
 
       // 5. Special Transformations, Forms & Skill Channeling
@@ -11323,7 +11325,28 @@ async function main() {
       throw new Error('Zeus SkillManager storm is missing isSignature / signature / isUltimate flag');
     }
 
-    console.log('✅ [Signature Skills Test] Successfully verified Zenitsu Skill 1 (Thunderclap and Flash) and Zeus Ultimate (Thunder Storm) signature flags across getSkillDataForFighter and SkillManager!');
+    // 5. Verify Sans Gaster Blaster in getSkillDataForFighter & SkillManager
+    const SansClass = FIGHTER_CLASS_MAP.sans;
+    const sansInstance = new SansClass({ x: 300, y: 300, color: '#00d0ebff', controls: {} });
+    const sansSkills = getSkillDataForFighter(sansInstance);
+    const sansBlaster = sansSkills.find(s => s.id === 'blaster');
+    if (!sansBlaster) {
+      throw new Error('Sans Skill 1 (blaster) not found in getSkillDataForFighter');
+    }
+    if (!sansBlaster.isSignature || !sansBlaster.signature) {
+      throw new Error('Sans Gaster Blaster is missing isSignature / signature flag in getSkillDataForFighter');
+    }
+
+    const sansSkillManagerData = sansInstance.skillManager.getHudSkillData();
+    const sansSmBlaster = sansSkillManagerData.find(s => s.id === 'gaster_blaster');
+    if (!sansSmBlaster) {
+      throw new Error('Sans gaster_blaster not found in skillManager');
+    }
+    if (!sansSmBlaster.isSignature || !sansSmBlaster.signature) {
+      throw new Error('Sans SkillManager gaster_blaster is missing isSignature / signature flag');
+    }
+
+    console.log('✅ [Signature Skills Test] Successfully verified Zenitsu (Thunderclap), Zeus (Thunder Storm) & Sans (Gaster Blaster) signature flags across getSkillDataForFighter and SkillManager!');
   } catch (err) {
     console.error('❌ [SIGNATURE SKILLS TEST ERROR]:', err.message || err);
     errors++;

@@ -162,6 +162,9 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             if (ent.isChannelingDivineFlame) {
               ent.isChannelingDivineFlame = false;
               ent.divineFlameChargeTimer = 0;
+              ent._isFiringDomainFuga = false;
+              const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+              ent.divineFlameCooldown = ent.domainActive ? (CONFIG.sukuna?.divineFlameDomainCooldown || 210) : Math.round(normalCd * 0.5);
               if (ent.fugaSoundKey && typeof stopLoopingSound === 'function') {
                 stopLoopingSound(ent.fugaSoundKey);
                 ent.fugaSoundKey = null;

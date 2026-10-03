@@ -96,8 +96,12 @@ export function fireDivineFlame(fighter, ownerIndex) {
   const fugaTravelVol = CONFIG.sukuna?.soundVolumes?.fugaTravel ?? (sound ? sound.volume : 1.5);
   audioSystem.playSFX(fugaTravelSnd, fugaTravelVol);
 
-  const isDomainFuga = fighter.domainActive;
-  const normalCd = CONFIG.sukuna?.divineFlameCooldown || 700;
+  const isDomainFuga = Boolean(fighter.domainActive);
+  if (isDomainFuga) {
+    fighter._hasFiredFugaInDomain = true;
+  }
+  fighter._isFiringDomainFuga = false;
+  const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
   const cdReduction = CONFIG.sukuna?.domainFugaCooldownReduction ?? CONFIG.sukuna?.domainFugaCooldownReductionPercent ?? 0.70;
   const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? Math.round(normalCd * (1 - cdReduction));
   fighter.divineFlameRecoveryTimer = CONFIG.sukuna?.divineFlameRecoveryTime || 60;
@@ -332,10 +336,10 @@ export function applyDomainEffect(fighter, arena) {
   if (fighter._domainFrame % domainDamageInterval === 0) {
     // Spawn arena-clipped spatial cut lines and execute physical hits for each line
     const hitAny = spawnDomainSlashLines(fighter, slashesPerTick);
-    if (hitAny) {
-      const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3';
-      const sliceVol = (CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7) * 0.85;
-      audioSystem.playSFX(sliceSnd, sliceVol);
-    }
+    
+    // Play Malevolent Shrine slice sound on each slash wave execution (whether hit or dodged by Sans/Saitama)
+    const sliceSnd = CONFIG.sukuna?.sounds?.fleshSlice || 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3';
+    const sliceVol = (CONFIG.sukuna?.soundVolumes?.fleshSlice ?? 0.7) * 0.85;
+    audioSystem.playSFX(sliceSnd, sliceVol);
   }
 }

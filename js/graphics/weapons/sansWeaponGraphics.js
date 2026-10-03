@@ -170,20 +170,21 @@ export function drawGasterBlaster(ctx, blaster) {
  * Uses layered concentric beams with white laser core and stepped cyan aura rings (Rule 11 compliant).
  */
 export function drawGasterBeam(ctx, beam) {
-  if (!beam || beam.length <= 0) return;
+  if (!beam) return;
+  const length = beam.length || beam.reach || beam.laserHeight || 800;
+  if (length <= 0) return;
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
   ctx.save();
   ctx.translate(beam.startX, beam.startY);
   ctx.rotate(beam.angle || 0);
 
-  const length = beam.length || 800;
-  const beamWidth = beam.width || 36;
+  const beamHeight = beam.height || beam.beamHeight || beam.width || beam.beamWidth || 36;
   const alpha = beam.alpha !== undefined ? beam.alpha : 1.0;
   ctx.globalAlpha = alpha;
 
-  const pulse = Math.sin(now * 0.03) * (beamWidth * 0.08);
-  const totalW = beamWidth + pulse;
+  const pulse = Math.sin(now * 0.03) * (beamHeight * 0.08);
+  const totalW = beamHeight + pulse;
 
   // 1. Outer Cyan Energy Glow (Layer 1)
   ctx.fillStyle = 'rgba(0, 245, 255, 0.22)';

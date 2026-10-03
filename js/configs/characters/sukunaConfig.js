@@ -82,7 +82,7 @@ export const sukunaConfig = {
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     enableFurnace: true,              // Master toggle for Furnace (Divine Flame / Fuga)
-    divineFlameCooldown: 1500,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
+    divineFlameCooldown: 2500,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
     divineFlameChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Furnace / Fuga
     divineFlameCorridorHalfWidth: 45, // Straight corridor half-width for cardinal alignment detection (Up, Down, Left, Straight/Right)
     divineFlameDetectionAngle: Math.PI * 0.08, // Maximum angular deviation from cardinal angle (~14.4 deg)

@@ -1271,23 +1271,8 @@ function updateHealthHud() {
         info.push(`<b>DMG:</b> ${baseBoneDmg}`);
       }
 
-      // 2. KR (Karmic Retribution) Poison Info
-      const activeKarmaTargets = (f.karmaTargets && f.karmaTargets.size > 0) ? f.karmaTargets.size : 0;
-      if (activeKarmaTargets > 0) {
-        info.push(`<b>KR:</b> Active (${activeKarmaTargets}) <span style="color: #A855F7; font-size: 10px;">▲</span>`);
-      } else {
-        info.push(`<b>KR:</b> 1/tick`);
-      }
-
-      // 3. DODGE / Stamina Info
-      const curStam = Math.round(f.stamina !== undefined ? f.stamina : 100);
-      const dodgeCount = Math.floor(curStam / (cfg.dodgeStaminaCost || 20));
-      const dodgeRate = Math.round((cfg.dodgeChance ?? 0.85) * 100);
-      if (curStam <= 0) {
-        info.push(`<b>DODGE:</b> 0% <span style="color: #EF4444; font-size: 10px;">(TIRED)</span>`);
-      } else {
-        info.push(`<b>DODGE:</b> ${dodgeRate}% (${dodgeCount}x)`);
-      }
+      // 2. HP: 1/1 (True Glass Cannon)
+      info.push(`<b>HP:</b> 1/1`);
     } else if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
       const baseDmg = CONFIG.yuta?.meleeDamage || CONFIG.yuta?.damage || 15;
@@ -2463,13 +2448,25 @@ function updateHealthHud() {
     if (members && members.length > 0) {
       barsHTML = members.map((m, mIndex) => {
         const isMemberCj = m && (m.characterId === 'cj' || m.type === 'cj');
-        const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
-        const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = isMemberCj ? '#DC2626' : getFighterHealthBarColor(m, ratio, isDarkTheme);
+        const isMemberSans = m && (m.characterId === 'sans' || m.type === 'sans' || (m.name && m.name.toLowerCase() === 'sans'));
+        let ratio, percent, barColor, hpText;
+        if (isMemberSans) {
+          const curStam = (m.stamina !== undefined) ? m.stamina : 100;
+          const maxStam = m.maxStamina || 100;
+          ratio = maxStam > 0 ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 1.0;
+          percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+          barColor = (ratio < 0.25) ? '#FFE600' : '#2c4de0ff';
+          hpText = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
+        } else {
+          ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
+          percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+          barColor = isMemberCj ? '#DC2626' : getFighterHealthBarColor(m, ratio, isDarkTheme);
+          hpText = (isTactical && m.hp <= 0) ? 'KIA' : `${Math.floor(Math.max(0, Number(m.hp) || 0))}`;
+        }
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
+        const sansBarClass = isMemberSans ? ' hud-bar-sans-stamina' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
-        const hpText = (isTactical && m.hp <= 0) ? 'KIA' : `${Math.floor(Math.max(0, Number(m.hp) || 0))}`;
         const memberShakeTimer = m._healthBarShakeTimer || 0;
         const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
         const memberShakeStyle = memberShakeTimer > 0 ? `transform: translateX(${memberShakeAmount}px);` : '';
@@ -2482,7 +2479,6 @@ function updateHealthHud() {
         const infoGridStyle = isSingleCol ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; grid-template-columns: 1fr;` : `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;`;
 
         const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta' || (m.name && m.name.toUpperCase().includes('YUTA')));
-        const isMemberSans = m && (m.characterId === 'sans' || m.type === 'sans' || (m.name && m.name.toLowerCase() === 'sans'));
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
         const memberName = isMemberSans ? 'sans' : (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
 
@@ -2500,9 +2496,37 @@ function updateHealthHud() {
         return `
           <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '18px'};">
             ${memberStackHTML}
-            <div class="health-card__bar${cjBarClass}" style="${memberShakeStyle} ${hideHb ? 'display: none;' : ''}">
+            <div class="health-card__bar${cjBarClass}${sansBarClass}" style="${memberShakeStyle} ${hideHb ? 'display: none;' : ''}">
+            ${isMemberSans ? `
+              <div class="sans-bolt-wrapper">
+                <svg class="sans-bolt-icon" width="22" height="30" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 1L2 14H10L3 29L20 14H12L17 1H12Z" fill="#000000" stroke="#000000" stroke-width="2.5" stroke-linejoin="miter"/>
+                <path d="M12 2L3 14H10L4 27L19 14H12L16 2H12Z" fill="url(#sansBoltGrad)"/>
+                <path d="M12 3L5 14H10L6 22L16 14H11L14 3H12Z" fill="#ffffff" opacity="0.6"/>
+                <defs>
+                  <linearGradient id="sansBoltGrad" x1="3" y1="2" x2="19" y2="28" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#93c5fd"/>
+                    <stop offset="25%" stop-color="#38bdf8"/>
+                    <stop offset="60%" stop-color="#2c4de0"/>
+                    <stop offset="100%" stop-color="#1e3a8a"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+              </div>
+              <div class="sans-stamina-pixel-track">
+                <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
+                <div class="sans-stamina-dividers">
+                  <span class="sans-stamina-divider" style="left: 20%;"></span>
+                  <span class="sans-stamina-divider" style="left: 40%;"></span>
+                  <span class="sans-stamina-divider" style="left: 60%;"></span>
+                  <span class="sans-stamina-divider" style="left: 80%;"></span>
+                </div>
+                <span class="health-card__bar-text">${hpText}</span>
+              </div>
+            ` : `
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
+            `}
             </div>
             ${memberSkillsHTML ? `<div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>` : ''}
             ${memberInfoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>` : ''}
@@ -2511,9 +2535,22 @@ function updateHealthHud() {
       }).join('');
     } else {
       const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
-      const percent = Math.round(safeRatio * 100);
-      const barColor = isTargetCj ? '#DC2626' : getFighterHealthBarColor(targetFighter, safeRatio, isDarkTheme);
+      const isTargetSans = targetFighter && (targetFighter.characterId === 'sans' || targetFighter.type === 'sans' || (targetFighter.name && targetFighter.name.toLowerCase() === 'sans'));
+      let percent, barColor, displayValue;
+      if (isTargetSans) {
+        const curStam = (targetFighter.stamina !== undefined) ? targetFighter.stamina : 100;
+        const maxStam = targetFighter.maxStamina || 100;
+        const stamRatio = maxStam > 0 ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 1.0;
+        percent = Math.min(100, Math.max(0, Math.round(stamRatio * 100)));
+        barColor = (stamRatio < 0.25) ? '#FFE600' : '#2c4de0ff';
+        displayValue = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
+      } else {
+        percent = Math.round(safeRatio * 100);
+        barColor = isTargetCj ? '#DC2626' : getFighterHealthBarColor(targetFighter, safeRatio, isDarkTheme);
+        displayValue = metaValue;
+      }
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
+      const sansBarClass = isTargetSans ? ' hud-bar-sans-stamina' : '';
       const { className } = getGlowStyles(targetFighter);
       
       const isDummy = targetFighter && (targetFighter.characterId === 'dummy' || targetFighter.type === 'dummy');
@@ -2540,9 +2577,37 @@ function updateHealthHud() {
         `;
       } else {
         barsHTML = `
-          <div class="health-card__bar${cjBarClass}" style="${barShakeStyle} ${hideHb ? 'display: none;' : ''}">
+          <div class="health-card__bar${cjBarClass}${sansBarClass}" style="${barShakeStyle} ${hideHb ? 'display: none;' : ''}">
+          ${isTargetSans ? `
+            <div class="sans-bolt-wrapper">
+              <svg class="sans-bolt-icon" width="22" height="30" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 1L2 14H10L3 29L20 14H12L17 1H12Z" fill="#000000" stroke="#000000" stroke-width="2.5" stroke-linejoin="miter"/>
+                <path d="M12 2L3 14H10L4 27L19 14H12L16 2H12Z" fill="url(#sansBoltGrad)"/>
+                <path d="M12 3L5 14H10L6 22L16 14H11L14 3H12Z" fill="#ffffff" opacity="0.6"/>
+                <defs>
+                  <linearGradient id="sansBoltGrad" x1="3" y1="2" x2="19" y2="28" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#93c5fd"/>
+                    <stop offset="25%" stop-color="#38bdf8"/>
+                    <stop offset="60%" stop-color="#2c4de0"/>
+                    <stop offset="100%" stop-color="#1e3a8a"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <div class="sans-stamina-pixel-track">
+              <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
+              <div class="sans-stamina-dividers">
+                <span class="sans-stamina-divider" style="left: 20%;"></span>
+                <span class="sans-stamina-divider" style="left: 40%;"></span>
+                <span class="sans-stamina-divider" style="left: 60%;"></span>
+                <span class="sans-stamina-divider" style="left: 80%;"></span>
+              </div>
+              <span class="health-card__bar-text">${displayValue}</span>
+            </div>
+          ` : `
             <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
-            <span class="health-card__bar-text">${metaValue}</span>
+            <span class="health-card__bar-text">${displayValue}</span>
+          `}
           </div>
           ${showDescription ? `
             ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
@@ -2997,11 +3062,24 @@ function updateHealthHud() {
 
         const isDarkTheme = isDarkModeActive();
         const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
-        const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
-        const maxHp = fighter._originalMaxHp || fighter.maxHp;
-        const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
-        const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = isCj ? '#DC2626' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
+        const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        let percent, barColor, hpText;
+        if (isSans) {
+          const curStam = (fighter.stamina !== undefined) ? fighter.stamina : 100;
+          const maxStam = fighter.maxStamina || 100;
+          const stamRatio = maxStam > 0 ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 1.0;
+          percent = Math.min(100, Math.max(0, Math.round(stamRatio * 100)));
+          barColor = (stamRatio < 0.25) ? '#FFE600' : '#2c4de0ff';
+          hpText = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
+        } else {
+          const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
+          const maxHp = fighter._originalMaxHp || fighter.maxHp;
+          const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
+          percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+          barColor = isCj ? '#DC2626' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
+          const isTactical = isTacticalMatch(state);
+          hpText = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`;
+        }
         const glow = getGlowStyles(fighter);
         
         if (m.lastHpPct !== percent) {
@@ -3018,14 +3096,13 @@ function updateHealthHud() {
         
         if (m.bar) {
           const cjBarClass = isCj ? ' hud-bar-cj' : '';
-          m.bar.className = `health-card__bar${cjBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+          const sansBarClass = isSans ? ' hud-bar-sans-stamina' : '';
+          m.bar.className = `health-card__bar${cjBarClass}${sansBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
           const memberShakeTimer = fighter._healthBarShakeTimer || 0;
           const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
           m.bar.style.transform = memberShakeTimer > 0 ? `translateX(${memberShakeAmount}px)` : '';
         }
 
-        const isTactical = isTacticalMatch(state);
-        const hpText = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`;
         if (m.lastHpText !== hpText) {
           m.text.textContent = hpText;
           m.lastHpText = hpText;
@@ -3183,11 +3260,29 @@ function updateHealthHud() {
 
       const isDarkTheme = isDarkModeActive();
       const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
-      const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
-      const maxHp = fighter._originalMaxHp || fighter.maxHp;
-      const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
-      const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-      const barColor = isCj ? '#DC2626' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
+      const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+      const isBossBar = Boolean(_cachedTopContainer && cachedCard.hpBar && _cachedTopContainer.contains(cachedCard.hpBar));
+      let percent, barColor, metaValue;
+
+      if (isSans) {
+        const curStam = (fighter.stamina !== undefined) ? fighter.stamina : 100;
+        const maxStam = fighter.maxStamina || 100;
+        const stamRatio = maxStam > 0 ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 1.0;
+        percent = Math.min(100, Math.max(0, Math.round(stamRatio * 100)));
+        barColor = (stamRatio < 0.25) ? '#FFE600' : '#2c4de0ff';
+        metaValue = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
+      } else {
+        const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
+        const maxHp = fighter._originalMaxHp || fighter.maxHp;
+        const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
+        percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+        barColor = isCj ? '#DC2626' : getFighterHealthBarColor(fighter, ratio, isDarkTheme);
+        const isTactical = isTacticalMatch(state);
+        const bossMaxHp = fighter._originalMaxHp || fighter.maxHp || 440;
+        metaValue = isBossBar
+          ? `${Math.floor(Math.max(0, Number(curHp) || 0))} / ${Math.floor(bossMaxHp)}`
+          : ((curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`);
+      }
       const glow = getGlowStyles(fighter);
 
       if (cachedCard.hpBarFill) {
@@ -3204,23 +3299,17 @@ function updateHealthHud() {
         cachedCard.hpBarFill.className = glow.className || 'health-card__fill';
       }
 
-      const isBossBar = Boolean(_cachedTopContainer && cachedCard.hpBar && _cachedTopContainer.contains(cachedCard.hpBar));
-
       if (cachedCard.hpBar) {
         const cjBarClass = isCj ? ' hud-bar-cj' : '';
+        const sansBarClass = isSans ? ' hud-bar-sans-stamina' : '';
         const bossBarClass = isBossBar ? ' boss-bar' : '';
-        cachedCard.hpBar.className = `health-card__bar${bossBarClass}${cjBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+        cachedCard.hpBar.className = `health-card__bar${bossBarClass}${cjBarClass}${sansBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
         const shakeTimer = fighter._healthBarShakeTimer || 0;
         const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
         cachedCard.hpBar.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
       }
 
       if (cachedCard.hpBarText) {
-        const isTactical = isTacticalMatch(state);
-        const bossMaxHp = fighter._originalMaxHp || fighter.maxHp || 440;
-        const metaValue = isBossBar
-          ? `${Math.floor(Math.max(0, Number(curHp) || 0))} / ${Math.floor(bossMaxHp)}`
-          : ((curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.max(0, Number(curHp) || 0))}`);
         if (cachedCard.lastHpText !== metaValue) {
           cachedCard.hpBarText.textContent = metaValue;
           cachedCard.lastHpText = metaValue;

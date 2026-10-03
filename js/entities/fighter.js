@@ -451,6 +451,13 @@ export class Fighter {
       d.type === 'minion'
     );
 
+    const isSans = Boolean(
+      this.characterId === 'sans' ||
+      this.type === 'sans' ||
+      d.characterId === 'sans' ||
+      d.type === 'sans'
+    );
+
     const isMakima = Boolean(
       this.characterId === 'makima' ||
       this.type === 'makima' ||
@@ -460,7 +467,9 @@ export class Fighter {
     const hpRatio = isMakima ? ((typeof CONFIG !== 'undefined' && CONFIG.makima?.maxHpRatio !== undefined) ? CONFIG.makima.maxHpRatio : 1.0) : 1.0;
     const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || (isMakima ? (MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp) : null);
 
-    if (!isTurretOrMinion && (MODE_SETTINGS[state.mode]?.fixedHp || (isMakima && modeFixed))) {
+    if (isSans) {
+      this.maxHp = (typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : (d.hp || 1);
+    } else if (!isTurretOrMinion && (MODE_SETTINGS[state.mode]?.fixedHp || (isMakima && modeFixed))) {
       const baseFixed = MODE_SETTINGS[state.mode]?.fixedHp || modeFixed;
       this.maxHp = Math.round(baseFixed * hpRatio);
     } else {

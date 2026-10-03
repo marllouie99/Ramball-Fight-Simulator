@@ -105,6 +105,10 @@ export class SukunaFighter extends Fighter {
           if (fighter) {
             fighter._hasPlayedDomainChannelSound = false;
             fighter._hasPlayedDomainActivateSound = false;
+            fighter._hasFiredFugaInDomain = false;
+            fighter._isFiringDomainFuga = false;
+            const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+            fighter.divineFlameCooldown = Math.max(fighter.divineFlameCooldown, normalCd);
           }
         }
       });
@@ -177,8 +181,14 @@ export class SukunaFighter extends Fighter {
         stopLoopingSound(this.fugaSoundKey);
         this.fugaSoundKey = null;
       }
+      if (this.isChannelingDivineFlame) {
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? 210;
+        this.divineFlameCooldown = this.domainActive ? domainCd : Math.round(normalCd * 0.5);
+      }
       this.isChannelingDivineFlame = false;
       this.divineFlameChargeTimer = 0;
+      this._isFiringDomainFuga = false;
       this.isChannelingDomainExpansion = false;
       this.domainChargeTimer = 0;
       this._hasPlayedDomainChannelSound = false;
@@ -214,8 +224,14 @@ export class SukunaFighter extends Fighter {
         stopLoopingSound(this.fugaSoundKey);
         this.fugaSoundKey = null;
       }
+      if (this.isChannelingDivineFlame) {
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? 210;
+        this.divineFlameCooldown = this.domainActive ? domainCd : Math.round(normalCd * 0.5);
+      }
       this.isChannelingDivineFlame = false;
       this.divineFlameChargeTimer = 0;
+      this._isFiringDomainFuga = false;
     }
   }
 
@@ -244,6 +260,8 @@ export class SukunaFighter extends Fighter {
 
     this.divineFlameCooldown = CONFIG.sukuna.divineFlameCooldown || 1500;
     this.isChannelingDivineFlame = false;
+    this._hasFiredFugaInDomain = false;
+    this._isFiringDomainFuga = false;
     this.divineFlameChargeTimer = 0;
     this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 100;
     this.divineFlameRecoveryTimer = 0;
@@ -549,6 +567,10 @@ export class SukunaFighter extends Fighter {
       if (this.domainTimer <= 0) {
         this.domainActive = false;
         clearDomainSlashLines();
+        this._hasFiredFugaInDomain = false;
+        this._isFiringDomainFuga = false;
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        this.divineFlameCooldown = Math.max(this.divineFlameCooldown, normalCd);
       } else {
         this._applyDomainEffect(arena);
       }
@@ -642,8 +664,12 @@ export class SukunaFighter extends Fighter {
         this._hasPlayedDomainChannelSound = false;
       }
       if (this.isChannelingDivineFlame) {
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? 210;
+        this.divineFlameCooldown = this.domainActive ? domainCd : Math.round(normalCd * 0.5);
         this.isChannelingDivineFlame = false;
         this.divineFlameChargeTimer = 0;
+        this._isFiringDomainFuga = false;
         if (this.fugaSoundKey) {
           stopLoopingSound(this.fugaSoundKey);
           this.fugaSoundKey = null;
@@ -763,12 +789,11 @@ export class SukunaFighter extends Fighter {
       this.combatAuraOpacity = Math.max(0, this.combatAuraOpacity - 0.04);
     }
 
-    // Update cooldowns
+    // Update cooldowns (SkillManager handles base 1x per-frame decay for registered skills)
     if (this.spiderwebCooldown > 0) this.spiderwebCooldown--;
-    if (!this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0 && this.divineFlameCooldown > 0) {
-      const cdRate = this.domainActive ? (CONFIG.sukuna?.domainFugaCooldownTickRate || 4) : 1;
-      this.divineFlameCooldown -= cdRate;
-      if (this.divineFlameCooldown < 0) this.divineFlameCooldown = 0;
+    if (this.domainActive && !this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0 && this.divineFlameCooldown > 0) {
+      const extraRate = (CONFIG.sukuna?.domainFugaCooldownTickRate || 3);
+      this.divineFlameCooldown = Math.max(0, this.divineFlameCooldown - extraRate);
     }
     if (!this.isChannelingDomainExpansion && !this.domainActive && (this.domainChargeTimer || 0) <= 0) this._hasPlayedDomainChannelSound = false;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
@@ -895,6 +920,7 @@ export class SukunaFighter extends Fighter {
           this.gunAngle = aimAngle;
           this.angle = aimAngle;
           this.isChannelingDivineFlame = true;
+          this._isFiringDomainFuga = true;
           this.divineFlameChargeTimer = 0;
           this.punchAnimTimer = 0;
           this.slashSwingTimer = 0;
@@ -939,6 +965,7 @@ export class SukunaFighter extends Fighter {
           this.gunAngle = aimAngle;
           this.angle = aimAngle;
           this.isChannelingDivineFlame = true;
+          this._isFiringDomainFuga = false;
           this.isChannelingDomainExpansion = false; // Explicit mutual exclusion
           this.divineFlameChargeTimer = 0;
           this.punchAnimTimer = 0;
@@ -1139,6 +1166,8 @@ export class SukunaFighter extends Fighter {
     this.isChannelingDomainExpansion = false;
     this.domainChargeTimer = 0;
     this.domainActive = true;
+    this._hasFiredFugaInDomain = false;
+    this._isFiringDomainFuga = false;
     this.domainActivationTime = Date.now();
     this.domainUseCount++;
     this.domainTimer = CONFIG.sukuna.domainDuration || 500;

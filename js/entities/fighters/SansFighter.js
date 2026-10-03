@@ -22,14 +22,16 @@ export class SansFighter extends Fighter {
     this.characterId = 'sans';
     this.type = 'sans';
     this.name = def.name || 'SANS';
-    this.themeColor = cfg.themeColor || '#00F5FF';
+    this.themeColor = cfg.themeColor || '#2c4de0ff';
     this.color = this.themeColor;
     this.secondaryColor = cfg.secondaryColor || '#FFE600';
-    this.damageNumberColor = cfg.damageNumberColor || '#00F5FF';
+    this.damageNumberColor = cfg.damageNumberColor || '#2c4de0ff';
 
-    this.baseSpeed = (def.moveSpeed !== undefined) ? def.moveSpeed : (cfg.moveSpeed || 5.2);
+    this.moveSpeed = (def.moveSpeed !== undefined) ? def.moveSpeed : (cfg.moveSpeed || cfg.speed || 5.2);
+    this.baseSpeed = this.moveSpeed;
     this.speed = this.baseSpeed;
-    this.hp = def.hp || cfg.hp || 240;
+    this.dodgeStallTimer = 0;
+    this.hp = (def.hp !== undefined) ? def.hp : (cfg.hp !== undefined ? cfg.hp : 1);
     this.maxHp = this.hp;
 
     // Undertale Speech Bubble System
@@ -47,11 +49,10 @@ export class SansFighter extends Fighter {
     this._hasSaidWinQuote = false;
     this._hasSaidDeathQuote = false;
 
-    // Passive 1: Dodge Stamina System
-    this.stamina = cfg.dodgeStaminaMax || 100;
-    this.maxStamina = cfg.dodgeStaminaMax || 100;
+    // Passive 1: Dodge Stamina System (replaces healthbar in HUD)
+    this.stamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
+    this.maxStamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
     this.dodgeCooldown = 0;
-    this.dodgeFatigueTimer = 0;
     this.afterImages = [];
 
     // Passive 2: Karmic Retribution (KR) State
@@ -92,6 +93,8 @@ export class SansFighter extends Fighter {
         id: 'gaster_blaster',
         name: 'Gaster Blaster',
         type: 'ranged',
+        isSignature: true,
+        signature: true,
         cooldownKey: 'blasterCooldown',
         cooldownMax: () => (CONFIG.sans?.blasterCooldown ?? sansConfig.blasterCooldown),
         color: this.themeColor,
@@ -131,9 +134,13 @@ export class SansFighter extends Fighter {
     super.reset();
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
 
-    this.stamina = cfg.dodgeStaminaMax || 100;
+    // Sans maintains his canonical 1 HP ignoring arena mode fixed HP overrides
+    this.maxHp = (cfg.hp !== undefined) ? cfg.hp : 1;
+    this.hp = this.maxHp;
+    this.stamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
+    this.maxStamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
+
     this.dodgeCooldown = 0;
-    this.dodgeFatigueTimer = 0;
     this.blasterCooldown = 0;
     this.boneZoneCooldown = 0;
     this.gravitySlamCooldown = 0;
@@ -179,6 +186,55 @@ export class SansFighter extends Fighter {
       this.karmaTargets.clear();
     } else {
       this.karmaTargets = new Map();
+    }
+    const def = this._def || {};
+    const originalBaseSpeed = (def.moveSpeed !== undefined) ? def.moveSpeed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : (cfg.speed || 5.2));
+    this.moveSpeed = originalBaseSpeed;
+    this.baseSpeed = originalBaseSpeed;
+    this.speed = originalBaseSpeed;
+    this.dodgeStallTimer = 0;
+
+    const angle = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(angle) * this.speed;
+    this.vy = Math.sin(angle) * this.speed;
+  }
+
+  isStationarySkillActive() {
+    return Boolean(
+      this.gravitySlamTimer > 0 ||
+      (this.dodgeStallTimer && this.dodgeStallTimer > 0) ||
+      super.isStationarySkillActive?.()
+    );
+  }
+
+  resumeMovement(target = null, speedMultiplier = 1.0, forcedAngle = null) {
+    this.dodgeStallTimer = 0;
+    super.resumeMovement(target, speedMultiplier, forcedAngle);
+  }
+
+  /**
+   * Instantly snaps Sans's aim angle (gunAngle & angle) directly toward the attacker/opponent.
+   * Invoked upon teleport dodging to ensure immediate, snappy target alignment without turn lag.
+   * @param {Object} [attacker=null] - Attacker, projectile, or target entity
+   */
+  snapAimAtTarget(attacker = null) {
+    const target = (attacker && !attacker.isSliceLine && attacker !== this && attacker.hp > 0 && typeof attacker.x === 'number')
+      ? attacker
+      : ((attacker && attacker.owner && attacker.owner !== this && attacker.owner.hp > 0 && typeof attacker.owner.x === 'number')
+        ? attacker.owner
+        : ((attacker && attacker.attacker && attacker.attacker !== this && attacker.attacker.hp > 0 && typeof attacker.attacker.x === 'number')
+          ? attacker.attacker
+          : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null))));
+
+    if (target && typeof target.x === 'number' && typeof target.y === 'number') {
+      const targetY = (target.y !== undefined ? target.y : this.y) - (target.z || 0);
+      const myY = this.y - (this.z || 0);
+      const snapAngle = Math.atan2(targetY - myY, target.x - this.x);
+      this.gunAngle = snapAngle;
+      this.angle = snapAngle;
+      if (typeof this.aim === 'function') {
+        this.aim(target);
+      }
     }
   }
 
@@ -353,36 +409,31 @@ export class SansFighter extends Fighter {
     const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
     if (isFrozen || this.hp <= 0) return false;
 
-    const staminaCost = cfg.dodgeStaminaCost || 20;
-    if (this.stamina < staminaCost || this.dodgeCooldown > 0) {
-      return false; // Out of stamina or on dodge cooldown -> cannot dodge slice line!
+    // Special Interaction: Stamina/mana cost is only 1 when Sukuna's domain is open
+    const isSukunaDomainActive = (lineData && (lineData.isSukunaDomain || lineData.attacker?.characterId === 'sukuna' || lineData.attacker?.type === 'sukuna')) ||
+      (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna') && f.domainActive));
+    const staminaCost = isSukunaDomainActive ? (cfg.domainDodgeStaminaCost ?? 1) : ((cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10);
+    if (this.stamina < staminaCost) {
+      return false; // Out of stamina -> cannot dodge slice line!
+    }
+
+    if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) {
+      return false; // On dodge cooldown -> cannot dodge slice line!
     }
 
     // Probability roll check (domain spatial cuts)
-    const dodgeChance = (cfg.domainDodgeChance !== undefined) ? cfg.domainDodgeChance : (cfg.dodgeChance ?? 0.80);
+    const dodgeChance = (cfg.domainDodgeChance !== undefined) ? cfg.domainDodgeChance : ((cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 1.0);
     if (dodgeChance < 1.0 && Math.random() >= dodgeChance) {
       return false; // Roll failed -> slice line connects!
     }
 
     // Deduct stamina and set dodge cooldown
     this.stamina -= staminaCost;
-    this.dodgeCooldown = cfg.dodgeCooldown || 18;
-    this.dodgeFatigueTimer = 45;
+    this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 0;
 
-    // Spawn afterimage at old location
-    if (!this.afterImages) this.afterImages = [];
-    if (this.afterImages.length >= 4) {
-      this.afterImages.shift();
-    }
-    this.afterImages.push({
-      x: this.x,
-      y: this.y,
-      r: this.r,
-      angle: this.gunAngle || this.angle || 0,
-      gunAngle: this.gunAngle || this.angle || 0,
-      timer: cfg.dodgeAfterimageDuration || 14,
-      maxTimer: cfg.dodgeAfterimageDuration || 14
-    });
+    const startX = this.x;
+    const startY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
 
     // Calculate evasion sidestep perpendicular to the spatial cut line
     const arena = state.arena || { width: 500, height: 500, x: 50, y: 50 };
@@ -398,7 +449,7 @@ export class SansFighter extends Fighter {
       sideSign = Math.random() < 0.5 ? 1 : -1;
     }
 
-    const jumpDist = cfg.dodgeDistance || 85;
+    const jumpDist = (cfg.dodgeDistance !== undefined) ? cfg.dodgeDistance : 85;
     let targetX = this.x + nx * sideSign * jumpDist;
     let targetY = this.y + ny * sideSign * jumpDist;
 
@@ -412,15 +463,20 @@ export class SansFighter extends Fighter {
       targetY = this.y - ny * sideSign * jumpDist;
     }
 
-    this.x = Math.max(minX, Math.min(maxX, targetX));
-    this.y = Math.max(minY, Math.min(maxY, targetY));
+    const finalX = Math.max(minX, Math.min(maxX, targetX));
+    const finalY = Math.max(minY, Math.min(maxY, targetY));
+
+    // Spawn configurable afterimages across the teleport displacement vector
+    this._spawnDodgeAfterimages(startX, startY, finalX, finalY, startAngle, startAngle);
+
+    this.x = finalX;
+    this.y = finalY;
     this.vx = 0;
     this.vy = 0;
+    this.dodgeStallTimer = (cfg.dodgeStallDuration !== undefined) ? cfg.dodgeStallDuration : 12;
 
-    // Re-aim at attacker (Rule 1.3)
-    if (lineData.attacker) {
-      this.aim(lineData.attacker);
-    }
+    // Snap aim directly at attacker upon teleport arrival (Rule 1.3)
+    this.snapAimAtTarget(lineData?.attacker);
 
     // Spawn floating "MISS" banner
     spawnFloatingText(this.x, this.y - this.r - 12, 'MISS', '#FFFFFF');
@@ -431,12 +487,48 @@ export class SansFighter extends Fighter {
       audioSystem.playSFX(flashSnd, 0.7);
     }
 
-    // Occasional voice blip on close dodge when low on stamina
-    if (this.stamina < 35 && Math.random() < 0.35) {
+    // Occasional voice blip on close dodge when low on HP
+    if (this.hp < 50 && Math.random() < 0.25) {
       this.speak('whoops.', 80);
     }
 
     return true; // Successfully dodged!
+  }
+
+  /**
+   * Spawns configurable dodge afterimages along the teleport displacement vector.
+   */
+  _spawnDodgeAfterimages(startX, startY, endX, endY, startAngle = 0, endAngle = 0) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    const count = cfg.dodgeAfterimageCount ?? cfg.dodgeAfterimages ?? 1;
+    if (count <= 0) return;
+
+    if (!this.afterImages) this.afterImages = [];
+    const maxBuffer = cfg.dodgeMaxAfterimages ?? cfg.dodgeAfterimageMax ?? Math.max(16, count * 4);
+    const duration = (cfg.dodgeAfterimageDuration !== undefined) ? cfg.dodgeAfterimageDuration : 20;
+    const alpha = (cfg.dodgeAfterimageAlpha !== undefined) ? cfg.dodgeAfterimageAlpha : 0.40;
+
+    for (let i = 0; i < count; i++) {
+      while (this.afterImages.length >= maxBuffer) {
+        this.afterImages.shift();
+      }
+
+      const t = count === 1 ? 0 : (i / count);
+      const px = startX + (endX - startX) * t;
+      const py = startY + (endY - startY) * t;
+      const pAngle = startAngle + (endAngle - startAngle) * t;
+
+      this.afterImages.push({
+        x: px,
+        y: py,
+        r: this.r,
+        angle: pAngle,
+        gunAngle: pAngle,
+        timer: duration,
+        maxTimer: duration,
+        alpha: alpha
+      });
+    }
   }
 
   /**
@@ -445,32 +537,27 @@ export class SansFighter extends Fighter {
   takeDamage(amount, attacker, options = {}) {
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
 
-    // Check if dodge is valid: dodge enabled, not frozen in time-stop, stamina available
+    // Check if dodge is valid: dodge enabled, stamina available, off cooldown (or zero cooldown), roll passed
     const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
     const isDomainSlash = Boolean(options.isSukunaDomainSliceLine || options.isDomainSlash);
-    const dodgeChance = isDomainSlash ? (cfg.domainDodgeChance ?? 0.80) : (cfg.dodgeChance ?? 0.85);
+    const dodgeChance = isDomainSlash ? ((cfg.domainDodgeChance !== undefined) ? cfg.domainDodgeChance : 1.0) : ((cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 1.0);
     const rollsDodge = (dodgeChance >= 1.0 || Math.random() < dodgeChance);
-    const canDodge = cfg.enableTeleportDodge && !isFrozen && (this.stamina >= cfg.dodgeStaminaCost) && (this.dodgeCooldown <= 0) && rollsDodge;
+    // Special Interaction: Stamina/mana cost is only 1 when Sukuna's domain is open
+    const isSukunaDomainActive = isDomainSlash ||
+      (attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna') && attacker.domainActive) ||
+      (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna') && f.domainActive));
+    const staminaCost = isSukunaDomainActive ? (cfg.domainDodgeStaminaCost ?? 1) : ((cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10);
+    const hasStamina = (this.stamina >= staminaCost);
+    const cooldownReady = (this.dodgeCooldown <= 0) || (cfg.dodgeCooldown === 0);
+    const canDodge = cfg.enableTeleportDodge && !isFrozen && hasStamina && cooldownReady && rollsDodge;
 
     if (canDodge && (!options.bypassDodge || isDomainSlash)) {
-      this.stamina -= cfg.dodgeStaminaCost;
-      this.dodgeCooldown = cfg.dodgeCooldown || 18;
-      this.dodgeFatigueTimer = 45;
+      this.stamina -= staminaCost;
+      this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 0;
 
-      // Spawn afterimage at current location (capped ring buffer)
-      if (!this.afterImages) this.afterImages = [];
-      if (this.afterImages.length >= 4) {
-        this.afterImages.shift();
-      }
-      this.afterImages.push({
-        x: this.x,
-        y: this.y,
-        r: this.r,
-        angle: this.gunAngle || this.angle || 0,
-        gunAngle: this.gunAngle || this.angle || 0,
-        timer: cfg.dodgeAfterimageDuration || 14,
-        maxTimer: cfg.dodgeAfterimageDuration || 14
-      });
+      const startX = this.x;
+      const startY = this.y;
+      const startAngle = this.gunAngle || this.angle || 0;
 
       // Teleport sideways / away
       const arena = state.arena || { width: 500, height: 500, x: 50, y: 50 };
@@ -478,17 +565,21 @@ export class SansFighter extends Fighter {
       const centerY = arena.y + arena.height * 0.5;
 
       const randomAngle = Math.random() * Math.PI * 2;
-      const jumpDist = cfg.dodgeDistance || 85;
+      const jumpDist = (cfg.dodgeDistance !== undefined) ? cfg.dodgeDistance : 85;
       const newX = Math.max(arena.x + this.r + 20, Math.min(arena.x + arena.width - this.r - 20, this.x + Math.cos(randomAngle) * jumpDist));
       const newY = Math.max(arena.y + this.r + 20, Math.min(arena.y + arena.height - this.r - 20, this.y + Math.sin(randomAngle) * jumpDist));
+
+      // Spawn configurable afterimages across the teleport displacement vector
+      this._spawnDodgeAfterimages(startX, startY, newX, newY, startAngle, startAngle);
 
       this.x = newX;
       this.y = newY;
       this.vx = 0;
       this.vy = 0;
+      this.dodgeStallTimer = (cfg.dodgeStallDuration !== undefined) ? cfg.dodgeStallDuration : 12;
 
-      // Re-aim at attacker (Rule 1.3)
-      if (attacker) this.aim(attacker);
+      // Snap aim directly at attacker upon teleport arrival (Rule 1.3)
+      this.snapAimAtTarget(attacker);
 
       // Floating "MISS" text
       spawnFloatingText(this.x, this.y - this.r - 12, 'MISS', '#FFFFFF');
@@ -498,8 +589,8 @@ export class SansFighter extends Fighter {
         audioSystem.playSFX(sansConfig.sounds.flash, 0.7);
       }
 
-      // Occasional voice blip on close dodge when low on stamina
-      if (this.stamina < 35 && Math.random() < 0.35) {
+      // Occasional voice blip on close dodge when low on HP
+      if (this.hp < 50 && Math.random() < 0.25) {
         this.speak('whoops.', 80);
       }
 
@@ -600,6 +691,20 @@ export class SansFighter extends Fighter {
     this.gasterBlasterFiring = true;
     this.blasterCooldown = cfg.blasterCooldown || 320;
 
+    // Self-HP drain on Skill 1 cast (Undertale exhaustion mechanic, drains down to minimum 1 HP)
+    const hpCost = (cfg.blasterHpCost !== undefined) ? cfg.blasterHpCost : 20;
+    if (hpCost > 0 && this.hp > 1) {
+      const actualCost = Math.min(this.hp - 1, hpCost);
+      this.hp -= actualCost;
+      this.damageReceived = (this.damageReceived || 0) + actualCost;
+      spawnFloatingText(this.x, this.y - this.r - 12, `-${actualCost} HP`, '#FF3B30');
+
+      // Low HP exhaustion dialogue blip
+      if (this.hp <= 40 && Math.random() < 0.40) {
+        this.speak('phew...', 70);
+      }
+    }
+
     // SFX: Blaster intro charge
     if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function' && sansConfig.sounds?.gasterBlaster) {
       audioSystem.playSFX(sansConfig.sounds.gasterBlaster, 0.85);
@@ -668,8 +773,9 @@ export class SansFighter extends Fighter {
 
     const chargeTime = cfg.blasterCarouselChargeTime || cfg.blasterChargeTime || 16;
     const fireDur = cfg.blasterCarouselFireDuration || cfg.blasterFireDuration || 22;
-    const damage = cfg.blasterCarouselDamage || cfg.blasterBeamDamage || 9;
-    const beamWidth = cfg.blasterCarouselBeamWidth || cfg.blasterBeamWidth || 32;
+    const damage = cfg.blasterCarouselDamage || cfg.blasterBeamDamage || 30;
+    const beamHeight = cfg.blasterCarouselBeamHeight ?? cfg.blasterCarouselBeamWidth ?? cfg.blasterBeamHeight ?? cfg.blasterBeamWidth ?? 32;
+    const reach = cfg.blasterLaserHeight ?? cfg.blasterLaserReach ?? 800;
 
     this.gasterBlasters.push({
       x: bx,
@@ -684,8 +790,10 @@ export class SansFighter extends Fighter {
       fireTimer: fireDur,
       fireMax: fireDur,
       damage: damage,
-      beamWidth: beamWidth,
-      reach: cfg.blasterLaserReach || 800,
+      beamHeight: beamHeight,
+      beamWidth: beamHeight,
+      reach: reach,
+      length: reach,
       isCharging: true,
       isFiring: false,
       damageDealt: false
@@ -714,8 +822,9 @@ export class SansFighter extends Fighter {
     const radius = cfg.blasterRingRadius || (Math.min(arena.width, arena.height) * 0.45);
     const chargeTime = cfg.blasterRingChargeTime || 28;
     const fireDur = cfg.blasterRingFireDuration || 28;
-    const damage = cfg.blasterRingDamage || 11;
-    const beamWidth = cfg.blasterRingBeamWidth || 36;
+    const damage = cfg.blasterRingDamage || 30;
+    const beamHeight = cfg.blasterRingBeamHeight ?? cfg.blasterRingBeamWidth ?? cfg.blasterBeamHeight ?? cfg.blasterBeamWidth ?? 36;
+    const reach = cfg.blasterLaserHeight ?? cfg.blasterLaserReach ?? 800;
     const startAngle = Math.random() * (Math.PI * 2 / count);
 
     for (let i = 0; i < count; i++) {
@@ -737,8 +846,10 @@ export class SansFighter extends Fighter {
         fireTimer: fireDur,
         fireMax: fireDur,
         damage: damage,
-        beamWidth: beamWidth,
-        reach: cfg.blasterLaserReach || 800,
+        beamHeight: beamHeight,
+        beamWidth: beamHeight,
+        reach: reach,
+        length: reach,
         isCharging: true,
         isFiring: false,
         damageDealt: false
@@ -768,9 +879,9 @@ export class SansFighter extends Fighter {
     const scale = cfg.blasterGigaScale || 2.6;
     const chargeTime = cfg.blasterGigaChargeTime || 32;
     const fireDur = cfg.blasterGigaFireDuration || 36;
-    const damage = cfg.blasterGigaDamage || 24;
-    const beamWidth = cfg.blasterGigaBeamWidth || 120;
-    const reach = cfg.blasterGigaReach || 1000;
+    const damage = cfg.blasterGigaDamage || 100;
+    const beamHeight = cfg.blasterGigaBeamHeight ?? cfg.blasterGigaBeamWidth ?? 120;
+    const reach = cfg.blasterGigaLaserHeight ?? cfg.blasterGigaReach ?? 1000;
 
     this.gasterBlasters.push({
       x: bx,
@@ -785,8 +896,10 @@ export class SansFighter extends Fighter {
       fireTimer: fireDur,
       fireMax: fireDur,
       damage: damage,
-      beamWidth: beamWidth,
+      beamHeight: beamHeight,
+      beamWidth: beamHeight,
       reach: reach,
+      length: reach,
       isCharging: true,
       isFiring: false,
       damageDealt: false
@@ -846,8 +959,8 @@ export class SansFighter extends Fighter {
         b.fireProgress = 1.0 - (b.fireTimer / b.fireMax);
 
         // Laser ray collision
-        const reach = b.reach || cfg.blasterLaserReach || 800;
-        const beamW = b.beamWidth || cfg.blasterBeamWidth || 32;
+        const reach = b.reach || b.length || cfg.blasterLaserHeight || cfg.blasterLaserReach || 800;
+        const beamH = b.beamHeight || b.beamWidth || cfg.blasterBeamHeight || cfg.blasterBeamWidth || 32;
         const cosA = Math.cos(b.angle);
         const sinA = Math.sin(b.angle);
 
@@ -866,7 +979,7 @@ export class SansFighter extends Fighter {
 
           if (projDist > 0 && projDist < reach) {
             const perpDist = Math.abs(-dx * sinA + dy * cosA);
-            if (perpDist <= (beamW * 0.5 + target.r)) {
+            if (perpDist <= (beamH * 0.5 + target.r)) {
               // Apply continuous beam ticks / damage
               if (!b.damageDealt || (b.fireTimer % 6 === 0)) {
                 b.damageDealt = true;
@@ -1227,7 +1340,6 @@ export class SansFighter extends Fighter {
       this.stamina = Math.min(this.maxStamina, this.stamina + (cfg.dodgeStaminaRegen || 0.20));
     }
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
-    if (this.dodgeFatigueTimer > 0) this.dodgeFatigueTimer--;
     if (this.basicAttackCooldown > 0) this.basicAttackCooldown--;
     if (this.basicAttackAnimTimer > 0) this.basicAttackAnimTimer--;
 
@@ -1303,9 +1415,21 @@ export class SansFighter extends Fighter {
     }
 
     // 8. Centralized Movement & Physics Integration (Rule 1.2)
-    const speedMult = this.isBadTimeActive ? (cfg.badTimeSpeedMultiplier || 1.20) : 1.0;
-    this.speed = this.baseSpeed * speedMult;
-    super.update(opponent, ownerIndex, arena);
+    // When dodging (dodgeStallTimer > 0): stop walking movement completely and snap aim to opponent
+    // When NOT dodging: normal continuous movement walking and physics
+    if (this.dodgeStallTimer > 0) {
+      this.dodgeStallTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      if (opponent && opponent.hp > 0) {
+        this.snapAimAtTarget(opponent);
+      }
+      this.resolveWallBounce(arena, opponent);
+    } else {
+      const speedMult = this.isBadTimeActive ? (cfg.badTimeSpeedMultiplier || 1.20) : 1.0;
+      this.speed = this.baseSpeed * speedMult;
+      super.update(opponent, ownerIndex, arena);
+    }
   }
 
   /**
@@ -1329,8 +1453,9 @@ export class SansFighter extends Fighter {
           startX: blaster.x,
           startY: blaster.y,
           angle: blaster.angle,
-          length: blaster.reach || (CONFIG.sans?.blasterLaserReach || sansConfig.blasterLaserReach),
-          width: blaster.beamWidth || (CONFIG.sans?.blasterBeamWidth || sansConfig.blasterBeamWidth),
+          length: blaster.reach || blaster.length || (CONFIG.sans?.blasterLaserHeight || CONFIG.sans?.blasterLaserReach || sansConfig.blasterLaserHeight || sansConfig.blasterLaserReach),
+          height: blaster.beamHeight || blaster.beamWidth || (CONFIG.sans?.blasterBeamHeight || CONFIG.sans?.blasterBeamWidth || sansConfig.blasterBeamHeight || sansConfig.blasterBeamWidth),
+          width: blaster.beamHeight || blaster.beamWidth || (CONFIG.sans?.blasterBeamHeight || CONFIG.sans?.blasterBeamWidth || sansConfig.blasterBeamHeight || sansConfig.blasterBeamWidth),
           alpha: Math.min(1.0, blaster.fireTimer / (blaster.fireMax * 0.2))
         });
       }

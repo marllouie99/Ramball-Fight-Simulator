@@ -3656,17 +3656,18 @@ async function runInteractionTests() {
     const sansSkills = getSkillDataForFighter(sans);
     assert(sansSkills && sansSkills.length === 3, `Sans must have 3 HUD skill providers (got ${sansSkills.length})`);
     assert(sansSkills.some(s => s.id === 'blaster'), 'Sans must have Gaster Blaster skill bar');
+    assert(sansSkills.find(s => s.id === 'blaster').isSignature === true, 'Gaster Blaster must be marked as Sans signature skill');
     assert(sansSkills.some(s => s.id === 'bone_zone'), 'Sans must have Bone Zone skill bar');
     assert(sansSkills.some(s => s.id === 'bad_time'), 'Sans must have Bad Time skill bar');
-    assert(sansSkills.every(s => s.color === '#00F5FF'), 'All Sans HUD skill progress bars must use the unified themeColor (#00F5FF)');
-    // 10. Verify Sans Teleport Dodge & Stamina in Sukuna Domain Slash Lines
+    assert(sansSkills.every(s => s.color === sans.themeColor), 'All Sans HUD skill progress bars must use the unified themeColor');
+    // 10. Verify Sans Teleport Dodge in Sukuna Domain Slash Lines
     const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
     const sukuna = new SukunaFighter({ name: 'SUKUNA' });
-    sans.stamina = 100;
     sans.dodgeCooldown = 0;
+    sans.stamina = sans.maxStamina || 100;
     const initialSansHp = sans.hp;
 
-    // Dodge slice line 1 (100 -> 80 stamina) with deterministic random mock
+    // Dodge slice line 1 with deterministic random mock
     const origRandom = Math.random;
     Math.random = () => 0.1;
     const dodged1 = sans.dodgeSliceLine({
@@ -3680,45 +3681,54 @@ async function runInteractionTests() {
     });
     Math.random = origRandom;
 
-    assert(dodged1 === true, 'Sans must successfully dodge Sukuna domain slice line when stamina is available');
-    assert(sans.stamina === 80, `Expected 80 stamina after dodge (got ${sans.stamina})`);
+    assert(dodged1 === true, 'Sans must successfully dodge Sukuna domain slice line when ready');
+    // Special Interaction: Sukuna Domain reduces dodge cost to 1
+    assert(sans.stamina === (sans.maxStamina || 100) - 1, `Sans stamina cost during Sukuna domain slice must be 1 (got ${sans.stamina})`);
     assert(sans.hp === initialSansHp, 'Sans HP must remain untouched after dodging domain slice line');
     assert(sans.afterImages && sans.afterImages.length > 0, 'Sans must leave afterimage when dodging domain slice line');
 
-    // Test failed dodge roll when random check fails (0.95 >= 0.80)
-    sans.stamina = 80;
-    sans.dodgeCooldown = 0;
-    Math.random = () => 0.95;
-    const dodgedRollFailed = sans.dodgeSliceLine({
-      angle: 0,
-      cx: sans.x,
-      cy: sans.y,
-      normalX: 0,
-      normalY: 1,
-      thickness: 4,
-      attacker: sukuna
-    });
-    Math.random = origRandom;
-    assert(dodgedRollFailed === false, 'Sans must fail dodge when dodge chance roll fails');
+    // 11. Verify Sans Stamina-Based Dodge & 1 HP Lethality
+    sans.reset();
+    opponent.hp = 100;
+    state.gameState = "playing";
+    state.isGameOver = false;
+    assert(sans.hp === 1, `Sans canonical HP must be 1 (got ${sans.hp})`);
+    assert(sans.stamina === (sans.maxStamina || 100), `Sans max stamina must match maxStamina (got ${sans.stamina})`);
 
-    // Simulate depleting Sans's stamina down to 0
-    sans.stamina = 10;
-    sans.dodgeCooldown = 0;
-    const dodgedExhausted = sans.dodgeSliceLine({
-      angle: 0,
-      cx: sans.x,
-      cy: sans.y,
-      normalX: 0,
-      normalY: 1,
-      thickness: 4,
-      attacker: sukuna
-    });
-    assert(dodgedExhausted === false, 'Sans must NOT be able to dodge domain slice line when stamina is insufficient');
-
-    // 11. Verify Sans dodge chance configuration (85% standard, 80% domain cuts)
     const { sansConfig } = await import('../js/configs/characters/sansConfig.js');
-    assert(sansConfig.dodgeChance === 0.85, `Expected 0.85 dodgeChance (got ${sansConfig.dodgeChance})`);
-    assert(sansConfig.domainDodgeChance === 0.80, `Expected 0.80 domainDodgeChance (got ${sansConfig.domainDodgeChance})`);
+    const stamCost = (sansConfig.dodgeStaminaCost !== undefined) ? sansConfig.dodgeStaminaCost : 10;
+    const initialStam = sans.stamina;
+
+    // Dodge 1: Full stamina -> 100% dodge chance
+    const dmg1 = sans.takeDamage(50, opponent);
+    assert(dmg1 === 0, "Sans must dodge incoming attack when stamina is available");
+    assert(sans.hp === 1, "Sans HP must remain 1 after dodge");
+    assert(sans.stamina === initialStam - stamCost, `Sans stamina must be ${initialStam - stamCost} after 1 dodge (got ${sans.stamina})`);
+
+    // Deplete remaining stamina to 0
+    while (sans.stamina >= stamCost) {
+      sans.takeDamage(50, opponent);
+    }
+    assert(sans.stamina < stamCost, `Sans stamina must be depleted below cost (got ${sans.stamina})`);
+
+    // Out of stamina -> Cannot dodge -> Takes lethal damage and dies
+    const dmgFinal = sans.takeDamage(50, opponent);
+    assert(Boolean(dmgFinal), "Sans must take damage when out of stamina");
+    assert(sans.hp <= 0, `Sans must be defeated at 0 HP after getting hit (got ${sans.hp})`);
+    // 12. Verify Sans 100% dodge configuration
+    assert(sansConfig.dodgeChance === 1.0, `Expected 1.0 dodgeChance (got ${sansConfig.dodgeChance})`);
+    assert(sansConfig.domainDodgeChance === 1.0, `Expected 1.0 domainDodgeChance (got ${sansConfig.domainDodgeChance})`);
+    assert(sansConfig.dodgeCooldown === 0, `Expected 0 dodgeCooldown (got ${sansConfig.dodgeCooldown})`);
+
+    // 13. Verify Sans Fuga Dodge: Takes 0 damage and receives 0 burn effect
+    sans.reset();
+    sans.burnTimer = 0;
+    assert(sans.burnTimer === 0, 'Sans burnTimer must initialize at 0');
+    
+    // Trigger Fuga thermobaric explosion near Sans
+    projectileSystem.triggerThermobaricExplosion(sans.x, sans.y, 1, 300);
+    assert(sans.hp === 1, `Sans must dodge Fuga explosion and remain at 1 HP (got ${sans.hp})`);
+    assert(sans.burnTimer === 0, `Sans must NOT receive burn effect after dodging Fuga (got ${sans.burnTimer})`);
 
     // Verify canvas stack depth during dodge state
     mockCtx.resetStackDepth();

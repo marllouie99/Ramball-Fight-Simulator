@@ -30,33 +30,40 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "CRAZYDAVE",
+        "character": "SANS",
         "deltas": [
             {
+                "type": "NERF",
+                "key": "hp",
+                "oldVal": 240,
+                "newVal": 1,
+                "pct": "-99.6%"
+            },
+            {
                 "type": "ADJUST",
-                "key": "displayName",
-                "oldVal": "CRAZY DAVE",
-                "newVal": "PLANTS",
+                "key": "speed",
+                "oldVal": "5.2",
+                "newVal": "4.0",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "damageNumberColor",
+                "oldVal": "#00F5FF",
+                "newVal": "#03d5f1ff",
                 "pct": "Mod"
             }
         ]
     },
     {
-        "character": "SANS",
+        "character": "SUKUNA",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "enableKarma",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "1",
-                "oldVal": "Gaster Blaster Barrage",
-                "newVal": "Gaster Blaster Arsenal (3 Authentic Undertale Patterns)",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "divineFlameCooldown",
+                "oldVal": 1500,
+                "newVal": 2500,
+                "pct": "+66.7%"
             }
         ]
     }

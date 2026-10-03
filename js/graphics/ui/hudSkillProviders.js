@@ -63,15 +63,23 @@ export function getSkillDataForFighter(f, getProjectiles) {
   // ─────────────────────────────────────────────
   if (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.sans) ? CONFIG.sans : {};
-    const themeColor = f.themeColor || cfg.themeColor || '#00F5FF';
+    const themeColor = f.themeColor || cfg.themeColor || '#2c4de0ff';
     const skills = [];
 
-    // 1. Gaster Blaster (Skill 1)
+    // 1. Gaster Blaster (Signature Skill / Skill 1)
     if (isSkillEnabled(cfg.enableGasterBlaster, true)) {
       const blasterMax = cfg.blasterCooldown || 500;
       const blasterTimer = f.blasterCooldown !== undefined ? f.blasterCooldown : 0;
       const blasterPct = Math.max(0, Math.min(100, (1 - (blasterTimer / blasterMax)) * 100));
-      skills.push({ id: 'blaster', pct: blasterPct, ready: blasterPct >= 99 && blasterTimer <= 0, color: themeColor, label: 'GASTER BLASTER' });
+      skills.push({
+        id: 'blaster',
+        pct: blasterPct,
+        ready: blasterPct >= 99 && blasterTimer <= 0,
+        color: themeColor,
+        label: 'GASTER BLASTER',
+        isSignature: true,
+        signature: true
+      });
     }
 
     // 2. Bone Zone & Traps (Skill 2)
@@ -2449,6 +2457,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     megumi: ['chimera', 'shadow', 'SHADOW GARDEN', 'GARDEN'],
     megumin: ['explosion', 'EXPLOSION', 'EXPLOSION MAGIC'],
     crazydave: ['lawnmower', 'lawn_mower', 'LAWN MOWER', 'cherrybomb', 'cherry_bomb', 'CHERRY BOMB'],
+    sans: ['blaster', 'gaster_blaster', 'gaster blaster', 'GASTER BLASTER', 'BLASTER'],
     namelessdeity: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
     nameless_deity: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
     nameless: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
