@@ -543,6 +543,7 @@ export class Fighter {
     this.isCaughtInNamelessBeam = false;
     this.iceFreezeTimer = 0;
     this.isFrozenBySnowPea = false;
+    this.isFrozenByBlueBone = false;
     this.isParalyzedByMahito = false;
     this.isGrabbedByMahoraga = false;
     this.invincibilityTimer = 0;
@@ -618,6 +619,7 @@ export class Fighter {
     if (this.freezeTimer && this.freezeTimer > 0) return true;
     if (this.iceFreezeTimer && this.iceFreezeTimer > 0) return true;
     if (this.isFrozenBySnowPea) return true;
+    if (this.isFrozenByBlueBone) return true;
     
     // Unstoppable hyper-armored channeling abilities (e.g. Gojo Red/Purple/Domain) are exempt from minor hit flinches
     const isHyperArmoredChannel = Boolean(
@@ -2463,7 +2465,21 @@ export class Fighter {
       (realAttacker && (realAttacker.characterId === 'namelessdeity' || realAttacker.characterId === 'nameless_deity' || realAttacker.type === 'namelessdeity') && ((realAttacker.destroyerFireTimer || 0) > 0 || (realAttacker.destroyerWindupTimer || 0) > 0 || (realAttacker.destroyerRecoveryTimer || 0) > 0))
     );
 
-    const isSansDeath = Boolean(
+    const isMinionOrSummon = Boolean(
+      this.isMinion ||
+      this.isSummon ||
+      this.isTurret ||
+      this.isIllusion ||
+      this.isPlant ||
+      this.isPlantMinion ||
+      this.isClone ||
+      this.isServant ||
+      this.isSubEntity ||
+      this.isCompanion ||
+      this.owner
+    );
+
+    const isSansDeath = !isMinionOrSummon && Boolean(
       this.characterId === 'sans' ||
       this.type === 'sans' ||
       (realAttacker && (realAttacker.characterId === 'sans' || realAttacker.type === 'sans'))

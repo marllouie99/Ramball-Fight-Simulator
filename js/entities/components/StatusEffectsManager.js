@@ -83,12 +83,24 @@ export class StatusEffectsManager {
     const duration = frames ?? (CONFIG.crazydave?.snowPeaFreezeDuration || 60);
     if ((this.fighter.iceFreezeTimer || 0) < duration) {
       this.fighter.iceFreezeTimer = duration;
-      this.fighter.isFrozenBySnowPea = true;
+      this.fighter.isFrozenBySnowPea = !opts.isBlueBone;
+      this.fighter.isFrozenByBlueBone = Boolean(opts.isBlueBone);
       this.fighter.lastFreezeAttacker = attacker;
 
-      // Play freeze audio
-      const sfx = CONFIG.crazydave?.sounds?.snowPeaFreeze || 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3';
-      const volume = CONFIG.crazydave?.soundVolumes?.snowPeaFreeze ?? 0.85;
+      // Play freeze audio (Undertale Ding for Sans, Snow Pea SFX for Crazy Dave)
+      let sfx = opts.sfx;
+      let volume = opts.volume ?? 0.85;
+
+      if (!sfx) {
+        if (opts.isBlueBone || (attacker && (attacker.characterId === 'sans' || attacker.name === 'SANS' || attacker.isSans))) {
+          sfx = CONFIG.sans?.sounds?.ding || 'Assets/Sound Effects/Sans/Ding.ogg';
+          volume = 0.85;
+        } else {
+          sfx = CONFIG.crazydave?.sounds?.snowPeaFreeze || 'Assets/Sound Effects/SkillEffects/crazydave-snowpea-freeze.mp3';
+          volume = CONFIG.crazydave?.soundVolumes?.snowPeaFreeze ?? 0.85;
+        }
+      }
+
       if (audioSystem && typeof audioSystem.playSFX === 'function') {
         audioSystem.playSFX(sfx, volume);
       } else if (audioSystem && typeof audioSystem.playSound === 'function') {
@@ -358,10 +370,12 @@ export class StatusEffectsManager {
       if (fighter.iceFreezeTimer <= 0) {
         fighter.iceFreezeTimer = 0;
         fighter.isFrozenBySnowPea = false;
+        fighter.isFrozenByBlueBone = false;
       }
       return true;
     } else {
       fighter.isFrozenBySnowPea = false;
+      fighter.isFrozenByBlueBone = false;
     }
 
     // Crimson Execution Stun & DoT

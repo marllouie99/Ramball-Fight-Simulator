@@ -1611,12 +1611,112 @@ export function drawIceFreezeEffect(ctx, baseRadius, fighter = null) {
   ctx.restore();
 }
 
+/**
+ * Renders Sans's authentic Undertale Blue Attack stasis freeze effect on an afflicted target.
+ * Displays a pulsating cyan energy aura, the iconic upright Blue SOUL heart model, and a downward gravity arrow.
+ * (Rule 11 compliant: uses concentric stepped arcs and polygons, NO shadowBlur).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} baseRadius
+ * @param {Object} [fighter]
+ */
+export function drawBlueBoneStasisEffect(ctx, baseRadius, fighter = null) {
+  if (!fighter || ((fighter.iceFreezeTimer || 0) <= 0 && !fighter.isFrozenByBlueBone)) return;
+
+  ctx.save();
+
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const pulse = Math.sin(now * 0.02) * 0.5 + 0.5;
+
+  // 1. Concentric Cyan Stasis Aura
+  const haloR = baseRadius * 1.25 + pulse * 3.5;
+  ctx.strokeStyle = `rgba(0, 245, 255, ${0.50 + 0.35 * pulse})`;
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(0, 85, 255, ${0.35 + 0.25 * pulse})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(0, 0, haloR * 0.88, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 2. Upright Undertale Blue SOUL Heart
+  ctx.save();
+  if (typeof ctx.getTransform === 'function') {
+    const m = ctx.getTransform();
+    const currentAngle = Math.atan2(m.b, m.a);
+    const isFlipped = (m.a * m.d - m.b * m.c) < 0;
+    if (isFlipped) ctx.scale(1, -1);
+    ctx.rotate(-currentAngle);
+  } else if (fighter) {
+    const appliedAngle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+    const facingLeft = Math.abs(appliedAngle) > Math.PI / 2;
+    if (facingLeft && !fighter.isSpinning) ctx.scale(1, -1);
+    ctx.rotate(-appliedAngle);
+  }
+
+  const heartScale = 0.95 + pulse * 0.12;
+  ctx.scale(heartScale, heartScale);
+
+  // Heart Dark Shadow Outline
+  ctx.fillStyle = '#0E0F14';
+  ctx.beginPath();
+  ctx.moveTo(0, 7);
+  ctx.bezierCurveTo(-11, 2, -11, -8, 0, -3.5);
+  ctx.bezierCurveTo(11, -8, 11, 2, 0, 7);
+  ctx.fill();
+
+  // Blue SOUL Core
+  ctx.fillStyle = '#0055FF';
+  ctx.beginPath();
+  ctx.moveTo(0, 5.5);
+  ctx.bezierCurveTo(-9, 1.2, -9, -6.5, 0, -2.5);
+  ctx.bezierCurveTo(9, -6.5, 9, 1.2, 0, 5.5);
+  ctx.fill();
+
+  // Cyan rim glint
+  ctx.strokeStyle = '#00F5FF';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // White Specular Glint
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(-3, -3, 1.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Downward gravity stasis arrow beneath heart
+  ctx.fillStyle = '#00F5FF';
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.moveTo(0, 16);
+  ctx.lineTo(-5, 10);
+  ctx.lineTo(-2, 10);
+  ctx.lineTo(-2, 8);
+  ctx.lineTo(2, 8);
+  ctx.lineTo(2, 10);
+  ctx.lineTo(5, 10);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+  ctx.restore();
+}
+
 /** Declarative registry for all global status overlays rendered on fighters */
 export const STATUS_OVERLAY_REGISTRY = [
   {
     id: 'iceFreeze',
-    isActive: (f) => Boolean((f.iceFreezeTimer || 0) > 0 || f.isFrozenBySnowPea),
+    isActive: (f) => Boolean(((f.iceFreezeTimer || 0) > 0 || f.isFrozenBySnowPea) && !f.isFrozenByBlueBone),
     render: (ctx, baseRadius, f) => drawIceFreezeEffect(ctx, baseRadius, f)
+  },
+  {
+    id: 'blueBoneStasis',
+    isActive: (f) => Boolean((f.iceFreezeTimer || 0) > 0 && f.isFrozenByBlueBone),
+    render: (ctx, baseRadius, f) => drawBlueBoneStasisEffect(ctx, baseRadius, f)
   },
   {
     id: 'slow',

@@ -149,6 +149,9 @@ export class SansFighter extends Fighter {
     this.shootCooldown = 999999;
 
     this.gasterBlasters = [];
+    this.blasterCircleSequence = null;
+    this.blasterPatternIndex = 0;
+    this.lastBlasterPattern = -1;
     this.boneProjectiles = [];
     this.boneTraps = [];
     this.slamImpacts = [];
@@ -177,6 +180,11 @@ export class SansFighter extends Fighter {
     } else {
       this.karmaTargets = new Map();
     }
+  }
+
+  interruptAttacks() {
+    super.interruptAttacks();
+    // Gaster Blasters and sequential circle spawners are independent summoned entities and persist through CC
   }
 
   /**
@@ -557,6 +565,7 @@ export class SansFighter extends Fighter {
    */
   castBasicBone(opponent) {
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    if (!cfg.enableBasicBone) return;
     this.basicAttackCooldown = cfg.basicBoneCooldown || 26;
     this.basicAttackAnimTimer = 16;
     this.basicAttackAnimMaxTimer = 16;
@@ -580,13 +589,14 @@ export class SansFighter extends Fighter {
   }
 
   /**
-   * Skill 1: Casts a barrage of Gaster Blasters.
+   * Skill 1: Casts one of 3 authentic Undertale Gaster Blaster patterns:
+   * 1. Sequential Orbiting Carousel (10 accelerating circular chain blasters)
+   * 2. 360° Simultaneous Radial Ring (8-10 blasters surrounding at once)
+   * 3. Colossal Titan Gigablaster (Massive 2.6x titan blaster with 120px super laser)
    */
   castGasterBlasters(opponent) {
     if (!opponent) return;
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
-    const count = this.isBadTimeActive ? (cfg.blasterBadTimeCount || 3) : (cfg.blasterCount || 2);
-
     this.gasterBlasterFiring = true;
     this.blasterCooldown = cfg.blasterCooldown || 320;
 
@@ -595,27 +605,140 @@ export class SansFighter extends Fighter {
       audioSystem.playSFX(sansConfig.sounds.gasterBlaster, 0.85);
     }
 
-    for (let i = 0; i < count; i++) {
-      const angleToOpp = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      const spread = ((i - (count - 1) / 2) * 0.45);
-      const spawnAngle = angleToOpp + spread;
-      const spawnDist = cfg.blasterSpawnOffset || 120;
+    // Randomize pattern across all 3 authentic Undertale formations
+    const availablePatterns = [0, 1, 2];
+    const pool = availablePatterns.filter(p => p !== this.lastBlasterPattern);
+    const pattern = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : Math.floor(Math.random() * 3);
+    this.lastBlasterPattern = pattern;
 
-      const bx = this.x + Math.cos(spawnAngle) * spawnDist;
-      const by = this.y + Math.sin(spawnAngle) * spawnDist;
+    if (pattern === 0) {
+      this._castCarouselPattern(opponent);
+    } else if (pattern === 1) {
+      this._castRadialRingPattern(opponent);
+    } else {
+      this._castGigablasterPattern(opponent);
+    }
+  }
+
+  /**
+   * Pattern 1: Sequential Orbiting Carousel (Arena perimeter circular orbit firing inward).
+   */
+  _castCarouselPattern(opponent) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    const totalCount = this.isBadTimeActive ? (cfg.blasterBadTimeChainCount ?? 10) : (cfg.blasterCircleChainCount ?? 10);
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { x: 50, y: 50, width: 500, height: 500 });
+
+    // Center around the arena middle (Undertale arena board center)
+    const centerX = arena.x + arena.width * 0.5;
+    const centerY = arena.y + arena.height * 0.5;
+    const radius = cfg.blasterCircleRadius || (Math.min(arena.width, arena.height) * 0.44);
+    const spinDir = (Math.random() < 0.5 ? 1 : -1);
+    const orbitStep = (cfg.blasterOrbitSpeed || 0.628) * spinDir;
+    const startAngle = Math.random() * Math.PI * 2;
+
+    this.blasterCircleSequence = {
+      active: true,
+      centerX,
+      centerY,
+      radius,
+      orbitStep,
+      currentAngle: startAngle,
+      remainingCount: totalCount,
+      spawnInterval: cfg.blasterSpawnInterval || 4,
+      spawnTimer: 0,
+      totalSpawned: 0
+    };
+
+    // Spawn first blaster immediately
+    this._spawnNextSequentialBlaster(opponent);
+  }
+
+  /**
+   * Spawns the next Gaster Blaster along the advancing circular perimeter orbit.
+   */
+  _spawnNextSequentialBlaster(opponent) {
+    if (!this.blasterCircleSequence || this.blasterCircleSequence.remainingCount <= 0) return;
+    const seq = this.blasterCircleSequence;
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+
+    const theta = seq.currentAngle;
+    const bx = seq.centerX + Math.cos(theta) * seq.radius;
+    const by = seq.centerY + Math.sin(theta) * seq.radius;
+    const aimAngle = theta + Math.PI; // Aim directly inward through center
+
+    const chargeTime = cfg.blasterCarouselChargeTime || cfg.blasterChargeTime || 16;
+    const fireDur = cfg.blasterCarouselFireDuration || cfg.blasterFireDuration || 22;
+    const damage = cfg.blasterCarouselDamage || cfg.blasterBeamDamage || 9;
+    const beamWidth = cfg.blasterCarouselBeamWidth || cfg.blasterBeamWidth || 32;
+
+    this.gasterBlasters.push({
+      x: bx,
+      y: by,
+      centerX: seq.centerX,
+      centerY: seq.centerY,
+      angle: aimAngle,
+      scale: 1.0,
+      spawnScale: 0.2,
+      chargeTimer: chargeTime,
+      chargeMax: chargeTime,
+      fireTimer: fireDur,
+      fireMax: fireDur,
+      damage: damage,
+      beamWidth: beamWidth,
+      reach: cfg.blasterLaserReach || 800,
+      isCharging: true,
+      isFiring: false,
+      damageDealt: false
+    });
+
+    seq.totalSpawned++;
+    seq.remainingCount--;
+    seq.currentAngle += seq.orbitStep;
+    seq.spawnTimer = seq.spawnInterval;
+
+    // Slight acceleration curve as the sequence progresses (classic Undertale acceleration!)
+    if (seq.totalSpawned % 5 === 0 && seq.spawnInterval > 2) {
+      seq.spawnInterval = Math.max(2, seq.spawnInterval - 1);
+    }
+  }
+
+  /**
+   * Pattern 2: 360° Simultaneous Radial Ring (8-10 blasters surrounding entire arena).
+   */
+  _castRadialRingPattern(opponent) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    const count = this.isBadTimeActive ? 10 : (cfg.blasterRingCount || 8);
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { x: 50, y: 50, width: 500, height: 500 });
+    const centerX = arena.x + arena.width * 0.5;
+    const centerY = arena.y + arena.height * 0.5;
+    const radius = cfg.blasterRingRadius || (Math.min(arena.width, arena.height) * 0.45);
+    const chargeTime = cfg.blasterRingChargeTime || 28;
+    const fireDur = cfg.blasterRingFireDuration || 28;
+    const damage = cfg.blasterRingDamage || 11;
+    const beamWidth = cfg.blasterRingBeamWidth || 36;
+    const startAngle = Math.random() * (Math.PI * 2 / count);
+
+    for (let i = 0; i < count; i++) {
+      const theta = startAngle + (i / count) * Math.PI * 2;
+      const bx = centerX + Math.cos(theta) * radius;
+      const by = centerY + Math.sin(theta) * radius;
+      const aimAngle = theta + Math.PI;
 
       this.gasterBlasters.push({
         x: bx,
         y: by,
-        targetX: opponent.x,
-        targetY: opponent.y,
-        angle: spawnAngle,
-        scale: 1.0,
+        centerX: centerX,
+        centerY: centerY,
+        angle: aimAngle,
+        scale: 1.05,
         spawnScale: 0.2,
-        chargeTimer: cfg.blasterChargeTime || 30,
-        chargeMax: cfg.blasterChargeTime || 30,
-        fireTimer: cfg.blasterFireDuration || 26,
-        fireMax: cfg.blasterFireDuration || 26,
+        chargeTimer: chargeTime,
+        chargeMax: chargeTime,
+        fireTimer: fireDur,
+        fireMax: fireDur,
+        damage: damage,
+        beamWidth: beamWidth,
+        reach: cfg.blasterLaserReach || 800,
         isCharging: true,
         isFiring: false,
         damageDealt: false
@@ -624,29 +747,85 @@ export class SansFighter extends Fighter {
   }
 
   /**
-   * Updates active Gaster Blasters, lasers, and collisions.
+   * Pattern 3: Colossal Titan Gigablaster (Massive 2.6x titan blaster unleashing a 120px super laser).
+   */
+  _castGigablasterPattern(opponent) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { x: 50, y: 50, width: 500, height: 500 });
+    const toOppX = opponent.x - this.x;
+    const toOppY = opponent.y - this.y;
+    const aimAngle = Math.atan2(toOppY, toOppX);
+
+    // Position colossal titan skull hovering behind Sans near arena perimeter
+    const spawnDist = 55;
+    let bx = this.x - Math.cos(aimAngle) * spawnDist;
+    let by = this.y - Math.sin(aimAngle) * spawnDist;
+
+    // Clamp within arena perimeter bounds
+    bx = Math.max(arena.x + 35, Math.min(arena.x + arena.width - 35, bx));
+    by = Math.max(arena.y + 35, Math.min(arena.y + arena.height - 35, by));
+
+    const scale = cfg.blasterGigaScale || 2.6;
+    const chargeTime = cfg.blasterGigaChargeTime || 32;
+    const fireDur = cfg.blasterGigaFireDuration || 36;
+    const damage = cfg.blasterGigaDamage || 24;
+    const beamWidth = cfg.blasterGigaBeamWidth || 120;
+    const reach = cfg.blasterGigaReach || 1000;
+
+    this.gasterBlasters.push({
+      x: bx,
+      y: by,
+      centerX: this.x,
+      centerY: this.y,
+      angle: aimAngle,
+      scale: scale,
+      spawnScale: 0.15,
+      chargeTimer: chargeTime,
+      chargeMax: chargeTime,
+      fireTimer: fireDur,
+      fireMax: fireDur,
+      damage: damage,
+      beamWidth: beamWidth,
+      reach: reach,
+      isCharging: true,
+      isFiring: false,
+      damageDealt: false
+    });
+  }
+
+  /**
+   * Updates active sequential circle queue, individual Gaster Blasters, lasers, and collisions.
    */
   _updateGasterBlasters(opponent) {
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+
+    // 1. Process active sequential circle spawner queue
+    if (this.blasterCircleSequence && this.blasterCircleSequence.active) {
+      const seq = this.blasterCircleSequence;
+      seq.spawnTimer--;
+      if (seq.spawnTimer <= 0 && seq.remainingCount > 0) {
+        this._spawnNextSequentialBlaster(opponent);
+      }
+      if (seq.remainingCount <= 0) {
+        seq.active = false;
+      }
+    }
+
     let anyFiring = false;
 
+    // 2. Process all active Gaster Blasters
     for (let i = this.gasterBlasters.length - 1; i >= 0; i--) {
       const b = this.gasterBlasters[i];
 
       // Smooth spawn scale pop-in
       if (b.spawnScale < 1.0) {
-        b.spawnScale = Math.min(1.0, b.spawnScale + 0.15);
+        b.spawnScale = Math.min(1.0, b.spawnScale + 0.20);
       }
 
-      // Phase 1: Charging
+      // Phase 1: Rapid Charging
       if (b.isCharging) {
         b.chargeTimer--;
         b.chargeProgress = 1.0 - (b.chargeTimer / b.chargeMax);
-
-        // Tracking opponent during windup
-        if (opponent) {
-          b.angle = Math.atan2(opponent.y - b.y, opponent.x - b.x);
-        }
 
         if (b.chargeTimer <= 0) {
           b.isCharging = false;
@@ -654,21 +833,21 @@ export class SansFighter extends Fighter {
 
           // SFX: Beam Fire
           if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function' && sansConfig.sounds?.gasterBlast) {
-            audioSystem.playSFX(sansConfig.sounds.gasterBlast, 0.9);
+            audioSystem.playSFX(sansConfig.sounds.gasterBlast, 0.75);
           }
-          triggerGlobalScreenShake(5.0, 14);
+          triggerGlobalScreenShake(3.5, 8);
         }
       }
 
-      // Phase 2: Active Laser Beam Firing
+      // Phase 2: Active Laser Beam Firing Inward
       if (b.isFiring) {
         anyFiring = true;
         b.fireTimer--;
         b.fireProgress = 1.0 - (b.fireTimer / b.fireMax);
 
         // Laser ray collision
-        const reach = cfg.blasterLaserReach || 800;
-        const beamW = cfg.blasterBeamWidth || 38;
+        const reach = b.reach || cfg.blasterLaserReach || 800;
+        const beamW = b.beamWidth || cfg.blasterBeamWidth || 32;
         const cosA = Math.cos(b.angle);
         const sinA = Math.sin(b.angle);
 
@@ -689,15 +868,15 @@ export class SansFighter extends Fighter {
             const perpDist = Math.abs(-dx * sinA + dy * cosA);
             if (perpDist <= (beamW * 0.5 + target.r)) {
               // Apply continuous beam ticks / damage
-              if (!b.damageDealt || (b.fireTimer % 10 === 0)) {
+              if (!b.damageDealt || (b.fireTimer % 6 === 0)) {
                 b.damageDealt = true;
-                const dmg = cfg.blasterBeamDamage || 8;
+                const dmg = b.damage || cfg.blasterBeamDamage || 9;
                 if (target.takeDamage) target.takeDamage(dmg, this);
                 this.applyKarma(target);
 
                 // Knockback
-                if (target.applyKnockback) {
-                  target.applyKnockback(cosA * (cfg.blasterKnockback || 9), sinA * (cfg.blasterKnockback || 9));
+                if (target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {
+                  target.applyKnockback(cosA * cfg.blasterKnockback, sinA * cfg.blasterKnockback);
                 }
               }
             }
@@ -710,7 +889,7 @@ export class SansFighter extends Fighter {
       }
     }
 
-    this.gasterBlasterFiring = anyFiring;
+    this.gasterBlasterFiring = anyFiring || Boolean(this.blasterCircleSequence && this.blasterCircleSequence.active);
   }
 
   /**
@@ -801,7 +980,10 @@ export class SansFighter extends Fighter {
 
           if (bone.boneType === 'blue' && t.applyFreeze) {
             const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
-            t.applyFreeze(cfg.blueBoneFreezeDuration || 24);
+            t.applyFreeze(cfg.blueBoneFreezeDuration || 24, this, {
+              isBlueBone: true,
+              sfx: (CONFIG.sans?.sounds?.ding || sansConfig.sounds?.ding) || 'Assets/Sound Effects/Sans/Ding.ogg'
+            });
           }
 
           bone.life = 0;
@@ -1030,6 +1212,11 @@ export class SansFighter extends Fighter {
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
       this.interruptAttacks();
+      // Gaster Blasters and active bone traps are independent arena entities and must not get stopped when Sans is CC'd
+      this._updateGasterBlasters(opponent);
+      this._updateBones();
+      this._updateKarma();
+      this._updateHeartShatters();
       return;
     }
 
@@ -1067,8 +1254,23 @@ export class SansFighter extends Fighter {
       this.speak('ready?', 120);
     }
 
-    // 6. Win Quote & Heart Shatter when opponent is defeated
-    if (opponent && opponent.hp <= 0 && !this._hasTriggeredOpponentShatter) {
+    // 6. Win Quote & Heart Shatter when opponent is defeated (Main fighters only, excluding minions/plants/turrets)
+    const isMinionOrSummon = Boolean(
+      !opponent ||
+      opponent.isMinion ||
+      opponent.isSummon ||
+      opponent.isTurret ||
+      opponent.isIllusion ||
+      opponent.isPlant ||
+      opponent.isPlantMinion ||
+      opponent.isClone ||
+      opponent.isServant ||
+      opponent.isSubEntity ||
+      opponent.isCompanion ||
+      opponent.owner
+    );
+
+    if (opponent && opponent.hp <= 0 && !isMinionOrSummon && !this._hasTriggeredOpponentShatter) {
       this._hasTriggeredOpponentShatter = true;
       this.triggerHeartShatter(opponent.x, opponent.y);
       if (!this._hasSaidWinQuote) {
@@ -1094,8 +1296,8 @@ export class SansFighter extends Fighter {
       else if (this.boneZoneCooldown <= 0 && dist < 360) {
         this.castBoneZone(opponent);
       }
-      // Basic Bone Toss
-      else if (this.basicAttackCooldown <= 0 && dist < (cfg.basicBoneReach || 420)) {
+      // Basic Bone Toss (if enabled)
+      else if (cfg.enableBasicBone && this.basicAttackCooldown <= 0 && dist < (cfg.basicBoneReach || 420)) {
         this.castBasicBone(opponent);
       }
     }
@@ -1127,8 +1329,8 @@ export class SansFighter extends Fighter {
           startX: blaster.x,
           startY: blaster.y,
           angle: blaster.angle,
-          length: (CONFIG.sans?.blasterLaserReach || sansConfig.blasterLaserReach),
-          width: (CONFIG.sans?.blasterBeamWidth || sansConfig.blasterBeamWidth),
+          length: blaster.reach || (CONFIG.sans?.blasterLaserReach || sansConfig.blasterLaserReach),
+          width: blaster.beamWidth || (CONFIG.sans?.blasterBeamWidth || sansConfig.blasterBeamWidth),
           alpha: Math.min(1.0, blaster.fireTimer / (blaster.fireMax * 0.2))
         });
       }

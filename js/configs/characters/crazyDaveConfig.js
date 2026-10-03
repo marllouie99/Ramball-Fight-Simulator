@@ -5,7 +5,7 @@
 export const crazyDaveConfig = {
   id: 'crazydave',
   name: 'Crazy Dave',
-  displayName: 'CRAZY DAVE',
+  displayName: 'PLANTS',
   category: 'Gaming',
   color: '#84CC16',          // Plant Lime Green
   themeColor: '#84CC16',     // Primary Theme Color

@@ -28,7 +28,39 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "CRAZYDAVE",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "displayName",
+                "oldVal": "CRAZY DAVE",
+                "newVal": "PLANTS",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "SANS",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "enableKarma",
+                "oldVal": "true",
+                "newVal": "0",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "1",
+                "oldVal": "Gaster Blaster Barrage",
+                "newVal": "Gaster Blaster Arsenal (3 Authentic Undertale Patterns)",
+                "pct": "Mod"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

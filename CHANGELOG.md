@@ -3,4 +3,12 @@
 
 ---
 
-*No balance parameter modifications detected in `js/configs/`.*
+## 🥊 Fighter Stat Modifications
+
+### CRAZYDAVE
+* **🔄 ADJUST** `displayName`: `CRAZY DAVE` ➔ `PLANTS` (Mod)
+
+### SANS
+* **🔄 ADJUST** `enableKarma`: `true` ➔ `0` (Mod)
+* **🔄 ADJUST** `1`: `Gaster Blaster Barrage` ➔ `Gaster Blaster Arsenal (3 Authentic Undertale Patterns)` (Mod)
+

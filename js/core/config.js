@@ -1723,7 +1723,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 50,
-    name: 'CRAZY DAVE',
+    name: 'PLANTS',
+    displayName: 'PLANTS',
     category: 'Gaming',
     color: crazyDaveConfig.color || '#84CC16',
     themeColor: crazyDaveConfig.themeColor || '#84CC16',

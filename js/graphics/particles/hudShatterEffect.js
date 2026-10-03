@@ -307,12 +307,12 @@ function getTopMatchNameCharacters(arena) {
 
   if (isTeamMatch) {
     const team0Data = team0.map(f => ({
-      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
       color: getFighterThemeColor(f, '#38BDF8')
     }));
 
     const team1Data = team1.map(f => ({
-      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
       color: getFighterThemeColor(f, '#F87171')
     }));
 
@@ -417,7 +417,7 @@ function getTopMatchNameCharacters(arena) {
     const vsText = 'vs';
     const textY = arena.y - 12;
     const fighterData = mainFighters.map(f => ({
-      name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+      name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
       color: getFighterThemeColor(f, '#F8FAFC')
     }));
 

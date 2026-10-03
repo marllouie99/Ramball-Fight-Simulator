@@ -2448,12 +2448,9 @@ function updateHealthHud() {
     }
 
     const isDarkTheme = isDarkModeActive();
-    const getTitleStyle = (color, isCj = false, isSans = false) => {
+    const getTitleStyle = (color, isCj = false) => {
       if (isTactical) {
         return `color: ${color || '#ffffff'}; font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.2px; line-height: 1.15; `;
-      }
-      if (isSans) {
-        return `color: ${color || '#ffffff'}; font-size: ${baseFontSize + 1}px; text-transform: lowercase; font-family: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive, monospace; letter-spacing: 0px; font-weight: bold; `;
       }
       const useCj = isCj;
       const fontFamily = useCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;

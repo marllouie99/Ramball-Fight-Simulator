@@ -308,12 +308,7 @@ export class FighterRenderer {
       }
     }
 
-    const isSans = Boolean(fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans')));
-    if (isSans) {
-      ctx.font = '700 15px "Comic Sans MS", "Comic Neue", "Chalkboard SE", monospace, sans-serif';
-    } else {
-      ctx.font = '900 17px "Rajdhani", "Outfit", "Segoe UI", sans-serif';
-    }
+    ctx.font = '900 17px "Rajdhani", "Outfit", "Segoe UI", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     const hpText = Math.floor(fighter.hp).toString();

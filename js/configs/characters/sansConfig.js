@@ -31,7 +31,7 @@ export const sansConfig = {
   desc: 'The laid-back skeleton judge from Undertale. Dodges incoming attacks with instant teleportation afterimages. Attacks with rapid bone barrages, summons heavy Gaster Blaster laser cannons, applies Karmic Retribution (KR) damage over time, and controls battlefield gravity with Blue Soul telekinesis slams.',
 
   // Passive 1: Karmic Retribution (KR)
-  enableKarma: true,
+  enableKarma: 0,
   karmaTickDamage: 1,
   karmaTickInterval: 14,       // Frames between poison ticks (~0.23s)
   karmaMaxStacks: 12,          // Up to 12 stacks for sustained pressure
@@ -49,23 +49,45 @@ export const sansConfig = {
   dodgeAfterimageDuration: 14,
   dodgeText: 'MISS',
 
-  // Basic Attack: Bone Toss
-  enableBasicBone: true,
+  // Basic Attack: Bone Toss (Disabled)
+  enableBasicBone: 1,
   basicBoneDamage: 8,          // Balanced poke damage (8 + KR)
   basicBoneSpeed: 8.5,
   basicBoneReach: 420,
   basicBoneCooldown: 100,       // Rapid chip barrage
 
-  // Skill 1: Gaster Blaster Barrage
+  // Skill 1: Gaster Blaster Arsenal (3 Authentic Undertale Patterns)
   enableGasterBlaster: true,
-  blasterCooldown: 350,        // ~5.3s cooldown
-  blasterCount: 5,
-  blasterBadTimeCount: 3,      // Extra blasters during Bad Time mode
-  blasterSpawnOffset: 120,     // Distance in pixels from Sans when summoned
-  blasterChargeTime: 30,       // Pre-fire telegraph frames (~0.50s)
-  blasterFireDuration: 30,     // Active beam firing frames (~0.43s)
-  blasterBeamDamage: 15,        // 8 dmg/tick (3 ticks = 24 per blaster, 48 total burst, 72 in Bad Time)
-  blasterBeamWidth: 38,        // Beam thickness
+  blasterCooldown: 320,        // ~5.3s cooldown
+  
+  // Pattern 1: Sequential Orbiting Carousel (Arena Perimeter Circle)
+  blasterCircleChainCount: 10, // Total blasters in sequential orbiting chain (10 blasters)
+  blasterBadTimeChainCount: 10,// Total blasters during Bad Time (10 blasters)
+  blasterCircleRadius: 210,    // Distance from arena center in pixels (encircles the arena)
+  blasterOrbitSpeed: 0.628,    // Angular step per spawn along the orbit (2*PI / 10 = ~0.628 rad for a clean 360-degree loop)
+  blasterSpawnInterval: 4,     // Frames between consecutive blaster spawns (~0.066s)
+  blasterCarouselChargeTime: 16,// Rapid telegraph charge frames (~0.26s)
+  blasterCarouselFireDuration: 22,// Active beam firing frames (~0.36s)
+  blasterCarouselDamage: 9,    // Damage per beam tick
+  blasterCarouselBeamWidth: 32,// Beam thickness
+
+  // Pattern 2: 360° Simultaneous Radial Ring (Arena Perimeter Ring)
+  blasterRingCount: 8,         // 8 blasters surrounding arena simultaneously
+  blasterRingRadius: 215,      // Distance from arena center in pixels (encircles the arena)
+  blasterRingChargeTime: 28,   // Synchronized pre-fire telegraph (~0.46s)
+  blasterRingFireDuration: 28, // Inward beam firing frames (~0.46s)
+  blasterRingDamage: 11,       // Damage per beam tick
+  blasterRingBeamWidth: 36,    // Beam thickness
+
+  // Pattern 3: Colossal Titan Gigablaster (Massive 2.6x Super Laser)
+  blasterGigaScale: 2.6,        // Massive skull sprite scale
+  blasterGigaChargeTime: 32,    // Heavy charge telegraph build-up (~0.53s)
+  blasterGigaFireDuration: 36,  // Prolonged apocalyptic laser beam (~0.60s)
+  blasterGigaDamage: 20,        // High devastating beam damage per tick
+  blasterGigaBeamWidth: 120,    // Giant 120px-wide laser beam
+  blasterGigaReach: 1000,       // Full arena corridor reach
+
+  // General Laser Tuning
   blasterLaserReach: 800,      // Max laser length
   blasterKnockback: 0,
 
@@ -100,6 +122,7 @@ export const sansConfig = {
     slam: 'Assets/Sound Effects/Sans/Slam.ogg',
     boneStab: 'Assets/Sound Effects/Sans/BoneStab.ogg',
     flash: 'Assets/Sound Effects/Sans/Flash.ogg',
+    ding: 'Assets/Sound Effects/Sans/Ding.ogg',
     sansSpeak: 'Assets/Sound Effects/Sans/SansSpeak.ogg',
     warning: 'Assets/Sound Effects/Sans/Warning.ogg',
     heartSplit: 'Assets/Sound Effects/Sans/HeartSplit.ogg',
