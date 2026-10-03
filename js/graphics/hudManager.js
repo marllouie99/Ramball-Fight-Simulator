@@ -985,7 +985,7 @@ function ensureTacticalCardElement(container, index, accentColor) {
       <!-- Top Row: Operator Name & Caliber / Live Health Readout -->
       <div style="display: flex; justify-content: space-between; align-items: center; line-height: 1.15;">
         <div style="display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden;">
-          <span class="tac-name" style="font-family: 'Rajdhani', 'Outfit', sans-serif; font-size: 10.5px; font-weight: 900; color: ${accentColor}; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+          <span class="tac-name" style="font-family: 'Rajdhani', 'Outfit', sans-serif; font-size: 10.5px; font-weight: 900; color: ${accentColor}; letter-spacing: 0.1px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
           <span class="tac-caliber" style="font-family: 'Rajdhani', monospace; font-size: 8px; font-weight: 700; color: #94a3b8; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); padding: 0 3px; border-radius: 2px; white-space: nowrap;"></span>
         </div>
         <div class="tac-hp-badge" style="font-family: 'Rajdhani', monospace; font-size: 10px; font-weight: 900; color: #f8fafc; display: flex; align-items: baseline; gap: 2px;">
@@ -2425,15 +2425,15 @@ function updateHealthHud() {
     const isDarkTheme = isDarkModeActive();
     const getTitleStyle = (color, isCj = false, isSans = false) => {
       if (isTactical) {
-        return `color: ${color || '#ffffff'}; font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; line-height: 1.15; `;
+        return `color: ${color || '#ffffff'}; font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.2px; line-height: 1.15; `;
       }
       if (isSans) {
-        return `color: ${color || '#ffffff'}; font-size: ${baseFontSize + 1}px; text-transform: lowercase; font-family: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive, monospace; letter-spacing: 0.5px; font-weight: bold; `;
+        return `color: ${color || '#ffffff'}; font-size: ${baseFontSize + 1}px; text-transform: lowercase; font-family: 'Comic Sans MS', 'Comic Neue', 'Chalkboard SE', cursive, monospace; letter-spacing: 0px; font-weight: bold; `;
       }
       const useCj = isCj;
       const fontFamily = useCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
       const fontSize = useCj ? (baseFontSize + 2) : baseFontSize;
-      const letterSpacing = useCj ? '1.2px' : '0.8px';
+      const letterSpacing = useCj ? '0.5px' : '0.2px';
       return `color: ${color || '#ffffff'}; font-size: ${fontSize}px; text-transform: uppercase; font-family: ${fontFamily}; letter-spacing: ${letterSpacing}; font-weight: normal; `;
     };
 

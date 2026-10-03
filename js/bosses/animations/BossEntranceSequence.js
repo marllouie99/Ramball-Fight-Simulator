@@ -289,14 +289,14 @@ class BossEntranceSequenceClass {
 
     // Top Tag Banner
     ctx.font = '700 12px "Silkscreen", monospace, sans-serif';
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '1px';
     ctx.fillStyle = '#FF3344';
     ctx.globalAlpha = alpha;
     ctx.fillText(topTag, canvasW / 2, cardY - 24);
 
     // Boss Name Plate
     ctx.font = '700 38px "Silkscreen", monospace, sans-serif';
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '3px';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '1px';
     ctx.fillStyle = themeColor;
     ctx.globalAlpha = alpha;
     ctx.fillText(bossName, canvasW / 2, cardY + 14);
@@ -304,7 +304,7 @@ class BossEntranceSequenceClass {
     // Boss Subtitle / Epithet (Simple, crisp, high-contrast text)
     const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
     ctx.font = '700 12px "Silkscreen", monospace, sans-serif';
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '2px';
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
     ctx.fillStyle = isDark ? '#E2E8F0' : '#0F172A';
     ctx.globalAlpha = alpha;
     ctx.fillText(bossSubtitle, canvasW / 2, cardY + 38);
@@ -313,7 +313,7 @@ class BossEntranceSequenceClass {
     if (this.timer >= 25) {
       const skipAlpha = Math.min(1.0, (this.timer - 25) / 20) * alpha;
       ctx.font = '700 10px "Silkscreen", monospace, sans-serif';
-      if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
       ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(15, 23, 42, 0.55)';
       ctx.globalAlpha = skipAlpha;
       const isTouchOrMobile = typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0));

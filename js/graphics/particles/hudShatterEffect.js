@@ -324,7 +324,7 @@ function getTopMatchNameCharacters(arena) {
 
     if (measureCtx) {
       measureCtx.font = customNameFont;
-      if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '2px';
+      if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '0.5px';
     }
 
     let wTeam0 = 0;
@@ -341,7 +341,7 @@ function getTopMatchNameCharacters(arena) {
 
     if (measureCtx) {
       measureCtx.font = customVsFont;
-      if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '1.5px';
+      if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '0.5px';
     }
     const vsText = 'vs';
     const wVs = measureCtx ? measureCtx.measureText(vsText).width : (vsText.length * vsFontSize * 0.7);
@@ -429,19 +429,19 @@ function getTopMatchNameCharacters(arena) {
     let totalW = 0;
     if (measureCtx) {
       measureCtx.font = nameFont;
-      if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '2px';
+      if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '0.5px';
     }
     fighterData.forEach((fd, i) => {
       totalW += measureCtx ? measureCtx.measureText(fd.name).width : (fd.name.length * nameFontSize * 0.7);
       if (i < fighterData.length - 1) {
         if (measureCtx) {
           measureCtx.font = vsFont;
-          if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '1.5px';
+          if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '0.5px';
         }
         totalW += pad + (measureCtx ? measureCtx.measureText(vsText).width : (vsText.length * vsFontSize * 0.7)) + pad;
         if (measureCtx) {
           measureCtx.font = nameFont;
-          if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '2px';
+          if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '0.5px';
         }
       }
     });
@@ -484,19 +484,19 @@ function getTopMatchNameCharacters(arena) {
     };
 
     fighterData.forEach((fd, i) => {
-      extractFfaChars(fd.name, curX, nameFont, '2px', fd.color, nameFontSize);
+      extractFfaChars(fd.name, curX, nameFont, '0.5px', fd.color, nameFontSize);
       if (measureCtx) {
         measureCtx.font = nameFont;
-        if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '2px';
+        if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '0.5px';
       }
       curX += measureCtx ? measureCtx.measureText(fd.name).width : (fd.name.length * nameFontSize * 0.7);
 
       if (i < fighterData.length - 1) {
         curX += pad;
-        extractFfaChars(vsText, curX, vsFont, '1.5px', isDark ? '#94A3B8' : '#475569', vsFontSize);
+        extractFfaChars(vsText, curX, vsFont, '0.5px', isDark ? '#94A3B8' : '#475569', vsFontSize);
         if (measureCtx) {
           measureCtx.font = vsFont;
-          if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '1.5px';
+          if ('letterSpacing' in measureCtx) measureCtx.letterSpacing = '0.5px';
         }
         curX += (measureCtx ? measureCtx.measureText(vsText).width : (vsText.length * vsFontSize * 0.7)) + pad;
       }
