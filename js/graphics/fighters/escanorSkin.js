@@ -85,6 +85,8 @@ export function _drawEscanorHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Escanor-hair.png (500x500). Visible hair bounding box:
     // X: [112, 391] (width 280, horizontal center at 251.5)
@@ -99,9 +101,10 @@ export function _drawEscanorHair(ctx, r, facingLeft = false) {
     const drawX = -251.5 * scaleX + offX;
     const drawY = -r * 1.35 - 122 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
@@ -129,6 +132,8 @@ export function _drawEscanorMustache(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Escanor-mustache.png (1254x1254). Visible mustache bounding box:
     // X: [186, 1070] (width 885, horizontal center at 628)
@@ -143,9 +148,10 @@ export function _drawEscanorMustache(ctx, r, facingLeft = false) {
     const drawX = -628 * scaleX + offX;
     const drawY = -r * 0.04 - 492 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(mustacheImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(mustacheImg, drawX, drawY, drawW, drawH);

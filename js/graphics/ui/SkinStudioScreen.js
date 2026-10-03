@@ -36,6 +36,7 @@ import { drawDoppelgangerSkin, drawDoppelgangerPixelBody } from '../fighters/dop
 import { drawEmberSkin } from '../fighters/flamewardenSkin.js';
 import { drawEyeOfCthulhuSkin } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawNamelessDeitySkin, NAMELESS_DEITY_DEFAULT_CONFIGS, NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS } from '../fighters/namelessDeitySkin.js';
+import { drawAvatarOfEmptinessSkin, AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS } from '../fighters/avatarOfEmptinessSkin.js';
 
 
 
@@ -52,6 +53,7 @@ if (state.studioSkinModalOpen === undefined) state.studioSkinModalOpen = false;
 if (state.studioSkinModalPage === undefined) state.studioSkinModalPage = 0;
 if (state.studioSkinCategory === undefined) state.studioSkinCategory = 'ALL';
 if (state.studioSkinNamelessPart === undefined) state.studioSkinNamelessPart = 'overall';
+if (state.studioSkinAvatarPart === undefined) state.studioSkinAvatarPart = 'overall';
 
 export const NAMELESS_DEITY_PARTS = [
   { id: 'overall', label: '⭐ ALL', fullLabel: 'ALL / OVERALL', asset: 'Body + Antlers + Cicada + Censor + Vines + Flowers + Wings + Halo + Wheel + Limbs', desc: 'Overall model scale & shift' },
@@ -68,6 +70,15 @@ export const NAMELESS_DEITY_PARTS = [
   { id: 'arm', label: '💪 ARM', fullLabel: 'UPPER ARM', asset: 'Assets/model/NamelessDeity/Arm.png', desc: 'Upper arm length & shoulder shift' },
   { id: 'forearm', label: '🦾 FOREARM', fullLabel: 'FOREARM', asset: 'Assets/model/NamelessDeity/Forearm.png', desc: 'Forearm length, elbow & wrist alignment' },
   { id: 'hand', label: '✋ HAND', fullLabel: 'HAND', asset: 'Assets/model/NamelessDeity/Hand.png', desc: 'Hand size, wrist angle & offset' }
+];
+
+export const AVATAR_OF_EMPTINESS_PARTS = [
+  { id: 'overall', label: '⭐ ALL', fullLabel: 'ALL / OVERALL', asset: 'Body Circle + Left/Right Arms + Forearms', desc: 'Overall model scale & shift' },
+  { id: 'body', label: '🫀 BODY', shortLabel: 'BODY', fullLabel: 'VOID CORE BODY', asset: 'Procedural Void Core Circle & Aura', desc: 'Body scale, shift & event horizon' },
+  { id: 'arm_left', label: '💪 L-ARM', shortLabel: 'L-ARM', fullLabel: 'FRONT LEFT ARM', asset: 'Assets/model/Avatar/FrontArmLeft.png', desc: 'Left arm scale, shoulder shift & angle' },
+  { id: 'arm_right', label: '💪 R-ARM', shortLabel: 'R-ARM', fullLabel: 'FRONT RIGHT ARM', asset: 'Assets/model/Avatar/FrontArmRight.png', desc: 'Right arm scale, shoulder shift & angle' },
+  { id: 'forearm_left', label: '🦾 L-FORE', shortLabel: 'L-FORE', fullLabel: 'FRONT LEFT FOREARM', asset: 'Assets/model/Avatar/FrontForearmLeft.png', desc: 'Left forearm scale, elbow shift & angle' },
+  { id: 'forearm_right', label: '🦾 R-FORE', shortLabel: 'R-FORE', fullLabel: 'FRONT RIGHT FOREARM', asset: 'Assets/model/Avatar/FrontForearmRight.png', desc: 'Right forearm scale, elbow shift & angle' }
 ];
 
 const ZOOM_MIN = 0.6;
@@ -90,7 +101,7 @@ export const SKIN_STUDIO_CATEGORIES = [
   { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'eye_of_cthulhu'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu'].includes(f.key) }
 ];
 
 
@@ -601,6 +612,20 @@ export const SKIN_STUDIO_FIGHTERS = [
     forms: [
       { id: 'default', label: 'DIVINE FORM' }
     ]
+  },
+  {
+    key: 'avatar_of_emptiness',
+    label: 'AVATAR OF EMPTINESS',
+    category: 'boss',
+    asset: 'Avatar (ArmLeft/ArmRight/Forearms/Hands)',
+    assetDims: 'Paper Collage Multi-Limb Model',
+    baseW: 2.40,
+    baseH: 2.40,
+    baseCrownY: -1.20,
+    themeColor: '#9D4EDD',
+    forms: [
+      { id: 'default', label: 'STANDARD' }
+    ]
   }
 ];
 
@@ -623,20 +648,44 @@ const NAMELESS_KEY_MAP = {
   nameless_deity_hand: 'hand'
 };
 
+const AVATAR_KEY_MAP = {
+  avatar_of_emptiness: 'overall',
+  avatarofemptiness: 'overall',
+  avatar_of_emptiness_body: 'body',
+  avatarofemptiness_body: 'body',
+  avatar_of_emptiness_arm_left: 'arm_left',
+  avatarofemptiness_arm_left: 'arm_left',
+  avatar_of_emptiness_arm_right: 'arm_right',
+  avatarofemptiness_arm_right: 'arm_right',
+  avatar_of_emptiness_forearm_left: 'forearm_left',
+  avatarofemptiness_forearm_left: 'forearm_left',
+  avatar_of_emptiness_forearm_right: 'forearm_right',
+  avatarofemptiness_forearm_right: 'forearm_right'
+};
+
 function ensureFighterCustom(key) {
   if (!state.skinCustomizations) state.skinCustomizations = {};
   if (!state.skinCustomizations[key]) {
     const isSkin2 = (state.selectedNamelessDeitySkin === 'skin2');
     const configMap = isSkin2 ? NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS : NAMELESS_DEITY_DEFAULT_CONFIGS;
     const deityPart = NAMELESS_KEY_MAP[key];
-    const def = deityPart ? configMap[deityPart] : {
+    const avatarPart = AVATAR_KEY_MAP[key];
+
+    let def = {
       widthScale: 1.0,
       heightScale: 1.0,
       offsetX: 0,
       offsetY: 0,
       angleOffset: 0,
-      flipX: false
+      flipX: false,
+      flipY: false
     };
+
+    if (deityPart) {
+      def = configMap[deityPart] || def;
+    } else if (avatarPart) {
+      def = AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS[avatarPart] || def;
+    }
     state.skinCustomizations[key] = { ...def };
   }
   return state.skinCustomizations[key];
@@ -651,6 +700,8 @@ function generateJsCode(fDef, custom) {
   const offX = Math.round(custom.offsetX ?? 0);
   const offY = Math.round(custom.offsetY ?? 0);
   const rot = (custom.angleOffset ?? 0).toFixed(2);
+  const flipX = Boolean(custom.flipX);
+  const flipY = Boolean(custom.flipY);
 
   const targetW = (fDef.baseW * (custom.widthScale ?? 1.0)).toFixed(2);
   const targetH = (fDef.baseH * (custom.heightScale ?? 1.0)).toFixed(2);
@@ -825,6 +876,16 @@ function generateJsCode(fDef, custom) {
            `offsetX: ${Math.round(custom.offsetX ?? 0)},\n` +
            `offsetY: ${Math.round(custom.offsetY ?? 0)},\n` +
            `angleOffset: ${((custom.angleOffset ?? 0) * (180 / Math.PI)).toFixed(1)}° (${(custom.angleOffset ?? 0).toFixed(4)} rad)`;
+  } else if (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness') {
+    const part = state.studioSkinAvatarPart || 'overall';
+    const activeKey = (part !== 'overall') ? `avatar_of_emptiness_${part}` : 'avatar_of_emptiness';
+    return `// Calibrated Avatar of Emptiness Asset [${part.toUpperCase()}]\n` +
+           `// Storage Key: state.skinCustomizations.${activeKey}\n` +
+           `widthScale: ${(custom.widthScale ?? 1.0).toFixed(2)},\n` +
+           `heightScale: ${(custom.heightScale ?? 1.0).toFixed(2)},\n` +
+           `offsetX: ${Math.round(custom.offsetX ?? 0)},\n` +
+           `offsetY: ${Math.round(custom.offsetY ?? 0)},\n` +
+           `angleOffset: ${((custom.angleOffset ?? 0) * (180 / Math.PI)).toFixed(1)}° (${(custom.angleOffset ?? 0).toFixed(4)} rad)`;
   }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
@@ -861,9 +922,16 @@ export function drawSkinStudioScreen() {
   const isNamelessDeity = (fDef.key === 'nameless_deity');
   const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
   const activePartDef = isNamelessDeity ? (NAMELESS_DEITY_PARTS.find(p => p.id === activePartId) || NAMELESS_DEITY_PARTS[0]) : null;
+
+  const isAvatarOfEmptiness = (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness');
+  const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
+  const activeAvatarPartDef = isAvatarOfEmptiness ? (AVATAR_OF_EMPTINESS_PARTS.find(p => p.id === activeAvatarPartId) || AVATAR_OF_EMPTINESS_PARTS[0]) : null;
+
   const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
     ? `nameless_deity_${activePartId}`
-    : fDef.key;
+    : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
+      ? `avatar_of_emptiness_${activeAvatarPartId}`
+      : fDef.key;
   const custom = ensureFighterCustom(activeCustomKey);
 
   // ── Tier 1: Header Section ──
@@ -994,27 +1062,30 @@ export function drawSkinStudioScreen() {
   const isFacingLeft = state.studioSkinFacing === 'left';
   const aimAngle = isFacingLeft ? Math.PI : 0;
 
+  const dummyFighter = {
+    x: 0,
+    y: 0,
+    r: baseRadius,
+    radius: baseRadius,
+    gunAngle: aimAngle,
+    angle: aimAngle,
+    _isWinnerReveal: true, // Clean upright presentation
+    _isStudioDummy: true,
+    characterId: fDef.key,
+    type: fDef.key,
+    color: themeColor,
+    hideFrontHand: true,
+    hideBackHand: true,
+    isShikai: state.studioSkinForm === 'shikai',
+    isBankai: state.studioSkinForm === 'bankai' || state.studioSkinForm === 'mask',
+    isHybridModeActive: state.studioSkinForm === 'bomb',
+    isUnmasked: state.studioSkinForm === 'unmasked',
+    isMegumiForm: state.studioSkinForm === 'megumi',
+    skinVariant: (typeof state !== 'undefined' ? state.selectedNamelessDeitySkin : 'skin1') || 'skin1'
+  };
+
   // Render Base Body if toggled on
   if (state.studioSkinShowBody) {
-    const dummyFighter = {
-      x: 0,
-      y: 0,
-      r: baseRadius,
-      gunAngle: aimAngle,
-      angle: aimAngle,
-      _isWinnerReveal: true, // Clean upright presentation
-      characterId: fDef.key,
-      type: fDef.key,
-      color: themeColor,
-      hideFrontHand: true,
-      hideBackHand: true,
-      isShikai: state.studioSkinForm === 'shikai',
-      isBankai: state.studioSkinForm === 'bankai' || state.studioSkinForm === 'mask',
-      isHybridModeActive: state.studioSkinForm === 'bomb',
-      isUnmasked: state.studioSkinForm === 'unmasked',
-      isMegumiForm: state.studioSkinForm === 'megumi'
-    };
-
     try {
       if (fDef.key === 'ichigo') {
         const origMask = state.showHollowMask;
@@ -1106,6 +1177,9 @@ export function drawSkinStudioScreen() {
       } else if (fDef.key === 'nameless_deity') {
         dummyFighter.skinVariant = (typeof state !== 'undefined' ? state.selectedNamelessDeitySkin : 'skin1') || 'skin1';
         drawNamelessDeitySkin(ctx, dummyFighter);
+      } else if (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness') {
+        dummyFighter._isStudioDummy = true;
+        drawAvatarOfEmptinessSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -1151,6 +1225,9 @@ export function drawSkinStudioScreen() {
       _drawGunslingerHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'nameless_deity') {
       drawNamelessDeitySkin(ctx, dummyFighter);
+    } else if (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness') {
+      dummyFighter._isStudioDummy = true;
+      drawAvatarOfEmptinessSkin(ctx, dummyFighter);
     } else if (fDef.key === 'zeus') {
       _drawZeusHair(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
       _drawZeusCrown(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
@@ -1258,10 +1335,25 @@ export function drawSkinStudioScreen() {
 
   // Facing Toggle Button
   const facingLabel = `FACING: ${state.studioSkinFacing.toUpperCase()}`;
-  drawButton(facingLabel, topBarX + 45, topBarY + 10, () => {
+  drawButton(facingLabel, topBarX + 42, topBarY + 10, () => {
     state.studioSkinFacing = (state.studioSkinFacing === 'right') ? 'left' : 'right';
-  }, 90, 20, null, 3);
-  topBarX += 98;
+  }, 84, 20, null, 3);
+  topBarX += 88;
+
+  // Quick Flip X & Flip Y Buttons for the Active Asset
+  const flipXLabel = custom.flipX ? 'FLIP X: ↔ ON' : 'FLIP X: ↔';
+  drawButton(flipXLabel, topBarX + 40, topBarY + 10, () => {
+    custom.flipX = !custom.flipX;
+    saveSkinCustomizations();
+  }, 80, 20, custom.flipX ? '#10b981' : null, 3);
+  topBarX += 86;
+
+  const flipYLabel = custom.flipY ? 'FLIP Y: ↕ ON' : 'FLIP Y: ↕';
+  drawButton(flipYLabel, topBarX + 40, topBarY + 10, () => {
+    custom.flipY = !custom.flipY;
+    saveSkinCustomizations();
+  }, 80, 20, custom.flipY ? '#10b981' : null, 3);
+  topBarX += 86;
 
   // Form Selector Button (if fighter has multiple forms)
   if (fDef.key === 'eye_of_cthulhu') {
@@ -1368,6 +1460,52 @@ export function drawSkinStudioScreen() {
     });
   }
 
+  // ── Avatar of Emptiness Multi-Asset Part Selector Bar (Inside Viewport) ──
+  if (isAvatarOfEmptiness) {
+    const totalParts = AVATAR_OF_EMPTINESS_PARTS.length;
+    const maxCols = 7;
+    const partBtnH = 19;
+    const partGapX = 5;
+    const partGapY = 3;
+    const partStartX = viewportX + 10;
+    const availableW = viewportW - 20;
+    const partBtnW = Math.floor((availableW - (partGapX * (maxCols - 1))) / maxCols);
+    const startY = viewportY + 34;
+
+    AVATAR_OF_EMPTINESS_PARTS.forEach((part, idx) => {
+      const isPartSelected = (activeAvatarPartId === part.id);
+      const row = Math.floor(idx / maxCols);
+      const col = idx % maxCols;
+      const bx = partStartX + col * (partBtnW + partGapX);
+      const by = startY + row * (partBtnH + partGapY);
+
+      ctx.save();
+      if (isPartSelected) {
+        ctx.fillStyle = '#1A0B2E';
+        ctx.strokeStyle = '#00F5D4';
+        ctx.lineWidth = 1.8;
+      } else {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, bx, by, partBtnW, partBtnH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isPartSelected ? '#00F5D4' : '#94a3b8';
+      ctx.font = isPartSelected ? '900 9.5px "Rajdhani", sans-serif' : '700 9px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(part.label, bx + partBtnW / 2, by + partBtnH / 2);
+      ctx.restore();
+
+      _registerButton(bx, by, partBtnW, partBtnH, () => {
+        state.studioSkinAvatarPart = part.id;
+      });
+    });
+  }
+
   // ── Viewport Zoom Controls (Bottom of Viewport) ──
   const zoomY = viewportY + viewportH - 22;
   const zoomCenterX = heroX;
@@ -1444,7 +1582,7 @@ export function drawSkinStudioScreen() {
   const tabs = [
     { id: 'scale', label: '1. HAIR SCALE / SIZE', desc: 'Width & Height multipliers' },
     { id: 'position', label: '2. POSITION & SHIFT', desc: 'X/Y & Crown elevation offsets' },
-    { id: 'rotation', label: '3. ROTATION & ANGLE', desc: 'Tilt, sweep & orientation' },
+    { id: 'rotation', label: '3. ROTATION & FLIP', desc: 'Tilt, angle & horizontal/vertical flip' },
     { id: 'export', label: '4. LIVE CODE EXPORT', desc: 'Copy ready-to-paste JS code' }
   ];
 
@@ -1511,6 +1649,15 @@ export function drawSkinStudioScreen() {
     ctx.fillText(`ACTIVE ASSET: [ ${activePartDef.fullLabel} ]`, infoCardX + 8, infoCardY + 24);
     ctx.fillStyle = '#94a3b8';
     const displayPartAsset = activePartDef.asset.length > 22 ? activePartDef.asset.slice(0, 20) + '…' : activePartDef.asset;
+    ctx.fillText(`ASSET: ${displayPartAsset}`, infoCardX + 8, infoCardY + 40);
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(`TARGET: ${activeCustomKey}`, infoCardX + 8, infoCardY + 56);
+  } else if (isAvatarOfEmptiness && activeAvatarPartDef) {
+    ctx.fillText(`MODEL: ${fDef.label}`, infoCardX + 8, infoCardY + 8);
+    ctx.fillStyle = '#00F5D4';
+    ctx.fillText(`ACTIVE ASSET: [ ${activeAvatarPartDef.fullLabel} ]`, infoCardX + 8, infoCardY + 24);
+    ctx.fillStyle = '#94a3b8';
+    const displayPartAsset = activeAvatarPartDef.asset.length > 22 ? activeAvatarPartDef.asset.slice(0, 20) + '…' : activeAvatarPartDef.asset;
     ctx.fillText(`ASSET: ${displayPartAsset}`, infoCardX + 8, infoCardY + 40);
     ctx.fillStyle = '#64748b';
     ctx.fillText(`TARGET: ${activeCustomKey}`, infoCardX + 8, infoCardY + 56);
@@ -1850,19 +1997,70 @@ export function drawSkinStudioScreen() {
     }, 18, btnSize, null, 2);
     curY += 46;
 
-    // Reset Angle
-    drawButton('RESET ANGLE (0°)', rowX + rowW / 2, curY + 12, () => {
+    // ── FLIP HORIZONTAL (X) ROW ──
+    ctx.save();
+    ctx.fillStyle = custom.flipX ? 'rgba(16, 185, 129, 0.15)' : 'rgba(18, 22, 32, 0.92)';
+    ctx.strokeStyle = custom.flipX ? '#10b981' : 'rgba(255, 255, 255, 0.10)';
+    ctx.lineWidth = custom.flipX ? 1.4 : 1;
+    drawChamferedRect(ctx, rowX, curY, rowW, rowH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = custom.flipX ? '#34d399' : '#ffffff';
+    ctx.font = '900 10.5px "Rajdhani", sans-serif';
+    ctx.fillText(`FLIP X (HORIZONTAL): ${custom.flipX ? 'ON' : 'OFF'}`, rowX + 8, curY + rowH / 2);
+
+    drawButton(custom.flipX ? '✓ FLIP X: ON' : 'FLIP X: OFF', rowX + rowW - 48, curY + rowH / 2, () => {
+      custom.flipX = !custom.flipX;
+      saveSkinCustomizations();
+    }, 84, btnSize + 2, custom.flipX ? '#10b981' : null, 2);
+    curY += 46;
+
+    // ── FLIP VERTICAL (Y) ROW ──
+    ctx.save();
+    ctx.fillStyle = custom.flipY ? 'rgba(16, 185, 129, 0.15)' : 'rgba(18, 22, 32, 0.92)';
+    ctx.strokeStyle = custom.flipY ? '#10b981' : 'rgba(255, 255, 255, 0.10)';
+    ctx.lineWidth = custom.flipY ? 1.4 : 1;
+    drawChamferedRect(ctx, rowX, curY, rowW, rowH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = custom.flipY ? '#34d399' : '#ffffff';
+    ctx.font = '900 10.5px "Rajdhani", sans-serif';
+    ctx.fillText(`FLIP Y (VERTICAL): ${custom.flipY ? 'ON' : 'OFF'}`, rowX + 8, curY + rowH / 2);
+
+    drawButton(custom.flipY ? '✓ FLIP Y: ON' : 'FLIP Y: OFF', rowX + rowW - 48, curY + rowH / 2, () => {
+      custom.flipY = !custom.flipY;
+      saveSkinCustomizations();
+    }, 84, btnSize + 2, custom.flipY ? '#10b981' : null, 2);
+    curY += 46;
+
+    // Reset Angle & Flip Buttons
+    const halfW = Math.floor((rowW - 6) / 2);
+    drawButton('RESET ANGLE (0°)', rowX + halfW / 2, curY + 12, () => {
       custom.angleOffset = 0;
       saveSkinCustomizations();
-    }, rowW, 22, null, 3);
+    }, halfW, 22, null, 3);
+
+    drawButton('RESET FLIP (OFF)', rowX + halfW + 6 + halfW / 2, curY + 12, () => {
+      custom.flipX = false;
+      custom.flipY = false;
+      saveSkinCustomizations();
+    }, halfW, 22, null, 3);
     curY += 38;
 
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#64748b';
     ctx.font = '900 9px "Rajdhani", sans-serif';
-    ctx.fillText('USE STEPPERS TO FINE-TUNE SWEEP ANGLE', rowX, curY + 4);
-    ctx.fillText('TO PERFECTLY MATCH HEAD PROFILE', rowX, curY + 18);
+    ctx.fillText('TIP: FLIP X/Y TO MIRROR ASSETS ACROSS THEIR AXIS', rowX, curY + 4);
+    ctx.fillText('CLICK BUTTONS TO INSTANTLY TOGGLE LIVE PREVIEW', rowX, curY + 18);
 
   } else if (state.studioSkinDetailTab === 'export') {
     // ── LIVE JS CODE EXPORT ──
@@ -1934,6 +2132,34 @@ export function drawSkinStudioScreen() {
           });
         }
       }, halfBtnW, 22, '#FFE259', 3);
+    } else if (isAvatarOfEmptiness) {
+      const allAvatarParts = {
+        overall: state.skinCustomizations?.avatar_of_emptiness || {},
+        body: state.skinCustomizations?.avatar_of_emptiness_body || {},
+        arm_left: state.skinCustomizations?.avatar_of_emptiness_arm_left || {},
+        arm_right: state.skinCustomizations?.avatar_of_emptiness_arm_right || {},
+        forearm_left: state.skinCustomizations?.avatar_of_emptiness_forearm_left || {},
+        forearm_right: state.skinCustomizations?.avatar_of_emptiness_forearm_right || {}
+      };
+      const allPartsJson = JSON.stringify(allAvatarParts, null, 2);
+
+      drawButton(`📋 COPY ${activeAvatarPartDef?.shortLabel || 'PART'}`, rowX + halfBtnW / 2, curY + 10, () => {
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(jsCode).then(() => {
+            _copyToastText = `✓ COPIED ${activeAvatarPartDef?.shortLabel || 'PART'}!`;
+            _copyToastTimer = 90;
+          });
+        }
+      }, halfBtnW, 22, null, 3);
+
+      drawButton('📋 ALL PARTS JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(allPartsJson).then(() => {
+            _copyToastText = '✓ COPIED ALL AVATAR PARTS JSON!';
+            _copyToastTimer = 90;
+          });
+        }
+      }, halfBtnW, 22, '#00F5D4', 3);
     } else {
       drawButton('📋 COPY JS', rowX + halfBtnW / 2, curY + 10, () => {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
@@ -1990,25 +2216,35 @@ export function drawSkinStudioScreen() {
   const bottomY = canvas.height - 30;
 
   drawButton('RESET DEFAULTS', 75, bottomY, () => {
-    const targetDesc = isNamelessDeity ? `Nameless Deity [${activePartDef?.fullLabel || 'Overall'}]` : fDef.label;
+    const targetDesc = isNamelessDeity
+      ? `Nameless Deity [${activePartDef?.fullLabel || 'Overall'}]`
+      : (isAvatarOfEmptiness ? `Avatar of Emptiness [${activeAvatarPartDef?.fullLabel || 'Overall'}]` : fDef.label);
     if (confirm(`Reset ${targetDesc} customizations to code defaults?`)) {
-      const deityPart = isNamelessDeity ? NAMELESS_KEY_MAP[activeCustomKey] : null;
-      const def = deityPart ? NAMELESS_DEITY_DEFAULT_CONFIGS[deityPart] : {
+      let def = {
         widthScale: 1.0,
         heightScale: 1.0,
         offsetX: 0,
         offsetY: 0,
         angleOffset: 0,
-        flipX: false
+        flipX: false,
+        flipY: false
       };
+      if (isNamelessDeity) {
+        const deityPart = NAMELESS_KEY_MAP[activeCustomKey];
+        if (deityPart) def = NAMELESS_DEITY_DEFAULT_CONFIGS[deityPart] || def;
+      } else if (isAvatarOfEmptiness) {
+        const avatarPart = AVATAR_KEY_MAP[activeCustomKey];
+        if (avatarPart) def = AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS[avatarPart] || def;
+      }
       custom.widthScale = def.widthScale;
       custom.heightScale = def.heightScale;
       custom.offsetX = def.offsetX;
       custom.offsetY = def.offsetY;
       custom.angleOffset = def.angleOffset;
       custom.flipX = def.flipX ?? false;
+      custom.flipY = def.flipY ?? false;
       saveSkinCustomizations();
-      _copyToastText = `✓ RESET ${isNamelessDeity ? activePartDef?.fullLabel : 'DEFAULTS'}!`;
+      _copyToastText = `✓ RESET ${isNamelessDeity ? activePartDef?.fullLabel : (isAvatarOfEmptiness ? activeAvatarPartDef?.fullLabel : 'DEFAULTS')}!`;
       _copyToastTimer = 75;
     }
   }, 105, 26, null, 4);
@@ -2019,7 +2255,7 @@ export function drawSkinStudioScreen() {
     _copyToastTimer = 90;
   }, 110, 26, '#10b981', 4);
 
-  drawButton(isNamelessDeity ? 'COPY ALL JSON' : 'COPY CODE', 315, bottomY, () => {
+  drawButton((isNamelessDeity || isAvatarOfEmptiness) ? 'COPY ALL JSON' : 'COPY CODE', 315, bottomY, () => {
     let code = '';
     if (isNamelessDeity) {
       const allDeityParts = {
@@ -2037,12 +2273,22 @@ export function drawSkinStudioScreen() {
         hand: state.skinCustomizations?.nameless_deity_hand || {}
       };
       code = JSON.stringify(allDeityParts, null, 2);
+    } else if (isAvatarOfEmptiness) {
+      const allAvatarParts = {
+        overall: state.skinCustomizations?.avatar_of_emptiness || {},
+        body: state.skinCustomizations?.avatar_of_emptiness_body || {},
+        arm_left: state.skinCustomizations?.avatar_of_emptiness_arm_left || {},
+        arm_right: state.skinCustomizations?.avatar_of_emptiness_arm_right || {},
+        forearm_left: state.skinCustomizations?.avatar_of_emptiness_forearm_left || {},
+        forearm_right: state.skinCustomizations?.avatar_of_emptiness_forearm_right || {}
+      };
+      code = JSON.stringify(allAvatarParts, null, 2);
     } else {
       code = generateJsCode(fDef, custom);
     }
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       navigator.clipboard.writeText(code).then(() => {
-        _copyToastText = isNamelessDeity ? '✓ COPIED ALL 12 PARTS JSON!' : '✓ COPIED JS CODE!';
+        _copyToastText = isNamelessDeity ? '✓ COPIED ALL 12 PARTS JSON!' : (isAvatarOfEmptiness ? '✓ COPIED ALL AVATAR PARTS JSON!' : '✓ COPIED JS CODE!');
         _copyToastTimer = 90;
       });
     }
@@ -2250,6 +2496,9 @@ export function drawSkinStudioScreen() {
         if (f.key === 'nameless_deity' && !state.studioSkinNamelessPart) {
           state.studioSkinNamelessPart = 'overall';
         }
+        if ((f.key === 'avatar_of_emptiness' || f.key === 'avatarofemptiness') && !state.studioSkinAvatarPart) {
+          state.studioSkinAvatarPart = 'overall';
+        }
         state.studioSkinModalOpen = false;
         isDraggingHairCenter = false;
         isDraggingHairScale = false;
@@ -2385,16 +2634,20 @@ if (typeof window !== 'undefined') {
       const fDef = SKIN_STUDIO_FIGHTERS.find(f => f.key === activeKey) || SKIN_STUDIO_FIGHTERS[0];
       const isNamelessDeity = (fDef.key === 'nameless_deity');
       const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
+      const isAvatarOfEmptiness = (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness');
+      const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
-        : fDef.key;
+        : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
+          ? `avatar_of_emptiness_${activeAvatarPartId}`
+          : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       // Local hero coordinate space
       const localX = (mx - heroX) / currentScale;
       const localY = (my - heroY) / currentScale;
 
-      const baseCrownY = (isNamelessDeity && activePartId !== 'overall')
+      const baseCrownY = ((isNamelessDeity && activePartId !== 'overall') || (isAvatarOfEmptiness && activeAvatarPartId !== 'overall'))
         ? 0
         : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
       const handleCenterX = custom.offsetX;
@@ -2464,14 +2717,18 @@ if (typeof window !== 'undefined') {
       const fDef = SKIN_STUDIO_FIGHTERS.find(f => f.key === activeKey) || SKIN_STUDIO_FIGHTERS[0];
       const isNamelessDeity = (fDef.key === 'nameless_deity');
       const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
+      const isAvatarOfEmptiness = (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness');
+      const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
-        : fDef.key;
+        : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
+          ? `avatar_of_emptiness_${activeAvatarPartId}`
+          : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       const localX = (mx - heroX) / currentScale;
       const localY = (my - heroY) / currentScale;
-      const baseCrownY = (isNamelessDeity && activePartId !== 'overall')
+      const baseCrownY = ((isNamelessDeity && activePartId !== 'overall') || (isAvatarOfEmptiness && activeAvatarPartId !== 'overall'))
         ? 0
         : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
 

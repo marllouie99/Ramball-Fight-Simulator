@@ -334,6 +334,8 @@ export function _drawGojoHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Gojo-hair.png (1254x1254). True visible hair bounding box:
     // X: [136, 1103] (width 968, horizontal center at 620)
@@ -348,9 +350,10 @@ export function _drawGojoHair(ctx, r, facingLeft = false) {
     const drawX = -620 * scaleX + offX;
     const drawY = -r * 1.42 - 203 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);

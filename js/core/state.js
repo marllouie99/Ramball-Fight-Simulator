@@ -445,7 +445,13 @@ export const state = {
     nameless_deity_wheel: { widthScale: 0.84, heightScale: 0.56, offsetX: 0, offsetY: -34, angleOffset: 0, flipX: false },
     nameless_deity_arm: { widthScale: 1.0, heightScale: 1.0, offsetX: 13, offsetY: 6, angleOffset: 0, flipX: false },
     nameless_deity_forearm: { widthScale: 0.82, heightScale: 1.86, offsetX: 0, offsetY: -15, angleOffset: 1.1868238913561435, flipX: false },
-    nameless_deity_hand: { widthScale: 0.94, heightScale: 1.0, offsetX: 7, offsetY: -11, angleOffset: 0.05235987755982989, flipX: false }
+    nameless_deity_hand: { widthScale: 0.94, heightScale: 1.0, offsetX: 7, offsetY: -11, angleOffset: 0.05235987755982989, flipX: false },
+    avatar_of_emptiness: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    avatar_of_emptiness_body: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    avatar_of_emptiness_arm_left: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    avatar_of_emptiness_arm_right: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    avatar_of_emptiness_forearm_left: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
+    avatar_of_emptiness_forearm_right: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false }
   },
   selectedNamelessDeitySkin: (typeof localStorage !== 'undefined' && localStorage.getItem('selectedNamelessDeitySkin')) || 'skin1',
   selectedIchigoSkin: (typeof localStorage !== 'undefined' && localStorage.getItem('selectedIchigoSkin')) || 'shikai',

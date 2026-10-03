@@ -183,5 +183,18 @@ export const AUDIO_CONFIG = {
   'nameless_big_supernova': 'Assets/Sound Effects/NamelessDeity/BigSupernova.ogg',
   'nameless_moment_of_creation': 'Assets/Sound Effects/NamelessDeity/MomentOfCreation.ogg',
   'nameless_chuckle': 'Assets/Sound Effects/NamelessDeity/Chuckle.ogg',
-  'nameless_wing_flap': 'Assets/Sound Effects/NamelessDeity/WingFlap2.ogg'
+  'nameless_wing_flap': 'Assets/Sound Effects/NamelessDeity/WingFlap2.ogg',
+
+  // Avatar of Emptiness (Terraria: Wrath of the Gods)
+  'avatar_rift_shoot': 'Assets/Sound Effects/Avatar/RiftShoot1.ogg',
+  'avatar_frost_column_burst': 'Assets/Sound Effects/Avatar/FrostColumnBurst.ogg',
+  'avatar_frost_column_charge': 'Assets/Sound Effects/Avatar/FrostColumnChargeUp.ogg',
+  'avatar_reality_impact': 'Assets/Sound Effects/Avatar/RealityImpact.ogg',
+  'avatar_portal_hand_reach': 'Assets/Sound Effects/Avatar/PortalHandReach1.ogg',
+  'avatar_portal_pierce': 'Assets/Sound Effects/Avatar/PortalPierce1.ogg',
+  'avatar_annihilation_charge': 'Assets/Sound Effects/Avatar/UniversalAnnihilationCharge.ogg',
+  'avatar_annihilation_blast': 'Assets/Sound Effects/Avatar/UniversalAnnihilationBlast.ogg',
+  'avatar_annihilation_loop': 'Assets/Sound Effects/Avatar/UniversalAnnihilationLoop.ogg',
+  'avatar_reality_shatter': 'Assets/Sound Effects/Avatar/RealityShatter1.ogg',
+  'avatar_hurt': 'Assets/Sound Effects/Avatar/AvatarHurt1.ogg'
 };

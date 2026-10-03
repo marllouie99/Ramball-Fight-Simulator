@@ -41,6 +41,7 @@ import { MeguminFighter } from '../fighters/MeguminFighter.js';
 import { CrazyDaveFighter } from '../fighters/CrazyDaveFighter.js';
 import { PekkaFighter } from '../fighters/PekkaFighter.js';
 import { NamelessDeityFighter } from '../fighters/NamelessDeityFighter.js';
+import { AvatarOfEmptinessFighter } from '../fighters/AvatarOfEmptinessFighter.js';
 import { DraedonFighter } from '../fighters/DraedonFighter.js';
 import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 import { CJFighter } from '../fighters/CJFighter.js';
@@ -114,6 +115,9 @@ export const FIGHTER_CLASS_MAP = {
   'namelessdeity': NamelessDeityFighter,
   'nameless_deity': NamelessDeityFighter,
   'nameless': NamelessDeityFighter,
+  'avatarofemptiness': AvatarOfEmptinessFighter,
+  'avatar_of_emptiness': AvatarOfEmptinessFighter,
+  'avatar': AvatarOfEmptinessFighter,
   'draedon': DraedonFighter,
   'exomech': DraedonFighter,
   'exo_mech': DraedonFighter,
@@ -201,6 +205,14 @@ function wrapFighterDraw(FighterClass) {
       fighter.type === 'nameless_deity' ||
       fighter.type === 'nameless'
     );
+    const isAvatarOfEmptiness = Boolean(
+      fighter.characterId === 'avatarofemptiness' ||
+      fighter.characterId === 'avatar_of_emptiness' ||
+      fighter.characterId === 'avatar' ||
+      fighter.type === 'avatarofemptiness' ||
+      fighter.type === 'avatar_of_emptiness' ||
+      fighter.type === 'avatar'
+    );
     const shouldHideHands = Boolean(
       (typeof state !== 'undefined' && state.showSkinOnly) ||
       fighter.hideHands ||
@@ -208,7 +220,8 @@ function wrapFighterDraw(FighterClass) {
       fighter.hasCustomHands ||
       fighter.characterId === 'zeus' ||
       fighter.type === 'zeus' ||
-      isNamelessDeity
+      isNamelessDeity ||
+      isAvatarOfEmptiness
     );
 
     const originalArc = ctx.arc;

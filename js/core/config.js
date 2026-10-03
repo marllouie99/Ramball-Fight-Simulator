@@ -21,6 +21,7 @@ import { crazyDaveConfig } from '../configs/characters/crazyDaveConfig.js';
 import { pekkaConfig } from '../configs/characters/pekkaConfig.js';
 import { sansConfig } from '../configs/characters/sansConfig.js';
 import { namelessDeityConfig } from '../configs/characters/namelessDeityConfig.js';
+import { avatarOfEmptinessConfig } from '../configs/characters/avatarOfEmptinessConfig.js';
 import { draedonConfig } from '../configs/characters/draedonConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
@@ -70,6 +71,9 @@ export const CONFIG = {
   namelessdeity: namelessDeityConfig,
   namelessDeity: namelessDeityConfig,
   nameless_deity: namelessDeityConfig,
+  avatarofemptiness: avatarOfEmptinessConfig,
+  avatarOfEmptiness: avatarOfEmptinessConfig,
+  avatar_of_emptiness: avatarOfEmptinessConfig,
   draedon: draedonConfig,
   gojo: gojoConfig,
   sukuna: sukunaConfig,
@@ -1826,6 +1830,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: sansConfig.projectileSpeedMultiplier || 1.0,
     ability: sansConfig.ability || 'Gaster Blasters, Bone Zone & Blue Soul Gravity ("Bad Time")',
     desc: sansConfig.desc || 'The laid-back skeleton judge from Undertale. Dodges incoming attacks with instant teleportation afterimages. Attacks with rapid bone barrages, summons heavy Gaster Blaster laser cannons, applies Karmic Retribution (KR) damage over time, and controls battlefield gravity with Blue Soul telekinesis slams.',
+  },
+  {
+    id: 55,
+    name: 'AVATAR OF EMPTINESS',
+    category: 'Gaming',
+    color: avatarOfEmptinessConfig.color || '#9D4EDD',
+    themeColor: avatarOfEmptinessConfig.themeColor || '#9D4EDD',
+    secondaryColor: avatarOfEmptinessConfig.secondaryColor || '#00F5D4',
+    startX: 300,
+    startY: 250,
+    startVx: 1.0,
+    startVy: 0.9,
+    radius: avatarOfEmptinessConfig.radius || avatarOfEmptinessConfig.r || 29,
+    aimbot: false,
+    spinRate: 0,
+    type: 'avatarofemptiness',
+    hp: avatarOfEmptinessConfig.hp || 460,
+    damage: avatarOfEmptinessConfig.damage || 17,
+    cooldown: avatarOfEmptinessConfig.cooldown || 34,
+    moveSpeed: avatarOfEmptinessConfig.moveSpeed || avatarOfEmptinessConfig.speed || 4.7,
+    projectileSpeedMultiplier: avatarOfEmptinessConfig.projectileSpeedMultiplier || 1.0,
+    ability: avatarOfEmptinessConfig.ability || 'Universal Annihilation & Three Universes',
+    desc: avatarOfEmptinessConfig.desc || 'The incomprehensible sovereign of the Dark, Cryonic, and Visceral Universes from Terraria: Wrath of the Gods. Fires homing Antimatter Void Blasts, triggers Cryonic Absolute Zero frost outbursts, summons Visceral Blood Torrents, strikes with Dark Portal Arms, and uncages the reality-shattering "Universal Annihilation" cosmic death beam.',
   }
 ];
 

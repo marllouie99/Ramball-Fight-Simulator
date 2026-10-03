@@ -69,6 +69,8 @@ export function _drawEngineerHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Engineer-Hair.png (1280x1229). Visible hard hat bounding box:
     // X: [120, 1159] (width 1039, horizontal center at 639.5)
@@ -83,9 +85,10 @@ export function _drawEngineerHair(ctx, r, facingLeft = false) {
     const drawX = -639.5 * scaleX + offX;
     const drawY = -r * 1.15 - 234 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);

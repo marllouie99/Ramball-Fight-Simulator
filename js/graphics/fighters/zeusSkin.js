@@ -86,6 +86,8 @@ export function _drawZeusHair(ctx, r, isStormActive = false, facingLeft = false)
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Zeus-hair.png (1254x1254). True visible hair bounding box:
     // X: [41, 1235] (width 1195, horizontal center at 638)
@@ -99,9 +101,10 @@ export function _drawZeusHair(ctx, r, isStormActive = false, facingLeft = false)
     const drawX = -638 * scaleX + offX;
     const drawY = -r * 1.30 - 31 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
@@ -131,6 +134,8 @@ export function _drawZeusCrown(ctx, r, isStormActive = false, facingLeft = false
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Zeus-crown.png (1627x967). True visible crown bounding box:
     // X: [0, 1587] (width 1588, horizontal center at 793.5)
@@ -145,9 +150,10 @@ export function _drawZeusCrown(ctx, r, isStormActive = false, facingLeft = false
     const drawX = -793.5 * scaleX + offX;
     const drawY = -r * 1.05 - 62 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(crownImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(crownImg, drawX, drawY, drawW, drawH);

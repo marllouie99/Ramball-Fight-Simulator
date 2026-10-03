@@ -422,6 +422,13 @@ export const BASIC_ATTACK_SOUNDS = {
     src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
     volume: 0.8,
     delay: 0,
+  },
+
+  // ── Avatar of Emptiness (ID 55) ──────────
+  55: {
+    src: 'Assets/Sound Effects/Avatar/RiftShoot1.ogg',
+    volume: 0.85,
+    delay: 0,
   }
 };
 
@@ -1147,6 +1154,21 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   },
   'nameless': {
     src: 'Assets/Sound Effects/NamelessDeity/SunBeamShoot.ogg',
+    volume: 0.85,
+    delay: 0,
+  },
+  'avatarofemptiness': {
+    src: 'Assets/Sound Effects/Avatar/RiftShoot1.ogg',
+    volume: 0.85,
+    delay: 0,
+  },
+  'avatar_of_emptiness': {
+    src: 'Assets/Sound Effects/Avatar/RiftShoot1.ogg',
+    volume: 0.85,
+    delay: 0,
+  },
+  'avatar': {
+    src: 'Assets/Sound Effects/Avatar/RiftShoot1.ogg',
     volume: 0.85,
     delay: 0,
   },

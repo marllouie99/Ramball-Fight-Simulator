@@ -154,6 +154,60 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
+  // ─────────────────────────────────────────────
+  // AVATAR OF EMPTINESS (Terraria: Wrath of the Gods)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'avatarofemptiness' || f.characterId === 'avatar_of_emptiness' || f.type === 'avatarofemptiness' || f.type === 'avatar_of_emptiness' || f.name === 'Avatar of Emptiness') {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.avatarofemptiness) ? CONFIG.avatarofemptiness : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#9D4EDD';
+    const skills = [];
+
+    // 1. Cryonic Zero
+    if (isSkillEnabled(cfg.enableCryonicZero, true)) {
+      const cryoMax = cfg.cryonicCooldown || 360;
+      const cryoTimer = f.cryonicCooldown !== undefined ? f.cryonicCooldown : 0;
+      const cryoPct = Math.max(0, Math.min(100, (1 - (cryoTimer / cryoMax)) * 100));
+      skills.push({ id: 'cryonic', pct: cryoPct, ready: cryoPct >= 99 && cryoTimer <= 0, color: '#00F5D4', label: 'CRYONIC ZERO' });
+    }
+
+    // 2. Visceral Torrent
+    if (isSkillEnabled(cfg.enableVisceralTorrent, true)) {
+      const viscMax = cfg.visceralCooldown || 390;
+      const viscTimer = f.visceralCooldown !== undefined ? f.visceralCooldown : 0;
+      const viscPct = Math.max(0, Math.min(100, (1 - (viscTimer / viscMax)) * 100));
+      skills.push({ id: 'visceral', pct: viscPct, ready: viscPct >= 99 && viscTimer <= 0, color: '#FF0055', label: 'VISCERAL TORRENT' });
+    }
+
+    // 3. Dark Portal Strikes
+    if (isSkillEnabled(cfg.enablePortalStrikes, true)) {
+      const portMax = cfg.portalCooldown || 480;
+      const portTimer = f.portalCooldown !== undefined ? f.portalCooldown : 0;
+      const portPct = Math.max(0, Math.min(100, (1 - (portTimer / portMax)) * 100));
+      skills.push({ id: 'portal', pct: portPct, ready: portPct >= 99 && portTimer <= 0, color: themeColor, label: 'PORTAL STRIKES' });
+    }
+
+    // 4. Universal Annihilation (Ultimate)
+    if (isSkillEnabled(cfg.enableUniversalAnnihilation, true)) {
+      const annMax = cfg.annihilationCooldown || 880;
+      const annTimer = f.annihilationCooldown !== undefined ? f.annihilationCooldown : 0;
+      let annPct = 0;
+      let annReady = false;
+
+      if ((f.annihilationWindupTimer || 0) > 0) {
+        annPct = Math.max(0, Math.min(100, (1 - (f.annihilationWindupTimer / (f.annihilationWindupMax || 50))) * 100));
+        annReady = true;
+      } else if ((f.annihilationFireTimer || 0) > 0) {
+        annPct = 100;
+        annReady = true;
+      } else {
+        annPct = Math.max(0, Math.min(100, (1 - (annTimer / annMax)) * 100));
+        annReady = (annPct >= 99 && annTimer <= 0);
+      }
+      skills.push({ id: 'annihilation', pct: annPct, ready: annReady, color: '#00F5D4', label: 'UNIVERSAL ANNIHILATION' });
+    }
+
+    return skills;
+  }
 
   // ─────────────────────────────────────────────
   // GOJO SATORU (Limitless & Six Eyes)
@@ -2344,7 +2398,10 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     crazydave: ['lawnmower', 'lawn_mower', 'LAWN MOWER', 'cherrybomb', 'cherry_bomb', 'CHERRY BOMB'],
     namelessdeity: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
     nameless_deity: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
-    nameless: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER']
+    nameless: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
+    avatarofemptiness: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
+    avatar_of_emptiness: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
+    avatar: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES']
   };
 
   const keys = signatureMap[fId];

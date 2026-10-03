@@ -68,6 +68,8 @@ export function _drawRezeHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Reze-hair.png (500x500)
     // Visible bounding box:
@@ -83,7 +85,7 @@ export function _drawRezeHair(ctx, r, facingLeft = false) {
     const drawY = -r * 1.20 - 80 * scaleY + offY; // Moved hair slightly down towards the bottom
 
     // Horizontally flip hair so the side bun and bangs sweep naturally
-    ctx.scale(-1, 1);
+    ctx.scale(-1 * flipX, 1 * flipY);
     if (rot !== 0) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
       ctx.rotate(rot);

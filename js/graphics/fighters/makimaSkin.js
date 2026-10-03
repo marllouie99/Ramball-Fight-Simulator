@@ -67,6 +67,8 @@ export function _drawMakimaHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Makima-hair.png (522x478).
     // True visible hair bounding box:
@@ -81,9 +83,10 @@ export function _drawMakimaHair(ctx, r, facingLeft = false) {
     const drawX = -249.5 * scaleX + offX;
     const drawY = -r * 1.28 - 43 * scaleY + offY; // Rounded natural crown curve
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);

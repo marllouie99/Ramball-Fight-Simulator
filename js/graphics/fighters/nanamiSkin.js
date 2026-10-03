@@ -56,6 +56,8 @@ export function _drawNanamiHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Nanami-hair.png (1345x1170). True visible hair bounding box:
     // X: [73, 1324] (width 1252, horizontal center at 698.5)
@@ -70,9 +72,10 @@ export function _drawNanamiHair(ctx, r, facingLeft = false) {
     const drawX = -698.5 * scaleX + offX;
     const drawY = -r * 1.15 - 250 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);

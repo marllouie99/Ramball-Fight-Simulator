@@ -63,6 +63,8 @@ export function _drawCrazyDaveHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // crazydave-hair.png (1536x1024). Main Pan Dome Bounding Box:
     // X: [184, 1038] (width 855, horizontal center of pan dome at 611)
@@ -77,9 +79,10 @@ export function _drawCrazyDaveHair(ctx, r, facingLeft = false) {
     const drawX = -611 * scaleX + offX;
     const drawY = -r * 1.15 - 301 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);

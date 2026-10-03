@@ -962,6 +962,45 @@ export const SKILL_SOUNDS = {
       volume: 0.65,
       delay: 0
     }
+  },
+
+  // ── Avatar of Emptiness ─────────────────────
+  avatarofemptiness: {
+    annihilation_charge: {
+      src: 'Assets/Sound Effects/Avatar/UniversalAnnihilationCharge.ogg',
+      volume: 0.9,
+      delay: 0
+    },
+    annihilation_blast: {
+      src: 'Assets/Sound Effects/Avatar/UniversalAnnihilationBlast.ogg',
+      volume: 1.0,
+      delay: 0
+    },
+    annihilation_loop: {
+      src: 'Assets/Sound Effects/Avatar/UniversalAnnihilationLoop.ogg',
+      volume: 0.85,
+      delay: 0
+    },
+    reality_shatter: {
+      src: 'Assets/Sound Effects/Avatar/RealityShatter1.ogg',
+      volume: 0.95,
+      delay: 0
+    },
+    frost_column: {
+      src: 'Assets/Sound Effects/Avatar/FrostColumnBurst.ogg',
+      volume: 0.8,
+      delay: 0
+    },
+    visceral_torrent: {
+      src: 'Assets/Sound Effects/Avatar/RealityImpact.ogg',
+      volume: 0.85,
+      delay: 0
+    },
+    portal_strike: {
+      src: 'Assets/Sound Effects/Avatar/PortalPierce1.ogg',
+      volume: 0.8,
+      delay: 0
+    }
   }
 };
 
@@ -1008,6 +1047,8 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS['reze'];
     } else if (strKey.includes('nameless')) {
       fighterConfig = SKILL_SOUNDS['namelessdeity'];
+    } else if (strKey.includes('avatar')) {
+      fighterConfig = SKILL_SOUNDS['avatarofemptiness'];
     }
   }
 
@@ -1078,6 +1119,8 @@ export function getFighterSkillSoundPaths(idOrType) {
       fighterConfig = SKILL_SOUNDS['reze'];
     } else if (strKey.includes('nameless')) {
       fighterConfig = SKILL_SOUNDS['namelessdeity'];
+    } else if (strKey.includes('avatar')) {
+      fighterConfig = SKILL_SOUNDS['avatarofemptiness'];
     }
   }
 

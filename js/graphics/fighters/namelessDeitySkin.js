@@ -415,10 +415,13 @@ function _drawAtPivot(ctx, image, x, y, scaleX, scaleY, pivotX = 0.5, pivotY = 0
 /**
  * Draws a limb segment with precise local pixel pivot and optional vertical flip.
  */
-function _drawLimbSegment(ctx, image, posX, posY, scaleX, scaleY, rotation, pivotPixelX, pivotPixelY, flipY = false) {
+function _drawLimbSegment(ctx, image, posX, posY, scaleX, scaleY, rotation, pivotPixelX, pivotPixelY, flipY = false, flipX = false) {
   ctx.save();
   ctx.translate(posX, posY);
   ctx.rotate(rotation);
+  if (flipX) {
+    ctx.scale(-1, 1);
+  }
   if (flipY) {
     ctx.scale(1, -1);
   }
@@ -505,37 +508,37 @@ function _evaluateWingSquish(t) {
 }
 
 export const NAMELESS_DEITY_DEFAULT_CONFIGS = {
-  overall: { widthScale: 0.76, heightScale: 1.03, offsetX: 1, offsetY: -4, angleOffset: 0, flipX: false },
-  body: { widthScale: 1.0, heightScale: 0.86, offsetX: 0, offsetY: 1, angleOffset: 0, flipX: false },
-  antlers: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, gap: 0, angleOffset: 0, flipX: false },
-  antler_vines: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-  cicada: { widthScale: 1.0, heightScale: 0.7, offsetX: 0, offsetY: -6, angleOffset: 0, flipX: false },
-  censor: { widthScale: 1.02, heightScale: 0.72, offsetX: 0, offsetY: -4, angleOffset: 0, flipX: false },
-  vines: { widthScale: 1.3, heightScale: 0.86, offsetX: -11, offsetY: 0, angleOffset: 0, flipX: false },
-  flowers: { widthScale: 1.5, heightScale: 1.04, offsetX: 6, offsetY: 19, angleOffset: 0, flipX: false },
-  wings: { widthScale: 1.2, heightScale: 1.32, offsetX: -22, offsetY: -19, angleOffset: 0, flipX: false },
-  halo: { widthScale: 2.16, heightScale: 1.52, offsetX: 0, offsetY: 13, angleOffset: 0, flipX: false },
-  wheel: { widthScale: 0.84, heightScale: 0.56, offsetX: 0, offsetY: -34, angleOffset: 0, flipX: false },
-  arm: { widthScale: 1.0, heightScale: 1.0, offsetX: 13, offsetY: 6, angleOffset: 0, flipX: false },
-  forearm: { widthScale: 0.82, heightScale: 1.86, offsetX: 0, offsetY: -15, angleOffset: 1.1868238913561435, flipX: false },
-  hand: { widthScale: 0.94, heightScale: 1.0, offsetX: 7, offsetY: -11, angleOffset: 0.05235987755982989, flipX: false }
+  overall: { widthScale: 0.76, heightScale: 1.03, offsetX: 1, offsetY: -4, angleOffset: 0, flipX: false, flipY: false },
+  body: { widthScale: 1.0, heightScale: 0.86, offsetX: 0, offsetY: 1, angleOffset: 0, flipX: false, flipY: false },
+  antlers: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, gap: 0, angleOffset: 0, flipX: false, flipY: false },
+  antler_vines: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  cicada: { widthScale: 1.0, heightScale: 0.7, offsetX: 0, offsetY: -6, angleOffset: 0, flipX: false, flipY: false },
+  censor: { widthScale: 1.02, heightScale: 0.72, offsetX: 0, offsetY: -4, angleOffset: 0, flipX: false, flipY: false },
+  vines: { widthScale: 1.3, heightScale: 0.86, offsetX: -11, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  flowers: { widthScale: 1.5, heightScale: 1.04, offsetX: 6, offsetY: 19, angleOffset: 0, flipX: false, flipY: false },
+  wings: { widthScale: 1.2, heightScale: 1.32, offsetX: -22, offsetY: -19, angleOffset: 0, flipX: false, flipY: false },
+  halo: { widthScale: 2.16, heightScale: 1.52, offsetX: 0, offsetY: 13, angleOffset: 0, flipX: false, flipY: false },
+  wheel: { widthScale: 0.84, heightScale: 0.56, offsetX: 0, offsetY: -34, angleOffset: 0, flipX: false, flipY: false },
+  arm: { widthScale: 1.0, heightScale: 1.0, offsetX: 13, offsetY: 6, angleOffset: 0, flipX: false, flipY: false },
+  forearm: { widthScale: 0.82, heightScale: 1.86, offsetX: 0, offsetY: -15, angleOffset: 1.1868238913561435, flipX: false, flipY: false },
+  hand: { widthScale: 0.94, heightScale: 1.0, offsetX: 7, offsetY: -11, angleOffset: 0.05235987755982989, flipX: false, flipY: false }
 };
 
 export const NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS = {
-  overall: { widthScale: 0.76, heightScale: 1.03, offsetX: 1, offsetY: -4, angleOffset: 0, flipX: false },
-  body: { widthScale: 1.02, heightScale: 0.8, offsetX: 0, offsetY: 1, angleOffset: 0, flipX: false },
-  antlers: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, gap: 0, angleOffset: 0, flipX: false },
-  antler_vines: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-  cicada: { widthScale: 0.7, heightScale: 0.7, offsetX: 0, offsetY: -6, angleOffset: 0, flipX: false },
-  censor: { widthScale: 1.02, heightScale: 0.72, offsetX: 0, offsetY: -4, angleOffset: 0, flipX: false },
-  vines: { widthScale: 0.9, heightScale: 0.88, offsetX: -16, offsetY: 0, angleOffset: 0, flipX: false },
-  flowers: { widthScale: 1.66, heightScale: 1.04, offsetX: 6, offsetY: 19, angleOffset: 0, flipX: false },
-  wings: { widthScale: 1.48, heightScale: 1.62, offsetX: -17, offsetY: -8, angleOffset: 0, flipX: false },
-  halo: { widthScale: 2.56, heightScale: 1.72, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-  wheel: { widthScale: 0.84, heightScale: 0.53, offsetX: 0, offsetY: -28, angleOffset: 0, flipX: false },
-  arm: { widthScale: 1.02, heightScale: 1.24, offsetX: 10, offsetY: 14, angleOffset: -0.29670597283903605, flipX: false },
-  forearm: { widthScale: 0.82, heightScale: 0.66, offsetX: 9, offsetY: -7, angleOffset: 1.1868238913561435, flipX: false },
-  hand: { widthScale: 0.64, heightScale: 0.9, offsetX: 4, offsetY: -12, angleOffset: 0.05235987755982989, flipX: false }
+  overall: { widthScale: 0.76, heightScale: 1.03, offsetX: 1, offsetY: -4, angleOffset: 0, flipX: false, flipY: false },
+  body: { widthScale: 1.02, heightScale: 0.8, offsetX: 0, offsetY: 1, angleOffset: 0, flipX: false, flipY: false },
+  antlers: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, gap: 0, angleOffset: 0, flipX: false, flipY: false },
+  antler_vines: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  cicada: { widthScale: 0.7, heightScale: 0.7, offsetX: 0, offsetY: -6, angleOffset: 0, flipX: false, flipY: false },
+  censor: { widthScale: 1.02, heightScale: 0.72, offsetX: 0, offsetY: -4, angleOffset: 0, flipX: false, flipY: false },
+  vines: { widthScale: 0.9, heightScale: 0.88, offsetX: -16, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  flowers: { widthScale: 1.66, heightScale: 1.04, offsetX: 6, offsetY: 19, angleOffset: 0, flipX: false, flipY: false },
+  wings: { widthScale: 1.48, heightScale: 1.62, offsetX: -17, offsetY: -8, angleOffset: 0, flipX: false, flipY: false },
+  halo: { widthScale: 2.56, heightScale: 1.72, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  wheel: { widthScale: 0.84, heightScale: 0.53, offsetX: 0, offsetY: -28, angleOffset: 0, flipX: false, flipY: false },
+  arm: { widthScale: 1.02, heightScale: 1.24, offsetX: 10, offsetY: 14, angleOffset: -0.29670597283903605, flipX: false, flipY: false },
+  forearm: { widthScale: 0.82, heightScale: 0.66, offsetX: 9, offsetY: -7, angleOffset: 1.1868238913561435, flipX: false, flipY: false },
+  hand: { widthScale: 0.64, heightScale: 0.9, offsetX: 4, offsetY: -12, angleOffset: 0.05235987755982989, flipX: false, flipY: false }
 };
 
 export const NAMELESS_DEITY_SKINS = {
@@ -632,13 +635,20 @@ function _drawNamelessLimb(ctx, arm, forearm, elbowJoint, hand, startX, startY, 
   const handOriginX = isSkin2 ? (handNatW * 0.25) : 169;
   const handOriginY = isSkin2 ? (handNatH * 0.50) : 309.5;
 
+  const armFlipX = Boolean(customArm.flipX ?? armDef.flipX);
+  const armFlipY = Boolean(customArm.flipY ?? armDef.flipY);
+  const forearmFlipX = Boolean(customForearm.flipX ?? forearmDef.flipX);
+  const forearmFlipY = Boolean(customForearm.flipY ?? forearmDef.flipY);
+  const handFlipX = Boolean(customHand.flipX ?? handDef.flipX);
+  const handFlipY = Boolean(customHand.flipY ?? handDef.flipY);
+
   // 6. Draw Upper Arm (Arm.png / arm9.png)
-  _drawLimbSegment(ctx, arm, startPtX, startPtY, limbScale * armScaleW, limbScale * armScaleH, armRotation - elbowRotateAngle + armRotOff, armOriginX, armOriginY, isLeft);
+  _drawLimbSegment(ctx, arm, startPtX, startPtY, limbScale * armScaleW, limbScale * armScaleH, armRotation - elbowRotateAngle + armRotOff, armOriginX, armOriginY, isLeft !== armFlipY, armFlipX);
 
   // 7. Draw Forearm (Forearm.png / forearm9.png) connected at Elbow
   const elbowDrawX = elbowPos.x + forearmOffX;
   const elbowDrawY = elbowPos.y + forearmOffY;
-  _drawLimbSegment(ctx, forearm, elbowDrawX, elbowDrawY, limbScale * forearmScaleW, limbScale * forearmScaleH, forearmRotation + forearmRotOff, forearmOriginX, forearmOriginY, isLeft);
+  _drawLimbSegment(ctx, forearm, elbowDrawX, elbowDrawY, limbScale * forearmScaleW, limbScale * forearmScaleH, forearmRotation + forearmRotOff, forearmOriginX, forearmOriginY, isLeft !== forearmFlipY, forearmFlipX);
 
   // 8. Draw Elbow Joint (ElbowJoint.png) connector if available
   if (_isImageReady(elbowJoint)) {
@@ -658,7 +668,7 @@ function _drawNamelessLimb(ctx, arm, forearm, elbowJoint, hand, startX, startY, 
   const handRotation = forearmRotation + forearmRotOff + handCutAlignment + handRotOff;
 
   if (!hideHands && _isImageReady(hand)) {
-    _drawLimbSegment(ctx, hand, wristX + handOffX, wristY + handOffY, limbScale * handScaleW, limbScale * handScaleH, handRotation, handOriginX, handOriginY, isLeft);
+    _drawLimbSegment(ctx, hand, wristX + handOffX, wristY + handOffY, limbScale * handScaleW, limbScale * handScaleH, handRotation, handOriginX, handOriginY, isLeft !== handFlipY, handFlipX);
   }
 
   return { x: wristX + handOffX, y: wristY + handOffY };
@@ -732,6 +742,9 @@ export function drawNamelessDeitySkin(ctx, fighter) {
   }
   ctx.translate(customOffsetX * rScale, customOffsetY * rScale);
 
+  if (customOverall.flipX) ctx.scale(-1, 1);
+  if (customOverall.flipY) ctx.scale(1, -1);
+
   // 2. LAYER 0 (VERY BACK HALO): Cosmic Light Circle Starburst Halo + Celestial Glow Bloom
   const cosmicLight = isSkin2 ? _getBlueCosmicLightCenterCanvas() : _getCosmicLightCenterImage();
   if (_isImageReady(cosmicLight)) {
@@ -741,11 +754,13 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     const haloOffX = (customHalo.offsetX ?? haloDef.offsetX);
     const haloOffY = (customHalo.offsetY ?? haloDef.offsetY);
     const haloAngle = (customHalo.angleOffset ?? haloDef.angleOffset);
+    const haloFlipX = (customHalo.flipX ?? haloDef.flipX) ? -1 : 1;
+    const haloFlipY = (customHalo.flipY ?? haloDef.flipY) ? -1 : 1;
 
     const haloNatH = cosmicLight.naturalHeight || cosmicLight.height || 1254;
     const haloBaseScale = (r * 3.8) / haloNatH;
-    const hScaleX = haloBaseScale * haloScaleW;
-    const hScaleY = haloBaseScale * haloScaleH;
+    const hScaleX = haloBaseScale * haloScaleW * haloFlipX;
+    const hScaleY = haloBaseScale * haloScaleH * haloFlipY;
 
     ctx.save();
     ctx.translate(haloOffX * rScale, hoverBob + haloOffY * rScale);
@@ -789,10 +804,12 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     const wheelOffX = (customWheel.offsetX ?? wheelDef.offsetX);
     const wheelOffY = (customWheel.offsetY ?? wheelDef.offsetY);
     const wheelAngle = (customWheel.angleOffset ?? wheelDef.angleOffset);
+    const wheelFlipX = (customWheel.flipX ?? wheelDef.flipX) ? -1 : 1;
+    const wheelFlipY = (customWheel.flipY ?? wheelDef.flipY) ? -1 : 1;
 
     const wheelBaseScale = (r * 2.2) / wheel.naturalHeight;
-    const wScaleX = wheelBaseScale * wheelScaleW;
-    const wScaleY = wheelBaseScale * wheelScaleH;
+    const wScaleX = wheelBaseScale * wheelScaleW * wheelFlipX;
+    const wScaleY = wheelBaseScale * wheelScaleH * wheelFlipY;
 
     ctx.save();
     ctx.translate(wheelOffX * rScale, hoverBob + wheelOffY * rScale);
@@ -810,11 +827,13 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     const flowerOffX = (customFlowers.offsetX ?? flowersDef.offsetX);
     const flowerOffY = (customFlowers.offsetY ?? flowersDef.offsetY);
     const flowerAngle = (customFlowers.angleOffset ?? flowersDef.angleOffset);
+    const flowerFlipX = (customFlowers.flipX ?? flowersDef.flipX) ? -1 : 1;
+    const flowerFlipY = (customFlowers.flipY ?? flowersDef.flipY) ? -1 : 1;
 
     const flowerNatH = flower.naturalHeight || flower.height || 1199;
     const flowerBaseScale = (r * 1.50) / flowerNatH;
-    const flScaleX = flowerBaseScale * flowerScaleW;
-    const flScaleY = flowerBaseScale * flowerScaleH;
+    const flScaleX = flowerBaseScale * flowerScaleW * flowerFlipX;
+    const flScaleY = flowerBaseScale * flowerScaleH * flowerFlipY;
 
     const flowerSpacingX = (r * 0.95 * widthScale) + (flowerOffX * rScale);
     const flowerAnchorY = hoverBob - (r * 0.35 * heightScale) + (flowerOffY * rScale);
@@ -852,11 +871,13 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     const wingOffX = (customWings.offsetX ?? wingsDef.offsetX);
     const wingOffY = (customWings.offsetY ?? wingsDef.offsetY);
     const wingAngle = (customWings.angleOffset ?? wingsDef.angleOffset);
+    const wingFlipX = (customWings.flipX ?? wingsDef.flipX) ? -1 : 1;
+    const wingFlipY = (customWings.flipY ?? wingsDef.flipY) ? -1 : 1;
 
     const wingsNatH = wings.naturalHeight || wings.height || 852;
     const baseScale = (r * 2.8) / wingsNatH;
-    const scaleX = baseScale * 1.35 * wingScaleW;
-    const scaleY = baseScale * 1.10 * (1.0 - wingSquish) * wingScaleH;
+    const scaleX = baseScale * 1.35 * wingScaleW * wingFlipX;
+    const scaleY = baseScale * 1.10 * (1.0 - wingSquish) * wingScaleH * wingFlipY;
 
     const wingAnchorX = (r * 0.65 * wingScaleW) + (wingOffX * rScale);
     const wingAnchorY = hoverBob + (r * 0.20 * wingScaleH) + (wingOffY * rScale);
@@ -886,10 +907,12 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     const vinesOffX = (customVines.offsetX ?? vinesDef.offsetX);
     const vinesOffY = (customVines.offsetY ?? vinesDef.offsetY);
     const vinesAngle = (customVines.angleOffset ?? vinesDef.angleOffset);
+    const vinesFlipX = (customVines.flipX ?? vinesDef.flipX) ? -1 : 1;
+    const vinesFlipY = (customVines.flipY ?? vinesDef.flipY) ? -1 : 1;
 
     const vinesBaseScale = (r * 2.85) / vines.naturalHeight;
-    const vScaleX = vinesBaseScale * vinesScaleW;
-    const vScaleY = vinesBaseScale * vinesScaleH;
+    const vScaleX = vinesBaseScale * vinesScaleW * vinesFlipX;
+    const vScaleY = vinesBaseScale * vinesScaleH * vinesFlipY;
 
     const vineSpacingX = (r * 0.28 * widthScale) + (vinesOffX * rScale);
     const vineAnchorY = hoverBob + (r * 0.42 * heightScale) + (vinesOffY * rScale);
@@ -921,10 +944,12 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     const bodyOffX = (customBody.offsetX ?? bodyDef.offsetX);
     const bodyOffY = (customBody.offsetY ?? bodyDef.offsetY);
     const bodyAngle = (customBody.angleOffset ?? bodyDef.angleOffset);
+    const bodyFlipX = (customBody.flipX ?? bodyDef.flipX) ? -1 : 1;
+    const bodyFlipY = (customBody.flipY ?? bodyDef.flipY) ? -1 : 1;
 
     const bodyBaseScale = (r * 2.35) / divineBody.naturalHeight;
-    const bScaleX = bodyBaseScale * bodyScaleW;
-    const bScaleY = bodyBaseScale * bodyScaleH;
+    const bScaleX = bodyBaseScale * bodyScaleW * bodyFlipX;
+    const bScaleY = bodyBaseScale * bodyScaleH * bodyFlipY;
 
     ctx.save();
     ctx.translate(bodyOffX * rScale, hoverBob + bodyOffY * rScale);
@@ -948,15 +973,17 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     const antlersOffY = (customAntlers.offsetY ?? antlersDef.offsetY);
     const antlersAngle = (customAntlers.angleOffset ?? antlersDef.angleOffset);
     const antlersGap = (customAntlers.gap ?? antlersDef.gap ?? 0) * rScale;
+    const antlersFlipX = (customAntlers.flipX ?? antlersDef.flipX) ? -1 : 1;
+    const antlersFlipY = (customAntlers.flipY ?? antlersDef.flipY) ? -1 : 1;
 
     const antlersNatW = antlers.naturalWidth || 1536;
     const antlersNatH = antlers.naturalHeight || 1024;
     const halfNatW = antlersNatW / 2;
     const antlersBaseScale = (r * 3.4) / antlersNatW;
-    const aScaleX = antlersBaseScale * antlersScaleW;
-    const aScaleY = antlersBaseScale * antlersScaleH;
-    const halfDrawW = halfNatW * aScaleX;
-    const drawH = antlersNatH * aScaleY;
+    const aScaleX = antlersBaseScale * antlersScaleW * antlersFlipX;
+    const aScaleY = antlersBaseScale * antlersScaleH * antlersFlipY;
+    const halfDrawW = halfNatW * Math.abs(aScaleX);
+    const drawH = antlersNatH * Math.abs(aScaleY);
 
     const anchorX = antlersOffX * rScale;
     const anchorY = hoverBob - (r * 0.40 * heightScale) + (antlersOffY * rScale);
@@ -973,6 +1000,8 @@ export function drawNamelessDeitySkin(ctx, fighter) {
       ctx.save();
       ctx.translate(anchorX - antlersGap, anchorY);
       ctx.rotate(antlersAngle);
+      if (antlersFlipX < 0) ctx.scale(-1, 1);
+      if (antlersFlipY < 0) ctx.scale(1, -1);
       ctx.drawImage(antlers, 0, 0, halfNatW, antlersNatH, -halfDrawW, -drawH * 0.95, halfDrawW, drawH);
       ctx.restore();
 
@@ -980,6 +1009,8 @@ export function drawNamelessDeitySkin(ctx, fighter) {
       ctx.save();
       ctx.translate(anchorX + antlersGap, anchorY);
       ctx.rotate(antlersAngle);
+      if (antlersFlipX < 0) ctx.scale(-1, 1);
+      if (antlersFlipY < 0) ctx.scale(1, -1);
       ctx.drawImage(antlers, halfNatW, 0, halfNatW, antlersNatH, 0, -drawH * 0.95, halfDrawW, drawH);
       ctx.restore();
     }
@@ -995,6 +1026,8 @@ export function drawNamelessDeitySkin(ctx, fighter) {
       const avOffX = (customAntlerVines.offsetX ?? antlerVinesDef.offsetX);
       const avOffY = (customAntlerVines.offsetY ?? antlerVinesDef.offsetY);
       const avAngle = (customAntlerVines.angleOffset ?? antlerVinesDef.angleOffset);
+      const avFlipX = (customAntlerVines.flipX ?? antlerVinesDef.flipX) ? -1 : 1;
+      const avFlipY = (customAntlerVines.flipY ?? antlerVinesDef.flipY) ? -1 : 1;
 
       const antlersScaleW = widthScale * (customAntlers.widthScale ?? antlersDef.widthScale);
       const antlersScaleH = heightScale * (customAntlers.heightScale ?? antlersDef.heightScale);
@@ -1005,8 +1038,8 @@ export function drawNamelessDeitySkin(ctx, fighter) {
 
       const avNatH = antlerVines.naturalHeight || antlerVines.height || 710;
       const avBaseScale = (r * 1.85) / avNatH;
-      const avScaleX = avBaseScale * avScaleW;
-      const avScaleY = avBaseScale * avScaleH;
+      const avScaleX = avBaseScale * avScaleW * avFlipX;
+      const avScaleY = avBaseScale * avScaleH * avFlipY;
 
       const anchorX = antlersOffX * rScale;
       const anchorY = hoverBob - (r * 0.40 * heightScale) + (antlersOffY * rScale);
@@ -1041,10 +1074,12 @@ export function drawNamelessDeitySkin(ctx, fighter) {
       const cicadaOffX = (customCicada.offsetX ?? cicadaDef.offsetX);
       const cicadaOffY = (customCicada.offsetY ?? cicadaDef.offsetY);
       const cicadaAngle = (customCicada.angleOffset ?? cicadaDef.angleOffset);
+      const ciFlipX = (customCicada.flipX ?? cicadaDef.flipX) ? -1 : 1;
+      const ciFlipY = (customCicada.flipY ?? cicadaDef.flipY) ? -1 : 1;
 
       const cicadaBaseScale = (r * 1.65) / cicada.naturalHeight;
-      const ciScaleX = cicadaBaseScale * cicadaScaleW;
-      const ciScaleY = cicadaBaseScale * cicadaScaleH;
+      const ciScaleX = cicadaBaseScale * cicadaScaleW * ciFlipX;
+      const ciScaleY = cicadaBaseScale * cicadaScaleH * ciFlipY;
 
       ctx.save();
       ctx.translate(cicadaOffX * rScale, hoverBob - (r * 0.45 * heightScale) + (cicadaOffY * rScale));
@@ -1064,10 +1099,12 @@ export function drawNamelessDeitySkin(ctx, fighter) {
       const censorOffX = (customCensor.offsetX ?? censorDef.offsetX);
       const censorOffY = (customCensor.offsetY ?? censorDef.offsetY);
       const censorAngle = (customCensor.angleOffset ?? censorDef.angleOffset);
+      const cFlipX = (customCensor.flipX ?? censorDef.flipX) ? -1 : 1;
+      const cFlipY = (customCensor.flipY ?? censorDef.flipY) ? -1 : 1;
 
       const censorBaseScale = (r * 1.85) / censor.naturalHeight;
-      const cScaleX = censorBaseScale * censorScaleW;
-      const cScaleY = censorBaseScale * censorScaleH;
+      const cScaleX = censorBaseScale * censorScaleW * cFlipX;
+      const cScaleY = censorBaseScale * censorScaleH * cFlipY;
 
       ctx.save();
       ctx.translate(censorOffX * rScale, hoverBob - (r * 0.10 * heightScale) + (censorOffY * rScale));

@@ -67,6 +67,8 @@ export function _drawGunslingerHair(ctx, r, facingLeft = false) {
     const offX = custom.offsetX ?? 0;
     const offY = custom.offsetY ?? 0;
     const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
 
     // Gunslinger-hair.png (1536x1024). Visible cowboy hat bounding box:
     // X: [0, 1516] (width 1517, horizontal center at 758)
@@ -81,9 +83,10 @@ export function _drawGunslingerHair(ctx, r, facingLeft = false) {
     const drawX = -758 * scaleX + offX;
     const drawY = -r * 1.32 - 7 * scaleY + offY;
 
-    if (rot !== 0) {
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
-      ctx.rotate(rot);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
       ctx.drawImage(hairImg, -drawW / 2, -drawH / 2, drawW, drawH);
     } else {
       ctx.drawImage(hairImg, drawX, drawY, drawW, drawH);
