@@ -201,14 +201,15 @@ canvas {
 
 .health-hud {
   position: absolute;
-  top: 79.2%;
+  top: 67.5%;
+  bottom: auto;
   left: 0;
   right: 0;
   z-index: 10;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
-  gap: 24px;
+  gap: 48px;
   margin: 0 auto;
   padding: 0;
   width: 100%;
@@ -219,7 +220,7 @@ canvas {
 
 .health-card {
   flex: 1;
-  min-width: 160px;
+  min-width: 120px;
   background: transparent;
   border: none;
   border-radius: 0;
@@ -591,8 +592,9 @@ canvas {
 
 .hud-bottom-container {
   position: absolute;
-  top: 78.0%;
-  /* Tightly below arena without overlapping */
+  top: 67.5%;
+  bottom: auto;
+  /* Snug below arena */
   left: 7.41%;
   right: 7.41%;
   display: flex;
@@ -1073,8 +1075,6 @@ canvas {
   align-items: flex-start !important;
   gap: 12px !important;
   box-sizing: border-box !important;
-  left: 2.675% !important;
-  width: 94.65% !important;
   max-width: none !important;
   right: auto !important;
   margin: 0 !important;

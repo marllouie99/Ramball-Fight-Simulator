@@ -14,6 +14,7 @@ import { genosConfig } from '../configs/characters/genosConfig.js';
 import { ichigoConfig } from '../configs/characters/ichigoConfig.js';
 import { mahitoConfig } from '../configs/characters/mahitoConfig.js';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js';
+import { naoyaConfig } from '../configs/characters/naoyaConfig.js';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
@@ -59,6 +60,9 @@ export const CONFIG = {
   genos: genosConfig,
   mahito: mahitoConfig,
   nanami: nanamiConfig,
+  naoya: naoyaConfig,
+  Naoya: naoyaConfig,
+  naoya_zenin: naoyaConfig,
   nobara: nobaraConfig,
   megumi: megumiConfig,
   megumin: meguminConfig,
@@ -218,6 +222,7 @@ export const CONFIG = {
   hudInfoFontSize: 14.5,             // Font size for fighter info (DMG, etc.) in HUD (px)
   hudSkillFontSize: 15,              // Font size for skill bar labels in HUD (px)
   hudWidthModifier: 1.0,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
+  bottomHudWidthModifier: 1.007,    // Bottom HUD width relative to raw arena width (1.007 = aligns flush with arena side borders)
   showArenaTitle: false,             // Set to true to display the "Fight of Characters / Ball Fight Simulator" title header above the arena, false to hide it
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -1853,6 +1858,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: avatarOfEmptinessConfig.projectileSpeedMultiplier || 1.0,
     ability: avatarOfEmptinessConfig.ability || 'Universal Annihilation & Three Universes',
     desc: avatarOfEmptinessConfig.desc || 'The incomprehensible sovereign of the Dark, Cryonic, and Visceral Universes from Terraria: Wrath of the Gods. Fires homing Antimatter Void Blasts, triggers Cryonic Absolute Zero frost outbursts, summons Visceral Blood Torrents, strikes with Dark Portal Arms, and uncages the reality-shattering "Universal Annihilation" cosmic death beam.',
+  },
+  {
+    id: 56,
+    name: 'NAOYA',
+    category: 'Anime',
+    color: naoyaConfig.color || '#76E042',
+    themeColor: naoyaConfig.themeColor || '#76E042',
+    secondaryColor: naoyaConfig.secondaryColor || '#C8E64A',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.1,
+    radius: naoyaConfig.radius || naoyaConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'naoya',
+    hp: naoyaConfig.hp || 190,
+    damage: naoyaConfig.damage || 8,
+    cooldown: naoyaConfig.cooldown || 40,
+    moveSpeed: naoyaConfig.moveSpeed || naoyaConfig.speed || 5.6,
+    projectileSpeedMultiplier: naoyaConfig.projectileSpeedMultiplier || 1.0,
+    ability: naoyaConfig.ability || 'Projection Sorcery (24 FPS)',
+    desc: naoyaConfig.desc || 'Inheritor of Projection Sorcery from Jujutsu Kaisen. Divides 1s into 24 frames to accelerate to supersonic speeds. Traps enemies who fail the 24 FPS rule inside frozen film frames with palm strikes, executing with Mach-speed flurry slashes.',
   }
 ];
 

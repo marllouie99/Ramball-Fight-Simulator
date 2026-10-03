@@ -1953,6 +1953,31 @@ function updateHealthHud() {
       }
     }
 
+    // Naoya (24 FPS Projection Sorcery) stats info
+    if (f.characterId === 'naoya' || fType === 'naoya' || (f._def && f._def.name === 'Naoya Zenin')) {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
+      const baseDmg = cfg.tantoDamage || 8;
+      info.push(`<b>DMG:</b> ${baseDmg}`);
+
+      const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+      const baseSpd = (f.baseSpeed || cfg.speed || 5.6) * modeMult;
+      const currentSpd = (f.speed || baseSpd) * modeMult;
+      const spdDiff = Math.max(0, currentSpd - baseSpd);
+      const stacks = f.frameStacks || 0;
+
+      const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 10;
+      if (spdDiff > 0.05 && stacks > 0) {
+        info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)} + ${spdDiff.toFixed(1)} <span style="color: #76E042; font-size: 10px;">▲ (x${stacks}/${maxStacks})</span>`);
+      } else {
+        info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)}`);
+      }
+
+      const evadePct = Math.round((f.evadeChance ?? (cfg.baseEvadeChance || 0.05)) * 100);
+      if (evadePct > 0) {
+        info.push(`<b>EVADE:</b> ${evadePct}% <span style="color: #00F2FE; font-size: 10px;">▲</span>`);
+      }
+    }
+
     // Tick Damage
     if (f.tickDamageTimer > 0 && f.tickDamage > 0) {
       info.push(`<b>Tick DMG:</b> ${f.tickDamage}/tick <span style="color: #ef4444; font-size: 10px;">▼</span>`);

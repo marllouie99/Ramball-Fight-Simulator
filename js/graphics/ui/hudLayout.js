@@ -69,12 +69,20 @@ export function syncHudPosition() {
   const arenaX = arena.x;
   
   const widthModifier = CONFIG.hudWidthModifier ?? scale;
+  const topWidthModifier = CONFIG.topHudWidthModifier ?? widthModifier;
+  const bottomWidthModifier = CONFIG.bottomHudWidthModifier ?? (CONFIG.hudBottomWidthModifier ?? 1.007);
 
-  const hudCssWidth = isTactical ? arenaWidth : ((arenaWidth * widthModifier) / hudScale);
-  const visualWidthPercent = (hudCssWidth / canvasWidth) * 100;
+  // Top HUD sizing & positioning (spans full arena header)
+  const topHudCssWidth = isTactical ? arenaWidth : ((arenaWidth * topWidthModifier) / hudScale);
+  const topVisualWidthPercent = (topHudCssWidth / canvasWidth) * 100;
+  const topHudCssLeft = isTactical ? arenaX : ((arenaX + arenaWidth / 2) - topHudCssWidth / 2);
+  const topVisualLeftPercent = (topHudCssLeft / canvasWidth) * 100;
 
-  const hudCssLeft = isTactical ? arenaX : ((arenaX + arenaWidth / 2) - hudCssWidth / 2);
-  const visualLeftPercent = (hudCssLeft / canvasWidth) * 100;
+  // Bottom HUD sizing & positioning (compact centered width)
+  const bottomHudCssWidth = isTactical ? (arenaWidth * bottomWidthModifier) : ((arenaWidth * bottomWidthModifier) / hudScale);
+  const bottomVisualWidthPercent = (bottomHudCssWidth / canvasWidth) * 100;
+  const bottomHudCssLeft = isTactical ? ((arenaX + arenaWidth / 2) - (arenaWidth * bottomWidthModifier) / 2) : ((arenaX + arenaWidth / 2) - bottomHudCssWidth / 2);
+  const bottomVisualLeftPercent = (bottomHudCssLeft / canvasWidth) * 100;
 
   const is1v2 = Boolean(
     state.mode === 'Boss Battle' ||
@@ -92,47 +100,43 @@ export function syncHudPosition() {
   if (!_cachedTopContainer) _cachedTopContainer = document.getElementById('hudTopContainer');
   if (_cachedTopContainer) {
     setSafeStyle(_cachedTopContainer, 'top', `${topPercent.toFixed(3)}%`);
-    setSafeStyle(_cachedTopContainer, 'width', `${visualWidthPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedTopContainer, 'width', `${topVisualWidthPercent.toFixed(3)}%`, 'important');
     setSafeStyle(_cachedTopContainer, 'max-width', 'none', 'important');
-    setSafeStyle(_cachedTopContainer, 'left', `${visualLeftPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedTopContainer, 'left', `${topVisualLeftPercent.toFixed(3)}%`, 'important');
     setSafeStyle(_cachedTopContainer, 'right', 'auto', 'important');
     setSafeStyle(_cachedTopContainer, 'margin', '0', 'important');
     setSafeStyle(_cachedTopContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`);
     setSafeStyle(_cachedTopContainer, 'transform-origin', 'top center', 'important');
   }
 
-  // 2. Position Bottom HUD Container
-  const bottomRatio = ((arena.y + arena.height + 20) / canvasHeight);
+  // 2. Position Bottom HUD Container (Snug right below arena bottom wall)
+  const bottomMarginPx = is1v2 ? 24 : 16;
+  const bottomRatio = ((arena.y + arena.height + bottomMarginPx) / canvasHeight);
   const bottomPx = canvasTopInBox + canvasRect.height * bottomRatio;
   const bottomPercent = (bottomPx / boxRect.height) * 100;
 
   if (!_cachedBottomContainer) _cachedBottomContainer = document.getElementById('hudBottomContainer');
   if (_cachedBottomContainer) {
     setSafeStyle(_cachedBottomContainer, 'top', `${bottomPercent.toFixed(3)}%`);
-    setSafeStyle(_cachedBottomContainer, 'width', `${visualWidthPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedBottomContainer, 'bottom', 'auto', 'important');
+    setSafeStyle(_cachedBottomContainer, 'width', `${bottomVisualWidthPercent.toFixed(3)}%`, 'important');
     setSafeStyle(_cachedBottomContainer, 'max-width', 'none', 'important');
-    setSafeStyle(_cachedBottomContainer, 'left', `${visualLeftPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedBottomContainer, 'left', `${bottomVisualLeftPercent.toFixed(3)}%`, 'important');
     setSafeStyle(_cachedBottomContainer, 'right', 'auto', 'important');
     setSafeStyle(_cachedBottomContainer, 'margin', '0', 'important');
     setSafeStyle(_cachedBottomContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`);
     setSafeStyle(_cachedBottomContainer, 'transform-origin', 'top center', 'important');
   }
 
-  // 3. Position Health HUD
-  const arenaBottomRatio = (arena.y + arena.height) / canvasHeight;
-  const arenaBottomInBox = canvasTopInBox + canvasRect.height * arenaBottomRatio;
-  const bottomMarginPx = is1v2 ? 40 : 20;
-  const hudMargin = canvasRect.height * (bottomMarginPx / canvasHeight);
-  const hudTopPx = arenaBottomInBox + hudMargin;
-  const hudTopPercent = (hudTopPx / boxRect.height) * 100;
-
+  // 3. Position Health HUD (Snug right below arena bottom wall)
   if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
   const healthHud = _cachedContainerBottom;
   if (healthHud) {
-    setSafeStyle(healthHud, 'top', `${hudTopPercent.toFixed(3)}%`);
-    setSafeStyle(healthHud, 'width', `${visualWidthPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(healthHud, 'top', `${bottomPercent.toFixed(3)}%`);
+    setSafeStyle(healthHud, 'bottom', 'auto', 'important');
+    setSafeStyle(healthHud, 'width', `${bottomVisualWidthPercent.toFixed(3)}%`, 'important');
     setSafeStyle(healthHud, 'max-width', 'none', 'important');
-    setSafeStyle(healthHud, 'left', `${visualLeftPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(healthHud, 'left', `${bottomVisualLeftPercent.toFixed(3)}%`, 'important');
     setSafeStyle(healthHud, 'right', 'auto', 'important');
     setSafeStyle(healthHud, 'margin', '0', 'important');
     setSafeStyle(healthHud, 'transform', isTactical ? 'none' : `scale(${hudScale})`);
@@ -232,66 +236,17 @@ export function updateTopHudCameraTracking(topContainer) {
 }
 
 /**
- * Dynamically updates the Bottom HUD Container (#healthHud) position & transform
- * to remain anchored to the arena bottom edge when fixed camera zooms, dynamic camera tracks, or screen shakes.
+ * Dynamically ensures the Bottom HUD Container (#healthHud and #hudBottomContainer)
+ * remains strictly screen-locked in viewport space with ZERO camera tracking drift or arena tethering.
  */
 export function updateBottomHudCameraTracking(bottomContainer) {
   if (!bottomContainer) return;
-  if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
-  if (!_cachedPixiView) _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
-  if (!_cachedGameBox || !_cachedPixiView) return;
-
-  const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
-  const canvasHeight = (typeof state !== 'undefined' && state.canvas && state.canvas.height) || CONFIG.canvasHeight || 960;
-  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-  const arenaCenterX = arena.x + arena.width / 2;
-  const arenaCenterY = arena.y + arena.height / 2;
-  const screenCenterY = arenaCenterY;
-
-  const cam = (typeof state !== 'undefined') ? state.camera : null;
-  const isFixed = Boolean(!cam || !cam.enabled || cam.mode === 'fixed');
-  const camZoom = cam ? (cam.zoom || 1.0) : 1.0;
 
   const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
   const scale = CONFIG.internalScale || 1.0;
   const baseHudScale = isTactical ? 1.0 : (scale * 0.9);
 
-  const is1v2 = Boolean(
-    typeof state !== 'undefined' && (
-      state.mode === 'Boss Battle' ||
-      state.mode === '1v2 Stand Off' ||
-      state.mode === '1v2' ||
-      state.mode === 'Stand Off 1v2' ||
-      (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2))
-    )
-  );
-
-  const boxRect = _cachedGameBox.getBoundingClientRect();
-  const canvasRect = _cachedPixiView.getBoundingClientRect();
-  if (boxRect.height <= 0 || canvasRect.height <= 0 || boxRect.width <= 0 || canvasRect.width <= 0) return;
-
-  const canvasTopInBox = canvasRect.top - boxRect.top;
-  const bottomMarginPx = is1v2 ? 40 : 20;
-
-  const camX = isFixed ? arenaCenterX : (cam ? cam.x : arenaCenterX);
-  const camY = isFixed ? arenaCenterY : (cam ? cam.y : arenaCenterY);
-
-  const screenArenaBottom = screenCenterY + (arena.y + arena.height - camY) * camZoom;
-  const hudTopCanvasY = screenArenaBottom + (bottomMarginPx * camZoom);
-  const effectiveHudScale = baseHudScale * camZoom;
-
-  const hudTopPxInBox = canvasTopInBox + (canvasRect.height * (hudTopCanvasY / canvasHeight));
-  const hudTopPercent = (hudTopPxInBox / boxRect.height) * 100;
-
-  const displayRatio = canvasRect.width / canvasWidth;
-  const panOffsetX = (arenaCenterX - camX) * camZoom;
-  const shakeX = ((cam ? cam.shakeX : (state ? state.shakeX : 0)) || 0);
-  const shakeY = ((cam ? cam.shakeY : (state ? state.shakeY : 0)) || 0);
-
-  const totalTranslateX = (panOffsetX + shakeX) * displayRatio;
-  const totalTranslateY = shakeY * displayRatio;
-
-  setSafeStyle(bottomContainer, 'top', `${hudTopPercent.toFixed(3)}%`);
-  setSafeStyle(bottomContainer, 'transform', `translate(${totalTranslateX.toFixed(2)}px, ${totalTranslateY.toFixed(2)}px) scale(${effectiveHudScale.toFixed(4)})`, 'important');
+  setSafeStyle(bottomContainer, 'bottom', 'auto', 'important');
+  setSafeStyle(bottomContainer, 'transform', isTactical ? 'none' : `scale(${baseHudScale})`, 'important');
   setSafeStyle(bottomContainer, 'transform-origin', 'top center', 'important');
 }

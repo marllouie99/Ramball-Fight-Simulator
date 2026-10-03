@@ -748,6 +748,33 @@
           "cooldown": 580
         }
       }
+    },
+    "naoya": {
+      "name": "Naoya Zenin",
+      "archetype": "blade",
+      "hp": 190,
+      "speed": 5.6,
+      "radius": 25,
+      "baseDamage": 8,
+      "baseCooldown": 40,
+      "themeColor": "#76E042",
+      "keySkills": {
+        "frameBlitz": {
+          "damage": 24,
+          "cooldown": 330,
+          "stasisDuration": 60
+        },
+        "sonicKick": {
+          "damage": 26,
+          "cooldown": 480,
+          "shockwaveRadius": 150
+        },
+        "shutterExecution": {
+          "totalDamage": 130,
+          "cooldown": 1440,
+          "timeStopDuration": 90
+        }
+      }
     }
   }
 }

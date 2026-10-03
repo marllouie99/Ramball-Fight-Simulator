@@ -636,7 +636,7 @@ export class Fighter {
     }
 
     if (this.isParalyzed || this.isFrozen || this.isFrozenByInfinity || this.isParalyzedByMahito || this.isParalyzedByMahoraga) return true;
-    if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || (this.makimaWallPinTimer && this.makimaWallPinTimer > 0) || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || (this.escanorWallPinTimer && this.escanorWallPinTimer > 0)) return true;
+    if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || (this.makimaWallPinTimer && this.makimaWallPinTimer > 0) || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || (this.escanorWallPinTimer && this.escanorWallPinTimer > 0) || this.isCurrentlyWallPinnedByNaoya || (this.naoyaWallPinTimer && this.naoyaWallPinTimer > 0) || this._isFlyingToWallPin) return true;
     if (this.isGrabbedByMahoraga) return true;
     if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
     if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
@@ -1621,6 +1621,36 @@ export class Fighter {
       this.basicAttackHitPauseTimer--;
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.isCurrentlyWallPinnedByNaoya || ((this.naoyaWallPinTimer || 0) > 0)) {
+      if (this.pinnedWallX !== undefined && this.pinnedWallY !== undefined) {
+        this.x = this.pinnedWallX;
+        this.y = this.pinnedWallY;
+      }
+      if (this.naoyaWallPinTimer > 0) {
+        this.naoyaWallPinTimer--;
+        if (this.naoyaWallPinTimer <= 0) {
+          this.isCurrentlyWallPinnedByNaoya = false;
+          this.pinnedWallX = undefined;
+          this.pinnedWallY = undefined;
+        }
+      }
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.isCaughtInNaoyaUlt) {
+      this.vx = 0;
+      this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this._carCrashRagdollTimer > 0 || this._isFlyingToWallPin) {
       this._handleFrozenSkillCooldowns();
       return true;
     }
@@ -2855,9 +2885,10 @@ export class Fighter {
     const isGenosTrapped = Boolean(this.caughtInGenosFlurry);
     const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));
     const isEscanorPinned = Boolean(this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0));
+    const isNaoyaPinned = Boolean(this.isCurrentlyWallPinnedByNaoya || ((this.naoyaWallPinTimer || 0) > 0) || this._isFlyingToWallPin);
     const isCruelSunDragged = Boolean(this._draggedByCruelSun || this.isCaughtInCruelSun);
     const isStationaryHover = ((this.purpleRecoveryTimer || 0) > 0) || this.isChannelingPurple || this.isChannelingDomainExpansion;
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned || isCruelSunDragged || isStationaryHover;
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned || isNaoyaPinned || isCruelSunDragged || isStationaryHover;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
@@ -3102,7 +3133,7 @@ export class Fighter {
    */
   canAim() {
     if (this.hp <= 0 || this.isDead) return false;
-    if (this.isTargetOfAmbush || (this.timeStopTimer > 0 && !this.isChainedByMakima)) return false;
+    if (this.isTargetOfAmbush || this.isCaughtInNaoyaUlt || this.isCurrentlyWallPinnedByNaoya || (this.naoyaWallPinTimer > 0) || (this._carCrashRagdollTimer > 0) || (this.timeStopTimer > 0 && !this.isChainedByMakima)) return false;
     const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
                      (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
                      (this.electricStunTimer && this.electricStunTimer > 0) ||

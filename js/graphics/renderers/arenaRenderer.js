@@ -339,7 +339,13 @@ function drawOuterActionTrianglesAndNeedles(ctx, width, height, arena, isDark) {
 
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
-  const isDark = (state.arenaTheme === 'dark');
+  const isDark = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
 
   // Custom Tactical Shooter Battleground Map
   if (state.gameCategory === 'tactical') {
@@ -389,12 +395,11 @@ export function drawArena() {
       return { color: 0x000000, alpha: 1 };
     };
 
-    const isDark = (state.arenaTheme === 'dark');
     const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#ffffffff'));
     const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff'));
     const innerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff'));
 
-    const bleed = 600;
+    const bleed = 4000;
     const bgW = pixiApp.screen.width + bleed * 2;
     const bgH = pixiApp.screen.height + bleed * 2;
 
@@ -443,7 +448,7 @@ export function drawArena() {
     // Canvas 2D fallback: Draw outer background under camera transform with bleed
     ctx.save();
     applyCameraToCtx(ctx);
-    const bleed = 600;
+    const bleed = 4000;
     const canvasBg = isDark ? '#000000' : (CONFIG.canvasBgColor || '#ffffffff');
     const outerBg = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
     ctx.fillStyle = canvasBg;

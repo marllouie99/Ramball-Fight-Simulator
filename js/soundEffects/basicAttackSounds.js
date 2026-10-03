@@ -711,6 +711,17 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
 
+  // Naoya — Projection Sorcery Concealed Tanto
+  'naoya': {
+    get src() {
+      return CONFIG.naoya?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.naoya?.soundVolumes?.swordSwing !== undefined ? CONFIG.naoya.soundVolumes.swordSwing : 0.80;
+    },
+    delay: 0,
+  },
+
   // Nobara — Straw Doll Technique Nails
   'nobara': {
     get src() {

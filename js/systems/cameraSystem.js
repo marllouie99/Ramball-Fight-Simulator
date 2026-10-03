@@ -168,6 +168,12 @@ export function updateCamera() {
     (((f.destroyerWindupTimer || 0) > 0) || ((f.destroyerFireTimer || 0) > 0) || ((f.destroyerRecoveryTimer || 0) > 0))
   );
 
+  const castingNaoya = (state.fighters || []).find(f =>
+    f && (f.characterId === 'naoya' || f.characterId === 'naoya_zenin' || f.type === 'naoya') &&
+    f.hp > 0 && !f.dead && !f.isDead &&
+    f.isExecutingUlt && (f.ultPhase === 1 || f.ultPhase === 2)
+  );
+
   const cinematicTarget = state.cameraFocusTarget;
 
   // Check for Boss Entrance Cinematic Sequence
@@ -188,6 +194,15 @@ export function updateCamera() {
 
     const makimaCfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     camera.targetZoom = makimaCfg.crucifixionCameraZoom ?? 1.15;
+  } else if (castingNaoya && state.gameState !== 'countdown') {
+    // Naoya Zenin Ultimate: Screen-Wide Mach 3 Runway Acceleration Sprint
+    // Unclamped direct camera tracking on Naoya so he stays 100% centered even at extreme vertical stratosphere apexes
+    camera.cinematicOverride = true;
+    camera.targetX = castingNaoya.x;
+    camera.targetY = castingNaoya.y;
+
+    const naoyaCfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
+    camera.targetZoom = naoyaCfg.ultCameraZoom ?? 1.12;
   } else if (castingDeity && state.gameState !== 'countdown') {
     // Nameless Deity casting / firing the Nameless Destroyer super-beam:
     // Support smooth gradual zoom out in BOTH dynamic tracking mode and fixed camera mode!
@@ -389,8 +404,17 @@ export function updateCamera() {
   }
 
   // Smooth exponential interpolation (lerp)
-  camera.x += (camera.targetX - camera.x) * camera.smoothing;
-  camera.y += (camera.targetY - camera.y) * camera.smoothing;
+  let posSmoothing = camera.smoothing;
+  if (castingNaoya) {
+    const baseSmoothing = CONFIG.naoya?.ultCameraSmoothing ?? 0.28;
+    const camDist = Math.hypot(camera.targetX - camera.x, camera.targetY - camera.y);
+    // Dynamic catchup: as Naoya accelerates into Mach 3 or sweeps along wide angled loops, dynamically scale up follow rate
+    const catchup = Math.min(0.55, (camDist / 180) * 0.35);
+    posSmoothing = Math.min(0.85, baseSmoothing + catchup);
+  }
+
+  camera.x += (camera.targetX - camera.x) * posSmoothing;
+  camera.y += (camera.targetY - camera.y) * posSmoothing;
 
   // Asymmetric zoom rate: responsive quick zoom-out when spreading, smooth cinematic zoom-in
   const zoomLerpRate = (camera.targetZoom < camera.zoom)

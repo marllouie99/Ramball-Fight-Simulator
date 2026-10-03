@@ -2319,6 +2319,58 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
+  // ─────────────────────────────────────────────
+  // NAOYA ZENIN (24 FPS Projection Sorcery)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'naoya' || f.type === 'naoya') {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
+    const themeColor = f.color || cfg.themeColor || '#76E042';
+    const skills = [];
+
+    // 1. Permanent Stacking Speed Boost (SPD) — Uncapped
+    if (isSkillEnabled(cfg.enableProjectionSorcery, true)) {
+      const currentStacks = f.frameStacks || 0;
+      const currentSpeed = f.speed || 5.6;
+      const refMaxSpeed = Math.max(20.0, (f.baseSpeed || 5.6) + currentStacks * (cfg.speedBonusPerStack || 0.65));
+      const spdPct = Math.max(0, Math.min(100, (currentSpeed / refMaxSpeed) * 100));
+      const spdLabel = currentStacks > 0 ? `SPD: ${currentSpeed.toFixed(1)} (x${currentStacks})` : `SPD: ${currentSpeed.toFixed(1)}`;
+      const isReady = currentStacks > 0;
+
+      skills.push({ id: 'spd', pct: spdPct, ready: isReady, color: themeColor, label: spdLabel });
+    }
+
+    // 2. Skill 1: Frame Blitz (Toggle: enableFrameBlitz)
+    if (isSkillEnabled(cfg.enableFrameBlitz, true)) {
+      const blitzMax = f.skill1CooldownMax || cfg.skill1Cooldown || 330;
+      const blitzTimer = f.skill1Cooldown !== undefined ? f.skill1Cooldown : 0;
+      const blitzPct = Math.max(0, Math.min(100, (1 - (blitzTimer / blitzMax)) * 100));
+      skills.push({ id: 'blitz', pct: blitzPct, ready: blitzPct >= 99 && (f.skill1Cooldown || 0) <= 0, color: themeColor, label: 'FRAME BLITZ' });
+    }
+
+    // 3. Skill 2: Sonic Rebound Kick (Toggle: enableSonicKick)
+    if (isSkillEnabled(cfg.enableSonicKick, true)) {
+      const kickMax = f.skill2CooldownMax || cfg.skill2Cooldown || 480;
+      const kickTimer = f.skill2Cooldown !== undefined ? f.skill2Cooldown : 0;
+      const kickPct = Math.max(0, Math.min(100, (1 - (kickTimer / kickMax)) * 100));
+      skills.push({ id: 'sonic_kick', pct: kickPct, ready: kickPct >= 99 && (f.skill2Cooldown || 0) <= 0, color: '#C8E64A', label: 'SONIC REBOUND' });
+    }
+
+    // 4. Ultimate: 24 FPS Mach 3 Runway Breach (Toggle: enableUltimate)
+    if (isSkillEnabled(cfg.enableUltimate, true)) {
+      const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
+      const currentStacks = f.frameStacks || 0;
+      const ultMax = f.ultCooldownMax || cfg.ultCooldown || 1440;
+      const ultTimer = f.ultCooldown !== undefined ? f.ultCooldown : 0;
+      const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      const hasStacks = currentStacks >= maxStacks;
+      const isReady = ultPct >= 99 && (f.ultCooldown || 0) <= 0 && hasStacks;
+      const label = hasStacks ? 'MACH 3 BREACH' : `MACH 3 (${currentStacks}/${maxStacks})`;
+      skills.push({ id: 'shutter_exec', pct: ultPct, ready: isReady, color: '#00F2FE', label: label });
+    }
+
+    return skills;
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
     return [];
   }
@@ -2379,6 +2431,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     yuji: ['bf_threshold', 'black_flash', 'BLACK FLASH'],
     todo: ['clap', 'boogie', 'BOOGIE'],
     nanami: ['lunge', 'decisive', 'DECISIVE'],
+    naoya: ['shutter_exec', 'shutter', 'execution', 'blitz', 'FRAME BLITZ', 'SHUTTER EXECUTION', '24 FPS'],
     mahoraga: ['wheel', 'adaptation', 'WHEEL', 'ADAPTATION', 'WOA'],
     cj: ['baguvix', 'godmode', 'BAGUVIX', 'GODMODE'],
     engineer: ['turret', 'sentry', 'SENTRY', 'TURRET'],

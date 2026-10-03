@@ -213,6 +213,15 @@ export function resolveFighterCollision(a, b) {
   if ((a.ultimateActive || a._wasFinalBlowSpin) && (a.characterId === 'toji' || a.type === 'toji' || a.name === 'Toji' || a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
   if ((b.ultimateActive || b._wasFinalBlowSpin) && (b.characterId === 'toji' || b.type === 'toji' || b.name === 'Toji' || b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
 
+  // Naoya Projection Sorcery Runway Ultimate: victim locked in stasis, sprinting Naoya, and ragdoll wall flight ignore circle-circle collision push
+  const aIsNaoyaUlt = (a.characterId === 'naoya' || a.type === 'naoya') && a.isExecutingUlt;
+  const bIsNaoyaUlt = (b.characterId === 'naoya' || b.type === 'naoya') && b.isExecutingUlt;
+  if (a.isCaughtInNaoyaUlt || b.isCaughtInNaoyaUlt || aIsNaoyaUlt || bIsNaoyaUlt || a._isFlyingToWallPin || b._isFlyingToWallPin || a.isCurrentlyWallPinnedByNaoya || b.isCurrentlyWallPinnedByNaoya) {
+    if (a.isCaughtInNaoyaUlt) { a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0; }
+    if (b.isCaughtInNaoyaUlt) { b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0; }
+    return;
+  }
+
   // Megumi phases through fighters while submerged in liquid shadow or erupting (Kage no Utsuwa)
   if (a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting) return;
 
@@ -1142,8 +1151,8 @@ export function updateFighters() {
         if (j <= i) continue; // Only check each pair once
         if (!b || b.hp <= 0) continue;
         
-        // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, or when submerged/erupting in liquid shadow
-        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush) continue;
+        // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, Naoya ult runway stasis, or when submerged/erupting in liquid shadow
+        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush || a.isCaughtInNaoyaUlt || b.isCaughtInNaoyaUlt || a._isFlyingToWallPin || b._isFlyingToWallPin || a.isCurrentlyWallPinnedByNaoya || b.isCurrentlyWallPinnedByNaoya || (a.isExecutingUlt && (a.characterId === 'naoya' || a.type === 'naoya')) || (b.isExecutingUlt && (b.characterId === 'naoya' || b.type === 'naoya'))) continue;
 
         resolveFighterCollision(a, b);
       }
