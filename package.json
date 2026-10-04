@@ -16,6 +16,8 @@
     "scaffold:fighter": "node scripts/scaffoldFighter.mjs",
     "scaffold:boss": "node scripts/scaffoldBossConfig.mjs",
     "patch-notes": "node scripts/generatePatchNotes.mjs",
+    "build:web": "node scripts/buildWeb.mjs",
+    "preview:web": "serve -l 8000 dist",
     "build": "electron-builder --win"
   },
   "author": "",
@@ -35,7 +37,9 @@
   },
   "devDependencies": {
     "electron": "^43.1.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.2",
+    "javascript-obfuscator": "^5.9.0"
   },
   "dependencies": {
     "pixi.js": "^7.3.2",

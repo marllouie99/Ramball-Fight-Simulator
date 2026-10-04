@@ -1,5 +1,5 @@
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
-import { state, getLeaderboardData } from '../../core/state.js';
+import { state, getLeaderboardData, saveLeaderboard, loadLeaderboard, initLeaderboardEntry } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
 import { clearHealthHud } from '../hudManager.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
@@ -130,9 +130,9 @@ function drawLeaderboardScreen() {
   drawButton('✏️ EDIT: ' + (isLeaderboardEditMode ? 'ON' : 'OFF'), winX + winW - 75, winY + 46, () => {
     if (isLeaderboardEditMode) {
       if (confirm('Save your edited leaderboard records?')) {
-        import('../core/state.js').then(m => m.saveLeaderboard());
+        saveLeaderboard();
       } else {
-        import('../core/state.js').then(m => m.loadLeaderboard());
+        loadLeaderboard();
       }
     }
     isLeaderboardEditMode = !isLeaderboardEditMode;
@@ -280,9 +280,9 @@ function drawLeaderboardScreen() {
   drawButton('◀ BACK TO TITLE', canvas.width / 2, footerY, () => {
     if (isLeaderboardEditMode) {
       if (confirm('Save your edited leaderboard records?')) {
-        import('../core/state.js').then(m => m.saveLeaderboard());
+        saveLeaderboard();
       } else {
-        import('../core/state.js').then(m => m.loadLeaderboard());
+        loadLeaderboard();
       }
       isLeaderboardEditMode = false;
     }
@@ -310,7 +310,7 @@ function drawLeaderboardScreen() {
     if (mx >= winX + 16 && mx <= winX + 180 && my >= footerY - 30 && my <= footerY + 20) {
       if (confirm('Clear all leaderboard stats?')) {
         state.leaderboard = {};
-        import('../core/state.js').then(m => m.saveLeaderboard());
+        saveLeaderboard();
       }
     }
   };
@@ -330,10 +330,8 @@ function _drawSmallEditor(ctx, val, x, y, fighterIndex, statName) {
   ctx.strokeRect(mx, my, btnSize, btnSize);
   ctx.fillStyle = '#2d080c'; ctx.fillText('-', mx + btnSize / 2, y);
   _registerButton(mx, my, btnSize, btnSize, () => {
-    import('../core/state.js').then(m => {
-      m.initLeaderboardEntry(fighterIndex);
-      state.leaderboard[fighterIndex][statName] = Math.max(0, state.leaderboard[fighterIndex][statName] - 1);
-    });
+    initLeaderboardEntry(fighterIndex);
+    state.leaderboard[fighterIndex][statName] = Math.max(0, state.leaderboard[fighterIndex][statName] - 1);
   });
 
   const px = x + 18 - btnSize;
@@ -345,10 +343,8 @@ function _drawSmallEditor(ctx, val, x, y, fighterIndex, statName) {
   ctx.strokeRect(px, py, btnSize, btnSize);
   ctx.fillStyle = '#2d080c'; ctx.fillText('+', px + btnSize / 2, y);
   _registerButton(px, py, btnSize, btnSize, () => {
-    import('../core/state.js').then(m => {
-      m.initLeaderboardEntry(fighterIndex);
-      state.leaderboard[fighterIndex][statName]++;
-    });
+    initLeaderboardEntry(fighterIndex);
+    state.leaderboard[fighterIndex][statName]++;
   });
 }
 
