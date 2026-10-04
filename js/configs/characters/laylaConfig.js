@@ -2,6 +2,8 @@
 // Layla — Cosmic Marksman Config
 // ─────────────────────────────────────────────
 export const laylaConfig = {
+    name: 'Layla',
+    displayName: 'Layla',
     bossTitle: 'Cosmic Gunner',
     title: 'Cosmic Gunner',
 

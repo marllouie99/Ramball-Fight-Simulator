@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const johnWickConfig = {
+  name: 'John Wick',
+  displayName: 'John Wick',
   bossTitle: 'Baba Yaga',
   title: 'Baba Yaga',
 

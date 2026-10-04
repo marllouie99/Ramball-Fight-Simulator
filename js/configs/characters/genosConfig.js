@@ -1,4 +1,6 @@
 export const genosConfig = {
+  name: 'Genos',
+  displayName: 'Genos',
   bossTitle: 'Demon Cyborg',
   title: 'Demon Cyborg',
 

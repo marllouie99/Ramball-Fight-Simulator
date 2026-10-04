@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const rezeConfig = {
+  name: 'Reze',
+  displayName: 'Reze',
   bossTitle: 'Bomb Devil',
   title: 'Bomb Devil',
 

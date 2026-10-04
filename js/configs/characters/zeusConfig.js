@@ -18,6 +18,8 @@ export const zeusConfig = {
   cooldown: 200,
   projectileSpeedMultiplier: 1.0,
   ability: 'Storm Bringer',
+  name: 'Zeus',
+  displayName: 'Zeus',
   bossTitle: 'King of Olympus',
   title: 'King of Olympus',
   desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',

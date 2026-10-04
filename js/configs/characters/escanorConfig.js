@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const escanorConfig = {
+  name: 'Escanor',
+  displayName: 'Escanor',
   bossTitle: 'Lion Sin of Pride',
   title: 'Lion Sin of Pride',
 

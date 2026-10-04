@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────
 
 export const engineerConfig = {
+  name: 'Engineer',
+  displayName: 'Engineer',
   bossTitle: 'Combat Engineer',
   title: 'Combat Engineer',
 

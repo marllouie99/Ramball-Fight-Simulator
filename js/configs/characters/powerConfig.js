@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const powerConfig = {
+  name: 'Power',
+  displayName: 'Power',
   bossTitle: 'Blood Fiend',
   title: 'Blood Fiend',
 

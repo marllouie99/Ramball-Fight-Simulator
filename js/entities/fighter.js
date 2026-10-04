@@ -2337,7 +2337,7 @@ export class Fighter {
 
     const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
     const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || this.noBlood || this.suppressBlood || this.bleedImmune || this.characterId === 'namelessdeity' || isRatioPauseActive;
-    if (!this.isTurret && !this.isPlant && !this.isPlantMinion && !this.noBlood && !this.suppressBlood && !this.bleedImmune && this.characterId !== 'namelessdeity' && !isExplosionOrFlame && !isSecondTurretHit) {
+    if (!this.isTurret && !this.isDispenser && !this.isPlant && !this.isPlantMinion && !this.noBlood && !this.suppressBlood && !this.bleedImmune && this.characterId !== 'namelessdeity' && !isExplosionOrFlame && !isSecondTurretHit) {
       const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
       if (typeof spawnBloodEffect === 'function') {
         spawnBloodEffect(this, bloodAmount, damageAngle, opts);

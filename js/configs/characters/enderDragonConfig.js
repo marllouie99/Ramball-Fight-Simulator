@@ -18,6 +18,7 @@ export const enderDragonConfig = {
   acidColor: '#A21CAF', // Dragon's Breath Acid Purple
   damageNumberColor: '#C026D3',
   name: 'Ender Dragon',
+  displayName: 'Ender Dragon',
   ability: 'Ruler of The End',
   bossTitle: 'Ruler of The End',
   title: 'Ruler of The End',

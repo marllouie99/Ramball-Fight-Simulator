@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const tanjiroConfig = {
+  name: 'Tanjiro',
+  displayName: 'Tanjiro',
   bossTitle: 'Sun Breathing Slayer',
   title: 'Sun Breathing Slayer',
 

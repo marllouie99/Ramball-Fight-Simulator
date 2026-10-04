@@ -2,6 +2,8 @@
 // Rubbick — Arcane Mage & Spell Steal Config
 // ─────────────────────────────────────────────
 export const rubbickConfig = {
+  name: 'Rubbick',
+  displayName: 'Rubbick',
   bossTitle: 'Grand Magus',
   title: 'Grand Magus',
 

@@ -2,6 +2,8 @@
 // Ryomen Sukuna — King of Curses Config
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
+    name: 'Sukuna',
+    displayName: 'Sukuna',
     // ── Base Attributes ──
     hp: 200,
     speed: 5.8,

@@ -39,6 +39,7 @@ export class DispenserEntity extends Fighter {
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.hideHpText = true; // Disable HP number overlay over body
+    this.suppressBlood = true; // Machines don't bleed — spawn sparks instead
     this.maxHp = cfg.dispenserHp || 160;
     this.hp = this.maxHp;
     this.healCooldownTimer = 0;

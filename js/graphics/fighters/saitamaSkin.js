@@ -111,7 +111,8 @@ export function drawSaitamaSkin(ctx, fighter) {
       const ai = fighter.afterImages[i];
       if (!ai || ai.timer <= 0) continue;
       const progress = ai.timer / (ai.maxTimer || 10);
-      const alpha = progress * 0.38;
+      const baseAlpha = ai.alpha !== undefined ? ai.alpha : 0.38;
+      const alpha = progress * baseAlpha;
       const aiAngle = ai.gunAngle !== undefined ? ai.gunAngle : (ai.angle || 0);
 
       ctx.save();

@@ -6,7 +6,7 @@
 export const draedonConfig = {
   id: 'draedon',
   name: 'Draedon',
-  displayName: 'DRAEDON',
+  displayName: 'Draedon',
   category: 'Gaming',
   bossTitle: 'Architect of the Exo Mechs',
   title: 'Architect of the Exo Mechs',

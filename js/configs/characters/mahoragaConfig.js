@@ -2,6 +2,8 @@
 // Mahoraga — Divine General Config
 // ─────────────────────────────────────────────
 export const mahoragaConfig = {
+    name: 'Mahoraga',
+    displayName: 'Mahoraga',
     // ── Base Attributes ──
     hp: 250,
     speed: 6.5,

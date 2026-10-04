@@ -200,3 +200,23 @@ export const AUDIO_CONFIG = {
   'avatar_reality_shatter': 'Assets/Sound Effects/Avatar/RealityShatter1.ogg',
   'avatar_hurt': 'Assets/Sound Effects/Avatar/AvatarHurt1.ogg'
 };
+
+/**
+ * 90s Arcade Retro Voiceline DSP Configuration (CPS1/CPS2/Neo-Geo MVS aesthetic)
+ */
+export const RETRO_ARCADE_VOICE_CONFIG = {
+  enabled: true,                 // Master toggle for 90s Arcade Retro Voiceline DSP processing
+  highpassFreq: 240,             // Cuts modern sub-bass boom (Hz)
+  highpassQ: 0.707,
+  peakingFreq: 2200,             // Classic arcade forward vocal bite (Hz)
+  peakingGain: 3.8,              // Gain boost (dB)
+  peakingQ: 1.2,
+  lowpassFreq: 4200,             // 16-bit / 22kHz DAC rolloff (Hz)
+  lowpassQ: 0.85,
+  saturationDrive: 1.30,         // Warm arcade cabinet soft-clip saturation drive
+  speedMultiplier: 1.03,         // Arcade PCB audio clock pace multiplier (+3%)
+  enableSlapbackUltimates: true, // Short 85ms slapback echo for domain expansions & massive ultimates
+  slapbackDelaySec: 0.085,
+  slapbackFeedback: 0.18,
+  slapbackMix: 0.22,
+};

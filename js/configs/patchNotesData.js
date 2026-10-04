@@ -28,7 +28,86 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "AVATAROFEMPTINESS",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "displayName",
+                "oldVal": "AVATAR OF EMPTINESS",
+                "newVal": "Avatar of Emptiness",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "DRAEDON",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "displayName",
+                "oldVal": "DRAEDON",
+                "newVal": "Draedon",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "NAOYA",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "moveSpeed",
+                "oldVal": 10.6,
+                "newVal": 12.6,
+                "pct": "+18.9%"
+            },
+            {
+                "type": "NERF",
+                "key": "maxFrameStacks",
+                "oldVal": 30,
+                "newVal": 15,
+                "pct": "-50.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "maxDisruptionsForStasis",
+                "oldVal": 3,
+                "newVal": 20,
+                "pct": "+566.7%"
+            },
+            {
+                "type": "NERF",
+                "key": "basicComboHits",
+                "oldVal": 30,
+                "newVal": 20,
+                "pct": "-33.3%"
+            },
+            {
+                "type": "NERF",
+                "key": "tantoCooldown",
+                "oldVal": 40,
+                "newVal": 500,
+                "pct": "+1150.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "maxStacksPerFlurry",
+                "oldVal": 4,
+                "newVal": 5,
+                "pct": "+25.0%"
+            },
+            {
+                "type": "NERF",
+                "key": "ultPostStrikeBreatherFrames",
+                "oldVal": 100,
+                "newVal": 24,
+                "pct": "-76.0%"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

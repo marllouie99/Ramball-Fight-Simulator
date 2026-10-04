@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────
 
 export const nanamiConfig = {
+  name: 'Nanami',
+  displayName: 'Nanami',
   bossTitle: '7:3 Ratio Sorcerer',
   title: '7:3 Ratio Sorcerer',
 

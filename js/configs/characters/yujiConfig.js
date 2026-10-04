@@ -2,6 +2,8 @@
 // Yuji Itadori — The Black Flash Brawler Config
 // ─────────────────────────────────────────────
 export const yujiConfig = {
+  name: 'Yuji',
+  displayName: 'Yuji',
   bossTitle: 'Tiger of West Junior High',
   title: 'Tiger of West Junior High',
 

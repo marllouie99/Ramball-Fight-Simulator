@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const ulquiorraConfig = {
+  name: 'Ulquiorra',
+  displayName: 'Ulquiorra',
   bossTitle: '4th Espada',
   title: '4th Espada',
 

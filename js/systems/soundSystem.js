@@ -4,8 +4,9 @@
 
 import { state } from '../core/state.js';
 import { soundSpriteManager } from './soundSpriteSystem.js';
+import { RETRO_ARCADE_VOICE_CONFIG } from '../configs/audioConfig.js';
 
-export { soundSpriteManager };
+export { soundSpriteManager, RETRO_ARCADE_VOICE_CONFIG };
 
 const _cache = new Map();
 const _loopingSounds = new Map();
@@ -93,7 +94,8 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
 
 /**
  * Checks whether an audio source is a fighter voice line, vocal chant,
- * or character speech that should not be stolen or played by Rubbick.
+ * or character speech that should not be stolen or played by Rubbick,
+ * and should receive 90s Arcade Retro DSP filtering.
  * @param {string} src
  * @returns {boolean}
  */
@@ -122,7 +124,141 @@ export function isVoicelineAudio(src) {
          s.includes('homie') ||
          s.includes('dialogue') ||
          s.includes('ragescream') ||
-         s.includes('comerika');
+         s.includes('comerika') ||
+         s.includes('sansspeak') ||
+         s.includes('seriouspunch') ||
+         s.includes('bankai') ||
+         s.includes('incinerat') ||
+         s.includes('machinegunblow') ||
+         s.includes('bang') ||
+         s.includes('bakketsu') ||
+         s.includes('hinokami') ||
+         s.includes('thunderclap');
+}
+
+/**
+ * Checks whether a voiceline is an ultimate chant or domain expansion that benefits
+ * from classic arcade slapback reverberation.
+ * @param {string} src
+ * @returns {boolean}
+ */
+export function isUltimateVoiceline(src) {
+  if (!src) return false;
+  const s = String(src).toLowerCase();
+  return s.includes('domain') ||
+         s.includes('shrine') ||
+         s.includes('hollowpurple') ||
+         s.includes('bankai') ||
+         s.includes('seriouspunch') ||
+         s.includes('champion') ||
+         s.includes('purelovebeam') ||
+         s.includes('cosmiclaser') ||
+         s.includes('universalannihilation') ||
+         s.includes('megatontsar');
+}
+
+let _arcadeVoiceChain = null;
+let _arcadeVoiceSlapbackChain = null;
+
+/**
+ * Returns the Arcade Retro DSP filter chain for character voicelines:
+ * - Highpass Filter (240Hz): Removes sub-bass proximity mud
+ * - Peaking Filter (2200Hz, +3.8dB, Q: 1.2): Injects classic arcade vocal bite and presence
+ * - Lowpass Filter (4200Hz): Emulates 16-bit / 22kHz DAC hardware cutoff of CPS1/CPS2/Neo-Geo
+ * - WaveShaper Saturation: Adds warm analog speaker overdrive
+ * - Optional Slapback Delay: 85ms arcade reverberation for Domain Expansions
+ * @param {boolean} [isSlapback=false]
+ * @returns {AudioNode} Input node of the arcade voice DSP chain
+ */
+export function getArcadeVoiceDestination(isSlapback = false) {
+  const audioCtx = getAudioContext();
+  if (!audioCtx) return null;
+  const masterDest = getMasterAudioDestination();
+
+  const isEnabled = (typeof state !== 'undefined' && state.arcadeVoiceFilter !== undefined)
+    ? state.arcadeVoiceFilter
+    : (RETRO_ARCADE_VOICE_CONFIG?.enabled !== false);
+
+  if (!isEnabled) {
+    return masterDest;
+  }
+
+  const useSlapback = isSlapback && (RETRO_ARCADE_VOICE_CONFIG?.enableSlapbackUltimates !== false);
+
+  if (useSlapback) {
+    if (_arcadeVoiceSlapbackChain && _arcadeVoiceSlapbackChain.ctx === audioCtx) {
+      return _arcadeVoiceSlapbackChain.input;
+    }
+  } else {
+    if (_arcadeVoiceChain && _arcadeVoiceChain.ctx === audioCtx) {
+      return _arcadeVoiceChain.input;
+    }
+  }
+
+  try {
+    const cfg = RETRO_ARCADE_VOICE_CONFIG || {};
+
+    // 1. Highpass Filter (Cuts modern sub-bass mud)
+    const hp = audioCtx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.setValueAtTime(cfg.highpassFreq || 240, audioCtx.currentTime);
+    hp.Q.setValueAtTime(cfg.highpassQ || 0.707, audioCtx.currentTime);
+
+    // 2. Presence Peaking Filter (Classic arcade vocal forward punch)
+    const peak = audioCtx.createBiquadFilter();
+    peak.type = 'peaking';
+    peak.frequency.setValueAtTime(cfg.peakingFreq || 2200, audioCtx.currentTime);
+    peak.gain.setValueAtTime(cfg.peakingGain || 3.8, audioCtx.currentTime);
+    peak.Q.setValueAtTime(cfg.peakingQ || 1.2, audioCtx.currentTime);
+
+    // 3. Lowpass Filter (16-bit / 22kHz DAC rolloff)
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(cfg.lowpassFreq || 4200, audioCtx.currentTime);
+    lp.Q.setValueAtTime(cfg.lowpassQ || 0.85, audioCtx.currentTime);
+
+    // 4. WaveShaper Saturation Curve (Soft-clip arcade drive)
+    const shaper = audioCtx.createWaveShaper();
+    const n_samples = 256;
+    const curve = new Float32Array(n_samples);
+    const k = cfg.saturationDrive || 1.30;
+    for (let i = 0; i < n_samples; ++i) {
+      const x = (i * 2) / n_samples - 1;
+      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    shaper.curve = curve;
+    shaper.oversample = 'none';
+
+    hp.connect(peak);
+    peak.connect(lp);
+    lp.connect(shaper);
+
+    if (useSlapback) {
+      const delay = audioCtx.createDelay();
+      delay.delayTime.setValueAtTime(cfg.slapbackDelaySec || 0.085, audioCtx.currentTime);
+      const feedback = audioCtx.createGain();
+      feedback.gain.setValueAtTime(cfg.slapbackFeedback || 0.18, audioCtx.currentTime);
+      const wetGain = audioCtx.createGain();
+      wetGain.gain.setValueAtTime(cfg.slapbackMix || 0.22, audioCtx.currentTime);
+
+      shaper.connect(delay);
+      delay.connect(feedback);
+      feedback.connect(delay);
+      delay.connect(wetGain);
+
+      shaper.connect(masterDest);
+      wetGain.connect(masterDest);
+
+      _arcadeVoiceSlapbackChain = { ctx: audioCtx, input: hp };
+      return hp;
+    } else {
+      shaper.connect(masterDest);
+      _arcadeVoiceChain = { ctx: audioCtx, input: hp };
+      return hp;
+    }
+  } catch (e) {
+    return masterDest;
+  }
 }
 
 function _pruneSoundCache() {
@@ -338,10 +474,16 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
       const gainNode = audioCtx.createGain();
       const targetGain = Math.max(0, Math.min(25.0, volume));
       const rampTime = fadeMs > 0 ? (fadeMs / 1000) : MICRO_FADE_IN;
-      gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
-      gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + rampTime);
+      const isVoice = isVoicelineAudio(src);
+      const isArcadeEnabled = (typeof state !== 'undefined' && state.arcadeVoiceFilter !== undefined)
+        ? state.arcadeVoiceFilter
+        : (RETRO_ARCADE_VOICE_CONFIG?.enabled !== false);
+      const targetDest = (isVoice && isArcadeEnabled)
+        ? getArcadeVoiceDestination(false)
+        : getMasterAudioDestination();
+
       source.connect(gainNode);
-      gainNode.connect(getMasterAudioDestination());
+      gainNode.connect(targetDest);
       source.playbackRate.value = Math.max(0.1, speed);
       source.loop = true;
       source.start(0);
@@ -772,12 +914,24 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
       const delaySec = delay > 0 ? (delay < 10 ? delay : delay / 1000) : 0;
       const startTime = audioCtx.currentTime + delaySec;
 
+      const isVoice = isVoicelineAudio(src);
+      const isUltVoice = isVoice && isUltimateVoiceline(src);
+      const isArcadeEnabled = (typeof state !== 'undefined' && state.arcadeVoiceFilter !== undefined)
+        ? state.arcadeVoiceFilter
+        : (RETRO_ARCADE_VOICE_CONFIG?.enabled !== false);
+      const targetDest = (isVoice && isArcadeEnabled)
+        ? getArcadeVoiceDestination(isUltVoice)
+        : getMasterAudioDestination();
+
       // Instant zero-delay attack at startTime
       gainNode.gain.setValueAtTime(targetGain, startTime);
       source.connect(gainNode);
-      gainNode.connect(getMasterAudioDestination());
+      gainNode.connect(targetDest);
 
-      const safeSpeed = Math.max(0.1, speed);
+      const speedMultiplier = (isVoice && isArcadeEnabled && speed === 1.0)
+        ? (RETRO_ARCADE_VOICE_CONFIG?.speedMultiplier || 1.03)
+        : 1.0;
+      const safeSpeed = Math.max(0.1, speed * speedMultiplier);
       source.playbackRate.value = safeSpeed;
 
       const offsetSec = Math.max(0, spriteBaseOffset + offset);

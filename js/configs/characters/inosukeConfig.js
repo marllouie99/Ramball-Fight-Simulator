@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const inosukeConfig = {
+  name: 'Inosuke',
+  displayName: 'Inosuke',
   bossTitle: 'Beast Breathing Slayer',
   title: 'Beast Breathing Slayer',
 

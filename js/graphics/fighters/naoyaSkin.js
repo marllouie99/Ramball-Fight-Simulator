@@ -299,7 +299,8 @@ export function drawNaoyaSkin(ctx, fighter) {
     const handOutline = '#0E1015';
 
     const isPunching = Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
-    const isUltSprinting = Boolean(fighter.isExecutingUlt && (fighter.ultPhase === 1 || fighter.ultPhase === 0));
+    const isUltPaused = Boolean(fighter.isExecutingUlt && (fighter.ultStartupPauseTimer || 0) > 0);
+    const isUltSprinting = Boolean(fighter.isExecutingUlt && !isUltPaused && (fighter.ultPhase === 1 || fighter.ultPhase === 0));
 
     if (isPunching) {
       const maxT = fighter.punchAnimMaxTimer || 8;

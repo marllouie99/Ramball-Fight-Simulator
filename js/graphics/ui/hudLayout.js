@@ -9,6 +9,11 @@ let _cachedContainerBottom = null;
 let _cachedTopContainer = null;
 let _cachedBottomContainer = null;
 let _cachedPixiView = null;
+let _cachedBoxHeight = 0;
+let _cachedBoxWidth = 0;
+let _cachedCanvasHeight = 0;
+let _cachedCanvasWidth = 0;
+let _cachedCanvasTopInBox = 0;
 
 /**
  * Safely sets a style property on a DOM element, supporting both standard
@@ -56,7 +61,13 @@ export function syncHudPosition() {
 
   if (boxRect.height <= 0 || canvasRect.height <= 0 || boxRect.width <= 0 || canvasRect.width <= 0) return;
 
-  const canvasTopInBox = canvasRect.top - boxRect.top;
+  _cachedBoxHeight = boxRect.height;
+  _cachedBoxWidth = boxRect.width;
+  _cachedCanvasHeight = canvasRect.height;
+  _cachedCanvasWidth = canvasRect.width;
+  _cachedCanvasTopInBox = canvasRect.top - boxRect.top;
+
+  const canvasTopInBox = _cachedCanvasTopInBox;
   const canvasLeftInBox = canvasRect.left - boxRect.left;
 
   const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
@@ -205,11 +216,15 @@ export function updateTopHudCameraTracking(topContainer) {
     )
   );
 
-  const boxRect = _cachedGameBox.getBoundingClientRect();
-  const canvasRect = _cachedPixiView.getBoundingClientRect();
-  if (boxRect.height <= 0 || canvasRect.height <= 0 || boxRect.width <= 0 || canvasRect.width <= 0) return;
+  if (_cachedBoxHeight <= 0 || _cachedCanvasHeight <= 0) {
+    syncHudPosition();
+    if (_cachedBoxHeight <= 0 || _cachedCanvasHeight <= 0) return;
+  }
 
-  const canvasTopInBox = canvasRect.top - boxRect.top;
+  const boxHeight = _cachedBoxHeight;
+  const canvasHeightPx = _cachedCanvasHeight;
+  const canvasWidthPx = _cachedCanvasWidth;
+  const canvasTopInBox = _cachedCanvasTopInBox;
   const topOffsetPx = is1v2 ? 100 : 90;
 
   const camX = isFixed ? arenaCenterX : (cam ? cam.x : arenaCenterX);
@@ -219,10 +234,10 @@ export function updateTopHudCameraTracking(topContainer) {
   const hudTopCanvasY = screenArenaTop - (topOffsetPx * camZoom);
   const effectiveHudScale = baseHudScale * camZoom;
 
-  const hudTopPxInBox = canvasTopInBox + (canvasRect.height * (hudTopCanvasY / canvasHeight));
-  const hudTopPercent = (hudTopPxInBox / boxRect.height) * 100;
+  const hudTopPxInBox = canvasTopInBox + (canvasHeightPx * (hudTopCanvasY / canvasHeight));
+  const hudTopPercent = (hudTopPxInBox / boxHeight) * 100;
 
-  const displayRatio = canvasRect.width / canvasWidth;
+  const displayRatio = canvasWidthPx / canvasWidth;
   const panOffsetX = (arenaCenterX - camX) * camZoom;
   const shakeX = ((cam ? cam.shakeX : (state ? state.shakeX : 0)) || 0);
   const shakeY = ((cam ? cam.shakeY : (state ? state.shakeY : 0)) || 0);
@@ -235,6 +250,8 @@ export function updateTopHudCameraTracking(topContainer) {
   setSafeStyle(topContainer, 'transform-origin', 'top center', 'important');
 }
 
+let _lastBottomHudStyle = '';
+
 /**
  * Dynamically ensures the Bottom HUD Container (#healthHud and #hudBottomContainer)
  * remains strictly screen-locked in viewport space with ZERO camera tracking drift or arena tethering.
@@ -245,6 +262,9 @@ export function updateBottomHudCameraTracking(bottomContainer) {
   const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
   const scale = CONFIG.internalScale || 1.0;
   const baseHudScale = isTactical ? 1.0 : (scale * 0.9);
+  const curStyle = `${isTactical ? 'none' : baseHudScale}`;
+  if (_lastBottomHudStyle === curStyle) return;
+  _lastBottomHudStyle = curStyle;
 
   setSafeStyle(bottomContainer, 'bottom', 'auto', 'important');
   setSafeStyle(bottomContainer, 'transform', isTactical ? 'none' : `scale(${baseHudScale})`, 'important');

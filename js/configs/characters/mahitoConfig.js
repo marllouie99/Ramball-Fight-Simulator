@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const mahitoConfig = {
+  name: 'Mahito',
+  displayName: 'Mahito',
   bossTitle: 'Curse of Humanity',
   title: 'Curse of Humanity',
 

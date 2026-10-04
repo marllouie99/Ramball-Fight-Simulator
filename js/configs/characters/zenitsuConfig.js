@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const zenitsuConfig = {
+  name: 'Zenitsu',
+  displayName: 'Zenitsu',
   bossTitle: 'Thunder Breathing Slayer',
   title: 'Thunder Breathing Slayer',
 

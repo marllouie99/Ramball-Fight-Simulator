@@ -1494,24 +1494,34 @@ export function updateAspectScaling() {
     container.style.removeProperty('transform');
     container.style.removeProperty('transform-origin');
     container.style.removeProperty('--app-scale');
+    container.style.removeProperty('position');
+    container.style.removeProperty('top');
+    container.style.removeProperty('left');
+    container.style.removeProperty('margin');
     return;
   }
 
   document.documentElement.classList.add('fit-window-mode');
   document.body.classList.add('fit-window-mode');
 
-  const winW = (typeof window !== 'undefined' && (window.innerWidth || (document.documentElement && document.documentElement.clientWidth))) || 540;
-  const winH = (typeof window !== 'undefined' && (window.innerHeight || (document.documentElement && document.documentElement.clientHeight))) || 960;
+  // Reliable viewport dimension detection across mobile Safari, Android Chrome, and Desktop
+  const docEl = (typeof document !== 'undefined' && document.documentElement) ? document.documentElement : null;
+  const winW = (typeof window !== 'undefined' && (window.innerWidth || (docEl && docEl.clientWidth))) || 540;
+  const winH = (typeof window !== 'undefined' && (window.innerHeight || (docEl && docEl.clientHeight))) || 960;
   const baseW = 540;
   const baseH = 960;
 
   // Calculate aspect-preserving scale factor
   const scale = Math.min(winW / baseW, winH / baseH);
-  const formattedScale = Math.max(0.1, Math.min(10.0, scale)).toFixed(4);
+  const formattedScale = Math.max(0.05, Math.min(10.0, scale)).toFixed(4);
 
   container.style.setProperty('--app-scale', formattedScale);
-  container.style.transform = `scale(${formattedScale})`;
+  container.style.position = 'fixed';
+  container.style.top = '50%';
+  container.style.left = '50%';
+  container.style.transform = `translate(-50%, -50%) scale(${formattedScale})`;
   container.style.transformOrigin = 'center center';
+  container.style.margin = '0';
 }
 
 export function toggleAspectScaling() {
@@ -1641,7 +1651,14 @@ document.addEventListener('fullscreenchange', () => {
   updateAspectScaling();
 });
 window.addEventListener('resize', updateAspectScaling);
-window.addEventListener('orientationchange', updateAspectScaling);
+window.addEventListener('orientationchange', () => {
+  updateAspectScaling();
+  setTimeout(updateAspectScaling, 100);
+  setTimeout(updateAspectScaling, 300);
+});
+if (typeof window !== 'undefined' && window.visualViewport) {
+  window.visualViewport.addEventListener('resize', updateAspectScaling);
+}
 setInterval(syncMobileQuickBar, 100);
 
 // Initialize aspect scaling on initial boot

@@ -16,6 +16,20 @@ export { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomH
 initHudSync();
 
 /**
+ * Resolves dynamic display name for a fighter directly from its character config (e.g. CONFIG[id].displayName || CONFIG[id].name).
+ * Live config updates immediately reflect in the HUD.
+ */
+export function getFighterDisplayName(fighter, uppercase = true) {
+  if (!fighter) return '';
+  const charId = fighter.characterId || fighter.type || (fighter._def && (fighter._def.id || fighter._def.type));
+  const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
+  const rawName = charCfg?.displayName || charCfg?.name || fighter.displayName || fighter.name || fighter._def?.displayName || fighter._def?.name || charId || 'FIGHTER';
+  const isSans = Boolean(charId === 'sans' || (typeof rawName === 'string' && rawName.toLowerCase() === 'sans'));
+  if (isSans) return 'sans';
+  return uppercase ? String(rawName).toUpperCase() : String(rawName);
+}
+
+/**
  * Checks if the screen is currently dimmed by an active Domain Expansion (or active non-Purple ultimate strike).
  * Strictly excludes skill channeling / windup phases, and excludes Hollow Purple per explicit requirements.
  */
@@ -2480,7 +2494,7 @@ function updateHealthHud() {
 
         const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta' || (m.name && m.name.toUpperCase().includes('YUTA')));
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
-        const memberName = isMemberSans ? 'sans' : (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
+        const memberName = getFighterDisplayName(m, true);
 
         if (isMemberCj) {
           return `
@@ -2673,7 +2687,7 @@ function updateHealthHud() {
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const barColor = getFighterHealthBarColor(bossFighter, ratio, isDark);
         const isBossSans = Boolean(bossFighter.characterId === 'sans' || bossFighter.type === 'sans' || (bossFighter.name && bossFighter.name.toLowerCase() === 'sans'));
-        const bossName = isBossSans ? 'sans' : (bossFighter.name || bossFighter.characterId || 'BOSS').toUpperCase();
+        const bossName = getFighterDisplayName(bossFighter, true);
         const bossSubname = getBossSubName(bossFighter);
         const bossColor = getFighterThemeColor(bossFighter, '#ef4444');
         const hpValText = `${Math.floor(Math.max(0, Number(curHp) || 0))} / ${Math.floor(maxHp)}`;
@@ -2747,7 +2761,7 @@ function updateHealthHud() {
         const chColor = chFighter.color || fighterThemeColor;
         let nameColor = isDark ? (fighterThemeColor || '#ffffff') : '#000000';
         const isChSans = Boolean(chFighter.characterId === 'sans' || chFighter.type === 'sans' || (chFighter.name && chFighter.name.toLowerCase() === 'sans'));
-        const fighterName = isChSans ? 'sans' : (chFighter.name || chFighter.characterId || `CHALLENGER ${chIdx + 1}`).toUpperCase();
+        const fighterName = getFighterDisplayName(chFighter, true);
         const fighterStats = state.leaderboard ? (state.leaderboard[chFighter.fighterIndex] || { wins: 0, losses: 0 }) : { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
         const losses = fighterStats.losses;
@@ -2925,7 +2939,7 @@ function updateHealthHud() {
         const color = fighter.color || '#fff';
         const isYutaFighter = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
         let nameColor = (state.arenaTheme === 'dark') ? (isYutaFighter ? '#FF1493' : '#ffffff') : '#000000';
-        const fighterName = fighter.name || `FIGHTER ${index + 1}`;
+        const fighterName = getFighterDisplayName(fighter, true);
         const fighterStats = state.leaderboard ? (state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 }) : { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
         const losses = fighterStats.losses;
@@ -3331,7 +3345,7 @@ function updateHealthHud() {
           }
         }
         const isBossSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
-        const bossName = isBossSans ? 'sans' : (fighter.name || fighter.characterId || 'BOSS').toUpperCase();
+        const bossName = getFighterDisplayName(fighter, true);
         if (cachedCard.lastBossName !== bossName) {
           cachedCard.bossCardName.textContent = bossName;
           cachedCard.lastBossName = bossName;
@@ -3362,7 +3376,7 @@ function updateHealthHud() {
           }
         }
         const isChSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
-        const chName = isChSans ? 'sans' : (fighter.name || fighter.characterId || 'CHALLENGER').toUpperCase();
+        const chName = getFighterDisplayName(fighter, true);
         if (cachedCard.lastChName !== chName) {
           cachedCard.chCardName.textContent = chName;
           cachedCard.lastChName = chName;

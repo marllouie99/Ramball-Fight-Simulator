@@ -6,6 +6,7 @@ export const gunslingerConfig = {
   // ── Base Character Attributes ──
   id: 13,
   name: 'Gun Slinger',
+  displayName: 'Gun Slinger',
   characterId: 'gunslinger',
   category: 'Sci-Fi & Modern',
   title: 'Western Outlaw',

@@ -19,6 +19,8 @@ export const eyeOfCthulhuConfig = {
   damage: 28,
   cooldown: 90,
   projectileSpeedMultiplier: 1.0,
+  name: 'Eye of Cthulhu',
+  displayName: 'Eye of Cthulhu',
   ability: 'The Evil Presence',
   bossTitle: 'Ancient Ocular Horror',
   title: 'Ancient Ocular Horror',

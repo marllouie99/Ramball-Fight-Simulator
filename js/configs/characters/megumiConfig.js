@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────
 
 export const megumiConfig = {
+  name: 'Megumi',
+  displayName: 'Megumi',
   bossTitle: 'Ten Shadows Summoner',
   title: 'Ten Shadows Summoner',
 

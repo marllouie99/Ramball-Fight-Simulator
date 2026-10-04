@@ -2,6 +2,8 @@
 // Gojo Satoru — Limitless Fighter Configuration
 // ─────────────────────────────────────────────
 export const gojoConfig = {
+  name: 'Gojo',
+  displayName: 'Gojo',
   // ── Base Attributes ──
   hp: 200,
   speed: 5.5,

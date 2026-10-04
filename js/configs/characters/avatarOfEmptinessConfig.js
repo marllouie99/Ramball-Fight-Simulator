@@ -6,7 +6,7 @@
 export const avatarOfEmptinessConfig = {
   id: 'avatarofemptiness',
   name: 'Avatar of Emptiness',
-  displayName: 'AVATAR OF EMPTINESS',
+  displayName: 'Avatar of Emptiness',
   category: 'Gaming',
   bossTitle: 'Sovereign of the Three Universes',
   title: 'Sovereign of the Three Universes',

@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const sansConfig = {
+  name: 'sans',
+  displayName: 'sans',
   bossTitle: 'The Judge of the Underground',
   title: 'The Judge of the Underground',
 

@@ -2,6 +2,8 @@
 // Uryu Ishida — The Last Quincy & Sternritter "A" Config
 // ─────────────────────────────────────────────
 export const uryuConfig = {
+  name: 'Uryu',
+  displayName: 'Uryu',
   bossTitle: 'Last Quincy',
   title: 'Last Quincy',
 

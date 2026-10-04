@@ -5,6 +5,7 @@ export const spikeConfig = {
   // ── Base Character Attributes ──
   id: 3,
   name: 'Spike',
+  displayName: 'Spike',
   category: 'Fantasy & Magic',
   title: 'Thorn Brawler',
   bossTitle: 'Thorn Brawler',

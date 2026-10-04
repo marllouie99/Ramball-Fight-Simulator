@@ -2,6 +2,8 @@
 // Yuta Okkotsu — Special Grade Sorcerer Config
 // ─────────────────────────────────────────────
 export const yutaConfig = {
+  name: 'Yuta',
+  displayName: 'Yuta',
   // ── Base Attributes ──
   hp: 200,
   speed: 5.8,

@@ -2,6 +2,8 @@
 // Aoi Todo — Boogie Woogie Brawler Config
 // ─────────────────────────────────────────────
 export const todoConfig = {
+    name: 'Todo',
+    displayName: 'Todo',
     bossTitle: '530,000 IQ Brother',
     title: '530,000 IQ Brother',
 

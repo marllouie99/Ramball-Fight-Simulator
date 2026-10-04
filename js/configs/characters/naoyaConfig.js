@@ -9,7 +9,7 @@ export const naoyaConfig = {
   // Base Attributes
   hp: 190,
   speed: 6.6,
-  moveSpeed: 10.6,
+  moveSpeed: 12.6,
   r: 25,
   radius: 25,
   color: '#76E042', // Electric Lime
@@ -29,7 +29,7 @@ export const naoyaConfig = {
 
   // Passive: Projection Sorcery (Permanent Speed & Evade Stacking on Hit)
   enableProjectionSorcery: true,
-  maxFrameStacks: 30,               // Max speed & evade stacks
+  maxFrameStacks: 15,               // Max speed & evade stacks
   speedBonusPerStack: 0.50,         // +0.50 permanent movement speed per hit
   baseEvadeChance: 0.05,            // 5% starting base evade chance
   evadeBonusPerStack: 0.04,         // +4% permanent evade chance per hit stack
@@ -38,19 +38,30 @@ export const naoyaConfig = {
   projectedFrameLeadOffset: 1.0,    // Tight forward spawn distance multiplier relative to radius
   projectedFrameStepDistance: 0.85, // Step trigger radius threshold relative to radius
 
+  // Idle & Movement Afterimages (24 FPS Trailing Ghost Frames)
+  enableMovementAfterimages: true,   // ⚡ Enable discrete afterimage trail during normal movement / combat
+  movementAfterimageInterval: 10,     // ⚡ How often (frames) a trailing afterimage spawns while moving (lower = denser trail)
+  movementAfterimageAlpha: 0.65,     // ⚡ Initial opacity of each movement afterimage (0.10 to 1.0)
+  movementAfterimageLifespanFrames: 50, // ⚡ Duration (frames) each idle/movement afterimage lasts before fading out 1 by 1 (e.g. 15 = fast, 40 = long trail)
+  movementAfterimageFadeEase: 1.15,  // ⚡ Fade-out dissolve curve (1.0 = linear, >1.0 = smooth ease-out)
+  movementAfterimageMinSpeed: 0.8,   // ⚡ Minimum movement speed threshold to spawn trailing afterimages
+  movementAfterimageShockwaves: true, // ⚡ Spawn expanding sonic shockwave ring when each idle/movement afterimage pops into existence
+  movementAfterimageShockwaveRadiusMult: 1.8, // ⚡ Shockwave expansion size relative to fighter radius
+  movementAfterimageSFX: false,      // ⚡ Subtle step SFX on each movement afterimage pop
+
   // Passive: 24-Frame Palm Touch & Frame Stasis Freeze
-  enableFrameFreeze: 0,
-  frameFreezeDuration: 60,          // 1.0s duration (60 frames)
-  frameFreezeCooldown: 1000,         // ⚡ Cooldown between passive palm touch freezes (4.0s / 240 frames)
+  enableFrameFreeze: 1,             // ⚡ Enabled when Flurry is UP
+  frameFreezeDuration: 50,          // 1.0s duration (60 frames)
+  frameFreezeCooldown: 500,         // ⚡ Cooldown between passive palm touch freezes (4.0s / 240 frames)
   frameFreezeVulnerability: 0.30,   // +30% bonus True Damage taken while frozen
-  maxDisruptionsForStasis: 3,       // Number of basic disruptions required to trigger stasis
+  maxDisruptionsForStasis: 20,       // Number of basic disruptions required to trigger stasis
   frameShatterDamage: 18,           // AOE shatter damage upon breaking out
   frameShatterRadius: 75,
 
   // Primary Attack: Rapid 24 FPS Hypersonic Brawler Punch Flurry Barrage (Attack-Teleport-Attack Sequence)
   meleeReach: 72,
   meleeArc: (140 * Math.PI) / 180,  // 140° frontal arc
-  basicComboHits: 30,               // ⚡ How many total punches in a flurry sequence (e.g. 10, 20, 30)
+  basicComboHits: 20,               // ⚡ How many total punches in a flurry sequence (e.g. 10, 20, 30)
   flurryPunchesPerTeleport: 0,      // ⚡ How many punches Naoya throws at each teleport angle (e.g. 1 = teleport every punch, 3 = 3 punches per teleport)
   flurryStrikeIntervalFrames: 8,   // ⚡ Speed of each attack (lower = faster! 3 frames = 20 attacks/sec)
   flurryOrbitDistance: 24,         // Surround distance when teleporting around the target
@@ -61,11 +72,11 @@ export const naoyaConfig = {
   punchKnockback: 16,              // Knockback applied ONLY on the final finisher punch
   tantoDamage: 4,                  // Backward compatibility alias
   tantoComboFinisherDamage: 18,
-  tantoCooldown: 40,
+  tantoCooldown: 500,
   tantoKnockback: 16,
   tantoStrikeFrames: 30,
   tantoRecoveryFrames: 8,
-  maxStacksPerFlurry: 4,            // ⚡ Maximum speed & evade stacks gained per flurry sequence
+  maxStacksPerFlurry: 5,            // ⚡ Maximum speed & evade stacks gained per flurry sequence
 
   // Skill 1: Frame Blitz (Nijūyon Koma Senkō)
   enableFrameBlitz: 0,
@@ -87,25 +98,28 @@ export const naoyaConfig = {
   // Ultimate: 24 FPS Mach 3 Runway Breach — Out-of-Bounds Acceleration & Sonic Shatter
   enableUltimate: 1,
   ultCooldown: 1440,                // 24.0s (1440 frames)
-  ultRunwayRadiusX: 2500,           // ⚡ Runway Path Distance (Horizontal width radius in px — increase to make path wider)
-  ultRunwayRadiusY: 3000,           // ⚡ Runway Path Distance (Vertical height radius in px — increase to make path longer/taller)
-  ultRunwaySpeedRate: 0.0050,       // ⚡ Fixed runway speed rate per frame (lower = longer sprint duration, higher = faster sprint)
-  ultRunwayStartSpeedMult: 0.50,    // ⚡ Initial slow acceleration multiplier (smooth, slow initial slide startup)
-  ultRunwayEndSpeedMult: 3.20,      // ⚡ Peak Mach 3 acceleration multiplier upon slamming into target
-  ultRunwayAccelPower: 2.10,        // ⚡ Progressive acceleration curve exponent (Smooth ease-in ramp into Mach 3)
+  ultStartupPauseFrames: 28,        // ⚡ Duration (frames) of the initial arena time-stop pause where Naoya stops before running (~0.45s)
+  ultRunwayRadiusX: 10000,           // ⚡ Runway Path Distance (Horizontal width radius in px — increase to make path wider)
+  ultRunwayRadiusY: 10000,           // ⚡ Runway Path Distance (Vertical height radius in px — increase to make path longer/taller)
+  ultRunwaySpeedRate: 0.0048,       // ⚡ Fixed runway speed rate per frame (lower = longer sprint duration, higher = faster sprint)
+  ultRunwayStartSpeedMult: 0.40,    // ⚡ Initial slow takeoff acceleration multiplier (ultra-smooth, slow startup glide into path)
+  ultRunwayEndSpeedMult: 1.40,      // ⚡ Peak Mach 3 acceleration multiplier upon slamming into target
+  ultRunwayAccelPower: 2.30,        // ⚡ Progressive acceleration curve exponent (Smooth ease-in ramp into Mach 3)
   ultRunwayAfterimageCount: 52,     // ⚡ Number of afterimages distributed along the runway path
-  ultRunwaySpacingPower: 2.15,      // ⚡ Non-linear compression exponent (afterimages start far apart and get closer & closer together)
-  ultAfterimageAlpha: 0.38,         // ⚡ Smooth semi-transparent opacity for runway afterimage ghost bodies (0.15 to 0.60)
-  ultFinisherDamage: 75,            // Direct Mach 3 impact True Damage
+  ultRunwaySpacingPower: 1.15,      // ⚡ Non-linear compression exponent (afterimages start far apart and get closer & closer together)
+  ultAfterimageAlpha: 0.45,         // ⚡ Initial opacity for runway afterimage ghost bodies (0.15 to 0.80)
+  ultAfterimageLifespanFrames: 36,  // ⚡ Duration (frames) each afterimage lasts before fading out 1 by 1 (e.g. 20 = fast fade, 50 = long trail)
+  ultAfterimageFadeEase: 1.20,      // ⚡ Fade-out curve (1.0 = linear, >1.0 = smooth ease-out dissolve)
+  ultFinisherDamage: 150,            // Direct Mach 3 impact True Damage
   ultTimeStopDuration: 240,         // Target freeze duration during runway sprint
   ultCameraZoom: 1.00,              // Cinematic camera zoom when tracking Naoya during runway sprint
   ultBreachStraightDist: 140,       // ⚡ Length (px) of the dedicated straight supersonic runway breach approach into the target
   ultImpactMinArmProgress: 0.92,    // ⚡ Minimum runway progress before physical collision with the target is armed
   ultImpactThresholdProgress: 0.985,// ⚡ Terminal runway progress where impact is guaranteed even if target moved
-  ultPostStrikeBreatherFrames: 100,  // ⚡ Duration (frames) of Naoya's post-strike breather / recovery cooldown before basic attacks resume
+  ultPostStrikeBreatherFrames: 24,  // ⚡ Duration (frames) of Naoya's post-strike breather / recovery cooldown before basic attacks resume
   ultPostStrikeSlowMultiplier: 0.30, // ⚡ Heavy movement speed slow multiplier while recovering from Mach 3 crash (30% speed)
-  ultPostStrikeReboundSpeed: 14.0,  // ⚡ Natural kinetic recoil rebound velocity applied to Naoya on impact
-  ultWallLaunchSpeed: 42.0,         // ⚡ Launch velocity pushing victim into the arena wall on impact
+  ultPostStrikeReboundSpeed: 0.0,   // ⚡ Clean post-strike standstill at impact point facing the victim
+  ultWallLaunchSpeed: 10.0,         // ⚡ Launch velocity pushing victim into the arena wall on impact
   ultWallPinDurationFrames: 50,    // ⚡ Duration (frames) enemy remains pinned to the wall (120 frames = 2.0s at 60fps)
   ultVictimPostCrashSlowDuration: 120, // ⚡ Duration (frames) victim is slowed after wall pin release
   ultVictimPostCrashSlowMultiplier: 0.40, // ⚡ Movement slow multiplier applied to victim (40% speed)

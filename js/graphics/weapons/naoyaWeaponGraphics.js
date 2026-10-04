@@ -368,10 +368,11 @@ function _renderProjectionFrameCell(ctx, cx, cy, angle, r, alpha) {
  */
 export function drawProjectionSorceryForwardFrames(ctx, fighter) {
   if (!fighter || fighter.isExecutingUlt) return;
+  if (typeof fighter.isMovementSlowed === 'function' && fighter.isMovementSlowed()) return;
 
   const r = fighter.r || 25;
 
-  // 1. Draw all smoothly fading stepped afterimage frames (pure ghost models)
+  // 1. Draw all smoothly fading stepped afterimage frames left behind in his wake (pure trailing ghost models)
   if (fighter.steppedFrames && fighter.steppedFrames.length > 0) {
     for (let i = 0; i < fighter.steppedFrames.length; i++) {
       const sf = fighter.steppedFrames[i];
@@ -380,13 +381,6 @@ export function drawProjectionSorceryForwardFrames(ctx, fighter) {
       }
     }
   }
-
-  // 2. Draw active ahead projected ghost frame (pure ghost model)
-  const frame = fighter.projectedFrame;
-  if (!frame || !frame.active || frame.alpha <= 0) return;
-
-  const alpha = Math.max(0, Math.min(1, frame.alpha));
-  drawNaoyaGhostModel(ctx, frame.x, frame.y, frame.angle || fighter.gunAngle || 0, r, alpha * 0.60);
 }
 
 /**
@@ -649,41 +643,14 @@ export function drawNaoyaMachRunwayVFX(ctx, fighter) {
     const targetY = targetPos ? targetPos.y : (target ? target.y : 0);
     const targetR = targetPos ? targetPos.r : ((target && target.r) ? target.r : 25);
 
-    for (let i = 0; i < numFrames; i++) {
-      // Non-linear compression: afterimages start far apart at t=0 and get progressively closer & closer together towards t=1
-      const u = numFrames > 1 ? (i / (numFrames - 1)) : 0;
-      const frameT = Math.min(1.0, Math.max(0, 1.0 - Math.pow(1.0 - u, spacingPower)));
-      const pt = sampleNaoyaRunwaySpline(points, frameT);
-
-      // Do not render duplicate ghost afterimages overlapping directly inside the enemy's body or at the terminal end (frameT >= 0.98)
-      if (target && !target.isDead) {
-        const distToEnemy = Math.hypot(pt.x - targetX, pt.y - targetY);
-        if (distToEnemy < targetR + 10 || frameT >= 0.98) continue;
+    // Draw all active stepped afterimages that fade out 1 by 1 sequentially
+    if (fighter.steppedRunwayFrames && fighter.steppedRunwayFrames.length > 0) {
+      for (let i = 0; i < fighter.steppedRunwayFrames.length; i++) {
+        const af = fighter.steppedRunwayFrames[i];
+        if (af && af.alpha > 0.01) {
+          drawNaoyaGhostModel(ctx, af.x, af.y, af.angle || 0, r, af.alpha);
+        }
       }
-      // Do not render duplicate ghost afterimage directly under Naoya's starting body if progress is still at start
-      if (currentProgress < 0.05) {
-        const distToStart = Math.hypot(pt.x - startPos.x, pt.y - startPos.y);
-        if (distToStart < r * 0.8) continue;
-      }
-
-      // Distance between Naoya's current sprint position and this frame
-      const distFromNaoya = Math.abs(currentProgress - frameT);
-
-      let frameAlpha;
-      if (distFromNaoya < 0.045) {
-        // Immediate active sprint step (bright highlight as he steps on / passes this frame)
-        frameAlpha = Math.min(0.65, baseAlphaCfg * 1.50);
-      } else if (frameT < currentProgress) {
-        // Trailing wake afterimages behind Naoya
-        const distBehind = currentProgress - frameT;
-        frameAlpha = Math.max(0.18, baseAlphaCfg * (1.1 - distBehind * 0.40));
-      } else {
-        // Ahead afterimages along the runway path (visible showing the compressing route ahead)
-        frameAlpha = baseAlphaCfg;
-      }
-
-      // Render Clean Cached Pixel Art Ghost Body (All Frames Visible along Full Runway Path)
-      drawNaoyaGhostModel(ctx, pt.x, pt.y, pt.angle || 0, r, frameAlpha);
     }
 
     // 2. 24 FPS Target Lock Box around target
@@ -701,19 +668,12 @@ export function drawNaoyaMachRunwayVFX(ctx, fighter) {
       ctx.moveTo(targetX + boxR - c, targetY - boxR);
       ctx.lineTo(targetX + boxR, targetY - boxR);
       ctx.lineTo(targetX + boxR, targetY - boxR + c);
-      // Bottom-left
-      ctx.moveTo(targetX - boxR, targetY + boxR - c);
-      ctx.lineTo(targetX - boxR, targetY + boxR);
-      ctx.lineTo(targetX - boxR + c, targetY + boxR);
       // Bottom-right
       ctx.moveTo(targetX + boxR - c, targetY + boxR);
       ctx.lineTo(targetX + boxR, targetY + boxR);
       ctx.lineTo(targetX + boxR, targetY + boxR - c);
       ctx.stroke();
     }
-
-    // 3. Smooth Fade-in Chained Speedlines trailing along the curved runway path behind Naoya
-    drawNaoyaRunwaySpeedLines(ctx, fighter, points);
   }
 
   ctx.restore();

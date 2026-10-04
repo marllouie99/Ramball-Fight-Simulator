@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────
 
 export const tojiConfig = {
+  name: 'Toji',
+  displayName: 'Toji',
   // Base Attributes
   hp: 420,
   speed: 5.6,

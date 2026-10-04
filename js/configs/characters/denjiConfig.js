@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const denjiConfig = {
+  name: 'Denji',
+  displayName: 'Denji',
   bossTitle: 'Chainsaw Man',
   title: 'Chainsaw Man',
 

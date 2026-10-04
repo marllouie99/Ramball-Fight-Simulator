@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const cjConfig = {
+  name: 'CJ',
+  displayName: 'CJ',
   bossTitle: 'Grove Street Legend',
   title: 'Grove Street Legend',
 

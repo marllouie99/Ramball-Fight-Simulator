@@ -5,6 +5,8 @@
 // ─────────────────────────────────────────────
 
 export const meguminConfig = {
+  name: 'Megumin',
+  displayName: 'Megumin',
   bossTitle: 'Crimson Archmage',
   title: 'Crimson Demon',
 

@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────
 
 export const nobaraConfig = {
+  name: 'Nobara',
+  displayName: 'Nobara',
   bossTitle: 'Straw Doll Sorcerer',
   title: 'Straw Doll Sorcerer',
 

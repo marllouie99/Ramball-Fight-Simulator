@@ -52,6 +52,10 @@ export class SaitamaFighter extends Fighter {
     this.dodgeCooldown = 0;
     this.afterImages = [];
     this._lastDodgeSideLeft = false;
+    this._dodgedVolleyIds = new Set();
+    this._lastShotgunDodgeFrame = 0;
+    this._shotgunDodgeGraceTimer = 0;
+    this._lastShotgunDodgeAttacker = null;
 
     // Passive: Serious Skill Counter (Teleport Behind Punch)
     this.skillPunishCooldown = CONFIG.saitama?.initialSkillPunishCooldown ?? (CONFIG.saitama?.skillPunishCooldown || 2000);
@@ -490,8 +494,68 @@ export class SaitamaFighter extends Fighter {
   }
 
   /**
+   * Clears all active dodge afterimages.
+   */
+  clearAllAfterimages() {
+    if (this.afterImages) this.afterImages.length = 0;
+  }
+
+  /**
+   * Snaps aim facing direction directly at target upon teleport arrival (Rule 1.3).
+   */
+  snapAimAtTarget(target) {
+    if (!target) return;
+    const opp = (target.attacker && target.attacker.hp > 0) ? target.attacker :
+      (target.owner && target.owner.hp > 0) ? target.owner :
+      (target.hp > 0) ? target : null;
+    if (!opp || typeof opp.x !== 'number') return;
+    const aimAngle = Math.atan2(opp.y - this.y, opp.x - this.x);
+    this.gunAngle = aimAngle;
+    this.angle = aimAngle;
+    if (typeof this.aim === 'function') {
+      this.aim(opp);
+    }
+  }
+
+  /**
+   * Spawns configurable dodge afterimages along the teleport displacement vector (similar to Sans).
+   */
+  _spawnDodgeAfterimages(startX, startY, endX, endY, startAngle = 0, endAngle = 0) {
+    const cfg = (CONFIG && CONFIG.saitama) ? CONFIG.saitama : {};
+    const count = cfg.dodgeAfterimageCount ?? cfg.dodgeAfterimages ?? 2;
+    if (count <= 0) return;
+
+    if (!this.afterImages) this.afterImages = [];
+    const maxBuffer = cfg.dodgeMaxAfterimages ?? cfg.dodgeAfterimageMax ?? Math.max(16, count * 4);
+    const duration = (cfg.dodgeAfterimageDuration !== undefined) ? cfg.dodgeAfterimageDuration : 18;
+    const alpha = (cfg.dodgeAfterimageAlpha !== undefined) ? cfg.dodgeAfterimageAlpha : 0.40;
+
+    for (let i = 0; i < count; i++) {
+      while (this.afterImages.length >= maxBuffer) {
+        this.afterImages.shift();
+      }
+
+      const t = count === 1 ? 0 : (i / count);
+      const px = startX + (endX - startX) * t;
+      const py = startY + (endY - startY) * t;
+      const pAngle = startAngle + (endAngle - startAngle) * t;
+
+      this.afterImages.push({
+        x: px,
+        y: py,
+        r: this.r,
+        angle: pAngle,
+        gunAngle: pAngle,
+        timer: duration,
+        maxTimer: duration,
+        alpha: alpha
+      });
+    }
+  }
+
+  /**
    * Passive Dodge Teleport (Caped Baldy Reflexes):
-   * Sidesteps a short distance left or right upon detecting incoming attacks or projectiles.
+   * Sidesteps or teleports upon detecting incoming attacks or projectiles (similar to Sans).
    */
   executeDodgeTeleport(attacker, isProjectile = false) {
     if (this.hp <= 0 || this.isChainedByMakima) return false;
@@ -501,6 +565,7 @@ export class SaitamaFighter extends Fighter {
       return false;
     }
 
+    const cfg = (CONFIG && CONFIG.saitama) ? CONFIG.saitama : {};
     const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
     const isSliceLineDodge = Boolean(attacker && attacker.isSliceLine);
     const isDomainDodge = isInsideDomain || isSliceLineDodge;
@@ -554,7 +619,7 @@ export class SaitamaFighter extends Fighter {
     // Check if Nanami or Escanor is currently executing a hit-pause
     const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
 
-    if (!this.isSkillEnabled(CONFIG.saitama?.enableDodge, true) || this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isFlurryBreather || isGlobalHitPausing) {
+    if (!this.isSkillEnabled(cfg.enableDodge, true) || this.dodgeCooldown > 0 || this.isFrozenByInfinity || this.isTargetOfAmbush || this.isChainedByMakima || isExecutingSeriousCounter || isFlurryBreather || isGlobalHitPausing) {
       return false;
     }
     // Block dodge if time-stopped by non-domain effects
@@ -563,20 +628,22 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Passive: Caped Baldy Reflexes (Dodge Teleport)
-    const dodgeChance = CONFIG.saitama?.dodgeChance ?? 0.50;
-    if (Math.random() > dodgeChance) {
+    const dodgeChance = isDomainDodge
+      ? ((cfg.domainDodgeChance !== undefined) ? cfg.domainDodgeChance : 0.85)
+      : ((cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 0.70);
+    if (dodgeChance < 1.0 && Math.random() > dodgeChance) {
       return false; // Dodge failed!
     }
 
     const oldX = this.x;
     const oldY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
 
     if (isStationaryDodge) {
       // During Serious Skill Counter charging state or Consecutive Normal Punches:
       // Dodge mechanic is ENABLED (negates damage, shows "MISS!", plays SFX/grunt, spawns impact flash),
       // but teleportation / sidestep is DISABLED (Saitama stays in place executing his skill/counter punch).
       
-      // Clear any hitStun, hit-pause, or beam/purple/flurry trap state on dodge so Saitama breaks free cleanly
       const savedTimeStop = this.timeStopTimer;
       this.hitStunTimer = 0;
       this.basicAttackHitPauseTimer = 0;
@@ -626,39 +693,41 @@ export class SaitamaFighter extends Fighter {
         spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
       }
 
-      // Spawn floating text "MISS!" on successful dodge
+      // Spawn floating text on successful dodge
+      const dodgeTxt = cfg.dodgeText || 'MISS';
+      const dodgeColor = cfg.dodgeTextColor || '#FFFFFF';
       if (typeof spawnFloatingText === 'function') {
-        spawnFloatingText(this.x, this.y - this.r - 18, 'MISS!', '#A0AEC0');
+        spawnFloatingText(this.x, this.y - this.r - 18, dodgeTxt, dodgeColor);
       }
 
       // Crisp dash audio effect
-      const dashSFX = CONFIG.saitama?.sounds?.dodgeSFX || 'skill_dash3';
-      const dashVol = CONFIG.saitama?.soundVolumes?.dodgeSFX ?? 0.85;
+      const dashSFX = cfg.sounds?.dodgeSFX || 'skill_dash3';
+      const dashVol = cfg.soundVolumes?.dodgeSFX ?? 0.85;
       audioSystem.playSFX(dashSFX, dashVol);
 
       // Play Saitama Dodge Grunt / Noise with configurable chance & volume
-      const dodgeNoiseSounds = CONFIG.saitama?.sounds?.dodgeNoiseSounds || [
+      const dodgeNoiseSounds = cfg.sounds?.dodgeNoiseSounds || [
         'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
         'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
         'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
       ];
-      const dodgeNoiseChance = (typeof CONFIG.saitama?.soundChances?.dodgeNoise === 'number')
-        ? CONFIG.saitama.soundChances.dodgeNoise
-        : ((typeof CONFIG.saitama?.dodgeNoiseChance === 'number') ? CONFIG.saitama.dodgeNoiseChance : 0.35);
+      const dodgeNoiseChance = (typeof cfg.soundChances?.dodgeNoise === 'number')
+        ? cfg.soundChances.dodgeNoise
+        : ((typeof cfg.dodgeNoiseChance === 'number') ? cfg.dodgeNoiseChance : 0.35);
 
       if (dodgeNoiseSounds && dodgeNoiseSounds.length > 0 && Math.random() < dodgeNoiseChance) {
         const selectedDodgeNoise = dodgeNoiseSounds[Math.floor(Math.random() * dodgeNoiseSounds.length)];
-        const noiseVol = CONFIG.saitama?.soundVolumes?.dodgeNoise !== undefined 
-          ? CONFIG.saitama.soundVolumes.dodgeNoise 
-          : (CONFIG.saitama?.dodgeNoiseVolume !== undefined ? CONFIG.saitama.dodgeNoiseVolume : 2.5);
+        const noiseVol = cfg.soundVolumes?.dodgeNoise !== undefined 
+          ? cfg.soundVolumes.dodgeNoise 
+          : (cfg.dodgeNoiseVolume !== undefined ? cfg.dodgeNoiseVolume : 2.5);
         audioSystem.playSFX(selectedDodgeNoise, noiseVol);
       }
 
-      this.dodgeCooldown = CONFIG.saitama?.dodgeCooldown ?? 1;
+      this.dodgeCooldown = cfg.dodgeCooldown ?? 1;
       return true;
     }
 
-    const baseDist = CONFIG.saitama?.dodgeDistance || 100;
+    const baseDist = cfg.dodgeDistance || 110;
     let dist = baseDist;
     let perpAngle;
 
@@ -701,12 +770,12 @@ export class SaitamaFighter extends Fighter {
     let targetY = this.y + Math.sin(perpAngle) * dist;
 
     // Arena boundary check to keep Saitama strictly inside arena walls
-    const arena = CONFIG.arena;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { width: 500, height: 500, x: 50, y: 50 });
     if (arena) {
-      const minX = arena.x + this.r + 10;
-      const maxX = arena.x + arena.width - this.r - 10;
-      const minY = arena.y + this.r + 10;
-      const maxY = arena.y + arena.height - this.r - 10;
+      const minX = arena.x + this.r + 15;
+      const maxX = arena.x + arena.width - this.r - 15;
+      const minY = arena.y + this.r + 15;
+      const maxY = arena.y + arena.height - this.r - 15;
 
       // If primary sidestep hits boundary, attempt opposite side
       if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
@@ -718,6 +787,9 @@ export class SaitamaFighter extends Fighter {
       targetX = Math.max(minX, Math.min(maxX, targetX));
       targetY = Math.max(minY, Math.min(maxY, targetY));
     }
+
+    // Spawn afterimages across the displacement vector (similar to Sans)
+    this._spawnDodgeAfterimages(oldX, oldY, targetX, targetY, startAngle, startAngle);
 
     // Teleport position update
     this.x = targetX;
@@ -754,7 +826,7 @@ export class SaitamaFighter extends Fighter {
       this.timeStopTimer = savedTimeStop;
     }
 
-    // MANDATORY Rule #3: Always update aim facing direction relative to opponent after changing position!
+    // Snap aim facing direction relative to target opponent after changing position (Rule 1.3)
     const targetOpponent = (attacker && !attacker.isSliceLine && attacker !== this && attacker.hp > 0 && typeof attacker.x === 'number')
       ? attacker 
       : ((attacker && attacker.attacker && attacker.attacker !== this && attacker.attacker.hp > 0 && typeof attacker.attacker.x === 'number')
@@ -762,36 +834,15 @@ export class SaitamaFighter extends Fighter {
         : ((attacker && attacker.owner && attacker.owner !== this && attacker.owner.hp > 0 && typeof attacker.owner.x === 'number')
           ? attacker.owner
           : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null)));
-    if (targetOpponent && typeof targetOpponent.x === 'number') {
-      const aimAngle = Math.atan2(targetOpponent.y - this.y, targetOpponent.x - this.x);
-      this.gunAngle = aimAngle;
-      this.angle = aimAngle;
-      if (typeof this.aim === 'function') {
-        this.aim(targetOpponent);
-      }
+    if (targetOpponent) {
+      this.snapAimAtTarget(targetOpponent);
     }
 
     // Apply teleport chase delay to attacker (e.g. Gojo or Sukuna) so they don't snap-teleport instantly to Saitama's new dodge position
     const chaser = (attacker && !attacker.isSliceLine && attacker !== this) ? attacker : (attacker && attacker.attacker ? attacker.attacker : targetOpponent);
     if (chaser) {
-      const chaseDelay = CONFIG.saitama?.attackerTeleportChaseDelayFrames ?? 5;
+      const chaseDelay = cfg.attackerTeleportChaseDelayFrames ?? 5;
       chaser.teleportChaseDelayTimer = Math.max(chaser.teleportChaseDelayTimer || 0, chaseDelay);
-    }
-
-    // Spawn subtle fading ghost model skin afterimages along dodge path dynamically scaled with distance
-    if (!this.afterImages) this.afterImages = [];
-    const dodgeDist = Math.hypot(this.x - oldX, this.y - oldY);
-    const steps = Math.min(2, Math.max(1, Math.floor(dodgeDist / 60)));
-    for (let i = 0; i <= steps; i++) {
-      const p = i / steps;
-      pushTrailCap(this.afterImages, {
-        x: oldX + (this.x - oldX) * p,
-        y: oldY + (this.y - oldY) * p,
-        r: this.r,
-        gunAngle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
-        timer: 10,
-        maxTimer: 10,
-      }, 6);
     }
 
     // Clean impact flashes at old & new coordinates
@@ -800,53 +851,160 @@ export class SaitamaFighter extends Fighter {
       spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
     }
 
-    // Spawn floating text "MISS!" on successful dodge
+    // Spawn floating text on successful dodge
+    const dodgeTxt = cfg.dodgeText || 'MISS';
+    const dodgeColor = cfg.dodgeTextColor || '#FFFFFF';
     if (typeof spawnFloatingText === 'function') {
-      spawnFloatingText(this.x, this.y - this.r - 18, 'MISS!', '#A0AEC0');
+      spawnFloatingText(this.x, this.y - this.r - 18, dodgeTxt, dodgeColor);
     }
 
     // Crisp dash audio effect
-    const dashSFX = CONFIG.saitama?.sounds?.dodgeSFX || 'skill_dash3';
-    const dashVol = CONFIG.saitama?.soundVolumes?.dodgeSFX ?? 0.85;
+    const dashSFX = cfg.sounds?.dodgeSFX || 'skill_dash3';
+    const dashVol = cfg.soundVolumes?.dodgeSFX ?? 0.85;
     audioSystem.playSFX(dashSFX, dashVol);
 
-    // Play Saitama Dodge Grunt / Noise with configurable chance & volume (organized like Nanami)
-    const dodgeNoiseSounds = CONFIG.saitama?.sounds?.dodgeNoiseSounds || [
+    // Play Saitama Dodge Grunt / Noise with configurable chance & volume
+    const dodgeNoiseSounds = cfg.sounds?.dodgeNoiseSounds || [
       'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
       'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
       'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
     ];
-    const dodgeNoiseChance = (typeof CONFIG.saitama?.soundChances?.dodgeNoise === 'number')
-      ? CONFIG.saitama.soundChances.dodgeNoise
-      : ((typeof CONFIG.saitama?.dodgeNoiseChance === 'number') ? CONFIG.saitama.dodgeNoiseChance : 0.35);
+    const dodgeNoiseChance = (typeof cfg.soundChances?.dodgeNoise === 'number')
+      ? cfg.soundChances.dodgeNoise
+      : ((typeof cfg.dodgeNoiseChance === 'number') ? cfg.dodgeNoiseChance : 0.35);
 
     if (dodgeNoiseSounds && dodgeNoiseSounds.length > 0 && Math.random() < dodgeNoiseChance) {
       const selectedDodgeNoise = dodgeNoiseSounds[Math.floor(Math.random() * dodgeNoiseSounds.length)];
-      const noiseVol = CONFIG.saitama?.soundVolumes?.dodgeNoise !== undefined 
-        ? CONFIG.saitama.soundVolumes.dodgeNoise 
-        : (CONFIG.saitama?.dodgeNoiseVolume !== undefined ? CONFIG.saitama.dodgeNoiseVolume : 2.5);
-      // Play full audio clip without cutting off on subsequent rapid teleports
+      const noiseVol = cfg.soundVolumes?.dodgeNoise !== undefined 
+        ? cfg.soundVolumes.dodgeNoise 
+        : (cfg.dodgeNoiseVolume !== undefined ? cfg.dodgeNoiseVolume : 2.5);
       audioSystem.playSFX(selectedDodgeNoise, noiseVol);
     }
 
-    // Apply a subtle micro-glide velocity sideways along perpAngle so Saitama moves a little smoothly after dodging
+    // Apply subtle micro-glide velocity sideways along perpAngle
     const microGlideSpeed = 2.2;
     this.vx = Math.cos(perpAngle) * microGlideSpeed;
     this.vy = Math.sin(perpAngle) * microGlideSpeed;
-    this.dodgeStallTimer = 8; // Short 8-frame micro-glide (~0.13s)
-    this.dodgeCooldown = CONFIG.saitama?.dodgeCooldown ?? 1;
+    this.dodgeStallTimer = cfg.dodgeStallDuration ?? 8;
+    this.dodgeCooldown = cfg.dodgeCooldown ?? 1;
     return true;
   }
 
   /**
    * Passive: Caped Baldy Reflexes against Sukuna's spatial cut lines
-   * Allows Saitama to dodge through Malevolent Shrine slice lines.
+   * Allows Saitama to dodge through Malevolent Shrine slice lines (similar to Sans).
    */
   dodgeSliceLine(lineData = {}) {
-    return this.executeDodgeTeleport({
-      isSliceLine: true,
-      ...lineData
-    });
+    const cfg = (CONFIG && CONFIG.saitama) ? CONFIG.saitama : {};
+    if (!this.isSkillEnabled(cfg.enableDodge, true)) return false;
+
+    if (this._isInsideGojoDomain() || this.isChainedByMakima || this.hp <= 0) return false;
+    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
+    if (isGlobalHitPausing) return false;
+
+    if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) {
+      return false;
+    }
+
+    const dodgeChance = (cfg.domainDodgeChance !== undefined) ? cfg.domainDodgeChance : ((cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 0.85);
+    if (dodgeChance < 1.0 && Math.random() >= dodgeChance) {
+      return false; // Roll failed
+    }
+
+    this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 1;
+
+    const startX = this.x;
+    const startY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
+
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { width: 500, height: 500, x: 50, y: 50 });
+    const angle = lineData.angle || 0;
+    const nx = lineData.normalX !== undefined ? lineData.normalX : -Math.sin(angle);
+    const ny = lineData.normalY !== undefined ? lineData.normalY : Math.cos(angle);
+
+    let sideSign = 1;
+    if (typeof lineData.cx === 'number' && typeof lineData.cy === 'number') {
+      const side = (this.x - lineData.cx) * nx + (this.y - lineData.cy) * ny;
+      sideSign = side >= 0 ? 1 : -1;
+    } else {
+      this._lastDodgeSideLeft = !this._lastDodgeSideLeft;
+      sideSign = this._lastDodgeSideLeft ? 1 : -1;
+    }
+
+    const jumpDist = (cfg.dodgeDistance !== undefined) ? cfg.dodgeDistance : 110;
+    let targetX = this.x + nx * sideSign * jumpDist;
+    let targetY = this.y + ny * sideSign * jumpDist;
+
+    const minX = arena.x + this.r + 15;
+    const maxX = arena.x + arena.width - this.r - 15;
+    const minY = arena.y + this.r + 15;
+    const maxY = arena.y + arena.height - this.r - 15;
+
+    if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
+      targetX = this.x - nx * sideSign * jumpDist;
+      targetY = this.y - ny * sideSign * jumpDist;
+    }
+
+    const finalX = Math.max(minX, Math.min(maxX, targetX));
+    const finalY = Math.max(minY, Math.min(maxY, targetY));
+
+    // Spawn afterimages along displacement vector
+    this._spawnDodgeAfterimages(startX, startY, finalX, finalY, startAngle, startAngle);
+
+    this.x = finalX;
+    this.y = finalY;
+    this.vx = 0;
+    this.vy = 0;
+    this.dodgeStallTimer = (cfg.dodgeStallDuration !== undefined) ? cfg.dodgeStallDuration : 8;
+
+    // Clear CC/traps
+    this.hitStunTimer = 0;
+    this.basicAttackHitPauseTimer = 0;
+    this.isCaughtInPurple = false;
+    this.caughtInPureLoveBeam = false;
+    this.caughtInGenosFlurry = false;
+    this.caughtInSaitamaFlurry = false;
+
+    // Snap aim at attacker (Rule 1.3)
+    this.snapAimAtTarget(lineData?.attacker);
+
+    // Spawn impact flash
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(startX, startY, 20, '#F5C400');
+      spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
+    }
+
+    // Spawn floating text
+    const dodgeTxt = cfg.dodgeText || 'MISS';
+    const dodgeColor = cfg.dodgeTextColor || '#FFFFFF';
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 18, dodgeTxt, dodgeColor);
+    }
+
+    // Audio SFX
+    const dashSFX = cfg.sounds?.dodgeSFX || 'skill_dash3';
+    const dashVol = cfg.soundVolumes?.dodgeSFX ?? 0.85;
+    audioSystem.playSFX(dashSFX, dashVol);
+
+    // Grunts
+    const dodgeNoiseSounds = cfg.sounds?.dodgeNoiseSounds || [
+      'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
+    ];
+    const dodgeNoiseChance = (typeof cfg.soundChances?.dodgeNoise === 'number')
+      ? cfg.soundChances.dodgeNoise
+      : ((typeof cfg.dodgeNoiseChance === 'number') ? cfg.dodgeNoiseChance : 0.35);
+
+    if (dodgeNoiseSounds && dodgeNoiseSounds.length > 0 && Math.random() < dodgeNoiseChance) {
+      const selectedDodgeNoise = dodgeNoiseSounds[Math.floor(Math.random() * dodgeNoiseSounds.length)];
+      const noiseVol = cfg.soundVolumes?.dodgeNoise !== undefined 
+        ? cfg.soundVolumes.dodgeNoise 
+        : (cfg.dodgeNoiseVolume !== undefined ? cfg.dodgeNoiseVolume : 2.5);
+      audioSystem.playSFX(selectedDodgeNoise, noiseVol);
+    }
+
+    return true;
   }
 
   /**
@@ -1705,6 +1863,8 @@ export class SaitamaFighter extends Fighter {
       return super.takeDamage(amount, attacker, opts);
     }
 
+    const cfg = (CONFIG && CONFIG.saitama) ? CONFIG.saitama : {};
+
     // If paralyzed by Nanami's guaranteed 7:3 Ratio strike / hit-pause or explicit sure-kill attack, Saitama cannot dodge or counter!
     const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
     const isDomainFreeze = isInsideDomain;
@@ -1755,11 +1915,39 @@ export class SaitamaFighter extends Fighter {
       return super.takeDamage(amount, attacker, opts);
     }
 
+    const proj = opts.projectile;
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : ((Date.now() / 16.6) | 0);
+
+    const isShotgunPellet = Boolean(
+      proj && (
+        proj.isShotgun ||
+        proj.shotgunVolleyId ||
+        proj.visual === 'johnWickShotgunPellet' ||
+        proj.visual === 'EngineerBullet' ||
+        (opts.isTacticalBullet && attacker && (attacker.characterId === 'shotgun' || attacker.characterId === 'spas12' || attacker._def?.type === 'spas12'))
+      )
+    );
+
+    // Multi-projectile / Shotgun Volley Check (similar to Sans):
+    // When a shotgun blast or multi-projectile volley fires, dodging one pellet dodges the blast as a single attack.
+    const isAlreadyDodgedVolley = Boolean(
+      (proj && proj.shotgunVolleyId && this._dodgedVolleyIds && this._dodgedVolleyIds.has(proj.shotgunVolleyId)) ||
+      (proj && proj.shotPairId && this._dodgedVolleyIds && this._dodgedVolleyIds.has(proj.shotPairId)) ||
+      (isShotgunPellet && (
+        (this._lastShotgunDodgeFrame === currentFrame) ||
+        (this._shotgunDodgeGraceTimer > 0 && this._lastShotgunDodgeAttacker === attacker)
+      ))
+    );
+
+    if (isAlreadyDodgedVolley && (!opts.bypassDodge || isSukunaDomainSlash)) {
+      return false; // Free dodge for remaining pellets from this shot
+    }
+
     // If incoming damage is from a skill/ultimate/channeling attack and counter is ready, execute counter punch!
     const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isChanneling;
     if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0 && !this.isFlurrying) {
       const primaryTarget = this._resolveTrueFighterTarget(attacker) || attacker;
-      const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
+      const maxRange = cfg.counterTriggerDistance ?? 320;
       const distToAttacker = Math.hypot(primaryTarget.x - this.x, primaryTarget.y - this.y);
       if (distToAttacker <= maxRange) {
         const countered = this.executeSkillCounterPunish(primaryTarget);
@@ -1794,6 +1982,16 @@ export class SaitamaFighter extends Fighter {
       }
       const dodged = this.executeDodgeTeleport(dodgeTarget);
       if (dodged) {
+        // Track shotgun / multi-projectile volley so remaining pellets from this shot are auto-dodged
+        if (isShotgunPellet || (proj && proj.shotPairId)) {
+          if (!this._dodgedVolleyIds) this._dodgedVolleyIds = new Set();
+          if (proj && proj.shotgunVolleyId) this._dodgedVolleyIds.add(proj.shotgunVolleyId);
+          if (proj && proj.shotPairId) this._dodgedVolleyIds.add(proj.shotPairId);
+          this._lastShotgunDodgeFrame = currentFrame;
+          const graceWindow = (cfg.shotgunDodgeGraceWindow !== undefined) ? cfg.shotgunDodgeGraceWindow : 16;
+          this._shotgunDodgeGraceTimer = graceWindow;
+          this._lastShotgunDodgeAttacker = attacker;
+        }
         return false; // Negate damage (dodged!)
       }
     }
@@ -2101,7 +2299,13 @@ export class SaitamaFighter extends Fighter {
     this.punchCooldownTimer = 0;
     this.boredomStacks = 0;
     this.boredomTimer = 0;
+    this.dodgeCooldown = 0;
     this.afterImages = [];
+    if (this._dodgedVolleyIds) this._dodgedVolleyIds.clear();
+    else this._dodgedVolleyIds = new Set();
+    this._lastShotgunDodgeFrame = 0;
+    this._shotgunDodgeGraceTimer = 0;
+    this._lastShotgunDodgeAttacker = null;
     this.flurryCooldown = CONFIG.saitama?.flurryCooldown || 540; // Start at full CD so bar ticks down from match start
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
@@ -2130,6 +2334,16 @@ export class SaitamaFighter extends Fighter {
         img.timer--;
         return img.timer > 0;
       });
+    }
+
+    if (this.dodgeCooldown > 0) {
+      this.dodgeCooldown--;
+    }
+    if (this._shotgunDodgeGraceTimer > 0) {
+      this._shotgunDodgeGraceTimer--;
+    }
+    if (this._dodgedVolleyIds && this._dodgedVolleyIds.size > 20) {
+      this._dodgedVolleyIds.clear();
     }
 
     // Always tick cooldowns and stun timers every frame even while frozen

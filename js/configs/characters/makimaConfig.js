@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const makimaConfig = {
+  name: 'Makima',
+  displayName: 'Makima',
   bossTitle: 'Control Devil',
   title: 'Control Devil',
 

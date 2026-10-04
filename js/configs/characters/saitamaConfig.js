@@ -3,6 +3,8 @@
 // ─────────────────────────────────────────────
 
 export const saitamaConfig = {
+  name: 'Saitama',
+  displayName: 'Saitama',
   // Base stats
   hp: 420,
   speed: 6.0,
@@ -104,9 +106,19 @@ export const saitamaConfig = {
 
   // Passive: Caped Baldy Reflexes (Dodge Teleport)
   enableDodge: true,             // Master toggle for Passive: Caped Baldy Reflexes
-  dodgeChance: 0.70, // probability (0-1) of successfully dodging incoming attacks
-  dodgeDistance: 100, // Short sidestep distance (left/right)
-  dodgeCooldown: 1, // Minimum frames (~0.06s) between dodge sidesteps
+  dodgeChance: 0.70,             // Probability (0-1) of successfully dodging incoming attacks
+  domainDodgeChance: 0.85,       // Probability (0-1) of dodging spatial slice lines in Domain Expansions (e.g. Malevolent Shrine)
+  dodgeDistance: 110,            // Sidestep jump distance (pixels)
+  dodgeCooldown: 1,              // Minimum frames (~0.016s) between dodge sidesteps
+  shotgunDodgeGraceWindow: 16,   // Grace window (frames) where subsequent pellets from a shotgun spread/volley are auto-dodged
+  dodgeAfterimageCount: 2,       // Number of ghost model afterimages spawned per dodge
+  dodgeAfterimages: 2,           // Alias for dodgeAfterimageCount
+  dodgeMaxAfterimages: 16,       // Maximum simultaneous active afterimages in arena buffer
+  dodgeAfterimageDuration: 18,   // Lifespan of each dodge afterimage ghost (frames)
+  dodgeAfterimageAlpha: 0.40,    // Base opacity / visibility of afterimage ghosts
+  dodgeStallDuration: 8,         // Frames movement velocity is dampened after dodge (micro-glide)
+  dodgeText: 'MISS',             // Floating text on successful dodge ('MISS' or 'DODGE')
+  dodgeTextColor: '#FFFFFF',     // Floating text color
   attackerTeleportChaseDelayFrames: 5, // Delay (frames) applied to teleporting chasers (Gojo/Sukuna) when Saitama dodges (~0.5s)
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)

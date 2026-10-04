@@ -9,7 +9,7 @@ import { updateGame } from './updateSystem.js';
 import { renderGame } from './renderSystem.js';
 import { getAudioCurrentTime } from './soundSystem.js';
 
-export const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+export const isMobile = (typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) || (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024);
 export const TARGET_FPS = 60; // Standard 60 FPS across all devices for consistent combat physics
 export const FRAME_TIME = 1000 / TARGET_FPS;
 let lastFrameTime = 0;
@@ -26,16 +26,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 export function animate(timestamp) {
-  // Mobile: skip frame to limit FPS and reduce heating
-  if (isMobile) {
-    const elapsed = timestamp - lastFrameTime;
-    if (elapsed < FRAME_TIME) {
-      requestAnimationFrame(animate);
-      return;
-    }
-    lastFrameTime = timestamp - (elapsed % FRAME_TIME);
-  }
-
   // Skip updates when page is hidden
   if (!isPageVisible) {
     requestAnimationFrame(animate);
@@ -51,8 +41,8 @@ export function animate(timestamp) {
       state.fpsFrames = 0;
       state.fpsLastTime = timestamp;
 
-      // Visual quality stays at 100% full quality (no dynamic degradation on FPS drop)
-      state.qualityLevel = state.performanceMode ? 0.2 : 1.0;
+      // Adaptive particle and LOD quality: 100% on desktop, 75% on mobile (eliminates GPU fillrate choke)
+      state.qualityLevel = state.performanceMode ? 0.2 : (isMobile ? 0.75 : 1.0);
 
       // Track active particles
       let burnActive = 0;
@@ -73,8 +63,9 @@ export function animate(timestamp) {
         state.berserkerRageEffects.length + (state.sparkEffects ? state.sparkEffects.length : 0) +
         burnActive + flameActive;
 
-      // FPS Drop Detection
-      if (state.fps < 45 && state.gameState === 'playing') {
+      // FPS Drop Detection (Throttled to once per second to eliminate diagnostic overhead during combat)
+      if (state.fps < 45 && state.gameState === 'playing' && (!state._lastFpsLogTime || (timestamp - state._lastFpsLogTime >= 1000))) {
+        state._lastFpsLogTime = timestamp;
         // Collect diagnostic data synchronously (cheap integer checks)
         const currentFps = state.fps;
         const projCount = getProjectiles().length;

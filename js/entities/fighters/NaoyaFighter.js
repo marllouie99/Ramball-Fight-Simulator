@@ -74,6 +74,8 @@ export class NaoyaFighter extends Fighter {
     this.isSonicKicking = false;
     this.sonicKickTimer = 0;
     this.sonicShockwaves = []; // Active shockwave rings
+    this.steppedRunwayFrames = []; // Runway afterimages fading out 1 by 1
+    this.movementAfterimages = []; // Idle/movement afterimages fading out 1 by 1
 
     // Ultimate: 24 FPS Shutter Execution & Vehicular Run-Over
     this.ultCooldown = 0;
@@ -86,6 +88,7 @@ export class NaoyaFighter extends Fighter {
     this.ultRunOverTimer = 0;
     this.ultBreatherTimer = 0;
     this.ultBreachAngle = 0;
+    this.ultStartupPauseTimer = 0;
     this.skidMarks = []; // Burning asphalt tire skid tracks from car crash impact
 
     // Projection Sorcery Single Ahead Frame, Step Pops & Fading Stepped Frames
@@ -103,6 +106,10 @@ export class NaoyaFighter extends Fighter {
         cooldownKey: 'skill1Cooldown',
         cooldownMax: () => this.skill1CooldownMax,
         color: this.themeColor,
+        canCast: (fighter) => {
+          const cfg = CONFIG.naoya || {};
+          return Boolean(cfg.enableFrameBlitz && cfg.enableFrameBlitz !== 0 && cfg.enableFrameBlitz !== '0' && cfg.enableFrameBlitz !== false);
+        },
         onActivate: (fighter, opponent) => {
           fighter._castFrameBlitz(opponent);
         }
@@ -114,6 +121,10 @@ export class NaoyaFighter extends Fighter {
         cooldownKey: 'skill2Cooldown',
         cooldownMax: () => this.skill2CooldownMax,
         color: '#C8E64A',
+        canCast: (fighter) => {
+          const cfg = CONFIG.naoya || {};
+          return Boolean(cfg.enableSonicKick && cfg.enableSonicKick !== 0 && cfg.enableSonicKick !== '0' && cfg.enableSonicKick !== false);
+        },
         onActivate: (fighter, opponent) => {
           fighter._castSonicKick(opponent);
         }
@@ -129,7 +140,7 @@ export class NaoyaFighter extends Fighter {
         canCast: (fighter) => {
           const cfg = CONFIG.naoya || {};
           const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
-          return (fighter.frameStacks || 0) >= maxStacks;
+          return (fighter.frameStacks || 0) >= maxStacks && !fighter.isExecutingFlurry;
         },
         onActivate: (fighter, opponent) => {
           fighter._castUltimate(opponent);
@@ -168,6 +179,7 @@ export class NaoyaFighter extends Fighter {
     this.ultTargetY = null;
     this.ultPathAngle = 0;
     this.ultBreatherTimer = 0;
+    this.ultStartupPauseTimer = 0;
     if (this.sonicShockwaves) this.sonicShockwaves.length = 0;
     else this.sonicShockwaves = [];
     if (this.afterimages) this.afterimages.length = 0;
@@ -287,7 +299,9 @@ export class NaoyaFighter extends Fighter {
    * Casts Skill 1: Frame Blitz (Nijūyon Koma Senkō)
    */
   _castFrameBlitz(opponent) {
-    if (!opponent || opponent.isDead || this.isExecutingUlt) return;
+    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry) return;
+    const cfg = CONFIG.naoya || {};
+    if (cfg.enableFrameBlitz === 0 || cfg.enableFrameBlitz === false || cfg.enableFrameBlitz === '0') return;
 
     this.skill1Cooldown = this.skill1CooldownMax;
     this.isDashingBlitz = true;
@@ -321,7 +335,9 @@ export class NaoyaFighter extends Fighter {
    * Casts Skill 2: Sonic Boom Rebound Kick (Onpoku Kyaku)
    */
   _castSonicKick(opponent) {
-    if (!opponent || opponent.isDead || this.isExecutingUlt) return;
+    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry) return;
+    const cfg = CONFIG.naoya || {};
+    if (cfg.enableSonicKick === 0 || cfg.enableSonicKick === false || cfg.enableSonicKick === '0') return;
 
     this.skill2Cooldown = this.skill2CooldownMax;
     this.isSonicKicking = true;
@@ -355,10 +371,121 @@ export class NaoyaFighter extends Fighter {
   }
 
   /**
+   * Freezes all other entities in the arena during Naoya's 24 FPS Runway Ultimate.
+   * @param {number} dur
+   */
+  _freezeArenaEntities(dur = 30) {
+    if (typeof state === 'undefined') return;
+
+    // 1. Freeze all other combatants in the match
+    if (state.fighters && Array.isArray(state.fighters)) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (f && f !== this && !f.isDead && (f.hp || 0) > 0) {
+          f.isCaughtInNaoyaUlt = true;
+          if (typeof f.interruptAttacks === 'function') f.interruptAttacks(true);
+          if (typeof f.applyTimeStop === 'function') f.applyTimeStop(dur, { isUltimate: true, isDomain: true });
+          else if (f.statusEffects && typeof f.statusEffects.applyTimeStop === 'function') f.statusEffects.applyTimeStop(dur);
+          else f.timeStopTimer = Math.max(f.timeStopTimer || 0, dur);
+
+          f.isFrameFrozen = true;
+          f.frameFreezeTimer = Math.max(f.frameFreezeTimer || 0, dur);
+          f.vx = 0;
+          f.vy = 0;
+          if (f.knockbackVx !== undefined) f.knockbackVx = 0;
+          if (f.knockbackVy !== undefined) f.knockbackVy = 0;
+        }
+      }
+    }
+
+    // 2. Freeze all illusions / summons (Rika, clones, etc.)
+    if (state.illusions && Array.isArray(state.illusions)) {
+      for (let i = 0; i < state.illusions.length; i++) {
+        const ill = state.illusions[i];
+        if (ill && !ill.dead && !ill.isDead && (ill.hp || 0) > 0) {
+          if (typeof ill.interruptAttacks === 'function') ill.interruptAttacks(true);
+          if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(dur, { isUltimate: true });
+          else ill.timeStopTimer = Math.max(ill.timeStopTimer || 0, dur);
+          ill.vx = 0;
+          ill.vy = 0;
+        }
+      }
+    }
+
+    // 3. Freeze Greenwood Sedan minion cars (CJ Drive-By)
+    if (state.cjDriveBys && Array.isArray(state.cjDriveBys)) {
+      for (let i = 0; i < state.cjDriveBys.length; i++) {
+        const car = state.cjDriveBys[i];
+        if (car && !car.dead && (car.hp || 0) > 0) {
+          if (typeof car.applyTimeStop === 'function') car.applyTimeStop(dur);
+          else car.timeStopTimer = Math.max(car.timeStopTimer || 0, dur);
+          car.speed = 0;
+          car.targetSpeed = 0;
+          car.vx = 0;
+          car.vy = 0;
+        }
+      }
+    }
+
+    // 4. Freeze active projectiles in flight
+    if (state.projectiles && Array.isArray(state.projectiles)) {
+      for (let i = 0; i < state.projectiles.length; i++) {
+        const p = state.projectiles[i];
+        if (p) {
+          p.timeStopTimer = Math.max(p.timeStopTimer || 0, dur);
+        }
+      }
+    }
+  }
+
+  /**
+   * Unfreezes all arena entities when Naoya's ultimate terminates or is interrupted.
+   */
+  _unfreezeArenaEntities() {
+    if (typeof state === 'undefined') return;
+
+    if (state.fighters && Array.isArray(state.fighters)) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (f && f !== this) {
+          f.isCaughtInNaoyaUlt = false;
+          f.isFrameFrozen = false;
+          f.frameFreezeTimer = 0;
+          f.timeStopTimer = 0;
+          if (f.statusEffects) {
+            f.statusEffects.timeStopTimer = 0;
+            f.statusEffects.isFrozen = false;
+          }
+          if (typeof f.resumeMovement === 'function') f.resumeMovement();
+        }
+      }
+    }
+
+    if (state.illusions && Array.isArray(state.illusions)) {
+      for (let i = 0; i < state.illusions.length; i++) {
+        const ill = state.illusions[i];
+        if (ill) {
+          ill.timeStopTimer = 0;
+          if (ill.statusEffects) ill.statusEffects.timeStopTimer = 0;
+        }
+      }
+    }
+
+    if (state.projectiles && Array.isArray(state.projectiles)) {
+      for (let i = 0; i < state.projectiles.length; i++) {
+        const p = state.projectiles[i];
+        if (p && p.timeStopTimer > 0) {
+          p.timeStopTimer = 0;
+        }
+      }
+    }
+  }
+
+  /**
    * Casts Ultimate: 24 FPS Mach 3 Runway Breach (Out-of-Bounds Orbit & Breach)
    */
   _castUltimate(opponent) {
-    if (!opponent || opponent.isDead || this.isExecutingUlt) return;
+    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry) return;
     const cfg = CONFIG.naoya || {};
     const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
     if ((this.frameStacks || 0) < maxStacks) return;
@@ -383,6 +510,13 @@ export class NaoyaFighter extends Fighter {
     this.ultBreatherTimer = 0;
     this.ultStartX = Number.isFinite(this.x) ? this.x : 300;
     this.ultStartY = Number.isFinite(this.y) ? this.y : 250;
+
+    // 1. Immediately zero Naoya's movement and initiate startup pause
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.ultStartupPauseTimer = cfg.ultStartupPauseFrames ?? 28;
     
     // Spawn runway path shooting directly out to Naoya's front based on movement velocity vector or facing angle
     const speed = Math.hypot(this.vx || 0, this.vy || 0);
@@ -393,36 +527,41 @@ export class NaoyaFighter extends Fighter {
       ? cfg.ultFixedAngle
       : moveAngle;
 
+    // Smoothly align facing direction to the start tangent of the generated runway spline
+    const arenaBox = (typeof state !== 'undefined' && state.arena) ? state.arena : { x: 40, y: 170, width: 460, height: 460 };
+    const canvasW = (state.canvas && state.canvas.width) || 540;
+    const canvasH = (state.canvas && state.canvas.height) || 960;
+    const startPos = { x: this.ultStartX, y: this.ultStartY };
+    const targetPos = {
+      x: this.ultTargetX,
+      y: this.ultTargetY,
+      r: (opponent && opponent.r) ? opponent.r : 25
+    };
+    const points = getNaoyaScreenRunwayPoints(arenaBox, canvasW, canvasH, targetPos, startPos, this.ultPathAngle);
+    const initialSample = sampleNaoyaRunwaySpline(points, 0.0);
+    this.gunAngle = initialSample.angle;
+    this.angle = initialSample.angle;
+
     // Clear any lingering combat afterimages, stepped frames, or pop particles
     if (this.afterimages) this.afterimages.length = 0;
     if (this.steppedFrames) this.steppedFrames.length = 0;
+    if (this.steppedRunwayFrames) this.steppedRunwayFrames.length = 0;
+    else this.steppedRunwayFrames = [];
     if (this.frameStepPops) this.frameStepPops.length = 0;
     this.projectedFrame = null;
     this.lastSteppedAfterimageIndex = -1;
 
-    // Completely stop enemy from doing anything during the ultimate runway approach!
-    opponent.isCaughtInNaoyaUlt = true;
-    if (typeof opponent.interruptAttacks === 'function') {
-      opponent.interruptAttacks(true);
-    }
-    opponent.vx = 0;
-    opponent.vy = 0;
-    opponent.knockbackVx = 0;
-    opponent.knockbackVy = 0;
-    opponent.isFrameFrozen = true;
-    opponent.frameFreezeTimer = 180;
+    // 2. Pause the entire arena immediately (all fighters, summons, minions, projectiles)
+    this._freezeArenaEntities(180);
 
-    spawnFloatingText(this.x, this.y - this.r - 25, 'MACH 3 RUNWAY CHARGE!', '#00F2FE');
+    spawnFloatingText(this.x, this.y - this.r - 25, '24 FPS STASIS! RUNWAY LOCK', '#00F2FE');
     audioSystem.playSFX('enhance', 1.1);
     triggerGlobalScreenShake(6, 12);
   }
 
   interruptAttacks(force = false) {
-    if (this.ultTarget && this.ultTarget.isCaughtInNaoyaUlt) {
-      this.ultTarget.isCaughtInNaoyaUlt = false;
-      this.ultTarget.isFrameFrozen = false;
-      this.ultTarget.frameFreezeTimer = 0;
-    }
+    this._unfreezeArenaEntities();
+    this.ultStartupPauseTimer = 0;
     this.ultTargetX = null;
     this.ultTargetY = null;
     this.isExecutingUlt = false;
@@ -532,57 +671,62 @@ export class NaoyaFighter extends Fighter {
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
         if (Math.abs(angleDiff) <= arcAngle / 2) {
-          // Track Disruption count for 24-Frame Palm Touch Stasis (Passive with Cooldown)
-          const canPassiveFreeze = (cfg.enableFrameFreeze !== false) && (this.frameFreezeCooldownTimer <= 0);
-          if (canPassiveFreeze) {
-            const currentHits = (this.disruptionHits.get(target) || 0) + 1;
-            this.disruptionHits.set(target, currentHits);
+          // Apply damage to determine if target took damage or successfully dodged/blocked
+          const hitSuccess = applyDamageToTarget(target, baseDmg, this, { isMelee: true });
 
-            if (currentHits >= (cfg.maxDisruptionsForStasis || 3)) {
-              this.disruptionHits.set(target, 0);
-              this.frameFreezeCooldownTimer = cfg.frameFreezeCooldown !== undefined ? cfg.frameFreezeCooldown : (this.frameFreezeCooldownMax || 240);
-              this.applyFrameStasis(target, cfg.frameFreezeDuration || 60);
+          if (hitSuccess) {
+            // Track Disruption count for 24-Frame Palm Touch Stasis (Passive with Cooldown)
+            // ONLY triggers when the Flurry is UP / actively executing AND damage was successfully dealt
+            const isFreezeEnabled = cfg.enableFrameFreeze === 1 || cfg.enableFrameFreeze === true || (cfg.enableFrameFreeze !== 0 && cfg.enableFrameFreeze !== false);
+            const isFlurryUp = Boolean(this.isExecutingFlurry);
+            const canPassiveFreeze = isFreezeEnabled && isFlurryUp && (this.frameFreezeCooldownTimer <= 0);
+            if (canPassiveFreeze) {
+              const currentHits = (this.disruptionHits.get(target) || 0) + 1;
+              this.disruptionHits.set(target, currentHits);
+
+              if (currentHits >= (cfg.maxDisruptionsForStasis || 3)) {
+                this.disruptionHits.set(target, 0);
+                this.frameFreezeCooldownTimer = cfg.frameFreezeCooldown !== undefined ? cfg.frameFreezeCooldown : (this.frameFreezeCooldownMax || 240);
+                this.applyFrameStasis(target, cfg.frameFreezeDuration || 60);
+              }
             }
+
+            // Stack speed & evade up to maxStacksPerFlurry during this flurry burst ONLY upon successful damage dealt
+            const maxFlurryStacks = cfg.maxStacksPerFlurry !== undefined ? cfg.maxStacksPerFlurry : 4;
+            if (this.flurryStacksGained < maxFlurryStacks) {
+              this.flurryStacksGained++;
+              this._onDamageEnemy(target);
+            }
+
+            // True damage bonus if target is already Frame Frozen
+            if (target.isFrameFrozen) {
+              const bonusTrueDmg = Math.round(baseDmg * (cfg.frameFreezeVulnerability || 0.30));
+              applyDamageToTarget(target, bonusTrueDmg, this, { isTrueDamage: true });
+              spawnFloatingText(target.x, target.y - target.r - 12, `+${bonusTrueDmg} CRIT!`, '#00F2FE');
+              spawnSparks(target.x, target.y, 6, '#00F2FE');
+            }
+
+            // Knockback: zero on intermediate flurry hits so enemy stays locked in barrage, heavy on finisher!
+            const knockback = isFinisher ? (cfg.tantoKnockback || 16) : 0;
+            if (knockback > 0) {
+              const kAngle = targetAngle;
+              target.vx = (target.vx || 0) + Math.cos(kAngle) * knockback;
+              target.vy = (target.vy || 0) + Math.sin(kAngle) * knockback;
+            }
+
+            // Spawn high-impact kinetic shockwave ring directly on target hit
+            this.sonicShockwaves.push({
+              x: target.x,
+              y: target.y,
+              currentRadius: 6,
+              maxRadius: isFinisher ? 80 : 44,
+              timer: 0,
+              maxTimer: isFinisher ? 14 : 9
+            });
+
+            spawnBloodEffect(target.x, target.y, isFinisher ? 10 : 3);
+            spawnImpactFlash(target.x, target.y, isFinisher ? 18 : 10, isFinisher ? '#FFFFFF' : this.themeColor);
           }
-
-          // Apply damage
-          applyDamageToTarget(target, baseDmg, this, { isMelee: true });
-
-          // Stack speed & evade up to maxStacksPerFlurry during this flurry burst
-          const maxFlurryStacks = cfg.maxStacksPerFlurry !== undefined ? cfg.maxStacksPerFlurry : 4;
-          if (this.flurryStacksGained < maxFlurryStacks) {
-            this.flurryStacksGained++;
-            this._onDamageEnemy(target);
-          }
-
-          // True damage bonus if target is already Frame Frozen
-          if (target.isFrameFrozen) {
-            const bonusTrueDmg = Math.round(baseDmg * (cfg.frameFreezeVulnerability || 0.30));
-            applyDamageToTarget(target, bonusTrueDmg, this, { isTrueDamage: true });
-            spawnFloatingText(target.x, target.y - target.r - 12, `+${bonusTrueDmg} CRIT!`, '#00F2FE');
-            spawnSparks(target.x, target.y, 6, '#00F2FE');
-          }
-
-          // Knockback: zero on intermediate flurry hits so enemy stays locked in barrage, heavy on finisher!
-          const knockback = isFinisher ? (cfg.tantoKnockback || 16) : 0;
-          if (knockback > 0) {
-            const kAngle = targetAngle;
-            target.vx = (target.vx || 0) + Math.cos(kAngle) * knockback;
-            target.vy = (target.vy || 0) + Math.sin(kAngle) * knockback;
-          }
-
-          // Spawn high-impact kinetic shockwave ring directly on target hit
-          this.sonicShockwaves.push({
-            x: target.x,
-            y: target.y,
-            currentRadius: 6,
-            maxRadius: isFinisher ? 80 : 44,
-            timer: 0,
-            maxTimer: isFinisher ? 14 : 9
-          });
-
-          spawnBloodEffect(target.x, target.y, isFinisher ? 10 : 3);
-          spawnImpactFlash(target.x, target.y, isFinisher ? 18 : 10, isFinisher ? '#FFFFFF' : this.themeColor);
         }
       }
     }
@@ -610,7 +754,9 @@ export class NaoyaFighter extends Fighter {
     this.flurryTarget = opponent;
     this.flurryOwnerIndex = ownerIndex;
     this.flurryStacksGained = 0;
-    this.shootCooldownMax = cfg.tantoCooldown || cfg.punchCooldown || 40;
+    const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
+    this.shootCooldownMax = tantoCd;
+    this.shootCooldown = 0; // Cooldown starts ticking ONLY after flurry completes!
 
     // Immediately trigger 1st attack at starting teleport position
     this.flurryHitsDone++;
@@ -624,7 +770,7 @@ export class NaoyaFighter extends Fighter {
 
     if (isFinisher) {
       this.isExecutingFlurry = false;
-      this.shootCooldown = this.shootCooldownMax;
+      this.shootCooldown = tantoCd;
     }
   }
 
@@ -644,20 +790,33 @@ export class NaoyaFighter extends Fighter {
       this.ultBreatherTimer--;
       this.shootCooldown = Math.max(this.shootCooldown || 0, this.ultBreatherTimer);
       this.isExecutingFlurry = false;
+      this.vx = 0;
+      this.vy = 0;
 
       const cfg = CONFIG.naoya || {};
-      const maxBreather = cfg.ultPostStrikeBreatherFrames ?? 100;
+      const maxBreather = cfg.ultPostStrikeBreatherFrames ?? 24;
       const minSlow = cfg.ultPostStrikeSlowMultiplier ?? 0.30;
       // Smoothly recovers from heavy slow (30% speed) back to 100% base speed as breather finishes
       const recoveryProgress = 1 - (this.ultBreatherTimer / maxBreather);
       const currentSlowMult = minSlow + (1 - minSlow) * Math.pow(recoveryProgress, 1.5);
       this.speed = this.baseSpeed * currentSlowMult;
-
-      // Decelerate rebound inertia smoothly
-      this.vx *= 0.88;
-      this.vy *= 0.88;
     } else if (this.frameStacks === 0 && !this.isExecutingUlt && !this.isDashingBlitz) {
       this.speed = this.baseSpeed;
+    }
+
+    // Age and fade any remaining runway afterimages 1 by 1 post-strike
+    if (this.steppedRunwayFrames && this.steppedRunwayFrames.length > 0 && !this.isExecutingUlt) {
+      const cfg = CONFIG.naoya || {};
+      const fadeEase = cfg.ultAfterimageFadeEase ?? 1.20;
+      for (let i = this.steppedRunwayFrames.length - 1; i >= 0; i--) {
+        const af = this.steppedRunwayFrames[i];
+        af.lifeTimer++;
+        const prog = Math.min(1.0, af.lifeTimer / af.maxLife);
+        af.alpha = af.maxAlpha * Math.pow(1.0 - prog, fadeEase);
+        if (af.lifeTimer >= af.maxLife || af.alpha <= 0.005) {
+          this.steppedRunwayFrames.splice(i, 1);
+        }
+      }
     }
 
     if (this.skill1Cooldown > 0) this.skill1Cooldown--;
@@ -665,6 +824,8 @@ export class NaoyaFighter extends Fighter {
     if (this.ultCooldown > 0) this.ultCooldown--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.frameFreezeCooldownTimer > 0) this.frameFreezeCooldownTimer--;
+    // Basic Attack Cooldown (tantoCooldown) ticks down only when not actively executing a flurry
+    if (this.shootCooldown > 0 && !this.isExecutingFlurry) this.shootCooldown--;
 
     // 2. Update Primary Attack: 24 FPS Hypersonic Flurry Barrage (3 Punches per Teleport)
     if (this.isExecutingFlurry && this.ultBreatherTimer <= 0) {
@@ -721,11 +882,15 @@ export class NaoyaFighter extends Fighter {
 
           if (isFinisher) {
             this.isExecutingFlurry = false;
-            this.shootCooldown = cfg.punchCooldown || cfg.tantoCooldown || 40;
+            const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
+            this.shootCooldown = tantoCd;
+            this.shootCooldownMax = tantoCd;
           }
         } else {
           this.isExecutingFlurry = false;
-          this.shootCooldown = cfg.punchCooldown || cfg.tantoCooldown || 40;
+          const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
+          this.shootCooldown = tantoCd;
+          this.shootCooldownMax = tantoCd;
         }
       }
     }
@@ -742,18 +907,20 @@ export class NaoyaFighter extends Fighter {
         this.isDashingBlitz = false;
         if (this.blitzTarget && !this.blitzTarget.isDead && (this.blitzTarget.hp || 0) > 0) {
           const dmg = CONFIG.naoya?.skill1Damage || 24;
-          applyDamageToTarget(this.blitzTarget, dmg, this, { isTrueDamage: false });
-          this._onDamageEnemy(this.blitzTarget);
-          this.applyFrameStasis(this.blitzTarget, CONFIG.naoya?.skill1StasisDuration || 60);
-          spawnBloodEffect(this.blitzTarget.x, this.blitzTarget.y, 12);
-          this.sonicShockwaves.push({
-            x: this.blitzTarget.x,
-            y: this.blitzTarget.y,
-            currentRadius: 8,
-            maxRadius: 85,
-            timer: 0,
-            maxTimer: 14
-          });
+          const hitSuccess = applyDamageToTarget(this.blitzTarget, dmg, this, { isTrueDamage: false });
+          if (hitSuccess) {
+            this._onDamageEnemy(this.blitzTarget);
+            this.applyFrameStasis(this.blitzTarget, CONFIG.naoya?.skill1StasisDuration || 60);
+            spawnBloodEffect(this.blitzTarget.x, this.blitzTarget.y, 12);
+            this.sonicShockwaves.push({
+              x: this.blitzTarget.x,
+              y: this.blitzTarget.y,
+              currentRadius: 8,
+              maxRadius: 85,
+              timer: 0,
+              maxTimer: 14
+            });
+          }
         }
       }
     }
@@ -810,39 +977,48 @@ export class NaoyaFighter extends Fighter {
 
         // Phase 1: Screen-Wide Colossal Runway Acceleration Sprint Leading Directly into Enemy
         if (this.ultPhase === 1) {
-          const target = this.ultTarget;
-          if (target && !target.isDead && target._carCrashRagdollTimer <= 0) {
-            target.vx = 0;
-            target.vy = 0;
-            target.knockbackVx = 0;
-            target.knockbackVy = 0;
-            if (typeof this.ultTargetX === 'number' && typeof this.ultTargetY === 'number') {
-              target.x = this.ultTargetX;
-              target.y = this.ultTargetY;
-            }
-          }
-          const progress = Math.min(1.0, Math.max(0, this.ultRunwayProgress || 0));
-
-          // Progressive 24 FPS acceleration curve: starts slow and deliberate, ramping into blazing Mach 3
-          const startMult = cfg.ultRunwayStartSpeedMult ?? 0.25;
-          const endMult = cfg.ultRunwayEndSpeedMult ?? 2.85;
-          const accelExp = cfg.ultRunwayAccelPower ?? 1.65;
-          const accelMult = startMult + (endMult - startMult) * Math.pow(progress, accelExp);
-
-          const baseSpeedRate = cfg.ultRunwaySpeedRate || 0.0055;
-          this.ultRunwayProgress = (this.ultRunwayProgress || 0) + baseSpeedRate * accelMult;
-          const newProgress = Math.min(1.0, this.ultRunwayProgress);
+          // Maintain global arena time stop every frame
+          this._freezeArenaEntities(20);
 
           const canvasW = (state.canvas && state.canvas.width) || 540;
           const canvasH = (state.canvas && state.canvas.height) || 960;
           const startPos = { x: this.ultStartX, y: this.ultStartY };
           const pathAngle = this.ultPathAngle || 0;
+          const target = this.ultTarget;
           const targetPos = {
             x: (typeof this.ultTargetX === 'number') ? this.ultTargetX : (target ? target.x : (arenaBox.x + arenaBox.width / 2)),
             y: (typeof this.ultTargetY === 'number') ? this.ultTargetY : (target ? target.y : (arenaBox.y + arenaBox.height / 2)),
             r: (target && target.r) ? target.r : 25
           };
           const points = getNaoyaScreenRunwayPoints(arenaBox, canvasW, canvasH, targetPos, startPos, pathAngle);
+
+          // ── Subphase 1A: Startup Stasis Pause (Naoya stops movement for a moment while entire arena pauses) ──
+          if (this.ultStartupPauseTimer > 0) {
+            this.ultStartupPauseTimer--;
+            this.vx = 0;
+            this.vy = 0;
+            this.x = this.ultStartX;
+            this.y = this.ultStartY;
+
+            const initialSample = sampleNaoyaRunwaySpline(points, 0.0);
+            this.gunAngle = initialSample.angle;
+            this.angle = initialSample.angle;
+            return; // Pause during startup windup
+          }
+
+          // ── Subphase 1B: Runway Sprint (Slowly starting towards afterimages path, progressively accelerating to Mach 3) ──
+          const progress = Math.min(1.0, Math.max(0, this.ultRunwayProgress || 0));
+
+          // Progressive 24 FPS acceleration curve: starts ultra-slow and deliberate, ramping into blazing Mach 3
+          const startMult = cfg.ultRunwayStartSpeedMult ?? 0.08;
+          const endMult = cfg.ultRunwayEndSpeedMult ?? 3.40;
+          const accelExp = cfg.ultRunwayAccelPower ?? 2.30;
+          const accelMult = startMult + (endMult - startMult) * Math.pow(progress, accelExp);
+
+          const baseSpeedRate = cfg.ultRunwaySpeedRate || 0.0048;
+          this.ultRunwayProgress = (this.ultRunwayProgress || 0) + baseSpeedRate * accelMult;
+          const newProgress = Math.min(1.0, this.ultRunwayProgress);
+
           const sampled = sampleNaoyaRunwaySpline(points, newProgress);
 
           this.x = sampled.x;
@@ -852,12 +1028,17 @@ export class NaoyaFighter extends Fighter {
           this.gunAngle = sampled.angle;
           this.angle = sampled.angle;
 
-          // Stepping progression audio during runway acceleration sprint
+          // Stepping progression audio and 1-by-1 fading afterimages during runway sprint
           const numFrames = cfg.ultRunwayAfterimageCount ?? 52;
-          const spacingPower = cfg.ultRunwaySpacingPower ?? 2.15;
+          const spacingPower = cfg.ultRunwaySpacingPower ?? 1.15;
+          const lifespan = cfg.ultAfterimageLifespanFrames ?? 36;
+          const baseAlpha = cfg.ultAfterimageAlpha ?? 0.45;
 
           if (this.lastSteppedAfterimageIndex === undefined || this.lastSteppedAfterimageIndex === null) {
             this.lastSteppedAfterimageIndex = -1;
+          }
+          if (!this.steppedRunwayFrames) {
+            this.steppedRunwayFrames = [];
           }
 
           while (this.lastSteppedAfterimageIndex + 1 < numFrames) {
@@ -868,8 +1049,44 @@ export class NaoyaFighter extends Fighter {
             if (newProgress >= frameT) {
               this.lastSteppedAfterimageIndex = nextIdx;
               audioSystem.playSFX('swordswing', 0.85);
+
+              const stepPt = sampleNaoyaRunwaySpline(points, frameT);
+
+              // 1. Spawn dynamic expanding sonic boom shockwave ring at stepped afterimage location
+              this.sonicShockwaves.push({
+                x: stepPt.x,
+                y: stepPt.y,
+                currentRadius: 6,
+                maxRadius: (this.r || 25) * 2.2,
+                timer: 0,
+                maxTimer: 16
+              });
+
+              // 2. Spawn stepped afterimage that fades out 1 by 1
+              this.steppedRunwayFrames.push({
+                x: stepPt.x,
+                y: stepPt.y,
+                angle: stepPt.angle || this.gunAngle || 0,
+                alpha: baseAlpha,
+                maxAlpha: baseAlpha,
+                lifeTimer: 0,
+                maxLife: lifespan,
+                frameT: frameT
+              });
             } else {
               break;
+            }
+          }
+
+          // Age and fade stepped afterimages 1 by 1
+          const fadeEase = cfg.ultAfterimageFadeEase ?? 1.20;
+          for (let i = this.steppedRunwayFrames.length - 1; i >= 0; i--) {
+            const af = this.steppedRunwayFrames[i];
+            af.lifeTimer++;
+            const prog = Math.min(1.0, af.lifeTimer / af.maxLife);
+            af.alpha = af.maxAlpha * Math.pow(1.0 - prog, fadeEase);
+            if (af.lifeTimer >= af.maxLife || af.alpha <= 0.005) {
+              this.steppedRunwayFrames.splice(i, 1);
             }
           }
 
@@ -886,7 +1103,8 @@ export class NaoyaFighter extends Fighter {
             if (isNaN(breachAngle)) breachAngle = this.gunAngle || this.angle || 0;
             this.ultBreachAngle = breachAngle;
 
-            // 1. Instantly release pre-impact stasis so knockback impulse physically launches the enemy (Toji 3rd sequence standard)
+            // 1. Unfreeze all arena entities and release target stasis
+            this._unfreezeArenaEntities();
             target.isCaughtInNaoyaUlt = false;
             target.isFrameFrozen = false;
             target.frameFreezeTimer = 0;
@@ -942,7 +1160,7 @@ export class NaoyaFighter extends Fighter {
             target.pinnedWallX = undefined;
             target.pinnedWallY = undefined;
 
-            // 4. Naoya naturally rebounds backwards from the strike impact!
+            // 4. Naoya cleanly positions right at the strike contact point facing the target!
             this.ultTargetX = null;
             this.ultTargetY = null;
             this.isExecutingUlt = false;
@@ -960,16 +1178,22 @@ export class NaoyaFighter extends Fighter {
             this.projectedFrame = null;
             this.lastSteppedAfterimageIndex = -1;
 
-            const reboundSpeed = cfg.ultPostStrikeReboundSpeed ?? 14.0;
-            this.vx = -Math.cos(breachAngle) * reboundSpeed;
-            this.vy = -Math.sin(breachAngle) * reboundSpeed;
-            const breatherFrames = cfg.ultPostStrikeBreatherFrames ?? 100;
+            // Firmly lock Naoya at the contact position facing the victim without slingshotting or snapping
+            const contactDist = (this.r || 25) + (target.r || 25) + 4;
+            this.x = target.x - Math.cos(breachAngle) * contactDist;
+            this.y = target.y - Math.sin(breachAngle) * contactDist;
+            this.vx = 0;
+            this.vy = 0;
+            this.knockbackVx = 0;
+            this.knockbackVy = 0;
+
+            const breatherFrames = cfg.ultPostStrikeBreatherFrames ?? 24;
             this.ultBreatherTimer = breatherFrames;
             this.shootCooldown = breatherFrames; // Breather pause before basic attacks resume
             this.skill1Cooldown = Math.max(this.skill1Cooldown || 0, Math.round(breatherFrames * 0.75));
             this.skill2Cooldown = Math.max(this.skill2Cooldown || 0, Math.round(breatherFrames * 0.75));
-            this.gunAngle = Math.atan2(target.y - this.y, target.x - this.x);
-            this.angle = this.gunAngle;
+            this.gunAngle = breachAngle;
+            this.angle = breachAngle;
 
             // Large expanding sonic boom shockwave ring
             this.sonicShockwaves.push({
@@ -1007,6 +1231,7 @@ export class NaoyaFighter extends Fighter {
           target.vx = lvx;
           target.vy = lvy;
           target.angle = (target.angle || 0) + (target._carCrashSpin || 0.45);
+          target.gunAngle = target.angle; // Ensure all fighter models and skins spin continuously during launch
 
           const tr = target.r || 25;
           let hitWall = false;
@@ -1052,6 +1277,13 @@ export class NaoyaFighter extends Fighter {
             target.vy = 0;
             target.knockbackVx = 0;
             target.knockbackVy = 0;
+
+            // Face inward toward the arena interior while pinned to the wall
+            const cx = arenaBox.x + arenaBox.width / 2;
+            const cy = arenaBox.y + arenaBox.height / 2;
+            const inwardAngle = Math.atan2(cy - target.y, cx - target.x);
+            target.angle = inwardAngle;
+            target.gunAngle = inwardAngle;
 
             if (typeof target.interruptAttacks === 'function') {
               target.interruptAttacks(true);
@@ -1114,17 +1346,19 @@ export class NaoyaFighter extends Fighter {
     }
 
     // 6. AI Decision Matrix
-    if (opponent && !opponent.isDead && (opponent.hp || 0) > 0 && !this.isExecutingUlt && !this.isDashingBlitz && this.ultBreatherTimer <= 0) {
+    if (opponent && !opponent.isDead && (opponent.hp || 0) > 0 && !this.isExecutingUlt && !this.isDashingBlitz && !this.isExecutingFlurry && this.ultBreatherTimer <= 0) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
       const cfg = CONFIG.naoya || {};
       const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
+      const canBlitz = Boolean(cfg.enableFrameBlitz && cfg.enableFrameBlitz !== 0 && cfg.enableFrameBlitz !== '0' && cfg.enableFrameBlitz !== false);
+      const canSonicKick = Boolean(cfg.enableSonicKick && cfg.enableSonicKick !== 0 && cfg.enableSonicKick !== '0' && cfg.enableSonicKick !== false);
 
-      // Ultimate trigger when ready and max frame stacks reached
-      if (this.ultCooldown <= 0 && (this.frameStacks || 0) >= maxStacks && dist < 240) {
+      // Ultimate trigger when ready, max frame stacks reached, and NOT currently executing a flurry
+      if (this.ultCooldown <= 0 && (this.frameStacks || 0) >= maxStacks && !this.isExecutingFlurry && dist < 240) {
         this._castUltimate(opponent);
-      } else if (this.skill1Cooldown <= 0 && dist < 220) {
+      } else if (canBlitz && !this.isExecutingFlurry && this.skill1Cooldown <= 0 && dist < 220) {
         this._castFrameBlitz(opponent);
-      } else if (this.skill2Cooldown <= 0 && dist < 180) {
+      } else if (canSonicKick && !this.isExecutingFlurry && this.skill2Cooldown <= 0 && dist < 180) {
         this._castSonicKick(opponent);
       }
     }
@@ -1137,7 +1371,38 @@ export class NaoyaFighter extends Fighter {
   }
 
   isStationarySkillActive() {
-    return Boolean(this.isDashingBlitz || this.isExecutingUlt || this.isExecutingFlurry);
+    return Boolean(this.isDashingBlitz || this.isExecutingUlt || this.isExecutingFlurry || (this.ultBreatherTimer && this.ultBreatherTimer > 0));
+  }
+
+  /**
+   * Evaluates if Naoya's movement speed is slowed or hindered by any attack or status effect debuff.
+   * @returns {boolean}
+   */
+  isMovementSlowed() {
+    // 1. Direct slow timer or slow multiplier
+    if (this.slowTimer > 0 || (this.slowMultiplier !== undefined && this.slowMultiplier < 0.99)) return true;
+
+    // 2. StatusEffectsManager slow tracking
+    if (this.statusEffects) {
+      if (this.statusEffects.slowTimer > 0 || (this.statusEffects.slowMultiplier !== undefined && this.statusEffects.slowMultiplier < 0.99) || this.statusEffects.isSlowed) {
+        return true;
+      }
+    }
+
+    // 3. Stun / Paralyze / Freeze / Time-stop / Hit-stun CCs
+    if (this.hitStunTimer > 0 || this.paralyzeTimer > 0 || this.timeStopTimer > 0 || this.frameFreezeTimer > 0) return true;
+    if (this.statusEffects && (this.statusEffects.hitStunTimer > 0 || this.statusEffects.paralyzeTimer > 0 || this.statusEffects.timeStopTimer > 0 || this.statusEffects.isFrozen || this.statusEffects.isParalyzed)) return true;
+
+    // 4. Trapped in external beams / grabs / drags
+    if (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) return true;
+    if (this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) return true;
+    if ((this.caughtInLaserBeamTimer || 0) > 0 || (this.caughtInLaylaBeamTimer || 0) > 0 || (this.caughtInNamelessBeamTimer || 0) > 0) return true;
+    if (this.isTargetOfAmbush) return true;
+
+    // 5. Post-ultimate crash breather recovery slow
+    if (this.ultBreatherTimer && this.ultBreatherTimer > 0) return true;
+
+    return false;
   }
 
   applyMovementPhysics(extraMultiplier = 1) {
@@ -1166,9 +1431,12 @@ export class NaoyaFighter extends Fighter {
    * @param {Object} arena
    */
   _updateProjectionSorceryAheadFrame(arena) {
-    // 1. Ahead Frame Generation (only active during normal combat / blitz dashes; inactive during ult or breather)
-    if (this.isExecutingUlt || (this.ultBreatherTimer && this.ultBreatherTimer > 0)) {
+    // 1. Ahead Frame Generation (only active during normal combat / blitz dashes; inactive during ult, breather, or when slowed)
+    if (this.isExecutingUlt || (this.ultBreatherTimer && this.ultBreatherTimer > 0) || this.isMovementSlowed()) {
       this.projectedFrame = null;
+      if (this.isMovementSlowed()) {
+        this.steppedFrames = [];
+      }
     } else {
       const moveSpeed = Math.hypot(this.vx, this.vy);
       const isMoving = moveSpeed > 0.3 || this.isDashingBlitz || this.isSonicKicking;
@@ -1277,22 +1545,72 @@ export class NaoyaFighter extends Fighter {
       }
     }
 
-    // 4. Record High-Speed Afterimage Ghost Trails (Subsonic / Blitz only; Ult uses dedicated runway VFX)
-    if ((this.isSubsonicOverdrive || this.isDashingBlitz) && !this.isExecutingUlt) {
-      this.afterimages.push({
-        x: this.x,
-        y: this.y,
-        gunAngle: this.gunAngle,
-        alpha: 0.70,
-        color: this.themeColor
-      });
-    }
+    // 4. Record High-Speed & Idle Movement Afterimages fading 1 by 1
+    const cfg = CONFIG.naoya || {};
+    const enableMovementAI = cfg.enableMovementAfterimages !== false;
+    const isSlowed = this.isMovementSlowed();
 
-    // 5. Unconditionally Decay Active Afterimages on every frame
-    for (let i = this.afterimages.length - 1; i >= 0; i--) {
-      this.afterimages[i].alpha -= 0.08;
-      if (this.afterimages[i].alpha <= 0) {
-        this.afterimages.splice(i, 1);
+    if (isSlowed) {
+      // If movement is slowed by any attack or debuff, hide and clear idle afterimages
+      this.movementAfterimages = [];
+      this.steppedFrames = [];
+      this.afterimages = [];
+    } else if (enableMovementAI && !this.isExecutingUlt) {
+      const moveSpeed = Math.hypot(this.vx, this.vy);
+      const minSpeed = cfg.movementAfterimageMinSpeed ?? 0.8;
+      const interval = Math.max(1, cfg.movementAfterimageInterval ?? 4);
+      const maxLife = cfg.movementAfterimageLifespanFrames ?? 24;
+      const startAlpha = cfg.movementAfterimageAlpha ?? 0.65;
+
+      if (!this.movementAfterimages) this.movementAfterimages = [];
+      if (this._movementAfterimageTick === undefined) this._movementAfterimageTick = 0;
+
+      const isMovingActive = moveSpeed >= minSpeed || this.isDashingBlitz || this.isSonicKicking || (this.isExecutingFlurry && this.ultBreatherTimer <= 0) || this.isSubsonicOverdrive;
+
+      if (isMovingActive) {
+        this._movementAfterimageTick++;
+        if (this._movementAfterimageTick % interval === 0) {
+          this.movementAfterimages.push({
+            x: this.x,
+            y: this.y,
+            gunAngle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
+            alpha: startAlpha,
+            maxAlpha: startAlpha,
+            lifeTimer: 0,
+            maxLife: maxLife
+          });
+
+          // Pop shockwave ring on each movement afterimage step (matching ultimate runway rhythm pop)
+          const enableShockwave = cfg.movementAfterimageShockwaves !== false;
+          if (enableShockwave) {
+            const shockwaveMult = cfg.movementAfterimageShockwaveRadiusMult ?? 1.8;
+            if (!this.sonicShockwaves) this.sonicShockwaves = [];
+            this.sonicShockwaves.push({
+              x: this.x,
+              y: this.y,
+              currentRadius: 4,
+              maxRadius: (this.r || 25) * shockwaveMult,
+              timer: 0,
+              maxTimer: 14
+            });
+          }
+
+          if (cfg.movementAfterimageSFX) {
+            audioSystem.playSFX('swordswing', 0.40);
+          }
+        }
+      }
+
+      // Age and fade movement/idle afterimages 1 by 1
+      const fadeEase = cfg.movementAfterimageFadeEase ?? 1.15;
+      for (let i = this.movementAfterimages.length - 1; i >= 0; i--) {
+        const af = this.movementAfterimages[i];
+        af.lifeTimer++;
+        const prog = Math.min(1.0, af.lifeTimer / Math.max(1, af.maxLife));
+        af.alpha = af.maxAlpha * Math.pow(1.0 - prog, fadeEase);
+        if (af.lifeTimer >= af.maxLife || af.alpha <= 0.005) {
+          this.movementAfterimages.splice(i, 1);
+        }
       }
     }
 
@@ -1334,13 +1652,25 @@ export class NaoyaFighter extends Fighter {
     drawNaoyaMachRunwayVFX(ctx, this);
 
     // 2. Draw Projection Sorcery Forward-Projected 24 FPS Ghost Frames (Ahead of Movement)
-    drawProjectionSorceryForwardFrames(ctx, this);
+    if (!this.isMovementSlowed()) {
+      drawProjectionSorceryForwardFrames(ctx, this);
+    }
 
-    // 3. Draw Trailing Ghost Model Afterimages
-    for (let i = 0; i < this.afterimages.length; i++) {
-      const ai = this.afterimages[i];
-      if (ai && ai.alpha > 0.01) {
-        drawNaoyaGhostModel(ctx, ai.x, ai.y, ai.gunAngle || 0, this.r || 25, ai.alpha * 0.60);
+    // 3. Draw Trailing Ghost Model Afterimages (Fading out 1 by 1)
+    if (!this.isMovementSlowed()) {
+      if (this.movementAfterimages && this.movementAfterimages.length > 0) {
+        for (let i = 0; i < this.movementAfterimages.length; i++) {
+          const af = this.movementAfterimages[i];
+          if (af && af.alpha > 0.01) {
+            drawNaoyaGhostModel(ctx, af.x, af.y, af.gunAngle || 0, this.r || 25, af.alpha);
+          }
+        }
+      }
+      for (let i = 0; i < this.afterimages.length; i++) {
+        const ai = this.afterimages[i];
+        if (ai && ai.alpha > 0.01) {
+          drawNaoyaGhostModel(ctx, ai.x, ai.y, ai.gunAngle || 0, this.r || 25, ai.alpha * 0.60);
+        }
       }
     }
 

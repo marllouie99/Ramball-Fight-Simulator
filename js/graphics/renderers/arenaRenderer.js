@@ -837,6 +837,16 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     ctx.letterSpacing = '0.5px';
   }
 
+  const getFighterDisplayName = (f, uppercase = true) => {
+    if (!f) return '';
+    const charId = f.characterId || f.type || (f._def && (f._def.id || f._def.type));
+    const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
+    const rawName = charCfg?.displayName || charCfg?.name || f.displayName || f.name || f._def?.displayName || f._def?.name || charId || 'P';
+    const isSans = Boolean(charId === 'sans' || (typeof rawName === 'string' && rawName.toLowerCase() === 'sans'));
+    if (isSans) return 'sans';
+    return uppercase ? String(rawName).toUpperCase() : String(rawName);
+  };
+
   const getFighterThemeColor = (f, fallbackColor = '#38BDF8') => {
     if (!f) return fallbackColor;
     const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
@@ -895,13 +905,13 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
 
   if (isTeamMatch) {
     const team0Data = team0.map(f => ({
-      name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
+      name: getFighterDisplayName(f, true),
       color: getHudNameColor(f, '#38BDF8'),
       fighter: f
     }));
 
     const team1Data = team1.map(f => ({
-      name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
+      name: getFighterDisplayName(f, true),
       color: getHudNameColor(f, '#F87171'),
       fighter: f
     }));
@@ -996,7 +1006,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     const vsText = 'vs';
     const textY = arena.y - 12;
     const fighterData = mainFighters.map(f => ({
-      name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
+      name: getFighterDisplayName(f, true),
       color: getHudNameColor(f, '#F8FAFC')
     }));
 

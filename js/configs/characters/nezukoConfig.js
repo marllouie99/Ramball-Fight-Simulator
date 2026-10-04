@@ -4,6 +4,8 @@
 // ─────────────────────────────────────────────
 
 export const nezukoConfig = {
+  name: 'Nezuko',
+  displayName: 'Nezuko',
   bossTitle: 'Demon Princess',
   title: 'Demon Princess',
 

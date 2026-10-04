@@ -2,6 +2,8 @@
 // Ichigo Kurosaki — Substitute Soul Reaper Config (Unified)
 // ─────────────────────────────────────────────
 export const ichigoConfig = {
+  name: 'Ichigo',
+  displayName: 'Ichigo',
   bossTitle: 'Substitute Soul Reaper',
   title: 'Substitute Soul Reaper',
 
