@@ -1,5 +1,7 @@
-import { playSound, stopSound, stopLoopingSound, stopSoundBySrc, stopAllSounds, stopAllLoopingSounds, playLoopingSound, fadeOutSound, fadeOutLoopingSound, fadeInSound, pauseSound, resumeSound } from './soundSystem.js';
+import { playSound, stopSound, stopLoopingSound, stopSoundBySrc, stopAllSounds, stopAllLoopingSounds, playLoopingSound, fadeOutSound, fadeOutLoopingSound, fadeInSound, pauseSound, resumeSound, soundSpriteManager } from './soundSystem.js';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
+
+export { soundSpriteManager };
 
 class AudioEventEmitter {
   constructor() {

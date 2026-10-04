@@ -22,10 +22,10 @@ import {
 } from '../../Tactical Force/systems/tacticalPhysics.js';
 import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
 import { clearFighterDomain, cleanupDeadFightersDomains } from './domainSystem.js';
-import { wasmDist, wasmDistSq, wasmCircleCollide, wasmClamp, wasmLerp } from '../core/wasmMath.js';
+import { wasmDist, wasmDistSq, wasmCircleCollide, wasmClamp, wasmLerp, wasmSpatialGridHash, wasmBatchCircleCollisions } from '../core/wasmMath.js';
 
 // ─────────────────────────────────────────────
-// SPATIAL PARTITIONING GRID
+// SPATIAL PARTITIONING GRID (WASM ACCELERATED)
 // ─────────────────────────────────────────────
 class SpatialGrid {
   constructor(cellSize) {
@@ -57,7 +57,7 @@ class SpatialGrid {
   getKey(x, y) {
     const cellX = (x / this.cellSize) | 0;
     const cellY = (y / this.cellSize) | 0;
-    return (((cellX + 2000) & 0xFFFF) << 16) | ((cellY + 2000) & 0xFFFF);
+    return wasmSpatialGridHash(cellX, cellY);
   }
 
   insert(entity) {
@@ -81,7 +81,7 @@ class SpatialGrid {
 
     for (let dx = -cellRadius; dx <= cellRadius; dx++) {
       for (let dy = -cellRadius; dy <= cellRadius; dy++) {
-        const key = ((((cellX + dx) + 2000) & 0xFFFF) << 16) | (((cellY + dy) + 2000) & 0xFFFF);
+        const key = wasmSpatialGridHash(cellX + dx, cellY + dy);
         const cell = this.grid.get(key);
         if (cell) {
           for (let i = 0, len = cell.length; i < len; i++) {
@@ -91,6 +91,13 @@ class SpatialGrid {
       }
     }
     return nearby;
+  }
+
+  getColliding(targetX, targetY, targetR, candidateEntities) {
+    const out = this.getArray();
+    const count = wasmBatchCircleCollisions(targetX, targetY, targetR, candidateEntities, candidateEntities.length, out);
+    out.length = count;
+    return out;
   }
 }
 

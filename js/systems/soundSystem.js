@@ -3,6 +3,9 @@
 // ─────────────────────────────────────────────
 
 import { state } from '../core/state.js';
+import { soundSpriteManager } from './soundSpriteSystem.js';
+
+export { soundSpriteManager };
 
 const _cache = new Map();
 const _loopingSounds = new Map();
@@ -255,6 +258,13 @@ export async function preloadSound(src, options = {}) {
       });
     }
     return;
+  }
+  if (soundSpriteManager.hasSprite(src)) {
+    const info = soundSpriteManager.getSpriteInfo(src);
+    if (info) {
+      const audioCtx = getAudioContext();
+      return soundSpriteManager.loadSpriteSheet(info.sheetId, audioCtx);
+    }
   }
   if (_cache.has(src)) return;
   if (_loadingPromises.has(src)) {
@@ -741,9 +751,13 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
     if (!_evictOldestSound()) break;
   }
 
-  const cached = _cache.get(src);
+  const spriteAudio = soundSpriteManager.getSpriteAudio(src);
+  const cached = spriteAudio ? spriteAudio.buffer : _cache.get(src);
+  const isSprite = Boolean(spriteAudio);
+  const spriteBaseOffset = isSprite ? spriteAudio.offset : 0;
+  const spriteMaxDuration = isSprite ? spriteAudio.duration : 0;
 
-  // Fast path: AudioBuffer (fully decoded during preload) — zero latency Web Audio scheduling
+  // Fast path: AudioBuffer (fully decoded during preload or from sound sprite) — zero latency Web Audio scheduling
   if (isAudioBufferLike(cached) && audioCtx) {
     try {
       if (audioCtx.state === 'suspended' && _audioUnlocked) {
@@ -766,10 +780,15 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
       const safeSpeed = Math.max(0.1, speed);
       source.playbackRate.value = safeSpeed;
 
-      const offsetSec = Math.max(0, offset);
-      source.start(startTime, offsetSec);
+      const offsetSec = Math.max(0, spriteBaseOffset + offset);
+      const remainingDuration = isSprite ? Math.max(0, spriteMaxDuration - offset) : Math.max(0, cached.duration - offsetSec);
+      if (isSprite) {
+        source.start(startTime, offsetSec, remainingDuration);
+      } else {
+        source.start(startTime, offsetSec);
+      }
 
-      const duration = Math.max(0, (cached.duration - offsetSec) / safeSpeed);
+      const duration = Math.max(0, remainingDuration / safeSpeed);
       const endTime = startTime + duration;
 
       let safetyTimeout = null;
