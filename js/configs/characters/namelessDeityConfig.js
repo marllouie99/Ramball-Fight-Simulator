@@ -87,19 +87,19 @@ export const namelessDeityConfig = {
   // Ultimate: Nameless Destroyer (Transcendent Cosmic Super-Beam)
   // ──────────────────────────────────────────
   enableNamelessDestroyer: true,
-  destroyerCooldown: 2000,
-  destroyerInitialCooldown: 2000, // Initial cooldown at round start (~6.67s @ 60fps) before first super-beam
+  destroyerCooldown: 1500,
+  destroyerInitialCooldown: 1000, // Initial cooldown at round start (~6.67s @ 60fps) before first super-beam
 
   // Sequential Step-by-Step Animation Phase Frame Timers (Matched directly to Audio Durations)
   destroyerWindupFrames: 393,       // Exact duration of CosmicLaserChargeUp.ogg (6.551s = 393 frames @ 60fps)
-  destroyerFlareWindupFrames: 200,  // Phase 1: Duration (frames) of pure flare wind-up & starlight gathering
+  destroyerFlareWindupFrames: 150,  // Phase 1: Duration (frames) of pure flare wind-up & starlight gathering
   destroyerCircleFadeInFrames: 150, // Phase 2: Duration (frames) of 3D magic circle smooth fade-in while spinning (150 frames)
   destroyerHoldFrames: 43,          // Phase 3: Hold duration (frames) with fully formed circle before snap (200 + 150 + 43 = 393 frames)
-  destroyerFireFrames: 500,         // Phase 4: Long continuous cosmic super-beam firing (800 frames = ~13.3s with seamless audio looping)
+  destroyerFireFrames: 400,         // Phase 4: Long continuous cosmic super-beam firing (800 frames = ~13.3s with seamless audio looping)
   destroyerRecoveryFrames: 50,      // Post-beam celestial aura fade duration
 
   destroyerTotalDamage: 1000,        // Total damage distributed across active beam ticks
-  destroyerTickInterval: 50,         // Damage ticks every 4 frames
+  destroyerTickInterval: 10,         // Damage ticks every 4 frames
   destroyerBeamWidth: 142.5,        // Core beam collision half-width (matches 285px visual aperture diameter)
   destroyerBeamLength: 1400,        // Total reach (length) of the cosmic super-beam across the arena
   destroyerKnockbackPerTick: 1.8,

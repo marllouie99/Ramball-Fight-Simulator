@@ -29,7 +29,7 @@ export const naoyaConfig = {
 
   // Passive: Projection Sorcery (Permanent Speed & Evade Stacking on Hit)
   enableProjectionSorcery: true,
-  maxFrameStacks: 15,               // Max speed & evade stacks
+  maxFrameStacks: 5,               // Max speed & evade stacks
   speedBonusPerStack: 0.50,         // +0.50 permanent movement speed per hit
   baseEvadeChance: 0.05,            // 5% starting base evade chance
   evadeBonusPerStack: 0.04,         // +4% permanent evade chance per hit stack
@@ -126,7 +126,12 @@ export const naoyaConfig = {
 
   // Sound Configuration & Volumes
   sounds: {
+    punchHit: 'Assets/Sound Effects/Attacks/punch.mp3',
+    finisherPunch: 'Assets/Sound Effects/Attacks/punch.mp3',
     swordSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    runwayAfterimageShockwave: 'Assets/Sound Effects/NaoyaSFX/Naoya-pathafterimages-shockwaves.wav',
+    heavySmash: 'Assets/Sound Effects/Attacks/heavypunch3.mp3',
+    carCrashImpact: 'Assets/Sound Effects/Attacks/heavypunch3.mp3',
     frameStasis: 'Assets/Sound Effects/Skills/enhance.mp3',
     frameBlitz: 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3',
     sonicKick: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
@@ -134,7 +139,12 @@ export const naoyaConfig = {
     shatterFinisher: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3'
   },
   soundVolumes: {
+    punchHit: 0.85,
+    finisherPunch: 0.95,
     swordSwing: 0.80,
+    runwayAfterimageShockwave: 0.85,
+    heavySmash: 1.25,
+    carCrashImpact: 1.25,
     frameStasis: 0.95,
     frameBlitz: 1.00,
     sonicKick: 1.10,

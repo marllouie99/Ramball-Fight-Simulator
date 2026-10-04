@@ -1602,6 +1602,7 @@ async function runInteractionTests() {
 
     // Clean up
     sukuna.domainActive = false;
+    state.activeDomain = null;
     state.deathEffects = [];
     state.illusions = [];
     state.projectiles = [];
@@ -1615,8 +1616,13 @@ async function runInteractionTests() {
     const GojoClass = FIGHTER_CLASS_MAP.gojo;
     const { drawDeathEffects } = await import('../js/graphics/particles/deathShatterEffect.js');
 
-    const saitama = new SaitamaClass({ radius: 25, x: 200, y: 300, hp: 500, maxHp: 500, color: '#F5C400' });
-    const gojo = new GojoClass({ radius: 25, x: 250, y: 300, hp: 200, maxHp: 200, color: '#00E5FF' });
+    state.mode = '1v1';
+    const saitama = new SaitamaClass({ radius: 25, x: 200, y: 300, hp: 1000, maxHp: 1000, color: '#F5C400' });
+    const gojo = new GojoClass({ radius: 25, x: 250, y: 300, hp: 1000, maxHp: 1000, color: '#00E5FF' });
+    saitama.maxHp = 1000;
+    saitama.hp = 1000;
+    gojo.maxHp = 1000;
+    gojo.hp = 1000;
 
     state.fighters = [saitama, gojo];
     state.arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
@@ -1651,24 +1657,18 @@ async function runInteractionTests() {
     gojo.draw(mockCtx);
     assert(mockCtx.getStackDepth() === 0, `Gojo draw with barrier cracks must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
 
-    // 4. Saitama lands Serious Counter punch (200 barrier damage) -> brings barrier to critical 45 HP
-    gojo.takeDamage(350, saitama, { isSkill: true, isCounter: true, isCritical: true, bypassShield: true, isSaitamaCounter: true, bypassEvade: true, undodgeable: true, isGuaranteedHit: true });
-    assert(gojo.hp === initialGojoHp, 'Gojo HP must still be untouched');
-    assert(gojo.infinityBarrierHp === 45, `Barrier HP must be at 45 (got ${gojo.infinityBarrierHp})`);
-    assert(gojo.infinityCrackLevel === 3, `Crack level must be 3 (Critical stress) at 45 HP (got ${gojo.infinityCrackLevel})`);
+    // 4. Saitama lands Serious Counter punch -> instantly shatters the Infinity barrier and deals direct HP damage!
+    const counterResult = gojo.takeDamage(350, saitama, { isSkill: true, isCounter: true, isCritical: true, bypassShield: true, isSaitamaCounter: true, bypassEvade: true, undodgeable: true, isGuaranteedHit: true });
 
-    // 5. Final Normal Punch lands to shatter the remaining 45 HP of the barrier and penetrate directly!
-    const breakHitResult = gojo.takeDamage(75, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true, undodgeable: true });
-    
-    // Barrier must be completely shattered!
-    assert(gojo.infinityBarrierHp === 0, `Barrier HP must be 0 after shatter (got ${gojo.infinityBarrierHp})`);
-    assert(gojo.infinityActive === false, 'Infinity must be deactivated after being shattered');
+    // Barrier must be completely shattered by the counter!
+    assert(gojo.infinityBarrierHp === 0, `Barrier HP must be 0 after counter shatter (got ${gojo.infinityBarrierHp})`);
+    assert(gojo.infinityActive === false, 'Infinity must be deactivated after counter shatter');
     assert(gojo.infinityCooldown === (CONFIG.gojo?.infinityBrokenCooldown ?? 360), `Infinity must be placed on broken lockout cooldown (got ${gojo.infinityCooldown})`);
-    assert(breakHitResult !== false, 'Shattering punch must penetrate barrier and deal direct HP damage');
-    assert(gojo.hp < initialGojoHp, `Gojo must take direct HP damage on the barrier shattering punch (HP: ${gojo.hp} < ${initialGojoHp})`);
+    assert(counterResult !== false, 'Counter punch must penetrate barrier and deal direct HP damage');
+    assert(gojo.hp < initialGojoHp, `Gojo must take direct HP damage from the barrier-shattering counter (HP: ${gojo.hp} < ${initialGojoHp})`);
     assert(!saitama.isFrozenByInfinity, 'Saitama must NOT be frozen in Infinity when shattering the barrier');
 
-    // 6. Verify flying glass shard particles spawned in state.deathEffects
+    // 5. Verify flying glass shard particles spawned in state.deathEffects
     const glassShards = state.deathEffects.filter(e => e.isInfinityGlassShard);
     assert(glassShards.length > 0, `Expected infinity glass shards to spawn on barrier shatter (got ${glassShards.length})`);
     
@@ -1677,14 +1677,14 @@ async function runInteractionTests() {
     drawDeathEffects();
     assert(mockCtx.getStackDepth() === 0, `drawDeathEffects with glass shards must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
 
-    // 7. Next Saitama attack while Infinity is shattered MUST deal direct HP damage to Gojo
+    // 6. Next Saitama attack while Infinity is shattered MUST deal direct HP damage to Gojo
     const hpBeforeDirectHit = gojo.hp;
     const directHitResult = gojo.takeDamage(50, saitama, { isMelee: true, isSkill: true, isSaitamaPunch: true, bypassShield: true });
     assert(directHitResult !== false, 'takeDamage must succeed and apply damage when Infinity is shattered');
     assert(gojo.hp < hpBeforeDirectHit, `Gojo must take direct HP damage while Infinity is broken (HP: ${gojo.hp} < ${hpBeforeDirectHit})`);
     assert(!saitama.isFrozenByInfinity, 'Saitama must NOT be frozen in Infinity on subsequent hits while barrier is broken');
 
-    // 8. Verify cooldown decrements cleanly across update ticks while remaining inactive
+    // 7. Verify cooldown decrements cleanly across update ticks while remaining inactive
     state.frameCount = 1;
     const cdBeforeTick = gojo.infinityCooldown;
     state.frameCount++;
@@ -1693,7 +1693,7 @@ async function runInteractionTests() {
     assert(gojo.infinityActive === false, 'Infinity must remain inactive while cooldown > 0');
     assert(gojo.hasActiveInfinity() === false, 'hasActiveInfinity must return false while on cooldown');
 
-    // 9. Fast-forward remaining cooldown frames and verify automatic re-arming and restoration in Ranged Mode
+    // 8. Fast-forward remaining cooldown frames and verify automatic re-arming and restoration in Ranged Mode
     saitama.x = 9999;
     while (gojo.infinityCooldown > 0) {
       state.frameCount++;
@@ -3763,6 +3763,424 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during domain slice dodge state must be 0');
 
     console.log('      ✅ Sans Undertale speech bubbles, warning box, Heart Shatter defeat VFX, faah suppression, in-arena overlay HP, skill bars, initial blaster cooldown & Sukuna domain slice line dodges verified.');
+  }
+
+  // ─────────────────────────────────────────────
+  // 34. Nameless Deity vs Saitama: Arena Center Rebounce on Ultimate
+  // ─────────────────────────────────────────────
+  {
+    console.log('\n[TEST 34] Nameless Deity vs Saitama: Arena Center Rebounce on Ultimate');
+    const { Fighter } = await import('../js/entities/fighter.js');
+    const { NamelessDeityFighter } = await import('../js/entities/fighters/NamelessDeityFighter.js');
+    const { SaitamaFighter } = await import('../js/entities/fighters/SaitamaFighter.js');
+
+    const arena = { x: 50, y: 50, width: 800, height: 600 };
+    state.arena = arena;
+    const centerX = arena.x + arena.width / 2;
+    const centerY = arena.y + arena.height / 2;
+
+    const deity = new NamelessDeityFighter({ radius: 28, x: 100, y: 120 });
+    const saitama = new SaitamaFighter({ radius: 25, x: 700, y: 500 });
+    const genericOpponent = new Fighter({ radius: 20, x: 700, y: 500 });
+
+    state.gameState = 'playing';
+    state.isGameOver = false;
+
+    // A. Verify non-Saitama cast keeps Deity at its current position
+    state.fighters = [deity, genericOpponent];
+    deity.x = 100;
+    deity.y = 120;
+    deity.castNamelessDestroyer(genericOpponent);
+    assert(deity.x === 100 && deity.y === 120, 'Nameless Deity must NOT rebounce when casting ultimate against a standard opponent');
+    assert(deity.destroyerWindupTimer > 0, 'Nameless Deity must initiate windup timer');
+
+    // B. Reset and test against Saitama
+    state.fighters = [deity, saitama];
+    deity.destroyerWindupTimer = 0;
+    deity.destroyerFireTimer = 0;
+    deity.destroyerCooldown = 0;
+    deity.x = 100;
+    deity.y = 120;
+
+    deity.castNamelessDestroyer(saitama);
+
+    // Deity must enter rebounce state towards arena center
+    assert(deity.isRebouncingToCenter === true, 'Nameless Deity must enter isRebouncingToCenter state against Saitama');
+    assert(deity.rebounceTimer === 18, `Expected 18 rebounceTimer frames, got ${deity.rebounceTimer}`);
+    assert(deity.rebounceTargetX === centerX && deity.rebounceTargetY === centerY, 'Rebounce target must be arena center');
+
+    // Simulate the 18 rebounce glide frames
+    for (let f = 0; f < 18; f++) {
+      deity.update(saitama, 0, arena);
+    }
+
+    // After 18 frames, Deity must have reached arena center and initiated ultimate channeling
+    assert(deity.isRebouncingToCenter === false, 'isRebouncingToCenter must be false after completing rebounce');
+    assert(Math.abs(deity.x - centerX) < 0.001, `Nameless Deity x must be at arena center (${centerX}), got ${deity.x}`);
+    assert(Math.abs(deity.y - centerY) < 0.001, `Nameless Deity y must be at arena center (${centerY}), got ${deity.y}`);
+    assert(deity.vx === 0 && deity.vy === 0, 'Nameless Deity velocity must be zeroed upon center rebounce arrival');
+    assert(deity.destroyerWindupTimer > 0, 'Nameless Deity ultimate windup must be actively channeling from center');
+
+    // Aim angle must be aimed at Saitama from the arena center
+    const expectedAngle = Math.atan2(saitama.y - centerY, saitama.x - centerX);
+    assert(Math.abs(deity.destroyerCastAngle - expectedAngle) < 0.001, `Deity aim must target Saitama from arena center (expected ${expectedAngle}, got ${deity.destroyerCastAngle})`);
+
+    // Verify Camera Zoom Out behavior: disabled vs Saitama, enabled vs generic opponent
+    const { updateCamera, resetCamera } = await import('../js/systems/cameraSystem.js');
+    resetCamera(true);
+    state.camera.mode = 'fixed';
+    state.camera.enabled = true;
+
+    // Test with Saitama: zoom out MUST be disabled (targetZoom stays 1.0)
+    updateCamera();
+    assert(state.camera.targetZoom === 1.0, `Camera targetZoom vs Saitama must remain 1.0 (zoom out disabled), got ${state.camera.targetZoom}`);
+
+    // Test with generic opponent: zoom out MUST be active (targetZoom zooms out towards 0.93)
+    state.fighters = [deity, genericOpponent];
+    deity.destroyerWindupTimer = Math.floor(deity.destroyerWindupMax / 2);
+    updateCamera();
+    assert(state.camera.targetZoom < 1.0, `Camera targetZoom vs generic opponent must zoom out below 1.0, got ${state.camera.targetZoom}`);
+
+    // C. Verify Saitama Serious Skill Counter teleports AWAY from Nameless Deity (Standoff retreat distance)
+    state.fighters = [deity, saitama];
+    deity.x = 400;
+    deity.y = 300;
+    saitama.x = 430;
+    saitama.y = 300; // Close to Deity
+    saitama.vx = 5;
+    saitama.vy = 5;
+    saitama.skillPunishCooldown = 0;
+    saitama._counterPunchTimer = 0;
+    saitama.isCountering = false;
+
+    // Direct invocation of executeSkillCounterPunish against Deity
+    const counterResult = saitama.executeSkillCounterPunish(deity);
+    assert(counterResult === true, 'executeSkillCounterPunish must successfully trigger counter channeling against Nameless Deity');
+    const distToDeity = Math.hypot(saitama.x - deity.x, saitama.y - deity.y);
+    assert(distToDeity >= 200, `Saitama must teleport AWAY from Nameless Deity (expected distance >= 200, got ${distToDeity})`);
+    assert(saitama.vx === 0 && saitama.vy === 0, 'Saitama velocity must be stopped (vx=0, vy=0) while channeling counter against Deity');
+    assert(saitama.isCountering === true, 'Saitama isCountering must be true (actively channeling counter)');
+    assert(saitama._counterPunchTimer > 0, 'Saitama _counterPunchTimer must be active and counting down');
+    assert(saitama._counterPunchTarget === deity, 'Saitama _counterPunchTarget must be Deity');
+
+    // Test during counter channeling: Saitama maintains stationary lock while channeling
+    saitama.vx = 4;
+    saitama.vy = 4;
+    saitama.update(deity, 1, arena);
+    assert(saitama.vx === 0 && saitama.vy === 0, 'Saitama velocity must remain 0 (stopped) while actively channeling Serious Counter against Deity');
+
+    // Test Nameless Deity beam does NOT cancel Saitama Serious Skill Counter
+    deity.destroyerFireTimer = 100;
+    deity.destroyerWindupTimer = 0;
+    deity.x = 400;
+    deity.y = 300;
+    deity.destroyerCastAngle = Math.atan2(saitama.y - deity.y, saitama.x - deity.x);
+    deity.update(saitama, 0, arena);
+    assert(saitama.isCountering === true, 'Nameless Deity beam must NOT cancel Saitama Serious Skill Counter');
+    assert(saitama._counterPunchTimer > 0, 'Saitama _counterPunchTimer must remain active and not cancelled by beam');
+
+    // Verify drawing stack depth
+    mockCtx.resetStackDepth();
+    deity.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Nameless Deity draw stack depth during ultimate windup must be 0');
+    mockCtx.resetStackDepth();
+    saitama.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Saitama draw stack depth must be 0');
+
+    console.log('      ✅ Nameless Deity vs Saitama center rebounce glide, ultimate channeling, disabled camera zoom out & beam immunity to counter cancellation verified successfully.');
+  }
+
+  // ─────────────────────────────────────────────
+  // 35. Nameless Deity: Modular Asset Death Shatter
+  // ─────────────────────────────────────────────
+  {
+    console.log('\n[TEST 35] Nameless Deity: Modular Asset Death Shatter');
+    const { NamelessDeityFighter } = await import('../js/entities/fighters/NamelessDeityFighter.js');
+    const { spawnDeathShatter, drawDeathEffects } = await import('../js/graphics/particles/deathShatterEffect.js');
+
+    state.deathEffects = [];
+    const deity = new NamelessDeityFighter({ radius: 28, x: 400, y: 300 });
+
+    spawnDeathShatter(deity);
+
+    // Verify death effects contain modular assets
+    const assetGores = state.deathEffects.filter(e => e && e.isNamelessDeityAssetGore);
+    const glassShards = state.deathEffects.filter(e => e && e.isNamelessDeityGlassShard);
+
+    assert(assetGores.length > 0, `Expected modular asset gore effects, got ${assetGores.length}`);
+    assert(glassShards.length > 0, `Expected prismatic glass shard effects, got ${glassShards.length}`);
+
+    // Verify key anatomical assets exist in the shatter array
+    const wingsPieces = assetGores.filter(g => g.type === 'wings_left' || g.type === 'wings_right');
+    const haloPiece = assetGores.find(g => g.type === 'halo_wheel');
+    const antlerPiece = assetGores.find(g => g.type === 'antlers');
+    const bodyPiece = assetGores.find(g => g.type === 'body');
+    const eyePiece = assetGores.find(g => g.type === 'cosmic_eye');
+    const handPieces = assetGores.filter(g => g.type === 'hand_left' || g.type === 'hand_right');
+
+    assert(wingsPieces.length === 2, `Expected 2 wings pieces (left and right), got ${wingsPieces.length}`);
+    assert(Boolean(haloPiece), 'Expected sacred halo wheel piece in death shatter');
+    assert(Boolean(antlerPiece), 'Expected antlers piece in death shatter');
+    assert(Boolean(bodyPiece), 'Expected divine body/robe piece in death shatter');
+    assert(Boolean(eyePiece), 'Expected cosmic eye piece in death shatter');
+    assert(handPieces.length === 2, `Expected 2 hands pieces, got ${handPieces.length}`);
+
+    assert(assetGores.every(g => g.isPermanentGore === true), 'All Nameless Deity asset gores must be permanent');
+    const { clearAllBattleEffects } = await import('../js/graphics/particles/bloodEffect.js');
+    clearAllBattleEffects();
+    const preservedGores = state.deathEffects.filter(e => e && e.isNamelessDeityAssetGore);
+    assert(preservedGores.length === assetGores.length, `Expected ${assetGores.length} preserved gores after clearAllBattleEffects, got ${preservedGores.length}`);
+
+    // Verify canvas stack depth when drawing all death effects
+    mockCtx.resetStackDepth();
+    drawDeathEffects();
+    assert(mockCtx.getStackDepth() === 0, 'drawDeathEffects stack depth for Nameless Deity assets must be 0');
+
+    console.log('      ✅ Nameless Deity modular asset death shatter (wings, halo, antlers, body, eye, arms, hands, crystals & permanent preservation) verified successfully.');
+  }
+
+  // ── TEST 47: Nameless Deity vs Saitama Special Interaction Architecture ──
+  console.log('   47. Testing Nameless Deity vs Saitama Special Interaction & Dedicated Module Architecture...');
+  {
+    const {
+      isNamelessDeityEntity,
+      isSaitamaEntity,
+      hasSaitamaEnemy,
+      shouldNamelessDeityRebounce,
+      shouldDisableCameraZoomForDeity,
+      calculateSaitamaRetreatPosition,
+      executeSaitamaCounterDeity,
+      isSaitamaCounterImmuneToDeityBeam,
+      isMatchInteractionActive
+    } = await import('../js/interactions/index.js');
+    const { deitySaitamaConfig } = await import('../js/configs/interactions/index.js');
+    const { NamelessDeityFighter } = await import('../js/entities/fighters/NamelessDeityFighter.js');
+    const { SaitamaFighter } = await import('../js/entities/fighters/SaitamaFighter.js');
+
+    const deity = new NamelessDeityFighter({ radius: 28, x: 100, y: 100 });
+    const saitama = new SaitamaFighter({ radius: 25, x: 150, y: 150 });
+    state.fighters = [deity, saitama];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+
+    // 1. Entity type recognition
+    assert(isNamelessDeityEntity(deity) === true, 'Deity must be recognized by isNamelessDeityEntity');
+    assert(isSaitamaEntity(saitama) === true, 'Saitama must be recognized by isSaitamaEntity');
+    assert(hasSaitamaEnemy(deity, saitama, state) === true, 'hasSaitamaEnemy must return true');
+    assert(isMatchInteractionActive('deitySaitama', state) === true, 'isMatchInteractionActive must return true for deitySaitama');
+
+    // 2. Camera zoom disabled
+    assert(shouldDisableCameraZoomForDeity(deity, state.fighters) === true, 'Camera zoom-out must be disabled vs Saitama');
+
+    // 3. Center rebounce logic
+    assert(shouldNamelessDeityRebounce(deity, saitama, state) === true, 'Deity must trigger center rebounce when off-center vs Saitama');
+
+    // 4. Standoff retreat calculation & execution
+    const retreatPos = calculateSaitamaRetreatPosition(saitama, deity, state.arena);
+    assert(typeof retreatPos.x === 'number' && typeof retreatPos.y === 'number', 'Retreat position must return numeric coords');
+    const standoffDist = Math.hypot(retreatPos.x - deity.x, retreatPos.y - deity.y);
+    assert(standoffDist >= 250, `Saitama standoff retreat distance must be >= 250px (got ${standoffDist})`);
+
+    const prevX = saitama.x;
+    const prevY = saitama.y;
+    executeSaitamaCounterDeity(saitama, deity, state.arena, prevX, prevY);
+    assert(saitama.x === retreatPos.x && saitama.y === retreatPos.y, 'executeSaitamaCounterDeity must update Saitama position to retreat coords');
+    assert(saitama.vx === 0 && saitama.vy === 0, 'executeSaitamaCounterDeity must zero velocities');
+
+    // 5. Super armor / immunity against beam interrupt during counter
+    saitama.isCountering = true;
+    assert(isSaitamaCounterImmuneToDeityBeam(saitama) === true, 'Saitama must be immune to Deity beam interrupt while countering');
+
+    saitama.isCountering = false;
+    assert(isSaitamaCounterImmuneToDeityBeam(saitama) === false, 'Saitama must NOT be immune when not countering');
+
+    // 6. InteractionManager Event Hooks Dispatch
+    const { interactionManager } = await import('../js/interactions/index.js');
+    assert(interactionManager.shouldOverrideCameraZoom(deity, state.fighters) === true, 'interactionManager must dispatch shouldOverrideCameraZoom');
+    assert(interactionManager.isBeamImmune(saitama, deity, 'nameless_destroyer') === false, 'isBeamImmune must be false when Saitama is not countering');
+    saitama.isCountering = true;
+    assert(interactionManager.isBeamImmune(saitama, deity, 'nameless_destroyer') === true, 'isBeamImmune must be true when Saitama is countering');
+    saitama.isCountering = false;
+
+    // Test counter teleport dispatch
+    const handledCounter = interactionManager.handleCounterTeleport(saitama, deity, state.arena, 150, 150);
+    assert(handledCounter === true, 'interactionManager.handleCounterTeleport must return true for Saitama vs Deity');
+
+    // 7. Toggle Control Verification (enabled: false bypass)
+    deitySaitamaConfig.enabled = false;
+    assert(shouldNamelessDeityRebounce(deity, saitama, state) === false, 'shouldNamelessDeityRebounce must return false when enabled is false');
+    assert(shouldDisableCameraZoomForDeity(deity, state.fighters) === false, 'shouldDisableCameraZoomForDeity must return false when enabled is false');
+    assert(isSaitamaCounterImmuneToDeityBeam(saitama) === false, 'isSaitamaCounterImmuneToDeityBeam must return false when enabled is false');
+    assert(interactionManager.handleCounterTeleport(saitama, deity, state.arena, 150, 150) === false, 'handleCounterTeleport must return false when enabled is false');
+    assert(interactionManager.handleUltimatePreCast(deity, saitama, state, false) === false, 'handleUltimatePreCast must return false when enabled is false');
+    assert(interactionManager.shouldOverrideCameraZoom(deity, state.fighters) === false, 'shouldOverrideCameraZoom must return false when enabled is false');
+    deitySaitamaConfig.enabled = true; // Restore
+
+    // 8. Beam Evasion & Dodging for Saitama and Sans
+    const { SansFighter } = await import('../js/entities/fighters/SansFighter.js');
+    const sans = new SansFighter({ radius: 25, x: 200, y: 100 });
+    
+    // Test Sans dodging Deity's beam
+    deity.x = 100;
+    deity.y = 100;
+    deity.destroyerCastAngle = 0; // Firing horizontally to the right
+    deity.destroyerFireTimer = 500;
+    sans.x = 250;
+    sans.y = 100; // Directly in the centerline of the beam
+    sans.stamina = 100;
+    sans.dodgeCooldown = 0;
+
+    const sansBeamData = {
+      attacker: deity,
+      startX: deity.x,
+      startY: deity.y,
+      angle: deity.destroyerCastAngle,
+      beamLength: 1400,
+      beamHalfWidth: 142.5
+    };
+
+    const sansDidDodge = sans.dodgeBeam(sansBeamData);
+    assert(sansDidDodge === true, 'Sans must successfully dodge Nameless Deity beam');
+    assert(sans.stamina < 100, `Sans stamina must be consumed on beam dodge (got ${sans.stamina})`);
+    const sansPerpDist = Math.abs(sans.y - deity.y);
+    assert(sansPerpDist >= 142.5, `Sans must dodge outside beam aperture (perpDist=${sansPerpDist}, expected >= 142.5)`);
+
+    // Test Saitama dodging Deity's beam
+    saitama.x = 250;
+    saitama.y = 100; // Directly in the centerline of the beam
+    saitama.dodgeCooldown = 0;
+    saitama.isCountering = false;
+
+    const saitamaBeamData = {
+      attacker: deity,
+      startX: deity.x,
+      startY: deity.y,
+      angle: deity.destroyerCastAngle,
+      beamLength: 1400,
+      beamHalfWidth: 142.5
+    };
+
+    const saitamaDidDodge = saitama.dodgeBeam(saitamaBeamData);
+    assert(saitamaDidDodge === true, 'Saitama must successfully dodge Nameless Deity beam');
+    const saitamaPerpDist = Math.abs(saitama.y - deity.y);
+    assert(saitamaPerpDist >= 142.5, `Saitama must dodge outside beam aperture (perpDist=${saitamaPerpDist}, expected >= 142.5)`);
+
+    // Test live beam update loop with Sans and Saitama dodging
+    state.fighters = [deity, sans, saitama];
+    sans.x = 300;
+    sans.y = 100;
+    sans.stamina = 100;
+    sans.dodgeCooldown = 0;
+    saitama.x = 350;
+    saitama.y = 100;
+    saitama.dodgeCooldown = 0;
+    saitama.isCountering = false;
+
+    deity.update(sans, 0, state.arena);
+    assert(sans.y !== 100, 'Sans must have dodged away from y=100 during Deity beam update tick');
+    assert(saitama.y !== 100, 'Saitama must have dodged away from y=100 during Deity beam update tick');
+    assert(sans.hp === 1, 'Sans must NOT take damage on dodged beam tick');
+
+    // 9. Hollow Purple & Yuta Pure Love Beam Evasion for Saitama and Sans
+    const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+    const { YutaPureLoveBeamBehavior } = await import('../js/systems/projectiles/behaviors/YutaPureLoveBeamBehavior.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { YutaFighter } = await import('../js/entities/fighters/YutaFighter.js');
+
+    const gojo = new GojoFighter({ radius: 25, x: 100, y: 100 });
+    const yuta = new YutaFighter({ radius: 25, x: 100, y: 100 });
+    state.fighters = [gojo, yuta, sans, saitama];
+
+    // A. Hollow Purple Evasion
+    const purpleBehavior = new GojoPurpleBehavior();
+    const purpleProj = {
+      x: 200,
+      y: 100,
+      vx: 4.0,
+      vy: 0,
+      r: 45,
+      damage: 70,
+      purpleDPS: 150,
+      purpleDPSInterval: 1,
+      owner: 0,
+      ownerFighter: gojo,
+      life: 100,
+      behaviorType: 'gojo_purple',
+      hitTargets: new Set(),
+      hitFighters: new Set()
+    };
+    state.projectiles = [purpleProj];
+
+    sans.x = 220;
+    sans.y = 100;
+    sans.stamina = 100;
+    sans.dodgeCooldown = 0;
+
+    saitama.x = 240;
+    saitama.y = 100;
+    saitama.dodgeCooldown = 0;
+    saitama.isCountering = false;
+
+    const mockSystem = { projectiles: state.projectiles };
+    purpleBehavior.update(purpleProj, state.fighters, mockSystem);
+
+    assert(sans.y !== 100, 'Sans must dodge out of Hollow Purple trajectory');
+    assert(saitama.y !== 100, 'Saitama must dodge out of Hollow Purple trajectory');
+    assert(sans.isCaughtInPurple === false, 'Sans must NOT be caught in purple stasis');
+    assert(saitama.isCaughtInPurple === false, 'Saitama must NOT be caught in purple stasis');
+
+    // B. Yuta Pure Love Beam Evasion
+    const yutaBeamBehavior = new YutaPureLoveBeamBehavior();
+    yuta.isFiringPureLoveBeam = true;
+    yuta.pureLoveBeamActiveTimer = 200;
+    yuta.pureLoveBeamLockedAngle = 0; // Firing horizontally along y=100
+    yuta.gunAngle = 0;
+
+    const yutaBeamProj = {
+      x: 100,
+      y: 100,
+      angle: 0,
+      owner: 1,
+      ownerFighter: yuta,
+      life: 200,
+      damage: 15,
+      hitTickTimer: 0,
+      hitTargets: new Set()
+    };
+    state.projectiles = [yutaBeamProj];
+
+    sans.x = 250;
+    sans.y = 100; // In direct path of Yuta beam
+    sans.stamina = 100;
+    sans.dodgeCooldown = 0;
+
+    saitama.x = 300;
+    saitama.y = 100; // In direct path of Yuta beam
+    saitama.dodgeCooldown = 0;
+    saitama.isCountering = false;
+
+    yutaBeamBehavior.update(yutaBeamProj, state.fighters, mockSystem);
+
+    // C. Gojo vs Saitama Dedicated Interaction Module & Config Verification
+    const { gojoSaitamaConfig } = await import('../js/configs/interactions/gojoSaitamaConfig.js');
+    const { isGojoEntity, isSaitamaEntity: isSaitamaGojoEntity, hasGojoEnemy, hasSaitamaEnemy: hasSaitamaGojoEnemy, computeSaitamaBarrierDamage } = await import('../js/interactions/gojoSaitamaInteraction.js');
+
+    assert(isMatchInteractionActive('gojoSaitama', state) === true, 'gojoSaitama match interaction must be active');
+    assert(isGojoEntity(gojo) === true, 'isGojoEntity must return true for Gojo');
+    assert(isSaitamaGojoEntity(saitama) === true, 'isSaitamaGojoEntity must return true for Saitama');
+    assert(hasGojoEnemy(saitama, state) === true, 'saitama must detect gojo as living enemy');
+    assert(hasSaitamaGojoEnemy(gojo, state) === true, 'gojo must detect saitama as living enemy');
+    assert(computeSaitamaBarrierDamage(50, saitama, { isSaitamaCounter: true }) === 99999, 'Counter punch barrier damage must be 99999');
+    assert(computeSaitamaBarrierDamage(50, saitama, { isSaitamaPunch: true }) === 70, 'Normal punch barrier damage must be 70');
+    assert(computeSaitamaBarrierDamage(50, saitama, { isMachineGunBlow: true }) === 35, 'Machine gun blow barrier damage must be 35');
+    assert(gojoSaitamaConfig.enabled === true, 'gojoSaitamaConfig.enabled must be true by default');
+
+    // Verify first-impact dodge tracking sets
+    assert(purpleProj._dodgedEntities && purpleProj._dodgedEntities.has(sans), 'Sans must be recorded in purpleProj._dodgedEntities');
+    assert(purpleProj._dodgedEntities && purpleProj._dodgedEntities.has(saitama), 'Saitama must be recorded in purpleProj._dodgedEntities');
+    assert(yutaBeamProj._dodgedEntities && yutaBeamProj._dodgedEntities.has(sans), 'Sans must be recorded in yutaBeamProj._dodgedEntities');
+    assert(yutaBeamProj._dodgedEntities && yutaBeamProj._dodgedEntities.has(saitama), 'Saitama must be recorded in yutaBeamProj._dodgedEntities');
+
+    console.log('      ✅ Dedicated interactions module, registry queries, interactionManager event hooks, config toggles (enabled: true/false), camera zoom bypass, standoff retreat, beam super-armor, Saitama/Sans Deity beam dodging, Gojo Hollow Purple dodging & Yuta Pure Love Beam dodging verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

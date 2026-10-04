@@ -17,6 +17,14 @@ export const AUDIO_CONFIG = {
   'attack_fleshhit': 'Assets/Sound Effects/Attacks/fleshhit.mp3',
   'attack_groundsmash': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'attack_swordswing': 'Assets/Sound Effects/Attacks/swordswing.mp3',
+  'attack_punch': 'Assets/Sound Effects/Attacks/punch.mp3',
+  'attack_heavypunch1': 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+  'attack_heavypunch2': 'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+  'attack_heavypunch3': 'Assets/Sound Effects/Attacks/heavypunch3.mp3',
+  'punch': 'Assets/Sound Effects/Attacks/punch.mp3',
+  'heavypunch1': 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+  'heavypunch2': 'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+  'heavypunch3': 'Assets/Sound Effects/Attacks/heavypunch3.mp3',
   'attack_escanor': 'Assets/Sound Effects/Attacks/Escanor-attack.mp3',
   'attack_sukunaslice': 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3',
   'sukuna_slice': 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3',
@@ -97,6 +105,10 @@ export const AUDIO_CONFIG = {
   'skill_engineer_sentry_reloading': 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3',
   'skill_engineer_repair': 'Assets/Sound Effects/Skills/repair.mp3',
   'repair': 'Assets/Sound Effects/Skills/repair.mp3',
+  'naoya_runway_shockwave': 'Assets/Sound Effects/NaoyaSFX/Naoya-pathafterimages-shockwaves.wav',
+  'naoya_pathafterimages_shockwaves': 'Assets/Sound Effects/NaoyaSFX/Naoya-pathafterimages-shockwaves.wav',
+  'naoya_heavysmash': 'Assets/Sound Effects/NaoyaSFX/naoya_heavysmash.wav',
+  'naoya_heavy_smash': 'Assets/Sound Effects/NaoyaSFX/naoya_heavysmash.wav',
 
   // CJ Grove Street
   'skill_cj_carroam_noise': 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',
@@ -201,22 +213,4 @@ export const AUDIO_CONFIG = {
   'avatar_hurt': 'Assets/Sound Effects/Avatar/AvatarHurt1.ogg'
 };
 
-/**
- * 90s Arcade Retro Voiceline DSP Configuration (CPS1/CPS2/Neo-Geo MVS aesthetic)
- */
-export const RETRO_ARCADE_VOICE_CONFIG = {
-  enabled: true,                 // Master toggle for 90s Arcade Retro Voiceline DSP processing
-  highpassFreq: 240,             // Cuts modern sub-bass boom (Hz)
-  highpassQ: 0.707,
-  peakingFreq: 2200,             // Classic arcade forward vocal bite (Hz)
-  peakingGain: 3.8,              // Gain boost (dB)
-  peakingQ: 1.2,
-  lowpassFreq: 4200,             // 16-bit / 22kHz DAC rolloff (Hz)
-  lowpassQ: 0.85,
-  saturationDrive: 1.30,         // Warm arcade cabinet soft-clip saturation drive
-  speedMultiplier: 1.03,         // Arcade PCB audio clock pace multiplier (+3%)
-  enableSlapbackUltimates: true, // Short 85ms slapback echo for domain expansions & massive ultimates
-  slapbackDelaySec: 0.085,
-  slapbackFeedback: 0.18,
-  slapbackMix: 0.22,
-};
+

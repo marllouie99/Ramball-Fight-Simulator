@@ -7,7 +7,9 @@ import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { getEyePhase1Image, getEyePhase2Image, getEyeShatterImage, EOC_SHATTER_SPRITES } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawEnderDragonDeathDisintegration } from '../fighters/enderDragonSkin.js';
+import { getNamelessDeityShatterAssets, NAMELESS_DEITY_DEFAULT_CONFIGS, NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS } from '../fighters/namelessDeitySkin.js';
 import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 
 /**
  * Spawns a death shatter effect at the fighter's position.
@@ -19,6 +21,9 @@ export function spawnDeathShatter(fighter) {
   }
   if (fighter.characterId === 'ender_dragon' || fighter.type === 'ender_dragon') {
     return spawnEnderDragonDisintegrationDeath(fighter);
+  }
+  if (fighter.characterId === 'namelessdeity' || fighter.type === 'namelessdeity' || fighter.characterId === 'nameless_deity') {
+    return spawnNamelessDeityShatterDeath(fighter);
   }
 
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
@@ -922,6 +927,101 @@ export function updateDeathEffects() {
       continue;
     }
 
+    // 1.5. Nameless Deity Modular Asset Separation Physics: detached PNG body parts fly outward, bounce, and settle
+    if (effect.isNamelessDeityAssetGore) {
+      if (!effect.isSettled) {
+        effect.x += effect.vx;
+        effect.y += effect.vy;
+        effect.vy += (effect.gravity || 0.32);
+
+        // Aerodynamic air drag & flutter dynamics
+        const dragX = effect.isPaper ? 0.94 : (effect.isWing ? 0.96 : 0.985);
+        const dragY = effect.isPaper ? 0.96 : (effect.isWing ? 0.97 : 0.99);
+        effect.vx *= dragX;
+        effect.vy *= dragY;
+
+        // Paper flutter wobble for censor note
+        if (effect.isPaper) {
+          effect.flutterPhase = (effect.flutterPhase || 0) + 0.18;
+          effect.rotation += Math.sin(effect.flutterPhase) * 0.08;
+          effect.vx += Math.cos(effect.flutterPhase) * 0.4;
+        } else {
+          effect.rotation += effect.rotationSpeed;
+        }
+
+        const pieceMargin = (effect.size || 15) * 0.4;
+        const leftBound = arenaLeft + pieceMargin;
+        const rightBound = arenaRight - pieceMargin;
+        const bottomBound = arenaBottom - pieceMargin;
+
+        // Wall horizontal bounce clamp
+        if (effect.x <= leftBound) {
+          effect.x = leftBound;
+          effect.vx = Math.abs(effect.vx) * (effect.restitution || 0.40);
+          effect.rotationSpeed = -effect.rotationSpeed * 0.6;
+        } else if (effect.x >= rightBound) {
+          effect.x = rightBound;
+          effect.vx = -Math.abs(effect.vx) * (effect.restitution || 0.40);
+          effect.rotationSpeed = -effect.rotationSpeed * 0.6;
+        }
+
+        // Ceiling bounce
+        if (effect.y <= arenaTop + pieceMargin) {
+          effect.y = arenaTop + pieceMargin;
+          if (effect.vy < 0) effect.vy = -effect.vy * 0.35;
+        }
+
+        // Floor bounce & landing
+        if (effect.y >= bottomBound) {
+          effect.y = bottomBound;
+          effect.groundFrames = (effect.groundFrames || 0) + 1;
+
+          if (effect.vy > 0) {
+            if (effect.vy > 1.2 && effect.groundFrames < 14) {
+              effect.vy = -effect.vy * (effect.restitution || 0.36);
+              effect.vx *= 0.78;
+              effect.rotationSpeed = (effect.vx >= 0 ? 1 : -1) * Math.min(0.20, Math.abs(effect.vx) * 0.06);
+
+              // Secondary starlight spark impact
+              spawnSparks(effect.x, effect.y, 2, 'cyan', effect.color || '#00F0FF');
+            } else {
+              effect.vy = 0;
+              effect.vx *= 0.60;
+              effect.rotationSpeed *= 0.60;
+
+              if (Math.abs(effect.vx) < 0.05 || effect.groundFrames > 22) {
+                effect.vx = 0;
+                effect.rotationSpeed = 0;
+                effect.isSettled = true;
+                effect.settleHoldTimer = 120; // Rest visibly on floor for 2.0s
+                effect.decay = 0.005;
+              }
+            }
+          }
+        }
+
+        // Trail celestial sparks while airborne
+        if (Math.hypot(effect.vx, effect.vy) > 3.0 && Math.random() < 0.25) {
+          spawnSparks(effect.x + (Math.random() - 0.5) * 8, effect.y + (Math.random() - 0.5) * 8, 1, 'cyan', effect.color || '#00F0FF');
+        }
+      }
+
+      // Settle and remain on the arena floor (permanent like Eye of Cthulhu gore)
+      if (effect.isSettled) {
+        if (!effect.isPermanentGore && (effect.decay || 0) > 0) {
+          if (effect.settleHoldTimer > 0) {
+            effect.settleHoldTimer--;
+          } else {
+            effect.life -= effect.decay;
+            if (effect.life <= 0) {
+              state.deathEffects.splice(i, 1);
+            }
+          }
+        }
+      }
+      continue;
+    }
+
     // 2. Machine Corpse
     if (effect.isMachineCorpse) {
       effect.x += effect.vx;
@@ -1115,6 +1215,10 @@ export function drawDeathEffects() {
       ctx.strokeStyle = 'rgba(8, 18, 32, 0.90)';
       ctx.lineWidth = 1.1;
       ctx.stroke();
+    } else if (effect.isNamelessDeityAssetGore) {
+      drawNamelessDeityAssetGore(ctx, effect);
+    } else if (effect.isNamelessDeityGlassShard) {
+      drawNamelessDeityGlassShard(ctx, effect);
     } else if (effect.isMachineCorpse) {
       const s = effect.size / 15; // default size is 15
       ctx.scale(s, s);
@@ -1504,4 +1608,548 @@ export function spawnInfinityGlassShards(x, y, radius = 60, count = 20) {
       decay: 0.008,
     });
   }
+}
+
+/**
+ * Spawns an authentic Terraria: Wrath of the Gods death shatter effect for Nameless Deity.
+ * All modular anatomical assets (Wings, Wheel/Halo, Antlers, Vines, Divine Body,
+ * Cosmic Light Eye, Censor, Cicada, Lotus Flowers, Arms, Forearms, Hands) separate and shatter outward,
+ * accompanied by glowing starlight glass shards and chromatic flashes.
+ */
+export function spawnNamelessDeityShatterDeath(fighter) {
+  if (!fighter) return;
+  if (!state.deathEffects) state.deathEffects = [];
+
+  const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 60 : 120) * qualityMultiplier);
+
+  const baseR = fighter.r || 28;
+  const rScale = baseR / 25;
+  const assets = getNamelessDeityShatterAssets(fighter);
+  const isSkin2 = Boolean(assets.isSkin2);
+
+  // Read skin studio customizations or defaults
+  const customOverall = (typeof state !== 'undefined' && (state.skinCustomizations?.nameless_deity || state.skinCustomizations?.namelessDeity)) || {};
+  const customBody = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_body) || {};
+  const customAntlers = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_antlers) || {};
+  const customAntlerVines = (typeof state !== 'undefined' && (state.skinCustomizations?.nameless_deity_antler_vines || state.skinCustomizations?.nameless_deity_antlerVines)) || {};
+  const customCicada = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_cicada) || {};
+  const customCensor = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_censor) || {};
+  const customVines = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_vines) || {};
+  const customFlowers = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_flowers) || {};
+  const customWings = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_wings) || {};
+  const customArm = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_arm) || {};
+  const customForearm = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_forearm) || {};
+  const customHand = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_hand) || {};
+  const customHalo = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_halo) || {};
+  const customWheel = (typeof state !== 'undefined' && state.skinCustomizations?.nameless_deity_wheel) || {};
+
+  const activeDefs = isSkin2 ? NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS : NAMELESS_DEITY_DEFAULT_CONFIGS;
+  const overallDef = activeDefs.overall;
+  const widthScale = customOverall.widthScale ?? overallDef.widthScale;
+  const heightScale = customOverall.heightScale ?? overallDef.heightScale;
+
+  // Explosive celestial supernova flash, screen shake, audio & multi-tiered starlight particle burst
+  try {
+    triggerGlobalScreenShake(14, 32);
+    spawnImpactFlash(fighter.x, fighter.y, baseR * 2.5, isSkin2 ? '#FFD700' : '#00F0FF');
+    spawnImpactFlash(fighter.x, fighter.y, baseR * 1.8, '#FFFFFF');
+    spawnSparks(fighter.x, fighter.y, Math.floor(35 * qualityMultiplier), 'cyan', isSkin2 ? '#FFD700' : '#00F0FF');
+    spawnSparks(fighter.x, fighter.y, Math.floor(25 * qualityMultiplier), 'spark', '#A17FE0');
+    spawnSparks(fighter.x, fighter.y, Math.floor(20 * qualityMultiplier), 'white', '#FFFFFF');
+
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX('Assets/Sound Effects/NamelessDeity/Supernova.ogg', 1.0);
+      audioSystem.playSFX('Assets/Sound Effects/NamelessDeity/RealityTear.ogg', 0.85);
+    }
+  } catch (e) {}
+
+  // Calculate exact model scales matching drawNamelessDeitySkin
+  const wingsNatH = (assets.wings && (assets.wings.naturalHeight || assets.wings.height)) || 852;
+  const wingsBaseScale = (baseR * 2.8) / wingsNatH;
+  const wingsScaleW = wingsBaseScale * 1.35 * widthScale * (customWings.widthScale ?? activeDefs.wings.widthScale);
+  const wingsScaleH = wingsBaseScale * 1.10 * heightScale * (customWings.heightScale ?? activeDefs.wings.heightScale);
+  const wingAnchorX = (baseR * 0.65 * (customWings.widthScale ?? activeDefs.wings.widthScale)) + ((customWings.offsetX ?? activeDefs.wings.offsetX) * rScale);
+  const wingAnchorY = (baseR * 0.20 * (customWings.heightScale ?? activeDefs.wings.heightScale)) + ((customWings.offsetY ?? activeDefs.wings.offsetY) * rScale);
+
+  const wheelNatH = (assets.wheel && (assets.wheel.naturalHeight || assets.wheel.height)) || 1200;
+  const wheelBaseScale = (baseR * 2.2) / wheelNatH;
+  const wheelScaleW = wheelBaseScale * widthScale * (customWheel.widthScale ?? activeDefs.wheel.widthScale);
+  const wheelScaleH = wheelBaseScale * heightScale * (customWheel.heightScale ?? activeDefs.wheel.heightScale);
+  const wheelOffX = (customWheel.offsetX ?? activeDefs.wheel.offsetX) * rScale;
+  const wheelOffY = (customWheel.offsetY ?? activeDefs.wheel.offsetY) * rScale;
+
+  const haloNatH = (assets.cosmicCenter && (assets.cosmicCenter.naturalHeight || assets.cosmicCenter.height)) || 1254;
+  const haloBaseScale = (baseR * 3.8) / haloNatH;
+  const haloScaleW = haloBaseScale * widthScale * (customHalo.widthScale ?? activeDefs.halo.widthScale);
+  const haloScaleH = haloBaseScale * heightScale * (customHalo.heightScale ?? activeDefs.halo.heightScale);
+  const haloOffX = (customHalo.offsetX ?? activeDefs.halo.offsetX) * rScale;
+  const haloOffY = (customHalo.offsetY ?? activeDefs.halo.offsetY) * rScale;
+
+  const bodyNatH = (assets.body && (assets.body.naturalHeight || assets.body.height)) || 1000;
+  const bodyBaseScale = (baseR * 2.35) / bodyNatH;
+  const bodyScaleW = bodyBaseScale * widthScale * (customBody.widthScale ?? activeDefs.body.widthScale);
+  const bodyScaleH = bodyBaseScale * heightScale * (customBody.heightScale ?? activeDefs.body.heightScale);
+  const bodyOffX = (customBody.offsetX ?? activeDefs.body.offsetX) * rScale;
+  const bodyOffY = (customBody.offsetY ?? activeDefs.body.offsetY) * rScale;
+
+  const antlersNatW = (assets.antlers && (assets.antlers.naturalWidth || assets.antlers.width)) || 1536;
+  const antlersBaseScale = (baseR * 3.4) / antlersNatW;
+  const antlersScaleW = antlersBaseScale * widthScale * (customAntlers.widthScale ?? activeDefs.antlers.widthScale);
+  const antlersScaleH = antlersBaseScale * heightScale * (customAntlers.heightScale ?? activeDefs.antlers.heightScale);
+  const antlersOffX = (customAntlers.offsetX ?? activeDefs.antlers.offsetX) * rScale;
+  const antlersOffY = (-(baseR * 0.40 * heightScale)) + ((customAntlers.offsetY ?? activeDefs.antlers.offsetY) * rScale);
+
+  const flowerNatH = (assets.sideFlower && (assets.sideFlower.naturalHeight || assets.sideFlower.height)) || 1199;
+  const flowerBaseScale = (baseR * 1.50) / flowerNatH;
+  const flowerScaleW = flowerBaseScale * widthScale * (customFlowers.widthScale ?? activeDefs.flowers.widthScale);
+  const flowerScaleH = flowerBaseScale * heightScale * (customFlowers.heightScale ?? activeDefs.flowers.heightScale);
+  const flowerSpacingX = (baseR * 0.95 * widthScale) + ((customFlowers.offsetX ?? activeDefs.flowers.offsetX) * rScale);
+  const flowerAnchorY = (-(baseR * 0.35 * heightScale)) + ((customFlowers.offsetY ?? activeDefs.flowers.offsetY) * rScale);
+
+  const vinesNatH = (assets.vines && (assets.vines.naturalHeight || assets.vines.height)) || 1000;
+  const vinesBaseScale = (baseR * 2.85) / vinesNatH;
+  const vinesScaleW = vinesBaseScale * widthScale * (customVines.widthScale ?? activeDefs.vines.widthScale);
+  const vinesScaleH = vinesBaseScale * heightScale * (customVines.heightScale ?? activeDefs.vines.heightScale);
+  const vineSpacingX = (baseR * 0.28 * widthScale) + ((customVines.offsetX ?? activeDefs.vines.offsetX) * rScale);
+  const vineAnchorY = (baseR * 0.42 * heightScale) + ((customVines.offsetY ?? activeDefs.vines.offsetY) * rScale);
+
+  const armNatW = (assets.arm && (assets.arm.naturalWidth || assets.arm.width)) || 950;
+  const limbScale = (baseR * 2.30 * widthScale) / armNatW;
+  const armScaleW = limbScale * (customArm.widthScale ?? activeDefs.arm.widthScale);
+  const armScaleH = limbScale * (customArm.heightScale ?? activeDefs.arm.heightScale);
+  const forearmScaleW = limbScale * (customForearm.widthScale ?? activeDefs.forearm.widthScale);
+  const forearmScaleH = limbScale * (customForearm.heightScale ?? activeDefs.forearm.heightScale);
+  const handScaleW = limbScale * (customHand.widthScale ?? activeDefs.hand.widthScale);
+  const handScaleH = limbScale * (customHand.heightScale ?? activeDefs.hand.heightScale);
+
+  const shoulderX = baseR * 0.48 * widthScale;
+  const shoulderY = baseR * 0.16 * heightScale;
+  const defaultHandX = baseR * 2.10 * widthScale;
+  const defaultHandY = baseR * 0.12 * heightScale;
+
+  const assetGoreList = [
+    // 1. Wings (Left & Right) - Outward explosive flapping separation
+    {
+      type: 'wings_left',
+      img: assets.wings,
+      flipX: true,
+      spawnX: fighter.x - wingAnchorX,
+      spawnY: fighter.y + wingAnchorY,
+      scaleW: wingsScaleW,
+      scaleH: wingsScaleH,
+      vx: -(8.5 + Math.random() * 4.0),
+      vy: -(6.0 + Math.random() * 4.0),
+      rotSpeed: -0.18,
+      color: '#FFFFFF',
+      isWing: true
+    },
+    {
+      type: 'wings_right',
+      img: assets.wings,
+      flipX: false,
+      spawnX: fighter.x + wingAnchorX,
+      spawnY: fighter.y + wingAnchorY,
+      scaleW: wingsScaleW,
+      scaleH: wingsScaleH,
+      vx: (8.5 + Math.random() * 4.0),
+      vy: -(6.0 + Math.random() * 4.0),
+      rotSpeed: 0.18,
+      color: '#FFFFFF',
+      isWing: true
+    },
+    // 2. Wheel / Clockwork Halo Ring - Launches upward spinning rapidly
+    {
+      type: 'halo_wheel',
+      img: assets.wheel,
+      spawnX: fighter.x + wheelOffX,
+      spawnY: fighter.y + wheelOffY,
+      scaleW: wheelScaleW,
+      scaleH: wheelScaleH,
+      vx: (Math.random() - 0.5) * 6.5,
+      vy: -(8.0 + Math.random() * 4.5),
+      rotSpeed: (Math.random() < 0.5 ? -1 : 1) * 0.28,
+      color: isSkin2 ? '#FFD700' : '#00F0FF',
+      restitution: 0.50
+    },
+    // 3. Cosmic Center Light Circle Halo / Eye
+    {
+      type: 'cosmic_eye',
+      img: assets.cosmicCenter,
+      spawnX: fighter.x + haloOffX,
+      spawnY: fighter.y + haloOffY,
+      scaleW: haloScaleW,
+      scaleH: haloScaleH,
+      vx: (Math.random() - 0.5) * 5.0,
+      vy: -(6.5 + Math.random() * 3.5),
+      rotSpeed: 0.14,
+      color: isSkin2 ? '#FFD700' : '#00F0FF'
+    },
+    // 4. Sacred Antlers
+    {
+      type: 'antlers',
+      img: assets.antlers,
+      spawnX: fighter.x + antlersOffX,
+      spawnY: fighter.y + antlersOffY,
+      scaleW: antlersScaleW,
+      scaleH: antlersScaleH,
+      vx: (Math.random() - 0.5) * 5.5,
+      vy: -(7.5 + Math.random() * 3.5),
+      rotSpeed: -0.20,
+      color: '#FFFFFF'
+    },
+    // 5. Divine Body / Robe
+    {
+      type: 'body',
+      img: assets.body,
+      spawnX: fighter.x + bodyOffX,
+      spawnY: fighter.y + bodyOffY,
+      scaleW: bodyScaleW,
+      scaleH: bodyScaleH,
+      vx: (Math.random() - 0.5) * 4.5,
+      vy: -(4.5 + Math.random() * 3.0),
+      rotSpeed: 0.10,
+      color: '#FFFFFF'
+    },
+    // 6. Side Lotus Flowers (Left & Right)
+    {
+      type: 'side_flower_left',
+      img: assets.sideFlower,
+      flipX: true,
+      spawnX: fighter.x - flowerSpacingX,
+      spawnY: fighter.y + flowerAnchorY,
+      scaleW: flowerScaleW,
+      scaleH: flowerScaleH,
+      vx: -(6.5 + Math.random() * 3.5),
+      vy: -(5.0 + Math.random() * 3.0),
+      rotSpeed: -0.24,
+      color: isSkin2 ? '#FFD700' : '#A17FE0'
+    },
+    {
+      type: 'side_flower_right',
+      img: assets.sideFlower,
+      flipX: false,
+      spawnX: fighter.x + flowerSpacingX,
+      spawnY: fighter.y + flowerAnchorY,
+      scaleW: flowerScaleW,
+      scaleH: flowerScaleH,
+      vx: (6.5 + Math.random() * 3.5),
+      vy: -(5.0 + Math.random() * 3.0),
+      rotSpeed: 0.24,
+      color: isSkin2 ? '#FFD700' : '#A17FE0'
+    },
+    // 7. Hanging Lower Vines
+    {
+      type: 'vines',
+      img: assets.vines,
+      spawnX: fighter.x - vineSpacingX,
+      spawnY: fighter.y + vineAnchorY,
+      scaleW: vinesScaleW,
+      scaleH: vinesScaleH,
+      vx: -(5.0 + Math.random() * 3.0),
+      vy: -(4.0 + Math.random() * 3.0),
+      rotSpeed: -0.16,
+      color: '#A17FE0'
+    },
+    {
+      type: 'vines_right',
+      img: assets.vines,
+      flipX: true,
+      spawnX: fighter.x + vineSpacingX,
+      spawnY: fighter.y + vineAnchorY,
+      scaleW: vinesScaleW,
+      scaleH: vinesScaleH,
+      vx: (5.0 + Math.random() * 3.0),
+      vy: -(4.0 + Math.random() * 3.0),
+      rotSpeed: 0.16,
+      color: '#A17FE0'
+    },
+    // 8. Upper Arms (Left & Right)
+    {
+      type: 'arm_left',
+      img: assets.arm,
+      flipX: true,
+      spawnX: fighter.x - shoulderX,
+      spawnY: fighter.y + shoulderY,
+      scaleW: armScaleW,
+      scaleH: armScaleH,
+      vx: -(7.0 + Math.random() * 3.5),
+      vy: -(6.0 + Math.random() * 3.5),
+      rotSpeed: -0.25,
+      color: '#FFFFFF'
+    },
+    {
+      type: 'arm_right',
+      img: assets.arm,
+      flipX: false,
+      spawnX: fighter.x + shoulderX,
+      spawnY: fighter.y + shoulderY,
+      scaleW: armScaleW,
+      scaleH: armScaleH,
+      vx: (7.0 + Math.random() * 3.5),
+      vy: -(6.0 + Math.random() * 3.5),
+      rotSpeed: 0.25,
+      color: '#FFFFFF'
+    },
+    // 9. Forearms (Left & Right)
+    {
+      type: 'forearm_left',
+      img: assets.forearm,
+      flipX: true,
+      spawnX: fighter.x - (shoulderX + defaultHandX) * 0.5,
+      spawnY: fighter.y + (shoulderY + defaultHandY) * 0.5,
+      scaleW: forearmScaleW,
+      scaleH: forearmScaleH,
+      vx: -(8.0 + Math.random() * 3.5),
+      vy: -(5.0 + Math.random() * 3.0),
+      rotSpeed: -0.30,
+      color: '#FFFFFF'
+    },
+    {
+      type: 'forearm_right',
+      img: assets.forearm,
+      flipX: false,
+      spawnX: fighter.x + (shoulderX + defaultHandX) * 0.5,
+      spawnY: fighter.y + (shoulderY + defaultHandY) * 0.5,
+      scaleW: forearmScaleW,
+      scaleH: forearmScaleH,
+      vx: (8.0 + Math.random() * 3.5),
+      vy: -(5.0 + Math.random() * 3.0),
+      rotSpeed: 0.30,
+      color: '#FFFFFF'
+    },
+    // 10. Hands (Left & Right)
+    {
+      type: 'hand_left',
+      img: assets.hand,
+      flipX: true,
+      spawnX: fighter.x - defaultHandX,
+      spawnY: fighter.y + defaultHandY,
+      scaleW: handScaleW,
+      scaleH: handScaleH,
+      vx: -(9.5 + Math.random() * 4.0),
+      vy: -(5.5 + Math.random() * 3.5),
+      rotSpeed: -0.35,
+      color: isSkin2 ? '#FFD700' : '#00F0FF'
+    },
+    {
+      type: 'hand_right',
+      img: assets.hand,
+      flipX: false,
+      spawnX: fighter.x + defaultHandX,
+      spawnY: fighter.y + defaultHandY,
+      scaleW: handScaleW,
+      scaleH: handScaleH,
+      vx: (9.5 + Math.random() * 4.0),
+      vy: -(5.5 + Math.random() * 3.5),
+      rotSpeed: 0.35,
+      color: isSkin2 ? '#FFD700' : '#00F0FF'
+    }
+  ];
+
+  // Skin 1 Special Pieces: Cicada Brooch & Taped Censor Sketch
+  if (!isSkin2) {
+    const cicadaNatH = (assets.cicada && (assets.cicada.naturalHeight || assets.cicada.height)) || 800;
+    const cicadaBaseScale = (baseR * 1.65) / cicadaNatH;
+    const cicadaScaleW = cicadaBaseScale * widthScale * (customCicada.widthScale ?? activeDefs.cicada.widthScale);
+    const cicadaScaleH = cicadaBaseScale * heightScale * (customCicada.heightScale ?? activeDefs.cicada.heightScale);
+    assetGoreList.push({
+      type: 'cicada',
+      img: assets.cicada,
+      spawnX: fighter.x + ((customCicada.offsetX ?? activeDefs.cicada.offsetX) * rScale),
+      spawnY: fighter.y - (baseR * 0.45 * heightScale) + ((customCicada.offsetY ?? activeDefs.cicada.offsetY) * rScale),
+      scaleW: cicadaScaleW,
+      scaleH: cicadaScaleH,
+      vx: (Math.random() - 0.5) * 6.0,
+      vy: -(6.0 + Math.random() * 3.5),
+      rotSpeed: 0.22,
+      color: '#00F0FF'
+    });
+
+    const censorNatH = (assets.censor && (assets.censor.naturalHeight || assets.censor.height)) || 600;
+    const censorBaseScale = (baseR * 1.85) / censorNatH;
+    const censorScaleW = censorBaseScale * widthScale * (customCensor.widthScale ?? activeDefs.censor.widthScale);
+    const censorScaleH = censorBaseScale * heightScale * (customCensor.heightScale ?? activeDefs.censor.heightScale);
+    assetGoreList.push({
+      type: 'censor',
+      img: assets.censor,
+      spawnX: fighter.x + ((customCensor.offsetX ?? activeDefs.censor.offsetX) * rScale),
+      spawnY: fighter.y - (baseR * 0.10 * heightScale) + ((customCensor.offsetY ?? activeDefs.censor.offsetY) * rScale),
+      scaleW: censorScaleW,
+      scaleH: censorScaleH,
+      vx: (Math.random() - 0.5) * 5.0,
+      vy: -(5.0 + Math.random() * 3.0),
+      rotSpeed: -0.18,
+      color: '#0D0B18',
+      isPaper: true,
+      gravity: 0.14
+    });
+  } else {
+    // Skin 2 Special Pieces: Antler Hanging Vines
+    const avNatH = (assets.antlerVines && (assets.antlerVines.naturalHeight || assets.antlerVines.height)) || 710;
+    const avBaseScale = (baseR * 1.85) / avNatH;
+    const avScaleW = avBaseScale * widthScale * (customAntlerVines.widthScale ?? activeDefs.antler_vines.widthScale);
+    const avScaleH = avBaseScale * heightScale * (customAntlerVines.heightScale ?? activeDefs.antler_vines.heightScale);
+    const avSpacingX = (baseR * 0.90 * antlersScaleW) + ((customAntlerVines.offsetX ?? activeDefs.antler_vines.offsetX) * rScale);
+    const avAnchorY = antlersOffY - (baseR * 0.45 * antlersScaleH) + ((customAntlerVines.offsetY ?? activeDefs.antler_vines.offsetY) * rScale);
+
+    assetGoreList.push({
+      type: 'antler_vines',
+      img: assets.antlerVines,
+      spawnX: fighter.x - avSpacingX,
+      spawnY: fighter.y + avAnchorY,
+      scaleW: avScaleW,
+      scaleH: avScaleH,
+      vx: -(5.5 + Math.random() * 3.0),
+      vy: -(6.0 + Math.random() * 3.0),
+      rotSpeed: -0.20,
+      color: '#00F0FF'
+    });
+    assetGoreList.push({
+      type: 'antler_vines_right',
+      img: assets.antlerVines,
+      flipX: true,
+      spawnX: fighter.x + avSpacingX,
+      spawnY: fighter.y + avAnchorY,
+      scaleW: avScaleW,
+      scaleH: avScaleH,
+      vx: (5.5 + Math.random() * 3.0),
+      vy: -(6.0 + Math.random() * 3.0),
+      rotSpeed: 0.20,
+      color: '#00F0FF'
+    });
+  }
+
+  for (const gore of assetGoreList) {
+    if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
+      const nonPermIndex = state.deathEffects.findIndex(e => !e.isEyeOfCthulhuGore && !e.isPermanentGore && !e.isNamelessDeityAssetGore);
+      if (nonPermIndex !== -1) {
+        state.deathEffects.splice(nonPermIndex, 1);
+      } else if (state.deathEffects.length > 90) {
+        state.deathEffects.shift();
+      }
+    }
+
+    state.deathEffects.push({
+      x: gore.spawnX ?? (fighter.x + (Math.random() - 0.5) * (baseR * 0.5)),
+      y: gore.spawnY ?? (fighter.y + (Math.random() - 0.5) * (baseR * 0.5)),
+      vx: gore.vx + (fighter.vx || 0) * 0.3,
+      vy: gore.vy + (fighter.vy || 0) * 0.3,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: gore.rotSpeed || (Math.random() - 0.5) * 0.4,
+      size: baseR * 0.6,
+      scaleW: gore.scaleW,
+      scaleH: gore.scaleH,
+      type: gore.type,
+      goreType: gore.type,
+      img: gore.img,
+      flipX: Boolean(gore.flipX),
+      color: gore.color || '#00F0FF',
+      isNamelessDeityAssetGore: true,
+      isPermanentGore: true,
+      isPaper: Boolean(gore.isPaper),
+      isWing: Boolean(gore.isWing),
+      life: 1.0,
+      maxLife: 1.0,
+      decay: 0, // Permanent: stays resting on the arena floor like Eye of Cthulhu gore
+      gravity: gore.gravity ?? 0.32,
+      restitution: gore.restitution ?? (0.38 + Math.random() * 0.12),
+      isSettled: false
+    });
+  }
+
+  // 11. Prismatic Starlight Shards & Cosmic Glass Crystals
+  const crystalCount = Math.floor((isMulti ? 10 : 18) * qualityMultiplier);
+  const crystalColors = isSkin2
+    ? ['#FFD700', '#FDE047', '#FFFFFF', '#00F0FF', '#FFFBEB']
+    : ['#00F0FF', '#A17FE0', '#FFFFFF', '#E0F7FA', '#80DEEA'];
+
+  for (let c = 0; c < crystalCount; c++) {
+    if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
+      state.deathEffects.shift();
+    }
+    const angle = (Math.PI * 2 * c) / crystalCount + (Math.random() - 0.5) * 0.4;
+    const speed = 7.0 + Math.random() * 8.0;
+    state.deathEffects.push({
+      x: fighter.x,
+      y: fighter.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - (3.5 + Math.random() * 5.0),
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.8,
+      size: baseR * (0.15 + Math.random() * 0.20),
+      color: crystalColors[c % crystalColors.length],
+      isNamelessDeityGlassShard: true,
+      life: 1.0,
+      maxLife: 1.0,
+      decay: 0.008,
+      gravity: 0.36,
+      restitution: 0.40,
+      isSettled: false
+    });
+  }
+}
+
+/**
+ * Renders an authentic modular sprite asset gore chunk for Nameless Deity's death shatter.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} effect
+ */
+export function drawNamelessDeityAssetGore(ctx, effect) {
+  const img = effect.img;
+  const isImgReady = Boolean(img && img.complete && (img.naturalWidth || img.width) > 0);
+
+  if (isImgReady) {
+    const imgW = img.naturalWidth || img.width || 300;
+    const imgH = img.naturalHeight || img.height || 300;
+    const scaleW = effect.scaleW || 0.15;
+    const scaleH = effect.scaleH || 0.15;
+    const drawW = imgW * scaleW;
+    const drawH = imgH * scaleH;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    if (effect.flipX) {
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(img, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+    ctx.restore();
+  } else {
+    // Fallback: draw luminous prismatic polygonal crystal
+    const s = effect.size || 15;
+    ctx.beginPath();
+    ctx.moveTo(0, -s);
+    ctx.lineTo(s * 0.7, s * 0.3);
+    ctx.lineTo(0, s * 0.8);
+    ctx.lineTo(-s * 0.7, s * 0.3);
+    ctx.closePath();
+    ctx.fillStyle = effect.color || '#00F0FF';
+    ctx.fill();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.0;
+    ctx.stroke();
+  }
+}
+
+/**
+ * Renders a sharp cosmic glass / starlight diamond crystal shard for Nameless Deity's death shatter.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} effect
+ */
+export function drawNamelessDeityGlassShard(ctx, effect) {
+  const s = effect.size || 8;
+  ctx.beginPath();
+  ctx.moveTo(0, -s);
+  ctx.lineTo(s * 0.6, 0);
+  ctx.lineTo(0, s);
+  ctx.lineTo(-s * 0.6, 0);
+  ctx.closePath();
+
+  ctx.fillStyle = effect.color || '#00F0FF';
+  ctx.fill();
+
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
 }

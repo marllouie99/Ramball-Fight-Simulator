@@ -438,6 +438,16 @@ export const BASIC_ATTACK_SOUNDS = {
  * This is checked as a fallback when BASIC_ATTACK_SOUNDS[id] has no entry.
  */
 export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
+  // Naoya Zenin — 24 FPS Hypersonic Brawler Punches
+  'naoya': {
+    get src() {
+      return CONFIG.naoya?.sounds?.punchHit || 'Assets/Sound Effects/Attacks/punch.mp3';
+    },
+    get volume() {
+      return CONFIG.naoya?.soundVolumes?.punchHit !== undefined ? CONFIG.naoya.soundVolumes.punchHit : 0.85;
+    },
+    delay: 0,
+  },
   // Carl "CJ" Johnson — Street Boxing Brass Knuckles
   'cj': {
     get src() {

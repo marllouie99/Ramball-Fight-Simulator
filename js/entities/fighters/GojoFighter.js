@@ -17,6 +17,7 @@ import { drawGojoBody } from '../../graphics/fighters/gojoSkin.js';
 import { drawGojoWeapon, drawGojoOrb, drawAnamorphicLensFlare } from '../../graphics/weapons/gojoWeaponGraphics.js';
 import { spatialGrid } from '../../systems/physics.js';
 import { isInsideRubbickStolenVoid } from './rubbick/rubbickThemes.js';
+import { computeSaitamaBarrierDamage, applyGojoBarrierDamage, shatterGojoInfinityBarrier, isSaitamaEntity } from '../../interactions/gojoSaitamaInteraction.js';
 
 export class GojoFighter extends Fighter {
   constructor(def) {
@@ -612,91 +613,11 @@ export class GojoFighter extends Fighter {
   }
 
   damageInfinityBarrier(damageAmount, attacker, opts = {}) {
-    if (this.infinityBarrierHp === undefined) {
-      this.infinityBarrierHp = this.infinityBarrierMaxHp || 350;
-    }
-    this.infinityBarrierHp = Math.max(0, this.infinityBarrierHp - damageAmount);
-    const ratio = this.infinityBarrierHp / (this.infinityBarrierMaxHp || 350);
-
-    // Update crack level
-    if (ratio <= 0.0) {
-      this.infinityCrackLevel = 3;
-    } else if (ratio <= 0.35) {
-      this.infinityCrackLevel = 3;
-    } else if (ratio <= 0.70) {
-      this.infinityCrackLevel = 2;
-    } else if (ratio < 1.0) {
-      this.infinityCrackLevel = 1;
-    } else {
-      this.infinityCrackLevel = 0;
-    }
-
-    // Barrier shudder/shake vibration on hit
-    this.infinityCrackShakeTimer = 12;
-
-    // Contact visual effects
-    const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
-    const gojoY = this.y - (this.z || 0);
-    let contactAngle = (this.gunAngle !== undefined) ? this.gunAngle : 0;
-    if (attacker && attacker !== this) {
-      contactAngle = Math.atan2((attacker.y - (attacker.z || 0)) - gojoY, attacker.x - this.x);
-    }
-    const contactX = this.x + Math.cos(contactAngle) * barrierRadius;
-    const contactY = gojoY + Math.sin(contactAngle) * barrierRadius;
-
-    if (typeof spawnSparks === 'function') {
-      spawnSparks(contactX, contactY, 12, 'cyan', '#00E5FF');
-    }
-    if (typeof spawnMeleeClashShockwave === 'function') {
-      spawnMeleeClashShockwave(contactX, contactY, 75, 'gojo_infinity');
-    }
-    if (typeof spawnImpactFlash === 'function') {
-      spawnImpactFlash(contactX, contactY, 35, '#FFFFFF');
-    }
-
-    // Floating text showing barrier damage / crack
-    if (typeof spawnFloatingText === 'function') {
-      const crackLabel = (this.infinityCrackLevel === 1) ? '⚡ CRACK!' : ((this.infinityCrackLevel === 2) ? '⚡ FRACTURE!' : '⚡ CRITICAL STRESS!');
-      spawnFloatingText(contactX, contactY - 18, crackLabel, '#00E5FF');
-    }
-
-    if (this.infinityBarrierHp <= 0) {
-      this.shatterInfinityBarrier(attacker, opts);
-    }
+    applyGojoBarrierDamage(this, damageAmount, attacker, opts);
   }
 
   shatterInfinityBarrier(attacker, opts = {}) {
-    this.infinityActive = false;
-    this.infinityCooldown = CONFIG.gojo?.infinityBrokenCooldown ?? 360;
-    this.infinityBarrierHp = 0;
-    this.infinityCrackLevel = 3;
-    this.infinityFadeOpacity = 0;
-    this.infinityBlockTimer = 0;
-
-    // Sound effect: thin-ice-breaker.mp3
-    if (typeof audioSystem !== 'undefined') {
-      audioSystem.playSFX('Assets/Sound Effects/Skills/thin-ice-breaker.mp3', 2.0);
-    }
-
-    // Spawn explosion of flying glass crystal shards
-    const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
-    if (typeof spawnInfinityGlassShards === 'function') {
-      spawnInfinityGlassShards(this.x, this.y - (this.z || 0), barrierRadius, 28);
-    }
-
-    // Global screen shake on barrier shattering
-    if (typeof triggerGlobalScreenShake === 'function') {
-      triggerGlobalScreenShake(18, 20);
-    }
-
-    // Floating announcement text
-    if (typeof spawnFloatingText === 'function') {
-      spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 35, 'INFINITY SHATTERED!', '#00E5FF');
-    }
-
-    if (typeof spawnImpactFlash === 'function') {
-      spawnImpactFlash(this.x, this.y - (this.z || 0), 60, '#00E5FF');
-    }
+    shatterGojoInfinityBarrier(this, attacker, opts);
   }
 
   restoreInfinityBarrier() {
@@ -722,7 +643,7 @@ export class GojoFighter extends Fighter {
     );
     const isAmbushHit = Boolean(this.isTargetOfAmbush || (attacker && attacker.isAmbushing) || isTojiUltimateAssault || (opts && (opts.isAmbushKatana || opts.isAmbushFlurry || opts.isTojiUltimateAssault || opts.isTojiUltimateFinalBlow)));
     const isSaitamaAttacker = Boolean(
-      (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')) ||
+      isSaitamaEntity(attacker) ||
       (opts && (opts.isSaitamaPunch || opts.isSaitamaCounter || opts.isMachineGunBlow || opts.isSeriousPunch))
     );
     const isSaitamaCountering = isSaitamaAttacker &&
@@ -790,20 +711,7 @@ export class GojoFighter extends Fighter {
 
         // Saitama Special Interaction: Deal structural damage & crack the Infinity barrier
         if (isSaitamaAttacker) {
-          let barrierDmg = 70;
-          if (opts.isSaitamaCounter || isSaitamaCountering) {
-            barrierDmg = 200;
-          } else if (opts.isSeriousPunch) {
-            barrierDmg = 280;
-          } else if (opts.isFinalBlow) {
-            barrierDmg = 120;
-          } else if (opts.isMachineGunBlow) {
-            barrierDmg = 35;
-          } else if (opts.isSaitamaPunch || opts.isBasic || opts.isMelee) {
-            barrierDmg = 70;
-          } else if (typeof amount === 'number' && amount > 0) {
-            barrierDmg = Math.max(35, Math.min(250, Math.round(amount * 0.5)));
-          }
+          const barrierDmg = computeSaitamaBarrierDamage(amount, attacker, opts);
           this.damageInfinityBarrier(barrierDmg, attacker, opts);
 
           // If the barrier was shattered by this hit:

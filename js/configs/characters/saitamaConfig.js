@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -59,7 +59,7 @@ export const saitamaConfig = {
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
 
   // Skill 1: Consecutive Normal Punches
-  consecutivePunchesEnabled: 1, // Set to false to disable Consecutive Normal Punches (Skill 1)
+  consecutivePunchesEnabled: true, // Set to false to disable Consecutive Normal Punches (Skill 1)
   flurryEnabled: true,             // Alias toggle
   disableConsecutivePunches: false, // If true, disables Consecutive Normal Punches
   flurryDamage: 20,                 // Damage per rapid punch hit
@@ -108,6 +108,8 @@ export const saitamaConfig = {
   enableDodge: true,             // Master toggle for Passive: Caped Baldy Reflexes
   dodgeChance: 0.70,             // Probability (0-1) of successfully dodging incoming attacks
   domainDodgeChance: 0.85,       // Probability (0-1) of dodging spatial slice lines in Domain Expansions (e.g. Malevolent Shrine)
+  beamDodgeChance: 1.0,          // Probability (0-1) of dodging lethal super-beams (Nameless Destroyer, Pure Love Beam)
+  purpleDodgeChance: 1.0,        // Probability (0-1) of dodging Hollow Purple orbs & suction fields
   dodgeDistance: 110,            // Sidestep jump distance (pixels)
   dodgeCooldown: 1,              // Minimum frames (~0.016s) between dodge sidesteps
   shotgunDodgeGraceWindow: 16,   // Grace window (frames) where subsequent pellets from a shotgun spread/volley are auto-dodged
@@ -135,15 +137,15 @@ export const saitamaConfig = {
   counterWindupFrames: 50,        // Frames Saitama waits before teleporting (reaction delay)
   counterTeleportIdleFrames: 10,  // Frames Saitama stands completely still (staring) after teleporting before starting the charge
   counterTeleportDistanceOffset: 35, // Distance offset behind enemy (guarantees Saitama never overlaps the enemy's body)
-  counterPunchPoseFrames: 100,     // Frames Saitama holds the punch pose before it lands (increased to 1.5s so effects are visible)
+  counterPunchPoseFrames: 120,     // Frames Saitama holds the punch pose before it lands (increased to 1.5s so effects are visible)
   counterPunchKnockback: 50,      // Knockback force applied to the target on punch landing
   counterPunchHitPauseFrames: 10, // Frames the target is frozen after the punch lands
   counterPunchSlowFrames: 120,    // Slow debuff duration after punch (~2s at 60fps)
   counterPunchSlowMultiplier: 0.35, // Slow debuff strength (35% speed — staggering)
   counterPunchRecoveryFrames: 65, // Frames Saitama stands still after landing (post-punch stall)
   counterDodgeLockFrames: 20,      // Dodge cooldown after counter execution
-  skillPunishCooldown: 2000,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
-  initialSkillPunishCooldown: 2000, // Cooldown at the start of the round before first counter is available (2000 frames)
+  skillPunishCooldown: 1500,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
+  initialSkillPunishCooldown: 1500, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
   counterOverlayZoomMax: 0.08,           // Subtle expansion factor (1.0 -> 1.08) for Serious Punch overlay
@@ -193,11 +195,11 @@ export const saitamaConfig = {
     counterPunchVoice: 3.0,
     counterPunchCharging: 1.0,
     counterPunchImpact: 1.0,
-    championVoiceline: 2.0
+    championVoiceline: 0.0
   },
   soundChances: {
     attackNoise: 0.40, // 40% chance to play attack grunt/noise on basic punch
-    dodgeNoise: 0.35   // 35% chance to play dodge grunt/noise on dodge teleport
+    dodgeNoise: 0.0   // 35% chance to play dodge grunt/noise on dodge teleport
   },
   soundDelays: {
     attackNoise: 0,

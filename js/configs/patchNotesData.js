@@ -30,26 +30,47 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "AVATAROFEMPTINESS",
+        "character": "MAHORAGA",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "displayName",
-                "oldVal": "AVATAR OF EMPTINESS",
-                "newVal": "Avatar of Emptiness",
-                "pct": "Mod"
+                "type": "BUFF",
+                "key": "throwDamage",
+                "oldVal": 14,
+                "newVal": 20,
+                "pct": "+42.9%"
+            },
+            {
+                "type": "NERF",
+                "key": "maxRctRegenRate",
+                "oldVal": 0.12,
+                "newVal": 0.05,
+                "pct": "-58.3%"
             }
         ]
     },
     {
-        "character": "DRAEDON",
+        "character": "NAMELESSDEITY",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "displayName",
-                "oldVal": "DRAEDON",
-                "newVal": "Draedon",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "destroyerFlareWindupFrames",
+                "oldVal": 200,
+                "newVal": 150,
+                "pct": "-25.0%"
+            },
+            {
+                "type": "NERF",
+                "key": "destroyerFireFrames",
+                "oldVal": 500,
+                "newVal": 400,
+                "pct": "-20.0%"
+            },
+            {
+                "type": "NERF",
+                "key": "destroyerTickInterval",
+                "oldVal": 50,
+                "newVal": 10,
+                "pct": "-80.0%"
             }
         ]
     },
@@ -57,53 +78,44 @@ export const patchNotesData = {
         "character": "NAOYA",
         "deltas": [
             {
-                "type": "BUFF",
-                "key": "moveSpeed",
-                "oldVal": 10.6,
-                "newVal": 12.6,
-                "pct": "+18.9%"
-            },
-            {
                 "type": "NERF",
                 "key": "maxFrameStacks",
-                "oldVal": 30,
-                "newVal": 15,
-                "pct": "-50.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "maxDisruptionsForStasis",
-                "oldVal": 3,
-                "newVal": 20,
-                "pct": "+566.7%"
-            },
-            {
-                "type": "NERF",
-                "key": "basicComboHits",
-                "oldVal": 30,
-                "newVal": 20,
-                "pct": "-33.3%"
-            },
-            {
-                "type": "NERF",
-                "key": "tantoCooldown",
-                "oldVal": 40,
-                "newVal": 500,
-                "pct": "+1150.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "maxStacksPerFlurry",
-                "oldVal": 4,
+                "oldVal": 15,
                 "newVal": 5,
-                "pct": "+25.0%"
+                "pct": "-66.7%"
+            }
+        ]
+    },
+    {
+        "character": "SAITAMA",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "consecutivePunchesEnabled",
+                "oldVal": "1",
+                "newVal": "true",
+                "pct": "Mod"
             },
             {
-                "type": "NERF",
-                "key": "ultPostStrikeBreatherFrames",
+                "type": "BUFF",
+                "key": "counterPunchPoseFrames",
                 "oldVal": 100,
-                "newVal": 24,
-                "pct": "-76.0%"
+                "newVal": 120,
+                "pct": "+20.0%"
+            },
+            {
+                "type": "ADJUST",
+                "key": "championVoiceline",
+                "oldVal": "2.0",
+                "newVal": "0.0",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "dodgeNoise",
+                "oldVal": "0.35   // 35% chance to play dodge grunt/noise on dodge teleport",
+                "newVal": "0.0   // 35% chance to play dodge grunt/noise on dodge teleport",
+                "pct": "Mod"
             }
         ]
     }

@@ -232,8 +232,6 @@ export const state = {
   // GTA San Andreas "WASTED" Death Overlay
   wastedOverlay: null,
 
-  // 90s Arcade Retro Voiceline DSP Effect Filter
-  arcadeVoiceFilter: true,
 
   // Game flow
   gameState: 'title', // 'title' | 'select' | 'index' | 'indexDetail' | 'leaderboard' | 'weapons' | 'weaponDetail' | 'playing' | 'paused' | 'roundEnd' | 'matchEnd'

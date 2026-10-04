@@ -731,11 +731,9 @@ export class NaoyaFighter extends Fighter {
       }
     }
 
-    if (this.flurryHitsDone % 2 === 0) {
-      audioSystem.playSFX('swordswing', 0.85);
-    } else {
-      audioSystem.playSFX('attack_fleshhit', 0.80);
-    }
+    const punchSfx = cfg.sounds?.punchHit || 'attack_punch';
+    const punchVol = isFinisher ? (cfg.soundVolumes?.finisherPunch ?? 0.95) : (cfg.soundVolumes?.punchHit ?? 0.85);
+    audioSystem.playSFX(punchSfx, punchVol);
   }
 
   /**
@@ -1048,7 +1046,9 @@ export class NaoyaFighter extends Fighter {
 
             if (newProgress >= frameT) {
               this.lastSteppedAfterimageIndex = nextIdx;
-              audioSystem.playSFX('swordswing', 0.85);
+              const stepSfx = cfg.sounds?.runwayAfterimageShockwave || 'Assets/Sound Effects/NaoyaSFX/Naoya-pathafterimages-shockwaves.wav';
+              const stepVol = cfg.soundVolumes?.runwayAfterimageShockwave ?? 0.85;
+              audioSystem.playSFX(stepSfx, stepVol);
 
               const stepPt = sampleNaoyaRunwaySpline(points, frameT);
 
@@ -1206,11 +1206,10 @@ export class NaoyaFighter extends Fighter {
             });
 
             spawnBloodEffect(target.x, target.y, 35);
-            spawnImpactFlash(target.x, target.y, 45, '#FFFFFF');
             spawnFloatingText(target.x, target.y - target.r - 28, '💥 RUN OVER! MACH 3 CRASH!', '#00F2FE');
-            audioSystem.playSFX('yuji-blackflash', 1.45);
-            audioSystem.playSFX('groundSmash', 1.35);
-            audioSystem.playSFX('sonicKick', 1.25);
+            const strikeSfx = cfg.sounds?.heavySmash || 'Assets/Sound Effects/Attacks/heavypunch3.mp3';
+            const strikeVol = cfg.soundVolumes?.heavySmash ?? 1.25;
+            audioSystem.playSFX(strikeSfx, strikeVol);
             triggerGlobalScreenShake(20, 30);
           }
         }

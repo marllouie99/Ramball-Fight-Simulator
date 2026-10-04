@@ -48,8 +48,10 @@ import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
 import { TACTICAL_FIGHTER_DEFS } from '../../Tactical Force/tacticalFighterDefs.js';
+import { interactionConfigs } from '../configs/interactions/index.js';
 
 export const CONFIG = {
+  interactions: interactionConfigs,
   tactical: tacticalMainConfig,
   tacticalMain: tacticalMainConfig,
   blood: bloodConfig,

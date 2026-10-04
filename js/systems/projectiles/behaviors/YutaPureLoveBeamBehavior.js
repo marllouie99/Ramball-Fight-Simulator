@@ -97,6 +97,38 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
         const isInsideBeam = isAtBeamOrigin || (distFromAxis <= (currentBeamRadius + radius));
 
         if (isInsideBeam) {
+          const beamData = {
+            attacker: ownerFighter,
+            projectile: p,
+            startX: startX,
+            startY: startY,
+            endX: endX,
+            endY: endY,
+            angle: p.angle,
+            beamLength: Math.hypot(dx, dy),
+            beamHalfWidth: currentBeamRadius,
+            hitRadius: radius,
+            distFromAxis: distFromAxis,
+            isPureLoveBeam: true,
+            isYutaBeam: true,
+            isBeam: true
+          };
+
+          if (!p._dodgedEntities) {
+            p._dodgedEntities = new Set();
+          }
+
+          if (!p._dodgedEntities.has(ent)) {
+            const didDodge = (typeof ent.dodgeBeam === 'function' && ent.dodgeBeam(beamData));
+            if (didDodge) {
+              p._dodgedEntities.add(ent);
+              ent.caughtInPureLoveBeam = false;
+              ent.wasCaughtInPureLoveBeam = false;
+              ent.pureLoveBeamTimer = 0;
+              continue; // Successfully dodged out of Pure Love Beam on first impact!
+            }
+          }
+
           const solidDamage = CONFIG.yuta?.pureLoveBeamDamagePerTick ?? p.damage ?? 10;
 
           if (p.hitTargets && !p.hitTargets.has(ent)) {

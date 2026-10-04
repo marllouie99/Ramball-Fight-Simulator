@@ -166,6 +166,21 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const dy = projectile.y - ent.y;
         const dist = Math.hypot(dx, dy);
         
+        const purpleData = {
+          attacker: ownerFighter,
+          projectile: projectile,
+          x: projectile.x,
+          y: projectile.y,
+          vx: projectile.vx,
+          vy: projectile.vy,
+          r: effectiveRadius,
+          pullRadius: purplePullRadius,
+          trapRadius: trapRadius,
+          dist: dist,
+          isGojoPurple: true,
+          isPurple: true
+        };
+
         if (dist < trapRadius) {
           ent.isCaughtInPurple = false; // No paralyzing stasis
 
@@ -240,6 +255,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       const damageRadius = Math.max(effectiveRadius * 1.8, purplePullRadius * 0.70);
       const damageRadiusSq = damageRadius * damageRadius;
 
+      if (!projectile._dodgedEntities) {
+        projectile._dodgedEntities = new Set();
+      }
+
       for (let i = 0; i < allTargets.length; i++) {
         const ent = allTargets[i];
         if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
@@ -259,6 +278,34 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const distSq = dx * dx + dy * dy;
         
         if (distSq < damageRadiusSq) {
+          // First-impact dodge check: target attempts to teleport-dodge out of Hollow Purple on initial collision
+          if (!projectile._dodgedEntities.has(ent)) {
+            const purpleDpsData = {
+              attacker: ownerFighter,
+              projectile: projectile,
+              x: projectile.x,
+              y: projectile.y,
+              vx: projectile.vx,
+              vy: projectile.vy,
+              r: effectiveRadius,
+              pullRadius: purplePullRadius,
+              dist: Math.sqrt(distSq),
+              isGojoPurple: true,
+              isPurple: true
+            };
+
+            const didDodge = (typeof ent.dodgePurple === 'function' && ent.dodgePurple(purpleDpsData)) ||
+              (typeof ent.dodgeBeam === 'function' && ent.dodgeBeam(purpleDpsData));
+
+            if (didDodge) {
+              projectile._dodgedEntities.add(ent);
+              ent.isCaughtInPurple = false;
+              ent.purpleHitTimer = 0;
+              ent.slowTimer = 0;
+              continue; // Successfully dodged out of Hollow Purple on first impact!
+            }
+          }
+
           const dpsDamage = projectile.purpleDPS * (projectile.purpleDPSInterval / 60);
           if (typeof ent.takeDamage === 'function') {
             ent.takeDamage(dpsDamage, ownerFighter, { 

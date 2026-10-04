@@ -17,6 +17,7 @@ import {
   drawSuperclusterStarMandala
 } from '../../graphics/weapons/namelessDeityWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
+import { interactionManager } from '../../interactions/index.js';
 
 function getNamelessSetting(config, key) {
   return config?.[key] ?? namelessDeityConfig[key];
@@ -77,6 +78,16 @@ export class NamelessDeityFighter extends Fighter {
     this.destroyerFireFrames = getNamelessSetting(cfg, 'destroyerFireFrames') ?? 800;
     this.destroyerLoopSoundKey = null;
     this.wingAnimationTimer = 0;
+
+    // Special Interaction: Center Rebounce vs Saitama
+    this.isRebouncingToCenter = false;
+    this.rebounceTimer = 0;
+    this.rebounceMaxFrames = 0;
+    this.rebounceStartX = 0;
+    this.rebounceStartY = 0;
+    this.rebounceTargetX = 0;
+    this.rebounceTargetY = 0;
+    this.rebounceTargetOpponent = null;
 
     // Transcendent Celestial God Poise: Complete immunity to knockback, pull, push, and body displacement
     this.isImmovable = true;
@@ -272,12 +283,14 @@ export class NamelessDeityFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
-    if (!forceCancelAll && (this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0)) {
+    if (!forceCancelAll && (this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.isRebouncingToCenter)) {
       return; // Transcendent Celestial Hyper-Armor: Never cancel Nameless Destroyer beam from transient hits/stuns
     }
     this._stopDestroyerLoopSounds(0);
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
+    this.isRebouncingToCenter = false;
+    this.rebounceTimer = 0;
     super.interruptAttacks?.(forceCancelAll);
   }
 
@@ -285,6 +298,8 @@ export class NamelessDeityFighter extends Fighter {
     this._stopDestroyerLoopSounds(0);
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
+    this.isRebouncingToCenter = false;
+    this.rebounceTimer = 0;
     super.onDeath?.();
   }
 
@@ -621,8 +636,18 @@ export class NamelessDeityFighter extends Fighter {
     return true;
   }
 
-  castNamelessDestroyer(opponent) {
+  castNamelessDestroyer(opponent, bypassRebounce = false) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
+
+    // Ultimate Pre-Cast Lifecycle Hook (e.g. center rebounce or special repositioning)
+    const stateObj = typeof state !== 'undefined' ? state : null;
+    if (interactionManager.handleUltimatePreCast(this, opponent, stateObj, bypassRebounce)) {
+      return true;
+    }
+
+    // Direct Channeling Initiation (either after rebounce arrival or standard cast)
+    this.isRebouncingToCenter = false;
+    this.rebounceTimer = 0;
 
     // Snapshot committed 360° omnidirectional aim angle (Rule 1.4)
     let targetAngle = this.gunAngle || 0;
@@ -666,6 +691,47 @@ export class NamelessDeityFighter extends Fighter {
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
       this.interruptAttacks(true);
+      return;
+    }
+
+    // Active Divine Center Rebounce State (Special Interaction vs Saitama)
+    if (this.isRebouncingToCenter && this.rebounceTimer > 0) {
+      this.rebounceTimer--;
+      const maxF = this.rebounceMaxFrames || 18;
+      const t = 1 - (this.rebounceTimer / maxF);
+      // Smooth cubic ease-out glide
+      const ease = 1 - Math.pow(1 - t, 3);
+      this.x = this.rebounceStartX + (this.rebounceTargetX - this.rebounceStartX) * ease;
+      this.y = this.rebounceStartY + (this.rebounceTargetY - this.rebounceStartY) * ease;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+
+      // Trailing starlight particles during rebounce glide
+      if (this.rebounceTimer % 2 === 0) {
+        spawnSparks(this.x, this.y, 4, '#00F0FF');
+      }
+
+      // Keep aim oriented towards target opponent while gliding
+      const targetOpp = this.rebounceTargetOpponent || opponent;
+      if (targetOpp && targetOpp.hp > 0 && this.canAim()) {
+        this.aim(targetOpp);
+      }
+
+      if (this.rebounceTimer === 0) {
+        // Reached arena center! Lock position, trigger arrival burst, and activate ultimate channel
+        this.x = this.rebounceTargetX;
+        this.y = this.rebounceTargetY;
+        this.isRebouncingToCenter = false;
+
+        spawnImpactFlash(this.x, this.y, '#FFFFFF');
+        spawnSparks(this.x, this.y, 24, '#00F0FF');
+        triggerGlobalScreenShake(6.0, 16);
+
+        // Now activate and channel the ultimate from center!
+        this.castNamelessDestroyer(targetOpp, true);
+      }
       return;
     }
 
@@ -809,6 +875,7 @@ export class NamelessDeityFighter extends Fighter {
         this.destroyerFireTimer = (typeof this.destroyerFireFrames === 'number' && this.destroyerFireFrames > 0)
           ? this.destroyerFireFrames
           : (getNamelessSetting(cfg, 'destroyerFireFrames') ?? 800);
+        this._dodgedBeamEntities = new Set();
 
         // 2. laserStart SFX: Initial cosmic blast burst
         playSound(getNamelessSetting(cfg, 'sounds')?.laserStart || 'Assets/Sound Effects/NamelessDeity/CosmicLaserStart.ogg', getNamelessSetting(cfg, 'laserStartVolume') || 1.30);
@@ -899,10 +966,41 @@ export class NamelessDeityFighter extends Fighter {
           const perpDist = Math.abs(-dx * Math.sin(this.destroyerCastAngle) + dy * Math.cos(this.destroyerCastAngle));
           const hitRadius = (f.hitRadius || f.r || (f.width ? f.width * 0.5 : 20));
           if (perpDist <= beamHalfWidth + hitRadius) {
+            // Check if victim can dodge the incoming beam ray
+            const beamData = {
+              attacker: this,
+              startX: startX,
+              startY: startY,
+              angle: this.destroyerCastAngle,
+              beamLength: beamLen,
+              beamHalfWidth: beamHalfWidth,
+              hitRadius: hitRadius,
+              perpDist: perpDist,
+              projLen: projLen,
+              isNamelessBeam: true,
+              isNamelessDeityBeam: true
+            };
+
+            if (!this._dodgedBeamEntities) {
+              this._dodgedBeamEntities = new Set();
+            }
+
+            if (!this._dodgedBeamEntities.has(f)) {
+              const didDodge = (typeof f.dodgeBeam === 'function' && f.dodgeBeam(beamData)) ||
+                interactionManager.handleBeamEvade(f, this, beamData);
+
+              if (didDodge) {
+                this._dodgedBeamEntities.add(f);
+                continue; // Successfully dodged out of the beam! Skip pull, paralyze, and damage this frame.
+              }
+            }
+
+            const isVictimImmune = interactionManager.isBeamImmune(f, this, 'nameless_destroyer');
+
             // 1. Cosmic Gravitational Suction: Pull target directly into the beam's central axis
             const lineX = startX + Math.cos(this.destroyerCastAngle) * projLen;
             const lineY = startY + Math.sin(this.destroyerCastAngle) * projLen;
-            if (!f.isImmovable && !f.cannotBePushed && !f.isCarMinion && !f.isDriveByCar) {
+            if (!f.isImmovable && !f.cannotBePushed && !f.isCarMinion && !f.isDriveByCar && !isVictimImmune) {
               f.x += (lineX - f.x) * pullFactor;
               f.y += (lineY - f.y) * pullFactor;
 
@@ -918,16 +1016,18 @@ export class NamelessDeityFighter extends Fighter {
               f.knockbackVx = 0;
               f.knockbackVy = 0;
             }
-            f.caughtInNamelessBeamTimer = paralyzeDur;
-            f.isCaughtInNamelessBeam = true;
-            if (typeof f.applyParalyze === 'function') {
-              f.applyParalyze(paralyzeDur, { isSilent: true });
-            }
-            if (typeof f.interruptAttacks === 'function') {
-              f.interruptAttacks(true);
-            }
-            if (f.statusEffects) {
-              f.statusEffects.paralyzeTimer = Math.max(f.statusEffects.paralyzeTimer || 0, paralyzeDur);
+            if (!isVictimImmune) {
+              f.caughtInNamelessBeamTimer = paralyzeDur;
+              f.isCaughtInNamelessBeam = true;
+              if (typeof f.applyParalyze === 'function') {
+                f.applyParalyze(paralyzeDur, { isSilent: true });
+              }
+              if (typeof f.interruptAttacks === 'function') {
+                f.interruptAttacks(true);
+              }
+              if (f.statusEffects) {
+                f.statusEffects.paralyzeTimer = Math.max(f.statusEffects.paralyzeTimer || 0, paralyzeDur);
+              }
             }
 
             // 4. Tick Damage & Sparks (Silent celestial disintegration without global hit sound or death sound)
@@ -960,8 +1060,8 @@ export class NamelessDeityFighter extends Fighter {
       }
     }
 
-    // AI Skill Decision Matrix (Strictly locked during active windup, firing, and recovery)
-    const isChannelingDestroyer = (this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.destroyerRecoveryTimer > 0);
+    // AI Skill Decision Matrix (Strictly locked during active windup, firing, recovery, and center rebounce)
+    const isChannelingDestroyer = (this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.destroyerRecoveryTimer > 0 || this.isRebouncingToCenter);
     if (!isChannelingDestroyer && opponent && opponent.hp > 0 && !this.isTeammate(opponent)) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
       if (this.destroyerCooldown <= 0 && isSkillEnabled(cfg.enableNamelessDestroyer, true)) {

@@ -1,6 +1,6 @@
 import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
-import { GAME_MODES } from '../core/modeConfig.js';
+import { interactionManager } from '../interactions/index.js';
 
 /**
  * Camera System for Circle Mini-Battle
@@ -204,10 +204,11 @@ export function updateCamera() {
     const naoyaCfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
     camera.targetZoom = naoyaCfg.ultCameraZoom ?? 1.12;
   } else if (castingDeity && state.gameState !== 'countdown') {
-    // Nameless Deity casting / firing the Nameless Destroyer super-beam:
-    // Support smooth gradual zoom out in BOTH dynamic tracking mode and fixed camera mode!
-    const deityCfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : {};
-    const finalDeityZoom = deityCfg.destroyerCameraZoom ?? 0.93;
+    // Special Interaction Hook: Disable camera zoom out during ultimate channeling
+    const isSpecialSaitamaInteraction = Boolean(
+      castingDeity.isRebouncingToCenter ||
+      interactionManager.shouldOverrideCameraZoom(castingDeity, state.fighters)
+    );
 
     const isFixed = (!camera.enabled || camera.mode === 'fixed');
 
@@ -241,6 +242,9 @@ export function updateCamera() {
       const smoothDist = normDist * normDist * (3 - 2 * normDist);
       startCombatZoom = Math.max(minZ, Math.min(maxZ, Math.min(maxZ - smoothDist * (maxZ - minZ), envelopeFit)));
     }
+
+    const deityCfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : {};
+    const finalDeityZoom = isSpecialSaitamaInteraction ? startCombatZoom : (deityCfg.destroyerCameraZoom ?? 0.93);
 
     // Phase 1: Channeling & Charging Windup (slowly and smoothly zoom out over the full windup duration)
     if ((castingDeity.destroyerWindupTimer || 0) > 0) {
@@ -291,6 +295,22 @@ export function updateCamera() {
         const beamFocusDist = Math.min(180, (castingDeity.destroyerBeamLength || 1400) * 0.15);
         focusX = (castingDeity.x + Math.cos(aimAngle) * beamFocusDist + arenaCenterX) / 2;
         focusY = (castingDeity.y + Math.sin(aimAngle) * beamFocusDist + arenaCenterY) / 2;
+      }
+
+      // Lock camera framing when active super-beam firing begins to prevent dragging as targets get pushed
+      if ((castingDeity.destroyerFireTimer || 0) > 0) {
+        if (!castingDeity._beamCamFocusX || !castingDeity._beamCamFocusY) {
+          castingDeity._beamCamFocusX = focusX;
+          castingDeity._beamCamFocusY = focusY;
+        }
+        focusX = castingDeity._beamCamFocusX;
+        focusY = castingDeity._beamCamFocusY;
+      } else if ((castingDeity.destroyerRecoveryTimer || 0) > 0 && castingDeity._beamCamFocusX) {
+        focusX = castingDeity._beamCamFocusX;
+        focusY = castingDeity._beamCamFocusY;
+      } else {
+        castingDeity._beamCamFocusX = null;
+        castingDeity._beamCamFocusY = null;
       }
 
       camera.targetX = Math.max(minCamX, Math.min(maxCamX, focusX));

@@ -518,6 +518,215 @@ export class SansFighter extends Fighter {
   }
 
   /**
+   * Passive 2: Teleport Dodge against continuous energy/cosmic beams (e.g. Nameless Destroyer).
+   * Evasively teleports Sans sideways safely outside the beam cylinder if stamina is available.
+   * @param {Object} beamData - Beam intersection details { attacker, startX, startY, angle, beamLength, beamHalfWidth }
+   * @returns {boolean} True if successfully dodged, false otherwise.
+   */
+  dodgeBeam(beamData = {}) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    if (!cfg.enableTeleportDodge) return false;
+
+    const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
+    if (isFrozen || this.hp <= 0) return false;
+
+    const staminaCost = (cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10;
+    if (this.stamina < staminaCost) {
+      return false; // Out of stamina -> cannot dodge beam!
+    }
+
+    if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) {
+      return false; // On dodge cooldown -> cannot dodge beam!
+    }
+
+    const dodgeChance = (cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 1.0;
+    if (dodgeChance < 1.0 && Math.random() >= dodgeChance) {
+      return false; // Roll failed
+    }
+
+    // Deduct stamina and set dodge cooldown
+    this.stamina -= staminaCost;
+    this.staminaRegenDelayTimer = (cfg.dodgeStaminaRegenDelay !== undefined) ? cfg.dodgeStaminaRegenDelay : 50;
+    this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 0;
+
+    const startX = this.x;
+    const startY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
+
+    // Calculate safe evasion point strictly perpendicular to the beam axis
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : { width: 500, height: 500, x: 50, y: 50 };
+    const beamAngle = beamData.angle !== undefined ? beamData.angle : 0;
+    const nx = -Math.sin(beamAngle);
+    const ny = Math.cos(beamAngle);
+
+    // Determine current side relative to beam centerline
+    const bStartX = beamData.startX !== undefined ? beamData.startX : (beamData.attacker?.x ?? 0);
+    const bStartY = beamData.startY !== undefined ? beamData.startY : (beamData.attacker?.y ?? 0);
+    const dx = this.x - bStartX;
+    const dy = this.y - bStartY;
+    const cross = -dx * Math.sin(beamAngle) + dy * Math.cos(beamAngle);
+    let sideSign = cross >= 0 ? 1 : -1;
+
+    // Jump distance must place Sans safely outside the beam aperture
+    const beamHalfWidth = beamData.beamHalfWidth || 142.5;
+    const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 150), beamHalfWidth + this.r + 40);
+
+    let targetX = this.x + nx * sideSign * jumpDist;
+    let targetY = this.y + ny * sideSign * jumpDist;
+
+    const minX = arena.x + this.r + 20;
+    const maxX = arena.x + arena.width - this.r - 20;
+    const minY = arena.y + this.r + 20;
+    const maxY = arena.y + arena.height - this.r - 20;
+
+    if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
+      targetX = this.x - nx * sideSign * jumpDist;
+      targetY = this.y - ny * sideSign * jumpDist;
+    }
+
+    const finalX = Math.max(minX, Math.min(maxX, targetX));
+    const finalY = Math.max(minY, Math.min(maxY, targetY));
+
+    // Spawn afterimages
+    this._spawnDodgeAfterimages(startX, startY, finalX, finalY, startAngle, startAngle);
+
+    this.x = finalX;
+    this.y = finalY;
+    this.vx = 0;
+    this.vy = 0;
+    this.dodgeStallTimer = (cfg.dodgeStallDuration !== undefined) ? cfg.dodgeStallDuration : 12;
+
+    // Snap aim at beam caster (Rule 1.3)
+    this.snapAimAtTarget(beamData.attacker);
+
+    // Floating "MISS"
+    spawnFloatingText(this.x, this.y - this.r - 12, 'MISS', '#FFFFFF');
+
+    // SFX
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      const flashSnd = (CONFIG.sans?.sounds?.flash || sansConfig.sounds?.flash) || 'Assets/Sound Effects/Sans/Flash.ogg';
+      audioSystem.playSFX(flashSnd, 0.7);
+    }
+
+    // Clear beam capture flags
+    this.caughtInPureLoveBeam = false;
+    this.wasCaughtInPureLoveBeam = false;
+    this.pureLoveBeamTimer = 0;
+
+    return true; // Successfully dodged!
+  }
+
+  /**
+   * Passive 2: Teleport Dodge against Gojo's Hollow Purple orb & suction field.
+   * Evasively teleports Sans sideways outside the Purple orb path if stamina is available.
+   * @param {Object} purpleData - Hollow Purple details { attacker, projectile, x, y, vx, vy, r, pullRadius }
+   * @returns {boolean} True if successfully dodged, false otherwise.
+   */
+  dodgePurple(purpleData = {}) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    if (!cfg.enableTeleportDodge) return false;
+
+    const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
+    if (isFrozen || this.hp <= 0) return false;
+
+    const staminaCost = (cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10;
+    if (this.stamina < staminaCost) {
+      return false; // Out of stamina -> cannot dodge purple!
+    }
+
+    if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) {
+      return false; // On cooldown
+    }
+
+    const dodgeChance = (cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 1.0;
+    if (dodgeChance < 1.0 && Math.random() >= dodgeChance) {
+      return false;
+    }
+
+    this.stamina -= staminaCost;
+    this.staminaRegenDelayTimer = (cfg.dodgeStaminaRegenDelay !== undefined) ? cfg.dodgeStaminaRegenDelay : 50;
+    this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 0;
+
+    const startX = this.x;
+    const startY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
+
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : { width: 500, height: 500, x: 50, y: 50 };
+    const pX = purpleData.x !== undefined ? purpleData.x : (purpleData.projectile?.x ?? 0);
+    const pY = purpleData.y !== undefined ? purpleData.y : (purpleData.projectile?.y ?? 0);
+    const pVx = purpleData.vx !== undefined ? purpleData.vx : (purpleData.projectile?.vx ?? 0);
+    const pVy = purpleData.vy !== undefined ? purpleData.vy : (purpleData.projectile?.vy ?? 0);
+    const isMoving = Math.hypot(pVx, pVy) > 0.1;
+
+    let targetX, targetY;
+    const safeRadius = (purpleData.r || 50) + this.r + 65;
+    const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 150), safeRadius);
+
+    if (isMoving) {
+      const travelAngle = Math.atan2(pVy, pVx);
+      const nx = -Math.sin(travelAngle);
+      const ny = Math.cos(travelAngle);
+      const cross = -(this.x - pX) * Math.sin(travelAngle) + (this.y - pY) * Math.cos(travelAngle);
+      const sideSign = cross >= 0 ? 1 : -1;
+      targetX = this.x + nx * sideSign * jumpDist;
+      targetY = this.y + ny * sideSign * jumpDist;
+    } else {
+      const radAngle = Math.atan2(this.y - pY, this.x - pX);
+      targetX = pX + Math.cos(radAngle) * jumpDist;
+      targetY = pY + Math.sin(radAngle) * jumpDist;
+    }
+
+    const minX = arena.x + this.r + 20;
+    const maxX = arena.x + arena.width - this.r - 20;
+    const minY = arena.y + this.r + 20;
+    const maxY = arena.y + arena.height - this.r - 20;
+
+    if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
+      if (isMoving) {
+        const travelAngle = Math.atan2(pVy, pVx);
+        const nx = -Math.sin(travelAngle);
+        const ny = Math.cos(travelAngle);
+        const cross = -(this.x - pX) * Math.sin(travelAngle) + (this.y - pY) * Math.cos(travelAngle);
+        const sideSign = cross >= 0 ? -1 : 1;
+        targetX = this.x + nx * sideSign * jumpDist;
+        targetY = this.y + ny * sideSign * jumpDist;
+      }
+    }
+
+    const finalX = Math.max(minX, Math.min(maxX, targetX));
+    const finalY = Math.max(minY, Math.min(maxY, targetY));
+
+    this._spawnDodgeAfterimages(startX, startY, finalX, finalY, startAngle, startAngle);
+
+    this.x = finalX;
+    this.y = finalY;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.dodgeStallTimer = (cfg.dodgeStallDuration !== undefined) ? cfg.dodgeStallDuration : 12;
+
+    this.isCaughtInPurple = false;
+    this.purpleHitTimer = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+
+    this.snapAimAtTarget(purpleData.attacker);
+    spawnFloatingText(this.x, this.y - this.r - 12, 'MISS', '#FFFFFF');
+
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      const flashSnd = (CONFIG.sans?.sounds?.flash || sansConfig.sounds?.flash) || 'Assets/Sound Effects/Sans/Flash.ogg';
+      audioSystem.playSFX(flashSnd, 0.7);
+    }
+
+    if (this.hp < 50 && Math.random() < 0.25) {
+      this.speak('whoops.', 80);
+    }
+
+    return true;
+  }
+
+  /**
    * Spawns configurable dodge afterimages along the teleport displacement vector.
    */
   _spawnDodgeAfterimages(startX, startY, endX, endY, startAngle = 0, endAngle = 0) {

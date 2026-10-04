@@ -557,6 +557,38 @@ export const NAMELESS_DEITY_SKINS = {
 };
 
 /**
+ * Returns all modular sprite images for the Nameless Deity death shatter effect.
+ */
+export function getNamelessDeityShatterAssets(fighter) {
+  const isSkin2 = Boolean(
+    fighter?.skinVariant === 2 ||
+    fighter?.skinVariant === 'skin2' ||
+    fighter?.skinVariant === 'golden' ||
+    fighter?.isSkin2 ||
+    fighter?.activeSkin === 'skin2' ||
+    fighter?.activeSkin === 'golden_seraph'
+  );
+
+  return {
+    isSkin2,
+    wings: isSkin2 ? _getWings2Image() : _getWingsImage(),
+    wheel: isSkin2 ? _getWheel3Image() : _getWheelImage(),
+    antlers: isSkin2 ? _getAntlers2Image() : _getAntlersImage(),
+    vines: isSkin2 ? _getVines2Image() : _getVinesImage(),
+    antlerVines: _getAntlerVinesImage(),
+    body: isSkin2 ? _getDivineBody2Image() : _getDivineBodyImage(),
+    sideFlower: isSkin2 ? _getSideFlower2Image() : _getGraySideFlowerCanvas(),
+    cosmicCenter: isSkin2 ? _getBlueCosmicLightCenterCanvas() : _getCosmicLightCenterImage(),
+    censor: _getCensorImage(),
+    cicada: _getCicadaImage(),
+    arm: isSkin2 ? _getArm5Image() : _getArmImage(),
+    forearm: isSkin2 ? _getForearm2Image() : _getForearmImage(),
+    hand: isSkin2 ? _getHand2Image() : _getHandImage(),
+    elbow: _getElbowJointImage()
+  };
+}
+
+/**
  * Draws one complete arm + forearm + hand limb chain using inverse kinematics.
  * Connects Arm.png -> Forearm.png -> Hand.png with per-part tuning and exact cut-edge alignment.
  */

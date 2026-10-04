@@ -8,6 +8,7 @@ import { triggerSaitamaWallShatter } from '../../graphics/particles/saitamaWallS
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { fadeOutSound } from '../../systems/soundSystem.js';
+import { interactionManager, isNamelessDeityEntity } from '../../interactions/index.js';
 
 /**
  * Saitama — The Caped Baldy
@@ -578,6 +579,8 @@ export class SaitamaFighter extends Fighter {
       (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0) ||
       this.caughtInLaserBeamTimer ||
       this.caughtInLaylaBeamTimer ||
+      this.isCaughtInNamelessBeam ||
+      (this.caughtInNamelessBeamTimer && this.caughtInNamelessBeamTimer > 0) ||
       this.isDraggedByGetsuga ||
       (this._hitByGetsugaTimer && this._hitByGetsugaTimer > 0) ||
       isSuppressedByGetsuga(this) ||
@@ -586,6 +589,8 @@ export class SaitamaFighter extends Fighter {
         attacker.behaviorType === 'getsuga_tensho' ||
         attacker.isBeam ||
         attacker.isPureLoveBeam ||
+        attacker.isNamelessBeam ||
+        attacker.isNamelessDeityBeam ||
         attacker.isPurpleDPS ||
         attacker.isHollowPurple ||
         attacker.isBlueDPS ||
@@ -1008,6 +1013,274 @@ export class SaitamaFighter extends Fighter {
   }
 
   /**
+   * Passive: Caped Baldy Reflexes against continuous beams (e.g. Nameless Deity Destroyer).
+   * Evasively teleports Saitama sideways outside the beam zone if dodge is ready.
+   * @param {Object} beamData - Beam intersection details { attacker, startX, startY, angle, beamLength, beamHalfWidth }
+   * @returns {boolean} True if successfully dodged, false otherwise.
+   */
+  dodgeBeam(beamData = {}) {
+    const cfg = (CONFIG && CONFIG.saitama) ? CONFIG.saitama : {};
+    if (!this.isSkillEnabled(cfg.enableDodge, true)) return false;
+
+    if (this._isInsideGojoDomain() || this.isChainedByMakima || this.hp <= 0 || this.isFrozenByInfinity || this.isTargetOfAmbush) {
+      return false;
+    }
+
+    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
+    if (isGlobalHitPausing) return false;
+
+    // If Saitama is actively countering, Serious Skill Counter super-armor / standoff retreat handles it
+    if (this.isCountering || (this._counterPunchTimer && this._counterPunchTimer > 0)) {
+      return false; // Standoff counter handles this
+    }
+
+    if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) {
+      return false;
+    }
+
+    const dodgeChance = (cfg.beamDodgeChance !== undefined) ? cfg.beamDodgeChance : ((cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 1.0);
+    if (dodgeChance < 1.0 && Math.random() >= dodgeChance) {
+      return false; // Roll failed
+    }
+
+    this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 1;
+
+    const startX = this.x;
+    const startY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
+
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { width: 500, height: 500, x: 50, y: 50 });
+    const beamAngle = beamData.angle !== undefined ? beamData.angle : 0;
+    const nx = -Math.sin(beamAngle);
+    const ny = Math.cos(beamAngle);
+
+    // Determine current side relative to beam centerline
+    const bStartX = beamData.startX !== undefined ? beamData.startX : (beamData.attacker?.x ?? 0);
+    const bStartY = beamData.startY !== undefined ? beamData.startY : (beamData.attacker?.y ?? 0);
+    const dx = this.x - bStartX;
+    const dy = this.y - bStartY;
+    const cross = -dx * Math.sin(beamAngle) + dy * Math.cos(beamAngle);
+
+    this._lastDodgeSideLeft = !this._lastDodgeSideLeft;
+    let sideSign = cross !== 0 ? (cross > 0 ? 1 : -1) : (this._lastDodgeSideLeft ? 1 : -1);
+
+    const beamHalfWidth = beamData.beamHalfWidth || 142.5;
+    const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 110), beamHalfWidth + this.r + 40);
+
+    let targetX = this.x + nx * sideSign * jumpDist;
+    let targetY = this.y + ny * sideSign * jumpDist;
+
+    if (arena) {
+      const minX = arena.x + this.r + 15;
+      const maxX = arena.x + arena.width - this.r - 15;
+      const minY = arena.y + this.r + 15;
+      const maxY = arena.y + arena.height - this.r - 15;
+
+      if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
+        targetX = this.x - nx * sideSign * jumpDist;
+        targetY = this.y - ny * sideSign * jumpDist;
+      }
+
+      targetX = Math.max(minX, Math.min(maxX, targetX));
+      targetY = Math.max(minY, Math.min(maxY, targetY));
+    }
+
+    // Spawn afterimages
+    this._spawnDodgeAfterimages(startX, startY, targetX, targetY, startAngle, startAngle);
+
+    this.x = targetX;
+    this.y = targetY;
+
+    // Clear any hitstun, paralyze, beam trap state
+    this.hitStunTimer = 0;
+    this.timeStopTimer = 0;
+    this.paralyzeTimer = 0;
+    this.isParalyzed = false;
+    this.caughtInNamelessBeamTimer = 0;
+    this.isCaughtInNamelessBeam = false;
+    this.caughtInPureLoveBeam = false;
+    this.wasCaughtInPureLoveBeam = false;
+    this.pureLoveBeamTimer = 0;
+    this.pureLoveBeamRecoveryTimer = 0;
+
+    // Snap aim facing direction at caster (Rule 1.3)
+    this.snapAimAtTarget(beamData.attacker);
+
+    // Flashes & Floating text
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(startX, startY, 20, '#F5C400');
+      spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
+    }
+    const dodgeTxt = cfg.dodgeText || 'MISS';
+    const dodgeColor = cfg.dodgeTextColor || '#FFFFFF';
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 18, dodgeTxt, dodgeColor);
+    }
+
+    // SFX & Grunt
+    const dashSFX = cfg.sounds?.dodgeSFX || 'skill_dash3';
+    const dashVol = cfg.soundVolumes?.dodgeSFX ?? 0.85;
+    audioSystem.playSFX(dashSFX, dashVol);
+
+    const dodgeNoiseSounds = cfg.sounds?.dodgeNoiseSounds || [
+      'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
+    ];
+    const dodgeNoiseChance = (typeof cfg.soundChances?.dodgeNoise === 'number')
+      ? cfg.soundChances.dodgeNoise
+      : ((typeof cfg.dodgeNoiseChance === 'number') ? cfg.dodgeNoiseChance : 0.35);
+
+    if (dodgeNoiseSounds && dodgeNoiseSounds.length > 0 && Math.random() < dodgeNoiseChance) {
+      const selectedDodgeNoise = dodgeNoiseSounds[Math.floor(Math.random() * dodgeNoiseSounds.length)];
+      const noiseVol = cfg.soundVolumes?.dodgeNoise !== undefined 
+        ? cfg.soundVolumes.dodgeNoise 
+        : (cfg.dodgeNoiseVolume !== undefined ? cfg.dodgeNoiseVolume : 2.5);
+      audioSystem.playSFX(selectedDodgeNoise, noiseVol);
+    }
+
+    const microGlideSpeed = 2.2;
+    const perpAngle = Math.atan2(ny * sideSign, nx * sideSign);
+    this.vx = Math.cos(perpAngle) * microGlideSpeed;
+    this.vy = Math.sin(perpAngle) * microGlideSpeed;
+    this.dodgeStallTimer = cfg.dodgeStallDuration ?? 8;
+
+    return true;
+  }
+
+  /**
+   * Passive: Caped Baldy Reflexes against Gojo's Hollow Purple orb & suction vortex.
+   * Evasively teleports Saitama sideways outside the Purple path if dodge is ready.
+   * @param {Object} purpleData - Hollow Purple details { attacker, projectile, x, y, vx, vy, r, pullRadius }
+   * @returns {boolean} True if successfully dodged, false otherwise.
+   */
+  dodgePurple(purpleData = {}) {
+    const cfg = (CONFIG && CONFIG.saitama) ? CONFIG.saitama : {};
+    if (!this.isSkillEnabled(cfg.enableDodge, true)) return false;
+
+    if (this._isInsideGojoDomain() || this.isChainedByMakima || this.hp <= 0 || this.isFrozenByInfinity || this.isTargetOfAmbush) {
+      return false;
+    }
+
+    const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
+    if (isGlobalHitPausing) return false;
+
+    if (this.isCountering || (this._counterPunchTimer && this._counterPunchTimer > 0)) {
+      return false;
+    }
+
+    if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) {
+      return false;
+    }
+
+    const dodgeChance = (cfg.purpleDodgeChance !== undefined) ? cfg.purpleDodgeChance : ((cfg.beamDodgeChance !== undefined) ? cfg.beamDodgeChance : 1.0);
+    if (dodgeChance < 1.0 && Math.random() >= dodgeChance) {
+      return false;
+    }
+
+    this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 1;
+
+    const startX = this.x;
+    const startY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
+
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { width: 500, height: 500, x: 50, y: 50 });
+    const pX = purpleData.x !== undefined ? purpleData.x : (purpleData.projectile?.x ?? 0);
+    const pY = purpleData.y !== undefined ? purpleData.y : (purpleData.projectile?.y ?? 0);
+    const pVx = purpleData.vx !== undefined ? purpleData.vx : (purpleData.projectile?.vx ?? 0);
+    const pVy = purpleData.vy !== undefined ? purpleData.vy : (purpleData.projectile?.vy ?? 0);
+    const isMoving = Math.hypot(pVx, pVy) > 0.1;
+
+    let targetX, targetY;
+    const safeRadius = (purpleData.r || 50) + this.r + 65;
+    const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 110), safeRadius);
+
+    if (isMoving) {
+      const travelAngle = Math.atan2(pVy, pVx);
+      const nx = -Math.sin(travelAngle);
+      const ny = Math.cos(travelAngle);
+      this._lastDodgeSideLeft = !this._lastDodgeSideLeft;
+      const cross = -(this.x - pX) * Math.sin(travelAngle) + (this.y - pY) * Math.cos(travelAngle);
+      const sideSign = cross !== 0 ? (cross > 0 ? 1 : -1) : (this._lastDodgeSideLeft ? 1 : -1);
+      targetX = this.x + nx * sideSign * jumpDist;
+      targetY = this.y + ny * sideSign * jumpDist;
+    } else {
+      const radAngle = Math.atan2(this.y - pY, this.x - pX);
+      targetX = pX + Math.cos(radAngle) * jumpDist;
+      targetY = pY + Math.sin(radAngle) * jumpDist;
+    }
+
+    if (arena) {
+      const minX = arena.x + this.r + 15;
+      const maxX = arena.x + arena.width - this.r - 15;
+      const minY = arena.y + this.r + 15;
+      const maxY = arena.y + arena.height - this.r - 15;
+
+      if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
+        if (isMoving) {
+          const travelAngle = Math.atan2(pVy, pVx);
+          const nx = -Math.sin(travelAngle);
+          const ny = Math.cos(travelAngle);
+          const cross = -(this.x - pX) * Math.sin(travelAngle) + (this.y - pY) * Math.cos(travelAngle);
+          const sideSign = cross >= 0 ? -1 : 1;
+          targetX = this.x + nx * sideSign * jumpDist;
+          targetY = this.y + ny * sideSign * jumpDist;
+        }
+      }
+
+      targetX = Math.max(minX, Math.min(maxX, targetX));
+      targetY = Math.max(minY, Math.min(maxY, targetY));
+    }
+
+    this._spawnDodgeAfterimages(startX, startY, targetX, targetY, startAngle, startAngle);
+
+    this.x = targetX;
+    this.y = targetY;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
+    this.hitStunTimer = 0;
+    this.timeStopTimer = 0;
+    this.isCaughtInPurple = false;
+    this.purpleHitTimer = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+
+    this.snapAimAtTarget(purpleData.attacker);
+
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(startX, startY, 20, '#F5C400');
+      spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
+    }
+    const dodgeTxt = cfg.dodgeText || 'MISS';
+    const dodgeColor = cfg.dodgeTextColor || '#FFFFFF';
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 18, dodgeTxt, dodgeColor);
+    }
+
+    const dashSFX = cfg.sounds?.dodgeSFX || 'skill_dash3';
+    const dashVol = cfg.soundVolumes?.dodgeSFX ?? 0.85;
+    audioSystem.playSFX(dashSFX, dashVol);
+
+    const microGlideSpeed = 2.2;
+    const perpAngle = Math.atan2(targetY - startY, targetX - startX);
+    this.vx = Math.cos(perpAngle) * microGlideSpeed;
+    this.vy = Math.sin(perpAngle) * microGlideSpeed;
+    this.dodgeStallTimer = cfg.dodgeStallDuration ?? 8;
+
+    return true;
+  }
+
+  /**
+   * Helper to check if an entity is Nameless Deity (delegates to deitySaitamaInteraction).
+   */
+  _isNamelessDeity(target) {
+    return isNamelessDeityEntity(target);
+  }
+
+  /**
    * Helper to check if an entity is a minion, summon, deployable, illusion, or companion entity.
    */
   _isMinionEntity(target) {
@@ -1140,6 +1413,7 @@ export class SaitamaFighter extends Fighter {
     const trueTarget = this._resolveTrueFighterTarget(target);
     const resolvedTarget = trueTarget || target;
     if (this.hp <= 0 || !resolvedTarget || resolvedTarget.hp <= 0 || resolvedTarget === this) return false;
+
     if (this.skillPunishCooldown > 0) return false;
     const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive);
     const isGlobalHitPausing = isGlobalHitPauseActive(state, this);
@@ -1148,87 +1422,120 @@ export class SaitamaFighter extends Fighter {
     // Check team alignment in 2v2/team modes ONLY.
     if (this._isSameTeam(resolvedTarget)) return false;
 
-    // Range guard: Prevent triggering passive counter if target is not within counter range
-    const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
-    const currentDist = Math.hypot(resolvedTarget.x - this.x, resolvedTarget.y - this.y);
-    if (currentDist > maxRange) {
-      return false; // Target is out of range
-    }
-
     const oldX = this.x;
     const oldY = this.y;
 
-    // Calculate position directly behind the target relative to the target's facing direction
-    const targetAngle = resolvedTarget.gunAngle !== undefined ? resolvedTarget.gunAngle : (resolvedTarget.angle || 0);
-    const spacing = CONFIG.saitama?.counterTeleportDistanceOffset ?? 35;
-    const offsetDist = this.r + resolvedTarget.r + spacing;
-    const behindAngle = targetAngle + Math.PI;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    const isHandledByInteraction = interactionManager.handleCounterTeleport(this, resolvedTarget, arena, oldX, oldY);
 
-    const arena = CONFIG.arena;
-    let chosenX = resolvedTarget.x + Math.cos(behindAngle) * offsetDist;
-    let chosenY = resolvedTarget.y + Math.sin(behindAngle) * offsetDist;
+    if (!isHandledByInteraction) {
+      // Range guard: Prevent triggering passive counter if target is not within counter range
+      const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
+      const currentDist = Math.hypot(resolvedTarget.x - this.x, resolvedTarget.y - this.y);
+      if (currentDist > maxRange) {
+        return false; // Target is out of range
+      }
 
-    if (arena) {
-      const minX = arena.x + this.r + 10;
-      const maxX = arena.x + arena.width - this.r - 10;
-      const minY = arena.y + this.r + 10;
-      const maxY = arena.y + arena.height - this.r - 10;
+      // Calculate position directly behind the target relative to the target's facing direction
+      const targetAngle = resolvedTarget.gunAngle !== undefined ? resolvedTarget.gunAngle : (resolvedTarget.angle || 0);
+      const spacing = CONFIG.saitama?.counterTeleportDistanceOffset ?? 35;
+      const offsetDist = this.r + resolvedTarget.r + spacing;
+      const behindAngle = targetAngle + Math.PI;
 
-      // Check if pure behind position is within arena bounds
-      const isInside = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
+      const arena = CONFIG.arena;
+      let chosenX = resolvedTarget.x + Math.cos(behindAngle) * offsetDist;
+      let chosenY = resolvedTarget.y + Math.sin(behindAngle) * offsetDist;
 
-      if (!isInside(chosenX, chosenY)) {
-        // Try candidate flanking angles around the back that don't collide with the arena wall
-        const candidateOffsets = [0.35, -0.35, 0.7, -0.7, 1.0, -1.0, Math.PI / 2, -Math.PI / 2];
-        let foundClearAngle = false;
-        for (const off of candidateOffsets) {
-          const candAngle = behindAngle + off;
-          const candX = resolvedTarget.x + Math.cos(candAngle) * offsetDist;
-          const candY = resolvedTarget.y + Math.sin(candAngle) * offsetDist;
-          if (isInside(candX, candY)) {
-            chosenX = candX;
-            chosenY = candY;
-            foundClearAngle = true;
-            break;
-          }
-        }
+      if (arena) {
+        const minX = arena.x + this.r + 10;
+        const maxX = arena.x + arena.width - this.r - 10;
+        const minY = arena.y + this.r + 10;
+        const maxY = arena.y + arena.height - this.r - 10;
 
-        // If target is in a deep corner, clamp and guarantee minimum physical clearance from target
-        if (!foundClearAngle) {
-          chosenX = Math.max(minX, Math.min(maxX, chosenX));
-          chosenY = Math.max(minY, Math.min(maxY, chosenY));
-          
-          const curDist = Math.hypot(chosenX - resolvedTarget.x, chosenY - resolvedTarget.y);
-          const minRequiredDist = this.r + resolvedTarget.r + 25;
-          if (curDist < minRequiredDist) {
-            // Push Saitama along the vector pointing from target towards arena center or open space
-            let pushDir = Math.atan2(chosenY - resolvedTarget.y, chosenX - resolvedTarget.x);
-            if (curDist < 0.001) {
-              const arenaCenterX = arena.x + arena.width / 2;
-              const arenaCenterY = arena.y + arena.height / 2;
-              pushDir = Math.atan2(arenaCenterY - resolvedTarget.y, arenaCenterX - resolvedTarget.x);
+        // Check if pure behind position is within arena bounds
+        const isInside = (x, y) => x >= minX && x <= maxX && y >= minY && y <= maxY;
+
+        if (!isInside(chosenX, chosenY)) {
+          // Try candidate flanking angles around the back that don't collide with the arena wall
+          const candidateOffsets = [0.35, -0.35, 0.7, -0.7, 1.0, -1.0, Math.PI / 2, -Math.PI / 2];
+          let foundClearAngle = false;
+          for (const off of candidateOffsets) {
+            const candAngle = behindAngle + off;
+            const candX = resolvedTarget.x + Math.cos(candAngle) * offsetDist;
+            const candY = resolvedTarget.y + Math.sin(candAngle) * offsetDist;
+            if (isInside(candX, candY)) {
+              chosenX = candX;
+              chosenY = candY;
+              foundClearAngle = true;
+              break;
             }
-            chosenX = resolvedTarget.x + Math.cos(pushDir) * minRequiredDist;
-            chosenY = resolvedTarget.y + Math.sin(pushDir) * minRequiredDist;
+          }
+
+          // If target is in a deep corner, clamp and guarantee minimum physical clearance from target
+          if (!foundClearAngle) {
             chosenX = Math.max(minX, Math.min(maxX, chosenX));
             chosenY = Math.max(minY, Math.min(maxY, chosenY));
+            
+            const curDist = Math.hypot(chosenX - resolvedTarget.x, chosenY - resolvedTarget.y);
+            const minRequiredDist = this.r + resolvedTarget.r + 25;
+            if (curDist < minRequiredDist) {
+              // Push Saitama along the vector pointing from target towards arena center or open space
+              let pushDir = Math.atan2(chosenY - resolvedTarget.y, chosenX - resolvedTarget.x);
+              if (curDist < 0.001) {
+                const arenaCenterX = arena.x + arena.width / 2;
+                const arenaCenterY = arena.y + arena.height / 2;
+                pushDir = Math.atan2(arenaCenterY - resolvedTarget.y, arenaCenterX - resolvedTarget.x);
+              }
+              chosenX = resolvedTarget.x + Math.cos(pushDir) * minRequiredDist;
+              chosenY = resolvedTarget.y + Math.sin(pushDir) * minRequiredDist;
+              chosenX = Math.max(minX, Math.min(maxX, chosenX));
+              chosenY = Math.max(minY, Math.min(maxY, chosenY));
+            }
           }
         }
       }
-    }
 
-    // Verify the teleport destination is within melee reach of the target
-    const punchReach = this.r + resolvedTarget.r + (CONFIG.saitama?.punchReach || 80);
-    const destDist = Math.hypot(chosenX - resolvedTarget.x, chosenY - resolvedTarget.y);
-    if (destDist > punchReach + 40) {
-      return false; // Chosen teleport position is not within reach
-    }
+      // Verify the teleport destination is within melee reach of the target
+      const punchReach = this.r + resolvedTarget.r + (CONFIG.saitama?.punchReach || 80);
+      const destDist = Math.hypot(chosenX - resolvedTarget.x, chosenY - resolvedTarget.y);
+      if (destDist > punchReach + 40) {
+        return false; // Chosen teleport position is not within reach
+      }
 
-    // Teleport Saitama behind the target with clean physical spacing
-    this.x = chosenX;
-    this.y = chosenY;
-    this.vx = 0;
-    this.vy = 0;
+      // Teleport Saitama behind the target with clean physical spacing
+      this.x = chosenX;
+      this.y = chosenY;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Spawn subtle fading ghost model skin afterimages along teleport trajectory dynamically scaled with distance
+      if (!this.afterImages) this.afterImages = [];
+      const counterDist = Math.hypot(this.x - oldX, this.y - oldY);
+      const steps = Math.min(3, Math.max(1, Math.floor(counterDist / 80)));
+      for (let i = 0; i <= steps; i++) {
+        const p = i / steps;
+        const duration = 12;
+        pushTrailCap(this.afterImages, {
+          x: oldX + (this.x - oldX) * p,
+          y: oldY + (this.y - oldY) * p,
+          r: this.r,
+          gunAngle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
+          timer: duration,
+          maxTimer: duration,
+        }, 6);
+      }
+
+      // Teleport SFX
+      const counterDashSFX = CONFIG.saitama?.sounds?.counterDashSFX || 'skill_dash5';
+      const counterDashVol = CONFIG.saitama?.soundVolumes?.counterDash ?? 1.0;
+      audioSystem.playSFX(counterDashSFX, counterDashVol);
+
+      // Impact flash at teleport origin and behind enemy
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(oldX, oldY, 25, '#F5C400');
+        spawnImpactFlash(this.x, this.y, 30, '#FFFFFF');
+      }
+    }
 
     // Set counter state and clear any Infinity freeze/stasis/beam/flurry locks
     this.isCountering = true;
@@ -1261,40 +1568,12 @@ export class SaitamaFighter extends Fighter {
     this.angle = aimAngle;
     this._counterAimAngle = aimAngle;
 
-    // Spawn subtle fading ghost model skin afterimages along teleport trajectory dynamically scaled with distance
-    if (!this.afterImages) this.afterImages = [];
-    const counterDist = Math.hypot(this.x - oldX, this.y - oldY);
-    const steps = Math.min(3, Math.max(1, Math.floor(counterDist / 80)));
-    for (let i = 0; i <= steps; i++) {
-      const p = i / steps;
-      const duration = 12;
-      pushTrailCap(this.afterImages, {
-        x: oldX + (this.x - oldX) * p,
-        y: oldY + (this.y - oldY) * p,
-        r: this.r,
-        gunAngle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
-        timer: duration,
-        maxTimer: duration,
-      }, 6);
-    }
-
-    // Teleport SFX
-    const counterDashSFX = CONFIG.saitama?.sounds?.counterDashSFX || 'skill_dash5';
-    const counterDashVol = CONFIG.saitama?.soundVolumes?.counterDash ?? 1.0;
-    audioSystem.playSFX(counterDashSFX, counterDashVol);
-
     // Calculate wind-up duration (Idle stare + charging pose)
     const poseFrames = CONFIG.saitama?.counterPunchPoseFrames ?? 100;
-    const idleFrames = CONFIG.saitama?.counterTeleportIdleFrames ?? 10;
+    const idleFrames = isHandledByInteraction ? 0 : (CONFIG.saitama?.counterTeleportIdleFrames ?? 10);
     const counterWindupDuration = poseFrames + idleFrames;
 
     this.punchAnimTimer = 0;
-
-    // Impact flash at teleport origin and behind enemy
-    if (typeof spawnImpactFlash === 'function') {
-      spawnImpactFlash(oldX, oldY, 25, '#F5C400');
-      spawnImpactFlash(this.x, this.y, 30, '#FFFFFF');
-    }
 
     // Store target and start Phase 2 wind-up countdown (Idle stare + charging pose)
     // NOTE: Enemies and arena entities are NOT frozen, giving them the chance to react, move, or escape!
@@ -1947,9 +2226,10 @@ export class SaitamaFighter extends Fighter {
     const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isChanneling;
     if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0 && !this.isFlurrying) {
       const primaryTarget = this._resolveTrueFighterTarget(attacker) || attacker;
+      const isDeityTarget = this._isNamelessDeity(primaryTarget);
       const maxRange = cfg.counterTriggerDistance ?? 320;
       const distToAttacker = Math.hypot(primaryTarget.x - this.x, primaryTarget.y - this.y);
-      if (distToAttacker <= maxRange) {
+      if (isDeityTarget || distToAttacker <= maxRange) {
         const countered = this.executeSkillCounterPunish(primaryTarget);
         if (countered) {
           return false;
@@ -2380,6 +2660,8 @@ export class SaitamaFighter extends Fighter {
       this.isFrozenByInfinity = false;
       this.isDraggedByGetsuga = false;
       this.isCaughtInTelekinesis = false;
+      this.isCaughtInNamelessBeam = false;
+      this.caughtInNamelessBeamTimer = 0;
       this.timeStopTimer = 0;
       this.hitStunTimer = 0;
       this.paralyzeTimer = 0;
@@ -2420,7 +2702,8 @@ export class SaitamaFighter extends Fighter {
       for (const target of targetsToScan) {
         if (this._isMinionEntity(target)) continue;
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        if (dist <= maxCounterRange && dist < minDist) {
+        const isDeity = this._isNamelessDeity(target);
+        if ((isDeity || dist <= maxCounterRange) && dist < minDist) {
           minDist = dist;
           bestTarget = target;
         }
@@ -2430,7 +2713,8 @@ export class SaitamaFighter extends Fighter {
       if (!bestTarget) {
         for (const target of targetsToScan) {
           const dist = Math.hypot(target.x - this.x, target.y - this.y);
-          if (dist <= maxCounterRange && dist < minDist) {
+          const isDeity = this._isNamelessDeity(target);
+          if ((isDeity || dist <= maxCounterRange) && dist < minDist) {
             minDist = dist;
             bestTarget = target;
           }
@@ -2438,11 +2722,17 @@ export class SaitamaFighter extends Fighter {
       }
 
       if (bestTarget) {
-        this._counterWindupTimer = (this._counterWindupTimer || 0) + 1;
-        const windupThreshold = CONFIG.saitama?.counterWindupFrames ?? 50;
-        if (this._counterWindupTimer >= windupThreshold) {
+        const isDeityCasting = this._isNamelessDeity(bestTarget) && (bestTarget.destroyerWindupTimer > 0 || bestTarget.isRebouncingToCenter || bestTarget.destroyerFireTimer > 0);
+        if (isDeityCasting) {
           this._counterWindupTimer = 0;
           this.executeSkillCounterPunish(bestTarget);
+        } else {
+          this._counterWindupTimer = (this._counterWindupTimer || 0) + 1;
+          const windupThreshold = CONFIG.saitama?.counterWindupFrames ?? 50;
+          if (this._counterWindupTimer >= windupThreshold) {
+            this._counterWindupTimer = 0;
+            this.executeSkillCounterPunish(bestTarget);
+          }
         }
       } else {
         this._counterWindupTimer = 0;

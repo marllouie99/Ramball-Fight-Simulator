@@ -34,11 +34,11 @@ export const mahoragaConfig = {
     neutralTeleportDistance: 55,
 
     // ── Throw Barrage & Blitz Finishing ──
-    enableThrowBarrage: true,        // Master toggle for debris throw barrage
-    throwCooldown: 1000,
+    enableThrowBarrage: 0,        // Master toggle for debris throw barrage
+    throwCooldown: 2000,
     throwMinDistance: 180,
     throwSpreadAngle: 0.28,
-    throwDamage: 14,
+    throwDamage: 20,
     throwSpeed: 25,
     throwKnockback: 6.0,
     throwBarrageCount: 10,
@@ -57,7 +57,7 @@ export const mahoragaConfig = {
     movementSpeedMultiplierPerAdaptation: 0.01, // Movement speed multiplier per wheel adaptation stage
     rctRegenPerStage: 0.25,         // Passive RCT HP regeneration per frame per adaptation level (+1.5 HP/sec per stage)
     maxRctRegenStages: 12,           // Maximum adaptation stages contributing to passive RCT regeneration
-    maxRctRegenRate: 0.12,          // Maximum passive RCT regeneration cap per frame (~7.2 HP/sec)
+    maxRctRegenRate: 0.05,          // Maximum passive RCT regeneration cap per frame (~7.2 HP/sec)
     enableRCTHeal: true,            // Toggle on/off Reverse Cursed Technique healing on wheel click
     rctHealPercent: 0.50,           // Percentage of max HP healed on each wheel rotation click (12% max HP)
     maxRctHealingPool: Infinity,    // Uncapped RCT healing capacity across a match
