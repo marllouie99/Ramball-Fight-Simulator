@@ -109,6 +109,23 @@
       image-rendering: crisp-edges;
       image-rendering: pixelated;
     }
+
+    /* Auto-Fit Responsive Window Scaling Mode */
+    html.fit-window-mode,
+    body.fit-window-mode {
+      overflow: hidden !important;
+      height: 100% !important;
+      height: 100vh !important;
+      min-height: 100% !important;
+      justify-content: center !important;
+      align-items: center !important;
+    }
+
+    body.fit-window-mode .game-container {
+      margin: auto !important;
+      flex-shrink: 0;
+      will-change: transform;
+    }
   </style>
 </head>
 
@@ -143,6 +160,9 @@
         </button>
         <button id="quickBtnRestart" class="quick-btn" title="Restart Round" aria-label="Restart Round">
           <span class="quick-icon">🔄</span>
+        </button>
+        <button id="quickBtnFit" class="quick-btn" title="Toggle Auto-Fit / Scroll" aria-label="Toggle Auto-Fit">
+          <span class="quick-icon" id="quickIconFit">📐</span>
         </button>
         <button id="quickBtnFullscreen" class="quick-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">
           <span class="quick-icon" id="quickIconFullscreen">⛶</span>
@@ -776,6 +796,21 @@
                       <div class="card-title-row">
                         <span class="card-title">ARENA TITLE</span>
                         <button id="btn-arenatitle" class="tactical-chip-btn">OFF</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tactical-card system-card" data-action="toggle-aspect-scaling">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 1h5v2H3v3H1V1z M15 1h-5v2h3v3h2V1z M1 15h5v-2H3v-3H1v5z M15 15h-5v-2h3v-3h2v5z" fill="#ffffff"/>
+                        <path d="M5 5h6v6H5V5z" fill="#ffd1dc"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">WINDOW SCALING</span>
+                        <button id="btn-aspect-scaling" class="tactical-chip-btn">AUTO-FIT</button>
                       </div>
                     </div>
                   </div>

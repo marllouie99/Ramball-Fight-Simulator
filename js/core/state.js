@@ -247,6 +247,7 @@ export const state = {
   testMode: false, // Disables leaderboard recording
   cinefilmFilter: false, // Retro Cinefilm 35mm filter toggle
   disableDimEffects: (typeof localStorage !== 'undefined' && localStorage.getItem('disableDimEffects') === 'true') || false, // Global dim effects toggle
+  aspectScalingMode: (typeof localStorage !== 'undefined' && localStorage.getItem('ramball_aspect_scaling')) || 'fit', // 'fit' (Auto-Fit Window, preserve 9:16) | 'fixed' (1X Fixed / Vertical Scroll)
   quickBarMode: (typeof localStorage !== 'undefined' && localStorage.getItem('quickBarMode')) || 'auto', // 'auto' | 'off' | 'on'
   dummyAggressive: false, // Whether target dummies fight back
   dummyEnabled: true, // Whether Target Dummy appears in fighter selection

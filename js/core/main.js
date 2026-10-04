@@ -1112,6 +1112,8 @@ export function executeTacticalAction(action) {
     localStorage.setItem('todo_enableTakadaBackgroundSong', (!isEnabled).toString());
     const btn = document.getElementById('btn-todobgm');
     if (btn) btn.innerText = (!isEnabled) ? 'ON' : 'OFF';
+  } else if (action === 'toggle-aspect-scaling') {
+    toggleAspectScaling();
   }
 }
 
@@ -1387,6 +1389,11 @@ document.getElementById('btn-todobgm')?.addEventListener('click', (e) => {
   e.target.innerText = (!isEnabled) ? 'ON' : 'OFF';
 });
 
+document.getElementById('btn-aspect-scaling')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  toggleAspectScaling();
+});
+
 // Initialize initial UI screens and menu view on boot
 initPixelModelExportUI();
 initImageBgRemoverUI();
@@ -1397,6 +1404,11 @@ window.addEventListener('keydown', (e) => {
   if (e.key === 'F2') {
     e.preventDefault();
     toggleBalanceDebugOverlay();
+    return;
+  }
+
+  if (e.key.toLowerCase() === 'o') {
+    toggleAspectScaling();
     return;
   }
 
@@ -1444,6 +1456,8 @@ const mobileQuickBar = document.getElementById('mobileQuickBar');
 const quickBtnPause = document.getElementById('quickBtnPause');
 const quickIconPause = document.getElementById('quickIconPause');
 const quickBtnRestart = document.getElementById('quickBtnRestart');
+const quickBtnFit = document.getElementById('quickBtnFit');
+const quickIconFit = document.getElementById('quickIconFit');
 const quickBtnFullscreen = document.getElementById('quickBtnFullscreen');
 const quickIconFullscreen = document.getElementById('quickIconFullscreen');
 const quickBtnCamera = document.getElementById('quickBtnCamera');
@@ -1451,6 +1465,70 @@ const quickBtnSound = document.getElementById('quickBtnSound');
 const quickIconSound = document.getElementById('quickIconSound');
 
 let _isMuted = false;
+
+// ─────────────────────────────────────────────
+// FIT-TO-WINDOW & ASPECT RATIO SCALING ENGINE
+// ─────────────────────────────────────────────
+export function updateAspectScaling() {
+  const isFit = state.aspectScalingMode === 'fit';
+  const container = document.querySelector('.game-container');
+  const btn = document.getElementById('btn-aspect-scaling');
+  const quickFit = document.getElementById('quickIconFit');
+  const quickBtn = document.getElementById('quickBtnFit');
+
+  if (btn) {
+    btn.innerText = isFit ? 'AUTO-FIT' : 'FIXED 1X';
+  }
+  if (quickFit) {
+    quickFit.textContent = isFit ? '📐' : '🔍';
+  }
+  if (quickBtn) {
+    quickBtn.title = isFit ? 'Window Scaling: Auto-Fit (Click for Fixed 1X)' : 'Window Scaling: Fixed 1X (Click for Auto-Fit)';
+  }
+
+  if (!container) return;
+
+  if (!isFit) {
+    document.documentElement.classList.remove('fit-window-mode');
+    document.body.classList.remove('fit-window-mode');
+    container.style.removeProperty('transform');
+    container.style.removeProperty('transform-origin');
+    container.style.removeProperty('--app-scale');
+    return;
+  }
+
+  document.documentElement.classList.add('fit-window-mode');
+  document.body.classList.add('fit-window-mode');
+
+  const winW = (typeof window !== 'undefined' && (window.innerWidth || (document.documentElement && document.documentElement.clientWidth))) || 540;
+  const winH = (typeof window !== 'undefined' && (window.innerHeight || (document.documentElement && document.documentElement.clientHeight))) || 960;
+  const baseW = 540;
+  const baseH = 960;
+
+  // Calculate aspect-preserving scale factor
+  const scale = Math.min(winW / baseW, winH / baseH);
+  const formattedScale = Math.max(0.1, Math.min(10.0, scale)).toFixed(4);
+
+  container.style.setProperty('--app-scale', formattedScale);
+  container.style.transform = `scale(${formattedScale})`;
+  container.style.transformOrigin = 'center center';
+}
+
+export function toggleAspectScaling() {
+  const nextMode = (state.aspectScalingMode === 'fit') ? 'fixed' : 'fit';
+  state.aspectScalingMode = nextMode;
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('ramball_aspect_scaling', nextMode);
+  }
+  updateAspectScaling();
+}
+
+if (quickBtnFit) {
+  quickBtnFit.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleAspectScaling();
+  });
+}
 
 if (quickBtnPause) {
   quickBtnPause.addEventListener('click', (e) => {
@@ -1487,7 +1565,10 @@ if (quickBtnFullscreen) {
     } else {
       document.exitFullscreen?.().catch(() => {});
     }
-    setTimeout(syncMobileQuickBar, 100);
+    setTimeout(() => {
+      syncMobileQuickBar();
+      updateAspectScaling();
+    }, 100);
   });
 }
 
@@ -1536,7 +1617,7 @@ export function syncMobileQuickBar() {
   );
 
   const shouldShow = shouldShowQuickBar() && inCombat;
-  const curState = `${shouldShow ? '1' : '0'}_${state.gameState}_${Boolean(document.fullscreenElement)}_${_isMuted}`;
+  const curState = `${shouldShow ? '1' : '0'}_${state.gameState}_${Boolean(document.fullscreenElement)}_${_isMuted}_${state.aspectScalingMode}`;
   if (curState === _lastQuickBarState) return;
   _lastQuickBarState = curState;
 
@@ -1550,7 +1631,18 @@ export function syncMobileQuickBar() {
   if (quickIconSound) {
     quickIconSound.textContent = _isMuted ? '🔇' : '🔊';
   }
+  if (quickIconFit) {
+    quickIconFit.textContent = (state.aspectScalingMode === 'fit') ? '📐' : '🔍';
+  }
 }
 
-document.addEventListener('fullscreenchange', syncMobileQuickBar);
+document.addEventListener('fullscreenchange', () => {
+  syncMobileQuickBar();
+  updateAspectScaling();
+});
+window.addEventListener('resize', updateAspectScaling);
+window.addEventListener('orientationchange', updateAspectScaling);
 setInterval(syncMobileQuickBar, 100);
+
+// Initialize aspect scaling on initial boot
+updateAspectScaling();

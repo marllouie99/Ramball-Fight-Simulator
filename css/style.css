@@ -58,6 +58,23 @@ body {
 /* ─────────────────────────────────────────────
    Layout
 ───────────────────────────────────────────── */
+/* Auto-Fit Responsive Window Scaling Mode */
+html.fit-window-mode,
+body.fit-window-mode {
+  overflow: hidden !important;
+  height: 100% !important;
+  height: 100vh !important;
+  min-height: 100% !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+body.fit-window-mode .game-container {
+  margin: auto !important;
+  flex-shrink: 0;
+  will-change: transform;
+}
+
 .game-container {
   position: relative;
   display: flex;
