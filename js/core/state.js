@@ -147,6 +147,34 @@ if (hasPixi) {
   canvas.style.display = 'block';
 }
 
+/**
+ * Smart Auto-Detect Scaling on First Boot:
+ * Automatically selects 'fit' on mobile, touch, and compact browser viewports,
+ * while preserving explicit user choices saved in localStorage.
+ */
+export function detectOptimalAspectScaling() {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('ramball_aspect_scaling');
+    if (saved === 'fit' || saved === 'fixed') {
+      return saved;
+    }
+  }
+
+  if (typeof window === 'undefined') return 'fit';
+  if (window.electronAPI) return 'fixed';
+
+  const winW = (typeof window !== 'undefined' && (window.innerWidth || (document.documentElement && document.documentElement.clientWidth))) || 540;
+  const winH = (typeof window !== 'undefined' && (window.innerHeight || (document.documentElement && document.documentElement.clientHeight))) || 960;
+  const isTouch = (typeof window !== 'undefined' && (('ontouchstart' in window) || (navigator.maxTouchPoints > 0)));
+  const isMobileUA = typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '');
+
+  if (isTouch || isMobileUA || winH < 980 || winW < 600) {
+    return 'fit';
+  }
+
+  return 'fit';
+}
+
 // ─────────────────────────────────────────────
 // GAME STATE — single mutable object
 // All modules import this object and mutate its properties directly.
@@ -247,7 +275,7 @@ export const state = {
   testMode: false, // Disables leaderboard recording
   cinefilmFilter: false, // Retro Cinefilm 35mm filter toggle
   disableDimEffects: (typeof localStorage !== 'undefined' && localStorage.getItem('disableDimEffects') === 'true') || false, // Global dim effects toggle
-  aspectScalingMode: (typeof localStorage !== 'undefined' && localStorage.getItem('ramball_aspect_scaling')) || 'fit', // 'fit' (Auto-Fit Window, preserve 9:16) | 'fixed' (1X Fixed / Vertical Scroll)
+  aspectScalingMode: detectOptimalAspectScaling(), // 'fit' (Auto-Fit Window, preserve 9:16) | 'fixed' (1X Fixed / Vertical Scroll)
   quickBarMode: (typeof localStorage !== 'undefined' && localStorage.getItem('quickBarMode')) || 'auto', // 'auto' | 'off' | 'on'
   dummyAggressive: false, // Whether target dummies fight back
   dummyEnabled: true, // Whether Target Dummy appears in fighter selection
