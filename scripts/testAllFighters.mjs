@@ -3100,14 +3100,17 @@ async function main() {
         }
         const initialRedAngle = fighter.gunAngle;
 
-        // Enemy moves behind Gojo during buildup - verify aim tracks smoothly on committed side and NEVER rotates to the opposite side
+        // Enemy moves behind Gojo during buildup - verify aim tracks smoothly with continuous 360 degree tracking
         dummyOpponent.x = 100;
         dummyOpponent.y = 80;
         for (let i = 0; i < 20; i++) {
           fighter.update(dummyOpponent, 0, state.arena);
         }
-        if (Math.cos(fighter.gunAngle) < -0.001 || Math.abs(fighter.gunAngle) > (Math.PI / 2 + 0.001)) {
-          throw new Error(`Expected Gojo to stay committed to right side without turning around (angle: ${fighter.gunAngle.toFixed(2)})`);
+        const expectedAngleBehind = Math.atan2(80 - fighter.y, 100 - fighter.x);
+        let diffBehind = Math.abs(fighter.gunAngle - expectedAngleBehind);
+        while (diffBehind > Math.PI) diffBehind = Math.abs(diffBehind - Math.PI * 2);
+        if (diffBehind > 1.2) {
+          throw new Error(`Expected Gojo to track smoothly toward enemy position (${expectedAngleBehind.toFixed(2)}), got angle: ${fighter.gunAngle.toFixed(2)}`);
         }
         const firedRedAngle = fighter.gunAngle;
         fighter._detonateRed();
@@ -3202,14 +3205,17 @@ async function main() {
         }
         const lockedRedAngle2 = fighter.gunAngle;
 
-        // Move opponent behind Gojo during Red buildup and verify Gojo aim tracks smoothly on committed side without turning around
+        // Move opponent behind Gojo during Red buildup and verify Gojo aim tracks smoothly without strict vertical clamping
         dummyOpponent.x = 100;
         dummyOpponent.y = 400;
         for (let i = 0; i < 20; i++) {
           fighter.aim(dummyOpponent);
         }
-        if (Math.cos(fighter.gunAngle) < -0.001 || Math.abs(fighter.gunAngle) > (Math.PI / 2 + 0.001)) {
-          throw new Error(`Expected Gojo to stay committed to right side without turning around (angle: ${fighter.gunAngle.toFixed(2)})`);
+        const expectedAngleBehind2 = Math.atan2(400 - fighter.y, 100 - fighter.x);
+        let diffBehind2 = Math.abs(fighter.gunAngle - expectedAngleBehind2);
+        while (diffBehind2 > Math.PI) diffBehind2 = Math.abs(diffBehind2 - Math.PI * 2);
+        if (diffBehind2 > 1.2) {
+          throw new Error(`Expected Gojo to track smoothly toward enemy position (${expectedAngleBehind2.toFixed(2)}), got angle: ${fighter.gunAngle.toFixed(2)}`);
         }
 
         // Fast-forward to detonation
@@ -10040,16 +10046,18 @@ async function main() {
       throw new Error(`[RED AUTO-AIM TRACKING FAILED] Gojo aim did not rotate upward toward target. Before: ${redAngleBefore}, After: ${redAngleAfter}`);
     }
 
-    // Target moves BEHIND Gojo to the left hemisphere (target.x = 100, target.y = 300)
+    // Target moves BEHIND Gojo (target.x = 100, target.y = 300) - Gojo smoothly tracks towards target
     target.x = 100;
     target.y = 300;
     for (let i = 0; i < 30; i++) {
       gojo.aim(target);
     }
 
-    // Gojo MUST NOT rotate to the other side (left hemisphere) — gunAngle must remain on right hemisphere (Math.cos >= 0)
-    if (Math.cos(gojo.gunAngle) < -0.001 || Math.abs(gojo.gunAngle) > (Math.PI / 2 + 0.001)) {
-      throw new Error(`[RED NO-TURNAROUND FAILED] Gojo rotated to the opposite side while channeling Red! Angle: ${gojo.gunAngle}`);
+    const expectedBehind = Math.atan2(300 - gojo.y, 100 - gojo.x);
+    let diffBehind = Math.abs(gojo.gunAngle - expectedBehind);
+    while (diffBehind > Math.PI) diffBehind = Math.abs(diffBehind - Math.PI * 2);
+    if (diffBehind > 1.2) {
+      throw new Error(`[RED 360 AIM TRACKING FAILED] Gojo did not track smoothly toward target behind him! Expected ~${expectedBehind.toFixed(2)}, got: ${gojo.gunAngle}`);
     }
 
     // Test detonateRed releases at current gunAngle without snapping to a newly relocated target

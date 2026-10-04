@@ -276,7 +276,7 @@ export class GojoFighter extends Fighter {
   }
 
   cancelRed(applyPenalty = true) {
-    if (this.redEffectTimer > 0 || this.redBuildupPhase) {
+    if ((this.redEffectTimer > 0 || this.redBuildupPhase) && !this.redDetonated) {
       this.redEffectTimer = 0;
       this.redBuildupPhase = false;
       this.redDetonated = false;
@@ -326,57 +326,19 @@ export class GojoFighter extends Fighter {
         return;
       }
 
-      // Reversal Red Side-Committed Aim:
-      // Auto-aim tracks the target smoothly to ANY vertical / diagonal / forward angle on the current side,
-      // but MUST NOT rotate to the other side (cannot turn around to face behind him).
-      const currentRefAngle = (this.redInitialAngle !== undefined && this.redInitialAngle !== null && !Number.isNaN(this.redInitialAngle))
-        ? this.redInitialAngle
-        : ((this.redTargetAngle !== undefined && this.redTargetAngle !== null && !Number.isNaN(this.redTargetAngle))
-          ? this.redTargetAngle
-          : ((this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : 0));
-
-      const committedSide = this.redCommittedSide || (Math.abs(currentRefAngle) > Math.PI / 2 ? 'left' : 'right');
-      this.redCommittedSide = committedSide;
-
-      let clampedTargetAngle = targetAngle;
-      if (committedSide === 'right') {
-        // Committed to Right Side (Math.cos >= 0: [-PI/2, +PI/2])
-        if (Math.cos(targetAngle) < 0) {
-          // Target is on the other side (left hemisphere) — clamp to upper/lower vertical boundary of right side
-          clampedTargetAngle = (targetAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
-        }
-      } else {
-        // Committed to Left Side (Math.cos <= 0: Math.abs(angle) >= PI/2)
-        if (Math.cos(targetAngle) > 0) {
-          // Target is on the other side (right hemisphere) — clamp to upper/lower vertical boundary of left side
-          clampedTargetAngle = (targetAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
-        }
-      }
-
-      // Smooth tracking using redChannelTurnRate
+      // Continuous 360° Reversal Red Smooth Tracking (No strict vertical clamping):
       const turnRate = CONFIG.gojo?.redChannelTurnRate ?? 0.045;
       let currentAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
       while (currentAngle > Math.PI) currentAngle -= Math.PI * 2;
       while (currentAngle < -Math.PI) currentAngle += Math.PI * 2;
 
-      let diff = clampedTargetAngle - currentAngle;
+      let diff = targetAngle - currentAngle;
       while (diff < -Math.PI) diff += Math.PI * 2;
       while (diff > Math.PI) diff -= Math.PI * 2;
 
       let newAngle = currentAngle + diff * turnRate;
       while (newAngle > Math.PI) newAngle -= Math.PI * 2;
       while (newAngle < -Math.PI) newAngle += Math.PI * 2;
-
-      // Strict enforcement that newAngle does not cross to the other side
-      if (committedSide === 'right') {
-        if (Math.cos(newAngle) < 0) {
-          newAngle = (newAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
-        }
-      } else {
-        if (Math.cos(newAngle) > 0) {
-          newAngle = (newAngle < 0) ? -Math.PI / 2 : Math.PI / 2;
-        }
-      }
 
       this.gunAngle = newAngle;
       this.angle = newAngle;
@@ -604,9 +566,9 @@ export class GojoFighter extends Fighter {
   shoot(ownerIndex) {
     if (!this.isSkillEnabled(CONFIG.gojo?.enableBlue, true)) return false;
     if (!this.canPerformBasicAttack() || this.isPurpleActive()) return false;
-    const target = this.target || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+    const target = (this.target && this._isValidCombatTarget(this.target)) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
     let aimAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
-    if (target && !target.isDead && target.hp > 0) {
+    if (target && this._isValidCombatTarget(target)) {
       const targetZ = target.z || 0;
       const myZ = this.z || 0;
       aimAngle = Math.atan2((target.y - targetZ) - (this.y - myZ), target.x - this.x);
@@ -891,8 +853,9 @@ export class GojoFighter extends Fighter {
     // Melee mode activation: Now that Infinity has had its chance to intercept, enter Melee Mode if hit by close-range melee
     const isSpatialOrRanged = Boolean(opts.isDomain || opts.isDomainSlash || opts.isSukunaSlash || opts.isProjectile || opts.isGetsuga || opts.isFlame || opts.isDivineFlame || opts.fromDomain || opts.isTick || opts.isTickDamage || opts.isContinuous || opts.isRed);
     const isAttackerAmbushing = attacker && (attacker.isAmbushing || (attacker.isStealthed && !this.domainActive) || (attacker.ultimateActive && (attacker.characterId === 'toji' || attacker.type === 'toji')));
+    const isAttackerLawnmower = Boolean(opts.isLawnmower || opts.damageType === 'crush' || (attacker && (attacker.isLawnmower || attacker.characterId === 'crazydave_lawnmower' || attacker.isUntargetable || attacker.untargetable || attacker.cannotBeTargeted || attacker.isTargetable === false)));
     const isMeleeAllowed = this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true);
-    if (isMeleeAllowed && !isGojoSkillOrPurpleActive && !isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
+    if (isMeleeAllowed && !isAttackerLawnmower && !isGojoSkillOrPurpleActive && !isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
       if (!this.isMeleeMode) {
         this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
         this.isMeleeMode = true;
@@ -1425,7 +1388,7 @@ export class GojoFighter extends Fighter {
     let inMeleeRange = false;
     if (state.fighters) {
       state.fighters.forEach((f, idx) => {
-        if (f && f !== this && f.hp > 0) {
+        if (f && f !== this && this._isValidCombatTarget(f)) {
           const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
           if (isEnemy && Math.hypot(f.x - this.x, f.y - this.y) <= meleeDistanceThreshold) {
             inMeleeRange = true;
@@ -1488,12 +1451,12 @@ export class GojoFighter extends Fighter {
 
 
     // Stop attacking if round/match has ended or if all enemies are dead!
-    const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
-    let hasLivingEnemies = opponent && !opponent.isDead && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving);
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    let hasLivingEnemies = opponent && this._isValidCombatTarget(opponent);
     if (!hasLivingEnemies && state.fighters) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
-        if (f && f !== this && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving)) {
+        if (f && f !== this && this._isValidCombatTarget(f)) {
           const isEnemy = myTeam === null || (state.getFighterTeam ? state.getFighterTeam(i) !== myTeam : f.team !== this.team);
           if (isEnemy) {
             hasLivingEnemies = true;
@@ -1503,7 +1466,7 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    if (!isGamePlaying || !hasLivingEnemies) {
+    if (isMatchEnded || !hasLivingEnemies) {
       this.cancelRed(false);
       this.interruptAttacks(false); // Cancel channeling skills without hard-canceling punch animation
       if (this.punchAnimTimer > 0) this.punchAnimTimer--;
@@ -1537,13 +1500,19 @@ export class GojoFighter extends Fighter {
       this.domainPreSlideTimer--;
 
       // Smooth friction deceleration towards full stop
-      this.vx *= 0.82;
-      this.vy *= 0.82;
+      this.vx = Number.isFinite(this.vx) ? this.vx * 0.65 : 0;
+      this.vy = Number.isFinite(this.vy) ? this.vy * 0.65 : 0;
       this.x += this.vx;
       this.y += this.vy;
 
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent);
+      const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+      if (currentArena) {
+        clampEntityToArenaBounds(this, currentArena);
+      }
+
+      const slideOpp = (opponent && this._isValidCombatTarget(opponent)) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+      if (slideOpp && !slideOpp.isDead) {
+        this.aim(slideOpp);
       }
 
       if (this.afterImages && this.domainPreSlideTimer % 2 === 0) {
@@ -1560,7 +1529,7 @@ export class GojoFighter extends Fighter {
         spawnSparks(this.x, this.y, 1, 'blue');
       }
 
-      this.resolveWallBounce(arena);
+      this.resolveWallBounce(currentArena);
 
       if (this.domainPreSlideTimer <= 0) {
         this.isDomainPreSlide = false;
@@ -1570,8 +1539,16 @@ export class GojoFighter extends Fighter {
         // Slide complete -> Stop move -> Channel Domain (facing the opponent)
         this.isChannelingDomainExpansion = true;
         this.domainChargeTimer = 0;
-        const domainTarget = opponent || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
-        const domainAimAngle = domainTarget ? Math.atan2(domainTarget.y - this.y, domainTarget.x - this.x) : (this.gunAngle || 0);
+        const domainTarget = (opponent && this._isValidCombatTarget(opponent)) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+        let domainAimAngle = this.gunAngle || 0;
+        if (domainTarget && Number.isFinite(domainTarget.x) && Number.isFinite(domainTarget.y)) {
+          const tdx = domainTarget.x - this.x;
+          const tdy = (domainTarget.y - (domainTarget.z || 0)) - (this.y - (this.z || 0));
+          if (Math.abs(tdx) > 0.1 || Math.abs(tdy) > 0.1) {
+            domainAimAngle = Math.atan2(tdy, tdx);
+          }
+        }
+        if (!Number.isFinite(domainAimAngle)) domainAimAngle = 0;
         this.gunAngle = domainAimAngle;
         this.angle = domainAimAngle;
         this._domainChannelAngle = domainAimAngle;
@@ -1587,21 +1564,29 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && opponent && !opponent.isDead) {
+    const validDomainOpponent = (opponent && this._isValidCombatTarget(opponent)) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && validDomainOpponent && !validDomainOpponent.isDead) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
 
       // Initiate smooth Pre-Domain Slide Phase before stopping to channel
       this.isDomainPreSlide = true;
-      this.domainPreSlideTimer = 18; // ~18 frames smooth glide deceleration
+      this.domainPreSlideTimer = 8; // Gentle short brake glide (~8 frames) rather than launching across the map
 
-      // Calculate directional slide vector towards/past opponent
-      const slideAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      const currentSpeed = Math.hypot(this.vx, this.vy);
-      const initialSpeed = Math.max(9.5, currentSpeed * 1.5);
-      this.vx = Math.cos(slideAngle) * initialSpeed;
-      this.vy = Math.sin(slideAngle) * initialSpeed;
+      // Smoothly preserve existing momentum with a gentle brake rather than shooting across the arena
+      const currentSpeed = Number.isFinite(this.vx) && Number.isFinite(this.vy) ? Math.hypot(this.vx, this.vy) : 0;
+      if (currentSpeed > 0.1) {
+        this.vx = (this.vx / currentSpeed) * Math.min(currentSpeed, 3.5);
+        this.vy = (this.vy / currentSpeed) * Math.min(currentSpeed, 3.5);
+      } else {
+        this.vx = 0;
+        this.vy = 0;
+      }
+
+      if (validDomainOpponent && Number.isFinite(validDomainOpponent.x) && Number.isFinite(validDomainOpponent.y)) {
+        this.aim(validDomainOpponent);
+      }
 
       const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
       const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.6;
@@ -1625,17 +1610,22 @@ export class GojoFighter extends Fighter {
       this.vy = 0;
 
       // Lock stance facing the opponent while channeling domain expansion
-      if (this._domainChannelAngle !== undefined) {
+      if (this._domainChannelAngle !== undefined && Number.isFinite(this._domainChannelAngle)) {
         this.gunAngle = this._domainChannelAngle;
         this.angle = this._domainChannelAngle;
       }
 
-      if (this.domainChargeTimer >= this.domainChargeMax) {
-        this.isChannelingDomainExpansion = false;
-        this._activateDomain(arena);
+      const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+      if (currentArena) {
+        clampEntityToArenaBounds(this, currentArena);
       }
 
-      this.resolveWallBounce(arena);
+      if (this.domainChargeTimer >= this.domainChargeMax) {
+        this.isChannelingDomainExpansion = false;
+        this._activateDomain(currentArena);
+      }
+
+      this.resolveWallBounce(currentArena);
       return;
     }
 
@@ -1715,7 +1705,7 @@ export class GojoFighter extends Fighter {
       this.z = Math.sin(levitateProgress * Math.PI * 0.5) * maxLevitationHeight;
 
       // Smooth auto-aim tracking while channeling Purple (no sudden snap on firing)
-      const purpleAimTarget = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving))
+      const purpleAimTarget = (opponent && this._isValidCombatTarget(opponent))
         ? opponent
         : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
       if (purpleAimTarget && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
@@ -1852,9 +1842,9 @@ export class GojoFighter extends Fighter {
 
       // Auto-aim tracking while channeling Red (smoothly tracks on committed side)
       if (this.redBuildupPhase && !this.redDetonated && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
-        const redAimTarget = (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && opponent.hp > 0)
+        const redAimTarget = (opponent && this._isValidCombatTarget(opponent))
           ? opponent
-          : (this._redTargetRef && !this._redTargetRef.isDead && this._redTargetRef.hp > 0
+          : (this._redTargetRef && this._isValidCombatTarget(this._redTargetRef)
             ? this._redTargetRef
             : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
         if (redAimTarget) {
@@ -1869,13 +1859,13 @@ export class GojoFighter extends Fighter {
     // Delete enemy projectiles if Purple is active
     this._deleteEnemyProjectilesInPurple();
 
-    // Check if ANY enemy is currently in melee range radius
+    // Check if ANY enemy is currently in melee range radius (ignoring untargetable/lawnmower entities)
     let isBeingMeleed = false;
     let closestEnemyDist = Infinity;
     const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 85;
     const leaveMeleeRadius = closeRangeRadius + 30;
 
-    if (opponent && !opponent.isDead && !opponent.dead && opponent.hp > 0 && (!opponent.isStealthed || this.domainActive)) {
+    if (this._isValidCombatTarget(opponent) && (!opponent.isStealthed || this.domainActive)) {
       const d = Math.hypot(this.x - opponent.x, this.y - opponent.y);
       if (d < closestEnemyDist) closestEnemyDist = d;
       if (d <= closeRangeRadius) {
@@ -1886,7 +1876,7 @@ export class GojoFighter extends Fighter {
     if (state.fighters && state.fighters.length > 0) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
-        if (!f || f === this || f.hp <= 0 || (f.isStealthed && !this.domainActive)) continue;
+        if (!this._isValidCombatTarget(f) || (f.isStealthed && !this.domainActive)) continue;
         const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
         if (!isEnemy) continue;
 
@@ -1941,13 +1931,13 @@ export class GojoFighter extends Fighter {
       speedMult = 0;
 
       if (this.domainActive) {
-        const domainOpponent = (opponent && !opponent.isDead && opponent.hp > 0)
+        const domainOpponent = (opponent && this._isValidCombatTarget(opponent))
           ? opponent
-          : ((this.target && !this.target.isDead && this.target.hp > 0)
+          : ((this.target && this._isValidCombatTarget(this.target))
             ? this.target
             : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null));
 
-        if (domainOpponent && !domainOpponent.isDead && domainOpponent.hp > 0) {
+        if (domainOpponent && this._isValidCombatTarget(domainOpponent)) {
           this.target = domainOpponent;
           this.vx = 0;
           this.vy = 0;
@@ -1961,8 +1951,17 @@ export class GojoFighter extends Fighter {
         }
       } else {
         // Regular Melee Mode: Physical movement stops completely, teleportation handles all repositioning
-        if (canAct && opponent && !opponent.isDead) {
-          this._updateMeleeCombat(opponent, arena);
+        let targetOpponent = (opponent && this._isValidCombatTarget(opponent))
+          ? opponent
+          : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null);
+
+        if (canAct && targetOpponent && this._isValidCombatTarget(targetOpponent)) {
+          this._updateMeleeCombat(targetOpponent, arena);
+        } else if (!targetOpponent || !this._isValidCombatTarget(targetOpponent)) {
+          // No valid living enemy to fight in melee mode: disengage back to ranged
+          this.isMeleeMode = false;
+          this.forcedMeleeTimer = 0;
+          this.meleeComboCount = 0;
         }
       }
     } else {
@@ -1996,8 +1995,14 @@ export class GojoFighter extends Fighter {
     }
     this.applyMovementPhysics(speedMult);
 
-    if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
-      this.aim(opponent);
+    const aimTarget = (opponent && this._isValidCombatTarget(opponent))
+      ? opponent
+      : ((this.target && this._isValidCombatTarget(this.target))
+        ? this.target
+        : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
+
+    if (aimTarget && (!aimTarget.isDead || aimTarget.isRevivingFromContract || aimTarget.isShatterReviving) && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
+      this.aim(aimTarget);
     } else {
       this.turnToNormalPosition(0.035);
     }
@@ -2030,7 +2035,7 @@ export class GojoFighter extends Fighter {
    * Melee / Domain Flurry: Teleports Gojo instantly to a fresh angle around the target
    */
   _teleportToMeleeAngle(opponent, arena) {
-    if (!opponent || opponent.isDead || this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || this.isPurpleActive()) return;
+    if (!opponent || !this._isValidCombatTarget(opponent) || this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || this.isPurpleActive()) return;
 
     const oldX = this.x;
     const oldY = this.y;
@@ -2082,14 +2087,17 @@ export class GojoFighter extends Fighter {
     }
     const offsetDist = (opponent.r || 25) + this.r + 14;
 
-    let targetX = opponent.x + Math.cos(baseAngle) * offsetDist;
-    let targetY = opponent.y + Math.sin(baseAngle) * offsetDist;
+    const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+    const targetXFinite = (opponent && Number.isFinite(opponent.x)) ? opponent.x : (currentArena ? currentArena.x + currentArena.width / 2 : this.x);
+    const targetYFinite = (opponent && Number.isFinite(opponent.y)) ? opponent.y : (currentArena ? currentArena.y + currentArena.height / 2 : this.y);
+    let targetX = targetXFinite + Math.cos(baseAngle) * offsetDist;
+    let targetY = targetYFinite + Math.sin(baseAngle) * offsetDist;
 
-    if (arena) {
-      if (arena.shape === 'circle') {
-        const acx = arena.x + arena.width / 2;
-        const acy = arena.y + arena.height / 2;
-        const ar = Math.max(10, (arena.radius || (arena.width / 2)) - this.r);
+    if (currentArena) {
+      if (currentArena.shape === 'circle') {
+        const acx = currentArena.x + currentArena.width / 2;
+        const acy = currentArena.y + currentArena.height / 2;
+        const ar = Math.max(10, (currentArena.radius || (currentArena.width / 2)) - this.r);
         const cdx = targetX - acx;
         const cdy = targetY - acy;
         const cdist = Math.hypot(cdx, cdy);
@@ -2098,13 +2106,13 @@ export class GojoFighter extends Fighter {
           targetY = acy + (cdy / cdist) * ar;
         }
       } else {
-        targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-        targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+        targetX = Math.max(currentArena.x + this.r, Math.min(currentArena.x + currentArena.width - this.r, targetX));
+        targetY = Math.max(currentArena.y + this.r, Math.min(currentArena.y + currentArena.height - this.r, targetY));
       }
     }
 
-    this.x = targetX;
-    this.y = targetY;
+    this.x = Number.isFinite(targetX) ? targetX : this.x;
+    this.y = Number.isFinite(targetY) ? targetY : this.y;
     this.vx = 0;
     this.vy = 0;
 
@@ -2148,6 +2156,78 @@ export class GojoFighter extends Fighter {
     audioSystem.playSFX(dashSnd, dashVol);
   }
 
+  /**
+   * Validates if an entity is a targetable enemy combatant.
+   * Filters out invulnerable or untargetable entities like Crazy Dave's Lawnmowers.
+   */
+  _isValidCombatTarget(target) {
+    if (!target || target === this) return false;
+    if (target.isLawnmower || target.characterId === 'crazydave_lawnmower') return false;
+    if (target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
+    if (target.isDead || target.dead || target._hasDied) return false;
+    const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
+    if (target.hp <= 0 && !isReforming) return false;
+    if (target.vanishTimer && target.vanishTimer > 0) return false;
+    if (typeof this.isValidAimTarget === 'function' && !this.isValidAimTarget(target)) return false;
+    return true;
+  }
+
+  /**
+   * Universal helper: Finds the closest valid living enemy combatant.
+   */
+  _findClosestEnemy(preferredOpponent = null) {
+    if (preferredOpponent && preferredOpponent !== this && this._isValidCombatTarget(preferredOpponent)) {
+      const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0) : (this.team !== undefined ? this.team : null);
+      if (myTeam === null || (state.getFighterTeam && preferredOpponent.fighterIndex !== undefined ? state.getFighterTeam(preferredOpponent.fighterIndex) !== myTeam : preferredOpponent.team !== myTeam)) {
+        return preferredOpponent;
+      }
+    }
+
+    let closest = null;
+    let minDist = Infinity;
+    const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0) : (this.team !== undefined ? this.team : null);
+
+    if (state.fighters) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (f && f !== this && this._isValidCombatTarget(f)) {
+          const isEnemy = myTeam === null || (state.getFighterTeam ? state.getFighterTeam(i) !== myTeam : f.team !== this.team);
+          if (isEnemy) {
+            const d = Math.hypot((f.x || 0) - this.x, (f.y || 0) - this.y);
+            if (d < minDist) {
+              minDist = d;
+              closest = f;
+            }
+          }
+        }
+      }
+    }
+
+    if (state.illusions) {
+      for (let i = 0; i < state.illusions.length; i++) {
+        const ill = state.illusions[i];
+        if (ill && this._isValidCombatTarget(ill) && (ill.vanishTimer || 0) <= 0) {
+          let isEnemy = true;
+          if (myTeam !== null && ill.owner) {
+            const ownerIdx = state.fighters ? state.fighters.indexOf(ill.owner) : -1;
+            if (ownerIdx !== -1 && state.getFighterTeam) {
+              isEnemy = state.getFighterTeam(ownerIdx) !== myTeam;
+            }
+          }
+          if (isEnemy) {
+            const d = Math.hypot((ill.x || 0) - this.x, (ill.y || 0) - this.y);
+            if (d < minDist) {
+              minDist = d;
+              closest = ill;
+            }
+          }
+        }
+      }
+    }
+
+    return closest;
+  }
+
   _teleportToDomainAngle(opponent, arena) {
     return this._teleportToMeleeAngle(opponent, arena);
   }
@@ -2169,15 +2249,15 @@ export class GojoFighter extends Fighter {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
 
-    // Dynamic target selection in 1v2 / multi-enemy mode: always prioritize the closest living enemy
-    let activeTarget = opponent;
+    // Dynamic target selection in 1v2 / multi-enemy mode: always prioritize the closest living enemy (ignoring lawnmowers / untargetable entities)
+    let activeTarget = (opponent && this._isValidCombatTarget(opponent)) ? opponent : null;
     const myTeam = state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0);
-    let minDist = (activeTarget && activeTarget.hp > 0) ? Math.hypot(activeTarget.x - this.x, activeTarget.y - this.y) : Infinity;
+    let minDist = activeTarget ? Math.hypot(activeTarget.x - this.x, activeTarget.y - this.y) : Infinity;
 
     if (state.fighters && state.fighters.length > 1) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
-        if (f && f !== this && f.hp > 0) {
+        if (f && f !== this && this._isValidCombatTarget(f)) {
           const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
           if (isEnemy) {
             const d = Math.hypot(f.x - this.x, f.y - this.y);
@@ -2190,7 +2270,41 @@ export class GojoFighter extends Fighter {
       }
     }
 
+    // Also check valid illusions (like Rika)
+    if (state.illusions && state.illusions.length > 0) {
+      for (let i = 0; i < state.illusions.length; i++) {
+        const ill = state.illusions[i];
+        if (ill && this._isValidCombatTarget(ill) && (ill.vanishTimer || 0) <= 0) {
+          let isEnemy = true;
+          if (myTeam !== null && ill.owner) {
+            const ownerIdx = state.fighters ? state.fighters.indexOf(ill.owner) : -1;
+            if (ownerIdx !== -1 && state.getFighterTeam) {
+              isEnemy = state.getFighterTeam(ownerIdx) !== myTeam;
+            }
+          }
+          if (isEnemy) {
+            const d = Math.hypot(ill.x - this.x, ill.y - this.y);
+            if (d < minDist) {
+              minDist = d;
+              activeTarget = ill;
+            }
+          }
+        }
+      }
+    }
+
+    if (!activeTarget) {
+      activeTarget = typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null;
+    }
+
     opponent = activeTarget;
+
+    if (!opponent || !this._isValidCombatTarget(opponent)) {
+      this.isMeleeMode = false;
+      this.forcedMeleeTimer = 0;
+      this.meleeComboCount = 0;
+      return;
+    }
 
     const punchCooldown = CONFIG.gojo?.meleePunchCooldown ?? 10;
 
@@ -2252,27 +2366,34 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    this.resolveWallBounce(arena);
+    const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+    this.resolveWallBounce(currentArena);
   }
 
   /**
    * Teleports Gojo away to range when transitioning out of melee mode
    */
   _teleportAwayFrom(opponent, arena) {
-    if (!opponent || this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0) return;
+    const opp = (opponent && this._isValidCombatTarget(opponent))
+      ? opponent
+      : ((this.target && this._isValidCombatTarget(this.target))
+        ? this.target
+        : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
+    if (!opp || this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0) return;
     const oldX = this.x;
     const oldY = this.y;
 
-    const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5);
+    const angle = Math.atan2(this.y - opp.y, this.x - opp.x) + (Math.random() - 0.5);
     const dist = CONFIG.gojo.comboDisengageDistance ?? 300;
-    let targetX = opponent.x + Math.cos(angle) * dist;
-    let targetY = opponent.y + Math.sin(angle) * dist;
+    let targetX = opp.x + Math.cos(angle) * dist;
+    let targetY = opp.y + Math.sin(angle) * dist;
 
-    if (arena) {
-      if (arena.shape === 'circle') {
-        const acx = arena.x + arena.width / 2;
-        const acy = arena.y + arena.height / 2;
-        const ar = Math.max(10, (arena.radius || (arena.width / 2)) - this.r);
+    const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+    if (currentArena) {
+      if (currentArena.shape === 'circle') {
+        const acx = currentArena.x + currentArena.width / 2;
+        const acy = currentArena.y + currentArena.height / 2;
+        const ar = Math.max(10, (currentArena.radius || (currentArena.width / 2)) - this.r);
         const cdx = targetX - acx;
         const cdy = targetY - acy;
         const cdist = Math.hypot(cdx, cdy);
@@ -2281,8 +2402,8 @@ export class GojoFighter extends Fighter {
           targetY = acy + (cdy / cdist) * ar;
         }
       } else {
-        targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-        targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+        targetX = Math.max(currentArena.x + this.r, Math.min(currentArena.x + currentArena.width - this.r, targetX));
+        targetY = Math.max(currentArena.y + this.r, Math.min(currentArena.y + currentArena.height - this.r, targetY));
       }
     }
 
@@ -2316,9 +2437,9 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    this.aim(opponent);
-    if (opponent && !opponent.isDead && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
-      opponent.aim(this);
+    this.aim(opp);
+    if (opp && !opp.isDead && typeof opp.aim === 'function' && !opp.isTargetOfAmbush) {
+      opp.aim(this);
     }
 
     // Smooth mode switch to Ranged without freezing movement
@@ -2344,10 +2465,13 @@ export class GojoFighter extends Fighter {
   }
 
   aim(opponent) {
-    if (opponent) this.target = opponent;
+    if (opponent && this._isValidCombatTarget(opponent)) this.target = opponent;
     if (this.isChannelingDomainExpansion) {
-      this.gunAngle = Math.PI / 2;
-      this.angle = Math.PI / 2;
+      const lockedAngle = (this._domainChannelAngle !== undefined && Number.isFinite(this._domainChannelAngle))
+        ? this._domainChannelAngle
+        : (this.gunAngle || 0);
+      this.gunAngle = lockedAngle;
+      this.angle = lockedAngle;
       return false;
     }
     if (this.redDetonated && (this.redEffectTimer || 0) > 0) {
@@ -2373,12 +2497,12 @@ export class GojoFighter extends Fighter {
     // Auto-aim snaps instantaneously directly to the enemy target at any angle (0-frame snap, bypasses turn rate delays, stealth penalties, and channel inertia).
     if (this.domainActive) {
       const isReforming = Boolean(opponent && (opponent.isRevivingFromContract || opponent.isShatterReviving));
-      const target = (opponent && (!opponent.isDead || isReforming) && (opponent.hp > 0 || isReforming))
+      const target = (opponent && (this._isValidCombatTarget(opponent) || isReforming))
         ? opponent
-        : ((this.target && (!this.target.isDead || this.target.isRevivingFromContract || this.target.isShatterReviving) && (this.target.hp > 0 || this.target.isRevivingFromContract || this.target.isShatterReviving))
+        : ((this.target && (this._isValidCombatTarget(this.target) || isReforming))
           ? this.target
           : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null));
-      if (target && (!target.isDead || target.isRevivingFromContract || target.isShatterReviving) && (target.hp > 0 || target.isRevivingFromContract || target.isShatterReviving)) {
+      if (target && (this._isValidCombatTarget(target) || isReforming)) {
         this.target = target;
         const targetZ = target.z || 0;
         const myZ = this.z || 0;
@@ -2389,7 +2513,11 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    const aimTarget = opponent || this.target || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+    const aimTarget = (opponent && this._isValidCombatTarget(opponent))
+      ? opponent
+      : ((this.target && this._isValidCombatTarget(this.target))
+        ? this.target
+        : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
     return super.aim(aimTarget);
   }
 
@@ -2431,7 +2559,7 @@ export class GojoFighter extends Fighter {
     ];
 
     for (const ent of allEntities) {
-      if (!ent || ent.hp <= 0 || ent === this || (ent.invincibilityTimer || 0) > 0 || ent.owner === this) continue;
+      if (!ent || !this._isValidCombatTarget(ent) || ent === this || (ent.invincibilityTimer || 0) > 0 || ent.owner === this) continue;
 
       if (ent.owner) {
         const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
@@ -2457,7 +2585,7 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    if (validTargets.length === 0 && opponent && !opponent.isDead) {
+    if (validTargets.length === 0 && opponent && this._isValidCombatTarget(opponent)) {
       validTargets.push(opponent);
     }
 
@@ -2713,18 +2841,20 @@ export class GojoFighter extends Fighter {
     // Immediately freeze and interrupt channeling/counter skills on all entities in the arena
     this._applyDomainEffect();
 
+    const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+
     // Snap auto-aim to the enemy target immediately upon domain opening & flash-teleport to flank
-    const domainTarget = (this.target && !this.target.isDead && this.target.hp > 0)
+    const domainTarget = (this.target && this._isValidCombatTarget(this.target))
       ? this.target
       : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null);
-    if (domainTarget && !domainTarget.isDead && domainTarget.hp > 0) {
+    if (domainTarget && this._isValidCombatTarget(domainTarget)) {
       this.target = domainTarget;
       const targetZ = domainTarget.z || 0;
       const myZ = this.z || 0;
       const snapAngle = Math.atan2((domainTarget.y - targetZ) - (this.y - myZ), domainTarget.x - this.x);
       this.gunAngle = snapAngle;
       this.angle = snapAngle;
-      this._teleportToDomainAngle(domainTarget, arena);
+      this._teleportToDomainAngle(domainTarget, currentArena);
       this.meleePunchCooldown = 0;
     }
   }
@@ -2992,7 +3122,7 @@ export class GojoFighter extends Fighter {
     let bestDist = Infinity;
 
     for (const ent of candidates) {
-      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable) continue;
+      if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {
@@ -3055,7 +3185,7 @@ export class GojoFighter extends Fighter {
     let bestDist = Infinity;
 
     for (const ent of candidates) {
-      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable) continue;
+      if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {

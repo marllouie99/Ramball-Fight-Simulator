@@ -15,9 +15,13 @@ export function drawTacticalBullet(ctx, p) {
   const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
   const speed = Math.hypot(vx, vy);
 
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer && p.infinityFreezeTimer > 0));
+  const freezeTimer = p.infinityFreezeTimer || 0;
+  const fadeAlpha = (isFrozen && freezeTimer < 30 && freezeTimer > 0) ? Math.max(0, freezeTimer / 30) : 1.0;
+
   // Derive dynamic theme color from projectile or owner character
   const owner = (typeof p.owner === 'number' && typeof state !== 'undefined' && state.fighters) ? state.fighters[p.owner] : p.owner;
-  const themeColor = p.color || (owner ? (owner.themeColor || owner.color || owner._def?.color) : null) || '#00e5ff';
+  const themeColor = isFrozen ? '#00E5FF' : (p.color || (owner ? (owner.themeColor || owner.color || owner._def?.color) : null) || '#00e5ff');
 
   const bulletRadius = p.r || 4;
   const caliberScale = p.tacticalCaliberScale || (bulletRadius / 4.0);
@@ -32,6 +36,7 @@ export function drawTacticalBullet(ctx, p) {
     const len = pts.length;
 
     ctx.save();
+    ctx.globalAlpha = fadeAlpha;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
@@ -42,7 +47,7 @@ export function drawTacticalBullet(ctx, p) {
       const ratio = i / len; // 0 (oldest tail) -> 1 (head)
 
       // Outer Neon Theme Glow
-      ctx.globalAlpha = Math.pow(ratio, 1.4) * 0.70;
+      ctx.globalAlpha = Math.pow(ratio, 1.4) * 0.70 * fadeAlpha;
       ctx.strokeStyle = themeColor;
       ctx.lineWidth = Math.max(1.2, ratio * bulletHalfWidth * 2.4);
       ctx.beginPath();
@@ -51,7 +56,7 @@ export function drawTacticalBullet(ctx, p) {
       ctx.stroke();
 
       // Inner White-Hot Core Line
-      ctx.globalAlpha = Math.pow(ratio, 2.0) * 0.95;
+      ctx.globalAlpha = Math.pow(ratio, 2.0) * 0.95 * fadeAlpha;
       ctx.strokeStyle = '#ffffff';
       ctx.lineWidth = Math.max(0.8, ratio * bulletHalfWidth * 0.9);
       ctx.beginPath();
@@ -62,7 +67,7 @@ export function drawTacticalBullet(ctx, p) {
 
     // Connect last history point directly to current bullet head (p.x, p.y)
     const lastPt = pts[len - 1];
-    ctx.globalAlpha = 0.85;
+    ctx.globalAlpha = 0.85 * fadeAlpha;
     ctx.strokeStyle = themeColor;
     ctx.lineWidth = bulletHalfWidth * 2.4;
     ctx.beginPath();
@@ -70,7 +75,7 @@ export function drawTacticalBullet(ctx, p) {
     ctx.lineTo(p.x, p.y);
     ctx.stroke();
 
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = 1.0 * fadeAlpha;
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = bulletHalfWidth * 0.9;
     ctx.beginPath();
@@ -85,8 +90,21 @@ export function drawTacticalBullet(ctx, p) {
   // 2. LOCAL-SPACE AERODYNAMIC TRACER CAPSULE & KINETIC NOSE
   // ─────────────────────────────────────────────
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
+
+  if (isFrozen) {
+    // Electric Limitless Infinity Stasis Halo
+    const freezeHalo = ctx.createRadialGradient(0, 0, 1, 0, 0, 14 * caliberScale);
+    freezeHalo.addColorStop(0.0, 'rgba(0, 229, 255, 0.85)');
+    freezeHalo.addColorStop(0.5, 'rgba(56, 189, 248, 0.40)');
+    freezeHalo.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+    ctx.fillStyle = freezeHalo;
+    ctx.beginPath();
+    ctx.arc(0, 0, 14 * caliberScale, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Aerodynamic Speed Wedge (Behind bullet: -X)
   const localTrailLen = Math.min(32, Math.max(14, speed * 1.5)) * caliberScale;

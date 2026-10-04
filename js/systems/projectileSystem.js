@@ -218,6 +218,8 @@ class ProjectileSystem {
     p.isJohnWickBullet = false;
     p.isJohnWickShotgunPellet = false;
     p.isJohnWickRifleBullet = false;
+    p.isShotgun = false;
+    p.shotgunVolleyId = null;
     p.scale = undefined;
     p.visualScale = undefined;
     p.trailAlpha = undefined;
@@ -469,6 +471,7 @@ class ProjectileSystem {
     proj.lastAngle = calculatedAngle;
     proj.visual = visualType;
     proj.isSukunaSlash = (visualType === 'sukunaSlash' || visualType === 'sukunaCleave' || visualType === 'sukunaDismantleGrid' || visualType === 'ghostBlade' || (fighter && (fighter.characterId === 'sukuna' || fighter.type === 'sukuna')));
+    proj.isShotgun = (visualType === 'johnWickShotgunPellet' || visualType === 'EngineerBullet' || Boolean(proj.isShotgun));
     if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
     proj.historyMax = 10;
 

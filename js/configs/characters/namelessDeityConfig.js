@@ -6,7 +6,7 @@
 export const namelessDeityConfig = {
   id: 'namelessdeity',
   name: 'Nameless Deity',
-  displayName: 'NAMELESS DEITY',
+  displayName: 'DEITY',
   category: 'Gaming',
   bossTitle: 'Transcendent Cosmic Entity',
   title: 'Transcendent Cosmic Entity',

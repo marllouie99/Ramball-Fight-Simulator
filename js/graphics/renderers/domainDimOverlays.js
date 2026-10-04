@@ -5,6 +5,37 @@ import { isInsideRubbickStolenVoid } from '../../entities/fighters/rubbick/rubbi
 import { isTodoTakadaOverlayActive } from './specialOverlayRenderer.js';
 
 // ──────────────────────────────────────────
+// SAFE GRADIENT HELPERS (Non-finite / NaN immune)
+// ──────────────────────────────────────────
+export function createSafeRadialGradient(ctx, x0, y0, r0, x1, y1, r1) {
+  if (!ctx) return null;
+  const sx0 = Number.isFinite(x0) ? x0 : 0;
+  const sy0 = Number.isFinite(y0) ? y0 : 0;
+  const sr0 = Number.isFinite(r0) && r0 >= 0 ? r0 : 0;
+  const sx1 = Number.isFinite(x1) ? x1 : sx0;
+  const sy1 = Number.isFinite(y1) ? y1 : sy0;
+  const sr1 = Number.isFinite(r1) && r1 >= 0 ? r1 : Math.max(sr0 + 1, 100);
+  try {
+    return ctx.createRadialGradient(sx0, sy0, sr0, sx1, sy1, sr1);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function createSafeLinearGradient(ctx, x0, y0, x1, y1) {
+  if (!ctx) return null;
+  const sx0 = Number.isFinite(x0) ? x0 : 0;
+  const sy0 = Number.isFinite(y0) ? y0 : 0;
+  const sx1 = Number.isFinite(x1) ? x1 : sx0;
+  const sy1 = Number.isFinite(y1) ? y1 : sy0;
+  try {
+    return ctx.createLinearGradient(sx0, sy0, sx1, sy1);
+  } catch (e) {
+    return null;
+  }
+}
+
+// ──────────────────────────────────────────
 // GOJO INFINITY CUTOUT HELPER
 // ──────────────────────────────────────────
 export function excludeGojoInfinityFromDim(ctx) {
@@ -26,22 +57,24 @@ export function excludeGojoInfinityFromDim(ctx) {
     if (!isLimitlessActive) continue;
     
     const infinityR = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
-    const camZoom = (state.camera && state.camera.mode === 'dynamic') ? state.camera.zoom : 1.0;
-    const cutoutRadius = (infinityR + 25) * camZoom;
+    const camZoom = (state.camera && state.camera.mode === 'dynamic' && Number.isFinite(state.camera.zoom) && state.camera.zoom > 0) ? state.camera.zoom : 1.0;
+    const cutoutRadius = Math.max(1, (infinityR + 25) * camZoom);
     const screenPos = worldToScreen(f.x, f.y - (f.z || 0));
-    const drawX = screenPos.x;
-    const drawY = screenPos.y;
+    const drawX = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : (state.canvas ? state.canvas.width / 2 : 270);
+    const drawY = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : (state.canvas ? state.canvas.height / 2 : 480);
 
     ctx.save();
     ctx.globalCompositeOperation = 'destination-out';
-    const holeGrad = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, cutoutRadius);
-    holeGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
-    holeGrad.addColorStop(0.70, 'rgba(0, 0, 0, 0.85)');
-    holeGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = holeGrad;
-    ctx.beginPath();
-    ctx.arc(drawX, drawY, cutoutRadius, 0, Math.PI * 2);
-    ctx.fill();
+    const holeGrad = createSafeRadialGradient(ctx, drawX, drawY, 0, drawX, drawY, cutoutRadius);
+    if (holeGrad) {
+      holeGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+      holeGrad.addColorStop(0.70, 'rgba(0, 0, 0, 0.85)');
+      holeGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = holeGrad;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, cutoutRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 }
@@ -480,49 +513,55 @@ export function drawGojoDomainDimScreen() {
   }
 
   const opacity = currentGojoDomainDimOpacity;
-  const w = canvas.width;
-  const h = canvas.height;
+  const w = (canvas && Number.isFinite(canvas.width) && canvas.width > 0) ? canvas.width : 540;
+  const h = (canvas && Number.isFinite(canvas.height) && canvas.height > 0) ? canvas.height : 960;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // 1. Deep Abyssal Cosmic Void Linear Gradient Across Full Screen (Darker & Richer Multi-Stop Gradient)
-  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
-  linearGrad.addColorStop(0.0, `rgba(1, 2, 8, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-cosmic void top
-  linearGrad.addColorStop(0.18, `rgba(2, 6, 22, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark celestial midnight
-  linearGrad.addColorStop(0.35, `rgba(4, 14, 45, ${(opacity * 0.90).toFixed(3)})`);   // Dark astral navy
-  linearGrad.addColorStop(0.50, `rgba(6, 18, 55, ${(opacity * 0.87).toFixed(3)})`);   // Deep Limitless space center
-  linearGrad.addColorStop(0.65, `rgba(4, 14, 45, ${(opacity * 0.90).toFixed(3)})`);   // Dark astral navy
-  linearGrad.addColorStop(0.82, `rgba(2, 6, 22, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark celestial midnight
-  linearGrad.addColorStop(1.0, `rgba(1, 2, 8, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-cosmic void bottom
-
-  ctx.fillStyle = linearGrad;
-  ctx.fillRect(0, 0, w, h);
+  const linearGrad = createSafeLinearGradient(ctx, 0, 0, 0, h);
+  if (linearGrad) {
+    linearGrad.addColorStop(0.0, `rgba(1, 2, 8, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-cosmic void top
+    linearGrad.addColorStop(0.18, `rgba(2, 6, 22, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark celestial midnight
+    linearGrad.addColorStop(0.35, `rgba(4, 14, 45, ${(opacity * 0.90).toFixed(3)})`);   // Dark astral navy
+    linearGrad.addColorStop(0.50, `rgba(6, 18, 55, ${(opacity * 0.87).toFixed(3)})`);   // Deep Limitless space center
+    linearGrad.addColorStop(0.65, `rgba(4, 14, 45, ${(opacity * 0.90).toFixed(3)})`);   // Dark astral navy
+    linearGrad.addColorStop(0.82, `rgba(2, 6, 22, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark celestial midnight
+    linearGrad.addColorStop(1.0, `rgba(1, 2, 8, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-cosmic void bottom
+    ctx.fillStyle = linearGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 2. High-contrast celestial Limitless Eye / Cosmic Event Horizon Radial Gradient centered on Gojo
   const screenPos = gojoFighter ? worldToScreen(gojoFighter.x, gojoFighter.y - (gojoFighter.z || 0)) : { x: w / 2, y: h / 2 };
-  const cx = screenPos.x;
-  const cy = screenPos.y;
-  const maxDim = Math.max(w, h) * 0.92;
+  const cx = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : w / 2;
+  const cy = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : h / 2;
+  const maxDim = Math.max(10, Math.max(w, h) * 0.92);
 
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0.00, `rgba(0, 210, 255, ${(opacity * 0.50).toFixed(3)})`);       // Radiant electric limitless cyan core
-  grad.addColorStop(0.12, `rgba(0, 150, 245, ${(opacity * 0.42).toFixed(3)})`);       // Celestial azure halo
-  grad.addColorStop(0.28, `rgba(12, 70, 195, ${(opacity * 0.32).toFixed(3)})`);       // Deep royal blue ring
-  grad.addColorStop(0.48, `rgba(6, 35, 125, ${(opacity * 0.24).toFixed(3)})`);        // Dark stellar cobalt void
-  grad.addColorStop(0.72, `rgba(3, 15, 60, ${(opacity * 0.18).toFixed(3)})`);         // Deep astral space transition
-  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+  const grad = createSafeRadialGradient(ctx, cx, cy, 0, cx, cy, maxDim);
+  if (grad) {
+    grad.addColorStop(0.00, `rgba(0, 210, 255, ${(opacity * 0.50).toFixed(3)})`);       // Radiant electric limitless cyan core
+    grad.addColorStop(0.12, `rgba(0, 150, 245, ${(opacity * 0.42).toFixed(3)})`);       // Celestial azure halo
+    grad.addColorStop(0.28, `rgba(12, 70, 195, ${(opacity * 0.32).toFixed(3)})`);       // Deep royal blue ring
+    grad.addColorStop(0.48, `rgba(6, 35, 125, ${(opacity * 0.24).toFixed(3)})`);        // Dark stellar cobalt void
+    grad.addColorStop(0.72, `rgba(3, 15, 60, ${(opacity * 0.18).toFixed(3)})`);         // Deep astral space transition
+    grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 3. Dark Outer Edge Screen Corner Vignette (Deepens perimeter without blocking center)
-  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85);
-  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-  cornerGrad.addColorStop(0.60, `rgba(0, 2, 8, ${(opacity * 0.50).toFixed(3)})`);
-  cornerGrad.addColorStop(1.0, `rgba(0, 1, 4, ${(opacity * 0.85).toFixed(3)})`);
-  ctx.fillStyle = cornerGrad;
-  ctx.fillRect(0, 0, w, h);
+  const cornerR0 = Math.max(0, Math.min(w, h) * 0.35);
+  const cornerR1 = Math.max(cornerR0 + 1, Math.max(w, h) * 0.85);
+  const cornerGrad = createSafeRadialGradient(ctx, w / 2, h / 2, cornerR0, w / 2, h / 2, cornerR1);
+  if (cornerGrad) {
+    cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+    cornerGrad.addColorStop(0.60, `rgba(0, 2, 8, ${(opacity * 0.50).toFixed(3)})`);
+    cornerGrad.addColorStop(1.0, `rgba(0, 1, 4, ${(opacity * 0.85).toFixed(3)})`);
+    ctx.fillStyle = cornerGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 4. Clear arena interior with subtle edge vignette so Unlimited Void cosmic artwork is 100% visible
   if (gojoFighter && gojoFighter.domainActive) {
@@ -575,55 +614,60 @@ export function drawRubbickDomainDimScreen() {
   }
 
   const opacity = currentRubbickDomainDimOpacity;
-  const w = canvas.width;
-  const h = canvas.height;
+  const w = (canvas && Number.isFinite(canvas.width) && canvas.width > 0) ? canvas.width : 540;
+  const h = (canvas && Number.isFinite(canvas.height) && canvas.height > 0) ? canvas.height : 960;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // 1. Deep Abyssal Arcane Emerald Linear Gradient Across Full Screen
-  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
-  linearGrad.addColorStop(0.0, `rgba(1, 6, 2, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-green void top
-  linearGrad.addColorStop(0.18, `rgba(2, 18, 8, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark emerald midnight
-  linearGrad.addColorStop(0.35, `rgba(3, 35, 16, ${(opacity * 0.90).toFixed(3)})`);   // Dark arcane jade
-  linearGrad.addColorStop(0.50, `rgba(4, 48, 22, ${(opacity * 0.87).toFixed(3)})`);   // Deep stolen Unlimited Void center
-  linearGrad.addColorStop(0.65, `rgba(3, 35, 16, ${(opacity * 0.90).toFixed(3)})`);   // Dark arcane jade
-  linearGrad.addColorStop(0.82, `rgba(2, 18, 8, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark emerald midnight
-  linearGrad.addColorStop(1.0, `rgba(1, 6, 2, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-green void bottom
-
-  ctx.fillStyle = linearGrad;
-  ctx.fillRect(0, 0, w, h);
+  const linearGrad = createSafeLinearGradient(ctx, 0, 0, 0, h);
+  if (linearGrad) {
+    linearGrad.addColorStop(0.0, `rgba(1, 6, 2, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-green void top
+    linearGrad.addColorStop(0.18, `rgba(2, 18, 8, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark emerald midnight
+    linearGrad.addColorStop(0.35, `rgba(3, 35, 16, ${(opacity * 0.90).toFixed(3)})`);   // Dark arcane jade
+    linearGrad.addColorStop(0.50, `rgba(4, 48, 22, ${(opacity * 0.87).toFixed(3)})`);   // Deep stolen Unlimited Void center
+    linearGrad.addColorStop(0.65, `rgba(3, 35, 16, ${(opacity * 0.90).toFixed(3)})`);   // Dark arcane jade
+    linearGrad.addColorStop(0.82, `rgba(2, 18, 8, ${(opacity * 0.95).toFixed(3)})`);    // Deep dark emerald midnight
+    linearGrad.addColorStop(1.0, `rgba(1, 6, 2, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-green void bottom
+    ctx.fillStyle = linearGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 2. High-contrast Arcane Jade / Stolen Domain Horizon Radial Gradient centered on Rubbick
   const screenPos = rubbickFighter ? worldToScreen(rubbickFighter.x, rubbickFighter.y - (rubbickFighter.z || 0)) : { x: w / 2, y: h / 2 };
-  const cx = screenPos.x;
-  const cy = screenPos.y;
-  const maxDim = Math.max(w, h) * 0.92;
+  const cx = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : w / 2;
+  const cy = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : h / 2;
+  const maxDim = Math.max(10, Math.max(w, h) * 0.92);
 
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0.00, `rgba(0, 255, 140, ${(opacity * 0.50).toFixed(3)})`);       // Radiant arcane electric green core
-  grad.addColorStop(0.12, `rgba(0, 200, 100, ${(opacity * 0.42).toFixed(3)})`);       // Bright emerald halo
-  grad.addColorStop(0.28, `rgba(10, 140, 65, ${(opacity * 0.32).toFixed(3)})`);       // Deep mystic jade ring
-  grad.addColorStop(0.48, `rgba(5, 80, 35, ${(opacity * 0.24).toFixed(3)})`);         // Dark forest void
-  grad.addColorStop(0.72, `rgba(2, 35, 15, ${(opacity * 0.18).toFixed(3)})`);         // Deep arcane shadow transition
-  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+  const grad = createSafeRadialGradient(ctx, cx, cy, 0, cx, cy, maxDim);
+  if (grad) {
+    grad.addColorStop(0.00, `rgba(0, 255, 140, ${(opacity * 0.50).toFixed(3)})`);       // Radiant arcane electric green core
+    grad.addColorStop(0.12, `rgba(0, 200, 100, ${(opacity * 0.42).toFixed(3)})`);       // Bright emerald halo
+    grad.addColorStop(0.28, `rgba(10, 140, 65, ${(opacity * 0.32).toFixed(3)})`);       // Deep mystic jade ring
+    grad.addColorStop(0.48, `rgba(5, 80, 35, ${(opacity * 0.24).toFixed(3)})`);         // Dark forest void
+    grad.addColorStop(0.72, `rgba(2, 35, 15, ${(opacity * 0.18).toFixed(3)})`);         // Deep arcane shadow transition
+    grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 3. Dark Outer Edge Screen Corner Vignette
-  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85);
-  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-  cornerGrad.addColorStop(0.60, `rgba(0, 6, 2, ${(opacity * 0.50).toFixed(3)})`);
-  cornerGrad.addColorStop(1.0, `rgba(0, 3, 1, ${(opacity * 0.85).toFixed(3)})`);
-  ctx.fillStyle = cornerGrad;
-  ctx.fillRect(0, 0, w, h);
+  const cornerR0 = Math.max(0, Math.min(w, h) * 0.35);
+  const cornerR1 = Math.max(cornerR0 + 1, Math.max(w, h) * 0.85);
+  const cornerGrad = createSafeRadialGradient(ctx, w / 2, h / 2, cornerR0, w / 2, h / 2, cornerR1);
+  if (cornerGrad) {
+    cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+    cornerGrad.addColorStop(0.60, `rgba(0, 6, 2, ${(opacity * 0.50).toFixed(3)})`);
+    cornerGrad.addColorStop(1.0, `rgba(0, 3, 1, ${(opacity * 0.85).toFixed(3)})`);
+    ctx.fillStyle = cornerGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 4. Clear arena interior with subtle edge vignette so stolen domain artwork is 100% visible
   if (rubbickFighter && (rubbickFighter.stolenDomainActive || (rubbickFighter.domainActive && rubbickFighter.stolenType === 'gojo_domain'))) {
     applyDomainArenaVignetteCutout(ctx);
   }
-
 
   ctx.restore();
 
@@ -670,41 +714,44 @@ export function drawSukunaDomainDimScreen() {
   }
 
   const opacity = currentSukunaDomainDimOpacity;
-  const w = canvas.width;
-  const h = canvas.height;
+  const w = (canvas && Number.isFinite(canvas.width) && canvas.width > 0) ? canvas.width : 540;
+  const h = (canvas && Number.isFinite(canvas.height) && canvas.height > 0) ? canvas.height : 960;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // 1. Vertical gradient dim: Crimson Red (top) → Dark transition → Teal Cyan (bottom)
-  const dimGrad = ctx.createLinearGradient(0, 0, 0, h);
-  dimGrad.addColorStop(0.0, `rgba(8, 0, 2, ${(opacity * 0.96).toFixed(3)})`);      // Pitch black-red void (top)
-  dimGrad.addColorStop(0.15, `rgba(50, 3, 8, ${(opacity * 0.92).toFixed(3)})`);     // Deep dark crimson
-  dimGrad.addColorStop(0.30, `rgba(80, 5, 14, ${(opacity * 0.88).toFixed(3)})`);    // Sinister crimson cloud band
-  dimGrad.addColorStop(0.42, `rgba(35, 2, 6, ${(opacity * 0.93).toFixed(3)})`);     // Dark maroon transition
-  dimGrad.addColorStop(0.50, `rgba(4, 4, 8, ${(opacity * 0.95).toFixed(3)})`);      // Dark neutral crossover
-  dimGrad.addColorStop(0.58, `rgba(2, 12, 20, ${(opacity * 0.94).toFixed(3)})`);    // Dark teal transition
-  dimGrad.addColorStop(0.72, `rgba(2, 22, 35, ${(opacity * 0.92).toFixed(3)})`);    // Deep dark teal
-  dimGrad.addColorStop(0.88, `rgba(1, 16, 28, ${(opacity * 0.94).toFixed(3)})`);    // Abyssal dark cyan
-  dimGrad.addColorStop(1.0, `rgba(1, 6, 12, ${(opacity * 0.97).toFixed(3)})`);      // Pitch dark cyan floor (bottom)
-
-  ctx.fillStyle = dimGrad;
-  ctx.fillRect(0, 0, w, h);
+  const dimGrad = createSafeLinearGradient(ctx, 0, 0, 0, h);
+  if (dimGrad) {
+    dimGrad.addColorStop(0.0, `rgba(8, 0, 2, ${(opacity * 0.96).toFixed(3)})`);      // Pitch black-red void (top)
+    dimGrad.addColorStop(0.15, `rgba(50, 3, 8, ${(opacity * 0.92).toFixed(3)})`);     // Deep dark crimson
+    dimGrad.addColorStop(0.30, `rgba(80, 5, 14, ${(opacity * 0.88).toFixed(3)})`);    // Sinister crimson cloud band
+    dimGrad.addColorStop(0.42, `rgba(35, 2, 6, ${(opacity * 0.93).toFixed(3)})`);     // Dark maroon transition
+    dimGrad.addColorStop(0.50, `rgba(4, 4, 8, ${(opacity * 0.95).toFixed(3)})`);      // Dark neutral crossover
+    dimGrad.addColorStop(0.58, `rgba(2, 12, 20, ${(opacity * 0.94).toFixed(3)})`);    // Dark teal transition
+    dimGrad.addColorStop(0.72, `rgba(2, 22, 35, ${(opacity * 0.92).toFixed(3)})`);    // Deep dark teal
+    dimGrad.addColorStop(0.88, `rgba(1, 16, 28, ${(opacity * 0.94).toFixed(3)})`);    // Abyssal dark cyan
+    dimGrad.addColorStop(1.0, `rgba(1, 6, 12, ${(opacity * 0.97).toFixed(3)})`);      // Pitch dark cyan floor (bottom)
+    ctx.fillStyle = dimGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 2. Subtle radial lighter pocket centered on Sukuna (so the action area isn't completely crushed)
   const screenPos = sukunaFighter ? worldToScreen(sukunaFighter.x, sukunaFighter.y - (sukunaFighter.z || 0)) : { x: w / 2, y: h / 2 };
-  const cx = screenPos.x;
-  const cy = screenPos.y;
-  const maxDim = Math.max(w, h) * 0.85;
+  const cx = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : w / 2;
+  const cy = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : h / 2;
+  const maxDim = Math.max(10, Math.max(w, h) * 0.85);
 
   ctx.globalCompositeOperation = 'destination-out';
-  const clearGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  clearGrad.addColorStop(0.0, `rgba(0, 0, 0, ${(opacity * 0.12).toFixed(3)})`);
-  clearGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(opacity * 0.06).toFixed(3)})`);
-  clearGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
-  clearGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = clearGrad;
-  ctx.fillRect(0, 0, w, h);
+  const clearGrad = createSafeRadialGradient(ctx, cx, cy, 0, cx, cy, maxDim);
+  if (clearGrad) {
+    clearGrad.addColorStop(0.0, `rgba(0, 0, 0, ${(opacity * 0.12).toFixed(3)})`);
+    clearGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(opacity * 0.06).toFixed(3)})`);
+    clearGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+    clearGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = clearGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
   ctx.globalCompositeOperation = 'source-over';
 
   // 3. Clear arena interior with subtle edge vignette so Malevolent Shrine artwork is 100% visible
@@ -756,49 +803,55 @@ export function drawYutaDomainDimScreen() {
   }
 
   const opacity = currentYutaDomainDimOpacity;
-  const w = canvas.width;
-  const h = canvas.height;
+  const w = (canvas && Number.isFinite(canvas.width) && canvas.width > 0) ? canvas.width : 540;
+  const h = (canvas && Number.isFinite(canvas.height) && canvas.height > 0) ? canvas.height : 960;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // 1. Deep Abyssal Crimson-Void Linear Gradient Across Full Screen matching Yuta's PNG domain backdrop
-  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
-  linearGrad.addColorStop(0.0, `rgba(8, 8, 8, ${(opacity * 0.98).toFixed(3)})`);         // Pitch obsidian top
-  linearGrad.addColorStop(0.18, `rgba(24, 4, 18, ${(opacity * 0.95).toFixed(3)})`);      // Deep dark crimson-burgundy
-  linearGrad.addColorStop(0.35, `rgba(53, 7, 25, ${(opacity * 0.90).toFixed(3)})`);      // Dark authentic wine void
-  linearGrad.addColorStop(0.50, `rgba(90, 4, 28, ${(opacity * 0.88).toFixed(3)})`);      // Rich cursed plum-magenta center
-  linearGrad.addColorStop(0.65, `rgba(53, 7, 25, ${(opacity * 0.90).toFixed(3)})`);      // Dark authentic wine void
-  linearGrad.addColorStop(0.82, `rgba(24, 4, 18, ${(opacity * 0.95).toFixed(3)})`);      // Deep dark crimson-burgundy
-  linearGrad.addColorStop(1.0, `rgba(8, 8, 8, ${(opacity * 0.98).toFixed(3)})`);         // Pitch obsidian bottom
-
-  ctx.fillStyle = linearGrad;
-  ctx.fillRect(0, 0, w, h);
+  const linearGrad = createSafeLinearGradient(ctx, 0, 0, 0, h);
+  if (linearGrad) {
+    linearGrad.addColorStop(0.0, `rgba(8, 8, 8, ${(opacity * 0.98).toFixed(3)})`);         // Pitch obsidian top
+    linearGrad.addColorStop(0.18, `rgba(24, 4, 18, ${(opacity * 0.95).toFixed(3)})`);      // Deep dark crimson-burgundy
+    linearGrad.addColorStop(0.35, `rgba(53, 7, 25, ${(opacity * 0.90).toFixed(3)})`);      // Dark authentic wine void
+    linearGrad.addColorStop(0.50, `rgba(90, 4, 28, ${(opacity * 0.88).toFixed(3)})`);      // Rich cursed plum-magenta center
+    linearGrad.addColorStop(0.65, `rgba(53, 7, 25, ${(opacity * 0.90).toFixed(3)})`);      // Dark authentic wine void
+    linearGrad.addColorStop(0.82, `rgba(24, 4, 18, ${(opacity * 0.95).toFixed(3)})`);      // Deep dark crimson-burgundy
+    linearGrad.addColorStop(1.0, `rgba(8, 8, 8, ${(opacity * 0.98).toFixed(3)})`);         // Pitch obsidian bottom
+    ctx.fillStyle = linearGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 2. High-contrast cursed Authentic Mutual Love Radial Aura centered on Yuta matching PNG color highlights
   const screenPos = yutaFighter ? worldToScreen(yutaFighter.x, yutaFighter.y - (yutaFighter.z || 0)) : { x: w / 2, y: h / 2 };
-  const cx = screenPos.x;
-  const cy = screenPos.y;
-  const maxDim = Math.max(w, h) * 0.92;
+  const cx = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : w / 2;
+  const cy = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : h / 2;
+  const maxDim = Math.max(10, Math.max(w, h) * 0.92);
 
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0.00, `rgba(193, 0, 70, ${(opacity * 0.52).toFixed(3)})`);       // Radiant cursed authentic ruby core (#c10046)
-  grad.addColorStop(0.14, `rgba(151, 3, 54, ${(opacity * 0.44).toFixed(3)})`);       // Deep crimson-rose halo (#970336)
-  grad.addColorStop(0.30, `rgba(107, 8, 53, ${(opacity * 0.34).toFixed(3)})`);       // Rich dark wine-plum ring (#6b0835)
-  grad.addColorStop(0.52, `rgba(53, 7, 25, ${(opacity * 0.24).toFixed(3)})`);        // Dark burgundy void (#350719)
-  grad.addColorStop(0.75, `rgba(24, 8, 20, ${(opacity * 0.16).toFixed(3)})`);        // Deep shadow transition (#180814)
-  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                        // Outer boundary blend
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+  const grad = createSafeRadialGradient(ctx, cx, cy, 0, cx, cy, maxDim);
+  if (grad) {
+    grad.addColorStop(0.00, `rgba(193, 0, 70, ${(opacity * 0.52).toFixed(3)})`);       // Radiant cursed authentic ruby core (#c10046)
+    grad.addColorStop(0.14, `rgba(151, 3, 54, ${(opacity * 0.44).toFixed(3)})`);       // Deep crimson-rose halo (#970336)
+    grad.addColorStop(0.30, `rgba(107, 8, 53, ${(opacity * 0.34).toFixed(3)})`);       // Rich dark wine-plum ring (#6b0835)
+    grad.addColorStop(0.52, `rgba(53, 7, 25, ${(opacity * 0.24).toFixed(3)})`);        // Dark burgundy void (#350719)
+    grad.addColorStop(0.75, `rgba(24, 8, 20, ${(opacity * 0.16).toFixed(3)})`);        // Deep shadow transition (#180814)
+    grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                        // Outer boundary blend
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 3. Dark Outer Edge Screen Corner Vignette (Deepens perimeter without blocking the arena)
-  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85);
-  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-  cornerGrad.addColorStop(0.60, `rgba(8, 2, 6, ${(opacity * 0.50).toFixed(3)})`);
-  cornerGrad.addColorStop(1.0, `rgba(8, 8, 8, ${(opacity * 0.88).toFixed(3)})`);
-  ctx.fillStyle = cornerGrad;
-  ctx.fillRect(0, 0, w, h);
+  const cornerR0 = Math.max(0, Math.min(w, h) * 0.35);
+  const cornerR1 = Math.max(cornerR0 + 1, Math.max(w, h) * 0.85);
+  const cornerGrad = createSafeRadialGradient(ctx, w / 2, h / 2, cornerR0, w / 2, h / 2, cornerR1);
+  if (cornerGrad) {
+    cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+    cornerGrad.addColorStop(0.60, `rgba(8, 2, 6, ${(opacity * 0.50).toFixed(3)})`);
+    cornerGrad.addColorStop(1.0, `rgba(8, 8, 8, ${(opacity * 0.88).toFixed(3)})`);
+    ctx.fillStyle = cornerGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 4. Clear arena interior so domain artwork and all corner foliage sprites are 100% visible
   if (yutaFighter && (yutaFighter.domainActive || yutaFighter.isChannelingDomain)) {
@@ -849,47 +902,53 @@ export function drawMahitoDomainDimScreen() {
   }
 
   const opacity = currentMahitoDomainDimOpacity;
-  const w = canvas.width;
-  const h = canvas.height;
+  const w = (canvas && Number.isFinite(canvas.width) && canvas.width > 0) ? canvas.width : 540;
+  const h = (canvas && Number.isFinite(canvas.height) && canvas.height > 0) ? canvas.height : 960;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // 1. Deep Abyssal Black-Violet Linear Gradient Across Screen
-  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
-  linearGrad.addColorStop(0.0, `rgba(4, 0, 6, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-violet void top
-  linearGrad.addColorStop(0.2, `rgba(18, 2, 24, ${(opacity * 0.94).toFixed(3)})`);    // Dark cursed plum
-  linearGrad.addColorStop(0.5, `rgba(28, 4, 36, ${(opacity * 0.90).toFixed(3)})`);    // Sinister transfigured violet mid
-  linearGrad.addColorStop(0.8, `rgba(14, 2, 20, ${(opacity * 0.95).toFixed(3)})`);    // Deep shadow blend
-  linearGrad.addColorStop(1.0, `rgba(3, 0, 5, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-violet void bottom
-
-  ctx.fillStyle = linearGrad;
-  ctx.fillRect(0, 0, w, h);
+  const linearGrad = createSafeLinearGradient(ctx, 0, 0, 0, h);
+  if (linearGrad) {
+    linearGrad.addColorStop(0.0, `rgba(4, 0, 6, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-violet void top
+    linearGrad.addColorStop(0.2, `rgba(18, 2, 24, ${(opacity * 0.94).toFixed(3)})`);    // Dark cursed plum
+    linearGrad.addColorStop(0.5, `rgba(28, 4, 36, ${(opacity * 0.90).toFixed(3)})`);    // Sinister transfigured violet mid
+    linearGrad.addColorStop(0.8, `rgba(14, 2, 20, ${(opacity * 0.95).toFixed(3)})`);    // Deep shadow blend
+    linearGrad.addColorStop(1.0, `rgba(3, 0, 5, ${(opacity * 0.98).toFixed(3)})`);      // Pitch black-violet void bottom
+    ctx.fillStyle = linearGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 2. High-contrast cursed soul / transfigured flesh radial gradient centered on Mahito
   const screenPos = mahitoFighter ? worldToScreen(mahitoFighter.x, mahitoFighter.y - (mahitoFighter.z || 0)) : { x: w / 2, y: h / 2 };
-  const cx = screenPos.x;
-  const cy = screenPos.y;
-  const maxDim = Math.max(w, h) * 0.92;
+  const cx = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : w / 2;
+  const cy = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : h / 2;
+  const maxDim = Math.max(10, Math.max(w, h) * 0.92);
 
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0.00, `rgba(217, 70, 239, ${(opacity * 0.50).toFixed(3)})`);      // Radiant transfigured magenta-violet core
-  grad.addColorStop(0.12, `rgba(168, 85, 247, ${(opacity * 0.42).toFixed(3)})`);      // Cursed soul violet halo
-  grad.addColorStop(0.28, `rgba(107, 33, 168, ${(opacity * 0.35).toFixed(3)})`);      // Deep royal cursed purple
-  grad.addColorStop(0.50, `rgba(59, 7, 100, ${(opacity * 0.25).toFixed(3)})`);        // Dark plum shadow
-  grad.addColorStop(0.75, `rgba(20, 2, 32, ${(opacity * 0.15).toFixed(3)})`);         // Abyssal transition
-  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
-
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+  const grad = createSafeRadialGradient(ctx, cx, cy, 0, cx, cy, maxDim);
+  if (grad) {
+    grad.addColorStop(0.00, `rgba(217, 70, 239, ${(opacity * 0.50).toFixed(3)})`);      // Radiant transfigured magenta-violet core
+    grad.addColorStop(0.12, `rgba(168, 85, 247, ${(opacity * 0.42).toFixed(3)})`);      // Cursed soul violet halo
+    grad.addColorStop(0.28, `rgba(107, 33, 168, ${(opacity * 0.35).toFixed(3)})`);      // Deep royal cursed purple
+    grad.addColorStop(0.50, `rgba(59, 7, 100, ${(opacity * 0.25).toFixed(3)})`);        // Dark plum shadow
+    grad.addColorStop(0.75, `rgba(20, 2, 32, ${(opacity * 0.15).toFixed(3)})`);         // Abyssal transition
+    grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer edge blend
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 3. Dark Outer Edge Screen Vignette
-  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.35, w / 2, h / 2, Math.max(w, h) * 0.85);
-  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-  cornerGrad.addColorStop(0.5, `rgba(6, 1, 10, ${(opacity * 0.35).toFixed(3)})`);
-  cornerGrad.addColorStop(1.0, `rgba(2, 0, 4, ${(opacity * 0.85).toFixed(3)})`);
-  ctx.fillStyle = cornerGrad;
-  ctx.fillRect(0, 0, w, h);
+  const cornerR0 = Math.max(0, Math.min(w, h) * 0.35);
+  const cornerR1 = Math.max(cornerR0 + 1, Math.max(w, h) * 0.85);
+  const cornerGrad = createSafeRadialGradient(ctx, w / 2, h / 2, cornerR0, w / 2, h / 2, cornerR1);
+  if (cornerGrad) {
+    cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+    cornerGrad.addColorStop(0.5, `rgba(6, 1, 10, ${(opacity * 0.35).toFixed(3)})`);
+    cornerGrad.addColorStop(1.0, `rgba(2, 0, 4, ${(opacity * 0.85).toFixed(3)})`);
+    ctx.fillStyle = cornerGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
 
   // 4. Clear arena interior with smooth edge vignette so woven hands domain background stands out prominently
   if (mahitoFighter && (mahitoFighter.domainActive || mahitoFighter._mahitoDomainActive)) {

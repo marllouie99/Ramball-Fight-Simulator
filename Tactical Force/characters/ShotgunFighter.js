@@ -52,6 +52,7 @@ export class ShotgunFighter extends TacticalBaseFighter {
     const baseSpeed = (CONFIG.projectile?.speed || 7) * (this._def?.projectileSpeedMultiplier || cfg.projectileSpeedMultiplier || 2.1) * globalMult;
     const dmgPerPellet = cfg.damagePerPellet || this.damage || 18;
 
+    const shotgunVolleyId = `tac_sg_${Date.now()}_${Math.random()}`;
     for (let i = 0; i < pelletCount; i++) {
       const spreadOffset = (i / (pelletCount - 1) - 0.5) * spreadAngle + (Math.random() - 0.5) * 0.04;
       const pelletAngle = fireAngle + spreadOffset;
@@ -65,7 +66,9 @@ export class ShotgunFighter extends TacticalBaseFighter {
         radius: cfg.bulletRadius || 3.8,
         life: cfg.bulletLife || 55,
         caliberScale: 0.85,
-        historyMax: 8
+        historyMax: 8,
+        isShotgun: true,
+        shotgunVolleyId
       });
     }
   }

@@ -964,10 +964,15 @@ export class JohnWickFighter extends Fighter {
         const baseSpeed = cfg.shotgunPelletSpeed || 23.0;
         const pelletDmg = cfg.shotgunPelletDamage || 3;
 
+        const shotgunVolleyId = `jw_sg_${Date.now()}_${Math.random()}`;
         for (let k = 0; k < pelletCount; k++) {
           const pelletAngle = angle + (Math.random() - 0.5) * spreadArc;
           const pelletSpeed = baseSpeed * (0.92 + Math.random() * 0.16);
-          projectileSystem.fireProjectile(this, ownerIndex, pelletDmg, false, pelletSpeed, false, 'johnWickShotgunPellet', spawnX, spawnY, pelletAngle);
+          const p = projectileSystem.fireProjectile(this, ownerIndex, pelletDmg, false, pelletSpeed, false, 'johnWickShotgunPellet', spawnX, spawnY, pelletAngle);
+          if (p) {
+            p.isShotgun = true;
+            p.shotgunVolleyId = shotgunVolleyId;
+          }
         }
       }
 

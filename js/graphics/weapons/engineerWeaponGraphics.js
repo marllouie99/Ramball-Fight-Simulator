@@ -587,7 +587,7 @@ function _getTurretCoreGrad(ctx) {
  * Draws Engineer's Shotgun Buckshot Tracer Bullet (matching John Wick's gun projectile style).
  */
 export function drawEngineerBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio = 1.0) {
-  let bx, by, bAngle, bScale, bLife, bHistory;
+  let bx, by, bAngle, bScale, bLife, bHistory, isFrozen = false, freezeTimer = 0;
   if (typeof xOrObj === 'object' && xOrObj !== null) {
     bx = xOrObj.x;
     by = xOrObj.y;
@@ -597,6 +597,8 @@ export function drawEngineerBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio
     bScale = xOrObj.scale || 1.0;
     bLife = Math.max(0.4, (xOrObj.life || 40) / (xOrObj.maxLife || 40));
     bHistory = xOrObj.history;
+    isFrozen = Boolean(xOrObj.isFrozenByInfinity || (xOrObj.infinityFreezeTimer && xOrObj.infinityFreezeTimer > 0));
+    freezeTimer = xOrObj.infinityFreezeTimer || 0;
   } else {
     bx = xOrObj;
     by = y;
@@ -608,42 +610,65 @@ export function drawEngineerBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio
 
   const len = 14 * bScale;
   const width = 3.6 * bScale;
+  const fadeAlpha = (isFrozen && freezeTimer < 30 && freezeTimer > 0) ? Math.max(0, freezeTimer / 30) : 1.0;
 
-  // 1. Persistent World-Space Tracer Trail (using projectile path history - exactly like John Wick)
+  // 1. Persistent World-Space Tracer Trail (using projectile path history)
   if (bHistory && bHistory.length > 1) {
     ctx.save();
-    // Outer golden-amber glow line
+    ctx.globalAlpha = fadeAlpha;
+    // Outer glow line
     ctx.beginPath();
     ctx.moveTo(bHistory[0].x, bHistory[0].y);
     for (let i = 1; i < bHistory.length; i++) {
       ctx.lineTo(bHistory[i].x, bHistory[i].y);
     }
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
+    ctx.strokeStyle = isFrozen ? 'rgba(0, 229, 255, 0.50)' : 'rgba(245, 158, 11, 0.45)';
     ctx.lineWidth = 2.0 * bScale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // Inner hot-yellow highlight line on latest segments
+    // Inner highlight line on latest segments
     const sliceCount = Math.max(1, bHistory.length - 4);
     ctx.beginPath();
     ctx.moveTo(bHistory[sliceCount - 1].x, bHistory[sliceCount - 1].y);
     for (let i = sliceCount; i < bHistory.length; i++) {
       ctx.lineTo(bHistory[i].x, bHistory[i].y);
     }
-    ctx.strokeStyle = 'rgba(254, 240, 138, 0.85)';
+    ctx.strokeStyle = isFrozen ? 'rgba(224, 247, 255, 0.90)' : 'rgba(254, 240, 138, 0.85)';
     ctx.lineWidth = 1.0 * bScale;
     ctx.stroke();
     ctx.restore();
   }
 
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(bx, by);
   ctx.rotate(bAngle);
 
+  if (isFrozen) {
+    // Electric Limitless Infinity Stasis Halo
+    const freezeHalo = ctx.createRadialGradient(0, 0, 1, 0, 0, 12 * bScale);
+    freezeHalo.addColorStop(0.0, 'rgba(0, 229, 255, 0.85)');
+    freezeHalo.addColorStop(0.5, 'rgba(56, 189, 248, 0.40)');
+    freezeHalo.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+    ctx.fillStyle = freezeHalo;
+    ctx.beginPath();
+    ctx.arc(0, 0, 12 * bScale, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // 2. High-speed Motion Trail (Fading gradient streak trailing backward)
   const trailLen = 32 * bScale;
-  ctx.fillStyle = _getEngBulletTrailGrad(ctx);
+  if (isFrozen) {
+    const frozenTrailGrad = ctx.createLinearGradient(-trailLen, 0, 0, 0);
+    frozenTrailGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+    frozenTrailGrad.addColorStop(0.55, 'rgba(0, 229, 255, 0.45)');
+    frozenTrailGrad.addColorStop(1.0, 'rgba(224, 247, 255, 0.95)');
+    ctx.fillStyle = frozenTrailGrad;
+  } else {
+    ctx.fillStyle = _getEngBulletTrailGrad(ctx);
+  }
   ctx.beginPath();
   ctx.moveTo(-trailLen, 0);
   ctx.lineTo(-len / 2, -width * 0.85);
@@ -652,9 +677,18 @@ export function drawEngineerBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio
   ctx.closePath();
   ctx.fill();
 
-  // 3. Copper/Gold Bullet Core (Sharp aerodynamic metal jacket bullet)
-  ctx.fillStyle = _getEngBulletCoreGrad(ctx);
-  ctx.strokeStyle = '#78350F';
+  // 3. Bullet Core (Sharp aerodynamic metal jacket bullet)
+  if (isFrozen) {
+    const frozenCoreGrad = ctx.createLinearGradient(-7, 0, 7, 0);
+    frozenCoreGrad.addColorStop(0, '#0284C7');    // Deep icy blue base
+    frozenCoreGrad.addColorStop(0.55, '#00E5FF'); // Radiant electric limitless cyan
+    frozenCoreGrad.addColorStop(1.0, '#E0F7FF');  // Brilliant white-cyan tip
+    ctx.fillStyle = frozenCoreGrad;
+    ctx.strokeStyle = '#0369A1';
+  } else {
+    ctx.fillStyle = _getEngBulletCoreGrad(ctx);
+    ctx.strokeStyle = '#78350F';
+  }
   ctx.lineWidth = 0.8 * bScale;
 
   ctx.beginPath();
@@ -687,7 +721,7 @@ export function drawEngineerBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio
  * Draws Turret Bullet (matching John Wick's gun projectile style).
  */
 export function drawTurretBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio = 1.0) {
-  let bx, by, bAngle, bScale, bLife, bHistory;
+  let bx, by, bAngle, bScale, bLife, bHistory, isFrozen = false, freezeTimer = 0;
   if (typeof xOrObj === 'object' && xOrObj !== null) {
     bx = xOrObj.x;
     by = xOrObj.y;
@@ -697,6 +731,8 @@ export function drawTurretBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio =
     bScale = xOrObj.scale || 1.0;
     bLife = Math.max(0.4, (xOrObj.life || 40) / (xOrObj.maxLife || 40));
     bHistory = xOrObj.history;
+    isFrozen = Boolean(xOrObj.isFrozenByInfinity || (xOrObj.infinityFreezeTimer && xOrObj.infinityFreezeTimer > 0));
+    freezeTimer = xOrObj.infinityFreezeTimer || 0;
   } else {
     bx = xOrObj;
     by = y;
@@ -708,17 +744,19 @@ export function drawTurretBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio =
 
   const len = 16 * bScale;
   const width = 3.8 * bScale;
+  const fadeAlpha = (isFrozen && freezeTimer < 30 && freezeTimer > 0) ? Math.max(0, freezeTimer / 30) : 1.0;
 
-  // 1. Persistent World-Space Tracer Trail (using projectile path history - exactly like John Wick)
+  // 1. Persistent World-Space Tracer Trail (using projectile path history)
   if (bHistory && bHistory.length > 1) {
     ctx.save();
-    // Outer fiery-amber glow line
+    ctx.globalAlpha = fadeAlpha;
+    // Outer glow line
     ctx.beginPath();
     ctx.moveTo(bHistory[0].x, bHistory[0].y);
     for (let i = 1; i < bHistory.length; i++) {
       ctx.lineTo(bHistory[i].x, bHistory[i].y);
     }
-    ctx.strokeStyle = 'rgba(249, 115, 22, 0.50)';
+    ctx.strokeStyle = isFrozen ? 'rgba(0, 229, 255, 0.55)' : 'rgba(249, 115, 22, 0.50)';
     ctx.lineWidth = 2.2 * bScale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -731,19 +769,40 @@ export function drawTurretBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio =
     for (let i = sliceCount; i < bHistory.length; i++) {
       ctx.lineTo(bHistory[i].x, bHistory[i].y);
     }
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+    ctx.strokeStyle = isFrozen ? 'rgba(224, 247, 255, 0.95)' : 'rgba(255, 255, 255, 0.95)';
     ctx.lineWidth = 1.2 * bScale;
     ctx.stroke();
     ctx.restore();
   }
 
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(bx, by);
   ctx.rotate(bAngle);
 
+  if (isFrozen) {
+    // Electric Limitless Infinity Stasis Halo
+    const freezeHalo = ctx.createRadialGradient(0, 0, 1, 0, 0, 14 * bScale);
+    freezeHalo.addColorStop(0.0, 'rgba(0, 229, 255, 0.85)');
+    freezeHalo.addColorStop(0.5, 'rgba(56, 189, 248, 0.40)');
+    freezeHalo.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+    ctx.fillStyle = freezeHalo;
+    ctx.beginPath();
+    ctx.arc(0, 0, 14 * bScale, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // 2. High-speed Supersonic Motion Trail (Fading gradient streak trailing backward)
   const trailLen = 36 * bScale;
-  ctx.fillStyle = _getTurretTrailGrad(ctx);
+  if (isFrozen) {
+    const frozenTrailGrad = ctx.createLinearGradient(-trailLen, 0, 0, 0);
+    frozenTrailGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+    frozenTrailGrad.addColorStop(0.50, 'rgba(0, 229, 255, 0.50)');
+    frozenTrailGrad.addColorStop(1.0, 'rgba(224, 247, 255, 0.95)');
+    ctx.fillStyle = frozenTrailGrad;
+  } else {
+    ctx.fillStyle = _getTurretTrailGrad(ctx);
+  }
   ctx.beginPath();
   ctx.moveTo(-trailLen, 0);
   ctx.lineTo(-len / 2, -width * 0.85);
@@ -752,9 +811,18 @@ export function drawTurretBullet(ctx, xOrObj, y, angle, scale = 1.0, lifeRatio =
   ctx.closePath();
   ctx.fill();
 
-  // 3. 7.62mm Armor-Piercing Bullet Core (Copper base, brass body, green penetrator tip)
-  ctx.fillStyle = _getTurretCoreGrad(ctx);
-  ctx.strokeStyle = '#78350F';
+  // 3. 7.62mm Armor-Piercing Bullet Core (Copper base, brass body, green penetrator tip / Frozen cyan)
+  if (isFrozen) {
+    const frozenCoreGrad = ctx.createLinearGradient(-8, 0, 8, 0);
+    frozenCoreGrad.addColorStop(0, '#0284C7');    // Deep icy blue base
+    frozenCoreGrad.addColorStop(0.60, '#00E5FF'); // Radiant electric cyan middle
+    frozenCoreGrad.addColorStop(1.0, '#E0F7FF');  // Bright white-cyan penetrator tip
+    ctx.fillStyle = frozenCoreGrad;
+    ctx.strokeStyle = '#0369A1';
+  } else {
+    ctx.fillStyle = _getTurretCoreGrad(ctx);
+    ctx.strokeStyle = '#78350F';
+  }
   ctx.lineWidth = 0.8 * bScale;
 
   ctx.beginPath();

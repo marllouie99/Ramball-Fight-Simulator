@@ -981,13 +981,44 @@ export function drawPeaBullet(ctx, p) {
   const y = p.y || 0;
   const r = p.r || 6.0;
 
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer && p.infinityFreezeTimer > 0));
+  const freezeTimer = p.infinityFreezeTimer || 0;
+  const fadeAlpha = (isFrozen && freezeTimer < 30 && freezeTimer > 0) ? Math.max(0, freezeTimer / 30) : 1.0;
+
   const projImg = getPeaProjSprite();
   const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
 
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(x, y);
 
-  if (hasImg) {
+  if (isFrozen) {
+    // Electric Limitless Infinity Stasis Halo
+    const freezeHalo = ctx.createRadialGradient(0, 0, 1, 0, 0, r + 8);
+    freezeHalo.addColorStop(0.0, 'rgba(0, 229, 255, 0.90)');
+    freezeHalo.addColorStop(0.45, 'rgba(56, 189, 248, 0.45)');
+    freezeHalo.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+    ctx.fillStyle = freezeHalo;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Solid Frozen Ice-Blue Pea Core
+    ctx.fillStyle = '#00E5FF';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#0284C7';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Specular icy highlight
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (hasImg) {
     const frameIdx = Math.floor(Math.abs(p.life || 0) / 3) % PEA_PROJ_RECTS.length;
     const frame = PEA_PROJ_RECTS[frameIdx] || PEA_PROJ_RECTS[0];
     const size = r * 2.4;
@@ -1029,13 +1060,42 @@ export function drawSnowPeaBullet(ctx, p) {
   const y = p.y || 0;
   const r = p.r || 6.0;
 
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer && p.infinityFreezeTimer > 0));
+  const freezeTimer = p.infinityFreezeTimer || 0;
+  const fadeAlpha = (isFrozen && freezeTimer < 30 && freezeTimer > 0) ? Math.max(0, freezeTimer / 30) : 1.0;
+
   const projImg = getSnowPeaProjSprite();
   const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
 
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(x, y);
 
-  if (hasImg) {
+  if (isFrozen) {
+    // Electric Limitless Cyan Stasis Halo
+    const freezeHalo = ctx.createRadialGradient(0, 0, 1, 0, 0, r + 9);
+    freezeHalo.addColorStop(0.0, 'rgba(0, 229, 255, 0.95)');
+    freezeHalo.addColorStop(0.5, 'rgba(56, 189, 248, 0.50)');
+    freezeHalo.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+    ctx.fillStyle = freezeHalo;
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 9, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#00E5FF';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = '#0369A1';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.38, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (hasImg) {
     const frameIdx = Math.floor(Math.abs(p.life || 0) / 3) % SNOWPEA_PROJ_RECTS.length;
     const frame = SNOWPEA_PROJ_RECTS[frameIdx] || SNOWPEA_PROJ_RECTS[0];
     const size = r * 2.4;
@@ -1208,6 +1268,10 @@ export function drawFirePeaBullet(ctx, p) {
   const y = p.y || 0;
   const r = p.r || 6.0;
 
+  const isFrozen = Boolean(p.isFrozenByInfinity || (p.infinityFreezeTimer && p.infinityFreezeTimer > 0));
+  const freezeTimer = p.infinityFreezeTimer || 0;
+  const fadeAlpha = (isFrozen && freezeTimer < 30 && freezeTimer > 0) ? Math.max(0, freezeTimer / 30) : 1.0;
+
   // Determine trajectory angle
   let angle = 0;
   if (p.angle !== undefined) {
@@ -1220,46 +1284,77 @@ export function drawFirePeaBullet(ctx, p) {
   const hasImg = Boolean(projImg && projImg.complete && projImg.naturalWidth > 0);
 
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(x, y);
 
-  // Fiery ambient halo (Zero shadowBlur - Rule 2.2)
-  const haloR = r + 8;
-  const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, haloR);
-  halo.addColorStop(0, 'rgba(251, 191, 36, 0.85)');
-  halo.addColorStop(0.35, 'rgba(249, 115, 22, 0.5)');
-  halo.addColorStop(0.7, 'rgba(239, 68, 68, 0.2)');
-  halo.addColorStop(1, 'rgba(220, 38, 38, 0)');
-  ctx.fillStyle = halo;
-  ctx.beginPath();
-  ctx.arc(0, 0, haloR, 0, Math.PI * 2);
-  ctx.fill();
+  if (isFrozen) {
+    // Limitless Stasis Ambient Halo in Radiant Electric Cyan
+    const haloR = r + 10;
+    const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, haloR);
+    halo.addColorStop(0, 'rgba(0, 229, 255, 0.90)');
+    halo.addColorStop(0.35, 'rgba(56, 189, 248, 0.55)');
+    halo.addColorStop(0.7, 'rgba(2, 132, 199, 0.25)');
+    halo.addColorStop(1, 'rgba(2, 132, 199, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Rotate to align with trajectory
-  ctx.rotate(angle);
+    // Solid Frozen Cyan Core
+    ctx.fillStyle = '#00E5FF';
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.1, 0, Math.PI * 2);
+    ctx.fill();
 
-  if (hasImg) {
-    // 6-step animated pulse cycle (2 frames per step)
-    const tick = (p.animTick !== undefined) ? p.animTick : (p.life !== undefined ? Math.abs(1000 - p.life) : 0);
-    const stepIdx = Math.floor(tick / 2) % FIRE_PEA_FRAME_SEQUENCE.length;
-    const frameIdx = FIRE_PEA_FRAME_SEQUENCE[stepIdx];
-    const frame = FIRE_PEA_RECTS[frameIdx] || FIRE_PEA_RECTS[0];
+    ctx.strokeStyle = '#0284C7';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
 
-    const aspect = frame.sw / (frame.sh || 1);
-    const drawHeight = r * 4.4;
-    const drawWidth = drawHeight * aspect;
-
-    // Flip horizontally so the round fireball head leads forward (+X) and flame trail trails behind (-X)
-    ctx.scale(-1, 1);
-
-    // In the raw sprite, the head center is around 26% from the left edge.
-    // Offsetting X by -drawWidth * 0.26 anchors the head center precisely at (0, 0).
-    ctx.drawImage(
-      projImg,
-      frame.sx, frame.sy, frame.sw, frame.sh,
-      -drawWidth * 0.26, -drawHeight * 0.5, drawWidth, drawHeight
-    );
+    // Glint
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
   } else {
-    _drawProceduralFirePeaBullet(ctx, r);
+    // Fiery ambient halo (Zero shadowBlur - Rule 2.2)
+    const haloR = r + 8;
+    const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, haloR);
+    halo.addColorStop(0, 'rgba(251, 191, 36, 0.85)');
+    halo.addColorStop(0.35, 'rgba(249, 115, 22, 0.5)');
+    halo.addColorStop(0.7, 'rgba(239, 68, 68, 0.2)');
+    halo.addColorStop(1, 'rgba(220, 38, 38, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, haloR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Rotate to align with trajectory
+    ctx.rotate(angle);
+
+    if (hasImg) {
+      // 6-step animated pulse cycle (2 frames per step)
+      const tick = (p.animTick !== undefined) ? p.animTick : (p.life !== undefined ? Math.abs(1000 - p.life) : 0);
+      const stepIdx = Math.floor(tick / 2) % FIRE_PEA_FRAME_SEQUENCE.length;
+      const frameIdx = FIRE_PEA_FRAME_SEQUENCE[stepIdx];
+      const frame = FIRE_PEA_RECTS[frameIdx] || FIRE_PEA_RECTS[0];
+
+      const aspect = frame.sw / (frame.sh || 1);
+      const drawHeight = r * 4.4;
+      const drawWidth = drawHeight * aspect;
+
+      // Flip horizontally so the round fireball head leads forward (+X) and flame trail trails behind (-X)
+      ctx.scale(-1, 1);
+
+      // In the raw sprite, the head center is around 26% from the left edge.
+      // Offsetting X by -drawWidth * 0.26 anchors the head center precisely at (0, 0).
+      ctx.drawImage(
+        projImg,
+        frame.sx, frame.sy, frame.sw, frame.sh,
+        -drawWidth * 0.26, -drawHeight * 0.5, drawWidth, drawHeight
+      );
+    } else {
+      _drawProceduralFirePeaBullet(ctx, r);
+    }
   }
 
   ctx.restore();

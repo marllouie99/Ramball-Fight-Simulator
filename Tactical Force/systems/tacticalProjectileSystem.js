@@ -252,6 +252,8 @@ export class TacticalProjectileSystem {
     p.fadingOut = false;
     p.fadingAlpha = 1.0;
     p._bounceCooldown = 0;
+    p.isShotgun = Boolean(options.isShotgun);
+    p.shotgunVolleyId = options.shotgunVolleyId || null;
 
     // 1. Clamp muzzle spawn point against arena boundaries
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;

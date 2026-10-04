@@ -3172,6 +3172,28 @@ async function runInteractionTests() {
     assert(mahoragaTest.adaptationDashTimer === 0, 'Adapted Mahoraga must NOT trigger adaptation dash/teleport on Lawnmower');
     state.fighters = [];
 
+    // 8d. Test Gojo in Melee Mode ignores Lawnmower: Gojo must never target, teleport to, aim at, or punch Lawnmowers in melee mode
+    const gojoMeleeTest = new FIGHTER_CLASS_MAP.gojo({ radius: 25, x: 200, y: 200, hp: 350 });
+    const gojoMower = new LawnmowerEntity(220, 200, dave, 1, 0); // Very close to Gojo (20px away)
+    dave.x = 500; dave.y = 200; // Dave is 300px away
+    state.fighters = [dave, gojoMeleeTest, gojoMower];
+    state.arena = testArena;
+
+    // Force Gojo into melee mode
+    gojoMeleeTest.isMeleeMode = true;
+    gojoMeleeTest.forcedMeleeTimer = 120;
+    gojoMeleeTest.meleePunchCooldown = 0;
+    gojoMeleeTest.meleeComboCount = 0;
+
+    // Run Gojo update in melee mode
+    gojoMeleeTest.update(dave, 1, testArena);
+
+    // Target must NOT be the lawnmower
+    assert(gojoMeleeTest.target !== gojoMower, 'Gojo must NOT target the Lawnmower in Melee Mode');
+    assert(gojoMeleeTest._isValidCombatTarget(gojoMower) === false, 'Gojo _isValidCombatTarget must return false for Lawnmowers');
+    assert(gojoMeleeTest.target === dave, 'Gojo in Melee Mode must target Crazy Dave instead of Lawnmower');
+    state.fighters = [];
+
     // 9. Test Mower despawn upon driving past arena boundary
     targetMower.x = targetMower.facingDirection === 1
       ? testArena.x + testArena.width + 100
@@ -3730,12 +3752,17 @@ async function runInteractionTests() {
     assert(sans.hp === 1, `Sans must dodge Fuga explosion and remain at 1 HP (got ${sans.hp})`);
     assert(sans.burnTimer === 0, `Sans must NOT receive burn effect after dodging Fuga (got ${sans.burnTimer})`);
 
+    // 14. Verify Sans Gaster Blaster Initial Cooldown
+    sans.reset();
+    const expectedInitBlasterCd = sansConfig.initialBlasterCooldown !== undefined ? sansConfig.initialBlasterCooldown : 180;
+    assert(sans.blasterCooldown === expectedInitBlasterCd, `Sans Gaster Blaster must start on initial cooldown (${expectedInitBlasterCd} frames, got ${sans.blasterCooldown})`);
+
     // Verify canvas stack depth during dodge state
     mockCtx.resetStackDepth();
     sans.draw(mockCtx);
     assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during domain slice dodge state must be 0');
 
-    console.log('      ✅ Sans Undertale speech bubbles, warning box, Heart Shatter defeat VFX, faah suppression, in-arena overlay HP, skill bars & Sukuna domain slice line dodges verified.');
+    console.log('      ✅ Sans Undertale speech bubbles, warning box, Heart Shatter defeat VFX, faah suppression, in-arena overlay HP, skill bars, initial blaster cooldown & Sukuna domain slice line dodges verified.');
   }
 
   console.log('───────────────────────────────────────────────────────');

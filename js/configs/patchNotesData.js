@@ -30,40 +30,59 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "SANS",
+        "character": "GOJO",
         "deltas": [
             {
-                "type": "NERF",
-                "key": "hp",
-                "oldVal": 240,
-                "newVal": 1,
-                "pct": "-99.6%"
-            },
-            {
                 "type": "ADJUST",
-                "key": "speed",
-                "oldVal": "5.2",
-                "newVal": "4.0",
+                "key": "infinityFreezeChance",
+                "oldVal": "0.5",
+                "newVal": "1.0",
                 "pct": "Mod"
             },
             {
+                "type": "BUFF",
+                "key": "redDamage",
+                "oldVal": 100,
+                "newVal": 200,
+                "pct": "+100.0%"
+            }
+        ]
+    },
+    {
+        "character": "NAMELESSDEITY",
+        "deltas": [
+            {
                 "type": "ADJUST",
-                "key": "damageNumberColor",
-                "oldVal": "#00F5FF",
-                "newVal": "#03d5f1ff",
+                "key": "displayName",
+                "oldVal": "NAMELESS DEITY",
+                "newVal": "DEITY",
                 "pct": "Mod"
             }
         ]
     },
     {
-        "character": "SUKUNA",
+        "character": "SANS",
         "deltas": [
             {
                 "type": "NERF",
-                "key": "divineFlameCooldown",
-                "oldVal": 1500,
-                "newVal": 2500,
-                "pct": "+66.7%"
+                "key": "blasterCarouselDamage",
+                "oldVal": 30,
+                "newVal": 20,
+                "pct": "-33.3%"
+            },
+            {
+                "type": "NERF",
+                "key": "blasterRingDamage",
+                "oldVal": 30,
+                "newVal": 20,
+                "pct": "-33.3%"
+            },
+            {
+                "type": "NERF",
+                "key": "blasterGigaDamage",
+                "oldVal": 50,
+                "newVal": 30,
+                "pct": "-40.0%"
             }
         ]
     }

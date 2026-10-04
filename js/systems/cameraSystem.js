@@ -309,15 +309,25 @@ export function updateCamera() {
       let maxX = -Infinity;
       let minY = Infinity;
       let maxY = -Infinity;
+      let validCombatantsCount = 0;
 
       for (const f of aliveFighters) {
+        if (!f || !Number.isFinite(f.x) || !Number.isFinite(f.y)) continue;
         const fx = f.x;
         const fy = f.y - (f.z ? f.z * 0.35 : 0);
-        const r = f.r || 22;
+        const r = Number.isFinite(f.r) ? f.r : 22;
         if (fx - r < minX) minX = fx - r;
         if (fx + r > maxX) maxX = fx + r;
         if (fy - r < minY) minY = fy - r;
         if (fy + r > maxY) maxY = fy + r;
+        validCombatantsCount++;
+      }
+
+      if (validCombatantsCount === 0 || !Number.isFinite(minX) || !Number.isFinite(maxX)) {
+        minX = arenaCenterX - 100;
+        maxX = arenaCenterX + 100;
+        minY = arenaCenterY - 100;
+        maxY = arenaCenterY + 100;
       }
 
       const envelopeMidX = (minX + maxX) / 2;
@@ -326,8 +336,8 @@ export function updateCamera() {
       const spanY = Math.max(60, maxY - minY);
       const diagDist = Math.hypot(spanX, spanY);
 
-      let midX = envelopeMidX;
-      let midY = envelopeMidY;
+      let midX = Number.isFinite(envelopeMidX) ? envelopeMidX : arenaCenterX;
+      let midY = Number.isFinite(envelopeMidY) ? envelopeMidY : arenaCenterY;
 
       const is1v2 = Boolean(
         state.mode === 'Boss Battle' ||
@@ -340,22 +350,25 @@ export function updateCamera() {
       if (is1v2) {
         const boss = aliveFighters.find(f => f === state.fighters?.[0] || f.isBoss || f.fighterIndex === 0) || aliveFighters[0];
         const challengers = aliveFighters.filter(f => f !== boss);
-        if (boss && challengers.length > 0) {
+        if (boss && challengers.length > 0 && Number.isFinite(boss.x) && Number.isFinite(boss.y)) {
           let closestCh = challengers[0];
           let minDistSq = Infinity;
           for (const ch of challengers) {
+            if (!ch || !Number.isFinite(ch.x) || !Number.isFinite(ch.y)) continue;
             const dSq = (ch.x - boss.x) ** 2 + (ch.y - boss.y) ** 2;
             if (dSq < minDistSq) {
               minDistSq = dSq;
               closestCh = ch;
             }
           }
-          const clashMidX = (boss.x + closestCh.x) / 2;
-          const clashMidY = ((boss.y - (boss.z ? boss.z * 0.35 : 0)) + (closestCh.y - (closestCh.z ? closestCh.z * 0.35 : 0))) / 2;
+          if (closestCh && Number.isFinite(closestCh.x) && Number.isFinite(closestCh.y)) {
+            const clashMidX = (boss.x + closestCh.x) / 2;
+            const clashMidY = ((boss.y - (boss.z ? boss.z * 0.35 : 0)) + (closestCh.y - (closestCh.z ? closestCh.z * 0.35 : 0))) / 2;
 
-          // Keep the full envelope firmly centered while adding subtle focus to active clash point
-          midX = envelopeMidX * 0.85 + clashMidX * 0.15;
-          midY = envelopeMidY * 0.85 + clashMidY * 0.15;
+            // Keep the full envelope firmly centered while adding subtle focus to active clash point
+            midX = envelopeMidX * 0.85 + clashMidX * 0.15;
+            midY = envelopeMidY * 0.85 + clashMidY * 0.15;
+          }
         }
       }
 
@@ -381,17 +394,20 @@ export function updateCamera() {
 
       // Blend: dynamic smooth distance zoom constrained by envelope viewport fit
       const calculatedZoom = Math.min(distanceZoom, envelopeFit);
-      camera.targetZoom = Math.max(minZ, Math.min(maxZ, calculatedZoom));
+      const safeTargetZoom = Math.max(minZ, Math.min(maxZ, calculatedZoom));
+      camera.targetZoom = Number.isFinite(safeTargetZoom) ? safeTargetZoom : 1.0;
 
       // Smoothly pan camera to track combat centroid
-      camera.targetX = Math.max(minCamX, Math.min(maxCamX, midX));
-      camera.targetY = Math.max(minCamY, Math.min(maxCamY, midY));
+      const safeMidX = Number.isFinite(midX) ? midX : arenaCenterX;
+      const safeMidY = Number.isFinite(midY) ? midY : arenaCenterY;
+      camera.targetX = Math.max(minCamX, Math.min(maxCamX, safeMidX));
+      camera.targetY = Math.max(minCamY, Math.min(maxCamY, safeMidY));
 
     } else if (aliveFighters.length === 1) {
       // Winner focus during victory or solo stance
       const winner = aliveFighters[0];
-      const winX = winner.x;
-      const winY = winner.y - (winner.z ? winner.z * 0.35 : 0);
+      const winX = Number.isFinite(winner.x) ? winner.x : arenaCenterX;
+      const winY = Number.isFinite(winner.y) ? (winner.y - (winner.z ? winner.z * 0.35 : 0)) : arenaCenterY;
 
       camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
       camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));
@@ -413,6 +429,14 @@ export function updateCamera() {
     posSmoothing = Math.min(0.85, baseSmoothing + catchup);
   }
 
+  // Defensive fallback against NaN in camera positions
+  if (!Number.isFinite(camera.targetX)) camera.targetX = arenaCenterX;
+  if (!Number.isFinite(camera.targetY)) camera.targetY = arenaCenterY;
+  if (!Number.isFinite(camera.x)) camera.x = arenaCenterX;
+  if (!Number.isFinite(camera.y)) camera.y = arenaCenterY;
+  if (!Number.isFinite(camera.targetZoom)) camera.targetZoom = 1.0;
+  if (!Number.isFinite(camera.zoom)) camera.zoom = 1.0;
+
   camera.x += (camera.targetX - camera.x) * posSmoothing;
   camera.y += (camera.targetY - camera.y) * posSmoothing;
 
@@ -426,26 +450,29 @@ export function updateCamera() {
 export function applyCameraToCtx(ctx) {
   const cam = state.camera;
   const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
-  const arenaCenterX = arena.x + arena.width / 2;
-  const arenaCenterY = arena.y + arena.height / 2;
-  const screenCenterX = state.canvas.width / 2;
+  const arenaCenterX = (arena.x || 0) + (arena.width || 450) / 2;
+  const arenaCenterY = (arena.y || 0) + (arena.height || 450) / 2;
+  const screenCenterX = (state.canvas && Number.isFinite(state.canvas.width)) ? (state.canvas.width / 2) : 270;
   const screenCenterY = arenaCenterY;
 
   const isDynamic = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
   const isZooming = Boolean(cam && Math.abs((cam.zoom || 1.0) - 1.0) > 0.0005);
 
   if (isDynamic || isZooming) {
-    const camX = cam ? cam.x : arenaCenterX;
-    const camY = cam ? cam.y : arenaCenterY;
-    const camZoom = cam ? cam.zoom : 1.0;
-    ctx.translate(screenCenterX + (cam?.shakeX || 0), screenCenterY + (cam?.shakeY || 0));
+    const camX = (cam && Number.isFinite(cam.x)) ? cam.x : arenaCenterX;
+    const camY = (cam && Number.isFinite(cam.y)) ? cam.y : arenaCenterY;
+    const camZoom = (cam && Number.isFinite(cam.zoom) && cam.zoom > 0) ? cam.zoom : 1.0;
+    const shakeX = (cam && Number.isFinite(cam.shakeX)) ? cam.shakeX : 0;
+    const shakeY = (cam && Number.isFinite(cam.shakeY)) ? cam.shakeY : 0;
+
+    ctx.translate(screenCenterX + shakeX, screenCenterY + shakeY);
     ctx.scale(camZoom, camZoom);
     ctx.translate(-camX, -camY);
   } else {
     // Fixed camera mode (still supports screen shake)
-    const shakeX = (cam ? cam.shakeX : state.shakeX) || 0;
-    const shakeY = (cam ? cam.shakeY : state.shakeY) || 0;
-    if (shakeX !== 0 || shakeY !== 0) {
+    const shakeX = ((cam ? cam.shakeX : state.shakeX) || 0);
+    const shakeY = ((cam ? cam.shakeY : state.shakeY) || 0);
+    if (Number.isFinite(shakeX) && Number.isFinite(shakeY) && (shakeX !== 0 || shakeY !== 0)) {
       ctx.translate(shakeX, shakeY);
     }
   }
@@ -459,23 +486,32 @@ export function applyCameraToCtx(ctx) {
 export function worldToScreen(worldX, worldY) {
   const cam = state.camera;
   const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
-  const arenaCenterX = arena.x + arena.width / 2;
-  const arenaCenterY = arena.y + arena.height / 2;
-  const screenCenterX = state.canvas ? (state.canvas.width / 2) : 270;
+  const arenaCenterX = (arena.x || 0) + (arena.width || 450) / 2;
+  const arenaCenterY = (arena.y || 0) + (arena.height || 450) / 2;
+  const screenCenterX = (state.canvas && Number.isFinite(state.canvas.width)) ? (state.canvas.width / 2) : 270;
   const screenCenterY = arenaCenterY;
+
+  const safeWorldX = Number.isFinite(worldX) ? worldX : arenaCenterX;
+  const safeWorldY = Number.isFinite(worldY) ? worldY : arenaCenterY;
 
   const isDynamic = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
   const isZooming = Boolean(cam && Math.abs((cam.zoom || 1.0) - 1.0) > 0.0005);
 
   if (isDynamic || isZooming) {
-    const camX = cam ? cam.x : arenaCenterX;
-    const camY = cam ? cam.y : arenaCenterY;
-    const camZoom = cam ? cam.zoom : 1.0;
-    const sx = screenCenterX + (worldX - camX) * camZoom;
-    const sy = screenCenterY + (worldY - camY) * camZoom;
-    return { x: sx, y: sy };
+    const camX = (cam && Number.isFinite(cam.x)) ? cam.x : arenaCenterX;
+    const camY = (cam && Number.isFinite(cam.y)) ? cam.y : arenaCenterY;
+    const camZoom = (cam && Number.isFinite(cam.zoom) && cam.zoom > 0) ? cam.zoom : 1.0;
+    const sx = screenCenterX + (safeWorldX - camX) * camZoom;
+    const sy = screenCenterY + (safeWorldY - camY) * camZoom;
+    return { 
+      x: Number.isFinite(sx) ? sx : screenCenterX, 
+      y: Number.isFinite(sy) ? sy : screenCenterY 
+    };
   } else {
-    return { x: worldX, y: worldY };
+    return { 
+      x: Number.isFinite(safeWorldX) ? safeWorldX : screenCenterX, 
+      y: Number.isFinite(safeWorldY) ? safeWorldY : screenCenterY 
+    };
   }
 }
 

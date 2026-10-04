@@ -28,7 +28,7 @@ export const gojoConfig = {
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact
   infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
   infinityRadius: 80,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
-  infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
+  infinityFreezeChance: 1.0,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
   infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
   infinityMeleePushForce: 0,               // No pushback impulse on barrier contact; slows movement instead
   infinitySlowDuration: 20,                // Duration in frames (~0.33s) of movement slow on barrier contact
@@ -61,7 +61,7 @@ export const gojoConfig = {
   // ── 3. Skill: Cursed Technique Reversal: Red ──
   enableRed: true,                         // Master toggle for Skill: Reversal Red
   redCooldown: 1000,         // Cooldown of Red (frames)
-  redDamage: 100,           // Base damage dealt by Reversal Red blast
+  redDamage: 200,           // Base damage dealt by Reversal Red blast
   redKnockback: 10,         // Supersonic knockback force of Red
   redRange: 650,            // Base range
   redFrontalReach: 650,     // Long frontal reach corridor in pixels

@@ -68,13 +68,16 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
     // 1. Gaster Blaster (Signature Skill / Skill 1)
     if (isSkillEnabled(cfg.enableGasterBlaster, true)) {
-      const blasterMax = cfg.blasterCooldown || 500;
+      const blasterMax = cfg.blasterCooldown || 320;
       const blasterTimer = f.blasterCooldown !== undefined ? f.blasterCooldown : 0;
-      const blasterPct = Math.max(0, Math.min(100, (1 - (blasterTimer / blasterMax)) * 100));
+      const effectiveMax = Math.max(blasterMax, blasterTimer);
+      const blasterPct = Math.max(0, Math.min(100, (1 - (blasterTimer / effectiveMax)) * 100));
+      const staminaCost = cfg.blasterStaminaCost !== undefined ? cfg.blasterStaminaCost : 25;
+      const hasStamina = (f.stamina === undefined || f.stamina >= staminaCost);
       skills.push({
         id: 'blaster',
         pct: blasterPct,
-        ready: blasterPct >= 99 && blasterTimer <= 0,
+        ready: blasterPct >= 99 && blasterTimer <= 0 && hasStamina,
         color: themeColor,
         label: 'GASTER BLASTER',
         isSignature: true,

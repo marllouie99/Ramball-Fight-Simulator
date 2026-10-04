@@ -5,11 +5,15 @@
 
 ## 🥊 Fighter Stat Modifications
 
-### SANS
-* **🔴 NERF** `hp`: `240` ➔ `1` (-99.6%)
-* **🔄 ADJUST** `speed`: `5.2` ➔ `4.0` (Mod)
-* **🔄 ADJUST** `damageNumberColor`: `#00F5FF` ➔ `#03d5f1ff` (Mod)
+### GOJO
+* **🔄 ADJUST** `infinityFreezeChance`: `0.5` ➔ `1.0` (Mod)
+* **🟢 BUFF** `redDamage`: `100` ➔ `200` (+100.0%)
 
-### SUKUNA
-* **🔴 NERF** `divineFlameCooldown`: `1500` ➔ `2500` (+66.7%)
+### NAMELESSDEITY
+* **🔄 ADJUST** `displayName`: `NAMELESS DEITY` ➔ `DEITY` (Mod)
+
+### SANS
+* **🔴 NERF** `blasterCarouselDamage`: `30` ➔ `20` (-33.3%)
+* **🔴 NERF** `blasterRingDamage`: `30` ➔ `20` (-33.3%)
+* **🔴 NERF** `blasterGigaDamage`: `50` ➔ `30` (-40.0%)
 

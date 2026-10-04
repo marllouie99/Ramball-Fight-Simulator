@@ -52,6 +52,7 @@ export class SansFighter extends Fighter {
     // Passive 1: Dodge Stamina System (replaces healthbar in HUD)
     this.stamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
     this.maxStamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
+    this.staminaRegenDelayTimer = 0;
     this.dodgeCooldown = 0;
     this.afterImages = [];
 
@@ -59,7 +60,10 @@ export class SansFighter extends Fighter {
     this.karmaTargets = new Map(); // target -> { stacks, timer, tickTimer }
 
     // Skill 1: Gaster Blasters
-    this.blasterCooldown = 0;
+    const initBlasterCd = (cfg.initialBlasterCooldown !== undefined)
+      ? cfg.initialBlasterCooldown
+      : ((cfg.blasterInitialCooldown !== undefined) ? cfg.blasterInitialCooldown : 180);
+    this.blasterCooldown = initBlasterCd;
     this.gasterBlasters = [];
 
     // Skill 2: Bone Zone & Traps
@@ -97,6 +101,11 @@ export class SansFighter extends Fighter {
         signature: true,
         cooldownKey: 'blasterCooldown',
         cooldownMax: () => (CONFIG.sans?.blasterCooldown ?? sansConfig.blasterCooldown),
+        canCast: (fighter) => {
+          const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+          const cost = cfg.blasterStaminaCost !== undefined ? cfg.blasterStaminaCost : 25;
+          return (fighter.stamina !== undefined ? fighter.stamina : 100) >= cost;
+        },
         color: this.themeColor,
         icon: '💀',
         onActivate: (fighter, opponent) => {
@@ -139,9 +148,21 @@ export class SansFighter extends Fighter {
     this.hp = this.maxHp;
     this.stamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
     this.maxStamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
+    this.staminaRegenDelayTimer = 0;
 
     this.dodgeCooldown = 0;
-    this.blasterCooldown = 0;
+    this._shotgunDodgeGraceTimer = 0;
+    this._lastShotgunDodgeFrame = -1;
+    this._lastShotgunDodgeAttacker = null;
+    if (this._dodgedVolleyIds && typeof this._dodgedVolleyIds.clear === 'function') {
+      this._dodgedVolleyIds.clear();
+    } else {
+      this._dodgedVolleyIds = new Set();
+    }
+    const initBlasterCd = (cfg.initialBlasterCooldown !== undefined)
+      ? cfg.initialBlasterCooldown
+      : ((cfg.blasterInitialCooldown !== undefined) ? cfg.blasterInitialCooldown : 180);
+    this.blasterCooldown = initBlasterCd;
     this.boneZoneCooldown = 0;
     this.gravitySlamCooldown = 0;
     this.isBadTimeActive = false;
@@ -429,6 +450,7 @@ export class SansFighter extends Fighter {
 
     // Deduct stamina and set dodge cooldown
     this.stamina -= staminaCost;
+    this.staminaRegenDelayTimer = (cfg.dodgeStaminaRegenDelay !== undefined) ? cfg.dodgeStaminaRegenDelay : 50;
     this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 0;
 
     const startX = this.x;
@@ -551,9 +573,51 @@ export class SansFighter extends Fighter {
     const cooldownReady = (this.dodgeCooldown <= 0) || (cfg.dodgeCooldown === 0);
     const canDodge = cfg.enableTeleportDodge && !isFrozen && hasStamina && cooldownReady && rollsDodge;
 
+    const proj = options.projectile;
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : ((Date.now() / 16.6) | 0);
+
+    const isShotgunPellet = Boolean(
+      proj && (
+        proj.isShotgun ||
+        proj.shotgunVolleyId ||
+        proj.visual === 'johnWickShotgunPellet' ||
+        proj.visual === 'EngineerBullet' ||
+        (options.isTacticalBullet && attacker && (attacker.characterId === 'shotgun' || attacker.characterId === 'spas12' || attacker._def?.type === 'spas12'))
+      )
+    );
+
+    // Multi-projectile / Shotgun Volley Check:
+    // When a shotgun blast or multi-projectile volley fires, dodging one pellet dodges the blast as a single attack.
+    // Subsequent pellets from the same volley or hitting within the shotgun dodge grace window cost 0 stamina.
+    const isAlreadyDodgedVolley = Boolean(
+      (proj && proj.shotgunVolleyId && this._dodgedVolleyIds && this._dodgedVolleyIds.has(proj.shotgunVolleyId)) ||
+      (proj && proj.shotPairId && this._dodgedVolleyIds && this._dodgedVolleyIds.has(proj.shotPairId)) ||
+      (isShotgunPellet && (
+        (this._lastShotgunDodgeFrame === currentFrame) ||
+        (this._shotgunDodgeGraceTimer > 0 && this._lastShotgunDodgeAttacker === attacker)
+      ))
+    );
+
+    if (isAlreadyDodgedVolley && (!options.bypassDodge || isDomainSlash)) {
+      // Free dodge! Sans already executed the teleport dodge maneuver for this shotgun blast / volley.
+      return 0;
+    }
+
     if (canDodge && (!options.bypassDodge || isDomainSlash)) {
       this.stamina -= staminaCost;
+      this.staminaRegenDelayTimer = (cfg.dodgeStaminaRegenDelay !== undefined) ? cfg.dodgeStaminaRegenDelay : 50;
       this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 0;
+
+      // Track shotgun / multi-projectile volley so remaining pellets from this shot cost 0 stamina
+      if (isShotgunPellet || (proj && proj.shotPairId)) {
+        if (!this._dodgedVolleyIds) this._dodgedVolleyIds = new Set();
+        if (proj && proj.shotgunVolleyId) this._dodgedVolleyIds.add(proj.shotgunVolleyId);
+        if (proj && proj.shotPairId) this._dodgedVolleyIds.add(proj.shotPairId);
+        this._lastShotgunDodgeFrame = currentFrame;
+        const graceWindow = (cfg.shotgunDodgeGraceWindow !== undefined) ? cfg.shotgunDodgeGraceWindow : 16;
+        this._shotgunDodgeGraceTimer = graceWindow;
+        this._lastShotgunDodgeAttacker = attacker;
+      }
 
       const startX = this.x;
       const startY = this.y;
@@ -688,19 +752,19 @@ export class SansFighter extends Fighter {
   castGasterBlasters(opponent) {
     if (!opponent) return;
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    const staminaCost = cfg.blasterStaminaCost !== undefined ? cfg.blasterStaminaCost : 25;
+    if (this.stamina < staminaCost) return;
+
     this.gasterBlasterFiring = true;
     this.blasterCooldown = cfg.blasterCooldown || 320;
 
-    // Self-HP drain on Skill 1 cast (Undertale exhaustion mechanic, drains down to minimum 1 HP)
-    const hpCost = (cfg.blasterHpCost !== undefined) ? cfg.blasterHpCost : 20;
-    if (hpCost > 0 && this.hp > 1) {
-      const actualCost = Math.min(this.hp - 1, hpCost);
-      this.hp -= actualCost;
-      this.damageReceived = (this.damageReceived || 0) + actualCost;
-      spawnFloatingText(this.x, this.y - this.r - 12, `-${actualCost} HP`, '#FF3B30');
+    // Deduct stamina cost on firing Gaster Blaster (Undertale exhaustion mechanic)
+    if (staminaCost > 0) {
+      this.stamina = Math.max(0, this.stamina - staminaCost);
+      this.staminaRegenDelayTimer = (cfg.dodgeStaminaRegenDelay !== undefined) ? cfg.dodgeStaminaRegenDelay : 50;
 
-      // Low HP exhaustion dialogue blip
-      if (this.hp <= 40 && Math.random() < 0.40) {
+      // Low stamina exhaustion dialogue blip
+      if (this.stamina <= 30 && Math.random() < 0.40) {
         this.speak('phew...', 70);
       }
     }
@@ -1336,10 +1400,21 @@ export class SansFighter extends Fighter {
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
 
     // 2. Stamina Regeneration & Cooldowns
-    if (this.stamina < this.maxStamina) {
+    if (this.staminaRegenDelayTimer > 0) {
+      this.staminaRegenDelayTimer--;
+    } else if (this.stamina < this.maxStamina) {
       this.stamina = Math.min(this.maxStamina, this.stamina + (cfg.dodgeStaminaRegen || 0.20));
     }
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+    if (this._shotgunDodgeGraceTimer > 0) {
+      this._shotgunDodgeGraceTimer--;
+      if (this._shotgunDodgeGraceTimer <= 0) {
+        this._lastShotgunDodgeAttacker = null;
+        if (this._dodgedVolleyIds && this._dodgedVolleyIds.size > 20) {
+          this._dodgedVolleyIds.clear();
+        }
+      }
+    }
     if (this.basicAttackCooldown > 0) this.basicAttackCooldown--;
     if (this.basicAttackAnimTimer > 0) this.basicAttackAnimTimer--;
 
@@ -1401,7 +1476,7 @@ export class SansFighter extends Fighter {
         this.castBadTimeGravitySlam(opponent);
       }
       // AI Skill 1: Gaster Blaster
-      else if (this.blasterCooldown <= 0 && dist < 420) {
+      else if (this.blasterCooldown <= 0 && dist < 420 && this.stamina >= (cfg.blasterStaminaCost !== undefined ? cfg.blasterStaminaCost : 25)) {
         this.castGasterBlasters(opponent);
       }
       // AI Skill 2: Bone Zone
@@ -1423,6 +1498,9 @@ export class SansFighter extends Fighter {
       this.vy = 0;
       if (opponent && opponent.hp > 0) {
         this.snapAimAtTarget(opponent);
+      }
+      if (this.skillManager && typeof this.skillManager.tickCooldowns === 'function') {
+        this.skillManager.tickCooldowns(false);
       }
       this.resolveWallBounce(arena, opponent);
     } else {

@@ -632,6 +632,7 @@ export class EngineerFighter extends Fighter {
     const muzzleY = this.y + Math.sin(this.gunAngle) * (this.r + muzzleOffset);
 
     // Spawn projectiles in a randomized cone
+    const shotgunVolleyId = `eng_sg_${Date.now()}_${Math.random()}`;
     for (let i = 0; i < pellets; i++) {
       // Chaotic spread: centered mostly around the middle, with outliers
       const angleVariance = (Math.random() - 0.5) * spread + (Math.random() - 0.5) * (spread * 0.5);
@@ -644,7 +645,11 @@ export class EngineerFighter extends Fighter {
       const spawnX = muzzleX + (Math.random() - 0.5) * 6;
       const spawnY = muzzleY + (Math.random() - 0.5) * 6;
       
-      projectileSystem.fireProjectile(this, state.fighters.indexOf(this), damage, false, speedVariance, false, 'EngineerBullet', spawnX, spawnY, pAngle);
+      const p = projectileSystem.fireProjectile(this, state.fighters.indexOf(this), damage, false, speedVariance, false, 'EngineerBullet', spawnX, spawnY, pAngle);
+      if (p) {
+        p.isShotgun = true;
+        p.shotgunVolleyId = shotgunVolleyId;
+      }
     }
     
     triggerGlobalScreenShake(12, 10);
