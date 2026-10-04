@@ -18,27 +18,54 @@
     rel="stylesheet">
   <link rel="stylesheet" href="css/style.css?v=37" />
   <style>
-    /* Optimize HTML & Body for Centered Canvas Preview (1:1 Pixel-Perfect Native Layout) */
-    html,
+    /* Optimize HTML & Body for Responsive Canvas Preview & Web Scrolling */
+    html {
+      margin: 0;
+      padding: 0;
+      background: #000000;
+      width: 100%;
+      height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
     body {
       margin: 0;
       padding: 0;
       background: #000000;
-      overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      min-height: 100%;
       min-height: 100vh;
+      overflow-x: hidden;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      align-items: center;
       box-sizing: border-box;
-      touch-action: none;
       -webkit-touch-callout: none;
       -webkit-user-select: none;
       user-select: none;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
       text-rendering: optimizeLegibility;
+    }
+
+    /* Custom Sleek Cyberpunk Scrollbar for Desktop PC Browsers */
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0B0F19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #2A334A;
+      border-radius: 5px;
+      border: 2px solid #0B0F19;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #FF3366;
     }
 
     .game-container {
@@ -48,10 +75,9 @@
       align-items: center;
       width: 540px;
       height: 960px;
-      margin: auto;
+      margin: auto 0;
       box-sizing: border-box;
       flex-shrink: 0;
-      touch-action: none;
     }
 
     .game-box {
@@ -1113,45 +1139,10 @@
                     </div>
                     <div id="patchnotes-balance-card" class="patchnotes-card">
                       <div class="patchnote-item">
-                        <span class="patchnote-tag tag-adj">ADJUST</span>
+                        <span class="patchnote-tag tag-adj">INFO</span>
                         <div class="patchnote-content">
-                          <strong class="patchnote-heading">GOJO</strong>
-                          <p class="patchnote-desc"><code>infinityFreezeChance</code>: <code>0.5</code> ➔ <code>1.0</code> (Mod)</p>
-                        </div>
-                      </div>
-                      <div class="patchnote-item">
-                        <span class="patchnote-tag tag-buff">BUFF</span>
-                        <div class="patchnote-content">
-                          <strong class="patchnote-heading">GOJO</strong>
-                          <p class="patchnote-desc"><code>redDamage</code>: <code>100</code> ➔ <code>200</code> (+100.0%)</p>
-                        </div>
-                      </div>
-                      <div class="patchnote-item">
-                        <span class="patchnote-tag tag-adj">ADJUST</span>
-                        <div class="patchnote-content">
-                          <strong class="patchnote-heading">NAMELESSDEITY</strong>
-                          <p class="patchnote-desc"><code>displayName</code>: <code>NAMELESS DEITY</code> ➔ <code>DEITY</code> (Mod)</p>
-                        </div>
-                      </div>
-                      <div class="patchnote-item">
-                        <span class="patchnote-tag tag-nerf">NERF</span>
-                        <div class="patchnote-content">
-                          <strong class="patchnote-heading">SANS</strong>
-                          <p class="patchnote-desc"><code>blasterCarouselDamage</code>: <code>30</code> ➔ <code>20</code> (-33.3%)</p>
-                        </div>
-                      </div>
-                      <div class="patchnote-item">
-                        <span class="patchnote-tag tag-nerf">NERF</span>
-                        <div class="patchnote-content">
-                          <strong class="patchnote-heading">SANS</strong>
-                          <p class="patchnote-desc"><code>blasterRingDamage</code>: <code>30</code> ➔ <code>20</code> (-33.3%)</p>
-                        </div>
-                      </div>
-                      <div class="patchnote-item">
-                        <span class="patchnote-tag tag-nerf">NERF</span>
-                        <div class="patchnote-content">
-                          <strong class="patchnote-heading">SANS</strong>
-                          <p class="patchnote-desc"><code>blasterGigaDamage</code>: <code>50</code> ➔ <code>30</code> (-40.0%)</p>
+                          <strong class="patchnote-heading">No Active Balance Tweaks</strong>
+                          <p class="patchnote-desc">All fighter configuration attributes are currently at default baseline.</p>
                         </div>
                       </div>
                     </div>

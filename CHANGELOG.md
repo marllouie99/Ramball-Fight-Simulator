@@ -3,17 +3,4 @@
 
 ---
 
-## 🥊 Fighter Stat Modifications
-
-### GOJO
-* **🔄 ADJUST** `infinityFreezeChance`: `0.5` ➔ `1.0` (Mod)
-* **🟢 BUFF** `redDamage`: `100` ➔ `200` (+100.0%)
-
-### NAMELESSDEITY
-* **🔄 ADJUST** `displayName`: `NAMELESS DEITY` ➔ `DEITY` (Mod)
-
-### SANS
-* **🔴 NERF** `blasterCarouselDamage`: `30` ➔ `20` (-33.3%)
-* **🔴 NERF** `blasterRingDamage`: `30` ➔ `20` (-33.3%)
-* **🔴 NERF** `blasterGigaDamage`: `50` ➔ `30` (-40.0%)
-
+*No balance parameter modifications detected in `js/configs/`.*
