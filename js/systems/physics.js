@@ -22,6 +22,7 @@ import {
 } from '../../Tactical Force/systems/tacticalPhysics.js';
 import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
 import { clearFighterDomain, cleanupDeadFightersDomains } from './domainSystem.js';
+import { wasmDist, wasmDistSq, wasmCircleCollide, wasmClamp, wasmLerp } from '../core/wasmMath.js';
 
 // ─────────────────────────────────────────────
 // SPATIAL PARTITIONING GRID
@@ -245,12 +246,12 @@ export function resolveFighterCollision(a, b) {
 
   const dx = b.x - a.x;
   const dy = b.y - a.y;
-  const distSq = dx * dx + dy * dy;
+  const distSq = wasmDistSq(a.x, a.y, b.x, b.y);
   const minDist = a.r + b.r;
   const minDistSq = minDist * minDist;
 
   if (distSq >= minDistSq) return;
-  const distance = Math.sqrt(distSq);
+  const distance = wasmDist(a.x, a.y, b.x, b.y);
 
   // Collision hooks (for contact damage, etc.)
   a.onCollide(b);

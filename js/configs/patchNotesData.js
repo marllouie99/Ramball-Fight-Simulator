@@ -28,65 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "GOJO",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "infinityFreezeChance",
-                "oldVal": "0.5",
-                "newVal": "1.0",
-                "pct": "Mod"
-            },
-            {
-                "type": "BUFF",
-                "key": "redDamage",
-                "oldVal": 100,
-                "newVal": 200,
-                "pct": "+100.0%"
-            }
-        ]
-    },
-    {
-        "character": "NAMELESSDEITY",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "displayName",
-                "oldVal": "NAMELESS DEITY",
-                "newVal": "DEITY",
-                "pct": "Mod"
-            }
-        ]
-    },
-    {
-        "character": "SANS",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "blasterCarouselDamage",
-                "oldVal": 30,
-                "newVal": 20,
-                "pct": "-33.3%"
-            },
-            {
-                "type": "NERF",
-                "key": "blasterRingDamage",
-                "oldVal": 30,
-                "newVal": 20,
-                "pct": "-33.3%"
-            },
-            {
-                "type": "NERF",
-                "key": "blasterGigaDamage",
-                "oldVal": 50,
-                "newVal": 30,
-                "pct": "-40.0%"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",
