@@ -117,3 +117,39 @@ Use this skill when designing or coding character skins, hair silhouettes, headw
     }
   }
   ```
+
+## Phase 5: Mandatory Hair & Head Asset Model Import (Rule 22)
+1. **Module-Level Image Cache**:
+   ```javascript
+   let _characterHairImage = null;
+   let _characterHairImageLoading = false;
+
+   export function _getCharacterHairImage() {
+     if (_characterHairImage && _characterHairImage.complete && _characterHairImage.naturalWidth > 0) {
+       return _characterHairImage;
+     }
+     if (!_characterHairImageLoading && typeof Image !== 'undefined') {
+       _characterHairImageLoading = true;
+       const img = new Image();
+       img.onload = () => {
+         _characterHairImage = img;
+         _characterHairImageLoading = false;
+       };
+       img.onerror = () => {
+         _characterHairImageLoading = false;
+       };
+       img.src = 'Assets/model/<characterId>/<Name>-hair.png?v=1';
+       _characterHairImage = img;
+     }
+     return _characterHairImage;
+   }
+
+   if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+     _getCharacterHairImage();
+   }
+   ```
+2. **Hair Drawing Pipeline**:
+   - MUST implement `_draw[Name]Hair(ctx, r, facingLeft)` with `ctx.imageSmoothingEnabled = false;`.
+   - Apply `state.skinCustomizations?.[characterId]` scaling and offsets.
+   - Calibrate visible bounds to frame crown at `-1.15r` to `-1.30r`.
+

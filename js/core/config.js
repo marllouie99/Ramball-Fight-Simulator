@@ -15,6 +15,7 @@ import { ichigoConfig } from '../configs/characters/ichigoConfig.js';
 import { mahitoConfig } from '../configs/characters/mahitoConfig.js';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js';
 import { naoyaConfig } from '../configs/characters/naoyaConfig.js';
+import { makiConfig } from '../configs/characters/makiConfig.js';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
@@ -65,6 +66,9 @@ export const CONFIG = {
   naoya: naoyaConfig,
   Naoya: naoyaConfig,
   naoya_zenin: naoyaConfig,
+  maki: makiConfig,
+  Maki: makiConfig,
+  maki_zenin: makiConfig,
   nobara: nobaraConfig,
   megumi: megumiConfig,
   megumin: meguminConfig,
@@ -1884,6 +1888,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: naoyaConfig.projectileSpeedMultiplier || 1.0,
     ability: naoyaConfig.ability || 'Projection Sorcery (24 FPS)',
     desc: naoyaConfig.desc || 'Inheritor of Projection Sorcery from Jujutsu Kaisen. Divides 1s into 24 frames to accelerate to supersonic speeds. Traps enemies who fail the 24 FPS rule inside frozen film frames with palm strikes, executing with Mach-speed flurry slashes.',
+  },
+  {
+    id: 57,
+    name: 'MAKI',
+    category: 'Anime',
+    color: makiConfig.color || '#18181B',
+    themeColor: makiConfig.themeColor || '#014913ff',
+    secondaryColor: '#8B5CF6',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.1,
+    radius: makiConfig.radius || makiConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'maki',
+    hp: makiConfig.hp || 220,
+    damage: makiConfig.damage || 28,
+    cooldown: makiConfig.cooldown || 35,
+    moveSpeed: makiConfig.moveSpeed || makiConfig.speed || 5.4,
+    projectileSpeedMultiplier: makiConfig.projectileSpeedMultiplier || 1.0,
+    ability: makiConfig.ability || 'Heavenly Restriction (Awakened)',
+    desc: makiConfig.desc || 'Zero Cursed Energy. Slices directly into the soul with the Split Soul Katana, bypasses domains, air-steps without friction, and absorbs kinetic force with Dragon-Bone.',
   }
 ];
 

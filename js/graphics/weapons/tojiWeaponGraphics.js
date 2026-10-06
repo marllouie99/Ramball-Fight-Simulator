@@ -344,25 +344,13 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
 }
 
 /**
- * Draws Toji's Split Soul Katana (Accurate slender curved Katana reference in Authentic Pixel Art Style).
+ * Renders the full Split Soul Katana blade, hilt, pommel, habaki collar, and flowing white fur collar.
+ * Grip anchor center is positioned exactly at (0, 0) in local coordinate space.
  */
-export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#242722', baseAngle = null) {
-  if (typeof state !== 'undefined' && state.showSkinOnly) return;
+export function drawSplitSoulKatanaBladeMesh(ctx, handColor = '#E8BD9B', drawHand = true) {
   ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(angle);
-
-  const flipAngle = baseAngle !== null ? baseAngle : angle;
-  const normAngle = Math.atan2(Math.sin(flipAngle), Math.cos(flipAngle));
-  if (Math.abs(normAngle) > Math.PI / 2) {
-    ctx.scale(1, -1);
-  }
-
-  // Position weapon relative to fighter radius
-  ctx.translate(r - 2, 0);
-
-  const scale = 0.95; // Increased scale for grand imposing Katana proportions!
-  ctx.scale(scale, scale);
+  // Translate by -24 along X so the grip center (X=24) aligns precisely with (0, 0)
+  ctx.translate(-24, 0);
 
   // 1. Stepped Pixel-Art Kashira Pommel Cap (X=0 to X=6)
   ctx.fillStyle = '#0E0F14';
@@ -388,8 +376,10 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
     ctx.fillRect(wx + 1, -2, 1, 2);
   }
 
-  // Hand gripping Katana handle (Pixel Art)
-  drawTojiPixelWeaponGrip(ctx, 24, 0, getHandSize(5.8), handColor || '#E8BD9B');
+  // Hand gripping Katana handle (Pixel Art) - optionally drawn
+  if (drawHand) {
+    drawTojiPixelWeaponGrip(ctx, 24, 0, getHandSize(5.8), handColor || '#E8BD9B');
+  }
 
   // Dark Metal Habaki / Collar (X=40 to X=44)
   ctx.fillStyle = '#0E0F14';
@@ -546,6 +536,32 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
     ctx.closePath();
     ctx.fill();
   });
+
+  ctx.restore();
+}
+
+/**
+ * Draws Toji's Split Soul Katana (Accurate slender curved Katana reference in Authentic Pixel Art Style).
+ */
+export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#242722', baseAngle = null) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  const flipAngle = baseAngle !== null ? baseAngle : angle;
+  const normAngle = Math.atan2(Math.sin(flipAngle), Math.cos(flipAngle));
+  if (Math.abs(normAngle) > Math.PI / 2) {
+    ctx.scale(1, -1);
+  }
+
+  // Position weapon relative to fighter radius (translates by r - 2 + 24 * scale)
+  ctx.translate(r - 2 + 24 * 0.95, 0);
+
+  const scale = 0.95; // Increased scale for grand imposing Katana proportions!
+  ctx.scale(scale, scale);
+
+  drawSplitSoulKatanaBladeMesh(ctx, handColor, true);
 
   ctx.restore();
 }

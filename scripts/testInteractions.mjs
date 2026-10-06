@@ -1416,7 +1416,202 @@ async function runInteractionTests() {
     console.log('      ✅ Todo Takada-chan idol BGM, team mode isolation, and single-use ultimate limit verified.');
   }
 
-  // ── TEST 21: Yuji Soul Swap vs Undetected / Bush Concealed Boss Yuta ──
+  // ── TEST 21A: Maki Dragon-Bone Windup, Impale, Lift & Throw Pacing ──
+  {
+    console.log('   21A. Testing Maki Dragon-Bone phase pacing...');
+    const MakiClass = FIGHTER_CLASS_MAP.maki;
+    const NormalClass = FIGHTER_CLASS_MAP.normal;
+    assert(MakiClass && NormalClass, 'Maki and Normal fighter classes must exist');
+
+    const maki = new MakiClass(100, 100, 0);
+    const target = new NormalClass(240, 100, 1);
+    const bystander = new NormalClass(130, 100, 2);
+    const bystanderHp = bystander.hp;
+    const initialAimAngle = -Math.PI / 2;
+    maki.gunAngle = initialAimAngle;
+    maki.angle = initialAimAngle;
+    const startX = maki.x;
+    const startY = maki.y;
+    state.fighters = [maki, target, bystander];
+    state.arena = arena;
+
+    const { drawMakiWeapons, drawMakiImpaledTargetOverlay } = await import('../js/graphics/weapons/makiWeaponGraphics.js');
+    const originalFillRect = mockCtx.fillRect;
+    const originalFill = mockCtx.fill;
+    const renderedFillStyles = [];
+    mockCtx.fillRect = (...args) => {
+      renderedFillStyles.push(mockCtx.fillStyle);
+      originalFillRect(...args);
+    };
+    mockCtx.fill = (...args) => {
+      renderedFillStyles.push(mockCtx.fillStyle);
+      originalFill(...args);
+    };
+    maki.dragonBoneActive = true;
+    maki.dragonBonePhase = 'lift';
+    maki.dragonBoneTarget = target;
+    target.isPinnedByMaki = true;
+    drawMakiWeapons(mockCtx, maki, maki.r, false);
+    assert(!renderedFillStyles.includes('#E2E6EC'), 'Pinned lift must not draw a second full katana blade from Maki');
+    renderedFillStyles.length = 0;
+    drawMakiImpaledTargetOverlay(mockCtx, target, maki);
+    assert(renderedFillStyles.includes('#E2E6EC'), 'Pinned-target overlay must render Maki’s real katana mesh');
+    assert(!renderedFillStyles.includes('#D8DDE2'), 'Pinned-target overlay must not paint a separate custom blade segment');
+    renderedFillStyles.length = 0;
+    target.isPinnedByMaki = false;
+    drawMakiWeapons(mockCtx, maki, maki.r, false);
+    assert(renderedFillStyles.includes('#E2E6EC'), 'Unpinned rendering must restore Maki’s katana blade');
+    mockCtx.fillRect = originalFillRect;
+    mockCtx.fill = originalFill;
+    maki.dragonBoneActive = false;
+    maki.dragonBonePhase = null;
+    maki.dragonBoneTarget = null;
+
+    const { FighterRenderer } = await import('../js/graphics/renderers/fighterRenderer.js');
+    const originalDrawGun = FighterRenderer.drawGun;
+    let genericGunDraws = 0;
+    FighterRenderer.drawGun = () => { genericGunDraws++; };
+    maki.dragonBoneActive = true;
+    maki.dragonBonePhase = 'windup';
+    maki.drawGun(mockCtx);
+    assert(genericGunDraws === 0, 'Maki must suppress generic gun rendering during Dragon-Bone');
+    maki.dragonBoneActive = false;
+    maki.drawGun(mockCtx);
+    assert(genericGunDraws === 0, 'Maki must suppress generic gun rendering to match Toji hand parity');
+    FighterRenderer.drawGun = originalDrawGun;
+
+    maki._castDragonBone(target);
+    assert(maki.dragonBonePhase === 'windup', 'Dragon-Bone must begin with a windup phase');
+    assert(maki.dragonBonePhaseMax === CONFIG.maki.dragonBoneWindupFrames, 'Windup duration must come from Maki config');
+    assert(Number.isFinite(CONFIG.maki.dragonBoneThrowDistanceMultiplier), 'Dragon-Bone throw distance multiplier must be numeric');
+    assert(Math.abs(maki.gunAngle - initialAimAngle) < 0.001, 'Starting windup must not snap aim to the target');
+    assert(CONFIG.maki.dragonBoneDashFrames === 16, 'Dragon-Bone dash must remain 16 frames');
+    assert(CONFIG.maki.dragonBoneDashSpeed === 19.0, 'Dragon-Bone dash speed must remain 19.0');
+
+    maki._updateDragonBone(target, arena);
+    assert(maki.gunAngle > initialAimAngle && maki.gunAngle < 0, 'Windup must smoothly auto-aim toward the target');
+    for (let frame = 0; frame < CONFIG.maki.dragonBoneWindupFrames - 2; frame++) {
+      maki._updateDragonBone(target, arena);
+    }
+    const aimBeforeRelease = maki.gunAngle;
+    target.x = maki.x;
+    target.y = maki.y + 200;
+    maki._updateDragonBone(target, arena);
+    assert(maki.x === startX && maki.y === startY, 'Maki must remain stationary during Dragon-Bone windup');
+    assert(maki.dragonBonePhase === 'dash', 'Dragon-Bone must dash after the windup');
+    assert(maki.gunAngle > aimBeforeRelease && maki.gunAngle - aimBeforeRelease < 0.2, 'Windup release must keep tracking smooth without snapping');
+    assert(Math.abs(maki.dragonBoneTargetAngle - maki.gunAngle) < 0.001, 'Dash must commit the final windup aim angle');
+
+    maki._getTargetsInFrontalArc = () => [target];
+    let aoeQueries = 0;
+    maki._getAllEnemiesInRadius = () => {
+      aoeQueries++;
+      return [bystander];
+    };
+    const dashStartX = maki.x;
+    const dashStartY = maki.y;
+    maki._updateDragonBone(target, arena);
+    assert(maki.dragonBonePhase === 'stab', 'A dash hit must enter the dedicated stab phase');
+    const expectedDashSpeed = CONFIG.maki.dragonBoneDashSpeed * (1.0 + maki.kineticCharges * 0.20);
+    assert(Math.hypot(
+      maki.x - dashStartX - Math.cos(maki.dragonBoneTargetAngle) * expectedDashSpeed,
+      maki.y - dashStartY - Math.sin(maki.dragonBoneTargetAngle) * expectedDashSpeed
+    ) < 0.001, 'Dragon-Bone dash must follow the committed windup aim angle');
+    assert(target.isPinnedByMaki === true, 'The impaled target must remain pinned during stab');
+    assert(CONFIG.maki.dragonBonePinGapPx === 24, 'Dragon-Bone pin gap must be configured to 24px');
+    const gripX = maki.x + Math.cos(maki.gunAngle) * maki.r * 0.82 - Math.sin(maki.gunAngle) * maki.r * 0.38;
+    const gripY = maki.y + Math.sin(maki.gunAngle) * maki.r * 0.82 + Math.cos(maki.gunAngle) * maki.r * 0.38;
+    const targetGap = Math.hypot(target.x - gripX, target.y - gripY) - target.r;
+    assert(Math.abs(targetGap - CONFIG.maki.dragonBonePinGapPx) < 0.001, 'Impaled target must sit at the configured distance from Maki’s grip');
+
+    for (let frame = 0; frame < CONFIG.maki.dragonBoneStabFrames - 1; frame++) {
+      maki._updateDragonBone(target, arena);
+    }
+    assert(maki.dragonBonePhase === 'stab', `The stab phase must last ${CONFIG.maki.dragonBoneStabFrames} frames`);
+    maki._updateDragonBone(target, arena);
+    assert(maki.dragonBonePhase === 'lift', 'Dragon-Bone must lift only after the stab phase completes');
+    assert(maki.dragonBonePhaseMax === CONFIG.maki.dragonBoneLiftFrames, 'Lift duration must come from Maki config');
+
+    for (let frame = 0; frame < CONFIG.maki.dragonBoneLiftFrames - 1; frame++) {
+      maki._updateDragonBone(target, arena);
+    }
+    assert(maki.dragonBonePhase === 'lift', `Dragon-Bone must remain lifting through frame ${CONFIG.maki.dragonBoneLiftFrames - 1}`);
+    maki._updateDragonBone(target, arena);
+    assert(maki.dragonBonePhase === 'throw', 'Dragon-Bone must throw after the configured lift instead of slamming down');
+    assert(maki.dragonBonePhaseMax === CONFIG.maki.dragonBoneThrowFrames, 'Throw duration must come from Maki config');
+
+    const releaseFrame = Math.floor(CONFIG.maki.dragonBoneThrowFrames * 0.5);
+    for (let frame = 0; frame < releaseFrame - 1; frame++) {
+      maki._updateDragonBone(target, arena);
+    }
+    assert(target.isPinnedByMaki === true, 'Target must stay pinned until the throw release');
+    const originalThrowDistanceMultiplier = CONFIG.maki.dragonBoneThrowDistanceMultiplier;
+    CONFIG.maki.dragonBoneThrowDistanceMultiplier = 1.5;
+    maki._updateDragonBone(target, arena);
+    assert(target.isPinnedByMaki === false, 'Target must be released on the throw frame');
+    const expectedThrowSpeed = CONFIG.maki.dragonBoneThrowSpeed * CONFIG.maki.dragonBoneThrowDistanceMultiplier * (1.0 + maki.kineticCharges * 0.25);
+    const throwVectorError = Math.hypot(
+      target.knockbackVx - Math.cos(maki.dragonBoneTargetAngle) * expectedThrowSpeed,
+      target.knockbackVy - Math.sin(maki.dragonBoneTargetAngle) * expectedThrowSpeed
+    );
+    assert(throwVectorError < 0.001, `Released target must launch along committed aim (expected ${expectedThrowSpeed} at ${maki.dragonBoneTargetAngle}, got ${target.knockbackVx}, ${target.knockbackVy})`);
+    assert(target.knockbackVx > 0, 'Dragon-Bone throw must use the ricocheting knockback channel');
+    assert(target.slowTimer === CONFIG.maki.dragonBoneThrowSlowFrames, 'Dragon-Bone throw must apply its configured brief slow');
+    CONFIG.maki.dragonBoneThrowDistanceMultiplier = originalThrowDistanceMultiplier;
+    const throwStartX = target.x;
+    const throwStartY = target.y;
+    for (let frame = 0; frame < 8; frame++) {
+      target.update(maki, 1, arena);
+    }
+    const throwTravel = Math.hypot(target.x - throwStartX, target.y - throwStartY);
+    assert(throwTravel > 40, `Released target must travel visibly away from Maki (moved ${throwTravel.toFixed(1)}px in 8 frames)`);
+    const wallArena = { x: 0, y: 0, width: 540, height: 960 };
+    state.arena = wallArena;
+    target.x = wallArena.width - target.r - 1;
+    target.y = wallArena.height / 2;
+    target.vx = target.knockbackVx;
+    target.vy = 0;
+    target.knockbackVy = 0;
+    target.update(maki, 1, wallArena);
+    assert(target.knockbackVx < 0, 'Thrown target must ricochet away from the wall');
+    assert(target.slowTimer > 0, 'Thrown target must remain slowed after the wall ricochet');
+    assert(aoeQueries === 0, 'Throw release must not trigger a ground-slam AOE');
+    assert(bystander.hp === bystanderHp, 'Nearby bystanders must not take ground-slam damage');
+
+    for (let frame = releaseFrame; frame < CONFIG.maki.dragonBoneThrowFrames; frame++) {
+      maki._updateDragonBone(target, arena);
+    }
+    assert(maki.dragonBonePhase === 'groundPin', 'Dragon-Bone must enter groundPin phase after throw frames');
+    assert(maki.dragonBonePhaseMax === CONFIG.maki.dragonBoneGroundPinFrames, 'groundPin duration must come from Maki config');
+
+    for (let frame = 0; frame < CONFIG.maki.dragonBoneGroundPinFrames; frame++) {
+      const initialDepth = mockCtx.getStackDepth();
+      maki.drawBody(mockCtx);
+      assert(mockCtx.getStackDepth() === initialDepth, `Maki drawBody stack leak during groundPin frame ${frame}`);
+      maki._updateDragonBone(target, arena);
+    }
+    assert(maki.dragonBoneActive === false, 'Dragon-Bone must finish after ground pin recovery');
+
+    // Verify Maki sword combo rendering (Steps 1, 2, 3 across startup, active, recovery)
+    for (const step of [1, 2, 3]) {
+      maki.swordComboStep = step;
+      maki.swordSwingMax = 24;
+      for (const timer of [24, 18, 12, 6, 1]) {
+        maki.swordSwingTimer = timer;
+        const initialDepth = mockCtx.getStackDepth();
+        maki.drawBody(mockCtx);
+        assert(mockCtx.getStackDepth() === initialDepth, `Maki drawBody stack leak during step ${step} timer ${timer}`);
+        maki.draw(mockCtx, target);
+        assert(mockCtx.getStackDepth() === initialDepth, `Maki draw stack leak during step ${step} timer ${timer}`);
+      }
+    }
+    maki.swordSwingTimer = 0;
+
+    state.fighters = [];
+    console.log('      ✅ Maki Dragon-Bone windup, stab, lift and throw pacing & sword combo rendering verified.');
+  }
+
+  // ── TEST 22: Yuji Soul Swap vs Undetected / Bush Concealed Boss Yuta ──
   console.log('   21. Testing Yuji Soul Swap Uninterrupted Sequence vs Undetected Boss Yuta...');
   {
     const YujiClass = FIGHTER_CLASS_MAP['yuji'];
@@ -4639,6 +4834,60 @@ async function runInteractionTests() {
     eye.reset();
 
     console.log('      ✅ Out-of-arena enemy basic attack gating (hold fire vs out-of-bounds boss & in-arena minion prioritization) verified successfully.');
+  }
+
+  // ─────────────────────────────────────────────
+  // TEST 55: Reze Ultimate Full Heal & Bomb Devil Form Lifesteal
+  // ─────────────────────────────────────────────
+  {
+    console.log('   55. Testing Reze Ultimate Full Heal & Bomb Devil Form Lifesteal...');
+    const RezeClass = FIGHTER_CLASS_MAP['reze'];
+    const NormalClass = FIGHTER_CLASS_MAP['normal'];
+    assert(RezeClass && NormalClass, 'Reze and Normal fighter classes must exist in FIGHTER_CLASS_MAP');
+
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    const reze = new RezeClass({ radius: 25, x: 220, y: 200, hp: 340, ownerIndex: 0 });
+    const dummy = new NormalClass({ radius: 25, x: 200, y: 200, hp: 300, ownerIndex: 1 });
+    state.fighters = [reze, dummy];
+
+    // A. Verify full heal upon Ultimate activation from low HP
+    reze.hp = 40;
+    assert(reze.hp === 40, 'Reze initial test HP must be 40');
+    reze._activateMegatonNuke(dummy);
+    assert(reze.hp === reze.maxHp, `Reze must be fully healed to maxHp (${reze.maxHp}) upon activating ultimate, got ${reze.hp}`);
+    assert(reze._healthBarHealTimer > 0, 'Reze healthBarHealTimer must be active for glowing HUD heal pulse');
+
+    // B. Fast forward transformation into Bomb Devil Form
+    reze.isPullingPin = false;
+    reze.isHybridModeActive = true;
+    reze.hp = 100; // Lower HP to test lifesteal headroom (reze.maxHp is 200 in 1v1 mode)
+
+    // C. Dealing damage in Bomb Devil Form triggers 35% lifesteal
+    const damageDealt = 100;
+    const expectedHeal = Math.round(damageDealt * 0.35); // 35 HP
+    dummy.takeDamage(damageDealt, reze);
+
+    assert(reze.hp === 100 + expectedHeal, `Reze HP must increase by 35% of damage dealt (expected ${100 + expectedHeal}, got ${reze.hp})`);
+    assert(reze._healthBarHealTimer === 16, 'Reze healthBarHealTimer must be set to 16 upon lifesteal recovery');
+
+    // D. Verify lifesteal does not exceed maxHp
+    reze.hp = reze.maxHp - 10;
+    dummy.takeDamage(100, reze);
+    assert(reze.hp === reze.maxHp, `Reze HP must cap cleanly at maxHp (${reze.maxHp}), got ${reze.hp}`);
+
+    // E. Verify human form does NOT trigger hybrid lifesteal
+    reze.isHybridModeActive = false;
+    reze.hp = 100;
+    dummy.takeDamage(100, reze);
+    assert(reze.hp === 100, `Human form Reze must not trigger hybrid lifesteal (expected 100, got ${reze.hp})`);
+
+    // Clean up
+    reze.reset();
+    dummy.reset();
+    state.fighters = [];
+
+    console.log('      ✅ Reze Ultimate 100% full heal and Bomb Devil Form 35% vampiric lifesteal verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

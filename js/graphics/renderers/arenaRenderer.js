@@ -851,17 +851,34 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     if (!f) return fallbackColor;
     const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
     if (isYuta) return '#FF1493';
-    return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
+    const charId = f.characterId || f.type || (f._def && (f._def.id || f._def.type));
+    const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
+    let color = charCfg?.themeColor ||
+      f.themeColor ||
+      f._def?.themeColor ||
+      (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].themeColor : null) ||
+      charCfg?.color ||
+      f.color ||
+      f._def?.color ||
+      (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].color : null) ||
+      fallbackColor;
+    if (typeof color === 'string' && /^[0-9a-fA-F]{3,8}$/.test(color)) {
+      color = '#' + color;
+    }
+    return color;
   };
 
   const getHudNameColor = (f, fallbackColor) => {
-    const color = getFighterThemeColor(f, fallbackColor);
+    let color = getFighterThemeColor(f, fallbackColor);
+    if (typeof color === 'string' && /^[0-9a-fA-F]{3,8}$/.test(color)) {
+      color = '#' + color;
+    }
     if (isDark || typeof color !== 'string' || !color.startsWith('#')) return color;
 
     const hex = color.slice(1);
     const normalized = hex.length === 3
       ? hex.split('').map(channel => channel + channel).join('')
-      : hex;
+      : (hex.length >= 8 ? hex.slice(0, 6) : hex);
     if (normalized.length !== 6) return color;
 
     const darken = channel => Math.round(parseInt(channel, 16) * 0.78).toString(16).padStart(2, '0');

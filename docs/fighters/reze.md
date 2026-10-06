@@ -141,6 +141,8 @@ When Reze's HP drops to 0 for the first time in a round:
 ### ☢️ Ultimate: Bomb Devil Unleashed — "Megaton Tsar Nuke" (*Kyoku no Bakudan — 極の爆弾*)
 * **Type**: 3-Phase Cinematic Arena Bombardment & Nuclear Crater Dive
 * **Cooldown**: `1500 frames` (~25.0s)
+* **Ultimate Full Heal**: Activating the ultimate immediately regenerates Reze to **100% Max HP** with green heal numbers (`+HP`) and a glowing HUD health pulse (`DEVIL REGENERATION!`).
+* **Bomb Devil State Lifesteal**: Throughout the entire active state of Bomb Devil Form, Reze gains **35% Vampiric Lifesteal** on all damage dealt (explosive punches, Spark Slap finisher, Rocket Lunges, Spark Flechettes, Decoy Bombs, and Tsar Nuke blasts).
 * **Phases**:
   * **Phase 1: Pin Pull Transformation**: Time briefly stops (`timeStopTimer: 35 frames` on enemies; Rule 5 compliant). Reze pulls her collar pin, unleashing a golden-orange transformation shockwave and entering full Bomb Devil Form.
   * **Phase 2: Carpet Torpedo Barrage**: Reze ascends into the air and bombards the arena floor with 6 homing torpedo rockets that detonate in chain explosions (`damage: 20 per rocket`).

@@ -26,6 +26,7 @@ import { drawKnightPixelBody } from '../fighters/knightSkin.js';
 import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighters/nanamiSkin.js';
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
 import { drawNaoyaSkin, _drawNaoyaHair, _getNaoyaHairImage } from '../fighters/naoyaSkin.js';
+import { drawMakiSkin, _drawMakiHair, _getMakiHairImage } from '../fighters/makiSkin.js';
 import { drawGenosSkin, drawGenosHands, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
 import { drawEscanorSkin, _drawEscanorHair, _getEscanorHairImage } from '../fighters/escanorSkin.js';
 import { drawEngineerSkin, _drawEngineerHair, _getEngineerHairImage } from '../fighters/engineerSkin.js';
@@ -99,7 +100,7 @@ let _copyToastTimer = 0;
 // Fighter Category Tabs in Skin Studio Modal
 export const SKIN_STUDIO_CATEGORIES = [
   { id: 'ALL', label: 'ALL', filter: () => true },
-  { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito', 'naoya'].includes(f.key) },
+  { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito', 'naoya', 'maki'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
   { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu'].includes(f.key) }
@@ -478,6 +479,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     ]
   },
   {
+    key: 'maki',
+    label: 'MAKI',
+    asset: 'Maki-hair.png',
+    assetDims: '1024 x 1024',
+    baseW: 2.85,
+    baseH: 2.20,
+    baseCrownY: -1.40,
+    visW: 882,
+    visH: 809,
+    centerX: 511.5,
+    topY: 92,
+    themeColor: '#014913ff',
+    forms: [
+      { id: 'default', label: 'AWAKENED' }
+    ]
+  },
+  {
     key: 'genos',
     label: 'GENOS',
     asset: 'Genos-hair.png',
@@ -844,6 +862,16 @@ function generateJsCode(fDef, custom) {
            `const drawH = 466 * scaleY;\n` +
            `const drawX = -267.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 6 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'maki') {
+    return `// Calibrated Hair for Maki (Assets/model/maki/Maki-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 882;\n` +
+           `const scaleY = targetHairHeight / 809;\n` +
+           `const drawW = 1024 * scaleX;\n` +
+           `const drawH = 1024 * scaleY;\n` +
+           `const drawX = -511.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 92 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'escanor') {
     return `// Calibrated Hair for Escanor (Assets/model/escanor/Escanor-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
@@ -1170,6 +1198,8 @@ export function drawSkinStudioScreen() {
         drawMahitoSkin(ctx, dummyFighter);
       } else if (fDef.key === 'naoya') {
         drawNaoyaSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'maki') {
+        drawMakiSkin(ctx, dummyFighter);
       } else if (fDef.key === 'genos') {
         drawGenosSkin(ctx, dummyFighter);
         drawGenosHands(ctx, dummyFighter);
@@ -1231,6 +1261,8 @@ export function drawSkinStudioScreen() {
       _drawMahitoHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'naoya') {
       _drawNaoyaHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'maki') {
+      _drawMakiHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'genos') {
       _drawGenosHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'escanor') {

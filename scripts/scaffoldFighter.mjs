@@ -299,12 +299,97 @@ export class ${className} extends Fighter {
 function generateSkinCode(id, name, themeColor) {
   return `/**
  * ${name} - Upright Minimalist Skin Renderer
- * Adheres strictly to Repository Rule 19:
- * - Upright Front-Profile Camera POV (Hair top -Y, Torso bottom +Y)
- * - Strict faceless minimalist aesthetic (NO eyes, mouth, nose)
- * - Vertical scale mirroring when aiming/facing left (ctx.scale(1, -1))
- * - No shadowBlur (Rule 11)
+ * Adheres strictly to Repository Standards:
+ * - Rule 19: Upright Front-Profile Camera POV (Hair top -Y, Torso bottom +Y)
+ * - Rule 18: Strict faceless minimalist aesthetic (NO eyes, mouth, nose)
+ * - Rule 20: Symmetrical hand positioning on front layer
+ * - Rule 22: Dedicated hair asset model import & loader pattern
+ * - Rule 11: Zero shadowBlur / shadowColor
  */
+
+import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
+
+let _${id}HairImage = null;
+let _${id}HairImageLoading = false;
+
+export function _get${capitalize(id)}HairImage() {
+  if (_${id}HairImage && _${id}HairImage.complete && _${id}HairImage.naturalWidth > 0) {
+    return _${id}HairImage;
+  }
+  if (!_${id}HairImageLoading && typeof Image !== 'undefined') {
+    _${id}HairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _${id}HairImage = img;
+      _${id}HairImageLoading = false;
+    };
+    img.onerror = () => {
+      _${id}HairImageLoading = false;
+    };
+    img.src = 'Assets/model/${id}/${capitalize(id)}-hair.png?v=1';
+    _${id}HairImage = img;
+  }
+  return _${id}HairImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _get${capitalize(id)}HairImage();
+}
+
+/**
+ * Draws ${name}'s hair asset from Assets/model/${id}/${capitalize(id)}-hair.png with procedural fallback.
+ */
+export function _draw${capitalize(id)}Hair(ctx, r, facingLeft = false) {
+  const hairImg = _get${capitalize(id)}HairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.${id}) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
+
+    const targetW = r * 2.30 * wMult;
+    const targetH = r * 1.80 * hMult;
+    const drawX = -targetW / 2 + offX;
+    const drawY = -r * 1.20 + offY;
+
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
+      ctx.translate(drawX + targetW / 2, drawY + targetH / 2);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
+      ctx.drawImage(hairImg, -targetW / 2, -targetH / 2, targetW, targetH);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, targetW, targetH);
+    }
+    ctx.restore();
+  } else {
+    // Procedural spiky hair fallback
+    ctx.save();
+    ctx.fillStyle = '${themeColor}';
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.35, r * 0.85, Math.PI, Math.PI * 2);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.75, -r * 0.45);
+    ctx.lineTo(-r * 0.50, -r * 1.15);
+    ctx.lineTo(-r * 0.15, -r * 0.65);
+    ctx.lineTo(0, -r * 1.20);
+    ctx.lineTo(r * 0.20, -r * 0.65);
+    ctx.lineTo(r * 0.55, -r * 1.10);
+    ctx.lineTo(r * 0.80, -r * 0.45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+}
 
 export function draw${capitalize(id)}Skin(ctx, fighter) {
   const r = fighter.r || 25;
@@ -314,7 +399,7 @@ export function draw${capitalize(id)}Skin(ctx, fighter) {
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
   ctx.rotate(angle);
 
-  // Vertical mirroring so hair stays top (-Y) when facing left
+  // Vertical mirroring so hair stays top (-Y) when facing left (Rule 19)
   const facingLeft = Math.abs(angle) > Math.PI / 2;
   if (facingLeft) {
     ctx.scale(1, -1);
@@ -322,13 +407,13 @@ export function draw${capitalize(id)}Skin(ctx, fighter) {
 
   // 1. Torso & Uniform (+Y Bottom)
   ctx.save();
-  ctx.fillStyle = '#1e293b'; // Base uniform
+  ctx.fillStyle = '#1e293b';
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // Torso Accent / Vest
+  // Torso Accent
   ctx.save();
   ctx.fillStyle = '${themeColor}';
   ctx.beginPath();
@@ -336,51 +421,16 @@ export function draw${capitalize(id)}Skin(ctx, fighter) {
   ctx.fill();
   ctx.restore();
 
-  // Collar / Robe Opening (+Y Center)
-  ctx.save();
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.35, r * 0.15);
-  ctx.lineTo(0, r * 0.65);
-  ctx.lineTo(r * 0.35, r * 0.15);
-  ctx.stroke();
-  ctx.restore();
+  // 2. Head & Hair Silhouettes (-Y Top - Rule 22)
+  _draw${capitalize(id)}Hair(ctx, r, facingLeft);
 
-  // 2. Head & Hair Silhouettes (-Y Top)
-  // Hair Volume Base
-  ctx.save();
-  ctx.fillStyle = '${themeColor}';
-  ctx.beginPath();
-  ctx.arc(0, -r * 0.35, r * 0.85, Math.PI, Math.PI * 2);
-  ctx.fill();
-
-  // Crown Hair Spikes extending beyond circle boundary (-r * 1.15)
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.75, -r * 0.45);
-  ctx.lineTo(-r * 0.50, -r * 1.15);
-  ctx.lineTo(-r * 0.15, -r * 0.65);
-  ctx.lineTo(0, -r * 1.20);
-  ctx.lineTo(r * 0.20, -r * 0.65);
-  ctx.lineTo(r * 0.55, -r * 1.10);
-  ctx.lineTo(r * 0.80, -r * 0.45);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  // 3. Frontal Hands Layering (+X toward opponent)
-  ctx.save();
-  ctx.fillStyle = '#e2e8f0';
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 2;
-
-  // Front Hand
-  const punchOffset = fighter.punchAnimTimer > 0 ? (fighter.punchAnimTimer / 14) * 16 : 0;
-  ctx.beginPath();
-  ctx.arc(r * 0.85 + punchOffset, r * 0.35, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+  // 3. Symmetrical Lower-Flank Hands (Rule 20)
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  if (!shouldHideHands) {
+    const handR = r * 0.30;
+    drawPixelHand(ctx, -r * 0.82, r * 0.38, handR, '#e2e8f0', '#0E0F14');
+    drawPixelHand(ctx, r * 0.82, r * 0.38, handR, '#e2e8f0', '#0E0F14');
+  }
 
   ctx.restore();
 }

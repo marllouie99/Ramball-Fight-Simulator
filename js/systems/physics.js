@@ -204,6 +204,12 @@ export function resolveFighterCollision(a, b) {
   // Telekinesis: lifted entity is in 3D air stasis and moved directly by Rubbick; skip ground circle collision push
   if (a.isCaughtInTelekinesis || b.isCaughtInTelekinesis) return;
 
+  // Maki Zen'in Dragon-Bone Skewer & Throw: pinned enemy is physically impaled on Maki's blade; skip circle collision push
+  if (a.isPinnedByMaki || b.isPinnedByMaki) return;
+  const aIsMakiSkewer = (a.characterId === 'maki' || a.type === 'maki') && a.dragonBoneActive && a.dragonBoneTarget === b && (a.dragonBonePhase === 'lift' || a.dragonBonePhase === 'throw');
+  const bIsMakiSkewer = (b.characterId === 'maki' || b.type === 'maki') && b.dragonBoneActive && b.dragonBoneTarget === a && (b.dragonBonePhase === 'lift' || b.dragonBonePhase === 'throw');
+  if (aIsMakiSkewer || bIsMakiSkewer) return;
+
   // Cronos / Rubbick Time Stop Sphere: entities inside or frozen by an active sphere must NEVER be pushed by collisions
   const aInSphere = !a.isTargetOfAmbush && (a._frozenByCronosSphere || a.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(a.x - f.sphereX, a.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + a.r))));
   const bInSphere = !b.isTargetOfAmbush && (b._frozenByCronosSphere || b.isInsideCronosSphere?.() || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.sphereActive && Math.hypot(b.x - f.sphereX, b.y - f.sphereY) <= (CONFIG.cronos.sphereRadius + b.r))));

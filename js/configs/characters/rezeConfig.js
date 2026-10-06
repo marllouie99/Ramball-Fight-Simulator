@@ -114,7 +114,10 @@ export const rezeConfig = {
 
   // Ultimate: Bomb Devil Unleashed — Megaton Tsar Nuke
   enableMegatonNuke: 1,             // Master toggle for Ultimate: Megaton Tsar Nuke
-  nukeCooldown: 2000,               // 25.0s cooldown
+  enableUltimateFullHeal: 1,        // Master toggle: Fully heal Reze to 100% Max HP when activating Ultimate
+  enableHybridLifesteal: 1,         // Master toggle: Vampiric lifesteal during Bomb Devil Form
+  hybridLifestealPercent: 0.35,     // 35% of damage dealt recovered as HP during Bomb Devil Form
+  nukeCooldown: 1500,               // 25.0s cooldown
   nukeTransformPauseFrames: 35,     // Transformation hit-stop on target (Rule 5 compliant)
   nukeAirborneBarrageFrames: 70,    // Carpet torpedo bombardment duration
   nukeRocketCount: 6,               // Number of raining torpedoes

@@ -114,6 +114,7 @@ export class RezeFighter extends Fighter {
     this.activeMartialArcs = [];
     this.activePalmBlasts = [];
     this.activeNukeBlasts = [];
+    this._lastLifestealTextTime = 0;
 
     // Declarative Skill Registration
     this._registerSkills();
@@ -221,6 +222,7 @@ export class RezeFighter extends Fighter {
     this.activeMartialArcs = [];
     this.activePalmBlasts = [];
     this.activeNukeBlasts = [];
+    this._lastLifestealTextTime = 0;
   }
 
   isStationarySkillActive() {
@@ -1213,9 +1215,21 @@ export class RezeFighter extends Fighter {
    * Ultimate: Bomb Devil Unleashed — Megaton Tsar Nuke
    */
   _activateMegatonNuke(target) {
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
     this.nukeCooldown = this.nukeCooldownMax;
     this.nukeTarget = target;
+
+    // Full HP Heal upon Ultimate Activation
+    if (this.isSkillEnabled(cfg.enableUltimateFullHeal, true)) {
+      const healAmount = Math.max(0, this.maxHp - this.hp);
+      if (healAmount > 0) {
+        this.hp = this.maxHp;
+        this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
+        this._healthBarHealTimer = 28;
+        spawnFloatingText(this.x, this.y - (this.r || 25) - 14, `+${healAmount}`, '#00FF66');
+        spawnFloatingText(this.x, this.y - (this.r || 25) - 34, 'FULL REGENERATION!', '#00FF66');
+      }
+    }
 
     // If Reze is in Human Form (!this.isHybridModeActive):
     // Play the pin-pull animation FIRST, then detonate the AOE explosion as she transforms!
@@ -1247,6 +1261,18 @@ export class RezeFighter extends Fighter {
     this.isPinPullRevive = isRevive;
     this.isExecutingNuke = false;
     this.nukePhase = 'IDLE';
+
+    // Full HP Heal upon Ultimate Transformation Pin-Pull
+    if (this.isSkillEnabled(cfg.enableUltimateFullHeal, true)) {
+      const healAmount = Math.max(0, this.maxHp - this.hp);
+      if (healAmount > 0) {
+        this.hp = this.maxHp;
+        this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
+        this._healthBarHealTimer = 28;
+        spawnFloatingText(this.x, this.y - (this.r || 25) - 14, `+${healAmount}`, '#00FF66');
+        spawnFloatingText(this.x, this.y - (this.r || 25) - 34, 'FULL REGENERATION!', '#00FF66');
+      }
+    }
 
     // Aim towards target immediately (Rule 3)
     if (target) {
@@ -1390,6 +1416,12 @@ export class RezeFighter extends Fighter {
     this.shootCooldown = 30;
     this.vx = 0;
     this.vy = 0;
+
+    // Ensure Full HP is topped up upon finishing transformation
+    if (this.isSkillEnabled(cfg.enableUltimateFullHeal, true) && this.hp < this.maxHp) {
+      this.hp = this.maxHp;
+      this._healthBarHealTimer = 24;
+    }
   }
 
   _updateMegatonNuke() {
@@ -1585,6 +1617,51 @@ export class RezeFighter extends Fighter {
 
   onFrozenSkillDurationTick(isInsideGojoDomain) {
     // Bomb Devil Form is permanent once activated — no duration to tick down
+  }
+
+  /**
+   * Applies vampiric blood lifesteal HP recovery when dealing damage during Bomb Devil Form (Ultimate State).
+   * @param {number} damageDealt
+   * @param {Object} [target]
+   */
+  applyHybridLifesteal(damageDealt, target = null) {
+    if (!this.isHybridModeActive || this.isDead || this.hp <= 0 || !damageDealt || damageDealt <= 0) return;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    if (!this.isSkillEnabled(cfg.enableHybridLifesteal, true)) return;
+
+    const lifestealPercent = (typeof cfg.hybridLifestealPercent === 'number') ? cfg.hybridLifestealPercent : 0.35;
+    if (lifestealPercent <= 0) return;
+
+    // Defensive target validation
+    if (target) {
+      if (target.isInvulnerable || (target.invulnerabilityTimer && target.invulnerabilityTimer > 0)) return;
+      if (typeof target.hasActiveInfinity === 'function' && target.hasActiveInfinity() && !this.gojoInfinityImmune) return;
+    }
+
+    const healAmount = Math.max(1, Math.round(damageDealt * lifestealPercent));
+    if (healAmount > 0 && this.hp < this.maxHp) {
+      this.hp = Math.min(this.maxHp, this.hp + healAmount);
+      this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
+      this._healthBarHealTimer = 16;
+
+      const now = Date.now();
+      if (!this._lastLifestealTextTime || now - this._lastLifestealTextTime >= 100) {
+        this._lastLifestealTextTime = now;
+        spawnFloatingText(this.x + (Math.random() - 0.5) * 16, this.y - (this.r || 25) - 12, `+${healAmount}`, '#00FF66');
+      }
+    }
+  }
+
+  /**
+   * Universal damage hook: Damage dealt while in Bomb Devil Form triggers lifesteal recovery.
+   */
+  onDamageDealt(target, projectile, ownerIndex, damageAmount) {
+    super.onDamageDealt?.(target, projectile, ownerIndex, damageAmount);
+    const dmg = typeof damageAmount === 'number' ? damageAmount : (projectile?.damage || 0);
+    if (this.isHybridModeActive && dmg > 0) {
+      this.applyHybridLifesteal(dmg, target);
+    }
   }
 }
 

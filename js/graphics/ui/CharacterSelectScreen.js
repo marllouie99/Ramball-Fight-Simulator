@@ -1358,6 +1358,8 @@ export function getFighterWeaponInfo(def) {
       return { name: 'CLEAVE, DISMANTLE & FUGA', category: 'CURSED // SPATIAL SLASH', desc: 'Invisible spatial slashes with Malevolent Shrine and Fuga Divine Flame arrow.' };
     case 'toji':
       return { name: 'INVERTED SPEAR & SPLIT SOUL', category: 'SPECIAL GRADE // CURSED TOOLS', desc: 'ISOH nullifies cursed barriers while the Split Soul Katana ignores physical defense.' };
+    case 'maki':
+      return { name: 'SPLIT SOUL KATANA & DRAGON-BONE', category: 'HEAVENLY RESTRICTION // COMPLETE', desc: 'True soul-severing damage that bypasses domains, air-stepping mobility, and Dragon-Bone kinetic exhaust.' };
     case 'mahoraga':
       return { name: 'SWORD OF EXTERMINATION', category: 'DIVINE // ADAPTATION', desc: 'Blade coated in positive energy that rapidly adapts and counters all damage.' };
     case 'yuta':

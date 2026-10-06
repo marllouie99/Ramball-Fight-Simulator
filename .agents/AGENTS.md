@@ -109,6 +109,18 @@ After completing ANY code modification, update, or fix in the project, the agent
 - The ONLY explicit lore exception is **Toji Fushiguro** (`characterId === 'toji'`), who wields the Inverted Spear of Heaven (ISOH) to bypass Infinity.
 - **Mahoraga** is blocked initially, but after 2 exposures adapts (`gojoInfinityImmune = true`), granting total immunity thereafter.
 
+### 1.8 Mandatory Basic Projectile Suppression (Rule 23)
+- Unless the character is explicitly a vanilla generic gun/bullet shooter, ALL new fighter classes MUST override `shoot(ownerIndex)` with a blank method or dedicated melee/skill action:
+  ```javascript
+  /**
+   * Overrides base Fighter.shoot() to suppress default generic bullet projectiles.
+   */
+  shoot(ownerIndex) {
+    // Intentionally empty: Character uses dedicated combat skills, weapons, or melee combos
+  }
+  ```
+- This prevents the base `Fighter.update()` loop in `fighter.js` from spawning unwanted generic circular bullet projectiles during basic attack loops.
+
 ---
 
 ## 2. Rendering, Performance & WebGL Standards
@@ -233,6 +245,13 @@ After completing ANY code modification, update, or fix in the project, the agent
   - Pre-render into 48x48 or 64x64 pixel art with 16-bit color quantization and binary alpha cut.
   - Scale with `ctx.imageSmoothingEnabled = false;` directly to `drawR = r * 1.04`.
   - Dynamic in-memory fallback uses offscreen canvas quantization if image is missing.
+
+### 3.8 Mandatory Hair & Head Asset Model Import (Rule 22)
+- When creating, scaffolding, or implementing new character skins, the agent **MUST ALWAYS** import and load the character's dedicated hair asset model:
+  - **Module-Level Image Cache**: Define `let _[name]HairImage = null;` and an exportable `_get[Name]HairImage()` loader function with proactive eager initialization (`if (typeof window !== 'undefined' && typeof Image !== 'undefined') _get[Name]HairImage();`).
+  - **Hair Renderer Function**: Define `_draw[Name]Hair(ctx, r, facingLeft)` supporting `state.skinCustomizations?.[characterId]` (scale, offsets, rotation, flipping) with nearest-neighbor pixel fidelity (`ctx.imageSmoothingEnabled = false;`).
+  - **Bounding Box Calibration**: Calibrate hair scale and draw offsets so the crown spikes frame the upper body circle seamlessly at `-1.15r` to `-1.30r`.
+  - **Directory Structure & Config Reference**: Store all character hair PNGs in `Assets/model/<characterId>/<Name>-hair.png` and register the path under `assets.hair` in `js/configs/characters/<name>Config.js`.
 
 ---
 

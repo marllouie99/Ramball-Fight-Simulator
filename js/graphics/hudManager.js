@@ -135,7 +135,9 @@ export function getFighterThemeColor(f, fallbackColor = '#38bdf8') {
     (f.name && f.name.toUpperCase().includes('YUTA'))
   );
   if (isYuta) return '#FF1493';
-  return f.themeColor ||
+  const charId = f.characterId || f.type || (f._def && (f._def.id || f._def.type));
+  const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
+  let color = charCfg?.themeColor || f.themeColor ||
     f._def?.themeColor ||
     (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].themeColor : null) ||
     (f.characterId && CONFIG && CONFIG[f.characterId] ? CONFIG[f.characterId].themeColor : null) ||
@@ -144,6 +146,10 @@ export function getFighterThemeColor(f, fallbackColor = '#38bdf8') {
     (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].color : null) ||
     (f.characterId && CONFIG && CONFIG[f.characterId] ? CONFIG[f.characterId].color : null) ||
     fallbackColor;
+  if (typeof color === 'string' && /^[0-9a-fA-F]{3,8}$/.test(color)) {
+    color = '#' + color;
+  }
+  return color;
 }
 
 const BOSS_SUB_NAMES = {

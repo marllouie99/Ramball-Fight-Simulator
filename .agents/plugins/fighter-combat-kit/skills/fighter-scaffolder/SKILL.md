@@ -51,3 +51,22 @@ super.update(opponent, ownerIndex, arena);
 ### 5. Mandatory In-Game Overlay HP & Status Drawing (Rule 21)
 - If overriding `draw(ctx, opponent)`: ALWAYS call `this.drawHealth(ctx);` and `this.drawFreezeTimer(ctx);` at the end of the `draw()` pipeline.
 - ALWAYS implement `drawBody(ctx) { draw[Name]Skin(ctx, this); }` so standard renderers, previews, and engine hooks work properly.
+
+### 6. Mandatory Hair & Head Asset Model Import (Rule 22)
+- ALWAYS import and load the character's dedicated hair asset (`Assets/model/<characterId>/<Name>-hair.png`) via module-level eager caching (`_get[Name]HairImage()`).
+- Implement `_draw[Name]Hair(ctx, r, facingLeft)` supporting `state.skinCustomizations?.[characterId]` with `ctx.imageSmoothingEnabled = false;` and calibrated crown offsets (`-1.15r` to `-1.30r`).
+- Register `assets.hair` inside `js/configs/characters/<name>Config.js`.
+
+### 7. Mandatory Basic Projectile Suppression (Rule 23)
+- Unless the character is explicitly a vanilla generic gun/bullet shooter, ALL fighter classes MUST override `shoot(ownerIndex)` with a blank method or custom melee/skill trigger:
+  ```javascript
+  /**
+   * Overrides base Fighter.shoot() to suppress default generic bullet projectiles.
+   */
+  shoot(ownerIndex) {
+    // Intentionally empty: Character uses dedicated combat skills, weapons, or melee combos
+  }
+  ```
+- This prevents the base `Fighter.update()` loop from spawning unwanted generic circular bullet projectiles during basic attack loops.
+
+

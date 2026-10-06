@@ -78,6 +78,7 @@ export { drawKnightSkin, drawKnightPixelBody, drawKnightBody, drawKnightGhostMod
 export { drawNanamiSkin, drawNanamiPixelBody, _drawNanamiHair, _getNanamiHairImage } from './fighters/nanamiSkin.js';
 export { drawMahitoSkin, drawMahitoPixelBody, _drawMahitoHair, _getMahitoHairImage } from './fighters/mahitoSkin.js';
 export { drawNaoyaSkin, drawNaoyaGhostModel, getNaoyaProjectionCachedCanvas, _drawNaoyaHair, _getNaoyaHairImage, _getNaoyaProjectionHairCanvas } from './fighters/naoyaSkin.js';
+export { drawMakiSkin, drawMakiGhostSkin, drawMakiPixelBody, _drawMakiHair, _getMakiHairImage } from './fighters/makiSkin.js';
 export { drawEmberSkin, drawEmberPixelBody, drawFlamewardenSkin } from './fighters/flamewardenSkin.js';
 export { drawEyeOfCthulhuSkin, drawServantOfCthulhuProjectile } from './fighters/eyeOfCthulhuSkin.js';
 export { drawEnderDragonSkin, drawEnderDragonPixelBody, drawDragonAcidPool, drawEnderDragonDeathDisintegration, getEnderDragonWingsSheet, getEnderDragonTailsSheet, getEnderDragonTextureSkinImage } from './fighters/enderDragonSkin.js';

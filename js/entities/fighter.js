@@ -1444,6 +1444,13 @@ export class Fighter {
       this.knockbackVy = 0;
       return;
     }
+    if (this.isPinnedByMaki) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
+      return;
+    }
     if (!this.isTargetOfAmbush && !this.isChainedByMakima && (this._frozenByCronosSphere || this.isInsideCronosSphere() || isInsideRubbickStolenVoid(this) || (this.timeStopTimer > 0 && !this.domainActive))) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
@@ -1604,6 +1611,14 @@ export class Fighter {
     if (this.isGrabbedByMahoraga) {
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.isPinnedByMaki) {
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
       this._handleFrozenSkillCooldowns();
       return true;
     }
@@ -2121,6 +2136,14 @@ export class Fighter {
         this.x = this._shatterLockedX;
         this.y = this._shatterLockedY;
       }
+      return;
+    }
+
+    if (this.isPinnedByMaki) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.vx = 0;
+      this.vy = 0;
       return;
     }
 

@@ -60,6 +60,7 @@ import { EyeOfCthulhuFighter } from '../fighters/EyeOfCthulhuFighter.js';
 import { EnderDragonFighter } from '../fighters/EnderDragonFighter.js';
 import { SansFighter } from '../fighters/SansFighter.js';
 import { NaoyaFighter } from '../fighters/NaoyaFighter.js';
+import { MakiFighter } from '../fighters/MakiFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -100,6 +101,8 @@ export const FIGHTER_CLASS_MAP = {
   'nanami': NanamiFighter,
   'naoya': NaoyaFighter,
   'naoya_zenin': NaoyaFighter,
+  'maki': MakiFighter,
+  'maki_zenin': MakiFighter,
   'nobara': NobaraFighter,
   'megumi': MegumiFighter,
   'megumin': MeguminFighter,

@@ -272,7 +272,13 @@ export function drawFaceOffThumbnailScreen() {
     if (def.type === 'yuta' || def.id === 23 || def.id === 'yuta' || (def.name && def.name.toUpperCase().includes('YUTA'))) {
       return '#FF1493';
     }
-    return def.themeColor || def.color || fallback;
+    const charId = def.type || def.id || def.key;
+    const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
+    let color = charCfg?.themeColor || def.themeColor || charCfg?.color || def.color || fallback;
+    if (typeof color === 'string' && /^[0-9a-fA-F]{3,8}$/.test(color)) {
+      color = '#' + color;
+    }
+    return color;
   };
 
   let leftThemeColor = getFaceOffThemeColor(p1Def, '#38bdf8');

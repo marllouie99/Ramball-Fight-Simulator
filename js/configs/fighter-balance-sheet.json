@@ -775,6 +775,31 @@
           "timeStopDuration": 90
         }
       }
+    },
+    "maki": {
+      "name": "Maki",
+      "archetype": "blade",
+      "hp": 220,
+      "speed": 5.4,
+      "radius": 25,
+      "baseDamage": 28,
+      "baseCooldown": 42,
+      "themeColor": "#014913ff",
+      "keySkills": {
+        "dragonBoneJet": {
+          "baseDamage": 55,
+          "maxDamage": 110,
+          "cooldown": 420
+        },
+        "soulRiposte": {
+          "damage": 70,
+          "cooldown": 540
+        },
+        "sakurajimaAwakening": {
+          "totalDamage": 225,
+          "cooldown": 2100
+        }
+      }
     }
   }
 }

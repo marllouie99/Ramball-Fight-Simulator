@@ -206,7 +206,21 @@ function getFighterThemeColor(f, fallbackColor = '#38BDF8') {
   if (!f) return fallbackColor;
   const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
   if (isYuta) return '#FF1493';
-  return f.themeColor || f._def?.themeColor || f.color || f._def?.color || fallbackColor;
+  const charId = f.characterId || f.type || (f._def && (f._def.id || f._def.type));
+  const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
+  let color = charCfg?.themeColor ||
+    f.themeColor ||
+    f._def?.themeColor ||
+    (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].themeColor : null) ||
+    charCfg?.color ||
+    f.color ||
+    f._def?.color ||
+    (f.fighterIndex !== undefined && FIGHTER_DEFS && FIGHTER_DEFS[f.fighterIndex] ? FIGHTER_DEFS[f.fighterIndex].color : null) ||
+    fallbackColor;
+  if (typeof color === 'string' && /^[0-9a-fA-F]{3,8}$/.test(color)) {
+    color = '#' + color;
+  }
+  return color;
 }
 
 /**

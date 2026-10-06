@@ -667,6 +667,8 @@ function drawIndexDetailScreen() {
     animBtns.push({ id: 'flurry', label: 'DISMANTLE' }, { id: 'fuga', label: 'FUGA ARROW' }, { id: 'domain', label: 'MALEVOLENT SHRINE' });
   } else if (def.type === 'toji') {
     animBtns.push({ id: 'spear', label: 'ISOH CHOP' }, { id: 'stealth', label: 'AMBUSH STRIKE' });
+  } else if (def.type === 'maki') {
+    animBtns.push({ id: 'jet', label: 'RYŪHOKU JET' }, { id: 'riposte', label: 'SOUL RIPOSTE' }, { id: 'ult', label: 'SAKURAJIMA' });
   } else if (def.type === 'todo') {
     animBtns.push({ id: 'clap', label: 'BOOGIE WOOGIE' }, { id: 'takada', label: 'TAKADA CHAN' });
   } else if (def.type === 'saitama') {

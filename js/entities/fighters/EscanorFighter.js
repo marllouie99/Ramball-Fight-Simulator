@@ -203,6 +203,7 @@ export class EscanorFighter extends Fighter {
     this._chopPreviousStrikeP = 0;
     this.chopHitPauseTimer = 0;
     this.chopHitPauseMax = 0;
+    this.chopHitPauseTargets = [];
     this.chopHitPauseTarget = null;
     this.punchAnimTimer = 0;
     this.punchMaxTime = 14;
@@ -339,6 +340,7 @@ export class EscanorFighter extends Fighter {
     this._chopPreviousStrikeP = 0;
     this.chopHitPauseTimer = 0;
     this.chopHitPauseMax = 0;
+    this.chopHitPauseTargets = [];
     this.chopHitPauseTarget = null;
     this.prideStacks = 0;
     this.prideChargeTimer = 0;
@@ -886,16 +888,21 @@ export class EscanorFighter extends Fighter {
         this.angle = this.chopCastAngle;
       }
 
-      // Keep target frozen in hit-pause stasis
-      if (this.chopHitPauseTarget) {
-        this.chopHitPauseTarget.vx = 0;
-        this.chopHitPauseTarget.vy = 0;
-        if (typeof this.chopHitPauseTarget.applyTimeStop === 'function') {
-          this.chopHitPauseTarget.applyTimeStop(this.chopHitPauseTimer);
+      // Keep all caught targets frozen in hit-pause stasis
+      const pauseTargets = (this.chopHitPauseTargets && this.chopHitPauseTargets.length > 0)
+        ? this.chopHitPauseTargets
+        : (this.chopHitPauseTarget ? [this.chopHitPauseTarget] : []);
+
+      for (const tgt of pauseTargets) {
+        if (!tgt || tgt.hp <= 0) continue;
+        tgt.vx = 0;
+        tgt.vy = 0;
+        if (typeof tgt.applyTimeStop === 'function') {
+          tgt.applyTimeStop(this.chopHitPauseTimer);
         } else {
-          this.chopHitPauseTarget.timeStopTimer = Math.max(this.chopHitPauseTarget.timeStopTimer || 0, this.chopHitPauseTimer);
+          tgt.timeStopTimer = Math.max(tgt.timeStopTimer || 0, this.chopHitPauseTimer);
         }
-        this.chopHitPauseTarget.suppressFreezeOverlay = true;
+        tgt.suppressFreezeOverlay = true;
       }
 
       // On pause completion (unpause moment): release stasis, launch knockback & screen shake!
@@ -904,8 +911,17 @@ export class EscanorFighter extends Fighter {
         const unpauseDur = cfg.basicUnpauseShakeDuration || 18;
         triggerGlobalScreenShake(unpauseShake, unpauseDur);
 
-        if (this.chopHitPauseTarget) {
-          const target = this.chopHitPauseTarget;
+        const knockbackAngle = (this.chopCastAngle !== undefined)
+          ? this.chopCastAngle
+          : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
+        const prideMult = 1.0 + (this.prideStacks * (cfg.prideStackDamageBonus || 0.08)) + (this.isTheOneActive ? 0.45 : 0);
+        const baseKnockback = (cfg.basicKnockback || 50.0) * (this.isTheOneActive ? 1.6 : 1.0) * prideMult;
+        const stunFrames = cfg.basicHitStunFrames || 18;
+
+        let hasHitAny = false;
+        for (const target of pauseTargets) {
+          if (!target) continue;
+          hasHitAny = true;
           target.suppressFreezeOverlay = false;
           target.timeStopTimer = 0; // Release timeStop so knockback is NOT zeroed by physics!
 
@@ -915,12 +931,6 @@ export class EscanorFighter extends Fighter {
           target._escanorAttacker = this;
 
           // Apply physical knockback push upon unpause along committed chop angle
-          const knockbackAngle = (this.chopCastAngle !== undefined)
-            ? this.chopCastAngle
-            : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
-          const prideMult = 1.0 + (this.prideStacks * (cfg.prideStackDamageBonus || 0.08)) + (this.isTheOneActive ? 0.45 : 0);
-          const baseKnockback = (cfg.basicKnockback || 50.0) * (this.isTheOneActive ? 1.6 : 1.0) * prideMult;
-
           if (typeof target.applyKnockback === 'function') {
             target.applyKnockback(Math.cos(knockbackAngle) * baseKnockback, Math.sin(knockbackAngle) * baseKnockback);
           } else {
@@ -931,7 +941,6 @@ export class EscanorFighter extends Fighter {
           }
 
           // Apply hit stun so target reels in knockback
-          const stunFrames = cfg.basicHitStunFrames || 18;
           if (typeof target.applyHitStun === 'function') {
             target.applyHitStun(stunFrames);
           } else {
@@ -946,7 +955,9 @@ export class EscanorFighter extends Fighter {
           // Explosive unpause effects: blood burst, sparks & heavy cleave audio!
           spawnBloodEffect(target.x, target.y, 10, knockbackAngle);
           spawnSparks(target.x, target.y, '#F59E0B', 14);
+        }
 
+        if (hasHitAny) {
           try {
             const unpauseSnd = cfg.sounds?.unpauseHit || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
             const unpauseVol = cfg.soundVolumes?.unpauseHit !== undefined ? cfg.soundVolumes.unpauseHit : 1.0;
@@ -956,9 +967,10 @@ export class EscanorFighter extends Fighter {
           // Residual forward cleave step on unpause carries weapon weight
           this.vx = Math.cos(knockbackAngle) * 2.2;
           this.vy = Math.sin(knockbackAngle) * 2.2;
-
-          this.chopHitPauseTarget = null;
         }
+
+        this.chopHitPauseTargets = [];
+        this.chopHitPauseTarget = null;
       }
       return; // Freeze Escanor's actions during the hit-pause!
     }
@@ -1405,25 +1417,28 @@ export class EscanorFighter extends Fighter {
     const prideMult = 1.0 + (this.prideStacks * (cfg.prideStackDamageBonus || 0.08)) + (this.isTheOneActive ? 0.45 : 0);
     const damage = Math.round((baseMin + Math.random() * (baseMax - baseMin)) * prideMult);
 
-    let hitTarget = null;
+    const hitTargets = [];
     const validTargets = this._getAllValidEnemyTargets();
+    const pauseFrames = cfg.chopHitPauseFrames || 26;
 
     for (const tgt of validTargets) {
       const hit = _testRhittaBladeHit(this, tgt, currentStrikeP, prevStrikeP);
       if (!hit) continue;
 
-      hitTarget = tgt;
+      hitTargets.push(tgt);
       this._chopHitConnected = true;
 
-      // Snapshot exact collision pose for hit-pause freeze
-      this.chopHitProgress = hit.sampleP;
-      this.chopHitAxeAngle = hit.blade.localAxeAngle;
-      this.chopHitHandX = hit.blade.localHandX;
-      this.chopHitHandY = hit.blade.localHandY;
-      this.chopHitBackHandX = hit.blade.localBackHandX;
-      this.chopHitBackHandY = hit.blade.localBackHandY;
+      // Snapshot exact collision pose for hit-pause freeze from the first connected strike
+      if (hitTargets.length === 1) {
+        this.chopHitProgress = hit.sampleP;
+        this.chopHitAxeAngle = hit.blade.localAxeAngle;
+        this.chopHitHandX = hit.blade.localHandX;
+        this.chopHitHandY = hit.blade.localHandY;
+        this.chopHitBackHandX = hit.blade.localBackHandX;
+        this.chopHitBackHandY = hit.blade.localBackHandY;
+      }
 
-      // Apply initial damage and burn
+      // Apply initial damage and burn to all targets caught in the cleave
       applyDamageToTarget(tgt, damage, this, { isMelee: true, isGuaranteedHit: true });
       if (typeof tgt.takeDamage === 'function') {
         tgt.takeDamage(cfg.basicBurnDamage || 6, this, { isMelee: true, isGuaranteedHit: true, isBurn: true });
@@ -1442,18 +1457,7 @@ export class EscanorFighter extends Fighter {
       spawnImpactFlash(contactX, contactY, '#F59E0B', 55);
       spawnSparks(contactX, contactY, '#F59E0B', 14);
 
-      try {
-        const hitSnd = cfg.sounds?.chopHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
-        const hitVol = cfg.soundVolumes?.chopHit !== undefined ? cfg.soundVolumes.chopHit : 0.95;
-        audioSystem.playSFX(hitSnd, hitVol);
-      } catch (e) {}
-
-      // Cinematic Hit-Pause (freeze at the exact point of impact)
-      const pauseFrames = cfg.chopHitPauseFrames || 26;
-      this.chopHitPauseTimer = pauseFrames;
-      this.chopHitPauseMax = pauseFrames;
-      this.chopHitPauseTarget = tgt;
-
+      // Freeze target in time-stop stasis for cinematic hit-pause
       if (typeof tgt.applyTimeStop === 'function') {
         tgt.applyTimeStop(pauseFrames);
       } else {
@@ -1462,8 +1466,21 @@ export class EscanorFighter extends Fighter {
       tgt.suppressFreezeOverlay = true;
       tgt.vx = 0;
       tgt.vy = 0;
+    }
+
+    if (hitTargets.length > 0) {
+      this.chopHitPauseTargets = hitTargets;
+      this.chopHitPauseTarget = hitTargets[0];
+      this.chopHitPauseTimer = pauseFrames;
+      this.chopHitPauseMax = pauseFrames;
       this.vx = 0;
       this.vy = 0;
+
+      try {
+        const hitSnd = cfg.sounds?.chopHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+        const hitVol = cfg.soundVolumes?.chopHit !== undefined ? cfg.soundVolumes.chopHit : 0.95;
+        audioSystem.playSFX(hitSnd, hitVol);
+      } catch (e) {}
 
       const impactShake = (cfg.basicImpactShake || 7.0) * (this.isTheOneActive ? 1.5 : 1.0);
       const impactDur = cfg.basicImpactShakeDuration || 12;
@@ -1472,11 +1489,9 @@ export class EscanorFighter extends Fighter {
       if (Boolean(cfg.enableSunshine ?? true) && this.prideStacks < this.prideMaxStacks) {
         this.prideStacks++;
       }
-
-      break; // Primary target hit connected
     }
 
-    return Boolean(hitTarget);
+    return hitTargets.length > 0;
   }
 
   /**
@@ -1487,59 +1502,70 @@ export class EscanorFighter extends Fighter {
    */
   _onChopStrikeFinished() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
-    if (this._chopHitConnected && this.chopHitPauseTarget) {
-      const target = this.chopHitPauseTarget;
-      target.suppressFreezeOverlay = false;
-      target.timeStopTimer = 0;
+    const pauseTargets = (this.chopHitPauseTargets && this.chopHitPauseTargets.length > 0)
+      ? this.chopHitPauseTargets
+      : (this.chopHitPauseTarget ? [this.chopHitPauseTarget] : []);
 
+    if (this._chopHitConnected && pauseTargets.length > 0) {
       const unpauseShake = (cfg.basicUnpauseShake || 10.0) * (this.isTheOneActive ? 1.5 : 1.0);
       const unpauseDur = cfg.basicUnpauseShakeDuration || 18;
       triggerGlobalScreenShake(unpauseShake, unpauseDur);
 
-      // Tag target for wall pin upon wall collision
-      target.isWallPinnedByEscanor = true;
-      target._knockedBackByEscanorBasicAttack = true;
-      target._escanorAttacker = this;
-
-      // Apply physical knockback push along committed chop angle
       const knockbackAngle = (this.chopCastAngle !== undefined)
         ? this.chopCastAngle
         : ((this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0));
       const prideMult = 1.0 + (this.prideStacks * (cfg.prideStackDamageBonus || 0.08)) + (this.isTheOneActive ? 0.45 : 0);
       const baseKnockback = (cfg.basicKnockback || 50.0) * (this.isTheOneActive ? 1.6 : 1.0) * prideMult;
-
-      if (typeof target.applyKnockback === 'function') {
-        target.applyKnockback(Math.cos(knockbackAngle) * baseKnockback, Math.sin(knockbackAngle) * baseKnockback);
-      } else {
-        target.knockbackVx = Math.cos(knockbackAngle) * baseKnockback;
-        target.knockbackVy = Math.sin(knockbackAngle) * baseKnockback;
-        target.vx = target.knockbackVx;
-        target.vy = target.knockbackVy;
-      }
-
-      // Apply hit stun so target reels in knockback
       const stunFrames = cfg.basicHitStunFrames || 18;
-      if (typeof target.applyHitStun === 'function') {
-        target.applyHitStun(stunFrames);
-      } else {
-        target.hitStunTimer = Math.max(target.hitStunTimer || 0, stunFrames);
+
+      let hasHitAny = false;
+      for (const target of pauseTargets) {
+        if (!target) continue;
+        hasHitAny = true;
+        target.suppressFreezeOverlay = false;
+        target.timeStopTimer = 0;
+
+        // Tag target for wall pin upon wall collision
+        target.isWallPinnedByEscanor = true;
+        target._knockedBackByEscanorBasicAttack = true;
+        target._escanorAttacker = this;
+
+        // Apply physical knockback push along committed chop angle
+        if (typeof target.applyKnockback === 'function') {
+          target.applyKnockback(Math.cos(knockbackAngle) * baseKnockback, Math.sin(knockbackAngle) * baseKnockback);
+        } else {
+          target.knockbackVx = Math.cos(knockbackAngle) * baseKnockback;
+          target.knockbackVy = Math.sin(knockbackAngle) * baseKnockback;
+          target.vx = target.knockbackVx;
+          target.vy = target.knockbackVy;
+        }
+
+        // Apply hit stun so target reels in knockback
+        if (typeof target.applyHitStun === 'function') {
+          target.applyHitStun(stunFrames);
+        } else {
+          target.hitStunTimer = Math.max(target.hitStunTimer || 0, stunFrames);
+        }
+
+        // Crushing weight slow — stagger from divine axe impact
+        if (typeof target.applySlow === 'function') {
+          target.applySlow(45, 0.4); // 40% speed for ~0.75s
+        }
+
+        // Explosive unpause effects: blood burst, sparks & heavy cleave audio!
+        spawnBloodEffect(target.x, target.y, 10, knockbackAngle);
+        spawnSparks(target.x, target.y, '#F59E0B', 14);
       }
 
-      // Crushing weight slow — stagger from divine axe impact
-      if (typeof target.applySlow === 'function') {
-        target.applySlow(45, 0.4); // 40% speed for ~0.75s
+      if (hasHitAny) {
+        try {
+          const unpauseSnd = cfg.sounds?.unpauseHit || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+          const unpauseVol = cfg.soundVolumes?.unpauseHit !== undefined ? cfg.soundVolumes.unpauseHit : 1.0;
+          audioSystem.playSFX(unpauseSnd, unpauseVol);
+        } catch (e) {}
       }
 
-      // Explosive unpause effects: blood burst, sparks & heavy cleave audio!
-      spawnBloodEffect(target.x, target.y, 10, knockbackAngle);
-      spawnSparks(target.x, target.y, '#F59E0B', 14);
-
-      try {
-        const unpauseSnd = cfg.sounds?.unpauseHit || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
-        const unpauseVol = cfg.soundVolumes?.unpauseHit !== undefined ? cfg.soundVolumes.unpauseHit : 1.0;
-        audioSystem.playSFX(unpauseSnd, unpauseVol);
-      } catch (e) {}
-
+      this.chopHitPauseTargets = [];
       this.chopHitPauseTarget = null;
     } else if (!this._chopHitConnected) {
       // Missed downward chop slammed into empty arena floor
@@ -2443,10 +2469,14 @@ export class EscanorFighter extends Fighter {
     this.slashOriginReach = undefined;
     this.slashOriginRadius = undefined;
     this.slashOriginTheOne = undefined;
-    if (this.chopHitPauseTarget) {
-      this.chopHitPauseTarget.suppressFreezeOverlay = false;
-      this.chopHitPauseTarget = null;
+    const pauseTargets = (this.chopHitPauseTargets && this.chopHitPauseTargets.length > 0)
+      ? this.chopHitPauseTargets
+      : (this.chopHitPauseTarget ? [this.chopHitPauseTarget] : []);
+    for (const tgt of pauseTargets) {
+      if (tgt) tgt.suppressFreezeOverlay = false;
     }
+    this.chopHitPauseTargets = [];
+    this.chopHitPauseTarget = null;
     this.chopHitPauseTimer = 0;
     this.chopHitProgress = null;
     this.chopHitAxeAngle = null;

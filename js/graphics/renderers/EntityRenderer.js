@@ -9,6 +9,7 @@ import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 import { drawCursedRocks } from '../fighters/todoSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 import { draw24FPSFrameStasisOverlay } from '../weapons/naoyaWeaponGraphics.js';
+import { drawMakiImpaledTargetOverlay } from '../weapons/makiWeaponGraphics.js';
 import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
 
@@ -518,6 +519,11 @@ export function drawFighters() {
       ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
       drawEmbeddedMahitoSpikes(ctx, fighter.r, fighter);
       ctx.restore();
+    }
+
+    // Maki Zen'in Dragon-Bone Impaled Sword Overlay (stuck through enemy body)
+    if (fighter.isPinnedByMaki && fighter.hp > 0 && !fighter.isDead) {
+      drawMakiImpaledTargetOverlay(ctx, fighter, fighter._makiPinnedBy);
     }
 
     // ── TOJI ULTIMATE HIGHLIGHT PASS: Ethereal Violet Rim Glow around Toji ──
