@@ -4,6 +4,10 @@
 // ─────────────────────────────────────────────
 
 export const denjiConfig = {
+  assets: {
+    skin: 'Assets/model/denji/denji-devilform-model-skin.png',
+  },
+
   name: 'Denji',
   displayName: 'Denji',
   bossTitle: 'Chainsaw Man',

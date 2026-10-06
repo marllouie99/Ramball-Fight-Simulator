@@ -42,10 +42,10 @@ export function _getIchigoHairImage() {
       _ichigoHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ichigo hair image at Assets/model/Ichigo-hair.png', e);
+      console.warn('Failed to load Ichigo hair image at Assets/model/ichigo/ichigo-hair.png', e);
       _ichigoHairImageLoading = false;
     };
-    img.src = 'Assets/model/Ichigo-hair.png?v=1';
+    img.src = 'Assets/model/ichigo/ichigo-hair.png?v=1';
     _ichigoHairImage = img;
   }
   return _ichigoHairImage;
@@ -862,7 +862,7 @@ export function drawIchigoSkin(ctx, fighter) {
     _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
   }
 
-  // ── 5.3. Authentic Pixel-Art Orange Hair (Assets/model/Ichigo-hair.png) ──
+  // ── 5.3. Authentic Pixel-Art Orange Hair (Assets/model/ichigo/ichigo-hair.png) ──
   // Render hair on top of face, static mask, and reforming mask pieces so hair is never overlaid
   _drawIchigoHair(ctx, r, facingLeft);
 
@@ -2491,7 +2491,7 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
 }
 
 /**
- * Draws Ichigo's authentic pixel-art orange spiky hair from Assets/model/Ichigo-hair.png.
+ * Draws Ichigo's authentic pixel-art orange spiky hair from Assets/model/ichigo/ichigo-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]

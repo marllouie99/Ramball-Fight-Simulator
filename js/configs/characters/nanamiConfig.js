@@ -3,6 +3,15 @@
 // ─────────────────────────────────────────────
 
 export const nanamiConfig = {
+  assets: {
+    hair: 'Assets/model/nanami/Nanami-hair.png',
+    skin: 'Assets/model/nanami/Nanami-SKIN.png',
+    pixelSkin: 'Assets/model/nanami/Nanami-PIXEL-SKIN.png',
+    weapon: 'Assets/model/nanami/Nanami-weapon.png',
+    overtimeOverlay: 'Assets/Overlays/Nanami-overtime-overlay.png',
+    ratioCritOverlay: 'Assets/Overlays/nanami-ratio-crit-anime.png',
+  },
+
   name: 'Nanami',
   displayName: 'Nanami',
   bossTitle: '7:3 Ratio Sorcerer',

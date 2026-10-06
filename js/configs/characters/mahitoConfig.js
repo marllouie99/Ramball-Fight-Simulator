@@ -3,6 +3,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const mahitoConfig = {
+  assets: {
+    hair: 'Assets/model/mahito/Mahito-hair.png',
+    weapon: 'Assets/model/mahito/MAHITO-CLAWS-WEAPON.png',
+    domainOverlay: 'Assets/Overlays/mahitos-de.png',
+  },
+
   name: 'Mahito',
   displayName: 'Mahito',
   bossTitle: 'Curse of Humanity',
@@ -252,7 +258,7 @@ export const mahitoConfig = {
     // Basic Attack & Weapon Morphs
     bladeSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     bladeSwingAlt: 'Assets/Sound Effects/Attacks/swordswing.mp3',
-    maceSmash: 'Assets/Sound Effects/Attacks/groundsmash.mp3',
+    maceSmash: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
     maceSmashAlt: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     fleshHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     subterraneanHumpSound: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',

@@ -164,6 +164,12 @@ After completing ANY code modification, update, or fix in the project, the agent
 - All HUD skill progress bars for a fighter MUST use the **exact same consistent color theme** (`themeColor = f.color || ...`).
 - Floating Heal Text: Unified format `+<amount>` in neon emerald green (`#00FF66`) with `this._healthBarHealTimer = 16` for top health card pulse.
 
+### 2.9 Mandatory In-Game Overlay HP & Status Drawing (Rule 21)
+- **Mandatory Overhead HP Layer**: Whenever creating, scaffolding, or overriding a fighter's `draw(ctx, opponent)` rendering pipeline:
+  - If the fighter class defines or overrides `draw(ctx, opponent)`, it **MUST ALWAYS** explicitly call `this.drawHealth(ctx);` and `this.drawFreezeTimer(ctx);` at the very end of `draw()` on the top layer.
+  - The fighter class MUST define `drawBody(ctx)` (e.g. `drawBody(ctx) { draw[Name]Skin(ctx, this); }`) so standard engine render passes and preview hooks function properly.
+  - Never omit `this.drawHealth(ctx)` in custom draw methods, as doing so removes the in-game floating HP number underneath/above the fighter during combat.
+
 ---
 
 ## 3. Upright Faceless Pixel Art & Character Model Standards

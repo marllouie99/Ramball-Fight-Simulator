@@ -274,10 +274,10 @@ export function _getTodoHairImage() {
       _todoHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Todo hair image at Assets/model/Todo-hair.png', e);
+      console.warn('Failed to load Todo hair image at Assets/model/todo/Todo-hair.png', e);
       _todoHairImageLoading = false;
     };
-    img.src = 'Assets/model/Todo-hair.png?v=1';
+    img.src = 'Assets/model/todo/Todo-hair.png?v=1';
     _todoHairImage = img;
   }
   return _todoHairImage;
@@ -288,7 +288,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Aoi Todo's authentic anime spiky topknot hair from Assets/model/Todo-hair.png.
+ * Draws Aoi Todo's authentic anime spiky topknot hair from Assets/model/todo/Todo-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -822,7 +822,7 @@ export function drawTodoSkin(ctx, fighter) {
     _renderTodoPixelBodyToCanvas(ctx, r, inBFState);
   }
 
-  // ── 6.1 AUTHENTIC PIXEL ART HAIR MODEL (Assets/model/Todo-hair.png) ──
+  // ── 6.1 AUTHENTIC PIXEL ART HAIR MODEL (Assets/model/todo/Todo-hair.png) ──
   _drawTodoHair(ctx, r, facingLeft);
 
   // 7. Render Hands (Front Layer - On Top of Body Circle)

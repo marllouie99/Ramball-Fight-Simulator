@@ -32,10 +32,10 @@ export function _getEscanorHairImage() {
       _escanorHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Escanor hair image at Assets/model/Escanor-hair.png', e);
+      console.warn('Failed to load Escanor hair image at Assets/model/escanor/Escanor-hair.png', e);
       _escanorHairImageLoading = false;
     };
-    img.src = 'Assets/model/Escanor-hair.png?v=1';
+    img.src = 'Assets/model/escanor/Escanor-hair.png?v=1';
     _escanorHairImage = img;
   }
   return _escanorHairImage;
@@ -53,10 +53,10 @@ export function _getEscanorMustacheImage() {
       _escanorMustacheImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Escanor mustache image at Assets/model/Escanor-mustache.png', e);
+      console.warn('Failed to load Escanor mustache image at Assets/model/escanor/Escanor-mustache.png', e);
       _escanorMustacheImageLoading = false;
     };
-    img.src = 'Assets/model/Escanor-mustache.png?v=1';
+    img.src = 'Assets/model/escanor/Escanor-mustache.png?v=1';
     _escanorMustacheImage = img;
   }
   return _escanorMustacheImage;
@@ -68,7 +68,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Escanor's signature noble golden hair from Assets/model/Escanor-hair.png.
+ * Draws Escanor's signature noble golden hair from Assets/model/escanor/Escanor-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -115,7 +115,7 @@ export function _drawEscanorHair(ctx, r, facingLeft = false) {
 }
 
 /**
- * Draws Escanor's proud handlebar mustache from Assets/model/Escanor-mustache.png.
+ * Draws Escanor's proud handlebar mustache from Assets/model/escanor/Escanor-mustache.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -242,10 +242,10 @@ export function drawEscanorSkin(ctx, fighter) {
   // 5. LAYER 1: MAIN BODY (Pixel Head/Neck Skin + Lowered Holy Knight Armor)
   drawEscanorPixelBody(ctx, r, fighter.isTheOneActive);
 
-  // 6. LAYER 2: MUSTACHE ASSET OVERLAY (Assets/model/Escanor-mustache.png)
+  // 6. LAYER 2: MUSTACHE ASSET OVERLAY (Assets/model/escanor/Escanor-mustache.png)
   _drawEscanorMustache(ctx, r, facingLeft);
 
-  // 7. LAYER 3: HAIR ASSET OVERLAY (Assets/model/Escanor-hair.png)
+  // 7. LAYER 3: HAIR ASSET OVERLAY (Assets/model/escanor/Escanor-hair.png)
   _drawEscanorHair(ctx, r, facingLeft);
 
   // 8. LAYER 4: FRONT HAND / POINTING GAUNTLET (On Top of Body, Mustache & Hair)

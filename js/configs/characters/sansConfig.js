@@ -4,6 +4,10 @@
 // ─────────────────────────────────────────────
 
 export const sansConfig = {
+  assets: {
+    gasterBlasterSheet: 'Assets/model/Sans/Sans-gaster-blaster-sprite-sheet.png',
+  },
+
   name: 'sans',
   displayName: 'sans',
   bossTitle: 'The Judge of the Underground',

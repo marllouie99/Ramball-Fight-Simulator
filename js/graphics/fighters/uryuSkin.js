@@ -26,10 +26,10 @@ export function _getUryuBodyImage() {
       _uryuBodyImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ishida body model image at Assets/model/Uryu-ishida.png', e);
+      console.warn('Failed to load Ishida body model image at Assets/model/uryu/Uryu-ishida.png', e);
       _uryuBodyImageLoading = false;
     };
-    img.src = 'Assets/model/Uryu-ishida.png?v=3';
+    img.src = 'Assets/model/uryu/Uryu-ishida.png?v=3';
     _uryuBodyImage = img;
   }
   return _uryuBodyImage;

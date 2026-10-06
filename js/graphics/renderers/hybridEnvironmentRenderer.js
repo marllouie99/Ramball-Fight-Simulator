@@ -547,17 +547,32 @@ export function updateHybridEnvironment() {
     const data = getGojoDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    const bleed = 40;
-    data.sprite.x = arena.x - bleed;
-    data.sprite.y = arena.y - bleed;
-    data.sprite.width = arena.width + bleed * 2;
-    data.sprite.height = arena.height + bleed * 2;
+    data.sprite.x = arena.x;
+    data.sprite.y = arena.y;
+    data.sprite.width = arena.width;
+    data.sprite.height = arena.height;
 
-    if (gojoArenaMask && gojoArenaMask.parent) {
-      gojoArenaMask.parent.removeChild(gojoArenaMask);
-      gojoArenaMask = null;
+    if (state.arena) {
+      if (!gojoArenaMask) {
+        gojoArenaMask = new window.PIXI.Graphics();
+        layer.addChild(gojoArenaMask);
+      }
+      gojoArenaMask.clear();
+      gojoArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = arena.radius !== undefined ? arena.radius : (arena.width / 2);
+        gojoArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        gojoArenaMask.drawRect(arena.x, arena.y, arena.width, arena.height);
+      }
+      gojoArenaMask.endFill();
+      data.sprite.mask = gojoArenaMask;
+    } else if (data.sprite.mask) {
+      data.sprite.mask = null;
     }
-    data.sprite.mask = null;
 
     if (updateGojo || !gojo._gojoDomainHybridReady) {
       gojo._gojoDomainHybridReady = true;
@@ -585,17 +600,32 @@ export function updateHybridEnvironment() {
     const data = getRubbickDomainHybridData();
     if (!data.sprite.parent) layer.addChild(data.sprite);
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    const bleed = 40;
-    data.sprite.x = arena.x - bleed;
-    data.sprite.y = arena.y - bleed;
-    data.sprite.width = arena.width + bleed * 2;
-    data.sprite.height = arena.height + bleed * 2;
+    data.sprite.x = arena.x;
+    data.sprite.y = arena.y;
+    data.sprite.width = arena.width;
+    data.sprite.height = arena.height;
 
-    if (rubbickArenaMask && rubbickArenaMask.parent) {
-      rubbickArenaMask.parent.removeChild(rubbickArenaMask);
-      rubbickArenaMask = null;
+    if (state.arena) {
+      if (!rubbickArenaMask) {
+        rubbickArenaMask = new window.PIXI.Graphics();
+        layer.addChild(rubbickArenaMask);
+      }
+      rubbickArenaMask.clear();
+      rubbickArenaMask.beginFill(0xFFFFFF);
+      const arena = state.arena;
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = arena.radius !== undefined ? arena.radius : (arena.width / 2);
+        rubbickArenaMask.drawCircle(acx, acy, Math.max(0, ar));
+      } else {
+        rubbickArenaMask.drawRect(arena.x, arena.y, arena.width, arena.height);
+      }
+      rubbickArenaMask.endFill();
+      data.sprite.mask = rubbickArenaMask;
+    } else if (data.sprite.mask) {
+      data.sprite.mask = null;
     }
-    data.sprite.mask = null;
 
     if (updateRubbick || !rubbick._rubbickDomainHybridReady) {
       rubbick._rubbickDomainHybridReady = true;

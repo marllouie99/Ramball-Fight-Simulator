@@ -1,4 +1,4 @@
-import { Fighter } from '../fighter.js';
+import { Fighter, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { zeusConfig } from '../../configs/characters/zeusConfig.js';
 import { spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
@@ -249,8 +249,10 @@ export class ZeusFighter extends Fighter {
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
       } else if (this.isSkillEnabled(cfg.enableChainLightning, true)) {
-        this.shoot(ownerIndex);
-        this.shootCooldown = this.shootCooldownMax;
+        if (!opponent || !isEntityOutsideArena(opponent, arena)) {
+          this.shoot(ownerIndex);
+          this.shootCooldown = this.shootCooldownMax;
+        }
       }
       this.applyMovementPhysics();
     }

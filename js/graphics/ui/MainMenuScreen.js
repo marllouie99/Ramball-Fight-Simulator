@@ -7,6 +7,71 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { startGame, goToTitle } from '../../core/gameFlow.js';
 import { GAME_MODES, MODE_ROUNDS, MODE_SETTINGS } from '../../core/modeConfig.js';
 
+import { getPreloadStatus } from '../graphicsCache.js';
+
+let _preloadFadeAlpha = 1.0;
+
+export function drawPreloadProgressBar(ctx, canvas) {
+  const status = getPreloadStatus();
+  if (status.isComplete && _preloadFadeAlpha <= 0.01) return;
+
+  if (status.isComplete) {
+    _preloadFadeAlpha = Math.max(0, _preloadFadeAlpha - 0.03);
+  } else {
+    _preloadFadeAlpha = Math.min(1.0, _preloadFadeAlpha + 0.05);
+  }
+
+  if (_preloadFadeAlpha <= 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = _preloadFadeAlpha;
+
+  const barW = Math.min(canvas.width - 40, 320);
+  const barH = 10;
+  const barX = (canvas.width - barW) / 2;
+  const barY = canvas.height - 40;
+
+  // Backdrop panel
+  ctx.fillStyle = 'rgba(10, 14, 22, 0.90)';
+  ctx.strokeStyle = 'rgba(0, 245, 212, 0.35)';
+  ctx.lineWidth = 1;
+  drawChamferedRect(ctx, barX - 8, barY - 18, barW + 16, barH + 26, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Status text
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.font = '900 9px "Rajdhani", monospace';
+  ctx.fillStyle = status.isComplete ? '#10b981' : '#00F5D4';
+  const label = status.isComplete
+    ? `✓ ALL ASSETS READY (${status.loaded}/${status.total})`
+    : `⚡ WARMING UP COMBAT ASSETS... [ ${status.loaded} / ${status.total} ]`;
+  ctx.fillText(label, barX, barY - 14);
+
+  // Percentage on right
+  ctx.textAlign = 'right';
+  ctx.fillText(`${Math.round(status.ratio * 100)}%`, barX + barW, barY - 14);
+
+  // Bar track
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.fillRect(barX, barY, barW, barH);
+
+  // Bar fill with neon gradient
+  const fillW = Math.max(2, barW * status.ratio);
+  const grad = ctx.createLinearGradient(barX, barY, barX + fillW, barY);
+  grad.addColorStop(0, '#00F5D4');
+  grad.addColorStop(1, '#00D4FF');
+  ctx.fillStyle = grad;
+  ctx.fillRect(barX, barY, fillW, barH);
+
+  // Highlight beam
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+  ctx.fillRect(barX, barY, fillW, 2);
+
+  ctx.restore();
+}
+
 function drawTitleScreen() {
   const { ctx, canvas } = state;
   _clearButtons();
@@ -24,7 +89,8 @@ function drawTitleScreen() {
   // Animated background particles
   updatePreviewBalls();
   
-  // Note: HTML DOM Overlay now handles buttons and text.
+  // Render asset preload progress bar if warming up
+  drawPreloadProgressBar(ctx, canvas);
 }
 
 // ─────────────────────────────────────────────

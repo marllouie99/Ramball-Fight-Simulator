@@ -25,6 +25,7 @@ import { drawVoidmasterPixelBody } from '../fighters/voidmasterSkin.js';
 import { drawKnightPixelBody } from '../fighters/knightSkin.js';
 import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighters/nanamiSkin.js';
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
+import { drawNaoyaSkin, _drawNaoyaHair, _getNaoyaHairImage } from '../fighters/naoyaSkin.js';
 import { drawGenosSkin, drawGenosHands, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
 import { drawEscanorSkin, _drawEscanorHair, _getEscanorHairImage } from '../fighters/escanorSkin.js';
 import { drawEngineerSkin, _drawEngineerHair, _getEngineerHairImage } from '../fighters/engineerSkin.js';
@@ -98,7 +99,7 @@ let _copyToastTimer = 0;
 // Fighter Category Tabs in Skin Studio Modal
 export const SKIN_STUDIO_CATEGORIES = [
   { id: 'ALL', label: 'ALL', filter: () => true },
-  { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito'].includes(f.key) },
+  { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito', 'naoya'].includes(f.key) },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
   { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu'].includes(f.key) }
@@ -460,6 +461,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     ]
   },
   {
+    key: 'naoya',
+    label: 'NAOYA',
+    asset: 'Naoya_hair.png',
+    assetDims: '1506 x 1045',
+    baseW: 2.50,
+    baseH: 1.80,
+    baseCrownY: -1.25,
+    visW: 1289,
+    visH: 913,
+    centerX: 740,
+    topY: 30,
+    themeColor: '#76E042',
+    forms: [
+      { id: 'default', label: 'PROJECTION SORCERY' }
+    ]
+  },
+  {
     key: 'genos',
     label: 'GENOS',
     asset: 'Genos-hair.png',
@@ -708,7 +726,7 @@ function generateJsCode(fDef, custom) {
   const crownY = fDef.baseCrownY ? fDef.baseCrownY.toFixed(2) : '-1.30';
 
   if (fDef.key === 'ichigo') {
-    return `// Calibrated Hair for Ichigo (Assets/model/Ichigo-hair.png)\n` +
+    return `// Calibrated Hair for Ichigo (Assets/model/ichigo/ichigo-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 951;\n` +
@@ -718,7 +736,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -705 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 105 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'gojo') {
-    return `// Calibrated Hair for Gojo (Assets/model/Gojo-hair.png)\n` +
+    return `// Calibrated Hair for Gojo (Assets/model/gojo/gojo-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 968;\n` +
@@ -728,7 +746,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -620 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 203 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'makima') {
-    return `// Calibrated Hair for Makima (Assets/model/Makima-hair.png)\n` +
+    return `// Calibrated Hair for Makima (Assets/model/makima/Makima-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 322;\n` +
@@ -748,7 +766,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -250 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 60 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'crazydave') {
-    return `// Calibrated Hair/Pan for Crazy Dave (Assets/model/Hair/crazydave-hair.png)\n` +
+    return `// Calibrated Hair/Pan for Crazy Dave (Assets/model/crazyDave/crazydave-hair.png)\n` +
            `const targetDomeWidth = r * ${targetW};\n` +
            `const targetDomeHeight = r * ${targetH};\n` +
            `const scaleX = targetDomeWidth / 855;\n` +
@@ -758,7 +776,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -611 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 301 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'reze') {
-    return `// Calibrated Hair for Reze (Assets/model/Reze-hair.png)\n` +
+    return `// Calibrated Hair for Reze (Assets/model/reze/Reze-hair.png)\n` +
            `const targetDomeWidth = r * ${targetW};\n` +
            `const scaleX = targetDomeWidth / 260;\n` +
            `const scaleY = ((r * ${targetH}) / 260);\n` +
@@ -767,7 +785,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -246 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 80 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'sukuna') {
-    return `// Calibrated Hair for Sukuna (Assets/model/Sukuna-hair.png)\n` +
+    return `// Calibrated Hair for Sukuna (Assets/model/sukuna/Sukuna-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 925;\n` +
@@ -777,7 +795,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -626 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 226 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'yuji') {
-    return `// Calibrated Hair for Yuji (Assets/model/Yuji-hair.png)\n` +
+    return `// Calibrated Hair for Yuji (Assets/model/yuji/Yuji-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 1042;\n` +
@@ -787,7 +805,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -668.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 140 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'yuta') {
-    return `// Calibrated Hair for Yuta (Assets/model/Yuta-hair.png)\n` +
+    return `// Calibrated Hair for Yuta (Assets/model/yuta/Yuta-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 421;\n` +
@@ -797,7 +815,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -282 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 82 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'toji') {
-    return `// Calibrated Hair for Toji (Assets/model/toji-hair.png)\n` +
+    return `// Calibrated Hair for Toji (Assets/model/toji/toji-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 1123;\n` +
@@ -807,7 +825,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -686 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 136 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'nanami') {
-    return `// Calibrated Hair for Nanami (Assets/model/Nanami-hair.png)\n` +
+    return `// Calibrated Hair for Nanami (Assets/model/nanami/Nanami-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 1252;\n` +
@@ -817,7 +835,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -698.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 250 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'mahito') {
-    return `// Calibrated Hair for Mahito (Assets/model/Mahito-hair.png)\n` +
+    return `// Calibrated Hair for Mahito (Assets/model/mahito/Mahito-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 408;\n` +
@@ -827,7 +845,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -267.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 6 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'escanor') {
-    return `// Calibrated Hair for Escanor (Assets/model/Escanor-hair.png)\n` +
+    return `// Calibrated Hair for Escanor (Assets/model/escanor/Escanor-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 280;\n` +
@@ -837,7 +855,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -251.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 122 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'todo') {
-    return `// Calibrated Hair for Todo (Assets/model/Todo-hair.png)\n` +
+    return `// Calibrated Hair for Todo (Assets/model/todo/Todo-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const scaleX = targetHairWidth / 1207;\n` +
@@ -847,7 +865,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -712 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 28 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'engineer') {
-    return `// Calibrated Hard Hat for Engineer (Assets/model/Hair/Engineer-Hair.png)\n` +
+    return `// Calibrated Hard Hat for Engineer (Assets/model/engineer/Engineer-Hair.png)\n` +
            `const targetHatWidth = r * ${targetW};\n` +
            `const targetHatHeight = r * ${targetH};\n` +
            `const scaleX = targetHatWidth / 1039;\n` +
@@ -857,7 +875,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -639.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 234 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'gunslinger') {
-    return `// Calibrated Cowboy Hat for Gunslinger (Assets/model/Hair/Gunslinger-hair.png)\n` +
+    return `// Calibrated Cowboy Hat for Gunslinger (Assets/model/gunslinger/Gunslinger-hair.png)\n` +
            `const targetHatWidth = r * ${targetW};\n` +
            `const targetHatHeight = r * ${targetH};\n` +
            `const scaleX = targetHatWidth / 1517;\n` +
@@ -1150,6 +1168,8 @@ export function drawSkinStudioScreen() {
       } else if (fDef.key === 'mahito') {
         dummyFighter.isTransformed = (state.studioSkinForm === 'distorted');
         drawMahitoSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'naoya') {
+        drawNaoyaSkin(ctx, dummyFighter);
       } else if (fDef.key === 'genos') {
         drawGenosSkin(ctx, dummyFighter);
         drawGenosHands(ctx, dummyFighter);
@@ -1209,6 +1229,8 @@ export function drawSkinStudioScreen() {
       _drawNanamiHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'mahito') {
       _drawMahitoHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'naoya') {
+      _drawNaoyaHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'genos') {
       _drawGenosHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'escanor') {
@@ -1583,14 +1605,15 @@ export function drawSkinStudioScreen() {
     { id: 'scale', label: '1. HAIR SCALE / SIZE', desc: 'Width & Height multipliers' },
     { id: 'position', label: '2. POSITION & SHIFT', desc: 'X/Y & Crown elevation offsets' },
     { id: 'rotation', label: '3. ROTATION & FLIP', desc: 'Tilt, angle & horizontal/vertical flip' },
-    { id: 'export', label: '4. LIVE CODE EXPORT', desc: 'Copy ready-to-paste JS code' }
+    { id: 'export', label: '4. LIVE CODE EXPORT', desc: 'Copy ready-to-paste JS code' },
+    { id: 'assets', label: '5. ASSET REGISTRY', desc: 'Skins, weapons & active assets' }
   ];
 
   // Left Console: Tab Cards
   tabs.forEach((tab, idx) => {
-    const cardY = consoleY + 32 + idx * 54;
+    const cardY = consoleY + 28 + idx * 44;
     const cardW = leftConsoleW - 20;
-    const cardH = 46;
+    const cardH = 38;
     const cardX = leftConsoleX + 10;
     const isSelected = state.studioSkinDetailTab === tab.id;
 
@@ -1612,12 +1635,12 @@ export function drawSkinStudioScreen() {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = isSelected ? '#ffffff' : '#94a3b8';
-    ctx.font = '900 10px "Rajdhani", sans-serif';
-    ctx.fillText(tab.label, cardX + 8, cardY + 8);
+    ctx.font = '900 9.5px "Rajdhani", sans-serif';
+    ctx.fillText(tab.label, cardX + 8, cardY + 6);
 
     ctx.fillStyle = isSelected ? `${themeColor}` : '#64748b';
-    ctx.font = '700 8.5px "Rajdhani", sans-serif';
-    ctx.fillText(tab.desc, cardX + 8, cardY + 24);
+    ctx.font = '700 8px "Rajdhani", sans-serif';
+    ctx.fillText(tab.desc, cardX + 8, cardY + 20);
 
     _registerButton(cardX, cardY, cardW, cardH, () => {
       state.studioSkinDetailTab = tab.id;
@@ -1626,9 +1649,9 @@ export function drawSkinStudioScreen() {
 
   // Fighter Info Box in Left Console Bottom
   const infoCardX = leftConsoleX + 10;
-  const infoCardY = consoleY + 252;
+  const infoCardY = consoleY + 254;
   const infoCardW = leftConsoleW - 20;
-  const infoCardH = 80;
+  const infoCardH = 78;
 
   ctx.save();
   ctx.fillStyle = 'rgba(18, 22, 32, 0.92)';
@@ -2185,6 +2208,86 @@ export function drawSkinStudioScreen() {
           });
         }
       }, halfBtnW, 22, null, 3);
+    }
+  } else if (state.studioSkinDetailTab === 'assets') {
+    // ── ASSETS & VARIANTS REGISTRY ──
+    const charAssets = CONFIG[fDef.key]?.assets || {};
+    const assetEntries = Object.entries(charAssets);
+
+    // Header / Stats card
+    ctx.save();
+    ctx.fillStyle = 'rgba(18, 22, 32, 0.92)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+    ctx.lineWidth = 1;
+    drawChamferedRect(ctx, rowX, curY, rowW, 36, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = themeColor;
+    ctx.font = '900 11px "Rajdhani", sans-serif';
+    ctx.fillText(`⚡ ${fDef.label} ASSET REGISTRY (${assetEntries.length} REGISTERED)`, rowX + 10, curY + 18);
+    curY += 42;
+
+    if (assetEntries.length === 0) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(12, 16, 24, 0.90)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = 1;
+      drawChamferedRect(ctx, rowX, curY, rowW, 50, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '700 9.5px "Rajdhani", sans-serif';
+      ctx.fillText('Pure procedural pixel art engine model.', rowX + 10, curY + 16);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '700 8.5px "Rajdhani", monospace';
+      ctx.fillText('No external PNG/JPG raster dependencies.', rowX + 10, curY + 34);
+      curY += 56;
+    } else {
+      const maxRows = 5;
+      assetEntries.slice(0, maxRows).forEach(([key, assetPath], aIdx) => {
+        const itemY = curY + aIdx * 40;
+        const itemH = 34;
+        ctx.save();
+        ctx.fillStyle = 'rgba(12, 16, 24, 0.90)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        drawChamferedRect(ctx, rowX, itemY, rowW, itemH, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = '#f8fafc';
+        ctx.font = '900 9.5px "Rajdhani", sans-serif';
+        ctx.fillText(`● ${key.toUpperCase()}`, rowX + 8, itemY + 5);
+
+        ctx.fillStyle = '#64748b';
+        ctx.font = '700 8px "Rajdhani", monospace';
+        const displayP = assetPath.length > 36 ? '…' + assetPath.slice(-34) : assetPath;
+        ctx.fillText(displayP, rowX + 8, itemY + 19);
+
+        // Copy / Inspect button on right
+        const btnW = 55;
+        const btnH = 20;
+        const btnX = rowX + rowW - btnW - 6;
+        const btnY = itemY + 7;
+        drawButton('📋 COPY', btnX + btnW / 2, btnY, () => {
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(assetPath).then(() => {
+              _copyToastText = `✓ COPIED ${key.toUpperCase()} PATH!`;
+              _copyToastTimer = 90;
+            });
+          }
+        }, btnW, btnH, themeColor, 3);
+      });
+      curY += Math.min(assetEntries.length, maxRows) * 40 + 6;
     }
   }
 

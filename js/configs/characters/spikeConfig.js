@@ -74,8 +74,8 @@ export const spikeConfig = {
 
   // ── Sound Effects ──
   sounds: {
-    basicAttack: 'Assets/Sound Effects/Attacks/Spikestab.mp3',
-    contactHit: 'Assets/Sound Effects/Attacks/Spikestab.mp3',
+    basicAttack: 'Assets/Sound Effects/Attacks/spikestab.mp3',
+    contactHit: 'Assets/Sound Effects/Attacks/spikestab.mp3',
   },
   soundVolumes: {
     basicAttack: 0.70,

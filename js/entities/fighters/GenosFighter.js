@@ -476,7 +476,7 @@ export class GenosFighter extends Fighter {
     const beamAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.ultAngle || this.angle || 0);
     const now = Date.now();
 
-    const beamW = CONFIG.genos?.ultBeamWidth || 70;
+    const beamW = CONFIG.genos?.ultBeamWidth || 140;
     const range = CONFIG.genos?.ultBeamRange || 1200;
     // Set startOffset to emerging right from mechanical hands
     const startOffset = this.r + 5;
@@ -1855,7 +1855,7 @@ export class GenosFighter extends Fighter {
       }
 
       const range = CONFIG.genos?.ultBeamRange || 1200;
-      const width = CONFIG.genos?.ultBeamWidth || 70;
+      const width = CONFIG.genos?.ultBeamWidth || 140;
 
       const targetsToScan = [];
       if (state.fighters) {

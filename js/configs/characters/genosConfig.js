@@ -1,4 +1,9 @@
 export const genosConfig = {
+  assets: {
+    hair: 'Assets/model/genos/Genos-hair.png',
+    ultimateOverlay: 'Assets/Overlays/Genos-ultimate-overlay.png',
+  },
+
   name: 'Genos',
   displayName: 'Genos',
   bossTitle: 'Demon Cyborg',
@@ -96,7 +101,7 @@ export const genosConfig = {
   ultDurationFrames: 120, // 2.0s beam duration
   ultDamagePerTick: 4,
   ultTickInterval: 6, // 10 ticks per second (300 total damage)
-  ultBeamWidth: 60,
+  ultBeamWidth: 140,
   ultBeamRange: 1200, // 1200px beam range across full arena (matches Hyperion's beam length)
   ultKnockbackForce: 8, // Directional beam push speed (prevents hyper-accel rebounce)
   ultSlowMultiplier: 0.45, // Speed multiplier for targets caught in beam (0.45 = 45% speed allows moving a little)

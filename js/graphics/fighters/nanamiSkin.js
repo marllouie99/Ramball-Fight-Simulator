@@ -25,10 +25,10 @@ export function _getNanamiHairImage() {
       _nanamiHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Nanami hair image at Assets/model/Nanami-hair.png', e);
+      console.warn('Failed to load Nanami hair image at Assets/model/nanami/Nanami-hair.png', e);
       _nanamiHairImageLoading = false;
     };
-    img.src = 'Assets/model/Nanami-hair.png?v=1';
+    img.src = 'Assets/model/nanami/Nanami-hair.png?v=1';
     _nanamiHairImage = img;
   }
   return _nanamiHairImage;
@@ -39,7 +39,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Nanami's signature 7:3 blonde side-part hair from Assets/model/Nanami-hair.png.
+ * Draws Nanami's signature 7:3 blonde side-part hair from Assets/model/nanami/Nanami-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -499,7 +499,7 @@ export function drawNanamiSkin(ctx, fighter) {
   // ── LAYER 2: BODY CIRCLE ──
   drawNanamiPixelBody(ctx, r, isOvertime);
 
-  // ── LAYER 3: 7:3 SIDE-PART HAIR OVERLAY (Assets/model/Nanami-hair.png) ──
+  // ── LAYER 3: 7:3 SIDE-PART HAIR OVERLAY (Assets/model/nanami/Nanami-hair.png) ──
   _drawNanamiHair(ctx, r, facingLeft);
 
   // Status overlays (stun, freeze, etc.)

@@ -33,10 +33,10 @@ export function _getGunslingerHairImage() {
       _gunslingerHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Gunslinger hair image at Assets/model/Hair/Gunslinger-hair.png', e);
+      console.warn('Failed to load Gunslinger hair image at Assets/model/gunslinger/Gunslinger-hair.png', e);
       _gunslingerHairImageLoading = false;
     };
-    img.src = 'Assets/model/Hair/Gunslinger-hair.png?v=1';
+    img.src = 'Assets/model/gunslinger/Gunslinger-hair.png?v=1';
     _gunslingerHairImage = img;
   }
   return _gunslingerHairImage;
@@ -48,7 +48,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Gunslinger's authentic cowboy hat from Assets/model/Hair/Gunslinger-hair.png.
+ * Draws Gunslinger's authentic cowboy hat from Assets/model/gunslinger/Gunslinger-hair.png.
  * Overlaid on top of the procedural pixel body circle.
  * Uses nearest-neighbor scaling for crisp pixel art fidelity (Rule 19 / Rule 3.5).
  * @param {CanvasRenderingContext2D} ctx
@@ -447,7 +447,7 @@ export function drawGunslingerSkin(ctx, fighterOrX, y, r, angle, color) {
   // Draw authentic Gunslinger pixel body
   drawGunslingerPixelBody(ctx, radius);
 
-  // Draw Cowboy Hat PNG Overlay (Assets/model/Hair/Gunslinger-hair.png)
+  // Draw Cowboy Hat PNG Overlay (Assets/model/gunslinger/Gunslinger-hair.png)
   _drawGunslingerHair(ctx, radius, facingLeft);
 
   ctx.restore();

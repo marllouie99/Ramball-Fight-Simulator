@@ -5,7 +5,7 @@
 // Rule 1.2 (Centralized Physics), and Rule 1.4 (360° Aiming)
 // ─────────────────────────────────────────────
 
-import { Fighter } from '../fighter.js';
+import { Fighter, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { sansConfig } from '../../configs/characters/sansConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
@@ -1693,7 +1693,7 @@ export class SansFighter extends Fighter {
         this.castBoneZone(opponent);
       }
       // Basic Bone Toss (if enabled)
-      else if (cfg.enableBasicBone && this.basicAttackCooldown <= 0 && dist < (cfg.basicBoneReach || 420)) {
+      else if (cfg.enableBasicBone && this.basicAttackCooldown <= 0 && dist < (cfg.basicBoneReach || 420) && !isEntityOutsideArena(opponent, arena)) {
         this.castBasicBone(opponent);
       }
     }

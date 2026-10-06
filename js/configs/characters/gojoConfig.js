@@ -2,6 +2,14 @@
 // Gojo Satoru — Limitless Fighter Configuration
 // ─────────────────────────────────────────────
 export const gojoConfig = {
+  assets: {
+    hair: 'Assets/model/gojo/gojo-hair.png',
+    skin: 'Assets/model/gojo/Saturo Gojo.png',
+    pixelSkin: 'Assets/model/gojo/Saturo-Gojo-PIXEL-SKIN.png',
+    skillIcons: 'Assets/model/gojo/Gojo-Skill-icons.png',
+    domainOverlay: 'Assets/Overlays/gojo-domainexpansion.png',
+  },
+
   name: 'Gojo',
   displayName: 'Gojo',
   // ── Base Attributes ──
@@ -146,15 +154,16 @@ export const gojoConfig = {
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
   enableMeleeMode: true,                   // Master toggle for Melee Mode & Hand-to-Hand Martial Arts
-  closeRangeRadius: 110,             // Proximity distance (pixels) to enter Melee Mode (direct contact only)
-  initialMeleeDuration: 100,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
-  meleeModeCooldown: 300,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
-  comboDisengageDistance: 100,      // Distance (pixels) teleported away when disengaging after clash
-  meleePunchDamage: 6,             // Damage dealt per martial arts punch strike
-  meleePunchCooldown: 16,           // Frames between consecutive punches (~0.16s at 60fps)
-  meleePunchAnimDuration: 15,       // Punch extension and retraction animation frame duration
-  meleeTeleportAngle: 1.75,         // Wide surround / flank angles for melee combo teleportation
-  teleportSpeed: 15,                // Teleport movement slide speed
+  closeRangeRadius: 80,                    // Proximity distance (pixels) to enter Melee Mode (direct contact only)
+  leaveMeleeRadius: 130,                   // Distance (pixels) beyond which Melee Mode is instantly disengaged
+  initialMeleeDuration: 60,                // Active melee clash duration in frames (~1.0s at 60fps)
+  meleeModeCooldown: 240,                  // Mandatory ranged separation cooldown in frames (~4.0s at 60fps)
+  comboDisengageDistance: 260,             // Distance (pixels) teleported away when disengaging after clash
+  meleePunchDamage: 6,                     // Damage dealt per martial arts punch strike
+  meleePunchCooldown: 16,                  // Frames between consecutive punches (~0.16s at 60fps)
+  meleePunchAnimDuration: 15,              // Punch extension and retraction animation frame duration
+  meleeTeleportAngle: 1.75,                // Wide surround / flank angles for melee combo teleportation
+  teleportSpeed: 15,                       // Teleport movement slide speed
 
   // ── 8. Teleport Dodge & Evasion Mechanics (Disabled) ──
   teleportDodgeChance: 0.0,                // Disabled

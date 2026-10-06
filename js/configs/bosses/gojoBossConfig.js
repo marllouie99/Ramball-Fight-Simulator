@@ -141,10 +141,11 @@ export const gojoBossConfig = {
   rctRevivalHealAmount: 150,
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
-  closeRangeRadius: 110,
-  initialMeleeDuration: 100,
-  meleeModeCooldown: 300,
-  comboDisengageDistance: 100,
+  closeRangeRadius: 80,
+  leaveMeleeRadius: 130,
+  initialMeleeDuration: 60,
+  meleeModeCooldown: 240,
+  comboDisengageDistance: 260,
   meleePunchDamage: 6,
   meleePunchCooldown: 16,
   meleePunchAnimDuration: 15,

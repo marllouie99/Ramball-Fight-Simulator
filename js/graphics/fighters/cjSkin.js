@@ -954,9 +954,9 @@ export function getCjBaguvixAuraFrames() {
   if (!_cjBaguvixAuraFramesLoading && typeof Image !== 'undefined') {
     _cjBaguvixAuraFramesLoading = true;
     const framePaths = [
-      'Assets/model/AnimationFrames/CJ-baguvix-aura_frame_1.png',
-      'Assets/model/AnimationFrames/CJ-baguvix-aura_frame_2.png',
-      'Assets/model/AnimationFrames/CJ-baguvix-aura_frame_3.png'
+      'Assets/model/cj/CJ-baguvix-aura_frame_1.png',
+      'Assets/model/cj/CJ-baguvix-aura_frame_2.png',
+      'Assets/model/cj/CJ-baguvix-aura_frame_3.png'
     ];
     framePaths.forEach((src, idx) => {
       const img = new Image();

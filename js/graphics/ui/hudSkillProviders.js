@@ -2366,7 +2366,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       skills.push({ id: 'sonic_kick', pct: kickPct, ready: kickPct >= 99 && (f.skill2Cooldown || 0) <= 0, color: '#C8E64A', label: 'SONIC REBOUND' });
     }
 
-    // 4. Ultimate: 24 FPS Mach 3 Runway Breach (Toggle: enableUltimate)
+    // 4. Ultimate / Signature Skill: 24 FPS Mach 3 Runway Breach (Toggle: enableUltimate)
     if (isSkillEnabled(cfg.enableUltimate, true)) {
       const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
       const currentStacks = f.frameStacks || 0;
@@ -2376,7 +2376,16 @@ export function getSkillDataForFighter(f, getProjectiles) {
       const hasStacks = currentStacks >= maxStacks;
       const isReady = ultPct >= 99 && (f.ultCooldown || 0) <= 0 && hasStacks;
       const label = hasStacks ? 'MACH 3 BREACH' : `MACH 3 (${currentStacks}/${maxStacks})`;
-      skills.push({ id: 'shutter_exec', pct: ultPct, ready: isReady, color: '#00F2FE', label: label });
+      skills.push({
+        id: 'shutter_exec',
+        pct: ultPct,
+        ready: isReady,
+        color: '#00F2FE',
+        label: label,
+        isUltimate: true,
+        isSignature: true,
+        signature: true
+      });
     }
 
     return skills;
@@ -2442,7 +2451,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     yuji: ['bf_threshold', 'black_flash', 'BLACK FLASH'],
     todo: ['clap', 'boogie', 'BOOGIE'],
     nanami: ['lunge', 'decisive', 'DECISIVE'],
-    naoya: ['shutter_exec', 'shutter', 'execution', 'blitz', 'FRAME BLITZ', 'SHUTTER EXECUTION', '24 FPS'],
+    naoya: ['shutter_exec', 'shutter', 'execution', 'mach 3', 'MACH 3 BREACH', 'MACH 3', 'SHUTTER EXECUTION'],
     mahoraga: ['wheel', 'adaptation', 'WHEEL', 'ADAPTATION', 'WOA'],
     cj: ['baguvix', 'godmode', 'BAGUVIX', 'GODMODE'],
     engineer: ['turret', 'sentry', 'SENTRY', 'TURRET'],

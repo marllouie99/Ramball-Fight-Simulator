@@ -109,6 +109,9 @@ export const AUDIO_CONFIG = {
   'naoya_pathafterimages_shockwaves': 'Assets/Sound Effects/NaoyaSFX/Naoya-pathafterimages-shockwaves.wav',
   'naoya_heavysmash': 'Assets/Sound Effects/NaoyaSFX/naoya_heavysmash.wav',
   'naoya_heavy_smash': 'Assets/Sound Effects/NaoyaSFX/naoya_heavysmash.wav',
+  'naoya_glass_break': 'Assets/Sound Effects/NaoyaSFX/Naoya_glass_break.mp3',
+  'naoya_takeoff_knife': 'Assets/Sound Effects/NaoyaSFX/Naoya_takeoff_knife.mp3',
+  'naoya_stabs': 'Assets/Sound Effects/NaoyaSFX/Naoya_stabs.mp3',
 
   // CJ Grove Street
   'skill_cj_carroam_noise': 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',

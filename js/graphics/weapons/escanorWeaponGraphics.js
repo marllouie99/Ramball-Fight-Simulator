@@ -102,10 +102,10 @@ export function _getEscanorWeaponImage() {
       _escanorWeaponImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Escanor weapon image at Assets/model/Escanor-Weapon.png', e);
+      console.warn('Failed to load Escanor weapon image at Assets/model/escanor/Escanor-Weapon.png', e);
       _escanorWeaponImageLoading = false;
     };
-    img.src = 'Assets/model/Escanor-Weapon.png?v=1';
+    img.src = 'Assets/model/escanor/Escanor-Weapon.png?v=1';
     _escanorWeaponImage = img;
   }
   return _escanorWeaponImage;
@@ -231,7 +231,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getEscanorSlashEffectImage();
 }
 
-// Geometry constants for Assets/model/Escanor-Weapon.png (1774 x 887)
+// Geometry constants for Assets/model/escanor/Escanor-Weapon.png (1774 x 887)
 const WEAPON_BLUE_GRIP_X = 1525.5;
 const WEAPON_BLUE_GRIP_Y = 742.3;
 const WEAPON_WIELD_GRIP_X = 1150.0; // Shaft grip balance point
@@ -246,7 +246,7 @@ const WEAPON_ROT_ALIGN = 2.722496;
 
 /**
  * Draws Escanor's Sacred Treasure: Divine Axe Rhitta (神斧 リッタ)
- * Supports High-Definition Pixel-Art Model from Assets/model/Escanor-Weapon.png with procedural fallback.
+ * Supports High-Definition Pixel-Art Model from Assets/model/escanor/Escanor-Weapon.png with procedural fallback.
  * @param {CanvasRenderingContext2D} ctx 
  * @param {number} x Offset X
  * @param {number} y Offset Y
@@ -765,7 +765,7 @@ let _escanorCruelSunSpriteLoading = false;
 
 /**
  * 6-Frame Discrete Grid Pixel Art Cruel Sun Sprite Coordinates
- * Sourced from Assets/model/Sprites/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png (1536 x 1024)
+ * Sourced from Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png (1536 x 1024)
  * 3 columns x 2 rows, each cell 512x512 with transparent background.
  * Anchored precisely on the core solar sphere center across all 6 frames.
  */
@@ -875,10 +875,10 @@ export function _getEscanorCruelSunSpriteImage(isTheOne = false) {
       _escanorCruelSunSpriteLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Escanor Cruel Sun sprite sheet at Assets/model/Sprites/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png', e);
+      console.warn('Failed to load Escanor Cruel Sun sprite sheet at Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png', e);
       _escanorCruelSunSpriteLoading = false;
     };
-    img.src = encodeURI('Assets/model/Sprites/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png?v=1');
+    img.src = encodeURI('Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png?v=1');
     _escanorCruelSunSpriteImage = img;
   }
   return _escanorCruelSunSpriteImage;
@@ -896,7 +896,7 @@ let _escanorSunExplosionSpriteLoading = false;
 
 /**
  * 6-Frame Discrete Grid Pixel Art Sun Explosion / Expiration Sprite Coordinates
- * Sourced from Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png (1536 x 1024)
+ * Sourced from Assets/model/escanor/Escanor-Sun-Explosion-Sprite-Sheet.png (1536 x 1024)
  * 3 columns x 2 rows, each cell 512x512 with transparent background.
  * Frame 0: Intact solar sphere with inner fissure fractures
  * Frame 1: Expanding solar cracks, molten fragments detaching
@@ -1005,10 +1005,10 @@ export function _getEscanorSunExplosionSpriteImage(isTheOne = false) {
       _escanorSunExplosionSpriteLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Escanor Sun Explosion sprite sheet at Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png', e);
+      console.warn('Failed to load Escanor Sun Explosion sprite sheet at Assets/model/escanor/Escanor-Sun-Explosion-Sprite-Sheet.png', e);
       _escanorSunExplosionSpriteLoading = false;
     };
-    img.src = encodeURI('Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png?v=1');
+    img.src = encodeURI('Assets/model/escanor/Escanor-Sun-Explosion-Sprite-Sheet.png?v=1');
     _escanorSunExplosionSpriteImage = img;
   }
   return _escanorSunExplosionSpriteImage;
@@ -1472,7 +1472,7 @@ export function drawProceduralPixelCruelSunExplosion(ctx, snapCx, snapCy, radius
 
 /**
  * Draws the Sun Expiration / Explosion Animation in Authentic Pixel Art Style
- * Uses 6-frame pixel art sprite sheet from Assets/model/Sprites/Escanor-Sun-Explosion-Sprite-Sheet.png
+ * Uses 6-frame pixel art sprite sheet from Assets/model/escanor/Escanor-Sun-Explosion-Sprite-Sheet.png
  * Features multi-tiered additive solar corona bloom and nuclear core radiance.
  * @param {CanvasRenderingContext2D} ctx - Canvas 2D rendering context
  * @param {number} cx - Center X coordinate in world space

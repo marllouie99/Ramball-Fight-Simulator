@@ -55,17 +55,26 @@ export function activateRed(fighter) {
   const fighterY = fighter.y - (fighter.z || 0);
   let aimAngle = null;
 
+  const isPrimaryFighter = (ent) => Boolean(
+    ent &&
+    !ent.isMinion &&
+    !ent.isIllusion &&
+    !ent.isServantOfCthulhu &&
+    !ent.owner &&
+    !ent.isDeployable &&
+    !ent.isTurret &&
+    !ent.isDispenser
+  );
+
   let targetF = (typeof fighter._findAlignedEnemyForRed === 'function')
-    ? (fighter._findAlignedEnemyForRed() || fighter._redTargetRef)
-    : ((typeof fighter._findVerticallyAlignedEnemy === 'function')
-      ? (fighter._findVerticallyAlignedEnemy() || fighter._redTargetRef)
-      : fighter._redTargetRef);
+    ? (fighter._findAlignedEnemyForRed() || (isPrimaryFighter(fighter._redTargetRef) ? fighter._redTargetRef : null))
+    : (isPrimaryFighter(fighter._redTargetRef) ? fighter._redTargetRef : null);
 
   if (!targetF && typeof state !== 'undefined' && state.fighters) {
     const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
     let closestDist = Infinity;
     state.fighters.forEach((f, idx) => {
-      if (f && f !== fighter && f.hp > 0 && !f.isDead && !f.dead) {
+      if (f && f !== fighter && f.hp > 0 && !f.isDead && !f.dead && isPrimaryFighter(f)) {
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
         if (isEnemy) {
           const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
@@ -76,6 +85,10 @@ export function activateRed(fighter) {
         }
       }
     });
+  }
+
+  if (!targetF) {
+    targetF = fighter._redTargetRef;
   }
 
   fighter._redTargetRef = targetF;

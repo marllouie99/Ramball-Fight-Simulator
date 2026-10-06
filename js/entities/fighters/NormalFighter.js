@@ -1,4 +1,4 @@
-import { Fighter } from '../fighter.js';
+import { Fighter, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
@@ -49,7 +49,8 @@ export class NormalFighter extends Fighter {
   }
 
   _fireWeapon(ownerIndex, isEnhanced) {
-    let finalSpeed = CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1);
+    if (!this.canPerformBasicAttack(this.target || this._lastOpponent)) return;
+    let finalSpeed = CONFIG.projectile.speed * (this._def?.projectileSpeedMultiplier || 1);
     let customSpawnX, customSpawnY;
     let visualType = undefined;
     let finalDamage = this.damage;
@@ -108,6 +109,8 @@ export class NormalFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    this.target = (opponent && !opponent.isDead) ? opponent : (this.target || null);
+    this._lastOpponent = opponent || this._lastOpponent || null;
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
@@ -170,7 +173,9 @@ export class NormalFighter extends Fighter {
       const canShoot = (!this.isSniper || !this.isReloading);
 
       if (aligned && this.shootCooldown === 0 && canShoot) {
-        if (this.isSniper && this.magazineBullets === 1) {
+        if (opponent && isEntityOutsideArena(opponent, arena)) {
+          this.lastAimAligned = aligned;
+        } else if (this.isSniper && this.magazineBullets === 1) {
           // Only start execution windup once — guard against repeated triggering
           if (!this.executionWindupTimer && this.lastAimAligned === false) {
             this.executionWindupTimer = CONFIG.sharpshooter?.executeWindupFrames || 25;

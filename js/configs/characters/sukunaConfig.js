@@ -2,6 +2,12 @@
 // Ryomen Sukuna — King of Curses Config
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
+  assets: {
+    hair: 'Assets/model/sukuna/Sukuna-hair.png',
+    skin: 'Assets/model/sukuna/SUKUNA.png',
+    shrine: 'Assets/model/sukuna/sukuna-shrine.png',
+  },
+
     name: 'Sukuna',
     displayName: 'Sukuna',
     // ── Base Attributes ──
@@ -95,7 +101,7 @@ export const sukunaConfig = {
     domainFugaCooldownTickRate: 0.2,  // Rate multiplier for cooldown ticks inside Domain (4x faster recharge)
     divineFlameChargeMax: 80,      // Charge up duration (1.5 seconds)
     divineFlameDamage: 100,         // Primary direct hit nuke damage
-    divineFlameExplosionRadius: 200, // Thermobaric nuke explosion AOE blast radius in pixels
+    divineFlameExplosionRadius: 400, // Thermobaric nuke explosion AOE blast radius in pixels
     divineFlameExplosionDamage: 50, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
     thermobaricSplashRadius: 220,  // Thermobaric explosion splash damage radius
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow

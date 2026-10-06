@@ -2,6 +2,11 @@
 // Mahoraga — Divine General Config
 // ─────────────────────────────────────────────
 export const mahoragaConfig = {
+  assets: {
+    eyeWings: 'Assets/model/mahoraga/Mahoraga-eyewings.png',
+    wheelOverlay: 'Assets/Overlays/Mahoraga-wheel-overlay.png',
+  },
+
     name: 'Mahoraga',
     displayName: 'Mahoraga',
     // ── Base Attributes ──

@@ -1,4 +1,4 @@
-import { Fighter } from '../fighter.js';
+import { Fighter, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { spawnFloatingText } from '../../core/state.js';
@@ -49,7 +49,7 @@ export class GrenadierFighter extends Fighter {
     const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     const inRadius = dist <= this.attackRadius;
 
-    if (inRadius && this.attackCooldown === 0) {
+    if (inRadius && this.attackCooldown === 0 && !isEntityOutsideArena(opponent, arena)) {
       this.shootGrenade(ownerIndex, opponent);
       this.attackCooldown = CONFIG.grenadier.throwCooldown;
     }

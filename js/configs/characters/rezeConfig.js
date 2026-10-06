@@ -4,6 +4,12 @@
 // ─────────────────────────────────────────────
 
 export const rezeConfig = {
+  assets: {
+    hair: 'Assets/model/reze/Reze-hair.png',
+    skin: 'Assets/model/reze/REZE-MODEL-SKIN.png',
+    weapon: 'Assets/model/reze/REZE-WEAPON.png',
+  },
+
   name: 'Reze',
   displayName: 'Reze',
   bossTitle: 'Bomb Devil',

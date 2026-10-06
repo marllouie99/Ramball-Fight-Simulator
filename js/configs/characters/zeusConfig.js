@@ -2,6 +2,11 @@
 // Zeus — King of Olympus & God of Thunder Config
 // ─────────────────────────────────────────────
 export const zeusConfig = {
+  assets: {
+    hair: 'Assets/model/zeus/Zeus-hair.png',
+    crown: 'Assets/model/zeus/Zeus-crown.png',
+  },
+
   // ── Base Attributes ──
   hp: 200,
   speed: 5.2,

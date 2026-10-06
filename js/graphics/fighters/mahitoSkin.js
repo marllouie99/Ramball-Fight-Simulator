@@ -40,10 +40,10 @@ export function _getMahitoHairImage() {
       _mahitoHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Mahito hair image at Assets/model/Mahito-hair.png', e);
+      console.warn('Failed to load Mahito hair image at Assets/model/mahito/Mahito-hair.png', e);
       _mahitoHairImageLoading = false;
     };
-    img.src = 'Assets/model/Mahito-hair.png?v=1';
+    img.src = 'Assets/model/mahito/Mahito-hair.png?v=1';
     _mahitoHairImage = img;
   }
   return _mahitoHairImage;
@@ -54,7 +54,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Mahito's signature long steel-blue hair from Assets/model/Mahito-hair.png.
+ * Draws Mahito's signature long steel-blue hair from Assets/model/mahito/Mahito-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -576,7 +576,7 @@ function drawBaseMahito(ctx, r, fighter, facingLeft = false) {
   // 1. PALE CURSED SPIRIT PIXEL ART BODY
   drawMahitoPixelBody(ctx, r, false);
 
-  // 2. LONG STEEL-BLUE HAIR (Assets/model/Mahito-hair.png)
+  // 2. LONG STEEL-BLUE HAIR (Assets/model/mahito/Mahito-hair.png)
   _drawMahitoHair(ctx, r, facingLeft);
 }
 

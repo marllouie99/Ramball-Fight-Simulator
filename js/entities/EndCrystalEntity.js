@@ -16,7 +16,7 @@ export function getEndCrystalSpriteSheet() {
   if (!_crystalSheetImg && typeof Image !== 'undefined') {
     _crystalSheetImg = new Image();
     _crystalSheetImg.onload = () => { _crystalSheetLoaded = true; };
-    _crystalSheetImg.src = encodeURI('Assets/model/Sprites/End-crystal-animation-sprite-sheet.png?v=1');
+    _crystalSheetImg.src = encodeURI('Assets/model/enderDragon/End-crystal-animation-sprite-sheet.png?v=1');
   }
   return _crystalSheetImg;
 }

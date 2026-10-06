@@ -35,10 +35,10 @@ export function _getEngineerHairImage() {
       _engineerHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Engineer hair image at Assets/model/Hair/Engineer-Hair.png', e);
+      console.warn('Failed to load Engineer hair image at Assets/model/engineer/Engineer-Hair.png', e);
       _engineerHairImageLoading = false;
     };
-    img.src = 'Assets/model/Hair/Engineer-Hair.png?v=1';
+    img.src = 'Assets/model/engineer/Engineer-Hair.png?v=1';
     _engineerHairImage = img;
   }
   return _engineerHairImage;
@@ -50,7 +50,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Engineer's construction hard hat from Assets/model/Hair/Engineer-Hair.png.
+ * Draws Engineer's construction hard hat from Assets/model/engineer/Engineer-Hair.png.
  * Overlaid on top of the procedural pixel body circle, replacing the procedural hat zone.
  * Uses nearest-neighbor scaling for crisp pixel art fidelity (Rule 19 / Rule 3.5).
  * @param {CanvasRenderingContext2D} ctx
@@ -430,7 +430,7 @@ export function drawEngineerSkin(ctx, fighter) {
   // ── LAYER 2: 100% DISCRETE PROCEDURAL PIXEL ART BODY (SAITAMA TECH & RULE 19 COMPLIANT) ──
   drawEngineerPixelBody(ctx, r);
 
-  // ── LAYER 3: HARD HAT PNG OVERLAY (Assets/model/Hair/Engineer-Hair.png) ──
+  // ── LAYER 3: HARD HAT PNG OVERLAY (Assets/model/engineer/Engineer-Hair.png) ──
   _drawEngineerHair(ctx, r, facingLeft);
 
   // ── LAYER 4: FRONT WEAPON (ACTIVE WEAPON ON TOP OF BODY) ──

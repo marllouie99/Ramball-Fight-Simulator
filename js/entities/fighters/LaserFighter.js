@@ -1,5 +1,5 @@
 import { fadeOutLoopingSound, stopLoopingSound } from '../../systems/soundSystem.js';
-import { Fighter } from '../fighter.js';
+import { Fighter, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -282,7 +282,7 @@ export class LaserFighter extends Fighter {
         this.beamCharge = Math.max(this.beamCharge - 1, 0);
       }
 
-      if (aligned && this.shootCooldown === 0 && this.beamCharge >= CONFIG.laser.windupDuration) {
+      if (aligned && this.shootCooldown === 0 && this.beamCharge >= CONFIG.laser.windupDuration && !isEntityOutsideArena(opponent, arena)) {
         this.beamTimer = this.beamDuration;
         this.shootCooldown = this.shootCooldownMax;
         this.beamHitState.clear();

@@ -41,7 +41,7 @@ export const ANNOUNCER_SOUNDS = {
         duration: 2.5,
     },
     bestof3: {
-        src: 'Assets/Sound Effects/Announcer/bestof3.mp3',
+        src: 'Assets/Sound Effects/Announcer/BestOf3.mp3',
         volume: 1.0,
         speed: 1.0,
         offset: 0,
@@ -84,7 +84,7 @@ export const ANNOUNCER_SOUNDS = {
     },
     youwin: {
         src: 'Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3',
-        volume: 1.0,
+        volume: 0.0,
         speed: 1.0,
         offset: 0.0,
         duration: 2.5,

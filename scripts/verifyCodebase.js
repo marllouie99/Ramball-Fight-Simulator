@@ -157,9 +157,91 @@ async function verifyAll() {
     }
   }
 
+  // 2.5 Asset Integrity and Exact Casing Scanner
+  console.log('🔍 [Asset Integrity Scanner] Validating referenced assets against disk with exact casing...');
+  let missingAssetsCount = 0;
+  const scannedAssets = new Set();
+
+  function verifyAssetPathExact(assetRelPath) {
+    const parts = assetRelPath.split('/');
+    let cur = process.cwd();
+    for (const p of parts) {
+      if (!fs.existsSync(cur)) return false;
+      const entries = fs.readdirSync(cur);
+      if (!entries.includes(p)) return false;
+      cur = path.join(cur, p);
+    }
+    return true;
+  }
+
+  const assetRegex = /(?:['"`]|url\(['"]?)(Assets\/[^'"`\r\n\?#]+)/g;
+
+  for (const filePath of files) {
+    const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
+    if (relPath.includes('patchNotesData.js')) continue; // Historical changelog diff entries
+    const content = fs.readFileSync(filePath, 'utf8');
+    let match;
+    while ((match = assetRegex.exec(content)) !== null) {
+      let assetPath = match[1].replace(/\\/g, '/').trim();
+      // Remove trailing quotes/spaces if captured
+      assetPath = assetPath.replace(/['"`\)]+$/, '');
+      if (assetPath.includes('${')) continue; // Dynamic string interpolation
+      if (scannedAssets.has(assetPath)) continue;
+      scannedAssets.add(assetPath);
+
+      if (!verifyAssetPathExact(assetPath)) {
+        console.error(`❌ [MISSING / CASING MISMATCH ASSET in ${relPath}]: '${assetPath}' does not match disk.`);
+        hasErrors = true;
+        missingAssetsCount++;
+      }
+    }
+  }
+
+  if (missingAssetsCount === 0) {
+    console.log(`✅ Verified ${scannedAssets.size} asset paths with exact case sensitivity!`);
+  }
+
+  // 2.6 Audio Volume Normalization & Range Validator
+  console.log('🔍 [Audio Normalization Scanner] Checking character audio volume definitions...');
+  let invalidAudioCount = 0;
+  const configFiles = files.filter(f => f.replace(/\\/g, '/').includes('js/configs/characters/') && f.endsWith('Config.js'));
+
+  for (const cfgFile of configFiles) {
+    const relPath = path.relative(process.cwd(), cfgFile).replace(/\\/g, '/');
+    const content = fs.readFileSync(cfgFile, 'utf8');
+
+    const soundsMatch = content.match(/sounds\s*:\s*\{([^}]+)\}/);
+    const volumesMatch = content.match(/soundVolumes\s*:\s*\{([^}]+)\}/);
+
+    if (soundsMatch) {
+      const volumeKeys = {};
+      if (volumesMatch) {
+        const vLines = volumesMatch[1].split('\n');
+        vLines.forEach(vl => {
+          const vMatch = vl.trim().match(/^([a-zA-Z0-9_$]+)\s*:\s*([0-9.]+)/);
+          if (vMatch && vMatch[1]) {
+            volumeKeys[vMatch[1]] = parseFloat(vMatch[2]);
+          }
+        });
+      }
+
+      for (const [key, val] of Object.entries(volumeKeys)) {
+        if (isNaN(val) || val < 0.0 || val > 5.0) {
+          console.error(`❌ [INVALID AUDIO VOLUME in ${relPath}]: '${key}' has out-of-range volume ${val} (expected 0.0 - 5.0).`);
+          hasErrors = true;
+          invalidAudioCount++;
+        }
+      }
+    }
+  }
+
+  if (invalidAudioCount === 0) {
+    console.log(`✅ Verified audio volume definitions across ${configFiles.length} character configs!`);
+  }
+
   console.log('───────────────────────────────────────────────────────');
   if (hasErrors) {
-    console.error(`🚨 Verification failed: ${totalSyntaxErrors} syntax errors, ${totalDuplicates} duplicate declarations found.`);
+    console.error(`🚨 Verification failed: ${totalSyntaxErrors} syntax errors, ${totalDuplicates} duplicates, ${missingAssetsCount} broken assets, ${invalidAudioCount} invalid audio volumes.`);
     process.exit(1);
   } else {
     console.log(`✅ All ${files.length} JavaScript files verified cleanly! No syntax errors, unbalanced braces, or duplicate declarations.`);

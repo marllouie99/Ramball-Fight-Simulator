@@ -238,7 +238,7 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
   if (hitAny) {
     triggerGlobalScreenShake(isTransformed ? 6 : 3, 8);
     if (fighter.morphType === 'mace') {
-      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/groundsmash.mp3', 1.8);
+      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/groundSmash.mp3', 1.8);
     } else {
       audioSystem.playSFX(cfg.sounds?.bladeSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3', 1.8);
     }
@@ -697,7 +697,7 @@ export function updateMahitoFleshSurge(fighter) {
       fighter.punchAnimTimer = 16; // Trigger ground plunge fist animation
 
       // Plunge ground impact SFX & particles
-      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/groundsmash.mp3', 2.0);
+      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/groundSmash.mp3', 2.0);
       audioSystem.playSFX(cfg.sounds?.whiff || 'Assets/Sound Effects/Skills/woosh.mp3', 1.8);
       spawnMeleeClashShockwave(fighter.x, fighter.y, 40, '#D946EF');
       spawnSparks(fighter.x, fighter.y, '#D946EF', 15);

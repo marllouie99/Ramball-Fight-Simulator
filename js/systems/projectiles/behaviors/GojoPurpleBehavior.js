@@ -182,7 +182,9 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         };
 
         if (dist < trapRadius) {
-          ent.isCaughtInPurple = false; // No paralyzing stasis
+          ent.isCaughtInPurple = true;
+          ent.purpleHitTimer = Math.max(ent.purpleHitTimer || 0, 30);
+          ent.isCaughtInPurpleVortex = true;
 
           // Apply heavy movement slow debuff
           const slowDuration = CONFIG.gojo?.purpleSlowDuration || 30;
@@ -210,6 +212,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             ent.vy = 0;
           }
         } else if (dist >= trapRadius && dist < purplePullRadius) {
+          ent.isCaughtInPurpleVortex = true;
           // Outer gravitational vortex pull field — strong suction toward orb
           const falloff = 1 - (dist - trapRadius) / (purplePullRadius - trapRadius);
           const outerPullSpeed = purplePullForce * 0.5 * Math.pow(falloff, 0.8);
@@ -472,7 +475,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
 
         // Outward explosive knockback push
         const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
-        const isEscanor = Boolean(ent && (ent.characterId === 'escanor' || ent.type === 'escanor' || ent.immuneToKnockback || ent.immuneToPush));
+        const isEscanor = Boolean(ent && (ent.characterId === 'escanor' || ent.type === 'escanor' || (ent.immuneToPull && !ent.isPlant)));
         if (isMakimaShatter) {
           ent.vx = 0; ent.vy = 0; ent.knockbackVx = 0; ent.knockbackVy = 0;
           if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
@@ -481,7 +484,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         } else if (isEscanor) {
           ent.knockbackVx = 0;
           ent.knockbackVy = 0;
-        } else if (isChanneling && !isFugaChanneling) {
+        } else if (isChanneling && !isFugaChanneling && ent.characterId !== 'eye_of_cthulhu' && ent.type !== 'eye_of_cthulhu') {
           // Channeling entities have hyper-armor and should not have their channeling stance displaced or interrupted!
         } else {
           const dirX = dist > 0 ? dx / dist : (Math.random() - 0.5) * 2;

@@ -25,10 +25,10 @@ export function _getMahitoClawsWeaponImage() {
       _mahitoClawsImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Mahito claws weapon image at Assets/model/MAHITO-CLAWS-WEAPON.png', e);
+      console.warn('Failed to load Mahito claws weapon image at Assets/model/mahito/MAHITO-CLAWS-WEAPON.png', e);
       _mahitoClawsImageLoading = false;
     };
-    img.src = 'Assets/model/MAHITO-CLAWS-WEAPON.png?v=1';
+    img.src = 'Assets/model/mahito/MAHITO-CLAWS-WEAPON.png?v=1';
     _mahitoClawsImage = img;
   }
   return _mahitoClawsImage;

@@ -37,10 +37,10 @@ export function _getGenosHairImage() {
       _genosHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Genos hair image at Assets/model/Genos-hair.png', e);
+      console.warn('Failed to load Genos hair image at Assets/model/genos/Genos-hair.png', e);
       _genosHairImageLoading = false;
     };
-    img.src = 'Assets/model/Genos-hair.png?v=1';
+    img.src = 'Assets/model/genos/Genos-hair.png?v=1';
     _genosHairImage = img;
   }
   return _genosHairImage;
@@ -51,7 +51,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Genos's authentic anime spiky blonde hair from Assets/model/Genos-hair.png.
+ * Draws Genos's authentic anime spiky blonde hair from Assets/model/genos/Genos-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -168,7 +168,7 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   drawGenosPixelBody(ctx, r, false, isChargingUlt, isSelfDestructing, fighter.isMeleeStance, now);
 
   // ─────────────────────────────────────────────
-  // 2b. AUTHENTIC HAIR OVERLAY (Assets/model/Genos-hair.png)
+  // 2b. AUTHENTIC HAIR OVERLAY (Assets/model/genos/Genos-hair.png)
   // ─────────────────────────────────────────────
   _drawGenosHair(ctx, r, facingLeft);
 

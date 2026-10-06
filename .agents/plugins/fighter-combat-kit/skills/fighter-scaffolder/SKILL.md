@@ -47,3 +47,7 @@ super.update(opponent, ownerIndex, arena);
 - Avoid `ctx.shadowBlur` / `ctx.shadowColor` anywhere in rendering loops.
 - Heavy persistent VFX (trails, spheres, full-screen dims) must use the PixiJS WebGL Hybrid Container Pattern.
 - HUD skill bars must use unified character `themeColor`.
+
+### 5. Mandatory In-Game Overlay HP & Status Drawing (Rule 21)
+- If overriding `draw(ctx, opponent)`: ALWAYS call `this.drawHealth(ctx);` and `this.drawFreezeTimer(ctx);` at the end of the `draw()` pipeline.
+- ALWAYS implement `drawBody(ctx) { draw[Name]Skin(ctx, this); }` so standard renderers, previews, and engine hooks work properly.

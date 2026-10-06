@@ -3,6 +3,12 @@
 // ─────────────────────────────────────────────
 
 export const tojiConfig = {
+  assets: {
+    hair: 'Assets/model/toji/toji-hair.png',
+    skin: 'Assets/model/toji/Toji-skin.png',
+    ultimateOverlay: 'Assets/Overlays/toji-ultimate-overlay.png',
+  },
+
   name: 'Toji',
   displayName: 'Toji',
   // Base Attributes

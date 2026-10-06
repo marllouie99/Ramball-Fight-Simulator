@@ -32,10 +32,10 @@ export function _getMakimaHairImage() {
       _makimaHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Makima hair image at Assets/model/Makima-hair.png', e);
+      console.warn('Failed to load Makima hair image at Assets/model/makima/Makima-hair.png', e);
       _makimaHairImageLoading = false;
     };
-    img.src = 'Assets/model/Makima-hair.png?v=1';
+    img.src = 'Assets/model/makima/Makima-hair.png?v=1';
     _makimaHairImage = img;
   }
   return _makimaHairImage;
@@ -46,7 +46,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Makima's authentic pixel-art hair from Assets/model/Makima-hair.png.
+ * Draws Makima's authentic pixel-art hair from Assets/model/makima/Makima-hair.png.
  * Features:
  * - Salmon-red parted bangs with center forehead peak
  * - Long face-framing cheek locks
@@ -97,7 +97,7 @@ export function _drawMakimaHair(ctx, r, facingLeft = false) {
 
 /**
  * Main Skin Renderer for Makima (The Control Devil)
- * Uses procedural drawn pixel body + authentic pixel hair asset from Assets/model/Makima-hair.png.
+ * Uses procedural drawn pixel body + authentic pixel hair asset from Assets/model/makima/Makima-hair.png.
  * Adheres strictly to Rule 19, 20, 11 (Authentic Pixel Art Style)
  */
 export function drawMakimaSkin(ctx, fighter) {
@@ -238,7 +238,7 @@ export function drawMakimaSkin(ctx, fighter) {
   // LAYER 1: PROCEDURAL PIXEL ART BODY CIRCLE
   drawMakimaPixelBody(ctx, r);
 
-  // LAYER 2: AUTHENTIC PIXEL-ART HAIR ASSET (Assets/model/Makima-hair.png)
+  // LAYER 2: AUTHENTIC PIXEL-ART HAIR ASSET (Assets/model/makima/Makima-hair.png)
   _drawMakimaHair(ctx, r, facingLeft);
 
   // Status Overlays (freeze, stun, time-stop)

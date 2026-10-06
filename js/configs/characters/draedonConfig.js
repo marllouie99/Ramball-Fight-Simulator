@@ -4,6 +4,19 @@
 // ─────────────────────────────────────────────
 
 export const draedonConfig = {
+  assets: {
+    pixelSkin: 'Assets/model/ExoMech/Exo-Disintegrator-PIXEL-SKIN.png',
+    marsMissile: 'Assets/model/ExoMech/ExoMech-MarsMissile.png',
+    marsMissileGlow: 'Assets/model/ExoMech/ExoMech-MarsMissileGlow.png',
+    railgunCannon: 'Assets/model/ExoMech/ExoMech-RailgunCannon.png',
+    railgunCannonGlowmask: 'Assets/model/ExoMech/ExoMech-RailgunCannonGlowmask.png',
+    unstableEnergyCannon: 'Assets/model/ExoMech/ExoMech-UnstableEnergyCannon.png',
+    unstableEnergyCannonGlowmask: 'Assets/model/ExoMech/ExoMech-UnstableEnergyCannonGlowmask.png',
+    unstableEnergyCannonScrollMap: 'Assets/model/ExoMech/ExoMech-UnstableEnergyCannonScrollMap.png',
+    unstableEnergyCannonScrollMapBlurred: 'Assets/model/ExoMech/ExoMech-UnstableEnergyCannonScrollMapBlurred.png',
+    solynSentientStar: 'Assets/model/ExoMech/ExoMech-SolynSentientStar.png',
+  },
+
   id: 'draedon',
   name: 'Draedon',
   displayName: 'Draedon',

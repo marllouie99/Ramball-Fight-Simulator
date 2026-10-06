@@ -107,10 +107,80 @@ globalThis.Audio = class {
   constructor() {
     this.play = () => Promise.resolve();
     this.pause = () => {};
+    this.load = () => {};
     this.addEventListener = () => {};
     this.removeEventListener = () => {};
     this.cloneNode = () => new globalThis.Audio();
   }
+};
+globalThis.AudioBuffer = class {
+  constructor(options = {}) {
+    this.duration = options.duration !== undefined ? options.duration : 1.5;
+    this.length = options.length !== undefined ? options.length : 44100;
+    this.numberOfChannels = options.numberOfChannels !== undefined ? options.numberOfChannels : 2;
+    this.sampleRate = options.sampleRate !== undefined ? options.sampleRate : 44100;
+    this._channels = Array.from({ length: this.numberOfChannels }, () => new Float32Array(this.length));
+  }
+  getChannelData(ch) {
+    return this._channels[ch] || new Float32Array(this.length);
+  }
+  copyToChannel(src, ch, offset) {
+    const dest = this._channels[ch];
+    if (dest && src) {
+      dest.set(src.subarray ? src.subarray(0, this.length - offset) : src, offset);
+    }
+  }
+};
+globalThis.AudioContext = class {
+  constructor() {
+    this.state = 'running';
+    this.currentTime = 0;
+    this.destination = {};
+    this.decodeAudioData = async (buffer) => new globalThis.AudioBuffer();
+    this.createBufferSource = () => ({
+      buffer: null,
+      playbackRate: { value: 1.0 },
+      connect: () => {},
+      start: () => {},
+      stop: () => {},
+      disconnect: () => {}
+    });
+    this.createGain = () => ({
+      gain: { value: 1.0, setValueAtTime: () => {}, linearRampToValueAtTime: () => {}, cancelScheduledValues: () => {} },
+      connect: () => {},
+      disconnect: () => {}
+    });
+    this.createBuffer = (channels, length, sampleRate) => {
+      const sRate = sampleRate || 44100;
+      return new globalThis.AudioBuffer({
+        numberOfChannels: channels,
+        length,
+        sampleRate: sRate,
+        duration: length / sRate
+      });
+    };
+  }
+  resume() { return Promise.resolve(); }
+};
+const _origAllFetch = globalThis.fetch;
+globalThis.fetch = async (url) => {
+  if (typeof url === 'string' && (url.startsWith('Assets/') || url.startsWith('./') || url.includes('.mp3') || url.includes('.wav') || url.includes('.png') || url.includes('.ogg'))) {
+    return {
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => new ArrayBuffer(1024)
+    };
+  }
+  if (_origAllFetch) {
+    try {
+      return await _origAllFetch(url);
+    } catch (e) {}
+  }
+  return {
+    ok: true,
+    status: 200,
+    arrayBuffer: async () => new ArrayBuffer(1024)
+  };
 };
 globalThis.localStorage = {
   getItem: () => null,

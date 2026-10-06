@@ -136,6 +136,11 @@ export function modUpdateStealth(fighter, opponent) {
     fighter.isParalyzed ||
     (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
     (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
+    fighter.isFrameFrozen ||
+    (fighter.frameFreezeTimer && fighter.frameFreezeTimer > 0) ||
+    fighter.isCaughtInNaoyaUlt ||
+    fighter.isCurrentlyWallPinnedByNaoya ||
+    (fighter.naoyaWallPinTimer && fighter.naoyaWallPinTimer > 0) ||
     fighter.isCurrentlyWallPinnedByMakima ||
     (fighter.makimaWallPinTimer && fighter.makimaWallPinTimer > 0) ||
     fighter.isCurrentlyWallPinnedByEscanor ||

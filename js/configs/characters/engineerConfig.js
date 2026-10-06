@@ -3,6 +3,10 @@
 // ─────────────────────────────────────────────
 
 export const engineerConfig = {
+  assets: {
+    hair: 'Assets/model/engineer/Engineer-Hair.png',
+  },
+
   name: 'Engineer',
   displayName: 'Engineer',
   bossTitle: 'Combat Engineer',

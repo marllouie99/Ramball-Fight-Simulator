@@ -111,19 +111,43 @@ export function updateChainPhysics(fighter) {
   let thrustDistance = 0;
 
   if (isAttacking) {
-    const t = 1 - (fighter.spearSwingTimer / 15);
-    if (t < 0.25) {
-      const p = t / 0.25;
-      thrustDistance = -6 * p;
-      offsetAngle = (0.42 + 0.15 * p) * flipSign;
-    } else if (t < 0.65) {
-      const p = (t - 0.25) / 0.4;
-      thrustDistance = -6 + 32 * Math.sin(p * Math.PI);
-      offsetAngle = (0.57 - 0.9 * Math.sin(p * Math.PI * 0.5)) * flipSign;
+    const maxTimer = fighter.spearSwingMax || (fighter.isAmbushThrust ? 36 : 26);
+    const t = Math.max(0, Math.min(1.0, 1 - (fighter.spearSwingTimer / maxTimer)));
+
+    if (fighter.isAmbushThrust) {
+      if (t < 0.12) {
+        const p = t / 0.12;
+        thrustDistance = -24 * (1 - p * 0.1);
+        offsetAngle = 0;
+      } else if (t < 0.72) {
+        const p = (t - 0.12) / 0.60;
+        const thrustProgress = Math.min(1.0, p * 4.0);
+        thrustDistance = -24 + 94 * thrustProgress;
+        offsetAngle = 0;
+      } else {
+        const p = (t - 0.72) / 0.28;
+        const easeP = p * (2 - p);
+        thrustDistance = 70 * (1 - easeP);
+        offsetAngle = 0.42 * easeP * flipSign;
+      }
     } else {
-      const p = (t - 0.65) / 0.35;
-      thrustDistance = 6 * (1 - p);
-      offsetAngle = (-0.33 + (0.42 - (-0.33)) * p) * flipSign;
+      // Smooth 3-Phase standard melee chop matching TojiFighter.js
+      if (t < 0.15) {
+        const p = t / 0.15;
+        const easeP = p * p * (3 - 2 * p); // smoothstep windup
+        thrustDistance = -6 * easeP;
+        offsetAngle = (0.42 + (-0.95 - 0.42) * easeP) * flipSign;
+      } else if (t < 0.50) {
+        const p = (t - 0.15) / 0.35;
+        const sweepCurve = 1 - Math.pow(1 - p, 2.4);
+        thrustDistance = -6 + 20 * Math.sin(p * Math.PI * 0.75);
+        offsetAngle = (-0.95 + 2.10 * sweepCurve) * flipSign;
+      } else {
+        const p = (t - 0.50) / 0.50;
+        const easeP = p * (2 - p);
+        thrustDistance = 14 * (1 - easeP);
+        offsetAngle = (1.15 + (0.42 - 1.15) * easeP) * flipSign;
+      }
     }
   } else {
     offsetAngle += Math.sin(Date.now() / 250) * 0.05 * flipSign;

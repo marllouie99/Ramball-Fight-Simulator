@@ -29,7 +29,7 @@ export const naoyaConfig = {
 
   // Passive: Projection Sorcery (Permanent Speed & Evade Stacking on Hit)
   enableProjectionSorcery: true,
-  maxFrameStacks: 5,               // Max speed & evade stacks
+  maxFrameStacks: 20,               // Max speed & evade stacks
   speedBonusPerStack: 0.50,         // +0.50 permanent movement speed per hit
   baseEvadeChance: 0.05,            // 5% starting base evade chance
   evadeBonusPerStack: 0.04,         // +4% permanent evade chance per hit stack
@@ -45,38 +45,43 @@ export const naoyaConfig = {
   movementAfterimageLifespanFrames: 50, // ⚡ Duration (frames) each idle/movement afterimage lasts before fading out 1 by 1 (e.g. 15 = fast, 40 = long trail)
   movementAfterimageFadeEase: 1.15,  // ⚡ Fade-out dissolve curve (1.0 = linear, >1.0 = smooth ease-out)
   movementAfterimageMinSpeed: 0.8,   // ⚡ Minimum movement speed threshold to spawn trailing afterimages
-  movementAfterimageShockwaves: true, // ⚡ Spawn expanding sonic shockwave ring when each idle/movement afterimage pops into existence
+  movementAfterimageShockwaves: false, // ⚡ Spawn expanding sonic shockwave ring when each idle/movement afterimage pops into existence (disabled)
   movementAfterimageShockwaveRadiusMult: 1.8, // ⚡ Shockwave expansion size relative to fighter radius
   movementAfterimageSFX: false,      // ⚡ Subtle step SFX on each movement afterimage pop
 
   // Passive: 24-Frame Palm Touch & Frame Stasis Freeze
-  enableFrameFreeze: 1,             // ⚡ Enabled when Flurry is UP
-  frameFreezeDuration: 50,          // 1.0s duration (60 frames)
-  frameFreezeCooldown: 500,         // ⚡ Cooldown between passive palm touch freezes (4.0s / 240 frames)
+  enableFrameFreeze: 1,             // ⚡ Enabled when tantoCooldown is UP
+  frameFreezeChance: 0.35,          // ⚡ Trigger chance (0.0 to 1.0, 35% chance per flurry sequence so it doesn't trigger too frequently)
+  frameFreezeCooldown: 500,         // ⚡ Synced with tantoCooldown
   frameFreezeVulnerability: 0.30,   // +30% bonus True Damage taken while frozen
-  maxDisruptionsForStasis: 20,       // Number of basic disruptions required to trigger stasis
+  maxDisruptionsForStasis: 1,       // Triggers on flurry hit once tantoCooldown is UP
   frameShatterDamage: 18,           // AOE shatter damage upon breaking out
   frameShatterRadius: 75,
 
   // Primary Attack: Rapid 24 FPS Hypersonic Brawler Punch Flurry Barrage (Attack-Teleport-Attack Sequence)
   meleeReach: 72,
   meleeArc: (140 * Math.PI) / 180,  // 140° frontal arc
-  basicComboHits: 20,               // ⚡ How many total punches in a flurry sequence (e.g. 10, 20, 30)
+  basicComboHits: 10,               // ⚡ How many total punches in a flurry sequence (e.g. 10, 20, 30)
   flurryPunchesPerTeleport: 0,      // ⚡ How many punches Naoya throws at each teleport angle (e.g. 1 = teleport every punch, 3 = 3 punches per teleport)
   flurryStrikeIntervalFrames: 8,   // ⚡ Speed of each attack (lower = faster! 3 frames = 20 attacks/sec)
+  flurryAngleStep: (155 * Math.PI) / 180, // ⚡ Increased teleport jump angle (~155° cross-jump across victim)
+  flurryRandomAngleSpread: (110 * Math.PI) / 180, // ⚡ Increased randomness spread (±55° random jitter per teleport)
   flurryOrbitDistance: 24,         // Surround distance when teleporting around the target
+  flurryRandomOrbitJitter: 16,      // ⚡ Random distance variation (px) for close/far punch depth (16px jitter)
   flurryLungeSpeed: 2.5,
-  punchDamage: 4,                  // Damage per flurry punch
+  punchDamage: 5,                  // Damage per flurry punch
   punchComboFinisherDamage: 18,    // Bonus damage on the final finisher punch
   punchCooldown: 40,               // Cooldown between full flurry bursts (~0.66s)
   punchKnockback: 16,              // Knockback applied ONLY on the final finisher punch
   tantoDamage: 4,                  // Backward compatibility alias
-  tantoComboFinisherDamage: 18,
+  tantoComboFinisherDamage: 30,
   tantoCooldown: 500,
-  tantoKnockback: 16,
+  knifeStabFrames: 50,              // ⚡ Total duration of the smooth tanto stab finisher animation (frames)
   tantoStrikeFrames: 30,
   tantoRecoveryFrames: 8,
   maxStacksPerFlurry: 5,            // ⚡ Maximum speed & evade stacks gained per flurry sequence
+  flurryAfterimageLifespanFrames: 45, // ⚡ Blue projection ghost afterimage lifespan (frames) during flurry
+  flurryAfterimageAlpha: 1.0,          // ⚡ Starting opacity for flurry blue projection ghost afterimages
 
   // Skill 1: Frame Blitz (Nijūyon Koma Senkō)
   enableFrameBlitz: 0,
@@ -87,7 +92,7 @@ export const naoyaConfig = {
   skill1StasisDuration: 60,
 
   // Skill 2: Sonic Boom Rebound Kick (Onpoku Kyaku)
-  enableSonicKick: 0,
+  enableSonicKick: 1,
   skill2Cooldown: 480,              // 8.0s (480 frames)
   skill2Damage: 26,
   skill2WallImpactDamage: 18,
@@ -98,6 +103,7 @@ export const naoyaConfig = {
   // Ultimate: 24 FPS Mach 3 Runway Breach — Out-of-Bounds Acceleration & Sonic Shatter
   enableUltimate: 1,
   ultCooldown: 1440,                // 24.0s (1440 frames)
+  ultPostComboDelayFrames: 120,     // ⚡ Buffer delay (frames) after completing a tanto stab finisher before ultimate can be cast (~2.0s cooldown buffer)
   ultStartupPauseFrames: 28,        // ⚡ Duration (frames) of the initial arena time-stop pause where Naoya stops before running (~0.45s)
   ultRunwayRadiusX: 10000,           // ⚡ Runway Path Distance (Horizontal width radius in px — increase to make path wider)
   ultRunwayRadiusY: 10000,           // ⚡ Runway Path Distance (Vertical height radius in px — increase to make path longer/taller)
@@ -126,8 +132,15 @@ export const naoyaConfig = {
 
   // Sound Configuration & Volumes
   sounds: {
-    punchHit: 'Assets/Sound Effects/Attacks/punch.mp3',
-    finisherPunch: 'Assets/Sound Effects/Attacks/punch.mp3',
+    punchHit: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3'
+    ],
+    punchHits: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3'
+    ],
+    finisherPunch: 'Assets/Sound Effects/Attacks/heavypunch2.mp3',
     swordSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     runwayAfterimageShockwave: 'Assets/Sound Effects/NaoyaSFX/Naoya-pathafterimages-shockwaves.wav',
     heavySmash: 'Assets/Sound Effects/Attacks/heavypunch3.mp3',
@@ -136,19 +149,25 @@ export const naoyaConfig = {
     frameBlitz: 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3',
     sonicKick: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
     flurryStrike: 'Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3',
-    shatterFinisher: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3'
+    shatterFinisher: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
+    glassBreak: 'Assets/Sound Effects/NaoyaSFX/Naoya_glass_break.mp3',
+    knifeTakeoff: 'Assets/Sound Effects/NaoyaSFX/Naoya_takeoff_knife.mp3',
+    knifeStabs: 'Assets/Sound Effects/NaoyaSFX/Naoya_stabs.mp3'
   },
   soundVolumes: {
     punchHit: 0.85,
     finisherPunch: 0.95,
     swordSwing: 0.80,
-    runwayAfterimageShockwave: 0.85,
+    runwayAfterimageShockwave: 1.85,
     heavySmash: 1.25,
     carCrashImpact: 1.25,
     frameStasis: 0.95,
     frameBlitz: 1.00,
     sonicKick: 1.10,
     flurryStrike: 1.05,
-    shatterFinisher: 1.25
+    shatterFinisher: 1.25,
+    glassBreak: 1.00,
+    knifeTakeoff: 1.05,
+    knifeStabs: 1.20
   }
 };

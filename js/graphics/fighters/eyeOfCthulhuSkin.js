@@ -34,8 +34,8 @@ export function getEyePhase1Image() {
   if (!_phase1Image && typeof Image !== 'undefined') {
     _phase1Image = new Image();
     _phase1Image.onload = () => { _p1Loaded = true; };
-    _phase1Image.onerror = (e) => { console.warn('Failed to load Eye of Cthulhu Phase 1 at Assets/model/Eye of Cthulhu.png', e); };
-    _phase1Image.src = encodeURI('Assets/model/Eye of Cthulhu.png?v=1');
+    _phase1Image.onerror = (e) => { console.warn('Failed to load Eye of Cthulhu Phase 1 at Assets/model/eyeOfCthulhu/Eye of Cthulhu.png', e); };
+    _phase1Image.src = encodeURI('Assets/model/eyeOfCthulhu/Eye of Cthulhu.png?v=1');
   }
   return _phase1Image;
 }
@@ -44,8 +44,8 @@ export function getEyePhase2Image() {
   if (!_phase2Image && typeof Image !== 'undefined') {
     _phase2Image = new Image();
     _phase2Image.onload = () => { _p2Loaded = true; };
-    _phase2Image.onerror = (e) => { console.warn('Failed to load Eye of Cthulhu Phase 2 at Assets/model/eye of cthulhu phase 2.png', e); };
-    _phase2Image.src = encodeURI('Assets/model/eye of cthulhu phase 2.png?v=1');
+    _phase2Image.onerror = (e) => { console.warn('Failed to load Eye of Cthulhu Phase 2 at Assets/model/eyeOfCthulhu/eye of cthulhu phase 2.png', e); };
+    _phase2Image.src = encodeURI('Assets/model/eyeOfCthulhu/eye of cthulhu phase 2.png?v=1');
   }
   return _phase2Image;
 }
@@ -57,8 +57,8 @@ export function getEyeShatterImage() {
   if (!_shatterImage && typeof Image !== 'undefined') {
     _shatterImage = new Image();
     _shatterImage.onload = () => { _shatterLoaded = true; };
-    _shatterImage.onerror = (e) => { console.warn('Failed to load Eye of Cthulhu Shatter Sprite Sheet at Assets/model/Sprites/Eye-of-Cthulhu-shatter-sprite-sheet.png', e); };
-    _shatterImage.src = encodeURI('Assets/model/Sprites/Eye-of-Cthulhu-shatter-sprite-sheet.png?v=2');
+    _shatterImage.onerror = (e) => { console.warn('Failed to load Eye of Cthulhu Shatter Sprite Sheet at Assets/model/eyeOfCthulhu/Eye-of-Cthulhu-shatter-sprite-sheet.png', e); };
+    _shatterImage.src = encodeURI('Assets/model/eyeOfCthulhu/Eye-of-Cthulhu-shatter-sprite-sheet.png?v=2');
   }
   return _shatterImage;
 }

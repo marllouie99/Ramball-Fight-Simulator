@@ -1073,7 +1073,7 @@ export function loadTojiUltimateOverlayImage() {
     tojiUltimateOverlayImgLoading = false;
     tojiUltimateOverlayImg = null;
   };
-  tojiUltimateOverlayImg.src = 'Assets/Overlays/Toji-ultimate-overlay.png';
+  tojiUltimateOverlayImg.src = 'Assets/Overlays/toji-ultimate-overlay.png';
 }
 
 export function getTojiUltimateOverlayImage() {

@@ -4,6 +4,12 @@
 // ─────────────────────────────────────────────
 
 export const powerConfig = {
+  assets: {
+    hair: 'Assets/model/power/Power-hair.png',
+    skin: 'Assets/model/power/POWER-MODEL-SKIN.png',
+    skinRgba: 'Assets/model/power/POWER-MODEL-SKIN.rgba',
+  },
+
   name: 'Power',
   displayName: 'Power',
   bossTitle: 'Blood Fiend',

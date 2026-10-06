@@ -1,4 +1,4 @@
-import { Fighter } from '../fighter.js';
+import { Fighter, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -509,33 +509,44 @@ export class GunSlingerFighter extends Fighter {
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
       } else if (secondaryTarget && !this.isReloading && this.magazineBullets > 1) {
-        this.currentGun = 'right';
-        this.fireBullet(ownerIndex, this.damage, false, primaryTarget);
-        this.muzzleFlashTimer = 5;
-        this.rightRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil;
-        this.rightRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt;
-        this.currentGun = 'left';
-        this.fireBullet(ownerIndex, this.damage, false, secondaryTarget);
-        this.muzzleFlashTimer = 5;
-        this.leftRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil * 0.9;
-        this.leftRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt * 0.85;
-        this.shootCooldown = CONFIG.gunslinger.shotCooldown;
-      } else if (this.leftGunTimer === 0 && !this.isReloading && this.magazineBullets > 0) {
-        this.fireBullet(ownerIndex, this.damage);
-        this.muzzleFlashTimer = 5;
-        // Alternate which gun gets the full recoil (creates visual variety)
-        if (this.currentGun === 'right') {
-          this.rightRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil;
-          this.rightRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt;
-          this.leftRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil * 0.3; // Small secondary recoil
-          this.leftRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt * 0.3;
-        } else {
-          this.leftRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil;
-          this.leftRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt;
-          this.rightRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil * 0.3;
-          this.rightRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt * 0.3;
+        const pInside = primaryTarget && !isEntityOutsideArena(primaryTarget, arena);
+        const sInside = secondaryTarget && !isEntityOutsideArena(secondaryTarget, arena);
+        if (pInside || sInside) {
+          if (pInside) {
+            this.currentGun = 'right';
+            this.fireBullet(ownerIndex, this.damage, false, primaryTarget);
+            this.muzzleFlashTimer = 5;
+            this.rightRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil;
+            this.rightRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt;
+          }
+          if (sInside) {
+            this.currentGun = 'left';
+            this.fireBullet(ownerIndex, this.damage, false, secondaryTarget);
+            this.muzzleFlashTimer = 5;
+            this.leftRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil * 0.9;
+            this.leftRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt * 0.85;
+          }
+          this.shootCooldown = CONFIG.gunslinger.shotCooldown;
         }
-        this.shootCooldown = CONFIG.gunslinger.shotCooldown;
+      } else if (this.leftGunTimer === 0 && !this.isReloading && this.magazineBullets > 0) {
+        const mainTarget = primaryTarget || opponent;
+        if (!mainTarget || !isEntityOutsideArena(mainTarget, arena)) {
+          this.fireBullet(ownerIndex, this.damage);
+          this.muzzleFlashTimer = 5;
+          // Alternate which gun gets the full recoil (creates visual variety)
+          if (this.currentGun === 'right') {
+            this.rightRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil;
+            this.rightRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt;
+            this.leftRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil * 0.3; // Small secondary recoil
+            this.leftRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt * 0.3;
+          } else {
+            this.leftRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil;
+            this.leftRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt;
+            this.rightRecoilOffset = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxRecoil * 0.3;
+            this.rightRecoilTilt = GUNSLINGER_WEAPON_GRAPHICS.recoil.maxTilt * 0.3;
+          }
+          this.shootCooldown = CONFIG.gunslinger.shotCooldown;
+        }
       } else if (this.magazineBullets === 0 && !this.isReloading) {
         this._startReload();
       }

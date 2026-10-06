@@ -1,7 +1,35 @@
-import { playSound, stopSound, stopLoopingSound, stopSoundBySrc, stopAllSounds, stopAllLoopingSounds, playLoopingSound, fadeOutSound, fadeOutLoopingSound, fadeInSound, pauseSound, resumeSound, soundSpriteManager } from './soundSystem.js';
+import {
+  playSound,
+  stopSound,
+  stopLoopingSound,
+  stopSoundBySrc,
+  stopAllSounds,
+  stopAllLoopingSounds,
+  playLoopingSound,
+  fadeOutSound,
+  fadeOutLoopingSound,
+  fadeInSound,
+  pauseSound,
+  resumeSound,
+  preloadSound,
+  preloadAudioBuffer,
+  preloadAudioBufferBatch,
+  getSoundCacheStats,
+  isSoundCached,
+  isSoundAudioBuffer,
+  soundSpriteManager
+} from './soundSystem.js';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 
-export { soundSpriteManager };
+export {
+  soundSpriteManager,
+  preloadSound,
+  preloadAudioBuffer,
+  preloadAudioBufferBatch,
+  getSoundCacheStats,
+  isSoundCached,
+  isSoundAudioBuffer
+};
 
 class AudioEventEmitter {
   constructor() {
@@ -87,6 +115,18 @@ class AudioEventEmitter {
     if (handle) {
       stopSound(handle);
     }
+  }
+
+  preload(src, options = {}) {
+    return preloadSound(src, options);
+  }
+
+  getCacheStats() {
+    return getSoundCacheStats();
+  }
+
+  isCached(src) {
+    return isSoundCached(src);
   }
 
   /**

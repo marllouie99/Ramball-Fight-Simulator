@@ -64,7 +64,7 @@ export const ENDER_DRAGON_MAP = {
 
   // ── Sprite Sheet Configuration ──
   sprites: {
-    crystalSheet: 'Assets/model/Sprites/End-crystal-animation-sprite-sheet.png',
+    crystalSheet: 'Assets/model/enderDragon/End-crystal-animation-sprite-sheet.png',
     frameCount: 6,
     frameWidth: 362,
     frameHeight: 724,

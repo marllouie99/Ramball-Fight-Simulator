@@ -2,6 +2,12 @@
 // Yuji Itadori — The Black Flash Brawler Config
 // ─────────────────────────────────────────────
 export const yujiConfig = {
+  assets: {
+    hair: 'Assets/model/yuji/Yuji-hair.png',
+    skin: 'Assets/model/yuji/Yuji-SKIN.png',
+    soulSwapOverlay: 'Assets/Overlays/Yuji-soulswap-overlay.png',
+  },
+
   name: 'Yuji',
   displayName: 'Yuji',
   bossTitle: 'Tiger of West Junior High',

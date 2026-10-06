@@ -645,7 +645,7 @@ export class YujiFighter extends Fighter {
           spawnFloatingText(this.x, this.y - this.r - 28, 'FURNACE (FUGA: OPEN)!', '#FF4500');
 
           const sound = getSkillSound('sukuna', 'divineFlame');
-          const fugaSrc = sound?.src || CONFIG.sukuna?.sounds?.divineFlame || 'Assets/Sound Effects/Skills/fuga_charge.mp3';
+          const fugaSrc = sound?.src || CONFIG.sukuna?.sounds?.fugaIgnite || 'Assets/Sound Effects/Skills/fugaignite.mp3';
           const fugaVol = sound?.volume ?? (CONFIG.sukuna?.soundVolumes?.divineFlame ?? 1.5);
           this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
           playLoopingSound(this.fugaSoundKey, fugaSrc, fugaVol);

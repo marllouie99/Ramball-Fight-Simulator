@@ -285,6 +285,10 @@ export class ${className} extends Fighter {
     super.update(opponent, ownerIndex, arena);
   }
 
+  drawBody(ctx) {
+    draw${capitalize(id)}Skin(ctx, this);
+  }
+
   drawSkin(ctx) {
     draw${capitalize(id)}Skin(ctx, this);
   }

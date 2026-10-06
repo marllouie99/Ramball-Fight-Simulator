@@ -4,6 +4,13 @@
 // ─────────────────────────────────────────────
 
 export const cjConfig = {
+  assets: {
+    overlay: 'Assets/Overlays/CJ-baguvix-overlay.png',
+    auraFrame1: 'Assets/model/cj/CJ-baguvix-aura_frame_1.png',
+    auraFrame2: 'Assets/model/cj/CJ-baguvix-aura_frame_2.png',
+    auraFrame3: 'Assets/model/cj/CJ-baguvix-aura_frame_3.png',
+  },
+
   name: 'CJ',
   displayName: 'CJ',
   bossTitle: 'Grove Street Legend',

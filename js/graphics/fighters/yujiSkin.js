@@ -24,10 +24,10 @@ export function _getYujiHairImage() {
       _yujiHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Yuji hair image at Assets/model/Yuji-hair.png', e);
+      console.warn('Failed to load Yuji hair image at Assets/model/yuji/Yuji-hair.png', e);
       _yujiHairImageLoading = false;
     };
-    img.src = 'Assets/model/Yuji-hair.png?v=1';
+    img.src = 'Assets/model/yuji/Yuji-hair.png?v=1';
     _yujiHairImage = img;
   }
   return _yujiHairImage;
@@ -38,7 +38,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Yuji's authentic anime spiky hair from Assets/model/Yuji-hair.png.
+ * Draws Yuji's authentic anime spiky hair from Assets/model/yuji/Yuji-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -273,7 +273,7 @@ export function drawYujiSkin(ctx, fighter) {
   // ── 2. Body Circle (Authentic Procedural Pixel Art) ──
   drawYujiPixelBody(ctx, r, isSukunaForm);
 
-  // ── 2.1 Authentic Hair Model (Assets/model/Yuji-hair.png or Sukuna-hair.png) ──
+  // ── 2.1 Authentic Hair Model (Assets/model/yuji/Yuji-hair.png or Sukuna-hair.png) ──
   if (isSukunaForm) {
     _drawSukunaHair(ctx, r, facingLeft);
   } else {

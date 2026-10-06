@@ -10,6 +10,13 @@ When creating or rendering new characters and model skins, ALWAYS use the approv
 - **Layering & Overlap**: Both hands MUST be rendered on the **front layer** (after rendering the central body circle), overlapping the lower perimeter of the body circle so approximately half of each hand circle overlaps the body edge and half protrudes outward as a distinct side fist.
 - **Weapon Wielding**: For weapon users, the main-hand weapon hilt/grip anchors directly at `(x: +r * 0.82, y: +r * 0.38)` during idle/rest, with the hand drawn over the grip.
 
+## Mandatory In-Game Overlay HP & Status Drawing (Rule 21)
+
+Whenever creating, scaffolding, or overriding a fighter's rendering pipeline:
+- **Custom `draw(ctx, opponent)` Override**: If the fighter class defines or overrides `draw(ctx, opponent)`, it **MUST ALWAYS** explicitly call `this.drawHealth(ctx);` and `this.drawFreezeTimer(ctx);` at the very end of `draw()` on the top layer.
+- **`drawBody(ctx)` Implementation**: The fighter class MUST define `drawBody(ctx)` (e.g. `drawBody(ctx) { draw[Name]Skin(ctx, this); }`) so standard engine render passes and preview hooks function properly.
+- **Never Omit `this.drawHealth(ctx)`**: Omitting `this.drawHealth(ctx)` removes the in-game floating HP number underneath/above the fighter during combat. Always ensure overhead HP is rendered.
+
 ## Post-Change Suggestions
 
 This applies to any chat-based AI coding assistant working in this repository, regardless of IDE, extension, model, or provider, whenever these project instructions are loaded.

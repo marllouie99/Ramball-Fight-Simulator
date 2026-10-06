@@ -6,8 +6,10 @@
 // - Rule 16: Manga 4-point needle speed lines
 // ─────────────────────────────────────────────
 
-import { state } from '../../core/state.js';
+import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { audioSystem } from '../../systems/audioSystem.js';
+import { spawnImpactFlash, spawnSparks } from '../particles/sparkEffect.js';
 import { getNaoyaCachedCanvas, drawNaoyaGhostModel } from '../fighters/naoyaSkin.js';
 
 export const NAOYA_WEAPON_GRAPHICS = {
@@ -53,7 +55,7 @@ export function drawNaoyaTanto(ctx, x, y, gunAngle, r, swingActive = false, swin
   const scale = custom.scale || 1.0;
   const offX = custom.offsetX || 0;
   const offY = custom.offsetY || 0;
-  const angleOff = (custom.angleOffset || 0) * (Math.PI / 180);
+  const angleOff = ((custom.angleOffset || 0) + (opts.angleOffset || 0)) * (Math.PI / 180);
 
   ctx.save();
   ctx.translate(x, y);
@@ -65,15 +67,20 @@ export function drawNaoyaTanto(ctx, x, y, gunAngle, r, swingActive = false, swin
     ctx.scale(1, -1);
   }
 
-  // Anchor at canonical right hand flank (+r * 0.82, +r * 0.38)
-  const hx = r * 0.82;
-  const hy = r * 0.38;
+  // Anchor at canonical right hand flank (+r * 0.82, +r * 0.38) or custom hand anchor
+  const hx = (opts.handX !== undefined) ? opts.handX : r * 0.82;
+  const hy = (opts.handY !== undefined) ? opts.handY : r * 0.38;
   ctx.translate(hx, hy);
 
-  // Dynamic swing rotation during slash
+  // Dynamic swing / stab rotation
   if (swingActive) {
-    const swingSwingRot = Math.sin(swingProgress * Math.PI) * 0.65;
-    ctx.rotate(swingSwingRot);
+    if (opts.isStab) {
+      const stabRot = (opts.stabRotation !== undefined) ? opts.stabRotation : 0;
+      ctx.rotate(stabRot);
+    } else {
+      const swingSwingRot = Math.sin(swingProgress * Math.PI) * 0.65;
+      ctx.rotate(swingSwingRot);
+    }
   }
 
   ctx.scale(scale, scale);
@@ -248,26 +255,52 @@ export function drawNaoyaSlashArc(ctx, fighter) {
   ctx.restore();
 }
 
+// ─────────────────────────────────────────────
+// 24 FPS SHUTTER GLASS STASIS & BREAK SYSTEM
+// ─────────────────────────────────────────────
+
+let _shutterGlassBreaks = [];
+
+/**
+ * Clears all active shutter glass break effects (useful on round restart / death).
+ */
+export function clearShutterGlassBreaks() {
+  _shutterGlassBreaks.length = 0;
+}
+
 /**
  * Draws the 24 FPS Film Frame Pane Stasis Overlay over an afflicted target (Rule 11 Zero shadowBlur).
+ * Includes pre-break structural cracks and micro-tremor when expiration is imminent.
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} target
  * @param {number} remainingFrames
  */
 export function draw24FPSFrameStasisOverlay(ctx, target, remainingFrames = 60) {
   if (!target || target.isDead || (target.hp || 0) <= 0) return;
+  if (typeof state !== 'undefined' && state.frameCount !== undefined) {
+    if (target._frameStasisRenderedFrame === state.frameCount) return;
+    target._frameStasisRenderedFrame = state.frameCount;
+  }
 
   const r = target.r || 25;
   const boxW = r * 2.8;
   const boxH = r * 2.8;
-  const cx = target.x;
-  const cy = target.y - (target.z || 0);
+  let cx = target.x;
+  let cy = target.y - (target.z || 0);
+
+  // Micro-tremor shudder when breaking is imminent (last 14 frames)
+  if (remainingFrames <= 14) {
+    const tremorAmp = ((15 - remainingFrames) / 14) * 2.0;
+    cx += (Math.random() - 0.5) * tremorAmp;
+    cy += (Math.random() - 0.5) * tremorAmp;
+  }
 
   ctx.save();
   ctx.translate(cx, cy);
 
-  // Subtle oscillation flicker
-  const pulse = Math.sin(remainingFrames * 0.35) * 0.15 + 0.85;
+  // Subtle oscillation flicker (accelerates as timer ticks down)
+  const freq = remainingFrames <= 14 ? 0.85 : 0.35;
+  const pulse = Math.sin(remainingFrames * freq) * 0.15 + 0.85;
 
   // 1. Semi-transparent Glass Film Pane
   ctx.fillStyle = `rgba(0, 242, 254, ${0.20 * pulse})`;
@@ -297,59 +330,411 @@ export function draw24FPSFrameStasisOverlay(ctx, target, remainingFrames = 60) {
     ctx.fillRect(boxW / 2 - holeSize - 1, hy, holeSize, holeSize);
   }
 
-  // 3. 24 FPS Tag / Countdown
+  // 3. Pre-Break Structural Cracks (when remainingFrames <= 14)
+  if (remainingFrames <= 14) {
+    const crackProgress = (15 - remainingFrames) / 14;
+    _drawFrameCrackFissures(ctx, boxW, boxH, crackProgress);
+  }
+
+  // 4. 24 FPS Tag / Countdown
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '900 9px "Outfit", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('1/24s', 0, -boxH / 2 - 8);
 
-  ctx.fillStyle = '#00F2FE';
+  ctx.fillStyle = remainingFrames <= 14 ? '#FF4444' : '#00F2FE';
   ctx.font = '800 8px monospace';
-  ctx.fillText('24 FPS STASIS', 0, boxH / 2 + 8);
+  ctx.fillText(remainingFrames <= 14 ? 'SHATTERING...' : '24 FPS STASIS', 0, boxH / 2 + 8);
 
   ctx.restore();
 }
 
 /**
- * Draws Sonic Boom Shockwave Ring for Skill 2 (Rule 11 Compliant).
+ * Renders spiderweb stress cracks across the 24 FPS shutter glass frame prior to breaking.
+ * Strictly Rule 11 zero shadowBlur compliant.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} boxW
+ * @param {number} boxH
+ * @param {number} progress (0.0 to 1.0)
+ */
+function _drawFrameCrackFissures(ctx, boxW, boxH, progress) {
+  if (progress <= 0) return;
+  const p = Math.min(1.0, Math.max(0.0, progress));
+
+  ctx.save();
+
+  // Branch definitions (from central fracture to perimeter edges)
+  const branches = [
+    [ [0, 0], [-boxW * 0.15, -boxH * 0.12], [-boxW * 0.28, -boxH * 0.32], [-boxW * 0.46, -boxH * 0.44] ],
+    [ [0, 0], [boxW * 0.12, -boxH * 0.16], [boxW * 0.30, -boxH * 0.25], [boxW * 0.44, -boxH * 0.42] ],
+    [ [0, 0], [-boxW * 0.14, boxH * 0.15], [-boxW * 0.32, boxH * 0.28], [-boxW * 0.45, boxH * 0.43] ],
+    [ [0, 0], [boxW * 0.18, boxH * 0.14], [boxW * 0.34, boxH * 0.30], [boxW * 0.47, boxH * 0.45] ],
+    [ [-boxW * 0.15, -boxH * 0.12], [-boxW * 0.35, -boxH * 0.08], [-boxW * 0.48, -boxH * 0.04] ],
+    [ [boxW * 0.18, boxH * 0.14], [boxW * 0.36, boxH * 0.06], [boxW * 0.48, boxH * 0.02] ],
+    [ [-boxW * 0.15, -boxH * 0.12], [boxW * 0.12, -boxH * 0.16], [boxW * 0.18, boxH * 0.14], [-boxW * 0.14, boxH * 0.15] ]
+  ];
+
+  // 1. Cyan under-layer glow line (Rule 11 zero shadowBlur, slightly wider stroke)
+  ctx.strokeStyle = `rgba(0, 242, 254, ${0.55 + p * 0.40})`;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'miter';
+
+  for (let b = 0; b < branches.length; b++) {
+    const pts = branches[b];
+    const maxIdx = Math.min(pts.length, Math.ceil(pts.length * Math.min(1.0, p * 1.25)));
+    if (maxIdx < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < maxIdx; i++) {
+      ctx.lineTo(pts[i][0], pts[i][1]);
+    }
+    if (b === 6 && p > 0.6) ctx.closePath();
+    ctx.stroke();
+  }
+
+  // 2. Pure White razor sharp core crack line
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.85 + p * 0.15})`;
+  ctx.lineWidth = 1.1;
+
+  for (let b = 0; b < branches.length; b++) {
+    const pts = branches[b];
+    const maxIdx = Math.min(pts.length, Math.ceil(pts.length * Math.min(1.0, p * 1.25)));
+    if (maxIdx < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < maxIdx; i++) {
+      ctx.lineTo(pts[i][0], pts[i][1]);
+    }
+    if (b === 6 && p > 0.6) ctx.closePath();
+    ctx.stroke();
+  }
+
+  // 3. Central fracture glint star
+  if (p > 0.3) {
+    const glintSize = 2.0 + p * 3.5;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(-glintSize / 2, -1, glintSize, 2);
+    ctx.fillRect(-1, -glintSize / 2, 2, glintSize);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Triggers the 24 FPS Shutter Glass Break animation and plays Naoya's glass break sound effect.
+ * @param {Object} target - Target entity or object with x, y, r
+ * @param {Object} [opts={}] - Optional coordinate / radius overrides
+ */
+export function triggerShutterGlassBreak(target, opts = {}) {
+  if (!target) return;
+  const cx = opts.x !== undefined ? opts.x : (target.x || 0);
+  const cy = opts.y !== undefined ? opts.y : ((target.y || 0) - (target.z || 0));
+  const r = opts.r !== undefined ? opts.r : (target.r || 25);
+  const boxW = r * 2.8;
+  const boxH = r * 2.8;
+
+  // 1. Play authentic Naoya glass break SFX
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
+  const vol = cfg.soundVolumes?.glassBreak !== undefined ? cfg.soundVolumes.glassBreak : 1.0;
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('naoya_glass_break', vol);
+  }
+
+  // 2. Global screen shake & impact flashes
+  triggerGlobalScreenShake(4, 6);
+  try {
+    spawnImpactFlash(cx, cy, boxW * 0.95, 'cyan');
+    spawnSparks(cx, cy, 16, 'cyan', '#00F2FE');
+    spawnSparks(cx, cy, 10, 'lime', '#76E042');
+    spawnFloatingText(cx, cy - boxH / 2 - 14, '24 FPS SHATTER!', '#00F2FE');
+  } catch (e) {}
+
+  // 3. Prevent unbounded memory growth: keep max 6 concurrent glass break effects
+  if (_shutterGlassBreaks.length >= 6) {
+    _shutterGlassBreaks.shift();
+  }
+
+  // 4. Construct the shattered 4 corner frame chunks (35mm film borders)
+  const cornerFragments = [
+    {
+      x: cx - boxW * 0.25,
+      y: cy - boxH * 0.25,
+      vx: -(6.0 + Math.random() * 3.0),
+      vy: -(5.0 + Math.random() * 3.5),
+      w: boxW * 0.44,
+      h: boxH * 0.44,
+      rot: 0,
+      rotSpeed: -(0.06 + Math.random() * 0.08),
+      cornerType: 'TL'
+    },
+    {
+      x: cx + boxW * 0.25,
+      y: cy - boxH * 0.25,
+      vx: (6.0 + Math.random() * 3.0),
+      vy: -(5.0 + Math.random() * 3.5),
+      w: boxW * 0.44,
+      h: boxH * 0.44,
+      rot: 0,
+      rotSpeed: (0.06 + Math.random() * 0.08),
+      cornerType: 'TR'
+    },
+    {
+      x: cx - boxW * 0.25,
+      y: cy + boxH * 0.25,
+      vx: -(6.0 + Math.random() * 3.0),
+      vy: (4.0 + Math.random() * 3.5),
+      w: boxW * 0.44,
+      h: boxH * 0.44,
+      rot: 0,
+      rotSpeed: (0.06 + Math.random() * 0.08),
+      cornerType: 'BL'
+    },
+    {
+      x: cx + boxW * 0.25,
+      y: cy + boxH * 0.25,
+      vx: (6.0 + Math.random() * 3.0),
+      vy: (4.0 + Math.random() * 3.5),
+      w: boxW * 0.44,
+      h: boxH * 0.44,
+      rot: 0,
+      rotSpeed: -(0.06 + Math.random() * 0.08),
+      cornerType: 'BR'
+    }
+  ];
+
+  // 5. Construct 16 sharp polygonal glass crystal shards
+  const shardCount = 16;
+  const glassShards = [];
+  const palette = [
+    'rgba(0, 242, 254, 0.85)',
+    'rgba(224, 255, 255, 0.90)',
+    'rgba(255, 255, 255, 0.95)',
+    'rgba(118, 224, 66, 0.80)'
+  ];
+
+  for (let i = 0; i < shardCount; i++) {
+    const angle = (i / shardCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+    const speed = 5.5 + Math.random() * 7.5;
+    const size = (boxW * 0.12) + Math.random() * (boxW * 0.16);
+
+    const p1 = { x: 0, y: -size * (0.8 + Math.random() * 0.4) };
+    const p2 = { x: size * (0.6 + Math.random() * 0.4), y: size * (0.2 + Math.random() * 0.3) };
+    const p3 = { x: -size * (0.4 + Math.random() * 0.4), y: size * (0.5 + Math.random() * 0.4) };
+
+    glassShards.push({
+      x: cx + Math.cos(angle) * (boxW * 0.25),
+      y: cy + Math.sin(angle) * (boxH * 0.25),
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - (3.0 + Math.random() * 4.5),
+      pts: [p1, p2, p3],
+      size: size,
+      rot: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.35,
+      color: palette[i % palette.length]
+    });
+  }
+
+  // 6. Expanding rectangular shockwave pulse
+  const shockwave = {
+    x: cx,
+    y: cy,
+    w: boxW,
+    h: boxH,
+    maxScale: 1.75,
+    timer: 0,
+    maxTimer: 14
+  };
+
+  _shutterGlassBreaks.push({
+    corners: cornerFragments,
+    shards: glassShards,
+    shockwave: shockwave,
+    life: 1.0,
+    maxLife: 1.0,
+    decay: 0.022
+  });
+}
+
+/**
+ * Updates physics for all active shutter glass break animations.
+ */
+export function updateShutterGlassBreaks() {
+  if (_shutterGlassBreaks.length === 0) return;
+
+  const gravity = 0.30;
+  const drag = 0.985;
+
+  for (let b = _shutterGlassBreaks.length - 1; b >= 0; b--) {
+    const effect = _shutterGlassBreaks[b];
+    effect.life -= effect.decay;
+
+    if (effect.life <= 0) {
+      _shutterGlassBreaks.splice(b, 1);
+      continue;
+    }
+
+    // Update corner frame pieces
+    for (let i = 0; i < effect.corners.length; i++) {
+      const c = effect.corners[i];
+      c.x += c.vx;
+      c.y += c.vy;
+      c.vy += gravity * 0.85;
+      c.vx *= drag;
+      c.vy *= drag;
+      c.rot += c.rotSpeed;
+    }
+
+    // Update glass shards
+    for (let i = 0; i < effect.shards.length; i++) {
+      const s = effect.shards[i];
+      s.x += s.vx;
+      s.y += s.vy;
+      s.vy += gravity;
+      s.vx *= drag;
+      s.vy *= drag;
+      s.rot += s.rotSpeed;
+    }
+
+    // Update shockwave pulse
+    if (effect.shockwave && effect.shockwave.timer < effect.shockwave.maxTimer) {
+      effect.shockwave.timer++;
+    }
+  }
+}
+
+/**
+ * Renders all active 24 FPS shutter glass breaking animations.
+ * Adheres strictly to Rule 11 (Zero shadowBlur) and Rule 2.4 (Transform Stack Integrity).
+ * @param {CanvasRenderingContext2D} ctx
+ */
+export function drawShutterGlassBreaks(ctx) {
+  if (_shutterGlassBreaks.length === 0) return;
+
+  for (let b = 0; b < _shutterGlassBreaks.length; b++) {
+    const effect = _shutterGlassBreaks[b];
+    const alpha = Math.max(0, Math.min(1.0, effect.life));
+
+    // 1. Draw Expanding Rectangular Shockwave Pulse
+    if (effect.shockwave && effect.shockwave.timer < effect.shockwave.maxTimer) {
+      const sw = effect.shockwave;
+      const progress = sw.timer / sw.maxTimer;
+      const curScale = 1.0 + progress * (sw.maxScale - 1.0);
+      const swAlpha = (1.0 - progress) * 0.85;
+
+      ctx.save();
+      ctx.translate(sw.x, sw.y);
+      ctx.scale(curScale, curScale);
+
+      // Outer Cyan shockwave rect
+      ctx.strokeStyle = `rgba(0, 242, 254, ${swAlpha})`;
+      ctx.lineWidth = 1.8 * (1.0 - progress * 0.5);
+      ctx.strokeRect(-sw.w / 2, -sw.h / 2, sw.w, sw.h);
+
+      // Inner Lime accent rect
+      ctx.strokeStyle = `rgba(118, 224, 66, ${swAlpha * 0.75})`;
+      ctx.lineWidth = 1.0;
+      ctx.strokeRect(-sw.w / 2 + 2, -sw.h / 2 + 2, sw.w - 4, sw.h - 4);
+
+      ctx.restore();
+    }
+
+    // 2. Draw 4 Shattered Corner Frame Pieces
+    for (let i = 0; i < effect.corners.length; i++) {
+      const c = effect.corners[i];
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.rotate(c.rot);
+      ctx.globalAlpha = alpha;
+
+      const cw = c.w;
+      const ch = c.h;
+
+      // Film pane glass base
+      ctx.fillStyle = `rgba(0, 242, 254, ${0.25 * alpha})`;
+      ctx.fillRect(-cw / 2, -ch / 2, cw, ch);
+
+      // Outer Cyan shutter frame border
+      ctx.strokeStyle = '#00F2FE';
+      ctx.lineWidth = 1.8;
+      ctx.strokeRect(-cw / 2, -ch / 2, cw, ch);
+
+      // Inner Lime border
+      ctx.strokeStyle = '#76E042';
+      ctx.lineWidth = 1.0;
+      ctx.strokeRect(-cw / 2 + 2, -ch / 2 + 2, cw - 4, ch - 4);
+
+      // 35mm Sprocket holes along the lateral side
+      ctx.fillStyle = '#12141A';
+      const holeSize = 3.5;
+      const isLeft = (c.cornerType === 'TL' || c.cornerType === 'BL');
+      const hx = isLeft ? (-cw / 2 + 1) : (cw / 2 - holeSize - 1);
+      ctx.fillRect(hx, -ch / 4 - holeSize / 2, holeSize, holeSize);
+      ctx.fillRect(hx, ch / 4 - holeSize / 2, holeSize, holeSize);
+
+      ctx.restore();
+    }
+
+    // 3. Draw 16 Sharp Polygonal Glass Crystal Shards
+    for (let i = 0; i < effect.shards.length; i++) {
+      const s = effect.shards[i];
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.rot);
+      ctx.globalAlpha = alpha;
+
+      const pts = s.pts;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let p = 1; p < pts.length; p++) {
+        ctx.lineTo(pts[p].x, pts[p].y);
+      }
+      ctx.closePath();
+
+      // Translucent tinted glass body
+      ctx.fillStyle = s.color;
+      ctx.fill();
+
+      // Sharp pure white specular razor edge
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      ctx.lineTo(pts[1].x, pts[1].y);
+      ctx.stroke();
+
+      // Dark manga ink border outline
+      ctx.strokeStyle = 'rgba(14, 16, 21, 0.90)';
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let p = 1; p < pts.length; p++) {
+        ctx.lineTo(pts[p].x, pts[p].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.restore();
+    }
+  }
+}
+
+/**
+/**
+ * Draws Sonic Boom Shockwave Ring for Skill 2, Flurry Punches & Dashes (Rule 11 Compliant).
+ * (Disabled / Removed per user request)
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x
  * @param {number} y
  * @param {number} currentRadius
  * @param {number} maxRadius
  * @param {number} progress
+ * @param {number} [angle=0]
  */
-export function drawSonicBoomRing(ctx, x, y, currentRadius, maxRadius, progress) {
-  if (progress >= 1.0) return;
-
-  ctx.save();
-  ctx.translate(x, y);
-
-  const alpha = (1 - progress) * 0.85;
-
-  // Outer Lime Pressure Ring
-  ctx.strokeStyle = `rgba(118, 224, 66, ${alpha})`;
-  ctx.lineWidth = 3.5 * (1 - progress);
-  ctx.beginPath();
-  ctx.arc(0, 0, currentRadius, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Inner Cyan Speed Ring
-  ctx.strokeStyle = `rgba(0, 242, 254, ${alpha * 1.2})`;
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.arc(0, 0, Math.max(0, currentRadius - 8), 0, Math.PI * 2);
-  ctx.stroke();
-
-  // White Flash Core
-  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.9})`;
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, Math.max(0, currentRadius - 4), 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.restore();
+export function drawSonicBoomRing(ctx, x, y, currentRadius, maxRadius, progress, angle = 0) {
+  // Shockwave visual removed per user request
+  return;
 }
 
 /**
@@ -368,7 +753,6 @@ function _renderProjectionFrameCell(ctx, cx, cy, angle, r, alpha) {
  */
 export function drawProjectionSorceryForwardFrames(ctx, fighter) {
   if (!fighter || fighter.isExecutingUlt) return;
-  if (typeof fighter.isMovementSlowed === 'function' && fighter.isMovementSlowed()) return;
 
   const r = fighter.r || 25;
 
@@ -377,7 +761,7 @@ export function drawProjectionSorceryForwardFrames(ctx, fighter) {
     for (let i = 0; i < fighter.steppedFrames.length; i++) {
       const sf = fighter.steppedFrames[i];
       if (sf && sf.alpha > 0.01) {
-        drawNaoyaGhostModel(ctx, sf.x, sf.y, sf.angle || 0, r, sf.alpha * 0.55);
+        drawNaoyaGhostModel(ctx, sf.x, sf.y, sf.angle || 0, r, sf.alpha);
       }
     }
   }

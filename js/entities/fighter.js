@@ -106,6 +106,38 @@ export function hasActiveInfinity(entity) {
 }
 
 /**
+ * Universal evaluation of whether an entity (fighter, boss, illusion, minion)
+ * is currently outside the playable arena boundaries.
+ * Supports both rectangular and circular arenas with a fractional radius margin.
+ * @param {Object} entity
+ * @param {Object} [arena]
+ * @returns {boolean}
+ */
+export function isEntityOutsideArena(entity, arena) {
+  if (!entity) return false;
+  const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
+  if (!curArena) return false;
+
+  const ex = (entity.x !== undefined ? entity.x : 0);
+  const ey = (entity.y !== undefined ? entity.y : 0);
+
+  if (curArena.shape === 'circle' || curArena.radius) {
+    const cx = curArena.x + curArena.width / 2;
+    const cy = curArena.y + curArena.height / 2;
+    const ar = (curArena.radius || (curArena.width / 2));
+    const dist = Math.hypot(ex - cx, ey - cy);
+    return dist > ar;
+  } else {
+    return (
+      ex < curArena.x ||
+      ex > curArena.x + curArena.width ||
+      ey < curArena.y ||
+      ey > curArena.y + curArena.height
+    );
+  }
+}
+
+/**
  * Universal helper: checks whether a skill, ability, or mechanic toggle is enabled in config.
  * Handles boolean true/false, numeric 1/0, string 'true'/'false', and undefined fallbacks.
  * @param {*} configValue
@@ -595,13 +627,20 @@ export class Fighter {
   /**
    * Central Source of Truth for Basic Attack Gating across ALL fighters.
    * Evaluates HP, stuns, beam caught, time stops, paralyze, ambush, and Soul Disfigurement/Rupture.
+   * Also gates basic attacks when the combat target is out of the arena boundaries.
    * Any future basic attack restriction added here automatically applies across the entire game.
    */
-  canPerformBasicAttack() {
+  canPerformBasicAttack(target = null) {
     if (this.hp <= 0 || this.isDead) return false;
     if (this.areAttackEffectsSuppressed()) return false;
     if (this.isCaughtInBeam()) return false;
     if (this.isAffectedBySoulDisfigurement()) return false;
+
+    // Gating: If target is out of the arena (e.g. Eye of Cthulhu outside arena bounds), hold basic attacks
+    const combatTarget = target || this.target || this._lastOpponent || null;
+    if (combatTarget && isEntityOutsideArena(combatTarget)) {
+      return false;
+    }
     return true;
   }
 
@@ -1658,6 +1697,14 @@ export class Fighter {
     if (this.isCaughtInNaoyaUlt) {
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
+    if (this.isFrameFrozen || ((this.frameFreezeTimer || 0) > 0)) {
+      this.vx = 0;
+      this.vy = 0;
+      if (this.knockbackVx !== undefined) this.knockbackVx = 0;
+      if (this.knockbackVy !== undefined) this.knockbackVy = 0;
       this._handleFrozenSkillCooldowns();
       return true;
     }
@@ -3311,6 +3358,9 @@ export class Fighter {
     if (typeof state !== 'undefined' && state.gameState !== 'playing') {
       return;
     }
+    if (!this.canPerformBasicAttack()) {
+      return;
+    }
     if (this.isCaughtInBeam()) {
       this.interruptAttacks();
       return;
@@ -3483,6 +3533,8 @@ export class Fighter {
     }
     this._handledTimeStopThisUpdate = false;
     this._inSuperUpdate = true;
+    this.target = (opponent && !opponent.isDead) ? opponent : (this.target || null);
+    this._lastOpponent = opponent || this._lastOpponent || null;
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
@@ -3582,8 +3634,10 @@ export class Fighter {
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
     } else if (this._def.type !== 'orange' && canAct && isTargetAlive && !opponent.isSubmerged && !opponent.isErupting && !isTargetReforming) { // Prevent shooting at submerged/erupting/reforming targets
-      this.shoot(ownerIndex);
-      this.shootCooldown = this.shootCooldownMax;
+      if (!isEntityOutsideArena(opponent, arena) && this.canPerformBasicAttack(opponent)) {
+        this.shoot(ownerIndex);
+        this.shootCooldown = this.shootCooldownMax;
+      }
     }
 
     this.applyMovementPhysics();

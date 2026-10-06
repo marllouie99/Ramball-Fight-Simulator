@@ -4,6 +4,12 @@
 // ─────────────────────────────────────────────
 
 export const makimaConfig = {
+  assets: {
+    hair: 'Assets/model/makima/Makima-hair.png',
+    skin: 'Assets/model/makima/Makima-model-skin.png',
+    skinRgba: 'Assets/model/makima/Makima-model-skin.rgba',
+  },
+
   name: 'Makima',
   displayName: 'Makima',
   bossTitle: 'Control Devil',
@@ -88,7 +94,7 @@ export const makimaConfig = {
   enableCrucifixion: true,          // Alias toggle for Crucifixion
   enableShrine: true,               // Alias toggle for Ultimate
   enableShrineRitual: true,         // Alias toggle for Ultimate
-  crucifixionCooldown: 1000,        // 32.0s (1920 frames)
+  crucifixionCooldown: 2000,        // 32.0s (1920 frames)
   shrineCooldown: 100,             // Backward compatibility alias
   crucifixionSlideDurationFrames: 16,// Smooth momentum deceleration slide before casting Crucifixion (~0.26s)
   enableCrucifixionSlide: true,      // Master toggle for smooth slide before casting Crucifixion
@@ -171,7 +177,7 @@ export const makimaConfig = {
     spearSummon: 0.85,
     spearExplosion: 1.00,
     crucifixionVoiceline: 3.2,
-    crucifixionRift: 1.25,
+    crucifixionRift: 0,
     crucifixionChains: 1.10,
     crucifixionGravity: 0.90,
     crucifixionDescent: 1.15,

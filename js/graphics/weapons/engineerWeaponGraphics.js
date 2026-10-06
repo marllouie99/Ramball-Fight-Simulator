@@ -74,7 +74,7 @@ export function drawEngineer(ctx, options = {}) {
   // 2. 100% Discrete Pixel Art Body (Hard Hat, Goggles, Red Shirt, Denim Overalls, Toolbelt)
   drawEngineerPixelBody(ctx, r);
 
-  // 3. Hard Hat PNG Overlay (Assets/model/Hair/Engineer-Hair.png)
+  // 3. Hard Hat PNG Overlay (Assets/model/engineer/Engineer-Hair.png)
   _drawEngineerHair(ctx, r, isFacingLeft);
 
   // 4. Front Weapon (active in hand)

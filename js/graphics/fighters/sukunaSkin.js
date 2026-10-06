@@ -232,10 +232,10 @@ export function _getSukunaHairImage() {
       _sukunaHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Sukuna hair image at Assets/model/Sukuna-hair.png', e);
+      console.warn('Failed to load Sukuna hair image at Assets/model/sukuna/Sukuna-hair.png', e);
       _sukunaHairImageLoading = false;
     };
-    img.src = 'Assets/model/Sukuna-hair.png?v=1';
+    img.src = 'Assets/model/sukuna/Sukuna-hair.png?v=1';
     _sukunaHairImage = img;
   }
   return _sukunaHairImage;
@@ -246,7 +246,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Sukuna's authentic pixel-art spiky hair from Assets/model/Sukuna-hair.png.
+ * Draws Sukuna's authentic pixel-art spiky hair from Assets/model/sukuna/Sukuna-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -334,7 +334,7 @@ export function drawSukunaBody(ctx, fighter) {
   // 1. Procedural Pixel Art Body with Stepped Outer Black Stroke
   drawSukunaPixelBody(ctx, r, fighter);
 
-  // 2. Authentic Pixel-Art Spiky Hair (Assets/model/Sukuna-hair.png)
+  // 2. Authentic Pixel-Art Spiky Hair (Assets/model/sukuna/Sukuna-hair.png)
   _drawSukunaHair(ctx, r, facingLeft);
 
   // 3. Status Overlays

@@ -29,10 +29,10 @@ export function _getJohnWickPixelSkinImage() {
       _johnWickPixelSkinLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load John Wick pixel skin at Assets/model/Johnwick-pixel-skin.png', e);
+      console.warn('Failed to load John Wick pixel skin at Assets/model/johnWick/Johnwick-pixel-skin.png', e);
       _johnWickPixelSkinLoading = false;
     };
-    img.src = 'Assets/model/Johnwick-pixel-skin.png?v=2';
+    img.src = 'Assets/model/johnWick/Johnwick-pixel-skin.png?v=2';
     _johnWickPixelSkinImage = img;
   }
   return _johnWickPixelSkinImage;
@@ -56,10 +56,10 @@ export function _getJohnWickHairImage() {
       _johnWickHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load John Wick hair image at Assets/model/Johnwick-hair.png', e);
+      console.warn('Failed to load John Wick hair image at Assets/model/johnWick/Johnwick-hair.png', e);
       _johnWickHairImageLoading = false;
     };
-    img.src = 'Assets/model/Johnwick-hair.png?v=1';
+    img.src = 'Assets/model/johnWick/Johnwick-hair.png?v=1';
     _johnWickHairImage = img;
   }
   return _johnWickHairImage;
@@ -71,7 +71,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws John Wick's authentic pixel-art hair from Assets/model/Johnwick-hair.png.
+ * Draws John Wick's authentic pixel-art hair from Assets/model/johnWick/Johnwick-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -730,7 +730,7 @@ export function drawJohnWickSkin(ctx, fighter) {
   // ── LAYER 2: MAIN BODY CIRCLE (100% DISCRETE 2D PIXEL ART ENGINE) ──
   drawJohnWickPixelBody(ctx, r);
 
-  // ── LAYER 3: PIXEL ART HAIR OVERLAY (Assets/model/Johnwick-hair.png) ──
+  // ── LAYER 3: PIXEL ART HAIR OVERLAY (Assets/model/johnWick/Johnwick-hair.png) ──
   _drawJohnWickHair(ctx, r, facingLeft);
 
   // ── PASSIVE 1: BALLISTIC TAILORED SUIT (Kevlar Weave Shimmer Overlay) ──

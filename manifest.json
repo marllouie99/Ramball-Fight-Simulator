@@ -10,13 +10,13 @@
   "categories": ["games", "action", "entertainment"],
   "icons": [
     {
-      "src": "Assets/KnightSword.png",
+      "src": "Assets/weapon/KnightSword.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "Assets/KnightSword.png",
+      "src": "Assets/weapon/KnightSword.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

@@ -4,6 +4,13 @@
 // ─────────────────────────────────────────────
 
 export const johnWickConfig = {
+  assets: {
+    model: 'Assets/model/johnWick/john-wick-model.png',
+    hair: 'Assets/model/johnWick/Johnwick-hair.png',
+    mustacheBeard: 'Assets/model/johnWick/Johnwick-mustache&beard.png',
+    pixelSkin: 'Assets/model/johnWick/Johnwick-pixel-skin.png',
+  },
+
   name: 'John Wick',
   displayName: 'John Wick',
   bossTitle: 'Baba Yaga',

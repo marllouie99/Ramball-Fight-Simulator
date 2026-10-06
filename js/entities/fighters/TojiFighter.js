@@ -53,7 +53,7 @@ export class TojiFighter extends Fighter {
     this.spearRange = CONFIG.toji?.spearRange || 50;
     this.spearDamage = CONFIG.toji?.spearDamage || 15;
     this.spearSwingTimer = 0;
-    this.spearSwingMax = 36;
+    this.spearSwingMax = 26;
 
     // Split Soul Katana
     // Physics Chain simulation
@@ -126,8 +126,8 @@ export class TojiFighter extends Fighter {
       if (typeof this.performInvertedSpearStrike === 'function') {
         this.performInvertedSpearStrike(fakeTarget, 0, false);
       } else {
-        this.spearSwingMax = 55;
-        this.spearSwingTimer = 55;
+        this.spearSwingMax = 26;
+        this.spearSwingTimer = 26;
       }
     }
   }
@@ -1482,6 +1482,12 @@ export class TojiFighter extends Fighter {
     if (this.ultimateActive) return false;
     return this.areAttackEffectsSuppressed() || Boolean(
       (this.statusEffects && this.statusEffects.timeStopTimer > 0) ||
+      (this.timeStopTimer && this.timeStopTimer > 0) ||
+      this.isFrameFrozen ||
+      (this.frameFreezeTimer && this.frameFreezeTimer > 0) ||
+      this.isCaughtInNaoyaUlt ||
+      this.isCurrentlyWallPinnedByNaoya ||
+      (this.naoyaWallPinTimer && this.naoyaWallPinTimer > 0) ||
       (this.mahoragaAdaptationFreezeTimer && this.mahoragaAdaptationFreezeTimer > 0) ||
       this.frozenByCronos ||
       this.isCronosStasis ||
@@ -1511,6 +1517,11 @@ export class TojiFighter extends Fighter {
       this.isTargetOfAmbush = false;
       this.caughtInGenosFlurry = false;
       this.caughtInJohnWickCombo = false;
+      this.isFrameFrozen = false;
+      this.frameFreezeTimer = 0;
+      this.isCaughtInNaoyaUlt = false;
+      this.isCurrentlyWallPinnedByNaoya = false;
+      this.naoyaWallPinTimer = 0;
       this.timeStopTimer = 0;
       if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
       this.paralyzeTimer = 0;
@@ -1636,8 +1647,8 @@ export class TojiFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Chains/WallPins)
-    if (!this.isChainedByMakima && !this.isCurrentlyWallPinnedByMakima && (!this.makimaWallPinTimer || this.makimaWallPinTimer <= 0) && !this.isCurrentlyWallPinnedByEscanor && (!this.escanorWallPinTimer || this.escanorWallPinTimer <= 0) && !this.isWallPinnedBySaitama) {
+    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos/Chains/WallPins/FrameStasis)
+    if (!this.isChainedByMakima && !this.isCurrentlyWallPinnedByMakima && (!this.makimaWallPinTimer || this.makimaWallPinTimer <= 0) && !this.isCurrentlyWallPinnedByEscanor && (!this.escanorWallPinTimer || this.escanorWallPinTimer <= 0) && !this.isWallPinnedBySaitama && !this.isCurrentlyWallPinnedByNaoya && (!this.naoyaWallPinTimer || this.naoyaWallPinTimer <= 0) && !this.isCaughtInNaoyaUlt && !this.isFrameFrozen && (!this.frameFreezeTimer || this.frameFreezeTimer <= 0)) {
       this.timeStopTimer = 0;
       if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
       this.hitStunTimer = 0;
@@ -1805,6 +1816,11 @@ export class TojiFighter extends Fighter {
   _clearTargetFreeze(target) {
     if (!target) return;
     target.isTargetOfAmbush = false;
+    target.isFrameFrozen = false;
+    target.frameFreezeTimer = 0;
+    target.isCaughtInNaoyaUlt = false;
+    target.isCurrentlyWallPinnedByNaoya = false;
+    target.naoyaWallPinTimer = 0;
     target.timeStopTimer = 0;
     target.paralyzeTimer = 0;
     target.hitStunTimer = 0;
@@ -2187,8 +2203,8 @@ export class TojiFighter extends Fighter {
       }
       this._lastSpearTimer = this.spearSwingTimer;
 
-      const maxTimer = this.spearSwingMax || (this.isAmbushThrust ? 50 : 55);
-      const t = 1 - (this.spearSwingTimer / maxTimer); // 0 to 1 attack progress
+      const maxTimer = this.spearSwingMax || (this.isAmbushThrust ? 36 : 26);
+      const t = Math.max(0, Math.min(1.0, 1 - (this.spearSwingTimer / maxTimer))); // 0 to 1 attack progress
       attackPhaseProgress = t;
 
       if (this.isAmbushThrust) {
@@ -2221,34 +2237,30 @@ export class TojiFighter extends Fighter {
         }
       } else {
         // Standard Melee Swing (Basic Attack — Inverted Spear of Heaven)
-        // Motion: weapon snaps to upper-right (-0.80), sweeps downward arc through
-        // horizontal (0) to lower-right (+0.55), then recovers to idle (+0.42).
-        // Matches reference drawing: top-to-bottom chop, single clean arc.
-        //
-        // Phase layout: 5% instant cock-up | 47% downward arc sweep | 48% recovery
-        if (t < 0.05) {
-          // Phase 1: Ultra-fast snap to cocked upper-right position (reads as "already cocked")
-          const p = t / 0.05;
-          thrustDistance = -8 * p;
-          offsetAngle = (0.42 - 1.57 * p) * _katanaFlipSign;   // 0.42 → -1.15 (upper-right, 11 o'clock)
+        // Smooth 3-Phase Animation:
+        // Phase 1 (0% to 15%): Fluid anticipation windup (eases from rest 0.42 to upper-right -0.95 rad)
+        // Phase 2 (15% to 50%): Explosive downward cleave stroke (-0.95 to +1.15 rad, lunges to +14px)
+        // Phase 3 (50% to 100%): Smooth recovery follow-through returning smoothly to guard (0.42 rad)
+        if (t < 0.15) {
+          const p = t / 0.15;
+          const easeP = p * p * (3 - 2 * p); // smoothstep windup
+          thrustDistance = -6 * easeP;
+          offsetAngle = (0.42 + (-0.95 - 0.42) * easeP) * _katanaFlipSign;
           slashArcAlpha = 0;
           this._activeSlashProgress = 0;
           this._recoveryProgress = 0;
-        } else if (t < 0.52) {
-          // Phase 2: Downward arc sweep — upper-right (-1.15) through horizontal to lower-right (+1.05)
-          const p = (t - 0.05) / 0.47;
-          const sweepCurve = 1 - Math.pow(1 - p, 2.2); // quadratic ease-out: fast snap, smooth landing
-          // thrustDistance: blade eases forward to a steady +12px and holds there during the arc.
-          // No sin-pulse lunge — that was causing the thrust look.
-          thrustDistance = -8 + 20 * Math.min(1.0, p * 3.0); // ramps to +12 in first 1/3, then holds
-          offsetAngle = (-1.15 + 2.20 * sweepCurve) * _katanaFlipSign;            // -1.15 → +1.05 (wider top-to-bottom arc, 126 degrees)
-          slashArcAlpha = Math.min(1.0, p * 4.0);              // Fades in instantly and stays at 1.0
-          this._activeSlashProgress = p; // Store the progress on this for trailing erase effect
+        } else if (t < 0.50) {
+          const p = (t - 0.15) / 0.35;
+          const sweepCurve = 1 - Math.pow(1 - p, 2.4); // explosive snap with smooth landing
+          thrustDistance = -6 + 20 * Math.sin(p * Math.PI * 0.75); // reaches +14px forward extension
+          offsetAngle = (-0.95 + 2.10 * sweepCurve) * _katanaFlipSign; // -0.95 -> +1.15 (120 deg arc)
+          slashArcAlpha = Math.min(1.0, p * 3.5);
+          this._activeSlashProgress = p;
           this._recoveryProgress = 0;
 
-          // Chain whips forward during early sweep burst
-          if (p > 0.04 && p < 0.40 && this.chainNodes && this.chainNodes.length > 2) {
-            const whipForce = -6.5;
+          // Chain dynamic whip force on early stroke
+          if (p > 0.04 && p < 0.45 && this.chainNodes && this.chainNodes.length > 2) {
+            const whipForce = -7.0;
             const sideAngle = baseAngle + offsetAngle;
             for (let i = 1; i < this.chainNodes.length; i++) {
               this.chainNodes[i].vx += Math.cos(sideAngle - 0.9) * (whipForce / i);
@@ -2256,14 +2268,13 @@ export class TojiFighter extends Fighter {
             }
           }
         } else {
-          // Phase 3: Smooth recovery — ease back from lower-right (+1.05) to idle (+0.42)
-          const p = (t - 0.52) / 0.48;
+          const p = (t - 0.50) / 0.50;
           const easeP = p * (2 - p); // quadratic ease-out
-          thrustDistance = 12 * (1 - easeP);                   // eases back from +12 to 0
-          offsetAngle = (1.05 + (0.42 - 1.05) * easeP) * _katanaFlipSign;          // +1.05 → +0.42
-          slashArcAlpha = 1 - p;                               // Fades out during recovery phase
+          thrustDistance = 14 * (1 - easeP);
+          offsetAngle = (1.15 + (0.42 - 1.15) * easeP) * _katanaFlipSign; // +1.15 -> +0.42
+          slashArcAlpha = p < 0.25 ? 1.0 : Math.pow(1 - (p - 0.25) / 0.75, 0.85);
           this._activeSlashProgress = 1.0;
-          this._recoveryProgress = p; // Store recovery progress
+          this._recoveryProgress = p;
         }
       }
     } else if (this.ambushPhase === 'PHANTOM_FLURRY' || (this.phantomSlashTimer && this.phantomSlashTimer > 0)) {
@@ -2328,12 +2339,10 @@ export class TojiFighter extends Fighter {
     const renderAngle = baseAngle + offsetAngle;
 
     // 1. Draw motion ghosting shadow during thrust lunge (shows hand & weapon driving forward)
-    if (isAttacking && attackPhaseProgress >= 0.15 && attackPhaseProgress <= 0.70 && !this._isFrozenOrPaused()) {
+    if (this.isAmbushThrust && isAttacking && attackPhaseProgress >= 0.15 && attackPhaseProgress <= 0.70 && !this._isFrozenOrPaused()) {
       ctx.save();
       ctx.globalAlpha = 0.45;
-      const ghostOffset = this.isAmbushThrust
-        ? -28 + 55 * Math.sin((attackPhaseProgress - 0.15) / 0.55 * Math.PI)
-        : -12 * (1 - Math.abs(attackPhaseProgress - 0.43) * 4);
+      const ghostOffset = -28 + 55 * Math.sin((attackPhaseProgress - 0.15) / 0.55 * Math.PI);
       ctx.translate(this.x + Math.cos(baseAngle) * ghostOffset, this.y + Math.sin(baseAngle) * ghostOffset);
       ctx.rotate(renderAngle);
       drawInvertedSpear(ctx, 0, 0, 0, this.r, null, this.color);
@@ -2689,7 +2698,7 @@ export class TojiFighter extends Fighter {
           drawArc(-0.35 + (this.spearOffset || 0), this.r + (this.spearThrust || 0) + 85, 18, slashArcAlpha, '160, 30, 240', '220, 20, 100', '12, 4, 20');
         }
       } else if (!this.isAmbushThrust) {
-        // --- INVERTED SPEAR / SPLIT SOUL KATANA BASIC ATTACK SLASH ---
+        // --- INVERTED SPEAR BASIC ATTACK DOUBLE-TAPERED CRESCENT SLASH ---
         const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
         if (editP) {
           ctx.translate(editP.offsetX, editP.offsetY);
@@ -2698,119 +2707,128 @@ export class TojiFighter extends Fighter {
 
         const frozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
         ctx.rotate(frozenAngle);
-        const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
-        const isKatana = (this.ambushPhase === 'KATANA_SLASH' || (typeof state !== 'undefined' && state.tojiWeaponIndex === 1));
-        if (isKatana && Math.abs(normAngle) > Math.PI / 2) {
+        const frozenFlip = this._slashStartFlipSign !== undefined ? this._slashStartFlipSign : _katanaFlipSign;
+        if (frozenFlip < 0) {
           ctx.scale(1, -1);
         }
 
-        const frozenFlip = this._slashStartFlipSign !== undefined ? this._slashStartFlipSign : _katanaFlipSign;
-        
+        const startOffset = -1.10;
+        const endOffset = 1.15;
+        const totalSweep = endOffset - startOffset; // ~2.25 rad (129 degrees)
+
+        let currentTipOffset, currentTailOffset;
+        const progress = this._activeSlashProgress !== undefined ? this._activeSlashProgress : 0;
         const recP = this._recoveryProgress !== undefined ? this._recoveryProgress : 0;
-        if (recP > 0) slashArcAlpha *= (1 - recP);
+        let trailAlpha = slashArcAlpha;
 
-        const endOffset = isKatana ? 1.25 : 1.05;
-        const liveOffset = isKatana ? (offsetAngle * frozenFlip) : offsetAngle;
-        const currentOffset = recP > 0 ? endOffset : liveOffset;
-
-        const startOffset = -1.15;
-        const maxTrailLength = isKatana ? 1.8 : 1.6;
-
-        let activeTrailLength = maxTrailLength;
-        if (recP > 0) {
-          activeTrailLength = maxTrailLength * Math.pow(1 - recP, 1.4);
-        }
-
-        const tipAngle = currentOffset;
-        const tailAngle = Math.max(startOffset, currentOffset - activeTrailLength);
-        const bladeReach = isKatana ? 80 : 85;
-        const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
-        const snap = (v) => Math.round(v / P) * P;
-        const outerR = (this.r + thrustDistance + bladeReach) * (editP ? editP.scale : 1.0);
-        const thickScale = activeTrailLength / maxTrailLength;
-        const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0) * thickScale;
-        const span = tipAngle - tailAngle;
-        const minAng = Math.min(tailAngle, tipAngle);
-        const maxAng = Math.max(tailAngle, tipAngle);
-
-        const outlineCol = `rgba(10, 4, 18, ${(0.98 * slashArcAlpha).toFixed(2)})`;
-
-        const isInsideBasic = (rx, ry) => {
-          const dist = Math.hypot(rx, ry);
-          if (dist <= 0) return false;
-          let ang = Math.atan2(ry, rx);
-          while (ang < minAng - Math.PI) ang += Math.PI * 2;
-          while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
-          if (ang < minAng || ang > maxAng) return false;
-
-          const t = (ang - tailAngle) / span;
-          if (t < 0 || t > 1.0) return false;
-
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
-          const thick = maxThick * taper;
-          const outRad = outerR + taper * 1.5;
-          const inRad = outRad - thick;
-          return dist >= inRad && dist <= outRad;
-        };
-
-        const minX = Math.floor((-outerR - P * 2) / P) * P;
-        const maxX = Math.ceil((outerR + P * 2) / P) * P;
-        const minY = Math.floor((-outerR - P * 2) / P) * P;
-        const maxY = Math.ceil((outerR + P * 2) / P) * P;
-
-        for (let gy = minY; gy <= maxY; gy += P) {
-          for (let gx = minX; gx <= maxX; gx += P) {
-            if (!isInsideBasic(gx, gy)) continue;
-
-            const pxX = snap(gx);
-            const pyY = snap(gy);
-
-            const isBorder = !isInsideBasic(gx + P, gy) ||
-                             !isInsideBasic(gx - P, gy) ||
-                             !isInsideBasic(gx, gy + P) ||
-                             !isInsideBasic(gx, gy - P);
-
-            if (isBorder) {
-              ctx.fillStyle = outlineCol;
-              ctx.fillRect(pxX, pyY, P, P);
-              continue;
-            }
-
-            const dist = Math.hypot(gx, gy);
-            let ang = Math.atan2(gy, gx);
-            while (ang < minAng - Math.PI) ang += Math.PI * 2;
-            while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
-            const t = (ang - tailAngle) / span;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.28 + 0.72 * t);
-            const outRad = outerR + taper * 1.5;
-            const depthFromApex = outRad - dist;
-
-            let col;
-            if (depthFromApex < P * 1.4) {
-              col = '#FFFFFF';
-            } else if (depthFromApex < P * 3.0) {
-              col = '#E2EAF5'; // Metallic silver
-            } else if (depthFromApex < P * 5.0) {
-              col = '#FF1E56'; // Crimson nullification
-            } else {
-              col = '#9B1FE8'; // Deep cursed violet
-            }
-
-            ctx.fillStyle = col;
-            ctx.fillRect(pxX, pyY, P, P);
+        if (recP <= 0) {
+          // Active cleave stroke: crescent tip sweeps smoothly from top to bottom
+          const sweepEase = 1 - Math.pow(1 - Math.min(1.0, progress), 2.2);
+          currentTipOffset = startOffset + sweepEase * totalSweep;
+          currentTailOffset = startOffset;
+          trailAlpha = Math.min(1.0, progress * 3.5);
+        } else {
+          // Follow-through & dynamic eraser wipe from tail to tip (Rule 15)
+          currentTipOffset = endOffset;
+          if (recP < 0.25) {
+            currentTailOffset = startOffset;
+            trailAlpha = 1.0;
+          } else {
+            const eraseP = (recP - 0.25) / 0.75;
+            const easedErase = Math.pow(eraseP, 1.4);
+            currentTailOffset = startOffset + easedErase * totalSweep;
+            trailAlpha = Math.pow(1 - eraseP, 0.85);
           }
         }
 
-        // Trailing Cursed Pixel Sparks
-        const numEmbers = 8;
-        for (let eb = 0; eb < numEmbers; eb++) {
-          const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-          const ebAng = tailAngle + ebT * span;
-          const ebDist = outerR - 10 - eb * 4;
-          const ex = snap(Math.cos(ebAng) * ebDist);
-          const ey = snap(Math.sin(ebAng) * ebDist);
-          ctx.fillStyle = (eb % 2 === 0) ? '#A030FF' : '#FF1E56';
-          ctx.fillRect(ex, ey, P, P);
+        const span = currentTipOffset - currentTailOffset;
+        if (Math.abs(span) >= 0.04 && trailAlpha > 0.01) {
+          const outerRadius = (this.r + thrustDistance + 85) * (editP ? editP.scale : 1.0);
+          const maxThick = 20.0 * (editP ? editP.thickness : 1.0);
+          const numSteps = 30;
+
+          const buildCrescentPath = (radOffset, thickMult, taperExp = 1.15) => {
+            ctx.beginPath();
+            for (let i = 0; i <= numSteps; i++) {
+              const st = i / numSteps;
+              const ang = currentTailOffset + st * span;
+              const taper = Math.pow(Math.sin(st * Math.PI), taperExp) * (0.28 + 0.72 * st);
+              const rad = outerRadius + radOffset + taper * 1.5;
+              const px = Math.cos(ang) * rad;
+              const py = Math.sin(ang) * rad;
+              if (i === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            for (let i = numSteps; i >= 0; i--) {
+              const st = i / numSteps;
+              const ang = currentTailOffset + st * span;
+              const taper = Math.pow(Math.sin(st * Math.PI), taperExp) * (0.28 + 0.72 * st);
+              const rad = outerRadius + radOffset - (maxThick * thickMult * taper);
+              const px = Math.cos(ang) * rad;
+              const py = Math.sin(ang) * rad;
+              ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+          };
+
+          // 1. Outer Cursed Atmospheric Glow Flare
+          buildCrescentPath(5.0, 1.30, 1.05);
+          ctx.fillStyle = `rgba(140, 20, 230, ${(0.32 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          buildCrescentPath(3.0, 1.15, 1.10);
+          ctx.fillStyle = `rgba(255, 30, 86, ${(0.38 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          // 2. Dark Manga Ink Shell
+          buildCrescentPath(1.0, 1.05, 1.15);
+          ctx.fillStyle = `rgba(10, 4, 18, ${(0.96 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(10, 4, 18, ${(0.96 * trailAlpha).toFixed(2)})`;
+          ctx.lineWidth = 2.0;
+          ctx.stroke();
+
+          // 3. Deep Cursed Violet Body
+          buildCrescentPath(0, 1.0, 1.15);
+          ctx.fillStyle = `rgba(155, 31, 232, ${(0.92 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          // 4. Crimson Nullification Energy Core
+          buildCrescentPath(-1.5, 0.65, 1.20);
+          ctx.fillStyle = `rgba(255, 30, 86, ${(0.95 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          // 5. Specular Razor-Sharp White Cutting Edge & Apex Core Line
+          buildCrescentPath(-0.8, 0.30, 1.25);
+          ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          for (let i = 0; i <= numSteps; i++) {
+            const st = i / numSteps;
+            const ang = currentTailOffset + st * span;
+            const taper = Math.pow(Math.sin(st * Math.PI), 1.25) * (0.28 + 0.72 * st);
+            const rad = outerRadius - 0.8 + taper * 1.2;
+            const px = Math.cos(ang) * rad;
+            const py = Math.sin(ang) * rad;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * trailAlpha).toFixed(2)})`;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+
+          // 6. Trailing Cursed Sparks
+          const numSparks = 7;
+          for (let s = 0; s < numSparks; s++) {
+            const sT = (s / numSparks + (Date.now() / 250)) % 1.0;
+            const sAng = currentTailOffset + sT * span;
+            const sDist = outerRadius - 3 - s * 2.0;
+            const sx = Math.cos(sAng) * sDist;
+            const sy = Math.sin(sAng) * sDist;
+            ctx.fillStyle = (s % 2 === 0) ? '#FFFFFF' : ((s % 3 === 1) ? '#A030FF' : '#FF1E56');
+            ctx.fillRect(sx - 1.5, sy - 1.5, 2.5, 2.5);
+          }
         }
       }
 

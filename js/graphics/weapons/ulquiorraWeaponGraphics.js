@@ -30,10 +30,10 @@ export function _getUlquiorraWeaponImage() {
       _ulquiorraWeaponImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ulquiorra weapon image at Assets/model/UlquiorraCifer-weapon.png', e);
+      console.warn('Failed to load Ulquiorra weapon image at Assets/model/ulquiorra/UlquiorraCifer-weapon.png', e);
       _ulquiorraWeaponImageLoading = false;
     };
-    img.src = 'Assets/model/UlquiorraCifer-weapon.png?v=1';
+    img.src = 'Assets/model/ulquiorra/UlquiorraCifer-weapon.png?v=1';
     _ulquiorraWeaponImage = img;
   }
   return _ulquiorraWeaponImage;
@@ -45,7 +45,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 
 /**
  * Draws Ulquiorra's Zanpakutō: Murciélago (The Great Black-Winged Bat).
- * Renders the authentic pixel art weapon model from Assets/model/UlquiorraCifer-weapon.png.
+ * Renders the authentic pixel art weapon model from Assets/model/ulquiorra/UlquiorraCifer-weapon.png.
  *
  * @param {CanvasRenderingContext2D} ctx 
  * @param {number} x Hand anchor X

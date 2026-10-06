@@ -30,10 +30,10 @@ export function _getCrazyDaveHairImage() {
       _crazyDaveHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Crazy Dave hair image at Assets/model/Hair/crazydave-hair.png', e);
+      console.warn('Failed to load Crazy Dave hair image at Assets/model/crazyDave/crazydave-hair.png', e);
       _crazyDaveHairImageLoading = false;
     };
-    img.src = 'Assets/model/Hair/crazydave-hair.png?v=1';
+    img.src = 'Assets/model/crazyDave/crazydave-hair.png?v=1';
     _crazyDaveHairImage = img;
   }
   return _crazyDaveHairImage;
@@ -44,7 +44,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Crazy Dave's cooking pot from Assets/model/Hair/crazydave-hair.png.
+ * Draws Crazy Dave's cooking pot from Assets/model/crazyDave/crazydave-hair.png.
  * Overlaid on top of the procedural pixel body circle.
  * Uses nearest-neighbor scaling for crisp pixel art fidelity (Rule 19 / Rule 3.5).
  * @param {CanvasRenderingContext2D} ctx

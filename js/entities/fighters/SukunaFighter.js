@@ -1,4 +1,4 @@
-import { Fighter } from '../fighter.js';
+import { Fighter, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound, playLoopingSound, fadeOutLoopingSound, stopLoopingSound, pauseLoopingSound, resumeLoopingSound } from '../../systems/soundSystem.js';
@@ -513,7 +513,7 @@ export class SukunaFighter extends Fighter {
       ? this._findClosestEnemy()
       : (this.target || null);
 
-    if (!closestEnemy) return; // No targets available (e.g., won the match)
+    if (!closestEnemy || isEntityOutsideArena(closestEnemy)) return; // No targets available or target is outside arena
 
     const slashDamage = CONFIG.sukuna?.slashDamage ?? this.damage;
     const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
@@ -1479,7 +1479,7 @@ export class SukunaFighter extends Fighter {
     ctx.restore();
   }
 
-  // Helper method to render the Malevolent Shrine structure (Using authentic pixel-art model from Assets/model/Sukuna-shrine.png)
+  // Helper method to render the Malevolent Shrine structure (Using authentic pixel-art model from Assets/model/sukuna/sukuna-shrine.png)
   _drawShrineBody(ctx) {
     SukunaRenderer._drawShrineBody(ctx, this);
   }

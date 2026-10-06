@@ -2,6 +2,17 @@
 // Ichigo Kurosaki — Substitute Soul Reaper Config (Unified)
 // ─────────────────────────────────────────────
 export const ichigoConfig = {
+  assets: {
+    hair: 'Assets/model/ichigo/ichigo-hair.png',
+    shikaiSkin: 'Assets/model/ichigo/ichigo-shikai-skin.png',
+    shikaiSword: 'Assets/model/ichigo/ICHIGO-SHIKAI-SWORD.png',
+    shikaiSwordBlade: 'Assets/model/ichigo/ICHIGO-SHIKAI-SWORD-BLADE.png',
+    bankaiSword: 'Assets/model/ichigo/ICHIGO-BANKAI-SWORD.png',
+    bankaiSwordBlade: 'Assets/model/ichigo/ICHIGO-BANKAI-SWORD-BLADE.png',
+    shikaiAttack: 'Assets/model/ichigo/Ichigo-shikai-attack.png',
+    bankaiAttack: 'Assets/model/ichigo/Ichigo-bankai-attack.png',
+  },
+
   name: 'Ichigo',
   displayName: 'Ichigo',
   bossTitle: 'Substitute Soul Reaper',

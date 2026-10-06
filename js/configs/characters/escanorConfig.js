@@ -4,6 +4,17 @@
 // ─────────────────────────────────────────────
 
 export const escanorConfig = {
+  assets: {
+    hair: 'Assets/model/escanor/Escanor-hair.png',
+    mustache: 'Assets/model/escanor/Escanor-mustache.png',
+    modelMustache: 'Assets/model/escanor/Escanor-model-mustache.png',
+    skin: 'Assets/model/escanor/Escanor-skin-model.png',
+    weapon: 'Assets/model/escanor/Escanor-Weapon.png',
+    cruelSun: 'Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png',
+    sunExplosion: 'Assets/model/escanor/Escanor-Sun-Explosion-Sprite-Sheet.png',
+    attackEffect: 'Assets/model/Attack-Effects/Attack-Effect-1.png',
+  },
+
   name: 'Escanor',
   displayName: 'Escanor',
   bossTitle: 'Lion Sin of Pride',

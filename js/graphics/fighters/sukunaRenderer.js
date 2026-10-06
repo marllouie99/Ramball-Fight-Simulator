@@ -24,10 +24,10 @@ export function _getSukunaShrineImage() {
       _sukunaShrineImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Sukuna shrine image at Assets/model/Sukuna-shrine.png', e);
+      console.warn('Failed to load Sukuna shrine image at Assets/model/sukuna/sukuna-shrine.png', e);
       _sukunaShrineImageLoading = false;
     };
-    img.src = 'Assets/model/Sukuna-shrine.png';
+    img.src = 'Assets/model/sukuna/sukuna-shrine.png';
     _sukunaShrineImage = img;
   }
   return _sukunaShrineImage;
@@ -923,7 +923,7 @@ export class SukunaRenderer {
     ctx.restore();
   }
 
-  // Helper method to render the Malevolent Shrine structure (Using authentic pixel-art model from Assets/model/Sukuna-shrine.png)
+  // Helper method to render the Malevolent Shrine structure (Using authentic pixel-art model from Assets/model/sukuna/sukuna-shrine.png)
   static _drawShrineBody(ctx, fighter) {
     const drawW = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineWidth) || 380;
     const glowRadius = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineGlowRadius) || 210;

@@ -8,6 +8,7 @@ import { soundSpriteManager } from './soundSpriteSystem.js';
 export { soundSpriteManager };
 
 const _cache = new Map();
+const _loadingPromises = new Map();
 const _loopingSounds = new Map();
 const _activeSounds = new Set();
 const _activeSoundHandles = new Set();
@@ -168,7 +169,10 @@ function _pruneSoundCache() {
 }
 
 function isAudioBufferLike(value) {
-  return typeof AudioBuffer !== 'undefined' && value instanceof AudioBuffer;
+  if (!value) return false;
+  if (typeof AudioBuffer !== 'undefined' && value instanceof AudioBuffer) return true;
+  if (typeof globalThis !== 'undefined' && typeof globalThis.AudioBuffer !== 'undefined' && value instanceof globalThis.AudioBuffer) return true;
+  return typeof value === 'object' && typeof value.duration === 'number' && typeof value.numberOfChannels === 'number';
 }
 
 let _masterLimiterNode = null;
@@ -176,10 +180,18 @@ let _masterLimiterNode = null;
 /** Get or create a shared AudioContext with balanced latency to avoid underruns during screen recording. */
 function getAudioContext() {
   if (!_sharedAudioCtx || _sharedAudioCtx.state === 'closed') {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    const AudioContextClass = (typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) ||
+                              (typeof globalThis !== 'undefined' && (globalThis.AudioContext || globalThis.webkitAudioContext));
     if (AudioContextClass) {
-      // 'interactive' requests the lowest possible hardware audio buffer (e.g. 128-256 samples = ~2.9-5.8ms)
-      _sharedAudioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+      try {
+        _sharedAudioCtx = new AudioContextClass({ latencyHint: 'interactive' });
+      } catch (e) {
+        try {
+          _sharedAudioCtx = new AudioContextClass();
+        } catch (e2) {
+          _sharedAudioCtx = null;
+        }
+      }
     }
     _masterLimiterNode = null;
   }
@@ -255,58 +267,72 @@ export async function unlockAudio() {
   }
 }
 
-const _loadingPromises = new Map();
+/**
+ * Detects whether an audio source is a full-length music / BGM track that should
+ * be streamed via HTML5 Audio rather than decoded into uncompressed Web Audio PCM buffers.
+ * @param {string} src
+ * @returns {boolean}
+ */
+export function isMusicAudio(src) {
+  if (!src) return false;
+  const s = String(src).toLowerCase();
+  return s.includes('arena-bgmusic') ||
+         s.includes('bgmusic') ||
+         s.includes('cps1') ||
+         s.includes('background-song') ||
+         s.includes('bgm') ||
+         s.includes('music') ||
+         s.includes('loop') ||
+         s.includes('megalovania') ||
+         s.includes('deathmusic') ||
+         s.includes('respect') ||
+         s.includes('cj-respectoverlay-bgmusic');
+}
 
 /**
- * Pre-load an audio file so it's ready to play instantly.
- * Uses fetch + AudioContext.decodeAudioData to fully decode the audio
- * into memory, bypassing the browser's lazy loading for zero-latency playback.
- * Falls back to a standard Audio element if Web Audio API fails.
- * @param {string|string[]} src - Path to the audio file (relative or absolute)
+ * Pre-load a single audio file into Web Audio memory as an AudioBuffer.
+ * For large BGM tracks, falls back to HTMLAudioElement to avoid CPU/memory decoding spikes.
+ * @param {string} src - Audio URL path
+ * @param {object} [options={}] - Options (e.g. forceWebAudio)
+ * @returns {Promise<AudioBuffer|HTMLAudioElement|null>}
  */
-export async function preloadSound(src, options = {}) {
-  if (!src) return;
-  if (Array.isArray(src)) {
-    const isPriority = Boolean(options && options.priority);
-    const isIdle = Boolean(options && options.idle);
-    const batchSize = isPriority ? 6 : (options.batchSize || (isIdle ? 2 : 6));
-    const yieldMs = isPriority ? 4 : (isIdle ? 80 : 16);
+export async function preloadAudioBuffer(src, options = {}) {
+  if (!src || typeof src !== 'string') return null;
 
-    for (let i = 0; i < src.length; i += batchSize) {
-      // If a match is currently in countdown or active combat, pause idle background preloading
-      // so 100% of CPU and media thread bandwidth is dedicated to smooth 60 FPS combat
-      while (isIdle && typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'playing')) {
-        await new Promise(r => setTimeout(r, 500));
-      }
-
-      const batch = src.slice(i, i + batchSize);
-      await Promise.all(batch.map((s) => preloadSound(s, options)));
-      // Yield to the event loop so rendering and game loop run smoothly
-      await new Promise(r => {
-        if (isIdle && typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
-          window.requestIdleCallback(() => setTimeout(r, 10), { timeout: 120 });
-        } else {
-          setTimeout(r, yieldMs);
-        }
-      });
-    }
-    return;
-  }
+  // 1. Check sound sprite sheet registry first
   if (soundSpriteManager.hasSprite(src)) {
     const info = soundSpriteManager.getSpriteInfo(src);
     if (info) {
-      const audioCtx = getAudioContext();
-      return soundSpriteManager.loadSpriteSheet(info.sheetId, audioCtx);
+      const sheet = soundSpriteManager.spriteSheets.get(info.sheetId);
+      if (sheet && sheet.buffer) {
+        _cache.set(src, sheet.buffer);
+        _pruneSoundCache();
+        return sheet.buffer;
+      } else if (sheet && !sheet.isVirtual && sheet.url && !sheet.url.startsWith('virtual://')) {
+        const audioCtx = getAudioContext();
+        const sheetBuffer = await soundSpriteManager.loadSpriteSheet(info.sheetId, audioCtx);
+        if (sheetBuffer) {
+          _cache.set(src, sheetBuffer);
+          _pruneSoundCache();
+          return sheetBuffer;
+        }
+      }
     }
   }
-  if (_cache.has(src)) return;
+
+  // 2. Return immediately if already resident in memory cache
+  if (_cache.has(src)) {
+    return _cache.get(src);
+  }
+
+  // 3. Return existing in-flight promise if currently fetching/decoding
   if (_loadingPromises.has(src)) {
     return _loadingPromises.get(src);
   }
 
   const loadPromise = (async () => {
-    // Full-length music tracks (3-5MB MP3s) stream efficiently via HTMLAudioElement without CPU decoding spikes
-    const isMusic = typeof src === 'string' && (src.includes('ARENA-BGMUSIC') || src.includes('bgmusic') || src.includes('CPS1') || src.includes('background-song'));
+    // Full-length music tracks (3-5MB MP3s) stream efficiently via HTMLAudioElement without uncompressed PCM spikes
+    const isMusic = !options.forceWebAudio && isMusicAudio(src);
     if (isMusic) {
       try {
         const audio = new Audio(src);
@@ -314,8 +340,10 @@ export async function preloadSound(src, options = {}) {
         audio.load();
         _cache.set(src, audio);
         _pruneSoundCache();
-      } catch (err) {}
-      return;
+        return audio;
+      } catch (err) {
+        return null;
+      }
     }
 
     try {
@@ -327,15 +355,19 @@ export async function preloadSound(src, options = {}) {
       const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
       _cache.set(src, audioBuffer);
       _pruneSoundCache();
+      return audioBuffer;
     } catch (e) {
-      // Fallback: standard Audio element (may have loading delay)
+      // Fallback: standard Audio element (streamed/on-demand)
       try {
         const audio = new Audio(src);
         audio.preload = 'auto';
         audio.load();
         _cache.set(src, audio);
         _pruneSoundCache();
-      } catch (err) {}
+        return audio;
+      } catch (err) {
+        return null;
+      }
     } finally {
       _loadingPromises.delete(src);
     }
@@ -343,6 +375,162 @@ export async function preloadSound(src, options = {}) {
 
   _loadingPromises.set(src, loadPromise);
   return loadPromise;
+}
+
+/**
+ * Concurrently batch-preloads and decodes an array of audio URLs into Web Audio buffers.
+ * Employs a worker pool pattern with bounded concurrency (default 6 parallel workers)
+ * to prevent network starvation and audio decoding CPU spikes while ensuring zero-latency
+ * instant combat sound playback.
+ *
+ * @param {string[]} urls - Array of audio file paths
+ * @param {object} [options={}] - Batch loading options
+ * @param {number} [options.concurrency=6] - Max simultaneous fetch + decode jobs
+ * @param {boolean} [options.priority=false] - High priority (e.g. match start) with higher concurrency
+ * @param {boolean} [options.idle=false] - Background idle load (yields/pauses during active matches)
+ * @param {function} [options.onProgress=null] - Progress callback: (completed, total, currentUrl, success)
+ * @returns {Promise<{ loaded: number, errors: number, total: number }>}
+ */
+export async function preloadAudioBufferBatch(urls, options = {}) {
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return { loaded: 0, errors: 0, total: 0 };
+  }
+
+  const isPriority = Boolean(options && options.priority);
+  const isIdle = Boolean(options && options.idle);
+  const concurrency = options.concurrency || (isPriority ? 8 : (isIdle ? 4 : 6));
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+
+  // Filter and de-duplicate unique audio URLs
+  const uniqueUrls = [...new Set(urls.filter(u => typeof u === 'string' && u.trim().length > 0))];
+  const totalCount = uniqueUrls.length;
+  if (totalCount === 0) {
+    return { loaded: 0, errors: 0, total: 0 };
+  }
+
+  let currentIndex = 0;
+  let completedCount = 0;
+  let errorCount = 0;
+
+  const workerCount = Math.min(concurrency, totalCount);
+  const workers = Array.from({ length: workerCount }, async () => {
+    while (currentIndex < totalCount) {
+      // If idle mode and match is active, pause preloading so combat maintains locked 60 FPS
+      while (isIdle && typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'playing')) {
+        await new Promise(r => setTimeout(r, 500));
+      }
+
+      const idx = currentIndex++;
+      if (idx >= totalCount) break;
+
+      const url = uniqueUrls[idx];
+      let success = true;
+      try {
+        await preloadAudioBuffer(url, options);
+      } catch (err) {
+        success = false;
+        errorCount++;
+      }
+
+      completedCount++;
+      if (onProgress) {
+        try {
+          onProgress(completedCount, totalCount, url, success);
+        } catch (e) {}
+      }
+
+      // Periodically yield to browser event loop to prevent micro-stutter
+      if (completedCount % 4 === 0) {
+        await new Promise(r => {
+          if (isIdle && typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(() => setTimeout(r, 4), { timeout: 60 });
+          } else {
+            setTimeout(r, isPriority ? 2 : 8);
+          }
+        });
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  return { loaded: completedCount - errorCount, errors: errorCount, total: totalCount };
+}
+
+/**
+ * Pre-load audio file(s) so they are ready to play instantly.
+ * Supports a single URL string or an array of URLs (which uses the concurrent batch worker pool).
+ * @param {string|string[]} src - Path or array of paths to audio files
+ * @param {object} [options={}] - Preload options (priority, idle, concurrency, onProgress)
+ * @returns {Promise<any>}
+ */
+export async function preloadSound(src, options = {}) {
+  if (!src) return;
+  if (Array.isArray(src)) {
+    return preloadAudioBufferBatch(src, options);
+  }
+  return preloadAudioBuffer(src, options);
+}
+
+/**
+ * Retrieve live diagnostics and memory statistics about the sound system audio cache.
+ * @returns {{ total: number, audioBuffers: number, audioElements: number, inFlight: number, activeHandles: number, loopingSounds: number, maxCacheSize: number }}
+ */
+export function getSoundCacheStats() {
+  let audioBuffers = 0;
+  let audioElements = 0;
+  for (const val of _cache.values()) {
+    if (isAudioBufferLike(val)) audioBuffers++;
+    else if (val) audioElements++;
+  }
+  return {
+    total: _cache.size,
+    audioBuffers,
+    audioElements,
+    inFlight: _loadingPromises.size,
+    activeHandles: _activeSoundHandles.size,
+    loopingSounds: _loopingSounds.size,
+    maxCacheSize: MAX_CACHE_SIZE
+  };
+}
+
+/**
+ * Checks whether a given audio asset is currently resident in the memory cache.
+ * @param {string} src
+ * @returns {boolean}
+ */
+export function isSoundCached(src) {
+  if (!src) return false;
+  if (_cache.has(src)) return true;
+  const spriteAudio = soundSpriteManager.getSpriteAudio(src);
+  return Boolean(spriteAudio && spriteAudio.buffer);
+}
+
+/**
+ * Checks whether a given audio asset is cached specifically as an uncompressed Web Audio AudioBuffer.
+ * @param {string} src
+ * @returns {boolean}
+ */
+export function isSoundAudioBuffer(src) {
+  if (!src) return false;
+  if (isAudioBufferLike(_cache.get(src))) return true;
+  const spriteAudio = soundSpriteManager.getSpriteAudio(src);
+  return Boolean(spriteAudio && isAudioBufferLike(spriteAudio.buffer));
+}
+
+/**
+ * Clear the sound memory cache.
+ * @param {boolean} [keepProtected=true] - If true, preserves protected announcer and death voice lines.
+ */
+export function clearSoundCache(keepProtected = true) {
+  if (!keepProtected) {
+    _cache.clear();
+    return;
+  }
+  for (const [key] of _cache.entries()) {
+    if (!isProtectedVoiceOrAnnouncerSound(key)) {
+      _cache.delete(key);
+    }
+  }
 }
 
 /**

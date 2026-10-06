@@ -3,6 +3,22 @@
 // Dave has NO basic attack — he moves around collecting Sun drops to deploy combat plants!
 
 export const crazyDaveConfig = {
+  assets: {
+    hair: 'Assets/model/crazyDave/crazydave-hair.png',
+    peashooterIdle: 'Assets/model/crazyDave/Peashooter-sprite-sheet.png',
+    peashooterShoot: 'Assets/model/crazyDave/peashooter-about2shoot-sprite-sheet.png',
+    snowPeaIdle: 'Assets/model/crazyDave/Snowpea-sprite-sheet.png',
+    snowPeaShoot: 'Assets/model/crazyDave/snowpea-about2shoot-sprite-sheet.png',
+    peaProjectile: 'Assets/model/crazyDave/Peashooter-projectile.png',
+    snowPeaProjectile: 'Assets/model/crazyDave/snowpea-projectile.png',
+    wallnut: 'Assets/model/crazyDave/Wallnut-sprite-sheet.png',
+    torchwood: 'Assets/model/crazyDave/torchwood-sprite-sheet.png',
+    firePeaProjectile: 'Assets/model/Sprites/Six-Frame Pixel Fireball Animation.png',
+    lawnmower: 'Assets/model/crazyDave/lawnmower-sprite-sheet.png',
+    potatoMine: 'Assets/model/crazyDave/potato-mine-sprite-sheet.png',
+    sun: 'Assets/model/crazyDave/Sun-economy-sprite.png',
+  },
+
   id: 'crazydave',
   name: 'Crazy Dave',
   displayName: 'PLANTS',
@@ -48,7 +64,7 @@ export const crazyDaveConfig = {
   wallnutRadius: 24,         // Solid collision barrier radius
   maxActiveWallnuts: 2,      // Maximum living Wall-nuts Dave can keep active
   wallnutCooldown: 1000,      // Cooldown for planting next Wall-nut
-  wallnutSpriteSrc: 'Assets/model/Sprites/Wallnut-sprite-sheet.png',
+  wallnutSpriteSrc: 'Assets/model/crazyDave/Wallnut-sprite-sheet.png',
 
   // Skill 2: Plant Peashooter (Regular Damage)
   enablePeashooter: true,
@@ -104,7 +120,7 @@ export const crazyDaveConfig = {
   torchwoodFirePeaSplashRadius: 45,    // Fire pea splash AoE radius on hit
   torchwoodFirePeaSplashDamage: 0.5,   // Splash deals 50% of fire pea damage
   torchwoodFirePeaColor: '#EF4444',    // Fiery Red
-  torchwoodSpriteSrc: 'Assets/model/Sprites/torchwood-sprite-sheet.png',
+  torchwoodSpriteSrc: 'Assets/model/crazyDave/torchwood-sprite-sheet.png',
 
   // Skill 5: Plant Potato Mine (Proximity Explosive Trap — PvZ Classic Area Denial)
   enablePotatoMine: true,
@@ -119,7 +135,7 @@ export const crazyDaveConfig = {
   potatoMineExplosionDamage: 150,  // Massive single-burst explosion damage (SPUDOW!)
   potatoMineExplosionRadius: 120,  // Blast radius for splash AOE damage
   potatoMineExplosionKnockback: 14, // Strong knockback impulse on detonation
-  potatoMineSpriteSrc: 'Assets/model/Sprites/potato-mine-sprite-sheet.png',
+  potatoMineSpriteSrc: 'Assets/model/crazyDave/potato-mine-sprite-sheet.png',
 
   // Lawnmower Baseline Defense System (PvZ Signature Final Defense)
   enableLawnmower: true,
@@ -130,7 +146,7 @@ export const crazyDaveConfig = {
   lawnmowerBaselineOffset: 2,  // Keep parked mowers tucked against the arena wall
   lawnmowerColor: '#DC2626',   // Classic cherry red mower
   lawnmowerStunDuration: 45,   // Stun frames applied to enemies hit by mower (≈0.75s at 60fps)
-  lawnmowerSpriteSrc: 'Assets/model/Sprites/lawnmower-sprite-sheet.png',
+  lawnmowerSpriteSrc: 'Assets/model/crazyDave/lawnmower-sprite-sheet.png',
 
   // Shared plant deployment and audio tuning
   plantingDuration: 20,
@@ -174,19 +190,19 @@ export const crazyDaveConfig = {
   },
 
   // Sprite Asset Sources
-  sunSpriteSrc: 'Assets/model/Sprites/Sun-economy-sprite.png',
-  wallnutSpriteSrc: 'Assets/model/Sprites/Wallnut-sprite-sheet.png',
-  peashooterIdleSpriteSrc: 'Assets/model/Sprites/Peashooter-sprite-sheet.png',
-  peashooterShootSpriteSrc: 'Assets/model/Sprites/peashooter-about2shoot-sprite-sheet.png',
-  peashooterProjSpriteSrc: 'Assets/model/Sprites/Peashooter-projectile.png',
-  snowPeaIdleSpriteSrc: 'Assets/model/Sprites/Snowpea-sprite-sheet.png',
-  snowPeaShootSpriteSrc: 'Assets/model/Sprites/snowpea-about2shoot-sprite-sheet.png',
-  snowPeaProjSpriteSrc: 'Assets/model/Sprites/snowpea-projectile.png',
-  torchwoodSpriteSrc: 'Assets/model/Sprites/torchwood-sprite-sheet.png',
+  sunSpriteSrc: 'Assets/model/crazyDave/Sun-economy-sprite.png',
+  wallnutSpriteSrc: 'Assets/model/crazyDave/Wallnut-sprite-sheet.png',
+  peashooterIdleSpriteSrc: 'Assets/model/crazyDave/Peashooter-sprite-sheet.png',
+  peashooterShootSpriteSrc: 'Assets/model/crazyDave/peashooter-about2shoot-sprite-sheet.png',
+  peashooterProjSpriteSrc: 'Assets/model/crazyDave/Peashooter-projectile.png',
+  snowPeaIdleSpriteSrc: 'Assets/model/crazyDave/Snowpea-sprite-sheet.png',
+  snowPeaShootSpriteSrc: 'Assets/model/crazyDave/snowpea-about2shoot-sprite-sheet.png',
+  snowPeaProjSpriteSrc: 'Assets/model/crazyDave/snowpea-projectile.png',
+  torchwoodSpriteSrc: 'Assets/model/crazyDave/torchwood-sprite-sheet.png',
   firePeaProjSpriteSrc: 'Assets/model/Sprites/Six-Frame Pixel Fireball Animation.png',
-  lawnmowerSpriteSrc: 'Assets/model/Sprites/lawnmower-sprite-sheet.png',
+  lawnmowerSpriteSrc: 'Assets/model/crazyDave/lawnmower-sprite-sheet.png',
   iceFreezeSpriteSrc: 'Assets/model/Sprites/ice-freeze-sprite.png',
-  potatoMineSpriteSrc: 'Assets/model/Sprites/potato-mine-sprite-sheet.png',
+  potatoMineSpriteSrc: 'Assets/model/crazyDave/potato-mine-sprite-sheet.png',
 
   // Arena Grass Tiles (PvZ Front Lawn)
   grassTilesSpriteSrc: 'Assets/model/Tiles/Grass-tiles-sprite-sheet.png',

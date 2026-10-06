@@ -198,10 +198,10 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
 }
 
 export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
-  if (fighter.mahoragaAdaptationFreezeTimer > 0) {
+  if (fighter.mahoragaAdaptationFreezeTimer > 0 || fighter.isFrameFrozen || (fighter.frameFreezeTimer && fighter.frameFreezeTimer > 0) || fighter.isCaughtInNaoyaUlt || fighter.isCurrentlyWallPinnedByNaoya || fighter.isCurrentlyWallPinnedByMakima || (fighter.isChainedByMakima && !fighter.isMindControlledByMakima)) {
     fighter.vx = 0;
     fighter.vy = 0;
-    return; // Freeze Toji mid-ambush 1-3 combo sequence during Mahoraga's wheel adaptation!
+    return; // Freeze Toji mid-ambush sequence during hard CC / Frame Stasis / Mahoraga's wheel adaptation!
   }
 
   if (tojiIsTargetDeadOrRemoved(fighter, opponent) || !fighter.isAmbushing) {

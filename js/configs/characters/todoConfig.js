@@ -2,6 +2,11 @@
 // Aoi Todo — Boogie Woogie Brawler Config
 // ─────────────────────────────────────────────
 export const todoConfig = {
+  assets: {
+    hair: 'Assets/model/todo/Todo-hair.png',
+    ultimateOverlay: 'Assets/Overlays/Todo-ultimate-overlay.png',
+  },
+
     name: 'Todo',
     displayName: 'Todo',
     bossTitle: '530,000 IQ Brother',

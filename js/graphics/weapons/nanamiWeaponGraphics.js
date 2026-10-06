@@ -20,10 +20,10 @@ export function _getNanamiWeaponImage() {
       _nanamiWeaponImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Nanami weapon image at Assets/model/Nanami-weapon.png', e);
+      console.warn('Failed to load Nanami weapon image at Assets/model/nanami/Nanami-weapon.png', e);
       _nanamiWeaponImageLoading = false;
     };
-    img.src = 'Assets/model/Nanami-weapon.png?v=1';
+    img.src = 'Assets/model/nanami/Nanami-weapon.png?v=1';
     _nanamiWeaponImage = img;
   }
   return _nanamiWeaponImage;

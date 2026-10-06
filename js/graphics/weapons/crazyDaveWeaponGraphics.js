@@ -117,47 +117,47 @@ function _loadPlantImage(src, current) {
 }
 
 export function getSunSprite() {
-  if (!_sunEconomyImg) _sunEconomyImg = _loadPlantImage('Assets/model/Sprites/Sun-economy-sprite.png', _sunEconomyImg);
+  if (!_sunEconomyImg) _sunEconomyImg = _loadPlantImage('Assets/model/crazyDave/Sun-economy-sprite.png', _sunEconomyImg);
   return _sunEconomyImg;
 }
 
 export function getPeashooterIdleSprite() {
-  if (!_peashooterIdleImg) _peashooterIdleImg = _loadPlantImage('Assets/model/Sprites/Peashooter-sprite-sheet.png', _peashooterIdleImg);
+  if (!_peashooterIdleImg) _peashooterIdleImg = _loadPlantImage('Assets/model/crazyDave/Peashooter-sprite-sheet.png', _peashooterIdleImg);
   return _peashooterIdleImg;
 }
 
 export function getPeashooterShootSprite() {
-  if (!_peashooterShootImg) _peashooterShootImg = _loadPlantImage('Assets/model/Sprites/peashooter-about2shoot-sprite-sheet.png', _peashooterShootImg);
+  if (!_peashooterShootImg) _peashooterShootImg = _loadPlantImage('Assets/model/crazyDave/peashooter-about2shoot-sprite-sheet.png', _peashooterShootImg);
   return _peashooterShootImg;
 }
 
 export function getSnowPeaIdleSprite() {
-  if (!_snowPeaIdleImg) _snowPeaIdleImg = _loadPlantImage('Assets/model/Sprites/Snowpea-sprite-sheet.png', _snowPeaIdleImg);
+  if (!_snowPeaIdleImg) _snowPeaIdleImg = _loadPlantImage('Assets/model/crazyDave/Snowpea-sprite-sheet.png', _snowPeaIdleImg);
   return _snowPeaIdleImg;
 }
 
 export function getSnowPeaShootSprite() {
-  if (!_snowPeaShootImg) _snowPeaShootImg = _loadPlantImage('Assets/model/Sprites/snowpea-about2shoot-sprite-sheet.png', _snowPeaShootImg);
+  if (!_snowPeaShootImg) _snowPeaShootImg = _loadPlantImage('Assets/model/crazyDave/snowpea-about2shoot-sprite-sheet.png', _snowPeaShootImg);
   return _snowPeaShootImg;
 }
 
 export function getPeaProjSprite() {
-  if (!_peaProjImg) _peaProjImg = _loadPlantImage('Assets/model/Sprites/Peashooter-projectile.png', _peaProjImg);
+  if (!_peaProjImg) _peaProjImg = _loadPlantImage('Assets/model/crazyDave/Peashooter-projectile.png', _peaProjImg);
   return _peaProjImg;
 }
 
 export function getSnowPeaProjSprite() {
-  if (!_snowPeaProjImg) _snowPeaProjImg = _loadPlantImage('Assets/model/Sprites/snowpea-projectile.png', _snowPeaProjImg);
+  if (!_snowPeaProjImg) _snowPeaProjImg = _loadPlantImage('Assets/model/crazyDave/snowpea-projectile.png', _snowPeaProjImg);
   return _snowPeaProjImg;
 }
 
 export function getWallnutSprite() {
-  if (!_wallnutImg) _wallnutImg = _loadPlantImage('Assets/model/Sprites/Wallnut-sprite-sheet.png', _wallnutImg);
+  if (!_wallnutImg) _wallnutImg = _loadPlantImage('Assets/model/crazyDave/Wallnut-sprite-sheet.png', _wallnutImg);
   return _wallnutImg;
 }
 
 export function getTorchwoodSprite() {
-  if (!_torchwoodImg) _torchwoodImg = _loadPlantImage('Assets/model/Sprites/torchwood-sprite-sheet.png', _torchwoodImg);
+  if (!_torchwoodImg) _torchwoodImg = _loadPlantImage('Assets/model/crazyDave/torchwood-sprite-sheet.png', _torchwoodImg);
   return _torchwoodImg;
 }
 
@@ -171,14 +171,14 @@ export function getFirePeaProjSprite() {
 let _lawnmowerImg = null;
 
 export function getLawnmowerSprite() {
-  if (!_lawnmowerImg) _lawnmowerImg = _loadPlantImage('Assets/model/Sprites/lawnmower-sprite-sheet.png', _lawnmowerImg);
+  if (!_lawnmowerImg) _lawnmowerImg = _loadPlantImage('Assets/model/crazyDave/lawnmower-sprite-sheet.png', _lawnmowerImg);
   return _lawnmowerImg;
 }
 
 let _potatoMineImg = null;
 
 export function getPotatoMineSprite() {
-  if (!_potatoMineImg) _potatoMineImg = _loadPlantImage('Assets/model/Sprites/potato-mine-sprite-sheet.png', _potatoMineImg);
+  if (!_potatoMineImg) _potatoMineImg = _loadPlantImage('Assets/model/crazyDave/potato-mine-sprite-sheet.png', _potatoMineImg);
   return _potatoMineImg;
 }
 

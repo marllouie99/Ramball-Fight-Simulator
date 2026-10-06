@@ -21,10 +21,10 @@ export function _getUryuBowImage() {
       _uryuBowImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ishida bow image at Assets/model/ISHIDA-BOW.png', e);
+      console.warn('Failed to load Ishida bow image at Assets/model/uryu/ISHIDA-BOW.png', e);
       _uryuBowImageLoading = false;
     };
-    img.src = 'Assets/model/ISHIDA-BOW.png?v=2';
+    img.src = 'Assets/model/uryu/ISHIDA-BOW.png?v=2';
     _uryuBowImage = img;
   }
   return _uryuBowImage;
@@ -45,10 +45,10 @@ export function _getUryuBowFrameImage() {
       _uryuBowFrameImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ishida bow frame image at Assets/model/ISHIDA-BOW-FRAME.png', e);
+      console.warn('Failed to load Ishida bow frame image at Assets/model/uryu/ISHIDA-BOW-FRAME.png', e);
       _uryuBowFrameImageLoading = false;
     };
-    img.src = 'Assets/model/ISHIDA-BOW-FRAME.png?v=2';
+    img.src = 'Assets/model/uryu/ISHIDA-BOW-FRAME.png?v=2';
     _uryuBowFrameImage = img;
   }
   return _uryuBowFrameImage;
@@ -69,10 +69,10 @@ export function _getUryuArrowImage() {
       _uryuArrowImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ishida arrow image at Assets/model/ISHIDA-ARROW.png', e);
+      console.warn('Failed to load Ishida arrow image at Assets/model/uryu/ISHIDA-ARROW.png', e);
       _uryuArrowImageLoading = false;
     };
-    img.src = 'Assets/model/ISHIDA-ARROW.png?v=2';
+    img.src = 'Assets/model/uryu/ISHIDA-ARROW.png?v=2';
     _uryuArrowImage = img;
   }
   return _uryuArrowImage;
@@ -93,10 +93,10 @@ export function _getUryuBowBladeImage() {
       _uryuBowBladeImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ishida bow blade image at Assets/model/ISHIDA-BOW-BLADE.png', e);
+      console.warn('Failed to load Ishida bow blade image at Assets/model/uryu/ISHIDA-BOW-BLADE.png', e);
       _uryuBowBladeImageLoading = false;
     };
-    img.src = 'Assets/model/ISHIDA-BOW-BLADE.png?v=2';
+    img.src = 'Assets/model/uryu/ISHIDA-BOW-BLADE.png?v=2';
     _uryuBowBladeImage = img;
   }
   return _uryuBowBladeImage;
@@ -128,7 +128,7 @@ export const URYU_WEAPON_GRAPHICS = {
 
 /**
  * Draws Ginrei Kojaku (Sacred Spirit Bow) and loaded Heilig Pfeil arrow.
- * Supports pixel art weapon model rendering from Assets/model/ISHIDA-BOW-FRAME.png & ISHIDA-ARROW.png
+ * Supports pixel art weapon model rendering from Assets/model/uryu/ISHIDA-BOW-FRAME.png & ISHIDA-ARROW.png
  * (matching Ichigo's weapon model method with physical dynamic arrow pull-back).
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x - Front hand grip X in local space

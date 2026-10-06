@@ -15,7 +15,7 @@ function _getDraedonBodyImage() {
   if (_draedonBodyImg && _draedonBodyImg.complete && _draedonBodyImg.naturalWidth > 0) return _draedonBodyImg;
   if (typeof Image !== 'undefined') {
     const img = new Image();
-    img.src = 'Assets/model/Exo-Disintegrator-PIXEL-SKIN.png';
+    img.src = 'Assets/model/ExoMech/Exo-Disintegrator-PIXEL-SKIN.png';
     _draedonBodyImg = img;
   }
   return _draedonBodyImg;

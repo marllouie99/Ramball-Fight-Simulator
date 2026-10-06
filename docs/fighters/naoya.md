@@ -1,4 +1,4 @@
-# Naoya Zenin — The Projection Sorcery Prodigy
+# Naoya — The Projection Sorcery Prodigy
 
 **Category:** Anime & Jujutsu Sorcerers  
 **Theme Color:** Electric Lime / Pale Gold (`#76E042` / `#C8E64A`)  
@@ -34,9 +34,14 @@ Naoya's model, hair, face, and traditional Zenin attire strictly adhere to the f
   - Supports `state.showSkinOnly` toggle.
 
 ### 2. 24-Frame Shutter Glass & Film Strip Visuals
-- **24 FPS Cell Overlay**:
+- **24 FPS Cell Overlay & Pre-Break Cracks**:
   - Targets afflicted with Frame Freeze are enveloped inside an oscillating, semi-transparent 24 FPS cel pane (`rgba(118, 224, 66, 0.25)` to `rgba(0, 242, 254, 0.45)`).
   - Features 35mm film reel perforations along the left and right borders with an active countdown timer indicator (`'1/24s'`, `'24 FPS STASIS'`).
+  - **Structural Stress Cracks**: When the freeze duration enters its final 14 frames, jagged spiderweb fracture fissures propagate from the center out towards the perimeter accompanied by high-frequency micro-tremor shudder.
+- **Glass Break Animation & Authentic SFX**:
+  - Upon timer expiration (or when stasis is broken early by Mach 3 collision or finisher), the shutter glass violently shatters!
+  - **Exploding Shards**: Spawns 4 distinct 35mm corner frame fragments with sprocket holes, 16 sharp polygonal translucent cyan/lime crystal shards with white razor edges and dark manga ink borders, and an expanding rectangular shockwave pulse.
+  - **Audio & Impact**: Plays authentic glass shatter audio (`Assets/Sound Effects/NaoyaSFX/Naoya_glass_break.mp3`), screen shake (`triggerGlobalScreenShake`), cyan impact flash, and `'24 FPS SHATTER!'` floating combat text.
 - **Sonic Boom Shockwave Rings**:
   - Expanding concentric shockwave polygons with zero `shadowBlur` (Rule 11) using gradient falloffs when breaking Mach thresholds.
 
@@ -166,11 +171,13 @@ Touching an enemy during active Projection Sorcery forces them to abide by the 2
 | Combat Event | Sound Effect Path | Volume / Speed |
 | :--- | :--- | :--- |
 | **Tanto Swing / Basic Attack** | `Assets/Sound Effects/Attacks/swordswing.mp3` | `0.90 Vol` / `1.15x` |
+| **Flurry Knife Takeoff / Unsheathe** | `Assets/Sound Effects/NaoyaSFX/Naoya_takeoff_knife.mp3` | `1.05 Vol` / `1.00x` |
+| **Final Strike Knife Stab** | `Assets/Sound Effects/NaoyaSFX/Naoya_stabs.mp3` | `1.20 Vol` / `1.00x` |
 | **Frame Freeze Stasis Lock** | `Assets/Sound Effects/Skills/enhance.mp3` | `1.10 Vol` / `1.30x` |
 | **Frame Blitz Supersonic Dash** | `Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3` | `1.15 Vol` / `1.25x` |
 | **Sonic Boom Shockwave Kick** | `Assets/Sound Effects/Attacks/groundSmash.mp3` | `1.20 Vol` / `1.10x` |
 | **Ultimate 5-Angle Flurry Hits** | `Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3` | `1.25 Vol` / `1.20x` |
-| **Mach 3 Glass Shatter Finisher** | `Assets/Sound Effects/Skills/yuji-blackflash.mp3` | `1.35 Vol` / `1.05x` |
+| **Mach 3 Glass Shatter Finisher** | `Assets/Sound Effects/NaoyaSFX/Naoya_glass_break.mp3` | `1.35 Vol` / `1.05x` |
 
 ---
 

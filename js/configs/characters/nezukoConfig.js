@@ -4,6 +4,10 @@
 // ─────────────────────────────────────────────
 
 export const nezukoConfig = {
+  assets: {
+    hair: 'Assets/model/nezuko/Nezuko-hair.png',
+  },
+
   name: 'Nezuko',
   displayName: 'Nezuko',
   bossTitle: 'Demon Princess',

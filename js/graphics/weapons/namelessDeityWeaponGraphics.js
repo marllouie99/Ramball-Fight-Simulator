@@ -21,7 +21,7 @@ function _getCosmicLightCircleImage() {
 }
 
 let _cosmicSpaceImage = null;
-const _COSMIC_SPACE_PATH = 'Assets/model/Sprites/Neon Cosmic Nebula Texture.png';
+const _COSMIC_SPACE_PATH = 'Assets/model/NamelessDeity/Neon Cosmic Nebula Texture.png';
 
 function _getCosmicSpaceImage() {
   if (_cosmicSpaceImage && _cosmicSpaceImage.complete && _cosmicSpaceImage.naturalWidth > 0) return _cosmicSpaceImage;

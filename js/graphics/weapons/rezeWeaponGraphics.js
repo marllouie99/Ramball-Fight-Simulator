@@ -919,10 +919,10 @@ export function _getRezeWeaponImage() {
       _rezeWeaponImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Reze weapon image at Assets/model/REZE-WEAPON.png', e);
+      console.warn('Failed to load Reze weapon image at Assets/model/reze/REZE-WEAPON.png', e);
       _rezeWeaponImageLoading = false;
     };
-    img.src = 'Assets/model/REZE-WEAPON.png?v=3';
+    img.src = 'Assets/model/reze/REZE-WEAPON.png?v=3';
     _rezeWeaponImage = img;
   }
   return _rezeWeaponImage;

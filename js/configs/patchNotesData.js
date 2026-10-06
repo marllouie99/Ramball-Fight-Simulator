@@ -30,47 +30,92 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "MAHORAGA",
+        "character": "CRAZYDAVE",
         "deltas": [
             {
-                "type": "BUFF",
-                "key": "throwDamage",
-                "oldVal": 14,
-                "newVal": 20,
-                "pct": "+42.9%"
+                "type": "ADJUST",
+                "key": "wallnutSpriteSrc",
+                "oldVal": "Assets/model/Sprites/Wallnut-sprite-sheet.png",
+                "newVal": "Assets/model/crazyDave/Wallnut-sprite-sheet.png",
+                "pct": "Mod"
             },
             {
-                "type": "NERF",
-                "key": "maxRctRegenRate",
-                "oldVal": 0.12,
-                "newVal": 0.05,
-                "pct": "-58.3%"
+                "type": "ADJUST",
+                "key": "torchwoodSpriteSrc",
+                "oldVal": "Assets/model/Sprites/torchwood-sprite-sheet.png",
+                "newVal": "Assets/model/crazyDave/torchwood-sprite-sheet.png",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "potatoMineSpriteSrc",
+                "oldVal": "Assets/model/Sprites/potato-mine-sprite-sheet.png",
+                "newVal": "Assets/model/crazyDave/potato-mine-sprite-sheet.png",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "lawnmowerSpriteSrc",
+                "oldVal": "Assets/model/Sprites/lawnmower-sprite-sheet.png",
+                "newVal": "Assets/model/crazyDave/lawnmower-sprite-sheet.png",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "lawnmowerSpriteSrc",
+                "oldVal": "Assets/model/Sprites/lawnmower-sprite-sheet.png",
+                "newVal": "Assets/model/crazyDave/lawnmower-sprite-sheet.png",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "potatoMineSpriteSrc",
+                "oldVal": "Assets/model/Sprites/potato-mine-sprite-sheet.png",
+                "newVal": "Assets/model/crazyDave/potato-mine-sprite-sheet.png",
+                "pct": "Mod"
             }
         ]
     },
     {
-        "character": "NAMELESSDEITY",
+        "character": "GENOS",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "ultBeamWidth",
+                "oldVal": 60,
+                "newVal": 140,
+                "pct": "+133.3%"
+            }
+        ]
+    },
+    {
+        "character": "MAHITO",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "maceSmash",
+                "oldVal": "Assets/Sound Effects/Attacks/groundsmash.mp3",
+                "newVal": "Assets/Sound Effects/Attacks/groundSmash.mp3",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "MAKIMA",
         "deltas": [
             {
                 "type": "NERF",
-                "key": "destroyerFlareWindupFrames",
-                "oldVal": 200,
-                "newVal": 150,
-                "pct": "-25.0%"
+                "key": "crucifixionCooldown",
+                "oldVal": 1000,
+                "newVal": 2000,
+                "pct": "+100.0%"
             },
             {
                 "type": "NERF",
-                "key": "destroyerFireFrames",
-                "oldVal": 500,
-                "newVal": 400,
-                "pct": "-20.0%"
-            },
-            {
-                "type": "NERF",
-                "key": "destroyerTickInterval",
-                "oldVal": 50,
-                "newVal": 10,
-                "pct": "-80.0%"
+                "key": "crucifixionRift",
+                "oldVal": 1.25,
+                "newVal": 0,
+                "pct": "-100.0%"
             }
         ]
     },
@@ -78,44 +123,72 @@ export const patchNotesData = {
         "character": "NAOYA",
         "deltas": [
             {
-                "type": "NERF",
+                "type": "BUFF",
                 "key": "maxFrameStacks",
-                "oldVal": 15,
+                "oldVal": 5,
+                "newVal": 20,
+                "pct": "+300.0%"
+            },
+            {
+                "type": "ADJUST",
+                "key": "movementAfterimageShockwaves",
+                "oldVal": "true",
+                "newVal": "false",
+                "pct": "Mod"
+            },
+            {
+                "type": "NERF",
+                "key": "maxDisruptionsForStasis",
+                "oldVal": 20,
+                "newVal": 1,
+                "pct": "-95.0%"
+            },
+            {
+                "type": "NERF",
+                "key": "basicComboHits",
+                "oldVal": 20,
+                "newVal": 10,
+                "pct": "-50.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "punchDamage",
+                "oldVal": 4,
                 "newVal": 5,
-                "pct": "-66.7%"
+                "pct": "+25.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "tantoComboFinisherDamage",
+                "oldVal": 18,
+                "newVal": 30,
+                "pct": "+66.7%"
+            },
+            {
+                "type": "BUFF",
+                "key": "enableSonicKick",
+                "oldVal": 0,
+                "newVal": 1,
+                "pct": "+0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "runwayAfterimageShockwave",
+                "oldVal": 0.85,
+                "newVal": 1.85,
+                "pct": "+117.6%"
             }
         ]
     },
     {
-        "character": "SAITAMA",
+        "character": "SUKUNA",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "consecutivePunchesEnabled",
-                "oldVal": "1",
-                "newVal": "true",
-                "pct": "Mod"
-            },
-            {
                 "type": "BUFF",
-                "key": "counterPunchPoseFrames",
-                "oldVal": 100,
-                "newVal": 120,
-                "pct": "+20.0%"
-            },
-            {
-                "type": "ADJUST",
-                "key": "championVoiceline",
-                "oldVal": "2.0",
-                "newVal": "0.0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "dodgeNoise",
-                "oldVal": "0.35   // 35% chance to play dodge grunt/noise on dodge teleport",
-                "newVal": "0.0   // 35% chance to play dodge grunt/noise on dodge teleport",
-                "pct": "Mod"
+                "key": "divineFlameExplosionRadius",
+                "oldVal": 200,
+                "newVal": 400,
+                "pct": "+100.0%"
             }
         ]
     }

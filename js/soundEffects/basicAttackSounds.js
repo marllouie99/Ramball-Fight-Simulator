@@ -43,7 +43,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // ── Spike (melee) ───────────────────────────
   // Contact damage melee attack. Sound plays on impact.
   3: {
-    src: 'Assets/Sound Effects/Attacks/Spikestab.mp3',
+    src: 'Assets/Sound Effects/Attacks/spikestab.mp3',
     volume: 0.7,
     delay: 0,
   },
@@ -441,7 +441,10 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   // Naoya Zenin — 24 FPS Hypersonic Brawler Punches
   'naoya': {
     get src() {
-      return CONFIG.naoya?.sounds?.punchHit || 'Assets/Sound Effects/Attacks/punch.mp3';
+      return CONFIG.naoya?.sounds?.punchHit || [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3'
+      ];
     },
     get volume() {
       return CONFIG.naoya?.soundVolumes?.punchHit !== undefined ? CONFIG.naoya.soundVolumes.punchHit : 0.85;
@@ -997,7 +1000,7 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: -2,
   },
   'melee': {
-    src: 'Assets/Sound Effects/Attacks/Spikestab.mp3',
+    src: 'Assets/Sound Effects/Attacks/spikestab.mp3',
     volume: 0.7,
     delay: 0,
   },
@@ -1052,7 +1055,7 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
   'targetdummy': {
-    src: 'Assets/Sound Effects/Attacks/Spikestab.mp3',
+    src: 'Assets/Sound Effects/Attacks/spikestab.mp3',
     volume: 0.7,
     delay: 0,
   },
@@ -1064,12 +1067,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
 
   // Tactical Force Weapon Arsenal
   'rifle': {
-    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    src: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
     volume: 0.65,
     delay: 0,
   },
   'm4a1': {
-    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    src: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
     volume: 0.65,
     delay: 0,
   },
@@ -1139,12 +1142,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
   'tactical_commando': {
-    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    src: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
     volume: 0.65,
     delay: 0,
   },
   'tactical_guerilla': {
-    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    src: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
     volume: 0.65,
     delay: 0,
   },
@@ -1154,7 +1157,7 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
   'tactical_heavy': {
-    src: 'Assets/Sound Effects/Attacks/m4a1-fire.mp3',
+    src: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
     volume: 0.65,
     delay: 0,
   },

@@ -1,4 +1,4 @@
-import { stopAllSounds, stopAllLoopingSounds, preloadSound, stopSound, unlockAudio } from '../systems/soundSystem.js';
+import { stopAllSounds, stopAllLoopingSounds, preloadSound, preloadAudioBuffer, preloadAudioBufferBatch, stopSound, unlockAudio } from '../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // GAME FLOW — State transitions and round management
 // Extracted from main.js so that ui.js can import these without

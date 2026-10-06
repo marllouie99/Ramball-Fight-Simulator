@@ -4,6 +4,11 @@
 // ─────────────────────────────────────────────
 
 export const tanjiroConfig = {
+  assets: {
+    hair: 'Assets/model/tanjiro/TANJRO-HAIR-MODEL.png',
+    pixelSkin: 'Assets/model/tanjiro/Tanjiro-PIXEL-SKIN.png',
+  },
+
   name: 'Tanjiro',
   displayName: 'Tanjiro',
   bossTitle: 'Sun Breathing Slayer',

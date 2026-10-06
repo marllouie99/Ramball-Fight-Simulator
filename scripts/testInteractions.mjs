@@ -109,10 +109,80 @@ globalThis.Audio = class {
   constructor() {
     this.play = () => Promise.resolve();
     this.pause = () => {};
+    this.load = () => {};
     this.addEventListener = () => {};
     this.removeEventListener = () => {};
     this.cloneNode = () => new globalThis.Audio();
   }
+};
+globalThis.AudioBuffer = class {
+  constructor(options = {}) {
+    this.duration = options.duration !== undefined ? options.duration : 1.5;
+    this.length = options.length !== undefined ? options.length : 44100;
+    this.numberOfChannels = options.numberOfChannels !== undefined ? options.numberOfChannels : 2;
+    this.sampleRate = options.sampleRate !== undefined ? options.sampleRate : 44100;
+    this._channels = Array.from({ length: this.numberOfChannels }, () => new Float32Array(this.length));
+  }
+  getChannelData(ch) {
+    return this._channels[ch] || new Float32Array(this.length);
+  }
+  copyToChannel(src, ch, offset) {
+    const dest = this._channels[ch];
+    if (dest && src) {
+      dest.set(src.subarray ? src.subarray(0, this.length - offset) : src, offset);
+    }
+  }
+};
+globalThis.AudioContext = class {
+  constructor() {
+    this.state = 'running';
+    this.currentTime = 0;
+    this.destination = {};
+    this.decodeAudioData = async (buffer) => new globalThis.AudioBuffer();
+    this.createBufferSource = () => ({
+      buffer: null,
+      playbackRate: { value: 1.0 },
+      connect: () => {},
+      start: () => {},
+      stop: () => {},
+      disconnect: () => {}
+    });
+    this.createGain = () => ({
+      gain: { value: 1.0, setValueAtTime: () => {}, linearRampToValueAtTime: () => {}, cancelScheduledValues: () => {} },
+      connect: () => {},
+      disconnect: () => {}
+    });
+    this.createBuffer = (channels, length, sampleRate) => {
+      const sRate = sampleRate || 44100;
+      return new globalThis.AudioBuffer({
+        numberOfChannels: channels,
+        length,
+        sampleRate: sRate,
+        duration: length / sRate
+      });
+    };
+  }
+  resume() { return Promise.resolve(); }
+};
+const _origFetch = globalThis.fetch;
+globalThis.fetch = async (url) => {
+  if (typeof url === 'string' && (url.startsWith('Assets/') || url.startsWith('./') || url.includes('.mp3') || url.includes('.wav') || url.includes('.png') || url.includes('.ogg'))) {
+    return {
+      ok: true,
+      status: 200,
+      arrayBuffer: async () => new ArrayBuffer(1024)
+    };
+  }
+  if (_origFetch) {
+    try {
+      return await _origFetch(url);
+    } catch (e) {}
+  }
+  return {
+    ok: true,
+    status: 200,
+    arrayBuffer: async () => new ArrayBuffer(1024)
+  };
 };
 globalThis.localStorage = {
   getItem: () => null,
@@ -4181,6 +4251,394 @@ async function runInteractionTests() {
     assert(yutaBeamProj._dodgedEntities && yutaBeamProj._dodgedEntities.has(saitama), 'Saitama must be recorded in yutaBeamProj._dodgedEntities');
 
     console.log('      ✅ Dedicated interactions module, registry queries, interactionManager event hooks, config toggles (enabled: true/false), camera zoom bypass, standoff retreat, beam super-armor, Saitama/Sans Deity beam dodging, Gojo Hollow Purple dodging & Yuta Pure Love Beam dodging verified.');
+  }
+
+  // ── TEST 48: Audio Buffer Memory Cache & Concurrent Load Batching ──
+  console.log('   48. Testing Audio Buffer Memory Cache, Worker Pool Batching & Sound Diagnostics...');
+  {
+    const {
+      preloadAudioBuffer,
+      preloadAudioBufferBatch,
+      preloadSound,
+      getSoundCacheStats,
+      isSoundCached,
+      isSoundAudioBuffer,
+      clearSoundCache,
+      isMusicAudio
+    } = await import('../js/systems/soundSystem.js');
+
+    // A. Music vs SFX classification test
+    assert(isMusicAudio('Assets/Sound Effects/Background/ARENA-BGMUSIC.mp3') === true, 'ARENA-BGMUSIC must be identified as music');
+    assert(isMusicAudio('Assets/Sound Effects/Background/megalovania.mp3') === true, 'megalovania must be identified as music');
+    assert(isMusicAudio('Assets/Sound Effects/Attacks/punch.mp3') === false, 'punch.mp3 must be identified as SFX, not music');
+    assert(isMusicAudio('Assets/Sound Effects/Attacks/swordswing.mp3') === false, 'swordswing.mp3 must be identified as SFX, not music');
+
+    // B. Preload single SFX buffer into memory cache
+    const testSfx = 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+    await preloadAudioBuffer(testSfx);
+    assert(isSoundCached(testSfx) === true, 'fleshhit.mp3 must be cached in memory');
+    assert(isSoundAudioBuffer(testSfx) === true, 'fleshhit.mp3 must be cached as AudioBuffer');
+
+    // C. Preload batch with concurrent worker pool
+    const testBatch = [
+      'Assets/Sound Effects/Attacks/punch.mp3',
+      'Assets/Sound Effects/Attacks/swordswing.mp3',
+      'Assets/Sound Effects/Attacks/groundSmash.mp3',
+      'Assets/Sound Effects/Attacks/explosion.mp3',
+      'Assets/Sound Effects/Attacks/spaceshot.mp3',
+      'Assets/Sound Effects/Background/ARENA-BGMUSIC.mp3'
+    ];
+
+    let progressCalls = 0;
+    const result = await preloadAudioBufferBatch(testBatch, {
+      concurrency: 4,
+      onProgress: (done, total, url) => {
+        progressCalls++;
+      }
+    });
+
+    assert(result.loaded + result.errors === testBatch.length, 'All batch items must be processed');
+    assert(progressCalls === testBatch.length, 'Progress callback must be invoked for each item');
+    assert(isSoundCached('Assets/Sound Effects/Attacks/punch.mp3') === true, 'punch.mp3 must be cached');
+    assert(isSoundCached('Assets/Sound Effects/Attacks/swordswing.mp3') === true, 'swordswing.mp3 must be cached');
+
+    // D. Diagnostic Cache Stats
+    const stats = getSoundCacheStats();
+    assert(typeof stats.total === 'number' && stats.total >= 5, 'Stats total must reflect cached audio items');
+    assert(typeof stats.audioBuffers === 'number' && stats.audioBuffers >= 5, 'Stats audioBuffers must count decoded buffers');
+    assert(typeof stats.inFlight === 'number', 'Stats inFlight must be numeric');
+    assert(stats.maxCacheSize === 1000, 'Stats maxCacheSize must match system constant');
+
+    // E. Test preloadSound array handling & AudioSystem delegation
+    const { audioSystem } = await import('../js/systems/audioSystem.js');
+    assert(typeof audioSystem.preload === 'function', 'audioSystem must expose preload helper');
+    assert(typeof audioSystem.getCacheStats === 'function', 'audioSystem must expose getCacheStats helper');
+    const audioStats = audioSystem.getCacheStats();
+    assert(audioStats.total >= 5, 'audioSystem getCacheStats must mirror soundSystem');
+
+    console.log('      ✅ Audio Buffer Memory Cache, concurrency worker pool batching, progress callbacks, stream classification & cache statistics verified successfully.');
+  }
+
+  // ── TEST 49: Sound Sprite System & Virtual AudioBuffer Stitching ──
+  console.log('   49. Testing Sound Sprite Manager, Virtual AudioBuffer Stitching & Slice API...');
+  {
+    const { soundSpriteManager, CORE_COMBAT_SFX_PATHS } = await import('../js/systems/soundSpriteSystem.js');
+
+    // A. Registration & Lookup Verification
+    assert(soundSpriteManager.hasSprite('punch') === true, 'punch must be registered in default sound sprite map');
+    assert(soundSpriteManager.hasSprite('Assets/Sound Effects/Attacks/punch.mp3') === true, 'Full path to punch.mp3 must be registered');
+    assert(soundSpriteManager.hasSprite('fleshhit') === true, 'fleshhit must be registered');
+    assert(soundSpriteManager.hasSprite('unknown_sound_never_exists.mp3') === false, 'Unknown sound must not match sprite map');
+
+    const punchInfo = soundSpriteManager.getSpriteInfo('punch');
+    assert(punchInfo && punchInfo.sheetId === 'core_combat_hits', 'punch must map to core_combat_hits sheet');
+    assert(typeof punchInfo.offset === 'number' && typeof punchInfo.duration === 'number', 'punch sprite info must contain numeric offset and duration');
+
+    // B. Virtual Buffer Stitching
+    const mockAudioCtx = new globalThis.AudioContext();
+    const buffer1 = new globalThis.AudioBuffer({ duration: 0.4, length: 17640 });
+    const buffer2 = new globalThis.AudioBuffer({ duration: 0.6, length: 26460 });
+
+    const stitched = soundSpriteManager.stitchBuffersToSpriteSheet('test_virtual_sheet', {
+      'custom_slash': buffer1,
+      'custom_blast': buffer2
+    }, mockAudioCtx);
+
+    assert(stitched !== null, 'Stitched sprite sheet AudioBuffer must be created');
+    assert(soundSpriteManager.hasSprite('custom_slash') === true, 'custom_slash must be indexed');
+    assert(soundSpriteManager.hasSprite('custom_blast') === true, 'custom_blast must be indexed');
+
+    const slashAudio = soundSpriteManager.getSpriteAudio('custom_slash');
+    assert(slashAudio && slashAudio.buffer === stitched, 'getSpriteAudio must return the stitched AudioBuffer');
+    assert(slashAudio.offset === 0, 'First stitched slice must start at offset 0');
+    assert(slashAudio.duration === 0.4, 'First stitched slice duration must match buffer duration');
+
+    // C. Sprite Manager Diagnostics & Stats
+    const sheets = soundSpriteManager.getRegisteredSheets();
+    assert(Array.isArray(sheets) && sheets.length >= 2, 'getRegisteredSheets must list all registered sheets');
+    const stats = soundSpriteManager.getSpriteStats();
+    assert(stats.totalSheets >= 2, 'getSpriteStats totalSheets must be >= 2');
+    assert(stats.totalSlices >= 8, 'getSpriteStats totalSlices must count registered slices');
+
+    console.log('      ✅ Sound Sprite Manager, virtual AudioBuffer stitching, slice metadata, and sprite diagnostics verified successfully.');
+  }
+
+  // ── TEST 50: Eye of Cthulhu vs Gojo Limitless Infinity Collision & Push Immunity (Rule 1.7) ──
+  console.log('   50. Testing Eye of Cthulhu vs Gojo Limitless Infinity Collision & Push Immunity...');
+  {
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { EyeOfCthulhuFighter, EOC_STATE } = await import('../js/entities/fighters/EyeOfCthulhuFighter.js');
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+
+    const gojo = new GojoFighter({ x: 200, y: 200, radius: 25, hp: 400, maxHp: 400 });
+    const eye = new EyeOfCthulhuFighter({ x: 230, y: 200, radius: 32, hp: 1200, maxHp: 1200 });
+
+    state.fighters = [gojo, eye];
+    gojo.infinityActive = true;
+    gojo.infinityCooldown = 0;
+    gojo.isMeleeMode = false;
+    assert(gojo.hasActiveInfinity() === true, 'Gojo must have active Limitless Infinity');
+
+    // A. Circle-Circle Physics Overlap Resolution: Gojo must stay fixed at (200, 200)
+    const initialGojoX = gojo.x;
+    const initialGojoY = gojo.y;
+    resolveFighterCollision(gojo, eye);
+
+    assert(gojo.x === initialGojoX && gojo.y === initialGojoY, 'Gojo must NOT be pushed by Eye of Cthulhu when Infinity is active');
+    assert(eye.x > 230, 'Eye of Cthulhu must be pushed outward away from Gojo barrier');
+
+    // Test reverse parameter ordering (eye, gojo)
+    gojo.x = 200; gojo.y = 200;
+    eye.x = 230; eye.y = 200;
+    resolveFighterCollision(eye, gojo);
+
+    assert(gojo.x === initialGojoX && gojo.y === initialGojoY, 'Gojo must NOT be pushed by Eye of Cthulhu when ordered (eye, gojo)');
+    assert(eye.x > 230, 'Eye of Cthulhu must be pushed outward when ordered (eye, gojo)');
+
+    // B. Eye of Cthulhu Ram Contact: Zero damage, Zero knockback on Gojo, Eye rebounds
+    eye.x = 220; eye.y = 200;
+    eye.vx = -18; eye.vy = 0;
+    eye.isRamming = true;
+    eye.aiState = EOC_STATE.RAM_DASH;
+    const initialHp = gojo.hp;
+
+    eye._applyRamHit(gojo, 35, 15.0);
+
+    assert(gojo.hp === initialHp, 'Gojo must take zero damage from Eye ram through active Infinity');
+    assert((gojo.knockbackVx || 0) === 0 && (gojo.knockbackVy || 0) === 0, 'Gojo must take zero knockback impulse through active Infinity');
+    assert(eye.vx > 0, 'Eye of Cthulhu must rebound backwards off Gojo Infinity barrier');
+    assert(eye.aiState === EOC_STATE.TURNAROUND, 'Eye of Cthulhu must transition to TURNAROUND state on barrier contact');
+
+    console.log('      ✅ Eye of Cthulhu vs Gojo Limitless Infinity push immunity, barrier rebound & zero displacement verified successfully.');
+  }
+
+  // ── TEST 51: Eye of Cthulhu Phase 2 vs Gojo Hollow Purple Gravitational Vortex Pull ──
+  console.log('   51. Testing Eye of Cthulhu Phase 2 vs Gojo Hollow Purple Gravitational Vortex Pull...');
+  {
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { EyeOfCthulhuFighter, EOC_STATE } = await import('../js/entities/fighters/EyeOfCthulhuFighter.js');
+    const { isEntityImmuneToGravitationalPull } = await import('../js/entities/fighter.js');
+
+    const gojo = new GojoFighter({ x: 100, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const eye = new EyeOfCthulhuFighter({ x: 300, y: 300, radius: 32, hp: 400, maxHp: 1200 }); // Below 50% HP = Phase 2
+    eye.isPhase2 = true;
+    eye._isPhase2 = true;
+    eye.aiState = EOC_STATE.P2_CHASE;
+
+    state.fighters = [gojo, eye];
+    state.projectiles = [];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+    projectileSystem.projectiles = [];
+
+    // A. Immunity function check: Eye of Cthulhu must NOT be immune to Purple gravitational pull
+    assert(isEntityImmuneToGravitationalPull(eye, 'purple') === false, 'Eye of Cthulhu must NOT be immune to Purple gravitational pull');
+
+    // B. Gojo fires Hollow Purple at Eye
+    gojo.gunAngle = 0; // Facing right toward Eye
+    gojo._firePurple(0);
+
+    const purple = projectileSystem.projectiles.find(p => p.isGojoPurple);
+    assert(purple !== undefined, 'Hollow Purple projectile must be spawned in projectileSystem');
+
+    // Position Purple 120px to the left of Eye (within purplePullRadius 280px)
+    purple.x = 180;
+    purple.y = 300;
+    const initialEyeX = eye.x;
+
+    // Run projectileSystem update to apply gravitational vortex pull
+    projectileSystem.update(state.fighters);
+
+    assert(eye.x < initialEyeX, `Eye of Cthulhu in Phase 2 must be pulled leftward toward Purple (initial: ${initialEyeX}, after: ${eye.x})`);
+    assert(eye.slowTimer > 0, 'Eye of Cthulhu must receive slow debuff while caught in Purple gravitational field');
+    assert(eye.isCaughtInPurpleVortex === true, 'Eye of Cthulhu must have isCaughtInPurpleVortex flag set');
+
+    // Clean up
+    state.projectiles = [];
+    projectileSystem.projectiles = [];
+    gojo.reset();
+    eye.reset();
+
+    console.log('      ✅ Eye of Cthulhu Phase 2 vs Gojo Hollow Purple vortex suction & gravitational drag verified successfully.');
+  }
+
+  // ── TEST 52: Eye of Cthulhu Active Dash Interruption on Hollow Purple Vortex Capture ──
+  console.log('   52. Testing Eye of Cthulhu Active Dash Interruption on Hollow Purple Vortex Capture...');
+  {
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { EyeOfCthulhuFighter, EOC_STATE } = await import('../js/entities/fighters/EyeOfCthulhuFighter.js');
+
+    const gojo = new GojoFighter({ x: 100, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const eye = new EyeOfCthulhuFighter({ x: 300, y: 300, radius: 32, hp: 400, maxHp: 1200 });
+    eye.isPhase2 = true;
+    eye._isPhase2 = true;
+    eye.aiState = EOC_STATE.P2_CHAIN_DASH;
+    eye.isRamming = true;
+    eye.ramsRemaining = 4;
+    eye.committedRamAngle = 0; // Commanded to charge right at full speed
+
+    state.fighters = [gojo, eye];
+    state.projectiles = [];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+
+    // Simulate Eye being trapped in Purple vortex
+    eye.isCaughtInPurple = true;
+    eye.isCaughtInPurpleVortex = true;
+    eye.purpleHitTimer = 30;
+
+    assert(eye.isTrappedInVortexOrBeam() === true, 'Eye must evaluate isTrappedInVortexOrBeam() as true');
+
+    // Run update tick
+    eye.update(gojo, 1, state.arena);
+
+    assert(eye.isRamming === false, 'Eye of Cthulhu must cancel active ramming when caught in Purple vortex');
+    assert(eye.ramsRemaining === 0, 'Eye of Cthulhu must cancel remaining chain dash charges when caught in Purple vortex');
+    assert(eye.aiState !== EOC_STATE.P2_CHAIN_DASH, 'Eye of Cthulhu must transition out of P2_CHAIN_DASH state when caught in Purple vortex');
+    assert(eye.vx < 15, `Eye of Cthulhu vx must be dampened and not charging forward at full ram speed (got vx=${eye.vx})`);
+
+    // Clean up
+    gojo.reset();
+    eye.reset();
+
+    console.log('      ✅ Eye of Cthulhu active dash cancellation & vortex capture stasis verified successfully.');
+  }
+
+  // ── TEST 53: Gojo Reversal Red Aiming Prioritization vs Eye of Cthulhu and Servants of Cthulhu ──
+  console.log('   53. Testing Gojo Reversal Red Aiming Prioritization vs Eye of Cthulhu and Servants of Cthulhu...');
+  {
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { EyeOfCthulhuFighter } = await import('../js/entities/fighters/EyeOfCthulhuFighter.js');
+    const { activateRed } = await import('../js/entities/fighters/gojo/gojoSkills.js');
+
+    const gojo = new GojoFighter({ x: 100, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const eye = new EyeOfCthulhuFighter({ x: 260, y: 300, radius: 32, hp: 1000, maxHp: 1200 }); // Distance 160px
+    gojo.team = 0;
+    eye.team = 1;
+
+    // Create a Servant of Cthulhu minion located closer to Gojo than the Eye (Distance 50px)
+    const servantMinion = {
+      x: 150,
+      y: 300,
+      r: 10,
+      hp: 120,
+      maxHp: 120,
+      owner: eye,
+      ownerIndex: 1,
+      team: 1,
+      isMinion: true,
+      isIllusion: true,
+      isServantOfCthulhu: true,
+    };
+
+    state.fighters = [gojo, eye];
+    state.illusions = [servantMinion];
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+
+    // A. Verify target selection selects the Eye (primary boss), not the closer servant minion
+    const selectedRedTarget = gojo._findAlignedEnemyForRed(eye);
+    assert(selectedRedTarget === eye, `Gojo _findAlignedEnemyForRed must prioritize the Eye of Cthulhu over servant minion (got ${selectedRedTarget?.isServantOfCthulhu ? 'Minion' : selectedRedTarget?.characterId})`);
+
+    // B. Activate Red on Gojo
+    gojo.redCooldown = 0;
+    gojo.globalSkillCooldown = 0;
+    gojo.redEffectTimer = 0;
+    activateRed(gojo);
+
+    assert(gojo.redBuildupPhase === true, 'Gojo must enter Red buildup phase');
+    assert(gojo._redTargetRef === eye, 'Gojo _redTargetRef must be set strictly to the Eye of Cthulhu');
+    assert(Math.abs(gojo.redTargetAngle) < 0.05, `Gojo redTargetAngle must be aimed right at the Eye (got ${gojo.redTargetAngle})`);
+
+    // C. Update Gojo during Red channeling while minion is right beside him
+    gojo.update(eye, 0, state.arena);
+    assert(Math.abs(gojo.gunAngle) < 0.05, `Gojo gunAngle during Red buildup must track the Eye of Cthulhu (got ${gojo.gunAngle})`);
+
+    // Clean up
+    state.illusions = [];
+    gojo.reset();
+    eye.reset();
+
+    console.log('      ✅ Gojo Reversal Red aiming prioritization on Eye of Cthulhu vs minion verified successfully.');
+  }
+
+  // ── TEST 54: Out-of-Arena Enemy Basic Attack Gating (Hold Fire vs Eye of Cthulhu Out-of-Bounds) ──
+  console.log('   54. Testing Out-of-Arena Enemy Basic Attack Gating (Hold Fire vs Out-of-Bounds Boss)...');
+  {
+    const { isEntityOutsideArena } = await import('../js/entities/fighter.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+    const { EyeOfCthulhuFighter } = await import('../js/entities/fighters/EyeOfCthulhuFighter.js');
+    const { getClosestOpponent } = await import('../js/systems/physics.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    const arena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+    state.arena = arena;
+
+    const gojo = new GojoFighter({ x: 400, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const normal = new NormalFighter({ id: 0, x: 350, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const eye = new EyeOfCthulhuFighter({ x: 400, y: -70, radius: 32, hp: 1000, maxHp: 1200 }); // Out of arena above ceiling (y = -70 < 0)
+    gojo.team = 0;
+    normal.team = 0;
+    eye.team = 1;
+
+    state.fighters = [gojo, normal, eye];
+    state.illusions = [];
+    projectileSystem.projectiles = [];
+
+    // A. Verify isEntityOutsideArena detects out-of-bounds entity correctly
+    assert(isEntityOutsideArena(eye, arena) === true, 'Eye of Cthulhu at y=-70 must be detected as outside the arena');
+    assert(isEntityOutsideArena(gojo, arena) === false, 'Gojo at y=300 must be detected as inside the arena');
+
+    // B. Verify canPerformBasicAttack is gated false when target is outside arena
+    assert(gojo.canPerformBasicAttack(eye) === false, 'Gojo canPerformBasicAttack(eye) must be false when Eye is outside arena');
+    assert(normal.canPerformBasicAttack(eye) === false, 'Normal canPerformBasicAttack(eye) must be false when Eye is outside arena');
+
+    // C. Verify fighters hold fire and do not spawn projectiles during update while Eye is out-of-bounds
+    gojo.shootCooldown = 0;
+    normal.shootCooldown = 0;
+    normal.angle = -Math.PI / 2; // Facing up directly at Eye
+
+    const initProjCount = projectileSystem.projectiles.length;
+    gojo.update(eye, 0, arena);
+    normal.update(eye, 1, arena);
+
+    assert(projectileSystem.projectiles.length === initProjCount, `No projectiles must be fired at out-of-bounds target (got ${projectileSystem.projectiles.length - initProjCount} projectiles fired)`);
+
+    // D. Verify that when Eye flies back inside the arena, basic attacks resume immediately
+    eye.y = 150; // Inside arena
+    assert(isEntityOutsideArena(eye, arena) === false, 'Eye of Cthulhu at y=150 must be detected as inside the arena');
+    assert(gojo.canPerformBasicAttack(eye) === true, 'Gojo canPerformBasicAttack(eye) must be true when Eye is inside arena');
+    assert(normal.canPerformBasicAttack(eye) === true, 'Normal canPerformBasicAttack(eye) must be true when Eye is inside arena');
+
+    gojo.shootCooldown = 0;
+    gojo.update(eye, 0, arena);
+    assert(projectileSystem.projectiles.length > initProjCount, 'Gojo must fire Blue orb when Eye returns inside arena');
+
+    // E. Verify targeting prioritizes reachable inside-arena minions over out-of-bounds boss
+    eye.y = -80; // Eye flies out of bounds again
+    const servantMinion = {
+      x: 400,
+      y: 200,
+      r: 10,
+      hp: 100,
+      owner: eye,
+      team: 1,
+      isMinion: true,
+      isIllusion: true,
+      isServantOfCthulhu: true,
+    };
+    state.illusions = [servantMinion];
+
+    const targetForGojo = getClosestOpponent(gojo);
+    assert(targetForGojo === servantMinion, 'getClosestOpponent must prioritize in-arena Servant of Cthulhu over out-of-arena Eye of Cthulhu');
+    assert(gojo.canPerformBasicAttack(targetForGojo) === true, 'Gojo can perform basic attack against in-arena Servant minion');
+
+    // Clean up
+    projectileSystem.projectiles = [];
+    state.illusions = [];
+    gojo.reset();
+    normal.reset();
+    eye.reset();
+
+    console.log('      ✅ Out-of-arena enemy basic attack gating (hold fire vs out-of-bounds boss & in-arena minion prioritization) verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

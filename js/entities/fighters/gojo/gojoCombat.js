@@ -272,12 +272,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
       }
     }
 
-    // Interrupt active basic attack swings/dashes on barrier collision (only if NOT channeling domain or telekinesis)
-    const isAttackerDomainChanneling = attacker.isChannelingDomain || attacker.isChannelingDomainExpansion;
-    if (!isAttackerDomainChanneling && !attacker.tkTimer && typeof attacker.interruptAttacks === 'function') {
-      attacker.interruptAttacks();
-    }
-
     // Calculate push direction away from Gojo
     let dx = attacker.x - fighter.x;
     let dy = (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0));
@@ -347,6 +341,16 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
         if (attacker.knockbackVx !== undefined) {
           attacker.knockbackVx = nx * bounceForce;
           attacker.knockbackVy = ny * bounceForce;
+        }
+      }
+
+      // Spatial Repulsion: If Gojo has velocity moving towards the deflected entity, brake/reflect Gojo's velocity
+      // so Gojo never drives into or follows the deflected enemy
+      if (!fighter.isMeleeMode && !fighter.domainActive) {
+        const gojoForwardDot = (fighter.vx || 0) * nx + (fighter.vy || 0) * ny;
+        if (gojoForwardDot > 0) {
+          fighter.vx -= gojoForwardDot * nx * 1.5;
+          fighter.vy -= gojoForwardDot * ny * 1.5;
         }
       }
     }

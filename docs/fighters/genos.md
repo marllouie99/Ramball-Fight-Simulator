@@ -101,7 +101,7 @@ Genos locks onto his target, combines his arm cannons, and fires his maximum pow
   - A bright orange warning targeting line projects from Genos to the edge of the arena.
   - His chest core glows with blinding orange light, pulling in ambient fire particles.
 - **Phase 2 — Fire Beam (2.0 seconds / 120 frames)**:
-  - Genos fires a massive continuous laser-like orange beam (width: **70px**, length: **600px**).
+  - Genos fires a massive continuous laser-like orange beam (width: **140px**, length: **1200px**).
   - The beam pierces all enemies (fighters & illusions) and deletes any enemy projectiles in its path.
   - **Damage**: Deals **15 damage** every 6 frames (total 20 ticks = **300 damage**).
   - **Knockback**: Constantly pushes enemies away from Genos along the beam's vector.

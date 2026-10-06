@@ -1953,11 +1953,8 @@ function updateHealthHud() {
     }
 
     // Naoya (24 FPS Projection Sorcery) stats info
-    if (f.characterId === 'naoya' || fType === 'naoya' || (f._def && f._def.name === 'Naoya Zenin')) {
+    if (f.characterId === 'naoya' || fType === 'naoya' || (f._def && (f._def.name === 'Naoya' || f._def.name === 'Naoya Zenin')) || f.name === 'Naoya') {
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
-      const baseDmg = cfg.tantoDamage || 8;
-      info.push(`<b>DMG:</b> ${baseDmg}`);
-
       const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
       const baseSpd = (f.baseSpeed || cfg.speed || 5.6) * modeMult;
       const currentSpd = (f.speed || baseSpd) * modeMult;

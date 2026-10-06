@@ -5,7 +5,7 @@
 // 1. High Standing White Wrap Collar with Gold Swirl Button & Dark Strap
 // 2. Fair Ivory-Peach Skin Tone (Rule 19 Compliant, Faceless)
 // 3. Midnight Charcoal Pants with Center White Cinch/Zipper Line
-// 4. Authentic Pixel-Art Jet-Black Swept Hair (Assets/model/Yuta-hair.png)
+// 4. Authentic Pixel-Art Jet-Black Swept Hair (Assets/model/yuta/Yuta-hair.png)
 // Rule 19 (Upright Front POV), Rule 20 (Hand Visibility), and Rule 11 Compliant
 // ─────────────────────────────────────────────
 
@@ -28,10 +28,10 @@ export function _getYutaHairImage() {
       _yutaHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Yuta hair image at Assets/model/Yuta-hair.png', e);
+      console.warn('Failed to load Yuta hair image at Assets/model/yuta/Yuta-hair.png', e);
       _yutaHairImageLoading = false;
     };
-    img.src = 'Assets/model/Yuta-hair.png?v=2';
+    img.src = 'Assets/model/yuta/Yuta-hair.png?v=2';
     _yutaHairImage = img;
   }
   return _yutaHairImage;
@@ -42,7 +42,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Yuta's authentic anime spiky hair from Assets/model/Yuta-hair.png.
+ * Draws Yuta's authentic anime spiky hair from Assets/model/yuta/Yuta-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -310,7 +310,7 @@ export function drawYutaSkin(ctx, fighter) {
   // ── 1. BODY CIRCLE (Authentic Procedural Pixel Art) ──
   drawYutaPixelBody(ctx, r);
 
-  // ── 2. AUTHENTIC PIXEL-ART HAIR MODEL (Assets/model/Yuta-hair.png) ──
+  // ── 2. AUTHENTIC PIXEL-ART HAIR MODEL (Assets/model/yuta/Yuta-hair.png) ──
   _drawYutaHair(ctx, r, facingLeft);
 
   // ── 3. STATUS OVERLAYS (Freeze, Paralyze, Stun, RCT) ──

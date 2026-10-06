@@ -1,6 +1,6 @@
 import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
 import { stopSound, stopSoundBySrc, fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
-import { Fighter, isSuppressedByGetsuga } from '../fighter.js';
+import { Fighter, isSuppressedByGetsuga, isEntityOutsideArena } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -543,12 +543,14 @@ export class GojoFighter extends Fighter {
     return false;
   }
 
-  canPerformBasicAttack() {
+  canPerformBasicAttack(target = null) {
     if (!this.isSkillEnabled(CONFIG.gojo?.enableBlue, true)) return false;
     if (this.isPurpleActive()) return false;
     if (this.isChannelingPurple || this.isChannelingDomainExpansion || (this.redEffectTimer || 0) > 0 || this.redBuildupPhase) return false;
     if (this.isMeleeMode) return false;
-    return super.canPerformBasicAttack();
+    const combatTarget = target || this.target || null;
+    if (combatTarget && isEntityOutsideArena(combatTarget)) return false;
+    return super.canPerformBasicAttack(combatTarget);
   }
 
   _getCardinalAngle(target) {
@@ -566,8 +568,11 @@ export class GojoFighter extends Fighter {
 
   shoot(ownerIndex) {
     if (!this.isSkillEnabled(CONFIG.gojo?.enableBlue, true)) return false;
-    if (!this.canPerformBasicAttack() || this.isPurpleActive()) return false;
-    const target = (this.target && this._isValidCombatTarget(this.target)) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+    const target = (this._isValidCombatTarget(this.target) ? this.target : null) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null);
+    if (!this.canPerformBasicAttack(target) || this.isPurpleActive()) {
+      return false;
+    }
+    if (target && isEntityOutsideArena(target)) return false;
     let aimAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
     if (target && this._isValidCombatTarget(target)) {
       const targetZ = target.z || 0;
@@ -765,7 +770,7 @@ export class GojoFighter extends Fighter {
     const isMeleeAllowed = this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true);
     if (isMeleeAllowed && !isAttackerLawnmower && !isGojoSkillOrPurpleActive && !isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
       if (!this.isMeleeMode) {
-        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
+        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 60;
         this.isMeleeMode = true;
         this.meleeComboCount = 0;
         this.infinityActive = false;
@@ -853,6 +858,8 @@ export class GojoFighter extends Fighter {
 
   update(opponent, ownerIndex, arena) {
     this._simTickCounter = (this._simTickCounter || 0) + 1;
+    this.target = (opponent && !opponent.isDead) ? opponent : (this.target || null);
+    this._lastOpponent = opponent || this._lastOpponent || null;
     const inRubbickVoid = isInsideRubbickStolenVoid(this);
     if (inRubbickVoid) {
       this.timeStopTimer = Math.max(this.timeStopTimer || 0, 15);
@@ -918,10 +925,12 @@ export class GojoFighter extends Fighter {
           audioSystem.playSFX('skill_dash3', 0.8);
         }
         this.introReboundActive = false;
-        this.resumeMovement(opponent);
+        const oppAngle = opponent ? Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5) * 1.0 : null;
+        this.resumeMovement(opponent, 1.0, oppAngle);
       } else if (this.introReboundTimer <= 0) {
         this.introReboundActive = false;
-        this.resumeMovement(opponent);
+        const oppAngle = opponent ? Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5) * 1.0 : null;
+        this.resumeMovement(opponent, 1.0, oppAngle);
       }
       return;
     }
@@ -1151,9 +1160,11 @@ export class GojoFighter extends Fighter {
       }
       // Rule #1: Cancel active channeling/skills
       this.interruptAttacks(true);
-      // Ensure Gojo resets to Ranged mode with Infinity active when knocked back or distanced from enemy (only after forced melee duration ends)
-      if (this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0 && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > 120 || this.knockbackVx !== 0 || this.knockbackVy !== 0 || this.paralyzeTimer > 0)) {
+      // Ensure Gojo resets to Ranged mode with Infinity active when knocked back or distanced from enemy
+      const leaveDistCheck = CONFIG.gojo?.leaveMeleeRadius ?? 130;
+      if (this.isMeleeMode && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > leaveDistCheck || this.knockbackVx !== 0 || this.knockbackVy !== 0 || this.paralyzeTimer > 0)) {
         this.isMeleeMode = false;
+        this.forcedMeleeTimer = 0;
       }
       if (this.isChainedByMakima) {
         this.infinityActive = false;
@@ -1715,7 +1726,8 @@ export class GojoFighter extends Fighter {
 
       if (this.rctChannelTimer <= 0) {
         this.isChannelingRCT = false;
-        this.resumeMovement(opponent);
+        const oppAngle = opponent ? Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5) * 1.0 : null;
+        this.resumeMovement(opponent, 1.0, oppAngle);
       }
     }
 
@@ -1748,13 +1760,28 @@ export class GojoFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Auto-aim tracking while channeling Red (smoothly tracks on committed side)
+      // Auto-aim tracking while channeling Red (smoothly tracks on committed side, prioritizing primary fighter/boss over minions)
       if (this.redBuildupPhase && !this.redDetonated && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
-        const redAimTarget = (opponent && this._isValidCombatTarget(opponent))
-          ? opponent
-          : (this._redTargetRef && this._isValidCombatTarget(this._redTargetRef)
-            ? this._redTargetRef
-            : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
+        const isPrimaryFighter = (ent) => Boolean(
+          ent &&
+          !ent.isMinion &&
+          !ent.isIllusion &&
+          !ent.isServantOfCthulhu &&
+          !ent.owner &&
+          !ent.isDeployable &&
+          !ent.isTurret &&
+          !ent.isDispenser
+        );
+
+        let redAimTarget = null;
+        if (opponent && this._isValidCombatTarget(opponent) && isPrimaryFighter(opponent)) {
+          redAimTarget = opponent;
+        } else if (this._redTargetRef && this._isValidCombatTarget(this._redTargetRef) && isPrimaryFighter(this._redTargetRef)) {
+          redAimTarget = this._redTargetRef;
+        } else {
+          redAimTarget = (typeof this._findAlignedEnemyForRed === 'function' ? this._findAlignedEnemyForRed(opponent) : null) || this._redTargetRef || opponent;
+        }
+
         if (redAimTarget) {
           this.aim(redAimTarget);
         }
@@ -1768,15 +1795,27 @@ export class GojoFighter extends Fighter {
     this._deleteEnemyProjectilesInPurple();
 
     // Check if ANY enemy is currently in melee range radius (ignoring untargetable/lawnmower entities)
+    // Check if ANY enemy is currently in melee range radius (ignoring untargetable/lawnmower entities)
     let isBeingMeleed = false;
     let closestEnemyDist = Infinity;
     const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 85;
     const leaveMeleeRadius = closeRangeRadius + 30;
+    const targetCheckRadius = this.isMeleeMode ? leaveMeleeRadius : closeRangeRadius;
+
+    const hasActiveInfinity = this.hasActiveInfinity();
+
+    const isBypassingEnemy = (f) => Boolean(
+      f && (
+        (f.characterId === 'toji' || f.type === 'toji') ||
+        ((f.characterId === 'mahoraga' || f.type === 'mahoraga') && (f.gojoInfinityImmune || f.isMaxAdapted || f.isInfinityBlitz || f.isWallSlamActive))
+      )
+    );
 
     if (this._isValidCombatTarget(opponent) && (!opponent.isStealthed || this.domainActive)) {
       const d = Math.hypot(this.x - opponent.x, this.y - opponent.y);
       if (d < closestEnemyDist) closestEnemyDist = d;
-      if (d <= closeRangeRadius) {
+      const canThreatenInMelee = !hasActiveInfinity || this.isMeleeMode || isBypassingEnemy(opponent);
+      if (d <= targetCheckRadius && canThreatenInMelee) {
         isBeingMeleed = true;
       }
     }
@@ -1791,7 +1830,8 @@ export class GojoFighter extends Fighter {
         const d = Math.hypot(this.x - f.x, this.y - f.y);
         if (d < closestEnemyDist) closestEnemyDist = d;
 
-        if (d <= closeRangeRadius) {
+        const canThreatenInMelee = !hasActiveInfinity || this.isMeleeMode || isBypassingEnemy(f);
+        if (d <= targetCheckRadius && canThreatenInMelee) {
           isBeingMeleed = true;
           break;
         }
@@ -1801,16 +1841,17 @@ export class GojoFighter extends Fighter {
     // Handle Melee / Ranged transitions
     if (!this.domainActive && !this.isChannelingAnySkill() && !this.isPurpleActive() && (this.purpleRecoveryTimer || 0) <= 0) {
       if (this.isMeleeMode) {
-        if ((this.forcedMeleeTimer || 0) <= 0) {
+        if (!isBeingMeleed || (this.forcedMeleeTimer || 0) <= 0) {
           this.isMeleeMode = false;
+          this.forcedMeleeTimer = 0;
           this.meleeComboCount = 0;
-          this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120;
+          this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 180;
           this._teleportAwayFrom(opponent, arena);
         }
       } else if (this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true) && isBeingMeleed && (this.meleeModeCooldown || 0) <= 0) {
         // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
         this.isMeleeMode = true;
-        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
+        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 60;
         this.meleeComboCount = 0;
         this.infinityActive = false;
         this.infinityFadeOpacity = 0;
@@ -1890,8 +1931,11 @@ export class GojoFighter extends Fighter {
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
       } else if (canAct) {
-        this.shoot(ownerIndex);
-        this.shootCooldown = this.shootCooldownMax;
+        const shootTarget = (this._isValidCombatTarget(this.target) ? this.target : null) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy(this.target) : null);
+        if (shootTarget && !isEntityOutsideArena(shootTarget, arena) && this.canPerformBasicAttack(shootTarget)) {
+          this.shoot(ownerIndex);
+          this.shootCooldown = this.shootCooldownMax;
+        }
       }
     }
 
@@ -2207,11 +2251,25 @@ export class GojoFighter extends Fighter {
 
     opponent = activeTarget;
 
-    if (!opponent || !this._isValidCombatTarget(opponent)) {
+    if (!opponent || !this._isValidCombatTarget(opponent) || isEntityOutsideArena(opponent, arena)) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.meleeComboCount = 0;
       return;
+    }
+
+    // Distance Guard: Outside Domain Expansion, if opponent has moved beyond melee range (e.g. dashed away or running with speed), DO NOT teleport across the arena!
+    if (!this.domainActive) {
+      const currentDist = Math.hypot(this.x - opponent.x, (this.y - (this.z || 0)) - (opponent.y - (opponent.z || 0)));
+      const leaveMeleeRadius = CONFIG.gojo?.leaveMeleeRadius ?? ((CONFIG.gojo?.closeRangeRadius ?? 80) + 40);
+      if (currentDist > leaveMeleeRadius) {
+        this.isMeleeMode = false;
+        this.forcedMeleeTimer = 0;
+        this.meleeComboCount = 0;
+        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 180;
+        this._teleportAwayFrom(opponent, arena);
+        return;
+      }
     }
 
     const punchCooldown = CONFIG.gojo?.meleePunchCooldown ?? 10;
@@ -2267,10 +2325,12 @@ export class GojoFighter extends Fighter {
       this.meleeComboTarget = this.domainActive ? 999 : (Math.random() < 0.5 ? 6 : 3);
       this.meleeFlankAngle = undefined; // Clear flank angle so next combo picks a fresh angle
 
-      if (!this.domainActive && (this.forcedMeleeTimer || 0) <= 0) {
+      if (!this.domainActive) {
         this.isMeleeMode = false;
-        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Mandatory ranged separation!
+        this.forcedMeleeTimer = 0;
+        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 180; // Mandatory ranged separation!
         this._teleportAwayFrom(opponent, arena);
+        return;
       }
     }
 
@@ -2292,7 +2352,7 @@ export class GojoFighter extends Fighter {
     const oldY = this.y;
 
     const angle = Math.atan2(this.y - opp.y, this.x - opp.x) + (Math.random() - 0.5);
-    const dist = CONFIG.gojo.comboDisengageDistance ?? 300;
+    const dist = Math.max(240, CONFIG.gojo.comboDisengageDistance ?? 260);
     let targetX = opp.x + Math.cos(angle) * dist;
     let targetY = opp.y + Math.sin(angle) * dist;
 
@@ -2317,8 +2377,7 @@ export class GojoFighter extends Fighter {
 
     this.x = targetX;
     this.y = targetY;
-    this.vx = 0;
-    this.vy = 0;
+    this.resumeMovement(opp, 1.0, angle);
 
     if (!this.afterImages) this.afterImages = [];
     const dx = targetX - oldX;
@@ -3001,24 +3060,47 @@ export class GojoFighter extends Fighter {
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
     const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
 
-    const candidates = [];
+    const primaryCandidates = [];
+    const secondaryCandidates = [];
+
+    const isPrimaryFighter = (ent) => Boolean(
+      ent &&
+      !ent.isMinion &&
+      !ent.isIllusion &&
+      !ent.isServantOfCthulhu &&
+      !ent.owner &&
+      !ent.isDeployable &&
+      !ent.isTurret &&
+      !ent.isDispenser
+    );
+
     if (preferredOpponent && !preferredOpponent.isDead && preferredOpponent.hp > 0) {
-      candidates.push(preferredOpponent);
+      if (isPrimaryFighter(preferredOpponent)) {
+        primaryCandidates.push(preferredOpponent);
+      } else {
+        secondaryCandidates.push(preferredOpponent);
+      }
     }
+
     if (typeof state !== 'undefined') {
       if (state.fighters) {
         for (const f of state.fighters) {
-          if (f && !candidates.includes(f)) candidates.push(f);
+          if (!f || primaryCandidates.includes(f) || secondaryCandidates.includes(f)) continue;
+          if (isPrimaryFighter(f)) {
+            primaryCandidates.push(f);
+          } else {
+            secondaryCandidates.push(f);
+          }
         }
       }
       if (state.illusions) {
         for (const ill of state.illusions) {
-          if (ill && !candidates.includes(ill)) candidates.push(ill);
+          if (ill && !secondaryCandidates.includes(ill)) secondaryCandidates.push(ill);
         }
       }
       if (state.cjDriveBys) {
         for (const car of state.cjDriveBys) {
-          if (car && !candidates.includes(car)) candidates.push(car);
+          if (car && !secondaryCandidates.includes(car)) secondaryCandidates.push(car);
         }
       }
     }
@@ -3026,34 +3108,40 @@ export class GojoFighter extends Fighter {
     const maxRange = CONFIG.gojo?.purpleTriggerRange || 850;
     const gojoY = this.y - (this.z || 0);
 
-    let bestTarget = null;
-    let bestDist = Infinity;
+    const evaluateBest = (list) => {
+      let bestTarget = null;
+      let bestDist = Infinity;
 
-    for (const ent of candidates) {
-      if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
-      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
-      if (ent.owner === this) continue;
-      if (myTeam !== null && myTeam !== undefined) {
-        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
-        if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
-        if (ent.team !== undefined && ent.team === myTeam) continue;
+      for (const ent of list) {
+        if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
+        if (ent.vanishTimer && ent.vanishTimer > 0) continue;
+        if (ent.owner === this) continue;
+        if (myTeam !== null && myTeam !== undefined) {
+          const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+          if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
+          if (ent.team !== undefined && ent.team === myTeam) continue;
+        }
+
+        const entY = ent.y - (ent.z || 0);
+        const dx = ent.x - this.x;
+        const dy = entY - gojoY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > maxRange) continue;
+        if (dist < (this.r + 5)) continue;
+
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestTarget = ent;
+        }
       }
+      return bestTarget;
+    };
 
-      const entY = ent.y - (ent.z || 0);
-      const dx = ent.x - this.x;
-      const dy = entY - gojoY;
-      const dist = Math.hypot(dx, dy);
+    const bestPrimary = evaluateBest(primaryCandidates);
+    if (bestPrimary) return bestPrimary;
 
-      if (dist > maxRange) continue;
-      if (dist < (this.r + 5)) continue;
-
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestTarget = ent;
-      }
-    }
-
-    return bestTarget;
+    return evaluateBest(secondaryCandidates);
   }
 
   _findHorizontallyAlignedEnemy(preferredOpponent = null) {
@@ -3064,24 +3152,47 @@ export class GojoFighter extends Fighter {
     const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
     const myTeam = (typeof state !== 'undefined' && state.getFighterTeam && myIndex >= 0) ? state.getFighterTeam(myIndex) : (this.team !== undefined ? this.team : null);
 
-    const candidates = [];
+    const primaryCandidates = [];
+    const secondaryCandidates = [];
+
+    const isPrimaryFighter = (ent) => Boolean(
+      ent &&
+      !ent.isMinion &&
+      !ent.isIllusion &&
+      !ent.isServantOfCthulhu &&
+      !ent.owner &&
+      !ent.isDeployable &&
+      !ent.isTurret &&
+      !ent.isDispenser
+    );
+
     if (preferredOpponent && !preferredOpponent.isDead && preferredOpponent.hp > 0) {
-      candidates.push(preferredOpponent);
+      if (isPrimaryFighter(preferredOpponent)) {
+        primaryCandidates.push(preferredOpponent);
+      } else {
+        secondaryCandidates.push(preferredOpponent);
+      }
     }
+
     if (typeof state !== 'undefined') {
       if (state.fighters) {
         for (const f of state.fighters) {
-          if (f && !candidates.includes(f)) candidates.push(f);
+          if (!f || primaryCandidates.includes(f) || secondaryCandidates.includes(f)) continue;
+          if (isPrimaryFighter(f)) {
+            primaryCandidates.push(f);
+          } else {
+            secondaryCandidates.push(f);
+          }
         }
       }
       if (state.illusions) {
         for (const ill of state.illusions) {
-          if (ill && !candidates.includes(ill)) candidates.push(ill);
+          if (ill && !secondaryCandidates.includes(ill)) secondaryCandidates.push(ill);
         }
       }
       if (state.cjDriveBys) {
         for (const car of state.cjDriveBys) {
-          if (car && !candidates.includes(car)) candidates.push(car);
+          if (car && !secondaryCandidates.includes(car)) secondaryCandidates.push(car);
         }
       }
     }
@@ -3089,34 +3200,40 @@ export class GojoFighter extends Fighter {
     const maxRange = CONFIG.gojo?.redTriggerRange || 350;
     const gojoY = this.y - (this.z || 0);
 
-    let bestTarget = null;
-    let bestDist = Infinity;
+    const evaluateBest = (list) => {
+      let bestTarget = null;
+      let bestDist = Infinity;
 
-    for (const ent of candidates) {
-      if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
-      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
-      if (ent.owner === this) continue;
-      if (myTeam !== null && myTeam !== undefined) {
-        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
-        if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
-        if (ent.team !== undefined && ent.team === myTeam) continue;
+      for (const ent of list) {
+        if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
+        if (ent.vanishTimer && ent.vanishTimer > 0) continue;
+        if (ent.owner === this) continue;
+        if (myTeam !== null && myTeam !== undefined) {
+          const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+          if (entIdx !== -1 && state.getFighterTeam && state.getFighterTeam(entIdx) === myTeam) continue;
+          if (ent.team !== undefined && ent.team === myTeam) continue;
+        }
+
+        const entY = ent.y - (ent.z || 0);
+        const dx = ent.x - this.x;
+        const dy = entY - gojoY;
+        const dist = Math.hypot(dx, dy);
+
+        if (dist > maxRange) continue;
+        if (dist < (this.r + 5)) continue;
+
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestTarget = ent;
+        }
       }
+      return bestTarget;
+    };
 
-      const entY = ent.y - (ent.z || 0);
-      const dx = ent.x - this.x;
-      const dy = entY - gojoY;
-      const dist = Math.hypot(dx, dy);
+    const bestPrimary = evaluateBest(primaryCandidates);
+    if (bestPrimary) return bestPrimary;
 
-      if (dist > maxRange) continue;
-      if (dist < (this.r + 5)) continue;
-
-      if (dist < bestDist) {
-        bestDist = dist;
-        bestTarget = ent;
-      }
-    }
-
-    return bestTarget;
+    return evaluateBest(secondaryCandidates);
   }
 
   _findVerticallyAlignedEnemy(preferredOpponent = null) {

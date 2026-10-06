@@ -32,10 +32,10 @@ export function _getZeusHairImage() {
       _zeusHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zeus hair image at Assets/model/Zeus-hair.png', e);
+      console.warn('Failed to load Zeus hair image at Assets/model/zeus/Zeus-hair.png', e);
       _zeusHairImageLoading = false;
     };
-    img.src = 'Assets/model/Zeus-hair.png?v=1';
+    img.src = 'Assets/model/zeus/Zeus-hair.png?v=1';
     _zeusHairImage = img;
   }
   return _zeusHairImage;
@@ -53,10 +53,10 @@ export function _getZeusCrownImage() {
       _zeusCrownImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zeus crown image at Assets/model/Zeus-crown.png', e);
+      console.warn('Failed to load Zeus crown image at Assets/model/zeus/Zeus-crown.png', e);
       _zeusCrownImageLoading = false;
     };
-    img.src = 'Assets/model/Zeus-crown.png?v=1';
+    img.src = 'Assets/model/zeus/Zeus-crown.png?v=1';
     _zeusCrownImage = img;
   }
   return _zeusCrownImage;
@@ -68,7 +68,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Zeus's authentic flowing silver anime hair from Assets/model/Zeus-hair.png.
+ * Draws Zeus's authentic flowing silver anime hair from Assets/model/zeus/Zeus-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [isStormActive=false]
@@ -115,7 +115,7 @@ export function _drawZeusHair(ctx, r, isStormActive = false, facingLeft = false)
 }
 
 /**
- * Draws Zeus's golden Olympian crown / headband from Assets/model/Zeus-crown.png.
+ * Draws Zeus's golden Olympian crown / headband from Assets/model/zeus/Zeus-crown.png.
  * Positioned cleanly as a headband wrapping across the brow and hair.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
@@ -506,10 +506,10 @@ export function drawZeusSkin(ctx, fighter) {
   // LAYER 1: MAIN BODY (Clean God Face + Royal Toga & Pleats)
   drawZeusPixelBody(ctx, r, isStorm);
 
-  // LAYER 2: AUTHENTIC ANIME HAIR ASSET (Assets/model/Zeus-hair.png)
+  // LAYER 2: AUTHENTIC ANIME HAIR ASSET (Assets/model/zeus/Zeus-hair.png)
   _drawZeusHair(ctx, r, isStorm, facingLeft);
 
-  // LAYER 3: GOLDEN OLYMPIAN CROWN HEADBAND (Assets/model/Zeus-crown.png)
+  // LAYER 3: GOLDEN OLYMPIAN CROWN HEADBAND (Assets/model/zeus/Zeus-crown.png)
   _drawZeusCrown(ctx, r, isStorm, facingLeft);
 
   // Status Overlays (Stun, Freeze, Paralyze, etc.)

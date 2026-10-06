@@ -5,7 +5,7 @@
 // 1. Warm Athletic Tan Skin Face with Signature Lip Scar (Rule 19 Compliant, Faceless)
 // 2. Charcoal Compression Crewneck Shirt
 // 3. Dark Hakama Pants & Sash with White Ribbon Loops
-// 4. Authentic Pixel-Art Jet-Black Hair Asset (Assets/model/toji-hair.png)
+// 4. Authentic Pixel-Art Jet-Black Hair Asset (Assets/model/toji/toji-hair.png)
 // Rule 19 (Upright Front POV), Rule 20 (Hand Visibility), and Rule 11 Compliant
 // ─────────────────────────────────────────────
 
@@ -28,10 +28,10 @@ export function _getTojiHairImage() {
       _tojiHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Toji hair image at Assets/model/toji-hair.png', e);
+      console.warn('Failed to load Toji hair image at Assets/model/toji/toji-hair.png', e);
       _tojiHairImageLoading = false;
     };
-    img.src = 'Assets/model/toji-hair.png?v=1';
+    img.src = 'Assets/model/toji/toji-hair.png?v=1';
     _tojiHairImage = img;
   }
   return _tojiHairImage;
@@ -42,7 +42,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Toji's authentic anime spiky hair from Assets/model/toji-hair.png.
+ * Draws Toji's authentic anime spiky hair from Assets/model/toji/toji-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]

@@ -149,10 +149,10 @@ export function _getZenitsuAssemblyImage() {
       _zenitsuAssemblyImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu assembly sprite sheet at Assets/model/Weapon/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png', e);
+      console.warn('Failed to load Zenitsu assembly sprite sheet at Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png', e);
       _zenitsuAssemblyImageLoading = false;
     };
-    img.src = encodeURI('Assets/model/Weapon/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png?v=1');
+    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png?v=1');
     _zenitsuAssemblyImage = img;
   }
   return _zenitsuAssemblyImage;
@@ -169,7 +169,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 
 /**
  * Draws Zenitsu's Modular Lightning Nichirin Katana from:
- * "Assets/model/Weapon/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png"
+ * "Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png"
  * Supports independent per-part tuning in Weapon Studio:
  * 1. Blade (Nagasa)
  * 2. Guard (Tsuba)

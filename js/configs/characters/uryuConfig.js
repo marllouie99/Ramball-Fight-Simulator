@@ -2,6 +2,14 @@
 // Uryu Ishida — The Last Quincy & Sternritter "A" Config
 // ─────────────────────────────────────────────
 export const uryuConfig = {
+  assets: {
+    hair: 'Assets/model/uryu/Uryu-ishida.png',
+    bow: 'Assets/model/uryu/ISHIDA-BOW.png',
+    bowFrame: 'Assets/model/uryu/ISHIDA-BOW-FRAME.png',
+    bowBlade: 'Assets/model/uryu/ISHIDA-BOW-BLADE.png',
+    arrow: 'Assets/model/uryu/ISHIDA-ARROW.png',
+  },
+
   name: 'Uryu',
   displayName: 'Uryu',
   bossTitle: 'Last Quincy',

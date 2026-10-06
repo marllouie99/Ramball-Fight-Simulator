@@ -2,6 +2,23 @@
 // Ender Dragon — Ruler of The End Character Config
 // ─────────────────────────────────────────────
 export const enderDragonConfig = {
+  assets: {
+    model: 'Assets/model/enderDragon/Ender-Dragon-Model.png',
+    bossMap: 'Assets/model/enderDragon/Enderdragon.jpg',
+    wings: 'Assets/model/enderDragon/Dragon-wings-sprite-sheet.png',
+    deathAnimation: 'Assets/model/enderDragon/Dragon-death-animation-sprite-sheet.png',
+    tailBirdeyeView: 'Assets/model/enderDragon/Dragon-tail-birdeyeview-sprite-sheet.png',
+    tailBirdeyeView1: 'Assets/model/enderDragon/Dragon-tail-birdeyeview-sprite-sheet1.png',
+    tailSegmented: 'Assets/model/enderDragon/Dragon-tail-segmented-sheet.png',
+    tails: 'Assets/model/enderDragon/Dragon-tails-sprite-sheet.png',
+    textureSkin: 'Assets/model/enderDragon/dragon-texture-skin.png',
+    endCrystal: 'Assets/model/enderDragon/End-crystal-animation-sprite-sheet.png',
+    disintegrationSequence: 'Assets/model/enderDragon/Ender-dragon-Disintegration-Sequence.png',
+    disintegrationSequence2: 'Assets/model/enderDragon/Ender-dragon-Disintegration-Sequence2.png',
+    modelSpriteSheet: 'Assets/model/enderDragon/Ender-dragon-model-sprite-sheet.png',
+    modelSpriteSheet2: 'Assets/model/enderDragon/Ender-dragon-model-sprite-sheet2.png',
+  },
+
   // ── Base Attributes ──
   hp: 520,
   speed: 4.4,
@@ -25,12 +42,12 @@ export const enderDragonConfig = {
   desc: 'Colossal flying draconic leviathan. Bypasses terrain with void flight, shoots lingering Dragon Breath acid pools, executes kinetic wing swoops, and unleashes cataclysmic void shockwaves.',
 
   // ── Asset Paths ──
-  textureSkinSrc: 'Assets/model/Sprites/dragon-texture-skin.png',
-  wingsSpriteSrc: 'Assets/model/Sprites/Dragon-wings-sprite-sheet.png',
-  tailsSpriteSrc: 'Assets/model/Sprites/Dragon-tail-segmented-sheet.png',
-  movementSpriteSrc: 'Assets/model/Sprites/Dragon-wings-sprite-sheet.png',
-  disintegrationSrc1: 'Assets/model/Sprites/Ender-dragon-Disintegration-Sequence.png',
-  disintegrationSrc2: 'Assets/model/Sprites/Ender-dragon-Disintegration-Sequence2.png',
+  textureSkinSrc: 'Assets/model/enderDragon/dragon-texture-skin.png',
+  wingsSpriteSrc: 'Assets/model/enderDragon/Dragon-wings-sprite-sheet.png',
+  tailsSpriteSrc: 'Assets/model/enderDragon/Dragon-tail-segmented-sheet.png',
+  movementSpriteSrc: 'Assets/model/enderDragon/Dragon-wings-sprite-sheet.png',
+  disintegrationSrc1: 'Assets/model/enderDragon/Ender-dragon-Disintegration-Sequence.png',
+  disintegrationSrc2: 'Assets/model/enderDragon/Ender-dragon-Disintegration-Sequence2.png',
 
   // ── Sprite Slicing & Animation ──
   spriteSheetWidth: 1536,

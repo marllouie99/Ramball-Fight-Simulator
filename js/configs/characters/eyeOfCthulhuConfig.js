@@ -2,6 +2,13 @@
 // Eye of Cthulhu — Ancient Ocular Horror Config
 // ─────────────────────────────────────────────
 export const eyeOfCthulhuConfig = {
+  assets: {
+    phase1: 'Assets/model/eyeOfCthulhu/Eye of Cthulhu.png',
+    phase2: 'Assets/model/eyeOfCthulhu/eye of cthulhu phase 2.png',
+    gore: 'Assets/model/eyeOfCthulhu/eoc-gore-spritesheet.png',
+    shatter: 'Assets/model/eyeOfCthulhu/Eye-of-Cthulhu-shatter-sprite-sheet.png',
+  },
+
   // ── Base Attributes ──
   hp: 480,
   speed: 4.6,
@@ -27,8 +34,8 @@ export const eyeOfCthulhuConfig = {
   desc: 'Floats freely through terrain. Summons Servants of Cthulhu and executes telegraphed triple rams. At 50% HP, tears into a ravenous berserk fanged maw.',
 
   // ── Sprites & Texture Paths ──
-  phase1SpriteSrc: 'Assets/model/Eye of Cthulhu.png',
-  phase2SpriteSrc: 'Assets/model/eye of cthulhu phase 2.png',
+  phase1SpriteSrc: 'Assets/model/eyeOfCthulhu/Eye of Cthulhu.png',
+  phase2SpriteSrc: 'Assets/model/eyeOfCthulhu/eye of cthulhu phase 2.png',
   spriteFrameCount: 6,
   spriteTicksPerFramePhase1: 8,
   spriteTicksPerFramePhase2: 4,

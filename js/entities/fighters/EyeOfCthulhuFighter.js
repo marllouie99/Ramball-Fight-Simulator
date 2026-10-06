@@ -81,20 +81,33 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.actionNoiseCooldown = 0;
     this.lastActionNoise = null;
 
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.slowTimer = 0;
+    this.slowMultiplier = 1.0;
+    this.purpleHitTimer = 0;
+    this.isCaughtInPurple = false;
+    this.isCaughtInPurpleVortex = false;
+
     this._registerSkills();
   }
 
-  // ── Unyielding Boss Poise: Zero Hit-Pause, Zero Flinch & Zero Knockback ──
-  get knockbackVx() {
-    return 0;
+  isTrappedInVortexOrBeam() {
+    return Boolean(
+      this.isCaughtInPurple ||
+      this.isCaughtInPurpleVortex ||
+      (this.purpleHitTimer && this.purpleHitTimer > 0) ||
+      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
+      this.isDraggedByGetsuga ||
+      this._draggedByCruelSun ||
+      this.isCaughtInCruelSun ||
+      this.isCaughtInBlackHole ||
+      this._insideBlackHole ||
+      this.caughtInPureLoveBeam
+    );
   }
-  set knockbackVx(_) {}
 
-  get knockbackVy() {
-    return 0;
-  }
-  set knockbackVy(_) {}
-
+  // ── Unyielding Boss Poise: Zero Hit-Pause, Zero Flinch & Zero Basic Knockback ──
   get basicAttackHitPauseTimer() {
     return 0;
   }
@@ -115,7 +128,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       ? stunFrames
       : (typeof opts === 'object' && opts !== null ? opts : {});
 
-    // Preserve pulling / dragging / beam suction mechanics (Getsuga, Pure Love Beam, Cruel Sun, Vortex, Black Hole)
+    // Preserve pulling / dragging / beam suction / vortex mechanics (Getsuga, Pure Love Beam, Cruel Sun, Vortex, Black Hole, Hollow Purple)
     const isPullOrDrag = Boolean(
       options.isPull ||
       options.isDrag ||
@@ -124,25 +137,30 @@ export class EyeOfCthulhuFighter extends Fighter {
       options.isGetsuga ||
       options.isCruelSun ||
       options.isVortex ||
+      options.isPurple ||
       options.fromBlackHole ||
       this.isDraggedByGetsuga ||
       this._draggedByCruelSun ||
       this.isCaughtInCruelSun ||
       (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
       this.isCaughtInBlackHole ||
-      this._insideBlackHole
+      this._insideBlackHole ||
+      this.isCaughtInPurple ||
+      this.isCaughtInPurpleVortex ||
+      (this.purpleHitTimer && this.purpleHitTimer > 0)
     );
 
     if (isPullOrDrag) {
       const stun = typeof stunFrames === 'number' ? stunFrames : (options.stunDuration || 0);
       return super.applyKnockback(vx, vy, stun);
     }
-    // 100% Immune to standard hit knockback & push back from strikes, bullets, and explosions
+    // 100% Immune to standard hit knockback & push back from basic strikes and bullets
     return;
   }
 
   applyRedKnockback(vx, vy) {
-    return;
+    this.knockbackVx = vx;
+    this.knockbackVy = vy;
   }
 
   applyHitStun(duration, opts = {}) {
@@ -271,10 +289,36 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
-    this.knockbackVx = 0;
-    this.knockbackVy = 0;
+    // 1. Process external knockback / vortex pull physics (Rule 1.2)
+    if (Math.abs(this.knockbackVx || 0) > 0.1 || Math.abs(this.knockbackVy || 0) > 0.1) {
+      this.x += this.knockbackVx;
+      this.y += this.knockbackVy;
+      this.knockbackVx *= 0.88;
+      this.knockbackVy *= 0.88;
+    } else {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+    }
 
-    // 1. Universal Freeze & TimeStop Guard (Rule 1.1)
+    if (this.purpleHitTimer > 0) {
+      this.purpleHitTimer--;
+      if (this.purpleHitTimer <= 0) {
+        this.isCaughtInPurple = false;
+        this.isCaughtInPurpleVortex = false;
+      }
+    } else {
+      this.isCaughtInPurple = false;
+      this.isCaughtInPurpleVortex = false;
+    }
+
+    if (this.slowTimer > 0) {
+      this.slowTimer--;
+      if (this.slowTimer <= 0) {
+        this.slowMultiplier = 1.0;
+      }
+    }
+
+    // 2. Universal Freeze & TimeStop Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
       this.interruptAttacks();
@@ -401,6 +445,29 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   _updateTerrariaAI(opponent, ownerIndex, arena, cfg) {
+    // If trapped in Hollow Purple vortex, beam, or gravitational pull, interrupt dashing
+    if (this.isTrappedInVortexOrBeam()) {
+      this.isRamming = false;
+      this.isWindupTelegraph = false;
+      this.ramsRemaining = 0;
+      if (this.aiState === EOC_STATE.RAM_DASH || this.aiState === EOC_STATE.P2_CHAIN_DASH || this.aiState === EOC_STATE.WINDUP_RAM) {
+        this.aiState = this.isPhase2 ? EOC_STATE.P2_CHASE : EOC_STATE.HOVER;
+        this.stateTimer = this.isPhase2 ? (cfg.p2RamRecoveryPauseFrames || 15) : (cfg.hoverDurationFrames || 120);
+      }
+
+      this.vx *= 0.85;
+      this.vy *= 0.85;
+      this.x += this.vx;
+      this.y += this.vy;
+
+      if (opponent) {
+        const aimAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
+      }
+      return;
+    }
+
     switch (this.aiState) {
       case EOC_STATE.HOVER:
         this._updateHoverState(opponent, ownerIndex, cfg);
@@ -463,7 +530,8 @@ export class EyeOfCthulhuFighter extends Fighter {
     const dy = targetY - this.y;
     const dist = Math.hypot(dx, dy) || 1;
 
-    const accel = cfg.hoverAcceleration || 0.24;
+    const slow = (this.slowTimer > 0 && typeof this.slowMultiplier === 'number') ? this.slowMultiplier : 1.0;
+    const accel = (cfg.hoverAcceleration || 0.24) * slow;
     this.vx += (dx / dist) * accel;
     this.vy += (dy / dist) * accel;
     this.vx *= (cfg.hoverFriction || 0.94);
@@ -590,6 +658,14 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   _updateRamDashState(opponent, ownerIndex, cfg) {
+    if (this.isTrappedInVortexOrBeam()) {
+      this.isRamming = false;
+      this.ramsRemaining = 0;
+      this.aiState = EOC_STATE.TURNAROUND;
+      this.stateTimer = cfg.ramTurnaroundFrames || 12;
+      return;
+    }
+
     this.isRamming = true;
     this.isWindupTelegraph = false;
 
@@ -597,7 +673,9 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.gunAngle = this.committedRamAngle;
     this.angle = this.committedRamAngle;
 
-    const speed = cfg.ramSpeed || 17.5;
+    const baseSpeed = cfg.ramSpeed || 17.5;
+    const slow = (this.slowTimer > 0 && typeof this.slowMultiplier === 'number') ? this.slowMultiplier : 1.0;
+    const speed = baseSpeed * slow;
     this.vx = Math.cos(this.committedRamAngle) * speed;
     this.vy = Math.sin(this.committedRamAngle) * speed;
 
@@ -606,8 +684,14 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     // Contact Damage check
     if (!this.hitOpponentThisRam) {
+      const isTargetGojoInfinity = opponent && (
+        (opponent.characterId === 'gojo' || opponent.type === 'gojo') &&
+        (!opponent.infinityCooldown || opponent.infinityCooldown <= 0) &&
+        (typeof opponent.hasActiveInfinity !== 'function' || opponent.hasActiveInfinity())
+      );
+      const effectiveReach = isTargetGojoInfinity ? (this.r + (CONFIG.gojo?.infinityRadius ?? (opponent.r + 30))) : (this.r + opponent.r);
       const dist = Math.hypot(this.x - opponent.x, this.y - opponent.y);
-      if (dist <= this.r + opponent.r) {
+      if (dist <= effectiveReach) {
         this.hitOpponentThisRam = true;
         this._applyRamHit(opponent, cfg.ramDamage || 28, cfg.ramKnockback || 14.0);
       }
@@ -625,9 +709,36 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (!opponent || typeof opponent.takeDamage !== 'function') return;
 
     // Gojo Infinity Barrier check (Rule 1.7)
-    if (opponent.characterId === 'gojo' && (!opponent.infinityCooldown || opponent.infinityCooldown <= 0)) {
-      spawnImpactFlash(this.x, this.y, 40, 'infinitySpark');
-      spawnSparks(this.x, this.y, 16, 'infinitySpark', '#38BDF8');
+    const isTargetGojoInfinity = opponent && (
+      (opponent.characterId === 'gojo' || opponent.type === 'gojo') &&
+      (!opponent.infinityCooldown || opponent.infinityCooldown <= 0) &&
+      (typeof opponent.hasActiveInfinity !== 'function' || opponent.hasActiveInfinity())
+    );
+    if (isTargetGojoInfinity && !this.gojoInfinityImmune) {
+      if (typeof opponent.triggerInfinityBlock === 'function') {
+        opponent.triggerInfinityBlock(this.x, this.y, this);
+      } else {
+        spawnImpactFlash(this.x, this.y, 40, 'infinitySpark');
+        spawnSparks(this.x, this.y, 16, 'infinitySpark', '#38BDF8');
+      }
+
+      // Rebound Eye velocity backwards off the spatial barrier
+      const currentSpeed = Math.hypot(this.vx, this.vy);
+      const reboundSpeed = Math.max(7.0, currentSpeed * 0.5);
+      const dx = this.x - opponent.x;
+      const dy = this.y - opponent.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      this.vx = (dx / dist) * reboundSpeed;
+      this.vy = (dy / dist) * reboundSpeed;
+
+      // Immediately cancel ram charge and transition to turnaround recovery
+      if (this.isRamming) {
+        this.isRamming = false;
+        this.aiState = EOC_STATE.TURNAROUND;
+        this.stateTimer = this.isPhase2
+          ? (eyeOfCthulhuConfig?.p2RamTurnaroundFrames || 8)
+          : (eyeOfCthulhuConfig?.ramTurnaroundFrames || 14);
+      }
       return;
     }
 
@@ -773,9 +884,20 @@ export class EyeOfCthulhuFighter extends Fighter {
         const dist = Math.hypot(dx, dy) || 1;
         const shockRadius = cfg.transformationShockwaveRadius || 190;
         if (dist <= shockRadius) {
-          const pushForce = cfg.transformationShockwaveKnockback || 18;
-          if (typeof opponent.applyKnockback === 'function') {
-            opponent.applyKnockback((dx / dist) * pushForce, (dy / dist) * pushForce);
+          const isTargetGojoInfinity = opponent && (
+            (opponent.characterId === 'gojo' || opponent.type === 'gojo') &&
+            (!opponent.infinityCooldown || opponent.infinityCooldown <= 0) &&
+            (typeof opponent.hasActiveInfinity !== 'function' || opponent.hasActiveInfinity())
+          );
+          if (isTargetGojoInfinity && !this.gojoInfinityImmune) {
+            if (typeof opponent.triggerInfinityBlock === 'function') {
+              opponent.triggerInfinityBlock(this.x, this.y, this);
+            }
+          } else {
+            const pushForce = cfg.transformationShockwaveKnockback || 18;
+            if (typeof opponent.applyKnockback === 'function') {
+              opponent.applyKnockback((dx / dist) * pushForce, (dy / dist) * pushForce);
+            }
           }
         }
       }
@@ -923,9 +1045,13 @@ export class EyeOfCthulhuFighter extends Fighter {
     const dy = opponent.y - this.y;
     const dist = Math.hypot(dx, dy) || 1;
 
-    const chaseSpeed = cfg.p2Speed || cfg.phase2Speed || 8.5;
-    this.vx += (dx / dist) * 0.55;
-    this.vy += (dy / dist) * 0.55;
+    const baseChaseSpeed = cfg.p2Speed || cfg.phase2Speed || 8.5;
+    const slow = (this.slowTimer > 0 && typeof this.slowMultiplier === 'number') ? this.slowMultiplier : 1.0;
+    const chaseSpeed = baseChaseSpeed * slow;
+    const accel = 0.55 * slow;
+
+    this.vx += (dx / dist) * accel;
+    this.vy += (dy / dist) * accel;
 
     const currentSpeed = Math.hypot(this.vx, this.vy);
     if (currentSpeed > chaseSpeed) {
@@ -968,6 +1094,14 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   _updateP2ChainDashState(opponent, ownerIndex, cfg) {
+    if (this.isTrappedInVortexOrBeam()) {
+      this.isRamming = false;
+      this.ramsRemaining = 0;
+      this.aiState = EOC_STATE.P2_CHASE;
+      this.stateTimer = cfg.p2RamRecoveryPauseFrames || 15;
+      return;
+    }
+
     this.isRamming = true;
     this.isWindupTelegraph = false;
 
@@ -977,7 +1111,9 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     // Speed scales based on current health (Expert mode enrage scaling)
     const hpRatio = (this.hp / (this.maxHp || 1));
-    const speed = hpRatio < 0.25 ? (cfg.p2RamSpeedEnraged || 23.5) : (cfg.p2RamSpeedBase || 19.5);
+    const baseSpeed = hpRatio < 0.25 ? (cfg.p2RamSpeedEnraged || 23.5) : (cfg.p2RamSpeedBase || 19.5);
+    const slow = (this.slowTimer > 0 && typeof this.slowMultiplier === 'number') ? this.slowMultiplier : 1.0;
+    const speed = baseSpeed * slow;
 
     this.vx = Math.cos(this.committedRamAngle) * speed;
     this.vy = Math.sin(this.committedRamAngle) * speed;
@@ -987,8 +1123,14 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     // Contact Damage check (Phase 2 contact damage boosted to 40)
     if (!this.hitOpponentThisRam) {
+      const isTargetGojoInfinity = opponent && (
+        (opponent.characterId === 'gojo' || opponent.type === 'gojo') &&
+        (!opponent.infinityCooldown || opponent.infinityCooldown <= 0) &&
+        (typeof opponent.hasActiveInfinity !== 'function' || opponent.hasActiveInfinity())
+      );
+      const effectiveReach = isTargetGojoInfinity ? (this.r + (CONFIG.gojo?.infinityRadius ?? (opponent.r + 30))) : (this.r + opponent.r);
       const dist = Math.hypot(this.x - opponent.x, this.y - opponent.y);
-      if (dist <= this.r + opponent.r) {
+      if (dist <= effectiveReach) {
         this.hitOpponentThisRam = true;
         this._applyRamHit(opponent, cfg.p2ContactDamage || 40, cfg.p2ContactKnockback || 16.0);
       }

@@ -19,10 +19,10 @@ function _getGojoImage() {
       _gojoImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Gojo pixel body model image at Assets/model/Saturo-Gojo-PIXEL-SKIN.png', e);
+      console.warn('Failed to load Gojo pixel body model image at Assets/model/gojo/Saturo-Gojo-PIXEL-SKIN.png', e);
       _gojoImageLoading = false;
     };
-    img.src = 'Assets/model/Saturo-Gojo-PIXEL-SKIN.png?v=1';
+    img.src = 'Assets/model/gojo/Saturo-Gojo-PIXEL-SKIN.png?v=1';
     _gojoImage = img;
   }
   return _gojoImage;
@@ -277,7 +277,7 @@ export function drawGojoBody(ctx, fighter) {
     // ═══════════════════════════════════════════════════════════════════
     drawGojoPixelBody(ctx, fighter.r);
 
-    // 2. Authentic Pixel-Art Spiky White Hair (Assets/model/Gojo-hair.png)
+    // 2. Authentic Pixel-Art Spiky White Hair (Assets/model/gojo/gojo-hair.png)
     _drawGojoHair(ctx, fighter.r, facingLeft);
 
     // Overlays (stun, poison, etc)
@@ -303,10 +303,10 @@ export function _getGojoHairImage() {
       _gojoHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Gojo hair image at Assets/model/Gojo-hair.png', e);
+      console.warn('Failed to load Gojo hair image at Assets/model/gojo/gojo-hair.png', e);
       _gojoHairImageLoading = false;
     };
-    img.src = 'Assets/model/Gojo-hair.png?v=1';
+    img.src = 'Assets/model/gojo/gojo-hair.png?v=1';
     _gojoHairImage = img;
   }
   return _gojoHairImage;
@@ -317,7 +317,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Gojo's authentic pixel-art spiky white hair from Assets/model/Gojo-hair.png.
+ * Draws Gojo's authentic pixel-art spiky white hair from Assets/model/gojo/gojo-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]

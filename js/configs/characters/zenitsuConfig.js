@@ -4,6 +4,19 @@
 // ─────────────────────────────────────────────
 
 export const zenitsuConfig = {
+  assets: {
+    hair: 'Assets/model/zenitsu/Zenitsu-hair.png',
+    weapon: 'Assets/model/zenitsu/Zenitsu-weapon.png',
+    katanaAssembly: 'Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png',
+    sixFrameSequence: 'Assets/model/zenitsu/Thunderclap and Flash Six-Frame Attack Sequence.png',
+    blueLightningEnergy: 'Assets/model/zenitsu/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png',
+    goldLightningEnergy: 'Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png',
+    goldLightningEnergy1: 'Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet.png',
+    lightningDashBlue: 'Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Blue.png',
+    lightningDashGold: 'Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Gold.png',
+    lightningDashDisappearance: 'Assets/model/zenitsu/Zenitsu-Lightning-Dash-Disappearance.png',
+  },
+
   name: 'Zenitsu',
   displayName: 'Zenitsu',
   bossTitle: 'Thunder Breathing Slayer',

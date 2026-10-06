@@ -4,7 +4,7 @@
 // Features Authentic Pixel-Art Model:
 // 1. Pale Anime Skin Face (Rule 19 Compliant, Faceless)
 // 2. Demon Slayer Corps Uniform & Triangle Scale Haori
-// 3. Authentic Pixel-Art Tiered Blonde Hair Asset (Assets/model/Hair/Zenitsu-hair.png)
+// 3. Authentic Pixel-Art Tiered Blonde Hair Asset (Assets/model/zenitsu/Zenitsu-hair.png)
 // Rule 19 (Upright Front POV), Rule 20 (Hand Visibility), and Rule 11 Compliant
 // ─────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ export function _getZenitsuHairImage() {
       _zenitsuHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu hair image at Assets/model/Hair/Zenitsu-hair.png, attempting Assets/model/Zenitsu-hair.png fallback', e);
+      console.warn('Failed to load Zenitsu hair image at Assets/model/zenitsu/Zenitsu-hair.png, attempting Assets/model/zenitsu/Zenitsu-hair.png fallback', e);
       const fallback = new Image();
       fallback.onload = () => {
         _zenitsuHairImage = fallback;
@@ -39,9 +39,9 @@ export function _getZenitsuHairImage() {
         console.warn('Failed to load fallback Zenitsu hair image', err);
         _zenitsuHairImageLoading = false;
       };
-      fallback.src = 'Assets/model/Zenitsu-hair.png?v=1';
+      fallback.src = 'Assets/model/zenitsu/Zenitsu-hair.png?v=1';
     };
-    img.src = 'Assets/model/Hair/Zenitsu-hair.png?v=1';
+    img.src = 'Assets/model/zenitsu/Zenitsu-hair.png?v=1';
     _zenitsuHairImage = img;
   }
   return _zenitsuHairImage;
@@ -72,7 +72,7 @@ export function _getZenitsuLightningSpriteImage() {
       _zenitsuLightningSpriteImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu blue lightning sprite sheet at Assets/model/Sprites/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png, falling back...', e);
+      console.warn('Failed to load Zenitsu blue lightning sprite sheet at Assets/model/zenitsu/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png, falling back...', e);
       const fallback = new Image();
       fallback.onload = () => {
         _zenitsuLightningSpriteImage = fallback;
@@ -81,9 +81,9 @@ export function _getZenitsuLightningSpriteImage() {
       fallback.onerror = () => {
         _zenitsuLightningSpriteImageLoading = false;
       };
-      fallback.src = encodeURI('Assets/model/Sprites/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png?v=2');
+      fallback.src = encodeURI('Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png?v=2');
     };
-    img.src = encodeURI('Assets/model/Sprites/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png?v=2');
+    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png?v=2');
     _zenitsuLightningSpriteImage = img;
   }
   return _zenitsuLightningSpriteImage;
@@ -113,9 +113,9 @@ export function _getZenitsuDashSpriteImage() {
       fallback.onerror = () => {
         _zenitsuDashSpriteImageLoading = false;
       };
-      fallback.src = encodeURI('Assets/model/Sprites/Zenitsu-Lightning-Dash-6Frames-Gold.png?v=1');
+      fallback.src = encodeURI('Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Gold.png?v=1');
     };
-    img.src = encodeURI('Assets/model/Sprites/Zenitsu-Lightning-Dash-6Frames-Blue.png?v=5');
+    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Blue.png?v=5');
     _zenitsuDashSpriteImage = img;
   }
   return _zenitsuDashSpriteImage;
@@ -136,10 +136,10 @@ export function _getZenitsuDashDisappearanceImage() {
       _zenitsuDashDisappearanceImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu dash disappearance sprite sheet at Assets/model/Sprites/Zenitsu-Lightning-Dash-Disappearance.png', e);
+      console.warn('Failed to load Zenitsu dash disappearance sprite sheet at Assets/model/zenitsu/Zenitsu-Lightning-Dash-Disappearance.png', e);
       _zenitsuDashDisappearanceImageLoading = false;
     };
-    img.src = encodeURI('Assets/model/Sprites/Zenitsu-Lightning-Dash-Disappearance.png?v=4');
+    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Lightning-Dash-Disappearance.png?v=4');
     _zenitsuDashDisappearanceImage = img;
   }
   return _zenitsuDashDisappearanceImage;
@@ -153,7 +153,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Zenitsu's authentic square-cut tiered blonde hair from Assets/model/Hair/Zenitsu-hair.png.
+ * Draws Zenitsu's authentic square-cut tiered blonde hair from Assets/model/zenitsu/Zenitsu-hair.png.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
@@ -1272,7 +1272,7 @@ export function drawZenitsuSkin(ctx, fighter) {
   // 4. LAYER 1: MAIN BODY (Pixel Circle + Triangle Haori + Corps Uniform + Face Skin)
   drawZenitsuPixelBody(ctx, r);
 
-  // 5. LAYER 2: AUTHENTIC HAIR MODEL OVERLAY (Assets/model/Hair/Zenitsu-hair.png)
+  // 5. LAYER 2: AUTHENTIC HAIR MODEL OVERLAY (Assets/model/zenitsu/Zenitsu-hair.png)
   _drawZenitsuHair(ctx, r, facingLeft);
 
   // 6. LAYER 3: FRONT HAND & LIGHTNING KATANA (On Top of Body)

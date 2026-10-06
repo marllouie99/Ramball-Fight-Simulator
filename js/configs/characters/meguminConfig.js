@@ -5,6 +5,10 @@
 // ─────────────────────────────────────────────
 
 export const meguminConfig = {
+  assets: {
+    staff: 'Assets/model/megumin/megumin-staff.jpg',
+  },
+
   name: 'Megumin',
   displayName: 'Megumin',
   bossTitle: 'Crimson Archmage',

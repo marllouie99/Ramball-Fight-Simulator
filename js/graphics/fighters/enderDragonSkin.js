@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────
 // Ender Dragon — Upright Circle Body Fighter Skin & Animated Wings + Tail Engine
 // Authentic Faceless Minimalist Pixel Art (Rule 19, 20 & 35)
-// Uses Assets/model/Sprites/Dragon-wings-sprite-sheet.png for animated flapping wings
-// Uses Assets/model/Sprites/Dragon-tails-sprite-sheet.png for animated articulated tail
+// Uses Assets/model/enderDragon/Dragon-wings-sprite-sheet.png for animated flapping wings
+// Uses Assets/model/enderDragon/Dragon-tails-sprite-sheet.png for animated articulated tail
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
 import { getHandSize } from '../../core/config.js';
@@ -52,8 +52,8 @@ export function getEnderDragonWingsSheet() {
   if (!_wingsSheet && typeof Image !== 'undefined') {
     _wingsSheet = new Image();
     _wingsSheet.onload = () => { _wingsLoaded = true; };
-    _wingsSheet.onerror = (e) => { console.warn('Failed to load Dragon Wings Sheet at Assets/model/Sprites/Dragon-wings-sprite-sheet.png', e); };
-    _wingsSheet.src = encodeURI('Assets/model/Sprites/Dragon-wings-sprite-sheet.png?v=1');
+    _wingsSheet.onerror = (e) => { console.warn('Failed to load Dragon Wings Sheet at Assets/model/enderDragon/Dragon-wings-sprite-sheet.png', e); };
+    _wingsSheet.src = encodeURI('Assets/model/enderDragon/Dragon-wings-sprite-sheet.png?v=1');
   }
   return _wingsSheet;
 }
@@ -62,8 +62,8 @@ export function getEnderDragonTailsSheet() {
   if (!_tailsSheet && typeof Image !== 'undefined') {
     _tailsSheet = new Image();
     _tailsSheet.onload = () => { _tailsLoaded = true; };
-    _tailsSheet.onerror = (e) => { console.warn('Failed to load Dragon Tails Sheet at Assets/model/Sprites/Dragon-tail-segmented-sheet.png', e); };
-    _tailsSheet.src = encodeURI(enderDragonConfig.tailsSpriteSrc || 'Assets/model/Sprites/Dragon-tail-segmented-sheet.png?v=1');
+    _tailsSheet.onerror = (e) => { console.warn('Failed to load Dragon Tails Sheet at Assets/model/enderDragon/Dragon-tail-segmented-sheet.png', e); };
+    _tailsSheet.src = encodeURI(enderDragonConfig.tailsSpriteSrc || 'Assets/model/enderDragon/Dragon-tail-segmented-sheet.png?v=1');
   }
   return _tailsSheet;
 }
@@ -72,8 +72,8 @@ export function getEnderDragonTextureSkinImage() {
   if (!_textureSkinImage && typeof Image !== 'undefined') {
     _textureSkinImage = new Image();
     _textureSkinImage.onload = () => { _textureSkinLoaded = true; };
-    _textureSkinImage.onerror = (e) => { console.warn('Failed to load Dragon Texture Skin at Assets/model/Sprites/dragon-texture-skin.png', e); };
-    _textureSkinImage.src = encodeURI(enderDragonConfig.textureSkinSrc || 'Assets/model/Sprites/dragon-texture-skin.png?v=1');
+    _textureSkinImage.onerror = (e) => { console.warn('Failed to load Dragon Texture Skin at Assets/model/enderDragon/dragon-texture-skin.png', e); };
+    _textureSkinImage.src = encodeURI(enderDragonConfig.textureSkinSrc || 'Assets/model/enderDragon/dragon-texture-skin.png?v=1');
   }
   return _textureSkinImage;
 }
@@ -90,12 +90,12 @@ export function getEnderDragonDisintegrationImages() {
   if (!_disintegration1 && typeof Image !== 'undefined') {
     _disintegration1 = new Image();
     _disintegration1.onload = () => { _dis1Loaded = true; };
-    _disintegration1.src = encodeURI('Assets/model/Sprites/Ender-dragon-Disintegration-Sequence.png?v=1');
+    _disintegration1.src = encodeURI('Assets/model/enderDragon/Ender-dragon-Disintegration-Sequence.png?v=1');
   }
   if (!_disintegration2 && typeof Image !== 'undefined') {
     _disintegration2 = new Image();
     _disintegration2.onload = () => { _dis2Loaded = true; };
-    _disintegration2.src = encodeURI('Assets/model/Sprites/Ender-dragon-Disintegration-Sequence2.png?v=1');
+    _disintegration2.src = encodeURI('Assets/model/enderDragon/Ender-dragon-Disintegration-Sequence2.png?v=1');
   }
   return { dis1: _disintegration1, dis2: _disintegration2 };
 }

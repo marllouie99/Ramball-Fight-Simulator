@@ -32,10 +32,10 @@ export function _getDenjiDevilSkinImage() {
       _denjiDevilSkinImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Denji devil form pixel skin image at Assets/model/denji-devilform-model-skin.png', e);
+      console.warn('Failed to load Denji devil form pixel skin image at Assets/model/denji/denji-devilform-model-skin.png', e);
       _denjiDevilSkinImageLoading = false;
     };
-    img.src = 'Assets/model/denji-devilform-model-skin.png?v=1';
+    img.src = 'Assets/model/denji/denji-devilform-model-skin.png?v=1';
     _denjiDevilSkinImage = img;
   }
   return _denjiDevilSkinImage;

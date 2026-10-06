@@ -27,10 +27,10 @@ export function _getPowerSkinImage() {
       _powerSkinImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Power pixel skin image at Assets/model/POWER-MODEL-SKIN.png', e);
+      console.warn('Failed to load Power pixel skin image at Assets/model/power/POWER-MODEL-SKIN.png', e);
       _powerSkinImageLoading = false;
     };
-    img.src = 'Assets/model/POWER-MODEL-SKIN.png?v=1';
+    img.src = 'Assets/model/power/POWER-MODEL-SKIN.png?v=1';
     _powerSkinImage = img;
   }
   return _powerSkinImage;
@@ -47,7 +47,7 @@ function snap(v) {
 
 /**
  * Main Skin Renderer for Power (The Blood Fiend)
- * Prioritizes the authentic pixel art model from Assets/model/POWER-MODEL-SKIN.png,
+ * Prioritizes the authentic pixel art model from Assets/model/power/POWER-MODEL-SKIN.png,
  * with procedural canvas fallback.
  */
 export function drawPowerSkin(ctx, fighter) {

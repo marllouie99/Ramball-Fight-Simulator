@@ -801,70 +801,184 @@ export function drawAnimeImpactFrame(ctx, effect) {
   ctx.shadowOffsetY = 0;
 
   ctx.translate(effect.x, effect.y);
+  const hitAngle = effect.hitAngle !== undefined ? effect.hitAngle : (effect.angle || 0);
+  ctx.rotate(hitAngle);
 
   const progress = Math.min(1.0, Math.max(0.0, 1.0 - effect.life));
-  const alpha = Math.min(1.0, effect.life * 1.35);
+  const alpha = Math.min(1.0, effect.life * 1.45);
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
 
+  // Fast non-linear expansion (Mach sonic burst profile)
+  const expansion = 0.20 + 0.80 * Math.pow(progress, 0.55);
+  const currentR = effect.size * expansion;
+  const baseR = Math.max(P * 2, currentR);
+
+  // Character Thematic Color Hierarchies (Rule 11 Compliant)
   const isGold = (effect.color === 'gold');
   const isBlackPink = (effect.color === 'blackpink' || effect.color === 'pink');
   const isOrange = (effect.color === 'orange');
-  const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity' || effect.color === 'gojo');
+  const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity' || effect.color === 'gojo' || effect.color === 'naoya');
   const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
   const isPurple = (effect.color === 'purple' || effect.color === 'boogie');
+  const isLime = (effect.color === 'lime' || effect.color === 'green');
 
-  let colRing, colHighlight;
+  let colCore = '#FFFFFF';
+  let colHighlight, colTheme, colAccent, colDarkRim;
+
   if (isGold) {
-    colRing = `rgba(255, 215, 0, ${alpha * 0.95})`;
-    colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+    colHighlight = `rgba(255, 245, 180, ${(alpha * 0.98).toFixed(3)})`;
+    colTheme = `rgba(255, 215, 0, ${(alpha * 0.95).toFixed(3)})`;
+    colAccent = `rgba(255, 150, 0, ${(alpha * 0.85).toFixed(3)})`;
+    colDarkRim = `rgba(25, 15, 0, ${(alpha * 0.92).toFixed(3)})`;
   } else if (isBlackPink) {
-    colRing = `rgba(255, 20, 147, ${alpha * 0.95})`;
-    colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+    colHighlight = `rgba(255, 180, 225, ${(alpha * 0.98).toFixed(3)})`;
+    colTheme = `rgba(255, 20, 147, ${(alpha * 0.95).toFixed(3)})`;
+    colAccent = `rgba(180, 0, 95, ${(alpha * 0.85).toFixed(3)})`;
+    colDarkRim = `rgba(15, 0, 8, ${(alpha * 0.95).toFixed(3)})`;
   } else if (isOrange) {
-    colRing = `rgba(255, 80, 0, ${alpha * 0.95})`;
-    colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+    colHighlight = `rgba(255, 225, 160, ${(alpha * 0.98).toFixed(3)})`;
+    colTheme = `rgba(255, 80, 0, ${(alpha * 0.95).toFixed(3)})`;
+    colAccent = `rgba(200, 40, 0, ${(alpha * 0.85).toFixed(3)})`;
+    colDarkRim = `rgba(25, 8, 0, ${(alpha * 0.92).toFixed(3)})`;
   } else if (isCyan) {
-    colRing = `rgba(0, 229, 255, ${alpha * 0.95})`;
-    colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+    colHighlight = `rgba(200, 248, 255, ${(alpha * 0.98).toFixed(3)})`;
+    colTheme = `rgba(0, 229, 255, ${(alpha * 0.95).toFixed(3)})`;
+    colAccent = `rgba(0, 140, 255, ${(alpha * 0.85).toFixed(3)})`;
+    colDarkRim = `rgba(0, 20, 38, ${(alpha * 0.92).toFixed(3)})`;
   } else if (isCrimson) {
-    colRing = `rgba(255, 36, 0, ${alpha * 0.95})`;
-    colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+    colHighlight = `rgba(255, 190, 190, ${(alpha * 0.98).toFixed(3)})`;
+    colTheme = `rgba(255, 36, 0, ${(alpha * 0.95).toFixed(3)})`;
+    colAccent = `rgba(180, 0, 20, ${(alpha * 0.85).toFixed(3)})`;
+    colDarkRim = `rgba(20, 0, 4, ${(alpha * 0.95).toFixed(3)})`;
   } else if (isPurple) {
-    colRing = `rgba(168, 85, 247, ${alpha * 0.95})`;
-    colHighlight = `rgba(255, 255, 255, ${alpha * 0.98})`;
+    colHighlight = `rgba(235, 210, 255, ${(alpha * 0.98).toFixed(3)})`;
+    colTheme = `rgba(168, 85, 247, ${(alpha * 0.95).toFixed(3)})`;
+    colAccent = `rgba(115, 25, 200, ${(alpha * 0.85).toFixed(3)})`;
+    colDarkRim = `rgba(18, 4, 30, ${(alpha * 0.92).toFixed(3)})`;
+  } else if (isLime) {
+    colHighlight = `rgba(220, 255, 180, ${(alpha * 0.98).toFixed(3)})`;
+    colTheme = `rgba(118, 224, 66, ${(alpha * 0.95).toFixed(3)})`;
+    colAccent = `rgba(0, 200, 100, ${(alpha * 0.85).toFixed(3)})`;
+    colDarkRim = `rgba(5, 25, 10, ${(alpha * 0.92).toFixed(3)})`;
   } else {
     if (!isDark && (effect.color === 'black' || !effect.color)) {
-      colRing = `rgba(20, 22, 28, ${alpha * 0.95})`;
-      colHighlight = `rgba(80, 90, 110, ${alpha * 0.98})`;
+      colHighlight = `rgba(120, 135, 160, ${(alpha * 0.98).toFixed(3)})`;
+      colTheme = `rgba(20, 22, 28, ${(alpha * 0.95).toFixed(3)})`;
+      colAccent = `rgba(45, 50, 65, ${(alpha * 0.85).toFixed(3)})`;
+      colDarkRim = `rgba(5, 6, 8, ${(alpha * 0.95).toFixed(3)})`;
     } else {
-      colRing = `rgba(255, 255, 255, ${alpha * 0.95})`;
-      colHighlight = `rgba(220, 240, 255, ${alpha * 0.98})`;
+      colHighlight = `rgba(240, 245, 255, ${(alpha * 0.98).toFixed(3)})`;
+      colTheme = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(3)})`;
+      colAccent = `rgba(180, 195, 215, ${(alpha * 0.85).toFixed(3)})`;
+      colDarkRim = `rgba(15, 18, 24, ${(alpha * 0.95).toFixed(3)})`;
     }
   }
 
-  const ringRadius = effect.size * (0.25 + 0.85 * Math.pow(progress, 0.65));
-  const ringThick = Math.max(P * 1.5, Math.round((P * 2.2 * effect.life) / P) * P);
-  const innerR = Math.max(0, ringRadius - ringThick);
-  const outerR = ringRadius + P * 0.5;
-
-  // High-performance Canvas stroke rendering (replaces 3,721-step nested fillRect loop)
-  const midR = Math.max(1, (innerR + outerR) / 2);
-  const strokeThick = Math.max(1, outerR - innerR);
-
-  // Outer ring body
+  // ── 1. Directional Mach Air-Displacement Pressure Crescents (Ahead of Fist) ──
+  const machCrestX = baseR * 0.50 * Math.pow(progress, 0.7);
+  const machR = baseR * 0.90;
   ctx.beginPath();
-  ctx.arc(0, 0, midR, 0, Math.PI * 2);
-  ctx.strokeStyle = colRing;
-  ctx.lineWidth = strokeThick;
+  ctx.arc(machCrestX, 0, machR, -Math.PI * 0.38, Math.PI * 0.38);
+  ctx.strokeStyle = colAccent;
+  ctx.lineWidth = Math.max(1, 3.8 * effect.life);
   ctx.stroke();
 
-  // Crisp inner/core highlight ring
   ctx.beginPath();
-  ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+  ctx.arc(machCrestX, 0, machR, -Math.PI * 0.35, Math.PI * 0.35);
   ctx.strokeStyle = colHighlight;
-  ctx.lineWidth = Math.max(1, P);
+  ctx.lineWidth = Math.max(0.8, 1.5 * effect.life);
   ctx.stroke();
+
+  // Secondary Precursor Air Shockwave Crest
+  const preCrestX = baseR * 0.85 * Math.pow(progress, 0.85);
+  const preR = baseR * 0.65;
+  ctx.beginPath();
+  ctx.arc(preCrestX, 0, preR, -Math.PI * 0.28, Math.PI * 0.28);
+  ctx.strokeStyle = colHighlight;
+  ctx.lineWidth = Math.max(0.8, 1.2 * effect.life);
+  ctx.stroke();
+
+  // ── 2. Concentric Elliptical Kinetic Shockwave Ring ──
+  const rx = baseR * 1.15;
+  const ry = baseR * 0.88;
+  const ringThick = Math.max(P * 1.5, Math.round((P * 2.8 * effect.life) / P) * P);
+
+  // Dark Manga Ink Outer Rim
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = colDarkRim;
+  ctx.lineWidth = ringThick + 2.2;
+  ctx.stroke();
+
+  // Vibrant Theme Energy Ring
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = colTheme;
+  ctx.lineWidth = ringThick;
+  ctx.stroke();
+
+  // Crisp Inner Core Highlight
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = colHighlight;
+  ctx.lineWidth = Math.max(1, P * 0.85);
+  ctx.stroke();
+
+  // Secondary Echo Ripple Ellipse
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx * 0.65, ry * 0.65, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = colHighlight;
+  ctx.lineWidth = Math.max(0.8, 1.6 * effect.life);
+  ctx.stroke();
+
+
+
+  // ── 4. Center Focal Ignition Impact Star (First 45% of Shockwave Life) ──
+  if (progress < 0.45) {
+    const starProg = 1.0 - (progress / 0.45);
+    const starR = effect.size * 0.40 * Math.pow(starProg, 1.2);
+    const starThick = starR * 0.22;
+
+    // Dark Border Star
+    ctx.fillStyle = colDarkRim;
+    ctx.beginPath();
+    ctx.moveTo(-starR - P, 0);
+    ctx.lineTo(-starThick - P * 0.5, -starThick - P * 0.5);
+    ctx.lineTo(0, -starR - P);
+    ctx.lineTo(starThick + P * 0.5, -starThick - P * 0.5);
+    ctx.lineTo(starR + P, 0);
+    ctx.lineTo(starThick + P * 0.5, starThick + P * 0.5);
+    ctx.lineTo(0, starR + P);
+    ctx.lineTo(-starThick - P * 0.5, starThick + P * 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // White Flash Core Star
+    ctx.fillStyle = colCore;
+    ctx.beginPath();
+    ctx.moveTo(-starR, 0);
+    ctx.lineTo(-starThick, -starThick);
+    ctx.lineTo(0, -starR);
+    ctx.lineTo(starThick, -starThick);
+    ctx.lineTo(starR, 0);
+    ctx.lineTo(starThick, starThick);
+    ctx.lineTo(0, starR);
+    ctx.lineTo(-starThick, starThick);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── 5. Ejected Diamond Spark Shards ──
+  const shardAngles = [0.38, -0.38, 1.15, -1.15, 2.25, -2.25];
+  for (let i = 0; i < shardAngles.length; i++) {
+    const sAng = shardAngles[i];
+    const sDist = baseR * (0.95 + 0.35 * progress);
+    const sX = Math.cos(sAng) * sDist * 1.15;
+    const sY = Math.sin(sAng) * sDist * 0.88;
+    const sSize = Math.max(1, P * 1.5 * effect.life);
+    ctx.fillStyle = (i % 2 === 0) ? colHighlight : colTheme;
+    ctx.fillRect(sX - sSize / 2, sY - sSize / 2, sSize, sSize);
+  }
 
   ctx.restore();
 }

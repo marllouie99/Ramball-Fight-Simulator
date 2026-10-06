@@ -33,10 +33,10 @@ export function _getRezeHairImage() {
       _rezeHairImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Reze hair image at Assets/model/Reze-hair.png', e);
+      console.warn('Failed to load Reze hair image at Assets/model/reze/Reze-hair.png', e);
       _rezeHairImageLoading = false;
     };
-    img.src = 'Assets/model/Reze-hair.png?v=1';
+    img.src = 'Assets/model/reze/Reze-hair.png?v=1';
     _rezeHairImage = img;
   }
   return _rezeHairImage;
@@ -47,7 +47,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Reze's authentic anime bob hair from Assets/model/Reze-hair.png.
+ * Draws Reze's authentic anime bob hair from Assets/model/reze/Reze-hair.png.
  * Features:
  * - Rounded plum/auburn voluminous manga bob
  * - Distinctive sweeping bangs framing the face

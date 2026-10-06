@@ -342,10 +342,10 @@ export function _getShikaiSwordImage() {
       _shikaiSwordImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Shikai sword image at Assets/model/ICHIGO-SHIKAI-SWORD.png', e);
+      console.warn('Failed to load Shikai sword image at Assets/model/ichigo/ICHIGO-SHIKAI-SWORD.png', e);
       _shikaiSwordImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-SHIKAI-SWORD.png';
+    img.src = 'Assets/model/ichigo/ICHIGO-SHIKAI-SWORD.png';
     _shikaiSwordImage = img;
   }
   return _shikaiSwordImage;
@@ -366,10 +366,10 @@ export function _getShikaiSwordBladeImage() {
       _shikaiSwordBladeImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Shikai sword blade image at Assets/model/ICHIGO-SHIKAI-SWORD-BLADE.png', e);
+      console.warn('Failed to load Shikai sword blade image at Assets/model/ichigo/ICHIGO-SHIKAI-SWORD-BLADE.png', e);
       _shikaiSwordBladeImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-SHIKAI-SWORD-BLADE.png';
+    img.src = 'Assets/model/ichigo/ICHIGO-SHIKAI-SWORD-BLADE.png';
     _shikaiSwordBladeImage = img;
   }
   return _shikaiSwordBladeImage;
@@ -390,10 +390,10 @@ export function _getBankaiSwordImage() {
       _bankaiSwordImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Bankai sword image at Assets/model/ICHIGO-BANKAI-SWORD.png', e);
+      console.warn('Failed to load Bankai sword image at Assets/model/ichigo/ICHIGO-BANKAI-SWORD.png', e);
       _bankaiSwordImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-BANKAI-SWORD.png';
+    img.src = 'Assets/model/ichigo/ICHIGO-BANKAI-SWORD.png';
     _bankaiSwordImage = img;
   }
   return _bankaiSwordImage;
@@ -414,10 +414,10 @@ export function _getBankaiSwordBladeImage() {
       _bankaiSwordBladeImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Bankai sword blade image at Assets/model/ICHIGO-BANKAI-SWORD-BLADE.png', e);
+      console.warn('Failed to load Bankai sword blade image at Assets/model/ichigo/ICHIGO-BANKAI-SWORD-BLADE.png', e);
       _bankaiSwordBladeImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-BANKAI-SWORD-BLADE.png';
+    img.src = 'Assets/model/ichigo/ICHIGO-BANKAI-SWORD-BLADE.png';
     _bankaiSwordBladeImage = img;
   }
   return _bankaiSwordBladeImage;
@@ -433,7 +433,7 @@ export const ICHIGO_BANKAI_ATTACK_CONFIG = {
   cy: 732.07,
   baseR: 688.66,
   rotOffset: -0.027,
-  src: 'Assets/model/Attack-Effects/Ichigo-bankai-attack.png'
+  src: 'Assets/model/ichigo/Ichigo-bankai-attack.png'
 };
 
 export const ICHIGO_SHIKAI_ATTACK_CONFIG = {
@@ -441,7 +441,7 @@ export const ICHIGO_SHIKAI_ATTACK_CONFIG = {
   cy: 732.07,
   baseR: 688.66,
   rotOffset: -0.027,
-  src: 'Assets/model/Attack-Effects/Ichigo-shikai-attack.png'
+  src: 'Assets/model/ichigo/Ichigo-shikai-attack.png'
 };
 
 let _ichigoBankaiAttackImg = null;

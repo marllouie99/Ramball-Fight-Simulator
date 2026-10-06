@@ -13,9 +13,13 @@ import {
   drawProjectionFrameStepPops,
   drawNaoyaMachRunwayVFX,
   getNaoyaScreenRunwayPoints,
-  sampleNaoyaRunwaySpline
+  sampleNaoyaRunwaySpline,
+  triggerShutterGlassBreak,
+  updateShutterGlassBreaks,
+  drawShutterGlassBreaks,
+  clearShutterGlassBreaks
 } from '../../graphics/weapons/naoyaWeaponGraphics.js';
-import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnAnimePunchImpactFrame } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 
@@ -24,7 +28,7 @@ export class NaoyaFighter extends Fighter {
     super(def);
     this.characterId = 'naoya';
     this.type = 'naoya';
-    this.name = 'Naoya Zenin';
+    this.name = 'Naoya';
 
     const cfg = CONFIG.naoya || {};
     this.themeColor = cfg.themeColor || '#76E042';
@@ -52,10 +56,11 @@ export class NaoyaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.flurryOwnerIndex = 0;
-    this.flurryStacksGained = 0;
+    this.flurryTriggeredStasis = false;
+    this._flurryLastAngle = undefined;
     this.disruptionHits = new Map(); // Target -> Disruption Hit Count
     this.frameFreezeCooldownTimer = 0;
-    this.frameFreezeCooldownMax = cfg.frameFreezeCooldown !== undefined ? cfg.frameFreezeCooldown : 240;
+    this.frameFreezeCooldownMax = cfg.frameFreezeCooldown !== undefined ? cfg.frameFreezeCooldown : (cfg.tantoCooldown || 500);
 
     // Skills & Cooldowns
     this.skill1Cooldown = 0;
@@ -80,6 +85,7 @@ export class NaoyaFighter extends Fighter {
     // Ultimate: 24 FPS Shutter Execution & Vehicular Run-Over
     this.ultCooldown = 0;
     this.ultCooldownMax = cfg.ultCooldown || 1440; // 24.0s
+    this.postComboUltDelay = 0;
     this.isExecutingUlt = false;
     this.ultPhase = 0;
     this.ultTimer = 0;
@@ -108,7 +114,10 @@ export class NaoyaFighter extends Fighter {
         color: this.themeColor,
         canCast: (fighter) => {
           const cfg = CONFIG.naoya || {};
-          return Boolean(cfg.enableFrameBlitz && cfg.enableFrameBlitz !== 0 && cfg.enableFrameBlitz !== '0' && cfg.enableFrameBlitz !== false);
+          return Boolean(cfg.enableFrameBlitz && cfg.enableFrameBlitz !== 0 && cfg.enableFrameBlitz !== '0' && cfg.enableFrameBlitz !== false) &&
+            !fighter.isExecutingFlurry &&
+            !fighter.isStabbingKnife &&
+            !fighter.isExecutingUlt;
         },
         onActivate: (fighter, opponent) => {
           fighter._castFrameBlitz(opponent);
@@ -123,7 +132,10 @@ export class NaoyaFighter extends Fighter {
         color: '#C8E64A',
         canCast: (fighter) => {
           const cfg = CONFIG.naoya || {};
-          return Boolean(cfg.enableSonicKick && cfg.enableSonicKick !== 0 && cfg.enableSonicKick !== '0' && cfg.enableSonicKick !== false);
+          return Boolean(cfg.enableSonicKick && cfg.enableSonicKick !== 0 && cfg.enableSonicKick !== '0' && cfg.enableSonicKick !== false) &&
+            !fighter.isExecutingFlurry &&
+            !fighter.isStabbingKnife &&
+            !fighter.isExecutingUlt;
         },
         onActivate: (fighter, opponent) => {
           fighter._castSonicKick(opponent);
@@ -137,10 +149,18 @@ export class NaoyaFighter extends Fighter {
         cooldownMax: () => this.ultCooldownMax,
         color: '#00F2FE',
         isUltimate: true,
+        isSignature: true,
+        signature: true,
         canCast: (fighter) => {
           const cfg = CONFIG.naoya || {};
           const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
-          return (fighter.frameStacks || 0) >= maxStacks && !fighter.isExecutingFlurry;
+          const isUltEnabled = Boolean(cfg.enableUltimate !== 0 && cfg.enableUltimate !== false && cfg.enableUltimate !== '0');
+          return isUltEnabled &&
+            (fighter.frameStacks || 0) >= maxStacks &&
+            !fighter.isExecutingFlurry &&
+            !fighter.isStabbingKnife &&
+            (fighter.postComboUltDelay || 0) <= 0 &&
+            (fighter.ultBreatherTimer || 0) <= 0;
         },
         onActivate: (fighter, opponent) => {
           fighter._castUltimate(opponent);
@@ -166,12 +186,18 @@ export class NaoyaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.flurryStacksGained = 0;
+    this.isStabbingKnife = false;
+    this.knifeStabTimer = 0;
+    this.knifeStabMaxTimer = 0;
+    this.knifeStabTarget = null;
+    this.knifeStabHitDone = false;
     if (this.disruptionHits) this.disruptionHits.clear();
     else this.disruptionHits = new Map();
     this.frameFreezeCooldownTimer = 0;
     this.skill1Cooldown = 0;
     this.skill2Cooldown = 0;
     this.ultCooldown = 0;
+    this.postComboUltDelay = 0;
     this.isDashingBlitz = false;
     this.isSonicKicking = false;
     this.isExecutingUlt = false;
@@ -189,6 +215,7 @@ export class NaoyaFighter extends Fighter {
     if (this.steppedFrames) this.steppedFrames.length = 0;
     else this.steppedFrames = [];
     this.projectedFrame = null;
+    clearShutterGlassBreaks();
   }
 
   /**
@@ -265,41 +292,62 @@ export class NaoyaFighter extends Fighter {
   }
 
   /**
-   * Applies Frame Stasis (1.0s 24 FPS Freeze) to a target.
+   * Applies Frame Stasis (24 FPS Film Freeze) to a target for the duration of the combo.
    * @param {Object} target
-   * @param {number} duration
+   * @param {number} [duration=999]
+   * @returns {boolean} Whether stasis was successfully applied
    */
-  applyFrameStasis(target, duration = 60) {
-    if (!target || target.isDead || (target.hp || 0) <= 0) return;
+  applyFrameStasis(target, duration = 999) {
+    if (!target || target.isDead || (target.hp || 0) <= 0) return false;
 
     // Check Gojo Infinity (Rule 1.7)
     if (target.characterId === 'gojo' || target.type === 'gojo') {
-      if (target.infinityCooldown <= 0) {
+      const isInfinityActive = (typeof target.hasActiveInfinity === 'function') ? target.hasActiveInfinity() : (target.infinityCooldown <= 0);
+      if (isInfinityActive) {
         spawnFloatingText(target.x, target.y - target.r - 20, 'INFINITY BLOCKED', '#4da3ff');
-        return;
+        return false;
       }
     }
 
-    // Check Toji Heavenly Restriction resilience (0.35s reduced freeze)
-    const effectiveDuration = (target.characterId === 'toji' || target.type === 'toji') ? 22 : duration;
-
-    target.frameFreezeTimer = effectiveDuration;
     target.isFrameFrozen = true;
+    target.frameFreezeTimer = duration;
 
     if (typeof target.applyTimeStop === 'function') {
-      target.applyTimeStop(effectiveDuration);
+      target.applyTimeStop(duration, { isFrameStasis: true, isNaoya: true });
+    } else {
+      target.timeStopTimer = Math.max(target.timeStopTimer || 0, duration);
     }
 
     spawnFloatingText(target.x, target.y - target.r - 20, '24 FPS FREEZE!', '#00F2FE');
     audioSystem.playSFX('enhance', 0.9);
     triggerGlobalScreenShake(4, 6);
+    return true;
+  }
+
+  /**
+   * Cleans up and ends 24-Frame Palm Touch Frame Stasis on a target entity,
+   * triggering the glass break shatter VFX.
+   * @param {Object} target
+   */
+  endFrameStasis(target) {
+    if (!target) return;
+    if (target.frameFreezeTimer > 0 || target.isFrameFrozen) {
+      target.frameFreezeTimer = 0;
+      target.isFrameFrozen = false;
+      if (typeof target.clearTimeStop === 'function') {
+        target.clearTimeStop();
+      } else if (target.timeStopTimer > 0) {
+        target.timeStopTimer = 0;
+      }
+      triggerShutterGlassBreak(target);
+    }
   }
 
   /**
    * Casts Skill 1: Frame Blitz (Nijūyon Koma Senkō)
    */
   _castFrameBlitz(opponent) {
-    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry) return;
+    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry || this.isStabbingKnife) return;
     const cfg = CONFIG.naoya || {};
     if (cfg.enableFrameBlitz === 0 || cfg.enableFrameBlitz === false || cfg.enableFrameBlitz === '0') return;
 
@@ -335,7 +383,7 @@ export class NaoyaFighter extends Fighter {
    * Casts Skill 2: Sonic Boom Rebound Kick (Onpoku Kyaku)
    */
   _castSonicKick(opponent) {
-    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry) return;
+    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry || this.isStabbingKnife) return;
     const cfg = CONFIG.naoya || {};
     if (cfg.enableSonicKick === 0 || cfg.enableSonicKick === false || cfg.enableSonicKick === '0') return;
 
@@ -448,6 +496,7 @@ export class NaoyaFighter extends Fighter {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
         if (f && f !== this) {
+          const hadFrameStasis = Boolean(f.isFrameFrozen || (f.frameFreezeTimer && f.frameFreezeTimer > 0));
           f.isCaughtInNaoyaUlt = false;
           f.isFrameFrozen = false;
           f.frameFreezeTimer = 0;
@@ -457,6 +506,9 @@ export class NaoyaFighter extends Fighter {
             f.statusEffects.isFrozen = false;
           }
           if (typeof f.resumeMovement === 'function') f.resumeMovement();
+          if (hadFrameStasis) {
+            triggerShutterGlassBreak(f);
+          }
         }
       }
     }
@@ -485,8 +537,9 @@ export class NaoyaFighter extends Fighter {
    * Casts Ultimate: 24 FPS Mach 3 Runway Breach (Out-of-Bounds Orbit & Breach)
    */
   _castUltimate(opponent) {
-    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry) return;
+    if (!opponent || opponent.isDead || this.isExecutingUlt || this.isExecutingFlurry || this.isStabbingKnife || (this.postComboUltDelay > 0)) return;
     const cfg = CONFIG.naoya || {};
+    if (cfg.enableUltimate === 0 || cfg.enableUltimate === false || cfg.enableUltimate === '0') return;
     const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
     if ((this.frameStacks || 0) < maxStacks) return;
 
@@ -498,6 +551,7 @@ export class NaoyaFighter extends Fighter {
     this.isDashingBlitz = false;
     this.isSonicKicking = false;
     this.ultCooldown = this.ultCooldownMax;
+    this.postComboUltDelay = 0;
     this.isExecutingUlt = true;
     this.ultPhase = 1;
     this.ultTimer = 0;
@@ -568,14 +622,27 @@ export class NaoyaFighter extends Fighter {
     this.ultPhase = 0;
     this.ultTimer = 0;
     this.ultBreatherTimer = 0;
+    this.postComboUltDelay = 0;
     this.isDashingBlitz = false;
     this.isSonicKicking = false;
+    if (this.flurryTarget) {
+      this.endFrameStasis(this.flurryTarget);
+    }
+    if (this.knifeStabTarget) {
+      this.endFrameStasis(this.knifeStabTarget);
+    }
     this.isExecutingFlurry = false;
+    this.flurryTriggeredStasis = false;
+    this.isStabbingKnife = false;
+    this.knifeStabTimer = 0;
+    this.knifeStabHitDone = false;
+    this.knifeStabTarget = null;
+    this.punchAnimTimer = 0;
     super.interruptAttacks(force);
   }
 
   /**
-   * Teleports Naoya to a fresh geometric surround angle around the target (3 punches per teleport angle).
+   * Teleports Naoya to a fresh geometric surround angle around the target (with wide jumping angles & high entropy randomness).
    */
   _teleportToFlurryAngle(target, arena) {
     if (!target || target.isDead) return;
@@ -584,11 +651,24 @@ export class NaoyaFighter extends Fighter {
     const oldY = this.y;
 
     const cfg = CONFIG.naoya || {};
-    const punchesPerTeleport = Math.max(1, cfg.flurryPunchesPerTeleport !== undefined ? cfg.flurryPunchesPerTeleport : 3);
+    const punchesPerTeleport = Math.max(1, cfg.flurryPunchesPerTeleport ? cfg.flurryPunchesPerTeleport : 1);
     const tripletIndex = Math.floor((this.flurryHitsDone - 1) / punchesPerTeleport);
-    const angleStep = (Math.PI * 2) / 6; // 6 distinct teleport surround positions (60° apart)
-    const strikeAngle = (tripletIndex * angleStep) + ((tripletIndex % 2) * (Math.PI * 0.25));
-    const orbitDist = (target.r || 25) + (this.r || 25) + (cfg.flurryOrbitDistance ?? 14);
+
+    // Dynamic wide jumping angle with high entropy randomness (Zigzag across 360° circle)
+    // Large jump angle (~155°) ensures consecutive teleports jump across the enemy rather than slowly orbiting
+    const baseJump = cfg.flurryAngleStep !== undefined ? cfg.flurryAngleStep : ((155 * Math.PI) / 180);
+    const angleJitterMax = cfg.flurryRandomAngleSpread !== undefined ? cfg.flurryRandomAngleSpread : ((110 * Math.PI) / 180);
+    const randomJitter = (Math.random() - 0.5) * angleJitterMax;
+    
+    // Combine base wide angle progression with randomized scatter
+    const strikeAngle = (this._flurryLastAngle !== undefined ? (this._flurryLastAngle + baseJump) : (Math.random() * Math.PI * 2)) + randomJitter;
+    this._flurryLastAngle = strikeAngle;
+
+    // Randomized orbit distance variation for close/far punch depth
+    const baseOrbit = (target.r || 25) + (this.r || 25) + (cfg.flurryOrbitDistance ?? 20);
+    const orbitJitterMax = cfg.flurryRandomOrbitJitter ?? 16;
+    const orbitJitter = (Math.random() - 0.5) * orbitJitterMax;
+    const orbitDist = Math.max((target.r || 25) + (this.r || 25) + 4, baseOrbit + orbitJitter);
 
     let targetX = target.x + Math.cos(strikeAngle) * orbitDist;
     let targetY = target.y + Math.sin(strikeAngle) * orbitDist;
@@ -600,22 +680,30 @@ export class NaoyaFighter extends Fighter {
       targetY = Math.max(arenaBox.y + margin, Math.min(arenaBox.y + arenaBox.height - margin, targetY));
     }
 
+    // Facing angle from the ghost's previous position towards the target
+    const oldAngle = Math.atan2(target.y - oldY, target.x - oldX);
+
     this.x = targetX;
     this.y = targetY;
     this.vx = 0;
     this.vy = 0;
 
-    // Face directly towards target (Rule 1.3 Re-aim Alignment)
+    // Face directly towards target from new position (Rule 1.3 Re-aim Alignment)
     const faceAngle = Math.atan2(target.y - this.y, target.x - this.x);
     this.gunAngle = faceAngle;
     this.angle = faceAngle;
 
-    // Leave a clean stepped ghost model at previous position
+    // Leave a clean stepped blue projection ghost model at previous position aimed at target
+    const maxLife = cfg.flurryAfterimageLifespanFrames ?? 45;
+    const startAlpha = cfg.flurryAfterimageAlpha ?? 1.0;
     this.steppedFrames.push({
       x: oldX,
       y: oldY,
-      angle: faceAngle,
-      alpha: 0.85,
+      angle: oldAngle,
+      alpha: startAlpha,
+      maxAlpha: startAlpha,
+      lifeTimer: 0,
+      maxLife: maxLife,
       stepCount: tripletIndex + 1
     });
   }
@@ -627,19 +715,6 @@ export class NaoyaFighter extends Fighter {
     const reach = (this.r || 25) + (cfg.meleeReach || 48);
     const arcAngle = cfg.meleeArc || ((140 * Math.PI) / 180);
     const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-
-    // Punch strike shockwave expanding from fist forward
-    const fistDist = (this.r || 25) * 1.15;
-    const fistX = this.x + Math.cos(aimAngle) * fistDist;
-    const fistY = this.y + Math.sin(aimAngle) * fistDist;
-    this.sonicShockwaves.push({
-      x: fistX,
-      y: fistY,
-      currentRadius: 4,
-      maxRadius: isFinisher ? 65 : 32,
-      timer: 0,
-      maxTimer: isFinisher ? 12 : 8
-    });
 
     // Frontal Arc Melee Execution (Rule 1.6: Checks both fighters and illusions)
     const targets = [];
@@ -675,19 +750,16 @@ export class NaoyaFighter extends Fighter {
           const hitSuccess = applyDamageToTarget(target, baseDmg, this, { isMelee: true });
 
           if (hitSuccess) {
-            // Track Disruption count for 24-Frame Palm Touch Stasis (Passive with Cooldown)
-            // ONLY triggers when the Flurry is UP / actively executing AND damage was successfully dealt
+            // Passive: 24-Frame Palm Touch & Frame Stasis Freeze
+            // Triggers with a configurable chance once tantoCooldown is UP so it doesn't trigger too frequently
             const isFreezeEnabled = cfg.enableFrameFreeze === 1 || cfg.enableFrameFreeze === true || (cfg.enableFrameFreeze !== 0 && cfg.enableFrameFreeze !== false);
-            const isFlurryUp = Boolean(this.isExecutingFlurry);
-            const canPassiveFreeze = isFreezeEnabled && isFlurryUp && (this.frameFreezeCooldownTimer <= 0);
-            if (canPassiveFreeze) {
-              const currentHits = (this.disruptionHits.get(target) || 0) + 1;
-              this.disruptionHits.set(target, currentHits);
-
-              if (currentHits >= (cfg.maxDisruptionsForStasis || 3)) {
-                this.disruptionHits.set(target, 0);
-                this.frameFreezeCooldownTimer = cfg.frameFreezeCooldown !== undefined ? cfg.frameFreezeCooldown : (this.frameFreezeCooldownMax || 240);
-                this.applyFrameStasis(target, cfg.frameFreezeDuration || 60);
+            if (isFreezeEnabled && !this.flurryTriggeredStasis) {
+              const freezeChance = cfg.frameFreezeChance !== undefined ? cfg.frameFreezeChance : 0.35;
+              if (Math.random() < freezeChance) {
+                const applied = this.applyFrameStasis(target);
+                if (applied) {
+                  this.flurryTriggeredStasis = true;
+                }
               }
             }
 
@@ -706,23 +778,13 @@ export class NaoyaFighter extends Fighter {
               spawnSparks(target.x, target.y, 6, '#00F2FE');
             }
 
-            // Knockback: zero on intermediate flurry hits so enemy stays locked in barrage, heavy on finisher!
-            const knockback = isFinisher ? (cfg.tantoKnockback || 16) : 0;
+            // Knockback: zero on flurry punch hits so enemy stays locked in barrage until the knife stab finisher
+            const knockback = 0;
             if (knockback > 0) {
               const kAngle = targetAngle;
               target.vx = (target.vx || 0) + Math.cos(kAngle) * knockback;
               target.vy = (target.vy || 0) + Math.sin(kAngle) * knockback;
             }
-
-            // Spawn high-impact kinetic shockwave ring directly on target hit
-            this.sonicShockwaves.push({
-              x: target.x,
-              y: target.y,
-              currentRadius: 6,
-              maxRadius: isFinisher ? 80 : 44,
-              timer: 0,
-              maxTimer: isFinisher ? 14 : 9
-            });
 
             spawnBloodEffect(target.x, target.y, isFinisher ? 10 : 3);
             spawnImpactFlash(target.x, target.y, isFinisher ? 18 : 10, isFinisher ? '#FFFFFF' : this.themeColor);
@@ -731,7 +793,20 @@ export class NaoyaFighter extends Fighter {
       }
     }
 
-    const punchSfx = cfg.sounds?.punchHit || 'attack_punch';
+    let punchSfx = 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+    if (isFinisher) {
+      punchSfx = cfg.sounds?.finisherPunch || 'Assets/Sound Effects/Attacks/heavypunch2.mp3';
+    } else {
+      const punchList = Array.isArray(cfg.sounds?.punchHit)
+        ? cfg.sounds.punchHit
+        : (Array.isArray(cfg.sounds?.punchHits)
+          ? cfg.sounds.punchHits
+          : (cfg.sounds?.punchHit ? [cfg.sounds.punchHit] : [
+              'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+              'Assets/Sound Effects/Attacks/heavypunch2.mp3'
+            ]));
+      punchSfx = punchList[Math.floor(Math.random() * punchList.length)] || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+    }
     const punchVol = isFinisher ? (cfg.soundVolumes?.finisherPunch ?? 0.95) : (cfg.soundVolumes?.punchHit ?? 0.85);
     audioSystem.playSFX(punchSfx, punchVol);
   }
@@ -740,7 +815,7 @@ export class NaoyaFighter extends Fighter {
    * Executes Primary Attack (Initiates 24 FPS Hypersonic Flurry Barrage)
    */
   shoot(ownerIndex, opponent) {
-    if (this.isCaughtInBeam() || this.isExecutingUlt || this.isDashingBlitz || this.isExecutingFlurry || (this.ultBreatherTimer > 0) || (this.shootCooldown > 0)) return;
+    if (this.isCaughtInBeam() || this.isExecutingUlt || this.isDashingBlitz || this.isExecutingFlurry || this.isStabbingKnife || (this.ultBreatherTimer > 0) || (this.shootCooldown > 0)) return;
 
     const cfg = CONFIG.naoya || {};
     const totalFlurryHits = cfg.basicComboHits || 30;
@@ -752,14 +827,16 @@ export class NaoyaFighter extends Fighter {
     this.flurryTarget = opponent;
     this.flurryOwnerIndex = ownerIndex;
     this.flurryStacksGained = 0;
+    this.flurryTriggeredStasis = false;
+    this._flurryLastAngle = Math.random() * Math.PI * 2;
     const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
     this.shootCooldownMax = tantoCd;
-    this.shootCooldown = 0; // Cooldown starts ticking ONLY after flurry completes!
+    this.shootCooldown = 0; // Cooldown starts ticking ONLY after flurry and knife stab complete!
 
     // Immediately trigger 1st attack at starting teleport position
     this.flurryHitsDone++;
     const isFinisher = this.flurryHitsDone >= this.flurryHitsTotal;
-    const baseDmg = isFinisher ? (cfg.punchComboFinisherDamage || cfg.tantoComboFinisherDamage || 18) : (cfg.punchDamage || cfg.tantoDamage || 4);
+    const baseDmg = cfg.punchDamage || cfg.tantoDamage || 4;
     this._teleportToFlurryAngle(opponent, (typeof state !== 'undefined' ? state.arena : null));
     this.punchAnimTimer = 8;
     this.punchAnimMaxTimer = 8;
@@ -767,8 +844,7 @@ export class NaoyaFighter extends Fighter {
     this._executeFlurryStrike(ownerIndex, isFinisher, baseDmg, cfg);
 
     if (isFinisher) {
-      this.isExecutingFlurry = false;
-      this.shootCooldown = tantoCd;
+      this._evaluateFlurryFinisher(opponent, ownerIndex, cfg);
     }
   }
 
@@ -820,6 +896,7 @@ export class NaoyaFighter extends Fighter {
     if (this.skill1Cooldown > 0) this.skill1Cooldown--;
     if (this.skill2Cooldown > 0) this.skill2Cooldown--;
     if (this.ultCooldown > 0) this.ultCooldown--;
+    if (this.postComboUltDelay > 0) this.postComboUltDelay--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.frameFreezeCooldownTimer > 0) this.frameFreezeCooldownTimer--;
     // Basic Attack Cooldown (tantoCooldown) ticks down only when not actively executing a flurry
@@ -827,6 +904,8 @@ export class NaoyaFighter extends Fighter {
 
     // 2. Update Primary Attack: 24 FPS Hypersonic Flurry Barrage (3 Punches per Teleport)
     if (this.isExecutingFlurry && this.ultBreatherTimer <= 0) {
+      this.vx = 0;
+      this.vy = 0;
       const cfg = CONFIG.naoya || {};
       const strikeInterval = Math.max(1, cfg.flurryStrikeIntervalFrames || 5);
       this.flurryTimer++;
@@ -855,7 +934,7 @@ export class NaoyaFighter extends Fighter {
         if (this.flurryTarget && !this.flurryTarget.isDead && (this.flurryTarget.hp || 0) > 0) {
           this.flurryHitsDone++;
           const isFinisher = this.flurryHitsDone >= this.flurryHitsTotal;
-          const baseDmg = isFinisher ? (cfg.punchComboFinisherDamage || cfg.tantoComboFinisherDamage || 18) : (cfg.punchDamage || cfg.tantoDamage || 4);
+          const baseDmg = cfg.punchDamage || cfg.tantoDamage || 4;
 
           // Teleport only on every Nth punch cycle (flurryPunchesPerTeleport punches per teleport angle)
           const punchesPerTeleport = Math.max(1, cfg.flurryPunchesPerTeleport !== undefined ? cfg.flurryPunchesPerTeleport : 3);
@@ -874,22 +953,86 @@ export class NaoyaFighter extends Fighter {
           this.punchAnimHand = (this.flurryHitsDone % 2);
           this._executeFlurryStrike(this.flurryOwnerIndex ?? ownerIndex, isFinisher, baseDmg, cfg);
 
-          if (this.flurryHitsDone % punchesPerTeleport === 0 || isFinisher) {
+          if (this.flurryHitsDone % punchesPerTeleport === 0 && !isFinisher) {
             spawnFloatingText(this.x, this.y - this.r - 22, `${this.flurryHitsDone}/${this.flurryHitsTotal} FLURRY!`, '#76E042');
           }
 
           if (isFinisher) {
-            this.isExecutingFlurry = false;
-            const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
-            this.shootCooldown = tantoCd;
-            this.shootCooldownMax = tantoCd;
+            this._evaluateFlurryFinisher(this.flurryTarget, this.flurryOwnerIndex ?? ownerIndex, cfg);
           }
         } else {
           this.isExecutingFlurry = false;
           const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
           this.shootCooldown = tantoCd;
           this.shootCooldownMax = tantoCd;
+          this.postComboUltDelay = cfg.ultPostComboDelayFrames !== undefined ? cfg.ultPostComboDelayFrames : 120;
         }
+      }
+    }
+
+    // 2.5 Update Final Strike: Cursed Tanto Knife Stab
+    if (this.isStabbingKnife && this.ultBreatherTimer <= 0) {
+      // Strictly halt all movement while doing the stab animation
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+
+      this.knifeStabTimer--;
+      const maxT = this.knifeStabMaxTimer || 38;
+      const rawProgress = 1.0 - Math.max(0, this.knifeStabTimer / maxT);
+
+      if (this.knifeStabTarget && !this.knifeStabTarget.isDead && (this.knifeStabTarget.hp || 0) > 0) {
+        const dx = this.knifeStabTarget.x - this.x;
+        const dy = (this.knifeStabTarget.y - (this.knifeStabTarget.z || 0)) - (this.y - (this.z || 0));
+        const faceAngle = Math.atan2(dy, dx);
+        this.gunAngle = faceAngle;
+        this.angle = faceAngle;
+      }
+
+      // Phase 2 (rawProgress >= 0.45): Execute the smooth knife stab into the enemy in the front!
+      if (rawProgress >= 0.45 && !this.knifeStabHitDone) {
+        this.knifeStabHitDone = true;
+        const cfg = CONFIG.naoya || {};
+
+        // Play authentic knife stab sound effect
+        audioSystem.playSFX('naoya_stabs', cfg.soundVolumes?.knifeStabs ?? 1.20);
+
+        if (this.knifeStabTarget && !this.knifeStabTarget.isDead && (this.knifeStabTarget.hp || 0) > 0) {
+          const stabDmg = cfg.tantoComboFinisherDamage || cfg.punchComboFinisherDamage || 30;
+          const hitSuccess = applyDamageToTarget(this.knifeStabTarget, stabDmg, this, {
+            isTrueDamage: false,
+            isMelee: true,
+            isFinisher: true,
+            knockback: cfg.tantoKnockback || 16,
+            knockbackAngle: this.gunAngle
+          });
+
+          if (hitSuccess) {
+            this._onDamageEnemy(this.knifeStabTarget);
+            // Passive: 24-Frame Palm Touch & Frame Stasis Freeze ends after Naoya stabs the enemy with his knife!
+            this.endFrameStasis(this.knifeStabTarget);
+            spawnBloodEffect(this.knifeStabTarget.x, this.knifeStabTarget.y, 16);
+            spawnImpactFlash(this.knifeStabTarget.x, this.knifeStabTarget.y, 28, '#76E042');
+            triggerGlobalScreenShake(4, 8);
+            spawnFloatingText(this.knifeStabTarget.x, this.knifeStabTarget.y - (this.knifeStabTarget.r || 25) - 22, 'TANTO STAB FINISHER!', '#76E042');
+          } else {
+            this.endFrameStasis(this.knifeStabTarget);
+          }
+        }
+      }
+
+      if (this.knifeStabTimer <= 0) {
+        if (this.knifeStabTarget) {
+          this.endFrameStasis(this.knifeStabTarget);
+        }
+        this.isStabbingKnife = false;
+        this.knifeStabHitDone = false;
+        const cfg = CONFIG.naoya || {};
+        const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
+        this.shootCooldown = tantoCd;
+        this.shootCooldownMax = tantoCd;
+        this.postComboUltDelay = cfg.ultPostComboDelayFrames !== undefined ? cfg.ultPostComboDelayFrames : 120;
       }
     }
 
@@ -1202,8 +1345,11 @@ export class NaoyaFighter extends Fighter {
               currentRadius: 12,
               maxRadius: 210,
               timer: 0,
-              maxTimer: 22
+              maxTimer: 22,
+              angle: breachAngle
             });
+
+            spawnAnimePunchImpactFrame(target.x, target.y, 110, breachAngle, 'gold');
 
             spawnBloodEffect(target.x, target.y, 35);
             spawnFloatingText(target.x, target.y - target.r - 28, '💥 RUN OVER! MACH 3 CRASH!', '#00F2FE');
@@ -1332,34 +1478,75 @@ export class NaoyaFighter extends Fighter {
       }
     }
 
-    // Decrement Frame Freeze stasis timers on targets
-    if (state.fighters && Array.isArray(state.fighters)) {
-      for (const f of state.fighters) {
-        if (f && f.frameFreezeTimer && f.frameFreezeTimer > 0) {
-          f.frameFreezeTimer--;
-          if (f.frameFreezeTimer <= 0) {
-            f.isFrameFrozen = false;
+    // Update active 24 FPS Frame Stasis targets
+    const updateFreezeEntity = (entity) => {
+      if (entity && (entity.frameFreezeTimer > 0 || entity.isFrameFrozen)) {
+        const isCurrentComboVictim = (this.isExecutingFlurry && (this.flurryTarget === entity || (state.fighters && state.fighters.includes(entity) && !this.isTeammate(entity)))) ||
+                                     (this.isStabbingKnife && this.knifeStabTarget === entity);
+        if (isCurrentComboVictim) {
+          // Maintain active time-stop lock on combo victim
+          entity.isFrameFrozen = true;
+          if (typeof entity.applyTimeStop === 'function') {
+            entity.applyTimeStop(30, { isFrameStasis: true, isNaoya: true });
+          } else {
+            entity.timeStopTimer = Math.max(entity.timeStopTimer || 0, 30);
           }
+          return;
+        }
+
+        // If not a combo victim, tick down independent frameFreezeTimer
+        if (entity.frameFreezeTimer > 0 && entity.frameFreezeTimer < 900) {
+          entity.frameFreezeTimer--;
+          if (entity.frameFreezeTimer <= 0) {
+            this.endFrameStasis(entity);
+          }
+        } else if (!this.isExecutingFlurry && !this.isStabbingKnife && !this.isExecutingUlt) {
+          this.endFrameStasis(entity);
         }
       }
+    };
+    if (state.fighters && Array.isArray(state.fighters)) {
+      for (const f of state.fighters) updateFreezeEntity(f);
+    }
+    if (state.illusions && Array.isArray(state.illusions)) {
+      for (const ill of state.illusions) updateFreezeEntity(ill);
     }
 
+    // Update active 24 FPS shutter glass break animations
+    updateShutterGlassBreaks();
+
     // 6. AI Decision Matrix
-    if (opponent && !opponent.isDead && (opponent.hp || 0) > 0 && !this.isExecutingUlt && !this.isDashingBlitz && !this.isExecutingFlurry && this.ultBreatherTimer <= 0) {
+    if (
+      opponent &&
+      !opponent.isDead &&
+      (opponent.hp || 0) > 0 &&
+      !this.isExecutingUlt &&
+      !this.isDashingBlitz &&
+      !this.isExecutingFlurry &&
+      !this.isStabbingKnife &&
+      (this.postComboUltDelay || 0) <= 0 &&
+      this.ultBreatherTimer <= 0
+    ) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
       const cfg = CONFIG.naoya || {};
       const maxStacks = cfg.maxFrameStacks !== undefined ? cfg.maxFrameStacks : 25;
+      const isUltEnabled = Boolean(cfg.enableUltimate !== 0 && cfg.enableUltimate !== false && cfg.enableUltimate !== '0');
       const canBlitz = Boolean(cfg.enableFrameBlitz && cfg.enableFrameBlitz !== 0 && cfg.enableFrameBlitz !== '0' && cfg.enableFrameBlitz !== false);
       const canSonicKick = Boolean(cfg.enableSonicKick && cfg.enableSonicKick !== 0 && cfg.enableSonicKick !== '0' && cfg.enableSonicKick !== false);
 
-      // Ultimate trigger when ready, max frame stacks reached, and NOT currently executing a flurry
-      if (this.ultCooldown <= 0 && (this.frameStacks || 0) >= maxStacks && !this.isExecutingFlurry && dist < 240) {
+      // Ultimate trigger when ready, max frame stacks reached, not executing flurry or stab, and post-combo delay expired
+      if (isUltEnabled && this.ultCooldown <= 0 && (this.frameStacks || 0) >= maxStacks && !this.isExecutingFlurry && !this.isStabbingKnife && (this.postComboUltDelay || 0) <= 0 && dist < 240) {
         this._castUltimate(opponent);
-      } else if (canBlitz && !this.isExecutingFlurry && this.skill1Cooldown <= 0 && dist < 220) {
+      } else if (canBlitz && !this.isExecutingFlurry && !this.isStabbingKnife && this.skill1Cooldown <= 0 && dist < 220) {
         this._castFrameBlitz(opponent);
-      } else if (canSonicKick && !this.isExecutingFlurry && this.skill2Cooldown <= 0 && dist < 180) {
+      } else if (canSonicKick && !this.isExecutingFlurry && !this.isStabbingKnife && this.skill2Cooldown <= 0 && dist < 180) {
         this._castSonicKick(opponent);
       }
+    }
+
+    if (this.isStationarySkillActive()) {
+      this.vx = 0;
+      this.vy = 0;
     }
 
     // 7. Centralized Movement & Physics Standard (Rule 1.2)
@@ -1370,7 +1557,21 @@ export class NaoyaFighter extends Fighter {
   }
 
   isStationarySkillActive() {
-    return Boolean(this.isDashingBlitz || this.isExecutingUlt || this.isExecutingFlurry || (this.ultBreatherTimer && this.ultBreatherTimer > 0));
+    return Boolean(
+      this.isExecutingFlurry ||
+      this.isStabbingKnife ||
+      this.isDashingBlitz ||
+      this.isExecutingUlt ||
+      (this.ultBreatherTimer && this.ultBreatherTimer > 0) ||
+      super.isStationarySkillActive?.()
+    );
+  }
+
+  canAim() {
+    if (this.isExecutingUlt || this.isExecutingFlurry || this.isDashingBlitz || this.isStabbingKnife || (this.ultBreatherTimer && this.ultBreatherTimer > 0)) {
+      return false;
+    }
+    return super.canAim();
   }
 
   /**
@@ -1404,6 +1605,99 @@ export class NaoyaFighter extends Fighter {
     return false;
   }
 
+  /**
+   * Evaluates the completion of a flurry barrage:
+   * ONLY executes the Cursed Tanto Knife Stab Finisher if Naoya successfully put the enemy
+   * in 24-Frame Palm Touch: Frame Freeze Stasis during the combo.
+   * Otherwise, the flurry concludes naturally with regular cooldowns.
+   * @param {Object} target
+   * @param {number} ownerIndex
+   * @param {Object} [cfg]
+   */
+  _evaluateFlurryFinisher(target, ownerIndex, cfg = CONFIG.naoya || {}) {
+    const isTargetFrozen = Boolean(target && !target.isDead && (target.isFrameFrozen || (target.frameFreezeTimer && target.frameFreezeTimer > 0)));
+    if (this.flurryTriggeredStasis && isTargetFrozen) {
+      this._triggerKnifeStabFinisher(target, ownerIndex);
+    } else {
+      this.isExecutingFlurry = false;
+      this.punchAnimTimer = 0;
+      const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
+      this.shootCooldown = tantoCd;
+      this.shootCooldownMax = tantoCd;
+      this.postComboUltDelay = cfg.ultPostComboDelayFrames !== undefined ? cfg.ultPostComboDelayFrames : 120;
+      if (target && !isTargetFrozen) {
+        this.endFrameStasis(target);
+      }
+    }
+  }
+
+  /**
+   * Final Strike: Naoya unsheathes his concealed cursed tanto knife and smoothly stabs the enemy in the front.
+   * ONLY executed when the target is trapped in 24-Frame Palm Touch Frame Freeze Stasis.
+   * @param {Object} target
+   * @param {number} ownerIndex
+   */
+  _triggerKnifeStabFinisher(target, ownerIndex) {
+    const cfg = CONFIG.naoya || {};
+    const isTargetFrozen = Boolean(target && !target.isDead && (target.isFrameFrozen || (target.frameFreezeTimer && target.frameFreezeTimer > 0)));
+    if (!isTargetFrozen) {
+      this.isExecutingFlurry = false;
+      this.punchAnimTimer = 0;
+      const tantoCd = cfg.tantoCooldown !== undefined ? cfg.tantoCooldown : (cfg.punchCooldown || 40);
+      this.shootCooldown = tantoCd;
+      this.shootCooldownMax = tantoCd;
+      this.postComboUltDelay = cfg.ultPostComboDelayFrames !== undefined ? cfg.ultPostComboDelayFrames : 120;
+      return;
+    }
+
+    const stabFrames = cfg.knifeStabFrames || 38;
+    this.isExecutingFlurry = false;
+    this.isStabbingKnife = true;
+    this.knifeStabTimer = stabFrames;
+    this.knifeStabMaxTimer = stabFrames;
+    this.knifeStabTarget = target;
+    this.knifeStabOwnerIndex = ownerIndex;
+    this.knifeStabHitDone = false;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+
+    // Smoothly reposition directly in front of target
+    this._positionForKnifeStab(target);
+
+    // Audio SFX 1: Take off / Unsheathe Knife
+    audioSystem.playSFX('naoya_takeoff_knife', cfg.soundVolumes?.knifeTakeoff ?? 1.05);
+  }
+
+  _positionForKnifeStab(target) {
+    if (!target || target.isDead) return;
+    const dx = target.x - this.x;
+    const dy = (target.y - (target.z || 0)) - (this.y - (this.z || 0));
+    const angle = Math.atan2(dy, dx);
+    this.gunAngle = angle;
+    this.angle = angle;
+
+    const targetDist = (this.r || 25) + (target.r || 25) + 12;
+    const arena = (typeof state !== 'undefined' ? state.arena : null);
+    let newX = target.x - Math.cos(angle) * targetDist;
+    let newY = target.y - Math.sin(angle) * targetDist;
+
+    if (arena) {
+      const margin = (this.r || 25) + 10;
+      newX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, newX));
+      newY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, newY));
+    }
+
+    this.x = newX;
+    this.y = newY;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.aim(target);
+  }
+
   applyMovementPhysics(extraMultiplier = 1) {
     if (this.isStationarySkillActive()) {
       this.vx = 0;
@@ -1433,9 +1727,6 @@ export class NaoyaFighter extends Fighter {
     // 1. Ahead Frame Generation (only active during normal combat / blitz dashes; inactive during ult, breather, or when slowed)
     if (this.isExecutingUlt || (this.ultBreatherTimer && this.ultBreatherTimer > 0) || this.isMovementSlowed()) {
       this.projectedFrame = null;
-      if (this.isMovementSlowed()) {
-        this.steppedFrames = [];
-      }
     } else {
       const moveSpeed = Math.hypot(this.vx, this.vy);
       const isMoving = moveSpeed > 0.3 || this.isDashingBlitz || this.isSonicKicking;
@@ -1526,12 +1817,21 @@ export class NaoyaFighter extends Fighter {
       }
     }
 
-    // 2. Unconditionally Decay Stepped Frames on every tick
+    // 2. Unconditionally Decay Stepped Frames on every tick (smoothly fade out over their full lifespan)
     for (let i = this.steppedFrames.length - 1; i >= 0; i--) {
       const sf = this.steppedFrames[i];
-      sf.alpha -= 0.045; // Smooth fade out over ~18-20 frames
-      if (sf.alpha <= 0) {
-        this.steppedFrames.splice(i, 1);
+      if (sf.maxLife && sf.maxLife > 0) {
+        sf.lifeTimer = (sf.lifeTimer || 0) + 1;
+        const prog = Math.min(1.0, sf.lifeTimer / sf.maxLife);
+        sf.alpha = (sf.maxAlpha || 1.0) * Math.pow(1.0 - prog, 1.25);
+        if (sf.lifeTimer >= sf.maxLife || sf.alpha <= 0.01) {
+          this.steppedFrames.splice(i, 1);
+        }
+      } else {
+        sf.alpha -= 0.035; // Smooth fade out over ~28 frames
+        if (sf.alpha <= 0.01) {
+          this.steppedFrames.splice(i, 1);
+        }
       }
     }
 
@@ -1549,10 +1849,9 @@ export class NaoyaFighter extends Fighter {
     const enableMovementAI = cfg.enableMovementAfterimages !== false;
     const isSlowed = this.isMovementSlowed();
 
-    if (isSlowed) {
-      // If movement is slowed by any attack or debuff, hide and clear idle afterimages
+    if (isSlowed && !this.isExecutingFlurry && !this.isStabbingKnife) {
+      // If movement is slowed by any attack or debuff, hide and clear idle movement afterimages
       this.movementAfterimages = [];
-      this.steppedFrames = [];
       this.afterimages = [];
     } else if (enableMovementAI && !this.isExecutingUlt) {
       const moveSpeed = Math.hypot(this.vx, this.vy);
@@ -1650,13 +1949,11 @@ export class NaoyaFighter extends Fighter {
     // 0B. Draw Mach 3 Runway Out-of-Bounds Visuals & Aim Needle during Ultimate
     drawNaoyaMachRunwayVFX(ctx, this);
 
-    // 2. Draw Projection Sorcery Forward-Projected 24 FPS Ghost Frames (Ahead of Movement)
-    if (!this.isMovementSlowed()) {
-      drawProjectionSorceryForwardFrames(ctx, this);
-    }
+    // 2. Draw Projection Sorcery Forward-Projected 24 FPS Ghost Frames & Flurry Stepped Afterimages
+    drawProjectionSorceryForwardFrames(ctx, this);
 
     // 3. Draw Trailing Ghost Model Afterimages (Fading out 1 by 1)
-    if (!this.isMovementSlowed()) {
+    if (!this.isMovementSlowed() || this.isExecutingFlurry) {
       if (this.movementAfterimages && this.movementAfterimages.length > 0) {
         for (let i = 0; i < this.movementAfterimages.length; i++) {
           const af = this.movementAfterimages[i];
@@ -1676,7 +1973,7 @@ export class NaoyaFighter extends Fighter {
     // 4. Draw Active Sonic Boom Rings
     for (let i = 0; i < this.sonicShockwaves.length; i++) {
       const sw = this.sonicShockwaves[i];
-      drawSonicBoomRing(ctx, sw.x, sw.y, sw.currentRadius, sw.maxRadius, sw.timer / sw.maxTimer);
+      drawSonicBoomRing(ctx, sw.x, sw.y, sw.currentRadius, sw.maxRadius, sw.timer / sw.maxTimer, sw.angle || 0);
     }
 
     // 5. Draw Main Body Skin
@@ -1685,10 +1982,38 @@ export class NaoyaFighter extends Fighter {
     // 6. Draw 24 FPS Frame Stasis Overlay if opponent or minion is frame-frozen
     if (state.fighters && Array.isArray(state.fighters)) {
       for (const f of state.fighters) {
-        if (f && f.frameFreezeTimer && f.frameFreezeTimer > 0) {
-          draw24FPSFrameStasisOverlay(ctx, f, f.frameFreezeTimer);
+        if (f && (f.frameFreezeTimer > 0 || f.isFrameFrozen)) {
+          draw24FPSFrameStasisOverlay(ctx, f, f.frameFreezeTimer || 60);
         }
       }
     }
+    if (state.illusions && Array.isArray(state.illusions)) {
+      for (const ill of state.illusions) {
+        if (ill && (ill.frameFreezeTimer > 0 || ill.isFrameFrozen)) {
+          draw24FPSFrameStasisOverlay(ctx, ill, ill.frameFreezeTimer || 60);
+        }
+      }
+    }
+
+    // 7. Draw Active 24 FPS Shutter Glass Break Effects
+    drawShutterGlassBreaks(ctx);
+
+    // 8. Draw Overlay Health Text and Freeze Timer on top layer
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
+  }
+
+  drawBody(ctx) {
+    drawNaoyaSkin(ctx, this);
+  }
+
+  /**
+   * Helper to trigger shutter glass break animation on a target entity.
+   * @param {Object} [target=null]
+   * @param {Object} [opts={}]
+   */
+  triggerShutterGlassBreak(target = null, opts = {}) {
+    triggerShutterGlassBreak(target || this, opts);
   }
 }
+

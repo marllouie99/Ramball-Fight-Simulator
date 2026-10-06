@@ -2,6 +2,13 @@
 // Yuta Okkotsu — Special Grade Sorcerer Config
 // ─────────────────────────────────────────────
 export const yutaConfig = {
+  assets: {
+    hair: 'Assets/model/yuta/Yuta-hair.png',
+    pixelSkin: 'Assets/model/yuta/Yuta-Pixel-Skin.png',
+    bossMap: 'Assets/model/yuta/Yuta-bossmap.png',
+    domainOverlay: 'Assets/Overlays/Yuta-domain-overlay.png',
+  },
+
   name: 'Yuta',
   displayName: 'Yuta',
   // ── Base Attributes ──

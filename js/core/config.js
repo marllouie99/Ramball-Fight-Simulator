@@ -212,12 +212,12 @@ export const CONFIG = {
   arenaXOverride: null,              // Absolute X override (px) - set to a number (e.g. 50) to skip centering
   arenaYOverride: null,              // Absolute Y override (px) - set to a number (e.g. 120) to skip centering
   arenaTheme: 'light',               // Arena visual theme: 'light' | 'dark'
-  canvasBgColor: '#F5EEDC',          // Canvas background color (hex string or hex number)
-  arenaOuterBgColor: '#F5EEDC',      // Background color of the container area outside the arena (under HUD and sides)
-  arenaInnerBgColor: '#F5EEDC',      // Background color inside the arena boundaries
-  lightCanvasBgColor: '#F5EEDC',
-  lightArenaOuterBgColor: '#F5EEDC',
-  lightArenaInnerBgColor: '#F5EEDC',
+  canvasBgColor: '#ffffffff',          // Canvas background color (hex string or hex number)
+  arenaOuterBgColor: '#ffffffff',      // Background color of the container area outside the arena (under HUD and sides)
+  arenaInnerBgColor: '#ffffffff',      // Background color inside the arena boundaries
+  lightCanvasBgColor: '#ffffffff',
+  lightArenaOuterBgColor: '#ffffffff',
+  lightArenaInnerBgColor: '#ffffffff',
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 22,              // Font size for fighter name in HUD (px)
   hudDescFontSize: 20,               // Font size for fighter description in HUD (px)

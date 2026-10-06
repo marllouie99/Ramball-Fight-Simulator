@@ -23,6 +23,7 @@ import {
 import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
 import { clearFighterDomain, cleanupDeadFightersDomains } from './domainSystem.js';
 import { wasmDist, wasmDistSq, wasmCircleCollide, wasmClamp, wasmLerp, wasmSpatialGridHash, wasmBatchCircleCollisions } from '../core/wasmMath.js';
+import { isEntityOutsideArena } from '../entities/fighter.js';
 
 // ─────────────────────────────────────────────
 // SPATIAL PARTITIONING GRID (WASM ACCELERATED)
@@ -434,8 +435,8 @@ export function resolveFighterCollision(a, b) {
     return;
   }
 
-  const aIsGojoInfinity = isEnemy && (typeof a.hasActiveInfinity === 'function') && a.hasActiveInfinity() && !b.isMeleeMode;
-  const bIsGojoInfinity = isEnemy && (typeof b.hasActiveInfinity === 'function') && b.hasActiveInfinity() && !a.isMeleeMode;
+  const aIsGojoInfinity = isEnemy && (typeof a.hasActiveInfinity === 'function') && a.hasActiveInfinity();
+  const bIsGojoInfinity = isEnemy && (typeof b.hasActiveInfinity === 'function') && b.hasActiveInfinity();
 
   if (aIsGojoInfinity && !b.gojoInfinityImmune) {
     if (typeof b.applySlow === 'function') b.applySlow(20, 0.35, { isInfinitySlow: true });
@@ -467,8 +468,17 @@ export function resolveFighterCollision(a, b) {
   const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless;
   const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless;
 
-  const aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
-  const bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
+  let aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
+  let bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
+
+  // Gojo Limitless Infinity: Spatial barrier prevents colliding entities from pushing Gojo (Rule 1.7)
+  if (aIsGojoInfinity && !b.gojoInfinityImmune) {
+    aIsImmovable = true;
+    bIsImmovable = false;
+  } else if (bIsGojoInfinity && !a.gojoInfinityImmune) {
+    bIsImmovable = true;
+    aIsImmovable = false;
+  }
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -529,8 +539,8 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isImmovable || aIsNameless;
-  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isImmovable || bIsNameless;
+  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isImmovable || aIsNameless || (aIsGojoInfinity && !b.gojoInfinityImmune);
+  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isImmovable || bIsNameless || (bIsGojoInfinity && !a.gojoInfinityImmune);
 
   if (aIsAnchor) {
     a.vx = 0;
@@ -693,7 +703,10 @@ export function getClosestOpponent(fighter) {
 
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;
-    const dSq = dx * dx + dy * dy;
+    let dSq = dx * dx + dy * dy;
+    if (isEntityOutsideArena(other, state.arena)) {
+      dSq += 2000000;
+    }
 
     if (dSq < bestDistance) {
       bestDistance = dSq;
@@ -716,7 +729,10 @@ export function getClosestOpponent(fighter) {
       }
       const dx = illusion.x - fighter.x;
       const dy = illusion.y - fighter.y;
-      const dSq = dx * dx + dy * dy;
+      let dSq = dx * dx + dy * dy;
+      if (isEntityOutsideArena(illusion, state.arena)) {
+        dSq += 2000000;
+      }
 
       if (dSq < bestDistance) {
         bestDistance = dSq;
@@ -738,7 +754,10 @@ export function getClosestOpponent(fighter) {
       }
       const dx = car.x - fighter.x;
       const dy = car.y - fighter.y;
-      const dSq = dx * dx + dy * dy;
+      let dSq = dx * dx + dy * dy;
+      if (isEntityOutsideArena(car, state.arena)) {
+        dSq += 2000000;
+      }
       if (dSq < bestDistance) {
         bestDistance = dSq;
         closest = car;
@@ -1203,7 +1222,7 @@ export function updateFighters() {
           const nx = dx / dist;
           const ny = dy / dist;
           const overlap = minDist - dist;
-          const fighterIsGojoInfinity = (typeof fighter.hasActiveInfinity === 'function') && fighter.hasActiveInfinity() && !entity.isMeleeMode;
+          const fighterIsGojoInfinity = (typeof fighter.hasActiveInfinity === 'function') && fighter.hasActiveInfinity();
           // Gojo Infinity slows colliding entities instead of pushing them back
           if (fighterIsGojoInfinity && !entity.gojoInfinityImmune) {
             if (typeof entity.applySlow === 'function') entity.applySlow(20, 0.35, { isInfinitySlow: true });
@@ -1227,6 +1246,14 @@ export function updateFighters() {
             }
             fighter.x -= nx * overlap * 2;
             fighter.y -= ny * overlap * 2;
+          } else if (fighterIsGojoInfinity && !entity.gojoInfinityImmune) {
+            entity.x += nx * overlap * 2;
+            entity.y += ny * overlap * 2;
+            const dotIll = (entity.vx || 0) * nx + (entity.vy || 0) * ny;
+            if (dotIll < 0) {
+              entity.vx -= dotIll * nx;
+              entity.vy -= dotIll * ny;
+            }
           } else if (fighterIsCounterLocked || fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai || (fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0) || (fighter.isChannelingGetsuga && fighter.isFinalMassiveGetsuga) || (fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter.isGhostTerrain || fighter.characterId === 'eye_of_cthulhu' || fighter.type === 'eye_of_cthulhu') {
             if (fighterIsCounterLocked) {
               fighter.vx = 0; fighter.vy = 0; fighter.knockbackVx = 0; fighter.knockbackVy = 0;

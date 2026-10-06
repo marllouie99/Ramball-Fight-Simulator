@@ -266,9 +266,11 @@ export class StatusEffectsManager {
 
   // --- Freeze / Time Stop ---
   applyTimeStop(frames, opts = {}) {
-    // Only apply if not immune
-    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji' || this.fighter.isCountering || (this.fighter._counterPunchTimer && this.fighter._counterPunchTimer > 0) || (this.fighter._postCounterRecoveryTimer && this.fighter._postCounterRecoveryTimer > 0)) {
-      return;
+    // Only apply if not immune (Frame stasis & Makima chains bypass generic CC immunity)
+    if (!opts.isFrameStasis && !opts.isNaoya) {
+      if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji' || this.fighter.isCountering || (this.fighter._counterPunchTimer && this.fighter._counterPunchTimer > 0) || (this.fighter._postCounterRecoveryTimer && this.fighter._postCounterRecoveryTimer > 0)) {
+        return;
+      }
     }
     
     // Mahoraga Limitless Infinity barrier adaptation immunity (does NOT bypass Domain Expansion Unlimited Void!)
@@ -314,7 +316,7 @@ export class StatusEffectsManager {
       return true;
     }
 
-    if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.immuneToCC || fighter.characterId === 'escanor' || fighter.type === 'escanor' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima) {
+    if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.immuneToCC || fighter.characterId === 'escanor' || fighter.type === 'escanor' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima && !fighter.isFrameFrozen && (!fighter.frameFreezeTimer || fighter.frameFreezeTimer <= 0) && !fighter.isCaughtInNaoyaUlt && !fighter.isCurrentlyWallPinnedByNaoya) {
       fighter.timeStopTimer = 0;
       fighter.isFrozenByInfinity = false;
       fighter.electricStunTimer = 0;

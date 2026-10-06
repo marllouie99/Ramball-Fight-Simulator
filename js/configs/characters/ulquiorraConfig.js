@@ -4,6 +4,10 @@
 // ─────────────────────────────────────────────
 
 export const ulquiorraConfig = {
+  assets: {
+    weapon: 'Assets/model/ulquiorra/UlquiorraCifer-weapon.png',
+  },
+
   name: 'Ulquiorra',
   displayName: 'Ulquiorra',
   bossTitle: '4th Espada',

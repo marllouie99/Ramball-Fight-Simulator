@@ -3,6 +3,10 @@
 // ─────────────────────────────────────────────
 
 export const gunslingerConfig = {
+  assets: {
+    hair: 'Assets/model/gunslinger/Gunslinger-hair.png',
+  },
+
   // ── Base Character Attributes ──
   id: 13,
   name: 'Gun Slinger',

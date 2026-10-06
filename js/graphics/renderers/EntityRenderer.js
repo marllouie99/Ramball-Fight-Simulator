@@ -8,6 +8,7 @@ import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbedded
 import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 import { drawCursedRocks } from '../fighters/todoSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
+import { draw24FPSFrameStasisOverlay } from '../weapons/naoyaWeaponGraphics.js';
 import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
 
@@ -164,7 +165,7 @@ export function drawFighters() {
 
         if (!isDarkMode) {
           const beamAngle = (genosUltFighter.gunAngle !== undefined) ? genosUltFighter.gunAngle : (genosUltFighter.ultAngle || genosUltFighter.angle || 0);
-          const beamW = CONFIG.genos?.ultBeamWidth || 70;
+          const beamW = CONFIG.genos?.ultBeamWidth || 140;
           const range = CONFIG.genos?.ultBeamRange || 1200;
           const startOffset = genosUltFighter.r + 5;
           const startX = genosUltFighter.x + Math.cos(beamAngle) * startOffset;
@@ -504,6 +505,11 @@ export function drawFighters() {
       ctx.save();
       drawTargetChainsOverlay(ctx, fighter, fighter._makimaChainer || null);
       ctx.restore();
+    }
+
+    // 24 FPS Film Frame Stasis Overlay (Naoya 24-Frame Palm Touch & Projection Sorcery Freeze)
+    if (fighter.isFrameFrozen || (fighter.frameFreezeTimer && fighter.frameFreezeTimer > 0)) {
+      draw24FPSFrameStasisOverlay(ctx, fighter, fighter.frameFreezeTimer || 60);
     }
 
     // Embedded Mahito Bone Spikes attached to body
@@ -1441,6 +1447,11 @@ export function drawIllusions() {
     // Makima Chains of Domination Body-Wrapping Chains & Subjugation Collar Overlay
     if (illusion.isChainedByMakima) {
       drawTargetChainsOverlay(ctx, illusion, illusion._makimaChainer || null);
+    }
+
+    // 24 FPS Film Frame Stasis Overlay (Naoya 24-Frame Palm Touch & Projection Sorcery Freeze)
+    if (illusion.isFrameFrozen || (illusion.frameFreezeTimer && illusion.frameFreezeTimer > 0)) {
+      draw24FPSFrameStasisOverlay(ctx, illusion, illusion.frameFreezeTimer || 60);
     }
 
     // Draw illusion sword (always visible, not just during swings)
