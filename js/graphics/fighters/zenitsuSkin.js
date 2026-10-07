@@ -177,13 +177,13 @@ export function _drawZenitsuHair(ctx, r, facingLeft = false) {
     // X: [55, 461] (width 407, horizontal center at 258)
     // Y: [54, 409] (height 356, top crown at 54)
     // Calibrated to seamlessly frame the upper circle with square-cut crown at -1.25r
-    const targetHairWidth = r * 2.35 * wMult;
-    const targetHairHeight = r * 1.95 * hMult;
+    const targetHairWidth = r * 2.82 * wMult;
+    const targetHairHeight = r * 1.83 * hMult;
     const scaleX = targetHairWidth / 407;
     const scaleY = targetHairHeight / 356;
     const drawW = 516 * scaleX;
     const drawH = 484 * scaleY;
-    const drawX = -258 * scaleX + offX;
+    const drawX = -258 * scaleX + 1 + offX;
     const drawY = -r * 1.25 - 54 * scaleY + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {

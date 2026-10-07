@@ -8,9 +8,10 @@ class NoCacheHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
         self.send_header('Expires', '0')
         super().end_headers()
 
+HOST = "127.0.0.1"
 PORT = 8000
 Handler = NoCacheHTTPRequestHandler
 
-with socketserver.TCPServer(("", PORT), Handler) as httpd:
-    print(f"Serving at port {PORT} with NO CACHING...")
+with socketserver.TCPServer((HOST, PORT), Handler) as httpd:
+    print(f"Serving locally at http://{HOST}:{PORT} with NO CACHING...")
     httpd.serve_forever()

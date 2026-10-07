@@ -63,14 +63,14 @@ export function _drawNanamiHair(ctx, r, facingLeft = false) {
     // X: [73, 1324] (width 1252, horizontal center at 698.5)
     // Y: [250, 1046] (height 797, top crown at 250)
     // Calibrated to seamlessly frame the upper circle with crown at -1.15r
-    const targetHairWidth = r * 2.45 * wMult;
-    const targetHairHeight = r * 1.55 * hMult;
+    const targetHairWidth = r * 3.43 * wMult;
+    const targetHairHeight = r * 1.92 * hMult;
     const scaleX = targetHairWidth / 1252;
     const scaleY = targetHairHeight / 797;
     const drawW = 1345 * scaleX;
     const drawH = 1170 * scaleY;
     const drawX = -698.5 * scaleX + offX;
-    const drawY = -r * 1.15 - 250 * scaleY + offY;
+    const drawY = -r * 1.15 - 250 * scaleY - 5 + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);

@@ -161,10 +161,22 @@ export function isUltimateVoiceline(src) {
 
 function _pruneSoundCache() {
   if (_cache.size > MAX_CACHE_SIZE) {
-    // Remove oldest entries (Map maintains insertion order)
     const entriesToRemove = _cache.size - MAX_CACHE_SIZE;
-    const keysToRemove = Array.from(_cache.keys()).slice(0, entriesToRemove);
-    keysToRemove.forEach(key => _cache.delete(key));
+    let removed = 0;
+    for (const key of _cache.keys()) {
+      if (removed >= entriesToRemove) break;
+      // Protect voice lines / announcer audio and active BGM from premature eviction
+      if (isProtectedVoiceOrAnnouncerSound(key) || (typeof state !== 'undefined' && state.activeMatchBgmSrc === key)) {
+        continue;
+      }
+      _cache.delete(key);
+      removed++;
+    }
+    if (_cache.size > MAX_CACHE_SIZE) {
+      const remaining = _cache.size - MAX_CACHE_SIZE;
+      const oldestKeys = Array.from(_cache.keys()).slice(0, remaining);
+      oldestKeys.forEach(k => _cache.delete(k));
+    }
   }
 }
 

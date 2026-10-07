@@ -74,14 +74,14 @@ export function _drawGunslingerHair(ctx, r, facingLeft = false) {
     // X: [0, 1516] (width 1517, horizontal center at 758)
     // Y: [7, 1023] (height 1017, top crown at 7)
     // Scales to sit naturally on top of Gunslinger's head
-    const targetHatWidth = r * 2.80 * wMult;
+    const targetHatWidth = r * 3.36 * wMult;
     const targetHatHeight = r * 1.85 * hMult;
     const scaleX = targetHatWidth / 1517;
     const scaleY = targetHatHeight / 1017;
     const drawW = 1536 * scaleX;
     const drawH = 1024 * scaleY;
     const drawX = -758 * scaleX + offX;
-    const drawY = -r * 1.32 - 7 * scaleY + offY;
+    const drawY = -r * 1.32 - 7 * scaleY - 10 + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);

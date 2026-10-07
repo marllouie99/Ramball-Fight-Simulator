@@ -312,14 +312,14 @@ export function _drawTodoHair(ctx, r, facingLeft = false) {
     // X: [109, 1315] (width 1207, horizontal center at 712)
     // Y: [28, 1108] (height 1081, top crown at 28)
     // Calibrated to seamlessly frame the upper body circle with authentic topknot at -1.55r
-    const targetHairWidth = r * 2.50 * wMult;
+    const targetHairWidth = r * 3.30 * wMult;
     const targetHairHeight = r * 2.25 * hMult;
     const scaleX = targetHairWidth / 1207;
     const scaleY = targetHairHeight / 1081;
     const drawW = 1345 * scaleX;
     const drawH = 1170 * scaleY;
-    const drawX = -712 * scaleX + offX;
-    const drawY = -r * 1.55 - 28 * scaleY + offY;
+    const drawX = -712 * scaleX + 2 + offX;
+    const drawY = -r * 1.55 - 28 * scaleY - 7 + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);

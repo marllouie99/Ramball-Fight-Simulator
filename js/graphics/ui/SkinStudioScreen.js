@@ -1,4 +1,16 @@
-import { state, saveSkinCustomizations } from '../../core/state.js';
+import {
+  state,
+  saveSkinCustomizations,
+  loadSkinCustomizations,
+  setFighterCustomAsDefault,
+  resetFighterToDefault,
+  resetAllFightersToDefault,
+  SKIN_CUSTOMIZATIONS_DATABASE,
+  DEFAULT_SKIN_CUSTOMIZATIONS,
+  getDatabaseDefault,
+  getAllDatabaseDefaults,
+  generateDatabaseModuleCode
+} from '../../core/state.js';
 import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawChamferedRect } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
@@ -273,13 +285,13 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'TOJI',
     asset: 'toji-hair.png',
     assetDims: '1345 x 1170',
-    baseW: 2.45,
-    baseH: 1.85,
+    baseW: 3.19,
+    baseH: 1.96,
     baseCrownY: -1.30,
-    visW: 1274,
-    visH: 960,
-    centerX: 677.5,
-    topY: 86,
+    visW: 1123,
+    visH: 908,
+    centerX: 686,
+    topY: 136,
     themeColor: '#7D3224',
     forms: [
       { id: 'default', label: 'STANDARD' }
@@ -290,7 +302,7 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'TODO',
     asset: 'Todo-hair.png',
     assetDims: '1345 x 1170',
-    baseW: 2.50,
+    baseW: 3.30,
     baseH: 2.25,
     baseCrownY: -1.55,
     visW: 1207,
@@ -320,8 +332,8 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'ZENITSU',
     asset: 'Zenitsu-hair.png',
     assetDims: '516 x 484',
-    baseW: 2.35,
-    baseH: 1.95,
+    baseW: 2.82,
+    baseH: 1.83,
     baseCrownY: -1.25,
     visW: 407,
     visH: 356,
@@ -430,8 +442,8 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'NANAMI',
     asset: 'Nanami-hair.png',
     assetDims: '1345 x 1170',
-    baseW: 2.45,
-    baseH: 1.55,
+    baseW: 3.43,
+    baseH: 1.92,
     baseCrownY: -1.15,
     visW: 1252,
     visH: 797,
@@ -448,8 +460,8 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'MAHITO',
     asset: 'Mahito-hair.png',
     assetDims: '536 x 466',
-    baseW: 2.35,
-    baseH: 2.64,
+    baseW: 2.82,
+    baseH: 2.22,
     baseCrownY: -1.25,
     visW: 408,
     visH: 458,
@@ -517,8 +529,8 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'ESCANOR',
     asset: 'Escanor-hair.png',
     assetDims: '500 x 500',
-    baseW: 2.30,
-    baseH: 1.80,
+    baseW: 2.29,
+    baseH: 1.49,
     baseCrownY: -1.15,
     visW: 280,
     visH: 220,
@@ -569,7 +581,7 @@ export const SKIN_STUDIO_FIGHTERS = [
     label: 'GUNSLINGER',
     asset: 'Hair/Gunslinger-hair.png',
     assetDims: '1536 x 1024',
-    baseW: 2.80,
+    baseW: 3.36,
     baseH: 1.85,
     baseCrownY: -1.32,
     visW: 1517,
@@ -699,30 +711,26 @@ const AVATAR_KEY_MAP = {
   avatarofemptiness_forearm_right: 'forearm_right'
 };
 
+export function getFighterDefaultCustom(key, useFactory = false) {
+  const isSkin2 = (state.selectedNamelessDeitySkin === 'skin2');
+  const configMap = isSkin2 ? NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS : NAMELESS_DEITY_DEFAULT_CONFIGS;
+  const deityPart = NAMELESS_KEY_MAP[key];
+  const avatarPart = AVATAR_KEY_MAP[key];
+
+  if (deityPart && configMap[deityPart]) return { ...configMap[deityPart] };
+  if (avatarPart && AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS[avatarPart]) return { ...AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS[avatarPart] };
+
+  if (!useFactory && state.defaultSkinCustomizations && state.defaultSkinCustomizations[key]) {
+    return { ...state.defaultSkinCustomizations[key] };
+  }
+
+  return getDatabaseDefault(key);
+}
+
 function ensureFighterCustom(key) {
   if (!state.skinCustomizations) state.skinCustomizations = {};
   if (!state.skinCustomizations[key]) {
-    const isSkin2 = (state.selectedNamelessDeitySkin === 'skin2');
-    const configMap = isSkin2 ? NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS : NAMELESS_DEITY_DEFAULT_CONFIGS;
-    const deityPart = NAMELESS_KEY_MAP[key];
-    const avatarPart = AVATAR_KEY_MAP[key];
-
-    let def = {
-      widthScale: 1.0,
-      heightScale: 1.0,
-      offsetX: 0,
-      offsetY: 0,
-      angleOffset: 0,
-      flipX: false,
-      flipY: false
-    };
-
-    if (deityPart) {
-      def = configMap[deityPart] || def;
-    } else if (avatarPart) {
-      def = AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS[avatarPart] || def;
-    }
-    state.skinCustomizations[key] = { ...def };
+    state.skinCustomizations[key] = getFighterDefaultCustom(key);
   }
   return state.skinCustomizations[key];
 }
@@ -881,7 +889,7 @@ function generateJsCode(fDef, custom) {
            `const drawW = 500 * scaleX;\n` +
            `const drawH = 500 * scaleY;\n` +
            `const drawX = -251.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
-           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 122 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 122 * scaleY + 4${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'todo') {
     return `// Calibrated Hair for Todo (Assets/model/todo/Todo-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
@@ -911,7 +919,57 @@ function generateJsCode(fDef, custom) {
            `const drawW = 1536 * scaleX;\n` +
            `const drawH = 1024 * scaleY;\n` +
            `const drawX = -758 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
-           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 7 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 7 * scaleY - 10${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'zenitsu') {
+    return `// Calibrated Hair for Zenitsu (Assets/model/zenitsu/Zenitsu-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 407;\n` +
+           `const scaleY = targetHairHeight / 356;\n` +
+           `const drawW = 516 * scaleX;\n` +
+           `const drawH = 484 * scaleY;\n` +
+           `const drawX = -258 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 54 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'naoya') {
+    return `// Calibrated Hair for Naoya (Assets/model/naoya/Naoya_hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 1289;\n` +
+           `const scaleY = targetHairHeight / 913;\n` +
+           `const drawW = 1506 * scaleX;\n` +
+           `const drawH = 1045 * scaleY;\n` +
+           `const drawX = -740 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 30 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'genos') {
+    return `// Calibrated Hair for Genos (Assets/model/genos/Genos-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 405;\n` +
+           `const scaleY = targetHairHeight / 328;\n` +
+           `const drawW = 500 * scaleX;\n` +
+           `const drawH = 500 * scaleY;\n` +
+           `const drawX = -253 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 81 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'john_wick') {
+    return `// Calibrated Hair for John Wick (Assets/model/johnWick/Johnwick-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 924;\n` +
+           `const scaleY = targetHairHeight / 912;\n` +
+           `const drawW = 1254 * scaleX;\n` +
+           `const drawH = 1254 * scaleY;\n` +
+           `const drawX = -626.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 209 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'zeus') {
+    return `// Calibrated Hair for Zeus (Assets/model/zeus/Zeus-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 1195;\n` +
+           `const scaleY = targetHairHeight / 1223;\n` +
+           `const drawW = 1254 * scaleX;\n` +
+           `const drawH = 1254 * scaleY;\n` +
+           `const drawX = -638 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 31 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'nameless_deity') {
     const part = state.studioSkinNamelessPart || 'overall';
     const activeKey = (part !== 'overall') ? `nameless_deity_${part}` : 'nameless_deity';
@@ -939,6 +997,139 @@ function generateJsCode(fDef, custom) {
          `offsetX: ${offX},\n` +
          `offsetY: ${offY},\n` +
          `angleOffset: ${rot}`;
+}
+
+/**
+ * Triggers a file download of all current fighter skin customizations as a JSON file.
+ */
+export function exportBulkPresetsToFile() {
+  try {
+    const data = state.skinCustomizations || {};
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `circle_mini_battle_skin_presets_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+    return true;
+  } catch (e) {
+    console.error('Failed to export presets to file:', e);
+    return false;
+  }
+}
+
+/**
+ * Triggers a file download of the full skinCustomizationsDatabase.js code module.
+ */
+export function downloadDatabaseFile() {
+  try {
+    const code = generateDatabaseModuleCode(state.skinCustomizations);
+    const blob = new Blob([code], { type: 'application/javascript' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `skinCustomizationsDatabase.js`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (a.parentNode) document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+    return true;
+  } catch (e) {
+    console.error('Failed to download database file:', e);
+    return false;
+  }
+}
+
+/**
+ * Validates, sanitizes, and merges an imported JSON object into state.skinCustomizations.
+ * @param {Object} importedObj
+ * @returns {number} Number of successfully imported fighter presets.
+ */
+export function validateAndMergeSkinPresets(importedObj) {
+  if (!importedObj || typeof importedObj !== 'object' || Array.isArray(importedObj)) {
+    throw new Error('Invalid JSON: Expected an object of fighter customizations.');
+  }
+
+  if (!state.skinCustomizations) state.skinCustomizations = {};
+  let count = 0;
+
+  for (const [key, val] of Object.entries(importedObj)) {
+    if (!val || typeof val !== 'object' || Array.isArray(val)) continue;
+
+    const sanitized = {
+      widthScale: (typeof val.widthScale === 'number' && isFinite(val.widthScale)) ? Number(val.widthScale.toFixed(2)) : 1.0,
+      heightScale: (typeof val.heightScale === 'number' && isFinite(val.heightScale)) ? Number(val.heightScale.toFixed(2)) : 1.0,
+      offsetX: (typeof val.offsetX === 'number' && isFinite(val.offsetX)) ? Math.round(val.offsetX) : 0,
+      offsetY: (typeof val.offsetY === 'number' && isFinite(val.offsetY)) ? Math.round(val.offsetY) : 0,
+      angleOffset: (typeof val.angleOffset === 'number' && isFinite(val.angleOffset)) ? Number(val.angleOffset.toFixed(4)) : 0,
+      flipX: Boolean(val.flipX),
+      flipY: Boolean(val.flipY)
+    };
+
+    if (typeof val.gap === 'number' && isFinite(val.gap)) {
+      sanitized.gap = Math.round(val.gap);
+    }
+
+    state.skinCustomizations[key] = {
+      ...(state.skinCustomizations[key] || {}),
+      ...sanitized
+    };
+    count++;
+  }
+
+  saveSkinCustomizations();
+  return count;
+}
+
+/**
+ * Triggers file picker to import presets from a JSON file.
+ */
+export function importBulkPresetsFromFile(onSuccess, onError) {
+  if (typeof document === 'undefined') return;
+  try {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.style.display = 'none';
+
+    input.onchange = (e) => {
+      const file = e.target.files?.[0];
+      if (!file) {
+        if (input.parentNode) document.body.removeChild(input);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const parsed = JSON.parse(evt.target.result);
+          const count = validateAndMergeSkinPresets(parsed);
+          if (typeof onSuccess === 'function') onSuccess(count);
+        } catch (err) {
+          if (typeof onError === 'function') onError(err);
+        } finally {
+          if (input.parentNode) document.body.removeChild(input);
+        }
+      };
+      reader.onerror = (err) => {
+        if (typeof onError === 'function') onError(err);
+        if (input.parentNode) document.body.removeChild(input);
+      };
+      reader.readAsText(file);
+    };
+
+    document.body.appendChild(input);
+    input.click();
+  } catch (e) {
+    if (typeof onError === 'function') onError(e);
+  }
 }
 
 export function drawSkinStudioScreen() {
@@ -1565,6 +1756,13 @@ export function drawSkinStudioScreen() {
   const zoomCenterX = heroX;
   const zoomPct = Math.round((currentScale / ZOOM_DEFAULT) * 100);
 
+  // Viewport "Make Adjustments Default" quick-action button
+  drawButton('💾 MAKE ADJUSTMENTS DEFAULT', viewportX + 90, zoomY, () => {
+    setFighterCustomAsDefault(activeCustomKey, custom);
+    _copyToastText = `✓ SAVED ${fDef.label} AS PERMANENT DEFAULT!`;
+    _copyToastTimer = 90;
+  }, 170, 20, '#10b981', 3);
+
   drawButton('−', zoomCenterX - 85, zoomY, () => {
     state.studioSkinPreviewScale = Math.max(ZOOM_MIN, state.studioSkinPreviewScale - ZOOM_STEP);
   }, 26, 18, null, 3);
@@ -1623,11 +1821,12 @@ export function drawSkinStudioScreen() {
   ctx.fillText('ASSET CALIBRATION TABS //', leftConsoleX + 12, consoleY + 12);
   ctx.fillText('PRECISION PARAMETERS //', rightConsoleX + 12, consoleY + 12);
 
-  // Auto-save indicator badge
-  ctx.fillStyle = '#059669';
-  ctx.font = '900 8.5px "Rajdhani", sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('● AUTO-SAVED', rightConsoleX + rightConsoleW - 12, consoleY + 12);
+  // Save as default button in header
+  drawButton('💾 SAVE AS DEFAULT', rightConsoleX + rightConsoleW - 62, consoleY + 12, () => {
+    setFighterCustomAsDefault(activeCustomKey, custom);
+    _copyToastText = `✓ SAVED ${fDef.label} AS PERMANENT DEFAULT!`;
+    _copyToastTimer = 90;
+  }, 114, 18, '#10b981', 3);
 
   // CRITICAL: Always reset text alignment to 'left' and 'top' to prevent coordinates overflow
   ctx.textAlign = 'left';
@@ -1637,7 +1836,7 @@ export function drawSkinStudioScreen() {
     { id: 'scale', label: '1. HAIR SCALE / SIZE', desc: 'Width & Height multipliers' },
     { id: 'position', label: '2. POSITION & SHIFT', desc: 'X/Y & Crown elevation offsets' },
     { id: 'rotation', label: '3. ROTATION & FLIP', desc: 'Tilt, angle & horizontal/vertical flip' },
-    { id: 'export', label: '4. LIVE CODE EXPORT', desc: 'Copy ready-to-paste JS code' },
+    { id: 'export', label: '4. CODE & BULK PRESETS', desc: 'Export JS & Bulk JSON Presets' },
     { id: 'assets', label: '5. ASSET REGISTRY', desc: 'Skins, weapons & active assets' }
   ];
 
@@ -1877,13 +2076,23 @@ export function drawSkinStudioScreen() {
       curY += 46;
     }
 
-    // Scale Reset button & Tip
-    drawButton('RESET SCALE (1.0x, 1.0x)', rowX + rowW / 2, curY + 12, () => {
-      custom.widthScale = 1.0;
-      custom.heightScale = 1.0;
-      if (isNamelessDeity && activePartId === 'antlers') custom.gap = 0;
+    // Scale Reset button & Save Default
+    const halfW = Math.floor((rowW - 6) / 2);
+    drawButton('RESET SCALE', rowX + halfW / 2, curY + 12, () => {
+      const def = getFighterDefaultCustom(activeCustomKey);
+      custom.widthScale = def.widthScale ?? 1.0;
+      custom.heightScale = def.heightScale ?? 1.0;
+      if (custom.gap !== undefined) custom.gap = def.gap ?? 0;
       saveSkinCustomizations();
-    }, rowW, 22, null, 3);
+      _copyToastText = `✓ RESET SCALE TO DEFAULT (${custom.widthScale}x, ${custom.heightScale}x)!`;
+      _copyToastTimer = 90;
+    }, halfW, 22, null, 3);
+
+    drawButton('💾 SET DEFAULT', rowX + halfW + 6 + halfW / 2, curY + 12, () => {
+      setFighterCustomAsDefault(activeCustomKey, custom);
+      _copyToastText = `✓ SAVED ${fDef.label} AS PERMANENT DEFAULT!`;
+      _copyToastTimer = 90;
+    }, halfW, 22, '#10b981', 3);
     curY += 34;
 
     ctx.textAlign = 'left';
@@ -1999,13 +2208,23 @@ export function drawSkinStudioScreen() {
       curY += 46;
     }
 
-    // Quick Reset Position Button
-    drawButton('CENTER POSITION (0, 0)', rowX + rowW / 2, curY + 12, () => {
-      custom.offsetX = 0;
-      custom.offsetY = 0;
-      if (isNamelessDeity && activePartId === 'antlers') custom.gap = 0;
+    // Quick Reset Position & Save Default Buttons
+    const halfPosW = Math.floor((rowW - 6) / 2);
+    drawButton('RESET POSITION', rowX + halfPosW / 2, curY + 12, () => {
+      const def = getFighterDefaultCustom(activeCustomKey);
+      custom.offsetX = def.offsetX ?? 0;
+      custom.offsetY = def.offsetY ?? 0;
+      if (custom.gap !== undefined) custom.gap = def.gap ?? 0;
       saveSkinCustomizations();
-    }, rowW, 22, null, 3);
+      _copyToastText = `✓ RESET POSITION TO DEFAULT (${custom.offsetX}X, ${custom.offsetY}Y)!`;
+      _copyToastTimer = 90;
+    }, halfPosW, 22, null, 3);
+
+    drawButton('💾 SET DEFAULT', rowX + halfPosW + 6 + halfPosW / 2, curY + 12, () => {
+      setFighterCustomAsDefault(activeCustomKey, custom);
+      _copyToastText = `✓ SAVED ${fDef.label} AS PERMANENT DEFAULT!`;
+      _copyToastTimer = 90;
+    }, halfPosW, 22, '#10b981', 3);
     curY += 38;
 
     ctx.textAlign = 'left';
@@ -2097,17 +2316,30 @@ export function drawSkinStudioScreen() {
     curY += 46;
 
     // Reset Angle & Flip Buttons
-    const halfW = Math.floor((rowW - 6) / 2);
-    drawButton('RESET ANGLE (0°)', rowX + halfW / 2, curY + 12, () => {
-      custom.angleOffset = 0;
+    const halfRotW = Math.floor((rowW - 6) / 2);
+    drawButton('RESET ANGLE', rowX + halfRotW / 2, curY + 12, () => {
+      const def = getFighterDefaultCustom(activeCustomKey);
+      custom.angleOffset = def.angleOffset ?? 0;
       saveSkinCustomizations();
-    }, halfW, 22, null, 3);
+      _copyToastText = '✓ RESET ANGLE TO DEFAULT!';
+      _copyToastTimer = 90;
+    }, halfRotW, 22, null, 3);
 
-    drawButton('RESET FLIP (OFF)', rowX + halfW + 6 + halfW / 2, curY + 12, () => {
-      custom.flipX = false;
-      custom.flipY = false;
+    drawButton('RESET FLIP', rowX + halfRotW + 6 + halfRotW / 2, curY + 12, () => {
+      const def = getFighterDefaultCustom(activeCustomKey);
+      custom.flipX = def.flipX ?? false;
+      custom.flipY = def.flipY ?? false;
       saveSkinCustomizations();
-    }, halfW, 22, null, 3);
+      _copyToastText = '✓ RESET FLIP TO DEFAULT!';
+      _copyToastTimer = 90;
+    }, halfRotW, 22, null, 3);
+    curY += 34;
+
+    drawButton('💾 MAKE ADJUSTMENTS DEFAULT', rowX + rowW / 2, curY + 10, () => {
+      setFighterCustomAsDefault(activeCustomKey, custom);
+      _copyToastText = `✓ SAVED ${fDef.label} AS PERMANENT DEFAULT!`;
+      _copyToastTimer = 90;
+    }, rowW, 22, '#10b981', 3);
     curY += 38;
 
     ctx.textAlign = 'left';
@@ -2118,128 +2350,332 @@ export function drawSkinStudioScreen() {
     ctx.fillText('CLICK BUTTONS TO INSTANTLY TOGGLE LIVE PREVIEW', rowX, curY + 18);
 
   } else if (state.studioSkinDetailTab === 'export') {
-    // ── LIVE JS CODE EXPORT ──
-    const jsCode = generateJsCode(fDef, custom);
+    // ── SUB-HEADER: SINGLE VS BULK TOGGLE ──
+    const exportMode = state.studioSkinExportSubTab || 'single';
+    const subTabBtnW = Math.floor((rowW - 6) / 2);
+    const subTabH = 20;
 
-    // Code Box
-    const codeBoxX = rowX;
-    const codeBoxY = curY;
-    const codeBoxW = rowW;
-    const codeBoxH = 195;
+    drawButton(exportMode === 'single' ? '● SINGLE FIGHTER' : 'SINGLE FIGHTER', rowX + subTabBtnW / 2, curY + subTabH / 2, () => {
+      state.studioSkinExportSubTab = 'single';
+    }, subTabBtnW, subTabH, exportMode === 'single' ? themeColor : null, 3);
 
-    ctx.save();
-    ctx.fillStyle = 'rgba(7, 10, 16, 0.95)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = 1;
-    drawChamferedRect(ctx, codeBoxX, codeBoxY, codeBoxW, codeBoxH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    drawButton(exportMode === 'bulk' ? '● 📦 BULK PRESETS' : '📦 BULK PRESETS', rowX + subTabBtnW + 6 + subTabBtnW / 2, curY + subTabH / 2, () => {
+      state.studioSkinExportSubTab = 'bulk';
+    }, subTabBtnW, subTabH, exportMode === 'bulk' ? '#10b981' : null, 3);
 
-    // Render formatted code lines
-    ctx.fillStyle = '#38bdf8';
-    ctx.font = '700 8px monospace';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
+    curY += subTabH + 8;
 
-    const lines = jsCode.split('\n');
-    lines.forEach((line, lIdx) => {
-      if (codeBoxY + 8 + lIdx * 14 < codeBoxY + codeBoxH - 8) {
-        ctx.fillText(line, codeBoxX + 8, codeBoxY + 8 + lIdx * 14);
+    if (exportMode === 'single') {
+      // ── SINGLE FIGHTER LIVE JS CODE EXPORT ──
+      const jsCode = generateJsCode(fDef, custom);
+      const codeBoxX = rowX;
+      const codeBoxY = curY;
+      const codeBoxW = rowW;
+      const codeBoxH = 175;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(7, 10, 16, 0.95)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1;
+      drawChamferedRect(ctx, codeBoxX, codeBoxY, codeBoxW, codeBoxH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '700 8px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+
+      const lines = jsCode.split('\n');
+      lines.forEach((line, lIdx) => {
+        if (codeBoxY + 8 + lIdx * 14 < codeBoxY + codeBoxH - 8) {
+          ctx.fillText(line, codeBoxX + 8, codeBoxY + 8 + lIdx * 14);
+        }
+      });
+
+      curY += codeBoxH + 8;
+
+      const halfBtnW = Math.floor((rowW - 8) / 2);
+      if (isNamelessDeity) {
+        const allDeityParts = {
+          overall: state.skinCustomizations?.nameless_deity || {},
+          body: state.skinCustomizations?.nameless_deity_body || {},
+          cicada: state.skinCustomizations?.nameless_deity_cicada || {},
+          censor: state.skinCustomizations?.nameless_deity_censor || {},
+          vines: state.skinCustomizations?.nameless_deity_vines || {},
+          flowers: state.skinCustomizations?.nameless_deity_flowers || {},
+          wings: state.skinCustomizations?.nameless_deity_wings || {},
+          halo: state.skinCustomizations?.nameless_deity_halo || {},
+          wheel: state.skinCustomizations?.nameless_deity_wheel || {},
+          arm: state.skinCustomizations?.nameless_deity_arm || {},
+          forearm: state.skinCustomizations?.nameless_deity_forearm || {},
+          hand: state.skinCustomizations?.nameless_deity_hand || {}
+        };
+        const allPartsJson = JSON.stringify(allDeityParts, null, 2);
+
+        drawButton(`📋 COPY ${activePartDef?.shortLabel || 'PART'}`, rowX + halfBtnW / 2, curY + 10, () => {
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(jsCode).then(() => {
+              _copyToastText = `✓ COPIED ${activePartDef?.shortLabel || 'PART'}!`;
+              _copyToastTimer = 90;
+            });
+          }
+        }, halfBtnW, 22, null, 3);
+
+        drawButton('📋 ALL PARTS JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(allPartsJson).then(() => {
+              _copyToastText = '✓ COPIED ALL 12 PARTS JSON!';
+              _copyToastTimer = 90;
+            });
+          }
+        }, halfBtnW, 22, '#FFE259', 3);
+      } else if (isAvatarOfEmptiness) {
+        const allAvatarParts = {
+          overall: state.skinCustomizations?.avatar_of_emptiness || {},
+          body: state.skinCustomizations?.avatar_of_emptiness_body || {},
+          arm_left: state.skinCustomizations?.avatar_of_emptiness_arm_left || {},
+          arm_right: state.skinCustomizations?.avatar_of_emptiness_arm_right || {},
+          forearm_left: state.skinCustomizations?.avatar_of_emptiness_forearm_left || {},
+          forearm_right: state.skinCustomizations?.avatar_of_emptiness_forearm_right || {}
+        };
+        const allPartsJson = JSON.stringify(allAvatarParts, null, 2);
+
+        drawButton(`📋 COPY ${activeAvatarPartDef?.shortLabel || 'PART'}`, rowX + halfBtnW / 2, curY + 10, () => {
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(jsCode).then(() => {
+              _copyToastText = `✓ COPIED ${activeAvatarPartDef?.shortLabel || 'PART'}!`;
+              _copyToastTimer = 90;
+            });
+          }
+        }, halfBtnW, 22, null, 3);
+
+        drawButton('📋 ALL PARTS JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(allPartsJson).then(() => {
+              _copyToastText = '✓ COPIED ALL AVATAR PARTS JSON!';
+              _copyToastTimer = 90;
+            });
+          }
+        }, halfBtnW, 22, '#00F5D4', 3);
+      } else {
+        drawButton('📋 COPY JS', rowX + halfBtnW / 2, curY + 10, () => {
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(jsCode).then(() => {
+              _copyToastText = '✓ COPIED JS CODE!';
+              _copyToastTimer = 90;
+            }).catch(() => {
+              _copyToastText = 'COPIED!';
+              _copyToastTimer = 60;
+            });
+          }
+        }, halfBtnW, 22, null, 3);
+
+        drawButton('📋 COPY JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+          const jsonStr = JSON.stringify(custom, null, 2);
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            navigator.clipboard.writeText(jsonStr).then(() => {
+              _copyToastText = '✓ COPIED JSON CONFIG!';
+              _copyToastTimer = 90;
+            }).catch(() => {
+              _copyToastText = 'COPIED!';
+              _copyToastTimer = 60;
+            });
+          }
+        }, halfBtnW, 22, null, 3);
       }
-    });
 
-    curY += codeBoxH + 10;
+      curY += 26;
+      drawButton(`💾 MAKE ADJUSTMENTS DEFAULT (${fDef.label})`, rowX + rowW / 2, curY + 10, () => {
+        setFighterCustomAsDefault(activeCustomKey, custom);
+        _copyToastText = `✓ SAVED ${fDef.label} AS PERMANENT DEFAULT!`;
+        _copyToastTimer = 90;
+      }, rowW, 22, '#10b981', 3);
 
-    // Single click Copy Code Buttons
-    const halfBtnW = Math.floor((rowW - 8) / 2);
-    if (isNamelessDeity) {
-      const allDeityParts = {
-        overall: state.skinCustomizations?.nameless_deity || {},
-        body: state.skinCustomizations?.nameless_deity_body || {},
-        cicada: state.skinCustomizations?.nameless_deity_cicada || {},
-        censor: state.skinCustomizations?.nameless_deity_censor || {},
-        vines: state.skinCustomizations?.nameless_deity_vines || {},
-        flowers: state.skinCustomizations?.nameless_deity_flowers || {},
-        wings: state.skinCustomizations?.nameless_deity_wings || {},
-        halo: state.skinCustomizations?.nameless_deity_halo || {},
-        wheel: state.skinCustomizations?.nameless_deity_wheel || {},
-        arm: state.skinCustomizations?.nameless_deity_arm || {},
-        forearm: state.skinCustomizations?.nameless_deity_forearm || {},
-        hand: state.skinCustomizations?.nameless_deity_hand || {}
-      };
-      const allPartsJson = JSON.stringify(allDeityParts, null, 2);
+      curY += 26;
+      const resetHalfW = Math.floor((rowW - 6) / 2);
+      drawButton(`🔄 RESET SAVED`, rowX + resetHalfW / 2, curY + 10, () => {
+        const def = getFighterDefaultCustom(activeCustomKey, false);
+        Object.assign(custom, def);
+        saveSkinCustomizations();
+        _copyToastText = `✓ RESTORED ${fDef.label} SAVED DEFAULT!`;
+        _copyToastTimer = 90;
+      }, resetHalfW, 22, '#ef4444', 3);
 
-      drawButton(`📋 COPY ${activePartDef?.shortLabel || 'PART'}`, rowX + halfBtnW / 2, curY + 10, () => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          navigator.clipboard.writeText(jsCode).then(() => {
-            _copyToastText = `✓ COPIED ${activePartDef?.shortLabel || 'PART'}!`;
-            _copyToastTimer = 90;
-          });
-        }
-      }, halfBtnW, 22, null, 3);
-
-      drawButton('📋 ALL PARTS JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          navigator.clipboard.writeText(allPartsJson).then(() => {
-            _copyToastText = '✓ COPIED ALL 12 PARTS JSON!';
-            _copyToastTimer = 90;
-          });
-        }
-      }, halfBtnW, 22, '#FFE259', 3);
-    } else if (isAvatarOfEmptiness) {
-      const allAvatarParts = {
-        overall: state.skinCustomizations?.avatar_of_emptiness || {},
-        body: state.skinCustomizations?.avatar_of_emptiness_body || {},
-        arm_left: state.skinCustomizations?.avatar_of_emptiness_arm_left || {},
-        arm_right: state.skinCustomizations?.avatar_of_emptiness_arm_right || {},
-        forearm_left: state.skinCustomizations?.avatar_of_emptiness_forearm_left || {},
-        forearm_right: state.skinCustomizations?.avatar_of_emptiness_forearm_right || {}
-      };
-      const allPartsJson = JSON.stringify(allAvatarParts, null, 2);
-
-      drawButton(`📋 COPY ${activeAvatarPartDef?.shortLabel || 'PART'}`, rowX + halfBtnW / 2, curY + 10, () => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          navigator.clipboard.writeText(jsCode).then(() => {
-            _copyToastText = `✓ COPIED ${activeAvatarPartDef?.shortLabel || 'PART'}!`;
-            _copyToastTimer = 90;
-          });
-        }
-      }, halfBtnW, 22, null, 3);
-
-      drawButton('📋 ALL PARTS JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          navigator.clipboard.writeText(allPartsJson).then(() => {
-            _copyToastText = '✓ COPIED ALL AVATAR PARTS JSON!';
-            _copyToastTimer = 90;
-          });
-        }
-      }, halfBtnW, 22, '#00F5D4', 3);
+      drawButton(`🏭 RESTORE FACTORY`, rowX + resetHalfW + 6 + resetHalfW / 2, curY + 10, () => {
+        const factoryDef = getFighterDefaultCustom(activeCustomKey, true);
+        Object.assign(custom, factoryDef);
+        saveSkinCustomizations();
+        _copyToastText = `✓ RESTORED ${fDef.label} FACTORY PRESET!`;
+        _copyToastTimer = 90;
+      }, resetHalfW, 22, '#f59e0b', 3);
     } else {
-      drawButton('📋 COPY JS', rowX + halfBtnW / 2, curY + 10, () => {
-        if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          navigator.clipboard.writeText(jsCode).then(() => {
-            _copyToastText = '✓ COPIED JS CODE!';
-            _copyToastTimer = 90;
-          }).catch(() => {
-            _copyToastText = 'COPIED!';
-            _copyToastTimer = 60;
-          });
-        }
-      }, halfBtnW, 22, null, 3);
+      // ── BULK PRESETS (ALL FIGHTERS) MODE ──
+      const allPresets = state.skinCustomizations || {};
+      const presetCount = Object.keys(allPresets).length;
+      const bulkJson = JSON.stringify(allPresets, null, 2);
 
-      drawButton('📋 COPY JSON', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
-        const jsonStr = JSON.stringify(custom, null, 2);
+      // Info badge
+      ctx.save();
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.12)';
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
+      ctx.lineWidth = 1;
+      drawChamferedRect(ctx, rowX, curY, rowW, 22, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#34d399';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.fillText(`📦 ALL FIGHTER PRESETS (${presetCount} REGISTERED)`, rowX + 8, curY + 11);
+
+      curY += 26;
+
+      // Bulk JSON Preview Box
+      const codeBoxX = rowX;
+      const codeBoxY = curY;
+      const codeBoxW = rowW;
+      const codeBoxH = 140;
+
+      ctx.save();
+      ctx.fillStyle = 'rgba(7, 10, 16, 0.95)';
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.25)';
+      ctx.lineWidth = 1;
+      drawChamferedRect(ctx, codeBoxX, codeBoxY, codeBoxW, codeBoxH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#a7f3d0';
+      ctx.font = '700 8px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+
+      const bulkLines = bulkJson.split('\n');
+      bulkLines.forEach((line, lIdx) => {
+        if (codeBoxY + 6 + lIdx * 12 < codeBoxY + codeBoxH - 6) {
+          ctx.fillText(line, codeBoxX + 8, codeBoxY + 6 + lIdx * 12);
+        }
+      });
+
+      curY += codeBoxH + 6;
+
+      // Action Deck 1: Copy All JSON & Export JSON File
+      const halfBtnW = Math.floor((rowW - 8) / 2);
+      drawButton('📋 COPY ALL JSON', rowX + halfBtnW / 2, curY + 10, () => {
         if (typeof navigator !== 'undefined' && navigator.clipboard) {
-          navigator.clipboard.writeText(jsonStr).then(() => {
-            _copyToastText = '✓ COPIED JSON CONFIG!';
+          navigator.clipboard.writeText(bulkJson).then(() => {
+            _copyToastText = `✓ COPIED ALL ${presetCount} PRESETS JSON!`;
             _copyToastTimer = 90;
-          }).catch(() => {
-            _copyToastText = 'COPIED!';
-            _copyToastTimer = 60;
           });
         }
-      }, halfBtnW, 22, null, 3);
+      }, halfBtnW, 22, '#10b981', 3);
+
+      drawButton('💾 EXPORT JSON FILE', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+        const ok = exportBulkPresetsToFile();
+        if (ok) {
+          _copyToastText = '✓ EXPORTED PRESETS FILE!';
+          _copyToastTimer = 90;
+        }
+      }, halfBtnW, 22, '#06b6d4', 3);
+
+      curY += 26;
+
+      // Action Deck 2: Copy Database JS Module Code & Download Database JS File
+      drawButton('📋 COPY DATABASE JS', rowX + halfBtnW / 2, curY + 10, () => {
+        const dbCode = generateDatabaseModuleCode(state.skinCustomizations);
+        if (typeof navigator !== 'undefined' && navigator.clipboard) {
+          navigator.clipboard.writeText(dbCode).then(() => {
+            _copyToastText = '✓ COPIED FULL DATABASE JS CODE!';
+            _copyToastTimer = 90;
+          });
+        }
+      }, halfBtnW, 22, '#8b5cf6', 3);
+
+      drawButton('💾 DOWNLOAD DATABASE.JS', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+        const ok = downloadDatabaseFile();
+        if (ok) {
+          _copyToastText = '✓ DOWNLOADED skinCustomizationsDatabase.js!';
+          _copyToastTimer = 90;
+        }
+      }, halfBtnW, 22, '#ec4899', 3);
+
+      curY += 26;
+
+      // Action Deck 3: Import File & Paste JSON / Reset
+      drawButton('📥 IMPORT FILE', rowX + halfBtnW / 2, curY + 10, () => {
+        importBulkPresetsFromFile((count) => {
+          _copyToastText = `✓ IMPORTED ${count} FIGHTER PRESETS!`;
+          _copyToastTimer = 90;
+        }, (err) => {
+          alert(`Import failed: ${err?.message || err}`);
+        });
+      }, halfBtnW, 22, '#3b82f6', 3);
+
+      drawButton('📋 PASTE / IMPORT', rowX + halfBtnW + 8 + halfBtnW / 2, curY + 10, () => {
+        if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.readText) {
+          navigator.clipboard.readText().then((clipText) => {
+            if (clipText && clipText.trim().startsWith('{')) {
+              try {
+                const parsed = JSON.parse(clipText);
+                const count = validateAndMergeSkinPresets(parsed);
+                _copyToastText = `✓ IMPORTED ${count} PRESETS FROM CLIPBOARD!`;
+                _copyToastTimer = 90;
+                return;
+              } catch (e) {}
+            }
+            const manual = prompt('Paste your Bulk Skin Customizations JSON here:');
+            if (manual) {
+              try {
+                const parsed = JSON.parse(manual);
+                const count = validateAndMergeSkinPresets(parsed);
+                _copyToastText = `✓ IMPORTED ${count} PRESETS!`;
+                _copyToastTimer = 90;
+              } catch (e) {
+                alert(`Invalid JSON: ${e?.message || e}`);
+              }
+            }
+          }).catch(() => {
+            const manual = prompt('Paste your Bulk Skin Customizations JSON here:');
+            if (manual) {
+              try {
+                const parsed = JSON.parse(manual);
+                const count = validateAndMergeSkinPresets(parsed);
+                _copyToastText = `✓ IMPORTED ${count} PRESETS!`;
+                _copyToastTimer = 90;
+              } catch (e) {
+                alert(`Invalid JSON: ${e?.message || e}`);
+              }
+            }
+          });
+        } else {
+          const manual = prompt('Paste your Bulk Skin Customizations JSON here:');
+          if (manual) {
+            try {
+              const parsed = JSON.parse(manual);
+              const count = validateAndMergeSkinPresets(parsed);
+              _copyToastText = `✓ IMPORTED ${count} PRESETS!`;
+              _copyToastTimer = 90;
+            } catch (e) {
+              alert(`Invalid JSON: ${e?.message || e}`);
+            }
+          }
+        }
+      }, halfBtnW, 22, '#059669', 3);
+
+      curY += 26;
+
+      // Action Deck 4: Reset All to Clean Defaults
+      drawButton('🏭 RESTORE ALL FACTORY DATABASE DEFAULTS', rowX + rowW / 2, curY + 10, () => {
+        if (confirm('Reset ALL fighter customizations to their factory calibrated database presets?')) {
+          resetAllFightersToDefault(true);
+          _copyToastText = '✓ ALL PRESETS RESTORED TO FACTORY DATABASE DEFAULTS!';
+          _copyToastTimer = 90;
+        }
+      }, rowW, 22, '#ef4444', 3);
     }
   } else if (state.studioSkinDetailTab === 'assets') {
     // ── ASSETS & VARIANTS REGISTRY ──

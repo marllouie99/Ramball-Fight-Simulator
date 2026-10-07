@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-title" content="Ramball Fight" />
   <meta name="theme-color" content="#000000" />
   <link rel="manifest" href="manifest.json" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob: file:; font-src 'self' https: data: blob: file:; style-src 'self' 'unsafe-inline' https:; media-src 'self' data: blob: file:; img-src 'self' data: blob: file: https:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data: blob: file:; img-src 'self' data: blob: file: https:; media-src 'self' data: blob: file:; connect-src 'self' data: blob: file:;" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -1570,13 +1570,8 @@
     });
   </script>
 
-  <!-- PixiJS WebGL Engine (Offline-ready local bundle with CDN fallback) -->
+  <!-- PixiJS WebGL Engine (Offline-ready local bundle) -->
   <script src="libs/pixi.min.js"></script>
-  <script>
-    if (typeof window.PIXI === 'undefined') {
-      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"><\/script>');
-    }
-  </script>
 
   <!-- Hidden Font Preloader for Pricedown GTA Font -->
   <span style="font-family: 'Pricedown'; position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true">mission passed! RESPECT +</span>

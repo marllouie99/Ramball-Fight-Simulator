@@ -178,6 +178,22 @@ export function detectOptimalAspectScaling() {
   return 'fit';
 }
 
+import {
+  SKIN_CUSTOMIZATIONS_DATABASE,
+  DEFAULT_SKIN_CUSTOMIZATIONS,
+  getDatabaseDefault,
+  getAllDatabaseDefaults,
+  generateDatabaseModuleCode
+} from '../configs/skinCustomizationsDatabase.js';
+
+export {
+  SKIN_CUSTOMIZATIONS_DATABASE,
+  DEFAULT_SKIN_CUSTOMIZATIONS,
+  getDatabaseDefault,
+  getAllDatabaseDefaults,
+  generateDatabaseModuleCode
+};
+
 // ─────────────────────────────────────────────
 // GAME STATE — single mutable object
 // All modules import this object and mutate its properties directly.
@@ -197,6 +213,10 @@ export const state = {
   baseCircleTexture,
   bloodSquareTexture,
   arena: CONFIG.arena,
+
+  // Master Skin & Hair Customizations Database (Active & User-Saved Defaults)
+  skinCustomizations: getAllDatabaseDefaults(),
+  defaultSkinCustomizations: getAllDatabaseDefaults(),
 
   // Dynamic Combat Tracking Camera (Boxx Arena style)
   camera: {
@@ -446,6 +466,7 @@ export const state = {
   announcerPlayingSequence: false,
   announcerTimeoutIds: [],
   announcerSubtitle: '',
+
   // Skin & Asset Studio State
   studioSelectedSkinFighter: 'ichigo',
   studioSkinPreviewScale: 2.4,
@@ -455,37 +476,7 @@ export const state = {
   studioSkinShowBody: true,
   studioSkinShowGuides: true,
   studioSkinTab: 'transform',
-  skinCustomizations: {
-    ichigo: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    gojo: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    makima: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    reze: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    sukuna: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    yuta: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    tanjiro: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    zenitsu: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    nezuko: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    power: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    engineer: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    nameless_deity: { widthScale: 0.76, heightScale: 1.03, offsetX: 1, offsetY: -4, angleOffset: 0, flipX: false },
-    nameless_deity_body: { widthScale: 1.0, heightScale: 0.86, offsetX: 0, offsetY: 1, angleOffset: 0, flipX: false },
-    nameless_deity_cicada: { widthScale: 1.0, heightScale: 0.7, offsetX: 0, offsetY: -6, angleOffset: 0, flipX: false },
-    nameless_deity_censor: { widthScale: 1.02, heightScale: 0.72, offsetX: 0, offsetY: -4, angleOffset: 0, flipX: false },
-    nameless_deity_vines: { widthScale: 1.3, heightScale: 0.86, offsetX: -11, offsetY: 0, angleOffset: 0, flipX: false },
-    nameless_deity_flowers: { widthScale: 1.5, heightScale: 1.04, offsetX: 6, offsetY: 19, angleOffset: 0, flipX: false },
-    nameless_deity_wings: { widthScale: 1.2, heightScale: 1.32, offsetX: -22, offsetY: -19, angleOffset: 0, flipX: false },
-    nameless_deity_halo: { widthScale: 2.16, heightScale: 1.52, offsetX: 0, offsetY: 13, angleOffset: 0, flipX: false },
-    nameless_deity_wheel: { widthScale: 0.84, heightScale: 0.56, offsetX: 0, offsetY: -34, angleOffset: 0, flipX: false },
-    nameless_deity_arm: { widthScale: 1.0, heightScale: 1.0, offsetX: 13, offsetY: 6, angleOffset: 0, flipX: false },
-    nameless_deity_forearm: { widthScale: 0.82, heightScale: 1.86, offsetX: 0, offsetY: -15, angleOffset: 1.1868238913561435, flipX: false },
-    nameless_deity_hand: { widthScale: 0.94, heightScale: 1.0, offsetX: 7, offsetY: -11, angleOffset: 0.05235987755982989, flipX: false },
-    avatar_of_emptiness: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    avatar_of_emptiness_body: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    avatar_of_emptiness_arm_left: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    avatar_of_emptiness_arm_right: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    avatar_of_emptiness_forearm_left: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false },
-    avatar_of_emptiness_forearm_right: { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false }
-  },
+  skinCustomizations: JSON.parse(JSON.stringify(DEFAULT_SKIN_CUSTOMIZATIONS)),
   selectedNamelessDeitySkin: (typeof localStorage !== 'undefined' && localStorage.getItem('selectedNamelessDeitySkin')) || 'skin1',
   selectedIchigoSkin: (typeof localStorage !== 'undefined' && localStorage.getItem('selectedIchigoSkin')) || 'shikai',
   matchTimer: 0,
@@ -741,28 +732,123 @@ export function loadWeaponCustomizations() {
   }
 }
 
-// Save skin asset customizations to localStorage
+// Auto-export skin customizations database to disk when running in desktop Electron environment
+export function autoExportSkinDatabaseToDisk() {
+  if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.saveSkinDatabase === 'function') {
+    try {
+      const code = generateDatabaseModuleCode(state.skinCustomizations);
+      window.electronAPI.saveSkinDatabase({ codeContent: code }).then((res) => {
+        if (res && res.success) {
+          console.log('💾 [Skin Database Auto-Export] Successfully synced to', res.filePath);
+        }
+      }).catch((e) => {
+        console.warn('Auto-export skin database failed:', e);
+      });
+    } catch (e) {
+      console.warn('Could not generate database code for auto-export:', e);
+    }
+  }
+}
+
+// Save skin asset customizations & user-defined defaults to localStorage
 export function saveSkinCustomizations() {
   try {
-    localStorage.setItem('circleMiniBattleSkinCustomizations', JSON.stringify(state.skinCustomizations));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('circleMiniBattleSkinCustomizations', JSON.stringify(state.skinCustomizations || {}));
+      if (state.defaultSkinCustomizations) {
+        localStorage.setItem('circleMiniBattleSkinDefaults', JSON.stringify(state.defaultSkinCustomizations));
+      }
+    }
     if (typeof window !== 'undefined' && typeof window.__clearFighterPreviewCache === 'function') {
       window.__clearFighterPreviewCache();
     }
+    autoExportSkinDatabaseToDisk();
   } catch (e) {
     console.warn('Could not save skin customizations:', e);
   }
 }
 
-// Load skin asset customizations from localStorage
+// Load skin asset customizations from database & localStorage
 export function loadSkinCustomizations() {
   try {
-    const saved = localStorage.getItem('circleMiniBattleSkinCustomizations');
-    if (saved) {
-      state.skinCustomizations = Object.assign({}, state.skinCustomizations, JSON.parse(saved));
+    // 1. Always initialize with fresh database defaults from skinCustomizationsDatabase.js
+    state.skinCustomizations = getAllDatabaseDefaults();
+    state.defaultSkinCustomizations = getAllDatabaseDefaults();
+
+    if (typeof localStorage !== 'undefined') {
+      // 2. Load user-saved defaults if present
+      const savedDefaults = localStorage.getItem('circleMiniBattleSkinDefaults');
+      if (savedDefaults) {
+        const parsedDefaults = JSON.parse(savedDefaults);
+        for (const k in parsedDefaults) {
+          state.defaultSkinCustomizations[k] = Object.assign({}, state.defaultSkinCustomizations[k] || {}, parsedDefaults[k]);
+          state.skinCustomizations[k] = Object.assign({}, state.skinCustomizations[k] || {}, parsedDefaults[k]);
+        }
+      }
+
+      // 3. Load active customization sliders if present
+      const saved = localStorage.getItem('circleMiniBattleSkinCustomizations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        for (const k in parsed) {
+          state.skinCustomizations[k] = Object.assign({}, state.skinCustomizations[k] || {}, parsed[k]);
+        }
+      }
     }
   } catch (e) {
     console.warn('Could not load skin customizations:', e);
   }
+}
+
+/**
+ * Sets the given customization as the persistent user default for a character.
+ * @param {string} fighterKey
+ * @param {Object} customObj
+ */
+export function setFighterCustomAsDefault(fighterKey, customObj) {
+  if (!state.defaultSkinCustomizations) state.defaultSkinCustomizations = getAllDatabaseDefaults();
+  if (!state.skinCustomizations) state.skinCustomizations = getAllDatabaseDefaults();
+
+  const cloned = { ...customObj };
+  state.defaultSkinCustomizations[fighterKey] = { ...cloned };
+  state.skinCustomizations[fighterKey] = { ...cloned };
+  saveSkinCustomizations();
+}
+
+/**
+ * Restores a fighter customization to default.
+ * @param {string} fighterKey
+ * @param {boolean} [useFactory=false] - If true, ignores user defaults and resets directly to built-in code database.
+ * @returns {Object} Restored customization object.
+ */
+export function resetFighterToDefault(fighterKey, useFactory = false) {
+  if (!state.skinCustomizations) state.skinCustomizations = getAllDatabaseDefaults();
+  const def = useFactory
+    ? getDatabaseDefault(fighterKey)
+    : (state.defaultSkinCustomizations?.[fighterKey] || getDatabaseDefault(fighterKey));
+  state.skinCustomizations[fighterKey] = { ...def };
+  if (useFactory && state.defaultSkinCustomizations) {
+    state.defaultSkinCustomizations[fighterKey] = { ...def };
+  }
+  saveSkinCustomizations();
+  return state.skinCustomizations[fighterKey];
+}
+
+/**
+ * Resets all fighters to default customizations.
+ * @param {boolean} [useFactory=false]
+ */
+export function resetAllFightersToDefault(useFactory = false) {
+  if (useFactory) {
+    state.skinCustomizations = getAllDatabaseDefaults();
+    state.defaultSkinCustomizations = getAllDatabaseDefaults();
+  } else {
+    state.skinCustomizations = {};
+    for (const [k, v] of Object.entries(state.defaultSkinCustomizations || getAllDatabaseDefaults())) {
+      state.skinCustomizations[k] = { ...v };
+    }
+  }
+  saveSkinCustomizations();
 }
 
 // Save fighter selections per category (foc / tactical) to localStorage

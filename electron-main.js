@@ -7,6 +7,18 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function sanitizeSafeFilename(fileName, defaultExt = '.png') {
+  if (typeof fileName !== 'string') return `export_${Date.now()}${defaultExt}`;
+  const base = path.basename(fileName).replace(/[^a-zA-Z0-9_.-]/g, '_');
+  if (!base || base === '.' || base === '..') return `export_${Date.now()}${defaultExt}`;
+  return base;
+}
+
+function isPathInside(childPath, parentDir) {
+  const relative = path.relative(path.resolve(parentDir), path.resolve(childPath));
+  return Boolean(relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
 // Auto-sync & scan function for ARENA-BGMUSIC folder:
 function scanAndSyncBgmFolder() {
   try {
@@ -39,12 +51,18 @@ ipcMain.handle('open-bgm-folder', () => {
 });
 
 // Native PNG Image Saving IPC Handlers for Desktop Electron App
-ipcMain.handle('save-image-file', async (event, { fileName, base64Data, defaultPath }) => {
+ipcMain.handle('save-image-file', async (event, { fileName, base64Data }) => {
   try {
-    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const safeName = sanitizeSafeFilename(fileName, '.png');
+    const downloadsDir = path.resolve(app.getPath('downloads'));
+    const targetPath = path.join(downloadsDir, safeName);
+    
+    if (!isPathInside(targetPath, downloadsDir) && targetPath !== downloadsDir) {
+      throw new Error('Target path is outside allowed downloads directory');
+    }
+
+    const cleanBase64 = typeof base64Data === 'string' ? base64Data.replace(/^data:image\/\w+;base64,/, '') : '';
     const buffer = Buffer.from(cleanBase64, 'base64');
-    const targetDir = defaultPath || app.getPath('downloads');
-    const targetPath = path.join(targetDir, fileName);
     fs.writeFileSync(targetPath, buffer);
     return { success: true, filePath: targetPath };
   } catch (err) {
@@ -81,7 +99,7 @@ ipcMain.handle('show-open-image-dialog', async (event) => {
     const ext = path.extname(filePath).toLowerCase().replace('.', '') || 'png';
     const mimeType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : ext === 'gif' ? 'image/gif' : 'image/png';
     const base64Data = `data:${mimeType};base64,${buffer.toString('base64')}`;
-    const fileName = path.basename(filePath);
+    const fileName = sanitizeSafeFilename(path.basename(filePath), `.${ext}`);
 
     return { success: true, filePath, fileName, base64Data };
   } catch (err) {
@@ -93,9 +111,10 @@ ipcMain.handle('show-open-image-dialog', async (event) => {
 ipcMain.handle('show-save-image-dialog', async (event, { defaultName, base64Data }) => {
   try {
     const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow() || (BrowserWindow.getAllWindows().length > 0 ? BrowserWindow.getAllWindows()[0] : null);
+    const safeName = sanitizeSafeFilename(defaultName, '.png');
     const dialogOptions = {
       title: 'Save Pixel Model PNG',
-      defaultPath: path.join(app.getPath('downloads'), defaultName),
+      defaultPath: path.join(app.getPath('downloads'), safeName),
       filters: [{ name: 'PNG Images (*.png)', extensions: ['png'] }]
     };
 
@@ -107,7 +126,7 @@ ipcMain.handle('show-save-image-dialog', async (event, { defaultName, base64Data
       return { canceled: true };
     }
 
-    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const cleanBase64 = typeof base64Data === 'string' ? base64Data.replace(/^data:image\/\w+;base64,/, '') : '';
     const buffer = Buffer.from(cleanBase64, 'base64');
     fs.writeFileSync(filePath, buffer);
 
@@ -122,10 +141,6 @@ ipcMain.handle('show-save-image-dialog', async (event, { defaultName, base64Data
     console.error('Error in show-save-image-dialog:', err);
     return { success: false, error: err.message };
   }
-});
-
-ipcMain.handle('open-path', async (event, fullPath) => {
-  return shell.openPath(fullPath);
 });
 
 ipcMain.handle('open-downloads-folder', async () => {
@@ -145,12 +160,18 @@ ipcMain.handle('open-assets-folder', async () => {
 
 ipcMain.handle('save-to-assets-model', async (event, { fileName, base64Data }) => {
   try {
-    const assetsDir = path.join(__dirname, 'Assets', 'model');
+    const assetsDir = path.resolve(__dirname, 'Assets', 'model');
     if (!fs.existsSync(assetsDir)) {
       fs.mkdirSync(assetsDir, { recursive: true });
     }
-    const targetPath = path.join(assetsDir, fileName);
-    const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
+    const safeName = sanitizeSafeFilename(fileName, '.png');
+    const targetPath = path.join(assetsDir, safeName);
+
+    if (!isPathInside(targetPath, assetsDir)) {
+      throw new Error('Invalid path traversal attempt in save-to-assets-model');
+    }
+
+    const cleanBase64 = typeof base64Data === 'string' ? base64Data.replace(/^data:image\/\w+;base64,/, '') : '';
     const buffer = Buffer.from(cleanBase64, 'base64');
     fs.writeFileSync(targetPath, buffer);
     try {
@@ -166,16 +187,52 @@ ipcMain.handle('save-to-assets-model', async (event, { fileName, base64Data }) =
 });
 
 ipcMain.handle('show-item-in-folder', async (event, fullPath) => {
-  shell.showItemInFolder(fullPath);
-  return true;
+  try {
+    if (typeof fullPath !== 'string') return false;
+    const resolved = path.resolve(fullPath);
+    const downloadsDir = path.resolve(app.getPath('downloads'));
+    const assetsDir = path.resolve(__dirname, 'Assets');
+
+    if (isPathInside(resolved, downloadsDir) || isPathInside(resolved, assetsDir) || resolved === downloadsDir || resolved === assetsDir) {
+      shell.showItemInFolder(resolved);
+      return true;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
 });
 
-// Redirect UserData directory to a local Temp folder to bypass OneDrive sync locking and AppData permission conflicts
-const tempUserDataPath = path.join(os.tmpdir(), 'circle-mini-battle-userdata');
-if (!fs.existsSync(tempUserDataPath)) {
-  fs.mkdirSync(tempUserDataPath, { recursive: true });
+// Auto-export & sync skin customizations database to disk (js/configs/skinCustomizationsDatabase.js)
+ipcMain.handle('save-skin-database', async (event, { codeContent }) => {
+  try {
+    if (typeof codeContent !== 'string' || !codeContent.includes('SKIN_CUSTOMIZATIONS_DATABASE')) {
+      throw new Error('Invalid codeContent: Expected valid SKIN_CUSTOMIZATIONS_DATABASE module.');
+    }
+    const dbPath = path.join(__dirname, 'js', 'configs', 'skinCustomizationsDatabase.js');
+    fs.writeFileSync(dbPath, codeContent, 'utf-8');
+    return { success: true, filePath: dbPath };
+  } catch (err) {
+    console.error('Error in save-skin-database IPC:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+// Configure dedicated UserData directory in AppData to isolate from temporary/multi-user directories and bypass OneDrive locking
+const appDataRoot = app.getPath('appData') || os.tmpdir();
+const safeUserDataPath = path.join(appDataRoot, 'circle-mini-battle-userdata');
+if (!fs.existsSync(safeUserDataPath)) {
+  try {
+    fs.mkdirSync(safeUserDataPath, { recursive: true });
+  } catch (e) {
+    // Fallback if permission error
+  }
 }
-app.setPath('userData', tempUserDataPath);
+try {
+  app.setPath('userData', safeUserDataPath);
+} catch (e) {
+  // Use default userData if setting fails
+}
 
 // Force Electron to ignore Windows display scaling (e.g. 125%, 150%)
 // This prevents Windows from blowing up the window size and clamping it to the monitor height!

@@ -1,4 +1,4 @@
-import { goToTitle, startGame, startFaceOffScreen, randomizeTagMatchFighters } from '../../core/gameFlow.js';
+import { goToTitle, startGame, startFaceOffScreen, randomizeTagMatchFighters, preloadFighterAssets } from '../../core/gameFlow.js';
 import { state, saveFighterSelections } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
@@ -519,6 +519,7 @@ function drawFighterSelectModal() {
     _registerButton(itemX, itemY, cellW, cellH + 2, () => {
       if (modalInspectIndex !== idx) {
         modalInspectIndex = idx;
+        preloadFighterAssets(idx);
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           audioSystem.playSFX('skill_dash5', 0.12);
         }
@@ -776,6 +777,7 @@ function drawFighterSelectModal() {
     if (selectingSlot) {
       state[selectingSlot] = modalInspectIndex;
       saveFighterSelections();
+      preloadFighterAssets(modalInspectIndex);
     }
     selectingSlot = null;
   }, btnW, btnH, '#cc2b4d', 4);
@@ -1489,6 +1491,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const nextPos = (pos + direction + count) % count;
       state[slotProp] = availableFighters[nextPos].idx;
       saveFighterSelections();
+      preloadFighterAssets(state[slotProp]);
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
         audioSystem.playSFX('skill_dash5', 0.12);
       }
@@ -1835,6 +1838,7 @@ window.addEventListener('keydown', (e) => {
         if (selectingSlot) {
           state[selectingSlot] = modalInspectIndex;
           saveFighterSelections();
+          preloadFighterAssets(modalInspectIndex);
         }
         selectingSlot = null;
         e.preventDefault();

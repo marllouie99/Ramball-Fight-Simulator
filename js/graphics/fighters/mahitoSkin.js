@@ -78,8 +78,8 @@ export function _drawMahitoHair(ctx, r, facingLeft = false) {
     // X: [64, 471] (width 408, horizontal center at 267.5)
     // Y: [6, 463] (height 458, top crown at 6)
     // Calibrated to seamlessly frame the upper circle with crown at -1.25r
-    const targetHairWidth = r * 2.35 * wMult;
-    const targetHairHeight = r * 2.64 * hMult;
+    const targetHairWidth = r * 2.82 * wMult;
+    const targetHairHeight = r * 2.22 * hMult;
     const scaleX = targetHairWidth / 408;
     const scaleY = targetHairHeight / 458;
     const drawW = 536 * scaleX;

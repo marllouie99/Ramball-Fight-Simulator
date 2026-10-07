@@ -38,7 +38,7 @@ import { getFocMapForBoss } from '../../FOC Maps/index.js';
 import { EndCrystalEntity } from '../entities/EndCrystalEntity.js';
 
 // ─────────────────────────────────────────────
-// SOUND PRELOADING
+// ON-DEMAND AUDIO & ASSET STREAMING (LAZY LOADING)
 // ─────────────────────────────────────────────
 const SOUND_ASSETS = {
   crimsonSniperShot: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
@@ -50,7 +50,6 @@ const SOUND_ASSETS = {
   yutaThinIceBreaker: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3',
   yutaThinIceBreakerNoise: 'Assets/Sound Effects/Skills/yuta-thin-ice-breaker-noise.mp3',
 };
-
 
 function extractSoundsFromObject(obj, seen = new Set(), results = []) {
   if (!obj || typeof obj !== 'object' || seen.has(obj)) return results;
@@ -80,10 +79,90 @@ function extractSoundsFromObject(obj, seen = new Set(), results = []) {
 }
 
 /**
+ * Preloads universal baseline UI and physical combat impact audio (~10-15 files, <500 KB total).
+ * Invoked on startup boot to guarantee instantaneous responsive UI and core hit impacts
+ * without downloading the entire 233+ MB game asset library upfront.
+ */
+export function preloadEssentialCoreSounds() {
+  const corePaths = [
+    'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    'Assets/Sound Effects/Attacks/punch.mp3',
+    'Assets/Sound Effects/Attacks/swordswing.mp3',
+    'Assets/Sound Effects/Attacks/groundSmash.mp3',
+    'Assets/Sound Effects/Attacks/explosion.mp3',
+    'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    'Assets/Sound Effects/Attacks/laserpew.mp3',
+    'Assets/Sound Effects/Skills/dash1.mp3',
+    'Assets/Sound Effects/Skills/dash3.mp3',
+    'Assets/Sound Effects/Skills/dash5.mp3',
+    ...getAnnouncerSoundPaths()
+  ];
+  return preloadSound([...new Set(corePaths.filter(Boolean))], { priority: false, idle: true });
+}
+
+/**
+ * Streams and decodes audio and hair assets on-demand for a specific fighter character.
+ * @param {object|string|number} fighterOrId - Fighter instance, character ID, or index
+ * @param {boolean} [isPriority=false]
+ * @returns {Promise<any>}
+ */
+export function preloadFighterAssets(fighterOrId, isPriority = false) {
+  if (fighterOrId === undefined || fighterOrId === null) return Promise.resolve();
+
+  let f = fighterOrId;
+  if (typeof fighterOrId === 'number') {
+    const currentDefs = getActiveFighterDefs();
+    f = currentDefs[fighterOrId] || FIGHTER_DEFS[fighterOrId] || { id: fighterOrId };
+  } else if (typeof fighterOrId === 'string') {
+    f = { characterId: fighterOrId, type: fighterOrId };
+  }
+
+  const def = f._def || f;
+  const fId = f.fighterIndex !== undefined ? f.fighterIndex : def.id;
+  const fType = f.type || def.type || f.characterId;
+  const charId = f.characterId || fType || fId;
+
+  const paths = [];
+
+  // 1. Basic attack sound paths
+  paths.push(...getFighterBasicAttackSoundPaths(fId, fType));
+  if (charId && charId !== fId && charId !== fType) {
+    paths.push(...getFighterBasicAttackSoundPaths(charId, charId));
+  }
+
+  // 2. Skill sound paths
+  paths.push(...getFighterSkillSoundPaths(fId));
+  if (fType && fType !== fId) {
+    paths.push(...getFighterSkillSoundPaths(fType));
+  }
+  if (charId && charId !== fType) {
+    paths.push(...getFighterSkillSoundPaths(charId));
+  }
+
+  // 3. Custom sounds and minion audio from character config
+  const cfg = (charId && CONFIG[charId]) || (fType && CONFIG[fType]) || (fId && CONFIG[fId]);
+  if (cfg) {
+    paths.push(...extractSoundsFromObject(cfg));
+  }
+
+  // 5. Preload character hair model asset if configured in character assets
+  if (typeof Image !== 'undefined' && cfg?.assets?.hair) {
+    try {
+      const img = new Image();
+      img.src = cfg.assets.hair;
+    } catch (e) {}
+  }
+
+  const uniquePaths = [...new Set(paths.filter(Boolean))];
+  if (uniquePaths.length === 0) return Promise.resolve();
+  return preloadSound(uniquePaths, { priority: isPriority, idle: !isPriority });
+}
+
+/**
  * Fast-path priority preloader for the active match combatants.
  * Gathers essential combat impact sounds, announcer countdown SFX, the selected
- * arena BGM track, and the active fighters' specific attack and skill sounds.
- * Decodes this compact set (~10-15 files) immediately with high priority so all
+ * arena BGM track, and the active fighters' specific attack, skill, and voice lines.
+ * Decodes this compact set (~15-25 files) immediately with high priority so all
  * active combat audio is 100% resident in Web Audio memory before countdown ends.
  */
 export function preloadActiveMatchSounds(fighters) {
@@ -96,6 +175,7 @@ export function preloadActiveMatchSounds(fighters) {
     'Assets/Sound Effects/Attacks/groundSmash.mp3',
     'Assets/Sound Effects/Attacks/explosion.mp3',
     'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    'Assets/Sound Effects/Attacks/laserpew.mp3',
     // Dynamic In-arena countdown & announcer sound configs
     ...getAnnouncerSoundPaths()
   ];
@@ -122,34 +202,10 @@ export function preloadActiveMatchSounds(fighters) {
     }
   } catch (e) {}
 
-  // Active fighters' specific basic attacks & skills
+  // Trigger fighter assets preloading for each active combatant
   for (const f of activeFighters) {
     if (!f) continue;
-    const def = f._def || f;
-    const fId = f.fighterIndex !== undefined ? f.fighterIndex : def.id;
-    const fType = f.type || def.type || f.characterId;
-
-    // Basic attack sound
-    activePaths.push(...getFighterBasicAttackSoundPaths(fId, fType));
-
-    // Skill sounds
-    activePaths.push(...getFighterSkillSoundPaths(fId));
-    if (fType && fType !== fId) {
-      activePaths.push(...getFighterSkillSoundPaths(fType));
-    }
-    if (f.characterId && f.characterId !== fType) {
-      activePaths.push(...getFighterSkillSoundPaths(f.characterId));
-    }
-
-    // Config custom sounds
-    const cfg = (f.characterId && CONFIG[f.characterId]) || (fType && CONFIG[fType]);
-    if (cfg && cfg.sounds) {
-      Object.values(cfg.sounds).forEach(val => {
-        if (typeof val === 'string' && (val.includes('/') || val.includes('.'))) {
-          activePaths.push(val);
-        }
-      });
-    }
+    preloadFighterAssets(f, true);
   }
 
   const uniqueActivePaths = [...new Set(activePaths.filter(Boolean))];
@@ -157,27 +213,7 @@ export function preloadActiveMatchSounds(fighters) {
 }
 
 export function preloadGameSounds(isIdle = true) {
-  // Preload legacy assets + basic attack sounds + skill sounds + skill effect sounds + mapped audio config sounds
-  const legacyPaths = Object.values(SOUND_ASSETS).filter(Boolean);
-  const mappedConfigPaths = Object.values(AUDIO_CONFIG).filter(s => typeof s === 'string' && (s.includes('/') || s.includes('.')));
-  const basicAttackPaths = getBasicAttackSoundPaths();
-  const skillPaths = getSkillSoundPaths();
-  const skillEffectPaths = getSkillEffectSoundPaths();
-  const announcerPaths = getAnnouncerSoundPaths();
-  const configSounds = extractSoundsFromObject(CONFIG);
-  const bgmTracks = ARENA_BGM_TRACKS.map(t => t.src).filter(Boolean);
-
-  const allPaths = [...new Set([
-    ...legacyPaths,
-    ...mappedConfigPaths,
-    ...basicAttackPaths,
-    ...skillPaths,
-    ...skillEffectPaths,
-    ...announcerPaths,
-    ...configSounds,
-    ...bgmTracks
-  ])];
-  return preloadSound(allPaths, { idle: isIdle });
+  return preloadEssentialCoreSounds();
 }
 
 // Re-export physics update steps so callers can import them from gameFlow.js

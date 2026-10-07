@@ -92,14 +92,14 @@ export function _drawEscanorHair(ctx, r, facingLeft = false) {
     // X: [112, 391] (width 280, horizontal center at 251.5)
     // Y: [122, 341] (height 220, top crown at 122)
     // Scales to cover the upper head circle hemisphere seamlessly with crown spikes at -1.35r
-    const targetHairWidth = r * 2.85 * wMult;
-    const targetHairHeight = r * 2.10 * hMult;
+    const targetHairWidth = r * 2.29 * wMult;
+    const targetHairHeight = r * 1.49 * hMult;
     const scaleX = targetHairWidth / 280;
     const scaleY = targetHairHeight / 220;
     const drawW = 500 * scaleX;
     const drawH = 500 * scaleY;
     const drawX = -251.5 * scaleX + offX;
-    const drawY = -r * 1.35 - 122 * scaleY + offY;
+    const drawY = -r * 1.15 - 122 * scaleY + 4 + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);

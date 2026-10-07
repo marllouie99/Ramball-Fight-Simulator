@@ -65,8 +65,19 @@ function copyDirSync(src, dest) {
   }
 }
 
-// 2. Bundle ES modules with esbuild
-console.log('📦 [1/5] Bundling all ES6 modules & WASM math kernel with esbuild...');
+// 1.5. Validate Master Skin Customizations Database
+console.log('🗄️  [1/5] Verifying and bundling Master Skin Customizations Database...');
+const dbModulePath = path.join(rootDir, 'js', 'configs', 'skinCustomizationsDatabase.js');
+if (!fs.existsSync(dbModulePath)) {
+  console.error('❌ skinCustomizationsDatabase.js not found at', dbModulePath);
+  process.exit(1);
+}
+const { SKIN_CUSTOMIZATIONS_DATABASE } = await import(`file://${dbModulePath.replace(/\\/g, '/')}`);
+const fighterCount = Object.keys(SKIN_CUSTOMIZATIONS_DATABASE || {}).length;
+console.log(`   ✅ Database verified: ${fighterCount} calibrated fighter & boss subpart presets ready.`);
+
+// 2. Bundle ES modules with esbuild (Clean Production Minification)
+console.log('📦 [2/5] Bundling and optimizing ES6 modules with esbuild...');
 const bundlePath = path.join(distDir, 'js', 'game.bundle.js');
 
 try {
@@ -87,60 +98,14 @@ try {
       '.wasm': 'binary'
     }
   });
-  console.log('   ✅ Bundled successfully: dist/js/game.bundle.js');
+  const bundleSizeKB = (fs.statSync(bundlePath).size / 1024).toFixed(1);
+  console.log(`   ✅ Bundled successfully: dist/js/game.bundle.js (${bundleSizeKB} KB)`);
 } catch (err) {
   console.error('❌ esbuild bundling failed:', err);
   process.exit(1);
 }
 
-// 3. Encrypt bundle into an impenetrable ciphertext payload with dynamic Blob executor
-console.log('🔒 [2/5] Encrypting code bundle and generating self-decrypting runtime wrapper...');
-try {
-  const rawCode = fs.readFileSync(bundlePath, 'utf-8');
-  
-  // High-entropy XOR encryption key
-  const encryptionKey = 0xAA;
-  const buffer = Buffer.from(rawCode, 'utf-8');
-  const encryptedBytes = new Uint8Array(buffer.length);
-  for (let i = 0; i < buffer.length; i++) {
-    encryptedBytes[i] = buffer[i] ^ encryptionKey;
-  }
-  const base64Cipher = Buffer.from(encryptedBytes).toString('base64');
-  
-  // Generate self-decrypting runtime loader that executes in-memory via ephemeral Blob URL
-  const runtimeLoader = `(function(){
-  "use strict";
-  const _k = ${encryptionKey};
-  const _c = "${base64Cipher}";
-  try {
-    const _b = atob(_c);
-    const _l = _b.length;
-    const _u = new Uint8Array(_l);
-    for (let i = 0; i < _l; i++) {
-      _u[i] = _b.charCodeAt(i) ^ _k;
-    }
-    const _d = new TextDecoder().decode(_u);
-    const _blob = new Blob([_d], { type: "application/javascript" });
-    const _url = URL.createObjectURL(_blob);
-    const _script = document.createElement("script");
-    _script.type = "module";
-    _script.src = _url;
-    _script.onload = () => { URL.revokeObjectURL(_url); _script.remove(); };
-    document.head.appendChild(_script);
-  } catch (e) {
-    console.error("Initialization error");
-  }
-})();`;
-
-  fs.writeFileSync(bundlePath, runtimeLoader, 'utf-8');
-  const bundleSizeKB = (fs.statSync(bundlePath).size / 1024).toFixed(1);
-  console.log(`   ✅ Code successfully encrypted into runtime payload (${bundleSizeKB} KB).`);
-} catch (err) {
-  console.error('❌ Encryption failed:', err);
-  process.exit(1);
-}
-
-// 4. Copy static assets (Assets/, css/, libs/, Tactical Force/, manifest.json)
+// 3. Copy static assets (Assets/, css/, libs/, Tactical Force/, manifest.json)
 console.log('🎨 [3/5] Optimizing and copying game assets, styles, and libraries...');
 const assetFolders = ['Assets', 'css', 'libs', 'Tactical Force'];
 for (const folder of assetFolders) {
@@ -148,7 +113,7 @@ for (const folder of assetFolders) {
   const dest = path.join(distDir, folder);
   if (fs.existsSync(src)) {
     copyDirSync(src, dest);
-    console.log(`   📂 Optimized & copied ${folder}/`);
+    console.log(`   📂 Copied ${folder}/`);
   }
 }
 
@@ -161,58 +126,24 @@ for (const file of singleFiles) {
   }
 }
 
-console.log(`   📊 Asset Optimization Summary: ${totalAssetsCopied} assets processed (${totalAudioFiles} audio tracks, ${totalImageFiles} textures/sprites, ${(totalAssetBytes / (1024 * 1024)).toFixed(2)} MB uncompressed).`);
+console.log(`   📊 Asset Summary: ${totalAssetsCopied} assets processed (${totalAudioFiles} audio tracks, ${totalImageFiles} textures/sprites, ${(totalAssetBytes / (1024 * 1024)).toFixed(2)} MB).`);
 
-// 5. Generate production index.html with Anti-Inspection Armor
-console.log('🛡️  [4/5] Generating production index.html with Anti-Reverse-Engineering Shield...');
+// 4. Generate production index.html referencing bundled script
+console.log('📄 [4/5] Generating production index.html...');
 const originalHtmlPath = path.join(rootDir, 'index.html');
 let html = fs.readFileSync(originalHtmlPath, 'utf-8');
 
-// Replace the original script tag with the bundled/obfuscated script
+// Replace the original development module script tag with the production bundle
 html = html.replace(
   /<script\s+type=["']module["']\s+src=["']js\/core\/main\.js(\?v=\d+)?["']\s*><\/script>/i,
   '<script type="module" src="js/game.bundle.js"></script>'
 );
 
-// Inject anti-inspection & right-click protection script
-const antiInspectionScript = `
-  <!-- Production Anti-Reverse-Engineering Protection Shield -->
-  <script>
-    (function() {
-      // Disable Right Click context menu
-      document.addEventListener('contextmenu', function(e) { e.preventDefault(); return false; }, { capture: true });
-
-      // Block inspection and source view keyboard shortcuts
-      document.addEventListener('keydown', function(e) {
-        // F12 (DevTools)
-        if (e.key === 'F12' || e.keyCode === 123) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-        // Ctrl+Shift+I (Inspect), Ctrl+Shift+J (Console), Ctrl+Shift+C (Element Picker)
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-        // Ctrl+U (View Source), Ctrl+S (Save Page)
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'u' || e.key === 'U' || e.key === 's' || e.key === 'S')) {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        }
-      }, { capture: true });
-    })();
-  </script>
-`;
-
-html = html.replace('</body>', `${antiInspectionScript}\n</body>`);
 fs.writeFileSync(path.join(distDir, 'index.html'), html, 'utf-8');
-console.log('   ✅ Production index.html generated with Anti-Tamper Shield.');
+console.log('   ✅ Production index.html written.');
 
-// 6. Generate ready-to-upload Web Release ZIP file
-console.log('📦 [5/5] Generating ready-to-deploy distribution ZIP archive (dist/ramball-fight-simulator-web.zip)...');
+// 5. Generate ready-to-upload Web Release ZIP file
+console.log('📦 [5/5] Generating distribution ZIP archive (dist/ramball-fight-simulator-web.zip)...');
 
 function createZipArchive(sourceDir, outZipPath) {
   const entries = [];

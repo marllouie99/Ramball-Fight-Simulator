@@ -63,17 +63,17 @@ export function _drawTojiHair(ctx, r, facingLeft = false) {
     const flipY = custom.flipY ? -1 : 1;
 
     // toji-hair.png (1345x1170). True visible hair bounding box:
-    // X: [41, 1314] (width 1274, horizontal center at 677.5)
-    // Y: [86, 1045] (height 960, top crown at 86)
+    // X: [125, 1248] (width 1123, horizontal center at 686)
+    // Y: [136, 1044] (height 908, top crown at 136)
     // Calibrated to seamlessly frame the upper circle with spiky crown at -1.30r
-    const targetHairWidth = r * 2.45 * wMult;
-    const targetHairHeight = r * 1.85 * hMult;
-    const scaleX = targetHairWidth / 1274;
-    const scaleY = targetHairHeight / 960;
+    const targetHairWidth = r * 3.19 * wMult;
+    const targetHairHeight = r * 1.96 * hMult;
+    const scaleX = targetHairWidth / 1123;
+    const scaleY = targetHairHeight / 908;
     const drawW = 1345 * scaleX;
     const drawH = 1170 * scaleY;
-    const drawX = -677.5 * scaleX + offX;
-    const drawY = -r * 1.30 - 86 * scaleY + offY;
+    const drawX = -686 * scaleX + offX;
+    const drawY = -r * 1.30 - 136 * scaleY - 1 + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);

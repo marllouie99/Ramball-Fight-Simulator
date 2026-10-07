@@ -4,7 +4,7 @@
 
 import { state, loadFighterSelections, saveFighterSelections } from './state.js';
 import { initFlameCanvas, resizeFlameCanvas } from '../graphics/canvasManager.js';
-import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown, preloadGameSounds } from './gameFlow.js';
+import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown, preloadEssentialCoreSounds, preloadFighterAssets } from './gameFlow.js';
 import { FIGHTER_DEFS, CONFIG } from './config.js';
 import { handleUIClick, handleUIMove, captureFaceOffScreenshot } from '../graphics/ui.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
@@ -38,8 +38,10 @@ if (state.pixiApp && typeof state.pixiApp.render === 'function') {
   } catch (e) {}
 }
 
-// Proactively preload all game sound effects and tracks lazily in background idle time
-preloadGameSounds(true).catch((e) => console.warn('Audio preloading warning:', e));
+// On-demand asset streaming: Preload essential core combat hits and UI sounds (~500 KB vs 233+ MB)
+preloadEssentialCoreSounds().catch((e) => console.warn('Core audio preloading warning:', e));
+if (typeof state.p1Index === 'number') preloadFighterAssets(state.p1Index);
+if (typeof state.p2Index === 'number') preloadFighterAssets(state.p2Index);
 
 if (typeof document !== 'undefined' && 'fonts' in document) {
   try {
