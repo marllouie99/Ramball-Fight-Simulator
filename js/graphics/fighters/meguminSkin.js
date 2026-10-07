@@ -281,7 +281,7 @@ function _renderMeguminPixelBodyToCanvas(destCtx, r) {
       );
 
       if (isBorder) {
-        destCtx.fillStyle = '#14080E';
+        destCtx.fillStyle = '#0E0F14';
         destCtx.fillRect(px, py, P, P);
         continue;
       }
@@ -292,46 +292,16 @@ function _renderMeguminPixelBodyToCanvas(destCtx, r) {
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // ZONE 1: Sweeping Forehead Bangs (ny < -0.15)
+      // ZONE 1: WARM PEACH PORCELAIN FACE & SIGNATURE EYEPATCH (ny < 0.30)
+      // Pure unbroken circular dome (All hair on Layer 2)
       // ──────────────────────────────────────────
-      if (ny < -0.15) {
-        // Discrete Triangular Anime Bang Locks peeking down into forehead
-        const leftBang = (nx >= -0.60 && nx <= -0.18 && ny <= -0.20 + (nx + 0.38) * 0.4);
-        const centerBang = (nx >= -0.22 && nx <= 0.08 && ny <= -0.12 - Math.abs(nx + 0.07) * 0.6);
-        const rightBang = (nx >= 0.15 && nx <= 0.60 && ny <= -0.18 - (nx - 0.38) * 0.4);
-
-        const isBangLock = (ny <= -0.45 || leftBang || centerBang || rightBang);
-
-        if (isBangLock) {
-          if (ny >= -0.22) {
-            destCtx.fillStyle = '#14080E'; // Bang tip ink outline
-          } else if (ny <= -0.70) {
-            destCtx.fillStyle = '#22121E'; // Hair root shadow
-          } else if (ny <= -0.45 && absX <= 0.50) {
-            destCtx.fillStyle = '#582E48'; // Hair sheen highlight
-          } else {
-            destCtx.fillStyle = '#3B2032'; // Brunette base tone
-          }
-          destCtx.fillRect(px, py, P, P);
-          continue;
-        }
-
-        // Exposed Forehead Porcelain Skin under bangs
-        let col = (absX >= 0.55) ? '#F5CBA7' : '#FFE0BD';
-        destCtx.fillStyle = col;
-        destCtx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE 2: Face & Eyepatch ( -0.15 <= ny < 0.22 - Full Size Face matching Makima/Reze )
-      // ──────────────────────────────────────────
-      else if (ny < 0.22) {
-        // Base peach porcelain skin tone
+      if (ny < 0.30) {
         let col = '#FFE0BD';
 
         if (absX >= 0.55) {
           col = '#F5CBA7'; // Soft warm cheek contour shadow
-        } else if (ny >= -0.05 && ny < 0.18 && absX < 0.35) {
-          col = '#FFF0DE'; // Radiant face center highlight
+        } else if (absX < 0.35 && ny > -0.25 && ny < 0.10) {
+          if ((gx + gy) % 4 === 0) col = '#FFF0DE'; // Radiant face center highlight
         }
 
         // ──────────────────────────────────────────
@@ -358,7 +328,7 @@ function _renderMeguminPixelBodyToCanvas(destCtx, r) {
         }
         // Diagonal Eyepatch Strap extending to right temple
         else if (nx > 0.46 && Math.abs(ny - (-0.06 + (nx - 0.46) * 0.4)) <= 0.04) {
-          col = '#14080E';
+          col = '#0E0F14';
         }
 
         destCtx.fillStyle = col;

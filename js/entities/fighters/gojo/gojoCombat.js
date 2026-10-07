@@ -107,6 +107,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
       (attacker.isAmbushing || attacker.ultimateActive);
     if (isAdaptedMahoraga || isTojiAssaultBypassing) {
       attacker.infinityFreezeTimer = 0;
+      attacker.timeStopTimer = 0;
       attacker.isFrozenByInfinity = false;
       attacker.adaptationPauseTimer = 0;
       return false;
@@ -226,10 +227,12 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker, spawnEffects
     }
 
     if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
-      const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
+      const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
+      const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8;
       if (hasAdapted) {
         // Mahoraga adapted to Limitless — bypasses Infinity block completely!
         attacker.infinityFreezeTimer = 0;
+        attacker.timeStopTimer = 0;
         attacker.isFrozenByInfinity = false;
         attacker.adaptationPauseTimer = 0;
         return false;

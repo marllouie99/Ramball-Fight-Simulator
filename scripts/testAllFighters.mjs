@@ -8942,15 +8942,25 @@ async function main() {
   try {
     const GojoClass = FIGHTER_CLASS_MAP['gojo'];
     const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
-    const gojoDef = FIGHTER_DEFS.find(d => d.id === 'gojo');
-    const sukunaDef = FIGHTER_DEFS.find(d => d.id === 'sukuna');
+    const YujiClass = FIGHTER_CLASS_MAP['yuji'];
+    const gojoDef = FIGHTER_DEFS.find(d => d.type === 'gojo');
+    const sukunaDef = FIGHTER_DEFS.find(d => d.type === 'sukuna');
+    const yujiDef = FIGHTER_DEFS.find(d => d.type === 'yuji');
     const arena = { x: 50, y: 50, width: 800, height: 600 };
 
-    if (GojoClass && gojoDef) {
+    if (!GojoClass || !gojoDef || !SukunaClass || !sukunaDef || !YujiClass || !yujiDef) {
+      throw new Error('Expected Gojo, Sukuna, and Yuji fighter fixtures for the melee proximity test');
+    }
+
+    {
       const gojo = new GojoClass(gojoDef);
-      const enemy = { x: 500, y: 350, r: 25, hp: 200, maxHp: 200, isDead: false, takeDamage: (dmg) => { enemy.hp -= dmg; return true; } };
+      const enemy = new YujiClass(yujiDef);
       gojo.x = 200;
       gojo.y = 350;
+      enemy.x = 500;
+      enemy.y = 350;
+      enemy.hp = enemy.maxHp = 200;
+      state.mode = '2v2';
       state.fighters = [gojo, enemy];
       state.gameState = 'playing';
 
@@ -8960,8 +8970,12 @@ async function main() {
         throw new Error(`Expected Gojo to be in Ranged Mode when enemy is far (300px), but isMeleeMode was true`);
       }
 
-      // 2. Move enemy within closeRangeRadius (60px) -> Gojo enters Melee Mode
-      enemy.x = 260; // dist = 60 <= closeRangeRadius (85px)
+      // 2. Move enemy within the configured close-range radius -> Gojo enters Melee Mode
+      enemy.x = 260; // dist = 60px
+      gojo.infinityActive = true;
+      if (!gojo.hasActiveInfinity()) {
+        throw new Error('Expected Gojo Infinity to be active before checking close-range melee activation');
+      }
       gojo.update(enemy, 0, arena);
       if (!gojo.isMeleeMode) {
         throw new Error(`Expected Gojo to enter Melee Mode when enemy is in closeRangeRadius (60px), but isMeleeMode remained false`);

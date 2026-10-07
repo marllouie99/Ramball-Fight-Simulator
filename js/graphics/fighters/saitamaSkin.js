@@ -761,63 +761,62 @@ function drawSaitamaPixelBody(ctx, r, isGhost = false) {
         continue;
       }
 
-      // Zone A: Head & Face Skin Section (ry < r * 0.20)
-      if (ry < r * 0.20) {
+      // Zone A: Head & Face Skin Section (ry < r * 0.30)
+      // Pure unbroken circular dome
+      if (ry < r * 0.30) {
         let col = '#FFE0BD';
-        if (ry < -r * 0.45 && Math.abs(rx) < r * 0.45) {
-          col = '#FFF2E0'; // Top bald shine highlight
-        } else if (Math.abs(rx) > r * 0.70) {
+        if (Math.abs(rx) > r * 0.55) {
           col = '#F2C8A4'; // Side cheek / jaw shadow
-        } else if (ry > r * 0.08) {
-          col = '#E5B892'; // Lower neck shadow
+        } else if (Math.abs(rx) < r * 0.35 && ry > -r * 0.25 && ry < r * 0.10) {
+          if ((gx + gy) % 4 === 0) col = '#FFF2E0'; // Top bald shine highlight
         }
         ctx.fillStyle = col;
         ctx.fillRect(px, py, P, P);
       }
-      // Zone B: Yellow Hero Suit (r * 0.20 <= ry < r * 0.62)
-      else if (ry < r * 0.62) {
+      // Zone B: Yellow Hero Suit (r * 0.30 <= ry < r * 0.68)
+      else if (ry < r * 0.68) {
         // Golden zipper pull tab at center
-        if (Math.abs(rx) < P * 0.8 && ry >= r * 0.20 && ry <= r * 0.42) {
-          if (ry <= r * 0.26) {
+        if (Math.abs(rx) < P * 0.8 && ry >= r * 0.30 && ry <= r * 0.50) {
+          if (ry <= r * 0.36) {
             ctx.fillStyle = '#C88A00'; // Zipper ring
           } else {
             ctx.fillStyle = '#FFFFFF'; // White zipper line
           }
         } else {
           let col = '#FFEB94';
-          if (ry < r * 0.38 && Math.abs(rx) < r * 0.45) {
+          if (ry < r * 0.44 && Math.abs(rx) < r * 0.45) {
             col = '#FFF5B8'; // Chest highlight
-          } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.54) {
+          } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.60) {
             col = '#E8CA65'; // Suit shadow / wrinkle
           }
           ctx.fillStyle = col;
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone C: Horizontal Black Hero Belt & Golden Buckle (r * 0.62 <= ry < r * 0.76)
-      else if (ry < r * 0.76) {
+      // Zone C: Horizontal Black Hero Belt & Golden Buckle (r * 0.68 <= ry < r * 0.78)
+      else if (ry < r * 0.78) {
         // Center Golden Buckle
         const isBuckle = (Math.abs(rx) <= r * 0.26);
         if (isBuckle) {
-          if (Math.abs(rx) >= r * 0.22 || Math.abs(ry - r * 0.69) >= r * 0.05) {
+          if (Math.abs(rx) >= r * 0.22 || Math.abs(ry - r * 0.73) >= r * 0.04) {
             ctx.fillStyle = '#111114'; // Buckle border
-          } else if (rx < -P && ry < r * 0.69) {
+          } else if (rx < -P && ry < r * 0.73) {
             ctx.fillStyle = '#FFF5A0'; // Metallic buckle glint
           } else {
             ctx.fillStyle = '#F5C400'; // Golden buckle plate
           }
         } else {
           // Belt leather
-          ctx.fillStyle = (ry < r * 0.69) ? '#282832' : '#111114';
+          ctx.fillStyle = (ry < r * 0.73) ? '#282832' : '#111114';
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone D: Crimson Red Boots / Lower Suit (ry >= r * 0.76)
+      // Zone D: Crimson Red Boots / Lower Suit (ry >= r * 0.78)
       else {
         let col = '#C80000';
-        if (ry < r * 0.84 && Math.abs(rx) < r * 0.45) {
+        if (ry < r * 0.86 && Math.abs(rx) < r * 0.45) {
           col = '#E52E2E'; // Top boot rim highlight
-        } else if (ry > r * 0.90 || Math.abs(rx) > r * 0.70) {
+        } else if (ry > r * 0.92 || Math.abs(rx) > r * 0.70) {
           col = '#8A0000'; // Boot heel / edge shadow
         }
         ctx.fillStyle = col;

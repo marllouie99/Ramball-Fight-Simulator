@@ -154,13 +154,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         if (ownerIdx !== -1 && areOnSameTeam(projectile.owner, ownerIdx)) continue;
       }
       
-      const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
-      const isPurpleAdapted = isMahoraga && (
-        (ent.gojoAdapted && ent.gojoAdapted.purple) || 
-        (ent.adaptedSkills && ent.adaptedSkills['purple']) ||
-        (ent.gojoAdaptColorHistory && ent.gojoAdaptColorHistory.includes('#8A2BE2')) ||
-        ((ent.goldAdaptationStage?.skill || 0) >= 2)
-      );
+      if (!projectile.pulledTargets) projectile.pulledTargets = new Set();
+
       if (!isEntityImmuneToGravitationalPull(ent, 'purple')) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;
@@ -185,6 +180,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           ent.isCaughtInPurple = true;
           ent.purpleHitTimer = Math.max(ent.purpleHitTimer || 0, 30);
           ent.isCaughtInPurpleVortex = true;
+          projectile.pulledTargets.add(ent);
 
           // Apply heavy movement slow debuff
           const slowDuration = CONFIG.gojo?.purpleSlowDuration || 30;
@@ -212,7 +208,9 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             ent.vy = 0;
           }
         } else if (dist >= trapRadius && dist < purplePullRadius) {
+          ent.isCaughtInPurple = false;
           ent.isCaughtInPurpleVortex = true;
+          projectile.pulledTargets.add(ent);
           // Outer gravitational vortex pull field — strong suction toward orb
           const falloff = 1 - (dist - trapRadius) / (purplePullRadius - trapRadius);
           const outerPullSpeed = purplePullForce * 0.5 * Math.pow(falloff, 0.8);
@@ -234,6 +232,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           // Dampen existing velocity and redirect toward center
           ent.vx = (ent.vx || 0) * 0.3 + dirX * outerPullSpeed * 0.5;
           ent.vy = (ent.vy || 0) * 0.3 + dirY * outerPullSpeed * 0.5;
+        } else if (projectile.pulledTargets.has(ent)) {
+          projectile.pulledTargets.delete(ent);
+          ent.isCaughtInPurple = false;
+          ent.isCaughtInPurpleVortex = false;
         }
 
         // Clamp entity strictly within arena bounds after all Purple displacement to prevent wall clipping
@@ -243,10 +245,15 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           ent.x = Math.max(_purpleArena.x + _er, Math.min(_purpleArena.x + _purpleArena.width - _er, ent.x));
           ent.y = Math.max(_purpleArena.y + _er, Math.min(_purpleArena.y + _purpleArena.height - _er, ent.y));
         }
-        if (ent.isPlant || ent.isPlantMinion) {
-          ent._fixedX = ent.x;
-          ent._fixedY = ent.y;
-        }
+      } else if (projectile.pulledTargets.has(ent)) {
+        projectile.pulledTargets.delete(ent);
+        ent.isCaughtInPurple = false;
+        ent.isCaughtInPurpleVortex = false;
+      }
+
+      if (ent.isPlant || ent.isPlantMinion) {
+        ent._fixedX = ent.x;
+        ent._fixedY = ent.y;
       }
     }
 
@@ -501,6 +508,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         // Release time-stop / stasis timers so target is blasted backward dynamically
         if (!isChanneling && ent.timeStopTimer > 0) ent.timeStopTimer = 0;
         ent.isCaughtInPurple = false;
+        ent.isCaughtInPurpleVortex = false;
 
         // Clamp inside arena bounds
         if (arena) {
@@ -511,6 +519,16 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
 
         spawnSparks(ent.x, ent.y, 6, 'lightningTrail', isGreen ? '#00FF64' : '#BF5AF2');
       }
+    }
+
+    if (projectile.pulledTargets && projectile.pulledTargets.size > 0) {
+      for (const ent of projectile.pulledTargets) {
+        if (ent) {
+          ent.isCaughtInPurple = false;
+          ent.isCaughtInPurpleVortex = false;
+        }
+      }
+      projectile.pulledTargets.clear();
     }
   }
 

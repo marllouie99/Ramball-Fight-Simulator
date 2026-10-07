@@ -47,11 +47,11 @@ export const sansConfig = {
   enableTeleportDodge: true,
   dodgeChance: 1.0,           // Probability (0-1) of dodging incoming attacks (100%)
   domainDodgeChance: 1.00,     // Probability (0-1) of dodging spatial slice lines inside enemy Domain Expansions (100%)
-  dodgeStaminaMax: 200,       // Max dodge stamina pool (replaces HP bar in HUD)
+  dodgeStaminaMax: 100,       // Max dodge stamina pool (replaces HP bar in HUD)
   dodgeStaminaCost: 2,        // Standard dodge stamina cost
   domainDodgeStaminaCost: 1,  // Special Interaction: Stamina/Mana cost is 1 only when Sukuna's domain is open!
   dodgeStaminaRegen: 0.05,    // Stamina recovery per frame (~10/sec)
-  dodgeStaminaRegenDelay: 10, // "Catch Breath" delay: frames after dodging before stamina begins recovering (~0.83s at 60fps)
+  dodgeStaminaRegenDelay: 20, // "Catch Breath" delay: frames after dodging before stamina begins recovering (~0.83s at 60fps)
   dodgeCooldown: 0,           // Min frames between consecutive dodges
   shotgunDodgeGraceWindow: 16,// Grace window (frames) where subsequent pellets from a shotgun spread/volley cost 0 stamina
   dodgeDistance: 150,         // Distance in pixels jumped during teleport

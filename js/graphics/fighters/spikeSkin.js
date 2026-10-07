@@ -29,7 +29,7 @@ function _renderPixelSpikeBody(ctx, r) {
   const steps = Math.ceil((r + 4) / P);
 
   // 1. Dark Manga Ink Outer Shell Outline
-  ctx.fillStyle = '#111114';
+  ctx.fillStyle = '#0E0F14';
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const dist = Math.hypot(gx * P, gy * P);
@@ -116,7 +116,7 @@ function _renderPixelSpikeGhost(ctx, r) {
   const steps = Math.ceil((r + 4) / P);
 
   // 1. Ghost Outer Outline
-  ctx.fillStyle = '#111114';
+  ctx.fillStyle = '#0E0F14';
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       if (Math.hypot(gx * P, gy * P) <= r + P * 0.75) {

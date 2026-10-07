@@ -552,10 +552,16 @@ export function drawEscanorPixelBody(ctx, r, isTheOne = false) {
       const normY = ry / r;
       const normX = rx / r;
 
-      // ── 1. Stepped Outer Dark Manga Ink Shell ──
-      const isOutline = dist >= r - P;
+      // ── 1. Stepped Outer Dark Manga Ink Shell (4-Neighbor Attached Boundary Test) ──
+      const isOutline = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
       if (isOutline) {
-        ctx.fillStyle = isTheOne ? '#78350F' : '#18181B';
+        ctx.fillStyle = isTheOne ? '#78350F' : '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }

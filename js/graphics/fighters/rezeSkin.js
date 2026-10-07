@@ -204,15 +204,16 @@ function _renderRezePixelBodyToCanvas(destCtx, r) {
 
       // 1. Pixelated Dark Ink Border Shell
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        destCtx.fillStyle = '#14101A';
+        destCtx.fillStyle = '#0E0F14';
         destCtx.fillRect(px, py, P, P);
         continue;
       }
 
       // ──────────────────────────────────────────
-      // 2. FAIR PORCELAIN FACE SKIN (ry < r * 0.26)
+      // 2. FAIR PORCELAIN FACE SKIN (ry < r * 0.30)
+      // Pure unbroken circular dome (All hair on Layer 2)
       // ──────────────────────────────────────────
-      if (ry < r * 0.26) {
+      if (ry < r * 0.30) {
         let col = '#FFE6D8'; // Warm porcelain skin base
 
         if (Math.abs(gx) >= 8 || gy < -8) {
@@ -539,7 +540,7 @@ export function drawRezeBombHybridBody(ctx, r, now) {
 
       // Pixelated Dark Ink Border Shell
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#0B0C12';
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }

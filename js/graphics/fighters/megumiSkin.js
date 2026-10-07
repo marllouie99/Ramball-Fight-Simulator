@@ -224,171 +224,11 @@ export function drawMegumiSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // ── CLIPPED BODY CIRCLE MESH ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
+  // ── CLIPPED BODY CIRCLE MESH (Discrete 1:1 Pixel Art Body from Offscreen Cache) ──
+  drawMegumiPixelBody(ctx, r);
 
-  // --- 1. Base (Skin Color) - Same as Gojo ---
-  ctx.fillStyle = '#FFE0BD';
-  ctx.fill();
-
-  // --- 2. JJK High Uniform Torso Base - Copied Directly from Gojo ---
-  ctx.fillStyle = '#211A36'; // Official JJK Deep Violet-Navy
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.55);
-  ctx.lineTo(-r * 0.45, r * 0.35);
-  ctx.lineTo(-r * 0.42, r * 0.22);
-  ctx.quadraticCurveTo(0, r * 0.26, r * 0.42, r * 0.22);
-  ctx.lineTo(r * 0.45, r * 0.35);
-  ctx.lineTo(r, r * 0.55);
-  ctx.lineTo(r, r);
-  ctx.lineTo(-r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // --- 3. Megumi Jet-Black Anime Hair Base Mesh ---
-  ctx.fillStyle = '#0E1017';
-  ctx.beginPath();
-  ctx.moveTo(-r * 1.05, -r * 1.05);
-  ctx.lineTo(r * 1.05, -r * 1.05);
-  ctx.lineTo(r * 1.05, -r * 0.32);
-
-  // Trace the stylized layered bangs
-  for (let i = 0; i < _MEGUMI_BANGS.length; i++) {
-    const pt = _MEGUMI_BANGS[i];
-    ctx.lineTo(r * pt.nx, r * pt.ny);
-  }
-  ctx.lineTo(-r * 1.05, -r * 0.32);
-  ctx.closePath();
-  ctx.fill();
-
-  // Subtle Dark Midnight Blue Hair Sheen
-  if (!isLowQuality) {
-    ctx.fillStyle = '#181E2E';
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.85, -r * 0.65);
-    ctx.quadraticCurveTo(0, -r * 0.80, r * 0.85, -r * 0.65);
-    ctx.quadraticCurveTo(0, -r * 0.50, -r * 0.85, -r * 0.65);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Crisp Manga Hairline Ink Outline along Bangs
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.0;
-  ctx.lineJoin = 'miter';
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(r * _MEGUMI_BANGS[0].nx, r * _MEGUMI_BANGS[0].ny);
-  for (let i = 1; i < _MEGUMI_BANGS.length; i++) {
-    const pt = _MEGUMI_BANGS[i];
-    ctx.lineTo(r * pt.nx, r * pt.ny);
-  }
-  ctx.stroke();
-
-  // --- 4. High Collar Detail & Central Placket - Copied Directly from Gojo ---
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 2.5;
-  ctx.lineCap = 'round';
-
-  // Collar Rim & Outer Edge Outline
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.55);
-  ctx.lineTo(-r * 0.45, r * 0.35);
-  ctx.lineTo(-r * 0.42, r * 0.22);
-  ctx.quadraticCurveTo(0, r * 0.26, r * 0.42, r * 0.22);
-  ctx.lineTo(r * 0.45, r * 0.35);
-  ctx.lineTo(r, r * 0.55);
-  ctx.stroke();
-
-  // Central Covered Zip/Button Placket (Vertical strip running up the neck/chest)
-  ctx.fillStyle = '#141024'; // Deep Violet-Black Placket Fill
-  ctx.beginPath();
-  ctx.rect(-r * 0.08, r * 0.24, r * 0.16, r * 0.76);
-  ctx.fill();
-
-  ctx.strokeStyle = '#0E0B1A';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(-r * 0.08, r * 0.24, r * 0.16, r * 0.76);
-
-  // Horizontal Fabric Folds & Collar Creases
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 1.8;
-
-  // Upper collar crease folds
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.40, r * 0.30);
-  ctx.lineTo(-r * 0.08, r * 0.33);
-  ctx.moveTo(r * 0.08, r * 0.33);
-  ctx.lineTo(r * 0.40, r * 0.30);
-
-  // Lower collar / shoulder seam lines
-  ctx.moveTo(-r * 0.45, r * 0.38);
-  ctx.quadraticCurveTo(-r * 0.25, r * 0.44, -r * 0.08, r * 0.42);
-  ctx.moveTo(r * 0.08, r * 0.42);
-  ctx.quadraticCurveTo(r * 0.25, r * 0.44, r * 0.45, r * 0.38);
-
-  // Mid-chest horizontal fabric folds
-  ctx.moveTo(-r * 0.85, r * 0.52);
-  ctx.lineTo(-r * 0.08, r * 0.50);
-  ctx.moveTo(r * 0.08, r * 0.50);
-  ctx.lineTo(r * 0.85, r * 0.52);
-  ctx.stroke();
-
-  ctx.restore(); // End clipped body circle
-
-  // ── EXTERNAL SPIKY CROWN TUFTS (Authentic Megumi Sea-Urchin Silhouette) ──
-  ctx.fillStyle = '#0E1017';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.0;
-  ctx.lineJoin = 'round';
-
-  // 1. Far-Left Outer Spike (~9:30 o'clock)
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.75, -r * 0.42);
-  ctx.lineTo(-r * 1.15, -r * 0.65);
-  ctx.lineTo(-r * 0.65, -r * 0.70);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 2. Mid-Left Crown Spike (~11 o'clock)
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.62, -r * 0.72);
-  ctx.lineTo(-r * 0.82, -r * 1.12);
-  ctx.lineTo(-r * 0.32, -r * 0.88);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 3. Center-Top Prominent Spike (~12 o'clock)
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.26, -r * 0.90);
-  ctx.lineTo(0, -r * 1.22);
-  ctx.lineTo(r * 0.24, -r * 0.92);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 4. Mid-Right Crown Spike (~1 o'clock)
-  ctx.beginPath();
-  ctx.moveTo(r * 0.32, -r * 0.88);
-  ctx.lineTo(r * 0.80, -r * 1.10);
-  ctx.lineTo(r * 0.65, -r * 0.70);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // 5. Far-Right Outer Spike (~2:30 o'clock)
-  ctx.beginPath();
-  ctx.moveTo(r * 0.68, -r * 0.65);
-  ctx.lineTo(r * 1.15, -r * 0.62);
-  ctx.lineTo(r * 0.78, -r * 0.40);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // ── LAYER 2: MEGUMI ANIME HAIR & CROWN TUFTS (Layer 2 Overlay) ──
+  _drawMegumiHair(ctx, r, facingLeft, isLowQuality);
 
   // ── HAND RENDERING (Rule 20 Guard Compliant) ──
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
@@ -603,6 +443,215 @@ export function drawMegumiGhostSkin(ctx, x, y, angle = 0, r = 25, alpha = 0.5) {
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+let _cachedMegumiCanvas = null;
+let _cachedMegumiR = 0;
+
+/**
+ * Solid 2D Pixel-Art Body for Megumi Fushiguro (Offscreen Cache Pattern)
+ */
+export function drawMegumiPixelBody(ctx, r) {
+  const intR = Math.round(r);
+  if (!_cachedMegumiCanvas || _cachedMegumiR !== intR) {
+    const P = 2.0;
+    const steps = Math.ceil((intR + P) / P);
+    const size = (steps + 2) * P * 2;
+    const offscreen = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+    if (offscreen) {
+      offscreen.width = size;
+      offscreen.height = size;
+      const offCtx = offscreen.getContext('2d');
+      offCtx.imageSmoothingEnabled = false;
+      offCtx.translate(size / 2, size / 2);
+      _renderMegumiPixelBodyToCanvas(offCtx, intR);
+      _cachedMegumiCanvas = offscreen;
+      _cachedMegumiR = intR;
+    }
+  }
+
+  if (_cachedMegumiCanvas) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(_cachedMegumiCanvas, -_cachedMegumiCanvas.width / 2, -_cachedMegumiCanvas.height / 2);
+    ctx.restore();
+  } else {
+    _renderMegumiPixelBodyToCanvas(ctx, intR);
+  }
+}
+
+/**
+ * Procedural discrete grid rasterization of Megumi's body
+ */
+function _renderMegumiPixelBodyToCanvas(ctx, r) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+      const normY = ry / r;
+      const absGx = Math.abs(gx);
+
+      // 4-neighbor attached boundary test for solid dark manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ── ZONE 1: Pure Face Dome (normY < 0.30) ──
+      if (normY < 0.30) {
+        if (normY < -0.40) {
+          ctx.fillStyle = '#FFF2E6'; // Forehead dome highlight
+        } else if (normY < 0.10) {
+          ctx.fillStyle = '#FFE0BD'; // Fair anime skin base (matches Gojo)
+        } else {
+          ctx.fillStyle = '#F5D0AE'; // Lower chin shadow
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ── ZONE 2: Tokyo Jujutsu High High-Stand Mandarin Collar & Uniform (0.30 <= normY < 0.68) ──
+      const isCollarV = absGx <= 2 && gy >= 3 && gy <= 5;
+      const isPlacket = absGx <= 1 && gy >= 6;
+      const isGoldButton = gx === 0 && (gy === 6 || gy === 9);
+
+      if (isGoldButton) {
+        ctx.fillStyle = '#F59E0B'; // Golden crest button
+      } else if (isPlacket) {
+        ctx.fillStyle = '#1D182E'; // Central placket
+      } else if (isCollarV) {
+        ctx.fillStyle = '#FFE0BD'; // Exposed neck skin
+      } else if (normY >= 0.68 && normY < 0.78) {
+        // ── ZONE 3: Dark Waistband (0.68 <= normY < 0.78) ──
+        ctx.fillStyle = '#1A1428';
+      } else {
+        // ── ZONE 4: Jujutsu High Navy Uniform Trousers (normY >= 0.78) ──
+        const isSeam = absGx === 0 || absGx === 4;
+        ctx.fillStyle = isSeam ? '#1E1830' : '#28203E'; // High luminance dark violet navy (Y >= 24)
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+}
+
+/**
+ * Draws Megumi's signature sea-urchin hair on Layer 2
+ */
+export function _drawMegumiHair(ctx, r, facingLeft = false, isLowQuality = false) {
+  ctx.save();
+
+  // 1. Clipped Bangs Layer
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.clip();
+
+  ctx.fillStyle = '#0E1017';
+  ctx.beginPath();
+  ctx.moveTo(-r * 1.05, -r * 1.05);
+  ctx.lineTo(r * 1.05, -r * 1.05);
+  ctx.lineTo(r * 1.05, -r * 0.32);
+
+  for (let i = 0; i < _MEGUMI_BANGS.length; i++) {
+    const pt = _MEGUMI_BANGS[i];
+    ctx.lineTo(r * pt.nx, r * pt.ny);
+  }
+  ctx.lineTo(-r * 1.05, -r * 0.32);
+  ctx.closePath();
+  ctx.fill();
+
+  if (!isLowQuality) {
+    ctx.fillStyle = '#181E2E';
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.85, -r * 0.65);
+    ctx.quadraticCurveTo(0, -r * 0.80, r * 0.85, -r * 0.65);
+    ctx.quadraticCurveTo(0, -r * 0.50, -r * 0.85, -r * 0.65);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.8;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(r * _MEGUMI_BANGS[0].nx, r * _MEGUMI_BANGS[0].ny);
+  for (let i = 1; i < _MEGUMI_BANGS.length; i++) {
+    const pt = _MEGUMI_BANGS[i];
+    ctx.lineTo(r * pt.nx, r * pt.ny);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // 2. External Spiky Crown Tufts (Sea-Urchin Silhouette)
+  ctx.fillStyle = '#0E1017';
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.8;
+  ctx.lineJoin = 'round';
+
+  // 1. Far-Left Outer Spike
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.75, -r * 0.42);
+  ctx.lineTo(-r * 1.15, -r * 0.65);
+  ctx.lineTo(-r * 0.65, -r * 0.70);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // 2. Mid-Left Crown Spike
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.62, -r * 0.72);
+  ctx.lineTo(-r * 0.82, -r * 1.12);
+  ctx.lineTo(-r * 0.32, -r * 0.88);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // 3. Center-Top Prominent Spike
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.26, -r * 0.90);
+  ctx.lineTo(0, -r * 1.22);
+  ctx.lineTo(r * 0.24, -r * 0.92);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // 4. Mid-Right Crown Spike
+  ctx.beginPath();
+  ctx.moveTo(r * 0.32, -r * 0.88);
+  ctx.lineTo(r * 0.80, -r * 1.10);
+  ctx.lineTo(r * 0.65, -r * 0.70);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // 5. Far-Right Outer Spike
+  ctx.beginPath();
+  ctx.moveTo(r * 0.68, -r * 0.65);
+  ctx.lineTo(r * 1.15, -r * 0.62);
+  ctx.lineTo(r * 0.78, -r * 0.40);
+  ctx.closePath();
+  ctx.fill();
   ctx.stroke();
 
   ctx.restore();

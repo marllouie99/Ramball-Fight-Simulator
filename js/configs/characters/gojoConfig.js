@@ -71,7 +71,7 @@ export const gojoConfig = {
   // ── 3. Skill: Cursed Technique Reversal: Red ──
   enableRed: true,                         // Master toggle for Skill: Reversal Red
   redCooldown: 1000,         // Cooldown of Red (frames)
-  redDamage: 200,           // Base damage dealt by Reversal Red blast
+  redDamage: 250,           // Base damage dealt by Reversal Red blast
   redKnockback: 10,         // Supersonic knockback force of Red
   redRange: 650,            // Base range
   redFrontalReach: 650,     // Long frontal reach corridor in pixels
@@ -154,9 +154,9 @@ export const gojoConfig = {
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
   enableMeleeMode: true,                   // Master toggle for Melee Mode & Hand-to-Hand Martial Arts
-  closeRangeRadius: 80,                    // Proximity distance (pixels) to enter Melee Mode (direct contact only)
-  leaveMeleeRadius: 130,                   // Distance (pixels) beyond which Melee Mode is instantly disengaged
-  initialMeleeDuration: 60,                // Active melee clash duration in frames (~1.0s at 60fps)
+  closeRangeRadius: 120,                   // Proximity distance (pixels) to enter Melee Mode (direct contact only)
+  leaveMeleeRadius: 150,                   // Distance (pixels) beyond which Melee Mode is instantly disengaged
+  initialMeleeDuration: 120,                // Active melee clash duration in frames (~1.0s at 60fps)
   meleeModeCooldown: 240,                  // Mandatory ranged separation cooldown in frames (~4.0s at 60fps)
   comboDisengageDistance: 260,             // Distance (pixels) teleported away when disengaging after clash
   meleePunchDamage: 6,                     // Damage dealt per martial arts punch strike

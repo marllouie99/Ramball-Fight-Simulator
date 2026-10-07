@@ -526,7 +526,7 @@ export function resolveFighterCollision(a, b) {
 
   // Laser slow & Infinity barrier contact should feel like a drag, not a push.
   // When either fighter is slowed or in contact with Infinity, damp the collision impulse heavily.
-  const slowActive = (a.slowTimer > 0) || (b.slowTimer > 0) || aIsGojoInfinity || bIsGojoInfinity;
+  const slowActive = (a.slowTimer > 0) || (b.slowTimer > 0) || (aIsGojoInfinity && !b.gojoInfinityImmune) || (bIsGojoInfinity && !a.gojoInfinityImmune);
 
   const { restitution } = CONFIG.collision;
   const rawImpulse = -(1 + restitution) * dotN / 2;

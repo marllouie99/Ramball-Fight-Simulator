@@ -237,190 +237,129 @@ export function _drawZeusVambrace(ctx, cx, cy, radius = 6.4, isStorm = false) {
   drawZeusHand(ctx, cx, cy, radius, '#FCD34D', isStorm);
 }
 
+let _cachedZeusCanvas = null;
+let _cachedZeusR = 0;
+let _cachedZeusStorm = false;
+
 /**
- * Renders the smooth, elegant anime body of Zeus.
- * Features Authentic Greek God Faceless Model matching repository standards (Rule 19):
- * - Smooth sun-kissed Olympian god faceless skin complexion
- * - Golden segmented gorget / collar armor at neck
- * - Diagonal draped white toga on left chest & bare muscular tanned god chest on right
- * - Golden armored segmented belt with central buckle plate
- * - Flowing white pleated himation / skirt
- *
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} r - Character radius
- * @param {boolean} [isStormActive=false] - Whether Divine Wrath / Thunder Storm is active
+ * Solid 2D Pixel-Art Body for Zeus (Offscreen Cache Pattern)
  */
 export function drawZeusBody(ctx, r = 25, isStormActive = false) {
-  ctx.save();
+  const intR = Math.round(r);
+  if (!_cachedZeusCanvas || _cachedZeusR !== intR || _cachedZeusStorm !== isStormActive) {
+    const P = 2.0;
+    const steps = Math.ceil((intR + P) / P);
+    const size = (steps + 2) * P * 2;
+    const offscreen = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+    if (offscreen) {
+      offscreen.width = size;
+      offscreen.height = size;
+      const offCtx = offscreen.getContext('2d');
+      offCtx.imageSmoothingEnabled = false;
+      offCtx.translate(size / 2, size / 2);
+      _renderZeusPixelBodyToCanvas(offCtx, intR, isStormActive);
+      _cachedZeusCanvas = offscreen;
+      _cachedZeusR = intR;
+      _cachedZeusStorm = isStormActive;
+    }
+  }
 
-  // 1. BASE BODY CIRCLE CLIP
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.save();
-  ctx.clip();
-
-  // 2. SMOOTH GOD SKIN BASE (Face, Crown, Neck, Right Chest)
-  const skinGrad = ctx.createLinearGradient(0, -r, 0, r * 0.7);
-  if (isStormActive) {
-    skinGrad.addColorStop(0, '#FFFFFF');
-    skinGrad.addColorStop(0.25, '#E0F2FE');
-    skinGrad.addColorStop(0.60, '#38BDF8');
-    skinGrad.addColorStop(1.0, '#0284C7');
+  if (_cachedZeusCanvas) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(_cachedZeusCanvas, -_cachedZeusCanvas.width / 2, -_cachedZeusCanvas.height / 2);
+    ctx.restore();
   } else {
-    skinGrad.addColorStop(0, '#FFF0E4');
-    skinGrad.addColorStop(0.25, '#F3BF9F');
-    skinGrad.addColorStop(0.55, '#E8AC8B');
-    skinGrad.addColorStop(0.85, '#D4A373');
-    skinGrad.addColorStop(1.0, '#B87E60');
+    _renderZeusPixelBodyToCanvas(ctx, intR, isStormActive);
   }
-  ctx.fillStyle = skinGrad;
-  ctx.fillRect(-r, -r, r * 2, r * 2);
+}
 
-  // 3. DIAGONAL DRAPED WHITE TOGA (Viewer's Left side)
-  ctx.beginPath();
-  ctx.moveTo(-r, -r * 0.2);
-  ctx.bezierCurveTo(-r * 0.6, r * 0.05, -r * 0.3, r * 0.35, 0, r * 0.65);
-  ctx.lineTo(-r, r * 0.65);
-  ctx.closePath();
+/**
+ * Procedural discrete grid rasterization of Zeus's body
+ */
+function _renderZeusPixelBodyToCanvas(ctx, r, isStorm = false) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
 
-  const togaGrad = ctx.createLinearGradient(-r, 0, 0, r * 0.65);
-  if (isStormActive) {
-    togaGrad.addColorStop(0, '#FFFFFF');
-    togaGrad.addColorStop(0.5, '#BAE6FD');
-    togaGrad.addColorStop(1, '#38BDF8');
-  } else {
-    togaGrad.addColorStop(0, '#FFFFFF');
-    togaGrad.addColorStop(0.4, '#F8FAFC');
-    togaGrad.addColorStop(0.8, '#F1F5F9');
-    togaGrad.addColorStop(1.0, '#CBD5E1');
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+      const normY = ry / r;
+      const normX = rx / r;
+      const absGx = Math.abs(gx);
+
+      // 4-neighbor attached boundary test for solid dark manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
+        ctx.fillStyle = isStorm ? '#00E5FF' : '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ── ZONE 1: Pure Face Dome (normY < 0.30) ──
+      if (normY < 0.30) {
+        if (normY < -0.40) {
+          ctx.fillStyle = isStorm ? '#FFFFFF' : '#FFF0E4'; // Forehead highlight
+        } else if (normY < 0.10) {
+          ctx.fillStyle = isStorm ? '#BAE6FD' : '#F3BF9F'; // Sun-kissed Olympian god skin base
+        } else {
+          ctx.fillStyle = isStorm ? '#38BDF8' : '#D4A373'; // Lower chin & jaw contour
+        }
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ── ZONE 2: Draped White Toga & Bare Muscular God Chest (0.30 <= normY < 0.68) ──
+      const isGorget = gy >= 3 && gy <= 5 && absGx <= 5;
+      const isToga = gx <= 1 && (normY >= 0.30 && normY < 0.68);
+
+      if (isGorget) {
+        // Golden Gorget Collar
+        if (absGx <= 1) {
+          ctx.fillStyle = isStorm ? '#FFFFFF' : '#FEF08A'; // Center glint
+        } else {
+          ctx.fillStyle = isStorm ? '#38BDF8' : '#FACC15'; // Olympian gold
+        }
+      } else if (isToga) {
+        // White Draped Toga (Left side)
+        const isTogaShadow = absGx === 3 || gy === 7;
+        ctx.fillStyle = isTogaShadow ? (isStorm ? '#BAE6FD' : '#CBD5E1') : (isStorm ? '#FFFFFF' : '#F8FAFC');
+      } else if (normY >= 0.68 && normY < 0.78) {
+        // ── ZONE 3: Golden Armored Belt & Diamond Buckle (0.68 <= normY < 0.78) ──
+        if (absGx <= 2) {
+          ctx.fillStyle = isStorm ? '#FFFFFF' : '#FEF08A'; // Buckle diamond plate
+        } else {
+          ctx.fillStyle = isStorm ? '#0284C7' : '#FACC15'; // Golden belt band
+        }
+      } else if (normY >= 0.78) {
+        // ── ZONE 4: White Pleated Himation / Skirt (normY >= 0.78) ──
+        const isPleat = absGx === 0 || absGx === 4 || absGx === 8;
+        ctx.fillStyle = isPleat ? (isStorm ? '#38BDF8' : '#CBD5E1') : (isStorm ? '#BAE6FD' : '#FFFFFF');
+      } else {
+        // Bare Muscular God Chest (Right side)
+        const isPectoralLine = (gy === 7 && gx >= 2 && gx <= 7);
+        if (isPectoralLine) {
+          ctx.fillStyle = isStorm ? '#0284C7' : '#B87E60'; // Pectoral shadow underline
+        } else {
+          ctx.fillStyle = isStorm ? '#7DD3FC' : '#E8AC8B'; // Muscular tanned chest
+        }
+      }
+      ctx.fillRect(px, py, P, P);
+    }
   }
-  ctx.fillStyle = togaGrad;
-  ctx.fill();
-
-  // Smooth Toga Fold Creases
-  ctx.strokeStyle = isStormActive ? 'rgba(2, 132, 199, 0.45)' : 'rgba(148, 163, 184, 0.55)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.8, -r * 0.05);
-  ctx.bezierCurveTo(-r * 0.55, r * 0.2, -r * 0.35, r * 0.45, -r * 0.15, r * 0.65);
-  ctx.moveTo(-r * 0.5, -r * 0.15);
-  ctx.bezierCurveTo(-r * 0.35, r * 0.15, -r * 0.2, r * 0.4, -0.05, r * 0.65);
-  ctx.stroke();
-
-  // Golden Shoulder Fibula Brooch
-  ctx.beginPath();
-  ctx.arc(-r * 0.62, r * 0.12, 3.2, 0, Math.PI * 2);
-  ctx.fillStyle = isStormActive ? '#E0F2FE' : '#FACC15';
-  ctx.fill();
-  ctx.strokeStyle = isStormActive ? '#0284C7' : '#A16207';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // 4. BARE MUSCULAR GOD CHEST CONTOURS (Viewer's Right side)
-  ctx.strokeStyle = isStormActive ? 'rgba(2, 132, 199, 0.4)' : 'rgba(180, 83, 9, 0.4)';
-  ctx.lineWidth = 1.4;
-  // Sternal Center Crease
-  ctx.beginPath();
-  ctx.moveTo(0, r * 0.28);
-  ctx.lineTo(0, r * 0.65);
-  ctx.stroke();
-  // Pectoral Muscle Underline
-  ctx.beginPath();
-  ctx.arc(r * 0.36, r * 0.42, r * 0.26, 0.2, Math.PI * 0.8);
-  ctx.stroke();
-  // Oblique / Rib definition
-  ctx.beginPath();
-  ctx.moveTo(r * 0.45, r * 0.52);
-  ctx.lineTo(r * 0.25, r * 0.65);
-  ctx.stroke();
-
-  // 5. GOLDEN SEGMENTED GORGET / NECK ARMOR (y ~ 0.22r to 0.34r)
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.26, r * 0.55, r * 0.08, 0, 0, Math.PI * 2);
-  const gorgetGrad = ctx.createLinearGradient(-r * 0.55, 0, r * 0.55, 0);
-  if (isStormActive) {
-    gorgetGrad.addColorStop(0, '#0284C7');
-    gorgetGrad.addColorStop(0.5, '#E0F2FE');
-    gorgetGrad.addColorStop(1, '#0284C7');
-  } else {
-    gorgetGrad.addColorStop(0, '#CA8A04');
-    gorgetGrad.addColorStop(0.2, '#FEF08A');
-    gorgetGrad.addColorStop(0.5, '#FACC15');
-    gorgetGrad.addColorStop(0.8, '#FEF08A');
-    gorgetGrad.addColorStop(1, '#A16207');
-  }
-  ctx.fillStyle = gorgetGrad;
-  ctx.fill();
-  ctx.strokeStyle = isStormActive ? '#0369A1' : '#78350F';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // 6. GOLDEN ARMORED WAIST BELT (y ~ 0.65r to 0.78r)
-  ctx.beginPath();
-  ctx.rect(-r, r * 0.65, r * 2, r * 0.13);
-  const beltGrad = ctx.createLinearGradient(-r, 0, r, 0);
-  if (isStormActive) {
-    beltGrad.addColorStop(0, '#0284C7');
-    beltGrad.addColorStop(0.5, '#E0F2FE');
-    beltGrad.addColorStop(1, '#0284C7');
-  } else {
-    beltGrad.addColorStop(0, '#CA8A04');
-    beltGrad.addColorStop(0.3, '#FEF08A');
-    beltGrad.addColorStop(0.5, '#FACC15');
-    beltGrad.addColorStop(0.7, '#FEF08A');
-    beltGrad.addColorStop(1, '#A16207');
-  }
-  ctx.fillStyle = beltGrad;
-  ctx.fill();
-
-  // Golden Buckle Diamond / Hexagonal Plate
-  ctx.beginPath();
-  ctx.moveTo(0, r * 0.63);
-  ctx.lineTo(r * 0.16, r * 0.71);
-  ctx.lineTo(0, r * 0.79);
-  ctx.lineTo(-r * 0.16, r * 0.71);
-  ctx.closePath();
-  ctx.fillStyle = isStormActive ? '#FFFFFF' : '#FEF08A';
-  ctx.fill();
-  ctx.strokeStyle = isStormActive ? '#0284C7' : '#78350F';
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // 7. WHITE PLEATED HIMATION / SKIRT (y >= 0.78r)
-  ctx.beginPath();
-  ctx.rect(-r, r * 0.78, r * 2, r * 0.35);
-  const skirtGrad = ctx.createLinearGradient(0, r * 0.78, 0, r);
-  if (isStormActive) {
-    skirtGrad.addColorStop(0, '#BAE6FD');
-    skirtGrad.addColorStop(1, '#38BDF8');
-  } else {
-    skirtGrad.addColorStop(0, '#FFFFFF');
-    skirtGrad.addColorStop(1, '#E2E8F0');
-  }
-  ctx.fillStyle = skirtGrad;
-  ctx.fill();
-
-  // Smooth vertical pleats
-  ctx.strokeStyle = isStormActive ? 'rgba(2, 132, 199, 0.45)' : 'rgba(148, 163, 184, 0.50)';
-  ctx.lineWidth = 1.2;
-  for (let px = -r * 0.65; px <= r * 0.65; px += r * 0.28) {
-    ctx.beginPath();
-    ctx.moveTo(px, r * 0.78);
-    ctx.lineTo(px * 1.08, r);
-    ctx.stroke();
-  }
-
-  // Restore clip
-  ctx.restore();
-
-  // 8. SLEEK OUTER CIRCULAR BORDER
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.strokeStyle = isStormActive ? '#0284C7' : '#1E293B';
-  ctx.lineWidth = 2.0;
-  ctx.stroke();
-
-  ctx.restore();
 }
 
 export const drawZeusPixelBody = drawZeusBody;

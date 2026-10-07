@@ -28,7 +28,7 @@ export function drawKnightPixelBody(ctx, r, isGhost = false) {
   }
 
   // ── PASS 1: 4-Neighbor Attached Manga Ink Outline Shell ──
-  const cOutline = isGhost ? '#0A0D14' : '#111114';
+  const cOutline = isGhost ? '#0A0D14' : '#0E0F14';
   ctx.fillStyle = cOutline;
   for (let gy = minY; gy <= maxY; gy += P) {
     for (let gx = minX; gx <= maxX; gx += P) {

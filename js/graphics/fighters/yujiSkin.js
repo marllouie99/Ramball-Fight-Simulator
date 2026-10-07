@@ -497,16 +497,6 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
   const P = 2.0;
   const steps = Math.ceil((r + P) / P);
 
-  // Hairline shape calculation: spiky jagged dusty pink-salmon fringe
-  function getHairlineY(rx) {
-    const nx = rx / r; // -1 to +1
-    // Asymmetric spiky bangs across forehead
-    const spikeWave = Math.abs(Math.sin((nx + 0.12) * Math.PI * 3.4));
-    const centralExtension = (1.0 - Math.abs(nx) * 0.30);
-    const spikeDepth = r * 0.28 * centralExtension * Math.pow(spikeWave, 1.15);
-    return -r * 0.38 + spikeDepth;
-  }
-
   // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -532,42 +522,27 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
         continue;
       }
 
-      const hairlineY = getHairlineY(rx);
       const nx = rx / r;
+      const ny = ry / r;
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // ZONE 1: Spiky Pink-Salmon Hair (ry < hairlineY)
+      // ZONE 1: WARM PEACH FACE SKIN, SCARS & SUKUNA MARKS (ny < 0.30)
+      // Pure unbroken circular dome (All hair on Layer 2)
       // ──────────────────────────────────────────
-      if (ry < hairlineY) {
-        let col = isSukunaForm ? '#C44E58' : '#D9847A'; // Base pink-salmon
-        if (ry < -r * 0.70) {
-          col = isSukunaForm ? '#E86E78' : '#F2A49B'; // Top hair crown highlight
-        } else if (ry < -r * 0.50 && Math.abs(rx) < r * 0.45) {
-          col = isSukunaForm ? '#D45C66' : '#E6938A'; // Mid hair highlight
-        } else if (ry > hairlineY - P * 2.2) {
-          col = isSukunaForm ? '#8E2832' : '#B85E55'; // Bang tip shadow
-        } else if (Math.abs(rx) > r * 0.72) {
-          col = isSukunaForm ? '#9A303A' : '#C26D64'; // Side fringe shadow
-        }
-
-        // Sukuna dark root undertones if transformed
-        if (isSukunaForm && ry > -r * 0.45 && ry < -r * 0.20 && Math.abs(rx) > r * 0.40) {
-          col = '#1A1114'; // Dark Sukuna undercuts
-        }
-
-        destCtx.fillStyle = col;
-        destCtx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE 2: Warm Peach Face Skin & Scars (hairlineY <= ry < r * 0.08)
-      // ──────────────────────────────────────────
-      else if (ry < r * 0.08) {
-        let col = isSukunaForm ? '#E8B4A2' : '#F0C090';
-        if (ry < hairlineY + P * 2.0) {
-          col = isSukunaForm ? '#D09A88' : '#DBA878'; // Bang shadow
-        } else if (absX > 0.72 || ry > 0) {
-          col = isSukunaForm ? '#CE9684' : '#DCA272'; // Cheek / neck shadow
+      if (ny < 0.30) {
+        let col = isSukunaForm ? '#FEDBC0' : '#F0C090';
+        if (absX >= 0.55) {
+          const dLevel = (absX - 0.55) / 0.45;
+          if (dLevel > 0.6) {
+            col = ((gx + gy) % 2 === 0) ? (isSukunaForm ? '#D89F7C' : '#CE9684') : (isSukunaForm ? '#E9B796' : '#DCA272');
+          } else if ((gx + gy) % 2 === 0) {
+            col = isSukunaForm ? '#E9B796' : '#DCA272';
+          }
+        } else if (absX < 0.35 && ny > -0.25 && ny < 0.10) {
+          if ((gx + gy) % 4 === 0) {
+            col = '#FFF0E2';
+          }
         }
 
         // Signature Brow Scar (diagonal slash)
@@ -585,12 +560,12 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
         let isSukunaMark = false;
         if (isSukunaForm) {
           if (ry >= -r * 0.26 && ry <= -r * 0.12 && absX <= 0.06) isSukunaMark = true;
-          if (ry >= -r * 0.10 && ry <= r * 0.06 && (Math.abs(rx - r * 0.44) <= P * 0.9 || Math.abs(rx + r * 0.44) <= P * 0.9)) isSukunaMark = true;
-          if (ry >= -r * 0.18 && ry <= -r * 0.14 && (Math.abs(rx - r * 0.34) <= r * 0.12 || Math.abs(rx + r * 0.34) <= r * 0.12)) isSukunaMark = true;
+          if (ry >= -r * 0.10 && ry <= r * 0.06 && (Math.abs(rx - r * 0.40) <= P * 0.9 || Math.abs(rx + r * 0.40) <= P * 0.9)) isSukunaMark = true;
+          if (ry >= -r * 0.18 && ry <= -r * 0.14 && (Math.abs(rx - r * 0.30) <= r * 0.10 || Math.abs(rx + r * 0.30) <= r * 0.10)) isSukunaMark = true;
         }
 
         if (isSukunaMark) {
-          destCtx.fillStyle = '#1A1116'; // Deep charcoal-black tattoo ink
+          destCtx.fillStyle = '#0E0F14'; // Deep charcoal-black tattoo ink
         } else if (isBrowScar) {
           destCtx.fillStyle = '#944430'; // Signature dark crimson-brown scar
         } else if (isBrowScarHighlight) {
@@ -603,7 +578,7 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 3: DETAILED RED HOODIE COWL & UNIFORM (ry >= r * 0.08)
+      // ZONE 2: DETAILED RED HOODIE COWL & UNIFORM (ny >= 0.30)
       // ──────────────────────────────────────────
       else {
         // Button helper function: Subtle antique gold Jujutsu High button (clean, zero wrapper look)
@@ -611,16 +586,13 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
           const dist = Math.hypot(bx - btnCenterX, by - btnCenterY);
           if (dist > btnRadius) return null;
 
-          // Dark bronze rim
           if (dist >= btnRadius - P * 0.8) {
             return '#1C1917';
           }
-          // Soft golden highlight
           const glintDist = Math.hypot(bx - (btnCenterX - btnRadius * 0.35), by - (btnCenterY - btnRadius * 0.35));
           if (glintDist <= P * 0.9) {
             return '#FCD34D';
           }
-          // Inner swirl
           const innerDist = Math.hypot(bx - btnCenterX, by - btnCenterY);
           if (innerDist <= btnRadius * 0.40 && innerDist >= btnRadius * 0.18) {
             return '#78350F';
@@ -628,16 +600,14 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
           if (innerDist < btnRadius * 0.18) {
             return '#1C1917';
           }
-          // Base antique gold
           return '#D4AF37';
         }
 
         // Button positions:
-        const b1X = -r * 0.14, b1Y = r * 0.24, b1R = r * 0.10;
-        const b2X = -r * 0.14, b2Y = r * 0.42, b2R = r * 0.10;
-        const b3X = r * 0.52, b3Y = r * 0.65, b3R = r * 0.10;
+        const b1X = -r * 0.14, b1Y = r * 0.40, b1R = r * 0.09;
+        const b2X = -r * 0.14, b2Y = r * 0.56, b2R = r * 0.09;
+        const b3X = r * 0.50, b3Y = r * 0.70, b3R = r * 0.09;
 
-        // Priority 1: Check buttons
         const btn1Col = getButtonPixel(rx, ry, b1X, b1Y, b1R);
         const btn2Col = getButtonPixel(rx, ry, b2X, b2Y, b2R);
         const btn3Col = getButtonPixel(rx, ry, b3X, b3Y, b3R);
@@ -658,58 +628,46 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
           continue;
         }
 
-        // Top collar boundary curve: curves down in center from r * 0.08 to r * 0.16
-        const cowlTopY = r * 0.08 + Math.max(0, (1 - Math.pow(absX / 0.45, 2)) * r * 0.08);
-        const isThroatSkin = (ry < cowlTopY);
+        // Red Cowl Region: from ny 0.30 down to r * 0.60
+        const isRedCowl = (ry <= r * 0.60);
+        const isCowlPlacket = (rx >= -r * 0.28 && rx <= 0.0 && ry >= r * 0.32 && ry <= r * 0.60);
+        const isCowlPlacketSeam = (Math.abs(rx - 0.0) <= P * 0.8 && ry >= r * 0.32 && ry <= r * 0.60);
+        const isCowlMiddleCrease = (Math.abs(ry - r * 0.44) <= P * 0.8 && !isCowlPlacket);
+        const isCowlTopRim = (Math.abs(ry - r * 0.30) <= P * 0.8);
+        const isCowlBottomSeam = (Math.abs(ry - r * 0.60) <= P * 0.8);
 
-        // Red Cowl Region: from cowlTopY down to r * 0.54
-        const isRedCowl = (!isThroatSkin && ry <= r * 0.54);
+        // Navy Uniform Region (ry > r * 0.60)
+        const isNavyFold1 = (Math.abs(ry - (r * 0.70 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
+        const isNavyFold1Hi = (Math.abs(ry - (r * 0.68 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
 
-        // Left Placket Flap: rx from -r * 0.28 to 0.0, ry from r * 0.14 to r * 0.54
-        const isCowlPlacket = (rx >= -r * 0.28 && rx <= 0.0 && ry >= r * 0.14 && ry <= r * 0.54);
-        const isCowlPlacketSeam = (Math.abs(rx - 0.0) <= P * 0.8 && ry >= r * 0.14 && ry <= r * 0.54);
-
-        // Horizontal fold crease across red cowl at ry ~ r * 0.32
-        const isCowlMiddleCrease = (Math.abs(ry - r * 0.32) <= P * 0.8 && !isCowlPlacket);
-        const isCowlTopRim = (Math.abs(ry - cowlTopY) <= P * 0.8);
-        const isCowlBottomSeam = (Math.abs(ry - r * 0.54) <= P * 0.8);
-
-        // Navy Uniform Region (ry > r * 0.54)
-        const isNavyFold1 = (Math.abs(ry - (r * 0.65 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
-        const isNavyFold1Hi = (Math.abs(ry - (r * 0.63 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
-        const isNavyFold2 = (Math.abs(ry - (r * 0.77 + rx * 0.06)) <= P * 0.8 && rx <= r * 0.42);
-        const isNavyFold2Hi = (Math.abs(ry - (r * 0.75 + rx * 0.06)) <= P * 0.8 && rx <= r * 0.42);
-
-        if (isThroatSkin) {
-          destCtx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
-        } else if (isRedCowl) {
+        if (isRedCowl) {
           if (isCowlTopRim || isCowlBottomSeam || isCowlPlacketSeam) {
-            destCtx.fillStyle = '#6E0E14'; // Subtle dark red fold crease
+            destCtx.fillStyle = '#6E0E14';
           } else if (isCowlMiddleCrease) {
-            destCtx.fillStyle = '#8A1018'; // Middle fold shadow
+            destCtx.fillStyle = '#8A1018';
           } else if (isCowlPlacket) {
-            destCtx.fillStyle = '#C81E2B'; // Rich vertical flap red
-          } else if (ry < r * 0.32) {
+            destCtx.fillStyle = '#C81E2B';
+          } else if (ry < r * 0.44) {
             let col = '#E52B38';
-            if (ry < cowlTopY + P * 2.5) col = '#F44336';
+            if (ry < r * 0.34) col = '#F44336';
             destCtx.fillStyle = col;
           } else {
             let col = '#B71C1C';
-            if (absX > r * 0.70 || ry > r * 0.46) col = '#8A1018';
+            if (absX > r * 0.70 || ry > r * 0.52) col = '#8A1018';
             destCtx.fillStyle = col;
           }
         } else {
-          // Navy Jujutsu High Uniform
-          if (isNavyFold1 || isNavyFold2) {
-            destCtx.fillStyle = '#0E1322'; // Deep navy shadow crease
-          } else if (isNavyFold1Hi || isNavyFold2Hi) {
-            destCtx.fillStyle = '#334168'; // Lighter denim blue fold highlight
+          // Navy Jujutsu High Uniform (Ensuring Y >= 24 luminance)
+          if (isNavyFold1) {
+            destCtx.fillStyle = '#181C2C';
+          } else if (isNavyFold1Hi) {
+            destCtx.fillStyle = '#3A4870';
           } else {
-            let col = '#1D253D'; // Midnight navy base
+            let col = '#262F4A';
             if (absX > r * 0.70 || ry > r * 0.85) {
-              col = '#101524';
-            } else if (ry < r * 0.65 && absX < r * 0.30) {
-              col = '#242E4A';
+              col = '#1C2236';
+            } else if (ry < r * 0.72 && absX < r * 0.30) {
+              col = '#303B5C';
             }
             destCtx.fillStyle = col;
           }
@@ -728,25 +686,29 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
  * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
  */
 export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined') {
+    _renderYujiPixelBodyToCanvas(ctx, r, isSukunaForm);
+    return;
+  }
 
-  if (!_cachedYujiNormalCanvas || !_cachedYujiSukunaCanvas || _cachedYujiR !== r) {
-    _cachedYujiR = r;
+  const intR = Math.round(r);
+  if (!_cachedYujiNormalCanvas || !_cachedYujiSukunaCanvas || _cachedYujiR !== intR) {
+    _cachedYujiR = intR;
     const P = 2.0;
-    const steps = Math.ceil((r + P) / P);
+    const steps = Math.ceil((intR + P) / P);
     const size = (steps * 2 + 1) * P;
 
     _cachedYujiNormalCanvas = document.createElement('canvas');
     _cachedYujiNormalCanvas.width = size;
     _cachedYujiNormalCanvas.height = size;
     const offCtxNormal = _cachedYujiNormalCanvas.getContext('2d');
-    _renderYujiPixelBodyToCanvas(offCtxNormal, r, false);
+    _renderYujiPixelBodyToCanvas(offCtxNormal, intR, false);
 
     _cachedYujiSukunaCanvas = document.createElement('canvas');
     _cachedYujiSukunaCanvas.width = size;
     _cachedYujiSukunaCanvas.height = size;
     const offCtxSukuna = _cachedYujiSukunaCanvas.getContext('2d');
-    _renderYujiPixelBodyToCanvas(offCtxSukuna, r, true);
+    _renderYujiPixelBodyToCanvas(offCtxSukuna, intR, true);
   }
 
   const canvasToDraw = isSukunaForm ? _cachedYujiSukunaCanvas : _cachedYujiNormalCanvas;

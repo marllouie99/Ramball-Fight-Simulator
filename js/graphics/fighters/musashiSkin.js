@@ -64,9 +64,10 @@ function _renderMusashiPixelBodyToCanvas(destCtx, r) {
       }
 
       // ──────────────────────────────────────────
-      // ZONE 1: Headband & Face (ry < r * 0.22)
+      // ZONE 1: Headband & Face (normY < 0.30)
+      // Pure unbroken circular dome (All hair on Layer 2)
       // ──────────────────────────────────────────
-      if (normY < 0.22) {
+      if (normY < 0.30) {
         // Forehead Hachimaki Headband (normY: -0.42 to -0.22)
         if (normY >= -0.42 && normY < -0.22) {
           if (normY < -0.38) {
@@ -84,7 +85,7 @@ function _renderMusashiPixelBodyToCanvas(destCtx, r) {
         let skinCol = '#E0A882';
 
         // Face Highlight (Forehead & bridge zone)
-        if (normY < 0.02 && Math.abs(normX) < 0.40) {
+        if (normY < 0.05 && Math.abs(normX) < 0.40) {
           skinCol = '#F0C09E';
         }
 
@@ -94,7 +95,7 @@ function _renderMusashiPixelBodyToCanvas(destCtx, r) {
         }
 
         // Battle Stubble / Jaw Shadow on lower chin
-        if (normY >= 0.10 && normY < 0.22) {
+        if (normY >= 0.16 && normY < 0.30) {
           if ((gx + gy) % 2 === 0) {
             skinCol = '#B07855'; // Rough stubble texture
           } else {
@@ -114,18 +115,18 @@ function _renderMusashiPixelBodyToCanvas(destCtx, r) {
       }
 
       // ──────────────────────────────────────────
-      // ZONE 2: Samurai Kimono Gi & Collar (0.22 <= normY < 0.58)
+      // ZONE 2: Samurai Kimono Gi & Collar (0.30 <= normY < 0.58)
       // ──────────────────────────────────────────
       if (normY < 0.58) {
         // Open V-Neck Bare Chest (Center exposed chest/collarbones)
-        const vSlope = (normY - 0.22) / (0.58 - 0.22); // 0 at neck, 1 at sternum
+        const vSlope = (normY - 0.30) / (0.58 - 0.30); // 0 at neck, 1 at sternum
         const vWidth = 0.28 * (1.0 - vSlope * 0.75); // V gets narrower at the base
 
-        if (Math.abs(normX) < vWidth && normY < 0.46) {
+        if (Math.abs(normX) < vWidth && normY < 0.48) {
           // Tan Bare Chest
-          if (normY < 0.32) {
+          if (normY < 0.38) {
             destCtx.fillStyle = '#F0C09E'; // Collarbone highlight
-          } else if (normX === 0 && normY >= 0.32) {
+          } else if (normX === 0 && normY >= 0.38) {
             destCtx.fillStyle = '#A06848'; // Center chest crease
           } else {
             destCtx.fillStyle = '#E0A882';
@@ -135,7 +136,7 @@ function _renderMusashiPixelBodyToCanvas(destCtx, r) {
         }
 
         // Inner White Robe Lapel Trim (along the V edge)
-        const isWhiteLapel = (Math.abs(normX) >= vWidth && Math.abs(normX) < vWidth + 0.08 && normY < 0.48);
+        const isWhiteLapel = (Math.abs(normX) >= vWidth && Math.abs(normX) < vWidth + 0.08 && normY < 0.50);
         if (isWhiteLapel) {
           destCtx.fillStyle = '#F1F5F9';
           destCtx.fillRect(px, py, P, P);
@@ -143,12 +144,12 @@ function _renderMusashiPixelBodyToCanvas(destCtx, r) {
         }
 
         // Deep Slate Navy / Charcoal Kimono Gi Fabric
-        if (normY < 0.30) {
+        if (normY < 0.38) {
           destCtx.fillStyle = '#2C3240'; // Shoulder highlight
         } else if (Math.abs(normX) < 0.45) {
-          destCtx.fillStyle = '#1E232E'; // Kimono chest fold
+          destCtx.fillStyle = '#242A36'; // Kimono chest fold (luminance >= 24)
         } else {
-          destCtx.fillStyle = '#171B24'; // Kimono dark fabric
+          destCtx.fillStyle = '#1E232E'; // Kimono dark fabric
         }
         destCtx.fillRect(px, py, P, P);
         continue;

@@ -259,20 +259,63 @@ async function runInteractionTests() {
   console.log('   2. Testing Mahoraga Wheel Adaptation against Gojo Infinity...');
   {
     const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
-    assert(MahoragaClass, 'Mahoraga class must exist');
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    assert(MahoragaClass && GojoClass, 'Mahoraga and Gojo classes must exist');
     const mahoraga = new MahoragaClass(270, 480, 0);
+    const gojo = new GojoClass({ id: 21, type: 'gojo', hp: 400, radius: 25, x: 600, y: 300 });
+    const arena = { x: 50, y: 50, width: 800, height: 600 };
+    const previousMode = state.mode;
+    const previousArena = state.arena;
+    const previousFighters = state.fighters;
+    const previousProjectiles = state.projectiles;
+    mahoraga.x = 250;
+    mahoraga.y = 300;
+    gojo.x = 600;
+    gojo.y = 300;
+    mahoraga.team = 1;
+    gojo.team = 0;
+    state.mode = '1v2';
+    state.arena = arena;
+    state.fighters = [gojo, mahoraga];
+    state.projectiles = [];
 
-    // Initial state: not adapted
     assert(!mahoraga.gojoInfinityImmune, 'Mahoraga must start without Gojo Infinity immunity');
-    
-    // Simulate adaptation triggers
-    mahoraga.infinityHitsTaken = (mahoraga.infinityHitsTaken || 0) + 10;
-    if (mahoraga.infinityHitsTaken >= 10) {
-      mahoraga.gojoInfinityImmune = true;
-      if (mahoraga.adapted) mahoraga.adapted.melee = true;
-    }
+    const freezesNeeded = CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 10;
+    mahoraga.infinityFreezeCount = freezesNeeded - 1;
+    mahoraga.isFrozenByInfinity = true;
+    mahoraga.timeStopTimer = 10;
+    const gojoStartingHp = gojo.hp;
+
+    mahoraga.update(gojo, 0, arena);
 
     assert(mahoraga.gojoInfinityImmune === true, 'Mahoraga must adapt to Infinity after 10 exposures');
+    assert(mahoraga.adaptationDashTimer > 0, 'Mahoraga must counter-dash toward Gojo after adapting to Infinity');
+
+    const dashStartX = mahoraga.x;
+    for (let frame = 0; frame < (mahoraga.adaptationDashMaxTimer || 10) + 1; frame++) {
+      mahoraga.update(gojo, 0, arena);
+    }
+    assert(mahoraga.x !== dashStartX, 'Infinity-adapted Mahoraga must complete his counter-dash toward Gojo');
+    assert(gojo.hp < gojoStartingHp, 'Mahoraga adaptation counter-dash must damage Gojo through Infinity');
+
+    mahoraga.x = gojo.x - 70;
+    mahoraga.y = gojo.y;
+    mahoraga.postDashPauseTimer = 0;
+    mahoraga.swordCooldown = 0;
+    const gojoHpBeforeMelee = gojo.hp;
+    assert(mahoraga.isValidAimTarget(gojo), 'Adapted Mahoraga must consider living Gojo a valid target');
+    assert(!mahoraga.isTeammate(gojo), 'Adapted Mahoraga must classify Gojo as an enemy');
+    assert(mahoraga._findClosestEnemy(gojo) === gojo, 'Adapted Mahoraga must select Gojo as its combat target');
+    mahoraga.update(gojo, 0, arena);
+    assert(mahoraga.attackCount > 0, 'Infinity-adapted Mahoraga must perform normal melee attacks against Gojo');
+    assert(gojo.hp < gojoHpBeforeMelee, `Infinity-adapted Mahoraga's basic melee attack must damage Gojo (${gojoHpBeforeMelee} -> ${gojo.hp})`);
+
+    mahoraga.reset();
+    gojo.reset();
+    state.mode = previousMode;
+    state.arena = previousArena;
+    state.fighters = previousFighters;
+    state.projectiles = previousProjectiles;
     console.log('      ✅ Mahoraga adaptation wheel verified.');
   }
 
@@ -4607,6 +4650,34 @@ async function runInteractionTests() {
     console.log('      ✅ Eye of Cthulhu vs Gojo Limitless Infinity push immunity, barrier rebound & zero displacement verified successfully.');
   }
 
+  // ── TEST 50A: Eye of Cthulhu Phase 2 waits for Gojo Domain expiration ──
+  console.log('   50A. Testing Eye of Cthulhu Phase 2 delay during Gojo Domain...');
+  {
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { EyeOfCthulhuFighter } = await import('../js/entities/fighters/EyeOfCthulhuFighter.js');
+
+    const gojo = new GojoFighter({ x: 200, y: 200, radius: 25, hp: 400, maxHp: 400 });
+    const eye = new EyeOfCthulhuFighter({ x: 300, y: 200, radius: 32, hp: 1200 });
+    eye.maxHp = 1200;
+    eye.hp = 400;
+    const arena = { x: 0, y: 0, width: 800, height: 600 };
+    state.fighters = [gojo, eye];
+    state.arena = arena;
+    gojo.domainActive = true;
+    eye._handleTimeStop = () => false;
+
+    eye.update(gojo, 1, arena);
+    assert(eye.isTransforming === false && eye.hasTransformed === false, 'Eye must defer starting Phase 2 while Gojo Domain is active');
+
+    gojo.domainActive = false;
+    eye.update(gojo, 1, arena);
+    assert(eye.isTransforming === true && eye.hasTransformed === true, 'Eye must start Phase 2 after Gojo Domain expires');
+
+    gojo.reset();
+    eye.reset();
+    console.log('      ✅ Eye of Cthulhu Phase 2 correctly waits for Gojo Domain expiration.');
+  }
+
   // ── TEST 51: Eye of Cthulhu Phase 2 vs Gojo Hollow Purple Gravitational Vortex Pull ──
   console.log('   51. Testing Eye of Cthulhu Phase 2 vs Gojo Hollow Purple Gravitational Vortex Pull...');
   {
@@ -4770,10 +4841,12 @@ async function runInteractionTests() {
     const gojo = new GojoFighter({ x: 400, y: 300, radius: 25, hp: 400, maxHp: 400 });
     const normal = new NormalFighter({ id: 0, x: 350, y: 300, radius: 25, hp: 400, maxHp: 400 });
     const eye = new EyeOfCthulhuFighter({ x: 400, y: -70, radius: 32, hp: 1000, maxHp: 1200 }); // Out of arena above ceiling (y = -70 < 0)
+    gojo.meleeModeCooldown = 1000;
     gojo.team = 0;
     normal.team = 0;
     eye.team = 1;
 
+    state.mode = '2v2';
     state.fighters = [gojo, normal, eye];
     state.illusions = [];
     projectileSystem.projectiles = [];
@@ -4888,6 +4961,70 @@ async function runInteractionTests() {
     state.fighters = [];
 
     console.log('      ✅ Reze Ultimate 100% full heal and Bomb Devil Form 35% vampiric lifesteal verified successfully.');
+  }
+
+  // ─────────────────────────────────────────────
+  // TEST 56: Mahoraga Hollow Purple Adaptation: 50% Damage & Continuous Gravitational Pull
+  // ─────────────────────────────────────────────
+  {
+    console.log('   56. Testing Mahoraga Hollow Purple Adaptation: 50% Damage Reduction & Continuous Gravitational Pull...');
+    const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+    const { isEntityImmuneToGravitationalPull } = await import('../js/entities/fighter.js');
+    const { applyGojoAdaptation } = await import('../js/entities/fighters/mahoraga/mahoragaAdaptation.js');
+
+    assert(MahoragaClass && GojoClass, 'Mahoraga and Gojo classes must exist');
+
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = { x: 0, y: 0, width: 800, height: 600 };
+    const gojo = new GojoClass({ radius: 25, x: 100, y: 300, hp: 200, ownerIndex: 0 });
+    const mahoraga = new MahoragaClass({ radius: 25, x: 260, y: 300, hp: 300, maxHp: 300, ownerIndex: 1 });
+    gojo.team = 0;
+    mahoraga.team = 1;
+    state.fighters = [gojo, mahoraga];
+
+    // A. Adapt Mahoraga to Hollow Purple
+    applyGojoAdaptation(mahoraga, 'purple');
+    assert(mahoraga.gojoAdapted.purple === true, 'Mahoraga must be marked as adapted to Gojo Purple');
+
+    // B. Verify Mahoraga is NOT immune to Hollow Purple gravitational pull
+    assert(isEntityImmuneToGravitationalPull(mahoraga, 'purple') === false, 'Adapted Mahoraga must NOT be immune to Purple gravitational pull');
+
+    // C. Fire Hollow Purple and verify Mahoraga is pulled toward it
+    projectileSystem.projectiles = [];
+    gojo.gunAngle = 0; // Facing right toward Mahoraga
+    gojo._firePurple(0);
+
+    const purple = projectileSystem.projectiles.find(p => p.isGojoPurple);
+    assert(purple !== undefined, 'Hollow Purple projectile must be spawned in projectileSystem');
+    purple.x = 200;
+    purple.y = 300;
+    const initialMahoragaX = mahoraga.x;
+
+    projectileSystem.update(state.fighters);
+
+    assert(mahoraga.isCaughtInPurple === true || mahoraga.isCaughtInPurpleVortex === true, 'Adapted Mahoraga must get caught in Purple vortex');
+    assert(mahoraga.isPulledOrDragged() === true, 'Adapted Mahoraga isPulledOrDragged() must evaluate to true while inside Purple');
+    assert(mahoraga.x < initialMahoragaX, `Mahoraga must be pulled left towards the Purple orb at x=200 (initial x=${initialMahoragaX}, new x=${mahoraga.x})`);
+
+    // D. Verify 50% damage reduction on Purple DPS and Purple Explosion damage
+    const hpBefore = mahoraga.hp;
+    mahoraga.takeDamage(100, gojo, { isPurpleDPS: true, projectile: purple });
+    assert(mahoraga.hp === hpBefore - 50, `Adapted Mahoraga must take exactly 50% damage (expected 50 dmg, lost ${hpBefore - mahoraga.hp})`);
+
+    const hpBeforeExplosion = mahoraga.hp;
+    mahoraga.takeDamage(80, gojo, { isPurpleExplosion: true, projectile: purple });
+    assert(mahoraga.hp === hpBeforeExplosion - 40, `Adapted Mahoraga must take exactly 50% damage from Purple Explosion (expected 40 dmg, lost ${hpBeforeExplosion - mahoraga.hp})`);
+
+    // Clean up
+    projectileSystem.projectiles = [];
+    gojo.reset();
+    mahoraga.reset();
+    state.fighters = [];
+
+    console.log('      ✅ Mahoraga Hollow Purple adaptation: 50% damage reduction and continuous gravitational pull verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

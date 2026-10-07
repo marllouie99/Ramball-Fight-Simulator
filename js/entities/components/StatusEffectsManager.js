@@ -273,8 +273,11 @@ export class StatusEffectsManager {
       }
     }
     
-    // Mahoraga Limitless Infinity barrier adaptation immunity (does NOT bypass Domain Expansion Unlimited Void!)
+    // Mahoraga Limitless Infinity barrier adaptation immunity (does NOT bypass Domain Expansion Unlimited Void unless domain-adapted)
     if (this.fighter.gojoInfinityImmune && (this.fighter.characterId === 'mahoraga' || this.fighter.type === 'mahoraga') && !opts?.isDomain) {
+      return;
+    }
+    if ((this.fighter.gojoDomainAdapted || this.fighter.gojoAdapted?.domain) && (this.fighter.characterId === 'mahoraga' || this.fighter.type === 'mahoraga')) {
       return;
     }
 
@@ -316,7 +319,8 @@ export class StatusEffectsManager {
       return true;
     }
 
-    if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.immuneToCC || fighter.characterId === 'escanor' || fighter.type === 'escanor' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima && !fighter.isFrameFrozen && (!fighter.frameFreezeTimer || fighter.frameFreezeTimer <= 0) && !fighter.isCaughtInNaoyaUlt && !fighter.isCurrentlyWallPinnedByNaoya) {
+    const isDomainImmuneMahoraga = (fighter.gojoDomainAdapted || fighter.gojoAdapted?.domain) && (fighter.characterId === 'mahoraga' || fighter.type === 'mahoraga');
+    if ((fighter.isBaguvixActive || fighter.isGodModeActive || fighter.domainImmunity || isDomainImmuneMahoraga || fighter.characterId === 'toji' || fighter.type === 'toji' || fighter.immuneToCC || fighter.characterId === 'escanor' || fighter.type === 'escanor' || fighter.isCountering || (fighter._counterPunchTimer && fighter._counterPunchTimer > 0) || (fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0)) && !fighter.isChainedByMakima && !fighter.isFrameFrozen && (!fighter.frameFreezeTimer || fighter.frameFreezeTimer <= 0) && !fighter.isCaughtInNaoyaUlt && !fighter.isCurrentlyWallPinnedByNaoya) {
       fighter.timeStopTimer = 0;
       fighter.isFrozenByInfinity = false;
       fighter.electricStunTimer = 0;
@@ -327,6 +331,10 @@ export class StatusEffectsManager {
       fighter.iceFreezeTimer = 0;
       fighter.isFrozenBySnowPea = false;
       return false;
+    }
+    if (fighter.gojoInfinityImmune && (fighter.characterId === 'mahoraga' || fighter.type === 'mahoraga')) {
+      fighter.isFrozenByInfinity = false;
+      fighter.infinityFreezeTimer = 0;
     }
     const isFrozen = (fighter.crimsonElectrifiedTimer > 0) || (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || (fighter.timeStopTimer > 0) || ((fighter.iceFreezeTimer || 0) > 0) || fighter.isFrozenBySnowPea;
 

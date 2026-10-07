@@ -69,7 +69,7 @@ function _renderEmberPixelBodyToCanvas(destCtx, r) {
       );
 
       if (isBorder) {
-        destCtx.fillStyle = '#0F0501'; // Deepest midnight volcanic obsidian ink outline
+        destCtx.fillStyle = '#0E0F14'; // Standard manga ink outline shell
         destCtx.fillRect(px, py, P, P);
         continue;
       }

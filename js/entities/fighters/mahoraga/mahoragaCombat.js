@@ -113,9 +113,7 @@ export function performMeleeAttack(fighter, opponent) {
 
   if (fighter.isWallReboundDashing) {
     fighter.isWallReboundDashing = false;
-    fighter.vx = 0;
-    fighter.vy = 0;
-    fighter.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+    fighter.postDashPauseTimer = 0;
   }
 
   if (opponent && fighter.neutralStanceTimer > 0) {

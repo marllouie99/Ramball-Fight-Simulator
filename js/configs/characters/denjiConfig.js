@@ -64,17 +64,23 @@ export const denjiConfig = {
   punchReach: 65,
   punchKnockback: 18,
 
-  // Hybrid Form: Twin Forearm Chainsaw Shred (140° Frontal Arc)
-  enableChainsawShred: true,        // Master toggle for Hybrid Form: 140° Twin Chainsaw Shred
-  sawArcAngle: Math.PI * 0.778,     // ~140 degrees
+  // Hybrid Form: Continuous 3-Blade Chainsaw Collision Shred
+  enableChainsawShred: true,        // Master toggle for Continuous 3-Blade Chainsaw Collision Shred
+  shredDamagePerTooth: 5,           // Rapid shred damage per chain tooth collision tick
+  shredTickInterval: 5,             // Interval in frames between chain teeth hits (matches animation RPM)
+  shredHitPauseFrames: 3,           // Micro hit-pause frames applied to enemy on each tooth strike
   sawReach: 75,
-  sawHit1Damage: 16,
-  sawHit2Damage: 16,
-  sawHit3Damage: 24,                // 3 rapid micro-ticks of 8
-  sawHitKnockback: 24,
+  sawHitKnockback: 6,
+
+  // Multi-Blade Simultaneous Shred Bonus
+  enableMultiBladeBonus: true,      // Master toggle for Multi-Blade Simultaneous Shred Bonus
+  dualBladeDamageMultiplier: 1.6,   // 1.6x Shred Damage (+60%) when 2 blades connect simultaneously
+  tripleBladeDamageMultiplier: 2.4, // 2.4x Shred Damage (+140%) when all 3 blades connect simultaneously
+  dualBladeHitPauseBonus: 1,        // +1 frame hit-pause (total 4 frames) on dual blade connection
+  tripleBladeHitPauseBonus: 2,      // +2 frames hit-pause (total 5 frames) on triple blade connection
 
   // Skill 1: Ripcord Engine Rev Lunge
-  enableEngineLunge: true,          // Master toggle for Skill 1: Ripcord Engine Rev Lunge
+  enableEngineLunge: 0,          // Master toggle for Skill 1: Ripcord Engine Rev Lunge
   lungeCooldown: 240,               // 4.0s
   lungeSpeed: 30.0,                 // Supersonic drag
   lungeMaxDistance: 300,
@@ -82,7 +88,7 @@ export const denjiConfig = {
   lungeWallStunFrames: 16,
 
   // Skill 2: Blood Intoxication Cleave
-  enableBloodCleave: true,          // Master toggle for Skill 2: Blood Intoxication Cleave
+  enableBloodCleave: 0,          // Master toggle for Skill 2: Blood Intoxication Cleave
   cleaveCooldown: 360,              // 6.0s
   cleaveRange: 160,
   cleaveDamage: 28,
@@ -90,7 +96,7 @@ export const denjiConfig = {
   cleaveStaggerFrames: 12,
 
   // Ultimate: Chainsaw Devil Awakening — Massacre Engine
-  enableMassacreEngine: true,       // Master toggle for Ultimate: Massacre Engine
+  enableMassacreEngine: 0,       // Master toggle for Ultimate: Massacre Engine
   ultimateCooldown: 1500,           // 25.0s
   ultimateTimeStopFrames: 35,
   ultimateCycloneRadius: 120,

@@ -18,11 +18,12 @@ Use this skill when designing or coding character skins, hair silhouettes, headw
    - **NEVER** draw eyes, pupils, sclera, irises, eyelashes, mouths, lips, or nose bridges on fighter skins.
    - Convey identity exclusively through hair silhouettes, headwear/eyewear, iconic scars/stitches, and tailored clothing.
 
-## Phase 2: Vertical Proportion Bands (Radius `r`)
-- **`-r * 1.15` to `-r * 0.35`**: Outer hair volume and crown spikes (must extend slightly beyond body circle to break silhouette).
-- **`-r * 0.35` to `0`**: Face area (forehead bangs, blindfolds, goggles, face stitches).
-- **`0` to `+r * 0.40`**: Neck opening, collar, tie, and lapels.
-- **`+r * 0.40` to `+r * 0.90`**: Torso, jacket body, belt, uniform hem.
+## Phase 2: Vertical Proportion Bands (Toji Reference Standard — Radius `r`)
+- **Primary Reference**: ALWAYS use `js/graphics/fighters/tojiSkin.js` as the baseline blueprint.
+- **`ry < r * 0.28` to `0.32`**: Face & head clean skin tone dome (tan/fair tone `#E8BD9B` / `#FFF0DE`, cheek contour `#D4A373`, lip scars/markings strictly bounded inside, zero baked hair).
+- **`r * 0.28 <= ry < r * 0.64` to `0.68`**: Collar, neck opening, compression shirt / uniform jacket (full body circle width `-r` to `+r`).
+- **`r * 0.64 <= ry < r * 0.78`**: Waistband, belt, dark sash knot with ribbon split / buckle frame.
+- **`ry >= r * 0.78`**: Lower trousers, hakama pants, skirts with fly seam, pleat creases, and luminance $Y \ge 24$.
 
 ## Phase 3: Local Transform & Hand Layering
 1. **Transform Setup**:
@@ -44,9 +45,9 @@ Use this skill when designing or coding character skins, hair silhouettes, headw
    - **Layer 3 (Weapon Anchor)**: Main-hand weapon hilt anchors at `(+r * 0.82, +r * 0.38)` during idle/rest, with the right hand drawn over the grip.
 
 
-## Phase 4: Mandatory Offscreen Canvas Caching Pattern (Rule 3.5)
+## Phase 4: Mandatory Offscreen Canvas Caching Pattern (Toji Reference Standard)
 - **STRICT PROHIBITION**: NEVER call per-pixel `ctx.fillRect(px, py, P, P)` loops directly in the game loop while the canvas is rotated (`ctx.rotate(angle)`). Rotated sub-pixel rectangles create ugly "crisscross white grid lines / screen-door artifacts" and cause severe frame drops.
-- **The Canonical Architecture (Gojo / Yuji / Sukuna Standard)**:
+- **The Canonical Architecture (Toji Standard — `tojiSkin.js`)**:
   ```javascript
   let _cachedCanvas = null;
   let _cachedR = 0;

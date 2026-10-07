@@ -28,7 +28,7 @@ export function drawVoidmasterPixelBody(ctx, r, isGhost = false) {
   }
 
   // ── PASS 1: 4-Neighbor Attached Manga Ink Outline Shell ──
-  const cOutline = isGhost ? '#080212' : '#0B0418';
+  const cOutline = isGhost ? '#080212' : '#0E0F14';
   ctx.fillStyle = cOutline;
   for (let gy = minY; gy <= maxY; gy += P) {
     for (let gx = minX; gx <= maxX; gx += P) {

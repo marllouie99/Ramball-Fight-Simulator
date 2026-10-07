@@ -70,6 +70,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     this._isPhase2 = false;
     this.isTransforming = false;
     this.hasTransformed = false;
+    this._phase2Pending = false;
     this.hasShedPupil = false;
     this.transformationSpinAngle = 0;
     this.transformationProgress = 0;
@@ -336,6 +337,13 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     // 2. Check Phase 2 Transformation Threshold (50% HP)
     if (!this.hasTransformed && this.hp > 0 && (this.hp / (this.maxHp || 1)) <= (cfg.phase2Threshold || 0.50)) {
+      this._phase2Pending = true;
+    }
+    const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f =>
+      f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+    );
+    if (!this.hasTransformed && this._phase2Pending && !isInsideGojoDomain) {
+      this._phase2Pending = false;
       this.hasTransformed = true;
       this.isTransforming = true;
       this.hasShedPupil = false;

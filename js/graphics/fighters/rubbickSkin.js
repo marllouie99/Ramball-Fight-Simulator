@@ -76,7 +76,7 @@ export function drawRubbickPixelBody(ctx, r, isGhost = false, isAttacking = fals
         Math.hypot(rx, ry + P) > r ||
         Math.hypot(rx, ry - P) > r
       ) {
-        ctx.fillStyle = isGhost ? 'rgba(8, 18, 11, 0.85)' : '#0A0F0D';
+        ctx.fillStyle = isGhost ? 'rgba(8, 18, 11, 0.85)' : '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }

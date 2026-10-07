@@ -61,7 +61,7 @@ export function drawCronosPixelBody(ctx, r = 25, isSphereActive = false) {
       );
 
       if (isBorder) {
-        ctx.fillStyle = isSphereActive ? '#00F3FF' : '#080F1E'; // Electric cyan border during Time Stop, else deep cosmic obsidian
+        ctx.fillStyle = isSphereActive ? '#00F3FF' : '#0E0F14'; // Electric cyan border during Time Stop, else dark manga ink outline
         ctx.fillRect(px, py, P, P);
         continue;
       }

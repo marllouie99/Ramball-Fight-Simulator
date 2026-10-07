@@ -55,7 +55,7 @@ export const tojiConfig = {
   // Primary Melee: Inverted Spear of Heaven (Amanosakahoko)
   enableSpear: true,                 // Master toggle for Primary Melee: Inverted Spear of Heaven
   spearRange: 50,                    // Distance required to land melee hit (50px)
-  spearCooldown: 10,                 // Spaced frames between basic melee strikes (0.92s swing)
+  spearCooldown: 50,                 // Spaced frames between basic melee strikes (0.92s swing)
   spearDamage: 8,                   // Base damage per swing
   spearKnockback: 2.5,               // Physical push velocity impulse on basic attack hit
   spearHitStun: 0,                   // Hit stun frames on basic attack hit (0 = no freeze/hit-stun on basic attacks)

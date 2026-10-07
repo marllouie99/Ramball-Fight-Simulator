@@ -42,15 +42,23 @@ export class DenjiFighter extends Fighter {
     }
     this.hp = this.maxHp;
 
-    // Animation & Hands
+    // Animation & Continuous Shred States
     this.punchAnimTimer = 0;
     this.punchMaxTime = 14;
     this.slashSwingTimer = 0;
     this.slashSwingMaxTimer = 14;
+    this.attackCooldown = 0;
     this.hideFrontHand = false;
     this.hideBackHand = false;
     this.punchComboCount = 0;
     this.sawComboCount = 0;
+    this.lastExecutedSawCombo = 0;
+    this.comboResetTimer = 0;
+    this.isShredding = false;
+    this.shredBladeCount = 0;
+    this.shredTickTimer = 0;
+    this.lastShredAudioTime = 0;
+    this._multiBladeIndicatorTimer = 0;
 
     // Passive 1: Pochita Heart Revive
     this.reviveStocksMax = cfg.maxReviveStocks || 1;
@@ -155,21 +163,32 @@ export class DenjiFighter extends Fighter {
     }
   }
 
-  _queryAllTargets() {
+  _queryAllTargets(fallbackOpponent = null) {
+    if (typeof this._getAllValidEnemyTargets === 'function') {
+      const valid = this._getAllValidEnemyTargets(fallbackOpponent);
+      if (valid && valid.length > 0) return valid;
+    }
     const targets = [];
-    if (state.fighters) {
+    if (typeof state !== 'undefined' && state.fighters && Array.isArray(state.fighters)) {
       for (let f of state.fighters) {
-        if (f && f !== this && f.hp > 0 && f.team !== this.team) {
-          targets.push(f);
+        if (f && f !== this && f.hp > 0) {
+          if (this.team === undefined || f.team === undefined || f.team !== this.team) {
+            targets.push(f);
+          }
         }
       }
     }
-    if (state.illusions) {
+    if (typeof state !== 'undefined' && state.illusions && Array.isArray(state.illusions)) {
       for (let ill of state.illusions) {
-        if (ill && ill !== this && ill.hp > 0 && ill.team !== this.team) {
-          targets.push(ill);
+        if (ill && ill !== this && ill.hp > 0) {
+          if (this.team === undefined || ill.team === undefined || ill.team !== this.team) {
+            targets.push(ill);
+          }
         }
       }
+    }
+    if (targets.length === 0 && fallbackOpponent && fallbackOpponent !== this && fallbackOpponent.hp > 0) {
+      targets.push(fallbackOpponent);
     }
     return targets;
   }
@@ -192,9 +211,19 @@ export class DenjiFighter extends Fighter {
       }
     }
 
+    if (this.attackCooldown > 0) this.attackCooldown--;
     if (this.lungeCooldown > 0) this.lungeCooldown--;
     if (this.cleaveCooldown > 0) this.cleaveCooldown--;
     if (this.massacreCooldown > 0) this.massacreCooldown--;
+
+    // Decrement combo reset timer (resets combo back to Hit 1 after idle)
+    if (this.comboResetTimer > 0) {
+      this.comboResetTimer--;
+      if (this.comboResetTimer <= 0) {
+        this.sawComboCount = 0;
+        this.punchComboCount = 0;
+      }
+    }
 
     // 3. Active Skill Execution
     if (this.isExecutingMassacre) {
@@ -208,7 +237,7 @@ export class DenjiFighter extends Fighter {
     }
 
     // 4. Regular Combat AI
-    const target = this._findBestTarget() || opponent;
+    const target = this._findBestTarget(opponent) || opponent;
     if (target) {
       this.aim(target);
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -230,20 +259,24 @@ export class DenjiFighter extends Fighter {
         this._performBloodCleave(target);
         return;
       }
-
-      // Basic Attack String
-      const canPunch = !this.isHybridModeActive && this.isSkillEnabled(CONFIG.denji?.enablePunches, true);
-      const canSaw = this.isHybridModeActive && this.isSkillEnabled(CONFIG.denji?.enableChainsawShred, true);
-      if ((canPunch || canSaw) && this.attackCooldown <= 0 && dist <= (this.isHybridModeActive ? 75 : 65)) {
-        this._performBasicAttack(target);
-      }
     }
+
+    // 5. Continuous 3-Blade Chainsaw Collision Shred
+    this._updateChainsawShredCollision(target || opponent);
 
     super.update(target || opponent, ownerIndex, arena);
   }
 
-  _findBestTarget() {
-    const targets = this._queryAllTargets();
+  /**
+   * Overrides base Fighter.shoot() to suppress default generic bullet projectiles (Rule 23).
+   * Denji uses continuous 3-blade chainsaw collision shred rather than projectile weapons.
+   */
+  shoot(ownerIndex) {
+    // Intentionally empty: Denji shreds continuously on blade contact
+  }
+
+  _findBestTarget(opponent = null) {
+    const targets = this._queryAllTargets(opponent);
     let best = null;
     let minD = Infinity;
     for (let t of targets) {
@@ -253,60 +286,257 @@ export class DenjiFighter extends Fighter {
         best = t;
       }
     }
-    return best;
+    return best || opponent;
   }
 
-  _performBasicAttack(target) {
-    if (this.isHybridModeActive) {
-      if (!this.isSkillEnabled(CONFIG.denji?.enableChainsawShred, true)) return;
-      // 140° Twin Forearm Chainsaw Shred
-      this.slashSwingTimer = this.slashSwingMaxTimer;
-      this.sawComboCount = (this.sawComboCount + 1) % 3;
-      this.attackCooldown = 18;
+  /**
+   * Helper to calculate squared distance from a point (px, py) to a line segment [(x1, y1), (x2, y2)].
+   */
+  _pointToSegmentDistSq(px, py, x1, y1, x2, y2) {
+    const l2 = (x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1);
+    if (l2 === 0) return (px - x1) * (px - x1) + (py - y1) * (py - y1);
+    let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    const projX = x1 + t * (x2 - x1);
+    const projY = y1 + t * (y2 - y1);
+    return (px - projX) * (px - projX) + (py - projY) * (py - projY);
+  }
 
-      const dmg = (this.sawComboCount === 2) ? 24 : 16;
-      this._executeFrontalArcHit(target, Math.PI * 0.778, 75, dmg, 24, true);
-    } else {
-      if (!this.isSkillEnabled(CONFIG.denji?.enablePunches, true)) return;
-      // 3-Hit Street Brawler Punch
-      this.punchAnimTimer = this.punchMaxTime;
-      this.punchComboCount = (this.punchComboCount + 1) % 3;
-      this.attackCooldown = 14;
+  /**
+   * Returns the 3 active chainsaw blade world-space segments:
+   * 1. Forehead Blade
+   * 2. Lead Right Hand Blade (0.0 rad)
+   * 3. Off-Hand Left Hand Blade (0.73 rad)
+   */
+  _getChainsawBladeWorldSegments() {
+    const r = this.r || 25;
+    const angle = this.gunAngle || this.angle || 0;
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
 
-      const dmg = this.punchComboCount === 2 ? 20 : (this.punchComboCount === 1 ? 14 : 12);
-      this._executeFrontalArcHit(target, Math.PI * 0.50, 65, dmg, 18, false);
+    const blades = [
+      // 1. Central Forehead Chainsaw Blade
+      { id: 'head', name: 'Forehead Saw', lx: r * 0.30, ly: -r * 0.35, lAngle: -0.18, len: Math.round(r * 3.1), halfThick: 9 },
+      // 2. Lead Right Hand Chainsaw Blade (Rule 20 lead hand)
+      { id: 'right', name: 'Lead Arm Saw', lx: r * 0.82, ly: r * 0.38, lAngle: 0.0, len: 56, halfThick: 7 },
+      // 3. Off-Hand Left Hand Chainsaw Blade (Rule 20 off-hand)
+      { id: 'left', name: 'Off-Hand Arm Saw', lx: -r * 0.82, ly: r * 0.38, lAngle: 0.73, len: 56, halfThick: 7 }
+    ];
+
+    const segments = [];
+    for (let b of blades) {
+      const effLy = facingLeft ? -b.ly : b.ly;
+      const effLAngle = facingLeft ? -b.lAngle : b.lAngle;
+
+      const startX = this.x + b.lx * cos - effLy * sin;
+      const startY = this.y + b.lx * sin + effLy * cos;
+      const bladeAngle = angle + effLAngle;
+      const endX = startX + Math.cos(bladeAngle) * b.len;
+      const endY = startY + Math.sin(bladeAngle) * b.len;
+
+      segments.push({
+        id: b.id,
+        name: b.name,
+        startX,
+        startY,
+        endX,
+        endY,
+        halfThick: b.halfThick,
+        bladeAngle
+      });
     }
+    return segments;
   }
 
-  _executeFrontalArcHit(primaryTarget, arcAngle, reach, damage, knockback, isSaw) {
-    const targets = this._queryAllTargets();
-    const aim = this.gunAngle || this.angle || 0;
+  /**
+   * Continuous Chainsaw Shred Damage & Multi-Blade Hit-Pause Engine:
+   * When an enemy collides with ANY of Denji's 3 active chainsaw blades,
+   * they take rapid shred damage matching the chain teeth velocity, with blood, sparks,
+   * hit-pause stasis, and 25%-35% vampiric lifesteal.
+   *
+   * Multi-Blade Simultaneous Shred Bonus:
+   * - 1 Blade (Single Saw): Base shred damage (5 dmg / 3 frames), 3 frames hit pause, 35% drag.
+   * - 2 Blades (Dual Saw): 1.6x shred damage (8 dmg / 3 frames), 4 frames hit pause, 50% drag, +50% lifesteal, +2 bleed stacks, amber sparks.
+   * - 3 Blades (Triple Saw Vortex): 2.4x shred damage (12 dmg / 3 frames), 5 frames hit pause, 65% drag, +100% lifesteal, +3 bleed stacks, crimson sparks & heavy screen shake.
+   */
+  _updateChainsawShredCollision(opponent) {
+    if (!this.isHybridModeActive || this.hp <= 0) {
+      this.isShredding = false;
+      this.shredBladeCount = 0;
+      return;
+    }
+
+    if (this.shredTickTimer > 0) {
+      this.shredTickTimer--;
+    }
+
+    const targets = this._queryAllTargets(opponent);
+    if (targets.length === 0) {
+      this.isShredding = false;
+      this.shredBladeCount = 0;
+      return;
+    }
+
+    const segments = this._getChainsawBladeWorldSegments();
+    const collidingTargets = [];
 
     for (let t of targets) {
-      const dx = t.x - this.x;
-      const dy = t.y - this.y;
-      const d = Math.hypot(dx, dy);
+      if (!t || t.hp <= 0) continue;
+      const targetR = t.r || 20;
+      const hitBlades = [];
 
-      if (d <= reach + (t.r || 20)) {
-        const targetAngle = Math.atan2(dy, dx);
-        let diff = targetAngle - aim;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
+      for (let seg of segments) {
+        const distSq = this._pointToSegmentDistSq(t.x, t.y, seg.startX, seg.startY, seg.endX, seg.endY);
+        const hitR = targetR + seg.halfThick + 6;
+        if (distSq <= hitR * hitR) {
+          hitBlades.push(seg);
+        }
+      }
 
-        if (Math.abs(diff) <= arcAngle / 2) {
-          applyDamageToTarget(t, damage, this);
-          t.knockbackVx = Math.cos(targetAngle) * knockback;
-          t.knockbackVy = Math.sin(targetAngle) * knockback;
+      // Point-blank frontal proximity check (contact with Denji's body circle while facing enemy):
+      if (hitBlades.length === 0) {
+        const bodyDist = Math.hypot(t.x - this.x, t.y - this.y);
+        if (bodyDist <= (this.r || 25) + targetR + 10) {
+          const angleToTarget = Math.atan2(t.y - this.y, t.x - this.x);
+          const denjiFacing = this.gunAngle || this.angle || 0;
+          let angleDiff = angleToTarget - denjiFacing;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          if (Math.abs(angleDiff) < Math.PI * 0.70) {
+            hitBlades.push(segments[0]); // Connect with head saw
+          }
+        }
+      }
 
-          // Lifesteal on Saw Hit
-          if (isSaw && this.isSkillEnabled(CONFIG.denji?.enableBloodSiphon, true)) {
-            const heal = Math.round(damage * 0.25);
-            this.hp = Math.min(this.maxHp, this.hp + heal);
-            spawnBloodEffect(t.x, t.y, 6);
+      if (hitBlades.length > 0) {
+        collidingTargets.push({ target: t, blades: hitBlades, bladeCount: hitBlades.length });
+      }
+    }
+
+    if (collidingTargets.length > 0) {
+      this.isShredding = true;
+
+      // When shred tick timer fires (every 3 frames, matching chain teeth animation RPM):
+      if (this.shredTickTimer <= 0) {
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.denji) ? CONFIG.denji : {};
+        const shredInterval = cfg.shredTickInterval || 3;
+        const baseDamage = cfg.shredDamagePerTooth || 5;
+        const basePauseFrames = cfg.shredHitPauseFrames || 3;
+        const enableBonus = cfg.enableMultiBladeBonus !== false;
+        const dualMultiplier = enableBonus ? (cfg.dualBladeDamageMultiplier || 1.6) : 1.0;
+        const tripleMultiplier = enableBonus ? (cfg.tripleBladeDamageMultiplier || 2.4) : 1.0;
+        const dualPauseBonus = enableBonus ? (cfg.dualBladeHitPauseBonus || 1) : 0;
+        const triplePauseBonus = enableBonus ? (cfg.tripleBladeHitPauseBonus || 2) : 0;
+
+        this.shredTickTimer = shredInterval;
+
+        const now = Date.now();
+        if (now - (this.lastShredAudioTime || 0) > 90) {
+          this.lastShredAudioTime = now;
+          try {
+            audioSystem.playSound('Assets/Sound Effects/Attacks/heavypunch1.mp3', { volume: 0.55 });
+          } catch (e) {}
+        }
+
+        let maxBladesInFrame = 1;
+
+        for (let { target: t, blades, bladeCount } of collidingTargets) {
+          if (bladeCount > maxBladesInFrame) {
+            maxBladesInFrame = bladeCount;
           }
 
-          spawnImpactFlash(t.x, t.y, '#EAB308');
+          // 1. Calculate Multi-Blade Scaled Parameters
+          let damageMultiplier = 1.0;
+          let pauseFrames = basePauseFrames;
+          let dragFactor = 0.65;
+          let lifestealBonus = 1.0;
+          let hemorrhageAdd = 1;
+          let sparkCount = 3;
+
+          if (bladeCount === 2) {
+            damageMultiplier = dualMultiplier;
+            pauseFrames = basePauseFrames + dualPauseBonus;
+            dragFactor = 0.50; // Dual saw grind friction
+            lifestealBonus = 1.5; // +50% lifesteal
+            hemorrhageAdd = 2; // +2 bleed stacks
+            sparkCount = 6;
+          } else if (bladeCount >= 3) {
+            damageMultiplier = tripleMultiplier;
+            pauseFrames = basePauseFrames + triplePauseBonus;
+            dragFactor = 0.35; // Triple saw vice lock
+            lifestealBonus = 2.0; // 2x lifesteal
+            hemorrhageAdd = 3; // +3 bleed stacks
+            sparkCount = 10;
+          }
+
+          // 2. Deal scaled shred damage
+          const finalDamage = Math.max(1, Math.round(baseDamage * damageMultiplier));
+          applyDamageToTarget(t, finalDamage, this);
+
+          // 3. Apply Multi-Blade Hit-Pause (pauses enemy completely on each chain tooth impact tick)
+          if (typeof t.applyTimeStop === 'function') {
+            t.applyTimeStop(pauseFrames);
+          } else if (typeof t.timeStopTimer === 'number') {
+            t.timeStopTimer = Math.max(t.timeStopTimer, pauseFrames);
+          }
+
+          // 4. Mechanical teeth friction & drag (locks enemy momentum in the grinding saws)
+          t.vx = 0;
+          t.vy = 0;
+          if (t.knockbackVx !== undefined) t.knockbackVx = 0;
+          if (t.knockbackVy !== undefined) t.knockbackVy = 0;
+
+          // 5. Spawn Blood Splatters & Chainsaw Sparks at all contacting blade points
+          const bloodAngle = Math.atan2(t.y - this.y, t.x - this.x);
+          for (let seg of blades) {
+            const contactX = (t.x + (seg.startX + seg.endX) * 0.5) * 0.5;
+            const contactY = (t.y + (seg.startY + seg.endY) * 0.5) * 0.5;
+            spawnBloodEffect(contactX, contactY, bloodAngle);
+            spawnSparks(contactX, contactY, bladeCount >= 3 ? '#EF4444' : (bladeCount === 2 ? '#F59E0B' : '#F97316'), Math.ceil(sparkCount / blades.length));
+          }
+
+          // 6. Blood Siphon Lifesteal (Passive 2 with Multi-Blade bonus)
+          if (this.isSkillEnabled(cfg.enableBloodSiphon, true)) {
+            const baseRatio = t.isBleeding ? (cfg.bleedingTargetLifestealRatio || 0.35) : (cfg.lifestealRatio || 0.25);
+            const lifestealRatio = baseRatio * lifestealBonus;
+            const heal = Math.max(1, Math.round(finalDamage * lifestealRatio));
+            this.hp = Math.min(this.maxHp, this.hp + heal);
+          }
+
+          // 7. Hemorrhage & Bleed Stacks (Passive 3 with Multi-Blade bonus)
+          if (this.isSkillEnabled(cfg.enableHemorrhage, true)) {
+            t.hemorrhageStacks = Math.min(cfg.maxHemorrhageStacks || 6, (t.hemorrhageStacks || 0) + hemorrhageAdd);
+            t.isBleeding = true;
+            t.bleedTimer = 90; // 1.5s refresh
+          }
+
+          // 8. Multi-Blade Floating Combat Indicator (Throttled per target)
+          if (bladeCount >= 2 && (!this._multiBladeIndicatorTimer || this._multiBladeIndicatorTimer <= 0)) {
+            if (bladeCount === 2) {
+              spawnFloatingText(t.x, t.y - 24, `⚔️ DUAL SHRED! x${dualMultiplier}`, '#F59E0B');
+            } else {
+              spawnFloatingText(t.x, t.y - 28, `⛓️ TRIPLE SHRED! x${tripleMultiplier}`, '#EF4444');
+            }
+            this._multiBladeIndicatorTimer = 16;
+          }
         }
+
+        this.shredBladeCount = maxBladesInFrame;
+
+        if (this._multiBladeIndicatorTimer > 0) {
+          this._multiBladeIndicatorTimer--;
+        }
+
+        // 9. Screen shake scaled dynamically to max blades colliding
+        const shakePower = maxBladesInFrame >= 3 ? 5 : (maxBladesInFrame === 2 ? 3 : 2);
+        triggerGlobalScreenShake(shakePower, 2);
+      }
+    } else {
+      this.isShredding = false;
+      this.shredBladeCount = 0;
+      if (this._multiBladeIndicatorTimer > 0) {
+        this._multiBladeIndicatorTimer--;
       }
     }
   }

@@ -770,7 +770,7 @@ export class GojoFighter extends Fighter {
     const isMeleeAllowed = this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true);
     if (isMeleeAllowed && !isAttackerLawnmower && !isGojoSkillOrPurpleActive && !isSpatialOrRanged && !isAttackerAmbushing && (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
       if (!this.isMeleeMode) {
-        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 60;
+        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
         this.isMeleeMode = true;
         this.meleeComboCount = 0;
         this.infinityActive = false;
@@ -1160,9 +1160,9 @@ export class GojoFighter extends Fighter {
       }
       // Rule #1: Cancel active channeling/skills
       this.interruptAttacks(true);
-      // Ensure Gojo resets to Ranged mode with Infinity active when knocked back or distanced from enemy
+      // Ensure Gojo resets to Ranged mode with Infinity active when distanced from enemy only after forced melee expires
       const leaveDistCheck = CONFIG.gojo?.leaveMeleeRadius ?? 130;
-      if (this.isMeleeMode && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > leaveDistCheck || this.knockbackVx !== 0 || this.knockbackVy !== 0 || this.paralyzeTimer > 0)) {
+      if (this.isMeleeMode && (this.forcedMeleeTimer <= 0) && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > leaveDistCheck || this.paralyzeTimer > 0)) {
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
       }
@@ -1802,20 +1802,10 @@ export class GojoFighter extends Fighter {
     const leaveMeleeRadius = closeRangeRadius + 30;
     const targetCheckRadius = this.isMeleeMode ? leaveMeleeRadius : closeRangeRadius;
 
-    const hasActiveInfinity = this.hasActiveInfinity();
-
-    const isBypassingEnemy = (f) => Boolean(
-      f && (
-        (f.characterId === 'toji' || f.type === 'toji') ||
-        ((f.characterId === 'mahoraga' || f.type === 'mahoraga') && (f.gojoInfinityImmune || f.isMaxAdapted || f.isInfinityBlitz || f.isWallSlamActive))
-      )
-    );
-
     if (this._isValidCombatTarget(opponent) && (!opponent.isStealthed || this.domainActive)) {
       const d = Math.hypot(this.x - opponent.x, this.y - opponent.y);
       if (d < closestEnemyDist) closestEnemyDist = d;
-      const canThreatenInMelee = !hasActiveInfinity || this.isMeleeMode || isBypassingEnemy(opponent);
-      if (d <= targetCheckRadius && canThreatenInMelee) {
+      if (d <= targetCheckRadius) {
         isBeingMeleed = true;
       }
     }
@@ -1830,8 +1820,7 @@ export class GojoFighter extends Fighter {
         const d = Math.hypot(this.x - f.x, this.y - f.y);
         if (d < closestEnemyDist) closestEnemyDist = d;
 
-        const canThreatenInMelee = !hasActiveInfinity || this.isMeleeMode || isBypassingEnemy(f);
-        if (d <= targetCheckRadius && canThreatenInMelee) {
+        if (d <= targetCheckRadius) {
           isBeingMeleed = true;
           break;
         }
@@ -1841,7 +1830,7 @@ export class GojoFighter extends Fighter {
     // Handle Melee / Ranged transitions
     if (!this.domainActive && !this.isChannelingAnySkill() && !this.isPurpleActive() && (this.purpleRecoveryTimer || 0) <= 0) {
       if (this.isMeleeMode) {
-        if (!isBeingMeleed || (this.forcedMeleeTimer || 0) <= 0) {
+        if (this.forcedMeleeTimer <= 0 && closestEnemyDist > leaveMeleeRadius) {
           this.isMeleeMode = false;
           this.forcedMeleeTimer = 0;
           this.meleeComboCount = 0;
@@ -1851,7 +1840,7 @@ export class GojoFighter extends Fighter {
       } else if (this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true) && isBeingMeleed && (this.meleeModeCooldown || 0) <= 0) {
         // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
         this.isMeleeMode = true;
-        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 60;
+        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
         this.meleeComboCount = 0;
         this.infinityActive = false;
         this.infinityFadeOpacity = 0;
@@ -2258,11 +2247,11 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    // Distance Guard: Outside Domain Expansion, if opponent has moved beyond melee range (e.g. dashed away or running with speed), DO NOT teleport across the arena!
+    // Distance Guard: Outside Domain Expansion, if opponent has moved beyond melee range once forced duration expired, disengage
     if (!this.domainActive) {
       const currentDist = Math.hypot(this.x - opponent.x, (this.y - (this.z || 0)) - (opponent.y - (opponent.z || 0)));
       const leaveMeleeRadius = CONFIG.gojo?.leaveMeleeRadius ?? ((CONFIG.gojo?.closeRangeRadius ?? 80) + 40);
-      if (currentDist > leaveMeleeRadius) {
+      if (this.forcedMeleeTimer <= 0 && currentDist > leaveMeleeRadius) {
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
         this.meleeComboCount = 0;
@@ -2319,13 +2308,13 @@ export class GojoFighter extends Fighter {
     // Set cooldown for next punch
     this.meleePunchCooldown = punchCooldown;
 
-    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
+    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached ONLY IF forced duration has expired
     if (this.meleeComboCount >= this.meleeComboTarget) {
       this.meleeComboCount = 0;
       this.meleeComboTarget = this.domainActive ? 999 : (Math.random() < 0.5 ? 6 : 3);
       this.meleeFlankAngle = undefined; // Clear flank angle so next combo picks a fresh angle
 
-      if (!this.domainActive) {
+      if (!this.domainActive && (this.forcedMeleeTimer || 0) <= 0) {
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
         this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 180; // Mandatory ranged separation!

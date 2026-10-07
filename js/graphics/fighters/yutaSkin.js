@@ -186,22 +186,25 @@ function _renderYutaPixelBodyToCanvas(destCtx, r) {
       }
 
       // ──────────────────────────────────────────
-      // ZONE 1: Face Skin (ry < r * 0.14)
+      // ZONE 1: WARM FAIR PEACH FACE DOME (ry < r * 0.30)
+      // Pure unbroken circular dome (All hair on Layer 2)
       // ──────────────────────────────────────────
-      if (ry < r * 0.14) {
-        let col = '#F7C4A5'; // Fair warm peach
-        if (Math.abs(rx) > r * 0.70) {
+      if (ry < r * 0.30) {
+        let col = '#FEDBC0'; // Fair warm peach
+        if (Math.abs(rx) > r * 0.55) {
           col = '#E8B496'; // Subtle cheek contour
+        } else if (Math.abs(rx) < r * 0.35 && ry > -r * 0.25 && ry < r * 0.10) {
+          if ((gx + gy) % 4 === 0) col = '#FFF0E2';
         }
         destCtx.fillStyle = col;
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 2: White Jujutsu High Jacket & Wrap Collar (r * 0.14 <= ry < r * 0.64)
+      // ZONE 2: White Jujutsu High Jacket & Wrap Collar (r * 0.30 <= ry < r * 0.68)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.64) {
-        // Gold Button #1: cx = r * 0.38, cy = r * 0.38, btnR = r * 0.10
-        const btnX = r * 0.38, btnY = r * 0.38, btnR = r * 0.10;
+      else if (ry < r * 0.68) {
+        // Gold Button #1: cx = r * 0.38, cy = r * 0.46, btnR = r * 0.09
+        const btnX = r * 0.38, btnY = r * 0.46, btnR = r * 0.09;
         const bDist = Math.hypot(rx - btnX, ry - btnY);
 
         if (bDist <= btnR) {
@@ -214,13 +217,13 @@ function _renderYutaPixelBodyToCanvas(destCtx, r) {
           } else {
             destCtx.fillStyle = '#D4AF37'; // Rich Antique Gold
           }
-        } else if (rx >= r * 0.44 && rx <= r * 0.54 && ry >= r * 0.30) {
+        } else if (rx >= r * 0.44 && rx <= r * 0.54 && ry >= r * 0.36) {
           // Subtle shoulder fold crease on right
           destCtx.fillStyle = '#D0D8E2';
-        } else if (rx <= -r * 0.52 && ry >= r * 0.14 && ry <= r * 0.22) {
+        } else if (rx <= -r * 0.52 && ry >= r * 0.30 && ry <= r * 0.38) {
           // Left collar notch
           destCtx.fillStyle = '#333B48';
-        } else if (ry > r * 0.54) {
+        } else if (ry > r * 0.58) {
           // Lower fold shadow band
           destCtx.fillStyle = '#D0D8E2';
         } else {
@@ -230,14 +233,14 @@ function _renderYutaPixelBodyToCanvas(destCtx, r) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 3: Dark Uniform Pants (ry >= r * 0.64)
+      // ZONE 3: Dark Uniform Pants (ry >= r * 0.68)
       // ──────────────────────────────────────────
       else {
         // Subtle center dark inseam crease (zero white wrapper lines)
-        if (Math.abs(rx) <= P * 0.6 && ry >= r * 0.64 && ry <= r * 0.94) {
-          destCtx.fillStyle = '#0E1014'; // Subtle center inseam
+        if (Math.abs(rx) <= P * 0.6 && ry >= r * 0.68 && ry <= r * 0.94) {
+          destCtx.fillStyle = '#12141A'; // Subtle center inseam
         } else {
-          destCtx.fillStyle = '#16181E'; // Midnight charcoal navy
+          destCtx.fillStyle = '#242834'; // Midnight charcoal navy (luminance >= 24)
         }
         destCtx.fillRect(px, py, P, P);
       }
@@ -275,12 +278,6 @@ export function drawYutaPixelBody(ctx, r) {
   if (_cachedYutaBodyCanvas) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-
-    // Enforce circular clip mask to prevent any rectangular canvas bleeding
-    ctx.beginPath();
-    ctx.arc(0, 0, intR + 1, 0, Math.PI * 2);
-    ctx.clip();
-
     ctx.drawImage(_cachedYutaBodyCanvas, -_cachedYutaBodyCanvas.width / 2, -_cachedYutaBodyCanvas.height / 2);
     ctx.restore();
   }

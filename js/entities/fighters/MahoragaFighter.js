@@ -306,19 +306,6 @@ export class MahoragaFighter extends Fighter {
       return false;
     }
 
-    if (opts.isAdaptableSkillShot && !opts.isLawnmower && !opts.isUnadaptable && !attacker?.isLawnmower && attacker?.characterId !== 'crazydave_lawnmower' && opts.skillShotId !== 'lawnmower' && opts.skillShotId !== 'crazyDaveSnowPea' && opts.projectile?.skillShotId !== 'crazyDaveSnowPea' && opts.skillShotId !== 'tojiAmbush' && opts.skillShotId !== 'purple' && !opts.isPurpleDPS && !opts.isPurple && opts.skillShotId !== 'getsugaTensho' && opts.skillShotId !== 'getsuga' && !opts.isGetsuga && this.adaptedSkills && this.adaptedSkills[opts.skillShotId] && this.skillDodgeReady && this.skillDodgeReady[opts.skillShotId]) {
-      const registryEntry = SKILL_REGISTRY[opts.skillShotId];
-      const mockProj = opts.projectile || {
-        skillShotId: opts.skillShotId,
-        skillShotColor: registryEntry ? registryEntry.skillShotColor : (opts.skillShotColor || '#FFFFFF'),
-        dodgeRadius: registryEntry ? registryEntry.dodgeRadius : (opts.isLaser ? (CONFIG.laser?.beamLength || 140) : (opts.dodgeRadius || 140)),
-        x: attacker ? attacker.x : this.x,
-        y: attacker ? attacker.y : this.y
-      };
-      
-      this._generalSkillShotTeleportDodge(attacker, mockProj);
-      return false; // Take 0 damage, dodge instantly!
-    }
 
     const isBeamDamage = (
       (!this.adaptedPureLoveBeam && (opts.isPureLoveBeam || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
@@ -418,10 +405,10 @@ export class MahoragaFighter extends Fighter {
   adaptToSoulDisfigurement() { adaptToSoulDisfigurement(this); }
   adaptToSaitamaCounter(attacker) { adaptToSaitamaCounter(this, attacker); }
   _triggerAdaptation(type, attacker) { triggerAdaptation(this, type, attacker); }
-  _gojoPurpleTeleportDodge(gojo, purpleOrb) { gojoPurpleTeleportDodge(this, gojo, purpleOrb); }
-  _gojoRedTeleportDodge(gojo) { gojoRedTeleportDodge(this, gojo); }
-  _sukunaFugaTeleportDodge(sukuna, fugaOrb) { sukunaFugaTeleportDodge(this, sukuna, fugaOrb); }
-  _generalSkillShotTeleportDodge(attacker, projectile) { generalSkillShotTeleportDodge(this, attacker, projectile); }
+  _gojoPurpleTeleportDodge(gojo, purpleOrb) { /* Teleport-away removed on adaptation */ }
+  _gojoRedTeleportDodge(gojo) { /* Teleport-away removed on adaptation */ }
+  _sukunaFugaTeleportDodge(sukuna, fugaOrb) { /* Teleport-away removed on adaptation */ }
+  _generalSkillShotTeleportDodge(attacker, projectile) { /* Teleport-away removed on adaptation */ }
   _startAdaptationFlashDash(attacker) { startAdaptationFlashDash(this, attacker); }
   _spawnTeleportAfterimages(oldX, oldY, newX, newY, customAngle) { spawnTeleportAfterimages(this, oldX, oldY, newX, newY, customAngle); }
   _performMeleeAttack(opponent) { performMeleeAttack(this, opponent); }
@@ -763,9 +750,7 @@ export class MahoragaFighter extends Fighter {
     if (distToOpponent <= meleeDist && this.swordCooldown <= 0) {
       if (this.isWallReboundDashing) {
         this.isWallReboundDashing = false;
-        this.vx = 0;
-        this.vy = 0;
-        this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+        this.postDashPauseTimer = 0;
       }
       this._performMeleeAttack(opponent);
       return true;
@@ -781,9 +766,7 @@ export class MahoragaFighter extends Fighter {
 
     if (this.isWallReboundDashing) {
       this.isWallReboundDashing = false;
-      this.vx = 0;
-      this.vy = 0;
-      this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+      this.postDashPauseTimer = 0;
     }
 
     this.aim(opponent);
@@ -1044,92 +1027,7 @@ export class MahoragaFighter extends Fighter {
       this._rctRegenAccumTimer = 0;
     }
 
-    // ── PROACTIVE GOJO ADAPTATION DODGE TRIGGERS ──
-    const livePurpleOrb = (projectileSystem && projectileSystem.projectiles)
-      ? projectileSystem.projectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') && (p.life || 0) > 0)
-      : null;
 
-    const gojoFighter = (opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo'))
-      ? opponent
-      : (state.fighters ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0) : null);
-
-    const isPurpleAdapted = (this.gojoAdapted && this.gojoAdapted.purple) || 
-                            (this.adaptedSkills && this.adaptedSkills['purple']) ||
-                            (this.gojoAdaptColorHistory && this.gojoAdaptColorHistory.includes('#8A2BE2')) ||
-                            ((this.goldAdaptationStage?.skill || 0) >= 2) ||
-                            ((this.adaptationStage?.skill || 0) >= 2);
-
-    // (Purple adaptation now only provides 50% damage reduction via mahoragaAdaptation.js
-    //  — Mahoraga still gets pulled and paralyzed by the gravitational vortex.)
-
-    // ── PROACTIVE SUKUNA FUGA ADAPTATION DODGE TRIGGERS ──
-    const liveFugaOrb = (projectileSystem && projectileSystem.projectiles)
-      ? projectileSystem.projectiles.find(p => p && p.isSukunaFurnace && (p.life || 0) > 0)
-      : null;
-
-    if (this.sukunaAdapted && this.sukunaAdapted.divineFlame) {
-      if (this.sukunaFugaDodgeReady && (this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
-        if (liveFugaOrb) {
-          const sukunaFighter = state.fighters
-            ? state.fighters.find(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna') && f.hp > 0)
-            : null;
-          if (sukunaFighter) {
-            this._sukunaFugaTeleportDodge(sukunaFighter, liveFugaOrb);
-          }
-        }
-      }
-      if (!this.sukunaFugaDodgeReady && !liveFugaOrb) {
-        this.sukunaFugaDodgeReady = true;
-      }
-    }
-
-    // ── PROACTIVE GENERAL SKILL SHOT DODGE TRIGGERS ──
-    if (projectileSystem && projectileSystem.projectiles) {
-      for (const p of projectileSystem.projectiles) {
-        if (p && p.isAdaptableSkillShot && !p.isLawnmower && p.skillShotId !== 'lawnmower' && p.skillShotId !== 'crazyDaveSnowPea' && p.skillShotId !== 'purple' && !p.isGojoPurple && !p.isGojoPurpleOrb && p.behaviorType !== 'gojo_purple' && p.skillShotId !== 'getsugaTensho' && p.skillShotId !== 'getsuga' && !p.isGetsuga && (p.life || 0) > 0) {
-          const skillId = p.skillShotId;
-          if (this.adaptedSkills && this.adaptedSkills[skillId] && this.skillDodgeReady && this.skillDodgeReady[skillId]) {
-            if ((this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
-              const attacker = state.fighters ? state.fighters[p.owner] : null;
-              if (attacker && !attacker.isLawnmower && attacker.characterId !== 'crazydave_lawnmower') {
-                this._generalSkillShotTeleportDodge(attacker, p);
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // ── PROACTIVE GENERAL SKILL SHOT DODGE TRIGGERS (OPPONENT CHARGING/FIRING STATE) ──
-    if (opponent && !opponent.isLawnmower && opponent.characterId !== 'crazydave_lawnmower' && opponent.isFiringSkillShot && opponent.isFiringSkillShot !== 'lawnmower' && opponent.isFiringSkillShot !== 'crazyDaveSnowPea' && opponent.isFiringSkillShot !== 'purple' && opponent.isFiringSkillShot !== 'getsugaTensho' && opponent.isFiringSkillShot !== 'getsuga') {
-      const skillId = opponent.isFiringSkillShot;
-      if (this.adaptedSkills && this.adaptedSkills[skillId] && this.skillDodgeReady && this.skillDodgeReady[skillId]) {
-        if ((this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
-          // Construct a mock projectile representing the laser/windup to reuse the dodge function
-          const registryEntry = SKILL_REGISTRY[skillId];
-          const mockProj = {
-            skillShotId: skillId,
-            skillShotColor: registryEntry ? registryEntry.skillShotColor : (opponent.color || '#FFFFFF'),
-            dodgeRadius: registryEntry ? registryEntry.dodgeRadius : (skillId === 'laser_beam' ? (CONFIG.laser?.beamLength || 140) : 140),
-            x: opponent.x,
-            y: opponent.y
-          };
-          this._generalSkillShotTeleportDodge(opponent, mockProj);
-        }
-      }
-    }
-
-    // ── CLEAN UP GENERAL SKILL DODGE READINESS ──
-    if (this.adaptedSkills && this.skillDodgeReady) {
-      for (const skillId in this.adaptedSkills) {
-        if (skillId === 'getsugaTensho' || skillId === 'getsuga') continue;
-        const liveProj = projectileSystem?.projectiles?.some(p => p && p.isAdaptableSkillShot && p.skillShotId === skillId && p.life > 0);
-        const opponentFiring = opponent && opponent.isFiringSkillShot === skillId;
-        if (!liveProj && !opponentFiring && !this.skillDodgeReady[skillId]) {
-          this.skillDodgeReady[skillId] = true;
-        }
-      }
-    }
 
     if (this.gojoRedDodgeReady) {
       this.gojoRedDodgeReady = false; // Mahoraga tanks Red with 50% damage reduction instead of dodging
@@ -1187,10 +1085,9 @@ export class MahoragaFighter extends Fighter {
           this.aim(target);
         }
 
-        // Zero out dash velocity and pause movement for ~1 second upon arriving at the enemy before moving naturally
-        this.vx = 0;
-        this.vy = 0;
-        this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+        // Cleanly finish dash and seamlessly transition into natural combat movement
+        this.postDashPauseTimer = 0;
+        this.resumeMovement(target);
 
         if (this.adaptationDashIsCounter && target && !target.isDead) {
           const damage = CONFIG.mahoraga?.swordDamage ?? 15;
@@ -1303,9 +1200,15 @@ export class MahoragaFighter extends Fighter {
 
       if (this.adaptationPauseTimer === 0) {
         this.wheelRotation = this.wheelTargetRotation;
-        this._pendingCounterTarget = null;
       }
       return;
+    }
+
+    if (this._pendingCounterTarget) {
+      const counterTarget = this._pendingCounterTarget;
+      this._pendingCounterTarget = null;
+      this._startAdaptationFlashDash(counterTarget);
+      if (this.adaptationDashTimer > 0) return;
     }
 
     if (this.shieldIconTimer > 0) {
@@ -1718,12 +1621,10 @@ export class MahoragaFighter extends Fighter {
       const meleeDist = this.r + target.r + swordRange;
       this.isMeleeMode = false;
 
-      // When arriving at target during a Wall Rebound Dash, stop movement for ~1s before moving naturally
+      // When arriving at target during a Wall Rebound Dash, transition seamlessly into melee combat
       if (this.isWallReboundDashing && distToOpponent <= meleeDist) {
         this.isWallReboundDashing = false;
-        this.vx = 0;
-        this.vy = 0;
-        this.postDashPauseTimer = CONFIG.mahoraga?.postDashPauseFrames ?? 60;
+        this.postDashPauseTimer = 0;
       }
 
       const isEnemyChanneling = (

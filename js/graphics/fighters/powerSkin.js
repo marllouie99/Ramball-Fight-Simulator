@@ -139,9 +139,14 @@ export function drawPowerPixelBody(ctx, r, now) {
       const normX = rx / r;
 
       // ── Outer Dark Manga Ink Shell ──
-      const isInkOutline = dist >= r - P;
+      const isInkOutline = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
       if (isInkOutline) {
-        ctx.fillStyle = '#180E0C';
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }

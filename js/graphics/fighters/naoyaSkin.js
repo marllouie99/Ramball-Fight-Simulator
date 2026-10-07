@@ -164,17 +164,17 @@ export function _drawNaoyaHair(ctx, r, facingLeft = false) {
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
     // Naoya_hair.png (1506x1045). True visible hair bounding box:
-    // X: [96, 1384] (width 1289, horizontal center at 740)
-    // Y: [30, 942] (height 913, top crown at 30)
-    // Calibrated to seamlessly frame the upper circle with spiky crown at -1.25r
-    const targetHairWidth = r * 2.50 * wMult;
-    const targetHairHeight = r * 1.80 * hMult;
-    const scaleX = targetHairWidth / 1289;
-    const scaleY = targetHairHeight / 913;
+    // X: [96, 1384] (width 1288, horizontal center at 740)
+    // Y: [30, 977] (height 947, top crown at 30)
+    // Calibrated to 1:1 match Gojo/Yuji anime hair volume (3.10r, crown apex: -1.42r)
+    const targetHairWidth = r * 3.10 * wMult;
+    const targetHairHeight = r * 2.10 * hMult;
+    const scaleX = targetHairWidth / 1288;
+    const scaleY = targetHairHeight / 947;
     const drawW = 1506 * scaleX;
     const drawH = 1045 * scaleY;
     const drawX = -740 * scaleX + offX;
-    const drawY = -r * 1.25 - 30 * scaleY + offY;
+    const drawY = -r * 1.42 - 30 * scaleY + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
@@ -192,8 +192,15 @@ export function _drawNaoyaHair(ctx, r, facingLeft = false) {
 }
 
 /**
- * Rasterizes Naoya's authentic body model (clean bald anime head + Zenin clan clothes)
+ * Rasterizes Naoya's authentic body model (clean anime head + Zenin clan clothes)
  * to an offscreen canvas for optimal 60 FPS performance (Rule 3.5).
+ * Built 1:1 on the Universal Character Body Model Standard (Gojo/Yuji/Todo Architecture):
+ * - 4-neighbor boundary test for clean 1-pixel outer manga ink outline (#0E0F14)
+ * - ZONE 1: Pale Blonde Hair Roots & Crown (ny < -0.28)
+ * - ZONE 2: Warm Fair Anime Skin Face & 3 Gold Stud Ear Piercings (-0.28 <= ny < 0.30)
+ * - ZONE 3: Traditional Kimono & Dark Slate Haori Shoulders (0.30 <= ny < 0.66)
+ * - ZONE 4: Dark Obi Sash & Electric Lime Obijime Cord (0.66 <= ny < 0.78)
+ * - ZONE 5: Lower Hakama Trousers (ny >= 0.78)
  * @param {HTMLCanvasElement|CanvasRenderingContext2D} canvasOrCtx
  * @param {number} r
  */
@@ -220,7 +227,7 @@ function _renderNaoyaPixelBodyToCanvas(canvasOrCtx, r) {
   const P = 2.0;
   const steps = Math.ceil((r + P) / P);
 
-  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border (1:1 Standard)
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -245,10 +252,32 @@ function _renderNaoyaPixelBodyToCanvas(canvasOrCtx, r) {
         continue;
       }
 
+      const nx = rx / r;
+      const ny = ry / r;
+      const absX = Math.abs(nx);
+
       // ──────────────────────────────────────────
-      // ZONE 1: Bald Head, Face Skin & Gold Ear Piercings (ry < r * 0.18)
+      // ZONE 1: PALE BLONDE HAIR ROOTS & CROWN (ny < -0.28)
       // ──────────────────────────────────────────
-      if (ry < r * 0.18) {
+      if (ny < -0.28) {
+        let col = '#F1DF88'; // Pale golden blonde base
+        if (absX >= 0.55) {
+          const dLevel = (absX - 0.55) / 0.45;
+          if (dLevel > 0.5) {
+            col = ((gx + gy) % 2 === 0) ? '#E0CD72' : '#C9B752';
+          } else if ((gx + gy) % 3 === 0) {
+            col = '#E0CD72';
+          }
+        } else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
+          col = '#FFF6B8'; // Crown shine
+        }
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2: WARM FAIR SKIN FACE & GOLD EAR PIERCINGS (-0.28 <= ny < 0.30)
+      // ──────────────────────────────────────────
+      else if (ny < 0.30) {
         // Zenin Clan Left Ear Piercings (3 Gold Studs along left ear flank)
         const isPiercing1 = Math.hypot(rx - (-r * 0.78), ry - (-r * 0.06)) <= P * 1.0;
         const isPiercing2 = Math.hypot(rx - (-r * 0.82), ry - (0.0)) <= P * 1.0;
@@ -257,80 +286,84 @@ function _renderNaoyaPixelBodyToCanvas(canvasOrCtx, r) {
         if (isPiercing1 || isPiercing2 || isPiercing3) {
           destCtx.fillStyle = '#FACC15'; // Gold Stud Piercings
         } else {
-          // Fair Ivory-Peach Anime Skin Tone
-          let col = '#FFDFC4';
-          if (ry < -r * 0.60) {
-            col = '#FFF2E6'; // Crown dome volumetric glint
-          } else if (ry < -r * 0.35) {
-            col = '#FFEADB'; // Forehead highlight
-          } else if (Math.abs(rx) > r * 0.70) {
-            col = '#EAB896'; // Side temple / cheek shadow
-          } else if (ry > r * 0.08) {
-            col = '#EAB896'; // Chin & jawline soft shadow
+          let col = '#FEDBC0'; // Fair ivory-peach skin base (1:1 with Gojo)
+          if (absX >= 0.55) {
+            const dLevel = (absX - 0.55) / 0.45;
+            if (dLevel > 0.6) {
+              col = ((gx + gy) % 2 === 0) ? '#D89F7C' : '#E9B796';
+            } else if ((gx + gy) % 2 === 0) {
+              col = '#E9B796';
+            }
+          } else if (absX < 0.35 && ny > -0.15 && ny < 0.10) {
+            if ((gx + gy) % 4 === 0) {
+              col = '#FFF0E2'; // Center face highlight
+            }
+          } else if (ny > 0.16) {
+            col = '#E9B796'; // Lower jaw shadow
           }
           destCtx.fillStyle = col;
         }
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 2: Zenin Clan Kimono & Dark Charcoal Haori (r * 0.18 <= ry < r * 0.62)
+      // ZONE 3: ZENIN CLAN KIMONO & HAORI SHOULDERS (0.30 <= ny < 0.66)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.62) {
+      else if (ny < 0.66) {
         // Pale Sage-Green Under-Kimono V-Neckline in center:
-        const vProgress = (ry - r * 0.18) / (r * 0.44); // 0 to 1
-        const kimonoHalfW = r * 0.16 + vProgress * (r * 0.22); // ~0.16r to 0.38r
+        const vProgress = (ny - 0.30) / 0.36; // 0 to 1
+        const kimonoHalfW = 0.16 + vProgress * 0.22; // ~0.16 to 0.38
 
-        if (Math.abs(rx) <= kimonoHalfW) {
+        if (absX <= kimonoHalfW) {
           // Center V opening neckline
-          const isWhiteCollarLeft = Math.abs(rx - (-kimonoHalfW + r * 0.06)) <= P * 0.8;
-          const isWhiteCollarRight = Math.abs(rx - (kimonoHalfW - r * 0.06)) <= P * 0.8;
-          const isNeckSkin = (ry < r * 0.28 && Math.abs(rx) <= (1 - (ry - r * 0.18) / (r * 0.10)) * (r * 0.12));
+          const isWhiteCollarLeft = Math.abs(nx - (-kimonoHalfW + 0.06)) <= P / r * 0.8;
+          const isWhiteCollarRight = Math.abs(nx - (kimonoHalfW - 0.06)) <= P / r * 0.8;
+          const isNeckSkin = (ny < 0.38 && absX <= (1 - (ny - 0.30) / 0.08) * 0.14);
 
           if (isNeckSkin) {
-            destCtx.fillStyle = '#EAB896'; // Neck skin in collar V
+            destCtx.fillStyle = '#E9B796'; // Throat skin in collar V
           } else if (isWhiteCollarLeft || isWhiteCollarRight) {
             destCtx.fillStyle = '#FFFFFF'; // Crisp white under-kimono collar lining
-          } else if (Math.abs(rx) <= P * 0.6) {
+          } else if (absX <= P / r * 0.6) {
             destCtx.fillStyle = '#8FA885'; // Inner green fold seam
           } else {
             destCtx.fillStyle = '#D9E8D2'; // Pale sage kimono fabric
           }
         } else {
-          // Flanking Dark Charcoal Haori Shoulders
-          if (Math.abs(rx) > r * 0.72) {
-            destCtx.fillStyle = '#12141A'; // Deep obsidian shadow at flanks
-          } else if (ry > r * 0.52) {
-            destCtx.fillStyle = '#14161C'; // Lower haori fold shadow
+          // Flanking Dark Slate Charcoal Haori Shoulders (High luminance Y >= 24)
+          if (absX > 0.72) {
+            destCtx.fillStyle = '#1E222D'; // Slate flank shadow
+          } else if (ny > 0.54) {
+            destCtx.fillStyle = '#242834'; // Lower haori fold shadow
           } else {
-            destCtx.fillStyle = '#1A1D24'; // Slate dark charcoal haori
+            destCtx.fillStyle = '#2C303E'; // Slate dark charcoal haori base
           }
         }
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 3: Dark Obi Sash & Electric Lime Cord (r * 0.62 <= ry < r * 0.78)
+      // ZONE 4: DARK OBI SASH & ELECTRIC LIME CORD (0.66 <= ny < 0.78)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.78) {
+      else if (ny < 0.78) {
         // Electric Lime Obijime Accent Cord in center of obi
-        if (ry >= r * 0.68 && ry <= r * 0.72) {
+        if (ny >= 0.70 && ny <= 0.74) {
           destCtx.fillStyle = '#76E042'; // Neon lime obijime cord
-        } else if (ry < r * 0.65) {
-          destCtx.fillStyle = '#181A20'; // Upper obi edge shadow
+        } else if (ny < 0.69) {
+          destCtx.fillStyle = '#2C3240'; // Upper obi edge highlight
         } else {
-          destCtx.fillStyle = '#0E1015'; // Dark ink obi sash
+          destCtx.fillStyle = '#181A22'; // Dark ink obi sash
         }
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 4: Lower Hakama Pants / Kimono Skirt (ry >= r * 0.78)
+      // ZONE 5: LOWER HAKAMA PANTS (ny >= 0.78)
       // ──────────────────────────────────────────
       else {
-        if (Math.abs(rx) <= P * 0.6 && ry >= r * 0.80 && ry <= r * 0.96) {
-          destCtx.fillStyle = '#0A0B0E'; // Center hakama inseam crease
-        } else if (Math.abs(rx) > r * 0.65) {
-          destCtx.fillStyle = '#101217'; // Outer pleat shadow
+        if (absX <= P / r * 0.6 && ny >= 0.80 && ny <= 0.96) {
+          destCtx.fillStyle = '#161924'; // Center hakama inseam crease
+        } else if (absX > 0.65) {
+          destCtx.fillStyle = '#1A1D28'; // Outer pleat shadow
         } else {
-          destCtx.fillStyle = '#161922'; // Dark charcoal hakama skirt
+          destCtx.fillStyle = '#262A38'; // Dark charcoal hakama skirt
         }
         destCtx.fillRect(px, py, P, P);
       }
@@ -413,10 +446,27 @@ function _renderNaoyaProjectionGhostToCanvas(canvasOrCtx, r) {
         continue;
       }
 
+      const nx = rx / r;
+      const ny = ry / r;
+      const absX = Math.abs(nx);
+
       // ──────────────────────────────────────────
-      // ZONE 1: Projection Face Skin & Piercings (ry < r * 0.18)
+      // ZONE 1: Projection Hair Crown (ny < -0.28)
       // ──────────────────────────────────────────
-      if (ry < r * 0.18) {
+      if (ny < -0.28) {
+        let col = '#38BDF8';
+        if (absX >= 0.55) {
+          col = ((gx + gy) % 2 === 0) ? '#0284C7' : '#0369A1';
+        } else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
+          col = '#E0F2FE';
+        }
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2: Projection Face Skin & Piercings (-0.28 <= ny < 0.30)
+      // ──────────────────────────────────────────
+      else if (ny < 0.30) {
         const isPiercing1 = Math.hypot(rx - (-r * 0.78), ry - (-r * 0.06)) <= P * 1.0;
         const isPiercing2 = Math.hypot(rx - (-r * 0.82), ry - (0.0)) <= P * 1.0;
         const isPiercing3 = Math.hypot(rx - (-r * 0.78), ry - (r * 0.06)) <= P * 1.0;
@@ -424,77 +474,73 @@ function _renderNaoyaProjectionGhostToCanvas(canvasOrCtx, r) {
         if (isPiercing1 || isPiercing2 || isPiercing3) {
           destCtx.fillStyle = '#FFFFFF'; // White-cyan stud glints
         } else {
-          // Luminous Electric Cyan-Blue Projection Face
           let col = '#38BDF8'; // Vivid sky cyan
-          if (ry < -r * 0.60) {
-            col = '#E0F2FE'; // Crown dome glint core
-          } else if (ry < -r * 0.35) {
-            col = '#BAE6FD'; // Forehead projection glow
-          } else if (Math.abs(rx) > r * 0.70) {
-            col = '#0284C7'; // Temple shadow
-          } else if (ry > r * 0.08) {
-            col = '#0369A1'; // Chin & jawline shadow
+          if (absX >= 0.55) {
+            col = ((gx + gy) % 2 === 0) ? '#0369A1' : '#0284C7';
+          } else if (absX < 0.35 && ny > -0.15 && ny < 0.10) {
+            if ((gx + gy) % 4 === 0) col = '#BAE6FD';
+          } else if (ny > 0.16) {
+            col = '#0369A1';
           }
           destCtx.fillStyle = col;
         }
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 2: Projection Kimono & Haori Shoulders (r * 0.18 <= ry < r * 0.62)
+      // ZONE 3: Projection Kimono & Haori Shoulders (0.30 <= ny < 0.66)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.62) {
-        const vProgress = (ry - r * 0.18) / (r * 0.44);
-        const kimonoHalfW = r * 0.16 + vProgress * (r * 0.22);
+      else if (ny < 0.66) {
+        const vProgress = (ny - 0.30) / 0.36;
+        const kimonoHalfW = 0.16 + vProgress * 0.22;
 
-        if (Math.abs(rx) <= kimonoHalfW) {
-          const isWhiteCollarLeft = Math.abs(rx - (-kimonoHalfW + r * 0.06)) <= P * 0.8;
-          const isWhiteCollarRight = Math.abs(rx - (kimonoHalfW - r * 0.06)) <= P * 0.8;
-          const isNeckSkin = (ry < r * 0.28 && Math.abs(rx) <= (1 - (ry - r * 0.18) / (r * 0.10)) * (r * 0.12));
+        if (absX <= kimonoHalfW) {
+          const isWhiteCollarLeft = Math.abs(nx - (-kimonoHalfW + 0.06)) <= P / r * 0.8;
+          const isWhiteCollarRight = Math.abs(nx - (kimonoHalfW - 0.06)) <= P / r * 0.8;
+          const isNeckSkin = (ny < 0.38 && absX <= (1 - (ny - 0.30) / 0.08) * 0.14);
 
           if (isNeckSkin) {
-            destCtx.fillStyle = '#38BDF8'; // Sky cyan neck in collar V
+            destCtx.fillStyle = '#38BDF8';
           } else if (isWhiteCollarLeft || isWhiteCollarRight) {
-            destCtx.fillStyle = '#F0F9FF'; // Luminous white collar lining
-          } else if (Math.abs(rx) <= P * 0.6) {
-            destCtx.fillStyle = '#0284C7'; // Inner seam fold
+            destCtx.fillStyle = '#F0F9FF';
+          } else if (absX <= P / r * 0.6) {
+            destCtx.fillStyle = '#0284C7';
           } else {
-            destCtx.fillStyle = '#0284C7'; // Projection blue kimono
+            destCtx.fillStyle = '#0284C7';
           }
         } else {
-          // Deep sapphire / indigo haori shoulders
-          if (Math.abs(rx) > r * 0.72) {
-            destCtx.fillStyle = '#082F49'; // Deep indigo flank shadow
-          } else if (ry > r * 0.52) {
-            destCtx.fillStyle = '#075985'; // Lower haori fold
+          if (absX > 0.72) {
+            destCtx.fillStyle = '#082F49';
+          } else if (ny > 0.54) {
+            destCtx.fillStyle = '#075985';
           } else {
-            destCtx.fillStyle = '#0C4A6E'; // Projection haori
+            destCtx.fillStyle = '#0C4A6E';
           }
         }
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 3: Projection Obi Sash (r * 0.62 <= ry < r * 0.78)
+      // ZONE 4: Projection Obi Sash (0.66 <= ny < 0.78)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.78) {
-        if (ry >= r * 0.68 && ry <= r * 0.72) {
+      else if (ny < 0.78) {
+        if (ny >= 0.70 && ny <= 0.74) {
           destCtx.fillStyle = '#00F2FE'; // Bright neon cyan obijime cord
-        } else if (ry < r * 0.65) {
-          destCtx.fillStyle = '#032B56'; // Upper obi shadow
+        } else if (ny < 0.69) {
+          destCtx.fillStyle = '#032B56';
         } else {
-          destCtx.fillStyle = '#021F3F'; // Dark sapphire obi
+          destCtx.fillStyle = '#021F3F';
         }
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 4: Lower Hakama Pants (ry >= r * 0.78)
+      // ZONE 5: Lower Hakama Pants (ny >= 0.78)
       // ──────────────────────────────────────────
       else {
-        if (Math.abs(rx) <= P * 0.6 && ry >= r * 0.80 && ry <= r * 0.96) {
-          destCtx.fillStyle = '#021F3F'; // Center inseam crease
-        } else if (Math.abs(rx) > r * 0.65) {
-          destCtx.fillStyle = '#082F49'; // Outer pleat shadow
+        if (absX <= P / r * 0.6 && ny >= 0.80 && ny <= 0.96) {
+          destCtx.fillStyle = '#021F3F';
+        } else if (absX > 0.65) {
+          destCtx.fillStyle = '#082F49';
         } else {
-          destCtx.fillStyle = '#075985'; // Deep sapphire hakama
+          destCtx.fillStyle = '#075985';
         }
         destCtx.fillRect(px, py, P, P);
       }
@@ -516,14 +562,14 @@ function _renderNaoyaProjectionGhostToCanvas(canvasOrCtx, r) {
     destCtx.save();
     destCtx.imageSmoothingEnabled = false;
 
-    const targetHairWidth = r * 2.50 * wMult;
-    const targetHairHeight = r * 1.80 * hMult;
-    const scaleX = targetHairWidth / 1289;
-    const scaleY = targetHairHeight / 913;
+    const targetHairWidth = r * 3.10 * wMult;
+    const targetHairHeight = r * 2.10 * hMult;
+    const scaleX = targetHairWidth / 1288;
+    const scaleY = targetHairHeight / 947;
     const drawW = 1506 * scaleX;
     const drawH = 1045 * scaleY;
     const drawX = -740 * scaleX + offX;
-    const drawY = -r * 1.25 - 30 * scaleY + offY;
+    const drawY = -r * 1.42 - 30 * scaleY + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       destCtx.translate(drawX + drawW / 2, drawY + drawH / 2);

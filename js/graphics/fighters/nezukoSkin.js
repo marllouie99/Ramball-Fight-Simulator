@@ -95,77 +95,64 @@ export function drawNezukoPixelBody(ctx, r) {
       const normY = ry / r;
       const normX = rx / r;
 
-      // ── 1. Stepped Outer Manga Ink Outline ──
-      const isOutline = dist >= r - P;
+      // ── 1. Stepped Outer Manga Ink Outline (4-Neighbor Attached Boundary Test) ──
+      const isOutline = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
       if (isOutline) {
-        ctx.fillStyle = '#18181B';
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }
 
-      // ── 2. LONG CASCADING BLACK & OMBRÉ HAIR (gy <= hairCutoffGy) ──
-      const hairIdx = Math.max(0, Math.min(26, gx + 13));
-      const hairCutoffGy = NEZUKO_HAIRLINE_GY[hairIdx];
-      const isHair = gy <= hairCutoffGy;
+      // ── 2. FAIR PORCELAIN FACE DOME (normY < 0.30) ──
+      if (normY < 0.30) {
+        // BAMBOO MUZZLE (gy = 0..3, Math.abs(gx) <= 6)
+        const isBambooMuzzle = (gy >= 0 && gy <= 3 && Math.abs(gx) <= 6);
+        const isBambooCord = (gy === 1 && Math.abs(gx) >= 7 && Math.abs(gx) <= 10);
 
-      if (isHair) {
-        // Bottom Ombré Tips on cascading side locks (Math.abs(gx) >= 9, gy >= 4)
-        if (Math.abs(gx) >= 8 && gy >= 4) {
-          ctx.fillStyle = (gy >= 6) ? '#F97316' : '#EA580C'; // Fiery vermilion/orange ombré tips
-        } else if (normY < -0.70) {
-          ctx.fillStyle = '#27272A'; // Hair crown shine
-        } else if (gy === hairCutoffGy) {
-          ctx.fillStyle = '#09090B'; // Hair shadow edge
-        } else {
-          ctx.fillStyle = '#18181B'; // Jet black hair mass
+        if (isBambooCord) {
+          ctx.fillStyle = '#DC2626'; // Red tying cord
+          ctx.fillRect(px, py, P, P);
+          continue;
+        } else if (isBambooMuzzle) {
+          const isNode = (gx === -3 || gx === 3);
+          const isHighlight = (gy === 1 && Math.abs(gx) <= 4);
+          if (isHighlight) {
+            ctx.fillStyle = '#86EFAC'; // Mint highlight sheen
+          } else if (isNode) {
+            ctx.fillStyle = '#15803D'; // Dark bamboo joint ring
+          } else {
+            ctx.fillStyle = '#22C55E'; // Vibrant bamboo green
+          }
+          ctx.fillRect(px, py, P, P);
+          continue;
         }
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
 
-      // ── 3. BAMBOO MUZZLE (gy = 0..3, Math.abs(gx) <= 8) ──
-      const isBambooMuzzle = (gy >= 0 && gy <= 3 && Math.abs(gx) <= 6);
-      const isBambooCord = (gy === 1 && Math.abs(gx) >= 7 && Math.abs(gx) <= 10);
-
-      if (isBambooCord) {
-        ctx.fillStyle = '#DC2626'; // Red tying cord
-        ctx.fillRect(px, py, P, P);
-        continue;
-      } else if (isBambooMuzzle) {
-        const isNode = (gx === -3 || gx === 3);
-        const isHighlight = (gy === 1 && Math.abs(gx) <= 4);
-        if (isHighlight) {
-          ctx.fillStyle = '#86EFAC'; // Mint highlight sheen
-        } else if (isNode) {
-          ctx.fillStyle = '#15803D'; // Dark bamboo joint ring
-        } else {
-          ctx.fillStyle = '#22C55E'; // Vibrant bamboo green
-        }
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
-
-      // ── 4. FAIR PORCELAIN FACE SKIN (-r*0.18 to +r*0.18) ──
-      if (normY < 0.18) {
-        if (normY < -0.05) {
-          ctx.fillStyle = '#FFF1E8'; // Fair porcelain base
+        // Face Skin Tones
+        if (normY < -0.40) {
+          ctx.fillStyle = '#FFF5EE'; // Forehead dome highlight
         } else if (normY < 0.08) {
-          ctx.fillStyle = '#FED7AA'; // Soft peach cheek tone
+          ctx.fillStyle = '#FFF0DE'; // Fair porcelain base
         } else {
-          ctx.fillStyle = '#FDBA74'; // Chin shadow
+          ctx.fillStyle = '#FED7AA'; // Lower face & cheek contour
         }
         ctx.fillRect(px, py, P, P);
         continue;
       }
 
-      // ── 5. ASANOHA KIMONO, OBI SASH & BLACK HAORI (+r*0.18 to +r*1.00) ──
+      // ── 3. ASANOHA KIMONO, OBI SASH & BLACK HAORI (normY >= 0.30) ──
       const isOuterHaori = Math.abs(gx) >= 8;
       const isObiSash = (gy >= 8 && gy <= 10 && Math.abs(gx) <= 7);
       const isObiJimeCord = (gy === 9 && Math.abs(gx) <= 7);
 
       if (isOuterHaori) {
-        // Dark Charcoal Black Haori
-        ctx.fillStyle = '#1C1917';
+        // Dark Charcoal Black Haori (Y >= 24 luminance)
+        ctx.fillStyle = '#242834';
         ctx.fillRect(px, py, P, P);
       } else if (isObiJimeCord) {
         // Orange Obi-Jime Cord

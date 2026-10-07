@@ -129,11 +129,6 @@ function _drawTanjiroProceduralFallback(ctx, r) {
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
-  // High Forehead Arch Root Map with side locks
-  const HAIRLINE_ROOT_GY = [
-    3, 2, 1, -1, -3, -5, -6, -6, -6, -5, -5, -6, -6, -6, -5, -4, -3, -1, 1, 2, 3
-  ];
-
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -144,82 +139,76 @@ function _drawTanjiroProceduralFallback(ctx, r) {
       const px = snap(rx);
       const py = snap(ry);
       const normY = ry / r;
+      const absGx = Math.abs(gx);
 
-      if (dist >= r - P) {
-        ctx.fillStyle = '#18181B';
+      // 4-neighbor attached boundary test for solid dark manga ink outline
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
+      if (isBorder) {
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }
 
-      const hairIdx = Math.max(0, Math.min(20, gx + 10));
-      const hairCutoffGy = HAIRLINE_ROOT_GY[hairIdx];
-      const isHair = gy <= hairCutoffGy;
-
-      if (isHair) {
-        if (normY < -0.65) {
-          ctx.fillStyle = (gx % 3 === 0) ? '#CD354E' : '#9B1F34';
-        } else if (normY < -0.35) {
-          ctx.fillStyle = (gx % 2 === 0) ? '#781829' : '#3F0C16';
-        } else {
-          ctx.fillStyle = '#3F0C16';
-        }
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
-
-      if (normY < 0.20) {
-        // Demon Slayer Flame Scar on right forehead
-        const isScar = (gx >= 3 && gx <= 7 && gy >= -5 && gy <= 0);
+      // Zone 1: Face Dome (ny < 0.30)
+      if (normY < 0.30) {
+        // Demon Slayer Flame Scar on right forehead (bounded away from perimeter)
+        const isScar = (gx >= 2 && gx <= 6 && gy >= -6 && gy <= -1);
         if (isScar) {
-          ctx.fillStyle = (gx === 5 && (gy === -4 || gy === -3)) ? '#38070E' : (gx >= 6 ? '#CC2234' : '#7A1624');
+          ctx.fillStyle = (gx === 4 && (gy === -4 || gy === -3)) ? '#5A0D15' : (gx >= 5 ? '#D92638' : '#8B1824');
           ctx.fillRect(px, py, P, P);
           continue;
         }
 
-        if (gy <= hairCutoffGy + 1) {
-          ctx.fillStyle = '#F5C2A0';
-        } else if (normY < 0.05) {
-          ctx.fillStyle = '#FFF3E8';
+        if (normY < -0.40) {
+          ctx.fillStyle = '#FFF2E6'; // Upper forehead highlight
+        } else if (normY < 0.10) {
+          ctx.fillStyle = '#FEE8D6'; // Fair porcelain skin base
         } else {
-          ctx.fillStyle = '#FDE2CE';
+          ctx.fillStyle = '#FDD3B2'; // Lower chin & neck shadow
         }
         ctx.fillRect(px, py, P, P);
         continue;
       }
 
-      const isWhiteCollar = Math.abs(gx) <= 2 && gy >= 3 && gy <= 6;
-      const isInnerBlackV = Math.abs(gx) <= 1 && gy >= 3 && gy <= 4;
+      // Zone 2: Collar & Upper Torso (0.30 <= normY < 0.68)
+      const isWhiteCollar = absGx <= 2 && gy >= 3 && gy <= 6;
+      const isInnerBlackV = absGx <= 1 && gy >= 3 && gy <= 4;
       const isGoldButton = gx === 0 && gy === 6;
-      const isWhiteBelt = gy >= 10 && gy <= 11 && Math.abs(gx) <= 9;
-      const isBeltBuckle = isWhiteBelt && Math.abs(gx) <= 2;
 
       if (isInnerBlackV) {
-        ctx.fillStyle = '#18181B';
+        ctx.fillStyle = '#242834';
       } else if (isWhiteCollar) {
         ctx.fillStyle = '#FFFFFF';
       } else if (isGoldButton) {
         ctx.fillStyle = '#F59E0B';
-      } else if (isBeltBuckle) {
-        ctx.fillStyle = '#94A3B8';
-      } else if (isWhiteBelt) {
-        ctx.fillStyle = '#F1F5F9';
+      } else if (normY >= 0.68 && normY < 0.78) {
+        // Zone 3: White Belt & Buckle
+        const isBeltBuckle = absGx <= 2;
+        ctx.fillStyle = isBeltBuckle ? '#CBD5E1' : '#F1F5F9';
       } else {
+        // Checkered Green & Charcoal Haori Pattern
         const tileX = Math.floor((gx + 12) / 4);
         const tileY = Math.floor((gy - 3) / 3);
         const isGreen = ((tileX + tileY) % 2 === 0);
-        ctx.fillStyle = isGreen ? '#059669' : '#18181B';
+        ctx.fillStyle = isGreen ? '#059669' : '#242834';
       }
       ctx.fillRect(px, py, P, P);
     }
   }
 
-  // Earrings
+  // Hanafuda Earrings
   [-1, 1].forEach(side => {
     const ex = snap(side * 11 * P);
     const ey = snap(3 * P);
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(ex - 2, ey + snap(2 * P), 4, 6);
-    ctx.fillStyle = '#18181B';
+    ctx.fillStyle = '#0E0F14';
     ctx.strokeRect(ex - 2, ey + snap(2 * P), 4, 6);
     ctx.fillStyle = '#EF4444';
     ctx.fillRect(ex - 1, ey + snap(3 * P), 2, 2);

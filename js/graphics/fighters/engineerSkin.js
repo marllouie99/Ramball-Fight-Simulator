@@ -183,7 +183,7 @@ export function drawEngineerPixelBody(ctx, r) {
 
       // Pixelated Dark Stroke Border
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#0B0D12';
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }

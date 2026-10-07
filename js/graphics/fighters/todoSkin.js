@@ -382,47 +382,41 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // ZONE 1: Clean Faceless Skin & Iconic Left Burn Scar (ry < r * 0.12)
+      // ZONE 1: Clean Faceless Skin & Iconic Left Burn Scar (ry < r * 0.30)
+      // Pure unbroken circular dome (All hair on Layer 2)
       // ──────────────────────────────────────────
-      if (ry < r * 0.12) {
+      if (ry < r * 0.30) {
         // Base Face Skin Palette
         let col = inBFState ? '#D88A75' : '#EBBF9E';
-        if (ry < -r * 0.60 && absX < 0.50) {
-          col = inBFState ? '#F5B8A8' : '#FFF0E4'; // Crown dome volumetric glint
-        } else if (ry < -r * 0.35 && absX < 0.40) {
-          col = inBFState ? '#E8A28E' : '#F5D2B8'; // Center forehead highlight
-        } else if (absX > 0.72 || ry > r * 0.02) {
-          col = inBFState ? '#A85A48' : '#D49D79'; // Jaw / cheek shadow
+        if (absX >= 0.55) {
+          col = inBFState ? '#A85A48' : '#D49D79'; // Side contour
+        } else if (absX < 0.35 && ry > -r * 0.25 && ry < r * 0.10) {
+          if ((gx + gy) % 4 === 0) col = inBFState ? '#F5B8A8' : '#FFF0E4';
         }
 
         // ── Todo's Signature Left Facial Burn Scar ──
-        // Spans left temple down to jawbone (rx < -r * 0.08 to -r * 0.65, ry in [-r * 0.52, r * 0.06])
+        // Spans left temple down to jawbone (rx in [-r * 0.60, -r * 0.08], ry in [-r * 0.45, r * 0.22])
         let isScar = false;
         let isScarEdge = false;
         let isScarCrease = false;
 
-        if (rx <= -r * 0.08 && rx >= -r * 0.65 && ry >= -r * 0.50 && ry <= r * 0.06) {
-          // Organically shaped scar profile across left temple & cheekbone
-          const scarProg = (ry - (-r * 0.50)) / (r * 0.56); // 0.0 (temple) -> 1.0 (jaw)
+        if (rx <= -r * 0.08 && rx >= -r * 0.60 && ry >= -r * 0.45 && ry <= r * 0.22) {
+          const scarProg = (ry - (-r * 0.45)) / (r * 0.67);
           let scarMinX, scarMaxX;
           if (scarProg < 0.45) {
-            // Temple to upper cheekbone (widens outward)
-            scarMinX = -r * 0.62;
+            scarMinX = -r * 0.58;
             scarMaxX = -r * 0.10 - (1 - scarProg / 0.45) * (r * 0.15);
           } else {
-            // Cheekbone to jaw (tapers back inward)
             const t = (scarProg - 0.45) / 0.55;
-            scarMinX = -r * 0.62 + t * (r * 0.16);
+            scarMinX = -r * 0.58 + t * (r * 0.16);
             scarMaxX = -r * 0.10 - t * (r * 0.12);
           }
 
           if (rx >= scarMinX && rx <= scarMaxX) {
             isScar = true;
-            // Scar dark outer boundary border
-            if (rx <= scarMinX + P * 1.0 || rx >= scarMaxX - P * 1.0 || ry <= -r * 0.48 || ry >= r * 0.04) {
+            if (rx <= scarMinX + P * 1.0 || rx >= scarMaxX - P * 1.0 || ry <= -r * 0.43 || ry >= r * 0.20) {
               isScarEdge = true;
             }
-            // Horizontal burn tissue texture lines
             if (Math.round((ry + r) / P) % 3 === 0) {
               isScarCrease = true;
             }
@@ -444,31 +438,23 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 3: Deep Magenta/Purple Athletic Shirt (r * 0.12 <= ry < r * 0.50)
+      // ZONE 2: Deep Magenta/Purple Athletic Shirt (r * 0.30 <= ry < r * 0.64)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.50) {
-        // Crew-Neck Collar Seam below chin (ry in [r * 0.12, r * 0.18], absX < 0.40)
-        const isCollar = (ry <= r * 0.18 && absX < 0.40);
-        const isCollarRim = (isCollar && (ry <= r * 0.14 || Math.abs(absX - 0.38) <= 0.06));
-
-        // Center Sternum Seam
-        const isSternumSeam = (absX < 0.05 && ry >= r * 0.18 && ry <= r * 0.46);
-
-        // Pectoral Muscle Highlights
-        const isPecHighlight = (ry >= r * 0.22 && ry <= r * 0.38 && absX >= 0.12 && absX <= 0.46);
-
-        // Short-Sleeve Shoulder Seams
-        const isShoulderSeam = (absX > 0.68 && ry >= r * 0.16 && ry <= r * 0.42);
+      else if (ry < r * 0.64) {
+        const isCollar = (ry <= r * 0.36 && absX < 0.40);
+        const isCollarRim = (isCollar && (ry <= r * 0.32 || Math.abs(absX - 0.38) <= 0.06));
+        const isSternumSeam = (absX < 0.05 && ry >= r * 0.36 && ry <= r * 0.58);
+        const isPecHighlight = (ry >= r * 0.38 && ry <= r * 0.52 && absX >= 0.12 && absX <= 0.46);
 
         if (isCollarRim) {
           destCtx.fillStyle = '#300A38'; // Dark collar outline
         } else if (isCollar) {
           destCtx.fillStyle = '#4A1254'; // Collar band
-        } else if (isSternumSeam || isShoulderSeam) {
+        } else if (isSternumSeam) {
           destCtx.fillStyle = '#3E1045'; // Deep shirt seam shadow
         } else if (isPecHighlight) {
           destCtx.fillStyle = '#882E95'; // Pectoral muscle highlight
-        } else if (ry > r * 0.42 || absX > 0.62) {
+        } else if (ry > r * 0.56 || absX > 0.62) {
           destCtx.fillStyle = '#4E1656'; // Lower shirt fold shadow
         } else {
           destCtx.fillStyle = '#6B2375'; // Base Magenta Purple shirt
@@ -477,49 +463,41 @@ function _renderTodoPixelBodyToCanvas(destCtx, r, inBFState) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 4: Dark Martial Arts Waist Sash (r * 0.50 <= ry < r * 0.68)
+      // ZONE 3: Dark Martial Arts Waist Sash (r * 0.64 <= ry < r * 0.76)
       // ──────────────────────────────────────────
-      else if (ry < r * 0.68) {
-        // Obi Horizontal Fold Crease Line
-        const isCrease = Math.abs(ry - r * 0.59) <= P * 0.6;
-        // Center Knot Detail
+      else if (ry < r * 0.76) {
+        const isCrease = Math.abs(ry - r * 0.70) <= P * 0.6;
         const isCenterKnot = (absX <= 0.16);
 
         if (isCenterKnot) {
-          if (absX >= 0.12 || Math.abs(ry - r * 0.59) >= r * 0.07) {
-            destCtx.fillStyle = '#14101A'; // Dark knot tie contour
+          if (absX >= 0.12 || Math.abs(ry - r * 0.70) >= r * 0.05) {
+            destCtx.fillStyle = '#181420'; // Dark knot tie contour
           } else {
-            destCtx.fillStyle = '#2D2538'; // Knot center fold
+            destCtx.fillStyle = '#342C40'; // Knot center fold
           }
-        } else if (ry <= r * 0.52) {
-          destCtx.fillStyle = '#332B3F'; // Top rim highlight
+        } else if (ry <= r * 0.66) {
+          destCtx.fillStyle = '#3A3246'; // Top rim highlight
         } else if (isCrease) {
-          destCtx.fillStyle = '#181320'; // Crease fold line
-        } else if (ry >= r * 0.65) {
-          destCtx.fillStyle = '#100D16'; // Bottom sash shadow
+          destCtx.fillStyle = '#1E1826'; // Crease fold line
         } else {
-          destCtx.fillStyle = '#221C2B'; // Base Dark Kyoto High Sash
+          destCtx.fillStyle = '#2A2434'; // Base Kyoto High Sash
         }
 
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 5: Dark Hakama Martial Artist Pants (ry >= r * 0.68)
+      // ZONE 4: Dark Hakama Martial Artist Pants (ry >= r * 0.76)
       // ──────────────────────────────────────────
       else {
-        // Center Vertical Inseam Pleat
         const isInseam = (absX <= 0.04);
-        // Left & Right Hakama Pleat Highlights
-        const isPleat = (absX >= 0.22 && absX <= 0.38 && ry < r * 0.88);
+        const isPleat = (absX >= 0.22 && absX <= 0.38 && ry < r * 0.90);
 
         if (isInseam) {
-          destCtx.fillStyle = '#0A090D'; // Deep center inseam
+          destCtx.fillStyle = '#14121A'; // Deep center inseam
         } else if (isPleat) {
-          destCtx.fillStyle = '#2A2533'; // Pleat highlight
-        } else if (absX > 0.70 || ry > r * 0.88) {
-          destCtx.fillStyle = '#0E0C12'; // Pants outer shadow
+          destCtx.fillStyle = '#342E40'; // Pleat highlight
         } else {
-          destCtx.fillStyle = '#18151D'; // Base Hakama dark charcoal
+          destCtx.fillStyle = '#262030'; // Base Hakama fabric (luminance >= 24)
         }
 
         destCtx.fillRect(px, py, P, P);

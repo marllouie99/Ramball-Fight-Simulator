@@ -149,7 +149,7 @@ function _renderGunslingerPixelBodyToCanvas(destCtx, r) {
       );
 
       if (isBorder) {
-        destCtx.fillStyle = '#110C08'; // Deep dark espresso ink outline
+        destCtx.fillStyle = '#0E0F14'; // Standard manga ink outline shell
         destCtx.fillRect(px, py, P, P);
         continue;
       }

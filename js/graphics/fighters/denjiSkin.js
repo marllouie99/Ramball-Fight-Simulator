@@ -11,7 +11,7 @@
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
-import { drawAuthenticChainsawBlade } from '../weapons/denjiWeaponGraphics.js';
+import { drawAuthenticChainsawBlade, drawDenjiAttackSlashFX } from '../weapons/denjiWeaponGraphics.js';
 
 const P = 2.0;
 function snap(v) {
@@ -75,19 +75,16 @@ export function drawDenjiSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // 2. Punch & Saw Animation States
+  // 2. Shred & Lunge States
   const isPunching = !isPodiumPreview && !isSuppressed && (fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
-  const isSawing = !isPodiumPreview && !isSuppressed && (fighter.slashSwingTimer && fighter.slashSwingTimer > 0);
   const isLunge = !isPodiumPreview && !isSuppressed && Boolean(fighter.isEngineLunging);
-  const animPhase = isPunching 
-    ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14)))
-    : (isSawing ? Math.min(1.0, 1.0 - (fighter.slashSwingTimer / (fighter.slashSwingMaxTimer || 14))) : 0);
-  const comboCycle = fighter.punchComboCount || fighter.sawComboCount || 0;
+  const isShredding = !isPodiumPreview && !isSuppressed && Boolean(fighter.isShredding);
 
   const combatOpts = {
-    isAttacking: isPunching || isSawing,
+    isAttacking: isPunching || isShredding,
     isLunging: isLunge,
-    isSawing: isSawing,
+    isSawing: isShredding,
+    shredBladeCount: fighter.shredBladeCount || (isShredding ? 1 : 0),
     isMassacre: Boolean(fighter.isExecutingMassacre)
   };
 
@@ -116,11 +113,11 @@ export function drawDenjiSkin(ctx, fighter) {
   if (!hideHands && !(typeof state !== 'undefined' && state.showSkinOnly)) {
     // Left Hand / Left Forearm Chainsaw (Symmetrical Lower-Left Flank)
     if (!fighter.hideBackHand && (!hideChainsaws || !isHybrid)) {
-      _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, combatOpts);
+      _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPodiumPreview, now, combatOpts);
     }
     // Right Hand / Right Forearm Chainsaw (Symmetrical Lower-Right Flank)
     if (!fighter.hideFrontHand && (!hideChainsaws || !isHybrid)) {
-      _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, combatOpts);
+      _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPodiumPreview, now, combatOpts);
     }
   }
 
@@ -157,9 +154,14 @@ export function drawDenjiHumanPixelBody(ctx, r, now) {
       const normX = rx / r;
 
       // ── Outer Dark Manga Ink Shell (1px boundary) ──
-      const isInkOutline = dist >= r - P;
+      const isInkOutline = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
       if (isInkOutline) {
-        ctx.fillStyle = '#18181B';
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }
@@ -322,9 +324,14 @@ export function drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaw = false) {
       const normX = rx / r;
 
       // ── Outer Dark Manga Ink Shell ──
-      const isInkOutline = dist >= r - P;
+      const isInkOutline = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
       if (isInkOutline) {
-        ctx.fillStyle = '#090D16';
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }
@@ -563,115 +570,80 @@ function _drawDenjiForeheadChainsaw(ctx, r, now, opts = {}) {
 /**
  * Draws Denji's Left Arm / Left Forearm Chainsaw (Rule 20 Canonical Symmetrical Standard)
  * Rendered on the Front Layer at (-r * 0.82, +r * 0.38)
+ * In idle/neutral, this off-hand chainsaw slants forward-downward at a 42° angle (0.73 rad).
  */
-function _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, opts = {}) {
-  ctx.save();
+function _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPodiumPreview, now, opts = {}) {
+  const handRadius = getHandSize(r * 0.30);
   let armX = -r * 0.82;
   let armY = r * 0.38;
-  let sawAngle = 1.35; // Extending downwards alongside lower-left flank
+  let sawAngle = 0.73; // ~42° forward-downward slant matching diagram
 
-  if (isPunching || isSawing) {
-    const isLeftArmHit = (comboCycle % 2 === 1);
-    if (isLeftArmHit) {
-      const ext = Math.sin(animPhase * Math.PI) * (r * 1.0);
-      armX += ext * 1.2;
-      armY -= ext * 0.3;
-      sawAngle = 0.15; // Snaps forward during strike
-    }
+  if (isPunching) {
+    const ext = Math.sin((fighter.punchAnimTimer / (fighter.punchMaxTime || 14)) * Math.PI) * (r * 0.6);
+    armX += ext;
   } else if (isLunge) {
-    armX += r * 0.5;
-    sawAngle = 0.20;
+    armX += r * 0.4;
+    sawAngle = 0.40;
   }
 
   if (isHybrid) {
-    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, now, false, opts);
+    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, handRadius, now, false, opts);
   } else {
-    drawPixelHand(ctx, armX, armY, getHandSize(r * 0.30), '#FFE0BD', '#18181B');
+    drawPixelHand(ctx, armX, armY, handRadius, '#FFE0BD', '#18181B');
   }
-  ctx.restore();
 }
 
 /**
  * Draws Denji's Right Arm / Right Forearm Chainsaw (Rule 20 Canonical Symmetrical Standard)
  * Rendered on the Front Layer at (+r * 0.82, +r * 0.38)
+ * In idle/neutral, this lead chainsaw points straight forward towards the enemy (0.0 rad).
  */
-function _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, opts = {}) {
-  ctx.save();
+function _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPodiumPreview, now, opts = {}) {
+  const handRadius = getHandSize(r * 0.30);
   let armX = r * 0.82;
   let armY = r * 0.38;
-  let sawAngle = 1.35; // Extending downwards alongside lower-right flank
+  let sawAngle = 0.0; // Pointing forward towards the enemy (0.0 rad)
 
-  if (isPunching || isSawing) {
-    const isRightArmHit = (comboCycle % 2 === 0);
-    if (isRightArmHit) {
-      const ext = Math.sin(animPhase * Math.PI) * (r * 1.0);
-      armX += ext * 1.2;
-      armY -= ext * 0.3;
-      sawAngle = -0.10; // Snaps forward during strike
-    }
+  if (isPunching) {
+    const ext = Math.sin((fighter.punchAnimTimer / (fighter.punchMaxTime || 14)) * Math.PI) * (r * 0.8);
+    armX += ext;
   } else if (isLunge) {
-    armX += r * 0.6;
-    sawAngle = 0.15;
+    armX += r * 0.5;
+    sawAngle = 0.0;
   }
 
   if (isHybrid) {
-    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, now, true, opts);
+    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, handRadius, now, true, opts);
   } else {
-    drawPixelHand(ctx, armX, armY, getHandSize(r * 0.30), '#FFE0BD', '#18181B');
+    drawPixelHand(ctx, armX, armY, handRadius, '#FFE0BD', '#18181B');
   }
-  ctx.restore();
 }
 
 /**
  * Draws a forearm-mounted chainsaw blade bursting from Denji's arm in 2D Pixel Art
- * Authentic Chainsaw Man manga/anime edition (1:1 Match with Reference Picture 1 & 2):
- * - Torn white shirt cuff and bloody ruptured flesh emergence ring
- * - Tight, shaded combat fist tucked below the saw spine with detailed knuckles
- * - Solid pale steel silver guide bar with sharp triangular cutter teeth and arterial blood gore
+ * Adheres strictly to Rule 20 (drawPixelHand front-layer rendering over weapon base)
  */
-function _drawPixelForearmChainsaw(ctx, cx, cy, angle, now, isFront, opts = {}) {
-  const sawLen = 58; // Proportional forearm length
-  const sawThick = Math.round((sawLen * 369) / 1594); // ~13.4px
+function _drawPixelForearmChainsaw(ctx, cx, cy, angle, handRadius, now, isFront, opts = {}) {
+  const sawLen = 56; // Proportional forearm length
+  const sawThick = Math.round((sawLen * 369) / 1594); // ~13px
 
+  // 1. Draw chainsaw blade emerging from wrist/forearm
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
 
-  // ── 1. Torn Shirt Sleeve Cuff & Flesh Emergence Ring ──
+  // Compact sleeve cuff & flesh emergence ring at blade root
   ctx.fillStyle = '#090D16';
-  ctx.fillRect(-9, -sawThick / 2 - 3, 10, sawThick + 6);
+  ctx.fillRect(-3, -sawThick / 2 - 1, 4, sawThick + 2);
   ctx.fillStyle = '#FAF7F0';
-  ctx.fillRect(-8, -sawThick / 2 - 2, 8, sawThick + 4);
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(-8, -sawThick / 2 - 1, 3, sawThick + 2);
-  // Torn jagged cuff threads
-  ctx.fillStyle = '#E2E8F0';
-  ctx.fillRect(-2, -sawThick / 2 - 3, 3, 1.5);
-  ctx.fillRect(-1, sawThick / 2 + 1.5, 3, 1.5);
-
-  // Bloody ruptured flesh ring where blade bursts through forearm
-  ctx.fillStyle = '#7F1D1D';
-  ctx.fillRect(-3, -sawThick / 2 - 2, 5, sawThick + 4);
+  ctx.fillRect(-2, -sawThick / 2, 2, sawThick);
   ctx.fillStyle = '#DC2626';
-  ctx.fillRect(-2, -sawThick / 2 - 1, 4, sawThick + 2);
-  ctx.fillStyle = '#EF4444';
-  ctx.fillRect(-1, -1, 3, 2);
+  ctx.fillRect(0, -1, 3, 2);
 
-  // ── 2. Clenched Combat Fist (Tight, shaded, anatomically proportional) ──
-  const fistX = -3;
-  const fistY = (isFront ? 4.5 : -4.5);
-  ctx.fillStyle = '#090D16';
-  ctx.fillRect(fistX - 5, fistY - 4, 10, 8);
-  ctx.fillStyle = '#FFE0BD';
-  ctx.fillRect(fistX - 4, fistY - 3, 8, 6);
-  ctx.fillStyle = '#F3C99F';
-  ctx.fillRect(fistX - 2, fistY - 2, 5, 4);
-  ctx.fillStyle = '#D49B6A';
-  ctx.fillRect(fistX - 4, fistY, 3, 4);
-  ctx.fillRect(fistX + 2, fistY + 1, 2, 2);
-
-  // ── 3. Authentic Chainsaw Blade (1:1 with Reference Picture 1 & 2) ──
+  // Chainsaw Blade extending along +X
   drawAuthenticChainsawBlade(ctx, sawLen, sawThick, now, opts);
-
   ctx.restore();
+
+  // 2. LAYER 2: Rule 20 Circular Pixel Hand overlapping front layer over blade anchor
+  drawPixelHand(ctx, cx, cy, handRadius, '#FFE0BD', '#090D16');
 }

@@ -145,11 +145,18 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   }
 
   // ── 50% Damage Reduction when Adapted to Hollow Purple ──
-  const isPurpleHit = opts.isPurpleDPS || (opts.projectile && (opts.projectile.isGojoPurple || opts.projectile.isGojoPurpleOrb || opts.projectile.behaviorType === 'gojo_purple' || opts.projectile.skillShotId === 'purple')) || opts.isPurple;
+  const isPurpleHit = Boolean(
+    opts.isPurpleDPS || 
+    opts.isPurpleExplosion || 
+    (opts.projectile && (opts.projectile.isGojoPurple || opts.projectile.isGojoPurpleOrb || opts.projectile.behaviorType === 'gojo_purple' || opts.projectile.skillShotId === 'purple')) || 
+    opts.isPurple || 
+    opts.skillShotId === 'purple'
+  );
   const isPurpleAdapted = (fighter.gojoAdapted && fighter.gojoAdapted.purple) || 
                           (fighter.adaptedSkills && fighter.adaptedSkills['purple']) || 
                           (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#8A2BE2')) || 
-                          ((fighter.goldAdaptationStage?.skill || 0) >= 2);
+                          ((fighter.goldAdaptationStage?.skill || 0) >= 2) ||
+                          ((fighter.adaptationStage?.skill || 0) >= 2);
 
   if (isPurpleHit && isPurpleAdapted) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Purple!
@@ -208,6 +215,25 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   );
   if (isLawnmowerHit && isLawnmowerAdapted) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Lawnmower crush!
+  }
+
+  // ── 50% Damage Reduction when Adapted to Sukuna's Divine Flame (Fuga) ──
+  const isFugaHit = Boolean(opts.isDivineFlame || opts.isFuga || (opts.projectile && (opts.projectile.isSukunaFurnace || opts.projectile.skillShotId === 'divineFlame')) || (opts.skillShotId === 'divineFlame'));
+  const isFugaAdapted = Boolean(
+    (fighter.sukunaAdapted && fighter.sukunaAdapted.divineFlame) ||
+    (fighter.adaptedSkills && (fighter.adaptedSkills['divineFlame'] || fighter.adaptedSkills['fuga'])) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF6F00'))
+  );
+  if (isFugaHit && isFugaAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Fuga!
+  }
+
+  // ── 50% Damage Reduction for any General Adapted Skill Shot ──
+  const currentSkillShotId = opts.skillShotId || (opts.projectile && opts.projectile.skillShotId);
+  if (currentSkillShotId && fighter.adaptedSkills && fighter.adaptedSkills[currentSkillShotId]) {
+    if (!isRedHit && !isPurpleHit && !isPureLoveBeamHit && !isGenosBeamHit && !isGenosFlurryHit && !isFugaHit && !isLawnmowerHit && !opts.isSoulDisfigurement && !isSaitamaCounterHit) {
+      finalAmount *= 0.50;
+    }
   }
 
   // ── General Defense Buff per Wheel Click ──
@@ -677,8 +703,8 @@ export function applyGojoAdaptation(fighter, gojoType) {
   switch (gojoType) {
     case 'purple':
       adaptColor = '#8A2BE2';
-      fighter.gojoPurpleDodgeReady = true;
-      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: PURPLE TELEPORT DODGE!', '#8A2BE2');
+      fighter.gojoPurpleDodgeReady = false;
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: PURPLE RESISTANCE (50% REDUCED)!', '#8A2BE2');
       break;
     case 'red':
       adaptColor = '#FF1144';
@@ -695,6 +721,11 @@ export function applyGojoAdaptation(fighter, gojoType) {
     case 'infinity':
       adaptColor = '#00E5FF';
       fighter.gojoInfinityImmune = true;
+      fighter.infinityFreezeTimer = 0;
+      fighter.isFrozenByInfinity = false;
+      fighter._wasInfinityFrozenLastFrame = false;
+      fighter.timeStopTimer = 0;
+      fighter.adaptationPauseTimer = 0;
       spawnFloatingText(fighter.x, wheelY - 35, '⚡ ADAPTED: INFINITY BYPASS!', '#00E5FF');
       spawnFloatingText(fighter.x, wheelY - 52, '∞ Limitless no longer works on Mahoraga!', '#FFFFFF');
       break;
@@ -705,6 +736,7 @@ export function applyGojoAdaptation(fighter, gojoType) {
       fighter.gojoAdapted.domain = true;
       fighter.timeStopTimer = 0;
       fighter.hitStunTimer = 0;
+      fighter.adaptationPauseTimer = 0;
       spawnFloatingText(fighter.x, wheelY - 35, '⚡ ADAPTED: UNLIMITED VOID IMMUNITY!', '#00E5FF');
       spawnFloatingText(fighter.x, wheelY - 52, '🌌 Mahoraga moves freely inside Domain!', '#FFFFFF');
       break;
@@ -736,6 +768,7 @@ export function handleInfinityFreeze(fighter) {
     fighter.infinityFreezeTimer = 0;
     fighter.isFrozenByInfinity = false;
     fighter._wasInfinityFrozenLastFrame = false;
+    fighter.timeStopTimer = 0;
     return false; // Adapted — NOT frozen!
   }
 
@@ -800,8 +833,8 @@ export function applySukunaAdaptation(fighter, sukunaType) {
   switch (sukunaType) {
     case 'divineFlame':
       adaptColor = '#FF6F00'; // Orange
-      fighter.sukunaFugaDodgeReady = true;
-      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: FUGA TELEPORT DODGE!', '#FF6F00');
+      fighter.sukunaFugaDodgeReady = false;
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: FUGA RESISTANCE (50% REDUCED)!', '#FF6F00');
       break;
   }
 
@@ -837,14 +870,15 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   if (fighter.adaptedSkills[skillShotId]) return;
 
   fighter.adaptedSkills[skillShotId] = true;
-  if (skillShotId !== 'getsugaTensho' && skillShotId !== 'getsuga' && skillShotId !== 'crazyDaveSnowPea' && skillShotId !== 'lawnmower' && skillShotId !== 'crazydave_lawnmower') {
-    fighter.skillDodgeReady[skillShotId] = true;
-  }
+  fighter.skillDodgeReady[skillShotId] = false;
 
   // Track specific old variables for backwards compatibility
   if (skillShotId === 'purple') {
     fighter.gojoAdapted.purple = true;
-    fighter.gojoPurpleDodgeReady = true;
+    fighter.gojoPurpleDodgeReady = false;
+  }
+  if (skillShotId === 'divineFlame') {
+    fighter.sukunaFugaDodgeReady = false;
   }
   if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
     fighter.adaptedGetsuga = true;
@@ -954,7 +988,7 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Immune to Soul Disfigurement debuffs!', '#FFFFFF');
   } else {
     const displayName = skillShotId.toUpperCase().replace('_', ' ');
-    spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} DODGE!`, color);
+    spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} RESISTANCE (50% REDUCED)!`, color);
   }
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');

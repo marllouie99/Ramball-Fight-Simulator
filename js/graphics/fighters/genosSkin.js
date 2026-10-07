@@ -211,37 +211,26 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
 
       // 4-neighbor attached border test (Rule #35 & Saitama standard)
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#0D1117'; // Dark manga ink border
+        ctx.fillStyle = '#0E0F14'; // Dark manga ink border
         ctx.fillRect(px, py, P, P);
         continue;
       }
 
-      // Zone 1: Face, Neck & Under-Hair Base (ry < r * 0.20)
-      if (ry < r * 0.20) {
-        // Crown under-hair base (in case hair asset is loading/transparent)
-        if (ry < -r * 0.35) {
-          if (ry < -r * 0.55 && (Math.abs(rx - r * 0.35) < r * 0.12 || Math.abs(rx + r * 0.35) < r * 0.12)) {
-            ctx.fillStyle = '#FAF0BE';
-          } else {
-            ctx.fillStyle = '#E5CC82';
-          }
+      // Zone 1: Pure Face & Neck Dome (ry < r * 0.30)
+      if (ry < r * 0.30) {
+        let skinCol = '#FEDBC0'; // Anime fair skin base
+        if (ry < -r * 0.40) {
+          skinCol = '#FFF0E2'; // Center forehead highlight
+        } else if (Math.abs(rx) > r * 0.65) {
+          skinCol = '#E9B796'; // Side cheek shadow
+        } else if (ry > r * 0.12) {
+          skinCol = '#F2C6A7'; // Lower neck shadow
         }
-        // Forehead, Face & Neck Skin Zone
-        else {
-          let skinCol = '#FEDBC0'; // Anime fair skin base
-          if (Math.abs(rx) > r * 0.65) {
-            skinCol = '#E9B796'; // Side cheek / jaw shadow
-          } else if (ry > r * 0.08) {
-            skinCol = '#F2C6A7'; // Lower neck shadow
-          } else if (Math.abs(rx) < r * 0.30 && ry < 0) {
-            skinCol = '#FFF0E2'; // Center face / forehead highlight
-          }
-          ctx.fillStyle = skinCol;
-        }
+        ctx.fillStyle = skinCol;
         ctx.fillRect(px, py, P, P);
       }
-      // Zone 2: Tactical Vest, Shoulders, Collar, & Chest Core (r * 0.20 <= ry < r * 0.62)
-      else if (ry < r * 0.62) {
+      // Zone 2: Tactical Vest, Shoulders, Collar, & Chest Core (r * 0.30 <= ry < r * 0.68)
+      else if (ry < r * 0.68) {
         const coreDist = Math.hypot(rx, ry - coreY);
 
         // B1. Central Glowing Energy Core
@@ -255,45 +244,45 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
           }
         }
         // B2. Metallic Silver Cybernetic Shoulders (left & right)
-        else if (Math.abs(rx) > r * 0.54 && Math.abs(ry - (r * 0.34)) < r * 0.28) {
+        else if (Math.abs(rx) > r * 0.54 && Math.abs(ry - (r * 0.38)) < r * 0.26) {
           const shoulderCX = rx > 0 ? r * 0.72 : -r * 0.72;
-          const sDist = Math.hypot((rx - shoulderCX) * 1.2, ry - (r * 0.34));
+          const sDist = Math.hypot((rx - shoulderCX) * 1.2, ry - (r * 0.38));
           if (sDist <= r * 0.08) {
             ctx.fillStyle = '#E6ECF2'; // Joint bolt glint
           } else if (sDist <= r * 0.16) {
             ctx.fillStyle = '#22262E'; // Bolt core
           } else {
-            ctx.fillStyle = (ry < r * 0.30) ? '#D8E2EC' : '#A8B4C0'; // Metallic shoulder plate
+            ctx.fillStyle = (ry < r * 0.34) ? '#D8E2EC' : '#A8B4C0'; // Metallic shoulder plate
           }
         }
         // B3. V-Neck Metallic Collar Trim
-        else if (Math.abs(ry - (r * 0.20 + Math.abs(rx) * 0.28)) < P * 0.9 && Math.abs(rx) <= r * 0.32 && ry <= r * 0.30) {
+        else if (Math.abs(ry - (r * 0.30 + Math.abs(rx) * 0.24)) < P * 0.9 && Math.abs(rx) <= r * 0.32 && ry <= r * 0.40) {
           ctx.fillStyle = '#B0B8C2'; // Metallic collar trim
         }
         // B4. Armor Panel Seam Lines
-        else if (Math.abs(Math.abs(rx) - r * 0.40) < P * 0.6 && ry >= r * 0.28) {
-          ctx.fillStyle = '#101217'; // Seam line
+        else if (Math.abs(Math.abs(rx) - r * 0.40) < P * 0.6 && ry >= r * 0.36) {
+          ctx.fillStyle = '#181C24'; // Seam line
         }
         // B5. Tactical Vest Body
         else {
-          let vestCol = '#1A1D24';
-          if (Math.abs(rx) < r * 0.35 && ry < r * 0.38) {
-            vestCol = '#22262F'; // Chest fabric highlight
-          } else if (Math.abs(rx) > r * 0.50 || ry > r * 0.52) {
-            vestCol = '#13151A'; // Vest shadow
+          let vestCol = '#222630';
+          if (Math.abs(rx) < r * 0.35 && ry < r * 0.44) {
+            vestCol = '#2A303D'; // Chest fabric highlight
+          } else if (Math.abs(rx) > r * 0.50 || ry > r * 0.58) {
+            vestCol = '#1A1E26'; // Vest shadow
           }
           ctx.fillStyle = vestCol;
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone 3: Tactical Belt & Gold Buckle (r * 0.62 <= ry < r * 0.76)
-      else if (ry < r * 0.76) {
+      // Zone 3: Tactical Belt & Gold Buckle (r * 0.68 <= ry < r * 0.78)
+      else if (ry < r * 0.78) {
         // Golden Buckle at center
         const isBuckle = (Math.abs(rx) <= r * 0.26);
         if (isBuckle) {
-          if (Math.abs(rx) <= r * 0.10 && Math.abs(ry - r * 0.69) <= r * 0.04) {
+          if (Math.abs(rx) <= r * 0.10 && Math.abs(ry - r * 0.73) <= r * 0.04) {
             ctx.fillStyle = '#241D09'; // Buckle inner slot notch
-          } else if (rx < -P && ry < r * 0.69) {
+          } else if (rx < -P && ry < r * 0.73) {
             ctx.fillStyle = '#FFF2A8'; // Metallic buckle glint
           } else {
             ctx.fillStyle = '#D4AF37'; // Gold buckle plate
@@ -301,19 +290,19 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
         } else if (Math.abs(Math.abs(rx) - r * 0.37) < P * 0.8) {
           ctx.fillStyle = '#A0AAB5'; // Silver belt loop
         } else {
-          ctx.fillStyle = (ry < r * 0.69) ? '#1A1D24' : '#101216'; // Belt strap
+          ctx.fillStyle = (ry < r * 0.73) ? '#262A36' : '#1C202A'; // Belt strap
         }
         ctx.fillRect(px, py, P, P);
       }
-      // Zone 4: Black Combat Pants (ry >= r * 0.76)
+      // Zone 4: Black Combat Pants (ry >= r * 0.78)
       else {
         // Center fly seam line
-        if (Math.abs(rx) < P * 0.6 && ry <= r * 0.92) {
-          ctx.fillStyle = '#2A2E38'; // Pants seam line
-        } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.88) {
-          ctx.fillStyle = '#0E1013'; // Pants shadow
+        if (Math.abs(rx) < P * 0.6 && ry <= r * 0.94) {
+          ctx.fillStyle = '#323846'; // Pants seam line
+        } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.90) {
+          ctx.fillStyle = '#1A1E26'; // Pants shadow
         } else {
-          ctx.fillStyle = '#16181C'; // Black combat pants body
+          ctx.fillStyle = '#242834'; // Combat pants body (Y >= 24)
         }
         ctx.fillRect(px, py, P, P);
       }

@@ -367,16 +367,15 @@ let _cachedGojoCanvas = null;
 let _cachedGojoR = 0;
 
 function _renderGojoPixelBodyToCanvas(destCtx, r) {
+  destCtx.save();
   destCtx.imageSmoothingEnabled = false;
+  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
   const P = 2.0;
   const steps = Math.ceil((r + P) / P);
 
-  // Palette Colors matching 1:1 Reference
+  // Palette Colors matching 1:1 Reference & Toji Standard
   const C = {
     outline: '#0E0F14',        // Deep dark pixel border
-    hairWhite: '#FFFFFF',      // Pure white hair core
-    hairBlue: '#CAD6E8',       // Light ice-blue hair partition line
-    hairShadow: '#8D9EB5',     // Corner hair shadow dither
 
     skinBase: '#FEDBC0',       // Warm fair skin
     skinHighlight: '#FFF0E2',  // Soft center forehead/face highlight
@@ -389,12 +388,6 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
     uniformZipper: '#120F1C',  // Central covered zipper placket
     uniformDither: '#181326'   // Bottom perimeter shadow
   };
-
-  const cx = destCtx.canvas.width / 2;
-  const cy = destCtx.canvas.height / 2;
-
-  destCtx.save();
-  destCtx.translate(cx, cy);
 
   // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
@@ -427,27 +420,10 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
       const absX = Math.abs(nx);
 
       // ──────────────────────────────────────────
-      // ZONE A: WHITE HAIR & ICE-BLUE STRANDS (ny < -0.28)
+      // ZONE 1: WARM FAIR SKIN FACE & CHEEKS (UNMASKED / NO BLINDFOLD) (ny < 0.30)
+      // Pure unbroken skin face dome matching Toji / Makima Standard (All Hair is on Layer 2)
       // ──────────────────────────────────────────
-      if (ny < -0.28) {
-        let col = C.hairWhite;
-        if (absX >= 0.55) {
-          const dLevel = (absX - 0.55) / 0.45;
-          if (dLevel > 0.5) {
-            col = ((gx + gy) % 2 === 0) ? C.hairBlue : C.hairShadow;
-          } else if ((gx + gy) % 3 === 0) {
-            col = C.hairBlue;
-          }
-        } else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
-          col = C.hairBlue;
-        }
-        destCtx.fillStyle = col;
-        destCtx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE B: WARM FAIR SKIN FACE & CHEEKS (UNMASKED / NO BLINDFOLD) (-0.28 <= ny < 0.30)
-      // ──────────────────────────────────────────
-      else if (ny < 0.30) {
+      if (ny < 0.30) {
         let col = C.skinBase;
         if (absX >= 0.55) {
           const dLevel = (absX - 0.55) / 0.45;
@@ -456,7 +432,7 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
           } else if ((gx + gy) % 2 === 0) {
             col = C.skinShadow1;
           }
-        } else if (absX < 0.35 && ny > -0.15 && ny < 0.10) {
+        } else if (absX < 0.35 && ny > -0.25 && ny < 0.10) {
           if ((gx + gy) % 4 === 0) {
             col = C.skinHighlight;
           }
@@ -465,7 +441,7 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE C: JUJUTSU HIGH UNIFORM (ny >= 0.30)
+      // ZONE 2: JUJUTSU HIGH UNIFORM (ny >= 0.30)
       // ──────────────────────────────────────────
       else {
         const isZipper = (absX <= 0.07);
@@ -513,20 +489,27 @@ function _renderGojoPixelBodyToCanvas(destCtx, r) {
  * Authentic 1:1 Procedural Pixel Art Body for Gojo Satoru (High Performance Offscreen Cached)
  */
 export function drawGojoPixelBody(ctx, r) {
-  if (!_cachedGojoCanvas || _cachedGojoR !== r) {
-    _cachedGojoR = r;
+  if (typeof document === 'undefined') {
+    _renderGojoPixelBodyToCanvas(ctx, r);
+    return;
+  }
+
+  const intR = Math.round(r);
+  if (!_cachedGojoCanvas || _cachedGojoR !== intR) {
+    _cachedGojoR = intR;
     const P = 2.0;
-    const steps = Math.ceil((r + P) / P);
+    const steps = Math.ceil((intR + P) / P);
     const size = (steps * 2 + 1) * P;
     _cachedGojoCanvas = document.createElement('canvas');
     _cachedGojoCanvas.width = size;
     _cachedGojoCanvas.height = size;
     const offCtx = _cachedGojoCanvas.getContext('2d');
-    _renderGojoPixelBodyToCanvas(offCtx, r);
+    _renderGojoPixelBodyToCanvas(offCtx, intR);
   }
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(_cachedGojoCanvas, -_cachedGojoCanvas.width / 2, -_cachedGojoCanvas.height / 2);
+  const size = _cachedGojoCanvas.width;
+  ctx.drawImage(_cachedGojoCanvas, -size / 2, -size / 2);
   ctx.restore();
 }

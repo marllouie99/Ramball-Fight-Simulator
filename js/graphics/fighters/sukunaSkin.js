@@ -1,42 +1,38 @@
 // Offscreen canvas cache for Sukuna's pixel body model (avoids 1,000 fillRect calls per frame)
 let _cachedSukunaCanvas = null;
 let _cachedSukunaR = 0;
-let _cachedSukunaColor = '';
 
-function _renderSukunaPixelBodyToCanvas(destCtx, r, crimsonBase) {
+function _renderSukunaPixelBodyToCanvas(destCtx, r) {
+  destCtx.save();
   destCtx.imageSmoothingEnabled = false;
+  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
   const P = 2.0;
   const steps = Math.ceil((r + P) / P);
 
-  // Palette Colors for Ryomen Sukuna (Crimson Face + Traditional Kimono)
+  // Palette Colors for Ryomen Sukuna (Crimson Cursed Ink Face + Traditional Kimono)
   const C = {
-    outline: '#0E0F14',        // Deep dark pixel border
+    outline: '#0E0F14',        // Deep dark manga ink pixel border
     tattooBlack: '#0E0F14',    // Deep high-contrast cursed ink tattoo
 
-    skinBase: '#FEDBC0',       // Warm fair skin (matches Gojo)
+    skinBase: '#FEDBC0',       // Warm fair skin (1:1 with Gojo & Toji)
     skinHighlight: '#FFF0E2',  // Soft center forehead/face highlight
     skinShadow1: '#E9B796',    // Light cheek shadow dither
     skinShadow2: '#D89F7C',    // Deep cheek shadow dither
 
-    // Traditional Kimono Outfit
-    cowlBase: '#1E1B24',       // Dark charcoal cowl/scarf
-    cowlLight: '#2C2836',      // Cowl fold subtle highlight
+    // Traditional Kimono Outfit (Ensuring Y >= 24 luminance so fabrics never merge into #0E0F14 outer stroke)
+    cowlBase: '#262230',       // Dark charcoal cowl/scarf
+    cowlLight: '#3A3448',      // Cowl fold subtle highlight
+    cowlCrease: '#181520',     // Cowl fold crease
     kimonoBase: '#DCD8D0',     // Light off-white kimono
     kimonoLight: '#EBE8E2',    // Kimono bright highlight
     kimonoShadow: '#B8B4AC',   // Kimono crease shadow
     kimonoDark: '#A09C94',     // Kimono perimeter dither
-    lapelNavy: '#302D52',      // Dark navy collar/lapel
-    lapelEdge: '#1A1830',      // Lapel dark outline edge
-    obiBase: '#2C2842',        // Obi belt dark base
+    lapelNavy: '#38345C',      // Dark navy collar/lapel
+    lapelEdge: '#201E34',      // Lapel dark outline edge
+    obiBase: '#2E2A44',        // Obi belt dark base
     obiPattern: '#8C8780',     // Obi geometric pattern accent
     obiEdge: '#1C1828',        // Obi border line
   };
-
-  const cx = destCtx.canvas.width / 2;
-  const cy = destCtx.canvas.height / 2;
-
-  destCtx.save();
-  destCtx.translate(cx, cy);
 
   // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
   for (let gy = -steps; gy <= steps; gy++) {
@@ -64,100 +60,107 @@ function _renderSukunaPixelBodyToCanvas(destCtx, r, crimsonBase) {
         continue;
       }
 
-      // ──────────────────────────────────────────
-      // EXACT CANONICAL SUKUNA TATTOO MARKINGS (DISCRETE PIXEL GRID)
-      // ──────────────────────────────────────────
-      let isTattoo = false;
-
-      // ── A. FOREHEAD TRIDENT & CENTRAL DROPLET ──
-      if (absGx === 0 && (gy === -9 || gy === -8 || gy === -7)) {
-        isTattoo = true;
-      } else if (absGx === 4 && (gy === -10 || gy === -9 || gy === -8)) {
-        isTattoo = true;
-      } else if (gy === -7 && absGx === 3) {
-        isTattoo = true;
-      } else if (gy === -6 && (absGx === 2 || absGx === 3 || absGx === 4)) {
-        isTattoo = true;
-      } else if ((gy === -5 && absGx === 4) || (gy === -4 && absGx === 5)) {
-        isTattoo = true;
-      } else if (absGx === 2 && (gy === -5 || gy === -4 || gy === -3)) {
-        isTattoo = true;
-      }
-      // ── B. NOSE / BROW WAVE ARCH ──
-      else if (gy === -2 && absGx <= 1) {
-        isTattoo = true;
-      } else if (gy === -1 && absGx === 2) {
-        isTattoo = true;
-      } else if (gy === 0 && absGx === 3) {
-        isTattoo = true;
-      }
-      // ── C. CHEEK FORKS, JAWLINE & CHIN ──
-      else if ((gy === -3 && absGx === 10) || (gy === -2 && absGx === 9)) {
-        isTattoo = true;
-      } else if ((gy === -2 && absGx === 7) || (gy === -1 && absGx === 8)) {
-        isTattoo = true;
-      } else if (absGx === 9 && (gy === 0 || gy === 1)) {
-        isTattoo = true;
-      } else if ((gy === 2 && absGx === 8) || (gy === 3 && absGx === 8) || (gy === 4 && absGx === 7)) {
-        isTattoo = true;
-      } else if ((gy === 5 && absGx === 6) || (gy === 6 && absGx === 5) || (gy === 7 && absGx === 4)) {
-        isTattoo = true;
-      } else if (gy === 8 && absGx === 5) {
-        isTattoo = true;
-      } else if (gy === 8 && absGx === 3) {
-        isTattoo = true;
-      } else if ((gy === 9 && absGx === 4) || (gy === 10 && absGx === 3)) {
-        isTattoo = true;
-      } else if (absGx === 1 && (gy === 9 || gy === 10)) {
-        isTattoo = true;
-      }
-
-      // ──────────────────────────────────────────
-      // 2. PIXEL RENDER: ZONED (CRIMSON FACE + KIMONO OUTFIT)
-      // ──────────────────────────────────────────
       const ny = ry / r;
       const nx = rx / r;
       const absNx = Math.abs(nx);
 
-      if (ny >= 0.20) {
-        // ── CLOTHING ZONE: Traditional Kimono Outfit ──
+      // ──────────────────────────────────────────
+      // ZONE 1: WARM ATHLETIC SKIN FACE & CANONICAL CURSED TATTOOS (ny < 0.30)
+      // Pure unbroken circular dome (All hair on Layer 2)
+      // Tattoos are strictly bounded within the interior so they never merge into the outer stroke
+      // ──────────────────────────────────────────
+      if (ny < 0.33) {
+        let isTattoo = false;
+
+        // A. Forehead Trident & Central Markings (safely inside forehead)
+        if (absGx === 0 && (gy === -8 || gy === -7 || gy === -6)) {
+          isTattoo = true;
+        } else if (absGx === 3 && (gy === -8 || gy === -7)) {
+          isTattoo = true;
+        } else if (gy === -6 && (absGx === 1 || absGx === 2 || absGx === 3)) {
+          isTattoo = true;
+        } else if (absGx === 2 && (gy === -5 || gy === -4)) {
+          isTattoo = true;
+        }
+        // B. Nose / Brow Wave Arch (Horizontally aligned with upper cheek fork)
+        else if (gy === -2 && absGx <= 1) {
+          isTattoo = true; // Top horizontal bridge
+        } else if (gy === -1 && absGx === 2) {
+          isTattoo = true; // Left/right diagonal legs
+        }
+        // C. Cheek Markings (Full-length long vertical cheek strokes aligned with nose arch)
+        else if (gy === -3 && (absGx === 9 || absGx === 10)) {
+          isTattoo = true; // Upper temple fork
+        } else if (gy === -2 && (absGx === 8 || absGx === 9)) {
+          isTattoo = true; // Upper cheek notch (aligned with nose arch)
+        } else if ((gy === -1 || gy === 0 || gy === 1 || gy === 2) && absGx === 8) {
+          isTattoo = true; // Long vertical cheek stroke
+        } else if (gy === 3 && (absGx === 7 || absGx === 8)) {
+          isTattoo = true; // Lower jaw curve
+        } else if (gy === 4 && (absGx === 6 || absGx === 7)) {
+          isTattoo = true; // Bottom jawline tip
+        }
+        // D. Chin Markings
+        else if (absGx === 1 && gy === 4) {
+          isTattoo = true;
+        }
+
+        if (isTattoo) {
+          destCtx.fillStyle = C.tattooBlack;
+        } else {
+          let col = C.skinBase;
+          if (absNx >= 0.55) {
+            const dLevel = (absNx - 0.55) / 0.45;
+            if (dLevel > 0.6) {
+              col = ((gx + gy) % 2 === 0) ? C.skinShadow2 : C.skinShadow1;
+            } else if ((gx + gy) % 2 === 0) {
+              col = C.skinShadow1;
+            }
+          } else if (absNx < 0.35 && ny > -0.25 && ny < 0.10) {
+            if ((gx + gy) % 4 === 0) {
+              col = C.skinHighlight;
+            }
+          }
+          destCtx.fillStyle = col;
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2 & 3: TRADITIONAL KIMONO OUTFIT & COWL (ny >= 0.30)
+      // ──────────────────────────────────────────
+      else {
         let col;
 
-        if (ny < 0.42) {
-          // Thick Puffy Dark Cowl / Scarf (large, wrapping around neck)
+        if (ny < 0.48) {
+          // Thick Puffy Dark Cowl / Scarf (wrapping around neck)
           col = C.cowlBase;
-          // Upper cowl highlight folds (subtle fabric texture)
-          if (ny < 0.28 && absNx < 0.45) col = C.cowlLight;
+          // Upper cowl highlight folds
+          if (ny < 0.36 && absNx < 0.50) col = C.cowlLight;
           // Mid cowl crease fold
-          if (ny >= 0.30 && ny < 0.33 && absNx < 0.50) col = '#151220';
+          if (ny >= 0.38 && ny < 0.41 && absNx < 0.55) col = C.cowlCrease;
           // Lower cowl highlight fold
-          if (ny >= 0.34 && ny < 0.37 && absNx < 0.42) col = C.cowlLight;
-          // Bottom cowl border crease edge
-          if (ny >= 0.40) col = C.outline;
+          if (ny >= 0.42 && ny < 0.45 && absNx < 0.48) col = C.cowlLight;
         } else {
           // Kimono Body (light/white robe)
           col = C.kimonoBase;
 
           // Single diagonal navy sash/collar band going from upper-left to lower-right
-          const sashCenter = (ny - 0.42) * 1.4 - 0.18;
+          const sashCenter = (ny - 0.48) * 1.3 - 0.15;
           const sashDist = Math.abs(nx - sashCenter);
-          if (sashDist < 0.10) {
+          if (sashDist < 0.11) {
             col = C.lapelNavy;
-            // Dark edge outline on sash borders
-            if (sashDist > 0.07) col = C.lapelEdge;
+            if (sashDist > 0.08) col = C.lapelEdge;
           }
 
-          // Obi belt band
-          if (ny >= 0.62 && ny < 0.76) {
+          // Obi belt band (ny >= 0.66 && ny < 0.78)
+          if (ny >= 0.66 && ny < 0.78) {
             col = C.obiBase;
-            // Geometric triangle-like pattern
-            if (ny >= 0.64 && ny < 0.74 && (absGx + gy) % 3 === 0) col = C.obiPattern;
-            // Top/bottom obi border edges
-            if (ny < 0.64 || ny >= 0.74) col = C.obiEdge;
+            if (ny >= 0.68 && ny < 0.76 && (absGx + gy) % 3 === 0) col = C.obiPattern;
+            if (ny < 0.68 || ny >= 0.76) col = C.obiEdge;
           }
 
           // Kimono fold crease
-          if (Math.abs(ny - 0.52) < 0.02 && absNx > 0.20 && absNx < 0.55) {
+          if (Math.abs(ny - 0.56) < 0.02 && absNx > 0.20 && absNx < 0.55) {
             col = C.kimonoShadow;
           }
 
@@ -168,24 +171,8 @@ function _renderSukunaPixelBodyToCanvas(destCtx, r, crimsonBase) {
         }
 
         destCtx.fillStyle = col;
-      } else if (isTattoo) {
-        // ── FACE ZONE: Cursed Ink Tattoo ──
-        destCtx.fillStyle = C.tattooBlack;
-      } else {
-        // ── FACE ZONE: Volumetric Crimson Flesh ──
-        let col = C.skinBase;
-        if (gy < -5 && absGx < 6) {
-          col = C.skinHighlight;
-        } else if (gy >= -2 && gy <= 4 && absGx < 4) {
-          col = C.skinHighlight;
-        } else if (absGx >= 9 || gy > 9 || gy < -9) {
-          col = C.skinShadow2;
-        } else if (absGx >= 7 || gy >= 7) {
-          col = C.skinShadow1;
-        }
-        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
       }
-      destCtx.fillRect(px, py, P, P);
     }
   }
 
@@ -196,24 +183,28 @@ function _renderSukunaPixelBodyToCanvas(destCtx, r, crimsonBase) {
  * Authentic 1:1 Procedural Pixel Art Body for Ryomen Sukuna (High Performance Offscreen Cached)
  */
 export function drawSukunaPixelBody(ctx, r, fighter = null) {
-  const crimsonBase = (fighter && fighter.color) ? fighter.color : '#8B0000';
+  if (typeof document === 'undefined') {
+    _renderSukunaPixelBodyToCanvas(ctx, r);
+    return;
+  }
 
-  if (!_cachedSukunaCanvas || _cachedSukunaR !== r || _cachedSukunaColor !== crimsonBase) {
-    _cachedSukunaR = r;
-    _cachedSukunaColor = crimsonBase;
+  const intR = Math.round(r);
+  if (!_cachedSukunaCanvas || _cachedSukunaR !== intR) {
+    _cachedSukunaR = intR;
     const P = 2.0;
-    const steps = Math.ceil((r + P) / P);
+    const steps = Math.ceil((intR + P) / P);
     const size = (steps * 2 + 1) * P;
     _cachedSukunaCanvas = document.createElement('canvas');
     _cachedSukunaCanvas.width = size;
     _cachedSukunaCanvas.height = size;
     const offCtx = _cachedSukunaCanvas.getContext('2d');
-    _renderSukunaPixelBodyToCanvas(offCtx, r, crimsonBase);
+    _renderSukunaPixelBodyToCanvas(offCtx, intR);
   }
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(_cachedSukunaCanvas, -_cachedSukunaCanvas.width / 2, -_cachedSukunaCanvas.height / 2);
+  const size = _cachedSukunaCanvas.width;
+  ctx.drawImage(_cachedSukunaCanvas, -size / 2, -size / 2);
   ctx.restore();
 }
 
@@ -269,15 +260,15 @@ export function _drawSukunaHair(ctx, r, facingLeft = false) {
     // Sukuna-hair.png (1254x1254). True visible hair bounding box:
     // X: [164, 1088] (width 925, horizontal center at 626)
     // Y: [226, 974] (height 749, top crown at 226)
-    // Scales with increased volume and length to match Gojo's spiky hair scale size
-    const targetHairWidth = r * 2.90 * wMult;
-    const targetHairHeight = r * 2.25 * hMult;
+    // Scales to frame upper head circle with spiky crown at -1.40r
+    const targetHairWidth = r * 3.10 * wMult;
+    const targetHairHeight = r * 2.00 * hMult;
     const scaleX = targetHairWidth / 925;
     const scaleY = targetHairHeight / 749;
     const drawW = 1254 * scaleX;
     const drawH = 1254 * scaleY;
     const drawX = -626 * scaleX + offX;
-    const drawY = -r * 1.70 - 226 * scaleY + offY;
+    const drawY = -r * 1.40 - 226 * scaleY + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);

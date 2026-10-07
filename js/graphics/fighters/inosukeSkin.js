@@ -86,10 +86,16 @@ export function drawInosukePixelBody(ctx, r) {
       const normY = ry / r;
       const normX = rx / r;
 
-      // ── 1. Stepped Outer Dark Manga Ink Shell ──
-      const isOutline = dist >= r - P;
+      // ── 1. Stepped Outer Dark Manga Ink Shell (4-Neighbor Attached Test) ──
+      const isOutline = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
+
       if (isOutline) {
-        ctx.fillStyle = '#18181B';
+        ctx.fillStyle = '#0E0F14';
         ctx.fillRect(px, py, P, P);
         continue;
       }
@@ -112,7 +118,7 @@ export function drawInosukePixelBody(ctx, r) {
         const isNostril = (gy === -1 && (gx === -2 || gx === 2));
 
         if (isNostril) {
-          ctx.fillStyle = '#18181B'; // Boar nostril
+          ctx.fillStyle = '#0E0F14'; // Boar nostril
           ctx.fillRect(px, py, P, P);
           continue;
         } else if (isSnout) {
@@ -160,7 +166,7 @@ export function drawInosukePixelBody(ctx, r) {
 
       // ── 5. DARK NAVY HAKAMA TROUSERS (normY: 0.72 to 1.00) ──
       const isPleatLine = (Math.abs(gx) === 3 || gx === 0);
-      ctx.fillStyle = isPleatLine ? '#0F172A' : '#1E293B'; // Deep indigo navy trousers
+      ctx.fillStyle = isPleatLine ? '#182030' : '#263044'; // Deep indigo navy trousers (Y >= 24)
       ctx.fillRect(px, py, P, P);
     }
   }

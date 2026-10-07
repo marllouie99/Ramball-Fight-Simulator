@@ -69,7 +69,7 @@ function _renderDoppelgangerPixelBodyToCanvas(destCtx, r) {
       );
 
       if (isBorder) {
-        destCtx.fillStyle = '#0a0314'; // Deepest midnight void ink outline
+        destCtx.fillStyle = '#0E0F14'; // Standard manga ink outline shell
         destCtx.fillRect(px, py, P, P);
         continue;
       }

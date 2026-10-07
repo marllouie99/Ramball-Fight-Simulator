@@ -28,7 +28,84 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "DENJI",
+        "deltas": [
+            {
+                "type": "NERF",
+                "key": "sawHitKnockback",
+                "oldVal": 24,
+                "newVal": 6,
+                "pct": "-75.0%"
+            },
+            {
+                "type": "ADJUST",
+                "key": "enableEngineLunge",
+                "oldVal": "true",
+                "newVal": "0",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "enableBloodCleave",
+                "oldVal": "true",
+                "newVal": "0",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "enableMassacreEngine",
+                "oldVal": "true",
+                "newVal": "0",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "GOJO",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "redDamage",
+                "oldVal": 200,
+                "newVal": 250,
+                "pct": "+25.0%"
+            }
+        ]
+    },
+    {
+        "character": "SANS",
+        "deltas": [
+            {
+                "type": "NERF",
+                "key": "dodgeStaminaMax",
+                "oldVal": 200,
+                "newVal": 100,
+                "pct": "-50.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "dodgeStaminaRegenDelay",
+                "oldVal": 10,
+                "newVal": 20,
+                "pct": "+100.0%"
+            }
+        ]
+    },
+    {
+        "character": "TOJI",
+        "deltas": [
+            {
+                "type": "NERF",
+                "key": "spearCooldown",
+                "oldVal": 10,
+                "newVal": 50,
+                "pct": "+400.0%"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

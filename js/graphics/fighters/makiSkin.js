@@ -63,18 +63,18 @@ export function _drawMakiHair(ctx, r, facingLeft = false) {
     const flipX = custom.flipX ? -1 : 1;
     const flipY = custom.flipY ? -1 : 1;
 
-    // Maki-hair.png (1024x1024). True visible hair bounding box:
-    // X: [71, 952] (width 882, horizontal center at 511.5)
-    // Y: [92, 900] (height 809, top crown at 92)
-    // Calibrated to seamlessly frame the upper circle with spiky crown at -1.40r
-    const targetHairWidth = r * 2.85 * wMult;
-    const targetHairHeight = r * 2.20 * hMult;
-    const scaleX = targetHairWidth / 882;
-    const scaleY = targetHairHeight / 809;
-    const drawW = 1024 * scaleX;
+    // Maki-hair.png (1536x1024). True visible hair bounding box:
+    // X: [384, 1176] (visible width 792, horizontal center at 780)
+    // Y: [135, 891] (visible height 756, top crown at 135)
+    // Calibrated 1:1 with Gojo's full anime hair volume (targetHairWidth: 3.10r, crown apex: -1.42r)
+    const targetHairWidth = r * 3.10 * wMult;
+    const targetHairHeight = r * 1.95 * hMult;
+    const scaleX = targetHairWidth / 792;
+    const scaleY = targetHairHeight / 756;
+    const drawW = 1536 * scaleX;
     const drawH = 1024 * scaleY;
-    const drawX = -511.5 * scaleX + offX;
-    const drawY = -r * 1.40 - 92 * scaleY + offY;
+    const drawX = -780 * scaleX + offX;
+    const drawY = -r * 1.42 - 135 * scaleY + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
@@ -98,11 +98,11 @@ function _drawProceduralMakiHair(ctx, r) {
   ctx.fillStyle = '#111216';
   // Spiky crown locks
   const locks = [
-    { x: 0, y: -r * 1.38, w: r * 0.45, h: r * 0.60 },
-    { x: -r * 0.50, y: -r * 1.25, w: r * 0.40, h: r * 0.55 },
-    { x: r * 0.50, y: -r * 1.25, w: r * 0.40, h: r * 0.55 },
-    { x: -r * 0.90, y: -r * 0.95, w: r * 0.35, h: r * 0.70 },
-    { x: r * 0.90, y: -r * 0.95, w: r * 0.35, h: r * 0.70 },
+    { x: 0, y: -r * 1.25, w: r * 0.40, h: r * 0.50 },
+    { x: -r * 0.45, y: -r * 1.15, w: r * 0.35, h: r * 0.45 },
+    { x: r * 0.45, y: -r * 1.15, w: r * 0.35, h: r * 0.45 },
+    { x: -r * 0.80, y: -r * 0.85, w: r * 0.30, h: r * 0.55 },
+    { x: r * 0.80, y: -r * 0.85, w: r * 0.30, h: r * 0.55 },
   ];
   for (const lock of locks) {
     ctx.beginPath();
@@ -115,33 +115,61 @@ function _drawProceduralMakiHair(ctx, r) {
 /**
  * Draws Maki's hand/fist in clean pixel art style with warm athletic tan skin tone.
  */
-export function drawMakiFist(ctx, x, y, radius, skinColor = '#D4A373', fighter = null) {
+export function drawMakiFist(ctx, x, y, radius, skinColor = '#FEDBC0', fighter = null) {
   ctx.save();
   ctx.translate(x, y);
   drawPixelHand(ctx, 0, 0, radius, skinColor);
   ctx.restore();
 }
 
-let _cachedMakiBodyCanvas = null;
-let _cachedMakiBodyR = 0;
+let _cachedMakiCanvas = null;
+let _cachedMakiR = 0;
 
 /**
  * Procedural Pixel Art Render Function (Renders once to offscreen cache).
- * Matches Awakened Maki Zen'in:
- * - Stepped dark outer circle stroke (#0E0F14)
- * - Warm athletic tan skin face with facial burn scars across cheeks/forehead
- * - High-collar black sleeveless combat turtleneck & tactical vest
- * - Utility chest harness straps & tactical waist belt
- * - Deep obsidian combat cargo trousers
+ * Built 1:1 on Gojo Satoru's Exact Body Model Shape, Size, and Architecture:
+ * - 4-neighbor boundary test for clean 1-pixel outer manga ink outline (#0E0F14)
+ * - ZONE A: Dark Hair Roots & Top Crown (ny < -0.28)
+ * - ZONE B: Warm Fair/Athletic Skin with Facial Burn Scars (-0.28 <= ny < 0.30)
+ * - ZONE C: Jujutsu High Tactical Turtleneck, Harness, Belt & Trousers (ny >= 0.30)
  */
 function _renderMakiPixelBodyToCanvas(destCtx, r) {
-  destCtx.save();
   destCtx.imageSmoothingEnabled = false;
-  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
   const P = 2.0;
   const steps = Math.ceil((r + P) / P);
 
-  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border
+  // Palette Colors matching 1:1 Gojo Reference with Maki Character Theme
+  const C = {
+    outline: '#0E0F14',        // Deep dark pixel border (1:1 with Gojo)
+    hairDark: '#12141A',       // Dark obsidian hair base
+    hairHighlight: '#222834',  // Hair strand highlight
+    hairShadow: '#0E0F14',     // Hair shadow dither
+
+    skinBase: '#FEDBC0',       // Warm fair/athletic skin (1:1 with Gojo)
+    skinHighlight: '#FFF0E2',  // Soft center forehead/face highlight
+    skinShadow1: '#E9B796',    // Light cheek shadow dither
+    skinShadow2: '#D89F7C',    // Deep cheek shadow dither
+
+    // Maki's Signature Facial Burn Scars
+    scarDeep: '#7D3224',       // Deep scar crimson-brown
+    scarCore: '#5A2218',       // Dark burn core
+    scarEdge: '#A85A48',       // Raised scar tissue edge
+
+    // Jujutsu High Uniform (1:1 Exact Gojo Palette & Spec)
+    uniformBase: '#262039',    // Deep indigo / midnight purple torso
+    uniformHighlight: '#483C6B', // Collar rim / crease highlight
+    uniformCrease: '#14121D',  // Collar fold / border crease
+    uniformZipper: '#120F1C',  // Central covered zipper placket
+    uniformDither: '#181326'   // Bottom perimeter shadow
+  };
+
+  const cx = destCtx.canvas.width / 2;
+  const cy = destCtx.canvas.height / 2;
+
+  destCtx.save();
+  destCtx.translate(cx, cy);
+
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border (1:1 Exact Gojo Loop)
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -152,7 +180,7 @@ function _renderMakiPixelBodyToCanvas(destCtx, r) {
       const px = rx - P / 2;
       const py = ry - P / 2;
 
-      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline (1:1 with Gojo)
       const isBorder = (
         Math.hypot((gx + 1) * P, gy * P) > r ||
         Math.hypot((gx - 1) * P, gy * P) > r ||
@@ -161,36 +189,48 @@ function _renderMakiPixelBodyToCanvas(destCtx, r) {
       );
 
       if (isBorder) {
-        destCtx.fillStyle = '#0E0F14';
+        destCtx.fillStyle = C.outline;
         destCtx.fillRect(px, py, P, P);
         continue;
       }
 
-      // ──────────────────────────────────────────
-      // ZONE 1: Face & Cheeks Tan Skin with Burn Scars (ry < r * 0.25)
-      // ──────────────────────────────────────────
-      if (ry < r * 0.25) {
-        let col = '#E4BA96'; // Warm athletic tan skin tone
+      // Normalized coordinates from -1.0 to +1.0 (1:1 with Gojo)
+      const nx = rx / r;
+      const ny = ry / r;
+      const absX = Math.abs(nx);
 
-        // Side cheek shadow
-        if (Math.abs(rx) > r * 0.68) {
-          col = '#CD9F78';
+      // ──────────────────────────────────────────
+      // ZONE 1: WARM FAIR SKIN WITH FACIAL BURN SCARS (ny < 0.30)
+      // Pure unbroken skin face dome matching Gojo & Toji Standard (All hair on Layer 2)
+      // ──────────────────────────────────────────
+      if (ny < 0.30) {
+        let col = C.skinBase;
+        if (absX >= 0.55) {
+          const dLevel = (absX - 0.55) / 0.45;
+          if (dLevel > 0.6) {
+            col = ((gx + gy) % 2 === 0) ? C.skinShadow2 : C.skinShadow1;
+          } else if ((gx + gy) % 2 === 0) {
+            col = C.skinShadow1;
+          }
+        } else if (absX < 0.35 && ny > -0.25 && ny < 0.10) {
+          if ((gx + gy) % 4 === 0) {
+            col = C.skinHighlight;
+          }
         }
 
-        // Facial Burn Scars (Left cheek & across nose bridge / forehead)
-        // Staggered textured burn tissue pattern
-        const isLeftCheekBurn = (rx >= -r * 0.55 && rx <= -r * 0.15 && ry >= -r * 0.10 && ry <= r * 0.20);
-        const isRightCheekBurn = (rx >= r * 0.20 && rx <= r * 0.48 && ry >= 0 && ry <= r * 0.22);
-        const isForeheadBurn = (rx >= -r * 0.35 && rx <= r * 0.25 && ry >= -r * 0.25 && ry <= -r * 0.12);
+        // Maki's Signature Facial Burn Scars across cheeks and forehead
+        const isLeftCheekBurn = (nx >= -0.52 && nx <= -0.12 && ny >= -0.10 && ny <= 0.26);
+        const isRightCheekBurn = (nx >= 0.16 && nx <= 0.48 && ny >= -0.04 && ny <= 0.24);
+        const isForeheadBurn = (nx >= -0.32 && nx <= 0.22 && ny >= -0.28 && ny <= -0.12);
 
         if (isLeftCheekBurn || isRightCheekBurn || isForeheadBurn) {
           const noise = ((Math.floor(rx / P) + Math.floor(ry / P)) % 3);
           if (noise === 0) {
-            col = '#7D3224'; // Deep scar crimson-brown
+            col = C.scarDeep;
           } else if (noise === 1) {
-            col = '#5A2218'; // Dark burn core
+            col = C.scarCore;
           } else {
-            col = '#A85A48'; // Raised scar tissue edge
+            col = C.scarEdge;
           }
         }
 
@@ -198,51 +238,41 @@ function _renderMakiPixelBodyToCanvas(destCtx, r) {
         destCtx.fillRect(px, py, P, P);
       }
       // ──────────────────────────────────────────
-      // ZONE 2: High-Collar Black Combat Turtleneck (r * 0.25 <= ry < r * 0.58)
-      // ──────────────────────────────────────────
-      else if (ry < r * 0.58) {
-        // High-collar neck band (ry ~ 0.25r to 0.32r)
-        if (ry < r * 0.32 && Math.abs(rx) <= r * 0.40) {
-          destCtx.fillStyle = '#0E1015'; // Dark collar rim
-        } else if (Math.abs(rx) >= r * 0.55 && ry > r * 0.35) {
-          // Sleeveless bare shoulder tan skin
-          destCtx.fillStyle = '#CD9F78';
-        } else if (Math.abs(rx) < r * 0.18 && ry > r * 0.34 && ry < r * 0.52) {
-          // Tactical zipper / center seam
-          destCtx.fillStyle = '#0A0C10';
-        } else if ((Math.abs(rx) >= r * 0.22 && Math.abs(rx) <= r * 0.32) && ry >= r * 0.32 && ry <= r * 0.56) {
-          // Tactical harness shoulder straps
-          destCtx.fillStyle = '#222530';
-        } else {
-          destCtx.fillStyle = '#161820'; // Obsidian tactical vest fabric
-        }
-        destCtx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE 3: Tactical Utility Belt & Holster (r * 0.58 <= ry < r * 0.70)
-      // ──────────────────────────────────────────
-      else if (ry < r * 0.70) {
-        if (Math.abs(rx) <= r * 0.14) {
-          destCtx.fillStyle = '#64748B'; // Steel center belt buckle
-        } else if (Math.abs(rx) >= r * 0.40 && Math.abs(rx) <= r * 0.65) {
-          destCtx.fillStyle = '#1E293B'; // Utility ammo / scroll pouches
-        } else {
-          destCtx.fillStyle = '#0F172A'; // Dark leather combat belt
-        }
-        destCtx.fillRect(px, py, P, P);
-      }
-      // ──────────────────────────────────────────
-      // ZONE 4: Dark Obsidian Cargo Combat Trousers (ry >= r * 0.70)
+      // ZONE C: JUJUTSU HIGH UNIFORM (ny >= 0.30) — 1:1 EXACT MATCH WITH GOJO
       // ──────────────────────────────────────────
       else {
-        if (Math.abs(rx) <= P * 0.6 && ry > r * 0.78) {
-          destCtx.fillStyle = '#0B0C10'; // Inseam crease shadow
-        } else if ((Math.abs(rx) >= r * 0.30 && Math.abs(rx) <= r * 0.38) || Math.abs(rx) >= r * 0.70) {
-          destCtx.fillStyle = '#12141A'; // Deep cargo fold shadow
-        } else if (ry < r * 0.82 && Math.abs(rx) < r * 0.45) {
-          destCtx.fillStyle = '#282C37'; // Thigh highlight
+        const isZipper = (absX <= 0.07);
+        const isZipperSeam = (Math.abs(absX - 0.07) <= P / r * 0.6);
+        const isZipperHighlight = (nx >= -0.06 && nx <= -0.03 && ny >= 0.34);
+
+        const isCollarRim = (ny <= 0.33 && absX <= 0.50);
+        const isCollarHighlight = (ny >= 0.33 && ny <= 0.36 && absX <= 0.50);
+
+        const isCrease1 = (Math.abs(ny - 0.35) <= P / r * 0.7 && absX <= 0.55);
+        const isCrease1Hi = (Math.abs(ny - 0.32) <= P / r * 0.7 && absX <= 0.55);
+        const isCrease2 = (Math.abs(ny - 0.46) <= P / r * 0.7 && absX <= 0.65);
+        const isCrease2Hi = (Math.abs(ny - 0.43) <= P / r * 0.7 && absX <= 0.65);
+
+        if (isZipperHighlight) {
+          destCtx.fillStyle = C.uniformHighlight;
+        } else if (isZipperSeam) {
+          destCtx.fillStyle = C.outline;
+        } else if (isZipper) {
+          destCtx.fillStyle = C.uniformZipper;
+        } else if (isCollarRim) {
+          destCtx.fillStyle = C.outline;
+        } else if (isCollarHighlight) {
+          destCtx.fillStyle = C.uniformHighlight;
+        } else if (isCrease1 || isCrease2) {
+          destCtx.fillStyle = C.uniformCrease;
+        } else if (isCrease1Hi || isCrease2Hi) {
+          destCtx.fillStyle = C.uniformHighlight;
         } else {
-          destCtx.fillStyle = '#1B1E26'; // Deep obsidian cargo fabric
+          let col = C.uniformBase;
+          if (absX > 0.68 || ny > 0.82) {
+            if ((gx + gy) % 2 === 0) col = C.uniformDither;
+          }
+          destCtx.fillStyle = col;
         }
         destCtx.fillRect(px, py, P, P);
       }
@@ -253,34 +283,26 @@ function _renderMakiPixelBodyToCanvas(destCtx, r) {
 }
 
 /**
- * Draws Maki's procedural pixel-art body with offscreen caching.
+ * Authentic 1:1 Procedural Pixel Art Body for Maki Zen'in (High Performance Offscreen Cached matching Gojo).
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Fighter radius
  */
 export function drawMakiPixelBody(ctx, r) {
-  if (typeof document === 'undefined') {
-    // Node environment fallback
-    _renderMakiPixelBodyToCanvas(ctx, r);
-    return;
-  }
-
-  const intR = Math.round(r);
-  if (!_cachedMakiBodyCanvas || _cachedMakiBodyR !== intR) {
+  if (!_cachedMakiCanvas || _cachedMakiR !== r) {
+    _cachedMakiR = r;
     const P = 2.0;
-    const steps = Math.ceil((intR + P) / P);
+    const steps = Math.ceil((r + P) / P);
     const size = (steps * 2 + 1) * P;
-    _cachedMakiBodyCanvas = document.createElement('canvas');
-    _cachedMakiBodyCanvas.width = size;
-    _cachedMakiBodyCanvas.height = size;
-    const cctx = _cachedMakiBodyCanvas.getContext('2d');
-    _renderMakiPixelBodyToCanvas(cctx, intR);
-    _cachedMakiBodyR = intR;
+    _cachedMakiCanvas = document.createElement('canvas');
+    _cachedMakiCanvas.width = size;
+    _cachedMakiCanvas.height = size;
+    const offCtx = _cachedMakiCanvas.getContext('2d');
+    _renderMakiPixelBodyToCanvas(offCtx, r);
   }
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  const size = _cachedMakiBodyCanvas.width;
-  ctx.drawImage(_cachedMakiBodyCanvas, -size / 2, -size / 2);
+  ctx.drawImage(_cachedMakiCanvas, -_cachedMakiCanvas.width / 2, -_cachedMakiCanvas.height / 2);
   ctx.restore();
 }
 

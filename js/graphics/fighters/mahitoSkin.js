@@ -1265,9 +1265,10 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
         }
 
         // ──────────────────────────────────────────
-        // 1. SICKLY PALE SKIN & SURGICAL STITCHES (ry < r * 0.26)
+        // 1. SICKLY PALE SKIN & SURGICAL STITCHES (ry < r * 0.30)
+        // Pure unbroken circular dome (All hair on Layer 2)
         // ──────────────────────────────────────────
-        if (ry < r * 0.26) {
+        if (ry < r * 0.30) {
           let col = '#EEF3F7';
           if (ry < -r * 0.65) {
             col = '#F8FAFC'; // Crown dome volumetric glint
@@ -1299,33 +1300,33 @@ export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
           ctx.fillRect(px, py, P, P);
         }
         // ──────────────────────────────────────────
-        // 2. DARK PATCHWORK PONCHO TUNIC (ry >= r * 0.26)
+        // 2. DARK PATCHWORK PONCHO TUNIC (ry >= r * 0.30)
         // ──────────────────────────────────────────
         else {
-          const neckHalfW = (1 - (ry - r * 0.26) / (r * 0.14)) * (r * 0.22);
-          const isNeckSkin = (ry <= r * 0.40 && Math.abs(rx) <= Math.max(0, neckHalfW));
+          const neckHalfW = (1 - (ry - r * 0.30) / (r * 0.14)) * (r * 0.22);
+          const isNeckSkin = (ry <= r * 0.44 && Math.abs(rx) <= Math.max(0, neckHalfW));
 
-          const isNeckStitch = (isNeckSkin && Math.abs(ry - r * 0.32) <= P * 0.6 && Math.abs(rx) <= r * 0.16);
-          const isNeckTick = (isNeckSkin && Math.abs(ry - r * 0.32) <= P * 1.8 && Math.abs(rx) <= r * 0.16 && Math.abs(Math.round(rx / (P * 3)) * (P * 3) - rx) <= P * 0.5);
+          const isNeckStitch = (isNeckSkin && Math.abs(ry - r * 0.36) <= P * 0.6 && Math.abs(rx) <= r * 0.16);
+          const isNeckTick = (isNeckSkin && Math.abs(ry - r * 0.36) <= P * 1.8 && Math.abs(rx) <= r * 0.16 && Math.abs(Math.round(rx / (P * 3)) * (P * 3) - rx) <= P * 0.5);
 
-          const isHorizSeam = (Math.abs(ry - r * 0.52) <= P * 0.7 || Math.abs(ry - r * 0.72) <= P * 0.7 || Math.abs(ry - r * 0.88) <= P * 0.7);
+          const isHorizSeam = (Math.abs(ry - r * 0.56) <= P * 0.7 || Math.abs(ry - r * 0.76) <= P * 0.7 || Math.abs(ry - r * 0.90) <= P * 0.7);
           const isVertSeam = (Math.abs(Math.abs(rx) - r * 0.35) <= P * 0.7 || Math.abs(rx) <= P * 0.7 || Math.abs(Math.abs(rx) - r * 0.65) <= P * 0.7);
           const isSeamStitchTick = ((isHorizSeam && Math.abs(rx % (r * 0.12)) <= P * 0.7) || (isVertSeam && Math.abs(ry % (r * 0.12)) <= P * 0.7));
 
           if (isNeckStitch || isNeckTick) {
             ctx.fillStyle = '#222530';
           } else if (isNeckSkin) {
-            ctx.fillStyle = (ry > r * 0.32) ? '#CCD7E0' : '#EEF3F7';
+            ctx.fillStyle = (ry > r * 0.36) ? '#CCD7E0' : '#EEF3F7';
           } else if (isSeamStitchTick) {
             ctx.fillStyle = '#4A5068';
           } else if (isHorizSeam || isVertSeam) {
             ctx.fillStyle = '#282B38';
           } else {
-            let col = '#181920';
+            let col = '#242634';
             if (Math.abs(rx) > r * 0.70 || ry > r * 0.85) {
-              col = '#0F1014';
-            } else if (ry < r * 0.48 && Math.abs(rx) < r * 0.45) {
-              col = '#22242E';
+              col = '#181A24';
+            } else if (ry < r * 0.52 && Math.abs(rx) < r * 0.45) {
+              col = '#2D3042';
             }
             ctx.fillStyle = col;
           }

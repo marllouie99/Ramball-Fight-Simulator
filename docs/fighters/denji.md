@@ -89,14 +89,21 @@ When Denji's HP drops to 0 for the first time in a round:
 
 ---
 
-### ⚙️ Basic Attack (Chainsaw Devil Form): Twin Chainsaw Shred (140° Frontal Arc)
-* **Type**: High-RPM Multi-Hit Frontal Cleave (Rule 7/8 Multi-Target Arc)
-* **Visual Style**: Solid 2D pixel-art saw arcs with rotating steel teeth, flying sparks, and blood splatters.
-* **Arc / Reach**: `140° frontal cone`, `75px reach`
-* **Combo Pattern**:
-  * **Hit 1 (Right Arm Cross-Saw)**: Downward sweeping chainsaw slash dealing `16` damage + `1` Hemorrhage stack + heals `4 HP`.
-  * **Hit 2 (Left Arm Upper-Saw)**: Upward diagonal chainsaw slash dealing `16` damage + `1` Hemorrhage stack + heals `4 HP`.
-  * **Hit 3 (Dual Arm Scissor Shred)**: Simultaneous twin arm scissor bite dealing 3 rapid micro-ticks of `8` damage (total `24` damage) + `24` knockback + heals `6 HP`.
+### ⚙️ Basic Attack (Chainsaw Devil Form): Continuous 3-Blade Collision Shred & Hit-Pause
+* **Type**: Continuous Multi-Blade Collision Shred (Zero Attack Swing Delays)
+* **Visual Style**: All 3 chainsaw blades (Forehead, Lead Right Hand at `0.0 rad`, Off-Hand Left Hand at `0.73 rad`) run continuously with high-RPM racetrack chain teeth animation (`chainsaw-chain-teeth-block.png`).
+* **Active Blade Hitboxes**:
+  * **Forehead Blade**: Protrudes forward from brow visor (`78px reach`, `18px thickness`).
+  * **Lead Right Arm Blade**: Points straight forward towards target (`56px reach`, `13px thickness`, `0.0 rad`).
+  * **Off-Hand Left Arm Blade**: Slants forward-downward along flank (`56px reach`, `13px thickness`, `0.73 rad / ~42°`).
+* **Collision Shred Mechanics**:
+  * Whenever an enemy collides with ANY of Denji's 3 active chainsaw blades, they take rapid shred damage (`5 damage` every `3 frames`) paced exactly to the chain teeth animation velocity.
+  * **Hit-Pause Effect**: Each tooth impact applies a `3-frame` hit-pause micro-stagger and mechanical friction (`35% drag`), locking enemies into the cutting teeth.
+  * **Blood & Sparks**: Generates continuous directional blood splatters, chainsaw orange spark bursts, and triggers `25%`–`35%` Blood Siphon lifesteal healing on every strike.
+* **Multi-Blade Simultaneous Shred Bonus**:
+  * **1 Blade (Single Saw Contact)**: `5 damage` per tick, `3-frame` hit-pause, `35%` friction drag, `1x` Blood Siphon, `+1` Hemorrhage stack per tick.
+  * **2 Blades (Dual Saw Grind)**: `8 damage` per tick (`1.6x Multiplier`), `4-frame` hit-pause, `50%` friction drag, `1.5x` Blood Siphon, `+2` Hemorrhage stacks per tick, amber sparks, and `⚔️ DUAL SHRED! x1.6` combat indicator.
+  * **3 Blades (Triple Saw Vortex)**: `12 damage` per tick (`2.4x Multiplier`), `5-frame` hit-pause, `65%` friction drag, `2.0x` Blood Siphon, `+3` Hemorrhage stacks per tick (rapid vascular rupture), crimson blood explosions, and `⛓️ TRIPLE SHRED! x2.4` combat indicator.
 
 ---
 

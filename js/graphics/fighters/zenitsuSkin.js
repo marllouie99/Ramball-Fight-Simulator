@@ -1327,18 +1327,24 @@ function _renderZenitsuPixelBodyToCanvas(destCtx, r) {
       const absGx = Math.abs(gx);
 
       // ── 1. 1-Pixel Stepped Outer Manga Ink Border ──
-      const isBorder = dist >= r - P;
+      const isBorder = (
+        Math.hypot((gx + 1) * P, gy * P) > r ||
+        Math.hypot((gx - 1) * P, gy * P) > r ||
+        Math.hypot(gx * P, (gy + 1) * P) > r ||
+        Math.hypot(gx * P, (gy - 1) * P) > r
+      );
       if (isBorder) {
-        destCtx.fillStyle = '#18181B';
+        destCtx.fillStyle = '#0E0F14';
         destCtx.fillRect(px, py, P, P);
         continue;
       }
 
-      // ── 2. Pale Anime Face Skin (normY < 0.16) ──
-      if (normY < 0.16) {
-        if (normY < -0.05) {
+      // ── 2. Pale Anime Face Skin (normY < 0.30) ──
+      // Pure unbroken circular dome (All hair on Layer 2)
+      if (normY < 0.30) {
+        if (normY < 0.05) {
           destCtx.fillStyle = '#FEE8D6'; // Pale anime skin
-        } else if (normY < 0.08) {
+        } else if (normY < 0.18) {
           destCtx.fillStyle = '#FDD3B2'; // Warm peach midtone
         } else {
           destCtx.fillStyle = '#F9B786'; // Chin shadow
