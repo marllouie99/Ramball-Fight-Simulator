@@ -3,8 +3,6 @@
 //  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
 //  - If you want to change Assassin weapon visuals, edit the palette or functions below.
 
-import { getHandSize } from '../../core/config.js';
-
 export const ASSASSIN_WEAPON_GRAPHICS = {
   shuriken: {
     bladeColor: '#3a3a3a',            // Main blade color
@@ -13,8 +11,8 @@ export const ASSASSIN_WEAPON_GRAPHICS = {
     centerColor: '#2a2a2a',           // Center hole color
   },
   positioning: {
-    shurikenScale: 1.8,
-    shurikenOffset: 12,               // Distance from fighter body edge
+    shurikenScale: 1.0,
+    shurikenOffset: 10,               // Distance from fighter body edge
     meleeScale: 1.0,
     meleeOffset: 6,                   // Distance from fighter body edge
   },
@@ -32,9 +30,8 @@ export const ASSASSIN_WEAPON_GRAPHICS = {
  * ★ POSITION ADJUST: Change this offset to move shuriken closer/farther from fighter
  * ★ SIZE ADJUST: Change shurikenScale to resize the entire weapon
  */
-export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor = '#4a6a6a') {
-  if (typeof state !== 'undefined' && state.showSkinOnly) return;
-  ctx.save();
+export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r) {
+  // Manual state management (replaces ctx.save/restore)
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
   
@@ -54,8 +51,8 @@ export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor =
   const bladeWidth = dim.shurikenBladeWidth * shurikenScale;
 
   for (let i = 0; i < numPoints; i++) {
-    ctx.save();
-    ctx.rotate((Math.PI * 2 * i) / numPoints);
+    const pointAngle = (Math.PI * 2 * i) / numPoints;
+    ctx.rotate(pointAngle);
     
     // Main blade shape
     ctx.beginPath();
@@ -78,7 +75,7 @@ export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor =
     ctx.lineWidth = 1 * shurikenScale;
     ctx.stroke();
     
-    ctx.restore();
+    ctx.rotate(-pointAngle);
   }
 
   // Center ring (the hole in the middle of the shuriken)
@@ -92,35 +89,29 @@ export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor =
 
   // Add small decorative notches on each blade
   for (let i = 0; i < numPoints; i++) {
-    ctx.save();
-    ctx.rotate((Math.PI * 2 * i) / numPoints);
+    const pointAngle = (Math.PI * 2 * i) / numPoints;
+    ctx.rotate(pointAngle);
     
     ctx.beginPath();
     ctx.arc(outerRadius * 0.6, 0, dim.shurikenNotchRadius * shurikenScale, 0, Math.PI * 2);
     ctx.fillStyle = '#1a1a1a';
     ctx.fill();
     
-    ctx.restore();
+    ctx.rotate(-pointAngle);
   }
 
-  // ── Hand ──
-  ctx.fillStyle = fighterColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, getHandSize(6), 0, Math.PI * 2); // Center of shuriken
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
-
-  ctx.restore();
+  // Inverse transforms (in reverse order)
+  ctx.translate(-(r + ASSASSIN_WEAPON_GRAPHICS.positioning.shurikenOffset), 0);
+  ctx.rotate(-gunAngle);
+  ctx.translate(-x, -y);
 }
 
-export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetScale = 1.0, flashIntensity = 0, fighterColor = '#4a6a6a') {
-  if (typeof state !== 'undefined' && state.showSkinOnly) return;
-  ctx.save();
+export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetScale = 1.0, flashIntensity = 0) {
+  // Manual state management (replaces ctx.save/restore)
   ctx.translate(x, y);
   ctx.rotate(gunAngle + Math.PI / 2);
-  ctx.translate((r + ASSASSIN_WEAPON_GRAPHICS.positioning.meleeOffset) * animationOffsetScale, 0);
+  const meleeOffset = (r + ASSASSIN_WEAPON_GRAPHICS.positioning.meleeOffset) * animationOffsetScale;
+  ctx.translate(meleeOffset, 0);
   ctx.rotate(-Math.PI / 2);
 
   const kunaiScale = 1.2;
@@ -211,16 +202,11 @@ export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetSc
   ctx.lineWidth = 1 + flashIntensity * 2;
   ctx.stroke();
 
-  // ── Hand ──
-  ctx.fillStyle = fighterColor;
-  ctx.beginPath();
-  ctx.arc(-r * 0.6 * 1.2 / 2, 0, getHandSize(6), 0, Math.PI * 2); // Center of hilt
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
-
-  ctx.restore();
+  // Inverse transforms (in reverse order)
+  ctx.rotate(Math.PI / 2);
+  ctx.translate(-meleeOffset, 0);
+  ctx.rotate(-(gunAngle + Math.PI / 2));
+  ctx.translate(-x, -y);
 }
 
 /**
@@ -229,12 +215,11 @@ export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetSc
  * ★ SIZE ADJUST: Change scale parameter to resize projectile
  */
 export function drawShurikenProjectile(ctx, x, y, angle, scale = 1.0) {
-  ctx.save();
+  // Manual state management (replaces ctx.save/restore)
   ctx.translate(x, y);
   ctx.rotate(angle);
 
-  // Increase the base scale of the projectile to match the held weapon
-  const shurikenScale = Math.max(0.5, scale * 1.8);
+  const shurikenScale = Math.max(0.5, scale);
   const shuriken = ASSASSIN_WEAPON_GRAPHICS.shuriken;
   const dim = ASSASSIN_WEAPON_GRAPHICS.dimensions;
 
@@ -244,8 +229,8 @@ export function drawShurikenProjectile(ctx, x, y, angle, scale = 1.0) {
   const bladeWidth = 5 * shurikenScale;
 
   for (let i = 0; i < numPoints; i++) {
-    ctx.save();
-    ctx.rotate((Math.PI * 2 * i) / numPoints);
+    const pointAngle = (Math.PI * 2 * i) / numPoints;
+    ctx.rotate(pointAngle);
     
     ctx.beginPath();
     ctx.moveTo(0, -bladeWidth / 2);
@@ -265,7 +250,7 @@ export function drawShurikenProjectile(ctx, x, y, angle, scale = 1.0) {
     ctx.lineWidth = 1 * shurikenScale;
     ctx.stroke();
     
-    ctx.restore();
+    ctx.rotate(-pointAngle);
   }
 
   ctx.beginPath();
@@ -276,5 +261,7 @@ export function drawShurikenProjectile(ctx, x, y, angle, scale = 1.0) {
   ctx.lineWidth = 1.2 * shurikenScale;
   ctx.stroke();
 
-  ctx.restore();
+  // Inverse transforms (in reverse order)
+  ctx.rotate(-angle);
+  ctx.translate(-x, -y);
 }

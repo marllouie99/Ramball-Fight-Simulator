@@ -28,27 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "TOJI",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "cooldown",
-                "oldVal": 40,
-                "newVal": 10,
-                "pct": "-75.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "spearCooldown",
-                "oldVal": 75,
-                "newVal": 10,
-                "pct": "-86.7%"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

@@ -19,8 +19,7 @@
 //       - Spike: spikeWeaponGraphics.js
 //       - Bomber: bomberWeaponGraphics.js
 
-import { CONFIG, GUN_TIP_DIST, getHandSize } from '../core/config.js';
-export { getHandSize };
+import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 export { drawGunSlingerDualRevolver } from './weapons/gunSlingerWeaponGraphics.js';
 export { drawBerserkerDualAxes } from './weapons/berserkerWeaponGraphics.js';
 export { drawCronosCrescentBlade } from './weapons/cronosWeaponGraphics.js';
@@ -30,12 +29,13 @@ export { drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee, drawShurikenProjecti
 export { drawWhiteRailgun, drawWhiteChargeEffect } from './weapons/ivoryWeaponGraphics.js';
 export { drawSpikeWeapon, drawSingleSpike } from './weapons/spikeWeaponGraphics.js';
 export { drawBlueAimbotGun } from './weapons/rangerWeaponGraphics.js';
-export { drawEngineer, drawEngineerShotgun, drawEngineerWrench, drawEngineerShotgunModel, drawEngineerBullet, drawTurret, drawTurretBullet, drawDispenser, drawDispenserTetherBeam, drawDispenserHealingRing, Engineer_WEAPON_GRAPHICS } from './weapons/engineerWeaponGraphics.js';
-export { drawEngineerSkin, drawEngineerPixelBody, drawEngineerPixelHand } from './fighters/engineerSkin.js';
+export { drawMachineGun, drawMachineGunBullet, MACHINEGUN_WEAPON_GRAPHICS } from './weapons/machinegunWeaponGraphics.js';
 export { drawBomberGrenade } from './weapons/bomberWeaponGraphics.js';
 export { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';
+export { drawEngineer, drawEngineerShotgun, drawEngineerWrench, drawTurret, drawDispenser } from './weapons/engineerWeaponGraphics.js';
 export { drawZeusWeapon } from './weapons/zeusWeaponGraphics.js';
+export { drawInvertedSpear, drawSplitSoulKatana } from './weapons/tojiWeaponGraphics.js';
 export { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch, MAHORAGA_WEAPON_GRAPHICS } from './weapons/mahoragaWeaponGraphics.js';
 export { drawMahoragaFaceWings, drawMahoragaChestNecklace, drawMahoragaSkin, drawMahoragaPixelBody } from './fighters/mahoragaSkin.js';
 export { drawMahitoClawWeapon, drawMahitoMaceCannon } from './weapons/mahitoWeaponGraphics.js';
@@ -46,12 +46,16 @@ export { drawRezeTacticalKnife, drawRezeWeaponPreview } from './weapons/rezeWeap
 // GRAY KNIGHT WEAPONS (Shield & Sword)
 // ─────────────────────────────────────────────
 
-export { drawGrayShield, drawGraySword, drawGrayBrokenSword, drawGraySwordProjectile } from './weapons/knightWeaponGraphics.js';
+export { drawGrayShield, drawGraySword, drawGrayBrokenSword, drawGraySwordProjectile } from './weapons/knightWeaponGrpahics.js';
 
 export function drawSwordProjectile(ctx, x, y, angle, scale = 1.0) {
   // Draw the same cyberpunk sword art used for Gray's held sword,
   // but scaled down and positioned at (x,y) pointing along `angle`.
-  ctx.save();
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevGlobalAlpha = ctx.globalAlpha;
+
   ctx.translate(x, y);
   ctx.rotate(angle);
 
@@ -123,7 +127,7 @@ export function drawSwordProjectile(ctx, x, y, angle, scale = 1.0) {
   ctx.lineWidth = 1.1 * swordScale;
   ctx.stroke();
 
-  ctx.save();
+  // Activation glow section
   // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.beginPath();
   ctx.moveTo(6 * swordScale, -4 * swordScale);
@@ -136,9 +140,7 @@ export function drawSwordProjectile(ctx, x, y, angle, scale = 1.0) {
   ctx.closePath();
   ctx.fillStyle = 'rgba(0, 229, 255, 0.95)';
   ctx.fill();
-  ctx.restore();
 
-  ctx.save();
   ctx.strokeStyle = '#00e5ff';
   ctx.lineWidth = 0.8 * swordScale;
   ctx.globalAlpha = 0.95;
@@ -160,13 +162,24 @@ export function drawSwordProjectile(ctx, x, y, angle, scale = 1.0) {
     ctx.arc(cx * swordScale, cy * swordScale, 0.8 * swordScale, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.restore();
 
-  ctx.restore();
+  // Manual transform reset
+  ctx.rotate(-angle);
+  ctx.translate(-x, -y);
+
+  // Manual state restore
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
+  ctx.globalAlpha = prevGlobalAlpha;
 }
 
 export function drawPoisonBottleCore(ctx, scale = 1.15) {
-  ctx.save();
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevLineCap = ctx.lineCap;
+
   ctx.scale(scale, scale);
 
   const flaskRadius = 13;
@@ -182,6 +195,8 @@ export function drawPoisonBottleCore(ctx, scale = 1.15) {
   liquidGrad.addColorStop(1, '#004400'); // Deep dark green
 
   // Draw Liquid Level (Clip region)
+  // OPTIMIZED: We MUST use save/restore for clipping, it's unavoidable.
+  // BUT we only use it locally for the clip.
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(neckWidth / 2, neckY);
@@ -279,16 +294,24 @@ export function drawPoisonBottleCore(ctx, scale = 1.15) {
   ctx.arc(1.2, -1, 0.8, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.restore();
+  // Manual transform reset
+  ctx.scale(1 / scale, 1 / scale);
+
+  // Manual state restore
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
+  ctx.lineCap = prevLineCap;
 }
 
 export function drawGreenBottleGun(ctx, x, y, gunAngle, r, throwProgress = 0) {
-  ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
 
+  let scaleY = 1;
   if (Math.abs(gunAngle) > Math.PI / 2) {
     ctx.scale(1, -1);
+    scaleY = -1;
   }
 
   // Animate during a throw (moves out and rotates slightly)
@@ -302,24 +325,35 @@ export function drawGreenBottleGun(ctx, x, y, gunAngle, r, throwProgress = 0) {
   ctx.rotate(throwRot);
 
   drawPoisonBottleCore(ctx, 1.15);
-  ctx.restore();
+
+  // Manual transform reset in reverse order
+  ctx.rotate(-throwRot);
+  ctx.translate(-cx, -cy);
+  if (scaleY === -1) {
+    ctx.scale(1, -1);
+  }
+  ctx.rotate(-gunAngle);
+  ctx.translate(-x, -y);
 }
 
 export function drawGreenBoilingEffect(ctx, x, y, gunAngle, r, active) {
   if (!active) return;
 
-  ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
 
+  let scaleY = 1;
   if (Math.abs(gunAngle) > Math.PI / 2) {
     ctx.scale(1, -1);
+    scaleY = -1;
   }
 
   const neckX = r + 13;
   // The top of the cork is around -33 scaled, so bubbles should start there
   const startY = -33;
   const progress = (Math.sin(Date.now() / 120) + 1) / 2;
+
+  const prevFillStyle = ctx.fillStyle;
 
   for (let i = 0; i < 5; i += 1) {
     const offsetY = startY - i * 6 - progress * 5;
@@ -332,18 +366,15 @@ export function drawGreenBoilingEffect(ctx, x, y, gunAngle, r, active) {
     ctx.fill();
   }
 
-  ctx.restore();
+  // Manual transform reset
+  if (scaleY === -1) {
+    ctx.scale(1, -1);
+  }
+  ctx.rotate(-gunAngle);
+  ctx.translate(-x, -y);
+
+  // Manual state restore
+  ctx.fillStyle = prevFillStyle;
 }
 
 // ─────────────────────────────────────────────
-
-
-export {
-  TOJI_WEAPON_CONFIG,
-  drawPhysicsChain,
-  drawInvertedSpear,
-  drawSplitSoulKatana,
-  drawRestedKatanaOverShoulder,
-  drawRestedInvertedSpearAtHip
-} from './weapons/tojiWeaponGraphics.js';
-

@@ -76,10 +76,43 @@ export function initGraphicsCache() {
   models.forEach(preloadImage);
 }
 
+const _canvasCache = new Map();
+
+/**
+ * Retrieves or renders an offscreen canvas by key.
+ * @param {string} key - Unique cache identifier
+ * @param {number} width - Canvas width
+ * @param {number} height - Canvas height
+ * @param {Function} renderFn - Callback `(ctx, canvas) => void` to paint into the canvas if cache miss
+ * @returns {HTMLCanvasElement|Object}
+ */
+export function getCachedCanvas(key, width, height, renderFn) {
+  if (_canvasCache.has(key)) {
+    return _canvasCache.get(key);
+  }
+  let canvas;
+  if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+    canvas = document.createElement('canvas');
+  } else if (typeof OffscreenCanvas !== 'undefined') {
+    canvas = new OffscreenCanvas(width, height);
+  } else {
+    canvas = { width, height, getContext: () => null };
+  }
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext ? canvas.getContext('2d') : null;
+  if (ctx && typeof renderFn === 'function') {
+    renderFn(ctx, canvas);
+  }
+  _canvasCache.set(key, canvas);
+  return canvas;
+}
+
 /**
  * Clears the graphics cache.
  * Call this when resetting the game or changing modes.
  */
 export function clearCache() {
   _imageCache.clear();
+  _canvasCache.clear();
 }

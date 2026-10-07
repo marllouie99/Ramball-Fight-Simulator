@@ -404,5 +404,13 @@ export class DenjiFighter extends Fighter {
 
     // 2. Main Skin Body & Saws
     drawDenjiSkin(ctx, this);
+
+    // 3. Mandatory Overhead HP & Freeze Timer (Rule 21)
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
+  }
+
+  drawBody(ctx) {
+    drawDenjiSkin(ctx, this);
   }
 }

@@ -1,35 +1,68 @@
+// flamewardenWeaponGraphics.js
+//  - Use this file for Flamewarden-specific weapon graphics (flamethrower).
+//  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
+//  - If you want to change Flamewarden weapon visuals, edit the palette or drawOrangeFlamethrowerGun() below.
+
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { CONFIG, getHandSize } from '../../core/config.js';
+import { CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
-import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 // ─────────────────────────────────────────────
-// FLAMETHROWER PARTICLE SYSTEM (Pixel Art Fire Edition)
+// FLAMETHROWER PARTICLE SYSTEM (High-Performance)
 // ─────────────────────────────────────────────
-// Uses discrete stepped pixel blocks (P = 2.0px) with thermal fire quantization
-// (White Core -> Solar Yellow -> Blazing Orange -> Volcanic Red -> Charcoal Smoke)
+// Uses additive blending for glow effect without expensive shadow operations.
+// Max 60 particles for consistent 60fps with dense flame appearance.
 
-const MAX_FLAME_PARTICLES = 80;
+const MAX_FLAME_PARTICLES = 25; // OPTIMIZED: Further reduced from 40 to 25 for severe performance situations
 
-// Object pool for PixiJS Sprites to eliminate VRAM allocations and GC thrashing
-const pixiSpritePool = [];
-function getPixiSprite() {
-  if (pixiSpritePool.length > 0) {
-    const s = pixiSpritePool.pop();
-    s.visible = true;
-    return s;
+// Color stops: [lifeRatio, r, g, b, alpha]
+// lifeRatio 0.0 = just born (white core), 1.0 = dying (smokey grey)
+const FLAME_COLOR_STOPS = [
+  [0.00, 255, 255, 255, 1.0],   // White core (hottest) - full alpha
+  [0.10, 255, 250, 200, 1.0],   // Near white
+  [0.25, 255, 220, 100, 0.95],  // Bright yellow
+  [0.45, 255, 150,  20, 0.90],  // Orange
+  [0.65, 255,  80,   0, 0.85],  // Deep orange
+  [0.80, 200,  30,   0, 0.70],  // Dark red-orange
+  [0.95, 120,  20,   0, 0.40],  // Dark red
+  [1.00,  60,  60,  60, 0.0],   // Smoke (invisible)
+];
+
+function lerpColor(stops, t) {
+  // Clamp t to 0-1 range
+  t = Math.max(0, Math.min(1, t));
+  
+  // Find the two color stops to interpolate between
+  let lower = stops[0];
+  let upper = stops[stops.length - 1];
+  
+  for (let i = 0; i < stops.length - 1; i++) {
+    if (t >= stops[i][0] && t <= stops[i + 1][0]) {
+      lower = stops[i];
+      upper = stops[i + 1];
+      break;
+    }
   }
-  if (!state.baseCircleTexture || !state.pixiLayers || !state.pixiLayers.particles) return null;
-  const s = new window.PIXI.Sprite(state.baseCircleTexture);
-  s.anchor.set(0.5);
-  state.pixiLayers.particles.addChild(s);
-  return s;
+  
+  // Interpolate between the two stops
+  const range = upper[0] - lower[0];
+  const localT = range > 0 ? (t - lower[0]) / range : 0;
+  
+  return {
+    r: Math.round(lower[1] + (upper[1] - lower[1]) * localT),
+    g: Math.round(lower[2] + (upper[2] - lower[2]) * localT),
+    b: Math.round(lower[3] + (upper[3] - lower[3]) * localT),
+    a: lower[4] + (upper[4] - lower[4]) * localT,
+  };
 }
 
-function releasePixiSprite(s) {
-  if (!s) return;
-  s.visible = false;
-  pixiSpritePool.push(s);
+// Pre-computed colors table for zero object allocations in draw loop
+const COLOR_LUT_SIZE = 256;
+const PRECOMPUTED_COLORS = new Array(COLOR_LUT_SIZE);
+for (let i = 0; i < COLOR_LUT_SIZE; i++) {
+  const t = i / (COLOR_LUT_SIZE - 1);
+  const color = lerpColor(FLAME_COLOR_STOPS, t);
+  PRECOMPUTED_COLORS[i] = `rgba(${color.r},${color.g},${color.b},${color.a})`;
 }
 
 export class FlamethrowerParticleSystem {
@@ -52,8 +85,7 @@ export class FlamethrowerParticleSystem {
         maxLife: 0,
         baseSize: 0,
         maxSize: 0,
-        turbulence: 0,
-        sprite: null
+        turbulence: 0
       };
     }
   }
@@ -79,6 +111,7 @@ export class FlamethrowerParticleSystem {
 
   // Spawn a single particle from the pool
   spawnParticle() {
+    // Find the first inactive particle
     let p = null;
     for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
       if (!this.particles[i].active) {
@@ -87,13 +120,17 @@ export class FlamethrowerParticleSystem {
       }
     }
     
+    // If pool is full, do not spawn
     if (!p) return;
 
     // Random spread around the nozzle angle
-    const spread = (Math.random() - 0.5) * 0.8;
+    const spread = (Math.random() - 0.5) * 0.8; // ±0.4 radians (~23°)
     const particleAngle = this.angle + spread;
 
-    const speed = 200 + Math.random() * 150;
+    // Initial velocity with some randomness
+    const speed = 200 + Math.random() * 150; // pixels per second
+
+    // Small offset from nozzle tip
     const offsetDist = 6 + Math.random() * 6;
 
     p.active = true;
@@ -102,23 +139,16 @@ export class FlamethrowerParticleSystem {
     p.vx = Math.cos(particleAngle) * speed;
     p.vy = Math.sin(particleAngle) * speed;
     p.life = 0;
-    p.maxLife = 0.3 + Math.random() * 0.4;
-    p.baseSize = 8 + Math.random() * 6;
-    p.maxSize = 25 + Math.random() * 15;
-    p.turbulence = Math.random() * 3 - 1.5;
-
-    // WebGL PixiJS Sprite initialization
-    p.sprite = getPixiSprite();
-    if (p.sprite) {
-      p.sprite.x = p.x;
-      p.sprite.y = p.y;
-      p.sprite.alpha = 1.0;
-      p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
-    }
+    p.maxLife = 0.3 + Math.random() * 0.4; // 0.3-0.7 seconds
+    p.baseSize = 8 + Math.random() * 6;     // Start larger
+    p.maxSize = 25 + Math.random() * 15;    // Grow bigger
+    p.turbulence = Math.random() * 3 - 1.5; // For wobbly flame movement
   }
 
   // Update all particles (call every frame)
   update(dt) {
+    // Pre-filter black holes once per frame to avoid O(particles * projectiles) cost
+    // OPTIMIZED: Cache black holes and skip if none exist
     let blackHoles = [];
     if (typeof projectileSystem !== 'undefined' && projectileSystem && projectileSystem.projectiles) {
       const hasBlackHoles = projectileSystem.projectiles.some(p => p.isBlackHole && p.transformed);
@@ -127,15 +157,19 @@ export class FlamethrowerParticleSystem {
       }
     }
 
+    // Spawn more particles while active for denser flame
     if (this.active) {
+      // OPTIMIZED: Apply dynamic quality level to spawn rate with more aggressive reduction
       const qualityMultiplier = state.qualityLevel || 1.0;
-      const baseSpawnCount = 3;
+      const baseSpawnCount = 1; // Always spawn 1 particle maximum for performance
       const spawnCount = qualityMultiplier < 0.5 ? 1 : Math.max(1, Math.floor(baseSpawnCount * qualityMultiplier));
       for (let i = 0; i < spawnCount; i++) {
         this.spawnParticle();
       }
     }
 
+    // Update existing particles
+    // OPTIMIZED: Apply distance-based culling - skip particles far from arena center
     const arenaCenterX = state.arena.x + state.arena.width / 2;
     const arenaCenterY = state.arena.y + state.arena.height / 2;
     const maxDistance = Math.max(state.arena.width, state.arena.height) * 0.8;
@@ -144,162 +178,103 @@ export class FlamethrowerParticleSystem {
       const p = this.particles[i];
       if (!p.active) continue;
 
+      // OPTIMIZED: Distance-based culling - deactivate particles too far from action
       const distFromCenter = Math.hypot(p.x - arenaCenterX, p.y - arenaCenterY);
       if (distFromCenter > maxDistance) {
-        if (p.sprite) {
-          releasePixiSprite(p.sprite);
-          p.sprite = null;
-        }
         p.active = false;
         continue;
       }
 
+      // Update life
       p.life += dt;
       if (p.life >= p.maxLife) {
-        if (p.sprite) {
-          releasePixiSprite(p.sprite);
-          p.sprite = null;
-        }
         p.active = false;
         continue;
       }
 
+      // Apply velocity with turbulence
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vy -= 20 * dt;
-      p.vx += p.turbulence * 40 * dt;
-      p.vx *= (1 - 2.5 * dt);
-      p.vy *= (1 - 2.5 * dt);
 
-      // WebGL Sprite transform & color sync
-      if (p.sprite) {
-        p.sprite.x = p.x;
-        p.sprite.y = p.y;
-        
-        const lifeRatio = p.life / p.maxLife;
-        const size = p.baseSize + (p.maxSize * 1.6 - p.baseSize) * lifeRatio;
-        
-        p.sprite.width = size * 2.2;
-        p.sprite.height = size * 2.2;
-        p.sprite.rotation = Math.atan2(p.vy, p.vx);
-        
-        const alphaScale = Math.max(0, lifeRatio > 0.8 ? 1.0 - ((lifeRatio - 0.8) / 0.2) : 1.0);
-        
-        if (lifeRatio < 0.2) {
-          p.sprite.tint = 0xFFFFFF;
-          p.sprite.alpha = alphaScale;
-          p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
-        } else if (lifeRatio < 0.5) {
-          p.sprite.tint = 0xFFBB22;
-          p.sprite.alpha = alphaScale * 0.9;
-          p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
-        } else if (lifeRatio < 0.8) {
-          p.sprite.tint = 0xFF5500;
-          p.sprite.alpha = alphaScale * 0.75;
-          p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
-        } else {
-          p.sprite.tint = 0x881100;
-          p.sprite.alpha = alphaScale * 0.3;
-          p.sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
-        }
-      }
+      // Add slight upward drift (hot air rises) and turbulence
+      p.vy -= 20 * dt; // Gentle upward force
+      p.vx += p.turbulence * 40 * dt; // Wobbly movement
 
-      if (blackHoles.length > 0) {
-        for (const proj of blackHoles) {
-          const dx = proj.x - p.x;
-          const dy = proj.y - p.y;
-          const pullRadius = proj.r * 2.5; 
-          if (Math.abs(dx) > pullRadius || Math.abs(dy) > pullRadius) continue;
-          const dist = Math.hypot(dx, dy);
-          if (dist < pullRadius) {
-            if (dist < proj.r * 0.5) {
-              if (p.sprite) {
-                releasePixiSprite(p.sprite);
-                p.sprite = null;
+      // Slight drag to slow down over time
+      p.vx *= (1 - 0.8 * dt);
+      p.vy *= (1 - 0.8 * dt);
+
+      // OPTIMIZED: Skip black hole logic if no black holes exist
+      if (blackHoles.length === 0) continue;
+
+      // Black Hole pull logic
+      for (const proj of blackHoles) {
+        const dx = proj.x - p.x;
+        const dy = proj.y - p.y;
+        const pullRadius = proj.r * 2.5; 
+        
+        if (Math.abs(dx) > pullRadius || Math.abs(dy) > pullRadius) continue;
+
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist < pullRadius) {
+              if (dist < proj.r * 0.5) {
+                p.active = false; // Destroy particle
+                break;
+              } else {
+                // Apply pull
+                const pullBase = CONFIG?.black?.blackHolePullStrength || 1.0;
+                // vx/vy here are pixels per second. Convert per-frame pull to per-second:
+                const pull = pullBase * 2.5 * (1 - dist / pullRadius) * (60 * dt) * 60;
+                const nx = dx / dist;
+                const ny = dy / dist;
+                p.vx += nx * pull;
+                p.vy += ny * pull;
               }
-              p.active = false;
-              break;
-            } else {
-              const pullBase = CONFIG?.black?.blackHolePullStrength || 1.0;
-              const pull = pullBase * 2.5 * (1 - dist / pullRadius) * (60 * dt) * 60;
-              const nx = dx / dist;
-              const ny = dy / dist;
-              p.vx += nx * pull;
-              p.vy += ny * pull;
             }
           }
-        }
-      }
     }
   }
 
-  // Draw authentic pixel-art fire voxel clusters (Canvas 2D rendering)
+  // Draw all particles (call every frame)
   draw(ctx) {
-    if (!ctx) return;
-    const P = 2.0;
-    const snap = (v) => Math.round(v / P) * P;
+    // Check if we have any active particles before saving context
+    let hasActive = false;
+    for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
+      if (this.particles[i].active) {
+        hasActive = true;
+        break;
+      }
+    }
+    if (!hasActive) return;
 
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    const prevGCO = ctx.globalCompositeOperation;
+    ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
 
     for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
       const p = this.particles[i];
       if (!p.active) continue;
 
       const lifeRatio = p.life / p.maxLife;
-      const currentSize = p.baseSize + (p.maxSize * 1.5 - p.baseSize) * lifeRatio;
-      const s = Math.max(P * 2, snap(currentSize));
-      const px = snap(p.x);
-      const py = snap(p.y);
 
-      const alpha = lifeRatio > 0.8 ? Math.max(0, 1.0 - (lifeRatio - 0.8) / 0.2) : 1.0;
-      ctx.globalAlpha = alpha;
+      // Size grows with distance from origin (based on life ratio)
+      const size = p.baseSize + (p.maxSize - p.baseSize) * lifeRatio;
 
-      if (lifeRatio < 0.20) {
-        // Stage 1: Incandescent White-Hot Core
-        ctx.fillStyle = '#EA580C';
-        ctx.fillRect(px - s / 2, py - s / 2, s, s);
-        ctx.fillStyle = '#FDE047';
-        ctx.fillRect(px - s / 2 + P, py - s / 2 + P, Math.max(P, s - P * 2), Math.max(P, s - P * 2));
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(px - s / 4, py - s / 4, Math.max(P, s / 2), Math.max(P, s / 2));
-      } else if (lifeRatio < 0.50) {
-        // Stage 2: Blazing Solar Orange & Yellow
-        ctx.fillStyle = '#DC2626';
-        ctx.fillRect(px - s / 2, py - s / 2, s, s);
-        ctx.fillStyle = '#F97316';
-        ctx.fillRect(px - s / 2 + P, py - s / 2 + P, Math.max(P, s - P * 2), Math.max(P, s - P * 2));
-        ctx.fillStyle = '#FDE047';
-        ctx.fillRect(px - s / 4, py - s / 4, Math.max(P, s / 2), Math.max(P, s / 2));
-      } else if (lifeRatio < 0.80) {
-        // Stage 3: Volcanic Crimson & Dark Orange Billow
-        ctx.fillStyle = '#7C2D12';
-        ctx.fillRect(px - s / 2, py - s / 2, s, s);
-        ctx.fillStyle = '#EA580C';
-        ctx.fillRect(px - s / 2 + P, py - s / 2 + P, Math.max(P, s - P * 2), Math.max(P, s - P * 2));
-        ctx.fillStyle = '#DC2626';
-        ctx.fillRect(px - s / 4, py - s / 4, Math.max(P, s / 2), Math.max(P, s / 2));
-      } else {
-        // Stage 4: Cooling Charcoal Smoke & Embers
-        ctx.fillStyle = '#262626';
-        ctx.fillRect(px - s / 2, py - s / 2, s, s);
-        if ((i + Math.floor(lifeRatio * 10)) % 2 === 0) {
-          ctx.fillStyle = '#EA580C';
-          ctx.fillRect(px - P / 2, py - P / 2, P, P);
-        }
-      }
+      // Get precomputed color string (avoid lerpColor object creation and string formatting)
+      const colorIdx = Math.floor(lifeRatio * (COLOR_LUT_SIZE - 1));
+      const colorStr = PRECOMPUTED_COLORS[Math.max(0, Math.min(COLOR_LUT_SIZE - 1, colorIdx))];
 
-      // Discrete pixel sparks floating alongside
-      if ((i % 3 === 0) && lifeRatio < 0.7) {
-        const sparkOffset = ((i * 7) % 11 - 5) * P;
-        ctx.fillStyle = (i % 2 === 0) ? '#FDE047' : '#FFFFFF';
-        ctx.fillRect(px + sparkOffset, py - s * 0.6, P, P);
-      }
+      // Draw the particle as a filled circle
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+      ctx.fillStyle = colorStr;
+      ctx.fill();
     }
 
-    ctx.restore();
+    ctx.globalCompositeOperation = prevGCO;
   }
 
+  // Check if there are any active particles
   isActive() {
     if (this.active) return true;
     for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
@@ -308,12 +283,9 @@ export class FlamethrowerParticleSystem {
     return false;
   }
 
+  // Clear all particles
   clear() {
     for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
-      if (this.particles[i].sprite) {
-        releasePixiSprite(this.particles[i].sprite);
-        this.particles[i].sprite = null;
-      }
       this.particles[i].active = false;
     }
     this.active = false;
@@ -324,145 +296,221 @@ export class FlamethrowerParticleSystem {
 export const flamewardenFlameSystem = new FlamethrowerParticleSystem();
 
 export const FLAMEWARDEN_WEAPON_GRAPHICS = {
+  flamethrower: {
+    tankGradient1: '#ff7b00',         // Fuel tank light
+    tankGradient2: '#cc5500',         // Fuel tank mid
+    tankGradient3: '#8a3a00',         // Fuel tank dark
+    tankStroke: '#2b1200',            // Tank outline
+    tankDetail: 'rgba(0,0,0,0.3)',   // Tank detail lines
+    bodyGradient1: '#4a4e54',         // Main body light
+    bodyGradient2: '#2c2f33',         // Main body dark
+    bodyStroke: '#181a1c',            // Body outline
+    bodyHighlight: '#ff7b00',         // Orange highlight line
+    gripColor: '#1e2124',             // Grip color
+    gripStroke: '#0f1012',            // Grip outline
+    shieldGradient1: '#b8babc',       // Heat shield light
+    shieldGradient2: '#72767a',       // Heat shield dark
+    shieldStroke: '#36393e',          // Shield outline
+    ventColor: '#222',                // Heat vent cutouts
+    ventGlow: '#ff3300',              // Glowing heat in vents
+    nozzleGradient1: '#5a4f4c',      // Muzzle nozzle light
+    nozzleGradient2: '#2c2524',       // Muzzle nozzle dark
+    nozzleStroke: '#1a1514',          // Nozzle outline
+    pilotBracket: '#333',             // Pilot light bracket
+    pilotCore: '#00ffff',             // Blueish pilot core
+    pilotHighlight: '#ffffff',        // White pilot highlight
+  },
   positioning: {
-    scale: 1.0,
-    bodyOffset: -4,
-  }
+    scale: 1.2,
+    bodyOffset: -5,                   // Offset from fighter body edge
+  },
+  dimensions: {
+    tankWidth: 14,
+    tankHeight: 14,
+    tankRadius: 3,
+    bodyLength: 22,
+    shieldLength: 16,
+    nozzleLength: 6,
+  },
 };
 
-/**
- * Authentic 2.0px Discrete Pixel Art Flamethrower Gun
- * Rendered with heavy forged basalt/steel chassis, glowing sight glass, perforated heat vents, and brass nozzle.
- * 
- * @param {CanvasRenderingContext2D} ctx
- * @param {number} x
- * @param {number} y
- * @param {number} gunAngle
- * @param {number} r
- * @param {string} fighterColor
- */
-export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor = '#FF8C00') {
-  if (typeof state !== 'undefined' && state.showSkinOnly) return;
-  const P = 2.0; // 2.0px discrete grid
-  const snap = (v) => Math.round(v / P) * P;
+export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
+  const prevShadowColor = ctx.shadowColor;
+  const prevShadowBlur = ctx.shadowBlur;
+  const prevShadowOffsetY = ctx.shadowOffsetY;
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
 
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
   
-  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
-  if (facingLeft) {
+  let scaleY = 1;
+  if (Math.abs(gunAngle) > Math.PI / 2) {
     ctx.scale(1, -1);
+    scaleY = -1;
   }
   
-  // Position gun slightly forward from the fighter body
-  const bodyOffset = Math.max(0, r - 6);
+  // Start closer to the fighter body
+  const bodyOffset = Math.max(0, r + FLAMEWARDEN_WEAPON_GRAPHICS.positioning.bodyOffset);
   ctx.translate(bodyOffset, 0);
 
-  const scale = 1.0;
+  const cfg = FLAMEWARDEN_WEAPON_GRAPHICS;
+  const scale = cfg.positioning.scale;
 
-  // ── 1. REAR HEAVY HEAT/FUEL TANK (-12px to 2px, Y: -8px to +8px) ──
-  // A. Outer Dark Ink Border
-  ctx.fillStyle = '#0F0501';
-  ctx.fillRect(snap(-12 * scale), snap(-8 * scale), snap(14 * scale), snap(16 * scale));
+  // Setup generic shadow (OPTIMIZED: removed shadowBlur)
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 2;
 
-  // B. Tank Body (Burnished Copper / Magma Bronze)
-  ctx.fillStyle = '#9A3412';
-  ctx.fillRect(snap(-10 * scale), snap(-6 * scale), snap(10 * scale), snap(12 * scale));
-  ctx.fillStyle = '#EA580C';
-  ctx.fillRect(snap(-10 * scale), snap(-6 * scale), snap(8 * scale), snap(4 * scale));
+  // -- 1. Rear Fuel Tank / Base --
+  ctx.beginPath();
+  ctx.roundRect(-10 * scale, -7 * scale, cfg.dimensions.tankWidth * scale, cfg.dimensions.tankHeight * scale, cfg.dimensions.tankRadius);
+  const tankGradient = ctx.createLinearGradient(-10 * scale, -7 * scale, 4 * scale, 7 * scale);
+  tankGradient.addColorStop(0, cfg.flamethrower.tankGradient1);
+  tankGradient.addColorStop(0.5, cfg.flamethrower.tankGradient2);
+  tankGradient.addColorStop(1, cfg.flamethrower.tankGradient3);
+  ctx.fillStyle = tankGradient;
+  ctx.fill();
+  ctx.strokeStyle = cfg.flamethrower.tankStroke;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
 
-  // C. Molten Glass Sight-Gauge Column
-  ctx.fillStyle = '#1C0B02';
-  ctx.fillRect(snap(-7 * scale), snap(-4 * scale), snap(4 * scale), snap(8 * scale));
-  ctx.fillStyle = '#FDE047'; // Molten plasma core in sight glass
-  ctx.fillRect(snap(-6 * scale), snap(-3 * scale), snap(2 * scale), snap(6 * scale));
-  ctx.fillStyle = '#FFFFFF'; // Specular gleam on sight glass
-  ctx.fillRect(snap(-6 * scale), snap(-3 * scale), snap(2 * scale), snap(2 * scale));
+  // Tank details
+  ctx.beginPath();
+  ctx.moveTo(-6 * scale, -4 * scale);
+  ctx.lineTo(-6 * scale, 4 * scale);
+  ctx.moveTo(-2 * scale, -4 * scale);
+  ctx.lineTo(-2 * scale, 4 * scale);
+  ctx.strokeStyle = cfg.flamethrower.tankDetail;
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
 
-  // D. Steel Reinforcement Tank Bracket Bands
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(snap(-11 * scale), snap(-8 * scale), snap(2 * scale), snap(16 * scale));
-  ctx.fillRect(snap(-2 * scale), snap(-8 * scale), snap(2 * scale), snap(16 * scale));
+  // -- 2. Main Body (Dark Metal) --
+  ctx.beginPath();
+  ctx.moveTo(2 * scale, -5 * scale);
+  ctx.lineTo(24 * scale, -4 * scale);
+  ctx.lineTo(24 * scale, 5 * scale);
+  ctx.lineTo(2 * scale, 6 * scale);
+  ctx.closePath();
+  const bodyGradient = ctx.createLinearGradient(2 * scale, -5 * scale, 24 * scale, 6 * scale);
+  bodyGradient.addColorStop(0, cfg.flamethrower.bodyGradient1);
+  bodyGradient.addColorStop(1, cfg.flamethrower.bodyGradient2);
+  ctx.fillStyle = bodyGradient;
+  ctx.fill();
+  ctx.strokeStyle = cfg.flamethrower.bodyStroke;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
 
-  // ── 2. FORGED RECEIVER / CHASSIS (2px to 22px, Y: -6px to +6px) ──
-  // A. Receiver Ink Border
-  ctx.fillStyle = '#0F0501';
-  ctx.fillRect(snap(2 * scale), snap(-6 * scale), snap(20 * scale), snap(12 * scale));
+  // Orange highlight line on body
+  ctx.beginPath();
+  ctx.moveTo(4 * scale, 0);
+  ctx.lineTo(20 * scale, 0);
+  ctx.strokeStyle = cfg.flamethrower.bodyHighlight;
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
 
-  // B. Gunmetal Steel Body
-  ctx.fillStyle = '#1E293B';
-  ctx.fillRect(snap(4 * scale), snap(-4 * scale), snap(16 * scale), snap(8 * scale));
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(snap(4 * scale), snap(-4 * scale), snap(16 * scale), snap(3 * scale));
+  // -- 3. Lower Grip / Trigger Housing --
+  ctx.beginPath();
+  ctx.moveTo(6 * scale, 6 * scale);
+  ctx.lineTo(12 * scale, 6 * scale);
+  ctx.lineTo(10 * scale, 14 * scale);
+  ctx.lineTo(4 * scale, 14 * scale);
+  ctx.closePath();
+  ctx.fillStyle = cfg.flamethrower.gripColor;
+  ctx.fill();
+  ctx.strokeStyle = cfg.flamethrower.gripStroke;
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
 
-  // C. Upper Fiery Heat Rail (Orange Conduit)
-  ctx.fillStyle = '#F97316';
-  ctx.fillRect(snap(4 * scale), snap(-2 * scale), snap(14 * scale), snap(2 * scale));
-  ctx.fillStyle = '#FDE047';
-  ctx.fillRect(snap(8 * scale), snap(-2 * scale), snap(6 * scale), snap(2 * scale));
+  // -- 4. Heat Shield / Barrel Sleeve --
+  ctx.beginPath();
+  ctx.moveTo(24 * scale, -6 * scale);
+  ctx.lineTo(40 * scale, -4 * scale);
+  ctx.lineTo(40 * scale, 5 * scale);
+  ctx.lineTo(24 * scale, 7 * scale);
+  ctx.closePath();
+  const shieldGradient = ctx.createLinearGradient(24 * scale, -6 * scale, 40 * scale, 7 * scale);
+  shieldGradient.addColorStop(0, cfg.flamethrower.shieldGradient1);
+  shieldGradient.addColorStop(1, cfg.flamethrower.shieldGradient2);
+  ctx.fillStyle = shieldGradient;
+  ctx.fill();
+  ctx.strokeStyle = cfg.flamethrower.shieldStroke;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
 
-  // D. Lower Pistol Grip & Trigger Housing (6px to 12px, Y: 6px to 14px)
-  ctx.fillStyle = '#0F0501';
-  ctx.fillRect(snap(6 * scale), snap(6 * scale), snap(6 * scale), snap(8 * scale));
-  ctx.fillStyle = '#1C1917';
-  ctx.fillRect(snap(8 * scale), snap(6 * scale), snap(4 * scale), snap(6 * scale));
-
-  // ── 3. PERFORATED HEAT BARREL SHROUD (22px to 38px, Y: -5px to +5px) ──
-  // A. Barrel Outer Ink Border
-  ctx.fillStyle = '#0F0501';
-  ctx.fillRect(snap(22 * scale), snap(-5 * scale), snap(16 * scale), snap(10 * scale));
-
-  // B. Heavy Dark Steel Sleeve
-  ctx.fillStyle = '#475569';
-  ctx.fillRect(snap(22 * scale), snap(-3 * scale), snap(14 * scale), snap(6 * scale));
-  ctx.fillStyle = '#64748B';
-  ctx.fillRect(snap(22 * scale), snap(-3 * scale), snap(14 * scale), snap(2 * scale));
-
-  // C. Heat Cooling Vent Slots & Glowing Red Internal Heating Coils
+  // Heat vent cutouts
+  ctx.fillStyle = cfg.flamethrower.ventColor;
   for (let i = 0; i < 3; i++) {
-    const vx = snap((25 + i * 4) * scale);
-    ctx.fillStyle = '#0F0501'; // Vent hole cutout
-    ctx.fillRect(vx, snap(-2 * scale), snap(2 * scale), snap(4 * scale));
-    ctx.fillStyle = '#EF4444'; // Glowing red heating element
-    ctx.fillRect(vx, snap(-1 * scale), snap(2 * scale), snap(2 * scale));
-    ctx.fillStyle = '#FDE047'; // White-hot central coil segment
-    ctx.fillRect(vx, snap(0), snap(1 * scale), snap(1 * scale));
+    const vx = (27 + i * 4) * scale;
+    ctx.fillRect(vx, -2 * scale, 1.5 * scale, 5 * scale);
   }
 
-  // ── 4. FLARED BRASS MUZZLE NOZZLE (38px to 46px, Y: -4px to +4px) ──
-  // A. Nozzle Ink Border
-  ctx.fillStyle = '#0F0501';
-  ctx.fillRect(snap(38 * scale), snap(-4 * scale), snap(8 * scale), snap(8 * scale));
+  // Glowing heat inside vents
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.fillStyle = cfg.flamethrower.ventGlow;
+  for (let i = 0; i < 3; i++) {
+    const vx = (27.5 + i * 4) * scale;
+    ctx.fillRect(vx, -1.5 * scale, 0.5 * scale, 4 * scale);
+  }
+  // Shadow for depth (OPTIMIZED: removed shadowBlur)
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 2;
 
-  // B. Flared Brass Stepped Nozzle
-  ctx.fillStyle = '#B45309'; // Dark brass
-  ctx.fillRect(snap(38 * scale), snap(-3 * scale), snap(6 * scale), snap(6 * scale));
-  ctx.fillStyle = '#F59E0B'; // Highlighted gold-brass rim
-  ctx.fillRect(snap(40 * scale), snap(-2 * scale), snap(4 * scale), snap(4 * scale));
-  ctx.fillStyle = '#1C0B02'; // Hollow muzzle opening
-  ctx.fillRect(snap(44 * scale), snap(-2 * scale), snap(2 * scale), snap(4 * scale));
+  // -- 5. Muzzle Nozzle --
+  ctx.beginPath();
+  ctx.moveTo(40 * scale, -3 * scale);
+  ctx.lineTo(46 * scale, -2 * scale);
+  ctx.lineTo(46 * scale, 3 * scale);
+  ctx.lineTo(40 * scale, 4 * scale);
+  ctx.closePath();
+  const nozzleGradient = ctx.createLinearGradient(40 * scale, -3 * scale, 46 * scale, 4 * scale);
+  nozzleGradient.addColorStop(0, cfg.flamethrower.nozzleGradient1);
+  nozzleGradient.addColorStop(1, cfg.flamethrower.nozzleGradient2);
+  ctx.fillStyle = nozzleGradient;
+  ctx.fill();
+  ctx.strokeStyle = cfg.flamethrower.nozzleStroke;
+  ctx.lineWidth = 1 * scale;
+  ctx.stroke();
 
-  // ── 5. PILOT IGNITER TORCH & BLUE FLAME (42px, Y: -8px) ──
-  ctx.fillStyle = '#0F0501';
-  ctx.fillRect(snap(41 * scale), snap(-8 * scale), snap(3 * scale), snap(4 * scale));
-  ctx.fillStyle = '#64748B';
-  ctx.fillRect(snap(42 * scale), snap(-7 * scale), snap(2 * scale), snap(3 * scale));
+  // -- 6. Pilot Light --
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  
+  // Pilot light bracket
+  ctx.fillStyle = cfg.flamethrower.pilotBracket;
+  ctx.fillRect(44 * scale, -5 * scale, 1.5 * scale, 4 * scale);
+  
+  // Pilot flame
+  ctx.beginPath();
+  ctx.arc(44.75 * scale, -6 * scale, 1.5 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = cfg.flamethrower.pilotCore;
+  // OPTIMIZED: Removed shadowBlur (expensive operation)
+  ctx.fill();
+  
+  ctx.beginPath();
+  ctx.arc(44.75 * scale, -6 * scale, 0.8 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = cfg.flamethrower.pilotHighlight;
+  // OPTIMIZED: Removed shadowBlur (expensive operation)
+  ctx.fill();
 
-  // Pilot flame (Cyan/White pixel diamond)
-  ctx.fillStyle = '#00FFFF';
-  ctx.fillRect(snap(41 * scale), snap(-10 * scale), snap(4 * scale), snap(3 * scale));
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(snap(42 * scale), snap(-9 * scale), snap(2 * scale), snap(2 * scale));
+  // Reset transformations
+  ctx.translate(-bodyOffset, 0);
+  if (scaleY === -1) {
+    ctx.scale(1, -1);
+  }
+  ctx.rotate(-gunAngle);
+  ctx.translate(-x, -y);
 
-  // ── 6. DUAL PIXEL HANDS (Rule 20 / Rule 3.6) ──
-  // Rear Grip Hand (holding main trigger)
-  drawPixelHand(ctx, snap(8 * scale), snap(8 * scale), getHandSize(5.5), '#EA580C', '#0F0501');
-  // Forward Steadying Hand (bracing under barrel shroud)
-  drawPixelHand(ctx, snap(22 * scale), snap(4 * scale), getHandSize(5.5), '#EA580C', '#0F0501');
-
-  ctx.restore();
+  // Restore state
+  ctx.shadowColor = prevShadowColor;
+  ctx.shadowBlur = prevShadowBlur;
+  ctx.shadowOffsetY = prevShadowOffsetY;
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
 }
 
 /**
@@ -568,4 +616,3 @@ export function drawPixelFlameProjectile(ctx, p) {
 
   ctx.restore();
 }
-

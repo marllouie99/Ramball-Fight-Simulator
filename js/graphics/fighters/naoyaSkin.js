@@ -12,10 +12,12 @@
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
-import { drawNaoyaTanto } from '../weapons/naoyaWeaponGraphics.js';
+import { drawNaoyaTanto, drawCursedWombCocoonVFX, drawCurseNaoyaMachRamjetVFX } from '../weapons/naoyaWeaponGraphics.js';
 
 let _cachedFighterCanvas = null;
 let _cachedFighterR = 0;
+let _cachedCurseFighterCanvas = null;
+let _cachedCurseFighterR = 0;
 let _cachedProjectionGhostCanvas = null;
 let _cachedProjectionGhostR = 0;
 let _cachedProjectionHairCanvas = null;
@@ -755,12 +757,222 @@ export function drawNaoyaGhostModel(ctx, x, y, angle, r, alpha = 0.5) {
 }
 
 /**
+ * Discrete Grid Rasterization Engine for Curse Naoya (Jet Turbine Exoskeleton Form).
+ * Fixed discrete grid unit (P = 2.0px) rasterized onto an offscreen canvas buffer.
+ */
+function _renderCurseNaoyaPixelBodyToCanvas(destCanvas, r) {
+  const destCtx = destCanvas.getContext('2d');
+  destCtx.imageSmoothingEnabled = false;
+
+  const P = 2.0;
+  const steps = Math.ceil((r * 1.6 + P) / P);
+  const cx = destCanvas.width / 2;
+  const cy = destCanvas.height / 2;
+
+  destCtx.save();
+  destCtx.translate(cx, cy);
+
+  const isInsideCurseBody = (gx, gy) => {
+    const rx = gx * P;
+    const ry = gy * P;
+    // Aerodynamic elongated body: radius r with side turbine nacelles
+    const mainBody = (rx * rx) / ((r * 1.15) * (r * 1.15)) + (ry * ry) / (r * r) <= 1.0;
+    const leftTurbine = Math.hypot(rx - (-r * 0.3), ry - (-r * 0.65)) <= r * 0.42;
+    const rightTurbine = Math.hypot(rx - (-r * 0.3), ry - (r * 0.65)) <= r * 0.42;
+    return mainBody || leftTurbine || rightTurbine;
+  };
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      if (!isInsideCurseBody(gx, gy)) continue;
+
+      const rx = gx * P;
+      const ry = gy * P;
+      const px = rx - P / 2;
+      const py = ry - P / 2;
+
+      // 4-neighbor attached boundary test for solid manga ink outline
+      const isBorder = (
+        !isInsideCurseBody(gx + 1, gy) ||
+        !isInsideCurseBody(gx - 1, gy) ||
+        !isInsideCurseBody(gx, gy + 1) ||
+        !isInsideCurseBody(gx, gy - 1)
+      );
+
+      if (isBorder) {
+        destCtx.fillStyle = '#020617';
+        destCtx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Zone 1: Bone-White Visor / Facial Skull Plate (-r * 0.35 to +r * 0.35 in Y, rx > 0)
+      if (rx >= -r * 0.15 && Math.abs(ry) <= r * 0.42) {
+        if (rx > r * 0.65) {
+          destCtx.fillStyle = '#FFFFFF'; // Front aerodynamic nose glint
+        } else if (rx > r * 0.25) {
+          destCtx.fillStyle = '#E2E8F0'; // Pale bone visor
+        } else {
+          destCtx.fillStyle = '#94A3B8'; // Visor seam shadow
+        }
+        destCtx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Zone 2: Jet Ramjet Turbines (Upper & Lower Side Nacelles)
+      const distLeftTurbine = Math.hypot(rx - (-r * 0.3), ry - (-r * 0.65));
+      const distRightTurbine = Math.hypot(rx - (-r * 0.3), ry - (r * 0.65));
+      if (distLeftTurbine <= r * 0.38 || distRightTurbine <= r * 0.38) {
+        const d = Math.min(distLeftTurbine, distRightTurbine);
+        if (d <= r * 0.16) {
+          destCtx.fillStyle = '#00F2FE'; // Cyan intake core
+        } else if (d <= r * 0.28) {
+          destCtx.fillStyle = '#76E042'; // Lime intake ring
+        } else {
+          destCtx.fillStyle = '#0F172A'; // Obsidian turbine housing
+        }
+        destCtx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Zone 3: Aerodynamic Exoskeleton Carapace Plates
+      if (rx < -r * 0.45) {
+        destCtx.fillStyle = '#0B0F19'; // Rear thruster exhaust housing
+      } else if (Math.abs(ry) > r * 0.50) {
+        destCtx.fillStyle = '#1E293B'; // Lateral carapace armor
+      } else if (rx > r * 0.10) {
+        destCtx.fillStyle = '#334155'; // Dorsal ridge plate
+      } else {
+        destCtx.fillStyle = '#111827'; // Dark chitin underlayer
+      }
+      destCtx.fillRect(px, py, P, P);
+    }
+  }
+
+  destCtx.restore();
+}
+
+export function getCurseNaoyaCachedCanvas(r) {
+  const intR = Math.round(r);
+  if (!_cachedCurseFighterCanvas || _cachedCurseFighterR !== intR) {
+    if (typeof document !== 'undefined') {
+      const P = 2.0;
+      const steps = Math.ceil((intR * 1.6 + P) / P);
+      const size = (steps * 2 + 1) * P;
+      _cachedCurseFighterCanvas = document.createElement('canvas');
+      _cachedCurseFighterCanvas.width = size;
+      _cachedCurseFighterCanvas.height = size;
+      _renderCurseNaoyaPixelBodyToCanvas(_cachedCurseFighterCanvas, intR);
+      _cachedCurseFighterR = intR;
+    }
+  }
+  return _cachedCurseFighterCanvas;
+}
+
+/**
+ * Draws Curse Naoya (Awakened Jet Turbine Cursed Spirit Form).
+ * Adheres strictly to Rule 19, Rule 20, and Rule 3.5.
+ */
+export function drawCurseNaoyaSkin(ctx, fighter) {
+  if (!fighter) return;
+
+  const r = fighter.r || 25;
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+
+  // 1. Offscreen Canvas Caching check
+  getCurseNaoyaCachedCanvas(r);
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+  ctx.rotate(angle);
+
+  // Rule 19: Vertical mirroring when aiming left
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
+
+  // 2. Draw Rear Ramjet Jet Exhaust Flames / Heat Distortion
+  drawCurseNaoyaMachRamjetVFX(ctx, fighter);
+
+  // 3. Render Cached Pixel Art Jet Body
+  if (_cachedCurseFighterCanvas) {
+    const w = _cachedCurseFighterCanvas.width;
+    const h = _cachedCurseFighterCanvas.height;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(_cachedCurseFighterCanvas, -w / 2, -h / 2, w, h);
+  } else {
+    _renderCurseNaoyaPixelBodyToCanvas(ctx, r);
+  }
+
+  // 4. Render Symmetrical Cursed Talon Claws (Rule 20 Canonical Lower Flanks)
+  const shouldHideHands = Boolean(
+    (typeof state !== 'undefined' && state.showSkinOnly) ||
+    fighter.hideHands
+  );
+
+  if (!shouldHideHands) {
+    const handR = getHandSize(r * 0.32);
+    const clawTone = '#1E293B';
+    const clawOutline = '#020617';
+
+    const isPunching = Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
+    const isLunging = Boolean(fighter.isRamjetLunging);
+
+    let leftX = -r * 0.82;
+    let leftY = -r * 0.38;
+    let rightX = r * 0.82;
+    let rightY = r * 0.38;
+
+    if (isLunging) {
+      // Both talons thrust forward during Mach 3 ramjet lunge
+      leftX = r * 0.85;
+      leftY = -r * 0.45;
+      rightX = r * 0.85;
+      rightY = r * 0.45;
+    } else if (isPunching) {
+      const maxT = fighter.punchAnimMaxTimer || 8;
+      const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+      const lunge = Math.sin(rawProgress * Math.PI) * (r * 1.25);
+      if (fighter.punchAnimHand === 1) {
+        leftX += lunge;
+      } else {
+        rightX += lunge;
+      }
+    }
+
+    // Draw Cursed Fists & Cyan Claw Tips
+    drawPixelHand(ctx, leftX, leftY, handR, clawTone, clawOutline);
+    drawPixelHand(ctx, rightX, rightY, handR, clawTone, clawOutline);
+
+    // Glowing Cyan Talon Points
+    ctx.fillStyle = '#00F2FE';
+    ctx.beginPath();
+    ctx.arc(leftX + handR * 0.6, leftY, handR * 0.35, 0, Math.PI * 2);
+    ctx.arc(rightX + handR * 0.6, rightY, handR * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws Naoya's full fighter skin adhering to Rule 19, Rule 20, and Rule 3.5.
+ * Automatically delegates to Cursed Womb or Curse Form when transformed!
  * @param {CanvasRenderingContext2D} ctx
  * @param {Object} fighter
  */
 export function drawNaoyaSkin(ctx, fighter) {
   if (!fighter) return;
+
+  // ── OPTION B: CURSED WOMB COCOON & CURSE FORM HOOKS ──
+  if (fighter.isCurseWomb) {
+    drawCursedWombCocoonVFX(ctx, fighter);
+    return;
+  }
+  if (fighter.isCurseForm) {
+    drawCurseNaoyaSkin(ctx, fighter);
+    return;
+  }
 
   const r = fighter.r || 25;
   const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);

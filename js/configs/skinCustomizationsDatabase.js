@@ -1,13 +1,13 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-07T05:40:51.975Z
+ * Generated from Skin Studio on 2026-10-07T07:52:07.071Z
  * =============================================================================
  */
 
 export const SKIN_CUSTOMIZATIONS_DATABASE = {
   ichigo: { widthScale: 1.00, heightScale: 1.00, offsetX: -1, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
-  gojo: { widthScale: 0.98, heightScale: 0.90, offsetX: -1, offsetY: 1, angleOffset: 0, flipX: false, flipY: false },
+  gojo: { widthScale: 0.88, heightScale: 0.94, offsetX: -1, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
   makima: { widthScale: 0.98, heightScale: 0.90, offsetX: -2, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   reze: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   sukuna: { widthScale: 0.86, heightScale: 0.88, offsetX: -1, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
@@ -17,7 +17,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   todo: { widthScale: 0.96, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   nanami: { widthScale: 1.06, heightScale: 1.08, offsetX: 0, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
   mahito: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
-  naoya: { widthScale: 1.04, heightScale: 0.84, offsetX: 0, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
+  naoya: { widthScale: 0.94, heightScale: 0.84, offsetX: 0, offsetY: 4, angleOffset: 0.0349, flipX: false, flipY: false },
   maki: { widthScale: 1.40, heightScale: 0.90, offsetX: 2, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
   genos: { widthScale: 1.04, heightScale: 0.82, offsetX: 0, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
   escanor: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -3, angleOffset: 0, flipX: false, flipY: false },
@@ -73,4 +73,62 @@ export function getAllDatabaseDefaults() {
   const clone = {};
   for (const [k, v] of Object.entries(SKIN_CUSTOMIZATIONS_DATABASE)) clone[k] = { ...v };
   return clone;
+}
+
+export function generateDatabaseModuleCode(customizations = SKIN_CUSTOMIZATIONS_DATABASE) {
+  const timestamp = new Date().toISOString();
+  let code = `/**
+ * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
+ * =============================================================================
+ * Generated from Skin Studio on ${timestamp}
+ * =============================================================================
+ */
+
+export const SKIN_CUSTOMIZATIONS_DATABASE = {\n`;
+
+  const keys = Object.keys(customizations || {});
+  keys.forEach((key, idx) => {
+    const entry = customizations[key];
+    if (!entry) return;
+    const pairs = [];
+    if (entry.widthScale !== undefined) pairs.push(`widthScale: ${Number(entry.widthScale).toFixed(2)}`);
+    if (entry.heightScale !== undefined) pairs.push(`heightScale: ${Number(entry.heightScale).toFixed(2)}`);
+    if (entry.offsetX !== undefined) pairs.push(`offsetX: ${Math.round(entry.offsetX)}`);
+    if (entry.offsetY !== undefined) pairs.push(`offsetY: ${Math.round(entry.offsetY)}`);
+    if (entry.angleOffset !== undefined) {
+      const angle = Number(entry.angleOffset);
+      pairs.push(`angleOffset: ${angle ? (Number.isInteger(angle) ? angle : Number(angle.toFixed(4))) : 0}`);
+    }
+    if (entry.flipX !== undefined) pairs.push(`flipX: ${Boolean(entry.flipX)}`);
+    if (entry.flipY !== undefined) pairs.push(`flipY: ${Boolean(entry.flipY)}`);
+    if (entry.gap !== undefined) pairs.push(`gap: ${entry.gap}`);
+
+    for (const prop of Object.keys(entry)) {
+      if (!['widthScale', 'heightScale', 'offsetX', 'offsetY', 'angleOffset', 'flipX', 'flipY', 'gap'].includes(prop)) {
+        pairs.push(`${prop}: ${JSON.stringify(entry[prop])}`);
+      }
+    }
+
+    const comma = idx < keys.length - 1 ? ',' : '';
+    code += `  ${key}: { ${pairs.join(', ')} }${comma}\n`;
+  });
+
+  code += `};
+
+export const DEFAULT_SKIN_CUSTOMIZATIONS = SKIN_CUSTOMIZATIONS_DATABASE;
+
+export function getDatabaseDefault(key) {
+  if (SKIN_CUSTOMIZATIONS_DATABASE[key]) return { ...SKIN_CUSTOMIZATIONS_DATABASE[key] };
+  return { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false };
+}
+
+export function getAllDatabaseDefaults() {
+  const clone = {};
+  for (const [k, v] of Object.entries(SKIN_CUSTOMIZATIONS_DATABASE)) clone[k] = { ...v };
+  return clone;
+}
+
+export ${generateDatabaseModuleCode.toString()}
+`;
+  return code;
 }

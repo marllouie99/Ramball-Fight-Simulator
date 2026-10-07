@@ -1,6 +1,6 @@
-import { CONFIG, getHandSize } from '../../core/config.js';
+import { CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
+import { getCachedCanvas } from '../graphicsCache.js';
 
 // dopplegangerWeaponGraphics.js
 // Doppelganger's Crystalline Ethereal Sword
@@ -62,21 +62,18 @@ export const DOPPLEGANGER_WEAPON_GRAPHICS = {
   },
 };
 
-export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingActive = false, swordSwingTimer = 0, swordSwingAngle = 0, swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20, timeOpt, fighterColor = '#7b2cbf') {
+export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingActive = false, swordSwingTimer = 0, swordSwingAngle = 0, swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20, timeOpt) {
   if (!CONFIG.doppleganger) return;
 
   const sword = DOPPLEGANGER_WEAPON_GRAPHICS.sword;
   const time = timeOpt || Date.now();
 
-  const baseRadius = CONFIG.doppleganger?.r || 25;
-  const radiusScale = (r || 25) / baseRadius;
-
-  ctx.save();
+  // Manual state backup for doppelganger sword
   ctx.translate(x, y);
 
-  const scale = DOPPLEGANGER_WEAPON_GRAPHICS.positioning.scale * radiusScale;
+  const scale = DOPPLEGANGER_WEAPON_GRAPHICS.positioning.scale;
   // Push the sword out slightly so the handle rests nicely in a "hand" area
-  const sideOffset = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset * radiusScale;
+  const sideOffset = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset;
 
   const defaultSwordRotation = swordSwingActive ? swordSwingAngle : gunAngle;
 
@@ -108,7 +105,7 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
       swingRot = endStrikeAngle * (1 - p) + restingAngle * p;
     }
 
-    drawDopplegangerSwingEffect(ctx, r, swingProgress, defaultSwordRotation, fighterColor, radiusScale);
+    drawDopplegangerSwingEffect(ctx, r, swingProgress);
   }
 
   // To make the hand grip look correct, we want to rotate around the body center first (defaultSwordRotation),
@@ -122,79 +119,96 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
   // OPTIMIZATION: Skip phantom trace at low FPS
   const fps = state.fps || 60;
   if (swordSwingActive && swingProgress > 0.1 && swingProgress < 0.8 && fps > 40) {
-    ctx.save();
-    ctx.translate(sideOffset - 5 * radiusScale, handOffsetY);
-    // Calculate a slight lag in rotation based on swing direction
-    const lagAmount = 0.25 * Math.sin(swingProgress * Math.PI);
-    ctx.rotate(swingRot - lagAmount);
+      const phantomX = sideOffset - 5;
+      const phantomY = handOffsetY;
+      ctx.translate(phantomX, phantomY);
+      // Calculate a slight lag in rotation based on swing direction
+      const lagAmount = 0.25 * Math.sin(swingProgress * Math.PI);
+      const lagRot = swingRot - lagAmount;
+      ctx.rotate(lagRot);
 
-    // Draw only the phantom silhouette
-    drawSingleSword(ctx, 0, scale, swordSwingActive, true);
-    ctx.restore();
-  }
+      // Draw only the phantom silhouette
+      drawSingleSword(ctx, 0, scale, swordSwingActive, true);
+      
+      ctx.rotate(-lagRot);
+      ctx.translate(-phantomX, -phantomY);
+    }
 
-  ctx.save();
-  ctx.translate(sideOffset - 5 * radiusScale, handOffsetY);
-  ctx.rotate(swingRot);
+    const swordX = sideOffset - 5;
+    const swordY = handOffsetY;
+    ctx.translate(swordX, swordY);
+    ctx.rotate(swingRot);
 
-  drawSingleSword(ctx, 0, scale, swordSwingActive, false);
-  ctx.restore();
-
-  ctx.restore();
+    // Use cached sword when not swinging (resting position)
+    if (!swordSwingActive && fps > 40) {
+      drawSingleSwordCached(ctx, 0, 0, scale, r);
+    } else {
+      drawSingleSword(ctx, 0, scale, swordSwingActive, false);
+    }
+    
+    ctx.rotate(-swingRot);
+    ctx.translate(-swordX, -swordY);
+    
+    // Restore doppelganger sword states
+    ctx.rotate(-defaultSwordRotation);
+    ctx.translate(-x, -y);
 }
 
-function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor, radiusScale = 1.0) {
+function drawDopplegangerSwingEffect(ctx, r, progress) {
   const fade = Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI);
-  const isFFA = typeof state !== 'undefined' && state.mode === 'FFA';
-  if (fade <= 0 || isFFA) return;
+  if (fade <= 0) return;
 
   const se = DOPPLEGANGER_WEAPON_GRAPHICS.swingEffect;
 
-  ctx.save();
-  ctx.rotate(facingAngle);
+  const prevAlpha = ctx.globalAlpha;
+  const prevGCO = ctx.globalCompositeOperation;
+  const prevLineWidth = ctx.lineWidth;
+  const prevLineCap = ctx.lineCap;
+  const prevStrokeStyle = ctx.strokeStyle;
+  
   ctx.globalCompositeOperation = 'lighter';
 
   // Outer ethereal trail - wide and soft
   ctx.globalAlpha = fade * 0.4;
   ctx.strokeStyle = se.trailColor;
-  ctx.lineWidth = Math.max(1, 20 * radiusScale);
+  ctx.lineWidth = 20;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.arc(0, 0, r + 38 * radiusScale, -Math.PI / 2.2, Math.PI / 2.2);
+  ctx.arc(0, 0, r + 38, -Math.PI / 2.2, Math.PI / 2.2);
   ctx.stroke();
 
   // Middle glow layer
   ctx.globalAlpha = fade * 0.6;
   ctx.strokeStyle = se.secondaryColor;
-  ctx.lineWidth = Math.max(1, 12 * radiusScale);
+  ctx.lineWidth = 12;
   ctx.beginPath();
-  ctx.arc(0, 0, r + 32 * radiusScale, -Math.PI / 2.8, Math.PI / 2.8);
+  ctx.arc(0, 0, r + 32, -Math.PI / 2.8, Math.PI / 2.8);
   ctx.stroke();
 
   // Primary swing arc
   ctx.globalAlpha = fade * 0.8;
   ctx.strokeStyle = se.primaryColor;
-  ctx.lineWidth = Math.max(1, 7 * radiusScale);
+  ctx.lineWidth = 7;
   ctx.beginPath();
-  ctx.arc(0, 0, r + 26 * radiusScale, -Math.PI / 3.2, Math.PI / 3.2);
+  ctx.arc(0, 0, r + 26, -Math.PI / 3.2, Math.PI / 3.2);
   ctx.stroke();
 
   // Bright inner arc
   ctx.globalAlpha = fade * 1.0;
   ctx.strokeStyle = se.tertiaryColor;
-  ctx.lineWidth = Math.max(1, 4 * radiusScale);
+  ctx.lineWidth = 4;
   ctx.beginPath();
-  ctx.arc(0, 0, r + 22 * radiusScale, -Math.PI / 3.5, Math.PI / 3.5);
+  ctx.arc(0, 0, r + 22, -Math.PI / 3.5, Math.PI / 3.5);
   ctx.stroke();
 
   // Energy particles along the arc
   const particleCount = 5; // Reduced for performance
   for (let i = 0; i < particleCount; i++) {
     const angle = -Math.PI / 3.5 + (Math.PI * 2 / 3.5) * (i / (particleCount - 1));
-    const px = Math.cos(angle) * (r + 26 * radiusScale);
-    const py = Math.sin(angle) * (r + 26 * radiusScale);
+    const px = Math.cos(angle) * (r + 26);
+    const py = Math.sin(angle) * (r + 26);
     const particleFade = fade * (0.5 + 0.5 * Math.sin(i * 1.5 + progress * 15));
-    const particleSize = (3 + fade * 4) * radiusScale;
+    const particleSize = 3 + fade * 4;
 
     ctx.globalAlpha = particleFade;
     ctx.fillStyle = se.tertiaryColor;
@@ -203,43 +217,28 @@ function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor
     ctx.fill();
   }
 
-  ctx.restore();
-
-  // ── Hand ──
-  ctx.save();
-  ctx.rotate(facingAngle);
-  
-  // Position hand at the sword handle
-  const sideOffsetHand = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset * radiusScale;
-  ctx.translate(sideOffsetHand, 0);
-  
-  ctx.fillStyle = fighterColor || '#7b2cbf';
-  ctx.beginPath();
-  ctx.arc(0, 0, getHandSize(6) * radiusScale, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = Math.max(1, 1.5 * radiusScale);
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
-  
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
+  ctx.globalCompositeOperation = prevGCO;
+  ctx.lineWidth = prevLineWidth;
+  ctx.lineCap = prevLineCap;
+  ctx.strokeStyle = prevStrokeStyle;
 }
 
 function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   const sword = DOPPLEGANGER_WEAPON_GRAPHICS.sword;
   const time = Date.now();
 
-  const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
-  const isFFA = typeof state !== 'undefined' && state.mode === 'FFA';
-  const useLOD = isFFA || (isMulti && (qualityLevel < 1.0 || fps < 55));
-  const useUltraLOD = isFFA || (isMulti && (qualityLevel <= 0.5 || fps < 40));
+  const useLOD = (state.fps < 45 && state.gameState === 'playing') || qualityLevel < 0.6;
+  const useUltraLOD = (state.fps < 38 && state.gameState === 'playing') || qualityLevel < 0.35;
 
   if (isPhantom) {
     if (useUltraLOD) { return; } // OPTIMIZED: Disable phantom trace on ULTRA low FPS
 
-    ctx.save();
     ctx.translate(xOffset, 0);
+    const prevGCO = ctx.globalCompositeOperation;
+    const prevAlpha = ctx.globalAlpha;
+    
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 0.45;
     ctx.fillStyle = '#000000';
@@ -250,11 +249,13 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
     ctx.beginPath();
     ctx.rect(-handleLength, -2.5 * scale, handleLength + bladeLength, 5 * scale);
     ctx.fill();
-    ctx.restore();
+    
+    ctx.globalCompositeOperation = prevGCO;
+    ctx.globalAlpha = prevAlpha;
+    ctx.translate(-xOffset, 0);
     return;
   }
 
-  ctx.save();
   ctx.translate(xOffset, 0);
 
   const bladeLength = 48 * scale;
@@ -267,31 +268,11 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   const bladeTop = baseY - bladeBaseWidth;
   const bladeBottom = baseY + bladeBaseWidth;
 
-  if (isFFA) {
-    ctx.fillStyle = sword.bladeCore;
-    ctx.beginPath();
-    ctx.moveTo(2 * scale, bladeTop);
-    ctx.lineTo(midX, bladeTop + 1.5 * scale);
-    ctx.lineTo(bladeLength, baseY);
-    ctx.lineTo(midX, bladeBottom - 1.5 * scale);
-    ctx.lineTo(2 * scale, bladeBottom);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = sword.bladeEdgeBright;
-    ctx.lineWidth = 1.5 * scale;
-    ctx.stroke();
-
-    ctx.fillStyle = sword.handleBase;
-    ctx.fillRect(-handleLength, baseY - 2.5 * scale, handleLength, 5 * scale);
-    
-    ctx.restore();
-    return;
-  }
-
   // Re-enabled Outer Aura, disabled only on Ultra LOD
   // OPTIMIZATION: Further reduce iterations for performance
   if (!useUltraLOD) {
-    ctx.save();
+    const prevGCO = ctx.globalCompositeOperation;
+    const prevAlpha = ctx.globalAlpha;
     ctx.globalCompositeOperation = 'lighter';
     const waveTime = time / 600;
     const iterations = useLOD ? 0 : 1; // Even fewer iterations on LOD
@@ -307,7 +288,8 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
       ctx.closePath();
       ctx.fill();
     }
-    ctx.restore();
+    ctx.globalCompositeOperation = prevGCO;
+    ctx.globalAlpha = prevAlpha;
   }
 
   // Handle & Pommel (Simplified for brevity, original logic is fine)
@@ -339,7 +321,11 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   // Re-enabled Dark Aura, disabled only on Ultra LOD
   // OPTIMIZATION: Skip dark aura on LOD as well
   if (!useLOD && !useUltraLOD) {
-    ctx.save();
+    const prevStroke = ctx.strokeStyle;
+    const prevLineWidth = ctx.lineWidth;
+    const prevLineCap = ctx.lineCap;
+    const prevLineJoin = ctx.lineJoin;
+
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = useLOD ? 6 * scale : 10 * scale;
     ctx.lineCap = 'round';
@@ -355,11 +341,14 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = useLOD ? 2 * scale : 4 * scale;
     ctx.stroke();
-    ctx.restore();
+
+    ctx.strokeStyle = prevStroke;
+    ctx.lineWidth = prevLineWidth;
+    ctx.lineCap = prevLineCap;
+    ctx.lineJoin = prevLineJoin;
   }
 
   // Main Blade
-  ctx.save();
   ctx.fillStyle = sword.bladeCore;
   ctx.beginPath();
   ctx.moveTo(2 * scale, bladeTop);
@@ -403,6 +392,11 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   ctx.fill();
 
   // Glowing Edges
+  const prevGCO = ctx.globalCompositeOperation;
+  const prevStroke = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevAlpha = ctx.globalAlpha;
+
   ctx.globalCompositeOperation = 'lighter';
   ctx.strokeStyle = sword.bladeEdgeBright;
   ctx.lineWidth = 1.5 * scale;
@@ -435,12 +429,17 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
       }
     }
   }
-  ctx.restore();
+  
+  ctx.globalCompositeOperation = prevGCO;
+  ctx.strokeStyle = prevStroke;
+  ctx.lineWidth = prevLineWidth;
+  ctx.globalAlpha = prevAlpha;
 
   // Particles disabled on LOD
   // OPTIMIZATION: Completely disable particles for performance
   if (!useLOD && state.fps > 50) {
-    ctx.save();
+    const prevGCO = ctx.globalCompositeOperation;
+    const prevAlpha = ctx.globalAlpha;
     ctx.globalCompositeOperation = 'source-over';
     const particleTime = time / 800;
     const particleCount = 2;
@@ -455,64 +454,189 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
       ctx.arc(pX, pY, pSize, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.restore();
+    ctx.globalCompositeOperation = prevGCO;
+    ctx.globalAlpha = prevAlpha;
   }
 
-  ctx.restore();
+  ctx.translate(-xOffset, 0);
 }
 
-// Off-screen canvases for static smoke/glow caching to eliminate GC allocation pressure
-let _smokeCacheCanvas = null;
-let _glowCacheCanvas = null;
-let _wispCacheCanvas = null;
+/**
+ * Draw cached Doppelganger sword (for resting position only)
+ * Uses pre-rendered offscreen canvas for performance
+ */
+export function drawSingleSwordCached(ctx, x, y, scale, r) {
+  const sword = DOPPLEGANGER_WEAPON_GRAPHICS.sword;
+  const time = Date.now();
+  
+  const qualityLevel = state.qualityLevel || 1.0;
+  const useLOD = (state.fps < 45 && state.gameState === 'playing') || qualityLevel < 0.6;
+  const useUltraLOD = (state.fps < 38 && state.gameState === 'playing') || qualityLevel < 0.35;
+  
+  // Use cached canvas for blade (pre-rendered without animated effects)
+  const cacheKey = `doppSword_${Math.round(r)}_${useLOD ? 'lod' : 'full'}`;
+  const cached = getCachedCanvas(cacheKey, 120, 60, (c) => {
+    c.translate(60, 30);
+    drawSwordToCache(c, scale, sword, useLOD, useUltraLOD, time);
+  });
+  
+  ctx.drawImage(cached, x - 60, y - 30, 120, 60);
+}
 
-function _initDoppelgangerCaches(r) {
-  const size = Math.ceil(r * 4);
-
-  if (!_smokeCacheCanvas || _smokeCacheCanvas.width !== size) {
-    _smokeCacheCanvas = document.createElement('canvas');
-    _smokeCacheCanvas.width = size;
-    _smokeCacheCanvas.height = size;
-    const sCtx = _smokeCacheCanvas.getContext('2d');
-    const grad = sCtx.createRadialGradient(size / 2, size / 2, size * 0.05, size / 2, size / 2, size * 0.5);
-    grad.addColorStop(0, 'rgba(60, 9, 108, 0.45)');
-    grad.addColorStop(0.7, 'rgba(26, 0, 43, 0.2)');
-    grad.addColorStop(1, 'rgba(16, 0, 43, 0)');
-    sCtx.fillStyle = grad;
-    sCtx.beginPath();
-    sCtx.arc(size / 2, size / 2, size * 0.5, 0, Math.PI * 2);
-    sCtx.fill();
+/**
+ * Draw the sword to a cached canvas (no animated effects)
+ */
+function drawSwordToCache(ctx, scale, sword, useLOD, useUltraLOD, time) {
+  const bladeLength = 48 * scale;
+  const handleLength = 14 * scale;
+  const crossguardWidth = 14 * scale;
+  const bladeBaseWidth = 5 * scale;
+  const tipLength = 12 * scale;
+  const baseY = 0;
+  const midX = bladeLength - tipLength;
+  const bladeTop = baseY - bladeBaseWidth;
+  const bladeBottom = baseY + bladeBaseWidth;
+  
+  // Outer Aura (simplified for cache)
+  if (!useUltraLOD) {
+    // Manual state backup for outer aura
+    const prevGCO1 = ctx.globalCompositeOperation;
+    const prevAlpha1 = ctx.globalAlpha;
+    ctx.globalCompositeOperation = 'lighter';
+    const waveTime = time / 600;
+    ctx.globalAlpha = 0.12;
+    ctx.fillStyle = sword.etherealGlow;
+    ctx.beginPath();
+    ctx.moveTo(0, baseY);
+    ctx.quadraticCurveTo(15 * scale + Math.sin(waveTime) * 6 * scale, -10 * scale, bladeLength, baseY);
+    ctx.quadraticCurveTo(15 * scale + Math.cos(waveTime) * 6 * scale, 10 * scale, 0, baseY);
+    ctx.closePath();
+    ctx.fill();
+    // Restore outer aura states
+    ctx.globalCompositeOperation = prevGCO1;
+    ctx.globalAlpha = prevAlpha1;
   }
-
-  if (!_glowCacheCanvas || _glowCacheCanvas.width !== size) {
-    _glowCacheCanvas = document.createElement('canvas');
-    _glowCacheCanvas.width = size;
-    _glowCacheCanvas.height = size;
-    const gCtx = _glowCacheCanvas.getContext('2d');
-    const grad = gCtx.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size * 0.45);
-    grad.addColorStop(0, 'rgba(157, 78, 221, 0.2)');
-    grad.addColorStop(0.7, 'rgba(76, 201, 240, 0.05)');
-    grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
-    gCtx.fillStyle = grad;
-    gCtx.beginPath();
-    gCtx.arc(size / 2, size / 2, size * 0.45, 0, Math.PI * 2);
-    gCtx.fill();
+  
+  // Handle & Pommel
+  ctx.fillStyle = sword.handleShadow;
+  ctx.fillRect(-handleLength, baseY - 2.5 * scale, handleLength, 5 * scale);
+  const handleGrad = ctx.createLinearGradient(-handleLength, baseY - 2.5 * scale, -handleLength, baseY + 2.5 * scale);
+  handleGrad.addColorStop(0, sword.handleShadow);
+  handleGrad.addColorStop(0.3, sword.handleBase);
+  handleGrad.addColorStop(0.7, sword.handleHighlight);
+  handleGrad.addColorStop(1, sword.handleBase);
+  ctx.fillStyle = handleGrad;
+  ctx.fillRect(-handleLength, baseY - 2.5 * scale, handleLength, 5 * scale);
+  
+  // Crossguard
+  const collarGrad = ctx.createLinearGradient(0, baseY - crossguardWidth / 2, 0, baseY + crossguardWidth / 2);
+  collarGrad.addColorStop(0, sword.collarHighlight);
+  collarGrad.addColorStop(0.5, sword.collarColor);
+  collarGrad.addColorStop(1, sword.handleShadow);
+  ctx.fillStyle = collarGrad;
+  ctx.beginPath();
+  ctx.moveTo(2 * scale, baseY - crossguardWidth / 2);
+  ctx.lineTo(-2 * scale, baseY - crossguardWidth / 2 + 2 * scale);
+  ctx.lineTo(-2 * scale, baseY + crossguardWidth / 2 - 2 * scale);
+  ctx.lineTo(2 * scale, baseY + crossguardWidth / 2);
+  ctx.lineTo(4 * scale, baseY);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Dark Aura (simplified for cache)
+  if (!useLOD && !useUltraLOD) {
+    // Manual state backup for dark aura
+    const prevStrokeStyle = ctx.strokeStyle;
+    const prevLineWidth = ctx.lineWidth;
+    const prevLineCap = ctx.lineCap;
+    const prevLineJoin = ctx.lineJoin;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 10 * scale;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const wave = Math.sin(time / 250) * 1.5 * scale;
+    ctx.beginPath();
+    ctx.moveTo(2 * scale, bladeTop + wave);
+    ctx.lineTo(midX, bladeTop + 1.5 * scale + wave);
+    ctx.lineTo(bladeLength, baseY);
+    ctx.lineTo(midX, bladeBottom - 1.5 * scale - wave);
+    ctx.lineTo(2 * scale, bladeBottom - wave);
+    ctx.stroke();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 4 * scale;
+    ctx.stroke();
+    // Restore dark aura states
+    ctx.strokeStyle = prevStrokeStyle;
+    ctx.lineWidth = prevLineWidth;
+    ctx.lineCap = prevLineCap;
+    ctx.lineJoin = prevLineJoin;
   }
-
-  if (!_wispCacheCanvas || _wispCacheCanvas.width !== size) {
-    _wispCacheCanvas = document.createElement('canvas');
-    _wispCacheCanvas.width = size;
-    _wispCacheCanvas.height = size;
-    const wCtx = _wispCacheCanvas.getContext('2d');
-    const grad = wCtx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-    grad.addColorStop(0, 'rgba(173, 216, 230, 1.0)'); // Light blueish core
-    grad.addColorStop(0.5, 'rgba(157, 78, 221, 0.7)'); // Violet mid
-    grad.addColorStop(1, 'rgba(157, 78, 221, 0)'); // Fade out
-    wCtx.fillStyle = grad;
-    wCtx.beginPath();
-    wCtx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
-    wCtx.fill();
-  }
+  
+  // Main Blade
+  // Manual state backup for main blade
+  const prevFill = ctx.fillStyle;
+  const prevGCO2 = ctx.globalCompositeOperation;
+  const prevStrokeStyle2 = ctx.strokeStyle;
+  const prevLineWidth2 = ctx.lineWidth;
+  ctx.fillStyle = sword.bladeCore;
+  ctx.beginPath();
+  ctx.moveTo(2 * scale, bladeTop);
+  ctx.lineTo(midX, bladeTop + 1.5 * scale);
+  ctx.lineTo(bladeLength, baseY);
+  ctx.lineTo(midX, bladeBottom - 1.5 * scale);
+  ctx.lineTo(2 * scale, bladeBottom);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Facets
+  ctx.fillStyle = sword.crystalFacet1;
+  ctx.beginPath();
+  ctx.moveTo(2 * scale, bladeTop);
+  ctx.lineTo(midX, bladeTop + 1.5 * scale);
+  ctx.lineTo(midX, baseY);
+  ctx.lineTo(2 * scale, baseY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = sword.crystalFacet2;
+  ctx.beginPath();
+  ctx.moveTo(2 * scale, baseY);
+  ctx.lineTo(midX, baseY);
+  ctx.lineTo(midX, bladeBottom - 1.5 * scale);
+  ctx.lineTo(2 * scale, bladeBottom);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = sword.crystalFacet3;
+  ctx.beginPath();
+  ctx.moveTo(midX, bladeTop + 1.5 * scale);
+  ctx.lineTo(bladeLength, baseY);
+  ctx.lineTo(midX, baseY);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = sword.crystalFacet4;
+  ctx.beginPath();
+  ctx.moveTo(midX, baseY);
+  ctx.lineTo(bladeLength, baseY);
+  ctx.lineTo(midX, bladeBottom - 1.5 * scale);
+  ctx.closePath();
+  ctx.fill();
+  
+  // Glowing Edges
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.strokeStyle = sword.bladeEdgeBright;
+  ctx.lineWidth = 1.5 * scale;
+  ctx.beginPath();
+  ctx.moveTo(2 * scale, bladeTop);
+  ctx.lineTo(midX, bladeTop + 1.5 * scale);
+  ctx.lineTo(bladeLength, baseY);
+  ctx.lineTo(midX, bladeBottom - 1.5 * scale);
+  ctx.lineTo(2 * scale, bladeBottom);
+  ctx.stroke();
+  
+  // Restore main blade states
+  ctx.globalCompositeOperation = prevGCO2;
+  ctx.strokeStyle = prevStrokeStyle2;
+  ctx.lineWidth = prevLineWidth2;
+  ctx.fillStyle = prevFill;
 }
 
 /**
@@ -520,90 +644,134 @@ function _initDoppelgangerCaches(r) {
  * This enhanced version uses procedural noise to create turbulent, organic smoke movement.
  */
 export function drawDopplegangerBodyEffect(ctx, x, y, r, angle, layer = 'under', timeOpt) {
-  const time = timeOpt || Date.now();
+    const time = timeOpt || Date.now();
 
-  // OPTIMIZATION: Only skip if FPS is severely broken (<15)
-  const fps = state.fps || 60;
-  if (fps < 15 && state.gameState === 'playing') return;
+    // OPTIMIZATION: Early exit at very low FPS
+    const fps = state.fps || 60;
+    if (fps < 30 && state.gameState === 'playing') return;
 
-  _initDoppelgangerCaches(r);
+    // Manual state backup for body effect
+    ctx.translate(x, y);
 
-  ctx.save();
-  ctx.translate(x, y);
+    const qualityLevel = state.qualityLevel || 1.0;
+    const useLOD = (fps < 45 && state.gameState === 'playing') || qualityLevel < 0.6;
+    const useUltraLOD = (fps < 38 && state.gameState === 'playing') || qualityLevel < 0.35;
 
-  const qualityLevel = state.qualityLevel || 1.0;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
-  const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
-  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+    // A simple noise function using sine waves for organic-looking turbulence
+    // This is a cheap way to simulate Perlin/Simplex noise.
+    const turbulence = (t, freq, amp) => Math.sin(t * freq) * amp;
 
-  const turbulence = (t, freq, amp) => Math.sin(t * freq) * amp;
-
-  if (layer === 'under') {
-    ctx.globalCompositeOperation = 'lighter';
-    // Draw a single simplified glow even on UltraLOD so the visual identity is preserved
-    const scaleSize = 1.0 + 0.1 * Math.sin(time / 500);
-    const cacheSize = _glowCacheCanvas.width;
-    ctx.globalAlpha = useUltraLOD ? 0.6 : 1.0;
-    ctx.drawImage(_glowCacheCanvas, -cacheSize * scaleSize / 2, -cacheSize * scaleSize / 2, cacheSize * scaleSize, cacheSize * scaleSize);
-    ctx.restore();
-    return;
-  }
-
-  if (layer === 'over') {
-    ctx.globalCompositeOperation = 'source-over';
-    
-    // 1. Base Shadow Smoke Layer (deep purple)
-    const particleCount = useUltraLOD ? 2 : (useLOD ? 3 : 5);
-    for (let i = 0; i < particleCount; i++) {
-      const idx = i + 1;
-      const swirlAngle = (time / (1000 + idx * 150)) + (idx * Math.PI * 2 / particleCount);
-      const dist = r * (0.4 + 0.3 * Math.sin(time / (900 + idx * 50)));
-
-      // Apply turbulence
-      const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1000, 0.5 + idx * 0.1, r * 0.2);
-      const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1000, 0.6 + idx * 0.1, r * 0.2);
-      const smokeRadius = r * (0.6 + 0.3 * Math.cos(time / (700 + idx * 60)));
-
-      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(time / (800 + idx * 70));
-      ctx.drawImage(_smokeCacheCanvas, noisyX - smokeRadius, noisyY - smokeRadius, smokeRadius * 2, smokeRadius * 2);
+    if (layer === 'under') {
+        if (useUltraLOD) {
+            // Restore body effect states
+            ctx.translate(-x, -y);
+            return;
+        }
+        // Softer, more vibrant under-glow
+        const prevGCO = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'lighter';
+        const grad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.8);
+        const pulse = 0.5 + 0.5 * Math.sin(time / 500);
+        grad.addColorStop(0, `rgba(157, 78, 221, ${0.25 * pulse})`); // Brighter core
+        grad.addColorStop(0.7, `rgba(76, 201, 240, 0.1)`);
+        grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+        // Restore body effect states
+        ctx.globalCompositeOperation = prevGCO;
+        ctx.translate(-x, -y);
+        return;
     }
 
-    // 2. Highlight Wisps Layer (brighter violet/cyan)
-    ctx.globalCompositeOperation = 'lighter';
-    const wispCount = useUltraLOD ? 1 : (useLOD ? 2 : 3);
-    for (let i = 0; i < wispCount; i++) {
-      const idx = i + 1;
-      const swirlAngle = -(time / (800 + idx * 200)) + (idx * Math.PI * 2 / wispCount);
-      const dist = r * (0.6 + 0.2 * Math.cos(time / (600 + idx * 100)));
+    if (layer === 'over') {
+        const prevGCO2 = ctx.globalCompositeOperation;
+        ctx.globalCompositeOperation = 'source-over';
+        // OPTIMIZATION: Further reduce particle counts for performance
+        const particleCount = useUltraLOD ? 2 : (useLOD ? 3 : 5);
 
-      const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1200, 0.4 + idx * 0.2, r * 0.3);
-      const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1200, 0.5 + idx * 0.2, r * 0.3);
+        // 1. Base Shadow Smoke Layer (deep purple)
+        for (let i = 0; i < particleCount; i++) {
+            const idx = i + 1;
+            const swirlAngle = (time / (1000 + idx * 150)) + (idx * Math.PI * 2 / particleCount);
+            const dist = r * (0.4 + 0.3 * Math.sin(time / (900 + idx * 50)));
+            
+            // Apply turbulence
+            const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1000, 0.5 + idx * 0.1, r * 0.2);
+            const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1000, 0.6 + idx * 0.1, r * 0.2);
 
-      const wispRadius = r * (0.4 + 0.2 * Math.sin(time / (500 + idx * 80)));
-      const alpha = 0.15 + 0.1 * Math.cos(time / (400 + idx * 90));
+            const smokeRadius = r * (0.6 + 0.3 * Math.cos(time / (700 + idx * 60)));
+            const alpha = 0.3 + 0.2 * Math.sin(time / (800 + idx * 70));
 
-      ctx.globalAlpha = alpha; 
-      ctx.drawImage(_wispCacheCanvas, noisyX - wispRadius, noisyY - wispRadius, wispRadius * 2, wispRadius * 2);
+            const smokeGrad = ctx.createRadialGradient(noisyX, noisyY, smokeRadius * 0.1, noisyX, noisyY, smokeRadius);
+            smokeGrad.addColorStop(0, `rgba(60, 9, 108, ${alpha})`);      // Dark violet core
+            smokeGrad.addColorStop(0.7, `rgba(26, 0, 43, ${alpha * 0.5})`); // Sheer shadow
+            smokeGrad.addColorStop(1, 'rgba(16, 0, 43, 0)');
+            
+            ctx.fillStyle = smokeGrad;
+            ctx.beginPath();
+            ctx.arc(noisyX, noisyY, smokeRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        if (useUltraLOD) {
+            // Restore body effect states
+            ctx.globalCompositeOperation = prevGCO2;
+            ctx.translate(-x, -y);
+            return;
+        }
+
+        // 2. Highlight Wisps Layer (brighter violet/cyan)
+        ctx.globalCompositeOperation = 'lighter';
+        // OPTIMIZATION: Reduce wisp count further
+        const wispCount = useUltraLOD ? 1 : (useLOD ? 2 : 3);
+        for (let i = 0; i < wispCount; i++) {
+            const idx = i + 1;
+            const swirlAngle = -(time / (800 + idx * 200)) + (idx * Math.PI * 2 / wispCount);
+            const dist = r * (0.6 + 0.2 * Math.cos(time / (600 + idx * 100)));
+
+            const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1200, 0.4 + idx * 0.2, r * 0.3);
+            const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1200, 0.5 + idx * 0.2, r * 0.3);
+
+            const wispRadius = r * (0.4 + 0.2 * Math.sin(time / (500 + idx * 80)));
+            const alpha = 0.15 + 0.1 * Math.cos(time / (400 + idx * 90));
+
+            const wispGrad = ctx.createRadialGradient(noisyX, noisyY, 0, noisyX, noisyY, wispRadius);
+            wispGrad.addColorStop(0, `rgba(173, 216, 230, ${alpha})`); // Light blueish
+            wispGrad.addColorStop(0.5, `rgba(157, 78, 221, ${alpha * 0.7})`); // Violet mid
+            wispGrad.addColorStop(1, 'rgba(157, 78, 221, 0)');
+
+            ctx.fillStyle = wispGrad;
+            ctx.beginPath();
+            ctx.arc(noisyX, noisyY, wispRadius, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        
+        // 3. Energy Motes (small, bright particles)
+        // OPTIMIZATION: Remove expensive blur filter and reduce count
+        const moteCount = useUltraLOD ? 0 : (useLOD ? 2 : 4);
+        for (let i = 0; i < moteCount; i++) {
+            const idx = i + 1;
+            const angle = (time / 2000 + idx * 2.1) % (Math.PI * 2);
+            const dist = r * (0.2 + (idx / moteCount) * 0.8) + Math.sin(time / (600 + idx * 50)) * r * 0.2;
+
+            const moteX = Math.cos(angle) * dist;
+            const moteY = Math.sin(angle) * dist;
+            const moteSize = r * (0.05 + 0.05 * Math.sin(time / 300 + idx));
+            const alpha = 0.5 + 0.4 * Math.cos(time / 400 + idx * 1.5);
+
+            ctx.fillStyle = `rgba(224, 177, 203, ${alpha})`; // Bright pink/white
+            ctx.beginPath();
+            ctx.arc(moteX, moteY, moteSize, 0, Math.PI * 2);
+            // OPTIMIZATION: Removed expensive blur filter
+            ctx.fill();
+        }
+        
+        // Restore body effect states
+        ctx.globalCompositeOperation = prevGCO2;
     }
 
-    // 3. Energy Motes (small, bright particles)
-    const moteCount = useUltraLOD ? 1 : (useLOD ? 2 : 4);
-    for (let i = 0; i < moteCount; i++) {
-      const idx = i + 1;
-      const angle = (time / 2000 + idx * 2.1) % (Math.PI * 2);
-      const dist = r * (0.2 + (idx / moteCount) * 0.8) + Math.sin(time / (600 + idx * 50)) * r * 0.2;
-
-      const moteX = Math.cos(angle) * dist;
-      const moteY = Math.sin(angle) * dist;
-      const moteSize = r * (0.05 + 0.05 * Math.sin(time / 300 + idx));
-      const alpha = 0.5 + 0.4 * Math.cos(time / 400 + idx * 1.5);
-
-      ctx.fillStyle = `rgba(224, 177, 203, ${alpha})`; 
-      ctx.beginPath();
-      ctx.arc(moteX, moteY, moteSize, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  ctx.restore();
+    // Restore body effect states
+    ctx.translate(-x, -y);
 }

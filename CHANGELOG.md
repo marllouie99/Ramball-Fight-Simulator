@@ -1,11 +1,6 @@
 # ⚔️ Ramball Fight Simulator — Balance Patch Notes
-**Generated:** October 7, 2026 | **Source:** Latest Commit (HEAD~1 ➔ HEAD)
+**Generated:** October 7, 2026 | **Source:** Working Directory (Uncommitted Changes)
 
 ---
 
-## 🥊 Fighter Stat Modifications
-
-### TOJI
-* **🟢 BUFF** `cooldown`: `40` ➔ `10` (-75.0%)
-* **🟢 BUFF** `spearCooldown`: `75` ➔ `10` (-86.7%)
-
+*No balance parameter modifications detected in `js/configs/`.*

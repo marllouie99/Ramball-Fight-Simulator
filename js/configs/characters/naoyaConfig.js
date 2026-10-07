@@ -130,6 +130,63 @@ export const naoyaConfig = {
   ultVictimPostCrashSlowDuration: 120, // ⚡ Duration (frames) victim is slowed after wall pin release
   ultVictimPostCrashSlowMultiplier: 0.40, // ⚡ Movement slow multiplier applied to victim (40% speed)
 
+  // ═══════════════════════════════════════════════════════════
+  // OPTION B: VENGEFUL CURSE REBIRTH & AWAKENED JET MECHANICS
+  // ═══════════════════════════════════════════════════════════
+  enableCurseRebirth: true,         // ⚡ Master toggle for Vengeful Curse Rebirth upon lethal damage (hp <= 0)
+  startInCurseForm: false,          // ⚡ Debug / testing toggle to start battle directly in Curse Form
+  curseRebirthHpPercent: 0.50,      // ⚡ Reborn with 50% max HP (95 HP)
+  curseWombDurationFrames: 60,      // ⚡ Duration (frames) of Cursed Womb cocoon phase before hatching (~1.0s)
+  curseWombRepelForce: 9.5,         // ⚡ Concussive knockback impulse repelling nearby entities on cocoon spawn
+  curseWombRadius: 30,              // ⚡ Visual cocoon size
+  
+  // Awakened Stats & Carapace
+  curseSpeed: 7.2,                  // ⚡ Base speed in Curse Form
+  curseMaxSpeed: 14.5,              // ⚡ Mach 3 top speed
+  curseCarapaceFrontalResist: 0.20, // ⚡ Takes 20% reduced damage from frontal incoming attacks
+  
+  // Ramjet Mach 3 Gauge
+  enableMachGauge: true,            // ⚡ Mach 3 Overdrive Gauge (0-100%)
+  machGaugeRampPerSecond: 12,       // ⚡ Passive gauge charge rate per second while moving
+  machGaugePerRicochet: 25,         // ⚡ Gauge bonus on arena wall bounce
+  machGaugePerHit: 20,              // ⚡ Gauge bonus when landing melee attacks
+  machOverdriveDurationFrames: 180, // ⚡ Duration of 100% Mach 3 Overdrive mode (3.0s)
+  machRamContactDamage: 18,         // ⚡ Collision body-check damage when rushing through enemies in Mach 3
+  machRamKnockback: 14,             // ⚡ Collision pushback
+  
+  // Awakened Basic Attack: Turbine Carapace Slam & Cursed Claws
+  curseMeleeReach: 80,
+  curseMeleeArc: (140 * Math.PI) / 180,
+  cursePunchDamage: 8,
+  cursePunchFinisherDamage: 24,
+  cursePunchCooldown: 36,
+
+  // Awakened Skill 1: Mach 3 Supersonic Ramjet (Chōsoku Ramjet)
+  enableCurseRamjet: true,
+  curseSkill1Cooldown: 390,          // 6.5s (390 frames)
+  curseRamjetChargeFrames: 8,       // Spool-up windup
+  curseRamjetTravelFrames: 14,      // Supersonic vector thrust
+  curseRamjetDamage: 45,            // Direct pierce damage
+  curseRamjetWallImpactDamage: 25,  // Wall-splat rebound damage
+  curseRamjetWallPinFrames: 60,     // 1.0s wall pin
+
+  // Awakened Skill 2: Concussive Air Turbine Inhale & Cannon Burst
+  enableCurseTurbineCannon: true,
+  curseSkill2Cooldown: 480,          // 8.0s (480 frames)
+  curseTurbineInhaleRadius: 220,    // Vacuum suction radius
+  curseTurbineInhaleDuration: 18,   // Suction frames
+  curseTurbineBurstRadius: 180,     // Shockwave explosion radius
+  curseTurbineBurstDamage: 38,      // Shockwave burst damage
+  curseTurbineKnockback: 18,        // Concussive repulsion
+
+  // Awakened Ultimate: Domain Expansion — Time Cell Moon Palace (時胞月宮殿 - Tokyū Gesshōkyū)
+  enableCurseDomain: true,
+  curseUltCooldown: 1440,            // 24.0s (1440 frames)
+  curseDomainDurationFrames: 480,    // 8.0s Domain duration
+  curseDomainCellularBleedInterval: 24, // Cellular rupture tick rate (every 24 frames = 0.4s)
+  curseDomainCellularBleedDamage: 6, // Bleed true damage per moving step
+  curseDomainCellularStunFrames: 6,  // Micro-hitstun on movement breach
+
   // Sound Configuration & Volumes
   sounds: {
     punchHit: [
@@ -152,7 +209,13 @@ export const naoyaConfig = {
     shatterFinisher: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
     glassBreak: 'Assets/Sound Effects/NaoyaSFX/Naoya_glass_break.mp3',
     knifeTakeoff: 'Assets/Sound Effects/NaoyaSFX/Naoya_takeoff_knife.mp3',
-    knifeStabs: 'Assets/Sound Effects/NaoyaSFX/Naoya_stabs.mp3'
+    knifeStabs: 'Assets/Sound Effects/NaoyaSFX/Naoya_stabs.mp3',
+    curseWombPulse: 'Assets/Sound Effects/Skills/enhance.mp3',
+    curseRebirthScream: 'Assets/Sound Effects/NaoyaSFX/Naoya_glass_break.mp3',
+    ramjetSpool: 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
+    ramjetBlast: 'Assets/Sound Effects/Attacks/explosion.mp3',
+    turbineInhale: 'Assets/Sound Effects/Skills/woosh.mp3',
+    domainExpansion: 'Assets/Sound Effects/Skills/enhance.mp3'
   },
   soundVolumes: {
     punchHit: 0.85,
@@ -168,6 +231,12 @@ export const naoyaConfig = {
     shatterFinisher: 1.25,
     glassBreak: 1.00,
     knifeTakeoff: 1.05,
-    knifeStabs: 1.20
+    knifeStabs: 1.20,
+    curseWombPulse: 0.95,
+    curseRebirthScream: 1.25,
+    ramjetSpool: 1.00,
+    ramjetBlast: 1.20,
+    turbineInhale: 0.85,
+    domainExpansion: 1.15
   }
 };

@@ -1203,5 +1203,320 @@ export function drawNaoyaRunwaySpeedLines(ctx, fighter, points) {
   ctx.restore();
 }
 
+// ═════════════════════════════════════════════════════════════════════
+// CURSE NAOYA / CURSED WOMB & DOMAIN EXPANSION VISUAL EFFECTS ENGINE
+// ═════════════════════════════════════════════════════════════════════
+
+/**
+ * Draws the Cursed Womb cocoon during Naoya's death rebirth awakening.
+ * Features an organic pulsing embryo egg with swirling cursed miasma tendrils.
+ */
+export function drawCursedWombCocoonVFX(ctx, fighter) {
+  if (!fighter || !fighter.isCurseWomb) return;
+
+  const timer = fighter.curseWombTimer || 0;
+  const maxTimer = fighter.curseWombMaxTimer || 60;
+  const progress = Math.max(0, Math.min(1.0, 1.0 - (timer / maxTimer)));
+  const r = (fighter.r || 25) * (1.15 + Math.sin(progress * Math.PI * 6) * 0.08);
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+
+  // 1. Swirling Cursed Miasma Aura (Multi-layer rotating concentric rings)
+  const auraRot = (Date.now() * 0.005) % (Math.PI * 2);
+  ctx.save();
+  ctx.rotate(auraRot);
+  for (let i = 0; i < 4; i++) {
+    const angle = (i * Math.PI) / 2;
+    const dist = r * 1.35;
+    const ax = Math.cos(angle) * dist;
+    const ay = Math.sin(angle) * dist;
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(118, 224, 66, 0.35)' : 'rgba(0, 242, 254, 0.25)';
+    ctx.beginPath();
+    ctx.arc(ax, ay, r * 0.45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // 2. Outer Organic Cocoon Shell (Dark Obsidian Cursed Flesh)
+  ctx.fillStyle = '#0F172A';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, r * 1.25, r * 1.45, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Cocoon Edge Ink Outline
+  ctx.strokeStyle = '#020617';
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+
+  // 4. Pulsing Cursed Veins
+  ctx.strokeStyle = progress > 0.65 ? '#00F2FE' : '#76E042';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(0, -r * 1.1);
+  ctx.bezierCurveTo(-r * 0.6, -r * 0.5, -r * 0.7, r * 0.4, 0, r * 1.1);
+  ctx.moveTo(0, -r * 1.1);
+  ctx.bezierCurveTo(r * 0.6, -r * 0.5, r * 0.7, r * 0.4, 0, r * 1.1);
+  ctx.moveTo(-r * 0.9, 0);
+  ctx.lineTo(r * 0.9, 0);
+  ctx.stroke();
+
+  // 5. Pre-Hatch Fracturing Stress Fissures (Final 20 frames)
+  if (timer <= 20) {
+    const crackAlpha = (20 - timer) / 20;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${crackAlpha * 0.95})`;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-r * 0.7, -r * 0.6);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(r * 0.8, -r * 0.4);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-r * 0.5, r * 0.8);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(r * 0.6, r * 0.7);
+    ctx.stroke();
+  }
+
+  // 6. Overhead Rebirth Text Indicator
+  ctx.fillStyle = '#C8E64A';
+  ctx.font = 'bold 11px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('CURSED REBIRTH...', 0, -r * 1.7);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Mach 3 Ramjet supersonic thrust VFX, shockwave cone, and speed needle lines.
+ */
+export function drawCurseNaoyaMachRamjetVFX(ctx, fighter) {
+  if (!fighter || (!fighter.isRamjetLunging && !fighter.isMachOverdrive)) return;
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+  const angle = fighter.gunAngle || fighter.angle || 0;
+  ctx.rotate(angle);
+
+  const r = fighter.r || 25;
+  const isLunge = fighter.isRamjetLunging;
+
+  // 1. Supersonic Aerodynamic Wind Cone (Porous vector cone in front of jet)
+  const coneLength = isLunge ? r * 3.5 : r * 2.2;
+  const coneWidth = r * 1.6;
+
+  ctx.fillStyle = 'rgba(0, 242, 254, 0.18)';
+  ctx.beginPath();
+  ctx.moveTo(coneLength, 0);
+  ctx.lineTo(-r * 0.3, -coneWidth);
+  ctx.lineTo(-r * 0.5, 0);
+  ctx.lineTo(-r * 0.3, coneWidth);
+  ctx.closePath();
+  ctx.fill();
+
+  // White razor cutting contour line
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.3, -coneWidth);
+  ctx.lineTo(coneLength, 0);
+  ctx.lineTo(-r * 0.3, coneWidth);
+  ctx.stroke();
+
+  // 2. Rear Ramjet Exhaust Flame Burst
+  const flameLen = (isLunge ? r * 4.0 : r * 2.5) + (Math.random() - 0.5) * 8;
+  const flameWidth = r * 0.85;
+
+  // Outer Cyan Thermal Flare
+  ctx.fillStyle = 'rgba(0, 242, 254, 0.75)';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.8, -flameWidth);
+  ctx.lineTo(-r * 0.8 - flameLen, 0);
+  ctx.lineTo(-r * 0.8, flameWidth);
+  ctx.closePath();
+  ctx.fill();
+
+  // Inner Lime Core Flame
+  ctx.fillStyle = 'rgba(118, 224, 66, 0.90)';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.8, -flameWidth * 0.6);
+  ctx.lineTo(-r * 0.8 - flameLen * 0.65, 0);
+  ctx.lineTo(-r * 0.8, flameWidth * 0.6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Pure White Core Igniter
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.8, -flameWidth * 0.25);
+  ctx.lineTo(-r * 0.8 - flameLen * 0.35, 0);
+  ctx.lineTo(-r * 0.8, flameWidth * 0.25);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Turbine Cannon inhale suction vortex and radial shockwave bursts.
+ */
+export function drawCurseTurbineCannonVFX(ctx, fighter) {
+  if (!fighter || !fighter.isTurbineInhaling) return;
+
+  const timer = fighter.turbineInhaleTimer || 0;
+  const maxTimer = fighter.turbineInhaleMaxTimer || 18;
+  const p = 1.0 - (timer / maxTimer);
+  const r = fighter.r || 25;
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+
+  // Concentric converging vacuum spiral lines
+  const numSpirals = 6;
+  const rot = timer * 0.35;
+  ctx.strokeStyle = 'rgba(0, 242, 254, 0.45)';
+  ctx.lineWidth = 1.6;
+
+  for (let i = 0; i < numSpirals; i++) {
+    const a = rot + (i * Math.PI * 2) / numSpirals;
+    const startDist = 200 * (1.0 - p * 0.8);
+    const endDist = r * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * startDist, Math.sin(a) * startDist);
+    ctx.lineTo(Math.cos(a + 0.6) * endDist, Math.sin(a + 0.6) * endDist);
+    ctx.stroke();
+  }
+
+  // Cyan intake glow
+  ctx.fillStyle = `rgba(0, 242, 254, ${0.25 + Math.sin(p * Math.PI) * 0.35})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draws Domain Expansion: Time Cell Moon Palace (Tokyū Gesshōkyū).
+ * Renders the lunar embryo backdrop, organic film lattice, and 24 FPS cellular grid.
+ */
+export function drawTimeCellMoonPalaceDomain(ctx, fighter) {
+  if (!fighter || !fighter.isDomainActive) return;
+
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  if (!arena) return;
+
+  const timer = fighter.domainTimer || 0;
+  const maxTimer = fighter.domainMaxTimer || 480;
+  const alpha = Math.min(1.0, Math.sin((timer / maxTimer) * Math.PI) * 1.4);
+
+  ctx.save();
+
+  // 1. Full-Arena Somber Slate Tint Overlay (Rule 11 Zero shadowBlur)
+  ctx.fillStyle = `rgba(6, 9, 15, ${alpha * 0.72})`;
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+
+  // 2. The Celestial Lunar Womb / Cellular Embryo (Backdrop Structure)
+  const centerX = arena.x + arena.width / 2;
+  const centerY = arena.y + arena.height / 2;
+  const moonRadius = 140;
+
+  // Outer Pale Greenish-Gold Crescent Halo
+  ctx.fillStyle = `rgba(200, 230, 74, ${alpha * 0.22})`;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY - 20, moonRadius * 1.15, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Giant Translucent Cellular Womb Moon
+  ctx.fillStyle = `rgba(18, 26, 38, ${alpha * 0.88})`;
+  ctx.strokeStyle = `rgba(118, 224, 66, ${alpha * 0.65})`;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY - 20, moonRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Microscopic Cellular Lattice Grid inside Moon
+  ctx.strokeStyle = `rgba(0, 242, 254, ${alpha * 0.25})`;
+  ctx.lineWidth = 1.0;
+  const gridSize = 24;
+  for (let x = centerX - moonRadius + 12; x < centerX + moonRadius; x += gridSize) {
+    for (let y = centerY - 20 - moonRadius + 12; y < centerY - 20 + moonRadius; y += gridSize) {
+      if (Math.hypot(x - centerX, y - (centerY - 20)) < moonRadius * 0.90) {
+        ctx.strokeRect(x - 8, y - 8, 16, 16);
+        // Small cross-hair in center of cell
+        ctx.beginPath();
+        ctx.moveTo(x - 3, y); ctx.lineTo(x + 3, y);
+        ctx.moveTo(x, y - 3); ctx.lineTo(x, y + 3);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // 3. 35mm Organic Film Strip Borders Along Arena Perimeters
+  const filmWidth = 24;
+  ctx.fillStyle = `rgba(15, 23, 42, ${alpha * 0.85})`;
+  // Top & Bottom strips
+  ctx.fillRect(arena.x, arena.y, arena.width, filmWidth);
+  ctx.fillRect(arena.x, arena.y + arena.height - filmWidth, arena.width, filmWidth);
+
+  // Film Reel Sprocket Perforations
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.75})`;
+  const spSpacing = 28;
+  for (let sx = arena.x + 14; sx < arena.x + arena.width - 14; sx += spSpacing) {
+    ctx.fillRect(sx, arena.y + 6, 12, 12);
+    ctx.fillRect(sx, arena.y + arena.height - filmWidth + 6, 12, 12);
+  }
+
+  // 4. Domain Name & Status Banner
+  ctx.fillStyle = `rgba(200, 230, 74, ${alpha * 0.95})`;
+  ctx.font = 'bold 15px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('時胞月宮殿 — TIME CELL MOON PALACE', centerX, arena.y + filmWidth + 24);
+
+  ctx.fillStyle = `rgba(0, 242, 254, ${alpha * 0.85})`;
+  ctx.font = '11px sans-serif';
+  ctx.fillText('[ CELLULAR 24 FPS STASIS RULE ACTIVE ]', centerX, arena.y + filmWidth + 40);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Mach 3 Speedometer / Overdrive Gauge HUD above Curse Naoya.
+ */
+export function drawCurseMachGaugeHUD(ctx, fighter) {
+  if (!fighter || !fighter.isCurseForm) return;
+
+  const gauge = Math.max(0, Math.min(100, fighter.machGauge || 0));
+  const isOverdrive = fighter.isMachOverdrive;
+  const r = fighter.r || 25;
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y - r - 22);
+
+  const barWidth = 44;
+  const barHeight = 5;
+
+  // Background Bar
+  ctx.fillStyle = '#0F172A';
+  ctx.fillRect(-barWidth / 2, 0, barWidth, barHeight);
+  ctx.strokeStyle = '#020617';
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(-barWidth / 2, 0, barWidth, barHeight);
+
+  // Fill Bar
+  const fillWidth = (gauge / 100) * barWidth;
+  ctx.fillStyle = isOverdrive ? '#00F2FE' : (gauge >= 75 ? '#76E042' : '#C8E64A');
+  ctx.fillRect(-barWidth / 2, 0, fillWidth, barHeight);
+
+  // Mach 3 Text Label
+  ctx.fillStyle = isOverdrive ? '#00F2FE' : '#94A3B8';
+  ctx.font = 'bold 9px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(isOverdrive ? 'MACH 3 OVERDRIVE!' : `MACH ${(1.0 + (gauge / 100) * 2.0).toFixed(1)}`, 0, -3);
+
+  ctx.restore();
+}
+
 
 

@@ -11,6 +11,7 @@
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
+import { drawAuthenticChainsawBlade } from '../weapons/denjiWeaponGraphics.js';
 
 const P = 2.0;
 function snap(v) {
@@ -83,17 +84,14 @@ export function drawDenjiSkin(ctx, fighter) {
     : (isSawing ? Math.min(1.0, 1.0 - (fighter.slashSwingTimer / (fighter.slashSwingMaxTimer || 14))) : 0);
   const comboCycle = fighter.punchComboCount || fighter.sawComboCount || 0;
 
-  // 3. LAYER 1: BACK HAND / LEFT ARM CHAINSAW (Behind Body Circle Layer)
-  // In Hybrid Devil form, always display the left arm chainsaw on the left flank!
-  const showBackArm = isHybrid 
-    ? (!hideHands && !hideChainsaws && !fighter.hideBackHand)
-    : (!isPodiumPreview && !hideHands && !fighter.hideBackHand && (isPunching || isSawing || isLunge));
+  const combatOpts = {
+    isAttacking: isPunching || isSawing,
+    isLunging: isLunge,
+    isSawing: isSawing,
+    isMassacre: Boolean(fighter.isExecutingMassacre)
+  };
 
-  if (showBackArm) {
-    _drawDenjiBackArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now);
-  }
-
-  // 4. LAYER 2: MAIN BODY CIRCLE (Permanently Chainsaw Devil Form)
+  // 3. LAYER 1: MAIN BODY CIRCLE (Permanently Chainsaw Devil Form)
   const devilImg = _getDenjiDevilSkinImage();
   if (devilImg && devilImg.complete && devilImg.naturalWidth > 0) {
     ctx.save();
@@ -107,20 +105,23 @@ export function drawDenjiSkin(ctx, fighter) {
 
     // Central Forehead Chainsaw Blade (Protruding Forward along Top Crest)
     if (!hideChainsaws && !(typeof state !== 'undefined' && state.showSkinOnly)) {
-      _drawDenjiForeheadChainsaw(ctx, r, now);
+      _drawDenjiForeheadChainsaw(ctx, r, now, combatOpts);
     }
   } else {
-    drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaws);
+    drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaws, combatOpts);
   }
 
-  // 5. LAYER 3: FRONT HAND / RIGHT ARM CHAINSAW (Front Layer — On Top of Body)
-  // In Hybrid Devil form, always display the right arm chainsaw on the right flank!
-  const showFrontArm = isHybrid 
-    ? (!hideHands && !hideChainsaws && !fighter.hideFrontHand)
-    : (!isPodiumPreview && !hideHands && !fighter.hideFrontHand && (isPunching || isSawing || isLunge));
-
-  if (showFrontArm) {
-    _drawDenjiFrontArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now);
+  // 4. LAYER 2: SYMMETRICAL FRONT HANDS & FOREARM CHAINSAWS (Rule 20 Front Layer Standard)
+  // Both Left Hand (-r * 0.82, +r * 0.38) and Right Hand (+r * 0.82, +r * 0.38) on the FRONT layer!
+  if (!hideHands && !(typeof state !== 'undefined' && state.showSkinOnly)) {
+    // Left Hand / Left Forearm Chainsaw (Symmetrical Lower-Left Flank)
+    if (!fighter.hideBackHand && (!hideChainsaws || !isHybrid)) {
+      _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, combatOpts);
+    }
+    // Right Hand / Right Forearm Chainsaw (Symmetrical Lower-Right Flank)
+    if (!fighter.hideFrontHand && (!hideChainsaws || !isHybrid)) {
+      _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, combatOpts);
+    }
   }
 
   ctx.restore();
@@ -539,186 +540,73 @@ function _drawDenjiTopPullHandle(ctx, r) {
 
 /**
  * Draws the iconic high-detail central forehead chainsaw blade protruding forward along the top crest
- * Authentic Chainsaw Man anime & manga edition:
- * - Gunmetal base mounting bracket anchored into skull engine with heavy steel hex bolts
- * - Tapered multi-tone brushed steel guide bar with metallic bevel highlight & underside shadow
- * - Recessed dark center guide slot with internal lightening cutouts and dual rail lines
- * - Circular nose sprocket with 4-rivet circle
- * - High-density rotating hooked razor teeth with leading chisel edges and raker depth gauges
- * - Dynamic arterial blood drips, streaks, and splatters along teeth and center slot
+ * Authentic Chainsaw Man anime & manga edition (1:1 Match with Reference Picture 1 & 2):
+ * - Solid pale steel silver guide bar with rounded nose tip (no external base sprocket)
+ * - Sharp triangular raked cutter teeth moving dynamically around the guide rail
+ * - Visceral arterial blood splatters, diagonal smears, and nose tip gore cap
  */
-function _drawDenjiForeheadChainsaw(ctx, r, now) {
-  const bladeLen = 58;
-  const bladeThick = 12;
-  const startX = r * 0.42;
-  const startY = -r * 0.35; // Brow/forehead level — between teeth and crown
+function _drawDenjiForeheadChainsaw(ctx, r, now, opts = {}) {
+  const bladeLen = Math.round(r * 3.1); // 78px (proportional reach matching anime screenshot)
+  const bladeThick = Math.round((bladeLen * 369) / 1594); // ~18px
+  const startX = r * 0.30; // Anchored flush into brow visor
+  const startY = -r * 0.35; // Forehead level
 
   ctx.save();
   ctx.translate(startX, startY);
   ctx.rotate(-0.18); // Tilted slightly upward
 
-
-
-  // ── 2. Guide Bar Outer Dark Manga Ink Shell (Tapered Nose) ──
-  ctx.fillStyle = '#090D16';
-  ctx.fillRect(0, -bladeThick / 2 - 2, bladeLen - 4, bladeThick + 4);
-  // Tapered nose sprocket curve
-  ctx.fillRect(bladeLen - 4, -bladeThick / 2 - 1, 4, bladeThick + 2);
-  ctx.fillRect(bladeLen, -bladeThick / 2 + 1, 3, bladeThick - 2);
-
-  // ── 3. Guide Bar Solid Steel Body & Bevels ──
-  // Top bevel bright highlight
-  ctx.fillStyle = '#F1F5F9';
-  ctx.fillRect(2, -bladeThick / 2 - 1, bladeLen - 6, 2);
-  ctx.fillStyle = '#E2E8F0';
-  ctx.fillRect(bladeLen - 6, -bladeThick / 2, 4, 2);
-
-  // Upper blade face: satin industrial steel
-  ctx.fillStyle = '#94A3B8';
-  ctx.fillRect(1, -bladeThick / 2 + 1, bladeLen - 4, 2);
-
-  // Lower blade face: dark shadowed steel
-  ctx.fillStyle = '#475569';
-  ctx.fillRect(1, bladeThick / 2 - 3, bladeLen - 4, 2);
-
-  // Bottom bevel shadow edge
-  ctx.fillStyle = '#1E293B';
-  ctx.fillRect(2, bladeThick / 2 - 1, bladeLen - 6, 2);
-
-  // ── 4. Deep Recessed Center Guide Slot & Lightening Cutouts ──
-  ctx.fillStyle = '#090D16';
-  ctx.fillRect(4, -1.5, bladeLen - 10, 3);
-  ctx.fillStyle = '#64748B';
-  ctx.fillRect(4, -1, bladeLen - 10, 0.8);
-  ctx.fillRect(4, 0.2, bladeLen - 10, 0.8);
-
-
-
-  // ── 5. Nose Sprocket Roller Bearing & Rivets ──
-  const noseX = bladeLen - 4;
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(noseX - 2, -3, 5, 6);
-  ctx.fillStyle = '#090D16';
-  ctx.fillRect(noseX - 1, -2, 3, 4);
-  // Center axle pin
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(noseX, -0.5, 1.5, 1.5);
-  // 4 Sprocket Rivets around nose
-  ctx.fillStyle = '#E2E8F0';
-  ctx.fillRect(noseX - 2, -2, 1, 1);
-  ctx.fillRect(noseX + 1.5, -2, 1, 1);
-  ctx.fillRect(noseX - 2, 1, 1, 1);
-  ctx.fillRect(noseX + 1.5, 1, 1, 1);
-
-  // ── 6. Rotating Hooked Chainsaw Razor Teeth ──
-  const toothStep = 4.5;
-  const scrollOffset = (now * 0.09) % toothStep;
-
-  // Top Track Teeth (Raking backward toward motor)
-  for (let x = 2; x < bladeLen - 3; x += toothStep) {
-    const tx = snap(x + scrollOffset);
-    if (tx < bladeLen - 4) {
-      ctx.fillStyle = '#CBD5E1';
-      ctx.fillRect(tx, -bladeThick / 2 - 2, 2, 2);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(tx + 1, -bladeThick / 2 - 3, 1.5, 1.5);
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(tx - 1, -bladeThick / 2 - 1, 1, 1);
-    }
-  }
-
-  // Bottom Track Teeth (Pushing forward)
-  for (let x = 2; x < bladeLen - 3; x += toothStep) {
-    const tx = snap(x - scrollOffset + toothStep);
-    if (tx > 2 && tx < bladeLen - 4) {
-      ctx.fillStyle = '#CBD5E1';
-      ctx.fillRect(tx, bladeThick / 2, 2, 2);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(tx + 1, bladeThick / 2 + 1.5, 1.5, 1.5);
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(tx - 1, bladeThick / 2, 1, 1);
-    }
-  }
-
-  // Nose tip rounding teeth
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(bladeLen + 1, -2, 2, 4);
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(bladeLen + 2, -1, 1, 2);
-
-  // ── 7. Dynamic Arterial Blood Gore & Splatters ──
-  ctx.fillStyle = '#7F1D1D';
-  ctx.fillRect(snap(6 + (scrollOffset * 0.5)), -1, 6, 2);
-  ctx.fillRect(snap(24 + (scrollOffset * 0.5)), -1, 7, 2);
-
-  ctx.fillStyle = '#DC2626';
-  ctx.fillRect(snap(8 + scrollOffset), -bladeThick / 2 - 3, 3, 2);
-  ctx.fillRect(snap(18 + scrollOffset), -bladeThick / 2 - 2, 4, 2);
-  ctx.fillRect(snap(28 + scrollOffset), bladeThick / 2, 4, 3);
-  ctx.fillRect(snap(36 + scrollOffset), bladeThick / 2 - 1, 3, 2);
-  ctx.fillRect(bladeLen - 1, -2, 2, 3);
-
-  ctx.fillStyle = '#EF4444';
-  ctx.fillRect(snap(19 + scrollOffset), -bladeThick / 2 - 2, 2, 1);
-  ctx.fillRect(snap(29 + scrollOffset), bladeThick / 2 + 1, 2, 1);
-  ctx.fillRect(bladeLen, 0, 2, 1.5);
-
-  // Trailing blood droplets flicking off the nose tip
-  const dripPhase = (now * 0.015) % 1.0;
-  ctx.fillStyle = '#991B1B';
-  ctx.fillRect(bladeLen + 3 + dripPhase * 5, -1 + Math.sin(dripPhase * 3) * 2, 1.5, 1.5);
-  ctx.fillRect(bladeLen + 7 + dripPhase * 4, 1 + Math.cos(dripPhase * 2) * 2, 1.5, 1.5);
+  drawAuthenticChainsawBlade(ctx, bladeLen, bladeThick, now, opts);
 
   ctx.restore();
 }
 
 /**
- * Draws Denji's Back Arm / Left Arm Chainsaw (Behind Body Circle Layer)
- * Permanently displayed on the left flank in Chainsaw Devil form.
+ * Draws Denji's Left Arm / Left Forearm Chainsaw (Rule 20 Canonical Symmetrical Standard)
+ * Rendered on the Front Layer at (-r * 0.82, +r * 0.38)
  */
-function _drawDenjiBackArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now) {
+function _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, opts = {}) {
   ctx.save();
-  let armX = -r * 0.70;
-  let armY = r * 0.20;
-  let sawAngle = 1.35; // Extending downwards alongside left flank matching Reference Image
+  let armX = -r * 0.82;
+  let armY = r * 0.38;
+  let sawAngle = 1.35; // Extending downwards alongside lower-left flank
 
   if (isPunching || isSawing) {
-    const isBackArmHit = (comboCycle % 2 === 1);
-    if (isBackArmHit) {
+    const isLeftArmHit = (comboCycle % 2 === 1);
+    if (isLeftArmHit) {
       const ext = Math.sin(animPhase * Math.PI) * (r * 1.0);
       armX += ext * 1.2;
-      armY -= ext * 0.4;
+      armY -= ext * 0.3;
       sawAngle = 0.15; // Snaps forward during strike
     }
   } else if (isLunge) {
-    armX += r * 0.4;
-    sawAngle = 0.25;
+    armX += r * 0.5;
+    sawAngle = 0.20;
   }
 
   if (isHybrid) {
-    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, now, false);
+    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, now, false, opts);
   } else {
-    drawPixelHand(ctx, armX, armY, getHandSize(5.5), '#FFE0BD', '#18181B');
+    drawPixelHand(ctx, armX, armY, getHandSize(r * 0.30), '#FFE0BD', '#18181B');
   }
   ctx.restore();
 }
 
 /**
- * Draws Denji's Front Arm / Right Arm Chainsaw (Front Layer — On Top of Body)
- * Permanently displayed on the right flank in Chainsaw Devil form.
+ * Draws Denji's Right Arm / Right Forearm Chainsaw (Rule 20 Canonical Symmetrical Standard)
+ * Rendered on the Front Layer at (+r * 0.82, +r * 0.38)
  */
-function _drawDenjiFrontArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now) {
+function _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isSawing, animPhase, comboCycle, isLunge, isPodiumPreview, now, opts = {}) {
   ctx.save();
-  let armX = r * 0.55;
-  let armY = r * 0.42;
-  let sawAngle = 1.35; // Extending downwards alongside right flank, keeping chin clear
+  let armX = r * 0.82;
+  let armY = r * 0.38;
+  let sawAngle = 1.35; // Extending downwards alongside lower-right flank
 
   if (isPunching || isSawing) {
-    const isFrontArmHit = (comboCycle % 2 === 0);
-    if (isFrontArmHit) {
-      const ext = Math.sin(animPhase * Math.PI) * (r * 1.1);
+    const isRightArmHit = (comboCycle % 2 === 0);
+    if (isRightArmHit) {
+      const ext = Math.sin(animPhase * Math.PI) * (r * 1.0);
       armX += ext * 1.2;
-      armY -= ext * 0.4;
+      armY -= ext * 0.3;
       sawAngle = -0.10; // Snaps forward during strike
     }
   } else if (isLunge) {
@@ -727,25 +615,23 @@ function _drawDenjiFrontArm(ctx, fighter, r, isHybrid, isPunching, isSawing, ani
   }
 
   if (isHybrid) {
-    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, now, true);
+    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, now, true, opts);
   } else {
-    drawPixelHand(ctx, armX, armY, getHandSize(6.0), '#FFE0BD', '#18181B');
+    drawPixelHand(ctx, armX, armY, getHandSize(r * 0.30), '#FFE0BD', '#18181B');
   }
   ctx.restore();
 }
 
 /**
  * Draws a forearm-mounted chainsaw blade bursting from Denji's arm in 2D Pixel Art
- * Authentic Chainsaw Man manga/anime edition:
+ * Authentic Chainsaw Man manga/anime edition (1:1 Match with Reference Picture 1 & 2):
  * - Torn white shirt cuff and bloody ruptured flesh emergence ring
- * - Reinforced gunmetal blade bracket rooted into the dorsal forearm
- * - Tapered multi-tone steel guide bar with center slot and rotating razor hooked teeth
  * - Tight, shaded combat fist tucked below the saw spine with detailed knuckles
- * - Visceral arterial blood splatters and dripping gore
+ * - Solid pale steel silver guide bar with sharp triangular cutter teeth and arterial blood gore
  */
-function _drawPixelForearmChainsaw(ctx, cx, cy, angle, now, isFront) {
-  const sawLen = 42;
-  const sawThick = 9;
+function _drawPixelForearmChainsaw(ctx, cx, cy, angle, now, isFront, opts = {}) {
+  const sawLen = 58; // Proportional forearm length
+  const sawThick = Math.round((sawLen * 369) / 1594); // ~13.4px
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -753,117 +639,39 @@ function _drawPixelForearmChainsaw(ctx, cx, cy, angle, now, isFront) {
 
   // ── 1. Torn Shirt Sleeve Cuff & Flesh Emergence Ring ──
   ctx.fillStyle = '#090D16';
-  ctx.fillRect(-7, -sawThick / 2 - 3, 8, sawThick + 6);
+  ctx.fillRect(-9, -sawThick / 2 - 3, 10, sawThick + 6);
   ctx.fillStyle = '#FAF7F0';
-  ctx.fillRect(-6, -sawThick / 2 - 2, 6, sawThick + 4);
+  ctx.fillRect(-8, -sawThick / 2 - 2, 8, sawThick + 4);
   ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(-6, -sawThick / 2 - 1, 2, sawThick + 2);
+  ctx.fillRect(-8, -sawThick / 2 - 1, 3, sawThick + 2);
   // Torn jagged cuff threads
   ctx.fillStyle = '#E2E8F0';
-  ctx.fillRect(-1, -sawThick / 2 - 3, 2, 1.5);
-  ctx.fillRect(0, sawThick / 2 + 1.5, 2, 1.5);
+  ctx.fillRect(-2, -sawThick / 2 - 3, 3, 1.5);
+  ctx.fillRect(-1, sawThick / 2 + 1.5, 3, 1.5);
 
   // Bloody ruptured flesh ring where blade bursts through forearm
   ctx.fillStyle = '#7F1D1D';
-  ctx.fillRect(-2, -sawThick / 2 - 2, 4, sawThick + 4);
+  ctx.fillRect(-3, -sawThick / 2 - 2, 5, sawThick + 4);
   ctx.fillStyle = '#DC2626';
-  ctx.fillRect(-1, -sawThick / 2 - 1, 3, sawThick + 2);
+  ctx.fillRect(-2, -sawThick / 2 - 1, 4, sawThick + 2);
   ctx.fillStyle = '#EF4444';
-  ctx.fillRect(0, -1, 2, 2);
+  ctx.fillRect(-1, -1, 3, 2);
 
   // ── 2. Clenched Combat Fist (Tight, shaded, anatomically proportional) ──
-  const fistX = -2;
-  const fistY = (isFront ? 3.5 : -3.5);
+  const fistX = -3;
+  const fistY = (isFront ? 4.5 : -4.5);
   ctx.fillStyle = '#090D16';
-  ctx.fillRect(fistX - 4, fistY - 3, 8, 7);
+  ctx.fillRect(fistX - 5, fistY - 4, 10, 8);
   ctx.fillStyle = '#FFE0BD';
-  ctx.fillRect(fistX - 3, fistY - 2, 6, 5);
+  ctx.fillRect(fistX - 4, fistY - 3, 8, 6);
   ctx.fillStyle = '#F3C99F';
-  ctx.fillRect(fistX - 1, fistY - 1, 4, 3);
+  ctx.fillRect(fistX - 2, fistY - 2, 5, 4);
   ctx.fillStyle = '#D49B6A';
-  ctx.fillRect(fistX - 3, fistY, 2, 3);
-  ctx.fillRect(fistX + 1, fistY + 1, 2, 1);
+  ctx.fillRect(fistX - 4, fistY, 3, 4);
+  ctx.fillRect(fistX + 2, fistY + 1, 2, 2);
 
-  // ── 3. Gunmetal Guide Bar & Tapered Steel Body ──
-  ctx.fillStyle = '#090D16';
-  ctx.fillRect(1, -sawThick / 2 - 2, sawLen - 4, sawThick + 4);
-  ctx.fillRect(sawLen - 4, -sawThick / 2 - 1, 4, sawThick + 2);
-  ctx.fillRect(sawLen, -sawThick / 2 + 1, 2, sawThick - 2);
-
-  // Top bevel highlight
-  ctx.fillStyle = '#F1F5F9';
-  ctx.fillRect(3, -sawThick / 2 - 1, sawLen - 6, 1.5);
-  // Upper steel face
-  ctx.fillStyle = '#94A3B8';
-  ctx.fillRect(2, -sawThick / 2 + 0.5, sawLen - 4, 1.5);
-  // Lower steel shadow
-  ctx.fillStyle = '#475569';
-  ctx.fillRect(2, sawThick / 2 - 2, sawLen - 4, 1.5);
-  // Bottom bevel shadow
-  ctx.fillStyle = '#1E293B';
-  ctx.fillRect(3, sawThick / 2 - 0.5, sawLen - 6, 1.5);
-
-  // Recessed center guide groove
-  ctx.fillStyle = '#090D16';
-  ctx.fillRect(4, -1, sawLen - 8, 2);
-  ctx.fillStyle = '#334155';
-  ctx.fillRect(4, -0.5, sawLen - 8, 1);
-
-  // ── 4. Nose Sprocket on Arm Saw ──
-  const noseX = sawLen - 3;
-  ctx.fillStyle = '#CBD5E1';
-  ctx.fillRect(noseX, -0.5, 1.5, 1);
-  ctx.fillStyle = '#E2E8F0';
-  ctx.fillRect(noseX - 1, -1.5, 1, 1);
-  ctx.fillRect(noseX - 1, 0.5, 1, 1);
-
-  // ── 5. Hooked Razor Teeth (Fast Moving) ──
-  const toothStep = 4.0;
-  const scrollOffset = (now * 0.09) % toothStep;
-
-  // Top cutting teeth
-  for (let x = 3; x < sawLen - 3; x += toothStep) {
-    const tx = snap(x + scrollOffset);
-    if (tx < sawLen - 3) {
-      ctx.fillStyle = '#CBD5E1';
-      ctx.fillRect(tx, -sawThick / 2 - 2, 1.5, 1.5);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(tx + 1, -sawThick / 2 - 2.5, 1, 1);
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(tx - 1, -sawThick / 2 - 1, 1, 1);
-    }
-  }
-
-  // Bottom cutting teeth
-  for (let x = 3; x < sawLen - 3; x += toothStep) {
-    const tx = snap(x - scrollOffset + toothStep);
-    if (tx > 3 && tx < sawLen - 3) {
-      ctx.fillStyle = '#CBD5E1';
-      ctx.fillRect(tx, sawThick / 2 + 0.5, 1.5, 1.5);
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(tx + 1, sawThick / 2 + 1.5, 1, 1);
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(tx - 1, sawThick / 2, 1, 1);
-    }
-  }
-
-  // Nose tip razor
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(sawLen + 0.5, -1.5, 1.5, 3);
-
-  // ── 6. Visceral Blood Gore & Trailing Splatters ──
-  ctx.fillStyle = '#7F1D1D';
-  ctx.fillRect(snap(6 + scrollOffset), -0.5, 4, 1);
-  ctx.fillRect(snap(16 + scrollOffset), -0.5, 5, 1);
-
-  ctx.fillStyle = '#DC2626';
-  ctx.fillRect(snap(8 + scrollOffset), -sawThick / 2 - 2, 2.5, 2);
-  ctx.fillRect(snap(18 + scrollOffset), sawThick / 2, 3, 2);
-  ctx.fillRect(sawLen - 1, -1, 1.5, 2);
-
-  ctx.fillStyle = '#EF4444';
-  ctx.fillRect(snap(9 + scrollOffset), -sawThick / 2 - 1, 1.5, 1);
-  ctx.fillRect(sawLen, 0, 1.5, 1);
+  // ── 3. Authentic Chainsaw Blade (1:1 with Reference Picture 1 & 2) ──
+  drawAuthenticChainsawBlade(ctx, sawLen, sawThick, now, opts);
 
   ctx.restore();
 }
