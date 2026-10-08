@@ -8,6 +8,7 @@ import { drawHUD, clearHealthHud, drawMissionPassedOverlay, drawWastedOverlay } 
 import { 
   handleUIMove, 
   handleUIClick, 
+  getHoveredButton,
   drawPanel 
 } from './ui/uiFramework.js';
 import { 
@@ -47,7 +48,6 @@ import {
   drawFaceOffThumbnailScreen,
   captureFaceOffScreenshot
 } from './ui/ThumbnailFaceOffScreen.js';
-import { drawKillFeed } from './ui/killFeedRenderer.js';
 
 export {
   renderTeamHpCard,
@@ -56,6 +56,7 @@ export {
   clearHealthHud,
   handleUIMove,
   handleUIClick,
+  getHoveredButton,
   drawPanel,
   drawTitleScreen,
   drawLeaderboardScreen,
@@ -77,6 +78,5 @@ export {
   drawFaceOffThumbnailScreen,
   captureFaceOffScreenshot,
   drawMissionPassedOverlay,
-  drawWastedOverlay,
-  drawKillFeed
+  drawWastedOverlay
 };

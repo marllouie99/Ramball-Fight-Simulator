@@ -29,7 +29,6 @@ import { drawYutaFist } from '../fighters/yutaSkin.js';
 import { drawUryuBow } from '../weapons/uryuWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
-import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
 import { drawDenjiWeaponPreview } from '../weapons/denjiWeaponGraphics.js';
 import { drawPowerWeaponPreview } from '../weapons/powerWeaponGraphics.js';
 import { drawTanjiroNichirinKatana, drawNezukoDemonClaws, drawZenitsuLightningKatana, drawInosukeDualSerratedKatanas } from '../weapons/demonSlayerWeaponGraphics.js';
@@ -161,60 +160,13 @@ function drawWeaponMenu() {
   ctx.restore();
 
   // Category Switcher Tabs
-  if (!state.weaponCategoryTab) {
-    state.weaponCategoryTab = (state.gameCategory === 'tactical') ? 'tactical' : 'foc';
-  }
-
-  const tabY = 94;
-  const tabW = 160;
-  const tabH = 24;
-  const tabGap = 10;
-  const totalTabsW = tabW * 2 + tabGap;
-  const tabStartX = (canvas.width - totalTabsW) / 2;
-
-  // Tab 1: FOC Fantasy / Anime Weapons
-  const isFoc = state.weaponCategoryTab !== 'tactical';
-  drawButton(
-    isFoc ? '⚔️ [ FOC FIGHTERS & ARSENAL ]' : '⚔️ FOC FIGHTERS & ARSENAL',
-    tabStartX + tabW / 2,
-    tabY,
-    () => {
-      if (state.weaponCategoryTab !== 'foc') {
-        state.weaponCategoryTab = 'foc';
-        state.weaponPage = 0;
-      }
-    },
-    tabW,
-    tabH,
-    isFoc ? '#f59e0b' : null,
-    4
-  );
-
-  // Tab 2: Tactical Force Firearms
-  const isTac = state.weaponCategoryTab === 'tactical';
-  drawButton(
-    isTac ? '🎯 [ TACTICAL OPERATIVES ]' : '🎯 TACTICAL OPERATIVES',
-    tabStartX + tabW + tabGap + tabW / 2,
-    tabY,
-    () => {
-      if (state.weaponCategoryTab !== 'tactical') {
-        state.weaponCategoryTab = 'tactical';
-        state.weaponPage = 0;
-      }
-    },
-    tabW,
-    tabH,
-    isTac ? '#f59e0b' : null,
-    4
-  );
-
   const cardX = Math.max(16, (canvas.width - 508) / 2);
   const cardW = Math.min(canvas.width - 32, 508);
   const cardH = 118;
   const cardSpacing = 10;
   const itemsPerPage = 5;
 
-  const activeDefs = (state.weaponCategoryTab === 'tactical') ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
+  const activeDefs = FIGHTER_DEFS;
 
   const totalPages = Math.max(1, Math.ceil(activeDefs.length / itemsPerPage));
   if (state.weaponPage === undefined) state.weaponPage = 0;
@@ -2374,7 +2326,7 @@ if (eventTarget && typeof eventTarget.addEventListener === 'function') {
     }
     if (state.gameState === 'weapons') {
       e.preventDefault();
-      const activeDefs = (state.weaponCategoryTab === 'tactical') ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
+      const activeDefs = FIGHTER_DEFS;
       const totalPages = Math.ceil(activeDefs.length / 5);
       if (e.deltaY > 0 && state.weaponPage < totalPages - 1) {
         state.weaponPage++;

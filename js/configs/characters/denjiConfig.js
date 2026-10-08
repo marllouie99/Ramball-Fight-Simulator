@@ -15,7 +15,7 @@ export const denjiConfig = {
   // Baseline Attributes
   hp: 360,
   maxHpRatio: 1.0,
-  speed: 6.0,
+  speed: 6.5,
   moveSpeed: 5.8,
   r: 26,
   radius: 25,
@@ -65,8 +65,8 @@ export const denjiConfig = {
 
   // Hybrid Form: Continuous 3-Blade Chainsaw Collision Shred
   enableChainsawShred: true,        // Master toggle for Continuous 3-Blade Chainsaw Collision Shred
-  shredDamagePerTooth: 3,           // Rapid shred damage per chain tooth collision tick
-  shredTickInterval: 5,             // Interval in frames between chain teeth hits (matches animation RPM)
+  shredDamagePerTooth: 4,           // Rapid shred damage per chain tooth collision tick
+  shredTickInterval: 6,             // Interval in frames between chain teeth hits (matches animation RPM)
   shredHitPauseFrames: 2,           // Micro hit-pause frames applied to enemy on each tooth strike
   shredArenaShakeIntensity: 6.0,    // Arena / screen shake intensity on each shred tick
   shredAudioLingerFrames: 4,        // Debounce frames (~66ms) to prevent single-frame physics micro-gaps

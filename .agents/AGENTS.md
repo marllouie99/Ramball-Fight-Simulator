@@ -57,7 +57,15 @@ After completing ANY code modification, update, or fix in the project, the agent
   - **Example Scenario**: ...
 ```
 
+### 0.8 Viewport Isolation & YouTube Shorts Thumbnail Standard (Rule 28)
+- **Vertical Standard (540×960, arena 450×450 at `y: 240`, camera zoom 1.0, 1920×1080 ↔ 540×960 F10 toggle) is the baseline.** The vertical mode is used directly for YouTube Shorts channel thumbnails and video captures. NEVER alter the canonical vertical arena dimensions (`450×450`), centering (`x: 45`), or vertical position (`y: 240`) so that all video thumbnails remain 100% pixel-aligned across the user's channel grid (top match banner, square arena box, bottom HUD cards).
+- Any change made for Horizontal mode (arena size 1400×1400, camera zoom, spawns, HUD, CSS, window sizing/IPC, F10/fullscreen toggles, aspect-fit scaling) MUST be strictly gated by `state.viewOrientation === 'horizontal'` (or live under `VIEWPORT_CONFIGS[HORIZONTAL]` / `.horizontal-viewport-mode`).
+- NEVER alter vertical arena dimensions, camera defaults, window sizes, or on-screen scale as a side effect. Do not reuse or "unify" shared constants/branches in ways that change vertical output.
+- Electron main-process code (`electron-main.js`) has no access to `state`; track orientation there explicitly (`currentWindowOrientation`) instead of inferring it from window dimensions.
+- Before finishing any viewport-related change, diff against `HEAD` and confirm the vertical code paths (`isHorizontal === false`) produce identical values/behavior; state this in the final report.
+
 ---
+
 
 ## 1. Fighter Update Loop & Combat Engine Standards
 
@@ -342,3 +350,10 @@ After completing ANY code modification, update, or fix in the project, the agent
 - All firearms follow the Unified Neon Cyberpunk Theme (Deep obsidian receiver `#0b0f19`, glowing neon contours `1.2px – 1.4px`, dynamic character theme colors: M4A1 Cyan, SPAS-12 Mint, Desert Eagle Amber, AWP Plasma Blue).
 - Obstacle physics resolves perimeter and interior overlaps with 0.85–0.90 restitution.
 - Tactical AI evaluates line-of-sight raycasting (`hasLineOfSight`) before shooting, avoids locking aim through solid walls, and holds fire on blocked sightlines.
+
+### 4.4 Mandatory Horizontal Mode Side Doll & Sprite Sheet Ground-Anchor Standard (Rule 29)
+- **Placement & Symmetrical Flanking**: In Horizontal Mode, animated/standing character dolls occupy the empty vertical column below the Left (Player 1: `centerX = 118px`, facing right) and Right (Player 2: `centerX = 842px`, facing left) side HUD cards at `baselineY = arena.y + arena.height - 4px` (~`466px`) with a grounded floor shadow ellipse (`rx = 44px, ry = 9px`).
+- **Per-Frame Sprite Sheet Foot & Spine Anchoring (Anti-Wobble Rule)**: NEVER draw multi-frame sprite cells with static `-drawW / 2` box offsets. Always declare calibrated ground anchor points (`footX`, `footY`) per frame and translate to `-frame.footX * scale` and `-frame.footY * scale` so character feet and center of gravity remain 100% stationary on the ground while the chest, torso, and head animate.
+- **Natural Breathing Frame Sequences**: Sprite breathing/idle animations MUST follow true physiological inhale/exhale cycles (e.g. Denji `[0, 2, 1, 3, 5, 4]` at $9\text{ ticks/frame} \approx 6.7\text{ FPS}$). Multi-frame sprite sheet dolls MUST NOT have artificial external vertical $Y$-bobbing applied on top of built-in breathing frames.
+- **Continuous 60 FPS Real-Time Timing**: Always derive doll animation ticks from continuous high-resolution timestamps (`performance.now()`) to ensure fluid, uninterrupted frame cycling across all match states.
+

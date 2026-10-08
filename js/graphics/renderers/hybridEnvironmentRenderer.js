@@ -7,6 +7,7 @@ import { renderMahitoDomainBackground, renderCjBaguvixBackground } from './envir
 import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
 import { drawCronosSphereVisual } from '../draw.js';
 import { isTodoTakadaOverlayActive } from './specialOverlayRenderer.js';
+import { syncPixiCanvasTextureSize } from '../../core/viewportManager.js';
 
 let furnaceDimSprite = null;
 let currentFurnaceDimOpacity = 0;
@@ -314,27 +315,23 @@ function releaseFlyHeadSprite(s) {
 }
 
 function syncDomainHybridDataSize(data) {
+  if (!data || !data.canvas) return;
   if (state.canvas && (data.canvas.width !== state.canvas.width || data.canvas.height !== state.canvas.height)) {
     data.canvas.width = state.canvas.width;
     data.canvas.height = state.canvas.height;
-    if (data.texture && data.texture.baseTexture) {
-      data.texture.baseTexture.setSize(state.canvas.width, state.canvas.height);
-    }
-    data.texture.update();
+    syncPixiCanvasTextureSize(data.sprite, data.canvas);
   }
 }
 
 function syncGojoDomainHybridDataSize(data) {
+  if (!data || !data.canvas) return;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
   const aw = Math.max(1, Math.round(arena.width || 450));
   const ah = Math.max(1, Math.round(arena.height || 450));
   if (data.canvas.width !== aw || data.canvas.height !== ah) {
     data.canvas.width = aw;
     data.canvas.height = ah;
-    if (data.texture && data.texture.baseTexture) {
-      data.texture.baseTexture.setSize(aw, ah);
-    }
-    data.texture.update();
+    syncPixiCanvasTextureSize(data.sprite, data.canvas);
   }
 }
 

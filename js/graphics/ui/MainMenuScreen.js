@@ -416,12 +416,7 @@ function _drawSmallEditor(ctx, val, x, y, fighterIndex, statName) {
 
 function drawModeSelection(cx, cy) {
   const { ctx, canvas } = state;
-  const isTactical = state.gameCategory === 'tactical';
-  const modes = isTactical ? [
-    { id: GAME_MODES.TACTICAL_1V1 || 'Tactical 1v1', label: 'DUEL (1V1)' },
-    { id: GAME_MODES.TACTICAL_FFA || 'Tactical FFA', label: 'TACTICAL FFA (4P)' },
-    { id: GAME_MODES.TACTICAL_2V2 || 'Tactical 2v2', label: '2 VS 2 (TEAMS)' }
-  ] : [
+  const modes = [
     { id: '1v1', label: '1V1' },
     { id: 'Stand Off', label: 'STANDOFF' },
     { id: '1v2 Stand Off', label: '1V2 SHOW' },
@@ -431,7 +426,7 @@ function drawModeSelection(cx, cy) {
     { id: 'TLFS', label: 'TLFS' }
   ];
 
-  const buttonWidth = isTactical ? 120 : Math.min(68, Math.max(52, Math.floor((canvas.width - 32) / modes.length - 4)));
+  const buttonWidth = Math.min(68, Math.max(52, Math.floor((canvas.width - 32) / modes.length - 4)));
   const buttonHeight = 24;
   const gap = 4;
   const totalWidth = modes.length * buttonWidth + (modes.length - 1) * gap;

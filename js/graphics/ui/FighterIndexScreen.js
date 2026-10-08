@@ -63,7 +63,6 @@ function drawIndexScreen() {
   // ── Unified Top Back Button ──
   drawButton('◀ BACK', 52, 64, () => { goToTitle(); }, 76, 26);
 
-  const isTactical = state.gameCategory === 'tactical';
   const currentDefs = getActiveFighterDefs();
 
   // ── Header Section ──
@@ -71,17 +70,17 @@ function drawIndexScreen() {
   ctx.font = '900 10px "Rajdhani", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText(isTactical ? 'TACTICAL SHOOTER // OPERATIVE DOSSIER // SYS.v2.5' : 'CIRCLE BATTLE // FIGHTER DOSSIER // SYS.v2.5', canvas.width / 2, 56);
+  ctx.fillText('CIRCLE BATTLE // FIGHTER DOSSIER // SYS.v2.5', canvas.width / 2, 56);
 
   ctx.save();
   ctx.fillStyle = '#f8fafc';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText(isTactical ? '[ SHOOTER ROSTER ]' : '[ FIGHTER DATABASE ]', canvas.width / 2, 78);
+  ctx.fillText('[ FIGHTER DATABASE ]', canvas.width / 2, 78);
   ctx.restore();
 
   ctx.fillStyle = '#94a3b8';
   ctx.font = '10px "Rajdhani", sans-serif';
-  ctx.fillText(isTactical ? 'Inspect firearm combatants, ballistics data, and tactical abilities.' : 'Inspect combatant classifications, abilities, and core telemetry.', canvas.width / 2, 94);
+  ctx.fillText('Inspect combatant classifications, abilities, and core telemetry.', canvas.width / 2, 94);
 
   // ── Category Filter Tabs ──
   const rawCategories = Array.from(new Set(currentDefs.map(d => d.category).filter(Boolean)));

@@ -46,6 +46,10 @@ function handleUIClick(mx, my) {
   return false;
 }
 
+function getHoveredButton() {
+  return _hoveredButton;
+}
+
 /** Draws a rounded or chamfered rectangle path. */
 export function drawChamferedRect(ctx, x, y, w, h, radius = 4) {
   const r = Math.min(radius, w / 4, h / 4);
@@ -310,4 +314,4 @@ function drawStatBar(ctx, label, value, maxValue, x, y, width, color = '#9e1a2b'
   }
 }
 
-export { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, fitSingleLineText, drawPremiumStatBar, drawStatBar };
+export { _clearButtons, _registerButton, handleUIMove, handleUIClick, getHoveredButton, drawPanel, drawButton, wrapText, fitSingleLineText, drawPremiumStatBar, drawStatBar };

@@ -363,9 +363,9 @@ class ProjectileSystem {
     const { radius, life } = CONFIG.projectile;
     let speed = speedOverride;
     if (speed === undefined) {
-      const isTac = fighter && (fighter.gameCategory === 'tactical' || fighter.isTacticalFighter || (fighter._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp'].includes(fighter._def.type)));
-      const tacGlobalMult = isTac ? (CONFIG.tactical?.globalBulletSpeedMultiplier ?? 1.0) : 1.0;
-      speed = (CONFIG.projectile.speed * (fighter?._def?.projectileSpeedMultiplier || 1)) * tacGlobalMult;
+
+
+      speed = (CONFIG.projectile.speed * (fighter?._def?.projectileSpeedMultiplier || 1));
     }
     const projDamage = Number(damage);
 
@@ -444,9 +444,9 @@ class ProjectileSystem {
     if (!visualType && fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {
       visualType = 'johnWickBullet';
     }
-    if (!visualType && (fighter.gameCategory === 'tactical' || (fighter._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'm4a1', 'spas12', 'desert_eagle', 'awp'].includes(fighter._def.type)))) {
-      visualType = 'tacticalBullet';
-    }
+
+
+
 
     const proj = this._getProjectile();
     proj.x = spawnX;

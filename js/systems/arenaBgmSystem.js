@@ -604,7 +604,7 @@ export function updateArenaBgm() {
       return;
     }
   } else if (state.gameState === 'roundEnd') {
-    const isMultiRound = (state.mode === '1v1' || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO);
+    const isMultiRound = (state.mode === '1v1' || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
     const maxWins = (state.scores && state.scores.length) ? Math.max(...state.scores) : (state.teamScores && state.teamScores.length ? Math.max(...state.teamScores) : 0);
     const modeRounds = (typeof MODE_SETTINGS !== 'undefined' && MODE_SETTINGS[state.mode]?.rounds) || 3;
     const winThreshold = modeRounds === 1 ? 1 : Math.ceil(modeRounds / 2);

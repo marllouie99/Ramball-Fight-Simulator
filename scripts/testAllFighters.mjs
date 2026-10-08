@@ -197,7 +197,7 @@ function assertCanvasStackBalance(locationTag) {
 }
 
 async function main() {
-  const { CONFIG, FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS } = await import('../js/core/config.js');
+  const { CONFIG, FIGHTER_DEFS } = await import('../js/core/config.js');
   const { MODE_SETTINGS, GAME_MODES } = await import('../js/core/modeConfig.js');
   const { FIGHTER_CLASS_MAP } = await import('../js/entities/factories/fighterFactory.js');
   const { state, triggerGlobalScreenShake, saveSkinCustomizations, loadSkinCustomizations } = await import('../js/core/state.js');
@@ -255,7 +255,7 @@ async function main() {
   let errors = 0;
   const errorList = [];
 
-  const allDefs = [...FIGHTER_DEFS, ...(TACTICAL_FIGHTER_DEFS || [])];
+  const allDefs = [...FIGHTER_DEFS];
 
   const meguminDef = allDefs.find((def) => def.type === 'megumin');
   const originalSizeMultiplier = CONFIG.globalFighter.sizeMultiplier;

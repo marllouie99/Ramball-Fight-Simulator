@@ -1,4 +1,4 @@
-import { FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
+import { FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { state } from '../../core/state.js';
@@ -60,11 +60,6 @@ function preRenderFighterPreviews() {
     renderPreviewForDef(def, `foc_${index}`);
     renderPreviewForDef(def, index);
   });
-  if (typeof TACTICAL_FIGHTER_DEFS !== 'undefined' && Array.isArray(TACTICAL_FIGHTER_DEFS)) {
-    TACTICAL_FIGHTER_DEFS.forEach((def, index) => {
-      renderPreviewForDef(def, `tactical_${index}`);
-    });
-  }
 }
 
 function getFighterPreview(index, category = null) {

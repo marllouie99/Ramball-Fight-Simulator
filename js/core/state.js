@@ -10,9 +10,6 @@ import { audioSystem } from '../systems/audioSystem.js';
 let _projectileSystem = null;
 export function registerProjectileSystem(ps) { _projectileSystem = ps; }
 
-let _tacticalProjectileSystem = null;
-export function registerTacticalProjectileSystem(tps) { _tacticalProjectileSystem = tps; }
-
 const canvas = document.getElementById('arena');
 canvas.width = CONFIG.canvasWidth || 540;
 canvas.height = CONFIG.canvasHeight || 960;
@@ -346,24 +343,35 @@ export const state = {
   // Leaderboard for 1v1 mode - tracks wins and losses per fighter
   leaderboard: {}, // { fighterIndex: { wins: 0, losses: 0 } }
 
-  // Team assignment: for 4v4 CT vs T, 2v2 duo, 1v2 standoff, and Tag Match
+  // Viewport & Horizontal Sub-Game State
+  viewOrientation: 'vertical', // 'vertical' (540x960) | 'horizontal' (960x540)
+  selectedHorizontalMapId: 'colosseum',
+  horizontalRosterSlots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+
+  // Team assignment: for 3v3v3v3, 2v2v2v2, 4v4, 2v2 duo, 1v2 standoff, and Tag Match
   getFighterTeam(fighterIndex) {
-    const is4v4 = state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4';
-    const is2v2 = state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2';
+    if (typeof fighterIndex !== 'number' || fighterIndex < 0 || !state.fighters || fighterIndex >= state.fighters.length) return null;
+
+    const is3v3v3v3 = state.mode === GAME_MODES.TEAMFIGHT_3V3V3V3 || state.mode === '3v3v3v3 Teamfight';
+    const is2v2v2v2 = state.mode === GAME_MODES.TEAMFIGHT_2V2V2V2 || state.mode === '2v2v2v2 Quad';
+    const is4v4 = state.mode === GAME_MODES.TEAM_4V4 || state.mode === '4v4 Grand War';
+    const isBR8 = state.mode === GAME_MODES.BATTLE_ROYALE_8 || state.mode === '8-Fighter Battle Royale';
+    const is2v2 = state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2';
     const is1v2 = state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2' || state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2';
     const isTagMatch = state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match' || state.mode === 'TAG_MATCH';
-    if (is4v4) {
-      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
-      const half = Math.max(1, Math.ceil(state.fighters.length / 2));
-      return fighterIndex < half ? 0 : 1;
+    const isH1v1 = state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel';
+
+    if (is3v3v3v3) {
+      return Math.floor(fighterIndex / 3); // 0..2: Team 0, 3..5: Team 1, 6..8: Team 2, 9..11: Team 3
+    } else if (is2v2v2v2) {
+      return Math.floor(fighterIndex / 2); // 0..1: Team 0, 2..3: Team 1, 4..5: Team 2, 6..7: Team 3
+    } else if (is4v4) {
+      return fighterIndex < 4 ? 0 : 1;
+    } else if (isBR8) {
+      return fighterIndex; // Free-For-All
     } else if (is2v2) {
-      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
       return fighterIndex < 2 ? 0 : 1;
-    } else if (is1v2) {
-      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
-      return fighterIndex === 0 ? 0 : 1;
-    } else if (isTagMatch) {
-      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
+    } else if (is1v2 || isTagMatch || isH1v1) {
       return fighterIndex === 0 ? 0 : 1;
     }
     return null;
@@ -377,6 +385,12 @@ export const state = {
   p4Index: 3, // Blue Slot 2
   p5Index: 4, // Red Slot 3
   p6Index: 5, // Blue Slot 3
+  p7Index: 6, // Green Slot 1
+  p8Index: 7, // Green Slot 2
+  p9Index: 8, // Green Slot 3
+  p10Index: 9, // Gold Slot 1
+  p11Index: 10, // Gold Slot 2
+  p12Index: 11, // Gold Slot 3
 
   // Floating text labels
   floatingTexts: [],
@@ -530,13 +544,10 @@ export function getProjectiles() {
   return _projectileSystem ? _projectileSystem.getProjectiles() : [];
 }
 
-// Helper to clear projectiles across standard and tactical systems
+// Helper to clear projectiles across standard systems
 export function clearProjectiles() {
   if (_projectileSystem) {
     _projectileSystem.clear();
-  }
-  if (_tacticalProjectileSystem) {
-    _tacticalProjectileSystem.clear();
   }
   if (typeof state !== 'undefined' && state.projectiles) {
     state.projectiles.length = 0;
@@ -862,6 +873,13 @@ export function saveFighterSelections() {
       p4Index: state.p4Index ?? 3,
       p5Index: state.p5Index ?? 4,
       p6Index: state.p6Index ?? 5,
+      p7Index: state.p7Index ?? 6,
+      p8Index: state.p8Index ?? 7,
+      p9Index: state.p9Index ?? 8,
+      p10Index: state.p10Index ?? 9,
+      p11Index: state.p11Index ?? 10,
+      p12Index: state.p12Index ?? 11,
+      horizontalRosterSlots: Array.isArray(state.horizontalRosterSlots) ? [...state.horizontalRosterSlots] : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
       bossBattleNoTeammate: Boolean(state.bossBattleNoTeammate)
     };
     const allSavedStr = localStorage.getItem('circleMiniBattleFighterSelections');
@@ -869,6 +887,9 @@ export function saveFighterSelections() {
     allSaved[cat] = selections;
     localStorage.setItem('circleMiniBattleFighterSelections', JSON.stringify(allSaved));
     localStorage.setItem('circleMiniBattleBossBattleNoTeammate', String(Boolean(state.bossBattleNoTeammate)));
+    if (Array.isArray(state.horizontalRosterSlots)) {
+      localStorage.setItem('circleMiniBattleHorizontalRoster', JSON.stringify(state.horizontalRosterSlots));
+    }
   } catch (e) {
     console.warn('Could not save fighter selections:', e);
   }
@@ -889,12 +910,39 @@ export function loadFighterSelections(targetCat = null) {
         if (typeof sel.p4Index === 'number') state.p4Index = sel.p4Index;
         if (typeof sel.p5Index === 'number') state.p5Index = sel.p5Index;
         if (typeof sel.p6Index === 'number') state.p6Index = sel.p6Index;
+        if (typeof sel.p7Index === 'number') state.p7Index = sel.p7Index;
+        if (typeof sel.p8Index === 'number') state.p8Index = sel.p8Index;
+        if (typeof sel.p9Index === 'number') state.p9Index = sel.p9Index;
+        if (typeof sel.p10Index === 'number') state.p10Index = sel.p10Index;
+        if (typeof sel.p11Index === 'number') state.p11Index = sel.p11Index;
+        if (typeof sel.p12Index === 'number') state.p12Index = sel.p12Index;
+        if (Array.isArray(sel.horizontalRosterSlots) && sel.horizontalRosterSlots.length > 0) {
+          state.horizontalRosterSlots = [...sel.horizontalRosterSlots];
+        }
         if (typeof sel.bossBattleNoTeammate === 'boolean') state.bossBattleNoTeammate = sel.bossBattleNoTeammate;
       }
+    }
+    const hRosterSaved = localStorage.getItem('circleMiniBattleHorizontalRoster');
+    if (hRosterSaved) {
+      try {
+        const parsed = JSON.parse(hRosterSaved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          state.horizontalRosterSlots = [...parsed];
+        }
+      } catch (e) {}
     }
     const soloSaved = localStorage.getItem('circleMiniBattleBossBattleNoTeammate');
     if (soloSaved !== null) {
       state.bossBattleNoTeammate = (soloSaved === 'true');
+    }
+
+    if (!Array.isArray(state.horizontalRosterSlots) || state.horizontalRosterSlots.length < 12) {
+      if (!Array.isArray(state.horizontalRosterSlots)) {
+        state.horizontalRosterSlots = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      }
+      while (state.horizontalRosterSlots.length < 12) {
+        state.horizontalRosterSlots.push(state.horizontalRosterSlots.length);
+      }
     }
   } catch (e) {
     console.warn('Could not load fighter selections:', e);
@@ -1276,4 +1324,4 @@ window.isGlobalHitPauseActive = isGlobalHitPauseActive;
 window.triggerMissionPassedOverlay = triggerMissionPassedOverlay;
 window.triggerWastedOverlay = triggerWastedOverlay;
 
-export { pushKillFeed } from '../graphics/ui/killFeedRenderer.js';
+

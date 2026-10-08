@@ -54,7 +54,7 @@ export function updateGame() {
     if (state.gameState === 'countdown') {
       state.countdownTimer = (state.countdownTimer || 0) + 1;
 
-      const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE);
+      const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
       let requiredCountdownFrames = 120;
 
       if (is1v1Mode) {
@@ -153,7 +153,7 @@ export function updateGame() {
         flamewardenFlameSystem.update(dt);
       }
     } else if (state.gameState === 'roundEnd') {
-      const is1v1Mode = (state.mode === '1v1' || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.ONE_VS_ONE);
+      const is1v1Mode = (state.mode === '1v1' || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
       const maxWins = (state.scores && state.scores.length) ? Math.max(...state.scores) : 0;
       if (!is1v1Mode || maxWins >= 2) {
         stopArenaBgm(true);

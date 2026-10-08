@@ -107,7 +107,7 @@ try {
 
 // 3. Copy static assets (Assets/, css/, libs/, Tactical Force/, manifest.json)
 console.log('🎨 [3/5] Optimizing and copying game assets, styles, and libraries...');
-const assetFolders = ['Assets', 'css', 'libs', 'Tactical Force'];
+const assetFolders = ['Assets', 'css', 'libs'];
 for (const folder of assetFolders) {
   const src = path.join(rootDir, folder);
   const dest = path.join(distDir, folder);

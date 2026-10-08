@@ -227,15 +227,7 @@ export function drawFloatingTexts() {
     if (t.timer < t.maxTimer) {
       ctx.globalAlpha = Math.max(0, alpha);
       
-      const isTactical = (state.gameCategory === 'tactical' || (state.mode && String(state.mode).toLowerCase().includes('tactical')));
-
-      // Arcade font for Floating Text & Damage Numbers across all themes (clean modern font for Tactical)
-      let targetFont;
-      if (isTactical) {
-        targetFont = t.isDamage ? '900 18px "Outfit", "Segoe UI", sans-serif' : '900 13.5px "Rajdhani", "Outfit", "Segoe UI", sans-serif';
-      } else {
-        targetFont = t.isDamage ? '700 16px "Silkscreen", "Press Start 2P", monospace' : '700 12px "Silkscreen", "Press Start 2P", monospace';
-      }
+      const targetFont = t.isDamage ? '700 16px "Silkscreen", "Press Start 2P", monospace' : '700 12px "Silkscreen", "Press Start 2P", monospace';
 
       if (currentFont !== targetFont) {
         ctx.font = targetFont;
@@ -257,18 +249,16 @@ export function drawFloatingTexts() {
 
       if (isDark) {
         // In Dark Mode: Thin crisp white outer stroke
-        ctx.lineWidth = isTactical ? (t.isDamage ? 3.0 : 2.5) : (t.isDamage ? 4.6 : 4.2);
-        ctx.strokeStyle = isTactical ? 'rgba(0, 0, 0, 0.95)' : 'rgba(255, 255, 255, 0.92)';
+        ctx.lineWidth = t.isDamage ? 4.6 : 4.2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
         ctx.strokeText(t.text, t.x, t.y);
 
-        if (!isTactical) {
-          ctx.lineWidth = t.isDamage ? 2.6 : 2.4;
-          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-          ctx.strokeText(t.text, t.x, t.y);
-        }
+        ctx.lineWidth = t.isDamage ? 2.6 : 2.4;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.strokeText(t.text, t.x, t.y);
       } else {
         // In Light Mode: Classic crisp black outline for arcade typography
-        ctx.lineWidth = isTactical ? 2.6 : (t.isDamage ? 3.8 : 3.4);
+        ctx.lineWidth = t.isDamage ? 3.8 : 3.4;
         ctx.strokeStyle = 'rgba(0,0,0,0.95)';
         ctx.strokeText(t.text, t.x, t.y);
       }

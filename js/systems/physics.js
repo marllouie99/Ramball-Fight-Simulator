@@ -12,14 +12,6 @@ import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js
 import { updateIllusions } from './illusionSystem.js';
 import { triggerMahitoParalyzeExplosion } from '../entities/fighters/mahito/mahitoCombat.js';
 import { spawnMahitoSoulBubbles, spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
-import { 
-  isTacticalFighter, 
-  getTacticalClosestOpponent, 
-  resolveTacticalFighterCollision, 
-  updateTacticalPhysicsPass,
-  resolveTacticalGunCollisions, 
-  handleTacticalObstaclePass 
-} from '../../Tactical Force/systems/tacticalPhysics.js';
 import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
 import { clearFighterDomain, cleanupDeadFightersDomains } from './domainSystem.js';
 import { wasmDist, wasmDistSq, wasmCircleCollide, wasmClamp, wasmLerp, wasmSpatialGridHash, wasmBatchCircleCollisions } from '../core/wasmMath.js';
@@ -532,12 +524,7 @@ export function resolveFighterCollision(a, b) {
   const rawImpulse = -(1 + restitution) * dotN / 2;
   const impulse = slowActive ? rawImpulse * 0.15 : rawImpulse;
 
-  // Delegate Tactical Fighter collisions to isolated Tactical Physics
-  const isTactical = isTacticalFighter(a) || isTacticalFighter(b) || (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical')));
-  if (isTactical) {
-    resolveTacticalFighterCollision(a, b, impulse, nx, ny, tx, ty);
-    return;
-  }
+
 
   // ── Pure FOC Collision Bounce: add random tangent component so fighters don't always
   //    bounce back along the exact collision normal ──────────────────────────
@@ -635,15 +622,6 @@ export function resolveFighterCollision(a, b) {
   }
 }
 
-// ─────────────────────────────────────────────
-// TACTICAL FORCE RE-EXPORTS (Modularized in Tactical Force/systems/tacticalPhysics.js)
-// ─────────────────────────────────────────────
-export { isTacticalFighter, resolveTacticalGunCollisions };
-
-// ─────────────────────────────────────────────
-// PROJECTILE UPDATE (main loop step)
-// ─────────────────────────────────────────────
-
 export function updateProjectiles() {
   if (isGlobalHitPauseActive(state)) {
     return; // Freeze all projectiles mid-air during hit pause
@@ -654,11 +632,6 @@ export function updateProjectiles() {
 }
 
 export function getClosestOpponent(fighter) {
-  const isTactical = (typeof state !== 'undefined' && state.gameCategory === 'tactical') || isTacticalFighter(fighter) || (typeof state !== 'undefined' && String(state.mode || '').toLowerCase().startsWith('tactical'));
-  if (isTactical) {
-    return getTacticalClosestOpponent(fighter);
-  }
-
   let closest = null;
   let bestDistance = Infinity;
 
@@ -666,9 +639,7 @@ export function getClosestOpponent(fighter) {
   const fighterTeam = state.getFighterTeam ? state.getFighterTeam(fighterIndex) : null;
   const isTeamMode = (
     state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' ||
-    state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2' ||
-    state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.ONE_VS_TWO ||
-    state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4'
+    state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.ONE_VS_TWO
   );
 
   // Mind-Control Puppetry: If chained by Makima or if Rika is chained by Makima, prioritize attacking Rika companion
@@ -909,7 +880,12 @@ function endRoundIf2v2Ended() {
 }
 
 function endRoundIf1v1Ended() {
-  if ((state.mode !== GAME_MODES.ONE_VS_ONE && state.mode !== GAME_MODES.STAND_OFF) || state.gameState !== 'playing') return;
+  const is1v1Check = (
+    state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1' ||
+    state.mode === GAME_MODES.STAND_OFF || state.mode === 'Stand Off' ||
+    state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel'
+  );
+  if (!is1v1Check || state.gameState !== 'playing') return;
 
   let aliveCount = 0;
   let winner = null;
@@ -928,7 +904,7 @@ function endRoundIf1v1Ended() {
   state.roundWinner = winner;
   state.roundEndTimer = 0;
 
-  const isMultiRound1v1 = (state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1');
+  const isMultiRound1v1 = (state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1' || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
   const winThreshold = MODE_SETTINGS[state.mode]?.rounds === 1 ? 1 : 2;
 
   let isMatchEnd = false;
@@ -1304,14 +1280,74 @@ export function updateFighters() {
     updateFuelPickups();
     updateIllusions();
 
-    // 3 & 4. Tactical Mode Exclusive Passes (Gun Collisions & Cover Obstacles isolated in tacticalPhysics.js)
-    const isTacticalActive = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
-    if (isTacticalActive) {
-      updateTacticalPhysicsPass(state.fighters, state.illusions);
+
+  }
+
+function endRoundIfMultiTeamEnded() {
+  const isMultiTeam = (
+    state.mode === GAME_MODES.TEAMFIGHT_3V3V3V3 || state.mode === '3v3v3v3 Teamfight' ||
+    state.mode === GAME_MODES.TEAMFIGHT_2V2V2V2 || state.mode === '2v2v2v2 Quad' ||
+    state.mode === GAME_MODES.TEAM_4V4 || state.mode === '4v4 Grand War' ||
+    state.mode === GAME_MODES.BATTLE_ROYALE_8 || state.mode === '8-Fighter Battle Royale' ||
+    state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel'
+  );
+  if (!isMultiTeam || state.gameState !== 'playing') return;
+
+  if (state.mode === GAME_MODES.BATTLE_ROYALE_8 || state.mode === '8-Fighter Battle Royale') {
+    const aliveFighters = state.fighters.filter(f => f && isFighterEffectivelyAlive(f));
+    if (aliveFighters.length > 1) return;
+    const winner = aliveFighters[0] || null;
+    if (winner && typeof winner.hasActiveFinishingAbility === 'function' && winner.hasActiveFinishingAbility()) return;
+
+    stopArenaBgm(true);
+    state.roundWinner = winner;
+    state.matchWinner = winner;
+    state.roundEndTimer = 0;
+    state.matchEndTimer = 0;
+    state.gameState = 'matchEnd';
+    return;
+  }
+
+  if (state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel') {
+    return endRoundIf1v1Ended();
+  }
+
+  // Multi-Team: Collect surviving teams
+  const survivingTeams = new Set();
+  let sampleLivingFighter = null;
+
+  for (let i = 0; i < state.fighters.length; i++) {
+    const f = state.fighters[i];
+    if (f && isFighterEffectivelyAlive(f)) {
+      const team = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(i) : null;
+      if (team !== null) {
+        survivingTeams.add(team);
+        sampleLivingFighter = f;
+      }
     }
   }
 
+  // Match continues while more than 1 team has living combatants
+  if (survivingTeams.size > 1) return;
+
+  if (sampleLivingFighter && typeof sampleLivingFighter.hasActiveFinishingAbility === 'function' && sampleLivingFighter.hasActiveFinishingAbility()) return;
+
+  const winningTeam = survivingTeams.size === 1 ? Array.from(survivingTeams)[0] : 0;
+  state.winningTeam = winningTeam;
+  const winnerFighter = state.fighters.find((f, idx) => f && isFighterEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam)
+    || state.fighters.find((f, idx) => f && state.getFighterTeam(idx) === winningTeam)
+    || state.fighters[0];
+
+  stopArenaBgm(true);
+  state.roundWinner = winnerFighter;
+  state.matchWinner = winnerFighter;
+  state.roundEndTimer = 0;
+  state.matchEndTimer = 0;
+  state.gameState = 'matchEnd';
+}
+
   if (state.gameState === 'playing') {
+    endRoundIfMultiTeamEnded();
     endRoundIfFFAEnded();
     endRoundIf2v2Ended();
     endRoundIf1v1Ended();

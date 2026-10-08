@@ -9,7 +9,7 @@ import { interactionManager } from '../interactions/index.js';
  */
 
 export function initCameraState() {
-  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 45, y: 240, width: 450, height: 450 };
   const centerX = arena.x + arena.width / 2;
   const centerY = arena.y + arena.height / 2;
 
@@ -37,10 +37,33 @@ export function initCameraState() {
   };
 }
 
+export function isGrandBattleActive() {
+  const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+  if (!isH) return false;
+  const m = (typeof state !== 'undefined' && state.mode) ? state.mode : '';
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
+  const isGrandSize = Boolean(arena && arena.width > 600);
+  return isGrandSize || Boolean(
+    m === '3v3v3v3' ||
+    m === '4v4' ||
+    m === '2v2v2v2' ||
+    m === 'Battle Royale 8' ||
+    m === '8-Fighter Battle Royale' ||
+    m === '3v3v3v3 Teamfight' ||
+    m === '4v4 Grand War' ||
+    m === '2v2v2v2 Quad Battle' ||
+    m === '2v2v2v2 Quad' ||
+    m === 'Grand Colosseum' ||
+    m === 'Classic Minimalist Arena'
+  );
+}
+
 export function resetCamera(immediate = false) {
-  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 45, y: 240, width: 450, height: 450 };
   const centerX = arena.x + arena.width / 2;
   const centerY = arena.y + arena.height / 2;
+  const isGrandBattle = isGrandBattleActive();
+  const defaultZoom = isGrandBattle ? 0.36 : 1.0;
 
   if (!state.camera) {
     state.camera = initCameraState();
@@ -48,13 +71,13 @@ export function resetCamera(immediate = false) {
 
   state.camera.targetX = centerX;
   state.camera.targetY = centerY;
-  state.camera.targetZoom = 1.0;
+  state.camera.targetZoom = defaultZoom;
   state.camera.cinematicOverride = false;
 
   if (immediate) {
     state.camera.x = centerX;
     state.camera.y = centerY;
-    state.camera.zoom = 1.0;
+    state.camera.zoom = defaultZoom;
   }
 }
 
@@ -105,7 +128,7 @@ export function updateCamera() {
 
   const camera = state.camera;
   const camCfg = CONFIG.camera || {};
-  const arena = state.arena || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+  const arena = state.arena || CONFIG.arena || { x: 45, y: 240, width: 450, height: 450 };
   const arenaCenterX = arena.x + arena.width / 2;
   const arenaCenterY = arena.y + arena.height / 2;
 
@@ -127,12 +150,14 @@ export function updateCamera() {
   );
 
   if (!isCombatActive) {
+    const isGrand = isGrandBattleActive();
+    const defaultZoom = isGrand ? 0.36 : 1.0;
     camera.targetX = arenaCenterX;
     camera.targetY = arenaCenterY;
-    camera.targetZoom = 1.0;
+    camera.targetZoom = defaultZoom;
     camera.x = arenaCenterX;
     camera.y = arenaCenterY;
-    camera.zoom = 1.0;
+    camera.zoom = defaultZoom;
     camera.cinematicOverride = false;
     return;
   }
@@ -320,9 +345,10 @@ export function updateCamera() {
     camera.cinematicOverride = false;
 
     if (!camera.enabled || camera.mode === 'fixed' || state.gameState === 'countdown') {
+      const isGrand = isGrandBattleActive();
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
-      camera.targetZoom = 1.0;
+      camera.targetZoom = isGrand ? 0.36 : 1.0;
     } else if (aliveFighters.length >= 2) {
       // Compute full bounding envelope across all active combatants
       let minX = Infinity;
@@ -396,10 +422,11 @@ export function updateCamera() {
       // Ensures all entities remain inside the safe window screen area with generous margins
       const screenW = state.canvas ? state.canvas.width : 540;
       const screenH = state.canvas ? state.canvas.height : 960;
-      const safeW = screenW - 90; // 45px safe padding on left/right screen edges
-      const safeH = Math.min(screenH - 240, 640); // 120px safe padding top/bottom for HUD & timer
-      const padX = 60; // World padding around entity box for hitboxes & auras
-      const padY = 60;
+      const isGrand = isGrandBattleActive();
+      const safeW = isGrand ? (screenW - 40) : (screenW - 90);
+      const safeH = isGrand ? (screenH - 50) : Math.min(screenH - 120, 640);
+      const padX = isGrand ? 100 : 60;
+      const padY = isGrand ? 100 : 60;
 
       const fitZoomX = safeW / (spanX + padX);
       const fitZoomY = safeH / (spanY + padY);
@@ -407,15 +434,17 @@ export function updateCamera() {
 
       // Distance curve mapping (Smooth Hermite from close melee to wide spread)
       const minD = camCfg.minDist ?? 70;
-      const maxD = camCfg.maxDist ?? 520;
+      const maxD = isGrand ? 1900 : (camCfg.maxDist ?? 520);
+      const effectiveMinZ = isGrand ? 0.28 : minZ;
+      const effectiveMaxZ = isGrand ? 0.70 : maxZ;
       const normDist = Math.max(0, Math.min(1, (diagDist - minD) / (maxD - minD)));
       const smoothT = normDist * normDist * (3 - 2 * normDist);
-      const distanceZoom = maxZ - smoothT * (maxZ - minZ);
+      const distanceZoom = effectiveMaxZ - smoothT * (effectiveMaxZ - effectiveMinZ);
 
       // Blend: dynamic smooth distance zoom constrained by envelope viewport fit
       const calculatedZoom = Math.min(distanceZoom, envelopeFit);
-      const safeTargetZoom = Math.max(minZ, Math.min(maxZ, calculatedZoom));
-      camera.targetZoom = Number.isFinite(safeTargetZoom) ? safeTargetZoom : 1.0;
+      const safeTargetZoom = Math.max(effectiveMinZ, Math.min(effectiveMaxZ, calculatedZoom));
+      camera.targetZoom = Number.isFinite(safeTargetZoom) ? safeTargetZoom : (isGrand ? 0.36 : 1.0);
 
       // Smoothly pan camera to track combat centroid
       const safeMidX = Number.isFinite(midX) ? midX : arenaCenterX;
@@ -425,17 +454,19 @@ export function updateCamera() {
 
     } else if (aliveFighters.length === 1) {
       // Winner focus during victory or solo stance
+      const isGrand = isGrandBattleActive();
       const winner = aliveFighters[0];
       const winX = Number.isFinite(winner.x) ? winner.x : arenaCenterX;
       const winY = Number.isFinite(winner.y) ? (winner.y - (winner.z ? winner.z * 0.35 : 0)) : arenaCenterY;
 
       camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
       camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));
-      camera.targetZoom = camCfg.winnerZoom ?? 1.10;
+      camera.targetZoom = isGrand ? (camCfg.winnerZoom ?? 0.55) : (camCfg.winnerZoom ?? 1.10);
     } else {
+      const isGrand = isGrandBattleActive();
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
-      camera.targetZoom = 1.0;
+      camera.targetZoom = isGrand ? 0.36 : 1.0;
     }
   }
 
@@ -469,7 +500,7 @@ export function updateCamera() {
 
 export function applyCameraToCtx(ctx) {
   const cam = state.camera;
-  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 45, y: 240, width: 450, height: 450 };
   const arenaCenterX = (arena.x || 0) + (arena.width || 450) / 2;
   const arenaCenterY = (arena.y || 0) + (arena.height || 450) / 2;
   const screenCenterX = (state.canvas && Number.isFinite(state.canvas.width)) ? (state.canvas.width / 2) : 270;
@@ -505,7 +536,7 @@ export function applyCameraToCtx(ctx) {
  */
 export function worldToScreen(worldX, worldY) {
   const cam = state.camera;
-  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 };
+  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 45, y: 240, width: 450, height: 450 };
   const arenaCenterX = (arena.x || 0) + (arena.width || 450) / 2;
   const arenaCenterY = (arena.y || 0) + (arena.height || 450) / 2;
   const screenCenterX = (state.canvas && Number.isFinite(state.canvas.width)) ? (state.canvas.width / 2) : 270;

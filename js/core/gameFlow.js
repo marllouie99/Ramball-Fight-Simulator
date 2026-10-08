@@ -7,7 +7,6 @@ import { stopAllSounds, stopAllLoopingSounds, preloadSound, preloadAudioBuffer, 
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from './config.js';
 import { GAME_MODES, MODE_SETTINGS } from './modeConfig.js';
 import { state, createFighterInstance, clearProjectiles, spawnFloatingText, saveFighterSelections } from './state.js';
-import { STARTER_MAP, MONOLITH_MAP } from '../../Tactical Force/maps/index.js';
 import { updateFighters, updateProjectiles, spawnFuelPickup } from '../systems/physics.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSoundPaths, getFighterBasicAttackSoundPaths } from '../soundEffects/basicAttackSounds.js';
@@ -31,11 +30,11 @@ import { clearDroppedMahoragaWheels } from '../graphics/particles/mahoragaDroppe
 import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
 import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
-import { tacticalProjectileSystem } from '../../Tactical Force/systems/tacticalProjectileSystem.js';
 import { resetCamera } from '../systems/cameraSystem.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 import { getFocMapForBoss } from '../../FOC Maps/index.js';
 import { EndCrystalEntity } from '../entities/EndCrystalEntity.js';
+import { setViewportOrientation } from './viewportManager.js';
 
 // ─────────────────────────────────────────────
 // ON-DEMAND AUDIO & ASSET STREAMING (LAZY LOADING)
@@ -238,7 +237,6 @@ export function reinitFighters(isNewMatch = false) {
   clearBamEffects();
   clearHybridProjectiles();
   clearProjectiles();
-  tacticalProjectileSystem.clear();
 
   if (state.floatingTexts) state.floatingTexts.length = 0;
   if (state.bloodEffects) state.bloodEffects.length = 0;
@@ -279,7 +277,64 @@ export function reinitFighters(isNewMatch = false) {
   state.fighters.forEach((f) => { if (f) f.lastKilledDef = null; });
  
   let fighterIndexes = [state.p1Index ?? 0, state.p2Index ?? 1];
-  if (state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match') {
+  if (state.mode === GAME_MODES.TEAMFIGHT_3V3V3V3 || state.mode === '3v3v3v3 Teamfight') {
+    const slots = state.horizontalRosterSlots || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    fighterIndexes = [
+      slots[0] ?? state.p1Index ?? 0,
+      slots[1] ?? state.p2Index ?? 1,
+      slots[2] ?? state.p3Index ?? 2,
+      slots[3] ?? state.p4Index ?? 3,
+      slots[4] ?? state.p5Index ?? 4,
+      slots[5] ?? state.p6Index ?? 5,
+      slots[6] ?? state.p7Index ?? 6,
+      slots[7] ?? state.p8Index ?? 7,
+      slots[8] ?? state.p9Index ?? 8,
+      slots[9] ?? state.p10Index ?? 9,
+      slots[10] ?? state.p11Index ?? 10,
+      slots[11] ?? state.p12Index ?? 11,
+    ];
+  } else if (state.mode === GAME_MODES.TEAMFIGHT_2V2V2V2 || state.mode === '2v2v2v2 Quad') {
+    const slots = state.horizontalRosterSlots || [0, 1, 2, 3, 4, 5, 6, 7];
+    fighterIndexes = [
+      slots[0] ?? state.p1Index ?? 0,
+      slots[1] ?? state.p2Index ?? 1,
+      slots[2] ?? state.p3Index ?? 2,
+      slots[3] ?? state.p4Index ?? 3,
+      slots[4] ?? state.p5Index ?? 4,
+      slots[5] ?? state.p6Index ?? 5,
+      slots[6] ?? state.p7Index ?? 6,
+      slots[7] ?? state.p8Index ?? 7,
+    ];
+  } else if (state.mode === GAME_MODES.TEAM_4V4 || state.mode === '4v4 Grand War') {
+    const slots = state.horizontalRosterSlots || [0, 1, 2, 3, 4, 5, 6, 7];
+    fighterIndexes = [
+      slots[0] ?? state.p1Index ?? 0,
+      slots[1] ?? state.p2Index ?? 1,
+      slots[2] ?? state.p3Index ?? 2,
+      slots[3] ?? state.p4Index ?? 3,
+      slots[4] ?? state.p5Index ?? 4,
+      slots[5] ?? state.p6Index ?? 5,
+      slots[6] ?? state.p7Index ?? 6,
+      slots[7] ?? state.p8Index ?? 7,
+    ];
+  } else if (state.mode === GAME_MODES.BATTLE_ROYALE_8 || state.mode === '8-Fighter Battle Royale') {
+    const slots = state.horizontalRosterSlots || [0, 1, 2, 3, 4, 5, 6, 7];
+    fighterIndexes = [
+      slots[0] ?? state.p1Index ?? 0,
+      slots[1] ?? state.p2Index ?? 1,
+      slots[2] ?? state.p3Index ?? 2,
+      slots[3] ?? state.p4Index ?? 3,
+      slots[4] ?? state.p5Index ?? 4,
+      slots[5] ?? state.p6Index ?? 5,
+      slots[6] ?? state.p7Index ?? 6,
+      slots[7] ?? state.p8Index ?? 7,
+    ];
+  } else if (state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel') {
+    const slots = state.horizontalRosterSlots || [0, 1];
+    state.p1Index = slots[0] ?? state.p1Index ?? 0;
+    state.p2Index = slots[1] ?? state.p2Index ?? 1;
+    fighterIndexes = [state.p1Index, state.p2Index];
+  } else if (state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match') {
     if (isNewMatch || !state.tagMatch || !state.tagMatch.team0Roster || state.tagMatch.team0Roster.length === 0) {
       state.tagMatch = {
         team0Roster: [state.p1Index ?? 0, state.p3Index ?? 2, state.p5Index ?? 4],
@@ -294,9 +349,9 @@ export function reinitFighters(isNewMatch = false) {
     const idx0 = state.tagMatch.team0Roster[state.tagMatch.team0ActiveSlot] ?? state.p1Index ?? 0;
     const idx1 = state.tagMatch.team1Roster[state.tagMatch.team1ActiveSlot] ?? state.p2Index ?? 1;
     fighterIndexes = [idx0, idx1];
-  } else if (state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA') {
+  } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA') {
     fighterIndexes.push(state.p3Index, state.p4Index);
-  } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4) {
+  } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2') {
     // Arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
   } else if (state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2') {
@@ -307,11 +362,8 @@ export function reinitFighters(isNewMatch = false) {
     fighterIndexes = state.bossBattleNoTeammate ? [state.p1Index, state.p2Index] : [state.p1Index, state.p2Index, state.p3Index];
   }
  
-  const isTacticalActive = (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
   if (CONFIG.globalFighter) {
-    CONFIG.globalFighter.sizeMultiplier = isTacticalActive
-      ? (CONFIG.tactical?.sizeMultiplier ?? 0.8)
-      : (CONFIG.globalFighter._defaultFocSizeMultiplier ?? 1.2);
+    CONFIG.globalFighter.sizeMultiplier = CONFIG.globalFighter._defaultFocSizeMultiplier ?? 1.2;
   }
 
   const currentDefs = getActiveFighterDefs();
@@ -363,99 +415,135 @@ export function reinitFighters(isNewMatch = false) {
     });
   }
 
-  const activeTacticalMap = state.activeMap || STARTER_MAP;
+  // Resolve dedicated FOC Boss Map if active boss exists (e.g. Yuta's Cursed Grove, Ender Dragon's The End)
+  const isBoss = Boolean(state.fighters && state.fighters[0]?.isBoss);
+  const bossMap = isBoss ? getFocMapForBoss(state.fighters[0]) : null;
+  if (bossMap) {
+    state.activeFocMap = bossMap;
+    state.arena = { ...bossMap.arena };
 
-  if (isTacticalActive) {
-    state.activeFocMap = null;
-    state.arena = { ...activeTacticalMap.arena };
-    state.arenaTheme = 'dark';
-    CONFIG.arenaTheme = 'dark';
-  } else {
-    // Resolve dedicated FOC Boss Map if active boss exists (e.g. Yuta's Cursed Grove, Ender Dragon's The End)
-    const isBoss = Boolean(state.fighters && state.fighters[0]?.isBoss);
-    const bossMap = isBoss ? getFocMapForBoss(state.fighters[0]) : null;
-    if (bossMap) {
-      state.activeFocMap = bossMap;
-      state.arena = { ...bossMap.arena };
-
-      // Spawn End Crystal Minion Entities if Ender Dragon Boss Map
-      if (bossMap.id === 'foc_ender_dragon_map' && Array.isArray(bossMap.crystals)) {
-        // Clear any existing crystals first
-        state.fighters = state.fighters.filter(f => !f.isEndCrystal);
-        for (let cDef of bossMap.crystals) {
-          const crystal = new EndCrystalEntity(cDef.x, cDef.y, cDef.id, cDef.name);
-          state.fighters.push(crystal);
-        }
-      }
-    } else {
-      state.activeFocMap = null;
-      if (!state.arena || state.arena.width === STARTER_MAP.arena.width) {
-        state.arena = { ...CONFIG.arena };
+    // Spawn End Crystal Minion Entities if Ender Dragon Boss Map
+    if (bossMap.id === 'foc_ender_dragon_map' && Array.isArray(bossMap.crystals)) {
+      // Clear any existing crystals first
+      state.fighters = state.fighters.filter(f => !f.isEndCrystal);
+      for (let cDef of bossMap.crystals) {
+        const crystal = new EndCrystalEntity(cDef.x, cDef.y, cDef.id, cDef.name);
+        state.fighters.push(crystal);
       }
     }
+  } else {
+    state.activeFocMap = null;
+    state.arena = { ...CONFIG.arena };
   }
 
   const arena = state.arena;
-  if (isTacticalActive) {
-    if (activeTacticalMap.id === 'tactical_monolith_map' || activeTacticalMap === MONOLITH_MAP) {
-      // ── Monolith Map (Sector 02) ──
-      // 2 Players: West vs East
-      // 3 Players: West vs East vs North Corridor
-      // 4 Players: West vs East vs North vs South Corridor
-      const count = state.fighters.length;
-      const spawnList = count <= 2
-        ? (activeTacticalMap.spawns?.twoPlayer || MONOLITH_MAP.spawns.twoPlayer)
-        : (count === 3
-            ? (activeTacticalMap.spawns?.threePlayer || MONOLITH_MAP.spawns.threePlayer)
-            : (activeTacticalMap.spawns?.fourPlayer || MONOLITH_MAP.spawns.fourPlayer));
+  if (state.mode === GAME_MODES.TEAMFIGHT_3V3V3V3 || state.mode === '3v3v3v3 Teamfight') {
+    // 4 Corner Pedestals (Red: Top-Left, Blue: Top-Right, Green: Bottom-Left, Gold: Bottom-Right)
+    const corners = [
+      { cx: arena.x + 260, cy: arena.y + 260, dirAngle: Math.PI / 4 },       // Team 0 (Red)
+      { cx: arena.x + arena.width - 260, cy: arena.y + 260, dirAngle: (3 * Math.PI) / 4 }, // Team 1 (Blue)
+      { cx: arena.x + 260, cy: arena.y + arena.height - 260, dirAngle: -Math.PI / 4 },      // Team 2 (Green)
+      { cx: arena.x + arena.width - 260, cy: arena.y + arena.height - 260, dirAngle: (-3 * Math.PI) / 4 } // Team 3 (Gold)
+    ];
 
-      state.fighters.forEach((fighter, index) => {
-        if (!fighter) return;
-        const pt = spawnList[index % spawnList.length];
-        const pad = (fighter.r || 24) + (arena.wallWidth || 6) + 6;
-        fighter.x = Math.max(arena.x + pad, Math.min(arena.x + arena.width - pad, pt.x));
-        fighter.y = Math.max(arena.y + pad, Math.min(arena.y + arena.height - pad, pt.y));
-        fighter.gunAngle = pt.angle;
-        fighter.angle = pt.angle;
-        const spd = fighter.speed || 1.5;
-        const moveAngle = Math.random() * Math.PI * 2;
-        fighter.vx = Math.cos(moveAngle) * spd;
-        fighter.vy = Math.sin(moveAngle) * spd;
-      });
-    } else {
-      // ── Starter Map (Sector 01) & Dynamic Tactical Spawns ──
-      const spawns = activeTacticalMap.spawns?.ffa || [
-        { x: arena.x + 67.5, y: arena.y + 45 },
-        { x: arena.x + arena.width - 67.5, y: arena.y + 45 },
-        { x: arena.x + 67.5, y: arena.y + arena.height - 45 },
-        { x: arena.x + arena.width - 67.5, y: arena.y + arena.height - 45 }
-      ];
+    const offsets = [
+      { dx: -34, dy: -20 },
+      { dx: +34, dy: -20 },
+      { dx: 0,   dy: +34 },
+    ];
 
-      // Shuffle corner indices randomly so every player gets a distinct pocket
-      const shuffledIndices = spawns.map((_, i) => i);
-      for (let i = shuffledIndices.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
-      }
+    state.fighters.forEach((fighter, idx) => {
+      if (!fighter) return;
+      const teamIdx = Math.floor(idx / 3);
+      const slotInTeam = idx % 3;
+      const corner = corners[teamIdx] || corners[0];
+      const offset = offsets[slotInTeam] || offsets[0];
 
-      const arenaCenterX = arena.x + arena.width / 2;
-      const arenaCenterY = arena.y + arena.height / 2;
+      fighter.x = corner.cx + offset.dx;
+      fighter.y = corner.cy + offset.dy;
+      const baseA = corner.dirAngle + (Math.random() - 0.5) * 0.4;
+      fighter.angle = baseA;
+      fighter.gunAngle = baseA;
+      fighter.vx = Math.cos(baseA) * fighter.speed * 0.5;
+      fighter.vy = Math.sin(baseA) * fighter.speed * 0.5;
+    });
+  } else if (state.mode === GAME_MODES.TEAMFIGHT_2V2V2V2 || state.mode === '2v2v2v2 Quad') {
+    const corners = [
+      { cx: arena.x + 260, cy: arena.y + 260, dirAngle: Math.PI / 4 },
+      { cx: arena.x + arena.width - 260, cy: arena.y + 260, dirAngle: (3 * Math.PI) / 4 },
+      { cx: arena.x + 260, cy: arena.y + arena.height - 260, dirAngle: -Math.PI / 4 },
+      { cx: arena.x + arena.width - 260, cy: arena.y + arena.height - 260, dirAngle: (-3 * Math.PI) / 4 }
+    ];
+    const offsets = [
+      { dx: -28, dy: 0 },
+      { dx: +28, dy: 0 },
+    ];
+    state.fighters.forEach((fighter, idx) => {
+      if (!fighter) return;
+      const teamIdx = Math.floor(idx / 2);
+      const slotInTeam = idx % 2;
+      const corner = corners[teamIdx] || corners[0];
+      const offset = offsets[slotInTeam] || offsets[0];
 
-      state.fighters.forEach((fighter, index) => {
-        if (!fighter) return;
-        const cornerIndex = shuffledIndices[index % shuffledIndices.length];
-        const pt = spawns[cornerIndex];
-        const angle = pt.angle !== undefined ? pt.angle : Math.atan2(arenaCenterY - pt.y, arenaCenterX - pt.x);
+      fighter.x = corner.cx + offset.dx;
+      fighter.y = corner.cy + offset.dy;
+      const baseA = corner.dirAngle + (Math.random() - 0.5) * 0.4;
+      fighter.angle = baseA;
+      fighter.gunAngle = baseA;
+      fighter.vx = Math.cos(baseA) * fighter.speed * 0.5;
+      fighter.vy = Math.sin(baseA) * fighter.speed * 0.5;
+    });
+  } else if (state.mode === GAME_MODES.TEAM_4V4 || state.mode === '4v4 Grand War') {
+    const leftX = arena.x + 260;
+    const rightX = arena.x + arena.width - 260;
+    const ySpacing = arena.height / 5;
 
-        const pad = (fighter.r || 24) + (arena.wallWidth || 6) + 6;
-        fighter.x = Math.max(arena.x + pad, Math.min(arena.x + arena.width - pad, pt.x));
-        fighter.y = Math.max(arena.y + pad, Math.min(arena.y + arena.height - pad, pt.y));
-        fighter.gunAngle = angle;
-        fighter.angle = angle;
-        const spd = fighter.speed || 1.5;
-        fighter.vx = Math.cos(angle) * spd;
-        fighter.vy = Math.sin(angle) * spd;
-      });
+    state.fighters.forEach((fighter, idx) => {
+      if (!fighter) return;
+      const isTeam0 = idx < 4;
+      const slot = idx % 4;
+      fighter.x = isTeam0 ? leftX : rightX;
+      fighter.y = arena.y + ySpacing * (slot + 1);
+      const baseA = isTeam0 ? 0 : Math.PI;
+      fighter.angle = baseA;
+      fighter.gunAngle = baseA;
+      fighter.vx = Math.cos(baseA) * fighter.speed * 0.5;
+      fighter.vy = Math.sin(baseA) * fighter.speed * 0.5;
+    });
+  } else if (state.mode === GAME_MODES.BATTLE_ROYALE_8 || state.mode === '8-Fighter Battle Royale') {
+    const cx = arena.x + arena.width / 2;
+    const cy = arena.y + arena.height / 2;
+    const rx = arena.width * 0.36;
+    const ry = arena.height * 0.36;
+
+    state.fighters.forEach((fighter, idx) => {
+      if (!fighter) return;
+      const a = (idx / 8) * Math.PI * 2;
+      fighter.x = cx + Math.cos(a) * rx;
+      fighter.y = cy + Math.sin(a) * ry;
+      const faceAngle = a + Math.PI; // Face towards center
+      fighter.angle = faceAngle;
+      fighter.gunAngle = faceAngle;
+      fighter.vx = Math.cos(faceAngle) * fighter.speed * 0.4;
+      fighter.vy = Math.sin(faceAngle) * fighter.speed * 0.4;
+    });
+  } else if (state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel') {
+    const cy = arena.y + arena.height / 2;
+    if (state.fighters[0]) {
+      state.fighters[0].x = arena.x + arena.width * 0.20;
+      state.fighters[0].y = cy;
+      state.fighters[0].angle = 0;
+      state.fighters[0].gunAngle = 0;
+      state.fighters[0].vx = state.fighters[0].speed * 0.5;
+      state.fighters[0].vy = 0;
+    }
+    if (state.fighters[1]) {
+      state.fighters[1].x = arena.x + arena.width * 0.80;
+      state.fighters[1].y = cy;
+      state.fighters[1].angle = Math.PI;
+      state.fighters[1].gunAngle = Math.PI;
+      state.fighters[1].vx = -state.fighters[1].speed * 0.5;
+      state.fighters[1].vy = 0;
     }
   } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA') {
     const leftX = arena.x + arena.width * 0.20;
@@ -1107,7 +1195,7 @@ export function startNextRound() {
     state.announcerSoundHandle = null;
   }
   state.announcerSubtitle = '';
-  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
+  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
   stopAllSounds(false, 0, 0);
   stopAllLoopingSounds(0, 0, true); // Stop any lingering audio loops from previous round (preserve BGM)
   clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
@@ -1147,7 +1235,7 @@ export function restartCurrentRound() {
     state.announcerSoundHandle = null;
   }
   state.announcerSubtitle = '';
-  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match');
+  const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1 VS 1' || state.mode === '1v1 Match' || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
   stopAllSounds(false, 0, 0);
   stopAllLoopingSounds(0, 0, true); // Preserve BGM across round restarts
   clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
@@ -1164,7 +1252,6 @@ export function restartCurrentRound() {
   clearBamEffects();
   clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
-  tacticalProjectileSystem.clear();
   startCountdown();
 }
 
@@ -1299,7 +1386,6 @@ export function resetMatch(showFaceOff = true) {
   clearBamEffects();
   clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
-  tacticalProjectileSystem.clear();
   if (showFaceOff) {
     startFaceOffScreen(false);
   } else {
@@ -1343,6 +1429,6 @@ export function goToTitle() {
   clearHybridProjectiles();
   clearProjectiles();
   clearAllPools();
-  
+
   state.gameState = 'title';
 }

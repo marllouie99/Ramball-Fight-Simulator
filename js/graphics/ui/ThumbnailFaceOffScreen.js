@@ -1392,9 +1392,7 @@ function drawFfaFaceOff(ctx, width, height, defs, scale, timer, exitProgress = 0
   });
 
   if (timer >= 96) {
-    const isTactical = (state.gameCategory === 'tactical' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.TACTICAL_FFA);
-    const badgeText = isTactical ? 'TACTICAL FFA' : 'FFA';
-    drawCenterUnifiedCountdown(ctx, cx, cy, timer, activeDefs[0]?.color || '#f59e0b', activeDefs[1]?.color || '#3b82f6', exitProgress, badgeText);
+    drawCenterUnifiedCountdown(ctx, cx, cy, timer, activeDefs[0]?.color || '#f59e0b', activeDefs[1]?.color || '#3b82f6', exitProgress, 'FFA');
   }
 }
 

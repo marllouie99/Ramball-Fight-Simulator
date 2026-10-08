@@ -305,17 +305,11 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
   const hitCfg = bloodCfg.hit || {};
   const physCfg = bloodCfg.physics || {};
 
-  const isTactical = (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().includes('tactical')));
-  const tacticalEnabled = (CONFIG && CONFIG.tactical && CONFIG.tactical.enableThemeColoredBlood !== false);
-  const targetColor = (opts && opts.color) || (entity && (entity.color || entity.themeColor || (entity._def && entity._def.color)));
-
   let bloodPalette;
   if (opts && Array.isArray(opts.palette)) {
     bloodPalette = opts.palette.map(parseColorToHexNum);
   } else if (opts && opts.color) {
     bloodPalette = generateThemeBloodPalette(opts.color);
-  } else if (isTactical && tacticalEnabled && targetColor) {
-    bloodPalette = generateThemeBloodPalette(targetColor);
   } else {
     bloodPalette = bloodCfg.palette || [0xE60000, 0xDC2626, 0x990000, 0x800000, 0xCC0000, 0xB91C1C];
   }
@@ -479,17 +473,11 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
     }
   }
 
-  const isTactical = (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().includes('tactical')));
-  const tacticalEnabled = (CONFIG && CONFIG.tactical && CONFIG.tactical.enableThemeColoredBlood !== false);
-  const targetColor = (opts && opts.color) || (targetFighter && (targetFighter.color || targetFighter.themeColor || (targetFighter._def && targetFighter._def.color)));
-
   let bloodColors;
   if (opts && Array.isArray(opts.palette)) {
     bloodColors = opts.palette.map(parseColorToHexNum);
   } else if (opts && opts.color) {
     bloodColors = generateThemeBloodPalette(opts.color);
-  } else if (isTactical && tacticalEnabled && targetColor) {
-    bloodColors = generateThemeBloodPalette(targetColor);
   } else {
     bloodColors = bloodCfg.palette || [0xE60000, 0xDC2626, 0xCC0000, 0x990000, 0x800000, 0xB91C1C];
   }

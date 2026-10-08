@@ -1,12 +1,13 @@
 import { state } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
-import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index.js';
 import { applyCameraToCtx, worldToScreen } from '../../systems/cameraSystem.js';
 import { updateSaitamaWallShatters, drawSaitamaWallShatters } from '../particles/saitamaWallShatter.js';
 import { drawTopHudNameShatters } from '../particles/hudShatterEffect.js';
 import { isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet, getGrassTileSpriteSheet } from './grassFloorRenderer.js';
 import { renderActiveArenaFloor } from '../../systems/arenaTileSystem.js';
+import { drawHorizontalMapFeatures } from '../../systems/horizontalMapSystem.js';
+import { drawHorizontalFighterDolls } from './horizontalDollRenderer.js';
 
 /**
  * Renders a solid vector fissure crack (matching manga comic / PNG crack art).
@@ -347,23 +348,6 @@ export function drawArena() {
     )
   );
 
-  // Custom Tactical Shooter Battleground Map
-  if (state.gameCategory === 'tactical') {
-    if (state.arenaGraphics) {
-      const g = state.arenaGraphics;
-      g.clear();
-      g.beginFill(0x000000, 1.0);
-      const scrW = pixiApp ? pixiApp.screen.width : (canvas.width || 540);
-      const scrH = pixiApp ? pixiApp.screen.height : (canvas.height || 960);
-      g.drawRect(0, 0, scrW, scrH);
-      g.endFill();
-    }
-    if (state.floorGraphics) state.floorGraphics.clear();
-    const activeMap = state.activeMap || STARTER_MAP;
-    drawTacticalMap(ctx, activeMap);
-    return;
-  }
-
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
   const isStorming = Boolean(
     (state.fighters && state.fighters.some(f => 
@@ -500,6 +484,10 @@ export function drawArena() {
       applyCameraToCtx(ctx);
       const fBleed = 0;
       renderActiveArenaFloor(ctx, arena, isDark, fBleed);
+      const isGrandArena = (arena.width > 600) || (state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' || state.mode === 'Battle Royale 8');
+      if (state.viewOrientation === 'horizontal' && isGrandArena) {
+        drawHorizontalMapFeatures(ctx, arena);
+      }
       ctx.restore();
     } else if (hasActiveDomain && !state.pixiApp) {
       // In native Canvas 2D mode, render active domain background under camera transform
@@ -933,6 +921,159 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       fighter: f
     }));
 
+    const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+    const isGrandBattleMode = Boolean(
+      state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' ||
+      state.mode === 'Battle Royale 8' || state.mode === 'Grand Battle' ||
+      (arena && arena.width > 600)
+    );
+    const isSideHud1v1 = isHorizontal && !isGrandBattleMode && (team0.length === 1 && team1.length === 1);
+
+    const drawHorizontal1v1TopWallHud = (fighter0, fighter1, fighter0Data, fighter1Data) => {
+      const sideFontSize = 34;
+      const customSideFont = `700 ${sideFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+      const maxSideW = 244;
+
+      const drawSideHudName = (td, x, y, align) => {
+        ctx.save();
+        ctx.font = customSideFont;
+        ctx.textBaseline = 'top';
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+        const measuredW = ctx.measureText(td.name).width;
+        const scale = measuredW > maxSideW ? maxSideW / measuredW : 1.0;
+        if (scale < 1.0) {
+          ctx.translate(x, y);
+          ctx.scale(scale, scale);
+          ctx.translate(-x, -y);
+        }
+        ctx.textAlign = align;
+        ctx.fillStyle = td.color;
+        if (!isDark) {
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 0.5;
+          ctx.strokeText(td.name, x, y);
+        }
+        ctx.fillText(td.name, x, y);
+        ctx.restore();
+      };
+
+      const nameY = arena.y;
+      // Player 1 on Left Flank (aligned with top arena wall: left 18px, top y: arena.y)
+      drawSideHudName(fighter0Data, 18, nameY, 'left');
+
+      // Player 2 on Right Flank (aligned with top arena wall: left-aligned with right column at 960 - 18 - maxSideW)
+      drawSideHudName(fighter1Data, 960 - 18 - maxSideW, nameY, 'left');
+
+      // ── Center Top-Wall Round Banner & Win Bullets: [BULLETS] ── [ROUND BANNER] ── [BULLETS] ──
+      const roundNum = state.roundNum || 1;
+      let roundText = 'ROUND 1';
+      if (roundNum === 2) {
+        roundText = 'ROUND 2';
+      } else if (roundNum >= 3) {
+        roundText = 'FINAL ROUND';
+      }
+
+      ctx.save();
+      const bannerFont = '700 11px "Press Start 2P", "Silkscreen", monospace';
+      ctx.font = bannerFont;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '1.5px';
+      const textMetrics = ctx.measureText(roundText);
+      const textW = textMetrics.width;
+
+      const pillPadX = 14;
+      const pillW = Math.max(92, Math.round(textW + pillPadX * 2));
+      const pillH = 22;
+      const pillRadius = 6;
+      const pillX = Math.round(centerX - pillW / 2);
+      const pillY = Math.round(arena.y - pillH / 2);
+
+      // ── Top-Wall Win Bullets ──
+      const p1Index = state.fighters ? state.fighters.indexOf(fighter0) : 0;
+      const p2Index = state.fighters ? state.fighters.indexOf(fighter1) : 1;
+      const p1Wins = (p1Index >= 0 && state.scores ? state.scores[p1Index] : 0) || 0;
+      const p2Wins = (p2Index >= 0 && state.scores ? state.scores[p2Index] : 0) || 0;
+      const maxBullets = 2;
+      const bulletR = 5.5;
+      const bulletGap = 16;
+      const bulletOffsetFromPill = 20;
+
+      const drawTopWallBullet = (bx, filled, fighterColor) => {
+        ctx.beginPath();
+        ctx.arc(bx, arena.y, bulletR, 0, Math.PI * 2);
+        if (filled) {
+          ctx.fillStyle = fighterColor || '#FFD700';
+          ctx.strokeStyle = isDark ? '#FFFFFF' : '#000000';
+          ctx.lineWidth = 1.8;
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = isDark ? '#141824' : '#FFFAF0';
+          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.45)' : '#000000';
+          ctx.lineWidth = 1.8;
+          ctx.fill();
+          ctx.stroke();
+        }
+      };
+
+      // P1 Bullets (Left side of Pill): Bullet 0 (outer left), Bullet 1 (inner left)
+      const p1Color = fighter0Data?.color || '#FF4D4D';
+      for (let i = 0; i < maxBullets; i++) {
+        const bx = pillX - bulletOffsetFromPill - (maxBullets - 1 - i) * bulletGap;
+        const filled = i < p1Wins;
+        drawTopWallBullet(bx, filled, p1Color);
+      }
+
+      // P2 Bullets (Right side of Pill): Bullet 0 (inner right), Bullet 1 (outer right)
+      const p2Color = fighter1Data?.color || '#38BDF8';
+      for (let i = 0; i < maxBullets; i++) {
+        const bx = pillX + pillW + bulletOffsetFromPill + i * bulletGap;
+        const filled = i < p2Wins;
+        drawTopWallBullet(bx, filled, p2Color);
+      }
+
+      // Pill Background
+      ctx.fillStyle = isDark ? '#141824' : '#FFFAF0';
+      ctx.strokeStyle = isDark ? '#FFD700' : '#000000';
+      ctx.lineWidth = 2.0;
+
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(pillX, pillY, pillW, pillH, pillRadius);
+      } else {
+        ctx.rect(pillX, pillY, pillW, pillH);
+      }
+      ctx.fill();
+      ctx.stroke();
+
+      // Text inside pill
+      ctx.fillStyle = isDark ? '#FFD700' : '#000000';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(roundText, centerX, arena.y + 0.5);
+      ctx.restore();
+
+      // ── Bottom / Footer Brand Handle: @CronosphereFOC ──
+      ctx.save();
+      const footerFont = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+      ctx.font = footerFont;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.2px';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = isDark ? '#94A3B8' : '#64748B';
+      const footerY = Math.round(arena.y + arena.height + 42);
+      ctx.fillText('@CronosphereFOC', centerX, footerY);
+      ctx.restore();
+
+      // ── Horizontal Side Character Dolls (Occupying Space Below Left & Right HUDs) ──
+      drawHorizontalFighterDolls(ctx, fighter0, fighter1, fighter0Data, fighter1Data, arena);
+    };
+
+    if (isSideHud1v1) {
+      drawHorizontal1v1TopWallHud(team0[0], team1[0], team0Data[0], team1Data[0]);
+      ctx.restore();
+      return;
+    }
+
     const hasStackedTeam = team0.length > 1 || team1.length > 1;
     const nameFontSize = hasStackedTeam ? 44 : 60;
     const customFighterFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
@@ -1018,14 +1159,29 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
 
     ctx.restore();
   } else {
-    // Multi-fighter FFA fallback: horizontal row joined with "vs"
-    const pad = 10;
-    const vsText = 'vs';
-    const textY = arena.y - 12;
+    const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+    const isGrandBattleMode = Boolean(
+      state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' ||
+      state.mode === 'Battle Royale 8' || state.mode === 'Grand Battle' ||
+      (arena && arena.width > 600)
+    );
+    const isSideHud1v1 = isHorizontal && !isGrandBattleMode && mainFighters.length === 2;
+
     const fighterData = mainFighters.map(f => ({
       name: getFighterDisplayName(f, true),
       color: getHudNameColor(f, '#F8FAFC')
     }));
+
+    if (isSideHud1v1 && fighterData.length === 2) {
+      drawHorizontal1v1TopWallHud(mainFighters[0], mainFighters[1], fighterData[0], fighterData[1]);
+      ctx.restore();
+      return;
+    }
+
+    // Multi-fighter FFA fallback: horizontal row joined with "vs"
+    const pad = 10;
+    const vsText = 'vs';
+    const textY = arena.y - 12;
 
     let totalW = 0;
     fighterData.forEach((fd, i) => {

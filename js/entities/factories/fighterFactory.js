@@ -61,7 +61,6 @@ import { EnderDragonFighter } from '../fighters/EnderDragonFighter.js';
 import { SansFighter } from '../fighters/SansFighter.js';
 import { NaoyaFighter } from '../fighters/NaoyaFighter.js';
 import { MakiFighter } from '../fighters/MakiFighter.js';
-import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -149,27 +148,6 @@ export const FIGHTER_CLASS_MAP = {
   'ender_dragon':   EnderDragonFighter,
   'enderdragon':    EnderDragonFighter,
   'ender dragon':   EnderDragonFighter,
-  'rifle':     RifleFighter,
-  'm4a1':      RifleFighter,
-  'shotgun':   ShotgunFighter,
-  'spas12':    ShotgunFighter,
-  'spas_12':   ShotgunFighter,
-  'pistol':    PistolFighter,
-  'desert_eagle': PistolFighter,
-  'deserteagle': PistolFighter,
-  'sniper':    SniperFighter,
-  'awp':       SniperFighter,
-  'barrett':   BarrettFighter,
-  'barrett50cal': BarrettFighter,
-  'tactical_barrett': BarrettFighter,
-  'tactical_sniper': SniperFighter,
-  'tactical_gunslinger': PistolFighter,
-  'tactical_commando': RifleFighter,
-  'tactical_guerilla': RifleFighter,
-  'tactical_breacher': ShotgunFighter,
-  'tactical_heavy': RifleFighter,
-  'tactical_infiltrator': PistolFighter,
-  'tactical_marksman': SniperFighter,
 };
 
 

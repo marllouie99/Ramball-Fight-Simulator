@@ -13,13 +13,11 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
 import { drawArenaFloorSelector, isArenaFloorModalOpen, drawArenaFloorModal, closeArenaFloorModal } from '../../systems/arenaTileSystem.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
-import { STARTER_MAP, MONOLITH_MAP } from '../../../Tactical Force/maps/index.js';
 import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
 let modalPage = 0;
-let isTacticalMapModalOpen = false;
 let _lastModalWheelTime = 0;
 let _lastCardWheelTime = 0;
 let _playerCardBounds = [];
@@ -181,213 +179,46 @@ function drawSmallFighterBadge(ctx, def, cx, cy, size = 16) {
   }
 }
 
-function drawMinimapBlueprint(ctx, map, x, y, w, h) {
-  ctx.save();
-  // Floor background
-  ctx.fillStyle = '#060a12';
-  ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#1e293b';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, w, h);
 
-  // Scale map obstacles to fit the minimap rect dynamically
-  const mapArena = map.arena || { x: 40, y: 105, width: 460, height: 740 };
-  const scaleX = w / mapArena.width;
-  const scaleY = h / mapArena.height;
 
-  if (map.obstacles && Array.isArray(map.obstacles)) {
-    map.obstacles.forEach(obs => {
-      const ox = x + (obs.x - mapArena.x) * scaleX;
-      const oy = y + (obs.y - mapArena.y) * scaleY;
-      const ow = obs.w * scaleX;
-      const oh = obs.h * scaleY;
-      ctx.fillStyle = '#334155';
-      ctx.fillRect(ox, oy, ow, oh);
-      ctx.strokeStyle = '#64748b';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(ox, oy, ow, oh);
-    });
-  }
-
-  // Draw spawn indicator points (cyan dots)
-  const isMonolith = (map.id === 'tactical_monolith_map' || map === MONOLITH_MAP);
-  const spawnPoints = isMonolith
-    ? (map.spawns?.fourPlayer || MONOLITH_MAP.spawns.fourPlayer)
-    : (map.spawns?.ffa || STARTER_MAP.spawns?.ffa || [
-        { x: 87.5, y: 210 }, { x: 452.5, y: 210 }, { x: 87.5, y: 690 }, { x: 452.5, y: 690 }
-      ]);
-
-  spawnPoints.forEach(sp => {
-    const sx = x + (sp.x - mapArena.x) * scaleX;
-    const sy = y + (sp.y - mapArena.y) * scaleY;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#00e5ff';
-    ctx.fill();
-  });
-
-  ctx.restore();
-}
-
-function drawTacticalMapSelectModal() {
-  const { ctx, canvas } = state;
-  const modalW = Math.min(canvas.width - 24, 500);
-  const modalH = 590;
-  const mx = (canvas.width - modalW) / 2;
-  const my = (canvas.height - modalH) / 2;
-
-  // Retro Dim Backdrop Overlay
-  ctx.fillStyle = 'rgba(33, 5, 12, 0.88)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Backdrop click closes modal
-  _registerButton(0, 0, canvas.width, canvas.height, () => {
-    isTacticalMapModalOpen = false;
-  });
-
-  // Blocker over modal panel window
-  _registerButton(mx, my, modalW, modalH, () => {});
-
-  // Draw main outer retro cream-pink panel
-  drawPanel(mx, my, modalW, modalH, 0.98, 6, '#21050c');
-
-  // Header Banner
-  ctx.fillStyle = '#b81c3b';
-  ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('TACTICAL SHOOTER // BATTLEGROUND MAP SELECTION // SYS.v2.5', mx + 18, my + 14);
-
-  ctx.fillStyle = '#21050c';
-  ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText('CHOOSE COMBAT SECTOR MAP', mx + 18, my + 28);
-
-  // Header accent line
-  ctx.fillStyle = '#21050c';
-  ctx.fillRect(mx + 18, my + 48, modalW - 36, 2);
-
-  const activeMap = state.activeMap || STARTER_MAP;
-  const maps = [
-    {
-      map: STARTER_MAP,
-      title: 'SECTOR 01: STARTER PROTOCOL',
-      subtitle: 'BALANCED BREACH FACILITY',
-      features: '4 CORNERS • 7 BARRIERS • CENTER MID-WALL',
-      desc: 'Balanced breach facility with corner spawn pockets, wide flanking corridors, and center mid-lane cover. Ideal for dynamic team crossfires.'
-    },
-    {
-      map: MONOLITH_MAP,
-      title: 'SECTOR 02: MONOLITH',
-      subtitle: 'QUAD 2x2 MONOLITH PILLARS',
-      features: '4 MONOLITHS • CROSSFIRE CORRIDOR • 4-WAY FLANKS',
-      desc: 'Quad central monolith pillars divided by a crossfire intersection, creating 4-way cover pockets and dynamic tactical shootouts.'
+function applyFighterSelection() {
+  if (selectingSlot) {
+    if (typeof selectingSlot === 'string' && selectingSlot.startsWith('slot_')) {
+      const slotNum = parseInt(selectingSlot.replace('slot_', ''), 10);
+      if (!state.horizontalRosterSlots) state.horizontalRosterSlots = [];
+      state.horizontalRosterSlots[slotNum] = modalInspectIndex;
+      if (slotNum === 0) state.p1Index = modalInspectIndex;
+      else if (slotNum === 1) state.p2Index = modalInspectIndex;
+      else if (slotNum === 2) state.p3Index = modalInspectIndex;
+      else if (slotNum === 3) state.p4Index = modalInspectIndex;
+      else if (slotNum === 4) state.p5Index = modalInspectIndex;
+      else if (slotNum === 5) state.p6Index = modalInspectIndex;
+      else if (slotNum === 6) state.p7Index = modalInspectIndex;
+      else if (slotNum === 7) state.p8Index = modalInspectIndex;
+      else if (slotNum === 8) state.p9Index = modalInspectIndex;
+      else if (slotNum === 9) state.p10Index = modalInspectIndex;
+      else if (slotNum === 10) state.p11Index = modalInspectIndex;
+      else if (slotNum === 11) state.p12Index = modalInspectIndex;
+    } else {
+      state[selectingSlot] = modalInspectIndex;
+      if (selectingSlot === 'p1Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[0] = modalInspectIndex;
+      else if (selectingSlot === 'p2Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[1] = modalInspectIndex;
+      else if (selectingSlot === 'p3Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[2] = modalInspectIndex;
+      else if (selectingSlot === 'p4Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[3] = modalInspectIndex;
+      else if (selectingSlot === 'p5Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[4] = modalInspectIndex;
+      else if (selectingSlot === 'p6Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[5] = modalInspectIndex;
     }
-  ];
-
-  const cardW = modalW - 36;
-  const cardH = 210;
-  const startCardY = my + 60;
-  const cardGap = 16;
-
-  maps.forEach((item, idx) => {
-    const cardY = startCardY + idx * (cardH + cardGap);
-    const isSelected = (activeMap.id === item.map.id || activeMap === item.map);
-
-    // 3D Shadow
-    ctx.fillStyle = isSelected ? '#5e0d1f' : '#baa88c';
-    drawChamferedRect(ctx, mx + 18, cardY + 3, cardW, cardH, 4);
-    ctx.fill();
-
-    // Card background
-    ctx.fillStyle = isSelected ? '#fff5f7' : '#faedf0';
-    ctx.strokeStyle = isSelected ? '#b81c3b' : '#21050c';
-    ctx.lineWidth = isSelected ? 2 : 1.6;
-    drawChamferedRect(ctx, mx + 18, cardY, cardW, cardH, 4);
-    ctx.fill();
-    ctx.stroke();
-
-    // Minimap blueprint preview on left
-    const miniW = 90;
-    const miniH = 170;
-    const miniX = mx + 30;
-    const miniY = cardY + 20;
-    drawMinimapBlueprint(ctx, item.map, miniX, miniY, miniW, miniH);
-
-    // Text intel on right
-    const textX = miniX + miniW + 16;
-    const maxTextW = cardW - miniW - 44;
-
-    // Title
-    ctx.fillStyle = isSelected ? '#b81c3b' : '#21050c';
-    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(item.title, textX, cardY + 18);
-
-    // Subtitle
-    ctx.fillStyle = '#8b1524';
-    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(item.subtitle, textX, cardY + 36);
-
-    // Features tag
-    ctx.fillStyle = '#d97706';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(item.features, textX, cardY + 52);
-
-    // Description
-    ctx.fillStyle = '#21050c';
-    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    wrapText(ctx, item.desc, textX, cardY + 70, maxTextW, 13);
-
-    // Status pill button
-    const pillW = 108;
-    const pillH = 26;
-    const pillX = textX;
-    const pillY = cardY + cardH - 36;
-
-    ctx.save();
-    ctx.fillStyle = isSelected ? '#5e0d1f' : '#baa88c';
-    drawChamferedRect(ctx, pillX, pillY + 2, pillW, pillH, 3);
-    ctx.fill();
-
-    ctx.fillStyle = isSelected ? '#cc2b4d' : '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.6;
-    drawChamferedRect(ctx, pillX, pillY, pillW, pillH, 3);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
-    ctx.font = '700 6.5px "Press Start 2P", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(isSelected ? '✓ ACTIVE' : 'SELECT MAP', pillX + pillW / 2, pillY + pillH / 2 + 0.5);
-    ctx.restore();
-
-    // Register card click
-    _registerButton(mx + 18, cardY, cardW, cardH, () => {
-      state.activeMap = item.map;
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash1', 0.25);
-      }
-      isTacticalMapModalOpen = false;
-    });
-  });
-
-  // Bottom Close Button
-  const closeBtnW = 160;
-  const closeBtnH = 32;
-  const closeBtnX = canvas.width / 2;
-  const closeBtnY = my + modalH - 28;
-  drawButton('CLOSE MAP LIST', closeBtnX, closeBtnY, () => {
-    isTacticalMapModalOpen = false;
-  }, closeBtnW, closeBtnH, null, 4);
+    saveFighterSelections();
+    preloadFighterAssets(modalInspectIndex);
+  }
+  selectingSlot = null;
 }
 
 function drawFighterSelectModal() {
   const { ctx, canvas } = state;
-  const modalW = Math.min(canvas.width - 20, 510);
-  const modalH = Math.min(canvas.height - 40, 600);
+  const isLandscape = canvas.width > 600 || state.viewOrientation === 'horizontal';
+  const modalW = isLandscape ? Math.min(canvas.width - 40, 900) : Math.min(canvas.width - 20, 510);
+  const modalH = isLandscape ? Math.min(canvas.height - 30, 490) : Math.min(canvas.height - 40, 600);
   const mx = (canvas.width - modalW) / 2;
   const my = (canvas.height - modalH) / 2;
 
@@ -403,7 +234,6 @@ function drawFighterSelectModal() {
   // Blocker over modal panel window
   _registerButton(mx, my, modalW, modalH, () => {});
 
-  const isTactical = state.gameCategory === 'tactical';
   const currentDefs = getActiveFighterDefs();
   const selectedDef = currentDefs[modalInspectIndex] || currentDefs[0] || FIGHTER_DEFS[0];
 
@@ -411,376 +241,710 @@ function drawFighterSelectModal() {
   drawPanel(mx, my, modalW, modalH, 0.98, 6, '#21050c');
 
   // Header Banner
-  const pNumMatch = selectingSlot ? selectingSlot.match(/\d/) : null;
-  const slotLabel = pNumMatch ? `PLAYER ${pNumMatch[0]}` : 'PLAYER';
+  const pNumMatch = selectingSlot ? String(selectingSlot).match(/\d+/) : null;
+  let slotLabel = 'PLAYER';
+  if (selectingSlot) {
+    if (String(selectingSlot).startsWith('slot_')) {
+      const sNum = parseInt(String(selectingSlot).replace('slot_', ''), 10) + 1;
+      slotLabel = `SLOT ${sNum}`;
+    } else if (pNumMatch) {
+      slotLabel = `PLAYER ${pNumMatch[0]}`;
+    }
+  }
 
   ctx.fillStyle = '#b81c3b';
   ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(isTactical ? 'TACTICAL FORCE // OPERATIVE ROSTER' : 'TACTICAL ROSTER // PROTOCOL 01', mx + 18, my + 14);
+  ctx.fillText('FIGHTER ROSTER // PROTOCOL 01', mx + 18, my + 12);
 
   ctx.fillStyle = '#21050c';
   ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText(`CHOOSE FIGHTER (${slotLabel})`, mx + 18, my + 28);
+  ctx.fillText(`CHOOSE FIGHTER (${slotLabel})`, mx + 18, my + 24);
 
   // Header accent line
   ctx.fillStyle = '#21050c';
-  ctx.fillRect(mx + 18, my + 48, modalW - 36, 2);
-
-  // ── Paginated Grid Configuration (Left Side: 3 Columns x 5 Rows = 15 Items per Page) ──
-  const cols = 3;
-  const rows = 5;
-  const itemsPerPage = cols * rows;
-  const gap = 6;
-  const gridW = 210;
-  const listX = mx + 18;
-  const listY = my + 58;
-
-  const cellW = Math.floor((gridW - (cols - 1) * gap) / cols);
-  const cellH = 68;
+  ctx.fillRect(mx + 18, my + 42, modalW - 36, 2);
 
   const modalAvailableFighters = currentDefs.map((def, idx) => ({ def, idx }))
     .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
 
-  const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
-  modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
+  if (isLandscape) {
+    // ── LANDSCAPE 16:9 DUAL-STAGE ROSTER MODAL ──
+    const cols = 5;
+    const rows = 3;
+    const itemsPerPage = cols * rows; // 15
+    const gap = 6;
+    const gridW = 460;
+    const listX = mx + 16;
+    const listY = my + 50;
 
-  const startIdx = modalPage * itemsPerPage;
-  const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + itemsPerPage);
+    const cellW = Math.floor((gridW - (cols - 1) * gap) / cols); // ~87px
+    const cellH = 92;
 
-  // ── Render Current Page Roster Grid ──
-  pageFighters.forEach(({ def, idx }, localPos) => {
-    const col = localPos % cols;
-    const row = Math.floor(localPos / cols);
+    const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
+    modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
 
-    const itemX = listX + col * (cellW + gap);
-    const itemY = listY + row * (cellH + gap);
+    const startIdx = modalPage * itemsPerPage;
+    const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + itemsPerPage);
 
-    const isSelected = idx === modalInspectIndex;
+    // Render 5x3 Grid
+    pageFighters.forEach(({ def, idx }, localPos) => {
+      const col = localPos % cols;
+      const row = Math.floor(localPos / cols);
+
+      const itemX = listX + col * (cellW + gap);
+      const itemY = listY + row * (cellH + gap);
+      const isSelected = idx === modalInspectIndex;
+
+      ctx.save();
+      if (isSelected) {
+        ctx.fillStyle = '#5e0d1f';
+        drawChamferedRect(ctx, itemX, itemY + 2.5, cellW, cellH, 3);
+        ctx.fill();
+
+        ctx.fillStyle = '#f26f88';
+        ctx.strokeStyle = '#21050c';
+        ctx.lineWidth = 1.8;
+        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffaec0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(itemX + 2, itemY + 1.5);
+        ctx.lineTo(itemX + cellW - 2, itemY + 1.5);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#baa88c';
+        drawChamferedRect(ctx, itemX, itemY + 2, cellW, cellH, 3);
+        ctx.fill();
+
+        ctx.fillStyle = '#fff5f7';
+        ctx.strokeStyle = '#21050c';
+        ctx.lineWidth = 1.5;
+        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Avatar
+      const avatarX = itemX + cellW / 2;
+      const avatarY = itemY + cellH / 2 - 8;
+      const previewImg = getFighterPreview(idx);
+      if (previewImg) {
+        const avatarSize = cellW - 16;
+        ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+      } else {
+        ctx.fillStyle = def.color || '#fff';
+        ctx.beginPath();
+        ctx.arc(avatarX, avatarY, 16, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Name Tag
+      ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
+      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      let shortName = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
+      if (shortName.length > 10) shortName = shortName.substring(0, 9) + '.';
+      ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
+
+      _registerButton(itemX, itemY, cellW, cellH + 2, () => {
+        if (modalInspectIndex !== idx) {
+          modalInspectIndex = idx;
+          preloadFighterAssets(idx);
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_dash5', 0.12);
+          }
+        }
+      });
+    });
+
+    // Pagination Controls Dock
+    const paginationY = listY + rows * (cellH + gap) + 4;
+    const paginationH = 32;
 
     ctx.save();
-    if (isSelected) {
-      ctx.fillStyle = '#5e0d1f';
-      drawChamferedRect(ctx, itemX, itemY + 2.5, cellW, cellH, 3);
-      ctx.fill();
-
-      ctx.fillStyle = '#f26f88';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.8;
-      drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.strokeStyle = '#ffaec0';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(itemX + 2, itemY + 1.5);
-      ctx.lineTo(itemX + cellW - 2, itemY + 1.5);
-      ctx.stroke();
-    } else {
-      ctx.fillStyle = '#baa88c';
-      drawChamferedRect(ctx, itemX, itemY + 2, cellW, cellH, 3);
-      ctx.fill();
-
-      ctx.fillStyle = '#fff5f7';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.5;
-      drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
-      ctx.fill();
-      ctx.stroke();
-    }
+    ctx.fillStyle = '#eed8dc';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.5;
+    drawChamferedRect(ctx, listX, paginationY, gridW, paginationH, 4);
+    ctx.fill();
+    ctx.stroke();
     ctx.restore();
 
-    // Fighter Preview Avatar inside card
-    const avatarX = itemX + cellW / 2;
-    const avatarY = itemY + cellH / 2 - 7;
-    const previewImg = getFighterPreview(idx);
-    if (previewImg) {
-      const avatarSize = cellW - 14;
-      ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
-    } else {
-      ctx.fillStyle = def.color || '#fff';
-      ctx.beginPath();
-      ctx.arc(avatarX, avatarY, 14, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    const pageBtnW = 34;
+    const pageBtnH = 22;
+    const pageBtnY = paginationY + paginationH / 2;
 
-    // Card Name Tag
-    ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-
-    let shortName = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
-    if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
-    ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
-
-    _registerButton(itemX, itemY, cellW, cellH + 2, () => {
-      if (modalInspectIndex !== idx) {
-        modalInspectIndex = idx;
-        preloadFighterAssets(idx);
+    drawButton('◄', listX + 8 + pageBtnW / 2, pageBtnY, () => {
+      if (modalPage > 0) {
+        modalPage--;
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           audioSystem.playSFX('skill_dash5', 0.12);
         }
       }
-    });
-  });
+    }, pageBtnW, pageBtnH, null, 3);
 
-  // ── Pagination Controls Dock at Bottom of Roster Grid ──
-  const paginationY = listY + rows * (cellH + gap) + 4;
-  const paginationH = 34;
-
-  // Background panel for pagination
-  ctx.save();
-  ctx.fillStyle = '#eed8dc';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.5;
-  drawChamferedRect(ctx, listX, paginationY, gridW, paginationH, 4);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  // Previous Page Button
-  const pageBtnW = 32;
-  const pageBtnH = 24;
-  const pageBtnY = paginationY + paginationH / 2;
-
-  drawButton('◄', listX + 8 + pageBtnW / 2, pageBtnY, () => {
-    if (modalPage > 0) {
-      modalPage--;
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash5', 0.12);
+    drawButton('►', listX + gridW - 8 - pageBtnW / 2, pageBtnY, () => {
+      if (modalPage < totalPages - 1) {
+        modalPage++;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash5', 0.12);
+        }
       }
+    }, pageBtnW, pageBtnH, null, 3);
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, paginationY + 11);
+
+    const dotSpacing = 14;
+    const dotsStartX = listX + gridW / 2 - ((totalPages - 1) * dotSpacing) / 2;
+    for (let p = 0; p < totalPages; p++) {
+      const dotX = dotsStartX + p * dotSpacing;
+      const dotY = paginationY + 23;
+      const isCurrentPage = p === modalPage;
+      ctx.fillStyle = isCurrentPage ? '#b81c3b' : '#baa88c';
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, isCurrentPage ? 3.5 : 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      _registerButton(dotX - 6, dotY - 6, 12, 12, () => {
+        if (modalPage !== p) {
+          modalPage = p;
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_dash5', 0.12);
+          }
+        }
+      });
     }
-  }, pageBtnW, pageBtnH, null, 3);
 
-  // Next Page Button
-  drawButton('►', listX + gridW - 8 - pageBtnW / 2, pageBtnY, () => {
-    if (modalPage < totalPages - 1) {
-      modalPage++;
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash5', 0.12);
-      }
-    }
-  }, pageBtnW, pageBtnH, null, 3);
+    // Cancel / Lock In action buttons below grid
+    const footerY = my + modalH - 34;
+    const actionBtnW = 210;
+    const actionBtnH = 30;
 
-  // Page Indicator Text & Dot Pips
-  ctx.fillStyle = '#21050c';
-  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, paginationY + 11);
+    drawButton('CANCEL', listX + gridW / 4, footerY, () => {
+      selectingSlot = null;
+    }, actionBtnW, actionBtnH, null, 4);
 
-  // Retro Dot Pips
-  const dotSpacing = 14;
-  const dotsStartX = listX + gridW / 2 - ((totalPages - 1) * dotSpacing) / 2;
-  for (let p = 0; p < totalPages; p++) {
-    const dotX = dotsStartX + p * dotSpacing;
-    const dotY = paginationY + 24;
-    const isCurrentPage = p === modalPage;
+    drawButton('LOCK IN', listX + (gridW * 3) / 4, footerY, () => {
+      applyFighterSelection();
+    }, actionBtnW, actionBtnH, '#cc2b4d', 4);
 
-    ctx.fillStyle = isCurrentPage ? '#b81c3b' : '#baa88c';
-    ctx.beginPath();
-    ctx.arc(dotX, dotY, isCurrentPage ? 3.5 : 2.5, 0, Math.PI * 2);
+    // ── Right Side: 2-Column Champion & Weapon Showcase Stage ──
+    const detailX = listX + gridW + 16;
+    const detailW = modalW - (detailX - mx) - 16; // ~392px
+    const detailY = listY;
+    const detailH = 414;
+
+    ctx.save();
+    ctx.fillStyle = '#baa88c';
+    drawChamferedRect(ctx, detailX, detailY + 3, detailW, detailH, 4);
     ctx.fill();
 
-    _registerButton(dotX - 6, dotY - 6, 12, 12, () => {
-      if (modalPage !== p) {
-        modalPage = p;
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.8;
+    drawChamferedRect(ctx, detailX, detailY, detailW, detailH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Split Right Side into Left Sub-panel (Stats/Hero) and Right Sub-panel (Weapon/Ability)
+    const subLeftX = detailX + 10;
+    const subLeftW = 175;
+    const subRightX = detailX + 192;
+    const subRightW = detailW - 202;
+
+    // Champion Preview Avatar
+    const previewX = subLeftX + subLeftW / 2;
+    const previewY = detailY + 44;
+    const previewSize = 64;
+
+    ctx.save();
+    ctx.fillStyle = '#eed8dc';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(previewX, previewY + 26, 36, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    const previewImage = getFighterPreview(modalInspectIndex);
+    if (previewImage) {
+      ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
+    }
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(fitSingleLineText(ctx, selectedDef.name.toUpperCase(), subLeftW - 8), previewX, detailY + 86);
+
+    // Class Badge Pill
+    const pillW = Math.min(subLeftW - 12, 110);
+    const pillH = 16;
+    ctx.fillStyle = '#b81c3b';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.4;
+    drawChamferedRect(ctx, previewX - pillW / 2, detailY + 98, pillW, pillH, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText(`CLASS // ${selectedDef.type.toUpperCase()}`, previewX, detailY + 106.5);
+
+    let statBarY = detailY + 124;
+    if (selectedDef.type === 'reze') {
+      const isHybrid = Boolean(state.showRezeTransformation);
+      drawButton(
+        isHybrid ? '💣 BOMB DEVIL' : '🌸 HUMAN FORM',
+        previewX,
+        statBarY + 8,
+        () => {
+          state.showRezeTransformation = !state.showRezeTransformation;
+          try {
+            if (state.showRezeTransformation) audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
+            else audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+          } catch (e) {}
+        },
+        subLeftW - 16,
+        18,
+        isHybrid ? '#b81c3b' : null,
+        3
+      );
+      statBarY += 24;
+    } else if (selectedDef.type === 'eye_of_cthulhu') {
+      const isP2 = Boolean(state.showEyeOfCthulhuPhase2);
+      drawButton(
+        isP2 ? '🦷 PHASE 2' : '👁️ PHASE 1',
+        previewX,
+        statBarY + 8,
+        () => {
+          state.showEyeOfCthulhuPhase2 = !state.showEyeOfCthulhuPhase2;
+          try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+        },
+        subLeftW - 16,
+        18,
+        isP2 ? '#e11d48' : null,
+        3
+      );
+      statBarY += 24;
+    }
+
+    drawStatBar(ctx, 'HP', selectedDef.hp, 150, subLeftX, statBarY, subLeftW, '#cc2b4d');
+    statBarY += 16;
+    drawStatBar(ctx, 'DMG', selectedDef.damage, 60, subLeftX, statBarY, subLeftW, '#f59e0b');
+    statBarY += 16;
+    drawStatBar(ctx, 'SPD', selectedDef.speed || 2, 4, subLeftX, statBarY, subLeftW, '#7c2d37');
+
+    // Right Sub-panel: Ability Box + Weapon Visual Box
+    const modalWeaponInfo = getFighterWeaponInfo(selectedDef);
+
+    // Ability Sub-box
+    const abY = detailY + 8;
+    const abH = 86;
+    ctx.save();
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.4;
+    drawChamferedRect(ctx, subRightX, abY, subRightW, abH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${selectedDef.ability.toUpperCase()}`, subRightW - 12), subRightX + 6, abY + 6);
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+    wrapText(ctx, selectedDef.desc, subRightX + 6, abY + 18, subRightW - 12, 12, 4);
+
+    // Weapon Visual Box
+    const wpY = abY + abH + 8;
+    const wpH = detailH - (wpY - detailY) - 8;
+    ctx.save();
+    ctx.fillStyle = '#faedf0';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.6;
+    drawChamferedRect(ctx, subRightX, wpY, subRightW, wpH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${modalWeaponInfo.name}`, subRightW - 12), subRightX + 6, wpY + 6);
+
+    ctx.fillStyle = '#8b1524';
+    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText(fitSingleLineText(ctx, `[ ${modalWeaponInfo.category} ]`, subRightW - 12), subRightX + 6, wpY + 19);
+
+    const mStageX = subRightX + subRightW / 2;
+    const mStageY = wpY + 95;
+
+    ctx.save();
+    ctx.fillStyle = '#eed8dc';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(mStageX, mStageY + 20, 44, 9, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.translate(mStageX, mStageY);
+    ctx.scale(1.05, 1.05);
+    drawWeaponPreview(ctx, selectedDef.type, selectedDef.color);
+    ctx.restore();
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    wrapText(ctx, modalWeaponInfo.desc, mStageX, wpY + 190, subRightW - 12, 12, 4);
+
+  } else {
+    // ── PORTRAIT (540x960) ORIGINAL MODAL LAYOUT (Rule 28 Baseline Preserved) ──
+    const cols = 3;
+    const rows = 5;
+    const itemsPerPage = cols * rows;
+    const gap = 6;
+    const gridW = 210;
+    const listX = mx + 18;
+    const listY = my + 58;
+
+    const cellW = Math.floor((gridW - (cols - 1) * gap) / cols);
+    const cellH = 68;
+
+    const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
+    modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
+
+    const startIdx = modalPage * itemsPerPage;
+    const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + itemsPerPage);
+
+    // Render Current Page Roster Grid
+    pageFighters.forEach(({ def, idx }, localPos) => {
+      const col = localPos % cols;
+      const row = Math.floor(localPos / cols);
+
+      const itemX = listX + col * (cellW + gap);
+      const itemY = listY + row * (cellH + gap);
+
+      const isSelected = idx === modalInspectIndex;
+
+      ctx.save();
+      if (isSelected) {
+        ctx.fillStyle = '#5e0d1f';
+        drawChamferedRect(ctx, itemX, itemY + 2.5, cellW, cellH, 3);
+        ctx.fill();
+
+        ctx.fillStyle = '#f26f88';
+        ctx.strokeStyle = '#21050c';
+        ctx.lineWidth = 1.8;
+        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffaec0';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(itemX + 2, itemY + 1.5);
+        ctx.lineTo(itemX + cellW - 2, itemY + 1.5);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#baa88c';
+        drawChamferedRect(ctx, itemX, itemY + 2, cellW, cellH, 3);
+        ctx.fill();
+
+        ctx.fillStyle = '#fff5f7';
+        ctx.strokeStyle = '#21050c';
+        ctx.lineWidth = 1.5;
+        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Fighter Preview Avatar inside card
+      const avatarX = itemX + cellW / 2;
+      const avatarY = itemY + cellH / 2 - 7;
+      const previewImg = getFighterPreview(idx);
+      if (previewImg) {
+        const avatarSize = cellW - 14;
+        ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+      } else {
+        ctx.fillStyle = def.color || '#fff';
+        ctx.beginPath();
+        ctx.arc(avatarX, avatarY, 14, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Card Name Tag
+      ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
+      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+
+      let shortName = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
+      if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
+      ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
+
+      _registerButton(itemX, itemY, cellW, cellH + 2, () => {
+        if (modalInspectIndex !== idx) {
+          modalInspectIndex = idx;
+          preloadFighterAssets(idx);
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_dash5', 0.12);
+          }
+        }
+      });
+    });
+
+    // Pagination Controls Dock at Bottom of Roster Grid
+    const paginationY = listY + rows * (cellH + gap) + 4;
+    const paginationH = 34;
+
+    ctx.save();
+    ctx.fillStyle = '#eed8dc';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.5;
+    drawChamferedRect(ctx, listX, paginationY, gridW, paginationH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    const pageBtnW = 32;
+    const pageBtnH = 24;
+    const pageBtnY = paginationY + paginationH / 2;
+
+    drawButton('◄', listX + 8 + pageBtnW / 2, pageBtnY, () => {
+      if (modalPage > 0) {
+        modalPage--;
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           audioSystem.playSFX('skill_dash5', 0.12);
         }
       }
-    });
-  }
+    }, pageBtnW, pageBtnH, null, 3);
 
-  // ── Right Side: Champion Showcase Stage ──
-  const detailX = listX + gridW + 16;
-  const detailW = modalW - (detailX - mx) - 18;
-  const detailY = my + 58;
-  const detailH = 444;
+    drawButton('►', listX + gridW - 8 - pageBtnW / 2, pageBtnY, () => {
+      if (modalPage < totalPages - 1) {
+        modalPage++;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash5', 0.12);
+        }
+      }
+    }, pageBtnW, pageBtnH, null, 3);
 
-  ctx.save();
-  ctx.fillStyle = '#baa88c';
-  drawChamferedRect(ctx, detailX, detailY + 3, detailW, detailH, 4);
-  ctx.fill();
+    ctx.fillStyle = '#21050c';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, paginationY + 11);
 
-  ctx.fillStyle = '#fff5f7';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.8;
-  drawChamferedRect(ctx, detailX, detailY, detailW, detailH, 4);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+    const dotSpacing = 14;
+    const dotsStartX = listX + gridW / 2 - ((totalPages - 1) * dotSpacing) / 2;
+    for (let p = 0; p < totalPages; p++) {
+      const dotX = dotsStartX + p * dotSpacing;
+      const dotY = paginationY + 24;
+      const isCurrentPage = p === modalPage;
 
-  const previewX = detailX + detailW / 2;
-  const previewY = detailY + 54;
+      ctx.fillStyle = isCurrentPage ? '#b81c3b' : '#baa88c';
+      ctx.beginPath();
+      ctx.arc(dotX, dotY, isCurrentPage ? 3.5 : 2.5, 0, Math.PI * 2);
+      ctx.fill();
 
-  // Warm pedestal
-  ctx.save();
-  ctx.fillStyle = '#eed8dc';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.ellipse(previewX, previewY + 32, 40, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  // Draw Champion Preview Image
-  const previewImage = getFighterPreview(modalInspectIndex);
-  if (previewImage) {
-    const previewSize = 78;
-    ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
-  }
-
-  // Champion Name
-  ctx.fillStyle = '#21050c';
-  ctx.font = '900 13.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 104);
-
-  // Class Badge Pill
-  const pillW = 96;
-  const pillH = 16;
-  ctx.fillStyle = '#b81c3b';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.4;
-  drawChamferedRect(ctx, previewX - pillW / 2, detailY + 116, pillW, pillH, 3);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText(`CLASS // ${selectedDef.type.toUpperCase()}`, previewX, detailY + 124.5);
-
-  // Stat Bars
-  let textY = detailY + 146;
-  if (selectedDef.type === 'reze') {
-    const isHybrid = Boolean(state.showRezeTransformation);
-    drawButton(
-      isHybrid ? '💣 BOMB DEVIL' : '🌸 HUMAN FORM',
-      previewX,
-      detailY + 142,
-      () => {
-        state.showRezeTransformation = !state.showRezeTransformation;
-        try {
-          if (state.showRezeTransformation) {
-            audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
-          } else {
-            audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+      _registerButton(dotX - 6, dotY - 6, 12, 12, () => {
+        if (modalPage !== p) {
+          modalPage = p;
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_dash5', 0.12);
           }
-        } catch (e) {}
-      },
-      115,
-      18,
-      isHybrid ? '#b81c3b' : null,
-      3
-    );
-    textY += 20;
-  } else if (selectedDef.type === 'eye_of_cthulhu') {
-    const isP2 = Boolean(state.showEyeOfCthulhuPhase2);
-    drawButton(
-      isP2 ? '🦷 PHASE 2 (FANGED MAW)' : '👁️ PHASE 1 (OCULAR)',
-      previewX,
-      detailY + 142,
-      () => {
-        state.showEyeOfCthulhuPhase2 = !state.showEyeOfCthulhuPhase2;
-        try {
-          audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-        } catch (e) {}
-      },
-      135,
-      18,
-      isP2 ? '#e11d48' : null,
-      3
-    );
-    textY += 20;
-  }
-  const barW = detailW - 20;
-  const barX = detailX + 10;
-
-  drawStatBar(ctx, 'HP', selectedDef.hp, 150, barX, textY, barW, '#cc2b4d');
-  textY += 16;
-  drawStatBar(ctx, 'DMG', selectedDef.damage, 60, barX, textY, barW, '#f59e0b');
-  textY += 16;
-  drawStatBar(ctx, 'SPD', selectedDef.speed || 2, 4, barX, textY, barW, '#7c2d37');
-  textY += 22;
-
-  const modalWeaponInfo = getFighterWeaponInfo(selectedDef);
-
-  // ── Weapon Visual Showcase Box in Modal ──
-  const mWeaponBoxY = textY;
-  const mWeaponBoxH = 110;
-  ctx.save();
-  ctx.fillStyle = '#faedf0';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.6;
-  drawChamferedRect(ctx, barX, mWeaponBoxY, barW, mWeaponBoxH, 4);
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  // Weapon Title
-  ctx.fillStyle = '#b81c3b';
-  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${modalWeaponInfo.name}`, barW - 16), barX + 8, mWeaponBoxY + 7);
-
-  ctx.fillStyle = '#8b1524';
-  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText(fitSingleLineText(ctx, `[ ${modalWeaponInfo.category} ]`, barW - 16), barX + 8, mWeaponBoxY + 20);
-
-  // Live Weapon Graphic Stage
-  const mStageX = barX + barW / 2;
-  const mStageY = mWeaponBoxY + 58;
-
-  ctx.save();
-  ctx.fillStyle = '#eed8dc';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.ellipse(mStageX, mStageY + 16, 36, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.translate(mStageX, mStageY);
-  ctx.scale(0.9, 0.9);
-  drawWeaponPreview(ctx, selectedDef.type, selectedDef.color);
-  ctx.restore();
-
-  // Ability Header & Text Below
-  const mAbilityY = mWeaponBoxY + mWeaponBoxH + 8;
-  ctx.fillStyle = '#b81c3b';
-  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${selectedDef.ability.toUpperCase()}`, barW), barX, mAbilityY);
-
-  ctx.fillStyle = '#21050c';
-  ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-  wrapText(ctx, selectedDef.desc, barX, mAbilityY + 14, barW, 13, 4);
-
-  // Footer Action Buttons
-  const footerY = my + modalH - 34;
-  const btnW = 130;
-  const btnH = 34;
-
-  drawButton('CANCEL', listX + gridW / 2, footerY, () => {
-    selectingSlot = null;
-  }, btnW, btnH, null, 4);
-
-  drawButton('LOCK IN', detailX + detailW / 2, footerY, () => {
-    if (selectingSlot) {
-      state[selectingSlot] = modalInspectIndex;
-      saveFighterSelections();
-      preloadFighterAssets(modalInspectIndex);
+        }
+      });
     }
-    selectingSlot = null;
-  }, btnW, btnH, '#cc2b4d', 4);
+
+    // Right Side: Champion Showcase Stage
+    const detailX = listX + gridW + 16;
+    const detailW = modalW - (detailX - mx) - 18;
+    const detailY = my + 58;
+    const detailH = 444;
+
+    ctx.save();
+    ctx.fillStyle = '#baa88c';
+    drawChamferedRect(ctx, detailX, detailY + 3, detailW, detailH, 4);
+    ctx.fill();
+
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.8;
+    drawChamferedRect(ctx, detailX, detailY, detailW, detailH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    const previewX = detailX + detailW / 2;
+    const previewY = detailY + 54;
+
+    ctx.save();
+    ctx.fillStyle = '#eed8dc';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.ellipse(previewX, previewY + 32, 40, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    const previewImage = getFighterPreview(modalInspectIndex);
+    if (previewImage) {
+      const previewSize = 78;
+      ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
+    }
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '900 13.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 104);
+
+    const pillW = 96;
+    const pillH = 16;
+    ctx.fillStyle = '#b81c3b';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.4;
+    drawChamferedRect(ctx, previewX - pillW / 2, detailY + 116, pillW, pillH, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText(`CLASS // ${selectedDef.type.toUpperCase()}`, previewX, detailY + 124.5);
+
+    let textY = detailY + 146;
+    if (selectedDef.type === 'reze') {
+      const isHybrid = Boolean(state.showRezeTransformation);
+      drawButton(
+        isHybrid ? '💣 BOMB DEVIL' : '🌸 HUMAN FORM',
+        previewX,
+        detailY + 142,
+        () => {
+          state.showRezeTransformation = !state.showRezeTransformation;
+          try {
+            if (state.showRezeTransformation) audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
+            else audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+          } catch (e) {}
+        },
+        115,
+        18,
+        isHybrid ? '#b81c3b' : null,
+        3
+      );
+      textY += 20;
+    } else if (selectedDef.type === 'eye_of_cthulhu') {
+      const isP2 = Boolean(state.showEyeOfCthulhuPhase2);
+      drawButton(
+        isP2 ? '🦷 PHASE 2 (FANGED MAW)' : '👁️ PHASE 1 (OCULAR)',
+        previewX,
+        detailY + 142,
+        () => {
+          state.showEyeOfCthulhuPhase2 = !state.showEyeOfCthulhuPhase2;
+          try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+        },
+        135,
+        18,
+        isP2 ? '#e11d48' : null,
+        3
+      );
+      textY += 20;
+    }
+    const barW = detailW - 20;
+    const barX = detailX + 10;
+
+    drawStatBar(ctx, 'HP', selectedDef.hp, 150, barX, textY, barW, '#cc2b4d');
+    textY += 16;
+    drawStatBar(ctx, 'DMG', selectedDef.damage, 60, barX, textY, barW, '#f59e0b');
+    textY += 16;
+    drawStatBar(ctx, 'SPD', selectedDef.speed || 2, 4, barX, textY, barW, '#7c2d37');
+    textY += 22;
+
+    const modalWeaponInfo = getFighterWeaponInfo(selectedDef);
+
+    // Weapon Visual Showcase Box in Modal
+    const mWeaponBoxY = textY;
+    const mWeaponBoxH = 110;
+    ctx.save();
+    ctx.fillStyle = '#faedf0';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.6;
+    drawChamferedRect(ctx, barX, mWeaponBoxY, barW, mWeaponBoxH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${modalWeaponInfo.name}`, barW - 16), barX + 8, mWeaponBoxY + 7);
+
+    ctx.fillStyle = '#8b1524';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText(fitSingleLineText(ctx, `[ ${modalWeaponInfo.category} ]`, barW - 16), barX + 8, mWeaponBoxY + 20);
+
+    const mStageX = barX + barW / 2;
+    const mStageY = mWeaponBoxY + 58;
+
+    ctx.save();
+    ctx.fillStyle = '#eed8dc';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.ellipse(mStageX, mStageY + 16, 36, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.translate(mStageX, mStageY);
+    ctx.scale(0.9, 0.9);
+    drawWeaponPreview(ctx, selectedDef.type, selectedDef.color);
+    ctx.restore();
+
+    const mAbilityY = mWeaponBoxY + mWeaponBoxH + 8;
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${selectedDef.ability.toUpperCase()}`, barW), barX, mAbilityY);
+
+    ctx.fillStyle = '#21050c';
+    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+    wrapText(ctx, selectedDef.desc, barX, mAbilityY + 14, barW, 13, 4);
+
+    const footerY = my + modalH - 34;
+    const btnW = 130;
+    const btnH = 34;
+
+    drawButton('CANCEL', listX + gridW / 2, footerY, () => {
+      selectingSlot = null;
+    }, btnW, btnH, null, 4);
+
+    drawButton('LOCK IN', detailX + detailW / 2, footerY, () => {
+      applyFighterSelection();
+    }, btnW, btnH, '#cc2b4d', 4);
+  }
 }
 
 function drawSelectScreen() {
@@ -805,79 +969,43 @@ function drawSelectScreen() {
 
   updatePreviewBalls();
 
+  const isLandscape = canvas.width > 600 || state.viewOrientation === 'horizontal';
+  const backBtnY = isLandscape ? 30 : 64;
+  const titleY = isLandscape ? 30 : 64;
+  const tmY = isLandscape ? 56 : 96;
+
   // ── Unified Top Back Button ──
-  drawButton('◀ BACK', 52, 64, () => { goToTitle(); }, 76, 26);
+  drawButton('◀ BACK', 52, backBtnY, () => { goToTitle(); }, 76, 26);
 
   // ── Header Section ──
-  const isTactical = state.gameCategory === 'tactical' || mode === 'Tactical 2v2' || mode === 'Tactical FFA' || mode === 'Tactical 4v4' || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1;
-  const isTac1v1 = isTactical && (mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === '1v1');
-  const isTacFFA = isTactical && (mode === 'Tactical FFA' || mode === GAME_MODES.TACTICAL_FFA);
   const isTag = mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH';
-  const isRegular1v2 = !isTactical && (mode === '1v2' || mode === GAME_MODES.ONE_VS_TWO);
+  const isRegular1v2 = mode === '1v2' || mode === GAME_MODES.ONE_VS_TWO;
 
   // Screen Title: FIGHT OF LARPERS 101
   ctx.save();
-  const titleText = isTac1v1
-    ? '[ 1 VS 1 DUEL ]'
-    : (isTacFFA
-      ? '[ 4-PLAYER FFA ]'
-      : (isTactical ? '[ 2 VS 2 FIREFIGHT ]' : (isTag ? '[ 3 VS 3 TAG MATCH ]' : (isRegular1v2 ? '[ 1 VS 2 BATTLE ]' : '[ FIGHT OF LARPERS 101 ]'))));
+  const titleText = isTag ? '[ 3 VS 3 TAG MATCH ]' : (isRegular1v2 ? '[ 1 VS 2 BATTLE ]' : '[ FIGHT OF LARPERS 101 ]');
   
   ctx.fillStyle = '#21050c';
   ctx.font = '700 12px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(titleText, canvas.width / 2 + 1, 64 + 2);
+  ctx.fillText(titleText, canvas.width / 2 + 1, titleY + 2);
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(titleText, canvas.width / 2, 64);
+  ctx.fillText(titleText, canvas.width / 2, titleY);
   ctx.restore();
 
-  // Tactical Sub-Controls (Map Selector & Arena BGM) & Boss Battle Team Toggle & Arena Floor Selector
-  const isBossBattleMode = !isTactical && (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
-  const mapW = isTactical ? 120 : 0;
+  // Sub-Controls (Boss Battle Team Toggle, Arena BGM & Arena Floor Selector)
+  const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
   const teamToggleW = isBossBattleMode ? 135 : 0;
   const bgmW = 115;
   const floorW = 115;
   const ctrlH = 24;
   const gap = 8;
-  const totalCtrlW = (isTactical ? mapW + gap : 0) + (isBossBattleMode ? teamToggleW + gap : 0) + bgmW + gap + floorW;
+  const totalCtrlW = (isBossBattleMode ? teamToggleW + gap : 0) + bgmW + gap + floorW;
   const startCtrlX = canvas.width / 2 - totalCtrlW / 2;
   
-  const tmY = 96;
   let curCtrlX = startCtrlX;
-  if (isTactical) {
-    const activeMap = state.activeMap || STARTER_MAP;
-    const isMonolith = (activeMap.id === 'tactical_monolith_map' || activeMap === MONOLITH_MAP);
-    const mapLabel = isMonolith ? '🗺️ MONOLITH' : '🗺️ SECTOR 01';
-
-    ctx.save();
-    ctx.fillStyle = '#baa88c';
-    drawChamferedRect(ctx, curCtrlX, tmY + 2, mapW, ctrlH, 3);
-    ctx.fill();
-
-    ctx.fillStyle = '#faedf0';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.6;
-    drawChamferedRect(ctx, curCtrlX, tmY, mapW, ctrlH, 3);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(mapLabel, curCtrlX + mapW / 2, tmY + ctrlH / 2);
-    ctx.restore();
-
-    _registerButton(curCtrlX, tmY, mapW, ctrlH + 2, () => {
-      isTacticalMapModalOpen = true;
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash1', 0.25);
-      }
-    });
-
-    curCtrlX += mapW + gap;
-  } else if (isBossBattleMode) {
+  if (isBossBattleMode) {
     const isSolo = Boolean(state.bossBattleNoTeammate);
     const toggleLabel = isSolo ? '👤 SOLO (1v1)' : '👥 DUO (1v2)';
 
@@ -910,7 +1038,6 @@ function drawSelectScreen() {
 
     curCtrlX += teamToggleW + gap;
   }
-
   // Arena BGM Selector Button
   drawArenaBgmSelector(ctx, curCtrlX, tmY, bgmW, ctrlH);
   curCtrlX += bgmW + gap;
@@ -919,21 +1046,21 @@ function drawSelectScreen() {
   drawArenaFloorSelector(ctx, curCtrlX, tmY, floorW, ctrlH);
 
   // ── Main Combatant Grid ──
-  const topY = 134;
-  const margin = 16;
-  const cardGap = 12;
+  const topY = isLandscape ? 88 : 134;
+  const margin = isLandscape ? 40 : 16;
+  const cardGap = isLandscape ? 40 : 12;
   const totalCardW = canvas.width - margin * 2;
-  const cardW = Math.floor((totalCardW - cardGap) / 2); // 248px
-  const fullCardH = 680; // Expands to Y = 814, leaving clean space before bottom command dock
+  const cardW = Math.floor((totalCardW - cardGap) / 2); // ~390px in landscape, 248px in portrait
+  const fullCardH = isLandscape ? 380 : 680;
 
-  if (isTac1v1 || (!isTactical && (mode === '1v1' || mode === 'Stand Off'))) {
+  if (mode === '1v1' || mode === 'Stand Off' || !mode || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF) {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
 
-    const p1Title = isTac1v1 ? 'OPERATIVE 1 // CT' : 'PLAYER 1 // RED';
-    const p2Title = isTac1v1 ? 'OPERATIVE 2 // T' : 'PLAYER 2 // BLUE';
-    const p1Color = isTac1v1 ? '#3b82f6' : '#cc2b4d';
-    const p2Color = isTac1v1 ? '#ef4444' : '#38bdf8';
+    const p1Title = 'PLAYER 1 // RED';
+    const p2Title = 'PLAYER 2 // BLUE';
+    const p1Color = '#cc2b4d';
+    const p2Color = '#38bdf8';
 
     drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, fullCardH, p1Color, true, true);
     drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, fullCardH, p2Color, true, true);
@@ -973,7 +1100,7 @@ function drawSelectScreen() {
     ctx.restore();
 
     // Bottom Command Dock
-    const btnText = isTac1v1 ? 'START TACTICAL DUEL' : 'START BATTLE';
+    const btnText = 'START BATTLE';
     drawBottomCommandDeck(btnText, () => startGame(), () => randomize1v1Fighters());
 
   } else if (isRegular1v2) {
@@ -1084,23 +1211,23 @@ function drawSelectScreen() {
       drawBottomCommandDeck('START DUO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
     }
 
-  } else if (isTactical || mode === '2v2' || mode === 'Tactical 2v2' || mode === 'FFA' || mode === 'Tactical FFA') {
+  } else if (mode === '2v2' || mode === 'FFA') {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
     const stackedH = Math.floor((fullCardH - cardGap) / 2);
     const bottomY = topY + stackedH + cardGap;
 
-    const isTeamMode = isTactical || mode === '2v2' || mode === 'Tactical 2v2';
+    const isTeamMode = mode === '2v2';
 
-    const p1Title = isTactical ? 'TEAM 1 // ALPHA' : (mode === '2v2' ? 'RED // SQUAD 1' : 'PLAYER 1');
-    const p2Title = isTactical ? 'TEAM 2 // CHARLIE' : (mode === '2v2' ? 'BLUE // SQUAD 1' : 'PLAYER 2');
-    const p3Title = isTactical ? 'TEAM 1 // BRAVO' : (mode === '2v2' ? 'RED // SQUAD 2' : 'PLAYER 3');
-    const p4Title = isTactical ? 'TEAM 2 // DELTA' : (mode === '2v2' ? 'BLUE // SQUAD 2' : 'PLAYER 4');
+    const p1Title = mode === '2v2' ? 'RED // SQUAD 1' : 'PLAYER 1';
+    const p2Title = mode === '2v2' ? 'BLUE // SQUAD 1' : 'PLAYER 2';
+    const p3Title = mode === '2v2' ? 'RED // SQUAD 2' : 'PLAYER 3';
+    const p4Title = mode === '2v2' ? 'BLUE // SQUAD 2' : 'PLAYER 4';
 
-    const p1Color = isTactical ? '#3b82f6' : (mode === '2v2' ? '#cc2b4d' : '#ef4444');
-    const p2Color = isTactical ? '#ef4444' : (mode === '2v2' ? '#38bdf8' : '#38bdf8');
-    const p3Color = isTactical ? '#3b82f6' : (mode === '2v2' ? '#cc2b4d' : '#f59e0b');
-    const p4Color = isTactical ? '#ef4444' : (mode === '2v2' ? '#38bdf8' : '#a855f7');
+    const p1Color = mode === '2v2' ? '#cc2b4d' : '#ef4444';
+    const p2Color = mode === '2v2' ? '#38bdf8' : '#38bdf8';
+    const p3Color = mode === '2v2' ? '#cc2b4d' : '#f59e0b';
+    const p4Color = mode === '2v2' ? '#38bdf8' : '#a855f7';
 
     drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, stackedH, p1Color, true);
     drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, stackedH, p2Color, true);
@@ -1140,7 +1267,7 @@ function drawSelectScreen() {
       ctx.restore();
     }
 
-    drawBottomCommandDeck(isTactical ? 'START TACTICAL 2V2' : (mode === '2v2' ? 'START 2V2 DUO' : 'START BATTLE'), () => startGame(), () => randomizeFfaFighters());
+    drawBottomCommandDeck(mode === '2v2' ? 'START 2V2 DUO' : 'START BATTLE', () => startGame(), () => randomizeFfaFighters());
 
   } else if (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH') {
     const leftX = margin;
@@ -1213,10 +1340,6 @@ function drawSelectScreen() {
     drawFighterSelectModal();
   }
 
-  if (isTacticalMapModalOpen) {
-    drawTacticalMapSelectModal();
-  }
-
   if (isArenaBgmModalOpen()) {
     drawArenaBgmModal(state.ctx);
   }
@@ -1228,9 +1351,10 @@ function drawSelectScreen() {
 
 function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
   const { canvas, ctx } = state;
-  const startBtnW = 180;
-  const thumbBtnW = 135;
-  const randBtnW = 135;
+  const isLandscape = canvas.width > 600 || state.viewOrientation === 'horizontal';
+  const startBtnW = isLandscape ? 220 : 180;
+  const thumbBtnW = isLandscape ? 150 : 135;
+  const randBtnW = isLandscape ? 150 : 135;
   const btnGap = 10;
   const totalRowW = startBtnW + thumbBtnW + randBtnW + btnGap * 2;
   let startX = canvas.width / 2 - totalRowW / 2;
@@ -1241,13 +1365,14 @@ function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
   startX += thumbBtnW + btnGap;
   const randBtnX = startX + randBtnW / 2;
 
-  const actionRowY = 852;
+  const actionRowY = isLandscape ? 498 : 852;
+  const btnH = isLandscape ? 38 : 46;
 
-  drawButton(primaryLabel, startBtnX, actionRowY, onStart, startBtnW, 46, '#cc2b4d', 6);
+  drawButton(primaryLabel, startBtnX, actionRowY, onStart, startBtnW, btnH, '#cc2b4d', 6);
   drawButton('📸 THUMBNAIL', thumbBtnX, actionRowY, () => {
     startFaceOffScreen(true);
-  }, thumbBtnW, 46, '#d97706', 6);
-  drawButton('RANDOMIZE', randBtnX, actionRowY, onRandomize, randBtnW, 46, null, 6);
+  }, thumbBtnW, btnH, '#d97706', 6);
+  drawButton('RANDOMIZE', randBtnX, actionRowY, onRandomize, randBtnW, btnH, null, 6);
 }
 
 function randomize1v1Fighters() {
@@ -1257,6 +1382,7 @@ function randomize1v1Fighters() {
     state.p1Index = available[Math.floor(Math.random() * available.length)];
     const remaining = available.filter(idx => idx !== state.p1Index);
     state.p2Index = remaining.length > 0 ? remaining[Math.floor(Math.random() * remaining.length)] : state.p1Index;
+    saveFighterSelections();
   }
 }
 
@@ -1271,6 +1397,7 @@ function randomize1v2Fighters() {
       const rem2 = rem1.filter(idx => idx !== state.p2Index);
       state.p3Index = rem2.length > 0 ? rem2[Math.floor(Math.random() * rem2.length)] : state.p2Index;
     }
+    saveFighterSelections();
   }
 }
 
@@ -1286,6 +1413,7 @@ function randomizeFfaFighters() {
   state.p2Index = indices[1] ?? (indices.length > 1 ? 1 : 0);
   state.p3Index = indices[2] ?? (indices.length > 2 ? 2 : 0);
   state.p4Index = indices[3] ?? (indices.length > 3 ? 3 : 0);
+  saveFighterSelections();
 }
 
 export function getFighterWeaponInfo(def) {
@@ -1416,14 +1544,14 @@ export function getFighterWeaponInfo(def) {
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:
-      return { name: (def.ability || 'TACTICAL WEAPON').toUpperCase(), category: 'COMBAT ARSENAL', desc: def.desc || 'Standard tactical armament.' };
+      return { name: (def.ability || 'COMBAT SKILL').toUpperCase(), category: 'COMBAT ARSENAL', desc: def.desc || 'Standard combat armament.' };
   }
 }
 
 function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLarge = false) {
   const { ctx, mode } = state;
   const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
-  const isAnyModalOpen = (selectingSlot !== null || isTacticalMapModalOpen || isArenaBgmModalOpen() || isArenaFloorModalOpen());
+  const isAnyModalOpen = (selectingSlot !== null || isArenaBgmModalOpen() || isArenaFloorModalOpen());
   const isInteractive = enabled && !isAnyModalOpen;
 
   // Track card bounds for direct mouse wheel cycling (only when interactive)
@@ -1490,6 +1618,12 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     if (count > 0) {
       const nextPos = (pos + direction + count) % count;
       state[slotProp] = availableFighters[nextPos].idx;
+      if (slotProp === 'p1Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[0] = state.p1Index;
+      else if (slotProp === 'p2Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[1] = state.p2Index;
+      else if (slotProp === 'p3Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[2] = state.p3Index;
+      else if (slotProp === 'p4Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[3] = state.p4Index;
+      else if (slotProp === 'p5Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[4] = state.p5Index;
+      else if (slotProp === 'p6Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[5] = state.p6Index;
       saveFighterSelections();
       preloadFighterAssets(state[slotProp]);
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
@@ -1499,150 +1633,294 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
   };
 
   if (isLarge) {
-    // ── TALL SHOWCASE CARD (1v1 / Stand-Off Solo / TLFS: H = 680) ──
-    const avatarX = x + w / 2;
-    const avatarY = y + 84;
-    const avatarSize = 80;
+    const isLandscape = (state.canvas && state.canvas.width > 600) || state.viewOrientation === 'horizontal';
+    if (isLandscape && h <= 420) {
+      // ── WIDESCREEN 16:9 LARGE CARD (1v1 / Stand-Off Solo in Horizontal Mode: H ~ 380, W ~ 390) ──
+      const subLeftX = x + 10;
+      const subLeftW = 168;
+      const subRightX = x + 184;
+      const subRightW = w - 194;
 
-    // Quick cycle arrows on large card avatar sides
-    drawButton('◄', x + 24, avatarY, () => cycleFighter(-1), 26, 26, null, 3);
-    drawButton('►', x + w - 24, avatarY, () => cycleFighter(1), 26, 26, null, 3);
+      const avatarX = subLeftX + subLeftW / 2;
+      const avatarY = y + 76;
+      const avatarSize = 64;
 
-    // Warm stage pedestal ring
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(avatarX, avatarY + 38, avatarSize * 0.44, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+      // Quick cycle arrows on avatar sides
+      drawButton('◄', subLeftX + 16, avatarY, () => cycleFighter(-1), 24, 24, null, 3);
+      drawButton('►', subLeftX + subLeftW - 16, avatarY, () => cycleFighter(1), 24, 24, null, 3);
 
-    if (previewImage) {
-      ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+      // Warm pedestal ring
+      ctx.save();
+      ctx.fillStyle = '#eed8dc';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(avatarX, avatarY + 30, avatarSize * 0.44, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      if (previewImage) {
+        ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+      }
+
+      // Fighter Name
+      ctx.fillStyle = '#21050c';
+      ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), subLeftW - 8), avatarX, y + 124);
+
+      // Class / Boss Tag Pill
+      const isBossCard = isBossBattleMode && slotProp === 'p1Index';
+      const p1BossCfg = isBossCard ? getBossConfig(def) : null;
+      const p1BossTitle = isBossCard ? (p1BossCfg?.bossTitle || def?.bossTitle || '').toUpperCase() : '';
+      const pillText = (isBossCard && p1BossTitle && p1BossTitle !== 'BOSS')
+        ? `BOSS // ${p1BossTitle}`
+        : `CLASS // ${def.type.toUpperCase()}`;
+
+      ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
+      const measuredPillW = Math.max(90, ctx.measureText(pillText).width + 16);
+      const pillW = Math.min(subLeftW - 12, measuredPillW);
+      const pillH = 16;
+      ctx.fillStyle = '#b81c3b';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.4;
+      drawChamferedRect(ctx, avatarX - pillW / 2, y + 136, pillW, pillH, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(pillText, avatarX, y + 144.5);
+
+      // Stat Telemetry Block
+      const statBoxY = y + 160;
+      drawStatBar(ctx, 'HP', def.hp, 150, subLeftX, statBoxY, subLeftW, '#cc2b4d');
+      drawStatBar(ctx, 'DMG', def.damage, 60, subLeftX, statBoxY + 16, subLeftW, '#f59e0b');
+      drawStatBar(ctx, 'SPD', def.speed || 2, 4, subLeftX, statBoxY + 32, subLeftW, '#7c2d37');
+
+      // Change Fighter Button
+      const btnW = subLeftW;
+      const btnH = 32;
+      const btnY = y + h - btnH - 12;
+
+      drawButton('CHANGE (ROSTER)', avatarX, btnY + btnH / 2, () => {
+        openFighterSelectModal(slotProp, fighterIndex);
+      }, btnW, btnH, null, 3);
+
+      // Right Side: Ability Box + Live Weapon Box
+      const abY = y + 32;
+      const abH = 80;
+      ctx.save();
+      ctx.fillStyle = '#fff5f7';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.5;
+      drawChamferedRect(ctx, subRightX, abY, subRightW, abH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#b81c3b';
+      ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, subRightW - 12), subRightX + 6, abY + 6);
+
+      ctx.fillStyle = '#21050c';
+      ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+      wrapText(ctx, def.desc, subRightX + 6, abY + 18, subRightW - 12, 12, 4);
+
+      // Live Weapon Visual Box
+      const wpY = abY + abH + 6;
+      const wpH = h - (wpY - y) - 12;
+      ctx.save();
+      ctx.fillStyle = '#fff5f7';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.5;
+      drawChamferedRect(ctx, subRightX, wpY, subRightW, wpH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#b81c3b';
+      ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, subRightW - 12), subRightX + 6, wpY + 6);
+
+      ctx.fillStyle = '#8b1524';
+      ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
+      ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, subRightW - 12), subRightX + 6, wpY + 19);
+
+      const wStageX = subRightX + subRightW / 2;
+      const wStageY = wpY + 86;
+
+      ctx.save();
+      ctx.fillStyle = '#eed8dc';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.ellipse(wStageX, wStageY + 20, 44, 9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.translate(wStageX, wStageY);
+      ctx.scale(1.0, 1.0);
+      drawWeaponPreview(ctx, def.type, def.color);
+      ctx.restore();
+
+      ctx.fillStyle = '#21050c';
+      ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      wrapText(ctx, weaponInfo.desc, wStageX, wpY + 172, subRightW - 12, 12, 4);
+
+    } else {
+      // ── TALL SHOWCASE CARD (1v1 / Stand-Off Solo / TLFS: H = 680 in Portrait) ──
+      const avatarX = x + w / 2;
+      const avatarY = y + 84;
+      const avatarSize = 80;
+
+      // Quick cycle arrows on large card avatar sides
+      drawButton('◄', x + 24, avatarY, () => cycleFighter(-1), 26, 26, null, 3);
+      drawButton('►', x + w - 24, avatarY, () => cycleFighter(1), 26, 26, null, 3);
+
+      // Warm stage pedestal ring
+      ctx.save();
+      ctx.fillStyle = '#eed8dc';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(avatarX, avatarY + 38, avatarSize * 0.44, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      if (previewImage) {
+        ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+      }
+
+      // Fighter Name
+      ctx.fillStyle = '#21050c';
+      ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.name.toUpperCase(), avatarX, y + 144);
+
+      // Class / Boss Tag Pill
+      const isBossCard = isBossBattleMode && slotProp === 'p1Index';
+      const p1BossCfg = isBossCard ? getBossConfig(def) : null;
+      const p1BossTitle = isBossCard ? (p1BossCfg?.bossTitle || def?.bossTitle || '').toUpperCase() : '';
+      const pillText = (isBossCard && p1BossTitle && p1BossTitle !== 'BOSS')
+        ? `BOSS // ${p1BossTitle}`
+        : `CLASS // ${def.type.toUpperCase()}`;
+
+      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+      const measuredPillW = Math.max(96, ctx.measureText(pillText).width + 18);
+      const pillW = Math.min(w - 24, measuredPillW);
+      const pillH = 16;
+      ctx.fillStyle = '#b81c3b';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.4;
+      drawChamferedRect(ctx, avatarX - pillW / 2, y + 156, pillW, pillH, 3);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(pillText, avatarX, y + 164.5);
+
+      // Stat Telemetry Block
+      const statBoxX = x + 10;
+      const statBoxY = y + 180;
+      const statBoxW = w - 20;
+
+      drawStatBar(ctx, 'HP', def.hp, 150, statBoxX, statBoxY, statBoxW, '#cc2b4d');
+      drawStatBar(ctx, 'DMG', def.damage, 60, statBoxX, statBoxY + 16, statBoxW, '#f59e0b');
+      drawStatBar(ctx, 'SPD', def.speed || 2, 4, statBoxX, statBoxY + 32, statBoxW, '#7c2d37');
+
+      // ── Ability Dossier Sub-Panel (Warm Cream Sub-box) ──
+      const abilityY = y + 224;
+      const abilityH = 88;
+      
+      ctx.save();
+      ctx.fillStyle = '#fff5f7';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.6;
+      drawChamferedRect(ctx, statBoxX, abilityY, statBoxW, abilityH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = '#b81c3b';
+      ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, statBoxW - 16), statBoxX + 8, abilityY + 7);
+
+      ctx.fillStyle = '#21050c';
+      ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+      wrapText(ctx, def.desc, statBoxX + 8, abilityY + 20, statBoxW - 16, 13, 5);
+
+      // ── Live Weapon Graphic Visual Stage Sub-Panel (Warm Cream Sub-box) ──
+      const weaponY = abilityY + abilityH + 8;
+      const weaponH = 296;
+
+      ctx.save();
+      ctx.fillStyle = '#fff5f7';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.6;
+      drawChamferedRect(ctx, statBoxX, weaponY, statBoxW, weaponH, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Weapon Header & Category
+      ctx.fillStyle = '#b81c3b';
+      ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, statBoxW - 16), statBoxX + 8, weaponY + 7);
+
+      ctx.fillStyle = '#8b1524';
+      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+      ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, statBoxW - 16), statBoxX + 8, weaponY + 20);
+
+      // Live Weapon Center Stage
+      const wStageX = statBoxX + statBoxW / 2;
+      const wStageY = weaponY + 114;
+
+      // Stage pedestal ring
+      ctx.save();
+      ctx.fillStyle = '#eed8dc';
+      ctx.strokeStyle = '#21050c';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(wStageX, wStageY + 28, 54, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Render LIVE WEAPON GRAPHIC
+      ctx.translate(wStageX, wStageY);
+      ctx.scale(1.15, 1.15);
+      drawWeaponPreview(ctx, def.type, def.color);
+      ctx.restore();
+
+      // Weapon Description Telemetry
+      ctx.fillStyle = '#21050c';
+      ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 222, statBoxW - 16, 13, 4);
+
+      // Change Fighter Button
+      const btnW = w - 24;
+      const btnH = 36;
+      const btnY = y + h - btnH - 12;
+
+      drawButton('CHANGE FIGHTER (ROSTER)', x + w / 2, btnY + btnH / 2, () => {
+        openFighterSelectModal(slotProp, fighterIndex);
+      }, btnW, btnH, null, 4);
     }
-
-    // Fighter Name
-    ctx.fillStyle = '#21050c';
-    ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(def.name.toUpperCase(), avatarX, y + 144);
-
-    // Class / Boss Tag Pill
-    const isBossCard = isBossBattleMode && slotProp === 'p1Index';
-    const p1BossCfg = isBossCard ? getBossConfig(def) : null;
-    const p1BossTitle = isBossCard ? (p1BossCfg?.bossTitle || def?.bossTitle || '').toUpperCase() : '';
-    const pillText = (isBossCard && p1BossTitle && p1BossTitle !== 'BOSS')
-      ? `BOSS // ${p1BossTitle}`
-      : `CLASS // ${def.type.toUpperCase()}`;
-
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    const measuredPillW = Math.max(96, ctx.measureText(pillText).width + 18);
-    const pillW = Math.min(w - 24, measuredPillW);
-    const pillH = 16;
-    ctx.fillStyle = '#b81c3b';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.4;
-    drawChamferedRect(ctx, avatarX - pillW / 2, y + 156, pillW, pillH, 3);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(pillText, avatarX, y + 164.5);
-
-    // Stat Telemetry Block
-    const statBoxX = x + 10;
-    const statBoxY = y + 180;
-    const statBoxW = w - 20;
-
-    drawStatBar(ctx, 'HP', def.hp, 150, statBoxX, statBoxY, statBoxW, '#cc2b4d');
-    drawStatBar(ctx, 'DMG', def.damage, 60, statBoxX, statBoxY + 16, statBoxW, '#f59e0b');
-    drawStatBar(ctx, 'SPD', def.speed || 2, 4, statBoxX, statBoxY + 32, statBoxW, '#7c2d37');
-
-    // ── Ability Dossier Sub-Panel (Warm Cream Sub-box) ──
-    const abilityY = y + 224;
-    const abilityH = 88;
-    
-    ctx.save();
-    ctx.fillStyle = '#fff5f7';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.6;
-    drawChamferedRect(ctx, statBoxX, abilityY, statBoxW, abilityH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.fillStyle = '#b81c3b';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, statBoxW - 16), statBoxX + 8, abilityY + 7);
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    wrapText(ctx, def.desc, statBoxX + 8, abilityY + 20, statBoxW - 16, 13, 5);
-
-    // ── Live Weapon Graphic Visual Stage Sub-Panel (Warm Cream Sub-box) ──
-    const weaponY = abilityY + abilityH + 8;
-    const weaponH = 296;
-
-    ctx.save();
-    ctx.fillStyle = '#fff5f7';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.6;
-    drawChamferedRect(ctx, statBoxX, weaponY, statBoxW, weaponH, 5);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    // Weapon Header & Category
-    ctx.fillStyle = '#b81c3b';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, statBoxW - 16), statBoxX + 8, weaponY + 7);
-
-    ctx.fillStyle = '#8b1524';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, statBoxW - 16), statBoxX + 8, weaponY + 20);
-
-    // Live Weapon Center Stage
-    const wStageX = statBoxX + statBoxW / 2;
-    const wStageY = weaponY + 114;
-
-    // Stage pedestal ring
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(wStageX, wStageY + 28, 54, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Render LIVE WEAPON GRAPHIC
-    ctx.translate(wStageX, wStageY);
-    ctx.scale(1.15, 1.15);
-    drawWeaponPreview(ctx, def.type, def.color);
-    ctx.restore();
-
-    // Weapon Description Telemetry
-    ctx.fillStyle = '#21050c';
-    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 222, statBoxW - 16, 13, 4);
-
-    // Change Fighter Button
-    const btnW = w - 24;
-    const btnH = 36;
-    const btnY = y + h - btnH - 12;
-
-    drawButton('CHANGE FIGHTER (ROSTER)', x + w / 2, btnY + btnH / 2, () => {
-      openFighterSelectModal(slotProp, fighterIndex);
-    }, btnW, btnH, null, 4);
 
   } else if (h < 260) {
     // ── COMPACT STACKED CARD (Tag Match 3-Stack: H ~ 218px) ──
@@ -1804,18 +2082,26 @@ function openFighterSelectModal(slotProp, fighterIndex) {
   } else {
     modalPage = 0;
   }
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash1', 0.2);
+  }
 }
 
-// Global Keyboard Shortcuts for Tactical Select Screen
+function isFighterSelectModalOpen() {
+  return selectingSlot !== null;
+}
+
+function closeFighterSelectModal() {
+  selectingSlot = null;
+}
+
+function getSelectingSlot() {
+  return selectingSlot;
+}
+
+// Global Keyboard Shortcuts for Select Screen
 window.addEventListener('keydown', (e) => {
-  if (state.gameState === 'select') {
-    if (isTacticalMapModalOpen) {
-      if (e.key === 'Escape' || e.key === 'Enter') {
-        isTacticalMapModalOpen = false;
-        e.preventDefault();
-        return;
-      }
-    }
+  if (state.gameState === 'select' || state.gameState === 'horizontal_select') {
     if (isArenaBgmModalOpen()) {
       if (e.key === 'Escape' || e.key === 'Enter') {
         closeArenaBgmModal();
@@ -1835,12 +2121,7 @@ window.addEventListener('keydown', (e) => {
         selectingSlot = null;
         e.preventDefault();
       } else if (e.key === 'Enter' || e.code === 'Space') {
-        if (selectingSlot) {
-          state[selectingSlot] = modalInspectIndex;
-          saveFighterSelections();
-          preloadFighterAssets(modalInspectIndex);
-        }
-        selectingSlot = null;
+        applyFighterSelection();
         e.preventDefault();
       } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
         e.preventDefault();
@@ -1873,7 +2154,9 @@ window.addEventListener('keydown', (e) => {
       startFaceOffScreen(true);
     } else if (e.code === 'KeyR') {
       e.preventDefault();
-      if (state.mode === '1v1' || state.mode === 'Stand Off') {
+      if (state.gameState === 'horizontal_select') {
+        import('./HorizontalTeamSelectScreen.js').then(m => m.randomizeHorizontalRoster && m.randomizeHorizontalRoster()).catch(() => {});
+      } else if (state.mode === '1v1' || state.mode === 'Stand Off') {
         randomize1v1Fighters();
       } else if (state.mode === '1v2 Stand Off') {
         randomize1v2Fighters();
@@ -1881,6 +2164,7 @@ window.addEventListener('keydown', (e) => {
         randomizeFfaFighters();
       } else if (state.mode === 'TLFS') {
         state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
+        saveFighterSelections();
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -1891,10 +2175,10 @@ window.addEventListener('keydown', (e) => {
 
 // Event listeners for character select screen & modal scrolling
 window.addEventListener('wheel', (e) => {
-  if (state.gameState !== 'select') return;
+  if (state.gameState !== 'select' && state.gameState !== 'horizontal_select') return;
 
-  // Block card wheel cycling when Arena BGM, Arena Floor, or Tactical Map modal is active
-  if (isArenaBgmModalOpen() || isArenaFloorModalOpen() || isTacticalMapModalOpen) {
+  // Block card wheel cycling when Arena BGM or Arena Floor modal is active
+  if (isArenaBgmModalOpen() || isArenaFloorModalOpen()) {
     return;
   }
 
@@ -1907,8 +2191,9 @@ window.addEventListener('wheel', (e) => {
 
   if (selectingSlot !== null) {
     // Modal scroll: flip to next / previous page on scroll!
-    const modalW = Math.min(state.canvas.width - 20, 510);
-    const modalH = Math.min(state.canvas.height - 40, 600);
+    const isLandscape = (state.canvas && state.canvas.width > 600) || state.viewOrientation === 'horizontal';
+    const modalW = isLandscape ? Math.min(state.canvas.width - 40, 900) : Math.min(state.canvas.width - 20, 510);
+    const modalH = isLandscape ? Math.min(state.canvas.height - 30, 490) : Math.min(state.canvas.height - 40, 600);
     const mx = (state.canvas.width - modalW) / 2;
     const my = (state.canvas.height - modalH) / 2;
 
@@ -1919,7 +2204,8 @@ window.addEventListener('wheel', (e) => {
       if (now - _lastModalWheelTime > 140) {
         const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
           .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / 15));
+        const itemsPerPage = isLandscape ? 15 : 15;
+        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
         
         if (e.deltaY > 0) {
           if (modalPage < totalPages - 1) {
@@ -1973,4 +2259,4 @@ window.addEventListener('wheel', (e) => {
   }
 }, { passive: false });
 
-export { drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, selectingSlot, modalInspectIndex, modalPage };
+export { drawPlayerCard, drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, randomize1v1Fighters, selectingSlot, modalInspectIndex, modalPage, openFighterSelectModal, isFighterSelectModalOpen, closeFighterSelectModal, getSelectingSlot };

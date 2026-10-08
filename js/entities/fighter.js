@@ -20,7 +20,7 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
-import { state, isGlobalHitPauseActive, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay, pushKillFeed } from '../core/state.js';
+import { state, isGlobalHitPauseActive, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay } from '../core/state.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahitoSoulExplosion, spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
@@ -2603,13 +2603,7 @@ export class Fighter {
           state.matchKills[realIdx].push(victimDef);
         }
 
-        // Push to Counter-Strike Style Kill Feed (Tactical mode only)
-        const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
-        if (isTactical) {
-          const weapon = realAttacker.characterId || realAttacker._def?.name || realAttacker.name || 'FIREARM';
-          const isHeadshot = Boolean(this._lastHitWasHeadshot || realAttacker.lastShotWasHeadshot);
-          pushKillFeed(realAttacker, this, weapon, isHeadshot);
-        }
+
       }
     };
 
@@ -2881,7 +2875,7 @@ export class Fighter {
       const survivor = state.fighters.find(f => f && _isEffectivelyAlive(f));
       const winnerFighter = survivor || ((realAttacker && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
       
-      const isMultiRound1v1 = (state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1');
+      const isMultiRound1v1 = (state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1' || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
 
       if (!winnerFighter) {
         if (!isMultiRound1v1) {
@@ -2930,7 +2924,7 @@ export class Fighter {
       }
 
       if (isMatchEnd && winnerFighter) {
-        if (state.mode === GAME_MODES.ONE_VS_ONE && winnerFighter) {
+        if ((state.mode === GAME_MODES.ONE_VS_ONE || state.mode === '1v1' || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel') && winnerFighter) {
           const winnerFighterIndex = typeof winnerFighter.fighterIndex === 'number' ? winnerFighter.fighterIndex : winnerIndex;
           const loserIndex = winnerFighterIndex === 0 ? 1 : 0;
           const loserFighterIndex = typeof state.fighters[loserIndex]?.fighterIndex === 'number'

@@ -4,7 +4,7 @@ import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
   drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawSkinStudioScreen, drawFaceOffThumbnailScreen, drawHUD, 
-  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay, drawKillFeed
+  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay
 } from '../graphics/ui.js';
 import {
   drawArena, drawArenaMatchNames, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
@@ -28,6 +28,8 @@ import { drawLightningEffects } from '../graphics/particles/lightningEffects.js'
 import { drawGetsugaImpactEffects, updateGetsugaImpactEffects } from '../graphics/particles/getsugaImpactEffect.js';
 import { drawTojiImpactEffects, updateTojiImpactEffects } from '../graphics/particles/tojiImpactEffect.js';
 import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaDomainVisuals.js';
+import { drawHorizontalTeamSelectScreen } from '../graphics/ui/HorizontalTeamSelectScreen.js';
+import { drawHorizontalPanoramicHud } from '../graphics/ui/horizontalHudManager.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
@@ -36,6 +38,7 @@ import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserke
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
 import { getAudioLatencyMs } from './soundSystem.js';
+import { syncPixiCanvasTextureSize } from '../core/viewportManager.js';
 import { BossAuraRenderer, BossPhaseTransitionVfx, BossEntranceSequence, YutaBushEntrance, EyeOfCthulhuEntrance } from '../bosses/index.js';
 import { drawFocMap, getActiveFocMap } from '../../FOC Maps/index.js';
 // Cached DOM elements to adhere strictly to Rule 13 (UI & DOM Query Caching Requirement)
@@ -177,6 +180,8 @@ export function renderGame() {
       drawWeaponStudioScreen();
     } else if (state.gameState === 'skinStudio') {
       drawSkinStudioScreen();
+    } else if (state.gameState === 'horizontal_select') {
+      drawHorizontalTeamSelectScreen(state.ctx);
     } else if (state.gameState === 'faceoff') {
       // Hide gameplay WebGL layers and DOM HUD elements so they never linger on the showoff screen
       if (state.floatingTextSprite) state.floatingTextSprite.visible = false;
@@ -522,8 +527,26 @@ export function renderGame() {
         state.topLevelUiCtx.setTransform(1, 0, 0, 1, 0, 0);
       }
 
-      if (state.gameState === 'playing' || state.gameState === 'countdown') {
-        drawHUD();
+      if (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
+        const isHorizontal = (state.viewOrientation === 'horizontal');
+        const isGrandBattle = isHorizontal && (Boolean(state.arena && state.arena.width > 600) || Boolean(
+          state.mode === '3v3v3v3' ||
+          state.mode === '4v4' ||
+          state.mode === '2v2v2v2' ||
+          state.mode === 'Battle Royale 8' ||
+          state.mode === '8-Fighter Battle Royale' ||
+          state.mode === '3v3v3v3 Teamfight' ||
+          state.mode === '4v4 Grand War' ||
+          state.mode === '2v2v2v2 Quad Battle' ||
+          state.mode === '2v2v2v2 Quad' ||
+          state.mode === 'Grand Colosseum' ||
+          state.mode === 'Classic Minimalist Arena'
+        ));
+        if (isGrandBattle) {
+          drawHorizontalPanoramicHud(state.topLevelUiCtx || state.ctx);
+        } else if (state.gameState === 'playing' || state.gameState === 'countdown') {
+          drawHUD();
+        }
       }
 
       // ── Super-Beam Absolute Top Layer (Rendered ON TOP of World Entities & In-Game HUD, behind Match-End Overlays) ──
@@ -585,8 +608,7 @@ export function renderGame() {
       drawMissionPassedOverlay(state.topLevelUiCtx || state.ctx);
       drawWastedOverlay(state.topLevelUiCtx || state.ctx);
 
-      // Render Counter-Strike style kill feed in top-right arena corner
-      drawKillFeed(state.topLevelUiCtx || state.ctx);
+
 
       // Render Camera Mode Toggle Notification Banner
       drawCameraToast(state.topLevelUiCtx || state.ctx);
@@ -603,12 +625,14 @@ export function renderGame() {
     // PIXIJS SYNC: Tell the GPU that the offscreen 2D canvas and floating text canvas have updated this frame.
     // This allows the 2D canvas (fighters, UI) and floating texts to be rendered inside the WebGL scene graph.
     if (state.legacyCanvasSprite && state.legacyCanvasSprite.texture) {
+      syncPixiCanvasTextureSize(state.legacyCanvasSprite, state.canvas);
       state.legacyCanvasSprite.texture.update();
     }
     if (state.floatingTextSprite && state.floatingTextSprite.texture) {
       const hasFloatingTexts = Boolean(state.floatingTexts && state.floatingTexts.length > 0);
       state.floatingTextSprite.visible = hasFloatingTexts;
       if (hasFloatingTexts) {
+        syncPixiCanvasTextureSize(state.floatingTextSprite, state.floatingTextCanvas);
         state.floatingTextSprite.texture.update();
       }
     }
@@ -636,6 +660,7 @@ export function renderGame() {
         );
         state.topLevelUiSprite.visible = hasTopUi;
         if (hasTopUi) {
+          syncPixiCanvasTextureSize(state.topLevelUiSprite, state.topLevelUiCanvas);
           state.topLevelUiSprite.texture.update();
         }
       }

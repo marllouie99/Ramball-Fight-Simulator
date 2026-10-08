@@ -19,6 +19,73 @@ function getAllJsFiles(dir) {
   return results;
 }
 
+// Mock minimal browser globals for Node.js module import execution
+if (typeof globalThis.window === 'undefined') globalThis.window = globalThis;
+if (typeof globalThis.addEventListener === 'undefined') globalThis.addEventListener = () => {};
+if (typeof globalThis.removeEventListener === 'undefined') globalThis.removeEventListener = () => {};
+if (typeof globalThis.dispatchEvent === 'undefined') globalThis.dispatchEvent = () => {};
+if (typeof globalThis.matchMedia === 'undefined') globalThis.matchMedia = () => ({ addEventListener: () => {}, removeEventListener: () => {}, matches: false });
+if (typeof globalThis.devicePixelRatio === 'undefined') globalThis.devicePixelRatio = 1;
+
+const createMockCanvas = () => ({
+  width: 540,
+  height: 960,
+  style: {},
+  getContext: () => ({
+    save: () => {}, restore: () => {}, beginPath: () => {}, closePath: () => {},
+    moveTo: () => {}, lineTo: () => {}, arc: () => {}, fill: () => {}, stroke: () => {},
+    fillRect: () => {}, strokeRect: () => {}, clearRect: () => {}, drawImage: () => {},
+    scale: () => {}, rotate: () => {}, translate: () => {}, createLinearGradient: () => ({ addColorStop: () => {} }),
+    createRadialGradient: () => ({ addColorStop: () => {} }), measureText: () => ({ width: 50 }),
+    fillText: () => {}, strokeText: () => {}
+  }),
+  appendChild: () => {},
+  classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+  addEventListener: () => {},
+  removeEventListener: () => {}
+});
+
+if (typeof globalThis.document === 'undefined') {
+  const _mockElements = new Map();
+  globalThis.document = {
+    createElement: (tag) => {
+      if (tag === 'canvas') return createMockCanvas();
+      return {
+        id: '',
+        tagName: (tag || 'DIV').toUpperCase(),
+        style: {},
+        classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+        textContent: '',
+        innerHTML: '',
+        appendChild: (child) => child,
+        removeChild: (child) => child,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        getContext: () => ({})
+      };
+    },
+    getElementById: (id) => {
+      if (id === 'arena' || id === 'topLevelUiCanvas' || id === 'floatingTextCanvas') {
+        if (!_mockElements.has(id)) _mockElements.set(id, createMockCanvas());
+        return _mockElements.get(id);
+      }
+      if (!_mockElements.has(id)) {
+        const el = globalThis.document.createElement('div');
+        el.id = id;
+        _mockElements.set(id, el);
+      }
+      return _mockElements.get(id);
+    },
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+}
+if (typeof globalThis.localStorage === 'undefined') {
+  globalThis.localStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+}
+
 console.log('🔍 [Codebase Integrity Scanner] Scanning all JavaScript files for syntax, brace balance, and duplicate declarations...');
 
 const files = getAllJsFiles('js');
@@ -237,6 +304,47 @@ async function verifyAll() {
 
   if (invalidAudioCount === 0) {
     console.log(`✅ Verified audio volume definitions across ${configFiles.length} character configs!`);
+  }
+
+  // 2.7 YouTube Shorts Thumbnail & Vertical Arena Alignment Validator (Rule 28)
+  console.log('🔍 [Rule 28 Validator] Checking YouTube Shorts vertical arena alignment...');
+  let rule28Errors = 0;
+  try {
+    const { CONFIG } = await import('../js/core/config.js');
+    const { VIEWPORT_CONFIGS, VIEWPORT_MODES } = await import('../js/core/viewportManager.js');
+
+    const expectedVerticalArena = { x: 45, y: 240, width: 450, height: 450 };
+
+    if (
+      CONFIG.arena.x !== expectedVerticalArena.x ||
+      CONFIG.arena.y !== expectedVerticalArena.y ||
+      CONFIG.arena.width !== expectedVerticalArena.width ||
+      CONFIG.arena.height !== expectedVerticalArena.height
+    ) {
+      console.error(`❌ [RULE 28 VIOLATION]: CONFIG.arena is { x: ${CONFIG.arena.x}, y: ${CONFIG.arena.y}, width: ${CONFIG.arena.width}, height: ${CONFIG.arena.height} }. Expected strictly { x: 45, y: 240, width: 450, height: 450 } to maintain YouTube Shorts thumbnail alignment.`);
+      hasErrors = true;
+      rule28Errors++;
+    }
+
+    const vCfg = VIEWPORT_CONFIGS?.[VIEWPORT_MODES.VERTICAL]?.arena;
+    if (
+      !vCfg ||
+      vCfg.x !== expectedVerticalArena.x ||
+      vCfg.y !== expectedVerticalArena.y ||
+      vCfg.width !== expectedVerticalArena.width ||
+      vCfg.height !== expectedVerticalArena.height
+    ) {
+      console.error(`❌ [RULE 28 VIOLATION]: VIEWPORT_CONFIGS[VERTICAL].arena is { x: ${vCfg?.x}, y: ${vCfg?.y}, width: ${vCfg?.width}, height: ${vCfg?.height} }. Expected strictly { x: 45, y: 240, width: 450, height: 450 } to maintain YouTube Shorts thumbnail alignment.`);
+      hasErrors = true;
+      rule28Errors++;
+    }
+
+    if (rule28Errors === 0) {
+      console.log('✅ Verified Rule 28: Vertical arena geometry strictly locked to { x: 45, y: 240, width: 450, height: 450 } for YouTube Shorts thumbnail consistency!');
+    }
+  } catch (err) {
+    console.error('❌ [RULE 28 VALIDATION ERROR]:', err.message);
+    hasErrors = true;
   }
 
   console.log('───────────────────────────────────────────────────────');

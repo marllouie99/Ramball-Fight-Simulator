@@ -218,6 +218,59 @@ ipcMain.handle('save-skin-database', async (event, { codeContent }) => {
   }
 });
 
+// Dynamic Desktop Window Resizing IPC Handlers (Vertical 9:16 <-> Horizontal 16:9)
+let currentWindowOrientation = 'vertical';
+ipcMain.handle('set-window-orientation', async (event, orientation) => {
+  currentWindowOrientation = (orientation === 'horizontal') ? 'horizontal' : 'vertical';
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow() || (BrowserWindow.getAllWindows().length > 0 ? BrowserWindow.getAllWindows()[0] : null);
+    if (!win) return false;
+    if (win.isFullScreen()) return true;
+
+    win.setResizable(true);
+    if (orientation === 'horizontal') {
+      win.setContentSize(960, 540);
+    } else {
+      win.setContentSize(540, 960);
+    }
+    win.center();
+    win.setResizable(false);
+    return true;
+  } catch (err) {
+    console.error('Error in set-window-orientation IPC:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('set-window-size', async (event, { width, height, center = true }) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow() || (BrowserWindow.getAllWindows().length > 0 ? BrowserWindow.getAllWindows()[0] : null);
+    if (!win) return false;
+    if (win.isFullScreen()) return true;
+
+    win.setResizable(true);
+    win.setContentSize(width, height);
+    if (center) win.center();
+    win.setResizable(false);
+    return true;
+  } catch (err) {
+    console.error('Error in set-window-size IPC:', err);
+    return false;
+  }
+});
+
+ipcMain.handle('drag-window', async (event, { deltaX, deltaY }) => {
+  try {
+    const win = BrowserWindow.fromWebContents(event.sender) || BrowserWindow.getFocusedWindow() || (BrowserWindow.getAllWindows().length > 0 ? BrowserWindow.getAllWindows()[0] : null);
+    if (!win || win.isFullScreen()) return false;
+    const [x, y] = win.getPosition();
+    win.setPosition(Math.round(x + (deltaX || 0)), Math.round(y + (deltaY || 0)));
+    return true;
+  } catch (err) {
+    return false;
+  }
+});
+
 // Configure dedicated UserData directory in AppData to isolate from temporary/multi-user directories and bypass OneDrive locking
 const appDataRoot = app.getPath('appData') || os.tmpdir();
 const safeUserDataPath = path.join(appDataRoot, 'circle-mini-battle-userdata');
@@ -289,18 +342,28 @@ function createWindow () {
         }
       }
 
-      // F10: Toggle exactly 1920x1080 windowed size (centered)
+      // F10: Toggle 1X <-> 2X windowed size (centered)
       if (input.key === 'F10') {
         event.preventDefault();
         if (win.isFullScreen()) {
           win.setFullScreen(false);
         }
-        const [width, height] = win.getSize();
+        const [width, height] = win.getContentSize();
         win.setResizable(true);
-        if (Math.abs(width - 1920) < 5 && Math.abs(height - 1080) < 5) {
-          win.setSize(540, 960);
+        const isHorizontal = currentWindowOrientation === 'horizontal';
+        if (isHorizontal) {
+          if (Math.abs(width - 1920) < 10 && Math.abs(height - 1080) < 10) {
+            win.setContentSize(960, 540);
+          } else {
+            win.setContentSize(1920, 1080);
+          }
         } else {
-          win.setSize(1920, 1080);
+          // Vertical: original behavior (1920x1080 letterboxed <-> native 540x960)
+          if (Math.abs(width - 1920) < 10 && Math.abs(height - 1080) < 10) {
+            win.setContentSize(540, 960);
+          } else {
+            win.setContentSize(1920, 1080);
+          }
         }
         win.center();
         win.setResizable(false);

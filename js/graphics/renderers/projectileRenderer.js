@@ -21,8 +21,6 @@ import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjUziBullet, drawCjMinigunBullet } from '../weapons/cjWeaponGraphics.js';
 import { drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet } from '../weapons/crazyDaveWeaponGraphics.js';
-import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeaponGraphics.js';
-import { tacticalProjectileSystem } from '../../../Tactical Force/systems/tacticalProjectileSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawPixelFlameProjectile } from '../weapons/flamewardenWeaponGraphics.js';
 import { drawServantOfCthulhuProjectile } from '../fighters/eyeOfCthulhuSkin.js';
@@ -32,11 +30,6 @@ export function drawProjectiles() {
   const ctx = state.ctx;
   const projectiles = getProjectiles();
   const now = getNow(); // Cache time once for all projectiles
-
-  // Dedicated Tactical Force Projectiles
-  if (typeof tacticalProjectileSystem !== 'undefined' && tacticalProjectileSystem.projectiles && tacticalProjectileSystem.projectiles.length > 0) {
-    tacticalProjectileSystem.draw(ctx);
-  }
 
   // View culling - define canvas bounds with generous padding so projectiles never clip out on screen
   const canvasW = (state.canvas && state.canvas.width) ? state.canvas.width : 540;
@@ -585,12 +578,6 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     // Crazy Dave / Torchwood ignited fire pea projectile
     if (p.visual === 'firePeaBullet') {
       drawFirePeaBullet(ctx, p);
-      return;
-    }
-
-    // Unified Tactical Force Bullet Projectile (Dynamic Character Theme Colored)
-    if (p.visual === 'tacticalBullet') {
-      drawTacticalBullet(ctx, p);
       return;
     }
 

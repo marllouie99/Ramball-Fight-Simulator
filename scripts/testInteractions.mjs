@@ -1329,8 +1329,8 @@ async function runInteractionTests() {
     state.mode = 'Stand Off';
     assert(isTodoTakadaSongEnabled() === true, 'isTodoTakadaSongEnabled() must return true in Stand Off mode');
 
-    // Subtest C: Team Match Modes ('2v2', 'Tactical 4v4', 'Tag Match') - Song must NOT play
-    const teamModes = ['2v2', 'Tactical 4v4', 'Tag Match', '1v2 Stand Off', 'FFA'];
+    // Subtest C: Team Match Modes ('2v2', 'Tag Match') - Song must NOT play
+    const teamModes = ['2v2', 'Tag Match', '1v2 Stand Off', 'FFA'];
     for (const tMode of teamModes) {
       state.mode = tMode;
       assert(isTodoTakadaSongEnabled() === false, `isTodoTakadaSongEnabled() must return false in ${tMode}`);
@@ -5052,6 +5052,30 @@ async function runInteractionTests() {
     state.fighters = [];
 
     console.log('      ✅ Mahoraga Hollow Purple adaptation: 50% damage reduction and continuous gravitational pull verified successfully.');
+  }
+
+  // ── TEST 57: Canonical YouTube Shorts Vertical Arena Geometry & Viewport Isolation (Rule 28) ──
+  console.log('   57. Testing Canonical YouTube Shorts Vertical Arena Geometry & Viewport Isolation (Rule 28)...');
+  {
+    const { CONFIG } = await import('../js/core/config.js');
+    const { VIEWPORT_CONFIGS, VIEWPORT_MODES } = await import('../js/core/viewportManager.js');
+
+    // Verify canonical vertical arena dimensions
+    assert(CONFIG.arena.x === 45, `CONFIG.arena.x must strictly be 45 (got ${CONFIG.arena.x})`);
+    assert(CONFIG.arena.y === 240, `CONFIG.arena.y must strictly be 240 (got ${CONFIG.arena.y})`);
+    assert(CONFIG.arena.width === 450, `CONFIG.arena.width must strictly be 450 (got ${CONFIG.arena.width})`);
+    assert(CONFIG.arena.height === 450, `CONFIG.arena.height must strictly be 450 (got ${CONFIG.arena.height})`);
+
+    // Verify viewport configs isolation
+    const vertArena = VIEWPORT_CONFIGS[VIEWPORT_MODES.VERTICAL].arena;
+    assert(vertArena.x === 45 && vertArena.y === 240 && vertArena.width === 450 && vertArena.height === 450, 'Vertical viewport config must strictly match { x: 45, y: 240, width: 450, height: 450 }');
+
+    const horizArena = VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].arena;
+    const grandArena = VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].grandArena;
+    assert(horizArena.width === 400 && horizArena.height === 400, 'Horizontal viewport config arena must be 400x400 for 1v1 mode with side HUD clearance');
+    assert(grandArena.width === 1400 && grandArena.height === 1400, 'Horizontal viewport config grandArena must preserve 1400x1400 widescreen square arena');
+
+    console.log('      ✅ Canonical YouTube Shorts vertical arena geometry (450x450 at y: 240) and horizontal viewport isolation verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

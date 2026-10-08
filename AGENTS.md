@@ -118,6 +118,35 @@ When implementing, tuning, or maintaining lifesteal, blood siphon, or continuous
   3. **In-Game Overhead Healthbar & Number**: Rendered automatically above/below the fighter via `this.drawHealth(ctx)`.
 - **Distinction from Ultimate Full-Heals**: One-off major ultimate activations or dramatic revival transformations (e.g. `FULL REGENERATION!`) may show singular floating text, but continuous combat lifesteal procs MUST NEVER spawn floating text in the arena.
 
+## Mandatory YouTube Shorts Thumbnail & Vertical Arena Layout Standard (Rule 28)
+
+The vertical gameplay mode is used directly for YouTube Shorts channel thumbnails and video captures. Agents **MUST ALWAYS PRESERVE THE CANONICAL VERTICAL ARENA DIMENSIONS**:
+- **Canonical Vertical Arena Geometry**: Strictly locked to `{ x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' }` on the `540 × 960` portrait canvas.
+- **Strict Prohibition of Ad-Hoc Vertical Arena Scaling**: NEVER change vertical arena dimensions (`450×450`), horizontal centering (`x: 45`), or vertical position (`y: 240`) without explicit user instruction. This guarantees that all in-game YouTube Shorts thumbnails maintain 100% pixel-aligned consistency across the channel feed:
+  1. **Top Match Title Banner (`#hudTopContainer`)**: Fixed header baseline with `240px` clearance above the arena.
+  2. **Arena Bounding Box**: Uniform `450 × 450` square frame with `45px` side margins.
+  3. **Bottom Skill & Status Card HUDs (`#hudBottomContainer`)**: Anchored directly below the arena floor (`y: 690 = 240 + 450`), preserving identical breathing room.
+- **Viewport Isolation**: All horizontal widescreen expansions (e.g. 1400×1400 arena, wide spawns, camera zoom) MUST be isolated under `state.viewOrientation === 'horizontal'` and must never leak into vertical mode.
+
+## Mandatory Horizontal Mode Side Doll & Sprite Sheet Ground-Anchor Standard (Rule 29)
+
+When implementing, rendering, or scaffolding side character dolls or animated standing sprites in Horizontal Mode:
+- **Placement & Symmetrical Flanking**:
+  - Dolls occupy the empty vertical column below the Left (Player 1) and Right (Player 2) side HUD cards.
+  - **Left Doll**: Anchored at `centerX = 118px`, `baselineY = arena.y + arena.height - 4px` (~`466px`), facing right toward the arena center.
+  - **Right Doll**: Anchored at `centerX = 960px - 118px = 842px`, `baselineY = arena.y + arena.height - 4px` (~`466px`), facing left toward the arena center.
+  - A subtle floor shadow ellipse (`rx = 44px, ry = 9px`) MUST be drawn under the feet of each doll at `(centerX, baselineY)`.
+- **Per-Frame Sprite Sheet Foot & Spine Anchoring (Anti-Wobble Rule)**:
+  - Multi-frame sprite sheets (e.g. `Denji-pixel-art-animation-sprite-sheet.png`) often have varying internal $X$ and $Y$ offsets per cell.
+  - **STRICT PROHIBITION of Naive Centering**: NEVER draw multi-frame sprite cells with static `-drawW / 2` box offsets. Doing so causes the character to slide or wobble forward and backward back and forth as frames cycle.
+  - **Mandatory Frame Anchors**: Each frame MUST declare calibrated ground anchor points (`footX`, `footY`). Rendering MUST translate to `-frame.footX * scale` and `-frame.footY * scale` so character feet and spine remain 100% stationary on the ground while the torso, chest, and head animate.
+- **Natural Breathing Frame Sequences**:
+  - Sprite breathing/idle animations MUST follow true physiological inhale/exhale cycles (e.g. Denji `[0, 2, 1, 3, 5, 4]`).
+  - Play back at a calm breathing cadence ($\approx 6.5\text{--}9\text{ FPS}$, $8\text{--}10\text{ ticks/frame}$).
+  - Multi-frame sprite sheet dolls MUST NOT have artificial external vertical $Y$-bobbing applied on top of built-in breathing frames.
+- **Continuous 60 FPS Real-Time Timing**:
+  - Always derive doll animation ticks from continuous high-resolution timestamps (`performance.now()`) to ensure fluid, uninterrupted frame cycling across all match states.
+
 ## Post-Change Suggestions
 
 This applies to any chat-based AI coding assistant working in this repository, regardless of IDE, extension, model, or provider, whenever these project instructions are loaded.

@@ -105,6 +105,12 @@ body.fit-window-mode .game-container {
   touch-action: pan-x pan-y pinch-zoom;
 }
 
+.game-container.horizontal-mode {
+  width: 960px;
+  height: 540px;
+  aspect-ratio: 16 / 9;
+}
+
 .game-box {
   position: relative;
   text-align: center;
@@ -121,6 +127,12 @@ body.fit-window-mode .game-container {
   touch-action: pan-x pan-y pinch-zoom;
 }
 
+.game-box.horizontal-mode {
+  width: 960px;
+  height: 540px;
+  aspect-ratio: 16 / 9;
+}
+
 .game-box canvas,
 #arena,
 #topLevelUiCanvas {
@@ -135,6 +147,13 @@ body.fit-window-mode .game-container {
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
   image-rendering: pixelated;
+}
+
+.game-box canvas.horizontal-mode,
+#arena.horizontal-mode,
+#topLevelUiCanvas.horizontal-mode {
+  width: 960px;
+  height: 540px;
 }
 
 #topLevelUiCanvas {
@@ -204,20 +223,76 @@ body.fit-window-mode .game-container {
 
 .health-hud-side {
   position: absolute;
-  top: 16px;
+  top: 108px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  width: 200px;
+  gap: 10px;
+  width: 244px;
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  z-index: 15;
+  pointer-events: auto;
 }
 
 #healthHudLeft {
-  right: calc(100% + 20px);
+  left: 18px;
+  right: auto;
 }
 
 #healthHudRight {
-  left: calc(100% + 20px);
+  right: 18px;
+  left: auto;
+}
+
+.horizontal-viewport-mode .health-hud-side .health-card {
+  width: 100%;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.horizontal-viewport-mode:not(.arena-dark-mode) .health-hud-side .health-card,
+body:not(.arena-dark-mode) .horizontal-viewport-mode .health-hud-side .health-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* Strictly enforce 1-column vertical grid for side HUD in horizontal mode */
+.health-hud-side .health-card__skills,
+.health-hud-side .health-card__info,
+.horizontal-viewport-mode .health-hud-side .health-card__skills,
+.horizontal-viewport-mode .health-hud-side .health-card__info {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-template-columns: 1fr !important;
+  width: 100% !important;
+  gap: 4px !important;
+}
+
+.health-hud-side .hud-skill-box,
+.horizontal-viewport-mode .health-hud-side .hud-skill-box {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  grid-column: 1 / -1 !important;
+  flex: 0 0 auto !important;
+}
+
+.health-hud-side .health-card__info > div,
+.horizontal-viewport-mode .health-hud-side .health-card__info > div {
+  width: 100% !important;
+  grid-column: 1 / -1 !important;
+}
+
+.horizontal-viewport-mode .hud-name-box {
+  text-align: left !important;
 }
 
 .game-box h2 {
@@ -1781,6 +1856,93 @@ body.arena-dark-mode {
   align-items: flex-start;
 }
 
+/* ─────────────────────────────────────────────
+   Main Menu Featured 16:9 Horizontal Mode Banner
+───────────────────────────────────────────── */
+.menu-featured-banner {
+  width: 100%;
+  margin-bottom: 12px;
+  background: linear-gradient(180deg, #ffd700 0%, #f59e0b 50%, #d97706 100%);
+  border: 3px solid #21050c;
+  border-radius: 8px;
+  box-shadow: inset 0 3px 0 #fef08a, inset 0 -3px 0 #92400e, 0 5px 0 #78350f, 0 7px 0 #21050c;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  box-sizing: border-box;
+  user-select: none;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+  flex-shrink: 0;
+}
+
+.menu-featured-banner:hover {
+  background: linear-gradient(180deg, #fef08a 0%, #fbbf24 50%, #eab308 100%);
+  transform: translateY(-2px);
+  box-shadow: inset 0 3px 0 #fffbeb, inset 0 -3px 0 #92400e, 0 7px 0 #78350f, 0 9px 0 #21050c;
+}
+
+.menu-featured-banner:active {
+  transform: translateY(3px);
+  box-shadow: inset 0 2px 0 #92400e, 0 2px 0 #78350f, 0 3px 0 #21050c;
+}
+
+.menu-featured-banner .banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.menu-featured-banner .banner-icon-box {
+  width: 36px;
+  height: 36px;
+  background: #b45309;
+  border: 2px solid #21050c;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  box-shadow: inset 0 2px 0 #f59e0b, inset 0 -2px 0 #78350f;
+  flex-shrink: 0;
+}
+
+.menu-featured-banner .banner-text {
+  text-align: left;
+}
+
+.menu-featured-banner .banner-title {
+  font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: #21050c;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.menu-featured-banner .banner-subtitle {
+  font-family: Arial, sans-serif;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #451a03;
+  margin-top: 2px;
+  letter-spacing: 0.2px;
+}
+
+.menu-featured-banner .banner-action-btn {
+  background: #21050c;
+  color: #ffd700;
+  font-family: 'Silkscreen', monospace, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  border: 2px solid #ffd700;
+  border-radius: 4px;
+  padding: 5px 9px;
+  pointer-events: none;
+  box-shadow: 0 2px 0 #000000;
+}
+
 /* Chunky Pixel Art 3D Button Tile (Perfect Square 1:1) */
 .menu-tile-3d {
   display: flex;
@@ -1885,6 +2047,114 @@ body.arena-dark-mode {
 .menu-tile-hub .tile-icon-box {
   background: #96122c;
 }
+
+/* ─────────────────────────────────────────────
+   Horizontal 16:9 Widescreen Menu Layout Adaptations
+───────────────────────────────────────────── */
+.horizontal-viewport-mode .retro-window-screen {
+  padding: 10px 16px;
+}
+
+.horizontal-viewport-mode .retro-window-box {
+  max-height: 520px;
+}
+
+.horizontal-viewport-mode .retro-window-body {
+  padding: 8px 12px;
+  gap: 6px;
+}
+
+.horizontal-viewport-mode .menu-featured-banner {
+  margin-bottom: 6px;
+  padding: 6px 12px;
+  background: linear-gradient(180deg, #10b981 0%, #059669 50%, #047857 100%);
+  border-color: #064e3b;
+  box-shadow: inset 0 3px 0 #a7f3d0, inset 0 -3px 0 #064e3b, 0 4px 0 #064e3b, 0 6px 0 #21050c;
+}
+
+.horizontal-viewport-mode .menu-featured-banner:hover {
+  background: linear-gradient(180deg, #34d399 0%, #10b981 50%, #059669 100%);
+  box-shadow: inset 0 3px 0 #d1fae5, inset 0 -3px 0 #064e3b, 0 6px 0 #064e3b, 0 8px 0 #21050c;
+}
+
+.horizontal-viewport-mode .menu-featured-banner .banner-icon-box {
+  background: #064e3b;
+  border-color: #022c22;
+  box-shadow: inset 0 2px 0 #34d399, inset 0 -2px 0 #064e3b;
+}
+
+.horizontal-viewport-mode .menu-featured-banner .banner-title {
+  color: #022c22;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.horizontal-viewport-mode .menu-featured-banner .banner-subtitle {
+  color: #064e3b;
+}
+
+.horizontal-viewport-mode .menu-featured-banner .banner-action-btn {
+  background: #21050c;
+  color: #34d399;
+  border: 2px solid #34d399;
+}
+
+.horizontal-viewport-mode .menu-grid-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr 1fr;
+  gap: 8px;
+  padding: 4px 2px;
+}
+
+.horizontal-viewport-mode .menu-tile-3d {
+  aspect-ratio: unset;
+  height: 76px;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.horizontal-viewport-mode .tile-icon-box {
+  width: 38px;
+  height: 38px;
+  font-size: 20px;
+}
+
+.horizontal-viewport-mode .tile-text-wrap {
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.horizontal-viewport-mode .subview-cards-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-content: start;
+  max-height: 420px;
+}
+
+.horizontal-viewport-mode .featured-horizontal-card {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+}
+
+.horizontal-viewport-mode .menu-grid-tactical,
+.horizontal-viewport-mode .menu-grid-arsenal {
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+/* Battle Modes Sub-View Screen Orientation Filtering */
+:root:not(.horizontal-viewport-mode) #menu-view-battle .tactical-card[data-orientation="horizontal"] {
+  display: none !important;
+}
+
+.horizontal-viewport-mode #menu-view-battle .tactical-card[data-orientation="vertical"] {
+  display: none !important;
+}
+
 
 /* ─────────────────────────────────────────────
    SUB-VIEWS & HEADERS
@@ -2694,6 +2964,113 @@ body.arena-dark-mode {
   font-size: 10px;
   color: #888888;
   letter-spacing: 0.5px;
+}
+
+/* ─────────────────────────────────────────────
+   MENU ORIENTATION TOGGLE PILL
+───────────────────────────────────────────── */
+.menu-orientation-pill {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: linear-gradient(180deg, #a855f7 0%, #7e22ce 100%);
+  border: 1.8px solid #3b0764;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 0 #581c87, 0 3px 0 #3b0764;
+  color: #ffffff;
+  font-family: 'Rajdhani', 'Outfit', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.menu-orientation-pill:hover {
+  background: linear-gradient(180deg, #c084fc 0%, #6b21a8 100%);
+  transform: translateY(-50%) translateY(-1px);
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #581c87, 0 4px 0 #3b0764;
+}
+
+.menu-orientation-pill:active {
+  transform: translateY(-50%) translateY(1px);
+  box-shadow: inset 0 1px 0 #4c1d95, 0 1px 0 #3b0764;
+}
+
+.horizontal-viewport-mode .menu-orientation-pill {
+  background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+  border-color: #064e3b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 0 #065f46, 0 3px 0 #064e3b;
+}
+
+.horizontal-viewport-mode .menu-orientation-pill:hover {
+  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #065f46, 0 4px 0 #064e3b;
+}
+
+.horizontal-viewport-mode .menu-orientation-pill:active {
+  box-shadow: inset 0 1px 0 #064e3b, 0 1px 0 #064e3b;
+}
+
+.menu-orientation-pill-right {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: linear-gradient(180deg, #a855f7 0%, #7e22ce 100%);
+  border: 1.8px solid #3b0764;
+  border-radius: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 0 #581c87, 0 3px 0 #3b0764;
+  color: #ffffff;
+  font-family: 'Rajdhani', 'Outfit', sans-serif;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background 0.08s ease;
+  z-index: 2;
+  flex-shrink: 0;
+}
+
+.menu-orientation-pill-right:hover {
+  background: linear-gradient(180deg, #c084fc 0%, #6b21a8 100%);
+  transform: translateY(-50%) translateY(-1px);
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #581c87, 0 4px 0 #3b0764;
+}
+
+.menu-orientation-pill-right:active {
+  transform: translateY(-50%) translateY(1px);
+  box-shadow: inset 0 1px 0 #4c1d95, 0 1px 0 #3b0764;
+}
+
+.horizontal-viewport-mode .menu-orientation-pill-right {
+  background: linear-gradient(180deg, #10b981 0%, #047857 100%);
+  border-color: #064e3b;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), 0 2px 0 #065f46, 0 3px 0 #064e3b;
+}
+
+.horizontal-viewport-mode .menu-orientation-pill-right:hover {
+  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+  box-shadow: inset 0 2px 0 #ffffff, 0 3px 0 #065f46, 0 4px 0 #064e3b;
+}
+
+.horizontal-viewport-mode .menu-orientation-pill-right:active {
+  box-shadow: inset 0 1px 0 #064e3b, 0 1px 0 #064e3b;
 }
 
 /* ─────────────────────────────────────────────

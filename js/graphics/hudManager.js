@@ -230,7 +230,7 @@ export function getBossSubName(fighter) {
  * Checks if a specific fighter is a Tactical Shooter operative.
  */
 export function isTacticalFighter(f) {
-  if (!f) return false;
+  return false;
   if (f.gameCategory === 'tactical' || (f._def && f._def.gameCategory === 'tactical')) return true;
   const t = String(f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
   return ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal', 'tactical_commando', 'tactical_guerilla', 'tactical_breacher', 'tactical_gunslinger', 'tactical_infiltrator', 'tactical_marksman', 'tactical_barrett', 'tactical_sniper', 'tactical_heavy'].includes(t);
@@ -240,7 +240,7 @@ export function isTacticalFighter(f) {
  * Robust check if current match/gamemode is Tactical Shooter.
  */
 export function isTacticalMatch(s) {
-  const stateObj = s || (typeof state !== 'undefined' ? state : null);
+  return false;
   if (!stateObj) return false;
   if (stateObj.gameCategory === 'tactical') return true;
   const m = String(stateObj.mode || '').toLowerCase();
@@ -399,42 +399,56 @@ export function drawHUD() {
     const isTLFSMode = mode === GAME_MODES.TLFS || mode === 'TLFS';
     const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
     const isTeamMode = is2v2Mode || is1v2Mode || isTLFSMode || (mainFighters && mainFighters.length > 2 && !isFfaMode);
-    const isSingleColMode = (!isTactical && (is1v1Mode || isStandOffMode)) || (isCameraTracking && isTeamMode && !isTactical);
-    containerBottom.classList.toggle('single-column-hud', isSingleColMode);
-    containerBottom.style.opacity = bottomHudOpacity;
-    if (bottomHudOpacity <= 0) {
+    const isHorizontal = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+    const isSideHud1v1 = isHorizontal && (is1v1Mode || isStandOffMode || isTLFSMode || (mainFighters && mainFighters.length === 2 && !is2v2Mode && !is1v2Mode));
+    if (isSideHud1v1) {
       containerBottom.style.visibility = 'hidden';
       containerBottom.style.pointerEvents = 'none';
       containerBottom.style.display = 'none';
     } else {
-      containerBottom.style.display = 'flex';
-      containerBottom.style.visibility = 'visible';
-      containerBottom.style.pointerEvents = 'auto';
-      updateBottomHudCameraTracking(containerBottom);
+      const isSingleColMode = (!isTactical && (is1v1Mode || isStandOffMode)) || (isCameraTracking && isTeamMode && !isTactical);
+      containerBottom.classList.toggle('single-column-hud', isSingleColMode);
+      containerBottom.style.opacity = bottomHudOpacity;
+      if (bottomHudOpacity <= 0) {
+        containerBottom.style.visibility = 'hidden';
+        containerBottom.style.pointerEvents = 'none';
+        containerBottom.style.display = 'none';
+      } else {
+        containerBottom.style.display = 'flex';
+        containerBottom.style.visibility = 'visible';
+        containerBottom.style.pointerEvents = 'auto';
+        updateBottomHudCameraTracking(containerBottom);
+      }
     }
   }
   if (containerLeft) {
-    const bottomHudOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
-    if (bottomHudOpacity <= 0 || !containerLeft.children || !containerLeft.children.length) {
+    const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+    const mainF = (fighters || []).filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
+    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mainF.length === 2);
+    const sideOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
+    if (sideOpacity <= 0 || !containerLeft.children || !containerLeft.children.length || (!isSide1v1 && state.mode !== 'FFA' && !isTacticalMatch(state) && mainF.length <= 4)) {
       containerLeft.style.visibility = 'hidden';
       containerLeft.style.pointerEvents = 'none';
       containerLeft.style.display = 'none';
     } else {
-      containerLeft.style.opacity = bottomHudOpacity;
-      containerLeft.style.display = 'block';
+      containerLeft.style.opacity = sideOpacity;
+      containerLeft.style.display = 'flex';
       containerLeft.style.visibility = 'visible';
       containerLeft.style.pointerEvents = 'auto';
     }
   }
   if (containerRight) {
-    const bottomHudOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
-    if (bottomHudOpacity <= 0 || !containerRight.children || !containerRight.children.length) {
+    const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+    const mainF = (fighters || []).filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
+    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mainF.length === 2);
+    const sideOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
+    if (sideOpacity <= 0 || !containerRight.children || !containerRight.children.length || (!isSide1v1 && state.mode !== 'FFA' && !isTacticalMatch(state) && mainF.length <= 4)) {
       containerRight.style.visibility = 'hidden';
       containerRight.style.pointerEvents = 'none';
       containerRight.style.display = 'none';
     } else {
-      containerRight.style.opacity = bottomHudOpacity;
-      containerRight.style.display = 'block';
+      containerRight.style.opacity = sideOpacity;
+      containerRight.style.display = 'flex';
       containerRight.style.visibility = 'visible';
       containerRight.style.pointerEvents = 'auto';
     }
@@ -1185,14 +1199,16 @@ function updateHealthHud() {
   state._lastHudHideOverheadHp = CONFIG.hudHideOverheadHp;
   state._lastArenaTheme = state.arenaTheme || 'light';
   state._lastCameraMode = currentCameraMode;
-  if (hudModeChanged || themeChanged || cameraModeChanged) {
+  const orientationChanged = state._lastViewOrientation !== (state.viewOrientation || 'vertical');
+  state._lastViewOrientation = state.viewOrientation || 'vertical';
+  if (hudModeChanged || themeChanged || cameraModeChanged || orientationChanged) {
     clearHealthHud();
   }
 
   // OPTIMIZATION: Throttling HUD updates to prevent extreme DOM reflow lag from progress bars.
   const isTactical = isTacticalMatch(state);
   const mainFighters = fighters.filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
-  const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && mainFighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
+  const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel' || (mainFighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
   const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
   const isRegular1v2 = mode === GAME_MODES.ONE_VS_TWO || mode === '1v2';
   const isBossBattle = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === 'STAND_OFF_1V2';
@@ -1201,7 +1217,7 @@ function updateHealthHud() {
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
   const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isTLFS || (mainFighters.length > 2 && mode !== GAME_MODES.FFA && mode !== 'FFA' && mode !== GAME_MODES.TACTICAL_FFA && mode !== 'Tactical FFA'));
-  const isSingleColumnMode = ((is1v1 || isStandOff) && !isTactical) || isTeamSingleColumn;
+  const isSingleColumnMode = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal') || ((is1v1 || isStandOff) && !isTactical) || isTeamSingleColumn;
   const currentHpStr = mainFighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = mainFighters.map(f => {
@@ -2976,8 +2992,10 @@ function updateHealthHud() {
         } else {
           extraClassStr = isFfa ? 'ffa-card' : (isSingleColumnMode ? 'single-column' : '');
         }
-        const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE);
-        const maxBulletsCount = is1v1Mode ? 2 : 0;
+        const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel');
+        const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+        const isSideHud = isH && (is1v1 || isStandOff || isTLFS || mainFighters.length === 2);
+        const maxBulletsCount = (is1v1Mode && !isSideHud) ? 2 : 0;
 
         const cardHTML = buildCard({
           title: fighterName,
@@ -2996,7 +3014,7 @@ function updateHealthHud() {
           kills: (isFfa) && state.matchKills ? state.matchKills[index] || [] : [],
           maxBullets: maxBulletsCount,
           targetFighter: fighter,
-          titleAlign: (index % 2 === 0 ? 'left' : 'right'),
+          titleAlign: isH ? 'left' : (index % 2 === 0 ? 'left' : 'right'),
           singleColumn: isSingleColumnMode
         });
 
@@ -3004,7 +3022,15 @@ function updateHealthHud() {
         tempDiv.innerHTML = cardHTML;
         const cardElement = tempDiv.firstElementChild;
 
-        if (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA' || is1v1 || isStandOff || isTLFS || isTactical || mainFighters.length <= 4) {
+
+
+        if (isSideHud) {
+          if (index === 0) {
+            containerLeft.appendChild(cardElement);
+          } else {
+            containerRight.appendChild(cardElement);
+          }
+        } else if (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA' || is1v1 || isStandOff || isTLFS || isTactical || mainFighters.length <= 4) {
           containerBottom.appendChild(cardElement);
         } else if (index % 2 === 0) {
           containerLeft.appendChild(cardElement);
@@ -3569,7 +3595,7 @@ function updateHealthHud() {
   }
 
   // 7. 1v1 Mode: Single Round Badge (R1, R2, or F) centered in the middle between P1 and P2 cards
-  const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE);
+  const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel');
   if (is1v1Mode && containerBottom) {
     let roundBanner = _cachedRoundBanner;
     if (!roundBanner || !roundBanner.parentNode) {

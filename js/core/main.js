@@ -4,22 +4,22 @@
 
 import { state, loadFighterSelections, saveFighterSelections } from './state.js';
 import { initFlameCanvas, resizeFlameCanvas } from '../graphics/canvasManager.js';
-import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown, preloadEssentialCoreSounds, preloadFighterAssets } from './gameFlow.js';
+import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown, preloadEssentialCoreSounds, preloadFighterAssets, goToTitle } from './gameFlow.js';
 import { FIGHTER_DEFS, CONFIG } from './config.js';
-import { handleUIClick, handleUIMove, captureFaceOffScreenshot } from '../graphics/ui.js';
+import { handleUIClick, handleUIMove, getHoveredButton, captureFaceOffScreenshot } from '../graphics/ui.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { getSelectedArenaBgmTrack, cycleNextArenaBgmTrack } from '../systems/arenaBgmSystem.js';
 import { initGraphicsCache } from '../graphics/graphicsCache.js';
 import { syncHudPosition } from '../graphics/ui/hudLayout.js';
 import { clearHealthHud } from '../graphics/hudManager.js';
-import { getTacticalIcon } from '../graphics/ui/tacticalIcons.js';
 import { GAME_MODES } from './modeConfig.js';
-import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
 import { toggleCameraMode } from '../systems/cameraSystem.js';
 import { BalanceManager } from '../configs/balanceManager.js';
 import { initPixelModelExportUI, updatePixelModelPreview } from '../graphics/ui/PixelModelExportScreen.js';
 import { initImageBgRemoverUI, processAndRenderImage } from '../graphics/ui/ImageBgRemoverScreen.js';
 import { BossEntranceSequence } from '../bosses/index.js';
+import { setViewportOrientation, toggleViewportOrientation, getViewportOrientation } from './viewportManager.js';
+import { initHorizontalTeamSelectScreen, handleHorizontalTeamSelectClick } from '../graphics/ui/HorizontalTeamSelectScreen.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
@@ -56,17 +56,25 @@ if (typeof document !== 'undefined' && 'fonts' in document) {
 // ─────────────────────────────────────────────
 export function fitGameToViewport() {
   const container = document.querySelector('.game-container');
+  const box = document.querySelector('.game-box');
   if (!container) return;
-  const targetW = 540;
-  const targetH = 960;
+
+  const isHorizontal = (state.viewOrientation === 'horizontal');
+  const targetW = isHorizontal ? 960 : 540;
+  const targetH = isHorizontal ? 540 : 960;
 
   container.style.width = `${targetW}px`;
   container.style.height = `${targetH}px`;
-  container.style.transform = '';
-  container.style.transformOrigin = '';
+  if (box) {
+    box.style.width = `${targetW}px`;
+    box.style.height = `${targetH}px`;
+  }
+
+  updateAspectScaling();
 }
 
-// Initial viewport auto-fit
+// Initial viewport orientation & auto-fit
+setViewportOrientation(getViewportOrientation());
 fitGameToViewport();
 
 // Handle window resize & orientation changes across all devices
@@ -128,7 +136,7 @@ window.addEventListener('keydown', (e) => {
       return;
     }
     if (state.gameState === 'title') {
-      const targetAction = activeTacticalAction || ((state.gameCategory === 'tactical') ? 'tactical-ffa' : 'mode-1v1');
+      const targetAction = activeTacticalAction || 'mode-1v1';
       executeTacticalAction(targetAction);
       return;
     }
@@ -180,6 +188,10 @@ window.addEventListener('keydown', (e) => {
 
 const inputTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
 
+let _isDraggingAppWindow = false;
+let _lastMouseScreenX = 0;
+let _lastMouseScreenY = 0;
+
 inputTarget.addEventListener('mousedown', (e) => {
   const rect = inputTarget.getBoundingClientRect();
   const scaleX = state.canvas.width / rect.width;
@@ -198,11 +210,30 @@ inputTarget.addEventListener('mousedown', (e) => {
     if (mx >= px && mx <= px + panelW && my >= py && my <= py + panelH) {
       state.isDraggingPauseMenu = true;
       state.pauseMenuDragOffset = { x: mx - cx, y: my - cy };
+      return;
     }
+  }
+
+  // Desktop Electron window dragging support on empty background
+  if (typeof window !== 'undefined' && window.electronAPI?.dragWindow && e.button === 0 && !getHoveredButton()) {
+    _isDraggingAppWindow = true;
+    _lastMouseScreenX = e.screenX;
+    _lastMouseScreenY = e.screenY;
   }
 });
 
 inputTarget.addEventListener('mousemove', (e) => {
+  if (_isDraggingAppWindow && typeof window !== 'undefined' && window.electronAPI?.dragWindow) {
+    const dx = e.screenX - _lastMouseScreenX;
+    const dy = e.screenY - _lastMouseScreenY;
+    if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+      _lastMouseScreenX = e.screenX;
+      _lastMouseScreenY = e.screenY;
+      window.electronAPI.dragWindow(dx, dy);
+    }
+    return;
+  }
+
   const rect = inputTarget.getBoundingClientRect();
   // Handle scaling if CSS sizes canvas differently
   const scaleX = state.canvas.width / rect.width;
@@ -238,6 +269,7 @@ inputTarget.addEventListener('mousemove', (e) => {
 
 window.addEventListener('mouseup', () => {
   state.isDraggingPauseMenu = false;
+  _isDraggingAppWindow = false;
 });
 
 let _lastTouchTapTime = 0;
@@ -320,6 +352,16 @@ inputTarget.addEventListener('touchend', (e) => {
       const my = (touch.clientY - rect.top) * scaleY;
 
       _lastTouchTapTime = Date.now();
+      if (state.gameState === 'horizontal_select') {
+        const modalHandled = handleUIClick(mx, my);
+        if (modalHandled) return;
+        handleHorizontalTeamSelectClick(mx, my, () => {
+          startGame();
+        }, () => {
+          goToTitle();
+        });
+        return;
+      }
       const clickedButton = handleUIClick(mx, my);
       if (!clickedButton && state.gameState === 'title') {
         stopAllSounds(false, 0, 0);
@@ -348,6 +390,17 @@ inputTarget.addEventListener('click', (e) => {
   if (BossEntranceSequence.isActive) {
     // Mouse clicks on PC do not skip entrance animation
     // Only ESC key on PC or touch tap on mobile can skip
+    return;
+  }
+
+  if (state.gameState === 'horizontal_select') {
+    const modalHandled = handleUIClick(mx, my);
+    if (modalHandled) return;
+    handleHorizontalTeamSelectClick(mx, my, () => {
+      startGame();
+    }, () => {
+      goToTitle();
+    });
     return;
   }
 
@@ -401,12 +454,10 @@ const _initialLightHudTextColor = CONFIG.hudTextColor || '#131313ff';
 
 // Function to apply Arena Theme (Dark / Light)
 export function applyArenaTheme(theme) {
-  const effectiveTheme = (state.gameCategory === 'tactical') ? 'dark' : theme;
+  const effectiveTheme = theme;
   state.arenaTheme = effectiveTheme;
   CONFIG.arenaTheme = effectiveTheme;
-  if (state.gameCategory !== 'tactical') {
-    localStorage.setItem('arenaTheme', effectiveTheme);
-  }
+  localStorage.setItem('arenaTheme', effectiveTheme);
 
   const isDark = (effectiveTheme === 'dark');
   CONFIG.canvasBgColor = isDark ? '#000000' : (CONFIG.lightCanvasBgColor || _initialLightCanvasBg);
@@ -565,6 +616,65 @@ export function syncHudButtons() {
 }
 
 syncHudButtons();
+
+export function syncMenuOrientationUI() {
+  const isH = (state.viewOrientation === 'horizontal');
+
+  // 1. Subview Header Orientation Toggle Pills
+  const pill = document.getElementById('btn-menu-orientation');
+  if (pill) {
+    pill.innerText = isH ? '📱 9:16 VIEW' : '🖥️ 16:9 VIEW';
+    pill.title = isH ? 'Switch to 9:16 Vertical Portrait View' : 'Switch to 16:9 Horizontal Widescreen View';
+  }
+  const battlePill = document.getElementById('btn-battle-orientation');
+  if (battlePill) {
+    battlePill.innerText = isH ? '📱 9:16 VIEW' : '🖥️ 16:9 VIEW';
+    battlePill.title = isH ? 'Switch to 9:16 Vertical Portrait View' : 'Switch to 16:9 Horizontal Widescreen View';
+  }
+
+  // 1b. Battle Subview Heading
+  const battleHeading = document.getElementById('battle-subview-heading');
+  if (battleHeading) {
+    battleHeading.innerText = isH ? 'SELECT BATTLE MODE (16:9)' : 'SELECT BATTLE MODE';
+  }
+
+  // 2. Main Menu Featured Banner
+  const banner = document.getElementById('banner-horizontal-mode');
+  if (banner) {
+    const icon = banner.querySelector('.banner-icon-box');
+    const title = banner.querySelector('.banner-title');
+    const subtitle = banner.querySelector('.banner-subtitle');
+    const btn = banner.querySelector('.banner-action-btn');
+
+    if (isH) {
+      if (icon) icon.innerText = '📱';
+      if (title) title.innerText = 'SWITCH TO VERTICAL (9:16)';
+      if (subtitle) subtitle.innerText = 'PORTRAIT VIEWPORT • CLASSIC RETRO LAYOUT';
+      if (btn) btn.innerText = 'SWITCH ➔';
+      banner.setAttribute('data-action', 'toggle-viewport-orientation');
+    } else {
+      if (icon) icon.innerText = '🖥️';
+      if (title) title.innerText = 'HORIZONTAL MODE (16:9)';
+      if (subtitle) subtitle.innerText = 'AUTO-ADJUSTS SCREEN • 3v3v3v3 TEAMFIGHTS';
+      if (btn) btn.innerText = 'LAUNCH ➔';
+      banner.setAttribute('data-action', 'open-grand-teamfight');
+    }
+  }
+
+  // 3. Settings Card Button
+  const settingsBtn = document.getElementById('btn-settings-orientation');
+  if (settingsBtn) {
+    settingsBtn.innerText = isH ? '16:9 WIDE' : '9:16 PORTRAIT';
+  }
+
+  // 4. In-Game Mobile Quick Bar Icon
+  const quickIcon = document.getElementById('quickIconOrientation');
+  if (quickIcon) {
+    quickIcon.textContent = isH ? '📱' : '🖥️';
+  }
+}
+
+syncMenuOrientationUI();
 
 if (localStorage.getItem('showArenaTitle') !== null) {
   CONFIG.showArenaTitle = localStorage.getItem('showArenaTitle') === 'true';
@@ -787,8 +897,8 @@ export function showMenuView(paneId, playAudio = true) {
   const badge = document.querySelector('.retro-badge-title');
   if (badge) {
     if (paneId === 'menu-view-main') {
-      badge.innerText = (state.gameCategory === 'tactical') ? 'Tactical Ops' : 'Operations';
-    } else if (paneId === 'menu-view-battle' || paneId === 'menu-view-tactical-battle') {
+      badge.innerText = 'Operations';
+    } else if (paneId === 'menu-view-battle') {
       badge.innerText = 'Battle Modes';
     } else if (paneId === 'menu-view-arsenal') {
       badge.innerText = 'Arsenal & Studio';
@@ -817,6 +927,10 @@ export function showMenuView(paneId, playAudio = true) {
 
   if (paneId === 'menu-view-patchnotes') {
     renderPatchNotesPane();
+  }
+
+  if (paneId === 'menu-view-main' || paneId === 'menu-view-system-settings' || paneId === 'menu-view-battle') {
+    syncMenuOrientationUI();
   }
 
   if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
@@ -880,42 +994,42 @@ export function executeTacticalAction(action) {
     state.gameState = 'select';
   }
 
-  // Tactical Shooter Actions
-  else if (action === 'tactical-4v4') {
-    state.gameCategory = 'tactical';
-    state.mode = GAME_MODES.TACTICAL_4V4 || 'Tactical 4v4';
-    loadFighterSelections('tactical');
+  // Widescreen Horizontal Grand Teamfight Sub-Game Modes
+  else if (action === 'mode-3v3v3v3' || action === 'open-grand-teamfight') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.TEAMFIGHT_3V3V3V3;
+    setViewportOrientation('horizontal');
+    initHorizontalTeamSelectScreen();
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'select';
-  } else if (action === 'tactical-1v1') {
-    state.gameCategory = 'tactical';
-    state.mode = GAME_MODES.TACTICAL_1V1 || 'Tactical 1v1';
-    loadFighterSelections('tactical');
+    state.gameState = 'horizontal_select';
+  } else if (action === 'mode-2v2v2v2') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.TEAMFIGHT_2V2V2V2;
+    setViewportOrientation('horizontal');
+    initHorizontalTeamSelectScreen();
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'select';
-  } else if (action === 'tactical-standoff') {
-    state.gameCategory = 'tactical';
-    state.mode = GAME_MODES.TACTICAL_STANDOFF || 'Tactical Stand Off';
-    loadFighterSelections('tactical');
+    state.gameState = 'horizontal_select';
+  } else if (action === 'mode-4v4') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.TEAM_4V4;
+    setViewportOrientation('horizontal');
+    initHorizontalTeamSelectScreen();
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'select';
-  } else if (action === 'tactical-random') {
-    state.gameCategory = 'tactical';
-    state.mode = GAME_MODES.TACTICAL_RANDOM || 'Tactical Random';
+    state.gameState = 'horizontal_select';
+  } else if (action === 'mode-br8') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.BATTLE_ROYALE_8;
+    setViewportOrientation('horizontal');
+    initHorizontalTeamSelectScreen();
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    startRandomStandoffBattle();
-  } else if (action === 'tactical-2v2') {
-    state.gameCategory = 'tactical';
-    state.mode = GAME_MODES.TACTICAL_2V2 || 'Tactical 2v2';
-    loadFighterSelections('tactical');
+    state.gameState = 'horizontal_select';
+  } else if (action === 'mode-h1v1') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.HORIZONTAL_1V1;
+    setViewportOrientation('horizontal');
+    initHorizontalTeamSelectScreen();
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'select';
-  } else if (action === 'tactical-ffa') {
-    state.gameCategory = 'tactical';
-    state.mode = GAME_MODES.TACTICAL_FFA || 'Tactical FFA';
-    loadFighterSelections('tactical');
-    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'select';
+    state.gameState = 'horizontal_select';
   }
 
   // Database / Arsenal Screens
@@ -928,7 +1042,7 @@ export function executeTacticalAction(action) {
   } else if (action === 'screen-weapons') {
     state.weaponSelectedFighter = null;
     state.weaponPage = 0;
-    state.weaponCategoryTab = (state.gameCategory === 'tactical') ? 'tactical' : 'foc';
+    state.weaponCategoryTab = 'foc';
     state.gameState = 'weapons';
   } else if (action === 'screen-leaderboard') {
     state.gameState = 'leaderboard';
@@ -947,6 +1061,10 @@ export function executeTacticalAction(action) {
     showMenuView('menu-view-audio-settings');
   } else if (action === 'open-system-settings') {
     showMenuView('menu-view-system-settings');
+  } else if (action === 'toggle-viewport-orientation') {
+    toggleViewportOrientation();
+    fitGameToViewport();
+    syncMenuOrientationUI();
   } else if (action === 'toggle-theme') {
     const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
     applyArenaTheme(nextTheme);
@@ -1123,115 +1241,22 @@ export function executeTacticalAction(action) {
 // GAME HUB SWITCHER
 // ─────────────────────────────────────────────
 export function switchGameHub(hub, playAudio = true) {
-  state.gameCategory = hub;
-
-  const tileBattleTitle = document.getElementById('tile-battle-title');
-  const tileBattleSubtitle = document.getElementById('tile-battle-subtitle');
-  const tileArsenalTitle = document.getElementById('tile-arsenal-title');
-  const tileArsenalSubtitle = document.getElementById('tile-arsenal-subtitle');
-  const tileIndexTitle = document.getElementById('tile-index-title');
-  const tileIndexSubtitle = document.getElementById('tile-index-subtitle');
-  const tileHubTitle = document.getElementById('tile-hub-title');
-  const tileHubSubtitle = document.getElementById('tile-hub-subtitle');
-  const tileHubIcon = document.getElementById('tile-hub-icon');
-  const cardArsenalTitle = document.getElementById('card-arsenal-title');
-  const cardArsenalSubtitle = document.getElementById('card-arsenal-subtitle');
-  const cardStudioWrap = document.getElementById('card-studio-wrap');
-  const cardSkinStudioWrap = document.getElementById('card-skinstudio-wrap');
-  const titleScreen = document.getElementById('title-screen');
-  const badge = document.querySelector('.retro-badge-title');
-
-  if (hub === 'tactical') {
-    state.mode = GAME_MODES.TACTICAL_FFA || 'Tactical FFA';
-    state.arena = { ...STARTER_MAP.arena };
-    loadFighterSelections('tactical');
-    activeTacticalAction = 'tactical-ffa';
-    titleScreen?.classList.add('hub-tactical');
-    if (badge) badge.innerText = 'Tactical Ops';
-    if (tileBattleTitle) tileBattleTitle.innerText = 'FIREFIGHT';
-    if (tileBattleSubtitle) tileBattleSubtitle.innerText = 'BALLISTIC MODES';
-    if (tileArsenalTitle) tileArsenalTitle.innerText = 'ARMORY';
-    if (tileArsenalSubtitle) tileArsenalSubtitle.innerText = 'FIREARMS & STATS';
-    if (tileIndexTitle) tileIndexTitle.innerText = 'ROSTER';
-    if (tileIndexSubtitle) tileIndexSubtitle.innerText = 'GUNSLINGERS';
-    if (tileHubTitle) tileHubTitle.innerText = 'ANIME BRAWL';
-    if (tileHubSubtitle) tileHubSubtitle.innerText = 'SWITCH HUB';
-    if (tileHubIcon) {
-      tileHubIcon.innerHTML = `<svg class="pixel-icon" viewBox="0 0 16 16" width="26" height="26" fill="none" shape-rendering="crispEdges">
-        <path d="M2 1h3v1h1v1h1v1h1v1h1v1h1v1h1v2h1v1h2v1h1v3h-3v-1h-1v-2h-1v-1h-1V9H8V8H7V7H6V6H5V5H4V4H3V3H2V1z" fill="#ffffff"/>
-        <path d="M14 1h-3v1h-1v1h-1v1H8v1H7v1H6v1H5v1H4v2H3v1H1v1H0v3h3v-1h1v-2h1v-1h1V9h1V8h1V7h1V6h1V5h1V4h1V3h1V1h-2z" fill="#ffffff"/>
-        <path d="M3 2h1v1h1v1h1v1h1v1h1v1h-1v1H6V7H5V6H4V5H3V2z" fill="#ffd1dc"/>
-        <path d="M13 2h-1v1h-1v1h-1v1H9v1H8v1h1v1h1V7h1V6h1V5h1V2z" fill="#ffd1dc"/>
-        <path d="M7 7h2v2H7z" fill="#ff99af"/>
-        <path d="M1 14h2v1H1z M13 14h2v1h-2z" fill="#21050c"/>
-      </svg>`;
-    }
-    if (cardArsenalTitle) cardArsenalTitle.innerText = 'FIREARMS ARMORY';
-    if (cardArsenalSubtitle) cardArsenalSubtitle.innerText = 'BALLISTICS & SKINS';
-    if (cardStudioWrap) cardStudioWrap.style.display = 'none';
-    if (cardSkinStudioWrap) cardSkinStudioWrap.style.display = 'none';
-    applyArenaTheme('dark');
-  } else {
-    state.mode = GAME_MODES.ONE_VS_ONE || '1v1';
-    state.arena = { ...CONFIG.arena };
-    loadFighterSelections('foc');
-    activeTacticalAction = 'mode-1v1';
-    titleScreen?.classList.remove('hub-tactical');
-    if (badge) badge.innerText = 'Operations';
-    if (tileBattleTitle) tileBattleTitle.innerText = 'BATTLE';
-    if (tileBattleSubtitle) tileBattleSubtitle.innerText = 'COMBAT MODES';
-    if (tileArsenalTitle) tileArsenalTitle.innerText = 'ARSENAL';
-    if (tileArsenalSubtitle) tileArsenalSubtitle.innerText = 'WEAPONS & STUDIO';
-    if (tileIndexTitle) tileIndexTitle.innerText = 'INDEX';
-    if (tileIndexSubtitle) tileIndexSubtitle.innerText = '24 FIGHTERS';
-    if (tileHubTitle) tileHubTitle.innerText = 'TACTICAL';
-    if (tileHubSubtitle) tileHubSubtitle.innerText = 'SWITCH HUB';
-    if (tileHubIcon) {
-      tileHubIcon.innerHTML = `<svg class="pixel-icon" viewBox="0 0 16 16" width="26" height="26" fill="none" shape-rendering="crispEdges">
-        <path d="M5 1h6v1h2v2h1v2h1v4h-1v2h-1v2h-2v1H5v-1H3v-2H2v-2H1V6h1V4h1V2h2V1z" fill="#ffffff"/>
-        <path d="M5 3h6v1h2v2h1v4h-1v2h-2v1H5v-1H3v-2H2V6h1V4h2V3z" fill="#21050c"/>
-        <path d="M6 4h4v1h1v1h1v4h-1v1h-1v1H6v-1H5v-1H4V6h1V5h1V4z" fill="#ffffff"/>
-        <path d="M7 6h2v1h1v2H9v1H7V9H6V7h1V6z" fill="#cf3355"/>
-        <path d="M7 7h2v2H7V7z" fill="#ffffff"/>
-        <path d="M7 0h2v3H7V0z M7 13h2v3H7v-3z M0 7h3v2H0V7z M13 7h3v2h-3V7z" fill="#ffffff"/>
-      </svg>`;
-    }
-    if (cardArsenalTitle) cardArsenalTitle.innerText = 'WEAPON ARSENAL';
-    if (cardArsenalSubtitle) cardArsenalSubtitle.innerText = 'WEAPON PREVIEW & SKINS';
-    if (cardStudioWrap) cardStudioWrap.style.display = 'flex';
-    if (cardSkinStudioWrap) cardSkinStudioWrap.style.display = 'flex';
-    applyArenaTheme(localStorage.getItem('arenaTheme') || 'light');
-  }
-
-  initPixelModelExportUI();
-  initImageBgRemoverUI();
-  showMenuView('menu-view-main', false);
-
-  if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-    audioSystem.playSFX('skill_dash1', 0.25);
-  }
+  // Tactical sub-game removed; hub is strictly Operations
 }
 
-// Unified Tactical & Main Menu Card Click Handlers
-document.querySelectorAll('.tactical-card, .menu-tile-3d').forEach(card => {
+// Main Menu Card Click Handlers
+document.querySelectorAll('.tactical-card, .menu-tile-3d, .menu-featured-banner').forEach(card => {
   card.addEventListener('click', (e) => {
     if (e.target && e.target.tagName === 'BUTTON' && e.target.id) return;
     const action = card.getAttribute('data-action');
     if (action === 'open-battle') {
-      if (state.gameCategory === 'tactical') {
-        showMenuView('menu-view-tactical-battle');
-      } else {
-        showMenuView('menu-view-battle');
-      }
+      showMenuView('menu-view-battle');
     } else if (action === 'open-arsenal') {
       showMenuView('menu-view-arsenal');
     } else if (action === 'open-settings') {
       showMenuView('menu-view-settings');
     } else if (action === 'open-patchnotes') {
       showMenuView('menu-view-patchnotes');
-    } else if (action === 'toggle-hub') {
-      const nextHub = (state.gameCategory === 'tactical') ? 'foc' : 'tactical';
-      switchGameHub(nextHub);
     } else if (action) {
       activeTacticalAction = action;
       executeTacticalAction(action);
@@ -1263,16 +1288,37 @@ document.getElementById('btn-whatsnew')?.addEventListener('click', (e) => {
   showMenuView('menu-view-patchnotes');
 });
 
+// Menu Orientation Pill Button Handlers
+document.getElementById('btn-menu-orientation')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-viewport-orientation');
+});
+
+document.getElementById('btn-battle-orientation')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-viewport-orientation');
+});
+
+// Settings Orientation Button Handler
+document.getElementById('btn-settings-orientation')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-viewport-orientation');
+});
+
+// Viewport Orientation Change Event Listener
+window.addEventListener('viewportOrientationChanged', () => {
+  fitGameToViewport();
+  syncMenuOrientationUI();
+});
+
 // System Buttons Handlers
 document.getElementById('btn-theme')?.addEventListener('click', (e) => {
   e.stopPropagation();
-  if (state.gameCategory === 'tactical') return;
   const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
   applyArenaTheme(nextTheme);
 });
 
 document.getElementById('quick-toggle-theme')?.addEventListener('click', () => {
-  if (state.gameCategory === 'tactical') return;
   const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
   applyArenaTheme(nextTheme);
 });
@@ -1455,6 +1501,8 @@ document.querySelectorAll('.debug-step-btn').forEach(btn => {
 // MOBILE & MULTI-DEVICE QUICK ACTION BAR CONTROLS
 // ─────────────────────────────────────────────
 const mobileQuickBar = document.getElementById('mobileQuickBar');
+const quickBtnOrientation = document.getElementById('quickBtnOrientation');
+const quickIconOrientation = document.getElementById('quickIconOrientation');
 const quickBtnPause = document.getElementById('quickBtnPause');
 const quickIconPause = document.getElementById('quickIconPause');
 const quickBtnRestart = document.getElementById('quickBtnRestart');
@@ -1510,8 +1558,9 @@ export function updateAspectScaling() {
   const docEl = (typeof document !== 'undefined' && document.documentElement) ? document.documentElement : null;
   const winW = (typeof window !== 'undefined' && (window.innerWidth || (docEl && docEl.clientWidth))) || 540;
   const winH = (typeof window !== 'undefined' && (window.innerHeight || (docEl && docEl.clientHeight))) || 960;
-  const baseW = 540;
-  const baseH = 960;
+  const isHorizontal = (state.viewOrientation === 'horizontal');
+  const baseW = isHorizontal ? 960 : 540;
+  const baseH = isHorizontal ? 540 : 960;
 
   // Calculate aspect-preserving scale factor
   const scale = Math.min(winW / baseW, winH / baseH);
@@ -1524,6 +1573,10 @@ export function updateAspectScaling() {
   container.style.transform = `translate(-50%, -50%) scale(${formattedScale})`;
   container.style.transformOrigin = 'center center';
   container.style.margin = '0';
+}
+
+if (typeof window !== 'undefined') {
+  window.updateAspectScaling = updateAspectScaling;
 }
 
 export function toggleAspectScaling() {
@@ -1539,6 +1592,13 @@ if (quickBtnFit) {
   quickBtnFit.addEventListener('click', (e) => {
     e.stopPropagation();
     toggleAspectScaling();
+  });
+}
+
+if (quickBtnOrientation) {
+  quickBtnOrientation.addEventListener('click', (e) => {
+    e.stopPropagation();
+    executeTacticalAction('toggle-viewport-orientation');
   });
 }
 
