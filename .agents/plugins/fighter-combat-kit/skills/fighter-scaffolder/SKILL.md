@@ -12,6 +12,11 @@ Use this skill when introducing a new fighter character to ensure complete compl
 ### 1. Fighter Class Template (`update()` loop)
 At the top of `update(opponent, ownerIndex, arena)`:
 ```javascript
+// 0. Process active visual effects lifecycles (Rule 25: Never get stuck on freeze)
+this._updateVisualExplosions?.();
+this._updateVisualEffects?.();
+
+// 1. Mandatory freeze & time-stop guard
 const isFrozen = this._handleTimeStop();
 if (isFrozen || this.isTargetOfAmbush) {
   this.interruptAttacks();
@@ -90,5 +95,6 @@ super.update(opponent, ownerIndex, arena);
   - `targetHairWidth = r * 2.80 - r * 3.10` and `targetHairHeight = r * 2.10 - r * 2.30`.
   - Crown apex anchor `drawY = -r * 1.30` to `-r * 1.45`.
 
-
-
+### 9. Mandatory Non-Freezing Active Visual Effects & Particle Decay Standard (Rule 25)
+- **Decay Before Freeze Guard**: Always update and decay transient visual effect arrays (explosions, slashes, particle bursts, shockwave rings) at the top of `update()` before `_handleTimeStop()`.
+- **Interrupt / Death Cleanup**: Clear effect arrays or decouple them to world space on `interruptAttacks(forceCancelAll = true)` or defeat so visual effects never freeze or stay stuck on screen when character movement is stopped.

@@ -54,6 +54,7 @@ export class SansFighter extends Fighter {
     this.maxStamina = (cfg.dodgeStaminaMax !== undefined) ? cfg.dodgeStaminaMax : 100;
     this.staminaRegenDelayTimer = 0;
     this.dodgeCooldown = 0;
+    this._naoyaFreezeGraceTimer = 0;
     this.afterImages = [];
 
     // Passive 2: Karmic Retribution (KR) State
@@ -151,6 +152,7 @@ export class SansFighter extends Fighter {
     this.staminaRegenDelayTimer = 0;
 
     this.dodgeCooldown = 0;
+    this._naoyaFreezeGraceTimer = 0;
     this._shotgunDodgeGraceTimer = 0;
     this._lastShotgunDodgeFrame = -1;
     this._lastShotgunDodgeAttacker = null;
@@ -262,6 +264,18 @@ export class SansFighter extends Fighter {
   interruptAttacks() {
     super.interruptAttacks();
     // Gaster Blasters and sequential circle spawners are independent summoned entities and persist through CC
+  }
+
+  /**
+   * Overrides applyTimeStop to allow Sans to teleport-dodge Naoya's freeze mechanic.
+   */
+  applyTimeStop(frames, opts = {}) {
+    const isNaoyaFreeze = Boolean(opts && (opts.isFrameStasis || opts.isNaoya || opts.attacker?.characterId === 'naoya' || opts.attacker?.type === 'naoya'));
+    if (isNaoyaFreeze) {
+      const dodged = this.dodgeFrameStasis({ attacker: opts.attacker || null, duration: frames, isUltimate: opts.isUltimate });
+      if (dodged) return;
+    }
+    super.applyTimeStop(frames, opts);
   }
 
   /**
@@ -724,6 +738,112 @@ export class SansFighter extends Fighter {
     }
 
     return true;
+  }
+
+  /**
+   * Passive 2: Teleport Dodge against Naoya's 24 FPS Projection Sorcery Frame Stasis freeze.
+   * Sans blinks out of the frame before it locks, so the freeze never applies.
+   * @param {Object} stasisData - { attacker, duration, isUltimate }
+   * @returns {boolean} True if successfully dodged (caller must skip applying the freeze).
+   */
+  dodgeFrameStasis(stasisData = {}) {
+    const attacker = stasisData.attacker || null;
+    if (this._naoyaFreezeGraceTimer > 0) {
+      this.isFrameFrozen = false;
+      this.frameFreezeTimer = 0;
+      this.isCaughtInNaoyaUlt = false;
+      this.timeStopTimer = 0;
+      if (this.statusEffects) {
+        this.statusEffects.timeStopTimer = 0;
+        this.statusEffects.isFrozen = false;
+      }
+      return true;
+    }
+
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    if (!this._canPayTeleportDodge(cfg)) return false;
+
+    const startX = this.x;
+    const startY = this.y;
+    const startAngle = this.gunAngle || this.angle || 0;
+    const { x: finalX, y: finalY } = this._getStasisDodgePoint(cfg, attacker);
+
+    this._spawnDodgeAfterimages(startX, startY, finalX, finalY, startAngle, startAngle);
+    this.x = finalX;
+    this.y = finalY;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    this.dodgeStallTimer = (cfg.dodgeStallDuration !== undefined) ? cfg.dodgeStallDuration : 12;
+
+    // Make sure no partial frame-freeze state lingers on Sans
+    this.isFrameFrozen = false;
+    this.frameFreezeTimer = 0;
+    this.isCaughtInNaoyaUlt = false;
+    this.timeStopTimer = 0;
+    if (this.statusEffects) {
+      this.statusEffects.timeStopTimer = 0;
+      this.statusEffects.isFrozen = false;
+    }
+
+    if (stasisData.isUltimate || attacker?.isExecutingUlt) {
+      this._naoyaFreezeGraceTimer = 35;
+    }
+
+    this.snapAimAtTarget(attacker);
+    spawnFloatingText(this.x, this.y - this.r - 12, 'MISS', '#FFFFFF');
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      const flashSnd = (CONFIG.sans?.sounds?.flash || sansConfig.sounds?.flash) || 'Assets/Sound Effects/Sans/Flash.ogg';
+      audioSystem.playSFX(flashSnd, 0.7);
+    }
+    if (Math.random() < 0.25) {
+      this.speak('nice try, kid. 24 frames is too slow.', 110);
+    }
+    return true;
+  }
+
+  /**
+   * Validates dodge availability (enabled, not CC'd, stamina, cooldown, roll) and pays the stamina cost.
+   * @returns {boolean} True if the dodge is paid for and should proceed.
+   */
+  _canPayTeleportDodge(cfg) {
+    if (!cfg.enableTeleportDodge || this.hp <= 0) return false;
+    const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
+    if (isFrozen) return false;
+
+    const staminaCost = (cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10;
+    if (this.stamina < staminaCost) return false;
+    if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) return false;
+
+    const dodgeChance = (cfg.dodgeChance !== undefined) ? cfg.dodgeChance : 1.0;
+    if (dodgeChance < 1.0 && Math.random() >= dodgeChance) return false;
+
+    this.stamina -= staminaCost;
+    this.staminaRegenDelayTimer = (cfg.dodgeStaminaRegenDelay !== undefined) ? cfg.dodgeStaminaRegenDelay : 50;
+    this.dodgeCooldown = (cfg.dodgeCooldown !== undefined) ? cfg.dodgeCooldown : 0;
+    return true;
+  }
+
+  /**
+   * Picks a teleport point directly away from the attacker (random if none), clamped inside the arena.
+   */
+  _getStasisDodgePoint(cfg, attacker) {
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : { width: 500, height: 500, x: 50, y: 50 };
+    const jumpDist = (cfg.dodgeDistance !== undefined) ? cfg.dodgeDistance : 85;
+    const hasAttacker = attacker && typeof attacker.x === 'number' && typeof attacker.y === 'number';
+    const awayAngle = hasAttacker
+      ? Math.atan2(this.y - attacker.y, this.x - attacker.x) + (Math.random() - 0.5) * 0.8
+      : Math.random() * Math.PI * 2;
+
+    const minX = arena.x + this.r + 20;
+    const maxX = arena.x + arena.width - this.r - 20;
+    const minY = arena.y + this.r + 20;
+    const maxY = arena.y + arena.height - this.r - 20;
+    return {
+      x: Math.max(minX, Math.min(maxX, this.x + Math.cos(awayAngle) * jumpDist)),
+      y: Math.max(minY, Math.min(maxY, this.y + Math.sin(awayAngle) * jumpDist))
+    };
   }
 
   /**
@@ -1615,6 +1735,7 @@ export class SansFighter extends Fighter {
       this.stamina = Math.min(this.maxStamina, this.stamina + (cfg.dodgeStaminaRegen || 0.20));
     }
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+    if (this._naoyaFreezeGraceTimer > 0) this._naoyaFreezeGraceTimer--;
     if (this._shotgunDodgeGraceTimer > 0) {
       this._shotgunDodgeGraceTimer--;
       if (this._shotgunDodgeGraceTimer <= 0) {

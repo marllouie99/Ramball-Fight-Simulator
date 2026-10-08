@@ -19,7 +19,7 @@ import { rezeConfig } from '../../configs/characters/rezeConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { MODE_SETTINGS, MODE_HP_MULTIPLIER } from '../../core/modeConfig.js';
 import { drawRezeSkin } from '../../graphics/fighters/rezeSkin.js';
-import { drawRezeSpeedLines, drawSparkFlechette, drawRezeDecoy, drawRezePalmBlast, drawRezeMegatonNuke, drawRezePixelMartialArc, drawRezeKnifeSlash } from '../../graphics/weapons/rezeWeaponGraphics.js';
+import { drawRezeSpeedLines, drawSparkFlechette, drawRezeClusterBomb, drawRezeDecoy, drawRezePalmBlast, drawRezeMegatonNuke, drawRezePixelMartialArc, drawRezeKnifeSlash } from '../../graphics/weapons/rezeWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -80,9 +80,14 @@ export class RezeFighter extends Fighter {
     this.sparkCooldown = this.sparkCooldownMax;
     this.activeFlechettes = [];
 
-    // Secondary Skill: Decapitation Decoy / Smoke Step
-    this.decoyCooldownMax = cfg.decoyCooldown || 420;
-    this.decoyCooldown = this.decoyCooldownMax;
+    // Secondary Skill: 3-Ball Cluster Bomb Spread (Throws 3 small bombs in spread that explode 1 by 1)
+    this.clusterCooldownMax = cfg.clusterBombCooldown || cfg.decoyCooldown || 320;
+    this.clusterCooldown = this.clusterCooldownMax;
+    this.decoyCooldown = this.clusterCooldownMax;
+    this.decoyCooldownMax = this.clusterCooldownMax;
+    this.clusterThrowTimer = 0;
+    this.clusterThrowMaxTimer = 16;
+    this.activeClusterBombs = [];
     this.activeDecoys = [];
 
     // Mobility Skill: Supersonic Rocket Lunge
@@ -98,6 +103,7 @@ export class RezeFighter extends Fighter {
     // Ultimate: Bomb Devil Unleashed (Megaton Tsar Nuke)
     this.nukeCooldownMax = cfg.nukeCooldown || 1500;
     this.nukeCooldown = this.nukeCooldownMax;
+    this.hasUsedNuke = false;
     this.isExecutingNuke = false;
     this.nukePhase = 'IDLE'; // 'TRANSFORM' | 'BARRAGE' | 'DIVE' | 'EXPLODE'
     this.nukeTimer = 0;
@@ -134,10 +140,10 @@ export class RezeFighter extends Fighter {
       });
     }
 
-    if (this.isSkillEnabled(cfg.enableDecoyBomb, false)) {
+    if (this.isSkillEnabled(cfg.enableClusterBomb, true) || this.isSkillEnabled(cfg.enableDecoyBomb, true)) {
       skills.push({
-        id: 'decoy_bomb',
-        name: 'Decoy Bomb',
+        id: 'cluster_bomb',
+        name: 'Cluster Bombs',
         type: 'active',
         cooldownKey: 'decoyCooldown',
         cooldownMaxKey: 'decoyCooldownMax'
@@ -174,7 +180,9 @@ export class RezeFighter extends Fighter {
         cooldownKey: 'nukeCooldown',
         cooldownMaxKey: 'nukeCooldownMax',
         channelingKey: 'isExecutingNuke',
-        channelTimerKey: 'nukeTimer'
+        channelTimerKey: 'nukeTimer',
+        canCast: (fighter) => !fighter.hasUsedNuke,
+        canTickCooldown: (fighter) => !fighter.hasUsedNuke
       });
     }
 
@@ -203,14 +211,18 @@ export class RezeFighter extends Fighter {
     this.punchComboCount = 0;
     this.comboResetTimer = 0;
     this.sparkCooldown = this.sparkCooldownMax;
+    this.clusterCooldown = this.clusterCooldownMax;
     this.decoyCooldown = this.decoyCooldownMax;
+    this.clusterThrowTimer = 0;
     this.rocketCooldown = this.rocketCooldownMax;
     this.nukeCooldown = this.nukeCooldownMax;
+    this.hasUsedNuke = false;
     this.isRocketLunging = false;
     this.isExecutingNuke = false;
     this.nukePhase = 'IDLE';
     this.wallLungeDebounceTimer = 0;
     this.activeFlechettes = [];
+    this.activeClusterBombs = [];
     this.activeDecoys = [];
     this.activeKnifeSlashes = [];
     this.isDiveBombing = false;
@@ -234,6 +246,7 @@ export class RezeFighter extends Fighter {
     this.isRocketLunging = false;
     this.isDiveBombing = false;
     this.isVaulting = false;
+    this.clusterThrowTimer = 0;
     this.z = 0;
     this.punchAnimTimer = 0;
     if (forceCancelAll) {
@@ -242,6 +255,10 @@ export class RezeFighter extends Fighter {
       this.nukePhase = 'IDLE';
       this.punchComboCount = 0;
       this.comboResetTimer = 0;
+      if (this.activeKnifeSlashes) this.activeKnifeSlashes.length = 0;
+      if (this.activeMartialArcs) this.activeMartialArcs.length = 0;
+      if (this.activePalmBlasts) this.activePalmBlasts.length = 0;
+      if (this.activeNukeBlasts) this.activeNukeBlasts.length = 0;
     }
   }
 
@@ -297,6 +314,10 @@ export class RezeFighter extends Fighter {
    * Main Fighter Update Loop
    */
   update(opponent, ownerIndex, arena) {
+    // 0. Update existing visual explosions & ground effects before freeze guard
+    // (Ensures explosion visual effects decay smoothly and NEVER get stuck on screen when Reze's movement is stopped by any attack)
+    this._updateVisualExplosions();
+
     // 1. Mandatory Rule 1 Freeze Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -314,10 +335,11 @@ export class RezeFighter extends Fighter {
     if (this.sparkCooldown > 0) this.sparkCooldown--;
     if (this.decoyCooldown > 0) this.decoyCooldown--;
     if (this.rocketCooldown > 0) this.rocketCooldown--;
-    if (this.nukeCooldown > 0) this.nukeCooldown--;
+    if (this.nukeCooldown > 0 && !this.hasUsedNuke) this.nukeCooldown--;
     if (this.diveBombCooldown > 0) this.diveBombCooldown--;
 
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+    if (this.clusterThrowTimer > 0) this.clusterThrowTimer--;
     if (this.wallLungeDebounceTimer > 0) this.wallLungeDebounceTimer--;
     if (this.comboResetTimer > 0) {
       this.comboResetTimer--;
@@ -331,12 +353,12 @@ export class RezeFighter extends Fighter {
 
     // 4. Update Active Effects & Sub-systems
     this._updateSparkFlechettes();
+    this._updateClusterBombs();
     this._updateDecoys();
     this._updateRocketLunge();
     this._updateMegatonNuke();
     this._updateDiveBomb();
     this._updateVault();
-    this._updateVisualExplosions();
 
     // 5. If busy with stationary ultimate, rocket lunge, dive bomb, or vault, skip standard steering
     if (this.isExecutingNuke || this.isRocketLunging || this.isDiveBombing || this.isVaulting) {
@@ -402,8 +424,8 @@ export class RezeFighter extends Fighter {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
 
-    // 1. Ultimate: Megaton Tsar Nuke
-    if (this.nukeCooldown <= 0 && this.isSkillEnabled(cfg.enableMegatonNuke, true) && dist < 350) {
+    // 1. Ultimate: Megaton Tsar Nuke (Single-use per round: Bomb Devil Form is permanent)
+    if (!this.hasUsedNuke && this.nukeCooldown <= 0 && this.isSkillEnabled(cfg.enableMegatonNuke, true) && dist < 350) {
       this._activateMegatonNuke(target);
       return;
     }
@@ -420,9 +442,9 @@ export class RezeFighter extends Fighter {
       return;
     }
 
-    // 4. Secondary: Decoy Bomb
-    if (this.decoyCooldown <= 0 && this.isSkillEnabled(cfg.enableDecoyBomb, false) && dist < 220) {
-      this._deployDecoyBomb(target);
+    // 4. Secondary: 3-Ball Cluster Bomb Spread (Explodes 1 by 1)
+    if (this.decoyCooldown <= 0 && (this.isSkillEnabled(cfg.enableClusterBomb, true) || this.isSkillEnabled(cfg.enableDecoyBomb, true)) && dist > 60 && dist < 340) {
+      this._throwClusterBombs(target);
       return;
     }
 
@@ -467,6 +489,7 @@ export class RezeFighter extends Fighter {
     const animDuration = isThrust ? 16 : (cfg.knifeCooldown || 14);
     this.punchAnimTimer = animDuration;
     this.punchMaxTime = animDuration;
+    this.punchActiveMaxTime = animDuration;
 
     // Cadence: Hits 1 and 2 allow fluid combo chaining (16 frames), while the thrust finisher has a recovery cooldown (38 frames)
     const nextCooldown = isThrust ? 38 : 16;
@@ -490,12 +513,17 @@ export class RezeFighter extends Fighter {
 
     if (targets.length > 0) {
       const sfx = isThrust
-        ? 'Assets/Sound Effects/Attacks/spikestab.mp3'
-        : 'Assets/Sound Effects/Attacks/swordswing.mp3';
-      try { audioSystem.playSFX(sfx, isThrust ? 0.70 : 0.55); } catch (e) {}
+        ? (cfg.sounds?.knifeStab || 'Assets/Sound Effects/Attacks/spikestab.mp3')
+        : (cfg.sounds?.knifeSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3');
+      const vol = isThrust
+        ? (cfg.soundVolumes?.knifeStab ?? 0.70)
+        : (cfg.soundVolumes?.knifeSwing ?? 0.55);
+      try { audioSystem.playSFX(sfx, vol); } catch (e) {}
     } else {
       try {
-        audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.25);
+        const sfx = cfg.sounds?.knifeSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+        const vol = (cfg.soundVolumes?.knifeSwing ?? 0.55) * 0.45;
+        audioSystem.playSFX(sfx, vol);
       } catch (e) {}
     }
 
@@ -505,8 +533,15 @@ export class RezeFighter extends Fighter {
       spawnSparks(target.x, target.y, isThrust ? 12 : 6, '#FFFFFF');
 
       const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
-      target.knockbackVx = Math.cos(kbAngle) * kbForce;
-      target.knockbackVy = Math.sin(kbAngle) * kbForce;
+      const kbVx = Math.cos(kbAngle) * kbForce;
+      const kbVy = Math.sin(kbAngle) * kbForce;
+      if (typeof target.applyKnockback === 'function') {
+        target.applyKnockback(kbVx, kbVy, stunDuration || 8);
+      } else {
+        target.vx = (target.vx || 0) + kbVx;
+        target.vy = (target.vy || 0) + kbVy;
+        target.knockbackStunTimer = Math.max(target.knockbackStunTimer || 0, stunDuration || 8);
+      }
 
       // Micro hit-stun for crisp flinch (Rule 5: on target only)
       if (typeof target.applyTimeStop === 'function') {
@@ -555,7 +590,7 @@ export class RezeFighter extends Fighter {
     this.diveBombVy = Math.sin(angle) * speed;
     this.gunAngle = angle;
 
-    audioSystem.playSFX('Assets/Sound Effects/Skills/dash2.mp3', 0.80);
+    audioSystem.playSFX(cfg.sounds?.diveBombDash || 'Assets/Sound Effects/Skills/dash2.mp3', cfg.soundVolumes?.diveBombDash ?? 0.80);
     spawnFloatingText(this.x, this.y - 25, 'DIVE BOMB!', '#E2E8F0');
   }
 
@@ -590,8 +625,8 @@ export class RezeFighter extends Fighter {
       spawnBloodEffect(hitTarget.x, hitTarget.y);
       spawnSparks(hitTarget.x, hitTarget.y, 14, '#FFFFFF');
 
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.75);
-      audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.65);
+      audioSystem.playSFX(cfg.sounds?.diveBombCut || 'Assets/Sound Effects/Attacks/swordswing.mp3', cfg.soundVolumes?.diveBombCut ?? 0.75);
+      audioSystem.playSFX(cfg.sounds?.diveBombParry || 'Assets/Sound Effects/Skills/parry.mp3', cfg.soundVolumes?.diveBombParry ?? 0.65);
       triggerGlobalScreenShake(3.0, 10);
 
       if (typeof hitTarget.applyTimeStop === 'function') {
@@ -675,6 +710,7 @@ export class RezeFighter extends Fighter {
     this.punchComboCount = (this.punchComboCount + 1) % 3;
     this.comboResetTimer = 55;
     this.punchAnimTimer = this.punchMaxTime;
+    this.punchActiveMaxTime = this.punchMaxTime;
 
     const isFinisher = (this.punchComboCount === 0);
     // Cadence: Hits 1 and 2 allow fluid combo punches (20 frames), while the Spark Slap palm blast finisher has a deliberate recovery cooldown (48 frames)
@@ -686,7 +722,7 @@ export class RezeFighter extends Fighter {
     const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
 
     const dmg = isFinisher ? (cfg.punchFinisherDamage || 32) : (cfg.punchDamage || 18);
-    const kbForce = isFinisher ? (cfg.punchFinisherKnockback || 34) : 14;
+    const kbForce = isFinisher ? (cfg.punchFinisherKnockback || 34) : (cfg.punchKnockback || 14);
 
     // Detonation impact location along punch strike vector
     const blastDist = punchReach * 0.72;
@@ -701,13 +737,13 @@ export class RezeFighter extends Fighter {
 
     // 1. Audio SFX: Every punch in Devil Form detonates an explosion!
     if (isFinisher) {
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.90);
+      audioSystem.playSFX(cfg.sounds?.punchExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.punchExplosion ?? 0.90);
       try {
-        audioSystem.playSFX(cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', 0.65);
+        audioSystem.playSFX(cfg.sounds?.punchFinisherExplosion || cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', cfg.soundVolumes?.punchFinisherExplosion ?? 0.65);
       } catch (e) {}
     } else {
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.55);
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 0.40);
+      audioSystem.playSFX(cfg.sounds?.punchExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.punchExplosion ?? 0.55);
+      audioSystem.playSFX(cfg.sounds?.punchSwing || 'Assets/Sound Effects/Attacks/heavypunch1.mp3', cfg.soundVolumes?.punchSwing ?? 0.40);
     }
 
     // 2. Global Screen Shake & Sparks on every punch explosion
@@ -766,8 +802,16 @@ export class RezeFighter extends Fighter {
 
       // Knockback physics blasting enemies away from Reze along the strike vector
       const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
-      target.knockbackVx = Math.cos(kbAngle) * kbForce;
-      target.knockbackVy = Math.sin(kbAngle) * kbForce;
+      const kbVx = Math.cos(kbAngle) * kbForce;
+      const kbVy = Math.sin(kbAngle) * kbForce;
+      const stunFrames = isFinisher ? 18 : 8;
+      if (typeof target.applyKnockback === 'function') {
+        target.applyKnockback(kbVx, kbVy, stunFrames);
+      } else {
+        target.vx = (target.vx || 0) + kbVx;
+        target.vy = (target.vy || 0) + kbVy;
+        target.knockbackStunTimer = Math.max(target.knockbackStunTimer || 0, stunFrames);
+      }
 
       // Rule 5: Hit-pause strictly on target, never on self!
       if (typeof target.applyTimeStop === 'function') {
@@ -856,11 +900,12 @@ export class RezeFighter extends Fighter {
         life: 45,
         damage: cfg.sparkDirectDamage || 14,
         explosionRadius: cfg.sparkExplosionRadius || 42,
-        explosionDamage: cfg.sparkExplosionDamage || 22
+        explosionDamage: cfg.sparkExplosionDamage || 22,
+        knockback: cfg.sparkKnockback || 12
       });
     }
 
-    audioSystem.playSFX(cfg.sounds?.sparkBurst || 'Assets/Sound Effects/Attacks/flamespray1.mp3', 0.65);
+    audioSystem.playSFX(cfg.sounds?.sparkBurst || 'Assets/Sound Effects/Attacks/flamespray1.mp3', cfg.soundVolumes?.sparkBurst ?? 0.65);
     spawnImpactFlash(this.x, this.y, '#FFE600');
     spawnFloatingText(this.x, this.y - 25, 'SPARK FLECHETTE', '#FFE600');
   }
@@ -900,51 +945,237 @@ export class RezeFighter extends Fighter {
   }
 
   _detonateFlechette(f) {
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
-    audioSystem.playSFX(cfg.sounds?.sparkExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3', 0.40);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    audioSystem.playSFX(cfg.sounds?.sparkExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.sparkExplosion ?? 0.40);
     spawnSparks(f.x, f.y, 14, '#FFE600');
     triggerGlobalScreenShake(2.0, 6);
 
     const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters?.indexOf(this)) : null;
+
     for (let t of allTargets) {
-      if (!t || t === this || t.isDead || (t.hp || 0) <= 0) continue;
+      if (!t || t === this || t.isDead || (t.hp || 0) <= 0 || t.isInvulnerable) continue;
+      if (state.fighters) {
+        const idx = state.fighters.indexOf(t);
+        if (idx !== -1 && myTeam !== null && state.getFighterTeam?.(idx) === myTeam) continue;
+      }
       const d = Math.hypot(t.x - f.x, t.y - f.y);
-      if (d <= f.explosionRadius) {
+      if (d <= f.explosionRadius + (t.r || 25)) {
         applyDamageToTarget(t, f.explosionDamage, this, false);
         spawnBloodEffect(t.x, t.y);
+
+        // Physical knockback impulse away from explosion center
+        const kbForce = f.knockback || cfg.sparkKnockback || 12;
+        const kbAng = Math.atan2(t.y - f.y, t.x - f.x);
+        const kbVx = Math.cos(kbAng) * kbForce;
+        const kbVy = Math.sin(kbAng) * kbForce;
+        if (typeof t.applyKnockback === 'function') {
+          t.applyKnockback(kbVx, kbVy, 10);
+        } else {
+          t.vx = (t.vx || 0) + kbVx;
+          t.vy = (t.vy || 0) + kbVy;
+          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 10);
+        }
+
+        if (typeof t.applyTimeStop === 'function') {
+          t.applyTimeStop(6);
+        }
       }
     }
   }
 
   /**
-   * Secondary Skill: Decoy Bomb / Smoke Step
+   * Secondary Skill: 3-Ball Cluster Bomb Spread
+   * Reze throws 3 small bomb balls in a fanned spread that travel outward and detonate
+   * sequentially 1 by 1 with staggered timers.
+   */
+  _throwClusterBombs(target) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    this.clusterCooldown = this.clusterCooldownMax;
+    this.decoyCooldown = this.clusterCooldownMax;
+    this.clusterThrowTimer = cfg.clusterBombThrowAnimFrames || 16;
+    this.clusterThrowMaxTimer = cfg.clusterBombThrowAnimFrames || 16;
+
+    const baseAngle = Math.atan2(target.y - this.y, target.x - this.x);
+    const count = cfg.clusterBombCount || 3;
+    const spreadAngle = cfg.clusterBombSpreadAngle || 0.40;
+    const flightFrames = cfg.clusterBombFlightFrames || 16;
+    const staggerFrames = cfg.clusterBombStaggerFrames || 14;
+    const throwDist = 135;
+
+    for (let i = 0; i < count; i++) {
+      // Symmetrical fanned spread: i = 0 (-0.40 rad), i = 1 (0 rad), i = 2 (+0.40 rad)
+      const offset = (i - (count - 1) / 2) * spreadAngle;
+      const angle = baseAngle + offset;
+      const dist = throwDist + (i === 1 ? 25 : 0); // Center bomb travels slightly farther
+
+      const startX = this.x + Math.cos(angle) * (this.r + 6);
+      const startY = this.y + Math.sin(angle) * (this.r + 6);
+      const targetX = this.x + Math.cos(angle) * dist;
+      const targetY = this.y + Math.sin(angle) * dist;
+
+      // Staggered sequential fuse: Ball 0 explodes at 24 frames, Ball 1 at 38 frames, Ball 2 at 52 frames (1 by 1!)
+      const fuseTimer = flightFrames + 8 + (i * staggerFrames);
+
+      this.activeClusterBombs.push({
+        index: i,
+        x: startX,
+        y: startY,
+        startX: startX,
+        startY: startY,
+        vx: (targetX - startX) / flightFrames,
+        vy: (targetY - startY) / flightFrames,
+        angle: angle,
+        radius: 6.5,
+        state: 'FLYING', // 'FLYING' -> 'ARMED'
+        flightTimer: flightFrames,
+        fuseTimer: fuseTimer,
+        maxFuse: fuseTimer,
+        damage: cfg.clusterBombExplosionDamage || 28,
+        explosionRadius: cfg.clusterBombExplosionRadius || 85,
+        knockback: cfg.clusterBombExplosionKnockback || 18,
+        trailPoints: [{ x: startX, y: startY }]
+      });
+    }
+
+    try {
+      const sfx = cfg.sounds?.clusterThrow || cfg.sounds?.knifeSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+      const vol = cfg.soundVolumes?.knifeSwing ?? 0.65;
+      audioSystem.playSFX(sfx, vol);
+    } catch (e) {}
+
+    spawnSparks(this.x, this.y, 16, '#FFE600');
+    spawnFloatingText(this.x, this.y - 25, 'CLUSTER SPREAD!', this.themeColor);
+  }
+
+  /**
+   * Backward-compatibility wrapper for test suites and older hooks
    */
   _deployDecoyBomb(target) {
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
-    this.decoyCooldown = this.decoyCooldownMax;
-
-    // Spawn decoy clone charging at opponent
-    const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+    this._throwClusterBombs(target);
     this.activeDecoys.push({
       x: this.x,
       y: this.y,
       r: this.r || 20,
-      angle: angleToTarget,
-      speed: cfg.decoyRushSpeed || 7.2,
+      angle: Math.atan2(target.y - this.y, target.x - this.x),
+      speed: 7.2,
       target: target,
-      fuseTimer: cfg.decoyFuseFrames || 90,
-      explosionRadius: cfg.decoyExplosionRadius || 110,
-      damage: cfg.decoyExplosionDamage || 45,
-      knockback: cfg.decoyExplosionKnockback || 24
+      fuseTimer: 90,
+      explosionRadius: 85,
+      damage: 28,
+      knockback: 18
+    });
+  }
+
+  _updateClusterBombs() {
+    if (!this.activeClusterBombs || this.activeClusterBombs.length === 0) return;
+
+    for (let i = this.activeClusterBombs.length - 1; i >= 0; i--) {
+      const b = this.activeClusterBombs[i];
+      if (!b) {
+        this.activeClusterBombs.splice(i, 1);
+        continue;
+      }
+
+      if (b.state === 'FLYING') {
+        if (!b.trailPoints) b.trailPoints = [];
+        if (b.trailPoints.length < 16) {
+          b.trailPoints.push({ x: b.x, y: b.y });
+        }
+        b.x += b.vx;
+        b.y += b.vy;
+        b.vx *= 0.95;
+        b.vy *= 0.95;
+        b.flightTimer--;
+
+        if (b.flightTimer <= 0) {
+          b.state = 'ARMED';
+          b.vx = 0;
+          b.vy = 0;
+        }
+      }
+
+      b.fuseTimer--;
+
+      // Spark trail while armed
+      if (b.fuseTimer % 4 === 0 && b.fuseTimer > 0) {
+        spawnSparks(b.x, b.y - 8, 2, '#FFE600');
+      }
+
+      // Detonate 1 by 1 as each fuse expires
+      if (b.fuseTimer <= 0) {
+        this._detonateClusterBomb(b);
+        this.activeClusterBombs.splice(i, 1);
+      }
+    }
+  }
+
+  _detonateClusterBomb(b) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    const radius = b.explosionRadius || cfg.clusterBombExplosionRadius || 85;
+    const damage = b.damage || cfg.clusterBombExplosionDamage || 28;
+    const knockback = b.knockback || cfg.clusterBombExplosionKnockback || 18;
+
+    // 1. Audio SFX
+    try {
+      const sfx = cfg.sounds?.clusterExplosion || cfg.sounds?.sparkExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3';
+      const vol = cfg.soundVolumes?.clusterExplosion ?? 0.75;
+      audioSystem.playSFX(sfx, vol);
+    } catch (e) {}
+
+    // 2. Screen shake & particle bursts
+    try {
+      triggerGlobalScreenShake(3.5, 10);
+      spawnSparks(b.x, b.y, 22, '#FF2E00');
+      spawnSparks(b.x, b.y, 14, '#FFE600');
+      spawnImpactFlash(b.x, b.y, '#FFE600');
+    } catch (e) {}
+
+    // 3. Register concentric water-ripple shockwave visual
+    this.activePalmBlasts.push({
+      x: b.x,
+      y: b.y,
+      radius: radius,
+      timer: 16,
+      maxTimer: 16,
+      isPunchExplosion: true,
+      isClusterExplosion: true
     });
 
-    // Reze flanks laterally
-    const flankAngle = angleToTarget + (Math.random() > 0.5 ? Math.PI / 2 : -Math.PI / 2);
-    this.x += Math.cos(flankAngle) * 90;
-    this.y += Math.sin(flankAngle) * 90;
+    // 4. Multi-target AOE damage & knockback (Rule 6: fighters & illusions)
+    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters?.indexOf(this)) : null;
 
-    audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.75);
-    spawnFloatingText(this.x, this.y - 25, 'DECOY STEP!', this.themeColor);
+    for (let t of allTargets) {
+      if (!t || t === this || t.isDead || (t.hp || 0) <= 0 || t.isInvulnerable) continue;
+      if (state.fighters) {
+        const idx = state.fighters.indexOf(t);
+        if (idx !== -1 && myTeam !== null && state.getFighterTeam?.(idx) === myTeam) continue;
+      }
+
+      const dist = Math.hypot(t.x - b.x, t.y - b.y);
+      if (dist <= radius + (t.r || 25)) {
+        try {
+          applyDamageToTarget(t, damage, this, false);
+          spawnBloodEffect(t.x, t.y);
+        } catch (e) {}
+
+        const kbAng = Math.atan2(t.y - b.y, t.x - b.x);
+        const kbVx = Math.cos(kbAng) * knockback;
+        const kbVy = Math.sin(kbAng) * knockback;
+        if (typeof t.applyKnockback === 'function') {
+          t.applyKnockback(kbVx, kbVy, 12);
+        } else {
+          t.vx = (t.vx || 0) + kbVx;
+          t.vy = (t.vy || 0) + kbVy;
+          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 12);
+        }
+
+        if (typeof t.applyTimeStop === 'function') {
+          t.applyTimeStop(8);
+        }
+      }
+    }
   }
 
   _updateDecoys() {
@@ -970,7 +1201,7 @@ export class RezeFighter extends Fighter {
 
   _detonateDecoy(d) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
-    audioSystem.playSFX(cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', 0.85);
+    audioSystem.playSFX(cfg.sounds?.decoyExplosion || cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', cfg.soundVolumes?.decoyExplosion ?? 0.85);
     spawnSparks(d.x, d.y, 28, '#FF2E00');
     triggerGlobalScreenShake(4.5, 14);
 
@@ -983,8 +1214,15 @@ export class RezeFighter extends Fighter {
         spawnBloodEffect(t.x, t.y);
 
         const kbAng = Math.atan2(t.y - d.y, t.x - d.x);
-        t.knockbackVx = Math.cos(kbAng) * d.knockback;
-        t.knockbackVy = Math.sin(kbAng) * d.knockback;
+        const kbVx = Math.cos(kbAng) * d.knockback;
+        const kbVy = Math.sin(kbAng) * d.knockback;
+        if (typeof t.applyKnockback === 'function') {
+          t.applyKnockback(kbVx, kbVy, 18);
+        } else {
+          t.vx = (t.vx || 0) + kbVx;
+          t.vy = (t.vy || 0) + kbVy;
+          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 18);
+        }
 
         // Rule 5: TimeStop strictly on target
         if (typeof t.applyTimeStop === 'function') {
@@ -1010,7 +1248,7 @@ export class RezeFighter extends Fighter {
     this.rocketLungeVy = Math.sin(angle) * speed;
     this.gunAngle = angle;
 
-    audioSystem.playSFX(cfg.sounds?.rocketJet || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3', 0.85);
+    audioSystem.playSFX(cfg.sounds?.rocketJet || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3', cfg.soundVolumes?.rocketJet ?? 0.85);
     spawnFloatingText(this.x, this.y - 25, 'ROCKET LUNGE!', this.themeColor);
   }
 
@@ -1027,15 +1265,24 @@ export class RezeFighter extends Fighter {
       if (!t || t === this || t.isDead || (t.hp || 0) <= 0) continue;
       if (Math.hypot(t.x - this.x, t.y - this.y) <= (this.r + (t.r || 25))) {
         // Impact!
-        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
-        audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.75);
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+        audioSystem.playSFX(cfg.sounds?.rocketImpact || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.rocketImpact ?? 0.75);
         applyDamageToTarget(t, cfg.rocketHitDamage || 35, this, true);
         spawnBloodEffect(t.x, t.y);
         spawnSparks(t.x, t.y, 22, this.themeColor);
         triggerGlobalScreenShake(4.0, 12);
 
-        t.knockbackVx = this.rocketLungeVx * 1.2;
-        t.knockbackVy = this.rocketLungeVy * 1.2;
+        const kb = cfg.rocketHitKnockback || 34;
+        const speed = Math.hypot(this.rocketLungeVx, this.rocketLungeVy) || 1;
+        const kbVx = (this.rocketLungeVx / speed) * kb;
+        const kbVy = (this.rocketLungeVy / speed) * kb;
+        if (typeof t.applyKnockback === 'function') {
+          t.applyKnockback(kbVx, kbVy, 20);
+        } else {
+          t.vx = (t.vx || 0) + kbVx;
+          t.vy = (t.vy || 0) + kbVy;
+          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 20);
+        }
         if (typeof t.applyTimeStop === 'function') t.applyTimeStop(10);
 
         this.isRocketLunging = false;
@@ -1189,8 +1436,8 @@ export class RezeFighter extends Fighter {
 
     // Detonation effects at wall contact point
     try {
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.80);
-      audioSystem.playSFX(cfg.sounds?.rocketJet || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3', 0.85);
+      audioSystem.playSFX(cfg.sounds?.wallRocketBlast || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.wallRocketBlast ?? 0.80);
+      audioSystem.playSFX(cfg.sounds?.rocketJet || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3', cfg.soundVolumes?.rocketJet ?? 0.85);
       spawnImpactFlash(this.x, this.y, 45, '#FFE600');
       spawnSparks(this.x, this.y, 24, '#FFE600');
       spawnSparks(this.x, this.y, 16, '#FF2E00');
@@ -1213,8 +1460,11 @@ export class RezeFighter extends Fighter {
 
   /**
    * Ultimate: Bomb Devil Unleashed — Megaton Tsar Nuke
+   * Single-use permanent transformation & living warhead nuke per round
    */
   _activateMegatonNuke(target) {
+    if (this.hasUsedNuke) return;
+    this.hasUsedNuke = true;
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
     this.nukeCooldown = this.nukeCooldownMax;
     this.nukeTarget = target;
@@ -1242,7 +1492,7 @@ export class RezeFighter extends Fighter {
     this.isExecutingNuke = true;
     this.nukePhase = 'DIVE';
     this.nukeTimer = 22;
-    audioSystem.playSFX(cfg.sounds?.nukeDive || 'Assets/Sound Effects/Skills/fugatravel.mp3', 0.85);
+    audioSystem.playSFX(cfg.sounds?.nukeDive || 'Assets/Sound Effects/Skills/fugatravel.mp3', cfg.soundVolumes?.nukeDive ?? 0.85);
     triggerGlobalScreenShake(5.0, 20);
     spawnFloatingText(this.x, this.y - 35, 'MEGATON TSAR NUKE!', '#FF2E00');
   }
@@ -1292,7 +1542,7 @@ export class RezeFighter extends Fighter {
     this.vy *= 0.15;
 
     try {
-      audioSystem.playSFX(cfg.sounds?.pinPull || 'Assets/Sound Effects/Skills/parry.mp3', 0.95);
+      audioSystem.playSFX(cfg.sounds?.pinPull || 'Assets/Sound Effects/Skills/parry.mp3', cfg.soundVolumes?.pinPull ?? 0.95);
     } catch (e) {}
 
     try {
@@ -1308,6 +1558,7 @@ export class RezeFighter extends Fighter {
   _updatePinPullTransformation(arena, opponent) {
     if (!this.isPullingPin) return;
 
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
     this.pinPullTimer--;
 
     // Keep aiming at target (Rule 3)
@@ -1322,12 +1573,10 @@ export class RezeFighter extends Fighter {
     const effectiveArena = arena || ((typeof CONFIG !== 'undefined' && CONFIG.arena) ? CONFIG.arena : state.arena);
     this.resolveWallBounce(effectiveArena, this.pinPullTarget || opponent);
 
-    this._updateVisualExplosions();
-
     // Midway event (~frame 22 of 44): hand pulls pin outward with tension, sparks spray from neck collar
     if (this.pinPullTimer === Math.round(this.pinPullMaxTimer * 0.50)) {
       try {
-        audioSystem.playSFX('Assets/Sound Effects/Attacks/flamespray1.mp3', 0.55);
+        audioSystem.playSFX(cfg.sounds?.pinPullSpray || 'Assets/Sound Effects/Attacks/flamespray1.mp3', cfg.soundVolumes?.pinPullSpray ?? 0.55);
         spawnSparks(this.x, this.y - 6, 14, '#FFE600');
         triggerGlobalScreenShake(2.5, 8);
       } catch (e) {}
@@ -1344,9 +1593,9 @@ export class RezeFighter extends Fighter {
    */
   _detonateTransformationBlast() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
-    const radius = 175;
-    const damage = 50;
-    const knockback = 34;
+    const radius = cfg.transformationExplosionRadius || 175;
+    const damage = cfg.transformationExplosionDamage || 50;
+    const knockback = cfg.transformationKnockback || 34;
 
     // 1. Radial Blast Shockwave Visual
     this.activeNukeBlasts.push({
@@ -1360,8 +1609,8 @@ export class RezeFighter extends Fighter {
 
     // 2. Audio SFX: Heavy explosion detonation
     try {
-      audioSystem.playSFX(cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', 1.0);
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.85);
+      audioSystem.playSFX(cfg.sounds?.transformationBlast || cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', cfg.soundVolumes?.transformationBlast ?? 1.0);
+      audioSystem.playSFX(cfg.sounds?.transformationExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.transformationExplosion ?? 0.85);
     } catch (e) {}
 
     // 3. Screen shake & Particle Bursts
@@ -1394,8 +1643,15 @@ export class RezeFighter extends Fighter {
         } catch (e) {}
 
         const angle = Math.atan2(t.y - this.y, t.x - this.x);
-        t.knockbackVx = Math.cos(angle) * knockback;
-        t.knockbackVy = Math.sin(angle) * knockback;
+        const kbVx = Math.cos(angle) * knockback;
+        const kbVy = Math.sin(angle) * knockback;
+        if (typeof t.applyKnockback === 'function') {
+          t.applyKnockback(kbVx, kbVy, 24);
+        } else {
+          t.vx = (t.vx || 0) + kbVx;
+          t.vy = (t.vy || 0) + kbVy;
+          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 24);
+        }
 
         if (typeof t.applyTimeStop === 'function') {
           t.applyTimeStop(20);
@@ -1459,22 +1715,35 @@ export class RezeFighter extends Fighter {
       maxTimer: 30
     });
 
-    audioSystem.playSFX(cfg.sounds?.nukeImpact || 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3', 1.0);
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.8);
+    audioSystem.playSFX(cfg.sounds?.nukeImpact || 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3', cfg.soundVolumes?.nukeImpact ?? 1.0);
+    audioSystem.playSFX(cfg.sounds?.nukeExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.nukeExplosion ?? 0.80);
     triggerGlobalScreenShake(8.0, 30);
     spawnSparks(this.x, this.y, 45, '#FF2E00');
 
     const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters?.indexOf(this)) : null;
+
     for (let t of allTargets) {
-      if (!t || t === this || t.isDead || (t.hp || 0) <= 0) continue;
+      if (!t || t === this || t.isDead || (t.hp || 0) <= 0 || t.isInvulnerable) continue;
+      if (state.fighters) {
+        const idx = state.fighters.indexOf(t);
+        if (idx !== -1 && myTeam !== null && state.getFighterTeam?.(idx) === myTeam) continue;
+      }
       const dist = Math.hypot(t.x - this.x, t.y - this.y);
-      if (dist <= radius) {
+      if (dist <= radius + (t.r || 25)) {
         applyDamageToTarget(t, dmg, this, false);
         spawnBloodEffect(t.x, t.y);
 
         const kbAng = Math.atan2(t.y - this.y, t.x - this.x);
-        t.knockbackVx = Math.cos(kbAng) * kb;
-        t.knockbackVy = Math.sin(kbAng) * kb;
+        const kbVx = Math.cos(kbAng) * kb;
+        const kbVy = Math.sin(kbAng) * kb;
+        if (typeof t.applyKnockback === 'function') {
+          t.applyKnockback(kbVx, kbVy, 30);
+        } else {
+          t.vx = (t.vx || 0) + kbVx;
+          t.vy = (t.vy || 0) + kbVy;
+          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 30);
+        }
 
         if (typeof t.applyTimeStop === 'function') {
           t.applyTimeStop(25);
@@ -1484,25 +1753,49 @@ export class RezeFighter extends Fighter {
   }
 
   _updateVisualExplosions() {
-    for (let i = this.activeKnifeSlashes.length - 1; i >= 0; i--) {
-      const k = this.activeKnifeSlashes[i];
-      k.timer--;
-      if (k.timer <= 0) this.activeKnifeSlashes.splice(i, 1);
+    if (this.activeKnifeSlashes && this.activeKnifeSlashes.length > 0) {
+      for (let i = this.activeKnifeSlashes.length - 1; i >= 0; i--) {
+        const k = this.activeKnifeSlashes[i];
+        if (!k || typeof k.timer !== 'number') {
+          this.activeKnifeSlashes.splice(i, 1);
+          continue;
+        }
+        k.timer--;
+        if (k.timer <= 0) this.activeKnifeSlashes.splice(i, 1);
+      }
     }
-    for (let i = this.activeMartialArcs.length - 1; i >= 0; i--) {
-      const a = this.activeMartialArcs[i];
-      a.timer--;
-      if (a.timer <= 0) this.activeMartialArcs.splice(i, 1);
+    if (this.activeMartialArcs && this.activeMartialArcs.length > 0) {
+      for (let i = this.activeMartialArcs.length - 1; i >= 0; i--) {
+        const a = this.activeMartialArcs[i];
+        if (!a || typeof a.timer !== 'number') {
+          this.activeMartialArcs.splice(i, 1);
+          continue;
+        }
+        a.timer--;
+        if (a.timer <= 0) this.activeMartialArcs.splice(i, 1);
+      }
     }
-    for (let i = this.activePalmBlasts.length - 1; i >= 0; i--) {
-      const b = this.activePalmBlasts[i];
-      b.timer--;
-      if (b.timer <= 0) this.activePalmBlasts.splice(i, 1);
+    if (this.activePalmBlasts && this.activePalmBlasts.length > 0) {
+      for (let i = this.activePalmBlasts.length - 1; i >= 0; i--) {
+        const b = this.activePalmBlasts[i];
+        if (!b || typeof b.timer !== 'number') {
+          this.activePalmBlasts.splice(i, 1);
+          continue;
+        }
+        b.timer--;
+        if (b.timer <= 0) this.activePalmBlasts.splice(i, 1);
+      }
     }
-    for (let i = this.activeNukeBlasts.length - 1; i >= 0; i--) {
-      const n = this.activeNukeBlasts[i];
-      n.timer--;
-      if (n.timer <= 0) this.activeNukeBlasts.splice(i, 1);
+    if (this.activeNukeBlasts && this.activeNukeBlasts.length > 0) {
+      for (let i = this.activeNukeBlasts.length - 1; i >= 0; i--) {
+        const n = this.activeNukeBlasts[i];
+        if (!n || typeof n.timer !== 'number') {
+          this.activeNukeBlasts.splice(i, 1);
+          continue;
+        }
+        n.timer--;
+        if (n.timer <= 0) this.activeNukeBlasts.splice(i, 1);
+      }
     }
   }
 
@@ -1542,8 +1835,8 @@ export class RezeFighter extends Fighter {
         });
 
         try {
-          audioSystem.playSFX(cfg.sounds?.pinPull || 'Assets/Sound Effects/Skills/parry.mp3', 0.95);
-          audioSystem.playSFX(cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', 0.90);
+          audioSystem.playSFX(cfg.sounds?.revivePinPull || cfg.sounds?.pinPull || 'Assets/Sound Effects/Skills/parry.mp3', cfg.soundVolumes?.revivePinPull ?? 0.95);
+          audioSystem.playSFX(cfg.sounds?.reviveExplosion || cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', cfg.soundVolumes?.reviveExplosion ?? 0.90);
         } catch (e) {}
 
         try {
@@ -1563,8 +1856,15 @@ export class RezeFighter extends Fighter {
               applyDamageToTarget(t, shockDmg, this, false);
             } catch (e) {}
             const ang = Math.atan2(t.y - this.y, t.x - this.x);
-            t.knockbackVx = Math.cos(ang) * shockKb;
-            t.knockbackVy = Math.sin(ang) * shockKb;
+            const kbVx = Math.cos(ang) * shockKb;
+            const kbVy = Math.sin(ang) * shockKb;
+            if (typeof t.applyKnockback === 'function') {
+              t.applyKnockback(kbVx, kbVy, 22);
+            } else {
+              t.vx = (t.vx || 0) + kbVx;
+              t.vy = (t.vy || 0) + kbVy;
+              t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 22);
+            }
             if (typeof t.applyTimeStop === 'function') t.applyTimeStop(15);
           }
         }
@@ -1587,7 +1887,10 @@ export class RezeFighter extends Fighter {
       drawSparkFlechette(ctx, f);
     }
 
-    // 3. Active Decoys
+    // 3. Active Cluster Bombs & Decoys (Skill 2)
+    for (let b of this.activeClusterBombs) {
+      drawRezeClusterBomb(ctx, b);
+    }
     for (let d of this.activeDecoys) {
       drawRezeDecoy(ctx, d);
     }
@@ -1644,12 +1947,6 @@ export class RezeFighter extends Fighter {
       this.hp = Math.min(this.maxHp, this.hp + healAmount);
       this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
       this._healthBarHealTimer = 16;
-
-      const now = Date.now();
-      if (!this._lastLifestealTextTime || now - this._lastLifestealTextTime >= 100) {
-        this._lastLifestealTextTime = now;
-        spawnFloatingText(this.x + (Math.random() - 0.5) * 16, this.y - (this.r || 25) - 12, `+${healAmount}`, '#00FF66');
-      }
     }
   }
 

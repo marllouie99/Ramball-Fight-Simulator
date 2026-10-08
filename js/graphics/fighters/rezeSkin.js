@@ -110,6 +110,64 @@ function _getMartialLungeCurve(p) {
 }
 
 /**
+ * Gojo-Standard Brawler Punch Kinematics Curve (JJK High-Impact Martial Arts Snap)
+ * Fast explosive snap in the first 28% of the strike, followed by smooth sinusoidal retraction.
+ */
+function _getGojoPunchCurve(p) {
+  if (p <= 0) return 0;
+  if (p >= 1) return 0;
+  if (p < 0.28) {
+    return Math.sin((p / 0.28) * (Math.PI * 0.5));
+  } else {
+    const retractT = (p - 0.28) / 0.72;
+    return Math.cos(retractT * (Math.PI * 0.5));
+  }
+}
+
+/**
+ * Dynamic target reach calculation (Gojo / Saitama standard):
+ * Dynamically scales punch reach directly toward the opponent's body edge (+12px penetration)
+ * so strikes physically connect with maximum impact.
+ */
+function _calculateGojoPunchReach(fighter, r, baseHandX, defaultLunge = r * 1.95) {
+  let maxLunge = defaultLunge;
+  const target = (fighter && fighter.target && !fighter.target.isDead)
+    ? fighter.target
+    : (fighter && typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
+
+  if (target && !target.isDead) {
+    const targetY = target.y - (target.z || 0);
+    const fighterY = fighter.y - (fighter.z || 0);
+    const dx = target.x - fighter.x;
+    const dy = targetY - fighterY;
+    const targetDist = Math.hypot(dx, dy);
+    const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+
+    // Check if target is in frontal hemisphere relative to punch angle
+    const angleToTarget = Math.atan2(dy, dx);
+    let angleDiff = angleToTarget - angle;
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+    if (Math.abs(angleDiff) < Math.PI * 0.5) {
+      const forwardDist = targetDist * Math.cos(angleDiff);
+      const targetR = target.r || r;
+      const targetNearEdge = forwardDist - targetR;
+      const gapToTarget = targetNearEdge - baseHandX;
+
+      // Deep solid punch impact into the opponent's body (+12px depth)
+      const desiredImpactReach = gapToTarget + Math.min(targetR * 0.55, 12);
+      const maxBeforeBackExit = (forwardDist + targetR * 0.40) - baseHandX;
+      const clampedTargetReach = Math.min(maxBeforeBackExit, desiredImpactReach);
+
+      // Dynamically clamp reach between r * 1.15 and r * 2.45
+      maxLunge = Math.max(r * 1.15, Math.min(r * 2.45, clampedTargetReach));
+    }
+  }
+  return maxLunge;
+}
+
+/**
  * Main Skin Renderer for Reze (Human Form & Bomb Devil Hybrid Form)
  */
 export function drawRezeSkin(ctx, fighter) {
@@ -136,19 +194,22 @@ export function drawRezeSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // 2. Punch & Lunge & Dive Bomb States
+  // 2. Punch & Throw & Lunge & Dive Bomb States
   const isPunching = !isPodiumPreview && !isSuppressed && (fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
+  const isThrowing = !isPodiumPreview && !isSuppressed && Boolean(fighter.clusterThrowTimer && fighter.clusterThrowTimer > 0);
   const isLunge = !isPodiumPreview && !isSuppressed && Boolean(fighter.isRocketLunging);
   const isDiveBomb = !isPodiumPreview && !isSuppressed && Boolean(fighter.isDiveBombing);
-  const punchPhase = isPunching ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14))) : 0;
+  const maxPunchT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 14;
+  const punchPhase = isPunching ? Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxPunchT))) : 0;
+  const throwPhase = isThrowing ? Math.min(1.0, Math.max(0.0, 1.0 - (fighter.clusterThrowTimer / (fighter.clusterThrowMaxTimer || 16)))) : 0;
   const punchCycle = fighter.punchComboCount || 0;
 
   // 3. LAYER 1: BACK HAND (Behind Body Circle Layer)
   // Hidden during podium preview & model inspection to show clean character details (Rule 20)
   // In Devil Form (isHybrid), back hand is displayed in ready combat guard stance
-  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && (isHybrid || isPunching || isLunge || isDiveBomb || fighter.isPullingPin);
+  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && (isHybrid || isPunching || isThrowing || isLunge || isDiveBomb || fighter.isPullingPin);
   if (showBackHand) {
-    _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now);
+    _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, isThrowing, throwPhase, now);
   }
 
   // 4. LAYER 2: MAIN BODY CIRCLE (Middle Layer)
@@ -170,7 +231,7 @@ export function drawRezeSkin(ctx, fighter) {
   // In Devil Form (isHybrid), Reze visibly displays her front martial arts guard hand
   const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand;
   if (showFrontHand) {
-    _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now);
+    _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, isThrowing, throwPhase, now);
   }
 
   ctx.restore();
@@ -782,7 +843,7 @@ function _drawRezeConcealedKnife(ctx, hx, hy, handSize, bladeAngle = 0, isRevers
 function _drawRezeHandPixelCombustion(ctx, hx, hy, handSize, isFinisher, punchPhase, now, fighter) {
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
-  const intensity = _getMartialLungeCurve(punchPhase);
+  const intensity = _getGojoPunchCurve(punchPhase);
 
   ctx.save();
   ctx.translate(hx, hy);
@@ -805,9 +866,16 @@ function _drawRezeHandPixelCombustion(ctx, hx, hy, handSize, isFinisher, punchPh
   ctx.fillRect(-P * 0.5, -P * 3, P, P);
   ctx.fillRect(-P * 0.5, P * 2, P, P);
 
-  // 4. Finisher "Spark Slap" Multi-Pixel Flare & Flying Embers
+  // 4. Kinetic Supersonic Spark Trail (trailing behind punch impact)
+  ctx.fillStyle = '#FFE600';
+  ctx.fillRect(-P * 4, -P * 1.5, P, P);
+  ctx.fillRect(-P * 5, P * 1.0, P, P);
+  ctx.fillStyle = '#FF6B1A';
+  ctx.fillRect(-P * 6, -P * 0.5, P, P);
+
+  // 5. Finisher "Spark Slap" Multi-Pixel Flare & Flying Embers
   if (isFinisher) {
-    const flareR = snap(handSize * (1.2 + intensity * 0.8));
+    const flareR = snap(handSize * (1.35 + intensity * 0.9));
     ctx.fillStyle = '#FFE600';
     ctx.fillRect(flareR, -P, P * 1.5, P * 2);
     ctx.fillRect(-flareR, -P, P * 1.5, P * 2);
@@ -815,12 +883,12 @@ function _drawRezeHandPixelCombustion(ctx, hx, hy, handSize, isFinisher, punchPh
     ctx.fillRect(-P, -flareR, P * 2, P * 1.5);
 
     // Flying spark pixels
-    for (let i = 0; i < 6; i++) {
-      const ang = (i / 6) * Math.PI * 2 + (now * 0.01);
-      const dist = snap(handSize * 1.8 + Math.sin(now * 0.02 + i) * 6);
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + (now * 0.015);
+      const dist = snap(handSize * 2.0 + Math.sin(now * 0.025 + i) * 8);
       const sx = snap(Math.cos(ang) * dist);
       const sy = snap(Math.sin(ang) * dist);
-      ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : ((fighter && fighter.themeColor) || '#430363ff');
+      ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : ((i % 3 === 0) ? '#FFE600' : '#FF2E00');
       ctx.fillRect(sx, sy, P, P);
     }
   }
@@ -831,7 +899,7 @@ function _drawRezeHandPixelCombustion(ctx, hx, hy, handSize, isFinisher, punchPh
 /**
  * Renders Reze's Back Hand (Layer 1 - Behind Body Circle) during active combat
  */
-function _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now) {
+function _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, isThrowing, throwPhase, now) {
   const handSize = isHybrid ? getHandSize(r * 0.22) : getHandSize(r * 0.18);
   const skinColor = isHybrid ? '#32394E' : '#FFE6D8';
   const outlineColor = isHybrid ? '#0E1017' : '#14101A';
@@ -840,7 +908,6 @@ function _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, pu
   let hy = r * 0.28;
   let activeCombustion = false;
   const isFinisher = isPunching && (punchCycle === 0 || punchCycle === 3);
-  const lungeProgress = isPunching ? _getMartialLungeCurve(punchPhase) : 0;
 
   if (fighter.isPullingPin) {
     // Dramatic stance: off-hand holds counter-balance near hip/ribcage
@@ -850,7 +917,33 @@ function _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, pu
     return;
   }
 
-  if (!isHybrid) {
+  if (isThrowing) {
+    if (!isHybrid) {
+      if (throwPhase < 0.28) {
+        // Windup: Off-hand reaches forward to aim/point at target
+        const t = Math.sin((throwPhase / 0.28) * (Math.PI * 0.5));
+        hx = r * (0.40 + 0.35 * t);
+        hy = r * (0.28 - 0.20 * t);
+      } else {
+        // Release & follow-through: Off-hand recoils back to ribs for biomechanical balance
+        const t = Math.min(1.0, (throwPhase - 0.28) / 0.35);
+        const ease = Math.sin(t * (Math.PI * 0.5));
+        hx = r * (0.75 - 0.40 * ease);
+        hy = r * (0.08 + 0.22 * ease);
+      }
+    } else {
+      if (throwPhase < 0.28) {
+        const t = Math.sin((throwPhase / 0.28) * (Math.PI * 0.5));
+        hx = r * (0.60 + 0.25 * t);
+        hy = -r * (0.32 - 0.15 * t);
+      } else {
+        const t = Math.min(1.0, (throwPhase - 0.28) / 0.35);
+        const ease = Math.sin(t * (Math.PI * 0.5));
+        hx = r * (0.85 - 0.30 * ease);
+        hy = -r * (0.17 + 0.15 * ease);
+      }
+    }
+  } else if (!isHybrid) {
     // ──────────────────────────────────────────
     // HUMAN FORM: TACTICAL CQC OFF-HAND GUARD
     // ──────────────────────────────────────────
@@ -876,39 +969,131 @@ function _drawRezeBackHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, pu
       hy = r * 0.28;
     }
   } else {
-    // Bomb Devil Form: Martial Arts combo & Guard Stance
-    // Off-hand guards from the LEFT side of body (like Mahoraga's stance)
+    // ──────────────────────────────────────────
+    // BOMB DEVIL FORM: GOJO-STYLE ALTERNATING PUNCH KINEMATICS & GUARD
+    // ──────────────────────────────────────────
     if (isPunching) {
-      if (punchCycle === 2) {
-        hx = r * 0.85 + lungeProgress * (r * 1.20);
-        hy = -r * 0.18;
-        activeCombustion = (punchPhase > 0.08 && punchPhase < 0.88);
-      } else if (punchCycle === 0) {
-        hx = r * 0.90 + lungeProgress * (r * 1.40);
-        hy = -r * 0.22;
-        activeCombustion = (punchPhase > 0.05 && punchPhase < 0.92);
-      } else {
-        // Non-punching hand recoils to left guard
-        hx = r * 0.55 - lungeProgress * (r * 0.15);
+      const baseHandX = r * 0.58;
+      const maxLunge = _calculateGojoPunchReach(fighter, r, baseHandX, r * 1.90);
+      const easePunch = _getGojoPunchCurve(punchPhase);
+      const currentLunge = easePunch * maxLunge;
+
+      if (punchCycle === 1) {
+        // ── Hit 1: Lead Left Explosive Straight Jab (Striking Fist!) ──
+        hx = baseHandX + currentLunge;
+        hy = -r * 0.20 + Math.sin(punchPhase * Math.PI) * (r * 0.08);
+        activeCombustion = (punchPhase > 0.04 && punchPhase < 0.88);
+      } else if (punchCycle === 2) {
+        // ── Hit 2: Rear Right Cross (Back Hand Recoils to High Left Guard) ──
+        const recoil = Math.sin(punchPhase * Math.PI) * (r * 0.16);
+        hx = r * 0.50 - recoil;
         hy = -r * 0.32;
+        activeCombustion = false;
+      } else {
+        // ── Hit 3: Spark Slap Palm Thrust (Back Hand Braces in 2-Handed Support Drive) ──
+        hx = r * 0.58 + easePunch * (r * 0.45);
+        hy = -r * 0.22;
+        activeCombustion = false;
       }
     } else if (isLunge || isDiveBomb) {
       hx = r * 0.75;
       hy = -r * 0.30;
     } else {
       // Idle / moving in Bomb Devil Form:
-      // Off-hand held in left-side martial-arts guard stance (like Mahoraga)
-      const idleBob = (now && typeof now === 'number') ? Math.sin(now * 0.005 + 1.2) * 0.8 : 0;
-      hx = r * 0.60;
-      hy = -r * 0.32 + idleBob;
+      // Left-side brawler guard stance with subtle natural breathing bob
+      const idleBob = (now && typeof now === 'number') ? Math.sin(now * 0.006 + 1.2) * (r * 0.035) : 0;
+      hx = r * 0.55;
+      hy = -r * 0.30 + idleBob;
     }
   }
 
   drawPixelHand(ctx, hx, hy, handSize, skinColor, outlineColor);
 
   if (activeCombustion) {
-    _drawRezeHandPixelCombustion(ctx, hx + handSize * 0.6, hy, handSize, isFinisher, punchPhase, now, fighter);
+    _drawRezeHandPixelCombustion(ctx, hx + handSize * 0.7, hy, handSize, isFinisher, punchPhase, now, fighter);
   }
+}
+
+/**
+ * Draws a small live bomb ball visibly held in Reze's hand during the throw windup
+ */
+function _drawRezeHeldBomb(ctx, hx, hy, handSize, r, now) {
+  const bombR = handSize * 0.90;
+  const P = 2.0;
+  ctx.save();
+  ctx.translate(hx, hy);
+
+  // Dark outline
+  ctx.fillStyle = '#0E0F14';
+  ctx.beginPath();
+  ctx.arc(0, 0, bombR + 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Dark iron body
+  ctx.fillStyle = '#261C30';
+  ctx.beginPath();
+  ctx.arc(0, 0, bombR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Metallic highlight
+  ctx.fillStyle = '#CBD5E1';
+  ctx.beginPath();
+  ctx.arc(-bombR * 0.35, -bombR * 0.35, bombR * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Sparkling fuse top
+  const fuseY = -bombR - 2.5;
+  ctx.fillStyle = '#FFE600';
+  ctx.beginPath();
+  ctx.arc(0, fuseY, 2.5 + Math.sin(now * 0.04) * 1.0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 4-Point cross spark star
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-P * 0.8, fuseY - P * 0.25, P * 1.6, P * 0.5);
+  ctx.fillRect(-P * 0.25, fuseY - P * 0.8, P * 0.5, P * 1.6);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the kinetic release speed arc and spark burst at the throw release point
+ */
+function _drawRezeThrowReleaseVFX(ctx, hx, hy, handSize, relP, now) {
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const alpha = Math.max(0, 1.0 - relP);
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  ctx.translate(hx, hy);
+
+  // 1. Kinetic forward speed streaks
+  const arcLen = 18 * (1.0 + relP * 0.8);
+  ctx.strokeStyle = '#FFE600';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(2, -4);
+  ctx.lineTo(2 + arcLen, -1);
+  ctx.moveTo(2, 4);
+  ctx.lineTo(2 + arcLen, 1);
+  ctx.stroke();
+
+  // 2. White kinetic release core
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(4, 0);
+  ctx.lineTo(4 + arcLen * 0.7, 0);
+  ctx.stroke();
+
+  // 3. Mini release spark dots
+  ctx.fillStyle = '#FF2E00';
+  ctx.fillRect(snap(arcLen * 0.5), snap(-6), P, P);
+  ctx.fillRect(snap(arcLen * 0.8), snap(5), P, P);
+
+  ctx.restore();
 }
 
 /**
@@ -994,7 +1179,7 @@ function _drawRezePinPullVisuals(ctx, r, pullProgress, hx, hy, handSize, now) {
  * Renders Reze's Front Hand (Layer 3 - On Top of Body Circle)
  * In Human Form (!isHybrid), Reze visibly holds her Chef's Knife in front guard stance.
  */
-function _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, now) {
+function _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, punchCycle, isLunge, isDiveBomb, isThrowing, throwPhase, now) {
   const handSize = isHybrid ? getHandSize(r * 0.22) : getHandSize(r * 0.18);
   const skinColor = isHybrid ? '#32394E' : '#FFE6D8';
   const outlineColor = isHybrid ? '#0E1017' : '#14101A';
@@ -1041,6 +1226,49 @@ function _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, p
 
     // 2. Draw Collar Pin, Pulled Ring, Stem Wire & Friction Sparks
     _drawRezePinPullVisuals(ctx, r, pullProgress, hx, hy, handSize, now);
+    return;
+  }
+
+  if (isThrowing) {
+    drawKnife = false; // Tactical knife is concealed/sheathed while pitching bombs
+
+    // ──────────────────────────────────────────
+    // 3-PHASE EXPLOSIVE BOMB THROW KINEMATICS
+    // ──────────────────────────────────────────
+    // Phase 1 (0.00 to 0.25): Deep Cock-Back Windup (hand draws back high, holding sparkling bomb)
+    // Phase 2 (0.25 to 0.65): Powerful Forward Pitch Whip (hand drives forward to 1.65r with release speed arc)
+    // Phase 3 (0.65 to 1.00): Follow-Through & Snappy Retraction back to guard
+    if (throwPhase < 0.25) {
+      const t = throwPhase / 0.25;
+      const ease = Math.sin(t * Math.PI * 0.5);
+      hx = r * (0.85 - 0.55 * ease);
+      hy = r * (0.22 - 0.52 * ease);
+    } else if (throwPhase < 0.65) {
+      const t = (throwPhase - 0.25) / 0.40;
+      const ease = Math.sin(t * Math.PI * 0.5);
+      hx = r * (0.30 + 1.35 * ease); // Drives forward out to 1.65r!
+      hy = r * (-0.30 + 0.35 * ease);
+    } else {
+      const recP = (throwPhase - 0.65) / 0.35;
+      const easeRec = Math.pow(1 - recP, 2.0);
+      hx = r * (0.85 + 0.80 * easeRec);
+      hy = r * (0.22 - 0.17 * (1 - easeRec));
+    }
+
+    // Draw held bomb in hand during windup (Phase 1)
+    if (throwPhase < 0.25) {
+      _drawRezeHeldBomb(ctx, hx - 2, hy - 2, handSize, r, now);
+    }
+
+    // Draw Front Pixel Hand
+    drawPixelHand(ctx, hx, hy, handSize, skinColor, outlineColor);
+
+    // Release Kinetic Speed Arc & Sparks (Phase 2 release moment: 0.25 to 0.48)
+    if (throwPhase >= 0.25 && throwPhase <= 0.48) {
+      const relP = (throwPhase - 0.25) / 0.23;
+      _drawRezeThrowReleaseVFX(ctx, hx, hy, handSize, relP, now);
+    }
+
     return;
   }
 
@@ -1130,19 +1358,30 @@ function _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, p
       }
     }
   } else if (isPunching && isHybrid) {
-    // Bomb Devil Form: Martial Arts punches
+    // ──────────────────────────────────────────
+    // BOMB DEVIL FORM: GOJO-STYLE ALTERNATING PUNCH KINEMATICS & GUARD
+    // ──────────────────────────────────────────
+    const baseHandX = r * 0.78;
+    const maxLunge = _calculateGojoPunchReach(fighter, r, baseHandX, r * 2.05);
+    const easePunch = _getGojoPunchCurve(punchPhase);
+    const currentLunge = easePunch * maxLunge;
+
     if (punchCycle === 1) {
-      hx = r * 0.80 + lungeProgress * (r * 1.55);
-      hy = -r * 0.05;
-      activeCombustion = (punchPhase > 0.08 && punchPhase < 0.88);
+      // ── Hit 1: Lead Left Jab (Front Hand Recoils into Tight Boxing Cheek Guard) ──
+      const recoil = Math.sin(punchPhase * Math.PI) * (r * 0.18);
+      hx = r * 0.65 - recoil;
+      hy = r * 0.20 + Math.sin(punchPhase * Math.PI) * (r * 0.04);
+      activeCombustion = false;
     } else if (punchCycle === 2) {
-      hx = r * 0.75 + lungeProgress * (r * 1.45);
-      hy = r * 0.12;
-      activeCombustion = (punchPhase > 0.08 && punchPhase < 0.88);
+      // ── Hit 2: Rear Right Heavy Molten Cross / Hook (Striking Fist!) ──
+      hx = baseHandX + currentLunge * 1.05;
+      hy = r * 0.12 - Math.sin(punchPhase * Math.PI) * (r * 0.08); // Drives inward toward center line
+      activeCombustion = (punchPhase > 0.04 && punchPhase < 0.88);
     } else {
-      hx = r * 0.85 + lungeProgress * (r * 1.65);
-      hy = 0;
-      activeCombustion = (punchPhase > 0.05 && punchPhase < 0.92);
+      // ── Hit 3: Devastating SPARK SLAP Palm Thrust Finisher (Deepest Forward Reach!) ──
+      hx = baseHandX + currentLunge * 1.22;
+      hy = 0; // Dead center forward along aim vector
+      activeCombustion = (punchPhase > 0.03 && punchPhase < 0.92);
     }
   } else if (isLunge) {
     hx = r * 1.05;
@@ -1151,11 +1390,11 @@ function _drawRezeFrontHand(ctx, fighter, r, isHybrid, isPunching, punchPhase, p
     knifeAngle = -0.10;
   } else {
     // Idle / Walking / Moving / Aiming
-    const idleBob = (now && typeof now === 'number') ? Math.sin(now * 0.005) * 0.8 : 0;
+    const idleBob = (now && typeof now === 'number') ? Math.sin(now * 0.006) * (r * 0.035) : 0;
     if (isHybrid) {
-      // Bomb Devil Form: Martial arts lead hand in front guard
+      // Bomb Devil Form: Right-side lead guard stance
       hx = r * 0.78;
-      hy = r * 0.10 + idleBob;
+      hy = r * 0.14 + idleBob;
       drawKnife = false;
     } else {
       // Human Form: Knife guard

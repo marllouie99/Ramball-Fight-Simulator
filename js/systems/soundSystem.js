@@ -42,6 +42,7 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('faah') ||
          s.includes('voiceline') ||
          s.includes('voice') ||
+         s.includes('vocal') ||
          s.includes('getsuga') ||
          s.includes('bankai') ||
          s.includes('ichigo') ||
@@ -104,6 +105,7 @@ export function isVoicelineAudio(src) {
   const s = String(src).toLowerCase();
   return s.includes('voiceline') ||
          s.includes('voice') ||
+         s.includes('vocal') ||
          s.includes('hollowpurple') ||
          s.includes('purpledeploy') ||
          s.includes('mixing') ||
@@ -554,7 +556,7 @@ export function clearSoundCache(keepProtected = true) {
  * @param {number} [speed=1.0] - Playback speed (1.0 is normal)
  * @returns {HTMLAudioElement}
  */
-export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0) {
+export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0, loopStart = 0, loopEnd = 0) {
   if (_loopingSounds.has(key)) {
     stopLoopingSound(key);
   }
@@ -573,13 +575,25 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
       const rampTime = fadeMs > 0 ? (fadeMs / 1000) : MICRO_FADE_IN;
       const targetDest = getMasterAudioDestination();
 
+      const now = audioCtx.currentTime;
+      if (fadeMs > 0) {
+        gainNode.gain.setValueAtTime(0.001, now);
+        gainNode.gain.linearRampToValueAtTime(targetGain, now + rampTime);
+      } else {
+        gainNode.gain.setValueAtTime(targetGain, now);
+      }
+
       source.connect(gainNode);
       gainNode.connect(targetDest);
       source.playbackRate.value = Math.max(0.1, speed);
       source.loop = true;
+      if (loopEnd > loopStart) {
+        source.loopStart = Math.max(0, loopStart);
+        source.loopEnd = Math.min(cached.duration || loopEnd, loopEnd);
+      }
       source.start(0);
       // Store as object with source and gain for later control
-      const soundObj = { source, gainNode, buffer: cached };
+      const soundObj = { source, gainNode, buffer: cached, _isFadingOut: false };
       _loopingSounds.set(key, soundObj);
       return soundObj;
     } catch (e) {
@@ -595,6 +609,7 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
   const targetVol = Math.max(0, Math.min(1, volume));
   audio.loop = true;
   audio.playbackRate = Math.max(0.1, speed);
+  audio._isFadingOut = false;
   if (fadeMs > 0) {
     audio.volume = 0.001;
     audio.play().catch(() => {});
@@ -622,6 +637,7 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
 export function isLoopingSoundPlaying(key) {
   const soundObj = _loopingSounds.get(key);
   if (!soundObj) return false;
+  if (soundObj._isFadingOut) return false;
   if (soundObj.gainNode && soundObj.buffer) {
     return true;
   }
@@ -640,13 +656,16 @@ export function fadeOutLoopingSound(key, fadeMs = 300) {
   const soundObj = _loopingSounds.get(key);
   if (!soundObj) return;
 
+  if (soundObj._isFadingOut) return;
+  soundObj._isFadingOut = true;
+
   // Handle Web Audio API objects (have source/gainNode/buffer)
   if (soundObj.gainNode && soundObj.buffer) {
     const gainNode = soundObj.gainNode;
     const source = soundObj.source;
     try {
       const audioCtx = getAudioContext();
-      const now = audioCtx.currentTime;
+      const now = audioCtx ? audioCtx.currentTime : 0;
       const currentGain = gainNode.gain.value;
       gainNode.gain.cancelScheduledValues(now);
       gainNode.gain.setValueAtTime(currentGain, now);
@@ -654,22 +673,31 @@ export function fadeOutLoopingSound(key, fadeMs = 300) {
       setTimeout(() => {
         try { source.stop(); } catch (e) {}
         try { gainNode.disconnect(); } catch (e) {}
-        _loopingSounds.delete(key);
+        if (_loopingSounds.get(key) === soundObj) {
+          _loopingSounds.delete(key);
+        }
       }, fadeMs + 30);
     } catch (e) {
       try { source.stop(); } catch (e2) {}
       try { gainNode.disconnect(); } catch (e2) {}
-      _loopingSounds.delete(key);
+      if (_loopingSounds.get(key) === soundObj) {
+        _loopingSounds.delete(key);
+      }
     }
     return;
   }
 
   // Handle HTML Audio elements
   const audio = soundObj;
-  if (audio.paused || audio.ended) return;
+  if (audio.paused || audio.ended) {
+    if (_loopingSounds.get(key) === soundObj) {
+      _loopingSounds.delete(key);
+    }
+    return;
+  }
   const startVol = audio.volume;
   const steps = 20;
-  const stepDelay = fadeMs / steps;
+  const stepDelay = Math.max(10, fadeMs / steps);
   let step = 0;
   const interval = setInterval(() => {
     step++;
@@ -679,7 +707,9 @@ export function fadeOutLoopingSound(key, fadeMs = 300) {
       audio.pause();
       audio.currentTime = 0;
       audio.loop = false;
-      _loopingSounds.delete(key);
+      if (_loopingSounds.get(key) === soundObj) {
+        _loopingSounds.delete(key);
+      }
     }
   }, stepDelay);
 }

@@ -922,8 +922,9 @@ export const HitImpactSystem = {
         audioSystem.playSFX('Assets/Sound Effects/SkillEffects/splat3.ogg', 0.85);
       }
 
-      // 4. Fire Pea direct burn ignition
-      if (isFire && target) {
+      // 4. Fire Pea direct burn ignition (only when the pea actually damaged the target)
+      const fireHitLanded = projectile._lastHitLanded !== false;
+      if (isFire && target && fireHitLanded) {
         if (typeof target.applyBurn === 'function') {
           target.applyBurn(projectile.ownerFighter || null, 180);
         } else {

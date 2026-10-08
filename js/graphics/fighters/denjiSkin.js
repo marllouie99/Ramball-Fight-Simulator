@@ -11,7 +11,7 @@
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
-import { drawAuthenticChainsawBlade, drawDenjiAttackSlashFX } from '../weapons/denjiWeaponGraphics.js';
+import { drawAuthenticChainsawBlade, drawDenjiAttackSlashFX, drawDenjiChainsawSmoke } from '../weapons/denjiWeaponGraphics.js';
 
 const P = 2.0;
 function snap(v) {
@@ -63,8 +63,16 @@ export function drawDenjiSkin(ctx, fighter) {
   const hideChainsaws = Boolean(fighter.hideChainsaws || fighter.hideChainsaw || (typeof state !== 'undefined' && (state.hideDenjiChainsaws || state.showSkinOnly)));
   const hideHands = Boolean(fighter.hideHands || fighter.hideFrontHand || fighter.hideBackHand || hideChainsaws || (typeof state !== 'undefined' && state.showSkinOnly));
 
+  let denjiShakeX = 0;
+  let denjiShakeY = 0;
+  if (fighter.shredShakeTimer && fighter.shredShakeTimer > 0) {
+    const intensity = fighter.shredShakeIntensity || 2.0;
+    denjiShakeX = (Math.random() - 0.5) * intensity * 2;
+    denjiShakeY = (Math.random() - 0.5) * intensity * 2;
+  }
+
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
+  ctx.translate(fighter.x + denjiShakeX, fighter.y + denjiShakeY);
 
   // 1. Standard Upright Orientation & Local Angle Transforms (Rule 19)
   const angle = isPodiumPreview ? 0 : (fighter.gunAngle || 0);
@@ -77,15 +85,48 @@ export function drawDenjiSkin(ctx, fighter) {
 
   // 2. Shred & Lunge States
   const isPunching = !isPodiumPreview && !isSuppressed && (fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
-  const isLunge = !isPodiumPreview && !isSuppressed && Boolean(fighter.isEngineLunging);
-  const isShredding = !isPodiumPreview && !isSuppressed && Boolean(fighter.isShredding);
+  const isLunge = !isPodiumPreview && !isSuppressed && Boolean(
+    fighter.isEngineLunging || 
+    (fighter.lungeWindupTimer && fighter.lungeWindupTimer > 0) || 
+    (fighter.lungeHitRecoveryTimer && fighter.lungeHitRecoveryTimer > 0)
+  );
+  const isShredding = !isPodiumPreview && Boolean(fighter.isShredding);
+
+  // Golden Helmet Vent Slits Illumination Alpha during Skill 1 (Windup, Dash, Impact Breather, Speed Boost)
+  let lungeGlowAlpha = 0;
+  if (!isPodiumPreview && !isSuppressed) {
+    if (fighter.lungeWindupTimer && fighter.lungeWindupTimer > 0) {
+      lungeGlowAlpha = 1.0;
+    } else if (fighter.isEngineLunging) {
+      lungeGlowAlpha = 1.0;
+    } else if (fighter.lungeHitRecoveryTimer && fighter.lungeHitRecoveryTimer > 0) {
+      lungeGlowAlpha = 1.0;
+    } else if (fighter.lungePostSpeedBoostTimer && fighter.lungePostSpeedBoostTimer > 0) {
+      const maxBoost = (typeof CONFIG !== 'undefined' && CONFIG.denji && CONFIG.denji.lungePostSpeedBoostFrames !== undefined)
+        ? CONFIG.denji.lungePostSpeedBoostFrames 
+        : (fighter.lungePostSpeedBoostFrames || 200);
+      const fadeDuration = Math.min(45, maxBoost);
+      if (fighter.lungePostSpeedBoostTimer > fadeDuration) {
+        lungeGlowAlpha = 1.0;
+      } else {
+        lungeGlowAlpha = Math.max(0, fighter.lungePostSpeedBoostTimer / fadeDuration);
+      }
+    }
+  }
+
+  const curContinuous = fighter.continuousShredTimer || 0;
+  const smokeMax = 120; // 2.0s continuous shred duration for full thermal friction heat
+  const heatRatio = curContinuous > 0 ? Math.min(1.0, curContinuous / smokeMax) : 0;
 
   const combatOpts = {
     isAttacking: isPunching || isShredding,
     isLunging: isLunge,
     isSawing: isShredding,
     shredBladeCount: fighter.shredBladeCount || (isShredding ? 1 : 0),
-    isMassacre: Boolean(fighter.isExecutingMassacre)
+    isMassacre: Boolean(fighter.isExecutingMassacre),
+    heatRatio: heatRatio,
+    isOverheated: heatRatio > 0,
+    lungeGlowAlpha: lungeGlowAlpha
   };
 
   // 3. LAYER 1: MAIN BODY CIRCLE (Permanently Chainsaw Devil Form)
@@ -100,12 +141,20 @@ export function drawDenjiSkin(ctx, fighter) {
     ctx.drawImage(devilImg, -shiftX, -shiftY, drawW, drawH);
     ctx.restore();
 
+    // Golden Helmet Vent Slit Illumination (Lights up during windup/dash, fades as speed boost expires)
+    if (lungeGlowAlpha > 0) {
+      _drawDenjiHelmetVentGlow(ctx, r, lungeGlowAlpha, now);
+    }
+
     // Central Forehead Chainsaw Blade (Protruding Forward along Top Crest)
     if (!hideChainsaws && !(typeof state !== 'undefined' && state.showSkinOnly)) {
       _drawDenjiForeheadChainsaw(ctx, r, now, combatOpts);
     }
   } else {
     drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaws, combatOpts);
+    if (lungeGlowAlpha > 0) {
+      _drawDenjiHelmetVentGlow(ctx, r, lungeGlowAlpha, now);
+    }
   }
 
   // 4. LAYER 2: SYMMETRICAL FRONT HANDS & FOREARM CHAINSAWS (Rule 20 Front Layer Standard)
@@ -122,6 +171,11 @@ export function drawDenjiSkin(ctx, fighter) {
   }
 
   ctx.restore();
+
+  // 5. LAYER 3: Chainsaw Overheat Smoke Effect (World Space Particles)
+  if (!isPodiumPreview && !hideChainsaws) {
+    drawDenjiChainsawSmoke(ctx, fighter);
+  }
 }
 
 /**
@@ -292,6 +346,179 @@ function _drawDenjiCrownSpikes(ctx, r) {
 }
 
 /**
+ * Renders the 3 acoustic exhaust vent ridges / slits on Denji's Chainsaw Devil helmet cowl
+ * glowing in radiant gold during Skill 1 Ripcord Engine Rev Lunge (wind-up, dash, recovery, speed boost).
+ * Adheres strictly to Rule 11 (Zero shadowBlur CPU performance preservation).
+ */
+export function _drawDenjiHelmetVentGlow(ctx, r, glowAlpha, now = 0) {
+  if (!glowAlpha || glowAlpha <= 0) return;
+  const clampedAlpha = Math.max(0, Math.min(1.0, glowAlpha));
+  const scale = r / 25;
+
+  // Pulse oscillation (high-frequency engine rev electrical vibration)
+  const time = now || Date.now();
+  const pulse = 0.90 + 0.10 * Math.sin(time * 0.035);
+  const effAlpha = clampedAlpha * pulse;
+
+  const slits = [
+    // Slit 1 (Left / Rear)
+    { x1: -10.8 * scale, y1: -13.2 * scale, x2: -7.2 * scale, y2: -2.0 * scale, thick: 2.6 * scale, steps: 5 },
+    // Slit 2 (Center / Main)
+    { x1: -6.2 * scale, y1: -15.8 * scale, x2: -2.4 * scale, y2: -1.8 * scale, thick: 2.8 * scale, steps: 6 },
+    // Slit 3 (Right / Front)
+    { x1: -1.6 * scale, y1: -13.2 * scale, x2: +2.4 * scale, y2: -1.8 * scale, thick: 2.6 * scale, steps: 5 },
+  ];
+
+  const bloomX = -4.3 * scale;
+  const bloomY = -8.0 * scale;
+
+  ctx.save();
+
+  // 0. LAYER 0: Multi-Tier Golden Radial Atmosphere Bloom (Simulated GPU Bloom without shadowBlur)
+  const bloomRadius = (r * 1.15) * (0.92 + 0.08 * Math.sin(time * 0.04));
+  const innerBloomRadius = r * 0.55;
+
+  // Outer Soft Ambient Golden Bloom
+  const outerBloomGrad = ctx.createRadialGradient(bloomX, bloomY, innerBloomRadius * 0.2, bloomX, bloomY, bloomRadius);
+  outerBloomGrad.addColorStop(0.0, `rgba(255, 255, 240, ${effAlpha * 0.65})`);
+  outerBloomGrad.addColorStop(0.25, `rgba(254, 240, 138, ${effAlpha * 0.45})`);
+  outerBloomGrad.addColorStop(0.55, `rgba(250, 204, 21, ${effAlpha * 0.24})`);
+  outerBloomGrad.addColorStop(0.82, `rgba(245, 158, 11, ${effAlpha * 0.08})`);
+  outerBloomGrad.addColorStop(1.0, 'rgba(217, 119, 6, 0.0)');
+
+  ctx.fillStyle = outerBloomGrad;
+  ctx.beginPath();
+  ctx.arc(bloomX, bloomY, bloomRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Intense Inner Core Bloom Hotspot
+  const innerBloomGrad = ctx.createRadialGradient(bloomX, bloomY, 0, bloomX, bloomY, innerBloomRadius);
+  innerBloomGrad.addColorStop(0.0, `rgba(255, 255, 255, ${effAlpha * 0.75})`);
+  innerBloomGrad.addColorStop(0.40, `rgba(254, 240, 138, ${effAlpha * 0.50})`);
+  innerBloomGrad.addColorStop(0.80, `rgba(250, 204, 21, ${effAlpha * 0.20})`);
+  innerBloomGrad.addColorStop(1.0, 'rgba(250, 204, 21, 0.0)');
+
+  ctx.fillStyle = innerBloomGrad;
+  ctx.beginPath();
+  ctx.arc(bloomX, bloomY, innerBloomRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 1. Outer Warm Amber Radiation Halo on Each Slit
+  for (let s of slits) {
+    ctx.strokeStyle = `rgba(245, 158, 11, ${effAlpha * 0.42})`;
+    ctx.lineWidth = s.thick + 3.4 * scale;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(s.x1, s.y1);
+    ctx.lineTo(s.x2, s.y2);
+    ctx.stroke();
+  }
+
+  // 2. Main Radiant Super Saiyan Anime Gold Body (#FACC15 / #FFD700)
+  for (let s of slits) {
+    ctx.strokeStyle = `rgba(250, 204, 21, ${effAlpha * 0.95})`;
+    ctx.lineWidth = s.thick;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(s.x1, s.y1);
+    ctx.lineTo(s.x2, s.y2);
+    ctx.stroke();
+  }
+
+  // 3. High-Intensity White-Gold Core Filament (#FEF08A / #FFFFFF)
+  for (let s of slits) {
+    ctx.strokeStyle = `rgba(254, 240, 138, ${effAlpha * 0.95})`;
+    ctx.lineWidth = Math.max(1.0, s.thick * 0.42);
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(s.x1 * 0.92 + s.x2 * 0.08, s.y1 * 0.92 + s.y2 * 0.08);
+    ctx.lineTo(s.x1 * 0.08 + s.x2 * 0.92, s.y1 * 0.08 + s.y2 * 0.92);
+    ctx.stroke();
+  }
+
+  // 4. Fine Discrete Pixel Slats & Specular Sparks (Authentic 1:1 Pixel Art Aesthetic)
+  for (let s of slits) {
+    for (let i = 0; i <= s.steps; i++) {
+      const t = i / s.steps;
+      const tx = s.x1 + (s.x2 - s.x1) * t;
+      const ty = s.y1 + (s.y2 - s.y1) * t;
+      const px = snap(tx);
+      const py = snap(ty);
+
+      if (i % 2 === 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${effAlpha * 0.95})`;
+        ctx.fillRect(px, py, P, P);
+      } else {
+        ctx.fillStyle = `rgba(254, 240, 138, ${effAlpha * 0.90})`;
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  // 5. Anamorphic Golden Lens Flare / Diamond Bloom Streaks
+  if (effAlpha >= 0.25) {
+    const flareLen = (r * 0.95) * (0.85 + 0.15 * Math.sin(time * 0.04));
+    const flareThick = 2.4 * scale;
+    const flareAngle = 1.28; // Diagonal slant aligned with helmet cowl acoustic slits
+
+    ctx.save();
+    ctx.translate(bloomX, bloomY);
+    ctx.rotate(flareAngle);
+
+    // Primary Longitudinal Lens Flare Beam
+    const flareGrad = ctx.createLinearGradient(-flareLen, 0, flareLen, 0);
+    flareGrad.addColorStop(0.0, 'rgba(250, 204, 21, 0.0)');
+    flareGrad.addColorStop(0.35, `rgba(250, 204, 21, ${effAlpha * 0.38})`);
+    flareGrad.addColorStop(0.5, `rgba(255, 255, 255, ${effAlpha * 0.88})`);
+    flareGrad.addColorStop(0.65, `rgba(250, 204, 21, ${effAlpha * 0.38})`);
+    flareGrad.addColorStop(1.0, 'rgba(250, 204, 21, 0.0)');
+
+    ctx.fillStyle = flareGrad;
+    ctx.beginPath();
+    ctx.moveTo(-flareLen, 0);
+    ctx.lineTo(0, -flareThick);
+    ctx.lineTo(flareLen, 0);
+    ctx.lineTo(0, flareThick);
+    ctx.closePath();
+    ctx.fill();
+
+    // Secondary Perpendicular Cross-Beam
+    const crossLen = flareLen * 0.45;
+    const crossThick = flareThick * 0.75;
+    const crossGrad = ctx.createLinearGradient(0, -crossLen, 0, crossLen);
+    crossGrad.addColorStop(0.0, 'rgba(254, 240, 138, 0.0)');
+    crossGrad.addColorStop(0.5, `rgba(255, 255, 255, ${effAlpha * 0.80})`);
+    crossGrad.addColorStop(1.0, 'rgba(254, 240, 138, 0.0)');
+
+    ctx.fillStyle = crossGrad;
+    ctx.beginPath();
+    ctx.moveTo(0, -crossLen);
+    ctx.lineTo(-crossThick, 0);
+    ctx.lineTo(0, crossLen);
+    ctx.lineTo(crossThick, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  // 6. Micro Engine Exhaust Flame/Sparks at Top Vent Lips (during peak lunge/dash)
+  if (effAlpha >= 0.75) {
+    const sparkCount = 3;
+    for (let i = 0; i < sparkCount; i++) {
+      const s = slits[i];
+      const sparkPhase = (time * 0.02 + i * 2.1);
+      const sparkX = s.x1 + Math.sin(sparkPhase) * (1.5 * scale);
+      const sparkY = s.y1 - Math.abs(Math.cos(sparkPhase)) * (2.5 * scale);
+      ctx.fillStyle = `rgba(254, 240, 138, ${effAlpha * (0.6 + 0.4 * Math.sin(sparkPhase * 2))})`;
+      ctx.fillRect(snap(sparkX), snap(sparkY), P, P);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws Denji's Chainsaw Devil Hybrid Form Body in Solid 2D Pixel Art
  * Authentic 1:1 Chainsaw Man reference design matching official anime close-up:
  * - Fiery orange helmet cowl with 3 concentric black acoustic/exhaust vent ridges
@@ -303,7 +530,7 @@ function _drawDenjiCrownSpikes(ctx, r) {
  * - Extended forehead chainsaw blade with hooked teeth and blood streaks
  * - Crisp cream Public Safety shirt, black silk tie, brown belt, dark trousers
  */
-export function drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaw = false) {
+export function drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaw = false, opts = {}) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   const steps = Math.ceil((r + P) / P);
@@ -423,7 +650,18 @@ export function drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaw = false) {
         const isVentArc3 = (ventDist >= 5.4 && ventDist <= 6.2 && gx >= -1 && gy <= -1);
 
         if (isVentArc1 || isVentArc2 || isVentArc3) {
-          ctx.fillStyle = '#090D16'; // Deep black acoustic vent arcs
+          if (opts && opts.lungeGlowAlpha && opts.lungeGlowAlpha > 0) {
+            const gAlpha = opts.lungeGlowAlpha;
+            if (gAlpha >= 0.8) {
+              ctx.fillStyle = (ventDist > 3.0 && ventDist < 4.8) ? '#FEF08A' : '#FACC15';
+            } else if (gAlpha >= 0.4) {
+              ctx.fillStyle = '#EAB308';
+            } else {
+              ctx.fillStyle = '#92400E';
+            }
+          } else {
+            ctx.fillStyle = '#090D16'; // Deep black acoustic vent arcs
+          }
           ctx.fillRect(px, py, P, P);
           continue;
         }
@@ -570,7 +808,8 @@ function _drawDenjiForeheadChainsaw(ctx, r, now, opts = {}) {
 /**
  * Draws Denji's Left Arm / Left Forearm Chainsaw (Rule 20 Canonical Symmetrical Standard)
  * Rendered on the Front Layer at (-r * 0.82, +r * 0.38)
- * In idle/neutral, this off-hand chainsaw slants forward-downward at a 42° angle (0.73 rad).
+ * In idle/neutral, this off-hand chainsaw slants forward-downward at a 42° angle (0.73 rad)
+ * with dynamic swinging animation.
  */
 function _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPodiumPreview, now, opts = {}) {
   const handRadius = getHandSize(r * 0.30);
@@ -578,16 +817,43 @@ function _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPod
   let armY = r * 0.38;
   let sawAngle = 0.73; // ~42° forward-downward slant matching diagram
 
+  const isSuppressed = !isPodiumPreview && Boolean(
+    fighter.isTargetOfAmbush || 
+    (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())
+  );
+
+  // Dynamic arm swinging animation (idle breathing & stride sway)
+  if (!isSuppressed) {
+    const moveSpeed = Math.hypot(fighter.vx || 0, fighter.vy || 0);
+    const speedFactor = Math.min(2.0, 1.0 + moveSpeed * 0.12);
+    const swingPhase = (now * 0.0055) * speedFactor;
+    
+    const swingAmpX = r * 0.08; // ~2.0px horizontal sway
+    const swingAmpY = r * 0.05; // ~1.25px vertical sway
+    const swingAngleAmp = 0.08; // ~4.6° angular oscillation
+
+    armX += Math.sin(swingPhase) * swingAmpX;
+    armY += Math.cos(swingPhase) * swingAmpY;
+    sawAngle += Math.sin(swingPhase) * swingAngleAmp;
+  }
+
+  // High-frequency chainsaw motor vibration during active shredding / sawing
+  if (opts.isSawing || opts.isMassacre) {
+    armX += (Math.sin(now * 0.08) - 0.5) * 1.5;
+    armY += (Math.cos(now * 0.08) - 0.5) * 1.5;
+    sawAngle += (Math.sin(now * 0.12) - 0.5) * 0.04;
+  }
+
   if (isPunching) {
     const ext = Math.sin((fighter.punchAnimTimer / (fighter.punchMaxTime || 14)) * Math.PI) * (r * 0.6);
     armX += ext;
   } else if (isLunge) {
-    armX += r * 0.4;
-    sawAngle = 0.40;
+    armX += r * 0.5;
+    sawAngle = 0.0; // Point directly forward toward the enemy alongside the right arm
   }
 
   if (isHybrid) {
-    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, handRadius, now, false, opts);
+    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, handRadius, now, false, opts, r);
   } else {
     drawPixelHand(ctx, armX, armY, handRadius, '#FFE0BD', '#18181B');
   }
@@ -596,13 +862,41 @@ function _drawDenjiLeftArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPod
 /**
  * Draws Denji's Right Arm / Right Forearm Chainsaw (Rule 20 Canonical Symmetrical Standard)
  * Rendered on the Front Layer at (+r * 0.82, +r * 0.38)
- * In idle/neutral, this lead chainsaw points straight forward towards the enemy (0.0 rad).
+ * In idle/neutral, this lead chainsaw points straight forward towards the enemy (0.0 rad)
+ * with dynamic swinging animation in complementary counter-phase.
  */
 function _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPodiumPreview, now, opts = {}) {
   const handRadius = getHandSize(r * 0.30);
   let armX = r * 0.82;
   let armY = r * 0.38;
   let sawAngle = 0.0; // Pointing forward towards the enemy (0.0 rad)
+
+  const isSuppressed = !isPodiumPreview && Boolean(
+    fighter.isTargetOfAmbush || 
+    (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())
+  );
+
+  // Dynamic arm swinging animation (counter-phase for natural alternating swing)
+  if (!isSuppressed) {
+    const moveSpeed = Math.hypot(fighter.vx || 0, fighter.vy || 0);
+    const speedFactor = Math.min(2.0, 1.0 + moveSpeed * 0.12);
+    const swingPhase = (now * 0.0055) * speedFactor + Math.PI; // Counter-phase (+180°)
+    
+    const swingAmpX = r * 0.08; // ~2.0px horizontal sway
+    const swingAmpY = r * 0.05; // ~1.25px vertical sway
+    const swingAngleAmp = 0.08; // ~4.6° angular oscillation
+
+    armX += Math.sin(swingPhase) * swingAmpX;
+    armY += Math.cos(swingPhase) * swingAmpY;
+    sawAngle += Math.sin(swingPhase) * swingAngleAmp;
+  }
+
+  // High-frequency chainsaw motor vibration during active shredding / sawing
+  if (opts.isSawing || opts.isMassacre) {
+    armX += (Math.sin(now * 0.08 + 1) - 0.5) * 1.5;
+    armY += (Math.cos(now * 0.08 + 1) - 0.5) * 1.5;
+    sawAngle += (Math.sin(now * 0.12 + 1) - 0.5) * 0.04;
+  }
 
   if (isPunching) {
     const ext = Math.sin((fighter.punchAnimTimer / (fighter.punchMaxTime || 14)) * Math.PI) * (r * 0.8);
@@ -613,7 +907,7 @@ function _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPo
   }
 
   if (isHybrid) {
-    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, handRadius, now, true, opts);
+    _drawPixelForearmChainsaw(ctx, armX, armY, sawAngle, handRadius, now, true, opts, r);
   } else {
     drawPixelHand(ctx, armX, armY, handRadius, '#FFE0BD', '#18181B');
   }
@@ -622,10 +916,11 @@ function _drawDenjiRightArm(ctx, fighter, r, isHybrid, isPunching, isLunge, isPo
 /**
  * Draws a forearm-mounted chainsaw blade bursting from Denji's arm in 2D Pixel Art
  * Adheres strictly to Rule 20 (drawPixelHand front-layer rendering over weapon base)
+ * Scaled to the exact same size as the head chainsaw (bladeLen: Math.round(r * 3.1))
  */
-function _drawPixelForearmChainsaw(ctx, cx, cy, angle, handRadius, now, isFront, opts = {}) {
-  const sawLen = 56; // Proportional forearm length
-  const sawThick = Math.round((sawLen * 369) / 1594); // ~13px
+function _drawPixelForearmChainsaw(ctx, cx, cy, angle, handRadius, now, isFront, opts = {}, r = 25) {
+  const sawLen = Math.round(r * 3.1); // Same scale size as head chainsaw (~78px)
+  const sawThick = Math.round((sawLen * 369) / 1594); // Same scale thickness (~18px)
 
   // 1. Draw chainsaw blade emerging from wrist/forearm
   ctx.save();
@@ -646,4 +941,86 @@ function _drawPixelForearmChainsaw(ctx, cx, cy, angle, handRadius, now, isFront,
 
   // 2. LAYER 2: Rule 20 Circular Pixel Hand overlapping front layer over blade anchor
   drawPixelHand(ctx, cx, cy, handRadius, '#FFE0BD', '#090D16');
+}
+
+/**
+ * Renders Denji's Chainsaw Devil Ghost Model afterimages at recorded absolute world coordinates.
+ * Each ghost model renders Denji's full Chainsaw Devil body circle along with all 3 chainsaws
+ * (forehead saw + left & right arm chainsaws) fading smoothly in his wake.
+ */
+export function drawDenjiAfterImages(ctx, fighter) {
+  const isSuppressed = Boolean(
+    fighter && (
+      fighter.isTargetOfAmbush || 
+      (typeof fighter.areAttackEffectsSuppressed === 'function' && fighter.areAttackEffectsSuppressed())
+    )
+  );
+  if (!fighter || !fighter.afterImages || fighter.afterImages.length === 0 || isSuppressed) return;
+  const r = fighter.r || 25;
+  const now = Date.now();
+
+  ctx.save();
+  for (let i = 0; i < fighter.afterImages.length; i++) {
+    const ai = fighter.afterImages[i];
+    if (!ai || ai.timer <= 0) continue;
+    const progress = ai.timer / (ai.maxTimer || 16);
+    const alpha = progress * 0.45;
+    const angle = ai.gunAngle !== undefined ? ai.gunAngle : (ai.angle || 0);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(ai.x, ai.y);
+    ctx.rotate(angle);
+
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft) ctx.scale(1, -1);
+
+    const ghostOpts = {
+      isAttacking: false,
+      isLunging: true,
+      isSawing: false,
+      shredBladeCount: 1,
+      isMassacre: false,
+      isGhost: true
+    };
+
+    // 1. Ghost Body Model (Chainsaw Devil)
+    const devilImg = _getDenjiDevilSkinImage();
+    if (devilImg && devilImg.complete && devilImg.naturalWidth > 0) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      const drawW = r * (1150 / 368);
+      const drawH = r * (1150 / 368);
+      const shiftX = r * (600 / 368);
+      const shiftY = r * (620 / 368);
+      ctx.drawImage(devilImg, -shiftX, -shiftY, drawW, drawH);
+      ctx.restore();
+
+      // Ghost Golden Vent Glow
+      _drawDenjiHelmetVentGlow(ctx, r, 1.0, now);
+
+      // Ghost Forehead Chainsaw Blade
+      _drawDenjiForeheadChainsaw(ctx, r, now, ghostOpts);
+    } else {
+      drawDenjiChainsawHybridBody(ctx, r, now, false, ghostOpts);
+      _drawDenjiHelmetVentGlow(ctx, r, 1.0, now);
+    }
+
+    // 2. Ghost Hands & Left / Right Forearm Chainsaws
+    const handRadius = getHandSize(r * 0.30);
+    // Left Arm Chainsaw (pointing forward at 0.0 rad)
+    _drawPixelForearmChainsaw(ctx, -r * 0.82 + r * 0.5, r * 0.38, 0.0, handRadius, now, false, ghostOpts, r);
+    // Right Arm Chainsaw (pointing forward at 0.0 rad)
+    _drawPixelForearmChainsaw(ctx, r * 0.82 + r * 0.5, r * 0.38, 0.0, handRadius, now, true, ghostOpts, r);
+
+    // 3. Amber Energy Aura Ring
+    ctx.beginPath();
+    ctx.arc(0, 0, r + 2, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(234, 179, 8, ${alpha * 0.8})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+  ctx.restore();
 }

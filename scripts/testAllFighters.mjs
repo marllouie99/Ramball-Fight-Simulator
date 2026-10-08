@@ -715,6 +715,7 @@ async function main() {
 
         // 6. Test Megaton Tsar Nuke Ultimate (Human Form triggers pin pull transformation; Devil Form triggers dive assault)
         fighter.nukeCooldown = 0;
+        fighter.hasUsedNuke = false;
         fighter._activateMegatonNuke(dummyOpponent);
         if (!fighter.isPullingPin) {
           throw new Error(`Reze failed to initiate Collar Pin Pull transformation in Human Form!`);
@@ -722,9 +723,19 @@ async function main() {
         fighter.isPullingPin = false;
         fighter.isHybridModeActive = true;
         fighter.nukeCooldown = 0;
+        fighter.hasUsedNuke = false;
         fighter._activateMegatonNuke(dummyOpponent);
         if (!fighter.isExecutingNuke || fighter.nukePhase !== 'DIVE') {
           throw new Error(`Reze failed to initiate Megaton Tsar Nuke Dive in Bomb Devil Form!`);
+        }
+
+        // Verify single-use per round restriction
+        fighter.nukeCooldown = 0;
+        fighter.isExecutingNuke = false;
+        fighter.nukePhase = 'IDLE';
+        fighter._activateMegatonNuke(dummyOpponent);
+        if (fighter.isExecutingNuke || fighter.isPullingPin) {
+          throw new Error(`Reze Megaton Tsar Nuke should only trigger once per round!`);
         }
 
         // 7. Test Bomb Devil Form: Punch AOE Explosions on every basic attack
@@ -1559,6 +1570,73 @@ async function main() {
 
         // Clean up
         fighter.interruptAttacks(true);
+      }
+
+      // Denji-specific Continuous Chainsaw Shred & Overheat Smoke Test
+      if (fType === 'denji') {
+        console.log("   Testing Denji Continuous Chainsaw Shred & Overheat Smoke...");
+
+        // 1. Idle & Weapon Preview Canvas Stack Balance
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Denji idle Chainsaw Devil model");
+
+        // 2. Continuous Shred Smoke Simulation
+        fighter.reset();
+        fighter.x = 200;
+        fighter.y = 200;
+        dummyOpponent.x = 230; // Point blank range in chainsaw contact
+        dummyOpponent.y = 200;
+        dummyOpponent.hp = 10000;
+        dummyOpponent.maxHp = 10000;
+        dummyOpponent.isDead = false;
+        state.fighters = [fighter, dummyOpponent];
+
+        // Simulate 20 frames of shredding - smoke should slowly start coming out
+        for (let f = 0; f < 20; f++) {
+          dummyOpponent.x = fighter.x + 30;
+          dummyOpponent.y = fighter.y;
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+        if (fighter.continuousShredTimer < 15) {
+          throw new Error(`Denji continuousShredTimer did not advance properly! Timer: ${fighter.continuousShredTimer}`);
+        }
+        if (fighter.chainsawSmokeParticles.length === 0) {
+          throw new Error("Denji failed to slowly start emitting steam smoke particles upon beginning shredding!");
+        }
+
+        // Simulate further to 90 frames (1.5s) - smoke density and timer should steadily scale
+        for (let f = 0; f < 70; f++) {
+          dummyOpponent.x = fighter.x + 30;
+          dummyOpponent.y = fighter.y;
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+        if (fighter.continuousShredTimer < 80) {
+          throw new Error(`Denji continuousShredTimer did not advance to sustained duration! Timer: ${fighter.continuousShredTimer}`);
+        }
+        if (fighter.chainsawSmokeParticles.length === 0) {
+          throw new Error("Denji steam smoke particles disappeared during continuous shredding!");
+        }
+
+        // Render with active smoke particles and verify 100% balanced Canvas 2D stack
+        mockCtx.resetStackDepth();
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance("Denji drawing with active chainsaw overheat smoke particles");
+
+        // Disengage opponent and verify smoke cool down decay
+        dummyOpponent.x = 800; // Move far away
+        const prevTimer = fighter.continuousShredTimer;
+        for (let f = 0; f < 20; f++) {
+          fighter.update(dummyOpponent, 0, state.arena);
+        }
+        if (fighter.continuousShredTimer >= prevTimer) {
+          throw new Error("Denji continuousShredTimer failed to decay when disengaged from target!");
+        }
+
+        fighter.reset();
+        if (fighter.continuousShredTimer !== 0 || fighter.chainsawSmokeParticles.length !== 0) {
+          throw new Error("Denji failed to reset continuousShredTimer or chainsawSmokeParticles on reset()!");
+        }
       }
 
       // Makima-specific Skill 1: Chains of Domination & Pixel Art Aesthetics Test

@@ -17,7 +17,7 @@ export const makimaConfig = {
 
   // Baseline Attributes
   hp: 360,
-  maxHpRatio: 1.00,         // Makima has 100% max HP based on the fixed HP in the game mode
+  maxHpRatio: 0.50,         // Makima has 100% max HP based on the fixed HP in the game mode
   speed: 5.5,
   moveSpeed: 5.5,
   r: 25,
@@ -30,7 +30,7 @@ export const makimaConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 1.0,
-  damage: 40,
+  damage: 50,
   cooldown: 100,
   projectileSpeedMultiplier: 1.0,
   ability: 'Control Devil & "Bang!"',
@@ -39,7 +39,7 @@ export const makimaConfig = {
   // Passive 1: Prime Minister Contract (Citizen Redirection)
   enableCitizenContract: true,      // Master toggle for Passive 1: Prime Minister Contract & Shatter Revive
   maxCitizenLives: 3,               // 5 citizen sacrifice stocks
-  citizenReviveHpPercent: 0.50,     // Revives with 100% Max HP
+  citizenReviveHpPercent: 1.00,     // Revives with 100% Max HP
   citizenReviveDurationFrames: 75,  // 1.25s death shatter & magnetic reassembly duration
   citizenDamageReduction: 0.20,     // 20% passive damage reduction while stocks remain
   citizenShockwaveRadius: 150,      // Repel shockwave radius on revive
@@ -47,7 +47,7 @@ export const makimaConfig = {
 
   // Primary Attack: "Bang!" (Lightning-Fast Full-Screen Invisible Beam)
   enableBang: true,                 // Master toggle for Primary Attack: "Bang!"
-  bangDamage: 40,                   // Direct hit damage
+  bangDamage: 70,                   // Direct hit damage
   bangWallBounceDamage: 22,         // Bonus damage when slammed into arena walls
   bangKnockbackForce: 46,           // Massive directional knockback
   bangRange: 1600,                  // Full-screen lightning-fast beam reach
@@ -166,17 +166,17 @@ export const makimaConfig = {
     contractShatter: 0.95,
     contractSmash: 0.85,
     contractReassemble: 0.85,
-    revertVoicelines: 3.5,
-    revertVoiceline: 3.5,
+    revertVoicelines: 0.0,
+    revertVoiceline: 0.0,
     chainsHook: 0.90,
     chainsGravity: 0.65,
     chainsRattle: 0.70,
     chainsBleed: 0.55,
     chainVoicelines: 3.5,
-    chainVoiceline: 3.5,
+    chainVoiceline: 2.0,
     spearSummon: 0.85,
     spearExplosion: 1.00,
-    crucifixionVoiceline: 3.2,
+    crucifixionVoiceline: 2.0,
     crucifixionRift: 0,
     crucifixionChains: 1.10,
     crucifixionGravity: 0.90,

@@ -68,6 +68,56 @@ When creating, scaffolding, or implementing new characters, agents **MUST ALWAYS
 
 
 
+## Mandatory Non-Freezing Active Visual Effects & Particle Decay Standard (Rule 25)
+
+Whenever a character is stopped, hit-paused, time-stopped, or immobilized by any attack or status effect (e.g. `_handleTimeStop()`, Gojo Infinity freeze, domain stasis, ambush stasis, paralyze, Makima chains, Saitama counter stasis, Nanami ratio pause, Cronos stasis, or death), all non-interactive visual effects, transient explosion rings, particle emitters, slashes, and shockwaves **MUST NEVER freeze in mid-air or get stuck on screen**:
+- **Top-of-Update Decay Processing**: All visual effect array decay routines (e.g. `this._updateVisualExplosions()`, `this._updateVisualEffects()`, `this._updateParticles()`) **MUST be called at the very top of `update(opponent, ownerIndex, arena)` BEFORE the freeze guard exit**:
+  ```javascript
+  update(opponent, ownerIndex, arena) {
+    // 0. Update visual effects & transient particle lifecycles before freeze guard
+    // (Ensures active visual effects decay naturally and NEVER get stuck on screen when movement is stopped)
+    this._updateVisualExplosions?.();
+    this._updateVisualEffects?.();
+
+    // 1. Mandatory Rule 1 Freeze & TimeStop Guard
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return; // MANDATORY: Stop combat/movement execution while frozen
+    }
+    ...
+  }
+  ```
+- **Why**: Base `Fighter._handleTimeStop()` universally guards against all CCs. If visual effect update routines are placed after `if (isFrozen) return;`, effect timers stop decrementing while the fighter is immobilized, causing explosion visuals and particle trails to remain frozen in mid-animation indefinitely.
+- **Interruption & Death Array Cleanup**: When `interruptAttacks(forceCancelAll = true)` or death occurs, fighter-anchored visual effect arrays must either be cleared immediately (`this.activeVisualEffects.length = 0;`) or decoupled into independent world-space particles so they decay smoothly without remaining attached to an immobilized body.
+
+## Mandatory Clean Concentric Shockwave Standard — Anti-Cobweb & Anti-Mesh Rule (Rule 26)
+
+When rendering explosive shockwaves, detonation perimeters, Mach compression rings, impact blasts, or aura waves:
+- **Sequential Water-Ripple Wavefront Staggering ("Dipping Fingers in Steady Water")**:
+  - Shockwave rings MUST ALWAYS animate with sequential, staggered wave propagation where concentric compression rings pop out 1-by-1 from the detonation center with progressive time offsets ($t_0 = 0.00, t_1 = 0.12, t_2 = 0.24, \dots$) and extend outward smoothly along a decelerating power curve ($R_k = R_{\max} \cdot \text{lp}_k^{\text{speedPow}}$).
+  - NEVER spawn all concentric rings at full radius simultaneously with fixed static multiplier fractions.
+- **Expanding Translucent Interior Wash**:
+  - The interior of expanding shockwaves must be filled with semi-transparent warm color washes (e.g. `rgba(255, 107, 26, 0.18 * waveAlpha)`) that expand dynamically with each active wave disc.
+- **Wavefront Opacity & Dissipation**:
+  - Each individual ring starts at $R = 0$, blooms in rapidly as it pops out ($\text{popIn} \le 0.10$), maintains crisp line weight during travel, and smoothly dissipates as it disperses at the perimeter ($\text{fadeOut} = (1 - \text{lp})^{1.25}$).
+- **Clean Circular & Crescent Compression Bands**:
+  - Shockwaves MUST ALWAYS be drawn as continuous, smooth, concentric expanding rings or crescents with sharp, solid line weights (e.g. supersonic white leading core, fiery orange outer stroke, violet ionization rim).
+- **STRICT PROHIBITION of Radial Spoke Meshes & Cobwebbing**:
+  - NEVER draw radial connecting lines, spoke rays, needle grids, starburst rays, or intersecting spokes that bridge across concentric shockwave rings. Doing so forms an unintended spiderweb, net, or cobweb pattern ("AI slop" aesthetic) that destroys visual punch and clarity.
+- **Prohibition of Spinning Line Ticks**:
+  - NEVER draw rotating straight line ticks or radial line segments attached to or spinning around shockwave perimeters. Particles, embers, and debris MUST be drawn as standalone discrete point dots, small squares, or detached shapes without any radial connecting lines.
+
+## Mandatory Lifesteal Healthbar-Only Feedback Standard — Prohibition of Arena Floating Text (Rule 27)
+
+When implementing, tuning, or maintaining lifesteal, blood siphon, or continuous vampiric HP recovery mechanics for any character (e.g. Reze Bomb Devil Form, Denji Chainsaw Shred, Ichigo Hollow Mask, Mahito Domain, Ruby Scythe):
+- **Strict Prohibition of In-Arena Floating Text**: NEVER spawn floating combat text (`spawnFloatingText`) in the arena for lifesteal recovery procs. High-frequency combat lifesteal during rapid combos causes excessive visual clutter that obscures arena action.
+- **Healthbar-Only Feedback Mechanism**: All lifesteal healing MUST be displayed exclusively through the healthbar systems:
+  1. **Direct HP Replenishment**: `this.hp = Math.min(this.maxHp, this.hp + healAmount);`
+  2. **Top HUD Healthbar Card Pulse**: `this._lastHealAmount = (this._lastHealAmount || 0) + healAmount; this._healthBarHealTimer = 16;`
+  3. **In-Game Overhead Healthbar & Number**: Rendered automatically above/below the fighter via `this.drawHealth(ctx)`.
+- **Distinction from Ultimate Full-Heals**: One-off major ultimate activations or dramatic revival transformations (e.g. `FULL REGENERATION!`) may show singular floating text, but continuous combat lifesteal procs MUST NEVER spawn floating text in the arena.
+
 ## Post-Change Suggestions
 
 This applies to any chat-based AI coding assistant working in this repository, regardless of IDE, extension, model, or provider, whenever these project instructions are loaded.

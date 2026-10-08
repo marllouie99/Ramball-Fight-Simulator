@@ -819,8 +819,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
 
   // Reze — The Bomb Devil
   'reze': {
-    src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-    volume: 0.7,
+    get src() {
+      return CONFIG.reze?.sounds?.punchSwing || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+    },
+    get volume() {
+      return CONFIG.reze?.soundVolumes?.punchSwing !== undefined ? CONFIG.reze.soundVolumes.punchSwing : 0.7;
+    },
     delay: 0,
   },
 

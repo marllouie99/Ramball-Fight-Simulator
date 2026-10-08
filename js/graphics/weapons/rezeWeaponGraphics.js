@@ -164,6 +164,115 @@ export function drawRezeDecoy(ctx, decoy) {
 }
 
 /**
+ * Draws Reze's Skill 2: 3-Ball Cluster Bomb Spread (Small Pixel Art Bomb Spheres with Red Trajectory Trails & Sparking Fuses)
+ */
+export function drawRezeClusterBomb(ctx, bomb) {
+  if (!bomb) return;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+
+  ctx.save();
+
+  // 1. Red Trajectory Spread Trail (Matching User's Fanned Spread Sketch)
+  if (bomb.trailPoints && bomb.trailPoints.length > 0) {
+    ctx.save();
+    const trailAlpha = (bomb.state === 'FLYING') ? 0.90 : Math.max(0.20, (bomb.fuseTimer / (bomb.maxFuse || 30)) * 0.70);
+    ctx.globalAlpha *= trailAlpha;
+
+    // Outer fiery crimson spread line
+    ctx.strokeStyle = '#FF2E00';
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(bomb.startX, bomb.startY);
+    for (let pt of bomb.trailPoints) {
+      ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.lineTo(bomb.x, bomb.y);
+    ctx.stroke();
+
+    // Hot golden-yellow trajectory core
+    ctx.strokeStyle = 'rgba(255, 230, 0, 0.85)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(bomb.startX, bomb.startY);
+    for (let pt of bomb.trailPoints) {
+      ctx.lineTo(pt.x, pt.y);
+    }
+    ctx.lineTo(bomb.x, bomb.y);
+    ctx.stroke();
+
+    // Trajectory spark embers along the spread path
+    for (let i = 0; i < bomb.trailPoints.length; i += 3) {
+      const pt = bomb.trailPoints[i];
+      ctx.fillStyle = (i % 2 === 0) ? '#FFE600' : '#FFFFFF';
+      ctx.fillRect(snap(pt.x) - P * 0.5, snap(pt.y) - P * 0.5, P, P);
+    }
+    ctx.restore();
+  }
+
+  // 2. Small Bomb Ball Body (r = 6px to 7px)
+  const r = bomb.radius || 6.5;
+  const isImminent = (bomb.fuseTimer <= 8);
+  const flashOn = isImminent && (Math.floor(now * 0.03) % 2 === 0);
+
+  ctx.translate(bomb.x, bomb.y);
+  ctx.imageSmoothingEnabled = false;
+
+  // Outer dark ink border
+  ctx.fillStyle = '#0E0F14';
+  ctx.beginPath();
+  ctx.arc(0, 0, r + 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Bomb spherical body
+  if (flashOn) {
+    ctx.fillStyle = '#FFFFFF';
+  } else if (isImminent) {
+    ctx.fillStyle = '#FF7A00';
+  } else {
+    ctx.fillStyle = '#261C30'; // Dark iron gunpowder body
+  }
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Metallic highlight glint (upper left)
+  if (!flashOn) {
+    ctx.fillStyle = '#CBD5E1';
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(snap(-r * 0.4), snap(-r * 0.4), P, P);
+  }
+
+  // Fuse neck / collar at top
+  ctx.fillStyle = '#4A3B32';
+  ctx.fillRect(-P, -r - P, P * 2, P);
+
+  // Burning spark at fuse tip
+  const sparkY = -r - P * 1.5;
+  const sparkSize = isImminent ? (4.0 + Math.sin(now * 0.05) * 2.0) : (2.5 + Math.sin(now * 0.03) * 1.2);
+
+  // Fuse spark glow
+  ctx.fillStyle = flashOn ? '#FFFFFF' : '#FFE600';
+  ctx.beginPath();
+  ctx.arc(0, sparkY, sparkSize, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 4-Point cross spark star
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-P * 1.5, sparkY - P * 0.5, P * 3, P);
+  ctx.fillRect(-P * 0.5, sparkY - P * 1.5, P, P * 3);
+
+  ctx.restore();
+}
+
+/**
  * Draws Reze's Concealed Knife Slash (Human Form Light Attack String & Aerial Dive Bomb)
  * Clean, razor-sharp surgical steel blade crescent rasterized in 2D Cartesian grid
  */
@@ -376,50 +485,98 @@ export function drawRezePixelMartialArc(ctx, arcFx) {
 }
 
 /**
- * Pixel Art Shockwave Ring — Devil Form Bare-Handed Explosive Punch Visual
- * Draws concentric expanding octagonal shockwave rings with pixelated geometry:
- * - Outer ring: Dark ink outline (#14101A) with fiery orange (#FF2E00) fill
- * - Middle ring: Bright tangerine (#FF7A00) with gold (#FFE600) highlights
- * - Inner ring: White-hot (#FFFFFF) detonation core
- * - Radiating pixel spark shards shooting outward
- * - Zero shadowBlur (Rule 11)
+ * Pixel Art Multi-Concentric Shockwave Rings — Devil Form Bare-Handed Explosive Punch Visual
+ * Features:
+ * - 3 Concentric discrete pixel-art shockwave rings that pop out 1-by-1 and extend outward like water ripples
+ * - Translucent warm orange interior wash tracking each expanding wave
+ * - 4-neighbor attached dark outline (#14101A)
+ * - Multi-tiered fiery palette (#FFFFFF leading edge -> #FFE600 gold -> #FF7A00 orange -> #FF2E00 crimson)
+ * - Zero cobweb/net lines, zero shadowBlur (Rule 11)
  */
 function _drawRezePixelShockwaveRing(ctx, p, reach, P, snap, now, isFinisher = false) {
-  const alpha = (p <= 0.55) ? 1.0 : Math.cos(((p - 0.55) / 0.45) * (Math.PI * 0.5));
+  const alpha = (p <= 0.60) ? 1.0 : Math.cos(((p - 0.60) / 0.40) * (Math.PI * 0.5));
   if (alpha <= 0.01) return;
 
-  // Expansion curve: fast initial burst, then decelerating
-  const expandP = Math.pow(Math.min(1.0, p / 0.35), 0.55);
-  const maxR = reach * (isFinisher ? 1.75 : 1.45);
-  const curR = maxR * (0.25 + expandP * 0.75);
+  const maxR = reach * (isFinisher ? 1.80 : 1.50);
 
-  // Ring thickness tapers as it expands (finisher is thicker)
-  const ringThick = Math.max(P * 2, (P * (isFinisher ? 9.5 : 7.5)) * (1.0 - expandP * 0.65));
-  const innerR = Math.max(0, curR - ringThick);
+  // Staggered water ripple ring configurations: pop out 1-by-1 from center
+  const ringDefs = [
+    { delay: 0.00, speedPow: 0.50, baseThick: isFinisher ? 8.0 : 6.0 }, // Ring 1: Primary Outer Wave
+    { delay: 0.16, speedPow: 0.55, baseThick: isFinisher ? 6.5 : 4.8 }, // Ring 2: Secondary Mid Wave
+    { delay: 0.32, speedPow: 0.60, baseThick: isFinisher ? 5.0 : 3.6 }  // Ring 3: Tertiary Inner Wave
+  ];
+
+  // Compute current radii for each active wave
+  const activeRings = [];
+  let maxActiveR = 0;
+
+  for (let i = 0; i < ringDefs.length; i++) {
+    const def = ringDefs[i];
+    if (p < def.delay) continue; // Has not popped out yet
+
+    const lp = (p - def.delay) / (1.0 - def.delay);
+    if (lp <= 0.001 || lp > 1.0) continue;
+
+    const ringR = maxR * Math.pow(lp, def.speedPow);
+    const ringThick = Math.max(P * 2, (P * def.baseThick) * (1.0 - lp * 0.45));
+    const innerR = Math.max(0, ringR - ringThick);
+    const ringPop = Math.min(1.0, lp / 0.12);
+    const ringFade = Math.pow(1.0 - lp, 1.25);
+    const ringAlpha = alpha * ringPop * ringFade;
+
+    if (ringR > maxActiveR) maxActiveR = ringR;
+
+    activeRings.push({
+      index: i + 1,
+      outerR: ringR,
+      innerR: innerR,
+      thick: ringThick,
+      lp: lp,
+      alpha: ringAlpha
+    });
+  }
+
+  if (activeRings.length === 0 || maxActiveR <= 1.0) return;
 
   ctx.save();
   ctx.globalAlpha *= alpha;
 
-  // Octagonal pixel ring rasterization
-  const gridExtent = Math.ceil((curR + P * 3) / P) * P;
+  // --- Pass 0: Translucent Orange Interior Wash (Water-ripple expanding discs) ---
+  for (let r of activeRings) {
+    if (r.innerR > 1.0 && r.alpha > 0.02) {
+      const washOpacity = (r.index === 1 ? 0.22 : (r.index === 2 ? 0.16 : 0.12)) * r.alpha;
+      ctx.fillStyle = `rgba(255, 107, 26, ${washOpacity})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, r.innerR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
-  // --- Pass 1: Outer Ring (fiery shockwave band) ---
+  const getRingAtDist = (dist) => {
+    for (let r of activeRings) {
+      if (dist <= r.outerR && dist >= r.innerR) return r;
+    }
+    return null;
+  };
+
+  const gridExtent = Math.ceil((maxActiveR + P * 3) / P) * P;
+
+  // --- Pass 1: Multi-Concentric Discrete Pixel Shockwave Rings ---
   for (let gy = -gridExtent; gy <= gridExtent; gy += P) {
     for (let gx = -gridExtent; gx <= gridExtent; gx += P) {
       const dist = Math.hypot(gx, gy);
-
-      // Inside the ring band?
-      if (dist > curR || dist < innerR) continue;
+      const ring = getRingAtDist(dist);
+      if (!ring) continue;
 
       const px = snap(gx);
       const py = snap(gy);
 
-      // 4-neighbor border test for crisp pixel outline
+      // 4-neighbor attached border test for crisp ink outline
       const isBorder =
-        Math.hypot(gx + P, gy) > curR || Math.hypot(gx + P, gy) < innerR ||
-        Math.hypot(gx - P, gy) > curR || Math.hypot(gx - P, gy) < innerR ||
-        Math.hypot(gx, gy + P) > curR || Math.hypot(gx, gy + P) < innerR ||
-        Math.hypot(gx, gy - P) > curR || Math.hypot(gx, gy - P) < innerR;
+        getRingAtDist(Math.hypot(gx + P, gy)) !== ring ||
+        getRingAtDist(Math.hypot(gx - P, gy)) !== ring ||
+        getRingAtDist(Math.hypot(gx, gy + P)) !== ring ||
+        getRingAtDist(Math.hypot(gx, gy - P)) !== ring;
 
       if (isBorder) {
         ctx.fillStyle = '#14101A'; // Dark ink pixel outline
@@ -427,21 +584,35 @@ function _drawRezePixelShockwaveRing(ctx, p, reach, P, snap, now, isFinisher = f
         continue;
       }
 
-      // Depth-based color banding within the ring
-      const depthNorm = (dist - innerR) / ringThick; // 0 = inner edge, 1 = outer edge
+      const depthNorm = (dist - ring.innerR) / ring.thick;
 
-      if (depthNorm > 0.75) {
-        // Outer cutting edge: bright yellow-white
-        ctx.fillStyle = '#FFE600';
-      } else if (depthNorm > 0.45) {
-        // Mid band: vibrant tangerine orange
-        ctx.fillStyle = '#FF7A00';
-      } else if (depthNorm > 0.18) {
-        // Inner glow: deep explosive red-orange
-        ctx.fillStyle = '#FF2E00';
+      if (ring.index === 1) {
+        // Outer Leading Ring (Highest energy)
+        if (depthNorm > 0.75) {
+          ctx.fillStyle = '#FFFFFF';
+        } else if (depthNorm > 0.45) {
+          ctx.fillStyle = '#FFE600';
+        } else if (depthNorm > 0.20) {
+          ctx.fillStyle = '#FF7A00';
+        } else {
+          ctx.fillStyle = '#FF2E00';
+        }
+      } else if (ring.index === 2) {
+        // Mid Echo Ring
+        if (depthNorm > 0.65) {
+          ctx.fillStyle = '#FFE600';
+        } else if (depthNorm > 0.30) {
+          ctx.fillStyle = '#FF7A00';
+        } else {
+          ctx.fillStyle = '#FF3D00';
+        }
       } else {
-        // Core edge: hot gold
-        ctx.fillStyle = '#FFF033';
+        // Inner Echo Ring
+        if (depthNorm > 0.50) {
+          ctx.fillStyle = '#FFF7A8';
+        } else {
+          ctx.fillStyle = '#FF9E00';
+        }
       }
 
       ctx.fillRect(px, py, P, P);
@@ -449,9 +620,9 @@ function _drawRezePixelShockwaveRing(ctx, p, reach, P, snap, now, isFinisher = f
   }
 
   // --- Pass 2: White-hot inner detonation core (early phase only) ---
-  if (p < 0.40) {
-    const coreAlpha = (1.0 - p / 0.40);
-    const coreR = innerR * 0.55;
+  if (p < 0.35) {
+    const coreAlpha = (1.0 - p / 0.35);
+    const coreR = maxR * 0.18 * (1.0 - p * 0.5);
     ctx.save();
     ctx.globalAlpha *= coreAlpha;
     for (let gy = -gridExtent; gy <= gridExtent; gy += P) {
@@ -467,37 +638,6 @@ function _drawRezePixelShockwaveRing(ctx, p, reach, P, snap, now, isFinisher = f
       }
     }
     ctx.restore();
-  }
-
-  // --- Pass 3: Radiating pixel spark shards ---
-  const sparkCount = isFinisher ? 12 : 8;
-  const sparkLen = P * (isFinisher ? 4.5 + expandP * 3.5 : 3.5 + expandP * 2.5);
-  const sparkThick = P;
-  const sparkBaseR = curR + P * 2;
-  const rotOffset = (now * 0.0012) % (Math.PI * 2);
-
-  for (let i = 0; i < sparkCount; i++) {
-    const ang = (i / sparkCount) * Math.PI * 2 + rotOffset;
-    const sx = snap(Math.cos(ang) * sparkBaseR);
-    const sy = snap(Math.sin(ang) * sparkBaseR);
-
-    // Each spark shard is a short pixel line along the radial direction
-    const dx = Math.cos(ang);
-    const dy = Math.sin(ang);
-
-    // Alternate spark colors: orange, yellow, white, dark
-    let sparkColor;
-    if (i % 4 === 0) sparkColor = '#FF2E00';
-    else if (i % 4 === 1) sparkColor = '#FFE600';
-    else if (i % 4 === 2) sparkColor = '#FFFFFF';
-    else sparkColor = '#FF7A00';
-
-    ctx.fillStyle = sparkColor;
-    for (let s = 0; s < sparkLen; s += P) {
-      const ppx = snap(sx + dx * s);
-      const ppy = snap(sy + dy * s);
-      ctx.fillRect(ppx, ppy, sparkThick, sparkThick);
-    }
   }
 
   ctx.restore();
@@ -754,13 +894,167 @@ function _drawRezePixelSparkSlapBlast(ctx, p, arcAngle, reach, isHybrid, P, snap
 }
 
 /**
+ * Draws crisp, clean concentric supersonic Mach shockwave rings.
+ * Animated with water-ripple wave propagation: rings pop out 1-by-1 from the center
+ * and extend outward smoothly like dipping fingers in steady water.
+ * 
+ * Adheres strictly to:
+ * - Rule 11 (Zero shadowBlur)
+ * - Rule 26 (Clean continuous concentric rings, NO cobweb/mesh spokes, NO spinning ticks)
+ */
+function _drawCrispShockwaveRings(ctx, maxR, p, alpha, isNuke, isTransformation) {
+  ctx.save();
+
+  // Water-ripple wave definitions: 5 concentric wave fronts with progressive staggered spawn times
+  const waveConfigs = [
+    { delay: 0.00, speedPow: 0.50, maxThick: isNuke ? 5.5 : 3.4, coreThick: isNuke ? 2.2 : 1.4, color: 'rgba(255, 61, 0, 0.95)', coreColor: 'rgba(255, 255, 255, 0.98)', washAlpha: 0.20 },
+    { delay: 0.12, speedPow: 0.54, maxThick: isNuke ? 4.5 : 2.8, coreThick: isNuke ? 1.8 : 1.0, color: 'rgba(255, 107, 26, 0.92)', coreColor: 'rgba(255, 240, 150, 0.95)', washAlpha: 0.16 },
+    { delay: 0.24, speedPow: 0.58, maxThick: isNuke ? 3.8 : 2.4, coreThick: isNuke ? 1.4 : 0.8, color: 'rgba(255, 200, 0, 0.88)', coreColor: 'rgba(255, 255, 200, 0.90)', washAlpha: 0.13 },
+    { delay: 0.36, speedPow: 0.62, maxThick: isNuke ? 3.2 : 2.0, coreThick: isNuke ? 1.0 : 0.6, color: 'rgba(255, 122, 0, 0.84)', coreColor: 'rgba(255, 220, 100, 0.85)', washAlpha: 0.10 },
+    { delay: 0.48, speedPow: 0.66, maxThick: isNuke ? 2.6 : 1.6, coreThick: isNuke ? 0.8 : 0.5, color: 'rgba(255, 230, 0, 0.78)', coreColor: 'rgba(255, 255, 220, 0.80)', washAlpha: 0.08 }
+  ];
+
+  for (let i = 0; i < waveConfigs.length; i++) {
+    const wave = waveConfigs[i];
+    if (p < wave.delay) continue; // Has not popped out yet
+
+    // Local wave progress: 0.0 (just popped out at center) to 1.0 (fully extended)
+    const lp = (p - wave.delay) / (1.0 - wave.delay);
+    if (lp <= 0.001 || lp > 1.0) continue;
+
+    // Expanding radius extending outward from 0 like a water ripple
+    const expandProgress = Math.pow(lp, wave.speedPow);
+    const ringR = maxR * expandProgress;
+    if (ringR <= 1.0) continue;
+
+    // Opacity lifecycle: rapid pop-in bloom, then gradual dissipation at outer boundary
+    const popIn = Math.min(1.0, lp / 0.10);
+    const fadeOut = Math.pow(1.0 - lp, 1.25);
+    const waveAlpha = alpha * popIn * fadeOut;
+    if (waveAlpha <= 0.01) continue;
+
+    // 1. Water Ripple Translucent Orange Wash Interior Fill (expanding wave disc)
+    ctx.fillStyle = `rgba(255, 107, 26, ${wave.washAlpha * waveAlpha})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Main Expanding Wave Front Ring Stroke
+    ctx.strokeStyle = wave.color.replace(/[\d\.]+\)$/, `${(0.92 * waveAlpha).toFixed(3)})`);
+    ctx.lineWidth = Math.max(1.0, wave.maxThick * (1.0 - lp * 0.40));
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 3. Leading Supersonic White/Gold Core Highlight Stroke
+    if (wave.coreThick > 0) {
+      ctx.strokeStyle = wave.coreColor.replace(/[\d\.]+\)$/, `${(0.95 * waveAlpha).toFixed(3)})`);
+      ctx.lineWidth = Math.max(0.6, wave.coreThick * (1.0 - lp * 0.40));
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // Atmospheric Violet Ionization Ring (Transformation / Revive special accent)
+  if (isTransformation && p >= 0.06) {
+    const tLp = (p - 0.06) / 0.94;
+    const tR = maxR * 1.08 * Math.pow(tLp, 0.48);
+    const tPop = Math.min(1.0, tLp / 0.12);
+    const tFade = Math.pow(1.0 - tLp, 1.2);
+    const tAlpha = alpha * tPop * tFade;
+
+    ctx.strokeStyle = `rgba(189, 0, 255, ${0.85 * tAlpha})`;
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, tR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 230, 0, ${0.90 * tAlpha})`;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, tR * 0.92, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws volumetric layered anime fireball plasma clouds.
+ */
+function _drawCrispFireballBody(ctx, curR, p, alpha, isNuke) {
+  ctx.save();
+
+  // Concentric stepped fireball fills (Zero shadowBlur, Rule 11 compliant)
+  // Outer Crimson Fire
+  ctx.fillStyle = `rgba(196, 20, 66, ${0.35 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, curR * 0.90, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Molten Red-Orange
+  ctx.fillStyle = `rgba(255, 61, 0, ${0.55 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, curR * 0.70, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Radiant Amber
+  ctx.fillStyle = `rgba(255, 122, 0, ${0.72 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, curR * 0.48, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Bright Solar Gold
+  ctx.fillStyle = `rgba(255, 230, 0, ${0.85 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, curR * 0.30, 0, Math.PI * 2);
+  ctx.fill();
+
+  // White-hot detonation apex core (early explosion phase)
+  if (p < 0.45) {
+    const coreA = (1.0 - p / 0.45) * alpha;
+    ctx.fillStyle = `rgba(255, 255, 255, ${coreA * 0.95})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, curR * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws discrete standalone spark pixels and ejected embers.
+ * Clean, separated points without any connecting lines.
+ */
+function _drawCrispSparks(ctx, curR, p, alpha, isNuke, P) {
+  const sparkCount = isNuke ? 16 : 8;
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+
+  for (let i = 0; i < sparkCount; i++) {
+    const ang = (i / sparkCount) * Math.PI * 2 + 0.25;
+    const distMult = 0.82 + ((i * 3) % 5) * 0.08;
+    const dist = curR * distMult * (0.85 + p * 0.25);
+    const sx = Math.round((Math.cos(ang) * dist) / P) * P;
+    const sy = Math.round((Math.sin(ang) * dist) / P) * P;
+    const size = (i % 2 === 0) ? P * 1.5 : P;
+
+    ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : ((i % 3 === 1) ? '#FFE600' : '#FF6B1A');
+    ctx.fillRect(sx - size / 2, sy - size / 2, size, size);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Draws Reze's Punch AOE Explosion Detonation (Bomb Devil Hybrid Combat)
  * Features:
- * - Concentric expanding fireball envelopes (molten blast red, radiant orange, spark yellow)
- * - White-hot incandescent detonation apex
- * - Supersonic Mach compression shockwave ring & secondary gold ring
- * - Radiating pixel spark shards
- * - Zero shadowBlur (Rule 11)
+ * - Crisp concentric supersonic Mach shockwave rings with 1-by-1 water-ripple wave extension
+ * - Volumetric stepped fireball plasma clouds & white-hot detonation core
+ * - Standalone pixel spark embers
+ * - Zero cobweb/net lines
+ * - Zero shadowBlur (Rule 11) & Discrete P=2.0px grid snapping
  */
 export function drawRezePalmBlast(ctx, blast) {
   if (!blast || blast.timer <= 0) return;
@@ -773,133 +1067,54 @@ export function drawRezePalmBlast(ctx, blast) {
 
   const p = Math.max(0, Math.min(1.0, 1.0 - (blast.timer / blast.maxTimer)));
   const isFinisher = Boolean(blast.isFinisher);
-  const maxR = blast.radius || (isFinisher ? 95 : 70);
+  const maxR = blast.radius || (isFinisher ? 100 : 75);
   const curR = maxR * Math.pow(p, 0.48);
   const alpha = 1.0 - Math.pow(p, 1.35);
   if (alpha <= 0.01) return;
 
+  const P = 2.0;
+
   ctx.save();
   ctx.translate(blast.x, blast.y);
 
-  // 1. Concentric Fireball Expanding Rings (Rule 11: Zero shadowBlur)
-  ctx.fillStyle = `rgba(255, 46, 0, ${0.32 * alpha})`;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 1.12, 0, Math.PI * 2);
-  ctx.fill();
+  // 1. Volumetric Fireball Body & Detonation Core
+  _drawCrispFireballBody(ctx, curR, p, alpha, false);
 
-  ctx.fillStyle = `rgba(255, 107, 26, ${0.52 * alpha})`;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 0.82, 0, Math.PI * 2);
-  ctx.fill();
+  // 2. Crisp Concentric Supersonic Mach Shockwave Rings (Water-Ripple Wave Propagation)
+  _drawCrispShockwaveRings(ctx, maxR, p, alpha, false, false);
 
-  ctx.fillStyle = `rgba(255, 230, 0, ${0.72 * alpha})`;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 0.52, 0, Math.PI * 2);
-  ctx.fill();
-
-  // White-hot detonation apex
-  if (p < 0.45) {
-    const coreA = (1.0 - p / 0.45) * alpha;
-    ctx.fillStyle = `rgba(255, 255, 255, ${coreA * 0.92})`;
-    ctx.beginPath();
-    ctx.arc(0, 0, curR * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 2. Supersonic Mach Compression Shockwave Ring
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.85 * alpha})`;
-  ctx.lineWidth = isFinisher ? 2.5 : 1.8;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 3. Secondary Spark Gold Shockwave Ring
-  ctx.strokeStyle = `rgba(255, 230, 0, ${0.70 * alpha})`;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 0.76, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // 4. Radiating Pixel Spark Shards
-  const shardCount = isFinisher ? 8 : 5;
-  const P = 2.0;
-  for (let i = 0; i < shardCount; i++) {
-    const ang = (i / shardCount) * Math.PI * 2 + 0.3;
-    const sDist = curR * (0.88 + (i % 3) * 0.22);
-    const sx = Math.round((Math.cos(ang) * sDist) / P) * P;
-    const sy = Math.round((Math.sin(ang) * sDist) / P) * P;
-    const size = (i % 2 === 0) ? P * 1.5 : P;
-    ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : '#FFE600';
-    ctx.fillRect(sx - size / 2, sy - size / 2, size, size);
-  }
+  // 3. Standalone Pixel Spark Embers
+  _drawCrispSparks(ctx, curR, p, alpha, false, P);
 
   ctx.restore();
 }
 
 /**
- * Draws Megaton Tsar Nuke Ultimate Visuals (Exploding Fireball, Mach Rings, Scorch Crater)
+ * Draws Megaton Tsar Nuke Ultimate Visuals (Clean Supernova Mach Rings, Volumetric Fireball, Spark Embers)
  */
 export function drawRezeMegatonNuke(ctx, nuke) {
+  if (!nuke || nuke.timer <= 0) return;
+
   const p = Math.max(0, Math.min(1.0, 1.0 - (nuke.timer / nuke.maxTimer)));
-  const maxR = nuke.radius || 220;
-  const curR = maxR * Math.pow(p, 0.5);
-  const alpha = 1.0 - Math.pow(p, 1.2);
+  const maxR = nuke.radius || 240;
+  const curR = maxR * Math.pow(p, 0.48);
+  const alpha = 1.0 - Math.pow(p, 1.25);
+  if (alpha <= 0.01) return;
+
+  const P = 2.0;
+  const isTransformation = Boolean(nuke.isTransformationBlast);
 
   ctx.save();
   ctx.translate(nuke.x, nuke.y);
 
-  // 1. Concentric Fireball Expanding Rings (Rule 11: Zero shadowBlur)
-  ctx.fillStyle = `rgba(255, 46, 0, ${0.35 * alpha})`;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 1.15, 0, Math.PI * 2);
-  ctx.fill();
+  // 1. Volumetric Nuclear Fireball Body & Detonation Core
+  _drawCrispFireballBody(ctx, curR, p, alpha, true);
 
-  ctx.fillStyle = `rgba(255, 107, 26, ${0.55 * alpha})`;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 0.85, 0, Math.PI * 2);
-  ctx.fill();
+  // 2. Multi-Band Concentric Supersonic Mach Shockwave Rings (Water-Ripple Wave Propagation)
+  _drawCrispShockwaveRings(ctx, maxR, p, alpha, true, isTransformation);
 
-  ctx.fillStyle = `rgba(255, 230, 0, ${0.75 * alpha})`;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 0.55, 0, Math.PI * 2);
-  ctx.fill();
-
-  // White-hot nuclear detonation core
-  if (p < 0.4) {
-    const coreAlpha = (1.0 - (p / 0.4));
-    ctx.fillStyle = `rgba(255, 255, 255, ${coreAlpha * 0.95})`;
-    ctx.beginPath();
-    ctx.arc(0, 0, curR * 0.35, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Supersonic Mach Compression Shockwave Rings
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.85 * alpha})`;
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = `rgba(255, 107, 26, ${0.60 * alpha})`;
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, curR * 0.92, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Transformation Shockwave Rings (Theme Colors: Imperial Plum #430363 & Spark Gold #FFE600)
-  if (nuke.isTransformationBlast) {
-    ctx.strokeStyle = `rgba(67, 3, 99, ${0.80 * alpha})`;
-    ctx.lineWidth = 4.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, curR * 1.08, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = `rgba(255, 230, 0, ${0.90 * alpha})`;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, curR * 0.78, 0, Math.PI * 2);
-    ctx.stroke();
-  }
+  // 3. Standalone Pixel Spark Embers
+  _drawCrispSparks(ctx, curR, p, alpha, true, P);
 
   ctx.restore();
 }

@@ -33,7 +33,7 @@ export const ARENA_FLOORS = [
     themeColor: '#64748b',
     gridSize: 76.6,
     features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Esports-grade minimalist pixel arena with 8-bit stepped corner brackets, discrete crosshairs, and center target reticle.'
+    desc: '6x6 Esports-grade minimalist pixel arena with 8-bit stepped corner brackets and discrete intersection crosshairs.'
   },
   {
     id: 'pvz_grass',
@@ -377,7 +377,6 @@ function _renderPixelCleanFloor(oc, width, height, cols, rows, cellW, cellH, isD
   const gridDotColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.12)';
   const frameColor = isDark ? '#334155' : '#cbd5e1';
   const bracketColor = isDark ? '#64748b' : '#475569';
-  const accentColor = isDark ? '#38bdf8' : '#0284c7';
 
   _pixelRect(oc, 0, 0, width, height, bgColor);
 
@@ -402,12 +401,6 @@ function _renderPixelCleanFloor(oc, width, height, cols, rows, cellW, cellH, isD
   _pixelLBracket(oc, width - pad - 2 - bThick, pad + 2, bLen, bThick, -1, 1, bracketColor);
   _pixelLBracket(oc, pad + 2, height - pad - 2 - bThick, bLen, bThick, 1, -1, bracketColor);
   _pixelLBracket(oc, width - pad - 2 - bThick, height - pad - 2 - bThick, bLen, bThick, -1, -1, bracketColor);
-
-  const cx = Math.round(width / 2);
-  const cy = Math.round(height / 2);
-  _pixelCross(oc, cx, cy, 8, 2, accentColor);
-  _pixelRect(oc, cx - 1, cy - 1, 3, 3, bgColor);
-  _pixelRect(oc, cx, cy, 1, 1, accentColor);
 }
 
 function _renderPixelPvzGrassFloor(oc, width, height, cols, rows, cellW, cellH, isDark) {

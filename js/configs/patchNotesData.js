@@ -33,75 +33,140 @@ export const patchNotesData = {
         "character": "DENJI",
         "deltas": [
             {
+                "type": "ADJUST",
+                "key": "speed",
+                "oldVal": "5.8",
+                "newVal": "6.0",
+                "pct": "Mod"
+            },
+            {
+                "type": "BUFF",
+                "key": "r",
+                "oldVal": 25,
+                "newVal": 26,
+                "pct": "+4.0%"
+            },
+            {
                 "type": "NERF",
-                "key": "sawHitKnockback",
+                "key": "damage",
                 "oldVal": 24,
-                "newVal": 6,
+                "newVal": 5,
+                "pct": "-79.2%"
+            },
+            {
+                "type": "ADJUST",
+                "key": "enablePochitaRevive",
+                "oldVal": "true",
+                "newVal": "0",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "enableHemorrhage",
+                "oldVal": "true",
+                "newVal": "0",
+                "pct": "Mod"
+            },
+            {
+                "type": "NERF",
+                "key": "ruptureDamage",
+                "oldVal": 28,
+                "newVal": 10,
+                "pct": "-64.3%"
+            },
+            {
+                "type": "NERF",
+                "key": "shredDamagePerTooth",
+                "oldVal": 5,
+                "newVal": 3,
+                "pct": "-40.0%"
+            },
+            {
+                "type": "NERF",
+                "key": "shredHitPauseFrames",
+                "oldVal": 3,
+                "newVal": 2,
+                "pct": "-33.3%"
+            }
+        ]
+    },
+    {
+        "character": "MAKIMA",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "maxHpRatio",
+                "oldVal": "1.00",
+                "newVal": "0.50",
+                "pct": "Mod"
+            },
+            {
+                "type": "BUFF",
+                "key": "damage",
+                "oldVal": 40,
+                "newVal": 50,
+                "pct": "+25.0%"
+            },
+            {
+                "type": "ADJUST",
+                "key": "citizenReviveHpPercent",
+                "oldVal": "0.50",
+                "newVal": "1.00",
+                "pct": "Mod"
+            },
+            {
+                "type": "BUFF",
+                "key": "bangDamage",
+                "oldVal": 40,
+                "newVal": 70,
+                "pct": "+75.0%"
+            },
+            {
+                "type": "ADJUST",
+                "key": "chainVoiceline",
+                "oldVal": "3.5",
+                "newVal": "2.0",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "crucifixionVoiceline",
+                "oldVal": "3.2",
+                "newVal": "2.0",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "REZE",
+        "deltas": [
+            {
+                "type": "NERF",
+                "key": "punchDamage",
+                "oldVal": 18,
+                "newVal": 10,
+                "pct": "-44.4%"
+            },
+            {
+                "type": "BUFF",
+                "key": "rocketCooldown",
+                "oldVal": 800,
+                "newVal": 200,
                 "pct": "-75.0%"
             },
             {
-                "type": "ADJUST",
-                "key": "enableEngineLunge",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "enableBloodCleave",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "enableMassacreEngine",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            }
-        ]
-    },
-    {
-        "character": "GOJO",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "redDamage",
-                "oldVal": 200,
-                "newVal": 250,
-                "pct": "+25.0%"
-            }
-        ]
-    },
-    {
-        "character": "SANS",
-        "deltas": [
-            {
                 "type": "NERF",
-                "key": "dodgeStaminaMax",
-                "oldVal": 200,
-                "newVal": 100,
-                "pct": "-50.0%"
+                "key": "rocketHitDamage",
+                "oldVal": 35,
+                "newVal": 30,
+                "pct": "-14.3%"
             },
             {
-                "type": "BUFF",
-                "key": "dodgeStaminaRegenDelay",
-                "oldVal": 10,
-                "newVal": 20,
-                "pct": "+100.0%"
-            }
-        ]
-    },
-    {
-        "character": "TOJI",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "spearCooldown",
-                "oldVal": 10,
-                "newVal": 50,
-                "pct": "+400.0%"
+                "type": "ADJUST",
+                "key": "hybridLifestealPercent",
+                "oldVal": "0.35",
+                "newVal": "0.10",
+                "pct": "Mod"
             }
         ]
     }

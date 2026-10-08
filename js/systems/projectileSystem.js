@@ -1488,6 +1488,7 @@ class ProjectileSystem {
             }
             
             // Delegate visual and piercing logic to HitImpactSystem
+            projectile._lastHitLanded = true;
             const shouldDestroy = HitImpactSystem.processProjectileHit(fighter, projectile, attacker, fighters);
             if (!shouldDestroy) {
               continue; // Projectile pierces or bounces
@@ -1560,7 +1561,9 @@ class ProjectileSystem {
         if (projectile.isChainLightning && illusion.staticDebuffTimer > 0) {
           illDamage *= (CONFIG.zeus?.staticDamageBonus ?? 1.33);
         }
-        applyDamageToTarget(illusion, illDamage, attacker, { isProjectile: true, projectile });
+        const illHpBefore = Number(illusion.hp);
+        const illLanded = applyDamageToTarget(illusion, illDamage, attacker, { isProjectile: true, projectile });
+        projectile._lastHitLanded = Boolean(illLanded) || Number(illusion.hp) < illHpBefore;
         
         if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
           this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
@@ -1596,9 +1599,12 @@ class ProjectileSystem {
           const distSq = rdx * rdx + rdy * rdy;
           if (distSq <= hitRadius * hitRadius) {
             const attacker = fighters[projectile.owner];
+            const rikaHpBefore = Number(rk.hp);
+            let rikaLanded = false;
             if (typeof rk.takeDamage === 'function') {
-              rk.takeDamage(projectile.damage, attacker, { isProjectile: true, projectile });
+              rikaLanded = rk.takeDamage(projectile.damage, attacker, { isProjectile: true, projectile });
             }
+            projectile._lastHitLanded = Boolean(rikaLanded) || Number(rk.hp) < rikaHpBefore;
 
             if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
               this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
@@ -1631,9 +1637,12 @@ class ProjectileSystem {
           const distSq = cdx * cdx + cdy * cdy;
           if (distSq <= hitRadius * hitRadius) {
             const attacker = fighters[projectile.owner];
+            const carHpBefore = Number(car.hp);
+            let carLanded = false;
             if (typeof car.takeDamage === 'function') {
-              car.takeDamage(projectile.damage, attacker, { isProjectile: true, projectile });
+              carLanded = car.takeDamage(projectile.damage, attacker, { isProjectile: true, projectile });
             }
+            projectile._lastHitLanded = Boolean(carLanded) || Number(car.hp) < carHpBefore;
 
             const shouldDestroy = HitImpactSystem.processProjectileHit(car, projectile, attacker, fighters);
             if (!shouldDestroy) {

@@ -44,6 +44,28 @@ function getCrazyDaveSoundVolume(config, key) {
   return config?.soundVolumes?.[key] ?? crazyDaveConfig.soundVolumes[key];
 }
 
+/**
+ * Applies plant damage and reports whether it actually landed.
+ * Returns false when the hit was dodged (e.g. Sans MISS), blocked, absorbed or ignored by immunity,
+ * so on-hit effects (burn, stun) are only applied on a successful damaging hit.
+ * @returns {boolean}
+ */
+function dealPlantDamage(target, amount, attacker, opts = {}) {
+  if (!target) return false;
+  const hpBefore = Number(target.hp);
+  let result = false;
+  if (typeof applyDamageToTarget === 'function') {
+    result = applyDamageToTarget(target, amount, attacker, opts);
+  } else if (typeof target.takeDamage === 'function') {
+    result = target.takeDamage(amount, attacker, opts);
+  } else if (typeof target.hp === 'number') {
+    target.hp = Math.max(0, target.hp - amount);
+  }
+  const hpAfter = Number(target.hp);
+  const hpDropped = Number.isFinite(hpBefore) && Number.isFinite(hpAfter) && hpAfter < hpBefore;
+  return Boolean(result) || hpDropped;
+}
+
 function getCrazyDavePlantOccupants(dave) {
   const plants = new Set();
   const ownPlantLists = [
@@ -1666,13 +1688,10 @@ export class TorchwoodEntity extends Fighter {
             const sdy = f.y - (target?.y || p.y);
             const sDist = Math.hypot(sdx, sdy);
             if (sDist <= splashRadius) {
-              if (typeof applyDamageToTarget === 'function') {
-                applyDamageToTarget(f, splashDmg, p.ownerFighter || this.owner || this, { isFirePea: true, isBurn: true, skipKnockback: true });
-              } else if (typeof f.takeDamage === 'function') {
-                f.takeDamage(splashDmg, p.ownerFighter || this.owner || this, { isFirePea: true, isBurn: true, skipKnockback: true });
-              } else if (typeof f.hp === 'number') {
-                f.hp = Math.max(0, f.hp - splashDmg);
-              }
+              const splashAttacker = p.ownerFighter || this.owner || this;
+              const splashLanded = dealPlantDamage(f, splashDmg, splashAttacker, { isFirePea: true, isBurn: true, skipKnockback: true });
+              // Burn only ignites when the splash actually damaged the enemy
+              if (!splashLanded) continue;
 
               if (typeof f.applyBurn === 'function') {
                 f.applyBurn(p.ownerFighter || this.owner || this, this._burnDuration);
@@ -1714,6 +1733,7 @@ export class TorchwoodEntity extends Fighter {
 
   _applyProximityBurn() {
     if (!state) return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
     const candidates = getAllPlantTargetCandidates();
 
     for (const fighter of candidates) {
@@ -1724,7 +1744,19 @@ export class TorchwoodEntity extends Fighter {
       const targetR = fighter.r || (fighter.width ? fighter.width * 0.5 : 16);
       if (Math.hypot(dx, dy) > this._burnRadius + targetR) continue;
 
+      // If already burning, do not re-apply or re-damage every frame
       if ((fighter.burnTimer || 0) > 0) continue;
+
+      // Contact blaze: Torchwood burns the enemy ONLY when it actually manages to damage them!
+      const contactDamage = getCrazyDaveSetting(cfg, 'torchwoodContactDamage') || 1;
+      const damaged = dealPlantDamage(fighter, contactDamage, this, {
+        isTorchwood: true,
+        isBurn: true,
+        isContact: true,
+        skipKnockback: true
+      });
+
+      if (!damaged) continue; // Dodged (Sans MISS), blocked (Gojo Infinity), or immune -> do not burn!
 
       if (typeof fighter.applyBurn === 'function') {
         fighter.applyBurn(this, this._burnDuration);
@@ -1754,7 +1786,7 @@ export class TorchwoodEntity extends Fighter {
       this.y = this._fixedY;
     }
 
-    // Enemies and enemy minions that approach the burning stump are ignited.
+    // Enemies and enemy minions that approach the burning stump are ignited only if damaged
     this._applyProximityBurn();
 
     // Core mechanic: intercept and transform passing pea projectiles
@@ -2367,13 +2399,10 @@ export class LawnmowerEntity extends Fighter {
           }
 
           // Devastating steamroller shred damage
-          if (typeof applyDamageToTarget === 'function') {
-            applyDamageToTarget(f, this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
-          } else if (typeof f.takeDamage === 'function') {
-            f.takeDamage(this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
-          } else if (typeof f.hp === 'number') {
-            f.hp = Math.max(0, f.hp - this._damage);
-          }
+          const crushLanded = dealPlantDamage(f, this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
+
+          // Dodged / blocked / immune → no knockback, no splat, and NO stun
+          if (!crushLanded) continue;
 
           const kbX = this.facingDirection * 10;
           const kbY = (Math.random() - 0.5) * 6;

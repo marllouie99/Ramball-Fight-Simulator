@@ -31,61 +31,7 @@ function _initDenjiSpeedLineSeeds() {
  * Draws Manga Action Speed Lines behind Denji during Engine Lunges (Rule 16)
  */
 export function drawDenjiSpeedLines(ctx, fighter) {
-  if (!fighter || !fighter.isEngineLunging) return;
-
-  if (!_denjiSpeedLineSeeds) {
-    _denjiSpeedLineSeeds = _initDenjiSpeedLineSeeds();
-  }
-
-  const now = Date.now();
-  const aimAngle = fighter.gunAngle || fighter.angle || 0;
-  const backOffset = (fighter.r || 25) * 1.2;
-  const cosA = Math.cos(aimAngle);
-  const sinA = Math.sin(aimAngle);
-  const perpX = -sinA;
-  const perpY =  cosA;
-
-  ctx.save();
-  for (let i = 0; i < _denjiSpeedLineSeeds.length; i++) {
-    const seed = _denjiSpeedLineSeeds[i];
-    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 80);
-
-    const lineCenterX = fighter.x - cosA * (backOffset + travel) + perpX * seed.perpOffset;
-    const lineCenterY = fighter.y - sinA * (backOffset + travel) + perpY * seed.perpOffset;
-
-    const halfLen = seed.length * 0.5;
-    const startX = lineCenterX - cosA * halfLen;
-    const startY = lineCenterY - sinA * halfLen;
-    const endX   = lineCenterX + cosA * halfLen;
-    const endY   = lineCenterY + sinA * halfLen;
-
-    const midOff = halfLen * 0.15;
-    const bulgeX = lineCenterX + cosA * midOff;
-    const bulgeY = lineCenterY + sinA * midOff;
-    const halfThick = 1.2;
-
-    const topMidX = bulgeX + perpX * halfThick;
-    const topMidY = bulgeY + perpY * halfThick;
-    const botMidX = bulgeX - perpX * halfThick;
-    const botMidY = bulgeY - perpY * halfThick;
-
-    // 4-Slot Color Theme Standard (Rule 16)
-    let color;
-    if (i % 4 === 0) color = 'rgba(234, 179, 8, 0.90)';   // Chainsaw Amber Gold
-    else if (i % 4 === 1) color = 'rgba(220, 38, 38, 0.85)'; // Blood Engine Crimson
-    else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White-hot core
-    else color = 'rgba(15, 23, 42, 0.90)';                 // Dark Gunmetal Ink
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(topMidX, topMidY);
-    ctx.lineTo(endX, endY);
-    ctx.lineTo(botMidX, botMidY);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
+  // Speed lines disabled in favor of authentic Chainsaw Devil ghost model afterimages with 3 attached chainsaws
 }
 
 let _denjiChainsawBladeImage = null;
@@ -255,10 +201,30 @@ export function drawAuthenticChainsawBlade(ctx, length, thickness, now = Date.no
       ctx.drawImage(teethImg, 547, 340, 1594, 197, 0, -bladeH / 2 + topH, bladeW, botH);
     }
 
+    // Friction Thermal Heat Glow & Overheat Sparks during Continuous Shredding
+    if (opts.heatRatio && opts.heatRatio > 0) {
+      const hr = Math.min(1.0, opts.heatRatio);
+      const heatAlpha = (0.35 + Math.sin(now * 0.02) * 0.15) * hr;
+      ctx.fillStyle = `rgba(239, 68, 68, ${heatAlpha * 0.7})`;
+      ctx.fillRect(0, -bladeH / 2 - 1, bladeW, 1.5);
+      ctx.fillRect(0, bladeH / 2, bladeW, 1.5);
+      if (hr > 0.3) {
+        ctx.fillStyle = `rgba(249, 115, 22, ${heatAlpha * 0.85})`;
+        ctx.fillRect(bladeW * 0.25, -bladeH / 2 - 0.5, bladeW * 0.70, 1.0);
+        ctx.fillRect(bladeW * 0.25, bladeH / 2 - 0.5, bladeW * 0.70, 1.0);
+      }
+      if (hr > 0.6) {
+        ctx.fillStyle = `rgba(254, 240, 138, ${heatAlpha * 0.95})`;
+        ctx.fillRect(bladeW * 0.45, -bladeH / 2, bladeW * 0.45, 0.75);
+        ctx.fillRect(bladeW * 0.45, bladeH / 2 - 0.75, bladeW * 0.45, 0.75);
+      }
+    }
+
     // Micro Friction Sparks when Revving/Attacking/Lunging
-    if (isAttacking || isLunging) {
+    if (isAttacking || isLunging || (opts.heatRatio && opts.heatRatio > 0)) {
       const bladeCount = opts?.shredBladeCount || 1;
-      const sparkCount = isLunging ? 4 : (bladeCount >= 3 ? 5 : (bladeCount === 2 ? 3 : 2));
+      const heatBonus = opts.heatRatio ? Math.floor(opts.heatRatio * 3) : 0;
+      const sparkCount = (isLunging ? 4 : (bladeCount >= 3 ? 5 : (bladeCount === 2 ? 3 : 2))) + heatBonus;
       for (let i = 0; i < sparkCount; i++) {
         const sparkSeed = ((now * 0.08 + i * 41) % 100) / 100;
         const spX = Math.round(bladeW * (0.25 + sparkSeed * 0.70));
@@ -380,7 +346,7 @@ export function drawDenjiAttackSlashFX(ctx, fighter, r = 25, now = Date.now()) {
     const thrustEase = Math.sin(progress * Math.PI);
     const fade = Math.max(0, 1.0 - progress);
 
-    // 1. Dual Rear Exhaust Muffler Smoke Puffs (Puffing backward from -X)
+    // 1. Dual Rear Exhaust Muffler Smoke Puffs (Pure White Translucent Steam Vapor)
     const puffCount = 3;
     for (let i = 0; i < puffCount; i++) {
       const pProg = Math.min(1.0, progress * 1.3 + i * 0.12);
@@ -397,23 +363,25 @@ export function drawDenjiAttackSlashFX(ctx, fighter, r = 25, now = Date.now()) {
       const botX = snap(-r * 0.75 - puffDist);
       const botY = snap(r * 0.28 + (i * 3));
 
-      // Layered stepped shading (Dark outline -> Mid gray -> Pure white core)
-      ctx.fillStyle = `rgba(15, 23, 42, ${puffAlpha * 0.7})`;
-      ctx.beginPath();
-      ctx.arc(topX, topY, puffR + 1.5, 0, Math.PI * 2);
-      ctx.arc(botX, botY, puffR + 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      // Pure White Translucent Steam Vapor (Zero dark outlines, pure airy white vapor)
+      const topGrad = ctx.createRadialGradient(topX, topY, 0, topX, topY, puffR);
+      topGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(puffAlpha * 0.22).toFixed(3)})`);
+      topGrad.addColorStop(0.5, `rgba(255, 255, 255, ${(puffAlpha * 0.08).toFixed(3)})`);
+      topGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
 
-      ctx.fillStyle = `rgba(148, 163, 184, ${puffAlpha * 0.85})`;
+      ctx.fillStyle = topGrad;
       ctx.beginPath();
       ctx.arc(topX, topY, puffR, 0, Math.PI * 2);
-      ctx.arc(botX, botY, puffR, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = `rgba(255, 255, 255, ${puffAlpha * 0.95})`;
+      const botGrad = ctx.createRadialGradient(botX, botY, 0, botX, botY, puffR);
+      botGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(puffAlpha * 0.22).toFixed(3)})`);
+      botGrad.addColorStop(0.5, `rgba(255, 255, 255, ${(puffAlpha * 0.08).toFixed(3)})`);
+      botGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+
+      ctx.fillStyle = botGrad;
       ctx.beginPath();
-      ctx.arc(topX - 1, topY - 1, puffR * 0.45, 0, Math.PI * 2);
-      ctx.arc(botX - 1, botY - 1, puffR * 0.45, 0, Math.PI * 2);
+      ctx.arc(botX, botY, puffR, 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -446,7 +414,7 @@ export function drawDenjiAttackSlashFX(ctx, fighter, r = 25, now = Date.now()) {
     _drawDoubleTaperedSlashArc(ctx, r * 2.4, -0.75, -0.15, 9.0, swingProg, '#EAB308', '#FEF08A', '#DC2626');
     _drawDoubleTaperedSlashArc(ctx, r * 2.4, 0.15, 0.75, 9.0, swingProg, '#EAB308', '#FEF08A', '#DC2626');
 
-    // 2. Ascending Ground Debris Particles & Sparks
+    // 2. Ascending Ground Sparks & Friction Flecks
     const debrisCount = 6;
     for (let d = 0; d < debrisCount; d++) {
       const debProg = (swingProg + d * 0.15) % 1.0;
@@ -454,14 +422,14 @@ export function drawDenjiAttackSlashFX(ctx, fighter, r = 25, now = Date.now()) {
       const debY = snap((d % 2 === 0 ? -1 : 1) * (r * 0.3 + debProg * (r * 1.2)));
       const debSize = (d % 3 === 0) ? 3.0 : 2.0;
 
-      // Dark rock debris chunk
-      ctx.fillStyle = (d % 2 === 0) ? '#0F172A' : '#334155';
+      // Golden friction spark & ember fleck
+      ctx.fillStyle = (d % 2 === 0) ? '#FEF08A' : '#F97316';
       ctx.fillRect(debX, debY, debSize, debSize);
 
-      // Upward flaring spark fleck
+      // Upward flaring white spark core
       if (d % 2 === 0) {
-        ctx.fillStyle = '#FEF08A';
-        ctx.fillRect(debX + 2, debY - 2, 1.5, 1.5);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(debX + 1, debY - 1, 1.5, 1.5);
       }
     }
   } else {
@@ -635,4 +603,93 @@ function _drawDoubleTaperedSlashArc(ctx, radius, startAngle, endAngle, maxThick,
   ctx.strokeStyle = coreColor || '#FFFFFF';
   ctx.lineWidth = 1.5;
   ctx.stroke();
+}
+
+/**
+ * Renders billowing steam smoke particles and sizzling vapor emitting from Denji's chainsaws
+ * after continuous shred damage (1.5s to 2.5s+ continuous damage threshold).
+ * Adheres strictly to Rule 11 (Zero shadowBlur CPU filtering).
+ * Features smooth fade-in and fade-out alpha envelopes, expanding white mist puffs, and zero black smoke.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} fighter
+ */
+export function drawDenjiChainsawSmoke(ctx, fighter) {
+  if (!fighter || !fighter.chainsawSmokeParticles || fighter.chainsawSmokeParticles.length === 0) return;
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+
+  const particles = fighter.chainsawSmokeParticles;
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    if (!p || p.life <= 0) continue;
+
+    const maxLife = p.maxLife || 30;
+    const progress = Math.max(0, Math.min(1.0, 1.0 - (p.life / maxLife)));
+
+    // Smooth Lifecycle Envelope: Fade-in (0% -> 22%), Peak Billow (22% -> 45%), Fade-out (45% -> 100%)
+    let lifeAlpha = 0;
+    const fadeInThreshold = 0.22;
+    const fadeOutStart = 0.45;
+
+    if (progress < fadeInThreshold) {
+      // Smooth Hermite Fade-In
+      const inT = progress / fadeInThreshold;
+      lifeAlpha = inT * inT * (3 - 2 * inT);
+    } else if (progress < fadeOutStart) {
+      // Full Density Peak
+      lifeAlpha = 1.0;
+    } else {
+      // Smooth Parabolic Fade-Out to 0
+      const outT = (progress - fadeOutStart) / (1.0 - fadeOutStart);
+      lifeAlpha = Math.max(0, 1.0 - (outT * outT));
+    }
+
+    const curAlpha = Math.max(0, Math.min(1.0, (p.alpha || 0.40) * lifeAlpha));
+    if (curAlpha <= 0.005) continue;
+
+    const px = p.x;
+    const py = p.y;
+    const pr = Math.max(1.5, p.r);
+
+    if (p.isEmber) {
+      // Sizzling friction spark / boiling micro-droplet with smooth fade
+      const sparkAlpha = Math.min(1.0, curAlpha * 1.15);
+      ctx.fillStyle = `rgba(254, 240, 138, ${(sparkAlpha * 0.45).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, Math.max(1.0, pr * 0.55), 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = (p.life % 2 === 0) 
+        ? `rgba(255, 255, 255, ${(sparkAlpha * 0.75).toFixed(3)})` 
+        : `rgba(251, 191, 36, ${(sparkAlpha * 0.75).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // 100% Pure White Ultra-Translucent Soft Steam Vapor (High Transparency & Smooth Dispersion)
+      const puffGrad = ctx.createRadialGradient(px, py, pr * 0.15, px, py, pr + 1.2);
+      puffGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(curAlpha * 0.18).toFixed(3)})`);
+      puffGrad.addColorStop(0.45, `rgba(255, 255, 255, ${(curAlpha * 0.09).toFixed(3)})`);
+      puffGrad.addColorStop(0.85, `rgba(255, 255, 255, ${(curAlpha * 0.03).toFixed(3)})`);
+      puffGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+
+      ctx.fillStyle = puffGrad;
+      ctx.beginPath();
+      ctx.arc(px, py, pr + 1.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Delicate micro-wisp center
+      if (pr > 3.5 && curAlpha > 0.18) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${(curAlpha * 0.14).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(px - 0.2, py - pr * 0.25, pr * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  ctx.restore();
 }

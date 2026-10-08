@@ -679,10 +679,15 @@ export class MakimaFighter extends Fighter {
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
-      // A. Ultimate: Crucifixion (Drop of Dominion) Check (Config Toggle: enableUltimate / enableCrucifixion)
-      // Unconditional trigger: Fires immediately whenever the skill is ready (zero HP conditions)
+      // A. Ultimate: Crucifixion (Drop of Dominion) / Kyoto Shrine Ritual Check (Config Toggle: enableUltimate / enableCrucifixion)
+      // Trigger condition: Ready off cooldown and target HP ratio <= crucifixionExecuteThreshold
       const enableUlt = cfg.enableUltimate ?? cfg.enableCrucifixion ?? cfg.enableShrine ?? cfg.enableShrineRitual ?? true;
-      if (enableUlt && this.crucifixionCooldown <= 0 && !this.isCrucifixionSliding && !this.isExecutingCrucifixion && !this.isExecutingRitual && !this.isChainingActive && this.chainTimer <= 0 && !this.isPreparingChain && !this.isThrowingChain) {
+      const targetHp = (typeof target.hp === 'number') ? target.hp : (target.health || 0);
+      const targetMaxHp = (typeof target.maxHp === 'number' && target.maxHp > 0) ? target.maxHp : (target.maxHealth || 100);
+      const targetHpRatio = targetHp / targetMaxHp;
+      const execThreshold = cfg.crucifixionExecuteThreshold ?? cfg.shrineExecuteThreshold ?? 0.25;
+
+      if (enableUlt && this.crucifixionCooldown <= 0 && targetHpRatio <= execThreshold && !this.isCrucifixionSliding && !this.isExecutingCrucifixion && !this.isExecutingRitual && !this.isChainingActive && this.chainTimer <= 0 && !this.isPreparingChain && !this.isThrowingChain) {
         this._castCrucifixionUltimate(target);
         return;
       }

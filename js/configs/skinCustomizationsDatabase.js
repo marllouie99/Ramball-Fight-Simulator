@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-07T17:06:27.817Z
+ * Generated from Skin Studio on 2026-10-07T19:34:40.282Z
  * =============================================================================
  */
 
@@ -10,8 +10,8 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   gojo: { widthScale: 0.88, heightScale: 0.94, offsetX: -1, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
   makima: { widthScale: 0.98, heightScale: 0.90, offsetX: -2, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   reze: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
-  sukuna: { widthScale: 0.94, heightScale: 0.98, offsetX: 0, offsetY: -8, angleOffset: 0, flipX: false, flipY: false },
-  yuta: { widthScale: 1.10, heightScale: 0.94, offsetX: -1, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
+  sukuna: { widthScale: 0.90, heightScale: 0.96, offsetX: -1, offsetY: -6, angleOffset: 0, flipX: false, flipY: false },
+  yuta: { widthScale: 1.00, heightScale: 0.94, offsetX: -1, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
   yuji: { widthScale: 0.90, heightScale: 1.00, offsetX: 0, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
   toji: { widthScale: 0.84, heightScale: 0.96, offsetX: 0, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
   todo: { widthScale: 0.96, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
@@ -19,7 +19,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   mahito: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   naoya: { widthScale: 0.80, heightScale: 0.78, offsetX: 0, offsetY: 8, angleOffset: 0.0349, flipX: false, flipY: false },
   maki: { widthScale: 0.80, heightScale: 1.04, offsetX: 1, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
-  genos: { widthScale: 1.04, heightScale: 0.82, offsetX: 0, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
+  genos: { widthScale: 0.94, heightScale: 0.82, offsetX: 0, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
   escanor: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -3, angleOffset: 0, flipX: false, flipY: false },
   john_wick: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 6, angleOffset: 0, flipX: false, flipY: false },
   gunslinger: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
@@ -27,7 +27,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   megumin: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   zeus: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -11, angleOffset: 0, flipX: false, flipY: false },
   tanjiro: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
-  zenitsu: { widthScale: 0.94, heightScale: 0.90, offsetX: 0, offsetY: 4, angleOffset: 0, flipX: false, flipY: false },
+  zenitsu: { widthScale: 0.92, heightScale: 0.90, offsetX: -1, offsetY: 5, angleOffset: -0.0698, flipX: false, flipY: false },
   nezuko: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   power: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   engineer: { widthScale: 0.94, heightScale: 0.88, offsetX: 0, offsetY: -7, angleOffset: 0, flipX: false, flipY: false },

@@ -508,6 +508,12 @@ export class NaoyaFighter extends Fighter {
       }
     }
 
+    // Sans Teleport Dodge vs Naoya Freeze Mechanic
+    if (typeof target.dodgeFrameStasis === 'function') {
+      const dodged = target.dodgeFrameStasis({ attacker: this, duration });
+      if (dodged) return false;
+    }
+
     target.isFrameFrozen = true;
     target.frameFreezeTimer = duration;
 
@@ -1057,6 +1063,12 @@ export class NaoyaFighter extends Fighter {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
         if (f && f !== this && !f.isDead && (f.hp || 0) > 0) {
+          // Check if target can dodge 24 FPS frame freeze mechanic (e.g. Sans)
+          if (typeof f.dodgeFrameStasis === 'function') {
+            const dodged = f.dodgeFrameStasis({ attacker: this, duration: dur, isUltimate: true });
+            if (dodged) continue;
+          }
+
           f.isCaughtInNaoyaUlt = true;
           if (typeof f.interruptAttacks === 'function') f.interruptAttacks(true);
           if (typeof f.applyTimeStop === 'function') f.applyTimeStop(dur, { isUltimate: true, isDomain: true });

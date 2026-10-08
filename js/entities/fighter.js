@@ -381,8 +381,24 @@ export class Fighter {
   }
 
   /** Check if a skill or feature toggle is enabled in config. */
-  isSkillEnabled(configValue, defaultValue = true) {
-    return isSkillEnabled(configValue, defaultValue);
+  isSkillEnabled(...args) {
+    let defaultValue = true;
+    let candidates = args;
+    if (args.length > 1 && typeof args[args.length - 1] === 'boolean') {
+      defaultValue = args[args.length - 1];
+      candidates = args.slice(0, -1);
+    }
+    for (const c of candidates) {
+      if (c === false || c === 0 || c === 'false' || c === '0' || c === 'off' || c === 'disabled') {
+        return false;
+      }
+    }
+    for (const c of candidates) {
+      if (c === true || (typeof c === 'number' && c > 0) || c === 'true' || c === '1' || c === 'on' || c === 'enabled') {
+        return true;
+      }
+    }
+    return defaultValue;
   }
 
   /** Check if another fighter/entity is on the same team. */
@@ -2516,6 +2532,7 @@ export class Fighter {
     }
   }
 
+
   /**
    * Handles entity death callback, announcer sounds, match kill logs, and round-end checks.
    */
@@ -3486,6 +3503,8 @@ export class Fighter {
                               (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) ||
                               ((this.comboHitsLeft || 0) > 0) ||
                               ((this.rockCounterComboLeft || 0) > 0) ||
+                              ((this.knockbackStunTimer || 0) > 0) ||
+                              ((this.hitStunTimer || 0) > 0) ||
                               (this.isChainedByMakima && !this.isMindControlledByMakima) ||
                               this.isCurrentlyWallPinnedByMakima ||
                               ((this.makimaWallPinTimer || 0) > 0) ||
@@ -3508,6 +3527,8 @@ export class Fighter {
                           (this.paralyzeTimer > 0) ||
                           (this.electricStunTimer > 0) ||
                           (this.dubstepStunTimer > 0) ||
+                          ((this.knockbackStunTimer || 0) > 0) ||
+                          ((this.hitStunTimer || 0) > 0) ||
                           (this.isTargetOfAmbush) ||
                           this.isCurrentlyWallPinnedByMakima ||
                           ((this.makimaWallPinTimer || 0) > 0) ||

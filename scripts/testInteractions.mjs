@@ -4930,22 +4930,33 @@ async function runInteractionTests() {
     reze._activateMegatonNuke(dummy);
     assert(reze.hp === reze.maxHp, `Reze must be fully healed to maxHp (${reze.maxHp}) upon activating ultimate, got ${reze.hp}`);
     assert(reze._healthBarHealTimer > 0, 'Reze healthBarHealTimer must be active for glowing HUD heal pulse');
+    assert(reze.hasUsedNuke === true, 'Reze hasUsedNuke must be true after activating ultimate');
+
+    // Verify subsequent Megaton Tsar Nuke activation attempt is blocked
+    const priorHp = reze.hp;
+    reze.hp = 50;
+    reze.nukeCooldown = 0;
+    reze._activateMegatonNuke(dummy);
+    assert(reze.hp === 50, 'Reze Megaton Tsar Nuke must only trigger once and not heal again after being used');
 
     // B. Fast forward transformation into Bomb Devil Form
     reze.isPullingPin = false;
     reze.isHybridModeActive = true;
     reze.hp = 100; // Lower HP to test lifesteal headroom (reze.maxHp is 200 in 1v1 mode)
 
-    // C. Dealing damage in Bomb Devil Form triggers 35% lifesteal
+    // C. Dealing damage in Bomb Devil Form triggers lifesteal
     const damageDealt = 100;
-    const expectedHeal = Math.round(damageDealt * 0.35); // 35 HP
+    const lifestealRatio = (typeof CONFIG !== 'undefined' && CONFIG.reze?.hybridLifestealPercent !== undefined)
+      ? CONFIG.reze.hybridLifestealPercent
+      : (rezeConfig.hybridLifestealPercent ?? 0.35);
+    const expectedHeal = Math.round(damageDealt * lifestealRatio);
     dummy.takeDamage(damageDealt, reze);
 
-    assert(reze.hp === 100 + expectedHeal, `Reze HP must increase by 35% of damage dealt (expected ${100 + expectedHeal}, got ${reze.hp})`);
+    assert(reze.hp === 100 + expectedHeal, `Reze HP must increase by lifesteal ratio of damage dealt (expected ${100 + expectedHeal}, got ${reze.hp})`);
     assert(reze._healthBarHealTimer === 16, 'Reze healthBarHealTimer must be set to 16 upon lifesteal recovery');
 
     // D. Verify lifesteal does not exceed maxHp
-    reze.hp = reze.maxHp - 10;
+    reze.hp = reze.maxHp - Math.max(1, Math.floor(expectedHeal / 2));
     dummy.takeDamage(100, reze);
     assert(reze.hp === reze.maxHp, `Reze HP must cap cleanly at maxHp (${reze.maxHp}), got ${reze.hp}`);
 
@@ -4955,12 +4966,28 @@ async function runInteractionTests() {
     dummy.takeDamage(100, reze);
     assert(reze.hp === 100, `Human form Reze must not trigger hybrid lifesteal (expected 100, got ${reze.hp})`);
 
+    // F. Verify explosion visuals decay smoothly and do NOT get stuck during time-stop/freeze
+    reze.activePalmBlasts = [{ x: 200, y: 200, radius: 70, timer: 3, maxTimer: 14, isPunchExplosion: true }];
+    reze.activeNukeBlasts = [{ x: 200, y: 200, radius: 175, timer: 3, maxTimer: 30, isTransformationBlast: true }];
+    reze.timeStopTimer = 20; // Reze's movement is stopped by an enemy attack
+
+    reze.update(dummy, 0, state.arena);
+    assert(reze.activePalmBlasts[0].timer === 2, 'activePalmBlasts timer must decrement during freeze');
+    assert(reze.activeNukeBlasts[0].timer === 2, 'activeNukeBlasts timer must decrement during freeze');
+
+    reze.update(dummy, 0, state.arena);
+    reze.update(dummy, 0, state.arena);
+    assert(reze.activePalmBlasts.length === 0, 'activePalmBlasts must clear naturally and not get stuck when Reze is frozen');
+    assert(reze.activeNukeBlasts.length === 0, 'activeNukeBlasts must clear naturally and not get stuck when Reze is frozen');
+    reze.timeStopTimer = 0;
+
     // Clean up
     reze.reset();
+    assert(reze.hasUsedNuke === false, 'Reze hasUsedNuke must reset cleanly to false on round reset');
     dummy.reset();
     state.fighters = [];
 
-    console.log('      ✅ Reze Ultimate 100% full heal and Bomb Devil Form 35% vampiric lifesteal verified successfully.');
+    console.log('      ✅ Reze Ultimate single-use per round, 100% full heal, vampiric lifesteal, and visual explosion non-freeze decay verified successfully.');
   }
 
   // ─────────────────────────────────────────────

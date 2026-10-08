@@ -35,3 +35,25 @@ Use this skill when creating or optimizing visual effects, particle bursts, blad
    - Draw screen dimming overlays strictly on the game canvas (`state.ctx`) or within `.game-box`. NEVER alter `document.body.style.backgroundColor`.
 2. **Canvas Stack Balance**:
    - Every `ctx.save()` MUST have a matching `ctx.restore()` in the exact same branch.
+
+## Phase 4: Non-Freezing Active Visual Effects Lifecycle (Rule 25)
+1. **Top-of-Update Processing**:
+   - All active visual effects, explosion rings, slashes, and particle bursts MUST decay at the top of the fighter's `update()` loop BEFORE the `_handleTimeStop()` freeze guard exit.
+   - This guarantees effects never freeze mid-air or get stuck on screen when character movement is stopped by CC, hit-pause, or time-stop.
+2. **Interruption & Defeat Safety**:
+   - Flush fighter-bound effect arrays or detach them to world-space on `interruptAttacks(forceCancelAll = true)` or fighter death.
+
+## Phase 5: Clean Concentric Shockwaves (Rule 26 — Anti-Cobweb & Anti-Mesh Rule)
+1. **Sequential Water-Ripple Wavefront Staggering ("Dipping Fingers in Steady Water")**:
+   - Shockwave rings MUST ALWAYS animate with sequential, staggered wave propagation where concentric compression rings pop out 1-by-1 from the detonation center with progressive time offsets ($t_0 = 0.00, t_1 = 0.12, t_2 = 0.24, \dots$) and extend outward smoothly along a decelerating power curve ($R_k = R_{\max} \cdot \text{lp}_k^{\text{speedPow}}$).
+   - NEVER spawn all concentric rings at full radius simultaneously with fixed static multiplier fractions.
+2. **Expanding Translucent Interior Wash**:
+   - The interior of expanding shockwaves must be filled with semi-transparent warm color washes (e.g. `rgba(255, 107, 26, 0.18 * waveAlpha)`) that expand dynamically with each active wave disc.
+3. **Wavefront Opacity & Dissipation**:
+   - Each individual ring starts at $R = 0$, blooms in rapidly as it pops out ($\text{popIn} \le 0.10$), maintains crisp line weight during travel, and smoothly dissipates as it disperses at the perimeter ($\text{fadeOut} = (1 - \text{lp})^{1.25}$).
+4. **Unbroken Compression Bands**:
+   - Shockwaves must be drawn as clean, smooth, concentric circular or crescent bands.
+5. **Strict Prohibition of Spiderweb / Radial Spokes**:
+   - NEVER draw connecting radial ray lines, spoke needles, or intersecting meshes across shockwave rings.
+6. **No Spinning Line Ticks**:
+   - Never draw rotating line segments around shockwaves. Use standalone point particles/embers without radial lines.

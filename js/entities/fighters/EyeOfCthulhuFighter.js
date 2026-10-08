@@ -402,7 +402,7 @@ export class EyeOfCthulhuFighter extends Fighter {
       }
     }
 
-    // 5. Soft Arena Leashing (Bypass standard rigid wall bounce during combat, enforce return on victory)
+    // 5. Natural Arena Wall Rebouncing (Follows the game's centralized rebouncing mechanics)
     this.resolveWallBounce(arena, opponent);
   }
 
@@ -478,7 +478,7 @@ export class EyeOfCthulhuFighter extends Fighter {
 
     switch (this.aiState) {
       case EOC_STATE.HOVER:
-        this._updateHoverState(opponent, ownerIndex, cfg);
+        this._updateHoverState(opponent, ownerIndex, arena, cfg);
         break;
 
       case EOC_STATE.WINDUP_RAM:
@@ -519,7 +519,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     }
   }
 
-  _updateHoverState(opponent, ownerIndex, cfg) {
+  _updateHoverState(opponent, ownerIndex, arena, cfg) {
     if (this.isPhase2) {
       this.aiState = EOC_STATE.P2_CHASE;
       this.stateTimer = cfg.p2RamRecoveryPauseFrames || 12;
@@ -530,9 +530,15 @@ export class EyeOfCthulhuFighter extends Fighter {
     this.isWindupTelegraph = false;
     this.hoverOrbitTime += 0.035;
 
-    // Target position: orbiting above the player
-    const targetX = opponent.x + Math.sin(this.hoverOrbitTime) * (cfg.hoverOrbitWobbleAmp || 45);
-    const targetY = opponent.y - (cfg.hoverTargetDistanceY || 175) + Math.cos(this.hoverOrbitTime * 0.5) * 20;
+    // Target position: orbiting above the player, safely bounded inside the arena
+    let targetX = opponent.x + Math.sin(this.hoverOrbitTime) * (cfg.hoverOrbitWobbleAmp || 45);
+    let targetY = opponent.y - (cfg.hoverTargetDistanceY || 175) + Math.cos(this.hoverOrbitTime * 0.5) * 20;
+
+    if (arena) {
+      const margin = (this.r || 32) + 15;
+      targetX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, targetX));
+      targetY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, targetY));
+    }
 
     const dx = targetX - this.x;
     const dy = targetY - this.y;
@@ -1188,58 +1194,64 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   /**
-   * Terraria Ghost Flight Physics:
-   * Eye of Cthulhu completely ignores arena walls and bounds, hovering and gliding freely
-   * through borders and blocks. Never clamps, bounces, or collides with the arena wall.
+   * Resolves arena wall collision using the game's natural rebouncing mechanics.
+   * When colliding with arena walls, the Eye naturally rebounces back into the arena.
    */
   resolveWallBounce(arena, opponent) {
     if (!arena && typeof state !== 'undefined') arena = state.arena;
     if (!arena) return false;
 
-    const cx = arena.x + arena.width / 2;
-    const cy = arena.y + arena.height / 2;
-    const ar = (arena.radius || (arena.width / 2));
+    // Rule 1.2: Standard CC trapping delegates to super
+    if (typeof this.isCaughtInBeam === 'function' && (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama)) {
+      return super.resolveWallBounce(arena, opponent);
+    }
 
-    const isMatchEnded = typeof state !== 'undefined' && (
-      state.gameState === 'roundEnd' || 
-      state.gameState === 'matchEnd' || 
-      state.gameState === 'gameOver' || 
-      state.gameState === 'champion' || 
-      Boolean(this._isWinnerReveal)
-    );
-    const isTargetAlive = Boolean(opponent && !opponent.isDead && opponent.hp > 0);
-
-    // If the Eye has won the match or target is dead, enforce safe return inside arena
-    if (isMatchEnded || !isTargetAlive) {
-      const safeRadius = Math.max(30, ar - this.r - 25);
-      const distFromCenter = Math.hypot(this.x - cx, this.y - cy);
-      if (distFromCenter > safeRadius && distFromCenter > 0) {
-        const nx = (cx - this.x) / distFromCenter;
-        const ny = (cy - this.y) / distFromCenter;
-        const pullSpeed = Math.min(8.5, Math.max(4.0, (distFromCenter - safeRadius) * 0.10));
-        this.vx += nx * pullSpeed * 0.30;
-        this.vy += ny * pullSpeed * 0.30;
-        const currentSpeed = Math.hypot(this.vx, this.vy);
-        if (currentSpeed > pullSpeed) {
-          this.vx = (this.vx / currentSpeed) * pullSpeed;
-          this.vy = (this.vy / currentSpeed) * pullSpeed;
+    // Support circular arena if shape is circle
+    if (arena.shape === 'circle') {
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      const d = Math.hypot(this.x - cx, this.y - cy);
+      if (d + this.r >= ar && d > 0) {
+        const nx = (this.x - cx) / d;
+        const ny = (this.y - cy) / d;
+        this.x = cx + nx * (ar - this.r);
+        this.y = cy + ny * (ar - this.r);
+        const restitution = CONFIG.collision?.restitution ?? 0.95;
+        const dot = this.vx * nx + this.vy * ny;
+        if (dot > 0) {
+          this.vx = (this.vx - 2 * dot * nx) * restitution;
+          this.vy = (this.vy - 2 * dot * ny) * restitution;
         }
+        this._onWallRebounce();
+        return true;
       }
       return false;
     }
 
-    // During active combat: soft parabolic tether
-    const maxAllowedDist = ar + (eyeOfCthulhuConfig.softLeashRadius || 140);
-    const distFromCenter = Math.hypot(this.x - cx, this.y - cy);
-    if (distFromCenter > maxAllowedDist && distFromCenter > 0) {
-      // Gentle soft steering back towards arena center (smooth parabolic tether)
-      const pullForce = 0.45;
-      const nx = (cx - this.x) / distFromCenter;
-      const ny = (cy - this.y) / distFromCenter;
-      this.vx += nx * pullForce;
-      this.vy += ny * pullForce;
+    const bounced = super.resolveWallBounce(arena, opponent);
+    if (bounced) {
+      this._onWallRebounce();
     }
-    return false;
+    return bounced;
+  }
+
+  _onWallRebounce() {
+    const newSpeed = Math.hypot(this.vx, this.vy);
+    if (newSpeed > 0.1) {
+      const bounceAngle = Math.atan2(this.vy, this.vx);
+      if (this.isRamming) {
+        this.committedRamAngle = bounceAngle;
+      }
+      this.gunAngle = bounceAngle;
+      this.angle = bounceAngle;
+    }
+    if (typeof spawnSparks === 'function') {
+      spawnSparks(this.x, this.y, 6, 'bloodSpark', '#E11D48');
+    }
+    if (this.isRamming && this.actionNoiseCooldown <= 0) {
+      this._playActionNoise();
+    }
   }
 
   onDeath() {

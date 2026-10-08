@@ -2046,11 +2046,11 @@ export function getSkillDataForFighter(f, getProjectiles) {
       const sparkPct = Math.max(0, Math.min(100, (1 - (sparkTimer / sparkMax)) * 100));
       skills.push({ id: 'spark', pct: sparkPct, ready: sparkPct >= 99, color: themeColor, label: 'SPARK FLECHETTE' });
     }
-    if (isSkillEnabled(cfg.enableDecoyBomb, true)) {
-      const decoyMax = f.decoyCooldownMax || cfg.decoyCooldown || 420;
-      const decoyTimer = f.decoyCooldown !== undefined ? f.decoyCooldown : 0;
-      const decoyPct = Math.max(0, Math.min(100, (1 - (decoyTimer / decoyMax)) * 100));
-      skills.push({ id: 'decoy', pct: decoyPct, ready: decoyPct >= 99, color: themeColor, label: 'DECOY BOMB' });
+    if (isSkillEnabled(cfg.enableClusterBomb, cfg.enableDecoyBomb, true)) {
+      const clusterMax = f.clusterCooldownMax || f.decoyCooldownMax || cfg.clusterBombCooldown || cfg.decoyCooldown || 320;
+      const clusterTimer = f.clusterCooldown !== undefined ? f.clusterCooldown : (f.decoyCooldown !== undefined ? f.decoyCooldown : 0);
+      const clusterPct = Math.max(0, Math.min(100, (1 - (clusterTimer / clusterMax)) * 100));
+      skills.push({ id: 'cluster_bomb', pct: clusterPct, ready: clusterPct >= 99, color: themeColor, label: 'CLUSTER BOMBS' });
     }
     if (isSkillEnabled(cfg.enableRocketLunge, true)) {
       const rocketMax = f.rocketCooldownMax || cfg.rocketCooldown || 300;
