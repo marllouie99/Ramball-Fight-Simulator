@@ -8,6 +8,7 @@ import { isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet
 import { renderActiveArenaFloor } from '../../systems/arenaTileSystem.js';
 import { drawHorizontalMapFeatures } from '../../systems/horizontalMapSystem.js';
 import { drawHorizontalFighterDolls } from './horizontalDollRenderer.js';
+import { drawCenterPlusObstacle } from '../../systems/arenaObstacleSystem.js';
 
 /**
  * Renders a solid vector fissure crack (matching manga comic / PNG crack art).
@@ -484,7 +485,7 @@ export function drawArena() {
       applyCameraToCtx(ctx);
       const fBleed = 0;
       renderActiveArenaFloor(ctx, arena, isDark, fBleed);
-      const isGrandArena = (arena.width > 600) || (state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' || state.mode === 'Battle Royale 8');
+      const isGrandArena = (arena.width > 1000) || (state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' || state.mode === 'Battle Royale 8');
       if (state.viewOrientation === 'horizontal' && isGrandArena) {
         drawHorizontalMapFeatures(ctx, arena);
       }
@@ -503,6 +504,9 @@ export function drawArena() {
     ctx.save();
     applyCameraToCtx(ctx);
     ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
+
+    // ── Draw Center Plus (+) Arena Wall (FFA Obstacle) ──
+    drawCenterPlusObstacle(ctx, arena, isDark);
 
     // ── Draw Wall Cracks (Decals) ──
     if (state.wallCracks && state.wallCracks.length > 0) {
@@ -801,12 +805,17 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   const mainFighters = state.fighters.filter(isPrimaryFighter);
   if (mainFighters.length === 0) return;
 
-  const centerX = arena.x + arena.width / 2;
+  const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+  const centerX = isHorizontal ? (state.canvas?.width ? state.canvas.width / 2 : 480) : (arena.x + arena.width / 2);
   const isDark = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode));
 
   ctx.save();
-  if (!alreadyInCameraSpace) {
+  // In vertical portrait mode, anchor match names to top arena wall in camera space.
+  // In horizontal widescreen mode, HUD names and top wall UI elements remain strictly screen-locked in viewport space.
+  if (!alreadyInCameraSpace && !isHorizontal) {
     applyCameraToCtx(ctx);
+  } else if (alreadyInCameraSpace && isHorizontal) {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
   }
 
   // If Top HUD Name Shatter is active, render the natural hanging/falling letter shards
@@ -907,64 +916,75 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   }
 
   const isTeamMatch = (team0.length > 0 && team1.length > 0 && (team0.length + team1.length === mainFighters.length));
+  const team0Data = team0.map(f => ({
+    name: getFighterDisplayName(f, true),
+    color: getHudNameColor(f, '#38BDF8'),
+    fighter: f
+  }));
 
-  if (isTeamMatch) {
-    const team0Data = team0.map(f => ({
-      name: getFighterDisplayName(f, true),
-      color: getHudNameColor(f, '#38BDF8'),
-      fighter: f
-    }));
+  const team1Data = team1.map(f => ({
+    name: getFighterDisplayName(f, true),
+    color: getHudNameColor(f, '#F87171'),
+    fighter: f
+  }));
 
-    const team1Data = team1.map(f => ({
-      name: getFighterDisplayName(f, true),
-      color: getHudNameColor(f, '#F87171'),
-      fighter: f
-    }));
+  const isGrandBattleMode = Boolean(
+    state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' ||
+    state.mode === 'Battle Royale 8' || state.mode === 'Grand Battle' ||
+    state.mode === '3v3v3v3 Teamfight' || state.mode === '4v4 Grand War' || state.mode === '2v2v2v2 Quad Battle' ||
+    (arena && arena.width > 1000)
+  );
+  const isSideHudHorizontal = isHorizontal && !isGrandBattleMode;
 
-    const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
-    const isGrandBattleMode = Boolean(
-      state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' ||
-      state.mode === 'Battle Royale 8' || state.mode === 'Grand Battle' ||
-      (arena && arena.width > 600)
+  const drawHorizontalTopWallHud = (leftFighters, rightFighters, leftData, rightData, renderDolls = true) => {
+    const sideFontSize = 34;
+    const customSideFont = `700 ${sideFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+    const stackedSideFont = `700 20px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+    const maxSideW = 244;
+
+    const drawSideColumnNames = (dataArr, x, baseY, align) => {
+      // In 1v1 mode (single fighter per side), draw the large top wall flank name above the side card.
+      // In multi-fighter modes (e.g. 2v2 or FFA), names are placed directly on each fighter's
+      // respective healthbar/skillbar block in the DOM instead of stacking on canvas.
+      if (!dataArr || dataArr.length !== 1) return;
+      ctx.save();
+      ctx.textBaseline = 'top';
+      ctx.textAlign = align;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+
+      ctx.font = customSideFont;
+      const td = dataArr[0];
+      const measuredW = ctx.measureText(td.name).width;
+      const scale = measuredW > maxSideW ? maxSideW / measuredW : 1.0;
+      if (scale < 1.0) {
+        ctx.translate(x, baseY);
+        ctx.scale(scale, scale);
+        ctx.translate(-x, -baseY);
+      }
+      ctx.fillStyle = td.color;
+      if (!isDark) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 0.5;
+        ctx.strokeText(td.name, x, baseY);
+      }
+      ctx.fillText(td.name, x, baseY);
+      ctx.restore();
+    };
+
+    const nameY = arena.y;
+    // Player / Team 1 on Left Flank (aligned with top arena wall: left 18px, top y: arena.y)
+    drawSideColumnNames(leftData, 18, nameY, 'left');
+
+    // Player / Team 2 on Right Flank (aligned with top arena wall: left-aligned with right column at 960 - 18 - maxSideW)
+    drawSideColumnNames(rightData, 960 - 18 - maxSideW, nameY, 'left');
+
+    // ── Center Top-Wall Round Banner & Win Bullets: [BULLETS] ── [ROUND BANNER] ── [BULLETS] ──
+    const isFfaMatch = Boolean(
+      state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === 'FFA 4-Player' ||
+      (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA))
     );
-    const isSideHud1v1 = isHorizontal && !isGrandBattleMode && (team0.length === 1 && team1.length === 1);
 
-    const drawHorizontal1v1TopWallHud = (fighter0, fighter1, fighter0Data, fighter1Data) => {
-      const sideFontSize = 34;
-      const customSideFont = `700 ${sideFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-      const maxSideW = 244;
-
-      const drawSideHudName = (td, x, y, align) => {
-        ctx.save();
-        ctx.font = customSideFont;
-        ctx.textBaseline = 'top';
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-        const measuredW = ctx.measureText(td.name).width;
-        const scale = measuredW > maxSideW ? maxSideW / measuredW : 1.0;
-        if (scale < 1.0) {
-          ctx.translate(x, y);
-          ctx.scale(scale, scale);
-          ctx.translate(-x, -y);
-        }
-        ctx.textAlign = align;
-        ctx.fillStyle = td.color;
-        if (!isDark) {
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 0.5;
-          ctx.strokeText(td.name, x, y);
-        }
-        ctx.fillText(td.name, x, y);
-        ctx.restore();
-      };
-
-      const nameY = arena.y;
-      // Player 1 on Left Flank (aligned with top arena wall: left 18px, top y: arena.y)
-      drawSideHudName(fighter0Data, 18, nameY, 'left');
-
-      // Player 2 on Right Flank (aligned with top arena wall: left-aligned with right column at 960 - 18 - maxSideW)
-      drawSideHudName(fighter1Data, 960 - 18 - maxSideW, nameY, 'left');
-
-      // ── Center Top-Wall Round Banner & Win Bullets: [BULLETS] ── [ROUND BANNER] ── [BULLETS] ──
+    if (!isFfaMatch) {
       const roundNum = state.roundNum || 1;
       let roundText = 'ROUND 1';
       if (roundNum === 2) {
@@ -988,47 +1008,90 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       const pillY = Math.round(arena.y - pillH / 2);
 
       // ── Top-Wall Win Bullets ──
-      const p1Index = state.fighters ? state.fighters.indexOf(fighter0) : 0;
-      const p2Index = state.fighters ? state.fighters.indexOf(fighter1) : 1;
-      const p1Wins = (p1Index >= 0 && state.scores ? state.scores[p1Index] : 0) || 0;
-      const p2Wins = (p2Index >= 0 && state.scores ? state.scores[p2Index] : 0) || 0;
-      const maxBullets = 2;
-      const bulletR = 5.5;
-      const bulletGap = 16;
-      const bulletOffsetFromPill = 20;
+      const isTwoFighterMatch = (leftFighters.length === 1 && rightFighters.length === 1);
+      if (isTwoFighterMatch) {
+        const fighter0 = leftFighters[0];
+        const fighter1 = rightFighters[0];
+        const p1Index = state.fighters ? state.fighters.indexOf(fighter0) : 0;
+        const p2Index = state.fighters ? state.fighters.indexOf(fighter1) : 1;
+        const p1Wins = (p1Index >= 0 && state.scores ? state.scores[p1Index] : 0) || 0;
+        const p2Wins = (p2Index >= 0 && state.scores ? state.scores[p2Index] : 0) || 0;
+        const maxBullets = 2;
+        const bulletR = 5.5;
+        const bulletGap = 16;
+        const bulletOffsetFromPill = 20;
 
-      const drawTopWallBullet = (bx, filled, fighterColor) => {
-        ctx.beginPath();
-        ctx.arc(bx, arena.y, bulletR, 0, Math.PI * 2);
-        if (filled) {
-          ctx.fillStyle = fighterColor || '#FFD700';
-          ctx.strokeStyle = isDark ? '#FFFFFF' : '#000000';
-          ctx.lineWidth = 1.8;
-          ctx.fill();
-          ctx.stroke();
-        } else {
-          ctx.fillStyle = isDark ? '#141824' : '#FFFAF0';
-          ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.45)' : '#000000';
-          ctx.lineWidth = 1.8;
-          ctx.fill();
-          ctx.stroke();
+        const drawTopWallBullet = (bx, filled, fighterColor) => {
+          ctx.beginPath();
+          ctx.arc(bx, arena.y, bulletR, 0, Math.PI * 2);
+          if (filled) {
+            ctx.fillStyle = fighterColor || '#FFD700';
+            ctx.strokeStyle = isDark ? '#FFFFFF' : '#000000';
+            ctx.lineWidth = 1.8;
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = isDark ? '#141824' : '#FFFAF0';
+            ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.45)' : '#000000';
+            ctx.lineWidth = 1.8;
+            ctx.fill();
+            ctx.stroke();
+          }
+        };
+
+        // P1 Bullets (Left side of Pill): Bullet 0 (outer left), Bullet 1 (inner left)
+        const p1Color = leftData[0]?.color || '#FF4D4D';
+        for (let i = 0; i < maxBullets; i++) {
+          const bx = pillX - bulletOffsetFromPill - (maxBullets - 1 - i) * bulletGap;
+          const filled = i < p1Wins;
+          drawTopWallBullet(bx, filled, p1Color);
         }
-      };
 
-      // P1 Bullets (Left side of Pill): Bullet 0 (outer left), Bullet 1 (inner left)
-      const p1Color = fighter0Data?.color || '#FF4D4D';
-      for (let i = 0; i < maxBullets; i++) {
-        const bx = pillX - bulletOffsetFromPill - (maxBullets - 1 - i) * bulletGap;
-        const filled = i < p1Wins;
-        drawTopWallBullet(bx, filled, p1Color);
-      }
+        // P2 Bullets (Right side of Pill): Bullet 0 (inner right), Bullet 1 (outer right)
+        const p2Color = rightData[0]?.color || '#38BDF8';
+        for (let i = 0; i < maxBullets; i++) {
+          const bx = pillX + pillW + bulletOffsetFromPill + i * bulletGap;
+          const filled = i < p2Wins;
+          drawTopWallBullet(bx, filled, p2Color);
+        }
+      } else if (isTeamMatch && state.teamScores) {
+        // Team Match Bullets (2v2 etc)
+        const team0Wins = state.teamScores[0] || 0;
+        const team1Wins = state.teamScores[1] || 0;
+        const maxBullets = 2;
+        const bulletR = 5.5;
+        const bulletGap = 16;
+        const bulletOffsetFromPill = 20;
 
-      // P2 Bullets (Right side of Pill): Bullet 0 (inner right), Bullet 1 (outer right)
-      const p2Color = fighter1Data?.color || '#38BDF8';
-      for (let i = 0; i < maxBullets; i++) {
-        const bx = pillX + pillW + bulletOffsetFromPill + i * bulletGap;
-        const filled = i < p2Wins;
-        drawTopWallBullet(bx, filled, p2Color);
+        const drawTopWallBullet = (bx, filled, color) => {
+          ctx.beginPath();
+          ctx.arc(bx, arena.y, bulletR, 0, Math.PI * 2);
+          if (filled) {
+            ctx.fillStyle = color || '#FFD700';
+            ctx.strokeStyle = isDark ? '#FFFFFF' : '#000000';
+            ctx.lineWidth = 1.8;
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillStyle = isDark ? '#141824' : '#FFFAF0';
+            ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.45)' : '#000000';
+            ctx.lineWidth = 1.8;
+            ctx.fill();
+            ctx.stroke();
+          }
+        };
+
+        for (let i = 0; i < maxBullets; i++) {
+          const bx = pillX - bulletOffsetFromPill - (maxBullets - 1 - i) * bulletGap;
+          const filled = i < team0Wins;
+          drawTopWallBullet(bx, filled, leftData[0]?.color || '#FF4D4D');
+        }
+
+        for (let i = 0; i < maxBullets; i++) {
+          const bx = pillX + pillW + bulletOffsetFromPill + i * bulletGap;
+          const filled = i < team1Wins;
+          drawTopWallBullet(bx, filled, rightData[0]?.color || '#38BDF8');
+        }
       }
 
       // Pill Background
@@ -1051,29 +1114,54 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       ctx.textBaseline = 'middle';
       ctx.fillText(roundText, centerX, arena.y + 0.5);
       ctx.restore();
-
-      // ── Bottom / Footer Brand Handle: @CronosphereFOC ──
-      ctx.save();
-      const footerFont = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-      ctx.font = footerFont;
-      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.2px';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = isDark ? '#94A3B8' : '#64748B';
-      const footerY = Math.round(arena.y + arena.height + 42);
-      ctx.fillText('@CronosphereFOC', centerX, footerY);
-      ctx.restore();
-
-      // ── Horizontal Side Character Dolls (Occupying Space Below Left & Right HUDs) ──
-      drawHorizontalFighterDolls(ctx, fighter0, fighter1, fighter0Data, fighter1Data, arena);
-    };
-
-    if (isSideHud1v1) {
-      drawHorizontal1v1TopWallHud(team0[0], team1[0], team0Data[0], team1Data[0]);
-      ctx.restore();
-      return;
     }
 
+    // ── Bottom / Footer Brand Handle: @CronosphereFOC (Anchored to Arena in Camera Space) ──
+    ctx.save();
+    applyCameraToCtx(ctx);
+    const footerFont = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+    ctx.font = footerFont;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.2px';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = isDark ? '#94A3B8' : '#64748B';
+    const arenaCenterX = arena.x + arena.width / 2;
+    const footerY = Math.round(arena.y + arena.height + 42);
+    ctx.fillText('@CronosphereFOC', arenaCenterX, footerY);
+    ctx.restore();
+
+    // ── Horizontal Side Character Dolls (Occupying Space Below Left & Right HUDs in 1v1 Mode) ──
+    const shouldRenderDolls = renderDolls && leftData.length === 1 && rightData.length === 1 && leftFighters[0] && rightFighters[0];
+    if (shouldRenderDolls) {
+      drawHorizontalFighterDolls(ctx, leftFighters[0], rightFighters[0], leftData[0], rightData[0], arena);
+    }
+  };
+
+  // If in Horizontal Side HUD mode, render names on the flanks above side cards
+  if (isSideHudHorizontal) {
+    if (isTeamMatch) {
+      drawHorizontalTopWallHud(team0, team1, team0Data, team1Data);
+    } else {
+      const leftFighters = mainFighters.filter((_, idx) => idx % 2 === 0);
+      const rightFighters = mainFighters.filter((_, idx) => idx % 2 === 1);
+      const leftData = leftFighters.map(f => ({
+        name: getFighterDisplayName(f, true),
+        color: getHudNameColor(f, '#38BDF8'),
+        fighter: f
+      }));
+      const rightData = rightFighters.map(f => ({
+        name: getFighterDisplayName(f, true),
+        color: getHudNameColor(f, '#F87171'),
+        fighter: f
+      }));
+      drawHorizontalTopWallHud(leftFighters, rightFighters, leftData, rightData);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // ── Vertical Mode / Non-Side-HUD Centered Names Rendering ──
+  if (isTeamMatch) {
     const hasStackedTeam = team0.length > 1 || team1.length > 1;
     const nameFontSize = hasStackedTeam ? 44 : 60;
     const customFighterFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
@@ -1159,24 +1247,10 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
 
     ctx.restore();
   } else {
-    const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
-    const isGrandBattleMode = Boolean(
-      state.mode === '3v3v3v3' || state.mode === '4v4' || state.mode === '2v2v2v2' ||
-      state.mode === 'Battle Royale 8' || state.mode === 'Grand Battle' ||
-      (arena && arena.width > 600)
-    );
-    const isSideHud1v1 = isHorizontal && !isGrandBattleMode && mainFighters.length === 2;
-
     const fighterData = mainFighters.map(f => ({
       name: getFighterDisplayName(f, true),
       color: getHudNameColor(f, '#F8FAFC')
     }));
-
-    if (isSideHud1v1 && fighterData.length === 2) {
-      drawHorizontal1v1TopWallHud(mainFighters[0], mainFighters[1], fighterData[0], fighterData[1]);
-      ctx.restore();
-      return;
-    }
 
     // Multi-fighter FFA fallback: horizontal row joined with "vs"
     const pad = 10;

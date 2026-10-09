@@ -39,7 +39,7 @@ export const makimaConfig = {
   // Passive 1: Prime Minister Contract (Citizen Redirection)
   enableCitizenContract: true,      // Master toggle for Passive 1: Prime Minister Contract & Shatter Revive
   maxCitizenLives: 3,               // 5 citizen sacrifice stocks
-  citizenReviveHpPercent: 1.00,     // Revives with 100% Max HP
+  citizenReviveHpPercent: 0.70,     // Revives with 100% Max HP
   citizenReviveDurationFrames: 75,  // 1.25s death shatter & magnetic reassembly duration
   citizenDamageReduction: 0.20,     // 20% passive damage reduction while stocks remain
   citizenShockwaveRadius: 150,      // Repel shockwave radius on revive
@@ -103,9 +103,10 @@ export const makimaConfig = {
   crucifixionCameraZoom: 1.0,       // Fixed full arena zoom (1.0) showing entire arena spectacle
   crucifixionFixedCamera: true,     // Fixed full arena camera view when enemy gets crucified until spear drop finishes
   crucifixionFocusEnemy: false,     // Disabled in favor of Fixed Full Arena view
+  crucifixionKillCameraHoldFrames: 70, // Delay frames after crucifixion kill before camera moves to focus on Makima (~1.16s)
   crucifixionPercentDamage: 0.45,   // 45% Max Target HP True Damage
   crucifixionFlatDamage: 100,       // 280 Flat True Damage
-  crucifixionExecuteThreshold: 0.25,// Instant execute if target HP <= 25%
+  crucifixionExecuteThreshold: 0.10,// Instant execute if target HP <= 25%
   shrinePercentDamage: 0.45,        // Backward compatibility
   shrineFlatDamage: 280,            // Backward compatibility
   shrineExecuteThreshold: 0.25,     // Backward compatibility

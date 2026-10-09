@@ -496,9 +496,9 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   if (timer > 0 && isFinalMatchWin) {
     stopArenaBgm(true);
   }
-  if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
+  if (!state._hasPlayedChampionYouWinVoice && timer >= 45) {
     state._hasPlayedChampionYouWinVoice = true;
-    if (isFinalMatchWin && effectiveWinner) {
+    if (isFinalMatchWin && effectiveWinner && !isDraw) {
       const youwin = getAnnouncerSound('youwin');
       if (youwin && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
         audioSystem.playSFX(youwin.src, youwin.volume, youwin.speed, youwin.offset || 0);
@@ -719,7 +719,7 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     stopArenaBgm(true);
   }
 
-  if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
+  if (!state._hasPlayedChampionYouWinVoice && timer >= 45) {
     state._hasPlayedChampionYouWinVoice = true;
     if (!isDraw && winner) {
       if (isFinalMatchWin) {
@@ -736,8 +736,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     }
   }
 
-  // 0b. Play Champion Victory Voiceline strictly when match is won AFTER announcer finishes (Frame 68)
-  if (!state._hasPlayedChampionVictoryVoice && timer >= 68 && isFinalMatchWin) {
+  // 0b. Play Champion Victory Voiceline strictly when match is won AFTER announcer finishes (Frame 130)
+  if (!state._hasPlayedChampionVictoryVoice && timer >= 130 && isFinalMatchWin) {
     state._hasPlayedChampionVictoryVoice = true;
 
     const isTodo = winner && (winner.characterId === 'todo' || winner.type === 'todo' || winner._def?.id === 'todo');

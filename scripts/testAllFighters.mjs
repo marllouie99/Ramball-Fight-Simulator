@@ -6336,34 +6336,47 @@ async function main() {
       while (genos.isUltSliding) {
         genos.update(initialTarget, 0, state.arena);
       }
-      const initialAngle = genos.ultAngle; // Locked cast angle upon completing slide into windup stance
+      const initialAngle = genos.ultAngle; // Initial cast angle upon completing slide into windup stance
 
-      // Opponent moves/teleports to top-left (-135°) during windup
+      // 1. Smooth auto-aim tracking during channeling (ultTimer > aimLockFrames)
       const movedTarget = { x: 300 - 300, y: 300 - 300, r: 25, hp: 100, maxHp: 100, isDead: false };
-      genos.aim(movedTarget);
+      genos.ultTimer = 50; // Well above aimLockFrames (25)
+      const angleBeforeTurn = genos.gunAngle;
       genos.update(movedTarget, 0, state.arena);
+      const angleAfterTurn = genos.gunAngle;
 
-      if (Math.abs(genos.ultAngle - initialAngle) > 0.001 || Math.abs(genos.gunAngle - initialAngle) > 0.001) {
-        throw new Error(`Genos auto-aim snapped or rotated during ultimate windup! Expected ${initialAngle}, got gunAngle=${genos.gunAngle}`);
-      }
-      if (genos.canAim()) {
-        throw new Error(`Genos canAim() should return false during ultimate windup!`);
+      if (angleAfterTurn === angleBeforeTurn) {
+        throw new Error(`Genos failed to smoothly track target during ultimate channeling! Before: ${angleBeforeTurn}, After: ${angleAfterTurn}`);
       }
 
-      // Transition to active firing
+      // 2. Lock-in direction during final frames before firing (ultTimer <= aimLockFrames)
+      genos.ultTimer = 15; // Inside aimLockFrames (25)
+      const lockedAngle = genos.ultAngle;
+      // Target moves to another position during lock-in window
+      const relocatedTarget = { x: 300, y: 300 + 400, r: 25, hp: 100, maxHp: 100, isDead: false };
+      genos.update(relocatedTarget, 0, state.arena);
+
+      if (Math.abs(genos.ultAngle - lockedAngle) > 0.001 || Math.abs(genos.gunAngle - lockedAngle) > 0.001) {
+        throw new Error(`Genos rotated during pre-firing lock-in frames! Expected locked angle ${lockedAngle}, got gunAngle=${genos.gunAngle}`);
+      }
+
+      // 3. Transition to active firing without snapping to relocated target
       genos.ultTimer = 0;
-      genos.update(movedTarget, 0, state.arena);
+      genos.update(relocatedTarget, 0, state.arena);
       if (!genos.isFiringUlt) {
         throw new Error(`Genos failed to transition from windup to active beam firing!`);
       }
+      if (Math.abs(genos.ultAngle - lockedAngle) > 0.001 || Math.abs(genos.gunAngle - lockedAngle) > 0.001) {
+        throw new Error(`Genos snapped aim upon firing! Expected locked angle ${lockedAngle}, got gunAngle=${genos.gunAngle}`);
+      }
 
-      // Opponent teleports directly behind Genos during beam fire
+      // 4. Opponent teleports directly behind Genos during beam fire: strictly holds beam angle
       const behindTarget = { x: 300 - 200, y: 300, r: 25, hp: 100, maxHp: 100, isDead: false };
       genos.aim(behindTarget);
       genos.update(behindTarget, 0, state.arena);
 
-      if (Math.abs(genos.ultAngle - initialAngle) > 0.001 || Math.abs(genos.gunAngle - initialAngle) > 0.001) {
-        throw new Error(`Genos auto-aim snapped or rotated during active beam firing! Expected ${initialAngle}, got gunAngle=${genos.gunAngle}`);
+      if (Math.abs(genos.ultAngle - lockedAngle) > 0.001 || Math.abs(genos.gunAngle - lockedAngle) > 0.001) {
+        throw new Error(`Genos auto-aim snapped or rotated during active beam firing! Expected ${lockedAngle}, got gunAngle=${genos.gunAngle}`);
       }
 
       // Draw beam overlay to verify Canvas 2D transform stack balance
@@ -6482,22 +6495,22 @@ async function main() {
     state.roundNum = 1;
     state.scores = [1, 0];
     state.roundWinner = state.fighters[0];
-    state.roundEndTimer = 10;
+    state.roundEndTimer = 45;
     state._hasPlayedChampionYouWinVoice = false;
 
-    // Round 1 end: 1 win in 1v1 -> should NOT play youwin audio
+    // Round 1 end: 1 win in 1v1 -> should NOT play youwin audio even after death audio finishes
     playedSounds = [];
     drawRoundEndScreen();
     if (playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
       throw new Error(`Played 'youwin' audio on 1 win in 1v1 mode!`);
     }
 
-    // Round 2 end: 2 wins in 1v1 -> MUST play youwin audio
+    // Round 2 end: 2 wins in 1v1 -> MUST play youwin audio after death audio finishes (timer >= 45)
     state.gameState = 'matchEnd';
     state.matchWinner = state.fighters[0];
     state.roundNum = 2;
     state.scores = [2, 0];
-    state.roundEndTimer = 10;
+    state.roundEndTimer = 45;
     state._hasPlayedChampionYouWinVoice = false;
     playedSounds = [];
     drawRoundEndScreen();
@@ -6505,12 +6518,12 @@ async function main() {
       throw new Error(`Failed to play 'youwin' audio when fighter won 2 times in 1v1 mode!`);
     }
 
-    // 2. Stand Off Mode: 1 round -> MUST play youwin audio on 1st win
+    // 2. Stand Off Mode: 1 round -> MUST play youwin audio on 1st win after death audio
     state.mode = 'Stand Off';
     state.roundNum = 1;
     state.scores = [1, 0];
-    state.roundEndTimer = 10;
-    state.matchEndTimer = 10;
+    state.roundEndTimer = 45;
+    state.matchEndTimer = 45;
     state.matchWinner = state.fighters[0];
     state.roundWinner = state.fighters[0];
     state.gameState = 'matchEnd';
@@ -6521,12 +6534,12 @@ async function main() {
       throw new Error(`Failed to play 'youwin' audio on match end in Stand Off mode!`);
     }
 
-    // 3. 1v2 Stand Off Mode: 1 round -> MUST play youwin audio on match win
+    // 3. 1v2 Stand Off Mode: 1 round -> MUST play youwin audio on match win after death audio
     state.mode = '1v2 Stand Off';
     state.roundNum = 1;
     state.teamScores = [1, 0];
-    state.roundEndTimer = 10;
-    state.matchEndTimer = 10;
+    state.roundEndTimer = 45;
+    state.matchEndTimer = 45;
     state.matchWinner = state.fighters[0];
     state.roundWinner = state.fighters[0];
     state.gameState = 'matchEnd';
@@ -6537,12 +6550,12 @@ async function main() {
       throw new Error(`Failed to play 'youwin' audio on match end in 1v2 Stand Off mode!`);
     }
 
-    // 4. FFA Mode: 1 round -> MUST play youwin audio on match win
+    // 4. FFA Mode: 1 round -> MUST play youwin audio on match win after death audio
     state.mode = 'FFA';
     state.roundNum = 1;
     state.scores = [1, 0, 0, 0];
-    state.roundEndTimer = 10;
-    state.matchEndTimer = 10;
+    state.roundEndTimer = 45;
+    state.matchEndTimer = 45;
     state.matchWinner = state.fighters[0];
     state.roundWinner = state.fighters[0];
     state.ffaMatchComplete = true;
@@ -11825,6 +11838,82 @@ async function main() {
     console.error('❌ [REGULAR 1V2 MODE TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[REGULAR 1V2 MODE TEST]: ${err.stack || err.message}`);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // ZEUS: Thunder Storm Stun Resilience & Non-Interrupt Strike Suite
+  // ═════════════════════════════════════════════════════════════════════════
+  try {
+    const { ZeusFighter } = await import('../js/entities/fighters/ZeusFighter.js');
+    const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+    const { state } = await import('../js/core/state.js');
+
+    const zeus = new ZeusFighter({ id: 'zeus', name: 'Zeus', color: '#00BFFF', hp: 200 });
+    const dummy = new NormalFighter({ id: 'normal', name: 'Dummy', color: '#FF0000', hp: 200 });
+
+    state.fighters = [zeus, dummy];
+    state.getFighterTeam = (idx) => idx === 0 ? 0 : 1;
+    state.arena = { x: 45, y: 240, width: 450, height: 450, shape: 'rect' };
+    state.zeusStormStrikes = [];
+
+    // Trigger storm
+    zeus.stormCooldown = 0;
+    zeus.update(dummy, 0, state.arena);
+
+    if (!zeus.stormActive) {
+      throw new Error(`Expected Zeus stormActive=true after activation, got: ${zeus.stormActive}`);
+    }
+
+    // 1. Test interruptAttacks while alive: must preserve stormActive & stormTimer
+    const prevTimer = zeus.stormTimer;
+    zeus.interruptAttacks(false);
+    if (!zeus.stormActive || zeus.stormTimer !== prevTimer) {
+      throw new Error(`interruptAttacks(false) cancelled Zeus storm! stormActive=${zeus.stormActive}`);
+    }
+
+    zeus.interruptAttacks(true);
+    if (!zeus.stormActive || zeus.stormTimer !== prevTimer) {
+      throw new Error(`interruptAttacks(true) cancelled Zeus storm while alive! stormActive=${zeus.stormActive}`);
+    }
+
+    // 2. Test Zeus frozen / stunned by CC: storm must continue striking dummy
+    const initialDummyHp = dummy.hp;
+    zeus.timeStopTimer = 30;
+    zeus.electricStunTimer = 30;
+    zeus.paralyzeTimer = 30;
+
+    for (let frame = 0; frame < 30; frame++) {
+      zeus.update(dummy, 0, state.arena);
+    }
+
+    if (!zeus.stormActive) {
+      throw new Error('Zeus stormActive was prematurely cancelled during stun/freeze frames!');
+    }
+    if (dummy.hp >= initialDummyHp) {
+      throw new Error(`Expected dummy to take storm strike damage during Zeus stun, but HP remained: ${dummy.hp}`);
+    }
+    if (!state.zeusStormStrikes || state.zeusStormStrikes.length === 0) {
+      throw new Error('Expected state.zeusStormStrikes to contain active lightning visuals during storm strikes!');
+    }
+
+    // 3. Test dummy stunned by another attack: storm strikes must continue
+    dummy.timeStopTimer = 30;
+    dummy.electricStunTimer = 30;
+    const midDummyHp = dummy.hp;
+
+    for (let frame = 0; frame < 30; frame++) {
+      zeus.update(dummy, 0, state.arena);
+    }
+
+    if (dummy.hp >= midDummyHp) {
+      throw new Error(`Expected dummy to take storm strike damage while dummy was stunned, but HP remained: ${dummy.hp}`);
+    }
+
+    console.log('✅ [Zeus Thunder Storm Test] Successfully verified Thunder Storm persistence & continuous lightning strikes while Zeus or enemies are stunned/frozen!');
+  } catch (err) {
+    console.error('❌ [ZEUS THUNDER STORM TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[ZEUS THUNDER STORM TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

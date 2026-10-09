@@ -4,6 +4,7 @@ import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { applyDamageToTarget, suppressAfterimagesAndAttackEffects, isSuppressedByGetsuga } from '../../../entities/fighter.js';
 import { spawnImpactFlash, spawnMeleeClashShockwave, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
+import { resolveProjectilePlusObstacleCollision } from '../../../systems/arenaObstacleSystem.js';
 
 export class GetsugaBehavior extends ProjectileBehavior {
   update(projectile, fighters, system) {
@@ -85,19 +86,26 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
       let hitWall = false;
 
-      if (projectile.vx < 0 && projectile.x + apexOffsetX <= arena.x) {
+      const obsHit = resolveProjectilePlusObstacleCollision(projectile, arena);
+      if (obsHit) {
+        projectile.x = obsHit.wallX;
+        projectile.y = obsHit.wallY;
+        hitWall = true;
+      }
+
+      if (!hitWall && projectile.vx < 0 && projectile.x + apexOffsetX <= arena.x) {
         projectile.x = arena.x - apexOffsetX;
         hitWall = true;
       }
-      if (projectile.vx > 0 && projectile.x + apexOffsetX >= arena.x + arena.width) {
+      if (!hitWall && projectile.vx > 0 && projectile.x + apexOffsetX >= arena.x + arena.width) {
         projectile.x = arena.x + arena.width - apexOffsetX;
         hitWall = true;
       }
-      if (projectile.vy < 0 && projectile.y + apexOffsetY <= arena.y) {
+      if (!hitWall && projectile.vy < 0 && projectile.y + apexOffsetY <= arena.y) {
         projectile.y = arena.y - apexOffsetY;
         hitWall = true;
       }
-      if (projectile.vy > 0 && projectile.y + apexOffsetY >= arena.y + arena.height) {
+      if (!hitWall && projectile.vy > 0 && projectile.y + apexOffsetY >= arena.y + arena.height) {
         projectile.y = arena.y + arena.height - apexOffsetY;
         hitWall = true;
       }

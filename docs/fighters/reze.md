@@ -144,7 +144,7 @@ When Reze's HP drops to 0 for the first time in a round:
 * **Ultimate Full Heal**: Activating the ultimate immediately regenerates Reze to **100% Max HP** with green heal numbers (`+HP`) and a glowing HUD health pulse (`DEVIL REGENERATION!`).
 * **Bomb Devil State Lifesteal**: Throughout the entire active state of Bomb Devil Form, Reze gains **35% Vampiric Lifesteal** on all damage dealt (explosive punches, Spark Slap finisher, Rocket Lunges, Spark Flechettes, Decoy Bombs, and Tsar Nuke blasts).
 * **Phases**:
-  * **Phase 1: Pin Pull Transformation**: Time briefly stops (`timeStopTimer: 35 frames` on enemies; Rule 5 compliant). Reze pulls her collar pin, unleashing a golden-orange transformation shockwave and entering full Bomb Devil Form.
+  * **Phase 1: Pin Pull Transformation**: Reze reaches to her neck collar and pulls the grenade ring pin with sparks, unleashing a golden-orange transformation shockwave and entering full Bomb Devil Form.
   * **Phase 2: Carpet Torpedo Barrage**: Reze ascends into the air and bombards the arena floor with 6 homing torpedo rockets that detonate in chain explosions (`damage: 20 per rocket`).
   * **Phase 3: Living Warhead Crater Dive**: Reze locks onto the primary opponent from above and dives headfirst as a living nuclear warhead.
     * **Impact**: Creates a massive expanding fireball shockwave (`radius: 220px`, `damage: 130 True Damage`, `knockback: 48`), violent screen shake, and arena scorch decals that burn enemies standing inside.

@@ -10,6 +10,7 @@ import { isEntityImmuneToGravitationalPull } from '../../../entities/fighter.js'
 const areOnSameTeam = (ownerIndex, targetIndex) => areOnSameTeamByIndex(state, ownerIndex, targetIndex);
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
+import { resolveProjectilePlusObstacleCollision, resolveEntityPlusObstacleCollision } from '../../../systems/arenaObstacleSystem.js';
 
 export class GojoPurpleBehavior extends ProjectileBehavior {
   static spawn(system, x, y, vx, vy, damage, ownerIndex, dps, opts = {}) {
@@ -515,6 +516,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           const er = ent.r || 25;
           ent.x = Math.max(arena.x + er, Math.min(arena.x + arena.width - er, ent.x));
           ent.y = Math.max(arena.y + er, Math.min(arena.y + arena.height - er, ent.y));
+          resolveEntityPlusObstacleCollision(ent, arena);
         }
 
         spawnSparks(ent.x, ent.y, 6, 'lightningTrail', isGreen ? '#00FF64' : '#BF5AF2');
@@ -539,10 +541,20 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       return true;
     }
 
-    // Clamp position to arena boundaries so it sticks to walls
+    // Clamp position to arena boundaries and obstacle walls so it sticks to walls
     // Zero velocity components on wall contact so the orb stops completely
     // instead of sliding along the wall edge
     if (arena) {
+      // 1. Check center obstacle wall (e.g. FFA Center Plus Wall)
+      const obsHit = resolveProjectilePlusObstacleCollision(projectile, arena);
+      if (obsHit) {
+        projectile.x = obsHit.wallX;
+        projectile.y = obsHit.wallY;
+        projectile.vx = 0;
+        projectile.vy = 0;
+      }
+
+      // 2. Check outer arena boundary
       const halfR = (projectile.r || 50) / 2;
       if (arena.shape === 'circle') {
         const cx = arena.x + arena.width / 2;

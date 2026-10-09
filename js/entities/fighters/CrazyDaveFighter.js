@@ -11,6 +11,7 @@ import { Fighter, applyDamageToTarget, isSkillEnabled } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { crazyDaveConfig } from '../../configs/characters/crazyDaveConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { isLineOfSightBlockedByObstacle, getArenaCenterObstacle, isPointInsidePlusObstacle } from '../../systems/arenaObstacleSystem.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawCrazyDaveSkin } from '../../graphics/fighters/crazyDaveSkin.js';
@@ -67,30 +68,61 @@ function dealPlantDamage(target, amount, attacker, opts = {}) {
 }
 
 function getCrazyDavePlantOccupants(dave) {
-  const plants = new Set();
-  const ownPlantLists = [
-    dave.activeWallnuts,
-    dave.activePeashooters,
-    dave.activeSnowPeas,
-    dave.activeTorchwoods,
-    dave.activePotatoMines
-  ];
+  const occupants = new Set();
 
-  for (const plantList of ownPlantLists) {
-    for (const plant of plantList || []) {
-      if (plant && plant.hp > 0) plants.add(plant);
+  // 1. Dave's own active plant lists
+  if (dave) {
+    const ownPlantLists = [
+      dave.activeWallnuts,
+      dave.activePeashooters,
+      dave.activeSnowPeas,
+      dave.activeTorchwoods,
+      dave.activePotatoMines
+    ];
+
+    for (const plantList of ownPlantLists) {
+      for (const plant of plantList || []) {
+        if (plant && plant.hp > 0 && !plant.dead && !plant.isDead) occupants.add(plant);
+      }
     }
   }
 
-  for (const plant of state.fighters || []) {
-    const owner = plant?.owner;
-    const isCrazyDave = owner?.characterId === 'crazydave' || owner?.type === 'crazydave' || owner?._def?.id === 'crazydave';
-    if (!plant?.isPlant || plant.hp <= 0 || !isCrazyDave) continue;
-    if (owner !== dave && !dave.isTeammate(owner)) continue;
-    plants.add(plant);
+  // 2. Scan all entities in state.fighters for plants, buildings, deployables, turrets, dispensers
+  if (state && Array.isArray(state.fighters)) {
+    for (const f of state.fighters) {
+      if (!f || f === dave) continue;
+      if (f.hp <= 0 || f.dead || f.isDead) continue;
+
+      const isPlant = Boolean(f.isPlant || f.isPlantMinion || f.isPlantBarrier || f.isWallnut);
+      const isBuilding = Boolean(f.isTurret || f.isDispenser || f.isDeployable || f.isEndCrystal || f.isIceWall || f.isBuilding || f.isBarrier);
+
+      if (isPlant || isBuilding) {
+        occupants.add(f);
+      }
+
+      // Check child entities attached to fighters
+      if (f.turretEntity && f.turretEntity.hp > 0 && !f.turretEntity.dead) {
+        occupants.add(f.turretEntity);
+      }
+      if (f.dispenserEntity && f.dispenserEntity.hp > 0 && !f.dispenserEntity.dead) {
+        occupants.add(f.dispenserEntity);
+      }
+      if (f.activeWallnuts || f.activePeashooters || f.activeSnowPeas || f.activeTorchwoods || f.activePotatoMines) {
+        const otherPlantLists = [f.activeWallnuts, f.activePeashooters, f.activeSnowPeas, f.activeTorchwoods, f.activePotatoMines];
+        for (const list of otherPlantLists) {
+          if (Array.isArray(list)) {
+            for (const p of list) {
+              if (p && p.hp > 0 && !p.dead && !p.isDead) {
+                occupants.add(p);
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
-  return [...plants];
+  return [...occupants];
 }
 
 export function getTeammateCrazyDaves(dave) {
@@ -112,14 +144,14 @@ export function getTeammateCrazyDaves(dave) {
 }
 
 function getAvailableCrazyDavePlantTile(dave, targetX, targetY, arena) {
-  const activePlants = getCrazyDavePlantOccupants(dave);
-  const tileCenter = getNearestGrassTileCenter(targetX, targetY, arena, activePlants);
+  const activeOccupants = getCrazyDavePlantOccupants(dave);
+  const tileCenter = getNearestGrassTileCenter(targetX, targetY, arena, activeOccupants);
   const targetTileSize = getCrazyDaveSetting(CONFIG.crazydave, 'grassTileSize') || 76.6;
   const cols = Math.max(3, Math.round(arena.width / targetTileSize));
   const rows = Math.max(3, Math.round(arena.height / targetTileSize));
   const occupiedRadius = Math.min(arena.width / cols, arena.height / rows) * 0.45;
 
-  if (activePlants.some(plant => Math.hypot(plant.x - tileCenter.x, plant.y - tileCenter.y) < occupiedRadius)) {
+  if (activeOccupants.some(occ => occ && occ.hp > 0 && Math.hypot(occ.x - tileCenter.x, occ.y - tileCenter.y) < occupiedRadius)) {
     return null;
   }
 
@@ -560,6 +592,7 @@ export class PeashooterEntity extends Fighter {
       // Check if enemy is ahead in the straight committed direction
       const isAhead = (this.facingDirection === 1) ? (dx > 0) : (dx < 0);
       if (!isMindControlled && !isAhead) return; // Behind the plant!
+      if (typeof state !== 'undefined' && state.arena && isLineOfSightBlockedByObstacle(this.x, this.y, f.x, f.y, state.arena)) return;
 
       const forwardDist = Math.abs(dx);
       const laneDist = Math.abs(dy);
@@ -2475,6 +2508,37 @@ export class LawnmowerEntity extends Fighter {
       this.gunAngle = (this.facingDirection === -1) ? Math.PI : 0;
       this.angle = 0;
 
+      // ── + Wall Collision: Lawnmower explodes on impact with the arena center wall ──
+      // The + wall is treated as an arena border — the mower cannot pass through it.
+      const _plusObs = getArenaCenterObstacle(arena);
+      if (_plusObs && isPointInsidePlusObstacle(this.x, this.y, _plusObs.cx, _plusObs.cy, _plusObs.halfSize + this.r, _plusObs.halfThick + this.r)) {
+        // Impact point: push back to wall face
+        const impactX = this.x - this.facingDirection * this._speed;
+        const impactY = this.y;
+
+        spawnFloatingText(impactX, impactY - 20, 'CRASH!', '#DC2626');
+        spawnFloatingText(impactX, impactY - 38, '💥 WALL', '#F97316');
+
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(impactX, impactY, 55, '#FF5500');
+        }
+        spawnSparks(impactX, impactY, 18, '#DC2626');
+        spawnSparks(impactX, impactY, 12, '#FBBF24');
+        spawnSparks(impactX, impactY, 8, '#475569');
+
+        if (typeof triggerGlobalScreenShake === 'function') {
+          triggerGlobalScreenShake(6, 10);
+        }
+
+        const playSfx = typeof audioSystem.playSFX === 'function' ? audioSystem.playSFX : audioSystem.playSound;
+        if (typeof playSfx === 'function') {
+          playSfx.call(audioSystem, getCrazyDaveSound(cfg, 'lawnmowerHit'), getCrazyDaveSoundVolume(cfg, 'lawnmowerHit'));
+        }
+
+        this.despawn();
+        return;
+      }
+
       if (this.animTick % 3 === 0) {
         spawnSparks(this.x - this.facingDirection * 14, this.y + 8, 3, '#15803D');
         spawnSparks(this.x - this.facingDirection * 16, this.y - 4, 2, '#475569');
@@ -2911,6 +2975,22 @@ export class CrazyDaveFighter extends Fighter {
       const tile = getRandomGrassTileCenter(arena);
       destX = tile.x;
       destY = tile.y;
+    }
+
+    // ── + Wall Guard: Redirect sun drops that would land inside the arena center wall ──
+    // The + wall occupies the arena center; suns must not land on solid wall geometry.
+    const _sunObs = getArenaCenterObstacle(arena);
+    if (_sunObs) {
+      let _sunWallRetries = 0;
+      while (
+        isPointInsidePlusObstacle(destX, destY, _sunObs.cx, _sunObs.cy, _sunObs.halfSize, _sunObs.halfThick) &&
+        _sunWallRetries < 8
+      ) {
+        const tile = getRandomGrassTileCenter(arena);
+        destX = tile.x;
+        destY = tile.y;
+        _sunWallRetries++;
+      }
     }
 
     // Spawn at the top outside of the arena and drop down to the grass tile center

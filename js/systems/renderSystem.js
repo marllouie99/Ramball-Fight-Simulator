@@ -15,7 +15,7 @@ import {
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaDimScreen, drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
-  drawYujiSoulSwapDimScreen, drawMeguminExplosionScreenOverlay,
+  drawYujiSoulSwapDimScreen, drawMeguminExplosionScreenOverlay, drawJohnWickAssassinationDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
   drawDroppedMiniguns, updateDroppedMiniguns,
@@ -312,6 +312,7 @@ export function renderGame() {
           drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
           drawTodoTakadaDimScreen(); // 2D Takada-chan 530,000 IQ Idol Imagination dark magenta dim & romantic spotlight overlay
           drawYujiSoulSwapDimScreen(); // 2D Yuji Soul Swap (Sukuna Takeover) arena overlay & cursed crimson dark background
+          drawJohnWickAssassinationDimScreen(); // 2D John Wick CQC Pencil Assassination cinematic spotlight & gold bloom overlay
           drawMeguminExplosionScreenOverlay(state.ctx, state.fighters); // 2D Megumin Explosion atmospheric crimson dim & solar blast flash
         } else {
           updateHybridEnvironment(); // Cleans up and detaches any active WebGL dim sprites
@@ -529,7 +530,7 @@ export function renderGame() {
 
       if (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
         const isHorizontal = (state.viewOrientation === 'horizontal');
-        const isGrandBattle = isHorizontal && (Boolean(state.arena && state.arena.width > 600) || Boolean(
+        const isGrandBattle = isHorizontal && (Boolean(state.arena && state.arena.width > 1000) || Boolean(
           state.mode === '3v3v3v3' ||
           state.mode === '4v4' ||
           state.mode === '2v2v2v2' ||

@@ -50,6 +50,98 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getGenosHairImage();
 }
 
+// ─── Genos Cybernetic Fist Sprite Asset Loader (Assets/model/genos/Genos-fist.png) ───
+let _genosFistSpriteImage = null;
+let _genosFistSpriteCanvas = null;
+let _genosFistSpriteLoading = false;
+
+export function _getGenosFistSpriteCanvas() {
+  if (_genosFistSpriteCanvas) {
+    return _genosFistSpriteCanvas;
+  }
+  if (_genosFistSpriteImage && _genosFistSpriteImage.complete && _genosFistSpriteImage.naturalWidth > 0) {
+    if (typeof document !== 'undefined') {
+      try {
+        const nw = _genosFistSpriteImage.naturalWidth;
+        const nh = _genosFistSpriteImage.naturalHeight;
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = nw;
+        offCanvas.height = nh;
+        const offCtx = offCanvas.getContext('2d');
+        offCtx.imageSmoothingEnabled = false;
+        offCtx.drawImage(_genosFistSpriteImage, 0, 0);
+
+        // Alpha Cut: Remove solid white / light background pixels (R, G, B > 230)
+        const imgData = offCtx.getImageData(0, 0, nw, nh);
+        const data = imgData.data;
+        let minX = nw, minY = nh, maxX = 0, maxY = 0;
+        let hasForeground = false;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const a = data[i + 3];
+
+          if (a === 0 || (r > 230 && g > 230 && b > 230)) {
+            data[i + 3] = 0;
+          } else {
+            const pixelIdx = i / 4;
+            const px = pixelIdx % nw;
+            const py = Math.floor(pixelIdx / nw);
+            if (px < minX) minX = px;
+            if (px > maxX) maxX = px;
+            if (py < minY) minY = py;
+            if (py > maxY) maxY = py;
+            hasForeground = true;
+          }
+        }
+        offCtx.putImageData(imgData, 0, 0);
+
+        if (hasForeground && maxX >= minX && maxY >= minY) {
+          const trimW = maxX - minX + 1;
+          const trimH = maxY - minY + 1;
+          const trimmedCanvas = document.createElement('canvas');
+          trimmedCanvas.width = trimW;
+          trimmedCanvas.height = trimH;
+          const trimCtx = trimmedCanvas.getContext('2d');
+          trimCtx.imageSmoothingEnabled = false;
+          trimCtx.drawImage(offCanvas, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
+          _genosFistSpriteCanvas = trimmedCanvas;
+          return _genosFistSpriteCanvas;
+        }
+
+        _genosFistSpriteCanvas = offCanvas;
+        return _genosFistSpriteCanvas;
+      } catch (e) {
+        console.warn('Failed to process Genos fist sprite canvas', e);
+        return null;
+      }
+    }
+  }
+
+  if (!_genosFistSpriteLoading && typeof Image !== 'undefined') {
+    _genosFistSpriteLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _genosFistSpriteImage = img;
+      _genosFistSpriteLoading = false;
+      _getGenosFistSpriteCanvas();
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Genos fist sprite at Assets/model/genos/Genos-fist.png', e);
+      _genosFistSpriteLoading = false;
+    };
+    img.src = 'Assets/model/genos/Genos-fist.png?v=1';
+    _genosFistSpriteImage = img;
+  }
+  return _genosFistSpriteCanvas;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getGenosFistSpriteCanvas();
+}
+
 /**
  * Draws Genos's authentic anime spiky blonde hair from Assets/model/genos/Genos-hair.png.
  * @param {CanvasRenderingContext2D} ctx
@@ -458,7 +550,7 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   // ─────────────────────────────────────────────
   if (isFlurrying) {
     const t = fighter.flurryTimer || 0;
-    const cycleFreq = (Math.PI * 2) / 6; // 6-frame harmonic cycle
+    const cycleFreq = (Math.PI * 2) / 5; // 5-frame harmonic cycle matching Saitama
     const strokeLeft  = (1 - Math.cos(t * cycleFreq)) / 2;
     const strokeRight = (1 + Math.cos(t * cycleFreq)) / 2;
     const flurryLungeLeft  = strokeLeft  * (r * 1.35);
@@ -480,9 +572,9 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
       _drawMechArm(ctx, curRightX, curRightY, hr, palmColor, false, isSelfDestructing, false, 0, glowR, false);
     }
 
-    // Ghost fist barrage (centered at chest height y = baseHandY)
+    // Ghost fist barrage (matching Saitama's Consecutive Normal Punches)
     if (!hideLeft && !hideRight) {
-      _drawGenosFlurryBarrage(ctx, r, hr, palmColor, t, baseHandY);
+      _drawGenosFlurryBarrage(ctx, r, hr, palmColor, t, fighter);
     }
     ctx.restore();
     return;
@@ -534,50 +626,76 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
 }
 
 /**
- * Draws the optical illusion multi-fist barrage during Machine Gun Blows (Flurry).
+ * Draws the iconic multi-fist optical illusion barrage during Machine Gun Blows.
+ * Fists continuously animate back-and-forth in staggered phases using the exact same animation method as Saitama's Consecutive Punches.
  */
-function _drawGenosFlurryBarrage(ctx, r, hr, palmColor, t, centerY = r * 0.45) {
+export function _drawGenosFlurryBarrage(ctx, r, hr, palmColor, flurryTimer, fighter = null) {
   const lanes = [
-    { y: centerY - r * 0.35, phase: 0.00, speedLineTheme: 'orange' },
-    { y: centerY - r * 0.12, phase: Math.PI * 0.65, speedLineTheme: 'solar' },
-    { y: centerY + r * 0.12, phase: Math.PI * 1.30, speedLineTheme: 'orange' },
-    { y: centerY + r * 0.35, phase: Math.PI * 1.95, speedLineTheme: 'solar' }
+    { y: -r * 0.70, phase: 0 },
+    { y: -r * 0.40, phase: Math.PI * 0.66 },
+    { y: -r * 0.10, phase: Math.PI * 1.33 },
+    { y:  r * 0.20, phase: Math.PI * 0.33 },
+    { y:  r * 0.50, phase: Math.PI * 1.0 },
+    { y:  r * 0.80, phase: Math.PI * 1.66 }
   ];
 
-  const cycleFreq = (Math.PI * 2) / 6;
+  const cycleFreq = (Math.PI * 2) / 5; // ~5 frames per full forward/backward cycle matching Saitama
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
   ctx.save();
   for (let i = 0; i < lanes.length; i++) {
     const lane = lanes[i];
-    const curPhase = t * cycleFreq + lane.phase;
-    const stroke = (1 - Math.cos(curPhase)) / 2; // 0.0 -> 1.0 -> 0.0
-    const forwardVel = Math.sin(curPhase); // > 0 moving forward
-
-    // Only render ghost fist when moving forward with high speed or near apex
-    if (stroke < 0.25 || forwardVel <= 0) continue;
-
-    const fistX = r * 0.25 + stroke * (r * 2.25);
-    const fistY = lane.y + Math.sin(curPhase * 0.5) * (r * 0.04);
-    const ghostAlpha = Math.min(0.60, Math.max(0.15, ((stroke - 0.25) / 0.75) * 0.60));
-
-    // 1. Draw supersonic 4-point needle speed lines behind ghost fist trailing along -X
-    const lineLen = r * 1.2 * stroke;
-    const startX = fistX - lineLen;
-    const halfW = hr * 0.35;
+    const curPhase = flurryTimer * cycleFreq + lane.phase;
     
-    ctx.fillStyle = lane.speedLineTheme === 'solar' ? 'rgba(255, 230, 0, 0.45)' : 'rgba(255, 85, 0, 0.45)';
-    ctx.beginPath();
-    ctx.moveTo(startX, fistY);
-    ctx.lineTo(fistX - hr * 0.4, fistY - halfW);
-    ctx.lineTo(fistX, fistY);
-    ctx.lineTo(fistX - hr * 0.4, fistY + halfW);
-    ctx.closePath();
-    ctx.fill();
+    // Continuous back-and-forth stroke (0.0 = fully retracted, 1.0 = fully extended forward)
+    const stroke = (Math.sin(curPhase) + 1) / 2; // 0.0 to 1.0
+    const forwardVel = Math.cos(curPhase); // > 0 moving forward, < 0 pulling backward
 
-    // 2. Draw ghost mechanical arm fist in stepped pixel style
-    _drawGhostMechFist(ctx, fistX, fistY, hr * 0.88, ghostAlpha, palmColor);
+    const reachMult = r * 2.75;
+    const fistX = -r * 0.10 + stroke * reachMult;
+    const fistY = lane.y + Math.sin(curPhase * 0.5) * (r * 0.05);
+    const fRadius = hr * (0.95 + stroke * 0.20);
+    const alpha = 0.40 + stroke * 0.55;
+
+    // 1. Incineration fiery pressure ring at tip (only while thrusting forward)
+    if (forwardVel > 0) {
+      ctx.fillStyle = 'rgba(255, 120, 20, 0.9)';
+      const ringOffset = 4;
+      for (let a = -Math.PI * 0.45; a <= Math.PI * 0.45; a += 0.2) {
+        const rx = fistX + Math.cos(a) * (fRadius + ringOffset);
+        const ry = fistY + Math.sin(a) * (fRadius + ringOffset);
+        ctx.fillRect(snap(rx), snap(ry), P, P);
+      }
+    }
+
+    // 2. Authentic Cybernetic Sprite Fist (Assets/model/genos/Genos-fist.png) with Procedural Fallback
+    drawGenosFistSprite(ctx, fistX, fistY, fRadius, alpha);
   }
   ctx.restore();
+}
+
+/**
+ * Draws Genos's authentic Genos-fist.png sprite (or stepped procedural fallback)
+ */
+export function drawGenosFistSprite(ctx, fistX, fistY, fRadius, alpha = 1.0) {
+  const spriteCanvas = _getGenosFistSpriteCanvas();
+  if (spriteCanvas && spriteCanvas.width > 0 && spriteCanvas.height > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = alpha;
+    ctx.translate(fistX, fistY);
+    ctx.rotate(Math.PI * 0.5); // Rotate 90 deg clockwise so knuckles point forward along +X
+    const sw = spriteCanvas.width;
+    const sh = spriteCanvas.height;
+    const scale = (fRadius * 2.20) / sh;
+    const dw = sw * scale;
+    const dh = sh * scale;
+    ctx.drawImage(spriteCanvas, -dw * 0.5, -dh * 0.5, dw, dh);
+    ctx.restore();
+  } else {
+    _drawGhostMechFist(ctx, fistX, fistY, fRadius * 1.10, alpha, '#FF5500');
+  }
 }
 
 /**

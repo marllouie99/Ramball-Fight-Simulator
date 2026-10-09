@@ -199,17 +199,7 @@ export class PowerFighter extends Fighter {
   }
 
   _findBestTarget() {
-    const targets = this._queryAllTargets();
-    let best = null;
-    let minD = Infinity;
-    for (let t of targets) {
-      const d = Math.hypot(t.x - this.x, t.y - this.y);
-      if (d < minD) {
-        minD = d;
-        best = t;
-      }
-    }
-    return best;
+    return this._findClosestEnemy();
   }
 
   _performBloodHammerAttack(target) {

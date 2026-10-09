@@ -22,6 +22,7 @@ import { getRubbickStaffTip } from '../graphics/weapons/rubbickWeaponGraphics.js
 import { isInsideRubbickStolenVoid } from '../entities/fighters/rubbick/rubbickThemes.js';
 import { collectProjectileCollisionCandidates, isFugaProjectile, shouldSkipProjectileTarget } from './projectileTargeting.js';
 import { getSweptProjectileCollision } from './projectileCollision.js';
+import { resolveProjectilePlusObstacleCollision } from './arenaObstacleSystem.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -2549,7 +2550,18 @@ class ProjectileSystem {
     const hitTop    = p.y - pr < arena.y;
     const hitBottom = p.y + pr > arena.y + arena.height;
 
-    return (hitLeft || hitRight || hitTop || hitBottom);
+    if (hitLeft || hitRight || hitTop || hitBottom) return true;
+    const obsHit = resolveProjectilePlusObstacleCollision(p, arena);
+    if (obsHit) {
+      if (p.isArcaneBolt && (p.bouncesLeft ?? 0) > 0) {
+        p.bouncesLeft--;
+        if (obsHit.normalX !== 0) p.vx = -p.vx;
+        if (obsHit.normalY !== 0) p.vy = -p.vy;
+        return false;
+      }
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -3487,6 +3499,87 @@ class ProjectileSystem {
       }
 
 
+
+      // ── ARENA CENTER PLUS (+) OBSTACLE COLLISION ──
+      const isCustomBehavior = Boolean(p.behaviorType && ProjectileBehaviorManager.has(p.behaviorType));
+      if (!p.fadingOut && !p.isVisual && !p.isSkywardBeacon && !p.isServantOfCthulhu && !isCustomBehavior) {
+        const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+        const obsHit = resolveProjectilePlusObstacleCollision(p, arena);
+        if (obsHit) {
+          if (p.isArcaneBolt && (p.bouncesLeft ?? 0) > 0) {
+            p.bouncesLeft--;
+            p.damage = (p.damage || 12) * (p.bounceDamageMultiplier || 0.7);
+            p.x = obsHit.wallX + obsHit.normalX * 2;
+            p.y = obsHit.wallY + obsHit.normalY * 2;
+            const dot = p.vx * obsHit.normalX + p.vy * obsHit.normalY;
+            if (dot < 0) {
+              p.vx -= 2 * dot * obsHit.normalX;
+              p.vy -= 2 * dot * obsHit.normalY;
+            }
+            spawnSparks(p.x, p.y, 8, 'arcane');
+            spawnImpactFlash(p.x, p.y, 18, '#00ffff');
+            playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.4);
+            p.lastAngle = Math.atan2(p.vy, p.vx);
+            p.angle = p.lastAngle;
+            p.rotation = p.lastAngle;
+            p.wobblePhase = Math.random() * Math.PI * 2;
+          } else if (p.isGrenade) {
+            this.detonateGrenade(p, fighters);
+            this.createAlchemistExplosion({ x: obsHit.wallX, y: obsHit.wallY, radius: p.aoeRadius || 60, owner: p.owner });
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            continue;
+          } else if (p.isBomberGrenade) {
+            this.detonateBomberGrenade(p, fighters);
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            continue;
+          } else if (p.isC4) {
+            this.detonateC4(p, fighters);
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            continue;
+          } else if (p.visual === 'layla_bomb') {
+            p.x = obsHit.wallX;
+            p.y = obsHit.wallY;
+            this.detonateLaylaBomb(p, fighters);
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            continue;
+          } else if (p.visual === 'layla_void_projectile') {
+            p.x = obsHit.wallX;
+            p.y = obsHit.wallY;
+            this.detonateLaylaVoidProjectile(p, fighters);
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            continue;
+          } else if (p.isSukunaFurnace || p.visual === 'sukunaFurnaceArrow' || p.behaviorType === 'sukuna_furnace') {
+            this.triggerThermobaricExplosion(obsHit.wallX, obsHit.wallY, p.owner, p.damage);
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            continue;
+          } else {
+            p.x = obsHit.wallX;
+            p.y = obsHit.wallY;
+            const sparkType = p.visual === 'snowPeaBullet' ? 'snowPeaShatter' : (p.visual === 'peaBullet' ? 'peaShatter' : 'default');
+            const flashColor = p.color || (p.visual === 'snowPeaBullet' ? '#38BDF8' : '#FFFFFF');
+            spawnSparks(obsHit.wallX, obsHit.wallY, 6, sparkType);
+            spawnImpactFlash(obsHit.wallX, obsHit.wallY, 14, flashColor);
+            p.life = 0;
+            p.fadingOut = true;
+            p._resumeVx = p.vx;
+            p._resumeVy = p.vy;
+            p.vx = 0;
+            p.vy = 0;
+          }
+        }
+      }
 
       if (p.fadingOut) {
         if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {

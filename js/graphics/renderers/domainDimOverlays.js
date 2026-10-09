@@ -3143,3 +3143,128 @@ function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFo
     ctx.restore();
   }
 }
+
+let currentJohnWickSpotlightOpacity = 0;
+
+/**
+ * Draws John Wick's CQC Assassination Highlight Spotlight & Cinematic Arena Dim Effect.
+ * Active during Pencil Assassination Grab & Stab and disengage roll.
+ * Seamlessly centers high-contrast spotlights on John Wick and his victim using worldToScreen,
+ * with dynamic camera zoom scaling, zero clipping outside the arena, and warm Continental Gold underfoot bloom.
+ */
+export function drawJohnWickAssassinationDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) {
+    currentJohnWickSpotlightOpacity = 0;
+    return;
+  }
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const wickFighter = state.fighters?.find(f => 
+    f && (f.characterId === 'john_wick' || f.type === 'john_wick' || f._def?.id === 'john_wick' || f._def?.type === 'john_wick') && 
+    f.cqcComboPhase && 
+    !f.isDead && 
+    f.hp > 0
+  );
+
+  const wCfg = (typeof CONFIG !== 'undefined' && CONFIG.john_wick) ? CONFIG.john_wick : {};
+  const baseDimAlpha = wCfg.cqcSpotlightDimAlpha !== undefined ? wCfg.cqcSpotlightDimAlpha : 0.68;
+
+  let targetOpacity = 0;
+  if (wickFighter) {
+    if (wickFighter.cqcComboPhase === 'PENCIL_STAB') {
+      targetOpacity = baseDimAlpha;
+    } else if (wickFighter.cqcComboPhase === 'BACKWARD_ROLL') {
+      const rollMax = wickFighter.rollMaxTimer || 20;
+      targetOpacity = baseDimAlpha * Math.max(0, (wickFighter.rollTimer || 0) / rollMax);
+    } else if (wickFighter.cqcComboPhase === 'FORWARD_ROLL') {
+      const rollMax = wickFighter.rollMaxTimer || 20;
+      const progress = 1.0 - Math.max(0, (wickFighter.rollTimer || 0) / rollMax);
+      targetOpacity = baseDimAlpha * Math.max(0, (progress - 0.5) * 2.0);
+    }
+  }
+
+  // Smooth opacity interpolation
+  if (targetOpacity > currentJohnWickSpotlightOpacity) {
+    currentJohnWickSpotlightOpacity += (targetOpacity - currentJohnWickSpotlightOpacity) * 0.20;
+  } else {
+    currentJohnWickSpotlightOpacity += (targetOpacity - currentJohnWickSpotlightOpacity) * 0.12;
+  }
+
+  if (currentJohnWickSpotlightOpacity < 0.005) {
+    currentJohnWickSpotlightOpacity = 0;
+    return;
+  }
+
+  const opacity = currentJohnWickSpotlightOpacity;
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const target = wickFighter?.cqcComboTarget;
+  const camZoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+
+  const wickScreen = wickFighter ? worldToScreen(wickFighter.x, wickFighter.y - (wickFighter.z || 0)) : { x: w / 2, y: h / 2 };
+  const targetScreen = (target && target.hp > 0) ? worldToScreen(target.x, target.y - (target.z || 0)) : wickScreen;
+
+  const focusX = (wickScreen.x + targetScreen.x) * 0.5;
+  const focusY = (wickScreen.y + targetScreen.y) * 0.5;
+
+  const spotR = (wCfg.cqcSpotlightRadius || 360) * camZoom;
+  const bloomR = (wCfg.cqcSpotlightBloomRadius || 150) * camZoom;
+  const maxDimDist = Math.max(w, h) * 1.1;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Full Arena Radial Vignette with crystal-clear spotlight cutout centered on John Wick & Victim
+  const spotGrad = createSafeRadialGradient(ctx, focusX, focusY, 35 * camZoom, focusX, focusY, Math.min(spotR, maxDimDist));
+  if (spotGrad) {
+    spotGrad.addColorStop(0,    'rgba(0, 0, 0, 0)'); // 100% crystal clear on fighters
+    spotGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(opacity * 0.12).toFixed(3)})`);
+    spotGrad.addColorStop(0.55, `rgba(0, 0, 0, ${(opacity * 0.62).toFixed(3)})`);
+    spotGrad.addColorStop(1.0,  `rgba(0, 0, 0, ${(opacity * 0.95).toFixed(3)})`);
+
+    ctx.fillStyle = spotGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // 2. Warm Continental Gold Underfoot Spotlight Bloom (Screen blend for luminous theatrical lighting)
+  ctx.globalCompositeOperation = 'screen';
+  const floorGlow = createSafeRadialGradient(ctx, focusX, focusY, 10 * camZoom, focusX, focusY, bloomR);
+  if (floorGlow) {
+    floorGlow.addColorStop(0,    `rgba(245, 158, 11, ${(0.32 * opacity).toFixed(3)})`);
+    floorGlow.addColorStop(0.50, `rgba(212, 175, 55, ${(0.16 * opacity).toFixed(3)})`);
+    floorGlow.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = floorGlow;
+    ctx.beginPath();
+    ctx.arc(focusX, focusY, bloomR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 3. Dual character rim spotlights (Ensures both John Wick and Victim remain crisp even at wider distances)
+  if (target && target.hp > 0 && Math.hypot(targetScreen.x - wickScreen.x, targetScreen.y - wickScreen.y) > 20) {
+    const wickRim = createSafeRadialGradient(ctx, wickScreen.x, wickScreen.y, 5 * camZoom, wickScreen.x, wickScreen.y, (wickFighter.r || 25) * 3.5 * camZoom);
+    if (wickRim) {
+      wickRim.addColorStop(0,    `rgba(245, 158, 11, ${(0.22 * opacity).toFixed(3)})`);
+      wickRim.addColorStop(1,    'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = wickRim;
+      ctx.beginPath();
+      ctx.arc(wickScreen.x, wickScreen.y, (wickFighter.r || 25) * 3.5 * camZoom, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const targetRim = createSafeRadialGradient(ctx, targetScreen.x, targetScreen.y, 5 * camZoom, targetScreen.x, targetScreen.y, (target.r || 25) * 3.5 * camZoom);
+    if (targetRim) {
+      targetRim.addColorStop(0,    `rgba(239, 68, 68, ${(0.22 * opacity).toFixed(3)})`);
+      targetRim.addColorStop(1,    'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = targetRim;
+      ctx.beginPath();
+      ctx.arc(targetScreen.x, targetScreen.y, (target.r || 25) * 3.5 * camZoom, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
+}
+

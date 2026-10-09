@@ -356,6 +356,7 @@ export const state = {
     const is2v2v2v2 = state.mode === GAME_MODES.TEAMFIGHT_2V2V2V2 || state.mode === '2v2v2v2 Quad';
     const is4v4 = state.mode === GAME_MODES.TEAM_4V4 || state.mode === '4v4 Grand War';
     const isBR8 = state.mode === GAME_MODES.BATTLE_ROYALE_8 || state.mode === '8-Fighter Battle Royale';
+    const isFFA = state.mode === GAME_MODES.FFA || state.mode === 'FFA' || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA';
     const is2v2 = state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2';
     const is1v2 = state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2' || state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2';
     const isTagMatch = state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match' || state.mode === 'TAG_MATCH';
@@ -367,7 +368,7 @@ export const state = {
       return Math.floor(fighterIndex / 2); // 0..1: Team 0, 2..3: Team 1, 4..5: Team 2, 6..7: Team 3
     } else if (is4v4) {
       return fighterIndex < 4 ? 0 : 1;
-    } else if (isBR8) {
+    } else if (isBR8 || isFFA) {
       return fighterIndex; // Free-For-All
     } else if (is2v2) {
       return fighterIndex < 2 ? 0 : 1;

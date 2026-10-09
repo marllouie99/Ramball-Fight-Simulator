@@ -10,7 +10,7 @@ import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { spawnSpentCasing } from '../../graphics/particles/johnWickDroppedMagazine.js';
 import { TurretEntity } from '../TurretEntity.js';
 import { DispenserEntity } from '../DispenserEntity.js';
-import { getNearestGrassTileCenter } from '../../graphics/renderers/grassFloorRenderer.js';
+import { getNearestGrassTileCenter, isCrazyDavePresent } from '../../graphics/renderers/grassFloorRenderer.js';
 import { drawEngineer } from '../../graphics/weaponVisuals.js';
 import { drawEngineerSkin } from '../../graphics/fighters/engineerSkin.js';
 
@@ -23,8 +23,66 @@ function isCrazyDaveFighter(fighter) {
     candidate.type === 'crazy_dave' ||
     candidate._def?.id === 'crazydave' ||
     candidate._def?.id === 'crazy_dave' ||
-    candidate.name === 'Crazy Dave'
+    candidate.name === 'Crazy Dave' ||
+    candidate.isCrazyDave === true
   ));
+}
+
+export function isCrazyDaveMatch(opponent) {
+  if (isCrazyDaveFighter(opponent)) return true;
+  if (typeof isCrazyDavePresent === 'function' && isCrazyDavePresent()) return true;
+  if (typeof state !== 'undefined' && state && Array.isArray(state.fighters)) {
+    return state.fighters.some(f => isCrazyDaveFighter(f) || Boolean(f?.isPlant || f?.isPlantMinion || f?.isPlantBarrier || f?.isWallnut));
+  }
+  return false;
+}
+
+export function getArenaTileOccupants(engineer, excludeEntity = null) {
+  const occupants = new Set();
+
+  if (typeof state !== 'undefined' && state && Array.isArray(state.fighters)) {
+    for (const f of state.fighters) {
+      if (!f || f === engineer || f === excludeEntity) continue;
+      if (f.hp <= 0 || f.dead || f.isDead) continue;
+
+      const isPlant = Boolean(f.isPlant || f.isPlantMinion || f.isPlantBarrier || f.isWallnut);
+      const isBuilding = Boolean(f.isTurret || f.isDispenser || f.isDeployable || f.isEndCrystal || f.isIceWall || f.isBuilding);
+
+      if (isPlant || isBuilding) {
+        occupants.add(f);
+      }
+    }
+  }
+
+  if (engineer) {
+    if (engineer.turretEntity && engineer.turretEntity !== excludeEntity && engineer.turretEntity.hp > 0 && !engineer.turretEntity.dead) {
+      occupants.add(engineer.turretEntity);
+    }
+    if (engineer.dispenserEntity && engineer.dispenserEntity !== excludeEntity && engineer.dispenserEntity.hp > 0 && !engineer.dispenserEntity.dead) {
+      occupants.add(engineer.dispenserEntity);
+    }
+  }
+
+  return [...occupants];
+}
+
+export function getAvailableTileForBuilding(targetX, targetY, arena, occupants = []) {
+  arena = arena || (typeof state !== 'undefined' && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
+  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
+  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
+  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cellW = arena.width / cols;
+  const cellH = arena.height / rows;
+  const occupiedRadius = Math.min(cellW, cellH) * 0.45;
+
+  const tileCenter = getNearestGrassTileCenter(targetX, targetY, arena, occupants);
+
+  // If the returned tile center is still occupied by any active plant or building, no free tile exists
+  if (occupants.some(occ => occ && occ.hp > 0 && Math.hypot(occ.x - tileCenter.x, occ.y - tileCenter.y) < occupiedRadius)) {
+    return null;
+  }
+
+  return tileCenter;
 }
 
 export class EngineerFighter extends Fighter {
@@ -244,10 +302,6 @@ export class EngineerFighter extends Fighter {
     const cfg = CONFIG.Engineer || {};
     const sentryEnabled = this.isSkillEnabled(cfg.enableSentryTurret, true);
     if (sentryEnabled && !this.isDemoFighter && this.skillCooldown <= 0 && !this.isBuildingTurret && !this.turretEntity) {
-      this.isBuildingTurret = true;
-      this.skillCooldown = cfg.skillCooldown || 500;
-      this.buildTimer = cfg.turretBuildTime || 90;
-      
       // Direction to build the turret
       let spawnAngle = this.gunAngle;
       if (opponent) {
@@ -258,14 +312,15 @@ export class EngineerFighter extends Fighter {
       let spawnX = this.x + Math.cos(spawnAngle) * offset;
       let spawnY = this.y + Math.sin(spawnAngle) * offset;
 
-      if (arena && isCrazyDaveFighter(opponent)) {
-        const centerTile = getNearestGrassTileCenter(
-          spawnX,
-          spawnY,
-          arena
-        );
-        spawnX = centerTile.x;
-        spawnY = centerTile.y;
+      if (arena && isCrazyDaveMatch(opponent)) {
+        const occupants = getArenaTileOccupants(this, this.turretEntity);
+        const tile = getAvailableTileForBuilding(spawnX, spawnY, arena, occupants);
+        if (!tile) {
+          // All tiles occupied by plants or buildings — cannot place sentry on occupied tile!
+          return;
+        }
+        spawnX = tile.x;
+        spawnY = tile.y;
       }
 
       // Ensure turret stays fully within arena limits, accounting for its radius (approx 20)
@@ -273,6 +328,10 @@ export class EngineerFighter extends Fighter {
         spawnX = Math.max(arena.x + 20, Math.min(arena.x + arena.width - 20, spawnX));
         spawnY = Math.max(arena.y + 20, Math.min(arena.y + arena.height - 20, spawnY));
       }
+
+      this.isBuildingTurret = true;
+      this.skillCooldown = cfg.skillCooldown || 500;
+      this.buildTimer = cfg.turretBuildTime || 90;
 
       // Destroy old turret if exists
       if (this.turretEntity && state && state.fighters) {
@@ -357,9 +416,6 @@ export class EngineerFighter extends Fighter {
     const dispenserEnabled = this.isSkillEnabled(cfg.enableDispenser, true);
     if (dispenserEnabled && !this.isDemoFighter && !this.isBuildingTurret && !this.isBuildingDispenser &&
         this.turretEntity && this.turretEntity.hp > 0 && !this.dispenserEntity && this.dispenserCooldown <= 0) {
-      this.isBuildingDispenser = true;
-      this.dispenserBuildTimer = cfg.dispenserBuildTime || 110;
-
       // Position dispenser at an offset angle from the turret
       let turretAngle = Math.atan2(this.turretEntity.y - this.y, this.turretEntity.x - this.x);
       let dispenserAngle = turretAngle + Math.PI * 0.75; // Offset 135° to create a tactical base
@@ -367,10 +423,24 @@ export class EngineerFighter extends Fighter {
       let spawnX = this.x + Math.cos(dispenserAngle) * dOffset;
       let spawnY = this.y + Math.sin(dispenserAngle) * dOffset;
 
+      if (arena && isCrazyDaveMatch(opponent)) {
+        const occupants = getArenaTileOccupants(this, this.dispenserEntity);
+        const tile = getAvailableTileForBuilding(spawnX, spawnY, arena, occupants);
+        if (!tile) {
+          // All tiles occupied by plants or buildings — cannot place dispenser on occupied tile!
+          return;
+        }
+        spawnX = tile.x;
+        spawnY = tile.y;
+      }
+
       if (arena) {
         spawnX = Math.max(arena.x + 20, Math.min(arena.x + arena.width - 20, spawnX));
         spawnY = Math.max(arena.y + 20, Math.min(arena.y + arena.height - 20, spawnY));
       }
+
+      this.isBuildingDispenser = true;
+      this.dispenserBuildTimer = cfg.dispenserBuildTime || 110;
 
       if (this.dispenserEntity && state && state.fighters) {
         const idx = state.fighters.indexOf(this.dispenserEntity);

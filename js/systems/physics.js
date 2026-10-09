@@ -184,8 +184,8 @@ export function resolveFighterCollision(a, b) {
   if (a.isTargetOfAmbush || b.isTargetOfAmbush || aIsTojiAssault || bIsTojiAssault) return;
 
   // John Wick pencil assassination grab: skip circle overlap push to eliminate jitter/shivering
-  const aIsWickStab = (a.cqcComboPhase === 'PENCIL_STAB' && a.cqcComboTarget === b);
-  const bIsWickStab = (b.cqcComboPhase === 'PENCIL_STAB' && b.cqcComboTarget === a);
+  const aIsWickStab = ((a.cqcComboPhase === 'PENCIL_STAB' || a.cqcComboPhase === 'FORWARD_ROLL') && a.cqcComboTarget === b);
+  const bIsWickStab = ((b.cqcComboPhase === 'PENCIL_STAB' || b.cqcComboPhase === 'FORWARD_ROLL') && b.cqcComboTarget === a);
   if (aIsWickStab || bIsWickStab) return;
 
   // Yuta Okkotsu Phantom Flurry: skip circle overlap push so enemy is never pushed away during flurry slashes

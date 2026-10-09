@@ -47,10 +47,12 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
 
   const screenW = state.canvas ? state.canvas.width : 1920;
   const screenH = state.canvas ? state.canvas.height : 1080;
+  const isHorizontal = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+  const shrineYOffset = isHorizontal ? -10 : -120;
   const drawW = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineWidth) || 380;
   const drawH = drawW * (408 / 612);
   const localSkullBaseY = -195 + (389 / 408) * drawH; // ~46.54px (exact bottom of non-transparent skulls)
-  const waterLineY = (sy - 120) + localSkullBaseY;   // ~sy - 73.46px (exact contact line)
+  const waterLineY = (sy + shrineYOffset) + localSkullBaseY;   // exact contact line
 
   // 1a. Upper Dark Crimson Cursed Sky (Pitch Black with Sinister Dark-Crimson Cloud Formations)
   if (!fighter._cachedSkyGrad || fighter._cachedSkyGradH !== waterLineY || fighter._cachedSkyGradScreenH !== screenH) {
@@ -256,10 +258,12 @@ export function renderSukunaDomainForeground(fighter, ctx) {
   const sy = fighter.domainY !== undefined ? fighter.domainY : fighter.y;
   const screenW = state.canvas ? state.canvas.width : (ctx.canvas ? ctx.canvas.width : 1920);
   const screenH = state.canvas ? state.canvas.height : (ctx.canvas ? ctx.canvas.height : 1080);
+  const isHorizontal = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+  const shrineYOffset = isHorizontal ? -10 : -120;
   const drawW = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineWidth) || 380;
   const drawH = drawW * (408 / 612);
   const localSkullBaseY = -195 + (389 / 408) * drawH; // ~46.54px (exact bottom of non-transparent skulls)
-  const waterLineY = (sy - 120) + localSkullBaseY;   // ~sy - 73.46px (exact contact line)
+  const waterLineY = (sy + shrineYOffset) + localSkullBaseY;   // exact contact line
 
   // Detect low quality / low FPS mode
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
@@ -291,9 +295,9 @@ export function renderSukunaDomainForeground(fighter, ctx) {
     ctx.restore();
   }
 
-  // ── 2. REAL SHRINE STRUCTURE (Above Water Level - Shifted higher toward top) ──
+  // ── 2. REAL SHRINE STRUCTURE (Above Water Level) ──
   ctx.save();
-  ctx.translate(sx, sy - 120);
+  ctx.translate(sx, sy + shrineYOffset);
   fighter._drawShrineBody(ctx);
   ctx.restore();
 

@@ -178,15 +178,40 @@ export function syncHudPosition() {
   if (!_cachedContainerRight) _cachedContainerRight = document.getElementById('healthHudRight');
 
   if (isHorizontal) {
-    const sideTopRatio = ((arena.y + 38) / canvasHeight);
+    const isMultiFighter = Boolean(
+      (state.fighters && state.fighters.filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable).length > 2) ||
+      state.mode === '2v2' || state.mode === '1v2' || state.mode === '4v4' ||
+      (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.ONE_VS_TWO))
+    );
+
+    // In large arenas (arena.width > 600, e.g. FFA 800x800 or Grand 1400x1400), side containers
+    // are anchored cleanly at screen top (24px) spanning the screen height (canvasHeight - 48px).
+    // In standard 1v1 mode, top is arena.y + 38px (below the 34px canvas name).
+    // In standard multi-fighter mode, top is arena.y (aligned with the arena top wall).
+    const isLargeArena = Boolean(arena && arena.width > 600);
+    const sideTopPxInCanvas = isLargeArena ? 24 : (isMultiFighter ? arena.y : (arena.y + 38));
+    const sideTopRatio = sideTopPxInCanvas / canvasHeight;
     const sideTopPx = canvasTopInBox + canvasRect.height * sideTopRatio;
     const sideTopPercent = (sideTopPx / boxRect.height) * 100;
 
-    const sideWidthPx = 244;
+    const sideHeightPx = isLargeArena ? (canvasHeight - 48) : arena.height;
+    const sideHeightPxInBox = canvasRect.height * (sideHeightPx / canvasHeight);
+    const sideHeightPercent = (sideHeightPxInBox / boxRect.height) * 100;
+
+    const isFfa = Boolean(
+      state.mode === 'FFA' || state.mode === 'Tactical FFA' ||
+      (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA))
+    );
+    const sideWidthPx = isFfa ? 176 : 244;
     const sideWidthPercent = (sideWidthPx / canvasWidth) * 100;
 
     if (_cachedContainerLeft) {
       setSafeStyle(_cachedContainerLeft, 'top', `${sideTopPercent.toFixed(3)}%`);
+      if (isMultiFighter) {
+        setSafeStyle(_cachedContainerLeft, 'height', `${sideHeightPercent.toFixed(3)}%`, 'important');
+      } else {
+        setSafeStyle(_cachedContainerLeft, 'height', 'auto');
+      }
       setSafeStyle(_cachedContainerLeft, 'left', `18px`, 'important');
       setSafeStyle(_cachedContainerLeft, 'right', 'auto', 'important');
       setSafeStyle(_cachedContainerLeft, 'width', `${sideWidthPercent.toFixed(3)}%`, 'important');
@@ -194,6 +219,11 @@ export function syncHudPosition() {
     }
     if (_cachedContainerRight) {
       setSafeStyle(_cachedContainerRight, 'top', `${sideTopPercent.toFixed(3)}%`);
+      if (isMultiFighter) {
+        setSafeStyle(_cachedContainerRight, 'height', `${sideHeightPercent.toFixed(3)}%`, 'important');
+      } else {
+        setSafeStyle(_cachedContainerRight, 'height', 'auto');
+      }
       setSafeStyle(_cachedContainerRight, 'right', `18px`, 'important');
       setSafeStyle(_cachedContainerRight, 'left', 'auto', 'important');
       setSafeStyle(_cachedContainerRight, 'width', `${sideWidthPercent.toFixed(3)}%`, 'important');

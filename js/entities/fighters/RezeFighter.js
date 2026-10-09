@@ -314,9 +314,12 @@ export class RezeFighter extends Fighter {
    * Main Fighter Update Loop
    */
   update(opponent, ownerIndex, arena) {
-    // 0. Update existing visual explosions & ground effects before freeze guard
-    // (Ensures explosion visual effects decay smoothly and NEVER get stuck on screen when Reze's movement is stopped by any attack)
+    // 0. Update independent deployed ordnances, cluster bombs, flechettes, and visual explosions before freeze guard
+    // (Ensures thrown cluster bombs, spark flechettes, decoys, and explosion visuals NEVER pause or freeze in mid-air when Reze is stunned or immobilized)
     this._updateVisualExplosions();
+    this._updateClusterBombs();
+    this._updateDecoys();
+    this._updateSparkFlechettes();
 
     // 1. Mandatory Rule 1 Freeze Guard
     const isFrozen = this._handleTimeStop();
@@ -352,9 +355,6 @@ export class RezeFighter extends Fighter {
     // (Bomb Devil form persists for the remainder of the round)
 
     // 4. Update Active Effects & Sub-systems
-    this._updateSparkFlechettes();
-    this._updateClusterBombs();
-    this._updateDecoys();
     this._updateRocketLunge();
     this._updateMegatonNuke();
     this._updateDiveBomb();
@@ -379,48 +379,14 @@ export class RezeFighter extends Fighter {
    * Unified Target Query (Rule 6: Fighters & Illusions)
    */
   _findBestTarget() {
-    let best = null;
-    let minD = Infinity;
-
-    const myTeam = (typeof state.getFighterTeam === 'function') 
-      ? state.getFighterTeam(state.fighters.indexOf(this)) 
-      : null;
-
-    // Check Fighters
-    if (state.fighters) {
-      for (let f of state.fighters) {
-        if (!f || f === this || f.isDead || (f.hp || 0) <= 0 || f.isInvulnerable) continue;
-        const fIdx = state.fighters.indexOf(f);
-        const fTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(fIdx) : null;
-        if (myTeam !== null && fTeam !== null && myTeam === fTeam) continue;
-
-        const d = Math.hypot(f.x - this.x, f.y - this.y);
-        if (d < minD) {
-          minD = d;
-          best = f;
-        }
-      }
-    }
-
-    // Check Illusions (Rule 6)
-    if (state.illusions) {
-      for (let ill of state.illusions) {
-        if (!ill || ill.isDead || (ill.hp || 0) <= 0) continue;
-        const d = Math.hypot(ill.x - this.x, ill.y - this.y);
-        if (d < minD) {
-          minD = d;
-          best = ill;
-        }
-      }
-    }
-
-    return best;
+    return this._findClosestEnemy();
   }
 
   /**
    * AI Decision Matrix for Reze
    */
   _updateRezeCombatAI(target) {
+    if (!target || !this.hasSpottedEnemy(target)) return;
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
 
@@ -430,11 +396,7 @@ export class RezeFighter extends Fighter {
       return;
     }
 
-    // 2. Mobility: Supersonic Rocket Lunge (Bomb Devil Form ONLY)
-    if (this.isHybridModeActive && this.rocketCooldown <= 0 && this.isSkillEnabled(cfg.enableRocketLunge, true) && dist > 140 && dist < 420) {
-      this._activateRocketLunge(target);
-      return;
-    }
+    // 2. Mobility: Supersonic Rocket Lunge (Bomb Devil Form ONLY - triggers exclusively upon colliding with arena walls in resolveWallBounce)
 
     // 3. Primary: Spark Flechette Barrage
     if (this.sparkCooldown <= 0 && this.isSkillEnabled(cfg.enableSparkFlechette, false) && dist > 80 && dist < 380) {
@@ -1237,7 +1199,7 @@ export class RezeFighter extends Fighter {
    */
   _activateRocketLunge(target) {
     if (!this.isHybridModeActive) return;
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
     this.rocketCooldown = this.rocketCooldownMax;
     this.isRocketLunging = true;
     this.rocketTimer = cfg.rocketDurationFrames || 24;
@@ -1248,8 +1210,88 @@ export class RezeFighter extends Fighter {
     this.rocketLungeVy = Math.sin(angle) * speed;
     this.gunAngle = angle;
 
+    // ── Foot Explosion Launch Booster ──
+    // In Chainsaw Man lore, Reze propels herself by igniting an explosion behind her feet
+    // to boost her forward at supersonic speeds, damaging and knocking away nearby enemies.
+    this._detonateRocketFootExplosion(angle, false);
+
     audioSystem.playSFX(cfg.sounds?.rocketJet || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3', cfg.soundVolumes?.rocketJet ?? 0.85);
     spawnFloatingText(this.x, this.y - 25, 'ROCKET LUNGE!', this.themeColor);
+  }
+
+  /**
+   * Detonates an explosive blast behind Reze's feet the moment she dashes,
+   * accelerating her into supersonic flight and damaging/pushing nearby enemies.
+   */
+  _detonateRocketFootExplosion(dashAngle, isWallLaunch = false) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    const footDist = this.r + 6;
+    const footX = this.x - Math.cos(dashAngle) * footDist;
+    const footY = this.y - Math.sin(dashAngle) * footDist;
+    const radius = cfg.rocketFootExplosionRadius || 65;
+    const damage = cfg.rocketFootExplosionDamage || 25;
+    const knockback = cfg.rocketFootExplosionKnockback || 22;
+
+    // 1. Audio SFX
+    try {
+      const sfx = isWallLaunch
+        ? (cfg.sounds?.wallRocketBlast || 'Assets/Sound Effects/Attacks/explosion.mp3')
+        : (cfg.sounds?.rocketExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3');
+      const vol = cfg.soundVolumes?.rocketExplosion ?? 0.80;
+      audioSystem.playSFX(sfx, vol);
+    } catch (e) {}
+
+    // 2. Visual sparks, flash & screen shake
+    try {
+      spawnImpactFlash(footX, footY, '#FFE600');
+      spawnSparks(footX, footY, 22, '#FF2E00');
+      spawnSparks(footX, footY, 16, '#FFE600');
+      triggerGlobalScreenShake(3.5, 10);
+    } catch (e) {}
+
+    // 3. Register concentric water-ripple shockwave
+    this.activePalmBlasts.push({
+      x: footX,
+      y: footY,
+      radius: radius,
+      timer: 14,
+      maxTimer: 14,
+      isPunchExplosion: true,
+      isFootExplosion: true
+    });
+
+    // 4. Multi-target AOE damage & knockback (Rule 6: fighters & illusions)
+    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters?.indexOf(this)) : null;
+
+    for (let t of allTargets) {
+      if (!t || t === this || t.isDead || (t.hp || 0) <= 0 || t.isInvulnerable) continue;
+      if (state.fighters) {
+        const idx = state.fighters.indexOf(t);
+        if (idx !== -1 && myTeam !== null && state.getFighterTeam?.(idx) === myTeam) continue;
+      }
+
+      const dist = Math.hypot(t.x - footX, t.y - footY);
+      if (dist <= radius + (t.r || 25)) {
+        applyDamageToTarget(t, damage, this, { isAOE: true, isExplosion: true });
+        spawnBloodEffect(t.x, t.y);
+
+        const kbAng = Math.atan2(t.y - footY, t.x - footX);
+        const kbVx = Math.cos(kbAng) * knockback;
+        const kbVy = Math.sin(kbAng) * knockback;
+        if (typeof t.applyKnockback === 'function') {
+          t.applyKnockback(kbVx, kbVy, 14);
+        } else {
+          t.vx = (t.vx || 0) + kbVx;
+          t.vy = (t.vy || 0) + kbVy;
+          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 14);
+        }
+
+        if (typeof t.applyTimeStop === 'function') {
+          t.applyTimeStop(8);
+        }
+      }
+    }
   }
 
   _updateRocketLunge() {
@@ -1258,6 +1300,13 @@ export class RezeFighter extends Fighter {
     this.x += this.rocketLungeVx;
     this.y += this.rocketLungeVy;
     this.rocketTimer--;
+
+    // Embers and spark trail from foot rocket propulsion
+    if (this.rocketTimer % 2 === 0) {
+      const trailX = this.x - Math.cos(this.gunAngle) * (this.r + 2);
+      const trailY = this.y - Math.sin(this.gunAngle) * (this.r + 2);
+      spawnSparks(trailX, trailY, 3, '#FFE600');
+    }
 
     // Collision check with enemies
     const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
@@ -1434,28 +1483,15 @@ export class RezeFighter extends Fighter {
     // Reset skill cooldown so HUD reflects activation
     this.rocketCooldown = this.rocketCooldownMax;
 
-    // Detonation effects at wall contact point
+    // Detonate foot propulsion blast off wall
+    this._detonateRocketFootExplosion(lungeAngle, true);
+
     try {
-      audioSystem.playSFX(cfg.sounds?.wallRocketBlast || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.wallRocketBlast ?? 0.80);
       audioSystem.playSFX(cfg.sounds?.rocketJet || 'Assets/Sound Effects/Skills/genos-dash-noise.mp3', cfg.soundVolumes?.rocketJet ?? 0.85);
-      spawnImpactFlash(this.x, this.y, 45, '#FFE600');
-      spawnSparks(this.x, this.y, 24, '#FFE600');
-      spawnSparks(this.x, this.y, 16, '#FF2E00');
-      triggerGlobalScreenShake(3.5, 10);
       if (typeof spawnFloatingText === 'function') {
-        spawnFloatingText(this.x, this.y - 25, 'WALL ROCKET!', this.themeColor);
+        spawnFloatingText(this.x, this.y - 25, 'ROCKET LUNGE!', this.themeColor);
       }
     } catch (e) {}
-
-    // Wall blast shockwave
-    this.activePalmBlasts.push({
-      x: this.x,
-      y: this.y,
-      radius: 65,
-      timer: 14,
-      maxTimer: 14,
-      isPunchExplosion: true
-    });
   }
 
   /**
@@ -1476,8 +1512,6 @@ export class RezeFighter extends Fighter {
         this.hp = this.maxHp;
         this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
         this._healthBarHealTimer = 28;
-        spawnFloatingText(this.x, this.y - (this.r || 25) - 14, `+${healAmount}`, '#00FF66');
-        spawnFloatingText(this.x, this.y - (this.r || 25) - 34, 'FULL REGENERATION!', '#00FF66');
       }
     }
 
@@ -1519,8 +1553,6 @@ export class RezeFighter extends Fighter {
         this.hp = this.maxHp;
         this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
         this._healthBarHealTimer = 28;
-        spawnFloatingText(this.x, this.y - (this.r || 25) - 14, `+${healAmount}`, '#00FF66');
-        spawnFloatingText(this.x, this.y - (this.r || 25) - 34, 'FULL REGENERATION!', '#00FF66');
       }
     }
 
@@ -1529,20 +1561,12 @@ export class RezeFighter extends Fighter {
       this.aim(target);
     }
 
-    // Rule 5: Apply hit-pause exclusively to opponents during transformation windup (NEVER freeze attacker)
-    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
-    for (let t of allTargets) {
-      if (t && t !== this && typeof t.applyTimeStop === 'function') {
-        t.applyTimeStop(55);
-      }
-    }
-
     // Decelerate movement to a grounded stance
     this.vx *= 0.15;
     this.vy *= 0.15;
 
     try {
-      audioSystem.playSFX(cfg.sounds?.pinPull || 'Assets/Sound Effects/Skills/parry.mp3', cfg.soundVolumes?.pinPull ?? 0.95);
+      audioSystem.playSFX(cfg.sounds?.pinPull || 'Assets/Sound Effects/RezeSFX/reze_boom_voiceline.mp3', cfg.soundVolumes?.pinPull ?? 0.95);
     } catch (e) {}
 
     try {
@@ -1651,10 +1675,6 @@ export class RezeFighter extends Fighter {
           t.vx = (t.vx || 0) + kbVx;
           t.vy = (t.vy || 0) + kbVy;
           t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 24);
-        }
-
-        if (typeof t.applyTimeStop === 'function') {
-          t.applyTimeStop(20);
         }
       }
     }
@@ -1835,7 +1855,7 @@ export class RezeFighter extends Fighter {
         });
 
         try {
-          audioSystem.playSFX(cfg.sounds?.revivePinPull || cfg.sounds?.pinPull || 'Assets/Sound Effects/Skills/parry.mp3', cfg.soundVolumes?.revivePinPull ?? 0.95);
+          audioSystem.playSFX(cfg.sounds?.revivePinPull || cfg.sounds?.pinPull || 'Assets/Sound Effects/RezeSFX/reze_boom_voiceline.mp3', cfg.soundVolumes?.revivePinPull ?? 0.95);
           audioSystem.playSFX(cfg.sounds?.reviveExplosion || cfg.sounds?.explosionLarge || 'Assets/Sound Effects/Skills/fugaexplode.mp3', cfg.soundVolumes?.reviveExplosion ?? 0.90);
         } catch (e) {}
 
@@ -1865,7 +1885,6 @@ export class RezeFighter extends Fighter {
               t.vy = (t.vy || 0) + kbVy;
               t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 22);
             }
-            if (typeof t.applyTimeStop === 'function') t.applyTimeStop(15);
           }
         }
         return;

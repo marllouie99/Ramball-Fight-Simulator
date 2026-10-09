@@ -27,10 +27,24 @@ export const VIEWPORT_CONFIGS = {
     width: 960,
     height: 540,
     arena: { x: 280, y: 70, width: 400, height: 400, wallWidth: 4, shape: 'rect' },
+    ffaArena: { x: 80, y: -130, width: 800, height: 800, wallWidth: 4, shape: 'rect', centerObstacle: { type: 'plus', size: 280, thickness: 90 } },
     grandArena: { x: -220, y: -430, width: 1400, height: 1400, wallWidth: 4, shape: 'rect' },
     label: '🖥️ Horizontal (16:9 Widescreen)',
   },
 };
+
+/**
+ * Helper to check if the current or target game mode is an FFA mode.
+ */
+export function isFfaMode(mode) {
+  const m = mode || (typeof state !== 'undefined' ? state.mode : '');
+  return Boolean(
+    m === 'FFA' ||
+    m === 'Tactical FFA' ||
+    m === 'FFA 4-Player' ||
+    (typeof GAME_MODES !== 'undefined' && (m === GAME_MODES.FFA || m === GAME_MODES.TACTICAL_FFA))
+  );
+}
 
 /**
  * Helper to check if the current or target game mode is a multi-team grand battle.
@@ -58,9 +72,13 @@ export function isGrandBattleMode(mode) {
 export function getArenaConfigForMode(mode, orientation) {
   const isH = (orientation === VIEWPORT_MODES.HORIZONTAL || (typeof state !== 'undefined' && state.viewOrientation === VIEWPORT_MODES.HORIZONTAL));
   if (isH) {
-    return isGrandBattleMode(mode)
-      ? { ...VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].grandArena }
-      : { ...VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].arena };
+    if (isGrandBattleMode(mode)) {
+      return { ...VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].grandArena };
+    }
+    if (isFfaMode(mode)) {
+      return { ...VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].ffaArena };
+    }
+    return { ...VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].arena };
   }
   return { ...VIEWPORT_CONFIGS[VIEWPORT_MODES.VERTICAL].arena };
 }
@@ -95,8 +113,9 @@ export function setViewportOrientation(mode) {
 
   // Determine arena geometry based on mode & orientation
   const isGrand = isGrandBattleMode(state.mode);
-  const activeArena = (targetMode === VIEWPORT_MODES.HORIZONTAL && isGrand)
-    ? { ...cfg.grandArena }
+  const isFfa = isFfaMode(state.mode);
+  const activeArena = (targetMode === VIEWPORT_MODES.HORIZONTAL)
+    ? (isGrand ? { ...cfg.grandArena } : (isFfa ? { ...cfg.ffaArena } : { ...cfg.arena }))
     : { ...cfg.arena };
 
   // Update logical config dimensions
@@ -146,8 +165,8 @@ export function setViewportOrientation(mode) {
     const floatCanvas = state.floatingTextCanvas || (typeof document !== 'undefined' ? document.getElementById('floatingTextCanvas') : null);
 
     if (isH) {
-      document.documentElement.classList.add('horizontal-viewport-mode');
-      document.body.classList.add('horizontal-viewport-mode');
+      if (document.documentElement?.classList) document.documentElement.classList.add('horizontal-viewport-mode');
+      if (document.body?.classList) document.body.classList.add('horizontal-viewport-mode');
       if (container) {
         container.classList.add('horizontal-mode');
         container.style.width = '960px';
@@ -160,23 +179,23 @@ export function setViewportOrientation(mode) {
         box.style.aspectRatio = '16 / 9';
       }
       if (canvas) {
-        canvas.classList.add('horizontal-mode');
+        if (canvas.classList) canvas.classList.add('horizontal-mode');
         canvas.style.width = '960px';
         canvas.style.height = '540px';
       }
       if (topCanvas) {
-        topCanvas.classList.add('horizontal-mode');
+        if (topCanvas.classList) topCanvas.classList.add('horizontal-mode');
         topCanvas.style.width = '960px';
         topCanvas.style.height = '540px';
       }
       if (floatCanvas) {
-        floatCanvas.classList.add('horizontal-mode');
+        if (floatCanvas.classList) floatCanvas.classList.add('horizontal-mode');
         floatCanvas.style.width = '960px';
         floatCanvas.style.height = '540px';
       }
     } else {
-      document.documentElement.classList.remove('horizontal-viewport-mode');
-      document.body.classList.remove('horizontal-viewport-mode');
+      if (document.documentElement?.classList) document.documentElement.classList.remove('horizontal-viewport-mode');
+      if (document.body?.classList) document.body.classList.remove('horizontal-viewport-mode');
       if (container) {
         container.classList.remove('horizontal-mode');
         container.style.width = '540px';
@@ -189,17 +208,17 @@ export function setViewportOrientation(mode) {
         box.style.aspectRatio = '540 / 960';
       }
       if (canvas) {
-        canvas.classList.remove('horizontal-mode');
+        if (canvas.classList) canvas.classList.remove('horizontal-mode');
         canvas.style.width = '540px';
         canvas.style.height = '960px';
       }
       if (topCanvas) {
-        topCanvas.classList.remove('horizontal-mode');
+        if (topCanvas.classList) topCanvas.classList.remove('horizontal-mode');
         topCanvas.style.width = '540px';
         topCanvas.style.height = '960px';
       }
       if (floatCanvas) {
-        floatCanvas.classList.remove('horizontal-mode');
+        if (floatCanvas.classList) floatCanvas.classList.remove('horizontal-mode');
         floatCanvas.style.width = '540px';
         floatCanvas.style.height = '960px';
       }

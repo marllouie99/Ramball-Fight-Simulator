@@ -1,5 +1,6 @@
 import { state, isGlobalHitPauseActive, spawnFloatingText, isChampionScreenActive, triggerGlobalScreenShake } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
+import { isLineOfSightBlockedByObstacle } from './arenaObstacleSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { spawnIllusionSpawn } from '../graphics/particles/illusionSpawnEffect.js';
 import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
@@ -467,6 +468,7 @@ export function updateIllusions() {
           const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
           if (entityTeam !== null && entityTeam === _ownerTeam) return false;
         }
+        if (arena && isLineOfSightBlockedByObstacle(illusion.x, illusion.y, entity.x, entity.y, arena)) return false;
         return true;
       };
 

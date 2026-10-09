@@ -8,6 +8,7 @@ import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeCl
 import { drawGenosSkin, drawGenosHands } from '../../graphics/fighters/genosSkin.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
+import { isLineOfSightBlockedByObstacle } from '../../systems/arenaObstacleSystem.js';
 
 /**
  * Genos — The Demon Cyborg
@@ -57,7 +58,7 @@ export class GenosFighter extends Fighter {
     this.dashTargetY = 0;
 
     // Ultimate: Spiral Incineration Cannon
-    this.ultCooldown = CONFIG.genos?.initialUltCooldown !== undefined ? CONFIG.genos.initialUltCooldown : (CONFIG.genos?.ultCooldown || 800);
+    this.ultCooldown = CONFIG.genos?.initialUltCooldown !== undefined ? CONFIG.genos.initialUltCooldown : (CONFIG.genos?.ultCooldown || 1000);
     this.isUltSliding = false;
     this.ultSlideTimer = 0;
     this.isChargingUlt = false;
@@ -115,10 +116,11 @@ export class GenosFighter extends Fighter {
         name: 'Spiral Incineration Cannon',
         type: 'ultimate',
         cooldownKey: 'ultCooldown',
-        cooldownMax: () => CONFIG.genos?.ultCooldown || 800,
+        cooldownMax: () => CONFIG.genos?.ultCooldown || 1000,
         durationKey: 'ultTimer',
         activeKey: 'isFiringUlt',
-        channelingKey: 'isChargingUlt'
+        channelingKey: 'isChargingUlt',
+        canTickDuration: () => false
       });
     }
     if (this.isSkillEnabled(CONFIG.genos?.enableSelfDestruct, true)) {
@@ -154,6 +156,7 @@ export class GenosFighter extends Fighter {
       (this.incinerateChargeTimer > 0) ||
       (this.machineGunFlurryTimer > 0) ||
       (this.machineGunBlowTimer > 0) ||
+      this.isFlurrying ||
       this.isIncinerating ||
       this.isChargingUlt ||
       this.isFiringUlt ||
@@ -163,24 +166,9 @@ export class GenosFighter extends Fighter {
     );
   }
 
-  interruptAttacks(forceCancelAll = false) {
-    super.interruptAttacks(forceCancelAll);
-    this.basicBlastAnimTimer = 0;
-    this.punchAnimTimer = 0;
-    this.punchActiveMaxTime = 0;
-    this._basicHitConnectedTimer = 0;
-    this._flurryHitConnectedTimer = 0;
-    this.isFlurrying = false;
-    this.flurryHitsLeft = 0;
-    this.isChargingUlt = false;
-    this.isFiringUlt = false;
-    this.isUltSliding = false;
-    this.isUltRecovering = false;
-  }
-
   canAim() {
-    if (this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating || this.machineGunFlurryTimer > 0 || this.machineGunBlowTimer > 0) {
-      return false; // Disable auto-aim while channeling ultimate beam or stationary skills!
+    if (this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isSelfDestructing || this.isSelfDestructRecovering || this.isIncinerating) {
+      return false; // Disable auto-aim while channeling ultimate beam or self destruct!
     }
     return super.canAim();
   }
@@ -195,18 +183,9 @@ export class GenosFighter extends Fighter {
       return false;
     }
 
-    if (this.isFlurrying) {
-      // Strictly preserve locked Machine Gun Blows cardinal angle
-      if (this.flurryAimAngle !== undefined && !Number.isNaN(this.flurryAimAngle)) {
-        this.gunAngle = this.flurryAimAngle;
-        this.angle = this.flurryAimAngle;
-      }
-      return false;
-    }
-
     if (!this.canAim()) return false;
 
-    // Continuous 360° omnidirectional aiming towards target at any angle
+    // Continuous 360° omnidirectional aiming towards target at any angle (including active Machine Gun Blows flurry)
     const aimTarget = target || this._findClosestEnemy();
     if (aimTarget && typeof aimTarget.x === 'number' && typeof aimTarget.y === 'number') {
       const targetY = (aimTarget.y !== undefined ? aimTarget.y : this.y) - (aimTarget.z || 0);
@@ -214,6 +193,9 @@ export class GenosFighter extends Fighter {
       const aimAngle = Math.atan2(targetY - genosY, aimTarget.x - this.x);
       this.gunAngle = aimAngle;
       this.angle = aimAngle;
+      if (this.isFlurrying) {
+        this.flurryAimAngle = aimAngle;
+      }
       return true;
     }
     return super.aim(aimTarget);
@@ -722,12 +704,75 @@ export class GenosFighter extends Fighter {
   }
 
   applyKnockback(vx, vy, opts = 0) {
-    if (this.isChargingUlt || this.isFiringUlt || this.immuneToKnockback || this.immuneToPush) {
+    if (this.isChargingUlt || this.isFiringUlt || this.isFlurrying || this.immuneToKnockback || this.immuneToPush) {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
+      this.hitStunTimer = 0;
+      this.knockbackStunTimer = 0;
       return;
     }
     super.applyKnockback(vx, vy, opts);
+  }
+
+  applyRedKnockback(vx, vy, stunFrames = 0) {
+    if (this.isChargingUlt || this.isFiringUlt || this.isFlurrying || this.immuneToKnockback || this.immuneToPush) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.hitStunTimer = 0;
+      this.knockbackStunTimer = 0;
+      return;
+    }
+    super.applyRedKnockback(vx, vy, stunFrames);
+  }
+
+  applyTimeStop(duration, opts = {}) {
+    if (this.isFiringUlt && this.hp > 0 && !this.isDead) {
+      return; // Absolute hyper-armor CC immunity while actively firing Spiral Incineration Cannon
+    }
+    super.applyTimeStop(duration, opts);
+  }
+
+  applyHitStun(duration, opts = {}) {
+    if ((this.isFiringUlt || this.isFlurrying) && this.hp > 0 && !this.isDead) {
+      return; // Absolute hyper-armor CC immunity: Machine Gun Blows does not get interrupted by incidental hit-stun
+    }
+    super.applyHitStun(duration, opts);
+  }
+
+  applySlow(duration, multiplier, opts = {}) {
+    if (this.isFiringUlt && this.hp > 0 && !this.isDead) {
+      return;
+    }
+    super.applySlow(duration, multiplier, opts);
+  }
+
+  applyParalyze(duration, opts = {}) {
+    if (this.isFiringUlt && this.hp > 0 && !this.isDead) {
+      return;
+    }
+    super.applyParalyze(duration, opts);
+  }
+
+  clearAllAttackEffects() {
+    const wasFiringUlt = Boolean(this.isFiringUlt);
+    const ultTimer = this.ultTimer;
+    const ultAngle = this.ultAngle;
+    super.clearAllAttackEffects();
+    const isHardCancelled = this.hp <= 0 || this.dead || this.isDead || (this.silenceTimer || 0) > 0;
+    if (wasFiringUlt && !isHardCancelled) {
+      this.isFiringUlt = true;
+      this.ultTimer = ultTimer;
+      this.ultAngle = ultAngle;
+      this.gunAngle = ultAngle;
+      this.angle = ultAngle;
+      this.immuneToPush = true;
+      this.immuneToKnockback = true;
+      this.immuneToPull = true;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+    }
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -761,13 +806,13 @@ export class GenosFighter extends Fighter {
       return super.takeDamage(finalAmount, attacker, opts);
     }
 
-    // 3. Trigger Core Overdrive when HP drops to threshold (non-fatal damage only)
+    // 3. Trigger Core Overdrive when HP drops to threshold (non-fatal damage only; defer if firing ultimate)
     const isSelfDestructEnabled = this.isSkillEnabled(CONFIG.genos?.enableSelfDestruct, true);
     const thresholdRatio = CONFIG.genos?.selfDestructHpThreshold ?? CONFIG.genos?.selfDestructThreshold ?? 0.10;
     const sdThreshold = this.maxHp * thresholdRatio;
     const nextHp = this.hp - amount;
 
-    if (isSelfDestructEnabled && !this.usedSelfDestruct && nextHp > 0 && nextHp <= sdThreshold) {
+    if (isSelfDestructEnabled && !this.usedSelfDestruct && !this.isFiringUlt && nextHp > 0 && nextHp <= sdThreshold) {
       this.hp = Math.max(1, Math.min(sdThreshold, nextHp));
       this.isSelfDestructing = true;
       this.selfDestructTimer = CONFIG.genos?.selfDestructCountdownFrames || 150;
@@ -802,13 +847,20 @@ export class GenosFighter extends Fighter {
     this.punchAnimTimer = this.punchMaxTime;
   }
 
+  canPerformBasicAttack(target = null, arena = null) {
+    if (this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isFlurrying || this.isSelfDestructing || this.isSelfDestructRecovering) {
+      return false;
+    }
+    return super.canPerformBasicAttack(target, arena);
+  }
+
   /**
    * Overrides base Fighter shoot method to fire Genos's signature Incineration Palm fire blast.
    */
   shoot(ownerIndex) {
     if (!this.canPerformBasicAttack()) return false;
-    if (this.isSelfDestructing || this.isChargingUlt || this.isFiringUlt || this.isDashing || this.isFlurrying) {
-      return;
+    if (this.isSelfDestructing || this.isSelfDestructRecovering || this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering || this.isDashing || this.isFlurrying) {
+      return false;
     }
 
     // Determine target and aim to any continuous 360° angle
@@ -1058,15 +1110,14 @@ export class GenosFighter extends Fighter {
       });
     }
 
-    // Immediately stop target enemy movement on Skill 1 activation
+    // Apply heavy movement slow to target enemy on Skill 1 activation (no stun / time-stop)
     if (opponent && opponent.hp > 0) {
-      opponent.vx = 0;
-      opponent.vy = 0;
-      opponent.caughtInGenosFlurry = true;
-      if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
-      if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
-      if (typeof opponent.applyTimeStop === 'function') {
-        opponent.applyTimeStop(25, { isSkill: true });
+      const slowMult = CONFIG.genos?.flurrySlowMultiplier ?? 0.15;
+      const slowDuration = CONFIG.genos?.flurrySlowDuration ?? 14;
+      if (typeof opponent.applySlow === 'function') {
+        opponent.applySlow(slowDuration, slowMult, { isGenosFlurry: true });
+      } else if (opponent.statusEffects && typeof opponent.statusEffects.applySlow === 'function') {
+        opponent.statusEffects.applySlow(slowDuration, slowMult, { isGenosFlurry: true });
       }
     }
 
@@ -1158,18 +1209,44 @@ export class GenosFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    const wasFiringUlt = Boolean(this.isFiringUlt);
+    const wasFlurrying = Boolean(this.isFlurrying);
+    const isHardCancelled = this.hp <= 0 || this.dead || this.isDead || (this.silenceTimer || 0) > 0;
+    const shouldProtectUltFiring = wasFiringUlt && !isHardCancelled;
+    const isHardCC = forceCancelAll || this.isTargetOfAmbush || isHardCancelled || (this.timeStopTimer || 0) > 0 || (this.electricStunTimer || 0) > 0;
+
+    // Machine Gun Blows Hyper Armor: Barrage does NOT get cut off by incidental hits or enemy movement, completing all punches
+    if (wasFlurrying && !isHardCC) {
+      return;
+    }
+
     this.isUltSliding = false;
     this.ultSlideTimer = 0;
-    if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering) {
+    if (!shouldProtectUltFiring) {
+      if (this.isChargingUlt || this.isFiringUlt || this.isUltRecovering) {
+        this.isChargingUlt = false;
+        this.isFiringUlt = false;
+        this.isUltRecovering = false;
+        this.ultRecoveryTimer = 0;
+        this.ultTimer = 0;
+        this.immuneToPush = false;
+        this.immuneToKnockback = false;
+        this.immuneToPull = false;
+      }
+    } else {
+      // While actively firing Spiral Incineration Cannon, preserve firing state and full hyper-armor immunities
       this.isChargingUlt = false;
-      this.isFiringUlt = false;
       this.isUltRecovering = false;
       this.ultRecoveryTimer = 0;
-      this.ultTimer = 0;
-      this.immuneToPush = false;
-      this.immuneToKnockback = false;
-      this.immuneToPull = false;
+      this.immuneToPush = true;
+      this.immuneToKnockback = true;
+      this.immuneToPull = true;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
     }
+
     if (this.flurryTarget) {
       this.flurryTarget.caughtInGenosFlurry = false;
     }
@@ -1200,10 +1277,13 @@ export class GenosFighter extends Fighter {
       this.vy = (this.vy / currentSpeed) * this.speed;
     }
 
-    // Immediately stop ALL active audio handles & voice audio instances when interrupted
-    if (this.soundHandle) {
-      try { stopSound(this.soundHandle); } catch (e) {}
-      this.soundHandle = null;
+    // Immediately stop active audio handles & voice audio instances when interrupted, but preserve active ultimate beam audio
+    if (!shouldProtectUltFiring) {
+      if (this.soundHandle) {
+        try { stopSound(this.soundHandle); } catch (e) {}
+        this.soundHandle = null;
+      }
+      try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-incenerate-voice.mp3'); } catch (e) {}
     }
     if (this._ultChargeSoundHandle) {
       try { stopSound(this._ultChargeSoundHandle); } catch (e) {}
@@ -1214,26 +1294,42 @@ export class GenosFighter extends Fighter {
       this._selfDestructChargeHandle = null;
     }
 
-    try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-incenerate-voice.mp3'); } catch (e) {}
     try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-ultimatecharging.mp3'); } catch (e) {}
     if (forceCancelAll) {
       try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3'); } catch (e) {}
     }
     try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3'); } catch (e) {}
 
-    // Release all targets from beam trap on attack interruption
-    const clearBeamTrap = (entity) => {
-      if (!entity) return;
-      entity.caughtInGenosBeam = false;
-      entity.caughtInGenosBeamTimer = 0;
-      entity.preventKnockbackBounce = false;
-    };
-    if (typeof state !== 'undefined') {
-      if (state.fighters) state.fighters.forEach(clearBeamTrap);
-      if (state.illusions) state.illusions.forEach(clearBeamTrap);
+    // Release all targets from beam trap on attack interruption unless actively firing
+    if (!shouldProtectUltFiring) {
+      const clearBeamTrap = (entity) => {
+        if (!entity) return;
+        entity.caughtInGenosBeam = false;
+        entity.caughtInGenosBeamTimer = 0;
+        entity.preventKnockbackBounce = false;
+      };
+      if (typeof state !== 'undefined') {
+        if (state.fighters) state.fighters.forEach(clearBeamTrap);
+        if (state.illusions) state.illusions.forEach(clearBeamTrap);
+      }
     }
 
     super.interruptAttacks(forceCancelAll);
+
+    if (shouldProtectUltFiring) {
+      this.isFiringUlt = true;
+      this.immuneToPush = true;
+      this.immuneToKnockback = true;
+      this.immuneToPull = true;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
+        this.gunAngle = this.ultAngle;
+        this.angle = this.ultAngle;
+      }
+    }
   }
 
   executeSpiralIncinerationCannon(opponent) {
@@ -1253,7 +1349,8 @@ export class GenosFighter extends Fighter {
     this.immuneToPush = true;
     this.immuneToKnockback = true;
     this.immuneToPull = true;
-    this.ultCooldown = CONFIG.genos?.ultCooldown || 1680;
+    this.ultCooldown = CONFIG.genos?.ultCooldown || 1000;
+    this.shootCooldown = Math.max(this.shootCooldown || 0, CONFIG.genos?.postUltShootCooldown ?? CONFIG.genos?.blastCooldown ?? 40);
 
     // Rule 36: Continuous 360° omnidirectional targeting upon initiation with committed angle lock
     let castAngle = 0;
@@ -1561,7 +1658,9 @@ export class GenosFighter extends Fighter {
 
     // Incineration Cannon Ultimate Cooldown Exception: ultCooldown MUST ALWAYS tick down every frame,
     // even if Genos is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
-    if (!this.isChargingUlt && !this.isFiringUlt && (this.ultCooldown || 0) > 0) {
+    // But do NOT tick down while casting, sliding, charging, or actively firing the beam (only tick once the beam is done)
+    const isUltCastingOrFiring = Boolean(this.isUltSliding || this.isChargingUlt || this.isFiringUlt);
+    if (!isUltCastingOrFiring && (this.ultCooldown || 0) > 0) {
       this.ultCooldown--;
     }
 
@@ -1582,17 +1681,30 @@ export class GenosFighter extends Fighter {
     }
 
     // Mandatory Rule #1: TimeStop & Freeze Guard at top of update loop
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
+    // While actively firing Spiral Incineration Cannon, Genos possesses absolute hyper-armor against hit-pauses, explosion stuns, and time-stops
+    const isFrozen = !this.isFiringUlt && (this._handleTimeStop() || this.isTargetOfAmbush);
+    if (isFrozen) {
       const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
       if (!isNanamiPausing) {
         this.interruptAttacks();
       }
       return; // Stop update execution so fighter is frozen!
     }
+    if (this.isFiringUlt) {
+      this._handleTimeStop(); // Process internal timers/cooldowns without freezing execution
+      this.timeStopTimer = 0;
+      this.hitStunTimer = 0;
+      this.knockbackStunTimer = 0;
+      this.basicAttackHitPauseTimer = 0;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+    }
 
     // Decay Cooldowns & Timers
-    if (this.shootCooldown > 0) this.shootCooldown--;
+    const isUltActiveOrRecovering = Boolean(this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isUltRecovering);
+    if (!isUltActiveOrRecovering && this.shootCooldown > 0) this.shootCooldown--;
     if (this.basicBlastAnimTimer > 0) this.basicBlastAnimTimer--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.flurryCooldown > 0) this.flurryCooldown--;
@@ -1797,8 +1909,30 @@ export class GenosFighter extends Fighter {
       this.immuneToKnockback = true;
       this.immuneToPull = true;
 
-      // Strictly lock aim to the committed ultAngle upon casting; NO auto-aim tracking or snapping to moving targets!
-      if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
+      // Smooth, controlled auto-aim tracking during channeling until lock-in frames
+      const autoAimEnabled = CONFIG.genos?.enableUltAutoAim !== false;
+      const aimLockFrames = CONFIG.genos?.ultAimLockFrames ?? 25;
+      if (autoAimEnabled && this.ultTimer > aimLockFrames) {
+        const aimTarget = (opponent && opponent.hp > 0 && !opponent.isDead) ? opponent : this._findClosestEnemy();
+        if (aimTarget && typeof aimTarget.x === 'number' && typeof aimTarget.y === 'number') {
+          const targetY = (aimTarget.y !== undefined ? aimTarget.y : this.y) - (aimTarget.z || 0);
+          const genosY = this.y - (this.z || 0);
+          const targetAngle = Math.atan2(targetY - genosY, (aimTarget.x !== undefined ? aimTarget.x : this.x) - this.x);
+
+          let angleDiff = targetAngle - (this.gunAngle || this.angle || 0);
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+          const maxTurnRate = CONFIG.genos?.ultAutoAimTurnRate ?? 0.055; // ~3.15 deg/frame controlled mechanical tracking
+          const turnStep = Math.sign(angleDiff) * Math.min(Math.abs(angleDiff), maxTurnRate);
+          const newAngle = (this.gunAngle || this.angle || 0) + turnStep;
+
+          this.gunAngle = newAngle;
+          this.angle = newAngle;
+          this.ultAngle = newAngle;
+        }
+      } else if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
+        // Locked in direction for the final lock-in frames before firing (allows opponents to dodge!)
         this.gunAngle = this.ultAngle;
         this.angle = this.ultAngle;
       }
@@ -1819,7 +1953,14 @@ export class GenosFighter extends Fighter {
         this.vy = 0;
         this.knockbackVx = 0;
         this.knockbackVy = 0;
-        this.ultTimer = CONFIG.genos?.ultDurationFrames || 120;
+        this.ultTimer = CONFIG.genos?.ultDurationFrames || 150;
+
+        // STRICTLY PRESERVE LOCKED ANGLE: Do NOT auto-snap upon firing!
+        if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
+          this.gunAngle = this.ultAngle;
+          this.angle = this.ultAngle;
+        }
+
         const blastShake = CONFIG.genos?.ultBlastShakeIntensity ?? 6.0;
         if (blastShake > 0) {
           triggerGlobalScreenShake(blastShake, CONFIG.genos?.ultBlastShakeDuration || 12);
@@ -1881,6 +2022,7 @@ export class GenosFighter extends Fighter {
 
       // ── Per-Frame Movement Slow & Visual Sizzling Heat Sparks ──
       for (const target of targetsToScan) {
+        if (isLineOfSightBlockedByObstacle(this.x, this.y, target.x, target.y, state?.arena)) continue;
         const dx = target.x - this.x;
         const dy = target.y - this.y;
         const projDist = dx * Math.cos(this.ultAngle) + dy * Math.sin(this.ultAngle);
@@ -1909,6 +2051,7 @@ export class GenosFighter extends Fighter {
         const damage = CONFIG.genos?.ultDamagePerTick || 10;
 
         for (const target of targetsToScan) {
+          if (isLineOfSightBlockedByObstacle(this.x, this.y, target.x, target.y, state?.arena)) continue;
           const dx = target.x - this.x;
           const dy = target.y - this.y;
           const projDist = dx * Math.cos(this.ultAngle) + dy * Math.sin(this.ultAngle);
@@ -1966,6 +2109,7 @@ export class GenosFighter extends Fighter {
         this.immuneToPush = false;
         this.immuneToKnockback = false;
         this.immuneToPull = false;
+        this.ultCooldown = CONFIG.genos?.ultCooldown || 1000;
         this.ultRecoveryTimer = CONFIG.genos?.ultRecoveryFrames || 45; // ~0.75 seconds of recovery (repositioning hands & smoking)
         if (CONFIG.genos?.ultRecoveryEnabled !== false) {
           const recSrc = CONFIG.genos?.sounds?.ultRecovery || CONFIG.genos?.ultRecoverySound || 'Assets/Sound Effects/Skills/genos-recovery.mp3';
@@ -2014,7 +2158,7 @@ export class GenosFighter extends Fighter {
       if (this.ultRecoveryTimer <= 0) {
         this.isUltRecovering = false;
         this.isDashing = false;
-        this.isMeleeStance = false;
+        this.isMeleeStance = (this.heatAmmo <= 0);
         this.isMeleeWallDashing = false;
         this.meleeDashCount = 0;
         this.speedBoostTimer = 0;
@@ -2029,6 +2173,7 @@ export class GenosFighter extends Fighter {
         this._lastWallBounceFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : Date.now();
         this.dashCooldown = Math.max(this.dashCooldown || 0, CONFIG.genos?.postUltDashCooldown || 60);
         this.flurryCooldown = Math.max(this.flurryCooldown || 0, CONFIG.genos?.postUltFlurryCooldown || 60);
+        this.shootCooldown = Math.max(this.shootCooldown || 0, CONFIG.genos?.postUltShootCooldown ?? CONFIG.genos?.blastCooldown ?? 40);
       }
       return;
     }
@@ -2042,11 +2187,22 @@ export class GenosFighter extends Fighter {
 
     // 3. Skill 1: Machine Gun Blows Flurry Update
     if (this.isFlurrying) {
-      const currentTarget = (this.flurryTarget && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
-      const aimAngle = (this.flurryAimAngle !== undefined && !Number.isNaN(this.flurryAimAngle)) ? this.flurryAimAngle : this._getCardinalAngle(currentTarget);
-      this.flurryAimAngle = aimAngle;
-      this.gunAngle = aimAngle;
-      this.angle = aimAngle;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+
+      // Real-time continuous 360° auto-aim tracking towards the target during Machine Gun Blows
+      const currentTarget = (this.flurryTarget && this.flurryTarget.hp > 0) ? this.flurryTarget : (opponent && opponent.hp > 0 ? opponent : this._findClosestEnemy());
+      if (currentTarget && typeof currentTarget.x === 'number' && typeof currentTarget.y === 'number') {
+        const targetY = (currentTarget.y !== undefined ? currentTarget.y : this.y) - (currentTarget.z || 0);
+        const genosY = this.y - (this.z || 0);
+        const aimAngle = Math.atan2(targetY - genosY, currentTarget.x - this.x);
+        this.flurryAimAngle = aimAngle;
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
+      }
+      const aimAngle = (this.flurryAimAngle !== undefined && !Number.isNaN(this.flurryAimAngle)) ? this.flurryAimAngle : (this.gunAngle || this.angle || 0);
 
       this.flurryTimer++;
 
@@ -2073,10 +2229,11 @@ export class GenosFighter extends Fighter {
         });
       }
 
-      // Continuously stop enemy target movement every frame during Machine Gun Blows
+      // Continuously apply heavy movement slow every frame while targets are inside the Machine Gun Blows cone (no stun)
+      const slowMult = CONFIG.genos?.flurrySlowMultiplier ?? 0.15;
+      const slowDuration = CONFIG.genos?.flurrySlowDuration ?? 10;
       for (const target of targetsToScan) {
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        let inCone = false;
         if (dist <= this.r + reach + target.r) {
           const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
           let angleDiff = angleToTarget - aimAngle;
@@ -2084,21 +2241,14 @@ export class GenosFighter extends Fighter {
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
           if (Math.abs(angleDiff) <= halfArc) {
-            inCone = true;
             if (this.flurryHitsLeft > 0) {
-              target.vx = 0;
-              target.vy = 0;
-              target.caughtInGenosFlurry = true;
-              if (target.knockbackVx !== undefined) target.knockbackVx = 0;
-              if (target.knockbackVy !== undefined) target.knockbackVy = 0;
-              if (typeof target.applyTimeStop === 'function') {
-                target.applyTimeStop(10, { isSkill: true });
+              if (typeof target.applySlow === 'function') {
+                target.applySlow(slowDuration, slowMult, { isGenosFlurry: true });
+              } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+                target.statusEffects.applySlow(slowDuration, slowMult, { isGenosFlurry: true });
               }
             }
           }
-        }
-        if (!inCone) {
-          target.caughtInGenosFlurry = false;
         }
       }
 
@@ -2106,7 +2256,7 @@ export class GenosFighter extends Fighter {
         this.triggerPunchAnimation();
         this.flurryHitsLeft--;
 
-        const isFinalHit = this.flurryHitsLeft === 0;
+        const isFinalHit = this.flurryHitsLeft <= 0;
         let flurryHitAny = false;
 
         for (const target of targetsToScan) {
@@ -2129,13 +2279,18 @@ export class GenosFighter extends Fighter {
               });
 
               if (didDamage !== false) {
+                // Hit-Pause Mechanic: Apply crisp micro hit-stop to target on punch impact (Rule 1.5 Target-only)
+                const hitPauseFrames = isFinalHit 
+                  ? (CONFIG.genos?.flurryFinalHitPauseDuration ?? 10) 
+                  : (CONFIG.genos?.flurryHitPauseDuration ?? 2);
+                if (hitPauseFrames > 0 && typeof target.applyTimeStop === 'function') {
+                  target.applyTimeStop(hitPauseFrames);
+                }
+
                 if (isFinalHit) {
+                  // Final hit: release flurry hold and apply finisher knockback push along aim direction
                   target.caughtInGenosFlurry = false;
-                  // Final hit: apply heavy finisher knockback push & extended hit-pause strictly along cardinal direction
-                  if (typeof target.applyTimeStop === 'function') {
-                    target.applyTimeStop(20, { isSkill: true });
-                  }
-                  const pushForce = 18.0;
+                  const pushForce = CONFIG.genos?.flurryFinisherKnockback || 16.0;
                   const pushVx = Math.cos(aimAngle) * pushForce;
                   const pushVy = Math.sin(aimAngle) * pushForce;
                   if (typeof target.applyKnockback === 'function') {
@@ -2145,14 +2300,12 @@ export class GenosFighter extends Fighter {
                     target.vy += pushVy;
                   }
                 } else {
-                  // Non-final hits: Stop movement & freeze enemy in place so they stay pinned during Machine Gun Blows!
-                  target.vx = 0;
-                  target.vy = 0;
+                  // Non-final hits: continuously apply heavy movement slow and hold target in flurry
                   target.caughtInGenosFlurry = true;
-                  if (target.knockbackVx !== undefined) target.knockbackVx = 0;
-                  if (target.knockbackVy !== undefined) target.knockbackVy = 0;
-                  if (typeof target.applyTimeStop === 'function') {
-                    target.applyTimeStop(12, { isSkill: true });
+                  if (typeof target.applySlow === 'function') {
+                    target.applySlow(slowDuration, slowMult, { isGenosFlurry: true });
+                  } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+                    target.statusEffects.applySlow(slowDuration, slowMult, { isGenosFlurry: true });
                   }
                 }
 
@@ -2178,14 +2331,16 @@ export class GenosFighter extends Fighter {
           }
         }
 
-        // Spawn screen shake, arm wind lines & hand aura ONLY when punches actually connect with a target
-        if (flurryHitAny) {
+        // Always spawn wind speed lines from Genos's fists even if punching air
+        if (typeof spawnPunchWindSpeedLines === 'function') {
+          spawnPunchWindSpeedLines(this.x, this.y, aimAngle, isFinalHit ? 220 : 160, 'orange');
+        }
+
+        // Spawn screen shake & impact feedback when punches connect with a target or on final punch
+        if (flurryHitAny || isFinalHit) {
           this._flurryHitConnectedTimer = 10;
           if (typeof triggerGlobalScreenShake === 'function') {
-            triggerGlobalScreenShake(isFinalHit ? 3.2 : 1.5, isFinalHit ? 16 : 8);
-          }
-          if (typeof spawnPunchWindSpeedLines === 'function') {
-            spawnPunchWindSpeedLines(this.x, this.y, aimAngle, 180, 'orange');
+            triggerGlobalScreenShake(isFinalHit ? 3.2 : (flurryHitAny ? 1.5 : 0.8), isFinalHit ? 16 : 8);
           }
         }
 

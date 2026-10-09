@@ -5,6 +5,7 @@ import { HitImpactSystem } from '../../hitImpactSystem.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
 import { areOnSameTeam as areOnSameTeamByIndex } from '../../../core/teamUtils.js';
 import { isEntityImmuneToGravitationalPull } from '../../../entities/fighter.js';
+import { resolveProjectilePlusObstacleCollision, resolveEntityPlusObstacleCollision } from '../../../systems/arenaObstacleSystem.js';
 
 const areOnSameTeam = (ownerIndex, targetIndex) => areOnSameTeamByIndex(state, ownerIndex, targetIndex);
 
@@ -118,6 +119,7 @@ export class GojoBlueBehavior extends ProjectileBehavior {
             const er = f.r || 25;
             f.x = Math.max(arena.x + er, Math.min(arena.x + arena.width - er, f.x));
             f.y = Math.max(arena.y + er, Math.min(arena.y + arena.height - er, f.y));
+            resolveEntityPlusObstacleCollision(f, arena);
           }
         } else if (p.pulledTargets && p.pulledTargets.has(f)) {
           p.pulledTargets.delete(f);
@@ -222,20 +224,30 @@ export class GojoBlueBehavior extends ProjectileBehavior {
     }
 
     const pr = projectile.r || 15;
-    const hitLeft   = projectile.x - pr <= arena.x;
-    const hitRight  = projectile.x + pr >= arena.x + arena.width;
-    const hitTop    = projectile.y - pr <= arena.y;
-    const hitBottom = projectile.y + pr >= arena.y + arena.height;
+    const obsHit = resolveProjectilePlusObstacleCollision(projectile, arena);
+    let isHittingWall = false;
 
-    const isHittingWall = hitLeft || hitRight || hitTop || hitBottom;
+    if (obsHit) {
+      projectile.x = obsHit.wallX;
+      projectile.y = obsHit.wallY;
+      isHittingWall = true;
+    } else {
+      const hitLeft   = projectile.x - pr <= arena.x;
+      const hitRight  = projectile.x + pr >= arena.x + arena.width;
+      const hitTop    = projectile.y - pr <= arena.y;
+      const hitBottom = projectile.y + pr >= arena.y + arena.height;
+
+      isHittingWall = hitLeft || hitRight || hitTop || hitBottom;
+
+      if (isHittingWall) {
+        if (hitLeft)   { projectile.x = arena.x + pr; }
+        if (hitRight)  { projectile.x = arena.x + arena.width - pr; }
+        if (hitTop)    { projectile.y = arena.y + pr; }
+        if (hitBottom) { projectile.y = arena.y + arena.height - pr; }
+      }
+    }
 
     if (isHittingWall) {
-      // Clamp to wall boundaries
-      if (hitLeft)   { projectile.x = arena.x + pr; }
-      if (hitRight)  { projectile.x = arena.x + arena.width - pr; }
-      if (hitTop)    { projectile.y = arena.y + pr; }
-      if (hitBottom) { projectile.y = arena.y + arena.height - pr; }
-
       // Halt linear travel so it stays pinned to the wall
       projectile.vx = 0;
       projectile.vy = 0;

@@ -51,7 +51,7 @@ export const naoyaConfig = {
 
   // Passive: 24-Frame Palm Touch & Frame Stasis Freeze
   enableFrameFreeze: 1,             // ⚡ Enabled when tantoCooldown is UP
-  frameFreezeChance: 0.35,          // ⚡ Trigger chance (0.0 to 1.0, 35% chance per flurry sequence so it doesn't trigger too frequently)
+  frameFreezeChance: 0.25,          // ⚡ Trigger chance (0.0 to 1.0, 35% chance per flurry sequence so it doesn't trigger too frequently)
   frameFreezeCooldown: 500,         // ⚡ Synced with tantoCooldown
   frameFreezeVulnerability: 0.30,   // +30% bonus True Damage taken while frozen
   maxDisruptionsForStasis: 1,       // Triggers on flurry hit once tantoCooldown is UP
@@ -133,7 +133,7 @@ export const naoyaConfig = {
   // ═══════════════════════════════════════════════════════════
   // OPTION B: VENGEFUL CURSE REBIRTH & AWAKENED JET MECHANICS
   // ═══════════════════════════════════════════════════════════
-  enableCurseRebirth: true,         // ⚡ Master toggle for Vengeful Curse Rebirth upon lethal damage (hp <= 0)
+  enableCurseRebirth: 0,         // ⚡ Master toggle for Vengeful Curse Rebirth upon lethal damage (hp <= 0)
   startInCurseForm: false,          // ⚡ Debug / testing toggle to start battle directly in Curse Form
   curseRebirthHpPercent: 0.50,      // ⚡ Reborn with 50% max HP (95 HP)
   curseWombDurationFrames: 60,      // ⚡ Duration (frames) of Cursed Womb cocoon phase before hatching (~1.0s)
@@ -146,7 +146,7 @@ export const naoyaConfig = {
   curseCarapaceFrontalResist: 0.20, // ⚡ Takes 20% reduced damage from frontal incoming attacks
   
   // Ramjet Mach 3 Gauge
-  enableMachGauge: true,            // ⚡ Mach 3 Overdrive Gauge (0-100%)
+  enableMachGauge: 0,            // ⚡ Mach 3 Overdrive Gauge (0-100%)
   machGaugeRampPerSecond: 12,       // ⚡ Passive gauge charge rate per second while moving
   machGaugePerRicochet: 25,         // ⚡ Gauge bonus on arena wall bounce
   machGaugePerHit: 20,              // ⚡ Gauge bonus when landing melee attacks
@@ -162,7 +162,7 @@ export const naoyaConfig = {
   cursePunchCooldown: 36,
 
   // Awakened Skill 1: Mach 3 Supersonic Ramjet (Chōsoku Ramjet)
-  enableCurseRamjet: true,
+  enableCurseRamjet: 0,
   curseSkill1Cooldown: 390,          // 6.5s (390 frames)
   curseRamjetChargeFrames: 8,       // Spool-up windup
   curseRamjetTravelFrames: 14,      // Supersonic vector thrust
@@ -171,7 +171,7 @@ export const naoyaConfig = {
   curseRamjetWallPinFrames: 60,     // 1.0s wall pin
 
   // Awakened Skill 2: Concussive Air Turbine Inhale & Cannon Burst
-  enableCurseTurbineCannon: true,
+  enableCurseTurbineCannon: 0,
   curseSkill2Cooldown: 480,          // 8.0s (480 frames)
   curseTurbineInhaleRadius: 220,    // Vacuum suction radius
   curseTurbineInhaleDuration: 18,   // Suction frames
@@ -180,7 +180,7 @@ export const naoyaConfig = {
   curseTurbineKnockback: 18,        // Concussive repulsion
 
   // Awakened Ultimate: Domain Expansion — Time Cell Moon Palace (時胞月宮殿 - Tokyū Gesshōkyū)
-  enableCurseDomain: true,
+  enableCurseDomain: 0,
   curseUltCooldown: 1440,            // 24.0s (1440 frames)
   curseDomainDurationFrames: 480,    // 8.0s Domain duration
   curseDomainCellularBleedInterval: 24, // Cellular rupture tick rate (every 24 frames = 0.4s)

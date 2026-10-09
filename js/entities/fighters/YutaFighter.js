@@ -1316,19 +1316,12 @@ export class YutaFighter extends Fighter {
 
     const isDomainAllowed = this.isSkillEnabled(CONFIG.yuta?.enableDomain, true);
     if (isDomainAllowed && !this.isDemoFighter && canActivate && (isFirstTrigger || isSecondTrigger)) {
-      const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-      const hasEnemies = state.fighters.some((f, idx) => {
-        if (!f || f.hp <= 0 || f === this) return false;
-        const eTeam = state.getFighterTeam(idx);
-        return myTeam === null || eTeam === null || myTeam !== eTeam;
-      });
+      const targetEnemy = (opponent && this.hasSpottedEnemy(opponent, arena)) ? opponent : this._findSpottedEnemy();
 
-      if (hasEnemies) {
+      if (targetEnemy) {
         this.domainUseCount++;
         this.hasActivatedDomainAt25Hp = true;
-        if (opponent && !opponent.isDead) {
-          this.aim(opponent);
-        }
+        this.aim(targetEnemy);
         if (this.rika) {
           this.rika.killedInDomain = false;
           this.rika.isDying = false;
@@ -1453,23 +1446,9 @@ export class YutaFighter extends Fighter {
 
     const isBeamAllowed = this.isSkillEnabled(CONFIG.yuta?.enablePureLoveBeam, true);
     if (isBeamAllowed && !this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !isEnemyDomainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive && !isControlledRika) {
-      const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-      const hasEnemies = state.fighters.some((f, idx) => {
-        if (!f || f.hp <= 0 || f === this) return false;
-        const eTeam = state.getFighterTeam(idx);
-        return myTeam === null || eTeam === null || myTeam !== eTeam;
-      });
+      const targetEnemy = (opponent && this.hasSpottedEnemy(opponent, arena)) ? opponent : this._findSpottedEnemy();
 
-      if (hasEnemies) {
-        let targetEnemy = opponent;
-        if (!targetEnemy || targetEnemy.isDead) {
-          const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-          targetEnemy = state.fighters.find((f, idx) => {
-            if (!f || f.hp <= 0 || f === this || f.isDead || f.dead || f.isLawnmower || f.isUntargetable || f.untargetable || f.cannotBeTargeted || f.isTargetable === false || !this.isValidAimTarget(f)) return false;
-            const eTeam = state.getFighterTeam(idx);
-            return myTeam === null || eTeam === null || myTeam !== eTeam;
-          });
-        }
+      if (targetEnemy) {
 
         const oldX = this.x;
         const oldY = this.y;

@@ -2,6 +2,7 @@ import { ProjectileBehavior } from '../ProjectileBehavior.js';
 import { CONFIG } from '../../../core/config.js';
 import { state } from '../../../core/state.js';
 import { spawnImpactFlash, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
+import { isLineOfSightBlockedByObstacle } from '../../../systems/arenaObstacleSystem.js';
 
 export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
   update(p, fighters, system) {
@@ -71,6 +72,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
         }
         if (isControlledRika) isEnemy = true;
         if (!isEnemy) continue;
+        if (isLineOfSightBlockedByObstacle(startX, startY, ent.x, ent.y, state?.arena)) continue;
 
         // Line-to-Circle Collision & Origin Proximity Check
         const cx = ent.x;
@@ -195,7 +197,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
               ent.isChannelingDivineFlame = false;
               ent.divineFlameChargeTimer = 0;
               ent._isFiringDomainFuga = false;
-              const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+              const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
               ent.divineFlameCooldown = ent.domainActive ? (CONFIG.sukuna?.divineFlameDomainCooldown || 210) : Math.round(normalCd * 0.5);
               if (ent.fugaSoundKey && typeof stopLoopingSound === 'function') {
                 stopLoopingSound(ent.fugaSoundKey);

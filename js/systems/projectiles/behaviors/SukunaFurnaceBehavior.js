@@ -1,6 +1,8 @@
 import { ProjectileBehavior } from '../ProjectileBehavior.js';
 import { CONFIG } from '../../../core/config.js';
+import { state } from '../../../core/state.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
+import { resolveProjectilePlusObstacleCollision } from '../../../systems/arenaObstacleSystem.js';
 
 export class SukunaFurnaceBehavior extends ProjectileBehavior {
   /**
@@ -98,8 +100,16 @@ export class SukunaFurnaceBehavior extends ProjectileBehavior {
   }
 
   checkExpire(projectile, system) {
-    const arena = CONFIG.arena;
+    const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
     // Sukuna Furnace Arrow: triggers thermobaric explosion on wall hit or max range expiration
+    const obsHit = resolveProjectilePlusObstacleCollision(projectile, arena);
+    if (obsHit) {
+      if (!projectile.isFrozenByInfinity) {
+        system.triggerThermobaricExplosion(obsHit.wallX, obsHit.wallY, projectile.owner, projectile.damage);
+      }
+      return true;
+    }
+
     if (
       projectile.life <= 0 ||
       projectile.x - projectile.r < arena.x ||

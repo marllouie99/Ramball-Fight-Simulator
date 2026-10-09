@@ -63,7 +63,8 @@ export function resetCamera(immediate = false) {
   const centerX = arena.x + arena.width / 2;
   const centerY = arena.y + arena.height / 2;
   const isGrandBattle = isGrandBattleActive();
-  const defaultZoom = isGrandBattle ? 0.36 : 1.0;
+  const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+  const defaultZoom = isGrandBattle ? (isFfaArena ? 0.58 : 0.36) : 1.0;
 
   if (!state.camera) {
     state.camera = initCameraState();
@@ -151,7 +152,8 @@ export function updateCamera() {
 
   if (!isCombatActive) {
     const isGrand = isGrandBattleActive();
-    const defaultZoom = isGrand ? 0.36 : 1.0;
+    const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+    const defaultZoom = isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0;
     camera.targetX = arenaCenterX;
     camera.targetY = arenaCenterY;
     camera.targetZoom = defaultZoom;
@@ -346,9 +348,10 @@ export function updateCamera() {
 
     if (!camera.enabled || camera.mode === 'fixed' || state.gameState === 'countdown') {
       const isGrand = isGrandBattleActive();
+      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
-      camera.targetZoom = isGrand ? 0.36 : 1.0;
+      camera.targetZoom = isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0;
     } else if (aliveFighters.length >= 2) {
       // Compute full bounding envelope across all active combatants
       let minX = Infinity;
@@ -423,10 +426,11 @@ export function updateCamera() {
       const screenW = state.canvas ? state.canvas.width : 540;
       const screenH = state.canvas ? state.canvas.height : 960;
       const isGrand = isGrandBattleActive();
-      const safeW = isGrand ? (screenW - 40) : (screenW - 90);
+      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+      const safeW = isGrand ? (isFfaArena ? (screenW - 390) : (screenW - 40)) : (screenW - 90);
       const safeH = isGrand ? (screenH - 50) : Math.min(screenH - 120, 640);
-      const padX = isGrand ? 100 : 60;
-      const padY = isGrand ? 100 : 60;
+      const padX = isGrand ? (isFfaArena ? 80 : 100) : 60;
+      const padY = isGrand ? (isFfaArena ? 80 : 100) : 60;
 
       const fitZoomX = safeW / (spanX + padX);
       const fitZoomY = safeH / (spanY + padY);
@@ -434,9 +438,9 @@ export function updateCamera() {
 
       // Distance curve mapping (Smooth Hermite from close melee to wide spread)
       const minD = camCfg.minDist ?? 70;
-      const maxD = isGrand ? 1900 : (camCfg.maxDist ?? 520);
-      const effectiveMinZ = isGrand ? 0.28 : minZ;
-      const effectiveMaxZ = isGrand ? 0.70 : maxZ;
+      const maxD = isGrand ? (isFfaArena ? 1100 : 1900) : (camCfg.maxDist ?? 520);
+      const effectiveMinZ = isGrand ? (isFfaArena ? 0.52 : 0.28) : minZ;
+      const effectiveMaxZ = isGrand ? (isFfaArena ? 0.64 : 0.70) : maxZ;
       const normDist = Math.max(0, Math.min(1, (diagDist - minD) / (maxD - minD)));
       const smoothT = normDist * normDist * (3 - 2 * normDist);
       const distanceZoom = effectiveMaxZ - smoothT * (effectiveMaxZ - effectiveMinZ);
@@ -444,7 +448,7 @@ export function updateCamera() {
       // Blend: dynamic smooth distance zoom constrained by envelope viewport fit
       const calculatedZoom = Math.min(distanceZoom, envelopeFit);
       const safeTargetZoom = Math.max(effectiveMinZ, Math.min(effectiveMaxZ, calculatedZoom));
-      camera.targetZoom = Number.isFinite(safeTargetZoom) ? safeTargetZoom : (isGrand ? 0.36 : 1.0);
+      camera.targetZoom = Number.isFinite(safeTargetZoom) ? safeTargetZoom : (isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0);
 
       // Smoothly pan camera to track combat centroid
       const safeMidX = Number.isFinite(midX) ? midX : arenaCenterX;
@@ -455,18 +459,44 @@ export function updateCamera() {
     } else if (aliveFighters.length === 1) {
       // Winner focus during victory or solo stance
       const isGrand = isGrandBattleActive();
+      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
       const winner = aliveFighters[0];
-      const winX = Number.isFinite(winner.x) ? winner.x : arenaCenterX;
-      const winY = Number.isFinite(winner.y) ? (winner.y - (winner.z ? winner.z * 0.35 : 0)) : arenaCenterY;
 
-      camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
-      camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));
-      camera.targetZoom = isGrand ? (camCfg.winnerZoom ?? 0.55) : (camCfg.winnerZoom ?? 1.10);
+      // Delay camera focus transition to Makima if enemy died from Crucifixion
+      const isMakimaCrucifixHold = Boolean(
+        winner &&
+        (winner.characterId === 'makima' || winner.type === 'makima' || winner.name === 'Makima') &&
+        (winner.isExecutingCrucifixion || ((winner.crucifixionKillCameraHoldTimer || 0) > 0))
+      );
+
+      if (isMakimaCrucifixHold) {
+        const holdX = (typeof winner.crucifixionHoldCamX === 'number' && Number.isFinite(winner.crucifixionHoldCamX))
+          ? winner.crucifixionHoldCamX
+          : ((winner.x + (winner.crucifixionImpactX ?? winner.x)) / 2);
+        const holdY = (typeof winner.crucifixionHoldCamY === 'number' && Number.isFinite(winner.crucifixionHoldCamY))
+          ? winner.crucifixionHoldCamY
+          : ((winner.y + (winner.crucifixionImpactY ?? winner.y)) / 2);
+        const holdZoom = (typeof winner.crucifixionHoldCamZoom === 'number' && Number.isFinite(winner.crucifixionHoldCamZoom))
+          ? winner.crucifixionHoldCamZoom
+          : (isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0);
+
+        camera.targetX = Math.max(minCamX, Math.min(maxCamX, holdX));
+        camera.targetY = Math.max(minCamY, Math.min(maxCamY, holdY));
+        camera.targetZoom = holdZoom;
+      } else {
+        const winX = Number.isFinite(winner.x) ? winner.x : arenaCenterX;
+        const winY = Number.isFinite(winner.y) ? (winner.y - (winner.z ? winner.z * 0.35 : 0)) : arenaCenterY;
+
+        camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
+        camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));
+        camera.targetZoom = isGrand ? (isFfaArena ? 0.65 : (camCfg.winnerZoom ?? 0.55)) : (camCfg.winnerZoom ?? 1.10);
+      }
     } else {
       const isGrand = isGrandBattleActive();
+      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
-      camera.targetZoom = isGrand ? 0.36 : 1.0;
+      camera.targetZoom = isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0;
     }
   }
 

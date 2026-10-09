@@ -45,13 +45,6 @@ export const DOLL_METADATA = {
     drawH: 155,
     facingRight: false,
   },
-  sukuna: {
-    src: 'Assets/model/sukuna/SUKUNA.png',
-    type: 'static',
-    drawW: 155,
-    drawH: 155,
-    facingRight: false,
-  },
   yuji: {
     src: 'Assets/model/yuji/Yuji-SKIN.png',
     type: 'static',

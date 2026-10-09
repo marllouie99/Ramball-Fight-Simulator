@@ -246,7 +246,8 @@ export class StatusEffectsManager {
 
       if (this.fighter.bleedDamageTimer >= intervalFrames) {
         if (typeof this.fighter.takeDamage === 'function') {
-          this.fighter.takeDamage(damage, this.fighter.lastBleedAttacker, true, { isBleed: true });
+          this.fighter.takeDamage(damage, this.fighter.lastBleedAttacker, { isBleed: true, knockback: false });
+
         }
         this.fighter.bleedDamageTimer = 0;
       }

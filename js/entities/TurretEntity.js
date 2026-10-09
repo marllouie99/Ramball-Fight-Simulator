@@ -1,7 +1,8 @@
 import { Fighter } from './fighter.js';
 import { CONFIG } from '../core/config.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
-import { spawnFloatingText, state } from '../core/state.js';
+import { spawnFloatingText, state, triggerGlobalScreenShake } from '../core/state.js';
+import { isLineOfSightBlockedByObstacle } from '../systems/arenaObstacleSystem.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
@@ -116,13 +117,14 @@ export class TurretEntity extends Fighter {
     // Invulnerable while still being built
     if (this.isBuilding) return false;
     // Turrets are immune to poison damage
-    if (opts.isPoison) return false;
+    if (opts && opts.isPoison) return false;
 
-    if (opts) {
-      opts.knockback = false;
-      opts.knockbackVx = 0;
-      opts.knockbackVy = 0;
-    }
+    // Normalize opts: callers may pass a bare boolean (e.g. true) instead of an object.
+    // Assigning properties to a primitive throws a TypeError, so always wrap it.
+    if (!opts || typeof opts !== 'object') opts = {};
+    opts.knockback = false;
+    opts.knockbackVx = 0;
+    opts.knockbackVy = 0;
 
     const applied = super.takeDamage(amount, attacker, opts);
     this.vx = 0;
@@ -271,6 +273,7 @@ export class TurretEntity extends Fighter {
 
         // Skip stealthed & vanished targets
         if (f.invincibilityTimer > 0 || f.flashStepTimer > 0 || f.isStealthed || (f.vanishTimer && f.vanishTimer > 0)) return;
+        if (state.arena && isLineOfSightBlockedByObstacle(this.x, this.y, f.x, f.y, state.arena)) return;
 
         let fOwnerIndex = -1;
         if (f.owner && state.fighters.includes(f.owner)) {

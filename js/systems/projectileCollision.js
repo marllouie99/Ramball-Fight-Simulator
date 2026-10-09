@@ -1,3 +1,5 @@
+import { checkRayIntersectsPlusObstacle } from './arenaObstacleSystem.js';
+
 export function getSweptProjectileCollision(projectile, fighter, config, isFuga) {
   const isTactical = projectile.visual === 'tacticalBullet';
   const projRadius = isFuga
@@ -20,10 +22,11 @@ export function getSweptProjectileCollision(projectile, fighter, config, isFuga)
   let distSq;
   let closestX = projectile.x;
   let closestY = projectile.y;
+  let tHit = 1;
   if (segLenSq > 0.001) {
-    const t = Math.max(0, Math.min(1, ((fighter.x - prevX) * segVx + (fighter.y - prevY) * segVy) / segLenSq));
-    closestX = prevX + t * segVx;
-    closestY = prevY + t * segVy;
+    tHit = Math.max(0, Math.min(1, ((fighter.x - prevX) * segVx + (fighter.y - prevY) * segVy) / segLenSq));
+    closestX = prevX + tHit * segVx;
+    closestY = prevY + tHit * segVy;
     const cdx = fighter.x - closestX;
     const cdy = fighter.y - closestY;
     distSq = cdx * cdx + cdy * cdy;
@@ -31,6 +34,12 @@ export function getSweptProjectileCollision(projectile, fighter, config, isFuga)
     const dx = fighter.x - projectile.x;
     const dy = fighter.y - projectile.y;
     distSq = dx * dx + dy * dy;
+  }
+
+  // If the path from (prevX, prevY) to closest hit point crosses an arena obstacle wall, block the hit!
+  const wallHit = checkRayIntersectsPlusObstacle(prevX, prevY, closestX, closestY, null, projRadius);
+  if (wallHit && wallHit.hit && wallHit.t < 0.999) {
+    return null; // Wall intercepted the projectile before reaching the fighter!
   }
 
   const hitRadiusSq = hitRadius * hitRadius;

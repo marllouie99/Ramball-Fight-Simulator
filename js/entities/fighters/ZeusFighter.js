@@ -64,6 +64,7 @@ export class ZeusFighter extends Fighter {
         durationKey: 'stormTimer',
         durationMax: () => CONFIG.zeus.stormDuration,
         activeKey: 'stormActive',
+        canTickInFreeze: true,
         onExpire: (fighter) => {
           fighter.stormActive = false;
           fighter.isChargingStorm = false;
@@ -72,6 +73,28 @@ export class ZeusFighter extends Fighter {
     }
 
     this.skillManager.registerSkills(skills);
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    const isDead = (this.hp !== undefined && this.hp <= 0) || this.isDead || this.dead;
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    const shouldPreserveStorm = !isDead && !isMatchEnded && (this.stormActive || this.isChargingStorm);
+    
+    const savedStormActive = this.stormActive;
+    const savedStormTimer = this.stormTimer;
+    const savedStormLastStrikeTimer = this.stormLastStrikeTimer;
+    const savedIsChargingStorm = this.isChargingStorm;
+    const savedStormCooldown = this.stormCooldown;
+
+    super.interruptAttacks(forceCancelAll);
+
+    if (shouldPreserveStorm) {
+      this.stormActive = savedStormActive;
+      this.stormTimer = savedStormTimer;
+      this.stormLastStrikeTimer = savedStormLastStrikeTimer;
+      this.isChargingStorm = savedIsChargingStorm;
+      this.stormCooldown = savedStormCooldown;
+    }
   }
 
   reset() {
@@ -186,13 +209,9 @@ export class ZeusFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
-      return;
-    }
-    
-    if (this.aegisCooldown > 0) this.aegisCooldown--;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+
+    // Tick storm cooldown and charging state before freeze check so charging/casting cannot be frozen/stuck
     if (this.stormCooldown > 0) {
       this.stormCooldown--;
       
@@ -222,20 +241,31 @@ export class ZeusFighter extends Fighter {
     // If charging, the clouds billow and flash wildly
     this.auraPhase += this.isChargingStorm ? 0.45 : 0.15;
     
-    // Ultimate check (gated by master toggle)
-    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    // Ultimate check (gated by master toggle): Activate storm once charging completes
     if (this.isSkillEnabled(cfg.enableThunderStorm, true) && this.stormCooldown <= 0 && !this.stormActive && opponent) {
       this._activateStorm();
     }
     
+    // Process active Divine Thunder Storm strikes continuously (Rule 25: Map-wide ultimate persists and strikes even while Zeus or enemies are stunned/frozen)
     if (this.stormActive) {
       this.stormTimer--;
       this._processStorm();
       if (this.stormTimer <= 0) {
         this.stormActive = false;
-        this.resumeMovement(opponent);
+        if (opponent) {
+          this.resumeMovement(opponent);
+        }
       }
     }
+
+    // Mandatory Rule 1 Freeze & TimeStop Guard: CC freezes Zeus's movement/actions, but active storm in the sky continues striking
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return;
+    }
+    
+    if (this.aegisCooldown > 0) this.aegisCooldown--;
 
     // Immobilize, face front toward player/camera (0), and stop shooting during ultimate cast
     if (this.isChargingStorm || this.stormActive) {
@@ -299,19 +329,21 @@ export class ZeusFighter extends Fighter {
   
   _processStorm() {
     // Strike periodically based on strikes per second
-    this.stormLastStrikeTimer++;
-    const interval = Math.floor(60 / (CONFIG.zeus?.stormStrikesPerSec ?? 3));
+    this.stormLastStrikeTimer = (this.stormLastStrikeTimer || 0) + 1;
+    const strikesPerSec = (CONFIG.zeus?.stormStrikesPerSec ?? 3);
+    const interval = Math.max(1, Math.floor(60 / strikesPerSec));
     
     if (this.stormLastStrikeTimer >= interval) {
       this.stormLastStrikeTimer = 0;
       
       // Hit all living enemies
       if (state && state.fighters) {
-        const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+        const myIdx = state.fighters.indexOf(this);
+        const myTeam = state.getFighterTeam ? state.getFighterTeam(myIdx >= 0 ? myIdx : 0) : (this.team !== undefined ? this.team : null);
 
         state.fighters.forEach((f, idx) => {
-          if (f && f !== this && f.hp > 0) {
-            const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+          if (f && f !== this && f.hp > 0 && !f.isDead && !f.dead) {
+            const isEnemy = myTeam === null || (state.getFighterTeam ? state.getFighterTeam(idx) !== myTeam : f.team !== this.team);
             if (isEnemy) {
               this._strikeEnemyWithStorm(f);
             }
@@ -321,8 +353,8 @@ export class ZeusFighter extends Fighter {
         // Also hit illusions
         if (state.illusions) {
           state.illusions.forEach(ill => {
-            if (ill && ill.hp > 0 && ill.owner !== this) {
-              const illOwnerTeam = state.getFighterTeam(state.fighters.indexOf(ill.owner));
+            if (ill && ill.hp > 0 && !ill.isDead && !ill.dead && ill.owner !== this) {
+              const illOwnerTeam = (state.getFighterTeam && ill.owner) ? state.getFighterTeam(state.fighters.indexOf(ill.owner)) : null;
               const isEnemy = myTeam === null || illOwnerTeam !== myTeam;
               if (isEnemy) {
                  this._strikeEnemyWithStorm(ill);
@@ -335,13 +367,15 @@ export class ZeusFighter extends Fighter {
   }
   
   _strikeEnemyWithStorm(target) {
+    if (!target || target.hp <= 0 || target.isDead || target.dead) return;
+
     // Calculate damage based on static debuff
     let damage = CONFIG.zeus?.stormStrikeDamage ?? 20;
     if (target.staticDebuffTimer > 0) {
       damage *= (CONFIG.zeus?.staticDamageBonus ?? 1.33);
     }
     
-    target.takeDamage(damage, this, { isStorm: true });
+    target.takeDamage(damage, this, { isStorm: true, isUltimate: true });
     
     // Apply static and paralyze
     target.staticDebuffTimer = CONFIG.zeus?.staticDuration ?? 100;

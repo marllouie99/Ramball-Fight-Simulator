@@ -159,6 +159,10 @@ export class JohnWickFighter extends Fighter {
     this.recoilOffset = 0;
     this.flashTimer = 0;
     this.casingTimer = 0;
+    if (this.cqcComboTarget) {
+      this.cqcComboTarget.isTargetOfAmbush = false;
+      this.cqcComboTarget.caughtInJohnWickCombo = false;
+    }
     this.cqcComboPhase = null;
     this.cqcComboTarget = null;
     this.outOfAmmoRollDelayTimer = 0;
@@ -328,8 +332,19 @@ export class JohnWickFighter extends Fighter {
     const clampToArena = (ent) => {
       if (!arenaObj || !ent) return;
       const tr = ent.r || 20;
-      ent.x = Math.max(arenaObj.x + tr, Math.min(arenaObj.x + arenaObj.width - tr, ent.x));
-      ent.y = Math.max(arenaObj.y + tr, Math.min(arenaObj.y + arenaObj.height - tr, ent.y));
+      if (arenaObj.shape === 'circle') {
+        const cx = arenaObj.x + arenaObj.width / 2;
+        const cy = arenaObj.y + arenaObj.height / 2;
+        const maxR = (arenaObj.radius || (arenaObj.width / 2)) - tr;
+        const dist = Math.hypot(ent.x - cx, ent.y - cy);
+        if (dist > maxR && dist > 0.001) {
+          ent.x = cx + ((ent.x - cx) / dist) * maxR;
+          ent.y = cy + ((ent.y - cy) / dist) * maxR;
+        }
+      } else {
+        ent.x = Math.max(arenaObj.x + tr, Math.min(arenaObj.x + arenaObj.width - tr, ent.x));
+        ent.y = Math.max(arenaObj.y + tr, Math.min(arenaObj.y + arenaObj.height - tr, ent.y));
+      }
     };
 
     if (this.cqcComboPhase === 'FORWARD_ROLL') {
@@ -413,13 +428,23 @@ export class JohnWickFighter extends Fighter {
           this.gunAngle = castAngle;
           this.angle = castAngle;
 
-          // Hold target velocity during grab initiation to prevent jitter/push
+          // Hold target in assassination grab stasis
           if (target && target.hp > 0) {
+            target.caughtInJohnWickCombo = true;
+            target.isTargetOfAmbush = true;
             target.vx = 0;
             target.vy = 0;
             target.knockbackVx = 0;
             target.knockbackVy = 0;
             if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
+
+            // Calibrate spacing so target is aligned directly in front of Wick
+            const idealDist = this.r + (target.r || 25) + 4;
+            target.x = this.x + Math.cos(castAngle) * idealDist;
+            target.y = this.y + Math.sin(castAngle) * idealDist;
+
+            clampToArena(target);
+            clampToArena(this);
           }
         }
       } else {
@@ -442,15 +467,29 @@ export class JohnWickFighter extends Fighter {
       const thrustRatio = Math.min(0.95, (windupF + thrustF) / pencilDur);
 
       if (target && target.hp > 0) {
-        // Hold target steady during windup grab before impact
+        // Hold target steady in grab stasis before impact
         if (progress < thrustRatio) {
+          target.caughtInJohnWickCombo = true;
+          target.isTargetOfAmbush = true;
           target.vx = 0;
           target.vy = 0;
+          target.knockbackVx = 0;
+          target.knockbackVy = 0;
+
+          // Align target directly in front of Wick
+          const idealDist = this.r + (target.r || 25) + 4;
+          const castAngle = (this.pencilCastAngle !== undefined) ? this.pencilCastAngle : this.gunAngle;
+          target.x = this.x + Math.cos(castAngle) * idealDist;
+          target.y = this.y + Math.sin(castAngle) * idealDist;
+          clampToArena(target);
+          clampToArena(this);
         }
 
         // Forward thrust connects at full linear extension (tip impact instant — EXACT MOMENT HE STABS!)
         if (progress >= thrustRatio && !this._pencilDamageDealt) {
           this._pencilDamageDealt = true;
+          target.caughtInJohnWickCombo = false;
+          target.isTargetOfAmbush = false;
 
           // CANCEL / INTERRUPT target attacks only when the stab lands!
           if (typeof target.interruptAttacks === 'function') {
@@ -790,7 +829,7 @@ export class JohnWickFighter extends Fighter {
     if (state.fighters) {
       for (const f of state.fighters) {
         const isFReforming = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving));
-        if (f && f !== this && (f.hp > 0 || isFReforming) && !this.isTeammate(f)) {
+        if (f && f !== this && (f.hp > 0 || isFReforming) && !this.isTeammate(f) && this.hasSpottedEnemy(f)) {
           const d = Math.hypot(f.x - this.x, f.y - this.y);
           if (d <= closestDist) {
             closest = f;
@@ -802,7 +841,7 @@ export class JohnWickFighter extends Fighter {
     if (state.illusions) {
       const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
       for (const ill of state.illusions) {
-        if (ill && ill.hp > 0 && ill.owner !== myIdx && !this.isTeammate(ill.owner)) {
+        if (ill && ill.hp > 0 && ill.owner !== myIdx && !this.isTeammate(ill.owner) && this.hasSpottedEnemy(ill)) {
           const d = Math.hypot(ill.x - this.x, ill.y - this.y);
           if (d <= closestDist) {
             closest = ill;

@@ -45,16 +45,16 @@ export const zeusConfig = {
 
   // ── Debuff & Stun Progressive Mechanics ──
   enableStunDebuffs: true,     // Master toggle for progressive stun & debuff system
-  baseStunChance: 0.10,        // Starting stun chance (10%)
-  stunChanceIncrease: 0.05,    // +5% stun chance added per landed hit (tuned from +10%)
+  baseStunChance: 0.0,        // Starting stun chance (10%)
+  stunChanceIncrease: 0.00,    // +5% stun chance added per landed hit (tuned from +10%)
   maxStunChance: 0.00,         // Maximum stun chance cap (50%, tuned from 80%)
-  stunChance: 0.10,            // Initial fallback stun chance
+  stunChance: 0.00,            // Initial fallback stun chance
   stunDuration: 50,            // Duration in frames (~0.4s) target is stunned on electric hit
-  paralyzeChance: 0.10,        // 25% chance to apply paralyze slow
-  paralyzeDuration: 50,        // Duration in frames (~0.83s) of paralyze slow
+  paralyzeChance: 0.00,        // 25% chance to apply paralyze slow
+  paralyzeDuration: 0,        // Duration in frames (~0.83s) of paralyze slow
   paralyzeSlowMultiplier: 0.5, // Movement speed multiplier while paralyzed (50% speed)
-  staticChance: 0.10,          // 40% chance to afflict target with Static debuff
-  staticDuration: 100,         // Duration in frames (~1.67s) static lasts
+  staticChance: 0.0,          // 40% chance to afflict target with Static debuff
+  staticDuration: 0,         // Duration in frames (~1.67s) static lasts
   staticDamageBonus: 1.33,     // 33% extra damage to static targets (tuned down from 1.50)
   electricVisualDuration: 45,  // Duration in frames (~0.75s) electric shock overlay persists on target
 

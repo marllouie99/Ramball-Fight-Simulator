@@ -136,7 +136,9 @@ export class GojoFighter extends Fighter {
         type: 'active',
         cooldownKey: 'reverseCursedTechniqueCooldown',
         cooldownMax: () => CONFIG.gojo?.reverseCursedTechniqueCooldown || 700,
-        channelingKey: 'isChannelingRCT'
+        channelingKey: 'isChannelingRCT',
+        canTickCooldownInFreeze: true,
+        bypassParalyze: true
       });
     }
     if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true)) {
@@ -151,6 +153,7 @@ export class GojoFighter extends Fighter {
         activeKey: 'domainActive',
         channelingKey: 'isChannelingDomainExpansion',
         channelTimerKey: 'domainChargeTimer',
+        canTickCooldownInFreeze: true,
         onExpire: (fighter) => {
           fighter.domainActive = false;
         }
@@ -883,9 +886,6 @@ export class GojoFighter extends Fighter {
       if (typeof this.interruptAttacks === 'function') {
         this.interruptAttacks(true);
       }
-      if (this.domainCooldown > 0) this.domainCooldown--;
-      if (this.purpleCooldown > 0) this.purpleCooldown--;
-      if (this.redCooldown > 0) this.redCooldown--;
       if (this.teleportDodgeCooldown > 0) this.teleportDodgeCooldown--;
       return;
     }
@@ -961,19 +961,7 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    // ── UNLIMITED VOID: DOMAIN COOLDOWN & PROGRESSION EXCEPTION ──
-    // Unlimited Void domainCooldown MUST ALWAYS tick down every frame,
-    // even if Gojo is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
-    if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) {
-      this.domainCooldown--;
-    }
-
-    // Reverse Cursed Technique Cooldown Exception: reverseCursedTechniqueCooldown MUST ALWAYS tick down every frame,
-    // even if Gojo is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Beams / Stun!
-    if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) {
-      this.reverseCursedTechniqueCooldown--;
-    }
-
+    // Unlimited Void and Reverse Cursed Technique cooldowns are managed by SkillManager (1x decay rate)
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
@@ -1344,12 +1332,10 @@ export class GojoFighter extends Fighter {
       this.restoreInfinityBarrier();
     }
 
-    // Decrement skill cooldowns (Red, Purple, RCT, Blue, Domain, Melee) when not afflicted with paralyze debuff
-    // Skill CDs are FROZEN while Gojo's Domain Expansion (Unlimited Void) is active
+    // Decrement non-SkillManager mobility/utility cooldowns when not afflicted with paralyze debuff
+    // Note: SkillManager handles red, purple, rct, domain, and infinity cooldowns cleanly at canonical 1x rate
     if (!this.isParalyzedDebuffActive() && !this.domainActive) {
       if (this.cooldown > 0) this.cooldown--;
-      if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
-      if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
       if (this.healingAuraTimer > 0) this.healingAuraTimer--;
       if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
       if (this.teleportDodgeCooldown > 0) this.teleportDodgeCooldown--;
@@ -1483,7 +1469,7 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    const validDomainOpponent = (opponent && this._isValidCombatTarget(opponent)) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
+    const validDomainOpponent = (opponent && this._isValidCombatTarget(opponent) && this.hasSpottedEnemy(opponent, arena)) || (typeof this._findSpottedEnemy === 'function' ? this._findSpottedEnemy() : null);
     if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && validDomainOpponent && !validDomainOpponent.isDead) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
@@ -2116,57 +2102,8 @@ export class GojoFighter extends Fighter {
   /**
    * Universal helper: Finds the closest valid living enemy combatant.
    */
-  _findClosestEnemy(preferredOpponent = null) {
-    if (preferredOpponent && preferredOpponent !== this && this._isValidCombatTarget(preferredOpponent)) {
-      const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0) : (this.team !== undefined ? this.team : null);
-      if (myTeam === null || (state.getFighterTeam && preferredOpponent.fighterIndex !== undefined ? state.getFighterTeam(preferredOpponent.fighterIndex) !== myTeam : preferredOpponent.team !== myTeam)) {
-        return preferredOpponent;
-      }
-    }
-
-    let closest = null;
-    let minDist = Infinity;
-    const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0) : (this.team !== undefined ? this.team : null);
-
-    if (state.fighters) {
-      for (let i = 0; i < state.fighters.length; i++) {
-        const f = state.fighters[i];
-        if (f && f !== this && this._isValidCombatTarget(f)) {
-          const isEnemy = myTeam === null || (state.getFighterTeam ? state.getFighterTeam(i) !== myTeam : f.team !== this.team);
-          if (isEnemy) {
-            const d = Math.hypot((f.x || 0) - this.x, (f.y || 0) - this.y);
-            if (d < minDist) {
-              minDist = d;
-              closest = f;
-            }
-          }
-        }
-      }
-    }
-
-    if (state.illusions) {
-      for (let i = 0; i < state.illusions.length; i++) {
-        const ill = state.illusions[i];
-        if (ill && this._isValidCombatTarget(ill) && (ill.vanishTimer || 0) <= 0) {
-          let isEnemy = true;
-          if (myTeam !== null && ill.owner) {
-            const ownerIdx = state.fighters ? state.fighters.indexOf(ill.owner) : -1;
-            if (ownerIdx !== -1 && state.getFighterTeam) {
-              isEnemy = state.getFighterTeam(ownerIdx) !== myTeam;
-            }
-          }
-          if (isEnemy) {
-            const d = Math.hypot((ill.x || 0) - this.x, (ill.y || 0) - this.y);
-            if (d < minDist) {
-              minDist = d;
-              closest = ill;
-            }
-          }
-        }
-      }
-    }
-
-    return closest;
+  _findClosestEnemy(preferredOpponent = null, requireLOS = false) {
+    return super._findClosestEnemy(preferredOpponent, requireLOS);
   }
 
   _teleportToDomainAngle(opponent, arena) {
@@ -3102,7 +3039,7 @@ export class GojoFighter extends Fighter {
       let bestDist = Infinity;
 
       for (const ent of list) {
-        if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
+        if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable || !this.hasSpottedEnemy(ent)) continue;
         if (ent.vanishTimer && ent.vanishTimer > 0) continue;
         if (ent.owner === this) continue;
         if (myTeam !== null && myTeam !== undefined) {
@@ -3194,7 +3131,7 @@ export class GojoFighter extends Fighter {
       let bestDist = Infinity;
 
       for (const ent of list) {
-        if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable) continue;
+        if (!ent || ent === this || !this._isValidCombatTarget(ent) || ent.isInvulnerable || !this.hasSpottedEnemy(ent)) continue;
         if (ent.vanishTimer && ent.vanishTimer > 0) continue;
         if (ent.owner === this) continue;
         if (myTeam !== null && myTeam !== undefined) {

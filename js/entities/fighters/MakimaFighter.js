@@ -128,6 +128,13 @@ export class MakimaFighter extends Fighter {
     this.crucifixionWhiteFlashTimer = 0;
     this.crucifixionShockwaves = [];
     this.crucifixionShatteredLinks = [];
+    this.crucifixionKilledTarget = false;
+    this.crucifixionKillCameraHoldTimer = 0;
+    this.crucifixionImpactX = null;
+    this.crucifixionImpactY = null;
+    this.crucifixionHoldCamX = null;
+    this.crucifixionHoldCamY = null;
+    this.crucifixionHoldCamZoom = 1.0;
     // Backwards compatibility aliases:
     this.isExecutingRitual = false;
     this.ritualTimer = 0;
@@ -274,6 +281,13 @@ export class MakimaFighter extends Fighter {
     this.crucifixionWhiteFlashTimer = 0;
     this.crucifixionShockwaves = [];
     this.crucifixionShatteredLinks = [];
+    this.crucifixionKilledTarget = false;
+    this.crucifixionKillCameraHoldTimer = 0;
+    this.crucifixionImpactX = null;
+    this.crucifixionImpactY = null;
+    this.crucifixionHoldCamX = null;
+    this.crucifixionHoldCamY = null;
+    this.crucifixionHoldCamZoom = 1.0;
     this.isExecutingRitual = false;
     this.ritualTimer = 0;
     this.ritualTarget = null;
@@ -443,6 +457,11 @@ export class MakimaFighter extends Fighter {
    */
   update(opponent, fi, arena) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
+
+    // 0. Hold timers and visual effect lifecycles (Rule 25)
+    if (this.crucifixionKillCameraHoldTimer > 0) {
+      this.crucifixionKillCameraHoldTimer--;
+    }
 
     // ── 1. CITIZEN CONTRACT SHATTER & REASSEMBLY STASIS HANDLING ──
     if (this.isRevivingFromContract || this.isShatterReviving) {
@@ -720,8 +739,14 @@ export class MakimaFighter extends Fighter {
    * Acquires the nearest valid enemy entity (Fighters & Illusions per Rule 6).
    */
   _acquirePrimaryTarget(fallbackOpponent) {
-    let bestTarget = fallbackOpponent;
-    let bestDist = fallbackOpponent ? Math.hypot(fallbackOpponent.x - this.x, fallbackOpponent.y - this.y) : Infinity;
+    if (fallbackOpponent && !fallbackOpponent.isDead && fallbackOpponent.hp > 0 && this.hasSpottedEnemy(fallbackOpponent)) {
+      return fallbackOpponent;
+    }
+
+    let bestTarget = null;
+    let bestDist = Infinity;
+    let fallbackTarget = fallbackOpponent || null;
+    let fallbackDist = fallbackOpponent ? Math.hypot(fallbackOpponent.x - this.x, fallbackOpponent.y - this.y) : Infinity;
 
     const allEntities = [];
     if (state.fighters) allEntities.push(...state.fighters);
@@ -739,12 +764,17 @@ export class MakimaFighter extends Fighter {
         if (myTeam !== null && myTeam !== undefined && otherTeam !== null && otherTeam !== undefined && myTeam === otherTeam) continue;
       }
       const d = Math.hypot(e.x - this.x, e.y - this.y);
-      if (d < bestDist) {
-        bestDist = d;
-        bestTarget = e;
+      if (this.hasSpottedEnemy(e)) {
+        if (d < bestDist) {
+          bestDist = d;
+          bestTarget = e;
+        }
+      } else if (d < fallbackDist) {
+        fallbackDist = d;
+        fallbackTarget = e;
       }
     }
-    return bestTarget;
+    return bestTarget || fallbackTarget;
   }
 
   /**
@@ -1853,6 +1883,13 @@ export class MakimaFighter extends Fighter {
     this.crucifixionWhiteFlashTimer = 0;
     this.crucifixionShockwaves = [];
     this.crucifixionShatteredLinks = [];
+    this.crucifixionKilledTarget = false;
+    this.crucifixionKillCameraHoldTimer = 0;
+    this.crucifixionImpactX = target ? target.x : (this.x + 200);
+    this.crucifixionImpactY = target ? target.y : this.y;
+    this.crucifixionHoldCamX = (this.x + this.crucifixionImpactX) / 2;
+    this.crucifixionHoldCamY = (this.y + this.crucifixionImpactY) / 2;
+    this.crucifixionHoldCamZoom = 1.0;
     this.vx = 0;
     this.vy = 0;
     this.gunAngle = 0;
@@ -2047,12 +2084,34 @@ export class MakimaFighter extends Fighter {
         applyDamageToTarget(t, totalDmg, this, 'true');
 
         const execThreshold = cfg.crucifixionExecuteThreshold ?? cfg.shrineExecuteThreshold ?? 0.25;
-        if (t.hp <= 0 || t.hp <= maxHp * execThreshold) {
+        if (t.hp <= 0 || t.isDead || t.hp <= maxHp * execThreshold) {
           t.hp = 0;
           t.isDead = true;
+          this.crucifixionKilledTarget = true;
+          const holdFrames = (typeof cfg.crucifixionKillCameraHoldFrames === 'number')
+            ? cfg.crucifixionKillCameraHoldFrames
+            : 70;
+          this.crucifixionKillCameraHoldTimer = holdFrames;
+          this.crucifixionHoldCamX = (this.x + tx) / 2;
+          this.crucifixionHoldCamY = (this.y + ty) / 2;
+          this.crucifixionHoldCamZoom = 1.0;
           spawnFloatingText(t.x, t.y - 42, 'OBLITERATED', '#880000');
         }
       }
+    }
+
+    // Check if target died at any point during active crucifixion
+    if (this.crucifixionTarget && (this.crucifixionTarget.isDead || (this.crucifixionTarget.hp !== undefined && this.crucifixionTarget.hp <= 0)) && !this.crucifixionKilledTarget) {
+      this.crucifixionKilledTarget = true;
+      const holdFrames = (typeof cfg.crucifixionKillCameraHoldFrames === 'number')
+        ? cfg.crucifixionKillCameraHoldFrames
+        : 70;
+      this.crucifixionKillCameraHoldTimer = holdFrames;
+      const tx = this.crucifixionTarget.x;
+      const ty = this.crucifixionTarget.y;
+      this.crucifixionHoldCamX = (this.x + tx) / 2;
+      this.crucifixionHoldCamY = (this.y + ty) / 2;
+      this.crucifixionHoldCamZoom = 1.0;
     }
 
     // End of Sequence
@@ -2256,6 +2315,10 @@ export class MakimaFighter extends Fighter {
         this.crucifixionWhiteFlashTimer = 0;
         this.crucifixionShockwaves = [];
         this.crucifixionShatteredLinks = [];
+        this.crucifixionKilledTarget = false;
+        this.crucifixionKillCameraHoldTimer = 0;
+        this.crucifixionHoldCamX = null;
+        this.crucifixionHoldCamY = null;
         this.isExecutingRitual = false;
         this.ritualTimer = 0;
         this.ritualTarget = null;

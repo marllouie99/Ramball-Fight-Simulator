@@ -668,43 +668,7 @@ export class IchigoFighter extends Fighter {
   }
 
   _getClosestEnemy() {
-    let closest = null;
-    let minDist = Infinity;
-    const myIndex = state.fighters.indexOf(this);
-    const myTeam = state.getFighterTeam(myIndex);
-    
-    // Check fighters
-    if (state.fighters) {
-      state.fighters.forEach((f, idx) => {
-        if (f && f !== this && f.hp > 0) {
-          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-          if (isEnemy) {
-            const dist = Math.hypot(f.x - this.x, f.y - this.y);
-            if (dist < minDist) {
-              minDist = dist;
-              closest = f;
-            }
-          }
-        }
-      });
-    }
-    // Check illusions (Rule #6: Unified queries include illusions)
-    if (state.illusions) {
-      state.illusions.forEach((ill) => {
-        if (ill && ill.hp > 0) {
-          const ownerIdx = ill.ownerIndex !== undefined ? ill.ownerIndex : state.fighters.indexOf(ill.owner);
-          const isEnemy = myTeam === null || state.getFighterTeam(ownerIdx) !== myTeam;
-          if (isEnemy) {
-            const dist = Math.hypot(ill.x - this.x, ill.y - this.y);
-            if (dist < minDist) {
-              minDist = dist;
-              closest = ill;
-            }
-          }
-        }
-      });
-    }
-    return closest;
+    return this._findClosestEnemy();
   }
 
   /**

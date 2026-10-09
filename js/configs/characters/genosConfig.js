@@ -1,6 +1,7 @@
 export const genosConfig = {
   assets: {
     hair: 'Assets/model/genos/Genos-hair.png',
+    fist: 'Assets/model/genos/Genos-fist.png',
     ultimateOverlay: 'Assets/Overlays/Genos-ultimate-overlay.png',
   },
 
@@ -53,6 +54,11 @@ export const genosConfig = {
   flurryArcAngle: Math.PI * 0.5, // 90 degree arc
   flurryCooldown: 1200, // Cooldown duration between uses
   flurryTriggerRange: 280, // AI engagement range (px) to initiate Machine Gun Blows
+  flurrySlowMultiplier: 0.01, // Enemy movement speed multiplier while caught in Machine Gun Blows (85% slow, no stun)
+  flurrySlowDuration: 12,     // Duration in frames of the movement slow
+  flurryHitPauseDuration: 2,  // Target hit-pause freeze frames on each rapid punch hit
+  flurryFinalHitPauseDuration: 10, // Target hit-pause freeze frames on final finishing punch
+  flurryFinisherKnockback: 16.0, // Knockback push velocity of the final punch
 
   // Dash System (Unified tuning for all Genos thruster dashes)
   dashes: {
@@ -98,13 +104,16 @@ export const genosConfig = {
   ultSlideFrames: 22, // Pre-ultimate cybernetic thruster friction-brake slide duration in frames (~0.36s)
   ultSlideSpeed: 8.5, // Initial slide velocity speed (px/frame)
   ultWindupFrames: 60, // 1.0s windup
-  ultDurationFrames: 120, // 2.0s beam duration
-  ultDamagePerTick: 4,
-  ultTickInterval: 6, // 10 ticks per second (300 total damage)
-  ultBeamWidth: 140,
+  enableUltAutoAim: true,      // Smooth auto-aim tracking during windup channeling
+  ultAutoAimTurnRate: 0.055,   // Smooth mechanical turn rate in rad/frame (~3.15 deg/frame) during windup
+  ultAimLockFrames: 25,        // Lock-in direction frames before firing (gives enemies window to dodge, prevents snapping on fire)
+  ultDurationFrames: 150, // 2.0s beam duration
+  ultDamagePerTick: 10,
+  ultTickInterval: 10, // 10 ticks per second (300 total damage)
+  ultBeamWidth: 150,
   ultBeamRange: 1200, // 1200px beam range across full arena (matches Hyperion's beam length)
-  ultKnockbackForce: 8, // Directional beam push speed (prevents hyper-accel rebounce)
-  ultSlowMultiplier: 0.45, // Speed multiplier for targets caught in beam (0.45 = 45% speed allows moving a little)
+  ultKnockbackForce: 1, // Directional beam push speed (prevents hyper-accel rebounce)
+  ultSlowMultiplier: 0.01, // Speed multiplier for targets caught in beam (0.45 = 45% speed allows moving a little)
   ultBeamCenterPull: 0.04, // Axis alignment pull strength (0.04 allows enemies to steer/move inside beam)
   ultTriggerMinRange: 180, // AI minimum distance to initiate beam
   ultTriggerMaxRange: 450, // AI maximum distance to initiate beam
@@ -119,6 +128,7 @@ export const genosConfig = {
   ultRecoveryFrames: 45,        // Post-beam smoke cooling & recovery duration in frames (45 = 0.75s)
   postUltDashCooldown: 60,      // Grace period cooldown in frames (1.0s) before Genos can dash after recovery
   postUltFlurryCooldown: 60,    // Grace period cooldown in frames (1.0s) before Genos can flurry after recovery
+  postUltShootCooldown: 40,     // Grace period cooldown in frames (~0.67s) before Genos can fire basic attack after recovery
 
   // Ultimate Arena Overlay & Dim Tuning
   ultOverlayEnabled: true,
@@ -137,7 +147,7 @@ export const genosConfig = {
   selfDestructDamage: 200, // True damage explosion
   selfDestructKnockback: 20, // Push velocity applied to targets caught in blast
   selfDestructSurvivalHpPercent: 0.01, // Percentage of max HP Genos retains immediately after explosion (1%)
-  selfDestructHpRecoveryPercent: 0.15, // Percentage of max HP Genos recovers upon completing cybernetic reboot reassembly (30% = +96 HP)
+  selfDestructHpRecoveryPercent: 0.50, // Percentage of max HP Genos recovers upon completing cybernetic reboot reassembly (30% = +96 HP)
   selfDestructHpRecoveryFlat: 0,       // Optional flat HP amount added upon reboot recovery (0 = disabled)
   selfDestructShakeIntensity: 18,
   selfDestructShakeDuration: 50,

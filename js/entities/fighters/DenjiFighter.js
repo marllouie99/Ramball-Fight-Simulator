@@ -406,17 +406,7 @@ export class DenjiFighter extends Fighter {
   }
 
   _findBestTarget(opponent = null) {
-    const targets = this._queryAllTargets(opponent);
-    let best = null;
-    let minD = Infinity;
-    for (let t of targets) {
-      const d = Math.hypot(t.x - this.x, t.y - this.y);
-      if (d < minD) {
-        minD = d;
-        best = t;
-      }
-    }
-    return best || opponent;
+    return this._findClosestEnemy(opponent);
   }
 
   /**

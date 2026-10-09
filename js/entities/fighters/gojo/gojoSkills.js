@@ -415,7 +415,7 @@ export function firePurple(fighter, ownerIndex) {
   // 2. Post-fire Purple Breather Recovery (Gojo stays afloat in the air during breather stasis)
   fighter.purpleRecoveryTimer = recoveryDuration;
   fighter.purpleRecoveryMaxTimer = recoveryDuration;
-  fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1200;
+  fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1500;
   fighter.shootCooldown = fighter.shootCooldownMax ?? 60; // Reset basic attack cooldown so it resumes cleanly once purple expires
 
   // Maintain aerial levitation height and zero velocity (no continuous move-back / backward drift)

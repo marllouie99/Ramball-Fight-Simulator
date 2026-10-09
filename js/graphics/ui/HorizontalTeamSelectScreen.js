@@ -2,7 +2,7 @@ import { state, saveFighterSelections, loadFighterSelections } from '../../core/
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { HORIZONTAL_MAPS, getActiveHorizontalMap, setActiveHorizontalMap } from '../../systems/horizontalMapSystem.js';
-import { _clearButtons, _registerButton, drawPanel, drawButton, drawStatBar, drawChamferedRect, fitSingleLineText } from './uiFramework.js';
+import { _clearButtons, _registerButton, drawPanel, drawButton, drawStatBar, drawChamferedRect, fitSingleLineText, wrapText } from './uiFramework.js';
 import { openFighterSelectModal, isFighterSelectModalOpen, drawFighterSelectModal, drawPlayerCard, getFighterWeaponInfo } from './CharacterSelectScreen.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
@@ -17,9 +17,10 @@ import { goToTitle, startGame, startFaceOffScreen } from '../../core/gameFlow.js
  * Fully unified with the Retro Crimson Pixel & Cream-Pink Manga UI Theme.
  * Displays authentic fighter models, live weapon previews, and consistent tokens:
  *  1. 1v1 Widescreen Duel (P1 vs P2 Arcade Face-Off)
- *  2. 4v4 Grand War (2 Big Team Columns)
- *  3. 8-Fighter Battle Royale (8 Solo Free-For-All Grid)
- *  4. 3v3v3v3 Teamfight & 2v2v2v2 Quad Battle (4 Team Pods)
+ *  2. Free For All (4 Solo Combatants in Red, Blue, Green, Gold Columns)
+ *  3. 4v4 Grand War (2 Big Team Columns)
+ *  4. 8-Fighter Battle Royale (8 Solo Free-For-All Grid)
+ *  5. 3v3v3v3 Teamfight & 2v2v2v2 Quad Battle (4 Team Pods)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -42,50 +43,90 @@ export const ROYALE_PALETTES = [
 ];
 
 export function initHorizontalTeamSelectScreen() {
+  const isFfa = (state.mode === GAME_MODES.FFA || state.mode === 'FFA');
+  if (!isFfa) {
+    state.mode = GAME_MODES.HORIZONTAL_1V1;
+  }
   loadFighterSelections();
-  if (!Array.isArray(state.horizontalRosterSlots) || state.horizontalRosterSlots.length < 12) {
+  const requiredSlots = isFfa ? 4 : 2;
+  if (!Array.isArray(state.horizontalRosterSlots) || state.horizontalRosterSlots.length < requiredSlots) {
     if (!Array.isArray(state.horizontalRosterSlots)) {
-      state.horizontalRosterSlots = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      state.horizontalRosterSlots = [0, 1, 2, 3];
     }
-    while (state.horizontalRosterSlots.length < 12) {
+    while (state.horizontalRosterSlots.length < requiredSlots) {
       state.horizontalRosterSlots.push(state.horizontalRosterSlots.length);
     }
   }
   state.p1Index = state.horizontalRosterSlots[0] ?? state.p1Index ?? 0;
   state.p2Index = state.horizontalRosterSlots[1] ?? state.p2Index ?? 1;
+  if (isFfa) {
+    state.p3Index = state.horizontalRosterSlots[2] ?? state.p3Index ?? 2;
+    state.p4Index = state.horizontalRosterSlots[3] ?? state.p4Index ?? 3;
+  }
 }
 
 /**
- * Randomizes all fighter slots with random unique characters from the roster.
+ * Cycles a fighter slot forward or backward through the available roster.
+ */
+function _cycleFighterSlot(slotIndex, direction) {
+  const currentDefs = getActiveFighterDefs();
+  const availableFighters = currentDefs.map((def, idx) => ({ def, idx }))
+    .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
+  if (availableFighters.length === 0) return;
+
+  const currentIdx = state.horizontalRosterSlots?.[slotIndex] ?? slotIndex;
+  const listPos = availableFighters.findIndex(f => f.idx === currentIdx);
+  const count = availableFighters.length;
+  let nextPos = 0;
+  if (listPos !== -1) {
+    nextPos = (listPos + direction + count) % count;
+  }
+  const nextIdx = availableFighters[nextPos].idx;
+  if (!Array.isArray(state.horizontalRosterSlots)) {
+    state.horizontalRosterSlots = [];
+  }
+  state.horizontalRosterSlots[slotIndex] = nextIdx;
+  if (slotIndex === 0) state.p1Index = nextIdx;
+  else if (slotIndex === 1) state.p2Index = nextIdx;
+  else if (slotIndex === 2) state.p3Index = nextIdx;
+  else if (slotIndex === 3) state.p4Index = nextIdx;
+  saveFighterSelections();
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash5', 0.12);
+  }
+}
+
+/**
+ * Randomizes duel/FFA fighters with random unique characters from the roster.
  */
 export function randomizeHorizontalRoster() {
   const defs = getActiveFighterDefs();
-  const availableIndices = defs.map((_, i) => i);
+  const isFfa = (state.mode === GAME_MODES.FFA || state.mode === 'FFA');
+  const numSlots = isFfa ? 4 : 2;
+  if (defs.length < numSlots) return;
 
-  // Fisher-Yates Shuffle
-  for (let i = availableIndices.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const temp = availableIndices[i];
-    availableIndices[i] = availableIndices[j];
-    availableIndices[j] = temp;
+  const picked = [];
+  while (picked.length < numSlots) {
+    const idx = Math.floor(Math.random() * defs.length);
+    if (!picked.includes(idx) || picked.length >= defs.length) {
+      picked.push(idx);
+    }
   }
 
-  state.horizontalRosterSlots = availableIndices.slice(0, 12);
-  while (state.horizontalRosterSlots.length < 12) {
-    state.horizontalRosterSlots.push(state.horizontalRosterSlots.length % defs.length);
+  state.p1Index = picked[0];
+  state.p2Index = picked[1];
+  if (isFfa) {
+    state.p3Index = picked[2];
+    state.p4Index = picked[3];
   }
-  state.p1Index = state.horizontalRosterSlots[0] ?? 0;
-  state.p2Index = state.horizontalRosterSlots[1] ?? 1;
-  state.p3Index = state.horizontalRosterSlots[2] ?? 2;
-  state.p4Index = state.horizontalRosterSlots[3] ?? 3;
-  state.p5Index = state.horizontalRosterSlots[4] ?? 4;
-  state.p6Index = state.horizontalRosterSlots[5] ?? 5;
-  state.p7Index = state.horizontalRosterSlots[6] ?? 6;
-  state.p8Index = state.horizontalRosterSlots[7] ?? 7;
-  state.p9Index = state.horizontalRosterSlots[8] ?? 8;
-  state.p10Index = state.horizontalRosterSlots[9] ?? 9;
-  state.p11Index = state.horizontalRosterSlots[10] ?? 10;
-  state.p12Index = state.horizontalRosterSlots[11] ?? 11;
+
+  if (!Array.isArray(state.horizontalRosterSlots)) {
+    state.horizontalRosterSlots = [...picked];
+  } else {
+    for (let i = 0; i < numSlots; i++) {
+      state.horizontalRosterSlots[i] = picked[i];
+    }
+  }
   saveFighterSelections();
 }
 
@@ -134,7 +175,6 @@ export function drawHorizontalTeamSelectScreen(ctx) {
   const defs = getActiveFighterDefs();
   const w = state.canvas.width || 960;
   const h = state.canvas.height || 540;
-  const currentMode = state.mode || GAME_MODES.TEAMFIGHT_3V3V3V3;
 
   ctx.save();
 
@@ -157,16 +197,8 @@ export function drawHorizontalTeamSelectScreen(ctx) {
   }, 76, 26);
 
   // 3. Header Title & Sub-Controls
-  const is1v1 = (currentMode === GAME_MODES.HORIZONTAL_1V1 || currentMode === '1v1 Widescreen Duel' || currentMode === '1v1' || currentMode === GAME_MODES.ONE_VS_ONE);
-  const is4v4 = (currentMode === GAME_MODES.TEAM_4V4 || currentMode === '4v4 Grand War');
-  const isBR8 = (currentMode === GAME_MODES.BATTLE_ROYALE_8 || currentMode === '8-Fighter Battle Royale');
-  const is3v3v3v3 = (currentMode === GAME_MODES.TEAMFIGHT_3V3V3V3 || currentMode === '3v3v3v3 Teamfight');
-
-  let modeTitle = '[ 1 VS 1 WIDESCREEN DUEL ]';
-  if (is4v4) modeTitle = '[ 4 VS 4 GRAND WAR ]';
-  else if (isBR8) modeTitle = '[ 8-FIGHTER BATTLE ROYALE ]';
-  else if (is3v3v3v3) modeTitle = '[ 3V3V3V3 GRAND TEAMFIGHT ]';
-  else if (!is1v1) modeTitle = '[ 2V2V2V2 QUAD BATTLE ]';
+  const isFfa = (state.mode === GAME_MODES.FFA || state.mode === 'FFA');
+  const modeTitle = isFfa ? '[ FREE FOR ALL • 4 FIGHTERS ]' : '[ 1 VS 1 WIDESCREEN DUEL ]';
 
   // Title Text
   const titleY = 28;
@@ -191,15 +223,11 @@ export function drawHorizontalTeamSelectScreen(ctx) {
   drawArenaBgmSelector(ctx, startCtrlX, tmY, bgmW, 24);
   drawArenaFloorSelector(ctx, startCtrlX + bgmW + gap, tmY, floorW, 24);
 
-  // 4. Mode-Specific Layouts
-  if (is1v1) {
-    _draw1v1SelectLayout(ctx, defs, w, h);
-  } else if (is4v4) {
-    _draw4v4SelectLayout(ctx, defs, w, h);
-  } else if (isBR8) {
-    _draw8RoyaleSelectLayout(ctx, defs, w, h);
+  // 4. Layout
+  if (isFfa) {
+    _drawFfaSelectLayout(ctx, defs, w, h);
   } else {
-    _drawMultiTeamSelectLayout(ctx, defs, w, h, is3v3v3v3);
+    _draw1v1SelectLayout(ctx, defs, w, h);
   }
 
   ctx.restore();
@@ -214,6 +242,172 @@ export function drawHorizontalTeamSelectScreen(ctx) {
   if (isArenaFloorModalOpen()) {
     drawArenaFloorModal(ctx);
   }
+}
+
+/**
+ * Layout 0: Free-For-All 4-Fighter Widescreen Draft Screen
+ * 4 Symmetrical Columns across 16:9 canvas with authentic models, live weapon previews,
+ * quick cycle buttons, stat bars, and modal selection triggers.
+ */
+function _drawFfaSelectLayout(ctx, defs, w, h) {
+  const colW = 210;
+  const colGap = 16;
+  const startX = Math.floor((w - (colW * 4 + colGap * 3)) / 2); // 36px
+  const topY = 88;
+  const colH = 380;
+
+  // Sync state.horizontalRosterSlots to p1..p4
+  state.p1Index = state.horizontalRosterSlots?.[0] ?? state.p1Index ?? 0;
+  state.p2Index = state.horizontalRosterSlots?.[1] ?? state.p2Index ?? 1;
+  state.p3Index = state.horizontalRosterSlots?.[2] ?? state.p3Index ?? 2;
+  state.p4Index = state.horizontalRosterSlots?.[3] ?? state.p4Index ?? 3;
+
+  const playerNames = ['RED', 'BLUE', 'GREEN', 'GOLD'];
+
+  for (let i = 0; i < 4; i++) {
+    const cx = startX + i * (colW + colGap);
+    const pal = TEAM_PALETTES[i] || TEAM_PALETTES[0];
+    const fighterIndex = state.horizontalRosterSlots?.[i] ?? state[`p${i + 1}Index`] ?? i;
+    const def = defs[fighterIndex] || FIGHTER_DEFS[fighterIndex] || defs[0];
+
+    // 1. Outer Container Panel (Retro Cream/Crimson Frame)
+    drawPanel(cx, topY, colW, colH, 0.98, 6, '#21050c');
+
+    // 2. Header Band
+    ctx.save();
+    ctx.fillStyle = '#21050c';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.5;
+    drawChamferedRect(ctx, cx + 2, topY + 2, colW - 4, 26, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Top Accent Stripe
+    ctx.fillStyle = pal.accent;
+    ctx.fillRect(cx + 12, topY + 2, colW - 24, 2);
+
+    // Header Title
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`PLAYER ${i + 1} // ${playerNames[i]}`, cx + colW / 2, topY + 15);
+    ctx.restore();
+
+    // 3. Sub-Card Interior Area
+    const subCardX = cx + 7;
+    const subCardY = topY + 32;
+    const subCardW = colW - 14;
+    const subCardH = colH - 40;
+
+    ctx.save();
+    ctx.fillStyle = '#fff5f7';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.4;
+    drawChamferedRect(ctx, subCardX, subCardY, subCardW, subCardH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Register click on sub-card to open fighter select modal
+    _registerButton(subCardX, subCardY, subCardW, subCardH, () => {
+      openFighterSelectModal(`slot_${i}`, fighterIndex);
+    });
+
+    // 4. Authentic Fighter Model Stage Avatar
+    const avatarX = cx + colW / 2;
+    const avatarY = topY + 76;
+    _drawFighterModelStage(ctx, avatarX, avatarY, 28, fighterIndex, def);
+
+    // Quick Cycle Arrow Buttons
+    const arrowW = 22;
+    const arrowH = 24;
+    drawButton('◄', cx + 20, avatarY, () => _cycleFighterSlot(i, -1), arrowW, arrowH, null, 3);
+    drawButton('►', cx + colW - 20, avatarY, () => _cycleFighterSlot(i, 1), arrowW, arrowH, null, 3);
+
+    // 5. Fighter Name & Class Subtitle
+    ctx.save();
+    ctx.fillStyle = '#21050c';
+    ctx.font = '900 12.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(fitSingleLineText(ctx, (def.name || 'FIGHTER').toUpperCase(), colW - 24), cx + colW / 2, topY + 116);
+
+    ctx.fillStyle = '#8b1524';
+    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText(fitSingleLineText(ctx, `CLASS // ${(def.type || 'BRAWLER').toUpperCase()}`, colW - 24), cx + colW / 2, topY + 130);
+    ctx.restore();
+
+    // 6. Stat Bars
+    const barW = colW - 28;
+    const barX = cx + 14;
+    drawStatBar(ctx, 'HP', def.hp || 200, 150, barX, topY + 144, barW, pal.accent);
+    drawStatBar(ctx, 'DMG', def.damage || 20, 60, barX, topY + 159, barW, '#f59e0b');
+    drawStatBar(ctx, 'SPD', def.speed || 2, 4, barX, topY + 174, barW, '#7c2d37');
+
+    // 7. Live Weapon Preview Sub-Box
+    const weaponBoxX = cx + 12;
+    const weaponBoxY = topY + 193;
+    const weaponBoxW = colW - 24;
+    const weaponBoxH = 120;
+
+    ctx.save();
+    ctx.fillStyle = '#faedf0';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.2;
+    drawChamferedRect(ctx, weaponBoxX, weaponBoxY, weaponBoxW, weaponBoxH, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    const weaponInfo = getFighterWeaponInfo(def);
+
+    ctx.save();
+    ctx.fillStyle = '#b81c3b';
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, weaponBoxW - 12), weaponBoxX + 6, weaponBoxY + 6);
+
+    ctx.fillStyle = '#8b1524';
+    ctx.font = '900 8.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, weaponBoxW - 12), weaponBoxX + 6, weaponBoxY + 18);
+
+    // Mini Live Weapon Render
+    const wStageX = weaponBoxX + weaponBoxW / 2;
+    const wStageY = weaponBoxY + 58;
+
+    // Stage ellipse
+    ctx.fillStyle = '#eed8dc';
+    ctx.strokeStyle = '#21050c';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.ellipse(wStageX, wStageY + 14, 30, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.translate(wStageX, wStageY);
+    ctx.scale(0.72, 0.72);
+    drawWeaponPreview(ctx, def.type, def.color);
+    ctx.restore();
+
+    // Short Ability / Desc Text
+    ctx.save();
+    ctx.fillStyle = '#21050c';
+    ctx.font = '800 8.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    wrapText(ctx, def.desc || '', wStageX, weaponBoxY + 84, weaponBoxW - 10, 10, 3);
+    ctx.restore();
+
+    // 8. "CHANGE" Button
+    drawButton('CHANGE', cx + colW / 2, topY + colH - 24, () => {
+      openFighterSelectModal(`slot_${i}`, fighterIndex);
+    }, colW - 28, 22, null, 3);
+  }
+
+  // 9. Bottom Command Deck
+  _drawUnifiedBottomCommandDeck(w, h, 'START FREE FOR ALL');
 }
 
 /**

@@ -165,7 +165,7 @@ export function clearFighterDomain(fighter, state) {
     }
     fighter._hasFiredFugaInDomain = false;
     fighter._isFiringDomainFuga = false;
-    const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+    const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
     fighter.divineFlameCooldown = Math.max(fighter.divineFlameCooldown, normalCd);
   }
 

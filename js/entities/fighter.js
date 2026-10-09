@@ -28,6 +28,7 @@ import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.j
 import { clearFighterDomain } from '../systems/domainSystem.js';
 import { isInsideRubbickStolenVoid } from './fighters/rubbick/rubbickThemes.js';
 import { BalanceManager } from '../configs/balanceManager.js';
+import { resolveEntityPlusObstacleCollision, getArenaCenterObstacle, isPointInsidePlusObstacle, isLineOfSightBlockedByObstacle } from '../systems/arenaObstacleSystem.js';
 
 /**
  * Returns true if the entity is currently hit by, dragged by, or suppressed by Getsuga Tensho.
@@ -120,6 +121,14 @@ export function isEntityOutsideArena(entity, arena) {
 
   const ex = (entity.x !== undefined ? entity.x : 0);
   const ey = (entity.y !== undefined ? entity.y : 0);
+
+  // Check if entity is inside any interior arena wall obstacle (e.g. FFA Plus Wall)
+  const obs = getArenaCenterObstacle(curArena);
+  if (obs && obs.type === 'plus') {
+    if (isPointInsidePlusObstacle(ex, ey, obs.cx, obs.cy, obs.halfSize, obs.halfThick)) {
+      return true; // Inside interior wall -> treated as outside active playable arena
+    }
+  }
 
   if (curArena.shape === 'circle' || curArena.radius) {
     const cx = curArena.x + curArena.width / 2;
@@ -641,21 +650,44 @@ export class Fighter {
   }
 
   /**
+   * Universal evaluation of whether this fighter currently has clear line of sight (spotted)
+   * to a combat target. Returns false if target is null, dead, invalid, outside the arena,
+   * or if the line of sight is obstructed by any interior arena obstacle (e.g. FFA Center + Wall).
+   * @param {Object} [target] Target entity to check. Defaults to fighter's current opponent/target.
+   * @param {Object} [arena] Arena geometry reference.
+   * @returns {boolean}
+   */
+  hasSpottedEnemy(target = null, arena = null) {
+    const combatTarget = target || this.target || this._lastOpponent || null;
+    if (!combatTarget || combatTarget === this) return false;
+    if (typeof this.isValidAimTarget === 'function' && !this.isValidAimTarget(combatTarget)) return false;
+    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
+    if (isEntityOutsideArena(combatTarget, curArena)) return false;
+    if (curArena && isLineOfSightBlockedByObstacle(this.x, this.y, combatTarget.x || 0, combatTarget.y || 0, curArena)) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Central Source of Truth for Basic Attack Gating across ALL fighters.
    * Evaluates HP, stuns, beam caught, time stops, paralyze, ambush, and Soul Disfigurement/Rupture.
-   * Also gates basic attacks when the combat target is out of the arena boundaries.
+   * Also gates basic attacks and offensive skills when the combat target is not spotted (e.g. behind + wall).
    * Any future basic attack restriction added here automatically applies across the entire game.
    */
-  canPerformBasicAttack(target = null) {
+  canPerformBasicAttack(target = null, arena = null) {
     if (this.hp <= 0 || this.isDead) return false;
     if (this.areAttackEffectsSuppressed()) return false;
     if (this.isCaughtInBeam()) return false;
     if (this.isAffectedBySoulDisfigurement()) return false;
 
-    // Gating: If target is out of the arena (e.g. Eye of Cthulhu outside arena bounds), hold basic attacks
+    // Gating: If target is not spotted (e.g. outside arena or blocked by interior + wall), hold basic attacks / skills
     const combatTarget = target || this.target || this._lastOpponent || null;
-    if (combatTarget && isEntityOutsideArena(combatTarget)) {
-      return false;
+    if (combatTarget) {
+      const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+      if (!this.hasSpottedEnemy(combatTarget, curArena)) {
+        return false;
+      }
     }
     return true;
   }
@@ -704,7 +736,7 @@ export class Fighter {
     if (this.isParalyzed || this.isFrozen || this.isFrozenByInfinity || this.isParalyzedByMahito || this.isParalyzedByMahoraga) return true;
     if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || (this.makimaWallPinTimer && this.makimaWallPinTimer > 0) || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || (this.escanorWallPinTimer && this.escanorWallPinTimer > 0) || this.isCurrentlyWallPinnedByNaoya || (this.naoyaWallPinTimer && this.naoyaWallPinTimer > 0) || this._isFlyingToWallPin) return true;
     if (this.isGrabbedByMahoraga) return true;
-    if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
+    if (this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
     if (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) return true;
     // NOTE: chopHitPauseTimer is intentionally NOT checked here. It is an attacker-side timer
     // (set only on Escanor during his cinematic hit-pause). The TARGET receives timeStopTimer
@@ -1032,7 +1064,6 @@ export class Fighter {
   /** Returns true if this fighter is caught in any active paralyzing beam stasis (e.g. Laser Beam, Layla Beam, Nameless Destroyer). */
   isCaughtInBeam() {
     return !!(
-      this.caughtInGenosFlurry ||
       this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
       (this.caughtInLaylaBeamTimer || 0) > 0 ||
@@ -1309,8 +1340,10 @@ export class Fighter {
     this.flurryGhost = null;
 
     // Zeus
-    this.stormActive = false;
-    this.aegisActive = false;
+    if (forceCancelAll || (this.hp !== undefined && this.hp <= 0) || this.isDead) {
+      this.stormActive = false;
+      this.aegisActive = false;
+    }
 
     // Knight
     this.swipeActive = false;
@@ -1686,7 +1719,7 @@ export class Fighter {
       this._handleFrozenSkillCooldowns();
       return true;
     }
-    if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo) {
+    if (this.caughtInJohnWickCombo) {
       this.vx = 0;
       this.vy = 0;
       this._handleFrozenSkillCooldowns();
@@ -2197,6 +2230,10 @@ export class Fighter {
         if (this.x > maxX) { this.x = maxX; this.knockbackVx = -Math.abs(this.knockbackVx) * bounceMult; if (this.vx > 0) this.vx = 0; bounced = true; }
         if (this.y < minY) { this.y = minY; this.knockbackVy = Math.abs(this.knockbackVy) * bounceMult; if (this.vy < 0) this.vy = 0; bounced = true; }
         if (this.y > maxY) { this.y = maxY; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; if (this.vy > 0) this.vy = 0; bounced = true; }
+
+        if (resolveEntityPlusObstacleCollision(this, arena)) {
+          bounced = true;
+        }
 
         if (bounced) {
           if (isBeamTrapped || this.isDraggedByGetsuga) {
@@ -3116,6 +3153,11 @@ export class Fighter {
       
       this.normalizeSpeed();
     }
+
+    if (resolveEntityPlusObstacleCollision(this, arena)) {
+      bounced = true;
+    }
+
     return bounced;
   }
 
@@ -3203,33 +3245,75 @@ export class Fighter {
   /**
    * Universal helper: Finds the closest valid enemy target in the arena.
    * Subclasses inherit this centralized method with 0 boilerplate.
+   * @param {Object} [preferredOpponent]
+   * @param {boolean} [requireLOS=false] When true, only returns targets that are currently spotted (clear LOS).
    */
-  _findClosestEnemy(preferredOpponent = null) {
+  _findClosestEnemy(preferredOpponent = null, requireLOS = false) {
+    const curArena = (typeof state !== 'undefined' ? state.arena : null);
+
+    // If preferredOpponent is valid and has clear line of sight, prioritize immediately
     if (preferredOpponent && preferredOpponent !== this && this.isValidAimTarget(preferredOpponent) && (!this.isTeammate || !this.isTeammate(preferredOpponent))) {
-      return preferredOpponent;
+      const losBlocked = curArena && isLineOfSightBlockedByObstacle(this.x, this.y, preferredOpponent.x || 0, preferredOpponent.y || 0, curArena);
+      if (!losBlocked) {
+        return preferredOpponent;
+      }
     }
 
     const targets = this._getAllValidEnemyTargets();
-    if (targets.length === 0) return null;
+    if (targets.length === 0) {
+      if (preferredOpponent && !requireLOS && this.isValidAimTarget(preferredOpponent) && (!this.isTeammate || !this.isTeammate(preferredOpponent))) {
+        return preferredOpponent;
+      }
+      return null;
+    }
 
+    // Prefer visible targets (clear LOS through + wall) over wall-obscured ones.
+    // In FFA with the center obstacle, fighters prioritize enemies they can "see".
     let closest = null;
+    let closestObscured = null;
     let minDist = Infinity;
+    let minDistObscured = Infinity;
+
     for (let i = 0; i < targets.length; i++) {
       const ent = targets[i];
       const dist = Math.hypot((ent.x || 0) - this.x, (ent.y || 0) - this.y);
-      if (dist < minDist) {
-        minDist = dist;
-        closest = ent;
+      const losBlocked = curArena && isLineOfSightBlockedByObstacle(this.x, this.y, ent.x || 0, ent.y || 0, curArena);
+      if (!losBlocked) {
+        if (dist < minDist) {
+          minDist = dist;
+          closest = ent;
+        }
+      } else {
+        if (dist < minDistObscured) {
+          minDistObscured = dist;
+          closestObscured = ent;
+        }
       }
     }
-    return closest;
+
+    if (closest) return closest;
+    if (requireLOS) return null;
+
+    // Fall back to wall-obscured target (or preferredOpponent) only if no visible enemy exists
+    if (preferredOpponent && this.isValidAimTarget(preferredOpponent) && (!this.isTeammate || !this.isTeammate(preferredOpponent))) {
+      return preferredOpponent;
+    }
+    return closestObscured;
+  }
+
+  /**
+   * Universal helper: Finds the closest spotted enemy with clear line of sight.
+   * Returns null if all enemies are hidden / behind obstacles.
+   */
+  _findSpottedEnemy(preferredOpponent = null) {
+    return this._findClosestEnemy(preferredOpponent, true);
   }
 
   /**
    * Universal alias for _findClosestEnemy.
    */
-  _findNearestEnemy(preferredOpponent = null) {
-    return this._findClosestEnemy(preferredOpponent);
+  _findNearestEnemy(preferredOpponent = null, requireLOS = false) {
+    return this._findClosestEnemy(preferredOpponent, requireLOS);
   }
 
   /**
@@ -3270,6 +3354,17 @@ export class Fighter {
     if (!this.canAim() || !this.isValidAimTarget(opponent)) {
       return false;
     }
+
+    // ── Blind-Spot: + Arena Wall Line-of-Sight Block ──────────────────────────
+    // When the center FFA + wall is between this fighter and the target, suppress
+    // auto-aim so the wall acts as a true strategic blind spot. Fighters can only
+    // lock on to enemies they have a clear line of sight to.
+    const curArena = typeof state !== 'undefined' ? state.arena : null;
+    if (curArena && isLineOfSightBlockedByObstacle(this.x, this.y, opponent.x || 0, opponent.y || 0, curArena)) {
+      this.hasClearLOS = false;
+      return false; // Cannot aim at target behind the + wall
+    }
+    // ──────────────────────────────────────────────────────────────────────────
 
     this.hasClearLOS = true;
 

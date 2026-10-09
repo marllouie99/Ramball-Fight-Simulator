@@ -225,54 +225,7 @@ export function drawFighters() {
     }
   }
 
-  // John Wick CQC Assassination Highlight Spotlight & Arena Dim Effect
-  const wickFighter = fighters ? fighters.find(f => f && (f.characterId === 'john_wick' || f.type === 'john_wick') && f.cqcComboPhase) : null;
-  if (wickFighter && (wickFighter.cqcComboPhase === 'PENCIL_STAB' || wickFighter.cqcComboPhase === 'BACKWARD_ROLL')) {
-    const target = wickFighter.cqcComboTarget;
-    const wCfg = (typeof CONFIG !== 'undefined' && CONFIG.john_wick) ? CONFIG.john_wick : {};
-    const maxDimAlpha = wCfg.cqcSpotlightDimAlpha || 0.68;
-    const spotR = wCfg.cqcSpotlightRadius || 360;
-    const bloomR = wCfg.cqcSpotlightBloomRadius || 150;
 
-    let dimAlpha = maxDimAlpha;
-    if (wickFighter.cqcComboPhase === 'BACKWARD_ROLL') {
-      const rollMax = wickFighter.rollMaxTimer || 20;
-      dimAlpha = maxDimAlpha * Math.max(0, (wickFighter.rollTimer || 0) / rollMax); // Smooth fade-out during disengage roll
-    }
-
-    if (dimAlpha > 0.01) {
-      const focusX = target ? (wickFighter.x + target.x) * 0.5 : wickFighter.x;
-      const focusY = target ? ((wickFighter.y - (wickFighter.z || 0)) + (target.y - (target.z || 0))) * 0.5 : (wickFighter.y - (wickFighter.z || 0));
-      const maxDimDist = Math.max(ctx.canvas.width, ctx.canvas.height) * 1.1;
-
-      ctx.save();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-
-      // 1. Full Arena Radial Vignette with crystal-clear spotlight cutout on John Wick & Victim
-      const spotGrad = ctx.createRadialGradient(focusX, focusY, 40, focusX, focusY, Math.min(spotR, maxDimDist));
-      spotGrad.addColorStop(0,    'rgba(0, 0, 0, 0)'); // Crystal clear on John Wick & Victim
-      spotGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(dimAlpha * 0.12).toFixed(3)})`);
-      spotGrad.addColorStop(0.55, `rgba(0, 0, 0, ${(dimAlpha * 0.62).toFixed(3)})`);
-      spotGrad.addColorStop(1.0,  `rgba(0, 0, 0, ${(dimAlpha * 0.95).toFixed(3)})`);
-
-      ctx.fillStyle = spotGrad;
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-      // 2. Warm Continental Gold Underfoot Spotlight Bloom
-      ctx.globalCompositeOperation = 'lighter';
-      const floorGlow = ctx.createRadialGradient(focusX, focusY, 10, focusX, focusY, bloomR);
-      floorGlow.addColorStop(0,    `rgba(245, 158, 11, ${(0.32 * dimAlpha).toFixed(3)})`);
-      floorGlow.addColorStop(0.50, `rgba(212, 175, 55, ${(0.16 * dimAlpha).toFixed(3)})`);
-      floorGlow.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
-
-      ctx.fillStyle = floorGlow;
-      ctx.beginPath();
-      ctx.arc(focusX, focusY, bloomR, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.restore();
-    }
-  }
 
   // Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
   // Exception: Fighters with an active domain expansion are forced to draw last (on top of everyone).

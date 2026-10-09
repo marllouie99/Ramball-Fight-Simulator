@@ -87,7 +87,7 @@ export const gojoConfig = {
   redBuildupFrames: 100,    // Frames of orb manifestation before detonation
   redSlowDuration: 120,     // Frames the post-detonation slow lasts (~2s at 60fps)
   redSlowMultiplier: 0.35,  // Speed multiplier while slowed by Red (35% of normal)
-  redChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Reversal Red
+  redChannelTurnRate: 0.070, // Smooth aim rotation turn rate while channeling Reversal Red
   redShakeIntensity: 14,    // Heavy screen shake intensity on Red detonation
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
   redDimOpacity: 0.94,      // Opacity of the full-screen Reversal Red dim effect
@@ -103,7 +103,7 @@ export const gojoConfig = {
   purpleRadius: 50,         // Radius of Purple orb
   purpleLife: 200,         // How long Purple orb stays in arena (frames - 8.0s)
   purpleTravelTime: 20,    // Frames the orb travels before stopping
-  purpleDPS: 35,            // Damage per second dealt to enemies inside the orb
+  purpleDPS: 30,            // Damage per second dealt to enemies inside the orb
   purpleDPSInterval: 10,   // Frames between DPS ticks
   purpleSlowDuration: 60,  // Frames the slow effect lasts
   purpleSlowMultiplier: 0.20, // Speed multiplier while slowed (0.20 = 20% speed, very heavy slow)
@@ -111,7 +111,7 @@ export const gojoConfig = {
   purplePullForce: 20.5,    // How strongly enemies and illusions are dragged toward orb center
   purpleShakeIntensity: 4, // Screen shake intensity when purple orb fires
   purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
-  purpleExplosionDamage: 100, // Blast explosion damage when Hollow Purple detonates upon expiring
+  purpleExplosionDamage: 200, // Blast explosion damage when Hollow Purple detonates upon expiring
   purpleExplosionRadius: 280, // Blast explosion radius in pixels
   purpleExplosionKnockback: 10, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
@@ -125,7 +125,7 @@ export const gojoConfig = {
   purple200DimOpacity: 0.98,        // Opacity of the full-screen dim effect during 200% Hollow Purple
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
-  purpleSecondCastDamageMultiplier: 5.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
+  purpleSecondCastDamageMultiplier: 2.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
   purpleSecondCastChargeMax: 120,           // Channeling duration in frames for 200% Hollow Purple (~3.0s at 60fps)
   purpleSecondCastTextBanner: '200% HOLLOW PURPLE!', // Floating text displayed on 2nd cast release
   purpleSecondCastTextHeader100: 'PURPLE 100%',     // Skill HUD bar label for 100% cast

@@ -107,7 +107,7 @@ export class SukunaFighter extends Fighter {
             fighter._hasPlayedDomainActivateSound = false;
             fighter._hasFiredFugaInDomain = false;
             fighter._isFiringDomainFuga = false;
-            const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+            const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
             fighter.divineFlameCooldown = Math.max(fighter.divineFlameCooldown, normalCd);
           }
         }
@@ -132,7 +132,8 @@ export class SukunaFighter extends Fighter {
         type: 'healing',
         cooldownKey: 'reverseCursedTechniqueCooldown',
         cooldownMax: CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700,
-        allowsFrozenCooldownTick: true
+        allowsFrozenCooldownTick: true,
+        bypassParalyze: true
       });
     }
     this.skillManager.registerSkills(skills);
@@ -182,7 +183,7 @@ export class SukunaFighter extends Fighter {
         this.fugaSoundKey = null;
       }
       if (this.isChannelingDivineFlame) {
-        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
         const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? 210;
         this.divineFlameCooldown = this.domainActive ? domainCd : Math.round(normalCd * 0.5);
       }
@@ -225,7 +226,7 @@ export class SukunaFighter extends Fighter {
         this.fugaSoundKey = null;
       }
       if (this.isChannelingDivineFlame) {
-        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
         const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? 210;
         this.divineFlameCooldown = this.domainActive ? domainCd : Math.round(normalCd * 0.5);
       }
@@ -569,24 +570,14 @@ export class SukunaFighter extends Fighter {
         clearDomainSlashLines();
         this._hasFiredFugaInDomain = false;
         this._isFiringDomainFuga = false;
-        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
         this.divineFlameCooldown = Math.max(this.divineFlameCooldown, normalCd);
       } else {
         this._applyDomainEffect(arena);
       }
     }
 
-    // Malevolent Shrine Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame,
-    // even if Sukuna is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Purple / Beams / Unlimited Void!
-    if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) {
-      this.domainCooldown--;
-    }
-
-    // Reverse Cursed Technique Cooldown Exception: reverseCursedTechniqueCooldown MUST ALWAYS tick down every frame,
-    // even if Sukuna is paralyzed, frozen, time-stopped, or hit by Getsuga Tensho / Purple / Beams / Unlimited Void!
-    if ((this.rctVisualTimer || 0) <= 0 && this.reverseCursedTechniqueCooldown > 0) {
-      this.reverseCursedTechniqueCooldown--;
-    }
+    // Malevolent Shrine and RCT cooldowns are managed by SkillManager (1x canonical rate)
 
     // Update slash hit visuals (Ghost blade / domain slashes) so they animate even during paralyze / time stop
     if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
@@ -664,7 +655,7 @@ export class SukunaFighter extends Fighter {
         this._hasPlayedDomainChannelSound = false;
       }
       if (this.isChannelingDivineFlame) {
-        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+        const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
         const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? 210;
         this.divineFlameCooldown = this.domainActive ? domainCd : Math.round(normalCd * 0.5);
         this.isChannelingDivineFlame = false;
@@ -987,7 +978,7 @@ export class SukunaFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate - disabled in demo mode)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (this.isSkillEnabled(CONFIG.sukuna?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && opponent && !opponent.isDead) {
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && opponent && !opponent.isDead && this.hasSpottedEnemy(opponent, arena)) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
@@ -2247,7 +2238,7 @@ export class SukunaFighter extends Fighter {
     let bestAngle = 0;
 
     for (const ent of candidates) {
-      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable) continue;
+      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.dead || ent.isInvulnerable || !this.hasSpottedEnemy(ent)) continue;
       if (ent.vanishTimer && ent.vanishTimer > 0) continue;
       if (ent.owner === this) continue;
       if (myTeam !== null && myTeam !== undefined) {

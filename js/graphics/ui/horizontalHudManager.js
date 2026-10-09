@@ -24,6 +24,14 @@ export function drawHorizontalPanoramicHud(ctx) {
 
   const mainFighters = fighters.filter(f => f && !f.isIllusion && !f.isTurret && !f.isMinion && !f.isEndCrystal && !f.isDeployable);
   const currentMode = state.mode || '';
+  const isFfa = Boolean(
+    currentMode === 'FFA' ||
+    currentMode === 'Tactical FFA' ||
+    currentMode === 'FFA 4-Player' ||
+    (typeof GAME_MODES !== 'undefined' && (currentMode === GAME_MODES.FFA || currentMode === GAME_MODES.TACTICAL_FFA))
+  );
+  if (isFfa) return;
+
   const is1v1 = (currentMode === GAME_MODES.HORIZONTAL_1V1 || currentMode === '1v1 Widescreen Duel' || (mainFighters.length === 2 && !currentMode.includes('2v2') && !currentMode.includes('4v4') && !currentMode.includes('3v3v3v3') && !currentMode.includes('Battle Royale')));
 
   ctx.save();

@@ -58,13 +58,13 @@ export const engineerConfig = {
   skillCooldown: 500,          // Rebuild cooldown after destruction (~8.3s)
   turretRadius: 18,            // Physical collision radius
   turretAimSpeed: 0.08,        // Aim rotation speed in radians per frame
-  turretBuildTime: 90,         // Construction duration (~1.5s)
+  turretBuildTime: 200,         // Construction duration (~1.5s)
   turretSpawnDistance: -40,    // Spawn offset distance (negative = behind)
   turretHealAmount: 30,        // Wrench repair heal amount
   turretHealCooldown: 60,      // Cooldown between wrench repairs
   turretBulletSpeed: 22,       // Bullet projectile speed
   turretRange: 360,            // Target acquisition radius
-  turretReloadTime: 90,        // Frames to reload (~1.5s)
+  turretReloadTime: 200,        // Frames to reload (~1.5s)
   turretAmmoBarOffsetY: 25,    // Distance above turret to draw reload/ammo UI
   turretReloadBarWidth: 32,    // Reload progress bar width
   turretReloadBarHeight: 5,    // Reload progress bar height
@@ -74,31 +74,31 @@ export const engineerConfig = {
   // Level 1 Sentry Stats (Single Barrel Cannon)
   enableSentryLevel1: true,
   turretLevel1Hp: 200,
-  turretLevel1Damage: 2.2,     // Damage per bullet (single barrel)
+  turretLevel1Damage: 1.0,     // Damage per bullet (single barrel)
   turretLevel1FireRate: 8,     // Frames between shots
-  turretLevel1Ammo: 15,        // Shots per magazine
+  turretLevel1Ammo: 10,        // Shots per magazine
 
   // Level 2 Sentry Stats (Dual Gatling Miniguns)
   enableSentryLevel2: true,
   turretLevel2Hp: 280,
-  turretLevel2Damage: 1.8,     // Damage per bullet (twin volley = 3.6)
+  turretLevel2Damage: 1.3,     // Damage per bullet (twin volley = 3.6)
   turretLevel2FireRate: 6,     // Faster fire rate
-  turretLevel2Ammo: 25,        // Shots per magazine
+  turretLevel2Ammo: 20,        // Shots per magazine
 
   // Level 3 Sentry Stats (Dual Heavy Gatlings + Quad Rocket Pod)
   enableSentryLevel3: true,
   turretLevel3Hp: 380,
-  turretLevel3Damage: 2.0,     // Damage per bullet (twin volley = 4.0)
+  turretLevel3Damage: 1.5,     // Damage per bullet (twin volley = 4.0)
   turretLevel3FireRate: 5,     // Supersonic Gatling fire rate
-  turretLevel3Ammo: 35,        // High capacity drum
-  turretLevel3RocketDamage: 8.0, // Area of effect damage per micro-rocket
+  turretLevel3Ammo: 30,        // High capacity drum
+  turretLevel3RocketDamage: 5.0, // Area of effect damage per micro-rocket
   turretLevel3RocketInterval: 4, // Fires rocket salvo every 4 bullet volleys
 
   // Skill 2: Dispenser (Secondary Support Building)
   enableDispenser: true,       // Master toggle for Dispenser
   dispenserHp: 300,            // Dispenser max health
   dispenserRadius: 19,         // Physical collision radius
-  dispenserBuildTime: 110,     // Construction duration (~1.8s)
+  dispenserBuildTime: 200,     // Construction duration (~1.8s)
   dispenserRange: 260,         // Healing field radius & tether range
   dispenserHealPerTick: 2,     // Health restored per pulse
   dispenserTickInterval: 30,   // Ticks every 0.5s (~4 HP/s)

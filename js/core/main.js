@@ -655,7 +655,7 @@ export function syncMenuOrientationUI() {
     } else {
       if (icon) icon.innerText = '🖥️';
       if (title) title.innerText = 'HORIZONTAL MODE (16:9)';
-      if (subtitle) subtitle.innerText = 'AUTO-ADJUSTS SCREEN • 3v3v3v3 TEAMFIGHTS';
+      if (subtitle) subtitle.innerText = 'AUTO-ADJUSTS SCREEN • 1V1 WIDESCREEN DUEL';
       if (btn) btn.innerText = 'LAUNCH ➔';
       banner.setAttribute('data-action', 'open-grand-teamfight');
     }
@@ -994,42 +994,28 @@ export function executeTacticalAction(action) {
     state.gameState = 'select';
   }
 
-  // Widescreen Horizontal Grand Teamfight Sub-Game Modes
-  else if (action === 'mode-3v3v3v3' || action === 'open-grand-teamfight') {
-    state.gameCategory = 'foc';
-    state.mode = GAME_MODES.TEAMFIGHT_3V3V3V3;
-    setViewportOrientation('horizontal');
-    initHorizontalTeamSelectScreen();
-    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'horizontal_select';
-  } else if (action === 'mode-2v2v2v2') {
-    state.gameCategory = 'foc';
-    state.mode = GAME_MODES.TEAMFIGHT_2V2V2V2;
-    setViewportOrientation('horizontal');
-    initHorizontalTeamSelectScreen();
-    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'horizontal_select';
-  } else if (action === 'mode-4v4') {
-    state.gameCategory = 'foc';
-    state.mode = GAME_MODES.TEAM_4V4;
-    setViewportOrientation('horizontal');
-    initHorizontalTeamSelectScreen();
-    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'horizontal_select';
-  } else if (action === 'mode-br8') {
-    state.gameCategory = 'foc';
-    state.mode = GAME_MODES.BATTLE_ROYALE_8;
-    setViewportOrientation('horizontal');
-    initHorizontalTeamSelectScreen();
-    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-    state.gameState = 'horizontal_select';
-  } else if (action === 'mode-h1v1') {
+  // 16:9 Widescreen 1v1 Duel Mode Launcher
+  else if (action === 'mode-h1v1') {
     state.gameCategory = 'foc';
     state.mode = GAME_MODES.HORIZONTAL_1V1;
     setViewportOrientation('horizontal');
     initHorizontalTeamSelectScreen();
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'horizontal_select';
+  } else if (action === 'mode-hffa') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.FFA;
+    setViewportOrientation('horizontal');
+    initHorizontalTeamSelectScreen();
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'horizontal_select';
+  } else if (action === 'open-grand-teamfight') {
+    setViewportOrientation('horizontal');
+    fitGameToViewport();
+    syncMenuOrientationUI();
+    showMenuView('menu-view-main');
+    state.gameState = 'title';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
   }
 
   // Database / Arsenal Screens

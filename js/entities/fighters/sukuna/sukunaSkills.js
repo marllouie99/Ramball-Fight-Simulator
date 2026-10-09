@@ -101,7 +101,7 @@ export function fireDivineFlame(fighter, ownerIndex) {
     fighter._hasFiredFugaInDomain = true;
   }
   fighter._isFiringDomainFuga = false;
-  const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 2500;
+  const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
   const cdReduction = CONFIG.sukuna?.domainFugaCooldownReduction ?? CONFIG.sukuna?.domainFugaCooldownReductionPercent ?? 0.70;
   const domainCd = CONFIG.sukuna?.divineFlameDomainCooldown ?? Math.round(normalCd * (1 - cdReduction));
   fighter.divineFlameRecoveryTimer = CONFIG.sukuna?.divineFlameRecoveryTime || 60;

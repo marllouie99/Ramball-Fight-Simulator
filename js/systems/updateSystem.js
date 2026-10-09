@@ -21,6 +21,7 @@ import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 import { updateFocMap, getActiveFocMap, resetFocMapState } from '../../FOC Maps/index.js';
+import { isFfaMode } from '../core/viewportManager.js';
 
 export function updateGame() {
     // Increment global frame count on EVERY frame across all game states
@@ -101,6 +102,19 @@ export function updateGame() {
       updateFighters();
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);
+
+      // FFA Countdown Center-Facing: Override every fighter's aim to face the arena center
+      // during the countdown so players dramatically "stare down" the battlefield.
+      if (isFfaMode(state.mode) && state.arena && state.fighters) {
+        const _cX = state.arena.x + state.arena.width / 2;
+        const _cY = state.arena.y + state.arena.height / 2;
+        for (const f of state.fighters) {
+          if (!f || f.hp <= 0 || f.dead) continue;
+          const _angle = Math.atan2(_cY - f.y, _cX - f.x);
+          f.gunAngle = _angle;
+          f.angle = _angle;
+        }
+      }
 
       if (state.countdownTimer >= requiredCountdownFrames) {
         state.gameState = 'playing';

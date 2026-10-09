@@ -33,8 +33,8 @@ import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRe
 import { resetCamera } from '../systems/cameraSystem.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 import { getFocMapForBoss } from '../../FOC Maps/index.js';
-import { EndCrystalEntity } from '../entities/EndCrystalEntity.js';
-import { setViewportOrientation } from './viewportManager.js';
+import { setViewportOrientation, getArenaConfigForMode } from './viewportManager.js';
+import { getFfaPlusQuadrantSpawns } from '../systems/arenaObstacleSystem.js';
 
 // ─────────────────────────────────────────────
 // ON-DEMAND AUDIO & ASSET STREAMING (LAZY LOADING)
@@ -350,7 +350,15 @@ export function reinitFighters(isNewMatch = false) {
     const idx1 = state.tagMatch.team1Roster[state.tagMatch.team1ActiveSlot] ?? state.p2Index ?? 1;
     fighterIndexes = [idx0, idx1];
   } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA') {
-    fighterIndexes.push(state.p3Index, state.p4Index);
+    if (state.viewOrientation === 'horizontal' && Array.isArray(state.horizontalRosterSlots)) {
+      state.p1Index = state.horizontalRosterSlots[0] ?? state.p1Index ?? 0;
+      state.p2Index = state.horizontalRosterSlots[1] ?? state.p2Index ?? 1;
+      state.p3Index = state.horizontalRosterSlots[2] ?? state.p3Index ?? 2;
+      state.p4Index = state.horizontalRosterSlots[3] ?? state.p4Index ?? 3;
+      fighterIndexes = [state.p1Index, state.p2Index, state.p3Index, state.p4Index];
+    } else {
+      fighterIndexes.push(state.p3Index, state.p4Index);
+    }
   } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2') {
     // Arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
@@ -433,7 +441,9 @@ export function reinitFighters(isNewMatch = false) {
     }
   } else {
     state.activeFocMap = null;
-    state.arena = { ...CONFIG.arena };
+    const resolvedArena = getArenaConfigForMode(state.mode, state.viewOrientation);
+    CONFIG.arena = { ...resolvedArena };
+    state.arena = { ...resolvedArena };
   }
 
   const arena = state.arena;
@@ -545,17 +555,8 @@ export function reinitFighters(isNewMatch = false) {
       state.fighters[1].vx = -state.fighters[1].speed * 0.5;
       state.fighters[1].vy = 0;
     }
-  } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA') {
-    const leftX = arena.x + arena.width * 0.20;
-    const rightX = arena.x + arena.width * 0.80;
-    const topY = arena.y + arena.height * 0.25;
-    const bottomY = arena.y + arena.height * 0.75;
-    const spawnPoints = [
-      { x: leftX,  y: topY },
-      { x: rightX, y: topY },
-      { x: leftX,  y: bottomY },
-      { x: rightX, y: bottomY },
-    ];
+  } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA' || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA') {
+    const spawnPoints = getFfaPlusQuadrantSpawns(arena);
 
     // Shuffle spawn points so fighter positions change each round
     for (let i = spawnPoints.length - 1; i > 0; i--) {

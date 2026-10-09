@@ -38,6 +38,7 @@ function createMockCtx() {
 const mockCtx = createMockCtx();
 const mockCanvas = mockCtx.canvas;
 mockCanvas.style = {};
+mockCanvas.classList = { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false };
 mockCanvas.getContext = () => mockCtx;
 
 globalThis.window = globalThis;
@@ -96,7 +97,8 @@ globalThis.document = {
     el.firstElementChild = el;
     return el;
   },
-  body: { style: {} }
+  documentElement: { classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} }, style: {} },
+  body: { classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} }, style: {} }
 };
 globalThis.Image = class {
   constructor() {
@@ -769,14 +771,76 @@ async function runInteractionTests() {
     assert(isEntityImmuneToGravitationalPull(genos, 'purple') === true, 'Genos must be immune to gravitational pull during ult beam');
     assert(isEntityImmuneToGravitationalPull(genos, 'blue') === true, 'Genos must be immune to blue suction during ult beam');
 
-    // 4. Post-Ult Recovery - Immunity clears cleanly
+    // Test attack interruption & explosive damage immunity while actively firing
+    genos.interruptAttacks(true);
+    assert(genos.isFiringUlt === true, 'Genos isFiringUlt must NOT be cancelled by interruptAttacks(true)');
+    assert(genos.immuneToPush === true, 'Genos immuneToPush must remain true after interruptAttacks while firing ult');
+
+    genos.takeDamage(40, saitama, { isExplosion: true, isKnockback: true });
+    assert(genos.isFiringUlt === true, 'Genos isFiringUlt must NOT be cancelled by explosive damage');
+
+    genos.takeDamage(20, saitama, { isMelee: true });
+    assert(genos.isFiringUlt === true, 'Genos isFiringUlt must NOT be cancelled by melee hit damage');
+
+    // 4. Test Reze Explosions & Stun / TimeStop Immunity while actively firing
+    const reze = new FIGHTER_CLASS_MAP.reze({ radius: 25, x: 270, y: 520, hp: 340, color: '#430363ff' });
+    state.fighters = [genos, reze];
+    genos.reset();
+    genos.hp = 320;
+    genos.isFiringUlt = true;
+    genos.ultTimer = 80;
+    genos.immuneToPush = true;
+    genos.immuneToKnockback = true;
+    genos.immuneToPull = true;
+
+    // A. Direct applyTimeStop / applyHitStun calls on Genos during ult
+    genos.applyTimeStop(15);
+    assert(genos.isFiringUlt === true, 'applyTimeStop must not cancel isFiringUlt');
+    genos.applyHitStun(20);
+    assert(genos.isFiringUlt === true, 'applyHitStun must not cancel isFiringUlt');
+    genos.applySlow(30, 0.2);
+    assert(genos.isFiringUlt === true, 'applySlow must not cancel isFiringUlt');
+    genos.applyParalyze(25);
+    assert(genos.isFiringUlt === true, 'applyParalyze must not cancel isFiringUlt');
+
+    // B. Reze cluster bomb detonation on Genos
+    const clusterBomb = {
+      x: genos.x,
+      y: genos.y,
+      damage: 28,
+      explosionRadius: 85,
+      knockback: 18
+    };
+    reze._detonateClusterBomb(clusterBomb);
+    assert(genos.isFiringUlt === true, 'Reze cluster bomb explosion must NOT cancel Genos isFiringUlt');
+
+    // C. Reze explosive punch on Genos
+    reze.isHybridModeActive = true;
+    reze.gunAngle = -Math.PI / 2;
+    reze._performExplosivePunch(genos);
+    assert(genos.isFiringUlt === true, 'Reze explosive punch must NOT cancel Genos isFiringUlt');
+
+    // D. Update tick progresses beam timer and does NOT freeze
+    const prevTimer = genos.ultTimer;
+    genos.update(reze, 0, state.arena);
+    assert(genos.isFiringUlt === true, 'Genos must continue firing ult during update');
+    assert(genos.ultTimer === prevTimer - 1, `Genos ultTimer must tick down smoothly without freeze (got ${genos.ultTimer}, expected ${prevTimer - 1})`);
+
+    // 5. Post-Ult Recovery - Immunity clears cleanly
     genos.ultTimer = 0;
     genos.update(saitama, 0, state.arena);
     assert(genos.isFiringUlt === false, 'isFiringUlt must end');
     assert(genos.immuneToPush === false, 'immuneToPush must reset after ult beam completes');
     assert(genos.immuneToKnockback === false, 'immuneToKnockback must reset after ult beam completes');
 
-    console.log('      ✅ Genos physical push & knockback immunity during ultimate beam verified.');
+    // 6. Fatal damage cancels ult immediately
+    genos.isFiringUlt = true;
+    genos.hp = 0;
+    genos.dead = true;
+    genos.interruptAttacks(true);
+    assert(genos.isFiringUlt === false, 'isFiringUlt must cancel when Genos dies');
+
+    console.log('      ✅ Genos physical push, Reze explosion resilience & knockback immunity during ultimate beam verified.');
   }
 
   // ── 12. Testing Genos Skill Cancellation & Speed Normalization ──
@@ -2961,6 +3025,49 @@ async function runInteractionTests() {
     drawWeaponPreview(mockCtx, 'crazydave', '#84CC16');
     assert(mockCtx.getStackDepth() === 0, `drawWeaponPreview('crazydave') must maintain 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
 
+    // 18. Test Crazy Dave plant avoidance of occupied building & plant tiles and full-arena blocking
+    const daveTestOccupancy = new CrazyDaveClass({ startX: 100, startY: 300, radius: 25, hp: 390 });
+    daveTestOccupancy.sunCount = 500;
+    daveTestOccupancy.peashooterCooldown = 0;
+    state.arena = { x: 40, y: 170, width: 437, height: 437, shape: 'rectangle' };
+    
+    // Target tile in front of Dave has an Engineer Sentry Turret
+    const rawTargetX = daveTestOccupancy.x + 32;
+    const rawTargetY = daveTestOccupancy.y;
+    const targetTile = getNearestGrassTileCenter(rawTargetX, rawTargetY, state.arena);
+    const mockSentry = { isTurret: true, x: targetTile.x, y: targetTile.y, hp: 200 };
+    state.fighters = [daveTestOccupancy, mockSentry];
+
+    daveTestOccupancy.plantPeashooter(gojo);
+    const deployedPea = daveTestOccupancy.activePeashooters[daveTestOccupancy.activePeashooters.length - 1];
+    assert(deployedPea !== undefined, 'Peashooter must still be planted on an alternative unoccupied tile');
+    const distToSentry = Math.hypot(deployedPea.x - mockSentry.x, deployedPea.y - mockSentry.y);
+    assert(distToSentry > 30, 'Crazy Dave must NOT plant on top of an occupied building/sentry tile');
+
+    // Test full arena occupancy blocking Dave planting
+    const daveFullArena = new CrazyDaveClass({ startX: 100, startY: 300, radius: 25, hp: 390 });
+    daveFullArena.sunCount = 500;
+    daveFullArena.peashooterCooldown = 0;
+    const testCols = Math.max(3, Math.round(state.arena.width / 76.6));
+    const testRows = Math.max(3, Math.round(state.arena.height / 76.6));
+    const cellWidth = state.arena.width / testCols;
+    const cellHeight = state.arena.height / testRows;
+    const allOccupyingBuildings = [];
+    for (let r = 0; r < testRows; r++) {
+      for (let c = 0; c < testCols; c++) {
+        allOccupyingBuildings.push({
+          isDispenser: true,
+          x: state.arena.x + (c + 0.5) * cellWidth,
+          y: state.arena.y + (r + 0.5) * cellHeight,
+          hp: 160
+        });
+      }
+    }
+    state.fighters = [daveFullArena, ...allOccupyingBuildings];
+    const plantResult = daveFullArena.plantPeashooter(gojo);
+    assert(plantResult === false, 'Crazy Dave must NOT be able to plant when all tiles are occupied by buildings');
+    assert(daveFullArena.activePeashooters.length === 0, 'No plant should be added when all tiles are occupied');
+
     // Clean up
     state.deathEffects = [];
     state.illusions = [];
@@ -3516,7 +3623,7 @@ async function runInteractionTests() {
     console.log('      ✅ Lawnmower 6-frame bounds, canvas stack balance, baseline deployment, breach triggering & steamroller shred verified.');
   }
 
-  console.log('   28. Testing Engineer sentry placement on Crazy Dave center grass tile...');
+  console.log('   28. Testing Engineer sentry and dispenser tile placement, occupancy checks & full-arena gating...');
   {
     const EngineerClass = FIGHTER_CLASS_MAP.Engineer;
     const CrazyDaveClass = FIGHTER_CLASS_MAP.crazydave;
@@ -3540,6 +3647,57 @@ async function runInteractionTests() {
     assert(Math.abs(engineer.turretEntity.x - expectedBuildTile.x) < 0.001, 'Engineer sentry must use the grass tile nearest Engineer against Crazy Dave');
     assert(Math.abs(engineer.turretEntity.y - expectedBuildTile.y) < 0.001, 'Engineer sentry must use Engineer-side grass tile y against Crazy Dave');
 
+    // Complete sentry building to test dispenser deployment
+    engineer.isBuildingTurret = false;
+    engineer.turretEntity.isBuilding = false;
+    engineer.turretEntity.buildProgress = 1;
+    engineer.dispenserCooldown = 0;
+
+    // Update to trigger dispenser build
+    engineer.update(davePlantTarget, 0, testArena);
+    assert(engineer.dispenserEntity !== null, 'Engineer must deploy a dispenser when sentry is active and cooldown is ready');
+
+    // Verify dispenser is snapped to the center of a tile
+    const dispenserTile = getNearestGrassTileCenter(engineer.dispenserEntity.x, engineer.dispenserEntity.y, testArena);
+    assert(Math.abs(engineer.dispenserEntity.x - dispenserTile.x) < 0.001, 'Dispenser must be placed at the center of the grass tile');
+    assert(Math.abs(engineer.dispenserEntity.y - dispenserTile.y) < 0.001, 'Dispenser must be placed at the center of the grass tile (y)');
+
+    // Verify dispenser did not place on the sentry's tile
+    const distBetweenBuildings = Math.hypot(engineer.dispenserEntity.x - engineer.turretEntity.x, engineer.dispenserEntity.y - engineer.turretEntity.y);
+    assert(distBetweenBuildings > 30, 'Dispenser and Sentry must not occupy the same tile');
+
+    // Test plant-occupied tile avoidance
+    const engineer2 = new EngineerClass({ startX: 100, startY: 300, radius: 25, hp: 400 });
+    const occupyingPlant = { isPlant: true, x: expectedBuildTile.x, y: expectedBuildTile.y, hp: 100 };
+    state.fighters = [engineer2, daveOpponent, occupyingPlant];
+    engineer2.update(davePlantTarget, 0, testArena);
+    assert(engineer2.turretEntity !== null, 'Engineer must deploy sentry on an alternative unoccupied tile');
+    const sentryToPlantDist = Math.hypot(engineer2.turretEntity.x - occupyingPlant.x, engineer2.turretEntity.y - occupyingPlant.y);
+    assert(sentryToPlantDist > 30, 'Engineer sentry must not be placed on a plant-occupied tile');
+
+    // Test full arena occupancy blocking deployment
+    const engineer3 = new EngineerClass({ startX: 100, startY: 300, radius: 25, hp: 400 });
+    const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
+    const cols = Math.max(3, Math.round(testArena.width / targetTileSize));
+    const rows = Math.max(3, Math.round(testArena.height / targetTileSize));
+    const cellW = testArena.width / cols;
+    const cellH = testArena.height / rows;
+    const allPlants = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        allPlants.push({
+          isPlant: true,
+          x: testArena.x + (c + 0.5) * cellW,
+          y: testArena.y + (r + 0.5) * cellH,
+          hp: 100
+        });
+      }
+    }
+    state.fighters = [engineer3, daveOpponent, ...allPlants];
+    engineer3.update(davePlantTarget, 0, testArena);
+    assert(engineer3.turretEntity === null, 'Engineer must NOT deploy a sentry when all tiles are occupied');
+
+    // Test non-Crazy-Dave opponent retains normal offset placement
     const normalEngineer = new EngineerClass({ startX: 100, startY: 300, radius: 25, hp: 400 });
     const normalOpponent = { characterId: 'gojo', type: 'gojo', x: 360, y: 300, hp: 200 };
     state.fighters = [normalEngineer, normalOpponent];
@@ -3552,7 +3710,7 @@ async function runInteractionTests() {
 
     state.fighters = [];
     state.arena = null;
-    console.log('      ✅ Engineer sentry center grass-tile placement against Crazy Dave verified.');
+    console.log('      ✅ Engineer sentry and dispenser tile placement, occupancy checks & full-arena gating verified.');
   }
 
   console.log('   29. Testing Megumin Explosion phases, team filtering, crater, and burnout...');
@@ -4981,13 +5139,71 @@ async function runInteractionTests() {
     assert(reze.activeNukeBlasts.length === 0, 'activeNukeBlasts must clear naturally and not get stuck when Reze is frozen');
     reze.timeStopTimer = 0;
 
+    // G. Verify Cluster Bombs do NOT pause and continue to play/detonate when Reze is stunned
+    state.gameState = 'playing';
+    dummy.hp = 200;
+    dummy.dead = false;
+    dummy.isDead = false;
+    dummy._hasDied = false;
+    dummy.x = 220;
+    dummy.y = 200;
+    const rezeCfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    const expectedBombCount = rezeCfg?.clusterBombCount || 3;
+    reze._throwClusterBombs(dummy);
+    assert(reze.activeClusterBombs.length === expectedBombCount, `Reze must deploy ${expectedBombCount} cluster bombs in a spread (got ${reze.activeClusterBombs.length})`);
+
+    const initialFuse0 = reze.activeClusterBombs[0].fuseTimer;
+    const maxFuse = Math.max(...reze.activeClusterBombs.map(b => b.fuseTimer));
+
+    // Apply hard stun / time stop to Reze that exceeds total fuse duration
+    reze.timeStopTimer = maxFuse + 30;
+    reze.electricStunTimer = maxFuse + 30;
+    reze.paralyzeTimer = maxFuse + 30;
+
+    // Advance 5 frames while Reze is frozen
+    for (let f = 0; f < 5; f++) {
+      reze.update(dummy, 0, state.arena);
+    }
+    assert(reze.activeClusterBombs.length > 0, 'Cluster bombs must remain active and not get wiped');
+    assert(reze.activeClusterBombs[0].fuseTimer === initialFuse0 - 5, `Cluster bomb fuse must decrement during freeze (expected ${initialFuse0 - 5}, got ${reze.activeClusterBombs[0].fuseTimer})`);
+
+    // Advance until all bombs have detonated while Reze is still frozen
+    const initialDummyHp = dummy.hp;
+    for (let f = 0; f < maxFuse + 10; f++) {
+      reze.update(dummy, 0, state.arena);
+    }
+    assert(reze.activeClusterBombs.length === 0, 'All cluster bombs must finish their fuses and detonate 1-by-1');
+    assert(dummy.hp < initialDummyHp, `Dummy must take damage from cluster bomb detonations during Reze stun (expected < ${initialDummyHp}, got ${dummy.hp})`);
+
+    // H. Verify Mobility Skill: Supersonic Rocket Lunge Foot Launch Explosion
+    state.gameState = 'playing';
+    reze.isHybridModeActive = true;
+    reze.rocketCooldown = 0;
+    reze.x = 250;
+    reze.y = 200;
+    dummy.hp = 200;
+    dummy.dead = false;
+    dummy.isDead = false;
+    dummy._hasDied = false;
+    dummy.x = 210; // Positioned behind Reze's feet
+    dummy.y = 200;
+    const forwardTarget = { x: 450, y: 200, r: 25, hp: 300, isDead: false };
+
+    reze.activePalmBlasts = [];
+    reze._activateRocketLunge(forwardTarget);
+
+    assert(reze.isRocketLunging === true, 'Reze must enter isRocketLunging state');
+    assert(reze.activePalmBlasts.length > 0, 'Foot explosion shockwave must be registered in activePalmBlasts');
+    assert(reze.activePalmBlasts[0].isFootExplosion === true, 'Active blast must be marked as isFootExplosion');
+    assert(dummy.hp < 200, `Dummy behind Reze feet must take damage from foot launch explosion (expected < 200, got ${dummy.hp})`);
+
     // Clean up
     reze.reset();
     assert(reze.hasUsedNuke === false, 'Reze hasUsedNuke must reset cleanly to false on round reset');
     dummy.reset();
     state.fighters = [];
 
-    console.log('      ✅ Reze Ultimate single-use per round, 100% full heal, vampiric lifesteal, and visual explosion non-freeze decay verified successfully.');
+    console.log('      ✅ Reze Ultimate single-use per round, 100% full heal, vampiric lifesteal, visual explosion non-freeze decay, cluster bomb stun resilience, and rocket lunge foot explosion verified successfully.');
   }
 
   // ─────────────────────────────────────────────
@@ -5054,28 +5270,140 @@ async function runInteractionTests() {
     console.log('      ✅ Mahoraga Hollow Purple adaptation: 50% damage reduction and continuous gravitational pull verified successfully.');
   }
 
-  // ── TEST 57: Canonical YouTube Shorts Vertical Arena Geometry & Viewport Isolation (Rule 28) ──
-  console.log('   57. Testing Canonical YouTube Shorts Vertical Arena Geometry & Viewport Isolation (Rule 28)...');
+  // ── TEST 58: Horizontal FFA Game Mode Select, 4-Fighter Roster, and HUD Integration ──
+  console.log('   58. Testing Horizontal FFA Game Mode Select, 4-Player Draft, and Panoramic HUD...');
   {
-    const { CONFIG } = await import('../js/core/config.js');
-    const { VIEWPORT_CONFIGS, VIEWPORT_MODES } = await import('../js/core/viewportManager.js');
+    const { state } = await import('../js/core/state.js');
+    const { GAME_MODES } = await import('../js/core/modeConfig.js');
+    const { setViewportOrientation } = await import('../js/core/viewportManager.js');
+    const { initHorizontalTeamSelectScreen, randomizeHorizontalRoster, drawHorizontalTeamSelectScreen } = await import('../js/graphics/ui/HorizontalTeamSelectScreen.js');
+    const { reinitFighters } = await import('../js/core/gameFlow.js');
+    const { drawHorizontalPanoramicHud } = await import('../js/graphics/ui/horizontalHudManager.js');
 
-    // Verify canonical vertical arena dimensions
-    assert(CONFIG.arena.x === 45, `CONFIG.arena.x must strictly be 45 (got ${CONFIG.arena.x})`);
-    assert(CONFIG.arena.y === 240, `CONFIG.arena.y must strictly be 240 (got ${CONFIG.arena.y})`);
-    assert(CONFIG.arena.width === 450, `CONFIG.arena.width must strictly be 450 (got ${CONFIG.arena.width})`);
-    assert(CONFIG.arena.height === 450, `CONFIG.arena.height must strictly be 450 (got ${CONFIG.arena.height})`);
+    // 1. Initialize Horizontal FFA Mode
+    setViewportOrientation('horizontal');
+    state.mode = GAME_MODES.FFA;
+    state.gameState = 'horizontal_select';
+    initHorizontalTeamSelectScreen();
 
-    // Verify viewport configs isolation
-    const vertArena = VIEWPORT_CONFIGS[VIEWPORT_MODES.VERTICAL].arena;
-    assert(vertArena.x === 45 && vertArena.y === 240 && vertArena.width === 450 && vertArena.height === 450, 'Vertical viewport config must strictly match { x: 45, y: 240, width: 450, height: 450 }');
+    assert(state.horizontalRosterSlots.length >= 4, 'Horizontal FFA must initialize at least 4 roster slots');
+    assert(state.p1Index !== undefined && state.p2Index !== undefined && state.p3Index !== undefined && state.p4Index !== undefined, 'p1Index..p4Index must be defined');
 
-    const horizArena = VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].arena;
-    const grandArena = VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].grandArena;
-    assert(horizArena.width === 400 && horizArena.height === 400, 'Horizontal viewport config arena must be 400x400 for 1v1 mode with side HUD clearance');
-    assert(grandArena.width === 1400 && grandArena.height === 1400, 'Horizontal viewport config grandArena must preserve 1400x1400 widescreen square arena');
+    // 2. Draw Horizontal Team Select Screen and verify stack depth
+    mockCtx.resetStackDepth();
+    mockCanvas.width = 960;
+    mockCanvas.height = 540;
+    state.canvas = mockCanvas;
+    state.ctx = mockCtx;
 
-    console.log('      ✅ Canonical YouTube Shorts vertical arena geometry (450x450 at y: 240) and horizontal viewport isolation verified successfully.');
+    drawHorizontalTeamSelectScreen(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, `Canvas stack depth must be 0 after drawHorizontalTeamSelectScreen (got ${mockCtx.getStackDepth()})`);
+
+    // 3. Test Randomize in FFA mode
+    randomizeHorizontalRoster();
+    assert(state.horizontalRosterSlots.length >= 4, 'Randomize in FFA must preserve at least 4 slots');
+    assert(state.p1Index === state.horizontalRosterSlots[0], 'p1Index must sync with horizontalRosterSlots[0]');
+    assert(state.p4Index === state.horizontalRosterSlots[3], 'p4Index must sync with horizontalRosterSlots[3]');
+
+    // 4. Test reinitFighters in Horizontal FFA mode
+    state.gameState = 'playing';
+    reinitFighters(true);
+    assert(state.fighters.length === 4, `reinitFighters in Horizontal FFA must create 4 fighters (got ${state.fighters.length})`);
+
+    for (let i = 0; i < 4; i++) {
+      assert(state.getFighterTeam(i) === i, `FFA fighter ${i} must belong to solo team ${i} (got ${state.getFighterTeam(i)})`);
+    }
+
+    // 5. Test Horizontal Panoramic HUD for 4 FFA fighters
+    mockCtx.resetStackDepth();
+    drawHorizontalPanoramicHud(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, `Canvas stack depth must be 0 after drawHorizontalPanoramicHud (got ${mockCtx.getStackDepth()})`);
+
+    // Clean up
+    state.fighters = [];
+    setViewportOrientation('vertical');
+
+    console.log('      ✅ Horizontal FFA Game Mode Select, 4-Player draft layout, and Panoramic HUD verified successfully.');
+  }
+
+  // ==========================================
+  // TEST 59: Makima Crucifixion Kill Camera Hold (Delayed Winner Focus)
+  // ==========================================
+  {
+    console.log('   59. Testing Makima Crucifixion Kill Camera Hold (Delayed Winner Focus)...');
+
+    const MakimaClass = FIGHTER_CLASS_MAP['makima'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    assert(MakimaClass && GojoClass, 'Makima and Gojo classes must exist in FIGHTER_CLASS_MAP');
+
+    const makima = new MakimaClass(200, 400, 0);
+    const gojo = new GojoClass(340, 400, 1);
+
+    state.fighters = [makima, gojo];
+    state.gameState = 'playing';
+
+    const { updateCamera, resetCamera } = await import('../js/systems/cameraSystem.js');
+    resetCamera(true);
+    state.camera.mode = 'dynamic';
+    state.camera.enabled = true;
+
+    // Cast Crucifixion on Gojo
+    makima._castCrucifixionUltimate(gojo, true);
+    assert(makima.isExecutingCrucifixion === true, 'Makima must be executing Crucifixion');
+    assert(makima.crucifixionTarget === gojo, 'Crucifixion target must be Gojo');
+    assert(makima.crucifixionKillCameraHoldTimer === 0, 'Camera hold timer must start at 0 before kill');
+
+    // Fast-forward to impact frame (Frame 80)
+    makima.crucifixionTimer = (makima.crucifixionMaxTimer - makima.crucifixionImpactFrame) + 1;
+    gojo.hp = 50; // Low HP so execution threshold triggers kill
+
+    makima._updateCrucifixionUltimate();
+
+    // Verify Gojo died and hold timer activated
+    assert(gojo.isDead === true, 'Gojo must be killed by Crucifixion spear strike');
+    assert(makima.crucifixionKilledTarget === true, 'makima.crucifixionKilledTarget must be true');
+    assert(makima.crucifixionKillCameraHoldTimer > 0, `makima.crucifixionKillCameraHoldTimer must be > 0 (got ${makima.crucifixionKillCameraHoldTimer})`);
+
+    const holdX = makima.crucifixionHoldCamX;
+    const holdY = makima.crucifixionHoldCamY;
+    assert(typeof holdX === 'number' && Number.isFinite(holdX), 'crucifixionHoldCamX must be a valid number');
+    assert(typeof holdY === 'number' && Number.isFinite(holdY), 'crucifixionHoldCamY must be a valid number');
+
+    // Update camera while hold timer is active
+    updateCamera();
+
+    // Camera target must NOT be Makima's coordinates and targetZoom must NOT be winnerZoom
+    assert(Math.abs(state.camera.targetX - holdX) < 1.0, `Camera targetX must stay at crucifixion hold position (${holdX}), got ${state.camera.targetX}`);
+    assert(Math.abs(state.camera.targetY - holdY) < 1.0, `Camera targetY must stay at crucifixion hold position (${holdY}), got ${state.camera.targetY}`);
+    assert(state.camera.targetZoom === 1.0, `Camera targetZoom must stay at 1.0 combat framing during hold, got ${state.camera.targetZoom}`);
+    assert(state.camera.targetZoom !== CONFIG.camera.winnerZoom, 'Camera targetZoom must NOT immediately jump to winnerZoom');
+
+    // Tick all hold frames until the timer expires and ultimate completes
+    const holdDuration = makima.crucifixionKillCameraHoldTimer;
+    for (let i = 0; i < holdDuration + 5; i++) {
+      makima.update(gojo, 0, state.arena);
+      updateCamera();
+    }
+
+    assert(makima.crucifixionKillCameraHoldTimer === 0, 'crucifixionKillCameraHoldTimer must reach 0');
+    assert(makima.isExecutingCrucifixion === false, 'isExecutingCrucifixion must be false');
+
+    // Now camera should smoothly target Makima as the winner with winnerZoom
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - makima.x) < 1.0, `Camera targetX must now focus on Makima (${makima.x}), got ${state.camera.targetX}`);
+    assert(Math.abs(state.camera.targetY - makima.y) < 1.0, `Camera targetY must now focus on Makima (${makima.y}), got ${state.camera.targetY}`);
+    assert(state.camera.targetZoom === (CONFIG.camera.winnerZoom ?? 1.10), `Camera targetZoom must now be winnerZoom (${CONFIG.camera.winnerZoom}), got ${state.camera.targetZoom}`);
+
+    // Verify drawing stack balance
+    mockCtx.resetStackDepth();
+    makima.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, `Canvas stack depth must be 0 after makima.draw (got ${mockCtx.getStackDepth()})`);
+
+    // Clean up
+    state.fighters = [];
+    resetCamera(true);
+
+    console.log('      ✅ Makima Crucifixion Kill Camera Hold & delayed focus transition verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

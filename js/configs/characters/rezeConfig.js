@@ -31,7 +31,7 @@ export const rezeConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 1.0,
-  damage: 22,
+  damage: 10,
   cooldown: 28,
   projectileSpeedMultiplier: 1.0,
   ability: 'Bomb Devil & "Megaton Tsar Nuke"',
@@ -104,9 +104,9 @@ export const rezeConfig = {
   clusterBombSpreadAngle: 0.90,     // Fanned spread angle (~23° per outer trajectory)
   clusterBombThrowSpeed: 13.5,      // Flight speed
   clusterBombFlightFrames: 16,      // Travel duration before arming
-  clusterBombStaggerFrames: 14,     // Sequential delay between explosions (1 by 1)
-  clusterBombExplosionRadius: 300,   // Explosion blast radius per bomb
-  clusterBombExplosionDamage: 30,   // Damage per explosion
+  clusterBombStaggerFrames: 8,     // Sequential delay between explosions (1 by 1)
+  clusterBombExplosionRadius: 200,   // Explosion blast radius per bomb
+  clusterBombExplosionDamage: 15,   // Damage per explosion
   clusterBombExplosionKnockback: 18, // Physical knockback force per blast
   decoyExplosionRadius: 85,         // Backward compatibility alias
   decoyExplosionDamage: 28,         // Backward compatibility alias
@@ -114,15 +114,18 @@ export const rezeConfig = {
 
   // Mobility Skill: Supersonic Rocket Lunge
   enableRocketLunge: 1,             // Master toggle for Mobility Skill: Supersonic Rocket Lunge
-  rocketCooldown: 200,              // 5.0s cooldown
+  rocketCooldown: 300,              // 5.0s cooldown
   rocketLungeSpeed: 28.0,           // Rocket dash velocity (34.0 in Bomb Form)
   rocketDurationFrames: 24,         // Max dash frame duration
   rocketHitDamage: 30,              // Impact dropkick damage
   rocketHitKnockback: 34,           // Impact knockback
   rocketCraterRadius: 55,           // Floor crater scorch decal radius
+  rocketFootExplosionRadius: 150,    // Foot launch explosion blast radius
+  rocketFootExplosionDamage: 25,    // Foot launch explosion damage to enemies caught behind her
+  rocketFootExplosionKnockback: 22, // Foot launch explosion knockback force
 
   // Transformation Blast (Collar Pin Pull Culmination)
-  transformationExplosionRadius: 175, // Awakening radial blast radius
+  transformationExplosionRadius: 200, // Awakening radial blast radius
   transformationExplosionDamage: 50,  // Awakening radial blast damage
   transformationKnockback: 34,        // Awakening radial blast knockback force
 
@@ -130,7 +133,7 @@ export const rezeConfig = {
   enableMegatonNuke: 1,             // Master toggle for Ultimate: Megaton Tsar Nuke
   enableUltimateFullHeal: 1,        // Master toggle: Fully heal Reze to 100% Max HP when activating Ultimate
   enableHybridLifesteal: 1,         // Master toggle: Vampiric lifesteal during Bomb Devil Form
-  hybridLifestealPercent: 0.10,     // 35% of damage dealt recovered as HP during Bomb Devil Form
+  hybridLifestealPercent: 0.15,     // 35% of damage dealt recovered as HP during Bomb Devil Form
   nukeCooldown: 1500,               // 25.0s cooldown
   nukeTransformPauseFrames: 35,     // Transformation hit-stop on target (Rule 5 compliant)
   nukeAirborneBarrageFrames: 70,    // Carpet torpedo bombardment duration
@@ -148,7 +151,7 @@ export const rezeConfig = {
   // ──────────────────────────────────────────
   sounds: {
     // Passive 1: Collar Pin Hybrid Physiology (Explosive Revive)
-    revivePinPull: 'Assets/Sound Effects/Skills/parry.mp3',
+    revivePinPull: 'Assets/Sound Effects/RezeSFX/reze_boom_voiceline.mp3',
     reviveExplosion: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
 
     // Human Form — Basic Attack: Tactical Knife
@@ -181,7 +184,7 @@ export const rezeConfig = {
     wallRocketBlast: 'Assets/Sound Effects/Attacks/explosion.mp3',
 
     // Ultimate: Bomb Devil Unleashed — Megaton Tsar Nuke
-    pinPull: 'Assets/Sound Effects/Skills/parry.mp3',
+    pinPull: 'Assets/Sound Effects/RezeSFX/reze_boom_voiceline.mp3',
     pinPullSpray: 'Assets/Sound Effects/Attacks/flamespray1.mp3',
     transformationBlast: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
     transformationExplosion: 'Assets/Sound Effects/Attacks/explosion.mp3',

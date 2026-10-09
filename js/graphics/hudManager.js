@@ -400,7 +400,7 @@ export function drawHUD() {
     const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
     const isTeamMode = is2v2Mode || is1v2Mode || isTLFSMode || (mainFighters && mainFighters.length > 2 && !isFfaMode);
     const isHorizontal = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
-    const isSideHud1v1 = isHorizontal && (is1v1Mode || isStandOffMode || isTLFSMode || (mainFighters && mainFighters.length === 2 && !is2v2Mode && !is1v2Mode));
+    const isSideHud1v1 = isHorizontal && (is1v1Mode || isStandOffMode || isTLFSMode || isFfaMode || (mainFighters && mainFighters.length <= 4 && !is2v2Mode && !is1v2Mode));
     if (isSideHud1v1) {
       containerBottom.style.visibility = 'hidden';
       containerBottom.style.pointerEvents = 'none';
@@ -424,7 +424,7 @@ export function drawHUD() {
   if (containerLeft) {
     const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
     const mainF = (fighters || []).filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
-    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mainF.length === 2);
+    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.HORIZONTAL_1V1 || (mainF && mainF.length <= 4 && mode !== GAME_MODES.TWO_VS_TWO && mode !== '2v2'));
     const sideOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
     if (sideOpacity <= 0 || !containerLeft.children || !containerLeft.children.length || (!isSide1v1 && state.mode !== 'FFA' && !isTacticalMatch(state) && mainF.length <= 4)) {
       containerLeft.style.visibility = 'hidden';
@@ -440,7 +440,7 @@ export function drawHUD() {
   if (containerRight) {
     const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
     const mainF = (fighters || []).filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
-    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mainF.length === 2);
+    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.HORIZONTAL_1V1 || (mainF && mainF.length <= 4 && mode !== GAME_MODES.TWO_VS_TWO && mode !== '2v2'));
     const sideOpacity = (state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
     if (sideOpacity <= 0 || !containerRight.children || !containerRight.children.length || (!isSide1v1 && state.mode !== 'FFA' && !isTacticalMatch(state) && mainF.length <= 4)) {
       containerRight.style.visibility = 'hidden';
@@ -1207,6 +1207,7 @@ function updateHealthHud() {
 
   // OPTIMIZATION: Throttling HUD updates to prevent extreme DOM reflow lag from progress bars.
   const isTactical = isTacticalMatch(state);
+  const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
   const mainFighters = fighters.filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
   const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel' || (mainFighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
   const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
@@ -2513,11 +2514,21 @@ function updateHealthHud() {
 
         const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta' || (m.name && m.name.toUpperCase().includes('YUTA')));
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
+        const memberThemeColor = getFighterThemeColor(m, memberNameColor);
         const memberName = getFighterDisplayName(m, true);
+        const memberNameClass = isMemberSans ? 'health-card__member-name hud-sans-name' : 'health-card__member-name';
+        const memberHeaderHTML = `
+          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${titleAlign === 'right' ? 'flex-end' : 'flex-start'};">
+            <span class="${memberNameClass}" style="color: ${memberThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: ${isH ? '18px' : '15px'}; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${memberName}</span>
+          </div>
+        `;
+
+        const memberMarginTop = isH ? (mIndex === 0 ? '0' : 'auto') : (mIndex === 0 ? '0' : '18px');
 
         if (isMemberCj) {
           return `
-            <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '18px'};">
+            <div class="health-card__member" style="margin-top: ${memberMarginTop};">
+              ${memberHeaderHTML}
               ${generateCjGtaHudWidgetHTML(m, titleAlign, hpText, memberShakeStyle)}
               ${memberSkillsHTML ? `<div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>` : ''}
               ${memberInfoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>` : ''}
@@ -2527,7 +2538,8 @@ function updateHealthHud() {
 
         const hideHb = Boolean(CONFIG.hudHideHealthBars || CONFIG.hudHideAll);
         return `
-          <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '18px'};">
+          <div class="health-card__member" style="margin-top: ${memberMarginTop};">
+            ${memberHeaderHTML}
             ${memberStackHTML}
             <div class="health-card__bar${cjBarClass}${sansBarClass}" style="${memberShakeStyle} ${hideHb ? 'display: none;' : ''}">
             ${isMemberSans ? `
@@ -2916,10 +2928,19 @@ function updateHealthHud() {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = cardHTML;
         const cardElement = tempDiv.firstElementChild;
-        containerBottom.appendChild(cardElement);
+        if (isH) {
+          if (teamIndex === 0) {
+            containerLeft.appendChild(cardElement);
+          } else {
+            containerRight.appendChild(cardElement);
+          }
+        } else {
+          containerBottom.appendChild(cardElement);
+        }
 
         const cachedMembers = [];
         cardElement.querySelectorAll('.health-card__member').forEach((memberEl, i) => {
+          const nameEl = memberEl.querySelector('.health-card__member-name') || memberEl.querySelector('.health-card__name');
           const fill = memberEl.querySelector('.health-card__fill');
           const text = memberEl.querySelector('.health-card__bar-text');
           const bar = memberEl.querySelector('.health-card__bar');
@@ -2939,9 +2960,10 @@ function updateHealthHud() {
             skillBars.set(id, { box, fill: fillEl, text: textEl });
           });
           cachedMembers.push({
-            fill, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
+            nameEl, fill, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
             lastMoneyText: '', lastStarCount: -1, lastWeaponIcon: '', lastWeaponAmmo: '', lastClockText: '',
-            infoContainer, skillsContainer, skillBars, fighter: members[i], lastInfoHTML: ''
+            infoContainer, skillsContainer, skillBars, fighter: members[i], lastInfoHTML: '',
+            lastMemberName: '', lastMemberColor: ''
           });
         });
 
@@ -2990,12 +3012,20 @@ function updateHealthHud() {
           const is2x2 = isFfa || fighters.length >= 3;
           extraClassStr = is2x2 ? 'tactical-card tactical-card-2x2' : 'tactical-card tactical-card-1v1';
         } else {
-          extraClassStr = isFfa ? 'ffa-card' : (isSingleColumnMode ? 'single-column' : '');
+          extraClassStr = isFfa ? 'single-column ffa-card' : (isSingleColumnMode ? 'single-column' : '');
         }
         const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel');
-        const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
-        const isSideHud = isH && (is1v1 || isStandOff || isTLFS || mainFighters.length === 2);
+        const isSideHud = isH && (is1v1 || isStandOff || isTLFS || isFfa || mainFighters.length <= 4);
         const maxBulletsCount = (is1v1Mode && !isSideHud) ? 2 : 0;
+
+        const isSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        const fighterThemeColor = getFighterThemeColor(fighter, nameColor);
+        const nameClass = isSans ? 'health-card__member-name hud-sans-name' : 'health-card__member-name';
+        const fighterHeaderHTML = (isSideHud && mainFighters.length > 2) ? `
+          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${isH ? 'flex-start' : (index % 2 === 0 ? 'flex-start' : 'flex-end')};">
+            <span class="${nameClass}" style="color: ${fighterThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${fighterName}</span>
+          </div>
+        ` : '';
 
         const cardHTML = buildCard({
           title: fighterName,
@@ -3015,7 +3045,8 @@ function updateHealthHud() {
           maxBullets: maxBulletsCount,
           targetFighter: fighter,
           titleAlign: isH ? 'left' : (index % 2 === 0 ? 'left' : 'right'),
-          singleColumn: isSingleColumnMode
+          singleColumn: isSingleColumnMode,
+          customHeaderHTML: fighterHeaderHTML
         });
 
         const tempDiv = document.createElement('div');
@@ -3025,7 +3056,14 @@ function updateHealthHud() {
 
 
         if (isSideHud) {
-          if (index === 0) {
+          if (isFfa) {
+            if (containerLeft) containerLeft.classList.add('ffa-side-hud');
+            if (containerRight) containerRight.classList.add('ffa-side-hud');
+          } else {
+            if (containerLeft) containerLeft.classList.remove('ffa-side-hud');
+            if (containerRight) containerRight.classList.remove('ffa-side-hud');
+          }
+          if (index % 2 === 0) {
             containerLeft.appendChild(cardElement);
           } else {
             containerRight.appendChild(cardElement);
@@ -3106,6 +3144,21 @@ function updateHealthHud() {
         const isDarkTheme = isDarkModeActive();
         const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
         const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+
+        if (m.nameEl) {
+          const currentName = getFighterDisplayName(fighter, true);
+          const isMemberYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+          const defaultNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : '#ffffff') : '#000000';
+          const memberThemeColor = getFighterThemeColor(fighter, defaultNameColor);
+          if (m.lastMemberName !== currentName) {
+            m.nameEl.textContent = currentName;
+            m.lastMemberName = currentName;
+          }
+          if (m.lastMemberColor !== memberThemeColor) {
+            m.nameEl.style.color = memberThemeColor;
+            m.lastMemberColor = memberThemeColor;
+          }
+        }
         let percent, barColor, hpText;
         if (isSans) {
           const curStam = (fighter.stamina !== undefined) ? fighter.stamina : 100;
@@ -3356,6 +3409,40 @@ function updateHealthHud() {
         if (cachedCard.lastHpText !== metaValue) {
           cachedCard.hpBarText.textContent = metaValue;
           cachedCard.lastHpText = metaValue;
+        }
+      }
+
+      // ── FFA Eliminated State: Grayscale card + huge red X overlay ──
+      // Applied whenever this fighter is dead in any FFA game mode.
+      // Overlay div is lazy-created once, then shown/hidden per frame via dirty-check.
+      {
+        const _isFfaHud = (mode === 'FFA' || mode === 'Tactical FFA' ||
+          (typeof GAME_MODES !== 'undefined' && (mode === GAME_MODES.FFA || mode === GAME_MODES.TACTICAL_FFA)));
+        const _curHpElim = isSans
+          ? ((fighter.stamina !== undefined) ? fighter.stamina : 1)
+          : ((typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp);
+        const _isEliminated = _isFfaHud && (_curHpElim <= 0);
+
+        if (_isFfaHud && cachedCard.cardElement) {
+          // Lazy-create the red X overlay element once per card
+          if (!cachedCard.ffaEliminatedOverlay) {
+            const _overlay = document.createElement('div');
+            _overlay.className = 'ffa-eliminated-overlay';
+            _overlay.style.display = 'none';
+            cachedCard.cardElement.appendChild(_overlay);
+            cachedCard.ffaEliminatedOverlay = _overlay;
+          }
+
+          // Dirty-check prevents layout thrashing on every frame
+          if (cachedCard.lastFfaEliminated !== _isEliminated) {
+            cachedCard.ffaEliminatedOverlay.style.display = _isEliminated ? 'flex' : 'none';
+            if (_isEliminated) {
+              cachedCard.cardElement.classList.add('ffa-eliminated');
+            } else {
+              cachedCard.cardElement.classList.remove('ffa-eliminated');
+            }
+            cachedCard.lastFfaEliminated = _isEliminated;
+          }
         }
       }
 
