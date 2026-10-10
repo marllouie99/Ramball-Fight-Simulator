@@ -2455,8 +2455,10 @@ function updateHealthHud() {
       maxBullets = 0;
     }
 
-    const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
-    const maxChars = isTactical ? 28 : (extraClass.includes('ffa-card') ? 18 : 24);
+    const isH = typeof state !== 'undefined' && state.viewOrientation === 'horizontal';
+    const isCompactCard = extraClass.includes('ffa-card') || isH;
+    const baseFontSize = isCompactCard ? 16 : (CONFIG.hudTitleFontSize || 20);
+    const maxChars = isTactical ? 28 : (isCompactCard ? 18 : 24);
     const isDark = (state.arenaTheme === 'dark') || isTactical;
     const isYutaCard = (targetFighter && (targetFighter.characterId === 'yuta' || targetFighter.type === 'yuta')) || (title && (title.toUpperCase().includes('YUTA') || title.toUpperCase().includes('OKKOTSU')));
     const defaultNameColor = isDark ? (isYutaCard ? '#FF1493' : '#ffffff') : '#000000';
@@ -2519,7 +2521,7 @@ function updateHealthHud() {
         const memberNameClass = isMemberSans ? 'health-card__member-name hud-sans-name' : 'health-card__member-name';
         const memberHeaderHTML = `
           <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${titleAlign === 'right' ? 'flex-end' : 'flex-start'};">
-            <span class="${memberNameClass}" style="color: ${memberThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: ${isH ? '18px' : '15px'}; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${memberName}</span>
+            <span class="${memberNameClass}" style="color: ${memberThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: ${isH ? '14.5px' : '15px'}; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${memberName}</span>
           </div>
         `;
 
@@ -3022,8 +3024,8 @@ function updateHealthHud() {
         const fighterThemeColor = getFighterThemeColor(fighter, nameColor);
         const nameClass = isSans ? 'health-card__member-name hud-sans-name' : 'health-card__member-name';
         const fighterHeaderHTML = (isSideHud && mainFighters.length > 2) ? `
-          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${isH ? 'flex-start' : (index % 2 === 0 ? 'flex-start' : 'flex-end')};">
-            <span class="${nameClass}" style="color: ${fighterThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: 18px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${fighterName}</span>
+          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${index % 2 === 0 ? 'flex-start' : 'flex-end'};">
+            <span class="${nameClass}" style="color: ${fighterThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: 14.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${fighterName}</span>
           </div>
         ` : '';
 
@@ -3044,7 +3046,7 @@ function updateHealthHud() {
           kills: (isFfa) && state.matchKills ? state.matchKills[index] || [] : [],
           maxBullets: maxBulletsCount,
           targetFighter: fighter,
-          titleAlign: isH ? 'left' : (index % 2 === 0 ? 'left' : 'right'),
+          titleAlign: (index % 2 === 0 ? 'left' : 'right'),
           singleColumn: isSingleColumnMode,
           customHeaderHTML: fighterHeaderHTML
         });

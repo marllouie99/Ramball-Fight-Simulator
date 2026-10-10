@@ -171,7 +171,7 @@ export const MODE_SETTINGS = {
     rounds: 3,
     hpMultiplier: 1.2,
     fixedHp: 1000,
-    speedMultiplier: 1.3,
+    speedMultiplier: 1.0,
     initialFuelPickups: 2,
     supportFourFighters: false,
   },

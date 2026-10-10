@@ -85,6 +85,7 @@ export class SansFighter extends Fighter {
     this.slamImpacts = [];
     this.heartShatters = [];
     this._hasTriggeredOpponentShatter = false;
+    this._hasTriggeredSelfDeathShatter = false;
     // Basic Attack Cooldown & Animation
     this.basicAttackCooldown = 0;
     this.basicAttackAnimTimer = 0;
@@ -187,6 +188,7 @@ export class SansFighter extends Fighter {
     this.slamImpacts = [];
     this.heartShatters = [];
     this._hasTriggeredOpponentShatter = false;
+    this._hasTriggeredSelfDeathShatter = false;
     this.speechBubble = {
       text: '',
       fullText: '',
@@ -374,19 +376,36 @@ export class SansFighter extends Fighter {
           }
         }
 
-        // Update shard physics
+        // Update shard physics with floor bounce
         if (fx.shards) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 });
+          const wallW = (arena && arena.wallWidth) || 4;
+          const floorY = (arena ? arena.y + arena.height : 800) - wallW - fx.y + 16;
+
           for (const shard of fx.shards) {
             shard.x += shard.vx;
             shard.y += shard.vy;
             shard.vy += 0.26; // Gravity
             shard.vx *= 0.98; // Air resistance
             shard.rot += shard.vRot;
+
+            if (shard.y >= floorY) {
+              shard.y = floorY;
+              if (shard.vy > 0.8) {
+                shard.vy = -shard.vy * 0.35;
+                shard.vx *= 0.70;
+              } else {
+                shard.vy = 0;
+                shard.vx *= 0.50;
+                shard.vRot *= 0.50;
+              }
+            }
           }
         }
       }
 
-      if (fx.timer <= 0) {
+      const minT = fx.minTimer !== undefined ? fx.minTimer : -45;
+      if (fx.timer <= minT) {
         this.heartShatters.splice(i, 1);
       }
     }
@@ -432,6 +451,23 @@ export class SansFighter extends Fighter {
   }
 
   /**
+   * Calculates dynamic teleport dodge stamina cost scaling at 10% of incoming attack damage.
+   * Special case: Sukuna's Malevolent Shrine domain cuts cost to 1 stamina.
+   * Floor: Minimum cost of 1 stamina (minDodgeStaminaCost).
+   * @param {number} [damageVal=10] - Damage of incoming attack/projectile
+   * @param {boolean} [isSukunaDomainActive=false] - Whether Sukuna's domain is active
+   * @returns {number} Calculated stamina cost
+   */
+  _calculateDodgeStaminaCost(damageVal, isSukunaDomainActive = false) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    if (isSukunaDomainActive) return cfg.domainDodgeStaminaCost ?? 1;
+    const mult = cfg.damageStaminaCostMultiplier ?? 0.10;
+    const minCost = cfg.minDodgeStaminaCost ?? 1;
+    const dmg = (typeof damageVal === 'number' && Number.isFinite(damageVal) && damageVal > 0) ? damageVal : 10;
+    return Math.max(minCost, Math.round(dmg * mult));
+  }
+
+  /**
    * Passive 2: Teleport Dodge & Stamina against Sukuna's domain slash lines.
    * Allows Sans to teleport dodge through Malevolent Shrine spatial slash lines as long as he has stamina.
    * @param {Object} lineData - Slice line intersection details { angle, cx, cy, normalX, normalY, thickness, attacker }
@@ -447,7 +483,7 @@ export class SansFighter extends Fighter {
     // Special Interaction: Stamina/mana cost is only 1 when Sukuna's domain is open
     const isSukunaDomainActive = (lineData && (lineData.isSukunaDomain || lineData.attacker?.characterId === 'sukuna' || lineData.attacker?.type === 'sukuna')) ||
       (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna') && f.domainActive));
-    const staminaCost = isSukunaDomainActive ? (cfg.domainDodgeStaminaCost ?? 1) : ((cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10);
+    const staminaCost = this._calculateDodgeStaminaCost(lineData.damage || lineData.attacker?.damage, isSukunaDomainActive);
     if (this.stamina < staminaCost) {
       return false; // Out of stamina -> cannot dodge slice line!
     }
@@ -544,7 +580,7 @@ export class SansFighter extends Fighter {
     const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
     if (isFrozen || this.hp <= 0) return false;
 
-    const staminaCost = (cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10;
+    const staminaCost = this._calculateDodgeStaminaCost(beamData.damage || beamData.attacker?.damage);
     if (this.stamina < staminaCost) {
       return false; // Out of stamina -> cannot dodge beam!
     }
@@ -643,7 +679,7 @@ export class SansFighter extends Fighter {
     const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
     if (isFrozen || this.hp <= 0) return false;
 
-    const staminaCost = (cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10;
+    const staminaCost = this._calculateDodgeStaminaCost(purpleData.damage || purpleData.projectile?.damage);
     if (this.stamina < staminaCost) {
       return false; // Out of stamina -> cannot dodge purple!
     }
@@ -761,7 +797,7 @@ export class SansFighter extends Fighter {
     }
 
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
-    if (!this._canPayTeleportDodge(cfg)) return false;
+    if (!this._canPayTeleportDodge(cfg, stasisData.damage || stasisData.attacker?.damage)) return false;
 
     const startX = this.x;
     const startY = this.y;
@@ -805,14 +841,16 @@ export class SansFighter extends Fighter {
 
   /**
    * Validates dodge availability (enabled, not CC'd, stamina, cooldown, roll) and pays the stamina cost.
+   * @param {Object} cfg - Character config
+   * @param {number} [attackDamage=10] - Incoming attack damage to calculate stamina cost
    * @returns {boolean} True if the dodge is paid for and should proceed.
    */
-  _canPayTeleportDodge(cfg) {
+  _canPayTeleportDodge(cfg, attackDamage = 10) {
     if (!cfg.enableTeleportDodge || this.hp <= 0) return false;
     const isFrozen = this.isTimeStopped || this.isStunned || this.isParalyzed || this.isChainedByMakima;
     if (isFrozen) return false;
 
-    const staminaCost = (cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10;
+    const staminaCost = this._calculateDodgeStaminaCost(attackDamage);
     if (this.stamina < staminaCost) return false;
     if (this.dodgeCooldown > 0 && (cfg.dodgeCooldown > 0)) return false;
 
@@ -897,7 +935,8 @@ export class SansFighter extends Fighter {
     const isSukunaDomainActive = isDomainSlash ||
       (attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna') && attacker.domainActive) ||
       (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna') && f.domainActive));
-    const staminaCost = isSukunaDomainActive ? (cfg.domainDodgeStaminaCost ?? 1) : ((cfg.dodgeStaminaCost !== undefined) ? cfg.dodgeStaminaCost : 10);
+    const incomingDmg = (typeof amount === 'number' && amount > 0) ? amount : (options.projectile?.damage || attacker?.damage);
+    const staminaCost = this._calculateDodgeStaminaCost(incomingDmg, isSukunaDomainActive);
     const hasStamina = (this.stamina >= staminaCost);
     const cooldownReady = (this.dodgeCooldown <= 0) || (cfg.dodgeCooldown === 0);
     const canDodge = cfg.enableTeleportDodge && !isFrozen && hasStamina && cooldownReady && rollsDodge;
@@ -992,9 +1031,15 @@ export class SansFighter extends Fighter {
 
     // Stamina depleted or CC'd -> take regular damage
     const applied = super.takeDamage(amount, attacker, options);
-    if (this.hp <= 0 && !this._hasSaidDeathQuote) {
-      this._hasSaidDeathQuote = true;
-      this.speak("welp. i'm going to grillby's.", 160, true);
+    if (this.hp <= 0) {
+      if (!this._hasTriggeredSelfDeathShatter) {
+        this._hasTriggeredSelfDeathShatter = true;
+        this.triggerHeartShatter(this.x, this.y);
+      }
+      if (!this._hasSaidDeathQuote) {
+        this._hasSaidDeathQuote = true;
+        this.speak("welp. i'm going to grillby's.", 160, true);
+      }
     }
     return applied;
   }
@@ -1714,6 +1759,20 @@ export class SansFighter extends Fighter {
    * Main Fighter Update Loop
    */
   update(opponent, ownerIndex, arena) {
+    // 0. Update visual effects & transient particle lifecycles before freeze guard (Rule 25)
+    this._updateHeartShatters();
+    this._updateSpeech();
+
+    // Trigger Undertale Heart Shatter on Sans himself when defeated
+    if (this.hp <= 0 && !this._hasTriggeredSelfDeathShatter) {
+      this._hasTriggeredSelfDeathShatter = true;
+      this.triggerHeartShatter(this.x, this.y);
+      if (!this._hasSaidDeathQuote) {
+        this._hasSaidDeathQuote = true;
+        this.speak("welp. i'm going to grillby's.", 160, true);
+      }
+    }
+
     // 1. Mandatory Freeze & TimeStop Early Exit Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -1722,7 +1781,6 @@ export class SansFighter extends Fighter {
       this._updateGasterBlasters(opponent);
       this._updateBones();
       this._updateKarma();
-      this._updateHeartShatters();
       return;
     }
 
@@ -1762,8 +1820,6 @@ export class SansFighter extends Fighter {
     this._updateGasterBlasters(opponent);
     this._updateBones();
     this._updateBlueSoul();
-    this._updateSpeech();
-    this._updateHeartShatters();
 
     // 5. Intro Speech Trigger on Match Start
     if (!this._hasSaidIntro && state && (state.gameState === 'playing' || state.gameState === 'countdown')) {

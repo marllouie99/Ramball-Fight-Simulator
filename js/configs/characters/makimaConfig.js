@@ -39,7 +39,7 @@ export const makimaConfig = {
   // Passive 1: Prime Minister Contract (Citizen Redirection)
   enableCitizenContract: true,      // Master toggle for Passive 1: Prime Minister Contract & Shatter Revive
   maxCitizenLives: 3,               // 5 citizen sacrifice stocks
-  citizenReviveHpPercent: 0.70,     // Revives with 100% Max HP
+  citizenReviveHpPercent: 1.00,     // Revives with 100% Max HP
   citizenReviveDurationFrames: 75,  // 1.25s death shatter & magnetic reassembly duration
   citizenDamageReduction: 0.20,     // 20% passive damage reduction while stocks remain
   citizenShockwaveRadius: 150,      // Repel shockwave radius on revive
@@ -51,7 +51,7 @@ export const makimaConfig = {
   bangWallBounceDamage: 22,         // Bonus damage when slammed into arena walls
   bangKnockbackForce: 46,           // Massive directional knockback
   bangRange: 1600,                  // Full-screen lightning-fast beam reach
-  bangCooldown: 300,                 // ~0.73s cooldown between shots
+  bangCooldown: 380,                 // ~0.73s cooldown between shots
   bangBeamWidth: 32,                // Kinetic shockwave cylinder width
   bangPierceProjectiles: true,      // Pierces and destroys incoming enemy projectiles
   wallPinDurationFrames: 20,        // 1.5 seconds (90 frames) wall-stick duration on collision

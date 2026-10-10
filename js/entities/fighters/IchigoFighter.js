@@ -370,6 +370,10 @@ export class IchigoFighter extends Fighter {
 
   interruptAttacks(forceCancelAll = false) {
     const isTrulyDead = Boolean(this.isDead || this.hp <= 0);
+    if (!forceCancelAll && this.isSkillPreservedInStasis() && !isTrulyDead) {
+      return;
+    }
+
     const isChannelingHollow = Boolean(this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this._hollowVoicelineWait);
     const isChannelingBankai = Boolean(this.isChannelingBankai || this.bankaiBurstTimer > 0);
     const isChannelingGrandFinisher = Boolean(this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || (this.getsugaRecoveryTimer > 0 && this.isFinalGetsugaRecovery) || this._isFinalGetsugaVoicelinePlaying());
@@ -911,8 +915,7 @@ export class IchigoFighter extends Fighter {
       this.vy = 0;
       this.knockbackVx = 0;
       this.knockbackVy = 0;
-      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-      if (!isNanamiPausing && !isChannelingHollow && !isChannelingGrandFinisher && !isAboutToUnleashNormal && !isChannelingCombo && !this.isChannelingBankai && this.bankaiBurstTimer <= 0) {
+      if (!this.isSkillPreservedInStasis() && !isChannelingHollow && !isChannelingGrandFinisher && !isAboutToUnleashNormal && !isChannelingCombo && !this.isChannelingBankai && this.bankaiBurstTimer <= 0) {
         this._stopFinalGetsugaVoiceline();
         this.interruptAttacks(true);
       }

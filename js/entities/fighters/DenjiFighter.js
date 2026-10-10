@@ -247,7 +247,9 @@ export class DenjiFighter extends Fighter {
     // 1. Mandatory Rule 1 Freeze Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush || this.isChainedByMakima) {
-      this.interruptAttacks();
+      if (!this.isSkillPreservedInStasis()) {
+        this.interruptAttacks();
+      }
       // Continuous 3-Blade Chainsaw Shredding is ALWAYS active even while stunned, frozen, paralyzed, or chained!
       const target = this._findBestTarget(opponent) || opponent;
       this._updateChainsawShredCollision(target || opponent);
@@ -1410,6 +1412,10 @@ export class DenjiFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     super.interruptAttacks(forceCancelAll);
     if (this.hp <= 0 || this.dead || this.isDead) {
       this._stopShredAudio(false);

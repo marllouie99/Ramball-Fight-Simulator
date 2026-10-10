@@ -309,24 +309,20 @@ export class EngineerFighter extends Fighter {
       }
       
       const offset = cfg.turretSpawnDistance ?? -40;
-      let spawnX = this.x + Math.cos(spawnAngle) * offset;
-      let spawnY = this.y + Math.sin(spawnAngle) * offset;
+      let rawSpawnX = this.x + Math.cos(spawnAngle) * offset;
+      let rawSpawnY = this.y + Math.sin(spawnAngle) * offset;
+      let spawnX = rawSpawnX;
+      let spawnY = rawSpawnY;
 
-      if (arena && isCrazyDaveMatch(opponent)) {
+      if (arena) {
         const occupants = getArenaTileOccupants(this, this.turretEntity);
-        const tile = getAvailableTileForBuilding(spawnX, spawnY, arena, occupants);
+        const tile = getAvailableTileForBuilding(rawSpawnX, rawSpawnY, arena, occupants);
         if (!tile) {
           // All tiles occupied by plants or buildings — cannot place sentry on occupied tile!
           return;
         }
         spawnX = tile.x;
         spawnY = tile.y;
-      }
-
-      // Ensure turret stays fully within arena limits, accounting for its radius (approx 20)
-      if (arena) {
-        spawnX = Math.max(arena.x + 20, Math.min(arena.x + arena.width - 20, spawnX));
-        spawnY = Math.max(arena.y + 20, Math.min(arena.y + arena.height - 20, spawnY));
       }
 
       this.isBuildingTurret = true;
@@ -345,6 +341,8 @@ export class EngineerFighter extends Fighter {
       const turret = new TurretEntity(spawnX, spawnY, this, currentLvl);
       turret.isBuilding = true;
       turret.buildProgress = 0;
+      turret._fixedX = spawnX;
+      turret._fixedY = spawnY;
       
       // Determine max allowed level based on toggles
       const lvl3Allowed = this.isSkillEnabled(cfg.enableSentryLevel3, true);
@@ -420,23 +418,20 @@ export class EngineerFighter extends Fighter {
       let turretAngle = Math.atan2(this.turretEntity.y - this.y, this.turretEntity.x - this.x);
       let dispenserAngle = turretAngle + Math.PI * 0.75; // Offset 135° to create a tactical base
       const dOffset = cfg.dispenserSpawnDistance ?? 45;
-      let spawnX = this.x + Math.cos(dispenserAngle) * dOffset;
-      let spawnY = this.y + Math.sin(dispenserAngle) * dOffset;
+      let rawSpawnX = this.x + Math.cos(dispenserAngle) * dOffset;
+      let rawSpawnY = this.y + Math.sin(dispenserAngle) * dOffset;
+      let spawnX = rawSpawnX;
+      let spawnY = rawSpawnY;
 
-      if (arena && isCrazyDaveMatch(opponent)) {
+      if (arena) {
         const occupants = getArenaTileOccupants(this, this.dispenserEntity);
-        const tile = getAvailableTileForBuilding(spawnX, spawnY, arena, occupants);
+        const tile = getAvailableTileForBuilding(rawSpawnX, rawSpawnY, arena, occupants);
         if (!tile) {
           // All tiles occupied by plants or buildings — cannot place dispenser on occupied tile!
           return;
         }
         spawnX = tile.x;
         spawnY = tile.y;
-      }
-
-      if (arena) {
-        spawnX = Math.max(arena.x + 20, Math.min(arena.x + arena.width - 20, spawnX));
-        spawnY = Math.max(arena.y + 20, Math.min(arena.y + arena.height - 20, spawnY));
       }
 
       this.isBuildingDispenser = true;
@@ -450,6 +445,8 @@ export class EngineerFighter extends Fighter {
       const dispenser = new DispenserEntity(spawnX, spawnY, this);
       dispenser.isBuilding = true;
       dispenser.buildProgress = 0;
+      dispenser._fixedX = spawnX;
+      dispenser._fixedY = spawnY;
 
       if (state && state.fighters) {
         state.fighters.push(dispenser);

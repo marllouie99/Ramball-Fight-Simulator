@@ -59,13 +59,6 @@ export const DOLL_METADATA = {
     drawH: 155,
     facingRight: false,
   },
-  reze: {
-    src: 'Assets/model/reze/REZE-MODEL-SKIN.png',
-    type: 'static',
-    drawW: 155,
-    drawH: 155,
-    facingRight: false,
-  },
   nanami: {
     src: 'Assets/model/nanami/Nanami-PIXEL-SKIN.png',
     type: 'static',

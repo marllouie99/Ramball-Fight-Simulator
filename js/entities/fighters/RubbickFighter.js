@@ -305,6 +305,10 @@ export class RubbickFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     super.interruptAttacks(forceCancelAll);
     this.stolenWindUpTimer = 0;
     this.activePullActive = false;
@@ -1417,7 +1421,7 @@ export class RubbickFighter extends Fighter {
                 this.stolenType = stolenId;
                 this.stolenColor = '#00FF64';
                 this.stolenTimer = rubbickCfg.spellStealDuration;
-                this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 45; // Initial delay before casting newly stolen skill
+                this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 300; // Initial delay before casting newly stolen skill (300 frames = 5s)
                 this._hasFiredStolenSkillTrick = false;
 
                 spawnFloatingText(this.x, this.y - this.r - 20, `STOLEN: ${skillLabel}!`, '#00FF64');
@@ -1435,7 +1439,7 @@ export class RubbickFighter extends Fighter {
           this.stolenType = opponent._def.type;
           this.stolenColor = opponent._def.color;
           this.stolenTimer = rubbickCfg.spellStealDuration;
-          this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 45; // Initial delay before casting newly stolen skill
+          this.stolenSkillCooldown = rubbickCfg.spellStealCastDelay ?? 300; // Initial delay before casting newly stolen skill (300 frames = 5s)
           this._hasFiredStolenSkillTrick = false;
 
           const stolenLabel = this.stolenType.toUpperCase();

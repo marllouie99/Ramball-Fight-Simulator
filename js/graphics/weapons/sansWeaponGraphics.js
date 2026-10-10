@@ -680,7 +680,8 @@ export function drawSansSpeechBubble(ctx, fighter) {
  * Phase 3 (timer 52-0): Exploding pixel shards flying with physics, gravity and rotation.
  */
 export function drawHeartShatterEffect(ctx, fx) {
-  if (!fx || fx.timer <= 0) return;
+  const minT = fx && fx.minTimer !== undefined ? fx.minTimer : -45;
+  if (!fx || fx.timer <= minT) return;
 
   ctx.save();
   ctx.translate(fx.x, fx.y);
@@ -724,11 +725,11 @@ export function drawHeartShatterEffect(ctx, fx) {
       ctx.fillRect(-1.5, -8, 3, 16);
     }
   }
-  // Phase 3: Pixel Heart Shards Explosion (timer 52 to 0)
+  // Phase 3: Pixel Heart Shards Explosion & Settle (timer 52 to minTimer)
   else {
     ctx.translate(0, -16);
-    const alpha = Math.min(1.0, t / 18);
-    ctx.globalAlpha = Math.max(0, alpha);
+    const alpha = t > 0 ? 1.0 : Math.max(0, (45 + t) / 45);
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
 
     if (fx.shards && fx.shards.length > 0) {
       for (const shard of fx.shards) {

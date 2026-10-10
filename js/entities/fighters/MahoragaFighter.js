@@ -558,6 +558,10 @@ export class MahoragaFighter extends Fighter {
       for (let i = 0; i < projectileSystem.projectiles.length; i++) {
         const p = projectileSystem.projectiles[i];
         if (!p || (p.life || 0) <= 0) continue;
+        // Projectile must belong to an active enemy fighter in the current match state
+        if (!p.owner) continue;
+        if (p.owner === this || (typeof this.isTeammate === 'function' && this.isTeammate(p.owner))) continue;
+        if (typeof state !== 'undefined' && state.fighters && !state.fighters.includes(p.owner)) continue;
 
         // Gojo Hollow Purple suction / gravitational vortex
         if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') {
@@ -617,6 +621,25 @@ export class MahoragaFighter extends Fighter {
     }
 
     return false;
+  }
+
+  /**
+   * Overrides base isStationarySkillActive() to include all of Mahoraga's stationary
+   * states: pulling/dragging CCs, wall slams, cleaves, shouts, throws, and adaptation pauses.
+   * This ensures applyMovementPhysics() suppresses auto-velocity-recovery while Mahoraga
+   * is being carried by Getsuga Tensho, Gojo Blue/Purple, Ruby Hook, Black Hole, etc.
+   */
+  isStationarySkillActive() {
+    return Boolean(
+      this.isPulledOrDragged() ||
+      this.isWallSlamActive ||
+      this.isThrowing ||
+      this.isCleaving ||
+      this.isShouting ||
+      (this.adaptationPauseTimer || 0) > 0 ||
+      (this.postDashPauseTimer || 0) > 0 ||
+      super.isStationarySkillActive?.()
+    );
   }
 
   /**
@@ -1600,7 +1623,10 @@ export class MahoragaFighter extends Fighter {
     const target = this._findClosestEnemy(opponent);
     this.isMeleeMode = false;
 
-    if (this.postDashPauseTimer > 0) {
+    if (this.postDashPauseTimer > 0 || this.isPulledOrDragged()) {
+      // Zero out Mahoraga's own movement drive so external pull forces (Getsuga drag,
+      // Gojo Blue/Purple suction, Ruby Hook, Black Hole, Reze Pin Pull, etc.) are NOT
+      // immediately cancelled by Mahoraga's high natural speed auto-recovery each frame.
       this.vx = 0;
       this.vy = 0;
       this.applyMovementPhysics(0);

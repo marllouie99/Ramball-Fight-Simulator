@@ -156,7 +156,7 @@ export const gojoConfig = {
   enableMeleeMode: true,                   // Master toggle for Melee Mode & Hand-to-Hand Martial Arts
   closeRangeRadius: 120,                   // Proximity distance (pixels) to enter Melee Mode (direct contact only)
   leaveMeleeRadius: 150,                   // Distance (pixels) beyond which Melee Mode is instantly disengaged
-  initialMeleeDuration: 120,                // Active melee clash duration in frames (~1.0s at 60fps)
+  initialMeleeDuration: 100,                // Active melee clash duration in frames (~1.0s at 60fps)
   meleeModeCooldown: 240,                  // Mandatory ranged separation cooldown in frames (~4.0s at 60fps)
   comboDisengageDistance: 260,             // Distance (pixels) teleported away when disengaging after clash
   meleePunchDamage: 6,                     // Damage dealt per martial arts punch strike

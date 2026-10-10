@@ -3,7 +3,7 @@ import { drawYutaSkin, drawYutaFist } from '../../graphics/fighters/yutaSkin.js'
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { stopSound, stopSoundBySrc, fadeOutSound, fadeOutSoundBySrc, pauseSound, resumeSound, pauseSoundBySrc, resumeSoundBySrc } from '../../systems/soundSystem.js';
-import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
@@ -633,8 +633,8 @@ export class YutaFighter extends Fighter {
       this.knockbackVy = 0;
     }
 
-    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-    const isFrozen = isNanamiPausing || (!this.isChannelingDomain && !this.domainActive && !this.isFiringPureLoveBeam && !this.isChannelingPureLoveBeam && this._handleTimeStop()) || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
+    const isStasisFrozen = this.isSkillPreservedInStasis();
+    const isFrozen = isStasisFrozen || (!this.isChannelingDomain && !this.domainActive && !this.isFiringPureLoveBeam && !this.isChannelingPureLoveBeam && this._handleTimeStop()) || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
 
     if (this.rctCooldown > 0) this.rctCooldown--;
 
@@ -701,7 +701,7 @@ export class YutaFighter extends Fighter {
       }
 
       // Domain channeling, Pure Love Beam, Rika Emergence/Call, & active domain have hyper-armor — do NOT cancel them via interruptAttacks().
-      if (!isNanamiPausing && !this.isChannelingDomain && !this.domainActive && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.rikaEmergingForBeamTimer && (this.rikaCallTimer <= 0) && !this.isChannelingThinIceBreaker) {
+      if (!this.isSkillPreservedInStasis() && !this.isChannelingDomain && !this.domainActive && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.rikaEmergingForBeamTimer && (this.rikaCallTimer <= 0) && !this.isChannelingThinIceBreaker) {
         this.interruptAttacks();
       }
       return;
@@ -2398,6 +2398,10 @@ export class YutaFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     const wasChannelingDomain = this.isChannelingDomain;
     const currentDomainCharge = this.domainChargeTimer;
 

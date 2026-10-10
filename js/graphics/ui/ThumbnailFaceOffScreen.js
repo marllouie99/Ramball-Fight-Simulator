@@ -398,82 +398,13 @@ function renderCachedBackground(width, height, leftColor, rightColor) {
   const ctx = _bgCacheCtx;
   ctx.clearRect(0, 0, width, height);
 
-  const topSplitX = width * 0.62;
-  const botSplitX = width * 0.38;
-
-  // ── Step 1: Diagonal Left Domain (Deep, Rich, Vibrant Shade of Fighter 1's Color) ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(topSplitX, 0);
-  ctx.lineTo(botSplitX, height);
-  ctx.lineTo(0, height);
-  ctx.closePath();
-
-  const leftGrad = ctx.createLinearGradient(0, 0, botSplitX, height);
-  const deepDarkLeft = adjustBrightness(leftColor, -65);
-  const midDarkLeft = adjustBrightness(leftColor, -48);
-  const topDarkLeft = adjustBrightness(leftColor, -35);
-  leftGrad.addColorStop(0, topDarkLeft);
-  leftGrad.addColorStop(0.5, midDarkLeft);
-  leftGrad.addColorStop(1, deepDarkLeft);
-  ctx.fillStyle = leftGrad;
-  ctx.fill();
-  ctx.restore();
-
-  // Left Ambient Energy Bloom (Moody & Saturated)
-  const leftBloom = ctx.createRadialGradient(width * 0.22, height * 0.44, 20, width * 0.22, height * 0.44, width * 0.48);
-  leftBloom.addColorStop(0, hexToRgba(leftColor, 0.28));
-  leftBloom.addColorStop(0.55, hexToRgba(leftColor, 0.08));
-  leftBloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = leftBloom;
+  // Simply White Background
+  ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, width, height);
-
-  // ── Step 2: Diagonal Right Domain (Deep, Rich, Slightly Dark Shade of Fighter 2's Color) ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(topSplitX, 0);
-  ctx.lineTo(width, 0);
-  ctx.lineTo(width, height);
-  ctx.lineTo(botSplitX, height);
-  ctx.closePath();
-
-  const rightGrad = ctx.createLinearGradient(botSplitX, height, width, 0);
-  const deepDarkRight = adjustBrightness(rightColor, -65);
-  const midDarkRight = adjustBrightness(rightColor, -48);
-  const topDarkRight = adjustBrightness(rightColor, -35);
-  rightGrad.addColorStop(0, deepDarkRight);
-  rightGrad.addColorStop(0.5, midDarkRight);
-  rightGrad.addColorStop(1, topDarkRight);
-  ctx.fillStyle = rightGrad;
-  ctx.fill();
-  ctx.restore();
-
-  // Right Ambient Energy Bloom (Moody & Saturated)
-  const rightBloom = ctx.createRadialGradient(width * 0.78, height * 0.44, 20, width * 0.78, height * 0.44, width * 0.48);
-  rightBloom.addColorStop(0, hexToRgba(rightColor, 0.28));
-  rightBloom.addColorStop(0.55, hexToRgba(rightColor, 0.08));
-  rightBloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = rightBloom;
-  ctx.fillRect(0, 0, width, height);
-
-  // ── Step 3: Halftone Dot Patterns ──
-  drawHalftoneGrid(ctx, 0, 0, width * 0.45, height * 0.40, hexToRgba(leftColor, 0.18), true);
-  drawHalftoneGrid(ctx, width * 0.55, height * 0.60, width * 0.45, height * 0.40, hexToRgba(rightColor, 0.18), false);
-
-  // ── Step 4: Grunge Paint Splatters & Diagonal Brush Streaks ──
-  drawGrungeBrushStrokes(ctx, width, height, topSplitX, botSplitX, leftColor, rightColor);
-
-  // ── Step 5: Floating Triangles & Debris Specks ──
-  drawFloatingActionDebris(ctx, width, height, leftColor, rightColor);
 }
 
 /** Draws the Dynamic Anime Grunge Split Background with High-Performance Offscreen Caching */
 function drawAnimeGrungeSplitBackground(ctx, width, height, leftColor, rightColor, timer) {
-  if (!_floatingDebris || _floatingDebris.length === 0) {
-    initDebrisAndScratches(width, height);
-  }
-
   const bgKey = `${width}_${height}_${leftColor}_${rightColor}`;
   if (bgKey !== _lastBgKey || !_bgCacheCanvas) {
     _lastBgKey = bgKey;
@@ -484,11 +415,6 @@ function drawAnimeGrungeSplitBackground(ctx, width, height, leftColor, rightColo
   if (_bgCacheCanvas) {
     ctx.drawImage(_bgCacheCanvas, 0, 0);
   }
-
-  // Dynamic Jagged White Lightning Fracture Seam
-  const topSplitX = width * 0.62;
-  const botSplitX = width * 0.38;
-  drawJaggedLightningCrack(ctx, width, height, topSplitX, botSplitX, timer);
 }
 
 /** Horizontal zigzag coordinates for FFA 4-way screen division */
@@ -534,143 +460,13 @@ function renderCachedFfaBackground(width, height, colors) {
   const ctx = _ffaBgCacheCtx;
   ctx.clearRect(0, 0, width, height);
 
-  const midX = width * 0.5;
-  const midY = height * 0.44;
-  const hz = getFfaHorizontalZigzagPoints(width, midY);
-  const vz = getFfaVerticalZigzagPoints(height, midX);
-
-  const c0 = colors[0] || '#3b82f6';
-  const c1 = colors[1] || '#10b981';
-  const c2 = colors[2] || '#f59e0b';
-  const c3 = colors[3] || '#ef4444';
-
-  // Helper to render a fully saturated, rich, edge-to-edge theme domain inside a clipped quadrant
-  const renderQuadrant = (clipFn, startX, startY, endX, endY, qX, qY, qW, qH, color) => {
-    ctx.save();
-    ctx.beginPath();
-    clipFn();
-    ctx.closePath();
-    ctx.clip();
-
-    // 1. Rich Edge-to-Edge Theme Color Gradient (100% coverage, no black voids)
-    const deepDark = adjustBrightness(color, -70);
-    const midDark = adjustBrightness(color, -44);
-    const topVibrant = adjustBrightness(color, -22);
-
-    const grad = ctx.createLinearGradient(startX, startY, endX, endY);
-    grad.addColorStop(0, deepDark);
-    grad.addColorStop(0.5, midDark);
-    grad.addColorStop(1, topVibrant);
-    ctx.fillStyle = grad;
-    ctx.fillRect(qX - 50, qY - 50, qW + 100, qH + 100);
-
-    // 2. High-Impact Ambient Energy Bloom across the whole frame
-    const bloomCenterX = qX + qW * 0.5;
-    const bloomCenterY = qY + qH * 0.5;
-    const bloomRadius = Math.hypot(qW, qH) * 0.65;
-    const bloom = ctx.createRadialGradient(bloomCenterX, bloomCenterY, 20, bloomCenterX, bloomCenterY, bloomRadius);
-    bloom.addColorStop(0, hexToRgba(color, 0.48));
-    bloom.addColorStop(0.45, hexToRgba(color, 0.22));
-    bloom.addColorStop(0.85, hexToRgba(color, 0.06));
-    bloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = bloom;
-    ctx.fillRect(qX - 50, qY - 50, qW + 100, qH + 100);
-
-    // 3. Full-Frame Halftone Dot Pattern
-    drawHalftoneGrid(ctx, qX, qY, qW, qH, hexToRgba(color, 0.20), true);
-
-    // 4. Subtle Inner Glow & Paint Strokes
-    const cornerGrad = ctx.createRadialGradient(startX, startY, 10, startX, startY, qW * 0.8);
-    cornerGrad.addColorStop(0, hexToRgba(color, 0.35));
-    cornerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = cornerGrad;
-    ctx.fillRect(qX - 50, qY - 50, qW + 100, qH + 100);
-
-    ctx.restore();
-  };
-
-  // ── Quadrant 0: Top-Left (Fighter 1) ──
-  renderQuadrant(
-    () => {
-      ctx.moveTo(0, 0);
-      ctx.lineTo(midX, 0);
-      for (let i = 0; i < vz.length; i++) {
-        if (vz[i].y <= midY) ctx.lineTo(vz[i].x, vz[i].y);
-      }
-      for (let i = hz.length - 1; i >= 0; i--) {
-        if (hz[i].x <= midX) ctx.lineTo(hz[i].x, hz[i].y);
-      }
-      ctx.lineTo(0, 0);
-    },
-    0, 0, midX, midY,
-    0, 0, midX, midY,
-    c0
-  );
-
-  // ── Quadrant 1: Top-Right (Fighter 2) ──
-  renderQuadrant(
-    () => {
-      ctx.moveTo(midX, 0);
-      ctx.lineTo(width, 0);
-      ctx.lineTo(width, midY);
-      for (let i = hz.length - 1; i >= 0; i--) {
-        if (hz[i].x >= midX) ctx.lineTo(hz[i].x, hz[i].y);
-      }
-      for (let i = vz.length - 1; i >= 0; i--) {
-        if (vz[i].y <= midY) ctx.lineTo(vz[i].x, vz[i].y);
-      }
-    },
-    width, 0, midX, midY,
-    midX, 0, width - midX, midY,
-    c1
-  );
-
-  // ── Quadrant 2: Bottom-Left (Fighter 3) ──
-  renderQuadrant(
-    () => {
-      ctx.moveTo(0, midY);
-      for (let i = 0; i < hz.length; i++) {
-        if (hz[i].x <= midX) ctx.lineTo(hz[i].x, hz[i].y);
-      }
-      for (let i = 0; i < vz.length; i++) {
-        if (vz[i].y >= midY) ctx.lineTo(vz[i].x, vz[i].y);
-      }
-      ctx.lineTo(0, height);
-      ctx.lineTo(0, midY);
-    },
-    0, height, midX, midY,
-    0, midY, midX, height - midY,
-    c2
-  );
-
-  // ── Quadrant 3: Bottom-Right (Fighter 4) ──
-  renderQuadrant(
-    () => {
-      ctx.moveTo(midX, midY);
-      for (let i = 0; i < hz.length; i++) {
-        if (hz[i].x >= midX) ctx.lineTo(hz[i].x, hz[i].y);
-      }
-      ctx.lineTo(width, height);
-      ctx.lineTo(midX, height);
-      for (let i = vz.length - 1; i >= 0; i--) {
-        if (vz[i].y >= midY) ctx.lineTo(vz[i].x, vz[i].y);
-      }
-    },
-    width, height, midX, midY,
-    midX, midY, width - midX, height - midY,
-    c3
-  );
-
-  // Floating debris in all 4 colors
-  drawFloatingFfaDebris(ctx, width, height, colors);
+  // Simply White Background
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, width, height);
 }
 
-/** Draws the 4-way FFA Anime Grunge Zigzag Background */
+/** Draws the 4-way FFA Background */
 function drawFfaAnimeGrungeZigzagBackground(ctx, width, height, colors, timer) {
-  if (!_floatingDebris || _floatingDebris.length === 0) {
-    initDebrisAndScratches(width, height);
-  }
-
   const bgKey = `${width}_${height}_${colors.join('_')}`;
   if (bgKey !== _lastFfaBgKey || !_ffaBgCacheCanvas) {
     _lastFfaBgKey = bgKey;
@@ -680,68 +476,9 @@ function drawFfaAnimeGrungeZigzagBackground(ctx, width, height, colors, timer) {
   if (_ffaBgCacheCanvas) {
     ctx.drawImage(_ffaBgCacheCanvas, 0, 0);
   }
-
-  const midX = width * 0.5;
-  const midY = height * 0.44;
-  drawFfaJaggedZigzagDividers(ctx, width, height, midX, midY, timer, colors);
 }
 
-/** Draws the sharp horizontal and vertical zigzag divider seams */
-function drawFfaJaggedZigzagDividers(ctx, width, height, midX, midY, timer, colors) {
-  ctx.save();
-
-  const hz = getFfaHorizontalZigzagPoints(width, midY);
-  const vz = getFfaVerticalZigzagPoints(height, midX);
-
-  ctx.lineJoin = 'miter';
-  ctx.miterLimit = 4;
-  ctx.lineCap = 'square';
-
-  const tracePath = (pts) => {
-    ctx.beginPath();
-    pts.forEach((p, idx) => {
-      if (idx === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-  };
-
-  // 1. Thick Solid Black Ink Backing
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 14.0;
-  tracePath(hz);
-  ctx.stroke();
-  tracePath(vz);
-  ctx.stroke();
-
-  // 2. Outer White / Neon Glow Line
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-  ctx.lineWidth = 5.0;
-  tracePath(hz);
-  ctx.stroke();
-  tracePath(vz);
-  ctx.stroke();
-
-  // 3. Middle Intense White Lightning Line
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2.6;
-  tracePath(hz);
-  ctx.stroke();
-  tracePath(vz);
-  ctx.stroke();
-
-  // 4. Center Diamond Intersection Emblem
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  const nodeR = 7.0;
-  ctx.moveTo(midX, midY - nodeR);
-  ctx.lineTo(midX + nodeR, midY);
-  ctx.lineTo(midX, midY + nodeR);
-  ctx.lineTo(midX - nodeR, midY);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.restore();
-}
+function drawFfaJaggedZigzagDividers() {}
 
 /** Draws floating geometric action debris in 4 FFA colors */
 function drawFloatingFfaDebris(ctx, width, height, colors) {
@@ -859,66 +596,8 @@ function drawGrungeBrushStrokes(ctx, width, height, topSplitX, botSplitX, leftCo
   ctx.restore();
 }
 
-/** Draws the sharp, jagged white lightning bolt crack dividing the two domains */
-function drawJaggedLightningCrack(ctx, width, height, topSplitX, botSplitX, timer) {
-  ctx.save();
-
-  const crackPoints = [
-    { y: 0,              xOff: 0 },
-    { y: height * 0.12,  xOff: -14 },
-    { y: height * 0.18,  xOff: 18 },
-    { y: height * 0.27,  xOff: -22 },
-    { y: height * 0.36,  xOff: 26 },
-    { y: height * 0.45,  xOff: -32 },
-    { y: height * 0.54,  xOff: 30 },
-    { y: height * 0.63,  xOff: -24 },
-    { y: height * 0.72,  xOff: 20 },
-    { y: height * 0.84,  xOff: -16 },
-    { y: height * 0.93,  xOff: 12 },
-    { y: height,         xOff: 0 }
-  ];
-
-  const crackProgress = Math.min(1.0, timer / 12);
-  const visibleCount = Math.max(2, Math.floor(crackPoints.length * crackProgress));
-
-  ctx.lineJoin = 'miter';
-  ctx.miterLimit = 4;
-  ctx.lineCap = 'square';
-
-  ctx.beginPath();
-  for (let i = 0; i < visibleCount; i++) {
-    const pt = crackPoints[i];
-    const t = pt.y / height;
-    const baseSplitX = topSplitX + (botSplitX - topSplitX) * t;
-    const px = baseSplitX + pt.xOff;
-    const py = pt.y;
-
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-
-  // 1. Thick Solid Black Ink Stroke Backing
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 13.0;
-  ctx.stroke();
-
-  // 2. Outer White Lightning Glow Stroke
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.70)';
-  ctx.lineWidth = 5.0;
-  ctx.stroke();
-
-  // 3. Middle Intense Bright White Line
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 2.8;
-  ctx.stroke();
-
-  // 4. Inner Intense Bright White Core
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  ctx.restore();
-}
+/** Draws the sharp, jagged white lightning bolt crack (suppressed) */
+function drawJaggedLightningCrack() {}
 
 /** Draws floating geometric action triangles & ink particles */
 function drawFloatingActionDebris(ctx, width, height, leftColor, rightColor) {
@@ -1401,103 +1080,23 @@ function drawTlfsFaceOff(ctx, width, height, p1Def, enemyDef, scale, timer, left
   draw1v1FaceOff(ctx, width, height, p1Def, enemyDef, scale, timer, leftColor, rightColor, exitProgress);
 }
 
-/** Speed lines streaming behind fighters during the exit dash */
+/** Speed lines streaming behind fighters during the exit dash (suppressed for minimalist design) */
 function drawExitDashSpeedLines(ctx, startX, startY, length, color, progress) {
-  ctx.save();
-  ctx.strokeStyle = hexToRgba(color, 0.7 * progress);
-  ctx.lineWidth = 2.5;
-  for (let i = -3; i <= 3; i++) {
-    const yOff = i * 14;
-    const len = length * (0.6 + Math.abs(i) * 0.1);
-    ctx.beginPath();
-    ctx.moveTo(startX, startY + yOff);
-    ctx.lineTo(startX - len, startY + yOff);
-    ctx.stroke();
-  }
-  ctx.restore();
+  // Suppressed for clean minimalist thumbnail
 }
 
 /**
- * Multi-Layered Engineer-Style Holographic Hero Glow System
+ * Clean Subtle Hero Ground Shadow
  */
 function drawEngineerStyleHeroGlow(ctx, cx, cy, radius, glowColor = '#38bdf8') {
   ctx.save();
   ctx.translate(cx, cy);
 
-  // ── 1. Volumetric Back Silhouette Body Bloom ──
-  const backBloom = ctx.createRadialGradient(0, 0, radius * 0.3, 0, 0, radius * 2.2);
-  backBloom.addColorStop(0, hexToRgba(glowColor, 0.70));
-  backBloom.addColorStop(0.35, hexToRgba(glowColor, 0.40));
-  backBloom.addColorStop(0.70, hexToRgba(glowColor, 0.12));
-  backBloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = backBloom;
+  // Soft clean ground oval drop shadow base
   ctx.beginPath();
-  ctx.arc(0, 0, radius * 2.2, 0, Math.PI * 2);
+  ctx.ellipse(0, radius * 0.95, radius * 1.25, radius * 0.40, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
   ctx.fill();
-
-  // ── 2. Ground Oval Drop Shadow Base ──
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 1.35, radius * 0.45, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-  ctx.fill();
-
-  // ── 3. Translucent Radial Holographic Floor Fill ──
-  const floorFill = ctx.createRadialGradient(0, radius * 0.95, 6, 0, radius * 0.95, radius * 1.8);
-  floorFill.addColorStop(0, hexToRgba(glowColor, 0.55));
-  floorFill.addColorStop(0.55, hexToRgba(glowColor, 0.20));
-  floorFill.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = floorFill;
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 1.8, radius * 0.60, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ── 4. Multi-Layered Perimeter Boundary Rings ──
-  ctx.strokeStyle = hexToRgba(glowColor, 0.28);
-  ctx.lineWidth = 6.0;
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 1.55, radius * 0.52, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = hexToRgba(glowColor, 0.85);
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 1.55, radius * 0.52, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 1.55, radius * 0.52, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // ── 5. Inner Concentric Ripple Ring ──
-  ctx.strokeStyle = hexToRgba(glowColor, 0.50);
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 1.05, radius * 0.35, 0, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // ── 6. Tactical Holographic Cross / Diamond Tech Nodes ──
-  const rx = radius * 1.55;
-  const ry = radius * 0.52;
-  const nodes = [
-    { x: -rx, y: radius * 0.95 },
-    { x: rx,  y: radius * 0.95 },
-    { x: 0,   y: radius * 0.95 - ry },
-    { x: 0,   y: radius * 0.95 + ry }
-  ];
-
-  nodes.forEach(n => {
-    ctx.fillStyle = glowColor;
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(n.x, n.y, 1.8, 0, Math.PI * 2);
-    ctx.fill();
-  });
 
   ctx.restore();
 }
@@ -1544,113 +1143,67 @@ function drawCenterUnifiedCountdown(ctx, cx, cy, timer, leftColor = '#38bdf8', r
   drawCountdownDigit(ctx, cx, cy, 'FIGHT!', ease, leftColor, rightColor, exitProgress);
 }
 
-/** Draws the animated "VS" Brush Letters */
-function drawAnimeBrushVsClash(ctx, cx, cy, label, ease, leftColor, rightColor) {
+/** Draws clean "VS" text emblem with white font fill & black stroke outline (both V & S in identical font size) */
+function drawAnimeBrushVsClash(ctx, cx, cy, label = 'VS', ease = 1.0, leftColor, rightColor) {
   ctx.save();
   ctx.translate(cx, cy);
 
-  // 1. Central Flare Bloom
-  const flare = ctx.createRadialGradient(0, 0, 10, 0, 0, 110);
-  flare.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
-  flare.addColorStop(0.35, hexToRgba(leftColor, 0.45));
-  flare.addColorStop(0.70, hexToRgba(rightColor, 0.25));
-  flare.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = flare;
-  ctx.beginPath();
-  ctx.arc(0, 0, 110, 0, Math.PI * 2);
-  ctx.fill();
+  const scale = Math.min(1.0, ease);
+  ctx.scale(scale, scale);
 
-  // 2. Ink Splatter Explosion Burst (Pre-computed polygon points)
-  const inkScale = Math.min(1.0, ease);
-  ctx.save();
-  ctx.scale(inkScale, inkScale);
-  ctx.fillStyle = '#06070a';
-  ctx.beginPath();
-  for (let i = 0; i < _inkSplatterPoints.length; i++) {
-    const pt = _inkSplatterPoints[i];
-    if (i === 0) ctx.moveTo(pt.x, pt.y);
-    else ctx.lineTo(pt.x, pt.y);
-  }
-  ctx.closePath();
-  ctx.fill();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
 
-  for (let s = 0; s < _splatterDots.length; s++) {
-    const dot = _splatterDots[s];
-    ctx.beginPath();
-    ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
-    ctx.fillStyle = dot.isLeft ? leftColor : rightColor;
-    ctx.fill();
-  }
-  ctx.restore();
+  if (label === 'VS' || label === 'Vs') {
+    const fontSize = 54;
+    const fontStr = `900 ${fontSize}px "Outfit", "Rajdhani", "Permanent Marker", sans-serif`;
 
-  // 3. Render Brush Letters "V" & "S"
-  if (label === 'VS') {
-    const vOffset = (1 - ease) * 80;
+    // Upper 'V'
     ctx.save();
-    ctx.translate(-24 - vOffset, -vOffset * 0.5);
-
-    const _isDark = (state.arenaTheme === 'dark');
-    const _vsFont = _isDark ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
-    const _vsSmFont = _isDark ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
-    ctx.strokeStyle = hexToRgba(leftColor, 0.40);
-    ctx.lineWidth = 14;
-    ctx.font = `900 ${_isDark ? 52 : 68}px ${_vsFont}`;
+    ctx.translate(-14, -10);
+    ctx.font = fontStr;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.strokeText('V', 0, 2);
 
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 6;
-    ctx.strokeText('V', 0, 2);
+    ctx.lineWidth = 9;
+    ctx.strokeText('V', 0, 0);
 
-    ctx.fillStyle = leftColor;
-    ctx.fillText('V', 0, 2);
-
-    ctx.fillStyle = adjustBrightness(leftColor, +45);
-    ctx.font = `900 ${_isDark ? 48 : 64}px ${_vsSmFont}`;
-    ctx.fillText('V', -1, 0);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText('V', 0, 0);
     ctx.restore();
 
-    const sOffset = (1 - ease) * 80;
+    // Lower 'S' (Identical font size & uppercase S, staggered down-right)
     ctx.save();
-    ctx.translate(22 + sOffset, 2 + sOffset * 0.5);
-
-    ctx.strokeStyle = hexToRgba(rightColor, 0.40);
-    ctx.lineWidth = 14;
-    ctx.font = `900 ${_isDark ? 52 : 68}px ${_vsFont}`;
+    ctx.translate(14, 10);
+    ctx.font = fontStr;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.strokeText('S', 0, 0);
 
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 6;
+    ctx.lineWidth = 9;
     ctx.strokeText('S', 0, 0);
 
-    ctx.fillStyle = rightColor;
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillText('S', 0, 0);
-
-    ctx.fillStyle = adjustBrightness(rightColor, +45);
-    ctx.font = `900 ${_isDark ? 48 : 64}px ${_vsSmFont}`;
-    ctx.fillText('S', 1, -1);
     ctx.restore();
   } else {
-    ctx.save();
-    ctx.scale(Math.min(1.0, ease), Math.min(1.0, ease));
-    ctx.fillStyle = rightColor;
-    ctx.font = `900 ${(state.arenaTheme === 'dark') ? 22 : 32}px ${(state.arenaTheme === 'dark') ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif'}`;
+    ctx.font = '900 44px "Outfit", "Rajdhani", "Permanent Marker", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 8;
     ctx.strokeText(label, 0, 0);
+
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillText(label, 0, 0);
-    ctx.restore();
   }
 
   ctx.restore();
 }
 
-/** Draws Countdown Digits ("3", "2", "1", "FIGHT!") with Holographic Rings and Energy Flares */
+/** Draws Countdown Digits ("3", "2", "1", "FIGHT!") with clean typography */
 function drawCountdownDigit(ctx, cx, cy, digitStr, ease, leftColor, rightColor, exitProgress = 0) {
   ctx.save();
   ctx.translate(cx, cy);
@@ -1660,18 +1213,6 @@ function drawCountdownDigit(ctx, cx, cy, digitStr, ease, leftColor, rightColor, 
   const scale = (0.85 + ease * 0.25) * exitScale;
   ctx.scale(scale, scale);
 
-  // 1. Central Flare Bloom
-  const flare = ctx.createRadialGradient(0, 0, 8, 0, 0, isFight ? 140 : 100);
-  flare.addColorStop(0, 'rgba(255, 255, 255, 0.92)');
-  flare.addColorStop(0.35, hexToRgba(leftColor, 0.50));
-  flare.addColorStop(0.70, hexToRgba(rightColor, 0.30));
-  flare.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = flare;
-  ctx.beginPath();
-  ctx.arc(0, 0, isFight ? 140 : 100, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. Large Stylized Countdown Typography
   const _isDarkCD = (state.arenaTheme === 'dark');
   const _cdFontFamily = _isDarkCD ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
   const fontSize = _isDarkCD ? (isFight ? 48 : 72) : (isFight ? 64 : 96);
@@ -1679,29 +1220,13 @@ function drawCountdownDigit(ctx, cx, cy, digitStr, ease, leftColor, rightColor, 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // Layer A: Radiant outer glow stroke
-  ctx.strokeStyle = hexToRgba(isFight ? rightColor : leftColor, 0.50);
-  ctx.lineWidth = isFight ? 20 : 16;
-  ctx.strokeText(digitStr, 0, isFight ? 2 : 4);
-
-  // Layer B: Sharp black outline
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = isFight ? 9 : 8;
+  ctx.lineWidth = isFight ? 10 : 8;
   ctx.lineJoin = 'round';
   ctx.strokeText(digitStr, 0, isFight ? 2 : 4);
 
-  // Layer C: Dynamic dual-tone gradient fill
-  const numGrad = ctx.createLinearGradient(0, -45, 0, 45);
-  numGrad.addColorStop(0, '#ffffff');
-  numGrad.addColorStop(0.40, leftColor);
-  numGrad.addColorStop(1, rightColor);
-  ctx.fillStyle = numGrad;
+  ctx.fillStyle = '#FFFFFF';
   ctx.fillText(digitStr, 0, isFight ? 2 : 4);
-
-  // Layer D: Inner bright white highlight core
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `900 ${fontSize * 0.94}px ${_cdFontFamily}`;
-  ctx.fillText(digitStr, 0, isFight ? 1 : 2);
 
   ctx.restore();
 }

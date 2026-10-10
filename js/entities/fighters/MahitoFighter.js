@@ -4,7 +4,7 @@
 
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { drawMahitoSkin } from '../../graphics/fighters/mahitoSkin.js';
 import { spawnImpactFlash, spawnSparks, spawnMahitoSoulBubbles, spawnMahitoSoulExplosion } from '../../graphics/particles/sparkEffect.js';
 import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
@@ -502,8 +502,6 @@ export class MahitoFighter extends Fighter {
       return;
     }
 
-    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-
     // Unstoppable Domain Expansion Hyper-Armor: clear all hitStuns / paralyzes while channeling domain unless targeted by Toji ambush / silence
     if (this.isChannelingDomainExpansion && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0) {
       this.hitStunTimer = 0;
@@ -511,7 +509,7 @@ export class MahitoFighter extends Fighter {
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
-      if (!isNanamiPausing) {
+      if (!this.isSkillPreservedInStasis()) {
         this.timeStopTimer = 0;
       }
       this.purpleHitTimer = 0;

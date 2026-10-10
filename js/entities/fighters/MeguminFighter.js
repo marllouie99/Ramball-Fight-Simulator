@@ -128,6 +128,10 @@ export class MeguminFighter extends Fighter {
    * Interrupt active channeling upon receiving hard CC.
    */
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     const wasChantingExplosion = this.isChantingExplosion;
     super.interruptAttacks(forceCancelAll);
     if (wasChantingExplosion) {
@@ -315,7 +319,9 @@ export class MeguminFighter extends Fighter {
     // 1. Mandatory Rule 1.1 Freeze & Time-Stop Early Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
+      if (!this.isSkillPreservedInStasis()) {
+        this.interruptAttacks();
+      }
       return;
     }
 

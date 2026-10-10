@@ -374,7 +374,9 @@ export class YujiFighter extends Fighter {
       if (this.isChannelingDivineFlame && this.fugaSoundKey) {
         pauseLoopingSound(this.fugaSoundKey);
       }
-      this.interruptAttacks();
+      if (!this.isSkillPreservedInStasis()) {
+        this.interruptAttacks();
+      }
       return;
     }
 
@@ -1068,6 +1070,10 @@ export class YujiFighter extends Fighter {
 
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     const isAlive = (this.hp > 0 && !this.isDead && !this.dead && !this._hasDied);
     const inSoulSwap = Boolean((this.soulSwapActive || (this.soulSwapTransitionTimer && this.soulSwapTransitionTimer > 0)) && isAlive);
     const wasInFugaPhase = Boolean(this.isChannelingDivineFlame || this.rapidSlashPhase === 'FUGA_CHANNEL' || this.rapidSlashPhase === 'FUGA_RECOVERY');

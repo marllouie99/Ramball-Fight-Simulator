@@ -285,15 +285,6 @@ export function clearBlackFlashEffects() {
 export function drawBlackFlashEffects(ctx) {
   if (!ctx || _blackFlashParticles.length === 0) return;
 
-  const isPodiumActive = typeof state !== 'undefined' && (
-    (state.gameState === 'roundEnd' && state.roundEndTimer > 55) ||
-    state.gameState === 'matchEnd'
-  );
-  if (isPodiumActive) {
-    clearBlackFlashEffects();
-    return;
-  }
-
   ctx.save();
   ctx.imageSmoothingEnabled = false;
 

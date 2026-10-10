@@ -9,6 +9,40 @@
 
 import { state } from '../../core/state.js';
 
+const REZE_PALM_SHOCKWAVES = [
+  { delay: 0.00, speedPow: 0.50, maxThick: 3.4, coreThick: 1.4, color: '255, 61, 0', coreColor: '255, 255, 255', washAlpha: 0.20 },
+  { delay: 0.12, speedPow: 0.54, maxThick: 2.8, coreThick: 1.0, color: '255, 107, 26', coreColor: '255, 240, 150', washAlpha: 0.16 },
+  { delay: 0.24, speedPow: 0.58, maxThick: 2.4, coreThick: 0.8, color: '255, 200, 0', coreColor: '255, 255, 200', washAlpha: 0.13 },
+  { delay: 0.36, speedPow: 0.62, maxThick: 2.0, coreThick: 0.6, color: '255, 122, 0', coreColor: '255, 220, 100', washAlpha: 0.10 },
+  { delay: 0.48, speedPow: 0.66, maxThick: 1.6, coreThick: 0.5, color: '255, 230, 0', coreColor: '255, 255, 220', washAlpha: 0.08 }
+];
+const REZE_NUKE_SHOCKWAVES = [
+  { ...REZE_PALM_SHOCKWAVES[0], maxThick: 5.5, coreThick: 2.2 },
+  { ...REZE_PALM_SHOCKWAVES[1], maxThick: 4.5, coreThick: 1.8 },
+  { ...REZE_PALM_SHOCKWAVES[2], maxThick: 3.8, coreThick: 1.4 },
+  { ...REZE_PALM_SHOCKWAVES[3], maxThick: 3.2, coreThick: 1.0 },
+  { ...REZE_PALM_SHOCKWAVES[4], maxThick: 2.6, coreThick: 0.8 }
+];
+const REZE_PALM_SPARKS = Array.from({ length: 8 }, (_, i) => {
+  const angle = (i / 8) * Math.PI * 2 + 0.25;
+  return { cos: Math.cos(angle), sin: Math.sin(angle), distMult: 0.82 + ((i * 3) % 5) * 0.08 };
+});
+const REZE_NUKE_SPARKS = Array.from({ length: 16 }, (_, i) => {
+  const angle = (i / 16) * Math.PI * 2 + 0.25;
+  return { cos: Math.cos(angle), sin: Math.sin(angle), distMult: 0.82 + ((i * 3) % 5) * 0.08 };
+});
+const REZE_PIXEL_SHOCKWAVE_RINGS = [
+  { delay: 0.00, speedPow: 0.50, normalThickness: 6.0, finisherThickness: 8.0 },
+  { delay: 0.16, speedPow: 0.55, normalThickness: 4.8, finisherThickness: 6.5 },
+  { delay: 0.32, speedPow: 0.60, normalThickness: 3.6, finisherThickness: 5.0 }
+];
+const REZE_PIXEL_SHOCKWAVE_COLORS = [
+  '#14101A', '#FFFFFF', '#FFE600', '#FF7A00',
+  '#FF2E00', '#FF3D00', '#FFF7A8', '#FF9E00'
+];
+const REZE_PIXEL_SHOCKWAVE_BUCKETS = REZE_PIXEL_SHOCKWAVE_COLORS.map(() => []);
+const REZE_PIXEL_SHOCKWAVE_CORE_BUCKETS = [[], []];
+
 let _rezeSpeedLineSeeds = null;
 
 function _getRezeSpeedLineSeeds() {
@@ -470,7 +504,7 @@ export function drawRezePixelMartialArc(ctx, arcFx) {
 
   if (isHybrid) {
     // Devil Form: Pixel-art shockwave ring for ALL punches (no slash — bare-handed explosive punch)
-    _drawRezePixelShockwaveRing(ctx, p, baseReach, P, snap, now, isFinisher);
+    _drawRezePixelShockwaveRing(ctx, p, baseReach, P, isFinisher);
   } else {
     // Human Form: Blade crescent slash visuals
     ctx.rotate(arcFx.angle || 0);
@@ -493,32 +527,26 @@ export function drawRezePixelMartialArc(ctx, arcFx) {
  * - Multi-tiered fiery palette (#FFFFFF leading edge -> #FFE600 gold -> #FF7A00 orange -> #FF2E00 crimson)
  * - Zero cobweb/net lines, zero shadowBlur (Rule 11)
  */
-function _drawRezePixelShockwaveRing(ctx, p, reach, P, snap, now, isFinisher = false) {
+function _drawRezePixelShockwaveRing(ctx, p, reach, P, isFinisher = false) {
   const alpha = (p <= 0.60) ? 1.0 : Math.cos(((p - 0.60) / 0.40) * (Math.PI * 0.5));
   if (alpha <= 0.01) return;
 
   const maxR = reach * (isFinisher ? 1.80 : 1.50);
 
-  // Staggered water ripple ring configurations: pop out 1-by-1 from center
-  const ringDefs = [
-    { delay: 0.00, speedPow: 0.50, baseThick: isFinisher ? 8.0 : 6.0 }, // Ring 1: Primary Outer Wave
-    { delay: 0.16, speedPow: 0.55, baseThick: isFinisher ? 6.5 : 4.8 }, // Ring 2: Secondary Mid Wave
-    { delay: 0.32, speedPow: 0.60, baseThick: isFinisher ? 5.0 : 3.6 }  // Ring 3: Tertiary Inner Wave
-  ];
-
   // Compute current radii for each active wave
   const activeRings = [];
   let maxActiveR = 0;
 
-  for (let i = 0; i < ringDefs.length; i++) {
-    const def = ringDefs[i];
+  for (let i = 0; i < REZE_PIXEL_SHOCKWAVE_RINGS.length; i++) {
+    const def = REZE_PIXEL_SHOCKWAVE_RINGS[i];
     if (p < def.delay) continue; // Has not popped out yet
 
     const lp = (p - def.delay) / (1.0 - def.delay);
     if (lp <= 0.001 || lp > 1.0) continue;
 
     const ringR = maxR * Math.pow(lp, def.speedPow);
-    const ringThick = Math.max(P * 2, (P * def.baseThick) * (1.0 - lp * 0.45));
+    const baseThickness = isFinisher ? def.finisherThickness : def.normalThickness;
+    const ringThick = Math.max(P * 2, (P * baseThickness) * (1.0 - lp * 0.45));
     const innerR = Math.max(0, ringR - ringThick);
     const ringPop = Math.min(1.0, lp / 0.12);
     const ringFade = Math.pow(1.0 - lp, 1.25);
@@ -529,7 +557,9 @@ function _drawRezePixelShockwaveRing(ctx, p, reach, P, snap, now, isFinisher = f
     activeRings.push({
       index: i + 1,
       outerR: ringR,
+      outerR2: ringR * ringR,
       innerR: innerR,
+      innerR2: innerR * innerR,
       thick: ringThick,
       lp: lp,
       alpha: ringAlpha
@@ -552,90 +582,112 @@ function _drawRezePixelShockwaveRing(ctx, p, reach, P, snap, now, isFinisher = f
     }
   }
 
-  const getRingAtDist = (dist) => {
+  const getRingAtDistSq = (distSq) => {
     for (let r of activeRings) {
-      if (dist <= r.outerR && dist >= r.innerR) return r;
+      if (distSq <= r.outerR2 && distSq >= r.innerR2) return r.index;
     }
-    return null;
-  };
+    return 0;
+  }
 
   const gridExtent = Math.ceil((maxActiveR + P * 3) / P) * P;
+  for (const bucket of REZE_PIXEL_SHOCKWAVE_BUCKETS) bucket.length = 0;
+  const p2 = P * P;
 
   // --- Pass 1: Multi-Concentric Discrete Pixel Shockwave Rings ---
   for (let gy = -gridExtent; gy <= gridExtent; gy += P) {
     for (let gx = -gridExtent; gx <= gridExtent; gx += P) {
-      const dist = Math.hypot(gx, gy);
-      const ring = getRingAtDist(dist);
-      if (!ring) continue;
-
-      const px = snap(gx);
-      const py = snap(gy);
+      const distSq = gx * gx + gy * gy;
+      const ringIndex = getRingAtDistSq(distSq);
+      if (ringIndex === 0) continue;
+      const ring = activeRings[ringIndex - 1];
 
       // 4-neighbor attached border test for crisp ink outline
       const isBorder =
-        getRingAtDist(Math.hypot(gx + P, gy)) !== ring ||
-        getRingAtDist(Math.hypot(gx - P, gy)) !== ring ||
-        getRingAtDist(Math.hypot(gx, gy + P)) !== ring ||
-        getRingAtDist(Math.hypot(gx, gy - P)) !== ring;
+        getRingAtDistSq(distSq + 2 * gx * P + p2) !== ringIndex ||
+        getRingAtDistSq(distSq - 2 * gx * P + p2) !== ringIndex ||
+        getRingAtDistSq(distSq + 2 * gy * P + p2) !== ringIndex ||
+        getRingAtDistSq(distSq - 2 * gy * P + p2) !== ringIndex;
 
       if (isBorder) {
-        ctx.fillStyle = '#14101A'; // Dark ink pixel outline
-        ctx.fillRect(px, py, P, P);
+        REZE_PIXEL_SHOCKWAVE_BUCKETS[0].push(gx, gy);
         continue;
       }
 
-      const depthNorm = (dist - ring.innerR) / ring.thick;
+      const depthNorm = (Math.sqrt(distSq) - ring.innerR) / ring.thick;
+      let colorIndex;
 
       if (ring.index === 1) {
         // Outer Leading Ring (Highest energy)
         if (depthNorm > 0.75) {
-          ctx.fillStyle = '#FFFFFF';
+          colorIndex = 1;
         } else if (depthNorm > 0.45) {
-          ctx.fillStyle = '#FFE600';
+          colorIndex = 2;
         } else if (depthNorm > 0.20) {
-          ctx.fillStyle = '#FF7A00';
+          colorIndex = 3;
         } else {
-          ctx.fillStyle = '#FF2E00';
+          colorIndex = 4;
         }
       } else if (ring.index === 2) {
         // Mid Echo Ring
         if (depthNorm > 0.65) {
-          ctx.fillStyle = '#FFE600';
+          colorIndex = 2;
         } else if (depthNorm > 0.30) {
-          ctx.fillStyle = '#FF7A00';
+          colorIndex = 3;
         } else {
-          ctx.fillStyle = '#FF3D00';
+          colorIndex = 5;
         }
       } else {
         // Inner Echo Ring
         if (depthNorm > 0.50) {
-          ctx.fillStyle = '#FFF7A8';
+          colorIndex = 6;
         } else {
-          ctx.fillStyle = '#FF9E00';
+          colorIndex = 7;
         }
       }
 
-      ctx.fillRect(px, py, P, P);
+      REZE_PIXEL_SHOCKWAVE_BUCKETS[colorIndex].push(gx, gy);
     }
+  }
+
+  // Group discrete pixels by color to reduce Canvas calls without softening the pixel-art edges.
+  for (let colorIndex = 0; colorIndex < REZE_PIXEL_SHOCKWAVE_BUCKETS.length; colorIndex++) {
+    const pixels = REZE_PIXEL_SHOCKWAVE_BUCKETS[colorIndex];
+    if (pixels.length === 0) continue;
+    ctx.fillStyle = REZE_PIXEL_SHOCKWAVE_COLORS[colorIndex];
+    ctx.beginPath();
+    for (let i = 0; i < pixels.length; i += 2) {
+      ctx.rect(pixels[i], pixels[i + 1], P, P);
+    }
+    ctx.fill();
   }
 
   // --- Pass 2: White-hot inner detonation core (early phase only) ---
   if (p < 0.35) {
     const coreAlpha = (1.0 - p / 0.35);
     const coreR = maxR * 0.18 * (1.0 - p * 0.5);
+    const coreR2 = coreR * coreR;
+    const coreExtent = Math.ceil(coreR / P) * P;
     ctx.save();
     ctx.globalAlpha *= coreAlpha;
-    for (let gy = -gridExtent; gy <= gridExtent; gy += P) {
-      for (let gx = -gridExtent; gx <= gridExtent; gx += P) {
-        const dist = Math.hypot(gx, gy);
-        if (dist > coreR) continue;
-        const px = snap(gx);
-        const py = snap(gy);
-        const coreBorder = Math.hypot(gx + P, gy) > coreR || Math.hypot(gx - P, gy) > coreR ||
-                           Math.hypot(gx, gy + P) > coreR || Math.hypot(gx, gy - P) > coreR;
-        ctx.fillStyle = coreBorder ? '#FFE600' : '#FFFFFF';
-        ctx.fillRect(px, py, P, P);
+    for (const bucket of REZE_PIXEL_SHOCKWAVE_CORE_BUCKETS) bucket.length = 0;
+    for (let gy = -coreExtent; gy <= coreExtent; gy += P) {
+      for (let gx = -coreExtent; gx <= coreExtent; gx += P) {
+        const distSq = gx * gx + gy * gy;
+        if (distSq > coreR2) continue;
+        const coreBorder = distSq + 2 * gx * P + p2 > coreR2 || distSq - 2 * gx * P + p2 > coreR2 ||
+                           distSq + 2 * gy * P + p2 > coreR2 || distSq - 2 * gy * P + p2 > coreR2;
+        REZE_PIXEL_SHOCKWAVE_CORE_BUCKETS[coreBorder ? 0 : 1].push(gx, gy);
       }
+    }
+    for (let colorIndex = 0; colorIndex < REZE_PIXEL_SHOCKWAVE_CORE_BUCKETS.length; colorIndex++) {
+      const pixels = REZE_PIXEL_SHOCKWAVE_CORE_BUCKETS[colorIndex];
+      if (pixels.length === 0) continue;
+      ctx.fillStyle = colorIndex === 0 ? '#FFE600' : '#FFFFFF';
+      ctx.beginPath();
+      for (let i = 0; i < pixels.length; i += 2) {
+        ctx.rect(pixels[i], pixels[i + 1], P, P);
+      }
+      ctx.fill();
     }
     ctx.restore();
   }
@@ -903,19 +955,9 @@ function _drawRezePixelSparkSlapBlast(ctx, p, arcAngle, reach, isHybrid, P, snap
  * - Rule 26 (Clean continuous concentric rings, NO cobweb/mesh spokes, NO spinning ticks)
  */
 function _drawCrispShockwaveRings(ctx, maxR, p, alpha, isNuke, isTransformation) {
-  ctx.save();
-
-  // Water-ripple wave definitions: 5 concentric wave fronts with progressive staggered spawn times
-  const waveConfigs = [
-    { delay: 0.00, speedPow: 0.50, maxThick: isNuke ? 5.5 : 3.4, coreThick: isNuke ? 2.2 : 1.4, color: 'rgba(255, 61, 0, 0.95)', coreColor: 'rgba(255, 255, 255, 0.98)', washAlpha: 0.20 },
-    { delay: 0.12, speedPow: 0.54, maxThick: isNuke ? 4.5 : 2.8, coreThick: isNuke ? 1.8 : 1.0, color: 'rgba(255, 107, 26, 0.92)', coreColor: 'rgba(255, 240, 150, 0.95)', washAlpha: 0.16 },
-    { delay: 0.24, speedPow: 0.58, maxThick: isNuke ? 3.8 : 2.4, coreThick: isNuke ? 1.4 : 0.8, color: 'rgba(255, 200, 0, 0.88)', coreColor: 'rgba(255, 255, 200, 0.90)', washAlpha: 0.13 },
-    { delay: 0.36, speedPow: 0.62, maxThick: isNuke ? 3.2 : 2.0, coreThick: isNuke ? 1.0 : 0.6, color: 'rgba(255, 122, 0, 0.84)', coreColor: 'rgba(255, 220, 100, 0.85)', washAlpha: 0.10 },
-    { delay: 0.48, speedPow: 0.66, maxThick: isNuke ? 2.6 : 1.6, coreThick: isNuke ? 0.8 : 0.5, color: 'rgba(255, 230, 0, 0.78)', coreColor: 'rgba(255, 255, 220, 0.80)', washAlpha: 0.08 }
-  ];
-
-  for (let i = 0; i < waveConfigs.length; i++) {
-    const wave = waveConfigs[i];
+  const waves = isNuke ? REZE_NUKE_SHOCKWAVES : REZE_PALM_SHOCKWAVES;
+  for (let i = 0; i < waves.length; i++) {
+    const wave = waves[i];
     if (p < wave.delay) continue; // Has not popped out yet
 
     // Local wave progress: 0.0 (just popped out at center) to 1.0 (fully extended)
@@ -940,18 +982,14 @@ function _drawCrispShockwaveRings(ctx, maxR, p, alpha, isNuke, isTransformation)
     ctx.fill();
 
     // 2. Main Expanding Wave Front Ring Stroke
-    ctx.strokeStyle = wave.color.replace(/[\d\.]+\)$/, `${(0.92 * waveAlpha).toFixed(3)})`);
+    ctx.strokeStyle = `rgba(${wave.color}, ${(0.92 * waveAlpha).toFixed(3)})`;
     ctx.lineWidth = Math.max(1.0, wave.maxThick * (1.0 - lp * 0.40));
-    ctx.beginPath();
-    ctx.arc(0, 0, ringR, 0, Math.PI * 2);
     ctx.stroke();
 
     // 3. Leading Supersonic White/Gold Core Highlight Stroke
     if (wave.coreThick > 0) {
-      ctx.strokeStyle = wave.coreColor.replace(/[\d\.]+\)$/, `${(0.95 * waveAlpha).toFixed(3)})`);
+      ctx.strokeStyle = `rgba(${wave.coreColor}, ${(0.95 * waveAlpha).toFixed(3)})`;
       ctx.lineWidth = Math.max(0.6, wave.coreThick * (1.0 - lp * 0.40));
-      ctx.beginPath();
-      ctx.arc(0, 0, ringR, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -977,15 +1015,12 @@ function _drawCrispShockwaveRings(ctx, maxR, p, alpha, isNuke, isTransformation)
     ctx.stroke();
   }
 
-  ctx.restore();
 }
 
 /**
  * Draws volumetric layered anime fireball plasma clouds.
  */
 function _drawCrispFireballBody(ctx, curR, p, alpha, isNuke) {
-  ctx.save();
-
   // Concentric stepped fireball fills (Zero shadowBlur, Rule 11 compliant)
   // Outer Crimson Fire
   ctx.fillStyle = `rgba(196, 20, 66, ${0.35 * alpha})`;
@@ -1020,7 +1055,6 @@ function _drawCrispFireballBody(ctx, curR, p, alpha, isNuke) {
     ctx.fill();
   }
 
-  ctx.restore();
 }
 
 /**
@@ -1028,23 +1062,20 @@ function _drawCrispFireballBody(ctx, curR, p, alpha, isNuke) {
  * Clean, separated points without any connecting lines.
  */
 function _drawCrispSparks(ctx, curR, p, alpha, isNuke, P) {
-  const sparkCount = isNuke ? 16 : 8;
-  ctx.save();
+  const sparks = isNuke ? REZE_NUKE_SPARKS : REZE_PALM_SPARKS;
   ctx.globalAlpha *= alpha;
 
-  for (let i = 0; i < sparkCount; i++) {
-    const ang = (i / sparkCount) * Math.PI * 2 + 0.25;
-    const distMult = 0.82 + ((i * 3) % 5) * 0.08;
-    const dist = curR * distMult * (0.85 + p * 0.25);
-    const sx = Math.round((Math.cos(ang) * dist) / P) * P;
-    const sy = Math.round((Math.sin(ang) * dist) / P) * P;
+  for (let i = 0; i < sparks.length; i++) {
+    const spark = sparks[i];
+    const dist = curR * spark.distMult * (0.85 + p * 0.25);
+    const sx = Math.round((spark.cos * dist) / P) * P;
+    const sy = Math.round((spark.sin * dist) / P) * P;
     const size = (i % 2 === 0) ? P * 1.5 : P;
 
     ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : ((i % 3 === 1) ? '#FFE600' : '#FF6B1A');
     ctx.fillRect(sx - size / 2, sy - size / 2, size, size);
   }
 
-  ctx.restore();
 }
 
 /**
@@ -1261,4 +1292,3 @@ export function drawRezeWeaponPreview(ctx, x = 0, y = 0, angle = 0, r = 25, opts
     drawRezeTacticalKnife(ctx, x, y, angle, r, { ...opts, isPreview: true, scale: 1.15 });
   }
 }
-

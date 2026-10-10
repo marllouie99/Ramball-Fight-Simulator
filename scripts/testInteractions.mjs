@@ -820,6 +820,35 @@ async function runInteractionTests() {
     reze._performExplosivePunch(genos);
     assert(genos.isFiringUlt === true, 'Reze explosive punch must NOT cancel Genos isFiringUlt');
 
+    // D. Reze Rocket Lunge launch and direct impact must preserve Genos's live beam
+    genos.x = 130;
+    genos.y = 200;
+    genos.hp = 320;
+    genos.dead = false;
+    genos.isDead = false;
+    genos._hasDied = false;
+    genos.isFiringUlt = true;
+    genos.ultTimer = 80;
+    genos.immuneToPush = true;
+    genos.immuneToKnockback = true;
+    genos.immuneToPull = true;
+    genos.timeStopTimer = 0;
+    genos.hitStunTimer = 0;
+    genos.knockbackStunTimer = 0;
+    genos.knockbackVx = 0;
+    genos.knockbackVy = 0;
+    reze.x = 100;
+    reze.y = 200;
+    reze.rocketCooldown = 0;
+    reze.isRocketLunging = false;
+    reze._activateRocketLunge(genos);
+    assert(genos.isFiringUlt === true, 'Reze foot-launch explosion must not cancel Genos’s active ultimate');
+    reze._updateRocketLunge();
+    assert(genos.isFiringUlt === true, 'Reze direct Rocket Lunge impact must not cancel Genos’s active ultimate');
+    assert(genos.ultTimer === 80, 'Rocket Lunge impact must not consume or reset Genos’s active beam timer');
+    assert(genos.timeStopTimer === 0 && genos.hitStunTimer === 0 && genos.knockbackStunTimer === 0,
+      'Rocket Lunge must not leave Genos time-stopped, hit-stunned, or knockback-stunned during his beam');
+
     // D. Update tick progresses beam timer and does NOT freeze
     const prevTimer = genos.ultTimer;
     genos.update(reze, 0, state.arena);
@@ -833,7 +862,46 @@ async function runInteractionTests() {
     assert(genos.immuneToPush === false, 'immuneToPush must reset after ult beam completes');
     assert(genos.immuneToKnockback === false, 'immuneToKnockback must reset after ult beam completes');
 
-    // 6. Fatal damage cancels ult immediately
+    // 6. Reze's blast must not interrupt Genos during the ultimate slide/charge phase
+    genos.reset();
+    genos.hp = 320;
+    genos.ultCooldown = 0;
+    reze.x = genos.x;
+    reze.y = genos.y + 40;
+    reze.isHybridModeActive = true;
+    state.fighters = [genos, reze];
+    genos.executeSpiralIncinerationCannon(reze);
+    assert(genos.isUltSliding === true, 'Genos must enter the pre-ultimate slide before Reze attacks');
+    const genosHpBeforeSlideHit = genos.hp;
+    const genosSlideTimerBeforeHit = genos.ultSlideTimer;
+    reze._detonateClusterBomb({
+      x: genos.x, y: genos.y, damage: 20, explosionRadius: 85, knockback: 18
+    });
+    assert(genos.hp < genosHpBeforeSlideHit, 'Reze’s slide-phase cluster blast must actually hit Genos');
+    assert(genos.timeStopTimer === 0, 'Reze’s cluster blast must not time-stop Genos during his ultimate slide');
+    genos.update(reze, 0, state.arena);
+    assert(genos.isUltSliding === true, 'Reze’s cluster blast must not cancel Genos’s ultimate slide');
+    assert(genos.ultSlideTimer === genosSlideTimerBeforeHit - 1,
+      'Genos’s ultimate slide must continue progressing after Reze’s blast');
+    while (genos.isUltSliding) {
+      genos.update(reze, 0, state.arena);
+    }
+    assert(genos.isChargingUlt === true, 'Genos must enter the ultimate charge phase before Reze attacks');
+    const genosHpBeforeChargeHit = genos.hp;
+    const genosChargeTimerBeforeHit = genos.ultTimer;
+    reze._detonateClusterBomb({
+      x: genos.x, y: genos.y, damage: 20, explosionRadius: 85, knockback: 18
+    });
+    assert(genos.hp < genosHpBeforeChargeHit, 'Reze’s charge-phase cluster blast must actually hit Genos');
+    assert(genos.timeStopTimer === 0, 'Reze’s cluster blast must not time-stop Genos during his ultimate charge');
+    genos.update(reze, 0, state.arena);
+    assert(genos.isChargingUlt === true, 'Reze’s cluster blast must not cancel Genos’s ultimate charge');
+    assert(genos.ultTimer === genosChargeTimerBeforeHit - 1,
+      'Genos’s ultimate charge timer must continue advancing after Reze’s blast');
+    assert(genos.immuneToPush === true && genos.immuneToKnockback === true,
+      'Genos must keep ultimate movement immunity during charging after Reze’s hit');
+
+    // 7. Fatal damage cancels ult immediately
     genos.isFiringUlt = true;
     genos.hp = 0;
     genos.dead = true;
@@ -3697,15 +3765,17 @@ async function runInteractionTests() {
     engineer3.update(davePlantTarget, 0, testArena);
     assert(engineer3.turretEntity === null, 'Engineer must NOT deploy a sentry when all tiles are occupied');
 
-    // Test non-Crazy-Dave opponent retains normal offset placement
+    // Test non-Crazy-Dave opponent also gets placed at center of tile
     const normalEngineer = new EngineerClass({ startX: 100, startY: 300, radius: 25, hp: 400 });
     const normalOpponent = { characterId: 'gojo', type: 'gojo', x: 360, y: 300, hp: 200 };
     state.fighters = [normalEngineer, normalOpponent];
     normalEngineer.update(normalOpponent, 0, testArena);
     assert(normalEngineer.turretEntity !== null, 'Engineer must still deploy a sentry against normal opponents');
+    const normalSentryTile = getNearestGrassTileCenter(normalEngineer.turretEntity.x, normalEngineer.turretEntity.y, testArena);
     assert(
-      Math.hypot(normalEngineer.turretEntity.x - expectedBuildTile.x, normalEngineer.turretEntity.y - expectedBuildTile.y) > 1,
-      'Engineer sentry must retain normal offset placement against non-Crazy-Dave opponents'
+      Math.abs(normalEngineer.turretEntity.x - normalSentryTile.x) < 0.001 &&
+      Math.abs(normalEngineer.turretEntity.y - normalSentryTile.y) < 0.001,
+      'Engineer sentry must be placed at the center of an arena tile against all opponents'
     );
 
     state.fighters = [];
@@ -4184,25 +4254,41 @@ async function runInteractionTests() {
     assert(sans.stamina === (sans.maxStamina || 100), `Sans max stamina must match maxStamina (got ${sans.stamina})`);
 
     const { sansConfig } = await import('../js/configs/characters/sansConfig.js');
-    const stamCost = (sansConfig.dodgeStaminaCost !== undefined) ? sansConfig.dodgeStaminaCost : 10;
+    const attackDmg = 100; // 100 damage attack (e.g. Makima Bang) -> 10 stamina cost (10%)
+    const stamCost = typeof sans._calculateDodgeStaminaCost === 'function'
+      ? sans._calculateDodgeStaminaCost(attackDmg)
+      : ((sansConfig.dodgeStaminaCost !== undefined) ? sansConfig.dodgeStaminaCost : 10);
     const initialStam = sans.stamina;
 
     // Dodge 1: Full stamina -> 100% dodge chance
-    const dmg1 = sans.takeDamage(50, opponent);
+    const dmg1 = sans.takeDamage(attackDmg, opponent);
     assert(dmg1 === 0, "Sans must dodge incoming attack when stamina is available");
     assert(sans.hp === 1, "Sans HP must remain 1 after dodge");
     assert(sans.stamina === initialStam - stamCost, `Sans stamina must be ${initialStam - stamCost} after 1 dodge (got ${sans.stamina})`);
 
     // Deplete remaining stamina to 0
     while (sans.stamina >= stamCost) {
-      sans.takeDamage(50, opponent);
+      sans.takeDamage(attackDmg, opponent);
     }
     assert(sans.stamina < stamCost, `Sans stamina must be depleted below cost (got ${sans.stamina})`);
 
     // Out of stamina -> Cannot dodge -> Takes lethal damage and dies
-    const dmgFinal = sans.takeDamage(50, opponent);
+    const dmgFinal = sans.takeDamage(attackDmg, opponent);
     assert(Boolean(dmgFinal), "Sans must take damage when out of stamina");
     assert(sans.hp <= 0, `Sans must be defeated at 0 HP after getting hit (got ${sans.hp})`);
+
+    // Verify Sans death spawns Undertale / Deltarune Red SOUL Heart Split & Shatter in deathEffects
+    const sansDeathFx = state.deathEffects.find(e => e && e.isSansHeartShatter);
+    assert(sansDeathFx !== undefined, 'Sans death must register isSansHeartShatter in state.deathEffects');
+    assert(sansDeathFx.timer === 85, 'Sans death shatter must start at 85 frames');
+    assert(sansDeathFx.speechBubble && sansDeathFx.speechBubble.fullText.includes("grillby"), 'Sans death must include Grillby death quote');
+
+    // Step through death effects update and render
+    mockCtx.resetStackDepth();
+    const { updateDeathEffects, drawDeathEffects } = await import('../js/graphics/particles/deathShatterEffect.js');
+    drawDeathEffects();
+    assert(mockCtx.getStackDepth() === 0, 'drawDeathEffects with Sans heart shatter must maintain 0 stack depth');
+
     // 12. Verify Sans 100% dodge configuration
     assert(sansConfig.dodgeChance === 1.0, `Expected 1.0 dodgeChance (got ${sansConfig.dodgeChance})`);
     assert(sansConfig.domainDodgeChance === 1.0, `Expected 1.0 domainDodgeChance (got ${sansConfig.domainDodgeChance})`);
@@ -5197,6 +5283,69 @@ async function runInteractionTests() {
     assert(reze.activePalmBlasts[0].isFootExplosion === true, 'Active blast must be marked as isFootExplosion');
     assert(dummy.hp < 200, `Dummy behind Reze feet must take damage from foot launch explosion (expected < 200, got ${dummy.hp})`);
 
+    // I. Rocket Lunge should damage a skill user without interrupting or stunning their active skill
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    assert(GojoClass, 'Gojo fighter class must exist for Rocket Lunge skill-interruption coverage');
+    const gojo = new GojoClass({ radius: 25, x: 300, y: 200, hp: 200, ownerIndex: 1 });
+    gojo.infinityActive = false;
+    gojo.infinityBarrierHp = 0;
+    gojo.isChannelingPurple = true;
+    assert(gojo.isPerformingSkill() === true, 'Gojo must be actively channeling Purple before Rocket Lunge impact');
+
+    const rocketFootExplosionConfig = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+    const originalFootExplosionRadius = rocketFootExplosionConfig.rocketFootExplosionRadius;
+    let channelingSkillHpAfterImpact;
+    let channelingSkillTimerAfterImpact;
+    let channelingKnockbackStunAfterImpact;
+    let channelingTimeStopAfterImpact;
+    let regularKnockbackStunAfterImpact;
+    let regularTimeStopAfterImpact;
+    try {
+      rocketFootExplosionConfig.rocketFootExplosionRadius = 40;
+      reze.x = 250;
+      reze.y = 200;
+      reze.isRocketLunging = false;
+      reze.rocketCooldown = 0;
+      state.fighters = [reze, gojo];
+      reze._activateRocketLunge(gojo);
+      assert(gojo.hp === 200, 'Rocket launch blast must not hit Gojo ahead of Reze in this direct-impact case');
+      reze._updateRocketLunge();
+      channelingSkillHpAfterImpact = gojo.hp;
+      channelingSkillTimerAfterImpact = gojo.isChannelingPurple;
+      channelingKnockbackStunAfterImpact = gojo.knockbackStunTimer || 0;
+      channelingTimeStopAfterImpact = gojo.timeStopTimer || 0;
+
+      gojo.reset();
+      dummy.x = 300;
+      dummy.y = 200;
+      dummy.hp = 200;
+      dummy.knockbackStunTimer = 0;
+      dummy.timeStopTimer = 0;
+      dummy.knockbackVx = 0;
+      dummy.knockbackVy = 0;
+      dummy.vx = 0;
+      dummy.vy = 0;
+      reze.x = 250;
+      reze.y = 200;
+      reze.isRocketLunging = false;
+      reze.rocketCooldown = 0;
+      state.fighters = [reze, dummy];
+      reze._activateRocketLunge(dummy);
+      reze._updateRocketLunge();
+      regularKnockbackStunAfterImpact = dummy.knockbackStunTimer || 0;
+      regularTimeStopAfterImpact = dummy.timeStopTimer || 0;
+    } finally {
+      rocketFootExplosionConfig.rocketFootExplosionRadius = originalFootExplosionRadius;
+    }
+
+    assert(channelingSkillHpAfterImpact < 200, 'Rocket Lunge must still damage an enemy who is channeling a skill');
+    assert(channelingSkillTimerAfterImpact === true, 'Rocket Lunge impact must not cancel Gojo’s active Purple channel');
+    assert(channelingKnockbackStunAfterImpact === 0, 'Rocket Lunge must not apply knockback stun to an enemy channeling a skill');
+    assert(channelingTimeStopAfterImpact === 0, 'Rocket Lunge must not time-stop an enemy channeling a skill');
+    assert(regularKnockbackStunAfterImpact > 0, 'Rocket Lunge should retain its knockback against an enemy not performing a skill');
+    assert(regularTimeStopAfterImpact > 0, 'Rocket Lunge should retain its brief impact stop against an enemy not performing a skill');
+    gojo.reset();
+
     // Clean up
     reze.reset();
     assert(reze.hasUsedNuke === false, 'Reze hasUsedNuke must reset cleanly to false on round reset');
@@ -5404,6 +5553,258 @@ async function runInteractionTests() {
     resetCamera(true);
 
     console.log('      ✅ Makima Crucifixion Kill Camera Hold & delayed focus transition verified successfully.');
+  }
+
+  // ==========================================
+  // TEST 60: Reze Shockwave Renderer Hot-Path Cost
+  // ==========================================
+  {
+    console.log('   60. Testing Reze shockwave renderer hot-path cost...');
+    const { drawRezePalmBlast, drawRezeMegatonNuke, drawRezePixelMartialArc } = await import('../js/graphics/weapons/rezeWeaponGraphics.js');
+    const originalSave = mockCtx.save;
+    const originalRestore = mockCtx.restore;
+    const originalArc = mockCtx.arc;
+    const originalFillRect = mockCtx.fillRect;
+    const originalRect = mockCtx.rect;
+    const originalFill = mockCtx.fill;
+    let saveCalls = 0;
+    let restoreCalls = 0;
+    let arcCalls = 0;
+    let fillRectCalls = 0;
+    let rectCalls = 0;
+    let fillCalls = 0;
+    mockCtx.save = (...args) => {
+      saveCalls++;
+      return originalSave(...args);
+    };
+    mockCtx.restore = (...args) => {
+      restoreCalls++;
+      return originalRestore(...args);
+    };
+    mockCtx.arc = (...args) => {
+      arcCalls++;
+      return originalArc(...args);
+    };
+    mockCtx.fillRect = (...args) => {
+      fillRectCalls++;
+      return originalFillRect(...args);
+    };
+    mockCtx.rect = (...args) => {
+      rectCalls++;
+      return originalRect(...args);
+    };
+    mockCtx.fill = (...args) => {
+      fillCalls++;
+      return originalFill(...args);
+    };
+
+    mockCtx.resetStackDepth();
+    drawRezePalmBlast(mockCtx, {
+      x: 200, y: 200, radius: 90, timer: 7, maxTimer: 14, isPunchExplosion: true
+    });
+    assert(saveCalls === 1 && restoreCalls === 1,
+      `Reze palm blast must use one balanced canvas state scope (saves ${saveCalls}, restores ${restoreCalls})`);
+    assert(arcCalls === 9, `Reze palm blast must reuse each shockwave path for its fills and outlines (got ${arcCalls})`);
+    assert(mockCtx.getStackDepth() === 0, 'Reze palm blast must leave the canvas state stack balanced');
+
+    saveCalls = 0;
+    restoreCalls = 0;
+    arcCalls = 0;
+    drawRezeMegatonNuke(mockCtx, {
+      x: 200, y: 200, radius: 240, timer: 15, maxTimer: 30, isTransformationBlast: true
+    });
+    assert(saveCalls === 1 && restoreCalls === 1,
+      `Reze nuke blast must use one balanced canvas state scope (saves ${saveCalls}, restores ${restoreCalls})`);
+    assert(arcCalls === 11, `Reze nuke blast must reuse each shockwave path and retain transformation accents (got ${arcCalls})`);
+    assert(mockCtx.getStackDepth() === 0, 'Reze nuke blast must leave the canvas state stack balanced');
+
+    fillRectCalls = 0;
+    rectCalls = 0;
+    fillCalls = 0;
+    drawRezePixelMartialArc(mockCtx, {
+      x: 200, y: 200, angle: 0, arc: Math.PI * 2 / 3, radius: 90,
+      timer: 7, maxTimer: 14, isHybrid: true
+    });
+    assert(fillRectCalls === 0,
+      `Reze pixel shockwave tiles must be batched instead of issuing per-pixel fillRect calls (got ${fillRectCalls})`);
+    assert(rectCalls > 500, `Reze pixel shockwave must preserve detailed pixel geometry (got ${rectCalls} tiles)`);
+    assert(fillCalls >= 4, `Reze pixel shockwave must render the batched ring and wash layers (got ${fillCalls} fills)`);
+    assert(mockCtx.getStackDepth() === 0, 'Reze pixel shockwave must leave the canvas state stack balanced');
+
+    mockCtx.save = originalSave;
+    mockCtx.restore = originalRestore;
+    mockCtx.arc = originalArc;
+    mockCtx.fillRect = originalFillRect;
+    mockCtx.rect = originalRect;
+    console.log('      ✅ Reze palm and nuke blast renderers preserve shockwave geometry with one balanced canvas state scope.');
+  }
+
+  // -------------------------------------------------------------
+  // TEST 61: Toji Ultimate Final Blow Auto-Aim Windup Tracking
+  // -------------------------------------------------------------
+  {
+    console.log('\n   61. Testing Toji Ultimate Final Blow Windup Auto-Aim Tracking...');
+    const { TojiFighter } = await import('../js/entities/fighters/TojiFighter.js');
+    const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+    const { state } = await import('../js/core/state.js');
+
+    const toji = new TojiFighter({ x: 200, y: 200 });
+    const target = new NormalFighter({ x: 400, y: 200 });
+    state.fighters = [toji, target];
+    const testArena = { x: 0, y: 0, width: 600, height: 600 };
+
+    // Setup Toji in ultimate CRATER windup phase
+    toji.ultimateActive = true;
+    toji.ultimatePhase = 'CRATER';
+    toji.ultimateTarget = target;
+    const diveTime = CONFIG.toji?.ultimateCraterDiveTime ?? 16;
+    const spinTime = CONFIG.toji?.ultimateCraterSpinTime ?? 14;
+    const diveAndSpinTotal = diveTime + spinTime;
+    toji.ultimateCycleTimer = diveAndSpinTotal + 40; // in charge/windup
+    toji.gunAngle = 0;
+    toji.angle = 0;
+
+    // During windup, canAim() must be true
+    assert(toji.canAim() === true, 'Toji canAim() must return true during ultimate final blow windup');
+
+    // Reposition target above Toji (y: 50, x: 200) -> angle should turn toward -PI/2
+    target.x = 200;
+    target.y = 50;
+    const angleBefore = toji.gunAngle;
+    toji.updateUltimate(testArena, 0);
+
+    assert(toji.gunAngle !== angleBefore, 'Toji must auto-aim and rotate toward target during final blow windup');
+    assert(toji.canAim() === true, 'Toji canAim() must remain true throughout final blow windup');
+
+    // Advance to dive launch frame
+    toji.ultimateCycleTimer = diveAndSpinTotal;
+    toji.updateUltimate(testArena, 0);
+
+    // During supersonic dive, canAim() must return false (committed trajectory)
+    assert(toji.canAim() === false, 'Toji canAim() must return false during supersonic dive execution');
+    assert(toji.aimTurnRate === undefined, 'Toji aimTurnRate must be cleared upon dive launch');
+    assert(toji.isSpinning === false, 'Toji must not spin during flight');
+
+    // Advance through spin to impact
+    toji.ultimateCycleTimer = 1;
+    toji.updateUltimate(testArena, 0); // final spin frame
+    toji.updateUltimate(testArena, 0); // triggers impact & cleanup
+    assert(toji.ultimateActive === false, 'Toji ultimateActive must reset after impact');
+    assert(toji.aimTurnRate === undefined, 'Toji aimTurnRate must be undefined after ultimate completion');
+
+    console.log('      ✅ Toji ultimate final blow windup auto-aim tracking and committed dive trajectory verified.');
+  }
+
+  // -------------------------------------------------------------
+  // TEST 62: Naoya 24-Frame Palm Touch Stasis Preserves Active Skill Casting Without Reset
+  // -------------------------------------------------------------
+  {
+    console.log('\n   62. Testing Naoya 24-Frame Palm Touch Stasis Skill Preservation vs Reset...');
+    const { NaoyaFighter } = await import('../js/entities/fighters/NaoyaFighter.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const { MeguminFighter } = await import('../js/entities/fighters/MeguminFighter.js');
+    const { state } = await import('../js/core/state.js');
+
+    const testArena = { x: 0, y: 0, width: 800, height: 600 };
+    const naoya = new NaoyaFighter({ x: 200, y: 200, hp: 500, maxHp: 500 });
+    naoya.team = 0;
+
+    // A. Gojo Hollow Purple Channeling vs Naoya 24-Frame Palm Touch Stasis
+    const gojo = new GojoFighter({ x: 300, y: 200, hp: 400, maxHp: 400 });
+    gojo.team = 1;
+    state.fighters = [naoya, gojo];
+    state.arena = testArena;
+    state.gameState = 'playing';
+
+    // Begin Hollow Purple channeling on Gojo
+    gojo.isChannelingPurple = true;
+    gojo.purpleChargeTimer = 60;
+    gojo.purpleCooldown = 0;
+    gojo.gunAngle = 0;
+    gojo.vx = 2.0;
+    gojo.vy = 0;
+
+    // Naoya applies 24-Frame Palm Touch stasis
+    const stasisApplied = naoya.applyFrameStasis(gojo, 24);
+    assert(stasisApplied === true, 'Naoya applyFrameStasis must return true when targeting Gojo');
+    assert(gojo.isFrameFrozen === true, 'Gojo isFrameFrozen must be true during 24-Frame stasis');
+    assert(gojo.frameFreezeTimer === 24, 'Gojo frameFreezeTimer must be 24');
+
+    // Update Gojo while frozen
+    gojo.update(naoya, 1, testArena);
+    assert(gojo.isChannelingPurple === true, 'Gojo Hollow Purple channeling must NOT be cancelled during 24-Frame stasis');
+    assert(gojo.purpleChargeTimer === 60, 'Gojo purpleChargeTimer must be frozen at 60 during 24-Frame stasis');
+    assert(gojo.purpleCooldown === 0, 'Gojo purpleCooldown must NOT receive penalty cooldown during 24-Frame stasis');
+    assert(gojo.vx === 0 && gojo.vy === 0, 'Gojo movement must be paused during 24-Frame stasis');
+
+    // End 24-Frame stasis (glass shatter)
+    naoya.endFrameStasis(gojo);
+    assert(gojo.isFrameFrozen === false, 'Gojo isFrameFrozen must be false after endFrameStasis');
+    assert(gojo.frameFreezeTimer === 0, 'Gojo frameFreezeTimer must be 0 after endFrameStasis');
+
+    // Update Gojo after stasis -> Hollow Purple channeling resumes and progresses!
+    gojo.update(naoya, 1, testArena);
+    assert(gojo.isChannelingPurple === true, 'Gojo Hollow Purple must continue channeling after 24-Frame stasis ends');
+    assert(gojo.purpleChargeTimer === 61, `Gojo purpleChargeTimer must increment to 61 after resuming casting (got ${gojo.purpleChargeTimer})`);
+
+    // B. Megumin Explosion Chant vs Naoya 24-Frame Palm Touch Stasis
+    const megumin = new MeguminFighter({ x: 400, y: 200, hp: 300, maxHp: 300 });
+    megumin.team = 1;
+    state.fighters = [naoya, megumin];
+
+    megumin.isChantingExplosion = true;
+    megumin.explosionTimer = 100;
+    megumin.chantTimer = 100;
+    megumin.chantMaxTimer = 240;
+    megumin.chantProgress = 100 / 240;
+    megumin.explosionPhase = 'CHANT';
+    megumin.explosionTargetX = 200;
+    megumin.explosionTargetY = 200;
+
+    naoya.applyFrameStasis(megumin, 24);
+    assert(megumin.isFrameFrozen === true, 'Megumin isFrameFrozen must be true');
+
+    // Update Megumin while frozen
+    megumin.update(naoya, 1, testArena);
+    assert(megumin.isChantingExplosion === true, 'Megumin explosion chant must NOT be cancelled during 24-Frame stasis');
+    assert(megumin.chantTimer === 100, 'Megumin chantTimer must remain paused at 100 during 24-Frame stasis');
+    assert(megumin.explosionPhase === 'CHANT', 'Megumin explosionPhase must remain CHANT during 24-Frame stasis');
+
+    // End stasis
+    naoya.endFrameStasis(megumin);
+    megumin.update(naoya, 1, testArena);
+    assert(megumin.isChantingExplosion === true, 'Megumin must continue chanting explosion after stasis ends');
+    assert(megumin.chantTimer === 101, `Megumin chantTimer must advance to 101 after unfreezing (got ${megumin.chantTimer})`);
+
+    // C. Sukuna Divine Flame Fuga vs Naoya 24-Frame Palm Touch Stasis
+    const sukuna = new SukunaFighter({ x: 500, y: 200, hp: 500, maxHp: 500 });
+    sukuna.team = 1;
+    state.fighters = [naoya, sukuna];
+
+    sukuna.isChannelingDivineFlame = true;
+    sukuna.divineFlameChargeTimer = 45;
+    sukuna.divineFlameCooldown = 0;
+
+    naoya.applyFrameStasis(sukuna, 24);
+    sukuna.update(naoya, 1, testArena);
+    assert(sukuna.isChannelingDivineFlame === true, 'Sukuna Fuga channeling must NOT be cancelled during 24-Frame stasis');
+    assert(sukuna.divineFlameChargeTimer === 45, 'Sukuna divineFlameChargeTimer must remain paused at 45 during 24-Frame stasis');
+
+    naoya.endFrameStasis(sukuna);
+    sukuna.update(naoya, 1, testArena);
+    assert(sukuna.isChannelingDivineFlame === true, 'Sukuna Fuga must continue channeling after stasis ends');
+    assert(sukuna.divineFlameChargeTimer === 46, `Sukuna divineFlameChargeTimer must advance to 46 after unfreezing (got ${sukuna.divineFlameChargeTimer})`);
+
+    // D. Contrast: Naoya Ultimate hard-cancellation
+    gojo.isChannelingPurple = true;
+    gojo.purpleChargeTimer = 60;
+    gojo.isCaughtInNaoyaUlt = true;
+    gojo.interruptAttacks(true);
+    assert(gojo.isChannelingPurple === false, 'Gojo Hollow Purple must be hard-cancelled when caught in Naoya Ultimate');
+    assert(gojo.purpleCooldown >= 270, 'Gojo purpleCooldown must receive penalty cooldown when hard-cancelled by Ultimate');
+
+    console.log('      ✅ Naoya 24-Frame Palm Touch stasis correctly preserves active skill casting and resumes on stasis end without resetting.');
   }
 
   console.log('───────────────────────────────────────────────────────');

@@ -556,12 +556,42 @@ function _renderYujiPixelBodyToCanvas(destCtx, r, isSukunaForm) {
         const chinScarX = -r * 0.06 + (r * 0.12) * chinProg;
         const isChinScar = (ry >= r * 0.04 && ry <= r * 0.08 && Math.abs(rx - chinScarX) <= P * 0.8);
 
-        // Sukuna Facial Cursed Markings (Tattoos)
+        // Sukuna Facial Cursed Markings (Canonical Tattoos synced 1:1 with Sukuna model)
         let isSukunaMark = false;
         if (isSukunaForm) {
-          if (ry >= -r * 0.26 && ry <= -r * 0.12 && absX <= 0.06) isSukunaMark = true;
-          if (ry >= -r * 0.10 && ry <= r * 0.06 && (Math.abs(rx - r * 0.40) <= P * 0.9 || Math.abs(rx + r * 0.40) <= P * 0.9)) isSukunaMark = true;
-          if (ry >= -r * 0.18 && ry <= -r * 0.14 && (Math.abs(rx - r * 0.30) <= r * 0.10 || Math.abs(rx + r * 0.30) <= r * 0.10)) isSukunaMark = true;
+          const absGx = Math.abs(gx);
+          // A. Forehead Trident & Central Markings (safely inside forehead)
+          if (absGx === 0 && (gy === -8 || gy === -7 || gy === -6)) {
+            isSukunaMark = true;
+          } else if (absGx === 3 && (gy === -8 || gy === -7)) {
+            isSukunaMark = true;
+          } else if (gy === -6 && (absGx === 1 || absGx === 2 || absGx === 3)) {
+            isSukunaMark = true;
+          } else if (absGx === 2 && (gy === -5 || gy === -4)) {
+            isSukunaMark = true;
+          }
+          // B. Nose / Brow Wave Arch (Horizontally aligned with upper cheek fork)
+          else if (gy === -2 && absGx <= 1) {
+            isSukunaMark = true; // Top horizontal bridge
+          } else if (gy === -1 && absGx === 2) {
+            isSukunaMark = true; // Left/right diagonal legs
+          }
+          // C. Cheek Markings (Full-length long vertical cheek strokes aligned with nose arch)
+          else if (gy === -3 && (absGx === 9 || absGx === 10)) {
+            isSukunaMark = true; // Upper temple fork
+          } else if (gy === -2 && (absGx === 8 || absGx === 9)) {
+            isSukunaMark = true; // Upper cheek notch (aligned with nose arch)
+          } else if ((gy === -1 || gy === 0 || gy === 1 || gy === 2) && absGx === 8) {
+            isSukunaMark = true; // Long vertical cheek stroke
+          } else if (gy === 3 && (absGx === 7 || absGx === 8)) {
+            isSukunaMark = true; // Lower jaw curve
+          } else if (gy === 4 && (absGx === 6 || absGx === 7)) {
+            isSukunaMark = true; // Bottom jawline tip
+          }
+          // D. Chin Markings
+          else if (absGx === 1 && gy === 4) {
+            isSukunaMark = true;
+          }
         }
 
         if (isSukunaMark) {

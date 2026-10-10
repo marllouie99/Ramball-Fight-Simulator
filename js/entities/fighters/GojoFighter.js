@@ -383,6 +383,10 @@ export class GojoFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     const wasChannelingDomain = this.isChannelingDomainExpansion;
     const wasChannelingPurple = this.isChannelingPurple;
     const savedPurpleCharge = this.purpleChargeTimer;
@@ -408,8 +412,11 @@ export class GojoFighter extends Fighter {
 
     // True Hard CC conditions that cancel even hyper-armored abilities:
     const isTrueHardCC = Boolean(
+      forceCancelAll ||
       this.isTargetOfAmbush ||
-      (this.timeStopTimer || 0) > 0 ||
+      this.isCaughtInNaoyaUlt ||
+      this.isCurrentlyWallPinnedByNaoya ||
+      ((this.timeStopTimer || 0) > 0 && !this.isFrameFrozen && (!this.frameFreezeTimer || this.frameFreezeTimer <= 0)) ||
       this.isFrozenByInfinity ||
       (this.silenceTimer || 0) > 0 ||
       this.isChainedByMakima ||
@@ -1104,8 +1111,7 @@ export class GojoFighter extends Fighter {
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
-      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-      if (!isNanamiPausing) {
+      if (!this.isSkillPreservedInStasis()) {
         this.timeStopTimer = 0;
       }
       this.purpleHitTimer = 0;
@@ -1120,9 +1126,8 @@ export class GojoFighter extends Fighter {
 
     const isFrozen = this._handleTimeStop();
     if (isFrozen) {
-      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-      if (isNanamiPausing) {
-        return; // Retain all channeling states intact during Nanami 7:3 Ratio hit-pause!
+      if (this.isSkillPreservedInStasis()) {
+        return; // Retain all channeling states intact during Nanami 7:3 Ratio hit-pause and Naoya 24-FPS Frame Stasis!
       }
       if (!this.isCaughtInTelekinesis) this.z = 0;
       if (this.isDomainPreSlide) {

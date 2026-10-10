@@ -48,7 +48,9 @@ export const sansConfig = {
   dodgeChance: 1.0,           // Probability (0-1) of dodging incoming attacks (100%)
   domainDodgeChance: 1.00,     // Probability (0-1) of dodging spatial slice lines inside enemy Domain Expansions (100%)
   dodgeStaminaMax: 100,       // Max dodge stamina pool (replaces HP bar in HUD)
-  dodgeStaminaCost: 2,        // Standard dodge stamina cost
+  dodgeStaminaCost: 10,       // Baseline / fallback dodge stamina cost
+  damageStaminaCostMultiplier: 0.10, // Dynamic stamina cost ratio: 10% of incoming attack damage (e.g. 100 dmg -> 10 stamina)
+  minDodgeStaminaCost: 1,     // Minimum stamina cost per dodge (1 stamina)
   domainDodgeStaminaCost: 1,  // Special Interaction: Stamina/Mana cost is 1 only when Sukuna's domain is open!
   dodgeStaminaRegen: 0.05,    // Stamina recovery per frame (~10/sec)
   dodgeStaminaRegenDelay: 20, // "Catch Breath" delay: frames after dodging before stamina begins recovering (~0.83s at 60fps)
@@ -68,11 +70,11 @@ export const sansConfig = {
   basicBoneDamage: 8,          // Balanced poke damage (8 + KR)
   basicBoneSpeed: 8.5,
   basicBoneReach: 420,
-  basicBoneCooldown: 100,       // Rapid chip barrage
+  basicBoneCooldown: 50,       // Rapid chip barrage
 
   // Skill 1: Gaster Blaster Arsenal (3 Authentic Undertale Patterns)
   enableGasterBlaster: true,
-  blasterCooldown: 320,        // ~5.3s cooldown
+  blasterCooldown: 500,        // ~5.3s cooldown
   initialBlasterCooldown: 320, // Initial cooldown at round start (~3.0s at 60fps) before first Gaster Blaster barrage
   blasterInitialCooldown: 180, // Alias for initialBlasterCooldown
   blasterStaminaCost: 15,      // Stamina exhaustion cost per Gaster Blaster barrage (25 / 100 Stamina)
@@ -90,7 +92,7 @@ export const sansConfig = {
   blasterBadTimeChainCount: 10,// Total blasters during Bad Time (10 blasters)
   blasterCircleRadius: 210,    // Distance from arena center in pixels (encircles the arena)
   blasterOrbitSpeed: 0.628,    // Angular step per spawn along the orbit (2*PI / 10 = ~0.628 rad for a clean 360-degree loop)
-  blasterSpawnInterval: 4,     // Frames between consecutive blaster spawns (~0.066s)
+  blasterSpawnInterval: 6,     // Frames between consecutive blaster spawns (~0.066s)
   blasterCarouselChargeTime: 16,// Rapid telegraph charge frames (~0.26s)
   blasterCarouselFireDuration: 22,// Active beam firing frames (~0.36s)
   blasterCarouselDamage: 20,    // Damage per beam tick
@@ -131,7 +133,7 @@ export const sansConfig = {
 
   // Ultimate / Skill 3: Blue Soul Gravity Slam ("Bad Time")
   enableGravitySlam: true,
-  gravitySlamCooldown: 580,    // ~9.6s cooldown
+  gravitySlamCooldown: 800,    // ~9.6s cooldown
   gravitySlamDuration: 80,     // Total channeling duration
   gravityForce: 18,            // Physics impulse slammed into walls
   gravitySlamDamage: 22,       // Balanced initial slam impact damage

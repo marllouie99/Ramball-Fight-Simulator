@@ -251,17 +251,20 @@ body.fit-window-mode .game-container {
   justify-content: space-between !important;
   align-items: stretch !important;
   gap: 0 !important;
+  width: 176px !important;
 }
 
 /* Default / Individual health cards in side HUD are compact auto-height blocks */
 .horizontal-viewport-mode .health-hud-side .health-card {
   width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   height: auto !important;
   flex: 0 0 auto !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
-  gap: 3px !important;
+  gap: 2px !important;
   box-sizing: border-box !important;
   padding: 0 !important;
   margin: 0 !important;
@@ -281,12 +284,14 @@ body.fit-window-mode .game-container {
 
 .horizontal-viewport-mode .health-hud-side .health-card__member {
   width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
   height: auto !important;
   flex: 0 0 auto !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
-  gap: 3px !important;
+  gap: 2px !important;
   box-sizing: border-box !important;
 }
 
@@ -331,135 +336,137 @@ body:not(.arena-dark-mode) .horizontal-viewport-mode .health-hud-side .health-ca
   margin-bottom: 0 !important;
 }
 
-.horizontal-viewport-mode .health-hud-side .health-card__member-header {
+/* Compact Character Name Header */
+.horizontal-viewport-mode .health-hud-side .health-card__member-header,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__member-header {
   margin: 0 0 2px 0 !important;
   flex: 0 0 auto !important;
 }
 
-.horizontal-viewport-mode .health-hud-side .health-card__bar {
+.horizontal-viewport-mode #healthHudRight .health-card__member-header,
+.horizontal-viewport-mode #healthHudRight .health-card .health-card__member-header {
+  justify-content: flex-end !important;
+}
+
+.horizontal-viewport-mode .health-hud-side .health-card__member-name,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__member-name {
+  font-size: 14.5px !important;
+  letter-spacing: 0.5px !important;
+  line-height: 1.1 !important;
+}
+
+.horizontal-viewport-mode #healthHudRight .health-card__member-name,
+.horizontal-viewport-mode #healthHudRight .health-card .health-card__member-name {
+  text-align: right !important;
+}
+
+/* Compact Health Bar */
+.horizontal-viewport-mode .health-hud-side .health-card__bar,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__bar {
+  height: 12px !important;
+  border-radius: 2px !important;
+  border-width: 1.2px !important;
   margin: 0 !important;
   flex: 0 0 auto !important;
 }
 
-/* Strictly enforce 1-column vertical grid for side HUD in horizontal mode */
+.horizontal-viewport-mode .health-hud-side .health-card__bar-text,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__bar-text {
+  font-size: 9.5px !important;
+  right: 4px !important;
+  letter-spacing: 0.2px !important;
+}
+
+/* Compact Skill Bars */
 .health-hud-side .health-card__skills,
 .health-hud-side .health-card__info,
 .horizontal-viewport-mode .health-hud-side .health-card__skills,
-.horizontal-viewport-mode .health-hud-side .health-card__info {
+.horizontal-viewport-mode .health-hud-side .health-card__info,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__skills,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__info {
   display: flex !important;
   flex-direction: column !important;
   grid-template-columns: 1fr !important;
   width: 100% !important;
-  gap: 3px !important;
-  margin-top: 3px !important;
+  gap: 2px !important;
+  margin-top: 2px !important;
   margin-bottom: 0 !important;
   flex: 0 0 auto !important;
 }
 
 .health-hud-side .hud-skill-box,
-.horizontal-viewport-mode .health-hud-side .hud-skill-box {
+.horizontal-viewport-mode .health-hud-side .hud-skill-box,
+.horizontal-viewport-mode .health-hud-side .health-card .hud-skill-box {
   width: 100% !important;
   max-width: 100% !important;
+  height: 14px !important;
+  border-radius: 2px !important;
+  border-width: 1.2px !important;
   box-sizing: border-box !important;
   grid-column: 1 / -1 !important;
   flex: 0 0 auto !important;
   margin: 0 !important;
 }
 
-.health-hud-side .health-card__info > div,
-.horizontal-viewport-mode .health-hud-side .health-card__info > div {
-  width: 100% !important;
-  grid-column: 1 / -1 !important;
-  margin: 0 !important;
-}
-
-.horizontal-viewport-mode .hud-name-box {
-  text-align: left !important;
-}
-
-/* =========================================================================
-   Horizontal Mode - FFA Side HUD Compact Scale Size
-   ========================================================================= */
-
-.horizontal-viewport-mode .health-hud-side.ffa-side-hud,
-.horizontal-viewport-mode .health-hud-side:has(.ffa-card) {
-  width: 176px !important;
-}
-
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card {
-  width: 100% !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
-  flex: 0 0 auto !important;
-  gap: 2px !important;
-}
-
-/* FFA Compact Character Name Header */
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .health-card__member-header {
-  margin-bottom: 2px !important;
-}
-
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .health-card__member-name {
-  font-size: 14.5px !important;
-  letter-spacing: 0.5px !important;
-  line-height: 1.1 !important;
-}
-
-/* FFA Compact Health Bar */
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .health-card__bar {
-  height: 12px !important;
-  border-radius: 2px !important;
-  border-width: 1.2px !important;
-  margin: 0 !important;
-}
-
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .health-card__bar-text {
-  font-size: 9.5px !important;
-  right: 4px !important;
-  letter-spacing: 0.2px !important;
-}
-
-/* FFA Compact Skill Bars */
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .health-card__skills {
-  gap: 2px !important;
-  margin-top: 2px !important;
-}
-
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .hud-skill-box {
-  height: 14px !important;
-  border-radius: 2px !important;
-  border-width: 1.2px !important;
-  margin: 0 !important;
-}
-
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .hud-skill-box-text {
+.horizontal-viewport-mode .health-hud-side .hud-skill-box-text,
+.horizontal-viewport-mode .health-hud-side .health-card .hud-skill-box-text {
   font-size: 11px !important;
   margin-left: 5px !important;
   letter-spacing: 0.1px !important;
   line-height: 14px !important;
 }
 
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .hud-skill-box-text .hud-num {
+.horizontal-viewport-mode .health-hud-side .hud-skill-box-text .hud-num,
+.horizontal-viewport-mode .health-hud-side .health-card .hud-skill-box-text .hud-num {
   font-size: 1.0em !important;
 }
 
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .hud-skill-box.label-only .hud-skill-box-text {
+.horizontal-viewport-mode .health-hud-side .hud-skill-box.label-only .hud-skill-box-text,
+.horizontal-viewport-mode .health-hud-side .health-card .hud-skill-box.label-only .hud-skill-box-text {
   font-size: 11px !important;
   line-height: 14px !important;
 }
 
-/* FFA Compact Stats / Info Lines */
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .health-card__info {
+/* Compact Stats / Info Lines */
+.health-hud-side .health-card__info,
+.horizontal-viewport-mode .health-hud-side .health-card__info,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__info {
   font-size: 11.5px !important;
   line-height: 1.25 !important;
   gap: 1.5px !important;
   margin-top: 2px !important;
 }
 
-.horizontal-viewport-mode .health-hud-side .health-card.ffa-card .health-card__info > div {
+.health-hud-side .health-card__info > div,
+.horizontal-viewport-mode .health-hud-side .health-card__info > div,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__info > div {
+  width: 100% !important;
+  grid-column: 1 / -1 !important;
   font-size: 11.5px !important;
   line-height: 1.25 !important;
   margin: 0 !important;
+}
+
+/* Compact Round Win Bullets */
+.horizontal-viewport-mode .health-hud-side .health-card__wins,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__wins {
+  gap: 4px !important;
+  margin: 1px 0 3px !important;
+}
+
+.horizontal-viewport-mode .health-hud-side .health-card__win-bullet,
+.horizontal-viewport-mode .health-hud-side .health-card .health-card__win-bullet {
+  width: 7px !important;
+  height: 7px !important;
+  border-width: 1.2px !important;
+}
+
+.horizontal-viewport-mode #hudTopLeft {
+  text-align: left !important;
+}
+
+.horizontal-viewport-mode #hudTopRight {
+  text-align: right !important;
 }
 
 .game-box h2 {

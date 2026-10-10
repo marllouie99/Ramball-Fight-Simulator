@@ -1,7 +1,7 @@
 import { goToTitle } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
-import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
+import { FIGHTER_DEFS, getActiveFighterDefs, CONFIG } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { clearHealthHud } from '../hudManager.js';
@@ -1223,7 +1223,7 @@ function drawWeaponDetailScreen() {
   ctx.fillText('[ FIGHTER & WEAPON REVIEW ]', canvas.width / 2, navY);
   ctx.restore();
 
-  const activeList = TACTICAL_FIGHTER_DEFS.some(f => f.type === def.type) ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
+  const activeList = getActiveFighterDefs();
   const currentIdx = activeList.findIndex(f => f.type === def.type);
   if (currentIdx > 0) {
     drawButton('◄ PREV', canvas.width - 95, navY, () => {

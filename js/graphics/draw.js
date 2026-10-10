@@ -8,7 +8,7 @@ export { drawFloatingJetpacks, spawnDroppedJetpack, updateFloatingJetpacks, clea
 export { drawDroppedMiniguns, spawnDroppedMinigun, updateDroppedMiniguns, clearDroppedMiniguns } from './particles/cjDroppedMinigun.js';
 export { drawDroppedMahoragaWheels, spawnDroppedMahoragaWheel, updateDroppedMahoragaWheels, clearDroppedMahoragaWheels } from './particles/mahoragaDroppedWheel.js';
 export { drawCarExplosions, drawCarScorchMarks, spawnCarExplosion, updateCarExplosions, clearCarExplosions } from './particles/cjCarExplosion.js';
-export { spawnDeathShatter, spawnEnderDragonDisintegrationDeath, spawnEnderDragonXPFountain, drawMinecraftXPOrb } from './particles/deathShatterEffect.js';
+export { spawnDeathShatter, spawnSansHeartShatterDeath, spawnEnderDragonDisintegrationDeath, spawnEnderDragonXPFountain, drawMinecraftXPOrb } from './particles/deathShatterEffect.js';
 // ——————————————————————————————————————————————————————
 // DRAW — ARENA
 // ——————————————————————————————————————————————————————

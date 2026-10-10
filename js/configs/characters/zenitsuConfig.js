@@ -58,27 +58,35 @@ export const zenitsuConfig = {
   staticBurstDamage: 20,
   staticStunFrames: 18,
 
-  // Basic Attack: Thunder Iai Quickdraw & Sheath Flurry (140° Frontal Arc)
-  enableBasicAttack: false,         // Master toggle for Basic Attack: Thunder Iai Quickdraw (DISABLED: Zenitsu maintains Iaido stance at all times)
-  katanaArcAngle: Math.PI * 0.778, // ~140 degrees
+  // Basic Attack: 1 Single Thunderclap Dash (Hekireki Issen: Single Dash)
+  enableBasicAttack: true,          // Master toggle for Basic Attack: 1 Thunderclap Dash
+  basicAttackCooldown: 100,          // Cooldown in frames between basic dashes (60 frames = 1.0s at 60fps)
+  basicDashWindupFrames: 50,         // Stance & charge windup frames before dashing (~130ms)
+  basicDashRange: 450,              // Range within which Zenitsu initiates basic dash
+  basicDashDamage: 30,              // Damage dealt on single dash impact
+  basicDashDuration: 5,             // Travel frames per single dash (~83ms)
+  basicDashSpeed: 36.0,             // Godspeed velocity
+  basicDashStunFrames: 18,          // Paralyze / stun duration on basic dash hit
+  basicDashSlideFrames: 10,         // Brief post-dash friction slide duration
+  basicDashSlideSpeed: 7.0,         // Slide deceleration speed
+  basicDashSlideFriction: 0.86,     // Slide deceleration friction multiplier per frame
+  basicDashBreatherFrames: 0,      // Stance hold & breather pause duration in frames (~0.75s)
+  basicDashBreatherExitFrames: 18,  // Duration in frames to transition from stance back to normal pose
+  katanaArcAngle: Math.PI * 0.778, // ~140 degrees (fallback)
   katanaReach: 78,
-  hit1Damage: 18,
-  hit1StunFrames: 6,
-  hit2Damage: 22,
-  hit2StunFrames: 8,
-  hit3Damage: 28,
-  hit3Knockback: 22,
 
   // Skill 1: Thunder Breathing First Form: Thunderclap and Flash (Hekireki Issen)
-  enableThunderclap: true,          // Master toggle for Skill 1: Thunderclap and Flash
-  thunderclapCooldown: 300,    // 3.8s
+  enableThunderclap: 1,          // Master toggle for Skill 1: Thunderclap and Flash
+  enableThunderclapAimLock: true,   // Master toggle for aim lock commitment before firing
+  thunderclapCommitFrames: 18,      // Lock-in commit frames before unleashing dash (~300ms where aim is strictly locked)
+  thunderclapCooldown: 500,    // 3.8s
   thunderclapChannelDuration: 150,   // Wind-up channel frames (Frames 1-2 Stance & Charge animation)
   thunderclapDashCount: 5,          // 4 consecutive godspeed zig-zag slashes
   thunderclapDashDuration: 2,       // Travel frames per dash
   thunderclapDashPauseFrames: 5,    // Pause/windup frames between each consecutive dash
   thunderclapSpeed: 36.0,
   thunderclapDamage: 20,            // Damage per intermediate dash
-  thunderclapFinisherDamage: 50,    // Finisher dash damage
+  thunderclapFinisherDamage: 30,    // Finisher dash damage
   thunderclapStunFrames: 50,
   dashAudioFadeOutMs: 120,          // Fast audio fade-out in ms the moment all dashes are completed
   firstFormToThunderclapGapFrames: 18, // Spacing/pause frames (~300ms) between "First Form" and "Thunderclap and Flash" voicelines

@@ -774,6 +774,7 @@ function roundedRect(ctx, x, y, w, h, r) {
  * @param {boolean} [alreadyInCameraSpace=false] - Whether camera transform is already applied to ctx
  */
 export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
+  if (CONFIG.hudHideAll) return;
   if (typeof state === 'undefined' || !state || !state.fighters || state.fighters.length === 0) return;
   if (!ctx) return;
   if (state.gameState !== 'playing' && state.gameState !== 'countdown' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
@@ -940,7 +941,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     const sideFontSize = 34;
     const customSideFont = `700 ${sideFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
     const stackedSideFont = `700 20px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
-    const maxSideW = 244;
+    const maxSideW = 176;
 
     const drawSideColumnNames = (dataArr, x, baseY, align) => {
       // In 1v1 mode (single fighter per side), draw the large top wall flank name above the side card.
@@ -975,8 +976,8 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     // Player / Team 1 on Left Flank (aligned with top arena wall: left 18px, top y: arena.y)
     drawSideColumnNames(leftData, 18, nameY, 'left');
 
-    // Player / Team 2 on Right Flank (aligned with top arena wall: left-aligned with right column at 960 - 18 - maxSideW)
-    drawSideColumnNames(rightData, 960 - 18 - maxSideW, nameY, 'left');
+    // Player / Team 2 on Right Flank (aligned with top arena wall: right 18px / x: 960 - 18, top y: arena.y, right-aligned)
+    drawSideColumnNames(rightData, 960 - 18, nameY, 'right');
 
     // ── Center Top-Wall Round Banner & Win Bullets: [BULLETS] ── [ROUND BANNER] ── [BULLETS] ──
     const isFfaMatch = Boolean(

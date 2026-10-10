@@ -72,7 +72,7 @@ export function _getZenitsuLightningSpriteImage() {
       _zenitsuLightningSpriteImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu blue lightning sprite sheet at Assets/model/zenitsu/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png, falling back...', e);
+      console.warn('Failed to load Zenitsu golden lightning sprite sheet at Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png, falling back...', e);
       const fallback = new Image();
       fallback.onload = () => {
         _zenitsuLightningSpriteImage = fallback;
@@ -81,44 +81,64 @@ export function _getZenitsuLightningSpriteImage() {
       fallback.onerror = () => {
         _zenitsuLightningSpriteImageLoading = false;
       };
-      fallback.src = encodeURI('Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png?v=2');
+      fallback.src = encodeURI('Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png?v=3');
     };
-    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png?v=2');
+    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png?v=3');
     _zenitsuLightningSpriteImage = img;
   }
   return _zenitsuLightningSpriteImage;
 }
 
 let _zenitsuDashSpriteImage = null;
+let _zenitsuDashSpriteImageBlue = null;
+let _zenitsuDashSpriteImageGold = null;
 let _zenitsuDashSpriteImageLoading = false;
 
-export function _getZenitsuDashSpriteImage() {
-  if (_zenitsuDashSpriteImage && _zenitsuDashSpriteImage.complete && _zenitsuDashSpriteImage.naturalWidth > 0) {
-    return _zenitsuDashSpriteImage;
+export function _getZenitsuDashSpriteImage(theme = 'blue') {
+  if (theme === 'gold') {
+    if (_zenitsuDashSpriteImageGold && _zenitsuDashSpriteImageGold.complete && _zenitsuDashSpriteImageGold.naturalWidth > 0) {
+      return _zenitsuDashSpriteImageGold;
+    }
+  } else {
+    if (_zenitsuDashSpriteImageBlue && _zenitsuDashSpriteImageBlue.complete && _zenitsuDashSpriteImageBlue.naturalWidth > 0) {
+      return _zenitsuDashSpriteImageBlue;
+    }
   }
+
   if (!_zenitsuDashSpriteImageLoading && typeof Image !== 'undefined') {
     _zenitsuDashSpriteImageLoading = true;
-    const img = new Image();
-    img.onload = () => {
-      _zenitsuDashSpriteImage = img;
-      _zenitsuDashSpriteImageLoading = false;
+    const imgBlue = new Image();
+    imgBlue.onload = () => {
+      _zenitsuDashSpriteImageBlue = imgBlue;
+      _zenitsuDashSpriteImage = imgBlue;
     };
-    img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu blue dash sprite sheet, falling back to gold...', e);
-      const fallback = new Image();
-      fallback.onload = () => {
-        _zenitsuDashSpriteImage = fallback;
-        _zenitsuDashSpriteImageLoading = false;
-      };
-      fallback.onerror = () => {
-        _zenitsuDashSpriteImageLoading = false;
-      };
-      fallback.src = encodeURI('Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Gold.png?v=1');
+    imgBlue.onerror = (e) => {
+      console.warn('Failed to load Zenitsu blue dash sprite sheet', e);
     };
-    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Blue.png?v=5');
-    _zenitsuDashSpriteImage = img;
+    imgBlue.src = encodeURI('Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Blue.png?v=5');
+
+    const imgGold = new Image();
+    imgGold.onload = () => {
+      _zenitsuDashSpriteImageGold = imgGold;
+    };
+    imgGold.onerror = (e) => {
+      console.warn('Failed to load Zenitsu gold dash sprite sheet', e);
+    };
+    imgGold.src = encodeURI('Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Gold.png?v=5');
   }
-  return _zenitsuDashSpriteImage;
+
+  if (theme === 'gold') {
+    return _zenitsuDashSpriteImageGold || _zenitsuDashSpriteImageBlue || _zenitsuDashSpriteImage;
+  }
+  return _zenitsuDashSpriteImageBlue || _zenitsuDashSpriteImageGold || _zenitsuDashSpriteImage;
+}
+
+export function _getZenitsuDashGoldSpriteImage() {
+  return _getZenitsuDashSpriteImage('gold');
+}
+
+export function _getZenitsuDashBlueSpriteImage() {
+  return _getZenitsuDashSpriteImage('blue');
 }
 
 let _zenitsuDashDisappearanceImage = null;
@@ -148,7 +168,8 @@ export function _getZenitsuDashDisappearanceImage() {
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getZenitsuHairImage();
   _getZenitsuLightningSpriteImage();
-  _getZenitsuDashSpriteImage();
+  _getZenitsuDashSpriteImage('blue');
+  _getZenitsuDashSpriteImage('gold');
   _getZenitsuDashDisappearanceImage();
 }
 
@@ -367,7 +388,7 @@ function _drawThunderclapChargeSprite(ctx, r, burst, jitterX = 0, jitterY = 0) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  // Outer Electric Cyan Corona (4 samples @ 5px)
+  // Outer Electric Gold Corona (4 samples @ 5px)
   const outerRadius = Math.max(3, Math.min(7, r * 0.24 * (burst.intensity || 0.8)));
   const outerAlpha = (isDark ? 0.12 : 0.08) * alpha;
   for (let i = 0; i < 4; i++) {
@@ -383,7 +404,7 @@ function _drawThunderclapChargeSprite(ctx, r, burst, jitterX = 0, jitterY = 0) {
     );
   }
 
-  // Tight Electric Rim (4 samples @ 2.5px)
+  // Tight Electric Gold Rim (4 samples @ 2.5px)
   const innerRadius = Math.max(1.5, outerRadius * 0.45);
   const innerAlpha = (isDark ? 0.20 : 0.14) * alpha;
   for (let i = 0; i < 4; i++) {
@@ -438,7 +459,7 @@ function _drawThunderclapChargeProceduralFallback(ctx, r, burst, jitterX = 0, ji
     let cy = Math.sin(angle) * dist + (burst.snapY || 0) + jitterY;
     const segs = 3;
 
-    ctx.strokeStyle = i % 2 === 0 ? '#0284C7' : '#38BDF8';
+    ctx.strokeStyle = i % 2 === 0 ? '#F59E0B' : '#FBBF24';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(cx, cy);
@@ -473,9 +494,9 @@ function _drawThunderclapChargeVFX(ctx, r, progress, elapsed = 0, total = 100, j
   const groundGlow = ctx.createRadialGradient(jitterX, feetY * 0.4 + jitterY, 0, jitterX, feetY * 0.4 + jitterY, groundRadius);
   const gIntensity = 0.65 * (burst.intensity || 0.8) * (burst.alpha || 1.0);
   groundGlow.addColorStop(0, `rgba(255, 255, 255, ${gIntensity * 0.95})`);
-  groundGlow.addColorStop(0.20, `rgba(224, 242, 254, ${gIntensity * 0.85})`);
-  groundGlow.addColorStop(0.45, `rgba(0, 229, 255, ${gIntensity * 0.70})`);
-  groundGlow.addColorStop(0.75, `rgba(2, 132, 199, ${gIntensity * 0.30})`);
+  groundGlow.addColorStop(0.20, `rgba(254, 240, 138, ${gIntensity * 0.85})`);
+  groundGlow.addColorStop(0.45, `rgba(245, 158, 11, ${gIntensity * 0.70})`);
+  groundGlow.addColorStop(0.75, `rgba(217, 119, 6, ${gIntensity * 0.30})`);
   groundGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
@@ -491,7 +512,7 @@ function _drawThunderclapChargeVFX(ctx, r, progress, elapsed = 0, total = 100, j
 
   const segs = 4;
   const stepX = (spread * 2) / segs;
-  ctx.strokeStyle = (burst.burstId === 2 ? '#38BDF8' : '#00E5FF');
+  ctx.strokeStyle = (burst.burstId === 2 ? '#FBBF24' : '#F59E0B');
   ctx.lineWidth = 1.8;
   ctx.beginPath();
   ctx.moveTo(-spread + jitterX, feetY);
@@ -525,7 +546,7 @@ function _drawThunderclapChargeVFX(ctx, r, progress, elapsed = 0, total = 100, j
     const spX = Math.round((Math.cos(spAngle) * spDist + jitterX) / 2) * 2;
     const spY = Math.round((Math.sin(spAngle) * spDist + jitterY) / 2) * 2;
     const sz = ((i + elapsed) % 2 === 0) ? 2 : 3;
-    ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : '#38BDF8';
+    ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : '#F59E0B';
     ctx.fillRect(spX, spY, sz, sz);
   }
 
@@ -544,17 +565,17 @@ export const ZENITSU_DASH_FRAMES = [
 ];
 
 export const ZENITSU_DISAPPEARANCE_FRAMES = [
-  // Disappearance Frame 1: Fracturing, dissolving lightning bolt in the air (BBox: 431x153)
-  { frame: 0, sx: 13, sy: 33, sw: 431, sh: 153 },
-  // Disappearance Frame 2: Lingering spark flecks fading into the air (BBox: 382x93)
-  { frame: 1, sx: 518, sy: 63, sw: 382, sh: 93 }
+  // Disappearance Frame 1: Fracturing, dissolving lightning bolt in the air (Frame 5 in 6-Frames sheet)
+  { frame: 4, sx: 1942, sy: 42, sw: 437, sh: 156 },
+  // Disappearance Frame 2: Lingering spark flecks fading into the air (Frame 6 in 6-Frames sheet)
+  { frame: 5, sx: 2447, sy: 72, sw: 386, sh: 97 }
 ];
 
 /**
  * Lightning Dash Animation & Disappearance Renderer
  * 1. Active Dash Travel (Frames 1 to 4): Trailing streak stretches from origin to Zenitsu's circle.
  * 2. Air Linger: Full lightning bolt stays seared in the air between start and destination for a brief moment.
- * 3. Disappearance (Zenitsu-Lightning-Dash-Disappearance.png): Fracturing bolt -> fading lingering sparks.
+ * 3. Disappearance: Fracturing bolt (Frame 5) -> fading lingering sparks (Frame 6) matching the dash color theme.
  * Rule 11 (Zero shadowBlur) & Rule 2.4 (Stack integrity) compliant.
  */
 export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
@@ -596,7 +617,7 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
     frameDef = ZENITSU_DASH_FRAMES[3];
     alpha = 1.0;
   } else {
-    // Phase 3: Disappearance animation using Zenitsu-Lightning-Dash-Disappearance.png
+    // Phase 3: Disappearance animation using Frames 5 and 6 from 6Frames sheet
     isDisappearancePhase = true;
     const disappearTimer = vfx.timer - lingerEnd;
     const disappearTotal = Math.max(1, vfx.maxTimer - lingerEnd);
@@ -627,22 +648,22 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
     )
   );
 
+  const isGold = Boolean(vfx.theme === 'gold' || (!vfx.isBasic && vfx.theme !== 'blue'));
+
   // ── LAYER -1: PROXIMITY ENTITY LIGHTING & BLOOM ──
-  // Casts an additive electric cyan directional specular highlight and rim arc on nearby entities
+  // Casts an additive directional specular highlight and rim arc on nearby entities
   if (currentDist > 8 && alpha > 0.05) {
-    _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, alpha, isDark, fighter, vfx.timer);
+    _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, alpha, isDark, fighter, vfx.timer, isGold);
   }
 
   ctx.save();
   ctx.translate(startX, startY);
   ctx.rotate(angle);
 
-  const dashImg = isDisappearancePhase
-    ? (_getZenitsuDashDisappearanceImage() || _getZenitsuDashSpriteImage())
-    : _getZenitsuDashSpriteImage();
+  const dashImg = _getZenitsuDashSpriteImage(isGold ? 'gold' : 'blue');
 
   // ── LAYER 0: AMBIENT FLOOR / GROUND LIGHTING WASH ──
-  // Casts a soft, continuous pool of radiant electric cyan illumination onto the arena floor beneath the dash
+  // Casts a soft, continuous pool of radiant illumination onto the arena floor beneath the dash
   if (drawW > 6 && alpha > 0.05) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -657,10 +678,17 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
       const nodeR = groundLightRadius * (0.85 + Math.sin(t * Math.PI) * 0.30);
 
       const groundGlow = ctx.createRadialGradient(nx, ny, 0, nx, ny, nodeR);
-      groundGlow.addColorStop(0, `rgba(0, 229, 255, ${groundIntensity * 1.0})`);
-      groundGlow.addColorStop(0.35, isDark ? `rgba(2, 132, 199, ${groundIntensity * 0.55})` : `rgba(14, 165, 233, ${groundIntensity * 0.45})`);
-      groundGlow.addColorStop(0.70, isDark ? `rgba(3, 105, 161, ${groundIntensity * 0.20})` : `rgba(2, 132, 199, ${groundIntensity * 0.15})`);
-      groundGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      if (isGold) {
+        groundGlow.addColorStop(0, `rgba(251, 191, 36, ${groundIntensity * 1.0})`);
+        groundGlow.addColorStop(0.35, isDark ? `rgba(245, 158, 11, ${groundIntensity * 0.55})` : `rgba(251, 191, 36, ${groundIntensity * 0.45})`);
+        groundGlow.addColorStop(0.70, isDark ? `rgba(217, 119, 6, ${groundIntensity * 0.20})` : `rgba(245, 158, 11, ${groundIntensity * 0.15})`);
+        groundGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      } else {
+        groundGlow.addColorStop(0, `rgba(0, 229, 255, ${groundIntensity * 1.0})`);
+        groundGlow.addColorStop(0.35, isDark ? `rgba(2, 132, 199, ${groundIntensity * 0.55})` : `rgba(14, 165, 233, ${groundIntensity * 0.45})`);
+        groundGlow.addColorStop(0.70, isDark ? `rgba(3, 105, 161, ${groundIntensity * 0.20})` : `rgba(2, 132, 199, ${groundIntensity * 0.15})`);
+        groundGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      }
 
       ctx.fillStyle = groundGlow;
       ctx.beginPath();
@@ -687,7 +715,7 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
-    // Outer Electric Cyan Corona (4 samples @ 6px)
+    // Outer Electric Corona (4 samples @ 6px)
     const outerRadius = Math.max(3, Math.min(8, r * 0.28));
     const outerAlpha = (isDark ? 0.10 : 0.07) * alpha;
     for (let i = 0; i < 4; i++) {
@@ -740,11 +768,11 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
     }
     ctx.restore();
   } else {
-    _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisappearancePhase, isDark);
+    _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisappearancePhase, isDark, isGold);
   }
 
   // Lingering flickering electric trails & drifting sparks in the air
-  _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, isDark);
+  _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, isDark, isGold);
 
   ctx.restore();
 }
@@ -754,7 +782,7 @@ export function _drawZenitsuThunderclapDashVFX(ctx, vfx, fighter = null) {
  * Similar to Yuta's Pure Love Beam lingering lightning crackles and spark embers.
  * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
  */
-function _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, isDark) {
+function _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, isDark, isGold = false) {
   if (!ctx || drawW <= 12 || alpha <= 0.05) return;
 
   const pseudoRand = (seed) => {
@@ -792,8 +820,12 @@ function _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, i
     }
 
     if (arcPoints.length >= 2) {
-      // Outer Cyan Corona Stroke
-      ctx.strokeStyle = (i % 2 === 0) ? `rgba(0, 229, 255, ${0.85 * alpha})` : `rgba(56, 189, 248, ${0.75 * alpha})`;
+      // Outer Corona Stroke (Gold for basic attack, Cyan for skill 1)
+      if (isGold) {
+        ctx.strokeStyle = (i % 2 === 0) ? `rgba(245, 158, 11, ${0.85 * alpha})` : `rgba(251, 191, 36, ${0.75 * alpha})`;
+      } else {
+        ctx.strokeStyle = (i % 2 === 0) ? `rgba(0, 229, 255, ${0.85 * alpha})` : `rgba(56, 189, 248, ${0.75 * alpha})`;
+      }
       ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.moveTo(arcPoints[0].x, arcPoints[0].y);
@@ -826,7 +858,11 @@ function _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, i
     const sz = (i % 3 === 0) ? 3 : 2;
     const isWhite = (i % 2 === 0);
 
-    ctx.fillStyle = isWhite ? `rgba(255, 255, 255, ${0.90 * alpha})` : `rgba(0, 229, 255, ${0.75 * alpha})`;
+    if (isGold) {
+      ctx.fillStyle = isWhite ? `rgba(255, 255, 255, ${0.90 * alpha})` : `rgba(251, 191, 36, ${0.85 * alpha})`;
+    } else {
+      ctx.fillStyle = isWhite ? `rgba(255, 255, 255, ${0.90 * alpha})` : `rgba(0, 229, 255, ${0.75 * alpha})`;
+    }
     ctx.fillRect(emberX - sz / 2, emberY - sz / 2, sz, sz);
   }
 
@@ -837,7 +873,7 @@ function _drawZenitsuLingeringElectricTrails(ctx, drawW, drawH, r, vfx, alpha, i
  * Renders directional electric bloom & rim lighting on entities near Zenitsu's lightning dash path.
  * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
  */
-function _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, alpha, isDark, excludeFighter = null, vfxTimer = 0) {
+function _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, alpha, isDark, excludeFighter = null, vfxTimer = 0, isGold = false) {
   if (!ctx || alpha <= 0.05) return;
 
   const segDx = headX - startX;
@@ -880,14 +916,22 @@ function _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, 
 
     const lightAngle = Math.atan2(projY - entY, projX - entX);
 
-    // 1. Massive Radial Electric Bloom around entity (matches Hyperion beam bloom)
+    // 1. Massive Radial Electric Bloom around entity
     const gradR = entR * 3.0;
     const bodyGlow = ctx.createRadialGradient(entX, entY, entR * 0.15, entX, entY, gradR);
-    bodyGlow.addColorStop(0, `rgba(255, 255, 255, ${(0.95 + Math.random() * 0.05) * intensity})`);
-    bodyGlow.addColorStop(0.22, `rgba(224, 242, 254, ${0.90 * intensity})`);
-    bodyGlow.addColorStop(0.50, `rgba(0, 229, 255, ${(isDark ? 0.85 : 0.75) * intensity})`);
-    bodyGlow.addColorStop(0.78, isDark ? `rgba(2, 132, 199, ${0.40 * intensity})` : `rgba(14, 165, 233, ${0.30 * intensity})`);
-    bodyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    if (isGold) {
+      bodyGlow.addColorStop(0, `rgba(255, 255, 255, ${(0.95 + Math.random() * 0.05) * intensity})`);
+      bodyGlow.addColorStop(0.22, `rgba(254, 240, 138, ${0.90 * intensity})`);
+      bodyGlow.addColorStop(0.50, `rgba(245, 158, 11, ${(isDark ? 0.85 : 0.75) * intensity})`);
+      bodyGlow.addColorStop(0.78, isDark ? `rgba(217, 119, 6, ${0.40 * intensity})` : `rgba(245, 158, 11, ${0.30 * intensity})`);
+      bodyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else {
+      bodyGlow.addColorStop(0, `rgba(255, 255, 255, ${(0.95 + Math.random() * 0.05) * intensity})`);
+      bodyGlow.addColorStop(0.22, `rgba(224, 242, 254, ${0.90 * intensity})`);
+      bodyGlow.addColorStop(0.50, `rgba(0, 229, 255, ${(isDark ? 0.85 : 0.75) * intensity})`);
+      bodyGlow.addColorStop(0.78, isDark ? `rgba(2, 132, 199, ${0.40 * intensity})` : `rgba(14, 165, 233, ${0.30 * intensity})`);
+      bodyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    }
 
     ctx.fillStyle = bodyGlow;
     ctx.beginPath();
@@ -902,7 +946,7 @@ function _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, 
 
     // 3. High-Voltage Directional Electric Rim Arc
     const rimWidth = Math.max(1.8, Math.min(3.6, entR * 0.12));
-    ctx.strokeStyle = `rgba(0, 229, 255, ${intensity * 0.95})`;
+    ctx.strokeStyle = isGold ? `rgba(245, 158, 11, ${intensity * 0.95})` : `rgba(0, 229, 255, ${intensity * 0.95})`;
     ctx.lineWidth = rimWidth;
     ctx.beginPath();
     ctx.arc(entX, entY, entR + 1.2, lightAngle - Math.PI * 0.45, lightAngle + Math.PI * 0.45);
@@ -925,7 +969,11 @@ function _drawZenitsuProximityEntityLighting(ctx, startX, startY, headX, headY, 
         const spDist = entR + 2.5 + ((seed % 5) - 2);
         const spX = entX + Math.cos(sparkAng) * spDist;
         const spY = entY + Math.sin(sparkAng) * spDist;
-        ctx.fillStyle = (s === 0) ? `rgba(255, 255, 255, ${intensity * 0.95})` : `rgba(56, 189, 248, ${intensity * 0.85})`;
+        if (isGold) {
+          ctx.fillStyle = (s === 0) ? `rgba(255, 255, 255, ${intensity * 0.95})` : `rgba(251, 191, 36, ${intensity * 0.85})`;
+        } else {
+          ctx.fillStyle = (s === 0) ? `rgba(255, 255, 255, ${intensity * 0.95})` : `rgba(56, 189, 248, ${intensity * 0.85})`;
+        }
         ctx.fillRect(spX - 1, spY - 1, 2, 2);
       }
     }
@@ -973,8 +1021,8 @@ function _drawZenitsuChannelingEntityLighting(ctx, zenX, zenY, burst, isDark, ex
 
     const bodyGlow = ctx.createRadialGradient(hx, hy, 0, entX, entY, gradR);
     bodyGlow.addColorStop(0, `rgba(255, 255, 255, ${intensity * 0.75})`);
-    bodyGlow.addColorStop(0.35, `rgba(0, 229, 255, ${intensity * 0.60})`);
-    bodyGlow.addColorStop(0.70, isDark ? `rgba(2, 132, 199, ${intensity * 0.25})` : `rgba(14, 165, 233, ${intensity * 0.18})`);
+    bodyGlow.addColorStop(0.35, `rgba(251, 191, 36, ${intensity * 0.60})`);
+    bodyGlow.addColorStop(0.70, isDark ? `rgba(217, 119, 6, ${intensity * 0.25})` : `rgba(245, 158, 11, ${intensity * 0.18})`);
     bodyGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     ctx.fillStyle = bodyGlow;
@@ -983,7 +1031,7 @@ function _drawZenitsuChannelingEntityLighting(ctx, zenX, zenY, burst, isDark, ex
     ctx.fill();
 
     // Directional rim arc
-    ctx.strokeStyle = `rgba(0, 229, 255, ${intensity * 0.80})`;
+    ctx.strokeStyle = `rgba(245, 158, 11, ${intensity * 0.80})`;
     ctx.lineWidth = Math.max(1.2, entR * 0.08);
     ctx.beginPath();
     ctx.arc(entX, entY, entR + 0.8, lightAngle - Math.PI * 0.35, lightAngle + Math.PI * 0.35);
@@ -996,17 +1044,17 @@ function _drawZenitsuChannelingEntityLighting(ctx, zenX, zenY, burst, isDark, ex
 /**
  * Procedural electric dash bolt fallback when sprite sheet is loading or unavailable.
  */
-function _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisappearance = false, isDark = true) {
+function _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisappearance = false, isDark = true, isGold = false) {
   if (isDisappearance) {
     const sparkCount = 12;
     for (let i = 0; i < sparkCount; i++) {
       const sx = (i / sparkCount) * drawW;
       const sy = ((i % 2 === 0 ? -1 : 1) * (i * 5 % 11));
       if (!isDark) {
-        ctx.fillStyle = '#00E5FF';
+        ctx.fillStyle = isGold ? '#FBBF24' : '#00E5FF';
         ctx.fillRect(sx - 1, sy - 1, 5, 5);
       }
-      ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : (isDark ? '#0284C7' : '#0369A1');
+      ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : (isGold ? (isDark ? '#F59E0B' : '#D97706') : (isDark ? '#0284C7' : '#0369A1'));
       ctx.fillRect(sx, sy, 3, 3);
     }
     return;
@@ -1030,29 +1078,55 @@ function _drawZenitsuDashProceduralFallback(ctx, drawW, drawH, frameIdx, isDisap
   ctx.save();
   ctx.lineCap = 'round';
 
-  // Tier 1: Outer Huge Bloom
-  tracePath();
-  ctx.strokeStyle = isDark ? 'rgba(0, 120, 255, 0.30)' : 'rgba(0, 150, 255, 0.28)';
-  ctx.lineWidth = 14.0;
-  ctx.stroke();
+  if (isGold) {
+    // Tier 1: Outer Huge Bloom
+    tracePath();
+    ctx.strokeStyle = isDark ? 'rgba(217, 119, 6, 0.30)' : 'rgba(245, 158, 11, 0.28)';
+    ctx.lineWidth = 14.0;
+    ctx.stroke();
 
-  // Tier 2: Secondary Wide Glow
-  tracePath();
-  ctx.strokeStyle = isDark ? 'rgba(0, 210, 255, 0.50)' : 'rgba(0, 200, 255, 0.45)';
-  ctx.lineWidth = 7.0;
-  ctx.stroke();
+    // Tier 2: Secondary Wide Glow
+    tracePath();
+    ctx.strokeStyle = isDark ? 'rgba(245, 158, 11, 0.50)' : 'rgba(251, 191, 36, 0.45)';
+    ctx.lineWidth = 7.0;
+    ctx.stroke();
 
-  // Tier 3: Mid Bright Glow
-  tracePath();
-  ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.80)' : 'rgba(14, 165, 233, 0.75)';
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
+    // Tier 3: Mid Bright Glow
+    tracePath();
+    ctx.strokeStyle = isDark ? 'rgba(251, 191, 36, 0.80)' : 'rgba(254, 240, 138, 0.75)';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
 
-  // Tier 4: Inner White Core
-  tracePath();
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
+    // Tier 4: Inner White Core
+    tracePath();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  } else {
+    // Tier 1: Outer Huge Bloom
+    tracePath();
+    ctx.strokeStyle = isDark ? 'rgba(0, 120, 255, 0.30)' : 'rgba(0, 150, 255, 0.28)';
+    ctx.lineWidth = 14.0;
+    ctx.stroke();
+
+    // Tier 2: Secondary Wide Glow
+    tracePath();
+    ctx.strokeStyle = isDark ? 'rgba(0, 210, 255, 0.50)' : 'rgba(0, 200, 255, 0.45)';
+    ctx.lineWidth = 7.0;
+    ctx.stroke();
+
+    // Tier 3: Mid Bright Glow
+    tracePath();
+    ctx.strokeStyle = isDark ? 'rgba(56, 189, 248, 0.80)' : 'rgba(14, 165, 233, 0.75)';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+
+    // Tier 4: Inner White Core
+    tracePath();
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
@@ -1072,8 +1146,13 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
     )
   );
 
-  const total = fighter.thunderclapChannelDuration || 36;
-  const current = fighter.thunderclapChannelTimer || 0;
+  const isBasicPrep = Boolean(fighter.isBasicDashPreparing);
+  const total = isBasicPrep
+    ? (fighter.basicDashPrepMaxTimer || 8)
+    : (fighter.thunderclapChannelDuration || 36);
+  const current = isBasicPrep
+    ? (fighter.basicDashPrepTimer || 0)
+    : (fighter.thunderclapChannelTimer || 0);
   const isDashingOrPause = Boolean(fighter.isDashingThunderclap || (fighter.thunderclapDashPauseTimer && fighter.thunderclapDashPauseTimer > 0));
   const isPostDashActive = Boolean(fighter.isThunderclapSliding || fighter.isThunderclapBreather);
 
@@ -1136,7 +1215,7 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
 
   // Calculate easeEntrance: smoothly lower into stance, hold stance throughout dash, slide & breather
   let easeEntrance = 1.0;
-  if (fighter.isThunderclapBreather || fighter.isThunderclapSliding || isDashingOrPause) {
+  if (isBasicPrep || fighter.isThunderclapBreather || fighter.isThunderclapSliding || isDashingOrPause) {
     easeEntrance = 1.0;
   } else {
     const entranceFrames = 8;
@@ -1146,13 +1225,13 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
 
   // Frame 1 (Stance) during first half (0 to 0.5)
   // Frame 2 (Charge) during second half (0.5 to 1.0)
-  const isChargePhase = progress >= 0.5 && !isPostDashActive;
+  const isChargePhase = (isBasicPrep || progress >= 0.5) && !isPostDashActive;
 
-  // Stored explosive power vibration / micro-jitter: during active lightning bursts, pre-launch surge, OR aftermath bursts
+  // Stored explosive power vibration / micro-jitter: during active lightning bursts, aim-lock commit, pre-launch surge, OR aftermath bursts
   let jitterX = 0;
   let jitterY = 0;
-  if (currentBurst || (!isDashingOrPause && !isPostDashActive && progress >= 0.90)) {
-    const intensity = currentBurst ? (currentBurst.intensity || 0.8) : (progress - 0.90) * 10;
+  if (isBasicPrep || currentBurst || fighter.isThunderclapAimLocked || (!isDashingOrPause && !isPostDashActive && progress >= 0.90)) {
+    const intensity = isBasicPrep ? 0.85 : (currentBurst ? (currentBurst.intensity || 0.8) : (fighter.isThunderclapAimLocked ? 1.25 : (progress - 0.90) * 10));
     jitterX = (Math.random() - 0.5) * 1.4 * intensity;
     jitterY = (Math.random() - 0.5) * 1.2 * intensity;
   }
@@ -1187,10 +1266,30 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
     ctx.restore();
   }
 
-  // LAYER 4: Sporadic Golden Lightning & Energy Bursts (Channel + Aftermath)
+  // LAYER 4: Sporadic Golden Lightning & Energy Bursts (Channel + Aftermath + Basic Prep)
   if (!isDashingOrPause) {
-    const vfxElapsed = isPostDashActive ? aftermathElapsed : elapsed;
-    _drawThunderclapChargeVFX(ctx, r, progress, vfxElapsed, isPostDashActive ? 30 : total, jitterX, jitterY);
+    if (isBasicPrep) {
+      const feetY = r * 0.85;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.strokeStyle = '#38BDF8';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5 + jitterX, feetY + jitterY);
+      ctx.lineTo(r * 0.5 + jitterX, feetY + jitterY);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#E0F2FE';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.35 + jitterX, feetY + jitterY);
+      ctx.lineTo(r * 0.35 + jitterX, feetY + jitterY);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      const vfxElapsed = isPostDashActive ? aftermathElapsed : elapsed;
+      _drawThunderclapChargeVFX(ctx, r, progress, vfxElapsed, isPostDashActive ? 30 : total, jitterX, jitterY);
+    }
   }
 
   // Status Overlays
@@ -1231,6 +1330,7 @@ export function drawZenitsuSkin(ctx, fighter) {
   );
 
   const isIaidoStance = !isPodiumPreview && !fighter.isTargetOfAmbush && Boolean(
+    fighter.isBasicDashPreparing ||
     fighter.isChannelingThunderclap ||
     (fighter.thunderclapChannelTimer && fighter.thunderclapChannelTimer > 0) ||
     fighter.isDashingThunderclap ||

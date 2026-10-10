@@ -869,8 +869,7 @@ export class EscanorFighter extends Fighter {
     // 1. Rule 1 Freeze / TimeStop Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
-      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-      if (!isNanamiPausing && !this.isChannelingCruelSun && !this.isChannelingDivineSword && !this.cruelSunCharging && !this.isLiftingWeapon() && (this.slashSwingTimer || 0) <= 0) {
+      if (!this.isSkillPreservedInStasis() && !this.isChannelingCruelSun && !this.isChannelingDivineSword && !this.cruelSunCharging && !this.isLiftingWeapon() && (this.slashSwingTimer || 0) <= 0) {
         this.interruptAttacks();
       }
       return;

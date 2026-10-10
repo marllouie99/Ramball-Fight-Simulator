@@ -242,6 +242,10 @@ export class RezeFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     super.interruptAttacks(forceCancelAll);
     this.isRocketLunging = false;
     this.isDiveBombing = false;
@@ -324,7 +328,9 @@ export class RezeFighter extends Fighter {
     // 1. Mandatory Rule 1 Freeze Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
+      if (!this.isSkillPreservedInStasis()) {
+        this.interruptAttacks();
+      }
       return;
     }
 
@@ -1273,25 +1279,42 @@ export class RezeFighter extends Fighter {
 
       const dist = Math.hypot(t.x - footX, t.y - footY);
       if (dist <= radius + (t.r || 25)) {
-        applyDamageToTarget(t, damage, this, { isAOE: true, isExplosion: true });
+        const isPerformingSkill = this._isTargetPerformingSkill(t);
+        const damageOpts = isPerformingSkill
+          ? { isSkill: true, skipInterrupt: true, skipKnockback: true, skipHitStun: true }
+          : { isAOE: true, isExplosion: true };
+        applyDamageToTarget(t, damage, this, damageOpts);
         spawnBloodEffect(t.x, t.y);
 
-        const kbAng = Math.atan2(t.y - footY, t.x - footX);
-        const kbVx = Math.cos(kbAng) * knockback;
-        const kbVy = Math.sin(kbAng) * knockback;
-        if (typeof t.applyKnockback === 'function') {
-          t.applyKnockback(kbVx, kbVy, 14);
-        } else {
-          t.vx = (t.vx || 0) + kbVx;
-          t.vy = (t.vy || 0) + kbVy;
-          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 14);
-        }
+        if (!isPerformingSkill) {
+          const kbAng = Math.atan2(t.y - footY, t.x - footX);
+          const kbVx = Math.cos(kbAng) * knockback;
+          const kbVy = Math.sin(kbAng) * knockback;
+          if (typeof t.applyKnockback === 'function') {
+            t.applyKnockback(kbVx, kbVy, 14);
+          } else {
+            t.vx = (t.vx || 0) + kbVx;
+            t.vy = (t.vy || 0) + kbVy;
+            t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 14);
+          }
 
-        if (typeof t.applyTimeStop === 'function') {
-          t.applyTimeStop(8);
+          if (typeof t.applyTimeStop === 'function') {
+            t.applyTimeStop(8);
+          }
         }
       }
     }
+  }
+
+  _isTargetPerformingSkill(target) {
+    if (!target) return false;
+    return Boolean(
+      target.isChannelingDomainExpansion ||
+      target.isChannelingDomain ||
+      (typeof target.isPerformingSkill === 'function' && target.isPerformingSkill()) ||
+      (typeof target.isChannelingSkill === 'function' && target.isChannelingSkill()) ||
+      (typeof target.isStationarySkillActive === 'function' && target.isStationarySkillActive())
+    );
   }
 
   _updateRocketLunge() {
@@ -1315,24 +1338,30 @@ export class RezeFighter extends Fighter {
       if (Math.hypot(t.x - this.x, t.y - this.y) <= (this.r + (t.r || 25))) {
         // Impact!
         const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
+        const isPerformingSkill = this._isTargetPerformingSkill(t);
         audioSystem.playSFX(cfg.sounds?.rocketImpact || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.rocketImpact ?? 0.75);
-        applyDamageToTarget(t, cfg.rocketHitDamage || 35, this, true);
+        const damageOpts = isPerformingSkill
+          ? { isSkill: true, skipInterrupt: true, skipKnockback: true, skipHitStun: true }
+          : {};
+        applyDamageToTarget(t, cfg.rocketHitDamage || 35, this, damageOpts);
         spawnBloodEffect(t.x, t.y);
         spawnSparks(t.x, t.y, 22, this.themeColor);
         triggerGlobalScreenShake(4.0, 12);
 
-        const kb = cfg.rocketHitKnockback || 34;
-        const speed = Math.hypot(this.rocketLungeVx, this.rocketLungeVy) || 1;
-        const kbVx = (this.rocketLungeVx / speed) * kb;
-        const kbVy = (this.rocketLungeVy / speed) * kb;
-        if (typeof t.applyKnockback === 'function') {
-          t.applyKnockback(kbVx, kbVy, 20);
-        } else {
-          t.vx = (t.vx || 0) + kbVx;
-          t.vy = (t.vy || 0) + kbVy;
-          t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 20);
+        if (!isPerformingSkill) {
+          const kb = cfg.rocketHitKnockback || 34;
+          const speed = Math.hypot(this.rocketLungeVx, this.rocketLungeVy) || 1;
+          const kbVx = (this.rocketLungeVx / speed) * kb;
+          const kbVy = (this.rocketLungeVy / speed) * kb;
+          if (typeof t.applyKnockback === 'function') {
+            t.applyKnockback(kbVx, kbVy, 20);
+          } else {
+            t.vx = (t.vx || 0) + kbVx;
+            t.vy = (t.vy || 0) + kbVy;
+            t.knockbackStunTimer = Math.max(t.knockbackStunTimer || 0, 20);
+          }
+          if (typeof t.applyTimeStop === 'function') t.applyTimeStop(10);
         }
-        if (typeof t.applyTimeStop === 'function') t.applyTimeStop(10);
 
         this.isRocketLunging = false;
         break;
@@ -1980,4 +2009,3 @@ export class RezeFighter extends Fighter {
     }
   }
 }
-

@@ -51,6 +51,7 @@ import { drawEmberSkin } from '../fighters/flamewardenSkin.js';
 import { drawEyeOfCthulhuSkin } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawNamelessDeitySkin, NAMELESS_DEITY_DEFAULT_CONFIGS, NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS } from '../fighters/namelessDeitySkin.js';
 import { drawAvatarOfEmptinessSkin, AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS } from '../fighters/avatarOfEmptinessSkin.js';
+import { drawUryuSkin, _drawUryuHair, _getUryuHairImage, _drawUryuGlasses, _getUryuGlassesImage } from '../fighters/uryuSkin.js';
 
 
 
@@ -68,6 +69,12 @@ if (state.studioSkinModalPage === undefined) state.studioSkinModalPage = 0;
 if (state.studioSkinCategory === undefined) state.studioSkinCategory = 'ALL';
 if (state.studioSkinNamelessPart === undefined) state.studioSkinNamelessPart = 'overall';
 if (state.studioSkinAvatarPart === undefined) state.studioSkinAvatarPart = 'overall';
+if (state.studioSkinUryuPart === undefined) state.studioSkinUryuPart = 'hair';
+
+export const URYU_PARTS = [
+  { id: 'hair', label: '💇 HAIR', shortLabel: 'HAIR', fullLabel: 'QUINCY HAIR SILHOUETTE', asset: 'Assets/model/uryu/Ishida-hair.png', desc: 'Hair scale, shift & angle' },
+  { id: 'glasses', label: '👓 GLASSES', shortLabel: 'GLASSES', fullLabel: 'EYE GLASSES FRAME', asset: 'Assets/model/uryu/Ishida-eye-glasses.png', desc: 'Glasses scale, shift & angle' }
+];
 
 export const NAMELESS_DEITY_PARTS = [
   { id: 'overall', label: '⭐ ALL', fullLabel: 'ALL / OVERALL', asset: 'Body + Antlers + Cicada + Censor + Vines + Flowers + Wings + Halo + Wheel + Limbs', desc: 'Overall model scale & shift' },
@@ -225,6 +232,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     forms: [
       { id: 'human', label: 'HUMAN BOB' },
       { id: 'bomb', label: 'BOMB DEVIL' }
+    ]
+  },
+  {
+    key: 'uryu',
+    label: 'URYU ISHIDA',
+    asset: 'Ishida-hair.png & Ishida-eye-glasses.png',
+    assetDims: 'Dedicated Quincy Head Assets',
+    baseW: 2.85,
+    baseH: 2.25,
+    baseCrownY: -1.25,
+    visW: 500,
+    visH: 400,
+    centerX: 250,
+    topY: 50,
+    themeColor: '#00E5FF',
+    forms: [
+      { id: 'default', label: 'THE LAST QUINCY' }
     ]
   },
   {
@@ -810,6 +834,13 @@ function generateJsCode(fDef, custom) {
            `const drawH = 500 * scaleY;\n` +
            `const drawX = -246 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 80 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'uryu') {
+    return `// Calibrated Quincy Head Assets for Uryu Ishida (Assets/model/uryu/Ishida-hair.png & Ishida-eye-glasses.png)\n` +
+           `widthScale: ${wMult},\n` +
+           `heightScale: ${hMult},\n` +
+           `offsetX: ${offX},\n` +
+           `offsetY: ${offY},\n` +
+           `angleOffset: ${rot}`;
   } else if (fDef.key === 'sukuna') {
     return `// Calibrated Hair for Sukuna (Assets/model/sukuna/Sukuna-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
@@ -1164,11 +1195,17 @@ export function drawSkinStudioScreen() {
   const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
   const activeAvatarPartDef = isAvatarOfEmptiness ? (AVATAR_OF_EMPTINESS_PARTS.find(p => p.id === activeAvatarPartId) || AVATAR_OF_EMPTINESS_PARTS[0]) : null;
 
+  const isUryu = (fDef.key === 'uryu');
+  const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
+  const activeUryuPartDef = isUryu ? (URYU_PARTS.find(p => p.id === activeUryuPartId) || URYU_PARTS[0]) : null;
+
   const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
     ? `nameless_deity_${activePartId}`
     : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
       ? `avatar_of_emptiness_${activeAvatarPartId}`
-      : fDef.key;
+      : (isUryu && activeUryuPartId === 'glasses')
+        ? 'uryu_glasses'
+        : fDef.key;
   const custom = ensureFighterCustom(activeCustomKey);
 
   // ── Tier 1: Header Section ──
@@ -1343,6 +1380,8 @@ export function drawSkinStudioScreen() {
         drawSansSkin(ctx, dummyFighter);
       } else if (fDef.key === 'reze') {
         drawRezeSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'uryu') {
+        drawUryuSkin(ctx, dummyFighter);
       } else if (fDef.key === 'sukuna') {
         drawSukunaBody(ctx, dummyFighter);
       } else if (fDef.key === 'yuji') {
@@ -1435,6 +1474,10 @@ export function drawSkinStudioScreen() {
     else if (fDef.key === 'megumin') _drawMeguminHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'crazydave') _drawCrazyDaveHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'reze') _drawRezeHair(ctx, baseRadius, isFacingLeft);
+    else if (fDef.key === 'uryu') {
+      _drawUryuGlasses(ctx, baseRadius, isFacingLeft);
+      _drawUryuHair(ctx, baseRadius, isFacingLeft);
+    }
     else if (fDef.key === 'sukuna') _drawSukunaHair(ctx, baseRadius, isFacingLeft);
     else if (fDef.key === 'yuji') {
       if (state.studioSkinForm === 'sukuna') {
@@ -1485,7 +1528,9 @@ export function drawSkinStudioScreen() {
   if (state.studioSkinShowGuides) {
     const baseCrownY = (isNamelessDeity && activePartId !== 'overall')
       ? 0
-      : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+      : (isUryu && activeUryuPartId === 'glasses')
+        ? -baseRadius * 0.04
+        : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
     const handleCenterX = custom.offsetX;
     const handleCenterY = baseCrownY + custom.offsetY;
 
@@ -1747,6 +1792,46 @@ export function drawSkinStudioScreen() {
 
       _registerButton(bx, by, partBtnW, partBtnH, () => {
         state.studioSkinAvatarPart = part.id;
+      });
+    });
+  }
+
+  // ── Uryu Multi-Asset Part Selector Bar (Inside Viewport) ──
+  if (isUryu) {
+    const partBtnH = 20;
+    const partGapX = 8;
+    const partStartX = viewportX + 10;
+    const partBtnW = 100;
+    const startY = viewportY + 34;
+
+    URYU_PARTS.forEach((part, idx) => {
+      const isPartSelected = (activeUryuPartId === part.id);
+      const bx = partStartX + idx * (partBtnW + partGapX);
+      const by = startY;
+
+      ctx.save();
+      if (isPartSelected) {
+        ctx.fillStyle = '#083344';
+        ctx.strokeStyle = '#00E5FF';
+        ctx.lineWidth = 1.8;
+      } else {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, bx, by, partBtnW, partBtnH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isPartSelected ? '#00E5FF' : '#94a3b8';
+      ctx.font = isPartSelected ? '900 10px "Rajdhani", sans-serif' : '700 9.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(part.label, bx + partBtnW / 2, by + partBtnH / 2);
+      ctx.restore();
+
+      _registerButton(bx, by, partBtnW, partBtnH, () => {
+        state.studioSkinUryuPart = part.id;
       });
     });
   }
@@ -3207,11 +3292,16 @@ if (typeof window !== 'undefined') {
       const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
       const isAvatarOfEmptiness = (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness');
       const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
+      const isUryu = (fDef.key === 'uryu');
+      const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
+
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
         : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
           ? `avatar_of_emptiness_${activeAvatarPartId}`
-          : fDef.key;
+          : (isUryu && activeUryuPartId === 'glasses')
+            ? 'uryu_glasses'
+            : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       // Local hero coordinate space
@@ -3220,13 +3310,17 @@ if (typeof window !== 'undefined') {
 
       const baseCrownY = ((isNamelessDeity && activePartId !== 'overall') || (isAvatarOfEmptiness && activeAvatarPartId !== 'overall'))
         ? 0
-        : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+        : (isUryu && activeUryuPartId === 'glasses')
+          ? -baseRadius * 0.04
+          : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
       const handleCenterX = custom.offsetX;
       const handleCenterY = baseCrownY + custom.offsetY;
 
       // Check center handle click (radius ~14px screen space)
       if (Math.hypot(localX - handleCenterX, localY - handleCenterY) < 14 / currentScale) {
         isDraggingHairCenter = true;
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
         return;
       }
 
@@ -3235,6 +3329,8 @@ if (typeof window !== 'undefined') {
       const widthHandleY = handleCenterY;
       if (Math.hypot(localX - widthHandleX, localY - widthHandleY) < 14 / currentScale) {
         isDraggingHairWidth = true;
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
         return;
       }
 
@@ -3243,6 +3339,8 @@ if (typeof window !== 'undefined') {
       const heightHandleY = handleCenterY - (baseRadius * 0.8 * (custom.heightScale ?? 1.0));
       if (Math.hypot(localX - heightHandleX, localY - heightHandleY) < 14 / currentScale) {
         isDraggingHairHeight = true;
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
         return;
       }
 
@@ -3251,6 +3349,8 @@ if (typeof window !== 'undefined') {
       const scaleHandleY = heightHandleY;
       if (Math.hypot(localX - scaleHandleX, localY - scaleHandleY) < 14 / currentScale) {
         isDraggingHairScale = true;
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
         return;
       }
 
@@ -3261,6 +3361,8 @@ if (typeof window !== 'undefined') {
       const rotHandleY = handleCenterY + Math.sin(curAngle - Math.PI / 2) * rotStalkLen;
       if (Math.hypot(localX - rotHandleX, localY - rotHandleY) < 14 / currentScale) {
         isDraggingHairRotate = true;
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
         return;
       }
     });
@@ -3270,6 +3372,7 @@ if (typeof window !== 'undefined') {
       if (!isDraggingHairCenter && !isDraggingHairWidth && !isDraggingHairHeight && !isDraggingHairScale && !isDraggingHairRotate) {
         return;
       }
+      if (e.preventDefault) e.preventDefault();
 
       const rect = getSkinStudioRect(eventTarget);
       const scaleX = state.canvas.width / (rect.width || state.canvas.width);
@@ -3290,18 +3393,25 @@ if (typeof window !== 'undefined') {
       const activePartId = isNamelessDeity ? (state.studioSkinNamelessPart || 'overall') : 'overall';
       const isAvatarOfEmptiness = (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness');
       const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
+      const isUryu = (fDef.key === 'uryu');
+      const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
+
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
         : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
           ? `avatar_of_emptiness_${activeAvatarPartId}`
-          : fDef.key;
+          : (isUryu && activeUryuPartId === 'glasses')
+            ? 'uryu_glasses'
+            : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       const localX = (mx - heroX) / currentScale;
       const localY = (my - heroY) / currentScale;
       const baseCrownY = ((isNamelessDeity && activePartId !== 'overall') || (isAvatarOfEmptiness && activeAvatarPartId !== 'overall'))
         ? 0
-        : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+        : (isUryu && activeUryuPartId === 'glasses')
+          ? -baseRadius * 0.04
+          : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
 
       if (isDraggingHairCenter) {
         custom.offsetX = Math.round(localX);

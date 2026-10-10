@@ -473,6 +473,53 @@ export class GenosFighter extends Fighter {
     this._drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY, startOffset);
   }
 
+  _getPixelBeamPaths(range, tier4Half, auraHalf, muzzleR) {
+    if (typeof Path2D !== 'function') return null;
+
+    const cache = this._pixelBeamPathCache || (this._pixelBeamPathCache = new Map());
+    const key = `${range}:${tier4Half}:${auraHalf}:${muzzleR}`;
+    if (cache.has(key)) return cache.get(key);
+
+    const P = 2;
+    const ditherStep = P * 2;
+    const aura = new Path2D();
+    for (let u = 0; u <= range; u += ditherStep) {
+      for (let v = -auraHalf; v <= auraHalf; v += ditherStep) {
+        if (Math.abs(v) <= tier4Half) continue;
+        if (((u / ditherStep) + (v / ditherStep)) % 2 === 0) {
+          aura.rect(u, v, P, P);
+        }
+      }
+    }
+
+    const muzzle = {
+      '#800A00': new Path2D(),
+      '#CC2A00': new Path2D(),
+      '#FF5500': new Path2D(),
+      '#FFE600': new Path2D(),
+      '#FFFFFF': new Path2D()
+    };
+    for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
+      const spanX = Math.round(muzzleR * (1.0 - Math.abs(dy) / muzzleR) / P) * P;
+      for (let dx = -spanX; dx <= spanX; dx += P) {
+        const normDist = (Math.abs(dx) + Math.abs(dy)) / muzzleR;
+        if (normDist > 1.0) continue;
+
+        const color = normDist >= 0.90 ? '#800A00'
+          : normDist <= 0.22 ? '#FFFFFF'
+            : normDist <= 0.48 ? '#FFE600'
+              : normDist <= 0.74 ? '#FF5500'
+                : '#CC2A00';
+        muzzle[color].rect(dx, dy, P, P);
+      }
+    }
+
+    const paths = { aura, muzzle };
+    if (cache.size >= 8) cache.delete(cache.keys().next().value);
+    cache.set(key, paths);
+    return paths;
+  }
+
   /**
    * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Spiral Incineration Cannon Beam.
    * Renders with multi-tiered plasma core, 3D stepped spiral helix coils, obsidian manga borders,
@@ -493,6 +540,8 @@ export class GenosFighter extends Fighter {
     const tier3Half = Math.max(P * 3, snap(halfW * 0.68)); // Saturated fiery orange column
     const tier4Half = halfW;                              // Magma crimson outer body
     const auraHalf  = snap(halfW * 1.30);                 // Stepped pixel thermal aura
+    const muzzleR = snap(halfW * 1.15);
+    const beamPaths = this._getPixelBeamPaths(range, tier4Half, auraHalf, muzzleR);
 
     const totalDuration = CONFIG.genos?.ultDurationFrames || 120;
     const timeFired = totalDuration - (this.ultTimer || 0);
@@ -505,8 +554,37 @@ export class GenosFighter extends Fighter {
 
       ctx.save();
       ctx.globalAlpha = flareAlpha;
+      const createFlarePixelBatch = () => {
+        if (typeof Path2D !== 'function') {
+          return {
+            add(color, x, y) {
+              ctx.fillStyle = color;
+              ctx.fillRect(x, y, P, P);
+            },
+            draw() {}
+          };
+        }
+
+        const paths = {
+          '#FFFFFF': new Path2D(),
+          '#FFE600': new Path2D(),
+          '#FF5500': new Path2D()
+        };
+        return {
+          add(color, x, y) {
+            paths[color].rect(x, y, P, P);
+          },
+          draw() {
+            for (const [color, path] of Object.entries(paths)) {
+              ctx.fillStyle = color;
+              ctx.fill(path);
+            }
+          }
+        };
+      };
 
       // A. Vertical Anamorphic Stepped Lens Flare Line in World Space
+      const verticalFlare = createFlarePixelBatch();
       for (let gy = -flareR * 2.2; gy <= flareR * 2.2; gy += P) {
         const absY = Math.abs(gy);
         const normY = absY / (flareR * 2.2);
@@ -515,19 +593,22 @@ export class GenosFighter extends Fighter {
         for (let gx = -thick; gx <= thick; gx += P) {
           const wx = snap(startX + gx);
           const wy = snap(startY + gy);
+          let color;
           if (Math.abs(gx) < P && normY < 0.45) {
-            ctx.fillStyle = '#FFFFFF';
+            color = '#FFFFFF';
           } else if (normY < 0.7) {
-            ctx.fillStyle = '#FFE600';
+            color = '#FFE600';
           } else {
-            ctx.fillStyle = '#FF5500';
+            color = '#FF5500';
           }
-          ctx.fillRect(wx, wy, P, P);
+          verticalFlare.add(color, wx, wy);
         }
       }
+      verticalFlare.draw();
 
       // B. 8-Point Stepped Diamond Starburst Rays in World Space
       for (let k = 0; k < 8; k++) {
+        const rayFlare = createFlarePixelBatch();
         const rAngle = (k * Math.PI) / 4;
         const rLen = flareR * (k % 2 === 0 ? 1.4 : 0.8);
         const cosR = Math.cos(rAngle);
@@ -536,22 +617,25 @@ export class GenosFighter extends Fighter {
         for (let st = 0; st <= rLen; st += P * 1.5) {
           const wx = snap(startX + cosR * st);
           const wy = snap(startY + sinR * st);
-          ctx.fillStyle = (st < rLen * 0.35) ? '#FFFFFF' : ((st < rLen * 0.75) ? '#FFE600' : '#FF5500');
-          ctx.fillRect(wx, wy, P, P);
+          const color = (st < rLen * 0.35) ? '#FFFFFF' : ((st < rLen * 0.75) ? '#FFE600' : '#FF5500');
+          rayFlare.add(color, wx, wy);
         }
+        rayFlare.draw();
       }
 
       // C. Central White-Hot Core Diamond
+      const coreFlare = createFlarePixelBatch();
       const coreR = snap(flareR * 0.40);
       for (let dy = -coreR; dy <= coreR; dy += P) {
         const spanX = coreR - Math.abs(dy);
         for (let dx = -spanX; dx <= spanX; dx += P) {
           const wx = snap(startX + dx);
           const wy = snap(startY + dy);
-          ctx.fillStyle = (Math.abs(dx) + Math.abs(dy) < coreR * 0.5) ? '#FFFFFF' : '#FFE600';
-          ctx.fillRect(wx, wy, P, P);
+          const color = (Math.abs(dx) + Math.abs(dy) < coreR * 0.5) ? '#FFFFFF' : '#FFE600';
+          coreFlare.add(color, wx, wy);
         }
       }
+      coreFlare.draw();
 
       ctx.restore();
     }
@@ -598,15 +682,20 @@ export class GenosFighter extends Fighter {
 
     // A. Outer Atmosphere Dithered Pixel Aura
     ctx.fillStyle = 'rgba(255, 68, 0, 0.25)';
-    const ditherStep = P * 2;
-    for (let u = 0; u <= range; u += ditherStep) {
-      for (let v = -auraHalf; v <= auraHalf; v += ditherStep) {
-        const absV = Math.abs(v);
-        if (absV <= tier4Half) continue;
-        if (((u / ditherStep) + (v / ditherStep)) % 2 === 0) {
-          ctx.fillRect(u, v, P, P);
+    if (beamPaths) {
+      ctx.fill(beamPaths.aura);
+    } else {
+      const ditherStep = P * 2;
+      ctx.beginPath();
+      for (let u = 0; u <= range; u += ditherStep) {
+        for (let v = -auraHalf; v <= auraHalf; v += ditherStep) {
+          if (Math.abs(v) <= tier4Half) continue;
+          if (((u / ditherStep) + (v / ditherStep)) % 2 === 0) {
+            ctx.rect(u, v, P, P);
+          }
         }
       }
+      ctx.fill();
     }
 
     // B. Deep Incineration Crimson Outer Border (Fiery pixel perimeter with NO black stripes)
@@ -677,25 +766,31 @@ export class GenosFighter extends Fighter {
     }
 
     // ── 6. Stepped Muzzle Diamond Flare at Local (0, 0) (Seamless Origin & Zero Cutoffs) ──
-    const muzzleR = snap(halfW * 1.15);
-    for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
-      const spanX = snap(muzzleR * (1.0 - Math.abs(dy) / muzzleR));
-      for (let dx = -spanX; dx <= spanX; dx += P) {
-        const normDist = (Math.abs(dx) + Math.abs(dy)) / muzzleR;
-        if (normDist > 1.0) continue;
+    if (beamPaths) {
+      for (const [color, path] of Object.entries(beamPaths.muzzle)) {
+        ctx.fillStyle = color;
+        ctx.fill(path);
+      }
+    } else {
+      for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
+        const spanX = snap(muzzleR * (1.0 - Math.abs(dy) / muzzleR));
+        for (let dx = -spanX; dx <= spanX; dx += P) {
+          const normDist = (Math.abs(dx) + Math.abs(dy)) / muzzleR;
+          if (normDist > 1.0) continue;
 
-        if (normDist >= 0.90) {
-          ctx.fillStyle = '#800A00';
-        } else if (normDist <= 0.22) {
-          ctx.fillStyle = '#FFFFFF';
-        } else if (normDist <= 0.48) {
-          ctx.fillStyle = '#FFE600';
-        } else if (normDist <= 0.74) {
-          ctx.fillStyle = '#FF5500';
-        } else {
-          ctx.fillStyle = '#CC2A00';
+          if (normDist >= 0.90) {
+            ctx.fillStyle = '#800A00';
+          } else if (normDist <= 0.22) {
+            ctx.fillStyle = '#FFFFFF';
+          } else if (normDist <= 0.48) {
+            ctx.fillStyle = '#FFE600';
+          } else if (normDist <= 0.74) {
+            ctx.fillStyle = '#FF5500';
+          } else {
+            ctx.fillStyle = '#CC2A00';
+          }
+          ctx.fillRect(dx, dy, P, P);
         }
-        ctx.fillRect(dx, dy, P, P);
       }
     }
 
@@ -726,41 +821,47 @@ export class GenosFighter extends Fighter {
   }
 
   applyTimeStop(duration, opts = {}) {
-    if (this.isFiringUlt && this.hp > 0 && !this.isDead) {
-      return; // Absolute hyper-armor CC immunity while actively firing Spiral Incineration Cannon
+    if ((this.isUltSliding || this.isChargingUlt || this.isFiringUlt) && this.hp > 0 && !this.isDead) {
+      return; // Ultimate hyper-armor prevents CC from cancelling its slide, charge, or beam phases
     }
     super.applyTimeStop(duration, opts);
   }
 
   applyHitStun(duration, opts = {}) {
-    if ((this.isFiringUlt || this.isFlurrying) && this.hp > 0 && !this.isDead) {
-      return; // Absolute hyper-armor CC immunity: Machine Gun Blows does not get interrupted by incidental hit-stun
+    if ((this.isUltSliding || this.isChargingUlt || this.isFiringUlt || this.isFlurrying) && this.hp > 0 && !this.isDead) {
+      return; // Ultimate and flurry hyper-armor prevent incidental hit-stun interruptions
     }
     super.applyHitStun(duration, opts);
   }
 
   applySlow(duration, multiplier, opts = {}) {
-    if (this.isFiringUlt && this.hp > 0 && !this.isDead) {
+    if ((this.isUltSliding || this.isChargingUlt || this.isFiringUlt) && this.hp > 0 && !this.isDead) {
       return;
     }
     super.applySlow(duration, multiplier, opts);
   }
 
   applyParalyze(duration, opts = {}) {
-    if (this.isFiringUlt && this.hp > 0 && !this.isDead) {
+    if ((this.isUltSliding || this.isChargingUlt || this.isFiringUlt) && this.hp > 0 && !this.isDead) {
       return;
     }
     super.applyParalyze(duration, opts);
   }
 
   clearAllAttackEffects() {
+    const wasUltSliding = Boolean(this.isUltSliding);
+    const ultSlideTimer = this.ultSlideTimer;
+    const wasChargingUlt = Boolean(this.isChargingUlt);
     const wasFiringUlt = Boolean(this.isFiringUlt);
     const ultTimer = this.ultTimer;
     const ultAngle = this.ultAngle;
     super.clearAllAttackEffects();
     const isHardCancelled = this.hp <= 0 || this.dead || this.isDead || (this.silenceTimer || 0) > 0;
-    if (wasFiringUlt && !isHardCancelled) {
-      this.isFiringUlt = true;
+    if ((wasUltSliding || wasChargingUlt || wasFiringUlt) && !isHardCancelled) {
+      this.isUltSliding = wasUltSliding;
+      this.ultSlideTimer = ultSlideTimer;
+      this.isChargingUlt = wasChargingUlt;
+      this.isFiringUlt = wasFiringUlt;
       this.ultTimer = ultTimer;
       this.ultAngle = ultAngle;
       this.gunAngle = ultAngle;
@@ -806,13 +907,13 @@ export class GenosFighter extends Fighter {
       return super.takeDamage(finalAmount, attacker, opts);
     }
 
-    // 3. Trigger Core Overdrive when HP drops to threshold (non-fatal damage only; defer if firing ultimate)
+    // 3. Defer Core Overdrive until the ultimate slide, charge, and beam sequence has ended
     const isSelfDestructEnabled = this.isSkillEnabled(CONFIG.genos?.enableSelfDestruct, true);
     const thresholdRatio = CONFIG.genos?.selfDestructHpThreshold ?? CONFIG.genos?.selfDestructThreshold ?? 0.10;
     const sdThreshold = this.maxHp * thresholdRatio;
     const nextHp = this.hp - amount;
 
-    if (isSelfDestructEnabled && !this.usedSelfDestruct && !this.isFiringUlt && nextHp > 0 && nextHp <= sdThreshold) {
+    if (isSelfDestructEnabled && !this.usedSelfDestruct && !this.isUltSliding && !this.isChargingUlt && !this.isFiringUlt && nextHp > 0 && nextHp <= sdThreshold) {
       this.hp = Math.max(1, Math.min(sdThreshold, nextHp));
       this.isSelfDestructing = true;
       this.selfDestructTimer = CONFIG.genos?.selfDestructCountdownFrames || 150;
@@ -839,7 +940,10 @@ export class GenosFighter extends Fighter {
     }
 
     // Otherwise, apply damage normally via base class (if hit is fatal, he dies instantly)
-    return super.takeDamage(amount, attacker, opts);
+    const damageOpts = (this.isUltSliding || this.isChargingUlt)
+      ? { ...opts, skipInterrupt: true }
+      : opts;
+    return super.takeDamage(amount, attacker, damageOpts);
   }
 
   triggerPunchAnimation() {
@@ -1209,6 +1313,10 @@ export class GenosFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     const wasFiringUlt = Boolean(this.isFiringUlt);
     const wasFlurrying = Boolean(this.isFlurrying);
     const isHardCancelled = this.hp <= 0 || this.dead || this.isDead || (this.silenceTimer || 0) > 0;
@@ -1681,25 +1789,27 @@ export class GenosFighter extends Fighter {
     }
 
     // Mandatory Rule #1: TimeStop & Freeze Guard at top of update loop
-    // While actively firing Spiral Incineration Cannon, Genos possesses absolute hyper-armor against hit-pauses, explosion stuns, and time-stops
-    const isFrozen = !this.isFiringUlt && (this._handleTimeStop() || this.isTargetOfAmbush);
+    // Genos's ultimate slide, charge, and beam phases have hyper-armor against hit-pauses, stuns, and time-stops
+    const isUltHyperArmored = Boolean(this.isUltSliding || this.isChargingUlt || this.isFiringUlt);
+    const isFrozen = !isUltHyperArmored && (this._handleTimeStop() || this.isTargetOfAmbush);
     if (isFrozen) {
-      const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-      if (!isNanamiPausing) {
+      if (!this.isSkillPreservedInStasis()) {
         this.interruptAttacks();
       }
       return; // Stop update execution so fighter is frozen!
     }
-    if (this.isFiringUlt) {
+    if (isUltHyperArmored) {
       this._handleTimeStop(); // Process internal timers/cooldowns without freezing execution
       this.timeStopTimer = 0;
       this.hitStunTimer = 0;
       this.knockbackStunTimer = 0;
       this.basicAttackHitPauseTimer = 0;
-      this.vx = 0;
-      this.vy = 0;
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
+      if (!this.isUltSliding) {
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+      }
     }
 
     // Decay Cooldowns & Timers

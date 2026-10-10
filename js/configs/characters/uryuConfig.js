@@ -3,7 +3,8 @@
 // ─────────────────────────────────────────────
 export const uryuConfig = {
   assets: {
-    hair: 'Assets/model/uryu/Uryu-ishida.png',
+    hair: 'Assets/model/uryu/Ishida-hair.png',
+    glasses: 'Assets/model/uryu/Ishida-eye-glasses.png',
     bow: 'Assets/model/uryu/ISHIDA-BOW.png',
     bowFrame: 'Assets/model/uryu/ISHIDA-BOW-FRAME.png',
     bowBlade: 'Assets/model/uryu/ISHIDA-BOW-BLADE.png',

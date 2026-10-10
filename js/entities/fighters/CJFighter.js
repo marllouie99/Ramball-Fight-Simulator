@@ -549,6 +549,10 @@ export class CJFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     super.interruptAttacks(forceCancelAll);
     this.punchAnimTimer = 0;
     this.minigunRecoil = 0;
@@ -651,7 +655,9 @@ export class CJFighter extends Fighter {
     } else {
       const isFrozen = this._handleTimeStop();
       if (isFrozen || this.isTargetOfAmbush) {
-        this.interruptAttacks();
+        if (!this.isSkillPreservedInStasis()) {
+          this.interruptAttacks();
+        }
         // BAGUVIX Cooldown must NEVER pause even when afflicted with paralyze debuffs / stasis / freeze
         if (!this.isBaguvixActive && this.baguvixCooldown > 0) {
           const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;

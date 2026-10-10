@@ -240,16 +240,25 @@ export function getNearestTileCenter(targetX, targetY, arena, existingOccupants 
   const baseCol = Math.max(0, Math.min(cols - 1, Math.floor((targetX - arena.x) / cellW)));
   const baseRow = Math.max(0, Math.min(rows - 1, Math.floor((targetY - arena.y) / cellH)));
 
+  const isInsideCircularArena = (cx, cy) => {
+    if (arena.shape !== 'circle') return true;
+    const arenaMidX = arena.x + arena.width / 2;
+    const arenaMidY = arena.y + arena.height / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - 25;
+    return Math.hypot(cx - arenaMidX, cy - arenaMidY) <= ar;
+  };
+
   const isOccupied = (c, r) => {
     const cx = arena.x + (c + 0.5) * cellW;
     const cy = arena.y + (r + 0.5) * cellH;
+    if (!isInsideCircularArena(cx, cy)) return true;
     return existingOccupants.some(occ => {
       if (!occ || occ.hp <= 0) return false;
       return Math.hypot(occ.x - cx, occ.y - cy) < Math.min(cellW, cellH) * 0.45;
     });
   };
 
-  if (!isOccupied(baseCol, baseRow)) {
+  if (!isOccupied(baseCol, baseRow) && isInsideCircularArena(arena.x + (baseCol + 0.5) * cellW, arena.y + (baseRow + 0.5) * cellH)) {
     return {
       x: arena.x + (baseCol + 0.5) * cellW,
       y: arena.y + (baseRow + 0.5) * cellH,
@@ -267,6 +276,7 @@ export function getNearestTileCenter(targetX, targetY, arena, existingOccupants 
       if (isOccupied(c, r)) continue;
       const cx = arena.x + (c + 0.5) * cellW;
       const cy = arena.y + (r + 0.5) * cellH;
+      if (!isInsideCircularArena(cx, cy)) continue;
       const d = Math.hypot(cx - targetX, cy - targetY);
       if (d < minD) {
         minD = d;

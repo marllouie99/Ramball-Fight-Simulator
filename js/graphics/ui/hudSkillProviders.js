@@ -2168,6 +2168,37 @@ export function getSkillDataForFighter(f, getProjectiles) {
         isSignature: true,
         signature: true
       });
+    } else if (isSkillEnabled(cfg.enableBasicAttack, true)) {
+      // Basic Attack Gauge shown when Skill 1 is disabled so cooldown is visible
+      const basicMax = f.shootCooldownMax || cfg.basicAttackCooldown || cfg.basicDashCooldown || cfg.cooldown || 60;
+      const basicTimer = f.shootCooldown !== undefined ? f.shootCooldown : 0;
+      let basicPct = 0;
+      let basicLabel = 'HEKIREKI ISSEN (DASH)';
+      let isReady = false;
+
+      if (f.isBasicDashPreparing) {
+        const prepMax = f.basicDashPrepMaxTimer || cfg.basicDashWindupFrames || 8;
+        const remaining = f.basicDashPrepTimer || 0;
+        basicPct = Math.max(0, Math.min(100, (1 - (remaining / prepMax)) * 100));
+        basicLabel = 'HEKIREKI ISSEN (READYING)';
+      } else if (f.isDashingThunderclap && f.isBasicDash) {
+        basicPct = 100;
+        basicLabel = 'HEKIREKI ISSEN (DASHING)';
+        isReady = true;
+      } else {
+        basicPct = Math.max(0, Math.min(100, (1 - (basicTimer / basicMax)) * 100));
+        isReady = basicPct >= 99;
+      }
+
+      skills.push({
+        id: 'thunderclap',
+        pct: basicPct,
+        ready: isReady,
+        color: themeColor,
+        label: basicLabel,
+        isSignature: true,
+        signature: true
+      });
     }
 
     // 2. Ultimate: Flaming Thunder God (Honoikazuchi no Kami) (Toggle: enableFlamingThunderGod)

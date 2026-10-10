@@ -859,8 +859,8 @@ export function clearAllBattleEffects() {
     state.sparkEffects.length = 0;
   }
   if (state.deathEffects) {
-    // Retain permanent Eye of Cthulhu gore pieces, Nameless Deity asset gore, Ender Dragon death animation, and XP fountain orbs during win reveals!
-    state.deathEffects = state.deathEffects.filter(e => e && (e.isEyeOfCthulhuGore || e.isPermanentGore || e.isNamelessDeityAssetGore || e.isEnderDragonDeath || e.isEnderDragonXPOrb));
+    // Retain permanent Eye of Cthulhu gore pieces, Nameless Deity asset gore, Ender Dragon death animation, Sans heart shatter, and XP fountain orbs during win reveals!
+    state.deathEffects = state.deathEffects.filter(e => e && (e.isEyeOfCthulhuGore || e.isPermanentGore || e.isNamelessDeityAssetGore || e.isEnderDragonDeath || e.isEnderDragonXPOrb || e.isSansHeartShatter));
   }
   if (state.doppelgangerDeathEffects) state.doppelgangerDeathEffects.length = 0;
   if (state.illusionDeathEffects) state.illusionDeathEffects.length = 0;

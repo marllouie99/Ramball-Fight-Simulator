@@ -198,11 +198,7 @@ export function syncHudPosition() {
     const sideHeightPxInBox = canvasRect.height * (sideHeightPx / canvasHeight);
     const sideHeightPercent = (sideHeightPxInBox / boxRect.height) * 100;
 
-    const isFfa = Boolean(
-      state.mode === 'FFA' || state.mode === 'Tactical FFA' ||
-      (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA))
-    );
-    const sideWidthPx = isFfa ? 176 : 244;
+    const sideWidthPx = 176;
     const sideWidthPercent = (sideWidthPx / canvasWidth) * 100;
 
     if (_cachedContainerLeft) {

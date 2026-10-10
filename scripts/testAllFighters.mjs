@@ -6380,9 +6380,64 @@ async function main() {
       }
 
       // Draw beam overlay to verify Canvas 2D transform stack balance
-      mockCtx.resetStackDepth();
-      genos.drawBeamOverlay(mockCtx);
-      assertCanvasStackBalance('Genos Spiral Incineration Cannon Beam Draw');
+      const previousPath2D = globalThis.Path2D;
+      const originalDateNow = Date.now;
+      const originalFillRect = mockCtx.fillRect;
+      const originalFill = mockCtx.fill;
+      let pathRectCalls = 0;
+      let pathFillCalls = 0;
+      let fillRectCalls = 0;
+      class MockBeamPath {
+        rect() {
+          pathRectCalls++;
+        }
+      }
+
+      try {
+        globalThis.Path2D = MockBeamPath;
+        Date.now = () => 100000;
+        mockCtx.fillRect = () => {
+          fillRectCalls++;
+        };
+        mockCtx.fill = (path) => {
+          if (path instanceof MockBeamPath) pathFillCalls++;
+        };
+        genos.ultTimer = (CONFIG.genos?.ultDurationFrames || 120) - 6;
+        genos._pixelBeamPathCache?.clear();
+        mockCtx.resetStackDepth();
+        genos.drawBeamOverlay(mockCtx);
+        assertCanvasStackBalance('Genos Spiral Incineration Cannon Flare Draw');
+        if (fillRectCalls >= 700) {
+          throw new Error(`Genos beam startup flare should batch pixel drawing (got ${fillRectCalls} fillRect calls)`);
+        }
+
+        fillRectCalls = 0;
+        pathFillCalls = 0;
+        pathRectCalls = 0;
+        genos.ultTimer = 80;
+        genos._pixelBeamPathCache?.clear();
+        mockCtx.resetStackDepth();
+        genos.drawBeamOverlay(mockCtx);
+        assertCanvasStackBalance('Genos Spiral Incineration Cannon Beam Draw');
+        if (fillRectCalls >= 700) {
+          throw new Error(`Genos beam should avoid per-pixel fillRect calls (got ${fillRectCalls})`);
+        }
+        if (pathFillCalls < 6) {
+          throw new Error('Genos beam should draw cached aura and color-batched muzzle paths');
+        }
+
+        const cachedPathRectCalls = pathRectCalls;
+        genos.drawBeamOverlay(mockCtx);
+        if (pathRectCalls !== cachedPathRectCalls) {
+          throw new Error('Genos beam pixel paths should be reused across frames');
+        }
+        assertCanvasStackBalance('Genos Spiral Incineration Cannon Cached Beam Draw');
+      } finally {
+        globalThis.Path2D = previousPath2D;
+        Date.now = originalDateNow;
+        mockCtx.fillRect = originalFillRect;
+        mockCtx.fill = originalFill;
+      }
     }
   } catch (err) {
     console.error('❌ [GENOS SPIRAL INCINERATION CANNON 360 TEST ERROR]:', err);
@@ -9626,23 +9681,29 @@ async function main() {
       throw new Error('Zenitsu thunderclapFlashVoice must not trigger during the space gap');
     }
 
-    // Advance past the space gap (65 elapsed of 100) -> Thunderclap and Flash voiceline triggers
+    // Advance past the space gap (65 elapsed of 100) -> Thunderclap and Flash voiceline triggers (auto-aim enabled)
     zenitsu.thunderclapChannelTimer = 35; // 65 elapsed
     zenitsu.update(dummyOpponent, 0, state.arena);
     if (!zenitsu._hasPlayedThunderclapVoice) {
       throw new Error('Zenitsu thunderclapFlashVoice failed to trigger after the space gap');
     }
+    if (zenitsu.canAim() !== true) {
+      throw new Error('Zenitsu canAim() should return true during early Thunderclap channeling (auto-aim tracking before commit frames)');
+    }
 
-    // Advance to final 10 frames (about to unleash) -> Sixfold voiceline should trigger
+    // Advance to final 10 frames (commit phase about to unleash) -> Sixfold voiceline triggers and aim locks
     zenitsu.thunderclapChannelTimer = 10;
     zenitsu.update(dummyOpponent, 0, state.arena);
     if (!zenitsu._hasPlayedSixfoldVoice) {
       throw new Error('Zenitsu sixfoldVoice failed to trigger when about to unleash skill');
     }
 
-    // Auto-aim stays enabled throughout entire channeling phase (continuous tracking until dash fires)
-    if (zenitsu.canAim() !== true) {
-      throw new Error('Zenitsu canAim() should return true during Thunderclap channeling (continuous auto-aim tracking)');
+    // Aim is firmly locked during final commit frames before launch (Saitama counter style lock-in)
+    if (zenitsu.isThunderclapAimLocked !== true) {
+      throw new Error('Zenitsu isThunderclapAimLocked should be true during final commit frames');
+    }
+    if (zenitsu.canAim() !== false) {
+      throw new Error('Zenitsu canAim() should return false during locked commit frames');
     }
     zenitsu.interruptAttacks();
     if (zenitsu.isChannelingThunderclap !== false) {
@@ -9752,6 +9813,78 @@ async function main() {
     if (!Array.isArray(zenitsu.thunderclapDashVFXList) || zenitsu.thunderclapDashVFXList.length === 0) {
       throw new Error('Expected active dash VFX trails in thunderclapDashVFXList');
     }
+
+    // 11.6.5 Skill 1 Breather & Basic Attack Breather Auto-Aim Disabled Test
+    // A. Skill 1 Breather Phase
+    zenitsu.isThunderclapSliding = false;
+    zenitsu.isThunderclapBreather = true;
+    zenitsu.thunderclapBreatherTimer = 30;
+    zenitsu.thunderclapBreatherMaxTimer = 45;
+    zenitsu.thunderclapDashAngle = 1.25;
+    zenitsu.gunAngle = 1.25;
+    zenitsu.angle = 1.25;
+
+    if (zenitsu.canAim() !== false) {
+      throw new Error('Zenitsu canAim() must return false during Skill 1 breather');
+    }
+    const movedDummy = new ZenitsuClass({ x: 100, y: 500, color: '#ff0000', controls: {} });
+    zenitsu.aim(movedDummy);
+    zenitsu.update(movedDummy, 0, state.arena);
+    if (Math.abs(zenitsu.gunAngle - 1.25) > 1e-5 || Math.abs(zenitsu.angle - 1.25) > 1e-5) {
+      throw new Error(`Zenitsu auto-aim must be disabled during Skill 1 breather! Expected angle 1.25, got gunAngle ${zenitsu.gunAngle}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawZenitsuSkin(mockCtx, zenitsu);
+    assertCanvasStackBalance('drawZenitsuSkin during Skill 1 breather');
+
+    // B. Basic Attack Breather Phase
+    zenitsu.interruptAttacks(true);
+    zenitsu.isBasicDash = false;
+    zenitsu.isThunderclapSliding = false;
+    zenitsu.isThunderclapBreather = true;
+    zenitsu.thunderclapBreatherTimer = 20;
+    zenitsu.thunderclapBreatherMaxTimer = 40;
+    zenitsu.thunderclapDashAngle = -2.10;
+    zenitsu.gunAngle = -2.10;
+    zenitsu.angle = -2.10;
+
+    if (zenitsu.canAim() !== false) {
+      throw new Error('Zenitsu canAim() must return false during Basic Attack breather');
+    }
+    zenitsu.aim(movedDummy);
+    zenitsu.update(movedDummy, 0, state.arena);
+    if (Math.abs(zenitsu.gunAngle - (-2.10)) > 1e-5 || Math.abs(zenitsu.angle - (-2.10)) > 1e-5) {
+      throw new Error(`Zenitsu auto-aim must be disabled during Basic Attack breather! Expected angle -2.10, got gunAngle ${zenitsu.gunAngle}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawZenitsuSkin(mockCtx, zenitsu);
+    assertCanvasStackBalance('drawZenitsuSkin during Basic Attack breather');
+
+    // C. Basic Attack Single Dash Execution & Blue Theme VFX Test
+    zenitsu.interruptAttacks(true);
+    zenitsu.shoot(0);
+    if (!zenitsu.isBasicDash || !zenitsu.isBasicDashPreparing) {
+      throw new Error('Zenitsu shoot() must trigger basic dash preparation');
+    }
+    zenitsu.basicDashPrepTimer = 0;
+    zenitsu.update(movedDummy, 0, state.arena);
+    if (!zenitsu.isDashingThunderclap || !zenitsu.thunderclapDashVFX) {
+      throw new Error('Zenitsu must enter isDashingThunderclap with thunderclapDashVFX after basic prep completes');
+    }
+    if (zenitsu.thunderclapDashVFX.theme !== 'blue' || !zenitsu.thunderclapDashVFX.isBasic) {
+      throw new Error(`Expected Zenitsu basic dash VFX theme to be 'blue', got ${zenitsu.thunderclapDashVFX.theme}`);
+    }
+
+    // Canvas stack balance test for blue dash VFX rendering
+    for (const testTimer of [1, 4, 10, 20, 30]) {
+      zenitsu.thunderclapDashVFX.timer = testTimer;
+      mockCtx.resetStackDepth();
+      drawZenitsuSkin(mockCtx, zenitsu);
+      assertCanvasStackBalance(`drawZenitsuSkin with basic attack blue dash VFX at timer ${testTimer}`);
+    }
+
     zenitsu.interruptAttacks(true);
   } catch (err) {
     console.error('❌ [ZENITSU MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
@@ -11330,10 +11463,43 @@ async function main() {
       throw new Error('Zenitsu canAim should be true after breather expired!');
     }
 
-    // Verify clean drawing in normal pose
-    drawZenitsuSkin(mockCtx, zenitsu);
+    // 8. Verify Basic Attack (Blue theme) vs Skill 1 (Gold theme)
+    zenitsu.reset();
+    zenitsu.x = 200;
+    zenitsu.y = 200;
+    zenitsu.shootCooldown = 0;
+    zenitsu._executeBasicThunderclapDash(dummyOpponent);
+    zenitsu._startBasicDashTravel(dummyOpponent);
 
-    console.log('✅ [Zenitsu Slide & Breather Test] Successfully verified post-dash slide, breather stance hold, gradual pose return, and resume movement.');
+    if (!zenitsu.thunderclapDashVFX || zenitsu.thunderclapDashVFX.theme !== 'blue' || !zenitsu.thunderclapDashVFX.isBasic) {
+      throw new Error(`Zenitsu basic attack dash VFX expected theme='blue' and isBasic=true, got theme='${zenitsu.thunderclapDashVFX?.theme}', isBasic=${zenitsu.thunderclapDashVFX?.isBasic}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawZenitsuSkin(mockCtx, zenitsu);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] Zenitsu basic attack dash draw stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    zenitsu.reset();
+    zenitsu.x = 200;
+    zenitsu.y = 200;
+    zenitsu.thunderclapCooldown = 0;
+    zenitsu._triggerThunderclapAndFlash(dummyOpponent);
+    zenitsu.thunderclapChannelTimer = 0;
+    zenitsu._executeThunderclapDash(dummyOpponent);
+
+    if (!zenitsu.thunderclapDashVFX || zenitsu.thunderclapDashVFX.theme !== 'gold' || zenitsu.thunderclapDashVFX.isBasic) {
+      throw new Error(`Zenitsu Skill 1 dash VFX expected theme='gold' and isBasic=false, got theme='${zenitsu.thunderclapDashVFX?.theme}', isBasic=${zenitsu.thunderclapDashVFX?.isBasic}`);
+    }
+
+    mockCtx.resetStackDepth();
+    drawZenitsuSkin(mockCtx, zenitsu);
+    if (mockCtx.getStackDepth() !== 0) {
+      throw new Error(`[CANVAS STACK LEAK] Zenitsu Skill 1 gold dash draw stackDepth=${mockCtx.getStackDepth()} != 0`);
+    }
+
+    console.log('✅ [Zenitsu Slide & Breather Test] Successfully verified post-dash slide, breather stance hold, gradual pose return, resume movement, and Blue Basic Attack vs Gold Skill 1 themes.');
   } catch (err) {
     console.error('❌ [ZENITSU SLIDE & BREATHER TEST ERROR]:', err.message || err);
     errors++;
@@ -11914,6 +12080,160 @@ async function main() {
     console.error('❌ [ZEUS THUNDER STORM TEST ERROR]:', err.message || err);
     errors++;
     errorList.push(`[ZEUS THUNDER STORM TEST]: ${err.stack || err.message}`);
+  }
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // SPRITE SHEET ASSET PALETTE & PREMULTIPLICATION HEALTH SUITE
+  // ═════════════════════════════════════════════════════════════════════════
+  try {
+    const fs = await import('fs');
+    const path = await import('path');
+    const zlib = await import('zlib');
+
+    function decodePngBuffer(buffer) {
+      if (buffer.readUInt32BE(0) !== 0x89504E47 || buffer.readUInt32BE(4) !== 0x0D0A1A0A) {
+        throw new Error('Not a PNG file');
+      }
+      let offset = 8;
+      let width = 0, height = 0, colorType = 0, bitDepth = 0;
+      const idatChunks = [];
+
+      while (offset < buffer.length) {
+        const len = buffer.readUInt32BE(offset);
+        const type = buffer.toString('ascii', offset + 4, offset + 8);
+        const data = buffer.subarray(offset + 8, offset + 8 + len);
+        offset += 12 + len;
+
+        if (type === 'IHDR') {
+          width = data.readUInt32BE(0);
+          height = data.readUInt32BE(4);
+          bitDepth = data[8];
+          colorType = data[9];
+        } else if (type === 'IDAT') {
+          idatChunks.push(data);
+        } else if (type === 'IEND') {
+          break;
+        }
+      }
+
+      if (bitDepth !== 8 || (colorType !== 6 && colorType !== 2)) {
+        throw new Error(`Unsupported PNG format: bitDepth=${bitDepth}, colorType=${colorType}`);
+      }
+
+      const bpp = colorType === 6 ? 4 : 3;
+      const decompressed = zlib.inflateSync(Buffer.concat(idatChunks));
+      const stride = width * bpp;
+      const pixels = Buffer.alloc(width * height * 4);
+
+      let inOffset = 0;
+      let prevRecon = Buffer.alloc(stride);
+      let recon = Buffer.alloc(stride);
+
+      for (let y = 0; y < height; y++) {
+        const filter = decompressed[inOffset++];
+        const scanline = decompressed.subarray(inOffset, inOffset + stride);
+        inOffset += stride;
+
+        for (let x = 0; x < stride; x++) {
+          const a = x >= bpp ? recon[x - bpp] : 0;
+          const b = prevRecon[x];
+          const c = x >= bpp ? prevRecon[x - bpp] : 0;
+          const val = scanline[x];
+
+          if (filter === 0) recon[x] = val;
+          else if (filter === 1) recon[x] = (val + a) & 0xff;
+          else if (filter === 2) recon[x] = (val + b) & 0xff;
+          else if (filter === 3) recon[x] = (val + Math.floor((a + b) / 2)) & 0xff;
+          else if (filter === 4) {
+            const p = a + b - c;
+            const pa = Math.abs(p - a);
+            const pb = Math.abs(p - b);
+            const pc = Math.abs(p - c);
+            const pr = (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c);
+            recon[x] = (val + pr) & 0xff;
+          }
+        }
+
+        for (let x = 0; x < width; x++) {
+          const outIdx = (y * width + x) * 4;
+          const inIdx = x * bpp;
+          if (bpp === 4) {
+            pixels[outIdx] = recon[inIdx];
+            pixels[outIdx + 1] = recon[inIdx + 1];
+            pixels[outIdx + 2] = recon[inIdx + 2];
+            pixels[outIdx + 3] = recon[inIdx + 3];
+          } else {
+            pixels[outIdx] = recon[inIdx];
+            pixels[outIdx + 1] = recon[inIdx + 1];
+            pixels[outIdx + 2] = recon[inIdx + 2];
+            pixels[outIdx + 3] = 255;
+          }
+        }
+        prevRecon.set(recon);
+      }
+
+      return { width, height, pixels };
+    }
+
+    const zenitsuGoldSheets = [
+      'Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Gold.png',
+      'Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png',
+      'Assets/model/zenitsu/Zenitsu-Lightning-Dash-Grid-Gold.png'
+    ];
+
+    const zenitsuBlueSheets = [
+      'Assets/model/zenitsu/Zenitsu-Lightning-Dash-6Frames-Blue.png',
+      'Assets/model/zenitsu/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png',
+      'Assets/model/zenitsu/Zenitsu-Lightning-Dash-Grid-Blue.png'
+    ];
+
+    for (const sheetPath of zenitsuGoldSheets) {
+      if (!fs.existsSync(sheetPath)) throw new Error(`Missing gold sprite sheet asset: ${sheetPath}`);
+      const buf = fs.readFileSync(sheetPath);
+      const { width, height, pixels } = decodePngBuffer(buf);
+      if (width <= 0 || height <= 0) throw new Error(`Invalid dimensions for ${sheetPath}: ${width}x${height}`);
+
+      let rogueCyanPixels = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const a = pixels[i + 3];
+        if (a >= 30 && b > 100 && (b - r) > 30 && g > 60) {
+          rogueCyanPixels++;
+        }
+      }
+      if (rogueCyanPixels > 0) {
+        throw new Error(`Gold sprite sheet '${sheetPath}' contains ${rogueCyanPixels} rogue cyan/blue pixels!`);
+      }
+    }
+
+    for (const sheetPath of zenitsuBlueSheets) {
+      if (!fs.existsSync(sheetPath)) throw new Error(`Missing blue sprite sheet asset: ${sheetPath}`);
+      const buf = fs.readFileSync(sheetPath);
+      const { width, height, pixels } = decodePngBuffer(buf);
+      if (width <= 0 || height <= 0) throw new Error(`Invalid dimensions for ${sheetPath}: ${width}x${height}`);
+
+      let rogueGoldPixels = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const a = pixels[i + 3];
+        if (a >= 30 && r > 120 && (r - b) > 30 && g > 60) {
+          rogueGoldPixels++;
+        }
+      }
+      if (rogueGoldPixels > 0) {
+        throw new Error(`Blue sprite sheet '${sheetPath}' contains ${rogueGoldPixels} rogue gold/amber pixels!`);
+      }
+    }
+
+    console.log('✅ [Sprite Sheet Asset Palette Health Suite] Successfully verified 0 rogue pixels and pristine color palettes across all Zenitsu Gold and Blue themed sprite sheets!');
+  } catch (err) {
+    console.error('❌ [SPRITE SHEET PALETTE HEALTH TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[SPRITE SHEET PALETTE HEALTH TEST]: ${err.stack || err.message}`);
   }
 
   console.log('───────────────────────────────────────────────────────');

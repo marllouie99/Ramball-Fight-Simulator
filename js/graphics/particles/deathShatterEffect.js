@@ -10,12 +10,17 @@ import { drawEnderDragonDeathDisintegration } from '../fighters/enderDragonSkin.
 import { getNamelessDeityShatterAssets, NAMELESS_DEITY_DEFAULT_CONFIGS, NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS } from '../fighters/namelessDeitySkin.js';
 import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
+import { drawHeartShatterEffect, drawSansSpeechBubble } from '../weapons/sansWeaponGraphics.js';
+import { sansConfig } from '../../configs/characters/sansConfig.js';
 
 /**
  * Spawns a death shatter effect at the fighter's position.
  * @param {Object} fighter - The fighter that died
  */
 export function spawnDeathShatter(fighter) {
+  if (fighter.characterId === 'sans' || fighter.type === 'sans') {
+    return spawnSansHeartShatterDeath(fighter);
+  }
   if (fighter.characterId === 'eye_of_cthulhu' || fighter.type === 'eye_of_cthulhu' || fighter.isServantOfCthulhu) {
     return spawnEyeOfCthulhuTerrariaDeath(fighter, Boolean(fighter.isServantOfCthulhu));
   }
@@ -550,6 +555,47 @@ export function spawnMachineCorpse(x, y, angle) {
   });
 }
 
+/**
+ * Spawns the authentic Undertale / Deltarune Red SOUL Heart Split and Shatter death effect for Sans.
+ * Renders the floating red heart, cracking split into two halves with HeartSplit.ogg,
+ * exploding into pixel shards with HeartShatter.ogg, and Sans's death quote speech bubble.
+ * @param {Object} fighter - The Sans fighter that died
+ */
+export function spawnSansHeartShatterDeath(fighter) {
+  if (!fighter) return null;
+  if (!state.deathEffects) state.deathEffects = [];
+
+  const x = fighter.x || 0;
+  const y = fighter.y || 0;
+  const r = fighter.r || 25;
+
+  const effect = {
+    x: x,
+    y: y,
+    r: r,
+    timer: 85,
+    maxTimer: 85,
+    splitGap: 0,
+    shards: [],
+    soundPlayedSplit: false,
+    soundPlayedShatter: false,
+    isSansHeartShatter: true,
+    life: 1.0,
+    speechBubble: {
+      text: '',
+      fullText: "welp. i'm going to grillby's.",
+      charIndex: 0,
+      timer: 160,
+      maxTimer: 160,
+      charTimer: 0,
+      blipInterval: 3
+    }
+  };
+
+  state.deathEffects.push(effect);
+  return effect;
+}
+
 export function spawnEnderDragonDisintegrationDeath(fighter) {
   triggerGlobalScreenShake(14, 40);
   if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
@@ -636,6 +682,104 @@ export function updateDeathEffects() {
 
   for (let i = state.deathEffects.length - 1; i >= 0; i--) {
     const effect = state.deathEffects[i];
+
+    // 0.2 Sans Undertale / Deltarune Heart Split & Shatter Sequence
+    if (effect.isSansHeartShatter) {
+      effect.timer--;
+
+      // Update typewriter speech bubble if present
+      if (effect.speechBubble && effect.speechBubble.timer > 0) {
+        effect.speechBubble.timer--;
+        if (effect.speechBubble.charIndex < effect.speechBubble.fullText.length) {
+          effect.speechBubble.charTimer++;
+          if (effect.speechBubble.charTimer >= effect.speechBubble.blipInterval) {
+            effect.speechBubble.charTimer = 0;
+            effect.speechBubble.charIndex = Math.min(effect.speechBubble.fullText.length, effect.speechBubble.charIndex + 1);
+            effect.speechBubble.text = effect.speechBubble.fullText.slice(0, effect.speechBubble.charIndex);
+            const char = effect.speechBubble.fullText[effect.speechBubble.charIndex - 1];
+            if (char && char !== ' ' && effect.speechBubble.charIndex % 2 === 0) {
+              if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+                const speakSound = (CONFIG.sans?.sounds?.sansSpeak || sansConfig.sounds?.sansSpeak) || 'Assets/Sound Effects/Sans/SansSpeak.ogg';
+                audioSystem.playSFX(speakSound, 0.65);
+              }
+            }
+          }
+        }
+      }
+
+      // Phase 2: Heart Split (frames 70 to 53)
+      if (effect.timer <= 70 && effect.timer > 52) {
+        if (!effect.soundPlayedSplit) {
+          effect.soundPlayedSplit = true;
+          const splitSound = (CONFIG.sans?.sounds?.heartSplit || sansConfig.sounds?.heartSplit) || 'Assets/Sound Effects/Sans/HeartSplit.ogg';
+          if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+            audioSystem.playSFX(splitSound, 0.95);
+          }
+        }
+        effect.splitGap = (70 - effect.timer) * 0.45;
+      }
+
+      // Phase 3: Heart Shatter into Shards (frames 52 to 0)
+      if (effect.timer <= 52) {
+        if (!effect.soundPlayedShatter) {
+          effect.soundPlayedShatter = true;
+          const shatterSound = (CONFIG.sans?.sounds?.heartShatter || sansConfig.sounds?.heartShatter) || 'Assets/Sound Effects/Sans/HeartShatter.ogg';
+          if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+            audioSystem.playSFX(shatterSound, 1.0);
+          }
+          triggerGlobalScreenShake(6.0, 16);
+
+          // Generate 8 physics shards
+          effect.shards = [];
+          const shardCount = 8;
+          for (let s = 0; s < shardCount; s++) {
+            const angle = (s / shardCount) * Math.PI * 2 + (Math.random() * 0.4 - 0.2);
+            const speed = 3.5 + Math.random() * 3.5;
+            effect.shards.push({
+              x: 0,
+              y: 0,
+              vx: Math.cos(angle) * speed,
+              vy: Math.sin(angle) * speed - 2.5, // Initial upward pop
+              rot: Math.random() * Math.PI * 2,
+              vRot: (Math.random() - 0.5) * 0.35,
+              size: 3 + Math.random() * 3,
+              color: (s % 3 === 0) ? '#FFFFFF' : '#FF0000'
+            });
+          }
+        }
+
+        // Update shard physics with gentle floor settle
+        if (effect.shards) {
+          const floorY = arenaBottom - effect.y + 16;
+          for (const shard of effect.shards) {
+            shard.x += shard.vx;
+            shard.y += shard.vy;
+            shard.vy += 0.26; // Gravity
+            shard.vx *= 0.98; // Air resistance
+            shard.rot += shard.vRot;
+
+            if (shard.y >= floorY) {
+              shard.y = floorY;
+              if (shard.vy > 0.8) {
+                shard.vy = -shard.vy * 0.35;
+                shard.vx *= 0.70;
+              } else {
+                shard.vy = 0;
+                shard.vx *= 0.50;
+                shard.vRot *= 0.50;
+              }
+            }
+          }
+        }
+      }
+
+      const minT = effect.minTimer !== undefined ? effect.minTimer : -45;
+      const isSpeechActive = effect.speechBubble && effect.speechBubble.timer > 0;
+      if (effect.timer <= minT && !isSpeechActive) {
+        state.deathEffects.splice(i, 1);
+      }
+      continue;
+    }
 
     // 0. Ender Dragon Disintegration Sequence
     if (effect.isEnderDragonDeath) {
@@ -1131,6 +1275,14 @@ export function spawnHollowMaskShatter(fighter) {
 export function drawDeathEffects() {
   const { ctx } = state;
   for (const effect of state.deathEffects) {
+    if (effect.isSansHeartShatter) {
+      drawHeartShatterEffect(ctx, effect);
+      if (effect.speechBubble && effect.speechBubble.timer > 0) {
+        drawSansSpeechBubble(ctx, effect);
+      }
+      continue;
+    }
+
     ctx.save();
     ctx.translate(effect.x, effect.y);
     ctx.rotate(effect.rotation);

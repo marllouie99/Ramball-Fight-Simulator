@@ -39,7 +39,7 @@ export const mahoragaConfig = {
     neutralTeleportDistance: 55,
 
     // ── Throw Barrage & Blitz Finishing ──
-    enableThrowBarrage: 0,        // Master toggle for debris throw barrage
+    enableThrowBarrage: 1,        // Master toggle for debris throw barrage
     throwCooldown: 2000,
     throwMinDistance: 180,
     throwSpreadAngle: 0.28,

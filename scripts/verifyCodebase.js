@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { execSync } from 'child_process';
 
 function getAllJsFiles(dir) {
@@ -345,6 +346,161 @@ async function verifyAll() {
   } catch (err) {
     console.error('❌ [RULE 28 VALIDATION ERROR]:', err.message);
     hasErrors = true;
+  }
+
+  // 2.8 Sprite Sheet Asset Palette & Premultiplication Health Scanner
+  console.log('🔍 [Sprite Sheet Palette Health Scanner] Checking themed sprite sheet color palettes and integrity...');
+  let paletteErrors = 0;
+  let scannedSheetCount = 0;
+
+  function decodePngBuffer(buffer) {
+    if (buffer.readUInt32BE(0) !== 0x89504E47 || buffer.readUInt32BE(4) !== 0x0D0A1A0A) {
+      throw new Error('Not a PNG file');
+    }
+    let offset = 8;
+    let width = 0, height = 0, colorType = 0, bitDepth = 0;
+    const idatChunks = [];
+
+    while (offset < buffer.length) {
+      const len = buffer.readUInt32BE(offset);
+      const type = buffer.toString('ascii', offset + 4, offset + 8);
+      const data = buffer.subarray(offset + 8, offset + 8 + len);
+      offset += 12 + len;
+
+      if (type === 'IHDR') {
+        width = data.readUInt32BE(0);
+        height = data.readUInt32BE(4);
+        bitDepth = data[8];
+        colorType = data[9];
+      } else if (type === 'IDAT') {
+        idatChunks.push(data);
+      } else if (type === 'IEND') {
+        break;
+      }
+    }
+
+    if (bitDepth !== 8 || (colorType !== 6 && colorType !== 2)) {
+      throw new Error(`Unsupported PNG format: bitDepth=${bitDepth}, colorType=${colorType}`);
+    }
+
+    const bpp = colorType === 6 ? 4 : 3;
+    const decompressed = zlib.inflateSync(Buffer.concat(idatChunks));
+    const stride = width * bpp;
+    const pixels = Buffer.alloc(width * height * 4);
+
+    let inOffset = 0;
+    let prevRecon = Buffer.alloc(stride);
+    let recon = Buffer.alloc(stride);
+
+    for (let y = 0; y < height; y++) {
+      const filter = decompressed[inOffset++];
+      const scanline = decompressed.subarray(inOffset, inOffset + stride);
+      inOffset += stride;
+
+      for (let x = 0; x < stride; x++) {
+        const a = x >= bpp ? recon[x - bpp] : 0;
+        const b = prevRecon[x];
+        const c = x >= bpp ? prevRecon[x - bpp] : 0;
+        const val = scanline[x];
+
+        if (filter === 0) recon[x] = val;
+        else if (filter === 1) recon[x] = (val + a) & 0xff;
+        else if (filter === 2) recon[x] = (val + b) & 0xff;
+        else if (filter === 3) recon[x] = (val + Math.floor((a + b) / 2)) & 0xff;
+        else if (filter === 4) {
+          const p = a + b - c;
+          const pa = Math.abs(p - a);
+          const pb = Math.abs(p - b);
+          const pc = Math.abs(p - c);
+          const pr = (pa <= pb && pa <= pc) ? a : (pb <= pc ? b : c);
+          recon[x] = (val + pr) & 0xff;
+        }
+      }
+
+      for (let x = 0; x < width; x++) {
+        const outIdx = (y * width + x) * 4;
+        const inIdx = x * bpp;
+        if (bpp === 4) {
+          pixels[outIdx] = recon[inIdx];
+          pixels[outIdx + 1] = recon[inIdx + 1];
+          pixels[outIdx + 2] = recon[inIdx + 2];
+          pixels[outIdx + 3] = recon[inIdx + 3];
+        } else {
+          pixels[outIdx] = recon[inIdx];
+          pixels[outIdx + 1] = recon[inIdx + 1];
+          pixels[outIdx + 2] = recon[inIdx + 2];
+          pixels[outIdx + 3] = 255;
+        }
+      }
+      prevRecon.set(recon);
+    }
+
+    return { width, height, pixels };
+  }
+
+  function getThemedPngFiles(dir) {
+    let results = [];
+    if (!fs.existsSync(dir)) return results;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        results = results.concat(getThemedPngFiles(full));
+      } else if (ent.name.endsWith('.png')) {
+        const nameLower = ent.name.toLowerCase();
+        if (nameLower.includes('gold') || nameLower.includes('blue') || nameLower.includes('cyan')) {
+          results.push(full);
+        }
+      }
+    }
+    return results;
+  }
+
+  const themedPngs = getThemedPngFiles('Assets/model');
+  for (const pngPath of themedPngs) {
+    const relPath = path.relative(process.cwd(), pngPath).replace(/\\/g, '/');
+    try {
+      const buf = fs.readFileSync(pngPath);
+      const { width, height, pixels } = decodePngBuffer(buf);
+      scannedSheetCount++;
+
+      const isGold = /gold|golden/i.test(path.basename(pngPath));
+      const isBlue = /blue|cyan/i.test(path.basename(pngPath));
+
+      let rogueCount = 0;
+      for (let i = 0; i < pixels.length; i += 4) {
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const a = pixels[i + 3];
+
+        if (a < 30) continue;
+
+        if (isGold) {
+          if (b > 100 && (b - r) > 30 && g > 60) {
+            rogueCount++;
+          }
+        } else if (isBlue) {
+          if (r > 120 && (r - b) > 30 && g > 60) {
+            rogueCount++;
+          }
+        }
+      }
+
+      if (rogueCount > 0) {
+        console.error(`❌ [ROGUE PIXEL PALETTE MISMATCH in ${relPath}]: Found ${rogueCount} off-palette pixels in themed sprite sheet.`);
+        hasErrors = true;
+        paletteErrors++;
+      }
+    } catch (err) {
+      console.error(`❌ [SPRITE DECODE ERROR in ${relPath}]: ${err.message}`);
+      hasErrors = true;
+      paletteErrors++;
+    }
+  }
+
+  if (paletteErrors === 0) {
+    console.log(`✅ Verified palette health and zero rogue pixels across ${scannedSheetCount} themed sprite sheets!`);
   }
 
   console.log('───────────────────────────────────────────────────────');

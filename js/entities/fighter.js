@@ -650,6 +650,19 @@ export class Fighter {
   }
 
   /**
+   * Evaluates whether this fighter is currently in a non-interrupting stasis state
+   * (e.g. Nanami's 7:3 Ratio Hit-Pause or Naoya's 24-Frame Palm Touch Frame Stasis)
+   * where skill casting, channeling, and timers should be paused and preserved without being reset.
+   * @returns {boolean}
+   */
+  isSkillPreservedInStasis() {
+    if (this.hp <= 0 || this.isDead || this.dead || this._hasDied) return false;
+    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
+    const isNaoyaFrameFrozen = (this.isFrameFrozen || ((this.frameFreezeTimer || 0) > 0)) && !this.isCaughtInNaoyaUlt;
+    return Boolean(isNanamiPausing || isNaoyaFrameFrozen);
+  }
+
+  /**
    * Universal evaluation of whether this fighter currently has clear line of sight (spotted)
    * to a combat target. Returns false if target is null, dead, invalid, outside the arena,
    * or if the line of sight is obstructed by any interior arena obstacle (e.g. FFA Center + Wall).
@@ -958,6 +971,11 @@ export class Fighter {
     this.cqcComboPhase = null;
     this.cqcComboTarget = null;
 
+    this.isChantingExplosion = false;
+    this.chantTimer = 0;
+    this.chantProgress = 0;
+    if (this.explosionPhase === 'CHANT') this.explosionPhase = 'IDLE';
+
     this.stormActive = false;
     this.aegisActive = false;
     this.flameActive = false;
@@ -1069,6 +1087,16 @@ export class Fighter {
       (this.caughtInLaylaBeamTimer || 0) > 0 ||
       (this.caughtInNamelessBeamTimer || 0) > 0
     );
+  }
+
+  /**
+   * Helper method on fighter instances to check if a skill toggle is enabled in config.
+   * @param {*} configValue
+   * @param {boolean} [defaultValue=true]
+   * @returns {boolean}
+   */
+  isSkillEnabled(configValue, defaultValue = true) {
+    return isSkillEnabled(configValue, defaultValue);
   }
 
   applySlow(frames, multiplier, opts = {}) {
@@ -1282,6 +1310,12 @@ export class Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    // If the fighter is alive and currently in a global hit-pause or 24-Frame Palm Touch stasis,
+    // DO NOT cancel skill channeling or reset skills! Skill casting is preserved/frozen in stasis and continues casting after the freeze.
+    if (!forceCancelAll && this.isSkillPreservedInStasis()) {
+      return;
+    }
+
     this.clearAllAttackEffects();
     if (forceCancelAll || this.areAttackEffectsSuppressed()) {
       this.clearAllAfterimages();
@@ -1311,13 +1345,6 @@ export class Fighter {
       if (this.isChannelingRCT) {
         if (typeof this.reverseCursedTechniqueCooldown === 'number') this.reverseCursedTechniqueCooldown = Math.max(this.reverseCursedTechniqueCooldown, penaltyCD);
       }
-    }
-
-    // If the fighter is alive and currently in a global hit-pause (e.g. Nanami's 7:3 Ratio Hit-Pause),
-    // DO NOT cancel skill channeling! Channeling pauses and continues after the hit-pause.
-    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-    if (isNanamiPausing && this.hp > 0) {
-      return;
     }
 
     // Stop active skill sound handles
@@ -1564,9 +1591,8 @@ export class Fighter {
     if (this._lastSkillCdTickFrame === currentFrame && currentFrame !== undefined) return;
     this._lastSkillCdTickFrame = currentFrame;
 
-    // During global hit-pause (e.g. Nanami's 7:3 Ratio Hit-Pause), freeze/pause skill channeling and durations without decay
-    const isNanamiPausing = typeof isGlobalHitPauseActive === 'function' && isGlobalHitPauseActive(state, this);
-    if (isNanamiPausing) {
+    // During global hit-pause or 24-Frame Frame Stasis, freeze/pause skill channeling and durations without decay
+    if (this.isSkillPreservedInStasis()) {
       return;
     }
 

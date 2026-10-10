@@ -33,60 +33,18 @@ export const patchNotesData = {
         "character": "ENGINEER",
         "deltas": [
             {
-                "type": "BUFF",
-                "key": "turretBuildTime",
-                "oldVal": 90,
-                "newVal": 200,
-                "pct": "+122.2%"
-            },
-            {
-                "type": "BUFF",
-                "key": "turretReloadTime",
-                "oldVal": 90,
-                "newVal": 200,
-                "pct": "+122.2%"
-            },
-            {
                 "type": "ADJUST",
-                "key": "turretLevel1Damage",
-                "oldVal": "2.2",
-                "newVal": "1.0",
+                "key": "shotgunDamage",
+                "oldVal": "5.20",
+                "newVal": "2.20",
                 "pct": "Mod"
             },
             {
                 "type": "NERF",
-                "key": "turretLevel1Ammo",
-                "oldVal": 15,
+                "key": "dispenserTickInterval",
+                "oldVal": 30,
                 "newVal": 10,
-                "pct": "-33.3%"
-            },
-            {
-                "type": "NERF",
-                "key": "turretLevel2Damage",
-                "oldVal": 1.8,
-                "newVal": 1.3,
-                "pct": "-27.8%"
-            },
-            {
-                "type": "NERF",
-                "key": "turretLevel2Ammo",
-                "oldVal": 25,
-                "newVal": 20,
-                "pct": "-20.0%"
-            },
-            {
-                "type": "ADJUST",
-                "key": "turretLevel3Damage",
-                "oldVal": "2.0",
-                "newVal": "1.5",
-                "pct": "Mod"
-            },
-            {
-                "type": "BUFF",
-                "key": "dispenserBuildTime",
-                "oldVal": 110,
-                "newVal": 200,
-                "pct": "+81.8%"
+                "pct": "-66.7%"
             }
         ]
     },
@@ -94,11 +52,11 @@ export const patchNotesData = {
         "character": "GENOS",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "selfDestructHpRecoveryPercent",
-                "oldVal": "0.15",
-                "newVal": "0.50",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "ultBeamWidth",
+                "oldVal": 150,
+                "newVal": 130,
+                "pct": "-13.3%"
             }
         ]
     },
@@ -106,32 +64,23 @@ export const patchNotesData = {
         "character": "GOJO",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "redChannelTurnRate",
-                "oldVal": "0.045",
-                "newVal": "0.070",
-                "pct": "Mod"
-            },
-            {
                 "type": "NERF",
-                "key": "purpleDPS",
-                "oldVal": 35,
-                "newVal": 30,
-                "pct": "-14.3%"
-            },
+                "key": "initialMeleeDuration",
+                "oldVal": 120,
+                "newVal": 100,
+                "pct": "-16.7%"
+            }
+        ]
+    },
+    {
+        "character": "MAHORAGA",
+        "deltas": [
             {
                 "type": "BUFF",
-                "key": "purpleExplosionDamage",
-                "oldVal": 100,
-                "newVal": 200,
-                "pct": "+100.0%"
-            },
-            {
-                "type": "ADJUST",
-                "key": "purpleSecondCastDamageMultiplier",
-                "oldVal": "5.0",
-                "newVal": "2.0",
-                "pct": "Mod"
+                "key": "enableThrowBarrage",
+                "oldVal": 0,
+                "newVal": 1,
+                "pct": "+0%"
             }
         ]
     },
@@ -141,110 +90,68 @@ export const patchNotesData = {
             {
                 "type": "ADJUST",
                 "key": "citizenReviveHpPercent",
-                "oldVal": "1.00",
-                "newVal": "0.70",
+                "oldVal": "0.70",
+                "newVal": "1.00",
                 "pct": "Mod"
             },
             {
-                "type": "ADJUST",
-                "key": "crucifixionExecuteThreshold",
-                "oldVal": "0.25",
-                "newVal": "0.10",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "bangCooldown",
+                "oldVal": 300,
+                "newVal": 380,
+                "pct": "+26.7%"
             }
         ]
     },
     {
-        "character": "NAOYA",
+        "character": "RUBBICK",
         "deltas": [
             {
-                "type": "NERF",
-                "key": "frameFreezeChance",
-                "oldVal": 0.35,
-                "newVal": 0.25,
-                "pct": "-28.6%"
-            },
-            {
-                "type": "ADJUST",
-                "key": "enableCurseRebirth",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "enableMachGauge",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "enableCurseRamjet",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "enableCurseTurbineCannon",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "enableCurseDomain",
-                "oldVal": "true",
-                "newVal": "0",
-                "pct": "Mod"
-            }
-        ]
-    },
-    {
-        "character": "REZE",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "damage",
-                "oldVal": 22,
-                "newVal": 10,
-                "pct": "-54.5%"
-            },
-            {
-                "type": "NERF",
-                "key": "rocketCooldown",
-                "oldVal": 200,
+                "type": "BUFF",
+                "key": "spellStealCastDelay",
+                "oldVal": 45,
                 "newVal": 300,
-                "pct": "+50.0%"
+                "pct": "+566.7%"
+            }
+        ]
+    },
+    {
+        "character": "SANS",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "dodgeStaminaCost",
+                "oldVal": 2,
+                "newVal": 10,
+                "pct": "+400.0%"
             },
             {
                 "type": "BUFF",
-                "key": "transformationExplosionRadius",
-                "oldVal": 175,
-                "newVal": 200,
-                "pct": "+14.3%"
+                "key": "basicBoneCooldown",
+                "oldVal": 100,
+                "newVal": 50,
+                "pct": "-50.0%"
             },
             {
-                "type": "ADJUST",
-                "key": "hybridLifestealPercent",
-                "oldVal": "0.10",
-                "newVal": "0.15",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "blasterCooldown",
+                "oldVal": 320,
+                "newVal": 500,
+                "pct": "+56.3%"
             },
             {
-                "type": "ADJUST",
-                "key": "revivePinPull",
-                "oldVal": "Assets/Sound Effects/Skills/parry.mp3",
-                "newVal": "Assets/Sound Effects/RezeSFX/reze_boom_voiceline.mp3",
-                "pct": "Mod"
+                "type": "BUFF",
+                "key": "blasterSpawnInterval",
+                "oldVal": 4,
+                "newVal": 6,
+                "pct": "+50.0%"
             },
             {
-                "type": "ADJUST",
-                "key": "pinPull",
-                "oldVal": "Assets/Sound Effects/Skills/parry.mp3",
-                "newVal": "Assets/Sound Effects/RezeSFX/reze_boom_voiceline.mp3",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "gravitySlamCooldown",
+                "oldVal": 580,
+                "newVal": 800,
+                "pct": "+37.9%"
             }
         ]
     },
@@ -252,37 +159,54 @@ export const patchNotesData = {
         "character": "SUKUNA",
         "deltas": [
             {
-                "type": "BUFF",
-                "key": "divineFlameCooldown",
-                "oldVal": 2500,
-                "newVal": 1500,
-                "pct": "-40.0%"
-            },
-            {
                 "type": "NERF",
-                "key": "divineFlameDomainCooldown",
-                "oldVal": 210,
-                "newVal": 500,
-                "pct": "+138.1%"
-            },
-            {
-                "type": "BUFF",
-                "key": "divineFlameExplosionDamage",
-                "oldVal": 50,
+                "key": "initialMeleeDuration",
+                "oldVal": 150,
                 "newVal": 100,
-                "pct": "+100.0%"
+                "pct": "-33.3%"
             }
         ]
     },
     {
-        "character": "ZEUS",
+        "character": "URYU",
         "deltas": [
             {
                 "type": "ADJUST",
-                "key": "stunChance",
-                "oldVal": "0.10",
-                "newVal": "0.00",
+                "key": "hair",
+                "oldVal": "Assets/model/uryu/Uryu-ishida.png",
+                "newVal": "Assets/model/uryu/Ishida-hair.png",
                 "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "YUJI",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "soulSwapDamageMultiplier",
+                "oldVal": "2.0",
+                "newVal": "1.2",
+                "pct": "Mod"
+            },
+            {
+                "type": "NERF",
+                "key": "soulSwapFugaDamage",
+                "oldVal": 220,
+                "newVal": 150,
+                "pct": "-31.8%"
+            }
+        ]
+    },
+    {
+        "character": "ZENITSU",
+        "deltas": [
+            {
+                "type": "NERF",
+                "key": "thunderclapFinisherDamage",
+                "oldVal": 50,
+                "newVal": 30,
+                "pct": "-40.0%"
             }
         ]
     }

@@ -116,6 +116,7 @@ export const tojiConfig = {
   ultimateSlideDistance: 240,        // Spawning offset distance (px) before sliding in (balanced cinematic runway)
   ultimateSlideSpeed: 42,            // Inward slide speed
   ultimateCraterChargeTime: 90,      // Frames spent hovering in the air winding up the katana
+  ultimateCraterAimTurnRate: 0.12,   // Controlled turn rate (rad/frame) for auto-aim tracking during final blow windup
   ultimateCraterDiveTime: 16,        // Frames spent diving straight towards the enemy
   ultimateCraterSpinTime: 14,        // Frames spent executing the 360 final blow rotation at the enemy
   ultimateCraterFadeInFrames: 35,    // Frames spent sliding away to the distant vantage position

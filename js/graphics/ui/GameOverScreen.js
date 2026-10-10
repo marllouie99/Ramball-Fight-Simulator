@@ -793,8 +793,9 @@ function drawRoundEndScreen() {
   }
 
   const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath));
+  const isSansDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter && (e.timer > -40 || (e.speechBubble && e.speechBubble.timer > 0))));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = hasMissionOverlay ? 180 : (isDragonDying ? 135 : 0);
+  const displayDelay = hasMissionOverlay ? 180 : ((isDragonDying || isSansDying) ? 135 : 0);
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
@@ -862,8 +863,9 @@ function drawMatchEndScreen() {
   }
 
   const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath));
+  const isSansDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter && (e.timer > -40 || (e.speechBubble && e.speechBubble.timer > 0))));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
-  const displayDelay = hasMissionOverlay ? 180 : (isDragonDying ? 135 : 0);
+  const displayDelay = hasMissionOverlay ? 180 : ((isDragonDying || isSansDying) ? 135 : 0);
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 
   // Determine Match Winner Entity

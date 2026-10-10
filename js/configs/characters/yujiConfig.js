@@ -79,7 +79,7 @@ export const yujiConfig = {
   enableSoulSwap: true,           // Master toggle for Soul Swap ultimate
   soulSwapHpThreshold: 0.50,       // Triggers when HP drops to 30% or below
   soulSwapDuration: 500,            // Duration of Soul Swap in frames (~1.67 seconds of free Dismantle combat at 60fps)
-  soulSwapDamageMultiplier: 2.0,   // Damage multiplier while Sukuna is active
+  soulSwapDamageMultiplier: 1.2,   // Damage multiplier while Sukuna is active
   soulSwapBlackFlashThreshold: 2,  // Black Flash triggers after only 2 hits during Soul Swap
   soulSwapSpeedMultiplier: 1.15,   // Movement speed boost during Soul Swap
   soulSwapDismantleCooldown: 30,   // Fire rate / cooldown in frames between basic attack Dismantles during Soul Swap (lower = faster fire rate, e.g. 15 = rapid fire, 24 = ~0.4s at 60fps)
@@ -90,7 +90,7 @@ export const yujiConfig = {
   soulSwapRapidSlashCooldown: 25,  // Pacing frames between each slash-teleport strike
   soulSwapFugaChargeMax: 85,       // Frames to channel Fuga flaming arrow construct (~1.4s)
   soulSwapFugaRecovery: 40,        // Recoil recovery frames after releasing Fuga arrow
-  soulSwapFugaDamage: 220,         // Nuke damage of Soul Swap Fuga arrow
+  soulSwapFugaDamage: 150,         // Nuke damage of Soul Swap Fuga arrow
   soulSwapHealPercent: 0.50,       // Percentage of max HP restored to Yuji upon swapping back after the slashes
   soulSwapCooldown: 99999,         // Once per match only
 

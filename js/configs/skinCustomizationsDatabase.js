@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-07T19:34:40.282Z
+ * Generated from Skin Studio on 2026-10-10T09:23:18.003Z
  * =============================================================================
  */
 
@@ -10,6 +10,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   gojo: { widthScale: 0.88, heightScale: 0.94, offsetX: -1, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
   makima: { widthScale: 0.98, heightScale: 0.90, offsetX: -2, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   reze: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  uryu: { widthScale: 1.48, heightScale: 0.94, offsetX: 0, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
   sukuna: { widthScale: 0.90, heightScale: 0.96, offsetX: -1, offsetY: -6, angleOffset: 0, flipX: false, flipY: false },
   yuta: { widthScale: 1.00, heightScale: 0.94, offsetX: -1, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
   yuji: { widthScale: 0.90, heightScale: 1.00, offsetX: 0, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
@@ -59,7 +60,8 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   avatar_of_emptiness_arm_left: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   avatar_of_emptiness_arm_right: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   avatar_of_emptiness_forearm_left: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
-  avatar_of_emptiness_forearm_right: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false }
+  avatar_of_emptiness_forearm_right: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  uryu_glasses: { widthScale: 1.40, heightScale: 1.10, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false }
 };
 
 export const DEFAULT_SKIN_CUSTOMIZATIONS = SKIN_CUSTOMIZATIONS_DATABASE;

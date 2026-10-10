@@ -81,6 +81,8 @@ export class TurretEntity extends Fighter {
     this.isReloading = false;
     this._hasDetectedTarget = false;
     this._rocketSalvoCounter = 0;
+    this._fixedX = x;
+    this._fixedY = y;
   }
 
   reset() {
@@ -97,6 +99,10 @@ export class TurretEntity extends Fighter {
     this.ammo = cfg.turretAmmo || 20;
     this.maxAmmo = cfg.turretAmmo || 20;
     this._hasDetectedTarget = false;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;

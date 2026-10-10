@@ -51,6 +51,8 @@ export class DispenserEntity extends Fighter {
     this._tetheredFighterSet = new Set();
     this.isBuilding = true;
     this.buildProgress = 0;
+    this._fixedX = x;
+    this._fixedY = y;
   }
 
   reset() {
@@ -66,6 +68,10 @@ export class DispenserEntity extends Fighter {
     this.hp = this.maxHp;
     this.tetheredTargets = [];
     this._tetheredFighterSet = new Set();
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
     this.vx = 0;
     this.vy = 0;
     this.knockbackVx = 0;

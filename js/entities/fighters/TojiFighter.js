@@ -720,6 +720,7 @@ export class TojiFighter extends Fighter {
         this.ultimatePhase = null;
         this.ultimateTarget = null;
         this.postUltimateRecoveryTimer = 0;
+        this.aimTurnRate = undefined;
         return;
       }
     }
@@ -917,15 +918,9 @@ export class TojiFighter extends Fighter {
       }
 
       // Smooth rotation tracking toward enemy during slide away
-      if (this.ultimateTarget) {
-        const targetAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
-        const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        let diff = targetAngle - currentAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        const turnRate = 0.08; // Smooth tracking
-        this.gunAngle = currentAngle + diff * turnRate;
-        this.angle = this.gunAngle;
+      if (this.ultimateTarget && !tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
+        this.aimTurnRate = CONFIG.toji?.ultimateCraterAimTurnRate ?? 0.12;
+        this.aim(this.ultimateTarget);
       }
       
       // Spawn swirling wind debris (leaves & pebbles) around Toji as he slides back
@@ -1190,13 +1185,21 @@ export class TojiFighter extends Fighter {
           spawnTojiWhirlingWindDebris(this.x, this.y, 2);
         }
         
-        // Auto-aim tracking is DISABLED during final blow charge (strictly NO auto-aim rotation towards enemy)
+        // Auto-aim tracking enabled during final blow windup: dynamically track and face target
+        if (this.ultimateTarget && !tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
+          this.aimTurnRate = CONFIG.toji?.ultimateCraterAimTurnRate ?? 0.12;
+          this.aim(this.ultimateTarget);
+        }
       } else if (this.ultimateCycleTimer === diveAndSpinTotal) {
         this.ultimateCycleTimer--;
+        this.aimTurnRate = undefined;
         
-        // Launch! Rocket straight along committed aim direction in diveTime frames (strictly NO snap auto-aim to enemy)
+        // Launch! Rocket straight along committed aim direction in diveTime frames
         const fireAngle = (this.gunAngle !== undefined && !Number.isNaN(this.gunAngle)) ? this.gunAngle : (this.angle || 0);
-        const diveDist = CONFIG.toji?.ultimateCraterDistance || 320;
+        const targetDist = (this.ultimateTarget && !tojiIsTargetDeadOrRemoved(this, this.ultimateTarget))
+          ? Math.hypot(this.ultimateTarget.x - this.x, this.ultimateTarget.y - this.y)
+          : (CONFIG.toji?.ultimateCraterDistance || 320);
+        const diveDist = targetDist || (CONFIG.toji?.ultimateCraterDistance || 320);
         const rawTargetX = this.x + Math.cos(fireAngle) * diveDist;
         const rawTargetY = this.y + Math.sin(fireAngle) * diveDist;
         const clampedTarget = this._clampToArena(rawTargetX, rawTargetY);
@@ -1389,6 +1392,7 @@ export class TojiFighter extends Fighter {
         this.ambushPhase = null;
         this.isAmbushing = false;
         this.spearSwingTimer = 0;
+        this.aimTurnRate = undefined;
         
         // PRESERVE FINAL BLOW ANIMATION & SLASH FOLLOW-THROUGH (Do NOT abruptly cut off!):
         const fadeFrames = CONFIG.toji?.ultimateCraterSlashFadeFrames ?? 28;
@@ -1758,8 +1762,15 @@ export class TojiFighter extends Fighter {
     if (isHardCC) return false;
     // Sequence 2 (KATANA_SLASH / KATANA_CHARGE) commits to its locked swing trajectory in normal ambush and must NOT auto-aim
     if (!this.ultimateActive && (this.ambushPhase === 'KATANA_SLASH' || this.ambushPhase === 'KATANA_CHARGE')) return false;
-    // Ultimate slide strikes and crater slam commit strictly to their forward rush angles (prevents reverse aim flips)
-    if (this.ultimateActive && (this.ultimatePhase === 'STRIKING' || this.ultimatePhase === 'CRATER' || this.ultimatePhase === 'CRATER_DIVE')) return false;
+    // Ultimate slide strikes commit strictly to their forward rush angles (prevents reverse aim flips)
+    if (this.ultimateActive && (this.ultimatePhase === 'STRIKING' || this.ultimatePhase === 'CRATER_DIVE')) return false;
+    // During ultimate Crater Slam: allow auto-aim tracking during wind-up/charge, lock during supersonic dive and 360 spin
+    if (this.ultimateActive && this.ultimatePhase === 'CRATER') {
+      const diveTime = CONFIG.toji?.ultimateCraterDiveTime ?? 16;
+      const spinTime = CONFIG.toji?.ultimateCraterSpinTime ?? 14;
+      const diveAndSpinTotal = diveTime + spinTime;
+      if (this.ultimateCycleTimer <= diveAndSpinTotal) return false;
+    }
     if (this.isAmbushing || this.ultimateActive) return true; // Rule 3: Toji ALWAYS aims strictly at his target throughout ambush/ultimate phases!
     return true;
   }

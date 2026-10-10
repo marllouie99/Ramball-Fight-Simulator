@@ -178,6 +178,21 @@ export function resolveFighterCollision(a, b) {
     if (isFriendly) return;
   }
 
+  // Engineer buildings (Sentry / Dispenser / Deployables) allow friendly Engineer and teammates to pass freely without body block!
+  const aIsBuilding = Boolean(a.isTurret || a.isDispenser || a.isDeployable);
+  const bIsBuilding = Boolean(b.isTurret || b.isDispenser || b.isDeployable);
+  if (aIsBuilding || bIsBuilding) {
+    const building = aIsBuilding ? a : b;
+    const other = aIsBuilding ? b : a;
+    const isFriendly = (other === building.owner) ||
+      (building.owner && other.owner === building.owner) ||
+      (other.characterId === 'engineer' || other.type === 'engineer' || other._def?.type === 'engineer' || other.name === 'Engineer') ||
+      (other.isTurret || other.isDispenser || other.isDeployable) ||
+      (typeof building.isTeammate === 'function' && building.isTeammate(other)) ||
+      (typeof other.isTeammate === 'function' && building.owner && other.isTeammate(building.owner));
+    if (isFriendly) return;
+  }
+
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
   const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
   const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive || b._wasFinalBlowSpin || (b.postUltimateRecoveryTimer && b.postUltimateRecoveryTimer > 0));

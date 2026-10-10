@@ -36,7 +36,7 @@ export const engineerConfig = {
   shotgunCooldown: 80,
   shotgunPellets: 8,
   shotgunSpread: 0.45,         // Spread angle in radians (~26°)
-  shotgunDamage: 5.20,         // Damage per pellet
+  shotgunDamage: 2.20,         // Damage per pellet
   shotgunSpeed: 30,            // Initial projectile velocity
   shotgunRange: 400,           // Max distance to trigger shotgun
   shotgunRecoilForce: 3.5,     // Pushback impulse on firing
@@ -101,7 +101,7 @@ export const engineerConfig = {
   dispenserBuildTime: 200,     // Construction duration (~1.8s)
   dispenserRange: 260,         // Healing field radius & tether range
   dispenserHealPerTick: 2,     // Health restored per pulse
-  dispenserTickInterval: 30,   // Ticks every 0.5s (~4 HP/s)
+  dispenserTickInterval: 10,   // Ticks every 0.5s (~4 HP/s)
   dispenserSpeedBuff: 1.10,    // 10% movement speed boost in zone
   dispenserHealAmount: 30,     // Wrench repair heal amount
   dispenserHealCooldown: 60,   // Cooldown between wrench repairs
