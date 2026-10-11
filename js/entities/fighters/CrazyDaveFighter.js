@@ -14,6 +14,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { isLineOfSightBlockedByObstacle, getArenaCenterObstacle, isPointInsidePlusObstacle } from '../../systems/arenaObstacleSystem.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
+import { ARENA_TILE_COUNT } from '../../systems/arenaTileGrid.js';
 import { drawCrazyDaveSkin } from '../../graphics/fighters/crazyDaveSkin.js';
 import { drawMinionHealthBar } from '../../graphics/statusEffects.js';
 import {
@@ -94,7 +95,7 @@ function getCrazyDavePlantOccupants(dave) {
       if (f.hp <= 0 || f.dead || f.isDead) continue;
 
       const isPlant = Boolean(f.isPlant || f.isPlantMinion || f.isPlantBarrier || f.isWallnut);
-      const isBuilding = Boolean(f.isTurret || f.isDispenser || f.isDeployable || f.isEndCrystal || f.isIceWall || f.isBuilding || f.isBarrier);
+      const isBuilding = Boolean(f.isMinion || f.isTurret || f.isDispenser || f.isDeployable || f.isEndCrystal || f.isIceWall || f.isBuilding || f.isBarrier);
 
       if (isPlant || isBuilding) {
         occupants.add(f);
@@ -146,9 +147,8 @@ export function getTeammateCrazyDaves(dave) {
 function getAvailableCrazyDavePlantTile(dave, targetX, targetY, arena) {
   const activeOccupants = getCrazyDavePlantOccupants(dave);
   const tileCenter = getNearestGrassTileCenter(targetX, targetY, arena, activeOccupants);
-  const targetTileSize = getCrazyDaveSetting(CONFIG.crazydave, 'grassTileSize') || 76.6;
-  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const occupiedRadius = Math.min(arena.width / cols, arena.height / rows) * 0.45;
 
   if (activeOccupants.some(occ => occ && occ.hp > 0 && Math.hypot(occ.x - tileCenter.x, occ.y - tileCenter.y) < occupiedRadius)) {
@@ -2342,7 +2342,7 @@ export class LawnmowerEntity extends Fighter {
   _checkTripCondition(arena, cfg) {
     if (!state) return;
 
-    const rowH = arena.height / Math.max(3, Math.round(arena.height / (getCrazyDaveSetting(cfg, 'grassTileSize') || 76.6)));
+    const rowH = arena.height / ARENA_TILE_COUNT;
     const halfRowH = rowH * 0.55;
     const allCandidates = getAllPlantTargetCandidates();
 
@@ -2913,8 +2913,7 @@ export class CrazyDaveFighter extends Fighter {
     if (!isSkillEnabled(cfg.enableLawnmower, true)) return;
 
     arena = arena || (state && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
-    const targetTileSize = getCrazyDaveSetting(cfg, 'grassTileSize') || 76.6;
-    const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+    const rows = ARENA_TILE_COUNT;
     const cellH = arena.height / rows;
 
     // Lawnmowers parked on the side based on where Dave spawns
@@ -2929,8 +2928,8 @@ export class CrazyDaveFighter extends Fighter {
     const facingDirection = isRightSpawn ? -1 : 1;
     const baselineOffset = getCrazyDaveSetting(cfg, 'lawnmowerBaselineOffset') ?? 2;
     const baselineX = isRightSpawn
-      ? (arena.x + arena.width - baselineOffset)
-      : (arena.x + baselineOffset);
+      ? (arena.x + arena.width + baselineOffset)
+      : (arena.x - baselineOffset);
 
     this.lawnmowers = [];
     for (let r = 0; r < rows; r++) {

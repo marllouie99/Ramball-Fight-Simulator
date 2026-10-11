@@ -260,7 +260,7 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       } else if (opts.damageAngle !== undefined) {
         damageAngle = opts.damageAngle;
       }
-      const isTargetBloodImmune = target.noBlood || target.suppressBlood || target.bleedImmune || target.characterId === 'namelessdeity' || target.type === 'namelessdeity';
+      const isTargetBloodImmune = target.noBlood || target.suppressBlood || target.bleedImmune || target.isBloodImmune || target.isChessTroop || target.isChessMinion || target.isChessPiece || (typeof target.characterId === 'string' && target.characterId.startsWith('chess_')) || target.characterId === 'namelessdeity' || target.type === 'namelessdeity';
       if (typeof spawnBloodEffect === 'function' && !opts.noBlood && !opts.suppressBlood && !isTargetBloodImmune && !isRatioPauseActive && !isSecondTurretHit) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(effectiveAmount * 0.16)) : effectiveAmount;
         spawnBloodEffect(target, bloodAmount, damageAngle);

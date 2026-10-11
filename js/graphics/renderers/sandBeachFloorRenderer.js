@@ -7,6 +7,7 @@
 
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { ARENA_TILE_COUNT } from '../../systems/arenaTileGrid.js';
 
 // Pre-computed default frame bounding boxes from sand-beach-tiles-sprite-sheet.png (2172x724)
 export const DEFAULT_SAND_TILE_RECTS = [
@@ -18,7 +19,7 @@ export const DEFAULT_SAND_TILE_RECTS = [
   { id: 'sand_6', sx: 1810, sy: 198, sw: 354, sh: 332 }
 ];
 
-// 36-variant natural distribution pool for 6x6 arena grid (ensures non-repeating adjacent tiles)
+// 36-variant natural distribution pool for the 8x8 arena grid
 const ALL_SAND_VARIANTS_POOL = [
   0, 2, 4, 1, 3, 5,
   3, 5, 0, 4, 2, 1,
@@ -105,9 +106,8 @@ export function getOrCreateSandBeachFloorCanvas(arena, isDark = false, fBleed = 
 
   oc.imageSmoothingEnabled = false;
 
-  const targetTileSize = 76.6;
-  const cols = arena.cols || Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = arena.rows || Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = width / cols;
   const cellH = height / rows;
 

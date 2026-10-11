@@ -61,8 +61,17 @@ import { EnderDragonFighter } from '../fighters/EnderDragonFighter.js';
 import { SansFighter } from '../fighters/SansFighter.js';
 import { NaoyaFighter } from '../fighters/NaoyaFighter.js';
 import { MakiFighter } from '../fighters/MakiFighter.js';
+import { ShiroFighter } from '../fighters/ShiroFighter.js';
+import { SoraFighter } from '../fighters/SoraFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
+  'shiro':      ShiroFighter,
+  'Shiro':      ShiroFighter,
+  'shiro_ngnl': ShiroFighter,
+  'sora':       ShiroFighter,
+  'Sora':       ShiroFighter,
+  'sora_ngnl':  ShiroFighter,
+  'blank':      ShiroFighter,
   'normal':    NormalFighter,
   'aimbot':    AimbotFighter,
   'melee':     MeleeFighter,

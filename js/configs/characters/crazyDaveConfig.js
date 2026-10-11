@@ -48,7 +48,7 @@ export const crazyDaveConfig = {
   // Sun Economy System
   initialSun: 50,
   maxSun: 500,
-  sunRadius: 30,             // Sized large and prominent to fill 76.6px grass tiles
+  sunRadius: 30,             // Sized large and prominent for the 8x8 grass grid
   sunPickupValue: 50,
   sunSpawnRate: 70,         // Frames between ambient Sun drops (~1.8s at 60fps)
   sunFallSpeed: 2.2,         // Smooth vertical descent speed
@@ -143,7 +143,7 @@ export const crazyDaveConfig = {
   lawnmowerSpeed: 11.5,        // Fast horizontal charging speed across the lawn
   lawnmowerRadius: 18,         // Collision hitbox radius
   lawnmowerTriggerRadius: 38,  // Proximity trigger distance from baseline
-  lawnmowerBaselineOffset: 2,  // Keep parked mowers tucked against the arena wall
+  lawnmowerBaselineOffset: 16, // Park mower centers just outside the arena walls
   lawnmowerColor: '#DC2626',   // Classic cherry red mower
   lawnmowerStunDuration: 45,   // Stun frames applied to enemies hit by mower (≈0.75s at 60fps)
   lawnmowerSpriteSrc: 'Assets/model/crazyDave/lawnmower-sprite-sheet.png',
@@ -205,6 +205,5 @@ export const crazyDaveConfig = {
   potatoMineSpriteSrc: 'Assets/model/crazyDave/potato-mine-sprite-sheet.png',
 
   // Arena Grass Tiles (PvZ Front Lawn)
-  grassTilesSpriteSrc: 'Assets/model/Tiles/Grass-tiles-sprite-sheet.png',
-  grassTileSize: 76.6
+  grassTilesSpriteSrc: 'Assets/model/Tiles/Grass-tiles-sprite-sheet.png'
 };

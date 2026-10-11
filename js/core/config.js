@@ -16,6 +16,8 @@ import { mahitoConfig } from '../configs/characters/mahitoConfig.js';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js';
 import { naoyaConfig } from '../configs/characters/naoyaConfig.js';
 import { makiConfig } from '../configs/characters/makiConfig.js';
+import { shiroConfig } from '../configs/characters/shiroConfig.js';
+import { soraConfig } from '../configs/characters/soraConfig.js';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
@@ -65,6 +67,13 @@ export const CONFIG = {
   maki: makiConfig,
   Maki: makiConfig,
   maki_zenin: makiConfig,
+  shiro: shiroConfig,
+  Shiro: shiroConfig,
+  shiro_ngnl: shiroConfig,
+  sora: shiroConfig,
+  Sora: shiroConfig,
+  sora_ngnl: shiroConfig,
+  blank: shiroConfig,
   nobara: nobaraConfig,
   megumi: megumiConfig,
   megumin: meguminConfig,
@@ -116,6 +125,10 @@ export const CONFIG = {
   CJ: cjConfig,
   engineer: engineerConfig,
   Engineer: engineerConfig,
+  shiro: shiroConfig,
+  Shiro: shiroConfig,
+  sora: soraConfig,
+  Sora: soraConfig,
   camera: {
     minZoom: 0.65,
     maxZoom: 1.18,
@@ -1890,6 +1903,29 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: makiConfig.projectileSpeedMultiplier || 1.0,
     ability: makiConfig.ability || 'Heavenly Restriction (Awakened)',
     desc: makiConfig.desc || 'Zero Cursed Energy. Slices directly into the soul with the Split Soul Katana, bypasses domains, air-steps without friction, and absorbs kinetic force with Dragon-Bone.',
+  },
+  {
+    id: 58,
+    name: 'SHIRO',
+    category: 'Anime',
+    color: shiroConfig.color || '#A855F7',
+    themeColor: shiroConfig.themeColor || '#8B5CF6',
+    secondaryColor: '#38BDF8',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.1,
+    radius: shiroConfig.radius || shiroConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'shiro',
+    hp: shiroConfig.hp || 340,
+    damage: shiroConfig.damage || 24,
+    cooldown: shiroConfig.cooldown || 75,
+    moveSpeed: shiroConfig.moveSpeed || shiroConfig.speed || 5.6,
+    projectileSpeedMultiplier: shiroConfig.projectileSpeedMultiplier || 1.0,
+    ability: shiroConfig.ability || 'Disboard Chess Prodigy & Living Troops',
+    desc: shiroConfig.desc || 'Mastermind of Blank 『　　』 & Living Chess Prodigy. Commands the Disboard Chessboard, flicks living chess pieces (Pawn, Knight, Bishop, Rook, Queen), executes calculated 1-by-1 grandmaster tactical maneuvers, and calculates Checkmate in 10^120 variations!',
   }
 ];
 

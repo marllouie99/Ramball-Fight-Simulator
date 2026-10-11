@@ -32,6 +32,16 @@ export function animate(timestamp) {
     return;
   }
 
+  // Strict 60 FPS frame rate lock for high-Hz displays (120Hz/144Hz/240Hz)
+  // Ensures low CPU/GPU temperature, consistent battery life, and rock-solid 60 FPS simulation
+  if (!lastFrameTime) lastFrameTime = timestamp;
+  const elapsed = timestamp - lastFrameTime;
+  if (elapsed < FRAME_TIME - 1.0) {
+    requestAnimationFrame(animate);
+    return;
+  }
+  lastFrameTime = timestamp - (elapsed % FRAME_TIME);
+
   try {
     // FPS calculation
     if (!state.fpsLastTime) state.fpsLastTime = timestamp;
@@ -165,7 +175,7 @@ export function animate(timestamp) {
     resetCachedTime();
     state.frameAudioTime = getAudioCurrentTime();
 
-    // The abstracted core updates and renders!
+    // The abstracted core updates and renders in clean 60 FPS lockstep!
     updateGame();
     renderGame();
 

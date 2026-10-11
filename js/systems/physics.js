@@ -193,6 +193,21 @@ export function resolveFighterCollision(a, b) {
     if (isFriendly) return;
   }
 
+  // Living Chess Troops allow friendly Shiro and teammates to pass freely, but physically body-block enemies!
+  const aIsChess = Boolean(a.isChessTroop || a.isChessMinion);
+  const bIsChess = Boolean(b.isChessTroop || b.isChessMinion);
+  if (aIsChess || bIsChess) {
+    const chessTroop = aIsChess ? a : b;
+    const other = aIsChess ? b : a;
+    const isFriendly = (other === chessTroop.owner) ||
+      (chessTroop.owner && other.owner === chessTroop.owner) ||
+      (other.characterId === 'shiro' || other.type === 'shiro' || other.characterId === 'sora' || other.type === 'sora') ||
+      (other.isChessTroop || other.isChessMinion) ||
+      (typeof chessTroop.isTeammate === 'function' && chessTroop.isTeammate(other)) ||
+      (typeof other.isTeammate === 'function' && chessTroop.owner && other.isTeammate(chessTroop.owner));
+    if (isFriendly) return;
+  }
+
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
   const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
   const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive || b._wasFinalBlowSpin || (b.postUltimateRecoveryTimer && b.postUltimateRecoveryTimer > 0));
@@ -275,8 +290,8 @@ export function resolveFighterCollision(a, b) {
   const distance = wasmDist(a.x, a.y, b.x, b.y);
 
   // Collision hooks (for contact damage, etc.)
-  a.onCollide(b);
-  b.onCollide(a);
+  if (typeof a.onCollide === 'function') a.onCollide(b);
+  if (typeof b.onCollide === 'function') b.onCollide(a);
 
   const teamA = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(a._stateIdx !== undefined ? a._stateIdx : (state.fighters ? state.fighters.indexOf(a) : -1)) : null;
   const teamB = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(b._stateIdx !== undefined ? b._stateIdx : (state.fighters ? state.fighters.indexOf(b) : -1)) : null;
@@ -478,8 +493,8 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless;
-  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless;
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless;
 
   let aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
   let bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
@@ -547,8 +562,8 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isImmovable || aIsNameless || (aIsGojoInfinity && !b.gojoInfinityImmune);
-  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isImmovable || bIsNameless || (bIsGojoInfinity && !a.gojoInfinityImmune);
+  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isImmovable || aIsNameless || (aIsGojoInfinity && !b.gojoInfinityImmune);
+  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isImmovable || bIsNameless || (bIsGojoInfinity && !a.gojoInfinityImmune);
 
   if (aIsAnchor) {
     a.vx = 0;
@@ -1096,7 +1111,9 @@ export function updateFighters() {
         return;
       }
       const opponent = getClosestOpponent(fighter);
-      fighter.update(opponent, fi, state.arena);
+      if (typeof fighter.update === 'function') {
+        fighter.update(opponent, fi, state.arena);
+      }
 
       // Post-Kill / Round End / Match End Continuous Movement:
       // If the round or match has ended (or all opponents are dead), ensure the living winner smoothly coasts!

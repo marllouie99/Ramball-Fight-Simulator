@@ -7,6 +7,7 @@
 
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { ARENA_TILE_COUNT } from '../../systems/arenaTileGrid.js';
 
 export const DEFAULT_MOSSY_STONE_TILE_RECTS = [
   { id: 'stone_cobble', sx: 0,   sy: 0, sw: 256, sh: 256 }, // Multi-block cobblestone flagstone slab (Zero grass)
@@ -100,9 +101,8 @@ export function getOrCreateMossyStoneFloorCanvas(arena, isDark = false, fBleed =
 
   oc.imageSmoothingEnabled = true;
 
-  const targetTileSize = 76.6;
-  const cols = arena.cols || Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = arena.rows || Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = width / cols;
   const cellH = height / rows;
 

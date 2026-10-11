@@ -30,183 +30,26 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "ENGINEER",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "shotgunDamage",
-                "oldVal": "5.20",
-                "newVal": "2.20",
-                "pct": "Mod"
-            },
-            {
-                "type": "NERF",
-                "key": "dispenserTickInterval",
-                "oldVal": 30,
-                "newVal": 10,
-                "pct": "-66.7%"
-            }
-        ]
-    },
-    {
-        "character": "GENOS",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "ultBeamWidth",
-                "oldVal": 150,
-                "newVal": 130,
-                "pct": "-13.3%"
-            }
-        ]
-    },
-    {
-        "character": "GOJO",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "initialMeleeDuration",
-                "oldVal": 120,
-                "newVal": 100,
-                "pct": "-16.7%"
-            }
-        ]
-    },
-    {
-        "character": "MAHORAGA",
+        "character": "CRAZYDAVE",
         "deltas": [
             {
                 "type": "BUFF",
-                "key": "enableThrowBarrage",
-                "oldVal": 0,
-                "newVal": 1,
-                "pct": "+0%"
-            }
-        ]
-    },
-    {
-        "character": "MAKIMA",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "citizenReviveHpPercent",
-                "oldVal": "0.70",
-                "newVal": "1.00",
-                "pct": "Mod"
-            },
-            {
-                "type": "NERF",
-                "key": "bangCooldown",
-                "oldVal": 300,
-                "newVal": 380,
-                "pct": "+26.7%"
-            }
-        ]
-    },
-    {
-        "character": "RUBBICK",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "spellStealCastDelay",
-                "oldVal": 45,
-                "newVal": 300,
-                "pct": "+566.7%"
-            }
-        ]
-    },
-    {
-        "character": "SANS",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "dodgeStaminaCost",
+                "key": "lawnmowerBaselineOffset",
                 "oldVal": 2,
-                "newVal": 10,
-                "pct": "+400.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "basicBoneCooldown",
-                "oldVal": 100,
-                "newVal": 50,
-                "pct": "-50.0%"
-            },
-            {
-                "type": "NERF",
-                "key": "blasterCooldown",
-                "oldVal": 320,
-                "newVal": 500,
-                "pct": "+56.3%"
-            },
-            {
-                "type": "BUFF",
-                "key": "blasterSpawnInterval",
-                "oldVal": 4,
-                "newVal": 6,
-                "pct": "+50.0%"
-            },
-            {
-                "type": "NERF",
-                "key": "gravitySlamCooldown",
-                "oldVal": 580,
-                "newVal": 800,
-                "pct": "+37.9%"
+                "newVal": 16,
+                "pct": "+700.0%"
             }
         ]
     },
     {
-        "character": "SUKUNA",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "initialMeleeDuration",
-                "oldVal": 150,
-                "newVal": 100,
-                "pct": "-33.3%"
-            }
-        ]
-    },
-    {
-        "character": "URYU",
+        "character": "EYEOFCTHULHU",
         "deltas": [
             {
                 "type": "ADJUST",
-                "key": "hair",
-                "oldVal": "Assets/model/uryu/Uryu-ishida.png",
-                "newVal": "Assets/model/uryu/Ishida-hair.png",
+                "key": "displayName",
+                "oldVal": "Eye of Cthulhu",
+                "newVal": "EOC",
                 "pct": "Mod"
-            }
-        ]
-    },
-    {
-        "character": "YUJI",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "soulSwapDamageMultiplier",
-                "oldVal": "2.0",
-                "newVal": "1.2",
-                "pct": "Mod"
-            },
-            {
-                "type": "NERF",
-                "key": "soulSwapFugaDamage",
-                "oldVal": 220,
-                "newVal": 150,
-                "pct": "-31.8%"
-            }
-        ]
-    },
-    {
-        "character": "ZENITSU",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "thunderclapFinisherDamage",
-                "oldVal": 50,
-                "newVal": 30,
-                "pct": "-40.0%"
             }
         ]
     }

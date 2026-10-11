@@ -12,6 +12,9 @@ import { spawnSparks, spawnImpactFlash } from './sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { drawHeartShatterEffect, drawSansSpeechBubble } from '../weapons/sansWeaponGraphics.js';
 import { sansConfig } from '../../configs/characters/sansConfig.js';
+import { drawChessTroopShatterShard, spawnChessTroopShatter } from '../weapons/shiroChessGraphics.js';
+
+export { spawnChessTroopShatter };
 
 /**
  * Spawns a death shatter effect at the fighter's position.
@@ -1371,6 +1374,8 @@ export function drawDeathEffects() {
       drawNamelessDeityAssetGore(ctx, effect);
     } else if (effect.isNamelessDeityGlassShard) {
       drawNamelessDeityGlassShard(ctx, effect);
+    } else if (effect.isChessTroopShatter) {
+      drawChessTroopShatterShard(ctx, effect);
     } else if (effect.isMachineCorpse) {
       const s = effect.size / 15; // default size is 15
       ctx.scale(s, s);

@@ -295,8 +295,8 @@ export function drawFighters() {
     return a.f.y - b.f.y;
   });
 
-  // ── BOTTOM LAYER PASS: Underfoot Team Indicator Rings ──
-  // Always render team indicator rings on the bottom layer underneath all fighters, bodies, hands, weapons & effects!
+  // ── BOTTOM LAYER PASS: Underfoot Team Indicator Rings & Ground Floor Grids ──
+  // Always render team indicator rings & arena floor grids on the bottom layer underneath all fighters, bodies, hands, weapons & effects!
   if (isTeamMode && fighters) {
     fighters.forEach((f, fi) => {
       drawTeamRing(f, fi);

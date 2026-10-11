@@ -213,7 +213,24 @@ export const AUDIO_CONFIG = {
   'avatar_annihilation_blast': 'Assets/Sound Effects/Avatar/UniversalAnnihilationBlast.ogg',
   'avatar_annihilation_loop': 'Assets/Sound Effects/Avatar/UniversalAnnihilationLoop.ogg',
   'avatar_reality_shatter': 'Assets/Sound Effects/Avatar/RealityShatter1.ogg',
-  'avatar_hurt': 'Assets/Sound Effects/Avatar/AvatarHurt1.ogg'
+  'avatar_hurt': 'Assets/Sound Effects/Avatar/AvatarHurt1.ogg',
+
+  // Shiro (Disboard Chess Prodigy / Blank 『　　』)
+  'shiro_troop_summon': 'Assets/Sound Effects/Shiro/StarblessedPlatformActivate.ogg',
+  'shiro_troop_move': 'Assets/Sound Effects/Shiro/FingerSnap.ogg',
+  'shiro_board_turnon': 'Assets/Sound Effects/Shiro/shiro_chessboard_turnon.mp3',
+  'shiro_board_shutdown': 'Assets/Sound Effects/Shiro/LightFlickerOff.ogg',
+  'shiro_knight_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+  'shiro_queen_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+  'shiro_rook_ram': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+
+  // Shiro SFX Aliases & Compatibility
+  'shiro_finger_snap': 'Assets/Sound Effects/Shiro/FingerSnap.ogg',
+  'shiro_board_appear': 'Assets/Sound Effects/Shiro/shiro_chessboard_turnon.mp3',
+  'shiro_board_activate': 'Assets/Sound Effects/Shiro/StarblessedPlatformActivate.ogg',
+  'knight_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+  'queen_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+  'chess_snap': 'Assets/Sound Effects/Shiro/FingerSnap.ogg'
 };
 
 

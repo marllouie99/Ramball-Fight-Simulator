@@ -180,6 +180,31 @@ export function isStandOffMode() {
 }
 
 /**
+ * Helper to check if an entity or minion suppresses blood effects (e.g. Chess Troops, Nameless Deity).
+ */
+export function isBloodSuppressedEntity(entity) {
+  if (!entity) return false;
+  if (
+    entity.noBlood ||
+    entity.suppressBlood ||
+    entity.bleedImmune ||
+    entity.isBloodImmune ||
+    entity.isChessTroop ||
+    entity.isChessMinion ||
+    entity.isChessPiece ||
+    (typeof entity.characterId === 'string' && entity.characterId.startsWith('chess_')) ||
+    (typeof entity.type === 'string' && ['pawn', 'knight', 'bishop', 'rook', 'queen'].includes(entity.type) && (entity.isMinion || entity.isChessTroop || entity.isChessPiece)) ||
+    entity.characterId === 'namelessdeity' ||
+    entity.type === 'namelessdeity' ||
+    entity.characterId === 'nameless_deity' ||
+    entity.name === 'Nameless Deity'
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Spawns a standard blood effect at the fighter's position upon taking damage.
  * High-velocity directional blood droplets erupt along the strike/damage vector,
  * flying away from the attacker in a natural, impactful ballistic cone.
@@ -193,6 +218,17 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
   // Pattern 1: Coordinate call spawnBloodEffect(x, y, ...)
   if (typeof arg0 === 'number' && typeof arg1 === 'number') {
     entity = { x: arg0, y: arg1, r: 25 };
+    // Check if target entity or minion at this location suppresses blood
+    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      const match = state.fighters.find(f => f && isBloodSuppressedEntity(f) && Math.hypot(f.x - arg0, f.y - arg1) <= ((f.r || f.radius || 20) + 12));
+      if (match) return;
+      for (const f of state.fighters) {
+        if (f && Array.isArray(f.activeMinions)) {
+          const minionMatch = f.activeMinions.find(m => m && !m.dead && isBloodSuppressedEntity(m) && Math.hypot(m.x - arg0, m.y - arg1) <= ((m.r || m.radius || 20) + 12));
+          if (minionMatch) return;
+        }
+      }
+    }
     if (typeof arg2 === 'number') {
       dmgAmount = arg2;
       if (typeof arg3 === 'string') {
@@ -250,15 +286,8 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
 
   if (!entity || dmgAmount <= 0) return;
   if (
-    entity.noBlood ||
-    entity.suppressBlood ||
-    entity.bleedImmune ||
-    entity.isBloodImmune ||
-    entity.characterId === 'namelessdeity' ||
-    entity.type === 'namelessdeity' ||
-    entity.characterId === 'nameless_deity' ||
-    entity.name === 'Nameless Deity' ||
-    (opts && (opts.noBlood || opts.suppressBlood || opts.target?.noBlood || opts.target?.characterId === 'namelessdeity'))
+    isBloodSuppressedEntity(entity) ||
+    (opts && (opts.noBlood || opts.suppressBlood || isBloodSuppressedEntity(opts.target) || isBloodSuppressedEntity(opts.entity)))
   ) {
     return;
   }
@@ -444,12 +473,24 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
     fx = fighterOrX;
     fy = typeof optsOrY === 'number' ? optsOrY : 0;
     fr = typeof maybeR === 'number' ? maybeR : 25;
+    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      const match = state.fighters.find(f => f && isBloodSuppressedEntity(f) && Math.hypot(f.x - fx, f.y - fy) <= ((f.r || f.radius || 20) + 12));
+      if (match) return;
+      for (const f of state.fighters) {
+        if (f && Array.isArray(f.activeMinions)) {
+          const minionMatch = f.activeMinions.find(m => m && !m.dead && isBloodSuppressedEntity(m) && Math.hypot(m.x - fx, m.y - fy) <= ((m.r || m.radius || 20) + 12));
+          if (minionMatch) return;
+        }
+      }
+    }
   } else if (fighterOrX && typeof fighterOrX === 'object') {
     targetFighter = fighterOrX;
+    if (isBloodSuppressedEntity(targetFighter)) return;
     fx = typeof fighterOrX.x === 'number' ? fighterOrX.x : 0;
     fy = typeof fighterOrX.y === 'number' ? fighterOrX.y : 0;
     fr = typeof fighterOrX.r === 'number' ? fighterOrX.r : 25;
     opts = (typeof optsOrY === 'object' && optsOrY !== null) ? optsOrY : {};
+    if (opts && (opts.noBlood || opts.suppressBlood || isBloodSuppressedEntity(opts.target))) return;
   } else {
     return;
   }

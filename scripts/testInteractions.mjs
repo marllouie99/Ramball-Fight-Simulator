@@ -2,6 +2,8 @@
 // Multi-Fighter Complex Interaction & Stasis Test Suite
 // ─────────────────────────────────────────────
 
+import { ARENA_TILE_COUNT } from '../js/systems/arenaTileGrid.js';
+
 // 1. Mock browser DOM & WebGL environment
 function createMockCtx() {
   const noop = () => {};
@@ -200,6 +202,7 @@ async function runInteractionTests() {
   const { BalanceManager } = await import('../js/configs/balanceManager.js');
   const { CONFIG } = await import('../js/core/config.js');
   const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+  const { spawnBloodEffect } = await import('../js/graphics/particles/bloodEffect.js');
 
   const arena = { width: 540, height: 960 };
 
@@ -2296,9 +2299,8 @@ async function runInteractionTests() {
     assert(Math.hypot(teammateNewPlant.x - teammateSharedTile.x, teammateNewPlant.y - teammateSharedTile.y) > 1, 'Teammate Daves must not plant on the same grass tile');
 
     const savedSun = teammateDave.sunCount;
-    const grassTileSize = CONFIG.crazydave.grassTileSize;
-    const grassCols = Math.max(3, Math.round(state.arena.width / grassTileSize));
-    const grassRows = Math.max(3, Math.round(state.arena.height / grassTileSize));
+    const grassCols = ARENA_TILE_COUNT;
+    const grassRows = ARENA_TILE_COUNT;
     const cellW = state.arena.width / grassCols;
     const cellH = state.arena.height / grassRows;
     state.fighters = [firstTeamDave, teammateDave, gojo];
@@ -3112,12 +3114,23 @@ async function runInteractionTests() {
     const distToSentry = Math.hypot(deployedPea.x - mockSentry.x, deployedPea.y - mockSentry.y);
     assert(distToSentry > 30, 'Crazy Dave must NOT plant on top of an occupied building/sentry tile');
 
+    const chessDave = new CrazyDaveClass({ startX: 100, startY: 300, radius: 25, hp: 390 });
+    chessDave.sunCount = 500;
+    const chessTile = getNearestGrassTileCenter(chessDave.x + 32, chessDave.y, state.arena);
+    const shiroTroopOccupant = { isMinion: true, x: chessTile.x, y: chessTile.y, hp: 80 };
+    const fightersBeforeChessOccupancy = state.fighters;
+    state.fighters = [chessDave, shiroTroopOccupant];
+    assert(chessDave.plantPeashooter(gojo), 'Crazy Dave must plant on another tile when a Shiro minion occupies the candidate tile');
+    const chessDavePlant = chessDave.activePeashooters[0];
+    assert(Math.hypot(chessDavePlant.x - shiroTroopOccupant.x, chessDavePlant.y - shiroTroopOccupant.y) > 1, 'Crazy Dave must not overlap a Shiro minion tile');
+    state.fighters = fightersBeforeChessOccupancy;
+
     // Test full arena occupancy blocking Dave planting
     const daveFullArena = new CrazyDaveClass({ startX: 100, startY: 300, radius: 25, hp: 390 });
     daveFullArena.sunCount = 500;
     daveFullArena.peashooterCooldown = 0;
-    const testCols = Math.max(3, Math.round(state.arena.width / 76.6));
-    const testRows = Math.max(3, Math.round(state.arena.height / 76.6));
+    const testCols = ARENA_TILE_COUNT;
+    const testRows = ARENA_TILE_COUNT;
     const cellWidth = state.arena.width / testCols;
     const cellHeight = state.arena.height / testRows;
     const allOccupyingBuildings = [];
@@ -3535,7 +3548,9 @@ async function runInteractionTests() {
     dave.initLawnmowers(testArena);
     assert(dave.lawnmowers.length > 0, `Crazy Dave must initialize lawnmowers across arena rows (got ${dave.lawnmowers.length})`);
     for (const m of dave.lawnmowers) {
-      assert(m.x === testArena.x + testArena.width - CONFIG.crazydave.lawnmowerBaselineOffset, `Right-spawn lawnmowers must be tucked against the right wall (got ${m.x})`);
+      assert(m.x === testArena.x + testArena.width + CONFIG.crazydave.lawnmowerBaselineOffset, `Right-spawn lawnmowers must be outside the right arena wall (got ${m.x})`);
+      assert(m.x > testArena.x + testArena.width, 'Right-spawn lawnmower centers must be outside the arena');
+      assert(m.y === testArena.y + (m.row + 0.5) * testArena.height / ARENA_TILE_COUNT, 'Lawnmowers must remain aligned with 8x8 tile rows');
       assert(m.facingDirection === -1, 'Right-spawn lawnmowers must face left (-1)');
       assert(m.state === 'idle', 'Lawnmowers must start in idle state');
       assert(m.hp === 99999, 'Lawnmower must have invulnerable HP pool');
@@ -3547,7 +3562,8 @@ async function runInteractionTests() {
 
     const leftSpawnDave = new CrazyDaveFighter({ startX: 100, startY: 200 });
     leftSpawnDave.initLawnmowers(testArena);
-    assert(leftSpawnDave.lawnmowers.every(m => m.x === testArena.x + CONFIG.crazydave.lawnmowerBaselineOffset), 'Left-spawn lawnmowers must be tucked against the left wall');
+    assert(leftSpawnDave.lawnmowers.every(m => m.x === testArena.x - CONFIG.crazydave.lawnmowerBaselineOffset), 'Left-spawn lawnmowers must be outside the left arena wall');
+    assert(leftSpawnDave.lawnmowers.every(m => m.x < testArena.x), 'Left-spawn lawnmower centers must be outside the arena');
     assert(leftSpawnDave.lawnmowers.every(m => m.facingDirection === 1), 'Left-spawn lawnmowers must face right (+1)');
 
     // 4. Test Untargetable status: isValidAimTarget and getClosestOpponent ignore Lawnmowers
@@ -3568,7 +3584,7 @@ async function runInteractionTests() {
     testEnemy.vx = -3;
     resolveFighterCollision(sampleMower, testEnemy);
     assert(testEnemy.x === sampleMower.x, 'Entities must pass directly through Lawnmower without collision displacement');
-    assert(sampleMower.x === testArena.x + testArena.width - CONFIG.crazydave.lawnmowerBaselineOffset, 'Lawnmower must not be displaced by colliding entity');
+    assert(sampleMower.x === testArena.x + testArena.width + CONFIG.crazydave.lawnmowerBaselineOffset, 'Lawnmower must not be displaced by colliding entity');
 
     // 6. Test Lawnmower breach trigger when enemy penetrates baseline
     const targetMower = dave.lawnmowers[0];
@@ -3745,9 +3761,8 @@ async function runInteractionTests() {
 
     // Test full arena occupancy blocking deployment
     const engineer3 = new EngineerClass({ startX: 100, startY: 300, radius: 25, hp: 400 });
-    const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
-    const cols = Math.max(3, Math.round(testArena.width / targetTileSize));
-    const rows = Math.max(3, Math.round(testArena.height / targetTileSize));
+    const cols = ARENA_TILE_COUNT;
+    const rows = ARENA_TILE_COUNT;
     const cellW = testArena.width / cols;
     const cellH = testArena.height / rows;
     const allPlants = [];
@@ -3959,7 +3974,8 @@ async function runInteractionTests() {
     // Test grid info math
     const testArena = { x: 40, y: 240, width: 460, height: 460, shape: 'rect' };
     const gridInfo = getTileGridInfo(testArena);
-    assert(gridInfo.cols > 0 && gridInfo.rows > 0 && gridInfo.cellW > 0, 'getTileGridInfo should calculate valid dimensions');
+    assert(gridInfo.cols === ARENA_TILE_COUNT && gridInfo.rows === ARENA_TILE_COUNT, 'Arena floor grids must be exactly 8x8');
+    assert(gridInfo.totalTiles === 64 && gridInfo.cellW > 0, 'getTileGridInfo should calculate all 64 tile cells');
     
     const nearest = getNearestTileCenter(100, 300, testArena);
     assert(nearest && typeof nearest.x === 'number' && typeof nearest.y === 'number', 'getNearestTileCenter should return valid coordinates');
@@ -5805,6 +5821,296 @@ async function runInteractionTests() {
     assert(gojo.purpleCooldown >= 270, 'Gojo purpleCooldown must receive penalty cooldown when hard-cancelled by Ultimate');
 
     console.log('      ✅ Naoya 24-Frame Palm Touch stasis correctly preserves active skill casting and resumes on stasis end without resetting.');
+  }
+
+  // ── TEST 63: Shiro Living Chess Troops — Body Blocking & Enemy Targetability ──
+  console.log('   63. Testing Shiro Living Chess Troops Body Blocking (Except for Shiro) & Enemy Targetability / Damage...');
+  {
+    const ShiroClass = FIGHTER_CLASS_MAP['shiro'];
+    const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+
+    assert(ShiroClass && SaitamaClass, 'Shiro and Saitama classes must exist');
+
+    const shiro = new ShiroClass({ x: 200, y: 300, hp: 340, maxHp: 340 });
+    const enemy = new SaitamaClass({ x: 400, y: 300, hp: 600, maxHp: 600 });
+    assert(shiro.hideHands === true, 'Shiro model hands must be hidden');
+    assert(Object.prototype.hasOwnProperty.call(ShiroClass.prototype, 'drawGun'), 'Shiro must override the default gun renderer');
+    shiro.team = 0;
+    enemy.team = 1;
+    state.fighters = [shiro, enemy];
+    state.arena = { x: 45, y: 240, width: 450, height: 450 };
+
+    // 1. Shiro flicks a troop and plants it on a tile
+    shiro.gunAngle = 0;
+    shiro.shootCooldown = 0;
+    shiro._flickChessTroop(enemy);
+    assert(shiro.activeMinions.length === 1, 'Shiro must have 1 active minion');
+
+    const troop = shiro.activeMinions[0];
+    assert(!troop.isMinion, 'Troop starts in projectile phase');
+
+    const occupiedTile = { isMinion: true, isPlant: true, x: troop.x, y: troop.y, hp: 100, owner: enemy };
+    state.fighters.push(occupiedTile);
+    const occupiedCol = Math.floor((occupiedTile.x - state.arena.x) / (state.arena.width / ARENA_TILE_COUNT));
+    const occupiedRow = Math.floor((occupiedTile.y - state.arena.y) / (state.arena.height / ARENA_TILE_COUNT));
+
+    // Simulate projectile planting onto tile center
+    shiro._plantTroopOnTileCenter(troop, state.arena);
+    assert(troop.isMinion === true, 'Troop must be marked as isMinion');
+    assert(troop.isChessTroop === true, 'Troop must be marked as isChessTroop');
+    assert(troop.isImmovable === true, 'Troop must be immovable for solid body block');
+    assert(troop.immuneToKnockback && troop.immuneToPush, 'Planted troops must carry shared knockback and push immunity flags');
+    assert(troop.tileCol !== occupiedCol || troop.tileRow !== occupiedRow, 'Shiro must not plant a troop on a tile occupied by another minion');
+    assert(state.fighters.includes(troop), 'Planted troop must be registered in state.fighters');
+
+    // Shared projectile impact applies a direct positional push unless the target is marked immune.
+    const { HitImpactSystem } = await import('../js/systems/hitImpactSystem.js');
+    const troopX = troop.x;
+    const troopY = troop.y;
+    HitImpactSystem.processProjectileHit(troop, { visual: 'mahoragaBasaltMonolith', vx: 10, vy: 0 }, enemy, state.fighters);
+    assert(troop.x === troopX && troop.y === troopY, 'Projectile attacks must not displace planted chess troops');
+    troop.applyKnockback(25, -25);
+    assert(troop.vx === 0 && troop.vy === 0 && troop.knockbackVx === 0 && troop.knockbackVy === 0, 'Knockback calls must leave planted troop motion at zero');
+
+    const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+    const originalFighters = state.fighters;
+    const originalTroopHp = troop.hp;
+    troop.hp = troop.maxHp + 500;
+    state.fighters = [troop];
+    const purpleOwner = { characterId: 'gojo', type: 'gojo', x: troopX - 20, y: troopY, r: 25, hp: 100 };
+    const purple = { x: troopX - 1, y: troopY, owner: -1, ownerFighter: purpleOwner };
+    new GojoPurpleBehavior().triggerPurpleExplosion(purple, state.fighters, {});
+    state.fighters = originalFighters;
+    troop.hp = originalTroopHp;
+    assert(troop.vx === 0 && troop.vy === 0 && troop.knockbackVx === 0 && troop.knockbackVy === 0, 'Gojo Purple must not impart knockback to planted chess troops');
+
+    // 2. Test Friendly Pass-Through: Shiro colliding with her own troop does NOT get blocked
+    shiro.x = troop.x;
+    shiro.y = troop.y;
+    const initialShiroX = shiro.x;
+    resolveFighterCollision(shiro, troop);
+    assert(shiro.x === initialShiroX, 'Shiro must phase through her own chess troop without being pushed/blocked');
+
+    // 3. Test Enemy Body Block: Enemy colliding with the troop is physically pushed back
+    const troopR = troop.r || troop.radius || 14;
+    const enemyR = enemy.r || enemy.radius || 25;
+    enemy.x = troop.x + troopR + enemyR - 10; // Overlapping by 10px
+    enemy.y = troop.y;
+    const initialEnemyX = enemy.x;
+    resolveFighterCollision(enemy, troop);
+    assert(enemy.x > initialEnemyX, 'Enemy must be pushed back by the chess troop body block');
+
+    // 4. Test Enemy Targetability: Enemy can target the living chess troop
+    assert(enemy.isValidAimTarget(troop) === true, 'Chess troop must be a valid aim target for enemies');
+    const validTargets = enemy._getAllValidEnemyTargets();
+    assert(validTargets.includes(troop), 'Enemy target query must include living chess troop');
+
+    // 5. Test Damage & Destruction & Zero Blood Particles
+    assert(troop.noBlood === true && troop.suppressBlood === true, 'Troop must have blood suppression flags');
+    state.bloodEffects = [];
+    spawnBloodEffect(troop, 20);
+    spawnBloodEffect(troop.x, troop.y, 20);
+    assert(state.bloodEffects.length === 0, 'No blood particles must spawn on chess troops');
+    const initialHp = troop.hp;
+    troop.takeDamage(20, enemy);
+    assert(troop.hp === initialHp - 20, `Troop HP must decrease by 20 (got ${troop.hp})`);
+
+    // Fatal blow destroying the troop -> must spawn digital crystal shatter shards in state.deathEffects
+    const initialDeathEffectsCount = state.deathEffects.length;
+    troop.takeDamage(troop.hp + 50, enemy);
+    assert(troop.dead === true, 'Troop must be marked as dead');
+    assert(!state.fighters.includes(troop), 'Destroyed troop must be removed from state.fighters');
+    const chessShatters = state.deathEffects.filter(e => e && e.isChessTroopShatter);
+    assert(chessShatters.length > 0, `Destroyed chess troop must spawn digital crystal shatter shards in state.deathEffects (got ${chessShatters.length})`);
+
+    // Verify death effect rendering maintains balanced 0 stack depth
+    const { drawDeathEffects } = await import('../js/graphics/particles/deathShatterEffect.js');
+    drawDeathEffects(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'drawDeathEffects with chess troop shatter shards must maintain 0 stack depth');
+
+    // 6. Test TV / Console Power-Off Shutdown Animation on Chessboard
+    const { drawDisboardChessboard } = await import('../js/graphics/weapons/shiroChessGraphics.js');
+    drawDisboardChessboard(mockCtx, state.arena, 1.0, 1.0, 0.25); // Phase 1: Vertical collapse
+    assert(mockCtx.getStackDepth() === 0, 'drawDisboardChessboard phase 1 shutdown must maintain 0 stack depth');
+    drawDisboardChessboard(mockCtx, state.arena, 1.0, 1.0, 0.60); // Phase 2: Horizontal collapse into dot
+    assert(mockCtx.getStackDepth() === 0, 'drawDisboardChessboard phase 2 shutdown must maintain 0 stack depth');
+    drawDisboardChessboard(mockCtx, state.arena, 1.0, 1.0, 0.90); // Phase 3: Phosphor dot dissipation
+    assert(mockCtx.getStackDepth() === 0, 'drawDisboardChessboard phase 3 shutdown must maintain 0 stack depth');
+
+    // 7. Test Round Reset Cleanup
+    shiro._flickChessTroop(enemy);
+    const troop2 = shiro.activeMinions[0];
+    shiro._plantTroopOnTileCenter(troop2, state.arena);
+    assert(state.fighters.includes(troop2), 'Second troop registered in state.fighters');
+
+    shiro.reset();
+    assert(shiro.activeMinions.length === 0, 'Reset must clear activeMinions array');
+    assert(!state.fighters.includes(troop2), 'Reset must unregister all chess troops from state.fighters');
+
+    console.log('      ✅ Shiro chess troops body-block enemies, allow Shiro pass-through, targetable by enemies, death shatter & TV shutdown verified.');
+  }
+
+  // ── TEST 64: Shiro Pawn Promotion After Four Successful Captures ──
+  console.log('   64. Testing Shiro pawn promotion after four successful captures...');
+  {
+    const ShiroClass = FIGHTER_CLASS_MAP['shiro'];
+    const shiro = new ShiroClass({ x: 200, y: 300, hp: 340, maxHp: 340 });
+    const enemy = {
+      x: 400,
+      y: 300,
+      hp: 1000,
+      maxHp: 1000,
+      r: 25,
+      dead: false,
+      team: 1,
+      takeDamage(amount) {
+        this.hp -= amount;
+      },
+      applyHitStun() {}
+    };
+    shiro.team = 0;
+    enemy.team = 1;
+    state.fighters = [shiro, enemy];
+    state.projectiles = [];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+
+    const originalRandom = Math.random;
+    Math.random = () => 0.001;
+    try {
+      shiro._flickChessTroop(enemy);
+    } finally {
+      Math.random = originalRandom;
+    }
+
+    const pawn = shiro.activeMinions[0];
+    assert(pawn.type === 'pawn', 'Promotion test must start with a pawn');
+    shiro._plantTroopOnTileCenter(pawn, arena);
+    enemy.x = pawn.x;
+    enemy.y = pawn.y;
+    const runPawnCapture = () => {
+      pawn.isAttacking = true;
+      pawn.moveTimer = 1;
+      pawn.moveMaxTimer = 1;
+      pawn.startTile = { col: pawn.tileCol, row: pawn.tileRow, x: pawn.x, y: pawn.y };
+      pawn.targetTile = { col: pawn.tileCol, row: pawn.tileRow, x: pawn.x, y: pawn.y };
+      shiro._updateTroopMinions(enemy, arena);
+    };
+
+    const originalTakeDamage = enemy.takeDamage;
+    enemy.takeDamage = () => false;
+    runPawnCapture();
+    assert(pawn.pawnDamageCount === 0, 'Blocked capture damage must not count toward promotion');
+    enemy.takeDamage = originalTakeDamage;
+
+    for (let hit = 0; hit < 4; hit++) runPawnCapture();
+    assert(enemy.hp === 944, 'Pawn must deal damage on all four successful captures');
+    assert(pawn.type !== 'pawn', 'Pawn must promote after four successful captures');
+    assert(['knight', 'bishop', 'rook', 'queen'].includes(pawn.type), 'Promotion must select a random non-pawn troop');
+    assert(pawn.pawnDamageCount === 4, 'Pawn promotion must be tied to exactly four successful captures');
+    assert(shiro.activeMinions.includes(pawn), 'Promotion must transform the same active troop');
+    assert(pawn.radius === pawn.r && pawn.radius > 15, 'Promoted troop radius must match its new type');
+
+    shiro.reset();
+    state.fighters = [];
+    state.projectiles = [];
+    console.log('      ✅ Shiro pawns ignore blocked captures and promote in place after four successful hits.');
+  }
+
+  // ── TEST 65: Shiro Chess Troops Capture Enemy Minions ──
+  console.log('   65. Testing Shiro troop captures against enemy plants and Engineer buildings...');
+  {
+    const ShiroClass = FIGHTER_CLASS_MAP['shiro'];
+    const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+    const tileCenter = (col, row) => ({
+      x: arena.x + (col + 0.5) * arena.width / ARENA_TILE_COUNT,
+      y: arena.y + (row + 0.5) * arena.height / ARENA_TILE_COUNT
+    });
+
+    const runCaptureCase = (targetFlags, label) => {
+      const startTile = tileCenter(1, 1);
+      const captureTile = tileCenter(2, 2);
+      const allyTile = tileCenter(0, 2);
+      const shiro = new ShiroClass({ x: startTile.x - 35, y: startTile.y, hp: 340, maxHp: 340 });
+      const enemy = new SaitamaClass({ x: tileCenter(7, 7).x, y: tileCenter(7, 7).y, hp: 600, maxHp: 600 });
+      const alliedMinion = {
+        ...targetFlags,
+        x: allyTile.x,
+        y: allyTile.y,
+        r: 18,
+        hp: 120,
+        maxHp: 120,
+        dead: false,
+        team: 0,
+        owner: shiro
+      };
+      const enemyMinion = {
+        ...targetFlags,
+        x: captureTile.x,
+        y: captureTile.y,
+        r: 18,
+        hp: 300,
+        maxHp: 300,
+        dead: false,
+        team: 1,
+        owner: enemy,
+        hitCount: 0,
+        takeDamage(amount) {
+          this.hitCount++;
+          this.lastDamage = amount;
+          this.hp = Math.max(0, this.hp - amount);
+          if (this.hp <= 0) this.dead = true;
+          return true;
+        }
+      };
+
+      shiro.team = 0;
+      enemy.team = 1;
+      state.arena = arena;
+      state.projectiles = [];
+      state.fighters = [shiro, enemy, alliedMinion, enemyMinion];
+
+      const originalRandom = Math.random;
+      Math.random = () => 0.001;
+      try {
+        shiro._flickChessTroop(enemy);
+      } finally {
+        Math.random = originalRandom;
+      }
+
+      const pawn = shiro.activeMinions[0];
+      assert(pawn.type === 'pawn', `${label}: capture fixture must start with a pawn`);
+      shiro._plantTroopOnTileCenter(pawn, arena);
+      pawn.isSummoning = false;
+      pawn.summonTimer = 0;
+      pawn.attackCooldown = 0;
+      shiro.chessTurnCooldown = 0;
+
+      shiro._selectAndExecuteNextChessMove(enemy, arena);
+      assert(pawn.attackTarget === enemyMinion, `${label}: Shiro must select the enemy minion and ignore its ally`);
+      assert(pawn.targetTile.col === 2 && pawn.targetTile.row === 2, `${label}: pawn must route to the enemy minion's tile`);
+
+      pawn.isTelegraphing = false;
+      pawn.isAttacking = true;
+      pawn.moveTimer = 1;
+      pawn.moveMaxTimer = 1;
+      pawn.startTile = { col: pawn.tileCol, row: pawn.tileRow, x: pawn.x, y: pawn.y };
+      shiro._updateTroopMinions(enemy, arena);
+
+      assert(enemyMinion.hitCount === 1, `${label}: enemy minion must be consumed in one hit`);
+      assert(enemyMinion.hp === 0 && enemyMinion.dead, `${label}: captured minion must be dead`);
+      assert(!state.fighters.includes(enemyMinion), `${label}: captured minion must be removed from the active roster`);
+      assert(pawn.tileCol === 2 && pawn.tileRow === 2, `${label}: Shiro troop must occupy the captured tile`);
+
+      shiro.reset();
+      state.fighters = [];
+      state.projectiles = [];
+    };
+
+    runCaptureCase({ isMinion: true, isPlant: true, isPlantMinion: true }, 'Enemy plant');
+    runCaptureCase({ isMinion: true, isDeployable: true, isTurret: true }, 'Engineer turret');
+    console.log('      ✅ Shiro troops capture enemy plants and Engineer turrets in one hit while preserving allied minions.');
   }
 
   console.log('───────────────────────────────────────────────────────');

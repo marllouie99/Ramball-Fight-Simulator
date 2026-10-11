@@ -9365,6 +9365,9 @@ async function main() {
 
   // 8. Core UI Screens Canvas Stack Balance Check
   console.log('🖥️ [UI Screen Stack Test] Verifying all menus & select screens transform balance...');
+    if (!SKIN_STUDIO_FIGHTERS.some(fighterDefinition => fighterDefinition.key === 'shiro' && fighterDefinition.asset === 'shiro-hair.png')) {
+      throw new Error('Skin Studio must register Shiro and her dedicated hair asset');
+    }
   const uiScreens = [
     { name: 'drawTitleScreen', fn: drawTitleScreen },
     { name: 'drawSelectScreen', fn: drawSelectScreen },

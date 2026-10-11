@@ -9,6 +9,9 @@ import { renderActiveArenaFloor } from '../../systems/arenaTileSystem.js';
 import { drawHorizontalMapFeatures } from '../../systems/horizontalMapSystem.js';
 import { drawHorizontalFighterDolls } from './horizontalDollRenderer.js';
 import { drawCenterPlusObstacle } from '../../systems/arenaObstacleSystem.js';
+import { drawDisboardChessboard, drawTroopThreatTiles } from '../weapons/shiroChessGraphics.js';
+import { audioSystem } from '../../systems/audioSystem.js';
+import { shiroConfig } from '../../configs/characters/shiroConfig.js';
 
 /**
  * Renders a solid vector fissure crack (matching manga comic / PNG crack art).
@@ -339,6 +342,101 @@ function drawOuterActionTrianglesAndNeedles(ctx, width, height, arena, isDark) {
   ctx.restore();
 }
 
+/**
+ * Renders the Shiro & Sora Disboard Virtual Chessboard on the arena floor.
+ * Placed strictly on the floor pass so all domain dim screens, arena borders,
+ * wall cracks, speed lines, ground VFX, and character bodies render on top!
+ */
+export function renderShiroChessboardFloor(ctx, arena) {
+  if (!arena) return;
+  const fighters = state.fighters;
+  const shiroFighters = fighters ? fighters.filter(f => f && (f.characterId === 'shiro' || f.type === 'shiro' || f.characterId === 'sora' || f.type === 'sora')) : [];
+
+  if (shiroFighters.length === 0) {
+    state._shiroChessboardAlpha = 0.0;
+    state._shiroChessboardAssembleProgress = 0.0;
+    state._shiroChessboardShutdownTimer = 0;
+    state._shiroChessboardWasActive = false;
+    return;
+  }
+
+  let hasActiveTroops = false;
+  const allMinions = [];
+
+  for (const sf of shiroFighters) {
+    if (sf.activeMinions && Array.isArray(sf.activeMinions)) {
+      for (const m of sf.activeMinions) {
+        if (m && !m.dead && (m.hp > 0 || !m.isMinion)) {
+          hasActiveTroops = true;
+        }
+        allMinions.push(m);
+      }
+    }
+  }
+
+  if (state._shiroChessboardAlpha === undefined) state._shiroChessboardAlpha = 0.0;
+  if (state._shiroChessboardAssembleProgress === undefined) state._shiroChessboardAssembleProgress = 0.0;
+  if (state._shiroChessboardShutdownTimer === undefined) state._shiroChessboardShutdownTimer = 0;
+  if (state._shiroChessboardWasActive === undefined) state._shiroChessboardWasActive = false;
+
+  const SHUTDOWN_DURATION = 28; // ~0.46s authentic CRT power-off collapse
+  let shutdownProgress = 0.0;
+
+  const getShiroVol = (key, defaultVol = 0.85) => {
+    return shiroConfig.soundVolumes?.[key]
+      ?? shiroConfig.audioVolumes?.[key]
+      ?? CONFIG.shiro?.soundVolumes?.[key]
+      ?? CONFIG.shiro?.audioVolumes?.[key]
+      ?? defaultVol;
+  };
+
+  if (hasActiveTroops) {
+    // Active troops present: if not already active, trigger chessboard turn-on sound effect
+    if (!state._shiroChessboardWasActive && state._shiroChessboardAlpha <= 0.05) {
+      audioSystem.playSFX('shiro_board_turnon', getShiroVol('boardAppear', 0.85));
+    }
+    state._shiroChessboardShutdownTimer = 0;
+    state._shiroChessboardWasActive = true;
+    state._shiroChessboardAlpha = Math.min(1.0, state._shiroChessboardAlpha + 0.12);
+    state._shiroChessboardAssembleProgress = Math.min(1.0, state._shiroChessboardAssembleProgress + 0.025);
+  } else {
+    // No active troops: if the chessboard was active, trigger the CRT TV / Console shutdown animation!
+    if (state._shiroChessboardWasActive && state._shiroChessboardShutdownTimer === 0 && state._shiroChessboardAlpha > 0.1) {
+      state._shiroChessboardShutdownTimer = SHUTDOWN_DURATION;
+      audioSystem.playSFX('shiro_board_shutdown', getShiroVol('boardShutdown', 0.85));
+    }
+
+    if (state._shiroChessboardShutdownTimer > 0) {
+      state._shiroChessboardShutdownTimer--;
+      shutdownProgress = 1.0 - (state._shiroChessboardShutdownTimer / SHUTDOWN_DURATION);
+      // During shutdown collapse, hold board alpha, then fade out during final dot fizzle
+      state._shiroChessboardAlpha = (shutdownProgress >= 0.85)
+        ? Math.max(0.0, (1.0 - shutdownProgress) / 0.15)
+        : 1.0;
+
+      if (state._shiroChessboardShutdownTimer <= 0) {
+        state._shiroChessboardWasActive = false;
+        state._shiroChessboardAlpha = 0.0;
+        state._shiroChessboardAssembleProgress = 0.0;
+      }
+    } else {
+      // Fully powered off
+      state._shiroChessboardAlpha = Math.max(0.0, state._shiroChessboardAlpha - 0.10);
+      if (state._shiroChessboardAlpha <= 0.01) {
+        state._shiroChessboardAssembleProgress = 0.0;
+        state._shiroChessboardWasActive = false;
+      }
+    }
+  }
+
+  if (ctx && (state._shiroChessboardAlpha > 0.01 || state._shiroChessboardShutdownTimer > 0)) {
+    drawDisboardChessboard(ctx, arena, state._shiroChessboardAlpha, state._shiroChessboardAssembleProgress, shutdownProgress);
+    if (allMinions.length > 0 && shutdownProgress === 0.0) {
+      drawTroopThreatTiles(ctx, arena, allMinions, state._shiroChessboardAlpha);
+    }
+  }
+}
+
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
   const isDark = Boolean(
@@ -489,15 +587,19 @@ export function drawArena() {
       if (state.viewOrientation === 'horizontal' && isGrandArena) {
         drawHorizontalMapFeatures(ctx, arena);
       }
+      renderShiroChessboardFloor(ctx, arena);
       ctx.restore();
-    } else if (hasActiveDomain && !state.pixiApp) {
-      // In native Canvas 2D mode, render active domain background under camera transform
-      const activeDomainFighter = state.fighters?.find(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
-      if (activeDomainFighter) {
-        ctx.save();
-        applyCameraToCtx(ctx);
-        activeDomainFighter.drawDomainBackground(ctx);
-        ctx.restore();
+    } else {
+      renderShiroChessboardFloor(null, arena);
+      if (hasActiveDomain && !state.pixiApp) {
+        // In native Canvas 2D mode, render active domain background under camera transform
+        const activeDomainFighter = state.fighters?.find(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
+        if (activeDomainFighter) {
+          ctx.save();
+          applyCameraToCtx(ctx);
+          activeDomainFighter.drawDomainBackground(ctx);
+          ctx.restore();
+        }
       }
     }
 

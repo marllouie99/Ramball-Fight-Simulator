@@ -11,6 +11,7 @@ import { spawnSpentCasing } from '../../graphics/particles/johnWickDroppedMagazi
 import { TurretEntity } from '../TurretEntity.js';
 import { DispenserEntity } from '../DispenserEntity.js';
 import { getNearestGrassTileCenter, isCrazyDavePresent } from '../../graphics/renderers/grassFloorRenderer.js';
+import { ARENA_TILE_COUNT } from '../../systems/arenaTileGrid.js';
 import { drawEngineer } from '../../graphics/weaponVisuals.js';
 import { drawEngineerSkin } from '../../graphics/fighters/engineerSkin.js';
 
@@ -68,9 +69,8 @@ export function getArenaTileOccupants(engineer, excludeEntity = null) {
 
 export function getAvailableTileForBuilding(targetX, targetY, arena, occupants = []) {
   arena = arena || (typeof state !== 'undefined' && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
-  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
-  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = arena.width / cols;
   const cellH = arena.height / rows;
   const occupiedRadius = Math.min(cellW, cellH) * 0.45;

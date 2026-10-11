@@ -5,6 +5,7 @@
 
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { ARENA_TILE_COUNT } from '../../systems/arenaTileGrid.js';
 
 // Pre-computed default frame bounding boxes from Grass-tiles-sprite-sheet.png (1536x1024)
 export const DEFAULT_GRASS_TILE_RECTS = [
@@ -159,10 +160,8 @@ export function getOrCreateGrassFloorCanvas(arena, isDark = false, fBleed = 0) {
 
   oc.imageSmoothingEnabled = false;
 
-  // Grid calculation: standard 6x6 tiles for 460x460 arena (or dynamic ~76px per tile)
-  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
-  const cols = arena.cols || Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = arena.rows || Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = width / cols;
   const cellH = height / rows;
 
@@ -275,9 +274,8 @@ export function renderCrazyDaveGrassFloor(ctx, arena, isDark = false, fBleed = 0
  */
 export function getNearestGrassTileCenter(targetX, targetY, arena, existingOccupants = []) {
   arena = arena || (typeof state !== 'undefined' && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
-  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
-  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = arena.width / cols;
   const cellH = arena.height / rows;
 
@@ -344,9 +342,8 @@ export function getNearestGrassTileCenter(targetX, targetY, arena, existingOccup
  */
 export function getRandomGrassTileCenter(arena, existingOccupants = []) {
   arena = arena || (typeof state !== 'undefined' && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
-  const targetTileSize = CONFIG.crazydave?.grassTileSize || 76.6;
-  const cols = Math.max(3, Math.round(arena.width / targetTileSize));
-  const rows = Math.max(3, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = arena.width / cols;
   const cellH = arena.height / rows;
 

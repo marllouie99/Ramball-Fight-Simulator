@@ -484,12 +484,18 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         // Outward explosive knockback push
         const isMakimaShatter = Boolean(ent && (ent.isRevivingFromContract || ent.isShatterReviving || (ent.shatteredPieces && ent.shatteredPieces.length > 0) || (ent.characterId === 'makima' && (ent.isDead || ent.dead || ent.hp <= 0))));
         const isEscanor = Boolean(ent && (ent.characterId === 'escanor' || ent.type === 'escanor' || (ent.immuneToPull && !ent.isPlant)));
+        const isKnockbackImmune = Boolean(ent && (ent.immuneToKnockback || ent.immuneToPush || ent.cannotBeKnockbacked || ent.cannotBePushed));
         if (isMakimaShatter) {
           ent.vx = 0; ent.vy = 0; ent.knockbackVx = 0; ent.knockbackVy = 0;
           if (typeof ent._shatterLockedX === 'number' && typeof ent._shatterLockedY === 'number') {
             ent.x = ent._shatterLockedX; ent.y = ent._shatterLockedY;
           }
         } else if (isEscanor) {
+          ent.knockbackVx = 0;
+          ent.knockbackVy = 0;
+        } else if (isKnockbackImmune) {
+          ent.vx = 0;
+          ent.vy = 0;
           ent.knockbackVx = 0;
           ent.knockbackVy = 0;
         } else if (isChanneling && !isFugaChanneling && ent.characterId !== 'eye_of_cthulhu' && ent.type !== 'eye_of_cthulhu') {

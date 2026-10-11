@@ -438,6 +438,17 @@ export const BASIC_ATTACK_SOUNDS = {
  * This is checked as a fallback when BASIC_ATTACK_SOUNDS[id] has no entry.
  */
 export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
+  // Shiro — Queen of Elkia (Chess Troop Flick)
+  'shiro': {
+    src: 'Assets/Sound Effects/Attacks/shurikenthrow.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
+  'sora': {
+    src: 'Assets/Sound Effects/Attacks/shurikenthrow.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
   // Naoya Zenin — 24 FPS Hypersonic Brawler Punches
   'naoya': {
     get src() {

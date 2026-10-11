@@ -5,6 +5,8 @@
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { getHandSize } from '../../core/config.js';
 
+const PLANT_VISUAL_SCALE = 0.92;
+
 // Pre-computed Sprite Frame Bounding Boxes
 export const PEASHOOTER_IDLE_RECTS = [
   { sx: 15,   sy: 218, sw: 370, sh: 358 },
@@ -616,6 +618,7 @@ export function drawPeashooter(ctx, peashooter) {
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Ground leaf base shadow
   ctx.beginPath();
@@ -669,6 +672,7 @@ export function drawSnowPea(ctx, snowpea) {
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Ground frost shadow
   ctx.beginPath();
@@ -821,6 +825,7 @@ export function drawWallnut(ctx, wallnut) {
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Ground soil shadow
   ctx.beginPath();
@@ -1149,6 +1154,7 @@ export function drawTorchwood(ctx, torchwood) {
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Warm ambient fire glow centered on the upper flaming crown (Zero shadowBlur - Rule 2.2)
   const glowRadius = r * 2.8;
@@ -1537,6 +1543,7 @@ export function drawPotatoMine(ctx, mine) {
 
   ctx.save();
   ctx.translate(x, y);
+  ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Ground dirt shadow
   ctx.beginPath();

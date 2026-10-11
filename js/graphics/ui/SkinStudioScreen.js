@@ -26,6 +26,7 @@ import { drawSukunaBody, _drawSukunaHair, _getSukunaHairImage } from '../fighter
 import { drawYujiSkin, _drawYujiHair, _getYujiHairImage } from '../fighters/yujiSkin.js';
 import { drawYutaSkin, _drawYutaHair, _getYutaHairImage } from '../fighters/yutaSkin.js';
 import { drawTojiSkin, _drawTojiHair, _getTojiHairImage } from '../fighters/tojiSkin.js';
+import { drawShiroSkin, _drawShiroHair, _getShiroHairImage, _drawShiroCrown, _getShiroCrownImage } from '../fighters/shiroSkin.js';
 import { drawTanjiroSkin } from '../fighters/tanjiroSkin.js';
 import { drawZenitsuSkin } from '../fighters/zenitsuSkin.js';
 import { drawNezukoSkin } from '../fighters/nezukoSkin.js';
@@ -70,10 +71,16 @@ if (state.studioSkinCategory === undefined) state.studioSkinCategory = 'ALL';
 if (state.studioSkinNamelessPart === undefined) state.studioSkinNamelessPart = 'overall';
 if (state.studioSkinAvatarPart === undefined) state.studioSkinAvatarPart = 'overall';
 if (state.studioSkinUryuPart === undefined) state.studioSkinUryuPart = 'hair';
+if (state.studioSkinShiroPart === undefined) state.studioSkinShiroPart = 'hair';
 
 export const URYU_PARTS = [
   { id: 'hair', label: '💇 HAIR', shortLabel: 'HAIR', fullLabel: 'QUINCY HAIR SILHOUETTE', asset: 'Assets/model/uryu/Ishida-hair.png', desc: 'Hair scale, shift & angle' },
   { id: 'glasses', label: '👓 GLASSES', shortLabel: 'GLASSES', fullLabel: 'EYE GLASSES FRAME', asset: 'Assets/model/uryu/Ishida-eye-glasses.png', desc: 'Glasses scale, shift & angle' }
+];
+
+export const SHIRO_PARTS = [
+  { id: 'hair', label: '💇 HAIR', shortLabel: 'HAIR', fullLabel: 'SHIRO HAIR SILHOUETTE', asset: 'Assets/model/shiro/shiro-hair.png', desc: 'Hair scale, shift & angle' },
+  { id: 'crown', label: '👑 CROWN', shortLabel: 'CROWN', fullLabel: 'ELKIA ROYAL CROWN', asset: 'Assets/model/shiro/shiro_crown.png', desc: 'Crown scale, shift & angle' }
 ];
 
 export const NAMELESS_DEITY_PARTS = [
@@ -120,6 +127,7 @@ let _copyToastTimer = 0;
 export const SKIN_STUDIO_CATEGORIES = [
   { id: 'ALL', label: 'ALL', filter: () => true },
   { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito', 'naoya', 'maki'].includes(f.key) },
+    { id: 'NGNL', label: 'NGNL', filter: (fighter) => fighter.key === 'shiro' },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
   { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu'].includes(f.key) }
@@ -317,6 +325,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     centerX: 686,
     topY: 136,
     themeColor: '#7D3224',
+    forms: [
+      { id: 'default', label: 'STANDARD' }
+    ]
+  },
+  {
+    key: 'shiro',
+    label: 'SHIRO',
+    asset: 'shiro-hair.png',
+    assetDims: '360 x 280',
+    baseW: 3.30,
+    baseH: 2.50,
+    baseCrownY: -1.40,
+    visW: 360,
+    visH: 280,
+    centerX: 180,
+    topY: 0,
+    themeColor: '#A855F7',
     forms: [
       { id: 'default', label: 'STANDARD' }
     ]
@@ -881,6 +906,24 @@ function generateJsCode(fDef, custom) {
            `const drawH = 1170 * scaleY;\n` +
            `const drawX = -686 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 136 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'shiro') {
+    if (state.studioSkinShiroPart === 'crown') {
+      return `// Calibrated Elkia Royal Crown for Shiro (Assets/model/shiro/shiro_crown.png)\n` +
+             `widthScale: ${wMult},\n` +
+             `heightScale: ${hMult},\n` +
+             `offsetX: ${offX},\n` +
+             `offsetY: ${offY},\n` +
+             `angleOffset: ${rot}`;
+    }
+    return `// Calibrated Hair for Shiro (Assets/model/shiro/shiro-hair.png)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const scaleX = targetHairWidth / 360;\n` +
+           `const scaleY = targetHairHeight / 280;\n` +
+           `const drawW = 360 * scaleX;\n` +
+           `const drawH = 280 * scaleY;\n` +
+           `const drawX = -180 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)}${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'nanami') {
     return `// Calibrated Hair for Nanami (Assets/model/nanami/Nanami-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
@@ -1199,13 +1242,19 @@ export function drawSkinStudioScreen() {
   const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
   const activeUryuPartDef = isUryu ? (URYU_PARTS.find(p => p.id === activeUryuPartId) || URYU_PARTS[0]) : null;
 
+  const isShiro = (fDef.key === 'shiro');
+  const activeShiroPartId = isShiro ? (state.studioSkinShiroPart || 'hair') : 'hair';
+  const activeShiroPartDef = isShiro ? (SHIRO_PARTS.find(p => p.id === activeShiroPartId) || SHIRO_PARTS[0]) : null;
+
   const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
     ? `nameless_deity_${activePartId}`
     : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
       ? `avatar_of_emptiness_${activeAvatarPartId}`
       : (isUryu && activeUryuPartId === 'glasses')
         ? 'uryu_glasses'
-        : fDef.key;
+        : (isShiro && activeShiroPartId === 'crown')
+          ? 'shiro_crown'
+          : fDef.key;
   const custom = ensureFighterCustom(activeCustomKey);
 
   // ── Tier 1: Header Section ──
@@ -1393,6 +1442,8 @@ export function drawSkinStudioScreen() {
         drawYutaSkin(ctx, dummyFighter);
       } else if (fDef.key === 'toji') {
         drawTojiSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'shiro') {
+        drawShiroSkin(ctx, dummyFighter);
       } else if (fDef.key === 'tanjiro') {
         drawTanjiroSkin(ctx, dummyFighter);
       } else if (fDef.key === 'zenitsu') {
@@ -1489,6 +1540,9 @@ export function drawSkinStudioScreen() {
       _drawYutaHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'toji') {
       _drawTojiHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'shiro') {
+      _drawShiroHair(ctx, baseRadius, isFacingLeft);
+      _drawShiroCrown(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'nanami') {
       _drawNanamiHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'mahito') {
@@ -1530,7 +1584,9 @@ export function drawSkinStudioScreen() {
       ? 0
       : (isUryu && activeUryuPartId === 'glasses')
         ? -baseRadius * 0.04
-        : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+        : (isShiro && activeShiroPartId === 'crown')
+          ? -baseRadius * 0.90
+          : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
     const handleCenterX = custom.offsetX;
     const handleCenterY = baseCrownY + custom.offsetY;
 
@@ -1836,6 +1892,46 @@ export function drawSkinStudioScreen() {
     });
   }
 
+  // ── Shiro Multi-Asset Part Selector Bar (Inside Viewport) ──
+  if (isShiro) {
+    const partBtnH = 20;
+    const partGapX = 8;
+    const partStartX = viewportX + 10;
+    const partBtnW = 100;
+    const startY = viewportY + 34;
+
+    SHIRO_PARTS.forEach((part, idx) => {
+      const isPartSelected = (activeShiroPartId === part.id);
+      const bx = partStartX + idx * (partBtnW + partGapX);
+      const by = startY;
+
+      ctx.save();
+      if (isPartSelected) {
+        ctx.fillStyle = '#3b0764';
+        ctx.strokeStyle = '#C084FC';
+        ctx.lineWidth = 1.8;
+      } else {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, bx, by, partBtnW, partBtnH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isPartSelected ? '#C084FC' : '#94a3b8';
+      ctx.font = isPartSelected ? '900 10px "Rajdhani", sans-serif' : '700 9.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(part.label, bx + partBtnW / 2, by + partBtnH / 2);
+      ctx.restore();
+
+      _registerButton(bx, by, partBtnW, partBtnH, () => {
+        state.studioSkinShiroPart = part.id;
+      });
+    });
+  }
+
   // ── Viewport Zoom Controls (Bottom of Viewport) ──
   const zoomY = viewportY + viewportH - 22;
   const zoomCenterX = heroX;
@@ -1997,6 +2093,15 @@ export function drawSkinStudioScreen() {
     ctx.fillText(`ACTIVE ASSET: [ ${activeAvatarPartDef.fullLabel} ]`, infoCardX + 8, infoCardY + 24);
     ctx.fillStyle = '#94a3b8';
     const displayPartAsset = activeAvatarPartDef.asset.length > 22 ? activeAvatarPartDef.asset.slice(0, 20) + '…' : activeAvatarPartDef.asset;
+    ctx.fillText(`ASSET: ${displayPartAsset}`, infoCardX + 8, infoCardY + 40);
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(`TARGET: ${activeCustomKey}`, infoCardX + 8, infoCardY + 56);
+  } else if (isShiro && activeShiroPartDef) {
+    ctx.fillText(`MODEL: ${fDef.label}`, infoCardX + 8, infoCardY + 8);
+    ctx.fillStyle = '#C084FC';
+    ctx.fillText(`ACTIVE ASSET: [ ${activeShiroPartDef.fullLabel} ]`, infoCardX + 8, infoCardY + 24);
+    ctx.fillStyle = '#94a3b8';
+    const displayPartAsset = activeShiroPartDef.asset.length > 22 ? activeShiroPartDef.asset.slice(0, 20) + '…' : activeShiroPartDef.asset;
     ctx.fillText(`ASSET: ${displayPartAsset}`, infoCardX + 8, infoCardY + 40);
     ctx.fillStyle = '#64748b';
     ctx.fillText(`TARGET: ${activeCustomKey}`, infoCardX + 8, infoCardY + 56);
@@ -3294,6 +3399,8 @@ if (typeof window !== 'undefined') {
       const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
       const isUryu = (fDef.key === 'uryu');
       const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
+      const isShiro = (fDef.key === 'shiro');
+      const activeShiroPartId = isShiro ? (state.studioSkinShiroPart || 'hair') : 'hair';
 
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
@@ -3301,7 +3408,9 @@ if (typeof window !== 'undefined') {
           ? `avatar_of_emptiness_${activeAvatarPartId}`
           : (isUryu && activeUryuPartId === 'glasses')
             ? 'uryu_glasses'
-            : fDef.key;
+            : (isShiro && activeShiroPartId === 'crown')
+              ? 'shiro_crown'
+              : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       // Local hero coordinate space
@@ -3312,7 +3421,9 @@ if (typeof window !== 'undefined') {
         ? 0
         : (isUryu && activeUryuPartId === 'glasses')
           ? -baseRadius * 0.04
-          : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+          : (isShiro && activeShiroPartId === 'crown')
+            ? -baseRadius * 0.90
+            : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
       const handleCenterX = custom.offsetX;
       const handleCenterY = baseCrownY + custom.offsetY;
 
@@ -3395,6 +3506,8 @@ if (typeof window !== 'undefined') {
       const activeAvatarPartId = isAvatarOfEmptiness ? (state.studioSkinAvatarPart || 'overall') : 'overall';
       const isUryu = (fDef.key === 'uryu');
       const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
+      const isShiro = (fDef.key === 'shiro');
+      const activeShiroPartId = isShiro ? (state.studioSkinShiroPart || 'hair') : 'hair';
 
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
@@ -3402,7 +3515,9 @@ if (typeof window !== 'undefined') {
           ? `avatar_of_emptiness_${activeAvatarPartId}`
           : (isUryu && activeUryuPartId === 'glasses')
             ? 'uryu_glasses'
-            : fDef.key;
+            : (isShiro && activeShiroPartId === 'crown')
+              ? 'shiro_crown'
+              : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       const localX = (mx - heroX) / currentScale;
@@ -3411,7 +3526,9 @@ if (typeof window !== 'undefined') {
         ? 0
         : (isUryu && activeUryuPartId === 'glasses')
           ? -baseRadius * 0.04
-          : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+          : (isShiro && activeShiroPartId === 'crown')
+            ? -baseRadius * 0.90
+            : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
 
       if (isDraggingHairCenter) {
         custom.offsetX = Math.round(localX);

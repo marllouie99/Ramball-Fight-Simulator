@@ -1,0 +1,1 @@
+export const ARENA_TILE_COUNT = 8;

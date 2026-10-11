@@ -4,6 +4,7 @@
 
 import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
+import { ARENA_TILE_COUNT } from './arenaTileGrid.js';
 import { _registerButton, drawChamferedRect, drawPanel, fitSingleLineText, wrapText } from '../graphics/ui/uiFramework.js';
 import { getOrCreateGrassFloorCanvas } from '../graphics/renderers/grassFloorRenderer.js';
 import { getOrCreateSandBeachFloorCanvas } from '../graphics/renderers/sandBeachFloorRenderer.js';
@@ -21,7 +22,6 @@ export const ARENA_FLOORS = [
     shortName: 'NO TILES',
     icon: '🚫',
     themeColor: '#64748b',
-    gridSize: 76.6,
     features: 'CLEAN RING • NO TILES / NO GRID',
     desc: 'Pure clean minimalist fighting ring with a solid backdrop and zero floor tiles, grid lines, or ground sprites.'
   },
@@ -31,9 +31,8 @@ export const ARENA_FLOORS = [
     shortName: 'PIXEL CLEAN',
     icon: '⚪',
     themeColor: '#64748b',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Esports-grade minimalist pixel arena with 8-bit stepped corner brackets and discrete intersection crosshairs.'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 Esports-grade minimalist pixel arena with 8-bit stepped corner brackets and discrete intersection crosshairs.'
   },
   {
     id: 'pvz_grass',
@@ -41,9 +40,8 @@ export const ARENA_FLOORS = [
     shortName: 'PVZ LAWN',
     icon: '🌱',
     themeColor: '#22c55e',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Authentic Plants vs. Zombies front lawn with 6 columns and 6 rows of sprite tiles (daisies, solar sunbeams, dirt paths).'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 Authentic Plants vs. Zombies front lawn with 8 columns and 8 rows of sprite tiles (daisies, solar sunbeams, dirt paths).'
   },
   {
     id: 'clash_arena',
@@ -51,9 +49,8 @@ export const ARENA_FLOORS = [
     shortName: 'CLASH',
     icon: '⚔️',
     themeColor: '#f59e0b',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Royal battle turf bounded by heavy pixel slate pauldron blocks, 16-bit golden bolt rivets, and emerald grass tufts.'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 Royal battle turf bounded by heavy pixel slate pauldron blocks, 16-bit golden bolt rivets, and emerald grass tufts.'
   },
   {
     id: 'checker_arcade',
@@ -61,9 +58,8 @@ export const ARENA_FLOORS = [
     shortName: 'CHECKER',
     icon: '🏁',
     themeColor: '#8b5cf6',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 High-contrast 16-bit retro arcade checkerboard with 3D stepped beveled rims on every tile, specular highlights, and studs.'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 High-contrast 16-bit retro arcade checkerboard with 3D stepped beveled rims on every tile, specular highlights, and studs.'
   },
   {
     id: 'cyber_grid',
@@ -71,9 +67,8 @@ export const ARENA_FLOORS = [
     shortName: 'CYBER',
     icon: '🌐',
     themeColor: '#06b6d4',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Deep obsidian void arena with glowing neon cyan pixel tracks, 8-bit diamond intersection nodes, and PCB traces.'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 Deep obsidian void arena with glowing neon cyan pixel tracks, 8-bit diamond intersection nodes, and PCB traces.'
   },
   {
     id: 'stone_dungeon',
@@ -81,9 +76,8 @@ export const ARENA_FLOORS = [
     shortName: 'DUNGEON',
     icon: '🧱',
     themeColor: '#78716c',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Authentic carved dungeon stone tiles with 6 discrete sprite variants, iron sewer grates, mossy slabs, and rubble masonry.'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 Authentic carved dungeon stone tiles with 6 discrete sprite variants, iron sewer grates, mossy slabs, and rubble masonry.'
   },
   {
     id: 'tatami_dojo',
@@ -91,9 +85,8 @@ export const ARENA_FLOORS = [
     shortName: 'TATAMI',
     icon: '🥋',
     themeColor: '#d97706',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Traditional martial arts dojo with discrete woven straw reed striations, deep indigo cloth borders, and pixel cross-stitches.'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 Traditional martial arts dojo with discrete woven straw reed striations, deep indigo cloth borders, and pixel cross-stitches.'
   },
   {
     id: 'sand_beach',
@@ -101,9 +94,8 @@ export const ARENA_FLOORS = [
     shortName: 'SAND BEACH',
     icon: '🏖️',
     themeColor: '#f59e0b',
-    gridSize: 76.6,
-    features: '6x6 TILES • 6 COLS x 6 ROWS',
-    desc: '6x6 Authentic tropical sand tiles with 6 discrete sprite variants, pixel beach pebbles, sunlit dunes, and seamless interlocking.'
+    features: '8x8 TILES • 8 COLS x 8 ROWS',
+    desc: '8x8 Authentic tropical sand tiles with 6 discrete sprite variants, pixel beach pebbles, sunlit dunes, and seamless interlocking.'
   },
   {
     id: 'end_stone',
@@ -111,8 +103,7 @@ export const ARENA_FLOORS = [
     shortName: 'END STONE',
     icon: '🟨',
     themeColor: '#ca8a04',
-    gridSize: 76.6,
-    features: '6x6 TILES • MINECRAFT THEME',
+    features: '8x8 TILES • MINECRAFT THEME',
     desc: 'Authentic 16-bit Minecraft End Stone terrain with pale yellowish-tan cobblestone texture and dark olive pitting.'
   },
   {
@@ -121,8 +112,7 @@ export const ARENA_FLOORS = [
     shortName: 'END BRICKS',
     icon: '🧱',
     themeColor: '#ca8a04',
-    gridSize: 76.6,
-    features: '6x6 TILES • MINECRAFT BRICKS',
+    features: '8x8 TILES • MINECRAFT BRICKS',
     desc: 'Authentic 16-bit Minecraft End Stone Bricks masonry with pale cream brick courses, dark olive mortar grooves, and seamless bond.'
   },
   {
@@ -131,8 +121,7 @@ export const ARENA_FLOORS = [
     shortName: 'STONE SLABS',
     icon: '🪨',
     themeColor: '#64748b',
-    gridSize: 76.6,
-    features: '6x6 TILES • 2 PURE STONE TILES',
+    features: '8x8 TILES • 2 PURE STONE TILES',
     desc: 'Weathered flagstone cobblestones and 4-square carved stone paver slabs with zero grass, deep mortar grooves, and seamless interlocking.'
   }
 ];
@@ -216,9 +205,8 @@ export function getActiveArenaFloorDef() {
 export function getTileGridInfo(arena) {
   arena = arena || (typeof state !== 'undefined' && state.arena) || { x: 0, y: 0, width: 460, height: 460 };
   const floorDef = getActiveArenaFloorDef();
-  const targetTileSize = floorDef.gridSize || 76.6;
-  const cols = Math.max(2, Math.round(arena.width / targetTileSize));
-  const rows = Math.max(2, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = arena.width / cols;
   const cellH = arena.height / rows;
 
@@ -228,7 +216,7 @@ export function getTileGridInfo(arena) {
     cellW,
     cellH,
     totalTiles: cols * rows,
-    tileSize: targetTileSize,
+    tileSize: Math.min(cellW, cellH),
     floorDef
   };
 }
@@ -967,9 +955,8 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
   oc.imageSmoothingEnabled = false;
 
   const floorDef = ARENA_FLOORS.find(f => f.id === floorId) || ARENA_FLOORS[0];
-  const targetTileSize = floorDef.gridSize || 76.6;
-  const cols = arena.cols || Math.max(2, Math.round(arena.width / targetTileSize));
-  const rows = arena.rows || Math.max(2, Math.round(arena.height / targetTileSize));
+  const cols = ARENA_TILE_COUNT;
+  const rows = ARENA_TILE_COUNT;
   const cellW = width / cols;
   const cellH = height / rows;
 

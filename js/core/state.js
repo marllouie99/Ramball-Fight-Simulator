@@ -454,7 +454,7 @@ export const state = {
   fpsLastTime: 0,
   fpsLogs: [],
   allFpsLogs: [],
-  hideFpsLogs: localStorage.getItem('hideFpsLogs') === 'true',
+  hideFpsLogs: (typeof localStorage !== 'undefined') && localStorage.getItem('hideFpsLogs') === 'true',
   performanceMode: false,
   frameAudioTime: 0,
 
