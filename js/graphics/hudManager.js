@@ -30,6 +30,17 @@ export function getFighterDisplayName(fighter, uppercase = true) {
 }
 
 /**
+ * Formats a fighter's display name for DOM elements, styling Japanese corner brackets 『...』
+ * (e.g. 『SHIRO』) with dedicated CSS classes so 『 sits at top-left and 』 sits at bottom-right.
+ */
+export function formatFighterNameHTML(name) {
+  if (!name || typeof name !== 'string') return name || '';
+  const match = name.match(/^[『「](.+)[』」]$/);
+  if (!match) return name;
+  return `<span class="kuhaku-bracket kuhaku-bracket-left">『</span><span class="kuhaku-inner-name">${match[1]}</span><span class="kuhaku-bracket kuhaku-bracket-right">』</span>`;
+}
+
+/**
  * Checks if the screen is currently dimmed by an active Domain Expansion (or active non-Purple ultimate strike).
  * Strictly excludes skill channeling / windup phases, and excludes Hollow Purple per explicit requirements.
  */
@@ -207,6 +218,7 @@ const BOSS_SUB_NAMES = {
   dummy: 'Unbreakable Target',
   targetdummy: 'Unbreakable Target',
   doppleganger: 'Mirror Phantom',
+  shiro: 'Queen of Elkia 『　　』',
 };
 
 /**
@@ -1084,7 +1096,14 @@ function updateTacticalCard(cardObj, f, index, accentColor) {
 
   // 1. Operator Name
   if (cardObj.nameEl) {
-    if (cardObj.nameEl.textContent !== name) cardObj.nameEl.textContent = name;
+    if (cardObj.lastCardName !== name) {
+      if (typeof name === 'string' && name.includes('『')) {
+        cardObj.nameEl.innerHTML = formatFighterNameHTML(name);
+      } else {
+        cardObj.nameEl.textContent = name;
+      }
+      cardObj.lastCardName = name;
+    }
     if (cardObj.nameEl.style.color !== fighterColor) cardObj.nameEl.style.color = fighterColor;
   }
 
@@ -1597,6 +1616,23 @@ function updateHealthHud() {
     } else if (f.characterId === 'crazydave' || f.type === 'crazydave' || f._def?.id === 'crazydave' || f._def?.type === 'crazydave' || f.isCrazyDave) {
       const sun = Math.max(0, Math.round(f.sunCount || 0));
       info.push(`<b>$UN:</b> ${sun}`);
+    } else if (f.characterId === 'shiro' || f.type === 'shiro' || fType === 'shiro' || (f.name && f.name.toLowerCase().includes('shiro')) || (f.displayName && f.displayName.includes('SHIRO'))) {
+      const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.shiro || CONFIG.Shiro)) ? (CONFIG.shiro || CONFIG.Shiro) : {};
+      const baseDmg = f.damage || cfg.damage || 24;
+      if (f.blankActiveTimer > 0) {
+        const mult = cfg.blankBuffDamageMultiplier || 1.35;
+        const boostDmg = Math.round(baseDmg * mult) - baseDmg;
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
+      let troopCount = 0;
+      if (Array.isArray(f.activeMinions)) {
+        troopCount = f.activeMinions.filter(m => m && !m.dead && !m.isDead && (m.hp === undefined || m.hp > 0)).length;
+      } else if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+        troopCount = state.fighters.filter(other => other && (other.owner === f || other.owner === f.fighterIndex) && (other.isChessTroop || other.isChessMinion) && !other.dead && !other.isDead && (other.hp || 0) > 0).length;
+      }
+      info.push(`<b>Troops:</b> ${troopCount}`);
     } else if (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || fType === 'namelessdeity' || fType === 'nameless_deity') {
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : {};
       const baseDmg = Math.round(cfg.damage || 14);
@@ -2343,7 +2379,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>') || line.includes('<b>$UN:</b>') || line.includes('<b>SUN:</b>') || line.includes('<b>Plants:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>') || line.includes('<b>$UN:</b>') || line.includes('<b>SUN:</b>') || line.includes('<b>Plants:</b>') || line.includes('<b>Troops:</b>'));
     }
     if (info.length === 0) return '';
     
@@ -3153,7 +3189,11 @@ function updateHealthHud() {
           const defaultNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : '#ffffff') : '#000000';
           const memberThemeColor = getFighterThemeColor(fighter, defaultNameColor);
           if (m.lastMemberName !== currentName) {
-            m.nameEl.textContent = currentName;
+            if (typeof currentName === 'string' && currentName.includes('『')) {
+              m.nameEl.innerHTML = formatFighterNameHTML(currentName);
+            } else {
+              m.nameEl.textContent = currentName;
+            }
             m.lastMemberName = currentName;
           }
           if (m.lastMemberColor !== memberThemeColor) {

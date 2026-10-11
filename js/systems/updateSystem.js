@@ -184,11 +184,15 @@ export function updateGame() {
       state.roundEndTimer++;
 
       // Auto next round / match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Full Respect BGM playback)
-      const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && (e.isEnderDragonDeath || (e.isEnderDragonXPOrb && !e.isSettled))));
-      const isSansDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter && (e.timer > -40 || (e.speechBubble && e.speechBubble.timer > 0))));
+      const isDragonDying = Boolean(state._hadDragonDeath || (state.deathEffects && state.deathEffects.some(e => e && (e.isEnderDragonDeath || (e.isEnderDragonXPOrb && !e.isSettled)))));
+      const isSansDying = Boolean(state._hadSansDeath || (state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter)));
       const isRespectPlaying = Boolean(state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active));
       const hasOverlay = Boolean(state._hadMissionOverlay || isRespectPlaying || (state.wastedOverlay && state.wastedOverlay.active));
-      const autoDelay = isRespectPlaying ? 620 : (hasOverlay ? 480 : (isDragonDying ? 340 : (isSansDying ? 260 : 180)));
+      const isShiroDyingOrWinning = Boolean(
+        state._shiroVictoryShutdown ||
+        (state.fighters && state.fighters.some(f => f && (f.characterId === 'shiro' || f.type === 'shiro') && (f._hasSaidWinQuote || f.dead || f.hp <= 0)))
+      );
+      const autoDelay = isRespectPlaying ? 620 : (hasOverlay ? 480 : (isDragonDying ? 340 : (isSansDying ? 340 : (isShiroDyingOrWinning ? 380 : 180))));
       const isTodoUltPlaying = Boolean(state.fighters && state.fighters.some(f => 
         f && (f.characterId === 'todo' || f.type === 'todo') &&
         f.hp > 0 && !f.isDead && !f.dead &&
@@ -214,8 +218,8 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.matchEndTimer++;
 
-      const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && (e.isEnderDragonDeath || (e.isEnderDragonXPOrb && !e.isSettled))));
-      const isSansDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter && (e.timer > -40 || (e.speechBubble && e.speechBubble.timer > 0))));
+      const isDragonDying = Boolean(state._hadDragonDeath || (state.deathEffects && state.deathEffects.some(e => e && (e.isEnderDragonDeath || (e.isEnderDragonXPOrb && !e.isSettled)))));
+      const isSansDying = Boolean(state._hadSansDeath || (state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter)));
       const isRespectPlaying = Boolean(state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active));
       const hasOverlay = Boolean(state._hadMissionOverlay || isRespectPlaying || (state.wastedOverlay && state.wastedOverlay.active));
       const isNamelessBeamActive = Boolean(state.fighters && state.fighters.some(f => 
@@ -226,7 +230,11 @@ export function updateGame() {
       // Match End: allow all death animations, particles, blood scars and celebrations to play naturally without clearing
 
       // Auto next match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Full Respect BGM playback)
-      const matchEndAutoDelay = isRespectPlaying ? 640 : (hasOverlay ? 600 : (isDragonDying ? 360 : (isSansDying ? 280 : 210)));
+      const isShiroDyingOrWinning = Boolean(
+        state._shiroVictoryShutdown ||
+        (state.fighters && state.fighters.some(f => f && (f.characterId === 'shiro' || f.type === 'shiro') && (f._hasSaidWinQuote || f.dead || f.hp <= 0)))
+      );
+      const matchEndAutoDelay = isRespectPlaying ? 640 : (hasOverlay ? 600 : (isDragonDying ? 360 : (isSansDying ? 360 : (isShiroDyingOrWinning ? 400 : 210))));
       const isTodoUltPlaying = Boolean(state.fighters && state.fighters.some(f => 
         f && (f.characterId === 'todo' || f.type === 'todo') &&
         f.hp > 0 && !f.isDead && !f.dead &&

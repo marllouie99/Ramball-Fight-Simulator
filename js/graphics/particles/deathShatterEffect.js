@@ -567,6 +567,7 @@ export function spawnMachineCorpse(x, y, angle) {
 export function spawnSansHeartShatterDeath(fighter) {
   if (!fighter) return null;
   if (!state.deathEffects) state.deathEffects = [];
+  if (typeof state !== 'undefined') state._hadSansDeath = true;
 
   const x = fighter.x || 0;
   const y = fighter.y || 0;
@@ -600,6 +601,7 @@ export function spawnSansHeartShatterDeath(fighter) {
 }
 
 export function spawnEnderDragonDisintegrationDeath(fighter) {
+  if (typeof state !== 'undefined') state._hadDragonDeath = true;
   triggerGlobalScreenShake(14, 40);
   if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
     audioSystem.playSFX('Assets/Sound Effects/Skills/purpledeploy.mp3', 0.9);

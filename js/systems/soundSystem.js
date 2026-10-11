@@ -1000,6 +1000,19 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
   // Frequent combat sounds (hits, swings, slashes, summons) enforce a 20ms minimum gap (just over 1 frame at 60fps)
   // to avoid same-frame audio doubling while guaranteeing rapid consecutive strikes play instantly
   const srcLower = String(src).toLowerCase();
+
+  // Single-instance deduplication: strictly only 1 instance of Shiro troop buff voiceline can play at a time (avoid dupes)
+  if (srcLower.includes('shiro_troop_buff_voiceline')) {
+    for (const handle of _activeSoundHandles) {
+      if (handle && handle.src && String(handle.src).toLowerCase().includes('shiro_troop_buff_voiceline')) {
+        return null; // Already playing! Strictly block concurrent duplicate audio!
+      }
+    }
+    if (now - lastTime < 2500) {
+      return null; // Enforce minimum 2.5s gap between plays to avoid dupes
+    }
+  }
+
   const isCombatSound = srcLower.includes('fleshhit') || srcLower.includes('sword') || srcLower.includes('slash') || srcLower.includes('illusion') || srcLower.includes('hit') || srcLower.includes('punch') || srcLower.includes('smash');
   const minInterval = isCombatSound ? 20 : 15;
 

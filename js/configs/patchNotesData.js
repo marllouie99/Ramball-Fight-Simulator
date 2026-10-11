@@ -30,25 +30,44 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "CRAZYDAVE",
+        "character": "SANS",
         "deltas": [
             {
-                "type": "BUFF",
-                "key": "lawnmowerBaselineOffset",
-                "oldVal": 2,
-                "newVal": 16,
-                "pct": "+700.0%"
+                "type": "NERF",
+                "key": "basicBoneCooldown",
+                "oldVal": 50,
+                "newVal": 80,
+                "pct": "+60.0%"
             }
         ]
     },
     {
-        "character": "EYEOFCTHULHU",
+        "character": "SHIRO",
         "deltas": [
             {
                 "type": "ADJUST",
                 "key": "displayName",
-                "oldVal": "Eye of Cthulhu",
-                "newVal": "EOC",
+                "oldVal": "Shiro",
+                "newVal": "『SHIRO』",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "throwSpeed",
+                "oldVal": "10.0",
+                "newVal": "15.0",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "SORA",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "displayName",
+                "oldVal": "Shiro",
+                "newVal": "『SHIRO』",
                 "pct": "Mod"
             }
         ]

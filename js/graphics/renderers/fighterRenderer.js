@@ -150,8 +150,20 @@ export class FighterRenderer {
   }
 
   static drawStatusOverlays(ctx, fighter) {
+    if (!fighter) return;
     const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
     fighter._statusOverlaysRenderedFrame = currentFrame;
+
+    if (
+      fighter.suppressDebuffs ||
+      fighter.suppressStatusOverlays ||
+      fighter.isChessTroop ||
+      fighter.isChessMinion ||
+      fighter.isChessPiece ||
+      fighter.characterId?.startsWith('chess_')
+    ) {
+      return;
+    }
 
     const baseRadius = fighter.r;
     
@@ -163,6 +175,11 @@ export class FighterRenderer {
     const isMatchEnded = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) || Boolean(fighter._isWinnerReveal);
     const hasCustomHitFlash = Boolean(
       fighter.customHitFlash ||
+      fighter.suppressHitFlash ||
+      fighter.isChessTroop ||
+      fighter.isChessMinion ||
+      fighter.isChessPiece ||
+      fighter.characterId?.startsWith('chess_') ||
       fighter.isPlant ||
       fighter.isPlantMinion ||
       fighter.isTurret ||
@@ -321,7 +338,19 @@ export class FighterRenderer {
   }
 
   static drawFreezeTimer(ctx, fighter) {
-    if (fighter._suppressFreezeTimer || fighter.isTargetOfAmbush || fighter.isChainedByMakima || fighter.suppressFreezeOverlay) return;
+    if (!fighter) return;
+    if (
+      fighter._suppressFreezeTimer ||
+      fighter.suppressFreezeTimer ||
+      fighter.suppressDebuffs ||
+      fighter.isChessTroop ||
+      fighter.isChessMinion ||
+      fighter.isChessPiece ||
+      fighter.characterId?.startsWith('chess_') ||
+      fighter.isTargetOfAmbush ||
+      fighter.isChainedByMakima ||
+      fighter.suppressFreezeOverlay
+    ) return;
     if (!fighter._timeStopStartTime || !fighter._timeStopOriginalDuration) return;
     
     ctx.save();

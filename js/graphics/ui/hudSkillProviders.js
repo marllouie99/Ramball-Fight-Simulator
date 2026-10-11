@@ -2422,6 +2422,56 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
+  // ─────────────────────────────────────────────
+  // SHIRO (Elkia Queen / 『　　』 Blank)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'shiro' || f.type === 'shiro' || (f.name && f.name.toLowerCase().includes('shiro')) || (f.displayName && f.displayName.includes('SHIRO'))) {
+    const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.shiro || CONFIG.Shiro)) ? (CONFIG.shiro || CONFIG.Shiro) : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#8B5CF6';
+    const skills = [];
+
+    // 1. Passive 3 / Signature Skill: 『　　』 (Blank) Never Loses & Prediction
+    if (isSkillEnabled(cfg.enableBlankNeverLoses, true)) {
+      const blankMax = f.blankCooldownMax || cfg.blankCooldown || 480;
+      const blankCd = f.blankCooldown !== undefined ? f.blankCooldown : 0;
+      const blankActive = f.blankActiveTimer || 0;
+      const totalActive = f.blankActiveMaxTimer || cfg.blankBuffDuration || 240;
+      let blankPct = 0;
+      let isReady = false;
+      let label = '『　　』 PREDICTION';
+
+      if (blankActive > 0) {
+        // Active Duration Phase: Bar properly drains from 100% down to 0%
+        blankPct = Math.max(0, Math.min(100, (blankActive / totalActive) * 100));
+        isReady = false;
+        label = `『　　』 ACTIVE (${(blankActive / 60).toFixed(1)}s)`;
+      } else if (f.blankWindupTimer > 0) {
+        // Windup / Voiceline Phase (0:00:02): Bar pulses at 100% ready while Shiro speaks voiceline
+        blankPct = 100;
+        isReady = true;
+        label = `『　　』 PREDICTING... (${(f.blankWindupTimer / 60).toFixed(1)}s)`;
+      } else {
+        // Cooldown / Charging Phase: Bar fills up from 0% to 100%
+        blankPct = Math.max(0, Math.min(100, (1 - (blankCd / blankMax)) * 100));
+        isReady = blankPct >= 99 && blankCd <= 0;
+        label = '『　　』 PREDICTION';
+      }
+
+      skills.push({
+        id: 'blank_prediction',
+        pct: blankPct,
+        ready: isReady,
+        color: themeColor,
+        label: label,
+        isSignature: true,
+        signature: true,
+        isUltimate: true
+      });
+    }
+
+    return skills;
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
     return [];
   }
@@ -2506,7 +2556,8 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     nameless: ['supercluster', 'mandala', 'STAR MANDALA', 'destroyer', 'NAMELESS DESTROYER'],
     avatarofemptiness: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
     avatar_of_emptiness: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
-    avatar: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES']
+    avatar: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
+    shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction']
   };
 
   const keys = signatureMap[fId];

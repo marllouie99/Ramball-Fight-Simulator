@@ -70,7 +70,7 @@ export const sansConfig = {
   basicBoneDamage: 8,          // Balanced poke damage (8 + KR)
   basicBoneSpeed: 8.5,
   basicBoneReach: 420,
-  basicBoneCooldown: 50,       // Rapid chip barrage
+  basicBoneCooldown: 80,       // Rapid chip barrage
 
   // Skill 1: Gaster Blaster Arsenal (3 Authentic Undertale Patterns)
   enableGasterBlaster: true,

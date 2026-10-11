@@ -11,7 +11,7 @@ export const shiroConfig = {
   },
 
   name: 'Shiro',
-  displayName: 'Shiro',
+  displayName: '『SHIRO』',
   // Base Attributes (Rule 24 Standard Humanoid Radius)
   hp: 340,
   maxHp: 340,
@@ -41,13 +41,68 @@ export const shiroConfig = {
   centerPoiseReduction: 0.20, // 20% super-armor / knockback reduction in center
   chessboardGridDuration: 300, // 5.0s (300 frames)
 
+  // ──────────────────────────────────────────
+  // DISBOARD CHESSBOARD ANIMATION FRAMES CONFIG
+  // ──────────────────────────────────────────
+  chessboard: {
+    // 1. Assembly & Appear Animation Frames
+    assembleDuration: 120, // Duration in game frames for full 8x8 tile assembly sequence (~0.66s at 60 FPS)
+    fadeInSpeed: 0.12, // Alpha opacity increment per frame during turn-on
+    fadeOutSpeed: 0.10, // Alpha opacity decrement per frame after complete shutdown
+    tileDropDistance: 24, // Vertical pixel drop height during digital landing
+    tileDropDurationRatio: 0.25, // Relative progression duration per individual tile landing
+
+    // 2. CRT TV / Console Power-Off Shutdown Animation Frames
+    shutdownDuration: 50, // Duration in game frames for CRT power-off collapse (~0.46s at 60 FPS)
+    shutdownPhase1Ratio: 0.45, // Vertical squash duration ratio [0.0 -> 0.45] (Phase 1: ~12.6 frames)
+    shutdownPhase2Ratio: 0.80, // Horizontal collapse into dot ratio [0.45 -> 0.80] (Phase 2: ~9.8 frames)
+    shutdownFadeThreshold: 0.85, // Phosphor dot dissipation threshold [0.85 -> 1.0] (Phase 3: ~5.6 frames)
+
+    // 3. Scanline, Noise & CRT Visual Effects Timing
+    scanlineSpeed: 14.0, // Scanline vertical scroll speed multiplier
+    scanlineSpacing: 3, // Scanline vertical pixel spacing
+    scanlineAlpha: 0.08, // Scanline darkness opacity
+    staticNoiseIntensity: 0.06, // CRT screen static jitter strength
+    staticNoiseBars: 6, // Number of concurrent horizontal noise interference bars
+    scanBeamSpeed: 75.0, // Rolling hologram scan-beam vertical speed (px/sec)
+    scanBeamHeight: 50, // Height of moving laser scan-beam gradient
+    scanBeamAlpha: 0.14, // Core opacity of hologram scan-beam
+    snapBracketLength: 8, // Length of 4-corner snap brackets on tile landing
+    snapFlashLineWidth: 2.4, // Stroke width of tile landing impact flash
+    threatPulseSpeed: 3.5, // Red threat tile pulse rate
+    maxAlpha: 1.0 // Maximum board opacity
+  },
+
   // Passive 2: Loaded Dice & Probability Pity System
   enableLoadedDice: true,
   pityThreshold: 4, // Guaranteed Rook or Queen every 4th basic attack throw
 
   // Passive 3: 『　　』 (Blank) Never Loses & Prediction
-  predictionBonusDmg: 0.20, // +20% bonus damage on Check! status
-  predictionDebuffDuration: 180, // 3.0s
+  enableBlankNeverLoses: true,
+  blankCooldown: 1000, // Cooldown in frames (~8.0s at 60 FPS) between Blank Never Loses activations
+  blankInitialCooldown: 1000, // Initial startup delay (2.0s) so it activates promptly after initial troop throws
+  blankBuffDuration: 500, // 4.0s duration of the golden empowered troop buff
+  blankBuffDamageMultiplier: 1.35, // +35% bonus damage on all piece strikes while buffed
+  predictionBonusDmg: 0.25, // +25% bonus damage on Check! status
+  predictionDebuffDuration: 180, // 3.0s duration for Check! debuff
+  blankVoicelineDuration: 120, // 2.0s duration (120 frames at 60 FPS, 0:00:02) for the troop buff voiceline
+
+  // ──────────────────────────────────────────
+  // CHESS TROOP TIMING & PAUSE FRAMES CONFIG
+  // ──────────────────────────────────────────
+  troopTiming: {
+    telegraphDuration: 10, // Frames the troop pauses & flashes its threat tile before moving (~0.36s at 60 FPS)
+    summonDuration: 40, // Frames the troop ascends/materializes onto its square on initial landing (~0.66s)
+    postSummonPause: 30, // Idle pause frames after summoning before the troop can make its first move (~0.50s)
+    postAttackCooldown: 40, // Cooldown pause frames on a piece after completing a move before it can move again (~0.66s)
+    turnCooldown: 5 // Global delay frames between separate piece turns (1-by-1 grandmaster cadence)
+  },
+  // Top-level aliases for direct access:
+  troopTelegraphDuration: 22,
+  troopSummonDuration: 40,
+  troopPostSummonPause: 30,
+  troopPostAttackCooldown: 40,
+  turnCooldown: 5, // Authentic chess 1-by-1 turn cadence between piece moves
 
   // Basic Attack: RNG Chess Troop Gacha Throw (Zero Active Skills)
   enableChessTroops: true,
@@ -56,24 +111,23 @@ export const shiroConfig = {
   projectileRadius: 6, // Small compact projectile collision radius during flight (distinct from planted troop size)
   projectileScale: 0.45, // Visual scale multiplier for small flying projectile pieces
   basicAttackCooldown: 200, // Deliberate Grandmaster Turn Cadence (~1.25s)
-  maxActiveMinions: 16, // Max 4 concurrent living chess troops permanently defending tiles
+  maxActiveMinions: 16, // Max concurrent living chess troops defending tiles
   minionPermanent: true, // Troops stay indefinitely until destroyed by enemy attacks
-  turnCooldown: 10, // Authentic chess 1-by-1 turn cadence between piece moves
 
   // Weighted Gacha Drop Rates
   dropRates: {
     pawn: 0.50,    // 50% Common
-    knight: 0.20,  // 20% Uncommon
-    bishop: 0.15,  // 15% Uncommon
-    rook: 0.10,    // 10% Rare
-    queen: 0.05    // 5% Jackpot
+    knight: 0.50,  // 20% Uncommon
+    bishop: 0.50,  // 15% Uncommon
+    rook: 0.50,    // 10% Rare
+    queen: 0.50    // 5% Jackpot
   },
 
   // Troop Specific Tuning (All troop movement & throw speeds set to 10)
   troops: {
     pawn: {
       name: 'Pawn',
-      throwSpeed: 10.0,
+      throwSpeed: 15.0,
       projSpeed: 15.0,
       moveSpeed: 15.0,
       moveDuration: 10,
@@ -83,7 +137,12 @@ export const shiroConfig = {
       radius: 15,
       captureRange: 48,
       captureDmg: 14,
-      captureStun: 10
+      captureStun: 10,
+      aoeRadius: 46,
+      aoeDmg: 14,
+      aoeStun: 10,
+      screenShakeIntensity: 2.5,
+      screenShakeDuration: 6
     },
     knight: {
       name: 'Knight',
@@ -174,6 +233,7 @@ export const shiroConfig = {
     // 3. Chessboard Appear & Shutdown
     boardAppear: 'Assets/Sound Effects/Shiro/shiro_chessboard_turnon.mp3',
     boardShutdown: 'Assets/Sound Effects/Shiro/LightFlickerOff.ogg',
+    boardShutdownVoiceline: 'Assets/Sound Effects/Shiro/shiro_chessboard_shutdown_voiceline.mp3',
 
     // 4. Knight Spawn Shockwaves
     knightSlam: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
@@ -182,7 +242,14 @@ export const shiroConfig = {
     queenSlam: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
 
     // 6. Rook Fortress Ram Impact
-    rookRam: 'Assets/Sound Effects/Attacks/groundSmash.mp3'
+    rookRam: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+
+    // 7. Passive 3: Blank Never Loses Buff Chime & Voiceline
+    blankBuff: 'Assets/Sound Effects/Shiro/BookSynthFirstTier.ogg',
+    blankVoiceline: 'Assets/Sound Effects/Shiro/shiro_troop_buff_voiceline.mp3',
+
+    // 8. Troop Destroyed / Shattered SFX
+    troopDestroyed: 'Assets/Sound Effects/Shiro/PermafrostKeepSealMine1.ogg'
   },
 
   // Audio Volume Normalization & Acoustic Balancing
@@ -191,9 +258,13 @@ export const shiroConfig = {
     troopMove: 0.85,
     boardAppear: 4.85,
     boardShutdown: 4.85,
+    boardShutdownVoiceline: 1.0,
     knightSlam: 0.95,
     queenSlam: 1.0,
     rookRam: 0.90,
+    blankBuff: 0.90,
+    blankVoiceline: 1.0,
+    troopDestroyed: 0.90,
     fleshHit: 0.80
   },
   audioVolumes: {
@@ -201,9 +272,13 @@ export const shiroConfig = {
     troopMove: 0.85,
     boardAppear: 0.85,
     boardShutdown: 0.85,
+    boardShutdownVoiceline: 1.0,
     knightSlam: 0.95,
     queenSlam: 1.0,
     rookRam: 0.90,
+    blankBuff: 0.90,
+    blankVoiceline: 1.0,
+    troopDestroyed: 0.90,
     fleshHit: 0.80
   }
 };

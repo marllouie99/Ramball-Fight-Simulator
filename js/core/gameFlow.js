@@ -259,6 +259,8 @@ export function reinitFighters(isNewMatch = false) {
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
   state._hadMissionOverlay = false;
+  state._hadSansDeath = false;
+  state._hadDragonDeath = false;
   state.cheatNotification = null;
   state._isChampionLayoutActive = false;
   state._winnerStartPositions = null;
@@ -1173,6 +1175,8 @@ export function startNextRound() {
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
   state._hadMissionOverlay = false;
+  state._hadSansDeath = false;
+  state._hadDragonDeath = false;
   const isFFA = (state.mode === GAME_MODES.FFA || state.mode === 'FFA' || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA');
   if (isFFA && state.ffaMatchComplete) {
     resetMatch();
@@ -1227,6 +1231,8 @@ export function restartCurrentRound() {
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
   state._hadMissionOverlay = false;
+  state._hadSansDeath = false;
+  state._hadDragonDeath = false;
   state.illusions = []; // Clear all illusions
   state.wallCracks = []; // Clear all wall crack decals
   state.shatteredWalls = []; // Clear all shattered wall breaches
@@ -1347,6 +1353,9 @@ export function resetMatch(showFaceOff = true) {
   state.ffaMatchComplete = false;
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
+  state._hadMissionOverlay = false;
+  state._hadSansDeath = false;
+  state._hadDragonDeath = false;
   state.cheatNotification = null;
   state._hasPlayedChampionVictoryVoice = false;
   state._hasPlayedChampionYouWinVoice = false;
@@ -1415,7 +1424,9 @@ export function goToTitle() {
   state._respectMusicHandle = null;
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
-  state.cheatNotification = null;
+  state._hadMissionOverlay = false;
+  state._hadSansDeath = false;
+  state._hadDragonDeath = false;
   state.wallCracks = []; // Clear all wall crack decals on return to title
   state.shatteredWalls = []; // Clear all shattered wall breaches on return to title
   clearHudShatters();

@@ -1197,6 +1197,8 @@ export class SukunaFighter extends Fighter {
 
   applyBleed(target, stacks) {
     if (!this.isSkillEnabled(CONFIG.sukuna?.enableBleed, true)) return;
+    if (!target || target.dead || target.isDead || (target.hp !== undefined && target.hp <= 0)) return;
+    if (target.isBloodImmune || target.noBlood || target.suppressBlood || target.bleedImmune || target.isStatusImmune || target.isBaguvixActive || target.isGodModeActive) return;
     if (!this.bleedStacks.has(target)) {
       this.bleedStacks.set(target, 0);
     }

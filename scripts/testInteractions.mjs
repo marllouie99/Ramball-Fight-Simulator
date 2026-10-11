@@ -6113,6 +6113,497 @@ async function runInteractionTests() {
     console.log('      ✅ Shiro troops capture enemy plants and Engineer turrets in one hit while preserving allied minions.');
   }
 
+  // ── TEST 66: Shiro Passive 3 Voiceline (0:00:02 Windup) & Troop Buff ──
+  console.log('   66. Testing Shiro Passive 3 Voiceline Trigger (0:00:02 Windup) & Subsequent Troop Buff...');
+  {
+    const ShiroClass = FIGHTER_CLASS_MAP['shiro'];
+    const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+    const shiro = new ShiroClass({ x: 200, y: 300, hp: 340, maxHp: 340 });
+    const enemy = new SaitamaClass({ x: 350, y: 300, hp: 600, maxHp: 600 });
+    shiro.team = 0;
+    enemy.team = 1;
+    state.arena = arena;
+    state.fighters = [shiro, enemy];
+    state.gameState = 'playing';
+    state.matchWinner = null;
+    state.roundWinner = null;
+
+    // Give Shiro an active living troop on the board
+    const troop = {
+      isMinion: true,
+      isChessTroop: true,
+      dead: false,
+      isDead: false,
+      hp: 50,
+      maxHp: 50,
+      r: 16,
+      x: 250,
+      y: 300,
+      owner: shiro,
+      team: 0,
+      blankBuffTimer: 0,
+      isBuffed: false
+    };
+    shiro.activeMinions = [troop];
+    state.fighters.push(troop);
+
+    // Spy audioSystem.playSFX
+    const { audioSystem } = await import('../js/systems/audioSystem.js');
+    const { shiroConfig } = await import('../js/configs/characters/shiroConfig.js');
+    const origPlaySFX = audioSystem.playSFX;
+    const playedSounds = [];
+    audioSystem.playSFX = (src, vol) => {
+      playedSounds.push(src);
+      if (origPlaySFX) return origPlaySFX(src, vol);
+    };
+
+    try {
+      // 1. Ready cooldown to 0 so Shiro is about to use Passive 3
+      shiro.blankCooldown = 0;
+      shiro.blankActiveTimer = 0;
+      shiro.blankWindupTimer = 0;
+      shiro._blankWindupStarted = false;
+
+      // Update once: Shiro should trigger the 0:00:02 voiceline and enter windup
+      shiro._updateTroopMinions(enemy, arena);
+
+      assert(shiro._blankWindupStarted === true, 'Shiro must start Passive 3 windup when about to use Passive 3');
+      assert(shiro.blankWindupTimer === 120, 'Shiro must set blankWindupTimer to 120 (0:00:02 at 60 FPS)');
+      assert(
+        playedSounds.some(s => String(s).includes('shiro_troop_buff_voiceline.mp3')),
+        'Shiro must trigger shiro_troop_buff_voiceline.mp3 when about to use Passive 3'
+      );
+      assert(troop.isBuffed === false, 'Troop must NOT be buffed immediately during the voiceline windup');
+      assert(shiro.blankActiveTimer === 0, 'Active buff timer must remain 0 during voiceline windup');
+
+      // 2. Advance 60 frames halfway through the voiceline
+      for (let i = 0; i < 60; i++) {
+        shiro._updateTroopMinions(enemy, arena);
+      }
+      assert(shiro.blankWindupTimer === 60, 'Windup timer must decrement smoothly during voiceline');
+      assert(troop.isBuffed === false, 'Troop remains unbuffed while voiceline is in flight');
+
+      // 3. Advance remaining 60 frames to conclude the 2-second voiceline
+      for (let i = 0; i < 60; i++) {
+        shiro._updateTroopMinions(enemy, arena);
+      }
+
+      // Now 120 frames have elapsed: the voiceline finishes and Passive 3 troop buff activates!
+      const expectedBuffDuration = shiroConfig.blankBuffDuration || 240;
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must reach 0');
+      assert(shiro._blankWindupStarted === false, 'Windup started flag must reset');
+      assert(
+        shiro.blankActiveTimer >= expectedBuffDuration - 1 && shiro.blankActiveTimer <= expectedBuffDuration,
+        `Passive 3 active buff timer must initialize to ${expectedBuffDuration} frames`
+      );
+      assert(troop.isBuffed === true, 'Troop must now be buffed with golden prediction aura');
+      assert(
+        troop.blankBuffTimer >= expectedBuffDuration - 1 && troop.blankBuffTimer <= expectedBuffDuration,
+        `Troop must receive ${expectedBuffDuration}-frame buff duration`
+      );
+      assert(
+        playedSounds.some(s => String(s).includes('BookSynthFirstTier.ogg')),
+        'BookSynthFirstTier.ogg buff chime must play upon Passive 3 activation'
+      );
+      // 3B. Verify anti-duplication: Second activation in same match must NOT re-trigger voiceline!
+      playedSounds.length = 0;
+      shiro.blankActiveTimer = 0;
+      shiro.blankCooldown = 0;
+      shiro.blankWindupTimer = 0;
+      shiro._blankWindupStarted = false;
+      shiro._updateTroopMinions(enemy, arena);
+      assert(
+        !playedSounds.some(s => String(s).includes('shiro_troop_buff_voiceline.mp3')),
+        'STRICT RULE: shiro_troop_buff_voiceline.mp3 must only play ONCE per match/round to avoid duplicate voicelines'
+      );
+
+      // 4. Verify match is over: Shiro must NEVER trigger shiro_troop_buff_voiceline.mp3!
+      playedSounds.length = 0;
+      shiro.blankCooldown = 0;
+      shiro.blankActiveTimer = 0;
+      shiro.blankWindupTimer = 0;
+      shiro._blankWindupStarted = false;
+      troop.isBuffed = false;
+
+      state.gameState = 'matchEnd';
+      state.matchWinner = shiro;
+      enemy.hp = 0;
+      enemy.dead = true;
+
+      shiro._updateTroopMinions(enemy, arena);
+      assert(shiro._blankWindupStarted === false, 'Shiro must NOT start troop buff windup when match is over');
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must stay 0 when match is over');
+      assert(
+        !playedSounds.some(s => String(s).includes('shiro_troop_buff_voiceline.mp3')),
+        'shiro_troop_buff_voiceline.mp3 must NEVER trigger when match is over'
+      );
+
+      // 5. If windup was active when match ends, it must immediately be cancelled
+      shiro._blankWindupStarted = true;
+      shiro.blankWindupTimer = 60;
+      shiro._updateTroopMinions(enemy, arena);
+      assert(shiro._blankWindupStarted === false, 'Pending windup must be cancelled when match is over');
+      assert(shiro.blankWindupTimer === 0, 'Pending windup timer must be reset to 0 when match is over');
+
+      console.log('      ✅ Shiro Passive 3 0:00:02 voiceline trigger and match-over suppression verified.');
+    } finally {
+      audioSystem.playSFX = origPlaySFX;
+      shiro.reset();
+      state.fighters = [];
+    }
+  }
+
+  // ── TEST 67: Shiro Victory Audio Sequencing: faah -> YOU WIN! -> Shutdown Voiceline ──
+  console.log('   67. Testing Shiro Victory Audio Sequencing (faah -> YOU WIN! -> shutdown voiceline)...');
+  {
+    const ShiroClass = FIGHTER_CLASS_MAP['shiro'];
+    const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+    const shiro = new ShiroClass({ x: 200, y: 300, hp: 340, maxHp: 340 });
+    const enemy = new SaitamaClass({ x: 350, y: 300, hp: 0, maxHp: 600 });
+    enemy.dead = true;
+    shiro.team = 0;
+    enemy.team = 1;
+    state.arena = arena;
+    state.fighters = [shiro, enemy];
+    state.matchWinner = shiro;
+    state.roundWinner = shiro;
+    state.gameState = 'matchEnd';
+    state.isRoundDraw = false;
+    state.isDraw = false;
+    state._shiroChessboardAlpha = 1.0;
+    state._shiroChessboardWasActive = true;
+    state._shiroChessboardShutdownTimer = 0;
+    state._hasPlayedChampionYouWinVoice = false;
+
+    const { audioSystem } = await import('../js/systems/audioSystem.js');
+    const { drawMatchEndScreen } = await import('../js/graphics/ui/GameOverScreen.js');
+    const origPlaySFX = audioSystem.playSFX;
+    const playedSounds = [];
+    audioSystem.playSFX = (src, vol) => {
+      playedSounds.push(src);
+      if (origPlaySFX) return origPlaySFX(src, vol);
+    };
+
+    try {
+      // 1. Frame 60 (While faah.mp3 is playing, 0 - 119 frames):
+      // Neither YOU WIN! nor shutdown voiceline should trigger yet!
+      state.matchEndTimer = 60;
+      shiro._checkMatchVictory(enemy);
+      drawMatchEndScreen();
+
+      assert(shiro._hasSaidWinQuote === false, 'Shiro must NOT say win quote while faah.mp3 is playing (endTimer < 120)');
+      assert(state._shiroChessboardShutdownTimer === 0, 'Chessboard shutdown must NOT initiate during faah.mp3');
+      assert(state._hasPlayedChampionYouWinVoice === false, 'YOU WIN announcer must NOT play while faah.mp3 is active (timer < 120)');
+      assert(
+        !playedSounds.some(s => String(s).includes('shiro_chessboard_shutdown_voiceline.mp3')),
+        'Shutdown voiceline must not play during faah.mp3'
+      );
+      assert(
+        !playedSounds.some(s => String(s).includes('you-win')),
+        'YOU WIN announcer must not play during faah.mp3'
+      );
+
+      // 2. Frame 120 (faah.mp3 has finished playing completely):
+      // YOU WIN! announcer triggers now!
+      state.matchEndTimer = 120;
+      drawMatchEndScreen();
+      assert(state._hasPlayedChampionYouWinVoice === true, 'YOU WIN announcer MUST trigger at frame 120 when faah finishes');
+      assert(
+        playedSounds.some(s => String(s).includes('you-win')),
+        'YOU WIN sound must be played at frame 120'
+      );
+
+      // But Shiro's shutdown voiceline must still WAIT for YOU WIN announcer to finish (~80 frames, until frame 200)!
+      shiro._checkMatchVictory(enemy);
+      assert(shiro._hasSaidWinQuote === false, 'Shiro must wait for YOU WIN announcer to finish (endTimer < 200)');
+      assert(
+        !playedSounds.some(s => String(s).includes('shiro_chessboard_shutdown_voiceline.mp3')),
+        'Shutdown voiceline must NOT overlap with YOU WIN announcer'
+      );
+
+      // 3. Frame 200 (YOU WIN announcer has completed its full ~80 frames duration):
+      // Shiro now triggers "Checkmate!" and the chessboard shutdown voiceline!
+      state.matchEndTimer = 200;
+      shiro._checkMatchVictory(enemy);
+
+      assert(shiro._hasSaidWinQuote === true, 'Shiro must trigger win quote at frame 200 after YOU WIN finishes');
+      assert(shiro.speechBubble && shiro.speechBubble.fullText === 'Checkmate!', 'Shiro must speak "Checkmate!"');
+      assert(state._shiroChessboardShutdownTimer > 0, 'Chessboard shutdown timer must initiate at frame 200');
+      assert(
+        playedSounds.some(s => String(s).includes('shiro_chessboard_shutdown_voiceline.mp3')),
+        'shiro_chessboard_shutdown_voiceline.mp3 must play after YOU WIN announcer finishes'
+      );
+      assert(
+        playedSounds.some(s => String(s).includes('LightFlickerOff.ogg') || String(s).includes('shiro_board_shutdown')),
+        'shiro_board_shutdown SFX must play along with the shutdown voiceline'
+      );
+
+      console.log('      ✅ Shiro victory audio sequence (faah -> YOU WIN! -> shutdown voiceline) verified.');
+    } finally {
+      audioSystem.playSFX = origPlaySFX;
+      shiro.reset();
+      state.fighters = [];
+      state._hasPlayedChampionYouWinVoice = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // TEST 68: Shiro Defeat Handling (Immediate Chessboard Shutdown, Troop Destruction, Strict Audio Suppression)
+  // ---------------------------------------------------------------------------
+  {
+    console.log('Test 68: Shiro Defeat Handling (Immediate Chessboard Shutdown, All Troops Destroyed, Audio Suppressed)');
+    const { ShiroFighter } = await import('../js/entities/fighters/ShiroFighter.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+    const { renderShiroChessboardFloor } = await import('../js/graphics/renderers/arenaRenderer.js');
+    const { audioSystem } = await import('../js/systems/audioSystem.js');
+
+    const shiro = new ShiroFighter({ x: 200, y: 300, radius: 25 });
+    const enemy = new Fighter({ x: 400, y: 300, radius: 25 });
+    shiro.reset();
+    enemy.reset();
+    shiro.fighterIndex = 0;
+    enemy.fighterIndex = 1;
+
+    state.fighters = [shiro, enemy];
+    state.arena = { x: 50, y: 50, width: 440, height: 440 };
+    state.gameState = 'fighting';
+    state._shiroChessboardAlpha = 1.0;
+    state._shiroChessboardWasActive = true;
+    state._shiroChessboardShutdownTimer = 0;
+    state._shiroVictoryShutdown = false;
+    state._shiroDefeatShutdown = false;
+
+    // Plant 3 active chess troops
+    shiro.activeMinions = [
+      { id: 't1', type: 'pawn', isMinion: true, isChessTroop: true, hp: 30, dead: false, x: 220, y: 220, r: 15 },
+      { id: 't2', type: 'knight', isMinion: true, isChessTroop: true, hp: 45, dead: false, x: 260, y: 220, r: 15 },
+      { id: 't3', type: 'queen', isMinion: true, isChessTroop: true, hp: 100, dead: false, x: 300, y: 220, r: 18 }
+    ];
+    for (const t of shiro.activeMinions) {
+      t.owner = shiro;
+      state.fighters.push(t);
+    }
+
+    // Set passive 3 windup active
+    shiro._blankWindupStarted = true;
+    shiro.blankWindupTimer = 90;
+
+    const origPlaySFX = audioSystem.playSFX;
+    const playedSounds = [];
+    audioSystem.playSFX = (src, vol) => {
+      playedSounds.push(src);
+      if (origPlaySFX) return origPlaySFX(src, vol);
+    };
+
+    try {
+      // 1. Enemy defeats Shiro (Shiro dies / matchEnd with enemy winner)
+      state.gameState = 'matchEnd';
+      state.matchWinner = enemy;
+      shiro.hp = 0;
+      shiro.onDeath();
+
+      // 2. Verify all active troops were shattered and destroyed immediately!
+      assert(shiro.activeMinions.length === 0, 'All active minions in shiro.activeMinions must be destroyed on defeat');
+      const lingeringTroops = state.fighters.filter(f => f && (f.isChessTroop || f.isChessMinion));
+      assert(lingeringTroops.length === 0, 'No chess troops should linger in state.fighters on Shiro defeat');
+
+      // 3. Verify chessboard shutdown was initiated immediately without delay!
+      assert(state._shiroChessboardShutdownTimer > 0, 'Chessboard shutdown must initiate immediately on defeat');
+      assert(state._shiroDefeatShutdown === true, 'state._shiroDefeatShutdown must be set to true');
+      assert(state._shiroVictoryShutdown === false, 'state._shiroVictoryShutdown must be false on defeat');
+
+      // 4. Verify speech bubble and buff windup were cancelled
+      assert(shiro.speechBubble === null, 'Shiro speech bubble must be cleared on defeat');
+      assert(shiro._blankWindupStarted === false, 'Passive 3 buff windup must be cancelled on defeat');
+      assert(shiro.blankWindupTimer === 0, 'Passive 3 buff windup timer must be reset to 0 on defeat');
+
+      // 5. Verify audio: Mechanical shutdown and troop shatter SFX played, but VOICELINES are strictly suppressed!
+      assert(
+        playedSounds.some(s => String(s).includes('LightFlickerOff.ogg') || String(s).includes('shiro_board_shutdown')),
+        'Chessboard shutdown mechanical SFX (LightFlickerOff.ogg) must play on defeat'
+      );
+      assert(
+        playedSounds.some(s => String(s).includes('PermafrostKeepSealMine1.ogg') || String(s).includes('troopDestroyed')),
+        'Troop shatter destruction SFX must play on defeat'
+      );
+      assert(
+        !playedSounds.some(s => String(s).includes('shiro_chessboard_shutdown_voiceline.mp3')),
+        'STRICT RULE: shiro_chessboard_shutdown_voiceline.mp3 must NEVER play on defeat'
+      );
+      assert(
+        !playedSounds.some(s => String(s).includes('shiro_troop_buff_voiceline.mp3')),
+        'STRICT RULE: shiro_troop_buff_voiceline.mp3 must NEVER play on defeat'
+      );
+      assert(
+        !playedSounds.some(s => String(s).includes('FingerSnap.ogg')),
+        'STRICT RULE: FingerSnap speech SFX must NEVER play on defeat'
+      );
+
+      // 6. Test renderer frame pass to confirm renderShiroChessboardFloor adheres to defeat rules
+      const testCtx = createMockCtx();
+      renderShiroChessboardFloor(testCtx, state.arena);
+
+      // Verify voiceline still not played after render pass
+      assert(
+        !playedSounds.some(s => String(s).includes('shiro_chessboard_shutdown_voiceline.mp3')),
+        'STRICT RULE: shiro_chessboard_shutdown_voiceline.mp3 must not play during render pass on defeat'
+      );
+
+      console.log('      ✅ Shiro defeat handling (immediate shutdown, all troops destroyed, audio suppressed) verified.');
+    } finally {
+      audioSystem.playSFX = origPlaySFX;
+      shiro.reset();
+      enemy.reset();
+      state.fighters = [];
+      state._shiroDefeatShutdown = false;
+      state._shiroVictoryShutdown = false;
+      state._shiroChessboardShutdownTimer = 0;
+      state._shiroChessboardAlpha = 0;
+    }
+  }
+
+  // ── TEST 69: Shiro Voiceline Stun Cut-off (Immediate Termination on Stun / Hit-Stun / Freeze) ──
+  console.log('   69. Testing Shiro Voiceline Stun Cut-off (Immediate Audio Termination & Windup Cancellation)...');
+  {
+    const ShiroClass = FIGHTER_CLASS_MAP['shiro'];
+    const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+    const shiro = new ShiroClass({ x: 200, y: 300, hp: 340, maxHp: 340 });
+    const enemy = new SaitamaClass({ x: 350, y: 300, hp: 600, maxHp: 600 });
+    shiro.team = 0;
+    enemy.team = 1;
+    state.arena = arena;
+    state.gameState = 'playing';
+    state.matchWinner = null;
+    state.roundWinner = null;
+    state._shiroDefeatShutdown = false;
+    state._shiroVictoryShutdown = false;
+    state._isShiroTroopBuffVoicePlaying = false;
+
+    const pawn = {
+      isMinion: true,
+      isChessTroop: true,
+      owner: shiro,
+      team: 0,
+      hp: 50,
+      maxHp: 50,
+      dead: false,
+      isDead: false,
+      isBuffed: false,
+      blankBuffTimer: 0,
+      type: 'pawn',
+      r: 16,
+      x: 220,
+      y: 300
+    };
+    shiro.activeMinions = [pawn];
+    state.fighters = [shiro, enemy, pawn];
+
+    const origPlaySFX = audioSystem.playSFX;
+
+    audioSystem.playSFX = (src, vol, speed, p1, p2, onEnd) => {
+      const handle = { src, volume: vol, isPlaying: true, onEnd };
+      return handle;
+    };
+
+    const triggerWindup = () => {
+      shiro.hp = 340;
+      shiro.dead = false;
+      shiro.knockbackStunTimer = 0;
+      shiro.hitStunTimer = 0;
+      shiro.stunTimer = 0;
+      shiro.paralyzeTimer = 0;
+      shiro.isParalyzed = false;
+      shiro.timeStopTimer = 0;
+      shiro.freezeTimer = 0;
+      shiro.iceFreezeTimer = 0;
+      shiro.isFrozen = false;
+      shiro.isTargetOfAmbush = false;
+      shiro.blankCooldown = 0;
+      shiro.blankActiveTimer = 0;
+      shiro.blankWindupTimer = 0;
+      shiro._blankWindupStarted = false;
+      shiro._hasPlayedBlankVoiceline = false;
+      shiro._blankVoiceHandle = null;
+      state._isShiroTroopBuffVoicePlaying = false;
+      pawn.hp = 50;
+      pawn.dead = false;
+      pawn.isDead = false;
+      shiro.activeMinions = [pawn];
+      state.fighters = [shiro, enemy, pawn];
+
+      shiro._updateTroopMinions(enemy, arena);
+      assert(shiro._blankVoiceHandle !== null, 'Voiceline handle must be active');
+      assert(shiro.blankWindupTimer === 120, 'blankWindupTimer must be 120');
+      assert(shiro._blankWindupStarted === true, 'Windup must be started');
+      assert(state._isShiroTroopBuffVoicePlaying === true, 'state._isShiroTroopBuffVoicePlaying must be true');
+    };
+
+    try {
+      // 1. Knockback Stun cut-off
+      triggerWindup();
+      shiro.applyKnockback(5, 0, 15);
+      assert(shiro.knockbackStunTimer === 15, 'Knockback stun timer must be set to 15');
+      assert(shiro._blankVoiceHandle === null, 'Shiro must immediately clear _blankVoiceHandle upon stun');
+      assert(shiro.blankWindupTimer === 0, 'Shiro blankWindupTimer must immediately reset to 0 upon stun');
+      assert(shiro._blankWindupStarted === false, 'Shiro _blankWindupStarted must reset to false upon stun');
+      assert(state._isShiroTroopBuffVoicePlaying === false, 'state._isShiroTroopBuffVoicePlaying must be false upon stun');
+      assert(shiro.blankCooldown >= 180, 'Shiro Passive 3 must receive interruption cooldown upon stun');
+
+      // 2. Paralyze CC cut-off
+      triggerWindup();
+      shiro.applyParalyze(30);
+      assert(shiro._blankVoiceHandle === null, 'Voiceline handle must be cut off on paralyze');
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must reset on paralyze');
+      assert(shiro._blankWindupStarted === false, 'Windup started flag must reset on paralyze');
+
+      // 3. Time-Stop / Stasis cut-off
+      triggerWindup();
+      shiro.applyTimeStop(45);
+      assert(shiro._blankVoiceHandle === null, 'Voiceline handle must be cut off on timeStop');
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must reset on timeStop');
+      assert(shiro._blankWindupStarted === false, 'Windup started flag must reset on timeStop');
+
+      // 4. Hit-Stun cut-off
+      triggerWindup();
+      shiro.applyHitStun(20);
+      assert(shiro._blankVoiceHandle === null, 'Voiceline handle must be cut off on hitStun');
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must reset on hitStun');
+      assert(shiro._blankWindupStarted === false, 'Windup started flag must reset on hitStun');
+
+      // 5. Heavy Damage cut-off
+      triggerWindup();
+      shiro.takeDamage(25, enemy, { isKnockback: true, isHeavy: true });
+      assert(shiro._blankVoiceHandle === null, 'Voiceline handle must be cut off on heavy damage');
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must reset on heavy damage');
+      assert(shiro._blankWindupStarted === false, 'Windup started flag must reset on heavy damage');
+
+      // 6. Ambush / CC stasis detection in update loop cut-off
+      triggerWindup();
+      shiro.isTargetOfAmbush = true;
+      shiro.update(enemy, 0, arena);
+      assert(shiro._blankVoiceHandle === null, 'Voiceline handle must be cut off when update detects ambush stasis');
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must reset when update detects ambush stasis');
+      assert(shiro._blankWindupStarted === false, 'Windup started flag must reset when update detects ambush stasis');
+
+      // 7. General interruptAttacks() invocation cut-off
+      triggerWindup();
+      shiro.interruptAttacks();
+      assert(shiro._blankVoiceHandle === null, 'Voiceline handle must be cut off on interruptAttacks');
+      assert(shiro.blankWindupTimer === 0, 'Windup timer must reset on interruptAttacks');
+      assert(shiro._blankWindupStarted === false, 'Windup started flag must reset on interruptAttacks');
+
+      console.log('      ✅ Shiro voiceline stun cut-off (knockback stun, paralyze, time-stop, hit-stun, heavy damage, update stasis & interrupt) verified.');
+    } finally {
+      audioSystem.playSFX = origPlaySFX;
+      shiro.reset();
+      enemy.reset();
+      state.fighters = [];
+    }
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

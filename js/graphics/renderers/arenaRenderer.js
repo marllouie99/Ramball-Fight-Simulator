@@ -379,7 +379,12 @@ export function renderShiroChessboardFloor(ctx, arena) {
   if (state._shiroChessboardShutdownTimer === undefined) state._shiroChessboardShutdownTimer = 0;
   if (state._shiroChessboardWasActive === undefined) state._shiroChessboardWasActive = false;
 
-  const SHUTDOWN_DURATION = 28; // ~0.46s authentic CRT power-off collapse
+  const cb = shiroConfig?.chessboard || CONFIG?.shiro?.chessboard || {};
+  const SHUTDOWN_DURATION = cb.shutdownDuration ?? 28; // Duration in frames for CRT power-off collapse
+  const ASSEMBLE_SPEED = cb.assembleDuration ? (1.0 / cb.assembleDuration) : 0.025; // Speed per frame
+  const FADE_IN_SPEED = cb.fadeInSpeed ?? 0.12;
+  const FADE_OUT_SPEED = cb.fadeOutSpeed ?? 0.10;
+  const FADE_THRESHOLD = cb.shutdownFadeThreshold ?? 0.85;
   let shutdownProgress = 0.0;
 
   const getShiroVol = (key, defaultVol = 0.85) => {
@@ -390,41 +395,133 @@ export function renderShiroChessboardFloor(ctx, arena) {
       ?? defaultVol;
   };
 
-  if (hasActiveTroops) {
-    // Active troops present: if not already active, trigger chessboard turn-on sound effect
+  const areAllShiroDead = shiroFighters.length > 0 && shiroFighters.every(sf => sf.dead || sf.isDead || (sf.hp || 0) <= 0);
+  let isShiroDefeatedInMatch = Boolean(state._shiroDefeatShutdown) || areAllShiroDead;
+
+  if (typeof state !== 'undefined') {
+    const winner = state.matchWinner || state.roundWinner;
+    if (winner) {
+      const isWinnerShiroOrAlly = shiroFighters.some(sf => {
+        if (winner === sf) return true;
+        if (state.getFighterTeam && typeof state.getFighterTeam === 'function' && Array.isArray(state.fighters)) {
+          const winnerIdx = state.fighters.indexOf(winner);
+          const sfIdx = state.fighters.indexOf(sf);
+          if (winnerIdx !== -1 && sfIdx !== -1 && state.getFighterTeam(winnerIdx) === state.getFighterTeam(sfIdx)) {
+            return true;
+          }
+        }
+        return false;
+      });
+      if (!isWinnerShiroOrAlly) {
+        isShiroDefeatedInMatch = true;
+      }
+    } else if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
+      if (areAllShiroDead) {
+        isShiroDefeatedInMatch = true;
+      }
+    }
+  }
+
+  const isDefeatShutdown = isShiroDefeatedInMatch;
+  if (isDefeatShutdown) {
+    state._shiroVictoryShutdown = false;
+    state._shiroDefeatShutdown = true;
+  }
+  const isVictoryShutdown = Boolean(state._shiroVictoryShutdown) && !isDefeatShutdown;
+  const shouldShutdown = isVictoryShutdown || isDefeatShutdown || (!hasActiveTroops && state._shiroChessboardWasActive);
+
+  if (!shouldShutdown && hasActiveTroops) {
+    // Active troops present during normal battle: if not already active, trigger chessboard turn-on sound effect
     if (!state._shiroChessboardWasActive && state._shiroChessboardAlpha <= 0.05) {
       audioSystem.playSFX('shiro_board_turnon', getShiroVol('boardAppear', 0.85));
     }
     state._shiroChessboardShutdownTimer = 0;
     state._shiroChessboardWasActive = true;
-    state._shiroChessboardAlpha = Math.min(1.0, state._shiroChessboardAlpha + 0.12);
-    state._shiroChessboardAssembleProgress = Math.min(1.0, state._shiroChessboardAssembleProgress + 0.025);
+    state._shiroChessboardAlpha = Math.min(cb.maxAlpha ?? 1.0, state._shiroChessboardAlpha + FADE_IN_SPEED);
+    state._shiroChessboardAssembleProgress = Math.min(1.0, state._shiroChessboardAssembleProgress + ASSEMBLE_SPEED);
   } else {
-    // No active troops: if the chessboard was active, trigger the CRT TV / Console shutdown animation!
-    if (state._shiroChessboardWasActive && state._shiroChessboardShutdownTimer === 0 && state._shiroChessboardAlpha > 0.1) {
-      state._shiroChessboardShutdownTimer = SHUTDOWN_DURATION;
-      audioSystem.playSFX('shiro_board_shutdown', getShiroVol('boardShutdown', 0.85));
+    // Shutdown branch (either victory shutdown, defeat shutdown, or all troops destroyed during fight)
+    const shutdownDuration = state._shiroChessboardShutdownDuration || SHUTDOWN_DURATION;
+
+    const isRoundOrMatchEnd = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+    const endTimer = (typeof state !== 'undefined' && (
+      state.gameState === 'matchEnd' 
+        ? (state.matchEndTimer || 0) 
+        : (state.roundEndTimer || state.matchEndTimer || 0)
+    )) || 0;
+
+    // Start shutdown if not already running, BUT ONLY IF the board was actively visible!
+    // On defeat: start shutdown immediately without waiting for victory timer!
+    // On victory: wait until faah.mp3 (120f) and YOU WIN! announcer (80f) have finished (200 frames) before initiating shutdown!
+    const canStartShutdown = isDefeatShutdown || (!isRoundOrMatchEnd || endTimer >= 200);
+    if (state._shiroChessboardShutdownTimer === 0 && canStartShutdown) {
+      if (state._shiroChessboardWasActive && state._shiroChessboardAlpha > 0.05) {
+        state._shiroChessboardShutdownTimer = shutdownDuration;
+        state._shiroChessboardShutdownStartAlpha = state._shiroChessboardAlpha;
+        audioSystem.playSFX('shiro_board_shutdown', getShiroVol('boardShutdown', 0.85));
+
+        // STRICT AUDIO SUPPRESSION: Only play shutdown voiceline on VICTORY! NEVER on defeat!
+        if (isVictoryShutdown && !isDefeatShutdown) {
+          const shutdownVoice = shiroConfig.sounds?.boardShutdownVoiceline || 'Assets/Sound Effects/Shiro/shiro_chessboard_shutdown_voiceline.mp3';
+          audioSystem.playSFX(shutdownVoice, getShiroVol('boardShutdownVoiceline', 1.0));
+        }
+
+        // When the chessboard shuts down, destroy all active troops!
+        for (const sf of shiroFighters) {
+          sf.destroyAllActiveTroops?.(true);
+        }
+      }
+    }
+
+    if (isDefeatShutdown) {
+      // Guarantee all active troops are destroyed when Shiro loses!
+      for (const sf of shiroFighters) {
+        if (sf.activeMinions && sf.activeMinions.length > 0) {
+          sf.destroyAllActiveTroops?.(true);
+        }
+      }
     }
 
     if (state._shiroChessboardShutdownTimer > 0) {
+      // Ensure all active troops are destroyed during chessboard shutdown
+      for (const sf of shiroFighters) {
+        if (sf.activeMinions && sf.activeMinions.length > 0) {
+          sf.destroyAllActiveTroops?.(true);
+        }
+      }
+
       state._shiroChessboardShutdownTimer--;
-      shutdownProgress = 1.0 - (state._shiroChessboardShutdownTimer / SHUTDOWN_DURATION);
-      // During shutdown collapse, hold board alpha, then fade out during final dot fizzle
-      state._shiroChessboardAlpha = (shutdownProgress >= 0.85)
-        ? Math.max(0.0, (1.0 - shutdownProgress) / 0.15)
-        : 1.0;
+      shutdownProgress = 1.0 - (state._shiroChessboardShutdownTimer / shutdownDuration);
+
+      // Fade alpha from startAlpha during final dissipation threshold (never jump to 1.0!)
+      const startAlpha = state._shiroChessboardShutdownStartAlpha ?? (cb.maxAlpha ?? 1.0);
+      if (shutdownProgress >= FADE_THRESHOLD) {
+        const fadeRatio = (1.0 - shutdownProgress) / Math.max(0.01, 1.0 - FADE_THRESHOLD);
+        state._shiroChessboardAlpha = Math.max(0.0, startAlpha * fadeRatio);
+      } else {
+        state._shiroChessboardAlpha = startAlpha;
+      }
+
+      // Lock assemble progress at 1.0 during shutdown so no half-assembled wireframe tiles appear
+      state._shiroChessboardAssembleProgress = 1.0;
 
       if (state._shiroChessboardShutdownTimer <= 0) {
         state._shiroChessboardWasActive = false;
         state._shiroChessboardAlpha = 0.0;
         state._shiroChessboardAssembleProgress = 0.0;
+        state._shiroVictoryShutdown = false;
+        state._shiroDefeatShutdown = false;
+        state._shiroChessboardShutdownStartAlpha = null;
       }
     } else {
-      // Fully powered off
-      state._shiroChessboardAlpha = Math.max(0.0, state._shiroChessboardAlpha - 0.10);
+      // Fully powered off / fading out
+      state._shiroChessboardAlpha = Math.max(0.0, state._shiroChessboardAlpha - FADE_OUT_SPEED);
       if (state._shiroChessboardAlpha <= 0.01) {
         state._shiroChessboardAssembleProgress = 0.0;
         state._shiroChessboardWasActive = false;
+        state._shiroVictoryShutdown = false;
+        state._shiroDefeatShutdown = false;
+        state._shiroChessboardShutdownStartAlpha = null;
       }
     }
   }
@@ -870,6 +967,189 @@ function roundedRect(ctx, x, y, w, h, r) {
 }
 
 /**
+ * Measures text width for fighter display names, accounting for custom corner bracket framing (e.g. 『SHIRO』).
+ */
+export function measureDecoratedFighterName(ctx, name) {
+  if (!name || typeof name !== 'string') return 0;
+  const match = name.match(/^(.*?)『(.*?)』(.*)$/);
+  if (!match) {
+    return ctx.measureText(name).width;
+  }
+  const prefix = match[1];
+  const innerText = match[2];
+  const suffix = match[3];
+
+  const prefixW = prefix ? ctx.measureText(prefix).width : 0;
+  const innerW = ctx.measureText(innerText).width;
+  const suffixW = suffix ? ctx.measureText(suffix).width : 0;
+
+  const fontMatch = (ctx.font || '').match(/(\d+(?:\.\d+)?)px/);
+  const fontSize = fontMatch ? parseFloat(fontMatch[1]) : 42;
+  const capH = fontSize * 0.84;
+  const bracketH = Math.round(capH * 0.48);
+  const bracketW = Math.max(5, Math.round(bracketH * 0.58));
+  const bracketGap = Math.max(2, Math.round(fontSize * 0.08));
+
+  return prefixW + bracketW + bracketGap + innerW + bracketGap + bracketW + suffixW;
+}
+
+/**
+ * Draws a fighter's display name. If the name is framed with Japanese corner brackets 『...』 (e.g. 『SHIRO』),
+ * it renders authentic No Game No Life / Kuhaku corner brackets calibrated to the reference standard:
+ * - Opening bracket 『: anchored at UPPER-LEFT, framing letter crown, height = ~48% of letter cap height.
+ * - Closing bracket 』: anchored at LOWER-RIGHT, aligned with baseline, height = ~48% of letter cap height.
+ * - Double-line hollow white corner bracket geometry matching the reference.
+ */
+export function drawDecoratedFighterName(ctx, name, x, y, options = {}) {
+  if (!name || typeof name !== 'string') return;
+  const match = name.match(/^(.*?)『(.*?)』(.*)$/);
+
+  const textColor = options.color || options.fillColor || ctx.fillStyle || '#FFFFFF';
+  ctx.fillStyle = textColor;
+  if (options.stroke && options.strokeColor) {
+    ctx.strokeStyle = options.strokeColor;
+  }
+
+  if (!match) {
+    if (options.stroke) {
+      ctx.strokeText(name, x, y);
+    }
+    ctx.fillText(name, x, y);
+    return;
+  }
+
+  const prefix = match[1];
+  const innerText = match[2];
+  const suffix = match[3];
+
+  const fontMatch = (ctx.font || '').match(/(\d+(?:\.\d+)?)px/);
+  const fontSize = fontMatch ? parseFloat(fontMatch[1]) : 42;
+
+  // Bracket dimensions calibrated to reference standard (short corner marks)
+  const innerMetrics = ctx.measureText ? ctx.measureText(innerText) : null;
+  const actualAscent = (innerMetrics && Number.isFinite(innerMetrics.actualBoundingBoxAscent) && innerMetrics.actualBoundingBoxAscent > 0)
+    ? innerMetrics.actualBoundingBoxAscent
+    : (fontSize * 0.84);
+  const capH = Math.max(actualAscent, fontSize * 0.84);
+
+  const bracketH = Math.round(capH * 0.48);
+  const bracketW = Math.max(5, Math.round(bracketH * 0.58));
+  const bracketGap = Math.max(2, Math.round(fontSize * 0.08));
+
+  const prefixW = prefix ? ctx.measureText(prefix).width : 0;
+  const innerW = innerMetrics ? (innerMetrics.width || 0) : ctx.measureText(innerText).width;
+  const suffixW = suffix ? ctx.measureText(suffix).width : 0;
+  const totalW = prefixW + bracketW + bracketGap + innerW + bracketGap + bracketW + suffixW;
+
+  const textAlign = ctx.textAlign || 'left';
+  const textBaseline = ctx.textBaseline || 'bottom';
+
+  // Compute horizontal X start anchor
+  let curX = x;
+  if (textAlign === 'center') {
+    curX = x - totalW / 2;
+  } else if (textAlign === 'right') {
+    curX = x - totalW;
+  }
+
+  // Compute vertical Y anchors (letter top & baseline)
+  let topY = y;
+  let baselineY = y + capH;
+  if (textBaseline === 'bottom') {
+    baselineY = y;
+    topY = y - capH;
+  } else if (textBaseline === 'middle') {
+    topY = y - capH / 2;
+    baselineY = y + capH / 2;
+  } else if (textBaseline === 'top') {
+    topY = y;
+    baselineY = y + capH;
+  }
+
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.fillStyle = textColor;
+
+  // 1. Draw prefix if present
+  if (prefix) {
+    if (options.stroke) ctx.strokeText(prefix, curX, y);
+    ctx.fillText(prefix, curX, y);
+    curX += prefixW;
+  }
+
+  const leftBracketX = curX;
+  curX += bracketW + bracketGap;
+  const innerTextX = curX;
+
+  // 2. Draw inner text (e.g. SHIRO)
+  if (options.stroke) ctx.strokeText(innerText, innerTextX, y);
+  ctx.fillText(innerText, innerTextX, y);
+  curX += innerW + bracketGap;
+
+  const rightBracketX = curX;
+  curX += bracketW;
+
+  // 3. Draw suffix if present (e.g. WINS!)
+  if (suffix) {
+    if (options.stroke) ctx.strokeText(suffix, curX, y);
+    ctx.fillText(suffix, curX, y);
+  }
+
+  // 4. Draw Hollow White Corner Brackets
+  const color = options.color || ctx.fillStyle || '#A855F7';
+  const strokeW = Math.max(1.2, Math.round(fontSize * 0.035 * 10) / 10);
+  const hollowGap = Math.max(1.2, Math.round(fontSize * 0.035 * 10) / 10);
+  const armThick = strokeW * 2 + hollowGap;
+
+  const drawCornerL = (bx, by, bw, bh) => {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = strokeW;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+
+    // Outer L
+    ctx.beginPath();
+    ctx.moveTo(bx + bw, by + strokeW / 2);
+    ctx.lineTo(bx + strokeW / 2, by + strokeW / 2);
+    ctx.lineTo(bx + strokeW / 2, by + bh);
+    ctx.stroke();
+
+    // Inner L
+    ctx.beginPath();
+    ctx.moveTo(bx + bw, by + armThick - strokeW / 2);
+    ctx.lineTo(bx + armThick - strokeW / 2, by + armThick - strokeW / 2);
+    ctx.lineTo(bx + armThick - strokeW / 2, by + bh);
+    ctx.stroke();
+
+    // End caps
+    ctx.beginPath();
+    ctx.moveTo(bx + bw, by);
+    ctx.lineTo(bx + bw, by + armThick);
+    ctx.moveTo(bx, by + bh);
+    ctx.lineTo(bx + armThick, by + bh);
+    ctx.stroke();
+
+    ctx.restore();
+  };
+
+  // Draw Opening Bracket 『 at TOP-LEFT (anchored slightly above letter crown)
+  const leftBracketY = topY - Math.max(2, Math.round(fontSize * 0.05));
+  drawCornerL(leftBracketX, leftBracketY, bracketW, bracketH);
+
+  // Draw Closing Bracket 』 at BOTTOM-RIGHT (bottom aligned with baseline, rotated 180)
+  const rightCenterCX = rightBracketX + bracketW / 2;
+  const rightCenterCY = baselineY + 1 - bracketH / 2;
+  ctx.save();
+  ctx.translate(rightCenterCX, rightCenterCY);
+  ctx.rotate(Math.PI);
+  drawCornerL(-bracketW / 2, -bracketH / 2, bracketW, bracketH);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+/**
  * Draws the Match Fighter Names above Top Arena Wall (e.g. "GOJO VS SUKUNA" / "SAITAMA VS GOJO").
  * Rendered on top of dim screens and domain barriers to ensure 100% visibility during ultimates & counters.
  * @param {CanvasRenderingContext2D} ctx - Target canvas context
@@ -1057,7 +1337,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
 
       ctx.font = customSideFont;
       const td = dataArr[0];
-      const measuredW = ctx.measureText(td.name).width;
+      const measuredW = measureDecoratedFighterName(ctx, td.name);
       const scale = measuredW > maxSideW ? maxSideW / measuredW : 1.0;
       if (scale < 1.0) {
         ctx.translate(x, baseY);
@@ -1065,12 +1345,11 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
         ctx.translate(-x, -baseY);
       }
       ctx.fillStyle = td.color;
-      if (!isDark) {
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 0.5;
-        ctx.strokeText(td.name, x, baseY);
-      }
-      ctx.fillText(td.name, x, baseY);
+      drawDecoratedFighterName(ctx, td.name, x, baseY, {
+        color: td.color,
+        stroke: !isDark,
+        strokeWidth: 0.5
+      });
       ctx.restore();
     };
 
@@ -1274,14 +1553,14 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     team0Data.forEach(td => {
       ctx.font = customFighterFont;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-      wTeam0 = Math.max(wTeam0, ctx.measureText(td.name).width);
+      wTeam0 = Math.max(wTeam0, measureDecoratedFighterName(ctx, td.name));
     });
 
     let wTeam1 = 0;
     team1Data.forEach(td => {
       ctx.font = customFighterFont;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-      wTeam1 = Math.max(wTeam1, ctx.measureText(td.name).width);
+      wTeam1 = Math.max(wTeam1, measureDecoratedFighterName(ctx, td.name));
     });
 
     ctx.font = customVsFont;
@@ -1318,12 +1597,11 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       ctx.font = customFighterFont;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
       ctx.fillStyle = td.color;
-      if (!isDark) {
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 0.5;
-        ctx.strokeText(td.name, x, y);
-      }
-      ctx.fillText(td.name, x, y);
+      drawDecoratedFighterName(ctx, td.name, x, y, {
+        color: td.color,
+        stroke: !isDark,
+        strokeWidth: 0.5
+      });
     };
 
     // Render Team 0 (Left Side)
@@ -1364,7 +1642,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
     fighterData.forEach((fd, i) => {
       ctx.font = nameFont;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-      totalW += ctx.measureText(fd.name).width;
+      totalW += measureDecoratedFighterName(ctx, fd.name);
       if (i < fighterData.length - 1) {
         ctx.font = vsFont;
         if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
@@ -1386,13 +1664,12 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       ctx.font = nameFont;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
       ctx.fillStyle = fd.color;
-      if (!isDark) {
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1.5;
-        ctx.strokeText(fd.name, startX, textY);
-      }
-      ctx.fillText(fd.name, startX, textY);
-      startX += ctx.measureText(fd.name).width;
+      drawDecoratedFighterName(ctx, fd.name, startX, textY, {
+        color: fd.color,
+        stroke: !isDark,
+        strokeWidth: 1.5
+      });
+      startX += measureDecoratedFighterName(ctx, fd.name);
 
       if (i < fighterData.length - 1) {
         startX += pad;

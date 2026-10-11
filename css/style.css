@@ -360,6 +360,25 @@ body:not(.arena-dark-mode) .horizontal-viewport-mode .health-hud-side .health-ca
   text-align: right !important;
 }
 
+/* No Game No Life 『 』 Kuhaku Corner Bracket Typography */
+.kuhaku-bracket {
+  display: inline-block;
+  font-size: 0.65em;
+  line-height: 1;
+  opacity: 0.95;
+  font-weight: 700;
+}
+.kuhaku-bracket-left {
+  vertical-align: top;
+  margin-right: 1.5px;
+  transform: translateY(-0.16em);
+}
+.kuhaku-bracket-right {
+  vertical-align: bottom;
+  margin-left: 1.5px;
+  transform: translateY(0.12em);
+}
+
 /* Compact Health Bar */
 .horizontal-viewport-mode .health-hud-side .health-card__bar,
 .horizontal-viewport-mode .health-hud-side .health-card .health-card__bar {

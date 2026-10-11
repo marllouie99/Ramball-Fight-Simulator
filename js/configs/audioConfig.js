@@ -220,14 +220,21 @@ export const AUDIO_CONFIG = {
   'shiro_troop_move': 'Assets/Sound Effects/Shiro/FingerSnap.ogg',
   'shiro_board_turnon': 'Assets/Sound Effects/Shiro/shiro_chessboard_turnon.mp3',
   'shiro_board_shutdown': 'Assets/Sound Effects/Shiro/LightFlickerOff.ogg',
+  'shiro_chessboard_shutdown_voiceline': 'Assets/Sound Effects/Shiro/shiro_chessboard_shutdown_voiceline.mp3',
+  'shiro_board_shutdown_voiceline': 'Assets/Sound Effects/Shiro/shiro_chessboard_shutdown_voiceline.mp3',
   'shiro_knight_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'shiro_queen_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'shiro_rook_ram': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+  'shiro_blank_buff': 'Assets/Sound Effects/Shiro/BookSynthFirstTier.ogg',
+  'shiro_troop_buff_voiceline': 'Assets/Sound Effects/Shiro/shiro_troop_buff_voiceline.mp3',
+  'shiro_blank_voiceline': 'Assets/Sound Effects/Shiro/shiro_troop_buff_voiceline.mp3',
+  'shiro_troop_destroyed': 'Assets/Sound Effects/Shiro/PermafrostKeepSealMine1.ogg',
 
   // Shiro SFX Aliases & Compatibility
   'shiro_finger_snap': 'Assets/Sound Effects/Shiro/FingerSnap.ogg',
   'shiro_board_appear': 'Assets/Sound Effects/Shiro/shiro_chessboard_turnon.mp3',
   'shiro_board_activate': 'Assets/Sound Effects/Shiro/StarblessedPlatformActivate.ogg',
+  'shiro_enhance': 'Assets/Sound Effects/Shiro/BookSynthFirstTier.ogg',
   'knight_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'queen_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'chess_snap': 'Assets/Sound Effects/Shiro/FingerSnap.ogg'

@@ -1907,6 +1907,7 @@ export const FIGHTER_DEFS = [
   {
     id: 58,
     name: 'SHIRO',
+    displayName: '『SHIRO』',
     category: 'Anime',
     color: shiroConfig.color || '#A855F7',
     themeColor: shiroConfig.themeColor || '#8B5CF6',

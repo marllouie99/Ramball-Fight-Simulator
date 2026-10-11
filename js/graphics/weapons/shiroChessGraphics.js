@@ -9,6 +9,8 @@
 import { state, triggerGlobalScreenShake } from '../../core/state.js';
 import { spawnSparks, spawnImpactFlash } from '../particles/sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
+import { shiroConfig } from '../../configs/characters/shiroConfig.js';
+import { CONFIG } from '../../core/config.js';
 
 // Precomputed 8x8 tile assembly sequence normalized [0.0, 0.75]
 // Center 4 tiles (d4, d5, e4, e5) plant first, followed by concentric expanding waves
@@ -57,18 +59,33 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
   const cy = arena.height / 2;
   const isShuttingDown = (shutdownProgress > 0 && shutdownProgress <= 1.0);
 
+  const cb = shiroConfig?.chessboard || CONFIG?.shiro?.chessboard || {};
+  const phase1Ratio = cb.shutdownPhase1Ratio ?? 0.45;
+  const phase2Ratio = cb.shutdownPhase2Ratio ?? 0.80;
+  const tileDuration = cb.tileDropDurationRatio ?? 0.25;
+  const tileDropDist = cb.tileDropDistance ?? 24;
+  const scanlineSpeed = cb.scanlineSpeed ?? 14.0;
+  const scanlineSpacing = cb.scanlineSpacing ?? 3;
+  const scanlineAlpha = cb.scanlineAlpha ?? 0.08;
+  const scanBeamSpeed = cb.scanBeamSpeed ?? 75.0;
+  const scanBeamHeight = cb.scanBeamHeight ?? 50;
+  const scanBeamAlpha = cb.scanBeamAlpha ?? 0.14;
+  const staticCount = cb.staticNoiseBars ?? 6;
+  const bLen = cb.snapBracketLength ?? 8;
+  const snapFlashLineWidth = cb.snapFlashLineWidth ?? 2.4;
+
   let scaleX = 1.0;
   let scaleY = 1.0;
 
   if (isShuttingDown) {
-    if (shutdownProgress < 0.45) {
+    if (shutdownProgress < phase1Ratio) {
       // Phase 1: Vertical squash toward horizontal center line
-      const t = shutdownProgress / 0.45;
+      const t = shutdownProgress / Math.max(0.01, phase1Ratio);
       scaleY = Math.max(0.002, Math.pow(1.0 - t, 2.5));
       scaleX = 1.0 + Math.sin(t * Math.PI) * 0.08;
-    } else if (shutdownProgress < 0.80) {
+    } else if (shutdownProgress < phase2Ratio) {
       // Phase 2: Horizontal collapse from line into central phosphor dot
-      const t = (shutdownProgress - 0.45) / 0.35;
+      const t = (shutdownProgress - phase1Ratio) / Math.max(0.01, phase2Ratio - phase1Ratio);
       scaleY = 0.002;
       scaleX = Math.max(0.004, Math.pow(1.0 - t, 2.2));
     } else {
@@ -89,13 +106,12 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
 
     const LIGHT_TILE = '#74E798'; // Pastel Digital Mint Green (#74E798)
     const DARK_TILE = '#3B5BDB';  // Vibrant Deep Cobalt Royal Blue (#3B5BDB)
-    const isFullyAssembled = (assembleProgress >= 1.0 && !isShuttingDown);
+    const isFullyAssembled = (assembleProgress >= 1.0 || isShuttingDown);
 
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const isLight = (r + c) % 2 === 0;
         const tileStart = _CHESS_TILE_ASSEMBLE_ORDER[r][c];
-        const tileDuration = 0.25;
 
         if (!isFullyAssembled && assembleProgress < tileStart) {
           // Holographic wireframe placeholder before tile is assembled
@@ -116,7 +132,7 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
           // Cubic ease out for crisp digital landing
           const ease = 1.0 - Math.pow(1.0 - localP, 3);
           scale = 0.35 + ease * 0.65;
-          dropY = (1.0 - ease) * -24; // Descends 24px down into arena floor
+          dropY = (1.0 - ease) * -tileDropDist; // Descends tileDropDist px down into arena floor
           snapFlash = Math.sin(localP * Math.PI); // Radiant laser snap flash on impact
         }
 
@@ -141,7 +157,7 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
         if (snapFlash > 0.05) {
           // Glowing laser perimeter
           ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * snapFlash})`;
-          ctx.lineWidth = 2.4;
+          ctx.lineWidth = snapFlashLineWidth;
           ctx.strokeRect(-tileW / 2, -tileH / 2, tileW, tileH);
 
           // Core holographic wash
@@ -149,9 +165,8 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
           ctx.fillRect(-tileW / 2, -tileH / 2, tileW, tileH);
 
           // Tactical 4-corner snap brackets
-          const bLen = 8;
           ctx.strokeStyle = `rgba(255, 255, 255, ${1.0 * snapFlash})`;
-          ctx.lineWidth = 2.8;
+          ctx.lineWidth = snapFlashLineWidth + 0.4;
 
           // Top-Left
           ctx.beginPath();
@@ -187,20 +202,21 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
     }
 
     // High-Density Horizontal CRT Phosphor Scanline Mesh (Console Screen Effect)
-    const scanShift = (now * 14) % 3;
-    ctx.fillStyle = 'rgba(10, 18, 40, 0.08)';
-    for (let y = scanShift; y < arena.height; y += 3) {
+    const scanShift = (now * scanlineSpeed) % scanlineSpacing;
+    ctx.fillStyle = `rgba(10, 18, 40, ${scanlineAlpha})`;
+    for (let y = scanShift; y < arena.height; y += scanlineSpacing) {
       ctx.fillRect(0, y, arena.width, 1.2);
     }
 
     // Dynamic Rolling Projector Beam Sweep (Slow vertical holographic roll)
-    const beamY = (now * 75) % (arena.height + 60) - 30;
-    const beamGrad = ctx.createLinearGradient(0, beamY - 25, 0, beamY + 25);
+    const beamY = (now * scanBeamSpeed) % (arena.height + 60) - 30;
+    const beamHalf = scanBeamHeight / 2;
+    const beamGrad = ctx.createLinearGradient(0, beamY - beamHalf, 0, beamY + beamHalf);
     beamGrad.addColorStop(0, 'rgba(56, 189, 248, 0.00)');
-    beamGrad.addColorStop(0.5, 'rgba(224, 242, 254, 0.14)');
+    beamGrad.addColorStop(0.5, `rgba(224, 242, 254, ${scanBeamAlpha})`);
     beamGrad.addColorStop(1, 'rgba(56, 189, 248, 0.00)');
     ctx.fillStyle = beamGrad;
-    ctx.fillRect(0, Math.max(0, beamY - 25), arena.width, Math.min(arena.height, 50));
+    ctx.fillRect(0, Math.max(0, beamY - beamHalf), arena.width, Math.min(arena.height, scanBeamHeight));
 
     // Secondary fine laser scanline at beam apex
     if (beamY >= 0 && beamY <= arena.height) {
@@ -210,7 +226,6 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
 
     // Horizontal Projector Static Interference & Signal Noise Bars
     const seed = Math.floor(now * 18);
-    const staticCount = 6;
     for (let i = 0; i < staticCount; i++) {
       const pseudoRand1 = Math.sin(seed * 11.13 + i * 7.7) * 10000;
       const norm1 = pseudoRand1 - Math.floor(pseudoRand1);
@@ -266,28 +281,37 @@ export function drawDisboardChessboard(ctx, arena, alpha = 1.0, assembleProgress
     if (shutdownProgress < 0.80) {
       const lineW = arena.width * scaleX;
       const startX = cx - lineW / 2;
-      const t = shutdownProgress < 0.45 ? (shutdownProgress / 0.45) : 1.0;
+      const t = shutdownProgress < phase1Ratio ? (shutdownProgress / Math.max(0.01, phase1Ratio)) : 1.0;
+
+      // Modulate laser intensity: in Phase 1, start soft and intensify as the screen squashes flat
+      let laserAlpha = 1.0;
+      if (shutdownProgress < phase1Ratio) {
+        laserAlpha = Math.pow(t, 1.8); // Builds up smoothly from 0.0 to 1.0 as board squashes
+      } else {
+        const p2 = (shutdownProgress - phase1Ratio) / Math.max(0.01, phase2Ratio - phase1Ratio);
+        laserAlpha = Math.max(0.0, 1.0 - p2 * 0.35);
+      }
 
       // Wide outer cyan plasma wash
       const glowH = 18 * (1.0 - t * 0.4) + 4;
-      ctx.fillStyle = `rgba(56, 189, 248, ${0.75 * (1.0 - shutdownProgress * 0.35)})`;
+      ctx.fillStyle = `rgba(56, 189, 248, ${0.75 * laserAlpha * (1.0 - shutdownProgress * 0.35)})`;
       ctx.fillRect(startX, cy - glowH / 2, lineW, glowH);
 
       // Digital mint inner plasma band
       const innerH = 6 * (1.0 - t * 0.3) + 2;
-      ctx.fillStyle = `rgba(116, 231, 152, ${0.85 * (1.0 - shutdownProgress * 0.3)})`;
+      ctx.fillStyle = `rgba(116, 231, 152, ${0.85 * laserAlpha * (1.0 - shutdownProgress * 0.3)})`;
       ctx.fillRect(startX, cy - innerH / 2, lineW, innerH);
 
       // Pure white supersonic laser core line
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.98)';
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.98 * laserAlpha})`;
       ctx.fillRect(startX, cy - 1.5, lineW, 3);
 
       // CRT phosphor static fizzle sparks at the collapsing ends
-      const sparkCount = Math.floor((1.0 - shutdownProgress) * 6);
+      const sparkCount = Math.floor((1.0 - shutdownProgress) * 6 * laserAlpha);
       for (let s = 0; s < sparkCount; s++) {
         const sx = startX + Math.random() * lineW;
         const sy = cy + (Math.random() - 0.5) * (glowH * 1.5);
-        ctx.fillStyle = s % 2 === 0 ? 'rgba(255, 255, 255, 0.9)' : 'rgba(56, 189, 248, 0.9)';
+        ctx.fillStyle = s % 2 === 0 ? `rgba(255, 255, 255, ${0.9 * laserAlpha})` : `rgba(56, 189, 248, ${0.9 * laserAlpha})`;
         ctx.fillRect(sx - 1, sy - 1, 2, 2);
       }
     }
@@ -556,9 +580,10 @@ export function drawChessTroop(ctx, troop) {
   if (!troop.isMinion && troop.angle) {
     ctx.rotate(troop.angle);
 
+    const isBuffedProj = Boolean(troop.blankBuffTimer > 0);
     // Aerodynamic speed line needle trail trailing behind the flying small projectile piece
     ctx.save();
-    ctx.fillStyle = 'rgba(56, 189, 248, 0.45)';
+    ctx.fillStyle = isBuffedProj ? 'rgba(252, 211, 77, 0.65)' : 'rgba(56, 189, 248, 0.45)';
     ctx.beginPath();
     ctx.moveTo(-r * 2.4, -r * 0.45);
     ctx.lineTo(-r * 0.4, 0);
@@ -568,7 +593,7 @@ export function drawChessTroop(ctx, troop) {
     ctx.fill();
 
     // Sharp supersonic white core needle
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.80)';
+    ctx.fillStyle = isBuffedProj ? 'rgba(254, 240, 138, 0.95)' : 'rgba(255, 255, 255, 0.80)';
     ctx.beginPath();
     ctx.moveTo(-r * 1.6, -r * 0.20);
     ctx.lineTo(-r * 0.3, 0);
@@ -595,13 +620,16 @@ export function drawChessTroop(ctx, troop) {
     const drawX = -drawTotalW / 2;
     const drawY = -drawH * 0.58 - processed.pad * scale;
 
-    // Unified cyan/blue under-glow only for living chess troops on board
-    const glowColor = 'rgba(56, 189, 248, 0.35)';
+    // Under-glow for living chess troops: Radiant Elkia Gold if buffed by Blank Never Loses, else classic cyan
     if (troop.isMinion) {
-      ctx.fillStyle = glowColor;
-      ctx.beginPath();
-      ctx.ellipse(0, drawH * 0.35, r * 0.95, r * 0.40, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (troop.blankBuffTimer > 0) {
+        _drawTroopBlankBuffAura(ctx, r, drawH);
+      } else {
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, drawH * 0.35, r * 0.95, r * 0.40, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     ctx.drawImage(processed.canvas, drawX, drawY, drawTotalW, drawTotalH);
@@ -616,13 +644,16 @@ export function drawChessTroop(ctx, troop) {
     const drawX = -drawW / 2;
     const drawY = -drawH * 0.58;
 
-    // Unified cyan/blue under-glow only for living chess troops on board
-    const glowColor = 'rgba(56, 189, 248, 0.35)';
+    // Under-glow for living chess troops: Radiant Elkia Gold if buffed by Blank Never Loses, else classic cyan
     if (troop.isMinion) {
-      ctx.fillStyle = glowColor;
-      ctx.beginPath();
-      ctx.ellipse(0, drawH * 0.35, r * 0.95, r * 0.40, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (troop.blankBuffTimer > 0) {
+        _drawTroopBlankBuffAura(ctx, r, drawH);
+      } else {
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, drawH * 0.35, r * 0.95, r * 0.40, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     ctx.drawImage(spriteSheet, frame.sx, frame.sy, frame.sw, frame.sh, drawX, drawY, drawW, drawH);
@@ -633,13 +664,16 @@ export function drawChessTroop(ctx, troop) {
     const isWhitePiece = (troop.isWhite || isRadiantQueen);
     const facingLeft = (troop.x > 270);
 
-    // Unified cyan/blue under-glow only for living chess troops on board
-    const glowColor = 'rgba(56, 189, 248, 0.35)';
+    // Under-glow for living chess troops: Radiant Elkia Gold if buffed by Blank Never Loses, else classic cyan
     if (troop.isMinion) {
-      ctx.fillStyle = glowColor;
-      ctx.beginPath();
-      ctx.ellipse(0, r * 0.60, r * 0.95, r * 0.35, 0, 0, Math.PI * 2);
-      ctx.fill();
+      if (troop.blankBuffTimer > 0) {
+        _drawTroopBlankBuffAura(ctx, r, 0);
+      } else {
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
+        ctx.beginPath();
+        ctx.ellipse(0, r * 0.60, r * 0.95, r * 0.35, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     switch (troop.type) {
@@ -927,24 +961,85 @@ function _drawQueenPiece(ctx, r, isWhite = true) {
   ctx.fillRect(-cBarW / 2, cy - cw / 2, cBarW, cw);
 }
 
+function _drawTroopBlankBuffAura(ctx, r, drawH = 0) {
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  const pulse = 0.5 + 0.5 * Math.sin(now * 7.0);
+  const baseCenterY = drawH ? (drawH * 0.35) : (r * 0.60);
+
+  ctx.save();
+  // 1. Radiant Expanding Golden Under-Glow Aura
+  ctx.fillStyle = `rgba(252, 211, 77, ${0.42 + pulse * 0.22})`;
+  ctx.beginPath();
+  ctx.ellipse(0, baseCenterY, r * 1.30 + pulse * 3.0, r * 0.52 + pulse * 1.5, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Concentric Golden Boundary Ring
+  ctx.strokeStyle = `rgba(245, 158, 11, ${0.72 + pulse * 0.24})`;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.ellipse(0, baseCenterY, r * 1.15 + pulse * 2.0, r * 0.45 + pulse * 1.0, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 3. Two Orbiting Golden Sparkle Motes
+  const orb1Angle = now * 4.0;
+  const orb2Angle = orb1Angle + Math.PI;
+  const orbR = r * 1.18;
+  ctx.fillStyle = '#FEF08A';
+  ctx.fillRect(Math.cos(orb1Angle) * orbR - 1.5, baseCenterY + Math.sin(orb1Angle) * (r * 0.40) - 1.5, 3, 3);
+  ctx.fillRect(Math.cos(orb2Angle) * orbR - 1.5, baseCenterY + Math.sin(orb2Angle) * (r * 0.40) - 1.5, 3, 3);
+  ctx.restore();
+}
+
+function _drawTroopCrownBadge(ctx, cx, cy, sz) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.fillStyle = '#FCD34D';
+  ctx.strokeStyle = '#D97706';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-sz, sz * 0.45);
+  ctx.lineTo(sz, sz * 0.45);
+  ctx.lineTo(sz * 0.9, -sz * 0.25);
+  ctx.lineTo(sz * 0.45, -sz * 0.05);
+  ctx.lineTo(0, -sz * 0.75);
+  ctx.lineTo(-sz * 0.45, -sz * 0.05);
+  ctx.lineTo(-sz * 0.9, -sz * 0.25);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Tiny jewel at center
+  ctx.fillStyle = '#EF4444';
+  ctx.fillRect(-1, sz * 0.05, 2, 2);
+  ctx.restore();
+}
+
 function _drawTroopOverheadHud(ctx, troop, r) {
   const hpPct = Math.max(0, Math.min(1, troop.hp / troop.maxHp));
   const barW = r * 2.4;
   const barH = 3.5;
   const barY = -r - 8;
+  const isBuffed = Boolean(troop.blankBuffTimer && troop.blankBuffTimer > 0);
 
   // Background
   ctx.fillStyle = 'rgba(14, 15, 20, 0.85)';
   ctx.fillRect(-barW / 2 - 1, barY - 1, barW + 2, barH + 2);
 
-  // Health bar (Emerald Green -> Amber -> Red based on HP)
-  ctx.fillStyle = hpPct > 0.5 ? '#10B981' : (hpPct > 0.25 ? '#F59E0B' : '#EF4444');
+  // Health bar (Radiant Gold if buffed by Blank Never Loses, else Emerald Green -> Amber -> Red based on HP)
+  ctx.fillStyle = isBuffed ? '#FCD34D' : (hpPct > 0.5 ? '#10B981' : (hpPct > 0.25 ? '#F59E0B' : '#EF4444'));
   ctx.fillRect(-barW / 2, barY, barW * hpPct, barH);
 
-  // Subtle border
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-  ctx.lineWidth = 0.8;
+  // Border (Glowing Gold if buffed)
+  ctx.strokeStyle = isBuffed ? 'rgba(252, 211, 77, 0.90)' : 'rgba(255, 255, 255, 0.25)';
+  ctx.lineWidth = isBuffed ? 1.2 : 0.8;
   ctx.strokeRect(-barW / 2 - 1, barY - 1, barW + 2, barH + 2);
+
+  // Floating Golden Queen Crown / Prediction Badge when buffed
+  if (isBuffed) {
+    const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+    const crownBob = Math.sin(now * 5.5) * 1.5;
+    _drawTroopCrownBadge(ctx, 0, barY - 7 + crownBob, 5.5);
+  }
 }
 
 function _getHarmonizedTileHighlight(col, row, type, alpha = 1.0) {
@@ -1159,6 +1254,9 @@ export function drawChessAttackVfx(ctx, arena, vfxList) {
       case 'pawn_thrust':
         _drawPawnThrustVfx(ctx, vfx);
         break;
+      case 'pawn_shockwave':
+        drawPawnShockwave(ctx, vfx);
+        break;
       case 'knight_shockwave':
         drawKnightShockwave(ctx, vfx);
         break;
@@ -1177,8 +1275,196 @@ export function drawChessAttackVfx(ctx, arena, vfxList) {
       case 'troop_plant':
         _drawTroopPlantCinematicVfx(ctx, arena, vfx);
         break;
+      case 'blank_troop_buff':
+        _drawBlankTroopBuffVfx(ctx, vfx);
+        break;
     }
   }
+}
+
+/**
+ * Draws the high-impact Elkia Golden Buff Activation animation on an active chess troop.
+ * Features: Dual concentric expanding gold water-ripple shockwaves (Rule 26),
+ * ascending vertical golden aura light column, floating Queen's Golden Crown apex crest,
+ * 4 digital prediction framing brackets, and ascending spiral sparkle motes.
+ * Color Theme: Elkia Gold (#FCD34D, #F59E0B, #FEF08A, #FFFBEB).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {object} vfx
+ */
+function _drawBlankTroopBuffVfx(ctx, vfx) {
+  const { timer, maxTimer, r = 16 } = vfx;
+  const targetX = (vfx.troop && !vfx.troop.dead && vfx.troop.hp > 0) ? vfx.troop.x : vfx.x;
+  const targetY = (vfx.troop && !vfx.troop.dead && vfx.troop.hp > 0)
+    ? (vfx.troop.y - (vfx.troop.z || 0))
+    : vfx.y;
+
+  const progress = Math.max(0, Math.min(1.0, 1.0 - (timer / (maxTimer || 45))));
+  const fadeOut = Math.pow(1.0 - progress, 1.25);
+  const popIn = Math.min(1.0, progress / 0.12);
+  const alpha = popIn * fadeOut;
+
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  ctx.translate(targetX, targetY);
+
+  // 1. Dual Concentric Gold Wavefront Shockwaves (Rule 26 Compliant)
+  const maxR = r * 2.8;
+  const wave1R = maxR * Math.pow(progress, 0.65);
+  if (wave1R > 1) {
+    // Translucent expanding golden interior wash
+    ctx.fillStyle = `rgba(252, 211, 77, ${0.20 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(0, r * 0.45, wave1R, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Supersonic pale-gold core line
+    ctx.strokeStyle = `rgba(254, 240, 138, ${0.95 * alpha})`;
+    ctx.lineWidth = Math.max(1.0, 2.8 * alpha);
+    ctx.beginPath();
+    ctx.arc(0, r * 0.45, wave1R, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Outer rich amber-gold ionization border
+    ctx.strokeStyle = `rgba(245, 158, 11, ${0.80 * alpha})`;
+    ctx.lineWidth = Math.max(1.0, 1.4 * alpha);
+    ctx.beginPath();
+    ctx.arc(0, r * 0.45, Math.max(0, wave1R - 1.5), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Wave 2: Staggered second ripple popping out at progress > 0.14
+  if (progress > 0.14) {
+    const p2 = (progress - 0.14) / 0.86;
+    const wave2R = maxR * 0.82 * Math.pow(p2, 0.65);
+    const fade2 = Math.pow(1.0 - p2, 1.25);
+    if (wave2R > 1) {
+      ctx.strokeStyle = `rgba(252, 211, 77, ${0.85 * fade2})`;
+      ctx.lineWidth = Math.max(1.0, 2.0 * fade2);
+      ctx.beginPath();
+      ctx.arc(0, r * 0.45, wave2R, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // 2. Ascending Golden Energy Light Column
+  const colHeight = r * 3.6 * Math.pow(progress, 0.60);
+  const colWidth = r * 1.6;
+  const colGradient = ctx.createLinearGradient(0, r * 0.45, 0, r * 0.45 - colHeight);
+  colGradient.addColorStop(0, `rgba(245, 158, 11, ${0.45 * alpha})`);
+  colGradient.addColorStop(0.35, `rgba(252, 211, 77, ${0.35 * alpha})`);
+  colGradient.addColorStop(0.85, `rgba(254, 240, 138, ${0.20 * alpha})`);
+  colGradient.addColorStop(1, 'rgba(254, 240, 138, 0)');
+
+  ctx.fillStyle = colGradient;
+  ctx.beginPath();
+  ctx.moveTo(-colWidth * 0.65, r * 0.45);
+  ctx.lineTo(colWidth * 0.65, r * 0.45);
+  ctx.lineTo(colWidth * 0.40, r * 0.45 - colHeight);
+  ctx.lineTo(-colWidth * 0.40, r * 0.45 - colHeight);
+  ctx.closePath();
+  ctx.fill();
+
+  // Sharp center energy filament
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.80 * alpha})`;
+  ctx.lineWidth = Math.max(1.0, 1.8 * alpha);
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.45);
+  ctx.lineTo(0, r * 0.45 - colHeight * 0.95);
+  ctx.stroke();
+
+  // 3. Digital Prediction Brackets [ ] Framing the Tile
+  const bracketDist = (r * 1.7) * (1.0 - progress * 0.28);
+  const bracketLen = r * 0.55;
+  ctx.strokeStyle = `rgba(252, 211, 77, ${0.90 * alpha})`;
+  ctx.lineWidth = 2.0;
+
+  // Top-Left [
+  ctx.beginPath();
+  ctx.moveTo(-bracketDist, -bracketDist + bracketLen);
+  ctx.lineTo(-bracketDist, -bracketDist);
+  ctx.lineTo(-bracketDist + bracketLen, -bracketDist);
+  ctx.stroke();
+
+  // Top-Right ]
+  ctx.beginPath();
+  ctx.moveTo(bracketDist - bracketLen, -bracketDist);
+  ctx.lineTo(bracketDist, -bracketDist);
+  ctx.lineTo(bracketDist, -bracketDist + bracketLen);
+  ctx.stroke();
+
+  // Bottom-Left [
+  ctx.beginPath();
+  ctx.moveTo(-bracketDist, bracketDist - bracketLen);
+  ctx.lineTo(-bracketDist, bracketDist);
+  ctx.lineTo(-bracketDist + bracketLen, bracketDist);
+  ctx.stroke();
+
+  // Bottom-Right ]
+  ctx.beginPath();
+  ctx.moveTo(bracketDist - bracketLen, bracketDist);
+  ctx.lineTo(bracketDist, bracketDist);
+  ctx.lineTo(bracketDist, bracketDist - bracketLen);
+  ctx.stroke();
+
+  // 4. Floating Elkia Queen's Golden Crown Emblem at the Apex
+  const crownElevation = -r * 1.3 - (progress * 24);
+  const crownSz = r * 0.75 * (0.6 + Math.sin(progress * Math.PI) * 0.55);
+  ctx.save();
+  ctx.translate(0, crownElevation);
+
+  // Crown glow backing
+  ctx.fillStyle = `rgba(252, 211, 77, ${0.40 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, crownSz * 1.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3-Peak Queen Crown Vector
+  ctx.fillStyle = `rgba(254, 240, 138, ${0.95 * alpha})`;
+  ctx.strokeStyle = `rgba(217, 119, 6, ${0.90 * alpha})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-crownSz, crownSz * 0.45);
+  ctx.lineTo(crownSz, crownSz * 0.45);
+  ctx.lineTo(crownSz * 0.9, -crownSz * 0.25);
+  ctx.lineTo(crownSz * 0.45, -crownSz * 0.05);
+  ctx.lineTo(0, -crownSz * 0.85);
+  ctx.lineTo(-crownSz * 0.45, -crownSz * 0.05);
+  ctx.lineTo(-crownSz * 0.9, -crownSz * 0.25);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Center royal ruby glint
+  ctx.fillStyle = `rgba(239, 68, 68, ${0.95 * alpha})`;
+  ctx.beginPath();
+  ctx.arc(0, crownSz * 0.12, crownSz * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // 5. Ascending Spiral Sparkle Motes (5 diamonds)
+  for (let i = 0; i < 5; i++) {
+    const pOffset = (progress + i * 0.20) % 1.0;
+    const moteAngle = (i * Math.PI * 0.4) + progress * 5.0;
+    const moteR = r * (0.7 + Math.sin(pOffset * Math.PI) * 0.5);
+    const mx = Math.cos(moteAngle) * moteR;
+    const my = r * 0.35 - (pOffset * (r * 3.4));
+    const moteAlpha = Math.sin(pOffset * Math.PI) * alpha;
+
+    if (moteAlpha > 0.05) {
+      const sz = 2.5 + Math.sin(pOffset * Math.PI) * 1.5;
+      ctx.fillStyle = i % 2 === 0 ? `rgba(255, 255, 255, ${0.95 * moteAlpha})` : `rgba(252, 211, 77, ${0.90 * moteAlpha})`;
+      ctx.beginPath();
+      ctx.moveTo(mx, my - sz);
+      ctx.lineTo(mx + sz, my);
+      ctx.lineTo(mx, my + sz);
+      ctx.lineTo(mx - sz, my);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
 }
 
 function _drawPawnThrustVfx(ctx, vfx) {
@@ -1419,6 +1705,78 @@ export function drawKnightShockwave(ctx, shockwave) {
       ctx.arc(sx, sy, sz, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws Pawn AOE Landing Radial Shockwave (Rule 26 Compliant).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {object} shockwave
+ */
+export function drawPawnShockwave(ctx, shockwave) {
+  if (!shockwave || shockwave.timer <= 0) return;
+
+  const { x, y, radius = 46, timer, maxTimer = 16 } = shockwave;
+  const globalP = Math.max(0, Math.min(1.0, 1.0 - timer / maxTimer));
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // 1. Digital Mint/Cyan Pop-in Flash
+  const flashP = Math.sin(Math.min(1.0, globalP / 0.35) * Math.PI);
+  if (flashP > 0.01) {
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.50 * flashP})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.30 * Math.pow(globalP, 0.4), 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = `rgba(116, 231, 152, ${0.30 * flashP})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.60 * Math.pow(globalP, 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 2. Staggered Concentric Compression Ripples (Rule 26)
+  const rippleOffsets = [0.00, 0.16];
+  const maxR = radius * 1.25;
+
+  for (let k = 0; k < rippleOffsets.length; k++) {
+    const tOffset = rippleOffsets[k];
+    if (globalP < tOffset) continue;
+
+    const localP = (globalP - tOffset) / (1.0 - tOffset);
+    const waveR = maxR * Math.pow(localP, 0.65);
+    const popIn = Math.min(1.0, localP / 0.10);
+    const fadeOut = Math.pow(1.0 - localP, 1.30);
+    const alpha = popIn * fadeOut;
+
+    if (alpha <= 0.01) continue;
+
+    // Translucent mint/cyan interior wash
+    ctx.fillStyle = (k === 0)
+      ? `rgba(116, 231, 152, ${0.16 * alpha})`
+      : `rgba(56, 189, 248, ${0.10 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Outer Digital Mint/Cyan Stroke
+    ctx.strokeStyle = (k === 0)
+      ? `rgba(116, 231, 152, ${0.90 * alpha})`
+      : `rgba(56, 189, 248, ${0.80 * alpha})`;
+    ctx.lineWidth = (k === 0) ? 2.6 * alpha : 1.8 * alpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, waveR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner White Super-Sonic Edge
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+    ctx.lineWidth = 1.2 * alpha;
+    ctx.beginPath();
+    ctx.arc(0, 0, Math.max(0, waveR - 1.2), 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   ctx.restore();
@@ -1726,4 +2084,77 @@ export function drawChessTroopShatterShard(ctx, effect) {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(-1.5, -1.5, 3, 3);
   }
+}
+
+/**
+ * Draws Shiro's victory speech bubble with typewriter text reveal and anime dialogue styling.
+ * Renders on Canvas 2D with a pointer tail pointing towards Shiro's head.
+ */
+export function drawShiroSpeechBubble(ctx, fighter) {
+  if (!fighter || !fighter.speechBubble || fighter.speechBubble.timer <= 0) return;
+  const bubble = fighter.speechBubble;
+  const displayText = bubble.text || '';
+  if (!displayText && bubble.charIndex === 0) return;
+
+  ctx.save();
+
+  // Smooth fade-out during final 18 frames
+  let alpha = 1.0;
+  if (bubble.timer < 18) {
+    alpha = Math.max(0, bubble.timer / 18);
+  }
+  ctx.globalAlpha = alpha;
+
+  const font = '700 13px "Courier New", "Consolas", "Inter", "Segoe UI", monospace, sans-serif';
+  ctx.font = font;
+
+  // Use full text to measure width so bubble size remains stable throughout typewriter animation
+  const measureTarget = bubble.fullText || 'Checkmate!';
+  const textW = ctx.measureText(measureTarget).width;
+  const padX = 14;
+  const padY = 5;
+  const bubbleW = Math.max(72, textW + padX * 2);
+  const bubbleH = 26;
+
+  const bubbleX = fighter.x;
+  // Position right above Shiro's crown hair spikes (taking z into account)
+  const bubbleY = fighter.y - (fighter.z || 0) - fighter.r - 30;
+
+  const left = bubbleX - bubbleW / 2;
+  const top = bubbleY - bubbleH / 2;
+  const cornerR = 5;
+
+  // Draw Speech Bubble Body (White fill with crisp 2px dark ink border)
+  ctx.fillStyle = '#FFFFFF';
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 2.0;
+
+  ctx.beginPath();
+  ctx.moveTo(left + cornerR, top);
+  ctx.lineTo(left + bubbleW - cornerR, top);
+  ctx.arcTo(left + bubbleW, top, left + bubbleW, top + cornerR, cornerR);
+  ctx.lineTo(left + bubbleW, top + bubbleH - cornerR);
+  ctx.arcTo(left + bubbleW, top + bubbleH, left + bubbleW - cornerR, top + bubbleH, cornerR);
+
+  // Downward pointer tail pointing directly to Shiro's head
+  ctx.lineTo(bubbleX + 4, top + bubbleH);
+  ctx.lineTo(bubbleX, top + bubbleH + 7);
+  ctx.lineTo(bubbleX - 4, top + bubbleH);
+
+  ctx.lineTo(left + cornerR, top + bubbleH);
+  ctx.arcTo(left, top + bubbleH, left, top + bubbleH - cornerR, cornerR);
+  ctx.lineTo(left, top + cornerR);
+  ctx.arcTo(left, top, left + cornerR, top, cornerR);
+  ctx.closePath();
+
+  ctx.fill();
+  ctx.stroke();
+
+  // Render dialogue in crisp manga black
+  ctx.fillStyle = '#0E0F14';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(displayText, bubbleX, bubbleY);
+
+  ctx.restore();
 }

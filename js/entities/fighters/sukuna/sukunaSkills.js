@@ -216,8 +216,10 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     // Multi-angle arc variance per strike
     const slashAngle = aimAngle + (Math.random() - 0.5) * 0.35;
 
+    const preHp = typeof target.hp === 'number' ? target.hp : null;
+    let dmgResult = false;
     if (typeof target.takeDamage === 'function') {
-      target.takeDamage(slashDamage, fighter, {
+      dmgResult = target.takeDamage(slashDamage, fighter, {
         isMelee: true,
         isSukunaSlash: true,
         isCleave: true,
@@ -227,6 +229,7 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
         isCrit
       });
     }
+    const damageLanded = (dmgResult && (dmgResult === true || dmgResult > 0)) || (preHp !== null && target.hp < preHp);
 
     spawnFloatingText(fighter.x, fighter.y - 30, 'CLEAVE!', '#E0E8FF');
     spawnSparks(target.x, target.y, 16, 'crimsonSniper', '#8B0000');
@@ -299,8 +302,10 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     const dashVol = CONFIG.sukuna?.soundVolumes?.teleportDash ?? 0.7;
     audioSystem.playSFX(dashSnd, dashVol);
 
-    if (typeof target.applyHitStun === 'function') target.applyHitStun(6);
-    if (typeof fighter.applyBleed === 'function') fighter.applyBleed(target, 1);
+    if (damageLanded) {
+      if (typeof target.applyHitStun === 'function') target.applyHitStun(6);
+      if (typeof fighter.applyBleed === 'function') fighter.applyBleed(target, 1);
+    }
 
     fighter.rapidSlashTimer = CONFIG.sukuna?.domainRapidSlashCooldown || 20;
   } else {

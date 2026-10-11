@@ -14,6 +14,7 @@ import { startNextRound, restartCurrentRound, resetMatch, randomize1v1Fighters, 
 import { stopArenaBgm } from '../../systems/arenaBgmSystem.js';
 import { getAnnouncerSound } from '../../soundEffects/announcerSounds.js';
 import { GAME_MODES, MODE_SETTINGS } from '../../core/modeConfig.js';
+import { drawDecoratedFighterName, measureDecoratedFighterName } from '../renderers/arenaRenderer.js';
 
 // ──────────────────────────────────────────
 // COLOR & MATH UTILITIES
@@ -438,12 +439,12 @@ function getTeamFighterNames(winningTeam, mode, fallbackWinner) {
     }
 
     if (teamFighters.length > 0) {
-      return teamFighters.map(f => (f.name || f._def?.name || f.characterId || f.type || 'FIGHTER').toUpperCase());
+      return teamFighters.map(f => (f.displayName || f._def?.displayName || f.name || f._def?.name || f.characterId || f.type || 'FIGHTER').toUpperCase());
     }
   }
 
   if (fallbackWinner) {
-    const name = (fallbackWinner.name || fallbackWinner._def?.name || fallbackWinner.characterId || fallbackWinner.type || 'FIGHTER').toUpperCase();
+    const name = (fallbackWinner.displayName || fallbackWinner._def?.displayName || fallbackWinner.name || fallbackWinner._def?.name || fallbackWinner.characterId || fallbackWinner.type || 'FIGHTER').toUpperCase();
     return [name];
   }
   return [];
@@ -496,7 +497,13 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   if (timer > 0 && isFinalMatchWin) {
     stopArenaBgm(true);
   }
-  if (!state._hasPlayedChampionYouWinVoice && timer >= 45) {
+  const isShiroWinnerMatch = Boolean(
+    effectiveWinner && (effectiveWinner.characterId === 'shiro' || effectiveWinner.type === 'shiro' || (effectiveWinner._def && effectiveWinner._def.id === 'shiro'))
+  );
+  // For Shiro: let faah play completely first (120 frames), then trigger YOU WIN announcer!
+  const youWinDelayMatch = isShiroWinnerMatch ? 120 : 45;
+
+  if (!state._hasPlayedChampionYouWinVoice && timer >= youWinDelayMatch) {
     state._hasPlayedChampionYouWinVoice = true;
     if (isFinalMatchWin && effectiveWinner && !isDraw) {
       const youwin = getAnnouncerSound('youwin');
@@ -523,12 +530,13 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
       ? state.getFighterTeam(winnerIndex)
       : (state.winningTeam !== undefined ? state.winningTeam : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1));
     const teamNames = getTeamFighterNames(winningTeam, mode, effectiveWinner);
-    winText = formatTeamWinText(teamNames, (effectiveWinner ? (effectiveWinner.name || 'OPERATIVE').toUpperCase() + ' WINS!' : 'TEAM WINS!'));
+    winText = formatTeamWinText(teamNames, (effectiveWinner ? (effectiveWinner.displayName || effectiveWinner._def?.displayName || effectiveWinner.name || 'OPERATIVE').toUpperCase() + ' WINS!' : 'TEAM WINS!'));
     themeColor = (effectiveWinner && (effectiveWinner.color || effectiveWinner.themeColor)) || TEAM_COLORS_FALLBACK[winningTeam] || '#FFD700';
   } else if (effectiveWinner) {
-    const rawName = (effectiveWinner.name || effectiveWinner._def?.name || 'OPERATIVE').toUpperCase();
+    const rawName = (effectiveWinner.displayName || effectiveWinner._def?.displayName || effectiveWinner.name || effectiveWinner._def?.name || 'OPERATIVE').toUpperCase();
     winText = `${rawName} WINS!`;
-    themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#ffffff';
+    const isShiro = (effectiveWinner.characterId === 'shiro' || effectiveWinner.type === 'shiro' || (effectiveWinner.displayName && effectiveWinner.displayName.includes('SHIRO')));
+    themeColor = isShiro ? '#C084FC' : (effectiveWinner.color || effectiveWinner.themeColor || '#ffffff');
   }
 
   // Smooth entrance scale & alpha
@@ -549,7 +557,7 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   let baseFontSize = 26;
 
   ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
-  let textWidth = ctx.measureText(winText).width;
+  let textWidth = measureDecoratedFighterName(ctx, winText);
   if (textWidth > maxAllowedWidth) {
     baseFontSize = Math.max(12, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
     ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
@@ -558,12 +566,12 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   // Thick dark stroke for high readability against map floor
   ctx.lineWidth = 6;
   ctx.strokeStyle = '#000000';
-  ctx.lineJoin = 'round';
-  ctx.strokeText(winText, 0, 0);
-
-  // Vibrant theme fill
   ctx.fillStyle = themeColor;
-  ctx.fillText(winText, 0, 0);
+  ctx.lineJoin = 'round';
+  drawDecoratedFighterName(ctx, winText, 0, 0, {
+    stroke: true,
+    color: themeColor
+  });
 
   ctx.restore();
 }
@@ -613,12 +621,13 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
         ? state.getFighterTeam(winnerIndex)
         : (state.winningTeam !== undefined ? state.winningTeam : (state.teamScores && state.teamScores[0] >= state.teamScores[1] ? 0 : 1));
       const teamNames = getTeamFighterNames(winningTeam, mode, effectiveWinner);
-      mainText = formatTeamWinText(teamNames, (effectiveWinner ? (effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase() + ' WINS!' : 'TEAM WINS!'));
+      mainText = formatTeamWinText(teamNames, (effectiveWinner ? (effectiveWinner.displayName || effectiveWinner._def?.displayName || effectiveWinner.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase() + ' WINS!' : 'TEAM WINS!'));
       themeColor = (effectiveWinner && (effectiveWinner.color || effectiveWinner.themeColor)) || TEAM_COLORS_FALLBACK[winningTeam] || '#FFD700';
     } else if (effectiveWinner) {
-      const rawName = (effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase();
+      const rawName = (effectiveWinner.displayName || effectiveWinner._def?.displayName || effectiveWinner.name || effectiveWinner._def?.name || effectiveWinner.characterId || 'FIGHTER').toUpperCase();
       mainText = `${rawName} WINS!`;
-      themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#00E5FF';
+      const isShiro = (effectiveWinner.characterId === 'shiro' || effectiveWinner.type === 'shiro' || (effectiveWinner.displayName && effectiveWinner.displayName.includes('SHIRO')));
+      themeColor = isShiro ? '#C084FC' : (effectiveWinner.color || effectiveWinner.themeColor || '#00E5FF');
     }
   }
 
@@ -643,7 +652,7 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   const retroFontFamily = '"Silkscreen", "Press Start 2P", monospace, sans-serif';
 
   ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
-  let textWidth = ctx.measureText(mainText).width;
+  let textWidth = measureDecoratedFighterName(ctx, mainText);
   if (textWidth > maxAllowedWidth) {
     baseFontSize = Math.max(12, Math.floor(baseFontSize * (maxAllowedWidth / textWidth)));
     ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
@@ -655,13 +664,13 @@ function draw1v1WinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   // Main winner text - Heavy black outline for maximum contrast
   ctx.font = `700 ${baseFontSize}px ${retroFontFamily}`;
   ctx.strokeStyle = '#000000';
+  ctx.fillStyle = themeColor;
   ctx.lineWidth = 6;
   ctx.lineJoin = 'round';
-  ctx.strokeText(mainText, 0, mainY);
-
-  // Vibrant fill
-  ctx.fillStyle = themeColor;
-  ctx.fillText(mainText, 0, mainY);
+  drawDecoratedFighterName(ctx, mainText, 0, mainY, {
+    stroke: true,
+    color: themeColor
+  });
 
   // Subtitle / Round tag text - only in 1v1 multi-round mode or draw
   if (showSubText) {
@@ -719,7 +728,13 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     stopArenaBgm(true);
   }
 
-  if (!state._hasPlayedChampionYouWinVoice && timer >= 45) {
+  const isShiroWinnerLayout = Boolean(
+    winner && (winner.characterId === 'shiro' || winner.type === 'shiro' || (winner._def && winner._def.id === 'shiro'))
+  );
+  // For Shiro: let faah play completely first (120 frames), then trigger YOU WIN announcer!
+  const youWinDelayLayout = isShiroWinnerLayout ? 120 : 45;
+
+  if (!state._hasPlayedChampionYouWinVoice && timer >= youWinDelayLayout) {
     state._hasPlayedChampionYouWinVoice = true;
     if (!isDraw && winner) {
       if (isFinalMatchWin) {
@@ -792,8 +807,8 @@ function drawRoundEndScreen() {
     state._hasPlayedChampionVictoryVoice = false;
   }
 
-  const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath));
-  const isSansDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter && (e.timer > -40 || (e.speechBubble && e.speechBubble.timer > 0))));
+  const isDragonDying = Boolean(state._hadDragonDeath || (state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath)));
+  const isSansDying = Boolean(state._hadSansDeath || (state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter)));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
   const displayDelay = hasMissionOverlay ? 180 : ((isDragonDying || isSansDying) ? 135 : 0);
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
@@ -862,8 +877,8 @@ function drawMatchEndScreen() {
     state._hasPlayedChampionVictoryVoice = false;
   }
 
-  const isDragonDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath));
-  const isSansDying = Boolean(state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter && (e.timer > -40 || (e.speechBubble && e.speechBubble.timer > 0))));
+  const isDragonDying = Boolean(state._hadDragonDeath || (state.deathEffects && state.deathEffects.some(e => e && e.isEnderDragonDeath)));
+  const isSansDying = Boolean(state._hadSansDeath || (state.deathEffects && state.deathEffects.some(e => e && e.isSansHeartShatter)));
   const hasMissionOverlay = Boolean(state._hadMissionOverlay || state._isRespectMusicPlaying || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
   const displayDelay = hasMissionOverlay ? 180 : ((isDragonDying || isSansDying) ? 135 : 0);
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);

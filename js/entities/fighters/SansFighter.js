@@ -307,6 +307,7 @@ export class SansFighter extends Fighter {
    * Triggers the Undertale Red SOUL Heart Split and Shatter Defeat VFX at the target coordinates.
    */
   triggerHeartShatter(x, y) {
+    if (typeof state !== 'undefined') state._hadSansDeath = true;
     if (!this.heartShatters) this.heartShatters = [];
     this.heartShatters.push({
       x: x,
@@ -1032,6 +1033,7 @@ export class SansFighter extends Fighter {
     // Stamina depleted or CC'd -> take regular damage
     const applied = super.takeDamage(amount, attacker, options);
     if (this.hp <= 0) {
+      if (typeof state !== 'undefined') state._hadSansDeath = true;
       if (!this._hasTriggeredSelfDeathShatter) {
         this._hasTriggeredSelfDeathShatter = true;
         this.triggerHeartShatter(this.x, this.y);

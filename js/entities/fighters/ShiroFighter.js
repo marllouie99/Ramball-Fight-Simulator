@@ -15,13 +15,16 @@ import { shiroConfig } from '../../configs/characters/shiroConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { ARENA_TILE_COUNT } from '../../systems/arenaTileGrid.js';
 import { audioSystem } from '../../systems/audioSystem.js';
+import { stopSound, stopSoundBySrc } from '../../systems/soundSystem.js';
 import { drawShiroSkin } from '../../graphics/fighters/shiroSkin.js';
+import { spawnImpactFlash, spawnSparks } from '../../graphics/particles/sparkEffect.js';
 import {
   drawDisboardChessboard,
   drawTroopThreatTiles,
   drawChessTroop,
   drawChessAttackVfx,
-  spawnChessTroopShatter
+  spawnChessTroopShatter,
+  drawShiroSpeechBubble
 } from '../../graphics/weapons/shiroChessGraphics.js';
 
 export class ShiroFighter extends Fighter {
@@ -30,7 +33,7 @@ export class ShiroFighter extends Fighter {
     this.characterId = 'shiro';
     this.type = 'shiro';
     this.name = shiroConfig.name || 'Shiro';
-    this.displayName = shiroConfig.displayName || 'Shiro';
+    this.displayName = shiroConfig.displayName || '『SHIRO』';
     this.hideHands = true;
     this.themeColor = shiroConfig.themeColor || '#8B5CF6';
     this.color = shiroConfig.color || '#A855F7';
@@ -55,6 +58,23 @@ export class ShiroFighter extends Fighter {
     this.pityCounter = 0;
     this.centerGridTimer = 0;
     this.chessTurnCooldown = 0;
+
+    // Passive 3: 『　　』 (Blank) Never Loses & Prediction
+    this.blankCooldownMax = shiroConfig.blankCooldown || 480;
+    this.blankCooldown = shiroConfig.blankInitialCooldown !== undefined ? shiroConfig.blankInitialCooldown : 120;
+    this.blankActiveTimer = 0;
+    this.blankActiveMaxTimer = shiroConfig.blankBuffDuration || 240;
+    this.blankWindupTimer = 0;
+    this.blankWindupMax = shiroConfig.blankVoicelineDuration || 120; // 0:00:02 duration for shiro_troop_buff_voiceline
+    this._blankWindupStarted = false;
+    this._hasPlayedBlankVoiceline = false;
+    this._blankVoiceHandle = null;
+
+    // Victory Dialogue Speech Bubble & Chat Animation ("Checkmate!")
+    this.speechBubble = null;
+    this._speechCooldown = 0;
+    this._hasSaidWinQuote = false;
+    this._hasHandledDefeat = false;
   }
 
   reset() {
@@ -79,16 +99,137 @@ export class ShiroFighter extends Fighter {
     this.centerGridTimer = 0;
     this.chessTurnCooldown = 0;
     this.shootCooldown = this.shootCooldownMax;
+    this.blankCooldownMax = shiroConfig.blankCooldown || 480;
+    this.blankCooldown = shiroConfig.blankInitialCooldown !== undefined ? shiroConfig.blankInitialCooldown : 120;
+    this.blankActiveTimer = 0;
+    this.blankActiveMaxTimer = shiroConfig.blankBuffDuration || 240;
+    this.blankWindupTimer = 0;
+    this.blankWindupMax = shiroConfig.blankVoicelineDuration || 120;
+    this._blankWindupStarted = false;
+    this._hasPlayedBlankVoiceline = false;
+    this._cutOffBlankVoiceline('reset');
+    this.speechBubble = null;
+    this._speechCooldown = 0;
+    this._hasSaidWinQuote = false;
+    this._hasHandledDefeat = false;
     if (typeof state !== 'undefined') {
       state._shiroChessboardAlpha = 0;
       state._shiroChessboardAssembleProgress = 0;
       state._shiroChessboardShutdownTimer = 0;
       state._shiroChessboardWasActive = false;
+      state._shiroVictoryShutdown = false;
+      state._shiroDefeatShutdown = false;
+      state._shiroChessboardShutdownStartAlpha = null;
+      state._isShiroTroopBuffVoicePlaying = false;
+    }
+  }
+
+  /**
+   * Universal evaluation of whether Shiro is currently afflicted by any stun, hit-stun, CC, or immobility.
+   * Does NOT invoke _handleTimeStop() directly to prevent double-ticking fighter cooldowns.
+   */
+  _isShiroStunned() {
+    if (this.hp <= 0 || this.dead) return true;
+    if (this.isTargetOfAmbush) return true;
+    if ((this.knockbackStunTimer || 0) > 0) return true;
+    if ((this.hitStunTimer || 0) > 0) return true;
+    if ((this.stunTimer || 0) > 0) return true;
+    if ((this.basicAttackHitPauseTimer || 0) > 0) return true;
+    if ((this.paralyzeTimer || 0) > 0 || this.isParalyzed) return true;
+    if ((this.timeStopTimer || 0) > 0) return true;
+    if ((this.freezeTimer || 0) > 0 || (this.iceFreezeTimer || 0) > 0 || this.isFrozen || this.isFrozenBySnowPea || this.isFrozenByInfinity || this.isFrozenByBlueBone) return true;
+    if ((this.electricStunTimer || 0) > 0 || (this.crimsonElectrifiedTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0) return true;
+    if (this.isParalyzedByMahito || this.isParalyzedByMahoraga || this.isGrabbedByMahoraga) return true;
+    if (this.isPinnedByMaki || this.isChainedByMakima) return true;
+    if (this.isWallPinned || this.isWallSlammed || this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0) || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor || ((this.escanorWallPinTimer || 0) > 0) || this.isCurrentlyWallPinnedByNaoya || ((this.naoyaWallPinTimer || 0) > 0) || this._isFlyingToWallPin) return true;
+    if (this.caughtInJohnWickCombo || this.caughtInYujiFlurry || this.caughtInOmniPunch || this.caughtInSaitamaCounter) return true;
+    if ((this.ratioHitPauseTimer || 0) > 0) return true;
+    if (this.statusEffects && (this.statusEffects.hitStunTimer > 0 || this.statusEffects.paralyzeTimer > 0 || this.statusEffects.timeStopTimer > 0 || this.statusEffects.isParalyzed)) return true;
+    if (typeof this.areAttackEffectsSuppressed === 'function' && this.areAttackEffectsSuppressed()) return true;
+    return false;
+  }
+
+  /**
+   * Immediately cuts off Shiro's troop buff voiceline and cancels active prediction windup.
+   * Invoked upon any stun, hit-stun, knockback, time-stop, CC, or combat interrupt.
+   */
+  _cutOffBlankVoiceline(reason = 'stun') {
+    const wasPlayingOrWindup = Boolean(this._blankVoiceHandle || this._blankWindupStarted || this.blankWindupTimer > 0);
+
+    if (this._blankVoiceHandle) {
+      if (typeof stopSound === 'function') {
+        stopSound(this._blankVoiceHandle, true);
+      }
+      this._blankVoiceHandle = null;
+    }
+
+    if (typeof stopSoundBySrc === 'function') {
+      stopSoundBySrc('shiro_troop_buff_voiceline', true);
+    }
+
+    if (typeof state !== 'undefined') {
+      state._isShiroTroopBuffVoicePlaying = false;
+    }
+
+    if (this._blankWindupStarted || this.blankWindupTimer > 0) {
+      this._blankWindupStarted = false;
+      this.blankWindupTimer = 0;
+      // Put Passive 3 on cooldown if interrupted mid-windup so it doesn't immediately re-cast without penalty
+      this.blankCooldown = Math.max(this.blankCooldown || 0, 180);
+      if (wasPlayingOrWindup && typeof spawnFloatingText === 'function') {
+        spawnFloatingText(this.x, this.y - this.r - 24, 'INTERRUPTED!', '#EF4444');
+      }
     }
   }
 
   interruptAttacks(forceCancelAll = false) {
     super.interruptAttacks?.(forceCancelAll);
+    this._cutOffBlankVoiceline('interruptAttacks');
+  }
+
+  applyKnockback(vx, vy, stunFrames = 0) {
+    super.applyKnockback(vx, vy, stunFrames);
+    if (stunFrames > 0 || (this.knockbackStunTimer && this.knockbackStunTimer > 0)) {
+      this._cutOffBlankVoiceline('knockbackStun');
+    }
+  }
+
+  applyHitStun(frames, opts = {}) {
+    super.applyHitStun?.(frames, opts);
+    if (frames > 0) {
+      this._cutOffBlankVoiceline('hitStun');
+    }
+  }
+
+  applyParalyze(frames, opts = {}) {
+    super.applyParalyze?.(frames, opts);
+    if (frames > 0) {
+      this._cutOffBlankVoiceline('paralyze');
+    }
+  }
+
+  applyTimeStop(frames) {
+    super.applyTimeStop?.(frames);
+    if (frames > 0) {
+      this._cutOffBlankVoiceline('timeStop');
+    }
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    const res = super.takeDamage(amount, attacker, opts);
+    if (this._isShiroStunned() || opts?.isHeavy || opts?.isKnockback || opts?.isExplosion || opts?.isStun) {
+      this._cutOffBlankVoiceline('takeDamageStun');
+    }
+    return res;
+  }
+
+  onDeath() {
+    super.onDeath();
+    this._hasHandledDefeat = true;
+    this.speechBubble = null;
+    this._cutOffBlankVoiceline('death');
+    this.destroyAllActiveTroops(true);
+    this._triggerDefeatChessboardShutdown();
   }
 
   drawGun() {}
@@ -191,6 +332,18 @@ export class ShiroFighter extends Fighter {
       suppressBlood: true,
       bleedImmune: true,
       isBloodImmune: true,
+      suppressDebuffs: true,
+      suppressStatusOverlays: true,
+      suppressFreezeOverlay: true,
+      suppressFreezeTimer: true,
+      suppressStunVisual: true,
+      suppressParalyzeVisual: true,
+      suppressHitFlash: true,
+      customHitFlash: true,
+      isStatusImmune: true,
+      drawStatusOverlays: () => {},
+      drawFreezeTimer: () => {},
+      drawHealth: () => {},
       x: startX,
       y: startY,
       vx: Math.cos(angle) * finalThrowSpeed,
@@ -207,6 +360,9 @@ export class ShiroFighter extends Fighter {
       dead: false,
       bounces: 0,
       attackCooldown: 0,
+      blankBuffTimer: 0,
+      blankBuffMaxTimer: shiroConfig.blankBuffDuration || 240,
+      isBuffed: false,
       takeDamage(amount) {
         this.hp -= amount;
         if (this.hp <= 0) {
@@ -325,6 +481,7 @@ export class ShiroFighter extends Fighter {
       if (!target._hasShattered) {
         target._hasShattered = true;
         spawnChessTroopShatter(target);
+        audioSystem.playSFX(shiroConfig.sounds?.troopDestroyed || 'Assets/Sound Effects/Shiro/PermafrostKeepSealMine1.ogg', this._getSoundVolume('troopDestroyed', 0.90));
       }
     }
     target.dead = true;
@@ -359,6 +516,15 @@ export class ShiroFighter extends Fighter {
     troop.suppressBlood = true;
     troop.bleedImmune = true;
     troop.isBloodImmune = true;
+    troop.suppressDebuffs = true;
+    troop.suppressStatusOverlays = true;
+    troop.suppressFreezeOverlay = true;
+    troop.suppressFreezeTimer = true;
+    troop.suppressStunVisual = true;
+    troop.suppressParalyzeVisual = true;
+    troop.suppressHitFlash = true;
+    troop.customHitFlash = true;
+    troop.isStatusImmune = true;
     troop.isImmovable = true;
     troop.cannotBeKnockbacked = true;
     troop.immuneToKnockback = true;
@@ -380,6 +546,7 @@ export class ShiroFighter extends Fighter {
     troop.update = (opponent, ownerIndex, arena) => {};
     troop.drawHealth = (ctx) => {};
     troop.drawFreezeTimer = (ctx) => {};
+    troop.drawStatusOverlays = (ctx) => {};
     troop.canAim = () => false;
     troop.aim = (opponent) => {};
     troop.reset = () => {};
@@ -427,6 +594,7 @@ export class ShiroFighter extends Fighter {
         if (!troop._hasShattered) {
           troop._hasShattered = true;
           spawnChessTroopShatter(troop);
+          audioSystem.playSFX(shiroConfig.sounds?.troopDestroyed || 'Assets/Sound Effects/Shiro/PermafrostKeepSealMine1.ogg', this._getSoundVolume('troopDestroyed', 0.90));
         }
 
         // Remove from state.fighters immediately upon destruction
@@ -484,10 +652,22 @@ export class ShiroFighter extends Fighter {
       this.centerGridTimer = Math.max(this.centerGridTimer, 60);
 
       // Summon & Materialization lifecycle: Troop ascends slowly onto the square
+      const troopCfg = shiroConfig.troops?.[troop.type] || {};
+      const summonFrames = troopCfg.summonDuration ?? shiroConfig.troopTiming?.summonDuration ?? shiroConfig.troopSummonDuration ?? 40;
+      const summonIdleBuffer = troopCfg.postSummonPause ?? shiroConfig.troopTiming?.postSummonPause ?? shiroConfig.troopPostSummonPause ?? 30;
+
       troop.isSummoning = true;
-      troop.summonTimer = 40;
-      troop.summonMaxTimer = 40;
-      troop.attackCooldown = 40 + 30; // 40 frames of ascending summon + 30 frames of idle buffer before attacking
+      troop.summonTimer = summonFrames;
+      troop.summonMaxTimer = summonFrames;
+      troop.attackCooldown = summonFrames + summonIdleBuffer;
+
+      // Maintain active Blank Never Loses buff only if this troop was ALREADY buffed upon activation
+      if (troop.blankBuffTimer > 0) {
+        troop.isBuffed = true;
+      } else {
+        troop.blankBuffTimer = 0;
+        troop.isBuffed = false;
+      }
 
       // Trigger cinematic planting visual effect
       this.activeVisualEffects.push({
@@ -497,8 +677,8 @@ export class ShiroFighter extends Fighter {
         x: troop.x,
         y: troop.y,
         pieceType: troop.type,
-        timer: 40,
-        maxTimer: 40
+        timer: summonFrames,
+        maxTimer: summonFrames
       });
 
       // Subtle tactical screen micro-bump on troop lock-in
@@ -532,6 +712,21 @@ export class ShiroFighter extends Fighter {
     troop.r = promotedConfig.radius;
     troop.radius = promotedConfig.radius;
     troop.damage = promotedConfig.projDmg;
+
+    // Retain existing Blank buff upon promotion only if this troop was previously buffed
+    if (troop.blankBuffTimer > 0) {
+      troop.isBuffed = true;
+      this.activeVisualEffects.push({
+        type: 'blank_troop_buff',
+        troop: troop,
+        x: troop.x,
+        y: troop.y,
+        r: troop.r || 16,
+        timer: 45,
+        maxTimer: 45
+      });
+    }
+
     spawnFloatingText(troop.x, troop.y - 20, `PROMOTED: ${promotedConfig.name.toUpperCase()}!`, '#FCD34D');
   }
 
@@ -540,6 +735,156 @@ export class ShiroFighter extends Fighter {
   // ─────────────────────────────────────────────
   _updateTroopMinions(opponent, arena) {
     if (this.chessTurnCooldown > 0) this.chessTurnCooldown--;
+
+    // Passive 3 Duration & Cooldown Ticks:
+    // Cooldown MUST NOT tick down while the active buff duration is running!
+    if (this.blankActiveTimer > 0) {
+      this.blankActiveTimer--;
+      // Freeze cooldown at maximum until active duration finishes
+      this.blankCooldown = this.blankCooldownMax;
+      this.blankWindupTimer = 0;
+      this._blankWindupStarted = false;
+    } else if (this.blankWindupTimer > 0) {
+      // Windup / Voiceline Phase (0:00:02 / 120 frames): Audio is playing, preparing troop buff
+      this.blankWindupTimer--;
+      this.blankCooldown = 0;
+    } else if (this.blankCooldown > 0) {
+      // Cooldown only ticks down after the active duration has fully ended
+      this.blankCooldown--;
+    }
+
+    // Retrieval of active living minions currently stationed on the board
+    const getActiveTroops = () => {
+      const troopSet = new Set();
+      if (Array.isArray(this.activeMinions)) {
+        for (const m of this.activeMinions) {
+          if (m && m.isMinion && !m.dead && !m.isDead && (m.hp || 0) > 0) {
+            troopSet.add(m);
+          }
+        }
+      }
+      if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+        for (const f of state.fighters) {
+          if (f && f !== this && (f.owner === this || f.owner === this.fighterIndex) && (f.isChessTroop || f.isChessMinion || f.isMinion) && f.isMinion && !f.dead && !f.isDead && (f.hp || 0) > 0) {
+            troopSet.add(f);
+          }
+        }
+      }
+      return Array.from(troopSet);
+    };
+
+    // Check if match/round or fight is over (never trigger Passive 3 voiceline or buff after match ends)
+    const isMatchActive = typeof state === 'undefined' || !state.gameState || state.gameState === 'playing';
+    const isMatchEnded = typeof state !== 'undefined' && (
+      state.gameState === 'roundEnd' ||
+      state.gameState === 'matchEnd' ||
+      state.gameState === 'champion' ||
+      Boolean(state.matchWinner) ||
+      Boolean(state.roundWinner)
+    );
+    const isOpponentDefeated = opponent && (opponent.dead || (opponent.hp || 0) <= 0);
+    const isFightOver = !isMatchActive || isMatchEnded || isOpponentDefeated || this.dead || (this.hp || 0) <= 0;
+
+    // If fight/match is over, cancel any pending voiceline windup immediately
+    if (isFightOver) {
+      if (this._blankWindupStarted) {
+        this._blankWindupStarted = false;
+        this.blankWindupTimer = 0;
+      }
+      if (this._blankVoiceHandle) {
+        if (typeof stopSound === 'function') stopSound(this._blankVoiceHandle);
+        this._blankVoiceHandle = null;
+      }
+      if (typeof state !== 'undefined') state._isShiroTroopBuffVoicePlaying = false;
+    }
+
+    // Passive 3: 『　　』 (Blank) Never Loses & Prediction Activation
+    if (!isFightOver && this.blankCooldown <= 0 && this.blankActiveTimer <= 0 && this.isSkillEnabled(shiroConfig.enableBlankNeverLoses, true) && !this.dead && (this.hp || 0) > 0) {
+      const activeLivingTroops = getActiveTroops();
+      if (activeLivingTroops.length > 0) {
+        if (this.blankWindupTimer > 0) {
+          // In the 2-second voiceline windup phase — calculating!
+          if (this.blankWindupTimer % 15 === 0) {
+            spawnSparks(this.x, this.y, 4, 'gold', '#FCD34D');
+          }
+        } else if (this._blankWindupStarted) {
+          // 0:00:02 voiceline finished! Unleash the troop buff!
+          this._blankWindupStarted = false;
+          this.blankCooldown = this.blankCooldownMax;
+          this.blankActiveTimer = shiroConfig.blankBuffDuration || 240;
+          this.blankActiveMaxTimer = shiroConfig.blankBuffDuration || 240;
+          this._blankVoiceHandle = null;
+          if (typeof state !== 'undefined') state._isShiroTroopBuffVoicePlaying = false;
+
+          // Shiro Visuals, Voice & Screen Shake
+          spawnFloatingText(this.x, this.y - this.r - 24, '『　　』 NEVER LOSES!', '#FCD34D');
+          audioSystem.playSFX(shiroConfig.sounds?.blankBuff || 'Assets/Sound Effects/Shiro/BookSynthFirstTier.ogg', this._getSoundVolume('blankBuff', 0.90));
+          triggerGlobalScreenShake(3.0, 8);
+          spawnImpactFlash(this.x, this.y, 18, '#FCD34D');
+          spawnSparks(this.x, this.y, 14, 'gold', '#FCD34D');
+
+          // Apply Golden Buff & Trigger Buff Animation strictly to active living troops already present on the board
+          for (const troop of activeLivingTroops) {
+            troop.blankBuffTimer = shiroConfig.blankBuffDuration || 240;
+            troop.blankBuffMaxTimer = shiroConfig.blankBuffDuration || 240;
+            troop.isBuffed = true;
+            troop._blankBuffVfxPlayed = true;
+            spawnFloatingText(troop.x, troop.y - (troop.r || 16) - 16, '👑 PREDICTION!', '#FCD34D');
+            spawnSparks(troop.x, troop.y, 8, 'gold', '#FCD34D');
+
+            this.activeVisualEffects.push({
+              type: 'blank_troop_buff',
+              troop: troop,
+              x: troop.x,
+              y: troop.y,
+              r: troop.r || 16,
+              timer: 45,
+              maxTimer: 45
+            });
+          }
+        } else {
+          // Guard: If Shiro is stunned or unable to act, do not start voiceline or windup
+          if (this._isShiroStunned()) {
+            return;
+          }
+
+          // Shiro is about to use Passive 3!
+          // Trigger the 0:00:02 voiceline audio!
+          this._blankWindupStarted = true;
+          this.blankWindupTimer = shiroConfig.blankVoicelineDuration || 120; // 0:00:02 (120 frames at 60 FPS)
+          this.blankWindupMax = shiroConfig.blankVoicelineDuration || 120;
+
+          // STRICT SINGLE-PLAY & DEDUPLICATION: Only 1 of this voiceline plays per match/round! Avoid dupes!
+          const isGlobalVoicePlaying = typeof state !== 'undefined' && Boolean(state._isShiroTroopBuffVoicePlaying);
+          if (!this._hasPlayedBlankVoiceline && !isGlobalVoicePlaying) {
+            this._hasPlayedBlankVoiceline = true;
+            if (typeof state !== 'undefined') state._isShiroTroopBuffVoicePlaying = true;
+
+            const voiceSrc = shiroConfig.sounds?.blankVoiceline || 'Assets/Sound Effects/Shiro/shiro_troop_buff_voiceline.mp3';
+            this._blankVoiceHandle = audioSystem.playSFX(voiceSrc, this._getSoundVolume('blankVoiceline', 1.0), 1.0, 0, 0, () => {
+              if (typeof state !== 'undefined') state._isShiroTroopBuffVoicePlaying = false;
+              this._blankVoiceHandle = null;
+            });
+          }
+
+          spawnFloatingText(this.x, this.y - this.r - 24, '『　　』 PREDICTING...', '#FCD34D');
+          spawnImpactFlash(this.x, this.y, 14, '#FCD34D');
+          spawnSparks(this.x, this.y, 8, 'gold', '#FCD34D');
+        }
+      } else {
+        // No living troops on board — cancel windup if started
+        if (this._blankWindupStarted) {
+          this._cutOffBlankVoiceline('noLivingTroops');
+        }
+      }
+    }
+
+    if (this.blankActiveTimer <= 0) {
+      // Cooldown phase: reset animation play guards so future activations trigger fresh animations
+      for (const troop of this.activeMinions || []) {
+        troop._blankBuffVfxPlayed = false;
+      }
+    }
 
     // Keep max active minions clamped
     if (this.activeMinions.length > shiroConfig.maxActiveMinions + 2) {
@@ -563,6 +908,7 @@ export class ShiroFighter extends Fighter {
         if (!troop._hasShattered) {
           troop._hasShattered = true;
           spawnChessTroopShatter(troop);
+          audioSystem.playSFX(shiroConfig.sounds?.troopDestroyed || 'Assets/Sound Effects/Shiro/PermafrostKeepSealMine1.ogg', this._getSoundVolume('troopDestroyed', 0.90));
         }
         if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
           const idx = state.fighters.indexOf(troop);
@@ -581,8 +927,15 @@ export class ShiroFighter extends Fighter {
         if (opponent && !opponent.dead) {
           const dist = Math.hypot(opponent.x - troop.x, opponent.y - troop.y);
           if (dist <= troop.radius + (opponent.r || 25)) {
-            opponent.takeDamage?.(troop.damage, this);
-            spawnFloatingText(troop.x, troop.y - 12, `${troop.damage}`, '#38BDF8');
+            let finalThrowDmg = troop.damage;
+            const isBuffedThrow = Boolean(troop.blankBuffTimer > 0);
+            if (isBuffedThrow) {
+              finalThrowDmg = Math.round(finalThrowDmg * (shiroConfig.blankBuffDamageMultiplier || 1.35));
+            }
+            opponent.takeDamage?.(finalThrowDmg, this);
+            const hitLabel = isBuffedThrow ? `${finalThrowDmg} (PREDICTED)` : `${troop.damage}`;
+            const hitColor = isBuffedThrow ? '#FCD34D' : '#38BDF8';
+            spawnFloatingText(troop.x, troop.y - 12, hitLabel, hitColor);
             audioSystem.playSFX('attack_fleshhit', this._getSoundVolume('fleshHit', 0.80));
             // Snap & Plant Troop squarely at the center of the hit tile facing upright towards player
             this._plantTroopOnTileCenter(troop, arena);
@@ -707,11 +1060,11 @@ export class ShiroFighter extends Fighter {
           troop.z = 0;
           troop.tileCol = troop.targetTile.col;
           troop.tileRow = troop.targetTile.row;
-          troop.cornerTile = null;
-          troop.attackCooldown = 40;
-          this.chessTurnCooldown = shiroConfig.turnCooldown || 14; // Turn cadence before next piece can move
+          const cfg = shiroConfig.troops?.[troop.type] || {};
+          const postAttackCooldown = cfg.postAttackCooldown ?? shiroConfig.troopTiming?.postAttackCooldown ?? shiroConfig.troopPostAttackCooldown ?? 40;
+          troop.attackCooldown = postAttackCooldown;
+          this.chessTurnCooldown = cfg.turnCooldown ?? shiroConfig.troopTiming?.turnCooldown ?? shiroConfig.turnCooldown ?? 14;
 
-          const cfg = shiroConfig.troops[troop.type];
           const attackTarget = troop.attackTarget || opponent;
           troop.attackTarget = null;
 
@@ -763,17 +1116,29 @@ export class ShiroFighter extends Fighter {
                 continue;
               }
 
-              target.takeDamage?.(cfg.leapDmg, this);
-              target.applyHitStun?.(cfg.leapStun || 16);
-
-              // Apply Slow Debuff
-              if (typeof target.applySlow === 'function') {
-                target.applySlow(slowDur, slowMult, { isKnightSlow: true });
-              } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
-                target.statusEffects.applySlow(slowDur, slowMult, { isKnightSlow: true });
+              const previousHp = target.hp;
+              let finalLeapDmg = cfg.leapDmg;
+              const isBuffedHit = Boolean(troop.blankBuffTimer > 0);
+              if (isBuffedHit) {
+                finalLeapDmg = Math.round(finalLeapDmg * (shiroConfig.blankBuffDamageMultiplier || 1.35));
               }
+              const dmgResult = target.takeDamage?.(finalLeapDmg, this);
+              const damageLanded = (dmgResult === true || (typeof dmgResult === 'number' && dmgResult > 0) || (Number.isFinite(previousHp) && Number.isFinite(target.hp) && target.hp < previousHp));
 
-              spawnFloatingText(target.x, target.y - 18, `KNIGHT SLAM! -${cfg.leapDmg} (SLOW)`, '#F59E0B');
+              if (damageLanded) {
+                target.applyHitStun?.(cfg.leapStun || 16);
+
+                // Apply Slow Debuff
+                if (typeof target.applySlow === 'function') {
+                  target.applySlow(slowDur, slowMult, { isKnightSlow: true });
+                } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+                  target.statusEffects.applySlow(slowDur, slowMult, { isKnightSlow: true });
+                }
+
+                const hitLabel = isBuffedHit ? `KNIGHT SLAM! -${finalLeapDmg} (PREDICTED)` : `KNIGHT SLAM! -${cfg.leapDmg} (SLOW)`;
+                const hitColor = isBuffedHit ? '#FCD34D' : '#F59E0B';
+                spawnFloatingText(target.x, target.y - 18, hitLabel, hitColor);
+              }
             }
           } else if (troop.type === 'queen') {
             const aoeRadius = cfg.slashAoe || 110;
@@ -835,95 +1200,169 @@ export class ShiroFighter extends Fighter {
                 continue;
               }
 
-              target.takeDamage?.(cfg.slashDmg, this);
-              target.applyHitStun?.(16);
+              const previousHp = target.hp;
+              let finalSlashDmg = cfg.slashDmg;
+              const isBuffedHit = Boolean(troop.blankBuffTimer > 0);
+              if (isBuffedHit) {
+                finalSlashDmg = Math.round(finalSlashDmg * (shiroConfig.blankBuffDamageMultiplier || 1.35));
+              }
+              const dmgResult = target.takeDamage?.(finalSlashDmg, this);
+              const damageLanded = (dmgResult === true || (typeof dmgResult === 'number' && dmgResult > 0) || (Number.isFinite(previousHp) && Number.isFinite(target.hp) && target.hp < previousHp));
 
-              // 1. Knight Slow Debuff (65% movement speed reduction)
-              if (typeof target.applySlow === 'function') {
-                target.applySlow(slowDur, slowMult, { isQueenSlow: true });
-              } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
-                target.statusEffects.applySlow(slowDur, slowMult, { isQueenSlow: true });
+              if (damageLanded) {
+                target.applyHitStun?.(16);
+
+                // 1. Knight Slow Debuff (65% movement speed reduction)
+                if (typeof target.applySlow === 'function') {
+                  target.applySlow(slowDur, slowMult, { isQueenSlow: true });
+                } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+                  target.statusEffects.applySlow(slowDur, slowMult, { isQueenSlow: true });
+                }
+
+                // 2. Rook Stun Debuff (Paralyze / Stun)
+                if (typeof target.applyParalyze === 'function') {
+                  target.applyParalyze(stunDur);
+                } else if (typeof target.applyHitStun === 'function') {
+                  target.applyHitStun(stunDur);
+                }
+                if (target.statusEffects && typeof target.statusEffects.applyParalyze === 'function') {
+                  target.statusEffects.applyParalyze(stunDur);
+                }
+
+                // 3. Bishop Bleed Debuff (Continuous bleeding damage over 3s)
+                if (typeof target.applyBleed === 'function') {
+                  target.applyBleed(this, bleedDur, bleedDmg, bleedInt);
+                } else if (target.statusEffects && typeof target.statusEffects.applyBleed === 'function') {
+                  target.statusEffects.applyBleed(this, bleedDur, bleedDmg, bleedInt);
+                }
+
+                // 4. Rook Radial Knockback Blast
+                const radialAngle = Math.atan2(target.y - troop.y, target.x - troop.x);
+                const effAngle = (target.x === troop.x && target.y === troop.y) ? (this.gunAngle || 0) : radialAngle;
+                if (typeof target.applyKnockback === 'function') {
+                  target.applyKnockback(Math.cos(effAngle) * knockbackImpulse, Math.sin(effAngle) * knockbackImpulse);
+                } else {
+                  target.vx = (target.vx || 0) + Math.cos(effAngle) * knockbackImpulse;
+                  target.vy = (target.vy || 0) + Math.sin(effAngle) * knockbackImpulse;
+                }
+
+                const hitLabel = isBuffedHit ? `QUEEN CHECKMATE! -${finalSlashDmg} (CRIT/PREDICTED)` : `QUEEN CHECKMATE! -${cfg.slashDmg} (STUN+SLOW+BLEED)`;
+                const hitColor = isBuffedHit ? '#FCD34D' : '#EC4899';
+                spawnFloatingText(target.x, target.y - 20, hitLabel, hitColor);
+              }
+            }
+          } else if (troop.type === 'pawn') {
+            const aoeRadius = cfg.aoeRadius || cfg.captureRange || 46;
+            const aoeDmg = cfg.captureDmg || cfg.aoeDmg || 14;
+            const aoeStun = cfg.captureStun || cfg.aoeStun || 10;
+            const shakeInt = cfg.screenShakeIntensity || 2.5;
+            const shakeDur = cfg.screenShakeDuration || 6;
+
+            triggerGlobalScreenShake(shakeInt, shakeDur);
+            audioSystem.playSFX('attack_fleshhit', this._getSoundVolume('fleshHit', 0.80));
+
+            // Thrust vector visual effect
+            this.activeVisualEffects.push({
+              type: 'pawn_thrust',
+              startX: troop.startTile ? troop.startTile.x : troop.x,
+              startY: troop.startTile ? troop.startTile.y : troop.y,
+              endX: troop.x,
+              endY: troop.y,
+              timer: 14,
+              maxTimer: 14
+            });
+
+            // Radial mint/cyan AOE wave visual effect (Rule 26)
+            this.activeVisualEffects.push({
+              type: 'pawn_shockwave',
+              x: troop.x,
+              y: troop.y,
+              radius: aoeRadius,
+              timer: 16,
+              maxTimer: 16
+            });
+
+            // Query all valid enemies in the Pawn AOE zone
+            const validTargets = [];
+            if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+              for (const ent of state.fighters) {
+                if (!ent || ent.dead || ent.hp <= 0 || ent === this || (typeof this.isTeammate === 'function' && this.isTeammate(ent)) || ent.owner === this) continue;
+                const d = Math.hypot(ent.x - troop.x, ent.y - troop.y);
+                if (d <= aoeRadius + (ent.r || 25)) {
+                  validTargets.push(ent);
+                }
+              }
+            } else if (opponent && !opponent.dead) {
+              const d = Math.hypot(opponent.x - troop.x, opponent.y - troop.y);
+              if (d <= aoeRadius + (opponent.r || 25)) {
+                validTargets.push(opponent);
+              }
+            }
+
+            for (const target of validTargets) {
+              if (this._isChessMinionTarget(target)) {
+                if (this._captureEnemyChessMinion(target)) {
+                  this._recordPawnDamage(troop);
+                  spawnFloatingText(target.x, target.y - 15, `${target.name || target.type || 'MINION'} CAPTURED!`, '#38BDF8');
+                }
+                continue;
               }
 
-              // 2. Rook Stun Debuff (Paralyze / Stun)
-              if (typeof target.applyParalyze === 'function') {
-                target.applyParalyze(stunDur);
-              } else if (typeof target.applyHitStun === 'function') {
-                target.applyHitStun(stunDur);
+              const previousHp = target.hp;
+              let finalAoeDmg = aoeDmg;
+              const isBuffedHit = Boolean(troop.blankBuffTimer > 0);
+              if (isBuffedHit) {
+                finalAoeDmg = Math.round(finalAoeDmg * (shiroConfig.blankBuffDamageMultiplier || 1.35));
               }
-              if (target.statusEffects && typeof target.statusEffects.applyParalyze === 'function') {
-                target.statusEffects.applyParalyze(stunDur);
+              const damageApplied = target.takeDamage?.(finalAoeDmg, this);
+              if (damageApplied === true || (Number.isFinite(previousHp) && Number.isFinite(target.hp) && target.hp < previousHp)) {
+                this._recordPawnDamage(troop);
               }
-
-              // 3. Bishop Bleed Debuff (Continuous bleeding damage over 3s)
-              if (typeof target.applyBleed === 'function') {
-                target.applyBleed(this, bleedDur, bleedDmg, bleedInt);
-              } else if (target.statusEffects && typeof target.statusEffects.applyBleed === 'function') {
-                target.statusEffects.applyBleed(this, bleedDur, bleedDmg, bleedInt);
-              }
-
-              // 4. Rook Radial Knockback Blast
-              const radialAngle = Math.atan2(target.y - troop.y, target.x - troop.x);
-              const effAngle = (target.x === troop.x && target.y === troop.y) ? (this.gunAngle || 0) : radialAngle;
-              if (typeof target.applyKnockback === 'function') {
-                target.applyKnockback(Math.cos(effAngle) * knockbackImpulse, Math.sin(effAngle) * knockbackImpulse);
-              } else {
-                target.vx = (target.vx || 0) + Math.cos(effAngle) * knockbackImpulse;
-                target.vy = (target.vy || 0) + Math.sin(effAngle) * knockbackImpulse;
-              }
-
-              spawnFloatingText(target.x, target.y - 20, `QUEEN CHECKMATE! -${cfg.slashDmg} (STUN+SLOW+BLEED)`, '#EC4899');
+              target.applyHitStun?.(aoeStun);
+              const hitLabel = isBuffedHit ? `PAWN AOE! -${finalAoeDmg} (PREDICTED)` : `PAWN AOE! -${aoeDmg}`;
+              const hitColor = isBuffedHit ? '#FCD34D' : '#38BDF8';
+              spawnFloatingText(target.x, target.y - 15, hitLabel, hitColor);
             }
           } else if (this._isChessMinionTarget(attackTarget)) {
             const hitDist = Math.hypot(attackTarget.x - troop.x, attackTarget.y - troop.y);
             if (this._isEnemyChessTarget(attackTarget) && hitDist <= troop.radius + (attackTarget.r || 25) + 35) {
               if (this._captureEnemyChessMinion(attackTarget)) {
-                if (troop.type === 'pawn') this._recordPawnDamage(troop);
                 spawnFloatingText(attackTarget.x, attackTarget.y - 15, `${attackTarget.name || attackTarget.type || 'MINION'} CAPTURED!`, '#38BDF8');
               }
             }
           } else if (attackTarget && !attackTarget.dead) {
             const opponent = attackTarget;
-            // ── Pawn, Bishop, Rook: Melee-range hit check (must land close to opponent) ──
+            // ── Bishop, Rook: Melee-range hit check (must land close to opponent) ──
             const hitDist = Math.hypot(opponent.x - troop.x, opponent.y - troop.y);
             if (hitDist <= troop.radius + (opponent.r || 25) + 35) {
               switch (troop.type) {
-                case 'pawn':
-                  {
-                    const previousHp = opponent.hp;
-                    const damageApplied = opponent.takeDamage?.(cfg.captureDmg, this);
-                    if (damageApplied === true || (Number.isFinite(previousHp) && Number.isFinite(opponent.hp) && opponent.hp < previousHp)) {
-                      this._recordPawnDamage(troop);
-                    }
-                  }
-                  opponent.applyHitStun?.(cfg.captureStun || 10);
-                  spawnFloatingText(opponent.x, opponent.y - 15, `PAWN CAPTURE! ${cfg.captureDmg}`, '#38BDF8');
-                  this.activeVisualEffects.push({
-                    type: 'pawn_thrust',
-                    startX: troop.startTile.x,
-                    startY: troop.startTile.y,
-                    endX: troop.x,
-                    endY: troop.y,
-                    timer: 10,
-                    maxTimer: 10
-                  });
-                  break;
-
                 case 'bishop': {
-                  opponent.takeDamage?.(cfg.laserDmg, this);
-                  opponent.applyHitStun?.(12);
-
-                  // Apply Bleed Debuff
-                  const bleedDur = cfg.bleedDuration || 150;
-                  const bleedDmg = cfg.bleedDmgPerTick || 4;
-                  const bleedInt = cfg.bleedInterval || 25;
-                  if (typeof opponent.applyBleed === 'function') {
-                    opponent.applyBleed(this, bleedDur, bleedDmg, bleedInt);
-                  } else if (opponent.statusEffects && typeof opponent.statusEffects.applyBleed === 'function') {
-                    opponent.statusEffects.applyBleed(this, bleedDur, bleedDmg, bleedInt);
+                  const previousHp = opponent.hp;
+                  let finalLaserDmg = cfg.laserDmg;
+                  const isBuffedHit = Boolean(troop.blankBuffTimer > 0);
+                  if (isBuffedHit) {
+                    finalLaserDmg = Math.round(finalLaserDmg * (shiroConfig.blankBuffDamageMultiplier || 1.35));
                   }
+                  const dmgResult = opponent.takeDamage?.(finalLaserDmg, this);
+                  const damageLanded = (dmgResult === true || (typeof dmgResult === 'number' && dmgResult > 0) || (Number.isFinite(previousHp) && Number.isFinite(opponent.hp) && opponent.hp < previousHp));
 
-                  spawnFloatingText(opponent.x, opponent.y - 16, `BISHOP BLEED! -${cfg.laserDmg}`, '#EF4444');
+                  if (damageLanded) {
+                    opponent.applyHitStun?.(12);
+
+                    // Apply Bleed Debuff strictly when damage successfully lands on player/target
+                    const bleedDur = cfg.bleedDuration || 150;
+                    const bleedDmg = cfg.bleedDmgPerTick || 4;
+                    const bleedInt = cfg.bleedInterval || 25;
+                    if (typeof opponent.applyBleed === 'function') {
+                      opponent.applyBleed(this, bleedDur, bleedDmg, bleedInt);
+                    } else if (opponent.statusEffects && typeof opponent.statusEffects.applyBleed === 'function') {
+                      opponent.statusEffects.applyBleed(this, bleedDur, bleedDmg, bleedInt);
+                    }
+
+                    const hitLabel = isBuffedHit ? `BISHOP BLEED! -${finalLaserDmg} (CRIT/PREDICTED)` : `BISHOP BLEED! -${cfg.laserDmg}`;
+                    const hitColor = isBuffedHit ? '#FCD34D' : '#EF4444';
+                    spawnFloatingText(opponent.x, opponent.y - 16, hitLabel, hitColor);
+                  }
                   this.activeVisualEffects.push({
                     type: 'bishop_slash',
                     x: troop.x,
@@ -936,32 +1375,43 @@ export class ShiroFighter extends Fighter {
                 }
 
                 case 'rook': {
-                  opponent.takeDamage?.(cfg.laserDmg, this);
-
-                  // Apply strong Knockback Impulse
-                  const pushAngle = Math.atan2(troop.targetTile.y - troop.startTile.y, troop.targetTile.x - troop.startTile.x);
-                  const knockbackImpulse = cfg.knockbackImpulse || 18.0;
-                  if (typeof opponent.applyKnockback === 'function') {
-                    opponent.applyKnockback(Math.cos(pushAngle) * knockbackImpulse, Math.sin(pushAngle) * knockbackImpulse);
-                  } else {
-                    opponent.vx = (opponent.vx || 0) + Math.cos(pushAngle) * knockbackImpulse;
-                    opponent.vy = (opponent.vy || 0) + Math.sin(pushAngle) * knockbackImpulse;
+                  const previousHp = opponent.hp;
+                  let finalRamDmg = cfg.laserDmg;
+                  const isBuffedHit = Boolean(troop.blankBuffTimer > 0);
+                  if (isBuffedHit) {
+                    finalRamDmg = Math.round(finalRamDmg * (shiroConfig.blankBuffDamageMultiplier || 1.35));
                   }
+                  const dmgResult = opponent.takeDamage?.(finalRamDmg, this);
+                  const damageLanded = (dmgResult === true || (typeof dmgResult === 'number' && dmgResult > 0) || (Number.isFinite(previousHp) && Number.isFinite(opponent.hp) && opponent.hp < previousHp));
 
-                  // Apply Stun Debuff (Paralyze / Stun)
-                  const stunDur = cfg.stunDuration || 45;
-                  if (typeof opponent.applyParalyze === 'function') {
-                    opponent.applyParalyze(stunDur);
-                  } else if (typeof opponent.applyHitStun === 'function') {
-                    opponent.applyHitStun(stunDur);
-                  }
-                  if (opponent.statusEffects && typeof opponent.statusEffects.applyParalyze === 'function') {
-                    opponent.statusEffects.applyParalyze(stunDur);
-                  }
+                  if (damageLanded) {
+                    // Apply strong Knockback Impulse
+                    const pushAngle = Math.atan2(troop.targetTile.y - troop.startTile.y, troop.targetTile.x - troop.startTile.x);
+                    const knockbackImpulse = cfg.knockbackImpulse || 18.0;
+                    if (typeof opponent.applyKnockback === 'function') {
+                      opponent.applyKnockback(Math.cos(pushAngle) * knockbackImpulse, Math.sin(pushAngle) * knockbackImpulse);
+                    } else {
+                      opponent.vx = (opponent.vx || 0) + Math.cos(pushAngle) * knockbackImpulse;
+                      opponent.vy = (opponent.vy || 0) + Math.sin(pushAngle) * knockbackImpulse;
+                    }
 
-                  spawnFloatingText(opponent.x, opponent.y - 18, `ROOK STUN! -${cfg.laserDmg}`, '#FBBF24');
-                  triggerGlobalScreenShake(3.0, 6);
-                  audioSystem.playSFX('shiro_rook_ram', this._getSoundVolume('rookRam', 0.90));
+                    // Apply Stun Debuff (Paralyze / Stun)
+                    const stunDur = cfg.stunDuration || 45;
+                    if (typeof opponent.applyParalyze === 'function') {
+                      opponent.applyParalyze(stunDur);
+                    } else if (typeof opponent.applyHitStun === 'function') {
+                      opponent.applyHitStun(stunDur);
+                    }
+                    if (opponent.statusEffects && typeof opponent.statusEffects.applyParalyze === 'function') {
+                      opponent.statusEffects.applyParalyze(stunDur);
+                    }
+
+                    const hitLabel = isBuffedHit ? `ROOK STUN! -${finalRamDmg} (CRIT/PREDICTED)` : `ROOK STUN! -${cfg.laserDmg}`;
+                    const hitColor = isBuffedHit ? '#FCD34D' : '#FBBF24';
+                    spawnFloatingText(opponent.x, opponent.y - 18, hitLabel, hitColor);
+                    triggerGlobalScreenShake(3.0, 6);
+                    audioSystem.playSFX('shiro_rook_ram', this._getSoundVolume('rookRam', 0.90));
+                  }
                   this.activeVisualEffects.push({
                     type: 'rook_ram',
                     x: troop.x,
@@ -978,8 +1428,12 @@ export class ShiroFighter extends Fighter {
         continue;
       }
 
-      // 5. Stationary Idle Minion Lifecycle (Summon & Attack Cooldown Ticks)
+      // 5. Stationary Idle Minion Lifecycle (Summon, Attack & Buff Cooldown Ticks)
       if (troop.isMinion) {
+        if (troop.blankBuffTimer && troop.blankBuffTimer > 0) {
+          troop.blankBuffTimer--;
+          troop.isBuffed = (troop.blankBuffTimer > 0);
+        }
         if (troop.summonTimer && troop.summonTimer > 0) {
           troop.summonTimer--;
           if (troop.summonTimer <= 0) {
@@ -1098,10 +1552,13 @@ export class ShiroFighter extends Fighter {
     if (bestCandidate) {
       const { troop, attackTarget, myCol, myRow, targetCol, targetRow, dCol, dRow, moveDuration, targetX, targetY } = bestCandidate;
 
+      const troopCfg = shiroConfig.troops?.[troop.type] || {};
+      const telegraphFrames = troopCfg.telegraphDuration ?? shiroConfig.troopTiming?.telegraphDuration ?? shiroConfig.troopTelegraphDuration ?? 22;
+
       troop.isTelegraphing = true;
       troop.isAttacking = false;
-      troop.telegraphTimer = 22;
-      troop.telegraphMaxTimer = 22;
+      troop.telegraphTimer = telegraphFrames;
+      troop.telegraphMaxTimer = telegraphFrames;
       troop.moveDuration = moveDuration;
       troop.startTile = { col: myCol, row: myRow, x: troop.x, y: troop.y };
       troop.targetTile = { col: targetCol, row: targetRow, x: targetX, y: targetY };
@@ -1122,9 +1579,235 @@ export class ShiroFighter extends Fighter {
         };
       }
 
-      this.chessTurnCooldown = 12;
+      this.chessTurnCooldown = troopCfg.turnCooldown ?? shiroConfig.troopTiming?.turnCooldown ?? shiroConfig.turnCooldown ?? 12;
       // Audio: Troop Moving
       audioSystem.playSFX('shiro_troop_move', this._getSoundVolume('troopMove', 0.85));
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Speech & Victory Chat Animation ("Checkmate!")
+  // ─────────────────────────────────────────────
+  /**
+   * Triggers an anime dialogue speech bubble above Shiro with typewriter text animation.
+   */
+  speak(text, duration = 180, force = false) {
+    if (!text) return;
+    if (this.dead || this.hp <= 0 || (typeof state !== 'undefined' && state._shiroDefeatShutdown)) return;
+    if (!force && this._speechCooldown > 0 && this.speechBubble && this.speechBubble.timer > 0) return;
+    this.speechBubble = {
+      text: '',
+      fullText: String(text),
+      charIndex: 0,
+      timer: duration,
+      maxTimer: duration,
+      charTimer: 0,
+      blipInterval: 3
+    };
+    this._speechCooldown = duration + 35;
+    // Play Shiro's iconic FingerSnap SFX on dialogue trigger
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX('Assets/Sound Effects/Shiro/FingerSnap.ogg', 0.95);
+    }
+  }
+
+  /**
+   * Updates typewriter reveal progress and speech blip SFX.
+   */
+  _updateSpeech() {
+    if (this.dead || this.hp <= 0 || (typeof state !== 'undefined' && state._shiroDefeatShutdown)) {
+      this.speechBubble = null;
+      return;
+    }
+    if (this._speechCooldown > 0) this._speechCooldown--;
+    if (!this.speechBubble || this.speechBubble.timer <= 0) return;
+    this.speechBubble.timer--;
+    if (this.speechBubble.charIndex < this.speechBubble.fullText.length) {
+      this.speechBubble.charTimer++;
+      if (this.speechBubble.charTimer >= this.speechBubble.blipInterval) {
+        this.speechBubble.charTimer = 0;
+        this.speechBubble.charIndex = Math.min(this.speechBubble.fullText.length, this.speechBubble.charIndex + 1);
+        this.speechBubble.text = this.speechBubble.fullText.slice(0, this.speechBubble.charIndex);
+        const char = this.speechBubble.fullText[this.speechBubble.charIndex - 1];
+        if (char && char !== ' ' && this.speechBubble.charIndex % 2 === 0) {
+          if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+            audioSystem.playSFX('Assets/Sound Effects/Sans/SansSpeak.ogg', 0.40);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Detects match/round victory or defeat to handle quotes, troop cleanup, and chessboard shutdown.
+   */
+  _checkMatchVictory(opponent) {
+    if (this._hasHandledDefeat) return;
+
+    let isShiroWinner = false;
+    let isShiroDefeated = false;
+
+    if (this.hp <= 0 || this.dead) {
+      isShiroDefeated = true;
+    } else if (typeof state !== 'undefined') {
+      if (state.matchWinner === this || state.roundWinner === this) {
+        isShiroWinner = true;
+      } else if ((state.matchWinner || state.roundWinner) && state.getFighterTeam && typeof state.getFighterTeam === 'function' && Array.isArray(state.fighters)) {
+        const winner = state.matchWinner || state.roundWinner;
+        const winnerIdx = state.fighters.indexOf(winner);
+        const myIdx = state.fighters.indexOf(this);
+        if (winnerIdx !== -1 && myIdx !== -1 && state.getFighterTeam(winnerIdx) === state.getFighterTeam(myIdx)) {
+          isShiroWinner = true;
+        } else {
+          isShiroDefeated = true;
+        }
+      } else if (state.matchWinner && state.matchWinner !== this) {
+        isShiroDefeated = true;
+      } else if (state.roundWinner && state.roundWinner !== this) {
+        isShiroDefeated = true;
+      } else if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
+        const opponentDefeated = !opponent || opponent.dead || opponent.hp <= 0;
+        if (opponentDefeated) {
+          isShiroWinner = true;
+        } else {
+          isShiroDefeated = true;
+        }
+      }
+    }
+
+    if (isShiroDefeated) {
+      this._hasHandledDefeat = true;
+      this.speechBubble = null;
+      this._blankWindupStarted = false;
+      this.blankWindupTimer = 0;
+      this.destroyAllActiveTroops(true);
+      this._triggerDefeatChessboardShutdown();
+      return;
+    }
+
+    if (isShiroWinner && !this._hasSaidWinQuote) {
+      // Mandatory sequence: faah.mp3 (120f) -> YOU WIN! announcer (80f) -> shutdown voiceline!
+      const endTimer = (typeof state !== 'undefined' && (
+        state.gameState === 'matchEnd' 
+          ? (state.matchEndTimer || 0) 
+          : (state.roundEndTimer || state.matchEndTimer || 0)
+      )) || 0;
+      if (endTimer < 200) {
+        return; // Wait for faah.mp3 (120f) and YOU WIN! announcer (80f) to finish completely before shutdown voiceline!
+      }
+      this._hasSaidWinQuote = true;
+      this.speak('Checkmate!', 180, true);
+      this._triggerVictoryChessboardShutdown();
+    }
+  }
+
+  /**
+   * Destroys and shatters all active living chess troops on the arena tiles.
+   */
+  destroyAllActiveTroops(playSfx = true) {
+    let shatteredAny = false;
+
+    if (this.activeMinions && Array.isArray(this.activeMinions)) {
+      for (let i = this.activeMinions.length - 1; i >= 0; i--) {
+        const troop = this.activeMinions[i];
+        if (troop && !troop.dead) {
+          troop.hp = 0;
+          troop.dead = true;
+          if (!troop._hasShattered) {
+            troop._hasShattered = true;
+            spawnChessTroopShatter(troop);
+            shatteredAny = true;
+          }
+          if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+            const idx = state.fighters.indexOf(troop);
+            if (idx !== -1) state.fighters.splice(idx, 1);
+          }
+        }
+      }
+      this.activeMinions.length = 0;
+    }
+
+    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      for (let i = state.fighters.length - 1; i >= 0; i--) {
+        const f = state.fighters[i];
+        if (f && (f.owner === this || f.owner === this.fighterIndex) && (f.isChessTroop || f.isChessMinion) && !f.dead) {
+          f.hp = 0;
+          f.dead = true;
+          if (!f._hasShattered) {
+            f._hasShattered = true;
+            spawnChessTroopShatter(f);
+            shatteredAny = true;
+          }
+          state.fighters.splice(i, 1);
+        }
+      }
+    }
+
+    if (shatteredAny && playSfx) {
+      if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+        const destroySound = shiroConfig.sounds?.troopDestroyed || 'Assets/Sound Effects/Shiro/PermafrostKeepSealMine1.ogg';
+        audioSystem.playSFX(destroySound, this._getSoundVolume('troopDestroyed', 0.90));
+      }
+    }
+  }
+
+  /**
+   * Triggers the CRT television / game console power-off shutdown animation for the Disboard chessboard on victory.
+   */
+  _triggerVictoryChessboardShutdown() {
+    if (typeof state === 'undefined') return;
+    if (this.dead || this.hp <= 0 || state._shiroDefeatShutdown) return;
+    state._shiroVictoryShutdown = true;
+    const cb = shiroConfig?.chessboard || CONFIG?.shiro?.chessboard || {};
+    const SHUTDOWN_DURATION = cb.shutdownDuration ?? 50;
+
+    // Destroy all active troops when the chessboard shuts down
+    this.destroyAllActiveTroops(true);
+
+    // Only initiate shutdown if the chessboard was actually active/visible in this match
+    if (state._shiroChessboardAlpha > 0.05 || state._shiroChessboardWasActive) {
+      state._shiroChessboardShutdownTimer = SHUTDOWN_DURATION;
+      state._shiroChessboardShutdownDuration = SHUTDOWN_DURATION;
+      state._shiroChessboardShutdownStartAlpha = state._shiroChessboardAlpha || 1.0;
+      state._shiroChessboardAssembleProgress = 1.0;
+      if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+        const vol = shiroConfig.soundVolumes?.boardShutdown ?? 0.85;
+        audioSystem.playSFX('shiro_board_shutdown', vol);
+        const voiceVol = shiroConfig.soundVolumes?.boardShutdownVoiceline ?? 1.0;
+        const voiceSrc = shiroConfig.sounds?.boardShutdownVoiceline || 'Assets/Sound Effects/Shiro/shiro_chessboard_shutdown_voiceline.mp3';
+        audioSystem.playSFX(voiceSrc, voiceVol);
+      }
+    }
+  }
+
+  /**
+   * Triggers the CRT television power-off shutdown animation for the Disboard chessboard on defeat.
+   * STRICT AUDIO RULE: NEVER play shiro_chessboard_shutdown_voiceline.mp3 or victory quotes on defeat!
+   */
+  _triggerDefeatChessboardShutdown() {
+    if (typeof state === 'undefined') return;
+    state._shiroVictoryShutdown = false;
+    state._shiroDefeatShutdown = true;
+    this.speechBubble = null;
+    this._cutOffBlankVoiceline('defeat');
+
+    // Destroy all active troops immediately on defeat
+    this.destroyAllActiveTroops(true);
+
+    const cb = shiroConfig?.chessboard || CONFIG?.shiro?.chessboard || {};
+    const SHUTDOWN_DURATION = cb.shutdownDuration ?? 50;
+
+    // Only initiate shutdown if the chessboard was actually active/visible in this match
+    if ((state._shiroChessboardAlpha > 0.05 || state._shiroChessboardWasActive) && state._shiroChessboardShutdownTimer === 0) {
+      state._shiroChessboardShutdownTimer = SHUTDOWN_DURATION;
+      state._shiroChessboardShutdownDuration = SHUTDOWN_DURATION;
+      state._shiroChessboardShutdownStartAlpha = state._shiroChessboardAlpha || 1.0;
+      state._shiroChessboardAssembleProgress = 1.0;
+      if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+        const vol = shiroConfig.soundVolumes?.boardShutdown ?? 0.85;
+        audioSystem.playSFX('shiro_board_shutdown', vol);
+        // STRICT AUDIO SUPPRESSION: NEVER play shiro_chessboard_shutdown_voiceline.mp3 on defeat!
+      }
     }
   }
 
@@ -1134,11 +1817,28 @@ export class ShiroFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     // 0. Update visual effect decay before freeze guard (Rule 25)
     this._updateVisualEffects();
+    this._updateSpeech();
+    this._checkMatchVictory(opponent);
+
+    // If defeated, destroy active troops immediately and trigger defeat chessboard shutdown
+    if (this.hp <= 0 || this.dead) {
+      this.speechBubble = null;
+      this._cutOffBlankVoiceline('defeat');
+      if (this.activeMinions && this.activeMinions.length > 0) {
+        this.destroyAllActiveTroops(true);
+      }
+      if (!this._hasHandledDefeat) {
+        this._hasHandledDefeat = true;
+        this._triggerDefeatChessboardShutdown();
+      }
+    }
 
     // 1. Mandatory Freeze & TimeStop Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
+    const isStunned = isFrozen || this.isTargetOfAmbush || this._isShiroStunned();
+    if (isStunned) {
+      this._cutOffBlankVoiceline('stunnedDuringUpdate');
+      this.interruptAttacks(true);
       return;
     }
 
@@ -1186,5 +1886,8 @@ export class ShiroFighter extends Fighter {
     // 4. Mandatory Overhead HP & Freeze Timer (Rule 21)
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+
+    // 5. Victory Dialogue Speech Bubble ("Checkmate!")
+    drawShiroSpeechBubble(ctx, this);
   }
 }

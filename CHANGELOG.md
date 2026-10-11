@@ -5,9 +5,13 @@
 
 ## 🥊 Fighter Stat Modifications
 
-### CRAZYDAVE
-* **🟢 BUFF** `lawnmowerBaselineOffset`: `2` ➔ `16` (+700.0%)
+### SANS
+* **🔴 NERF** `basicBoneCooldown`: `50` ➔ `80` (+60.0%)
 
-### EYEOFCTHULHU
-* **🔄 ADJUST** `displayName`: `Eye of Cthulhu` ➔ `EOC` (Mod)
+### SHIRO
+* **🔄 ADJUST** `displayName`: `Shiro` ➔ `『SHIRO』` (Mod)
+* **🔄 ADJUST** `throwSpeed`: `10.0` ➔ `15.0` (Mod)
+
+### SORA
+* **🔄 ADJUST** `displayName`: `Shiro` ➔ `『SHIRO』` (Mod)
 

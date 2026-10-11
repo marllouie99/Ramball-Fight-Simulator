@@ -385,10 +385,25 @@ export function drawFighters() {
       const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
       if (fighter._statusOverlaysRenderedFrame !== currentFrame) {
         fighter._statusOverlaysRenderedFrame = currentFrame;
-        ctx.save();
-        ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-        FighterRenderer.drawStatusOverlays(ctx, fighter);
-        ctx.restore();
+        const isDebuffSuppressed = Boolean(
+          fighter.suppressDebuffs ||
+          fighter.suppressStatusOverlays ||
+          fighter.isChessTroop ||
+          fighter.isChessMinion ||
+          fighter.isChessPiece ||
+          fighter.characterId?.startsWith('chess_') ||
+          fighter.isPlant ||
+          fighter.isPlantMinion ||
+          fighter.isTurret ||
+          fighter.isBuilding ||
+          fighter.isDeployable
+        );
+        if (!isDebuffSuppressed) {
+          ctx.save();
+          ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+          FighterRenderer.drawStatusOverlays(ctx, fighter);
+          ctx.restore();
+        }
       }
       
       // If Mahoraga is adapting (wheel clicking), dim the opponent so only Mahoraga is highlighted
@@ -413,8 +428,16 @@ export function drawFighters() {
       ctx.restore();
     }
 
+    const isChessEntity = Boolean(
+      fighter.isChessTroop ||
+      fighter.isChessMinion ||
+      fighter.isChessPiece ||
+      fighter.characterId?.startsWith('chess_') ||
+      fighter.suppressDebuffs
+    );
+
     // Draw Mahito Paralyze Bubbly Flesh Deform & Orbiting Rings directly on top of fighter
-    if (isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
+    if (isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0 && !isChessEntity) {
       ctx.save();
       ctx.translate(fighter.x + shiverX, (fighter.y - (fighter.z || 0)) + shiverY);
       drawMahitoFleshBubblyDeformLocal(ctx, fighter.r || 25, fighter.paralyzeTimer, '#A855F7', fighter);
@@ -441,7 +464,7 @@ export function drawFighters() {
       fighter.isCronosStasis ||
       fighter.isTargetOfAmbush ||
       fighter.caughtInSaitamaFlurry
-    );
+    ) && !isChessEntity && !fighter.suppressStunVisual;
 
     if (isFighterStunned && !isParalyzedByMahito && !fighter.isChainedByMakima) {
       const dur = fighter.paralyzeTimer || fighter.timeStopTimer || fighter.electricStunTimer || fighter.hitStunTimer || 45;
@@ -455,19 +478,19 @@ export function drawFighters() {
     }
 
     // Makima Chains of Domination Body-Wrapping Chains & Subjugation Collar Overlay
-    if (fighter.isChainedByMakima) {
+    if (fighter.isChainedByMakima && !isChessEntity) {
       ctx.save();
       drawTargetChainsOverlay(ctx, fighter, fighter._makimaChainer || null);
       ctx.restore();
     }
 
     // 24 FPS Film Frame Stasis Overlay (Naoya 24-Frame Palm Touch & Projection Sorcery Freeze)
-    if (fighter.isFrameFrozen || (fighter.frameFreezeTimer && fighter.frameFreezeTimer > 0)) {
+    if ((fighter.isFrameFrozen || (fighter.frameFreezeTimer && fighter.frameFreezeTimer > 0)) && !isChessEntity) {
       draw24FPSFrameStasisOverlay(ctx, fighter, fighter.frameFreezeTimer || 60);
     }
 
     // Embedded Mahito Bone Spikes attached to body
-    if (fighter._embeddedMahitoSpikes && fighter._embeddedMahitoSpikes.length > 0) {
+    if (fighter._embeddedMahitoSpikes && fighter._embeddedMahitoSpikes.length > 0 && !isChessEntity) {
       ctx.save();
       ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
       drawEmbeddedMahitoSpikes(ctx, fighter.r, fighter);
@@ -475,7 +498,7 @@ export function drawFighters() {
     }
 
     // Maki Zen'in Dragon-Bone Impaled Sword Overlay (stuck through enemy body)
-    if (fighter.isPinnedByMaki && fighter.hp > 0 && !fighter.isDead) {
+    if (fighter.isPinnedByMaki && fighter.hp > 0 && !fighter.isDead && !isChessEntity) {
       drawMakiImpaledTargetOverlay(ctx, fighter, fighter._makiPinnedBy);
     }
 

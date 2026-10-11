@@ -8,5 +8,5 @@ import { shiroConfig } from './shiroConfig.js';
 export const soraConfig = {
   ...shiroConfig,
   name: 'Shiro',
-  displayName: 'Shiro'
+  displayName: '『SHIRO』'
 };

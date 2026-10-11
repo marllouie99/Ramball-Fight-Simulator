@@ -216,7 +216,9 @@ export class StatusEffectsManager {
 
   // --- Bleed ---
   applyBleed(attacker, duration, damagePerTick, intervalFrames) {
+    if (!this.fighter) return;
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) return;
+    if (this.fighter.isBloodImmune || this.fighter.noBlood || this.fighter.suppressBlood || this.fighter.bleedImmune || this.fighter.isStatusImmune || this.fighter.dead || this.fighter.isDead || (this.fighter.hp !== undefined && this.fighter.hp <= 0)) return;
     const bleedCfg = CONFIG.bleed || {};
     const finalDuration = duration ?? bleedCfg.defaultDuration ?? 180;
     const finalDamage = damagePerTick ?? bleedCfg.defaultDamagePerTick ?? 4;
@@ -230,7 +232,8 @@ export class StatusEffectsManager {
   }
 
   handleBleed() {
-    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) {
+    if (!this.fighter) return;
+    if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isBloodImmune || this.fighter.noBlood || this.fighter.suppressBlood || this.fighter.bleedImmune || this.fighter.isStatusImmune || this.fighter.dead || this.fighter.isDead || (this.fighter.hp !== undefined && this.fighter.hp <= 0)) {
       this.fighter.bleedTimer = 0;
       this.fighter.bleedDamageTimer = 0;
       return;
@@ -247,13 +250,12 @@ export class StatusEffectsManager {
       if (this.fighter.bleedDamageTimer >= intervalFrames) {
         if (typeof this.fighter.takeDamage === 'function') {
           this.fighter.takeDamage(damage, this.fighter.lastBleedAttacker, { isBleed: true, knockback: false });
-
         }
         this.fighter.bleedDamageTimer = 0;
       }
 
       // Continuous dripping blood particles (drops every dripFreq frames while bleeding!)
-      if (this.fighter.bleedTimer % dripFreq === 0) {
+      if (this.fighter.bleedTimer % dripFreq === 0 && !this.fighter.suppressBlood && !this.fighter.noBlood && !this.fighter.isBloodImmune) {
         const dropX = this.fighter.x + (Math.random() - 0.5) * (this.fighter.r || 25);
         const dropY = (this.fighter.y - (this.fighter.z || 0)) + (Math.random() - 0.2) * (this.fighter.r || 25);
         spawnBloodEffect({ x: dropX, y: dropY, z: 0, r: 4 }, 1, Math.PI / 2, {

@@ -502,10 +502,12 @@ export class JohnWickFighter extends Fighter {
           }
 
           // Deal massive true damage & apply bleed + slow
+          const preHp = typeof target.hp === 'number' ? target.hp : null;
           const pencilDmg = cfg.pencilDamage || 30;
-          applyDamageToTarget(target, pencilDmg, this, { isMelee: true, isTrueDamage: true });
+          const dmgResult = applyDamageToTarget(target, pencilDmg, this, { isMelee: true, isTrueDamage: true });
+          const damageLanded = (dmgResult && (dmgResult === true || dmgResult > 0)) || (preHp !== null && target.hp < preHp);
 
-          if (target.hp > 0) {
+          if (damageLanded && target.hp > 0) {
             const bleedDur = cfg.pencilBleedDuration || 180;
             const bleedDmg = cfg.pencilBleedDamagePerTick || 2;
             const bleedInterval = cfg.pencilBleedIntervalFrames || 30;
@@ -528,12 +530,14 @@ export class JohnWickFighter extends Fighter {
             }
           }
 
-          spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 14, 'WITH A F***ING PENCIL!', '#F59E0B');
-          
-          // Burst Blood Effect Particles & Heavy Arena Shake (High-velocity directional arterial spray)
-          spawnBloodEffect(target, 28, this.gunAngle, { minSize: cfg.cqcPencilBloodMinSize || 3.8, maxSize: cfg.cqcPencilBloodMaxSize || 6.8, count: cfg.cqcPencilBloodCount || 14 });
-          spawnSparks(target.x, target.y, 14, 'crimson', '#DC2626');
-          spawnSparks(target.x, target.y, 10, '#F59E0B');
+          if (damageLanded) {
+            spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 14, 'WITH A F***ING PENCIL!', '#F59E0B');
+            
+            // Burst Blood Effect Particles & Heavy Arena Shake (High-velocity directional arterial spray)
+            spawnBloodEffect(target, 28, this.gunAngle, { minSize: cfg.cqcPencilBloodMinSize || 3.8, maxSize: cfg.cqcPencilBloodMaxSize || 6.8, count: cfg.cqcPencilBloodCount || 14 });
+            spawnSparks(target.x, target.y, 14, 'crimson', '#DC2626');
+            spawnSparks(target.x, target.y, 10, '#F59E0B');
+          }
           const pencilSfx = cfg.sounds?.pencilStab || cfg.pencilStabSound || 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3';
           const pencilVol = cfg.soundVolumes?.pencilStab ?? cfg.pencilStabVolume ?? 1.0;
           audioSystem.playSFX(pencilSfx, pencilVol);
