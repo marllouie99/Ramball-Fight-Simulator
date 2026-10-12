@@ -343,16 +343,18 @@ export function drawFaceOffThumbnailScreen() {
   // 1. Draw Anime Grunge Background (4-Way Zigzag Split for FFA, Diagonal 2-Way Split for others)
   const isFFA = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
   if (isFFA) {
+    const isVertical = (state.viewOrientation !== 'horizontal');
+    const ffaDefs = isVertical ? [p1Def, p2Def, p3Def] : [p1Def, p2Def, p3Def, p4Def];
     const ffaDurations = [34, 44, 54, 64];
     const ffaSlots = [14, 18, 22, 26];
-    const ffaColors = [p1Def, p2Def, p3Def, p4Def].map((def, i) => {
+    const ffaColors = ffaDefs.map((def, i) => {
       const t = Math.min(1.0, timer / ffaDurations[i]);
       const k = Math.min(ffaSlots[i], Math.round(ffaSlots[i] * (1 - Math.pow(1 - t, 3.8))));
       const rollDef = getStripFighterDef(k, ffaSlots[i], def, getSlotSeed(`ffa_${i}`));
       return getFaceOffThemeColor(rollDef, ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][i]);
     });
     drawFfaAnimeGrungeZigzagBackground(ctx, canvas.width, canvas.height, ffaColors, timer);
-    drawFfaFaceOff(ctx, canvas.width, canvas.height, [p1Def, p2Def, p3Def, p4Def], scale, timer, exitProgress);
+    drawFfaFaceOff(ctx, canvas.width, canvas.height, ffaDefs, scale, timer, exitProgress);
   } else {
     drawAnimeGrungeSplitBackground(ctx, canvas.width, canvas.height, leftThemeColor, rightThemeColor, timer);
 
@@ -1016,7 +1018,7 @@ function draw2v2FaceOff(ctx, width, height, t1p1Def, t1p2Def, t2p1Def, t2p2Def, 
   }
 }
 
-/** FFA 4-Way Arena Layout */
+/** FFA 4-Way or 3-Way Arena Layout */
 function drawFfaFaceOff(ctx, width, height, defs, scale, timer, exitProgress = 0) {
   const cx = width / 2;
   const cy = height * 0.44;
@@ -1024,12 +1026,22 @@ function drawFfaFaceOff(ctx, width, height, defs, scale, timer, exitProgress = 0
   const spreadX = width * 0.25;
   const spreadY = 65;
 
-  const positions = [
-    { targetX: cx - spreadX, targetY: cy - spreadY, angle: 0.35, slots: 14, duration: 34, labelY: cy - spreadY + 48 },
-    { targetX: cx + spreadX, targetY: cy - spreadY, angle: Math.PI - 0.35, slots: 18, duration: 44, labelY: cy - spreadY + 48 },
-    { targetX: cx - spreadX, targetY: cy + spreadY, angle: -0.35, slots: 22, duration: 54, labelY: cy + spreadY + 48 },
-    { targetX: cx + spreadX, targetY: cy + spreadY, angle: Math.PI + 0.35, slots: 26, duration: 64, labelY: cy + spreadY + 48 }
-  ];
+  let positions;
+  if (defs.length === 3) {
+    // 3-Player Vertical FFA: Balanced Triangular Staggered Layout
+    positions = [
+      { targetX: cx, targetY: cy - spreadY - 12, angle: 0, slots: 14, duration: 34, labelY: cy - spreadY - 12 + 48 },
+      { targetX: cx - spreadX * 1.15, targetY: cy + spreadY * 0.75, angle: -0.35, slots: 18, duration: 44, labelY: cy + spreadY * 0.75 + 48 },
+      { targetX: cx + spreadX * 1.15, targetY: cy + spreadY * 0.75, angle: Math.PI + 0.35, slots: 22, duration: 54, labelY: cy + spreadY * 0.75 + 48 }
+    ];
+  } else {
+    positions = [
+      { targetX: cx - spreadX, targetY: cy - spreadY, angle: 0.35, slots: 14, duration: 34, labelY: cy - spreadY + 48 },
+      { targetX: cx + spreadX, targetY: cy - spreadY, angle: Math.PI - 0.35, slots: 18, duration: 44, labelY: cy - spreadY + 48 },
+      { targetX: cx - spreadX, targetY: cy + spreadY, angle: -0.35, slots: 22, duration: 54, labelY: cy + spreadY + 48 },
+      { targetX: cx + spreadX, targetY: cy + spreadY, angle: Math.PI + 0.35, slots: 26, duration: 64, labelY: cy + spreadY + 48 }
+    ];
+  }
 
   if (timer <= 1) {
     positions.forEach((_, i) => {

@@ -63,7 +63,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
   // ─────────────────────────────────────────────
   if (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.sans) ? CONFIG.sans : {};
-    const themeColor = f.themeColor || cfg.themeColor || '#2c4de0ff';
+    const themeColor = f.themeColor || cfg.themeColor || '#03d5f1ff';
     const skills = [];
 
     // 1. Gaster Blaster (Signature Skill / Skill 1)

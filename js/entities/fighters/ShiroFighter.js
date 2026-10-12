@@ -10,7 +10,7 @@
 // - Rule 25: Non-Freezing Active Visual Effects Decay at top of update
 // ─────────────────────────────────────────────
 
-import { Fighter } from '../fighter.js';
+import { Fighter, resolveDamageNumberColor } from '../fighter.js';
 import { shiroConfig } from '../../configs/characters/shiroConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { ARENA_TILE_COUNT } from '../../systems/arenaTileGrid.js';
@@ -332,6 +332,8 @@ export class ShiroFighter extends Fighter {
       suppressBlood: true,
       bleedImmune: true,
       isBloodImmune: true,
+      noHitSound: true,
+      suppressHitSound: true,
       suppressDebuffs: true,
       suppressStatusOverlays: true,
       suppressFreezeOverlay: true,
@@ -516,6 +518,8 @@ export class ShiroFighter extends Fighter {
     troop.suppressBlood = true;
     troop.bleedImmune = true;
     troop.isBloodImmune = true;
+    troop.noHitSound = true;
+    troop.suppressHitSound = true;
     troop.suppressDebuffs = true;
     troop.suppressStatusOverlays = true;
     troop.suppressFreezeOverlay = true;
@@ -584,8 +588,8 @@ export class ShiroFighter extends Fighter {
 
       const dmg = Math.max(1, Math.round(amount || 0));
       troop.hp -= dmg;
-      spawnFloatingText(troop.x, troop.y - 14, `-${dmg}`, '#EF4444');
-      audioSystem.playSFX('attack_fleshhit', this._getSoundVolume('fleshHit', 0.80));
+      const damageColor = resolveDamageNumberColor(attacker, options, '#EF4444');
+      spawnFloatingText(troop.x, troop.y - 14, `-${dmg}`, damageColor);
 
       if (troop.hp <= 0) {
         troop.hp = 0;

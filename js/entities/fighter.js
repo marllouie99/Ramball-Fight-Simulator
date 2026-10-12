@@ -10,7 +10,7 @@ import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { spawnDeathShatter, spawnEyeOfCthulhuDomainSlashGore } from '../graphics/particles/deathShatterEffect.js';
 import { spawnDroppedMahoragaWheel } from '../graphics/particles/mahoragaDroppedWheel.js';
-import { spawnBloodEffect, spawnFatalBloodSplash } from '../graphics/particles/bloodEffect.js';
+import { spawnBloodEffect, spawnFatalBloodSplash, isBloodSuppressedEntity } from '../graphics/particles/bloodEffect.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -174,6 +174,35 @@ export function suppressAfterimagesAndAttackEffects(target) {
   else if (target.afterImages) target.afterImages.length = 0;
 }
 
+/**
+ * Resolves the floating damage number color based on attacker, projectile, options, or fallback.
+ */
+export function resolveDamageNumberColor(attacker, opts = {}, fallback = '#EF4444') {
+  if (opts && typeof opts === 'object') {
+    if (opts.isPurpleDPS) return '#bf5af2';
+    if (opts.damageNumberColor) return opts.damageNumberColor;
+    if (opts.projectile && opts.projectile.damageNumberColor) return opts.projectile.damageNumberColor;
+  }
+  if (attacker) {
+    if (typeof attacker.getDamageNumberColor === 'function') {
+      return attacker.getDamageNumberColor(opts);
+    }
+    if (attacker.owner && typeof attacker.owner.getDamageNumberColor === 'function') {
+      return attacker.owner.getDamageNumberColor(opts);
+    }
+    if (attacker.damageNumberColor) {
+      return attacker.damageNumberColor;
+    }
+    if (attacker.owner && attacker.owner.damageNumberColor) {
+      return attacker.owner.damageNumberColor;
+    }
+    if (attacker.color) {
+      return attacker.color;
+    }
+  }
+  return fallback;
+}
+
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
   if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
@@ -241,11 +270,31 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
         target.hitFlashTimer = 8;
       }
 
-      // Play flesh hit audio effect unless it's a continuous DPS/dot effect or duplicate turret pair hit
-      const isSilentHit = Boolean(opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isPurpleDPS || opts.isDomainDPS || opts.isElectrified || opts.isBleed || opts.source === 'bleed' || opts.noHitSound || opts.suppressHitSound || opts.isNamelessBeam || opts.isSilent);
+      // Play flesh hit audio effect unless it's a continuous DPS/dot effect, duplicate turret pair hit, or sound-suppressed target (e.g. Shiro's chess troops, plants, buildings)
+      const isTargetSilent = Boolean(
+        target.noHitSound ||
+        target.suppressHitSound ||
+        target.isChessTroop ||
+        target.isChessMinion ||
+        target.isChessPiece ||
+        target.isTurret ||
+        target.isDispenser ||
+        target.isBuilding ||
+        target.isSentry ||
+        target.isPlant ||
+        target.isPlantMinion ||
+        target.isWallnut ||
+        target.isLawnmower ||
+        target.isDeployable ||
+        target.characterId === 'crazydave_plant' ||
+        target.characterId === 'crazydave_lawnmower' ||
+        (typeof target.characterId === 'string' && (target.characterId.startsWith('chess_') || target.characterId.startsWith('crazydave_'))) ||
+        (typeof target.type === 'string' && ['pawn', 'knight', 'bishop', 'rook', 'queen'].includes(target.type.toLowerCase()) && (target.isMinion || target.isChessTroop || target.isChessPiece))
+      );
+      const isSilentHit = Boolean(opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isPurpleDPS || opts.isDomainDPS || opts.isElectrified || opts.isBleed || opts.source === 'bleed' || opts.noHitSound || opts.suppressHitSound || opts.isNamelessBeam || opts.isSilent || isTargetSilent);
       if (!isSilentHit && !isSecondTurretHit) {
         audioSystem.playSFX('attack_fleshhit', 0.6);
-      } else if (opts.isPurpleDPS || opts.isDomainDPS) {
+      } else if ((opts.isPurpleDPS || opts.isDomainDPS) && !isTargetSilent) {
         const now = Date.now();
         if (!target._lastPurpleHitSoundTime || (now - target._lastPurpleHitSoundTime > 130)) {
           target._lastPurpleHitSoundTime = now;
@@ -260,7 +309,7 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       } else if (opts.damageAngle !== undefined) {
         damageAngle = opts.damageAngle;
       }
-      const isTargetBloodImmune = target.noBlood || target.suppressBlood || target.bleedImmune || target.isBloodImmune || target.isChessTroop || target.isChessMinion || target.isChessPiece || (typeof target.characterId === 'string' && target.characterId.startsWith('chess_')) || target.characterId === 'namelessdeity' || target.type === 'namelessdeity';
+      const isTargetBloodImmune = isBloodSuppressedEntity(target);
       if (typeof spawnBloodEffect === 'function' && !opts.noBlood && !opts.suppressBlood && !isTargetBloodImmune && !isRatioPauseActive && !isSecondTurretHit) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(effectiveAmount * 0.16)) : effectiveAmount;
         spawnBloodEffect(target, bloodAmount, damageAngle);
@@ -1187,6 +1236,9 @@ export class Fighter {
     if (opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) {
       return (typeof CONFIG !== 'undefined' && (CONFIG.ichigo?.damageNumberColor || CONFIG.ichigo?.themeColor)) || '#FF5500';
     }
+    if (this.characterId === 'sans' || this.type === 'sans') {
+      return this.damageNumberColor || (typeof CONFIG !== 'undefined' && (CONFIG.sans?.damageNumberColor || CONFIG.sans?.themeColor)) || '#03d5f1ff';
+    }
     if (this.damageNumberColor) return this.damageNumberColor;
     return this.color || '#ff4444';
   }
@@ -1836,7 +1888,7 @@ export class Fighter {
     const isMahitoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && f.domainActive);
 
     // Fatal Blood Splash explosion! Splashes to death with visceral blood
-    if (typeof spawnFatalBloodSplash === 'function' && !this.isTurret && !this.isDispenser && !this.isPlant && !this.isPlantMinion) {
+    if (typeof spawnFatalBloodSplash === 'function' && !isBloodSuppressedEntity(this)) {
       spawnFatalBloodSplash(this);
     }
 
@@ -2425,20 +2477,7 @@ export class Fighter {
 
     // Spawn floating damage number when actual HP was reduced
     if (this.hp < prevHp && amount > 0 && !opts.skipStandardDamageText && !isSecondTurretHit) {
-      let color = this.color || '#ff4444';
-      if (opts.isPurpleDPS) {
-        color = '#bf5af2';
-      } else if (attacker) {
-        if (typeof attacker.getDamageNumberColor === 'function') {
-          color = attacker.getDamageNumberColor(opts);
-        } else if (attacker.isIllusion && attacker.owner && typeof attacker.owner.getDamageNumberColor === 'function') {
-          color = attacker.owner.getDamageNumberColor(opts);
-        } else if (attacker.damageNumberColor) {
-          color = attacker.damageNumberColor;
-        } else if (attacker.color) {
-          color = attacker.color;
-        }
-      }
+      const color = resolveDamageNumberColor(attacker, opts, this.color || '#ff4444');
       const damageText = `${Math.round(amount)}`;
       this._healthBarShakeTimer = 12;
       this._healthBarHitTimer = 14;
@@ -2485,8 +2524,8 @@ export class Fighter {
     }
 
     const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
-    const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || this.noBlood || this.suppressBlood || this.bleedImmune || this.characterId === 'namelessdeity' || isRatioPauseActive;
-    if (!this.isTurret && !this.isDispenser && !this.isPlant && !this.isPlantMinion && !this.noBlood && !this.suppressBlood && !this.bleedImmune && this.characterId !== 'namelessdeity' && !isExplosionOrFlame && !isSecondTurretHit) {
+    const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isBloodSuppressedEntity(this) || isRatioPauseActive;
+    if (!isBloodSuppressedEntity(this) && !isExplosionOrFlame && !isSecondTurretHit) {
       const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
       if (typeof spawnBloodEffect === 'function') {
         spawnBloodEffect(this, bloodAmount, damageAngle, opts);
@@ -2572,7 +2611,27 @@ export class Fighter {
       opts.isSilent ||
       (opts.projectile && (opts.projectile.isDomainDPS || opts.projectile.fromDomain))
     );
-    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse' && !opts.noHitSound && !opts.suppressHitSound && !opts.isNamelessBeam && !opts.isSilent && !isDomainHit) {
+    const isTargetSilent = Boolean(
+      this.noHitSound ||
+      this.suppressHitSound ||
+      this.isChessTroop ||
+      this.isChessMinion ||
+      this.isChessPiece ||
+      this.isTurret ||
+      this.isDispenser ||
+      this.isBuilding ||
+      this.isSentry ||
+      this.isPlant ||
+      this.isPlantMinion ||
+      this.isWallnut ||
+      this.isLawnmower ||
+      this.isDeployable ||
+      this.characterId === 'crazydave_plant' ||
+      this.characterId === 'crazydave_lawnmower' ||
+      (typeof this.characterId === 'string' && (this.characterId.startsWith('chess_') || this.characterId.startsWith('crazydave_'))) ||
+      (typeof this.type === 'string' && ['pawn', 'knight', 'bishop', 'rook', 'queen'].includes(this.type.toLowerCase()) && (this.isMinion || this.isChessTroop || this.isChessPiece))
+    );
+    if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam && !opts.isBleed && opts.source !== 'bleed' && !opts.isCurse && opts.source !== 'curse' && !opts.noHitSound && !opts.suppressHitSound && !isTargetSilent && !opts.isNamelessBeam && !opts.isSilent && !isDomainHit) {
       if (!this.isTurret && !this.isDispenser) {
         if (!isSecondTurretHit) {
           audioSystem.playSFX('attack_fleshhit', 0.6);
@@ -2582,10 +2641,12 @@ export class Fighter {
     } else if (opts.isPurpleDPS) {
       if (!this.isTurret && !this.isDispenser) {
         this.hitFlashTimer = 6;
-        const now = Date.now();
-        if (!this._lastPurpleHitSoundTime || (now - this._lastPurpleHitSoundTime > 130)) {
-          this._lastPurpleHitSoundTime = now;
-          audioSystem.playSFX('attack_fleshhit', 0.5);
+        if (!isTargetSilent) {
+          const now = Date.now();
+          if (!this._lastPurpleHitSoundTime || (now - this._lastPurpleHitSoundTime > 130)) {
+            this._lastPurpleHitSoundTime = now;
+            audioSystem.playSFX('attack_fleshhit', 0.5);
+          }
         }
       }
     } else if (isDomainHit) {

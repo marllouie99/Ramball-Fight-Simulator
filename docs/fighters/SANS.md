@@ -54,15 +54,20 @@
 
 ---
 
-### 💀 Skill 1: Gaster Blaster Barrage
-- **Type**: Ranged Heavy Laser Cannon
-- **Cooldown**: `320 frames` (~5.3s)
-- **Blaster Count**: `2` Blasters (`3` during Bad Time mode)
-- **Beam Damage**: `8` per tick (`24` total per blaster, `48` total burst, `72` in Bad Time) (+ KR stacks)
-- **Laser Reach**: `800px`
-- **Beam Width**: `38px`
-- **Knockback**: `9 impulse`
-- **Description**: Summons floating skeletal dragon skull cannons that track the target, open their jaws with cyan energy cores, and fire massive high-energy continuous laser beams with concussive screen shake.
+### 💀 Skill 1: Gaster Blaster Arsenal (3 Authentic Undertale Patterns)
+- **Type**: Ranged Heavy Laser Cannon / Multi-Formation Arsenal
+- **Cooldown**: `500 frames` (~5.3s) (Round start initial cooldown: `320` / `180 frames`)
+- **Stamina Cost**: `15 Stamina`
+- **Damage Mechanics**:
+  - **First Impact**: Deals **100% Base Damage** upon initial beam contact with a target (`20` Carousel / `20` Radial Ring / `30` Gigablaster).
+  - **Continuous Damage**: Deals **50% Base Damage** on sustained beam ticks every `6 frames` (`10` Carousel / `10` Radial Ring / `15` Gigablaster) (+ KR stacks).
+- **Authentic Formations**:
+  1. **Pattern 1: Sequential Orbiting Carousel**: 10 blasters encircling arena perimeter (`r = 210px`), firing inward sequentially with rapid acceleration.
+  2. **Pattern 2: 360° Simultaneous Radial Ring**: 8 synchronized blasters surrounding the arena perimeter, firing inward simultaneously in a crossfire cage.
+  3. **Pattern 3: Colossal Titan Gigablaster**: Massive 2.6x titan blaster hovering behind Sans, unleashing a colossal 120px super laser with heavy screen shake.
+- **Laser Reach**: `800px` – `1000px`
+- **Beam Width**: `32px` (Carousel) / `36px` (Ring) / `120px` (Gigablaster)
+- **Description**: Summons floating skeletal dragon skull cannons that charge with glowing cyan energy cores, open their jaws, and fire devastating high-energy laser beams with concussive screen shake.
 
 ---
 

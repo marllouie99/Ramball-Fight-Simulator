@@ -418,7 +418,7 @@ export function drawHUD() {
       containerBottom.style.pointerEvents = 'none';
       containerBottom.style.display = 'none';
     } else {
-      const isSingleColMode = (!isTactical && (is1v1Mode || isStandOffMode)) || (isCameraTracking && isTeamMode && !isTactical);
+      const isSingleColMode = (!isTactical && (is1v1Mode || isStandOffMode || (isFfaMode && !isHorizontal))) || (isCameraTracking && isTeamMode && !isTactical);
       containerBottom.classList.toggle('single-column-hud', isSingleColMode);
       containerBottom.style.opacity = bottomHudOpacity;
       if (bottomHudOpacity <= 0) {
@@ -1236,8 +1236,9 @@ function updateHealthHud() {
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
-  const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isTLFS || (mainFighters.length > 2 && mode !== GAME_MODES.FFA && mode !== 'FFA' && mode !== GAME_MODES.TACTICAL_FFA && mode !== 'Tactical FFA'));
-  const isSingleColumnMode = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal') || ((is1v1 || isStandOff) && !isTactical) || isTeamSingleColumn;
+  const isFfa = mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA';
+  const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isTLFS || isFfa || mainFighters.length > 2);
+  const isSingleColumnMode = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal') || ((is1v1 || isStandOff || isFfa) && !isTactical) || isTeamSingleColumn;
   const currentHpStr = mainFighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = mainFighters.map(f => {
@@ -3059,9 +3060,12 @@ function updateHealthHud() {
         const isSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
         const fighterThemeColor = getFighterThemeColor(fighter, nameColor);
         const nameClass = isSans ? 'health-card__member-name hud-sans-name' : 'health-card__member-name';
-        const fighterHeaderHTML = (isSideHud && mainFighters.length > 2) ? `
-          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${index % 2 === 0 ? 'flex-start' : 'flex-end'};">
-            <span class="${nameClass}" style="color: ${fighterThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: 14.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${fighterName}</span>
+        const isFfaVertical = isFfa && !isH;
+        const ffaAlign = isFfaVertical ? (index === 0 ? 'left' : (index === 2 ? 'right' : 'center')) : (index % 2 === 0 ? 'left' : 'right');
+        const ffaJustify = ffaAlign === 'left' ? 'flex-start' : (ffaAlign === 'right' ? 'flex-end' : 'center');
+        const fighterHeaderHTML = ((isSideHud && mainFighters.length > 2) || isFfaVertical) ? `
+          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${ffaJustify};">
+            <span class="${nameClass}" style="color: ${fighterThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: 13.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${fighterName}</span>
           </div>
         ` : '';
 
@@ -3082,7 +3086,7 @@ function updateHealthHud() {
           kills: (isFfa) && state.matchKills ? state.matchKills[index] || [] : [],
           maxBullets: maxBulletsCount,
           targetFighter: fighter,
-          titleAlign: (index % 2 === 0 ? 'left' : 'right'),
+          titleAlign: ffaAlign,
           singleColumn: isSingleColumnMode,
           customHeaderHTML: fighterHeaderHTML
         });
@@ -3136,8 +3140,13 @@ function updateHealthHud() {
           skillBars.set(id, { box, fill, text });
         });
 
+        const nameEl = cardElement.querySelector('.health-card__member-name');
+
         _hudCache.fighters.set(fighter, {
           cardElement,
+          nameEl,
+          lastMemberName: fighterName,
+          lastMemberColor: fighterThemeColor,
           skillsContainer,
           hpBar,
           hpBarFill,
@@ -3373,7 +3382,7 @@ function updateHealthHud() {
 
         // Stats Info Update for Team Member
         if (m.infoContainer) {
-          const isSingleCol = isSingleColumnMode && mode !== GAME_MODES.FFA;
+          const isSingleCol = isSingleColumnMode;
           const infoHTML = generateFighterInfoHTML(fighter, isSingleCol, true);
           if (m.lastInfoHTML !== infoHTML) {
             m.infoContainer.innerHTML = infoHTML;
@@ -3546,6 +3555,25 @@ function updateHealthHud() {
         }
       }
 
+      if (cachedCard.nameEl) {
+        const currentName = getFighterDisplayName(fighter, true);
+        const isFighterYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+        const defaultNameColor = (state.arenaTheme === 'dark') ? (isFighterYuta ? '#FF1493' : '#ffffff') : '#000000';
+        const fighterThemeColor = getFighterThemeColor(fighter, defaultNameColor);
+        if (cachedCard.lastMemberName !== currentName) {
+          if (typeof currentName === 'string' && currentName.includes('『')) {
+            cachedCard.nameEl.innerHTML = formatFighterNameHTML(currentName);
+          } else {
+            cachedCard.nameEl.textContent = currentName;
+          }
+          cachedCard.lastMemberName = currentName;
+        }
+        if (cachedCard.lastMemberColor !== fighterThemeColor) {
+          cachedCard.nameEl.style.color = fighterThemeColor;
+          cachedCard.lastMemberColor = fighterThemeColor;
+        }
+      }
+
       // Wanted Stars Update for CJ (Individual Fighter)
       if (isCj && cachedCard.starsContainer) {
         const starCount = getCjStarLevel(fighter);
@@ -3630,7 +3658,7 @@ function updateHealthHud() {
         if (cachedCard.skillsContainer && (skills.length !== cachedCard.skillBars.size || skills.some(s => !cachedCard.skillBars.has(s.id)))) {
           const isRight = (cachedCard.cardElement.classList.contains('align-right') || cachedCard.cardElement.parentElement?.id === 'hud-top-right' || cachedCard.cardElement.parentElement?.id === 'hud-bottom-right');
           const align = isRight ? 'right' : 'left';
-          const isSingleCol = (isSingleColumnMode && mode !== GAME_MODES.FFA) || (is1v2 && index === 0);
+          const isSingleCol = isSingleColumnMode || (is1v2 && index === 0);
           cachedCard.skillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol);
           cachedCard.skillBars.clear();
           cachedCard.skillsContainer.querySelectorAll('.hud-skill-box').forEach(box => {
@@ -3696,7 +3724,7 @@ function updateHealthHud() {
 
       // 5. Additional Info (stats) — only write to DOM if text changed
       if (cachedCard.infoContainer) {
-        const isSingleCol = (isSingleColumnMode && mode !== GAME_MODES.FFA) || (is1v2 && index === 0);
+        const isSingleCol = isSingleColumnMode || (is1v2 && index === 0);
         const infoHTML = generateFighterInfoHTML(fighter, isSingleCol);
         if (cachedCard.lastInfoHTML !== infoHTML) {
           cachedCard.infoContainer.innerHTML = infoHTML;

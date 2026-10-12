@@ -352,14 +352,17 @@ export function reinitFighters(isNewMatch = false) {
     const idx1 = state.tagMatch.team1Roster[state.tagMatch.team1ActiveSlot] ?? state.p2Index ?? 1;
     fighterIndexes = [idx0, idx1];
   } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA') {
-    if (state.viewOrientation === 'horizontal' && Array.isArray(state.horizontalRosterSlots)) {
-      state.p1Index = state.horizontalRosterSlots[0] ?? state.p1Index ?? 0;
-      state.p2Index = state.horizontalRosterSlots[1] ?? state.p2Index ?? 1;
-      state.p3Index = state.horizontalRosterSlots[2] ?? state.p3Index ?? 2;
-      state.p4Index = state.horizontalRosterSlots[3] ?? state.p4Index ?? 3;
-      fighterIndexes = [state.p1Index, state.p2Index, state.p3Index, state.p4Index];
+    if (state.viewOrientation === 'horizontal') {
+      if (Array.isArray(state.horizontalRosterSlots)) {
+        state.p1Index = state.horizontalRosterSlots[0] ?? state.p1Index ?? 0;
+        state.p2Index = state.horizontalRosterSlots[1] ?? state.p2Index ?? 1;
+        state.p3Index = state.horizontalRosterSlots[2] ?? state.p3Index ?? 2;
+        state.p4Index = state.horizontalRosterSlots[3] ?? state.p4Index ?? 3;
+      }
+      fighterIndexes = [state.p1Index ?? 0, state.p2Index ?? 1, state.p3Index ?? 2, state.p4Index ?? 3];
     } else {
-      fighterIndexes.push(state.p3Index, state.p4Index);
+      // In VERTICAL MODE, FFA is strictly 3 PLAYERS ONLY
+      fighterIndexes = [state.p1Index ?? 0, state.p2Index ?? 1, state.p3Index ?? 2];
     }
   } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2') {
     // Arrange fighters to match the team spawn ordering.
@@ -558,24 +561,54 @@ export function reinitFighters(isNewMatch = false) {
       state.fighters[1].vy = 0;
     }
   } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA' || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA') {
-    const spawnPoints = getFfaPlusQuadrantSpawns(arena);
+    const isVertical = (state.viewOrientation !== 'horizontal');
+    if (isVertical && state.fighters.length === 3) {
+      // 3-Player Equilateral Triangular Spawns inside the 450x450 vertical arena
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const dist = arena.width * 0.30; // ~135px from center
+      const spawnOffsets = [
+        { angle: -Math.PI / 2 },          // Top
+        { angle: Math.PI / 6 },           // Bottom Right (+30 deg)
+        { angle: 5 * Math.PI / 6 },       // Bottom Left (+150 deg)
+      ];
+      // Randomize starting corner positions for fairness
+      for (let i = spawnOffsets.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = spawnOffsets[i];
+        spawnOffsets[i] = spawnOffsets[j];
+        spawnOffsets[j] = tmp;
+      }
+      state.fighters.forEach((fighter, index) => {
+        const offset = spawnOffsets[index % spawnOffsets.length];
+        fighter.x = cx + Math.cos(offset.angle) * dist;
+        fighter.y = cy + Math.sin(offset.angle) * dist;
+        const faceCenterAngle = Math.atan2(cy - fighter.y, cx - fighter.x);
+        fighter.angle = faceCenterAngle;
+        fighter.gunAngle = faceCenterAngle;
+        fighter.vx = Math.cos(faceCenterAngle) * fighter.speed * 0.3;
+        fighter.vy = Math.sin(faceCenterAngle) * fighter.speed * 0.3;
+      });
+    } else {
+      const spawnPoints = getFfaPlusQuadrantSpawns(arena);
 
-    // Shuffle spawn points so fighter positions change each round
-    for (let i = spawnPoints.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      const tmp = spawnPoints[i];
-      spawnPoints[i] = spawnPoints[j];
-      spawnPoints[j] = tmp;
+      // Shuffle spawn points so fighter positions change each round
+      for (let i = spawnPoints.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = spawnPoints[i];
+        spawnPoints[i] = spawnPoints[j];
+        spawnPoints[j] = tmp;
+      }
+
+      state.fighters.forEach((fighter, index) => {
+        const point = spawnPoints[index % spawnPoints.length] || spawnPoints[0];
+        fighter.x = point.x;
+        fighter.y = point.y;
+        const angle = Math.random() * Math.PI * 2;
+        fighter.vx = Math.cos(angle) * fighter.speed;
+        fighter.vy = Math.sin(angle) * fighter.speed;
+      });
     }
-
-    state.fighters.forEach((fighter, index) => {
-      const point = spawnPoints[index % spawnPoints.length] || spawnPoints[0];
-      fighter.x = point.x;
-      fighter.y = point.y;
-      const angle = Math.random() * Math.PI * 2;
-      fighter.vx = Math.cos(angle) * fighter.speed;
-      fighter.vy = Math.sin(angle) * fighter.speed;
-    });
   } else if (state.mode === GAME_MODES.TWO_VS_TWO) {
     // 2v2: Team 1 (fighters 0,1) on left, Team 2 (fighters 2,3) on right
     const leftX = arena.x + arena.width * 0.25;
@@ -852,7 +885,8 @@ export function startRandom2v2Battle() {
 }
 
 export function randomizeFfaFighters() {
-  if (FIGHTER_DEFS.length < 4) return;
+  const minRequired = (state.viewOrientation === 'horizontal') ? 4 : 3;
+  if (FIGHTER_DEFS.length < minRequired) return;
   const indices = FIGHTER_DEFS.map((_, idx) => idx);
   for (let i = indices.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -861,7 +895,9 @@ export function randomizeFfaFighters() {
   state.p1Index = indices[0];
   state.p2Index = indices[1];
   state.p3Index = indices[2];
-  state.p4Index = indices[3];
+  if (state.viewOrientation === 'horizontal') {
+    state.p4Index = indices[3];
+  }
 }
 
 export function startRandomFfaBattle() {

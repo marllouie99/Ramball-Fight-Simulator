@@ -24,6 +24,10 @@ export class DispenserEntity extends Fighter {
       isDispenser: true,
       isMinion: true,
       isDeployable: true,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: cfg.dispenserHp || 160,
       damage: 0,
       cooldown: 0,
@@ -39,7 +43,10 @@ export class DispenserEntity extends Fighter {
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.hideHpText = true; // Disable HP number overlay over body
+    this.noBlood = true;
     this.suppressBlood = true; // Machines don't bleed — spawn sparks instead
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.maxHp = cfg.dispenserHp || 160;
     this.hp = this.maxHp;
     this.healCooldownTimer = 0;

@@ -948,7 +948,17 @@ export class JohnWickFighter extends Fighter {
           spawnBloodEffect(target, 8, facing, { minSize: cfg.meleeHitBloodMinSize || 2.5, maxSize: cfg.meleeHitBloodMaxSize || 4.8, count: cfg.meleeHitBloodCount || 3 });
           const hitSfx = cfg.sounds?.fleshHit || 'attack_fleshhit';
           const hitVol = cfg.soundVolumes?.fleshHit ?? 0.9;
-          audioSystem.playSFX(hitSfx, hitVol);
+          const isTargetSilent = Boolean(
+            target.noHitSound ||
+            target.suppressHitSound ||
+            target.isChessTroop ||
+            target.isChessMinion ||
+            target.isChessPiece ||
+            (typeof target.characterId === 'string' && target.characterId.startsWith('chess_'))
+          );
+          if (!isTargetSilent) {
+            audioSystem.playSFX(hitSfx, hitVol);
+          }
           triggerGlobalScreenShake(2.0, 5);
 
           // 4. Focus Meter Gain on Melee Strike

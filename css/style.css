@@ -536,15 +536,32 @@ canvas {
 }
 
 .health-hud.ffa-hud {
-  gap: 10px 10px !important;
+  display: flex !important;
+  flex-wrap: nowrap !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
 }
 
 .health-card.ffa-card {
-  width: calc(50% - 6px) !important;
-  max-width: calc(50% - 6px) !important;
-  min-width: calc(50% - 6px) !important;
-  flex: 0 0 calc(50% - 6px) !important;
+  flex: 1 1 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
   box-sizing: border-box;
+}
+
+.health-card.ffa-card .hud-skill-box {
+  padding: 0 4px !important;
+}
+
+.health-card.ffa-card .hud-skill-box-text {
+  font-size: 13px !important;
+  letter-spacing: 0.2px !important;
+}
+
+.health-card.ffa-card .health-card__info {
+  font-size: 13px !important;
+  gap: 2px 4px !important;
 }
 
 .health-card.ffa-card .health-card__title {

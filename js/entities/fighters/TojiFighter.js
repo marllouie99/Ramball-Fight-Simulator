@@ -513,7 +513,7 @@ export class TojiFighter extends Fighter {
       !opts.isPureLoveBeam &&
       !(opts.projectile && opts.projectile.isPureLoveBeam);
     
-    let dodgeChance = CONFIG.toji?.stealthDodgeChance ?? 0.10;
+    let dodgeChance = (typeof this.stealthDodgeChance === 'number') ? this.stealthDodgeChance : (CONFIG.toji?.stealthDodgeChance ?? 0.10);
     if (isEnemyDomainActive) {
       const domainDodgeBonus = CONFIG.toji?.domainDodgeBonus ?? 0.50;
       const domainDodgeChance = CONFIG.toji?.domainDodgeChance ?? 0.95;

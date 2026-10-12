@@ -37,10 +37,25 @@ function createMockCtx() {
   };
 }
 
+function createMockClassList() {
+  const classes = new Set();
+  return {
+    add: (...cls) => cls.forEach(c => classes.add(c)),
+    remove: (...cls) => cls.forEach(c => classes.delete(c)),
+    toggle: (cls, force) => {
+      const has = classes.has(cls);
+      const next = force !== undefined ? !!force : !has;
+      if (next) classes.add(cls); else classes.delete(cls);
+      return next;
+    },
+    contains: (cls) => classes.has(cls)
+  };
+}
+
 const mockCtx = createMockCtx();
 const mockCanvas = mockCtx.canvas;
 mockCanvas.style = {};
-mockCanvas.classList = { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false };
+mockCanvas.classList = createMockClassList();
 mockCanvas.getContext = () => mockCtx;
 
 globalThis.window = globalThis;
@@ -69,12 +84,15 @@ globalThis.document = {
       id: '',
       tagName: tag.toUpperCase(),
       style: {},
-      classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+      classList: createMockClassList(),
       textContent: '',
       _innerHTML: '',
       get innerHTML() { return this._innerHTML; },
       set innerHTML(val) {
         this._innerHTML = val;
+        if (val === '') {
+          this.children = [];
+        }
         if (this.firstElementChild && this.firstElementChild !== this) {
           this.firstElementChild._innerHTML = val;
         }
@@ -99,8 +117,8 @@ globalThis.document = {
     el.firstElementChild = el;
     return el;
   },
-  documentElement: { classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} }, style: {} },
-  body: { classList: { add: () => {}, remove: () => {}, contains: () => false, toggle: () => {} }, style: {} }
+  documentElement: { classList: createMockClassList(), style: {} },
+  body: { classList: createMockClassList(), style: {} }
 };
 globalThis.Image = class {
   constructor() {
@@ -4325,12 +4343,71 @@ async function runInteractionTests() {
     const expectedInitBlasterCd = sansConfig.initialBlasterCooldown !== undefined ? sansConfig.initialBlasterCooldown : 180;
     assert(sans.blasterCooldown === expectedInitBlasterCd, `Sans Gaster Blaster must start on initial cooldown (${expectedInitBlasterCd} frames, got ${sans.blasterCooldown})`);
 
+    // 15. Verify Sans Skill 1: Gaster Blaster Arsenal First Impact (100%) & Continuous (50%) Damage
+    const { Fighter } = await import('../js/entities/fighter.js');
+    state.gameState = 'playing';
+    state.isGameOver = false;
+    sans.reset();
+    sans.stamina = 100;
+    sans.blasterCooldown = 0;
+    const targetDummy = new Fighter({ hp: 500, maxHp: 500, x: 300, y: 250, r: 25 });
+    targetDummy.team = 'enemy';
+    sans.team = 'player';
+    sans.x = 200;
+    sans.y = 250;
+    state.fighters = [sans, targetDummy];
+
+    // Cast Pattern 2: Colossal Titan Gigablaster (Massive super laser directly along x-axis)
+    sans.castGasterBlasters(targetDummy, 2);
+    assert(sans.gasterBlasters.length === 1, 'Gigablaster must be spawned in gasterBlasters array');
+    const gigaBlaster = sans.gasterBlasters[0];
+    assert(gigaBlaster.pattern === 2, 'Gigablaster pattern index must be 2');
+    const gigaBaseDmg = gigaBlaster.damage; // 30
+    assert(gigaBaseDmg === 30, `Gigablaster base damage must be 30 (got ${gigaBaseDmg})`);
+
+    // Complete charge phase; on final charge tick it transitions to firing and triggers First Impact (100% damage)
+    const hpBeforeCast = targetDummy.hp;
+    while (gigaBlaster.isCharging) {
+      sans._updateGasterBlasters(targetDummy);
+    }
+    assert(gigaBlaster.isFiring === true, 'Gigablaster must enter firing state after charging');
+
+    const firstImpactDealt = hpBeforeCast - targetDummy.hp;
+    assert(firstImpactDealt === gigaBaseDmg, `Gigablaster first impact must deal 100% damage (${gigaBaseDmg} dmg, got ${firstImpactDealt})`);
+    assert(gigaBlaster.hitTargets.has(targetDummy), 'Target must be recorded in blaster hitTargets');
+
+    // Intermediate frames within tickInterval (5 frames): No additional damage yet
+    const hpAfterFirstImpact = targetDummy.hp;
+    for (let f = 0; f < 5; f++) {
+      sans._updateGasterBlasters(targetDummy);
+    }
+    assert(targetDummy.hp === hpAfterFirstImpact, 'Target HP must remain constant within continuous damage tick interval');
+
+    // 6th frame (tickInterval reached): Continuous damage must deal 50% damage (15 dmg)
+    sans._updateGasterBlasters(targetDummy);
+    const continuousDealt = hpAfterFirstImpact - targetDummy.hp;
+    const expectedContinuousDmg = Math.max(1, Math.round(gigaBaseDmg * 0.5));
+    assert(continuousDealt === expectedContinuousDmg, `Gigablaster continuous damage must deal 50% damage (${expectedContinuousDmg} dmg, got ${continuousDealt})`);
+
+    // Verify Pattern 0 Carousel and Pattern 1 Radial Ring config base damage & 50% continuous ratio
+    sans.reset();
+    sans.stamina = 100;
+    sans.castGasterBlasters(targetDummy, 0);
+    assert(sans.gasterBlasters.length >= 1, 'Carousel blaster must spawn');
+    assert(sans.gasterBlasters[0].damage === (sansConfig.blasterCarouselDamage || 20), 'Carousel base damage must match config');
+
+    sans.reset();
+    sans.stamina = 100;
+    sans.castGasterBlasters(targetDummy, 1);
+    assert(sans.gasterBlasters.length === (sansConfig.blasterRingCount || 8), 'Radial ring must spawn configured blaster count');
+    assert(sans.gasterBlasters[0].damage === (sansConfig.blasterRingDamage || 20), 'Radial ring base damage must match config');
+
     // Verify canvas stack depth during dodge state
     mockCtx.resetStackDepth();
     sans.draw(mockCtx);
     assert(mockCtx.getStackDepth() === 0, 'Sans draw stack depth during domain slice dodge state must be 0');
 
-    console.log('      ✅ Sans Undertale speech bubbles, warning box, Heart Shatter defeat VFX, faah suppression, in-arena overlay HP, skill bars, initial blaster cooldown & Sukuna domain slice line dodges verified.');
+    console.log('      ✅ Sans Undertale speech bubbles, warning box, Heart Shatter defeat VFX, faah suppression, in-arena overlay HP, skill bars, initial blaster cooldown, Gaster Blaster 100% first impact & 50% continuous damage verified.');
   }
 
   // ─────────────────────────────────────────────
@@ -5491,6 +5568,83 @@ async function runInteractionTests() {
     console.log('      ✅ Horizontal FFA Game Mode Select, 4-Player draft layout, and Panoramic HUD verified successfully.');
   }
 
+  // ── TEST 58B: Vertical FFA Game Mode Select, 3-Player Only Standard, Equilateral Spawns & Face-Off ──
+  console.log('   58B. Testing Vertical FFA Game Mode (3 Players Only, Equilateral Spawns & Face-Off UI)...');
+  {
+    const { state } = await import('../js/core/state.js');
+    const { GAME_MODES } = await import('../js/core/modeConfig.js');
+    const { setViewportOrientation } = await import('../js/core/viewportManager.js');
+    const { drawSelectScreen, randomizeFfaFighters } = await import('../js/graphics/ui/CharacterSelectScreen.js');
+    const { drawFaceOffThumbnailScreen } = await import('../js/graphics/ui/ThumbnailFaceOffScreen.js');
+    const { reinitFighters } = await import('../js/core/gameFlow.js');
+
+    // 1. Enforce Vertical Mode & FFA
+    setViewportOrientation('vertical');
+    state.mode = GAME_MODES.FFA;
+    state.gameState = 'select';
+    state.viewOrientation = 'vertical';
+
+    // 2. Randomize FFA fighters in vertical mode
+    randomizeFfaFighters();
+    assert(typeof state.p1Index === 'number', 'p1Index must be a valid number');
+    assert(typeof state.p2Index === 'number', 'p2Index must be a valid number');
+    assert(typeof state.p3Index === 'number', 'p3Index must be a valid number');
+
+    // 3. Draw Character Select Screen (3-player vertical layout) and verify stack depth
+    mockCtx.resetStackDepth();
+    mockCanvas.width = 540;
+    mockCanvas.height = 960;
+    state.canvas = mockCanvas;
+    state.ctx = mockCtx;
+
+    drawSelectScreen(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, `Canvas stack depth must be 0 after drawSelectScreen (got ${mockCtx.getStackDepth()})`);
+
+    // 4. Test reinitFighters in Vertical FFA mode -> MUST BE 3 PLAYERS ONLY
+    state.gameState = 'playing';
+    reinitFighters(true);
+    assert(state.fighters.length === 3, `reinitFighters in Vertical FFA MUST create exactly 3 fighters (got ${state.fighters.length})`);
+
+    // Each of the 3 fighters belongs to their own solo team
+    for (let i = 0; i < 3; i++) {
+      assert(state.getFighterTeam(i) === i, `Vertical FFA fighter ${i} must belong to solo team ${i} (got ${state.getFighterTeam(i)})`);
+    }
+
+    // Spawns must be strictly inside the canonical vertical arena (450x450 at x:45, y:240)
+    for (let i = 0; i < 3; i++) {
+      const f = state.fighters[i];
+      assert(f.x >= state.arena.x && f.x <= state.arena.x + state.arena.width, `Fighter ${i} x (${f.x}) must be within arena`);
+      assert(f.y >= state.arena.y && f.y <= state.arena.y + state.arena.height, `Fighter ${i} y (${f.y}) must be within arena`);
+    }
+
+    // 5. Test Face-Off Thumbnail Screen (3-player vertical FFA layout) and verify stack depth
+    mockCtx.resetStackDepth();
+    state.faceOffTimer = 50;
+    drawFaceOffThumbnailScreen();
+    assert(mockCtx.getStackDepth() === 0, `Canvas stack depth must be 0 after drawFaceOffThumbnailScreen (got ${mockCtx.getStackDepth()})`);
+
+    // 6. Test In-Arena Triangular Match Names HUD Layout (P1 Top, VS Center, P2/P3 Bottom)
+    const { drawArenaMatchNames } = await import('../js/graphics/renderers/arenaRenderer.js');
+    mockCtx.resetStackDepth();
+    drawArenaMatchNames(mockCtx, false);
+    assert(mockCtx.getStackDepth() === 0, `Canvas stack depth must be 0 after drawArenaMatchNames (got ${mockCtx.getStackDepth()})`);
+
+    // 7. Test In-Game Bottom HUD Card Layout for Vertical FFA (Unified Single-Column Format & Member Headers)
+    const { drawHUD, clearHealthHud } = await import('../js/graphics/hudManager.js');
+    clearHealthHud();
+    drawHUD();
+    const healthHudEl = document.getElementById('healthHud');
+    assert(healthHudEl.classList.contains('single-column-hud'), 'Vertical FFA bottom HUD container must have single-column-hud class');
+    assert(healthHudEl.classList.contains('ffa-hud'), 'Vertical FFA bottom HUD container must have ffa-hud class');
+    assert(healthHudEl.children.length === 3, `Must append 3 health cards to bottom HUD for 3-player vertical FFA (got ${healthHudEl.children.length})`);
+    assert(healthHudEl.innerHTML.includes('health-card__member-header'), 'Must render member headers for vertical FFA');
+    clearHealthHud();
+
+    // Clean up
+    state.fighters = [];
+    console.log('      ✅ Vertical FFA (3 Players Only, Equilateral Spawns, Triangular HUD Names, Face-Off UI & Single-Column HUD Format) verified successfully.');
+  }
+
   // ==========================================
   // TEST 59: Makima Crucifixion Kill Camera Hold (Delayed Winner Focus)
   // ==========================================
@@ -5829,11 +5983,13 @@ async function runInteractionTests() {
     const ShiroClass = FIGHTER_CLASS_MAP['shiro'];
     const SaitamaClass = FIGHTER_CLASS_MAP['saitama'];
     const { resolveFighterCollision } = await import('../js/systems/physics.js');
+    const { spawnFloatingText } = await import('../js/core/state.js');
 
     assert(ShiroClass && SaitamaClass, 'Shiro and Saitama classes must exist');
 
     const shiro = new ShiroClass({ x: 200, y: 300, hp: 340, maxHp: 340 });
     const enemy = new SaitamaClass({ x: 400, y: 300, hp: 600, maxHp: 600 });
+    enemy.damageNumberColor = '#38BDF8';
     assert(shiro.hideHands === true, 'Shiro model hands must be hidden');
     assert(Object.prototype.hasOwnProperty.call(ShiroClass.prototype, 'drawGun'), 'Shiro must override the default gun renderer');
     shiro.team = 0;
@@ -5906,15 +6062,41 @@ async function runInteractionTests() {
     const validTargets = enemy._getAllValidEnemyTargets();
     assert(validTargets.includes(troop), 'Enemy target query must include living chess troop');
 
-    // 5. Test Damage & Destruction & Zero Blood Particles
+    // 5. Test Damage & Destruction & Zero Blood Particles & Zero Global Hit Audio
     assert(troop.noBlood === true && troop.suppressBlood === true, 'Troop must have blood suppression flags');
+    assert(troop.noHitSound === true && troop.suppressHitSound === true, 'Troop must have sound suppression flags');
     state.bloodEffects = [];
     spawnBloodEffect(troop, 20);
     spawnBloodEffect(troop.x, troop.y, 20);
     assert(state.bloodEffects.length === 0, 'No blood particles must spawn on chess troops');
-    const initialHp = troop.hp;
-    troop.takeDamage(20, enemy);
-    assert(troop.hp === initialHp - 20, `Troop HP must decrease by 20 (got ${troop.hp})`);
+
+    let playedFleshHitAudio = false;
+    const origPlaySFX = audioSystem.playSFX;
+    audioSystem.playSFX = (name, ...args) => {
+      if (name === 'attack_fleshhit' || (typeof name === 'string' && name.includes('fleshhit'))) {
+        playedFleshHitAudio = true;
+      }
+      return origPlaySFX ? origPlaySFX(name, ...args) : null;
+    };
+
+    try {
+      const initialHp = troop.hp;
+      state.floatingTexts = [];
+      troop.takeDamage(20, enemy);
+      assert(troop.hp === initialHp - 20, `Troop HP must decrease by 20 (got ${troop.hp})`);
+      const troopDamageColor = state.floatingTexts.at(-1)?.color;
+      state.floatingTexts = [];
+      spawnFloatingText(troop.x + 100, troop.y - 14, '-20', enemy.damageNumberColor);
+      assert(troopDamageColor === state.floatingTexts.at(-1)?.color, 'Chess troop damage text must use the attacking fighter damageNumberColor');
+      assert(!playedFleshHitAudio, 'Troop damage must NOT trigger global attack_fleshhit audio');
+
+      playedFleshHitAudio = false;
+      const { applyDamageToTarget } = await import('../js/entities/fighter.js');
+      applyDamageToTarget(troop, 10, enemy);
+      assert(!playedFleshHitAudio, 'applyDamageToTarget on chess troop must NOT trigger global attack_fleshhit audio');
+    } finally {
+      audioSystem.playSFX = origPlaySFX;
+    }
 
     // Fatal blow destroying the troop -> must spawn digital crystal shatter shards in state.deathEffects
     const initialDeathEffectsCount = state.deathEffects.length;
@@ -6603,6 +6785,323 @@ async function runInteractionTests() {
       state.fighters = [];
     }
   }
+
+  // ── TEST: Crazy Dave Unified Damage Number Color Standard ──
+  console.log('   Testing Crazy Dave Unified Damage Number Color Standard...');
+  {
+    const DaveClass = FIGHTER_CLASS_MAP['crazydave'];
+    const TargetClass = FIGHTER_CLASS_MAP['toji'];
+    const {
+      PeashooterEntity,
+      SnowPeaEntity,
+      WallnutEntity,
+      TorchwoodEntity,
+      PotatoMineEntity,
+      LawnmowerEntity
+    } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { crazyDaveConfig } = await import('../js/configs/characters/crazyDaveConfig.js');
+
+    assert(DaveClass && TargetClass, 'CrazyDaveFighter and TojiFighter must exist in FIGHTER_CLASS_MAP');
+    assert(crazyDaveConfig.damageNumberColor === '#84CC16', 'crazyDaveConfig.damageNumberColor must be #84CC16');
+
+    const dave = new DaveClass(200, 300, 0);
+    const target = new TargetClass(300, 300, 1);
+    target.stealthDodgeChance = 0;
+    const peashooter = new PeashooterEntity(200, 300, dave, 1);
+    const snowPea = new SnowPeaEntity(200, 300, dave, 1);
+    const wallnut = new WallnutEntity(200, 300, dave, 1);
+    const torchwood = new TorchwoodEntity(200, 300, dave, 1);
+    const potatoMine = new PotatoMineEntity(200, 300, dave, 1);
+    const lawnmower = new LawnmowerEntity(50, 300, dave, 1, 0);
+
+    // 1. Entity and Class getDamageNumberColor() audits
+    assert(dave.damageNumberColor === '#84CC16', `Dave damageNumberColor must be #84CC16, got ${dave.damageNumberColor}`);
+    assert(dave.getDamageNumberColor() === '#84CC16', `Dave getDamageNumberColor() must be #84CC16`);
+    assert(peashooter.getDamageNumberColor() === '#84CC16', `Peashooter getDamageNumberColor() must be #84CC16`);
+    assert(snowPea.getDamageNumberColor() === '#84CC16', `SnowPea getDamageNumberColor() must be #84CC16`);
+    assert(wallnut.getDamageNumberColor() === '#84CC16', `Wallnut getDamageNumberColor() must be #84CC16`);
+    assert(torchwood.getDamageNumberColor() === '#84CC16', `Torchwood getDamageNumberColor() must be #84CC16`);
+    assert(potatoMine.getDamageNumberColor() === '#84CC16', `PotatoMine getDamageNumberColor() must be #84CC16`);
+    assert(lawnmower.getDamageNumberColor() === '#84CC16', `Lawnmower getDamageNumberColor() must be #84CC16`);
+
+    try {
+      state.fighters = [dave, target];
+      state.projectiles = [];
+      if (projectileSystem && Array.isArray(projectileSystem.projectiles)) projectileSystem.projectiles = [];
+      target.hp = 1000;
+      target.maxHp = 1000;
+
+      // Peashooter projectile firing & hit
+      state.floatingTexts = [];
+      peashooter._firePea(0, 0);
+      const peaProj = (projectileSystem && projectileSystem.projectiles.pop()) || state.projectiles.pop();
+      assert(peaProj && peaProj.damageNumberColor === '#84CC16', `Peashooter peaProj.damageNumberColor must be #84CC16, got ${peaProj?.damageNumberColor}`);
+      target.takeDamage(10, peashooter, { projectile: peaProj, damageNumberColor: peaProj.damageNumberColor });
+      const peaText = state.floatingTexts[state.floatingTexts.length - 1];
+      assert(peaText, 'Peashooter hit must spawn floating damage text');
+      const expectedUnifiedColor = peaText.color;
+
+      // Snow Pea projectile firing & hit
+      state.floatingTexts = [];
+      snowPea._fireSnowPea(0, 0);
+      const snowProj = (projectileSystem && projectileSystem.projectiles.pop()) || state.projectiles.pop();
+      assert(snowProj && snowProj.damageNumberColor === '#84CC16', `Snow Pea snowProj.damageNumberColor must be #84CC16, got ${snowProj?.damageNumberColor}`);
+      target.takeDamage(12, snowPea, { projectile: snowProj, damageNumberColor: snowProj.damageNumberColor });
+      const snowText = state.floatingTexts[state.floatingTexts.length - 1];
+      assert(snowText && snowText.color === expectedUnifiedColor, `Snow Pea damage color must match Peashooter (${expectedUnifiedColor}), got ${snowText?.color}`);
+
+      // Torchwood fire pea ignition & hit
+      state.floatingTexts = [];
+      const unignitedPea = { visual: 'peaBullet', x: torchwood.x, y: torchwood.y, damage: 25, color: '#22C55E' };
+      if (projectileSystem && Array.isArray(projectileSystem.projectiles)) {
+        projectileSystem.projectiles.push(unignitedPea);
+      } else {
+        state.projectiles.push(unignitedPea);
+      }
+      torchwood._interceptProjectiles();
+      assert(unignitedPea.damageNumberColor === '#84CC16', `Ignited Fire Pea damageNumberColor must be #84CC16`);
+      target.takeDamage(25, torchwood, { projectile: unignitedPea, damageNumberColor: unignitedPea.damageNumberColor });
+      const fireText = state.floatingTexts.find(t => t.text !== 'MISS!') || state.floatingTexts[state.floatingTexts.length - 1];
+      assert(fireText && fireText.color === expectedUnifiedColor, `Fire Pea damage color must match Peashooter (${expectedUnifiedColor}), got ${fireText?.color}`);
+
+      // Potato Mine detonation
+      state.floatingTexts = [];
+      target.x = potatoMine.x + 10;
+      target.y = potatoMine.y;
+      potatoMine._detonate(crazyDaveConfig, 0);
+      const potatoDamageText = state.floatingTexts.find(t => t.text !== 'SPUDOW!');
+      assert(potatoDamageText && potatoDamageText.color === expectedUnifiedColor, `Potato Mine damage color must match Peashooter (${expectedUnifiedColor}), got ${potatoDamageText?.color}`);
+
+      // Lawnmower shred damage
+      state.floatingTexts = [];
+      target.x = lawnmower.x + 5;
+      target.y = lawnmower.y;
+      lawnmower.state = 'charging';
+      lawnmower._shredEnemies(crazyDaveConfig);
+      const lawnmowerDamageText = state.floatingTexts.find(t => t.text !== 'VROOOOM!');
+      assert(lawnmowerDamageText && lawnmowerDamageText.color === expectedUnifiedColor, `Lawnmower damage color must match Peashooter (${expectedUnifiedColor}), got ${lawnmowerDamageText?.color}`);
+
+      console.log(`      ✅ Crazy Dave unified damage number color (${expectedUnifiedColor} / #84CC16) 100% matched across Dave, Peashooter, Snow Pea, Torchwood, Potato Mine & Lawnmower.`);
+    } finally {
+      dave.reset();
+      target.reset();
+      state.fighters = [];
+      state.projectiles = [];
+      state.floatingTexts = [];
+    }
+  }
+
+  // ── TEST: Sans Unified Damage Number Color Standard (#03d5f1ff) ──
+  console.log('   Testing Sans Unified Damage Number Color Standard...');
+  {
+    const SansClass = FIGHTER_CLASS_MAP['sans'];
+    const TargetClass = FIGHTER_CLASS_MAP['toji'];
+    const { sansConfig } = await import('../js/configs/characters/sansConfig.js');
+
+    assert(SansClass && TargetClass, 'SansFighter and TojiFighter must exist in FIGHTER_CLASS_MAP');
+    assert(sansConfig.damageNumberColor === '#03d5f1ff', 'sansConfig.damageNumberColor must be #03d5f1ff');
+
+    const sans = new SansClass(200, 300, 0);
+    const target = new TargetClass(300, 300, 1);
+    target.stealthDodgeChance = 0;
+
+    assert(sans.damageNumberColor === '#03d5f1ff', `Sans damageNumberColor must be #03d5f1ff, got ${sans.damageNumberColor}`);
+    assert(sans.getDamageNumberColor() === '#03d5f1ff', `Sans getDamageNumberColor() must be #03d5f1ff`);
+
+    try {
+      state.fighters = [sans, target];
+      state.projectiles = [];
+      target.hp = 1000;
+      target.maxHp = 1000;
+
+      // 1. Gaster Blaster First Impact Damage
+      state.floatingTexts = [];
+      target.takeDamage(20, sans, {
+        isProjectile: true,
+        isLaser: true,
+        isGasterBlaster: true,
+        isSkill: true,
+        isFirstImpact: true,
+        damageNumberColor: sans.damageNumberColor
+      });
+      const blasterText = state.floatingTexts[state.floatingTexts.length - 1];
+      assert(blasterText && blasterText.color === '#03d5f1ff', `Gaster Blaster damage color must be #03d5f1ff, got ${blasterText?.color}`);
+
+      // 2. Bone Projectile Damage
+      state.floatingTexts = [];
+      sans.castBasicBone(target);
+      const bone = sans.boneProjectiles.pop();
+      assert(bone && bone.damageNumberColor === '#03d5f1ff', `Bone projectile damageNumberColor must be #03d5f1ff`);
+      target.takeDamage(bone.damage, sans, { projectile: bone, damageNumberColor: bone.damageNumberColor });
+      const boneText = state.floatingTexts[state.floatingTexts.length - 1];
+      assert(boneText && boneText.color === '#03d5f1ff', `Bone projectile damage color must be #03d5f1ff, got ${boneText?.color}`);
+
+      // 3. Karmic Retribution (KR) Poison Tick Damage
+      state.floatingTexts = [];
+      sans.karmaTargets.set(target, { stacks: 8, timer: 100, tickTimer: 13 });
+      sans._updateKarma();
+      const krText = state.floatingTexts[state.floatingTexts.length - 1];
+      assert(krText && krText.color === '#03d5f1ff', `Karmic Retribution damage color must be #03d5f1ff, got ${krText?.color}`);
+
+      // 4. Gravity Slam Wall Impact Damage
+      state.floatingTexts = [];
+      target.x = 450;
+      target.y = 250;
+      target.takeDamage(14, sans, { damageNumberColor: sans.damageNumberColor });
+      const slamText = state.floatingTexts[state.floatingTexts.length - 1];
+      assert(slamText && slamText.color === '#03d5f1ff', `Gravity slam damage color must be #03d5f1ff, got ${slamText?.color}`);
+
+      console.log(`      ✅ Sans unified damage number color (#03d5f1ff) 100% matched across Gaster Blaster, Bones, KR ticks & Gravity Slam.`);
+    } finally {
+      sans.reset();
+      target.reset();
+      state.fighters = [];
+      state.projectiles = [];
+      state.floatingTexts = [];
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TEST 70: Blood Particle Suppression on Non-Fleshy Entities (Buildings, Plants, and Troops)
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    console.log('   70. Testing Blood Suppression on Buildings, Plants, and Troops (FFA & General Modes)...');
+    const { isBloodSuppressedEntity, spawnBloodEffect, spawnFatalBloodSplash } = await import('../js/graphics/particles/bloodEffect.js');
+    const { applyDamageToTarget } = await import('../js/entities/fighter.js');
+    const { TurretEntity } = await import('../js/entities/TurretEntity.js');
+    const { DispenserEntity } = await import('../js/entities/DispenserEntity.js');
+    const { PeashooterEntity, SnowPeaEntity, WallnutEntity, TorchwoodEntity, PotatoMineEntity, LawnmowerEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+    const { ShiroFighter } = await import('../js/entities/fighters/ShiroFighter.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+
+    state.gameState = 'playing';
+    state.mode = 'FFA';
+    state.fighters = [];
+
+    const gojo = new GojoFighter({ id: 1, name: 'Gojo', color: '#38BDF8', startX: 200, startY: 200, radius: 25, hp: 1000 });
+    gojo.infinityActive = false;
+    const engineerOwner = new GojoFighter({ id: 2, name: 'Engineer', color: '#F59E0B', startX: 100, startY: 100, radius: 25, hp: 1000 });
+    const daveOwner = new GojoFighter({ id: 3, name: 'CrazyDave', color: '#84CC16', startX: 300, startY: 300, radius: 25, hp: 1000 });
+    const shiro = new ShiroFighter({ id: 4, name: 'Shiro', color: '#EC4899', startX: 400, startY: 400, radius: 25, hp: 1000 });
+
+    const turret = new TurretEntity(150, 150, engineerOwner, 1);
+    const dispenser = new DispenserEntity(180, 180, engineerOwner);
+    const peashooter = new PeashooterEntity(220, 220, daveOwner);
+    const snowPea = new SnowPeaEntity(250, 250, daveOwner);
+    const wallnut = new WallnutEntity(280, 280, daveOwner);
+    const torchwood = new TorchwoodEntity(310, 310, daveOwner);
+    const potatoMine = new PotatoMineEntity(340, 340, daveOwner);
+    const lawnmower = new LawnmowerEntity(370, 370, daveOwner);
+
+    // Chess piece minion
+    const chessPawn = {
+      x: 420, y: 420, r: 15, radius: 15, hp: 80, maxHp: 80,
+      type: 'pawn', isMinion: true, isChessTroop: true, isChessMinion: true, isChessPiece: true,
+      noBlood: true, suppressBlood: true, bleedImmune: true, isBloodImmune: true
+    };
+
+    const nonFleshyEntities = [turret, dispenser, peashooter, snowPea, wallnut, torchwood, potatoMine, lawnmower, chessPawn];
+
+    try {
+      // 1. Verify isBloodSuppressedEntity identifies all non-fleshy targets
+      for (const ent of nonFleshyEntities) {
+        assert(isBloodSuppressedEntity(ent) === true, `${ent.type || ent.name} must be identified as blood-suppressed`);
+      }
+      assert(isBloodSuppressedEntity(gojo) === false, 'Standard humanoid fighter must NOT be blood-suppressed');
+
+      // 2. Test applyDamageToTarget: Zero blood spawned on non-fleshy entities
+      for (const ent of nonFleshyEntities) {
+        state.bloodEffects = [];
+        applyDamageToTarget(ent, 30, { attacker: gojo });
+        assert((state.bloodEffects?.length || 0) === 0, `${ent.type || ent.name} must spawn 0 blood particles from applyDamageToTarget`);
+      }
+
+      // Verify human fighter DOES spawn blood normally from applyDamageToTarget
+      state.bloodEffects = [];
+      applyDamageToTarget(gojo, 30, { attacker: engineerOwner });
+      assert((state.bloodEffects?.length || 0) > 0, 'Humanoid fighter must spawn blood normally from applyDamageToTarget');
+
+      // 3. Test entity.takeDamage(): Zero blood spawned on non-fleshy entities
+      for (const ent of [turret, dispenser, peashooter, snowPea, wallnut, torchwood, potatoMine, lawnmower]) {
+        state.bloodEffects = [];
+        ent.takeDamage(20, gojo, {});
+        assert((state.bloodEffects?.length || 0) === 0, `${ent.type || ent.name} must spawn 0 blood particles from takeDamage`);
+      }
+
+      // 4. Test coordinate call spawnBloodEffect(x, y): When entity is at location in state.fighters
+      state.fighters = [turret, dispenser, peashooter, snowPea, wallnut, torchwood, potatoMine, lawnmower, chessPawn, gojo];
+      for (const ent of nonFleshyEntities) {
+        state.bloodEffects = [];
+        spawnBloodEffect(ent.x, ent.y, 25);
+        assert((state.bloodEffects?.length || 0) === 0, `Coordinate call spawnBloodEffect at ${ent.type || ent.name} position must spawn 0 blood`);
+      }
+
+      // Coordinate call at human fighter position MUST spawn blood
+      state.bloodEffects = [];
+      spawnBloodEffect(gojo.x, gojo.y, 25);
+      assert((state.bloodEffects?.length || 0) > 0, 'Coordinate call at humanoid position must spawn blood');
+
+      // 5. Test death fatal blood splash spawnFatalBloodSplash
+      for (const ent of nonFleshyEntities) {
+        state.bloodEffects = [];
+        spawnFatalBloodSplash(ent);
+        assert((state.bloodEffects?.length || 0) === 0, `spawnFatalBloodSplash on ${ent.type || ent.name} must spawn 0 blood`);
+
+        state.bloodEffects = [];
+        spawnFatalBloodSplash(ent.x, ent.y);
+        assert((state.bloodEffects?.length || 0) === 0, `spawnFatalBloodSplash at ${ent.type || ent.name} coordinates must spawn 0 blood`);
+      }
+
+      // spawnFatalBloodSplash on human fighter MUST spawn fatal blood
+      state.bloodEffects = [];
+      spawnFatalBloodSplash(gojo);
+      assert((state.bloodEffects?.length || 0) > 0, 'spawnFatalBloodSplash on humanoid fighter must spawn fatal blood');
+
+      console.log('      ✅ Blood particle suppression verified: 0 blood spawned on Turrets, Dispensers, Plants, Lawnmowers & Chess Troops across direct hits, coordinate attacks, and death splashes.');
+    } finally {
+      state.fighters = [];
+      state.bloodEffects = [];
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TEST 71: Unified Damage Number Color Resolution on Minions (Sans vs Minions)
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    console.log('   71. Testing Unified Damage Number Color Resolution on Minions...');
+    const { SansFighter } = await import('../js/entities/fighters/SansFighter.js');
+    const { ShiroFighter } = await import('../js/entities/fighters/ShiroFighter.js');
+    const { resolveDamageNumberColor } = await import('../js/entities/fighter.js');
+
+    state.gameState = 'playing';
+    state.fighters = [];
+    state.floatingTexts = [];
+
+    const sans = new SansFighter({ id: 0, name: 'Sans', color: '#00F3FF', startX: 100, startY: 100, hp: 100 });
+    const shiro = new ShiroFighter({ id: 1, name: 'Shiro', color: '#EC4899', startX: 400, startY: 400, hp: 100 });
+
+    shiro._flickChessTroop(sans);
+    const chessPawn = shiro.activeMinions[0];
+    shiro._plantTroopOnTileCenter(chessPawn, state.arena);
+
+    try {
+      // 1. Verify resolveDamageNumberColor extracts Sans's damageNumberColor
+      const resolvedColor = resolveDamageNumberColor(sans, { damageNumberColor: sans.damageNumberColor }, '#EF4444');
+      assert(resolvedColor === '#03d5f1ff', `resolveDamageNumberColor must return #03d5f1ff for Sans, got ${resolvedColor}`);
+
+      // 2. Sans direct attack on Shiro's chess troop
+      state.floatingTexts = [];
+      chessPawn.takeDamage(10, sans, { damageNumberColor: sans.damageNumberColor });
+      const lastText = state.floatingTexts[state.floatingTexts.length - 1];
+      assert(lastText && lastText.color === '#03d5f1ff', `Damage number color on minion must be #03d5f1ff, got ${lastText?.color}`);
+
+      console.log('      ✅ Minion damage number color resolution verified: Sans attacks display #03d5f1ff on chess minions.');
+    } finally {
+      state.fighters = [];
+      state.floatingTexts = [];
+    }
+  }
+
 
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');

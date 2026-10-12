@@ -180,28 +180,92 @@ export function isStandOffMode() {
 }
 
 /**
- * Helper to check if an entity or minion suppresses blood effects (e.g. Chess Troops, Nameless Deity).
+ * Finds the closest living entity or deployable near a world position.
+ */
+export function findNearestEntityAt(x, y, radiusBonus = 14) {
+  if (typeof state === 'undefined' || !Array.isArray(state.fighters)) return null;
+  let nearest = null;
+  let minDist = Infinity;
+
+  const test = (cand) => {
+    if (!cand) return;
+    const hitRadius = (cand.r || cand.radius || 20) + radiusBonus;
+    const d = Math.hypot(cand.x - x, cand.y - y);
+    if (d <= hitRadius) {
+      if (d < minDist || (Math.abs(d - minDist) <= 2 && isBloodSuppressedEntity(cand) && !isBloodSuppressedEntity(nearest))) {
+        minDist = d;
+        nearest = cand;
+      }
+    }
+  };
+
+  for (const f of state.fighters) {
+    test(f);
+    if (f) {
+      if (f.turretEntity) test(f.turretEntity);
+      if (f.dispenserEntity) test(f.dispenserEntity);
+      if (Array.isArray(f.activeMinions)) f.activeMinions.forEach(test);
+      if (Array.isArray(f.activeWallnuts)) f.activeWallnuts.forEach(test);
+      if (Array.isArray(f.activePeashooters)) f.activePeashooters.forEach(test);
+      if (Array.isArray(f.activeSnowPeas)) f.activeSnowPeas.forEach(test);
+      if (Array.isArray(f.activeTorchwoods)) f.activeTorchwoods.forEach(test);
+      if (Array.isArray(f.activePotatoMines)) f.activePotatoMines.forEach(test);
+      if (Array.isArray(f.activeLawnmowers)) f.activeLawnmowers.forEach(test);
+    }
+  }
+
+  if (Array.isArray(state.deployables)) state.deployables.forEach(test);
+  if (Array.isArray(state.plants)) state.plants.forEach(test);
+  if (Array.isArray(state.buildings)) state.buildings.forEach(test);
+
+  return nearest;
+}
+
+/**
+ * Helper to check if an entity or minion suppresses blood effects (e.g. Buildings, Plants, Chess Troops, Nameless Deity).
  */
 export function isBloodSuppressedEntity(entity) {
   if (!entity) return false;
-  if (
+  return Boolean(
     entity.noBlood ||
     entity.suppressBlood ||
     entity.bleedImmune ||
     entity.isBloodImmune ||
+    entity.immuneToBleed ||
+    // Buildings & Mechanical structures
+    entity.isTurret ||
+    entity.isDispenser ||
+    entity.isBuilding ||
+    entity.isSentry ||
+    entity.isDeployable ||
+    entity.isEndCrystal ||
+    entity.isIceWall ||
+    entity.isBarrier ||
+    entity._def?.isTurret ||
+    entity._def?.isDeployable ||
+    (typeof entity.type === 'string' && ['turret', 'dispenser', 'sentry', 'building'].includes(entity.type.toLowerCase())) ||
+    // Plants & PvZ entities
+    entity.isPlant ||
+    entity.isPlantMinion ||
+    entity.isWallnut ||
+    entity.isLawnmower ||
+    entity.isPlantBarrier ||
+    entity.characterId === 'crazydave_plant' ||
+    entity.characterId === 'crazydave_lawnmower' ||
+    (typeof entity.characterId === 'string' && entity.characterId.startsWith('crazydave_')) ||
+    (typeof entity.type === 'string' && ['peashooter', 'snowpea', 'wallnut', 'torchwood', 'potatomine', 'lawnmower'].includes(entity.type.toLowerCase())) ||
+    // Troops (Shiro's chess pieces & inorganic troops)
     entity.isChessTroop ||
     entity.isChessMinion ||
     entity.isChessPiece ||
     (typeof entity.characterId === 'string' && entity.characterId.startsWith('chess_')) ||
-    (typeof entity.type === 'string' && ['pawn', 'knight', 'bishop', 'rook', 'queen'].includes(entity.type) && (entity.isMinion || entity.isChessTroop || entity.isChessPiece)) ||
+    (typeof entity.type === 'string' && ['pawn', 'knight', 'bishop', 'rook', 'queen'].includes(entity.type.toLowerCase()) && (entity.isMinion || entity.isChessTroop || entity.isChessPiece || entity.isDeployable)) ||
+    // Nameless Deity
     entity.characterId === 'namelessdeity' ||
     entity.type === 'namelessdeity' ||
     entity.characterId === 'nameless_deity' ||
     entity.name === 'Nameless Deity'
-  ) {
-    return true;
-  }
-  return false;
+  );
 }
 
 /**
@@ -218,16 +282,10 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
   // Pattern 1: Coordinate call spawnBloodEffect(x, y, ...)
   if (typeof arg0 === 'number' && typeof arg1 === 'number') {
     entity = { x: arg0, y: arg1, r: 25 };
-    // Check if target entity or minion at this location suppresses blood
-    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
-      const match = state.fighters.find(f => f && isBloodSuppressedEntity(f) && Math.hypot(f.x - arg0, f.y - arg1) <= ((f.r || f.radius || 20) + 12));
-      if (match) return;
-      for (const f of state.fighters) {
-        if (f && Array.isArray(f.activeMinions)) {
-          const minionMatch = f.activeMinions.find(m => m && !m.dead && isBloodSuppressedEntity(m) && Math.hypot(m.x - arg0, m.y - arg1) <= ((m.r || m.radius || 20) + 12));
-          if (minionMatch) return;
-        }
-      }
+    // Check if target entity, building, plant, or troop at this location suppresses blood
+    const nearby = findNearestEntityAt(arg0, arg1);
+    if (nearby && isBloodSuppressedEntity(nearby)) {
+      return;
     }
     if (typeof arg2 === 'number') {
       dmgAmount = arg2;
@@ -267,6 +325,13 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
   } else if (arg0 && typeof arg0 === 'object') {
     // Pattern 2: Entity call spawnBloodEffect(entity, amount, damageAngle, customOpts)
     entity = arg0;
+    // If a generic coordinate dummy object was passed (e.g. { x, y, r }), check nearest world entity
+    if (!entity.characterId && !entity.type && !entity.isFighter && !entity.name && typeof entity.x === 'number' && typeof entity.y === 'number') {
+      const nearby = findNearestEntityAt(entity.x, entity.y, (entity.r || 20) + 12);
+      if (nearby && isBloodSuppressedEntity(nearby)) {
+        return;
+      }
+    }
     dmgAmount = typeof arg1 === 'number' ? arg1 : 10;
     if (typeof arg2 === 'number') {
       angle = arg2;
@@ -473,19 +538,15 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
     fx = fighterOrX;
     fy = typeof optsOrY === 'number' ? optsOrY : 0;
     fr = typeof maybeR === 'number' ? maybeR : 25;
-    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
-      const match = state.fighters.find(f => f && isBloodSuppressedEntity(f) && Math.hypot(f.x - fx, f.y - fy) <= ((f.r || f.radius || 20) + 12));
-      if (match) return;
-      for (const f of state.fighters) {
-        if (f && Array.isArray(f.activeMinions)) {
-          const minionMatch = f.activeMinions.find(m => m && !m.dead && isBloodSuppressedEntity(m) && Math.hypot(m.x - fx, m.y - fy) <= ((m.r || m.radius || 20) + 12));
-          if (minionMatch) return;
-        }
-      }
-    }
+    const nearby = findNearestEntityAt(fx, fy, fr + 12);
+    if (nearby && isBloodSuppressedEntity(nearby)) return;
   } else if (fighterOrX && typeof fighterOrX === 'object') {
     targetFighter = fighterOrX;
     if (isBloodSuppressedEntity(targetFighter)) return;
+    if (!targetFighter.characterId && !targetFighter.type && !targetFighter.isFighter && !targetFighter.name && typeof targetFighter.x === 'number' && typeof targetFighter.y === 'number') {
+      const nearby = findNearestEntityAt(targetFighter.x, targetFighter.y, (targetFighter.r || 25) + 12);
+      if (nearby && isBloodSuppressedEntity(nearby)) return;
+    }
     fx = typeof fighterOrX.x === 'number' ? fighterOrX.x : 0;
     fy = typeof fighterOrX.y === 'number' ? fighterOrX.y : 0;
     fr = typeof fighterOrX.r === 'number' ? fighterOrX.r : 25;
@@ -623,8 +684,11 @@ export function spawnMakimaBloodShatter(fighterOrX, optsOrY = {}, maybeAngle = n
   if (typeof fighterOrX === 'number') {
     fx = fighterOrX;
     fy = typeof optsOrY === 'number' ? optsOrY : 0;
+    const nearby = findNearestEntityAt(fx, fy, 35);
+    if (nearby && isBloodSuppressedEntity(nearby)) return;
     impactAngle = typeof maybeAngle === 'number' ? maybeAngle : null;
   } else if (fighterOrX && typeof fighterOrX === 'object') {
+    if (isBloodSuppressedEntity(fighterOrX)) return;
     fx = typeof fighterOrX.x === 'number' ? fighterOrX.x : 0;
     fy = typeof fighterOrX.y === 'number' ? fighterOrX.y : 0;
     fr = typeof fighterOrX.r === 'number' ? fighterOrX.r : 25;
@@ -698,7 +762,7 @@ export function spawnMakimaBloodShatter(fighterOrX, optsOrY = {}, maybeAngle = n
  * Spawns a visceral, directional crimson blood burst when Nanami unpauses from a 7:3 Ratio Severance.
  */
 export function spawnNanamiRatioBloodBurst(target, count = 16, angle = null) {
-  if (!target) return;
+  if (!target || isBloodSuppressedEntity(target)) return;
   if (!state.bloodEffects) state.bloodEffects = [];
 
   const bloodColors = [0xE50018, 0xDC2626, 0x990000, 0x78000A, 0xFF1E27, 0xB91C1C];

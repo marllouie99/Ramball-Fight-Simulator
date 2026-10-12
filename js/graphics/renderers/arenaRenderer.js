@@ -1006,8 +1006,9 @@ export function drawDecoratedFighterName(ctx, name, x, y, options = {}) {
 
   const textColor = options.color || options.fillColor || ctx.fillStyle || '#FFFFFF';
   ctx.fillStyle = textColor;
-  if (options.stroke && options.strokeColor) {
-    ctx.strokeStyle = options.strokeColor;
+  if (options.stroke) {
+    ctx.strokeStyle = options.strokeColor || '#000000';
+    ctx.lineWidth = (typeof options.strokeWidth === 'number') ? options.strokeWidth : 1.5;
   }
 
   if (!match) {
@@ -1633,54 +1634,124 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       color: getHudNameColor(f, '#F8FAFC')
     }));
 
-    // Multi-fighter FFA fallback: horizontal row joined with "vs"
-    const pad = 10;
-    const vsText = 'vs';
-    const textY = arena.y - 12;
+    if (fighterData.length === 3) {
+      // 3-Player Vertical FFA Triangular Arrangement:
+      //         NAME (P1)
+      //            VS
+      //    NAME (P2)   NAME (P3)
+      const nameFontSize = 26;
+      const customFighterFont = `700 ${nameFontSize}px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
+      const customVsFont = `700 18px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif`;
 
-    let totalW = 0;
-    fighterData.forEach((fd, i) => {
-      ctx.font = nameFont;
+      const bottomY = arena.y - 12;
+      const topY = bottomY - 50;
+      const vsY = Math.round((topY + bottomY) / 2) - 1;
+
+      ctx.save();
+      ctx.font = customFighterFont;
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-      totalW += measureDecoratedFighterName(ctx, fd.name);
-      if (i < fighterData.length - 1) {
-        ctx.font = vsFont;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-        totalW += pad + ctx.measureText(vsText).width + pad;
-      }
-    });
+      ctx.textBaseline = 'bottom';
 
-    const maxW = arena.width - 16;
-    const scale = totalW > maxW ? maxW / totalW : 1.0;
-    ctx.save();
-    ctx.translate(centerX, textY);
-    ctx.scale(scale, 1.0);
-    ctx.translate(-centerX, -textY);
-
-    let startX = centerX - totalW / 2;
-    ctx.textAlign = 'left';
-
-    fighterData.forEach((fd, i) => {
-      ctx.font = nameFont;
-      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-      ctx.fillStyle = fd.color;
-      drawDecoratedFighterName(ctx, fd.name, startX, textY, {
-        color: fd.color,
+      // 1. Top Centered Fighter (Player 1) - Uniform Fixed Font Size
+      ctx.save();
+      ctx.textAlign = 'center';
+      drawDecoratedFighterName(ctx, fighterData[0].name, centerX, topY, {
+        color: fighterData[0].color,
         stroke: !isDark,
         strokeWidth: 1.5
       });
-      startX += measureDecoratedFighterName(ctx, fd.name);
+      ctx.restore();
 
-      if (i < fighterData.length - 1) {
-        startX += pad;
-        ctx.font = vsFont;
-        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
-        ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
-        ctx.fillText(vsText, startX, textY - 1.5);
-        startX += ctx.measureText(vsText).width + pad;
+      // 2. Center "VS" Emblem
+      ctx.save();
+      ctx.font = customVsFont;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = isDark ? '#94A3B8' : '#334155';
+      if (!isDark) {
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.0;
+        ctx.strokeText('VS', centerX, vsY);
       }
-    });
-    ctx.restore();
+      ctx.fillText('VS', centerX, vsY);
+      ctx.restore();
+
+      // 3. Bottom Left Fighter (Player 2) & Bottom Right Fighter (Player 3) - Left & Right Aligned
+      const leftX = arena.x + 6;
+      const rightX = arena.x + arena.width - 6;
+
+      // Player 2 (Left - aligned to left)
+      ctx.save();
+      ctx.textAlign = 'left';
+      drawDecoratedFighterName(ctx, fighterData[1].name, leftX, bottomY, {
+        color: fighterData[1].color,
+        stroke: !isDark,
+        strokeWidth: 1.5
+      });
+      ctx.restore();
+
+      // Player 3 (Right - aligned to right)
+      ctx.save();
+      ctx.textAlign = 'right';
+      drawDecoratedFighterName(ctx, fighterData[2].name, rightX, bottomY, {
+        color: fighterData[2].color,
+        stroke: !isDark,
+        strokeWidth: 1.5
+      });
+      ctx.restore();
+
+      ctx.restore();
+    } else {
+      // Multi-fighter FFA fallback: horizontal row joined with "vs"
+      const pad = 10;
+      const vsText = 'vs';
+      const textY = arena.y - 12;
+
+      let totalW = 0;
+      fighterData.forEach((fd, i) => {
+        ctx.font = nameFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+        totalW += measureDecoratedFighterName(ctx, fd.name);
+        if (i < fighterData.length - 1) {
+          ctx.font = vsFont;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+          totalW += pad + ctx.measureText(vsText).width + pad;
+        }
+      });
+
+      const maxW = arena.width - 16;
+      const scale = totalW > maxW ? maxW / totalW : 1.0;
+      ctx.save();
+      ctx.translate(centerX, textY);
+      ctx.scale(scale, 1.0);
+      ctx.translate(-centerX, -textY);
+
+      let startX = centerX - totalW / 2;
+      ctx.textAlign = 'left';
+
+      fighterData.forEach((fd, i) => {
+        ctx.font = nameFont;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+        ctx.fillStyle = fd.color;
+        drawDecoratedFighterName(ctx, fd.name, startX, textY, {
+          color: fd.color,
+          stroke: !isDark,
+          strokeWidth: 1.5
+        });
+        startX += measureDecoratedFighterName(ctx, fd.name);
+
+        if (i < fighterData.length - 1) {
+          startX += pad;
+          ctx.font = vsFont;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = '0.5px';
+          ctx.fillStyle = isDark ? '#94A3B8' : '#475569';
+          ctx.fillText(vsText, startX, textY - 1.5);
+          startX += ctx.measureText(vsText).width + pad;
+        }
+      });
+      ctx.restore();
+    }
   }
 
   ctx.restore();

@@ -1229,10 +1229,21 @@ function drawSelectScreen() {
     const p3Color = mode === '2v2' ? '#cc2b4d' : '#f59e0b';
     const p4Color = mode === '2v2' ? '#38bdf8' : '#a855f7';
 
-    drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, stackedH, p1Color, true);
-    drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, stackedH, p2Color, true);
-    drawPlayerCard('p3Index', p3Title, leftX, bottomY, cardW, stackedH, p3Color, true);
-    drawPlayerCard('p4Index', p4Title, rightX, bottomY, cardW, stackedH, p4Color, true);
+    const isFfa3 = (mode === 'FFA' || mode === GAME_MODES.FFA) && !isLandscape;
+
+    if (isFfa3) {
+      // Vertical FFA: Exactly 3 players (P1 top-left, P2 top-right, P3 bottom-center)
+      const centerX = canvas.width / 2;
+      const p3X = Math.round(centerX - cardW / 2);
+      drawPlayerCard('p1Index', 'PLAYER 1', leftX, topY, cardW, stackedH, '#ef4444', true);
+      drawPlayerCard('p2Index', 'PLAYER 2', rightX, topY, cardW, stackedH, '#38bdf8', true);
+      drawPlayerCard('p3Index', 'PLAYER 3', p3X, bottomY, cardW, stackedH, '#f59e0b', true);
+    } else {
+      drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, stackedH, p1Color, true);
+      drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, stackedH, p2Color, true);
+      drawPlayerCard('p3Index', p3Title, leftX, bottomY, cardW, stackedH, p3Color, true);
+      drawPlayerCard('p4Index', p4Title, rightX, bottomY, cardW, stackedH, p4Color, true);
+    }
 
     // Center Holographic VS Crest for team mode
     if (isTeamMode) {
@@ -1412,7 +1423,9 @@ function randomizeFfaFighters() {
   state.p1Index = indices[0] ?? 0;
   state.p2Index = indices[1] ?? (indices.length > 1 ? 1 : 0);
   state.p3Index = indices[2] ?? (indices.length > 2 ? 2 : 0);
-  state.p4Index = indices[3] ?? (indices.length > 3 ? 3 : 0);
+  if (state.viewOrientation === 'horizontal') {
+    state.p4Index = indices[3] ?? (indices.length > 3 ? 3 : 0);
+  }
   saveFighterSelections();
 }
 

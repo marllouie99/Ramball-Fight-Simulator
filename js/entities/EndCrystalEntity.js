@@ -4,7 +4,7 @@
 // Flagged with isMinion = true, isImmovable = true, cannotBeKnockbacked = true
 // ─────────────────────────────────────────────
 
-import { Fighter, applyDamageToTarget } from './fighter.js';
+import { Fighter, applyDamageToTarget, resolveDamageNumberColor } from './fighter.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../systems/audioSystem.js';
@@ -257,7 +257,8 @@ export class EndCrystalEntity extends Fighter {
     this.knockbackVy = 0;
 
     if (typeof spawnFloatingText === 'function') {
-      spawnFloatingText(this.x, this.y - 20, `-${finalDmg}`, '#C026D3');
+      const color = resolveDamageNumberColor(source, options, '#C026D3');
+      spawnFloatingText(this.x, this.y - 20, `-${finalDmg}`, color);
     }
 
     if (this.hp <= 0) {

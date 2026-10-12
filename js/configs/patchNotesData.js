@@ -30,45 +30,21 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "SANS",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "basicBoneCooldown",
-                "oldVal": 50,
-                "newVal": 80,
-                "pct": "+60.0%"
-            }
-        ]
-    },
-    {
         "character": "SHIRO",
         "deltas": [
             {
                 "type": "ADJUST",
-                "key": "displayName",
-                "oldVal": "Shiro",
-                "newVal": "『SHIRO』",
+                "key": "moveSpeed",
+                "oldVal": "5.6",
+                "newVal": "5.0",
                 "pct": "Mod"
             },
             {
-                "type": "ADJUST",
-                "key": "throwSpeed",
-                "oldVal": "10.0",
-                "newVal": "15.0",
-                "pct": "Mod"
-            }
-        ]
-    },
-    {
-        "character": "SORA",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "displayName",
-                "oldVal": "Shiro",
-                "newVal": "『SHIRO』",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "maxActiveMinions",
+                "oldVal": 16,
+                "newVal": 8,
+                "pct": "-50.0%"
             }
         ]
     }

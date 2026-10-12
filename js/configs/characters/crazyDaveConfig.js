@@ -27,6 +27,7 @@ export const crazyDaveConfig = {
   themeColor: '#84CC16',     // Primary Theme Color
   secondaryColor: '#F59E0B', // Solar Sun Gold
   accentColor: '#38BDF8',    // Frost Blue (Snow Pea)
+  damageNumberColor: '#84CC16', // Unified Plant Lime Green Damage Number Color
 
   // Core Combat Stats (No basic attack)
   hp: 390,

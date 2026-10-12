@@ -22,10 +22,10 @@ export class SansFighter extends Fighter {
     this.characterId = 'sans';
     this.type = 'sans';
     this.name = def.name || 'SANS';
-    this.themeColor = cfg.themeColor || '#2c4de0ff';
+    this.themeColor = cfg.themeColor || '#03d5f1ff';
     this.color = this.themeColor;
     this.secondaryColor = cfg.secondaryColor || '#FFE600';
-    this.damageNumberColor = cfg.damageNumberColor || '#2c4de0ff';
+    this.damageNumberColor = cfg.damageNumberColor || '#03d5f1ff';
 
     this.moveSpeed = (def.moveSpeed !== undefined) ? def.moveSpeed : (cfg.moveSpeed || cfg.speed || 5.2);
     this.baseSpeed = this.moveSpeed;
@@ -442,6 +442,16 @@ export class SansFighter extends Fighter {
    */
   shoot(ownerIndex) {
     // Disabled! Sans does not fire generic bullet projectiles.
+  }
+
+  /**
+   * Returns the unified damage number color for all Sans attacks, skills, and passives (#03d5f1ff).
+   * @param {Object} [opts={}]
+   * @returns {string}
+   */
+  getDamageNumberColor(opts = {}) {
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    return this.damageNumberColor || cfg.damageNumberColor || '#03d5f1ff';
   }
 
   /**
@@ -1084,8 +1094,13 @@ export class SansFighter extends Fighter {
         kData.tickTimer = 0;
         const totalTick = Math.max(1, Math.min(3, Math.floor(kData.stacks * 0.25 * tickDmg)));
         if (target.takeDamage && target.hp > 1) {
-          target.takeDamage(totalTick, this, { isKarma: true, bypassDodge: true });
-          spawnFloatingText(target.x, target.y - target.r - 10, `-${totalTick}`, '#A855F7');
+          target.takeDamage(totalTick, this, {
+            isKarma: true,
+            bypassDodge: true,
+            damageNumberColor: this.damageNumberColor || '#03d5f1ff',
+            skipStandardDamageText: true
+          });
+          spawnFloatingText(target.x, target.y - target.r - 10, `-${totalTick}`, this.damageNumberColor || '#03d5f1ff');
         }
       }
     }
@@ -1111,6 +1126,7 @@ export class SansFighter extends Fighter {
       height: 24,
       boneType: 'white',
       damage: cfg.basicBoneDamage || 8,
+      damageNumberColor: this.damageNumberColor || '#03d5f1ff',
       life: 60
     });
 
@@ -1124,8 +1140,15 @@ export class SansFighter extends Fighter {
    * 1. Sequential Orbiting Carousel (10 accelerating circular chain blasters)
    * 2. 360° Simultaneous Radial Ring (8-10 blasters surrounding at once)
    * 3. Colossal Titan Gigablaster (Massive 2.6x titan blaster with 120px super laser)
+   *
+   * Damage Standard:
+   * - First Impact: Deals 100% base damage upon initial beam contact with a target.
+   * - Continuous Damage: Deals 50% base damage on sustained beam ticks every tickInterval frames.
+   *
+   * @param {Object} opponent - Target opponent entity
+   * @param {number|null} [forcedPattern=null] - Optional forced pattern (0: Carousel, 1: Radial Ring, 2: Gigablaster)
    */
-  castGasterBlasters(opponent) {
+  castGasterBlasters(opponent, forcedPattern = null) {
     if (!opponent) return;
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
     const staminaCost = cfg.blasterStaminaCost !== undefined ? cfg.blasterStaminaCost : 25;
@@ -1150,10 +1173,15 @@ export class SansFighter extends Fighter {
       audioSystem.playSFX(sansConfig.sounds.gasterBlaster, 0.85);
     }
 
-    // Randomize pattern across all 3 authentic Undertale formations
-    const availablePatterns = [0, 1, 2];
-    const pool = availablePatterns.filter(p => p !== this.lastBlasterPattern);
-    const pattern = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : Math.floor(Math.random() * 3);
+    // Determine pattern: optional forced pattern for tests/scripting, or authentic Undertale rotation
+    let pattern;
+    if (typeof forcedPattern === 'number' && forcedPattern >= 0 && forcedPattern <= 2) {
+      pattern = forcedPattern;
+    } else {
+      const availablePatterns = [0, 1, 2];
+      const pool = availablePatterns.filter(p => p !== this.lastBlasterPattern);
+      pattern = pool.length > 0 ? pool[Math.floor(Math.random() * pool.length)] : Math.floor(Math.random() * 3);
+    }
     this.lastBlasterPattern = pattern;
 
     if (pattern === 0) {
@@ -1213,7 +1241,7 @@ export class SansFighter extends Fighter {
 
     const chargeTime = cfg.blasterCarouselChargeTime || cfg.blasterChargeTime || 16;
     const fireDur = cfg.blasterCarouselFireDuration || cfg.blasterFireDuration || 22;
-    const damage = cfg.blasterCarouselDamage || cfg.blasterBeamDamage || 30;
+    const damage = cfg.blasterCarouselDamage || cfg.blasterBeamDamage || 20;
     const beamHeight = cfg.blasterCarouselBeamHeight ?? cfg.blasterCarouselBeamWidth ?? cfg.blasterBeamHeight ?? cfg.blasterBeamWidth ?? 32;
     const reach = cfg.blasterLaserHeight ?? cfg.blasterLaserReach ?? 800;
 
@@ -1230,13 +1258,16 @@ export class SansFighter extends Fighter {
       fireTimer: fireDur,
       fireMax: fireDur,
       damage: damage,
+      pattern: 0,
       beamHeight: beamHeight,
       beamWidth: beamHeight,
       reach: reach,
       length: reach,
       isCharging: true,
       isFiring: false,
-      damageDealt: false
+      damageDealt: false,
+      hitTargets: new Set(),
+      targetLastHitFrame: new Map()
     });
 
     seq.totalSpawned++;
@@ -1262,7 +1293,7 @@ export class SansFighter extends Fighter {
     const radius = cfg.blasterRingRadius || (Math.min(arena.width, arena.height) * 0.45);
     const chargeTime = cfg.blasterRingChargeTime || 28;
     const fireDur = cfg.blasterRingFireDuration || 28;
-    const damage = cfg.blasterRingDamage || 30;
+    const damage = cfg.blasterRingDamage || 20;
     const beamHeight = cfg.blasterRingBeamHeight ?? cfg.blasterRingBeamWidth ?? cfg.blasterBeamHeight ?? cfg.blasterBeamWidth ?? 36;
     const reach = cfg.blasterLaserHeight ?? cfg.blasterLaserReach ?? 800;
     const startAngle = Math.random() * (Math.PI * 2 / count);
@@ -1286,13 +1317,16 @@ export class SansFighter extends Fighter {
         fireTimer: fireDur,
         fireMax: fireDur,
         damage: damage,
+        pattern: 1,
         beamHeight: beamHeight,
         beamWidth: beamHeight,
         reach: reach,
         length: reach,
         isCharging: true,
         isFiring: false,
-        damageDealt: false
+        damageDealt: false,
+        hitTargets: new Set(),
+        targetLastHitFrame: new Map()
       });
     }
   }
@@ -1319,7 +1353,7 @@ export class SansFighter extends Fighter {
     const scale = cfg.blasterGigaScale || 2.6;
     const chargeTime = cfg.blasterGigaChargeTime || 32;
     const fireDur = cfg.blasterGigaFireDuration || 36;
-    const damage = cfg.blasterGigaDamage || 100;
+    const damage = cfg.blasterGigaDamage || 30;
     const beamHeight = cfg.blasterGigaBeamHeight ?? cfg.blasterGigaBeamWidth ?? 120;
     const reach = cfg.blasterGigaLaserHeight ?? cfg.blasterGigaReach ?? 1000;
 
@@ -1336,18 +1370,25 @@ export class SansFighter extends Fighter {
       fireTimer: fireDur,
       fireMax: fireDur,
       damage: damage,
+      pattern: 2,
       beamHeight: beamHeight,
       beamWidth: beamHeight,
       reach: reach,
       length: reach,
       isCharging: true,
       isFiring: false,
-      damageDealt: false
+      damageDealt: false,
+      hitTargets: new Set(),
+      targetLastHitFrame: new Map()
     });
   }
 
   /**
    * Updates active sequential circle queue, individual Gaster Blasters, lasers, and collisions.
+   *
+   * Damage Rule:
+   * - First Impact: Deals 100% of blaster base damage upon first contact with target.
+   * - Continuous Damage: Deals 50% of blaster base damage on sustained beam ticks (every tickInterval frames).
    */
   _updateGasterBlasters(opponent) {
     const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
@@ -1403,11 +1444,26 @@ export class SansFighter extends Fighter {
         const beamH = b.beamHeight || b.beamWidth || cfg.blasterBeamHeight || cfg.blasterBeamWidth || 32;
         const cosA = Math.cos(b.angle);
         const sinA = Math.sin(b.angle);
+        const tickInterval = cfg.blasterTickInterval || 6;
+        const firstImpactRatio = (cfg.blasterFirstImpactRatio !== undefined) ? cfg.blasterFirstImpactRatio : 1.0;
+        const continuousRatio = (cfg.blasterContinuousDamageRatio !== undefined)
+          ? cfg.blasterContinuousDamageRatio
+          : ((cfg.blasterContinuousRatio !== undefined) ? cfg.blasterContinuousRatio : 0.5);
+
+        if (!b.hitTargets) b.hitTargets = new Set();
+        if (!b.targetLastHitFrame) b.targetLastHitFrame = new Map();
 
         // Check targets (fighters & illusions)
         const targets = [];
-        if (state.fighters) targets.push(...state.fighters);
-        if (state.illusions) targets.push(...state.illusions);
+        if (state.fighters && Array.isArray(state.fighters)) {
+          targets.push(...state.fighters);
+        }
+        if (state.illusions && Array.isArray(state.illusions)) {
+          targets.push(...state.illusions);
+        }
+        if (opponent && !targets.includes(opponent)) {
+          targets.push(opponent);
+        }
 
         for (const target of targets) {
           if (!target || target === this || (target.team && target.team === this.team) || target.hp <= 0) continue;
@@ -1420,16 +1476,58 @@ export class SansFighter extends Fighter {
           if (projDist > 0 && projDist < reach) {
             const perpDist = Math.abs(-dx * sinA + dy * cosA);
             if (perpDist <= (beamH * 0.5 + target.r)) {
-              // Apply continuous beam ticks / damage
-              if (!b.damageDealt || (b.fireTimer % 6 === 0)) {
+              const baseDmg = b.damage || cfg.blasterBeamDamage || 20;
+              const hasTakenFirstImpact = b.hitTargets.has(target);
+
+              if (!hasTakenFirstImpact) {
+                // 1. FIRST IMPACT: Deals 100% Damage
+                b.hitTargets.add(target);
+                b.targetLastHitFrame.set(target, b.fireTimer);
                 b.damageDealt = true;
-                const dmg = b.damage || cfg.blasterBeamDamage || 9;
-                if (target.takeDamage) target.takeDamage(dmg, this);
+
+                const firstImpactDmg = Math.round(baseDmg * firstImpactRatio);
+                if (target.takeDamage) {
+                  target.takeDamage(firstImpactDmg, this, {
+                    isProjectile: true,
+                    isLaser: true,
+                    isGasterBlaster: true,
+                    isSkill: true,
+                    isFirstImpact: true,
+                    damageNumberColor: this.damageNumberColor || '#03d5f1ff'
+                  });
+                }
                 this.applyKarma(target);
 
-                // Knockback
+                // Concussive first impact screen shake & knockback
+                if (b.scale >= 2.0) {
+                  triggerGlobalScreenShake(4.0, 10);
+                }
                 if (target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {
                   target.applyKnockback(cosA * cfg.blasterKnockback, sinA * cfg.blasterKnockback);
+                }
+              } else {
+                // 2. CONTINUOUS DAMAGE: Deals 50% Damage every tick interval
+                const lastHit = b.targetLastHitFrame.get(target);
+                if (lastHit === undefined || (lastHit - b.fireTimer) >= tickInterval) {
+                  b.targetLastHitFrame.set(target, b.fireTimer);
+
+                  const continuousDmg = Math.max(1, Math.round(baseDmg * continuousRatio));
+                  if (target.takeDamage) {
+                    target.takeDamage(continuousDmg, this, {
+                      isProjectile: true,
+                      isLaser: true,
+                      isGasterBlaster: true,
+                      isSkill: true,
+                      isContinuousDamage: true,
+                      damageNumberColor: this.damageNumberColor || '#03d5f1ff'
+                    });
+                  }
+                  this.applyKarma(target);
+
+                  // Continuous subtle beam knockback
+                  if (target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {
+                    target.applyKnockback(cosA * (cfg.blasterKnockback * 0.5), sinA * (cfg.blasterKnockback * 0.5));
+                  }
                 }
               }
             }
@@ -1476,6 +1574,7 @@ export class SansFighter extends Fighter {
         height: 32,
         boneType: isBlue ? 'blue' : 'white',
         damage: cfg.boneDamage || 5,
+        damageNumberColor: this.damageNumberColor || '#03d5f1ff',
         life: 75
       });
     }
@@ -1491,7 +1590,8 @@ export class SansFighter extends Fighter {
         stabTimer: 18,
         isWarning: true,
         isRising: false,
-        damage: cfg.groundSpearDamage || 16
+        damage: cfg.groundSpearDamage || 16,
+        damageNumberColor: this.damageNumberColor || '#03d5f1ff'
       });
       if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
         const warnSound = (CONFIG.sans?.sounds?.warning || sansConfig.sounds?.warning) || 'Assets/Sound Effects/Sans/Warning.ogg';
@@ -1528,7 +1628,12 @@ export class SansFighter extends Fighter {
             continue;
           }
 
-          if (t.takeDamage) t.takeDamage(bone.damage, this);
+          if (t.takeDamage) {
+            t.takeDamage(bone.damage, this, {
+              projectile: bone,
+              damageNumberColor: this.damageNumberColor || '#03d5f1ff'
+            });
+          }
           this.applyKarma(t);
 
           if (bone.boneType === 'blue' && t.applyFreeze) {
@@ -1574,7 +1679,11 @@ export class SansFighter extends Fighter {
           for (const t of targets) {
             if (!t || t === this || (t.team && t.team === this.team) || t.hp <= 0) continue;
             if (Math.abs(t.x - trap.x) <= trap.width * 0.5 + t.r && Math.abs(t.y - trap.y) <= trap.height * 0.5 + t.r) {
-              if (t.takeDamage) t.takeDamage(trap.damage, this);
+              if (t.takeDamage) {
+                t.takeDamage(trap.damage, this, {
+                  damageNumberColor: this.damageNumberColor || '#03d5f1ff'
+                });
+              }
               this.applyKarma(t);
             }
           }
@@ -1634,7 +1743,9 @@ export class SansFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 16, 'BAD TIME', '#00F5FF');
 
     if (opponent.takeDamage) {
-      opponent.takeDamage(cfg.gravitySlamDamage || 22, this);
+      opponent.takeDamage(cfg.gravitySlamDamage || 22, this, {
+        damageNumberColor: this.damageNumberColor || '#03d5f1ff'
+      });
       this.applyKarma(opponent);
     }
   }
@@ -1720,7 +1831,9 @@ export class SansFighter extends Fighter {
 
           // Damage & KR Application
           if (this.blueSoulVictim.takeDamage) {
-            this.blueSoulVictim.takeDamage(cfg.gravityWallImpactDamage || 8, this);
+            this.blueSoulVictim.takeDamage(cfg.gravityWallImpactDamage || 8, this, {
+              damageNumberColor: this.damageNumberColor || '#03d5f1ff'
+            });
             this.applyKarma(this.blueSoulVictim);
           }
 

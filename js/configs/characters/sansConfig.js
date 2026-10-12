@@ -86,6 +86,13 @@ export const sansConfig = {
   blasterLaserHeight: 1500,     // Standard Gaster Blaster beam corridor length / reach (pixels)
   blasterLaserReach: 800,      // Alias for blasterLaserHeight
   blasterKnockback: 0,
+  blasterBeamDamage: 20,       // Fallback base damage per blaster
+
+  // Impact and Continuous Damage Tuning (100% First Impact, 50% Continuous Beam Damage)
+  blasterFirstImpactRatio: 1.0,        // 100% damage on first impact
+  blasterContinuousDamageRatio: 0.5,   // 50% damage on continuous beam contact ticks
+  blasterContinuousRatio: 0.5,         // Alias for blasterContinuousDamageRatio
+  blasterTickInterval: 6,              // Frames between continuous beam damage ticks (~0.10s)
 
   // Pattern 1: Sequential Orbiting Carousel (Arena Perimeter Circle)
   blasterCircleChainCount: 10, // Total blasters in sequential orbiting chain (10 blasters)
@@ -95,7 +102,7 @@ export const sansConfig = {
   blasterSpawnInterval: 6,     // Frames between consecutive blaster spawns (~0.066s)
   blasterCarouselChargeTime: 16,// Rapid telegraph charge frames (~0.26s)
   blasterCarouselFireDuration: 22,// Active beam firing frames (~0.36s)
-  blasterCarouselDamage: 20,    // Damage per beam tick
+  blasterCarouselDamage: 20,    // Base damage per blaster (100% first impact = 20, 50% continuous = 10)
   blasterCarouselBeamHeight: 32,// Pattern 1 Carousel beam thickness / height (pixels)
   blasterCarouselBeamWidth: 32, // Alias for blasterCarouselBeamHeight
 
@@ -104,7 +111,7 @@ export const sansConfig = {
   blasterRingRadius: 215,      // Distance from arena center in pixels (encircles the arena)
   blasterRingChargeTime: 28,   // Synchronized pre-fire telegraph (~0.46s)
   blasterRingFireDuration: 28, // Inward beam firing frames (~0.46s)
-  blasterRingDamage: 20,       // Damage per beam tick
+  blasterRingDamage: 20,       // Base damage per blaster (100% first impact = 20, 50% continuous = 10)
   blasterRingBeamHeight: 36,   // Pattern 2 Ring beam thickness / height (pixels)
   blasterRingBeamWidth: 36,    // Alias for blasterRingBeamHeight
 
@@ -112,7 +119,7 @@ export const sansConfig = {
   blasterGigaScale: 2.6,        // Massive skull sprite scale
   blasterGigaChargeTime: 32,    // Heavy charge telegraph build-up (~0.53s)
   blasterGigaFireDuration: 36,  // Prolonged apocalyptic laser beam (~0.60s)
-  blasterGigaDamage: 30,        // High devastating beam damage per tick
+  blasterGigaDamage: 30,        // Base damage per blaster (100% first impact = 30, 50% continuous = 15)
   blasterGigaBeamHeight: 120,   // Pattern 3 Giant titan laser beam thickness / height (pixels)
   blasterGigaBeamWidth: 120,    // Alias for blasterGigaBeamHeight
   blasterGigaLaserHeight: 1000, // Giant titan laser corridor length / reach (pixels)

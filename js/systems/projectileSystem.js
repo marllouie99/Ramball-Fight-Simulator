@@ -1453,6 +1453,7 @@ class ProjectileSystem {
           const applied = fighter.takeDamage(finalProjDmg, attacker, {
             isProjectile: true,
             projectile,
+            damageNumberColor: projectile.damageNumberColor,
             isFlame: !!projectile.isFlame,
             isCrit: isSlashCrit,
             skipStandardDamageText: false

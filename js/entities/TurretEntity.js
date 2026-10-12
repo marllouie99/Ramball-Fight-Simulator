@@ -47,6 +47,10 @@ export class TurretEntity extends Fighter {
       type: 'Turret',
       isTurret: true,
       isMinion: true,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: maxHp,
       damage: damage,
       cooldown: fireRate,
@@ -63,7 +67,10 @@ export class TurretEntity extends Fighter {
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.hideHpText = true; // Disable HP number overlay over body
+    this.noBlood = true;
     this.suppressBlood = true; // Machines don't bleed — spawn sparks instead
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.maxHp = maxHp;
     this.hp = this.maxHp;
     this.damage = damage;

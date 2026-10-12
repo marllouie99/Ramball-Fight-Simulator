@@ -1,5 +1,6 @@
 import { stopSound, stopSoundBySrc, fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
 import { CONFIG } from '../../../core/config.js';
+import { resolveDamageNumberColor } from '../../fighter.js';
 import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake, isChampionScreenActive } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash, spawnRikaRoarShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { spawnDeathShatter } from '../../../graphics/particles/deathShatterEffect.js';
@@ -287,7 +288,8 @@ export function initRika(fighter) {
       // Floating text
       if (typeof spawnFloatingText === 'function' && amount > 0) {
         const text = opts.isCrit ? `CRIT! ${Math.floor(amount)}` : Math.floor(amount);
-        const color = opts.isCrit ? '#ff0000' : '#ffffff';
+        const defaultColor = opts.isCrit ? '#ff0000' : '#ffffff';
+        const color = resolveDamageNumberColor(attacker, opts, defaultColor);
         spawnFloatingText(this.x, this.y - this.r - 10, text, color);
       }
 

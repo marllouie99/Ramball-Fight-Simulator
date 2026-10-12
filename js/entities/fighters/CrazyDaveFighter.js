@@ -54,12 +54,18 @@ function getCrazyDaveSoundVolume(config, key) {
  */
 function dealPlantDamage(target, amount, attacker, opts = {}) {
   if (!target) return false;
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+  const unifiedColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
+  const plantDamageOpts = {
+    ...opts,
+    damageNumberColor: opts.damageNumberColor || unifiedColor
+  };
   const hpBefore = Number(target.hp);
   let result = false;
   if (typeof applyDamageToTarget === 'function') {
-    result = applyDamageToTarget(target, amount, attacker, opts);
+    result = applyDamageToTarget(target, amount, attacker, plantDamageOpts);
   } else if (typeof target.takeDamage === 'function') {
-    result = target.takeDamage(amount, attacker, opts);
+    result = target.takeDamage(amount, attacker, plantDamageOpts);
   } else if (typeof target.hp === 'number') {
     target.hp = Math.max(0, target.hp - amount);
   }
@@ -324,6 +330,10 @@ export class PeashooterEntity extends Fighter {
       isMinion: true,
       isPlant: true,
       isPlantMinion: true,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: maxHp,
       damage: getCrazyDaveSetting(cfg, 'peashooterDamage'),
       cooldown: getCrazyDaveSetting(cfg, 'peashooterFireRate'),
@@ -339,6 +349,10 @@ export class PeashooterEntity extends Fighter {
     this.isMinion = true;
     this.isPlant = true;
     this.isPlantMinion = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.customHitFlash = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
@@ -414,7 +428,12 @@ export class PeashooterEntity extends Fighter {
     this.shootCooldown = 0;
     this.shootCooldownMax = getCrazyDaveSetting(cfg, 'peashooterFireRate');
     this.hitFlashTimer = 0;
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
     this.animTick = Math.floor(Math.random() * 30);
+  }
+
+  getDamageNumberColor(opts) {
+    return this.damageNumberColor;
   }
 
   canAim() {
@@ -652,6 +671,7 @@ export class PeashooterEntity extends Fighter {
       ownerFighter: ownership.ownerFighter,
       isPlantProjectile: true,
       color: '#22C55E',
+      damageNumberColor: getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16',
       visual: 'peaBullet',
       life: getCrazyDaveSetting(cfg, 'peashooterProjectileLife'),
       maxLife: getCrazyDaveSetting(cfg, 'peashooterProjectileLife'),
@@ -702,6 +722,10 @@ export class SnowPeaEntity extends Fighter {
       isMinion: true,
       isPlant: true,
       isPlantMinion: true,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: maxHp,
       damage: getCrazyDaveSetting(cfg, 'snowPeaDamage'),
       cooldown: getCrazyDaveSetting(cfg, 'snowPeaFireRate'),
@@ -717,6 +741,10 @@ export class SnowPeaEntity extends Fighter {
     this.isMinion = true;
     this.isPlant = true;
     this.isPlantMinion = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.customHitFlash = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
@@ -792,7 +820,12 @@ export class SnowPeaEntity extends Fighter {
     this.shootCooldown = 0;
     this.shootCooldownMax = getCrazyDaveSetting(cfg, 'snowPeaFireRate');
     this.hitFlashTimer = 0;
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
     this.animTick = Math.floor(Math.random() * 30);
+  }
+
+  getDamageNumberColor(opts) {
+    return this.damageNumberColor;
   }
 
   canAim() {
@@ -1032,6 +1065,7 @@ export class SnowPeaEntity extends Fighter {
       skillShotId: 'crazyDaveSnowPea',
       skillShotColor: '#38BDF8',
       color: '#38BDF8',
+      damageNumberColor: getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16',
       visual: 'snowPeaBullet',
       life: getCrazyDaveSetting(cfg, 'snowPeaProjectileLife'),
       maxLife: getCrazyDaveSetting(cfg, 'snowPeaProjectileLife'),
@@ -1104,6 +1138,10 @@ export class WallnutEntity extends Fighter {
       isPlantMinion: true,
       isWallnut: true,
       isPlantBarrier: true,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: maxHp,
       damage: 0,
       cooldown: 999999,
@@ -1122,6 +1160,10 @@ export class WallnutEntity extends Fighter {
     this.customHitFlash = true;
     this.isWallnut = true;
     this.isPlantBarrier = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.immuneToKnockback = true;
@@ -1195,7 +1237,12 @@ export class WallnutEntity extends Fighter {
 
     this.hitFlashTimer = 0;
     this.collisionSoundCooldown = 0;
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
     this.animTick = Math.floor(Math.random() * 30);
+  }
+
+  getDamageNumberColor(opts) {
+    return this.damageNumberColor;
   }
 
   canAim() {
@@ -1414,6 +1461,10 @@ export class TorchwoodEntity extends Fighter {
       isPlant: true,
       isPlantMinion: true,
       isTorchwood: true,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: maxHp,
       damage: 0,
       cooldown: 999999,
@@ -1431,6 +1482,10 @@ export class TorchwoodEntity extends Fighter {
     this.isPlantMinion = true;
     this.customHitFlash = true;
     this.isTorchwood = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.immuneToKnockback = true;
@@ -1509,7 +1564,12 @@ export class TorchwoodEntity extends Fighter {
     this._interceptRadius = getCrazyDaveSetting(cfg, 'torchwoodInterceptRadius') || 38;
     this._burnRadius = getCrazyDaveSetting(cfg, 'torchwoodBurnRadius') || 70;
     this._burnDuration = getCrazyDaveSetting(cfg, 'torchwoodBurnDuration') || 180;
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
     this._ignitedSet = new WeakSet(); // Track already-ignited projectiles to avoid re-processing
+  }
+
+  getDamageNumberColor(opts) {
+    return this.damageNumberColor;
   }
 
   canAim() {
@@ -1698,6 +1758,7 @@ export class TorchwoodEntity extends Fighter {
         p.damage = (p.damage || 10) * fireMultiplier;
         p.visual = 'firePeaBullet';
         p.color = getCrazyDaveSetting(cfg, 'torchwoodFirePeaColor') || '#EF4444';
+        p.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
         p.isFirePea = true;
         p.isPlantProjectile = true;
         p.knockbackForce = (p.knockbackForce || 0.5) * 1.5; // Extra pushback
@@ -1746,6 +1807,7 @@ export class TorchwoodEntity extends Fighter {
         // Melt the ice: revert to normal green pea, strip all ice properties
         p.visual = 'peaBullet';
         p.color = '#22C55E';
+        p.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
         p.isSnowPea = false;
         p.isFirePea = false;
         p.isAdaptableSkillShot = false;
@@ -1858,6 +1920,10 @@ export class PotatoMineEntity extends Fighter {
       isMinion: true,
       isPlant: true,
       isPlantMinion: true,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: maxHp,
       damage: 0,
       cooldown: 0,
@@ -1873,6 +1939,10 @@ export class PotatoMineEntity extends Fighter {
     this.isMinion = true;
     this.isPlant = true;
     this.isPlantMinion = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.customHitFlash = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
@@ -1952,7 +2022,12 @@ export class PotatoMineEntity extends Fighter {
     this.explodeAnimProgress = 0;
     this.hasDetonated = false;
     this.hitFlashTimer = 0;
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
     this.animTick = Math.floor(Math.random() * 40);
+  }
+
+  getDamageNumberColor(opts) {
+    return this.damageNumberColor;
   }
 
   canAim() { return false; }
@@ -2198,14 +2273,10 @@ export class PotatoMineEntity extends Fighter {
       const finalDamage = Math.round(explosionDamage * falloff);
 
       // Apply damage
-      if (typeof applyDamageToTarget === 'function') {
-        applyDamageToTarget(f, finalDamage, this.owner || this, {
-          knockback: true,
-          skipInterrupt: false,
-        });
-      } else if (typeof f.takeDamage === 'function') {
-        f.takeDamage(finalDamage, this.owner || this, {});
-      }
+      dealPlantDamage(f, finalDamage, this.owner || this, {
+        knockback: true,
+        skipInterrupt: false,
+      });
 
       // Apply explosion knockback push away from mine center
       if (f && typeof f.applyKnockback === 'function' && !f.isImmovable && !f.cannotBeKnockbacked) {
@@ -2251,6 +2322,10 @@ export class LawnmowerEntity extends Fighter {
       untargetable: true,
       cannotBeTargeted: true,
       isTargetable: false,
+      noBlood: true,
+      suppressBlood: true,
+      bleedImmune: true,
+      isBloodImmune: true,
       hp: 99999,
       damage: getCrazyDaveSetting(cfg, 'lawnmowerDamage') || 180,
       cooldown: 999999,
@@ -2270,6 +2345,10 @@ export class LawnmowerEntity extends Fighter {
     this.isPlantMinion = true;
     this.customHitFlash = true;
     this.isLawnmower = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
+    this.bleedImmune = true;
+    this.isBloodImmune = true;
     this.isImmovable = true;
     this.cannotBeKnockbacked = true;
     this.immuneToKnockback = true;
@@ -2306,6 +2385,11 @@ export class LawnmowerEntity extends Fighter {
     this._triggerRadius = getCrazyDaveSetting(cfg, 'lawnmowerTriggerRadius') || 38;
     this._speed = getCrazyDaveSetting(cfg, 'lawnmowerSpeed') || 11.5;
     this._damage = getCrazyDaveSetting(cfg, 'lawnmowerDamage') || 180;
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
+  }
+
+  getDamageNumberColor(opts) {
+    return this.damageNumberColor;
   }
 
   takeDamage() {
@@ -2579,7 +2663,7 @@ export class CrazyDaveFighter extends Fighter {
     this.color = def?.color ?? getCrazyDaveSetting(cfg, 'color');
     this.themeColor = def?.themeColor ?? getCrazyDaveSetting(cfg, 'themeColor');
     this.secondaryColor = def?.secondaryColor ?? getCrazyDaveSetting(cfg, 'secondaryColor');
-    this.damageNumberColor = getCrazyDaveSetting(cfg, 'color');
+    this.damageNumberColor = getCrazyDaveSetting(cfg, 'damageNumberColor') || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
 
     this.hp = getCrazyDaveSetting(cfg, 'hp');
     this.maxHp = getCrazyDaveSetting(cfg, 'maxHp');
@@ -2633,6 +2717,11 @@ export class CrazyDaveFighter extends Fighter {
 
   canAim() {
     return true;
+  }
+
+  getDamageNumberColor(opts) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    return getCrazyDaveSetting(cfg, 'damageNumberColor') || this.damageNumberColor || getCrazyDaveSetting(cfg, 'color') || '#84CC16';
   }
 
   isStationarySkillActive() {

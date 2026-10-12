@@ -16,7 +16,7 @@ export const shiroConfig = {
   hp: 340,
   maxHp: 340,
   speed: 5.6,
-  moveSpeed: 5.6,
+  moveSpeed: 5.0,
   r: 26,
   radius: 26,
   color: '#A855F7', // Soft Lavender Violet
@@ -111,7 +111,7 @@ export const shiroConfig = {
   projectileRadius: 6, // Small compact projectile collision radius during flight (distinct from planted troop size)
   projectileScale: 0.45, // Visual scale multiplier for small flying projectile pieces
   basicAttackCooldown: 200, // Deliberate Grandmaster Turn Cadence (~1.25s)
-  maxActiveMinions: 16, // Max concurrent living chess troops defending tiles
+  maxActiveMinions: 8, // Max concurrent living chess troops defending tiles
   minionPermanent: true, // Troops stay indefinitely until destroyed by enemy attacks
 
   // Weighted Gacha Drop Rates

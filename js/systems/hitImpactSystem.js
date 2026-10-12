@@ -4,12 +4,36 @@ import { state, triggerGlobalScreenShake, spawnFloatingText } from '../core/stat
 import { audioSystem } from '../systems/audioSystem.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave } from '../graphics/particles/sparkEffect.js';
-import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
+import { spawnBloodEffect, isBloodSuppressedEntity } from '../graphics/particles/bloodEffect.js';
 
 function shouldApplyPhysicalPush(target) {
   if (!target) return false;
   if (target.characterId === 'escanor' || target.type === 'escanor' || target.characterId === 'cj' || target.type === 'cj' || target.characterId === 'eye_of_cthulhu' || target.type === 'eye_of_cthulhu' || target.isGhostTerrain || target.immuneToPush || target.immuneToKnockback) return false;
   return true;
+}
+
+function isSoundSuppressedTarget(target) {
+  if (!target) return false;
+  return Boolean(
+    target.noHitSound ||
+    target.suppressHitSound ||
+    target.isChessTroop ||
+    target.isChessMinion ||
+    target.isChessPiece ||
+    target.isTurret ||
+    target.isDispenser ||
+    target.isBuilding ||
+    target.isSentry ||
+    target.isPlant ||
+    target.isPlantMinion ||
+    target.isWallnut ||
+    target.isLawnmower ||
+    target.isDeployable ||
+    target.characterId === 'crazydave_plant' ||
+    target.characterId === 'crazydave_lawnmower' ||
+    (typeof target.characterId === 'string' && (target.characterId.startsWith('chess_') || target.characterId.startsWith('crazydave_'))) ||
+    (typeof target.type === 'string' && ['pawn', 'knight', 'bishop', 'rook', 'queen'].includes(target.type.toLowerCase()) && (target.isMinion || target.isChessTroop || target.isChessPiece))
+  );
 }
 
 export const HitImpactSystem = {
@@ -32,6 +56,7 @@ export const HitImpactSystem = {
    * @returns {boolean} - true if projectile should be destroyed, false if it should pierce/bounce and continue.
    */
   processProjectileHit(target, projectile, attacker, fighters) {
+    const isSilentTarget = isSoundSuppressedTarget(target);
     const isSukunaSlash = projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade' || projectile.isSukunaSlash;
     const isMahoragaThrow = projectile.isMahoragaThrow || projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble';
     
@@ -43,12 +68,16 @@ export const HitImpactSystem = {
       if (isMahoragaThrow) {
         spawnSparks(target.x, target.y, 16, 'paleStoneShatter');
         spawnImpactFlash(target.x, target.y, 35, '#E2E8F0');
-        audioSystem.playSFX('attack_fleshhit', 0.8);
-        audioSystem.playSFX('attack_groundsmash', 0.4);
+        if (!isSilentTarget) {
+          audioSystem.playSFX('attack_fleshhit', 0.8);
+          audioSystem.playSFX('attack_groundsmash', 0.4);
+        }
       } else {
         spawnSparks(target.x, target.y, 10, 'crimsonSniper');
         spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
-        audioSystem.playSFX('attack_fleshhit', 0.5);
+        if (!isSilentTarget) {
+          audioSystem.playSFX('attack_fleshhit', 0.5);
+        }
       }
 
       // Apply physical push backward on hit (only for Mahoraga debris throws, disabled for Sukuna basic slashes)
@@ -119,7 +148,7 @@ export const HitImpactSystem = {
         const swRadius = projectile.isLichtRegenRain ? 28 : (projectile.isPiercing ? 48 : 36);
         spawnMeleeClashShockwave(target.x, target.y, swRadius, '#00E5FF');
       }
-      if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      if (!isSilentTarget && audioSystem && typeof audioSystem.playSFX === 'function') {
         audioSystem.playSFX('attack_fleshhit', 0.65);
       }
 
@@ -175,7 +204,7 @@ export const HitImpactSystem = {
       if (typeof spawnImpactFlash === 'function') {
         spawnImpactFlash(target.x, target.y, 22, '#E11D48');
       }
-      if (audioSystem && typeof audioSystem.playSFX === 'function') {
+      if (!isSilentTarget && audioSystem && typeof audioSystem.playSFX === 'function') {
         audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
       }
       return true; // Destroyed on target impact
@@ -248,7 +277,9 @@ export const HitImpactSystem = {
       // 4. Crisp flesh hit / ballistic impact SFX
       const hitSfx = CONFIG.john_wick?.sounds?.fleshHit || 'attack_fleshhit';
       const hitVol = CONFIG.john_wick?.soundVolumes?.fleshHit ?? 0.6;
-      audioSystem.playSFX(hitSfx, hitVol);
+      if (!isSilentTarget) {
+        audioSystem.playSFX(hitSfx, hitVol);
+      }
 
       // 4. Subtle punchy screen shake on direct 9mm pistol bullet impact
       if (typeof triggerGlobalScreenShake === 'function') {
@@ -301,7 +332,9 @@ export const HitImpactSystem = {
       // 4. Ballistic impact SFX & heavy 12-gauge screen shake
       const sgHitSfx = CONFIG.john_wick?.sounds?.fleshHit || 'attack_fleshhit';
       const sgHitVol = CONFIG.john_wick?.soundVolumes?.fleshHit ?? 0.8;
-      audioSystem.playSFX(sgHitSfx, sgHitVol);
+      if (!isSilentTarget) {
+        audioSystem.playSFX(sgHitSfx, sgHitVol);
+      }
       if (typeof triggerGlobalScreenShake === 'function') {
         const shakeInt = CONFIG.john_wick?.shotgunHitShakeIntensity || 4.0;
         const shakeDur = CONFIG.john_wick?.shotgunHitShakeDuration || 7;
@@ -352,7 +385,9 @@ export const HitImpactSystem = {
       // 4. Ballistic impact SFX & machine gun rapid vibration shake
       const rifleHitSfx = CONFIG.john_wick?.sounds?.fleshHit || 'attack_fleshhit';
       const rifleHitVol = CONFIG.john_wick?.soundVolumes?.fleshHit ?? 0.55;
-      audioSystem.playSFX(rifleHitSfx, rifleHitVol);
+      if (!isSilentTarget) {
+        audioSystem.playSFX(rifleHitSfx, rifleHitVol);
+      }
       if (typeof triggerGlobalScreenShake === 'function') {
         const shakeInt = CONFIG.john_wick?.rifleHitShakeIntensity || 0.7;
         const shakeDur = CONFIG.john_wick?.rifleHitShakeDuration || 2;
@@ -402,7 +437,9 @@ export const HitImpactSystem = {
       }
 
       // 4. Punchy bullet flesh hit SFX
-      audioSystem.playSFX('attack_fleshhit', isMinigun ? 0.65 : 0.50);
+      if (!isSilentTarget) {
+        audioSystem.playSFX('attack_fleshhit', isMinigun ? 0.65 : 0.50);
+      }
 
       // 5. Subtle punchy screen shake on direct bullet impact
       if (typeof triggerGlobalScreenShake === 'function') {
@@ -435,7 +472,9 @@ export const HitImpactSystem = {
       }
 
       // 3. Audio & screen shake
-      audioSystem.playSFX('attack_fleshhit', 0.45);
+      if (!isSilentTarget) {
+        audioSystem.playSFX('attack_fleshhit', 0.45);
+      }
       if (typeof playSound === 'function') {
         const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : null;
         const hitSound = cfg?.sounds?.supernova || 'Assets/Sound Effects/NamelessDeity/Supernova.ogg';
@@ -487,7 +526,9 @@ export const HitImpactSystem = {
       }
 
       // 4. Punchy shotgun pellet flesh hit audio
-      audioSystem.playSFX('attack_fleshhit', 0.52);
+      if (!isSilentTarget) {
+        audioSystem.playSFX('attack_fleshhit', 0.52);
+      }
 
       // 5. Punchy screen shake
       if (typeof triggerGlobalScreenShake === 'function') {
@@ -564,7 +605,9 @@ export const HitImpactSystem = {
         }
 
         // Flesh hit SFX & screen shake
-        audioSystem.playSFX('attack_fleshhit', 0.48);
+        if (!isSilentTarget) {
+          audioSystem.playSFX('attack_fleshhit', 0.48);
+        }
         if (typeof triggerGlobalScreenShake === 'function') {
           triggerGlobalScreenShake(1.2, 2);
         }
@@ -612,7 +655,9 @@ export const HitImpactSystem = {
       }
 
       // 4. Flesh hit SFX & subtle screen shake
-      audioSystem.playSFX('attack_fleshhit', 0.52);
+      if (!isSilentTarget) {
+        audioSystem.playSFX('attack_fleshhit', 0.52);
+      }
       if (typeof triggerGlobalScreenShake === 'function') {
         triggerGlobalScreenShake(1.2, 2);
       }
@@ -935,7 +980,7 @@ export const HitImpactSystem = {
       const hitAngle = Math.atan2(projectile.vy || 0, projectile.vx || 0.001);
       spawnBloodEffect(target, 10, hitAngle, { minSize: 2.0, maxSize: 3.5, count: 3 });
     }
-    if (audioSystem && typeof audioSystem.playSFX === 'function') {
+    if (!isSilentTarget && audioSystem && typeof audioSystem.playSFX === 'function') {
       audioSystem.playSFX('attack_fleshhit', 0.45);
     }
 

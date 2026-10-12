@@ -6,6 +6,7 @@
 // ─────────────────────────────────────────────
 
 import { state, isGlobalHitPauseActive, spawnFloatingText, triggerGlobalScreenShake } from '../core/state.js';
+import { resolveDamageNumberColor } from '../entities/fighter.js';
 import { CONFIG } from '../core/config.js';
 import { audioSystem } from './audioSystem.js';
 import { stopSound, stopSoundBySrc } from './soundSystem.js';
@@ -306,7 +307,8 @@ export function spawnGroveStreetDriveBy(cjFighter) {
 
       // Floating damage text above car
       const floatY = this.y - (this.width * 0.5 + 24);
-      spawnFloatingText(this.x + (Math.random() - 0.5) * 16, floatY, `-${Math.round(amount)}`, '#EF4444');
+      const color = resolveDamageNumberColor(attacker, opts, '#EF4444');
+      spawnFloatingText(this.x + (Math.random() - 0.5) * 16, floatY, `-${Math.round(amount)}`, color);
 
       // If destroyed: trigger vehicle explosion
       if (this.hp <= 0 && prevHp > 0) {
