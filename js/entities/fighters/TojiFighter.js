@@ -9,7 +9,7 @@ import { drawInvertedSpear, drawSplitSoulKatana, drawPhysicsChain, drawRestedKat
 import { drawTojiSkin, drawTojiGhostSkin } from '../../graphics/fighters/tojiSkin.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
-import { initChainPhysics as modInitChain, updateChainPhysics as modUpdateChain, performSplitSoulKatanaSlash as modKatanaSlash, performInvertedSpearStrike as modSpearStrike, tojiGetTargetsInFrontalArc } from './toji/tojiWeapons.js';
+import { initChainPhysics as modInitChain, updateChainPhysics as modUpdateChain, performSplitSoulKatanaSlash as modKatanaSlash, performInvertedSpearStrike as modSpearStrike, deliverInvertedSpearImpact as modDeliverSpearImpact, tojiGetTargetsInFrontalArc } from './toji/tojiWeapons.js';
 import { modSpawnTeleportAfterimages, modStartAmbushSequence, modUpdateAmbushSequence, tojiIsTargetDeadOrRemoved } from './toji/tojiAmbush.js';
 import { modUpdateChannelSense, modUpdateStealth } from './toji/tojiSkills.js';
 import { MODE_SPEED_MULTIPLIER } from '../../core/modeConfig.js';
@@ -51,9 +51,9 @@ export class TojiFighter extends Fighter {
     this.spearCooldown = 0;
     this.spearCooldownMax = CONFIG.toji?.spearCooldown || 75;
     this.spearRange = CONFIG.toji?.spearRange || 50;
-    this.spearDamage = CONFIG.toji?.spearDamage || 15;
     this.spearSwingTimer = 0;
-    this.spearSwingMax = 26;
+    const _c = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+    this.spearSwingMax = (_c.hit1LiftFrames ?? 5) + (_c.hit1HoldFrames ?? 2) + (_c.hit1StrikeFrames ?? 6) + (_c.hit1ImpactLockFrames ?? 6) + (_c.hit1RecoveryFrames ?? 9);
 
     // Split Soul Katana
     // Physics Chain simulation
@@ -114,22 +114,30 @@ export class TojiFighter extends Fighter {
    * Heavenly Restriction: Zero Cursed Energy. 
    * Toji is completely immune to domain effects and sensory overload slow effects (like Gojo's Limitless).
    */
-  triggerDemoAttack() {
-    const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
-    if ((state.tojiWeaponIndex || 0) === 1) {
-      this.ambushPhase = 'KATANA_SLASH';
-      this.katanaSlashTimer = 50;
-      if (typeof this.performSplitSoulKatanaSlash === 'function') {
-        this.performSplitSoulKatanaSlash(fakeTarget, 0);
-      }
-    } else {
-      if (typeof this.performInvertedSpearStrike === 'function') {
-        this.performInvertedSpearStrike(fakeTarget, 0, false);
-      } else {
-        this.spearSwingMax = 26;
-        this.spearSwingTimer = 26;
-      }
-    }
+  playBasicAttackPattern(step = 1, target = null) {
+    const opp = target || {
+      x: this.x + Math.cos(this.gunAngle || 0) * 55,
+      y: this.y + Math.sin(this.gunAngle || 0) * 55,
+      r: 25,
+      hp: 100,
+      maxHp: 100,
+      vx: 0,
+      vy: 0,
+      applyKnockback: () => {},
+      applySlow: () => {},
+      applyTimeStop: () => {},
+      takeDamage: () => {}
+    };
+    this.spearCooldown = 0;
+    this.postUltimateRecoveryTimer = 0;
+    this.isAmbushing = false;
+    this.isStealthed = false;
+    this.stealthActive = false;
+    this.performInvertedSpearStrike(opp, 0, false);
+  }
+
+  triggerDemoAttack(step = null) {
+    this.playBasicAttackPattern(step || 1);
   }
 
   isStationarySkillActive() {
@@ -295,6 +303,9 @@ export class TojiFighter extends Fighter {
       this._lastKatanaTimer = 0;
       this.slashSwingTimer = 0;
       this.spearSwingTimer = 0;
+      this.spearHitDelivered = false;
+      this.spearSwingTarget = null;
+      this.spearHitTremorTimer = 0;
     }
     this._secondSeqAngle = undefined;
     this.phantomSlashTimer = 0;
@@ -1508,6 +1519,9 @@ export class TojiFighter extends Fighter {
    * Main update loop for Toji's mechanics.
    */
   update(opponent, ownerIndex, arena) {
+    // 0. Update visual effects & transient particle/tremor lifecycles before freeze guard (Rule 25)
+    if (this.spearHitTremorTimer > 0) this.spearHitTremorTimer--;
+
     // Top-of-frame housekeeping & timer ticking (Rule 1 Compliant: hitFlashTimer, cooldowns, etc.)
     this._tickCooldowns();
 
@@ -1720,6 +1734,53 @@ export class TojiFighter extends Fighter {
     } else {
       this.aimTurnRate = undefined;
     }
+    // 5-Phase Basic Attack Momentum & Impact Lock (Rule 30 / Maki Standard)
+    if (this.spearSwingTimer > 0 && !this.isAmbushThrust) {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+      const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+      const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+      const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+      const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+      const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
+      const totalF = Math.max(1, liftF + holdF + strikeF + lockF + recF);
+      const t2 = (liftF + holdF) / totalF;
+      const t3 = (liftF + holdF + strikeF) / totalF;
+      const t4 = (liftF + holdF + strikeF + lockF) / totalF;
+
+      const maxTimer = this.spearSwingMax || totalF;
+      const t = Math.max(0, Math.min(1.0, 1 - (this.spearSwingTimer / maxTimer)));
+      if (t >= t2 && t < t3) {
+        // Phase 3: Forward lunging step momentum during hypersonic whip cleave
+        const pStrike = (t - t2) / Math.max(0.001, t3 - t2);
+        const lungeSpeed = (typeof cfg.hit1LungeSpeed === 'number') ? cfg.hit1LungeSpeed : (cfg.comboHit1Lunge || 4.5);
+        const lungeDecay = Math.sin(pStrike * Math.PI);
+        const slashAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        this.vx += Math.cos(slashAngle) * lungeSpeed * lungeDecay * 0.35;
+        this.vy += Math.sin(slashAngle) * lungeSpeed * lungeDecay * 0.35;
+
+        // Deliver impact at pStrike >= 0.50 (blade cleave contact plane)
+        if (pStrike >= 0.50 && !this.spearHitDelivered) {
+          this.spearHitDelivered = true;
+          const target = this.spearSwingTarget || opponent;
+          if (target) {
+            modDeliverSpearImpact(this, target, this.spearSwingOwnerIndex ?? ownerIndex, false);
+          }
+        }
+      } else if (t >= t3 && t < t4) {
+        // Phase 4: Canonical Impact Lock - clamp forward velocity during hard weapon impact
+        this.vx = 0;
+        this.vy = 0;
+
+        // Fallback: If strike phase skipped delivery, ensure delivered at start of lock
+        if (!this.spearHitDelivered) {
+          this.spearHitDelivered = true;
+          const target = this.spearSwingTarget || opponent;
+          if (target) {
+            modDeliverSpearImpact(this, target, this.spearSwingOwnerIndex ?? ownerIndex, false);
+          }
+        }
+      }
+    }
     this.applyMovementPhysics(speedMult);
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);
@@ -1863,6 +1924,10 @@ export class TojiFighter extends Fighter {
   performInvertedSpearStrike(target, ownerIndex, isAmbushThrust = false) {
     if (!isAmbushThrust && (this.postUltimateRecoveryTimer || 0) > 0) return false;
     return modSpearStrike(this, target, ownerIndex, isAmbushThrust);
+  }
+
+  deliverInvertedSpearImpact(target, ownerIndex, isAmbushThrust = false) {
+    return modDeliverSpearImpact(this, target, ownerIndex, isAmbushThrust);
   }
 
   shoot(ownerIndex) {
@@ -2247,45 +2312,73 @@ export class TojiFighter extends Fighter {
           slashArcAlpha = 0;
         }
       } else {
-        // Standard Melee Swing (Basic Attack — Inverted Spear of Heaven)
-        // Smooth 3-Phase Animation:
-        // Phase 1 (0% to 15%): Fluid anticipation windup (eases from rest 0.42 to upper-right -0.95 rad)
-        // Phase 2 (15% to 50%): Explosive downward cleave stroke (-0.95 to +1.15 rad, lunges to +14px)
-        // Phase 3 (50% to 100%): Smooth recovery follow-through returning smoothly to guard (0.42 rad)
-        if (t < 0.15) {
-          const p = t / 0.15;
-          const easeP = p * p * (3 - 2 * p); // smoothstep windup
-          thrustDistance = -6 * easeP;
-          offsetAngle = (0.42 + (-0.95 - 0.42) * easeP) * _katanaFlipSign;
+        // Standard Melee Swing (Basic Attack — 5-Phase Chemical Katana Kinematics / Rule 30 / Maki Standard)
+        const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+        const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+        const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+        const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+        const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+        const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
+        const totalF = Math.max(1, liftF + holdF + strikeF + lockF + recF);
+
+        const t1 = liftF / totalF;
+        const t2 = (liftF + holdF) / totalF;
+        const t3 = (liftF + holdF + strikeF) / totalF;
+        const t4 = (liftF + holdF + strikeF + lockF) / totalF;
+
+        if (t < t1) {
+          const p = t / Math.max(0.001, t1);
+          const easeP = Math.sin(p * Math.PI * 0.5);
+          thrustDistance = -12 * easeP;
+          offsetAngle = (0.42 + (-2.35 - 0.42) * easeP) * _katanaFlipSign;
           slashArcAlpha = 0;
           this._activeSlashProgress = 0;
           this._recoveryProgress = 0;
-        } else if (t < 0.50) {
-          const p = (t - 0.15) / 0.35;
-          const sweepCurve = 1 - Math.pow(1 - p, 2.4); // explosive snap with smooth landing
-          thrustDistance = -6 + 20 * Math.sin(p * Math.PI * 0.75); // reaches +14px forward extension
-          offsetAngle = (-0.95 + 2.10 * sweepCurve) * _katanaFlipSign; // -0.95 -> +1.15 (120 deg arc)
+        } else if (t < t2) {
+          thrustDistance = -12;
+          offsetAngle = -2.35 * _katanaFlipSign;
+          slashArcAlpha = 0;
+          this._activeSlashProgress = 0;
+          this._recoveryProgress = 0;
+        } else if (t < t3) {
+          const p = (t - t2) / Math.max(0.001, t3 - t2);
+          const sweepCurve = 1 - Math.pow(1 - p, 2.2);
+          thrustDistance = -12 + 38 * Math.sin(p * Math.PI * 0.75);
+          offsetAngle = (-2.35 + 3.70 * sweepCurve) * _katanaFlipSign;
           slashArcAlpha = Math.min(1.0, p * 3.5);
           this._activeSlashProgress = p;
           this._recoveryProgress = 0;
 
           // Chain dynamic whip force on early stroke
           if (p > 0.04 && p < 0.45 && this.chainNodes && this.chainNodes.length > 2) {
-            const whipForce = -7.0;
+            const whipForce = -8.5;
             const sideAngle = baseAngle + offsetAngle;
             for (let i = 1; i < this.chainNodes.length; i++) {
               this.chainNodes[i].vx += Math.cos(sideAngle - 0.9) * (whipForce / i);
               this.chainNodes[i].vy += Math.sin(sideAngle - 0.9) * (whipForce / i);
             }
           }
-        } else {
-          const p = (t - 0.50) / 0.50;
-          const easeP = p * (2 - p); // quadratic ease-out
-          thrustDistance = 14 * (1 - easeP);
-          offsetAngle = (1.15 + (0.42 - 1.15) * easeP) * _katanaFlipSign; // +1.15 -> +0.42
-          slashArcAlpha = p < 0.25 ? 1.0 : Math.pow(1 - (p - 0.25) / 0.75, 0.85);
+        } else if (t < t4) {
+          // Phase 4: Impact Lock / Latch (Rule 30) - firmly locked at cleave apex with tremor jitter
+          const pLock = (t - t3) / Math.max(0.001, t4 - t3);
+          const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
+          const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
+          const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.026);
+          thrustDistance = 26 + jitter;
+          offsetAngle = (1.35 + angJitter) * _katanaFlipSign;
+          slashArcAlpha = 1.0;
           this._activeSlashProgress = 1.0;
-          this._recoveryProgress = p;
+          this._recoveryProgress = 0;
+        } else {
+          // Phase 5: Damped Extraction & Recovery Settle (Rule 30 & Rule 15)
+          const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
+          const easeRec = Math.pow(recP, 1.8);
+          const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.06;
+          thrustDistance = 26 * (1.0 - easeRec);
+          offsetAngle = (1.35 + (0.42 - 1.35) * easeRec + dampedWave) * _katanaFlipSign;
+          slashArcAlpha = Math.pow(1.0 - recP, 0.85);
+          this._activeSlashProgress = 1.0;
+          this._recoveryProgress = recP;
         }
       }
     } else if (this.ambushPhase === 'PHANTOM_FLURRY' || (this.phantomSlashTimer && this.phantomSlashTimer > 0)) {
@@ -2723,9 +2816,9 @@ export class TojiFighter extends Fighter {
           ctx.scale(1, -1);
         }
 
-        const startOffset = -1.10;
-        const endOffset = 1.15;
-        const totalSweep = endOffset - startOffset; // ~2.25 rad (129 degrees)
+        const startOffset = -2.15;
+        const endOffset = 1.35;
+        const totalSweep = endOffset - startOffset; // ~3.50 rad (~200 degrees)
 
         let currentTipOffset, currentTailOffset;
         const progress = this._activeSlashProgress !== undefined ? this._activeSlashProgress : 0;
@@ -2733,7 +2826,7 @@ export class TojiFighter extends Fighter {
         let trailAlpha = slashArcAlpha;
 
         if (recP <= 0) {
-          // Active cleave stroke: crescent tip sweeps smoothly from top to bottom
+          // Active cleave stroke & impact lock: crescent tip sweeps smoothly from top to bottom and holds
           const sweepEase = 1 - Math.pow(1 - Math.min(1.0, progress), 2.2);
           currentTipOffset = startOffset + sweepEase * totalSweep;
           currentTailOffset = startOffset;
@@ -2741,11 +2834,11 @@ export class TojiFighter extends Fighter {
         } else {
           // Follow-through & dynamic eraser wipe from tail to tip (Rule 15)
           currentTipOffset = endOffset;
-          if (recP < 0.25) {
+          if (recP < 0.15) {
             currentTailOffset = startOffset;
             trailAlpha = 1.0;
           } else {
-            const eraseP = (recP - 0.25) / 0.75;
+            const eraseP = (recP - 0.15) / 0.85;
             const easedErase = Math.pow(eraseP, 1.4);
             currentTailOffset = startOffset + easedErase * totalSweep;
             trailAlpha = Math.pow(1 - eraseP, 0.85);
@@ -2754,9 +2847,9 @@ export class TojiFighter extends Fighter {
 
         const span = currentTipOffset - currentTailOffset;
         if (Math.abs(span) >= 0.04 && trailAlpha > 0.01) {
-          const outerRadius = (this.r + thrustDistance + 85) * (editP ? editP.scale : 1.0);
-          const maxThick = 20.0 * (editP ? editP.thickness : 1.0);
-          const numSteps = 30;
+          const outerRadius = (this.r + thrustDistance + 92) * (editP ? editP.scale : 1.0);
+          const maxThick = 22.0 * (editP ? editP.thickness : 1.0);
+          const numSteps = 32;
 
           const buildCrescentPath = (radOffset, thickMult, taperExp = 1.15) => {
             ctx.beginPath();

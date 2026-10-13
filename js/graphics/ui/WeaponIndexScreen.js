@@ -1910,8 +1910,8 @@ function drawWeaponPreview(ctx, type, color) {
   const r = 25;
 
   let offsetX = -40;
-  if (type === 'black') offsetX = 0;
-  else if (type === 'knight' || type === 'musashi') offsetX = -20; 
+  if (type === 'black' || type === 'knight') offsetX = 0;
+  else if (type === 'musashi') offsetX = -20; 
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
   else if (type === 'cronos') offsetX = -55;
   else if (type === 'ruby') offsetX = -75;

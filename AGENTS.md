@@ -165,11 +165,13 @@ When creating, scaffolding, animating, or tuning melee weapons and basic attack 
      - **Zero Forward Velocity Clamp**: Fighter velocity MUST be clamped (`this.vx = 0; this.vy = 0;`) while the weapon is locked at impact to simulate hard physical collision and inertia transfer.
      - **Micro-Tremor Jitter**: Weapon experiences high-frequency vibration/tremor (`±2.2px`, `±0.12 rad`) against impact resistance (`swordTremorIntensity`).
      - **Visual Slash Ribbon Lock Hold**: Slash arcs and annular ribbon meshes MUST remain 100% unfurled and anchored at the impact plane throughout the entire lock window. Recovery eraser wipes MUST NOT begin until Phase 5 starts.
+     - **Direct 1:1 Leading-Edge Blade Anchor**: The leading edge of the slash ribbon/arc MUST be locked directly to the weapon's real-time angle (`currentEndAngle = swordLocalAngle`), NEVER computed with a separate easing exponent that causes visual drift.
+     - **Full-Length Geometric Enveloping**: The radial span of the slash effect MUST envelop the full length of the blade from guard/collar (`innerR = r + hiltOffset`) to the blade tip kissaki (`outerR = r + hiltOffset + bladeLength + 4px`), with impact sparks and compression rings detonating directly at the blade tip.
      - **Impact Compression & Sparks**: Expanding concentric compression ring and discrete ember sparks at the impact contact point (Rule 26 compliant).
   5. **Phase 5: Extraction & Recovery Settle (`hit*RecoveryFrames`, ~9–12 frames)**: Blade dislodges from the impact plane and returns to guard stance with spring-damped settle (`Math.pow(1.0 - rp, 1.8)` with damped harmonic wave), while the slash arc erases from tail to tip (Rule 15).
 - **Layered Fleshy "Slap" Audio Palette**:
   - Combat hits MUST layer `attack_fleshhit` (1.0 volume) with blade slicing SFX (`sukuna_slice` or `attack_swordswing` at 0.90 volume) and heavy sub-bass punches (`attack_heavypunch1` on combo finishers) to deliver a visceral concussive slap impact rather than a generic metallic whoosh.
-- **Reference Playbook**: For detailed math, schemas, and templates, see dedicated skill `melee-attack-animator` (`.agents/skills/melee-attack-animator/SKILL.md`).
+- **Reference Playbook**: For detailed math, schemas, and templates, see dedicated skills `melee-attack-animator` (`.agents/skills/melee-attack-animator/SKILL.md`) and `chemical-katana-animator` (`.agents/skills/chemical-katana-animator/SKILL.md`).
 
 ## Post-Change Suggestions
 

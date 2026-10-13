@@ -1,7 +1,7 @@
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 
-export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = -Math.PI / 2) {
+export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = 0) {
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
@@ -11,8 +11,12 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
 
   ctx.save();
   ctx.translate(x, y);
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   const shieldAngle = gunAngle + shieldVisualOffset;
   ctx.rotate(shieldAngle);
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
   ctx.translate(r + 12, 0); 
 
   const shieldScale = 1.8; 
@@ -563,30 +567,46 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
   ctx.fill();
 }
 
-export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false) {
+export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false, isSwinging = false) {
   ctx.save();
   ctx.translate(x, y);
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   if (dashState === 'charging' || dashState === 'dashing') {
     ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
     ctx.translate(r + 8, 16);
+  } else if (isSwinging) {
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(r + 14, 0);
   } else {
-    ctx.rotate(gunAngle + Math.PI / 2);
-    ctx.translate(r + 12, 0); 
+    // Upright ready guard: held along left flank, blade pointing upward
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(-(r + 10), 4);
     ctx.rotate(-Math.PI / 2);
   }
   drawSwordBase(ctx, 1.0, false, isTrail);
   ctx.restore();
 }
 
-export function drawGrayBrokenSword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false) {
+export function drawGrayBrokenSword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false, isSwinging = false) {
   ctx.save();
   ctx.translate(x, y);
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   if (dashState === 'charging' || dashState === 'dashing') {
     ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
     ctx.translate(r + 8, 16);
+  } else if (isSwinging) {
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(r + 14, 0);
   } else {
-    ctx.rotate(gunAngle + Math.PI / 2);
-    ctx.translate(r + 12, 0); 
+    // Upright ready guard: held along left flank, blade pointing upward
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(-(r + 10), 4);
     ctx.rotate(-Math.PI / 2);
   }
   drawSwordBase(ctx, 1.0, true, isTrail);

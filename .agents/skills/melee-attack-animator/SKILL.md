@@ -243,16 +243,49 @@ if (progress < coilP) {
 }
 ```
 
-### Slash Ribbon Lock Hold (Anti-Premature Erasure)
-In `drawComboSlashVFX`, ensure the ribbon mesh **holds across Phase 4** and only erases in Phase 5:
-```javascript
-const lockWindow = (lockEndP - strikeStartP) / (1.0 - strikeStartP);
-const swingP = Math.min(1.0, p / activeWindow);
-// Recovery eraser wipe ONLY begins AFTER lockWindow!
-const recP = p > lockWindow ? (p - lockWindow) / (1.0 - lockWindow) : 0;
+### 6.2 Direct 1:1 Leading-Edge Blade Anchor & Geometric Enveloping Standard
+In `drawComboSlashVFX`, ensure the ribbon mesh **holds across Phase 4**, only erases in Phase 5, and **strictly locks its leading edge directly to the blade angle**:
 
-const currentStart = startArc + totalArc * Math.pow(recP, 1.8); // Trailing eraser wipe
-const currentEnd = startArc + totalArc * Math.pow(swingP, 2.0);   // Leading blade kissaki
+```javascript
+// 1. Direct Angle Lock: NEVER compute currentEnd with an independent easing curve!
+// Bind currentEndAngle directly to the real-time sword angle relative to baseAngle:
+const currentSwordAngle = this._getSwordSwingAngle();
+const swordLocalAngle = currentSwordAngle - baseAngle;
+
+let currentStartAngle = localStart;
+let currentEndAngle = localEnd;
+let recP = 0;
+
+if (elapsed < strikeEnd) {
+  // Phase 3: Whip Strike expansion — leading tip is 100% locked to the sword blade kissaki!
+  currentStartAngle = localStart;
+  currentEndAngle = swordLocalAngle;
+  recP = 0;
+} else if (elapsed < pinEnd) {
+  // Phase 4: Impact Lock hold across entire cleave plane
+  currentStartAngle = localStart;
+  currentEndAngle = localEnd;
+  recP = 0;
+} else {
+  // Phase 5: Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & 30)
+  const rp = (elapsed - pinEnd) / Math.max(1, recF);
+  recP = Math.pow(rp, 1.4);
+  currentStartAngle = localStart + (localEnd - localStart) * recP;
+  currentEndAngle = localEnd;
+}
+
+// 2. Full-Length Geometry Enveloping:
+// NEVER let the blade protrude beyond the slash ribbon!
+const innerR = this.r + hiltOffset;                  // Anchors right at the guard / collar
+const outerR = this.r + hiltOffset + bladeLength + 4; // Wraps 2-4px beyond the blade tip
+const arcRadius = this.r + hiltOffset + bladeLength * 0.85; // Cutting edge streak
+const tipDist = this.r + hiltOffset + bladeLength;   // Impact spark detonation point
+
+// 3. Coordinate Synchronization:
+// Translate by (x + tx, y + ty) so tremor vibration jitter affects sword and ribbon in 1:1 sync!
+ctx.save();
+ctx.translate(this.x + tx, this.y + ty);
+ctx.rotate(baseAngle);
 ```
 
 ---
@@ -262,7 +295,12 @@ const currentEnd = startArc + totalArc * Math.pow(swingP, 2.0);   // Leading bla
 - [ ] **NEVER omit Phase 4**: Every melee attack must dedicate 5–7 frames to the Impact Lock.
 - [ ] **NEVER start recovery at maximum extension**: Maximum stroke travel must transition into the impact lock before returning.
 - [ ] **NEVER allow forward velocity during the lock**: Clamp `vx = 0, vy = 0` during `strikeEnd <= elapsed < lockEnd`.
+- [ ] **NEVER use separate easing exponents for the slash VFX leading edge**: Always lock `currentEndAngle = swordLocalAngle` so the ribbon tracks the blade with zero angular drift.
+- [ ] **NEVER let the blade stick out past the slash ribbon**: Always calibrate `outerR = r + hiltOffset + bladeLength + 4px` so the crescent envelops the entire blade.
+- [ ] **NEVER detonate impact sparks in mid-blade**: Sparks and compression rings must explode at `tipDist = r + hiltOffset + bladeLength`.
 - [ ] **NEVER use single-sound whooshes**: Always layer `attack_fleshhit` for the fleshy slap.
 - [ ] **Always anchor to canonical hands (Rule 20)**: Right hand at `(+0.82r, +0.38r)`, Left hand at `(-0.82r, +0.38r)`.
 - [ ] **Always decay effect timers before freeze guard (Rule 25)**: `swordHitTremorTimer` must update before `_handleTimeStop()`.
 - [ ] **Always use concentric rings for ground impact (Rule 26)**: No radial spiderweb meshes or cobweb lines.
+- [ ] **Reference Implementation**: See [chemical-katana-animator](file:///c:/Users/asus/OneDrive/Desktop/Circle%20Mini-Battle/.agents/skills/chemical-katana-animator/SKILL.md) for the 2-hit Chemical Katana combo specification (Horizontal Cross Cleave & Upward Rising Scoop).
+

@@ -67,6 +67,8 @@ export const AUDIO_CONFIG = {
   'redblast': 'Assets/Sound Effects/Skills/redblast.mp3',
   'skill_rikaAppearance1': 'Assets/Sound Effects/Skills/rikaAppearance1.mp3',
   'skill_shieldcharge': 'Assets/Sound Effects/Skills/shieldcharge.mp3',
+  'skill_shielddash_push': 'Assets/Sound Effects/Skills/shield_dash_push.wav',
+  'skill_paladin_rush': 'Assets/Sound Effects/Skills/paladin_shield_rush.wav',
   'skill_spinslash': 'Assets/Sound Effects/Skills/spinslash.mp3',
   'skill_thunderstrike': 'Assets/Sound Effects/Skills/thunderstrike.mp3',
   'skill_todoclap': 'Assets/Sound Effects/Skills/todo-clap.mp3',

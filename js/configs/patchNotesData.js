@@ -28,20 +28,7 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [
-    {
-        "character": "GUNSLINGER",
-        "deltas": [
-            {
-                "type": "ADJUST",
-                "key": "hair",
-                "oldVal": "Assets/model/gunslinger/Gunslinger-hair.png",
-                "newVal": "Assets/model/Alucard/Red-hat.png",
-                "pct": "Mod"
-            }
-        ]
-    }
-],
+  balanceChanges: [],
   engineNotes: [
     {
         "tag": "PERF",

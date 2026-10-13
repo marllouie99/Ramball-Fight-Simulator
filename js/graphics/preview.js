@@ -129,6 +129,8 @@ export function createPreviewTarget(demoArea, options = {}) {
     applyHitStun() {},
     applySlow() {},
     applyStun() {},
+    applyKnockback() {},
+    applyTimeStop() {},
     interruptAttacks() {},
   };
 }
@@ -163,8 +165,8 @@ export function updateIndexDetailDemo(def, demoArea) {
   const demoSpeed = (state.indexDemoSpeed !== undefined) ? state.indexDemoSpeed : 1.0;
 
   // Handle Special Ability Animation Demo Modes (Skills / Passives / Ultimates)
-  const currentAnim = state.indexDemoAnim;
-  if (currentAnim && currentAnim !== 'basic') {
+  const currentAnim = state.indexDemoAnim || (def.type === 'toji' ? 'toji_basic' : 'basic');
+  if (currentAnim && (currentAnim !== 'basic' || def.type === 'toji')) {
     pstate.hideTarget = true;
     fighter.x = demoArea.x + demoArea.width / 2;
     fighter.y = demoArea.y + demoArea.height / 2;
@@ -325,6 +327,89 @@ export function updateIndexDetailDemo(def, demoArea) {
 
             fighter.playBasicAttackPattern(step, target);
             pstate.makiCycleTimer = 0;
+          }
+        }
+      }
+      previewProjectileSystem.update(demoArea, fighter, target);
+      pstate.frame += 1;
+      return pstate;
+    } else if (def.type === 'toji' && ['toji_basic', 'spear', 'basic'].includes(currentAnim)) {
+      pstate.hideTarget = false;
+      fighter.x = demoArea.x + demoArea.width / 2 - 40;
+      fighter.y = demoArea.y + demoArea.height / 2;
+      fighter.vx = 0;
+      fighter.vy = 0;
+      fighter.gunAngle = 0;
+      fighter.angle = 0;
+      fighter.isStealthed = false;
+      fighter.isAmbushing = false;
+
+      const baseX = (demoArea.x + demoArea.width / 2 - 40) + 65;
+      const baseY = demoArea.y + demoArea.height / 2;
+      if (target) {
+        target.x += (baseX - target.x) * 0.15;
+        target.y += (baseY - target.y) * 0.15;
+        target.r = 25;
+        target.isDead = false;
+        target.hp = 1000;
+      }
+
+      if (demoSpeed > 0) {
+        if (fighter.afterImages && fighter.afterImages.length > 0) {
+          for (let i = fighter.afterImages.length - 1; i >= 0; i--) {
+            fighter.afterImages[i].alpha -= 0.040;
+            if (fighter.afterImages[i].alpha <= 0) fighter.afterImages.splice(i, 1);
+          }
+        }
+
+        if (fighter.spearSwingTimer > 0) {
+          const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+          const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : 5;
+          const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : 2;
+          const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : 6;
+          const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : 6;
+          const totalF = fighter.spearSwingMax || 28;
+          const t2 = (liftF + holdF) / totalF;
+          const t3 = (liftF + holdF + strikeF) / totalF;
+          const t4 = (liftF + holdF + strikeF + lockF) / totalF;
+          const progress = 1 - (fighter.spearSwingTimer / totalF);
+
+          // Phase 3 lunging step momentum toward dummy target
+          if (progress >= t2 && progress < t3) {
+            const pStrike = (progress - t2) / Math.max(0.001, t3 - t2);
+            fighter.x += Math.sin(pStrike * Math.PI) * 1.2;
+            if (pStrike >= 0.50 && !pstate.tojiHitDelivered) {
+              pstate.tojiHitDelivered = true;
+              if (target) {
+                target.x += 16;
+                previewProjectileSystem.addImpact(target.x, target.y, '#A855F7', 0, 26);
+                previewProjectileSystem.addImpact(target.x, target.y, '#EF4444', 0, 18);
+              }
+              fighter.deliverInvertedSpearImpact?.(target, 0, false);
+            }
+          } else if (progress >= t3 && progress < t4) {
+            // Phase 4 Impact Lock on the dummy target
+            if (!pstate.tojiHitDelivered) {
+              pstate.tojiHitDelivered = true;
+              if (target) {
+                target.x += 16;
+                previewProjectileSystem.addImpact(target.x, target.y, '#A855F7', 0, 26);
+                previewProjectileSystem.addImpact(target.x, target.y, '#EF4444', 0, 18);
+              }
+              fighter.deliverInvertedSpearImpact?.(target, 0, false);
+            }
+          }
+
+          fighter.spearSwingTimer--;
+        } else {
+          fighter.x = demoArea.x + demoArea.width / 2 - 40;
+          pstate.tojiCycleTimer = (pstate.tojiCycleTimer || 0) + 1;
+          const recoveryWait = (CONFIG.toji?.hit1RecoveryFrames || 9) + 12;
+          if (pstate.tojiCycleTimer >= recoveryWait || !pstate.tojiInitialized) {
+            pstate.tojiInitialized = true;
+            pstate.tojiHitDelivered = false;
+            fighter.playBasicAttackPattern(1, target);
+            pstate.tojiCycleTimer = 0;
           }
         }
       }

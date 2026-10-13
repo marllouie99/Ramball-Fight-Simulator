@@ -55,10 +55,44 @@ export const tojiConfig = {
   // Primary Melee: Inverted Spear of Heaven (Amanosakahoko)
   enableSpear: true,                 // Master toggle for Primary Melee: Inverted Spear of Heaven
   spearRange: 50,                    // Distance required to land melee hit (50px)
+  spearReach: 50,                    // Alias for reach
   spearCooldown: 50,                 // Spaced frames between basic melee strikes (0.92s swing)
-  spearDamage: 8,                   // Base damage per swing
-  spearKnockback: 2.5,               // Physical push velocity impulse on basic attack hit
-  spearHitStun: 0,                   // Hit stun frames on basic attack hit (0 = no freeze/hit-stun on basic attacks)
+  spearTremorIntensity: 1.8,         // Micro-tremor amplitude (px) during impact lock (±1.8px)
+
+  // ── Hit 1: The Chemical Cleave (High-Angle Shoulder Coil & Hypersonic Slash — Maki Standard) ──
+  hit1LiftFrames: 5,                 // Frames to lift weapon into high shoulder anticipation coil (~0.08s)
+  hit1HoldFrames: 2,                 // Poised hold at overhead apex before snapping down (~0.03s)
+  hit1StrikeFrames: 6,               // Hypersonic downward whip-chop stroke (~0.10s) with power curve
+  hit1ImpactLockFrames: 6,           // CANONICAL IMPACT LOCK: Exact frames weapon locks firmly at impact before recovery begins (~0.10s)
+  hit1LockFrames: 6,                 // Shorthand alias
+  hit1PinFrames: 6,                  // Melee floor/ground pin alias
+  hit1GroundPinFrames: 6,            // Alias
+  hit1RecoveryFrames: 9,             // Frames for lifting blade from impact lock & settling stance (~0.15s)
+  hit1HitPauseFrames: 3,             // Meaty freeze-frame hit-pause on blade contact
+  hit1LungeSpeed: 5.5,               // Forward lunging step momentum speed during the strike
+  hit1ArcAngle: (160 * Math.PI) / 180, // ~160° frontal cleave arc
+  hit1Damage: 8,                     // Base damage per swing
+  hit1Knockback: 2.5,                // Physical push velocity impulse on basic attack hit
+  hit1HitStunFrames: 0,              // Hit stun frames on basic attack hit (0 = no freeze/hit-stun on basic attacks)
+  hit1ImpactShake: 3.5,              // Concussive screen shake on hit (Rule 30 satisfying slap)
+  hit1ImpactShakeDuration: 8,        // Screen shake duration in frames
+
+  // Direct spear* aliases for full backward compatibility
+  spearLiftFrames: 5,
+  spearHoldFrames: 2,
+  spearStrikeFrames: 6,
+  spearImpactLockFrames: 6,
+  spearRecoveryFrames: 9,
+  spearDamage: 8,
+  spearKnockback: 2.5,
+  spearHitStun: 0,
+
+  // Legacy fallback aliases (matching Maki's config schema)
+  comboHit1Frames: 28,
+  comboHit1Damage: 8,
+  comboHit1Knockback: 2.5,
+  comboHit1Lunge: 4.5,
+  comboHit1Arc: (160 * Math.PI) / 180,
   silenceDuration: 180,              // Frames target is Silenced on hit (3.0 seconds at 60fps)
   pierceInfinity: false,             // Does not bypass Gojo's Limitless Infinity barrier
   regenDebuffDuration: 300,          // Duration in frames (5.0s) for Decrease Regen debuff applied on basic attack hit

@@ -767,7 +767,11 @@ function drawIndexDetailScreen() {
     } else if (def.type === 'sukuna') {
       animBtns.push({ id: 'flurry', label: 'DISMANTLE' }, { id: 'fuga', label: 'FUGA ARROW' }, { id: 'domain', label: 'MALEVOLENT SHRINE' });
     } else if (def.type === 'toji') {
-      animBtns.push({ id: 'spear', label: 'ISOH CHOP' }, { id: 'stealth', label: 'AMBUSH STRIKE' });
+      animBtns.length = 0;
+      animBtns.push(
+        { id: 'toji_basic', label: 'BASIC ATTACK' },
+        { id: 'stealth', label: 'AMBUSH STRIKE' }
+      );
     } else if (def.type === 'todo') {
       animBtns.push({ id: 'clap', label: 'BOOGIE WOOGIE' }, { id: 'takada', label: 'TAKADA CHAN' });
     } else if (def.type === 'saitama') {
@@ -780,12 +784,12 @@ function drawIndexDetailScreen() {
       animBtns.push({ id: 'ability', label: (def.ability || 'SPECIAL SKILL').toUpperCase() });
     }
 
-    const activeAnim = state.indexDemoAnim || 'basic';
+    const activeAnim = state.indexDemoAnim || (def.type === 'toji' ? 'toji_basic' : 'basic');
     const totalAnimW = animBtns.length * 115 + (animBtns.length - 1) * 8;
     let animStartX = (canvas.width - totalAnimW) / 2;
 
     animBtns.forEach((btn) => {
-      const isActive = activeAnim === btn.id;
+      const isActive = activeAnim === btn.id || (def.type === 'toji' && btn.id === 'toji_basic' && (activeAnim === 'basic' || activeAnim === 'spear'));
       const btnW = 115;
       const btnH = 26;
 
@@ -815,7 +819,13 @@ function drawIndexDetailScreen() {
         state.indexDemoAnim = btn.id;
         resetIndexDetailState(def, demoArea);
 
-        if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
+        if (def.type === 'toji' && (btn.id === 'toji_basic' || btn.id === 'basic' || btn.id === 'spear')) {
+          audioSystem.playSFX('attack_swordswing', 0.95);
+          if (indexDetailState && indexDetailState.fighter && typeof indexDetailState.fighter.playBasicAttackPattern === 'function') {
+            indexDetailState.fighter.playBasicAttackPattern(1, indexDetailState.target);
+          }
+        }
+        else if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
         else if (btn.id === 'red') {
           audioSystem.playSFX('skill_redchanneling', 2.0);
           audioSystem.playSFX('skill_redcharging', 2.0);

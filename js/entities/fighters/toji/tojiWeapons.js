@@ -131,22 +131,46 @@ export function updateChainPhysics(fighter) {
         offsetAngle = 0.42 * easeP * flipSign;
       }
     } else {
-      // Smooth 3-Phase standard melee chop matching TojiFighter.js
-      if (t < 0.15) {
-        const p = t / 0.15;
-        const easeP = p * p * (3 - 2 * p); // smoothstep windup
-        thrustDistance = -6 * easeP;
-        offsetAngle = (0.42 + (-0.95 - 0.42) * easeP) * flipSign;
-      } else if (t < 0.50) {
-        const p = (t - 0.15) / 0.35;
-        const sweepCurve = 1 - Math.pow(1 - p, 2.4);
-        thrustDistance = -6 + 20 * Math.sin(p * Math.PI * 0.75);
-        offsetAngle = (-0.95 + 2.10 * sweepCurve) * flipSign;
+      // 5-Phase Melee Combat & Impact Lock (Rule 30 / Chemical Katana Motion Pattern — Maki Standard)
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+      const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+      const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+      const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+      const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+      const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
+      const totalF = Math.max(1, liftF + holdF + strikeF + lockF + recF);
+
+      const t1 = liftF / totalF;
+      const t2 = (liftF + holdF) / totalF;
+      const t3 = (liftF + holdF + strikeF) / totalF;
+      const t4 = (liftF + holdF + strikeF + lockF) / totalF;
+
+      if (t < t1) {
+        const p = t / Math.max(0.001, t1);
+        const easeP = Math.sin(p * Math.PI * 0.5); // sinusoidal anticipation ease
+        thrustDistance = -12 * easeP;
+        offsetAngle = (0.42 + (-2.35 - 0.42) * easeP) * flipSign;
+      } else if (t < t2) {
+        thrustDistance = -12;
+        offsetAngle = -2.35 * flipSign;
+      } else if (t < t3) {
+        const p = (t - t2) / Math.max(0.001, t3 - t2);
+        const sweepCurve = 1 - Math.pow(1 - p, 2.2); // explosive cleave acceleration
+        thrustDistance = -12 + 38 * Math.sin(p * Math.PI * 0.75); // reaches +26px forward
+        offsetAngle = (-2.35 + 3.70 * sweepCurve) * flipSign; // sweeps across 160°+ arc
+      } else if (t < t4) {
+        const pLock = (t - t3) / Math.max(0.001, t4 - t3);
+        const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
+        const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
+        const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.026);
+        thrustDistance = 26 + jitter;
+        offsetAngle = (1.35 + angJitter) * flipSign;
       } else {
-        const p = (t - 0.50) / 0.50;
-        const easeP = p * (2 - p);
-        thrustDistance = 14 * (1 - easeP);
-        offsetAngle = (1.15 + (0.42 - 1.15) * easeP) * flipSign;
+        const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
+        const easeRec = Math.pow(recP, 1.8);
+        const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.06;
+        thrustDistance = 26 * (1.0 - easeRec);
+        offsetAngle = (1.35 + (0.42 - 1.35) * easeRec + dampedWave) * flipSign;
       }
     }
   } else {
@@ -331,25 +355,39 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
   triggerGlobalScreenShake(16, 14);
 }
 
-export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, isAmbushThrust = false) {
-  if (isAmbushThrust && !fighter.isSkillEnabled(CONFIG.toji?.enableAmbush, true)) return [];
-  if (!isAmbushThrust && !fighter.isSkillEnabled(CONFIG.toji?.enableSpear, true)) return [];
-  if (!fighter.canPerformBasicAttack()) return [];
-  fighter.spearCooldown = fighter.spearCooldownMax;
-  fighter.isAmbushThrust = isAmbushThrust;
-  const speedMult = TOJI_WEAPON_CONFIG?.spearSwingAnimSpeed || 1.0;
-  fighter.spearSwingMax = Math.round((isAmbushThrust ? 36 : 26) / speedMult);
-  fighter.spearSwingTimer = fighter.spearSwingMax;
+export function deliverInvertedSpearImpact(fighter, primaryTarget, ownerIndex = 0, isAmbushThrust = false) {
+  if (fighter.spearHitDelivered) return [];
+  fighter.spearHitDelivered = true;
 
-  audioSystem.playSFX('attack_swordswing', 0.85);
-  audioSystem.playSFX('skill_backstab', 0.85);
-
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
   const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
-  const reach = isAmbushThrust ? (CONFIG.toji?.ambushSpearReach || 80) : (CONFIG.toji?.spearRange || fighter.spearRange || 50);
-  // 120 degree frontal arc cone for Inverted Spear thrust/stab!
-  const targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, Math.PI * 0.67);
+  const reach = isAmbushThrust ? (cfg.ambushSpearReach || 80) : (cfg.spearRange || fighter.spearRange || 50);
+  const arc = isAmbushThrust ? (Math.PI * 0.67) : (cfg.hit1ArcAngle || (Math.PI * 0.88));
+  let targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, arc);
 
-  const thrustDamage = isAmbushThrust ? (CONFIG.toji?.ambushBackThrustDamage ?? 50) : fighter.spearDamage;
+  if (targets.length === 0 && primaryTarget && primaryTarget !== fighter && primaryTarget.hp > 0 && !primaryTarget.isDead) {
+    targets = [primaryTarget];
+  }
+
+  // ── THE VISCERAL MEATY FLESH SLAP AUDIO COMBINATION (Rule 30 & Melee Animator Guide) ──
+  try {
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('attack_fleshhit', 1.0);     // The authentic visceral fleshy slap!
+      audioSystem.playSFX('sukuna_slice', 0.90);        // Razor cutting bite of the blade!
+      audioSystem.playSFX('skill_backstab', 0.70);      // Signature Inverted Spear piercing layer!
+    }
+  } catch (e) {}
+
+  const hitShake = isAmbushThrust ? 6 : (cfg.hit1ImpactShake || 3.5);
+  const hitShakeDur = isAmbushThrust ? 8 : (cfg.hit1ImpactShakeDuration || 8);
+  if (hitShake > 0 && hitShakeDur > 0) {
+    triggerGlobalScreenShake(hitShake, hitShakeDur);
+  }
+
+  const hitPause = cfg.hit1HitPauseFrames || 3;
+  fighter.spearHitTremorTimer = hitPause + 1;
+
+  const thrustDamage = isAmbushThrust ? (cfg.ambushBackThrustDamage ?? 50) : (cfg.hit1Damage || fighter.spearDamage || 8);
 
   for (const target of targets) {
     let wasInfinityActive = false;
@@ -383,8 +421,6 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     }
     target.gunAngle = target.angle;
 
-    // During ambush thrust, Gojo is impaled by ISOH in ambush stasis — do NOT restore infinityActive here!
-    // It will be restored when the ambush sequence fully ends.
     if (wasInfinityActive && !isAmbushThrust) {
       target.infinityActive = true;
     }
@@ -401,7 +437,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     const wasChanneling = isAmbushThrust && (fighter.ambushTargetWasChanneling || wasPurple || wasDomain || wasRCT || wasDivineFlame || wasStorm || wasGetsuga || wasGeneric);
 
     if (wasChanneling) {
-      const silenceFrames = CONFIG.toji?.silenceDuration || 180;
+      const silenceFrames = cfg.silenceDuration || 180;
       target.silenceTimer = silenceFrames;
 
       target.isChannelingPurple = false;
@@ -446,7 +482,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     if (!target.isTurret && !target.cannotBeKnockbacked) {
       target.isFirstHitKnockback = isAmbushThrust;
       const pushAngle = isAmbushThrust ? Math.atan2(target.y - fighter.y, target.x - fighter.x) : attackAngle;
-      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 8.5) : (CONFIG.toji?.spearKnockback || 2.5);
+      const knockbackSpeed = isAmbushThrust ? (cfg.ambushSpearThrustKnockback || 8.5) : (cfg.hit1Knockback || cfg.spearKnockback || 2.5);
       
       const kbVx = Math.cos(pushAngle) * knockbackSpeed;
       const kbVy = Math.sin(pushAngle) * knockbackSpeed;
@@ -463,12 +499,14 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
 
     if (isAmbushThrust && target && target.hp > 0 && !target.isDead && !target.isRevivingFromContract && !target.isShatterReviving && typeof target.applyHitStun === 'function') {
       target.applyHitStun(18);
+    } else if (target && target.hp > 0 && typeof target.applyTimeStop === 'function' && hitPause > 0) {
+      target.applyTimeStop(hitPause);
     }
 
     // Apply Slow Movement debuff to target on basic attack hit
     if (target && target.hp > 0 && !target.isDead && !target.isRevivingFromContract && !target.isShatterReviving) {
-      const slowFrames = CONFIG.toji?.spearSlowDuration ?? 90;
-      const slowMultiplier = CONFIG.toji?.spearSlowMultiplier ?? 0.50;
+      const slowFrames = cfg.spearSlowDuration ?? 90;
+      const slowMultiplier = cfg.spearSlowMultiplier ?? 0.50;
       if (typeof target.applySlow === 'function') {
         target.applySlow(slowFrames, slowMultiplier);
       } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
@@ -480,7 +518,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     }
 
     // Apply Decrease Regen debuff to target on basic attack hit
-    const regenDebuffFrames = CONFIG.toji?.regenDebuffDuration ?? 300;
+    const regenDebuffFrames = cfg.regenDebuffDuration ?? 300;
     target.tojiRegenDebuffTimer = Math.max(target.tojiRegenDebuffTimer || 0, regenDebuffFrames);
     const now = Date.now();
     if (!target._lastTojiDebuffAppliedTime || now - target._lastTojiDebuffAppliedTime > 800) {
@@ -496,6 +534,41 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
 
   fighter.ambushTargetWasChanneling = false;
   fighter.ambushTargetChannelState = null;
-  triggerGlobalScreenShake(isAmbushThrust ? 6 : 3, isAmbushThrust ? 8 : 4);
   return Array.from(targets);
+}
+
+export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, isAmbushThrust = false) {
+  if (isAmbushThrust && !fighter.isSkillEnabled(CONFIG.toji?.enableAmbush, true)) return [];
+  if (!isAmbushThrust && !fighter.isSkillEnabled(CONFIG.toji?.enableSpear, true)) return [];
+  if (!fighter.canPerformBasicAttack()) return [];
+  fighter.spearCooldown = fighter.spearCooldownMax;
+  fighter.isAmbushThrust = isAmbushThrust;
+  fighter.spearHitDelivered = false;
+  fighter.spearSwingTarget = primaryTarget;
+  fighter.spearSwingOwnerIndex = ownerIndex;
+
+  const speedMult = TOJI_WEAPON_CONFIG?.spearSwingAnimSpeed || 1.0;
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+  const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+  const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+  const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+  const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+  const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
+  const baseSwingFrames = Math.max(1, liftF + holdF + strikeF + lockF + recF);
+  fighter.spearSwingMax = Math.round((isAmbushThrust ? 36 : baseSwingFrames) / speedMult);
+  fighter.spearSwingTimer = fighter.spearSwingMax;
+
+  if (isAmbushThrust) {
+    audioSystem.playSFX('attack_swordswing', 0.85);
+    audioSystem.playSFX('skill_backstab', 0.85);
+    return deliverInvertedSpearImpact(fighter, primaryTarget, ownerIndex, true);
+  } else {
+    // Phase 1 anticipation coil swoosh!
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash1', 0.35);
+      }
+    } catch (e) {}
+    return [];
+  }
 }

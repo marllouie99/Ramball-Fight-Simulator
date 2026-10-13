@@ -80,7 +80,8 @@ class KnightDashingState extends FighterState {
     super.enter(prevState);
     this.duration = CONFIG.knight.dashDuration || 40;
     this.hasHit = false;
-    audioSystem.playSFX('skill_dash1', 0.6);
+    this.fighter.hasHitWithDash = false;
+    this.fighter.dashImpactTimer = 0;
     
     // Lock target position from when sword broke
     this.targetX = this.fighter.dashTargetX;
@@ -100,14 +101,37 @@ class KnightDashingState extends FighterState {
     }
     
     // Store velocity for physics
-    const dashSpeed = CONFIG.knight.dashSpeed;
+    const dashSpeed = CONFIG.knight.dashSpeed || 9.5;
     this.fighter.dashVx = this.dirX * dashSpeed;
     this.fighter.dashVy = this.dirY * dashSpeed;
+
+    // Antimatter Shield Dash: Lock facing direction and shield prow straight forward
+    const dashAngle = Math.atan2(this.fighter.dashVy, this.fighter.dashVx);
+    this.fighter.gunAngle = dashAngle;
+    this.fighter.angle = dashAngle;
+    this.fighter.shieldVisualOffset = 0;
+
+    // Layered Graal Antimatter push + Paladin thruster rush SFX
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_shielddash_push', 0.95);
+        audioSystem.playSFX('skill_paladin_rush', 0.65);
+        audioSystem.playSFX('skill_dash1', 0.60);
+      }
+    } catch (e) {}
   }
 
   update(dt) {
     this.timer++;
     
+    // Keep shield locked facing forward along travel vector
+    if (Math.hypot(this.fighter.dashVx, this.fighter.dashVy) > 0.1) {
+      const dashAngle = Math.atan2(this.fighter.dashVy, this.fighter.dashVx);
+      this.fighter.gunAngle = dashAngle;
+      this.fighter.angle = dashAngle;
+      this.fighter.shieldVisualOffset = 0;
+    }
+
     // Apply dash movement
     this.fighter.x += this.fighter.dashVx;
     this.fighter.y += this.fighter.dashVy;
@@ -158,18 +182,49 @@ export class KnightFighter extends Fighter {
     this.swordReturnTimer = 0;
     this.blockFlashTimer = 0;
     
+    // ── Chemical Katana 2-Hit Combo & 5-Phase State Tracking ──
+    this.swordComboStep  = 1; // 1 = Horizontal Cross Cleave, 2 = Upward Rising Cleave
+    this.comboResetTimer = 0;
+    this.swordSwingTimer = 0;
+    this.swordSwingMax   = 0;
+    this.swordSwingLiftFrames = 7;
+    this.swordSwingHoldFrames = 2;
+    this.swordSwingStrikeFrames = 5;
+    this.swordSwingImpactLockFrames = 6;
+    this.swordSwingRecFrames = 10;
+    this.swordSwingDamage = 28;
+    this.swordSwingKnockback = 6.0;
+    this.swordSwingLunge = 6.5;
+    this.swordSwingHitPause = 3;
+    this.swordSwingHitStun = 10;
+    this.swordHitDelivered = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordSlashAngle = 0;
+    this.swordTremorX    = 0;
+    this.swordTremorY    = 0;
+
     // Dash properties (used by FSM states)
     this.dashTargetX     = null;
     this.dashTargetY     = null;
     this.hasHitWithDash  = false;
     this.dashVx          = 0;
     this.dashVy          = 0;
+    this.dashImpactTimer = 0;
+    this.dashImpactX     = 0;
+    this.dashImpactY     = 0;
     
     // Visual properties
     this.slashFadeTimer  = 0;
     this.dashGlowFade    = 0;
-    this.shieldVisualOffset = -Math.PI / 2;
+    this.shieldVisualOffset = 0; // Right side resting stance
     this.shieldHoldTimer = 0;
+  }
+
+  /**
+   * Overrides base Fighter.shoot() to suppress default generic bullet projectiles (Rule 23).
+   */
+  shoot(ownerIndex) {
+    // Intentionally empty: Knight uses melee plasma sword combos and shield abilities.
   }
 
   reset() {
@@ -192,14 +247,28 @@ export class KnightFighter extends Fighter {
     this.swordThrown     = false;
     this.swordReturnTimer = 0;
     this.blockFlashTimer = 0;
+
+    // Reset combo state
+    this.swordComboStep  = 1;
+    this.comboResetTimer = 0;
+    this.swordSwingTimer = 0;
+    this.swordSwingMax   = 0;
+    this.swordHitDelivered = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordTremorX    = 0;
+    this.swordTremorY    = 0;
+
     this.dashTargetX     = null;
     this.dashTargetY     = null;
     this.hasHitWithDash  = false;
     this.dashVx          = 0;
     this.dashVy          = 0;
+    this.dashImpactTimer = 0;
+    this.dashImpactX     = 0;
+    this.dashImpactY     = 0;
     this.slashFadeTimer  = 0;
     this.dashGlowFade    = 0;
-    this.shieldVisualOffset = -Math.PI / 2;
+    this.shieldVisualOffset = 0; // Right side resting stance
     this.shieldHoldTimer = 0;
   }
 
@@ -255,36 +324,183 @@ export class KnightFighter extends Fighter {
     return super.takeDamage(amount, attacker, opts);
   }
 
-  // â”€â”€ Sword swipe â”€â”€
+  // ── Sword Combo Swipe (Chemical Katana 2-Hit Motion & Rule 30 5-Phase Architecture) ──
   _trySwordSwipe(opponent, ownerIndex) {
-    if (!opponent || this.swipeCooldown > 0 || this.swordBroken || this.isCaughtInBeam()) return;
+    if (!opponent || opponent.isDead || this.swipeCooldown > 0 || this.swordBroken || this.isCaughtInBeam() || this.swordSwingTimer > 0) return;
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
-    const maxDist = this.r + opponent.r + CONFIG.knight.swordRange;
+    const maxDist = this.r + opponent.r + (CONFIG.knight.swordRange || 42);
     if ((dx * dx + dy * dy) > maxDist * maxDist) return;
 
-    // Hit!
-    this.swipeAngle  = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    // Advance combo step (Hit 1 -> Hit 2)
+    if (this.comboResetTimer <= 0) {
+      this.swordComboStep = 1;
+    } else {
+      this.swordComboStep = (this.swordComboStep === 1) ? 2 : 1;
+    }
+
+    const cfg = CONFIG.knight || {};
+    let liftF, holdF, strikeF, pinF, recF, dmg, kb, lunge, hitPause, hitStun;
+
+    if (this.swordComboStep === 1) {
+      liftF = cfg.hit1LiftFrames ?? 7;
+      holdF = cfg.hit1HoldFrames ?? 2;
+      strikeF = cfg.hit1StrikeFrames ?? 5;
+      pinF = cfg.hit1ImpactLockFrames ?? 6;
+      recF = cfg.hit1RecoveryFrames ?? 10;
+      dmg = cfg.hit1Damage ?? 28;
+      kb = cfg.hit1Knockback ?? 6.0;
+      lunge = cfg.hit1LungeSpeed ?? 6.5;
+      hitPause = cfg.hit1HitPauseFrames ?? 3;
+      hitStun = cfg.hit1HitStunFrames ?? 10;
+    } else {
+      liftF = cfg.hit2LiftFrames ?? 6;
+      holdF = cfg.hit2HoldFrames ?? 2;
+      strikeF = cfg.hit2StrikeFrames ?? 5;
+      pinF = cfg.hit2ImpactLockFrames ?? 7;
+      recF = cfg.hit2RecoveryFrames ?? 12;
+      dmg = cfg.hit2Damage ?? 34;
+      kb = cfg.hit2Knockback ?? 8.5;
+      lunge = cfg.hit2LungeSpeed ?? 7.2;
+      hitPause = cfg.hit2HitPauseFrames ?? 3;
+      hitStun = cfg.hit2HitStunFrames ?? 14;
+    }
+
+    const totalFrames = liftF + holdF + strikeF + pinF + recF;
+    this.swordSwingTimer = totalFrames;
+    this.swordSwingMax = totalFrames;
+    this.swordSwingLiftFrames = liftF;
+    this.swordSwingHoldFrames = holdF;
+    this.swordSwingStrikeFrames = strikeF;
+    this.swordSwingImpactLockFrames = pinF;
+    this.swordSwingRecFrames = recF;
+    this.swordSwingDamage = dmg;
+    this.swordSwingKnockback = kb;
+    this.swordSwingLunge = lunge;
+    this.swordSwingHitPause = hitPause;
+    this.swordSwingHitStun = hitStun;
+
     this.swipeActive = true;
-    this.swipeTimer  = CONFIG.knight.swipeDuration;
-    this.swipeCooldown = CONFIG.knight.swipeCooldown;
-    opponent.takeDamage(CONFIG.knight.swordDamage, this, { isMelee: true });
-    triggerGlobalScreenShake(6, 8);
-    
-    // Physical hit knockback
-    const kbAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    opponent.vx += Math.cos(kbAngle) * 6;
-    opponent.vy += Math.sin(kbAngle) * 6;
+    this.swipeTimer = totalFrames;
+    this.swipeAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    this.swordSlashAngle = this.swipeAngle;
+    this.comboResetTimer = cfg.comboResetFrames ?? 90;
+    this.swipeCooldown = totalFrames + (cfg.swipeCooldown ?? 38);
+    this.swordHitDelivered = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
 
-    // Play sword swing sound
-    const swipeSound = getBasicAttackSound(this._def.id, this._def.type);
-    this._attackSoundTimer = swipeSound.delay;
-    this._attackSoundConfig = swipeSound;
+    // Anticipation flutter sound
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash1', 0.40);
+      }
+    } catch (e) {}
+  }
 
-    // Reduce durability
-    this.swordHealth--;
-    if (this.swordHealth <= 0) {
-      this._breakSword(opponent);
+  /**
+   * Updates 5-phase melee combo lifecycle, forward lunge physics, impact lock, and layered slap audio.
+   */
+  _updateSwordSwing(opponent, arena) {
+    if (this.swordSwingTimer <= 0) return;
+
+    const totalF = this.swordSwingMax || 30;
+    const elapsed = totalF - this.swordSwingTimer;
+    const liftF = this.swordSwingLiftFrames || 7;
+    const holdF = this.swordSwingHoldFrames || 2;
+    const strikeF = this.swordSwingStrikeFrames || 5;
+    const pinF = this.swordSwingImpactLockFrames || 6;
+    const recF = this.swordSwingRecFrames || 10;
+
+    const strikeStart = liftF + holdF;
+    const strikeEnd = liftF + holdF + strikeF;
+    const pinEnd = liftF + holdF + strikeF + pinF;
+
+    if (elapsed < strikeStart) {
+      // Phase 1 & 2: Anticipation Coil & Poised Hold
+      if (opponent && !opponent.isDead) {
+        this.swordSlashAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.swipeAngle = this.swordSlashAngle;
+      }
+      this.vx *= 0.88;
+      this.vy *= 0.88;
+    } else if (elapsed < strikeEnd) {
+      // Phase 3: Hypersonic Whip Strike Window
+      const strikeElapsed = elapsed - strikeStart;
+      const strikeP = strikeElapsed / Math.max(1, strikeF);
+
+      if (!this.swordSwingSoundPlayed) {
+        this.swordSwingSoundPlayed = true;
+        try {
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('attack_swordswing', 0.95);
+          }
+        } catch (e) {}
+      }
+
+      // Forward lunging momentum impulse
+      const lungeP = Math.sin(strikeP * Math.PI);
+      this.vx = Math.cos(this.swordSlashAngle) * this.swordSwingLunge * lungeP;
+      this.vy = Math.sin(this.swordSlashAngle) * this.swordSwingLunge * lungeP;
+
+      // Deliver impact at mid-strike (strikeP >= 0.50)
+      if (strikeP >= 0.50 && !this.swordHitDelivered && opponent && !opponent.isDead) {
+        this.swordHitDelivered = true;
+        const dx = opponent.x - this.x;
+        const dy = opponent.y - this.y;
+        const maxDist = this.r + opponent.r + (CONFIG.knight.swordRange || 42);
+        if ((dx * dx + dy * dy) <= (maxDist * 1.35) * (maxDist * 1.35)) {
+          opponent.takeDamage(this.swordSwingDamage, this, { isMelee: true });
+
+          // Rule 30: Layered fleshy slap audio
+          try {
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+              audioSystem.playSFX('attack_fleshhit', 1.0);
+              audioSystem.playSFX('sukuna_slice', 0.90);
+            }
+          } catch (e) {}
+
+          triggerGlobalScreenShake(this.swordComboStep === 2 ? 8 : 6, 8);
+
+          // Physical knockback
+          const kbAngle = this.swordSlashAngle;
+          opponent.vx += Math.cos(kbAngle) * this.swordSwingKnockback;
+          opponent.vy += Math.sin(kbAngle) * this.swordSwingKnockback;
+          if (this.swordComboStep === 2) {
+            opponent.vy -= 2.5; // rising uppercut loft
+          }
+
+          // Hit pause & stun
+          if (typeof opponent.applyTimeStop === 'function') opponent.applyTimeStop(this.swordSwingHitPause);
+          if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(this.swordSwingHitStun);
+
+          // Reduce durability & trigger break on 0
+          this.swordHealth--;
+          if (this.swordHealth <= 0) {
+            this._breakSword(opponent);
+          }
+        }
+      }
+    } else if (elapsed < pinEnd) {
+      // Phase 4: THE IMPACT LOCK / LATCH (Rule 30)
+      // Zero forward velocity clamp
+      this.vx = 0;
+      this.vy = 0;
+      // Mechanical tremor against impact resistance
+      this.swordTremorX = (Math.random() - 0.5) * 2.2;
+      this.swordTremorY = (Math.random() - 0.5) * 2.2;
+    } else {
+      // Phase 5: Extraction & Recovery Settle
+      this.swordTremorX = 0;
+      this.swordTremorY = 0;
+    }
+
+    this.swordSwingTimer--;
+    this.swipeTimer = this.swordSwingTimer;
+    if (this.swordSwingTimer <= 0) {
+      this.swipeActive = false;
+      this.slashFadeTimer = 15;
     }
   }
 
@@ -484,8 +700,8 @@ export class KnightFighter extends Fighter {
       }
     }
 
-    // Lerp shield offset
-    const targetOffset = (blocking || this.isDashing() || this.isCharging()) ? 0 : -Math.PI / 2;
+    // Lerp shield offset (rests on right flank at offset 0)
+    const targetOffset = 0;
     this.shieldVisualOffset += (targetOffset - this.shieldVisualOffset) * 0.2;
 
     // Advance state machine for charging/dashing logic
@@ -515,25 +731,51 @@ export class KnightFighter extends Fighter {
       return;
     }
 
-    // â€” DASHING phase: fly toward locked target â€”
+    // — DASHING phase: fly toward locked target (Antimatter Shield Dash) —
     if (this.fsm.isInState('KnightDashing')) {
-      this.angle += CONFIG.knight.dashSpeed * CONFIG.spin.rate * 3; // spin fast during dash
+      // Antimatter Shield Dash: Shield and facing angle locked forward as an impenetrable prow
+      const dashAngle = Math.atan2(this.dashVy, this.dashVx);
+      this.gunAngle = dashAngle;
+      this.angle = dashAngle;
+      this.shieldVisualOffset = 0;
 
-      if (!this.hasHitWithDash && opponent) {
+      if (!this.hasHitWithDash && opponent && !opponent.isDead && opponent.hp > 0) {
         const dx = opponent.x - this.x;
         const dy = opponent.y - this.y;
-        const hitRadius = this.r + opponent.r + 4;
+        const hitRadius = this.r + opponent.r + 6;
         if ((dx * dx + dy * dy) <= hitRadius * hitRadius) {
-          opponent.takeDamage(CONFIG.knight.dashDamage, this, { isMelee: true });
-          triggerGlobalScreenShake(12, 10);
-          // Knockback
-          const dx = opponent.x - this.x;
-          const dy = opponent.y - this.y;
-          const dSq = dx * dx + dy * dy;
-          const d = dSq > 0 ? Math.sqrt(dSq) : 1;
-          opponent.vx += (dx / d) * CONFIG.knight.dashKnockback;
-          opponent.vy += (dy / d) * CONFIG.knight.dashKnockback;
+          opponent.takeDamage(CONFIG.knight.dashDamage || 35, this, { isMelee: true });
+
+          // Rule 30 concussive impact audio layering
+          try {
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+              audioSystem.playSFX('attack_heavypunch1', 1.0);
+              audioSystem.playSFX('attack_fleshhit', 0.95);
+              audioSystem.playSFX('attack_groundsmash', 0.65);
+            }
+          } catch (e) {}
+
+          triggerGlobalScreenShake(14, 12);
+
+          // Hit pause & stasis
+          if (typeof opponent.applyTimeStop === 'function') opponent.applyTimeStop(5);
+          if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(16);
+
+          // Concussive knockback impulse
+          const d = Math.hypot(dx, dy) || 1;
+          const kb = CONFIG.knight.dashKnockback || 10.5;
+          opponent.vx = (dx / d) * kb;
+          opponent.vy = (dy / d) * kb;
+
+          // Impact brake / inertia transfer to simulated collision
+          this.dashVx *= 0.25;
+          this.dashVy *= 0.25;
           this.hasHitWithDash = true;
+
+          // Record collision contact point for Rule 26 compression rings
+          this.dashImpactX = opponent.x - (dx / d) * opponent.r;
+          this.dashImpactY = opponent.y - (dy / d) * opponent.r;
+          this.dashImpactTimer = 14;
         }
       }
       return;
@@ -544,16 +786,14 @@ export class KnightFighter extends Fighter {
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);
 
-    // Cooldown tick
+    // Cooldown and combo timer ticks
+    if (this.comboResetTimer > 0) this.comboResetTimer--;
     if (this.swipeCooldown > 0) this.swipeCooldown--;
+    if (this.dashImpactTimer > 0) this.dashImpactTimer--;
 
-    // Swipe animation tick
+    // Update 5-phase sword combo swing
     if (this.swipeActive) {
-      this.swipeTimer--;
-      if (this.swipeTimer <= 0) {
-        this.swipeActive = false;
-        this.slashFadeTimer = 15; // Linger for 15 frames
-      }
+      this._updateSwordSwing(opponent, arena);
     } else if (this.slashFadeTimer > 0) {
       this.slashFadeTimer--;
     }
@@ -581,19 +821,13 @@ export class KnightFighter extends Fighter {
         this.restoreWeapons();
       }
     }
-    // Try auto-swipe
+    // Try auto-swipe combo
     this._trySwordSwipe(opponent, ownerIndex);
 
     // Track sword history for movement afterimages
     if (!this.swordTrailHistory) this.swordTrailHistory = [];
     
-    let swordAngle = this.gunAngle;
-    if (this.swipeActive && this.swipeTimer > 0) {
-      const progress = 1 - this.swipeTimer / CONFIG.knight.swipeDuration;
-      const swingTotal = Math.PI * 1.1;
-      const swingStart = this.swipeAngle - swingTotal * 0.5;
-      swordAngle = swingStart + progress * swingTotal;
-    }
+    const swordAngle = this._getSwordSwingAngle();
     
     // Only save history if actually moving to prevent stacking when standing still
     const moveSpeedSq = this.vx * this.vx + this.vy * this.vy;
@@ -603,6 +837,87 @@ export class KnightFighter extends Fighter {
     } else {
       // Degrade history when standing still so trail disappears
       if (this.swordTrailHistory.length > 0) this.swordTrailHistory.pop();
+    }
+  }
+
+  /**
+   * Computes exact sword blade angle based on 5-phase Chemical Katana combo lifecycle.
+   */
+  _getSwordSwingAngle() {
+    if (!this.swipeActive || this.swordSwingTimer <= 0) {
+      return this.gunAngle || 0;
+    }
+
+    const totalF = this.swordSwingMax || 30;
+    const elapsed = Math.max(0, totalF - this.swordSwingTimer);
+    const liftF = this.swordSwingLiftFrames || 7;
+    const holdF = this.swordSwingHoldFrames || 2;
+    const strikeF = this.swordSwingStrikeFrames || 5;
+    const pinF = this.swordSwingImpactLockFrames || 6;
+    const recF = this.swordSwingRecFrames || 10;
+
+    const strikeStart = liftF + holdF;
+    const strikeEnd = strikeStart + strikeF;
+    const pinEnd = strikeEnd + pinF;
+
+    const baseAngle = this.swordSlashAngle || this.swipeAngle || this.gunAngle || 0;
+    const isHit2 = (this.swordComboStep === 2);
+    const swingTotal = Math.PI * (isHit2 ? 1.40 : 1.30);
+
+    if (isHit2) {
+      // Hit 2: Upward Rising Cleave (Chemical Katana Attack 2)
+      // Swings from low right (+swingTotal * 0.55) diagonally up to high left (-swingTotal * 0.55)
+      const startAngle = baseAngle + swingTotal * 0.55;
+      const endAngle = baseAngle - swingTotal * 0.55;
+
+      if (elapsed < liftF) {
+        // Phase 1: Lift / Scoop
+        const p = elapsed / Math.max(1, liftF);
+        return baseAngle + (startAngle - baseAngle) * Math.sin(p * Math.PI * 0.5);
+      } else if (elapsed < strikeStart) {
+        // Phase 2: Poised Hold
+        return startAngle;
+      } else if (elapsed < strikeEnd) {
+        // Phase 3: Hypersonic Whip Strike
+        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+        const ease = Math.pow(sp, 2.4);
+        return startAngle + (endAngle - startAngle) * ease;
+      } else if (elapsed < pinEnd) {
+        // Phase 4: Impact Lock (latched at apex)
+        return endAngle;
+      } else {
+        // Phase 5: Recovery Settle
+        const rp = (elapsed - pinEnd) / Math.max(1, recF);
+        const ease = Math.pow(1 - rp, 1.8);
+        return baseAngle + (endAngle - baseAngle) * ease;
+      }
+    } else {
+      // Hit 1: Horizontal Cross Cleave (Chemical Katana Attack 1)
+      // Swings from left shoulder (-swingTotal * 0.5) forward across to right (+swingTotal * 0.5)
+      const startAngle = baseAngle - swingTotal * 0.5;
+      const endAngle = baseAngle + swingTotal * 0.5;
+
+      if (elapsed < liftF) {
+        // Phase 1: Lift / Coil
+        const p = elapsed / Math.max(1, liftF);
+        return baseAngle + (startAngle - baseAngle) * Math.sin(p * Math.PI * 0.5);
+      } else if (elapsed < strikeStart) {
+        // Phase 2: Poised Hold
+        return startAngle;
+      } else if (elapsed < strikeEnd) {
+        // Phase 3: Hypersonic Whip Strike
+        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+        const ease = Math.pow(sp, 2.4);
+        return startAngle + (endAngle - startAngle) * ease;
+      } else if (elapsed < pinEnd) {
+        // Phase 4: Impact Lock (latched in plane)
+        return endAngle;
+      } else {
+        // Phase 5: Recovery Settle
+        const rp = (elapsed - pinEnd) / Math.max(1, recF);
+        const ease = Math.pow(1 - rp, 1.8);
+        return baseAngle + (endAngle - baseAngle) * ease;
+      }
     }
   }
 
@@ -635,13 +950,22 @@ export class KnightFighter extends Fighter {
   drawGun(ctx) {
     if (typeof state !== 'undefined' && state.showSkinOnly) return;
     const ga = this.gunAngle;
-    const isDashing = this.isDashing();
+    const isDashingState = this.fsm.isInState('KnightDashing');
+    const isChargingState = this.fsm.isInState('KnightCharging');
+    const isDashing = isDashingState || isChargingState;
+    const shieldState = isDashingState ? 'dashing' : (isChargingState ? 'charging' : null);
+    const shieldOffset = isDashing ? 0 : this.shieldVisualOffset;
+    const shieldGlow = isDashing ? 1.0 : this.dashGlowFade;
 
-    // Draw Shield Hand (drawn under shield grip)
+    // Draw Shield Hand (drawn under shield grip on the right flank)
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.rotate(ga + this.shieldVisualOffset);
-    ctx.translate(this.r + 2, 0); // Shield is slightly closer
+    const facingLeft = Math.abs(ga) > Math.PI / 2;
+    ctx.rotate(ga + shieldOffset);
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+    ctx.translate(this.r + 4, 0); // Shield is on the right side
     ctx.beginPath();
     ctx.arc(0, 0, 6, 0, Math.PI * 2);
     ctx.fillStyle = this.color;
@@ -651,83 +975,76 @@ export class KnightFighter extends Fighter {
     ctx.stroke();
     ctx.restore();
 
-    // Draw shield
-    drawGrayShield(ctx, this.x, this.y, ga, this.blockFlashTimer, isDashing ? 'charging' : null, this.r, this.dashGlowFade, this.shieldVisualOffset);
+    // Draw shield on the right flank
+    drawGrayShield(ctx, this.x, this.y, ga, this.blockFlashTimer, shieldState, this.r, shieldGlow, shieldOffset);
 
-    // Sword: if swiping, animate the sword arc; otherwise draw normally.
+    // Sword: if swiping, animate using 5-phase Chemical Katana combo angle; otherwise aim angle.
     // Hide the sword completely while it is thrown.
-    let swordAngle = ga;
-    let swingStart, swingTotal, progress;
-    if (this.swipeActive && this.swipeTimer > 0) {
-      progress = 1 - this.swipeTimer / CONFIG.knight.swipeDuration; // 0 -> 1
-      swingTotal = Math.PI * 1.1; // total sweep angle for visible arc
-      swingStart = this.swipeAngle - swingTotal * 0.5;
-      swordAngle = swingStart + progress * swingTotal;
-    }
+    const swordAngle = this._getSwordSwingAngle();
+    const isSwinging = Boolean(this.swipeActive && this.swordSwingTimer > 0);
 
     if (!this.swordThrown) {
-      
-      // --- DRAW AFTERIMAGES FROM MOVEMENT HISTORY ---
-      // Disable movement trails during a swing to save massive performance (they overlap anyway)
-      if (this.swordTrailHistory && this.swordTrailHistory.length > 0 && !this.swipeActive) {
-          ctx.save();
-          // Draw a fading trail of past sword positions, sampling further back so it visibly trails
-          for (let i = 4; i < this.swordTrailHistory.length; i += 4) { 
-             const past = this.swordTrailHistory[i];
-             ctx.globalAlpha = 0.5 * (1 - (i / 20)); // Fades smoothly as it gets older
-             ctx.globalCompositeOperation = 'screen'; 
-             
-             if (!this.swordBroken) {
-                drawGraySword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true);
-             } else {
-                drawGrayBrokenSword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true);
-             }
+      // --- DRAW AFTERIMAGES FROM MOVEMENT OR SWING HISTORY ---
+      if (this.swordTrailHistory && this.swordTrailHistory.length > 0) {
+        ctx.save();
+        if (isSwinging) {
+          // Dynamic energy motion blur trailing directly from recorded sword positions
+          for (let i = 1; i <= Math.min(4, this.swordTrailHistory.length - 1); i++) {
+            const past = this.swordTrailHistory[i];
+            ctx.globalAlpha = 0.45 * (1 - i / 5);
+            ctx.globalCompositeOperation = 'screen';
+            if (!this.swordBroken) {
+              drawGraySword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true, true);
+            } else {
+              drawGrayBrokenSword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true, true);
+            }
           }
-          ctx.restore();
-      }
-      // --- DRAW AFTERIMAGES DURING SWING ---
-      if (this.swipeActive && this.swipeTimer > 0) {
-          ctx.save();
-          // Draw 4 trailing afterimages for a cool sci-fi energy ghosting effect
-          for (let i = 1; i <= 4; i++) {
-             // Calculate angle slightly further back in the swing time
-             const pastProgress = Math.max(0, progress - (i * 0.05)); 
-             if (pastProgress > 0) {
-                 const trailAngle = swingStart + pastProgress * swingTotal;
-                 ctx.globalAlpha = 0.5 - (i * 0.1); // Opacity fades out trailing behind
-                 
-                 // 'screen' makes overlapping energy edges look brighter and more blinding
-                 ctx.globalCompositeOperation = 'screen'; 
-                 
-                 if (!this.swordBroken) {
-                    drawGraySword(ctx, this.x, this.y, trailAngle, this.r, isDashing ? 'dashing' : null, true);
-                 } else {
-                    drawGrayBrokenSword(ctx, this.x, this.y, trailAngle, this.r, isDashing ? 'dashing' : null, true);
-                 }
-             }
+        } else {
+          for (let i = 4; i < this.swordTrailHistory.length; i += 4) {
+            const past = this.swordTrailHistory[i];
+            ctx.globalAlpha = 0.5 * (1 - (i / 20));
+            ctx.globalCompositeOperation = 'screen';
+            if (!this.swordBroken) {
+              drawGraySword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true, false);
+            } else {
+              drawGrayBrokenSword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true, false);
+            }
           }
-          ctx.restore();
+        }
+        ctx.restore();
       }
 
-      // Draw Main Sword
+      // Apply tremor jitter during Impact Lock (Rule 30)
+      const tx = (this.swipeActive && this.swordTremorX) ? this.swordTremorX : 0;
+      const ty = (this.swipeActive && this.swordTremorY) ? this.swordTremorY : 0;
+
+      // Draw Main Sword (on the left side in idle, lunging forward when swinging)
       if (!this.swordBroken) {
-        drawGraySword(ctx, this.x, this.y, swordAngle, this.r, isDashing ? 'dashing' : null);
+        drawGraySword(ctx, this.x + tx, this.y + ty, swordAngle, this.r, isDashing ? 'dashing' : null, false, isSwinging);
       } else {
-        drawGrayBrokenSword(ctx, this.x, this.y, swordAngle, this.r, isDashing ? 'dashing' : null);
+        drawGrayBrokenSword(ctx, this.x + tx, this.y + ty, swordAngle, this.r, isDashing ? 'dashing' : null, false, isSwinging);
       }
       
-      // Draw Sword Hand (drawn over sword hilt)
+      // Draw Sword Hand (drawn over sword hilt on the left flank)
       ctx.save();
-      ctx.translate(this.x, this.y);
-      if (isDashing) {
-        ctx.rotate(swordAngle);
-        ctx.translate(this.r + 8, 16);
-      } else {
-        ctx.rotate(swordAngle + Math.PI / 2);
-        ctx.translate(this.r + 12, 0); 
-        ctx.rotate(-Math.PI / 2);
+      ctx.translate(this.x + tx, this.y + ty);
+      const facingLeftSword = Math.abs(swordAngle) > Math.PI / 2;
+      ctx.rotate(swordAngle);
+      if (facingLeftSword) {
+        ctx.scale(1, -1);
       }
-      ctx.translate(-13, 0); // Move to hilt center
+      if (isDashing) {
+        ctx.translate(this.r + 8, 16);
+        ctx.translate(-13, 0);
+      } else if (isSwinging) {
+        ctx.translate(this.r + 14, 0);
+        ctx.translate(-13, 0);
+      } else {
+        // Upright ready guard: hand holding sword hilt upright along left hip
+        ctx.translate(-(this.r + 10), 4);
+        ctx.rotate(-Math.PI / 2);
+        ctx.translate(-13, 0); // Move to hilt center
+      }
       ctx.beginPath();
       ctx.arc(0, 0, 6, 0, Math.PI * 2);
       ctx.fillStyle = this.color;
@@ -754,179 +1071,226 @@ export class KnightFighter extends Fighter {
       ctx.restore();
     }
 
-      // ── Anime Vibe Swipe arc flash ──
-    if ((this.swipeActive && this.swipeTimer > 0) || this.slashFadeTimer > 0) {
-      let progress = 1.0;
-      let fade = this.slashFadeTimer / 15;
-      
-      if (this.swipeActive) {
-        // Anime ease-out: explosive start, slowing down near the end
-        let rawProgress = 1 - (this.swipeTimer / CONFIG.knight.swipeDuration);
-        progress = 1 - Math.pow(1 - rawProgress, 3);
-        fade = 1.0;
-      }
-      
-      const glowAlpha = Math.pow(fade, 0.8);
-      const arcRadius = this.r + 28; // slightly larger for anime vibe
-      
-      // Broader swing angle for an exaggerated slash
-      const swingTotal = Math.PI * 1.35;
-      const localStartAngle = -swingTotal * 0.5;
-      const localEndAngle = swingTotal * 0.5;
-      const localCurrentEndAngle = localStartAngle + (localEndAngle - localStartAngle) * progress;
-      
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.swipeAngle);
-      
-      // Use source-over because the arena is white; lighter makes it invisible
-      ctx.globalAlpha = glowAlpha;
-      ctx.globalCompositeOperation = 'source-over';
-      
-      const startX = Math.cos(localStartAngle) * arcRadius;
-      const startY = Math.sin(localStartAngle) * arcRadius;
-      const endX = Math.cos(localCurrentEndAngle) * arcRadius;
-      const endY = Math.sin(localCurrentEndAngle) * arcRadius;
-      
-      const gradX = Math.abs(endX - startX) < 0.1 ? endX + 0.1 : endX;
-      const gradY = Math.abs(endY - startY) < 0.1 ? endY + 0.1 : endY;
+      // ── Anime Vibe 5-Phase Melee Slash Ribbon (Chemical Katana Combo) ──
+    if (this.swipeActive && this.swordSwingTimer > 0) {
+      const totalF = this.swordSwingMax || 30;
+      const elapsed = Math.max(0, totalF - this.swordSwingTimer);
+      const liftF = this.swordSwingLiftFrames || 7;
+      const holdF = this.swordSwingHoldFrames || 2;
+      const strikeF = this.swordSwingStrikeFrames || 5;
+      const pinF = this.swordSwingImpactLockFrames || 6;
+      const recF = this.swordSwingRecFrames || 10;
 
-      // --- GLOWING NEON BASE SLASH ---
-      // Draw a bright, smooth sci-fi glowing crescent underneath the rough pencil sketch
-      ctx.save();
-      ctx.beginPath();
-      const neonSegments = 30;
-      const neonStep = (localCurrentEndAngle - localStartAngle) / Math.max(0.01, neonSegments);
-      let nFirst = true;
-      for (let step = 0; step <= neonSegments; step++) {
-          const a = localStartAngle + step * neonStep;
-          const t = step / neonSegments;
-          const taper = Math.sin(t * Math.PI);
-          // The neon core has a slight outward bulge
-          const r = arcRadius + (6 * taper);
-          const px = Math.cos(a) * r;
-          const py = Math.sin(a) * r;
-          if (nFirst) {
-              ctx.moveTo(px, py);
-              nFirst = false;
-          } else {
-              ctx.lineTo(px, py);
-          }
-      }
-      
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      // Faint ambient neon aura
-      ctx.strokeStyle = `rgba(255, 150, 0, ${0.4 * glowAlpha})`;
-      ctx.lineWidth = 14;
-      ctx.stroke();
+      const strikeStart = liftF + holdF;
+      const strikeEnd = strikeStart + strikeF;
+      const pinEnd = strikeEnd + pinF;
 
-      // Bright intense gold core
-      ctx.strokeStyle = `rgba(255, 215, 0, ${0.7 * glowAlpha})`;
-      ctx.lineWidth = 4;
-      ctx.stroke();
-      
-      ctx.restore();
+      // Render slash ribbon starting from strike phase (Phases 3, 4, 5)
+      if (elapsed >= strikeStart) {
+        const isHit2 = (this.swordComboStep === 2);
+        const swingTotal = Math.PI * (isHit2 ? 1.40 : 1.30);
+        const baseAngle = this.swordSlashAngle || this.swipeAngle || this.gunAngle || 0;
 
-      // --- PENCIL DRAWN SKETCHY SLASH ---
-      // Draw many overlapping, smooth arcs in graphite colors to simulate multiple fast pencil strokes
-      // No jagged edges, no gold colors, to avoid the 'electric' look.
+        // Reach calibration matching drawSwordBase blade geometry:
+        // Crossguard hilt begins at this.r + 14 (39px), blade tip kissaki reaches this.r + 84 (109px)
+        const innerR = this.r + 14;
+        const outerR = this.r + 88;
+        const arcRadius = this.r + 76;
 
-      const numStrokes = 45; // Lots of scratchy pencil lines
-      
-      for (let i = 0; i < numStrokes; i++) {
+        // Hit 1: Left across to Right (-swingTotal * 0.5 -> +swingTotal * 0.5)
+        // Hit 2: Low Right diagonally up to High Left (+swingTotal * 0.55 -> -swingTotal * 0.55)
+        const localStart = isHit2 ? (swingTotal * 0.55) : (-swingTotal * 0.5);
+        const localEnd = isHit2 ? (-swingTotal * 0.55) : (swingTotal * 0.5);
+
+        // Synchronize leading arc edge 1:1 with sword blade position (Chemical Katana Standard)
+        const currentSwordAngle = this._getSwordSwingAngle();
+        const swordLocalAngle = currentSwordAngle - baseAngle;
+
+        let currentStartAngle = localStart;
+        let currentEndAngle = localEnd;
+        let recP = 0;
+
+        if (elapsed < strikeEnd) {
+          // Phase 3: Whip Strike expansion — leading tip is 100% locked to the sword blade kissaki!
+          currentStartAngle = localStart;
+          currentEndAngle = swordLocalAngle;
+          recP = 0;
+        } else if (elapsed < pinEnd) {
+          // Phase 4: Impact Lock (100% full hold, Rule 30)
+          currentStartAngle = localStart;
+          currentEndAngle = localEnd;
+          recP = 0;
+        } else {
+          // Phase 5: Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & 30)
+          const rp = (elapsed - pinEnd) / Math.max(1, recF);
+          recP = Math.pow(rp, 1.4);
+          currentStartAngle = localStart + (localEnd - localStart) * recP;
+          currentEndAngle = localEnd;
+        }
+
+        const angularSpan = Math.abs(currentEndAngle - currentStartAngle);
+
+        if (angularSpan > 0.04) {
+          const fade = Math.max(0, 1.0 - recP * 0.85);
+          const glowAlpha = fade;
+
+          const tx = (this.swipeActive && this.swordTremorX) ? this.swordTremorX : 0;
+          const ty = (this.swipeActive && this.swordTremorY) ? this.swordTremorY : 0;
+
+          ctx.save();
+          ctx.translate(this.x + tx, this.y + ty);
+          ctx.rotate(baseAngle);
+
+          // 1. Radiant Annular Sector Ribbon
+          const segCount = 28;
+          const stepAngle = (currentEndAngle - currentStartAngle) / segCount;
+
           ctx.beginPath();
-          
-          // Deterministic pseudo-random values based on stroke index 'i'
-          const rand1 = Math.abs(Math.sin(i * 12.9898));
-          const rand2 = Math.abs(Math.sin(i * 78.233));
-          const rand3 = Math.abs(Math.sin(i * 37.719));
-          const rand4 = Math.abs(Math.sin(i * 91.133));
+          // Outer arc
+          for (let s = 0; s <= segCount; s++) {
+            const a = currentStartAngle + s * stepAngle;
+            const t = s / segCount;
+            const bulge = Math.sin(t * Math.PI) * 4;
+            const px = Math.cos(a) * (outerR + bulge);
+            const py = Math.sin(a) * (outerR + bulge);
+            if (s === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          // Inner arc back
+          for (let s = segCount; s >= 0; s--) {
+            const a = currentStartAngle + s * stepAngle;
+            const px = Math.cos(a) * innerR;
+            const py = Math.sin(a) * innerR;
+            ctx.lineTo(px, py);
+          }
+          ctx.closePath();
 
-          // Slight random offset for the angle to make strokes imperfect and uneven
-          const sAngle = localStartAngle + (rand1 * 0.4 - 0.2);
-          const eAngle = localCurrentEndAngle + (rand2 * 0.4 - 0.1);
-          
-          if (sAngle >= eAngle) continue;
+          // Gold/orange energy wash
+          ctx.fillStyle = isHit2
+            ? `rgba(255, 140, 20, ${0.40 * glowAlpha})`
+            : `rgba(255, 195, 30, ${0.36 * glowAlpha})`;
+          ctx.fill();
 
-          // Divide the stroke into segments to create a smooth tapering curve
-          const segments = 25;
-          const aStep = (eAngle - sAngle) / segments;
-          
-          // Base spread logic for this stroke
-          let rSpread = rand3;
-          let spreadDist = (rSpread > 0.8 ? (rand4 * 40 - 20) : (rand4 * 16 - 8));
-          
-          let first = true;
-          for (let step = 0; step <= segments; step++) {
-              const a = sAngle + step * aStep;
-              
-              // Normalize angle relative to the FULL swing to create a global crescent envelope
-              const t = (a - localStartAngle) / Math.max(0.01, localCurrentEndAngle - localStartAngle);
-              
-              // Math.sin(t * Math.PI) creates a curve that is 0 at the tips and 1 in the middle.
-              // We use this to pinch all pencil strokes tightly together at the start and end.
+          // 2. Razor Core Glow Rim
+          ctx.beginPath();
+          for (let s = 0; s <= segCount; s++) {
+            const a = currentStartAngle + s * stepAngle;
+            const px = Math.cos(a) * (arcRadius + 2);
+            const py = Math.sin(a) * (arcRadius + 2);
+            if (s === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = `rgba(255, 255, 230, ${0.85 * glowAlpha})`;
+          ctx.lineWidth = 3.5;
+          ctx.stroke();
+
+          // 3. Signature Rough Pencil Sketch lines (Knight anime aesthetic)
+          const numStrokes = 32;
+          for (let i = 0; i < numStrokes; i++) {
+            ctx.beginPath();
+            const rand1 = Math.abs(Math.sin(i * 12.9898));
+            const rand2 = Math.abs(Math.sin(i * 78.233));
+            const rand3 = Math.abs(Math.sin(i * 37.719));
+            const rand4 = Math.abs(Math.sin(i * 91.133));
+
+            const sOffset = (rand1 * 0.16 - 0.08) * (currentEndAngle - currentStartAngle);
+            const eOffset = (rand2 * 0.16 - 0.08) * (currentEndAngle - currentStartAngle);
+            const sAngle = currentStartAngle + sOffset;
+            const eAngle = currentEndAngle + eOffset;
+
+            const strokeSegs = 18;
+            const strokeStep = (eAngle - sAngle) / strokeSegs;
+            const spreadDist = rand3 > 0.75 ? (rand4 * 28 - 14) : (rand4 * 12 - 6);
+
+            let firstPt = true;
+            for (let step = 0; step <= strokeSegs; step++) {
+              const a = sAngle + step * strokeStep;
+              const t = step / strokeSegs;
               const taper = Math.sin(Math.max(0, Math.min(1, t)) * Math.PI);
-              
-              // Apply the taper to the radius. Strokes spread wide in the middle and pinch sharp at the tips.
-              // Power of 0.7 gives a slightly fatter belly and sharper needle-like ends.
               const r = arcRadius + (spreadDist * Math.pow(taper, 0.7));
-              
               const px = Math.cos(a) * r;
               const py = Math.sin(a) * r;
-              
-              if (first) {
-                  ctx.moveTo(px, py);
-                  first = false;
+              if (firstPt) {
+                ctx.moveTo(px, py);
+                firstPt = false;
               } else {
-                  ctx.lineTo(px, py);
+                ctx.lineTo(px, py);
               }
-          }
-          
-          // Graphite and Colored Pencil mixing: dark grays, blacks, and golds
-          const colorRand = Math.abs(Math.sin(i * 53.111));
-          const alphaBase = 0.5 + 0.5 * Math.abs(Math.sin(i * 17.111)); // Opacity variation
+            }
 
-          if (colorRand > 0.6) {
-              ctx.strokeStyle = `rgba(30, 30, 30, ${alphaBase * 0.8 * glowAlpha})`; // Standard graphite
+            const colorRand = Math.abs(Math.sin(i * 53.111));
+            const alphaBase = 0.5 + 0.5 * Math.abs(Math.sin(i * 17.111));
+            if (colorRand > 0.6) {
+              ctx.strokeStyle = `rgba(30, 30, 30, ${alphaBase * 0.8 * glowAlpha})`;
               ctx.lineWidth = rand1 * 1.5 + 0.5;
-          } else if (colorRand > 0.3) {
-              ctx.strokeStyle = `rgba(180, 130, 0, ${alphaBase * 0.7 * glowAlpha})`; // Dark Gold colored pencil
+            } else if (colorRand > 0.3) {
+              ctx.strokeStyle = `rgba(180, 130, 0, ${alphaBase * 0.7 * glowAlpha})`;
               ctx.lineWidth = rand2 * 2 + 0.5;
-          } else if (colorRand > 0.15) {
-              ctx.strokeStyle = `rgba(255, 215, 0, ${alphaBase * 0.85 * glowAlpha})`; // Bright Gold pencil
+            } else if (colorRand > 0.15) {
+              ctx.strokeStyle = `rgba(255, 215, 0, ${alphaBase * 0.85 * glowAlpha})`;
               ctx.lineWidth = rand3 * 1.5 + 0.5;
-          } else {
-              ctx.strokeStyle = `rgba(10, 10, 10, ${alphaBase * 0.9 * glowAlpha})`; // Heavy black pencil press
+            } else {
+              ctx.strokeStyle = `rgba(10, 10, 10, ${alphaBase * 0.9 * glowAlpha})`;
               ctx.lineWidth = rand4 * 2.5 + 1;
+            }
+            ctx.stroke();
           }
-          
-          ctx.stroke();
-      }
 
-      // --- PENCIL SPEED LINES / SCRATCHES ---
-      // Short, straight graphite scratches following the curve
-      const numLines = Math.floor(20 * progress);
-      for(let i=0; i<numLines; i++) {
-          const r1 = Math.abs(Math.sin(i * 41.111));
-          const r2 = Math.abs(Math.sin(i * 61.222));
-          const r3 = Math.abs(Math.sin(i * 81.333));
-          
-          const a = localStartAngle + r1 * (localCurrentEndAngle - localStartAngle);
-          const r = arcRadius + (r2 * 26 - 13);
-          
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
-          // Short scratch in the direction of the swing
-          ctx.lineTo(Math.cos(a + 0.08)*r, Math.sin(a + 0.08)*r);
-          
-          ctx.strokeStyle = r3 > 0.3 ? `rgba(40, 40, 40, ${(0.3 + 0.7*r1) * 0.7 * glowAlpha})` : `rgba(218, 165, 32, ${(0.3 + 0.7*r2) * 0.8 * glowAlpha})`;
-          ctx.lineWidth = r3 * 1.5 + 0.5;
-          ctx.stroke();
-      }
+          // 4. Pencil speed lines / scratches
+          const numLines = Math.floor(16 * Math.min(1, angularSpan / (swingTotal * 0.5)));
+          for (let i = 0; i < numLines; i++) {
+            const r1 = Math.abs(Math.sin(i * 41.111));
+            const r2 = Math.abs(Math.sin(i * 61.222));
+            const r3 = Math.abs(Math.sin(i * 81.333));
 
-      ctx.restore();
+            const a = currentStartAngle + r1 * (currentEndAngle - currentStartAngle);
+            const r = arcRadius + (r2 * 26 - 13);
+
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+            const dir = (currentEndAngle >= currentStartAngle) ? 0.08 : -0.08;
+            ctx.lineTo(Math.cos(a + dir) * r, Math.sin(a + dir) * r);
+
+            ctx.strokeStyle = r3 > 0.3
+              ? `rgba(40, 40, 40, ${(0.3 + 0.7 * r1) * 0.7 * glowAlpha})`
+              : `rgba(218, 165, 32, ${(0.3 + 0.7 * r2) * 0.8 * glowAlpha})`;
+            ctx.lineWidth = r3 * 1.5 + 0.5;
+            ctx.stroke();
+          }
+
+          // 5. Phase 4: Impact Lock Sparks & Compression Ring (Rule 26 & 30)
+          if (elapsed >= strikeEnd && elapsed < pinEnd) {
+            const tipAngle = localEnd;
+            const tipDist = this.r + 84; // Blade tip kissaki
+            const tipX = Math.cos(tipAngle) * tipDist;
+            const tipY = Math.sin(tipAngle) * tipDist;
+            const pinProgress = (elapsed - strikeEnd) / Math.max(1, pinF);
+
+            // Supersonic compression ring expanding from impact point (Rule 26)
+            const ringR = 8 + pinProgress * 18;
+            const ringAlpha = Math.max(0, 1 - pinProgress);
+            ctx.beginPath();
+            ctx.arc(tipX, tipY, ringR, 0, Math.PI * 2);
+            ctx.lineWidth = 2.0;
+            ctx.strokeStyle = `rgba(255, 240, 180, ${0.75 * ringAlpha})`;
+            ctx.stroke();
+
+            // Discrete spark dots (Rule 26 compliant)
+            for (let spk = 0; spk < 6; spk++) {
+              const spkAngle = (spk / 6) * Math.PI * 2 + pinProgress * 1.2;
+              const spkDist = 6 + pinProgress * 16 + (spk % 3) * 3;
+              const sx = tipX + Math.cos(spkAngle) * spkDist;
+              const sy = tipY + Math.sin(spkAngle) * spkDist;
+              ctx.fillStyle = spk % 2 === 0 ? '#ffffff' : '#ffcc00';
+              ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+            }
+          }
+
+          ctx.restore();
+        }
+      }
     }
 
     // â”€â”€ Charge ring â”€â”€
@@ -961,37 +1325,137 @@ export class KnightFighter extends Fighter {
       ctx.restore();
     }
 
-    // ── Dash motion blur ──
+    // ── Antimatter Shield Dash Thrusters, Prow Aura, Speed Lines & Collision Shockwaves ──
     if (this.fsm.isInState('KnightDashing')) {
+      const dashAngle = Math.atan2(this.dashVy, this.dashVx);
+      const cosA = Math.cos(dashAngle);
+      const sinA = Math.sin(dashAngle);
+
       ctx.save();
-      ctx.globalCompositeOperation = 'screen';
+      ctx.globalCompositeOperation = 'source-over';
+
+      // 1. Rule 16: Manga Aerodynamic Speed Lines (4-point filled needle polygons trailing behind)
+      const numSpeedLines = 14;
+      for (let i = 0; i < numSpeedLines; i++) {
+        const lateralDist = ((i / (numSpeedLines - 1)) - 0.5) * (this.r * 2.2);
+        const perpX = -sinA * lateralDist;
+        const perpY = cosA * lateralDist;
+        const trailOffset = 18 + ((i * 17) % 24);
+        const needleLen = 34 + ((i * 29) % 36);
+        const thick = 1.4 + ((i * 13) % 1.6);
+
+        // Trailing tail tip
+        const startX = this.x - cosA * (trailOffset + needleLen) + perpX;
+        const startY = this.y - sinA * (trailOffset + needleLen) + perpY;
+        // Leading sharp tip
+        const endX = this.x - cosA * trailOffset + perpX;
+        const endY = this.y - sinA * trailOffset + perpY;
+
+        // Mid shoulders
+        const midX = (startX + endX) * 0.5;
+        const midY = (startY + endY) * 0.5;
+        const midPerpX = -sinA * (thick * 0.5);
+        const midPerpY = cosA * (thick * 0.5);
+
+        ctx.fillStyle = (i % 3 === 0)
+          ? 'rgba(255, 255, 255, 0.85)'
+          : (i % 3 === 1 ? 'rgba(255, 220, 100, 0.75)' : 'rgba(255, 170, 0, 0.55)');
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(midX + midPerpX, midY + midPerpY);
+        ctx.lineTo(endX, endY);
+        ctx.lineTo(midX - midPerpX, midY - midPerpY);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // 2. Kinetic Shield Prow Aura (Arc in front of the forward locked shield)
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(dashAngle);
+
+      // Translucent forward pressure wave
+      ctx.beginPath();
+      ctx.arc(this.r + 14, 0, 24, -Math.PI * 0.42, Math.PI * 0.42);
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = 'rgba(255, 180, 0, 0.35)';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Sharp white/gold plasma ram core
+      ctx.beginPath();
+      ctx.arc(this.r + 15, 0, 25, -Math.PI * 0.36, Math.PI * 0.36);
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineCap = 'round';
+      ctx.stroke();
+      ctx.restore();
+
+      // 3. Trailing Afterimages
       const trailCount = 3;
       for (let i = 1; i <= trailCount; i++) {
-        const tx = this.x - this.dashVx * i * 2;
-        const ty = this.y - this.dashVy * i * 2;
-        
+        const tx = this.x - this.dashVx * i * 1.8;
+        const ty = this.y - this.dashVy * i * 1.8;
+
         ctx.save();
         ctx.translate(tx, ty);
-        // Dim the trail as it goes back
-        ctx.globalAlpha = 0.6 / i;
-        
-        // Golden body glow
-        ctx.fillStyle = '#ff9900';
+        ctx.globalAlpha = 0.50 / i;
+
+        // Golden body shadow
+        ctx.fillStyle = '#ffaa00';
         ctx.beginPath();
         ctx.arc(0, 0, this.r * (1 - i * 0.1), 0, Math.PI * 2);
         ctx.fill();
-        
-        // Golden charging shield arc (matches his actual shield angle)
-        ctx.rotate(this.gunAngle + this.shieldVisualOffset);
-        ctx.translate(this.r + 5, 0);
+
+        // Forward shield shadow
+        ctx.rotate(dashAngle);
+        ctx.translate(this.r + 12, 0);
         ctx.beginPath();
-        ctx.arc(0, 0, 22 - i * 2, -Math.PI/2.5, Math.PI/2.5);
-        ctx.lineWidth = 6;
-        ctx.strokeStyle = '#ffea75';
-        ctx.lineCap = 'round';
+        ctx.arc(0, 0, 20 - i * 2, -Math.PI * 0.4, Math.PI * 0.4);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#ffe075';
         ctx.stroke();
-        
+
         ctx.restore();
+      }
+
+      ctx.restore();
+    }
+
+    // ── Rule 26 Concentric Compression Rings & Sparks on Shield Dash Impact ──
+    if (this.dashImpactTimer > 0) {
+      const ip = 1 - (this.dashImpactTimer / 14);
+      const ringAlpha = Math.max(0, 1 - ip);
+
+      ctx.save();
+      // Wave 1: Supersonic outer compression ring
+      const r1 = 10 + Math.pow(ip, 0.7) * 42;
+      ctx.beginPath();
+      ctx.arc(this.dashImpactX, this.dashImpactY, r1, 0, Math.PI * 2);
+      ctx.lineWidth = 3.0 * (1 - ip);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.90 * ringAlpha})`;
+      ctx.stroke();
+
+      // Wave 2: Staggered secondary gold ionization ring
+      if (ip > 0.12) {
+        const ip2 = (ip - 0.12) / 0.88;
+        const r2 = 6 + Math.pow(ip2, 0.7) * 28;
+        ctx.beginPath();
+        ctx.arc(this.dashImpactX, this.dashImpactY, r2, 0, Math.PI * 2);
+        ctx.lineWidth = 2.0 * (1 - ip2);
+        ctx.strokeStyle = `rgba(255, 200, 30, ${0.75 * (1 - ip2)})`;
+        ctx.stroke();
+      }
+
+      // Discrete spark dots (Rule 26: discrete squares/dots, zero radial spokes!)
+      for (let s = 0; s < 8; s++) {
+        const sparkA = (s / 8) * Math.PI * 2 + ip * 1.5;
+        const sparkDist = 8 + ip * 30 + ((s % 3) * 4);
+        const sx = this.dashImpactX + Math.cos(sparkA) * sparkDist;
+        const sy = this.dashImpactY + Math.sin(sparkA) * sparkDist;
+        ctx.fillStyle = s % 2 === 0 ? '#ffffff' : '#ffcc00';
+        ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
       }
       ctx.restore();
     }

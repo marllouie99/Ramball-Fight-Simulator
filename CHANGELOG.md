@@ -3,8 +3,4 @@
 
 ---
 
-## 🥊 Fighter Stat Modifications
-
-### GUNSLINGER
-* **🔄 ADJUST** `hair`: `Assets/model/gunslinger/Gunslinger-hair.png` ➔ `Assets/model/Alucard/Red-hat.png` (Mod)
-
+*No balance parameter modifications detected in `js/configs/`.*

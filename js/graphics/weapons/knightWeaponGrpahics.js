@@ -1,17 +1,12 @@
-export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = -Math.PI / 2) {
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
-  const prevLineJoin = ctx.lineJoin;
-  const prevLineCap = ctx.lineCap;
-  const prevGlobalAlpha = ctx.globalAlpha;
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
-  const prevShadowOffsetY = ctx.shadowOffsetY;
-
+export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = 0) {
+  ctx.save();
   ctx.translate(x, y);
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   const shieldAngle = gunAngle + shieldVisualOffset;
   ctx.rotate(shieldAngle);
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
   ctx.translate(r + 12, 0); 
 
   const shieldScale = 1.8; 
@@ -152,21 +147,7 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
     ctx.stroke();
   }
 
-  // Reverse transformations
-  ctx.translate(-(r + 12), 0);
-  ctx.rotate(-shieldAngle);
-  ctx.translate(-x, -y);
-
-  // Restore state
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
-  ctx.lineJoin = prevLineJoin;
-  ctx.lineCap = prevLineCap;
-  ctx.globalAlpha = prevGlobalAlpha;
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
-  ctx.shadowOffsetY = prevShadowOffsetY;
+  ctx.restore();
 }
 
 function drawSwordBase(ctx, swordScale, isBroken) {
@@ -361,103 +342,60 @@ function drawSwordBase(ctx, swordScale, isBroken) {
   ctx.stroke();
 }
 
-export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null) {
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
-
+export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false, isSwinging = false) {
+  ctx.save();
   ctx.translate(x, y);
-  let totalRotation = 0;
-  let offsetX = 0;
-  let offsetY = 0;
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
 
   if (dashState === 'charging' || dashState === 'dashing') {
-    totalRotation = gunAngle;
-    offsetX = r + 8;
-    offsetY = 16;
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(r + 8, 16);
+  } else if (isSwinging) {
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(r + 14, 0);
   } else {
-    totalRotation = gunAngle + Math.PI / 2;
-    offsetX = r + 12;
-    offsetY = 0;
-  }
-  
-  ctx.rotate(totalRotation);
-  ctx.translate(offsetX, offsetY);
-  if (!(dashState === 'charging' || dashState === 'dashing')) {
+    // Upright ready guard: held along left flank, blade pointing upward
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(-(r + 10), 4);
     ctx.rotate(-Math.PI / 2);
   }
 
   drawSwordBase(ctx, 1.0, false);
-
-  // Reverse transformations
-  if (!(dashState === 'charging' || dashState === 'dashing')) {
-    ctx.rotate(Math.PI / 2);
-  }
-  ctx.translate(-offsetX, -offsetY);
-  ctx.rotate(-totalRotation);
-  ctx.translate(-x, -y);
-
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
+  ctx.restore();
 }
 
-export function drawGrayBrokenSword(ctx, x, y, gunAngle, r, dashState = null) {
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
-
+export function drawGrayBrokenSword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false, isSwinging = false) {
+  ctx.save();
   ctx.translate(x, y);
-  let totalRotation = 0;
-  let offsetX = 0;
-  let offsetY = 0;
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
 
   if (dashState === 'charging' || dashState === 'dashing') {
-    totalRotation = gunAngle;
-    offsetX = r + 8;
-    offsetY = 16;
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(r + 8, 16);
+  } else if (isSwinging) {
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(r + 14, 0);
   } else {
-    totalRotation = gunAngle + Math.PI / 2;
-    offsetX = r + 12;
-    offsetY = 0;
-  }
-  
-  ctx.rotate(totalRotation);
-  ctx.translate(offsetX, offsetY);
-  if (!(dashState === 'charging' || dashState === 'dashing')) {
+    // Upright ready guard: held along left flank, blade pointing upward
+    ctx.rotate(gunAngle);
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.translate(-(r + 10), 4);
     ctx.rotate(-Math.PI / 2);
   }
 
   drawSwordBase(ctx, 1.0, true);
-
-  // Reverse transformations
-  if (!(dashState === 'charging' || dashState === 'dashing')) {
-    ctx.rotate(Math.PI / 2);
-  }
-  ctx.translate(-offsetX, -offsetY);
-  ctx.rotate(-totalRotation);
-  ctx.translate(-x, -y);
-
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
+  ctx.restore();
 }
 
 export function drawGraySwordProjectile(ctx, x, y, angle, scale = 1.0) {
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
-
+  ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
-  
-  // Add a glowing aura to the thrown sword (OPTIMIZED: removed shadowBlur)
-  
   drawSwordBase(ctx, Math.max(0.4, scale), false);
-
-  ctx.rotate(-angle);
-  ctx.translate(-x, -y);
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
+  ctx.restore();
 }
