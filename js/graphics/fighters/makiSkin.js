@@ -318,20 +318,13 @@ export function drawMakiSkin(ctx, fighter) {
   // 1. Orientation & Mirroring (Rule 19 Upright Front POV)
   let angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
 
-  const isSpinningSweep = fighter.swordSwingTimer > 0 && fighter.swordComboStep === 3;
-  if (isSpinningSweep) {
-    const maxT = fighter.swordSwingMax || 28;
-    const progress = Math.max(0, Math.min(1.0, 1.0 - fighter.swordSwingTimer / maxT));
-    const spinEase = Math.sin(progress * Math.PI * 0.5);
-    angle += spinEase * Math.PI * 2;
-  }
+  // Maki body stays upright facing aim angle cleanly (Rule 19 Upright Front POV Standard)
 
   const normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
   ctx.rotate(angle);
 
-  const isSpinning = fighter.isSpinning || isSpinningSweep;
   const facingLeft = Math.abs(normAngle) > Math.PI / 2;
-  if (facingLeft && !isSpinning) {
+  if (facingLeft) {
     ctx.scale(1, -1);
   }
 

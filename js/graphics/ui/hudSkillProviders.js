@@ -1291,24 +1291,50 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
 
   // ─────────────────────────────────────────────
-  // GUNSLINGER
+  // ALUCARD / GUNSLINGER
   // ─────────────────────────────────────────────
-  if (f.characterId === 'gunslinger' || f.type === 'gunslinger') {
+  if (f.characterId === 'gunslinger' || f.type === 'gunslinger' || f.characterId === 'alucard' || f.type === 'alucard') {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gunslinger) ? CONFIG.gunslinger : {};
-    if (!isSkillEnabled(cfg.enableRapidFire, true)) return [];
-    const themeColor = f.color || '#eab308';
-    let pct = 0;
+    const themeColor = f.themeColor || f.color || '#B91C1C';
+    const skills = [];
 
-    if (f.isReloading) {
-      const reloadTime = cfg.reloadTime || 90;
-      pct = Math.max(0, Math.min(100, (f.reloadTimer / reloadTime) * 100));
-    } else {
-      pct = Math.max(0, Math.min(100, (1 - (f.magazineBullets || 0) / (f.maxMagazine || 24)) * 100));
-    }
+    // Skill 1: Baskerville Feast
+    const s1Cd = cfg.skill1Cooldown || 240;
+    const s1Timer = f.skill1Timer || 0;
+    const s1Pct = Math.max(0, Math.min(100, ((s1Cd - s1Timer) / s1Cd) * 100));
+    skills.push({
+      id: 'alucard_baskerville',
+      pct: s1Pct,
+      ready: s1Timer <= 0,
+      color: themeColor,
+      label: 'BASKERVILLE'
+    });
 
-    return [
-      { id: 'rapidfire', pct: pct, ready: pct >= 99 && !f.isReloading, color: themeColor, label: 'RAPID FIRE' }
-    ];
+    // Skill 2: Shadow Phase
+    const s2Cd = cfg.skill2Cooldown || 320;
+    const s2Timer = f.skill2Timer || 0;
+    const s2Pct = Math.max(0, Math.min(100, ((s2Cd - s2Timer) / s2Cd) * 100));
+    skills.push({
+      id: 'alucard_phase',
+      pct: s2Pct,
+      ready: s2Timer <= 0,
+      color: themeColor,
+      label: f.isShadowPhasing ? 'PHASING...' : 'SHADOW PHASE'
+    });
+
+    // Skill 3: Illusion Counter
+    const s3Cd = cfg.skill3Cooldown || 420;
+    const s3Timer = f.skill3Timer || 0;
+    const s3Pct = Math.max(0, Math.min(100, ((s3Cd - s3Timer) / s3Cd) * 100));
+    skills.push({
+      id: 'alucard_counter',
+      pct: s3Pct,
+      ready: s3Timer <= 0,
+      color: themeColor,
+      label: f.isCounterStance ? 'MOCKING...' : 'ILLUSION COUNTER'
+    });
+
+    return skills;
   }
 
   // ─────────────────────────────────────────────

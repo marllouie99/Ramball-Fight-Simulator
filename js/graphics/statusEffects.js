@@ -1729,6 +1729,32 @@ export const STATUS_OVERLAY_REGISTRY = [
     render: (ctx, baseRadius, f) => drawElectricStunEffect(ctx, baseRadius, false)
   },
   {
+    id: 'grievousWounds',
+    isActive: (f) => Boolean((f.grievousWoundsTimer || 0) > 0 || (f.healBlockTimer || 0) > 0),
+    render: (ctx, baseRadius, f) => {
+      ctx.save();
+      const time = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+      const pulse = Math.sin(time * 0.008) * 0.5 + 0.5;
+      ctx.strokeStyle = `rgba(220, 38, 38, ${0.70 + pulse * 0.30})`;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius * 1.15, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Grievous Wounds crossed red sigil
+      const sz = baseRadius * 0.45;
+      ctx.strokeStyle = `rgba(239, 68, 68, ${0.85 + pulse * 0.15})`;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(-sz, -sz);
+      ctx.lineTo(sz, sz);
+      ctx.moveTo(sz, -sz);
+      ctx.lineTo(-sz, sz);
+      ctx.stroke();
+      ctx.restore();
+    }
+  },
+  {
     id: 'pureLoveBeamRecovery',
     isActive: (f) => f.pureLoveBeamRecoveryTimer > 0,
     render: (ctx, baseRadius, f) => {

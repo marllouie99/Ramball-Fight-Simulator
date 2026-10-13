@@ -7102,6 +7102,188 @@ async function runInteractionTests() {
     }
   }
 
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TEST 72: Gunslinger (Alucard) Match Victory Gun Spin & Holstering Animation
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    console.log('   72. Testing Gunslinger / Alucard Match Victory Gun Spin & Holstering Animation...');
+    const { GunSlingerFighter } = await import('../js/entities/fighters/GunSlingerFighter.js');
+    const { drawAlucardSkin } = await import('../js/graphics/fighters/gunSlingerSkin.js');
+
+    state.gameState = 'playing';
+    state.fighters = [];
+    state.matchWinner = null;
+    state.roundWinner = null;
+
+    const alucard = new GunSlingerFighter({ id: 0, name: 'GunSlinger', color: '#B91C1C', startX: 200, startY: 200, r: 25, radius: 25, hp: 100 });
+    const dummyOpponent = { id: 1, name: 'Target', hp: 0, dead: true, x: 300, y: 300, r: 25 };
+
+    try {
+      // 1. Initial State: weapons and hands must be visible and active
+      assert(alucard.hasWonMatch === false, 'Alucard hasWonMatch must initially be false');
+      assert(alucard.hideGuns === false, 'Alucard hideGuns must initially be false');
+      assert(alucard.hideHands === false, 'Alucard hideHands must initially be false');
+
+      // 2. Trigger Victory in Match End state
+      state.gameState = 'matchEnd';
+      state.matchWinner = alucard;
+      state.roundWinner = alucard;
+      state.fighters = [alucard, dummyOpponent];
+
+      alucard.update(dummyOpponent, 0, state.arena);
+
+      assert(alucard.hasWonMatch === true, 'Alucard hasWonMatch must be true upon victory detection');
+      assert(alucard.victorySpinTimer === 49, `Alucard victorySpinTimer must be 49 on first tick (got ${alucard.victorySpinTimer})`);
+      assert(alucard.victorySpinAngle > 0, 'Alucard victorySpinAngle must be > 0 while spinning');
+      assert(alucard.hideGuns === false, 'Guns must remain visible during the active victory spin');
+      assert(alucard.hideHands === false, 'Hands must remain visible during the active victory spin');
+      assert(alucard.vx === 0 && alucard.vy === 0, 'Alucard must be stationary during victory spin');
+      assert(alucard.gunAngle === 0, 'Alucard gunAngle must face upright (0) during victory');
+
+      // 3. Complete the victory spin duration (advance 55 ticks)
+      for (let i = 0; i < 55; i++) {
+        alucard.update(dummyOpponent, 0, state.arena);
+      }
+
+      assert(alucard.victorySpinTimer === 0, 'victorySpinTimer must decay to 0');
+      assert(alucard.victorySpinAngle === 0, 'victorySpinAngle must reset to 0 after spin completes');
+      assert(alucard.isVictoryXPose === true, 'Alucard isVictoryXPose must be true after victory animation finishes');
+      assert(alucard.victoryXPoseProgress === 1.0, 'Alucard victoryXPoseProgress must be 1.0 after victory animation finishes');
+      assert(alucard.hideGuns === false, 'Alucard hideGuns must be false (guns are kept in X form, not hidden)');
+      assert(alucard.hideHands === false, 'Alucard hideHands must be false (hands are kept holding weapons)');
+
+      // 4. Test drawGun renders guns in crossed X pose
+      let gunDrawn = false;
+      const mockCtx = {
+        save: () => {},
+        restore: () => {},
+        translate: () => {},
+        rotate: () => {},
+        scale: () => {},
+        drawImage: () => { gunDrawn = true; },
+        fillRect: () => { gunDrawn = true; },
+        beginPath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        arc: () => {},
+        fill: () => { gunDrawn = true; },
+        stroke: () => {},
+      };
+      state.ctx = mockCtx;
+      alucard.drawGun(mockCtx);
+      assert(gunDrawn === true, 'drawGun must render crossed X guns and hands in victory pose');
+
+      // 5. Test reset restores guns and hands for the next round
+      alucard.reset();
+      assert(alucard.hasWonMatch === false, 'Alucard hasWonMatch must reset to false');
+      assert(alucard.isVictoryXPose === false, 'Alucard isVictoryXPose must reset to false');
+      assert(alucard.victoryXPoseProgress === 0, 'Alucard victoryXPoseProgress must reset to 0');
+      assert(alucard.hideGuns === false, 'Alucard hideGuns must remain false');
+      assert(alucard.hideHands === false, 'Alucard hideHands must remain false');
+
+      console.log('      ✅ Gunslinger / Alucard match victory gun spin and crossed X formation verified.');
+    } finally {
+      state.fighters = [];
+      state.matchWinner = null;
+      state.roundWinner = null;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TEST 73: Alucard 5 Combat Mechanics (Aggressive Regeneration, Grievous Wounds, Baskerville Feast, Shadow Phase i-frames, Illusion Counter)
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    console.log('   73. Testing Alucard 5 Combat Mechanics (Aggressive Regen, Grievous Wounds, Baskerville, Shadow Phase, Illusion Counter)...');
+    const { GunSlingerFighter } = await import('../js/entities/fighters/GunSlingerFighter.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+
+    state.gameState = 'playing';
+    state.fighters = [];
+    state.floatingTexts = [];
+
+    const alucard = new GunSlingerFighter({ id: 0, name: 'Alucard', color: '#B91C1C', startX: 200, startY: 200, r: 25, radius: 25, hp: 100, maxHp: 100 });
+    const dummy = new Fighter({ id: 1, name: 'Target', color: '#3B82F6', startX: 300, startY: 200, r: 25, radius: 25, hp: 100, maxHp: 100 });
+    dummy.gunAngle = 0; // Facing right (towards +X)
+
+    state.fighters = [alucard, dummy];
+
+    try {
+      // 1. Passive: Aggressive Regeneration (35% base, 50% when <= 50% maxHp)
+      alucard.maxHp = 100;
+      alucard.hp = 80;
+      dummy.hp = 100;
+      alucard.onDamageDealt(dummy, null, 0, 20); // 20 damage dealt -> 35% of 20 = 7 heal
+      assert(alucard.hp === 87, `Alucard Aggressive Regeneration must heal 7 HP at high health (got ${alucard.hp})`);
+      assert(alucard._healthBarHealTimer === 16, 'Alucard top HUD health card glow timer must be set to 16');
+
+      alucard.hp = 40; // <= 50% maxHp -> 50% lifesteal
+      alucard.onDamageDealt(dummy, null, 0, 20); // 20 damage dealt -> 50% of 20 = 10 heal
+      assert(alucard.hp === 50, `Alucard Aggressive Regeneration must boost to 50% lifesteal when low HP (got ${alucard.hp})`);
+
+      // 2. Heavy Anti-Regeneration Shots: Grievous Wounds / Heal Block
+      assert(dummy.grievousWoundsTimer === 180, `Dummy grievousWoundsTimer must be 180 (got ${dummy.grievousWoundsTimer})`);
+      assert(dummy.healBlockTimer === 180, `Dummy healBlockTimer must be 180 (got ${dummy.healBlockTimer})`);
+
+      const dummyPreHp = dummy.hp;
+      dummy.hp = dummyPreHp + 25; // Attempt heal while afflicted with Grievous Wounds
+      assert(dummy.hp === dummyPreHp, `Dummy healing must be 100% blocked by Grievous Wounds (expected ${dummyPreHp}, got ${dummy.hp})`);
+
+      // 3. Skill 1: Baskerville Feast
+      alucard.skill1Timer = 0;
+      const castResult1 = alucard.castSkill1BaskervilleFeast(dummy);
+      assert(castResult1 === true, 'castSkill1BaskervilleFeast must return true when ready');
+      assert(alucard.skill1Timer === 240, 'Skill 1 cooldown must be set to 240');
+      assert(alucard.activeBaskervilleHounds.length === 1, 'Baskerville hound must be spawned');
+
+      const hound = alucard.activeBaskervilleHounds[0];
+      assert(hound.damage === 22.0, `Baskerville hound damage must be 22.0 (got ${hound.damage})`);
+      assert(hound.speed === 18.0, `Baskerville hound speed must be 18.0 (got ${hound.speed})`);
+
+      // Advance hound until impact
+      hound.x = dummy.x;
+      hound.y = dummy.y;
+      alucard._updateVisualEffects();
+      assert(hound.hasHit === true, 'Hound must register hit on impact');
+
+      // 4. Skill 2: Shadow Phase (Complete i-frames & Cross-Up Dash)
+      alucard.skill2Timer = 0;
+      const castResult2 = alucard.castSkill2ShadowPhase(dummy);
+      assert(castResult2 === true, 'castSkill2ShadowPhase must return true when ready');
+      assert(alucard.isShadowPhasing === true, 'alucard.isShadowPhasing must be true');
+      assert(alucard.shadowPhaseTimer === 22, 'alucard.shadowPhaseTimer must be 22');
+
+      // Invulnerability frames (i-frames) check
+      const alucardPreHp = alucard.hp;
+      const dmgResult = alucard.takeDamage(40, dummy);
+      assert(dmgResult === false, 'alucard.takeDamage must return false during Shadow Phase (i-frames)');
+      assert(alucard.hp === alucardPreHp, 'Alucard HP must remain untouched during Shadow Phase i-frames');
+
+      // 5. Skill 3: Illusion Counter (Mockery Stance -> Shadow Teleport & Point-Blank Execution)
+      alucard.isShadowPhasing = false;
+      alucard.shadowPhaseTimer = 0;
+      alucard.skill3Timer = 0;
+
+      const castResult3 = alucard.castSkill3IllusionCounter();
+      assert(castResult3 === true, 'castSkill3IllusionCounter must return true when ready');
+      assert(alucard.isCounterStance === true, 'alucard.isCounterStance must be true');
+      assert(alucard.counterStanceTimer === 60, 'alucard.counterStanceTimer must be 60');
+
+      dummy.x = 300; dummy.y = 200; dummy.gunAngle = 0; dummy.r = 25;
+      const counterHitResult = alucard.takeDamage(30, dummy);
+      assert(counterHitResult === false, 'Incoming hit during mockery stance must be nullified (return false)');
+      assert(alucard.isCounterStance === false, 'Counter stance must clear upon trigger');
+
+      // Check teleportation behind dummy (dummy facing angle 0 -> behind is -X)
+      assert(alucard.x < dummy.x, `Alucard must teleport behind dummy (got alucard.x=${alucard.x}, dummy.x=${dummy.x})`);
+      assert(dummy.timeStopTimer === 25, `Dummy must be hit-paused for 25 frames (got ${dummy.timeStopTimer})`);
+      assert(dummy.grievousWoundsTimer === 180, 'Dummy must be afflicted with Grievous Wounds from counter-strike');
+
+      console.log('      ✅ Alucard 5 combat mechanics (Aggressive Regen, Grievous Wounds, Baskerville, Shadow Phase, Illusion Counter) verified.');
+    } finally {
+      state.fighters = [];
+      state.floatingTexts = [];
+    }
+  }
 
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');

@@ -53,6 +53,7 @@ import { drawEyeOfCthulhuSkin } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawNamelessDeitySkin, NAMELESS_DEITY_DEFAULT_CONFIGS, NAMELESS_DEITY_SKIN2_DEFAULT_CONFIGS } from '../fighters/namelessDeitySkin.js';
 import { drawAvatarOfEmptinessSkin, AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS } from '../fighters/avatarOfEmptinessSkin.js';
 import { drawUryuSkin, _drawUryuHair, _getUryuHairImage, _drawUryuGlasses, _getUryuGlassesImage } from '../fighters/uryuSkin.js';
+import { drawAlucardSkin, _drawAlucardHat, _getAlucardHatImage, _drawAlucardGlasses, _getAlucardGlassesImage } from '../fighters/gunSlingerSkin.js';
 
 
 
@@ -72,6 +73,12 @@ if (state.studioSkinNamelessPart === undefined) state.studioSkinNamelessPart = '
 if (state.studioSkinAvatarPart === undefined) state.studioSkinAvatarPart = 'overall';
 if (state.studioSkinUryuPart === undefined) state.studioSkinUryuPart = 'hair';
 if (state.studioSkinShiroPart === undefined) state.studioSkinShiroPart = 'hair';
+if (state.studioSkinAlucardPart === undefined) state.studioSkinAlucardPart = 'hat';
+
+export const ALUCARD_PARTS = [
+  { id: 'hat', label: '🎩 FEDORA HAT', shortLabel: 'HAT', fullLabel: 'CRIMSON FEDORA & HAIR', asset: 'Assets/model/Alucard/Red-hat.png', desc: 'Fedora hat scale, shift & angle' },
+  { id: 'glasses', label: '👓 GLASSES', shortLabel: 'GLASSES', fullLabel: 'AMBER ROUND EYE GLASSES', asset: 'Assets/model/Alucard/Red-eye-glasses.png', desc: 'Eye glasses scale, shift & angle' }
+];
 
 export const URYU_PARTS = [
   { id: 'hair', label: '💇 HAIR', shortLabel: 'HAIR', fullLabel: 'QUINCY HAIR SILHOUETTE', asset: 'Assets/model/uryu/Ishida-hair.png', desc: 'Hair scale, shift & angle' },
@@ -627,19 +634,19 @@ export const SKIN_STUDIO_FIGHTERS = [
   },
   {
     key: 'gunslinger',
-    label: 'GUNSLINGER',
-    asset: 'Hair/Gunslinger-hair.png',
-    assetDims: '1536 x 1024',
-    baseW: 3.36,
-    baseH: 1.85,
-    baseCrownY: -1.32,
-    visW: 1517,
-    visH: 1017,
-    centerX: 758,
-    topY: 7,
-    themeColor: '#D97706',
+    label: 'ALUCARD',
+    asset: 'Red-hat.png & Red-eye-glasses.png',
+    assetDims: 'Dedicated Vampire Head Assets',
+    baseW: 3.30,
+    baseH: 1.38,
+    baseCrownY: -1.53,
+    visW: 1528,
+    visH: 643,
+    centerX: 768,
+    topY: 0,
+    themeColor: '#B91C1C',
     forms: [
-      { id: 'default', label: 'COWBOY' }
+      { id: 'default', label: 'NO-LIFE KING' }
     ]
   },
   {
@@ -984,16 +991,15 @@ function generateJsCode(fDef, custom) {
            `const drawH = 1229 * scaleY;\n` +
            `const drawX = -639.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 234 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
-  } else if (fDef.key === 'gunslinger') {
-    return `// Calibrated Cowboy Hat for Gunslinger (Assets/model/gunslinger/Gunslinger-hair.png)\n` +
-           `const targetHatWidth = r * ${targetW};\n` +
-           `const targetHatHeight = r * ${targetH};\n` +
-           `const scaleX = targetHatWidth / 1517;\n` +
-           `const scaleY = targetHatHeight / 1017;\n` +
-           `const drawW = 1536 * scaleX;\n` +
-           `const drawH = 1024 * scaleY;\n` +
-           `const drawX = -758 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
-           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 7 * scaleY - 10${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'gunslinger' || fDef.key === 'alucard') {
+    const partName = (typeof state !== 'undefined' && state.studioSkinAlucardPart === 'glasses') ? 'Eye Glasses' : 'Fedora Hat';
+    return `// Calibrated Alucard Head Assets (Assets/model/Alucard/Red-hat.png & Red-eye-glasses.png)\n` +
+           `// Selected Part: ${partName}\n` +
+           `widthScale: ${wMult},\n` +
+           `heightScale: ${hMult},\n` +
+           `offsetX: ${offX},\n` +
+           `offsetY: ${offY},\n` +
+           `angleOffset: ${rot}`;
   } else if (fDef.key === 'zenitsu') {
     return `// Calibrated Hair for Zenitsu (Assets/model/zenitsu/Zenitsu-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
@@ -1246,6 +1252,10 @@ export function drawSkinStudioScreen() {
   const activeShiroPartId = isShiro ? (state.studioSkinShiroPart || 'hair') : 'hair';
   const activeShiroPartDef = isShiro ? (SHIRO_PARTS.find(p => p.id === activeShiroPartId) || SHIRO_PARTS[0]) : null;
 
+  const isAlucard = (fDef.key === 'gunslinger' || fDef.key === 'alucard');
+  const activeAlucardPartId = isAlucard ? (state.studioSkinAlucardPart || 'hat') : 'hat';
+  const activeAlucardPartDef = isAlucard ? (ALUCARD_PARTS.find(p => p.id === activeAlucardPartId) || ALUCARD_PARTS[0]) : null;
+
   const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
     ? `nameless_deity_${activePartId}`
     : (isAvatarOfEmptiness && activeAvatarPartId !== 'overall')
@@ -1254,7 +1264,9 @@ export function drawSkinStudioScreen() {
         ? 'uryu_glasses'
         : (isShiro && activeShiroPartId === 'crown')
           ? 'shiro_crown'
-          : fDef.key;
+          : (isAlucard && activeAlucardPartId === 'glasses')
+            ? 'alucard_glasses'
+            : fDef.key;
   const custom = ensureFighterCustom(activeCustomKey);
 
   // ── Tier 1: Header Section ──
@@ -1586,7 +1598,9 @@ export function drawSkinStudioScreen() {
         ? -baseRadius * 0.04
         : (isShiro && activeShiroPartId === 'crown')
           ? -baseRadius * 0.90
-          : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+          : (isAlucard && activeAlucardPartId === 'glasses')
+            ? -baseRadius * 0.02
+            : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
     const handleCenterX = custom.offsetX;
     const handleCenterY = baseCrownY + custom.offsetY;
 
@@ -1928,6 +1942,46 @@ export function drawSkinStudioScreen() {
 
       _registerButton(bx, by, partBtnW, partBtnH, () => {
         state.studioSkinShiroPart = part.id;
+      });
+    });
+  }
+
+  // ── Alucard Multi-Asset Part Selector Bar (Inside Viewport) ──
+  if (isAlucard) {
+    const partBtnH = 20;
+    const partGapX = 8;
+    const partStartX = viewportX + 10;
+    const partBtnW = 100;
+    const startY = viewportY + 34;
+
+    ALUCARD_PARTS.forEach((part, idx) => {
+      const isPartSelected = (activeAlucardPartId === part.id);
+      const bx = partStartX + idx * (partBtnW + partGapX);
+      const by = startY;
+
+      ctx.save();
+      if (isPartSelected) {
+        ctx.fillStyle = '#450a0a';
+        ctx.strokeStyle = '#EF4444';
+        ctx.lineWidth = 1.8;
+      } else {
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, bx, by, partBtnW, partBtnH, 4);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = isPartSelected ? '#EF4444' : '#94a3b8';
+      ctx.font = isPartSelected ? '900 10px "Rajdhani", sans-serif' : '700 9.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(part.label, bx + partBtnW / 2, by + partBtnH / 2);
+      ctx.restore();
+
+      _registerButton(bx, by, partBtnW, partBtnH, () => {
+        state.studioSkinAlucardPart = part.id;
       });
     });
   }
@@ -3401,6 +3455,8 @@ if (typeof window !== 'undefined') {
       const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
       const isShiro = (fDef.key === 'shiro');
       const activeShiroPartId = isShiro ? (state.studioSkinShiroPart || 'hair') : 'hair';
+      const isAlucard = (fDef.key === 'gunslinger' || fDef.key === 'alucard');
+      const activeAlucardPartId = isAlucard ? (state.studioSkinAlucardPart || 'hat') : 'hat';
 
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
@@ -3410,7 +3466,9 @@ if (typeof window !== 'undefined') {
             ? 'uryu_glasses'
             : (isShiro && activeShiroPartId === 'crown')
               ? 'shiro_crown'
-              : fDef.key;
+              : (isAlucard && activeAlucardPartId === 'glasses')
+                ? 'alucard_glasses'
+                : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       // Local hero coordinate space
@@ -3423,7 +3481,9 @@ if (typeof window !== 'undefined') {
           ? -baseRadius * 0.04
           : (isShiro && activeShiroPartId === 'crown')
             ? -baseRadius * 0.90
-            : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+            : (isAlucard && activeAlucardPartId === 'glasses')
+              ? -baseRadius * 0.02
+              : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
       const handleCenterX = custom.offsetX;
       const handleCenterY = baseCrownY + custom.offsetY;
 
@@ -3508,6 +3568,8 @@ if (typeof window !== 'undefined') {
       const activeUryuPartId = isUryu ? (state.studioSkinUryuPart || 'hair') : 'hair';
       const isShiro = (fDef.key === 'shiro');
       const activeShiroPartId = isShiro ? (state.studioSkinShiroPart || 'hair') : 'hair';
+      const isAlucard = (fDef.key === 'gunslinger' || fDef.key === 'alucard');
+      const activeAlucardPartId = isAlucard ? (state.studioSkinAlucardPart || 'hat') : 'hat';
 
       const activeCustomKey = (isNamelessDeity && activePartId !== 'overall')
         ? `nameless_deity_${activePartId}`
@@ -3517,7 +3579,9 @@ if (typeof window !== 'undefined') {
             ? 'uryu_glasses'
             : (isShiro && activeShiroPartId === 'crown')
               ? 'shiro_crown'
-              : fDef.key;
+              : (isAlucard && activeAlucardPartId === 'glasses')
+                ? 'alucard_glasses'
+                : fDef.key;
       const custom = ensureFighterCustom(activeCustomKey);
 
       const localX = (mx - heroX) / currentScale;
@@ -3528,7 +3592,9 @@ if (typeof window !== 'undefined') {
           ? -baseRadius * 0.04
           : (isShiro && activeShiroPartId === 'crown')
             ? -baseRadius * 0.90
-            : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+            : (isAlucard && activeAlucardPartId === 'glasses')
+              ? -baseRadius * 0.02
+              : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
 
       if (isDraggingHairCenter) {
         custom.offsetX = Math.round(localX);

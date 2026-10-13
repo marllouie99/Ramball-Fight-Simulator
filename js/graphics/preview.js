@@ -6,6 +6,7 @@ import { Fighter } from '../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../entities/factories/fighterFactory.js';
 import { PreviewProjectileSystem } from './previewSystem.js';
 import { state } from '../core/state.js';
+import { audioSystem } from '../systems/audioSystem.js';
 
 export let indexDetailState = null;
 export let activePreviewState = null;
@@ -254,6 +255,215 @@ export function updateIndexDetailDemo(def, demoArea) {
       if (demoSpeed > 0) {
         fighter.bankaiChargeTimer = ((fighter.bankaiChargeTimer || 0) + 1) % chargeMax;
       }
+    } else if (def.type === 'maki' && ['maki_hit1', 'maki_hit2', 'maki_hit3', 'maki_combo'].includes(currentAnim)) {
+      pstate.hideTarget = false;
+      fighter.x = demoArea.x + demoArea.width / 2 - 40;
+      fighter.y = demoArea.y + demoArea.height / 2;
+      fighter.vx = 0;
+      fighter.vy = 0;
+      fighter.gunAngle = 0;
+      fighter.angle = 0;
+
+      const baseX = fighter.x + 72;
+      const baseY = fighter.y;
+      if (target) {
+        target.x += (baseX - target.x) * 0.15;
+        target.y += (baseY - target.y) * 0.15;
+        target.r = 25;
+        target.isDead = false;
+        target.hp = 1000;
+      }
+
+      if (demoSpeed > 0) {
+        if (fighter.afterImages && fighter.afterImages.length > 0) {
+          for (let i = fighter.afterImages.length - 1; i >= 0; i--) {
+            fighter.afterImages[i].alpha -= 0.040;
+            if (fighter.afterImages[i].alpha <= 0) fighter.afterImages.splice(i, 1);
+          }
+        }
+
+        if (fighter.swordSwingTimer > 0) {
+          const wasDelivered = fighter.swordHitDelivered;
+          if (typeof fighter._updateSwordSwing === 'function') {
+            fighter._updateSwordSwing(target, demoArea);
+          } else {
+            fighter.swordSwingTimer--;
+          }
+          if (target && !wasDelivered && fighter.swordHitDelivered) {
+            const step = fighter.swordComboStep || 1;
+            if (step === 1) {
+              target.x += 16;
+              target.y += 4;
+              previewProjectileSystem.addImpact(target.x, target.y, '#DC2626', 0, 24);
+            } else if (step === 2) {
+              target.x += 14;
+              target.y -= 16;
+              previewProjectileSystem.addImpact(target.x, target.y, '#8B5CF6', 0, 26);
+            } else if (step === 3) {
+              target.x += 28;
+              previewProjectileSystem.addImpact(target.x, target.y, '#F59E0B', 0, 36);
+            }
+          }
+        } else {
+          fighter.isSpinning = false;
+          pstate.makiCycleTimer = (pstate.makiCycleTimer || 0) + 1;
+          const recoveryWait = (currentAnim === 'maki_hit3')
+            ? ((CONFIG.maki?.hit3RecoveryFrames || 12) + 12)
+            : ((currentAnim === 'maki_hit2')
+              ? ((CONFIG.maki?.hit2RecoveryFrames || 10) + 10)
+              : ((CONFIG.maki?.hit1RecoveryFrames || 9) + 8));
+          if (pstate.makiCycleTimer >= recoveryWait) {
+            let step = 1;
+            if (currentAnim === 'maki_hit1') step = 1;
+            else if (currentAnim === 'maki_hit2') step = 2;
+            else if (currentAnim === 'maki_hit3') step = 3;
+            else if (currentAnim === 'maki_combo') {
+              pstate.makiComboStep = (pstate.makiComboStep || 1);
+              step = pstate.makiComboStep;
+              pstate.makiComboStep = (pstate.makiComboStep % 3) + 1;
+            }
+
+            fighter.playBasicAttackPattern(step, target);
+            pstate.makiCycleTimer = 0;
+          }
+        }
+      }
+      previewProjectileSystem.update(demoArea, fighter, target);
+      pstate.frame += 1;
+      return pstate;
+    } else if (def.type === 'maki' && currentAnim === 'jet') {
+      pstate.hideTarget = false;
+      const baseX = demoArea.x + demoArea.width / 2 + 55;
+      const baseY = demoArea.y + demoArea.height / 2;
+      fighter.y = baseY;
+      fighter.gunAngle = 0;
+      fighter.angle = 0;
+
+      if (!pstate.makiJetPhase) {
+        pstate.makiJetPhase = 'windup';
+        pstate.makiJetTimer = 0;
+      }
+
+      if (demoSpeed > 0) {
+        pstate.makiJetTimer++;
+        if (pstate.makiJetPhase === 'windup') {
+          fighter.x = demoArea.x + demoArea.width / 2 - 50;
+          target.x = baseX;
+          target.y = baseY;
+          target.isPinnedByMaki = false;
+          fighter.dragonBoneActive = true;
+          fighter.dragonBonePhase = 'windup';
+          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
+          fighter.dragonBonePhaseMax = 24;
+          if (pstate.makiJetTimer >= 24) {
+            pstate.makiJetPhase = 'dash';
+            pstate.makiJetTimer = 0;
+            try { audioSystem.playSFX('attack_swordswing', 0.9); } catch (e) {}
+          }
+        } else if (pstate.makiJetPhase === 'dash') {
+          const dashP = Math.min(1.0, pstate.makiJetTimer / 14);
+          fighter.x = (demoArea.x + demoArea.width / 2 - 50) + dashP * 45;
+          fighter.dragonBoneActive = true;
+          fighter.dragonBonePhase = 'dash';
+          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
+          fighter.dragonBonePhaseMax = 14;
+          if (pstate.makiJetTimer >= 14) {
+            pstate.makiJetPhase = 'stab';
+            pstate.makiJetTimer = 0;
+            target.isPinnedByMaki = true;
+            fighter.dragonBoneTarget = target;
+            try { audioSystem.playSFX('attack_groundsmash', 1.0); } catch (e) {}
+            previewProjectileSystem.addImpact(target.x, target.y, '#F59E0B', 0, 26);
+          }
+        } else if (pstate.makiJetPhase === 'stab') {
+          fighter.dragonBoneActive = true;
+          fighter.dragonBonePhase = 'stab';
+          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
+          fighter.dragonBonePhaseMax = 18;
+          target.x = fighter.x + 28;
+          target.y = fighter.y;
+          target.isPinnedByMaki = true;
+          if (pstate.makiJetTimer >= 18) {
+            pstate.makiJetPhase = 'lift';
+            pstate.makiJetTimer = 0;
+          }
+        } else if (pstate.makiJetPhase === 'lift') {
+          const liftP = Math.min(1.0, pstate.makiJetTimer / 22);
+          fighter.dragonBoneActive = true;
+          fighter.dragonBonePhase = 'lift';
+          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
+          fighter.dragonBonePhaseMax = 22;
+          target.x = fighter.x + (1.0 - liftP) * 28;
+          target.y = fighter.y - liftP * 40;
+          target.isPinnedByMaki = true;
+          if (pstate.makiJetTimer >= 22) {
+            pstate.makiJetPhase = 'throw';
+            pstate.makiJetTimer = 0;
+            try { audioSystem.playSFX('attack_swordswing', 1.0); } catch (e) {}
+          }
+        } else if (pstate.makiJetPhase === 'throw') {
+          const throwP = Math.min(1.0, pstate.makiJetTimer / 12);
+          fighter.dragonBoneActive = true;
+          fighter.dragonBonePhase = 'throw';
+          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
+          fighter.dragonBonePhaseMax = 12;
+          target.x = fighter.x + throwP * 55;
+          target.y = fighter.y - 40 + throwP * 48;
+          target.isPinnedByMaki = true;
+          if (pstate.makiJetTimer >= 12) {
+            pstate.makiJetPhase = 'groundPin';
+            pstate.makiJetTimer = 0;
+            try { audioSystem.playSFX('attack_groundsmash', 1.0); } catch (e) {}
+            previewProjectileSystem.addImpact(target.x, target.y, '#DC2626', 0, 30);
+          }
+        } else if (pstate.makiJetPhase === 'groundPin') {
+          fighter.dragonBoneActive = true;
+          fighter.dragonBonePhase = 'groundPin';
+          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
+          fighter.dragonBonePhaseMax = 25;
+          if (pstate.makiJetTimer >= 25) {
+            pstate.makiJetPhase = 'windup';
+            pstate.makiJetTimer = 0;
+            target.isPinnedByMaki = false;
+            fighter.dragonBoneActive = false;
+          }
+        }
+      }
+      previewProjectileSystem.update(demoArea, fighter, target);
+      pstate.frame += 1;
+      return pstate;
+    } else if (def.type === 'maki' && currentAnim === 'riposte') {
+      pstate.hideTarget = false;
+      fighter.x = demoArea.x + demoArea.width / 2 - 25;
+      fighter.y = demoArea.y + demoArea.height / 2;
+      fighter.gunAngle = 0;
+      fighter.angle = 0;
+      target.x = fighter.x + 60;
+      target.y = fighter.y;
+      fighter.riposteActive = true;
+      fighter.riposteTimer = 22;
+      if (demoSpeed > 0 && (pstate.frame % 60) === 0) {
+        previewProjectileSystem.addImpact(target.x, target.y, '#10B981', 0, 24);
+        target.x += 10;
+      }
+      previewProjectileSystem.update(demoArea, fighter, target);
+      pstate.frame += 1;
+      return pstate;
+    } else if (def.type === 'maki' && currentAnim === 'ult') {
+      pstate.hideTarget = false;
+      fighter.x = demoArea.x + demoArea.width / 2;
+      fighter.y = demoArea.y + demoArea.height / 2;
+      target.x = fighter.x + 70;
+      target.y = fighter.y;
+      fighter.ultimateActive = true;
+      fighter.ultimateTimer = 180;
+      if (demoSpeed > 0 && (pstate.frame % 10) === 0) {
+        if (typeof fighter._spawnAfterimage === 'function') fighter._spawnAfterimage(3, 8);
+        previewProjectileSystem.addImpact(target.x + (Math.random() - 0.5) * 30, target.y + (Math.random() - 0.5) * 30, '#8B5CF6', 0, 20);
+      }
+      previewProjectileSystem.update(demoArea, fighter, target);
+      pstate.frame += 1;
+      return pstate;
     }
 
     pstate.frame += 1;
@@ -293,6 +503,20 @@ export function updateIndexDetailDemo(def, demoArea) {
       fighter.skin = 'shikai';
       fighter.bankaiChargeTimer = 0;
     }
+    if (fighter.dragonBoneActive && currentAnim !== 'jet') {
+      fighter.dragonBoneActive = false;
+      fighter.dragonBonePhase = null;
+      fighter.dragonBoneTarget = null;
+      if (target) target.isPinnedByMaki = false;
+    }
+    if (fighter.riposteActive && currentAnim !== 'riposte') {
+      fighter.riposteActive = false;
+      fighter.riposteTimer = 0;
+    }
+    if (fighter.ultimateActive && currentAnim !== 'ult') {
+      fighter.ultimateActive = false;
+      fighter.ultimateTimer = 0;
+    }
   }
 
   // Stop / Pause (0x speed)
@@ -313,7 +537,7 @@ export function updateIndexDetailDemo(def, demoArea) {
   }
 
   for (let s = 0; s < steps; s++) {
-    const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
+    const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee', 'maki'].includes(def.type) || fighter.isMeleeFighter;
 
     // Force fighter to remain perfectly stationary in the center of the demo viewport
     fighter.x = demoArea.x + demoArea.width / 2;

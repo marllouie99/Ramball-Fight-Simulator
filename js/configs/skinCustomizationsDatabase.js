@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-11T18:26:03.447Z
+ * Generated from Skin Studio on 2026-10-13T14:42:29.471Z
  * =============================================================================
  */
 
@@ -23,7 +23,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   genos: { widthScale: 0.94, heightScale: 0.82, offsetX: 0, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
   escanor: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -3, angleOffset: 0, flipX: false, flipY: false },
   john_wick: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 6, angleOffset: 0, flipX: false, flipY: false },
-  gunslinger: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
+  gunslinger: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   crazydave: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   megumin: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   zeus: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -11, angleOffset: 0, flipX: false, flipY: false },
@@ -63,7 +63,8 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   avatar_of_emptiness_forearm_right: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   uryu_glasses: { widthScale: 1.40, heightScale: 1.10, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   shiro: { widthScale: 1.02, heightScale: 1.20, offsetX: -3, offsetY: -1, angleOffset: 0, flipX: false, flipY: false },
-  shiro_crown: { widthScale: 0.94, heightScale: 1.00, offsetX: -20, offsetY: -15, angleOffset: -0.5411, flipX: false, flipY: false }
+  shiro_crown: { widthScale: 0.94, heightScale: 1.00, offsetX: -20, offsetY: -15, angleOffset: -0.5411, flipX: false, flipY: false },
+  alucard_glasses: { widthScale: 1.10, heightScale: 1.10, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false }
 };
 
 export const DEFAULT_SKIN_CUSTOMIZATIONS = SKIN_CUSTOMIZATIONS_DATABASE;

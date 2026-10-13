@@ -1,6 +1,6 @@
 # AI Coding Agent Instructions
 
-## Canonical Default Model Hand Positioning (Rule 20)
+## Canonical Default Model Hand Positioning & Weapon Wielding (Rule 20)
 
 When creating or rendering new characters and model skins, ALWAYS use the approved default hand positioning standard:
 - **Symmetrical Lower-Flank Placement**: Both hands are circular elements (`drawPixelHand`) positioned symmetrically at the lower-left and lower-right flanks of the central body circle in local coordinate space:
@@ -8,7 +8,12 @@ When creating or rendering new characters and model skins, ALWAYS use the approv
   - **Right Hand**: `(x: +r * 0.82, y: +r * 0.38)`
 - **Hand Radius**: `handRadius = r * 0.30` (or `getHandSize(r * 0.30)`).
 - **Layering & Overlap**: Both hands MUST be rendered on the **front layer** (after rendering the central body circle), overlapping the lower perimeter of the body circle so approximately half of each hand circle overlaps the body edge and half protrudes outward as a distinct side fist.
-- **Weapon Wielding**: For weapon users, the main-hand weapon hilt/grip anchors directly at `(x: +r * 0.82, y: +r * 0.38)` during idle/rest, with the hand drawn over the grip.
+- **MANDATORY INSTRUCTION — ALWAYS USE DEFAULT HANDS TO HOLD WEAPONS**:
+  - For all weapon users and dual wielders, weapons MUST ALWAYS be anchored directly at the canonical default hands:
+    - Main-hand (Right Hand): hilt/grip anchors directly at `(x: +r * 0.82, y: +r * 0.38)`.
+    - Off-hand / Dual-wield (Left Hand): hilt/grip anchors directly at `(x: -r * 0.82, y: +r * 0.38)`.
+  - The canonical default hand MUST be drawn directly over the weapon grip/hilt (`drawPixelHand` at `(0, 0)` in weapon local space).
+  - **STRICT PROHIBITION of Weapon-Generated Duplicate Hands**: Weapon renderers MUST NEVER generate, create, or instantiate separate or arbitrary hands. Never render weapons with disconnected hands floating on the body while empty default hands sit below (resulting in 4 hands on screen). Always ensure single-source-of-truth hand rendering with exactly ONE pair of hands on the character across all match states.
 
 ## Mandatory In-Game Overlay HP & Status Drawing (Rule 21)
 
@@ -146,6 +151,25 @@ When implementing, rendering, or scaffolding side character dolls or animated st
   - Multi-frame sprite sheet dolls MUST NOT have artificial external vertical $Y$-bobbing applied on top of built-in breathing frames.
 - **Continuous 60 FPS Real-Time Timing**:
   - Always derive doll animation ticks from continuous high-resolution timestamps (`performance.now()`) to ensure fluid, uninterrupted frame cycling across all match states.
+
+## Mandatory 5-Phase Melee Combat Animation & Impact Lock Standard (Rule 30)
+
+When creating, scaffolding, animating, or tuning melee weapons and basic attack combos for any fighter (e.g. Maki Zen'in, Escanor, Toji, Ichigo, Nanami, Musashi, PEKKA, Knight):
+- **STRICT PROHIBITION of Weightless Snappy Swings**: NEVER implement melee attacks that transition immediately from the swing stroke into recovery on the exact frame the stroke finishes. Doing so creates an unsatisfying, snappy, floaty swing that feels like a rubber band snapping back or bouncing off thin air.
+- **Mandatory 5-Phase Animation Architecture**: All melee swings MUST implement the 5-phase timing lifecycle across config (`js/configs/characters/<name>Config.js`), weapon renderer (`js/graphics/weapons/*WeaponGraphics.js`), and entity loop (`js/entities/fighters/*Fighter.js`):
+  1. **Phase 1: Coil / Lift (`hit*LiftFrames`, ~6–8 frames)**: Smooth backward anticipation lift drawing arms and blade into potential energy load (`Math.sin(wp * Math.PI * 0.5)`).
+  2. **Phase 2: Poised Hold (`hit*HoldFrames`, ~2–4 frames)**: Tense pause at apex of anticipation (Escanor poised hold) before releasing the strike.
+  3. **Phase 3: Hypersonic Whip Strike (`hit*StrikeFrames`, ~5–8 frames)**: Explosive acceleration into the cleave plane with exponential power ease (`Math.pow(sp, 2.2)` to `2.6`) and lunging forward momentum. Deliver impact damage, hit-pause, and audio at `strikeP >= 0.50`.
+  4. **Phase 4: THE IMPACT LOCK / IMPACT LATCH (`hit*ImpactLockFrames` / `hit*LockFrames` / alias `hit*PinFrames`, ~5–7 frames)**:
+     - **Stationary Weapon Lock**: Weapon MUST remain firmly locked/latched into the impact plane (embedded in the ground, struck into target flesh, or locked at cleave apex, e.g. `weaponRot = 1.10`, `weaponLunge = 24px`, `weaponOffY = 14px`) throughout the entire impact lock window before recovery begins.
+     - **Zero Forward Velocity Clamp**: Fighter velocity MUST be clamped (`this.vx = 0; this.vy = 0;`) while the weapon is locked at impact to simulate hard physical collision and inertia transfer.
+     - **Micro-Tremor Jitter**: Weapon experiences high-frequency vibration/tremor (`±2.2px`, `±0.12 rad`) against impact resistance (`swordTremorIntensity`).
+     - **Visual Slash Ribbon Lock Hold**: Slash arcs and annular ribbon meshes MUST remain 100% unfurled and anchored at the impact plane throughout the entire lock window. Recovery eraser wipes MUST NOT begin until Phase 5 starts.
+     - **Impact Compression & Sparks**: Expanding concentric compression ring and discrete ember sparks at the impact contact point (Rule 26 compliant).
+  5. **Phase 5: Extraction & Recovery Settle (`hit*RecoveryFrames`, ~9–12 frames)**: Blade dislodges from the impact plane and returns to guard stance with spring-damped settle (`Math.pow(1.0 - rp, 1.8)` with damped harmonic wave), while the slash arc erases from tail to tip (Rule 15).
+- **Layered Fleshy "Slap" Audio Palette**:
+  - Combat hits MUST layer `attack_fleshhit` (1.0 volume) with blade slicing SFX (`sukuna_slice` or `attack_swordswing` at 0.90 volume) and heavy sub-bass punches (`attack_heavypunch1` on combo finishers) to deliver a visceral concussive slap impact rather than a generic metallic whoosh.
+- **Reference Playbook**: For detailed math, schemas, and templates, see dedicated skill `melee-attack-animator` (`.agents/skills/melee-attack-animator/SKILL.md`).
 
 ## Post-Change Suggestions
 

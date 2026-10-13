@@ -10,7 +10,7 @@ import { drawRubbickBolt } from '../weapons/rubbickWeaponGraphics.js';
 import { drawGojoOrb, drawPurpleOrbTrail } from '../weapons/gojoWeaponGraphics.js';
 
 
-import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash } from '../weapons/gunSlingerWeaponGraphics.js';
+import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash, drawAlucardCasullBullet, drawAlucardJackalBullet } from '../weapons/gunSlingerWeaponGraphics.js';
 import { drawEngineerBullet, drawTurretBullet } from '../weapons/engineerWeaponGraphics.js';
 import { drawRangerBullet } from '../weapons/rangerWeaponGraphics.js';
 import { drawCrimsonSniperBullet } from '../weapons/crimsonsniperWeaponGraphics.js';
@@ -533,7 +533,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     }
 
     // Gun Slinger bullet visual - detailed brass/copper revolver bullets
-    if (p.visual === 'gunslingerBullet') {
+    if (p.visual === 'gunslingerBullet' || p.visual === 'alucardCasullBullet' || p.visual === 'alucardJackalBullet') {
       const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
       const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
       const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
@@ -541,7 +541,13 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       const scale = owner ? Math.max(0.7, owner.r / 22) : 1.0;
       const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
 
-      drawGunSlingerBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      if (p.visual === 'alucardJackalBullet') {
+        drawAlucardJackalBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      } else if (p.visual === 'alucardCasullBullet') {
+        drawAlucardCasullBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      } else {
+        drawGunSlingerBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      }
       return;
     }
 

@@ -1,29 +1,41 @@
 // ─────────────────────────────────────────────
-// Gun Slinger — Dual Revolver Outlaw Config
+// Alucard — The No-Life King (Hellsing) Config
+// Dual Wielding Firearms (.454 Casull & 13mm Jackal)
 // ─────────────────────────────────────────────
 
 export const gunslingerConfig = {
   assets: {
-    hair: 'Assets/model/gunslinger/Gunslinger-hair.png',
+    hair: 'Assets/model/Alucard/Red-hat.png',
+    hat: 'Assets/model/Alucard/Red-hat.png',
+    glasses: 'Assets/model/Alucard/Red-eye-glasses.png',
+    weaponCasull: 'Assets/model/Alucard/Hellsing_.454_Casull_Pixel_Pistol.png',
+    weaponJackal: 'Assets/model/Alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png',
+    hellhoundFrames: [
+      'Assets/model/Alucard/Hellbound animation/Hellhound_frame1.png',
+      'Assets/model/Alucard/Hellbound animation/Hellhound_frame2.png',
+      'Assets/model/Alucard/Hellbound animation/Hellhound_frame3.png',
+      'Assets/model/Alucard/Hellbound animation/Hellhound_frame4.png',
+      'Assets/model/Alucard/Hellbound animation/Hellhound_frame5.png',
+    ],
   },
 
   // ── Base Character Attributes ──
   id: 13,
-  name: 'Gun Slinger',
-  displayName: 'Gun Slinger',
+  name: 'Alucard',
+  displayName: 'Alucard',
   characterId: 'gunslinger',
-  category: 'Sci-Fi & Modern',
-  title: 'Western Outlaw',
-  bossTitle: 'Western Outlaw',
-  hp: 80,                       // Balanced baseline HP (increased from 70)
-  damage: 6,                    // Base bullet damage (tuned from 10 to 6 for ~24 DPS)
-  cooldown: 25,
-  speed: 5.0,
-  moveSpeed: 5.0,
+  category: 'Anime & Supernatural',
+  title: 'The No-Life King',
+  bossTitle: 'Vampire of Hellsing',
+  hp: 85,                       // Aristocratic vampire HP baseline
+  damage: 7,                    // Base .454 Casull holy bullet damage
+  cooldown: 20,
+  speed: 5.2,
+  moveSpeed: 5.2,
   r: 25,
   radius: 25,
-  color: '#C19A6B',
-  themeColor: '#C19A6B',
+  color: '#8B0000',
+  themeColor: '#B91C1C',        // Crimson red theme
   startX: 260,
   startY: 250,
   startVx: 1.4,
@@ -31,43 +43,56 @@ export const gunslingerConfig = {
   aimbot: false,
   spinRate: 0.03,
   projectileSpeedMultiplier: 1.0,
-  ability: 'Dual Revolvers',
-  desc: 'Wields dual revolvers on both sides. Alternates rapid-fire shots and activates rapid sync fire.',
+  ability: 'Casull & Jackal',
+  desc: 'The No-Life King. Possesses Aggressive Regeneration on damage dealt, Heavy Anti-Regeneration Shots (Grievous Wounds), Baskerville Feast, invulnerable Shadow Phase cross-ups, and Mockery Illusion Counter.',
 
-  // ── Magazine & Reload System (Twin 6-Shooters) ──
+  // ── Magazine & Tactical Reload System (Casull & Jackal) ──
   enableMagazine: true,         // Master toggle for magazine system
-  magazineSize: 12,             // 12 bullets total (authentic 6 rounds per cylinder)
-  reloadTime: 75,               // Frames to reload (1.25s at 60 fps)
-  magazineRegenRate: 0,         // Bullets regenerated per second (0 = manual reload only)
-  reloadSpeedPenalty: 0.75,     // Movement speed multiplier during reload (25% slowdown)
+  magazineSize: 12,             // 12 rounds total (6 Casull silver rounds, 6 Jackal explosive rounds)
+  reloadTime: 70,               // Quick vampire reload (1.16s at 60 fps)
+  magazineRegenRate: 0,         // Manual/tactical reload only
+  reloadSpeedPenalty: 0.80,     // 20% movement slowdown during reload
 
-  // ── Basic Attack (Alternating Dual Revolvers) ──
+  // ── Basic Attacks & Heavy Anti-Regeneration (.454 Casull & 13mm Jackal) ──
   enableBasicAttack: true,      // Master toggle for basic attack
-  leftGunDelay: 8,              // Frames delay for left gun shot after right gun
-  shotCooldown: 15,             // Frames between alternating shots (4 shots/sec)
-  bulletDamage: 6,              // Damage per bullet
-  bulletSpeed: 30.0,            // Speed of bullets
-  basicAttackKnockback: 4.0,    // Micro-recoil impulse on basic attacks
+  leftGunDelay: 8,              // Delay between alternating shots
+  shotCooldown: 14,             // Frames between alternating fire (~4.3 shots/sec)
+  bulletDamage: 7,              // .454 Casull sacred silver bullet damage
+  jackalDamage: 8,              // 13mm Jackal explosive mercury bullet damage
+  bulletSpeed: 32.0,            // Supersonic high-velocity rounds
+  basicAttackKnockback: 4.5,    // Kinetic impact recoil
+  grievousWoundsDuration: 180,  // Grievous Wounds / Heal Block duration (3.0s at 60 fps)
 
-  // ── Passive Skill (Critical Hits & Momentum Scaling) ──
-  enablePassive: true,          // Master toggle for crit passive
-  critChance: 0.15,             // Base chance (15%) to deal critical damage
-  critMultiplier: 1.50,         // Base damage multiplier on critical hit (1.5x = 9.0 dmg)
-  critChanceIncrease: 0.03,     // Increase in crit chance (+3%) per crit hit
-  critMultiplierIncrease: 0.08, // Increase in damage multiplier (+0.08x) per crit hit
-  maxCritChance: 0.50,          // Maximum crit chance cap (50%)
-  maxCritMultiplier: 2.20,      // Maximum crit multiplier cap (2.20x = 13.2 dmg)
+  // ── Passive: Aggressive Regeneration ──
+  enablePassive: true,          // Master toggle for vampire passive
+  lifestealPercent: 0.35,       // Aggressive Regeneration: 35% base damage dealt converted to HP
+  lowHpLifestealPercent: 0.50,  // Aggressive Regeneration: 50% lifesteal when HP <= 50% maxHp
+  critChance: 0.15,             // Base critical hit chance (15%)
+  critMultiplier: 1.50,         // Base critical hit multiplier (1.50x)
+  critChanceIncrease: 0.04,     // Momentum increase (+4% crit chance per crit)
+  critMultiplierIncrease: 0.10, // Momentum increase (+0.10x crit multiplier per crit)
+  maxCritChance: 0.50,          // Maximum crit cap (50%)
+  maxCritMultiplier: 2.20,      // Maximum crit multiplier (2.20x)
 
-  // ── Active Skill (Rapid Sync Fire) ──
-  enableActiveSkill: true,      // Master toggle for active skill
-  skillCooldown: 360,           // Frames between skill uses (6.0s at 60 fps)
-  skillDuration: 50,            // Frames the rapid sync fire lasts
-  skillBurstCount: 6,           // Number of bullet pairs fired during skill (12 bullets total)
-  skillBurstInterval: 8,        // Frames between each bullet pair during skill
-  skillDamage: 4.0,             // Damage per bullet during skill (48 total burst damage)
-  skillRequiresFullMag: true,   // Skill can only be activated with full magazine
-  autoSkillThreshold: 2,        // Bullets or less triggers active skill before reload
-  leftGunAngleOffset: 0.3,      // Default left gun aim offset when no secondary target exists
+  // ── Skill 1: Baskerville Feast ──
+  enableSkill1: true,           // Master toggle for Baskerville Feast
+  skill1Cooldown: 240,          // Hound surge cooldown (4.0s at 60 fps)
+  houndDamage: 22.0,            // Baskerville Shadow Hound bite damage
+  houndSpeed: 18.0,             // Screen-crossing charge speed
+
+  // ── Skill 2: Shadow Phase ──
+  enableSkill2: true,           // Master toggle for Shadow Phase
+  skill2Cooldown: 320,          // Shadow Phase cooldown (5.33s at 60 fps)
+  shadowPhaseDuration: 22,      // Dash duration (frames)
+  shadowPhaseSpeed: 18.0,       // High-speed phase velocity
+  shadowPhaseInvulnerable: true,// 100% i-frames during dash
+
+  // ── Skill 3: Illusion Counter ──
+  enableSkill3: true,           // Master toggle for Illusion Counter
+  skill3Cooldown: 420,          // Illusion Counter cooldown (7.0s at 60 fps)
+  counterStanceDuration: 60,    // Mockery stance parry window (1.0s at 60 fps)
+  counterDamage: 26.0,          // Point-blank dual execution counter-strike damage
+  counterTimeStop: 25,          // Attacker hit-pause duration (frames)
 
   // ── Sound Effects & Audio Tuning ──
   sounds: {
@@ -79,3 +104,6 @@ export const gunslingerConfig = {
     reload: 0.60
   }
 };
+
+export const alucardConfig = gunslingerConfig;
+

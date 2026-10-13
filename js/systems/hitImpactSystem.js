@@ -616,8 +616,8 @@ export const HitImpactSystem = {
       return true; // Bullet spent on impact
     }
 
-    // Gun Slinger Dual Revolvers (Wild West Brass/Lead Cartridges) — Ballistic impact & fiery sparks
-    const isGunslingerBullet = projectile.visual === 'gunslingerBullet' || (attacker && (attacker.characterId === 'gunslinger' || attacker.type === 'gunslinger') && projectile.visual !== 'gunslinger_skill');
+    // Alucard (.454 Casull & 13mm Jackal) & Gun Slinger bullets — Ballistic impact & sparks
+    const isGunslingerBullet = projectile.visual === 'gunslingerBullet' || projectile.visual === 'alucardCasullBullet' || projectile.visual === 'alucardJackalBullet' || (attacker && (attacker.characterId === 'gunslinger' || attacker.type === 'gunslinger' || attacker.characterId === 'alucard' || attacker.type === 'alucard') && projectile.visual !== 'gunslinger_skill');
     if (isGunslingerBullet) {
       const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
 

@@ -501,7 +501,7 @@ function drawIndexDetailScreen() {
 
   // Define Demo Area coordinates inside panel (Spacious 496px × 360px Arena!)
   const demoInnerY = simY + 32;
-  const demoInnerH = 370;
+  const demoInnerH = (def.type === 'maki') ? 336 : 370;
   const demoArea = { x: containerX + 6, y: demoInnerY, width: containerW - 12, height: demoInnerH };
 
   // Clip combat rendering inside the demo window
@@ -654,101 +654,202 @@ function drawIndexDetailScreen() {
 
   ctx.restore(); // Restore Arena Clip
 
-  // Bottom of Arena Window: Animation Mode Chips Bar (Y: simY + 412)
-  const animDeckY = simY + 412;
-  const animBtns = [
-    { id: 'basic', label: 'BASIC ATK' }
-  ];
+  // Bottom of Arena Window: Animation Mode Chips Bar
+  if (def.type === 'maki') {
+    // ── Maki Zen'in: Dedicated 2-Row Layout (Basic Attack Patterns + Skills) ──
+    const activeAnim = state.indexDemoAnim || 'maki_hit1';
 
-  if (def.type === 'gojo') {
-    animBtns.push({ id: 'mixing', label: 'LAPSE BLUE' }, { id: 'red', label: 'REVERSAL RED' }, { id: 'domain', label: 'UNLIMITED VOID' });
-  } else if (def.type === 'sukuna') {
-    animBtns.push({ id: 'flurry', label: 'DISMANTLE' }, { id: 'fuga', label: 'FUGA ARROW' }, { id: 'domain', label: 'MALEVOLENT SHRINE' });
-  } else if (def.type === 'toji') {
-    animBtns.push({ id: 'spear', label: 'ISOH CHOP' }, { id: 'stealth', label: 'AMBUSH STRIKE' });
-  } else if (def.type === 'maki') {
-    animBtns.push({ id: 'jet', label: 'RYŪHOKU JET' }, { id: 'riposte', label: 'SOUL RIPOSTE' }, { id: 'ult', label: 'SAKURAJIMA' });
-  } else if (def.type === 'todo') {
-    animBtns.push({ id: 'clap', label: 'BOOGIE WOOGIE' }, { id: 'takada', label: 'TAKADA CHAN' });
-  } else if (def.type === 'saitama') {
-    animBtns.push({ id: 'flurry', label: 'CONSECUTIVE PUNCHES' }, { id: 'counter', label: 'SERIOUS PUNCH' });
-  } else if (def.type === 'genos') {
-    animBtns.push({ id: 'incinerate', label: 'INCINERATION CANNON' });
-  } else if (def.type === 'ichigo') {
-    animBtns.push({ id: 'hollow', label: 'HOLLOW MASK' }, { id: 'getsuga', label: 'GETSUGA TENSHO' }, { id: 'bankai', label: 'BANKAI' });
-  } else {
-    animBtns.push({ id: 'ability', label: (def.ability || 'SPECIAL SKILL').toUpperCase() });
-  }
+    // Row 1: Split Soul Katana Basic Attack Patterns
+    const makiBasicBtns = [
+      { id: 'maki_hit1', label: 'HIT 1: OVERHEAD' },
+      { id: 'maki_hit2', label: 'HIT 2: UPPERCUT' },
+      { id: 'maki_hit3', label: 'HIT 3: SWEEP 360°' },
+      { id: 'maki_combo', label: '3-HIT COMBO' }
+    ];
+    const row1Y = simY + 372;
+    const row1BtnW = 118;
+    const row1BtnH = 24;
+    const row1Gap = 6;
+    const row1TotalW = makiBasicBtns.length * row1BtnW + (makiBasicBtns.length - 1) * row1Gap;
+    let r1X = (canvas.width - row1TotalW) / 2;
 
-  const activeAnim = state.indexDemoAnim || 'basic';
-  const totalAnimW = animBtns.length * 115 + (animBtns.length - 1) * 8;
-  let animStartX = (canvas.width - totalAnimW) / 2;
-
-  animBtns.forEach((btn) => {
-    const isActive = activeAnim === btn.id;
-    const btnW = 115;
-    const btnH = 26;
-
-    ctx.save();
-    if (isActive) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 1.5;
-    } else {
-      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = 1;
-    }
-    drawChamferedRect(ctx, animStartX, animDeckY, btnW, btnH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.fillStyle = isActive ? '#ffffff' : '#8899aa';
-    ctx.font = '900 9.5px "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(btn.label, animStartX + btnW / 2, animDeckY + btnH / 2);
-
-    _registerButton(animStartX, animDeckY, btnW, btnH, () => {
-      unlockAudio();
-      state.indexDemoAnim = btn.id;
-      resetIndexDetailState(def, demoArea);
-
-      if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
-      else if (btn.id === 'red') {
-        audioSystem.playSFX('skill_redchanneling', 2.0);
-        audioSystem.playSFX('skill_redcharging', 2.0);
+    makiBasicBtns.forEach((btn) => {
+      const isActive = activeAnim === btn.id || (btn.id === 'maki_hit1' && activeAnim === 'basic');
+      ctx.save();
+      if (isActive) {
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.28)';
+        ctx.strokeStyle = '#10B981';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.lineWidth = 1;
       }
-      else if (btn.id === 'domain' && def.type === 'gojo') audioSystem.playSFX('skill_gojodomain', 5.0);
-      else if (btn.id === 'fuga') audioSystem.playSFX('skill_fuga', 3.5);
-      else if (btn.id === 'domain' && def.type === 'sukuna') audioSystem.playSFX('skill_domainexpansion', 5.5);
-      else if (btn.id === 'flurry' && def.type === 'saitama') audioSystem.playSFX('skill_dash3', 1.0);
-      else if (btn.id === 'counter' && def.type === 'saitama') audioSystem.playSFX(CONFIG.saitama?.counterPunchVoiceSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-voiceline.mp3', 3.0);
-      else if (btn.id === 'flurry') audioSystem.playSFX('skill_spinslash', 2.0);
-      else if (btn.id === 'spear') audioSystem.playSFX('attack_swordswing', 1.0);
-      else if (btn.id === 'stealth') audioSystem.playSFX('skill_dash5', 1.0);
-      else if (btn.id === 'clap') audioSystem.playSFX('skill_todoclap', 2.0);
-      else if (btn.id === 'takada') audioSystem.playSFX(CONFIG.todo?.takadaVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3', 3.0);
-      else if (btn.id === 'hollow' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/SkillEffects/flare.mp3', 0.9);
-      else if (btn.id === 'getsuga' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/Ichigo-getsugatensho-flashstep-voiceline.mp3', 1.0);
-      else if (btn.id === 'bankai' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/Ichigo-bankai-charging-voiceline.mp3', 1.0);
-      else if (btn.id === 'incinerate' && def.type === 'genos') {
-        if (CONFIG.genos?.ultVoiceEnabled !== false) {
-          const ultVoiceSrc = CONFIG.genos?.sounds?.ultVoice || CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3';
-          const ultVoiceVol = CONFIG.genos?.soundVolumes?.ultVoice ?? CONFIG.genos?.ultVoiceVolume ?? 0.90;
-          audioSystem.playSFX(ultVoiceSrc, ultVoiceVol);
-        }
-        if (CONFIG.genos?.ultChargeEnabled !== false) {
-          const ultChargeSrc = CONFIG.genos?.sounds?.ultCharge || CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3';
-          const ultChargeVol = CONFIG.genos?.soundVolumes?.ultCharge ?? CONFIG.genos?.ultChargeVolume ?? 0.55;
-          audioSystem.playSFX(ultChargeSrc, ultChargeVol);
-        }
-      }
+      drawChamferedRect(ctx, r1X, row1Y, row1BtnW, row1BtnH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
+      ctx.font = '900 9px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(btn.label, r1X + row1BtnW / 2, row1Y + row1BtnH / 2);
+
+      _registerButton(r1X, row1Y, row1BtnW, row1BtnH, () => {
+        unlockAudio();
+        state.indexDemoAnim = btn.id;
+        resetIndexDetailState(def, demoArea);
+        if (btn.id === 'maki_hit3') audioSystem.playSFX('attack_heavyhit', 1.0);
+        else audioSystem.playSFX('sword_slash_heavy', 0.9);
+      });
+
+      r1X += row1BtnW + row1Gap;
     });
 
-    animStartX += btnW + 8;
-  });
+    // Row 2: Cursed Tool Skills & Sakurajima Awakening Ultimate
+    const makiSkillBtns = [
+      { id: 'jet', label: 'RYŪHOKU JET' },
+      { id: 'riposte', label: 'SOUL RIPOSTE' },
+      { id: 'ult', label: 'SAKURAJIMA' }
+    ];
+    const row2Y = simY + 400;
+    const row2BtnW = 142;
+    const row2BtnH = 24;
+    const row2Gap = 12;
+    const row2TotalW = makiSkillBtns.length * row2BtnW + (makiSkillBtns.length - 1) * row2Gap;
+    let r2X = (canvas.width - row2TotalW) / 2;
+
+    makiSkillBtns.forEach((btn) => {
+      const isActive = activeAnim === btn.id;
+      ctx.save();
+      if (isActive) {
+        ctx.fillStyle = btn.id === 'ult' ? 'rgba(139, 92, 246, 0.30)' : 'rgba(245, 158, 11, 0.28)';
+        ctx.strokeStyle = btn.id === 'ult' ? '#8B5CF6' : '#F59E0B';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, r2X, row2Y, row2BtnW, row2BtnH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(btn.label, r2X + row2BtnW / 2, row2Y + row2BtnH / 2);
+
+      _registerButton(r2X, row2Y, row2BtnW, row2BtnH, () => {
+        unlockAudio();
+        state.indexDemoAnim = btn.id;
+        resetIndexDetailState(def, demoArea);
+        if (btn.id === 'jet') audioSystem.playSFX('attack_swordswing', 1.0);
+        else if (btn.id === 'riposte') audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
+        else if (btn.id === 'ult') audioSystem.playSFX('skill_domainexpansion', 4.0);
+      });
+
+      r2X += row2BtnW + row2Gap;
+    });
+
+  } else {
+    // ── Standard 1-Row Animation Chips Bar ──
+    const animDeckY = simY + 412;
+    const animBtns = [
+      { id: 'basic', label: 'BASIC ATK' }
+    ];
+
+    if (def.type === 'gojo') {
+      animBtns.push({ id: 'mixing', label: 'LAPSE BLUE' }, { id: 'red', label: 'REVERSAL RED' }, { id: 'domain', label: 'UNLIMITED VOID' });
+    } else if (def.type === 'sukuna') {
+      animBtns.push({ id: 'flurry', label: 'DISMANTLE' }, { id: 'fuga', label: 'FUGA ARROW' }, { id: 'domain', label: 'MALEVOLENT SHRINE' });
+    } else if (def.type === 'toji') {
+      animBtns.push({ id: 'spear', label: 'ISOH CHOP' }, { id: 'stealth', label: 'AMBUSH STRIKE' });
+    } else if (def.type === 'todo') {
+      animBtns.push({ id: 'clap', label: 'BOOGIE WOOGIE' }, { id: 'takada', label: 'TAKADA CHAN' });
+    } else if (def.type === 'saitama') {
+      animBtns.push({ id: 'flurry', label: 'CONSECUTIVE PUNCHES' }, { id: 'counter', label: 'SERIOUS PUNCH' });
+    } else if (def.type === 'genos') {
+      animBtns.push({ id: 'incinerate', label: 'INCINERATION CANNON' });
+    } else if (def.type === 'ichigo') {
+      animBtns.push({ id: 'hollow', label: 'HOLLOW MASK' }, { id: 'getsuga', label: 'GETSUGA TENSHO' }, { id: 'bankai', label: 'BANKAI' });
+    } else {
+      animBtns.push({ id: 'ability', label: (def.ability || 'SPECIAL SKILL').toUpperCase() });
+    }
+
+    const activeAnim = state.indexDemoAnim || 'basic';
+    const totalAnimW = animBtns.length * 115 + (animBtns.length - 1) * 8;
+    let animStartX = (canvas.width - totalAnimW) / 2;
+
+    animBtns.forEach((btn) => {
+      const isActive = activeAnim === btn.id;
+      const btnW = 115;
+      const btnH = 26;
+
+      ctx.save();
+      if (isActive) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.25)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, animStartX, animDeckY, btnW, btnH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = isActive ? '#ffffff' : '#8899aa';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(btn.label, animStartX + btnW / 2, animDeckY + btnH / 2);
+
+      _registerButton(animStartX, animDeckY, btnW, btnH, () => {
+        unlockAudio();
+        state.indexDemoAnim = btn.id;
+        resetIndexDetailState(def, demoArea);
+
+        if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
+        else if (btn.id === 'red') {
+          audioSystem.playSFX('skill_redchanneling', 2.0);
+          audioSystem.playSFX('skill_redcharging', 2.0);
+        }
+        else if (btn.id === 'domain' && def.type === 'gojo') audioSystem.playSFX('skill_gojodomain', 5.0);
+        else if (btn.id === 'fuga') audioSystem.playSFX('skill_fuga', 3.5);
+        else if (btn.id === 'domain' && def.type === 'sukuna') audioSystem.playSFX('skill_domainexpansion', 5.5);
+        else if (btn.id === 'flurry' && def.type === 'saitama') audioSystem.playSFX('skill_dash3', 1.0);
+        else if (btn.id === 'counter' && def.type === 'saitama') audioSystem.playSFX(CONFIG.saitama?.counterPunchVoiceSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-voiceline.mp3', 3.0);
+        else if (btn.id === 'flurry') audioSystem.playSFX('skill_spinslash', 2.0);
+        else if (btn.id === 'spear') audioSystem.playSFX('attack_swordswing', 1.0);
+        else if (btn.id === 'stealth') audioSystem.playSFX('skill_dash5', 1.0);
+        else if (btn.id === 'clap') audioSystem.playSFX('skill_todoclap', 2.0);
+        else if (btn.id === 'takada') audioSystem.playSFX(CONFIG.todo?.takadaVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3', 3.0);
+        else if (btn.id === 'hollow' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/SkillEffects/flare.mp3', 0.9);
+        else if (btn.id === 'getsuga' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/Ichigo-getsugatensho-flashstep-voiceline.mp3', 1.0);
+        else if (btn.id === 'bankai' && def.type === 'ichigo') audioSystem.playSFX('Assets/Sound Effects/Skills/Ichigo-bankai-charging-voiceline.mp3', 1.0);
+        else if (btn.id === 'incinerate' && def.type === 'genos') {
+          if (CONFIG.genos?.ultVoiceEnabled !== false) {
+            const ultVoiceSrc = CONFIG.genos?.sounds?.ultVoice || CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3';
+            const ultVoiceVol = CONFIG.genos?.soundVolumes?.ultVoice ?? CONFIG.genos?.ultVoiceVolume ?? 0.90;
+            audioSystem.playSFX(ultVoiceSrc, ultVoiceVol);
+          }
+          if (CONFIG.genos?.ultChargeEnabled !== false) {
+            const ultChargeSrc = CONFIG.genos?.sounds?.ultCharge || CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3';
+            const ultChargeVol = CONFIG.genos?.soundVolumes?.ultCharge ?? CONFIG.genos?.ultChargeVolume ?? 0.55;
+            audioSystem.playSFX(ultChargeSrc, ultChargeVol);
+          }
+        }
+      });
+
+      animStartX += btnW + 8;
+    });
+  }
 
   // ── Tier 3: Bottom Navigation Dock ──
   const dockY = canvas.height - 34;

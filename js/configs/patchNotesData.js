@@ -30,21 +30,14 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "SHIRO",
+        "character": "GUNSLINGER",
         "deltas": [
             {
                 "type": "ADJUST",
-                "key": "moveSpeed",
-                "oldVal": "5.6",
-                "newVal": "5.0",
+                "key": "hair",
+                "oldVal": "Assets/model/gunslinger/Gunslinger-hair.png",
+                "newVal": "Assets/model/Alucard/Red-hat.png",
                 "pct": "Mod"
-            },
-            {
-                "type": "NERF",
-                "key": "maxActiveMinions",
-                "oldVal": 16,
-                "newVal": 8,
-                "pct": "-50.0%"
             }
         ]
     }

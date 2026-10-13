@@ -2626,6 +2626,8 @@ class ProjectileSystem {
               p.visual === 'turretBullet' ||
               p.visual === 'EngineerBullet' ||
               p.visual === 'gunslingerBullet' ||
+              p.visual === 'alucardCasullBullet' ||
+              p.visual === 'alucardJackalBullet' ||
               p.visual === 'tacticalBullet' ||
               p.isGojoPurple ||
               p.isGojoPurpleOrb ||
@@ -4089,7 +4091,7 @@ class ProjectileSystem {
           }
         }
 
-        const isGunslingerBullet = p.visual === 'gunslingerBullet';
+        const isGunslingerBullet = p.visual === 'gunslingerBullet' || p.visual === 'alucardCasullBullet' || p.visual === 'alucardJackalBullet';
         if (isGunslingerBullet && expired && !hit) {
           const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
           let wallX = p.x;

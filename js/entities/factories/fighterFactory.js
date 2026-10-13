@@ -85,6 +85,8 @@ export const FIGHTER_CLASS_MAP = {
   'cronos':    CronosFighter,
   'bomber':    BomberFighter,
   'gunslinger': GunSlingerFighter,
+  'alucard':    GunSlingerFighter,
+  'Alucard':    GunSlingerFighter,
   'doppleganger': DopplegangerFighter,
   'Engineer': EngineerFighter,
   'targetdummy': TargetDummyFighter,
@@ -211,6 +213,11 @@ function wrapFighterDraw(FighterClass) {
       fighter.hideHands ||
       fighter.usesCustomHands ||
       fighter.hasCustomHands ||
+      fighter.characterId === 'gunslinger' ||
+      fighter.characterId === 'alucard' ||
+      fighter.type === 'gunslinger' ||
+      fighter.type === 'alucard' ||
+      fighter.name === 'Alucard' ||
       fighter.characterId === 'zeus' ||
       fighter.type === 'zeus' ||
       isNamelessDeity ||

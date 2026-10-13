@@ -537,9 +537,11 @@ export const CONFIG = {
     steeringForce: 0.35,     // how strongly bomber steers toward optimal distance (0-1)
   },
 
-  /** Gun Slinger — Dual revolver fighter */
+  /** Alucard (The No-Life King) — Dual wielding vampire (.454 Casull & 13mm Jackal) */
   gunslinger: gunslingerConfig,
   Gunslinger: gunslingerConfig,
+  alucard: gunslingerConfig,
+  Alucard: gunslingerConfig,
 
   /** Doppleganger ΓÇö Illusion melee fighter */
   doppleganger: {
@@ -906,9 +908,9 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 13,
-    name: 'Gun Slinger',
-    category: 'Sci-Fi & Modern',
-    color: gunslingerConfig.color || '#C19A6B',
+    name: 'Alucard',
+    category: gunslingerConfig.category || 'Anime & Supernatural',
+    color: gunslingerConfig.color || '#8B0000',
     startX: gunslingerConfig.startX || 260,
     startY: gunslingerConfig.startY || 250,
     startVx: gunslingerConfig.startVx || 1.4,
@@ -917,13 +919,13 @@ export const FIGHTER_DEFS = [
     aimbot: false,
     spinRate: gunslingerConfig.spinRate || 0.03,
     type: 'gunslinger',
-    hp: gunslingerConfig.hp || 80,
-    damage: gunslingerConfig.damage || 6,
-    cooldown: gunslingerConfig.cooldown || 25,
-    moveSpeed: gunslingerConfig.moveSpeed || 5.0,
+    hp: gunslingerConfig.hp || 85,
+    damage: gunslingerConfig.damage || 7,
+    cooldown: gunslingerConfig.cooldown || 20,
+    moveSpeed: gunslingerConfig.moveSpeed || 5.2,
     projectileSpeedMultiplier: gunslingerConfig.projectileSpeedMultiplier || 1.0,
-    ability: gunslingerConfig.ability || 'Dual Revolvers',
-    desc: gunslingerConfig.desc || 'Wields dual revolvers on both sides. Alternates rapid-fire shots and activates rapid sync fire.',
+    ability: gunslingerConfig.ability || 'Casull & Jackal',
+    desc: gunslingerConfig.desc || 'Wields the holy .454 Casull & 13mm Jackal with explosive armor-piercing rounds, vampiric blood lifesteal, and Control Art Restriction Level 1 shadow release.',
   },
   {
     id: 14,

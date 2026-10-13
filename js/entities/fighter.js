@@ -380,7 +380,15 @@ export class Fighter {
   set hp(value) {
     const oldHp = this._hp;
     if (oldHp !== undefined && value > oldHp && !this._bypassHealDebuff) {
-      if (this.tojiRegenDebuffTimer > 0) {
+      if (this.grievousWoundsTimer > 0 || this.healBlockTimer > 0) {
+        // Complete Heal Block / Grievous Wounds (Alucard): 100% healing prevention
+        value = oldHp;
+        const now = Date.now();
+        if (!this._lastHealBlockTextTime || now - this._lastHealBlockTextTime > 600) {
+          spawnFloatingText(this.x, this.y - this.r - 28, "HEAL BLOCKED!", "#DC2626");
+          this._lastHealBlockTextTime = now;
+        }
+      } else if (this.tojiRegenDebuffTimer > 0) {
         const healingAmount = value - oldHp;
         const debuffMult = CONFIG.toji?.regenDebuffMultiplier ?? 0.40;
         const reducedHealing = healingAmount * debuffMult;
@@ -651,6 +659,8 @@ export class Fighter {
     this.blackFlashDebuffTimer = 0;
     this.pureLoveBeamRegenDebuffTimer = 0;
     this.tojiRegenDebuffTimer = 0;
+    this.grievousWoundsTimer = 0;
+    this.healBlockTimer = 0;
     this.paralyzeTimer = 0;
     this.caughtInLaserBeamTimer = 0;
     this.caughtInLaylaBeamTimer = 0;
@@ -1988,6 +1998,12 @@ export class Fighter {
     }
     if (this.tojiRegenDebuffTimer > 0) {
       this.tojiRegenDebuffTimer--;
+    }
+    if (this.grievousWoundsTimer > 0) {
+      this.grievousWoundsTimer--;
+    }
+    if (this.healBlockTimer > 0) {
+      this.healBlockTimer--;
     }
     if (this._hitByGetsugaTimer > 0) this._hitByGetsugaTimer--;
     if (this._hitByFugaTimer > 0) this._hitByFugaTimer--;

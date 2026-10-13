@@ -1022,6 +1022,9 @@ function drawWeaponInfoCard(ctx, def) {
       nameText = 'Nameless Deity (Cosmic Seraph Form)';
       descText = 'Wrath of the Gods supreme cosmic entity. Wields the clockwork Wheel of Time, celestial wings, hovering multi-jointed divine armaments, and the primordial Nameless Destroyer super-beam with infinite destruction potential.';
     }
+  } else if (def.type === 'maki') {
+    nameText = 'Split Soul Katana (Shakkontō) & Dragon-Bone';
+    descText = 'Special-Grade Cursed Tools wielded with zero cursed energy. The Split Soul Katana bypasses physical toughness to sever the soul directly across a 3-hit combo sequence (Overhead Strike, Underhand Uppercut, 360° Spinning Sweep). Dragon-Bone absorbs kinetic recoil to unleash supersonic jet-thrust impalements and overhead ground slams.';
   }
 
   if (def.type === 'john_wick' || def.type === 'johnwick') {
@@ -2086,6 +2089,7 @@ function drawWeaponPreview(ctx, type, color) {
         return;
 
       case 'gunslinger':
+      case 'alucard':
         drawGunSlingerDualRevolver(0, 0, gunAngle, gunAngle + 0.18, r, false, 0);
         return;
 
@@ -2176,6 +2180,11 @@ function drawWeaponPreview(ctx, type, color) {
         } else {
           drawSplitSoulKatana(ctx, 0, 0, gunAngle, r);
         }
+        return;
+      }
+
+      case 'maki': {
+        drawSplitSoulKatana(ctx, 0, 0, gunAngle, r);
         return;
       }
 

@@ -98,3 +98,15 @@ super.update(opponent, ownerIndex, arena);
 ### 9. Mandatory Non-Freezing Active Visual Effects & Particle Decay Standard (Rule 25)
 - **Decay Before Freeze Guard**: Always update and decay transient visual effect arrays (explosions, slashes, particle bursts, shockwave rings) at the top of `update()` before `_handleTimeStop()`.
 - **Interrupt / Death Cleanup**: Clear effect arrays or decouple them to world space on `interruptAttacks(forceCancelAll = true)` or defeat so visual effects never freeze or stay stuck on screen when character movement is stopped.
+
+### 10. Mandatory 5-Phase Melee Combat Animation & Impact Lock Standard (Rule 30)
+- **No Weightless Snappy Swings**: When scaffolding melee weapon fighters (swords, axes, scythes, daggers), NEVER transition directly from swing to recovery on the same frame.
+- **5-Phase Lifecycle**: Implement all 5 distinct phases across config, renderer, and entity update:
+  1. **Lift / Coil** (`hit*LiftFrames`, ~6–8f)
+  2. **Poised Hold** (`hit*HoldFrames`, ~2–4f)
+  3. **Hypersonic Whip Strike** (`hit*StrikeFrames`, ~5–8f) — impact at `strikeP >= 0.50`
+  4. **THE IMPACT LOCK / IMPACT LATCH** (`hit*ImpactLockFrames` / `hit*LockFrames` / alias `hit*PinFrames`, ~5–7f) — blade stays locked at impact angle (ground embed, target flesh, or apex), `vx = 0, vy = 0`, tremor jitter, slash arc mesh held on impact plane, concentric compression ring & sparks
+  5. **Recovery Settle** (`hit*RecoveryFrames`, ~9–12f) — blade dislodges, returns to canonical hands (Rule 20), slash arc erases from tail to tip (Rule 15).
+- **Layered Fleshy Slap Audio**: Stack `attack_fleshhit` (1.0) + blade slice (0.90) + finisher concussive punch (0.95) on impact.
+- **Reference Playbook**: See dedicated skill `melee-attack-animator` (`.agents/skills/melee-attack-animator/SKILL.md`).
+

@@ -593,19 +593,21 @@
       }
     },
     "gunslinger": {
-      "name": "Gun Slinger",
-      "archetype": "tactical",
-      "hp": 80,
-      "speed": 5.0,
+      "name": "Alucard",
+      "archetype": "tactical vampire",
+      "hp": 85,
+      "speed": 5.2,
       "radius": 25,
-      "baseDamage": 6,
-      "baseCooldown": 15,
-      "themeColor": "#C19A6B",
+      "baseDamage": 7,
+      "baseCooldown": 14,
+      "themeColor": "#B91C1C",
       "keySkills": {
         "basicAttack": {
-          "damage": 6,
-          "speed": 16.0,
-          "cooldown": 15
+          "damage": 7,
+          "jackalDamage": 8,
+          "speed": 32.0,
+          "cooldown": 14,
+          "lifestealPercent": 0.25
         },
         "criticalPassive": {
           "baseChance": 0.15,
@@ -613,10 +615,11 @@
           "maxChance": 0.50,
           "maxMultiplier": 2.20
         },
-        "rapidSyncFire": {
-          "damage": 4.0,
+        "level1Release": {
+          "damage": 5.0,
+          "houndDamage": 18.0,
           "burstCount": 6,
-          "cooldown": 360
+          "cooldown": 340
         }
       }
     },

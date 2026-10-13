@@ -68,54 +68,209 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
     const progress = Math.max(0, Math.min(1.0, 1.0 - fighter.swordSwingTimer / maxT));
     const step = fighter.swordComboStep || 1;
 
+    // Dynamically derive phase boundaries from Escanor-style configured frame timings
+    const liftF = (typeof fighter.swordSwingLiftFrames === 'number')
+      ? fighter.swordSwingLiftFrames
+      : (step === 3 ? (CONFIG.maki?.hit3LiftFrames || 7) : (step === 2 ? (CONFIG.maki?.hit2LiftFrames || 8) : (CONFIG.maki?.hit1LiftFrames || 8)));
+    const holdF = (typeof fighter.swordSwingHoldFrames === 'number')
+      ? fighter.swordSwingHoldFrames
+      : (step === 3 ? (CONFIG.maki?.hit3HoldFrames || 4) : (step === 2 ? (CONFIG.maki?.hit2HoldFrames || 3) : (CONFIG.maki?.hit1HoldFrames || 3)));
+    const strikeF = (typeof fighter.swordSwingStrikeFrames === 'number')
+      ? fighter.swordSwingStrikeFrames
+      : (step === 3 ? (CONFIG.maki?.hit3StrikeFrames || 22) : (step === 2 ? (CONFIG.maki?.hit2StrikeFrames || 6) : (CONFIG.maki?.hit1StrikeFrames || 5)));
+    const pinF = (typeof fighter.swordSwingImpactLockFrames === 'number')
+      ? fighter.swordSwingImpactLockFrames
+      : ((typeof fighter.swordSwingLockFrames === 'number')
+        ? fighter.swordSwingLockFrames
+        : ((typeof fighter.swordSwingPinFrames === 'number')
+          ? fighter.swordSwingPinFrames
+          : (step === 3 ? (CONFIG.maki?.hit3ImpactLockFrames || CONFIG.maki?.hit3PinFrames || 8) : (step === 2 ? (CONFIG.maki?.hit2ImpactLockFrames || CONFIG.maki?.hit2PinFrames || 5) : (CONFIG.maki?.hit1ImpactLockFrames || CONFIG.maki?.hit1PinFrames || 6)))));
+    const recF = (typeof fighter.swordSwingRecFrames === 'number')
+      ? fighter.swordSwingRecFrames
+      : (step === 3 ? (CONFIG.maki?.hit3RecoveryFrames || 14) : (step === 2 ? (CONFIG.maki?.hit2RecoveryFrames || 10) : (CONFIG.maki?.hit1RecoveryFrames || 10)));
+
+    const totalF = Math.max(1, liftF + holdF + strikeF + pinF + recF);
+    const coilP = liftF / totalF;
+    const holdP = (liftF + holdF) / totalF;
+    const strikeP = (liftF + holdF + strikeF) / totalF;
+    const pinP = (liftF + holdF + strikeF + pinF) / totalF;
+
     if (step === 1) {
-      // Hit 1: The Overhead Strike (Two-handed downward chop)
+      // ──────────────────────────────────────────
+      // HIT 1: THE OVERHEAD CHOP & GROUND PIN
+      // Phase 1 (0 to coilP): Overhead lift coil (-1.55 rad backswing, arms drawn back)
+      // Phase 2 (coilP to holdP): Poised overhead apex hold (Escanor lift-hold)
+      // Phase 3 (holdP to strikeP): Hypersonic whip strike accelerating into ground slam (+1.10 rad)
+      // Phase 4 (strikeP to pinP): MELEE GROUND PIN — Katana stays locked/pinned to the floor!
+      // Phase 5 (pinP to 1.0): Dislodges from floor and smoothly recovers into stance
+      // ──────────────────────────────────────────
       isTwoHanded = true;
-      if (progress < 0.35) {
-        const wp = progress / 0.35;
+      if (progress < coilP) {
+        const wp = progress / Math.max(0.01, coilP);
         const ease = Math.sin(wp * Math.PI * 0.5);
-        weaponRot = -1.20 * ease;
-        weaponLunge = -6.0 * ease;
-        weaponOffY = -4.0 * ease;
-      } else {
-        const sp = (progress - 0.35) / 0.65;
-        const ease = Math.sin(sp * Math.PI * 0.5);
-        weaponRot = -1.20 + 1.80 * ease;
-        weaponLunge = -6.0 + 26.0 * Math.sin(sp * Math.PI);
-        weaponOffY = -4.0 + 6.0 * ease;
-      }
-    } else if (step === 2) {
-      // Hit 2: The Underhand Uppercut (Low rising cleave)
-      if (progress < 0.30) {
-        const wp = progress / 0.30;
-        const ease = Math.sin(wp * Math.PI * 0.5);
-        weaponRot = 0.85 * ease;
-        weaponLunge = -4.0 * ease;
-        weaponOffY = 6.0 * ease;
-        leftX = -r * 0.70;
-        leftY = r * 0.40;
-      } else {
-        const sp = (progress - 0.30) / 0.70;
-        const ease = Math.sin(sp * Math.PI * 0.5);
-        weaponRot = 0.85 - 2.10 * ease;
-        weaponLunge = -4.0 + 24.0 * Math.sin(sp * Math.PI);
-        weaponOffY = 6.0 - 12.0 * ease;
+        weaponRot = -1.55 * ease;
+        weaponLunge = -10.0 * ease;
+        weaponOffY = -8.0 * ease;
         leftX = rightX - 8;
         leftY = rightY - 4;
+      } else if (progress < holdP) {
+        // Poised overhead hold
+        weaponRot = -1.55;
+        weaponLunge = -10.0;
+        weaponOffY = -8.0;
+        leftX = rightX - 8;
+        leftY = rightY - 4;
+      } else if (progress < strikeP) {
+        // Hypersonic whip acceleration into ground slam (+1.10 rad)
+        const sp = (progress - holdP) / Math.max(0.01, (strikeP - holdP));
+        const whipEase = Math.pow(sp, 2.6);
+        weaponRot = -1.55 + 2.65 * whipEase;
+        weaponLunge = -10.0 + 34.0 * whipEase;
+        weaponOffY = -8.0 + 22.0 * whipEase;
+        leftX = rightX - 8;
+        leftY = rightY - 4;
+      } else if (progress < pinP) {
+        // MELEE IMPACT LOCK: Blade stays firmly embedded in the floor at impact angle (zero shaking)
+        weaponRot = 1.10;
+        weaponLunge = 24.0;
+        weaponOffY = 14.0;
+      } else {
+        // Recovery: Dislodging blade from floor and returning to guard
+        const rp = (progress - pinP) / Math.max(0.01, (1.0 - pinP));
+        const settleEase = Math.pow(1.0 - rp, 1.8);
+        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
+        weaponRot = (1.10 * settleEase) - (0.28 * springWave);
+        weaponLunge = (24.0 * settleEase) - (6.0 * springWave);
+        weaponOffY = (14.0 * settleEase) - (4.0 * springWave);
+        if (rp > 0.40) {
+          isTwoHanded = false;
+          const returnEase = (rp - 0.40) / 0.60;
+          leftX = (rightX - 8) + (-r * 0.82 - (rightX - 8)) * returnEase;
+          leftY = (rightY - 4) + (r * 0.38 - (rightY - 4)) * returnEase;
+        }
+      }
+    } else if (step === 2) {
+      // ──────────────────────────────────────────
+      // HIT 2: THE UNDERHAND UPPERCUT & APEX CLEAVE IMPACT LOCK
+      // Phase 1 (0 to coilP): Two-handed underhand scoop anticipation (+1.35 rad down-back coil)
+      // Phase 2 (coilP to holdP): Poised two-handed scoop hold
+      // Phase 3 (holdP to strikeP): Hypersonic rising whip snap to apex (-1.65 rad)
+      // Phase 4 (strikeP to pinP): APEX IMPACT LOCK — Locked firmly at peak vertical cleave (zero shaking)
+      // Phase 5 (pinP to 1.0): Recovery & two-handed stance settle
+      // ──────────────────────────────────────────
+      isTwoHanded = true;
+      if (progress < coilP) {
+        const wp = progress / Math.max(0.01, coilP);
+        const ease = Math.sin(wp * Math.PI * 0.5);
+        weaponRot = 1.35 * ease;
+        weaponLunge = -9.0 * ease;
+        weaponOffY = 12.0 * ease;
+      } else if (progress < holdP) {
+        // Poised in two-handed low scoop stance
+        weaponRot = 1.35;
+        weaponLunge = -9.0;
+        weaponOffY = 12.0;
+      } else if (progress < strikeP) {
+        // Hypersonic ascending whip stroke to apex (-1.65 rad)
+        const sp = (progress - holdP) / Math.max(0.01, (strikeP - holdP));
+        const whipEase = Math.pow(sp, 2.6);
+        weaponRot = 1.35 - 3.00 * whipEase;
+        weaponLunge = -9.0 + 33.0 * whipEase;
+        weaponOffY = 12.0 - 30.0 * whipEase;
+      } else if (progress < pinP) {
+        // APEX CLEAVE IMPACT LOCK: Clean, firmly locked at apex (zero shaking)
+        weaponRot = -1.65;
+        weaponLunge = 24.0;
+        weaponOffY = -18.0;
+      } else {
+        const rp = (progress - pinP) / Math.max(0.01, (1.0 - pinP));
+        const settleEase = Math.pow(1.0 - rp, 1.8);
+        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
+        weaponRot = (-1.65 * settleEase) + (0.35 * springWave);
+        weaponLunge = (24.0 * settleEase) - (6.0 * springWave);
+        weaponOffY = (-18.0 * settleEase) + (4.0 * springWave);
+        if (rp > 0.40) {
+          isTwoHanded = false;
+          const returnEase = (rp - 0.40) / 0.60;
+          leftX = (rightX - 8) + (-r * 0.82 - (rightX - 8)) * returnEase;
+          leftY = (rightY - 4) + (r * 0.38 - (rightY - 4)) * returnEase;
+        }
       }
     }
-    // HIT 3: THE SPINNING SWEEP (FRAME 5)
-    // (Full 360° whirlwind spinning horizontal sweep)
+    // ──────────────────────────────────────────
+    // ──────────────────────────────────────────
+    // HIT 3: THE SPINNING SWEEP & SUNDER IMPACT LOCK
+    // Phase 1 (0 to coilP): Two-handed anticipation load across chest
+    // Phase 2 (coilP to holdP): Poised torque hold at peak potential energy
+    // Phase 3 (holdP to strikeP): Hypersonic 360° whirlwind rotation orbiting around body center
+    // Phase 4 (strikeP to pinP): SUNDER IMPACT LOCK — Katana firmly locked in follow-through cleave plane
+    // Phase 5 (pinP to 1.0): Spring-damped return to guard without unwinding backwards
     // ──────────────────────────────────────────
     else {
-      isJetThrusting = true;
-      const ease = Math.sin(progress * Math.PI * 0.5);
-      weaponRot = 0.0; // Horizontal blade alignment
-      weaponLunge = 34.0 * Math.sin(progress * Math.PI); // Extended reach during full spin
-      weaponOffY = 0.0;
-      // Extended wide arms for centrifugal spin
-      leftX = -r * 0.70;
-      leftY = r * 0.40;
+      isTwoHanded = true;
+      const orbitRx = r * 0.85;
+      const orbitRy = r * 0.72;
+      const startAng = 0.55;
+      const lockAng = 0.55;
+      const lockRot = 0.80;
+      const lockHx = Math.cos(lockAng) * orbitRx;
+      const lockHy = Math.sin(lockAng) * orbitRy;
+
+      if (progress < coilP) {
+        // Phase 1: Draw two hands and hilt into coiled anticipation ready stance
+        const wp = progress / Math.max(0.01, coilP);
+        const ease = Math.sin(wp * Math.PI * 0.5);
+        const curHx = rightX + (lockHx - rightX) * ease;
+        const curHy = rightY + (lockHy - rightY) * ease;
+
+        weaponOffX = curHx - rightX;
+        weaponOffY = curHy - rightY;
+        weaponRot = startAng * ease;
+        weaponLunge = -6.0 * ease;
+      } else if (progress < holdP) {
+        // Phase 2: Poised hold at ready tension
+        weaponOffX = lockHx - rightX;
+        weaponOffY = lockHy - rightY;
+        weaponRot = startAng;
+        weaponLunge = -6.0;
+      } else if (progress < strikeP) {
+        // Phase 3: Hypersonic 360° whirlwind whip strike orbiting continuously around body center
+        const sp = (progress - holdP) / Math.max(0.01, (strikeP - holdP));
+        const whipEase = Math.pow(sp, 1.25);
+        const sweepAngle = startAng + (Math.PI * 2) * whipEase;
+        const curHx = Math.cos(sweepAngle) * orbitRx;
+        const curHy = Math.sin(sweepAngle) * orbitRy;
+
+        weaponOffX = curHx - rightX;
+        weaponOffY = curHy - rightY;
+        weaponRot = sweepAngle + 0.25;
+        weaponLunge = 28.0 * Math.sin(whipEase * Math.PI);
+      } else if (progress < pinP) {
+        // Phase 4: SUNDER IMPACT LOCK — Locked firmly in front-right cleave plane (zero shaking)
+        weaponOffX = lockHx - rightX;
+        weaponOffY = lockHy - rightY;
+        weaponRot = lockRot;
+        weaponLunge = 22.0;
+      } else {
+        // Phase 5: Spring-damped return from lock angle to neutral guard (NEVER unwinds backwards!)
+        const rp = (progress - pinP) / Math.max(0.01, (1.0 - pinP));
+        const settleEase = Math.pow(1.0 - rp, 1.8);
+        const springWave = Math.sin(rp * Math.PI * 2.0) * Math.exp(-rp * 4.0);
+
+        const lockOffX = lockHx - rightX;
+        const lockOffY = lockHy - rightY;
+        weaponOffX = (lockOffX * settleEase) + (1.5 * springWave);
+        weaponOffY = (lockOffY * settleEase) + (1.5 * springWave);
+        weaponRot = (lockRot * settleEase) - (0.22 * springWave);
+        weaponLunge = (22.0 * settleEase) - (5.0 * springWave);
+
+        if (rp > 0.40) {
+          isTwoHanded = false;
+          const returnEase = (rp - 0.40) / 0.60;
+          leftX = (rightX + weaponOffX - 8) + (-r * 0.82 - (rightX + weaponOffX - 8)) * returnEase;
+          leftY = (rightY + weaponOffY - 4) + (r * 0.38 - (rightY + weaponOffY - 4)) * returnEase;
+        }
+      }
     }
   } else if (fighter.dragonBoneActive) {
     isTwoHanded = true; // Mandatory 2-handed grip for the entire Dragon-Bone sequence (stab to throw & groundPin)
@@ -422,163 +577,334 @@ export function drawMakiComboSlashVFX(ctx, fighter, r, facingLeft = false) {
   const progress = Math.max(0, Math.min(1.0, 1.0 - fighter.swordSwingTimer / maxT));
   const step = fighter.swordComboStep || 1;
 
+  // Dynamically derive phase boundaries from Escanor-style configured frame timings
+  const liftF = (typeof fighter.swordSwingLiftFrames === 'number')
+    ? fighter.swordSwingLiftFrames
+    : (step === 3 ? (CONFIG.maki?.hit3LiftFrames || 7) : (step === 2 ? (CONFIG.maki?.hit2LiftFrames || 8) : (CONFIG.maki?.hit1LiftFrames || 8)));
+  const holdF = (typeof fighter.swordSwingHoldFrames === 'number')
+    ? fighter.swordSwingHoldFrames
+    : (step === 3 ? (CONFIG.maki?.hit3HoldFrames || 4) : (step === 2 ? (CONFIG.maki?.hit2HoldFrames || 3) : (CONFIG.maki?.hit1HoldFrames || 3)));
+  const strikeF = (typeof fighter.swordSwingStrikeFrames === 'number')
+    ? fighter.swordSwingStrikeFrames
+    : (step === 3 ? (CONFIG.maki?.hit3StrikeFrames || 22) : (step === 2 ? (CONFIG.maki?.hit2StrikeFrames || 6) : (CONFIG.maki?.hit1StrikeFrames || 5)));
+  const pinF = (typeof fighter.swordSwingImpactLockFrames === 'number')
+    ? fighter.swordSwingImpactLockFrames
+    : ((typeof fighter.swordSwingLockFrames === 'number')
+      ? fighter.swordSwingLockFrames
+      : ((typeof fighter.swordSwingPinFrames === 'number')
+        ? fighter.swordSwingPinFrames
+        : (step === 3 ? (CONFIG.maki?.hit3ImpactLockFrames || CONFIG.maki?.hit3PinFrames || 8) : (step === 2 ? (CONFIG.maki?.hit2ImpactLockFrames || CONFIG.maki?.hit2PinFrames || 5) : (CONFIG.maki?.hit1ImpactLockFrames || CONFIG.maki?.hit1PinFrames || 6)))));
+  const recF = (typeof fighter.swordSwingRecFrames === 'number')
+    ? fighter.swordSwingRecFrames
+    : (step === 3 ? (CONFIG.maki?.hit3RecoveryFrames || 14) : (step === 2 ? (CONFIG.maki?.hit2RecoveryFrames || 10) : (CONFIG.maki?.hit1RecoveryFrames || 10)));
+
+  const totalF = Math.max(1, liftF + holdF + strikeF + pinF + recF);
+  const strikeStartP = (liftF + holdF) / totalF;
+  const strikeEndP = (liftF + holdF + strikeF) / totalF;
+  const pinEndP = (liftF + holdF + strikeF + pinF) / totalF;
+
   // ──────────────────────────────────────────
   // STEP 1: THE OVERHEAD STRIKE VFX (FRAME 1)
-  // (Heavy vertical downward chop crescent & impact shockwave)
+  // Shinobi-Style Annular Filled Ribbon Mesh with Translucent Soul Wash & Razor White Rim
   // ──────────────────────────────────────────
   if (step === 1) {
-    if (progress >= 0.20 && progress <= 0.95) {
-      const p = (progress - 0.20) / 0.75;
-      const swingP = Math.min(1.0, p / 0.42);
-      const recP = p > 0.42 ? (p - 0.42) / 0.58 : 0;
+    if (progress >= strikeStartP && progress <= 0.98) {
+      const p = (progress - strikeStartP) / Math.max(0.01, (1.0 - strikeStartP));
+      const activeWindow = Math.max(0.01, (strikeEndP - strikeStartP) / (1.0 - strikeStartP));
+      const pinWindow = Math.max(0.01, (pinEndP - strikeStartP) / (1.0 - strikeStartP));
+      const swingP = Math.min(1.0, p / activeWindow);
+      const recP = p > pinWindow ? (p - pinWindow) / Math.max(0.01, (1.0 - pinWindow)) : 0;
 
-      const slashRadius = r * 3.30;
-      const startArc = -Math.PI * 0.60;  // High overhead
-      const maxArc = Math.PI * 0.28;     // Downward ground strike
-      const totalArc = maxArc - startArc;
+      const outerR = r * 3.50;
+      const innerR = r * 1.40;
+      const totalArc = CONFIG.maki?.hit1ArcAngle || ((140 * Math.PI) / 180);
+      const startArc = -totalArc * 0.58;  // High overhead
+      const maxArc = totalArc * 0.42;     // Downward ground strike
 
-      const currentStart = startArc + totalArc * Math.pow(recP, 1.4);
-      const currentEnd = startArc + totalArc * Math.sin(swingP * Math.PI * 0.5);
+      const currentStart = startArc + totalArc * Math.pow(recP, 1.8);
+      const currentEnd = startArc + totalArc * Math.pow(swingP, 2.0);
 
-      if (Math.abs(currentEnd - currentStart) > 0.05) {
-        const taper = Math.pow(Math.sin(p * Math.PI), 1.15) * (1.0 - recP * 0.5);
+      if (currentEnd - currentStart > 0.04) {
+        const taper = Math.pow(Math.sin(p * Math.PI), 1.15) * (1.0 - recP * 0.45);
+        const cx = r * 0.38;
+        const cy = -r * 0.08;
 
-        // 1. Outer Crimson Soul Glow
-        ctx.strokeStyle = 'rgba(220, 38, 38, 0.90)';
-        ctx.lineWidth = Math.max(1, 16 * taper);
+        ctx.save();
+        // 1. Translucent Soul Wash Ribbon (Filled Annular Sector)
         ctx.beginPath();
-        ctx.arc(r * 0.35, -r * 0.1, slashRadius, currentStart, currentEnd, false);
+        ctx.arc(cx, cy, outerR, currentStart, currentEnd, false);
+        ctx.arc(cx, cy, innerR, currentEnd, currentStart, true);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(220, 38, 38, ${0.44 * taper})`;
+        ctx.fill();
+
+        // 2. High-Density Inner Violet Kinetic Wash
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR * 0.92, currentStart, currentEnd, false);
+        ctx.arc(cx, cy, innerR * 1.45, currentEnd, currentStart, true);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(168, 85, 247, ${0.32 * taper})`;
+        ctx.fill();
+
+        // 3. Sub-Razor Outer Crimson Ionization Rim
+        ctx.strokeStyle = `rgba(239, 68, 68, ${0.90 * taper})`;
+        ctx.lineWidth = Math.max(1, 5.5 * taper);
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, currentStart, currentEnd, false);
         ctx.stroke();
 
-        // 2. Violet Kinetic Edge
-        ctx.strokeStyle = 'rgba(139, 92, 246, 0.95)';
-        ctx.lineWidth = Math.max(1, 8 * taper);
-        ctx.beginPath();
-        ctx.arc(r * 0.35, -r * 0.1, slashRadius, currentStart, currentEnd, false);
-        ctx.stroke();
-
-        // 3. Incandescent White Razor Core
-        ctx.strokeStyle = '#FFFFFF';
+        // 4. Supersonic White Razor Edge Rim
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * taper})`;
         ctx.lineWidth = Math.max(1, 3.2 * taper);
         ctx.beginPath();
-        ctx.arc(r * 0.35, -r * 0.1, slashRadius, currentStart, currentEnd, false);
+        ctx.arc(cx, cy, outerR, currentStart, currentEnd, false);
         ctx.stroke();
 
-        // 4. Downward needle speed lines
-        _drawNeedleSpeedLine(ctx, r * 1.5, -4, 0.25, 28 * taper, '#DC2626');
-        _drawNeedleSpeedLine(ctx, r * 1.5, 4, 0.25, 22 * taper, '#FFFFFF');
+        // 5. Leading Kissaki Tip Glint & Diamond Cross
+        const tipX = cx + Math.cos(currentEnd) * outerR;
+        const tipY = cy + Math.sin(currentEnd) * outerR;
+        _drawTipGlint(ctx, tipX, tipY, 4.5 * taper, '#FFFFFF');
+
+        // 6. Trailing Speed Needles (Rule 16)
+        _drawNeedleSpeedLine(ctx, cx + Math.cos(currentEnd - 0.28) * (outerR * 0.88), cy + Math.sin(currentEnd - 0.28) * (outerR * 0.88), currentEnd, 28 * taper, '#FFFFFF');
+        _drawNeedleSpeedLine(ctx, cx + Math.cos(currentEnd - 0.55) * (outerR * 0.72), cy + Math.sin(currentEnd - 0.55) * (outerR * 0.72), currentEnd, 24 * taper, '#DC2626');
+
+        // 7. Ground Pin Compression Ring & Floor Sparks (When blade pins into ground)
+        if (progress >= strikeEndP && progress <= pinEndP) {
+          const pinT = (progress - strikeEndP) / Math.max(0.01, (pinEndP - strikeEndP));
+          const pinAlpha = (1.0 - pinT);
+          const impactX = cx + Math.cos(maxArc) * outerR;
+          const impactY = cy + Math.sin(maxArc) * outerR;
+
+          // Concentric Ground Compression Ring (Rule 26 compliant)
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.85 * pinAlpha})`;
+          ctx.lineWidth = 2.0 * pinAlpha;
+          ctx.beginPath();
+          ctx.ellipse(impactX, impactY, 15 * (1 + pinT * 0.4), 7 * (1 + pinT * 0.4), 0, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Floor sparks (discrete dots, Rule 26 compliant)
+          ctx.fillStyle = '#F59E0B';
+          for (let s = 0; s < 4; s++) {
+            const sparkAng = (s * Math.PI * 0.5) + (pinT * 0.4);
+            const sparkDist = (7 + s * 3.5) * (1 + pinT * 0.6);
+            ctx.fillRect(impactX + Math.cos(sparkAng) * sparkDist - 1, impactY + Math.sin(sparkAng) * sparkDist * 0.5 - 1, 2, 2);
+          }
+        }
+        ctx.restore();
       }
     }
   }
   // ──────────────────────────────────────────
   // STEP 2: THE UNDERHAND UPPERCUT VFX (FRAME 4)
-  // (Bottom-to-Top ascending uppercut crescent & air surface bounce ring)
+  // Ascending Annular Ribbon Mesh with Solar Crimson Rim & Air Surface Bounce Ring
   // ──────────────────────────────────────────
   else if (step === 2) {
-    if (progress >= 0.18 && progress <= 0.95) {
-      const p = (progress - 0.18) / 0.77;
-      const swingP = Math.min(1.0, p / 0.46);
-      const recP = p > 0.46 ? (p - 0.46) / 0.54 : 0;
+    if (progress >= strikeStartP && progress <= 0.98) {
+      const p = (progress - strikeStartP) / Math.max(0.01, (1.0 - strikeStartP));
+      const activeWindow = Math.max(0.01, (strikeEndP - strikeStartP) / (1.0 - strikeStartP));
+      const pinWindow = Math.max(0.01, (pinEndP - strikeStartP) / (1.0 - strikeStartP));
+      const swingP = Math.min(1.0, p / activeWindow);
+      const recP = p > pinWindow ? (p - pinWindow) / Math.max(0.01, (1.0 - pinWindow)) : 0;
 
-      const slashRadius = r * 3.10;
-      const startArc = Math.PI * 0.30;   // Starts bottom-right
-      const maxArc = -Math.PI * 0.60;    // Sweeps UPWARDS to top-left
-      const totalArc = maxArc - startArc;
+      const outerR = r * 3.40;
+      const innerR = r * 1.35;
+      const totalArc = -(CONFIG.maki?.hit2ArcAngle || ((150 * Math.PI) / 180)); // Counter-clockwise sweep
+      const startArc = -totalArc * 0.35;   // Low scooping angle
+      const endArc = startArc + totalArc; // High ascending apex
 
-      const currentStart = startArc + totalArc * Math.pow(recP, 1.4);
-      const currentEnd = startArc + totalArc * Math.sin(swingP * Math.PI * 0.5);
+      const currentStart = startArc + totalArc * Math.pow(recP, 1.8);
+      const currentEnd = startArc + totalArc * Math.pow(swingP, 2.0);
 
-      if (Math.abs(currentEnd - currentStart) > 0.05) {
-        const taper = Math.pow(Math.sin(p * Math.PI), 1.15) * (1.0 - recP * 0.5);
+      if (Math.abs(currentEnd - currentStart) > 0.04) {
+        const taper = Math.pow(Math.sin(p * Math.PI), 1.15) * (1.0 - recP * 0.45);
+        const cx = r * 0.40;
+        const cy = -r * 0.12;
 
-        // 1. Ascending Soul Glow Ribbon (Sweeps upward)
-        ctx.strokeStyle = 'rgba(168, 85, 247, 0.85)';
-        ctx.lineWidth = Math.max(1, 16 * taper);
+        ctx.save();
+        // 1. Translucent Violet Soul Wash Ribbon (Filled Annular Sector)
         ctx.beginPath();
-        ctx.arc(r * 0.4, -r * 0.2, slashRadius, currentStart, currentEnd, true);
+        ctx.arc(cx, cy, outerR, currentStart, currentEnd, true);
+        ctx.arc(cx, cy, innerR, currentEnd, currentStart, false);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(168, 85, 247, ${0.46 * taper})`;
+        ctx.fill();
+
+        // 2. Solar Crimson Intermediate Wash
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR * 0.92, currentStart, currentEnd, true);
+        ctx.arc(cx, cy, innerR * 1.45, currentEnd, currentStart, false);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(239, 68, 68, ${0.30 * taper})`;
+        ctx.fill();
+
+        // 3. Sub-Razor Violet Ionization Rim
+        ctx.strokeStyle = `rgba(168, 85, 247, ${0.90 * taper})`;
+        ctx.lineWidth = Math.max(1, 5.5 * taper);
+        ctx.beginPath();
+        ctx.arc(cx, cy, outerR, currentStart, currentEnd, true);
         ctx.stroke();
 
-        // 2. Solar Crimson Accent Ribbon
-        ctx.strokeStyle = 'rgba(239, 68, 68, 0.90)';
-        ctx.lineWidth = Math.max(1, 8 * taper);
+        // 4. Supersonic White Razor Edge Rim
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * taper})`;
+        ctx.lineWidth = Math.max(1, 3.2 * taper);
         ctx.beginPath();
-        ctx.arc(r * 0.4, -r * 0.2, slashRadius, currentStart, currentEnd, true);
+        ctx.arc(cx, cy, outerR, currentStart, currentEnd, true);
         ctx.stroke();
 
-        // 3. Pure Razor White Core
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = Math.max(1, 3.0 * taper);
-        ctx.beginPath();
-        ctx.arc(r * 0.4, -r * 0.2, slashRadius, currentStart, currentEnd, true);
-        ctx.stroke();
+        // 5. Leading Kissaki Tip Glint
+        const tipX = cx + Math.cos(currentEnd) * outerR;
+        const tipY = cy + Math.sin(currentEnd) * outerR;
+        _drawTipGlint(ctx, tipX, tipY, 4.5 * taper, '#FFFFFF');
 
-        // 4. Atmospheric Air Surface Bounce Ring (Under feet)
-        if (p >= 0.25 && p <= 0.70) {
-          const ringP = (p - 0.25) / 0.45;
+        // 6. Trailing Speed Needles
+        _drawNeedleSpeedLine(ctx, cx + Math.cos(currentEnd + 0.28) * (outerR * 0.88), cy + Math.sin(currentEnd + 0.28) * (outerR * 0.88), currentEnd, 28 * taper, '#FFFFFF');
+        _drawNeedleSpeedLine(ctx, cx + Math.cos(currentEnd + 0.55) * (outerR * 0.72), cy + Math.sin(currentEnd + 0.55) * (outerR * 0.72), currentEnd, 24 * taper, '#8B5CF6');
+
+        // 7. Atmospheric Air Surface Bounce Ring (Under feet)
+        if (p >= 0.20 && p <= 0.75) {
+          const ringP = (p - 0.20) / 0.55;
           ctx.strokeStyle = `rgba(255, 255, 255, ${0.85 * (1.0 - ringP)})`;
           ctx.lineWidth = 1.8 * (1.0 - ringP);
           ctx.beginPath();
           ctx.ellipse(-r * 0.2, r * 0.6, 20 * ringP + 5, 8 * ringP + 2, 0, 0, Math.PI * 2);
           ctx.stroke();
         }
+        ctx.restore();
       }
     }
   }
   // ──────────────────────────────────────────
   // STEP 3: THE SPINNING SWEEP VFX (FRAME 5)
-  // (Full 360° concentric whirlwind blade disc & rotating vortex trails)
+  // Full 360° Concentric Whirlwind Annular Disc with Amber & Crimson Washes
   // ──────────────────────────────────────────
   else {
-    if (progress >= 0.15 && progress <= 0.95) {
-      const p = (progress - 0.15) / 0.80;
-      const spinP = Math.min(1.0, p / 0.55);
-      const recP = p > 0.55 ? (p - 0.55) / 0.45 : 0;
-      const taper = Math.pow(Math.sin(p * Math.PI), 1.1) * (1.0 - recP * 0.5);
+    if (progress >= strikeStartP && progress <= 0.98) {
+      const p = (progress - strikeStartP) / Math.max(0.01, (1.0 - strikeStartP));
+      const activeWindow = Math.max(0.01, (strikeEndP - strikeStartP) / (1.0 - strikeStartP));
+      const pinWindow = Math.max(0.01, (pinEndP - strikeStartP) / (1.0 - strikeStartP));
+      const spinP = Math.min(1.0, p / activeWindow);
+      const recP = p > pinWindow ? (p - pinWindow) / Math.max(0.01, (1.0 - pinWindow)) : 0;
+      const taper = Math.pow(Math.sin(p * Math.PI), 1.1) * (1.0 - recP * 0.45);
 
-      const discRadius = r * 3.20;
-      const currentArc = Math.PI * 2 * Math.sin(spinP * Math.PI * 0.5);
+      const outerR = r * 3.55;
+      const innerR = r * 1.35;
+      const totalArc = CONFIG.maki?.hit3ArcAngle || (Math.PI * 2);
+      const startArc = 0.55 + totalArc * Math.pow(recP, 1.8);
+      const endArc = 0.55 + totalArc * Math.pow(spinP, 1.25);
 
-      // 1. Concentric Whirlwind Outer Soul Disc
-      ctx.strokeStyle = 'rgba(245, 158, 11, 0.85)';
-      ctx.lineWidth = Math.max(1, 14 * taper);
-      ctx.beginPath();
-      ctx.arc(0, 0, discRadius, 0, currentArc);
-      ctx.stroke();
-
-      // 2. Fierce Crimson Intermediate Ring
-      ctx.strokeStyle = 'rgba(220, 38, 38, 0.90)';
-      ctx.lineWidth = Math.max(1, 8 * taper);
-      ctx.beginPath();
-      ctx.arc(0, 0, discRadius * 0.88, 0, currentArc);
-      ctx.stroke();
-
-      // 3. Incandescent White Razor Core Disc
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = Math.max(1, 3.2 * taper);
-      ctx.beginPath();
-      ctx.arc(0, 0, discRadius * 0.88, 0, currentArc);
-      ctx.stroke();
-
-      // 4. Spiral Perimeter Needle Speed Lines
-      for (let i = 0; i < 4; i++) {
-        const needleAngle = (currentArc - i * (Math.PI * 0.45));
-        const nx = Math.cos(needleAngle) * discRadius;
-        const ny = Math.sin(needleAngle) * discRadius;
-        _drawNeedleSpeedLine(ctx, nx, ny, needleAngle + Math.PI * 0.5, 24 * taper, i % 2 === 0 ? '#F59E0B' : '#FFFFFF');
-      }
-
-      // 5. Ground Shockwave Ring on Full Spin Crest
-      if (p >= 0.40) {
-        const ringP = (p - 0.40) / 0.60;
-        ctx.strokeStyle = `rgba(220, 38, 38, ${0.75 * (1.0 - ringP)})`;
-        ctx.lineWidth = 2.0 * (1.0 - ringP);
+      if (endArc - startArc > 0.05) {
+        ctx.save();
+        // 1. Concentric Whirlwind Outer Soul Amber Wash
         ctx.beginPath();
-        ctx.arc(0, 0, discRadius * (1.0 + ringP * 0.4), 0, Math.PI * 2);
+        ctx.arc(0, 0, outerR, startArc, endArc, false);
+        ctx.arc(0, 0, innerR, endArc, startArc, true);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(245, 158, 11, ${0.42 * taper})`;
+        ctx.fill();
+
+        // 2. Fierce Crimson Intermediate Wash
+        ctx.beginPath();
+        ctx.arc(0, 0, outerR * 0.92, startArc, endArc, false);
+        ctx.arc(0, 0, innerR * 1.45, endArc, startArc, true);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(220, 38, 38, ${0.32 * taper})`;
+        ctx.fill();
+
+        // 3. Sub-Razor Amber Ionization Rim
+        ctx.strokeStyle = `rgba(245, 158, 11, ${0.90 * taper})`;
+        ctx.lineWidth = Math.max(1, 5.5 * taper);
+        ctx.beginPath();
+        ctx.arc(0, 0, outerR, startArc, endArc, false);
         ctx.stroke();
+
+        // 4. Incandescent White Razor Core Disc Rim
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * taper})`;
+        ctx.lineWidth = Math.max(1, 3.2 * taper);
+        ctx.beginPath();
+        ctx.arc(0, 0, outerR, startArc, endArc, false);
+        ctx.stroke();
+
+        // 5. Leading Kissaki Tip Glint
+        const tipX = Math.cos(endArc) * outerR;
+        const tipY = Math.sin(endArc) * outerR;
+        _drawTipGlint(ctx, tipX, tipY, 5.0 * taper, '#FFFFFF');
+
+        // 6. Spiral Perimeter Needle Speed Lines
+        for (let i = 0; i < 4; i++) {
+          const needleAngle = (endArc - i * (Math.PI * 0.45));
+          const nx = Math.cos(needleAngle) * outerR;
+          const ny = Math.sin(needleAngle) * outerR;
+          _drawNeedleSpeedLine(ctx, nx, ny, needleAngle + Math.PI * 0.5, 26 * taper, i % 2 === 0 ? '#F59E0B' : '#FFFFFF');
+        }
+
+        // 7. Ground Shockwave Ring on Full Spin Crest
+        if (p >= 0.35) {
+          const ringP = (p - 0.35) / 0.65;
+          ctx.strokeStyle = `rgba(220, 38, 38, ${0.75 * (1.0 - ringP)})`;
+          ctx.lineWidth = 2.0 * (1.0 - ringP);
+          ctx.beginPath();
+          ctx.arc(0, 0, outerR * (1.0 + ringP * 0.35), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 8. Ground Sunder Pin Compression & Ember Ring (Rule 26)
+        if (progress >= strikeEndP && progress <= pinEndP) {
+          const pinT = (progress - strikeEndP) / Math.max(0.01, (pinEndP - strikeEndP));
+          const pinAlpha = (1.0 - pinT);
+          ctx.strokeStyle = `rgba(245, 158, 11, ${0.80 * pinAlpha})`;
+          ctx.lineWidth = 2.2 * pinAlpha;
+          ctx.beginPath();
+          ctx.arc(0, 0, outerR * (1.0 + pinT * 0.2), 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Perimeter sparks (discrete dots, Rule 26 compliant)
+          ctx.fillStyle = '#EF4444';
+          for (let s = 0; s < 6; s++) {
+            const spkAng = (s * Math.PI / 3) + (pinT * 0.5);
+            const spkDist = outerR * (1.02 + pinT * 0.15);
+            ctx.fillRect(Math.cos(spkAng) * spkDist - 1, Math.sin(spkAng) * spkDist - 1, 2, 2);
+          }
+        }
+        ctx.restore();
       }
     }
   }
 
+  ctx.restore();
+}
+
+/**
+ * Renders a crisp 4-point diamond cross glint at the kissaki (leading blade tip).
+ * Adheres strictly to Rule 11 (Zero shadowBlur) using clean vector polygon geometry.
+ */
+function _drawTipGlint(ctx, x, y, size, color = '#FFFFFF') {
+  if (size <= 0.2) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = color;
+  // White core circle
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.75, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Vertical needle glint
+  ctx.beginPath();
+  ctx.moveTo(0, -size * 2.2);
+  ctx.lineTo(size * 0.45, 0);
+  ctx.lineTo(0, size * 2.2);
+  ctx.lineTo(-size * 0.45, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Horizontal needle glint
+  ctx.beginPath();
+  ctx.moveTo(-size * 2.2, 0);
+  ctx.lineTo(0, size * 0.45);
+  ctx.lineTo(size * 2.2, 0);
+  ctx.lineTo(0, -size * 0.45);
+  ctx.closePath();
+  ctx.fill();
   ctx.restore();
 }
 

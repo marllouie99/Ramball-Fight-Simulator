@@ -1483,7 +1483,8 @@ export function getFighterWeaponInfo(def) {
     case 'bomber':
       return { name: 'GRENADE & C4 CANISTER', category: 'DEMOLITIONS // AOE', desc: 'Throws high-explosive grenades and drops a massive lethal C4 bomb on defeat.' };
     case 'gunslinger':
-      return { name: 'DUAL CUSTOM REVOLVERS', category: 'DUAL BALLISTIC // RAPID', desc: 'Twin six-shooters with rapid-fire fanning and devastating bullet barrages.' };
+    case 'alucard':
+      return { name: '.454 CASULL & 13MM JACKAL', category: 'HOLY & MERCURY // VAMPIRE', desc: 'Custom sacred silver semi-auto and 13mm matte black combat pistol with vampiric blood lifesteal and Baskerville shadow release.' };
     case 'doppleganger':
       return { name: 'PHANTOM SHADOWBLADE', category: 'ILLUSION // MELEE', desc: 'Ghostly curved sword that synchronizes strikes with spawned clones.' };
     case 'engineer':

@@ -49,6 +49,11 @@ export class MakiFighter extends Fighter {
     this.swordComboResetTimer = 0;
     this.swordSwingTimer = 0;
     this.swordSwingMax = 24;
+    this.swordHitTremorTimer = 0;
+    this.swordHitDelivered = true;
+    this.swordHitConnected = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordSwingOpponent = null;
     this.afterImages = [];
 
     // Skill 1: Dragon-Bone Kinetic Jet Skewer & Throw
@@ -137,6 +142,11 @@ export class MakiFighter extends Fighter {
     this.swordComboStep = 0;
     this.swordComboResetTimer = 0;
     this.swordSwingTimer = 0;
+    this.swordHitTremorTimer = 0;
+    this.swordHitDelivered = true;
+    this.swordHitConnected = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordSwingOpponent = null;
     this.afterImages = [];
     this.kineticCharges = 0;
     this.dragonBoneCooldown = 0;
@@ -164,12 +174,15 @@ export class MakiFighter extends Fighter {
     if (this.afterImages && this.afterImages.length > 0) {
       for (let i = this.afterImages.length - 1; i >= 0; i--) {
         const img = this.afterImages[i];
-        img.alpha -= 0.055;
+        img.alpha -= 0.040;
         if (img.alpha <= 0) {
           this.afterImages.splice(i, 1);
         }
       }
     }
+
+    // Rule 25: Decay active tremor before freeze guard so visual effects never stick
+    if (this.swordHitTremorTimer > 0) this.swordHitTremorTimer--;
 
     // Rule 1.1: Freeze & Time-Stop Early Guard
     const isFrozen = this._handleTimeStop();
@@ -191,10 +204,7 @@ export class MakiFighter extends Fighter {
       if (this.swordComboResetTimer <= 0) this.swordComboStep = 0;
     }
     if (this.swordSwingTimer > 0) {
-      this.swordSwingTimer--;
-      if (this.swordComboStep === 3) {
-        this.isSpinning = true;
-      }
+      this._updateSwordSwing(opponent, arena);
     } else if (!this.dragonBoneActive && !this.ultimateActive) {
       this.isSpinning = false;
     }
@@ -243,6 +253,20 @@ export class MakiFighter extends Fighter {
     return super.isStationarySkillActive();
   }
 
+  canAim() {
+    if (this.swordSwingTimer > 0) {
+      const totalF = this.swordSwingMax || 32;
+      const elapsed = totalF - this.swordSwingTimer;
+      const liftF = this.swordSwingLiftFrames || 8;
+      const holdF = this.swordSwingHoldFrames || 3;
+      // Lock committed aim throughout active cleave, impact lock, and recovery to prevent body angle twitching
+      if (elapsed >= (liftF + holdF)) return false;
+    }
+    if (this.dragonBoneActive && this.dragonBonePhase !== 'windup') return false;
+    if (this.ultimateActive) return false;
+    return super.canAim();
+  }
+
   _evaluateCombatAI(opponent, arena) {
     if (!opponent || opponent.isDead) return;
 
@@ -281,121 +305,314 @@ export class MakiFighter extends Fighter {
    * - Hit 2: The Underhand Uppercut (Frame 4): Low scoop rising cleave lifting enemy
    * - Hit 3: The Spinning Sweep (Frame 5): Full 360° whirlwind horizontal sweeping spin
    */
-  _performSplitSoulSlash(opponent) {
+  _performSplitSoulSlash(opponent, forcedComboStep = null) {
     if (!opponent) return;
 
-    this.swordComboStep = (this.swordComboStep % 3) + 1;
-    this.swordComboResetTimer = 95;
+    if (forcedComboStep !== null && forcedComboStep !== undefined) {
+      this.swordComboStep = forcedComboStep;
+    } else {
+      this.swordComboStep = (this.swordComboStep % 3) + 1;
+    }
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.maki) ? CONFIG.maki : {};
+    this.swordComboResetTimer = cfg.comboResetFrames || 95;
 
     const angle = this.gunAngle || Math.atan2(opponent.y - this.y, opponent.x - this.x);
     this.swordSlashAngle = angle;
 
-    const cfg = CONFIG.maki || {};
-    let dmg = cfg.swordDamage || 28;
-    let knockback = cfg.swordKnockback || 6.5;
-    let maxSwingFrames = 22;
+    let dmg = 28;
+    let knockback = 6.5;
+    let lunge = 6.5;
+    let hitPause = 2;
+    let hitStun = 10;
+    let shakeIntensity = 0;
+    let shakeDuration = 0;
+    let liftFrames = 7;
+    let holdFrames = 2;
+    let strikeFrames = 6;
+    let pinFrames = 6;
+    let recFrames = 10;
 
     if (this.swordComboStep === 1) {
-      maxSwingFrames = 22;
+      liftFrames = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : 8;
+      holdFrames = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : 3;
+      strikeFrames = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : 5;
+      pinFrames = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : ((typeof cfg.hit1PinFrames === 'number') ? cfg.hit1PinFrames : (cfg.hit1GroundPinFrames || 6)));
+      recFrames = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : 10;
+      dmg = (typeof cfg.hit1Damage === 'number') ? cfg.hit1Damage : (cfg.comboHit1Damage || 28);
+      knockback = (typeof cfg.hit1Knockback === 'number') ? cfg.hit1Knockback : (cfg.comboHit1Knockback || 6.5);
+      lunge = (typeof cfg.hit1LungeSpeed === 'number') ? cfg.hit1LungeSpeed : (cfg.comboHit1Lunge || 6.5);
+      hitPause = (typeof cfg.hit1HitPauseFrames === 'number') ? cfg.hit1HitPauseFrames : 3;
+      hitStun = (typeof cfg.hit1HitStunFrames === 'number') ? cfg.hit1HitStunFrames : 10;
+      shakeIntensity = (typeof cfg.hit1ImpactShake === 'number') ? cfg.hit1ImpactShake : 0;
+      shakeDuration = (typeof cfg.hit1ImpactShakeDuration === 'number') ? cfg.hit1ImpactShakeDuration : 0;
       this.swordCooldown = cfg.swordCooldown || 38;
-      // Hit 1: The Overhead Strike - Heavy downward lunging step
-      this.vx += Math.cos(angle) * 4.2;
-      this.vy += Math.sin(angle) * 4.2;
-      this._spawnAfterimage(2, 6);
-      audioSystem.playSFX('sword_slash_heavy', 0.9);
     } else if (this.swordComboStep === 2) {
-      maxSwingFrames = 24;
-      dmg = cfg.comboHit2Damage || 34;
-      knockback = 8.5;
+      liftFrames = (typeof cfg.hit2LiftFrames === 'number') ? cfg.hit2LiftFrames : 8;
+      holdFrames = (typeof cfg.hit2HoldFrames === 'number') ? cfg.hit2HoldFrames : 3;
+      strikeFrames = (typeof cfg.hit2StrikeFrames === 'number') ? cfg.hit2StrikeFrames : 6;
+      pinFrames = (typeof cfg.hit2ImpactLockFrames === 'number') ? cfg.hit2ImpactLockFrames : ((typeof cfg.hit2LockFrames === 'number') ? cfg.hit2LockFrames : ((typeof cfg.hit2PinFrames === 'number') ? cfg.hit2PinFrames : (cfg.hit2GroundPinFrames || 5)));
+      recFrames = (typeof cfg.hit2RecoveryFrames === 'number') ? cfg.hit2RecoveryFrames : 10;
+      dmg = (typeof cfg.hit2Damage === 'number') ? cfg.hit2Damage : (cfg.comboHit2Damage || 34);
+      knockback = (typeof cfg.hit2Knockback === 'number') ? cfg.hit2Knockback : (cfg.comboHit2Knockback || 8.5);
+      lunge = (typeof cfg.hit2LungeSpeed === 'number') ? cfg.hit2LungeSpeed : (cfg.comboHit2Lunge || 7.2);
+      hitPause = (typeof cfg.hit2HitPauseFrames === 'number') ? cfg.hit2HitPauseFrames : 3;
+      hitStun = (typeof cfg.hit2HitStunFrames === 'number') ? cfg.hit2HitStunFrames : 14;
+      shakeIntensity = (typeof cfg.hit2ImpactShake === 'number') ? cfg.hit2ImpactShake : 0;
+      shakeDuration = (typeof cfg.hit2ImpactShakeDuration === 'number') ? cfg.hit2ImpactShakeDuration : 0;
       this.swordCooldown = 42;
-      // Hit 2: The Underhand Uppercut - Deep rising step
-      this.vx += Math.cos(angle) * 5.4;
-      this.vy += Math.sin(angle) * 5.4;
-      this._spawnAfterimage(3, 8);
-      audioSystem.playSFX('sword_slash_heavy', 0.95);
     } else if (this.swordComboStep === 3) {
-      maxSwingFrames = 28;
-      dmg = cfg.comboHit3Damage || 52;
-      knockback = 16.0;
+      liftFrames = (typeof cfg.hit3LiftFrames === 'number') ? cfg.hit3LiftFrames : 8;
+      holdFrames = (typeof cfg.hit3HoldFrames === 'number') ? cfg.hit3HoldFrames : 4;
+      strikeFrames = (typeof cfg.hit3StrikeFrames === 'number') ? cfg.hit3StrikeFrames : 22;
+      pinFrames = (typeof cfg.hit3ImpactLockFrames === 'number') ? cfg.hit3ImpactLockFrames : ((typeof cfg.hit3LockFrames === 'number') ? cfg.hit3LockFrames : ((typeof cfg.hit3PinFrames === 'number') ? cfg.hit3PinFrames : (cfg.hit3GroundPinFrames || 8)));
+      recFrames = (typeof cfg.hit3RecoveryFrames === 'number') ? cfg.hit3RecoveryFrames : 14;
+      dmg = (typeof cfg.hit3Damage === 'number') ? cfg.hit3Damage : (cfg.comboHit3Damage || 52);
+      knockback = (typeof cfg.hit3Knockback === 'number') ? cfg.hit3Knockback : (cfg.comboHit3Knockback || 16.0);
+      lunge = (typeof cfg.hit3LungeSpeed === 'number') ? cfg.hit3LungeSpeed : (cfg.comboHit3Lunge || 8.5);
+      hitPause = (typeof cfg.hit3HitPauseFrames === 'number') ? cfg.hit3HitPauseFrames : 4;
+      hitStun = (typeof cfg.hit3HitStunFrames === 'number') ? cfg.hit3HitStunFrames : 22;
+      shakeIntensity = (typeof cfg.hit3ImpactShake === 'number') ? cfg.hit3ImpactShake : 0;
+      shakeDuration = (typeof cfg.hit3ImpactShakeDuration === 'number') ? cfg.hit3ImpactShakeDuration : 0;
       this.swordCooldown = 55;
-      this.isSpinning = true;
-      // Hit 3: The Spinning Sweep - High-velocity 360° whirlwind surge
-      this.vx += Math.cos(angle) * 6.2;
-      this.vy += Math.sin(angle) * 6.2;
-      this._spawnAfterimage(4, 10);
-      audioSystem.playSFX('attack_heavyhit', 1.0);
     }
 
-    this.swordSwingTimer = maxSwingFrames;
-    this.swordSwingMax = maxSwingFrames;
+    const totalSwingFrames = liftFrames + holdFrames + strikeFrames + pinFrames + recFrames;
+    this.swordSwingTimer = totalSwingFrames;
+    this.swordSwingMax = totalSwingFrames;
+    this.swordSwingLiftFrames = liftFrames;
+    this.swordSwingHoldFrames = holdFrames;
+    this.swordSwingStrikeFrames = strikeFrames;
+    this.swordSwingImpactLockFrames = pinFrames;
+    this.swordSwingLockFrames = pinFrames;
+    this.swordSwingPinFrames = pinFrames;
+    this.swordSwingRecFrames = recFrames;
+    this.swordSwingHitPause = hitPause;
+    this.swordSwingShake = shakeIntensity;
+    this.swordSwingShakeDuration = shakeDuration;
+    this.swordSwingDamage = dmg;
+    this.swordSwingKnockback = knockback;
+    this.swordSwingLunge = lunge;
+    this.swordSwingHitStun = hitStun;
+    this.swordHitDelivered = false;
+    this.swordHitConnected = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordSwingOpponent = opponent;
 
-    // Target Detection: 360° radius for Spinning Sweep (Hit 3), frontal arc for Hits 1 & 2
+    // Anticipation coil flutter sound
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash1', 0.4);
+      }
+    } catch (e) {}
+  }
+
+  /**
+   * Updates active sword swing frame pacing, physical lunge, ground pin, and impact timing.
+   */
+  _updateSwordSwing(opponent, arena) {
+    if (this.swordSwingTimer <= 0) return;
+
+    const totalF = this.swordSwingMax || 32;
+    const elapsed = totalF - this.swordSwingTimer;
+    const liftF = this.swordSwingLiftFrames || 8;
+    const holdF = this.swordSwingHoldFrames || 3;
+    const strikeF = this.swordSwingStrikeFrames || 5;
+    const pinF = this.swordSwingPinFrames || 6;
+    const recF = this.swordSwingRecFrames || 10;
+
+    const strikeStart = liftF + holdF;
+    const strikeEnd = liftF + holdF + strikeF;
+    const pinEnd = liftF + holdF + strikeF + pinF;
+
+    if (this.swordComboStep === 3) {
+      this.isSpinning = false;
+    }
+
+    if (elapsed < strikeStart) {
+      // Phase 1 & 2: Anticipation Coil & Poised Hold
+      if (opponent && !opponent.isDead) {
+        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.swordSlashAngle = targetAngle;
+      }
+    } else if (elapsed < strikeEnd) {
+      // Phase 3: Hypersonic Whip Strike Window
+      const strikeElapsed = elapsed - strikeStart;
+      const strikeP = strikeElapsed / Math.max(1, strikeF);
+
+      if (!this.swordSwingSoundPlayed) {
+        this.swordSwingSoundPlayed = true;
+        try {
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            if (this.swordComboStep === 3) {
+              audioSystem.playSFX('skill_spinslash', 0.90);
+            } else {
+              audioSystem.playSFX('attack_swordswing', 0.95);
+            }
+          }
+        } catch (e) {}
+        this._spawnAfterimage(this.swordComboStep === 3 ? 5 : 3, 11);
+      }
+
+      // Forward lunging step momentum into the cleave
+      const lungeSpeed = this.swordSwingLunge || 7.0;
+      const lungeDecay = Math.sin(strikeP * Math.PI);
+      this.vx = Math.cos(this.swordSlashAngle) * lungeSpeed * lungeDecay;
+      this.vy = Math.sin(this.swordSlashAngle) * lungeSpeed * lungeDecay;
+
+      // IMPACT DELIVERY: Trigger slap impact when blade completes whirlwind into front cleave plane
+      const impactThreshold = (this.swordComboStep === 3) ? 0.85 : 0.50;
+      if (!this.swordHitDelivered && strikeP >= impactThreshold) {
+        this._deliverSwordImpact(opponent || this.swordSwingOpponent);
+      }
+    } else if (elapsed < pinEnd) {
+      // Phase 4: MELEE GROUND PIN (Blade locked firmly in the floor before recovery!)
+      if (!this.swordHitDelivered) {
+        this._deliverSwordImpact(opponent || this.swordSwingOpponent);
+      }
+      // Zero movement while weapon is pinned into the ground
+      this.vx = 0;
+      this.vy = 0;
+    } else {
+      // Phase 5: Recovery & Stance Settle
+      if (!this.swordHitDelivered) {
+        this.swordHitDelivered = true;
+      }
+      this.vx *= 0.75;
+      this.vy *= 0.75;
+    }
+
+    this.swordSwingTimer--;
+    if (this.swordSwingTimer <= 0) {
+      this.isSpinning = false;
+      this.swordSwingOpponent = null;
+    }
+  }
+
+  /**
+   * Delivers the satisfying physical slap impact upon blade contact:
+   * Layered fleshy slap & soul-cleaving sound, blade tremor, screen shake, and damage.
+   */
+  _deliverSwordImpact(target = null) {
+    if (this.swordHitDelivered) return;
+    this.swordHitDelivered = true;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.maki) ? CONFIG.maki : {};
+    const reach = (cfg.swordReach || cfg.swordRange || 75) + this.r + (this.swordComboStep === 3 ? 35 : 20);
+
     let targets = [];
-    const reach = (cfg.swordRange || 72) + this.r + (this.swordComboStep === 3 ? 35 : 20);
-
     if (this.swordComboStep === 3) {
       targets = this._getAllEnemiesInRadius(reach);
     } else {
-      const arc = (this.swordComboStep === 1) ? ((140 * Math.PI) / 180) : ((150 * Math.PI) / 180);
+      const arc = (this.swordComboStep === 1)
+        ? (cfg.hit1ArcAngle || ((140 * Math.PI) / 180))
+        : (cfg.hit2ArcAngle || ((150 * Math.PI) / 180));
       targets = this._getTargetsInFrontalArc(reach, arc);
     }
 
-    for (const target of targets) {
-      // True Damage bypassing armor / shields
-      applyDamageToTarget(target, dmg, this, {
-        isTrueDamage: true,
-        bypassDefense: true,
-        damageType: 'slash'
-      });
-
-      // Inflict Soul Wound (Anti-Heal & True DOT)
-      if (typeof target.applySoulWound === 'function') {
-        target.applySoulWound(cfg.soulWoundDuration || 240, cfg.soulWoundHealReduction || 0.75);
-      } else {
-        target.soulWoundTimer = cfg.soulWoundDuration || 240;
-        target.isSoulWounded = true;
-      }
-
-      // Physics Push & Hit-Stun based on Combo Step
-      const hitAngle = Math.atan2(target.y - this.y, target.x - this.x);
-      target.vx += Math.cos(hitAngle) * knockback;
-      target.vy += Math.sin(hitAngle) * knockback;
-
-      // Hit 2 lifts the target slightly airborne
-      if (this.swordComboStep === 2) {
-        target.vy -= 4.5;
-      }
-
-      const hitStunFrames = this.swordComboStep === 3 ? 22 : (this.swordComboStep === 2 ? 14 : 10);
-      if (typeof target.applyHitStun === 'function') {
-        target.applyHitStun(hitStunFrames);
-      }
-
-      // Visual blood & spark flares
-      spawnBloodEffect(target.x, target.y, hitAngle, this.swordComboStep === 3 ? 12 : 7);
-      spawnSparks(target.x, target.y, this.swordComboStep === 3 ? 8 : 4, '#DC2626');
-      if (this.swordComboStep === 3) {
-        spawnImpactFlash(target.x, target.y, 45, '#F59E0B');
-        spawnGroundScorch(target.x, target.y, 40);
-      } else if (this.swordComboStep === 1) {
-        spawnGroundScorch(target.x, target.y, 25);
-      }
-    }
-
-    // Kinetic Storage on hit
-    if (targets.length > 0 && this.kineticCharges < this.maxKineticCharges) {
-      this.kineticCharges++;
+    if (targets.length === 0 && target && !target.isDead) {
+      targets = [target];
     }
 
     if (targets.length > 0) {
-      const shakeIntensity = this.swordComboStep === 3 ? 6 : (this.swordComboStep === 2 ? 3 : 2);
-      const shakeDuration = this.swordComboStep === 3 ? 12 : 8;
-      triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+      this.swordHitConnected = true;
+      const hitPause = this.swordSwingHitPause || 3;
+      this.swordHitTremorTimer = hitPause + 1; // Visceral blade tremor during hit-pause!
+
+      // ── THE VISCERAL MEATY FLESH SLAP AUDIO COMBINATION ──
+      try {
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('attack_fleshhit', 1.0);  // The authentic visceral fleshy slap!
+          audioSystem.playSFX('sukuna_slice', 0.90);     // Razor cutting bite of Split Soul!
+          if (this.swordComboStep === 3) {
+            audioSystem.playSFX('attack_heavypunch1', 0.95); // Concussive finisher slap!
+          }
+        }
+      } catch (e) {}
+
+      if (this.swordSwingShake > 0 && this.swordSwingShakeDuration > 0) {
+        triggerGlobalScreenShake(this.swordSwingShake, this.swordSwingShakeDuration);
+      }
 
       const comboTitles = ['OVERHEAD STRIKE!', 'UNDERHAND UPPERCUT!', 'SPINNING SWEEP!'];
       const comboColors = ['#DC2626', '#8B5CF6', '#F59E0B'];
       spawnFloatingText(this.x, this.y - this.r - 20, comboTitles[this.swordComboStep - 1], comboColors[this.swordComboStep - 1]);
+
+      if (this.kineticCharges < this.maxKineticCharges) {
+        this.kineticCharges++;
+      }
+
+      const dmg = this.swordSwingDamage || 28;
+      const knockback = this.swordSwingKnockback || 6.5;
+      const hitStun = this.swordSwingHitStun || 12;
+
+      for (const t of targets) {
+        applyDamageToTarget(t, dmg, this, {
+          isTrueDamage: true,
+          bypassDefense: true,
+          damageType: 'slash'
+        });
+
+        if (typeof t.applySoulWound === 'function') {
+          t.applySoulWound(cfg.soulWoundDuration || 240, cfg.soulWoundHealReduction || 0.75);
+        } else {
+          t.soulWoundTimer = cfg.soulWoundDuration || 240;
+          t.isSoulWounded = true;
+        }
+
+        const hitAngle = Math.atan2(t.y - this.y, t.x - this.x);
+        t.vx += Math.cos(hitAngle) * knockback;
+        t.vy += Math.sin(hitAngle) * knockback;
+
+        if (this.swordComboStep === 2) {
+          t.vy -= (cfg.hit2VerticalLift || 4.5);
+        }
+
+        if (typeof t.applyTimeStop === 'function') {
+          t.applyTimeStop(hitPause);
+        }
+        if (typeof t.applyHitStun === 'function') {
+          t.applyHitStun(hitStun);
+        }
+
+        spawnBloodEffect(t.x, t.y, hitAngle, this.swordComboStep === 3 ? 12 : 7);
+        spawnSparks(t.x, t.y, this.swordComboStep === 3 ? 8 : 4, '#DC2626');
+        if (this.swordComboStep === 3) {
+          spawnImpactFlash(t.x, t.y, 45, '#F59E0B');
+          spawnGroundScorch(t.x, t.y, 40);
+        } else if (this.swordComboStep === 1) {
+          spawnGroundScorch(t.x, t.y, 25);
+        }
+      }
     }
+  }
+
+  /**
+   * Plays a specific basic attack combo pattern on demand:
+   * 1: Hit 1 — Overhead Strike (two-handed downward chop)
+   * 2: Hit 2 — Underhand Uppercut (low scoop rising cleave)
+   * 3: Hit 3 — Spinning Sweep (full 360° whirlwind spin)
+   * @param {number} [step=1] Combo pattern step (1, 2, or 3)
+   * @param {object} [target=null] Target entity
+   */
+  playBasicAttackPattern(step = 1, target = null) {
+    const opp = target || {
+      x: this.x + Math.cos(this.gunAngle || 0) * 55,
+      y: this.y + Math.sin(this.gunAngle || 0) * 55,
+      r: 25,
+      takeDamage: () => {},
+      applyKnockback: () => {},
+      applyHitStun: () => {}
+    };
+    this._performSplitSoulSlash(opp, step);
+  }
+
+  /**
+   * Universal preview demo attack hook.
+   */
+  triggerDemoAttack(step = null) {
+    const targetStep = (step !== null && step !== undefined) ? step : ((this.swordComboStep % 3) + 1);
+    this.playBasicAttackPattern(targetStep);
   }
 
   /**
@@ -1005,11 +1222,11 @@ export class MakiFighter extends Fighter {
         x: this.x - Math.cos(angle) * (i * spacing),
         y: this.y - Math.sin(angle) * (i * spacing),
         angle: angle,
-        alpha: Math.max(0.15, 0.45 - (i * 0.08))
+        alpha: Math.max(0.18, 0.55 - (i * 0.07))
       });
     }
-    if (this.afterImages.length > 8) {
-      this.afterImages.splice(0, this.afterImages.length - 8);
+    if (this.afterImages.length > 14) {
+      this.afterImages.splice(0, this.afterImages.length - 14);
     }
   }
 
