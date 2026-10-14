@@ -1376,7 +1376,7 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
   }
 }
 
-export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, color = 'black') {
+export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, color = 'black', options = null) {
   const shockwave = ParticleSystem.getParticle();
   shockwave.x = x;
   shockwave.y = y;
@@ -1389,6 +1389,7 @@ export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, colo
   shockwave.type = 'animeImpactFrame';
   shockwave.hitAngle = hitAngle;
   shockwave.color = color;
+  shockwave.hideShockwaveRing = Boolean(options && (options.hideShockwaveRing || options.noShockwaveRing));
 
   shockwave.isProtected = true;
   shockwave.isPixi = false;

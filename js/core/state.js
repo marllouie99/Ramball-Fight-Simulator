@@ -1197,19 +1197,29 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   }
 
   // Fast Combo Stacking: Accumulate rapid damage on same target into climbing counter
-  // Prevents spawning 20 floating numbers on screen at once during rapid combos (e.g. Sukuna slashes, Toji flurries)
+  // Prevents spawning 20 floating numbers on screen at once during rapid combos (e.g. Sukuna slashes, Toji flurries, Denji shred)
   if (isDamage && !isCrit) {
+    const MAX_COMBO_STACKS = 4;
     for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
       const activeText = state.floatingTexts[i];
       if (activeText && activeText.isDamage && !activeText.isCrit &&
+          (activeText.stackCount || 1) < MAX_COMBO_STACKS &&
           Math.hypot(activeText.originX - posX, activeText.originY - posY) < 40 &&
           activeText.timer < 12) {
+        activeText.stackCount = (activeText.stackCount || 1) + 1;
         activeText.damageValue = (activeText.damageValue || 0) + numericVal;
         activeText.text = String(Math.round(activeText.damageValue));
         activeText.popFrames = 5;
-        activeText.timer = Math.min(activeText.timer, 3);
-        activeText.vy = -3.2; // Upward kick
-        activeText.baseScale = Math.min(1.4, 1.0 + Math.log10(1 + activeText.damageValue / 20) * 0.28);
+        activeText.timer = Math.min(activeText.timer, 4);
+        activeText.vy = Math.max(-2.0, (activeText.vy || 0) * 0.3 - 0.6);
+        if (activeText.y < activeText.originY - 24) {
+          activeText.y = activeText.originY - 24;
+          activeText.vy = Math.max(0, activeText.vy);
+        }
+        activeText.originX = posX;
+        activeText.originY = posY;
+        activeText.x += (posX - activeText.x) * 0.35;
+        activeText.baseScale = Math.min(1.55, 1.25 + Math.log10(1 + activeText.damageValue / 20) * 0.28);
         return;
       }
     }
@@ -1246,7 +1256,7 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   let popAmount = 0.35;
   let popFrames = 5;
   let maxTimer = 40;
-  let baseScale = 1.0;
+  let baseScale = 1.20;
   let finalColor = textColor;
 
   if (isCrit) {
@@ -1257,7 +1267,7 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     popFrames = 6;
     rotation = spreadDir * (0.08 + Math.random() * 0.06);
     maxTimer = 46;
-    baseScale = 1.15;
+    baseScale = 1.30;
     if (!finalColor || finalColor === '#ffffff' || finalColor === '#fff') {
       finalColor = '#FF3B30'; // Punchy red/orange crit
     }
@@ -1268,7 +1278,7 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     popAmount = 0.30;
     popFrames = 5;
     maxTimer = 38;
-    baseScale = 0.95;
+    baseScale = 1.10;
     if (!finalColor || finalColor === '#ffffff' || finalColor === '#fff') {
       finalColor = '#E2E8F0'; // Clean silver/white miss
     }
@@ -1281,7 +1291,7 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     popFrames = 5;
     maxTimer = 38;
     const val = isNaN(numericVal) ? 20 : Math.abs(numericVal);
-    baseScale = Math.min(1.35, 1.0 + Math.log10(1 + val / 25) * 0.25);
+    baseScale = Math.min(1.50, 1.25 + Math.log10(1 + val / 20) * 0.25);
     if (!finalColor) finalColor = '#FFFFFF';
   }
 
@@ -1304,6 +1314,7 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     isMiss,
     isDamage,
     damageValue: isDamage ? numericVal : 0,
+    stackCount: 1,
     originX: posX,
     originY: posY
   });

@@ -2574,34 +2574,8 @@ export function getIchigoSwingKinematics(fighter) {
         bodyTilt = 0.08 * easeP;
         isTwoHanded = progress <= 0.85;
       }
-    } else if (fighter.shunpoComboActive) {
-      const isFinisher = (fighter.slashSwingVariant === 2 && fighter.shunpoComboStep >= (fighter.shunpoMaxSteps || 2));
-      const slashPhase = isFinisher ? 0.35 : 0.40;
-      const isAlt = (fighter.slashSwingVariant === 2);
-      startAngle = isAlt ? 1.25 : -1.75;
-      endAngle = isAlt ? -1.45 : 1.35;
-
-      if (progress < slashPhase) {
-        phase = 3;
-        strikeP = progress / slashPhase;
-        const whipEase = strikeP * strikeP * (3 - 2 * strikeP);
-        swingAngle = startAngle + (endAngle - startAngle) * whipEase;
-        thrustDistance = -6 + 18 * Math.sin(strikeP * Math.PI * 0.5);
-        bodyShiftX = (isAlt ? -2.5 : 2.5) * Math.sin(strikeP * Math.PI * 0.5);
-        bodyTilt = (isAlt ? -0.08 : 0.08) * Math.sin(strikeP * Math.PI * 0.5);
-        isTwoHanded = isFinisher;
-      } else {
-        phase = 5;
-        recP = (progress - slashPhase) / (1.0 - slashPhase);
-        const easeP = Math.pow(1.0 - recP, 1.6);
-        swingAngle = -0.12 + (endAngle - (-0.12)) * easeP;
-        thrustDistance = 12 * easeP;
-        bodyShiftX = (isAlt ? -2.5 : 2.5) * easeP;
-        bodyTilt = (isAlt ? -0.08 : 0.08) * easeP;
-        isTwoHanded = isFinisher && (recP < 0.5);
-      }
     } else {
-      // Rule 30: 3-Hit 5-Phase Cursed Melee Combo
+      // Rule 30: 3-Hit 5-Phase Cursed Melee Combo (Standard Cleaves & Shunpo Blitz Flurry)
       const liftF = fighter.slashSwingLiftFrames || 7;
       const holdF = fighter.slashSwingHoldFrames || 2;
       const strikeF = fighter.slashSwingStrikeFrames || 5;

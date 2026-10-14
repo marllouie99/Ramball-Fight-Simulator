@@ -15,7 +15,7 @@ import {
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTojiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaDimScreen, drawTodoTakadaIdolScreenOverlay, isTodoTakadaOverlayActive, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
-  drawYujiSoulSwapDimScreen, drawMeguminExplosionScreenOverlay, drawJohnWickAssassinationDimScreen,
+  drawYujiSoulSwapDimScreen, drawMeguminExplosionScreenOverlay, drawJohnWickAssassinationDimScreen, drawZenitsuChannelDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
   drawDroppedMiniguns, updateDroppedMiniguns,
@@ -313,6 +313,7 @@ export function renderGame() {
           drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
           drawTodoTakadaDimScreen(); // 2D Takada-chan 530,000 IQ Idol Imagination dark magenta dim & romantic spotlight overlay
           drawYujiSoulSwapDimScreen(); // 2D Yuji Soul Swap (Sukuna Takeover) arena overlay & cursed crimson dark background
+          drawZenitsuChannelDimScreen(); // smooth dim while Zenitsu channels Thunderclap/ultimate
           drawJohnWickAssassinationDimScreen(); // 2D John Wick CQC Pencil Assassination cinematic spotlight & gold bloom overlay
           drawMeguminExplosionScreenOverlay(state.ctx, state.fighters); // 2D Megumin Explosion atmospheric crimson dim & solar blast flash
         } else {

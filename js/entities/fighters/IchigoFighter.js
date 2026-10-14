@@ -116,7 +116,7 @@ export class IchigoFighter extends Fighter {
     this.getsugaRecoveryTimer = 0;
     this.getsugaTarget = null;
     this.getsugaCastAngle = undefined;
-    this.shunpoMaxSteps = CONFIG.ichigo?.shunpoStrikes || 4;
+    this.shunpoMaxSteps = CONFIG.ichigo?.shunpoStrikes || 3;
 
     // Bankai Transformation Channeling & Slide State
     this.isChannelingBankai = false;
@@ -360,7 +360,7 @@ export class IchigoFighter extends Fighter {
     this.shunpoDashTimer = 0;
     this.shunpoComboActive = false;
     this.shunpoComboStep = 0;
-    this.shunpoMaxSteps = CONFIG.ichigo?.shunpoStrikes || 4;
+    this.shunpoMaxSteps = CONFIG.ichigo?.shunpoStrikes || 3;
     this.shunpoComboDelayTimer = 0;
     this.shunpoTarget = null;
     this.isChannelingGetsuga = false;

@@ -499,7 +499,7 @@ export class NaoyaFighter extends Fighter {
   applyFrameStasis(target, duration = 999) {
     if (!target || target.isDead || (target.hp || 0) <= 0) return false;
 
-    // Check Gojo Infinity (Rule 1.7)
+    // Check Gojo Infinity (Rule 1.7) — active Infinity blocks the 24-Frame Palm Touch (only Naoya's Ultimate disables it)
     if (target.characterId === 'gojo' || target.type === 'gojo') {
       const isInfinityActive = (typeof target.hasActiveInfinity === 'function') ? target.hasActiveInfinity() : (target.infinityCooldown <= 0);
       if (isInfinityActive) {
@@ -1081,6 +1081,13 @@ export class NaoyaFighter extends Fighter {
           f.vy = 0;
           if (f.knockbackVx !== undefined) f.knockbackVx = 0;
           if (f.knockbackVy !== undefined) f.knockbackVy = 0;
+
+          // Ultimate: 24 FPS Mach 3 Runway Breach disables Gojo's Limitless Infinity barrier
+          if (f.characterId === 'gojo' || f.type === 'gojo') {
+            f.infinityActive = false;
+            f.infinityFadeOpacity = 0;
+            f.infinityBlockTimer = 0;
+          }
         }
       }
     }
@@ -1958,7 +1965,12 @@ export class NaoyaFighter extends Fighter {
             }
 
             // 2. Apply massive direct True Damage
-            applyDamageToTarget(target, finisherDmg, this, { isTrueDamage: true, isUltimate: true });
+            applyDamageToTarget(target, finisherDmg, this, {
+              isTrueDamage: true,
+              isUltimate: true,
+              isNaoyaUlt: true,
+              isMach3Breach: true
+            });
 
             // Reset frame stacks back to 0 upon ultimate release
             this.frameStacks = 0;
@@ -2101,6 +2113,11 @@ export class NaoyaFighter extends Fighter {
             target._carCrashVy = 0;
             target.isCurrentlyWallPinnedByNaoya = true;
             target.naoyaWallPinTimer = cfg.ultWallPinDurationFrames ?? 120; // Config-driven wall-pin duration!
+            if (target.characterId === 'gojo' || target.type === 'gojo') {
+              target.infinityActive = false;
+              target.infinityFadeOpacity = 0;
+              target.infinityBlockTimer = 0;
+            }
             target.pinnedWallX = target.x;
             target.pinnedWallY = target.y;
             target.vx = 0;

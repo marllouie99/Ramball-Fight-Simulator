@@ -193,8 +193,8 @@ export function drawBlackHoleEffects() {
   }
 }
 
-const FONT_CRIT = '900 18px "Silkscreen", "Press Start 2P", monospace';
-const FONT_DEFAULT = '700 15px "Silkscreen", "Press Start 2P", monospace';
+const FONT_CRIT = '900 22px "Silkscreen", "Press Start 2P", monospace';
+const FONT_DEFAULT = '700 18px "Silkscreen", "Press Start 2P", monospace';
 
 export function drawFloatingTexts() {
   const { floatingTextCtx: ctx, floatingTextCanvas: canvas } = state;
@@ -234,6 +234,15 @@ export function drawFloatingTexts() {
     if (t.dragX) t.vx *= t.dragX;
     else t.vy *= 0.96;
 
+    // Hard ceiling clamp: prevent any floating text from ascending beyond natural fountain apex
+    if (typeof t.originY === 'number') {
+      const maxAscent = t.isCrit ? 68 : 50;
+      if (t.y < t.originY - maxAscent) {
+        t.y = t.originY - maxAscent;
+        if (t.vy < 0) t.vy = 0;
+      }
+    }
+
     if (t.timer >= t.maxTimer) {
       return false; // Evict expired text
     }
@@ -270,7 +279,7 @@ export function drawFloatingTexts() {
     }
 
     // Single crisp solid black outline (Rule 11 compliant, no CPU blur, no multi-pass)
-    ctx.lineWidth = isCrit ? 3.6 : 2.8;
+    ctx.lineWidth = isCrit ? 4.0 : 3.2;
     ctx.strokeStyle = '#000000';
     ctx.strokeText(t.text, 0, 0);
 

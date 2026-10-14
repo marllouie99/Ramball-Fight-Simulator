@@ -248,23 +248,7 @@ export class GojoRenderer {
         ctx.rotate(effect.angle);
         ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
-        // 1. Outer Glowing Blue Shockwave Ring
-        const ringRadius = (fighter.r + 5) * (0.8 + 1.2 * prog);
-        ctx.strokeStyle = '#00BFFF';
-        ctx.lineWidth = 5 * (1 - prog * 0.5);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 2. High-contrast Black Ink Outline (makes it visible on white/light backgrounds)
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = '#0a0a0a';
-        ctx.lineWidth = 2.5 * (1 - prog * 0.5);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringRadius * 0.94, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 3. Piercing White Impact Star Core
+        // 1. Piercing White Impact Star Core
         ctx.fillStyle = '#FFFFFF';
         ctx.beginPath();
         const numRays = 8;
@@ -279,12 +263,13 @@ export class GojoRenderer {
         ctx.closePath();
         ctx.fill();
 
-        // 4. Directional Cyan Impact Sparks
+        // 2. Directional Cyan Impact Sparks
         ctx.strokeStyle = '#00E5FF';
         ctx.lineWidth = 2.5;
+        const sparkSpreadRadius = (fighter.r + 5) * (0.8 + 1.2 * prog);
         for (let i = -2; i <= 2; i++) {
           const sa = i * 0.3;
-          const sDist = ringRadius * 1.1;
+          const sDist = sparkSpreadRadius * 1.1;
           ctx.beginPath();
           ctx.moveTo(Math.cos(sa) * (sDist * 0.5), Math.sin(sa) * (sDist * 0.5));
           ctx.lineTo(Math.cos(sa) * sDist, Math.sin(sa) * sDist);

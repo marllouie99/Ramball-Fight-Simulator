@@ -30,14 +30,14 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "TOJI",
+        "character": "ICHIGO",
         "deltas": [
             {
-                "type": "ADJUST",
-                "key": "Melee",
-                "oldVal": "Inverted Spear of Heaven (Amanosakahoko)",
-                "newVal": "Inverted Spear of Heaven (Amanosakahoko - Stab & Rip 2-Hit Assassin Dagger Combo)",
-                "pct": "Mod"
+                "type": "NERF",
+                "key": "shunpoStrikes",
+                "oldVal": 4,
+                "newVal": 3,
+                "pct": "-25.0%"
             }
         ]
     }

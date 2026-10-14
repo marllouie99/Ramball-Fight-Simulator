@@ -5,6 +5,6 @@
 
 ## 🥊 Fighter Stat Modifications
 
-### TOJI
-* **🔄 ADJUST** `Melee`: `Inverted Spear of Heaven (Amanosakahoko)` ➔ `Inverted Spear of Heaven (Amanosakahoko - Stab & Rip 2-Hit Assassin Dagger Combo)` (Mod)
+### ICHIGO
+* **🔴 NERF** `shunpoStrikes`: `4` ➔ `3` (-25.0%)
 

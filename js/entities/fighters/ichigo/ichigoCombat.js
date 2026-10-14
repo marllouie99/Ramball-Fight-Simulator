@@ -801,10 +801,9 @@ export function updateShunpoCombat(fighter, opponent) {
         let damageMult = 1.0;
         if (isBankai) damageMult *= (CONFIG.ichigo?.bankaiDamageMultiplier || 1.4);
         if (isMask) damageMult *= (CONFIG.ichigo?.hollowDamageMultiplier || 1.5);
-        const baseSlashDmg = CONFIG.ichigo?.shunpoStrike1Damage || 20;
         let defaultStrikes = isBankai 
           ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
-          : (CONFIG.ichigo?.shunpoStrikes || 2);
+          : (CONFIG.ichigo?.shunpoStrikes || 3);
         if (isBankai) {
           defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.bankaiShunpoStrikesMultiplier || 1.8));
         }
@@ -813,67 +812,54 @@ export function updateShunpoCombat(fighter, opponent) {
         }
         const maxSteps = fighter.shunpoMaxSteps || defaultStrikes;
 
-        if (fighter.shunpoComboStep < maxSteps) {
-          // Intermediate Flurry Strike
-          const s1Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike1Duration || 14) : (CONFIG.ichigo?.shunpoStrike1SlashDuration || CONFIG.ichigo?.shunpoStrikeDuration || 16);
-          fighter.slashSwingTimer = s1Duration;
-          fighter.slashSwingMaxTimer = s1Duration;
-          fighter.slashSwingVariant = (fighter.shunpoComboStep % 2 === 0) ? 2 : 1;
-          fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
+        // Map to Rule 30 3-Hit Melee Combo: Hit 1, Hit 2, or Hit 3 Finisher
+        const isFinalStep = (fighter.shunpoComboStep >= maxSteps);
+        const step = isFinalStep ? 3 : (((fighter.shunpoComboStep - 1) % 2) + 1);
 
-          if (typeof target.applyHitStun === 'function') {
-            target.applyHitStun(2);
-          }
+        fighter.swordComboStep = step;
+        fighter.slashSwingVariant = step;
+        fighter.isMeleeCleave = true;
+        fighter.swordHitDelivered = false;
+        fighter.swordSwingSoundPlayed = false;
+        fighter.swordSlashAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle : (fighter.angle || 0);
 
-          applyDamageToTarget(target, baseSlashDmg * damageMult, fighter, { isSkill: true });
-          spawnImpactFlash(target.x, target.y, (isBankai || isMask) ? 'sukuna' : 'gojo');
-          fighter._playSound('shunpoStrikeHit', 'Assets/Sound Effects/Attacks/fleshhit.mp3', 0.75);
-          if (typeof triggerGlobalScreenShake === 'function') {
-            const strikeShake = isBankai
-              ? (CONFIG.ichigo?.bankaiShunpoStrike1ScreenShake ?? 3.5)
-              : (CONFIG.ichigo?.shunpoStrike1ScreenShake ?? 2.5);
-            const strikeDur = CONFIG.ichigo?.shunpoStrike1ShakeDuration ?? 6;
-            triggerGlobalScreenShake(strikeShake, strikeDur);
-          }
-
-          fighter.shunpoComboDelayTimer = isBankai 
-            ? (CONFIG.ichigo?.bankaiShunpoComboDelayFrames || 6) 
-            : (CONFIG.ichigo?.shunpoComboDelayFrames || 8);
+        let liftF, holdF, strikeF, lockF, recF;
+        if (step === 1 || step === 2) {
+          liftF = 1;
+          holdF = 1;
+          strikeF = 2;
+          lockF = isBankai ? 1 : 2;
+          recF = isBankai ? 1 : 2;
         } else {
-          // Final Finisher Strike
-          const s2Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike2Duration || 18) : (CONFIG.ichigo?.shunpoStrike2SlashDuration || CONFIG.ichigo?.shunpoFinisherDuration || 20);
-          fighter.slashSwingTimer = s2Duration;
-          fighter.slashSwingMaxTimer = s2Duration;
-          fighter.slashSwingVariant = 2; // Grand fiery finisher
-          fighter._playSound('shunpoFinisherSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
+          liftF = 1;
+          holdF = 1;
+          strikeF = 2;
+          lockF = isBankai ? 1 : 2;
+          recF = 1;
+        }
+        const totalFrames = liftF + holdF + strikeF + lockF + recF;
+        fighter.slashSwingTimer = totalFrames;
+        fighter.slashSwingMaxTimer = totalFrames;
+        fighter.slashSwingLiftFrames = liftF;
+        fighter.slashSwingHoldFrames = holdF;
+        fighter.slashSwingStrikeFrames = strikeF;
+        fighter.slashSwingImpactLockFrames = lockF;
+        fighter.slashSwingRecFrames = recF;
 
-          const strike2Mult = CONFIG.ichigo?.shunpoStrike2Multiplier || 1.35;
-          const finisherDmg = baseSlashDmg * strike2Mult * damageMult;
-          applyDamageToTarget(target, finisherDmg, fighter, { isSkill: true });
-          const finStun = isBankai ? (CONFIG.ichigo?.bankaiShunpoStunDuration || 8) : (CONFIG.ichigo?.shunpoStrike2StunDuration || 8);
-          target.applyHitStun(finStun);
+        const baseSlashDmg = (step === 3) ? (CONFIG.ichigo?.hit3Damage || 24) : (step === 2 ? (CONFIG.ichigo?.hit2Damage || 16) : (CONFIG.ichigo?.hit1Damage || 12));
+        fighter.swordSwingDamage = baseSlashDmg * damageMult;
+        fighter.swordSwingKnockback = (step === 3) ? (CONFIG.ichigo?.hit3Knockback || 8.0) : (step === 2 ? (CONFIG.ichigo?.hit2Knockback || 5.5) : (CONFIG.ichigo?.hit1Knockback || 4.0));
+        fighter.swordSwingHitPause = (step === 3) ? 5 : 4;
+        fighter.swordSwingHitStun = (step === 3) ? 18 : (step === 2 ? 14 : 12);
+        fighter.swordSwingImpactShake = (step === 3) ? 7.0 : (step === 2 ? 5.0 : 3.5);
 
-          const aimAngle = fighter.gunAngle || 0;
-          const kbForce = CONFIG.ichigo?.shunpoStrike2Knockback || 7;
-          if (typeof target.applyKnockback === 'function') {
-            target.applyKnockback(Math.cos(aimAngle) * kbForce, Math.sin(aimAngle) * kbForce);
-          }
+        const stepText = (step === 1) ? 'HIT 1: CLEAVE!' : (step === 2 ? 'HIT 2: RISING SCOOP!' : 'HIT 3: SUNDER!');
+        spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, stepText, isBankai ? '#DC143C' : (step === 3 ? '#FFD700' : '#00D5FF'));
 
-          spawnImpactFlash(target.x, target.y, (isBankai || isMask) ? 'sukuna' : 'gojo');
-          spawnMeleeClashShockwave(target.x, target.y, CONFIG.ichigo?.shunpoShockwaveSize || 45, (isBankai || isMask) ? 'sukuna' : 'gojo');
-          fighter._playSound('shunpoFinisherHit', 'Assets/Sound Effects/Attacks/fleshhit.mp3', 0.90);
-          if (typeof triggerGlobalScreenShake === 'function') {
-            const finShake = isBankai
-              ? (CONFIG.ichigo?.bankaiShunpoFinisherScreenShake ?? 5.5)
-              : (isMask ? (CONFIG.ichigo?.hollowShunpoFinisherScreenShake ?? 5.0) : (CONFIG.ichigo?.shunpoScreenShake ?? 4.0));
-            const finDur = CONFIG.ichigo?.shunpoFinisherShakeDuration ?? 10;
-            triggerGlobalScreenShake(finShake, finDur);
-          }
-
-          // Schedule Disengage Back-Step Flash Step
-          fighter.shunpoDisengageDelayTimer = isBankai 
-            ? (CONFIG.ichigo?.bankaiComboDisengageDelayFrames || 5) 
-            : (CONFIG.ichigo?.comboDisengageDelayFrames || 7);
+        if (!isFinalStep) {
+          fighter.shunpoComboDelayTimer = totalFrames;
+        } else {
+          fighter.shunpoDisengageDelayTimer = totalFrames;
         }
       } else {
         fighter.shunpoComboActive = false;
@@ -881,6 +867,8 @@ export function updateShunpoCombat(fighter, opponent) {
         fighter.slashSwingTimer = 0;
         fighter.slashSwingVariant = 0;
         fighter.isMeleeCleave = false;
+        fighter.swordTremorX = 0;
+        fighter.swordTremorY = 0;
         if (typeof fighter.resumeMovement === 'function') {
           fighter.resumeMovement(opponent);
         }
@@ -895,7 +883,7 @@ export function updateShunpoCombat(fighter, opponent) {
     const isMask = fighter.hollowMaskActive;
     let defaultStrikes = isBankai 
       ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
-      : (CONFIG.ichigo?.shunpoStrikes || 2);
+      : (CONFIG.ichigo?.shunpoStrikes || 3);
     if (isBankai) {
       defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.bankaiShunpoStrikesMultiplier || 1.8));
     }
@@ -903,6 +891,69 @@ export function updateShunpoCombat(fighter, opponent) {
       defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.hollowShunpoStrikesMultiplier ?? 1.2));
     }
     const maxSteps = fighter.shunpoMaxSteps || defaultStrikes;
+
+    // 5-phase melee strike mechanics during active swing
+    if (fighter.slashSwingTimer > 0) {
+      const totalF = fighter.slashSwingMaxTimer || 20;
+      const elapsed = Math.max(0, totalF - fighter.slashSwingTimer);
+      const liftF = fighter.slashSwingLiftFrames || 3;
+      const holdF = fighter.slashSwingHoldFrames || 2;
+      const strikeF = fighter.slashSwingStrikeFrames || 4;
+      const lockF = fighter.slashSwingImpactLockFrames || 5;
+      const recF = fighter.slashSwingRecFrames || 5;
+      const strikeStart = liftF + holdF;
+      const strikeEnd = strikeStart + strikeF;
+      const lockEnd = strikeEnd + lockF;
+      const target = fighter.shunpoTarget;
+      const step = fighter.swordComboStep || 1;
+
+      if (elapsed < strikeStart) {
+        fighter.vx = 0;
+        fighter.vy = 0;
+      } else if (elapsed < strikeEnd) {
+        const strikeElapsed = elapsed - strikeStart;
+        const strikeP = strikeElapsed / Math.max(1, strikeF);
+
+        if (!fighter.swordSwingSoundPlayed) {
+          fighter.swordSwingSoundPlayed = true;
+          fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.90);
+        }
+
+        const lungeP = Math.sin(strikeP * Math.PI);
+        const lungeSpeed = (step === 3 ? 5.5 : 4.0) * (isBankai ? 1.2 : 1.0);
+        fighter.vx = Math.cos(fighter.swordSlashAngle) * lungeSpeed * lungeP;
+        fighter.vy = Math.sin(fighter.swordSlashAngle) * lungeSpeed * lungeP;
+
+        if (strikeP >= 0.50 && !fighter.swordHitDelivered && target && target.hp > 0 && !target.isDead) {
+          fighter.swordHitDelivered = true;
+          applyDamageToTarget(target, fighter.swordSwingDamage, fighter, { isSkill: true });
+          if (typeof target.applyTimeStop === 'function') target.applyTimeStop(fighter.swordSwingHitPause);
+          if (typeof target.applyHitStun === 'function') target.applyHitStun(fighter.swordSwingHitStun);
+          if (step === 3 && typeof target.applyKnockback === 'function') {
+            target.applyKnockback(Math.cos(fighter.swordSlashAngle) * fighter.swordSwingKnockback, Math.sin(fighter.swordSlashAngle) * fighter.swordSwingKnockback);
+          }
+          spawnImpactFlash(target.x, target.y, (isBankai || isMask) ? 'sukuna' : 'gojo');
+          spawnMeleeClashShockwave(target.x, target.y, step === 3 ? 50 : 38, (isBankai || isMask) ? 'sukuna' : 'gojo');
+          fighter._playSound('shunpoStrikeHit', 'Assets/Sound Effects/Attacks/fleshhit.mp3', 0.85);
+          fighter._playSound('sukunaSlice', 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3', 0.85);
+          if (step === 3) fighter._playSound('heavyPunch', 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 0.85);
+          if (typeof triggerGlobalScreenShake === 'function') {
+            triggerGlobalScreenShake(fighter.swordSwingImpactShake, 8);
+          }
+        }
+      } else if (elapsed < lockEnd) {
+        fighter.vx = 0;
+        fighter.vy = 0;
+        const tremor = step === 3 ? 2.5 : 1.8;
+        fighter.swordTremorX = (Math.random() - 0.5) * tremor;
+        fighter.swordTremorY = (Math.random() - 0.5) * tremor;
+      } else {
+        fighter.swordTremorX = 0;
+        fighter.swordTremorY = 0;
+        fighter.vx *= 0.82;
+        fighter.vy *= 0.82;
+      }
+    }
     
     // Check Disengage Back-Step trigger
     if (fighter.shunpoComboStep >= maxSteps && fighter.shunpoDisengageDelayTimer > 0) {
@@ -936,6 +987,8 @@ export function updateShunpoCombat(fighter, opponent) {
           fighter.slashSwingTimer = 0;
           fighter.slashSwingVariant = 0;
           fighter.isMeleeCleave = false;
+          fighter.swordTremorX = 0;
+          fighter.swordTremorY = 0;
           fighter.shunpoDashTimer = isBankai 
             ? (CONFIG.ichigo?.bankaiComboDisengageDashFrames || 3) 
             : (CONFIG.ichigo?.comboDisengageDashFrames || 3);
@@ -961,6 +1014,8 @@ export function updateShunpoCombat(fighter, opponent) {
           fighter.slashSwingTimer = 0;
           fighter.slashSwingVariant = 0;
           fighter.isMeleeCleave = false;
+          fighter.swordTremorX = 0;
+          fighter.swordTremorY = 0;
           let backwardAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)) + Math.PI;
           if (opponent && opponent.hp > 0) {
             backwardAngle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x);
@@ -994,6 +1049,8 @@ export function updateShunpoCombat(fighter, opponent) {
           fighter.slashSwingTimer = 0;
           fighter.slashSwingVariant = 0;
           fighter.isMeleeCleave = false;
+          fighter.swordTremorX = 0;
+          fighter.swordTremorY = 0;
           fighter.shunpoDashTimer = isBankai ? 3 : (CONFIG.ichigo?.shunpoDashDuration || 4);
 
           pushTrailCap(fighter.afterImages, {
@@ -1008,10 +1065,7 @@ export function updateShunpoCombat(fighter, opponent) {
             maxTimer: 16
           }, 32);
 
-          const isFinalStep = fighter.shunpoComboStep === maxSteps;
-          const labels = ['', 'FLANK SLASH!', 'CROSS STRIKE!', 'LIGHTNING FLASH!', 'SHADOW PIERCE!', 'TENSA BLITZ!', 'CROSS SLASH!'];
-          const stepText = isFinalStep ? 'CROSS SLASH!' : (labels[fighter.shunpoComboStep] || 'FLASH STRIKE!');
-          spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, stepText, isBankai ? '#DC143C' : '#FFD700');
+          spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, isBankai ? 'TENSA STEP!' : 'FLASH STEP!', isBankai ? '#DC143C' : '#00D5FF');
           fighter._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', isBankai ? 0.95 : 0.9);
           return true;
         } else {
@@ -1020,6 +1074,8 @@ export function updateShunpoCombat(fighter, opponent) {
           fighter.slashSwingTimer = 0;
           fighter.slashSwingVariant = 0;
           fighter.isMeleeCleave = false;
+          fighter.swordTremorX = 0;
+          fighter.swordTremorY = 0;
           if (typeof fighter.resumeMovement === 'function') {
             fighter.resumeMovement(opponent);
           }

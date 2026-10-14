@@ -39,12 +39,12 @@ export const sukunaConfig = {
 
     // Stacking Slash Crit Passive
     enableCritPassive: true,          // Master toggle for Stacking Slash Crit Passive
-    baseCritChance: 0.25,             // 10% base crit chance
-    baseCritMultiplier: 0.25,         // 1.50x base crit damage multiplier
+    baseCritChance: 1.00,             // 10% base crit chance
+    baseCritMultiplier: 1.00,         // 1.50x base crit damage multiplier
     critChancePerSlashHit: 0.01 ,      // +2% crit chance per landed slash hit
     critMultiplierPerSlashHit: 0.01,  // +0.05x crit multiplier per landed slash hit
-    maxCritChance: 1.0,              // 80% max crit chance cap
-    maxCritMultiplier: 1.0,          // 3.50x max crit damage multiplier cap
+    maxCritChance: 1.50,              // 80% max crit chance cap
+    maxCritMultiplier: 1.50,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
     enableRCT: true,                  // Master toggle for Reverse Cursed Technique (Passive)

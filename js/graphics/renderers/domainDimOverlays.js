@@ -51,7 +51,10 @@ export function excludeGojoInfinityFromDim(ctx) {
     if (!f || f.hp <= 0) continue;
     const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
     if (!isGojo) continue;
-    const isBarrierSuppressed = Boolean(f.isTargetOfAmbush || f.caughtInSaitamaCounter || isSaitamaCounterActive || (f.infinityFadeOpacity !== undefined && f.infinityFadeOpacity <= 0.005) || isInsideRubbickStolenVoid(f) || f.isChainedByMakima || f.isMeleeMode);
+    const isNaoyaStasisOrUlt = (typeof f.isCaughtInNaoyaStasisOrUlt === 'function')
+      ? f.isCaughtInNaoyaStasisOrUlt()
+      : Boolean(f.isCaughtInNaoyaUlt || f._isFlyingToWallPin || f.isCurrentlyWallPinnedByNaoya || (f.naoyaWallPinTimer && f.naoyaWallPinTimer > 0));
+    const isBarrierSuppressed = Boolean(f.isTargetOfAmbush || f.caughtInSaitamaCounter || isSaitamaCounterActive || isNaoyaStasisOrUlt || (f.infinityFadeOpacity !== undefined && f.infinityFadeOpacity <= 0.005) || isInsideRubbickStolenVoid(f) || f.isChainedByMakima || f.isMeleeMode);
     if (isBarrierSuppressed) continue;
     const isLimitlessActive = !f.isMeleeMode && (f.infinityActive || (f.infinityBlockTimer || 0) > 0);
     if (!isLimitlessActive) continue;
@@ -3266,5 +3269,90 @@ export function drawJohnWickAssassinationDimScreen() {
   }
 
   ctx.restore();
+}
+
+let currentZenitsuChannelDimOpacity = 0;
+
+/**
+ * Smoothly dims the screen while Zenitsu channels his ultimate-tier wind-up
+ * (Thunderclap and Flash stance channel, or Flaming Thunder God if enabled).
+ * Dim ramps in with an eased curve as the channel progresses, keeps Zenitsu in a
+ * crisp electric-yellow spotlight, and eases out smoothly once the dash is released or interrupted.
+ */
+export function drawZenitsuChannelDimScreen() {
+  if (typeof state !== 'undefined' && state.disableDimEffects) {
+    currentZenitsuChannelDimOpacity = 0;
+    return;
+  }
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const zenitsu = state.fighters?.find(f =>
+    f && f.hp > 0 && !f.isDead &&
+    (f.characterId === 'zenitsu' || f.type === 'zenitsu' || f._def?.id === 'zenitsu' || f._def?.type === 'zenitsu') &&
+    (f.isChannelingThunderclap || f.isChannelingFlamingThunderGod)
+  );
+
+  const zCfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : {};
+  const maxDimAlpha = zCfg.channelDimOpacity !== undefined ? zCfg.channelDimOpacity : 0.62;
+
+  let targetOpacity = 0;
+  if (zenitsu) {
+    const total = Math.max(1, zenitsu.thunderclapChannelDuration || zCfg.thunderclapChannelDuration || 60);
+    const remaining = Math.max(0, zenitsu.thunderclapChannelTimer || 0);
+    const progress = Math.min(1, Math.max(0, 1 - remaining / total));
+    targetOpacity = maxDimAlpha * Math.sin(progress * Math.PI * 0.5);
+  }
+
+  // Smooth ease-in while channeling, slower ease-out after release/interrupt
+  const lerp = targetOpacity > currentZenitsuChannelDimOpacity ? 0.10 : 0.07;
+  currentZenitsuChannelDimOpacity += (targetOpacity - currentZenitsuChannelDimOpacity) * lerp;
+
+  if (currentZenitsuChannelDimOpacity < 0.005) {
+    currentZenitsuChannelDimOpacity = 0;
+    return;
+  }
+
+  const opacity = currentZenitsuChannelDimOpacity;
+  const w = canvas.width;
+  const h = canvas.height;
+  const camZoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+  const focus = zenitsu
+    ? worldToScreen(zenitsu.x, zenitsu.y - (zenitsu.z || 0))
+    : { x: w / 2, y: h / 2 };
+  const fx = Number.isFinite(focus.x) ? focus.x : w / 2;
+  const fy = Number.isFinite(focus.y) ? focus.y : h / 2;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // 1. Deep indigo-black dim with a clear spotlight pocket centered on Zenitsu
+  const maxDist = Math.max(w, h) * 1.1;
+  const dimGrad = createSafeRadialGradient(ctx, fx, fy, 40 * camZoom, fx, fy, maxDist);
+  if (dimGrad) {
+    dimGrad.addColorStop(0.0, `rgba(6, 4, 22, ${(opacity * 0.20).toFixed(3)})`);
+    dimGrad.addColorStop(0.25, `rgba(6, 4, 22, ${(opacity * 0.65).toFixed(3)})`);
+    dimGrad.addColorStop(1.0, `rgba(2, 1, 10, ${(opacity * 0.98).toFixed(3)})`);
+    ctx.fillStyle = dimGrad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // 2. Soft electric-yellow thunder glow around Zenitsu
+  ctx.globalCompositeOperation = 'screen';
+  const glowR = 130 * camZoom;
+  const glow = createSafeRadialGradient(ctx, fx, fy, 6 * camZoom, fx, fy, glowR);
+  if (glow) {
+    glow.addColorStop(0.0, `rgba(255, 224, 70, ${(0.30 * opacity).toFixed(3)})`);
+    glow.addColorStop(0.5, `rgba(255, 190, 30, ${(0.12 * opacity).toFixed(3)})`);
+    glow.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(fx, fy, glowR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(2, 1, 10, ${(opacity * 0.9).toFixed(3)})`;
 }
 

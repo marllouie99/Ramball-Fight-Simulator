@@ -98,7 +98,7 @@ export const ichigoConfig = {
   enableFlurry: true,            // Toggle multi-strike flurry slashes (if false, executes single strike -> backstep -> Getsuga)
   initialShunpoCooldown: 100,    // Initial cooldown in frames after round start / countdown ends before first Shunpo Blitz (~3.0s at 60fps)
   shunpoCooldown: 200,           // Cooldown in frames between combo activations (~7.5s in Shikai)
-  shunpoStrikes: 4,              // Number of intermediate flurry slashes in Shikai
+  shunpoStrikes: 3,              // Number of flurry slashes in Shikai (Hit 1 -> Hit 2 -> Hit 3)
   shunpoRange: 220,              // Distance dashed on initial flank step
   shunpoDashDuration: 4,         // Flash step dash duration in frames
   shunpoTargetOffset: 34,        // Distance offset from target center on arrival

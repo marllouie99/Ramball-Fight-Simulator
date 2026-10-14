@@ -66,6 +66,7 @@ export class DenjiFighter extends Fighter {
     this._wasShredding = false;
     this._lastEngineIdlePlayTime = 0;
     this.shredBladeCount = 0;
+    this.shredCount = 0;
     this.shredTickTimer = 0;
     this.shredShakeTimer = 0;
     this.shredShakeIntensity = 0;
@@ -277,6 +278,26 @@ export class DenjiFighter extends Fighter {
     if (this.cleaveCooldown > 0) this.cleaveCooldown--;
     if (this.massacreCooldown > 0) this.massacreCooldown--;
     if (this.shredShakeTimer > 0) this.shredShakeTimer--;
+
+    // Target shred count inactivity decay
+    if (typeof state !== 'undefined' && state.fighters) {
+      for (let f of state.fighters) {
+        if (f && f !== this && f._denjiShredResetTimer > 0) {
+          f._denjiShredResetTimer--;
+          if (f._denjiShredResetTimer <= 0) {
+            f.denjiShredCount = 0;
+          }
+        }
+      }
+    } else if (opponent && opponent._denjiShredResetTimer > 0) {
+      opponent._denjiShredResetTimer--;
+      if (opponent._denjiShredResetTimer <= 0) {
+        opponent.denjiShredCount = 0;
+      }
+    }
+    if (!this.isShredding) {
+      this.shredCount = 0;
+    }
 
     // Temporary speed boost decay & afterimages after Skill 1 breather
     if (this.lungePostSpeedBoostTimer > 0) {
@@ -732,11 +753,42 @@ export class DenjiFighter extends Fighter {
             }
           }
 
-          // 7. Hemorrhage & Bleed Stacks (Passive 3 with Multi-Blade bonus)
-          if (didDamage && this.isSkillEnabled(cfg.enableHemorrhage, true)) {
-            t.hemorrhageStacks = Math.min(cfg.maxHemorrhageStacks || 6, (t.hemorrhageStacks || 0) + hemorrhageAdd);
-            t.isBleeding = true;
-            t.bleedTimer = 90; // 1.5s refresh
+          // 7. Chainsaw Shred Count & Bleed Debuff (Inflicts Bleed Debuff when Shred Count reaches 10)
+          const enableShredBleed = this.isSkillEnabled(cfg.enableShredBleed, true) || this.isSkillEnabled(cfg.enableHemorrhage, true);
+          if (didDamage && enableShredBleed) {
+            t.denjiShredCount = (t.denjiShredCount || 0) + 1;
+            t._denjiShredResetTimer = cfg.shredCountDecayFrames || 90;
+            this.shredCount = t.denjiShredCount;
+
+            const bleedThreshold = cfg.shredBleedThreshold || 10;
+            if (t.denjiShredCount >= bleedThreshold) {
+              t.denjiShredCount = 0;
+              this.shredCount = 0;
+
+              const bleedDur = cfg.shredBleedDuration || 180;
+              const bleedDmg = cfg.shredBleedDamagePerTick || 5;
+              const bleedInt = cfg.shredBleedIntervalFrames || 30;
+
+              if (typeof t.applyBleed === 'function') {
+                t.applyBleed(this, bleedDur, bleedDmg, bleedInt);
+              } else if (t.statusEffects && typeof t.statusEffects.applyBleed === 'function') {
+                t.statusEffects.applyBleed(this, bleedDur, bleedDmg, bleedInt);
+              } else {
+                t.bleedTimer = Math.max(t.bleedTimer || 0, bleedDur);
+                t.bleedDamageTimer = 0;
+                t.bleedDamagePerTick = bleedDmg;
+                t.bleedIntervalFrames = bleedInt;
+                t.lastBleedAttacker = this;
+              }
+              t.isBleeding = true;
+
+              // Visceral blood burst & flash at laceration point
+              const firstBlade = blades && blades[0];
+              const burstX = firstBlade ? (t.x + (firstBlade.startX + firstBlade.endX) * 0.5) * 0.5 : t.x;
+              const burstY = firstBlade ? (t.y + (firstBlade.startY + firstBlade.endY) * 0.5) * 0.5 : t.y;
+              spawnBloodEffect(burstX, burstY, bloodAngle, { count: 8, minSize: 2.5, maxSize: 5.0 });
+              spawnImpactFlash(burstX, burstY, '#DC2626', 20);
+            }
           }
 
           // 8. Multi-Blade Floating Combat Indicator (Throttled per target)
@@ -1382,6 +1434,7 @@ export class DenjiFighter extends Fighter {
     this._shredSustainTimer = 0;
     this._shredAudioPlayTimer = 0;
     this._wasShredding = false;
+    this.shredCount = 0;
     this.continuousShredTimer = 0;
     if (this.chainsawSmokeParticles) this.chainsawSmokeParticles.length = 0;
     super.onDeath();
@@ -1393,6 +1446,7 @@ export class DenjiFighter extends Fighter {
     this._stopShredTailAudio();
     this._stopEngineIdleAudio(0);
     this._wasShredding = false;
+    this.shredCount = 0;
     this._shredSustainTimer = 0;
     this._shredAudioPlayTimer = 0;
     this._lastEngineIdlePlayTime = 0;

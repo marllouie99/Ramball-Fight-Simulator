@@ -5974,7 +5974,77 @@ async function runInteractionTests() {
     assert(gojo.isChannelingPurple === false, 'Gojo Hollow Purple must be hard-cancelled when caught in Naoya Ultimate');
     assert(gojo.purpleCooldown >= 270, 'Gojo purpleCooldown must receive penalty cooldown when hard-cancelled by Ultimate');
 
+    // E. Gojo Limitless Infinity blocks Naoya's 24-Frame Palm Touch; only Naoya's Ultimate disables it
+    const { applyDamageToTarget } = await import('../js/entities/fighter.js');
+    const freshGojo = new GojoFighter({ x: 300, y: 200, hp: 400, maxHp: 400 });
+    freshGojo.team = 1;
+    freshGojo.infinityActive = true;
+    freshGojo.infinityCooldown = 0;
+    freshGojo.infinityFadeOpacity = 1.0;
+    state.fighters = [naoya, freshGojo];
+
+    // E1: Limitless Infinity active in neutral
+    assert(freshGojo.hasActiveInfinity() === true, 'Gojo must have active Limitless Infinity in neutral');
+
+    // E2: Active Infinity BLOCKS the 24-Frame Palm Touch Stasis (Infinity stays up)
+    const stasisBlocked = naoya.applyFrameStasis(freshGojo, 60);
+    assert(stasisBlocked === false, 'Naoya applyFrameStasis must be blocked by active Gojo Infinity');
+    assert(freshGojo.isFrameFrozen !== true, 'Gojo must NOT be frame frozen while Infinity is active');
+    assert(freshGojo.hasActiveInfinity() === true, 'Gojo Infinity must remain active after blocking the Palm Touch');
+
+    // E2b: With Infinity down (e.g. melee mode), the stasis can land
+    freshGojo.isMeleeMode = true;
+    freshGojo.infinityActive = false;
+    assert(naoya.applyFrameStasis(freshGojo, 60) === true, 'Palm Touch stasis must land when Gojo Infinity is down');
+    naoya.endFrameStasis(freshGojo);
+    freshGojo.isMeleeMode = false;
+    freshGojo.forcedMeleeTimer = 0;
+    freshGojo.timeStopTimer = 0;
+    freshGojo.x = 450;
+    freshGojo.y = 200;
+    freshGojo.infinityActive = true;
+    freshGojo.infinityFadeOpacity = 1.0;
+    freshGojo.update(naoya, 1, testArena);
+    assert(freshGojo.hasActiveInfinity() === true, 'Gojo Limitless Infinity must be active outside Naoya Ultimate');
+
+    // E3: Naoya Ultimate: 24 FPS Mach 3 Runway Breach -> Infinity disabled during runway sprint, crash & wall pin
+    freshGojo.isCaughtInNaoyaUlt = true;
+    freshGojo.infinityActive = false;
+    freshGojo.infinityFadeOpacity = 0;
+    assert(freshGojo.hasActiveInfinity() === false, 'Gojo hasActiveInfinity must return false during Naoya Ultimate Runway Breach');
+
+    freshGojo.update(naoya, 1, testArena);
+    assert(freshGojo.hasActiveInfinity() === false, 'Gojo hasActiveInfinity must remain false during Naoya Ultimate update');
+    assert(freshGojo.infinityActive === false, 'Gojo infinityActive must remain false during Naoya Ultimate update');
+
+    // Mach 3 impact penetrates and deals direct damage
+    const hpBeforeCrash = freshGojo.hp;
+    const crashOk = applyDamageToTarget(freshGojo, 75, naoya, {
+      isTrueDamage: true,
+      isUltimate: true,
+      isNaoyaUlt: true,
+      isMach3Breach: true
+    });
+    assert(crashOk === true, 'Mach 3 runway impact must hit Gojo');
+    assert(freshGojo.hp < hpBeforeCrash, 'Gojo HP must decrease from Mach 3 crash impact');
+
+    // During wall pin, Infinity remains disabled
+    freshGojo.isCaughtInNaoyaUlt = false;
+    freshGojo.isCurrentlyWallPinnedByNaoya = true;
+    freshGojo.naoyaWallPinTimer = 60;
+    assert(freshGojo.hasActiveInfinity() === false, 'Gojo hasActiveInfinity must return false during Naoya wall pin');
+
+    freshGojo.update(naoya, 1, testArena);
+    assert(freshGojo.hasActiveInfinity() === false, 'Gojo hasActiveInfinity must remain false during wall pin update');
+
+    // Wall pin ends -> Infinity restores
+    freshGojo.isCurrentlyWallPinnedByNaoya = false;
+    freshGojo.naoyaWallPinTimer = 0;
+    freshGojo.update(naoya, 1, testArena);
+    assert(freshGojo.hasActiveInfinity() === true, 'Gojo Limitless Infinity must restore after Naoya wall pin ends');
+
     console.log('      ✅ Naoya 24-Frame Palm Touch stasis correctly preserves active skill casting and resumes on stasis end without resetting.');
+    console.log('      ✅ Gojo Limitless Infinity blocks Naoya 24-Frame Palm Touch and is disabled only during Naoya Ultimate Mach 3 Runway Breach.');
   }
 
   // ── TEST 63: Shiro Living Chess Troops — Body Blocking & Enemy Targetability ──
@@ -7351,6 +7421,77 @@ async function runInteractionTests() {
       state.fighters = [];
       state.projectiles = [];
       projectileSystem.projectiles = [];
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 75. Testing Denji Chainsaw Shred Count & Bleed Debuff Mechanic
+  // ─────────────────────────────────────────────────────────────
+  {
+    console.log('   75. Testing Denji Chainsaw Shred Count & Bleed Debuff Mechanic...');
+    const { DenjiFighter } = await import('../js/entities/fighters/DenjiFighter.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+
+    const denji = new DenjiFighter({ x: 100, y: 300, radius: 25, hp: 360, maxHp: 360 });
+    const dummy = new Fighter({ x: 135, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    denji.team = 0;
+    dummy.team = 1;
+
+    const prevGetTeam = state.getFighterTeam;
+    state.getFighterTeam = (idx) => idx;
+    const prevMode = state.mode;
+    state.mode = '1v1';
+    state.fighters = [denji, dummy];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, centerObstacle: null };
+
+    try {
+      denji.gunAngle = 0; // Facing directly right into dummy
+      denji.angle = 0;
+
+      // Initial state: shredCount is 0, dummy is not bleeding
+      assert(denji.shredCount === 0, 'Denji initial shredCount must be 0');
+      assert(!dummy.isBleeding, 'Dummy must not be bleeding initially');
+      assert(!dummy.bleedTimer || dummy.bleedTimer === 0, 'Dummy bleedTimer must be 0 initially');
+
+      // Simulate 5 shred ticks (below threshold of 10)
+      for (let i = 1; i <= 5; i++) {
+        denji.shredTickTimer = 0; // Trigger shred tick
+        denji.update(dummy, 0, state.arena);
+        assert(dummy.denjiShredCount === i, `Dummy denjiShredCount must be ${i} after ${i} ticks (got ${dummy.denjiShredCount})`);
+        assert(denji.shredCount === i, `Denji shredCount must reflect active target count of ${i}`);
+        assert(!dummy.isBleeding, 'Dummy must not be bleeding before reaching 10 shred hits');
+      }
+
+      // Simulate remaining 5 shred ticks to reach threshold of 10
+      for (let i = 6; i <= 10; i++) {
+        denji.shredTickTimer = 0;
+        denji.update(dummy, 0, state.arena);
+      }
+
+      // Threshold reached: bleed debuff must be applied!
+      assert(dummy.isBleeding === true, 'Dummy must receive bleed debuff (isBleeding === true) upon reaching 10 shred hits');
+      assert(dummy.bleedTimer > 0, `Dummy bleedTimer must be active (> 0, got ${dummy.bleedTimer})`);
+      assert(dummy.denjiShredCount === 0, 'Dummy denjiShredCount must reset to 0 after triggering bleed debuff');
+      assert(denji.shredCount === 0, 'Denji shredCount must reset to 0 after triggering bleed debuff');
+
+      // Inactivity decay test: shred twice on a fresh cycle
+      denji.shredTickTimer = 0;
+      denji.update(dummy, 0, state.arena);
+      assert(dummy.denjiShredCount === 1, 'Dummy shredCount must start second cycle at 1');
+
+      // Move dummy out of shred range and let decay timer elapse
+      dummy.x = 600;
+      for (let f = 0; f < 100; f++) {
+        denji.update(dummy, 0, state.arena);
+      }
+      assert(dummy.denjiShredCount === 0, 'Dummy denjiShredCount must decay to 0 after inactivity');
+      assert(denji.shredCount === 0, 'Denji shredCount must be 0 when not actively shredding');
+
+      console.log('      ✅ Denji Chainsaw Shred Count & Bleed Debuff mechanic verified successfully.');
+    } finally {
+      state.getFighterTeam = prevGetTeam;
+      state.mode = prevMode;
+      state.fighters = [];
     }
   }
 

@@ -899,37 +899,39 @@ export function drawAnimeImpactFrame(ctx, effect) {
   ctx.stroke();
 
   // ── 2. Concentric Elliptical Kinetic Shockwave Ring ──
-  const rx = baseR * 1.15;
-  const ry = baseR * 0.88;
-  const ringThick = Math.max(P * 1.5, Math.round((P * 2.8 * effect.life) / P) * P);
+  if (!effect.hideShockwaveRing && !effect.noShockwaveRing) {
+    const rx = baseR * 1.15;
+    const ry = baseR * 0.88;
+    const ringThick = Math.max(P * 1.5, Math.round((P * 2.8 * effect.life) / P) * P);
 
-  // Dark Manga Ink Outer Rim
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = colDarkRim;
-  ctx.lineWidth = ringThick + 2.2;
-  ctx.stroke();
+    // Dark Manga Ink Outer Rim
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = colDarkRim;
+    ctx.lineWidth = ringThick + 2.2;
+    ctx.stroke();
 
-  // Vibrant Theme Energy Ring
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = colTheme;
-  ctx.lineWidth = ringThick;
-  ctx.stroke();
+    // Vibrant Theme Energy Ring
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = colTheme;
+    ctx.lineWidth = ringThick;
+    ctx.stroke();
 
-  // Crisp Inner Core Highlight
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = colHighlight;
-  ctx.lineWidth = Math.max(1, P * 0.85);
-  ctx.stroke();
+    // Crisp Inner Core Highlight
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = colHighlight;
+    ctx.lineWidth = Math.max(1, P * 0.85);
+    ctx.stroke();
 
-  // Secondary Echo Ripple Ellipse
-  ctx.beginPath();
-  ctx.ellipse(0, 0, rx * 0.65, ry * 0.65, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = colHighlight;
-  ctx.lineWidth = Math.max(0.8, 1.6 * effect.life);
-  ctx.stroke();
+    // Secondary Echo Ripple Ellipse
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx * 0.65, ry * 0.65, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = colHighlight;
+    ctx.lineWidth = Math.max(0.8, 1.6 * effect.life);
+    ctx.stroke();
+  }
 
 
 

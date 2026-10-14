@@ -48,8 +48,14 @@ export const denjiConfig = {
   lifestealRatio: 0.01,             // 25% base chainsaw lifesteal
   bleedingTargetLifestealRatio: 0.01,// 35% lifesteal vs bleeding enemies
 
-  // Passive 3: Hemorrhage & Vascular Rupture
-  enableHemorrhage: 0,           // Master toggle for Passive 3: Stacking Bleed & Vascular Rupture
+  // Passive 3: Chainsaw Shred Count & Bleed Debuff
+  enableShredBleed: true,           // Master toggle for Passive 3: Shred Count -> Bleed debuff mechanic
+  enableHemorrhage: true,           // Compatibility toggle
+  shredBleedThreshold: 10,          // Shred count required on enemy to trigger Bleed debuff
+  shredBleedDuration: 180,          // Bleed debuff duration in frames (3.0s @ 60fps)
+  shredBleedDamagePerTick: 5,       // Bleed damage per tick
+  shredBleedIntervalFrames: 30,     // Bleed damage tick interval (0.5s @ 60fps)
+  shredCountDecayFrames: 90,        // Frames of shred inactivity before shred count resets (1.5s)
   maxHemorrhageStacks: 6,
   defenseShredPerStack: 0.05,       // 5% defense reduction per stack
   bleedDpsPerStack: 3,              // 3 damage per second per stack

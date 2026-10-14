@@ -158,7 +158,7 @@ Touching an enemy during active Projection Sorcery forces them to abide by the 2
 
 | Opponent | Unique Interaction |
 | :--- | :--- |
-| **vs Satoru Gojo** | **Limitless Barrier Interaction (Rule 1.7)**: Naoya cannot touch Gojo directly through Infinity; however, top-speed Sonic Boom Shockwaves can push Gojo and force barrier energy drain. |
+| **vs Satoru Gojo** | **Projection Sorcery vs Limitless**: While Infinity is active it blocks Naoya's **Passive: 24-Frame Palm Touch & Frame Stasis Freeze** and flurry punches (Rule 1.7). Only Naoya's **Ultimate: 24 FPS Mach 3 Runway Breach** disables Infinity for the supersonic runway crash and wall-pin sequence, allowing direct True Damage; Infinity restores once the pin ends. |
 | **vs Toji Fushiguro** | **Zenin Clan Complex**: Naoya's Frame Stacks build 50% faster against Toji, but Toji's Heavenly Restriction bypasses Frame Stasis duration (reduces freeze to 0.35s). |
 | **vs Kento Nanami** | **Speed vs Ratio**: Nanami's 7:3 Ratio can catch Naoya during his trajectory stumble; however, Naoya's Mach speed makes him difficult for Nanami to measure. |
 | **vs Yuji Itadori / Todo** | **Swapping & Divergent Fist**: Todo's Boogie Woogie forces Naoya to break his predetermined 24-frame trajectory, causing an instant trajectory violation stumble. |
