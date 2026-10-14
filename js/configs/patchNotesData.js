@@ -30,61 +30,14 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "KNIGHT",
+        "character": "TOJI",
         "deltas": [
             {
                 "type": "ADJUST",
-                "key": "themeColor",
-                "oldVal": "#718096",
-                "newVal": "#9e9e9e",
+                "key": "Melee",
+                "oldVal": "Inverted Spear of Heaven (Amanosakahoko)",
+                "newVal": "Inverted Spear of Heaven (Amanosakahoko - Stab & Rip 2-Hit Assassin Dagger Combo)",
                 "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "desc",
-                "oldVal": "Passively blocks incoming direct projectile and melee attacks with a sturdy tower shield",
-                "newVal": "Wields an HP-backed tower shield with passive DEF buff that absorbs all incoming damage until broken",
-                "pct": "Mod"
-            },
-            {
-                "type": "ADJUST",
-                "key": "shieldBlockChance",
-                "oldVal": "0.50",
-                "newVal": "1.0",
-                "pct": "Mod"
-            }
-        ]
-    },
-    {
-        "character": "SUKUNA",
-        "deltas": [
-            {
-                "type": "NERF",
-                "key": "divineFlameCooldown",
-                "oldVal": 1500,
-                "newVal": 2000,
-                "pct": "+33.3%"
-            },
-            {
-                "type": "BUFF",
-                "key": "divineFlameDamage",
-                "oldVal": 200,
-                "newVal": 500,
-                "pct": "+150.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "domainCooldown",
-                "oldVal": 2000,
-                "newVal": 1500,
-                "pct": "-25.0%"
-            },
-            {
-                "type": "BUFF",
-                "key": "domainDuration",
-                "oldVal": 300,
-                "newVal": 500,
-                "pct": "+66.7%"
             }
         ]
     }

@@ -193,17 +193,28 @@ export function drawBlackHoleEffects() {
   }
 }
 
+const FONT_CRIT = '900 18px "Silkscreen", "Press Start 2P", monospace';
+const FONT_DEFAULT = '700 15px "Silkscreen", "Press Start 2P", monospace';
+
 export function drawFloatingTexts() {
   const { floatingTextCtx: ctx, floatingTextCanvas: canvas } = state;
   if (!ctx || !canvas) return;
 
-  // Clear the dedicated floating text canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   const texts = state.floatingTexts;
-  if (!texts || texts.length === 0) return;
+  if (!texts || texts.length === 0) {
+    if (state._floatingTextCanvasDirty) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      state._floatingTextCanvasDirty = false;
+      if (state.floatingTextSprite && state.floatingTextSprite.texture) {
+        state.floatingTextSprite.visible = false;
+        state.floatingTextSprite.texture.update();
+      }
+    }
+    return;
+  }
 
-  const isDark = (state.arenaTheme === 'dark');
+  state._floatingTextCanvasDirty = true;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   ctx.save();
   applyCameraToCtx(ctx);
@@ -215,63 +226,60 @@ export function drawFloatingTexts() {
 
   fastCleanArray(texts, (t) => {
     t.timer++;
+
+    // Kinematic motion & gravity
+    t.x += t.vx || 0;
     t.y += t.vy;
-    t.vy *= 0.96; // gradually decelerate upward drift
+    if (t.gravity) t.vy += t.gravity;
+    if (t.dragX) t.vx *= t.dragX;
+    else t.vy *= 0.96;
+
+    if (t.timer >= t.maxTimer) {
+      return false; // Evict expired text
+    }
 
     const progress = t.timer / t.maxTimer;
     let alpha = 1;
-    if (progress > 0.70) {
-      alpha = 1 - (progress - 0.70) / 0.30;
+    if (progress > 0.65) {
+      alpha = Math.max(0, 1 - (progress - 0.65) / 0.35);
+    }
+    ctx.globalAlpha = alpha;
+
+    // Scale punch pop * baseScale for heavy hits
+    let scale = t.baseScale || 1.0;
+    if (t.popFrames && t.timer < t.popFrames) {
+      const popRatio = (t.popFrames - t.timer) / t.popFrames;
+      scale *= (1.0 + (t.popAmount || 0.35) * Math.sin(popRatio * Math.PI * 0.5));
     }
 
-    if (t.timer < t.maxTimer) {
-      ctx.globalAlpha = Math.max(0, alpha);
-      
-      const targetFont = t.isDamage ? '700 16px "Silkscreen", "Press Start 2P", monospace' : '700 12px "Silkscreen", "Press Start 2P", monospace';
-
-      if (currentFont !== targetFont) {
-        ctx.font = targetFont;
-        currentFont = targetFont;
-      }
-
-      // Glow effect for green healing numbers (Rule #11 compliant)
-      const isGreenHeal = t.text.startsWith('+') && (t.color === '#39FF14' || t.color === '#00FF66' || t.color === '#22c55e');
-      if (isGreenHeal) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(57, 255, 20, 0.35)'; // Semi-transparent electric green outer glow
-        ctx.lineWidth = 8.5;
-        ctx.strokeText(t.text, t.x, t.y);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; // White inner core glow
-        ctx.lineWidth = 5.5;
-        ctx.strokeText(t.text, t.x, t.y);
-        ctx.restore();
-      }
-
-      if (isDark) {
-        // In Dark Mode: Thin crisp white outer stroke
-        ctx.lineWidth = t.isDamage ? 4.6 : 4.2;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
-        ctx.strokeText(t.text, t.x, t.y);
-
-        ctx.lineWidth = t.isDamage ? 2.6 : 2.4;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.strokeText(t.text, t.x, t.y);
-      } else {
-        // In Light Mode: Classic crisp black outline for arcade typography
-        ctx.lineWidth = t.isDamage ? 3.8 : 3.4;
-        ctx.strokeStyle = 'rgba(0,0,0,0.95)';
-        ctx.strokeText(t.text, t.x, t.y);
-      }
-
-      ctx.fillStyle = 'rgba(0,0,0,0.4)';
-      ctx.fillText(t.text, t.x + 1, t.y + 1); // Subtle drop shadow
-
-      ctx.fillStyle = t.color;
-      ctx.fillText(t.text, t.x, t.y);
-
-      return true; // Keep
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    if (t.rotation) {
+      ctx.rotate(t.rotation);
     }
-    return false; // Remove
+    if (scale !== 1.0) {
+      ctx.scale(scale, scale);
+    }
+
+    // Static Font Switch — cached font string, zero dynamic string interpolation
+    const isCrit = Boolean(t.isCrit || /^CRIT/i.test(t.text));
+    const fontToUse = isCrit ? FONT_CRIT : FONT_DEFAULT;
+    if (currentFont !== fontToUse) {
+      ctx.font = fontToUse;
+      currentFont = fontToUse;
+    }
+
+    // Single crisp solid black outline (Rule 11 compliant, no CPU blur, no multi-pass)
+    ctx.lineWidth = isCrit ? 3.6 : 2.8;
+    ctx.strokeStyle = '#000000';
+    ctx.strokeText(t.text, 0, 0);
+
+    // Single vibrant fill
+    ctx.fillStyle = t.color || (isCrit ? '#FF3B30' : '#FFFFFF');
+    ctx.fillText(t.text, 0, 0);
+
+    ctx.restore();
+    return true; // Keep active
   });
 
   ctx.restore();

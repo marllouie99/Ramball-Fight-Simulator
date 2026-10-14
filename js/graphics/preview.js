@@ -166,7 +166,11 @@ export function updateIndexDetailDemo(def, demoArea) {
 
   // Handle Special Ability Animation Demo Modes (Skills / Passives / Ultimates)
   const currentAnim = state.indexDemoAnim || (def.type === 'toji' ? 'toji_basic' : 'basic');
-  if (currentAnim && (currentAnim !== 'basic' || def.type === 'toji')) {
+  const isTojiBasicDemo = (def.type === 'toji') && ['toji_basic', 'toji_hit1', 'toji_hit2', 'toji_combo', 'spear', 'basic'].includes(currentAnim);
+  const isMakiBasicDemo = (def.type === 'maki') && ['maki_hit1', 'maki_hit2', 'maki_hit3', 'maki_combo'].includes(currentAnim);
+  const isMeleeWeaponDemo = isTojiBasicDemo || isMakiBasicDemo;
+
+  if (currentAnim && currentAnim !== 'basic' && !isMeleeWeaponDemo) {
     pstate.hideTarget = true;
     fighter.x = demoArea.x + demoArea.width / 2;
     fighter.y = demoArea.y + demoArea.height / 2;
@@ -333,7 +337,7 @@ export function updateIndexDetailDemo(def, demoArea) {
       previewProjectileSystem.update(demoArea, fighter, target);
       pstate.frame += 1;
       return pstate;
-    } else if (def.type === 'toji' && ['toji_basic', 'spear', 'basic'].includes(currentAnim)) {
+    } else if (isTojiBasicDemo) {
       pstate.hideTarget = false;
       fighter.x = demoArea.x + demoArea.width / 2 - 40;
       fighter.y = demoArea.y + demoArea.height / 2;
@@ -347,8 +351,14 @@ export function updateIndexDetailDemo(def, demoArea) {
       const baseX = (demoArea.x + demoArea.width / 2 - 40) + 65;
       const baseY = demoArea.y + demoArea.height / 2;
       if (target) {
-        target.x += (baseX - target.x) * 0.15;
-        target.y += (baseY - target.y) * 0.15;
+        if (!pstate.tojiTargetInitialized) {
+          pstate.tojiTargetInitialized = true;
+          target.x = baseX;
+          target.y = baseY;
+        } else {
+          target.x += (baseX - target.x) * 0.15;
+          target.y += (baseY - target.y) * 0.15;
+        }
         target.r = 25;
         target.isDead = false;
         target.hp = 1000;
@@ -364,11 +374,13 @@ export function updateIndexDetailDemo(def, demoArea) {
 
         if (fighter.spearSwingTimer > 0) {
           const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
-          const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : 5;
-          const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : 2;
-          const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : 6;
-          const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : 6;
-          const totalF = fighter.spearSwingMax || 28;
+          const isHit2 = (fighter.spearComboStep === 2);
+          const liftF = isHit2 ? (cfg.hit2LiftFrames ?? 3) : (cfg.hit1LiftFrames ?? 4);
+          const holdF = isHit2 ? (cfg.hit2HoldFrames ?? 1) : (cfg.hit1HoldFrames ?? 1);
+          const strikeF = isHit2 ? (cfg.hit2StrikeFrames ?? 5) : (cfg.hit1StrikeFrames ?? 4);
+          const lockF = isHit2 ? (cfg.hit2ImpactLockFrames ?? 5) : (cfg.hit1ImpactLockFrames ?? 4);
+          const recF = isHit2 ? (cfg.hit2RecoveryFrames ?? 7) : (cfg.hit1RecoveryFrames ?? 5);
+          const totalF = fighter.spearSwingMax || Math.max(1, liftF + holdF + strikeF + lockF + recF);
           const t2 = (liftF + holdF) / totalF;
           const t3 = (liftF + holdF + strikeF) / totalF;
           const t4 = (liftF + holdF + strikeF + lockF) / totalF;
@@ -377,13 +389,13 @@ export function updateIndexDetailDemo(def, demoArea) {
           // Phase 3 lunging step momentum toward dummy target
           if (progress >= t2 && progress < t3) {
             const pStrike = (progress - t2) / Math.max(0.001, t3 - t2);
-            fighter.x += Math.sin(pStrike * Math.PI) * 1.2;
+            fighter.x += Math.sin(pStrike * Math.PI) * (isHit2 ? 1.0 : 1.2);
             if (pStrike >= 0.50 && !pstate.tojiHitDelivered) {
               pstate.tojiHitDelivered = true;
               if (target) {
-                target.x += 16;
-                previewProjectileSystem.addImpact(target.x, target.y, '#A855F7', 0, 26);
-                previewProjectileSystem.addImpact(target.x, target.y, '#EF4444', 0, 18);
+                target.x += isHit2 ? 18 : 16;
+                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#EF4444' : '#A855F7', 0, isHit2 ? 30 : 26);
+                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#F59E0B' : '#EF4444', 0, 18);
               }
               fighter.deliverInvertedSpearImpact?.(target, 0, false);
             }
@@ -392,23 +404,42 @@ export function updateIndexDetailDemo(def, demoArea) {
             if (!pstate.tojiHitDelivered) {
               pstate.tojiHitDelivered = true;
               if (target) {
-                target.x += 16;
-                previewProjectileSystem.addImpact(target.x, target.y, '#A855F7', 0, 26);
-                previewProjectileSystem.addImpact(target.x, target.y, '#EF4444', 0, 18);
+                target.x += isHit2 ? 18 : 16;
+                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#EF4444' : '#A855F7', 0, isHit2 ? 30 : 26);
+                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#F59E0B' : '#EF4444', 0, 18);
               }
               fighter.deliverInvertedSpearImpact?.(target, 0, false);
             }
           }
 
           fighter.spearSwingTimer--;
+          if (fighter.spearSwingTimer <= 0) {
+            fighter.spearSwingTimer = 0;
+            fighter._lastSpearTimer = 0;
+            fighter.spearCastAngle = undefined;
+            fighter._slashStartAngle = undefined;
+          }
         } else {
           fighter.x = demoArea.x + demoArea.width / 2 - 40;
           pstate.tojiCycleTimer = (pstate.tojiCycleTimer || 0) + 1;
-          const recoveryWait = (CONFIG.toji?.hit1RecoveryFrames || 9) + 12;
+          const isHit2 = (fighter.spearComboStep === 2);
+          const recoveryWait = isHit2
+            ? ((CONFIG.toji?.hit2RecoveryFrames || 7) + 14)
+            : ((CONFIG.toji?.hit1RecoveryFrames || 5) + 12);
           if (pstate.tojiCycleTimer >= recoveryWait || !pstate.tojiInitialized) {
             pstate.tojiInitialized = true;
             pstate.tojiHitDelivered = false;
-            fighter.playBasicAttackPattern(1, target);
+            let nextStep = 1;
+            if (currentAnim === 'toji_hit1') {
+              nextStep = 1;
+            } else if (currentAnim === 'toji_hit2') {
+              nextStep = 2;
+            } else {
+              // toji_combo, toji_basic, basic, spear
+              pstate.tojiComboStep = (pstate.tojiComboStep === 1) ? 2 : 1;
+              nextStep = pstate.tojiComboStep;
+            }
+            fighter.playBasicAttackPattern(nextStep, target);
             pstate.tojiCycleTimer = 0;
           }
         }

@@ -2491,20 +2491,27 @@ export class Fighter {
   _applyDamageHitEffects(amount, attacker, opts, prevHp, isSecondTurretHit) {
     const isHeal = opts.isHeal || amount < 0;
 
-    // Spawn floating damage number when actual HP was reduced
+    // Spawn floating damage text when actual HP was reduced
     if (this.hp < prevHp && amount > 0 && !opts.skipStandardDamageText && !isSecondTurretHit) {
       const color = resolveDamageNumberColor(attacker, opts, this.color || '#ff4444');
       const damageText = `${Math.round(amount)}`;
       this._healthBarShakeTimer = 12;
       this._healthBarHitTimer = 14;
       
-      if (!opts.fromBlackHole) {
-        spawnFloatingText(this.x, this.y - this.r - 8, damageText, color);
+      const isCritical = Boolean(opts.isCrit || opts.isRatioCrit || opts.isCritical);
+      if (isCritical) {
+        if (!opts.fromBlackHole) {
+          spawnFloatingText(this.x, this.y - this.r - 12, `CRIT! ${damageText}`, '#FF3B30');
+        }
       } else {
-        const interval = opts.bhTextInterval || 60;
-        if (this._bhTextCooldown <= 0) {
+        if (!opts.fromBlackHole) {
           spawnFloatingText(this.x, this.y - this.r - 8, damageText, color);
-          this._bhTextCooldown = interval;
+        } else {
+          const interval = opts.bhTextInterval || 60;
+          if (this._bhTextCooldown <= 0) {
+            spawnFloatingText(this.x, this.y - this.r - 8, damageText, color);
+            this._bhTextCooldown = interval;
+          }
         }
       }
 

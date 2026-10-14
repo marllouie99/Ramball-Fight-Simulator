@@ -967,7 +967,7 @@ if (typeof window !== 'undefined') {
 // FLOATING TEXT LABELS
 // ─────────────────────────────────────────────
 
-const MAX_FLOATING_TEXTS = 10; // Aggressively lowered to avoid layouts inside recording hook
+const MAX_FLOATING_TEXTS = 16; // Capacity for juicy arcing fountains and combo counters
 const MINIMAL_FLOATING_TEXT = true; // Only show damage/heal numbers and key skill labels
 const SKILL_TEXT_WHITELIST = [
   'BLACK FLASH',
@@ -1034,15 +1034,17 @@ const SKILL_TEXT_WHITELIST = [
   'GROVE ST. DRIVE-BY!'
 ];
 
-function isAllowedFloatingText(text) {
-  const normalizedText = String(text).trim();
-  // Allow numeric damage or heal values (e.g. 24, -24, +50, 105)
-  if (/^[+-]?\d+(\.\d+)?$/.test(normalizedText)) return true;
-  // Allow whitelisted skill, dodge & reaction labels
-  const upper = normalizedText.toUpperCase();
-  if (SKILL_TEXT_WHITELIST.includes(upper) || SKILL_TEXT_WHITELIST.includes(upper + '!')) return true;
+export function isAllowedFloatingText(text) {
+  if (!text) return false;
+  const upper = String(text).trim().toUpperCase();
+  // ONLY Damage numbers, MISS, and CRIT variants are allowed; all status and skill announcement texts are suppressed.
+  if (/^MISS/i.test(upper)) return true;
+  if (/^CRIT/i.test(upper)) return true;
+  if (/^[-]?\d+(\.\d+)?$/i.test(upper)) return true; // Pure numeric damage values
   return false;
 }
+
+let _floatingTextSideToggle = 1;
 
 const FLOATING_TEXT_SPAM_COOLDOWN = 50; // ms window to filter identical messages in close proximity
 const spamPreventionCache = new Map();
@@ -1152,72 +1154,158 @@ function getContrastColor(colorStr, backgroundIsDark) {
 }
 
 export function spawnFloatingText(x, y, text, color = '#ffffff') {
-  if (!isAllowedFloatingText(text)) return;
+  // Support flexible argument order (text, x, y, color)
+  let posX = x;
+  let posY = y;
+  let content = text;
+  let textColor = color;
+  if (typeof x === 'string' && typeof y === 'number' && typeof text === 'number') {
+    content = x;
+    posX = y;
+    posY = text;
+    textColor = (typeof color === 'string') ? color : '#ffffff';
+  }
 
-  const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive);
-  const backgroundIsDark = hasActiveDomain || (state.currentHUDDimOpacity && state.currentHUDDimOpacity > 0.3);
-  const adjustedColor = getContrastColor(color, backgroundIsDark);
+  if (!isAllowedFloatingText(content)) return;
 
-  // Cap the global performance log to prevent infinite string allocation leaks
-  if (state.allFpsLogs.length > 100) {
+  // Cap global performance log to prevent infinite allocations
+  if (state.allFpsLogs && state.allFpsLogs.length > 100) {
     state.allFpsLogs.shift();
   }
 
-  // Filter duplicates to prevent FPS drops under dense damage ticks or status applications
+  let displayText = String(content).trim();
+  if (displayText.startsWith('-')) {
+    displayText = displayText.slice(1);
+  }
+  const upper = displayText.toUpperCase();
+  const isCrit = /^CRIT/i.test(upper) || upper.includes('💥');
+  const isMiss = /^MISS/i.test(upper);
+  const numericVal = parseFloat(displayText);
+  const isDamage = !isMiss && !isNaN(numericVal) && isFinite(numericVal);
+
+  // Normalize display text
+  if (isCrit) {
+    if (upper === 'CRIT' || upper === 'CRIT!') {
+      displayText = 'CRIT!';
+    }
+  } else if (isMiss) {
+    displayText = upper.includes('!') ? 'MISS!' : (upper === 'MISSED' ? 'MISSED' : 'MISS');
+  } else if (isDamage) {
+    displayText = String(Math.round(numericVal));
+  } else {
+    return;
+  }
+
+  // Fast Combo Stacking: Accumulate rapid damage on same target into climbing counter
+  // Prevents spawning 20 floating numbers on screen at once during rapid combos (e.g. Sukuna slashes, Toji flurries)
+  if (isDamage && !isCrit) {
+    for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+      const activeText = state.floatingTexts[i];
+      if (activeText && activeText.isDamage && !activeText.isCrit &&
+          Math.hypot(activeText.originX - posX, activeText.originY - posY) < 40 &&
+          activeText.timer < 12) {
+        activeText.damageValue = (activeText.damageValue || 0) + numericVal;
+        activeText.text = String(Math.round(activeText.damageValue));
+        activeText.popFrames = 5;
+        activeText.timer = Math.min(activeText.timer, 3);
+        activeText.vy = -3.2; // Upward kick
+        activeText.baseScale = Math.min(1.4, 1.0 + Math.log10(1 + activeText.damageValue / 20) * 0.28);
+        return;
+      }
+    }
+  }
+
+  // Filter duplicate spam in close proximity
   const now = Date.now();
-  const hashKey = fastHash(text, Math.round(x / 40), Math.round(y / 40));
+  const hashKey = fastHash(displayText, Math.round(posX / 40), Math.round(posY / 40));
   const lastSpawnedTime = spamPreventionCache.get(hashKey);
   if (lastSpawnedTime && (now - lastSpawnedTime) < FLOATING_TEXT_SPAM_COOLDOWN) {
     return;
   }
   spamPreventionCache.set(hashKey, now);
 
-  // Periodic garbage collection sweep of the static cache map
-  if (spamPreventionCache.size > 200) {
+  if (spamPreventionCache.size > 100) {
     for (const [key, val] of spamPreventionCache.entries()) {
-      if (now - val > 2000) spamPreventionCache.delete(key);
+      if (now - val > 1500) spamPreventionCache.delete(key);
     }
   }
 
-  // Remove oldest texts if we're at the cap
+  // Prune oldest texts when at capacity
   if (state.floatingTexts.length >= MAX_FLOATING_TEXTS) {
-    const removed = state.floatingTexts.shift();
-    if (removed && removed.pixiText && removed.pixiText.parent) {
-      removed.pixiText.parent.removeChild(removed.pixiText);
-      removed.pixiText.destroy();
+    state.floatingTexts.shift();
+  }
+
+  _floatingTextSideToggle = -_floatingTextSideToggle;
+  const spreadDir = _floatingTextSideToggle;
+
+  let vx = 0;
+  let vy = -2.4;
+  let gravity = 0.04;
+  let dragX = 0.98;
+  let rotation = 0;
+  let popAmount = 0.35;
+  let popFrames = 5;
+  let maxTimer = 40;
+  let baseScale = 1.0;
+  let finalColor = textColor;
+
+  if (isCrit) {
+    vx = spreadDir * (1.2 + Math.random() * 0.6);
+    vy = -4.5;
+    gravity = 0.16;
+    popAmount = 0.55;
+    popFrames = 6;
+    rotation = spreadDir * (0.08 + Math.random() * 0.06);
+    maxTimer = 46;
+    baseScale = 1.15;
+    if (!finalColor || finalColor === '#ffffff' || finalColor === '#fff') {
+      finalColor = '#FF3B30'; // Punchy red/orange crit
     }
-  }
-
-  // Count active texts that spawned near the same position to avoid stacking (using zero-allocation loop)
-  let nearbyCount = 0;
-  for (let i = 0; i < state.floatingTexts.length; i++) {
-    const t = state.floatingTexts[i];
-    if (Math.abs(t.originX - x) < 50 && Math.abs(t.originY - y) < 50) {
-      nearbyCount++;
+  } else if (isMiss) {
+    vx = (Math.random() - 0.5) * 0.6;
+    vy = -2.4;
+    gravity = 0.04;
+    popAmount = 0.30;
+    popFrames = 5;
+    maxTimer = 38;
+    baseScale = 0.95;
+    if (!finalColor || finalColor === '#ffffff' || finalColor === '#fff') {
+      finalColor = '#E2E8F0'; // Clean silver/white miss
     }
+  } else {
+    // Standard damage number takes a parabolic fountain arc
+    vx = spreadDir * (1.1 + Math.random() * 0.6);
+    vy = -3.6;
+    gravity = 0.14;
+    popAmount = 0.40;
+    popFrames = 5;
+    maxTimer = 38;
+    const val = isNaN(numericVal) ? 20 : Math.abs(numericVal);
+    baseScale = Math.min(1.35, 1.0 + Math.log10(1 + val / 25) * 0.25);
+    if (!finalColor) finalColor = '#FFFFFF';
   }
-
-  let displayText = String(text);
-  // Remove leading minus sign if present on damage numbers
-  if (displayText.startsWith('-')) {
-    displayText = displayText.slice(1);
-  }
-
-  // Detect if this text contains numbers (needs readable font like Architects Daughter instead of Glast Blitch)
-  const isDamage = /\d/.test(displayText);
 
   state.floatingTexts.push({
-    x: x + (Math.random() - 0.5) * 12,
-    y: y - Math.min(nearbyCount, 3) * 6,  // compact stacking near target
-    vy: isDamage ? -0.7 : -1.0,           // gentle upward drift so numbers stay close to target
+    x: posX + (Math.random() - 0.5) * 4,
+    y: posY - 6,
+    vx,
+    vy,
+    gravity,
+    dragX,
     text: displayText,
-    color: adjustedColor,
+    color: finalColor,
+    rotation,
+    popFrames,
+    popAmount,
+    baseScale,
     timer: 0,
-    maxTimer: isDamage ? 40 : 60,         // crisp ~40 frame duration for damage numbers
-    opacity: 1,
+    maxTimer,
+    isCrit,
+    isMiss,
     isDamage,
-    originX: x,
-    originY: y
+    damageValue: isDamage ? numericVal : 0,
+    originX: posX,
+    originY: posY
   });
 }
 
