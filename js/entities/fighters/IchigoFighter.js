@@ -46,7 +46,8 @@ import {
   performMeleeCleave,
   getParryChance,
   handleIchigoTakeDamage,
-  updateShunpoCombat
+  updateShunpoCombat,
+  updateMeleeSwing
 } from './ichigo/ichigoCombat.js';
 
 export class IchigoFighter extends Fighter {
@@ -80,9 +81,18 @@ export class IchigoFighter extends Fighter {
     this.afterImages = [];
     this.slashSwingTimer = 0;
     this.slashSwingMaxTimer = 0;
+    this.swordComboStep = 1;
+    this.comboResetTimer = 0;
+    this.swordHitDelivered = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
+    this.swordHitTremorTimer = 0;
+    this.swordSlashAngle = 0;
     this.parryStanceIndex = 0;
     this.blockPoseTimer = 0;
     this.parryHitAnimTimer = 0;
+    this.isMeleeCleave = false;
     this.isShunpoDashing = false;
     this.shunpoDashTimer = 0;
     this.shunpoStartX = 0;
@@ -243,6 +253,7 @@ export class IchigoFighter extends Fighter {
 
   isStationarySkillActive() {
     return Boolean(
+      (this.isMeleeCleave && this.slashSwingTimer > 0) ||
       this.isChannelingGetsuga ||
       (this.getsugaChargeTimer > 0) ||
       (this.getsugaRecoveryTimer > 0) ||
@@ -261,6 +272,23 @@ export class IchigoFighter extends Fighter {
       (this.shunpoDisengageDelayTimer > 0) ||
       super.isStationarySkillActive?.()
     );
+  }
+
+  canAim() {
+    if (this.isChannelingGetsuga || this.getsugaChargeTimer > 0 || this.isGetsugaSlash || this.isFinalMassiveGetsuga) {
+      return false;
+    }
+    if (this.isMeleeCleave && this.slashSwingTimer > 0) {
+      const totalF = this.slashSwingMaxTimer || 28;
+      const elapsed = totalF - this.slashSwingTimer;
+      const liftF = this.slashSwingLiftFrames || 7;
+      const holdF = this.slashSwingHoldFrames || 2;
+      if (elapsed >= (liftF + holdF)) return false;
+    }
+    if (this.isShunpoDashing || this.shunpoComboActive || this.isShunpoDisengaging) {
+      return false;
+    }
+    return super.canAim ? super.canAim() : true;
   }
 
   _playSound(key, defaultSfx, defaultVol = 1.0, minIntervalMs = 0) {
@@ -316,9 +344,18 @@ export class IchigoFighter extends Fighter {
     this._lastBankaiTrailX = undefined;
     this._lastBankaiTrailY = undefined;
     this.slashSwingTimer = 0;
+    this.swordComboStep = 1;
+    this.comboResetTimer = 0;
+    this.swordHitDelivered = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
+    this.swordHitTremorTimer = 0;
+    this.swordSlashAngle = 0;
     this.parryStanceIndex = 0;
     this.blockPoseTimer = 0;
     this.parryHitAnimTimer = 0;
+    this.isMeleeCleave = false;
     this.isShunpoDashing = false;
     this.shunpoDashTimer = 0;
     this.shunpoComboActive = false;
@@ -391,7 +428,15 @@ export class IchigoFighter extends Fighter {
     }
 
     this.slashSwingTimer = 0;
+    this.slashSwingVariant = 0;
+    this.isMeleeCleave = false;
+    this.parryHitAnimTimer = 0;
+    this.blockPoseTimer = 0;
     this.isGetsugaSlash = false;
+    this.swordHitDelivered = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
+    this.swordHitTremorTimer = 0;
     this.isShunpoDashing = false;
     this.shunpoDashTimer = 0;
     this.shunpoComboActive = false;
@@ -664,6 +709,16 @@ export class IchigoFighter extends Fighter {
     this._bankaiVoiceHandle = null;
     this._bankaiVoicePlaying = false;
     this._bankaiVoiceEndTime = 0;
+
+    if (force || this.isDead || this.hp <= 0) {
+      if (this._activeVoicelineHandle) {
+        stopSound(this._activeVoicelineHandle);
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
+          audioSystem.stopSFX(this._activeVoicelineHandle);
+        }
+        this._activeVoicelineHandle = null;
+      }
+    }
   }
 
   onDeath() {
@@ -750,31 +805,7 @@ export class IchigoFighter extends Fighter {
 
   triggerDemoAttack() {
     if (this.isGetsugaActive()) return;
-    const swingDur = CONFIG.ichigo?.swordSwingDuration || 22;
-    this.slashSwingTimer = swingDur;
-    this.slashSwingMaxTimer = swingDur;
-    this._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
-  }
-
-  stopAllSkillAudios(force = true) {
-    stopBankaiVoiceline(this, force);
-    stopHollowTransformationVoiceline(this, force);
-    stopFinalGetsugaVoiceline(this, force);
-
-    this._hollowVoiceHandle = null;
-    this._hollowFlareHandle = null;
-    this._hollowVoicePlaying = false;
-    this._hollowVoiceEndTime = 0;
-
-    if (force || this.isDead || this.hp <= 0) {
-      if (this._activeVoicelineHandle) {
-        stopSound(this._activeVoicelineHandle);
-        if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSFX === 'function') {
-          audioSystem.stopSFX(this._activeVoicelineHandle);
-        }
-        this._activeVoicelineHandle = null;
-      }
-    }
+    this.performMeleeCleave(this._getClosestEnemy ? this._getClosestEnemy() : null);
   }
 
   _stopBankaiVoiceline(force = false) {
@@ -896,9 +927,12 @@ export class IchigoFighter extends Fighter {
 
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
     if (this.blockPoseTimer > 0) this.blockPoseTimer--;
+    if (this.parryHitAnimTimer > 0) this.parryHitAnimTimer--;
     // Update Zangetsu ribbon & Bankai chain physics & anchor (keeps them seamlessly locked to pommel even when frozen)
     updateZangetsuRibbonPhysics(this);
     updateTensaZangetsuChainPhysics(this);
+    if (this.swordHitTremorTimer > 0) this.swordHitTremorTimer--;
+    if (this.comboResetTimer > 0) this.comboResetTimer--;
 
     // Rule #1: At the top of EVERY fighter update() method, freeze/time-stop guard checks
     const isInsideGojoDomain = this._isInsideGojoDomain();
@@ -940,11 +974,17 @@ export class IchigoFighter extends Fighter {
       return;
     }
 
-    // Slash swing animation timer decay
+    // Slash swing animation timer decay & 5-phase melee update
     if (this.slashSwingTimer > 0) {
-      this.slashSwingTimer--;
-      if (this.slashSwingTimer <= 0) {
-        this.isGetsugaSlash = false;
+      if (this.isMeleeCleave && !this.isGetsugaSlash && !this.shunpoComboActive) {
+        updateMeleeSwing(this, opponent, arena);
+      } else if (this.isGetsugaSlash) {
+        if (!this.getsugaRecoveryTimer || this.getsugaRecoveryTimer <= 0) {
+          this.slashSwingTimer--;
+          if (this.slashSwingTimer <= 0) {
+            this.isGetsugaSlash = false;
+          }
+        }
       }
     }
 
@@ -960,6 +1000,9 @@ export class IchigoFighter extends Fighter {
     }
     if (this.hollowMaskActive) {
       speedMult *= (CONFIG.ichigo?.hollowSpeedMultiplier || 1.4);
+    }
+    if (this.isMeleeCleave && this.slashSwingTimer > 0) {
+      speedMult = 0;
     }
     this.speedMultiplier = speedMult;
 

@@ -1,6 +1,65 @@
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 
+let _knightShieldImage = null;
+let _knightShieldImageLoading = false;
+
+export function _getKnightShieldImage() {
+  if (_knightShieldImage && _knightShieldImage.complete && _knightShieldImage.naturalWidth > 0) {
+    return _knightShieldImage;
+  }
+  if (!_knightShieldImageLoading && typeof Image !== 'undefined') {
+    _knightShieldImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _knightShieldImage = img;
+      _knightShieldImageLoading = false;
+    };
+    img.onerror = () => {
+      if (!img.src.includes('.jpg')) {
+        img.src = 'Assets/model/Knight/Knight_shield.jpg?v=1';
+      } else {
+        _knightShieldImageLoading = false;
+      }
+    };
+    img.src = 'Assets/model/Knight/Knight_shield.png?v=1';
+    _knightShieldImage = img;
+  }
+  return _knightShieldImage;
+}
+
+let _knightSwordImage = null;
+let _knightSwordImageLoading = false;
+
+export function _getKnightSwordImage() {
+  if (_knightSwordImage && _knightSwordImage.complete && _knightSwordImage.naturalWidth > 0) {
+    return _knightSwordImage;
+  }
+  if (!_knightSwordImageLoading && typeof Image !== 'undefined') {
+    _knightSwordImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _knightSwordImage = img;
+      _knightSwordImageLoading = false;
+    };
+    img.onerror = () => {
+      if (!img.src.includes('.jpg')) {
+        img.src = 'Assets/model/Knight/Knight_sword.jpg?v=1';
+      } else {
+        _knightSwordImageLoading = false;
+      }
+    };
+    img.src = 'Assets/model/Knight/Knight_sword.png?v=1';
+    _knightSwordImage = img;
+  }
+  return _knightSwordImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getKnightShieldImage();
+  _getKnightSwordImage();
+}
+
 export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = 0) {
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
@@ -41,283 +100,165 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
     neonGlow = 'rgba(255, 230, 100, 0.8)';
   }
 
-  // CHARGING/DASHING VISUAL EFFECTS
-  if (dashGlowFade > 0) {
+  // Shield shake on charging
+  if (dashGlowFade > 0 && dashState === 'charging') {
+    const shake = 2.5;
+    ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+  }
+
+  // ── SHIELD BODY RENDERING ──
+  const shieldImg = _getKnightShieldImage();
+  const hasShieldImg = shieldImg && shieldImg.complete && shieldImg.naturalWidth > 0;
+
+  if (hasShieldImg) {
+    const shieldW = 38.0;
+    const shieldH = 66.0;
     ctx.save();
-    ctx.globalAlpha = dashGlowFade; 
-    
-    // 1. Shield Shake
-    if (dashState === 'charging') {
-      const shake = 2.5;
-      ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(shieldImg, -shieldW / 2, -shieldH / 2 + 4, shieldW, shieldH);
+    if (blockFlashTimer > 0) {
+      ctx.globalCompositeOperation = 'source-atop';
+      ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1.0, blockFlashTimer / 10)})`;
+      ctx.fillRect(-shieldW / 2, -shieldH / 2 + 4, shieldW, shieldH);
     }
-    
-    // 2. Neon Hexagonal Pulse Aura
-    const pulse = (Math.sin(Date.now() / 60) + 1) / 2; 
-    ctx.strokeStyle = neonGlow;
-    ctx.lineWidth = (3 + 6 * pulse) * shieldScale;
-    
+    ctx.restore();
+  } else {
+    // BASE SHIELD: Hexagonal/Angular Riot Shield Profile (Procedural Fallback)
     ctx.beginPath();
-    ctx.moveTo(0, -18 * shieldScale);
-    ctx.lineTo(16 * shieldScale, -8 * shieldScale);
-    ctx.lineTo(12 * shieldScale, 18 * shieldScale);
-    ctx.lineTo(0, 28 * shieldScale);
-    ctx.lineTo(-12 * shieldScale, 18 * shieldScale);
-    ctx.lineTo(-16 * shieldScale, -8 * shieldScale);
+    ctx.moveTo(0, -16 * shieldScale);
+    ctx.lineTo(14 * shieldScale, -8 * shieldScale);
+    ctx.lineTo(10 * shieldScale, 16 * shieldScale);
+    ctx.lineTo(0, 24 * shieldScale);
+    ctx.lineTo(-10 * shieldScale, 16 * shieldScale);
+    ctx.lineTo(-14 * shieldScale, -8 * shieldScale);
     ctx.closePath();
+
+    const shieldGradient = ctx.createLinearGradient(-14 * shieldScale, -16 * shieldScale, 14 * shieldScale, 24 * shieldScale);
+    shieldGradient.addColorStop(0, armorLight);
+    shieldGradient.addColorStop(0.5, armorMid);
+    shieldGradient.addColorStop(1, armorDark);
+    ctx.fillStyle = shieldGradient;
+    ctx.fill();
+    
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 1.5 * shieldScale;
+    ctx.lineJoin = 'miter';
     ctx.stroke();
 
-    // 3. Digital Crackling Energy Lines
-    if (!useUltraLOD) {
-      ctx.beginPath();
-      const lineCount = useLOD ? 3 : 8;
-      for (let i = 0; i < lineCount; i++) {
-        const ang = Math.random() * Math.PI * 2;
-      const dist = 20 + Math.random() * 20; 
-      const len = 8 + Math.random() * 15;   
-      ctx.moveTo(Math.cos(ang) * dist * shieldScale, Math.sin(ang) * dist * shieldScale);
-      ctx.lineTo(Math.cos(ang+0.1) * (dist - len/2) * shieldScale, Math.sin(ang+0.1) * (dist - len/2) * shieldScale);
-      ctx.lineTo(Math.cos(ang) * (dist - len) * shieldScale, Math.sin(ang) * (dist - len) * shieldScale);
-      }
-      ctx.lineWidth = (1 + Math.random() * 2) * shieldScale;
-      ctx.strokeStyle = neonCore;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // BASE SHIELD: Hexagonal/Angular Riot Shield Profile
-  ctx.beginPath();
-  ctx.moveTo(0, -16 * shieldScale);
-  ctx.lineTo(14 * shieldScale, -8 * shieldScale);
-  ctx.lineTo(10 * shieldScale, 16 * shieldScale);
-  ctx.lineTo(0, 24 * shieldScale);
-  ctx.lineTo(-10 * shieldScale, 16 * shieldScale);
-  ctx.lineTo(-14 * shieldScale, -8 * shieldScale);
-  ctx.closePath();
-
-  const shieldGradient = ctx.createLinearGradient(-14 * shieldScale, -16 * shieldScale, 14 * shieldScale, 24 * shieldScale);
-  shieldGradient.addColorStop(0, armorLight);
-  shieldGradient.addColorStop(0.5, armorMid);
-  shieldGradient.addColorStop(1, armorDark);
-  ctx.fillStyle = shieldGradient;
-  ctx.fill();
-  
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 1.5 * shieldScale;
-  ctx.lineJoin = 'miter';
-  ctx.stroke();
-
-  // INNER ARMOR PLATING
-  ctx.beginPath();
-  ctx.moveTo(0, -12 * shieldScale);
-  ctx.lineTo(10 * shieldScale, -6 * shieldScale);
-  ctx.lineTo(7 * shieldScale, 13 * shieldScale);
-  ctx.lineTo(0, 19 * shieldScale);
-  ctx.lineTo(-7 * shieldScale, 13 * shieldScale);
-  ctx.lineTo(-10 * shieldScale, -6 * shieldScale);
-  ctx.closePath();
-  ctx.fillStyle = armorDark;
-  ctx.fill();
-  ctx.lineWidth = 1 * shieldScale;
-  ctx.stroke();
-
-  // Sci-Fi Tech Panel Lines (cutting across the armor)
-  ctx.beginPath();
-  ctx.moveTo(-9 * shieldScale, -2 * shieldScale);
-  ctx.lineTo(9 * shieldScale, -2 * shieldScale);
-  
-  ctx.moveTo(0, 19 * shieldScale);
-  ctx.lineTo(0, 12 * shieldScale);
-  
-  ctx.moveTo(-7 * shieldScale, 13 * shieldScale);
-  ctx.lineTo(-4 * shieldScale, 8 * shieldScale);
-  
-  ctx.moveTo(7 * shieldScale, 13 * shieldScale);
-  ctx.lineTo(4 * shieldScale, 8 * shieldScale);
-  
-  ctx.strokeStyle = outline;
-  ctx.lineWidth = 0.5 * shieldScale;
-  ctx.stroke();
-
-  // Inner holographic edge wireframe
-  ctx.beginPath();
-  ctx.moveTo(0, -10 * shieldScale);
-  ctx.lineTo(8 * shieldScale, -5 * shieldScale);
-  ctx.lineTo(5 * shieldScale, 11 * shieldScale);
-  ctx.lineTo(0, 16 * shieldScale);
-  ctx.lineTo(-5 * shieldScale, 11 * shieldScale);
-  ctx.lineTo(-8 * shieldScale, -5 * shieldScale);
-  ctx.closePath();
-  ctx.strokeStyle = 'rgba(255, 180, 0, 0.3)';
-  ctx.lineWidth = 1 * shieldScale;
-  ctx.stroke();
-
-  // GLOWING NEON ENERGY REACTOR CORE
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Bloom effect for the core
-  if (!useUltraLOD) {
-    // OPTIMIZED: Removed shadowColor
-  }
-
-  // Outer emitter ring
-  ctx.beginPath();
-  ctx.arc(0, 4 * shieldScale, 4.5 * shieldScale, 0, Math.PI * 2);
-  ctx.strokeStyle = '#ffaa00';
-  ctx.lineWidth = 1 * shieldScale;
-  ctx.stroke();
-  
-  // Neon circuit lines emitting from the reactor
-  ctx.beginPath();
-  ctx.moveTo(0, -0.5 * shieldScale);
-  ctx.lineTo(0, -8 * shieldScale);
-  
-  ctx.moveTo(4.5 * shieldScale, 4 * shieldScale);
-  ctx.lineTo(8 * shieldScale, 4 * shieldScale);
-  ctx.lineTo(10 * shieldScale, 0);
-
-  ctx.moveTo(-4.5 * shieldScale, 4 * shieldScale);
-  ctx.lineTo(-8 * shieldScale, 4 * shieldScale);
-  ctx.lineTo(-10 * shieldScale, 0);
-
-  ctx.moveTo(0, 8.5 * shieldScale);
-  ctx.lineTo(0, 15 * shieldScale);
-  
-  ctx.strokeStyle = neonCore;
-  ctx.lineWidth = 2 * shieldScale;
-  ctx.stroke();
-
-  // White-hot reactor center
-  ctx.beginPath();
-  ctx.arc(0, 4 * shieldScale, 2.5 * shieldScale, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-
-  ctx.restore();
-
-  // Tech Decals on the outer rim (Warning stripes/markers)
-  ctx.fillStyle = '#ffaa00';
-  ctx.beginPath();
-  ctx.moveTo(11 * shieldScale, -8 * shieldScale);
-  ctx.lineTo(13 * shieldScale, -7 * shieldScale);
-  ctx.lineTo(13 * shieldScale, -5 * shieldScale);
-  ctx.lineTo(11 * shieldScale, -6 * shieldScale);
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(-11 * shieldScale, -8 * shieldScale);
-  ctx.lineTo(-13 * shieldScale, -7 * shieldScale);
-  ctx.lineTo(-13 * shieldScale, -5 * shieldScale);
-  ctx.lineTo(-11 * shieldScale, -6 * shieldScale);
-  ctx.fill();
-
-  // Mechanical vent details
-  ctx.fillStyle = outline;
-  const vents = [
-    [0, -14], [8, 14], [0, 21], [-8, 14]
-  ];
-  for (let pos of vents) {
+    // INNER ARMOR PLATING
     ctx.beginPath();
-    ctx.rect((pos[0] - 1) * shieldScale, (pos[1] - 0.5) * shieldScale, 2 * shieldScale, 1 * shieldScale);
+    ctx.moveTo(0, -12 * shieldScale);
+    ctx.lineTo(10 * shieldScale, -6 * shieldScale);
+    ctx.lineTo(7 * shieldScale, 13 * shieldScale);
+    ctx.lineTo(0, 19 * shieldScale);
+    ctx.lineTo(-7 * shieldScale, 13 * shieldScale);
+    ctx.lineTo(-10 * shieldScale, -6 * shieldScale);
+    ctx.closePath();
+    ctx.fillStyle = armorDark;
     ctx.fill();
-  }
+    ctx.lineWidth = 1 * shieldScale;
+    ctx.stroke();
 
-  // HONEYCOMB ENERGY BARRIER (Fades in when blocking/raised)
-  // shieldVisualOffset interpolates to 0 when raised, -Math.PI/2 when resting
-  const barrierAlpha = Math.max(0, 1 - Math.abs(shieldVisualOffset) / (Math.PI / 4));
-  
-  if (barrierAlpha > 0.01 || blockFlashTimer > 0) {
+    // Sci-Fi Tech Panel Lines (cutting across the armor)
+    ctx.beginPath();
+    ctx.moveTo(-9 * shieldScale, -2 * shieldScale);
+    ctx.lineTo(9 * shieldScale, -2 * shieldScale);
+    
+    ctx.moveTo(0, 19 * shieldScale);
+    ctx.lineTo(0, 12 * shieldScale);
+    
+    ctx.moveTo(-7 * shieldScale, 13 * shieldScale);
+    ctx.lineTo(-4 * shieldScale, 8 * shieldScale);
+    
+    ctx.moveTo(7 * shieldScale, 13 * shieldScale);
+    ctx.lineTo(4 * shieldScale, 8 * shieldScale);
+    
+    ctx.strokeStyle = outline;
+    ctx.lineWidth = 0.5 * shieldScale;
+    ctx.stroke();
+
+    // Inner holographic edge wireframe
+    ctx.beginPath();
+    ctx.moveTo(0, -10 * shieldScale);
+    ctx.lineTo(8 * shieldScale, -5 * shieldScale);
+    ctx.lineTo(5 * shieldScale, 11 * shieldScale);
+    ctx.lineTo(0, 16 * shieldScale);
+    ctx.lineTo(-5 * shieldScale, 11 * shieldScale);
+    ctx.lineTo(-8 * shieldScale, -5 * shieldScale);
+    ctx.closePath();
+    ctx.strokeStyle = 'rgba(255, 180, 0, 0.3)';
+    ctx.lineWidth = 1 * shieldScale;
+    ctx.stroke();
+
+    // GLOWING NEON ENERGY REACTOR CORE
     ctx.save();
-    
-    // Boost glow and opacity when actively absorbing a hit
-    const flashBoost = blockFlashTimer > 0 ? (blockFlashTimer / 10) : 0;
-    const finalAlpha = Math.min(1, barrierAlpha + flashBoost * 2);
-    
-    ctx.globalAlpha = finalAlpha;
-    
-    // Scale up slightly to make it look like a projected hologram hovering in front
-    const hoverScale = 1.05 + flashBoost * 0.1;
-    ctx.scale(hoverScale, hoverScale);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
 
-    // Base state is a crisp, clean, thin-lined hologram without heavy glow
-    if (!useUltraLOD) {
-      // OPTIMIZED: Removed shadowColor
-    }
+    // Outer emitter ring
+    ctx.beginPath();
+    ctx.arc(0, 4 * shieldScale, 4.5 * shieldScale, 0, Math.PI * 2);
+    ctx.strokeStyle = '#ffaa00';
+    ctx.lineWidth = 1 * shieldScale;
+    ctx.stroke();
     
-    ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + flashBoost * 0.5})`;
-    ctx.lineWidth = (1.0 + flashBoost * 1.5) * shieldScale;
-    ctx.fillStyle = `rgba(255, 180, 0, ${0.05 + flashBoost * 0.35})`;
-
-    const hexSize = 4.5 * shieldScale;
-    const hexW = Math.sqrt(3) * hexSize;
-    const hexH = 2 * hexSize;
-    const yOffset = hexH * 0.75;
-
-    if (isFFA) {
-      // Extremely low-clutter shield polygon for FFA
-      ctx.beginPath();
-      ctx.moveTo(0, -22 * shieldScale);
-      ctx.lineTo(16 * shieldScale, -12 * shieldScale);
-      ctx.lineTo(12 * shieldScale, 18 * shieldScale);
-      ctx.lineTo(0, 26 * shieldScale);
-      ctx.lineTo(-12 * shieldScale, 18 * shieldScale);
-      ctx.lineTo(-16 * shieldScale, -12 * shieldScale);
-      ctx.closePath();
-      ctx.fillStyle = `rgba(255, 180, 0, ${0.15 + flashBoost * 0.4})`;
-      ctx.fill();
-      ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + flashBoost * 0.5})`;
-      ctx.lineWidth = 1.5 * shieldScale;
-      ctx.stroke();
-    } else {
-      if (!window._knightHoneycombCache) {
-        const c = document.createElement('canvas');
-        const size = 80 * shieldScale;
-        c.width = size;
-        c.height = size;
-        const octx = c.getContext('2d');
-        octx.translate(size / 2, size / 2);
-        
-        octx.strokeStyle = `rgba(255, 215, 0, 1.0)`;
-        octx.lineWidth = 1.5 * shieldScale;
-        octx.fillStyle = `rgba(255, 180, 0, 0.4)`;
-        
-        octx.beginPath();
-        const drawHex = (cx, cy) => {
-          for (let i = 0; i < 6; i++) {
-            const angle = i * Math.PI / 3 + Math.PI / 6; 
-            const px = cx + Math.cos(angle) * hexSize;
-            const py = cy + Math.sin(angle) * hexSize;
-            if (i === 0) octx.moveTo(px, py);
-            else octx.lineTo(px, py);
-          }
-          octx.closePath();
-        };
-
-        for (let row = -3; row <= 4; row++) {
-          let cols = Math.abs(row) % 2 === 0 ? 5 : 4; 
-          if (row === -3) cols = 3;
-          if (row === 3) cols = 3;
-          if (row === 4) cols = 2;
-          let startX = -(cols - 1) * hexW / 2;
-          for (let col = 0; col < cols; col++) {
-            drawHex(startX + col * hexW, row * yOffset + 2 * shieldScale); 
-          }
-        }
-        octx.fill();
-        octx.stroke();
-        window._knightHoneycombCache = { canvas: c, size: size };
-      }
-
-      const cache = window._knightHoneycombCache;
-      ctx.globalAlpha = finalAlpha * 0.5; // adjust for baked opacity
-      ctx.drawImage(cache.canvas, -cache.size / 2, -cache.size / 2);
-    }
+    // Neon circuit lines emitting from the reactor
+    ctx.beginPath();
+    ctx.moveTo(0, -0.5 * shieldScale);
+    ctx.lineTo(0, -8 * shieldScale);
     
+    ctx.moveTo(4.5 * shieldScale, 4 * shieldScale);
+    ctx.lineTo(8 * shieldScale, 4 * shieldScale);
+    ctx.lineTo(10 * shieldScale, 0);
+
+    ctx.moveTo(-4.5 * shieldScale, 4 * shieldScale);
+    ctx.lineTo(-8 * shieldScale, 4 * shieldScale);
+    ctx.lineTo(-10 * shieldScale, 0);
+
+    ctx.moveTo(0, 8.5 * shieldScale);
+    ctx.lineTo(0, 15 * shieldScale);
+    
+    ctx.strokeStyle = neonCore;
+    ctx.lineWidth = 2 * shieldScale;
+    ctx.stroke();
+
+    // White-hot reactor center
+    ctx.beginPath();
+    ctx.arc(0, 4 * shieldScale, 2.5 * shieldScale, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+
     ctx.restore();
+
+    // Tech Decals on the outer rim
+    ctx.fillStyle = '#ffaa00';
+    ctx.beginPath();
+    ctx.moveTo(11 * shieldScale, -8 * shieldScale);
+    ctx.lineTo(13 * shieldScale, -7 * shieldScale);
+    ctx.lineTo(13 * shieldScale, -5 * shieldScale);
+    ctx.lineTo(11 * shieldScale, -6 * shieldScale);
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-11 * shieldScale, -8 * shieldScale);
+    ctx.lineTo(-13 * shieldScale, -7 * shieldScale);
+    ctx.lineTo(-13 * shieldScale, -5 * shieldScale);
+    ctx.lineTo(-11 * shieldScale, -6 * shieldScale);
+    ctx.fill();
+
+    // Mechanical vent details
+    ctx.fillStyle = outline;
+    const vents = [
+      [0, -14], [8, 14], [0, 21], [-8, 14]
+    ];
+    for (let pos of vents) {
+      ctx.beginPath();
+      ctx.rect((pos[0] - 1) * shieldScale, (pos[1] - 0.5) * shieldScale, 2 * shieldScale, 1 * shieldScale);
+      ctx.fill();
+    }
   }
+
+
 
   ctx.restore();
 }
@@ -329,7 +270,37 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
   const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
-  // Sci-Fi Palette
+  // ── PIXEL ART WEAPON RENDERING (Assets/model/Knight/Knight_sword.png) ──
+  const swordImg = _getKnightSwordImage();
+  const hasSwordImg = swordImg && swordImg.complete && swordImg.naturalWidth > 0;
+
+  if (hasSwordImg) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    if (isBroken) {
+      // 1. Broken broadsword stump (clipped to hilt and base of blade)
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-35 * swordScale, -18 * swordScale, 55 * swordScale, 36 * swordScale);
+      ctx.clip();
+      ctx.rotate(0.8793); // +50.38 deg alignment
+      const s = (75.0 * swordScale) / 1393.62;
+      ctx.scale(s, s);
+      ctx.drawImage(swordImg, -308.3, -1073.5);
+      ctx.restore();
+
+    } else {
+      ctx.rotate(0.8793); // +50.38 deg alignment around grip (308.3, 1073.5)
+      const s = (75.0 * swordScale) / 1393.62;
+      ctx.scale(s, s);
+      ctx.drawImage(swordImg, -308.3, -1073.5);
+    }
+    ctx.restore();
+    return;
+  }
+
+  // Sci-Fi Palette (Procedural Fallback)
   const armorDark = '#1a1c20';
   const armorMid = '#2a2d34';
   const outline = '#0a0a0c';

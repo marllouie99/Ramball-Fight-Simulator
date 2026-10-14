@@ -47,6 +47,7 @@ import { zeusConfig } from '../configs/characters/zeusConfig.js';
 import { gunslingerConfig } from '../configs/characters/gunslingerConfig.js';
 import { eyeOfCthulhuConfig } from '../configs/characters/eyeOfCthulhuConfig.js';
 import { enderDragonConfig } from '../configs/characters/enderDragonConfig.js';
+import { knightConfig } from '../configs/characters/knightConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { interactionConfigs } from '../configs/interactions/index.js';
@@ -129,6 +130,8 @@ export const CONFIG = {
   Shiro: shiroConfig,
   sora: soraConfig,
   Sora: soraConfig,
+  knight: knightConfig,
+  Knight: knightConfig,
   camera: {
     minZoom: 0.65,
     maxZoom: 1.18,
@@ -320,72 +323,9 @@ export const CONFIG = {
     poisonDamagePerTick: 2,   // damage per poison tick
   },
 
-
-
-  // Neutral Close-Quarters Attack-Teleport Stance (Triggers while waiting for wheel to adapt!)
-  neutralAttacksPerTeleport: 2,    // Number of attacks before teleporting (e.g. 2 attacks -> teleport -> 2 attacks)
-  neutralAttackInterval: 20,       // Frame interval between consecutive attacks (~0.33s at 60fps)
-  neutralTeleportDelay: 12,        // Frame delay after teleporting before starting the next attack sequence (~0.20s)
-  neutralTeleportDistance: 55,     // Teleport distance offset around opponent
-
-  /** Gray ΓÇö Knight fighter */
-  knight: {
-
-
-    swordRange: 42,   // pixels from edge; how close enemy must be for a sword swipe
-    swipeCooldown: 38,  // frames between sword swipes (mirrors melee combo pacing)
-    swipeDuration: 30,   // total frames the swipe animation plays (dynamically managed by 5-phase combo)
-    swordDamage: 30,   // damage dealt by a sword swipe
-    swordDurability: 3,    // number of swipes before the sword breaks
-
-    // ── 2-Hit Chemical Katana Combo (Rule 30 5-Phase Architecture) ──
-    enableMeleeCombo: true,
-    comboResetFrames: 90, // window before combo step resets to Hit 1
-
-    // Hit 1: Horizontal Cross Cleave (Graal attack.gani)
-    hit1LiftFrames: 7,         // Anticipation coil lift (~0.12s)
-    hit1HoldFrames: 2,         // Poised tension (~0.03s)
-    hit1StrikeFrames: 5,       // Hypersonic forward cross-cleave (~0.08s)
-    hit1ImpactLockFrames: 10,   // CANONICAL IMPACT LOCK: Blade latches into cleave plane (~0.10s)
-    hit1LockFrames: 6,         // Alias
-    hit1PinFrames: 6,          // Alias
-    hit1RecoveryFrames: 10,    // Recovery & combo link window (~0.17s)
-    hit1Damage: 28,            // Slash damage
-    hit1Knockback: 6.0,        // Physical push impulse
-    hit1LungeSpeed: 6.5,       // Forward lunging step momentum
-    hit1HitPauseFrames: 3,     // Freeze-frame hit-pause
-    hit1HitStunFrames: 10,     // Hit stun duration
-
-    // Hit 2: Upward Rising Cleave (Graal attack2.gani)
-    hit2LiftFrames: 6,         // Smooth low-scoop hip draw (~0.10s)
-    hit2HoldFrames: 2,         // Poised tension (~0.03s)
-    hit2StrikeFrames: 5,       // Explosive diagonal upward rising cleave (~0.08s)
-    hit2ImpactLockFrames: 7,   // APEX IMPACT LOCK: Blade stays latched at apex (~0.12s)
-    hit2LockFrames: 7,         // Alias
-    hit2PinFrames: 7,          // Alias
-    hit2RecoveryFrames: 12,    // Spring-damped return to stance (~0.20s)
-    hit2Damage: 34,            // Rising cleave damage
-    hit2Knockback: 8.5,        // Rising push impulse
-    hit2LungeSpeed: 7.2,       // Forward lunge momentum
-    hit2HitPauseFrames: 3,     // Freeze-frame hit-pause
-    hit2HitStunFrames: 14,     // Hit stun duration
-
-    shieldBlockChance: 0.50, // probability (0–1) of blocking a direct incoming projectile
-    blockFlashFrames: 15,   // duration of the visual flash when a block occurs
-    shieldHoldFrames: 60,   // frames to keep shield in front after successfully blocking an attack
-    blockProjectileDetectionRadius: 250, // radius to detect incoming projectiles for shield block visual
-    blockMeleeDetectionRadius: 130, // radius to detect close enemies for shield block visual
-    shieldDurability: 2,    // number of successful blocks before the shield breaks
-    shieldThrowDamage: 30,  // damage dealt by thrown sword after shield breaks
-    swordReturnFrames: 180, // frames until thrown sword returns (≈3s)
-    dashChargeFrames: 10,   // frames Gray locks in and charges before the shield dash (≈0.8 s)
-    chargeKnockback: 2.0,   // velocity applied to nearby enemies when charging begins
-    chargeKnockbackRadius: 90, // radius in px for the charge knockback effect
-    dashDuration: 40,   // max frames the dash itself lasts before it auto-cancels
-    dashSpeed: 9.5,    // pixel velocity during the shield dash
-    dashDamage: 35,   // damage on shield bash contact
-    dashKnockback: 10.5, // velocity impulse applied to target on shield bash hit
-  },
+  /** Gray — Knight fighter */
+  knight: knightConfig,
+  Knight: knightConfig,
 
   /** Black ΓÇö Black Hole fighter */
   black: {
@@ -820,8 +760,8 @@ export const FIGHTER_DEFS = [
     damage: 30,   // sword swipe damage (mirrors CONFIG.knight.swordDamage)
     cooldown: 180,  // not used directly; knight manages its own swipeCooldown
     moveSpeed: 4.8,
-    ability: "Knight's Code",
-    desc: 'Shield passively blocks projectiles. When the sword breaks, locks in and bashes with the shield.',
+    ability: "Tower Shield & Broadsword",
+    desc: 'Passively blocks incoming direct projectile and melee attacks with a sturdy tower shield, striking with heavy broadsword cleaves.',
   },
   {
     id: 7,

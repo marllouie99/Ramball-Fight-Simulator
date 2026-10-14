@@ -3,4 +3,14 @@
 
 ---
 
-*No balance parameter modifications detected in `js/configs/`.*
+## 🥊 Fighter Stat Modifications
+
+### ICHIGO
+* **🔄 ADJUST** `Attack`: `Zangetsu Melee Cleave ──` ➔ `Zangetsu Melee Cleave (Rule 30: 3-Hit 5-Phase Melee Combo) ──` (Mod)
+
+### MAKI
+* **🟢 BUFF** `radius`: `25` ➔ `30` (+20.0%)
+
+### YUTA
+* **🟢 BUFF** `rikaRadius`: `30` ➔ `40` (+33.3%)
+

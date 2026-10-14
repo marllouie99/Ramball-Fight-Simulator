@@ -237,6 +237,9 @@ export function fireFinalMassiveGetsuga(fighter, target = null) {
   fighter.bankaiFinalGetsugaTriggered = true;
   fighter.slashSwingTimer = 0;
   fighter.isGetsugaSlash = false;
+  fighter.isMeleeCleave = false;
+  fighter.blockPoseTimer = 0;
+  fighter.parryHitAnimTimer = 0;
   castBankaiFinalGetsuga(fighter);
 }
 
@@ -356,6 +359,9 @@ export function fireGetsuga(fighter, target = null, isCombo = false) {
 
   fighter.slashSwingTimer = 0;
   fighter.isGetsugaSlash = false;
+  fighter.isMeleeCleave = false;
+  fighter.blockPoseTimer = 0;
+  fighter.parryHitAnimTimer = 0;
 
   const isBankai = fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask';
   const isMask = Boolean(fighter.hollowMaskActive || fighter.skin === 'bankai_mask' || fighter.skin === 'shikai_mask');

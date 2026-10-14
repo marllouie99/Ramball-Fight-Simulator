@@ -1,5 +1,6 @@
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { getIchigoSwingKinematics } from '../fighters/ichigoSkin.js';
 
 export function drawGetsugaSlash(ctx, p, isBlack) {
   let angle = p.angle;
@@ -1178,8 +1179,11 @@ export function drawIchigoSlashArc(ctx, fighter) {
   );
   if (isFrozen) return;
 
-  const maxT = fighter.slashSwingMaxTimer || 22;
-  const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+  const kin = getIchigoSwingKinematics(fighter);
+  if (kin.phase <= 2) {
+    // Phase 1 (Lift) & Phase 2 (Poised Hold): Slash trail is hidden during anticipation
+    return;
+  }
 
   const r = fighter.r || 25;
   const baseAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
@@ -1188,190 +1192,219 @@ export function drawIchigoSlashArc(ctx, fighter) {
   const isMask = Boolean(fighter.hollowMaskActive);
   const isBankai = Boolean(fighter.bankaiActive || fighter.skin === 'bankai');
   const isShikai = !isBankai;
+  const isBankaiOrMask = isBankai || isMask;
 
-  // Arc angles matching the exact sword rotation span (top-to-bottom downward power chop)
-  const startOffset = -1.56; // ~ -89.4 degrees (covers upper crescent tip)
-  const endOffset = 1.50;    // ~ +86.0 degrees (covers lower crescent tip)
-
-  const windupCutoff = 0.10;
-  const strikeCutoff = 0.38;
-  const holdCutoff = 0.48;
+  const startOffset = kin.startAngle;
+  const endOffset = kin.endAngle;
+  const isReverseSweep = (startOffset > endOffset); // Step 2 (Rising Scoop) sweeps upward!
 
   let currentStartA = startOffset;
   let currentEndA = endOffset;
-  let trailAlpha = 1.0;
+  let recP = 0;
 
-  if (rawProgress < windupCutoff) {
-    // Phase 1: Brief windup anticipation (trail hidden)
-    return;
-  } else if (rawProgress < strikeCutoff) {
-    // Phase 2: Active Strike Phase: Sword sweeps forward carving the arc from startOffset towards endOffset
-    const strikeP = (rawProgress - windupCutoff) / (strikeCutoff - windupCutoff);
-    const easedP = 1 - Math.pow(1 - strikeP, 2.5);
-    currentStartA = startOffset;
-    currentEndA = startOffset + (endOffset - startOffset) * easedP;
-    trailAlpha = Math.min(1.0, 0.45 + 0.55 * strikeP);
-  } else if (rawProgress < holdCutoff) {
-    // Phase 3: Impact Apex Hold: Full glorious arc held firmly at full extension during the impact freeze!
-    currentStartA = startOffset;
-    currentEndA = endOffset;
-    trailAlpha = 1.0;
+  if (kin.phase === 3) {
+    // Phase 3: Hypersonic Whip Strike Window — leading edge is 100% locked to kissaki (Rule 30)
+    if (!isReverseSweep) {
+      currentStartA = startOffset;
+      currentEndA = kin.swingAngle;
+    } else {
+      currentStartA = kin.swingAngle;
+      currentEndA = startOffset;
+    }
+    recP = 0;
+  } else if (kin.phase === 4) {
+    // Phase 4: THE IMPACT LOCK / LATCH (Rule 30)
+    // Full glorious slash ribbon held firmly 100% unfurled on the impact plane across the impact freeze!
+    if (!isReverseSweep) {
+      currentStartA = startOffset;
+      currentEndA = endOffset;
+    } else {
+      currentStartA = endOffset;
+      currentEndA = startOffset;
+    }
+    recP = 0;
+  } else if (kin.phase === 5) {
+    // Phase 5: Extraction & Recovery Settle
+    // Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & Rule 30):
+    // The leading edge stays locked at the cleave plane while the trailing tail chases it!
+    const rp = Math.min(1.0, Math.max(0, kin.recP));
+    recP = Math.pow(rp, 1.4);
+    if (!isReverseSweep) {
+      currentStartA = startOffset + (endOffset - startOffset) * recP;
+      currentEndA = endOffset;
+    } else {
+      currentStartA = endOffset;
+      currentEndA = startOffset + (endOffset - startOffset) * recP;
+    }
   } else {
-    // Phase 4: Recovery Phase: Smooth continuous dynamic eraser wipe starting from startOffset to endOffset (Escanor Method)
-    const recP = (rawProgress - holdCutoff) / (1.0 - holdCutoff);
-    const eraserP = Math.pow(Math.min(1.0, Math.max(0, recP)), 1.15);
-    currentStartA = startOffset + (endOffset - startOffset) * eraserP;
-    currentEndA = endOffset;
-    trailAlpha = Math.max(0, (1.0 - recP) * 0.95);
+    return;
   }
 
-  if (trailAlpha <= 0.01 || currentStartA >= currentEndA - 0.02) return;
+  const angularSpan = Math.abs(currentEndA - currentStartA);
+  if (angularSpan <= 0.04) return;
+
+  const trailAlpha = Math.max(0, 1.0 - recP * 0.85);
+  if (trailAlpha <= 0.01) return;
+
+  const minAng = Math.min(currentStartA, currentEndA);
+  const maxAng = Math.max(currentStartA, currentEndA);
+  const span = maxAng - minAng;
+  if (span <= 0.02) return;
+
+  const tx = fighter.swordTremorX || 0;
+  const ty = fighter.swordTremorY || 0;
 
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
+  ctx.translate(fighter.x + tx, fighter.y + ty);
   ctx.rotate(baseAngle);
   ctx.imageSmoothingEnabled = false; // Authentic nearest-neighbor pixel art rendering
 
-  // Mirror vertically when aiming left so swing remains top-to-bottom
+  // Mirror vertically when aiming left so swing remains natural
   if (facingLeft) {
     ctx.scale(1, -1);
   }
 
-  const P = 2.0; // Exact discrete pixel art grid unit matching Saitama
+  const P = 2.0; // Exact discrete pixel art grid unit matching Yuta & Saitama standard
   const snap = (v) => Math.round(v / P) * P;
 
-  const outerRadius = r + (isMask ? 58 : (isShikai ? 56 : 54));
-  const maxThick = isMask ? 20.0 : (isShikai ? 22.0 : 18.0);
-  const span = currentEndA - currentStartA;
+  // Full-Length Geometric Enveloping Standard (Rule 30):
+  // Inner radius clamped to r + 10 so the crescent wraps from blade collar/hilt to kissaki tip
+  const outerRadius = r + 92;
+  const innerRadius = r + 10;
+  const maxThick = 26.0;
 
-  // ── 2. Attack PNG Model Rendering or Procedural Fallback ──
-  const isBankaiOrMask = isBankai || isMask;
-  const attackCfg = isBankaiOrMask ? ICHIGO_BANKAI_ATTACK_CONFIG : ICHIGO_SHIKAI_ATTACK_CONFIG;
-  const targetImg = isBankaiOrMask ? _getIchigoBankaiAttackImage() : _getIchigoShikaiAttackImage();
+  const outlineCol = isBankaiOrMask
+    ? `rgba(20, 2, 8, ${(0.96 * trailAlpha).toFixed(2)})` // Deep Obsidian Crimson ink shell
+    : `rgba(0, 16, 44, ${(0.94 * trailAlpha).toFixed(2)})`; // Deep Abyssal Indigo ink shell
 
-  if (targetImg && targetImg.complete && (targetImg.naturalWidth > 0 || targetImg.width > 0)) {
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, Math.min(1.0, trailAlpha));
+  const isInsideSlash = (rx, ry) => {
+    const dist = Math.hypot(rx, ry);
+    if (dist <= 0) return false;
+    let ang = Math.atan2(ry, rx);
+    while (ang < minAng - Math.PI) ang += Math.PI * 2;
+    while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
 
-    // Dynamic sector clip [currentStartA, currentEndA] for Rule 2.6 / 15 Eraser Wipe (Escanor Method)
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, outerRadius * 2.5, currentStartA, currentEndA, false);
-    ctx.closePath();
-    ctx.clip();
+    if (ang < minAng || ang > maxAng) return false;
 
-    const bankaiScale = outerRadius / attackCfg.baseR;
-    ctx.rotate(attackCfg.rotOffset);
-    ctx.scale(bankaiScale, bankaiScale);
-    ctx.drawImage(
-      targetImg,
-      -attackCfg.cx,
-      -attackCfg.cy,
-      targetImg.naturalWidth || targetImg.width || 1093,
-      targetImg.naturalHeight || targetImg.height || 1438
-    );
-
-    ctx.restore();
-  } else {
-    // 1. Color Palette Setup
-    let outlineCol = `rgba(0, 20, 58, ${0.92 * trailAlpha})`;
-    if (isBankai || isMask) {
-      outlineCol = `rgba(26, 0, 6, ${0.98 * trailAlpha})`; // Deep Obsidian Crimson outline
+    let t = 0.5;
+    if (Math.abs(currentEndA - currentStartA) >= 0.0001) {
+      t = (ang - currentStartA) / (currentEndA - currentStartA);
     }
+    t = Math.max(0, Math.min(1.0, t));
 
-    const isInsideSlash = (rx, ry) => {
-      const dist = Math.hypot(rx, ry);
-      if (dist <= 0) return false;
-      let ang = Math.atan2(ry, rx);
-      // Align angle within swing interval
-      while (ang < currentStartA - Math.PI) ang += Math.PI * 2;
-      while (ang > currentEndA + Math.PI) ang -= Math.PI * 2;
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+    const thick = maxThick * taper;
+    const outR = outerRadius + taper * 2.0;
+    const inR = Math.max(innerRadius, outR - thick);
+    return dist >= inR && dist <= outR;
+  };
 
-      const t = (ang - currentStartA) / span;
-      if (t < 0 || t > 1.0) return false;
+  const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+  const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+  const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+  const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+
+  const step = kin.step || fighter.slashSwingVariant || fighter.swordComboStep || 1;
+
+  // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border (Rule 30) ──
+  for (let gy = minY; gy <= maxY; gy += P) {
+    for (let gx = minX; gx <= maxX; gx += P) {
+      if (!isInsideSlash(gx, gy)) continue;
+
+      const pxX = snap(gx);
+      const pyY = snap(gy);
+
+      // 4-neighbor attached border test matching Yuta & Saitama standard
+      const isBorder = !isInsideSlash(gx + P, gy) ||
+                       !isInsideSlash(gx - P, gy) ||
+                       !isInsideSlash(gx, gy + P) ||
+                       !isInsideSlash(gx, gy - P);
+
+      if (isBorder) {
+        ctx.fillStyle = outlineCol;
+        ctx.fillRect(pxX, pyY, P, P);
+        continue;
+      }
+
+      const dist = Math.hypot(gx, gy);
+      let ang = Math.atan2(gy, gx);
+      while (ang < minAng - Math.PI) ang += Math.PI * 2;
+      while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+
+      let t = 0.5;
+      if (Math.abs(currentEndA - currentStartA) >= 0.0001) {
+        t = (ang - currentStartA) / (currentEndA - currentStartA);
+      }
+      t = Math.max(0, Math.min(1.0, t));
 
       const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-      const thick = maxThick * taper;
-      const outR = outerRadius + taper * 1.5;
-      const inR = outR - thick;
-      return dist >= inR && dist <= outR;
-    };
+      const outR = outerRadius + taper * 2.0;
+      const depthFromApex = outR - dist;
 
-    const minX = Math.floor((-outerRadius - P * 2) / P) * P;
-    const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
-    const minY = Math.floor((-outerRadius - P * 2) / P) * P;
-    const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
-
-    // ── Discrete 2D Crescent Body Grid with 4-Neighbor Attached Border ──
-    for (let gy = minY; gy <= maxY; gy += P) {
-      for (let gx = minX; gx <= maxX; gx += P) {
-        if (!isInsideSlash(gx, gy)) continue;
-
-        const pxX = snap(gx);
-        const pyY = snap(gy);
-
-        // 4-neighbor attached border test matching Saitama skin technique
-        const isBorder = !isInsideSlash(gx + P, gy) ||
-                         !isInsideSlash(gx - P, gy) ||
-                         !isInsideSlash(gx, gy + P) ||
-                         !isInsideSlash(gx, gy - P);
-
-        if (isBorder) {
-          ctx.fillStyle = outlineCol;
-          ctx.fillRect(pxX, pyY, P, P);
-          continue;
-        }
-
-        const dist = Math.hypot(gx, gy);
-        let ang = Math.atan2(gy, gx);
-        while (ang < currentStartA - Math.PI) ang += Math.PI * 2;
-        while (ang > currentEndA + Math.PI) ang -= Math.PI * 2;
-        const t = (ang - currentStartA) / span;
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-        const outR = outerRadius + taper * 1.5;
-        const depthFromApex = outR - dist;
-
-        let col;
-        if (depthFromApex < P * 1.5) {
-          col = '#FFFFFF'; // Razor-sharp white-hot cutting edge
-        } else if (isBankai || isMask) {
-          // Kuroi Getsuga Black-Red Crimson Theme
-          if (depthFromApex < P * 3.4) {
-            col = '#FF0033'; // Electric vivid blood-crimson rim
-          } else if (depthFromApex < P * 5.4) {
-            col = '#8B0014'; // Transition deep burning crimson layer
-          } else {
-            col = '#080003'; // Abyssal pitch-black obsidian void core
-          }
+      let col;
+      if (depthFromApex < P * 1.4) {
+        col = '#FFFFFF'; // Razor-sharp white-hot cutting edge apex
+      } else if (isBankaiOrMask) {
+        // Kuroi Getsuga Authentic Black-Red Crimson Theme
+        if (depthFromApex < P * 3.0) {
+          col = '#FFF0F2'; // Glowing pastel crimson highlight rim
+        } else if (depthFromApex < P * 5.2) {
+          col = '#FF0033'; // Vibrant electric blood-crimson
+        } else if (depthFromApex < P * 7.5) {
+          col = (step === 3) ? '#800012' : '#B80020'; // Deep saturated burning crimson layer
         } else {
-          // Shikai Azure
-          if (depthFromApex < P * 3.4) {
-            col = '#00E5FF';
-          } else {
-            col = '#0055DD';
-          }
+          col = '#080003'; // Abyssal pitch-black obsidian void core
         }
-
-        ctx.fillStyle = col;
-        ctx.fillRect(pxX, pyY, P, P);
+      } else {
+        // Shikai Azure / Cyan Theme
+        if (depthFromApex < P * 3.0) {
+          col = '#E0FFFF'; // Glowing pastel cyan highlight rim
+        } else if (depthFromApex < P * 5.2) {
+          col = '#00E5FF'; // Vibrant electric cyan
+        } else if (depthFromApex < P * 7.5) {
+          col = (step === 3) ? '#0038A8' : '#0055DD'; // Deep saturated cobalt layer
+        } else {
+          col = '#00143A'; // Abyssal midnight-blue void core
+        }
       }
+
+      ctx.fillStyle = col;
+      ctx.fillRect(pxX, pyY, P, P);
     }
   }
 
-  // ── 3. Trailing Reiatsu Stepped Pixel Sparks ──
-  const numEmbers = 8;
+  // ── Discrete Reiatsu Stepped Pixel Sparks along crescent span ──
+  const numEmbers = 12;
+  const primaryColor = isBankaiOrMask ? '#FF0033' : '#00E5FF';
   for (let eb = 0; eb < numEmbers; eb++) {
-    const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-    const ebAng = currentStartA + ebT * span;
-    const ebDist = outerRadius - 10 - eb * 4;
+    const ebT = (eb / numEmbers + (Date.now() / 280)) % 1.0;
+    const ebAng = minAng + ebT * span;
+    const ebDist = outerRadius - 8 - eb * 3.5;
     const ex = snap(Math.cos(ebAng) * ebDist);
     const ey = snap(Math.sin(ebAng) * ebDist);
-    let col = '#FFFFFF';
-    if (isBankai || isMask) col = (eb % 2 === 0) ? '#FF0033' : '#FFFFFF';
-    else col = (eb % 2 === 0) ? '#00E5FF' : '#FFFFFF';
+    const col = (eb % 2 === 0) ? primaryColor : '#FFFFFF';
 
     ctx.fillStyle = col;
     ctx.fillRect(ex, ey, P, P);
+  }
+
+  // ── Impact Lock Kissaki Sparks & Detonation (During Pin Phase / Phase 4) ──
+  if (kin.phase === 4) {
+    const tipAng = isReverseSweep ? minAng : maxAng;
+    const tipX = snap(Math.cos(tipAng) * (outerRadius - 4));
+    const tipY = snap(Math.sin(tipAng) * (outerRadius - 4));
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(tipX - P, tipY - P, P * 2, P * 2);
+
+    for (let s = 0; s < 6; s++) {
+      const sAng = tipAng + (Math.sin(s * 1.7 + Date.now() * 0.02)) * 0.7;
+      const sDist = (outerRadius - 4) + (s * 2.5);
+      const sx = snap(Math.cos(sAng) * sDist);
+      const sy = snap(Math.sin(sAng) * sDist);
+      ctx.fillStyle = (s % 2 === 0) ? primaryColor : '#FFFFFF';
+      ctx.fillRect(sx, sy, P, P);
+    }
   }
 
   ctx.restore();

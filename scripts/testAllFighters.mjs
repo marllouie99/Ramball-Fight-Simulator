@@ -236,6 +236,8 @@ async function main() {
   const { _getZenitsuHairImage, _getZenitsuLightningSpriteImage, _getZenitsuDashSpriteImage, _drawZenitsuHair, drawZenitsuPixelBody, drawZenitsuSkin, _getThunderclapBurst, isZenitsuThunderclapBurst, _drawZenitsuThunderclapDashVFX } = await import('../js/graphics/fighters/zenitsuSkin.js');
   const { drawPixelCruelSunSphere, spawnCruelSunHitImpact, updateCruelSunHitImpacts, drawCruelSunHitImpacts, clearCruelSunHitImpacts, _getEscanorCruelSunSpriteImage, ESCANOR_CRUEL_SUN_FRAMES, _getEscanorSunExplosionSpriteImage, ESCANOR_SUN_EXPLOSION_FRAMES, drawProceduralPixelCruelSunExplosion, drawPixelCruelSunExplosion, drawCruelSunFloorLighting, drawCruelSunProximityEntityLighting, spawnCruelSunExplosion, updateCruelSunExplosions, drawCruelSunExplosions, clearCruelSunExplosions } = await import('../js/graphics/weapons/escanorWeaponGraphics.js');
   const { drawEscanorSkin } = await import('../js/graphics/fighters/escanorSkin.js');
+  const { _getKnightHairImage, _drawKnightHair, drawKnightPixelBody, drawKnightSkin } = await import('../js/graphics/fighters/knightSkin.js');
+  const { _getKnightShieldImage, _getKnightSwordImage, drawGrayShield, drawGraySword, drawGrayBrokenSword } = await import('../js/graphics/weapons/knightWeaponGraphics.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -7652,6 +7654,17 @@ async function main() {
     state.illusions = [];
 
     ichigo1.performMeleeCleave(dummy1);
+    if (ichigo1.slashSwingTimer <= 0) {
+      throw new Error(`Expected slashSwingTimer > 0 during basic sword swing windup! Got ${ichigo1.slashSwingTimer}`);
+    }
+    if (!ichigo1.hasActiveFinishingAbility()) {
+      throw new Error(`Ichigo hasActiveFinishingAbility() returned false during basic sword swing windup!`);
+    }
+
+    // Step through swing frames until strike delivers lethal hit
+    while (ichigo1.slashSwingTimer > 0 && dummy1.hp > 0) {
+      ichigo1.update(dummy1, 0, state.arena);
+    }
     if (dummy1.hp > 0) {
       throw new Error(`Expected dummy opponent to die from basic melee cleave! HP=${dummy1.hp}`);
     }
@@ -9520,6 +9533,54 @@ async function main() {
     assertCanvasStackBalance('drawTojiSkin(mockCtx, toji)');
   } catch (err) {
     console.error('❌ [TOJI MODEL HAIR & PIXEL BODY TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 11.25. Knight Model Assets & Weapons Canvas Stack Test
+  console.log('🛡️ [Knight Model Assets & Weapons Test] Verifying Knight_hair, Knight_shield, Knight_sword loaders & Canvas stack balance...');
+  try {
+    const hairImg = _getKnightHairImage();
+    if (!hairImg) throw new Error('_getKnightHairImage() returned null');
+    const shieldImg = _getKnightShieldImage();
+    if (!shieldImg) throw new Error('_getKnightShieldImage() returned null');
+    const swordImg = _getKnightSwordImage();
+    if (!swordImg) throw new Error('_getKnightSwordImage() returned null');
+
+    mockCtx.resetStackDepth();
+    drawKnightPixelBody(mockCtx, 25);
+    assertCanvasStackBalance('drawKnightPixelBody(mockCtx, 25)');
+
+    mockCtx.resetStackDepth();
+    _drawKnightHair(mockCtx, 25, false);
+    assertCanvasStackBalance('_drawKnightHair(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawKnightHair(mockCtx, 25, true);
+    assertCanvasStackBalance('_drawKnightHair(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawKnightSkin(mockCtx, 100, 100, 25, 0);
+    assertCanvasStackBalance('drawKnightSkin(mockCtx, 100, 100, 25, 0)');
+
+    mockCtx.resetStackDepth();
+    drawGrayShield(mockCtx, 100, 100, 0, 0, 'none', 25);
+    assertCanvasStackBalance('drawGrayShield(mockCtx, ...)');
+
+    mockCtx.resetStackDepth();
+    drawGraySword(mockCtx, 100, 100, 0, 25, null, false, true);
+    assertCanvasStackBalance('drawGraySword(mockCtx, ...)');
+
+    mockCtx.resetStackDepth();
+    drawGrayBrokenSword(mockCtx, 100, 100, 0, 25, null, false, false);
+    assertCanvasStackBalance('drawGrayBrokenSword(mockCtx, ...)');
+
+    const KnightClass = FIGHTER_CLASS_MAP.knight;
+    const knight = new KnightClass({ x: 200, y: 200, color: '#9e9e9e', controls: {} });
+    mockCtx.resetStackDepth();
+    knight.draw(mockCtx);
+    assertCanvasStackBalance('knight.draw(mockCtx)');
+  } catch (err) {
+    console.error('❌ [KNIGHT MODEL ASSETS & WEAPONS TEST ERROR]:', err);
     errors++;
   }
 

@@ -172,6 +172,11 @@ export function performShunpoGetsugaCombo(fighter, target) {
   // Flash Step Initiation
   fighter.shunpoTarget = target;
   fighter.shunpoComboActive = true;
+  fighter.isMeleeCleave = false;
+  fighter.slashSwingTimer = 0;
+  fighter.slashSwingVariant = 0;
+  fighter.blockPoseTimer = 0;
+  fighter.parryHitAnimTimer = 0;
   fighter.shunpoComboStep = 1;
   fighter.shunpoMaxSteps = maxStrikes;
   fighter.isShunpoDisengaging = false;
@@ -230,9 +235,12 @@ export function performShunpoGetsugaCombo(fighter, target) {
 }
 
 /**
- * Close-quarters Tensa Zangetsu blade sweep adhering to Rule 7 (Frontal Arc AOE).
+ * Initiates Ichigo's 3-Hit 5-Phase Cursed Melee Combo (Rule 30 compliant).
+ * Hit 1: Heavy Diagonal Cleave (Overhead to downward cleave & impact lock)
+ * Hit 2: Rising Crescent Scoop (Low crouch to upward rising scoop & apex lock)
+ * Hit 3: Two-Handed Execution Sunder (Massive two-handed chop & floor impact lock)
  * @param {import('../IchigoFighter.js').IchigoFighter} fighter
- * @param {Object} target
+ * @param {Object} [target]
  */
 export function performMeleeCleave(fighter, target) {
   if (!fighter.isSkillEnabled(CONFIG.ichigo?.enableMeleeCleave, true)) return;
@@ -241,34 +249,221 @@ export function performMeleeCleave(fighter, target) {
   if (fighter.isChannelingBankai || fighter.bankaiBurstTimer > 0 || fighter.shikaiReversionBurstTimer > 0 || fighter.hollowMaskFormationTimer > 0 || fighter.hollowBurstTimer > 0 || fighter.isChannelingGetsuga || fighter.getsugaRecoveryTimer > 0 || fighter.isShunpoDashing || fighter.shunpoComboActive || isFinalGetsugaVoicelinePlaying(fighter)) return;
   if (fighter.bankaiActive && !fighter.bankaiFinalGetsugaTriggered && fighter.bankaiTimer <= (CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160)) return;
 
+  const cfg = CONFIG.ichigo || {};
   const isBankai = fighter.bankaiActive || fighter.skin === 'bankai';
   const isMask = fighter.hollowMaskActive;
-  let damageMult = 1.0;
-  if (isBankai) damageMult *= (CONFIG.ichigo?.bankaiDamageMultiplier || 1.4);
-  if (isMask) damageMult *= (CONFIG.ichigo?.hollowDamageMultiplier || 1.5);
-  const baseDamage = CONFIG.ichigo?.swordDamage || 16;
-  const finalDamage = baseDamage * damageMult;
 
-  let baseCooldown = CONFIG.ichigo?.swordCooldown || 30;
+  // Advance combo step (1 -> 2 -> 3 -> 1)
+  if (!fighter.comboResetTimer || fighter.comboResetTimer <= 0) {
+    fighter.swordComboStep = 1;
+  } else {
+    fighter.swordComboStep = (fighter.swordComboStep % 3) + 1;
+  }
+  const step = fighter.swordComboStep;
+
+  let liftF, holdF, strikeF, pinF, recF, dmg, kb, lunge, hitPause, hitStun, shake;
+  if (step === 1) {
+    liftF = cfg.hit1LiftFrames ?? 7;
+    holdF = cfg.hit1HoldFrames ?? 2;
+    strikeF = cfg.hit1StrikeFrames ?? 5;
+    pinF = cfg.hit1ImpactLockFrames ?? 5;
+    recF = cfg.hit1RecoveryFrames ?? 9;
+    dmg = cfg.hit1Damage ?? 12;
+    kb = cfg.hit1Knockback ?? 4.5;
+    lunge = cfg.hit1LungeSpeed ?? 6.2;
+    hitPause = cfg.hit1HitPauseFrames ?? 4;
+    hitStun = cfg.hit1HitStunFrames ?? 12;
+    shake = cfg.hit1ImpactShake ?? 4.0;
+  } else if (step === 2) {
+    liftF = cfg.hit2LiftFrames ?? 6;
+    holdF = cfg.hit2HoldFrames ?? 2;
+    strikeF = cfg.hit2StrikeFrames ?? 5;
+    pinF = cfg.hit2ImpactLockFrames ?? 6;
+    recF = cfg.hit2RecoveryFrames ?? 10;
+    dmg = cfg.hit2Damage ?? 16;
+    kb = cfg.hit2Knockback ?? 6.5;
+    lunge = cfg.hit2LungeSpeed ?? 7.0;
+    hitPause = cfg.hit2HitPauseFrames ?? 4;
+    hitStun = cfg.hit2HitStunFrames ?? 14;
+    shake = cfg.hit2ImpactShake ?? 5.5;
+  } else {
+    liftF = cfg.hit3LiftFrames ?? 8;
+    holdF = cfg.hit3HoldFrames ?? 3;
+    strikeF = cfg.hit3StrikeFrames ?? 6;
+    pinF = cfg.hit3ImpactLockFrames ?? 8;
+    recF = cfg.hit3RecoveryFrames ?? 14;
+    dmg = cfg.hit3Damage ?? 24;
+    kb = cfg.hit3Knockback ?? 9.0;
+    lunge = cfg.hit3LungeSpeed ?? 8.5;
+    hitPause = cfg.hit3HitPauseFrames ?? 5;
+    hitStun = cfg.hit3HitStunFrames ?? 18;
+    shake = cfg.hit3ImpactShake ?? 8.0;
+  }
+
+  // Form scaling
+  if (isBankai) {
+    dmg *= (cfg.bankaiDamageMultiplier || 1.2);
+    lunge *= 1.25;
+  }
   if (isMask) {
-    const maskCdMult = CONFIG.ichigo?.hollowSwordCooldownMultiplier || 0.65;
+    dmg *= (cfg.hollowDamageMultiplier || 1.3);
+    lunge *= 1.15;
+  }
+
+  const totalFrames = liftF + holdF + strikeF + pinF + recF;
+  fighter.isMeleeCleave = true;
+  fighter.slashSwingTimer = totalFrames;
+  fighter.slashSwingMaxTimer = totalFrames;
+  fighter.vx = 0;
+  fighter.vy = 0;
+  fighter.blockPoseTimer = 0;
+  fighter.parryHitAnimTimer = 0;
+  fighter.slashSwingLiftFrames = liftF;
+  fighter.slashSwingHoldFrames = holdF;
+  fighter.slashSwingStrikeFrames = strikeF;
+  fighter.slashSwingImpactLockFrames = pinF;
+  fighter.slashSwingRecFrames = recF;
+  fighter.swordSwingDamage = dmg;
+  fighter.swordSwingKnockback = kb;
+  fighter.swordSwingLunge = lunge;
+  fighter.swordSwingHitPause = hitPause;
+  fighter.swordSwingHitStun = hitStun;
+  fighter.swordSwingImpactShake = shake;
+  fighter.slashSwingVariant = step;
+  fighter.swordSlashAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle : (fighter.angle || 0);
+  fighter.swordHitDelivered = false;
+  fighter.swordSwingSoundPlayed = false;
+  fighter.comboResetTimer = cfg.comboResetFrames ?? 85;
+
+  let baseCooldown = cfg.swordCooldown ?? 22;
+  if (isMask) {
+    const maskCdMult = cfg.hollowSwordCooldownMultiplier || 0.65;
     baseCooldown = Math.round(baseCooldown * maskCdMult);
   }
-  fighter.swordCooldown = baseCooldown;
-  const swingDur = CONFIG.ichigo?.swordSwingDuration || 26;
-  fighter.slashSwingTimer = swingDur;
-  fighter.slashSwingMaxTimer = swingDur;
-  fighter.slashSwingVariant = (fighter.slashSwingVariant === 1) ? 2 : 1;
+  fighter.swordCooldown = totalFrames + baseCooldown;
 
-  fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
+  // Anticipation swoosh sound
+  fighter._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.35);
+}
 
-  // Rule #7: Frontal Arc Radius AOE for Melee Weapon Users
+/**
+ * Updates 5-phase melee combo lifecycle, forward lunging momentum, impact lock velocity clamping,
+ * micro-tremor jitter, and mid-strike hit registration (Rule 30 standard).
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ * @param {Object} opponent
+ * @param {Object} arena
+ */
+export function updateMeleeSwing(fighter, opponent, arena) {
+  if (!fighter.isMeleeCleave || fighter.slashSwingTimer <= 0 || fighter.isGetsugaSlash || fighter.shunpoComboActive) {
+    if (fighter.isMeleeCleave && fighter.slashSwingTimer <= 0) {
+      fighter.isMeleeCleave = false;
+      fighter.slashSwingVariant = 0;
+      fighter.swordTremorX = 0;
+      fighter.swordTremorY = 0;
+      fighter.swordHitDelivered = false;
+      fighter.swordSwingSoundPlayed = false;
+      if (typeof fighter.resumeMovement === 'function') {
+        fighter.resumeMovement(opponent);
+      }
+    }
+    return;
+  }
+
+  const totalF = fighter.slashSwingMaxTimer || 28;
+  const elapsed = Math.max(0, totalF - fighter.slashSwingTimer);
+  const liftF = fighter.slashSwingLiftFrames || 7;
+  const holdF = fighter.slashSwingHoldFrames || 2;
+  const strikeF = fighter.slashSwingStrikeFrames || 5;
+  const lockF = fighter.slashSwingImpactLockFrames || 5;
+  const recF = fighter.slashSwingRecFrames || 9;
+
+  const strikeStart = liftF + holdF;
+  const strikeEnd = strikeStart + strikeF;
+  const lockEnd = strikeEnd + lockF;
+
+  if (elapsed < strikeStart) {
+    // Phase 1 & 2: Anticipation Lift & Poised Hold
+    if (opponent && opponent.hp > 0 && !opponent.isDead && !fighter.isAimLocked) {
+      const targetAng = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+      fighter.swordSlashAngle = targetAng;
+      fighter.gunAngle = targetAng;
+    }
+    fighter.vx = 0;
+    fighter.vy = 0;
+  } else if (elapsed < strikeEnd) {
+    // Phase 3: Hypersonic Whip Strike
+    const strikeElapsed = elapsed - strikeStart;
+    const strikeP = strikeElapsed / Math.max(1, strikeF);
+
+    if (!fighter.swordSwingSoundPlayed) {
+      fighter.swordSwingSoundPlayed = true;
+      fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.90);
+    }
+
+    // Forward lunging momentum step
+    const lungeP = Math.sin(strikeP * Math.PI);
+    const lungeSpeed = fighter.swordSwingLunge || 6.2;
+    fighter.vx = Math.cos(fighter.swordSlashAngle) * lungeSpeed * lungeP;
+    fighter.vy = Math.sin(fighter.swordSlashAngle) * lungeSpeed * lungeP;
+
+    // Deliver impact at mid-strike (strikeP >= 0.50)
+    if (strikeP >= 0.50 && !fighter.swordHitDelivered) {
+      fighter.swordHitDelivered = true;
+      _deliverMeleeImpact(fighter);
+    }
+  } else if (elapsed < lockEnd) {
+    // Phase 4: THE IMPACT LOCK / LATCH (Rule 30)
+    if (!fighter.swordHitDelivered) {
+      fighter.swordHitDelivered = true;
+      _deliverMeleeImpact(fighter);
+    }
+    // Hard collision: Zero forward velocity clamp
+    fighter.vx = 0;
+    fighter.vy = 0;
+    const tremor = CONFIG.ichigo?.swordTremorIntensity ?? 2.2;
+    fighter.swordTremorX = (Math.random() - 0.5) * tremor;
+    fighter.swordTremorY = (Math.random() - 0.5) * tremor;
+  } else {
+    // Phase 5: Extraction & Recovery Settle
+    fighter.swordTremorX = 0;
+    fighter.swordTremorY = 0;
+    fighter.vx *= 0.82;
+    fighter.vy *= 0.82;
+  }
+
+  // NOTE: fighter.slashSwingTimer is decremented once per frame in super.update(opponent, ownerIndex, arena)
+  // When timer reaches 1 (will become 0 this frame), clean up and restore movement immediately!
+  if (fighter.slashSwingTimer <= 1) {
+    fighter.isMeleeCleave = false;
+    fighter.slashSwingVariant = 0;
+    fighter.swordTremorX = 0;
+    fighter.swordTremorY = 0;
+    fighter.swordHitDelivered = false;
+    fighter.swordSwingSoundPlayed = false;
+    if (typeof fighter.resumeMovement === 'function') {
+      fighter.resumeMovement(opponent);
+    }
+  }
+}
+
+/**
+ * Delivers damage, layered fleshy slap audio, screenshake, knockback, and hitstun on melee impact.
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ */
+function _deliverMeleeImpact(fighter) {
+  const step = fighter.swordComboStep || 1;
+  const isBankai = fighter.bankaiActive || fighter.skin === 'bankai';
+  const isMask = fighter.hollowMaskActive;
+  const finalDamage = fighter.swordSwingDamage || (CONFIG.ichigo?.swordDamage || 12);
+  const kbForce = fighter.swordSwingKnockback || 5;
+  const hitPause = fighter.swordSwingHitPause || 4;
+  const hitStun = fighter.swordSwingHitStun || 14;
   const arc = ((CONFIG.ichigo?.swordArc || 140) * Math.PI) / 180;
-  const reach = CONFIG.ichigo?.swordRange || 70;
+  const reach = (CONFIG.ichigo?.swordRange || 75);
+
   const myIndex = state.fighters.indexOf(fighter);
   const myTeam = state.getFighterTeam(myIndex);
 
-  // Check all valid targets (fighters & illusions)
   const candidates = [];
   if (state.fighters) {
     state.fighters.forEach((f, idx) => {
@@ -290,7 +485,7 @@ export function performMeleeCleave(fighter, target) {
     });
   }
 
-  const aimAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  const slashAng = fighter.swordSlashAngle !== undefined ? fighter.swordSlashAngle : (fighter.gunAngle || 0);
 
   candidates.forEach((enemy) => {
     const dx = enemy.x - fighter.x;
@@ -298,37 +493,47 @@ export function performMeleeCleave(fighter, target) {
     const dist = Math.hypot(dx, dy);
 
     if (dist <= reach + enemy.r) {
-      // Calculate angle relative to aim direction
       const angleToEnemy = Math.atan2(dy, dx);
-      let angleDiff = angleToEnemy - fighter.gunAngle;
+      let angleDiff = angleToEnemy - slashAng;
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
       while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
       if (Math.abs(angleDiff) <= arc / 2) {
-        // Rule #5: ALWAYS apply hit-pause/time-stop exclusively to the target, NEVER to the attacker
+        // Rule #5: ALWAYS apply hit-pause exclusively to the target, NEVER to the attacker
         if (typeof enemy.applyTimeStop === 'function') {
-          enemy.applyTimeStop(CONFIG.ichigo?.swordFreezeDuration || 8);
+          enemy.applyTimeStop(hitPause);
+        }
+        if (typeof enemy.applyHitStun === 'function') {
+          enemy.applyHitStun(hitStun);
         }
 
         // Deal damage and knockback
         applyDamageToTarget(enemy, finalDamage, fighter, { isMelee: true });
-        
-        const kbForce = CONFIG.ichigo?.knockback || 6;
         enemy.applyKnockback(Math.cos(angleToEnemy) * kbForce, Math.sin(angleToEnemy) * kbForce);
-        
-        spawnImpactFlash(enemy.x, enemy.y, isMask ? 'sukuna' : 'gojo');
-        spawnMeleeClashShockwave(enemy.x, enemy.y, CONFIG.ichigo?.swordShockwaveSize || 35, isMask ? 'sukuna' : 'gojo');
 
-        if (typeof triggerGlobalScreenShake === 'function') {
-          const shakeIntensity = isMask
-            ? (CONFIG.ichigo?.hollowSwordHitScreenShake ?? 4.5)
-            : (isBankai ? (CONFIG.ichigo?.bankaiSwordHitScreenShake ?? 4.0) : (CONFIG.ichigo?.swordHitScreenShake ?? 3.0));
-          const shakeDuration = CONFIG.ichigo?.swordHitShakeDuration ?? 6;
-          triggerGlobalScreenShake(shakeIntensity, shakeDuration);
-        }
+        // Rule 30: Layered Fleshy "Slap" Audio Palette
+        try {
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('attack_fleshhit', 1.0);
+            audioSystem.playSFX('sukuna_slice', 0.90);
+            if (step === 3) {
+              audioSystem.playSFX('attack_heavypunch1', 0.85);
+            }
+          }
+        } catch (e) {}
+
+        // Rule 26: Concentric compression ring & discrete spark particles
+        spawnImpactFlash(enemy.x, enemy.y, (isBankai || isMask) ? 'sukuna' : 'gojo');
+        spawnMeleeClashShockwave(enemy.x, enemy.y, CONFIG.ichigo?.swordShockwaveSize || 40, (isBankai || isMask) ? 'sukuna' : 'gojo');
       }
     }
   });
+
+  const shakeIntensity = fighter.swordSwingImpactShake || (isMask ? 5.5 : (isBankai ? 5.0 : 4.0));
+  if (typeof triggerGlobalScreenShake === 'function') {
+    triggerGlobalScreenShake(shakeIntensity, 8);
+  }
+  fighter.swordHitTremorTimer = hitPause + 2;
 }
 
 /**
@@ -504,6 +709,9 @@ export function updateShunpoCombat(fighter, opponent) {
       fighter.shunpoComboActive = false;
       fighter.shunpoTarget = null;
       fighter.shunpoDashTimer = 0;
+      fighter.slashSwingTimer = 0;
+      fighter.slashSwingVariant = 0;
+      fighter.isMeleeCleave = false;
       return false;
     }
 
@@ -563,6 +771,9 @@ export function updateShunpoCombat(fighter, opponent) {
         // Disengage Flash Step Completed: Unleash Getsuga Tensho toward target
         fighter.isShunpoDisengaging = false;
         fighter.shunpoComboActive = false;
+        fighter.slashSwingTimer = 0;
+        fighter.slashSwingVariant = 0;
+        fighter.isMeleeCleave = false;
         if (target && target.hp > 0 && !target.isDead) {
           const targetY = (target.y !== undefined ? target.y : fighter.y) - (target.z || 0);
           const ichigoY = fighter.y - (fighter.z || 0);
@@ -667,6 +878,12 @@ export function updateShunpoCombat(fighter, opponent) {
       } else {
         fighter.shunpoComboActive = false;
         fighter.shunpoTarget = null;
+        fighter.slashSwingTimer = 0;
+        fighter.slashSwingVariant = 0;
+        fighter.isMeleeCleave = false;
+        if (typeof fighter.resumeMovement === 'function') {
+          fighter.resumeMovement(opponent);
+        }
       }
     }
     return true; // Locked in dash
@@ -716,6 +933,9 @@ export function updateShunpoCombat(fighter, opponent) {
           fighter.shunpoTargetY = targetClamped.y;
           fighter.isShunpoDashing = true;
           fighter.isShunpoDisengaging = true;
+          fighter.slashSwingTimer = 0;
+          fighter.slashSwingVariant = 0;
+          fighter.isMeleeCleave = false;
           fighter.shunpoDashTimer = isBankai 
             ? (CONFIG.ichigo?.bankaiComboDisengageDashFrames || 3) 
             : (CONFIG.ichigo?.comboDisengageDashFrames || 3);
@@ -738,6 +958,9 @@ export function updateShunpoCombat(fighter, opponent) {
         } else {
           fighter.shunpoComboActive = false;
           fighter.shunpoTarget = null;
+          fighter.slashSwingTimer = 0;
+          fighter.slashSwingVariant = 0;
+          fighter.isMeleeCleave = false;
           let backwardAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)) + Math.PI;
           if (opponent && opponent.hp > 0) {
             backwardAngle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x);
@@ -768,6 +991,9 @@ export function updateShunpoCombat(fighter, opponent) {
           fighter.shunpoTargetY = targetClamped.y;
 
           fighter.isShunpoDashing = true;
+          fighter.slashSwingTimer = 0;
+          fighter.slashSwingVariant = 0;
+          fighter.isMeleeCleave = false;
           fighter.shunpoDashTimer = isBankai ? 3 : (CONFIG.ichigo?.shunpoDashDuration || 4);
 
           pushTrailCap(fighter.afterImages, {
@@ -791,7 +1017,12 @@ export function updateShunpoCombat(fighter, opponent) {
         } else {
           fighter.shunpoComboActive = false;
           fighter.shunpoTarget = null;
-          fighter.resumeMovement(opponent);
+          fighter.slashSwingTimer = 0;
+          fighter.slashSwingVariant = 0;
+          fighter.isMeleeCleave = false;
+          if (typeof fighter.resumeMovement === 'function') {
+            fighter.resumeMovement(opponent);
+          }
         }
       }
     }

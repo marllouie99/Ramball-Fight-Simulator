@@ -39,17 +39,59 @@ export const ichigoConfig = {
   ability: 'Hollow Mask',
   desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 60% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
 
-  // ── Basic Attack: Zangetsu Melee Cleave ──
+  // ── Basic Attack: Zangetsu Melee Cleave (Rule 30: 3-Hit 5-Phase Melee Combo) ──
   enableMeleeCleave: true,       // Master toggle for Basic Attack: Zangetsu Melee Cleave
-  swordDamage: 8,               // Base damage per melee slash
-  swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s at 60fps)
-  swordRange: 50,                // Melee reach distance
+  enableMeleeCombo: true,        // Toggle for 3-hit 5-phase melee combo chain
+  swordDamage: 12,               // Base damage fallback per melee slash
+  swordCooldown: 22,             // Cooldown in frames after completing combo chain (~0.37s at 60fps)
+  swordRange: 75,                // Melee reach distance in pixels (matching blade length)
   swordArc: 140,                 // Frontal cleave arc cone in degrees
-  swordFreezeDuration: 8,        // Target hit-pause freeze frames on melee strike
-  swordSwingDuration: 26,        // Melee slash swing animation duration in frames
-  knockback: 0,                  // Base melee knockback force
-  swordScreenShake: 3.0,         // Screen shake intensity on basic melee hit
-  swordShockwaveSize: 35,        // Shockwave burst size on sword hit
+  swordFreezeDuration: 6,        // Target hit-pause freeze frames on melee strike (fallback)
+  swordSwingDuration: 28,        // Melee slash swing animation duration fallback
+  knockback: 5,                  // Base melee knockback force fallback
+  swordScreenShake: 4.0,         // Screen shake intensity fallback
+  swordShockwaveSize: 40,        // Shockwave burst size on sword hit
+  comboResetFrames: 85,          // Frames window before combo chain resets to Hit 1
+  swordTremorIntensity: 2.2,     // Blade & screen micro-tremor amplitude (px) during impact lock (Rule 30)
+
+  // ── Hit 1: Heavy Diagonal Cleave (Overhead to Downward Cleave & Impact Lock) ──
+  hit1LiftFrames: 6,             // Anticipation backward coil lift
+  hit1HoldFrames: 6,             // Poised tension hold at apex
+  hit1StrikeFrames: 5,           // Hypersonic downward whip stroke
+  hit1ImpactLockFrames: 10,       // IMPACT LOCK: Blade latches into impact plane with zero velocity
+  hit1RecoveryFrames: 9,         // Extraction & recovery settle
+  hit1HitPauseFrames: 4,         // Target hit-pause freeze frames
+  hit1HitStunFrames: 12,         // Target hitstun duration
+  hit1LungeSpeed: 6.2,           // Forward lunging momentum step
+  hit1Damage: 12,                // Hit 1 damage
+  hit1Knockback: 4.5,            // Horizontal push force
+  hit1ImpactShake: 4.0,          // Screenshake intensity
+
+  // ── Hit 2: Rising Crescent Scoop (Low Scoop to Upward Apex Lock) ──
+  hit2LiftFrames: 6,
+  hit2HoldFrames: 10,
+  hit2StrikeFrames: 5,
+  hit2ImpactLockFrames: 10,       // IMPACT LOCK: Blade latches at peak rising cleave apex
+  hit2RecoveryFrames: 10,
+  hit2HitPauseFrames: 4,
+  hit2HitStunFrames: 14,
+  hit2LungeSpeed: 7.0,
+  hit2Damage: 16,
+  hit2Knockback: 6.5,
+  hit2ImpactShake: 5.5,
+
+  // ── Hit 3: Two-Handed Execution Sunder (Overhead Execution Finisher) ──
+  hit3LiftFrames: 8,
+  hit3HoldFrames: 10,
+  hit3StrikeFrames: 6,
+  hit3ImpactLockFrames: 10,       // IMPACT LOCK: Blade embedded in ground/target with heavy tremor
+  hit3RecoveryFrames: 14,
+  hit3HitPauseFrames: 5,
+  hit3HitStunFrames: 18,
+  hit3LungeSpeed: 8.5,
+  hit3Damage: 24,
+  hit3Knockback: 9.0,
+  hit3ImpactShake: 8.0,
 
   // ── Skill Combo: Shunpo Blitz (Flash Step Flurry -> Disengage Back-Step -> Getsuga) ──
   enableShunpo: true,            // Toggle Flash Step teleport skill

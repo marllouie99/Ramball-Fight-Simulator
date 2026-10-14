@@ -11,7 +11,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnParrySpar
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { initRika, updateRika, stopRikaAudio } from './yuta/rikaLogic.js';
 import { renderYutaDomainBackground } from './yuta/yutaDomainVisuals.js';
-import { modExecuteKatanaMelee, modGetKatanaTipPositions } from './yuta/yutaKatana.js';
+import { modExecuteKatanaMelee, modGetKatanaTipPositions, modUpdateKatanaSwing, modGetKatanaSwingAngle, modGetFlurryKatanaAngle } from './yuta/yutaKatana.js';
 import { getNextCopiedTechnique, executeCopiedTechnique, executeThinIceBreaker } from './yuta/yutaCopyLogic.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
@@ -76,8 +76,17 @@ export class YutaFighter extends Fighter {
     this.themeColor = def?.themeColor || CONFIG.yuta?.themeColor || '#FF1493';
     this.damageNumberColor = '#FF1493';
     this.skinColor = '#FABC95';
-    this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 36;
+    this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 34;
     this.meleeCooldown = 0;
+    this.swordComboStep = 1;
+    this.comboResetTimer = 0;
+    this.swordSwingTimer = 0;
+    this.swordSwingMax = 0;
+    this.swordHitDelivered = false;
+    this.swordSwingSoundPlayed = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
+    this.swipeActive = false;
     this.swordTrail = [];
     this.trailGenTimer = 0;
     this.swordGlowAlpha = 0;
@@ -135,6 +144,8 @@ export class YutaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.flurrySlashTimer = 0;
+    this.flurrySlashAngle = undefined;
+    this.flurryTremorTimer = 0;
     this._flurryHitDelivered = false;
     this.isChannelingThinIceBreaker = false;
     this.thinIceBreakerChargeTimer = 0;
@@ -345,6 +356,8 @@ export class YutaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.flurrySlashTimer = 0;
+    this.flurrySlashAngle = undefined;
+    this.flurryTremorTimer = 0;
     this._flurryHitDelivered = false;
     delete this._prevFlurryBladePos;
     this.meleeCooldown = 0;
@@ -440,6 +453,7 @@ export class YutaFighter extends Fighter {
       spawnBloodEffect(target, 8, this.gunAngle);
     }
     triggerGlobalScreenShake(4, 5);
+    this.flurryTremorTimer = 4;
 
     const hitSound = getBasicAttackSound('musashi');
     if (hitSound) audioSystem.playSFX(hitSound.src, hitSound.volume);
@@ -477,8 +491,13 @@ export class YutaFighter extends Fighter {
       this.flurryHitsLeft = 0;
       this.flurrySlashTimer = 0;
       this.flurryTimer = 0;
+      this.flurrySlashAngle = undefined;
+      this.flurryTremorTimer = 0;
       this._flurryHitDelivered = false;
       delete this._prevFlurryBladePos;
+      this.swipeActive = false;
+      this.swordSwingTimer = 0;
+      this.slashFadeTimer = 0;
 
       if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 400) {
         this.aim(target);
@@ -505,8 +524,19 @@ export class YutaFighter extends Fighter {
     const oldY = this.y;
     this.x = target.x + Math.cos(angle) * dist;
     this.y = target.y + Math.sin(angle) * dist;
-    this.aim(target);
+    const targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+    this.gunAngle = targetAngle;
+    this.angle = targetAngle;
+    this.flurrySlashAngle = targetAngle;
     this.swordTrail = [];
+
+    // Ensure basic swing state is cleared so it never shadows the flurry slash ribbon
+    this.swipeActive = false;
+    this.swordSwingTimer = 0;
+    this.swordHitDelivered = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
+    this.slashFadeTimer = 0;
 
     this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
     spawnImpactFlash(oldX, oldY, 15, 'silver');
@@ -875,20 +905,33 @@ export class YutaFighter extends Fighter {
         this.flurryHitsLeft = 0;
         this.flurrySlashTimer = 0;
         this.flurryTimer = 0;
+        this.flurrySlashAngle = undefined;
+        this.flurryTremorTimer = 0;
         this.flurryGhost = null;
         this.flurryTarget = null;
         this._flurryHitDelivered = false;
         delete this._prevFlurryBladePos;
+        this.swipeActive = false;
+        this.swordSwingTimer = 0;
+        this.slashFadeTimer = 0;
         this.resumeMovement(opponent);
         return;
       }
       this.flurryTarget = target;
-      this.aim(target);
+      if (this.flurrySlashAngle !== undefined) {
+        this.gunAngle = this.flurrySlashAngle;
+      } else {
+        const targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+        this.gunAngle = targetAngle;
+        this.angle = targetAngle;
+        this.flurrySlashAngle = targetAngle;
+      }
 
       // Active slash animation & blade collision detection
       if (this.flurrySlashTimer > 0) {
         this.flurrySlashTimer--;
         this.flurryTimer = this.flurrySlashTimer;
+        if (this.flurryTremorTimer > 0) this.flurryTremorTimer--;
 
         if (!this._flurryHitDelivered) {
           const maxF = CONFIG.yuta?.flurrySlashFrames || 14;
@@ -957,8 +1000,7 @@ export class YutaFighter extends Fighter {
     }
 
     // Smoothly transition Yuta's sword glow alpha
-    const maxCd_glow = this.meleeCooldownMax;
-    const isSwinging_glow = (this.meleeCooldown > maxCd_glow - 15);
+    const isSwinging_glow = (this.swordSwingTimer > 0 || this.flurrySlashTimer > 0);
     const isBlocking_glow = (this.blockPoseTimer > 0);
     // Suppress weapon CE glow when frozen by Gojo's domain (reuses isFrozenByDomain from above)
     const targetGlow = (!isFrozenByDomain && (isSwinging_glow || isBlocking_glow)) ? 1.0 : (isFrozenByDomain ? 0.0 : (this.cursedEnergyAlpha || 0));
@@ -980,12 +1022,15 @@ export class YutaFighter extends Fighter {
       }
     }
 
+    // ── 5-Phase Cursed Melee Combo Lifecycle Update (Rule 30) ──
+    modUpdateKatanaSwing(this, opponent, arena);
+    if (this.comboResetTimer > 0) this.comboResetTimer--;
+    if (this.comboResetTimer === 0 && this.swordSwingTimer <= 0) {
+      this.swordComboStep = 1;
+    }
+
     if (this.meleeCooldown > 0) {
-      const maxCd = this.meleeCooldownMax;
       this.meleeCooldown--;
-      if (this.meleeCooldown === maxCd - 25) {
-        this.slashFadeTimer = 15;
-      }
       this.slowTimer = 0;
       this.slowMultiplier = 1.0;
       if (this.statusEffects) {
@@ -1543,7 +1588,7 @@ export class YutaFighter extends Fighter {
     // so he doesn't get infinitely stun-locked by Gojo or Sukuna's rapid punches.
     const isKnockedBack = (this.knockbackStunTimer || 0) > 0;
     const isKatanaAllowed = this.isSkillEnabled(CONFIG.yuta?.enableKatanaMelee, true);
-    if (isKatanaAllowed && this.hitStunTimer > 0 && !isKnockedBack && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.pureLoveBeamBreatherTimer || 0) <= 0 && this.hp > 0 && this.meleeCooldown <= 0) {
+    if (isKatanaAllowed && this.hitStunTimer > 0 && !isKnockedBack && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.pureLoveBeamBreatherTimer || 0) <= 0 && this.hp > 0 && this.meleeCooldown <= 0 && this.swordSwingTimer <= 0) {
       let enemyInMelee = false;
       const range = CONFIG.yuta.meleeRange || 70;
       const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
@@ -1598,7 +1643,7 @@ export class YutaFighter extends Fighter {
     // he detects incoming threats and raises his guard visually.
     const isParryAllowed = this.isSkillEnabled(CONFIG.yuta?.enableParry, true);
     if (isParryAllowed && this.hp > 0 && !this.isChannelingDomain && !this.domainActive && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam) {
-      const isSwinging = (this.meleeCooldown > this.meleeCooldownMax - 15);
+      const isSwinging = (this.swordSwingTimer > 0 || this.flurrySlashTimer > 0);
       const isKnockedBackOrStunned = (this.knockbackStunTimer || 0) > 0 || (this.hitStunTimer || 0) > 0;
       if (!isSwinging && !isKnockedBackOrStunned && (this.blockPoseTimer === undefined || this.blockPoseTimer <= 0)) {
         let incomingThreat = false;
@@ -1684,8 +1729,19 @@ export class YutaFighter extends Fighter {
     this.flurryGhost = { x: oldX, y: oldY };
     this.x = targetEntity.x + (dx / dist) * (this.r + targetEntity.r + 5);
     this.y = targetEntity.y + (dy / dist) * (this.r + targetEntity.r + 5);
-    if (targetEntity && !targetEntity.isDead) this.aim(targetEntity);
+    const targetAngle = Math.atan2(targetEntity.y - this.y, targetEntity.x - this.x);
+    this.gunAngle = targetAngle;
+    this.angle = targetAngle;
+    this.flurrySlashAngle = targetAngle;
     this.swordTrail = []; // Reset trail so it doesn't streak across the screen
+
+    // Clear basic katana swing state so combo slash never persists or freezes during flurry
+    this.swipeActive = false;
+    this.swordSwingTimer = 0;
+    this.swordHitDelivered = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
+    this.slashFadeTimer = 0;
 
     this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
@@ -1751,8 +1807,7 @@ export class YutaFighter extends Fighter {
     }
 
     // 25% chance to block if not currently swinging his sword (85% if actively guarding)
-    const maxCd = this.meleeCooldownMax;
-    const isSwinging = (this.meleeCooldown > maxCd - 15);
+    const isSwinging = (this.swordSwingTimer > 0 || this.flurrySlashTimer > 0);
 
     const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
     const isEnemyParalyzingDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some((f, idx) => {
@@ -2242,7 +2297,7 @@ export class YutaFighter extends Fighter {
     const isKatanaAllowed = this.isSkillEnabled(CONFIG.yuta?.enableKatanaMelee, true);
     if (isKatanaAllowed && enemyInMelee && closestEnemy) {
       this.aim(closestEnemy);
-      if (this.meleeCooldown <= 0) {
+      if (this.meleeCooldown <= 0 && this.swordSwingTimer <= 0) {
         this.executeKatanaMelee(this.gunAngle);
       }
       return;
@@ -2284,6 +2339,14 @@ export class YutaFighter extends Fighter {
 
   executeKatanaMelee(angle) {
     modExecuteKatanaMelee(this, angle);
+  }
+
+  _getKatanaSwingAngle() {
+    return modGetKatanaSwingAngle(this);
+  }
+
+  _getFlurryKatanaAngle() {
+    return modGetFlurryKatanaAngle(this);
   }
 
   _getKatanaTipPositions() {
@@ -2431,6 +2494,10 @@ export class YutaFighter extends Fighter {
     const currentFlurryGhost = this.flurryGhost;
 
     super.interruptAttacks(forceCancelAll);
+    this.swordSwingTimer = 0;
+    this.swipeActive = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
 
     const myTeam = (typeof state !== 'undefined' && state.fighters && typeof state.getFighterTeam === 'function') 
       ? state.getFighterTeam(state.fighters.indexOf(this)) 
@@ -2460,6 +2527,8 @@ export class YutaFighter extends Fighter {
       this.flurryHitsLeft = 0;
       this.flurryTimer = 0;
       this.flurrySlashTimer = 0;
+      this.flurrySlashAngle = undefined;
+      this.flurryTremorTimer = 0;
       this._flurryHitDelivered = false;
       delete this._prevFlurryBladePos;
       this.flurryTarget = null;
@@ -2480,6 +2549,8 @@ export class YutaFighter extends Fighter {
       this.flurryHitsLeft = 0;
       this.flurryTimer = 0;
       this.flurrySlashTimer = 0;
+      this.flurrySlashAngle = undefined;
+      this.flurryTremorTimer = 0;
       this._flurryHitDelivered = false;
       delete this._prevFlurryBladePos;
       this.flurryTarget = null;
@@ -2771,40 +2842,11 @@ export class YutaFighter extends Fighter {
     this._drawYutaSwordStrap(ctx);
 
     // Determine swing state
-    // Restrict meleeCooldown check to strictly <= maxCd because interruptAttacks(true) 
-    // sets meleeCooldown to 270 (penalty cooldown), which would falsely trigger 
-    // a 4-second backwards spinning katana animation!
     const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
-    const maxCd = this.meleeCooldownMax;
-    const swingDuration = 20;
-    const recoveryDuration = 16;
     const isFlurrySwinging = (this.flurrySlashTimer > 0);
+    const isComboSwinging = (this.swipeActive && this.swordSwingTimer > 0);
     const comboIndex = this.activeSlashType || 0;
-    const isValidSwingRange = (this.meleeCooldown > maxCd - (swingDuration + recoveryDuration)) && (this.meleeCooldown <= maxCd);
-    let isSwinging = isFlurrySwinging || isValidSwingRange || !!editP;
-    let progress = 1.0;
-    let fade = (this.slashFadeTimer || 0) / 15;
-
-    if (isFlurrySwinging) {
-      const maxF = 14;
-      progress = (maxF - this.flurrySlashTimer) / maxF;
-      fade = 1.0;
-    } else if (isSwinging) {
-      const elapsed = maxCd - this.meleeCooldown;
-      if (elapsed <= swingDuration) {
-        // Smooth ease-out swing (fast start, decelerating finish)
-        const rawP = editP ? 0.5 : elapsed / swingDuration;
-        progress = 1.0 - Math.pow(1.0 - rawP, 2.5);
-      } else {
-        // Smooth ease-in-out recovery back to idle
-        const recP = Math.min(1.0, (elapsed - swingDuration) / recoveryDuration);
-        const easedRec = recP < 0.5
-          ? 2 * recP * recP
-          : 1 - Math.pow(-2 * recP + 2, 2) / 2;
-        progress = 1.0 - easedRec * 0.15;
-      }
-      fade = 1.0;
-    }
+    const isSwinging = isFlurrySwinging || isComboSwinging || !!editP;
 
     // Generate static sword trail points when in editor mode
     if (editP) {
@@ -2823,171 +2865,396 @@ export class YutaFighter extends Fighter {
       }
     }
 
-    // --- DRAW DYNAMIC RULE 15 CRESCENT SWORD SLASH ARC ---
+    // --- DRAW DYNAMIC RULE 15 / RULE 30 CRESCENT SWORD SLASH ARC ---
     const isGojoDomainActive = typeof state !== 'undefined' && (
       state.domainActive || state.activeDomain ||
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
     );
 
-    const isSuppressed = this.isTargetOfAmbush || (typeof this.areAttackEffectsSuppressed === 'function' && this.areAttackEffectsSuppressed());
+    const isChannelingOrPunchingBreaker = this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0);
+    const isFlurryActive = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0) || ((this.flurrySlashTimer || 0) > 0);
+    const isSuppressed = this.isTargetOfAmbush || isChannelingOrPunchingBreaker || (typeof this.areAttackEffectsSuppressed === 'function' && this.areAttackEffectsSuppressed());
 
-    if (!isGojoDomainActive && !isSuppressed && isSwinging) {
+    if (!isGojoDomainActive && !isSuppressed) {
       const r = this.r || 22;
-      const facingLeft = Math.abs(this.gunAngle || 0) > Math.PI / 2;
-      const baseAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
+      const snap = (v) => Math.round(v / P) * P;
 
-      let startOffset = -1.25;
-      let endOffset = 1.15;
-      if (comboIndex === 1) {
-        startOffset = 1.15;
-        endOffset = -1.20;
-      } else if (comboIndex === 2) {
-        startOffset = -1.45;
-        endOffset = 1.35;
-      }
+      // ── 1. 5-Phase Cursed Melee Combo Slash Arc (Rule 30 Standard) ──
+      // Gated by !isFlurryActive so the basic melee arc never renders or gets stuck during flurry strikes
+      if (this.swipeActive && this.swordSwingTimer > 0 && !isFlurryActive) {
+        const totalF = this.swordSwingMax || 30;
+        const elapsed = Math.max(0, totalF - this.swordSwingTimer);
+        const liftF = this.swordSwingLiftFrames || 7;
+        const holdF = this.swordSwingHoldFrames || 2;
+        const strikeF = this.swordSwingStrikeFrames || 5;
+        const pinF = this.swordSwingImpactLockFrames || 5;
+        const recF = this.swordSwingRecFrames || 9;
 
-      let currentTipOffset = startOffset;
-      let currentTailOffset = startOffset;
-      let trailAlpha = 1.0;
+        const strikeStart = liftF + holdF;
+        const strikeEnd = strikeStart + strikeF;
+        const pinEnd = strikeEnd + pinF;
 
-      const totalDuration = isFlurrySwinging ? 14 : (swingDuration + recoveryDuration);
-      const rawProgress = isFlurrySwinging
-        ? Math.min(1.0, Math.max(0.0, (14 - this.flurrySlashTimer) / 14))
-        : (editP ? 0.5 : Math.min(1.0, Math.max(0.0, (maxCd - this.meleeCooldown) / totalDuration)));
+        if (elapsed >= strikeStart) {
+          const step = this.swordComboStep || 1;
+          const baseAngle = this.swordSlashAngle !== undefined ? this.swordSlashAngle : (this.gunAngle || 0);
+          const facingLeft = Math.abs(baseAngle) > Math.PI / 2;
 
-      const windupCutoff = isFlurrySwinging ? 0.0 : 0.08;
-      const cutCutoff = isFlurrySwinging ? 0.55 : 0.52;
+          let swingTotal, localStart, localEnd;
+          if (step === 2) {
+            swingTotal = Math.PI * 1.45;
+            localStart = swingTotal * 0.55;
+            localEnd = -swingTotal * 0.55;
+          } else if (step === 3) {
+            swingTotal = Math.PI * 1.65;
+            localStart = -swingTotal * 0.65;
+            localEnd = swingTotal * 0.40;
+          } else {
+            swingTotal = Math.PI * 1.35;
+            localStart = -swingTotal * 0.50;
+            localEnd = swingTotal * 0.50;
+          }
 
-      if (rawProgress < windupCutoff) {
-        currentTipOffset = startOffset;
-        currentTailOffset = startOffset;
-        trailAlpha = 0.0;
-      } else if (rawProgress < cutCutoff) {
-        // Active Cutting Phase: crescent smoothly expands across the arc
-        const t = (rawProgress - windupCutoff) / (cutCutoff - windupCutoff);
-        const eased = t * t * (3 - 2 * t);
-        currentTipOffset = startOffset + eased * (endOffset - startOffset);
-        currentTailOffset = startOffset;
-        trailAlpha = Math.sin(Math.min(1.0, t * 1.5) * (Math.PI / 2));
-      } else {
-        // Recovery / Fade Phase: Tip stays locked at endOffset while tail smoothly catches up and erases
-        const recP = (rawProgress - cutCutoff) / (1.0 - cutCutoff);
-        const easedRec = 0.5 + 0.5 * Math.cos(recP * Math.PI);
-        currentTipOffset = endOffset;
-        currentTailOffset = endOffset - (endOffset - startOffset) * easedRec;
-        trailAlpha = Math.sin((1.0 - recP) * (Math.PI / 2));
-      }
+          // Direct 1:1 Angle Lock: leading edge locked to sword blade kissaki!
+          const currentSwordAngle = this._getKatanaSwingAngle();
+          const swordLocalAngle = currentSwordAngle - baseAngle;
 
-      if (trailAlpha > 0.01 && Math.abs(currentTipOffset - currentTailOffset) >= 0.04) {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(baseAngle);
-        if (facingLeft) {
-          ctx.scale(1, -1);
-        }
+          let currentStartAngle = localStart;
+          let currentEndAngle = localEnd;
+          let recP = 0;
 
-        const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
-        const snap = (v) => Math.round(v / P) * P;
+          if (elapsed < strikeEnd) {
+            // Phase 3: Whip Strike expansion — leading tip is 100% locked to kissaki
+            currentStartAngle = localStart;
+            currentEndAngle = swordLocalAngle;
+            recP = 0;
+          } else if (elapsed < pinEnd) {
+            // Phase 4: Impact Lock hold across entire cleave plane
+            currentStartAngle = localStart;
+            currentEndAngle = localEnd;
+            recP = 0;
+          } else {
+            // Phase 5: Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & 30)
+            const rp = (elapsed - pinEnd) / Math.max(1, recF);
+            recP = Math.pow(rp, 1.4);
+            currentStartAngle = localStart + (localEnd - localStart) * recP;
+            currentEndAngle = localEnd;
+          }
 
-        const outerRadius = r + 82;
-        const maxThick = 24.0;
-        const span = currentTipOffset - currentTailOffset;
-        const minAng = Math.min(currentTipOffset, currentTailOffset);
-        const maxAng = Math.max(currentTipOffset, currentTailOffset);
+          const angularSpan = Math.abs(currentEndAngle - currentStartAngle);
+          if (angularSpan > 0.04) {
+            const trailAlpha = Math.max(0, 1.0 - recP * 0.85);
+            const tx = this.swordTremorX || 0;
+            const ty = this.swordTremorY || 0;
 
-        const outlineCol = `rgba(20, 2, 14, ${(0.96 * trailAlpha).toFixed(2)})`; // Deep Obsidian Cursed Ink shell
-
-        const isInsideSlash = (rx, ry) => {
-          const dist = Math.hypot(rx, ry);
-          if (dist <= 0) return false;
-          let ang = Math.atan2(ry, rx);
-          while (ang < minAng - Math.PI) ang += Math.PI * 2;
-          while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
-
-          if (ang < minAng || ang > maxAng) return false;
-
-          const t = (ang - currentTailOffset) / span;
-          if (t < 0 || t > 1.0) return false;
-
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-          const thick = maxThick * taper;
-          const outR = outerRadius + taper * 1.5;
-          const inR = outR - thick;
-          return dist >= inR && dist <= outR;
-        };
-
-        const minX = Math.floor((-outerRadius - P * 2) / P) * P;
-        const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
-        const minY = Math.floor((-outerRadius - P * 2) / P) * P;
-        const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
-
-        // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border (Clean Ichigo Style) ──
-        for (let gy = minY; gy <= maxY; gy += P) {
-          for (let gx = minX; gx <= maxX; gx += P) {
-            if (!isInsideSlash(gx, gy)) continue;
-
-            const pxX = snap(gx);
-            const pyY = snap(gy);
-
-            // 4-neighbor attached border test matching Ichigo & Saitama
-            const isBorder = !isInsideSlash(gx + P, gy) ||
-                             !isInsideSlash(gx - P, gy) ||
-                             !isInsideSlash(gx, gy + P) ||
-                             !isInsideSlash(gx, gy - P);
-
-            if (isBorder) {
-              ctx.fillStyle = outlineCol;
-              ctx.fillRect(pxX, pyY, P, P);
-              continue;
+            ctx.save();
+            ctx.translate(this.x + tx, this.y + ty);
+            ctx.rotate(baseAngle);
+            if (facingLeft) {
+              ctx.scale(1, -1);
             }
 
-            const dist = Math.hypot(gx, gy);
-            let ang = Math.atan2(gy, gx);
-            while (ang < minAng - Math.PI) ang += Math.PI * 2;
-            while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
-            const t = (ang - currentTailOffset) / span;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-            const outR = outerRadius + taper * 1.5;
-            const depthFromApex = outR - dist;
+            // Full-length geometric enveloping: inner collar to blade tip
+            const outerRadius = r + 92;
+            const innerRadius = r + 10;
+            const maxThick = 26.0;
+            const minAng = Math.min(currentStartAngle, currentEndAngle);
+            const maxAng = Math.max(currentStartAngle, currentEndAngle);
+            const span = maxAng - minAng;
 
-            let col;
-            if (depthFromApex < P * 1.4) {
-              col = '#FFFFFF'; // Razor-sharp white-hot cutting edge apex
-            } else if (depthFromApex < P * 3.0) {
-              col = '#FFF0F8'; // Glowing pastel pink highlight rim
-            } else if (depthFromApex < P * 5.0) {
-              col = '#FF1493'; // Vibrant electric cursed hot-pink
-            } else if (depthFromApex < P * 7.2) {
-              col = '#D80075'; // Deep saturated magenta layer
-            } else {
-              col = '#220016'; // Abyssal pitch-black cursed energy void core
+            const outlineCol = `rgba(20, 2, 14, ${(0.96 * trailAlpha).toFixed(2)})`; // Deep Obsidian Cursed Ink shell
+
+            const isInsideSlash = (rx, ry) => {
+              const dist = Math.hypot(rx, ry);
+              if (dist <= 0) return false;
+              let ang = Math.atan2(ry, rx);
+              while (ang < minAng - Math.PI) ang += Math.PI * 2;
+              while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+
+              if (ang < minAng || ang > maxAng) return false;
+
+              const t = (ang - minAng) / span;
+              if (t < 0 || t > 1.0) return false;
+
+              const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+              const thick = maxThick * taper;
+              const outR = outerRadius + taper * 2.0;
+              const inR = Math.max(innerRadius, outR - thick);
+              return dist >= inR && dist <= outR;
+            };
+
+            const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+            const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+            const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+            const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+
+            // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border (Rule 30) ──
+            for (let gy = minY; gy <= maxY; gy += P) {
+              for (let gx = minX; gx <= maxX; gx += P) {
+                if (!isInsideSlash(gx, gy)) continue;
+
+                const pxX = snap(gx);
+                const pyY = snap(gy);
+
+                const isBorder = !isInsideSlash(gx + P, gy) ||
+                                 !isInsideSlash(gx - P, gy) ||
+                                 !isInsideSlash(gx, gy + P) ||
+                                 !isInsideSlash(gx, gy - P);
+
+                if (isBorder) {
+                  ctx.fillStyle = outlineCol;
+                  ctx.fillRect(pxX, pyY, P, P);
+                  continue;
+                }
+
+                const dist = Math.hypot(gx, gy);
+                let ang = Math.atan2(gy, gx);
+                while (ang < minAng - Math.PI) ang += Math.PI * 2;
+                while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+                const t = (ang - minAng) / span;
+                const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+                const outR = outerRadius + taper * 2.0;
+                const depthFromApex = outR - dist;
+
+                let col;
+                if (depthFromApex < P * 1.4) {
+                  col = '#FFFFFF'; // Razor-sharp white-hot cutting edge apex
+                } else if (depthFromApex < P * 3.0) {
+                  col = '#FFF0F8'; // Glowing pastel pink highlight rim
+                } else if (depthFromApex < P * 5.2) {
+                  col = '#FF1493'; // Vibrant electric cursed hot-pink
+                } else if (depthFromApex < P * 7.5) {
+                  col = (step === 3) ? '#B80062' : '#D80075'; // Deep saturated magenta layer
+                } else {
+                  col = '#220016'; // Abyssal pitch-black cursed energy void core
+                }
+
+                ctx.fillStyle = col;
+                ctx.fillRect(pxX, pyY, P, P);
+              }
             }
 
-            ctx.fillStyle = col;
-            ctx.fillRect(pxX, pyY, P, P);
+            // ── Discrete Cursed Energy Stepped Pixel Sparks (Rule 26) ──
+            const numEmbers = 10;
+            for (let eb = 0; eb < numEmbers; eb++) {
+              const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
+              const ebAng = minAng + ebT * span;
+              const ebDist = outerRadius - 10 - eb * 4;
+              const ex = snap(Math.cos(ebAng) * ebDist);
+              const ey = snap(Math.sin(ebAng) * ebDist);
+              const col = (eb % 2 === 0) ? '#FF1493' : '#FFFFFF';
+
+              ctx.fillStyle = col;
+              ctx.fillRect(ex, ey, P, P);
+            }
+
+            ctx.restore();
           }
         }
+      } else if (isFlurrySwinging) {
+        // ── 2. Phantom Flurry Hypersonic Slash Ribbon (Rule 30 & Rule 15 Standard) ──
+        const maxF = CONFIG.yuta?.flurrySlashFrames || 14;
+        const elapsed = Math.max(0, maxF - this.flurrySlashTimer);
+        const liftF = CONFIG.yuta?.flurryLiftFrames || 2;
+        const strikeF = CONFIG.yuta?.flurryStrikeFrames || 5;
+        const pinF = CONFIG.yuta?.flurryImpactLockFrames || 3;
+        const recF = CONFIG.yuta?.flurryRecoveryFrames || 4;
 
-        // ── Discrete Cursed Energy Stepped Pixel Sparks ──
-        const numEmbers = 8;
-        for (let eb = 0; eb < numEmbers; eb++) {
-          const ebT = (eb / numEmbers + (Date.now() / 300)) % 1.0;
-          const ebAng = currentTailOffset + ebT * span;
-          const ebDist = outerRadius - 10 - eb * 4;
-          const ex = snap(Math.cos(ebAng) * ebDist);
-          const ey = snap(Math.sin(ebAng) * ebDist);
-          const col = (eb % 2 === 0) ? '#FF1493' : '#FFFFFF';
+        const strikeStart = liftF;
+        const strikeEnd = strikeStart + strikeF; // 7
+        const pinEnd = strikeEnd + pinF;         // 10
 
-          ctx.fillStyle = col;
-          ctx.fillRect(ex, ey, P, P);
+        if (elapsed >= strikeStart) {
+          const comboIndex = (this.activeSlashType || 0) % 3;
+          const baseAngle = (this.flurrySlashAngle !== undefined) ? this.flurrySlashAngle : (this.gunAngle || 0);
+          const facingLeft = Math.abs(baseAngle) > Math.PI / 2;
+
+          let localStart, localEnd;
+          if (comboIndex === 1) {
+            // Combo 1: Rising Scoop (sweeps from lower right up to high left)
+            localStart = Math.PI * 0.48;
+            localEnd = -Math.PI * 0.48;
+          } else if (comboIndex === 2) {
+            // Combo 2: Hypersonic Deep Horizontal Cross Cleave
+            localStart = -Math.PI * 0.60;
+            localEnd = Math.PI * 0.60;
+          } else {
+            // Combo 0: Diagonal Downward Cross Cleave (sweeps from top left down to right)
+            localStart = -Math.PI * 0.48;
+            localEnd = Math.PI * 0.48;
+          }
+
+          let currentStartAngle = localStart;
+          let currentEndAngle = localEnd;
+          let recP = 0;
+
+          if (elapsed < strikeEnd) {
+            // Phase 2: Hypersonic Whip Strike expansion — leading tip 100% locked to katana kissaki!
+            const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+            const ease = Math.pow(sp, 2.4);
+            const swordLocalAngle = localStart + (localEnd - localStart) * ease;
+            currentStartAngle = localStart;
+            currentEndAngle = swordLocalAngle;
+            recP = 0;
+          } else if (elapsed < pinEnd) {
+            // Phase 3: Impact Lock hold across entire cleave plane
+            currentStartAngle = localStart;
+            currentEndAngle = localEnd;
+            recP = 0;
+          } else {
+            // Phase 4: Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & 30)
+            const rp = (elapsed - pinEnd) / Math.max(1, recF);
+            recP = Math.pow(rp, 1.4);
+            currentStartAngle = localStart + (localEnd - localStart) * recP;
+            currentEndAngle = localEnd;
+          }
+
+          const angularSpan = Math.abs(currentEndAngle - currentStartAngle);
+          if (angularSpan > 0.04) {
+            const trailAlpha = Math.max(0, 1.0 - recP * 0.88);
+            const tx = (this.flurryTremorTimer > 0) ? (Math.sin(Date.now() * 0.3) * 2.5) : 0;
+            const ty = (this.flurryTremorTimer > 0) ? (Math.cos(Date.now() * 0.3) * 2.5) : 0;
+
+            ctx.save();
+            ctx.translate(this.x + tx, this.y + ty);
+            ctx.rotate(baseAngle);
+            if (facingLeft) {
+              ctx.scale(1, -1);
+            }
+
+            // Full-length geometric enveloping: inner collar to blade tip
+            const outerRadius = r + 92;
+            const innerRadius = r + 10;
+            const maxThick = 26.0;
+            const minAng = Math.min(currentStartAngle, currentEndAngle);
+            const maxAng = Math.max(currentStartAngle, currentEndAngle);
+            const span = maxAng - minAng;
+
+            const outlineCol = `rgba(20, 2, 14, ${(0.96 * trailAlpha).toFixed(2)})`; // Deep Obsidian Cursed Ink shell
+
+            const isInsideSlash = (rx, ry) => {
+              const dist = Math.hypot(rx, ry);
+              if (dist <= 0) return false;
+              let ang = Math.atan2(ry, rx);
+              while (ang < minAng - Math.PI) ang += Math.PI * 2;
+              while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+
+              if (ang < minAng || ang > maxAng) return false;
+
+              // Tail is currentStartAngle, tip is currentEndAngle
+              let t = 0.5;
+              if (Math.abs(currentEndAngle - currentStartAngle) >= 0.0001) {
+                t = (ang - currentStartAngle) / (currentEndAngle - currentStartAngle);
+              }
+              t = Math.max(0, Math.min(1.0, t));
+
+              const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+              const thick = maxThick * taper;
+              const outR = outerRadius + taper * 2.0;
+              const inR = Math.max(innerRadius, outR - thick);
+              return dist >= inR && dist <= outR;
+            };
+
+            const minX = Math.floor((-outerRadius - P * 2) / P) * P;
+            const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
+            const minY = Math.floor((-outerRadius - P * 2) / P) * P;
+            const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
+
+            // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border (Rule 30) ──
+            for (let gy = minY; gy <= maxY; gy += P) {
+              for (let gx = minX; gx <= maxX; gx += P) {
+                if (!isInsideSlash(gx, gy)) continue;
+
+                const pxX = snap(gx);
+                const pyY = snap(gy);
+
+                const isBorder = !isInsideSlash(gx + P, gy) ||
+                                 !isInsideSlash(gx - P, gy) ||
+                                 !isInsideSlash(gx, gy + P) ||
+                                 !isInsideSlash(gx, gy - P);
+
+                if (isBorder) {
+                  ctx.fillStyle = outlineCol;
+                  ctx.fillRect(pxX, pyY, P, P);
+                  continue;
+                }
+
+                const dist = Math.hypot(gx, gy);
+                let ang = Math.atan2(gy, gx);
+                while (ang < minAng - Math.PI) ang += Math.PI * 2;
+                while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+
+                let t = 0.5;
+                if (Math.abs(currentEndAngle - currentStartAngle) >= 0.0001) {
+                  t = (ang - currentStartAngle) / (currentEndAngle - currentStartAngle);
+                }
+                t = Math.max(0, Math.min(1.0, t));
+
+                const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
+                const outR = outerRadius + taper * 2.0;
+                const depthFromApex = outR - dist;
+
+                let col;
+                if (depthFromApex < P * 1.4) {
+                  col = '#FFFFFF'; // Razor-sharp white-hot cutting edge apex
+                } else if (depthFromApex < P * 3.0) {
+                  col = '#FFF0F8'; // Glowing pastel pink highlight rim
+                } else if (depthFromApex < P * 5.2) {
+                  col = '#FF1493'; // Vibrant electric cursed hot-pink
+                } else if (depthFromApex < P * 7.5) {
+                  col = (comboIndex === 2) ? '#B80062' : '#D80075'; // Deep saturated magenta layer
+                } else {
+                  col = '#220016'; // Abyssal pitch-black cursed energy void core
+                }
+
+                ctx.fillStyle = col;
+                ctx.fillRect(pxX, pyY, P, P);
+              }
+            }
+
+            // ── Discrete Cursed Energy Stepped Pixel Sparks along crescent span ──
+            const numEmbers = 12;
+            for (let eb = 0; eb < numEmbers; eb++) {
+              const ebT = (eb / numEmbers + (Date.now() / 250)) % 1.0;
+              const ebAng = minAng + ebT * span;
+              const ebDist = outerRadius - 8 - eb * 3.5;
+              const ex = snap(Math.cos(ebAng) * ebDist);
+              const ey = snap(Math.sin(ebAng) * ebDist);
+              const col = (eb % 2 === 0) ? '#FF1493' : '#FFFFFF';
+
+              ctx.fillStyle = col;
+              ctx.fillRect(ex, ey, P, P);
+            }
+
+            // ── Impact Lock Kissaki Sparks & Detonation (During Pin Phase) ──
+            if (elapsed >= strikeEnd && elapsed < pinEnd) {
+              const tipX = snap(Math.cos(currentEndAngle) * (outerRadius - 4));
+              const tipY = snap(Math.sin(currentEndAngle) * (outerRadius - 4));
+
+              ctx.fillStyle = '#FFFFFF';
+              ctx.fillRect(tipX - P, tipY - P, P * 2, P * 2);
+
+              for (let s = 0; s < 6; s++) {
+                const sAng = currentEndAngle + (Math.sin(s * 1.7 + Date.now() * 0.02)) * 0.7;
+                const sDist = (outerRadius - 4) + (s * 2.5);
+                const sx = snap(Math.cos(sAng) * sDist);
+                const sy = snap(Math.sin(sAng) * sDist);
+                ctx.fillStyle = (s % 2 === 0) ? '#FF1493' : '#FFFFFF';
+                ctx.fillRect(sx, sy, P, P);
+              }
+            }
+
+            ctx.restore();
+          }
         }
-
-        ctx.restore();
       }
     }
 
+    const tx = (this.swipeActive && this.swordTremorX) ? this.swordTremorX : (this.flurryTremorTimer > 0 ? (Math.sin(Date.now() * 0.3) * 2.5) : 0);
+    const ty = (this.swipeActive && this.swordTremorY) ? this.swordTremorY : (this.flurryTremorTimer > 0 ? (Math.cos(Date.now() * 0.3) * 2.5) : 0);
+
     ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.translate(this.x + tx, this.y + ty);
 
     const facingLeft = Math.abs(this.gunAngle) > Math.PI / 2;
     const baseAngle = facingLeft ? Math.PI : 0;
@@ -3005,62 +3272,21 @@ export class YutaFighter extends Fighter {
 
     let localWeaponAngle = 0;
 
-    // Smooth easing helper: ease-out cubic for fluid sword arcs
-    const easeOutCubic = (t) => 1.0 - Math.pow(1.0 - t, 3);
-
     if (isFlurrySwinging) {
-      const maxF = 14;
-      const p = Math.min(1.0, Math.max(0, (maxF - this.flurrySlashTimer) / maxF));
-      const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
-      if (comboIndex === 0) {
-        localWeaponAngle = (-Math.PI * 0.45) + (Math.PI * 0.90) * easedP;
-      } else if (comboIndex === 1) {
-        localWeaponAngle = (Math.PI * 0.45) - (Math.PI * 0.90) * easedP;
-      } else {
-        localWeaponAngle = (-Math.PI * 0.65) + (Math.PI * 1.30) * easedP;
-      }
-    } else if (isSwinging) {
-      const elapsed = maxCd - this.meleeCooldown;
-      if (elapsed <= swingDuration) {
-        const p = editP ? 0.5 : Math.min(1.0, elapsed / swingDuration);
-
-        if (comboIndex === 0) {
-          // Combo 0: Smooth windup back from idle (0 -> -0.45), then slash forward (-0.45 -> +0.65)
-          if (p < 0.20) {
-            const w = p / 0.20;
-            localWeaponAngle = normDiff + (-Math.PI * 0.45 - normDiff) * Math.sin(w * Math.PI * 0.5);
-          } else {
-            const s = (p - 0.20) / 0.80;
-            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
-            localWeaponAngle = (-Math.PI * 0.45) + (Math.PI * 1.10) * easedS;
-          }
-        } else if (comboIndex === 1) {
-          // Combo 1: Backhand Slash from +0.65 back to -0.55
-          const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
-          localWeaponAngle = (Math.PI * 0.65) - (Math.PI * 1.20) * easedP;
-        } else if (comboIndex === 2) {
-          // Combo 2: Overhead Finisher Chop (Raise -0.55 -> -0.85, then heavy chop -0.85 -> +0.85)
-          if (p < 0.15) {
-            const w = p / 0.15;
-            localWeaponAngle = (-Math.PI * 0.55) + (-Math.PI * 0.30) * Math.sin(w * Math.PI * 0.5);
-          } else {
-            const s = (p - 0.15) / 0.85;
-            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
-            localWeaponAngle = (-Math.PI * 0.85) + (Math.PI * 1.70) * easedS;
-          }
-        }
-      } else {
-        // Recovery: Smoothly return from end of swing to idle guard angle (normDiff)
-        const recP = Math.min(1.0, (elapsed - swingDuration) / recoveryDuration);
-        const easeRec = recP * (2 - recP);
-        let endAngle = Math.PI * 0.65;
-        if (comboIndex === 1) endAngle = -Math.PI * 0.55;
-        else if (comboIndex === 2) endAngle = Math.PI * 0.85;
-
-        localWeaponAngle = endAngle * (1.0 - easeRec) + normDiff * easeRec;
-      }
+      // 1:1 Synchronized Angle from 5-phase Flurry Kinematics!
+      const fullKatanaAngle = this._getFlurryKatanaAngle();
+      let lDiff = fullKatanaAngle - baseAngle;
+      let lNorm = Math.atan2(Math.sin(lDiff), Math.cos(lDiff));
+      if (facingLeft) lNorm = -lNorm;
+      localWeaponAngle = lNorm;
+    } else if (this.swipeActive && this.swordSwingTimer > 0) {
+      // 1:1 Synchronized Angle from 5-phase Kinematics!
+      const fullKatanaAngle = this._getKatanaSwingAngle();
+      let lDiff = fullKatanaAngle - baseAngle;
+      let lNorm = Math.atan2(Math.sin(lDiff), Math.cos(lDiff));
+      if (facingLeft) lNorm = -lNorm;
+      localWeaponAngle = lNorm;
     } else {
-      // Idle: Rotate body & weapon to aim directly at target angle
       localWeaponAngle = normDiff;
     }
 

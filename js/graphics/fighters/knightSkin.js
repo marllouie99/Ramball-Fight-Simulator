@@ -180,6 +180,77 @@ export function drawKnightPixelBody(ctx, r, isGhost = false) {
   ctx.restore();
 }
 
+let _knightHairImage = null;
+let _knightHairImageLoading = false;
+
+export function _getKnightHairImage() {
+  if (_knightHairImage && _knightHairImage.complete && _knightHairImage.naturalWidth > 0) {
+    return _knightHairImage;
+  }
+  if (!_knightHairImageLoading && typeof Image !== 'undefined') {
+    _knightHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _knightHairImage = img;
+      _knightHairImageLoading = false;
+    };
+    img.onerror = () => {
+      if (!img.src.includes('.jpg')) {
+        img.src = 'Assets/model/Knight/Knight_hair.jpg?v=1';
+      } else {
+        _knightHairImageLoading = false;
+      }
+    };
+    img.src = 'Assets/model/Knight/Knight_hair.png?v=1';
+    _knightHairImage = img;
+  }
+  return _knightHairImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getKnightHairImage();
+}
+
+/**
+ * Draws Knight's authentic anime helmet/hair from Assets/model/Knight/Knight_hair.jpg (Rule 22 compliant).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character body radius
+ * @param {boolean} [facingLeft=false]
+ */
+export function _drawKnightHair(ctx, r, facingLeft = false) {
+  const hairImg = _getKnightHairImage();
+  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor pixel fidelity
+
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.knight) || {};
+    const wMult = custom.widthScale ?? 1.0;
+    const hMult = custom.heightScale ?? 1.0;
+    const offX = custom.offsetX ?? 0;
+    const offY = custom.offsetY ?? 0;
+    const rot = custom.angleOffset ?? 0;
+    const flipX = custom.flipX ? -1 : 1;
+    const flipY = custom.flipY ? -1 : 1;
+
+    // Knight_hair.png (826x1331). True visible helmet bounding box:
+    // Calibrated to seamlessly frame the upper circle with spiky crown crest at -1.35r
+    const targetHairWidth = r * 2.40 * wMult;
+    const targetHairHeight = r * 2.50 * hMult;
+    const drawX = -targetHairWidth / 2 + offX;
+    const drawY = -r * 1.35 + offY;
+
+    if (rot !== 0 || flipX !== 1 || flipY !== 1) {
+      ctx.translate(drawX + targetHairWidth / 2, drawY + targetHairHeight / 2);
+      if (rot !== 0) ctx.rotate(rot);
+      if (flipX !== 1 || flipY !== 1) ctx.scale(flipX, flipY);
+      ctx.drawImage(hairImg, -targetHairWidth / 2, -targetHairHeight / 2, targetHairWidth, targetHairHeight);
+    } else {
+      ctx.drawImage(hairImg, drawX, drawY, targetHairWidth, targetHairHeight);
+    }
+    ctx.restore();
+  }
+}
+
 /**
  * Standard Knight Skin Renderer with Upright Front POV Transform (Rule 19)
  */
@@ -197,6 +268,7 @@ export function drawKnightSkin(ctx, x, y, r, angle) {
   }
 
   drawKnightPixelBody(ctx, r, false);
+  _drawKnightHair(ctx, r, facingLeft);
   ctx.restore();
 }
 
@@ -238,5 +310,6 @@ export function drawKnightBody(ctx, r, angle) {
     ctx.scale(1, -1);
   }
   drawKnightPixelBody(ctx, r, false);
+  _drawKnightHair(ctx, r, facingLeft);
   ctx.restore();
 }

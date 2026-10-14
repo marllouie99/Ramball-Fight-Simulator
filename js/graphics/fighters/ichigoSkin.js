@@ -240,144 +240,13 @@ export function drawIchigoSkin(ctx, fighter) {
     chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
   }
 
+  const kin = getIchigoSwingKinematics(fighter);
   const isSlashing = !isShikaiReverting && Boolean(fighter.slashSwingTimer > 0);
-  let rawSlashProg = 0;
-  let swingAngle = -0.12;
-  let thrustDistance = 0;
-  let bodyShiftX = 0;
-  let bodyTilt = 0;
-
-  if (isBankaiChanneling) {
-    // Bleach Anime Iconic Bankai Channeling Stance:
-    // Starts with sword lowered diagonally (+0.55 rad / ~32° down), then smoothly raises and points
-    // the blade straight horizontally (0.0 rad) directly at the enemy while extending forward!
-    const raiseProg = Math.min(1.0, bankaiProg / 0.48);
-    const raiseEase = raiseProg * raiseProg * (3 - 2 * raiseProg); // smooth cubic ease
-    const bankaiTremble = Math.sin(now * 0.075) * 0.025 * (0.3 + 0.7 * bankaiProg);
-
-    const startAngle = 0.55; // Lowered diagonal stance (pointing down-right, ~31.5°)
-    const targetAngle = 0.0; // Straight horizontal (pointing directly at the enemy)
-
-    swingAngle = startAngle * (1.0 - raiseEase) + targetAngle * raiseEase + bankaiTremble;
-    thrustDistance = -2.0 + 9.0 * raiseEase; // Extends forward pointing at the opponent
-    bodyShiftX = -1.5 + 4.5 * raiseEase;     // Focus stance lunging forward
-    bodyTilt = 0.03 * raiseEase + bankaiTremble * 0.4;
-  } else if (isHollowChanneling) {
-    // Bleach Anime Iconic Hollow Mask Manifestation Pose (matches reference diagram):
-    // Left hand clutches the face/mask on upper-left/center of the body circle (-0.32 * r, -0.18 * r).
-    // Right hand is placed at the lower-right perimeter of the body circle (+0.48 * r, +0.52 * r),
-    // firmly holding Zangetsu / Tensa Zangetsu angled downwards and outwards to the right (+X, +Y)!
-    const hollowTremble = Math.sin(now * 0.08) * 0.02 * (0.3 + 0.7 * formationProg);
-    swingAngle = 0.35 + hollowTremble; // Lowered diagonal angle pointing down-right (~20° downward slope)
-    thrustDistance = 0;
-    bodyShiftX = 0;
-    bodyTilt = 0.02 * Math.sin(now * 0.07);
-  } else if (isChanneling) {
-    // Dynamic 2-Handed Overhead Sword Lift-Up Charging Animation:
-    // As chargeProg increases (0 -> 1), sword lifts upward from idle (-0.12 rad) high into the sky overhead (-1.85 rad / ~ -106°)
-    const liftEase = Math.min(1.0, chargeProg * 1.7);
-    const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
-    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.03 * (0.3 + 0.7 * chargeProg);
-
-    swingAngle = -0.12 + (-1.85 - (-0.12)) * smoothLift + chargeTremble;
-    thrustDistance = -4.0 - 6.0 * smoothLift; // Pulls back close to shoulder/head
-    bodyShiftX = -1.5 - 3.0 * smoothLift;     // Body coils back into powerful overhead stance
-    bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.4;
-  } else if (isSlashing) {
-    const maxT = fighter.slashSwingMaxTimer || 22;
-    rawSlashProg = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
-
-    if (fighter.isGetsugaSlash) {
-      // Powerful instantaneous downward vertical cleave starting directly from the high lifted sword overhead pose (-1.85 rad) down to (+1.25 rad)
-      const slashPhase = 0.20; // Snappy, instantaneous down-chop (~4-5 frames)
-      if (rawSlashProg < slashPhase) {
-        const p = rawSlashProg / slashPhase;
-        const sweepCurve = p * p * (3 - 2 * p); // smooth cubic down-chop
-        swingAngle = -1.85 + (1.25 - (-1.85)) * sweepCurve;
-        thrustDistance = -10 + 26 * Math.sin(p * Math.PI * 0.5); // -10px to +16px
-        bodyShiftX = -4.5 + 9.5 * Math.sin(p * Math.PI * 0.5);  // lunges forward
-        bodyTilt = -0.12 + 0.20 * Math.sin(p * Math.PI * 0.5);
-      } else {
-        // Recovery phase: +1.25 rad eases smoothly back to idle -0.12 rad
-        const p = (rawSlashProg - slashPhase) / (1.0 - slashPhase);
-        const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
-        thrustDistance = 16 * easeP;
-        bodyShiftX = 5.0 * easeP;
-        bodyTilt = 0.08 * easeP;
-      }
-    } else {
-      if (rawSlashProg < 0.10) {
-        // Phase 1: Rapid Windup snap (idle -> -1.45 rad / ~ -83°) with anticipation recoil
-        const p = rawSlashProg / 0.10;
-        const easeP = p * (2 - p);
-        swingAngle = -0.12 + (-1.45 - (-0.12)) * easeP;
-        thrustDistance = -8 * easeP;
-        bodyShiftX = -2.5 * easeP;
-        bodyTilt = -0.05 * easeP;
-      } else if (rawSlashProg < 0.38) {
-        // Phase 2: Downward cutting sweep (-1.45 rad -> +1.25 rad / ~ +72°) with kinetic power lunge
-        const p = (rawSlashProg - 0.10) / 0.28;
-        const sweepCurve = 1 - Math.pow(1 - p, 2.5); // Explosive forward snap matching Escanor
-        swingAngle = -1.45 + (1.25 - (-1.45)) * sweepCurve;
-        thrustDistance = -8 + 22 * Math.sin(p * Math.PI * 0.5); // seamless -8px to +14px
-        bodyShiftX = -2.5 + 6.5 * Math.sin(p * Math.PI * 0.5); // surges forward from -2.5px to +4.0px
-        bodyTilt = -0.05 + 0.10 * Math.sin(p * Math.PI * 0.5);
-      } else if (rawSlashProg < 0.48) {
-        // Phase 3: Impact Apex Hold (+1.25 rad follow-through maintained across impact freeze)
-        swingAngle = 1.25;
-        thrustDistance = 14;
-        bodyShiftX = 4.0;
-        bodyTilt = 0.05;
-      } else {
-        // Phase 4: Fluid Cosine Recovery (+1.25 rad -> idle -0.12 rad)
-        const p = (rawSlashProg - 0.48) / 0.52;
-        const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI); // 1 -> 0
-        swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
-        thrustDistance = 14 * easeP; // seamlessly eases +14px back to 0px
-        bodyShiftX = 4.0 * easeP;
-      }
-    }
-  } else if (isBankaiStance) {
-    // ── Bankai / Bankai + Hollow Mask Champion Stance (matches reference: hand on lower-left rim, blade extending low down-left) ──
-    swingAngle = 2.65;
-    thrustDistance = 0;
-    bodyShiftX = 0;
-    bodyTilt = 0;
-  } else if (isBackSlungPose) {
-    // Shikai Champion Screen / FaceOff / Preview back-slung pose: handle behind head, blade sweeping down-right
-    swingAngle = facingLeft ? (Math.PI - Math.PI / 4.2) : (Math.PI / 4.2);
-    thrustDistance = 0;
-  } else if ((fighter.blockPoseTimer && fighter.blockPoseTimer > 0) || (fighter.parryHitAnimTimer && fighter.parryHitAnimTimer > 0)) {
-    // ── Dynamic Zanjutsu Parry & Deflection Angles (4 Distinct Blade Postures) ──
-    const pStance = fighter.parryStanceIndex || 0;
-    // Stance 0: High Angled Slash Guard (~ -65° / -1.15 rad)
-    // Stance 1: Low Reverse Guard Deflection (~ +75° / +1.30 rad)
-    // Stance 2: Vertical Center Blade Guard (~ +90° / +1.57 rad)
-    // Stance 3: 45° Cross Deflection Parry (~ -45° / -0.78 rad)
-    let parryAngle = -1.15;
-    if (pStance === 1) parryAngle = 1.30;
-    else if (pStance === 2) parryAngle = 1.57;
-    else if (pStance === 3) parryAngle = -0.78;
-
-    if (fighter.parryHitAnimTimer && fighter.parryHitAnimTimer > 0) {
-      const pProg = fighter.parryHitAnimTimer / 18;
-      const jitter = Math.sin(pProg * Math.PI * 4) * 0.12 * pProg;
-      swingAngle = parryAngle + jitter;
-      thrustDistance = -6 * pProg;
-      bodyShiftX = -3 * pProg;
-      bodyTilt = -0.06 * pProg;
-    } else {
-      swingAngle = parryAngle;
-      thrustDistance = -3;
-      bodyShiftX = -1.5;
-      bodyTilt = -0.03;
-    }
-  } else {
-    // Active combat pose: pointing sword forward at the enemy target
-    swingAngle = -0.12;
-    thrustDistance = 0;
-  }
+  const rawSlashProg = kin.progress;
+  const swingAngle = kin.swingAngle;
+  const thrustDistance = kin.thrustDistance;
+  const bodyShiftX = kin.bodyShiftX;
+  const bodyTilt = kin.bodyTilt;
 
   const renderZangetsu = () => {
     const hideWeapon = fighter.hideWeapon || (typeof state !== 'undefined' && state.showSkinOnly);
@@ -390,7 +259,7 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.rotate(swingAngle);
     } else {
       const gripOffsetY = (!isBackSlungPose || isBankaiStance) ? (r * 0.52) : 0;
-      ctx.translate(thrustDistance + bodyShiftX, gripOffsetY);
+      ctx.translate(thrustDistance + bodyShiftX + (fighter.swordTremorX || 0), gripOffsetY + (fighter.swordTremorY || 0));
       ctx.rotate(swingAngle);
     }
     if (isBankaiStance) {
@@ -643,7 +512,7 @@ export function drawIchigoSkin(ctx, fighter) {
       if (!hideHandsAndWeapon) {
         if (!isBackSlungPose || isHollowChanneling) {
           // Back hand (for 2-handed grip on heavy chop or charging stance)
-          if ((isChanneling || isBankaiChanneling || (fighter.isGetsugaSlash && rawSlashProg <= 0.85) || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
+          if ((isChanneling || isBankaiChanneling || kin.isTwoHanded) && !hideBackHand) {
             _drawIchigoHand(ctx, hiltX + 7, 0, skinColor, true);
           }
           // Front hand (main grip near guard)
@@ -724,7 +593,7 @@ export function drawIchigoSkin(ctx, fighter) {
       // Hands gripping Bankai hilt during active combat, Bankai victory stance, or Hollow Channeling
       if ((!isBackSlungPose || isBankaiStance || isHollowChanneling) && !hideHandsAndWeapon) {
         // Back hand (during 2-handed power chop or charging stance)
-        if ((isChanneling || isBankaiChanneling || (fighter.isGetsugaSlash && rawSlashProg <= 0.85) || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
+        if ((isChanneling || isBankaiChanneling || kin.isTwoHanded) && !hideBackHand) {
           _drawIchigoHand(ctx, swordStartX - 22, 0, skinColor, false);
         }
         // Front hand (main grip on the hilt/holder part behind guard, positioned cleanly on the handle)
@@ -2563,22 +2432,51 @@ function _drawIchigoHand(ctx, hx, hy, skinColor, isShikai) {
   ctx.restore();
 }
 
-export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
-  if (!fighter) return { x: 0, y: 0 };
-  const r = fighter.r || 25;
+/**
+ * Calculates Ichigo's unified 5-phase sword and body kinematics across all match states,
+ * including 3-Hit Melee Combo, Getsuga Tensho release, Bankai/Hollow channeling, and Parry poses.
+ * Single source of truth shared across body shift, weapon renderer, pommel tracker, and slash VFX.
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ * @returns {{
+ *   swingAngle: number,
+ *   thrustDistance: number,
+ *   bodyShiftX: number,
+ *   bodyTilt: number,
+ *   isTwoHanded: boolean,
+ *   phase: number,
+ *   step: number,
+ *   startAngle: number,
+ *   endAngle: number,
+ *   progress: number,
+ *   strikeP: number,
+ *   lockP: number,
+ *   recP: number
+ * }}
+ */
+export function getIchigoSwingKinematics(fighter) {
+  if (!fighter) {
+    return {
+      swingAngle: -0.12,
+      thrustDistance: 0,
+      bodyShiftX: 0,
+      bodyTilt: 0,
+      isTwoHanded: false,
+      phase: 0,
+      step: 1,
+      startAngle: -1.55,
+      endAngle: 1.20,
+      progress: 0,
+      strikeP: 0,
+      lockP: 0,
+      recP: 0
+    };
+  }
+
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   let angle = fighter.gunAngle || 0;
   while (angle > Math.PI) angle -= Math.PI * 2;
   while (angle < -Math.PI) angle += Math.PI * 2;
   const facingLeft = Math.cos(angle) < 0;
-
-  const isFrozen = Boolean(
-    fighter.isFrozenByInfinity ||
-    (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
-    (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0) ||
-    (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
-    fighter.isParalyzed ||
-    fighter.isTargetOfAmbush
-  );
 
   const isBackSlungPose = Boolean(
     fighter._isWinnerReveal || 
@@ -2598,99 +2496,270 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   const isHollowChanneling = Boolean((fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter._hollowVoicelineWait);
   const isChanneling = Boolean(fighter.isChannelingGetsuga && fighter.getsugaChargeTimer > 0);
   const isSlashing = Boolean(fighter.slashSwingTimer > 0);
-  const isBankaiForm = Boolean(isBankai || fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask');
+  const isBankaiForm = Boolean(fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask');
   const isBankaiStance = isBackSlungPose && isBankaiForm;
-  const maxT = fighter.slashSwingMaxTimer || 22;
-  const rawSlashProg = isSlashing ? Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT))) : 0;
 
   let swingAngle = -0.12;
   let thrustDistance = 0;
   let bodyShiftX = 0;
   let bodyTilt = 0;
+  let isTwoHanded = false;
+  let phase = 0;
+  let step = fighter.slashSwingVariant || fighter.swordComboStep || 1;
+  let startAngle = -1.55;
+  let endAngle = 1.20;
+  let progress = 0;
+  let strikeP = 0;
+  let lockP = 0;
+  let recP = 0;
 
   if (isBankaiChanneling) {
     const maxB = fighter.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 66;
     const bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.bankaiChargeTimer || 0) / maxB)));
     const raiseProg = Math.min(1.0, bankaiProg / 0.48);
     const raiseEase = raiseProg * raiseProg * (3 - 2 * raiseProg);
-    const bankaiTremble = Math.sin(Date.now() * 0.075) * 0.025 * (0.3 + 0.7 * bankaiProg);
+    const bankaiTremble = Math.sin(now * 0.075) * 0.025 * (0.3 + 0.7 * bankaiProg);
 
     swingAngle = 0.55 * (1.0 - raiseEase) + bankaiTremble;
     thrustDistance = -2.0 + 9.0 * raiseEase;
     bodyShiftX = -1.5 + 4.5 * raiseEase;
     bodyTilt = 0.03 * raiseEase + bankaiTremble * 0.4;
+    isTwoHanded = true;
   } else if (isHollowChanneling) {
     const formationTimer = fighter.hollowMaskFormationTimer !== undefined ? fighter.hollowMaskFormationTimer : 0;
     const formationMax = fighter.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 325;
     const formationProg = formationTimer > 0 ? Math.min(1.0, Math.max(0.0, 1.0 - (formationTimer / formationMax))) : 1.0;
-    const hollowTremble = Math.sin(Date.now() * 0.08) * 0.02 * (0.3 + 0.7 * formationProg);
+    const hollowTremble = Math.sin(now * 0.08) * 0.02 * (0.3 + 0.7 * formationProg);
     swingAngle = 0.35 + hollowTremble;
     thrustDistance = 0;
     bodyShiftX = 0;
+    bodyTilt = 0.02 * Math.sin(now * 0.07);
+    isTwoHanded = false;
   } else if (isChanneling) {
-    const chargeMax = fighter.getsugaChargeMax || CONFIG.ichigo?.getsugaChargeFrames || 50;
+    const chargeMax = fighter.getsugaChargeMax || CONFIG.ichigo?.getsugaChargeFrames || 64;
     const chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
     const liftEase = Math.min(1.0, chargeProg * 1.7);
     const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
-    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.03 * (0.3 + 0.7 * chargeProg);
+    const chargeTremble = Math.sin(now * 0.045) * 0.03 * (0.3 + 0.7 * chargeProg);
 
     swingAngle = -0.12 + (-1.85 - (-0.12)) * smoothLift + chargeTremble;
     thrustDistance = -4.0 - 6.0 * smoothLift;
     bodyShiftX = -1.5 - 3.0 * smoothLift;
     bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.4;
+    isTwoHanded = true;
   } else if (isSlashing) {
+    const maxT = fighter.slashSwingMaxTimer || 28;
+    progress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+
     if (fighter.isGetsugaSlash) {
+      startAngle = -1.85;
+      endAngle = 1.25;
       const slashPhase = 0.20;
-      if (rawSlashProg < slashPhase) {
-        const p = rawSlashProg / slashPhase;
-        const sweepCurve = p * p * (3 - 2 * p);
+      if (progress < slashPhase) {
+        phase = 3;
+        strikeP = progress / slashPhase;
+        const sweepCurve = strikeP * strikeP * (3 - 2 * strikeP);
         swingAngle = -1.85 + (1.25 - (-1.85)) * sweepCurve;
-        thrustDistance = -10 + 26 * Math.sin(p * Math.PI * 0.5);
-        bodyShiftX = -4.5 + 9.5 * Math.sin(p * Math.PI * 0.5);
-        bodyTilt = -0.12 + 0.20 * Math.sin(p * Math.PI * 0.5);
+        thrustDistance = -10 + 26 * Math.sin(strikeP * Math.PI * 0.5);
+        bodyShiftX = -4.5 + 9.5 * Math.sin(strikeP * Math.PI * 0.5);
+        bodyTilt = -0.12 + 0.20 * Math.sin(strikeP * Math.PI * 0.5);
+        isTwoHanded = true;
       } else {
-        const p = (rawSlashProg - slashPhase) / (1.0 - slashPhase);
-        const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
+        phase = 5;
+        recP = (progress - slashPhase) / (1.0 - slashPhase);
+        const easeP = 0.5 + 0.5 * Math.cos(recP * Math.PI);
         swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
         thrustDistance = 16 * easeP;
         bodyShiftX = 5.0 * easeP;
         bodyTilt = 0.08 * easeP;
+        isTwoHanded = progress <= 0.85;
+      }
+    } else if (fighter.shunpoComboActive) {
+      const isFinisher = (fighter.slashSwingVariant === 2 && fighter.shunpoComboStep >= (fighter.shunpoMaxSteps || 2));
+      const slashPhase = isFinisher ? 0.35 : 0.40;
+      const isAlt = (fighter.slashSwingVariant === 2);
+      startAngle = isAlt ? 1.25 : -1.75;
+      endAngle = isAlt ? -1.45 : 1.35;
+
+      if (progress < slashPhase) {
+        phase = 3;
+        strikeP = progress / slashPhase;
+        const whipEase = strikeP * strikeP * (3 - 2 * strikeP);
+        swingAngle = startAngle + (endAngle - startAngle) * whipEase;
+        thrustDistance = -6 + 18 * Math.sin(strikeP * Math.PI * 0.5);
+        bodyShiftX = (isAlt ? -2.5 : 2.5) * Math.sin(strikeP * Math.PI * 0.5);
+        bodyTilt = (isAlt ? -0.08 : 0.08) * Math.sin(strikeP * Math.PI * 0.5);
+        isTwoHanded = isFinisher;
+      } else {
+        phase = 5;
+        recP = (progress - slashPhase) / (1.0 - slashPhase);
+        const easeP = Math.pow(1.0 - recP, 1.6);
+        swingAngle = -0.12 + (endAngle - (-0.12)) * easeP;
+        thrustDistance = 12 * easeP;
+        bodyShiftX = (isAlt ? -2.5 : 2.5) * easeP;
+        bodyTilt = (isAlt ? -0.08 : 0.08) * easeP;
+        isTwoHanded = isFinisher && (recP < 0.5);
       }
     } else {
-      if (rawSlashProg < 0.05) {
-        const p = rawSlashProg / 0.05;
-        const easeP = p * (2 - p);
-        swingAngle = -0.12 + (-1.45 - (-0.12)) * easeP;
-        thrustDistance = -8 * easeP;
-        bodyShiftX = -2.5 * easeP;
-        bodyTilt = -0.05 * easeP;
-      } else if (rawSlashProg < 0.32) {
-        const p = (rawSlashProg - 0.05) / 0.27;
-        const sweepCurve = p * p * (3 - 2 * p);
-        swingAngle = -1.45 + (1.25 - (-1.45)) * sweepCurve;
-        thrustDistance = -8 + 22 * Math.sin(p * Math.PI * 0.5);
-        bodyShiftX = -2.5 + 6.5 * Math.sin(p * Math.PI * 0.5);
-        bodyTilt = -0.05 + 0.10 * Math.sin(p * Math.PI * 0.5);
-      } else if (rawSlashProg < 0.65) {
-        swingAngle = 1.25;
-        thrustDistance = 14;
-        bodyShiftX = 4.0;
-        bodyTilt = 0.05;
+      // Rule 30: 3-Hit 5-Phase Cursed Melee Combo
+      const liftF = fighter.slashSwingLiftFrames || 7;
+      const holdF = fighter.slashSwingHoldFrames || 2;
+      const strikeF = fighter.slashSwingStrikeFrames || 5;
+      const lockF = fighter.slashSwingImpactLockFrames || 5;
+      const recF = fighter.slashSwingRecFrames || 9;
+      const elapsed = maxT - fighter.slashSwingTimer;
+
+      const strikeStart = liftF + holdF;
+      const strikeEnd = strikeStart + strikeF;
+      const lockEnd = strikeEnd + lockF;
+
+      if (step === 1) {
+        startAngle = -1.55;
+        endAngle = 1.20;
+        if (elapsed < liftF) {
+          phase = 1;
+          const wp = elapsed / Math.max(1, liftF);
+          const easeWp = Math.sin(wp * Math.PI * 0.5);
+          swingAngle = -0.12 + (-1.55 - (-0.12)) * easeWp;
+          thrustDistance = -8.0 * easeWp;
+          bodyShiftX = -3.0 * easeWp;
+          bodyTilt = -0.06 * easeWp;
+        } else if (elapsed < strikeStart) {
+          phase = 2;
+          swingAngle = -1.55;
+          thrustDistance = -8.0;
+          bodyShiftX = -3.0;
+          bodyTilt = -0.06;
+        } else if (elapsed < strikeEnd) {
+          phase = 3;
+          strikeP = (elapsed - strikeStart) / Math.max(1, strikeF);
+          const whipEase = Math.pow(strikeP, 2.5);
+          swingAngle = -1.55 + (1.20 - (-1.55)) * whipEase;
+          thrustDistance = -8.0 + 22.0 * Math.sin(strikeP * Math.PI * 0.5);
+          bodyShiftX = -3.0 + 7.0 * Math.sin(strikeP * Math.PI * 0.5);
+          bodyTilt = -0.06 + 0.14 * Math.sin(strikeP * Math.PI * 0.5);
+        } else if (elapsed < lockEnd) {
+          phase = 4;
+          lockP = (elapsed - strikeEnd) / Math.max(1, lockF);
+          const tremor = (1.0 - lockP) * 0.04 * Math.sin(now * 0.15);
+          swingAngle = 1.20 + tremor;
+          thrustDistance = 14.0;
+          bodyShiftX = 4.0;
+          bodyTilt = 0.08;
+        } else {
+          phase = 5;
+          recP = (elapsed - lockEnd) / Math.max(1, recF);
+          const settleEase = Math.pow(1.0 - recP, 1.8);
+          const springWave = Math.sin(recP * Math.PI * 2.2) * Math.exp(-recP * 4.2);
+          swingAngle = -0.12 + (1.20 - (-0.12)) * settleEase - 0.15 * springWave;
+          thrustDistance = 14.0 * settleEase - 3.0 * springWave;
+          bodyShiftX = 4.0 * settleEase;
+          bodyTilt = 0.08 * settleEase;
+        }
+        isTwoHanded = (phase >= 3 && phase <= 4);
+      } else if (step === 2) {
+        startAngle = 1.10;
+        endAngle = -1.40;
+        if (elapsed < liftF) {
+          phase = 1;
+          const wp = elapsed / Math.max(1, liftF);
+          const easeWp = Math.sin(wp * Math.PI * 0.5);
+          swingAngle = -0.12 + (1.10 - (-0.12)) * easeWp;
+          thrustDistance = -6.0 * easeWp;
+          bodyShiftX = -2.5 * easeWp;
+          bodyTilt = 0.05 * easeWp;
+        } else if (elapsed < strikeStart) {
+          phase = 2;
+          swingAngle = 1.10;
+          thrustDistance = -6.0;
+          bodyShiftX = -2.5;
+          bodyTilt = 0.05;
+        } else if (elapsed < strikeEnd) {
+          phase = 3;
+          strikeP = (elapsed - strikeStart) / Math.max(1, strikeF);
+          const whipEase = Math.pow(strikeP, 2.4);
+          swingAngle = 1.10 + (-1.40 - 1.10) * whipEase;
+          thrustDistance = -6.0 + 20.0 * Math.sin(strikeP * Math.PI * 0.5);
+          bodyShiftX = -2.5 + 6.5 * Math.sin(strikeP * Math.PI * 0.5);
+          bodyTilt = 0.05 - 0.13 * Math.sin(strikeP * Math.PI * 0.5);
+        } else if (elapsed < lockEnd) {
+          phase = 4;
+          lockP = (elapsed - strikeEnd) / Math.max(1, lockF);
+          const tremor = (1.0 - lockP) * 0.04 * Math.sin(now * 0.15);
+          swingAngle = -1.40 + tremor;
+          thrustDistance = 14.0;
+          bodyShiftX = 4.0;
+          bodyTilt = -0.08;
+        } else {
+          phase = 5;
+          recP = (elapsed - lockEnd) / Math.max(1, recF);
+          const settleEase = Math.pow(1.0 - recP, 1.8);
+          const springWave = Math.sin(recP * Math.PI * 2.2) * Math.exp(-recP * 4.2);
+          swingAngle = -0.12 + (-1.40 - (-0.12)) * settleEase + 0.15 * springWave;
+          thrustDistance = 14.0 * settleEase - 3.0 * springWave;
+          bodyShiftX = 4.0 * settleEase;
+          bodyTilt = -0.08 * settleEase;
+        }
+        isTwoHanded = (phase >= 3 && phase <= 4);
       } else {
-        const p = (rawSlashProg - 0.65) / 0.35;
-        const easeP = 0.5 + 0.5 * Math.cos(p * Math.PI);
-        swingAngle = -0.12 + (1.25 - (-0.12)) * easeP;
-        thrustDistance = 14 * easeP;
-        bodyShiftX = 4.0 * easeP;
+        // Step 3: Two-Handed Execution Sunder Finisher
+        startAngle = -1.95;
+        endAngle = 1.35;
+        if (elapsed < liftF) {
+          phase = 1;
+          const wp = elapsed / Math.max(1, liftF);
+          const easeWp = Math.sin(wp * Math.PI * 0.5);
+          swingAngle = -0.12 + (-1.95 - (-0.12)) * easeWp;
+          thrustDistance = -10.0 * easeWp;
+          bodyShiftX = -4.0 * easeWp;
+          bodyTilt = -0.10 * easeWp;
+        } else if (elapsed < strikeStart) {
+          phase = 2;
+          swingAngle = -1.95;
+          thrustDistance = -10.0;
+          bodyShiftX = -4.0;
+          bodyTilt = -0.10;
+        } else if (elapsed < strikeEnd) {
+          phase = 3;
+          strikeP = (elapsed - strikeStart) / Math.max(1, strikeF);
+          const whipEase = Math.pow(strikeP, 2.6);
+          swingAngle = -1.95 + (1.35 - (-1.95)) * whipEase;
+          thrustDistance = -10.0 + 26.0 * Math.sin(strikeP * Math.PI * 0.5);
+          bodyShiftX = -4.0 + 9.5 * Math.sin(strikeP * Math.PI * 0.5);
+          bodyTilt = -0.10 + 0.22 * Math.sin(strikeP * Math.PI * 0.5);
+        } else if (elapsed < lockEnd) {
+          phase = 4;
+          lockP = (elapsed - strikeEnd) / Math.max(1, lockF);
+          const tremor = (1.0 - lockP) * 0.05 * Math.sin(now * 0.18);
+          swingAngle = 1.35 + tremor;
+          thrustDistance = 16.0;
+          bodyShiftX = 5.5;
+          bodyTilt = 0.12;
+        } else {
+          phase = 5;
+          recP = (elapsed - lockEnd) / Math.max(1, recF);
+          const settleEase = Math.pow(1.0 - recP, 1.8);
+          const springWave = Math.sin(recP * Math.PI * 2.2) * Math.exp(-recP * 4.2);
+          swingAngle = -0.12 + (1.35 - (-0.12)) * settleEase - 0.20 * springWave;
+          thrustDistance = 16.0 * settleEase - 4.0 * springWave;
+          bodyShiftX = 5.5 * settleEase;
+          bodyTilt = 0.12 * settleEase;
+        }
+        isTwoHanded = (phase !== 5 || recP < 0.65);
       }
     }
   } else if (isBankaiStance) {
     swingAngle = 2.65;
     thrustDistance = 0;
     bodyShiftX = 0;
+    bodyTilt = 0;
+    isTwoHanded = false;
   } else if (isBackSlungPose) {
     swingAngle = facingLeft ? (Math.PI - Math.PI / 4.2) : (Math.PI / 4.2);
     thrustDistance = 0;
+    bodyShiftX = 0;
+    bodyTilt = 0;
+    isTwoHanded = false;
   } else if ((fighter.blockPoseTimer && fighter.blockPoseTimer > 0) || (fighter.parryHitAnimTimer && fighter.parryHitAnimTimer > 0)) {
     const pStance = fighter.parryStanceIndex || 0;
     let parryAngle = -1.15;
@@ -2711,10 +2780,63 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
       bodyShiftX = -1.5;
       bodyTilt = -0.03;
     }
+    isTwoHanded = (pStance === 2);
   } else {
     swingAngle = -0.12;
     thrustDistance = 0;
+    bodyShiftX = 0;
+    bodyTilt = 0;
+    isTwoHanded = false;
   }
+
+  return {
+    swingAngle,
+    thrustDistance,
+    bodyShiftX,
+    bodyTilt,
+    isTwoHanded,
+    phase,
+    step,
+    startAngle,
+    endAngle,
+    progress,
+    strikeP,
+    lockP,
+    recP
+  };
+}
+
+export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
+  if (!fighter) return { x: 0, y: 0 };
+  const r = fighter.r || 25;
+  let angle = fighter.gunAngle || 0;
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  const facingLeft = Math.cos(angle) < 0;
+
+  const isBackSlungPose = Boolean(
+    fighter._isWinnerReveal || 
+    (typeof state !== 'undefined' && (
+      state.gameState === 'faceoff' ||
+      state.gameState === 'weaponIndex' || 
+      state.gameState === 'characterSelect' || 
+      state.gameState === 'indexDetail' || 
+      state._isFaceOffScreenActive ||
+      state.isRandomRollShowoff
+    )) ||
+    fighter.isDemoFighter ||
+    fighter._isFaceOff
+  );
+
+  const isHollowChanneling = Boolean((fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter._hollowVoicelineWait);
+  const isSlashing = Boolean(fighter.slashSwingTimer > 0);
+  const isBankaiForm = Boolean(isBankai || fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask');
+  const isBankaiStance = isBackSlungPose && isBankaiForm;
+
+  const kin = getIchigoSwingKinematics(fighter);
+  const swingAngle = kin.swingAngle;
+  const thrustDistance = kin.thrustDistance;
+  const bodyShiftX = kin.bodyShiftX;
 
   const swordStartX = isHollowChanneling ? 0 : (isBankaiStance ? (r * 1.05) : ((isSlashing || !isBackSlungPose) ? (r * (isBankaiForm ? 0.65 : 0.68)) : (-r * (isBankaiForm ? 0.65 : 0.72))));
   const scale = isBankaiForm ? 1.0 : 0.90;
@@ -2730,10 +2852,10 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   const gripOffsetY = (!isBackSlungPose || isBankaiStance) ? (r * 0.52) : 0;
   const localX = isHollowChanneling
     ? (r * 0.48 + innerX * cosT - innerY * sinT)
-    : (innerX * cosT - innerY * sinT + (thrustDistance + bodyShiftX));
+    : (innerX * cosT - innerY * sinT + (thrustDistance + bodyShiftX + (fighter.swordTremorX || 0)));
   let localY = isHollowChanneling
     ? (r * 0.52 + innerX * sinT + innerY * cosT)
-    : (innerX * sinT + innerY * cosT + gripOffsetY);
+    : (innerX * sinT + innerY * cosT + gripOffsetY + (fighter.swordTremorY || 0));
 
   // Apply facing flip
   if (facingLeft) {

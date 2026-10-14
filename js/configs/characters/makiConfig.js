@@ -17,7 +17,7 @@ export const makiConfig = {
   speed: 5.4,
   moveSpeed: 8.4,
   r: 25,
-  radius: 25,
+  radius: 30,
   color: '#18181B', // Deep Obsidian
   themeColor: '#014913ff', // Deep Emerald Green
   damageNumberColor: '#014913ff',

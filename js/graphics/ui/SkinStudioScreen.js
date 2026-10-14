@@ -35,7 +35,7 @@ import { drawZeusSkin, _drawZeusHair, _getZeusHairImage, _drawZeusCrown, _getZeu
 import { drawCronosSkin } from '../fighters/cronosSkin.js';
 import { drawBomberPixelBody } from '../fighters/bomberSkin.js';
 import { drawVoidmasterPixelBody } from '../fighters/voidmasterSkin.js';
-import { drawKnightPixelBody } from '../fighters/knightSkin.js';
+import { drawKnightPixelBody, drawKnightSkin, _drawKnightHair, _getKnightHairImage } from '../fighters/knightSkin.js';
 import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighters/nanamiSkin.js';
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
 import { drawNaoyaSkin, _drawNaoyaHair, _getNaoyaHairImage } from '../fighters/naoyaSkin.js';
@@ -633,6 +633,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     ]
   },
   {
+    key: 'knight',
+    label: 'KNIGHT',
+    asset: 'Knight_hair.png',
+    assetDims: '826 x 1331',
+    baseW: 2.40,
+    baseH: 2.50,
+    baseCrownY: -1.35,
+    visW: 826,
+    visH: 1331,
+    centerX: 413,
+    topY: 0,
+    themeColor: '#94A3B8',
+    forms: [
+      { id: 'default', label: 'STANDARD' }
+    ]
+  },
+  {
     key: 'gunslinger',
     label: 'ALUCARD',
     asset: 'Red-hat.png & Red-eye-glasses.png',
@@ -913,6 +930,12 @@ function generateJsCode(fDef, custom) {
            `const drawH = 1170 * scaleY;\n` +
            `const drawX = -686 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 136 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+  } else if (fDef.key === 'knight') {
+    return `// Calibrated Helmet for Knight (Assets/model/Knight/Knight_hair.jpg)\n` +
+           `const targetHairWidth = r * ${targetW};\n` +
+           `const targetHairHeight = r * ${targetH};\n` +
+           `const drawX = -targetHairWidth / 2${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)}${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'shiro') {
     if (state.studioSkinShiroPart === 'crown') {
       return `// Calibrated Elkia Royal Crown for Shiro (Assets/model/shiro/shiro_crown.png)\n` +
@@ -1552,6 +1575,8 @@ export function drawSkinStudioScreen() {
       _drawYutaHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'toji') {
       _drawTojiHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'knight') {
+      _drawKnightHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'shiro') {
       _drawShiroHair(ctx, baseRadius, isFacingLeft);
       _drawShiroCrown(ctx, baseRadius, isFacingLeft);

@@ -28,7 +28,44 @@ export const patchNotesData = {
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
 ],
-  balanceChanges: [],
+  balanceChanges: [
+    {
+        "character": "ICHIGO",
+        "deltas": [
+            {
+                "type": "ADJUST",
+                "key": "Attack",
+                "oldVal": "Zangetsu Melee Cleave ──",
+                "newVal": "Zangetsu Melee Cleave (Rule 30: 3-Hit 5-Phase Melee Combo) ──",
+                "pct": "Mod"
+            }
+        ]
+    },
+    {
+        "character": "MAKI",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "radius",
+                "oldVal": 25,
+                "newVal": 30,
+                "pct": "+20.0%"
+            }
+        ]
+    },
+    {
+        "character": "YUTA",
+        "deltas": [
+            {
+                "type": "BUFF",
+                "key": "rikaRadius",
+                "oldVal": 30,
+                "newVal": 40,
+                "pct": "+33.3%"
+            }
+        ]
+    }
+],
   engineNotes: [
     {
         "tag": "PERF",

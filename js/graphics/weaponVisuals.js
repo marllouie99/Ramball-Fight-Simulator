@@ -46,7 +46,7 @@ export { drawRezeTacticalKnife, drawRezeWeaponPreview } from './weapons/rezeWeap
 // GRAY KNIGHT WEAPONS (Shield & Sword)
 // ─────────────────────────────────────────────
 
-export { drawGrayShield, drawGraySword, drawGrayBrokenSword, drawGraySwordProjectile } from './weapons/knightWeaponGrpahics.js';
+export { drawGrayShield, drawGraySword, drawGrayBrokenSword, drawGraySwordProjectile, _getKnightShieldImage, _getKnightSwordImage } from './weapons/knightWeaponGraphics.js';
 
 export function drawSwordProjectile(ctx, x, y, angle, scale = 1.0) {
   // Draw the same cyberpunk sword art used for Gray's held sword,

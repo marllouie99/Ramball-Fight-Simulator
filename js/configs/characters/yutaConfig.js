@@ -50,13 +50,55 @@ export const yutaConfig = {
 
   // Basic Attack: Katana Melee
   enableKatanaMelee: true,                 // Master toggle for Basic Attack: Katana Melee
-  meleeCooldown: 100,                       // Frames between katana strikes
-  meleeRange: 50,                          // Katana blade length reach distance in pixels
-  meleeDamage: 8,                         // Base damage per katana swing
-  meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
-  meleeKnockback: 0.0,                     // Outward push force on katana melee strike
-  meleeHitStun: 12,                        // Hit stun frames on katana melee strike
+  enableMeleeCombo: true,                  // Enables 3-hit 5-phase cursed katana combo
+  meleeCooldown: 34,                       // Recovery frames between full combo chains (reduced from 100 for fluid flow)
+  meleeRange: 75,                          // Katana blade reach distance in pixels (matching blade scale)
+  meleeDamage: 14,                         // Base damage per katana swing (fallback)
+  meleeArc: Math.PI * 0.85,                // ~153-degree frontal arc cone for multi-enemy cleaves
+  meleeKnockback: 4.5,                     // Outward push force on katana melee strike
+  meleeHitStun: 14,                        // Hit stun frames on katana melee strike
   weaponOffsetY: 4.5,                      // Y-offset shift positioning hands & katana lower on Yuta's body/chest
+  comboResetFrames: 85,                    // Frames window before combo resets back to Hit 1
+  swordTremorIntensity: 2.2,               // Screen & blade tremor amplitude (px) during impact lock (Rule 30)
+
+  // ── Hit 1: Cursed Horizontal Cross Cleave (Midsection Cleave & Impact Lock) ──
+  hit1LiftFrames: 7,                       // Anticipation coil lift
+  hit1HoldFrames: 2,                       // Poised hold at apex
+  hit1StrikeFrames: 5,                     // Hypersonic cleave stroke
+  hit1ImpactLockFrames: 5,                 // Impact lock: blade latches at cleave plane with zero velocity
+  hit1RecoveryFrames: 9,                   // Extraction & recovery settle
+  hit1HitPauseFrames: 3,                   // Contact freeze-frame on target
+  hit1HitStunFrames: 12,                   // Hitstun on target
+  hit1LungeSpeed: 6.0,                     // Forward lunging momentum step
+  hit1Damage: 14,                          // Damage on Hit 1
+  hit1Knockback: 4.5,                      // Horizontal push force
+  hit1ImpactShake: 4.0,                    // Screenshake intensity
+
+  // ── Hit 2: Rising Cursed Crescent Scoop (Upward Diagonal Scoop & Apex Lock) ──
+  hit2LiftFrames: 6,
+  hit2HoldFrames: 2,
+  hit2StrikeFrames: 5,
+  hit2ImpactLockFrames: 6,
+  hit2RecoveryFrames: 10,
+  hit2HitPauseFrames: 3,
+  hit2HitStunFrames: 14,
+  hit2LungeSpeed: 6.8,
+  hit2Damage: 18,
+  hit2Knockback: 6.5,
+  hit2ImpactShake: 5.5,
+
+  // ── Hit 3: Two-Handed Cursed Overhead Execution Chop (Decapitation Finisher) ──
+  hit3LiftFrames: 8,
+  hit3HoldFrames: 3,
+  hit3StrikeFrames: 6,
+  hit3ImpactLockFrames: 8,
+  hit3RecoveryFrames: 14,
+  hit3HitPauseFrames: 4,
+  hit3HitStunFrames: 18,
+  hit3LungeSpeed: 8.5,
+  hit3Damage: 26,
+  hit3Knockback: 9.0,
+  hit3ImpactShake: 8.0,
 
   // Defensive / Counter Mechanic: Parry & Guard Stance
   enableParry: true,                       // Master toggle for Parry & Guard Stance
@@ -78,6 +120,10 @@ export const yutaConfig = {
   flurryDamage: 8,                         // Damage per slash during Flurry
   flurryHitInterval: 7,                    // Frames delay between each Flurry slash
   flurrySlashFrames: 14,                   // Frames duration for each flurry katana swing animation
+  flurryLiftFrames: 2,                     // Anticipation coil frames before hypersonic strike
+  flurryStrikeFrames: 5,                   // Hypersonic cleave stroke frames
+  flurryImpactLockFrames: 3,               // Impact lock frames (kissaki embedded, enemy in hit-pause)
+  flurryRecoveryFrames: 4,                 // Dynamic tail-to-tip eraser wipe & recovery frames
   flurryHitPauseFrames: 10,                // Stasis pause duration applied to enemy upon weapon collision (Escanor mechanic)
   flurryKnockback: 0.0,                    // Outward knockback push force during flurry slashes (0 = no push)
 
@@ -93,7 +139,7 @@ export const yutaConfig = {
   // Summon Companion: Rika Orimoto
   enableRika: true,                        // Master toggle for Summon Rika Orimoto
   rikaMaxHp: 250,                          // Maximum health pool when summoned
-  rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
+  rikaRadius: 40,                          // Physical body collision radius for Rika in pixels
   rikaSummonHpThreshold: 0.70,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
   rikaRechargeHpRatio: 0.20,               // HP ratio in damage required to re-summon Rika (20% of max HP)
   rikaSummonChargeDuration: 30,            // Channeling/pause duration when Yuta calls Rika (frames)
