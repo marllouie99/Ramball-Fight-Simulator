@@ -7,6 +7,7 @@ import { MeleeFighter } from '../fighters/MeleeFighter.js';
 import { GrenadierFighter } from '../fighters/GrenadierFighter.js';
 import { LaserFighter } from '../fighters/LaserFighter.js';
 import { KnightFighter } from '../fighters/KnightFighter.js';
+import { SpartanFighter } from '../fighters/SpartanFighter.js';
 import { BlackFighter } from '../fighters/BlackFighter.js';
 import { DarkSlateGrayFighter } from '../fighters/DarkSlateGrayFighter.js';
 import { OrangeFighter } from '../fighters/OrangeFighter.js';
@@ -78,6 +79,8 @@ export const FIGHTER_CLASS_MAP = {
   'grenadier': GrenadierFighter,
   'laser':     LaserFighter,
   'knight':    KnightFighter,
+  'spartan':   SpartanFighter,
+  'Spartan':   SpartanFighter,
   'black':     BlackFighter,
   'darkslategray': DarkSlateGrayFighter,
   'orange':    OrangeFighter,

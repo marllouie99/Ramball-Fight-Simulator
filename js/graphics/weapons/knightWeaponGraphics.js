@@ -60,7 +60,12 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getKnightSwordImage();
 }
 
-export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = 0) {
+export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = 0, isBroken = false) {
+  // When shield is shattered/broken, shield is completely gone and hand remains bare/empty
+  if (isBroken) {
+    return;
+  }
+
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
@@ -78,7 +83,7 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
   }
   ctx.translate(r + 12, 0); 
 
-  const shieldScale = 1.8; 
+  const shieldScale = 1.8;
 
   // Modern Sci-Fi Palette
   const armorDark = '#1f2124';
@@ -86,25 +91,8 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
   const armorLight = '#414652';
   const outline = '#0a0a0c';
   
-  let neonCore = '#ffd700'; // Bright gold
-  let neonGlow = 'rgba(255, 180, 0, 0.7)'; // Amber glow
-
-  if (blockFlashTimer > 0) {
-    neonCore = '#ffffff';
-    neonGlow = 'rgba(255, 255, 255, 0.9)';
-  } else if (dashState === 'charging') {
-    neonCore = `hsl(45, 90%, ${60 + 20 * Math.sin(Date.now() / 80)}%)`;
-    neonGlow = `hsla(45, 100%, 50%, ${0.5 + 0.3 * Math.sin(Date.now() / 80)})`;
-  } else if (dashState === 'dashing') {
-    neonCore = '#ffea75';
-    neonGlow = 'rgba(255, 230, 100, 0.8)';
-  }
-
-  // Shield shake on charging
-  if (dashGlowFade > 0 && dashState === 'charging') {
-    const shake = 2.5;
-    ctx.translate((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake);
-  }
+  let neonCore = '#ffd700'; // Bright gold when active
+  let neonGlow = 'rgba(255, 180, 0, 0.7)';
 
   // ── SHIELD BODY RENDERING ──
   const shieldImg = _getKnightShieldImage();
@@ -116,11 +104,6 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(shieldImg, -shieldW / 2, -shieldH / 2 + 4, shieldW, shieldH);
-    if (blockFlashTimer > 0) {
-      ctx.globalCompositeOperation = 'source-atop';
-      ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1.0, blockFlashTimer / 10)})`;
-      ctx.fillRect(-shieldW / 2, -shieldH / 2 + 4, shieldW, shieldH);
-    }
     ctx.restore();
   } else {
     // BASE SHIELD: Hexagonal/Angular Riot Shield Profile (Procedural Fallback)
@@ -257,8 +240,6 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
       ctx.fill();
     }
   }
-
-
 
   ctx.restore();
 }
@@ -542,11 +523,7 @@ export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null, isTrail 
   ctx.save();
   ctx.translate(x, y);
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
-  if (dashState === 'charging' || dashState === 'dashing') {
-    ctx.rotate(gunAngle);
-    if (facingLeft) ctx.scale(1, -1);
-    ctx.translate(r + 8, 16);
-  } else if (isSwinging) {
+  if (isSwinging) {
     ctx.rotate(gunAngle);
     if (facingLeft) ctx.scale(1, -1);
     ctx.translate(r + 14, 0);
@@ -565,11 +542,7 @@ export function drawGrayBrokenSword(ctx, x, y, gunAngle, r, dashState = null, is
   ctx.save();
   ctx.translate(x, y);
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
-  if (dashState === 'charging' || dashState === 'dashing') {
-    ctx.rotate(gunAngle);
-    if (facingLeft) ctx.scale(1, -1);
-    ctx.translate(r + 8, 16);
-  } else if (isSwinging) {
+  if (isSwinging) {
     ctx.rotate(gunAngle);
     if (facingLeft) ctx.scale(1, -1);
     ctx.translate(r + 14, 0);

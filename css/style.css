@@ -786,6 +786,26 @@ canvas {
   transition: box-shadow 120ms ease, border-color 120ms ease;
 }
 
+.health-card__ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  max-width: 100%;
+  background: #dc2626;
+  border-radius: 2px;
+  pointer-events: none;
+  z-index: 1;
+  box-sizing: border-box;
+  box-shadow: 0 0 6px rgba(220, 38, 38, 0.45);
+}
+
+.arena-dark-mode .health-card__ghost,
+.health-card.arena-dark-mode .health-card__ghost {
+  background: #ef4444;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+}
+
 .health-card__bar-text {
   position: absolute;
   right: 6px;
@@ -799,7 +819,7 @@ canvas {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 3px rgba(0, 0, 0, 0.85) !important;
   -webkit-text-stroke: 0px !important;
   pointer-events: none;
-  z-index: 2;
+  z-index: 5 !important;
   line-height: 1;
 }
 
@@ -810,6 +830,7 @@ canvas {
   transition: background-color 180ms ease, opacity 120ms ease;
   box-sizing: border-box;
   position: relative;
+  z-index: 2;
 }
 
 .health-card__fill::after {
@@ -1422,6 +1443,18 @@ canvas {
   margin: 0 !important;
 }
 
+.boss-bar .health-card__ghost {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  height: 100% !important;
+  border-radius: 2.5px !important;
+  background: #dc2626 !important;
+  box-shadow: 0 0 10px rgba(220, 38, 38, 0.7) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
 .boss-bar .health-card__fill {
   position: absolute !important;
   left: 0 !important;
@@ -1429,7 +1462,7 @@ canvas {
   height: 100% !important;
   border-radius: 2.5px !important;
   transition: width 0.12s ease-out, background-color 0.2s ease !important;
-  z-index: 1 !important;
+  z-index: 2 !important;
 }
 
 .boss-bar .boss-bar__text,
@@ -1442,6 +1475,8 @@ canvas {
   transform: translateY(-50%) !important;
   font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
   font-size: 10.5px !important;
+  font-weight: 700 !important;
+  z-index: 5 !important;
   font-weight: 700 !important;
   letter-spacing: 1px !important;
   color: #ffffff !important;
@@ -2716,6 +2751,18 @@ body.arena-dark-mode {
   margin: 8px 0 0 !important;
 }
 
+.health-card__bar.hud-bar-cj .health-card__ghost {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  height: 100% !important;
+  border-radius: 0px !important;
+  background: #7f1d1d !important;
+  box-shadow: 0 0 6px rgba(127, 29, 29, 0.7) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
 .health-card__bar.hud-bar-cj .health-card__fill {
   height: 100% !important;
   max-width: 100% !important;
@@ -2723,6 +2770,7 @@ body.arena-dark-mode {
   background: #FFFFFF !important;
   box-shadow: none !important;
   position: relative !important;
+  z-index: 2 !important;
 }
 
 .health-card__bar.hud-bar-cj .health-card__fill::after {
@@ -4258,6 +4306,19 @@ body.arena-dark-mode {
   box-shadow: 0 0 8px rgba(44, 77, 224, 0.4), inset 0 0 4px rgba(0, 0, 0, 0.8) !important;
 }
 
+.sans-stamina-pixel-track .health-card__ghost,
+.health-card__bar.hud-bar-sans-stamina .health-card__ghost {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  height: 100% !important;
+  border-radius: 0px !important;
+  background: #f59e0b !important;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6) !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
 .sans-stamina-pixel-track .health-card__fill,
 .health-card__bar.hud-bar-sans-stamina .health-card__fill {
   height: 100% !important;
@@ -4266,6 +4327,7 @@ body.arena-dark-mode {
   background: linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%) !important;
   box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 -1.5px 0 rgba(0, 0, 0, 0.6) !important;
   position: relative !important;
+  z-index: 2 !important;
   transition: width 80ms ease-out !important;
 }
 

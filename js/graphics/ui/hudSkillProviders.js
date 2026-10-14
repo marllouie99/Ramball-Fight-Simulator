@@ -528,6 +528,33 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
 
   // ─────────────────────────────────────────────
+  // KNIGHT (Tower Shield & Broadsword)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'knight' || f.type === 'knight' || (f.name && f.name.toLowerCase() === 'knight')) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.knight) ? CONFIG.knight : {};
+    const themeColor = cfg.hudSkillBarColor || cfg.themeColor || f.color || '#9e9e9e';
+    const skills = [];
+
+    const shieldMax = f.shieldMaxHp || cfg.shieldMaxHp || 90;
+    const shieldCur = Math.max(0, f.shieldHp !== undefined ? f.shieldHp : shieldMax);
+    const shieldPct = Math.max(0, Math.min(100, (shieldCur / shieldMax) * 100));
+    const isBroken = Boolean(f.isShieldBroken || shieldCur <= 0);
+
+    skills.push({
+      id: 'tower_shield',
+      pct: shieldPct,
+      ready: !isBroken,
+      color: isBroken ? '#ef4444' : themeColor,
+      label: isBroken ? 'SHIELD: BROKEN (50% DEF)' : `TOWER SHIELD: ${Math.round(shieldCur)}/${shieldMax}`,
+      isSignature: true,
+      signature: true,
+      fullWidth: true
+    });
+
+    return skills;
+  }
+
+  // ─────────────────────────────────────────────
   // LAYLA (Energy Gunner)
   // ─────────────────────────────────────────────
   if (f.characterId === 'layla' || f.type === 'layla') {
@@ -2498,6 +2525,28 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
+  // ─────────────────────────────────────────────
+  // SPARTAN (Greek Hoplite - Javelin Hurl)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'spartan' || f.type === 'spartan' || (f.name && f.name.toLowerCase() === 'spartan')) {
+    const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.spartan || CONFIG.Spartan)) ? (CONFIG.spartan || CONFIG.Spartan) : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#d97706';
+    const javMax = cfg.javelinCooldown || 360;
+    const javTimer = Math.max(0, f.javelinCooldown !== undefined ? f.javelinCooldown : 0);
+    const javPct = Math.max(0, Math.min(100, (1 - (javTimer / javMax)) * 100));
+    const isReady = javPct >= 99 && javTimer <= 0 && !f.isThrowingJavelin;
+    return [{
+      id: 'javelin_throw',
+      pct: javPct,
+      ready: isReady,
+      color: themeColor,
+      label: f.isThrowingJavelin ? 'JAVELIN HURLING...' : (isReady ? 'JAVELIN HURL: READY' : `JAVELIN HURL: ${Math.ceil(javTimer / 60)}s`),
+      isSignature: true,
+      signature: true,
+      fullWidth: true
+    }];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
     return [];
   }
@@ -2583,7 +2632,8 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     avatarofemptiness: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
     avatar_of_emptiness: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
     avatar: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
-    shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction']
+    shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction'],
+    spartan: ['javelin_throw', 'javelin', 'JAVELIN']
   };
 
   const keys = signatureMap[fId];

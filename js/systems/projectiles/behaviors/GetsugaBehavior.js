@@ -162,6 +162,25 @@ export class GetsugaBehavior extends ProjectileBehavior {
       }
     }
 
+    // 3. Continuous Wave Drag: Carry trapped targets along the wave's path while projectile travels
+    if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
+      for (const [target] of projectile.draggedTargets.entries()) {
+        if (!target || target.hp <= 0 || target.isDead || target.dead) {
+          projectile.draggedTargets.delete(target);
+          continue;
+        }
+        target.isDraggedByGetsuga = true;
+        if (target.characterId === 'eye_of_cthulhu' || target.type === 'eye_of_cthulhu') {
+          if (projectile.vx !== 0 || projectile.vy !== 0) {
+            target.knockbackVx = projectile.vx * 0.90;
+            target.knockbackVy = projectile.vy * 0.90;
+            target.vx = projectile.vx * 0.60;
+            target.vy = projectile.vy * 0.60;
+          }
+        }
+      }
+    }
+
     const allCandidates = [];
     if (fighters) allCandidates.push(...fighters);
     if (typeof state !== 'undefined' && state.illusions) allCandidates.push(...state.illusions);
@@ -188,11 +207,23 @@ export class GetsugaBehavior extends ProjectileBehavior {
       const fIdx = (fighters || []).indexOf(f);
       let isEnemy = true;
       if (fIdx !== -1) {
-        isEnemy = (myTeam === null || state.getFighterTeam(fIdx) !== myTeam);
+        const theirTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(fIdx) : null;
+        if (myTeam !== null && myTeam !== undefined && theirTeam !== null && theirTeam !== undefined) {
+          isEnemy = (myTeam !== theirTeam);
+        } else if (attacker && attacker.team !== undefined && f.team !== undefined) {
+          isEnemy = (attacker.team !== f.team);
+        } else {
+          isEnemy = (fIdx !== ownerIdx);
+        }
       } else if (f.owner) {
         const oIdx = (fighters || []).indexOf(f.owner);
-        if (oIdx !== -1 && myTeam !== null && typeof state.getFighterTeam === 'function') {
-          isEnemy = (state.getFighterTeam(oIdx) !== myTeam);
+        const theirTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && oIdx !== -1) ? state.getFighterTeam(oIdx) : null;
+        if (myTeam !== null && myTeam !== undefined && theirTeam !== null && theirTeam !== undefined) {
+          isEnemy = (myTeam !== theirTeam);
+        } else if (attacker && attacker.team !== undefined && f.owner.team !== undefined) {
+          isEnemy = (attacker.team !== f.owner.team);
+        } else {
+          isEnemy = (oIdx !== ownerIdx);
         }
       }
       if (!isEnemy) continue;
@@ -272,7 +303,12 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
         const isSaitamaCounter = Boolean(f && (f.characterId === 'saitama' || f.type === 'saitama') && (f.isCountering || (f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0)));
         const isMakimaShatter = Boolean(f && (f.isRevivingFromContract || f.isShatterReviving || (f.shatteredPieces && f.shatteredPieces.length > 0) || (f.characterId === 'makima' && (f.isDead || f.dead || f.hp <= 0))));
-        const isEscanorImmune = Boolean(f && (f.characterId === 'escanor' || f.type === 'escanor' || f.immuneToKnockback || f.immuneToPull));
+        const isEscanorImmune = Boolean(f && (
+          f.characterId === 'escanor' ||
+          f.type === 'escanor' ||
+          f.immuneToPull ||
+          (f.immuneToKnockback && f.characterId !== 'eye_of_cthulhu' && f.type !== 'eye_of_cthulhu')
+        ));
         if (isMakimaShatter) {
           f.vx = 0;
           f.vy = 0;
@@ -289,18 +325,38 @@ export class GetsugaBehavior extends ProjectileBehavior {
           if (projectile.draggedTargets && projectile.draggedTargets.has(f)) {
             projectile.draggedTargets.delete(f);
           }
-        } else if (projectile.vx !== 0 || projectile.vy !== 0) {
+        } else if (projectile.vx !== 0 || projectile.vy !== 0 || projectile._resumeVx !== undefined || projectile.launchAngle !== undefined) {
           f.isDraggedByGetsuga = true;
           if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
           projectile.draggedTargets.set(f, true);
-          const angle = Math.atan2(projectile.vy, projectile.vx);
+          const travelVx = projectile.vx !== 0 ? projectile.vx : (projectile._resumeVx || 0);
+          const travelVy = projectile.vy !== 0 ? projectile.vy : (projectile._resumeVy || 0);
+          const angle = (travelVx !== 0 || travelVy !== 0)
+            ? Math.atan2(travelVy, travelVx)
+            : (projectile.launchAngle !== undefined ? projectile.launchAngle : (projectile.angle || 0));
           const kbForce = isFinal
             ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 30)
             : (isMask
               ? (CONFIG.ichigo?.hollowGetsugaKnockback || 8)
               : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6)));
           if (typeof f.applyKnockback === 'function') {
-            f.applyKnockback(Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce), Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce));
+            f.applyKnockback(
+              Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce),
+              Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce),
+              0,
+              { isGetsuga: true, isDrag: true, isPull: true }
+            );
+          }
+          if (f.characterId === 'eye_of_cthulhu' || f.type === 'eye_of_cthulhu') {
+            if (projectile.vx !== 0 || projectile.vy !== 0) {
+              f.knockbackVx = projectile.vx * 0.90;
+              f.knockbackVy = projectile.vy * 0.90;
+              f.vx = projectile.vx * 0.60;
+              f.vy = projectile.vy * 0.60;
+            } else {
+              f.knockbackVx = Math.cos(angle) * 4.0;
+              f.knockbackVy = Math.sin(angle) * 4.0;
+            }
           }
         }
 

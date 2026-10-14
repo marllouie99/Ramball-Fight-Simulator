@@ -48,6 +48,7 @@ import { gunslingerConfig } from '../configs/characters/gunslingerConfig.js';
 import { eyeOfCthulhuConfig } from '../configs/characters/eyeOfCthulhuConfig.js';
 import { enderDragonConfig } from '../configs/characters/enderDragonConfig.js';
 import { knightConfig } from '../configs/characters/knightConfig.js';
+import { spartanConfig } from '../configs/characters/spartanConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { interactionConfigs } from '../configs/interactions/index.js';
@@ -132,6 +133,8 @@ export const CONFIG = {
   Sora: soraConfig,
   knight: knightConfig,
   Knight: knightConfig,
+  spartan: spartanConfig,
+  Spartan: spartanConfig,
   camera: {
     minZoom: 0.65,
     maxZoom: 1.18,
@@ -191,6 +194,10 @@ export const CONFIG = {
   hudHideStats: false,          // Toggle to completely hide all fighter HUD stats lines
   hudHideOverheadHp: false,      // Toggle to hide overhead canvas health numbers and bars on fighters
   hudSkillBarsMode: 'all',      // 'all' = show all skill bars, 'signature' = signature only, 'none' = completely hide all skill bars
+  hudGhostBarEnabled: true,      // Master toggle for fighting-game trailing damage ghost bar on healthbars
+  hudGhostBarHoldFrames: 8,      // Responsive delay in frames (~133ms) before trailing ghost bar begins catch-up decay
+  hudGhostBarDecaySpeed: 3.5,    // Fast linear decay rate (% per frame) for ghost bar catch-up
+  hudGhostBarColor: '#dc2626',   // Trailing damage ghost bar color (fighting game red)
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
   globalScreenShakeIntensityMultiplier: 0.7, // Global multiplier for all hit effect & arena screen shake intensity (1.0 = normal, 0.5 = half shake, 0.0 = disable shake completely)
   camera: {
@@ -751,6 +758,7 @@ export const FIGHTER_DEFS = [
     name: 'Knight',
     category: 'Fantasy & Magic',
     color: '#9e9e9e',
+    themeColor: '#9e9e9e',
     startX: 200, startY: 220,
     startVx: 0.7, startVy: 0.5,
     radius: 25,
@@ -761,7 +769,7 @@ export const FIGHTER_DEFS = [
     cooldown: 180,  // not used directly; knight manages its own swipeCooldown
     moveSpeed: 4.8,
     ability: "Tower Shield & Broadsword",
-    desc: 'Passively blocks incoming direct projectile and melee attacks with a sturdy tower shield, striking with heavy broadsword cleaves.',
+    desc: 'Wields an HP-backed tower shield with passive DEF buff that absorbs all incoming damage until broken, leaving him vulnerable with 50% reduced DEF.',
   },
   {
     id: 7,
@@ -1903,6 +1911,30 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: shiroConfig.projectileSpeedMultiplier || 1.0,
     ability: shiroConfig.ability || 'Disboard Chess Prodigy & Living Troops',
     desc: shiroConfig.desc || 'Mastermind of Blank 『　　』 & Living Chess Prodigy. Commands the Disboard Chessboard, flicks living chess pieces (Pawn, Knight, Bishop, Rook, Queen), executes calculated 1-by-1 grandmaster tactical maneuvers, and calculates Checkmate in 10^120 variations!',
+  },
+  {
+    id: 59,
+    name: 'SPARTAN',
+    displayName: 'SPARTAN',
+    category: 'Greek Mythology',
+    color: spartanConfig.color || '#b91c1c',
+    themeColor: spartanConfig.themeColor || '#d97706',
+    secondaryColor: '#dc2626',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.1,
+    radius: spartanConfig.radius || spartanConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'spartan',
+    hp: spartanConfig.hp || 110,
+    damage: spartanConfig.damage || 32,
+    cooldown: spartanConfig.spearCooldown || 34,
+    moveSpeed: spartanConfig.moveSpeed || spartanConfig.speed || 4.9,
+    projectileSpeedMultiplier: 1.0,
+    ability: spartanConfig.ability || 'Dory Spear & Javelin Hurl',
+    desc: spartanConfig.desc || 'Ancient Greek Hoplite. Wields a long-reach Dory spear and Hoplon bronze shield with passive deflection, hurling supersonic pinning Javelins at distant targets.',
   }
 ];
 

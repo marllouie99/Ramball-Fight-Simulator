@@ -280,21 +280,13 @@ export function drawKnightGhostModel(ctx, r) {
 }
 
 /**
- * Combat Outline Visualizer & Sword Range Radius
+ * Combat Outline Visualizer
  */
 export function drawKnightOutline(ctx, x, y, r) {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.lineWidth = 2.5;
   ctx.strokeStyle = '#94A3B8';
-  ctx.stroke();
-
-  // Draw sword range radius
-  const swordRange = CONFIG.knight?.swordRange || 60;
-  ctx.beginPath();
-  ctx.arc(x, y, r + swordRange, 0, Math.PI * 2);
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
   ctx.stroke();
 }
 

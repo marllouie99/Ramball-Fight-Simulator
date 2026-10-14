@@ -4,7 +4,7 @@ import { state, getProjectiles, triggerGlobalScreenShake } from '../../core/stat
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { FighterStateMachine, FighterState } from '../../core/fighterStateMachine.js';
-import { drawGrayShield, drawGraySword, drawGrayBrokenSword } from '../../graphics/weaponVisuals.js';
+import { drawGrayShield, drawGraySword } from '../../graphics/weaponVisuals.js';
 import { drawKnightPixelBody, drawKnightSkin, _drawKnightHair } from '../../graphics/fighters/knightSkin.js';
 
 // ─────────────────────────────────────────────
@@ -90,10 +90,18 @@ export class KnightFighter extends Fighter {
     this.shieldVisualOffset = 0; // Right side resting stance
     this.shieldHoldTimer = 0;
 
-    // Compatibility properties
-    this.swordBroken     = false;
-    this.shieldBroken    = false;
-    this.swordThrown     = false;
+    // ── Tower Shield HP, Defense Buff & Broken State Mechanics ──
+    const kConfig = CONFIG.knight || {};
+    this.shieldMaxHp = kConfig.shieldMaxHp !== undefined ? kConfig.shieldMaxHp : 90;
+    this.shieldHp = kConfig.shieldHp !== undefined ? kConfig.shieldHp : this.shieldMaxHp;
+    this.shieldPassiveDefBuff = kConfig.shieldPassiveDefBuff !== undefined ? kConfig.shieldPassiveDefBuff : 0.40;
+    this.shieldBrokenDefPenalty = kConfig.shieldBrokenDefPenalty !== undefined ? kConfig.shieldBrokenDefPenalty : 0.50;
+    this.isShieldBroken = false;
+    this.shieldBreakEffectTimer = 0;
+    this.shieldBreakParticles = [];
+    this.shieldShatterRingTimer = 0;
+    this.shieldShatterX = 0;
+    this.shieldShatterY = 0;
   }
 
   /**
@@ -146,23 +154,18 @@ export class KnightFighter extends Fighter {
     this.shieldVisualOffset = 0;
     this.shieldHoldTimer = 0;
 
-    this.swordBroken     = false;
-    this.shieldBroken    = false;
-    this.swordThrown     = false;
-  }
-
-  isDashing() {
-    return false;
-  }
-
-  isCharging() {
-    return false;
-  }
-
-  restoreWeapons() {
-    this.swordBroken = false;
-    this.shieldBroken = false;
-    this.swordThrown = false;
+    // Reset shield HP and broken state on match/round restart
+    const kConfig = CONFIG.knight || {};
+    this.shieldMaxHp = kConfig.shieldMaxHp !== undefined ? kConfig.shieldMaxHp : 90;
+    this.shieldHp = this.shieldMaxHp;
+    this.shieldPassiveDefBuff = kConfig.shieldPassiveDefBuff !== undefined ? kConfig.shieldPassiveDefBuff : 0.40;
+    this.shieldBrokenDefPenalty = kConfig.shieldBrokenDefPenalty !== undefined ? kConfig.shieldBrokenDefPenalty : 0.50;
+    this.isShieldBroken = false;
+    this.shieldBreakEffectTimer = 0;
+    this.shieldBreakParticles = [];
+    this.shieldShatterRingTimer = 0;
+    this.shieldShatterX = 0;
+    this.shieldShatterY = 0;
   }
 
   /**
@@ -247,29 +250,143 @@ export class KnightFighter extends Fighter {
     return super.canPerformBasicAttack();
   }
 
-  // ── Passive: shield block on direct projectile hits and melee attacks ──
+  /**
+   * Returns Knight's current passive DEF buff damage reduction multiplier.
+   * Full buff (e.g. 40% damage reduction) while shield is active;
+   * Loses 50% of the DEF buff (e.g. drops to 20% damage reduction) once shield is broken.
+   */
+  getDefenseBuff() {
+    const kConfig = CONFIG.knight || {};
+    const baseBuff = kConfig.shieldPassiveDefBuff !== undefined ? kConfig.shieldPassiveDefBuff : (this.shieldPassiveDefBuff ?? 0.40);
+    if (!this.isShieldBroken && this.shieldHp > 0) {
+      return baseBuff;
+    }
+    const penalty = kConfig.shieldBrokenDefPenalty !== undefined ? kConfig.shieldBrokenDefPenalty : (this.shieldBrokenDefPenalty ?? 0.50);
+    return baseBuff * (1 - penalty);
+  }
+
+  /**
+   * Triggers the shield break event when shield HP reaches 0.
+   */
+  _triggerShieldBreak(shieldAngle) {
+    this.isShieldBroken = true;
+    this.shieldHp = 0;
+    this.shieldBreakEffectTimer = 60;
+
+    const contactX = this.shieldImpactX || (this.x + Math.cos(shieldAngle || 0) * (this.r + 14));
+    const contactY = this.shieldImpactY || (this.y + Math.sin(shieldAngle || 0) * (this.r + 14));
+    this.shieldShatterRingTimer = 22;
+    this.shieldShatterX = contactX;
+    this.shieldShatterY = contactY;
+
+    // Concussive shield shatter audio
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        const breakSound = CONFIG.knight?.sounds?.shieldBreak || 'Assets/Sound Effects/SkillEffects/shield-break.mp3';
+        const breakVol = CONFIG.knight?.soundVolumes?.shieldBreak ?? 1.0;
+        audioSystem.playSFX(breakSound, breakVol);
+      }
+    } catch (e) {}
+
+    triggerGlobalScreenShake(7.0, 14);
+
+    // Floating text: "🛡️ SHIELD SHATTERED!"
+    if (typeof state !== 'undefined' && state.spawnFloatingText) {
+      state.spawnFloatingText('🛡️ SHIELD SHATTERED!', this.x, this.y - this.r - 20, {
+        color: '#ef4444',
+        font: '900 14px "Rajdhani", sans-serif',
+        rise: 26,
+        duration: 55
+      });
+    }
+
+    // Shield break particles: 32 faceted polygonal metal/gold/sheared shards
+    this.shieldBreakParticles = [];
+    const shardCount = 32;
+    const baseAngle = shieldAngle || 0;
+
+    // Shard polygon silhouettes (pre-calculated relative vertices for varied shard shapes)
+    const SHARD_SHAPES = [
+      // Large triangular shield plate fragments
+      [[-7, -4], [8, -2], [1, 7]],
+      [[-6, -6], [7, -1], [-2, 8]],
+      [[-8, 2], [3, -7], [6, 5]],
+      // Rhombus / quadrilateral armor shards
+      [[-6, -3], [5, -5], [7, 4], [-4, 6]],
+      [[-4, -5], [6, -3], [4, 6], [-5, 4]],
+      [[-5, -4], [6, -1], [3, 7], [-6, 3]],
+      // Needle-like edge splinters
+      [[-2, -7], [3, -1], [1, 8], [-2, 1]],
+      [[-1, -8], [2, 0], [0, 8], [-2, 2]],
+      // Small faceted chips
+      [[-3, -3], [4, -2], [1, 4]],
+      [[-4, -1], [3, -4], [2, 4], [-3, 3]],
+    ];
+
+    for (let i = 0; i < shardCount; i++) {
+      // Outward cone biased toward the incoming impact / outward from the shield
+      const pAngle = baseAngle + (Math.random() - 0.5) * Math.PI * 1.5;
+      const pSpeed = 3.2 + Math.random() * 6.5;
+      const shapeIdx = i % SHARD_SHAPES.length;
+      const scale = 0.75 + Math.random() * 0.9;
+      const pts = SHARD_SHAPES[shapeIdx].map(pt => [pt[0] * scale, pt[1] * scale]);
+
+      // Color distribution: steel armor, gold crest trim, dark alloy, hot sheared orange
+      let fillColor;
+      const randColor = Math.random();
+      if (randColor < 0.38) {
+        fillColor = '#2b2f38'; // Dark steel plate
+      } else if (randColor < 0.65) {
+        fillColor = '#414652'; // Mid steel plate
+      } else if (randColor < 0.88) {
+        fillColor = '#ffd700'; // Gold crest trim
+      } else {
+        fillColor = '#ff6b1a'; // Hot sheared fracture edge
+      }
+
+      this.shieldBreakParticles.push({
+        x: contactX + (Math.random() - 0.5) * 12,
+        y: contactY + (Math.random() - 0.5) * 12,
+        vx: Math.cos(pAngle) * pSpeed,
+        vy: Math.sin(pAngle) * pSpeed - (1.2 + Math.random() * 2.2), // Upward explosive pop
+        rot: Math.random() * Math.PI * 2,
+        vrot: (Math.random() - 0.5) * 0.55,
+        gravity: 0.22,
+        life: 36 + Math.floor(Math.random() * 24),
+        maxLife: 60,
+        pts: pts,
+        fillColor: fillColor,
+        strokeColor: '#0a0a0c',
+        hasHighlight: Math.random() > 0.4
+      });
+    }
+  }
+
+  // ── Passive: shield block on incoming attacks (Shield HP & Passive DEF Buff) ──
   takeDamage(amount, attacker, opts = {}) {
-    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit));
-    // Shield blocks direct projectile hits and melee attacks
-    const isBlockableHit = !!(opts.isProjectile || opts.projectile || opts.isMelee) && !isGuaranteedHit;
-    if (isBlockableHit && !(this.timeStopTimer > 0)) {
-      const blockChance = CONFIG.knight?.shieldBlockChance ?? 0.50;
-      if (Math.random() < blockChance) {
-        // Shield absorbs this hit! Trigger Shield Block Deflection Hit-Pause
-        const pauseFrames = CONFIG.knight?.blockHitPauseFrames ?? 8;
+    if (opts && (opts.isHeal || opts.heal) || amount <= 0) {
+      return super.takeDamage(amount, attacker, opts);
+    }
+
+    // ── ACTIVE SHIELD: Knight absolutely does NOT take any incoming damage to his HP as long as shield is not broken ──
+    // Absorbs ALL incoming damage sources (basic attacks, skills, projectiles, beams, explosions, domains) into the shield.
+    const isShieldActive = !this.isShieldBroken && (this.shieldHp > 0);
+
+    if (isShieldActive) {
+      // While shield is active, full passive DEF buff reduces incoming damage to the shield (unless true damage)
+      const defBuff = opts.isTrueDamage ? 0 : this.getDefenseBuff();
+      const damageToShield = Math.max(1, Math.round(amount * (1 - defBuff)));
+
+      // Deduct from shield HP
+      this.shieldHp = Math.max(0, this.shieldHp - damageToShield);
+
+      // Hit-pause & deflection effects
+      const pauseFrames = CONFIG.knight?.blockHitPauseFrames ?? 8;
+      if (this.blockHitPauseTimer <= 0) {
         this.blockHitPauseTimer = pauseFrames;
         this.blockHitPauseMax = pauseFrames;
-        this.blockFlashTimer = CONFIG.knight?.blockFlashFrames || 18;
-        this.shieldHoldTimer = CONFIG.knight?.shieldHoldFrames || 50;
-        this.shieldVisualOffset = 0.35; // Forward bracing angle!
         this.vx = 0;
         this.vy = 0;
-
-        // Calculate shield contact point for deflection shockwave & sparks (Rule 26)
-        const shieldAngle = (this.gunAngle || 0) + this.shieldVisualOffset;
-        this.shieldImpactX = this.x + Math.cos(shieldAngle) * (this.r + 14);
-        this.shieldImpactY = this.y + Math.sin(shieldAngle) * (this.r + 14);
-        this.shieldImpactTimer = 14;
 
         // If blocked a melee attacker, stagger/pause the attacker as well!
         if (opts.isMelee && attacker && attacker !== this && attacker.hp > 0 && !attacker.isDead) {
@@ -281,21 +398,64 @@ export class KnightFighter extends Fighter {
           attacker.vy = 0;
           this.blockHitPauseAttacker = attacker;
         }
+      }
 
-        // Trigger shield block sound
+      this.blockFlashTimer = CONFIG.knight?.blockFlashFrames || 18;
+      this.shieldHoldTimer = CONFIG.knight?.shieldHoldFrames || 50;
+      this.shieldVisualOffset = 0.35; // Forward bracing angle!
+
+      // Calculate shield contact point for deflection shockwave & sparks (Rule 26)
+      const shieldAngle = (this.gunAngle || 0) + this.shieldVisualOffset;
+      this.shieldImpactX = this.x + Math.cos(shieldAngle) * (this.r + 14);
+      this.shieldImpactY = this.y + Math.sin(shieldAngle) * (this.r + 14);
+      this.shieldImpactTimer = 14;
+
+      // Trigger shield block sound with audio debounce (prevents clipping during flurries)
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+      if (!this._lastShieldBlockSoundTime || now - this._lastShieldBlockSoundTime > 60) {
+        this._lastShieldBlockSoundTime = now;
         const blockSound = getSkillSound(this._def?.id, 'shieldblock');
-        if (blockSound) audioSystem.playSFX(blockSound.src, blockSound.volume);
+        const blockSrc = CONFIG.knight?.sounds?.shieldBlock || blockSound?.src || 'Assets/Sound Effects/Skills/shieldblock.mp3';
+        const blockVol = CONFIG.knight?.soundVolumes?.shieldBlock ?? blockSound?.volume ?? 0.95;
         try {
           if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('shieldblock', 0.95);
+            audioSystem.playSFX(blockSrc, blockVol);
           }
         } catch (e) {}
-
-        triggerGlobalScreenShake(3.0, 5);
-        return false; // absorbed the hit
       }
+
+      // Display floating combat damage text on the shield (amber/gold for shield absorption)
+      if (typeof state !== 'undefined' && state.spawnFloatingText && !opts.skipStandardDamageText) {
+        const textColor = (opts && opts.damageNumberColor) || (attacker && attacker.damageNumberColor) || '#eab308';
+        state.spawnFloatingText(this.x, this.y - this.r - 12, `${damageToShield}`, textColor);
+      }
+
+      // Notify attacker that damage was dealt (for passives, lifesteal, combos)
+      if (attacker && typeof attacker.onDamageDealt === 'function' && amount > 0) {
+        attacker.onDamageDealt(this, opts.projectile || null, (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(attacker) : -1, damageToShield);
+      }
+
+      triggerGlobalScreenShake(2.5, 4);
+
+      // Check if this attack shattered the shield!
+      if (this.shieldHp <= 0) {
+        this._triggerShieldBreak(shieldAngle);
+      }
+
+      // Destroy non-piercing projectile upon impact with the solid tower shield
+      if (opts && opts.projectile && !opts.projectile.isPiercing && !opts.projectile.isBeam) {
+        opts.projectile.life = 0;
+      }
+
+      // CRITICAL: Return false to indicate Knight's body HP took 0 damage while shield absorbed the hit!
+      return false;
     }
-    return super.takeDamage(amount, attacker, opts);
+
+    // ── BROKEN SHIELD / UNBLOCKED: Knight is completely vulnerable and loses 50% of his DEF buff ──
+    const brokenDefBuff = this.getDefenseBuff(); // 50% reduced DEF buff
+    const finalDamage = Math.max(1, Math.round(amount * (1 - brokenDefBuff)));
+
+    return super.takeDamage(finalDamage, attacker, opts);
   }
 
   /**
@@ -449,7 +609,9 @@ export class KnightFighter extends Fighter {
     // Anticipation flutter sound
     try {
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash1', 0.40);
+        const liftSound = CONFIG.knight?.sounds?.swordLift || 'skill_dash1';
+        const liftVol = CONFIG.knight?.soundVolumes?.swordLift ?? 0.40;
+        audioSystem.playSFX(liftSound, liftVol);
       }
     } catch (e) {}
   }
@@ -522,7 +684,9 @@ export class KnightFighter extends Fighter {
         this.swordSwingSoundPlayed = true;
         try {
           if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('attack_swordswing', 0.95);
+            const swingSound = CONFIG.knight?.sounds?.swordSwing || 'attack_swordswing';
+            const swingVol = CONFIG.knight?.soundVolumes?.swordSwing ?? 0.95;
+            audioSystem.playSFX(swingSound, swingVol);
           }
         } catch (e) {}
       }
@@ -581,8 +745,12 @@ export class KnightFighter extends Fighter {
           // Rule 30: Layered fleshy slap audio
           try {
             if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-              audioSystem.playSFX('attack_fleshhit', 1.0);
-              audioSystem.playSFX('sukuna_slice', 0.90);
+              const fleshSound = CONFIG.knight?.sounds?.fleshHit || 'attack_fleshhit';
+              const fleshVol = CONFIG.knight?.soundVolumes?.fleshHit ?? 1.0;
+              const sliceSound = CONFIG.knight?.sounds?.bladeSlice || 'sukuna_slice';
+              const sliceVol = CONFIG.knight?.soundVolumes?.bladeSlice ?? 0.90;
+              audioSystem.playSFX(fleshSound, fleshVol);
+              audioSystem.playSFX(sliceSound, sliceVol);
             }
           } catch (e) {}
 
@@ -641,7 +809,9 @@ export class KnightFighter extends Fighter {
     if (isStep2) {
       try {
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('attack_heavypunch1', 0.85);
+          const impactSound = CONFIG.knight?.sounds?.heavyImpact || 'attack_heavypunch1';
+          const impactVol = CONFIG.knight?.soundVolumes?.heavyImpact ?? 0.85;
+          audioSystem.playSFX(impactSound, impactVol);
         }
       } catch (e) {}
     }
@@ -701,7 +871,13 @@ export class KnightFighter extends Fighter {
     }
 
     if (bounced) {
-      this.playWallBounceSound();
+      const wbSound = CONFIG.knight?.sounds?.wallBounce;
+      const wbVol = CONFIG.knight?.soundVolumes?.wallBounce;
+      if (wbSound && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX(wbSound, wbVol ?? 0.50);
+      } else {
+        this.playWallBounceSound();
+      }
       // Melee approach: reflect directly toward the enemy to close combat distance!
       const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
       const dx = opponent.x - this.x;
@@ -734,6 +910,23 @@ export class KnightFighter extends Fighter {
     // 0. Rule 25: Visual effect timers decay continuously before freeze guard
     if (this.swordImpactTimer > 0) this.swordImpactTimer--;
     if (this.shieldImpactTimer > 0) this.shieldImpactTimer--;
+    if (this.shieldShatterRingTimer > 0) this.shieldShatterRingTimer--;
+    if (this.shieldBreakEffectTimer > 0) this.shieldBreakEffectTimer--;
+    if (this.shieldBreakParticles && this.shieldBreakParticles.length > 0) {
+      for (let i = this.shieldBreakParticles.length - 1; i >= 0; i--) {
+        const p = this.shieldBreakParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += p.gravity || 0.22;
+        p.rot += p.vrot;
+        p.vx *= 0.96;
+        p.vy *= 0.96;
+        p.life--;
+        if (p.life <= 0) {
+          this.shieldBreakParticles.splice(i, 1);
+        }
+      }
+    }
 
     this.handleStatusEffects();
 
@@ -805,8 +998,8 @@ export class KnightFighter extends Fighter {
       }
     }
 
-    // Lerp shield offset (rests on right flank at offset 0, braces forward at offset 0.35 during block hit-pause)
-    const targetOffset = (this.blockHitPauseTimer > 0) ? 0.35 : 0;
+    // Lerp shield offset (rests on right flank at offset 0, braces forward at offset 0.35 during block stance)
+    const targetOffset = (blocking || this.blockHitPauseTimer > 0 || this.shieldHoldTimer > 0) ? 0.35 : 0;
     this.shieldVisualOffset += (targetOffset - this.shieldVisualOffset) * 0.2;
 
     if (this.fsm) {
@@ -915,13 +1108,6 @@ export class KnightFighter extends Fighter {
   // ── Drawing ──
   drawOutline(ctx) {
     super.drawOutline(ctx);
-
-    // Draw sword range radius
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r + (CONFIG.knight?.swordRange || 75), 0, Math.PI * 2);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'rgba(158, 158, 158, 0.35)'; // Visible gray ring
-    ctx.stroke();
   }
 
   /** Draws the sword (left) and shield (right) around the body. */
@@ -953,7 +1139,7 @@ export class KnightFighter extends Fighter {
     ctx.restore();
 
     // Draw shield on the right flank
-    drawGrayShield(ctx, this.x + stx, this.y + sty, ga, this.blockFlashTimer, null, this.r, 0, shieldOffset);
+    drawGrayShield(ctx, this.x + stx, this.y + sty, ga, this.blockFlashTimer, null, this.r, 0, shieldOffset, this.isShieldBroken);
 
     // Sword: if swiping or hit-pausing, animate using 5-phase Chemical Katana combo angle; otherwise aim angle.
     const swordAngle = this._getSwordSwingAngle();
@@ -994,6 +1180,100 @@ export class KnightFighter extends Fighter {
   }
 
   draw(ctx) {
+    // ── Shield Shatter Debris & Faceted Shards ──
+    if (this.shieldBreakParticles && this.shieldBreakParticles.length > 0) {
+      ctx.save();
+      for (const p of this.shieldBreakParticles) {
+        const alpha = Math.max(0, p.life / p.maxLife);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.globalAlpha = alpha;
+
+        if (p.pts && p.pts.length >= 3) {
+          ctx.beginPath();
+          for (let j = 0; j < p.pts.length; j++) {
+            const pt = p.pts[j];
+            if (j === 0) ctx.moveTo(pt[0], pt[1]);
+            else ctx.lineTo(pt[0], pt[1]);
+          }
+          ctx.closePath();
+          ctx.fillStyle = p.fillColor || '#2b2f38';
+          ctx.fill();
+          ctx.strokeStyle = p.strokeColor || '#0a0a0c';
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
+
+          // Bright glint highlight line along one facet
+          if (p.hasHighlight) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(p.pts[0][0], p.pts[0][1]);
+            ctx.lineTo(p.pts[1][0], p.pts[1][1]);
+            ctx.stroke();
+          }
+        } else {
+          ctx.fillStyle = p.fillColor || '#eab308';
+          ctx.fillRect(-2, -2, 4, 4);
+        }
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    // ── Rule 26 Concentric Supersonic Shatter Shockwave ──
+    if (this.shieldShatterRingTimer > 0) {
+      const sp = 1 - (this.shieldShatterRingTimer / 22);
+      const ringAlpha = Math.max(0, 1 - sp);
+
+      ctx.save();
+      // Wave 1: Supersonic white core compression ring
+      const r1 = 12 + Math.pow(sp, 0.65) * 48;
+      ctx.beginPath();
+      ctx.arc(this.shieldShatterX, this.shieldShatterY, r1, 0, Math.PI * 2);
+      ctx.lineWidth = 3.0 * (1 - sp);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * ringAlpha})`;
+      ctx.stroke();
+
+      // Translucent expanding warm interior wash
+      ctx.fillStyle = `rgba(255, 180, 0, ${0.18 * ringAlpha})`;
+      ctx.fill();
+
+      // Wave 2: Staggered fiery gold/amber shockwave (pops out after sp > 0.12)
+      if (sp > 0.12) {
+        const sp2 = (sp - 0.12) / 0.88;
+        const r2 = 8 + Math.pow(sp2, 0.70) * 36;
+        ctx.beginPath();
+        ctx.arc(this.shieldShatterX, this.shieldShatterY, r2, 0, Math.PI * 2);
+        ctx.lineWidth = 2.2 * (1 - sp2);
+        ctx.strokeStyle = `rgba(255, 215, 0, ${0.85 * (1 - sp2)})`;
+        ctx.stroke();
+      }
+
+      // Wave 3: Staggered red-orange fracture ionization ring (pops out after sp > 0.24)
+      if (sp > 0.24) {
+        const sp3 = (sp - 0.24) / 0.76;
+        const r3 = 5 + Math.pow(sp3, 0.75) * 26;
+        ctx.beginPath();
+        ctx.arc(this.shieldShatterX, this.shieldShatterY, r3, 0, Math.PI * 2);
+        ctx.lineWidth = 1.6 * (1 - sp3);
+        ctx.strokeStyle = `rgba(255, 80, 20, ${0.75 * (1 - sp3)})`;
+        ctx.stroke();
+      }
+
+      // Discrete spark dots at the perimeter (Rule 26: discrete squares/dots, zero radial spokes!)
+      for (let s = 0; s < 10; s++) {
+        const sparkA = (s / 10) * Math.PI * 2 + sp * 2.2;
+        const sparkDist = 10 + sp * 40 + ((s % 3) * 5);
+        const sx = this.shieldShatterX + Math.cos(sparkA) * sparkDist;
+        const sy = this.shieldShatterY + Math.sin(sparkA) * sparkDist;
+        ctx.fillStyle = (s % 3 === 0) ? '#ffffff' : (s % 3 === 1 ? '#ffd700' : '#ff4500');
+        ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
+      }
+      ctx.restore();
+    }
+
     // ── Rule 26 Concentric Deflection Shockwave on Shield Block ──
     if (this.shieldImpactTimer > 0) {
       const ip = 1 - (this.shieldImpactTimer / 14);
@@ -1068,19 +1348,6 @@ export class KnightFighter extends Fighter {
       ctx.restore();
     }
 
-    // ——— Block expanding flash ———
-    if (this.blockFlashTimer > 0) {
-      const p = 1 - (this.blockFlashTimer / (CONFIG.knight?.blockFlashFrames || 15));
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.gunAngle + this.shieldVisualOffset);
-      ctx.translate(this.r + 5, 0);
-      ctx.beginPath();
-      ctx.arc(0, 0, 10 + p * 20, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(200, 216, 255, ${0.6 * (1 - p)})`;
-      ctx.fill();
-      ctx.restore();
-    }
 
     // ── Anime Vibe 5-Phase Melee Slash Ribbon (Chemical Katana Combo) ──
     if (this.swipeActive && this.swordSwingTimer > 0) {
@@ -1307,6 +1574,52 @@ export class KnightFighter extends Fighter {
     super.draw(ctx);
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+    this.drawShieldHealth(ctx);
+  }
+
+  /**
+   * Draws overhead shield HP bar or broken indicator above Knight's head.
+   */
+  drawShieldHealth(ctx) {
+    if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
+    if (CONFIG.hudHideOverheadHp) return;
+    if (this.hp <= 0 || this._isWinnerReveal || this._isFaceOff || this.hideHpText) return;
+
+    ctx.save();
+    const z = this.z || 0;
+    const drawY = this.y - z;
+    const barW = 34;
+    const barH = 4;
+    const barX = this.x - barW / 2;
+    const barY = drawY - this.r - 14;
+
+    const maxHp = this.shieldMaxHp || 90;
+    const curHp = Math.max(0, this.shieldHp || 0);
+    const pct = Math.max(0, Math.min(1.0, curHp / maxHp));
+
+    if (!this.isShieldBroken && curHp > 0) {
+      // Background track
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillRect(barX - 1, barY - 1, barW + 2, barH + 2);
+      // Shield HP fill (unified with Knight's theme color)
+      ctx.fillStyle = this.themeColor || this.color || '#9e9e9e';
+      ctx.fillRect(barX, barY, barW * pct, barH);
+      // Border
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
+    } else if (this.shieldBreakEffectTimer > 0) {
+      // Broken flash text
+      ctx.font = '900 10.5px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#000000';
+      ctx.strokeText('🛡️ BROKEN', this.x, barY + 4);
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('🛡️ BROKEN', this.x, barY + 4);
+    }
+    ctx.restore();
   }
 
   drawSkin(ctx) {

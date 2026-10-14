@@ -42,11 +42,40 @@ export const SKILL_SOUNDS = {
   // ── Knight ─────────────────────────────────
   // Plays when the Knight's shield successfully blocks a hit.
   6: {
-    shieldblock: {
-      src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
-      volume: 0.8,
-      delay: 0
+    get shieldblock() {
+      return {
+        src: CONFIG.knight?.sounds?.shieldBlock || 'Assets/Sound Effects/Skills/shieldblock.mp3',
+        volume: CONFIG.knight?.soundVolumes?.shieldBlock !== undefined ? CONFIG.knight.soundVolumes.shieldBlock : 0.8,
+        delay: CONFIG.knight?.soundDelays?.shieldBlock || 0
+      };
     },
+    get shield_block() { return this.shieldblock; },
+    get shieldbreak() {
+      return {
+        src: CONFIG.knight?.sounds?.shieldBreak || 'Assets/Sound Effects/SkillEffects/shield-break.mp3',
+        volume: CONFIG.knight?.soundVolumes?.shieldBreak !== undefined ? CONFIG.knight.soundVolumes.shieldBreak : 1.0,
+        delay: CONFIG.knight?.soundDelays?.shieldBreak || 0
+      };
+    },
+    get shield_break() { return this.shieldbreak; },
+  },
+  'knight': {
+    get shieldblock() {
+      return {
+        src: CONFIG.knight?.sounds?.shieldBlock || 'Assets/Sound Effects/Skills/shieldblock.mp3',
+        volume: CONFIG.knight?.soundVolumes?.shieldBlock !== undefined ? CONFIG.knight.soundVolumes.shieldBlock : 0.8,
+        delay: CONFIG.knight?.soundDelays?.shieldBlock || 0
+      };
+    },
+    get shield_block() { return this.shieldblock; },
+    get shieldbreak() {
+      return {
+        src: CONFIG.knight?.sounds?.shieldBreak || 'Assets/Sound Effects/SkillEffects/shield-break.mp3',
+        volume: CONFIG.knight?.soundVolumes?.shieldBreak !== undefined ? CONFIG.knight.soundVolumes.shieldBreak : 1.0,
+        delay: CONFIG.knight?.soundDelays?.shieldBreak || 0
+      };
+    },
+    get shield_break() { return this.shieldbreak; },
   },
 
   // ── Doppelganger ─────────────────────────────

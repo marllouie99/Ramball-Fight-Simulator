@@ -93,19 +93,28 @@ export class EyeOfCthulhuFighter extends Fighter {
     this._registerSkills();
   }
 
-  isTrappedInVortexOrBeam() {
+  isCaughtInBeam() {
     return Boolean(
+      this.caughtInPureLoveBeam ||
       this.isCaughtInPurple ||
       this.isCaughtInPurpleVortex ||
       (this.purpleHitTimer && this.purpleHitTimer > 0) ||
-      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
       this.isDraggedByGetsuga ||
       this._draggedByCruelSun ||
       this.isCaughtInCruelSun ||
       this.isCaughtInBlackHole ||
-      this._insideBlackHole ||
-      this.caughtInPureLoveBeam
+      this._insideBlackHole
     );
+  }
+
+  isTrappedInVortexOrBeam() {
+    return this.isCaughtInBeam();
+  }
+
+  clearAllAfterimages() {
+    if (this.afterImages) {
+      this.afterImages.length = 0;
+    }
   }
 
   // ── Unyielding Boss Poise: Zero Hit-Pause, Zero Flinch & Zero Basic Knockback ──
@@ -141,19 +150,19 @@ export class EyeOfCthulhuFighter extends Fighter {
       options.isPurple ||
       options.fromBlackHole ||
       this.isDraggedByGetsuga ||
-      this._draggedByCruelSun ||
-      this.isCaughtInCruelSun ||
-      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) ||
-      this.isCaughtInBlackHole ||
-      this._insideBlackHole ||
-      this.isCaughtInPurple ||
-      this.isCaughtInPurpleVortex ||
-      (this.purpleHitTimer && this.purpleHitTimer > 0)
+      this.isCaughtInBeam()
     );
 
     if (isPullOrDrag) {
       const stun = typeof stunFrames === 'number' ? stunFrames : (options.stunDuration || 0);
-      return super.applyKnockback(vx, vy, stun);
+      this.knockbackVx = (this.knockbackVx || 0) + vx;
+      this.knockbackVy = (this.knockbackVy || 0) + vy;
+      this.vx = (this.vx || 0) + vx;
+      this.vy = (this.vy || 0) + vy;
+      if (stun > 0 && !this.isKnockbackStunImmune) {
+        this.knockbackStunTimer = Math.max(this.knockbackStunTimer || 0, stun);
+      }
+      return;
     }
     // 100% Immune to standard hit knockback & push back from basic strikes and bullets
     return;
@@ -1202,7 +1211,7 @@ export class EyeOfCthulhuFighter extends Fighter {
     if (!arena) return false;
 
     // Rule 1.2: Standard CC trapping delegates to super
-    if (typeof this.isCaughtInBeam === 'function' && (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama)) {
+    if (this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama) {
       return super.resolveWallBounce(arena, opponent);
     }
 

@@ -1041,7 +1041,8 @@ function ensureTacticalCardElement(container, index, accentColor) {
 
       <!-- Middle: Clean Health Bar Track -->
       <div class="health-card__bar" style="height: 3.5px; background: rgba(255, 255, 255, 0.12); border-radius: 1.5px; overflow: hidden; position: relative;">
-        <div class="health-card__fill" style="width: 100%; height: 100%; background: ${accentColor}; border-radius: 1.5px; transition: width 0.15s ease, background 0.2s ease;"></div>
+        <div class="health-card__ghost" style="position: absolute; left: 0; top: 0; height: 100%; width: 100%; background: #dc2626; border-radius: 1.5px; z-index: 1;"></div>
+        <div class="health-card__fill" style="width: 100%; height: 100%; background: ${accentColor}; border-radius: 1.5px; position: relative; z-index: 2; transition: width 0.15s ease, background 0.2s ease;"></div>
       </div>
 
       <!-- Bottom Row: Simple Clean Minimal Text for AMMO and DMG (No cards/boxes) -->
@@ -1069,8 +1070,76 @@ function ensureTacticalCardElement(container, index, accentColor) {
     hpEl: card.querySelector('.tac-hp'),
     hpUnitEl: card.querySelector('.tac-hp-unit'),
     hpBadge: card.querySelector('.tac-hp-badge'),
-    fillEl: card.querySelector('.health-card__fill')
+    fillEl: card.querySelector('.health-card__fill'),
+    ghostEl: card.querySelector('.health-card__ghost')
   };
+}
+
+/**
+ * Updates the trailing damage ghost bar with fighting-game hold delay and smooth catch-up decay.
+ * @param {HTMLElement} ghostEl - The .health-card__ghost element
+ * @param {number} currentPct - Target HP/stamina percentage (0 - 100)
+ * @param {object} tracker - State tracking object (cachedCard, member, cardObj)
+ * @param {boolean} isSans - Whether this is Sans's stamina bar (uses amber glow)
+ */
+function updateHealthBarGhost(ghostEl, currentPct, tracker, isSans = false) {
+  if (!ghostEl || (typeof CONFIG !== 'undefined' && CONFIG.hudGhostBarEnabled === false)) return;
+
+  if (tracker.ghostHpPct === undefined) {
+    tracker.ghostHpPct = currentPct;
+    tracker.ghostHoldTimer = 0;
+    tracker.lastTargetHpPct = currentPct;
+  }
+
+  const holdFrames = (typeof CONFIG !== 'undefined' ? CONFIG.hudGhostBarHoldFrames : 8) ?? 8;
+  const lastTarget = tracker.lastTargetHpPct ?? currentPct;
+
+  // Detect fresh damage: target HP dropped lower than last frame
+  if (currentPct < lastTarget) {
+    if (currentPct <= 0) {
+      // Immediate catch-up on KO / elimination - zero delay while defeated
+      tracker.ghostHoldTimer = 0;
+    } else if (!tracker.ghostHoldTimer || tracker.ghostHoldTimer <= 0) {
+      // First damage impact: start snappy hold delay (~133ms)
+      tracker.ghostHoldTimer = holdFrames;
+    } else {
+      // Multi-hit flurry / combo: add a slight micro-buffer (+2 frames) capped at holdFrames
+      // Prevents the ghost bar from perpetually stalling indefinitely during sustained flurries/DoTs
+      tracker.ghostHoldTimer = Math.min(holdFrames, tracker.ghostHoldTimer + 2);
+    }
+  } else if (currentPct > tracker.ghostHpPct) {
+    // Immediate catch-up on heal or round reset
+    tracker.ghostHpPct = currentPct;
+    tracker.ghostHoldTimer = 0;
+  }
+  tracker.lastTargetHpPct = currentPct;
+
+  // Frame decay processing
+  if (tracker.ghostHoldTimer > 0) {
+    tracker.ghostHoldTimer--;
+  } else if (tracker.ghostHpPct > currentPct) {
+    const decay = (typeof CONFIG !== 'undefined' ? CONFIG.hudGhostBarDecaySpeed : 3.5) ?? 3.5;
+    const gap = tracker.ghostHpPct - currentPct;
+    const step = Math.max(decay, gap * 0.22);
+    if (gap <= step || gap < 0.4) {
+      tracker.ghostHpPct = currentPct;
+    } else {
+      tracker.ghostHpPct -= step;
+    }
+  } else {
+    tracker.ghostHpPct = currentPct;
+  }
+
+  // Apply to DOM via dirty-check
+  const ghostPctStr = `${Math.round(tracker.ghostHpPct * 10) / 10}%`;
+  if (tracker.lastGhostPct !== ghostPctStr) {
+    ghostEl.style.width = ghostPctStr;
+    tracker.lastGhostPct = ghostPctStr;
+  }
+  if (!isSans && typeof CONFIG !== 'undefined' && CONFIG.hudGhostBarColor && tracker.lastGhostColor !== CONFIG.hudGhostBarColor) {
+    ghostEl.style.background = CONFIG.hudGhostBarColor;
+    tracker.lastGhostColor = CONFIG.hudGhostBarColor;
+  }
 }
 
 function updateTacticalCard(cardObj, f, index, accentColor) {
@@ -1168,6 +1237,11 @@ function updateTacticalCard(cardObj, f, index, accentColor) {
     const widthStr = `${percent}%`;
     if (cardObj.fillEl.style.width !== widthStr) cardObj.fillEl.style.width = widthStr;
     if (cardObj.fillEl.style.background !== barColor) cardObj.fillEl.style.background = barColor;
+  }
+
+  // 7. Trailing Damage Ghost Bar
+  if (cardObj.ghostEl) {
+    updateHealthBarGhost(cardObj.ghostEl, percent, cardObj, false);
   }
 
   const opacityStr = isDead ? '0.35' : '1';
@@ -2274,6 +2348,7 @@ function updateHealthHud() {
 
             <!-- Red Health Bar (HP) -->
             <div class="health-card__bar hud-bar-cj" style="${(CONFIG.hudHideHealthBars || CONFIG.hudHideAll) ? 'display: none;' : ''}">
+              <div class="health-card__ghost" style="width: ${hpPercent}%;"></div>
               <div class="health-card__fill" style="width: ${hpPercent}%; background: #DC2626;"></div>
               <span class="health-card__bar-text" style="display: none;">${metaValue}</span>
             </div>
@@ -2598,6 +2673,7 @@ function updateHealthHud() {
               </svg>
               </div>
               <div class="sans-stamina-pixel-track">
+                <div class="health-card__ghost" style="width:${percent}%;"></div>
                 <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
                 <div class="sans-stamina-dividers">
                   <span class="sans-stamina-divider" style="left: 20%;"></span>
@@ -2608,6 +2684,7 @@ function updateHealthHud() {
                 <span class="health-card__bar-text">${hpText}</span>
               </div>
             ` : `
+              <div class="health-card__ghost" style="width:${percent}%;"></div>
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
             `}
@@ -2679,6 +2756,7 @@ function updateHealthHud() {
               </svg>
             </div>
             <div class="sans-stamina-pixel-track">
+              <div class="health-card__ghost" style="width:${percent}%;"></div>
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <div class="sans-stamina-dividers">
                 <span class="sans-stamina-divider" style="left: 20%;"></span>
@@ -2689,6 +2767,7 @@ function updateHealthHud() {
               <span class="health-card__bar-text">${displayValue}</span>
             </div>
           ` : `
+            <div class="health-card__ghost" style="width:${percent}%;"></div>
             <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
             <span class="health-card__bar-text">${displayValue}</span>
           `}
@@ -2770,6 +2849,7 @@ function updateHealthHud() {
               <span class="boss-card__subname" style="color: ${bossColor};">${bossSubname}</span>
             </div>
             <div class="health-card__bar boss-bar">
+              <div class="health-card__ghost" style="width: ${percent}%;"></div>
               <div class="health-card__fill" style="width: ${percent}%; background: ${barColor};"></div>
               <span class="boss-bar__text health-card__bar-text">${hpValText}</span>
             </div>
@@ -2784,6 +2864,7 @@ function updateHealthHud() {
         const bossCardEl = _cachedTopContainer.firstElementChild;
         const hpBar = bossCardEl ? bossCardEl.querySelector('.health-card__bar') : null;
         const hpBarFill = bossCardEl ? bossCardEl.querySelector('.health-card__fill') : null;
+        const hpBarGhost = bossCardEl ? bossCardEl.querySelector('.health-card__ghost') : null;
         const hpBarText = bossCardEl ? (bossCardEl.querySelector('.boss-bar__text') || bossCardEl.querySelector('.health-card__bar-text')) : null;
         const bossCardName = bossCardEl ? bossCardEl.querySelector('.boss-card__name') : null;
         const bossCardSubname = bossCardEl ? bossCardEl.querySelector('.boss-card__subname') : null;
@@ -2792,6 +2873,7 @@ function updateHealthHud() {
           cardElement: bossCardEl,
           hpBar,
           hpBarFill,
+          hpBarGhost,
           hpBarText,
           bossCardName,
           bossCardSubname,
@@ -2878,6 +2960,7 @@ function updateHealthHud() {
 
         const hpBar = cardElement.querySelector('.health-card__bar');
         const hpBarFill = cardElement.querySelector('.health-card__fill');
+        const hpBarGhost = cardElement.querySelector('.health-card__ghost');
         const hpBarText = cardElement.querySelector('.health-card__bar-text');
         const starsContainer = cardElement.querySelector('.hud-cj-stars');
         const moneyTextEl = cardElement.querySelector('.hud-cj-money-text');
@@ -2905,6 +2988,7 @@ function updateHealthHud() {
           skillsContainer,
           hpBar,
           hpBarFill,
+          hpBarGhost,
           hpBarText,
           chCardName,
           lastChName: fighterName,
@@ -2983,6 +3067,7 @@ function updateHealthHud() {
           const fill = memberEl.querySelector('.health-card__fill');
           const text = memberEl.querySelector('.health-card__bar-text');
           const bar = memberEl.querySelector('.health-card__bar');
+          const ghost = memberEl.querySelector('.health-card__ghost');
           const starsContainer = memberEl.querySelector('.hud-cj-stars');
           const moneyTextEl = memberEl.querySelector('.hud-cj-money-text');
           const weaponIconEl = memberEl.querySelector('.hud-cj-weapon-icon');
@@ -2999,7 +3084,7 @@ function updateHealthHud() {
             skillBars.set(id, { box, fill: fillEl, text: textEl });
           });
           cachedMembers.push({
-            nameEl, fill, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
+            nameEl, fill, ghost, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
             lastMoneyText: '', lastStarCount: -1, lastWeaponIcon: '', lastWeaponAmmo: '', lastClockText: '',
             infoContainer, skillsContainer, skillBars, fighter: members[i], lastInfoHTML: '',
             lastMemberName: '', lastMemberColor: ''
@@ -3120,6 +3205,7 @@ function updateHealthHud() {
 
         const hpBar = cardElement.querySelector('.health-card__bar');
         const hpBarFill = cardElement.querySelector('.health-card__fill');
+        const hpBarGhost = cardElement.querySelector('.health-card__ghost');
         const hpBarText = cardElement.querySelector('.health-card__bar-text');
         const starsContainer = cardElement.querySelector('.hud-cj-stars');
         const moneyTextEl = cardElement.querySelector('.hud-cj-money-text');
@@ -3150,6 +3236,7 @@ function updateHealthHud() {
           skillsContainer,
           hpBar,
           hpBarFill,
+          hpBarGhost,
           hpBarText,
           starsContainer,
           moneyTextEl,
@@ -3240,6 +3327,19 @@ function updateHealthHud() {
         m.fill.style.boxShadow = isCj ? '' : (glow.boxShadow || '');
         m.fill.style.filter = glow.filter || '';
         m.fill.className = glow.className || 'health-card__fill';
+
+        if (!m.ghost && m.bar) {
+          m.ghost = m.bar.querySelector('.health-card__ghost');
+          if (!m.ghost && m.fill) {
+            const ghost = document.createElement('div');
+            ghost.className = 'health-card__ghost';
+            m.bar.insertBefore(ghost, m.fill);
+            m.ghost = ghost;
+          }
+        }
+        if (m.ghost) {
+          updateHealthBarGhost(m.ghost, percent, m, isSans);
+        }
         
         if (m.bar) {
           const cjBarClass = isCj ? ' hud-bar-cj' : '';
@@ -3444,6 +3544,19 @@ function updateHealthHud() {
         cachedCard.hpBarFill.style.boxShadow = isCj ? '' : (glow.boxShadow || '');
         cachedCard.hpBarFill.style.filter = glow.filter || '';
         cachedCard.hpBarFill.className = glow.className || 'health-card__fill';
+      }
+
+      if (!cachedCard.hpBarGhost && cachedCard.hpBar) {
+        cachedCard.hpBarGhost = cachedCard.hpBar.querySelector('.health-card__ghost');
+        if (!cachedCard.hpBarGhost && cachedCard.hpBarFill) {
+          const ghost = document.createElement('div');
+          ghost.className = 'health-card__ghost';
+          cachedCard.hpBar.insertBefore(ghost, cachedCard.hpBarFill);
+          cachedCard.hpBarGhost = ghost;
+        }
+      }
+      if (cachedCard.hpBarGhost) {
+        updateHealthBarGhost(cachedCard.hpBarGhost, percent, cachedCard, isSans);
       }
 
       if (cachedCard.hpBar) {

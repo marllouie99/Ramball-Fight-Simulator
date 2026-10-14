@@ -7285,6 +7285,75 @@ async function runInteractionTests() {
     }
   }
 
+  // ── TEST 74: Eye of Cthulhu vs Ichigo Getsuga Tensho Wave Drag & Wall Pin ──
+  console.log('   74. Testing Eye of Cthulhu vs Ichigo Getsuga Tensho Wave Drag & Wall Pin...');
+  {
+    const { IchigoFighter } = await import('../js/entities/fighters/IchigoFighter.js');
+    const { EyeOfCthulhuFighter, EOC_STATE } = await import('../js/entities/fighters/EyeOfCthulhuFighter.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    const ichigo = new IchigoFighter({ x: 100, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const eye = new EyeOfCthulhuFighter({ x: 220, y: 300, radius: 32, hp: 1200, maxHp: 1200 });
+    ichigo.team = 0;
+    eye.team = 1;
+
+    const prevGetTeam = state.getFighterTeam;
+    state.getFighterTeam = (idx) => idx;
+
+    const prevMode = state.mode;
+    state.mode = '1v1';
+    state.fighters = [ichigo, eye];
+    state.projectiles = [];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, centerObstacle: null };
+    projectileSystem.projectiles = [];
+
+    try {
+      // 1. Ichigo fires Getsuga Tensho at Eye of Cthulhu
+      ichigo.gunAngle = 0; // Facing right toward Eye
+      ichigo.getsugaCastAngle = 0;
+      const getsuga = projectileSystem.fireGetsugaTensho(ichigo, 0, 15, 14, 'bankai');
+      assert(getsuga !== undefined, 'Getsuga Tensho projectile must spawn');
+
+      // Position Getsuga in front of Eye of Cthulhu
+      getsuga.x = 200;
+      getsuga.y = 300;
+      getsuga.vx = 14;
+      getsuga.vy = 0;
+      const initialEyeX = eye.x;
+
+      // Update projectile system
+      projectileSystem.update(state.fighters);
+
+      // Verify Eye of Cthulhu has isDraggedByGetsuga = true
+      assert(eye.isDraggedByGetsuga === true, 'Eye of Cthulhu must have isDraggedByGetsuga = true when struck by Getsuga Tensho');
+      assert(getsuga.draggedTargets && getsuga.draggedTargets.has(eye), 'Eye of Cthulhu must be registered in getsuga.draggedTargets');
+      assert(eye.knockbackVx > 0 || eye.vx > 0, 'Eye of Cthulhu must receive positive rightward drag velocity from Getsuga');
+
+      // Update eye with Terraria AI and verify it gets dragged rightward
+      eye.update(ichigo, 1, state.arena);
+      assert(eye.x > initialEyeX, `Eye of Cthulhu must be dragged rightward along Getsuga trajectory (initial: ${initialEyeX}, after: ${eye.x})`);
+
+      // Verify active ramming is cancelled while dragged
+      eye.isRamming = true;
+      eye.ramsRemaining = 3;
+      eye.update(ichigo, 1, state.arena);
+      assert(eye.isRamming === false, 'Eye of Cthulhu must cancel active ramming while isDraggedByGetsuga is true');
+
+      // Simulate Getsuga expiring
+      getsuga.life = 0;
+      projectileSystem.update(state.fighters);
+      assert(eye.isDraggedByGetsuga === false, 'Eye of Cthulhu isDraggedByGetsuga must clear when Getsuga expires');
+
+      console.log('      ✅ Eye of Cthulhu vs Ichigo Getsuga Tensho wave drag, ram interruption & pin release verified successfully.');
+    } finally {
+      state.getFighterTeam = prevGetTeam;
+      state.mode = prevMode;
+      state.fighters = [];
+      state.projectiles = [];
+      projectileSystem.projectiles = [];
+    }
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

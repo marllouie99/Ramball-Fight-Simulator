@@ -30,38 +30,61 @@ export const patchNotesData = {
 ],
   balanceChanges: [
     {
-        "character": "ICHIGO",
+        "character": "KNIGHT",
         "deltas": [
             {
                 "type": "ADJUST",
-                "key": "Attack",
-                "oldVal": "Zangetsu Melee Cleave ──",
-                "newVal": "Zangetsu Melee Cleave (Rule 30: 3-Hit 5-Phase Melee Combo) ──",
+                "key": "themeColor",
+                "oldVal": "#718096",
+                "newVal": "#9e9e9e",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "desc",
+                "oldVal": "Passively blocks incoming direct projectile and melee attacks with a sturdy tower shield",
+                "newVal": "Wields an HP-backed tower shield with passive DEF buff that absorbs all incoming damage until broken",
+                "pct": "Mod"
+            },
+            {
+                "type": "ADJUST",
+                "key": "shieldBlockChance",
+                "oldVal": "0.50",
+                "newVal": "1.0",
                 "pct": "Mod"
             }
         ]
     },
     {
-        "character": "MAKI",
+        "character": "SUKUNA",
         "deltas": [
             {
-                "type": "BUFF",
-                "key": "radius",
-                "oldVal": 25,
-                "newVal": 30,
-                "pct": "+20.0%"
-            }
-        ]
-    },
-    {
-        "character": "YUTA",
-        "deltas": [
-            {
-                "type": "BUFF",
-                "key": "rikaRadius",
-                "oldVal": 30,
-                "newVal": 40,
+                "type": "NERF",
+                "key": "divineFlameCooldown",
+                "oldVal": 1500,
+                "newVal": 2000,
                 "pct": "+33.3%"
+            },
+            {
+                "type": "BUFF",
+                "key": "divineFlameDamage",
+                "oldVal": 200,
+                "newVal": 500,
+                "pct": "+150.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "domainCooldown",
+                "oldVal": 2000,
+                "newVal": 1500,
+                "pct": "-25.0%"
+            },
+            {
+                "type": "BUFF",
+                "key": "domainDuration",
+                "oldVal": 300,
+                "newVal": 500,
+                "pct": "+66.7%"
             }
         ]
     }

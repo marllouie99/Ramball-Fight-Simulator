@@ -89,7 +89,7 @@ export const sukunaConfig = {
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     enableFurnace: true,              // Master toggle for Furnace (Divine Flame / Fuga)
-    divineFlameCooldown: 1500,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
+    divineFlameCooldown: 2000,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
     divineFlameChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Furnace / Fuga
     divineFlameCorridorHalfWidth: 45, // Straight corridor half-width for cardinal alignment detection (Up, Down, Left, Straight/Right)
     divineFlameDetectionAngle: Math.PI * 0.08, // Maximum angular deviation from cardinal angle (~14.4 deg)
@@ -99,7 +99,7 @@ export const sukunaConfig = {
     divineFlameDomainCooldown: 500, // Cooldown between Fuga uses inside Domain (~3.5 seconds at 60fps)
     domainFugaCooldownTickRate: 0.2,  // Rate multiplier for cooldown ticks inside Domain (4x faster recharge)
     divineFlameChargeMax: 100,      // Charge up duration (1.5 seconds)
-    divineFlameDamage: 200,         // Primary direct hit nuke damage
+    divineFlameDamage: 500,         // Primary direct hit nuke damage
     divineFlameExplosionRadius: 400, // Thermobaric nuke explosion AOE blast radius in pixels
     divineFlameExplosionDamage: 100, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
     thermobaricSplashRadius: 220,  // Thermobaric explosion splash damage radius
@@ -115,9 +115,9 @@ export const sukunaConfig = {
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
     enableDomain: true,               // Master toggle for Ultimate: Malevolent Shrine
-    domainCooldown: 2000,         // Cooldown before domain can trigger (~16.6s at 60 fps)
+    domainCooldown: 1500,         // Cooldown before domain can trigger (~16.6s at 60 fps)
     domainChargeMax: 125,         // Channeling duration before domain opens (2.0s at 60 fps)
-    domainDuration: 300,          // Domain active duration (~8.33s at 60 fps)
+    domainDuration: 500,          // Domain active duration (~8.33s at 60 fps)
     domainDamage: 7,             // Base damage per slash line hit (legacy fallback)
     domainSlashDamage: 7,        // Base damage dealt by each individual spatial cut line hit
     domainDamageInterval: 8,     // Frames between slash barrages (~3.3 waves per second)

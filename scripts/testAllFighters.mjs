@@ -238,6 +238,8 @@ async function main() {
   const { drawEscanorSkin } = await import('../js/graphics/fighters/escanorSkin.js');
   const { _getKnightHairImage, _drawKnightHair, drawKnightPixelBody, drawKnightSkin } = await import('../js/graphics/fighters/knightSkin.js');
   const { _getKnightShieldImage, _getKnightSwordImage, drawGrayShield, drawGraySword, drawGrayBrokenSword } = await import('../js/graphics/weapons/knightWeaponGraphics.js');
+  const { _getSpartanCrestImage, _drawSpartanCrest, drawSpartanPixelBody, drawSpartanSkin } = await import('../js/graphics/fighters/spartanSkin.js');
+  const { _getSpartanShieldImage, _getSpartanSpearImage, drawSpartanHoplon, drawSpartanSpear, drawSpartanJavelin, drawSpartanThrustVFX } = await import('../js/graphics/weapons/spartanWeaponGraphics.js');
 
   console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
@@ -9567,6 +9569,10 @@ async function main() {
     assertCanvasStackBalance('drawGrayShield(mockCtx, ...)');
 
     mockCtx.resetStackDepth();
+    drawGrayShield(mockCtx, 100, 100, 0, 0, 'none', 25, 0, 0, true);
+    assertCanvasStackBalance('drawGrayShield(mockCtx, ..., isBroken=true)');
+
+    mockCtx.resetStackDepth();
     drawGraySword(mockCtx, 100, 100, 0, 25, null, false, true);
     assertCanvasStackBalance('drawGraySword(mockCtx, ...)');
 
@@ -9579,8 +9585,183 @@ async function main() {
     mockCtx.resetStackDepth();
     knight.draw(mockCtx);
     assertCanvasStackBalance('knight.draw(mockCtx)');
+
+    // ── Test Knight Shield HP, DEF Buff & Broken Vulnerability ──
+    if (knight.shieldHp !== 90 || knight.isShieldBroken !== false) {
+      throw new Error(`Expected initial knight shieldHp=90, isShieldBroken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
+    }
+
+    const initialHp = knight.hp;
+    // 1. Attack active shield: 30 incoming damage, with 40% DEF buff -> 18 damage to shield
+    const hitResult = knight.takeDamage(30, null, {});
+    if (hitResult !== false) {
+      throw new Error(`Expected active shield to absorb hit (return false), got ${hitResult}`);
+    }
+    if (knight.hp !== initialHp) {
+      throw new Error(`Expected Knight HP to remain unchanged while shield active (${initialHp}), got ${knight.hp}`);
+    }
+    const expectedShieldHp = 90 - Math.round(30 * (1 - 0.40)); // 90 - 18 = 72
+    if (knight.shieldHp !== expectedShieldHp) {
+      throw new Error(`Expected shieldHp=${expectedShieldHp}, got ${knight.shieldHp}`);
+    }
+
+    // 2. Break the shield with heavy damage
+    knight.takeDamage(200, null, {});
+    if (knight.shieldHp !== 0 || knight.isShieldBroken !== true) {
+      throw new Error(`Expected shieldHp=0 and isShieldBroken=true after heavy hit, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
+    }
+    if (knight.hp !== initialHp) {
+      throw new Error(`Expected Knight HP to remain ${initialHp} on the shield-breaking blow, got ${knight.hp}`);
+    }
+
+    // 3. Knight is now completely vulnerable and loses 50% DEF (40% * 0.50 = 20% DEF)
+    const hpBeforeBrokenHit = knight.hp;
+    knight.takeDamage(30, null, {});
+    const expectedBrokenDmg = Math.round(30 * (1 - 0.20)); // 24 damage
+    const expectedHpAfter = hpBeforeBrokenHit - expectedBrokenDmg;
+    if (knight.hp !== expectedHpAfter) {
+      throw new Error(`Expected Knight HP after broken shield hit to be ${expectedHpAfter}, got ${knight.hp}`);
+    }
+
+    // 4. Test draw stack depth while broken
+    mockCtx.resetStackDepth();
+    knight.draw(mockCtx);
+    assertCanvasStackBalance('knight.draw(mockCtx) while broken');
+
+    // 5. Test reset restores shield
+    knight.reset();
+    if (knight.shieldHp !== 90 || knight.isShieldBroken !== false) {
+      throw new Error(`Expected reset to restore shieldHp=90, broken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
+    }
+
+    // 6. Test SKILL DAMAGE absorption on active shield
+    const hpBeforeSkill = knight.hp;
+    knight.timeStopTimer = 30; // Test during stasis/timeStop
+    const skillHitRes = knight.takeDamage(40, null, { isSkill: true, bypassShield: true, isSureKill: true, isDomain: true });
+    if (skillHitRes !== false) {
+      throw new Error(`Expected skill damage to be absorbed by active shield (return false), got ${skillHitRes}`);
+    }
+    if (knight.hp !== hpBeforeSkill) {
+      throw new Error(`Expected Knight HP to remain unchanged during skill hit on active shield (${hpBeforeSkill}), got ${knight.hp}`);
+    }
+    const expectedSkillShieldHp = 90 - Math.round(40 * (1 - 0.40)); // 90 - 24 = 66
+    if (knight.shieldHp !== expectedSkillShieldHp) {
+      throw new Error(`Expected shieldHp to reduce to ${expectedSkillShieldHp} after skill hit, got ${knight.shieldHp}`);
+    }
+
+    // 7. Verify drawOutline does not throw and maintains stack balance
+    mockCtx.resetStackDepth();
+    knight.drawOutline(mockCtx);
+    assertCanvasStackBalance('knight.drawOutline(mockCtx)');
   } catch (err) {
     console.error('❌ [KNIGHT MODEL ASSETS & WEAPONS TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 11.45. Spartan Model Assets, Weapons & Melee/Javelin Runtime Test
+  console.log('🏛️ [Spartan Model Assets, Hoplon & Dory Spear Test] Verifying Spartan Hoplon, Dory spear, Javelin throw, and Canvas 2D stack balance...');
+  try {
+    const spartanImg = _getSpartanCrestImage();
+    if (!spartanImg) {
+      throw new Error('_getSpartanCrestImage() returned null or undefined');
+    }
+
+    const shieldImg = _getSpartanShieldImage();
+    if (!shieldImg) {
+      throw new Error('_getSpartanShieldImage() returned null or undefined');
+    }
+
+    const spearImg = _getSpartanSpearImage();
+    if (!spearImg) {
+      throw new Error('_getSpartanSpearImage() returned null or undefined');
+    }
+
+    mockCtx.resetStackDepth();
+    _drawSpartanCrest(mockCtx, 25, false);
+    assertCanvasStackBalance('_drawSpartanCrest(mockCtx, 25, false)');
+
+    mockCtx.resetStackDepth();
+    _drawSpartanCrest(mockCtx, 25, true);
+    assertCanvasStackBalance('_drawSpartanCrest(mockCtx, 25, true)');
+
+    mockCtx.resetStackDepth();
+    drawSpartanPixelBody(mockCtx, 25);
+    assertCanvasStackBalance('drawSpartanPixelBody(mockCtx, 25)');
+
+    mockCtx.resetStackDepth();
+    drawSpartanSkin(mockCtx, { r: 25, gunAngle: 0 });
+    assertCanvasStackBalance('drawSpartanSkin(mockCtx, ...) facing right');
+
+    mockCtx.resetStackDepth();
+    drawSpartanSkin(mockCtx, { r: 25, gunAngle: Math.PI });
+    assertCanvasStackBalance('drawSpartanSkin(mockCtx, ...) facing left');
+
+    mockCtx.resetStackDepth();
+    drawSpartanHoplon(mockCtx, 100, 100, 0, 0, 25, 0);
+    assertCanvasStackBalance('drawSpartanHoplon(mockCtx, ...)');
+
+    mockCtx.resetStackDepth();
+    drawSpartanHoplon(mockCtx, 100, 100, 0, 10, 25, 0);
+    assertCanvasStackBalance('drawSpartanHoplon(mockCtx, ..., flash)');
+
+    mockCtx.resetStackDepth();
+    drawSpartanSpear(mockCtx, 100, 100, 0, 25, 0, false);
+    assertCanvasStackBalance('drawSpartanSpear(mockCtx, ...)');
+
+    mockCtx.resetStackDepth();
+    drawSpartanSpear(mockCtx, 100, 100, 0, 25, 15, true);
+    assertCanvasStackBalance('drawSpartanSpear(mockCtx, ..., thrust)');
+
+    mockCtx.resetStackDepth();
+    drawSpartanJavelin(mockCtx, 100, 100, 0, 55);
+    assertCanvasStackBalance('drawSpartanJavelin(mockCtx, ...)');
+
+    mockCtx.resetStackDepth();
+    drawSpartanThrustVFX(mockCtx, 100, 100, 0, 95, 0.5);
+    assertCanvasStackBalance('drawSpartanThrustVFX(mockCtx, ...)');
+
+    const SpartanClass = FIGHTER_CLASS_MAP.spartan;
+    if (!SpartanClass) {
+      throw new Error("FIGHTER_CLASS_MAP.spartan is undefined");
+    }
+    const spartan = new SpartanClass({ x: 200, y: 200, color: '#b91c1c', controls: {} });
+    mockCtx.resetStackDepth();
+    spartan.draw(mockCtx);
+    assertCanvasStackBalance('spartan.draw(mockCtx)');
+
+    // Test Javelin Throw initiation & committed aim lock
+    const dummyTarget = { x: 350, y: 200, hp: 100, isDead: false };
+    spartan.javelinCooldown = 0;
+    spartan._tryJavelinHurl(dummyTarget);
+    if (!spartan.isThrowingJavelin) {
+      throw new Error('Expected spartan.isThrowingJavelin to be true when distant target is available');
+    }
+    if (spartan.canAim()) {
+      throw new Error('Expected spartan.canAim() to be false during committed javelin windup');
+    }
+
+    mockCtx.resetStackDepth();
+    spartan.draw(mockCtx);
+    assertCanvasStackBalance('spartan.draw(mockCtx) during javelin windup');
+
+    // Simulate to release javelin
+    for (let f = 0; f < 20; f++) {
+      spartan.update(dummyTarget, 0, state.arena);
+    }
+    if (spartan.activeJavelins.length === 0) {
+      throw new Error('Expected spartan to spawn active javelin after windup frames elapsed');
+    }
+
+    mockCtx.resetStackDepth();
+    spartan.draw(mockCtx);
+    assertCanvasStackBalance('spartan.draw(mockCtx) with in-flight active javelin');
+
+    spartan.reset();
+    if (spartan.isThrowingJavelin || spartan.activeJavelins.length !== 0) {
+      throw new Error('Expected spartan.reset() to clear throwing state and active javelins');
+    }
+  } catch (err) {
+    console.error('❌ [SPARTAN MODEL ASSETS & WEAPONS TEST ERROR]:', err);
     errors++;
   }
 

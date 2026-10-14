@@ -90,9 +90,9 @@ export const BASIC_ATTACK_SOUNDS = {
   // ── Knight ─────────────────────────────────
   // Sword swipe melee attack. Sound plays on swing.
   6: {
-    src: 'Assets/Sound Effects/Attacks/energysword2.mp3',
-    volume: 0.7,
-    delay: 0,
+    get src() { return CONFIG.knight?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3'; },
+    get volume() { return CONFIG.knight?.soundVolumes?.swordSwing !== undefined ? CONFIG.knight.soundVolumes.swordSwing : 0.95; },
+    get delay() { return CONFIG.knight?.soundDelays?.swordSwing || 0; },
   },
 
   // ── Bomber ─────────────────────────────────
@@ -1025,9 +1025,9 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
   'knight': {
-    src: 'Assets/Sound Effects/Attacks/energysword2.mp3',
-    volume: 0.7,
-    delay: 0,
+    get src() { return CONFIG.knight?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3'; },
+    get volume() { return CONFIG.knight?.soundVolumes?.swordSwing !== undefined ? CONFIG.knight.soundVolumes.swordSwing : 0.95; },
+    get delay() { return CONFIG.knight?.soundDelays?.swordSwing || 0; },
   },
   'darkslategray': {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
@@ -1219,6 +1219,11 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   'exomech': {
     src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
     volume: 0.8,
+    delay: 0,
+  },
+  'spartan': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.9,
     delay: 0,
   }
 };
