@@ -36,6 +36,7 @@ import { drawDivineAxeRhitta } from '../weapons/escanorWeaponGraphics.js';
 import { drawRezeTacticalKnife, drawRezeWeaponPreview } from '../weapons/rezeWeaponGraphics.js';
 import { drawCrazyDaveWeapon, drawCrazyDaveShovel } from '../weapons/crazyDaveWeaponGraphics.js';
 import { drawPekkaWeapon } from '../weapons/pekkaWeaponGraphics.js';
+import { drawGutsWeaponPreview } from '../weapons/gutsWeaponGraphics.js';
 import { drawNamelessDeitySkin } from '../fighters/namelessDeitySkin.js';
 import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -1915,7 +1916,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
   else if (type === 'cronos') offsetX = -55;
   else if (type === 'ruby') offsetX = -75;
-  else if (type === 'toji' || type === 'denji' || type === 'power' || type === 'tanjiro' || type === 'zenitsu' || type === 'inosuke' || type === 'reze' || type === 'crazydave' || type === 'crazy_dave') offsetX = -40;
+  else if (type === 'toji' || type === 'denji' || type === 'power' || type === 'tanjiro' || type === 'zenitsu' || type === 'inosuke' || type === 'reze' || type === 'crazydave' || type === 'crazy_dave' || type === 'guts') offsetX = -40;
   else if (type === 'nezuko') offsetX = -35;
   else if (type === 'yuta') offsetX = -40;
   else if (type === 'megumi') offsetX = -45;
@@ -2184,13 +2185,38 @@ function drawWeaponPreview(ctx, type, color) {
       }
 
       case 'maki': {
+        const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.maki) ? state.weaponCustomizations.maki : null;
+        const offX = custom ? (custom.offsetX || 0) : 0;
+        const offY = custom ? (custom.offsetY || 0) : 0;
+        const sc = custom ? (custom.scale ?? 1.0) : 1.0;
+        const rot = custom ? (custom.angleOffset || 0) : 0;
+        const wSc = custom ? (custom.widthScale ?? 1.0) : 1.0;
+        const lSc = custom ? (custom.lengthScale ?? 1.0) : 1.0;
+        ctx.save();
+        ctx.translate(offX, offY);
+        ctx.rotate(rot);
+        ctx.scale(sc * lSc, sc * wSc);
         drawSplitSoulKatana(ctx, 0, 0, gunAngle, r);
+        ctx.restore();
         return;
       }
 
-      case 'mahoraga':
+      case 'mahoraga': {
+        const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.mahoraga) ? state.weaponCustomizations.mahoraga : null;
+        const offX = custom ? (custom.offsetX || 0) : 0;
+        const offY = custom ? (custom.offsetY || 0) : 0;
+        const sc = custom ? (custom.scale ?? 1.0) : 1.0;
+        const rot = custom ? (custom.angleOffset || 0) : 0;
+        const wSc = custom ? (custom.widthScale ?? 1.0) : 1.0;
+        const lSc = custom ? (custom.lengthScale ?? 1.0) : 1.0;
+        ctx.save();
+        ctx.translate(offX, offY);
+        ctx.rotate(rot);
+        ctx.scale(sc * lSc, sc * wSc);
         drawMahoragaSword(ctx, 0, 0, gunAngle, r);
+        ctx.restore();
         return;
+      }
 
       case 'mahito':
         drawMahitoClawWeapon(ctx, 0, 0, gunAngle, r, false);
@@ -2224,6 +2250,17 @@ function drawWeaponPreview(ctx, type, color) {
       }
 
       case 'cj': {
+        const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.cj) ? state.weaponCustomizations.cj : null;
+        const offX = custom ? (custom.offsetX || 0) : 0;
+        const offY = custom ? (custom.offsetY || 0) : 0;
+        const sc = custom ? (custom.scale ?? 1.0) : 1.0;
+        const rot = custom ? (custom.angleOffset || 0) : 0;
+        const wSc = custom ? (custom.widthScale ?? 1.0) : 1.0;
+        const lSc = custom ? (custom.lengthScale ?? 1.0) : 1.0;
+        ctx.save();
+        ctx.translate(offX, offY);
+        ctx.rotate(rot);
+        ctx.scale(sc * lSc, sc * wSc);
         const activeIndex = (state.cjWeaponIndex || 0);
         if (activeIndex === 0) {
           drawCjBrassKnuckles(ctx, 0, 0, gunAngle, r, { standalone: true });
@@ -2236,6 +2273,7 @@ function drawWeaponPreview(ctx, type, color) {
         } else {
           drawCjTec9(ctx, 0, 0, 1.35, 0, 0);
         }
+        ctx.restore();
         return;
       }
 
@@ -2280,6 +2318,10 @@ function drawWeaponPreview(ctx, type, color) {
 
       case 'pekka':
         drawPekkaWeapon(ctx, { r, angle: gunAngle, color: color || '#8B5CF6' });
+        return;
+
+      case 'guts':
+        drawGutsWeaponPreview(ctx, 0, 0, gunAngle, r, { isPreview: true });
         return;
 
       case 'namelessdeity':

@@ -32,6 +32,8 @@ export function drawMegumiShadowBlade(ctx, x = 0, y = 0, angle = 0, r = 25, isSw
     : { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
 
   const customScale = custom.scale !== undefined ? custom.scale : 1.0;
+  const customWidthScale = custom.widthScale !== undefined ? custom.widthScale : 1.0;
+  const customLengthScale = custom.lengthScale !== undefined ? custom.lengthScale : 1.0;
   const customOffsetX = custom.offsetX !== undefined ? custom.offsetX : 0;
   const customOffsetY = custom.offsetY !== undefined ? custom.offsetY : 0;
   const customAngle = custom.angleOffset !== undefined ? custom.angleOffset : 0;
@@ -39,7 +41,7 @@ export function drawMegumiShadowBlade(ctx, x = 0, y = 0, angle = 0, r = 25, isSw
   ctx.save();
   ctx.translate(x + customOffsetX, y + customOffsetY);
   ctx.rotate(angle + customAngle);
-  ctx.scale(customScale, customScale);
+  ctx.scale(customScale * customLengthScale, customScale * customWidthScale);
 
   const scale = r / 25;
 

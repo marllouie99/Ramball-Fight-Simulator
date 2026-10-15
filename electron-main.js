@@ -218,6 +218,21 @@ ipcMain.handle('save-skin-database', async (event, { codeContent }) => {
   }
 });
 
+// Auto-export & sync weapon customizations database to disk (js/configs/weaponCustomizationsDatabase.js)
+ipcMain.handle('save-weapon-database', async (event, { codeContent }) => {
+  try {
+    if (typeof codeContent !== 'string' || !codeContent.includes('WEAPON_CUSTOMIZATIONS_DATABASE')) {
+      throw new Error('Invalid codeContent: Expected valid WEAPON_CUSTOMIZATIONS_DATABASE module.');
+    }
+    const dbPath = path.join(__dirname, 'js', 'configs', 'weaponCustomizationsDatabase.js');
+    fs.writeFileSync(dbPath, codeContent, 'utf-8');
+    return { success: true, filePath: dbPath };
+  } catch (err) {
+    console.error('Error in save-weapon-database IPC:', err);
+    return { success: false, error: err.message };
+  }
+});
+
 // Dynamic Desktop Window Resizing IPC Handlers (Vertical 9:16 <-> Horizontal 16:9)
 let currentWindowOrientation = 'vertical';
 ipcMain.handle('set-window-orientation', async (event, orientation) => {

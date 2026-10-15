@@ -41,7 +41,49 @@ The blade literally locks into the impact plane (embedded in the ground, struck 
 | **Phase 2** | **Poised Hold** | `2–4 frames` (~0.03–0.06s) | Weapon pauses at peak anticipation load (Escanor poised hold). | Stationary, high spring potential energy. | Pure silence or wind draw. |
 | **Phase 3** | **Hypersonic Whip Strike** | `5–8 frames` (~0.08–0.13s) | Explosive acceleration into the cleave plane with exponential power curve (`Math.pow(sp, 2.2)` to `2.6`). | Lunging forward momentum impulse (`lungeSpeed * Math.sin(strikeP * π)`). | Whip swoosh (`attack_swordswing` / `skill_spinslash`). Trigger damage & impact at `strikeP >= 0.50`. |
 | **Phase 4** | **THE IMPACT LOCK / LATCH** *(The Key!)* | `5–7 frames` (~0.08–0.12s) | **Firmly locked/latched in impact plane** (embedded in floor, struck in flesh, or locked at apex, e.g. `weaponRot = 1.10`, `weaponLunge = 24px`, `weaponOffY = 14px`). | **Forward velocity clamped to zero** (`this.vx = 0; this.vy = 0;`), simulating hard collision. | **Slap audio** (`attack_fleshhit` + `sukuna_slice`), screen shake, micro-tremor jitter (`±2.2px`), slash ribbon held on plane, compression ring & sparks. |
-| **Phase 5** | **Extraction & Recovery Settle** | `9–12 frames` (~0.15–0.20s) | Weapon dislodges from impact plane and returns to guard stance with spring-damped settle (`(1 - rp)^1.8` + harmonic rebound). | Off-hand returns to canonical flank `(±0.82r, +0.38r)`. | Dynamic eraser wipe dissolves the slash ribbon from tail to tip (Rule 15). |
+| **Phase 5** | **Extraction & Recovery Settle** | `9–12 frames` (~0.15–0.20s) | Weapon dislodges from impact plane and returns to guard stance with spring-damped settle (`(1 - rp)^1.8` + harmonic rebound). | Off-hand returns to canonical flank `(±0.82r, +0.38r)`. Body absorbs backward recoil kickback (`vx -= cos(angle) * recoilKick`). | Dynamic eraser wipe dissolves the slash ribbon from tail to tip (Rule 15). |
+
+---
+
+## 2.1 Mandatory Arm Animation & Physical Force Linkages Standard (Anti-Detached Hands)
+
+### The Problem: Detached Hands & Pivot-Only "Propeller" Swings
+When a weapon rotates strictly around a single static pivot `(0, 0)` with hands floating as disconnected circles, the attack feels completely weightless—like a helicopter propeller spinning with no muscle or bodily leverage.
+
+### The Standard: 4 Pillars of Melee Arm Physics Force
+Whenever rendering, scaffolding, or animating melee weapon attacks:
+
+1. **Dynamic Arm Linkage Rendering (Shoulders to Grip)**:
+   - **STRICT PROHIBITION of Disconnected Floating Hands**: Arms MUST NOT be omitted or left as detached circles floating near the body edge.
+   - Renderers MUST draw dynamic arm segments (upper arm, elbow flex, forearm strokes/polygons matching character skin tone, sleeves, or armor plating) bridging directly from the shoulders/torso flanks `(x: ±r * 0.65, y: r * 0.22)` to the hands gripping the weapon.
+   - For armored or sleeve-wearing characters, draw distinct limb polygons or thick rounded strokes (`lineWidth = handRadius * 1.6`) underneath the hands.
+
+2. **Bodily Kinetic Force Transfer (Translational Lunge & Vertical Dip)**:
+   - Melee attacks MUST translate dynamically through space via `_getSwordSwingOffsets()` (or `weaponLunge` / `weaponOffY`), NEVER rotate about a static axis:
+     - **Phase 1 (Coil / Lift)**: Arms and weapon pull backward into tension (`lunge = -coilBack`, `offY = -liftY`).
+     - **Phase 3 (Hypersonic Whip Strike)**: Upper body muscles thrust forward, driving the hands and weapon into the cleave plane with exponential power ease (`lunge = -coilBack + (maxLunge + coilBack) * Math.pow(sp, 2.5)`, `offY = -liftY + (cleaveDip + liftY) * Math.pow(sp, 2.5)`).
+     - **Phase 4 (Impact Lock)**: Hands and arms remain locked at full extension (`lunge = maxLunge`, `offY = cleaveDip`), sustaining target collision force.
+
+3. **Push-Pull Muscular Lever Mechanics (Dual Hands)**:
+   - For 2-handed weapons (greatswords, katanas, polearms, axes):
+     - **Main Hand (crossguard / upper hilt)**: Acts as the forward driving fulcrum lever.
+     - **Off-Hand (pommel / lower grip)**: Pulls backward or guides counter-torque, visibly levering the blade through the cutting plane.
+   - Synchronize slash ribbon origins to follow the dynamic hand translation `(x + lunge, y + offY)` so the arc erupts from the physical cleave locus.
+
+4. **Kinetic Recoil Kickback & Elastic Muscle Settle**:
+   - In **Phase 5 (Recovery Settle)**, arresting the inertia of swinging heavy steel requires physical muscle recoil:
+     - Apply a physical backward velocity recoil impulse on the fighter entity:
+       ```javascript
+       this.vx -= Math.cos(this.swordSlashAngle) * recoilKick;
+       this.vy -= Math.sin(this.swordSlashAngle) * recoilKick;
+       ```
+     - Apply damped harmonic spring oscillation to the weapon and arms:
+       ```javascript
+       const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
+       weaponRot = (lockAngle * settleEase) - (recoilAngle * springWave);
+       weaponLunge = (maxLunge * settleEase) - (recoilDist * springWave);
+       ```
+     - Screen shake on whiff and impact (`triggerGlobalScreenShake(2.5, 4)`).
 
 ---
 
@@ -300,6 +342,9 @@ ctx.rotate(baseAngle);
 - [ ] **NEVER detonate impact sparks in mid-blade**: Sparks and compression rings must explode at `tipDist = r + hiltOffset + bladeLength`.
 - [ ] **NEVER use single-sound whooshes**: Always layer `attack_fleshhit` for the fleshy slap.
 - [ ] **Always anchor to canonical hands (Rule 20)**: Right hand at `(+0.82r, +0.38r)`, Left hand at `(-0.82r, +0.38r)`.
+- [ ] **Always render dynamic arm linkages from shoulders to hands (Section 2.1)**: Connect shoulders `(±r * 0.65, r * 0.22)` directly to hands with upper/forearm segments. Zero detached floating hands.
+- [ ] **Always translate hands with bodily kinetic force (Section 2.1)**: Hands and weapon hilt must move forward via `lunge` and vertical dip (`offY`), not rotate statically at `(0, 0)`.
+- [ ] **Always apply backward recoil impulse and spring damping (Section 2.1)**: Heavy swings must kick back on the body (`this.vx -= Math.cos(angle) * recoilKick`) with damped spring settle.
 - [ ] **Always decay effect timers before freeze guard (Rule 25)**: `swordHitTremorTimer` must update before `_handleTimeStop()`.
 - [ ] **Always use concentric rings for ground impact (Rule 26)**: No radial spiderweb meshes or cobweb lines.
 - [ ] **Reference Implementation**: See [chemical-katana-animator](file:///c:/Users/asus/OneDrive/Desktop/Circle%20Mini-Battle/.agents/skills/chemical-katana-animator/SKILL.md) for the 2-hit Chemical Katana combo specification (Horizontal Cross Cleave & Upward Rising Scoop).

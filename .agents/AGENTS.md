@@ -360,8 +360,18 @@ After completing ANY code modification, update, or fix in the project, the agent
 - **Natural Breathing Frame Sequences**: Sprite breathing/idle animations MUST follow true physiological inhale/exhale cycles (e.g. Denji `[0, 2, 1, 3, 5, 4]` at $9\text{ ticks/frame} \approx 6.7\text{ FPS}$). Multi-frame sprite sheet dolls MUST NOT have artificial external vertical $Y$-bobbing applied on top of built-in breathing frames.
 - **Continuous 60 FPS Real-Time Timing**: Always derive doll animation ticks from continuous high-resolution timestamps (`performance.now()`) to ensure fluid, uninterrupted frame cycling across all match states.
 
-### 4.5 Mandatory 5-Phase Melee Combat Animation & Impact Lock Standard (Rule 30)
-- **STRICT PROHIBITION of Weightless Snappy Swings**: NEVER implement melee attacks that transition immediately from the swing stroke into recovery on the exact frame the stroke finishes. Doing so creates an unsatisfying, snappy, floaty swing that feels like a rubber band snapping back or bouncing off thin air.
+### 4.5 Mandatory 5-Phase Melee Combat Animation, Impact Lock & Arm Physical Force Standard (Rule 30)
+- **STRICT PROHIBITION of Weightless Snappy Swings & Detached Floating Hands**:
+  - NEVER implement melee attacks that transition immediately from the swing stroke into recovery on the exact frame the stroke finishes. Doing so creates an unsatisfying, snappy, floaty swing that feels like a rubber band snapping back or bouncing off thin air.
+  - NEVER render weapons with disconnected, floating hands rotating around a static body center `(0, 0)` with no bodily leverage.
+- **Mandatory Muscular Arm Linkages & Physical Force Drive**:
+  - **Dynamic Arm Linkage Rendering (Shoulders to Grip)**: Renderers MUST explicitly draw dynamic arm segments (upper arm, elbow flexion, forearm polygons or strokes matching character skin tone, sleeves, or armor) connecting the fighter's shoulders/torso flanks (`±r * 0.65, r * 0.22`) directly to the hands gripping the weapon.
+  - **Bodily Kinetic Force Transfer (Translational Lunge & Dip)**: Hands and weapon hilt MUST translate dynamically through space via `_getSwordSwingOffsets()` (`lunge`, `offY`) rather than rotating statically around `(0, 0)`:
+    - **Phase 1 (Coil / Lift)**: Arms and weapon pull backward into tension (`lunge = -coilBack`, `offY = -liftY`).
+    - **Phase 3 (Hypersonic Whip Strike)**: Upper body muscles thrust forward, driving hands and weapon into the cleave plane with exponential power ease (`Math.pow(sp, 2.5)`).
+    - **Phase 4 (Impact Lock)**: Hands and arms remain locked at full extension (`lunge = maxLunge`, `offY = cleaveDip`), sustaining target collision force.
+  - **Push-Pull Muscular Lever Mechanics (Dual Hands)**: For 2-handed weapons, the main hand (near crossguard) acts as the forward driving fulcrum lever while the off-hand (near pommel) pulls backward or guides counter-torque, visibly levering the blade through the cutting plane.
+  - **Kinetic Recoil Kickback & Elastic Muscle Settle**: In Phase 5 (Recovery Settle), arresting the inertia of swinging heavy steel MUST apply a physical backward velocity recoil impulse on the fighter entity (`this.vx -= Math.cos(angle) * recoilKick`), screen rumble (`triggerGlobalScreenShake(2.5, 4)`), and spring-damped arm recovery oscillation (`Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2)`).
 - **Mandatory 5-Phase Animation Architecture**: All melee swings MUST implement the 5-phase timing lifecycle across config (`js/configs/characters/<name>Config.js`), weapon renderer (`js/graphics/weapons/*WeaponGraphics.js`), and entity loop (`js/entities/fighters/*Fighter.js`):
   1. **Phase 1: Coil / Lift (`hit*LiftFrames`, ~6–8 frames)**: Smooth backward anticipation lift drawing arms and blade into potential energy load (`Math.sin(wp * Math.PI * 0.5)`).
   2. **Phase 2: Poised Hold (`hit*HoldFrames`, ~2–4 frames)**: Tense pause at apex of anticipation (Escanor poised hold) before releasing the strike.

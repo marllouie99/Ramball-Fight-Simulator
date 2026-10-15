@@ -2547,6 +2547,86 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }];
   }
 
+  // ─────────────────────────────────────────────
+  // GUTS (The Black Swordsman / The Struggler)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'guts' || f.type === 'guts' || (f.name && f.name.toLowerCase() === 'guts')) {
+    const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.guts || CONFIG.Guts)) ? (CONFIG.guts || CONFIG.Guts) : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#71717a';
+    const skills = [];
+
+    // 1. Skill 1: Prosthetic Arm Cannon & Repeating Crossbow (Toggle: enableArmCannon)
+    if (isSkillEnabled(cfg.enableArmCannon, cfg.enableCannon, cfg.enableSkill1, true)) {
+      const cannonMax = f.cannonCooldownMax || cfg.cannonCooldownMax || 420;
+      const cannonCd = f.cannonCooldown !== undefined ? f.cannonCooldown : 0;
+      const cannonPct = Math.max(0, Math.min(100, (1 - (cannonCd / cannonMax)) * 100));
+      skills.push({
+        id: 'cannon',
+        pct: cannonPct,
+        ready: cannonPct >= 99 && cannonCd <= 0,
+        color: '#f59e0b',
+        label: 'WRIST CANNON / BOLTS'
+      });
+    }
+
+    // 2. Skill 2: Iron Cyclone Cleave (Toggle: enableCyclone)
+    if (isSkillEnabled(cfg.enableCyclone, cfg.enableIronCyclone, cfg.enableSkill2, true)) {
+      const cycloneMax = f.cycloneCooldownMax || cfg.cycloneCooldownMax || 540;
+      const cycloneCd = f.cycloneCooldown !== undefined ? f.cycloneCooldown : 0;
+      const cycloneActive = f.cycloneTimer || 0;
+      const totalActive = cfg.cycloneDuration || 30;
+      let cyclonePct = 0;
+      let label = 'CYCLONE CLEAVE';
+
+      if (cycloneActive > 0) {
+        cyclonePct = Math.max(0, Math.min(100, (cycloneActive / totalActive) * 100));
+        label = 'CYCLONE SPINNING...';
+      } else {
+        cyclonePct = Math.max(0, Math.min(100, (1 - (cycloneCd / cycloneMax)) * 100));
+      }
+
+      skills.push({
+        id: 'cyclone',
+        pct: cyclonePct,
+        ready: cyclonePct >= 99 && cycloneCd <= 0 && cycloneActive <= 0,
+        color: themeColor,
+        label: label
+      });
+    }
+
+    // 3. Ultimate Skill: Berserker Armor Awakening (Toggle: enableBerserkerArmor)
+    if (isSkillEnabled(cfg.enableBerserkerArmor, cfg.enableBerserker, cfg.enableUltimate, true)) {
+      const berserkerMax = f.berserkerCooldownMax || cfg.berserkerCooldownMax || 1800;
+      const berserkerCd = f.berserkerCooldown !== undefined ? f.berserkerCooldown : 0;
+      const berserkerActive = f.berserkerTimer || 0;
+      const totalActive = cfg.berserkerDuration || 600;
+      let berserkerPct = 0;
+      let isReady = false;
+      let label = 'BERSERKER ARMOR';
+
+      if (berserkerActive > 0) {
+        berserkerPct = Math.max(0, Math.min(100, (berserkerActive / totalActive) * 100));
+        label = `BERSERKER FRENZY (${(berserkerActive / 60).toFixed(1)}s)`;
+      } else {
+        berserkerPct = Math.max(0, Math.min(100, (1 - (berserkerCd / berserkerMax)) * 100));
+        isReady = berserkerPct >= 99 && berserkerCd <= 0;
+      }
+
+      skills.push({
+        id: 'berserker',
+        pct: berserkerPct,
+        ready: isReady,
+        color: '#dc2626',
+        label: label,
+        isUltimate: true,
+        isSignature: true,
+        signature: true
+      });
+    }
+
+    return skills;
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
     return [];
   }
@@ -2633,7 +2713,8 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     avatar_of_emptiness: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
     avatar: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
     shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction'],
-    spartan: ['javelin_throw', 'javelin', 'JAVELIN']
+    spartan: ['javelin_throw', 'javelin', 'JAVELIN'],
+    guts: ['berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON']
   };
 
   const keys = signatureMap[fId];

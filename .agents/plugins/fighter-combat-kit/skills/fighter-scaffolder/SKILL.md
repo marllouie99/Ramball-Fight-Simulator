@@ -99,8 +99,12 @@ super.update(opponent, ownerIndex, arena);
 - **Decay Before Freeze Guard**: Always update and decay transient visual effect arrays (explosions, slashes, particle bursts, shockwave rings) at the top of `update()` before `_handleTimeStop()`.
 - **Interrupt / Death Cleanup**: Clear effect arrays or decouple them to world space on `interruptAttacks(forceCancelAll = true)` or defeat so visual effects never freeze or stay stuck on screen when character movement is stopped.
 
-### 10. Mandatory 5-Phase Melee Combat Animation & Impact Lock Standard (Rule 30)
-- **No Weightless Snappy Swings**: When scaffolding melee weapon fighters (swords, axes, scythes, daggers), NEVER transition directly from swing to recovery on the same frame.
+### 10. Mandatory 5-Phase Melee Combat Animation, Impact Lock & Arm Physical Force Standard (Rule 30)
+- **No Weightless Snappy Swings & Zero Floating Hands**: When scaffolding melee weapon fighters (swords, axes, scythes, daggers), NEVER transition directly from swing to recovery on the same frame, and NEVER render weapons with disconnected floating hands rotating around a static body center `(0, 0)`.
+- **Mandatory Dynamic Arm Linkages & Physical Force Drive**:
+  - **Dynamic Arm Segments**: Render explicit arm segments (upper arm, elbow flexion, forearm polygons or strokes matching character skin tone, sleeves, or armor) connecting the fighter's shoulders/torso flanks (`±r * 0.65, r * 0.22`) directly to the hands gripping the weapon.
+  - **Bodily Kinetic Force Transfer**: Hands and weapon hilt MUST translate dynamically through space via `_getSwordSwingOffsets()` (`lunge`, `offY`), pulling back during Phase 1 (Coil), thrusting forward into the cleave plane during Phase 3 (Strike), and locking at full extension during Phase 4 (Impact Lock).
+  - **Recoil Kickback & Elastic Settle**: Heavy swings MUST apply a backward recoil velocity impulse on the fighter entity (`this.vx -= Math.cos(angle) * recoilKick`), screen rumble (`triggerGlobalScreenShake(2.5, 4)`), and spring-damped arm recovery oscillation (`Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2)`).
 - **5-Phase Lifecycle**: Implement all 5 distinct phases across config, renderer, and entity update:
   1. **Lift / Coil** (`hit*LiftFrames`, ~6–8f)
   2. **Poised Hold** (`hit*HoldFrames`, ~2–4f)

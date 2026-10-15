@@ -49,6 +49,7 @@ import { eyeOfCthulhuConfig } from '../configs/characters/eyeOfCthulhuConfig.js'
 import { enderDragonConfig } from '../configs/characters/enderDragonConfig.js';
 import { knightConfig } from '../configs/characters/knightConfig.js';
 import { spartanConfig } from '../configs/characters/spartanConfig.js';
+import { gutsConfig } from '../configs/characters/gutsConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { interactionConfigs } from '../configs/interactions/index.js';
@@ -135,6 +136,9 @@ export const CONFIG = {
   Knight: knightConfig,
   spartan: spartanConfig,
   Spartan: spartanConfig,
+  guts: gutsConfig,
+  Guts: gutsConfig,
+  berserker: gutsConfig,
   camera: {
     minZoom: 0.65,
     maxZoom: 1.18,
@@ -1935,6 +1939,30 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: spartanConfig.ability || 'Dory Spear & Javelin Hurl',
     desc: spartanConfig.desc || 'Ancient Greek Hoplite. Wields a long-reach Dory spear and Hoplon bronze shield with passive deflection, hurling supersonic pinning Javelins at distant targets.',
+  },
+  {
+    id: 60,
+    name: 'GUTS',
+    displayName: 'GUTS',
+    category: 'Anime & Dark Fantasy',
+    color: gutsConfig.color || '#18181b',
+    themeColor: gutsConfig.themeColor || '#71717a',
+    secondaryColor: '#dc2626',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.1,
+    radius: gutsConfig.radius || gutsConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'guts',
+    hp: gutsConfig.hp || 460,
+    damage: gutsConfig.damage || 36,
+    cooldown: gutsConfig.cooldown || 36,
+    moveSpeed: gutsConfig.moveSpeed || gutsConfig.speed || 4.6,
+    projectileSpeedMultiplier: 1.0,
+    ability: gutsConfig.ability || 'Dragon Slayer & Berserker Armor',
+    desc: gutsConfig.desc || 'Wielder of the monstrous 400-pound Dragon Slayer. Struggles against fate with unyielding poise, a high-explosive arm cannon, and the dwarf-forged Berserker Armor.',
   }
 ];
 

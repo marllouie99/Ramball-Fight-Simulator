@@ -94,6 +94,26 @@ export const DOLL_METADATA = {
     drawH: 155,
     facingRight: false,
   },
+  guts: {
+    src: 'Assets/model/Guts/Guts_battle_stance.png',
+    srcCountdown: 'Assets/model/Guts/Guts_neutral_countdown.png',
+    type: 'static',
+    drawW: 205,
+    drawH: 155,
+    countdownDrawW: 145,
+    countdownDrawH: 175,
+    facingRight: true,
+  },
+  berserker: {
+    src: 'Assets/model/Guts/Guts_battle_stance.png',
+    srcCountdown: 'Assets/model/Guts/Guts_neutral_countdown.png',
+    type: 'static',
+    drawW: 205,
+    drawH: 155,
+    countdownDrawW: 145,
+    countdownDrawH: 175,
+    facingRight: true,
+  },
 };
 
 /**
@@ -187,8 +207,10 @@ function drawSingleFighterDoll(ctx, fighter, fighterData, side, arena, tick, isD
   ctx.fill();
   ctx.restore();
 
-  // 2. Resolve Doll Asset
-  const img = dollMeta ? getDollImage(dollMeta.src) : null;
+  // 2. Resolve Doll Asset (Switches between Countdown Neutral Stance and Match Battle Stance)
+  const isCountdown = (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'select' || state.gameState === 'faceoff')) || Boolean(fighter?.isCountdownStance);
+  const dollSrc = (isCountdown && dollMeta?.srcCountdown) ? dollMeta.srcCountdown : (dollMeta?.src || null);
+  const img = dollSrc ? getDollImage(dollSrc) : null;
 
   ctx.save();
   ctx.translate(centerX + shakeX, baselineY + bounceY);
@@ -238,8 +260,8 @@ function drawSingleFighterDoll(ctx, fighter, fighterData, side, arena, tick, isD
       );
     } else {
       // Static doll / skin PNG
-      const dw = dollMeta.drawW || 155;
-      const dh = dollMeta.drawH || 155;
+      const dw = (isCountdown && dollMeta.countdownDrawW) ? dollMeta.countdownDrawW : (dollMeta.drawW || 155);
+      const dh = (isCountdown && dollMeta.countdownDrawH) ? dollMeta.countdownDrawH : (dollMeta.drawH || 155);
       ctx.drawImage(img, -dw / 2, -dh, dw, dh);
     }
   } else if (typeof fighter.drawBody === 'function') {

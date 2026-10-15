@@ -183,12 +183,25 @@ import {
   generateDatabaseModuleCode
 } from '../configs/skinCustomizationsDatabase.js';
 
+import {
+  WEAPON_CUSTOMIZATIONS_DATABASE,
+  DEFAULT_WEAPON_CUSTOMIZATIONS,
+  getWeaponDatabaseDefault,
+  getAllWeaponDatabaseDefaults,
+  generateWeaponDatabaseModuleCode
+} from '../configs/weaponCustomizationsDatabase.js';
+
 export {
   SKIN_CUSTOMIZATIONS_DATABASE,
   DEFAULT_SKIN_CUSTOMIZATIONS,
   getDatabaseDefault,
   getAllDatabaseDefaults,
-  generateDatabaseModuleCode
+  generateDatabaseModuleCode,
+  WEAPON_CUSTOMIZATIONS_DATABASE,
+  DEFAULT_WEAPON_CUSTOMIZATIONS,
+  getWeaponDatabaseDefault,
+  getAllWeaponDatabaseDefaults,
+  generateWeaponDatabaseModuleCode
 };
 
 // ─────────────────────────────────────────────
@@ -268,22 +281,8 @@ export const state = {
   },
 
   // Unified Weapon Customizer / Studio State
-  weaponCustomizations: {
-    mahito: {
-      blades: [
-        { idx: 0, knuckleX: 3.0, knuckleY: -6.5, fanAngle: -0.32, length: 82, heelWidth: 14.0, topArchY: -14.0, tipY: 16.0 },
-        { idx: 1, knuckleX: 5.0, knuckleY: -3.8, fanAngle: -0.22, length: 88, heelWidth: 15.5, topArchY: -9.0, tipY: 18.0 },
-        { idx: 2, knuckleX: 6.0, knuckleY: -0.8, fanAngle: -0.06, length: 84, heelWidth: 15.0, topArchY: -3.0, tipY: 24.0 },
-        { idx: 3, knuckleX: 1.5, knuckleY: 9.0, fanAngle: 0.48, length: 80, heelWidth: 14.5, topArchY: 18.0, tipY: -22.0 }
-      ]
-    },
-    yuta: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-    toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-    cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-    ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-    nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-    engineer: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0, widthScale: 1.0, lengthScale: 1.0 }
-  },
+  weaponCustomizations: getAllWeaponDatabaseDefaults(),
+  defaultWeaponCustomizations: getAllWeaponDatabaseDefaults(),
   mahitoClawCustomBlades: null,
 
   indexCategory: 'All',
@@ -719,29 +718,134 @@ export function loadLeaderboard() {
   }
 }
 
-// Save weapon customizations to localStorage
+// Auto-export weapon customizations database to disk when running in desktop Electron environment
+export function autoExportWeaponDatabaseToDisk() {
+  if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.saveWeaponDatabase === 'function') {
+    try {
+      const code = generateWeaponDatabaseModuleCode(state.weaponCustomizations);
+      window.electronAPI.saveWeaponDatabase({ codeContent: code }).then((res) => {
+        if (res && res.success) {
+          console.log('💾 [Weapon Database Auto-Export] Successfully synced to', res.filePath);
+        }
+      }).catch((e) => {
+        console.warn('Auto-export weapon database failed:', e);
+      });
+    } catch (e) {
+      console.warn('Could not generate weapon database code for auto-export:', e);
+    }
+  }
+}
+
+// Save weapon customizations & user-defined defaults to localStorage and auto-export to disk
 export function saveWeaponCustomizations() {
   try {
-    localStorage.setItem('circleMiniBattleWeaponCustomizations', JSON.stringify(state.weaponCustomizations));
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('circleMiniBattleWeaponCustomizations', JSON.stringify(state.weaponCustomizations || {}));
+      if (state.defaultWeaponCustomizations) {
+        localStorage.setItem('circleMiniBattleWeaponDefaults', JSON.stringify(state.defaultWeaponCustomizations));
+      }
+    }
+    autoExportWeaponDatabaseToDisk();
   } catch (e) {
     console.warn('Could not save weapon customizations:', e);
   }
 }
 
-// Load weapon customizations from localStorage
+// Load weapon customizations from database & localStorage
 export function loadWeaponCustomizations() {
   try {
-    const saved = localStorage.getItem('circleMiniBattleWeaponCustomizations');
-    if (saved) {
-      state.weaponCustomizations = JSON.parse(saved);
-      // Sync mahitoClawCustomBlades with the loaded data
-      if (state.weaponCustomizations.mahito && state.weaponCustomizations.mahito.blades) {
-        state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+    // 1. Always initialize with fresh database defaults from weaponCustomizationsDatabase.js
+    state.weaponCustomizations = getAllWeaponDatabaseDefaults();
+    state.defaultWeaponCustomizations = getAllWeaponDatabaseDefaults();
+
+    if (typeof localStorage !== 'undefined') {
+      // 2. Load user-saved defaults if present
+      const savedDefaults = localStorage.getItem('circleMiniBattleWeaponDefaults');
+      if (savedDefaults) {
+        const parsedDefaults = JSON.parse(savedDefaults);
+        for (const k in parsedDefaults) {
+          state.defaultWeaponCustomizations[k] = Object.assign({}, state.defaultWeaponCustomizations[k] || {}, parsedDefaults[k]);
+          state.weaponCustomizations[k] = Object.assign({}, state.weaponCustomizations[k] || {}, parsedDefaults[k]);
+        }
       }
+
+      // 3. Load active customization sliders if present
+      const saved = localStorage.getItem('circleMiniBattleWeaponCustomizations');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        for (const k in parsed) {
+          state.weaponCustomizations[k] = Object.assign({}, state.weaponCustomizations[k] || {}, parsed[k]);
+        }
+      }
+    }
+
+    // Sync mahitoClawCustomBlades with the loaded data
+    if (state.weaponCustomizations.mahito && state.weaponCustomizations.mahito.blades) {
+      state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
     }
   } catch (e) {
     console.warn('Could not load weapon customizations:', e);
   }
+}
+
+/**
+ * Sets the given customization as the persistent user default for a weapon.
+ * @param {string} weaponKey
+ * @param {Object} customObj
+ */
+export function setWeaponCustomAsDefault(weaponKey, customObj) {
+  if (!state.defaultWeaponCustomizations) state.defaultWeaponCustomizations = getAllWeaponDatabaseDefaults();
+  if (!state.weaponCustomizations) state.weaponCustomizations = getAllWeaponDatabaseDefaults();
+
+  const cloned = JSON.parse(JSON.stringify(customObj));
+  state.defaultWeaponCustomizations[weaponKey] = cloned;
+  state.weaponCustomizations[weaponKey] = JSON.parse(JSON.stringify(cloned));
+  if (weaponKey === 'mahito' && cloned.blades) {
+    state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+  }
+  saveWeaponCustomizations();
+}
+
+/**
+ * Restores a weapon customization to default.
+ * @param {string} weaponKey
+ * @param {boolean} [useFactory=false] - If true, ignores user defaults and resets directly to built-in code database.
+ * @returns {Object} Restored customization object.
+ */
+export function resetWeaponToDefault(weaponKey, useFactory = false) {
+  if (!state.weaponCustomizations) state.weaponCustomizations = getAllWeaponDatabaseDefaults();
+  const def = useFactory
+    ? getWeaponDatabaseDefault(weaponKey)
+    : (state.defaultWeaponCustomizations?.[weaponKey] || getWeaponDatabaseDefault(weaponKey));
+  state.weaponCustomizations[weaponKey] = JSON.parse(JSON.stringify(def));
+  if (useFactory && state.defaultWeaponCustomizations) {
+    state.defaultWeaponCustomizations[weaponKey] = JSON.parse(JSON.stringify(def));
+  }
+  if (weaponKey === 'mahito' && state.weaponCustomizations.mahito.blades) {
+    state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+  }
+  saveWeaponCustomizations();
+  return state.weaponCustomizations[weaponKey];
+}
+
+/**
+ * Resets all weapons to default customizations.
+ * @param {boolean} [useFactory=false]
+ */
+export function resetAllWeaponsToDefault(useFactory = false) {
+  if (useFactory) {
+    state.weaponCustomizations = getAllWeaponDatabaseDefaults();
+    state.defaultWeaponCustomizations = getAllWeaponDatabaseDefaults();
+  } else {
+    state.weaponCustomizations = {};
+    for (const [k, v] of Object.entries(state.defaultWeaponCustomizations || getAllWeaponDatabaseDefaults())) {
+      state.weaponCustomizations[k] = JSON.parse(JSON.stringify(v));
+    }
+  }
+  if (state.weaponCustomizations.mahito && state.weaponCustomizations.mahito.blades) {
+    state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+  }
+  saveWeaponCustomizations();
 }
 
 // Auto-export skin customizations database to disk when running in desktop Electron environment

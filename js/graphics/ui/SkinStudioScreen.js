@@ -54,6 +54,7 @@ import { drawNamelessDeitySkin, NAMELESS_DEITY_DEFAULT_CONFIGS, NAMELESS_DEITY_S
 import { drawAvatarOfEmptinessSkin, AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS } from '../fighters/avatarOfEmptinessSkin.js';
 import { drawUryuSkin, _drawUryuHair, _getUryuHairImage, _drawUryuGlasses, _getUryuGlassesImage } from '../fighters/uryuSkin.js';
 import { drawAlucardSkin, _drawAlucardHat, _getAlucardHatImage, _drawAlucardGlasses, _getAlucardGlassesImage } from '../fighters/gunSlingerSkin.js';
+import { drawGutsSkin, _drawGutsHelmet, _getGutsHelmetImage, _drawGutsHair, _getGutsHairImage } from '../fighters/gutsSkin.js';
 
 
 
@@ -137,7 +138,8 @@ export const SKIN_STUDIO_CATEGORIES = [
     { id: 'NGNL', label: 'NGNL', filter: (fighter) => fighter.key === 'shiro' },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
-  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu'].includes(f.key) }
+  { id: 'BERSERK', label: 'BERSERK', filter: (f) => f.key === 'guts' },
+  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu', 'guts'].includes(f.key) }
 ];
 
 
@@ -747,6 +749,25 @@ export const SKIN_STUDIO_FIGHTERS = [
     forms: [
       { id: 'default', label: 'STANDARD' }
     ]
+  },
+  {
+    key: 'guts',
+    label: 'GUTS',
+    asset: 'Assets/model/Guts/Guts_helmet.png',
+    assetDims: '500 x 500',
+    baseW: 2.30,
+    baseH: 2.92,
+    baseCrownY: -1.45,
+    visW: 390,
+    visH: 496,
+    centerX: 249.5,
+    topY: 4,
+    themeColor: '#71717a',
+    forms: [
+      { id: 'default', label: 'IDLE (SHOULDER REST)' },
+      { id: 'combat', label: 'COMBAT (SWORD IN MOUTH)' },
+      { id: 'hair', label: 'STRUGGLER (UNMASKED)' }
+    ]
   }
 ];
 
@@ -1093,6 +1114,23 @@ function generateJsCode(fDef, custom) {
            `offsetX: ${Math.round(custom.offsetX ?? 0)},\n` +
            `offsetY: ${Math.round(custom.offsetY ?? 0)},\n` +
            `angleOffset: ${((custom.angleOffset ?? 0) * (180 / Math.PI)).toFixed(1)}° (${(custom.angleOffset ?? 0).toFixed(4)} rad)`;
+  } else if (fDef.key === 'guts') {
+    if (state.studioSkinForm === 'hair') {
+      const curW = (2.20 * (custom.widthScale ?? 1.0)).toFixed(2);
+      const curH = (2.05 * (custom.heightScale ?? 1.0)).toFixed(2);
+      return `// Calibrated Hair for Guts (Assets/model/Guts/Guts-hair.png)\n` +
+             `const targetHairWidth = r * ${curW};\n` +
+             `const targetHairHeight = r * ${curH};\n` +
+             `const drawX = -targetHairWidth / 2${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+             `const drawY = -r * 1.30${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+    }
+    const curW = (2.30 * (custom.widthScale ?? 1.0)).toFixed(2);
+    const curH = (2.92 * (custom.heightScale ?? 1.0)).toFixed(2);
+    return `// Calibrated Helmet for Guts (Assets/model/Guts/Guts_helmet.png)\n` +
+           `const targetHairWidth = r * ${curW};\n` +
+           `const targetHairHeight = r * ${curH};\n` +
+           `const drawX = -targetHairWidth / 2${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)}${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
@@ -1546,6 +1584,13 @@ export function drawSkinStudioScreen() {
       } else if (fDef.key === 'avatar_of_emptiness' || fDef.key === 'avatarofemptiness') {
         dummyFighter._isStudioDummy = true;
         drawAvatarOfEmptinessSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'guts') {
+        dummyFighter._isStudioDummy = true;
+        dummyFighter.isCountdownStance = (state.studioSkinForm === 'default' || state.studioSkinForm === 'idle');
+        dummyFighter.isCombatStance = (state.studioSkinForm === 'combat');
+        dummyFighter.isUnmasked = (state.studioSkinForm === 'hair');
+        dummyFighter.hideWeapon = false;
+        drawGutsSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -1610,6 +1655,12 @@ export function drawSkinStudioScreen() {
     } else if (fDef.key === 'zeus') {
       _drawZeusHair(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
       _drawZeusCrown(ctx, baseRadius, state.studioSkinForm === 'storm', isFacingLeft);
+    } else if (fDef.key === 'guts') {
+      if (state.studioSkinForm === 'hair') {
+        _drawGutsHair(ctx, baseRadius, isFacingLeft);
+      } else {
+        _drawGutsHelmet(ctx, baseRadius, isFacingLeft, false);
+      }
     }
 
     ctx.restore();
@@ -1625,7 +1676,9 @@ export function drawSkinStudioScreen() {
           ? -baseRadius * 0.90
           : (isAlucard && activeAlucardPartId === 'glasses')
             ? -baseRadius * 0.02
-            : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+            : (fDef.key === 'guts' && state.studioSkinForm === 'hair')
+              ? -baseRadius * 1.30
+              : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
     const handleCenterX = custom.offsetX;
     const handleCenterY = baseCrownY + custom.offsetY;
 
@@ -2185,10 +2238,15 @@ export function drawSkinStudioScreen() {
     ctx.fillStyle = '#64748b';
     ctx.fillText(`TARGET: ${activeCustomKey}`, infoCardX + 8, infoCardY + 56);
   } else {
+    const isGutsHair = (fDef.key === 'guts' && state.studioSkinForm === 'hair');
+    const assetName = isGutsHair ? 'Assets/model/Guts/Guts-hair.png' : fDef.asset;
+    const assetDims = isGutsHair ? '44 x 41' : (fDef.assetDims || 'Standard');
+    const baseW = isGutsHair ? 2.20 : fDef.baseW;
+    const baseH = isGutsHair ? 2.05 : fDef.baseH;
     ctx.fillText(`MODEL: ${fDef.label}`, infoCardX + 8, infoCardY + 8);
-    ctx.fillText(`ASSET: ${fDef.asset}`, infoCardX + 8, infoCardY + 24);
-    ctx.fillText(`DIMS: ${fDef.assetDims || 'Standard'}`, infoCardX + 8, infoCardY + 40);
-    ctx.fillText(`BASE: ${fDef.baseW}r W | ${fDef.baseH}r H`, infoCardX + 8, infoCardY + 56);
+    ctx.fillText(`ASSET: ${assetName}`, infoCardX + 8, infoCardY + 24);
+    ctx.fillText(`DIMS: ${assetDims}`, infoCardX + 8, infoCardY + 40);
+    ctx.fillText(`BASE: ${baseW}r W | ${baseH}r H`, infoCardX + 8, infoCardY + 56);
   }
 
   // Right Console: Parameter Controls
@@ -2208,7 +2266,8 @@ export function drawSkinStudioScreen() {
     ctx.stroke();
     ctx.restore();
 
-    const curW = (fDef.baseW * (custom.widthScale ?? 1.0)).toFixed(2);
+    const activeBaseW = (fDef.key === 'guts' && state.studioSkinForm === 'hair') ? 2.20 : fDef.baseW;
+    const curW = (activeBaseW * (custom.widthScale ?? 1.0)).toFixed(2);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffffff';
@@ -2246,7 +2305,8 @@ export function drawSkinStudioScreen() {
     ctx.stroke();
     ctx.restore();
 
-    const curH = (fDef.baseH * (custom.heightScale ?? 1.0)).toFixed(2);
+    const activeBaseH = (fDef.key === 'guts' && state.studioSkinForm === 'hair') ? 2.05 : fDef.baseH;
+    const curH = (activeBaseH * (custom.heightScale ?? 1.0)).toFixed(2);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#ffffff';
@@ -3508,7 +3568,9 @@ if (typeof window !== 'undefined') {
             ? -baseRadius * 0.90
             : (isAlucard && activeAlucardPartId === 'glasses')
               ? -baseRadius * 0.02
-              : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+              : (fDef.key === 'guts' && state.studioSkinForm === 'hair')
+                ? -baseRadius * 1.30
+                : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
       const handleCenterX = custom.offsetX;
       const handleCenterY = baseCrownY + custom.offsetY;
 
@@ -3619,7 +3681,9 @@ if (typeof window !== 'undefined') {
             ? -baseRadius * 0.90
             : (isAlucard && activeAlucardPartId === 'glasses')
               ? -baseRadius * 0.02
-              : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
+              : (fDef.key === 'guts' && state.studioSkinForm === 'hair')
+                ? -baseRadius * 1.30
+                : (fDef.baseCrownY ? fDef.baseCrownY * baseRadius : -baseRadius * 1.3);
 
       if (isDraggingHairCenter) {
         custom.offsetX = Math.round(localX);

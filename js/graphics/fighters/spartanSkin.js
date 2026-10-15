@@ -69,8 +69,10 @@ export function _drawSpartanCrest(ctx, r, facingLeft = false) {
     const flipY = custom.flipY ? -1 : 1;
 
     // spartan_helmet.png (784x1312) - calibrated to frame the upper body circle seamlessly
-    const targetW = r * 2.10 * wMult;
-    const targetH = targetW * (1312 / 784) * hMult;
+    const baseW = r * 2.10;
+    const baseH = r * 3.514; // 2.10 * (1312 / 784)
+    const targetW = baseW * wMult;
+    const targetH = baseH * hMult;
     const drawX = -targetW / 2 + offX;
     const drawY = -r * 1.52 + offY;
 

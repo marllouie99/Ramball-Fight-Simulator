@@ -265,6 +265,8 @@ export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
     ? state.weaponCustomizations.escanor
     : { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   const customScale = custom.scale !== undefined ? custom.scale : 1.0;
+  const customWidthScale = custom.widthScale !== undefined ? custom.widthScale : 1.0;
+  const customLengthScale = custom.lengthScale !== undefined ? custom.lengthScale : 1.0;
   const customOffsetX = custom.offsetX !== undefined ? custom.offsetX : 0;
   const customOffsetY = custom.offsetY !== undefined ? custom.offsetY : 0;
   const customAngle = custom.angleOffset !== undefined ? custom.angleOffset : 0;
@@ -282,7 +284,7 @@ export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
       // Centered diagonal showcase for Weapon Menu Card & Selection Screen
       const previewScale = ((r * 3.4) / WEAPON_SHAFT_LEN) * customScale;
       ctx.rotate(-0.50 - WEAPON_ROT_ALIGN);
-      ctx.scale(previewScale, -previewScale);
+      ctx.scale(previewScale * customLengthScale, -previewScale * customWidthScale);
       ctx.drawImage(
         weaponImg,
         -WEAPON_MID_X,
@@ -296,7 +298,7 @@ export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
       const prideScaleMult = 1.0 + (opts.prideStacks || 0) * 0.04;
       const wieldScale = baseScale * (isTheOne ? 1.35 : prideScaleMult);
       ctx.rotate(-WEAPON_ROT_ALIGN);
-      ctx.scale(wieldScale, -wieldScale);
+      ctx.scale(wieldScale * customLengthScale, -wieldScale * customWidthScale);
       ctx.drawImage(
         weaponImg,
         -WEAPON_BLUE_GRIP_X,

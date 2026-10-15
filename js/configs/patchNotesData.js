@@ -27,7 +27,7 @@ export const patchNotesData = {
         "title": "Escanor Cruel Sun & Solar Poise",
         "desc": "6-frame sprite animations, ambient arena floor lighting, and total immunity to gravitational vortexes and suction fields while channeling."
     }
-],
+  ],
   balanceChanges: [
     {
         "character": "ICHIGO",

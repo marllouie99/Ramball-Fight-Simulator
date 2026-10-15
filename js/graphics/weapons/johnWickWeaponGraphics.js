@@ -147,9 +147,11 @@ export function drawJohnWickPistol(ctx, x, y, gunAngle, r, opts = {}) {
     ? state.weaponCustomizations.john_wick 
     : null;
   if (custom) {
+    const lSc = custom.lengthScale ?? 1.0;
+    const wSc = custom.widthScale ?? 1.0;
     ctx.translate(custom.offsetX, custom.offsetY);
-    ctx.scale(custom.scale, custom.scale);
     ctx.rotate(custom.angleOffset);
+    ctx.scale(custom.scale * lSc, custom.scale * wSc);
   }
 
   const isReloading = opts.isReloading || false;
@@ -1180,9 +1182,11 @@ export function drawJohnWickShotgun(ctx, x, y, gunAngle, r, opts = {}) {
     ? state.weaponCustomizations.john_wick 
     : null;
   if (custom) {
+    const lSc = custom.lengthScale ?? 1.0;
+    const wSc = custom.widthScale ?? 1.0;
     ctx.translate(custom.offsetX, custom.offsetY);
-    ctx.scale(custom.scale, custom.scale);
     ctx.rotate(custom.angleOffset);
+    ctx.scale(custom.scale * lSc, custom.scale * wSc);
   }
 
   // Weapon switch & reload workspace motion

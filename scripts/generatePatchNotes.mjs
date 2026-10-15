@@ -11,13 +11,13 @@ const CHAR_CONFIGS_DIR = path.join(CONFIGS_DIR, 'characters');
 
 function getGitDiff() {
   try {
-    // 1. Check unstaged + staged working changes
-    let diff = execSync('git diff HEAD -- js/configs/', { encoding: 'utf8' }).trim();
+    // 1. Check unstaged + staged working changes (excluding patchNotesData.js itself)
+    let diff = execSync('git diff HEAD -- js/configs/ ":(exclude)js/configs/patchNotesData.js"', { encoding: 'utf8' }).trim();
     let source = 'Working Directory (Uncommitted Changes)';
 
     // 2. If working directory is clean, inspect latest commit
     if (!diff) {
-      diff = execSync('git diff HEAD~1 HEAD -- js/configs/', { encoding: 'utf8' }).trim();
+      diff = execSync('git diff HEAD~1 HEAD -- js/configs/ ":(exclude)js/configs/patchNotesData.js"', { encoding: 'utf8' }).trim();
       source = 'Latest Commit (HEAD~1 ➔ HEAD)';
     }
 

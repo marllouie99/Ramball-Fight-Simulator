@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openDownloadsFolder: () => ipcRenderer.invoke('open-downloads-folder'),
   openAssetsFolder: () => ipcRenderer.invoke('open-assets-folder'),
   showItemInFolder: (p) => ipcRenderer.invoke('show-item-in-folder', p),
-  saveSkinDatabase: (data) => ipcRenderer.invoke('save-skin-database', data)
+  saveSkinDatabase: (data) => ipcRenderer.invoke('save-skin-database', data),
+  saveWeaponDatabase: (data) => ipcRenderer.invoke('save-weapon-database', data)
 });

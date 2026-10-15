@@ -1029,6 +1029,11 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     get volume() { return CONFIG.knight?.soundVolumes?.swordSwing !== undefined ? CONFIG.knight.soundVolumes.swordSwing : 0.95; },
     get delay() { return CONFIG.knight?.soundDelays?.swordSwing || 0; },
   },
+  'guts': {
+    get src() { return 'Assets/Sound Effects/Attacks/swordswing.mp3'; },
+    get volume() { return 0.95; },
+    get delay() { return 0; },
+  },
   'darkslategray': {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
     volume: 0.6,
@@ -1224,6 +1229,16 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   'spartan': {
     src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     volume: 0.9,
+    delay: 0,
+  },
+  'guts': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 1.0,
+    delay: 0,
+  },
+  'berserker': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 1.0,
     delay: 0,
   }
 };

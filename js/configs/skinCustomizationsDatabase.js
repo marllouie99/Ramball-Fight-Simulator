@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-13T14:42:29.471Z
+ * Generated from Skin Studio on 2026-10-15T00:17:18.736Z
  * =============================================================================
  */
 
@@ -64,7 +64,8 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   uryu_glasses: { widthScale: 1.40, heightScale: 1.10, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   shiro: { widthScale: 1.02, heightScale: 1.20, offsetX: -3, offsetY: -1, angleOffset: 0, flipX: false, flipY: false },
   shiro_crown: { widthScale: 0.94, heightScale: 1.00, offsetX: -20, offsetY: -15, angleOffset: -0.5411, flipX: false, flipY: false },
-  alucard_glasses: { widthScale: 1.10, heightScale: 1.10, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false }
+  alucard_glasses: { widthScale: 1.10, heightScale: 1.10, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  guts: { widthScale: 1.16, heightScale: 0.96, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false }
 };
 
 export const DEFAULT_SKIN_CUSTOMIZATIONS = SKIN_CUSTOMIZATIONS_DATABASE;

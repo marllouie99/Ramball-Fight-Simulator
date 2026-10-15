@@ -7,4 +7,3 @@
 
 ### ICHIGO
 * **🔴 NERF** `shunpoStrikes`: `4` ➔ `3` (-25.0%)
-

@@ -363,6 +363,8 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
   const wpOffX = customWp.offsetX || 0;
   const wpOffY = customWp.offsetY || 0;
   const wpScaleMult = (customWp.scale || 1.0) * 0.65;
+  const wpLengthMult = customWp.lengthScale ?? 1.0;
+  const wpWidthMult = customWp.widthScale ?? 1.0;
   const wpAngleOff = customWp.angleOffset || 0;
 
   ctx.translate(wpOffX, wpOffY);
@@ -372,7 +374,7 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
   // 2A. Render authentic Split Soul Katana scaled independently (White Fur Collar, Damascus Blade & Kashira Pommel)
   if (!isBladeShownInPinnedTarget) {
     ctx.save();
-    ctx.scale(wpScaleMult, wpScaleMult);
+    ctx.scale(wpScaleMult * wpLengthMult, wpScaleMult * wpWidthMult);
     drawSplitSoulKatanaBladeMesh(ctx, '#D4A373', false);
     ctx.restore();
   }

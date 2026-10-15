@@ -804,6 +804,33 @@
           "cooldown": 2100
         }
       }
+    },
+    "guts": {
+      "name": "Guts",
+      "archetype": "blade",
+      "hp": 460,
+      "speed": 4.6,
+      "radius": 30,
+      "baseDamage": 36,
+      "baseCooldown": 36,
+      "themeColor": "#71717a",
+      "keySkills": {
+        "wristCannon": {
+          "baseDamage": 95,
+          "sweetSpotDamage": 135,
+          "cooldown": 420
+        },
+        "cycloneCleave": {
+          "damage": 40,
+          "cooldown": 540
+        },
+        "berserkerArmor": {
+          "damageBuff": 1.25,
+          "lifesteal": 0.35,
+          "duration": 600,
+          "cooldown": 1800
+        }
+      }
     }
   }
 }

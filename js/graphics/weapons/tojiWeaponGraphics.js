@@ -170,9 +170,11 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
 
   const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.toji) ? state.weaponCustomizations.toji : null;
   if (custom) {
+    const lSc = custom.lengthScale ?? 1.0;
+    const wSc = custom.widthScale ?? 1.0;
     ctx.translate(custom.offsetX, custom.offsetY);
-    ctx.scale(custom.scale, custom.scale);
     ctx.rotate(custom.angleOffset);
+    ctx.scale(custom.scale * lSc, custom.scale * wSc);
   }
 
   // 1. Draw static chain fallback if physics nodes not passed (UI / preview cards)
@@ -555,11 +557,22 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
     ctx.scale(1, -1);
   }
 
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.toji) ? state.weaponCustomizations.toji : null;
+  const customOffX = custom ? (custom.offsetX || 0) : 0;
+  const customOffY = custom ? (custom.offsetY || 0) : 0;
+  const customScale = custom ? (custom.scale ?? 1.0) : 1.0;
+  const customAngle = custom ? (custom.angleOffset || 0) : 0;
+  const customLen = custom ? (custom.lengthScale ?? 1.0) : 1.0;
+  const customWid = custom ? (custom.widthScale ?? 1.0) : 1.0;
+
+  ctx.translate(customOffX, customOffY);
+  ctx.rotate(customAngle);
+
   // Position weapon relative to fighter radius (translates by r - 2 + 24 * scale)
   ctx.translate(r - 2 + 24 * 0.95, 0);
 
-  const scale = 0.95; // Increased scale for grand imposing Katana proportions!
-  ctx.scale(scale, scale);
+  const scale = 0.95 * customScale;
+  ctx.scale(scale * customLen, scale * customWid);
 
   drawSplitSoulKatanaBladeMesh(ctx, handColor, true);
 

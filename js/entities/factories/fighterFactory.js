@@ -64,8 +64,14 @@ import { NaoyaFighter } from '../fighters/NaoyaFighter.js';
 import { MakiFighter } from '../fighters/MakiFighter.js';
 import { ShiroFighter } from '../fighters/ShiroFighter.js';
 import { SoraFighter } from '../fighters/SoraFighter.js';
+import { GutsFighter } from '../fighters/GutsFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
+  'guts':       GutsFighter,
+  'Guts':       GutsFighter,
+  'GUTS':       GutsFighter,
+  'berserker':  GutsFighter,
+  'Berserker':  GutsFighter,
   'shiro':      ShiroFighter,
   'Shiro':      ShiroFighter,
   'shiro_ngnl': ShiroFighter,

@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openAssetsFolder: () => ipcRenderer.invoke('open-assets-folder'),
   showItemInFolder: (p) => ipcRenderer.invoke('show-item-in-folder', p),
   saveSkinDatabase: (data) => ipcRenderer.invoke('save-skin-database', data),
+  saveWeaponDatabase: (data) => ipcRenderer.invoke('save-weapon-database', data),
   setWindowOrientation: (orientation) => ipcRenderer.invoke('set-window-orientation', orientation),
   setWindowSize: (data) => ipcRenderer.invoke('set-window-size', data),
   dragWindow: (deltaX, deltaY) => ipcRenderer.invoke('drag-window', { deltaX, deltaY })
