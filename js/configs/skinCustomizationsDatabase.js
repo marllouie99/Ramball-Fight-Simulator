@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-15T00:17:18.736Z
+ * Generated from Skin Studio on 2026-10-15T18:34:02.457Z
  * =============================================================================
  */
 
@@ -19,7 +19,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   nanami: { widthScale: 1.06, heightScale: 1.08, offsetX: 0, offsetY: -2, angleOffset: 0, flipX: false, flipY: false },
   mahito: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   naoya: { widthScale: 0.80, heightScale: 0.78, offsetX: 0, offsetY: 8, angleOffset: 0.0349, flipX: false, flipY: false },
-  maki: { widthScale: 0.80, heightScale: 1.04, offsetX: 1, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
+  maki: { widthScale: 0.80, heightScale: 1.04, offsetX: 1, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
   genos: { widthScale: 0.94, heightScale: 0.82, offsetX: 0, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
   escanor: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -3, angleOffset: 0, flipX: false, flipY: false },
   john_wick: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 6, angleOffset: 0, flipX: false, flipY: false },
@@ -65,7 +65,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   shiro: { widthScale: 1.02, heightScale: 1.20, offsetX: -3, offsetY: -1, angleOffset: 0, flipX: false, flipY: false },
   shiro_crown: { widthScale: 0.94, heightScale: 1.00, offsetX: -20, offsetY: -15, angleOffset: -0.5411, flipX: false, flipY: false },
   alucard_glasses: { widthScale: 1.10, heightScale: 1.10, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
-  guts: { widthScale: 1.16, heightScale: 0.96, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false }
+  guts: { widthScale: 1.06, heightScale: 0.86, offsetX: 0, offsetY: 4, angleOffset: 0, flipX: false, flipY: false }
 };
 
 export const DEFAULT_SKIN_CUSTOMIZATIONS = SKIN_CUSTOMIZATIONS_DATABASE;

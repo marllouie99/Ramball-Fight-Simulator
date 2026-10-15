@@ -500,44 +500,28 @@ export function updateIndexDetailDemo(def, demoArea) {
           target.y = fighter.y;
           target.isPinnedByMaki = true;
           if (pstate.makiJetTimer >= 18) {
-            pstate.makiJetPhase = 'lift';
+            pstate.makiJetPhase = 'punch';
             pstate.makiJetTimer = 0;
+            try { audioSystem.playSFX('attack_heavypunch1', 1.0); } catch (e) {}
+            previewProjectileSystem.addImpact(target.x, target.y, '#F59E0B', 0, 32);
           }
-        } else if (pstate.makiJetPhase === 'lift') {
-          const liftP = Math.min(1.0, pstate.makiJetTimer / 22);
+        } else if (pstate.makiJetPhase === 'punch') {
+          const punchP = Math.min(1.0, pstate.makiJetTimer / 18);
           fighter.dragonBoneActive = true;
-          fighter.dragonBonePhase = 'lift';
+          fighter.dragonBonePhase = 'punch';
           fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
-          fighter.dragonBonePhaseMax = 22;
-          target.x = fighter.x + (1.0 - liftP) * 28;
-          target.y = fighter.y - liftP * 40;
-          target.isPinnedByMaki = true;
-          if (pstate.makiJetTimer >= 22) {
-            pstate.makiJetPhase = 'throw';
-            pstate.makiJetTimer = 0;
-            try { audioSystem.playSFX('attack_swordswing', 1.0); } catch (e) {}
+          fighter.dragonBonePhaseMax = 18;
+          if (punchP < 0.35) {
+            target.x = fighter.x + 28;
+            target.y = fighter.y;
+            target.isPinnedByMaki = true;
+          } else {
+            target.isPinnedByMaki = false;
+            const flyP = (punchP - 0.35) / 0.65;
+            target.x = fighter.x + 28 + flyP * 95;
+            target.y = fighter.y;
           }
-        } else if (pstate.makiJetPhase === 'throw') {
-          const throwP = Math.min(1.0, pstate.makiJetTimer / 12);
-          fighter.dragonBoneActive = true;
-          fighter.dragonBonePhase = 'throw';
-          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
-          fighter.dragonBonePhaseMax = 12;
-          target.x = fighter.x + throwP * 55;
-          target.y = fighter.y - 40 + throwP * 48;
-          target.isPinnedByMaki = true;
-          if (pstate.makiJetTimer >= 12) {
-            pstate.makiJetPhase = 'groundPin';
-            pstate.makiJetTimer = 0;
-            try { audioSystem.playSFX('attack_groundsmash', 1.0); } catch (e) {}
-            previewProjectileSystem.addImpact(target.x, target.y, '#DC2626', 0, 30);
-          }
-        } else if (pstate.makiJetPhase === 'groundPin') {
-          fighter.dragonBoneActive = true;
-          fighter.dragonBonePhase = 'groundPin';
-          fighter.dragonBonePhaseTimer = pstate.makiJetTimer;
-          fighter.dragonBonePhaseMax = 25;
-          if (pstate.makiJetTimer >= 25) {
+          if (pstate.makiJetTimer >= 18) {
             pstate.makiJetPhase = 'windup';
             pstate.makiJetTimer = 0;
             target.isPinnedByMaki = false;

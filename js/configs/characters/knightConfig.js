@@ -37,8 +37,8 @@ export const knightConfig = {
   blockProjectileDetectionRadius: 200,
 
   // Shield HP, Defense Buff & Broken State Mechanics
-  shieldHp: 90,                   // Starting shield HP
-  shieldMaxHp: 90,                // Maximum shield HP
+  shieldHp: 200,                   // Starting shield HP
+  shieldMaxHp: 200,                // Maximum shield HP
   shieldPassiveDefBuff: 0.40,     // 40% passive damage reduction applied while shield is active
   shieldBrokenDefPenalty: 0.50,   // Loses 50% of passive DEF buff when shield breaks (40% drops to 20%)
 

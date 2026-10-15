@@ -11,6 +11,7 @@ import { spawnSparks, spawnImpactFlash, spawnGroundScorch } from '../../graphics
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { drawMakiSkin, drawMakiGhostSkin } from '../../graphics/fighters/makiSkin.js';
 import { drawMakiSoulSlash } from '../../graphics/weapons/makiWeaponGraphics.js';
+import { resolveEntityPlusObstacleCollision } from '../../systems/arenaObstacleSystem.js';
 
 export class MakiFighter extends Fighter {
   constructor(def) {
@@ -27,6 +28,7 @@ export class MakiFighter extends Fighter {
     this.speed = cfg.speed || 5.4;
     this.baseSpeed = cfg.speed || 5.4;
     this.r = cfg.r || 25;
+    this.hideHands = true; // Weapon & skill animations render dedicated dynamic hands; default model fists hidden
 
     // Heavenly Restriction & Domain Immunity
     this.domainImmunity = true;
@@ -56,17 +58,18 @@ export class MakiFighter extends Fighter {
     this.swordSwingOpponent = null;
     this.afterImages = [];
 
-    // Skill 1: Dragon-Bone Kinetic Jet Skewer & Throw
+    // Skill 1: Dragon-Bone Kinetic Jet Skewer & Brutal Punch
     this.kineticCharges = 0;
     this.maxKineticCharges = cfg.maxKineticCharges || 3;
     this.dragonBoneCooldown = 0;
     this.dragonBoneCooldownMax = cfg.dragonBoneCooldown || 420;
     this.dragonBoneActive = false;
-    this.dragonBonePhase = null; // 'windup', 'dash', 'stab', 'lift', 'throw'
+    this.dragonBonePhase = null; // 'windup', 'dash', 'stab', 'punch'
     this.dragonBonePhaseTimer = 0;
     this.dragonBonePhaseMax = CONFIG.maki?.dragonBoneWindupFrames || 12;
     this.dragonBoneTarget = null;
     this.dragonBoneTargetAngle = 0;
+    this.makiLaunchedTargets = [];
 
     // Skill 2: Zen'in Annihilation Riposte
     this.riposteCooldown = 0;
@@ -91,7 +94,7 @@ export class MakiFighter extends Fighter {
     this.skillManager.registerSkills([
       {
         id: 'dragonBone',
-        name: 'DRAGON SKEWER THROW',
+        name: 'DRAGON SKEWER PUNCH',
         type: 'basic',
         cooldownKey: 'dragonBoneCooldown',
         cooldownMax: () => this.dragonBoneCooldownMax,
@@ -155,6 +158,7 @@ export class MakiFighter extends Fighter {
     this.dragonBonePhaseTimer = 0;
     this.dragonBonePhaseMax = CONFIG.maki?.dragonBoneWindupFrames || 12;
     this.dragonBoneTarget = null;
+    this.makiLaunchedTargets = [];
     this.riposteCooldown = 0;
     this.riposteActive = false;
     this.riposteTimer = 0;
@@ -209,6 +213,9 @@ export class MakiFighter extends Fighter {
       this.isSpinning = false;
     }
 
+    // Update launched enemies taking continuous flight tick damage
+    this._updateMakiLaunchedTargets(arena);
+
     // Update Active Skills & Sequences
     if (this.ultimateActive) {
       this._updateUltimate(opponent, arena);
@@ -247,7 +254,7 @@ export class MakiFighter extends Fighter {
   }
 
   isStationarySkillActive() {
-    if (this.dragonBoneActive && ['windup', 'stab', 'lift', 'throw'].includes(this.dragonBonePhase)) {
+    if (this.dragonBoneActive && ['windup', 'stab', 'punch', 'lift', 'throw', 'groundPin'].includes(this.dragonBonePhase)) {
       return true;
     }
     return super.isStationarySkillActive();
@@ -426,60 +433,133 @@ export class MakiFighter extends Fighter {
     const pinEnd = liftF + holdF + strikeF + pinF;
 
     if (this.swordComboStep === 3) {
-      this.isSpinning = false;
-    }
+      // ── Hit 3: Full 360° Whirlwind Spin & Sunder Impact Lock ──
+      if (elapsed < strikeStart) {
+        // Phase 1 & 2: Anticipation Coil & Poised Hold
+        if (opponent && !opponent.isDead) {
+          this.swordSlashAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        }
+        const coilP = Math.min(1.0, elapsed / Math.max(1, liftF));
+        const coilEase = Math.sin(coilP * Math.PI * 0.5);
+        this.angle = this.swordSlashAngle - 0.35 * coilEase;
+        this.gunAngle = this.angle;
+        this.isSpinning = false;
+      } else if (elapsed < strikeEnd) {
+        // Phase 3: Hypersonic 360° Whirlwind Whip Strike Window
+        const strikeElapsed = elapsed - strikeStart;
+        const strikeP = strikeElapsed / Math.max(1, strikeF);
+        const whipEase = Math.pow(strikeP, 1.25);
 
-    if (elapsed < strikeStart) {
-      // Phase 1 & 2: Anticipation Coil & Poised Hold
-      if (opponent && !opponent.isDead) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        this.swordSlashAngle = targetAngle;
-      }
-    } else if (elapsed < strikeEnd) {
-      // Phase 3: Hypersonic Whip Strike Window
-      const strikeElapsed = elapsed - strikeStart;
-      const strikeP = strikeElapsed / Math.max(1, strikeF);
+        // Maki's whole body spins 360° along with her weapon!
+        this.angle = (this.swordSlashAngle - 0.35) + (Math.PI * 2 + 0.35) * whipEase;
+        this.gunAngle = this.angle;
+        this.isSpinning = true;
 
-      if (!this.swordSwingSoundPlayed) {
-        this.swordSwingSoundPlayed = true;
-        try {
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            if (this.swordComboStep === 3) {
+        if (!this.swordSwingSoundPlayed) {
+          this.swordSwingSoundPlayed = true;
+          try {
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
               audioSystem.playSFX('skill_spinslash', 0.90);
-            } else {
+            }
+          } catch (e) {}
+          this._spawnAfterimage(5, 11);
+        }
+
+        // Forward lunging step momentum into whirlwind
+        const lungeSpeed = this.swordSwingLunge || 8.5;
+        const lungeDecay = Math.sin(strikeP * Math.PI);
+        this.vx = Math.cos(this.swordSlashAngle) * lungeSpeed * lungeDecay;
+        this.vy = Math.sin(this.swordSlashAngle) * lungeSpeed * lungeDecay;
+
+        // Trigger impact when whirlwind cleave connects
+        if (!this.swordHitDelivered && strikeP >= 0.85) {
+          this._deliverSwordImpact(opponent || this.swordSwingOpponent);
+        }
+      } else if (elapsed < pinEnd) {
+        // Phase 4: SUNDER IMPACT LOCK — Full 360° spin completed, locked firmly in cleave plane
+        this.angle = this.swordSlashAngle;
+        this.gunAngle = this.swordSlashAngle;
+        this.isSpinning = false;
+
+        if (!this.swordHitDelivered) {
+          this._deliverSwordImpact(opponent || this.swordSwingOpponent);
+        }
+        this.vx = 0;
+        this.vy = 0;
+      } else {
+        // Phase 5: Recovery & Stance Settle
+        this.angle = this.swordSlashAngle;
+        this.gunAngle = this.swordSlashAngle;
+        this.isSpinning = false;
+
+        if (!this.swordHitDelivered) {
+          this.swordHitDelivered = true;
+        }
+        // Rule 30: Kinetic recoil kickback on Phase 5 extraction
+        if (elapsed === pinEnd) {
+          const recoilKick = 2.8;
+          this.vx -= Math.cos(this.swordSlashAngle) * recoilKick;
+          this.vy -= Math.sin(this.swordSlashAngle) * recoilKick;
+        }
+        this.vx *= 0.75;
+        this.vy *= 0.75;
+      }
+    } else {
+      // ── Hit 1 & Hit 2: Directional Cleaves ──
+      this.isSpinning = false;
+      if (elapsed < strikeStart) {
+        // Phase 1 & 2: Anticipation Coil & Poised Hold
+        if (opponent && !opponent.isDead) {
+          const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+          this.swordSlashAngle = targetAngle;
+        }
+      } else if (elapsed < strikeEnd) {
+        // Phase 3: Hypersonic Whip Strike Window
+        const strikeElapsed = elapsed - strikeStart;
+        const strikeP = strikeElapsed / Math.max(1, strikeF);
+
+        if (!this.swordSwingSoundPlayed) {
+          this.swordSwingSoundPlayed = true;
+          try {
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
               audioSystem.playSFX('attack_swordswing', 0.95);
             }
-          }
-        } catch (e) {}
-        this._spawnAfterimage(this.swordComboStep === 3 ? 5 : 3, 11);
-      }
+          } catch (e) {}
+          this._spawnAfterimage(3, 11);
+        }
 
-      // Forward lunging step momentum into the cleave
-      const lungeSpeed = this.swordSwingLunge || 7.0;
-      const lungeDecay = Math.sin(strikeP * Math.PI);
-      this.vx = Math.cos(this.swordSlashAngle) * lungeSpeed * lungeDecay;
-      this.vy = Math.sin(this.swordSlashAngle) * lungeSpeed * lungeDecay;
+        // Forward lunging step momentum into the cleave
+        const lungeSpeed = this.swordSwingLunge || 7.0;
+        const lungeDecay = Math.sin(strikeP * Math.PI);
+        this.vx = Math.cos(this.swordSlashAngle) * lungeSpeed * lungeDecay;
+        this.vy = Math.sin(this.swordSlashAngle) * lungeSpeed * lungeDecay;
 
-      // IMPACT DELIVERY: Trigger slap impact when blade completes whirlwind into front cleave plane
-      const impactThreshold = (this.swordComboStep === 3) ? 0.85 : 0.50;
-      if (!this.swordHitDelivered && strikeP >= impactThreshold) {
-        this._deliverSwordImpact(opponent || this.swordSwingOpponent);
+        // IMPACT DELIVERY: Trigger slap impact at 50% of the whip stroke
+        if (!this.swordHitDelivered && strikeP >= 0.50) {
+          this._deliverSwordImpact(opponent || this.swordSwingOpponent);
+        }
+      } else if (elapsed < pinEnd) {
+        // Phase 4: MELEE GROUND PIN (Blade locked firmly in the floor before recovery!)
+        if (!this.swordHitDelivered) {
+          this._deliverSwordImpact(opponent || this.swordSwingOpponent);
+        }
+        // Zero movement while weapon is pinned into the ground
+        this.vx = 0;
+        this.vy = 0;
+      } else {
+        // Phase 5: Recovery & Stance Settle
+        if (!this.swordHitDelivered) {
+          this.swordHitDelivered = true;
+        }
+        // Rule 30: Kinetic recoil kickback on Phase 5 extraction
+        if (elapsed === pinEnd) {
+          const recoilKick = 2.0;
+          this.vx -= Math.cos(this.swordSlashAngle) * recoilKick;
+          this.vy -= Math.sin(this.swordSlashAngle) * recoilKick;
+        }
+        this.vx *= 0.75;
+        this.vy *= 0.75;
       }
-    } else if (elapsed < pinEnd) {
-      // Phase 4: MELEE GROUND PIN (Blade locked firmly in the floor before recovery!)
-      if (!this.swordHitDelivered) {
-        this._deliverSwordImpact(opponent || this.swordSwingOpponent);
-      }
-      // Zero movement while weapon is pinned into the ground
-      this.vx = 0;
-      this.vy = 0;
-    } else {
-      // Phase 5: Recovery & Stance Settle
-      if (!this.swordHitDelivered) {
-        this.swordHitDelivered = true;
-      }
-      this.vx *= 0.75;
-      this.vy *= 0.75;
     }
 
     this.swordSwingTimer--;
@@ -623,11 +703,71 @@ export class MakiFighter extends Fighter {
   * - Phase 4: Lift the enemy overhead, then chop down and throw them
    */
   /**
+   * Clamps an entity position within the active arena bounds (rectangular or circular).
+   * Returns { x, y, clamped: boolean, hitLeft: boolean, hitRight: boolean, hitTop: boolean, hitBottom: boolean }
+   */
+  _clampToArena(x, y, radius = this.r, arena = null) {
+    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
+    if (!curArena) return { x, y, clamped: false, hitLeft: false, hitRight: false, hitTop: false, hitBottom: false };
+
+    let clamped = false;
+    let newX = x;
+    let newY = y;
+    let hitLeft = false;
+    let hitRight = false;
+    let hitTop = false;
+    let hitBottom = false;
+    const r = radius || this.r || 25;
+
+    if (curArena.shape === 'circle' || curArena.radius) {
+      const cx = curArena.x + curArena.width / 2;
+      const cy = curArena.y + curArena.height / 2;
+      const maxDist = (curArena.radius || (curArena.width / 2)) - r;
+      const dx = newX - cx;
+      const dy = newY - cy;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxDist && dist > 0) {
+        newX = cx + (dx / dist) * maxDist;
+        newY = cy + (dy / dist) * maxDist;
+        clamped = true;
+      }
+    } else {
+      const minX = curArena.x + r;
+      const maxX = curArena.x + curArena.width - r;
+      const minY = curArena.y + r;
+      const maxY = curArena.y + curArena.height - r;
+
+      if (newX < minX) {
+        newX = minX;
+        clamped = true;
+        hitLeft = true;
+      } else if (newX > maxX) {
+        newX = maxX;
+        clamped = true;
+        hitRight = true;
+      }
+
+      if (newY < minY) {
+        newY = minY;
+        clamped = true;
+        hitTop = true;
+      } else if (newY > maxY) {
+        newY = maxY;
+        clamped = true;
+        hitBottom = true;
+      }
+    }
+
+    return { x: newX, y: newY, clamped, hitLeft, hitRight, hitTop, hitBottom };
+  }
+
+  /**
    * Aligns and locks the impaled enemy directly along the Split Soul Katana blade.
    * Accurately accounts for hand local offsets, facing mirroring, and weapon rotation
    * so the hilt/guard sits at the entry wound and the blade tip protrudes through the exit side.
+   * Clamps both target and Maki inside the active arena boundaries so neither ever clips into walls.
    */
-  _alignPinnedTargetOnBlade(target, weaponRot = 0) {
+  _alignPinnedTargetOnBlade(target, weaponRot = 0, arena = null) {
     if (!target || target.isDead) return;
     target.isPinnedByMaki = true;
     target.isGrabbed = true;
@@ -635,6 +775,8 @@ export class MakiFighter extends Fighter {
     target.vy = 0;
     target.knockbackVx = 0;
     target.knockbackVy = 0;
+
+    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
 
     const facingLeft = Math.abs(Math.atan2(Math.sin(this.gunAngle || 0), Math.cos(this.gunAngle || 0))) > Math.PI / 2;
     const handLocalX = this.r * 0.82;
@@ -651,13 +793,42 @@ export class MakiFighter extends Fighter {
     const targetR = target.r || 25;
     const distCenter = (CONFIG.maki?.dragonBonePinGapPx ?? 24) + targetR;
 
-    target.x = handWorldX + Math.cos(bladeWorldAngle) * distCenter;
-    target.y = handWorldY + Math.sin(bladeWorldAngle) * distCenter;
+    let targetX = handWorldX + Math.cos(bladeWorldAngle) * distCenter;
+    let targetY = handWorldY + Math.sin(bladeWorldAngle) * distCenter;
+
+    // Boundary check: If the pinned enemy would be pushed outside arena boundaries,
+    // push Maki and the target back into the arena so the target is stopped flush at the wall.
+    if (curArena) {
+      const clampedTarget = this._clampToArena(targetX, targetY, targetR, curArena);
+      if (clampedTarget.clamped) {
+        const shiftX = clampedTarget.x - targetX;
+        const shiftY = clampedTarget.y - targetY;
+        this.x += shiftX;
+        this.y += shiftY;
+        const clampedMaki = this._clampToArena(this.x, this.y, this.r, curArena);
+        this.x = clampedMaki.x;
+        this.y = clampedMaki.y;
+
+        const newHandWorldX = this.x + cosA * handLocalX - sinA * handLocalY;
+        const newHandWorldY = this.y + sinA * handLocalX + cosA * handLocalY;
+        targetX = newHandWorldX + Math.cos(bladeWorldAngle) * distCenter;
+        targetY = newHandWorldY + Math.sin(bladeWorldAngle) * distCenter;
+        const finalTarget = this._clampToArena(targetX, targetY, targetR, curArena);
+        targetX = finalTarget.x;
+        targetY = finalTarget.y;
+      }
+
+      // Check interior center obstacle
+      resolveEntityPlusObstacleCollision(target, curArena);
+      resolveEntityPlusObstacleCollision(this, curArena);
+    }
+
+    target.x = targetX;
+    target.y = targetY;
 
     // Store pinned references for top-layer overlay rendering
     target._makiPinnedBladeAngle = bladeWorldAngle;
     target._makiPinnedBy = this;
-
   }
 
   get aimTurnRate() {
@@ -669,6 +840,12 @@ export class MakiFighter extends Fighter {
 
   _castDragonBone(opponent) {
     if (!opponent) return;
+    const curArena = (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
+    if (curArena) {
+      const clamped = this._clampToArena(this.x, this.y, this.r, curArena);
+      this.x = clamped.x;
+      this.y = clamped.y;
+    }
     this.dragonBoneActive = true;
     this.dragonBoneCooldown = this.dragonBoneCooldownMax;
     this.dragonBonePhase = 'windup';
@@ -686,6 +863,7 @@ export class MakiFighter extends Fighter {
   _updateDragonBone(opponent, arena) {
     this.dragonBonePhaseTimer++;
     const cfg = CONFIG.maki || {};
+    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
 
     // ──────────────────────────────────────────
     // PHASE 1: PLANTED TWO-HANDED WINDUP
@@ -693,6 +871,11 @@ export class MakiFighter extends Fighter {
     if (this.dragonBonePhase === 'windup') {
       this.vx = 0;
       this.vy = 0;
+      if (curArena) {
+        const clamped = this._clampToArena(this.x, this.y, this.r, curArena);
+        this.x = clamped.x;
+        this.y = clamped.y;
+      }
       if (opponent && !opponent.isDead) {
         this.aim(opponent);
       }
@@ -728,6 +911,20 @@ export class MakiFighter extends Fighter {
         this._spawnAfterimage(2, 10);
       }
 
+      // Check boundary collisions
+      let hitWall = false;
+      if (curArena) {
+        const clampedMaki = this._clampToArena(this.x, this.y, this.r, curArena);
+        if (clampedMaki.clamped) {
+          hitWall = true;
+          this.x = clampedMaki.x;
+          this.y = clampedMaki.y;
+        }
+        if (resolveEntityPlusObstacleCollision(this, curArena)) {
+          hitWall = true;
+        }
+      }
+
       // Check collision / impalement along frontal blade tip
       const reach = this.r + 52;
       const targets = this._getTargetsInFrontalArc(reach, (65 * Math.PI) / 180);
@@ -749,8 +946,8 @@ export class MakiFighter extends Fighter {
         this.vx = 0;
         this.vy = 0;
 
-        // Center enemy directly onto the blade shaft
-        this._alignPinnedTargetOnBlade(hitTarget, 0.0);
+        // Center enemy directly onto the blade shaft with arena safety clamping
+        this._alignPinnedTargetOnBlade(hitTarget, 0.0, curArena);
 
         // Apply initial pierce true damage (suppress knockback)
         const pierceDmg = cfg.dragonBonePierceDamage || 25;
@@ -764,7 +961,7 @@ export class MakiFighter extends Fighter {
 
         if (typeof hitTarget.applyHitStun === 'function') {
           hitTarget.applyHitStun(
-            this.dragonBonePhaseMax + (cfg.dragonBoneLiftFrames || 30) + (cfg.dragonBoneThrowFrames ?? cfg.dragonBoneSlamFrames ?? 14) + 20
+            this.dragonBonePhaseMax + (cfg.dragonBonePunchFrames || 18) + (cfg.dragonBoneLaunchFrames || 36) + 20
           );
         }
 
@@ -774,6 +971,22 @@ export class MakiFighter extends Fighter {
         triggerGlobalScreenShake(5, 10);
         audioSystem.playSFX('sword_slash_heavy', 0.95);
         spawnFloatingText(hitTarget.x, hitTarget.y - 25, 'IMPALED!', '#DC2626');
+        return;
+      }
+
+      // Wall impact without impalement: gracefully halt the dash early so Maki never clips through the wall!
+      if (hitWall) {
+        spawnSparks(this.x, this.y, 8, '#F59E0B');
+        triggerGlobalScreenShake(3, 8);
+        try {
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('attack_fleshhit', 0.8);
+          }
+        } catch (e) {}
+        this.dragonBoneActive = false;
+        this.dragonBonePhase = null;
+        this.vx = 0;
+        this.vy = 0;
         return;
       }
 
@@ -790,113 +1003,39 @@ export class MakiFighter extends Fighter {
     // ──────────────────────────────────────────
     else if (this.dragonBonePhase === 'stab') {
       const target = this.dragonBoneTarget;
-      const maxT = this.dragonBonePhaseMax || 10;
+      const maxT = this.dragonBonePhaseMax || cfg.dragonBoneStabFrames || 10;
 
       this.vx = 0;
       this.vy = 0;
       if (target && !target.isDead) {
-        this._alignPinnedTargetOnBlade(target, 0.0);
+        this._alignPinnedTargetOnBlade(target, 0.0, curArena);
       }
 
       if (this.dragonBonePhaseTimer >= maxT) {
-        this.dragonBonePhase = 'lift';
+        this.dragonBonePhase = 'punch';
         this.dragonBonePhaseTimer = 0;
-        this.dragonBonePhaseMax = cfg.dragonBoneLiftFrames || 30;
+        this.dragonBonePhaseMax = cfg.dragonBonePunchFrames || 18;
       }
     }
     // ──────────────────────────────────────────
-    // PHASE 4: HOISTING / LIFTING IMPALED ENEMY
+    // PHASE 4: BRUTAL CONCUSSIVE PUNCH & LAUNCH
     // ──────────────────────────────────────────
-    else if (this.dragonBonePhase === 'lift') {
+    else if (this.dragonBonePhase === 'punch') {
       const target = this.dragonBoneTarget;
-      const maxT = this.dragonBonePhaseMax || 30;
-      const progress = Math.min(1.0, this.dragonBonePhaseTimer / maxT);
-      const ease = Math.sin(progress * Math.PI * 0.5);
-
-      // Halt movement during lift
-      this.vx = 0;
-      this.vy = 0;
-
-      // Pin enemy right through center of the rising blade
-      if (target && !target.isDead) {
-        const weaponRot = -1.65 * ease; // Lifts from 0 to -1.65 rad (straight up)
-        this._alignPinnedTargetOnBlade(target, weaponRot);
-
-        // Blood drips during lift
-        if (this.dragonBonePhaseTimer % 4 === 0) {
-          spawnBloodEffect(target.x, target.y, Math.PI * 0.5, 3);
-          spawnSparks(target.x, target.y, 2, '#F59E0B');
-        }
-      }
-
-      if (this.dragonBonePhaseTimer >= maxT) {
-        this.dragonBonePhase = 'throw';
-        this.dragonBonePhaseTimer = 0;
-        this.dragonBonePhaseMax = cfg.dragonBoneThrowFrames ?? cfg.dragonBoneSlamFrames ?? 14;
-      }
-    }
-    // ──────────────────────────────────────────
-    // PHASE 5: FORWARD THROW RELEASE
-    // ──────────────────────────────────────────
-    else if (this.dragonBonePhase === 'throw') {
-      const target = this.dragonBoneTarget;
-      const maxT = this.dragonBonePhaseMax || cfg.dragonBoneThrowFrames || 14;
-      const progress = Math.min(1.0, this.dragonBonePhaseTimer / maxT);
-      const releaseFrame = Math.max(1, Math.floor(maxT * 0.5));
-      const chopAngle = cfg.dragonBoneThrowChopAngle ?? 0.85;
+      const maxT = this.dragonBonePhaseMax || cfg.dragonBonePunchFrames || 18;
+      const impactFrame = Math.max(1, Math.floor(maxT * 0.35));
 
       this.vx = 0;
       this.vy = 0;
 
-      // Keep the enemy on the blade as Maki brings it forward and chops down with force for the throw.
-      if (this.dragonBonePhaseTimer < releaseFrame) {
+      // Enemy remains pinned to the blade until the punch connects
+      if (this.dragonBonePhaseTimer < impactFrame) {
         if (target && !target.isDead) {
-          const throwProgress = this.dragonBonePhaseTimer / releaseFrame;
-          const throwEase = Math.sin(throwProgress * Math.PI * 0.5);
-          const currentRot = -1.65 + (1.65 + chopAngle) * throwEase;
-          this._alignPinnedTargetOnBlade(target, currentRot);
+          this._alignPinnedTargetOnBlade(target, 0.0, curArena);
         }
-      } else if (this.dragonBonePhaseTimer === releaseFrame) {
-        this._executeDragonBoneThrow(target);
-      }
-
-      if (this.dragonBonePhaseTimer >= maxT) {
-        const pinFrames = cfg.dragonBoneGroundPinFrames ?? 14;
-        if (pinFrames > 0) {
-          this.dragonBonePhase = 'groundPin';
-          this.dragonBonePhaseTimer = 0;
-          this.dragonBonePhaseMax = pinFrames;
-        } else {
-          this.dragonBoneActive = false;
-          this.dragonBonePhase = null;
-        }
-        if (this.dragonBoneTarget) {
-          this.dragonBoneTarget.isPinnedByMaki = false;
-          this.dragonBoneTarget.isGrabbed = false;
-          this.dragonBoneTarget._makiPinnedBladeAngle = null;
-          this.dragonBoneTarget._makiPinnedBy = null;
-          this.dragonBoneTarget = null;
-        }
-      }
-    }
-    // ──────────────────────────────────────────
-    // PHASE 6: GROUND PIN & BLADE EXTRACTION
-    // ──────────────────────────────────────────
-    else if (this.dragonBonePhase === 'groundPin') {
-      const maxT = this.dragonBonePhaseMax || cfg.dragonBoneGroundPinFrames || 14;
-
-      this.vx = 0;
-      this.vy = 0;
-
-      // On initial pin impact frame: spawn ground scorch fissure & spark impact
-      if (this.dragonBonePhaseTimer === 0) {
-        const pinAngle = this.gunAngle || 0;
-        const pinDist = this.r * 1.6;
-        const pinX = this.x + Math.cos(pinAngle) * pinDist;
-        const pinY = this.y + Math.sin(pinAngle) * pinDist;
-        spawnGroundScorch(pinX, pinY, 35);
-        spawnSparks(pinX, pinY, 8, '#F59E0B');
-        triggerGlobalScreenShake(3, 6);
+      } else if (this.dragonBonePhaseTimer === impactFrame) {
+        // Punch connects! Heavy punch damage, dislodge from blade, push away, and initiate launching tick damage
+        this._executeDragonBonePunch(target, curArena);
       }
 
       if (this.dragonBonePhaseTimer >= maxT) {
@@ -911,29 +1050,64 @@ export class MakiFighter extends Fighter {
         }
       }
     }
+    // Backward compatibility fallback branches for legacy external calls
+    else if (this.dragonBonePhase === 'lift') {
+      this.dragonBonePhase = 'punch';
+      this.dragonBonePhaseTimer = 0;
+      this.dragonBonePhaseMax = cfg.dragonBonePunchFrames || 18;
+    }
+    else if (this.dragonBonePhase === 'throw') {
+      const target = this.dragonBoneTarget;
+      const maxT = this.dragonBonePhaseMax || cfg.dragonBonePunchFrames || 18;
+      const impactFrame = Math.max(1, Math.floor(maxT * 0.35));
+      if (this.dragonBonePhaseTimer === impactFrame) {
+        this._executeDragonBonePunch(target, curArena);
+      }
+      if (this.dragonBonePhaseTimer >= maxT) {
+        this.dragonBoneActive = false;
+        this.dragonBonePhase = null;
+        this.dragonBoneTarget = null;
+      }
+    }
+    else if (this.dragonBonePhase === 'groundPin') {
+      this.dragonBoneActive = false;
+      this.dragonBonePhase = null;
+      this.dragonBoneTarget = null;
+    }
   }
 
-  _executeDragonBoneThrow(target) {
+  _executeDragonBonePunch(target, arena = null) {
     const cfg = CONFIG.maki || {};
-    const baseDmg = cfg.dragonBoneBaseDamage || 60;
-    const bonusDmg = (this.kineticCharges / this.maxKineticCharges) * ((cfg.dragonBoneMaxDamage || 120) - baseDmg);
-    const totalDmg = Math.round(baseDmg + bonusDmg);
-    const throwSpeed = (cfg.dragonBoneThrowSpeed || 22.0)
-      * (cfg.dragonBoneThrowDistanceMultiplier ?? 1.0)
+    const basePunchDmg = cfg.dragonBonePunchDamage || cfg.dragonBoneBaseDamage || 60;
+    const bonusDmg = (this.kineticCharges / this.maxKineticCharges) * ((cfg.dragonBoneMaxDamage || 120) - basePunchDmg);
+    const totalPunchDmg = Math.round(basePunchDmg + bonusDmg * 0.5);
+
+    const launchSpeed = (cfg.dragonBoneLaunchSpeed || cfg.dragonBoneThrowSpeed || 22.0)
+      * (cfg.dragonBoneThrowDistanceMultiplier ?? 1.5)
       * (1.0 + this.kineticCharges * 0.25);
-    const throwAngle = this.gunAngle || 0;
+    const launchAngle = this.gunAngle || this.angle || 0;
+    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
 
     if (target && !target.isDead) {
+      // 1. Dislodge enemy from being stabbed on the Split Soul Katana
       target.isPinnedByMaki = false;
       target.isGrabbed = false;
       target._makiPinnedBladeAngle = null;
       target._makiPinnedBy = null;
 
-      // Massive True Damage bypass
-      applyDamageToTarget(target, totalDmg, this, {
+      // Ensure target is clamped inside arena before applying launch impulse
+      if (curArena) {
+        const clampedTarget = this._clampToArena(target.x, target.y, target.r || 25, curArena);
+        target.x = clampedTarget.x;
+        target.y = clampedTarget.y;
+        resolveEntityPlusObstacleCollision(target, curArena);
+      }
+
+      // 2. Deliver Heavy Concussive Punch True Damage
+      applyDamageToTarget(target, totalPunchDmg, this, {
         isTrueDamage: true,
         bypassDefense: true,
-        damageType: 'heavy_throw'
+        damageType: 'heavy_punch'
       });
 
       // Soul Wound infliction
@@ -944,21 +1118,22 @@ export class MakiFighter extends Fighter {
         target.isSoulWounded = true;
       }
 
-      // Use the knockback channel so wall contact reflects the throw into a ricochet.
-      const throwVx = Math.cos(throwAngle) * throwSpeed;
-      const throwVy = Math.sin(throwAngle) * throwSpeed;
+      // 3. Launch the enemy backward from the punch
+      const launchVx = Math.cos(launchAngle) * launchSpeed;
+      const launchVy = Math.sin(launchAngle) * launchSpeed;
       target.vx = 0;
       target.vy = 0;
       target.knockbackVx = 0;
       target.knockbackVy = 0;
       if (typeof target.applyKnockback === 'function') {
-        target.applyKnockback(throwVx, throwVy);
+        target.applyKnockback(launchVx, launchVy);
       } else {
-        target.vx = throwVx;
-        target.vy = throwVy;
-        target.knockbackVx = throwVx;
-        target.knockbackVy = throwVy;
+        target.vx = launchVx;
+        target.vy = launchVy;
+        target.knockbackVx = launchVx;
+        target.knockbackVy = launchVy;
       }
+
       if (typeof target.applySlow === 'function') {
         target.applySlow(
           cfg.dragonBoneThrowSlowFrames ?? 45,
@@ -970,17 +1145,113 @@ export class MakiFighter extends Fighter {
         target.applyHitStun(35);
       }
 
-      spawnBloodEffect(target.x, target.y, throwAngle, 14);
-      spawnSparks(target.x, target.y, 10, '#FFFFFF');
-      spawnImpactFlash(target.x, target.y, 32, '#F59E0B');
-      spawnFloatingText(target.x, target.y - 30, 'SOUL THROW!', '#DC2626');
+      // 4. Register for Launching Tick Damage
+      const launchFrames = cfg.dragonBoneLaunchFrames || 36;
+      const tickInterval = cfg.dragonBoneLaunchTickInterval || 4;
+      const tickDmg = cfg.dragonBoneLaunchTickDamage || 8;
+
+      if (!this.makiLaunchedTargets) {
+        this.makiLaunchedTargets = [];
+      }
+      this.makiLaunchedTargets.push({
+        target,
+        timer: launchFrames,
+        maxTimer: launchFrames,
+        tickInterval,
+        tickDamage: tickDmg,
+        angle: launchAngle,
+        hitWallTriggered: false
+      });
+
+      // 5. Concussive Punch Impact VFX & Audio
+      const punchHitX = this.x + Math.cos(launchAngle) * (this.r + 20);
+      const punchHitY = this.y + Math.sin(launchAngle) * (this.r + 20);
+      spawnBloodEffect(target.x, target.y, launchAngle, 14);
+      spawnSparks(punchHitX, punchHitY, 12, '#FFFFFF');
+      spawnImpactFlash(punchHitX, punchHitY, 48, '#F59E0B');
+      spawnFloatingText(punchHitX, punchHitY - 30, 'HEAVENLY BRUTAL PUNCH!', '#F59E0B');
     }
 
-    triggerGlobalScreenShake(5, 8);
-    audioSystem.playSFX('sword_slash_heavy', 0.9);
+    triggerGlobalScreenShake(6, 12);
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('attack_heavypunch1', 1.0);
+        audioSystem.playSFX('attack_fleshhit', 1.0);
+        audioSystem.playSFX('sword_slash_heavy', 0.85);
+      }
+    } catch (e) {}
 
     // Consume stored kinetic charges
     this.kineticCharges = 0;
+  }
+
+  _executeDragonBoneThrow(target, arena = null) {
+    return this._executeDragonBonePunch(target, arena);
+  }
+
+  /**
+   * Applies continuous tick damage to launched enemies while flying through the air.
+   */
+  _updateMakiLaunchedTargets(arena) {
+    if (!this.makiLaunchedTargets || this.makiLaunchedTargets.length === 0) return;
+
+    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
+
+    for (let i = this.makiLaunchedTargets.length - 1; i >= 0; i--) {
+      const entry = this.makiLaunchedTargets[i];
+      const t = entry.target;
+
+      if (!t || t.isDead || t.hp <= 0) {
+        this.makiLaunchedTargets.splice(i, 1);
+        continue;
+      }
+
+      // Check boundary wall impact during launch
+      let hitWall = false;
+      if (curArena) {
+        const tr = t.r || 25;
+        if (t.x <= curArena.x + tr + 2 || t.x >= curArena.x + curArena.width - tr - 2 ||
+            t.y <= curArena.y + tr + 2 || t.y >= curArena.y + curArena.height - tr - 2) {
+          hitWall = true;
+        }
+      }
+
+      // Apply launch flight tick damage
+      if (entry.timer % entry.tickInterval === 0) {
+        applyDamageToTarget(t, entry.tickDamage, this, {
+          isTrueDamage: true,
+          bypassDefense: true,
+          damageType: 'soul_rend'
+        });
+
+        // Visceral blood and kinetic friction particles
+        spawnBloodEffect(t.x, t.y, entry.angle, 3);
+        spawnSparks(t.x, t.y, 2, '#014913ff');
+      }
+
+      // Wall slam reaction
+      if (hitWall && !entry.hitWallTriggered) {
+        entry.hitWallTriggered = true;
+        triggerGlobalScreenShake(4, 8);
+        try {
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('attack_fleshhit', 0.9);
+          }
+        } catch (e) {}
+        spawnGroundScorch(t.x, t.y, 28);
+        spawnSparks(t.x, t.y, 6, '#F59E0B');
+        applyDamageToTarget(t, Math.round(entry.tickDamage * 1.5), this, {
+          isTrueDamage: true,
+          bypassDefense: true,
+          damageType: 'wall_impact'
+        });
+      }
+
+      entry.timer--;
+      if (entry.timer <= 0) {
+        this.makiLaunchedTargets.splice(i, 1);
+      }
+    }
   }
 
   /**
@@ -1007,10 +1278,17 @@ export class MakiFighter extends Fighter {
     if (!this.riposteActive || !attacker) return false;
     this.riposteActive = false;
 
-    // Teleport behind attacker
+    // Teleport behind attacker with arena boundary safety
+    const curArena = (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
     const backAngle = (attacker.gunAngle || 0) + Math.PI;
-    this.x = attacker.x + Math.cos(backAngle) * 45;
-    this.y = attacker.y + Math.sin(backAngle) * 45;
+    const rawX = attacker.x + Math.cos(backAngle) * 45;
+    const rawY = attacker.y + Math.sin(backAngle) * 45;
+    const clampedPos = this._clampToArena(rawX, rawY, this.r, curArena);
+    this.x = clampedPos.x;
+    this.y = clampedPos.y;
+    if (curArena) {
+      resolveEntityPlusObstacleCollision(this, curArena);
+    }
     this.aim(attacker);
 
     // Deliver Vertical Bisection Cleave
@@ -1088,8 +1366,12 @@ export class MakiFighter extends Fighter {
       if (this.ultimateTimer % 12 === 0 && this.ultimateFlurryStep < 3) {
         this.ultimateFlurryStep++;
         const angle = (this.ultimateFlurryStep * (Math.PI * 2 / 3));
-        this.x = target.x + Math.cos(angle) * 50;
-        this.y = target.y + Math.sin(angle) * 50;
+        const rawX = target.x + Math.cos(angle) * 50;
+        const rawY = target.y + Math.sin(angle) * 50;
+        const clampedPos = this._clampToArena(rawX, rawY, this.r, arena);
+        this.x = clampedPos.x;
+        this.y = clampedPos.y;
+        if (arena) resolveEntityPlusObstacleCollision(this, arena);
         this.aim(target);
 
         applyDamageToTarget(target, CONFIG.maki?.flurryHitDamage || 35, this, {
@@ -1106,8 +1388,12 @@ export class MakiFighter extends Fighter {
     } else if (this.ultimatePhase === 'execute') {
       if (this.ultimateTimer === 10) {
         // Drop from above with bisecting soul cleave
-        this.x = target.x;
-        this.y = target.y - 20;
+        const rawX = target.x;
+        const rawY = target.y - 20;
+        const clampedPos = this._clampToArena(rawX, rawY, this.r, arena);
+        this.x = clampedPos.x;
+        this.y = clampedPos.y;
+        if (arena) resolveEntityPlusObstacleCollision(this, arena);
         this.aim(target);
 
         applyDamageToTarget(target, CONFIG.maki?.executionCleaveDamage || 120, this, {

@@ -9587,8 +9587,9 @@ async function main() {
     assertCanvasStackBalance('knight.draw(mockCtx)');
 
     // ── Test Knight Shield HP, DEF Buff & Broken Vulnerability ──
-    if (knight.shieldHp !== 90 || knight.isShieldBroken !== false) {
-      throw new Error(`Expected initial knight shieldHp=90, isShieldBroken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
+    const initialShieldHp = CONFIG.knight?.shieldHp ?? 90;
+    if (knight.shieldHp !== initialShieldHp || knight.isShieldBroken !== false) {
+      throw new Error(`Expected initial knight shieldHp=${initialShieldHp}, isShieldBroken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
     }
 
     const initialHp = knight.hp;
@@ -9600,13 +9601,13 @@ async function main() {
     if (knight.hp !== initialHp) {
       throw new Error(`Expected Knight HP to remain unchanged while shield active (${initialHp}), got ${knight.hp}`);
     }
-    const expectedShieldHp = 90 - Math.round(30 * (1 - 0.40)); // 90 - 18 = 72
+    const expectedShieldHp = initialShieldHp - Math.round(30 * (1 - 0.40));
     if (knight.shieldHp !== expectedShieldHp) {
       throw new Error(`Expected shieldHp=${expectedShieldHp}, got ${knight.shieldHp}`);
     }
 
     // 2. Break the shield with heavy damage
-    knight.takeDamage(200, null, {});
+    knight.takeDamage(1000, null, {});
     if (knight.shieldHp !== 0 || knight.isShieldBroken !== true) {
       throw new Error(`Expected shieldHp=0 and isShieldBroken=true after heavy hit, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
     }
@@ -9630,8 +9631,8 @@ async function main() {
 
     // 5. Test reset restores shield
     knight.reset();
-    if (knight.shieldHp !== 90 || knight.isShieldBroken !== false) {
-      throw new Error(`Expected reset to restore shieldHp=90, broken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
+    if (knight.shieldHp !== initialShieldHp || knight.isShieldBroken !== false) {
+      throw new Error(`Expected reset to restore shieldHp=${initialShieldHp}, broken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
     }
 
     // 6. Test SKILL DAMAGE absorption on active shield
@@ -9644,7 +9645,7 @@ async function main() {
     if (knight.hp !== hpBeforeSkill) {
       throw new Error(`Expected Knight HP to remain unchanged during skill hit on active shield (${hpBeforeSkill}), got ${knight.hp}`);
     }
-    const expectedSkillShieldHp = 90 - Math.round(40 * (1 - 0.40)); // 90 - 24 = 66
+    const expectedSkillShieldHp = initialShieldHp - Math.round(40 * (1 - 0.40));
     if (knight.shieldHp !== expectedSkillShieldHp) {
       throw new Error(`Expected shieldHp to reduce to ${expectedSkillShieldHp} after skill hit, got ${knight.shieldHp}`);
     }
@@ -9655,6 +9656,82 @@ async function main() {
     assertCanvasStackBalance('knight.drawOutline(mockCtx)');
   } catch (err) {
     console.error('❌ [KNIGHT MODEL ASSETS & WEAPONS TEST ERROR]:', err);
+    errors++;
+  }
+
+  // 11.43. Maki Zen'in Skill 1 Dragon-Bone Arena Clamping & Wall Impact Test
+  console.log('🗡️ [Maki Skill 1 Dragon-Bone Arena Clamping Test] Verifying Maki and impaled targets never clip out of arena boundaries during Skill 1 dash, stab, lift, and throw...');
+  try {
+    const MakiClass = FIGHTER_CLASS_MAP.maki;
+    if (!MakiClass) {
+      throw new Error('MakiClass not found in FIGHTER_CLASS_MAP');
+    }
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+
+    // Test Case A: Maki dashes directly towards right wall into whiff without clipping
+    const makiWhiff = new MakiClass({ x: 400, y: 400, color: '#18181B', controls: {} });
+    makiWhiff.r = 25;
+    makiWhiff.gunAngle = 0; // facing right towards wall at x = 495 (max allowed x = 470)
+    makiWhiff._castDragonBone({ x: 490, y: 400, r: 25, isDead: false });
+
+    // Step through windup and dash
+    for (let f = 0; f < 80; f++) {
+      makiWhiff.update(null, 0, testArena);
+      const maxX = testArena.x + testArena.width - makiWhiff.r;
+      const minX = testArena.x + makiWhiff.r;
+      if (makiWhiff.x > maxX + 0.01 || makiWhiff.x < minX - 0.01) {
+        throw new Error(`Maki clipped out of arena during dash whiff! x=${makiWhiff.x}, bounds=[${minX}, ${maxX}] at frame ${f}`);
+      }
+    }
+    if (makiWhiff.dragonBoneActive) {
+      throw new Error(`Expected Maki Dragon-Bone dash to safely halt upon wall impact whiff, got active=${makiWhiff.dragonBoneActive}, phase=${makiWhiff.dragonBonePhase}, timer=${makiWhiff.dragonBonePhaseTimer}, x=${makiWhiff.x}, y=${makiWhiff.y}`);
+    }
+
+    // Test Case B: Maki impales enemy near the left wall (wall at x = 45, max allowed minX = 70)
+    const makiHit = new MakiClass({ x: 160, y: 400, color: '#18181B', controls: {} });
+    makiHit.r = 25;
+    const dummyTarget = {
+      x: 90,
+      y: 400,
+      r: 25,
+      hp: 200,
+      maxHp: 200,
+      isDead: false,
+      takeDamage: () => {},
+      applyKnockback: (vx, vy) => { dummyTarget.vx = vx; dummyTarget.vy = vy; },
+      applyHitStun: () => {},
+      applySlow: () => {}
+    };
+
+    makiHit.gunAngle = Math.PI; // facing left
+    makiHit._castDragonBone(dummyTarget);
+
+    for (let f = 0; f < 170; f++) {
+      makiHit.update(dummyTarget, 0, testArena);
+
+      const minMakiX = testArena.x + makiHit.r;
+      const maxMakiX = testArena.x + testArena.width - makiHit.r;
+      if (makiHit.x < minMakiX - 0.01 || makiHit.x > maxMakiX + 0.01) {
+        throw new Error(`Maki clipped out of bounds during impalement combo! x=${makiHit.x}, bounds=[${minMakiX}, ${maxMakiX}] at frame ${f}`);
+      }
+
+      if (dummyTarget.isPinnedByMaki) {
+        const minTargetX = testArena.x + dummyTarget.r;
+        const maxTargetX = testArena.x + testArena.width - dummyTarget.r;
+        if (dummyTarget.x < minTargetX - 0.01 || dummyTarget.x > maxTargetX + 0.01) {
+          throw new Error(`Pinned target clipped out of bounds! target.x=${dummyTarget.x}, bounds=[${minTargetX}, ${maxTargetX}] at frame ${f}`);
+        }
+      }
+    }
+
+    // Test Case C: Canvas 2D transform stack balance
+    mockCtx.resetStackDepth();
+    makiHit.draw(mockCtx, dummyTarget);
+    assertCanvasStackBalance('makiHit.draw(mockCtx)');
+
+    console.log('✅ [Maki Skill 1 Dragon-Bone Arena Clamping Test] Verified 0 wall clipping across dash whiffs and wall impalements with 100% balanced Canvas 2D stack depths!');
+  } catch (err) {
+    console.error('❌ [MAKI SKILL 1 ARENA CLAMPING TEST ERROR]:', err);
     errors++;
   }
 

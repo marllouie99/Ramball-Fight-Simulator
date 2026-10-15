@@ -94,7 +94,9 @@ export const gutsConfig = {
   hit1HitPauseFrames: 7,
   hit1HitStunFrames: 11,
 
-  // Hit 2: Reverse Cleave (Top-Right -> Bottom -> Down-Left back to Stance)
+  // Hit 2: Heavy Downward Launching Cleave (Overhead Top-Left -> Sky Apex -> Downward Forward Ground Slam)
+  hit2StartAngle: -2.15, // ~ -123 deg (overhead coiled sword position matching reference diagram)
+  hit2EndAngle: 0.85,    // ~ +49 deg (downward ground cleave impact angle)
   hit2LiftFrames: 6,
   hit2HoldFrames: 2,
   hit2StrikeFrames: 5,
@@ -102,11 +104,12 @@ export const gutsConfig = {
   hit2LockFrames: 7,
   hit2RecoveryFrames: 12,
   hit2Damage: 48,
-  hit2Knockback: 8.5,
-  hit2LungeSpeed: 7.5,
+  hit2Knockback: 10.5,
+  hit2LaunchImpulse: 6.0, // Upward loft impulse launching enemy on impact
+  hit2LungeSpeed: 8.0,
   hit2ArcAngle: (210 * Math.PI) / 180,
   hit2HitPauseFrames: 9,
-  hit2HitStunFrames: 15,
+  hit2HitStunFrames: 16,
 
 
   // ──────────────────────────────────────────

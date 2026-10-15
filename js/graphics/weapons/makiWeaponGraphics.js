@@ -42,6 +42,90 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
+ * Draws Maki's dynamic muscular arm connecting shoulder to hand (Rule 30 & Melee Attack Standard).
+ * Features:
+ * - Natural 2-segment elbow flexion based on extension distance
+ * - Manga ink outer stroke (#0E0F14)
+ * - Athletic tanned muscular skin tones (#FEDBC0 base, #D4A373 shadow, #FFF0E2 highlight)
+ * - High-collar sleeveless tactical turtleneck armhole seam cap (#262039)
+ */
+function _drawMakiMuscularArm(ctx, shoulderX, shoulderY, handX, handY, handRadius, r, isLeftArm = false) {
+  const dx = handX - shoulderX;
+  const dy = handY - shoulderY;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 2.0) return;
+
+  const nx = -dy / dist;
+  const ny = dx / dist;
+  const mx = shoulderX + dx * 0.48;
+  const my = shoulderY + dy * 0.48;
+
+  // Natural arm reach before tension
+  const armReach = r * 1.35;
+  const flexRatio = Math.max(0, 1 - (dist / armReach));
+  const bendAmount = Math.min(r * 0.42, r * 0.38 * Math.sin(flexRatio * Math.PI * 0.7));
+
+  // Determine elbow outward flare direction relative to body core (0, 0)
+  const dot = nx * mx + ny * my;
+  const outNx = (dot >= 0) ? nx : -nx;
+  const outNy = (dot >= 0) ? ny : -ny;
+  const flareX = isLeftArm ? -1.0 : 1.0;
+  const flareY = 0.35;
+  const dirX = outNx * 0.65 + flareX * 0.35;
+  const dirY = outNy * 0.65 + flareY * 0.35;
+  const dirLen = Math.hypot(dirX, dirY) || 1;
+
+  const elbowX = mx + (dirX / dirLen) * bendAmount;
+  const elbowY = my + (dirY / dirLen) * bendAmount;
+
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // 1. Manga ink outer border
+  ctx.beginPath();
+  ctx.moveTo(shoulderX, shoulderY);
+  ctx.lineTo(elbowX, elbowY);
+  ctx.lineTo(handX, handY);
+  ctx.lineWidth = handRadius * 1.55;
+  ctx.strokeStyle = '#0E0F14';
+  ctx.stroke();
+
+  // 2. Athletic muscular skin base tone
+  ctx.lineWidth = handRadius * 1.05;
+  ctx.strokeStyle = isLeftArm ? '#D4A373' : '#FEDBC0';
+  ctx.stroke();
+
+  // 3. Inner shadow contour along flexion underside
+  ctx.beginPath();
+  ctx.moveTo(elbowX, elbowY);
+  ctx.lineTo(handX, handY);
+  ctx.lineWidth = handRadius * 0.48;
+  ctx.strokeStyle = '#D89F7C';
+  ctx.stroke();
+
+  // 4. Forearm muscular highlight along crest
+  ctx.beginPath();
+  ctx.moveTo(shoulderX + (elbowX - shoulderX) * 0.35, shoulderY + (elbowY - shoulderY) * 0.35);
+  ctx.lineTo(elbowX, elbowY);
+  ctx.lineTo(handX - (handX - elbowX) * 0.25, handY - (handY - elbowY) * 0.25);
+  ctx.lineWidth = handRadius * 0.32;
+  ctx.strokeStyle = isLeftArm ? '#E9B796' : '#FFF0E2';
+  ctx.stroke();
+
+  // 5. Sleeveless tactical turtleneck deltoid cap / armhole rim at shoulder
+  ctx.beginPath();
+  ctx.arc(shoulderX, shoulderY, handRadius * 0.62, 0, Math.PI * 2);
+  ctx.fillStyle = '#262039';
+  ctx.fill();
+  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = '#0E0F14';
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * Draws Maki's weapons and hands adhering strictly to Rule 20 standard.
  * Features 3 completely unique, bespoke, non-chop combat stances:
  * - Hit 1: Battōjutsu Quick-Draw (Linear horizontal Iai flash from hip sheath, 0 downward chop)
@@ -142,12 +226,7 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
         weaponRot = (1.10 * settleEase) - (0.28 * springWave);
         weaponLunge = (24.0 * settleEase) - (6.0 * springWave);
         weaponOffY = (14.0 * settleEase) - (4.0 * springWave);
-        if (rp > 0.40) {
-          isTwoHanded = false;
-          const returnEase = (rp - 0.40) / 0.60;
-          leftX = (rightX - 8) + (-r * 0.82 - (rightX - 8)) * returnEase;
-          leftY = (rightY - 4) + (r * 0.38 - (rightY - 4)) * returnEase;
-        }
+        // Phase 5 Recovery: Two-handed stance settle (arms and hands remain on tsuka)
       }
     } else if (step === 2) {
       // ──────────────────────────────────────────
@@ -189,12 +268,7 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
         weaponRot = (-1.65 * settleEase) + (0.35 * springWave);
         weaponLunge = (24.0 * settleEase) - (6.0 * springWave);
         weaponOffY = (-18.0 * settleEase) + (4.0 * springWave);
-        if (rp > 0.40) {
-          isTwoHanded = false;
-          const returnEase = (rp - 0.40) / 0.60;
-          leftX = (rightX - 8) + (-r * 0.82 - (rightX - 8)) * returnEase;
-          leftY = (rightY - 4) + (r * 0.38 - (rightY - 4)) * returnEase;
-        }
+        // Phase 5 Recovery: Two-handed stance settle (arms and hands remain on tsuka)
       }
     }
     // ──────────────────────────────────────────
@@ -208,135 +282,134 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
     // ──────────────────────────────────────────
     else {
       isTwoHanded = true;
-      const orbitRx = r * 0.85;
-      const orbitRy = r * 0.72;
-      const startAng = 0.55;
-      const lockAng = 0.55;
-      const lockRot = 0.80;
-      const lockHx = Math.cos(lockAng) * orbitRx;
-      const lockHy = Math.sin(lockAng) * orbitRy;
-
       if (progress < coilP) {
-        // Phase 1: Draw two hands and hilt into coiled anticipation ready stance
+        // Phase 1: Draw two hands and hilt into coiled anticipation ready stance across chest
         const wp = progress / Math.max(0.01, coilP);
         const ease = Math.sin(wp * Math.PI * 0.5);
-        const curHx = rightX + (lockHx - rightX) * ease;
-        const curHy = rightY + (lockHy - rightY) * ease;
-
-        weaponOffX = curHx - rightX;
-        weaponOffY = curHy - rightY;
-        weaponRot = startAng * ease;
-        weaponLunge = -6.0 * ease;
+        weaponOffX = -6.0 * ease;
+        weaponOffY = -4.0 * ease;
+        weaponRot = -0.45 * ease;
+        weaponLunge = -8.0 * ease;
       } else if (progress < holdP) {
         // Phase 2: Poised hold at ready tension
-        weaponOffX = lockHx - rightX;
-        weaponOffY = lockHy - rightY;
-        weaponRot = startAng;
-        weaponLunge = -6.0;
+        weaponOffX = -6.0;
+        weaponOffY = -4.0;
+        weaponRot = -0.45;
+        weaponLunge = -8.0;
       } else if (progress < strikeP) {
-        // Phase 3: Hypersonic 360° whirlwind whip strike orbiting continuously around body center
+        // Phase 3: Hypersonic 360° whirlwind whip strike (body spins 360° in world space)
         const sp = (progress - holdP) / Math.max(0.01, (strikeP - holdP));
         const whipEase = Math.pow(sp, 1.25);
-        const sweepAngle = startAng + (Math.PI * 2) * whipEase;
-        const curHx = Math.cos(sweepAngle) * orbitRx;
-        const curHy = Math.sin(sweepAngle) * orbitRy;
-
-        weaponOffX = curHx - rightX;
-        weaponOffY = curHy - rightY;
-        weaponRot = sweepAngle + 0.25;
-        weaponLunge = 28.0 * Math.sin(whipEase * Math.PI);
+        weaponOffX = 0;
+        weaponOffY = 0;
+        weaponRot = 0.15 + 0.25 * Math.sin(whipEase * Math.PI);
+        weaponLunge = -8.0 + 34.0 * Math.sin(whipEase * Math.PI);
       } else if (progress < pinP) {
-        // Phase 4: SUNDER IMPACT LOCK — Locked firmly in front-right cleave plane (zero shaking)
-        weaponOffX = lockHx - rightX;
-        weaponOffY = lockHy - rightY;
-        weaponRot = lockRot;
-        weaponLunge = 22.0;
+        // Phase 4: SUNDER IMPACT LOCK — Locked firmly in front cleave plane (zero shaking)
+        weaponOffX = 0;
+        weaponOffY = 0;
+        weaponRot = 0.40;
+        weaponLunge = 24.0;
       } else {
         // Phase 5: Spring-damped return from lock angle to neutral guard (NEVER unwinds backwards!)
         const rp = (progress - pinP) / Math.max(0.01, (1.0 - pinP));
         const settleEase = Math.pow(1.0 - rp, 1.8);
         const springWave = Math.sin(rp * Math.PI * 2.0) * Math.exp(-rp * 4.0);
 
-        const lockOffX = lockHx - rightX;
-        const lockOffY = lockHy - rightY;
-        weaponOffX = (lockOffX * settleEase) + (1.5 * springWave);
-        weaponOffY = (lockOffY * settleEase) + (1.5 * springWave);
-        weaponRot = (lockRot * settleEase) - (0.22 * springWave);
-        weaponLunge = (22.0 * settleEase) - (5.0 * springWave);
+        weaponOffX = 0;
+        weaponOffY = 0;
+        weaponRot = (0.40 * settleEase) - (0.20 * springWave);
+        weaponLunge = (24.0 * settleEase) - (5.0 * springWave);
 
-        if (rp > 0.40) {
-          isTwoHanded = false;
-          const returnEase = (rp - 0.40) / 0.60;
-          leftX = (rightX + weaponOffX - 8) + (-r * 0.82 - (rightX + weaponOffX - 8)) * returnEase;
-          leftY = (rightY + weaponOffY - 4) + (r * 0.38 - (rightY + weaponOffY - 4)) * returnEase;
-        }
+        // Phase 5 Recovery: Two-handed stance settle (arms and hands remain on tsuka)
       }
     }
   } else if (fighter.dragonBoneActive) {
-    isTwoHanded = true; // Mandatory 2-handed grip for the entire Dragon-Bone sequence (stab to throw & groundPin)
     const phase = fighter.dragonBonePhase || 'dash';
     const timer = fighter.dragonBonePhaseTimer || 0;
     const maxT = fighter.dragonBonePhaseMax || 12;
     const progress = Math.min(1.0, timer / Math.max(1, maxT));
 
     if (phase === 'windup') {
+      isTwoHanded = true;
       // Draw the two-handed point back before the committed dash
       const ease = Math.sin(progress * Math.PI * 0.5);
       weaponRot = 0.0;
       weaponLunge = -22.0 * ease;
       weaponOffY = -4.0 * ease;
     } else if (phase === 'dash') {
+      isTwoHanded = true;
       // Phase 2: High-Speed Impalement Dash - Two-handed pointed thrust lock
       weaponRot = 0.0;
       weaponLunge = 26.0;
       isJetThrusting = true;
     } else if (phase === 'stab') {
-      // Phase 3: Hold the blade through the target before beginning the lift
+      // The other hand (Right Hand) holds the sword firmly skewering the target!
+      // The Left Hand begins its smooth windup animation from the hilt release!
+      isTwoHanded = false;
       weaponRot = 0.0;
-      weaponLunge = 26.0 + 4.0 * progress;
+      weaponLunge = 26.0;
       isJetThrusting = true;
-    } else if (phase === 'lift') {
-      // Phase 4: Hoisting the impaled enemy high overhead with both hands
       const ease = Math.sin(progress * Math.PI * 0.5);
-      weaponRot = -1.65 * ease; // Lifts straight up overhead
+      const hiltReleaseX = (rightX + 26.0) - handRadius * 1.35;
+      const hiltReleaseY = rightY;
+      const coilX = -r * 0.65 - 12.0;
+      const coilY = r * 0.22 - 12.0;
+      leftX = hiltReleaseX + (coilX - hiltReleaseX) * ease;
+      leftY = hiltReleaseY + (coilY - hiltReleaseY) * ease;
+    } else if (phase === 'punch') {
+      // The other hand (Right Hand) holds the sword until punch impact, then smoothly retracts!
+      isTwoHanded = false;
+      const punchImpact = 0.35;
+      const startX = -r * 0.65 - 12.0;
+      const startY = r * 0.22 - 12.0;
+      const extX = r * 1.65;
+      const extY = r * 0.08;
+
+      if (progress < 0.12) {
+        // Poised Hold: tense apex coil before punch release
+        const hp = progress / 0.12;
+        const tremor = Math.sin(hp * Math.PI * 4) * 0.8;
+        leftX = startX + tremor;
+        leftY = startY;
+        weaponRot = 0.0;
+        weaponLunge = 26.0;
+      } else if (progress < punchImpact) {
+        // Smooth explosive whip punch acceleration into target
+        const sp = (progress - 0.12) / (punchImpact - 0.12);
+        const punchEase = Math.pow(sp, 2.2);
+        leftX = startX + (extX - startX) * punchEase;
+        leftY = startY + (extY - startY) * punchEase;
+        weaponRot = 0.0;
+        weaponLunge = 26.0;
+      } else if (progress < 0.50) {
+        // Impact Lock: fist latched at full extension with micro-tremor against target resistance
+        const lockTremor = (Math.random() - 0.5) * 1.6;
+        leftX = extX + lockTremor;
+        leftY = extY + lockTremor;
+        // Sword retracts smoothly as enemy is punched off
+        const retP = (progress - punchImpact) / (1.0 - punchImpact);
+        const retEase = Math.pow(1.0 - retP, 1.4);
+        weaponLunge = 26.0 * retEase;
+        weaponRot = -0.12 * (1.0 - retEase);
+      } else {
+        // Smooth spring-damped recovery settle
+        const rp = (progress - 0.50) / 0.50;
+        const settleEase = Math.pow(1.0 - rp, 1.8);
+        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.0);
+        const restX = -r * 0.55;
+        const restY = r * 0.22;
+        leftX = restX + (extX - restX) * settleEase - 3.5 * springWave;
+        leftY = restY + (extY - restY) * settleEase + 1.8 * springWave;
+        const retP = (progress - punchImpact) / (1.0 - punchImpact);
+        const retEase = Math.pow(1.0 - retP, 1.4);
+        weaponLunge = 26.0 * retEase;
+        weaponRot = -0.12 * retEase;
+      }
+    } else {
+      isTwoHanded = true;
+      weaponRot = 0.0;
       weaponLunge = 0.0;
-      weaponOffY = 0.0;
-    } else if (phase === 'throw') {
-      const chopAngle = (CONFIG.maki?.dragonBoneThrowChopAngle ?? 0.85);
-      // Phase 5: Two-handed forward and downward chop
-      if (progress < 0.5) {
-        const sp = progress / 0.5;
-        const ease = Math.sin(sp * Math.PI * 0.5);
-        weaponRot = -1.65 + (1.65 + chopAngle) * ease;
-        weaponLunge = 10.0 * ease;
-        weaponOffY = 4.0 * ease;
-      } else {
-        const rp = (progress - 0.5) / 0.5;
-        const ease = Math.pow(1.0 - rp, 1.4);
-        weaponRot = chopAngle * ease;
-        weaponLunge = 26.0 * ease;
-        weaponOffY = 4.0 * ease;
-      }
-    } else if (phase === 'groundPin') {
-      const chopAngle = (CONFIG.maki?.dragonBoneThrowChopAngle ?? 0.85);
-      // Phase 6: Pinned firmly into the floor with both hands
-      if (progress < 0.70) {
-        weaponRot = chopAngle;
-        weaponLunge = 24.0;
-        weaponOffY = 6.0;
-      } else {
-        const extractP = (progress - 0.70) / 0.30;
-        const ease = Math.sin(extractP * Math.PI * 0.5);
-        weaponRot = chopAngle * (1.0 - ease);
-        weaponLunge = 24.0 * (1.0 - ease);
-        weaponOffY = 6.0 * (1.0 - ease);
-        if (extractP > 0.6) {
-          isTwoHanded = false;
-          const returnEase = (extractP - 0.6) / 0.4;
-          leftX = (rightX - 6) + (-r * 0.82 - (rightX - 6)) * returnEase;
-          leftY = (rightY + 2) + (r * 0.38 - (rightY + 2)) * returnEase;
-        }
-      }
     }
   } else if (fighter.riposteTimer > 0) {
     // Reverse-grip guard stance
@@ -344,19 +417,19 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
     weaponLunge = -2.0;
   }
 
-  // 1. Draw Left Hand (Fist on lower-left flank if not in a two-handed stance)
-  if (!isTwoHanded) {
-    drawPixelHand(ctx, leftX, leftY, handRadius, '#D4A373', '#0E0F14');
-  }
+  // ──────────────────────────────────────────
+  // DYNAMIC MUSCULAR ARM LINKAGES & HANDS (Rule 30 Anti-Detached Hands Standard)
+  // ──────────────────────────────────────────
+  const shouldHideDefaultHands = Boolean(fighter.hideHands || (typeof state !== 'undefined' && state.showSkinOnly));
+  const isPunchSkillActive = fighter.dragonBoneActive && (fighter.dragonBonePhase === 'stab' || fighter.dragonBonePhase === 'punch');
+  const isBasicAttacking = fighter.swordSwingTimer > 0;
+  const isSwordActive = isBasicAttacking || fighter.dragonBoneActive || fighter.riposteTimer > 0;
 
-  // The pinned-target overlay already draws the blade through the enemy; avoid a second katana mesh.
-  const isBladeShownInPinnedTarget = fighter.dragonBoneActive &&
-    fighter.dragonBoneTarget?.isPinnedByMaki &&
-    ['stab', 'lift', 'throw'].includes(fighter.dragonBonePhase);
-
-  // 2. Draw Split Soul Katana anchored at Right Hand & Hands in local weapon space
-  ctx.save();
-  ctx.translate(rightX + weaponOffX, rightY + weaponOffY);
+  // Shoulder coordinates on upper torso (Rule 30)
+  const lShoulderX = -r * 0.65;
+  const lShoulderY = r * 0.22;
+  const rShoulderX = r * 0.65;
+  const rShoulderY = r * 0.22;
 
   // Support Weapon Customizations
   const customWp = (typeof state !== 'undefined' && state.weaponCustomizations?.maki) || {};
@@ -367,11 +440,55 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
   const wpWidthMult = customWp.widthScale ?? 1.0;
   const wpAngleOff = customWp.angleOffset || 0;
 
-  ctx.translate(wpOffX, wpOffY);
-  ctx.rotate(weaponRot + wpAngleOff);
+  // Real-time weapon angle and translation in character coordinates
+  const hiltPivotX = rightX + weaponOffX + wpOffX;
+  const hiltPivotY = rightY + weaponOffY + wpOffY;
+  const totalAngle = weaponRot + wpAngleOff;
+  const cosA = Math.cos(totalAngle);
+  const sinA = Math.sin(totalAngle);
+
+  // Dominant Right Hand position in character coordinates (at tsuba collar)
+  const rHandX = hiltPivotX + cosA * weaponLunge;
+  const rHandY = hiltPivotY + sinA * weaponLunge;
+
+  // Support Left Hand position in character coordinates
+  const gripSpacing = handRadius * 1.35;
+  const lHandHiltX = hiltPivotX + cosA * (weaponLunge - gripSpacing);
+  const lHandHiltY = hiltPivotY + sinA * (weaponLunge - gripSpacing);
+  const lHandX = isTwoHanded ? lHandHiltX : leftX;
+  const lHandY = isTwoHanded ? lHandHiltY : leftY;
+
+  // 1. Draw Rear Arm Linkage (Left Arm from Left Shoulder)
+  if (isPunchSkillActive) {
+    // Dynamic punch arm linkage from left shoulder to punch fist with 2-segment elbow flexion
+    _drawMakiMuscularArm(ctx, lShoulderX, lShoulderY, leftX, leftY, handRadius, r, true);
+    drawPixelHand(ctx, leftX, leftY, handRadius, '#D4A373', '#0E0F14');
+  } else if (isTwoHanded) {
+    // Left arm crossing chest to grip lower tsuka
+    _drawMakiMuscularArm(ctx, lShoulderX, lShoulderY, lHandX, lHandY, handRadius, r, true);
+  } else if (!shouldHideDefaultHands) {
+    drawPixelHand(ctx, leftX, leftY, handRadius, '#D4A373', '#0E0F14');
+  }
+
+  // 2. Draw Dominant Arm Linkage (Right Arm from Right Shoulder)
+  if (isSwordActive) {
+    _drawMakiMuscularArm(ctx, rShoulderX, rShoulderY, rHandX, rHandY, handRadius, r, false);
+  } else if (!shouldHideDefaultHands) {
+    _drawMakiMuscularArm(ctx, rShoulderX, rShoulderY, rHandX, rHandY, handRadius, r, false);
+  }
+
+  // The pinned-target overlay already draws the blade through the enemy; avoid a second katana mesh.
+  const isBladeShownInPinnedTarget = fighter.dragonBoneActive &&
+    fighter.dragonBoneTarget?.isPinnedByMaki &&
+    ['stab', 'lift', 'throw', 'punch'].includes(fighter.dragonBonePhase);
+
+  // 3. Draw Split Soul Katana anchored at Right Hand & Hands in local weapon space
+  ctx.save();
+  ctx.translate(hiltPivotX, hiltPivotY);
+  ctx.rotate(totalAngle);
   ctx.translate(weaponLunge, 0);
 
-  // 2A. Render authentic Split Soul Katana scaled independently (White Fur Collar, Damascus Blade & Kashira Pommel)
+  // 3A. Render authentic Split Soul Katana scaled independently (White Fur Collar, Damascus Blade & Kashira Pommel)
   if (!isBladeShownInPinnedTarget) {
     ctx.save();
     ctx.scale(wpScaleMult * wpLengthMult, wpScaleMult * wpWidthMult);
@@ -379,13 +496,13 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
     ctx.restore();
   }
 
-  // 3. Render Hands Gripping the Katana Tsuka in Unscaled Character Space (1:1 size matching Left Hand & Toji)
+  // 3B. Render Hands Gripping the Katana Tsuka in Unscaled Character Space (1:1 size matching Left Hand & Toji)
   if (isTwoHanded) {
     // Rear support hand (Left Hand) gripping lower handle
-    drawPixelHand(ctx, -handRadius * 1.35, 0, handRadius, '#D4A373', '#0E0F14');
+    drawPixelHand(ctx, -gripSpacing, 0, handRadius, '#D4A373', '#0E0F14');
     // Main hand (Right Hand) gripping near collar
     drawPixelHand(ctx, 0, 0, handRadius, '#D4A373', '#0E0F14');
-  } else {
+  } else if (isSwordActive || !shouldHideDefaultHands) {
     // Single main hand (Right Hand) on grip
     drawPixelHand(ctx, 0, 0, handRadius, '#D4A373', '#0E0F14');
   }
@@ -424,8 +541,9 @@ export function drawMakiImpaledTargetOverlay(ctx, target, maki = null) {
     let weaponRot = 0;
     let weaponLunge = 0;
 
-    if (phase === 'stab') {
+    if (phase === 'stab' || phase === 'punch') {
       weaponLunge = 26.0 + 4.0 * progress;
+      weaponRot = 0;
     } else if (phase === 'lift') {
       weaponRot = -1.65 * Math.sin(progress * Math.PI * 0.5);
     } else if (phase === 'throw') {
@@ -544,6 +662,17 @@ export function drawMakiComboSlashVFX(ctx, fighter, r, facingLeft = false) {
       _drawNeedleSpeedLine(ctx, -r * 0.8, -6, 0, 42, '#F59E0B');
       _drawNeedleSpeedLine(ctx, -r * 0.8, 6, 0, 36, '#EF4444');
       _drawNeedleSpeedLine(ctx, -r * 1.2, 0, 0, 48, '#FFFFFF');
+    } else if (phase === 'punch') {
+      const maxT = Math.max(1, fighter.dragonBonePhaseMax || 1);
+      const timer = fighter.dragonBonePhaseTimer || 0;
+      const progress = Math.min(1.0, timer / maxT);
+      if (progress >= 0.35 && progress < 0.75) {
+        const punchP = (progress - 0.35) / 0.40;
+        const taper = Math.sin(punchP * Math.PI);
+        _drawNeedleSpeedLine(ctx, r * 1.1, 0, 0, 38 * taper, '#F59E0B');
+        _drawNeedleSpeedLine(ctx, r * 1.3, -4, -0.12, 28 * taper, '#FFFFFF');
+        _drawNeedleSpeedLine(ctx, r * 1.3, 4, 0.12, 28 * taper, '#EF4444');
+      }
     } else if (phase === 'throw') {
       const maxT = Math.max(1, fighter.dragonBonePhaseMax || 1);
       const timer = fighter.dragonBonePhaseTimer || 0;
@@ -553,24 +682,6 @@ export function drawMakiComboSlashVFX(ctx, fighter, r, facingLeft = false) {
         const taper = Math.sin(chopP * Math.PI);
         _drawNeedleSpeedLine(ctx, r * 1.5, 4, 0.40, 30 * taper, '#F59E0B');
         _drawNeedleSpeedLine(ctx, r * 1.7, 8, 0.50, 24 * taper, '#FFFFFF');
-      }
-    } else if (phase === 'groundPin') {
-      const maxT = Math.max(1, fighter.dragonBonePhaseMax || 1);
-      const timer = fighter.dragonBonePhaseTimer || 0;
-      const progress = Math.min(1.0, timer / maxT);
-      if (progress < 0.70) {
-        const pulse = Math.sin((progress / 0.70) * Math.PI);
-        ctx.strokeStyle = `rgba(245, 158, 11, ${0.85 * pulse})`;
-        ctx.lineWidth = 2.0;
-        ctx.beginPath();
-        ctx.ellipse(r * 1.5, 8, 14 * pulse + 4, 6 * pulse + 2, 0.45, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.strokeStyle = `rgba(220, 38, 38, ${0.75 * pulse})`;
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.ellipse(r * 1.5, 8, 22 * pulse + 6, 9 * pulse + 3, 0.45, 0, Math.PI * 2);
-        ctx.stroke();
       }
     }
   }
@@ -792,11 +903,15 @@ export function drawMakiComboSlashVFX(ctx, fighter, r, facingLeft = false) {
       const outerR = r * 3.55;
       const innerR = r * 1.35;
       const totalArc = CONFIG.maki?.hit3ArcAngle || (Math.PI * 2);
-      const startArc = 0.55 + totalArc * Math.pow(recP, 1.8);
-      const endArc = 0.55 + totalArc * Math.pow(spinP, 1.25);
+      const startArc = totalArc * Math.pow(recP, 1.8);
+      const endArc = totalArc * Math.pow(spinP, 1.25);
 
       if (endArc - startArc > 0.05) {
         ctx.save();
+        // Counter-rotate context so the 360° whirlwind disc sweeps in sync with world aim
+        const curAngle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+        ctx.rotate(-curAngle + (fighter.swordSlashAngle || 0));
+
         // 1. Concentric Whirlwind Outer Soul Amber Wash
         ctx.beginPath();
         ctx.arc(0, 0, outerR, startArc, endArc, false);

@@ -14,6 +14,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { gutsConfig } from '../../configs/characters/gutsConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
+import { spawnGroundScorch } from '../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { drawGutsSkin } from '../../graphics/fighters/gutsSkin.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -548,7 +549,7 @@ export class GutsFighter extends Fighter {
   }
 
   /**
-   * Chains immediately from Hit 1 into Hit 2: Reverse Cleave (Top-Right -> Bottom -> Down-Left back to Combat Stance).
+   * Chains immediately from Hit 1 into Hit 2: Heavy Downward Launching Cleave (Overhead Top-Left -> Sky Apex -> Downward Forward Ground Slam).
    */
   _startSwordHit2(opponent) {
     const cfg = gutsConfig;
@@ -560,10 +561,10 @@ export class GutsFighter extends Fighter {
     const pinF = cfg.hit2ImpactLockFrames ?? 7;
     const recF = cfg.hit2RecoveryFrames ?? 12;
     let dmg = cfg.hit2Damage ?? 48;
-    let lunge = cfg.hit2LungeSpeed ?? 7.5;
-    const kb = cfg.hit2Knockback ?? 8.5;
+    let lunge = cfg.hit2LungeSpeed ?? 8.0;
+    const kb = cfg.hit2Knockback ?? 10.5;
     const hitPause = cfg.hit2HitPauseFrames ?? 9;
-    const hitStun = cfg.hit2HitStunFrames ?? 15;
+    const hitStun = cfg.hit2HitStunFrames ?? 16;
 
     if (this.isBerserkerActive) {
       dmg *= cfg.berserkerDamageMultiplier || 1.25;
@@ -732,6 +733,14 @@ export class GutsFighter extends Fighter {
             }
           } catch (e) {}
 
+          // Ground scorch fissure and combat floating text
+          if (this.swordComboStep === 2) {
+            spawnGroundScorch(this.swordImpactX, this.swordImpactY, 35);
+            spawnFloatingText(this.x, this.y - this.r - 20, 'DOWNWARD LAUNCHING CLEAVE!', this.isBerserkerActive ? '#ef4444' : '#dc2626');
+          } else {
+            spawnFloatingText(this.x, this.y - this.r - 20, 'HEAVY RISING CLEAVE!', this.isBerserkerActive ? '#ef4444' : '#71717a');
+          }
+
           triggerGlobalScreenShake(this.swordComboStep === 2 ? 6 : 4, 8);
           return;
         }
@@ -780,7 +789,7 @@ export class GutsFighter extends Fighter {
       tgt.vx += Math.cos(kbAngle) * this.swordSwingKnockback;
       tgt.vy += Math.sin(kbAngle) * this.swordSwingKnockback;
       if (isStep2) {
-        tgt.vy -= 2.5; // Uppercut loft
+        tgt.vy -= (gutsConfig.hit2LaunchImpulse ?? 6.0); // Heavy downward smash rebound loft!
       }
 
       if (typeof tgt.applyHitStun === 'function') {
@@ -851,27 +860,32 @@ export class GutsFighter extends Fighter {
         return apexAngle - 0.32 * springWave + (startAngle - apexAngle) * 0.05 * (1 - settleEase);
       }
     } else {
-      // Hit 2: Reverse Cleave (up-right -> down-left)
+      // Hit 2: Heavy Downward Launching Cleave (Overhead Top-Left -> Sky Apex -> Downward Forward Ground Slam)
+      const hit2StartAngle = cfg.hit2StartAngle ?? -2.15; // ~ -123 deg (overhead coiled sword position matching reference diagram)
+      const hit2EndAngle = cfg.hit2EndAngle ?? 0.85;       // ~ +49 deg (downward ground cleave impact angle)
+
       if (elapsed < liftF) {
-        // Phase 1: Coil / Windup - pull back higher up-right
+        // Phase 1: Coil / Hoist Overhead - heave the massive iron sword from apexAngle (-0.70) up and back over head to -2.15
         const wp = elapsed / Math.max(1, liftF);
-        return apexAngle - 0.25 * Math.sin(wp * Math.PI * 0.5);
+        const ease = Math.sin(wp * Math.PI * 0.5);
+        return apexAngle + (hit2StartAngle - apexAngle) * ease;
       } else if (elapsed < strikeStart) {
-        // Phase 2: Poised Hold
-        return apexAngle - 0.25;
+        // Phase 2: Poised Overhead Hold - maximum potential energy (matching reference diagram)
+        return hit2StartAngle;
       } else if (elapsed < strikeEnd) {
-        // Phase 3: Hypersonic Whip Strike - cleaving down
+        // Phase 3: Hypersonic Whip Strike - explosive downward cleave over the head into the ground
         const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
         const ease = Math.pow(sp, 2.5);
-        return (apexAngle - 0.25) + (sweepArc + 0.25) * ease;
+        return hit2StartAngle + (hit2EndAngle - hit2StartAngle) * ease;
       } else if (elapsed < pinEnd) {
-        // Phase 4: Impact Lock - slammed into impact plane
-        return startAngle;
+        // Phase 4: THE IMPACT LOCK - slammed and latched in the impact plane
+        return hit2EndAngle;
       } else {
-        // Phase 5: Ground Bounce & Spring Recoil Settle
+        // Phase 5: Ground Bounce & Spring Recoil Settle back towards stance
         const rp = (elapsed - pinEnd) / Math.max(1, recF);
         const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
-        return startAngle + 0.35 * springWave;
+        const settleEase = Math.pow(1 - rp, 1.8);
+        return hit2EndAngle + 0.35 * springWave + (startAngle - hit2EndAngle) * (1 - settleEase);
       }
     }
   }
@@ -923,29 +937,32 @@ export class GutsFighter extends Fighter {
         };
       }
     } else {
-      // Hit 2: Reverse downward cleave
+      // Hit 2: Heavy Downward Launching Cleave
       if (elapsed < liftF) {
+        // Arms pull back and lift high overhead
         const wp = elapsed / Math.max(1, liftF);
         const ease = Math.sin(wp * Math.PI * 0.5);
-        return { lunge: -10.0 * ease, offY: -10.0 * ease };
+        return { lunge: -14.0 * ease, offY: -16.0 * ease };
       } else if (elapsed < strikeStart) {
-        return { lunge: -10.0, offY: -10.0 };
+        return { lunge: -14.0, offY: -16.0 };
       } else if (elapsed < strikeEnd) {
+        // Plunge body forward and down into the cleave plane
         const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
         const ease = Math.pow(sp, 2.5);
         return {
-          lunge: -10.0 + 36.0 * ease,
-          offY: -10.0 + 24.0 * ease
+          lunge: -14.0 + 42.0 * ease,
+          offY: -16.0 + 32.0 * ease
         };
       } else if (elapsed < pinEnd) {
-        return { lunge: 26.0, offY: 14.0 };
+        // Firmly latched at full extension into the ground
+        return { lunge: 28.0, offY: 16.0 };
       } else {
         const rp = (elapsed - pinEnd) / Math.max(1, recF);
         const settleEase = Math.pow(1 - rp, 1.8);
         const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
         return {
-          lunge: 26.0 * settleEase - 8.0 * springWave,
-          offY: 14.0 * settleEase - 5.0 * springWave
+          lunge: 28.0 * settleEase - 8.0 * springWave,
+          offY: 16.0 * settleEase - 5.0 * springWave
         };
       }
     }

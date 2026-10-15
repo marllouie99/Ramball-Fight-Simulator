@@ -382,6 +382,8 @@ export function drawGutsComboSlashVFX(ctx, fighter) {
       const isHit2 = (fighter.swordComboStep === 2);
       const startAngle = cfg.battleStanceStartAngle ?? (cfg.battleStanceAngle ?? 2.97); // ~170 deg (down-left)
       const apexAngle = cfg.battleStanceApexAngle ?? -0.70; // ~ -40 deg (up-right)
+      const hit2StartAngle = cfg.hit2StartAngle ?? -2.15; // ~ -123 deg (overhead coiled sword position matching diagram)
+      const hit2EndAngle = cfg.hit2EndAngle ?? 0.85;       // ~ +49 deg (downward ground cleave impact)
 
       const custom = (typeof state !== 'undefined' && state.weaponCustomizations?.guts) || {};
       const weaponReach = typeof fighter.getWeaponReach === 'function'
@@ -391,21 +393,23 @@ export function drawGutsComboSlashVFX(ctx, fighter) {
       const innerR = r * 0.40;
       const outerR = r + weaponReach + 6;
 
-      const currentSwordAngle = typeof fighter._getSwordSwingAngle === 'function' ? fighter._getSwordSwingAngle() : (isHit2 ? apexAngle : startAngle);
+      const currentSwordAngle = typeof fighter._getSwordSwingAngle === 'function'
+        ? fighter._getSwordSwingAngle()
+        : (isHit2 ? hit2EndAngle : apexAngle);
 
-      let currentStartAngle = isHit2 ? apexAngle : startAngle;
+      let currentStartAngle = isHit2 ? hit2StartAngle : startAngle;
       let currentEndAngle = currentSwordAngle;
 
       if (elapsed >= strikeEnd && elapsed < pinEnd) {
         // Phase 4: Impact Lock hold
-        currentStartAngle = isHit2 ? apexAngle : startAngle;
-        currentEndAngle = isHit2 ? startAngle : apexAngle;
+        currentStartAngle = isHit2 ? hit2StartAngle : startAngle;
+        currentEndAngle = isHit2 ? hit2EndAngle : apexAngle;
       } else if (elapsed >= pinEnd) {
         // Phase 5: Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & 30)
         const rp = Math.min(1.0, (elapsed - pinEnd) / Math.max(1, recF));
         const recP = Math.pow(rp, 1.4);
-        const originStart = isHit2 ? apexAngle : startAngle;
-        const targetEnd = isHit2 ? startAngle : apexAngle;
+        const originStart = isHit2 ? hit2StartAngle : startAngle;
+        const targetEnd = isHit2 ? hit2EndAngle : apexAngle;
         currentStartAngle = originStart + (targetEnd - originStart) * recP;
         currentEndAngle = targetEnd;
       }

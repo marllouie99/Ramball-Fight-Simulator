@@ -1674,6 +1674,7 @@ async function runInteractionTests() {
     maki.dragonBoneActive = false;
     maki.drawGun(mockCtx);
     assert(genericGunDraws === 0, 'Maki must suppress generic gun rendering to match Toji hand parity');
+    assert(maki.hideHands === true, 'Maki default model hands must be hidden');
     FighterRenderer.drawGun = originalDrawGun;
 
     maki._castDragonBone(target);
@@ -1725,34 +1726,33 @@ async function runInteractionTests() {
     }
     assert(maki.dragonBonePhase === 'stab', `The stab phase must last ${CONFIG.maki.dragonBoneStabFrames} frames`);
     maki._updateDragonBone(target, arena);
-    assert(maki.dragonBonePhase === 'lift', 'Dragon-Bone must lift only after the stab phase completes');
-    assert(maki.dragonBonePhaseMax === CONFIG.maki.dragonBoneLiftFrames, 'Lift duration must come from Maki config');
+    assert(maki.dragonBonePhase === 'punch', 'Dragon-Bone must punch after the stab phase completes (lift sequence removed)');
+    assert(maki.dragonBonePhaseMax === (CONFIG.maki.dragonBonePunchFrames || 18), 'Punch duration must come from Maki config');
 
-    for (let frame = 0; frame < CONFIG.maki.dragonBoneLiftFrames - 1; frame++) {
+    const punchImpactFrame = Math.max(1, Math.floor(maki.dragonBonePhaseMax * 0.35));
+    for (let frame = 0; frame < punchImpactFrame - 1; frame++) {
       maki._updateDragonBone(target, arena);
     }
-    assert(maki.dragonBonePhase === 'lift', `Dragon-Bone must remain lifting through frame ${CONFIG.maki.dragonBoneLiftFrames - 1}`);
-    maki._updateDragonBone(target, arena);
-    assert(maki.dragonBonePhase === 'throw', 'Dragon-Bone must throw after the configured lift instead of slamming down');
-    assert(maki.dragonBonePhaseMax === CONFIG.maki.dragonBoneThrowFrames, 'Throw duration must come from Maki config');
-
-    const releaseFrame = Math.floor(CONFIG.maki.dragonBoneThrowFrames * 0.5);
-    for (let frame = 0; frame < releaseFrame - 1; frame++) {
-      maki._updateDragonBone(target, arena);
-    }
-    assert(target.isPinnedByMaki === true, 'Target must stay pinned until the throw release');
+    assert(target.isPinnedByMaki === true, 'Target must stay pinned on blade until punch connects');
     const originalThrowDistanceMultiplier = CONFIG.maki.dragonBoneThrowDistanceMultiplier;
     CONFIG.maki.dragonBoneThrowDistanceMultiplier = 1.5;
     maki._updateDragonBone(target, arena);
-    assert(target.isPinnedByMaki === false, 'Target must be released on the throw frame');
-    const expectedThrowSpeed = CONFIG.maki.dragonBoneThrowSpeed * CONFIG.maki.dragonBoneThrowDistanceMultiplier * (1.0 + maki.kineticCharges * 0.25);
+    assert(target.isPinnedByMaki === false, 'Target must be dislodged and released from blade on punch impact frame');
+    const expectedPunchSpeed = (CONFIG.maki.dragonBoneLaunchSpeed || CONFIG.maki.dragonBoneThrowSpeed) * CONFIG.maki.dragonBoneThrowDistanceMultiplier * (1.0 + maki.kineticCharges * 0.25);
     const throwVectorError = Math.hypot(
-      target.knockbackVx - Math.cos(maki.dragonBoneTargetAngle) * expectedThrowSpeed,
-      target.knockbackVy - Math.sin(maki.dragonBoneTargetAngle) * expectedThrowSpeed
+      target.knockbackVx - Math.cos(maki.dragonBoneTargetAngle) * expectedPunchSpeed,
+      target.knockbackVy - Math.sin(maki.dragonBoneTargetAngle) * expectedPunchSpeed
     );
-    assert(throwVectorError < 0.001, `Released target must launch along committed aim (expected ${expectedThrowSpeed} at ${maki.dragonBoneTargetAngle}, got ${target.knockbackVx}, ${target.knockbackVy})`);
-    assert(target.knockbackVx > 0, 'Dragon-Bone throw must use the ricocheting knockback channel');
-    assert(target.slowTimer === CONFIG.maki.dragonBoneThrowSlowFrames, 'Dragon-Bone throw must apply its configured brief slow');
+    assert(throwVectorError < 0.001, `Released target must launch along committed aim (expected ${expectedPunchSpeed} at ${maki.dragonBoneTargetAngle}, got ${target.knockbackVx}, ${target.knockbackVy})`);
+    assert(target.knockbackVx > 0, 'Dragon-Bone punch must use the ricocheting knockback channel');
+    assert(target.slowTimer === CONFIG.maki.dragonBoneThrowSlowFrames, 'Dragon-Bone punch must apply its configured brief slow');
+    assert(maki.makiLaunchedTargets.length === 1, 'Target must be registered in makiLaunchedTargets for launching flight tick damage');
+
+    // Verify continuous flight tick damage
+    const hpBeforeTick = target.hp;
+    maki._updateMakiLaunchedTargets(arena);
+    assert(target.hp < hpBeforeTick, `Target must take tick damage while launching (was ${hpBeforeTick}, now ${target.hp})`);
+
     CONFIG.maki.dragonBoneThrowDistanceMultiplier = originalThrowDistanceMultiplier;
     const throwStartX = target.x;
     const throwStartY = target.y;
@@ -1771,22 +1771,16 @@ async function runInteractionTests() {
     target.update(maki, 1, wallArena);
     assert(target.knockbackVx < 0, 'Thrown target must ricochet away from the wall');
     assert(target.slowTimer > 0, 'Thrown target must remain slowed after the wall ricochet');
-    assert(aoeQueries === 0, 'Throw release must not trigger a ground-slam AOE');
+    assert(aoeQueries === 0, 'Punch release must not trigger a ground-slam AOE');
     assert(bystander.hp === bystanderHp, 'Nearby bystanders must not take ground-slam damage');
 
-    for (let frame = releaseFrame; frame < CONFIG.maki.dragonBoneThrowFrames; frame++) {
-      maki._updateDragonBone(target, arena);
-    }
-    assert(maki.dragonBonePhase === 'groundPin', 'Dragon-Bone must enter groundPin phase after throw frames');
-    assert(maki.dragonBonePhaseMax === CONFIG.maki.dragonBoneGroundPinFrames, 'groundPin duration must come from Maki config');
-
-    for (let frame = 0; frame < CONFIG.maki.dragonBoneGroundPinFrames; frame++) {
+    for (let frame = punchImpactFrame; frame < maki.dragonBonePhaseMax; frame++) {
       const initialDepth = mockCtx.getStackDepth();
       maki.drawBody(mockCtx);
-      assert(mockCtx.getStackDepth() === initialDepth, `Maki drawBody stack leak during groundPin frame ${frame}`);
+      assert(mockCtx.getStackDepth() === initialDepth, `Maki drawBody stack leak during punch frame ${frame}`);
       maki._updateDragonBone(target, arena);
     }
-    assert(maki.dragonBoneActive === false, 'Dragon-Bone must finish after ground pin recovery');
+    assert(maki.dragonBoneActive === false, 'Dragon-Bone must finish after punch recovery');
 
     // Verify Maki sword combo rendering (Steps 1, 2, 3 across startup, active, recovery)
     for (const step of [1, 2, 3]) {
@@ -1803,8 +1797,29 @@ async function runInteractionTests() {
     }
     maki.swordSwingTimer = 0;
 
+    // Verify Maki Hit 3 full 360-degree body spin in sync with weapon
+    maki._performSplitSoulSlash(target, 3);
+    const liftF = maki.swordSwingLiftFrames;
+    const holdF = maki.swordSwingHoldFrames;
+    const strikeF = maki.swordSwingStrikeFrames;
+    const initialSlashAngle = maki.swordSlashAngle;
+
+    // Fast-forward to middle of Phase 3 (360 whirlwind whip strike)
+    for (let f = 0; f < liftF + holdF + Math.floor(strikeF * 0.5); f++) {
+      maki._updateSwordSwing(target, arena);
+    }
+    assert(maki.isSpinning === true, 'Maki must have isSpinning = true during Hit 3 whirlwind strike');
+    assert(Math.abs(maki.angle - initialSlashAngle) > 0.3, 'Maki body angle must rotate during Hit 3 360 whirlwind');
+
+    // Fast-forward through Phase 4 and Phase 5 to completion
+    while (maki.swordSwingTimer > 0) {
+      maki._updateSwordSwing(target, arena);
+    }
+    assert(maki.isSpinning === false, 'Maki isSpinning must be false after Hit 3 finishes');
+    assert(Math.abs(maki.angle - maki.swordSlashAngle) < 0.01, 'Maki body angle must settle cleanly back to slash angle');
+
     state.fighters = [];
-    console.log('      ✅ Maki Dragon-Bone windup, stab, lift and throw pacing & sword combo rendering verified.');
+    console.log('      ✅ Maki Dragon-Bone windup, stab, lift and throw pacing & sword combo 360 body spin verified.');
   }
 
   // ── TEST 22: Yuji Soul Swap vs Undetected / Bush Concealed Boss Yuta ──

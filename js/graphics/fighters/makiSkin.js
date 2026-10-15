@@ -324,7 +324,7 @@ export function drawMakiSkin(ctx, fighter) {
   ctx.rotate(angle);
 
   const facingLeft = Math.abs(normAngle) > Math.PI / 2;
-  if (facingLeft) {
+  if (facingLeft && !fighter.isSpinning) {
     ctx.scale(1, -1);
   }
 
@@ -351,9 +351,9 @@ export function drawMakiSkin(ctx, fighter) {
   // 4. Hair Asset / Fallback Overlay
   _drawMakiHair(ctx, r, facingLeft);
 
-  // 5. Weapon & Symmetrical Hands (Rule 20)
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
-  if (!shouldHideHands) {
+  // 5. Weapon & Combat VFX (Always drawn during combat; suppressed only in showSkinOnly preview)
+  const isSkinOnly = typeof state !== 'undefined' && state.showSkinOnly;
+  if (!isSkinOnly) {
     drawMakiWeapons(ctx, fighter, r, facingLeft);
     drawMakiComboSlashVFX(ctx, fighter, r, facingLeft);
   }

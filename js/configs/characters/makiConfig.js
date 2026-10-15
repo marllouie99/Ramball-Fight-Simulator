@@ -16,7 +16,7 @@ export const makiConfig = {
   maxHp: 440,
   speed: 5.4,
   moveSpeed: 8.4,
-  r: 25,
+  r: 26,
   radius: 30,
   color: '#18181B', // Deep Obsidian
   themeColor: '#014913ff', // Deep Emerald Green
@@ -133,7 +133,7 @@ export const makiConfig = {
   comboHit2Arc: (150 * Math.PI) / 180,
   comboHit3Arc: Math.PI * 2,
 
-  // Skill 1: Dragon-Bone (Ryūhoku) Kinetic Jet Skewer & Throw
+  // Skill 1: Dragon-Bone (Ryūhoku) Kinetic Jet Skewer & Brutal Punch
   enableDragonBone: true,
   dragonBoneCooldown: 420, // 7.0s
   maxKineticCharges: 3,
@@ -146,11 +146,18 @@ export const makiConfig = {
   dragonBoneDashSpeed: 19.0,
   dragonBoneDashFrames: 16,
   dragonBoneStabFrames: 30,
-  dragonBoneLiftFrames: 30,
-  dragonBoneThrowFrames: 10,
+  dragonBonePunchFrames: 18,
+  dragonBonePunchDamage: 60,
+  dragonBoneLaunchSpeed: 10.0,
+  dragonBoneLaunchFrames: 36,
+  dragonBoneLaunchTickInterval: 4,
+  dragonBoneLaunchTickDamage: 8,
+  // Legacy aliases for backward compatibility
+  dragonBoneLiftFrames: 0,
+  dragonBoneThrowFrames: 18,
   dragonBoneThrowChopAngle: 0.95,
-  dragonBoneGroundPinFrames: 20,
-  dragonBoneThrowSpeed: 5.0,
+  dragonBoneGroundPinFrames: 0,
+  dragonBoneThrowSpeed: 22.0,
   dragonBoneThrowDistanceMultiplier: 1.5,
   dragonBoneThrowSlowFrames: 45,
   dragonBoneThrowSlowMultiplier: 0.65,
