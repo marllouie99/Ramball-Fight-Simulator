@@ -408,8 +408,9 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
     bloodPalette = bloodCfg.palette || [0xE60000, 0xDC2626, 0x990000, 0x800000, 0xCC0000, 0xB91C1C];
   }
 
+  const isMobile = (typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) || (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024);
   const qualityMultiplier = state.qualityLevel || 1.0;
-  const MAX_BLOOD_PARTICLES = Math.floor(300 * qualityMultiplier);
+  const MAX_BLOOD_PARTICLES = isMobile ? Math.floor(60 * qualityMultiplier) : Math.floor(300 * qualityMultiplier);
 
   // Scaled down: standard hits spawn 2-4 droplets
   const divisor = hitCfg.damageDivisor ?? 10.0;
@@ -436,7 +437,8 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
   const clampFy = Math.max(arenaTop + 4, Math.min(arenaBottom - 4, fy));
 
   const baseDecay = isStandOff ? (physCfg.floorDecayRateStandOff ?? 0.008) : (physCfg.floorDecayRate1v1 ?? 0.006);
-  const decayRate = baseDecay + Math.random() * (baseDecay * 0.5);
+  const mobileDecayBoost = isMobile ? 1.6 : 1.0;
+  const decayRate = (baseDecay + Math.random() * (baseDecay * 0.5)) * mobileDecayBoost;
 
   const baseSpeed = hitCfg.baseSpeed ?? 7.0;
   const speedVar = hitCfg.speedVariance ?? 8.0;
@@ -584,6 +586,7 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
     bloodColors = bloodCfg.palette || [0xE60000, 0xDC2626, 0xCC0000, 0x990000, 0x800000, 0xB91C1C];
   }
 
+  const isMobile = (typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) || (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024);
   const qualityMultiplier = state.qualityLevel || 1.0;
   const splashCount = (opts && opts.count !== undefined)
     ? Math.max(1, Math.floor(opts.count * qualityMultiplier))
@@ -595,7 +598,7 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
           ? (fatalCfg.countFFA ?? 16)
           : isMulti
             ? (fatalCfg.countMulti ?? 18)
-            : (fatalCfg.count1v1 ?? 22)) * qualityMultiplier));
+            : (fatalCfg.count1v1 ?? 22)) * qualityMultiplier * (isMobile ? 0.5 : 1.0)));
 
   const maxLimit = isStandOff
     ? (fatalCfg.maxActiveLimitStandOff ?? 45)
@@ -606,10 +609,11 @@ export function spawnFatalBloodSplash(fighterOrX, optsOrY = {}, maybeR = null) {
         : isMulti
           ? (fatalCfg.maxActiveLimitMulti ?? 55)
           : (fatalCfg.maxActiveLimit1v1 ?? 65);
-  const MAX_BLOOD_PARTICLES = Math.floor(maxLimit * qualityMultiplier);
+  const MAX_BLOOD_PARTICLES = isMobile ? Math.floor(Math.min(25, maxLimit * 0.45) * qualityMultiplier) : Math.floor(maxLimit * qualityMultiplier);
 
   const baseDecay = isStandOff ? (physCfg.floorDecayRateStandOff ?? 0.014) : (physCfg.floorDecayRate1v1 ?? 0.010);
-  const decayRate = baseDecay + Math.random() * (baseDecay * 0.5);
+  const mobileDecayBoost = isMobile ? 1.6 : 1.0;
+  const decayRate = (baseDecay + Math.random() * (baseDecay * 0.5)) * mobileDecayBoost;
 
   const arena = (state && state.arena) || (CONFIG && CONFIG.arena) || { x: 0, y: 0, width: 1200, height: 800 };
   const wallW = (arena && arena.wallWidth) || 4;

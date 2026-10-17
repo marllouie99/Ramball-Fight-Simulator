@@ -620,7 +620,8 @@ export function renderGame() {
       state.ctx = originalCtx;
       state.canvas = originalCanvas;
 
-      if (!state.pixiApp && state.topLevelUiCanvas) {
+      // Guard against redundant CPU blit when topLevelUiCanvas is already composited by the DOM at z-index: 25
+      if (!state.pixiApp && state.topLevelUiCanvas && !state.topLevelUiCanvas.parentNode) {
         state.ctx.drawImage(state.topLevelUiCanvas, 0, 0);
       }
     }

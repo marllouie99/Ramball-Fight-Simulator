@@ -759,16 +759,16 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     const is1v1Mode = mode === '1v1' || mode === '1 VS 1' || mode === '1v1 Match' || mode === GAME_MODES.ONE_VS_ONE || mode === 'Stand Off' || mode === GAME_MODES.STAND_OFF || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel' || !mode;
     const isTodoSongPlaying = Boolean(winner && (winner.isTakadaBackgroundPlaying || winner.isTakadaUltActive || winner.takadaSongStarted || (winner.takadaUltTimer > 0)));
     if (isTodo && !is1v1Mode && !isTodoSongPlaying) {
-      const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
-      const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
+      const todoSnd = CONFIG.todo?.sounds?.victoryVoice || CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
+      const vol = CONFIG.todo?.soundVolumes?.victoryVoice ?? (CONFIG.todo?.victoryVoiceVolume ?? 3.5);
       audioSystem.playSFX(todoSnd, vol);
     }
 
     const isYuji = winner && (winner.characterId === 'yuji' || winner.type === 'yuji' || winner._def?.id === 'yuji');
     const hasTodoTeammate = isYuji && state.fighters && state.fighters.some(f => f && f !== winner && (f.characterId === 'todo' || f.type === 'todo'));
     if (isYuji && hasTodoTeammate) {
-      const yujiSnd = CONFIG.yuji?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3';
-      const vol = CONFIG.yuji?.victoryVoiceVolume ?? 3.5;
+      const yujiSnd = CONFIG.yuji?.sounds?.victoryVoice || CONFIG.yuji?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3';
+      const vol = CONFIG.yuji?.soundVolumes?.victoryVoice ?? (CONFIG.yuji?.victoryVoiceVolume ?? 3.5);
       audioSystem.playSFX(yujiSnd, vol);
     }
 

@@ -5671,7 +5671,7 @@ async function main() {
         throw new Error(`Expected Final Getsuga angle to be ${expectedFinalAngle}, got ${finalProj.angle}`);
       }
 
-      // Test 4: Direction Commitment (No snap auto-aim during charge/channeling)
+      // Test 4: Auto-Aim Tracking during Channeling, Pre-Release Lock-In Phase, and Non-Snap Release
       ichigo.reset();
       ichigo.x = 270;
       ichigo.y = 480;
@@ -5680,22 +5680,50 @@ async function main() {
       ichigo.fireGetsuga(enemyRight, false);
       if (Math.abs(ichigo.gunAngle - 0) > 0.001) throw new Error('Expected initial aim 0 rad (Right)');
 
-      // Enemy dashes to Up (-Math.PI/2) while Ichigo is channeling
-      ichigo.aim(enemyUp);
+      // Step 4a: Verify Auto-Aim Tracking during channeling (before lock-in phase)
+      const lockInFrames = ichigo.getGetsugaLockInFrames();
+      if (!lockInFrames || lockInFrames <= 0) throw new Error(`Expected valid lockInFrames, got ${lockInFrames}`);
+
+      // While channeling with getsugaChargeTimer > lockInFrames, Ichigo tracks moving enemyUp (-Math.PI/2)
+      const prevAngle = ichigo.gunAngle;
       ichigo.update(enemyUp, 0, state.arena);
-      if (Math.abs(ichigo.gunAngle - 0) > 0.001 || Math.abs(ichigo.angle - 0) > 0.001) {
-        throw new Error(`Expected Ichigo to stay 100% committed to Right (0 rad) without snapping to enemy, got gunAngle=${ichigo.gunAngle}`);
+      // Since turn rate is 0.08, gunAngle rotates smoothly towards -Math.PI/2 (diff < 0)
+      if (ichigo.gunAngle >= prevAngle) {
+        throw new Error(`Expected Ichigo auto-aim to track towards enemyUp while channeling, got gunAngle=${ichigo.gunAngle}`);
+      }
+      if (ichigo.isGetsugaLockInPhase()) {
+        throw new Error('Expected Ichigo not to be in lock-in phase while getsugaChargeTimer > lockInFrames');
       }
 
-      // Releasing Getsuga fires strictly in the committed Right direction
-      ichigo._releaseGetsuga();
+      // Step 4b: Advance ticks until entering the lock-in frames
+      while (ichigo.getsugaChargeTimer > lockInFrames) {
+        ichigo.update(enemyUp, 0, state.arena);
+      }
+      if (!ichigo.isGetsugaLockInPhase()) {
+        throw new Error('Expected Ichigo to enter lock-in phase when chargeTimer <= lockInFrames');
+      }
+
+      // Snapshot the locked-in angle
+      const lockedAngle = ichigo.gunAngle;
+
+      // Enemy dashes across to Down (Math.PI/2) during lock-in frames
+      // Ichigo must NOT track enemyDown; aim must remain firmly locked at lockedAngle!
+      ichigo.aim(enemyDown);
+      ichigo.update(enemyDown, 0, state.arena);
+      if (Math.abs(ichigo.gunAngle - lockedAngle) > 0.0001 || Math.abs(ichigo.angle - lockedAngle) > 0.0001) {
+        throw new Error(`Expected Ichigo aim to stay locked during lock-in phase, got ${ichigo.gunAngle} vs locked ${lockedAngle}`);
+      }
+
+      // Step 4c: Advance through remaining lock-in frames to release
+      while (ichigo.getsugaChargeTimer > 0) {
+        ichigo.update(enemyDown, 0, state.arena);
+      }
+
+      // Releasing Getsuga must fire strictly along lockedAngle (NO snap to enemyDown at release!)
       const committedProj = projectileSystem.projectiles.find(p => p && (p.isGetsuga || p.behaviorType === 'getsuga_tensho'));
       if (!committedProj) throw new Error('Expected Getsuga projectile to spawn on release!');
-      if (Math.abs(committedProj.angle - 0) > 0.001) {
-        throw new Error(`Expected Getsuga projectile to fire along committed Right angle (0 rad), got ${committedProj.angle}`);
-      }
-      if (committedProj.vx <= 0 || Math.abs(committedProj.vy) > 0.001) {
-        throw new Error('Expected committed Getsuga projectile velocity along +X axis (vx > 0, vy = 0)');
+      if (Math.abs(committedProj.angle - lockedAngle) > 0.001) {
+        throw new Error(`Expected Getsuga projectile to fire along locked-in angle (${lockedAngle} rad), got ${committedProj.angle}`);
       }
 
       // Test 5: Post-Getsuga Backward Movement (Move back instead of forward toward enemy)

@@ -131,6 +131,7 @@ export const ichigoConfig = {
   getsugaSlowMultiplier: 0.40,   // Movement speed multiplier during slow (60% slow)
   getsugaHitCooldown: 4,         // Re-hit tick interval in frames (~15 ticks/sec)
   getsugaChargeFrames: 64,       // Channeling duration frames matching voiceline (~1.07s)
+  getsugaLockInFrames: 14,       // Lock-in duration frames before release where auto-aim locks and ceases tracking (~0.23s)
   channelTurnRate: 0.08,         // Aim tracking turn rate while channeling
   getsugaSlashDuration: 24,      // Slash animation duration on release
   getsugaRecoveryFrames: 24,     // Recovery frames held in follow-through pose before moving

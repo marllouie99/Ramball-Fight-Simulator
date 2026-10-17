@@ -64,7 +64,7 @@ export class MakiFighter extends Fighter {
     this.dragonBoneCooldown = 0;
     this.dragonBoneCooldownMax = cfg.dragonBoneCooldown || 420;
     this.dragonBoneActive = false;
-    this.dragonBonePhase = null; // 'windup', 'dash', 'stab', 'punch'
+    this.dragonBonePhase = null; // 'windup', 'dash', 'stab', 'punch', 'breather'
     this.dragonBonePhaseTimer = 0;
     this.dragonBonePhaseMax = CONFIG.maki?.dragonBoneWindupFrames || 12;
     this.dragonBoneTarget = null;
@@ -254,10 +254,19 @@ export class MakiFighter extends Fighter {
   }
 
   isStationarySkillActive() {
-    if (this.dragonBoneActive && ['windup', 'stab', 'punch', 'lift', 'throw', 'groundPin'].includes(this.dragonBonePhase)) {
+    if (this.dragonBoneActive && ['windup', 'stab', 'punch', 'lift', 'throw', 'groundPin', 'breather'].includes(this.dragonBonePhase)) {
       return true;
     }
     return super.isStationarySkillActive();
+  }
+
+  get isDragonBoneBreather() {
+    return Boolean(this.dragonBoneActive && this.dragonBonePhase === 'breather');
+  }
+
+  canPerformBasicAttack() {
+    if (this.dragonBoneActive) return false;
+    return super.canPerformBasicAttack ? super.canPerformBasicAttack() : true;
   }
 
   canAim() {
@@ -974,7 +983,7 @@ export class MakiFighter extends Fighter {
         return;
       }
 
-      // Wall impact without impalement: gracefully halt the dash early so Maki never clips through the wall!
+      // Wall impact without impalement: gracefully halt the dash early into a recovery breather
       if (hitWall) {
         spawnSparks(this.x, this.y, 8, '#F59E0B');
         triggerGlobalScreenShake(3, 8);
@@ -983,19 +992,14 @@ export class MakiFighter extends Fighter {
             audioSystem.playSFX('attack_fleshhit', 0.8);
           }
         } catch (e) {}
-        this.dragonBoneActive = false;
-        this.dragonBonePhase = null;
-        this.vx = 0;
-        this.vy = 0;
+        this._enterDragonBoneBreather(cfg);
         return;
       }
 
-      // Dash time-out without hitting anyone (whiff)
+      // Dash time-out without hitting anyone (whiff miss): enter recovery breather
       if (this.dragonBonePhaseTimer >= this.dragonBonePhaseMax) {
-        this.dragonBoneActive = false;
-        this.dragonBonePhase = null;
-        this.vx *= 0.3;
-        this.vy *= 0.3;
+        this._enterDragonBoneBreather(cfg);
+        return;
       }
     }
     // ──────────────────────────────────────────
@@ -1074,6 +1078,41 @@ export class MakiFighter extends Fighter {
       this.dragonBonePhase = null;
       this.dragonBoneTarget = null;
     }
+    // ──────────────────────────────────────────
+    // PHASE 5: MISS BREATHER RECOVERY PAUSE
+    // ──────────────────────────────────────────
+    else if (this.dragonBonePhase === 'breather') {
+      this.vx = 0;
+      this.vy = 0;
+      if (curArena) {
+        const clamped = this._clampToArena(this.x, this.y, this.r, curArena);
+        this.x = clamped.x;
+        this.y = clamped.y;
+      }
+
+      if (this.dragonBonePhaseTimer >= this.dragonBonePhaseMax) {
+        this.dragonBoneActive = false;
+        this.dragonBonePhase = null;
+        this.dragonBoneTarget = null;
+      }
+    }
+  }
+
+  _enterDragonBoneBreather(cfg = null) {
+    const makiCfg = cfg || CONFIG.maki || {};
+    this.dragonBonePhase = 'breather';
+    this.dragonBonePhaseTimer = 0;
+    this.dragonBonePhaseMax = makiCfg.dragonBoneMissBreatherFrames ?? makiCfg.dragonBoneBreatherFrames ?? 24;
+    if (this.dragonBoneTarget) {
+      this.dragonBoneTarget.isPinnedByMaki = false;
+      this.dragonBoneTarget.isGrabbed = false;
+      this.dragonBoneTarget._makiPinnedBladeAngle = null;
+      this.dragonBoneTarget._makiPinnedBy = null;
+      this.dragonBoneTarget = null;
+    }
+    this.vx = 0;
+    this.vy = 0;
+    this.kineticCharges = 0;
   }
 
   _executeDragonBonePunch(target, arena = null) {

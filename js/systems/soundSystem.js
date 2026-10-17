@@ -23,8 +23,13 @@ const MAX_POOL_SIZE = 30;
 // Sound cache management to prevent unbounded memory growth
 const MAX_CACHE_SIZE = 1000; // Increased to ensure all preloaded game sounds remain resident
 
-// ── CONCURRENT SOUND LIMITING (prevents audio bus overload → crackling) ──
-const MAX_CONCURRENT_SOUNDS = 40; // Hard cap on simultaneous Web Audio sources
+const _isMobileSound = typeof navigator !== 'undefined' && (
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '') ||
+  (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024)
+);
+
+// ── CONCURRENT SOUND LIMITING (prevents audio bus overload → crackling & mobile thermal heating) ──
+const MAX_CONCURRENT_SOUNDS = _isMobileSound ? 12 : 40; // Hard cap on simultaneous Web Audio sources (12 on mobile to protect audio DSP)
 // Micro-fade duration in seconds to prevent click/pop artifacts on start/stop without delaying attack transient
 const MICRO_FADE_IN = 0.002;  // 2ms fade-in (preserves crisp punch/slash attack snap)
 const MICRO_FADE_OUT = 0.015; // 15ms fade-out
@@ -412,7 +417,7 @@ export async function preloadAudioBufferBatch(urls, options = {}) {
 
   const isPriority = Boolean(options && options.priority);
   const isIdle = Boolean(options && options.idle);
-  const concurrency = options.concurrency || (isPriority ? 8 : (isIdle ? 4 : 6));
+  const concurrency = options.concurrency || (_isMobileSound ? (isPriority ? 3 : 2) : (isPriority ? 8 : (isIdle ? 4 : 6)));
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
 
   // Filter and de-duplicate unique audio URLs

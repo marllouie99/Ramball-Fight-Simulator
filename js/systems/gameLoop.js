@@ -51,8 +51,8 @@ export function animate(timestamp) {
       state.fpsFrames = 0;
       state.fpsLastTime = timestamp;
 
-      // Adaptive particle and LOD quality: 100% on desktop, 75% on mobile (eliminates GPU fillrate choke)
-      state.qualityLevel = state.performanceMode ? 0.2 : (isMobile ? 0.75 : 1.0);
+      // Adaptive particle and LOD quality: 100% on desktop, 45% on mobile (eliminates mobile CPU/GPU thermal choke)
+      state.qualityLevel = state.performanceMode ? 0.2 : (isMobile ? 0.45 : 1.0);
 
       // Track active particles
       let burnActive = 0;

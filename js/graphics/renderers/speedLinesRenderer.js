@@ -12,10 +12,15 @@ import { isSuppressedByGetsuga } from '../../entities/fighter.js';
 let _genosSpeedLineSeeds = null;
 let _genosSpeedLineTheme = null;
 
+const _isMobileSpeedLines = typeof navigator !== 'undefined' && (
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent || '') ||
+  (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024)
+);
+
 function _initGenosSpeedLineSeeds(theme = 'flurry', isDarkMode = false) {
   _genosSpeedLineSeeds = [];
   _genosSpeedLineTheme = `${theme}_${isDarkMode ? 'dark' : 'light'}`;
-  const totalLines = 22;
+  const totalLines = _isMobileSpeedLines ? 8 : 22;
 
   for (let i = 0; i < totalLines; i++) {
     const norm = (i / (totalLines - 1)) * 2 - 1; // -1.0 to +1.0
@@ -166,7 +171,7 @@ let _saitamaSpeedLineSeeds = null;
 
 function _initSaitamaSpeedLineSeeds() {
   _saitamaSpeedLineSeeds = [];
-  const totalLines = 24;
+  const totalLines = _isMobileSpeedLines ? 8 : 24;
 
   for (let i = 0; i < totalLines; i++) {
     const norm = (i / (totalLines - 1)) * 2 - 1; // -1.0 to +1.0
@@ -289,7 +294,7 @@ let _mahoragaSpeedLineSeeds = null;
 
 function _initMahoragaSpeedLineSeeds() {
   _mahoragaSpeedLineSeeds = [];
-  const totalLines = 25;
+  const totalLines = _isMobileSpeedLines ? 8 : 25;
 
   for (let i = 0; i < totalLines; i++) {
     const norm = (i / (totalLines - 1)) * 2 - 1; // -1.0 to +1.0

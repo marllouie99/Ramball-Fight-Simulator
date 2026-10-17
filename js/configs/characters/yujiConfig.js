@@ -51,8 +51,7 @@ export const yujiConfig = {
   divergentDashMinRange: 60,    // Min distance to initiate dash (prevents dashing when already in point-blank melee)
   divergentDashSpeed: 16.0,     // Supersonic dash velocity
   divergentDashMaxDuration: 20, // Max frames dash can persist before safety timeout
-  divergentDashSound: 'Assets/Sound Effects/Skills/dash3.mp3',
-  divergentDashVolume: 0.85,
+  // (Sound moved to sounds.divergentDash below; legacy getter preserved)
 
   // Passive: Divergent Fist — Delayed shockwave after each punch
   enableDivergentFist: true,      // Master toggle for Divergent Fist shockwave passive
@@ -103,31 +102,62 @@ export const yujiConfig = {
   soulSwapOverlayOffsetX: 0,                            // Horizontal offset in arena
   soulSwapOverlayOffsetY: 0,                            // Vertical offset in arena
 
-  //----------------------------------AUDIO CONFIG-----------------------------------------//
+  // ─────────────────────────────────────────────
+  // Audio & Sound Effects Configuration
+  // ─────────────────────────────────────────────
+  sounds: {
+    punch: 'Assets/Sound Effects/Attacks/punch.mp3',
+    punchSounds: [
+      'Assets/Sound Effects/Attacks/yuji-noise1.mp3',
+      'Assets/Sound Effects/Attacks/yuji-noise2.mp3',
+      'Assets/Sound Effects/Attacks/yuji-noise3.mp3'
+    ],
+    divergentDash: 'Assets/Sound Effects/Skills/dash3.mp3',
+    blackFlashEnter: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
+    transformation: 'Assets/Sound Effects/Skills/yuji-transformation.mp3',
+    victoryVoice: 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3'
+  },
+  soundVolumes: {
+    punch: 2.5,
+    punchSounds: 1.5,
+    divergentDash: 0.85,
+    blackFlashEnter: 2.0,
+    transformation: 2.0,
+    victoryVoice: 0.0
+  },
 
-  // Audio
-  punchSound: 'Assets/Sound Effects/Attacks/punch.mp3',
-  punchVolume: 2.5,
-  punchSounds: [
-    'Assets/Sound Effects/Attacks/yuji-noise1.mp3',
-    'Assets/Sound Effects/Attacks/yuji-noise2.mp3',
-    'Assets/Sound Effects/Attacks/yuji-noise3.mp3'
-  ],
-  punchSoundsVolume: 1.5,
-  punchSoundsChance: 0.15, // 5% chance to play voice noises on basic attack
+  // ── Backward Compatibility Getters & Setters for Legacy Flat Properties ──
+  get divergentDashSound() { return this.sounds.divergentDash; },
+  set divergentDashSound(v) { this.sounds.divergentDash = v; },
+  get divergentDashVolume() { return this.soundVolumes.divergentDash; },
+  set divergentDashVolume(v) { this.soundVolumes.divergentDash = v; },
 
-  // Black Flash Entrance Audio
-  blackFlashEnterSound: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
-  blackFlashEnterVolume: 2.0,
-  blackFlashEnterDelay: -0.10, // Delay in milliseconds before playing the sound
-  blackFlashNoiseChance: 0.05, // 5% chance to play the voiceline on Black Flash
+  get punchSound() { return this.sounds.punch; },
+  set punchSound(v) { this.sounds.punch = v; },
+  get punchVolume() { return this.soundVolumes.punch; },
+  set punchVolume(v) { this.soundVolumes.punch = v; },
 
-  // Transformation Audio
-  transformationSound: 'Assets/Sound Effects/Skills/yuji-transformation.mp3',
-  transformationVolume: 2.0,
+  get punchSounds() { return this.sounds.punchSounds; },
+  set punchSounds(v) { this.sounds.punchSounds = v; },
+  get punchSoundsVolume() { return this.soundVolumes.punchSounds; },
+  set punchSoundsVolume(v) { this.soundVolumes.punchSounds = v; },
+  punchSoundsChance: 0.15,
+
+  get blackFlashEnterSound() { return this.sounds.blackFlashEnter; },
+  set blackFlashEnterSound(v) { this.sounds.blackFlashEnter = v; },
+  get blackFlashEnterVolume() { return this.soundVolumes.blackFlashEnter; },
+  set blackFlashEnterVolume(v) { this.soundVolumes.blackFlashEnter = v; },
+  blackFlashEnterDelay: -0.10,
+  blackFlashNoiseChance: 0.05,
+
+  get transformationSound() { return this.sounds.transformation; },
+  set transformationSound(v) { this.sounds.transformation = v; },
+  get transformationVolume() { return this.soundVolumes.transformation; },
+  set transformationVolume(v) { this.soundVolumes.transformation = v; },
   transformationDelay: 0,
 
-  // Victory Voice Line (Team victory with Todo)
-  victoryVoiceSound: 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3',
-  victoryVoiceVolume: 0.0,
+  get victoryVoiceSound() { return this.sounds.victoryVoice; },
+  set victoryVoiceSound(v) { this.sounds.victoryVoice = v; },
+  get victoryVoiceVolume() { return this.soundVolumes.victoryVoice; },
+  set victoryVoiceVolume(v) { this.soundVolumes.victoryVoice = v; },
 };

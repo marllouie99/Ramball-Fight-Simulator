@@ -112,7 +112,7 @@ export const gojoConfig = {
   purpleShakeIntensity: 4, // Screen shake intensity when purple orb fires
   purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
   purpleExplosionDamage: 200, // Blast explosion damage when Hollow Purple detonates upon expiring
-  purpleExplosionRadius: 280, // Blast explosion radius in pixels
+  purpleExplosionRadius: 100, // Blast explosion radius in pixels
   purpleExplosionKnockback: 10, // Outward explosive knockback force away from detonation epicenter
   purpleExplosionShakeIntensity: 8, // Heavy screen shake intensity on explosion
   purpleExplosionShakeDuration: 30, // Duration of screen shake on explosion

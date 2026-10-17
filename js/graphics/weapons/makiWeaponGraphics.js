@@ -406,6 +406,15 @@ export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
         weaponLunge = 26.0 * retEase;
         weaponRot = -0.12 * retEase;
       }
+    } else if (phase === 'breather') {
+      isTwoHanded = true;
+      // Breather recovery pose: decelerates from forward thrust into grounded recovery stance
+      const settleEase = Math.pow(1.0 - progress, 1.6);
+      const springWave = Math.sin(progress * Math.PI * 2.0) * Math.exp(-progress * 3.5);
+      weaponRot = 0.22 * (1.0 - settleEase);
+      weaponLunge = (18.0 * settleEase) - (3.5 * springWave);
+      weaponOffY = 2.0 * (1.0 - settleEase);
+      isJetThrusting = false;
     } else {
       isTwoHanded = true;
       weaponRot = 0.0;
@@ -682,6 +691,16 @@ export function drawMakiComboSlashVFX(ctx, fighter, r, facingLeft = false) {
         const taper = Math.sin(chopP * Math.PI);
         _drawNeedleSpeedLine(ctx, r * 1.5, 4, 0.40, 30 * taper, '#F59E0B');
         _drawNeedleSpeedLine(ctx, r * 1.7, 8, 0.50, 24 * taper, '#FFFFFF');
+      }
+    } else if (phase === 'breather') {
+      // Cooling exhaust / subtle dissipation lines in early frames of the recovery breather
+      const maxT = Math.max(1, fighter.dragonBonePhaseMax || 1);
+      const timer = fighter.dragonBonePhaseTimer || 0;
+      const progress = Math.min(1.0, timer / maxT);
+      if (progress < 0.35) {
+        const decay = Math.pow(1.0 - (progress / 0.35), 1.5);
+        _drawNeedleSpeedLine(ctx, -r * 0.7, -4, 0, 20 * decay, 'rgba(245, 158, 11, 0.6)');
+        _drawNeedleSpeedLine(ctx, -r * 0.7, 4, 0, 18 * decay, 'rgba(239, 68, 68, 0.5)');
       }
     }
   }

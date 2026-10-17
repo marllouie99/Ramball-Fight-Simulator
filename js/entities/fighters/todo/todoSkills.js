@@ -10,13 +10,13 @@ export function playTodoRockCounterVoiceline(fighter) {
   if (!fighter) return;
   const chance = (typeof CONFIG.todo?.comboVoiceChance === 'number') ? CONFIG.todo.comboVoiceChance : 0.5;
   if (Math.random() < chance) {
-    const list = CONFIG.todo?.comboVoiceSounds || [
+    const list = CONFIG.todo?.sounds?.comboVoiceSounds || CONFIG.todo?.comboVoiceSounds || [
       'Assets/Sound Effects/Skills/todo-combo-voiceline.mp3',
       'Assets/Sound Effects/Skills/todo-combo-voiceline2.mp3'
     ];
     if (list && list.length > 0) {
       const selected = list[Math.floor(Math.random() * list.length)];
-      const vol = (typeof CONFIG.todo?.comboVoiceVolume === 'number') ? CONFIG.todo.comboVoiceVolume : 2.8;
+      const vol = CONFIG.todo?.soundVolumes?.comboVoice ?? (typeof CONFIG.todo?.comboVoiceVolume === 'number' ? CONFIG.todo.comboVoiceVolume : 2.8);
       audioSystem.playFighterVoiceline(fighter, selected, vol);
     }
   }
@@ -324,8 +324,10 @@ export function modExecutePendingSwap() {
 
   // CLAP SOUND & VISUAL EFFECT! Triggered at hands collision point
   let clapAudioHandle = null;
-  if (CONFIG.todo?.clapSound) {
-    clapAudioHandle = audioSystem.playSFX(CONFIG.todo.clapSound, CONFIG.todo.clapVolume ?? 2.0);
+  const clapSnd = CONFIG.todo?.sounds?.clap || CONFIG.todo?.clapSound;
+  const clapVol = CONFIG.todo?.soundVolumes?.clap ?? (CONFIG.todo?.clapVolume ?? 2.0);
+  if (clapSnd) {
+    clapAudioHandle = audioSystem.playSFX(clapSnd, clapVol);
   } else {
     clapAudioHandle = playSkillEffectSound('todo', 'clap');
   }
@@ -884,8 +886,8 @@ export function modCheckTeammateRescue() {
     // Play Todo's "Brother!" voiceline on teammate swap based on config chance
     const brotherChance = CONFIG.todo?.brotherVoiceChance ?? 0.25;
     if (Math.random() < brotherChance) {
-      const brotherSnd = CONFIG.todo?.brotherVoiceSound || 'Assets/Sound Effects/Skills/todo-brother-voiceline.mp3';
-      const brotherVol = CONFIG.todo?.brotherVoiceVolume ?? 2.5;
+      const brotherSnd = CONFIG.todo?.sounds?.brotherVoice || CONFIG.todo?.brotherVoiceSound || 'Assets/Sound Effects/Skills/todo-brother-voiceline.mp3';
+      const brotherVol = CONFIG.todo?.soundVolumes?.brotherVoice ?? (CONFIG.todo?.brotherVoiceVolume ?? 2.5);
       audioSystem.playSFX(brotherSnd, brotherVol);
     }
 
@@ -995,8 +997,8 @@ export function modStartTakadaChanneling(force = false) {
   spawnFloatingText(this.x, this.y - (this.r || 25) - 30, "530,000 IQ CPU THINKING...", "#ec4899");
 
   // Play 3.0s channeling voice line
-  const channelVoice = CONFIG.todo?.takadaChannelingVoiceline || 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3';
-  const voiceVol = CONFIG.todo?.takadaChannelingVoiceVolume ?? 1.0;
+  const channelVoice = CONFIG.todo?.sounds?.takadaChannelingVoiceline || CONFIG.todo?.takadaChannelingVoiceline || 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3';
+  const voiceVol = CONFIG.todo?.soundVolumes?.takadaChannelingVoice ?? (CONFIG.todo?.takadaChannelingVoiceVolume ?? 1.0);
   audioSystem.playSFX('skill_todotadakachannelvoice', voiceVol);
   audioSystem.playSFX(channelVoice, voiceVol);
 

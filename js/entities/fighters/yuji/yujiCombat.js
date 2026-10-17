@@ -8,7 +8,7 @@ import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeCl
 let lastPunchSoundSrc = null;
 
 function playYujiPunchSound(disableVoice = false) {
-  const sounds = CONFIG.yuji?.punchSounds;
+  const sounds = CONFIG.yuji?.sounds?.punchSounds || CONFIG.yuji?.punchSounds;
   const chance = CONFIG.yuji?.punchSoundsChance ?? 1.0;
   const shouldPlayNoise = !disableVoice && Math.random() < chance;
 
@@ -22,10 +22,10 @@ function playYujiPunchSound(disableVoice = false) {
     const idx = Math.floor(Math.random() * availableSounds.length);
     soundSrc = availableSounds[idx];
     lastPunchSoundSrc = soundSrc;
-    soundVol = CONFIG.yuji?.punchSoundsVolume || CONFIG.yuji?.punchVolume || 2.5;
+    soundVol = CONFIG.yuji?.soundVolumes?.punchSounds ?? (CONFIG.yuji?.punchSoundsVolume || CONFIG.yuji?.punchVolume || 2.5);
   } else {
-    soundSrc = CONFIG.yuji?.punchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
-    soundVol = CONFIG.yuji?.punchVolume || 2.5;
+    soundSrc = CONFIG.yuji?.sounds?.punch || CONFIG.yuji?.punchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
+    soundVol = CONFIG.yuji?.soundVolumes?.punch ?? (CONFIG.yuji?.punchVolume || 2.5);
   }
   audioSystem.playSFX(soundSrc, soundVol);
 }
@@ -46,12 +46,14 @@ export function modUpdateMeleeCombat(customTarget = null) {
     : (CONFIG.yuji?.blackFlashThreshold || 4);
     
   if (!isZone && this.blackFlashCharge >= thresholdForAudio) {
-    if (CONFIG.yuji?.blackFlashEnterSound && !this.soulSwapActive && Math.random() < (CONFIG.yuji?.blackFlashNoiseChance ?? 0.05)) {
+    const bfEnterSnd = CONFIG.yuji?.sounds?.blackFlashEnter || CONFIG.yuji?.blackFlashEnterSound;
+    const bfEnterVol = CONFIG.yuji?.soundVolumes?.blackFlashEnter ?? (CONFIG.yuji?.blackFlashEnterVolume ?? 2.0);
+    if (bfEnterSnd && !this.soulSwapActive && Math.random() < (CONFIG.yuji?.blackFlashNoiseChance ?? 0.05)) {
       audioSystem.playSFX(
-        CONFIG.yuji.blackFlashEnterSound, 
-        CONFIG.yuji.blackFlashEnterVolume ?? 2.0,
+        bfEnterSnd, 
+        bfEnterVol,
         1.0, 0, 
-        CONFIG.yuji.blackFlashEnterDelay ?? -0.10
+        CONFIG.yuji?.blackFlashEnterDelay ?? -0.10
       );
     }
   }

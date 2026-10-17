@@ -237,8 +237,8 @@ export class YujiFighter extends Fighter {
     this.rapidSlashHitsLeft = CONFIG.yuji?.soulSwapRapidSlashHits || 5; // Rapid slash combo strikes before Fuga!
 
     spawnFloatingText(this.x, this.y - this.r - 28, "SUKUNA TAKES OVER!", "#CC0000");
-    const transformSnd = CONFIG.yuji?.transformationSound || 'Assets/Sound Effects/Skills/yuji-transformation.mp3';
-    const transformVol = CONFIG.yuji?.transformationVolume ?? 2.5;
+    const transformSnd = CONFIG.yuji?.sounds?.transformation || CONFIG.yuji?.transformationSound || 'Assets/Sound Effects/Skills/yuji-transformation.mp3';
+    const transformVol = CONFIG.yuji?.soundVolumes?.transformation ?? (CONFIG.yuji?.transformationVolume ?? 2.5);
     if (typeof audioSystem !== 'undefined') {
       if (typeof audioSystem.playFighterVoiceline === 'function') {
         audioSystem.playFighterVoiceline(this, transformSnd, transformVol, 1.0, 0, 0, {
@@ -1003,8 +1003,8 @@ export class YujiFighter extends Fighter {
       this.divergentDashTarget = bestTarget;
       this.divergentDashTimer = CONFIG.yuji?.divergentDashMaxDuration || 20;
       this.divergentDashCooldown = CONFIG.yuji?.divergentDashCooldown || 240;
-      const snd = CONFIG.yuji?.divergentDashSound || 'Assets/Sound Effects/Skills/dash3.mp3';
-      const vol = CONFIG.yuji?.divergentDashVolume ?? 0.85;
+      const snd = CONFIG.yuji?.sounds?.divergentDash || CONFIG.yuji?.divergentDashSound || 'Assets/Sound Effects/Skills/dash3.mp3';
+      const vol = CONFIG.yuji?.soundVolumes?.divergentDash ?? (CONFIG.yuji?.divergentDashVolume ?? 0.85);
       audioSystem.playSFX(snd, vol);
       spawnImpactFlash(this.x, this.y, 20, 'gojo');
       spawnFloatingText(this.x, this.y - this.r - 28, 'DIVERGENT DASH!', '#D95C7E');

@@ -145,6 +145,7 @@ export const makiConfig = {
   dragonBoneWindupAimTurnRate: 0.12,
   dragonBoneDashSpeed: 19.0,
   dragonBoneDashFrames: 16,
+  dragonBoneMissBreatherFrames: 24, // 0.40s recovery breather on miss/whiff before moving
   dragonBoneStabFrames: 30,
   dragonBonePunchFrames: 18,
   dragonBonePunchDamage: 60,

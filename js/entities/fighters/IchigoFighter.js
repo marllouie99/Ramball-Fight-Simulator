@@ -32,7 +32,9 @@ import {
   fireFinalMassiveGetsuga,
   fireGetsuga,
   releaseGetsuga,
-  updateGetsuga
+  updateGetsuga,
+  isGetsugaLockInPhase,
+  getGetsugaLockInFrames
 } from './ichigo/ichigoGetsuga.js';
 
 import {
@@ -109,6 +111,7 @@ export class IchigoFighter extends Fighter {
 
     // Getsuga Tensho Channeling & Slide State
     this.isChannelingGetsuga = false;
+    this.isGetsugaLockIn = false;
     this.isGetsugaSlash = false;
     this.getsugaChargeTimer = 0;
     this.getsugaChargeMax = CONFIG.ichigo?.getsugaChargeFrames || 64;
@@ -274,8 +277,25 @@ export class IchigoFighter extends Fighter {
     );
   }
 
+  isGetsugaLockInPhase() {
+    return isGetsugaLockInPhase(this);
+  }
+
+  getGetsugaLockInFrames() {
+    return getGetsugaLockInFrames(this);
+  }
+
   canAim() {
-    if (this.isChannelingGetsuga || this.getsugaChargeTimer > 0 || this.isGetsugaSlash || this.isFinalMassiveGetsuga) {
+    if (this.isDead || this.hp <= 0) return false;
+    if (typeof this.isParalyzedOrBeamTrapped === 'function' && this.isParalyzedOrBeamTrapped()) return false;
+    if (this.isChannelingBankai) return false;
+    if (this.isChannelingGetsuga || this.getsugaChargeTimer > 0) {
+      if (this.isGetsugaLockInPhase()) {
+        return false;
+      }
+      return super.canAim ? super.canAim() : true;
+    }
+    if (this.isGetsugaSlash || (this.getsugaRecoveryTimer > 0) || (this.isFinalMassiveGetsuga && !this.isChannelingGetsuga)) {
       return false;
     }
     if (this.isMeleeCleave && this.slashSwingTimer > 0) {
@@ -289,6 +309,27 @@ export class IchigoFighter extends Fighter {
       return false;
     }
     return super.canAim ? super.canAim() : true;
+  }
+
+  aim(opponent) {
+    if (this.isChannelingBankai) {
+      return false; // Lock orientation fixed during Bankai transformation vortex
+    }
+    if (this.shunpoComboActive && this.shunpoTarget && this.shunpoTarget.hp > 0 && !this.shunpoTarget.isDead) {
+      // Rule #3: Always update facing direction directly toward target upon flash-stepping and attacking
+      const dx = this.shunpoTarget.x - this.x;
+      const dy = this.shunpoTarget.y - this.y;
+      this.applyAim(this.shunpoTarget, Math.atan2(dy, dx));
+      return true;
+    }
+    if (!this.canAim()) {
+      if (this.getsugaCastAngle !== undefined && (this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isGetsugaSlash)) {
+        this.gunAngle = this.getsugaCastAngle;
+        this.angle = this.getsugaCastAngle;
+      }
+      return false;
+    }
+    return super.aim(opponent);
   }
 
   _playSound(key, defaultSfx, defaultVol = 1.0, minIntervalMs = 0) {
@@ -329,6 +370,7 @@ export class IchigoFighter extends Fighter {
     this._maxBankaiPct = 0;
     this._winnerBankaiActive = undefined;
     this.bankaiFinalGetsugaTriggered = false;
+    this.isGetsugaLockIn = false;
     this.isFinalMassiveGetsuga = false;
     this.isFinalGetsugaRecovery = false;
     this.activeGetsugaProjectile = null;
@@ -390,7 +432,7 @@ export class IchigoFighter extends Fighter {
   }
 
   get channelTurnRate() {
-    return CONFIG.ichigo?.channelTurnRate ?? 0.055;
+    return CONFIG.ichigo?.getsugaChannelTurnRate ?? CONFIG.ichigo?.channelTurnRate ?? 0.08;
   }
 
   canPerformBasicAttack() {
@@ -756,26 +798,6 @@ export class IchigoFighter extends Fighter {
     }
   }
 
-  aim(opponent) {
-    if (this.isChannelingBankai) {
-      return; // Lock orientation fixed during Bankai transformation vortex
-    }
-    if (this.isChannelingGetsuga || this.isAboutToUnleashNormalGetsuga() || (this.getsugaRecoveryTimer > 0 && this.isGetsugaSlash)) {
-      if (this.getsugaCastAngle !== undefined) {
-        this.gunAngle = this.getsugaCastAngle;
-        this.angle = this.getsugaCastAngle;
-        return; // Fully committed to locked cardinal cast angle (NO snap auto-aim tracking!)
-      }
-    }
-    if (this.shunpoComboActive && this.shunpoTarget && this.shunpoTarget.hp > 0 && !this.shunpoTarget.isDead) {
-      // Rule #3: Always update facing direction directly toward target upon flash-stepping and attacking
-      const dx = this.shunpoTarget.x - this.x;
-      const dy = this.shunpoTarget.y - this.y;
-      this.applyAim(this.shunpoTarget, Math.atan2(dy, dx));
-      return;
-    }
-    super.aim(opponent);
-  }
 
   activateBankai() {
     activateBankai(this);

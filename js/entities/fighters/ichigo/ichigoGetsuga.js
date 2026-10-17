@@ -40,6 +40,53 @@ export function getCardinalAimAngle(fromX, fromY, toX, toY) {
 }
 
 /**
+ * Calculates the number of lock-in frames held before Getsuga wave release.
+ * During this window, auto-aim ceases tracking and locks committed cast angle.
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ * @returns {number}
+ */
+export function getGetsugaLockInFrames(fighter) {
+  const configured = CONFIG.ichigo?.getsugaLockInFrames ?? 14;
+  const chargeMax = fighter.getsugaChargeMax || (fighter.isFinalMassiveGetsuga ? (CONFIG.ichigo?.bankaiFinalGetsugaChargeFrames || 80) : (CONFIG.ichigo?.getsugaChargeFrames || 64));
+  return Math.max(1, Math.min(configured, Math.floor(chargeMax * 0.45)));
+}
+
+/**
+ * Returns true if Ichigo is currently in the lock-in commitment frames right before unleashing Getsuga Tensho.
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ * @returns {boolean}
+ */
+export function isGetsugaLockInPhase(fighter) {
+  if (!fighter.isChannelingGetsuga || (fighter.getsugaChargeTimer || 0) <= 0) return false;
+  const lockInFrames = getGetsugaLockInFrames(fighter);
+  return fighter.getsugaChargeTimer <= lockInFrames;
+}
+
+/**
+ * Retrieves the best target for Getsuga Tensho auto-aim tracking.
+ * @param {import('../IchigoFighter.js').IchigoFighter} fighter
+ * @param {Object} [opponent=null]
+ * @returns {Object|null}
+ */
+export function getGetsugaAimTarget(fighter, opponent) {
+  if (opponent && !opponent.isDead && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving) && (!fighter.isTeammate || !fighter.isTeammate(opponent))) {
+    return opponent;
+  }
+  if (fighter.getsugaTarget && !fighter.getsugaTarget.isDead && (fighter.getsugaTarget.hp > 0 || fighter.getsugaTarget.isRevivingFromContract || fighter.getsugaTarget.isShatterReviving)) {
+    return fighter.getsugaTarget;
+  }
+  if (typeof fighter._getClosestEnemy === 'function') {
+    const closest = fighter._getClosestEnemy();
+    if (closest && !closest.isDead && (closest.hp > 0 || closest.isRevivingFromContract || closest.isShatterReviving)) return closest;
+  }
+  if (typeof fighter.getNearestOpponent === 'function') {
+    const nearest = fighter.getNearestOpponent();
+    if (nearest && !nearest.isDead && (nearest.hp > 0 || nearest.isRevivingFromContract || nearest.isShatterReviving)) return nearest;
+  }
+  return null;
+}
+
+/**
  * Returns true if a Getsuga Tensho projectile launched by this Ichigo is currently active in the arena.
  * During this time, Ichigo is barred from performing basic attack swings or initiating new skills.
  * @param {import('../IchigoFighter.js').IchigoFighter} fighter
@@ -278,6 +325,7 @@ export function castBankaiFinalGetsuga(fighter) {
   fighter.isGetsugaSlash = false;
 
   fighter.isChannelingGetsuga = true;
+  fighter.isGetsugaLockIn = false;
   fighter.isFinalMassiveGetsuga = true;
   fighter.isFinalGetsugaRecovery = false;
   fighter._finalGetsugaVoicePlaying = true;
@@ -436,6 +484,7 @@ export function fireGetsuga(fighter, target = null, isCombo = false) {
   const slideFrames = isCombo ? 0 : (CONFIG.ichigo?.getsugaSlideFrames || 8);
 
   fighter.isChannelingGetsuga = true;
+  fighter.isGetsugaLockIn = false;
   fighter.getsugaChargeMax = chargeFrames;
   fighter.getsugaChargeTimer = chargeFrames;
   fighter.getsugaSlideTimer = slideFrames;
@@ -481,6 +530,7 @@ export function fireGetsuga(fighter, target = null, isCombo = false) {
  */
 export function releaseGetsuga(fighter) {
   fighter.isChannelingGetsuga = false;
+  fighter.isGetsugaLockIn = false;
   fighter.getsugaChargeTimer = 0;
   fighter.getsugaSlideTimer = 0;
 
@@ -617,6 +667,7 @@ export function updateGetsuga(fighter, opponent) {
   if (fighter.isChannelingGetsuga) {
     if (fighter.isCaughtInBeam()) {
       fighter.isChannelingGetsuga = false;
+      fighter.isGetsugaLockIn = false;
       fighter.getsugaChargeTimer = 0;
       fighter.getsugaSlideTimer = 0;
       fighter.isFinalMassiveGetsuga = false;
@@ -636,13 +687,32 @@ export function updateGetsuga(fighter, opponent) {
         fighter.vy = 0;
       }
 
-      // Commit 100% to the locked initial cast angle (strictly NO snap auto-aim tracking!)
-      const lockAngle = (fighter.getsugaCastAngle !== undefined && !Number.isNaN(fighter.getsugaCastAngle))
-        ? fighter.getsugaCastAngle
-        : ((fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0));
-      fighter.getsugaCastAngle = lockAngle;
-      fighter.gunAngle = lockAngle;
-      fighter.angle = lockAngle;
+      const lockInFrames = getGetsugaLockInFrames(fighter);
+      const isLockIn = fighter.getsugaChargeTimer <= lockInFrames;
+      fighter.isGetsugaLockIn = isLockIn;
+
+      if (!isLockIn) {
+        // Phase A: Active Auto-Aim Tracking Phase
+        // Smoothly rotates toward target while channeling Getsuga Tensho
+        const aimTarget = getGetsugaAimTarget(fighter, opponent);
+        if (aimTarget && typeof fighter.aim === 'function') {
+          fighter.getsugaTarget = aimTarget;
+          fighter.aim(aimTarget);
+          fighter.getsugaCastAngle = fighter.gunAngle;
+        } else if (fighter.getsugaCastAngle !== undefined) {
+          fighter.gunAngle = fighter.getsugaCastAngle;
+          fighter.angle = fighter.getsugaCastAngle;
+        }
+      } else {
+        // Phase B: Pre-Release Lock-In Phase
+        // Auto-aim freezes completely; strictly NO tracking, NO snapping upon releasing
+        const lockAngle = (fighter.getsugaCastAngle !== undefined && !Number.isNaN(fighter.getsugaCastAngle))
+          ? fighter.getsugaCastAngle
+          : ((fighter.gunAngle !== undefined && !Number.isNaN(fighter.gunAngle)) ? fighter.gunAngle : (fighter.angle || 0));
+        fighter.getsugaCastAngle = lockAngle;
+        fighter.gunAngle = lockAngle;
+        fighter.angle = lockAngle;
+      }
 
       fighter.getsugaChargeTimer--;
       if (fighter.getsugaChargeTimer <= 0) {

@@ -111,45 +111,79 @@ export const todoConfig = {
     // ─────────────────────────────────────────────
     // Audio & Sound Effects Configuration
     // ─────────────────────────────────────────────
-    // Basic Attacks & Combat SFX
-    punchSound: 'Assets/Sound Effects/Attacks/punch.mp3',   // Melee punch sound effect
-    punchVolume: 2.8,                                       // Punch SFX volume
-    punchNoiseSounds: [
-      'Assets/Sound Effects/Skills/todo-punch-noise.mp3',
-      'Assets/Sound Effects/Skills/todo-punch-noise2.mp3'
-    ],
-    punchNoiseVolume: 3.5,                                  // Punch grunt/noise volume
-    punchNoiseChance: 0.20,                                  // 50% chance to play punch noise on basic attack
+    sounds: {
+      punch: 'Assets/Sound Effects/Attacks/punch.mp3',
+      punchNoiseSounds: [
+        'Assets/Sound Effects/Skills/todo-punch-noise.mp3',
+        'Assets/Sound Effects/Skills/todo-punch-noise2.mp3'
+      ],
+      comboVoiceSounds: [
+        'Assets/Sound Effects/Skills/todo-combo-voiceline.mp3',
+        'Assets/Sound Effects/Skills/todo-combo-voiceline2.mp3'
+      ],
+      clap: 'Assets/Sound Effects/Skills/todo-clap.mp3',
+      brotherVoice: 'Assets/Sound Effects/Skills/todo-brother-voiceline.mp3',
+      victoryVoice: 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3',
+      takadaChannelingVoiceline: 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3',
+      takadaBackgroundSong: 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',
+    },
+    soundVolumes: {
+      punch: 2.8,
+      punchNoise: 3.5,
+      comboVoice: 3.8,
+      clap: 3.0,
+      brotherVoice: 2.5,
+      victoryVoice: 3.0,
+      takadaChannelingVoice: 1.0,
+      takadaBackgroundSong: 0.50,
+    },
 
-    // Rock Proximity Counter-Attack Voicelines
-    comboVoiceSounds: [
-      'Assets/Sound Effects/Skills/todo-combo-voiceline.mp3',
-      'Assets/Sound Effects/Skills/todo-combo-voiceline2.mp3'
-    ],
-    comboVoiceVolume: 3.8,                                  // Combo flurry voiceline volume
-    comboVoiceChance: 0.50,                                  // 50% chance to play combo voiceline on Rock Proximity Counter-Attack
+    // ── Backward Compatibility Getters & Setters for Legacy Flat Properties ──
+    get punchSound() { return this.sounds.punch; },
+    set punchSound(v) { this.sounds.punch = v; },
+    get punchVolume() { return this.soundVolumes.punch; },
+    set punchVolume(v) { this.soundVolumes.punch = v; },
 
-    // Skill 1: Boogie Woogie Clap SFX
-    clapSound: 'Assets/Sound Effects/Skills/todo-clap.mp3', // Boogie Woogie clap sound effect
-    clapVolume: 3.0,                                        // Clap SFX volume
-    clapFadeDurationMs: 300,                                // Smooth fade-out duration in ms for clap SFX after impact
+    get punchNoiseSounds() { return this.sounds.punchNoiseSounds; },
+    set punchNoiseSounds(v) { this.sounds.punchNoiseSounds = v; },
+    get punchNoiseVolume() { return this.soundVolumes.punchNoise; },
+    set punchNoiseVolume(v) { this.soundVolumes.punchNoise = v; },
+    punchNoiseChance: 0.20,
 
-    // Teammate Swap Voicelines
-    brotherVoiceSound: 'Assets/Sound Effects/Skills/todo-brother-voiceline.mp3', // Todo teammate swap voice line ("Brother!")
-    brotherVoiceVolume: 2.5,                                                     // Swap voice line volume
-    brotherVoiceChance: 0.05,                                                    // 15% probability to trigger "Brother!" voice line on swap
+    get comboVoiceSounds() { return this.sounds.comboVoiceSounds; },
+    set comboVoiceSounds(v) { this.sounds.comboVoiceSounds = v; },
+    get comboVoiceVolume() { return this.soundVolumes.comboVoice; },
+    set comboVoiceVolume(v) { this.soundVolumes.comboVoice = v; },
+    comboVoiceChance: 0.50,
 
-    // Victory Voicelines
-    victoryVoiceSound: 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3', // Todo victory voice line ("MY BEST FRIEND!")
-    victoryVoiceVolume: 3.0,                                                                // Victory voice line volume
+    get clapSound() { return this.sounds.clap; },
+    set clapSound(v) { this.sounds.clap = v; },
+    get clapVolume() { return this.soundVolumes.clap; },
+    set clapVolume(v) { this.soundVolumes.clap = v; },
+    clapFadeDurationMs: 300,
+
+    get brotherVoiceSound() { return this.sounds.brotherVoice; },
+    set brotherVoiceSound(v) { this.sounds.brotherVoice = v; },
+    get brotherVoiceVolume() { return this.soundVolumes.brotherVoice; },
+    set brotherVoiceVolume(v) { this.soundVolumes.brotherVoice = v; },
+    brotherVoiceChance: 0.05,
+
+    get victoryVoiceSound() { return this.sounds.victoryVoice; },
+    set victoryVoiceSound(v) { this.sounds.victoryVoice = v; },
+    get victoryVoiceVolume() { return this.soundVolumes.victoryVoice; },
+    set victoryVoiceVolume(v) { this.soundVolumes.victoryVoice = v; },
 
     // Ultimate: Takada-chan Voicelines & BGM
-    enableTakadaBackgroundSong: true,                               // Toggle to enable/disable Takada idol background music during ultimate (plays in 1v1 matches)
-    takadaChannelingVoiceline: 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3', // 3.0s channeling voice line
-    takadaChannelingVoiceVolume: 1.0,                              // Channeling voice line volume
-    takadaBackgroundSong: 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',           // Takada idol BGM (fades in & out)
-    takadaBackgroundSongVolume: 0.50,                              // Background song volume
-    takadaSongFadeInMs: 4500,     // Ultra smooth fade-in duration in ms (3.5s) so music swells gently under voiceline
-    takadaSongFadeOutMs: 2500,    // Smooth fade-out duration in ms (2.5s) at end of ultimate
-    takadaDeathSongFadeOutMs: 1200 // Smooth fade-out duration in ms (1.2s) when Todo dies during ultimate/channeling
+    enableTakadaBackgroundSong: true,
+    get takadaChannelingVoiceline() { return this.sounds.takadaChannelingVoiceline; },
+    set takadaChannelingVoiceline(v) { this.sounds.takadaChannelingVoiceline = v; },
+    get takadaChannelingVoiceVolume() { return this.soundVolumes.takadaChannelingVoice; },
+    set takadaChannelingVoiceVolume(v) { this.soundVolumes.takadaChannelingVoice = v; },
+    get takadaBackgroundSong() { return this.sounds.takadaBackgroundSong; },
+    set takadaBackgroundSong(v) { this.sounds.takadaBackgroundSong = v; },
+    get takadaBackgroundSongVolume() { return this.soundVolumes.takadaBackgroundSong; },
+    set takadaBackgroundSongVolume(v) { this.soundVolumes.takadaBackgroundSong = v; },
+    takadaSongFadeInMs: 4500,
+    takadaSongFadeOutMs: 2500,
+    takadaDeathSongFadeOutMs: 1200
 };

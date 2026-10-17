@@ -202,84 +202,151 @@ export const yutaConfig = {
   pureLoveBeamLifestealPct: 0.5,            // Lifesteal percentage (0.1 = 10% of damage dealt) recovered as HP per beam hit tick
 
 
-  //----------------------------------AUDIO CONFIG-----------------------------------------//
+  // ─────────────────────────────────────────────
+  // Audio & Sound Effects Configuration
+  // ─────────────────────────────────────────────
+  sounds: {
+    katanaSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    comeRika: 'Assets/Sound Effects/Skills/comerika.mp3',
+    rikaAppearance: 'Assets/Sound Effects/Skills/rikaAppearance1.mp3',
+    rikaAttack: 'Assets/Sound Effects/Skills/backstab.mp3',
+    rikaGroundSmash: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+    rikaGroundTremble: 'Assets/Sound Effects/SkillEffects/groundTremble.mp3',
+    rikaDeath: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3',
+    rikaNoises: [
+      'Assets/Sound Effects/Attacks/rikanoise1.mp3',
+      'Assets/Sound Effects/Attacks/rikanoise2.mp3',
+      'Assets/Sound Effects/Attacks/rikanoise3.mp3'
+    ],
+    thinIceBreaker: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3',
+    thinIceBreakerNoise: 'Assets/Sound Effects/Skills/yuta-thin-ice-breaker-noise.mp3',
+    domainChannel: 'Assets/Sound Effects/Skills/yutadomainexpansion.mp3',
+    domainDeploy: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
+    phantomFlurryNoise: 'Assets/Sound Effects/Skills/yuta-flurry-noise.mp3',
+    pureLoveBeamCharge: 'Assets/Sound Effects/Skills/rikaAppearance.mp3',
+    pureLoveBeamFire: 'Assets/Sound Effects/Skills/yuta-lovebeam-fires.mp3',
+    pureLoveBeamBackground: 'Assets/Sound Effects/Skills/yuta-lovebeam-background.mp3',
+  },
+  soundVolumes: {
+    katanaSwing: 0.7,
+    comeRika: 2.0,
+    rikaAppearance: 2.5,
+    rikaAttack: 0.8,
+    rikaGroundSmash: 1.5,
+    rikaGroundTremble: 1.8,
+    rikaDeath: 0.0,
+    rikaNoise: 0.80,
+    thinIceBreaker: 1.5,
+    thinIceBreakerNoise: 0.0,
+    domainChannel: 3.5,
+    domainDeploy: 3.5,
+    phantomFlurryNoise: 2.0,
+    pureLoveBeamCharge: 3.0,
+    pureLoveBeamFire: 3.5,
+    pureLoveBeamBackground: 2.0,
+  },
 
-  // Basic Attack: Katana Swing
-  katanaSwingSound: 'Assets/Sound Effects/Attacks/swordswing.mp3',
-  katanaSwingVolume: 0.7,
+  // ── Backward Compatibility Getters & Setters for Legacy Flat Properties ──
+  get katanaSwingSound() { return this.sounds.katanaSwing; },
+  set katanaSwingSound(v) { this.sounds.katanaSwing = v; },
+  get katanaSwingVolume() { return this.soundVolumes.katanaSwing; },
+  set katanaSwingVolume(v) { this.soundVolumes.katanaSwing = v; },
   katanaSwingDelay: 0,
 
-  // Summon Companion: Rika Orimoto
-  comeRikaSound: 'Assets/Sound Effects/Skills/comerika.mp3',
-  comeRikaVolume: 2.0,
+  get comeRikaSound() { return this.sounds.comeRika; },
+  set comeRikaSound(v) { this.sounds.comeRika = v; },
+  get comeRikaVolume() { return this.soundVolumes.comeRika; },
+  set comeRikaVolume(v) { this.soundVolumes.comeRika = v; },
   comeRikaDelay: 0,
-  comeRikaLeadTime: 90,                  // Frames before Rika emerges to play "Come, Rika!"
+  comeRikaLeadTime: 90,
 
-  rikaAppearanceSound: 'Assets/Sound Effects/Skills/rikaAppearance1.mp3',
-  rikaAppearanceVolume: 2.5,
+  get rikaAppearanceSound() { return this.sounds.rikaAppearance; },
+  set rikaAppearanceSound(v) { this.sounds.rikaAppearance = v; },
+  get rikaAppearanceVolume() { return this.soundVolumes.rikaAppearance; },
+  set rikaAppearanceVolume(v) { this.soundVolumes.rikaAppearance = v; },
   rikaAppearanceDelay: 0,
-  rikaAppearanceChance: 0.95, // Probability (0.35 = 35%) of Rika playing emergence roar audio when she emerges
+  rikaAppearanceChance: 0.95,
 
-  rikaAttackSound: 'Assets/Sound Effects/Skills/backstab.mp3',
-  rikaAttackVolume: 0.8,
+  get rikaAttackSound() { return this.sounds.rikaAttack; },
+  set rikaAttackSound(v) { this.sounds.rikaAttack = v; },
+  get rikaAttackVolume() { return this.soundVolumes.rikaAttack; },
+  set rikaAttackVolume(v) { this.soundVolumes.rikaAttack = v; },
   rikaAttackDelay: 0,
 
-  rikaGroundSmashSound: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-  rikaGroundSmashVolume: 1.5,
+  get rikaGroundSmashSound() { return this.sounds.rikaGroundSmash; },
+  set rikaGroundSmashSound(v) { this.sounds.rikaGroundSmash = v; },
+  get rikaGroundSmashVolume() { return this.soundVolumes.rikaGroundSmash; },
+  set rikaGroundSmashVolume(v) { this.soundVolumes.rikaGroundSmash = v; },
   rikaGroundSmashDelay: 0,
 
-  rikaGroundTrembleSound: 'Assets/Sound Effects/SkillEffects/groundTremble.mp3',
-  rikaGroundTrembleVolume: 1.8,
+  get rikaGroundTrembleSound() { return this.sounds.rikaGroundTremble; },
+  set rikaGroundTrembleSound(v) { this.sounds.rikaGroundTremble = v; },
+  get rikaGroundTrembleVolume() { return this.soundVolumes.rikaGroundTremble; },
+  set rikaGroundTrembleVolume(v) { this.soundVolumes.rikaGroundTremble = v; },
   rikaGroundTrembleDelay: 0,
 
-  rikaDeathSound: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3', // Shatter sound played when Rika loses all HP and dispels
-  rikaDeathVolume: 0.0,
+  get rikaDeathSound() { return this.sounds.rikaDeath; },
+  set rikaDeathSound(v) { this.sounds.rikaDeath = v; },
+  get rikaDeathVolume() { return this.soundVolumes.rikaDeath; },
+  set rikaDeathVolume(v) { this.soundVolumes.rikaDeath = v; },
   rikaDeathDelay: 0,
 
-  rikaNoises: [
-    'Assets/Sound Effects/Attacks/rikanoise1.mp3',
-    'Assets/Sound Effects/Attacks/rikanoise2.mp3',
-    'Assets/Sound Effects/Attacks/rikanoise3.mp3'
-  ],
-  rikaNoiseVolume: 0.80,
+  get rikaNoises() { return this.sounds.rikaNoises; },
+  set rikaNoises(v) { this.sounds.rikaNoises = v; },
+  get rikaNoiseVolume() { return this.soundVolumes.rikaNoise; },
+  set rikaNoiseVolume(v) { this.soundVolumes.rikaNoise = v; },
   rikaNoiseDelay: 0,
-  rikaNoiseCooldown: 25,                 // Cooldown in frames between Rika attack roars
+  rikaNoiseCooldown: 25,
   rikaNoiseChance: 0.35,
 
-  // Thin Ice Breaker
-  thinIceBreakerSound: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3',
-  thinIceBreakerVolume: 1.5,
+  get thinIceBreakerSound() { return this.sounds.thinIceBreaker; },
+  set thinIceBreakerSound(v) { this.sounds.thinIceBreaker = v; },
+  get thinIceBreakerVolume() { return this.soundVolumes.thinIceBreaker; },
+  set thinIceBreakerVolume(v) { this.soundVolumes.thinIceBreaker = v; },
   thinIceBreakerDelay: 0,
-  thinIceBreakerMaxDuration: 1200, // Stop playback after 1000ms
+  thinIceBreakerMaxDuration: 1200,
 
-  thinIceBreakerNoiseSound: 'Assets/Sound Effects/Skills/yuta-thin-ice-breaker-noise.mp3',
-  thinIceBreakerNoiseVolume: 0.0,
+  get thinIceBreakerNoiseSound() { return this.sounds.thinIceBreakerNoise; },
+  set thinIceBreakerNoiseSound(v) { this.sounds.thinIceBreakerNoise = v; },
+  get thinIceBreakerNoiseVolume() { return this.soundVolumes.thinIceBreakerNoise; },
+  set thinIceBreakerNoiseVolume(v) { this.soundVolumes.thinIceBreakerNoise = v; },
   thinIceBreakerNoiseDelay: 0,
   thinIceBreakerNoiseChance: 0.35,
-  thinIceBreakerNoiseMaxDuration: 750, // Stop voice line after 750ms
+  thinIceBreakerNoiseMaxDuration: 750,
 
-  // Ultimate: Domain Expansion
-  domainChannelSound: 'Assets/Sound Effects/Skills/yutadomainexpansion.mp3',
-  domainChannelVolume: 3.5,
+  get domainChannelSound() { return this.sounds.domainChannel; },
+  set domainChannelSound(v) { this.sounds.domainChannel = v; },
+  get domainChannelVolume() { return this.soundVolumes.domainChannel; },
+  set domainChannelVolume(v) { this.soundVolumes.domainChannel = v; },
   domainChannelDelay: 0,
 
-  domainDeploySound: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
-  domainDeployVolume: 3.5,
+  get domainDeploySound() { return this.sounds.domainDeploy; },
+  set domainDeploySound(v) { this.sounds.domainDeploy = v; },
+  get domainDeployVolume() { return this.soundVolumes.domainDeploy; },
+  set domainDeployVolume(v) { this.soundVolumes.domainDeploy = v; },
   domainDeployDelay: 0,
 
-  // Phantom Flurry Counter
-  phantomFlurryNoiseSound: 'Assets/Sound Effects/Skills/yuta-flurry-noise.mp3',
-  phantomFlurryNoiseVolume: 2.0,
+  get phantomFlurryNoiseSound() { return this.sounds.phantomFlurryNoise; },
+  set phantomFlurryNoiseSound(v) { this.sounds.phantomFlurryNoise = v; },
+  get phantomFlurryNoiseVolume() { return this.soundVolumes.phantomFlurryNoise; },
+  set phantomFlurryNoiseVolume(v) { this.soundVolumes.phantomFlurryNoise = v; },
   phantomFlurryNoiseDelay: 0,
   phantomFlurryNoiseChance: 0.35,
 
-  // Ultimate Skill: Pure Love Beam
-  pureLoveBeamChargeSound: 'Assets/Sound Effects/Skills/rikaAppearance.mp3', // Played when Rika appears behind Yuta for beam charge
-  pureLoveBeamChargeVolume: 3.0,
-  pureLoveBeamChargeOffset: 0.0,            // Time in seconds to skip at start of charge sound
-  pureLoveBeamFireSound: 'Assets/Sound Effects/Skills/yuta-lovebeam-fires.mp3', // Sound played when fired
-  pureLoveBeamFireVolume: 3.5,
-  pureLoveBeamFireOffset: 0.15,             // Time in seconds to skip at start of fire sound (adjust to sync with visuals)
-  pureLoveBeamBackgroundSound: 'Assets/Sound Effects/Skills/yuta-lovebeam-background.mp3', // Background track during charge & fire
-  pureLoveBeamBackgroundVolume: 2.0,
+  get pureLoveBeamChargeSound() { return this.sounds.pureLoveBeamCharge; },
+  set pureLoveBeamChargeSound(v) { this.sounds.pureLoveBeamCharge = v; },
+  get pureLoveBeamChargeVolume() { return this.soundVolumes.pureLoveBeamCharge; },
+  set pureLoveBeamChargeVolume(v) { this.soundVolumes.pureLoveBeamCharge = v; },
+  pureLoveBeamChargeOffset: 0.0,
+
+  get pureLoveBeamFireSound() { return this.sounds.pureLoveBeamFire; },
+  set pureLoveBeamFireSound(v) { this.sounds.pureLoveBeamFire = v; },
+  get pureLoveBeamFireVolume() { return this.soundVolumes.pureLoveBeamFire; },
+  set pureLoveBeamFireVolume(v) { this.soundVolumes.pureLoveBeamFire = v; },
+  pureLoveBeamFireOffset: 0.15,
+
+  get pureLoveBeamBackgroundSound() { return this.sounds.pureLoveBeamBackground; },
+  set pureLoveBeamBackgroundSound(v) { this.sounds.pureLoveBeamBackground = v; },
+  get pureLoveBeamBackgroundVolume() { return this.soundVolumes.pureLoveBeamBackground; },
+  set pureLoveBeamBackgroundVolume(v) { this.soundVolumes.pureLoveBeamBackground = v; },
 };

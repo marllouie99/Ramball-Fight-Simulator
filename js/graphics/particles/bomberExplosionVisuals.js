@@ -102,8 +102,9 @@ class HighFidelityExplosionSystem {
     }
     this.particles.push(flash);
 
+    const isMobile = (typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) || (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024);
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
-    const particleScale = isMulti ? 0.4 : 1.0;
+    const particleScale = (isMulti ? 0.4 : 1.0) * (isMobile ? 0.5 : 1.0);
 
     // 2. Organic Fireball 
     const fireCount = Math.floor((8 + Math.random() * 4) * particleScale);

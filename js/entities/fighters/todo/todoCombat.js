@@ -7,21 +7,21 @@ import { spawnBlackFlash } from '../../../graphics/particles/blackFlashEffect.js
 import { audioSystem } from '../../../systems/audioSystem.js';
 
 function playTodoPunchSound(fighter = null, isCombo = false) {
-  const soundSrc = CONFIG.todo?.punchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
-  const soundVol = CONFIG.todo?.punchVolume || 2.8;
+  const soundSrc = CONFIG.todo?.sounds?.punch || CONFIG.todo?.punchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
+  const soundVol = CONFIG.todo?.soundVolumes?.punch ?? (CONFIG.todo?.punchVolume || 2.8);
   audioSystem.playSFX(soundSrc, soundVol);
 
   // Play random punch noise on basic attack punches with configured probability (50% default)
   if (!isCombo && fighter) {
     const noiseChance = (typeof CONFIG.todo?.punchNoiseChance === 'number') ? CONFIG.todo.punchNoiseChance : 0.5;
     if (Math.random() < noiseChance) {
-      const noiseList = CONFIG.todo?.punchNoiseSounds || [
+      const noiseList = CONFIG.todo?.sounds?.punchNoiseSounds || CONFIG.todo?.punchNoiseSounds || [
         'Assets/Sound Effects/Skills/todo-punch-noise.mp3',
         'Assets/Sound Effects/Skills/todo-punch-noise2.mp3'
       ];
       if (noiseList.length > 0) {
         const selectedNoise = noiseList[Math.floor(Math.random() * noiseList.length)];
-        const noiseVol = (typeof CONFIG.todo?.punchNoiseVolume === 'number') ? CONFIG.todo.punchNoiseVolume : 2.5;
+        const noiseVol = CONFIG.todo?.soundVolumes?.punchNoise ?? (typeof CONFIG.todo?.punchNoiseVolume === 'number' ? CONFIG.todo.punchNoiseVolume : 2.5);
         audioSystem.playFighterVoiceline(fighter, selectedNoise, noiseVol);
       }
     }

@@ -121,15 +121,17 @@ class BurnEffectSystem {
   spawnBurnParticles(fighter) {
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
     
-    // OPTIMIZED: More aggressive limits for multi-fighter battles
-    const maxBurn = isMulti ? 40 : 200;
+    const isMobile = (typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) || (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024);
+    
+    // OPTIMIZED: Aggressive limits for mobile and multi-fighter battles to prevent thermal heating
+    const maxBurn = isMobile ? (isMulti ? 20 : 50) : (isMulti ? 40 : 200);
     const fpsBasedLimit = state.performanceMode ? 25 : maxBurn;
     if (this.particles.length > fpsBasedLimit) return;
     
     const r = fighter.r;
-    const fireChance = state.performanceMode ? 0.2 : 0.4;
-    const sparkChance = state.performanceMode ? 0.1 : 0.2;
-    const smokeChance = state.performanceMode ? 0.08 : 0.15;
+    const fireChance = (state.performanceMode || isMobile) ? 0.2 : 0.4;
+    const sparkChance = (state.performanceMode || isMobile) ? 0.1 : 0.2;
+    const smokeChance = (state.performanceMode || isMobile) ? 0.08 : 0.15;
 
     // Determine directional flow vector based on channeling angle or movement
     let flowVx = 0;

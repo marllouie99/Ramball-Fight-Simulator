@@ -36,7 +36,7 @@ export const saitamaConfig = {
   punchKnockback: 100, // Massive knockback force
   punchReach: 50,
   punchArcAngle: Math.PI * 0.5, // 90 degree arc angle
-  punchCooldown: 500, // ~0.6s cooldown at 60fps
+  punchCooldown: 1000, // ~0.6s cooldown at 60fps
   punchWindup: 0,
   punchWindupFrames: 0,
   punchMaxTime: 28,                // Smooth punch animation frames (~0.46s at 60fps)
@@ -79,7 +79,7 @@ export const saitamaConfig = {
   flurryBreatherFrames: 36,         // Frames Saitama stands completely motionless in a short breather stance after the final punch
   flurryFinalFrontalReach: 560,     // Frontal supersonic shockwave blast reach (px) on flurry final punch
   flurryFinalFrontalArc: Math.PI * 0.70, // Frontal shockwave blast cone angle on flurry final punch
-  flurryCooldown: 1000,              // Cooldown frames at 60fps
+  flurryCooldown: 2000,              // Cooldown frames at 60fps
   flurryTriggerDistance: 260,       // AI trigger distance threshold
   flurryInitialHitPauseFrames: 20,  // Target hit-pause on flurry start
   flurryHoldHitPauseFrames: 8,      // Target hit-pause during flurry cycle
@@ -144,8 +144,8 @@ export const saitamaConfig = {
   counterPunchSlowMultiplier: 0.35, // Slow debuff strength (35% speed — staggering)
   counterPunchRecoveryFrames: 65, // Frames Saitama stands still after landing (post-punch stall)
   counterDodgeLockFrames: 20,      // Dodge cooldown after counter execution
-  skillPunishCooldown: 2000,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
-  initialSkillPunishCooldown: 2000, // Cooldown at the start of the round before first counter is available (2000 frames)
+  skillPunishCooldown: 2500,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
+  initialSkillPunishCooldown: 2500, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
   counterOverlayZoomMax: 0.08,           // Subtle expansion factor (1.0 -> 1.08) for Serious Punch overlay
