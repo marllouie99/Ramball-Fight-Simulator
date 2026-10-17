@@ -52,6 +52,60 @@ import {
   updateMeleeSwing
 } from './ichigo/ichigoCombat.js';
 
+// ── Offscreen Cache for Ichigo Afterimage Silhouettes (Rule 3.5 Pattern) ──
+const _cachedIchigoAfterimageCanvases = new Map();
+
+function _getIchigoAfterimageCanvas(r, bodyColor, strokeColor) {
+  if (typeof document === 'undefined') return null;
+  const intR = Math.round(r || 25);
+  const key = `${intR}_${bodyColor}_${strokeColor || 'none'}`;
+  let cached = _cachedIchigoAfterimageCanvases.get(key);
+  if (cached) return cached;
+
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const maxExtent = Math.ceil(intR / P) + 2;
+  const size = (maxExtent * 2 + 1) * P;
+
+  cached = document.createElement('canvas');
+  cached.width = size;
+  cached.height = size;
+  const offCtx = cached.getContext('2d');
+  if (!offCtx) return null;
+  offCtx.imageSmoothingEnabled = false;
+  offCtx.translate(size / 2, size / 2);
+
+  // 1. Pixel-art afterimage body silhouette
+  offCtx.fillStyle = bodyColor || 'rgba(12, 4, 10, 0.75)';
+  for (let gy = -maxExtent; gy <= maxExtent; gy++) {
+    for (let gx = -maxExtent; gx <= maxExtent; gx++) {
+      const x = gx * P;
+      const y = gy * P;
+      if (Math.hypot(x, y) <= intR + 0.25) {
+        offCtx.fillRect(snap(x), snap(y), P, P);
+      }
+    }
+  }
+
+  // 2. Blocky outer aura border for Bankai / Hollow forms
+  if (strokeColor) {
+    offCtx.fillStyle = strokeColor;
+    for (let gy = -maxExtent - 1; gy <= maxExtent + 1; gy++) {
+      for (let gx = -maxExtent - 1; gx <= maxExtent + 1; gx++) {
+        const x = gx * P;
+        const y = gy * P;
+        const d = Math.hypot(x, y);
+        if (d >= intR - 1.5 && d <= intR + 2.5) {
+          offCtx.fillRect(snap(x), snap(y), P, P);
+        }
+      }
+    }
+  }
+
+  _cachedIchigoAfterimageCanvases.set(key, cached);
+  return cached;
+}
+
 export class IchigoFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -1154,42 +1208,26 @@ export class IchigoFighter extends Fighter {
         const life = Math.max(0, Math.min(1, ai.timer / (ai.maxTimer || 16)));
         if (life <= 0.01) continue;
 
+        const bodyColor = ai.color || 'rgba(12, 4, 10, 0.75)';
+        const strokeColor = (ai.strokeColor || ai.isBankai) ? (ai.strokeColor || 'rgba(220, 20, 20, 0.90)') : null;
+        const cachedCanvas = _getIchigoAfterimageCanvas(ai.r || 25, bodyColor, strokeColor);
+
         ctx.save();
         ctx.globalAlpha = life * 0.55;
         ctx.translate(ai.x, ai.y);
-        ctx.rotate(ai.angle || 0);
         ctx.imageSmoothingEnabled = false;
 
-        const p = 2.0;
-        const snap = (v) => Math.round(v / p) * p;
-        const radius = ai.r || 25;
-        const maxExtent = Math.ceil(radius / p) + 2;
-
-        // Pixel-art afterimage body silhouette
-        ctx.fillStyle = ai.color || 'rgba(12, 4, 10, 0.75)';
-        for (let gy = -maxExtent; gy <= maxExtent; gy++) {
-          for (let gx = -maxExtent; gx <= maxExtent; gx++) {
-            const x = gx * p;
-            const y = gy * p;
-            if (Math.hypot(x, y) <= radius + 0.25) {
-              ctx.fillRect(snap(x), snap(y), p, p);
-            }
-          }
-        }
-
-        // Blocky outer aura border for Bankai / Hollow forms
-        if (ai.strokeColor || ai.isBankai) {
-          const auraColor = ai.strokeColor || 'rgba(220, 20, 20, 0.90)';
-          ctx.fillStyle = auraColor;
-          for (let gy = -maxExtent - 1; gy <= maxExtent + 1; gy++) {
-            for (let gx = -maxExtent - 1; gx <= maxExtent + 1; gx++) {
-              const x = gx * p;
-              const y = gy * p;
-              const d = Math.hypot(x, y);
-              if (d >= radius - 1.5 && d <= radius + 2.5) {
-                ctx.fillRect(snap(x), snap(y), p, p);
-              }
-            }
+        if (cachedCanvas) {
+          ctx.drawImage(cachedCanvas, -cachedCanvas.width / 2, -cachedCanvas.height / 2);
+        } else {
+          ctx.fillStyle = bodyColor;
+          ctx.beginPath();
+          ctx.arc(0, 0, ai.r || 25, 0, Math.PI * 2);
+          ctx.fill();
+          if (strokeColor) {
+            ctx.strokeStyle = strokeColor;
+            ctx.lineWidth = 2.0;
+            ctx.stroke();
           }
         }
 

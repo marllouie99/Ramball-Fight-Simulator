@@ -416,11 +416,24 @@ export function resolveProjectilePlusObstacleCollision(p, arena) {
   const obs = getArenaCenterObstacle(arena);
   if (!obs || obs.type !== 'plus') return false;
 
-  const pr = p.r || p.radius || 4;
-  const prevX = (typeof p.vx === 'number' && Number.isFinite(p.vx)) ? (p.x - p.vx) : p.x;
-  const prevY = (typeof p.vy === 'number' && Number.isFinite(p.vy)) ? (p.y - p.vy) : p.y;
+  let px = p.x;
+  let py = p.y;
+  let pr = p.r || p.radius || 4;
+  const pvx = p.vx;
+  const pvy = p.vy;
 
-  const hit = checkRayIntersectsPlusObstacle(prevX, prevY, p.x, p.y, arena, pr);
+  if (p.isGetsuga || p.behaviorType === 'getsuga_tensho') {
+    const ang = p.angle !== undefined ? p.angle : ((pvx !== 0 || pvy !== 0) ? Math.atan2(pvy, pvx) : 0);
+    const apexDist = (p.r || 100) * 0.872;
+    px = p.x + Math.cos(ang) * apexDist;
+    py = p.y + Math.sin(ang) * apexDist;
+    pr = p.stoppingRadius || 12;
+  }
+
+  const prevX = (typeof pvx === 'number' && Number.isFinite(pvx)) ? (px - pvx) : px;
+  const prevY = (typeof pvy === 'number' && Number.isFinite(pvy)) ? (py - pvy) : py;
+
+  const hit = checkRayIntersectsPlusObstacle(prevX, prevY, px, py, arena, pr);
   if (hit) {
     return {
       hit: true,

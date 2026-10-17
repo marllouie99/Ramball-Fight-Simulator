@@ -13,6 +13,7 @@ import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch, spawnMahitoSoulExplosion } from '../graphics/particles/sparkEffect.js';
+import { spawnGetsugaExplosion } from '../graphics/particles/getsugaImpactEffect.js';
 import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
 import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
@@ -230,7 +231,19 @@ class ProjectileSystem {
     p.lastAngle = undefined;
     p.launchAngle = undefined;
     p.originalAngle = undefined;
+    if (p.draggedTargets && p.draggedTargets.size > 0) {
+      for (const [target] of p.draggedTargets.entries()) {
+        if (target) {
+          target.isDraggedByGetsuga = false;
+          target.preventKnockbackBounce = false;
+          target.z = 0;
+        }
+      }
+      p.draggedTargets.clear();
+    }
     p.draggedTargets = null;
+    if (p.dragTimers) p.dragTimers.clear();
+    p.dragTimers = null;
     p.preventKnockbackBounce = false;
     p.getsugaReleaseId = undefined;
     p.getsugaTravelShakeCounter = undefined;
@@ -873,6 +886,9 @@ class ProjectileSystem {
     proj._resumeVx = cosA * speed;
     proj._resumeVy = sinA * speed;
     proj.r = projRadius;
+    proj.stoppingRadius = isFinal
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaStoppingRadius || 16)
+      : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaStoppingRadius || 14) : (CONFIG.ichigo?.getsugaStoppingRadius || 12));
     proj.life = maxLife;
     proj.maxLife = maxLife;
     proj.color = isFinal
@@ -895,6 +911,11 @@ class ProjectileSystem {
             : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4) : (CONFIG.ichigo?.getsugaTickDamage || 2)))));
     proj.isGetsuga = true;
     proj.getsugaForm = form;
+    proj.form = form;
+    proj.isBankai = isBankai;
+    proj.isHollow = isMask;
+    proj.isHollowMask = isMask;
+    proj.isFinalBankai = isFinal;
     proj.visual = (isMask || isBankai) ? 'blackGetsuga' : 'getsuga';
     proj.behaviorType = 'getsuga_tensho';
     proj.getsugaReleaseId = (fighter.characterId || 'ichigo') + '_getsuga_' + (fighter.getsugaReleaseCount || Date.now());
@@ -1149,6 +1170,267 @@ class ProjectileSystem {
           }
         }
       });
+    }
+  }
+
+  /**
+   * Detonates a Getsuga Tensho projectile into a massive Bleach anime Reiatsu spiritual explosion.
+   * Releases dragged victims, deals radial splash damage/knockback, and spawns concentric
+   * shockwaves adhering to Rule 26 (anti-cobweb / anti-mesh) and Rule 27 (healthbar-only lifesteal).
+   * @param {Object} p The Getsuga Tensho projectile
+   * @param {Array} fighters Active fighters array
+   */
+  detonateGetsugaTensho(p, fighters) {
+    if (!p) return;
+
+    // 1. Release all dragged targets from Getsuga stasis
+    if (p.draggedTargets && p.draggedTargets.size > 0) {
+      for (const [target] of p.draggedTargets.entries()) {
+        if (target) {
+          target.isDraggedByGetsuga = false;
+          target.preventKnockbackBounce = false;
+          target.z = 0;
+        }
+      }
+      p.draggedTargets.clear();
+    }
+    if (p.dragTimers) p.dragTimers.clear();
+
+    // 2. Identify form and theme based on Ichigo's current form (with projectile fallback)
+    const targets = fighters || (typeof state !== "undefined" ? state.fighters : null);
+    const ownerFighter = p.ownerFighter || (targets && typeof p.owner === "number" ? targets[p.owner] : null);
+
+    const isFighterFinal = Boolean(
+      ownerFighter && (
+        ownerFighter.isFinalBankai ||
+        ownerFighter._isFinalGetsugaActive ||
+        ownerFighter.isMugetsu ||
+        ownerFighter.isFinalMassiveGetsuga ||
+        (ownerFighter.bankaiFinalGetsugaTriggered && ownerFighter.isFinalGetsugaRecovery)
+      )
+    );
+    const isFighterBankai = Boolean(
+      ownerFighter && (
+        ownerFighter.bankaiActive ||
+        ownerFighter.skin === 'bankai' ||
+        ownerFighter.skin === 'bankai_mask' ||
+        ownerFighter.isChannelingBankai ||
+        (ownerFighter.bankaiBurstTimer && ownerFighter.bankaiBurstTimer > 0)
+      )
+    );
+    const isFighterHollow = Boolean(
+      ownerFighter && (
+        ownerFighter.hollowMaskActive ||
+        ownerFighter.skin === 'hollow' ||
+        ownerFighter.skin === 'bankai_mask' ||
+        ownerFighter.skin === 'shikai_mask' ||
+        (ownerFighter.hollowMaskFormationTimer && ownerFighter.hollowMaskFormationTimer > 0) ||
+        (ownerFighter.hollowBurstTimer && ownerFighter.hollowBurstTimer > 0) ||
+        (typeof state !== 'undefined' && state.showHollowMask && (ownerFighter.type === 'ichigo' || ownerFighter.characterId === 'ichigo'))
+      )
+    );
+
+    const pForm = p.getsugaForm || p.form || (p.visual === 'blackGetsuga' ? 'bankai' : 'shikai');
+    const isProjFinal = Boolean(p.isFinalMassiveGetsuga || p.isFinalBankai || p.isFinalGetsuga || p.isMugetsu || pForm === 'final_bankai');
+    const isProjBankai = Boolean(p.isBankai || pForm === 'bankai' || pForm === 'bankai_hollow' || isProjFinal || p.visual === 'blackGetsuga');
+    const isProjHollow = Boolean(p.isHollowMask || p.isHollow || pForm === 'hollow' || pForm === 'bankai_hollow');
+
+    const isFinal = isFighterFinal || isProjFinal;
+    let isBankai = false;
+    let isHollow = false;
+
+    if (ownerFighter && (ownerFighter.characterId === 'ichigo' || ownerFighter.type === 'ichigo' || ownerFighter.bankaiActive !== undefined)) {
+      isBankai = isFinal || isFighterBankai;
+      isHollow = isFighterHollow;
+      if (!isBankai && isProjBankai) isBankai = true;
+      if (!isHollow && isProjHollow) isHollow = true;
+    } else {
+      isBankai = isFinal || isProjBankai;
+      isHollow = isProjHollow;
+    }
+
+    let formName = "shikai";
+    if (isFinal) formName = "final_bankai";
+    else if (isHollow && isBankai) formName = "bankai_hollow";
+    else if (isHollow) formName = "hollow";
+    else if (isBankai) formName = "bankai";
+
+    // 3. Compute detonation position at crescent apex
+    const blastAngle = p.angle !== undefined ? p.angle : ((p.vx !== 0 || p.vy !== 0) ? Math.atan2(p.vy, p.vx) : 0);
+    const gApexDist = (p.r || 100) * 0.872;
+    let detX = p.x + Math.cos(blastAngle) * gApexDist;
+    let detY = p.y + Math.sin(blastAngle) * gApexDist;
+
+    // Clamp within arena bounds if available
+    const arena = (typeof state !== "undefined" && state.arena) ? state.arena : null;
+    if (arena) {
+      detX = Math.max(arena.x + 8, Math.min(arena.x + arena.width - 8, detX));
+      detY = Math.max(arena.y + 8, Math.min(arena.y + arena.height - 8, detY));
+    }
+
+    // 4. Explosion stats from config
+    const baseBlastRadius = CONFIG.ichigo?.getsugaExplosionRadius || 110;
+    let blastRadius = baseBlastRadius;
+    let blastDamage = CONFIG.ichigo?.getsugaExplosionDamage || 12;
+    let blastShake = CONFIG.ichigo?.getsugaExplosionShake || 6.0;
+
+    if (isFinal) {
+      blastDamage = CONFIG.ichigo?.bankaiFinalGetsugaExplosionDamage || 28;
+      blastShake = CONFIG.ichigo?.bankaiFinalGetsugaExplosionShake || 11.5;
+      blastRadius = baseBlastRadius * 1.5;
+    } else if (isHollow && isBankai) {
+      blastDamage = CONFIG.ichigo?.bankaiHollowGetsugaExplosionDamage || 22;
+      blastShake = CONFIG.ichigo?.bankaiHollowGetsugaExplosionShake || 9.0;
+      blastRadius = baseBlastRadius * 1.30;
+    } else if (isHollow) {
+      blastDamage = CONFIG.ichigo?.hollowGetsugaExplosionDamage || 15;
+      blastShake = CONFIG.ichigo?.hollowGetsugaExplosionShake || 7.0;
+      blastRadius = baseBlastRadius * 1.25;
+    } else if (isBankai) {
+      blastDamage = CONFIG.ichigo?.bankaiGetsugaExplosionDamage || 18;
+      blastShake = CONFIG.ichigo?.bankaiGetsugaExplosionShake || 8.5;
+      blastRadius = baseBlastRadius * 1.15;
+    }
+
+    // 5. Sound & Screen Shake
+    const expSnd = CONFIG.ichigo?.sounds?.getsugaExplosion || "Assets/Sound Effects/Attacks/explosion.mp3";
+    const expVol = (typeof CONFIG.ichigo?.soundVolumes?.getsugaExplosion === "number")
+      ? CONFIG.ichigo.soundVolumes.getsugaExplosion
+      : 0.90;
+    if (typeof audioSystem !== "undefined" && typeof audioSystem.playSFX === "function") {
+      audioSystem.playSFX(expSnd, expVol);
+    } else if (typeof playSound === "function") {
+      playSound(expSnd, expVol);
+    }
+
+    triggerGlobalScreenShake(blastShake, 14);
+
+    // 6. Visual Effects — themed directly by Ichigo's resolved form
+    let themeColor = CONFIG.ichigo?.getsugaColor || "#00D5FF";
+    let sparkType = "cyan";
+    let secondarySparkType = "white";
+    let secondarySparkColor = "#FFFFFF";
+
+    if (isFinal) {
+      themeColor = CONFIG.ichigo?.bankaiFinalGetsugaColor || "#FF0A20";
+      sparkType = "crimson";
+      secondarySparkType = "white";
+      secondarySparkColor = "#FFFFFF";
+    } else if (isHollow && isBankai) {
+      themeColor = CONFIG.ichigo?.bankaiHollowGetsugaColor || "#FF1E00";
+      sparkType = "crimson";
+      secondarySparkType = "orange";
+      secondarySparkColor = "#FFAA00";
+    } else if (isHollow) {
+      themeColor = (CONFIG.ichigo?.hollowGetsugaColor && CONFIG.ichigo.hollowGetsugaColor !== '#FFFFFF') 
+        ? CONFIG.ichigo.hollowGetsugaColor 
+        : "#FF1E00";
+      sparkType = "orange";
+      secondarySparkType = "gold";
+      secondarySparkColor = "#FFAA00";
+    } else if (isBankai) {
+      themeColor = CONFIG.ichigo?.bankaiGetsugaColor || "#DC143C";
+      sparkType = "crimson";
+      secondarySparkType = "white";
+      secondarySparkColor = "#FFFFFF";
+    }
+
+    p.color = themeColor;
+
+    if (typeof spawnGetsugaExplosion === "function") {
+      spawnGetsugaExplosion(detX, detY, blastRadius, formName, blastAngle);
+    }
+    if (typeof spawnGroundScorch === "function") {
+      spawnGroundScorch(detX, detY, Math.round(blastRadius * 0.75), 45);
+    }
+    if (typeof spawnImpactFlash === "function") {
+      spawnImpactFlash(detX, detY, Math.max(80, blastRadius * 0.9), themeColor, 8);
+      spawnImpactFlash(detX, detY, Math.max(40, blastRadius * 0.45), "#FFFFFF", 6);
+    }
+    if (typeof spawnSparks === "function") {
+      spawnSparks(detX, detY, 20, sparkType, themeColor);
+      spawnSparks(detX, detY, 12, secondarySparkType, secondarySparkColor);
+    }
+
+    // 7. Blast Splash Damage & Radial Knockback
+    // (ownerFighter and targets resolved at top of detonateGetsugaTensho)
+    let totalDamageDealt = 0;
+
+    if (targets && targets.length > 0) {
+      for (let fi = 0; fi < targets.length; fi++) {
+        const victim = targets[fi];
+        if (!victim || victim.hp <= 0) continue;
+        if (areOnSameTeam(p.owner, fi)) continue;
+
+        const dx = victim.x - detX;
+        const dy = (victim.y - (victim.z || 0)) - detY;
+        const dist = Math.hypot(dx, dy);
+        const victimRadius = victim.r || 25;
+
+        if (dist <= blastRadius + victimRadius) {
+          const falloff = 1.0 - Math.min(1.0, Math.max(0, dist / (blastRadius + victimRadius))) * 0.40;
+          const finalDmg = Math.max(1, Math.round(blastDamage * falloff));
+
+          const hpBefore = victim.hp;
+          if (typeof applyDamageToTarget === "function") {
+            applyDamageToTarget(victim, finalDmg, ownerFighter, {
+              isExplosion: true,
+              isGetsuga: true,
+              damageAngle: Math.atan2(dy, dx)
+            });
+            totalDamageDealt += Math.max(0, hpBefore - victim.hp);
+          } else if (typeof victim.takeDamage === "function") {
+            victim.takeDamage(finalDmg, ownerFighter);
+            totalDamageDealt += Math.max(0, hpBefore - victim.hp);
+          } else {
+            victim.hp -= finalDmg;
+            totalDamageDealt += finalDmg;
+          }
+
+          const normDist = dist > 0.001 ? dist : 1;
+          const pushDirX = dist > 0.001 ? (dx / normDist) : Math.cos(blastAngle);
+          const pushDirY = dist > 0.001 ? (dy / normDist) : Math.sin(blastAngle);
+          const pushForce = (blastShake * 1.5) * falloff;
+
+          if (typeof victim.applyKnockback === "function") {
+            victim.applyKnockback(pushDirX * pushForce, pushDirY * pushForce, 0);
+          } else {
+            victim.knockbackVx = (victim.knockbackVx || 0) + pushDirX * pushForce;
+            victim.knockbackVy = (victim.knockbackVy || 0) + pushDirY * pushForce;
+            victim.vx = (victim.vx || 0) + pushDirX * pushForce;
+            victim.vy = (victim.vy || 0) + pushDirY * pushForce;
+          }
+        }
+      }
+    }
+
+    // 8. Damage illusions/summons
+    if (typeof state !== "undefined" && state.illusions && state.illusions.length > 0) {
+      state.illusions.forEach((ill) => {
+        if (!ill || ill.hp <= 0) return;
+        const illOwner = ill.owner?.fighterIndex ?? (state.fighters ? state.fighters.indexOf(ill.owner) : -1);
+        if (illOwner === p.owner) return;
+        const myTeam = (typeof state.getFighterTeam === "function" && typeof p.owner === "number") ? state.getFighterTeam(p.owner) : null;
+        if (myTeam !== null && illOwner !== -1 && state.getFighterTeam(illOwner) === myTeam) return;
+
+        const dist = Math.hypot(ill.x - detX, ill.y - detY);
+        if (dist <= blastRadius + (ill.r || 20)) {
+          if (typeof ill.takeDamage === "function") {
+            ill.takeDamage(blastDamage, ownerFighter);
+          } else {
+            ill.hp -= blastDamage;
+          }
+        }
+      });
+    }
+
+    // 9. Hollow Mask Vampiric Lifesteal (Rule 27: Healthbar-only, zero in-arena floating text)
+    if (ownerFighter && isHollow && totalDamageDealt > 0 && ownerFighter.hp > 0) {
+      const lifestealRatio = CONFIG.ichigo?.hollowLifesteal || 0.20;
+      const healAmount = Math.max(1, Math.round(totalDamageDealt * lifestealRatio));
+      ownerFighter.hp = Math.min(ownerFighter.maxHp, ownerFighter.hp + healAmount);
+      ownerFighter._lastHealAmount = (ownerFighter._lastHealAmount || 0) + healAmount;
+      ownerFighter._healthBarHealTimer = 16;
     }
   }
 
@@ -3567,6 +3849,14 @@ class ProjectileSystem {
             this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
             this.projectiles.pop();
             continue;
+          } else if (p.isGetsuga || p.behaviorType === 'getsuga_tensho') {
+            p.x = obsHit.wallX;
+            p.y = obsHit.wallY;
+            this.detonateGetsugaTensho(p, fighters);
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            continue;
           } else {
             p.x = obsHit.wallX;
             p.y = obsHit.wallY;
@@ -3585,7 +3875,16 @@ class ProjectileSystem {
       }
 
       if (p.fadingOut) {
-        if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
+        if (p.isGetsuga || p.behaviorType === 'getsuga_tensho') {
+          p.fadingOut = false;
+          if (!p.isFrozenByInfinity) {
+            this.detonateGetsugaTensho(p, fighters);
+          }
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        } else if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
           p.fadingOut = false;
         } else {
           // Trail shrinks from the tail toward the impact point
@@ -3626,10 +3925,18 @@ class ProjectileSystem {
           if (areOnSameTeam(p.owner, fi)) continue;
 
           const infinityRadius = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
-          const projRadius = (p.isGetsuga || p.behaviorType === 'getsuga_tensho') ? (p.r || 100) : 0;
+          const projRadius = (p.isGetsuga || p.behaviorType === 'getsuga_tensho') ? (p.stoppingRadius || 12) : 0;
           const effectiveInfinityRadius = infinityRadius + projRadius;
-          const dx = p.x - f.x;
-          const dy = p.y - (f.y - (f.z || 0));
+          let checkX = p.x;
+          let checkY = p.y;
+          if (p.isGetsuga || p.behaviorType === 'getsuga_tensho') {
+            const gAng = p.angle !== undefined ? p.angle : ((p.vx !== 0 || p.vy !== 0) ? Math.atan2(p.vy, p.vx) : 0);
+            const gApexDist = (p.r || 100) * 0.872;
+            checkX += Math.cos(gAng) * gApexDist;
+            checkY += Math.sin(gAng) * gApexDist;
+          }
+          const dx = checkX - f.x;
+          const dy = checkY - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
           if (distSq <= effectiveInfinityRadius * effectiveInfinityRadius) {
             // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
@@ -3729,6 +4036,17 @@ class ProjectileSystem {
         if (isFuga) {
           if (expired && !hit && !p.isFrozenByInfinity) {
             this.triggerThermobaricExplosion(p.x, p.y, p.owner, p.damage);
+          }
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
+        const isGetsuga = p.isGetsuga || p.behaviorType === "getsuga_tensho";
+        if (isGetsuga) {
+          if (expired && !p.isFrozenByInfinity) {
+            this.detonateGetsugaTensho(p, fighters);
           }
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
@@ -4229,7 +4547,7 @@ class ProjectileSystem {
           }
         }
 
-        if (p.history && p.history.length > 1) {
+        if (!p.isGetsuga && p.behaviorType !== 'getsuga_tensho' && p.history && p.history.length > 1) {
           p.fadingOut = true;
           // Store velocity before setting to 0 so visual angle is maintained during fade out
           p._resumeVx = p.vx;

@@ -70,7 +70,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
  * Start adaptation flash-dash toward the attacker after wheel click cinematic pause.
  */
 export function startAdaptationFlashDash(fighter, attacker) {
-  if (isTeleportDisabled(fighter) || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
+  if (isTeleportDisabled(fighter) || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
   if (!attacker || attacker.isDead || attacker === fighter || attacker.isLawnmower || attacker.isUntargetable || attacker.characterId === 'crazydave_lawnmower') return;
   const isInsideDomain = !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && !fighter.domainImmunity && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 

@@ -4353,10 +4353,24 @@ async function runInteractionTests() {
     assert(sans.hp === 1, `Sans must dodge Fuga explosion and remain at 1 HP (got ${sans.hp})`);
     assert(sans.burnTimer === 0, `Sans must NOT receive burn effect after dodging Fuga (got ${sans.burnTimer})`);
 
-    // 14. Verify Sans Gaster Blaster Initial Cooldown
+    // 14. Verify Sans Initial Cooldowns (Gaster Blaster, Bone Zone, Bad Time Gravity Slam)
     sans.reset();
     const expectedInitBlasterCd = sansConfig.initialBlasterCooldown !== undefined ? sansConfig.initialBlasterCooldown : 180;
     assert(sans.blasterCooldown === expectedInitBlasterCd, `Sans Gaster Blaster must start on initial cooldown (${expectedInitBlasterCd} frames, got ${sans.blasterCooldown})`);
+
+    const expectedInitBoneZoneCd = (sansConfig.initialBoneZoneCooldown !== undefined)
+      ? sansConfig.initialBoneZoneCooldown
+      : ((sansConfig.boneZoneInitialCooldown !== undefined) ? sansConfig.boneZoneInitialCooldown : 180);
+    assert(sans.boneZoneCooldown === expectedInitBoneZoneCd, `Sans Bone Zone must start on initial cooldown (${expectedInitBoneZoneCd} frames, got ${sans.boneZoneCooldown})`);
+
+    const expectedInitGravitySlamCd = (sansConfig.initialGravitySlamCooldown !== undefined)
+      ? sansConfig.initialGravitySlamCooldown
+      : ((sansConfig.gravitySlamInitialCooldown !== undefined)
+        ? sansConfig.gravitySlamInitialCooldown
+        : ((sansConfig.initialBadTimeCooldown !== undefined)
+          ? sansConfig.initialBadTimeCooldown
+          : ((sansConfig.badTimeInitialCooldown !== undefined) ? sansConfig.badTimeInitialCooldown : 480)));
+    assert(sans.gravitySlamCooldown === expectedInitGravitySlamCd, `Sans Bad Time / Gravity Slam must start on initial cooldown (${expectedInitGravitySlamCd} frames, got ${sans.gravitySlamCooldown})`);
 
     // 15. Verify Sans Skill 1: Gaster Blaster Arsenal First Impact (100%) & Continuous (50%) Damage
     const { Fighter } = await import('../js/entities/fighter.js');
@@ -4373,7 +4387,10 @@ async function runInteractionTests() {
     state.fighters = [sans, targetDummy];
 
     // Cast Pattern 2: Colossal Titan Gigablaster (Massive super laser directly along x-axis)
+    sans.stamina = 50;
+    const staminaBeforeCast = sans.stamina;
     sans.castGasterBlasters(targetDummy, 2);
+    const staminaAfterCast = sans.stamina;
     assert(sans.gasterBlasters.length === 1, 'Gigablaster must be spawned in gasterBlasters array');
     const gigaBlaster = sans.gasterBlasters[0];
     assert(gigaBlaster.pattern === 2, 'Gigablaster pattern index must be 2');
@@ -4390,6 +4407,8 @@ async function runInteractionTests() {
     const firstImpactDealt = hpBeforeCast - targetDummy.hp;
     assert(firstImpactDealt === gigaBaseDmg, `Gigablaster first impact must deal 100% damage (${gigaBaseDmg} dmg, got ${firstImpactDealt})`);
     assert(gigaBlaster.hitTargets.has(targetDummy), 'Target must be recorded in blaster hitTargets');
+    assert(sans.stamina > staminaAfterCast, `Sans must recover stamina on first impact hit (was ${staminaAfterCast}, now ${sans.stamina})`);
+    const staminaAfterFirstImpact = sans.stamina;
 
     // Intermediate frames within tickInterval (5 frames): No additional damage yet
     const hpAfterFirstImpact = targetDummy.hp;
@@ -4403,6 +4422,7 @@ async function runInteractionTests() {
     const continuousDealt = hpAfterFirstImpact - targetDummy.hp;
     const expectedContinuousDmg = Math.max(1, Math.round(gigaBaseDmg * 0.5));
     assert(continuousDealt === expectedContinuousDmg, `Gigablaster continuous damage must deal 50% damage (${expectedContinuousDmg} dmg, got ${continuousDealt})`);
+    assert(sans.stamina > staminaAfterFirstImpact, `Sans must recover stamina on continuous beam contact tick (was ${staminaAfterFirstImpact}, now ${sans.stamina})`);
 
     // Verify Pattern 0 Carousel and Pattern 1 Radial Ring config base damage & 50% continuous ratio
     sans.reset();
@@ -5509,14 +5529,27 @@ async function runInteractionTests() {
     assert(mahoraga.isPulledOrDragged() === true, 'Adapted Mahoraga isPulledOrDragged() must evaluate to true while inside Purple');
     assert(mahoraga.x < initialMahoragaX, `Mahoraga must be pulled left towards the Purple orb at x=200 (initial x=${initialMahoragaX}, new x=${mahoraga.x})`);
 
-    // D. Verify 50% damage reduction on Purple DPS and Purple Explosion damage
+    // D. Verify 25% damage reduction (takes 25% damage) on Purple DPS and Purple Explosion damage
     const hpBefore = mahoraga.hp;
     mahoraga.takeDamage(100, gojo, { isPurpleDPS: true, projectile: purple });
-    assert(mahoraga.hp === hpBefore - 50, `Adapted Mahoraga must take exactly 50% damage (expected 50 dmg, lost ${hpBefore - mahoraga.hp})`);
+    assert(mahoraga.hp === hpBefore - 25, `Adapted Mahoraga must take exactly 25% damage (expected 25 dmg, lost ${hpBefore - mahoraga.hp})`);
 
     const hpBeforeExplosion = mahoraga.hp;
     mahoraga.takeDamage(80, gojo, { isPurpleExplosion: true, projectile: purple });
-    assert(mahoraga.hp === hpBeforeExplosion - 40, `Adapted Mahoraga must take exactly 50% damage from Purple Explosion (expected 40 dmg, lost ${hpBeforeExplosion - mahoraga.hp})`);
+    assert(mahoraga.hp === hpBeforeExplosion - 20, `Adapted Mahoraga must take exactly 25% damage from Purple Explosion (expected 20 dmg, lost ${hpBeforeExplosion - mahoraga.hp})`);
+
+    // E. Verify Wheel Click Double Damage buff
+    assert(mahoraga.wheelDoubleDamageTimer > 0, 'Mahoraga must have wheelDoubleDamageTimer > 0 after wheel adaptation');
+    gojo.infinityActive = false;
+    gojo.infinityCooldown = 999;
+    mahoraga.x = 100;
+    mahoraga.y = 300;
+    const baseCleaveDamage = CONFIG.mahoraga?.cleaveDamage ?? 40;
+    const expectedDoubleDmg = baseCleaveDamage * (CONFIG.mahoraga?.wheelDoubleDamageMultiplier || 2.0);
+    const dummyHpBefore = gojo.hp;
+    mahoraga._executeCleave(gojo);
+    const damageDealt = dummyHpBefore - gojo.hp;
+    assert(damageDealt >= expectedDoubleDmg * 0.99, `Mahoraga cleave during wheel double damage must deal 2.0x damage (expected >= ${expectedDoubleDmg}, got ${damageDealt})`);
 
     // Clean up
     projectileSystem.projectiles = [];
@@ -5524,7 +5557,7 @@ async function runInteractionTests() {
     mahoraga.reset();
     state.fighters = [];
 
-    console.log('      ✅ Mahoraga Hollow Purple adaptation: 50% damage reduction and continuous gravitational pull verified successfully.');
+    console.log('      ✅ Mahoraga Hollow Purple adaptation: 25% damage reduction, continuous gravitational pull, and wheel double damage verified successfully.');
   }
 
   // ── TEST 58: Horizontal FFA Game Mode Select, 4-Fighter Roster, and HUD Integration ──
@@ -6607,7 +6640,30 @@ async function runInteractionTests() {
         'shiro_board_shutdown SFX must play along with the shutdown voiceline'
       );
 
-      console.log('      ✅ Shiro victory audio sequence (faah -> YOU WIN! -> shutdown voiceline) verified.');
+      // 4. Verify General Fighters (e.g. Zenitsu) also wait for faah.mp3 (120f) before YOU WIN announcer:
+      const { ZenitsuFighter } = await import('../js/entities/fighters/ZenitsuFighter.js');
+      const zenitsu = new ZenitsuFighter({ x: 200, y: 300, radius: 25 });
+      zenitsu.reset();
+      zenitsu.fighterIndex = 0;
+      state.fighters = [zenitsu, enemy];
+      state.matchWinner = zenitsu;
+      state.gameState = 'matchEnd';
+      state.scores = [2, 0];
+      state._hasPlayedChampionYouWinVoice = false;
+      playedSounds.length = 0;
+
+      // At frame 60 (faah still playing):
+      state.matchEndTimer = 60;
+      drawMatchEndScreen();
+      assert(state._hasPlayedChampionYouWinVoice === false, 'General fighter must NOT trigger YOU WIN while faah.mp3 is playing (timer < 120)');
+
+      // At frame 120 (faah finished):
+      state.matchEndTimer = 120;
+      drawMatchEndScreen();
+      assert(state._hasPlayedChampionYouWinVoice === true, 'General fighter MUST trigger YOU WIN announcer at frame 120 when faah finishes');
+      assert(playedSounds.some(s => String(s).includes('you-win')), 'YOU WIN SFX must play at frame 120 for general fighters');
+
+      console.log('      ✅ Universal victory audio sequence (faah -> YOU WIN! -> victory voiceline) verified across all fighters.');
     } finally {
       audioSystem.playSFX = origPlaySFX;
       shiro.reset();
@@ -7563,6 +7619,437 @@ async function runInteractionTests() {
       state.mode = prevMode;
       state.fighters = [];
     }
+  }
+
+  // ── TEST 77: Mahoraga vs Ichigo Getsuga Tensho: Drag Stasis & Adapted Pulling & Non-Zero Damage ──
+  console.log('   77. Testing Mahoraga vs Ichigo Getsuga Tensho Drag Stasis, Adapted Pulling & Non-Zero Damage...');
+  {
+    const { IchigoFighter } = await import('../js/entities/fighters/IchigoFighter.js');
+    const { MahoragaFighter } = await import('../js/entities/fighters/MahoragaFighter.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    const ichigo = new IchigoFighter({ x: 100, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const mahoraga = new MahoragaFighter({ x: 260, y: 300, radius: 35, hp: 2000, maxHp: 2000 });
+    ichigo.team = 0;
+    mahoraga.team = 1;
+
+    const prevGetTeam = state.getFighterTeam;
+    state.getFighterTeam = (idx) => idx;
+
+    const prevMode = state.mode;
+    state.mode = '1v1';
+    state.fighters = [ichigo, mahoraga];
+    state.projectiles = [];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, centerObstacle: null };
+    projectileSystem.projectiles = [];
+
+    try {
+      // 1. Ichigo fires Getsuga Tensho directly into unadapted Mahoraga
+      ichigo.gunAngle = 0;
+      ichigo.getsugaCastAngle = 0;
+      const getsuga = projectileSystem.fireGetsugaTensho(ichigo, 0, 15, 14, 'bankai');
+      assert(getsuga !== undefined, 'Getsuga Tensho projectile must spawn');
+
+      getsuga.x = 240;
+      getsuga.y = 300;
+      getsuga.vx = 14;
+      getsuga.vy = 0;
+
+      const initialMahoragaHp = mahoraga.hp;
+
+      // Update projectile system to collide with Mahoraga
+      projectileSystem.update(state.fighters);
+
+      // Verify unadapted Mahoraga took damage
+      assert(mahoraga.hp < initialMahoragaHp, 'Mahoraga must take damage from Getsuga Tensho when unadapted');
+      const unadaptedDmg = initialMahoragaHp - mahoraga.hp;
+      assert(unadaptedDmg > 0, `Unadapted Getsuga damage must be > 0 (got ${unadaptedDmg})`);
+
+      // Verify Mahoraga is pulled/dragged by Getsuga Tensho
+      assert(mahoraga.isDraggedByGetsuga === true, 'Mahoraga must have isDraggedByGetsuga = true');
+      assert(mahoraga.isPulledOrDragged() === true, 'Mahoraga isPulledOrDragged() must be true for Getsuga Tensho');
+      assert(getsuga.draggedTargets && getsuga.draggedTargets.has(mahoraga), 'Mahoraga must be registered in getsuga.draggedTargets');
+
+      // 2. Now adapt Mahoraga to Getsuga Tensho
+      mahoraga.adaptedGetsuga = true;
+      if (!mahoraga.adaptedSkills) mahoraga.adaptedSkills = {};
+      mahoraga.adaptedSkills['getsugaTensho'] = true;
+      mahoraga.adaptedSkills['getsuga'] = true;
+
+      // Clear cooldown so he can be hit again by adapted wave
+      getsuga.hitTargets.delete(mahoraga);
+      const adaptedHpBefore = mahoraga.hp;
+
+      // Update projectile system again
+      projectileSystem.update(state.fighters);
+
+      // Verify adapted Mahoraga STILL takes damage (NEVER 0 damage!)
+      const adaptedDmg = adaptedHpBefore - mahoraga.hp;
+      assert(adaptedDmg > 0, `Adapted Mahoraga must still take non-zero damage from Getsuga Tensho (got ${adaptedDmg})`);
+      assert(adaptedDmg >= 1, `Adapted Mahoraga damage must be at least 1 (got ${adaptedDmg})`);
+
+      // Verify adapted Mahoraga is STILL pulled/dragged by Getsuga Tensho
+      assert(mahoraga.isDraggedByGetsuga === true, 'Adapted Mahoraga must still have isDraggedByGetsuga = true');
+      assert(mahoraga.isPulledOrDragged() === true, 'Adapted Mahoraga isPulledOrDragged() must still be true');
+      assert(getsuga.draggedTargets && getsuga.draggedTargets.has(mahoraga), 'Adapted Mahoraga must remain registered in getsuga.draggedTargets');
+
+      // 3. Verify drag release when projectile expires or travels past Mahoraga
+      getsuga.life = 0;
+      projectileSystem.update(state.fighters);
+      assert(mahoraga.isDraggedByGetsuga === false, 'Mahoraga isDraggedByGetsuga must be false after Getsuga expires');
+      assert(mahoraga.isPulledOrDragged() === false, 'Mahoraga isPulledOrDragged() must be false after Getsuga expires');
+
+      // Verify Mahoraga immediately resumes natural movement physics and does not freeze
+      mahoraga.vx = 0;
+      mahoraga.vy = 0;
+      mahoraga.update(ichigo, 1, state.arena);
+      assert(Math.hypot(mahoraga.vx, mahoraga.vy) > 0, 'Mahoraga must resume active movement velocity once released from Getsuga');
+
+      // 4. Test safety timeout guard: an orphaned drag flag (lasting > 120 frames) must auto-clear and never permanently stall Mahoraga
+      mahoraga.isDraggedByGetsuga = true;
+      assert(mahoraga.isPulledOrDragged() === true, 'mahoraga isPulledOrDragged() must be true while isDraggedByGetsuga is active');
+      for (let f = 0; f < 125; f++) {
+        mahoraga.update(ichigo, 1, state.arena);
+      }
+      assert(mahoraga.isDraggedByGetsuga === false, 'mahoraga.isDraggedByGetsuga must auto-clear after safety timeout');
+      assert(mahoraga.isPulledOrDragged() === false, 'mahoraga.isPulledOrDragged() must be false after safety timeout');
+      assert(Math.hypot(mahoraga.vx, mahoraga.vy) > 0, 'Mahoraga must continue moving freely once drag flag is auto-cleared');
+
+      console.log('      ✅ Mahoraga vs Ichigo Getsuga Tensho drag stasis, adapted pulling & non-zero damage verified successfully.');
+    } finally {
+      state.getFighterTeam = prevGetTeam;
+      state.mode = prevMode;
+      state.fighters = [];
+      projectileSystem.projectiles = [];
+    }
+  }
+
+  // ── TEST 78: Ichigo Getsuga Tensho: Wall Impact Transition, Slow Forward Creep & Arena Clipping ──
+  console.log('   78. Testing Ichigo Getsuga Tensho Wall Impact Transition, Slow Forward Creep & Arena Clipping...');
+  {
+    const { IchigoFighter } = await import('../js/entities/fighters/IchigoFighter.js');
+    const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    const ichigo = new IchigoFighter({ x: 100, y: 300, radius: 25, hp: 400, maxHp: 400 });
+    const dummy = new NormalFighter({ x: 740, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    ichigo.team = 0;
+    dummy.team = 1;
+
+    const prevGetTeam = state.getFighterTeam;
+    state.getFighterTeam = (idx) => idx;
+
+    const prevMode = state.mode;
+    state.mode = '1v1';
+    state.fighters = [ichigo, dummy];
+    state.projectiles = [];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, centerObstacle: null, shape: 'rect' };
+    projectileSystem.projectiles = [];
+
+    try {
+      ichigo.gunAngle = 0; // Facing directly rightward toward the arena wall
+      ichigo.getsugaCastAngle = 0;
+      const getsuga = projectileSystem.fireGetsugaTensho(ichigo, 0, 15, 14, 'bankai');
+      assert(getsuga !== undefined, 'Getsuga Tensho projectile must spawn');
+
+      // Place Getsuga near the right wall (wall is at x = 800)
+      const apexOffset = getsuga.r || 100;
+      getsuga.x = 800 - apexOffset - 5;
+      getsuga.y = 300;
+      getsuga.vx = 14;
+      getsuga.vy = 0;
+
+      // 1. Update projectile system so Getsuga's apex strikes the right wall
+      projectileSystem.update(state.fighters);
+
+      // Verify wall collision triggered
+      assert(getsuga.hasHitWall === true, 'Getsuga Tensho must set hasHitWall = true upon colliding with arena wall');
+      assert(getsuga.isWallPenetrating === true, 'Getsuga Tensho must set isWallPenetrating = true');
+
+      // Verify velocity is NOT zeroed: it must slowly move forward
+      const creepSpeed = CONFIG.ichigo?.getsugaWallCreepSpeed || 1.2;
+      assert(getsuga.vx > 0, `Getsuga vx must be positive and not zero upon wall hit (current vx: ${getsuga.vx})`);
+      assert(Math.abs(getsuga.vx - creepSpeed) < 0.05, `Getsuga vx must match creepSpeed (${creepSpeed}, got: ${getsuga.vx})`);
+
+      const postHitX = getsuga.x;
+
+      // 2. Advance 15 frames to verify continuous slow forward movement clipping out of the arena
+      for (let step = 0; step < 15; step++) {
+        projectileSystem.update(state.fighters);
+      }
+
+      assert(getsuga.x > postHitX, `Getsuga must continue advancing forward past the wall (initial: ${postHitX}, after 15 frames: ${getsuga.x})`);
+      assert(getsuga.x + apexOffset > state.arena.x + state.arena.width, 'Getsuga cutting edge must clip out past the arena boundary wall');
+
+      // 3. Verify clean expiration when life reaches 0
+      getsuga.life = 0;
+      projectileSystem.update(state.fighters);
+      assert(getsuga.fadingOut === true || projectileSystem.projectiles.length === 0, 'Getsuga must enter fadeout or expire upon life <= 0');
+      for (let f = 0; f < 20 && projectileSystem.projectiles.length > 0; f++) {
+        projectileSystem.update(state.fighters);
+      }
+      assert(projectileSystem.projectiles.length === 0, 'Getsuga Tensho must expire and be returned to pool');
+
+      console.log('      ✅ Ichigo Getsuga Tensho wall impact transition, slow forward creep & arena clipping verified successfully.');
+    } finally {
+      state.getFighterTeam = prevGetTeam;
+      state.mode = prevMode;
+      state.fighters = [];
+      projectileSystem.projectiles = [];
+    }
+  }
+
+  // 79. Testing Choso Infinite Blood Generation, Laser Transmutation Matrix & Piercing Blood...
+  {
+    console.log('   79. Testing Choso Infinite Blood Generation, Laser Transmutation Matrix & Piercing Blood...');
+    const { ChosoFighter } = await import('../js/entities/fighters/ChosoFighter.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+
+    state.arena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+    const choso = new ChosoFighter({ x: 200, y: 300, hp: 420, maxHp: 420 });
+    const dummy = new Fighter({ x: 350, y: 300, hp: 300, maxHp: 300 });
+    choso.team = 0;
+    dummy.team = 1;
+    state.fighters = [choso, dummy];
+
+    // 1. Verify Baseline Attributes
+    assert(choso.characterId === 'choso', 'Character ID must be "choso"');
+    assert(choso.hp === 420, 'Choso HP must be 420');
+    assert(choso.bloodNodes.length === 0, 'Choso must start with 0 blood nodes');
+
+    // 2. Verify Taking Damage Spawns Interactive Blood Droplet Nodes
+    choso.takeDamage(40, dummy, { hitType: 'punch' });
+    assert(choso.bloodNodes.length >= 2, `Taking damage must spawn blood droplets (got ${choso.bloodNodes.length})`);
+
+    // 3. Verify Flowing Red Scale activates below 60% HP
+    choso.hp = 200; // < 60% of 420 (252)
+    choso.update(dummy, 0, state.arena);
+    assert(choso.isFlowingRedScaleActive === true, 'Flowing Red Scale must activate when HP drops below 60%');
+    assert(choso.speed > choso.baseSpeed, 'Movement speed must increase under Flowing Red Scale');
+
+    // 4. Verify Blood Transmutation: Crimson Laser Matrix
+    // Seed 4 nodes
+    choso.spawnBloodNode(180, 280);
+    choso.spawnBloodNode(220, 320);
+    const nodeCount = choso.bloodNodes.length;
+    assert(nodeCount >= 4, 'Must have at least 4 active blood nodes');
+
+    choso.skill3Cooldown = 0;
+    choso._startLaserMatrix(dummy);
+    assert(choso.isCastingLaserMatrix === true, 'Choso must enter Laser Matrix casting state');
+    assert(choso.isClaspedForConvergence === true, 'Choso must clasp hands in Convergence prayer pose');
+    assert(choso.isStationarySkillActive() === true, 'Choso must report stationary skill active during cast');
+    assert(choso.bloodNodes.every(n => n.isIgnitedAsLaser === true), 'All blood nodes must ignite into laser diodes');
+
+    // Advance telegraph and discharge
+    choso.laserMatrixTimer = 0;
+    choso.laserTelegraphTimer = 1;
+    const initialDummyHp = dummy.hp;
+    choso.update(dummy, 0, state.arena);
+    assert(choso.activeLaserBeams.length >= 4, `All active blood nodes must discharge laser beams (got ${choso.activeLaserBeams.length})`);
+    assert(dummy.hp < initialDummyHp, 'Laser Matrix beams must deal damage to target');
+    assert(choso.laserTransmutationOverdriveTimer > 0, 'Overdrive transmutation buff must be active after discharge');
+
+    // Verify blood particles are consumed and Skill 3 does NOT activate when blood is gone
+    choso.isCastingLaserMatrix = false;
+    choso.isClaspedForConvergence = false;
+    choso.bloodNodes = [];
+    if (state.bloodEffects) state.bloodEffects.length = 0;
+    assert(choso._getActiveBloodCount() === 0, 'Blood count must be 0 after consumption/clearing');
+    choso.skill3Cooldown = 0;
+    const activatedWithZeroBlood = choso._startLaserMatrix(dummy);
+    assert(activatedWithZeroBlood === false, 'Laser Matrix must NOT activate when blood particles are gone');
+    assert(choso.isCastingLaserMatrix === false, 'Choso must not enter casting pose when no blood exists');
+    assert(choso.skill3Cooldown === 0, 'Cooldown must not be consumed when skill fails to activate');
+
+    // Verify dynamic beam firing with no fixed number (e.g. exactly 1 single blood particle)
+    dummy.hp = 300;
+    dummy.isDead = false;
+    choso.spawnBloodNode(200, 250);
+    assert(choso._getActiveBloodCount() === 1, 'Must have exactly 1 active blood particle in arena');
+    choso.activeLaserBeams.length = 0;
+    const activatedWithOne = choso._startLaserMatrix(dummy);
+    assert(activatedWithOne === true, 'Laser Matrix must activate with even 1 single blood particle (no fixed number)');
+    assert(choso.bloodNodes.length === 1, 'Only the 1 existing blood particle must be ignited');
+    choso.laserMatrixTimer = 0;
+    choso.laserTelegraphTimer = 1;
+    choso.update(dummy, 0, state.arena);
+    assert(choso.activeLaserBeams.length === 1, 'Exactly 1 beam must be fired from the 1 existing blood particle');
+
+    // 4B. Verify Floor Blood Detection at resting floor level (~684.5px) and automatic update cast
+    dummy.hp = 300;
+    dummy.isDead = false;
+    choso.interruptAttacks(true);
+    choso.bloodNodes = [];
+    if (state.bloodEffects) state.bloodEffects.length = 0;
+    const floorY = state.arena.y + state.arena.height - 4 - 1.5; // Floor resting level
+    const floorBloodParticle = {
+      x: 250,
+      y: floorY,
+      vx: 0,
+      vy: 0,
+      size: 4.5,
+      life: 0.95,
+      decay: 0.006,
+      onGround: true,
+      numericColor: 0xE60000
+    };
+    if (state.bloodEffects) state.bloodEffects.push(floorBloodParticle);
+    const activeFloorBlood = choso._getActiveBloodParticles();
+    assert(activeFloorBlood.length === 1, `Floor blood at y=${floorY} must be recognized as active in arena (got ${activeFloorBlood.length})`);
+    assert(choso._getActiveBloodCount() === 1, 'Active blood count on floor must be 1');
+
+    // Verify HUD skill data returns Crimson Laser Matrix as ready with 1 blood
+    const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
+    choso.ultCooldown = 0;
+    choso.skill3Cooldown = 0;
+    choso.laserTransmutationOverdriveTimer = 0;
+    const hudSkills = getSkillDataForFighter(choso);
+    const laserMatrixSkill = hudSkills.find(s => s.id === 'laser_matrix');
+    assert(laserMatrixSkill !== undefined, 'Crimson Laser Matrix must be present in HUD skills');
+    assert(laserMatrixSkill.isUltimate === true, 'Crimson Laser Matrix must have isUltimate: true');
+    assert(laserMatrixSkill.ready === true, 'Crimson Laser Matrix must be ready when ultCooldown <= 0 and bloodCount > 0');
+    assert(laserMatrixSkill.label.includes('1 BLOOD'), `HUD skill label must include blood count (got: "${laserMatrixSkill.label}")`);
+
+    // Verify update() automatically triggers Laser Matrix when blood is on floor
+    choso.activeLaserBeams.length = 0;
+    choso.update(dummy, 0, state.arena);
+    assert(choso.isCastingLaserMatrix === true, 'Choso must automatically cast Laser Matrix during update when blood is present on the floor');
+    assert(choso.isClaspedForConvergence === true, 'Choso must be clasped for Convergence');
+    choso.laserMatrixTimer = 0;
+    choso.laserTelegraphTimer = 1;
+    choso.update(dummy, 0, state.arena);
+    assert(choso.activeLaserBeams.length === 1, 'Laser Matrix must fire beam from the floor blood particle');
+
+    // 5. Verify Overdrive Micro-Laser Emission when enabled
+    choso.laserTransmutationOverdriveTimer = 300;
+    CONFIG.choso.enableOverdriveMicroLasers = true;
+    const preOverdriveBeams = choso.activeLaserBeams.length;
+    choso.spawnBloodNode(210, 310);
+    assert(choso.activeLaserBeams.length > preOverdriveBeams, 'Spawning blood node during Overdrive must immediately fire a micro-laser when enabled');
+    CONFIG.choso.enableOverdriveMicroLasers = false;
+
+    // 6. Verify Piercing Blood Gating & Execution
+    choso.interruptAttacks(true);
+    choso.ultCooldown = 0;
+    choso.piercingBloodCooldown = 0;
+    choso.bloodNodes = [];
+    if (state.bloodEffects) state.bloodEffects.length = 0;
+    const pbActivatedWithoutBlood = choso._startPiercingBlood(dummy);
+    assert(pbActivatedWithoutBlood === false, 'Piercing Blood must NOT activate when there are no blood particles in arena');
+
+    // With active blood particle, Piercing Blood can activate
+    choso.spawnBloodNode(200, 250);
+    choso._startPiercingBlood(dummy);
+    assert(choso.isChargingPiercingBlood === true, 'Choso must enter Piercing Blood charging state');
+    choso.piercingBloodTimer = 1;
+    choso.update(dummy, 0, state.arena);
+    assert(choso.isFiringPiercingBlood === true, 'Choso must transition to active beam firing state');
+    assert(choso.vx < 0, 'Firing Piercing Blood must apply backward recoil velocity kick');
+
+    // Verify Piercing Blood fallout nodes are strictly contained within arena boundaries
+    choso.bloodNodes = [];
+    choso.piercingBloodTimer = 1;
+    choso.update(dummy, 0, state.arena); // Finishes firing beam and deposits fallout droplets
+    assert(choso.bloodNodes.length > 0, 'Piercing Blood aftermath must deposit fallout blood droplets');
+    const ar = state.arena;
+    for (const node of choso.bloodNodes) {
+      assert(node.x >= ar.x && node.x <= ar.x + ar.width, `Fallout droplet X (${node.x}) must be inside arena [${ar.x}, ${ar.x + ar.width}]`);
+      assert(node.y >= ar.y && node.y <= ar.y + ar.height, `Fallout droplet Y (${node.y}) must be inside arena [${ar.y}, ${ar.y + ar.height}]`);
+    }
+
+    // 7. Verify Strict Arena Containment on Out-of-Bounds Spawning & Laser Beams
+    const outNode = choso.spawnBloodNode(-500, 9999);
+    assert(outNode.x >= ar.x && outNode.x <= ar.x + ar.width, `Out-of-bounds spawnBloodNode X must clamp inside arena (got ${outNode.x})`);
+    assert(outNode.y >= ar.y && outNode.y <= ar.y + ar.height, `Out-of-bounds spawnBloodNode Y must clamp inside arena (got ${outNode.y})`);
+
+    // Verify Laser Matrix beams stay contained inside arena boundaries
+    dummy.hp = 300;
+    dummy.isDead = false;
+    choso.activeLaserBeams.length = 0;
+    choso.bloodNodes = [outNode];
+    choso._dischargeLaserMatrix(dummy);
+    assert(choso.activeLaserBeams.length === 1, 'Laser Matrix must fire 1 beam from the contained node');
+    const beam = choso.activeLaserBeams[0];
+    assert(beam.startX >= ar.x && beam.startX <= ar.x + ar.width, `Beam startX must be within arena`);
+    assert(beam.startY >= ar.y && beam.startY <= ar.y + ar.height, `Beam startY must be within arena`);
+    assert(beam.endX >= ar.x && beam.endX <= ar.x + ar.width, `Beam endX must be within arena`);
+    assert(beam.endY >= ar.y && beam.endY <= ar.y + ar.height, `Beam endY must be within arena`);
+
+    // 8. Verify Clean Canvas 2D Stack Balance
+    mockCtx.resetStackDepth();
+    choso.draw(mockCtx, dummy);
+    assert(mockCtx.getStackDepth() === 0, 'Choso draw stack balance must be 0');
+
+    // 9. Verify Zero Blood Being Fired when No Blood Particles Exist in Arena
+    const prevNova = CONFIG.choso.enableSupernova;
+    const prevChakram = CONFIG.choso.enableChakram;
+    CONFIG.choso.enableSupernova = 0;
+    CONFIG.choso.enableChakram = 0;
+    try {
+      choso.interruptAttacks(true);
+      choso.bloodNodes = [];
+      if (state.bloodEffects) state.bloodEffects.length = 0;
+      choso.ultCooldown = 0;
+      choso.skill3Cooldown = 0;
+      choso.piercingBloodCooldown = 0;
+      choso.skill1Cooldown = 0;
+      choso.skill2Cooldown = 0;
+      choso.basicAttackCooldown = 0;
+      choso.activeLaserBeams.length = 0;
+
+      // Run AI update loop with all skills off cooldown
+      choso.update(dummy, 0, state.arena);
+      assert(choso.activeLaserBeams.length === 0, 'ZERO laser beams may be fired when 0 blood particles exist');
+      assert(choso.isCastingLaserMatrix === false, 'Laser Matrix must NOT activate when 0 blood particles exist');
+      assert(choso.isChargingPiercingBlood === false, 'Piercing Blood must NOT charge when 0 blood particles exist');
+      assert(choso.isFiringPiercingBlood === false, 'Piercing Blood must NOT fire when 0 blood particles exist');
+      assert(choso.isChargingSupernova === false, 'Supernova must NOT charge when disabled');
+      assert(choso.chakrams.length === 0, 'Chakrams must NOT be spawned when disabled');
+    } finally {
+      CONFIG.choso.enableSupernova = prevNova;
+      CONFIG.choso.enableChakram = prevChakram;
+    }
+
+    // 10. Verify Sanguine Retaliation Matrix: Hit From Enemy -> Mid-Air Blood Eruption -> Convergence Laser Discharge (User Frame-by-Frame Scenario)
+    choso.interruptAttacks(true);
+    choso.bloodNodes = [];
+    if (state.bloodEffects) state.bloodEffects.length = 0;
+    choso.ultCooldown = 0;
+    choso.skill3Cooldown = 0;
+    dummy.hp = 300;
+    dummy.isDead = false;
+    state.gameState = 'playing';
+    state.fighters = [choso, dummy];
+
+    // Frame 1: Hit from enemy triggers retaliation spray
+    choso.takeDamage(25, dummy, { hitType: 'punch' });
+    assert(choso.isRetaliationSpraying === true, 'Choso must enter retaliation spray state upon enemy hit while Ult is UP');
+    assert(choso.bloodNodes.length >= 14, `Taking damage while Ult is UP must erupt blood particles fanning behind Choso (got ${choso.bloodNodes.length})`);
+    assert(choso.ultCooldown > 0, 'Ultimate cooldown must be consumed upon retaliation trigger');
+
+    // Frame 2: Visible mid-air blood fanning out behind Choso
+    while (choso.retaliationSprayTimer > 0) {
+      choso.update(dummy, 0, state.arena);
+    }
+    assert(choso.isRetaliationSpraying === false, 'Retaliation spray must complete');
+    assert(choso.isCastingLaserMatrix === true, 'Choso must transition to Convergence Clasp pose after spray');
+    assert(choso.isClaspedForConvergence === true, 'Choso must be clasped for Convergence');
+    assert(choso.bloodNodes.every(n => n.isIgnitedAsLaser === true), 'All sprayed blood droplets must be frozen in mid-air as laser diodes');
+
+    // Frame 3: Convergence laser matrix discharge back into the enemy
+    choso.laserMatrixTimer = 0;
+    choso.laserTelegraphTimer = 1;
+    choso.activeLaserBeams.length = 0;
+    const preHp = dummy.hp;
+    choso.update(dummy, 0, state.arena);
+    assert(choso.activeLaserBeams.length >= 14, `All ignited blood droplets must fire simultaneous laser beams at the attacker (got ${choso.activeLaserBeams.length})`);
+    assert(dummy.hp < preHp, 'Target must take damage from the retaliatory laser barrage');
+    assert(choso.bloodNodes.length >= 14, 'Blood droplet nodes must remain alive as laser emitter squares during discharge');
+    assert(choso.bloodNodes.every(n => n.dischargeTimer > 0), 'Nodes must have active dischargeTimer during laser blast');
+
+    console.log('      ✅ Choso Infinite Blood Generation, Laser Transmutation Matrix & Piercing Blood verified successfully.');
+    state.fighters = [];
   }
 
   console.log('───────────────────────────────────────────────────────');

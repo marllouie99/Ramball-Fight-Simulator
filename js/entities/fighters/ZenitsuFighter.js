@@ -101,6 +101,7 @@ export class ZenitsuFighter extends Fighter {
 
     // Active Consecutive Lightning Dash Travel State (4 Consecutive Godspeed Dashes)
     this.isDashingThunderclap = false;
+    this.isExecutingThunderclapDashes = false;
     this.thunderclapDashIndex = 0;
     this.thunderclapTotalDashes = cfg.thunderclapDashCount || 4;
     this.thunderclapDashStep = 0;
@@ -192,6 +193,7 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapChannelTimer = 0;
     this.thunderclapTarget = null;
     this.isDashingThunderclap = false;
+    this.isExecutingThunderclapDashes = false;
     this.thunderclapDashIndex = 0;
     this.thunderclapDashPauseTimer = 0;
     this.isThunderclapSliding = false;
@@ -252,6 +254,7 @@ export class ZenitsuFighter extends Fighter {
     this.isBasicDashSlide = false;
     this.isChannelingThunderclap = false;
     this.isThunderclapAimLocked = false;
+    this.isExecutingThunderclapDashes = false;
     this.thunderclapChannelTimer = 0;
     this.thunderclapDashIndex = 0;
     this.thunderclapTotalDashes = 1;
@@ -319,6 +322,10 @@ export class ZenitsuFighter extends Fighter {
 
   isStationarySkillActive() {
     return Boolean(this.isBasicDashPreparing || this.isChannelingThunderclap || this.thunderclapChannelTimer > 0 || this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0 || this.isThunderclapSliding || this.isThunderclapBreather);
+  }
+
+  isExecutingThunderclap() {
+    return Boolean(this.isChannelingThunderclap || this.isExecutingThunderclapDashes || ((this.isDashingThunderclap || this.thunderclapDashPauseTimer > 0) && !this.isBasicDash));
   }
 
   _updateDashVFX() {
@@ -488,6 +495,7 @@ export class ZenitsuFighter extends Fighter {
     this._hasPlayedSixfoldVoice = false;
     this._thunderclapVoiceDelayTimer = 0;
     this.isDashingThunderclap = false;
+    this.isExecutingThunderclapDashes = false;
     this.thunderclapDashIndex = 0;
     this.thunderclapDashPauseTimer = 0;
     this.isThunderclapSliding = false;
@@ -717,6 +725,7 @@ export class ZenitsuFighter extends Fighter {
         } else {
           // Skill 1: All consecutive dashes completed!
           this.isDashingThunderclap = false;
+          this.isExecutingThunderclapDashes = false;
           this.thunderclapDashIndex = 0;
           this.thunderclapDashPauseTimer = 0;
           this.thunderclapCooldown = this.thunderclapCooldownMax;
@@ -1021,6 +1030,7 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapChannelDuration = cfg.thunderclapChannelDuration || 36;
     this.thunderclapChannelTimer = this.thunderclapChannelDuration;
     this.isChannelingThunderclap = true;
+    this.isExecutingThunderclapDashes = false;
     this.thunderclapTarget = target;
     this._lastThunderclapBurstId = null;
     this._hasPlayedFirstFormVoice = false;
@@ -1066,6 +1076,7 @@ export class ZenitsuFighter extends Fighter {
     this.isChannelingThunderclap = false;
     this.isThunderclapAimLocked = false;
     this.thunderclapChannelTimer = 0;
+    this.isExecutingThunderclapDashes = true;
     this.thunderclapDashIndex = 0;
     this.thunderclapTotalDashes = cfg.thunderclapDashCount || 4;
     this.thunderclapDashTarget = target;
@@ -1413,6 +1424,12 @@ export class ZenitsuFighter extends Fighter {
       triggerGlobalScreenShake(7, 16);
       spawnFloatingText(this.x, this.y - 32, '霹靂一閃・四連 HEKIREKI ISSEN!', '#F59E0B');
     } else if (this.isBasicDash) {
+      // Basic attack dash impact audio: Also plays Zenitsu-dash2.mp3 to completion without being cut off
+      const basicDashSfx = cfg.sounds?.basicDash || cfg.sounds?.basicAttack || cfg.sounds?.thunderStrike || 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3';
+      const basicDashVol = cfg.soundVolumes?.basicDash !== undefined ? cfg.soundVolumes.basicDash : (cfg.soundVolumes?.basicAttack !== undefined ? cfg.soundVolumes.basicAttack : (cfg.soundVolumes?.thunderStrike !== undefined ? cfg.soundVolumes.thunderStrike * 0.90 : 0.85));
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX(basicDashSfx, basicDashVol);
+      }
       triggerGlobalScreenShake(3, 8);
       spawnFloatingText(this.x, this.y - 30, '霹靂一閃・一連 HEKIREKI ISSEN!', '#38BDF8');
     } else {

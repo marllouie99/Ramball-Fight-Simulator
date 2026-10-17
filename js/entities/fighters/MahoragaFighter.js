@@ -97,6 +97,8 @@ export class MahoragaFighter extends Fighter {
     this.wheelTargetRotation = 0;
     this.wheelGlowTimer = 0;
     this.wheelClickTimer = 0;
+    this.wheelDoubleDamageTimer = 0;
+    this.wheelDoubleDamageMaxTimer = 0;
 
     // Combat Mechanics
     this.swordCooldown = 0;
@@ -189,6 +191,8 @@ export class MahoragaFighter extends Fighter {
     this.wheelTargetRotation = 0;
     this.wheelGlowTimer = 0;
     this.wheelClickTimer = 0;
+    this.wheelDoubleDamageTimer = 0;
+    this.wheelDoubleDamageMaxTimer = 0;
     this.gammaRayRainbowTimer = 0;
     this.gammaRayRainbowMax = 180;
     this.shieldIconTimer = 0;
@@ -834,6 +838,7 @@ export class MahoragaFighter extends Fighter {
       this.wheelRotation = this.wheelTargetRotation;
     }
     if (this.wheelGlowTimer > 0) this.wheelGlowTimer--;
+    if (this.wheelDoubleDamageTimer > 0) this.wheelDoubleDamageTimer--;
     if (this.gammaRayRainbowTimer > 0) this.gammaRayRainbowTimer--;
 
     const threshold = this.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct ?? 0.15);
@@ -1113,7 +1118,8 @@ export class MahoragaFighter extends Fighter {
         this.resumeMovement(target);
 
         if (this.adaptationDashIsCounter && target && !target.isDead) {
-          const damage = CONFIG.mahoraga?.swordDamage ?? 15;
+          const dmgMult = this.wheelDoubleDamageTimer > 0 ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+          const damage = (CONFIG.mahoraga?.swordDamage ?? 15) * dmgMult;
           target.takeDamage(damage, this, { isMelee: true, isSkill: true });
 
           target.timeStopTimer = 0;
@@ -1146,7 +1152,8 @@ export class MahoragaFighter extends Fighter {
           }
 
           if (target && !target.isDead) {
-            const dmg = CONFIG.mahoraga?.swordDamage ?? 15;
+            const dmgMult = this.wheelDoubleDamageTimer > 0 ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+            const dmg = (CONFIG.mahoraga?.swordDamage ?? 15) * dmgMult;
             target.takeDamage(dmg, this, { isMelee: true, isSkill: true });
             this.punchAnimTimer = 22;
             this.punchAnimMaxTimer = 22;
@@ -1182,8 +1189,10 @@ export class MahoragaFighter extends Fighter {
                   counterTargets.push(target);
                 }
               }
+              const counterDmgMult = this.wheelDoubleDamageTimer > 0 ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+              const counterDmg = (CONFIG.mahoraga?.teleportCounterDamage ?? 22) * counterDmgMult;
               for (const t of counterTargets) {
-                t.takeDamage(CONFIG.mahoraga?.teleportCounterDamage ?? 22, this, { isMelee: true, isSkill: true });
+                t.takeDamage(counterDmg, this, { isMelee: true, isSkill: true });
               }
 
               spawnImpactFlash(target.x, target.y, 45, '#FFD700');
@@ -1358,7 +1367,7 @@ export class MahoragaFighter extends Fighter {
 
     // ── HAND-TO-HAND BLITZ SEQUENCE ──
     if (this.isBlitzActive) {
-      if (this.isDraggedByGetsuga || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged())) {
+      if (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) {
         this.isBlitzActive = false;
         this.isInfinityBlitz = false;
         this.isWallSlamBlitz = false;
@@ -1465,7 +1474,8 @@ export class MahoragaFighter extends Fighter {
 
         // 2. Perform Hand-to-Hand Martial Arts Strike / Sword Finisher
         if (hitIndex < totalHits) {
-          const blitzDamage = CONFIG.mahoraga?.blitzHitDamage ?? 15;
+          const blitzMult = this.wheelDoubleDamageTimer > 0 ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+          const blitzDamage = (CONFIG.mahoraga?.blitzHitDamage ?? 15) * blitzMult;
           target.takeDamage(blitzDamage, this, { isMelee: true, isSkill: true });
           if (typeof target.applyHitStun === 'function') {
             target.applyHitStun(2);
@@ -1543,7 +1553,8 @@ export class MahoragaFighter extends Fighter {
         } else {
           // Final Hit: GRAND FINISHER CLEAVE!
           this.bladeRetractProgress = 1.0;
-          const finisherDamage = CONFIG.mahoraga?.blitzFinisherDamage ?? 35;
+          const finMult = this.wheelDoubleDamageTimer > 0 ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+          const finisherDamage = (CONFIG.mahoraga?.blitzFinisherDamage ?? 35) * finMult;
           target.takeDamage(finisherDamage, this, { isMelee: true, isSkill: true });
 
           this.punchAnimTimer = 18;
@@ -1623,7 +1634,8 @@ export class MahoragaFighter extends Fighter {
     const target = this._findClosestEnemy(opponent);
     this.isMeleeMode = false;
 
-    if (this.postDashPauseTimer > 0 || this.isPulledOrDragged()) {
+    const isCurrentlyDragged = this.isPulledOrDragged();
+    if (this.postDashPauseTimer > 0 || isCurrentlyDragged) {
       // Zero out Mahoraga's own movement drive so external pull forces (Getsuga drag,
       // Gojo Blue/Purple suction, Ruby Hook, Black Hole, Reze Pin Pull, etc.) are NOT
       // immediately cancelled by Mahoraga's high natural speed auto-recovery each frame.
@@ -1631,6 +1643,9 @@ export class MahoragaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
     } else {
+      if (this.vx === 0 && this.vy === 0 && (this.knockbackStunTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0) {
+        this.resumeMovement(target || opponent);
+      }
       this.applyMovementPhysics();
     }
 

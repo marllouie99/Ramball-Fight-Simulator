@@ -2,6 +2,938 @@ import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { getIchigoSwingKinematics } from '../fighters/ichigoSkin.js';
 
+const _GETSUGA_CANVAS_SIZE = 228;
+const _GETSUGA_HALF_SIZE = 114;
+const _GETSUGA_BASE_R = 94;
+const _GETSUGA_FRAME_COUNT = 6;
+const _getsugaFrameCache = new Map();
+
+const _GETSUGA_PALETTES = {
+  bankai: {
+    outerBloomNear: 'rgba(235, 10, 35, 0.78)',
+    outerBloomFar: 'rgba(195, 0, 25, 0.28)',
+    innerBloom: 'rgba(220, 8, 32, 0.60)',
+    wispTip: '#990014',
+    wispBody: '#FF1226',
+    edgeDark: '#8C0012',
+    edgeBright: '#FF0E24',
+    bladeCore: '#FFFFFF',
+    bladeInnerTooth: '#FF2434',
+    splitRim: '#E60020',
+    concaveRimDark: '#920012',
+    concaveRimBright: '#EB0022',
+    fireHot1: '#FF6E1A',
+    fireHot2: '#FF4510',
+    fireMid: '#E6001E',
+    fireDeep: '#8F0012',
+    veinCol: '#C8001A',
+    coreVoid: '#060104',
+    lightningHalo: 'rgba(255, 16, 44, 0.84)',
+    afterglowWisp: 'rgba(220, 18, 42, 0.34)',
+    lightningCore: '#FFFFFF',
+    splinterCol: '#FF1E32'
+  },
+  hollow: {
+    outerBloomNear: 'rgba(235, 10, 35, 0.75)',
+    outerBloomFar: 'rgba(195, 0, 25, 0.26)',
+    innerBloom: 'rgba(220, 8, 32, 0.56)',
+    wispTip: '#990014',
+    wispBody: '#FF1226',
+    edgeDark: '#8C0012',
+    edgeBright: '#FF0E24',
+    bladeCore: '#FFFFFF',
+    bladeInnerTooth: '#FF2434',
+    splitRim: '#E60020',
+    concaveRimDark: '#920012',
+    concaveRimBright: '#EB0022',
+    fireHot1: '#FF6E1A',
+    fireHot2: '#FF4510',
+    fireMid: '#E6001E',
+    fireDeep: '#8F0012',
+    veinCol: '#C8001A',
+    coreVoid: '#060104',
+    lightningHalo: 'rgba(255, 16, 44, 0.84)',
+    afterglowWisp: 'rgba(220, 18, 42, 0.34)',
+    lightningCore: '#FFFFFF',
+    splinterCol: '#FF1E32'
+  },
+  shikai: {
+    outerBloomNear: 'rgba(0, 195, 255, 0.78)',
+    outerBloomFar: 'rgba(0, 140, 230, 0.28)',
+    innerBloom: 'rgba(0, 180, 255, 0.60)',
+    wispTip: '#004499',
+    wispBody: '#00D5FF',
+    edgeDark: '#003888',
+    edgeBright: '#00C8FF',
+    bladeCore: '#FFFFFF',
+    bladeInnerTooth: '#66ECFF',
+    splitRim: '#00B8FF',
+    concaveRimDark: '#003E99',
+    concaveRimBright: '#00CCFF',
+    fireHot1: '#99FFFF',
+    fireHot2: '#00F0FF',
+    fireMid: '#0099FF',
+    fireDeep: '#003C99',
+    veinCol: '#0080EE',
+    coreVoid: '#020818',
+    lightningHalo: 'rgba(0, 210, 255, 0.84)',
+    afterglowWisp: 'rgba(0, 185, 255, 0.34)',
+    lightningCore: '#FFFFFF',
+    splinterCol: '#00D8FF'
+  },
+  frozen: {
+    outerBloomNear: 'rgba(0, 229, 255, 0.75)',
+    outerBloomFar: 'rgba(0, 150, 255, 0.26)',
+    innerBloom: 'rgba(0, 210, 255, 0.55)',
+    wispTip: '#0044AA',
+    wispBody: '#00E5FF',
+    edgeDark: '#002B66',
+    edgeBright: '#00E5FF',
+    bladeCore: '#FFFFFF',
+    bladeInnerTooth: '#80F2FF',
+    splitRim: '#00BFFF',
+    concaveRimDark: '#003380',
+    concaveRimBright: '#00E5FF',
+    fireHot1: '#E0FFFF',
+    fireHot2: '#66F0FF',
+    fireMid: '#00B8FF',
+    fireDeep: '#0044AA',
+    veinCol: '#0099FF',
+    coreVoid: '#001436',
+    lightningHalo: 'rgba(0, 229, 255, 0.84)',
+    afterglowWisp: 'rgba(0, 200, 255, 0.34)',
+    lightningCore: '#FFFFFF',
+    splinterCol: '#00E5FF'
+  }
+};
+
+function _renderGetsugaFrameToCtx(ctx, pal, frameIdx = 0) {
+  const P = (typeof HTMLCanvasElement !== 'undefined') ? 1.0 : 8.0;
+  const R_out = _GETSUGA_BASE_R;
+  const halfSpan = 0.78 * Math.PI;
+  const phase = frameIdx * 0.65;
+
+  const evalCrescent = (rx, ry) => {
+    const cx = rx + 12;
+    const cy = ry * 1.06;
+    const distOut = Math.hypot(cx, cy);
+    if (distOut > R_out + 10 || distOut < 16) return null;
+
+    const ang = Math.atan2(cy, cx);
+    if (Math.abs(ang) > halfSpan) return null;
+
+    const t = ang / halfSpan;
+    const absT = Math.abs(t);
+
+    const tipFade = Math.pow(Math.cos(absT * Math.PI * 0.5), 1.30);
+    const bellySkew = 1.0 + 0.22 * Math.sin((t - 0.12) * Math.PI * 0.9);
+    const cleanThick = 50.0 * tipFade * bellySkew;
+
+    const depth = R_out - distOut;
+
+    const hookCoord = depth * 0.22 + t * 3.4 - Math.sin(t * 2.0) * 0.8;
+    const hookWave1 = Math.sin(hookCoord * 1.7 + phase * 0.35);
+    const hookWave2 = Math.sin(hookCoord * 3.1 - t * 2.5 - phase * 0.5);
+    const hookShape = Math.pow(Math.max(0, 0.55 * hookWave1 + 0.45 * hookWave2 + 0.35), 1.6);
+    const fangExtend = hookShape * 15.5 * Math.pow(Math.max(0, 1.0 - absT * 1.04), 0.72);
+
+    const outerPeelWave = Math.sin(depth * 0.85 - t * 10.5 + phase * 0.5);
+    const outerWisp = (outerPeelWave > 0.65 && absT > 0.08 && absT < 0.88)
+      ? (outerPeelWave - 0.65) * 6.5 * (1.0 - absT * 0.4)
+      : 0;
+
+    const outR = R_out + outerWisp;
+    const inR = R_out - cleanThick - fangExtend;
+
+    return {
+      distOut, ang, t, absT, tipFade, cleanThick,
+      depth, hookCoord, outR, inR
+    };
+  };
+
+  // 1 & 2. Unified Single-Pass Rasterization: Bloom, Rim & Main Crescent Body
+  const maxR2 = (R_out + 12) * (R_out + 12);
+  const minR2 = 14 * 14;
+
+  for (let gy = -112; gy <= 112; gy += P) {
+    const cy = gy * 1.06;
+    const cy2 = cy * cy;
+    for (let gx = -112; gx <= 112; gx += P) {
+      const cx = gx + 12;
+      const d2 = cx * cx + cy2;
+      if (d2 > maxR2 || d2 < minR2) continue;
+
+      const info = evalCrescent(gx, gy);
+      if (!info) continue;
+      const { distOut, t, absT, tipFade, depth, hookCoord, outR, inR } = info;
+
+      if (distOut > outR) {
+        const bloomSpan = 2.6 * tipFade;
+        if (bloomSpan > 0.25 && distOut <= outR + bloomSpan) {
+          const d = distOut - outR;
+          ctx.fillStyle = d < bloomSpan * 0.48 ? pal.outerBloomNear : pal.outerBloomFar;
+          ctx.fillRect(gx, gy, P, P);
+        }
+        continue;
+      }
+
+      if (distOut < inR) {
+        const inBloomSpan = 1.6 * tipFade;
+        if (inBloomSpan > 0.25 && distOut >= inR - inBloomSpan && absT < 0.94) {
+          ctx.fillStyle = pal.innerBloom;
+          ctx.fillRect(gx, gy, P, P);
+        }
+        continue;
+      }
+
+      const totalThick = Math.max(1.0, outR - inR);
+      const localNorm = (outR - distOut) / totalThick;
+
+      const bellySwelling = (t > -0.22 && t < 0.68)
+        ? Math.pow(Math.sin(((t + 0.22) / 0.90) * Math.PI), 1.25) * 11.5
+        : 0;
+      const whiteFangWave = Math.sin(hookCoord * 2.4 - t * 2.2 + phase * 0.3);
+      const whitePeelSpikes = Math.pow(Math.max(0, whiteFangWave), 1.8) * 5.8 * tipFade;
+      const whiteThick = Math.max(1.9, (4.6 + bellySwelling) * Math.pow(tipFade, 0.66) + whitePeelSpikes);
+
+      let col;
+
+      if (distOut > R_out) {
+        col = (distOut > outR - 1.0) ? pal.wispTip : pal.wispBody;
+      } else if (depth < 1.35) {
+        col = (depth < 0.65) ? pal.edgeDark : pal.edgeBright;
+      } else if (depth < 1.35 + whiteThick) {
+        const splitDepth = 3.2 + (t + 0.64) * 3.8;
+        const inUpperSplit = (t > -0.60 && t < -0.04) && Math.abs(depth - splitDepth) < (1.5 * Math.sin(((t + 0.60) / 0.56) * Math.PI));
+
+        const fleck1U = (t - 0.04) / 0.026;
+        const fleck1Env = Math.abs(fleck1U) < 1.0 ? Math.sqrt(1.0 - fleck1U * fleck1U) * 1.45 : 0;
+        const isFleck1 = fleck1Env > 0 && Math.abs(depth - (6.4 + (t - 0.04) * 18.0)) < fleck1Env;
+
+        const fleck2U = (t - 0.30) / 0.030;
+        const fleck2Env = Math.abs(fleck2U) < 1.0 ? Math.sqrt(1.0 - fleck2U * fleck2U) * 1.60 : 0;
+        const isFleck2 = fleck2Env > 0 && Math.abs(depth - (7.6 + (t - 0.30) * 18.0)) < fleck2Env;
+
+        if (inUpperSplit) {
+          col = Math.abs(depth - splitDepth) < 0.8 ? pal.coreVoid : pal.splitRim;
+        } else if (isFleck1 || isFleck2) {
+          col = pal.coreVoid;
+        } else if (depth > 1.35 + whiteThick - 1.35) {
+          col = pal.bladeInnerTooth;
+        } else {
+          col = pal.bladeCore;
+        }
+      } else if (localNorm > 0.89) {
+        col = (localNorm > 0.95) ? pal.concaveRimDark : pal.concaveRimBright;
+      } else {
+        const behindWhite = depth - (1.35 + whiteThick);
+        const normBehind = behindWhite / Math.max(1.0, totalThick - (1.35 + whiteThick));
+
+        const brushStream = normBehind * 3.4 * Math.PI + t * 3.1 - phase * 0.3;
+        const ribbonWave = Math.cos(brushStream) + 0.45 * Math.sin(brushStream * 1.9 - t * 2.4);
+
+        const bellyFireEnv = (t > -0.22 && t < 0.72)
+          ? Math.pow(Math.sin(((t + 0.22) / 0.94) * Math.PI), 1.12)
+          : 0.12;
+
+        const fireReachNorm = (0.16 + 0.60 * bellyFireEnv) * (0.52 + 0.48 * Math.max(-0.45, ribbonWave));
+
+        const blackSlashCut = (normBehind > 0.22 && normBehind < 0.58) &&
+          (Math.sin(hookCoord * 2.9 - t * 3.4 + phase * 0.25) > 0.62);
+
+        const isInnerVein = (normBehind > 0.66 && normBehind < 0.81) &&
+          (Math.sin(normBehind * 14.0 + t * 5.0 - phase * 0.4) > 0.42) &&
+          (t > -0.55 && t < 0.65);
+
+        if (normBehind < fireReachNorm && !blackSlashCut) {
+          const fireDepthRatio = normBehind / Math.max(0.05, fireReachNorm);
+          if (bellyFireEnv > 0.42 && fireDepthRatio < 0.54 && ribbonWave > -0.15) {
+            col = (fireDepthRatio < 0.28 && ribbonWave > 0.30) ? pal.fireHot1 : pal.fireHot2;
+          } else if (fireDepthRatio < 0.78) {
+            col = pal.fireMid;
+          } else {
+            col = pal.fireDeep;
+          }
+        } else if (isInnerVein) {
+          col = pal.veinCol;
+        } else {
+          col = pal.coreVoid;
+        }
+      }
+
+      ctx.fillStyle = col;
+      ctx.fillRect(gx, gy, P, P);
+    }
+  }
+
+  // 3. Organic Tapered Floating Flame Droplets in the Concave Hollow
+  const wispArcs = [
+    { tStart: -0.44, tSpan: 0.11, rExtra: 6 },
+    { tStart: -0.31, tSpan: 0.08, rExtra: 12 },
+    { tStart:  0.14, tSpan: 0.09, rExtra: 6 }
+  ];
+  for (const wa of wispArcs) {
+    const steps = 16;
+    for (let i = 0; i <= steps; i++) {
+      const u = i / steps;
+      const curT = wa.tStart + u * wa.tSpan;
+      const curAng = curT * halfSpan;
+      const tipFade = Math.pow(Math.cos(Math.abs(curT) * Math.PI * 0.5), 1.30);
+      const bellySkew = 1.0 + 0.22 * Math.sin((curT - 0.12) * Math.PI * 0.9);
+      const rPos = R_out - 50.0 * tipFade * bellySkew - wa.rExtra - Math.sin(u * Math.PI) * 2.5;
+      const wx = Math.round(Math.cos(curAng) * rPos - 12);
+      const wy = Math.round((Math.sin(curAng) * rPos) / 1.06);
+      const env = Math.sin(u * Math.PI);
+      if (env > 0.25) {
+        ctx.fillStyle = pal.concaveRimBright;
+        ctx.fillRect(wx - 1, wy - 1, 3, 2);
+        if (env > 0.55) {
+          ctx.fillStyle = pal.coreVoid;
+          ctx.fillRect(wx, wy, 1, 1);
+        }
+      }
+    }
+  }
+
+  // 4. Detached Tangential Reiatsu Slash Splinters & Embers
+  const numSplinters = 28;
+  for (let s = 0; s < numSplinters; s++) {
+    const isOuter = (s % 3 !== 0);
+    const tPos = -0.82 + ((s * 0.059 + frameIdx * 0.015) % 1.64);
+    const ang = tPos * halfSpan;
+    const absT = Math.min(1.0, Math.abs(tPos));
+    const tipFade = Math.pow(Math.cos(absT * Math.PI * 0.5), 1.30);
+    const bellySkew = 1.0 + 0.22 * Math.sin((tPos - 0.12) * Math.PI * 0.9);
+    const cleanThick = 50.0 * tipFade * bellySkew;
+    const radialOffset = isOuter
+      ? (R_out + 4.5 + (s % 5) * 3.0)
+      : (R_out - cleanThick - 7.0 - (s % 4) * 4.5);
+
+    const sx = Math.cos(ang) * radialOffset - 12;
+    const sy = (Math.sin(ang) * radialOffset) / 1.06;
+    const tanX = -Math.sin(ang);
+    const tanY = Math.cos(ang);
+    const splinterLen = (s % 4 === 0) ? 5 : 3;
+
+    ctx.fillStyle = (s % 6 === 0) ? pal.lightningCore : pal.splinterCol;
+    for (let k = 0; k < splinterLen; k++) {
+      ctx.fillRect(Math.round(sx + tanX * k), Math.round(sy + tanY * k), 1, 1);
+    }
+  }
+}
+
+function _getCachedGetsugaFrameCanvas(paletteKey, frameIdx, targetCtx) {
+  if (typeof document === 'undefined' || typeof document.createElement !== 'function') return null;
+  if (typeof HTMLCanvasElement === 'undefined') return null;
+
+  const key = `${paletteKey}_${frameIdx}`;
+  if (_getsugaFrameCache.has(key)) {
+    return _getsugaFrameCache.get(key);
+  }
+
+  const offCanvas = document.createElement('canvas');
+  if (!(offCanvas instanceof HTMLCanvasElement) || (targetCtx && offCanvas === targetCtx.canvas)) {
+    return null;
+  }
+
+  offCanvas.width = _GETSUGA_CANVAS_SIZE;
+  offCanvas.height = _GETSUGA_CANVAS_SIZE;
+  const offCtx = offCanvas.getContext('2d');
+  if (!offCtx) return null;
+
+  offCtx.save();
+  offCtx.imageSmoothingEnabled = false;
+  offCtx.translate(_GETSUGA_HALF_SIZE, _GETSUGA_HALF_SIZE);
+  const pal = _GETSUGA_PALETTES[paletteKey] || _GETSUGA_PALETTES.bankai;
+  _renderGetsugaFrameToCtx(offCtx, pal, frameIdx);
+  offCtx.restore();
+
+  _getsugaFrameCache.set(key, offCanvas);
+  return offCanvas;
+}
+
+export function clearGetsugaFrameCache() {
+  _getsugaFrameCache.clear();
+}
+
+/**
+ * Proactively warms up the Getsuga Tensho frame cache on browser idle / load
+ * so there is zero rendering hitch or lag spike on first cast.
+ */
+export function preloadGetsugaFrames() {
+  if (typeof document === 'undefined' || typeof HTMLCanvasElement === 'undefined') return;
+  for (const palKey of ['shikai', 'bankai', 'hollow', 'frozen']) {
+    for (let f = 0; f < _GETSUGA_FRAME_COUNT; f++) {
+      _getCachedGetsugaFrameCanvas(palKey, f, null);
+    }
+  }
+}
+
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(() => preloadGetsugaFrames());
+  } else {
+    setTimeout(preloadGetsugaFrames, 50);
+  }
+}
+
+function _getsugaHash1(n) {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453123;
+  return x - Math.floor(x);
+}
+
+/**
+ * Appends a crinkled lightning segment to the active Canvas 2D path.
+ * Uses 2 intermediate jagged points and spike extension in 0 allocations / 0 draw calls.
+ */
+function _appendBoltSegmentToPath(ctx, x0, y0, x1, y1, crinkleAmp = 2.0, crinkleSeed = 1.0, spikeDx = 0, spikeDy = 0, spikeLen = 0) {
+  if (!ctx || typeof ctx.moveTo !== 'function' || typeof ctx.lineTo !== 'function') return;
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 0.5) return;
+  const nx = -dy / dist;
+  const ny = dx / dist;
+
+  const c1 = (Math.sin(0.33 * Math.PI * 2.0 + crinkleSeed) * 0.65 + Math.sin(0.33 * Math.PI) * 0.35) * crinkleAmp * 0.88;
+  const c2 = (Math.sin(0.67 * Math.PI * 2.0 + crinkleSeed) * 0.65 + Math.sin(0.67 * Math.PI) * 0.35) * crinkleAmp * 0.88;
+
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x0 + dx * 0.33 + nx * c1, y0 + dy * 0.33 + ny * c1);
+  ctx.lineTo(x0 + dx * 0.67 + nx * c2, y0 + dy * 0.67 + ny * c2);
+  ctx.lineTo(x1, y1);
+
+  if (spikeLen > 0) {
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 + spikeDx * spikeLen, y1 + spikeDy * spikeLen);
+  }
+}
+
+/**
+ * Fast single-segment lightning renderer using path stroke instead of per-pixel fillRect loop.
+ */
+function _drawCrinkledBoltSeg(ctx, x0, y0, r0, x1, y1, r1, crinkleAmp = 2.0, crinkleSeed = 1.0, spikeDx = 0, spikeDy = 0, spikeLen = 0) {
+  if (!ctx || typeof ctx.beginPath !== 'function' || typeof ctx.stroke !== 'function' || typeof ctx.moveTo !== 'function' || typeof ctx.lineTo !== 'function') return;
+  ctx.beginPath();
+  _appendBoltSegmentToPath(ctx, x0, y0, x1, y1, crinkleAmp, crinkleSeed, spikeDx, spikeDy, spikeLen);
+  ctx.strokeStyle = ctx.fillStyle;
+  ctx.lineWidth = Math.max(1, Math.round((r0 + r1) * 1.15));
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'miter';
+  ctx.stroke();
+}
+
+function _computeBoltBisectors(chain) {
+  for (let i = 1; i < chain.length - 1; i++) {
+    const prev = chain[i - 1];
+    const curr = chain[i];
+    const next = chain[i + 1];
+    const v1x = curr.x - prev.x, v1y = curr.y - prev.y;
+    const l1 = Math.hypot(v1x, v1y) || 1;
+    const v2x = next.x - curr.x, v2y = next.y - curr.y;
+    const l2 = Math.hypot(v2x, v2y) || 1;
+    const bx = (v1x / l1) - (v2x / l2);
+    const by = (v1y / l1) - (v2y / l2);
+    const bl = Math.hypot(bx, by) || 1;
+    curr.spikeDx = bx / bl;
+    curr.spikeDy = by / bl;
+  }
+}
+
+function _renderGetsugaQuickStrikeSlot(ctx, slotIndex, strikeId, stage, pal) {
+  if (stage >= 4) return;
+  if (!ctx || typeof ctx.beginPath !== 'function' || typeof ctx.stroke !== 'function' || typeof ctx.moveTo !== 'function' || typeof ctx.lineTo !== 'function') return;
+
+  const R_out = _GETSUGA_BASE_R;
+  const halfSpan = 0.78 * Math.PI;
+  const seed = strikeId * 71.3 + slotIndex * 149.7 + 19.0;
+
+  const s1 = _getsugaHash1(seed * 1.13);
+  const s2 = _getsugaHash1(seed * 2.57);
+  const s3 = _getsugaHash1(seed * 3.91);
+
+  let tStart, tEnd, radialMode;
+  if (slotIndex === 0) {
+    tStart = -0.70 + s1 * 0.15;
+    tEnd = tStart + 0.38 + s2 * 0.10;
+    radialMode = 'outer';
+  } else if (slotIndex === 1) {
+    tStart = -0.42 + s1 * 0.16;
+    tEnd = tStart + 0.40 + s2 * 0.12;
+    radialMode = 'inner';
+  } else if (slotIndex === 2) {
+    tStart = -0.05 + s1 * 0.15;
+    tEnd = tStart + 0.40 + s2 * 0.12;
+    radialMode = 'inner';
+  } else {
+    tStart = 0.20 + s1 * 0.15;
+    tEnd = tStart + 0.38 + s2 * 0.10;
+    radialMode = 'outer';
+  }
+
+  const toCrescentXY = (curT, rOff) => {
+    const clampedT = Math.max(-0.88, Math.min(0.88, curT));
+    const curAng = clampedT * halfSpan;
+    const absT = Math.abs(clampedT);
+    const tipFade = Math.pow(Math.cos(Math.min(1.0, absT) * Math.PI * 0.5), 1.30);
+    const bellySkew = 1.0 + 0.22 * Math.sin((clampedT - 0.12) * Math.PI * 0.9);
+    const cleanThick = 50.0 * tipFade * bellySkew;
+    const baseR = (radialMode === 'inner')
+      ? (R_out - cleanThick * 0.82)
+      : (R_out + 1.0);
+    const rPos = baseR + rOff;
+    return {
+      x: Math.cos(curAng) * rPos - 12,
+      y: (Math.sin(curAng) * rPos) / 1.06
+    };
+  };
+
+  const expandDist = (stage === 0) ? 0.0 : (stage === 1 ? 2.5 : 4.5);
+  const splitDriftT = (stage === 0) ? 0.0 : (stage === 1 ? 0.030 : 0.050);
+  const flipSign = (s3 > 0.5) ? 1 : -1;
+  const isLoopStrike = (strikeId % 2 === 0);
+
+  const trunkTemplate = isLoopStrike
+    ? [
+        { u: 0.00, rSwing:  0.00, w: 0.35, spike: 0 },
+        { u: 0.15, rSwing: -0.18, w: 0.90, spike: 3 },
+        { u: 0.34, rSwing:  0.80, w: 1.20, spike: 4 },
+        { u: 0.52, rSwing:  0.38, w: 1.05, spike: 3 },
+        { u: 0.70, rSwing:  0.95, w: 1.30, spike: 5 },
+        { u: 0.86, rSwing: -0.10, w: 0.95, spike: 3 },
+        { u: 1.00, rSwing:  0.00, w: 0.35, spike: 0 }
+      ]
+    : [
+        { u: 0.00, rSwing:  0.00, w: 0.35, spike: 0 },
+        { u: 0.18, rSwing: -0.55, w: 0.85, spike: 3 },
+        { u: 0.36, rSwing:  0.65, w: 1.15, spike: 4 },
+        { u: 0.54, rSwing: -0.50, w: 1.10, spike: 4 },
+        { u: 0.74, rSwing:  0.85, w: 1.35, spike: 5 },
+        { u: 0.88, rSwing:  0.25, w: 0.90, spike: 3 },
+        { u: 1.00, rSwing:  0.00, w: 0.35, spike: 0 }
+      ];
+
+  const trunk = trunkTemplate.map((pt, idx) => {
+    const h1 = _getsugaHash1(seed * 13.3 + idx * 7.1);
+    const h2 = _getsugaHash1(seed * 29.7 + idx * 11.9);
+    const halfDrift = (idx <= 2 ? -splitDriftT : splitDriftT);
+    const curT = tStart + (tEnd - tStart) * pt.u + halfDrift;
+    const baseSwing = pt.rSwing * flipSign * (7.0 + h2 * 4.0);
+    const expSwing = baseSwing + (pt.rSwing >= 0 ? 1 : -1) * flipSign * expandDist;
+    const xy = toCrescentXY(curT, expSwing);
+    return {
+      x: xy.x,
+      y: xy.y,
+      r: pt.w * (0.85 + h1 * 0.30),
+      spike: pt.spike,
+      cSeed: h1 * 6.28
+    };
+  });
+  _computeBoltBisectors(trunk);
+
+  const loopBranch = [
+    trunk[1],
+    (() => {
+      const curT = tStart + (tEnd - tStart) * 0.32 - splitDriftT * 0.5;
+      const swing = -flipSign * (7.5 + expandDist);
+      const xy = toCrescentXY(curT, swing);
+      return { x: xy.x, y: xy.y, r: 0.85, spike: 3, cSeed: 1.7 };
+    })(),
+    (() => {
+      const curT = tStart + (tEnd - tStart) * 0.55 - splitDriftT * 0.3;
+      const swing = -flipSign * (5.5 + expandDist);
+      const xy = toCrescentXY(curT, swing);
+      return { x: xy.x, y: xy.y, r: 0.95, spike: 3, cSeed: 3.1 };
+    })(),
+    (() => {
+      const curT = tStart + (tEnd - tStart) * 0.72 + splitDriftT * 0.4;
+      const swing = -flipSign * (8.5 + expandDist);
+      const xy = toCrescentXY(curT, swing);
+      return { x: xy.x, y: xy.y, r: 0.85, spike: 3, cSeed: 4.8 };
+    })(),
+    trunk[5]
+  ];
+  _computeBoltBisectors(loopBranch);
+
+  const feelers = [
+    [
+      trunk[2],
+      { x: trunk[2].x + (trunk[2].spikeDx || 0.7) * 6 - (trunk[2].spikeDy || 0.7) * 2.5, y: trunk[2].y + (trunk[2].spikeDy || 0.7) * 6 + (trunk[2].spikeDx || 0.7) * 2.5, r: 0.40, cSeed: 2.1 },
+      { x: trunk[2].x + (trunk[2].spikeDx || 0.7) * 11 + (trunk[2].spikeDy || 0.7) * 2, y: trunk[2].y + (trunk[2].spikeDy || 0.7) * 11 - (trunk[2].spikeDx || 0.7) * 2, r: 0.25, cSeed: 4.2 }
+    ],
+    [
+      loopBranch[1],
+      { x: loopBranch[1].x + (loopBranch[1].spikeDx || -0.7) * 6.5, y: loopBranch[1].y + (loopBranch[1].spikeDy || -0.7) * 6.5, r: 0.40, cSeed: 5.1 },
+      { x: loopBranch[1].x + (loopBranch[1].spikeDx || -0.7) * 11 + 2.5, y: loopBranch[1].y + (loopBranch[1].spikeDy || -0.7) * 11 - 2, r: 0.25, cSeed: 1.3 }
+    ]
+  ];
+
+  // Stage 3: Soft curved S-wave ionized vapor wisp (00:03 in reference video)
+  if (stage === 3) {
+    ctx.strokeStyle = pal.afterglowWisp || pal.lightningHalo;
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    _appendBoltSegmentToPath(ctx, trunk[1].x, trunk[1].y, loopBranch[2].x, loopBranch[2].y, 3.2, 0.8, 0, 0, 0);
+    ctx.stroke();
+    return;
+  }
+
+  // Stage 2: Shattered corner sparks & micro-arcs (00:02 in reference video)
+  if (stage === 2) {
+    const nodes = [trunk[1], trunk[2], trunk[4], trunk[5], loopBranch[1], loopBranch[3]];
+    ctx.strokeStyle = pal.lightningHalo;
+    ctx.lineWidth = 2.0;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const sx = n.x + (n.spikeDx || 0.6) * 3.5;
+      const sy = n.y + (n.spikeDy || 0.6) * 3.5;
+      _appendBoltSegmentToPath(ctx, n.x, n.y, sx, sy, 1.2, n.cSeed, 0, 0, 0);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = pal.lightningCore;
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const sx = n.x + (n.spikeDx || 0.6) * 3.5;
+      const sy = n.y + (n.spikeDy || 0.6) * 3.5;
+      _appendBoltSegmentToPath(ctx, n.x, n.y, sx, sy, 1.2, n.cSeed, 0, 0, 0);
+    }
+    ctx.stroke();
+    return;
+  }
+
+  // Stage 1: Outward whip & clean two-piece fracture separation (00:01 in reference video)
+  if (stage === 1) {
+    const trunkActive = [0, 3, 4, 5];
+    const loopActive = [0, 1];
+
+    ctx.strokeStyle = pal.lightningHalo;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    for (let k = 0; k < trunkActive.length; k++) {
+      const i = trunkActive[k];
+      _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 1.6, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, Math.round(trunk[i + 1].spike * 0.7));
+    }
+    for (let k = 0; k < loopActive.length; k++) {
+      const i = loopActive[k];
+      _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 1.5, loopBranch[i].cSeed, loopBranch[i + 1].spikeDx, loopBranch[i + 1].spikeDy, Math.round((loopBranch[i + 1].spike || 0) * 0.7));
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = pal.lightningCore;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (let k = 0; k < trunkActive.length; k++) {
+      const i = trunkActive[k];
+      _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 1.6, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, Math.round(trunk[i + 1].spike * 0.65));
+    }
+    for (let k = 0; k < loopActive.length; k++) {
+      const i = loopActive[k];
+      _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 1.5, loopBranch[i].cSeed, loopBranch[i + 1].spikeDx, loopBranch[i + 1].spikeDy, Math.round((loopBranch[i + 1].spike || 0) * 0.65));
+    }
+    ctx.stroke();
+    return;
+  }
+
+  // Stage 0: Peak strike & open diamond loop / S-whip flash (00:00 & 00:06 in reference video)
+  const loopEndIdx = isLoopStrike ? (loopBranch.length - 1) : 2;
+
+  ctx.strokeStyle = pal.lightningHalo;
+  ctx.lineWidth = 2.6;
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  for (let i = 0; i < trunk.length - 1; i++) {
+    _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 1.5, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, trunk[i + 1].spike);
+  }
+  for (let i = 0; i < loopEndIdx; i++) {
+    _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 1.4, loopBranch[i].cSeed || 1.5, loopBranch[i + 1].spikeDx || 0, loopBranch[i + 1].spikeDy || 0, loopBranch[i + 1].spike || 0);
+  }
+  for (const fl of feelers) {
+    for (let i = 0; i < fl.length - 1; i++) {
+      _appendBoltSegmentToPath(ctx, fl[i].x, fl[i].y, fl[i + 1].x, fl[i + 1].y, 1.0, fl[i].cSeed || 1.0, 0, 0, 0);
+    }
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = pal.lightningCore;
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  for (let i = 0; i < trunk.length - 1; i++) {
+    _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 1.5, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, Math.max(0, trunk[i + 1].spike - 1));
+  }
+  for (let i = 0; i < loopEndIdx; i++) {
+    _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 1.4, loopBranch[i].cSeed || 1.5, loopBranch[i + 1].spikeDx || 0, loopBranch[i + 1].spikeDy || 0, Math.max(0, (loopBranch[i + 1].spike || 0) - 1));
+  }
+  for (const fl of feelers) {
+    for (let i = 0; i < fl.length - 1; i++) {
+      _appendBoltSegmentToPath(ctx, fl[i].x, fl[i].y, fl[i + 1].x, fl[i + 1].y, 1.0, fl[i].cSeed || 1.0, 0, 0, 0);
+    }
+  }
+  ctx.stroke();
+}
+
+/**
+ * Renders live, fast-striking anime lightning discharges across the Getsuga Tensho crescent
+ * matching the reference strike lifecycle (00:00 Diamond Loop Strike -> 00:01 Outward Whip & Two-Piece Breakup ->
+ * 00:02 Shattered Sparks -> 00:03 Curved Ionized Vapor Wisp -> 00:06 Forked S/Z-Whip Strike).
+ */
+function _drawGetsugaElectricDischarges(ctx, pal, p, now) {
+  const tick = Math.floor(now / 36) + (p && p.owner ? p.owner * 7 : 0);
+  const slotOffsets = [0, 3, 1, 4];
+  const cycleLen = 6;
+  for (let slot = 0; slot < 4; slot++) {
+    const slotTick = tick + slotOffsets[slot];
+    const strikeId = Math.floor(slotTick / cycleLen);
+    const stage = ((slotTick % cycleLen) + cycleLen) % cycleLen;
+    _renderGetsugaQuickStrikeSlot(ctx, slot, strikeId, stage, pal);
+  }
+}
+
+function _renderGetsugaWallPinSlot(ctx, wallSlot, strikeId, stage, pal) {
+  if (stage >= 4) return;
+  if (!ctx || typeof ctx.beginPath !== 'function' || typeof ctx.stroke !== 'function' || typeof ctx.moveTo !== 'function' || typeof ctx.lineTo !== 'function') return;
+
+  const wallX = _GETSUGA_BASE_R - 12; // 82: Leading blade apex contact plane
+  const seed = strikeId * 89.7 + wallSlot * 173.1 + 31.0;
+  const s1 = _getsugaHash1(seed * 1.19);
+  const s2 = _getsugaHash1(seed * 2.41);
+  const s3 = _getsugaHash1(seed * 3.73);
+
+  const expandDist = (stage === 0) ? 0.0 : (stage === 1 ? 5.0 : 8.0);
+  const splitDrift = (stage === 0) ? 0.0 : (stage === 1 ? 5.5 : 9.0);
+  const flipSign = (s3 > 0.5) ? 1 : -1;
+  const isLoopStrike = ((strikeId + wallSlot) % 2 === 0);
+
+  const mapPoint = (u, latSwing) => {
+    if (wallSlot === 0 || wallSlot === 1) {
+      const dirY = (wallSlot === 0) ? -1 : 1;
+      const yStart = dirY * (4 + s1 * 8);
+      const yEnd = dirY * (74 + s2 * 22);
+      const y = yStart + (yEnd - yStart) * u;
+      const x = wallX - 4 - u * 10 + latSwing * 0.85;
+      return { x, y };
+    }
+    const xStart = wallX + 2;
+    const xEnd = 22 + s1 * 14;
+    const x = xStart + (xEnd - xStart) * u;
+    const ySpan = (s2 - 0.5) * 44;
+    const y = ySpan * u + latSwing * 1.05;
+    return { x, y };
+  };
+
+  const trunkTemplate = isLoopStrike
+    ? [
+        { u: 0.00, rSwing:  0.00, w: 0.6, spike: 0 },
+        { u: 0.16, rSwing: -0.25, w: 1.9, spike: 6 },
+        { u: 0.35, rSwing:  1.20, w: 2.5, spike: 9 },
+        { u: 0.52, rSwing:  0.55, w: 2.1, spike: 7 },
+        { u: 0.72, rSwing:  1.40, w: 2.7, spike: 10 },
+        { u: 0.86, rSwing: -0.15, w: 2.0, spike: 7 },
+        { u: 1.00, rSwing:  0.00, w: 0.6, spike: 0 }
+      ]
+    : [
+        { u: 0.00, rSwing:  0.00, w: 0.6, spike: 0 },
+        { u: 0.18, rSwing: -0.90, w: 1.8, spike: 6 },
+        { u: 0.37, rSwing:  1.05, w: 2.4, spike: 8 },
+        { u: 0.55, rSwing: -0.80, w: 2.2, spike: 7 },
+        { u: 0.75, rSwing:  1.35, w: 2.7, spike: 10 },
+        { u: 0.89, rSwing:  0.35, w: 1.9, spike: 6 },
+        { u: 1.00, rSwing:  0.00, w: 0.6, spike: 0 }
+      ];
+
+  const trunk = trunkTemplate.map((pt, idx) => {
+    const h1 = _getsugaHash1(seed * 15.7 + idx * 7.3);
+    const h2 = _getsugaHash1(seed * 27.1 + idx * 11.3);
+    const uDrift = (idx <= 2 ? -splitDrift : splitDrift) / 85.0;
+    const curU = Math.max(0, Math.min(1.08, pt.u + uDrift));
+    const baseSwing = pt.rSwing * flipSign * (11.5 + h2 * 6.5);
+    const expSwing = baseSwing + (pt.rSwing >= 0 ? 1 : -1) * flipSign * expandDist;
+    const xy = mapPoint(curU, expSwing);
+    return {
+      x: xy.x,
+      y: xy.y,
+      r: pt.w * (0.88 + h1 * 0.28),
+      spike: pt.spike,
+      cSeed: h1 * 6.28
+    };
+  });
+  _computeBoltBisectors(trunk);
+
+  const loopBranch = [
+    trunk[1],
+    (() => {
+      const xy = mapPoint(0.33 - splitDrift / 160.0, -flipSign * (13.5 + expandDist));
+      return { x: xy.x, y: xy.y, r: 1.6, spike: 7, cSeed: 1.9 };
+    })(),
+    (() => {
+      const xy = mapPoint(0.55 - splitDrift / 220.0, -flipSign * (9.5 + expandDist));
+      return { x: xy.x, y: xy.y, r: 1.9, spike: 6, cSeed: 3.3 };
+    })(),
+    (() => {
+      const xy = mapPoint(0.73 + splitDrift / 180.0, -flipSign * (15.0 + expandDist));
+      return { x: xy.x, y: xy.y, r: 1.7, spike: 8, cSeed: 4.9 };
+    })(),
+    trunk[5]
+  ];
+  _computeBoltBisectors(loopBranch);
+
+  const feelers = [
+    [
+      trunk[2],
+      { x: trunk[2].x + (trunk[2].spikeDx || 0.7) * 11 - (trunk[2].spikeDy || 0.7) * 4, y: trunk[2].y + (trunk[2].spikeDy || 0.7) * 11 + (trunk[2].spikeDx || 0.7) * 4, r: 0.7, cSeed: 2.3 },
+      { x: trunk[2].x + (trunk[2].spikeDx || 0.7) * 19 + (trunk[2].spikeDy || 0.7) * 3, y: trunk[2].y + (trunk[2].spikeDy || 0.7) * 19 - (trunk[2].spikeDx || 0.7) * 3, r: 0.35, cSeed: 4.4 }
+    ],
+    [
+      loopBranch[1],
+      { x: loopBranch[1].x + (loopBranch[1].spikeDx || -0.7) * 12, y: loopBranch[1].y + (loopBranch[1].spikeDy || -0.7) * 12, r: 0.7, cSeed: 5.2 },
+      { x: loopBranch[1].x + (loopBranch[1].spikeDx || -0.7) * 19 + 4, y: loopBranch[1].y + (loopBranch[1].spikeDy || -0.7) * 19 - 3, r: 0.35, cSeed: 1.4 }
+    ]
+  ];
+
+  if (stage === 3) {
+    ctx.strokeStyle = pal.afterglowWisp || pal.lightningHalo;
+    ctx.lineWidth = 2.0;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    _appendBoltSegmentToPath(ctx, trunk[1].x, trunk[1].y, loopBranch[2].x, loopBranch[2].y, 5.5, 0.9, 0, 0, 0);
+    ctx.stroke();
+    return;
+  }
+
+  if (stage === 2) {
+    const nodes = [trunk[1], trunk[2], trunk[4], trunk[5], loopBranch[1], loopBranch[3]];
+    ctx.strokeStyle = pal.lightningHalo;
+    ctx.lineWidth = 2.6;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const sx = n.x + (n.spikeDx || 0.6) * 5.5;
+      const sy = n.y + (n.spikeDy || 0.6) * 5.5;
+      _appendBoltSegmentToPath(ctx, n.x, n.y, sx, sy, 1.6, n.cSeed, 0, 0, 0);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = pal.lightningCore;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const sx = n.x + (n.spikeDx || 0.6) * 5.5;
+      const sy = n.y + (n.spikeDy || 0.6) * 5.5;
+      _appendBoltSegmentToPath(ctx, n.x, n.y, sx, sy, 1.6, n.cSeed, 0, 0, 0);
+    }
+    ctx.stroke();
+    return;
+  }
+
+  if (stage === 1) {
+    const trunkActive = [0, 3, 4, 5];
+    const loopActive = [0, 1];
+
+    ctx.strokeStyle = pal.lightningHalo;
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'square';
+    ctx.lineJoin = 'miter';
+    ctx.beginPath();
+    for (let k = 0; k < trunkActive.length; k++) {
+      const i = trunkActive[k];
+      _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 2.4, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, Math.round(trunk[i + 1].spike * 0.7));
+    }
+    for (let k = 0; k < loopActive.length; k++) {
+      const i = loopActive[k];
+      _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 2.2, loopBranch[i].cSeed, loopBranch[i + 1].spikeDx, loopBranch[i + 1].spikeDy, Math.round((loopBranch[i + 1].spike || 0) * 0.7));
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = pal.lightningCore;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let k = 0; k < trunkActive.length; k++) {
+      const i = trunkActive[k];
+      _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 2.4, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, Math.round(trunk[i + 1].spike * 0.65));
+    }
+    for (let k = 0; k < loopActive.length; k++) {
+      const i = loopActive[k];
+      _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 2.2, loopBranch[i].cSeed, loopBranch[i + 1].spikeDx, loopBranch[i + 1].spikeDy, Math.round((loopBranch[i + 1].spike || 0) * 0.65));
+    }
+    ctx.stroke();
+    return;
+  }
+
+  const loopEndIdx = isLoopStrike ? (loopBranch.length - 1) : 2;
+
+  ctx.strokeStyle = pal.lightningHalo;
+  ctx.lineWidth = 3.4;
+  ctx.lineCap = 'square';
+  ctx.lineJoin = 'miter';
+  ctx.beginPath();
+  for (let i = 0; i < trunk.length - 1; i++) {
+    _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 2.3, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, trunk[i + 1].spike);
+  }
+  for (let i = 0; i < loopEndIdx; i++) {
+    _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 2.1, loopBranch[i].cSeed || 1.5, loopBranch[i + 1].spikeDx || 0, loopBranch[i + 1].spikeDy || 0, loopBranch[i + 1].spike || 0);
+  }
+  for (const fl of feelers) {
+    for (let i = 0; i < fl.length - 1; i++) {
+      _appendBoltSegmentToPath(ctx, fl[i].x, fl[i].y, fl[i + 1].x, fl[i + 1].y, 1.4, fl[i].cSeed || 1.0, 0, 0, 0);
+    }
+  }
+  ctx.stroke();
+
+  ctx.strokeStyle = pal.lightningCore;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  for (let i = 0; i < trunk.length - 1; i++) {
+    _appendBoltSegmentToPath(ctx, trunk[i].x, trunk[i].y, trunk[i + 1].x, trunk[i + 1].y, 2.3, trunk[i].cSeed, trunk[i + 1].spikeDx, trunk[i + 1].spikeDy, Math.max(0, trunk[i + 1].spike - 1));
+  }
+  for (let i = 0; i < loopEndIdx; i++) {
+    _appendBoltSegmentToPath(ctx, loopBranch[i].x, loopBranch[i].y, loopBranch[i + 1].x, loopBranch[i + 1].y, 2.1, loopBranch[i].cSeed || 1.5, loopBranch[i + 1].spikeDx || 0, loopBranch[i + 1].spikeDy || 0, Math.max(0, (loopBranch[i + 1].spike || 0) - 1));
+  }
+  for (const fl of feelers) {
+    for (let i = 0; i < fl.length - 1; i++) {
+      _appendBoltSegmentToPath(ctx, fl[i].x, fl[i].y, fl[i + 1].x, fl[i + 1].y, 1.4, fl[i].cSeed || 1.0, 0, 0, 0);
+    }
+  }
+  ctx.stroke();
+}
+
+/**
+ * Renders 3 staggered quick-strike lightning bursts along the wall contact plane and pinned target zone
+ * when Getsuga Tensho slams into and grinds against an arena wall.
+ */
+function _drawGetsugaWallPinLightningBurst(ctx, pal, p, now) {
+  const pinFrames = p.getsugaWallShakeCounter || 1;
+  const tick = Math.floor(now / 32) + (p && p.owner ? p.owner * 11 : 0);
+  const slotOffsets = [0, 2, 4];
+  const cycleLen = 5;
+
+  for (let wallSlot = 0; wallSlot < 3; wallSlot++) {
+    // On initial wall impact (first 6 frames), synchronize an immediate Stage 0 -> Stage 1 impact surge
+    if (pinFrames <= 6 && wallSlot < 2) {
+      const impactStage = pinFrames <= 3 ? 0 : 1;
+      _renderGetsugaWallPinSlot(ctx, wallSlot, 1, impactStage, pal);
+      continue;
+    }
+    const slotTick = tick + slotOffsets[wallSlot];
+    const strikeId = Math.floor(slotTick / cycleLen) + 2;
+    const stage = ((slotTick % cycleLen) + cycleLen) % cycleLen;
+    _renderGetsugaWallPinSlot(ctx, wallSlot, strikeId, stage, pal);
+  }
+}
+
 export function drawGetsugaSlash(ctx, p, isBlack) {
   let angle = p.angle;
   if (p.vx !== 0 || p.vy !== 0) {
@@ -19,25 +951,20 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   }
   const owner = state.fighters && state.fighters[p.owner];
   const form = p.getsugaForm || (isBlack ? 'bankai' : 'shikai');
-  
+
   const isFinal = form === 'final_bankai';
   const isBankaiHollow = form === 'bankai_hollow';
   const isShikaiHollow = form === 'hollow';
   const isBankai = form === 'bankai' || isBankaiHollow || isFinal;
-  const isShikai = form === 'shikai' && !isBankai && !isShikaiHollow;
 
   const scale = owner ? Math.max(0.9, owner.r / 22) : 1.0;
-  const lifeRatio = Math.max(0.0, (p.life || 30) / (p.maxLife || 30));
   const isInfinityFrozen = Boolean(p.isFrozenByInfinity);
   const fadeAlpha = (isInfinityFrozen && p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer < 30) ? Math.max(0, p.infinityFreezeTimer / 30) : 1.0;
-  const alpha = Math.min(1.0, lifeRatio * 3.5) * fadeAlpha;
+  const alpha = isInfinityFrozen ? fadeAlpha : 1.0;
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
-  // Quantize time to 30 FPS for stepped retro anime feel
-  const msPerFrame = 1000 / 30;
-  const qTime = Math.floor(now / msPerFrame) * msPerFrame;
+  const frameIdx = Math.floor(now / (1000 / 24)) % _GETSUGA_FRAME_COUNT;
 
-  // Dynamically scale visual crescent dimensions directly matching configured projectile radius
   const baseProjRadius = isFinal
     ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius ?? 120)
     : (isBankaiHollow
@@ -48,185 +975,48 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
           ? (CONFIG.ichigo?.bankaiGetsugaRadius ?? 110)
           : (CONFIG.ichigo?.getsugaRadius ?? 100))));
 
-  const radiusScale = (p.r !== undefined && p.r > 0) ? (p.r / 38) : (baseProjRadius / 38);
+  const targetRadius = (p.r !== undefined && p.r > 0) ? p.r : baseProjRadius;
+  const radiusScale = targetRadius / _GETSUGA_BASE_R;
+
+  let paletteKey = 'shikai';
+  if (isInfinityFrozen) {
+    paletteKey = 'frozen';
+  } else if (isBankai || isFinal || isBankaiHollow) {
+    paletteKey = 'bankai';
+  } else if (isShikaiHollow) {
+    paletteKey = 'hollow';
+  }
 
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
   ctx.scale(scale * radiusScale, scale * radiusScale);
-  ctx.imageSmoothingEnabled = false; // Authentic nearest-neighbor pixel art rendering
+  ctx.imageSmoothingEnabled = false;
 
-  // ── Exact Crescent Parameters (Normalized to 38px base, scaled seamlessly by radiusScale) ──
-  const P = 2.0; // Exact discrete pixel art grid unit matching Saitama
-  const snap = (v) => Math.round(v / P) * P;
+  const cachedCanvas = (typeof ctx.drawImage === 'function')
+    ? _getCachedGetsugaFrameCanvas(paletteKey, frameIdx, ctx)
+    : null;
 
-  const R = 38;
-  const maxThick = 14; // Exact same slim thickness across all forms, matching normal Getsuga Tensho!
-  const taperPower = 1.32; // Exact same slim needle-sharp double-tapering as normal Getsuga Tensho
-  const halfAngle = 0.64 * Math.PI; // Exact same slim crescent arc span as normal Getsuga Tensho
+  const pal = _GETSUGA_PALETTES[paletteKey] || _GETSUGA_PALETTES.bankai;
+  const prevAlpha = ctx.globalAlpha !== undefined ? ctx.globalAlpha : 1.0;
 
-  // ── Palette Definition ──
-  let cBorder, cSaturated, cBright, cCore, cAura, isDarkCore;
-  const isDarkMode = Boolean(typeof state !== 'undefined' && (state.arenaTheme === 'dark' || state.darkMode || (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))));
-
-  if (isInfinityFrozen) {
-    cBorder    = '#001a44';
-    cSaturated = '#0055dd';
-    cBright    = '#00e5ff';
-    cCore      = '#ffffff';
-    cAura      = `rgba(0, 229, 255, ${(0.35 * alpha).toFixed(2)})`;
-    isDarkCore = false;
-  } else if (isShikaiHollow) {
-    // ── Shikai + Hollow Mask: Monochrome White-Black Hollow Theme ──
-    cBorder    = '#141414'; // Pitch black obsidian outer border shell
-    cSaturated = '#080808'; // Pure black abyssal void core
-    cBright    = '#E8E8E8'; // Pure silver-white flame rim
-    cCore      = '#FFFFFF'; // Razor white-hot cutting edge
-    cAura      = `rgba(255, 255, 255, ${(0.38 * alpha).toFixed(2)})`; // Radiant silver-white spiritual aura
-    isDarkCore = true;
-  } else if (isBankai || isFinal || isBankaiHollow) {
-    // Kuroi Getsuga Tensho — Authentic Black-Red Crimson Theme
-    cBorder    = '#1A0006'; // Deep Obsidian Crimson outer border shell
-    cSaturated = '#080003'; // Abyssal pitch-black void core
-    cBright    = '#FF0033'; // Electric vivid blood-crimson flame rim
-    cCore      = '#FFFFFF'; // Razor white-hot cutting edge
-    cAura      = `rgba(220, 0, 45, ${(0.42 * alpha).toFixed(2)})`; // Radiant crimson flame atmosphere
-    isDarkCore = true;
-  } else { // Standard Shikai Azure
-    cBorder    = '#00143a';
-    cSaturated = '#0066ee';
-    cBright    = '#00e5ff';
-    cCore      = '#ffffff';
-    cAura      = `rgba(0, 180, 255, ${(0.32 * alpha).toFixed(2)})`;
-    isDarkCore = false;
+  if (cachedCanvas) {
+    ctx.globalAlpha = prevAlpha * alpha;
+    ctx.drawImage(cachedCanvas, -_GETSUGA_HALF_SIZE, -_GETSUGA_HALF_SIZE, _GETSUGA_CANVAS_SIZE, _GETSUGA_CANVAS_SIZE);
+  } else {
+    _renderGetsugaFrameToCtx(ctx, pal, frameIdx);
   }
 
-  // Dynamic 30 FPS quantized animation phases
-  const animTime = qTime * 0.015;
-  const flamePhase = qTime * 0.024;
+  // Dynamic lightning strikes quickly moving around the crescent (matching reference video)
+  ctx.globalAlpha = prevAlpha * alpha;
+  _drawGetsugaElectricDischarges(ctx, pal, p, now);
 
-  const isInsideGetsuga = (rx, ry) => {
-    const dist = Math.hypot(rx, ry);
-    if (dist > R || dist <= 0) return false;
-    const ang = Math.atan2(ry, rx);
-    if (Math.abs(ang) > halfAngle) return false;
-    const t = ang / halfAngle;
-    const taper = Math.cos(t * (Math.PI / 2));
-    // Dynamic rippling trailing flame tongues (pulsing with spiritual pressure)
-    const flameFlutter = Math.sin(t * 6.0 + flamePhase * 3.0) * (P * 1.0) + Math.cos(t * 10.0 - flamePhase * 2.0) * (P * 0.6);
-    const inR = R - (maxThick + flameFlutter) * Math.pow(taper, taperPower);
-    return dist >= inR;
-  };
-
-  const isInsideAura = (rx, ry) => {
-    const dist = Math.hypot(rx, ry);
-    const auraFlutter = Math.sin(ry * 0.15 + flamePhase * 2.0) * P;
-    if (dist > R + P * 2.0 + auraFlutter || dist <= 0) return false;
-    const ang = Math.atan2(ry, rx);
-    if (Math.abs(ang) > halfAngle + 0.08) return false;
-    const t = Math.min(1.0, Math.abs(ang) / halfAngle);
-    const taper = Math.cos(t * (Math.PI / 2));
-    const inR = R - (maxThick + P * 2.0) * Math.pow(taper, taperPower);
-    return dist >= inR;
-  };
-
-  const minX = Math.floor((Math.cos(halfAngle) * R - maxThick - P * 3) / P) * P;
-  const maxX = Math.ceil((R + P * 3) / P) * P;
-  const maxY = Math.ceil((Math.sin(halfAngle) * R + P * 3) / P) * P;
-
-  // ── 1. Atmosphere Stepped Pixel Aura ──
-  ctx.fillStyle = cAura;
-  for (let gy = -maxY; gy <= maxY; gy += P) {
-    for (let gx = minX; gx <= maxX; gx += P) {
-      if (isInsideAura(gx, gy) && !isInsideGetsuga(gx, gy)) {
-        ctx.fillRect(snap(gx), snap(gy), P, P);
-      }
-    }
+  // Wall-pin impact lightning burst when Getsuga Tensho slams into, grinds against, and clips out of an arena wall
+  const isWallPinned = !isInfinityFrozen && (p.hasHitWall || p.isWallPenetrating || (p.vx === 0 && p.vy === 0 && (p.getsugaWallShakeCounter !== undefined || p._resumeVx !== undefined)));
+  if (isWallPinned) {
+    _drawGetsugaWallPinLightningBurst(ctx, pal, p, now);
   }
-
-  // ── 2. Discrete 2D Crescent Body Grid with Animated Reiatsu Plasma Flow ──
-  for (let gy = -maxY; gy <= maxY; gy += P) {
-    for (let gx = minX; gx <= maxX; gx += P) {
-      if (!isInsideGetsuga(gx, gy)) continue;
-
-      const pxX = snap(gx);
-      const pyY = snap(gy);
-
-      // 4-neighbor attached border test matching Saitama skin technique
-      const isBorder = !isInsideGetsuga(gx + P, gy) ||
-                       !isInsideGetsuga(gx - P, gy) ||
-                       !isInsideGetsuga(gx, gy + P) ||
-                       !isInsideGetsuga(gx, gy - P);
-
-      if (isBorder) {
-        ctx.fillStyle = cBorder;
-        ctx.fillRect(pxX, pyY, P, P);
-        continue;
-      }
-
-      const dist = Math.hypot(gx, gy);
-      const ang = Math.atan2(gy, gx);
-      const depthFromApex = R - dist;
-
-      // ── Dynamic Flowing Reiatsu Wave ──
-      const waveFlow = Math.sin(ang * 5.0 - animTime * 4.0) + Math.cos(depthFromApex * 0.7 + animTime * 3.0);
-      const isSurge = waveFlow > 0.90;
-
-      if (depthFromApex < P * 1.5) {
-        ctx.fillStyle = cCore; // Razor-sharp white-hot leading cutting edge
-      } else if (depthFromApex < P * 3.4) {
-        // Blazing flame rim pulsing with white energy surges
-        ctx.fillStyle = isSurge ? cCore : cBright;
-      } else if (isShikaiHollow) {
-        // ── Shikai + Hollow Form: Monochrome White-Black Hollow Theme ──
-        if (depthFromApex < P * 5.2) {
-          ctx.fillStyle = isSurge ? '#FFFFFF' : '#B8B8B8'; // Transition bright silver-white layer
-        } else {
-          // Streaming pure white / silver lightning crackles surging through the pitch black void
-          const crackle = Math.sin(ang * 7.5 + (gx * 0.4 + gy * 0.3) + animTime * 5.0);
-          if (crackle > 0.82) {
-            ctx.fillStyle = '#FFFFFF'; // Pure white lightning vein
-          } else if (crackle > 0.55) {
-            ctx.fillStyle = '#555555'; // Monochrome silver-gray energy undercurrent
-          } else {
-            ctx.fillStyle = cSaturated; // Pitch black void core (#080808)
-          }
-        }
-      } else if (isDarkCore) {
-        // ── Kuroi Getsuga Animated Void Core (Bankai Black-Red Crimson) ──
-        if (depthFromApex < P * 5.2) {
-          ctx.fillStyle = isSurge ? cBright : '#8B0014'; // Transition burning crimson layer
-        } else {
-          // Streaming spiritual lightning crackles surging through the pitch black void
-          const crackle = Math.sin(ang * 7.5 + (gx * 0.4 + gy * 0.3) + animTime * 5.0);
-          if (crackle > 0.85) {
-            ctx.fillStyle = cBright; // Vivid blood-crimson lightning vein (#FF0033)
-          } else if (crackle > 0.58) {
-            ctx.fillStyle = '#8B0014'; // Deep blood energy undercurrent
-          } else {
-            ctx.fillStyle = cSaturated; // Pitch-black abyssal void core (#080003)
-          }
-        }
-      } else {
-        // ── Shikai Azure Standard Shimmering Plasma ──
-        if (depthFromApex < P * 5.2) {
-          ctx.fillStyle = isSurge ? cCore : cBright;
-        } else {
-          const azureCrackle = Math.sin(ang * 7.0 + (gx * 0.35 - gy * 0.35) + animTime * 5.0);
-          if (azureCrackle > 0.80) {
-            ctx.fillStyle = cCore; // White electrical lightning
-          } else if (azureCrackle > 0.45) {
-            ctx.fillStyle = cBright; // Neon electric cyan (#00E5FF / #00F0FF)
-          } else {
-            // Flowing anime stepped checkerboard plasma
-            const checkStep = Math.floor(animTime * 2);
-            ctx.fillStyle = ((Math.round(gx / P) + Math.round(gy / P) + checkStep) % 2 === 0) ? cSaturated : cBright;
-          }
-        }
-      }
-      ctx.fillRect(pxX, pyY, P, P);
-    }
-  }
+  ctx.globalAlpha = prevAlpha;
 
   ctx.restore();
 }

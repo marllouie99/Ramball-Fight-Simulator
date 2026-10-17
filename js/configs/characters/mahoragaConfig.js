@@ -22,7 +22,7 @@ export const mahoragaConfig = {
     startY: 250,
     startVx: 1.1,
     startVy: 1.1,
-    damage: 4,
+    damage: 6,
     cooldown: 60,
     projectileSpeedMultiplier: 1.0,
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
@@ -64,17 +64,20 @@ export const mahoragaConfig = {
     maxRctRegenStages: 12,           // Maximum adaptation stages contributing to passive RCT regeneration
     maxRctRegenRate: 0.05,          // Maximum passive RCT regeneration cap per frame (~7.2 HP/sec)
     enableRCTHeal: true,            // Toggle on/off Reverse Cursed Technique healing on wheel click
-    rctHealPercent: 0.50,           // Percentage of max HP healed on each wheel rotation click (12% max HP)
+    rctHealPercent: 0.35,           // Percentage of max HP healed on each wheel rotation click (12% max HP)
     maxRctHealingPool: Infinity,    // Uncapped RCT healing capacity across a match
     rctCombatDamagePauseFrames: 45, // Duration (frames) passive RCT is paused upon taking direct damage (45 frames = 0.75s)
     defBuffPerClickPercent: 0.05,   // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,        // Maximum defense damage reduction cap (0.50 = 50% max reduction)
+    adaptedDamageMultiplier: 0.25,  // Damage multiplier taken when adapted to an attack/skill (0.25 = 25% damage taken / 75% reduction)
+    wheelDoubleDamageDurationFrames: 240, // Duration (frames) of temporary double damage buff on wheel click (240 frames = 4.0s @ 60fps)
+    wheelDoubleDamageMultiplier: 2.0,     // Damage multiplier during temporary wheel click buff (2.0 = 2x damage)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,     // Maximum speed/KB resistance factor under stasis (60% max)
     fatalAdaptWindowFrames: 400,    // Rolling damage accumulator window (~6.6 seconds at 60fps)
     fatalDamageThresholdPct: 0.50,  // 15% max HP damage threshold within window triggers wheel adaptation click
     fatalAdaptCooldownFrames: 500,  // Cooldown frames between wheel clicks (180 frames = 3.0s cooldown before progressing again)
-    infinityAdaptFreezeCount: 10,   // Required Limitless Infinity freeze exposures to adapt (10 exposures)
+    infinityAdaptFreezeCount: 5,   // Required Limitless Infinity freeze exposures to adapt (10 exposures)
 
     // ── Visuals, Screen Dim & Afterimages ──
     enableGoldenScreenDim: true,     // Toggle on/off dark golden cinematic screen dimming on wheel rotation
@@ -96,7 +99,7 @@ export const mahoragaConfig = {
     enableSwordOfExtermination: true, // Master toggle for Sword of Extermination basic attacks
     swordRange: 50,               // Melee reach (110px frontal arc) for Sword of Extermination
     swordCooldown: 20,              // Frames between sword strikes (0.5s at 60fps)
-    swordDamage: 4,                // True damage dealt by Sword of Extermination
+    swordDamage: 6,                // True damage dealt by Sword of Extermination
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
     swordAnimFrames: 18,            // Duration (frames) of sword chop swing animation
     punchAnimFrames: 18,            // Duration (frames) of off-hand heavy punch animation

@@ -89,13 +89,14 @@ export function getSkillDataForFighter(f, getProjectiles) {
     if (isSkillEnabled(cfg.enableBoneZone, true)) {
       const boneMax = cfg.boneZoneCooldown || 240;
       const boneTimer = f.boneZoneCooldown !== undefined ? f.boneZoneCooldown : 0;
-      const bonePct = Math.max(0, Math.min(100, (1 - (boneTimer / boneMax)) * 100));
+      const effectiveBoneMax = Math.max(boneMax, boneTimer);
+      const bonePct = Math.max(0, Math.min(100, (1 - (boneTimer / (effectiveBoneMax || 1))) * 100));
       skills.push({ id: 'bone_zone', pct: bonePct, ready: bonePct >= 99 && boneTimer <= 0, color: themeColor, label: 'BONE ZONE' });
     }
 
     // 3. Bad Time & Blue Soul Gravity Slam (Ultimate)
     if (isSkillEnabled(cfg.enableGravitySlam, true)) {
-      const slamMax = cfg.gravitySlamCooldown || 580;
+      const slamMax = cfg.gravitySlamCooldown || 800;
       const slamTimer = f.gravitySlamCooldown !== undefined ? f.gravitySlamCooldown : 0;
       let slamPct = 0;
       if (f.isBadTimeActive) {
@@ -103,7 +104,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
         const btRemaining = f.badTimeTimer || 0;
         slamPct = Math.max(0, Math.min(100, (btRemaining / btDur) * 100));
       } else {
-        slamPct = Math.max(0, Math.min(100, (1 - (slamTimer / slamMax)) * 100));
+        const effectiveSlamMax = Math.max(slamMax, slamTimer);
+        slamPct = Math.max(0, Math.min(100, (1 - (slamTimer / (effectiveSlamMax || 1))) * 100));
       }
       skills.push({ id: 'bad_time', pct: slamPct, ready: (slamPct >= 99 && slamTimer <= 0) || f.isBadTimeActive, color: themeColor, label: 'BAD TIME' });
     }
@@ -2627,6 +2629,99 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
+  // ─────────────────────────────────────────────
+  // CHOSO (Death Painting Eldest - Blood & Laser Transmutation)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'choso' || f.type === 'choso' || (f.name && f.name.toLowerCase() === 'choso')) {
+    const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.choso || CONFIG.Choso)) ? (CONFIG.choso || CONFIG.Choso) : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#A31D1D';
+    const skills = [];
+
+    // 1. Skill 1: Slicing Exorcist (Chakram)
+    if (isSkillEnabled(cfg.enableChakram, true)) {
+      const chakramMax = f.skill1CooldownMax || cfg.skill1Cooldown || 360;
+      const chakramCd = f.skill1Cooldown !== undefined ? f.skill1Cooldown : 0;
+      const chakramPct = Math.max(0, Math.min(100, (1 - (chakramCd / chakramMax)) * 100));
+      skills.push({
+        id: 'chakram',
+        pct: chakramPct,
+        ready: chakramPct >= 99 && chakramCd <= 0,
+        color: themeColor,
+        label: 'SLICING EXORCIST'
+      });
+    }
+
+    // 2. Skill 2: Supernova (Omnidirectional Fragmentation)
+    if (isSkillEnabled(cfg.enableSupernova, true)) {
+      const novaMax = f.skill2CooldownMax || cfg.skill2Cooldown || 540;
+      const novaCd = f.skill2Cooldown !== undefined ? f.skill2Cooldown : 0;
+      const novaPct = Math.max(0, Math.min(100, (1 - (novaCd / novaMax)) * 100));
+      skills.push({
+        id: 'supernova',
+        pct: novaPct,
+        ready: novaPct >= 99 && novaCd <= 0,
+        color: themeColor,
+        label: 'SUPERNOVA'
+      });
+    }
+
+    // 3. Skill 3: Piercing Blood (Supersonic Hydraulic Beam)
+    if (isSkillEnabled(cfg.enablePiercingBlood, false)) {
+      const pbMax = f.piercingBloodCooldownMax || cfg.piercingBloodCooldown || 900;
+      const pbCd = f.piercingBloodCooldown !== undefined ? f.piercingBloodCooldown : 0;
+      const pbPct = Math.max(0, Math.min(100, (1 - (pbCd / pbMax)) * 100));
+      const isReady = pbPct >= 99 && pbCd <= 0;
+      skills.push({
+        id: 'piercing_blood',
+        pct: pbPct,
+        ready: isReady,
+        color: themeColor,
+        label: 'PIERCING BLOOD'
+      });
+    }
+
+    // 4. ULTIMATE: Crimson Laser Matrix (Transmutes all current arena blood into piercing laser beams)
+    if (isSkillEnabled(cfg.enableLaserMatrix, true)) {
+      const laserMax = f.ultCooldownMax || f.skill3CooldownMax || cfg.ultCooldown || cfg.skill3Cooldown || 840;
+      const laserCd = (f.ultCooldown !== undefined ? f.ultCooldown : f.skill3Cooldown) || 0;
+      const overdriveTimer = f.laserTransmutationOverdriveTimer || 0;
+      let laserPct = 0;
+      let isReady = false;
+      let label = 'CRIMSON LASER MATRIX';
+
+      if (overdriveTimer > 0) {
+        laserPct = Math.max(0, Math.min(100, (overdriveTimer / (cfg.laserTransmutationOverdriveFrames || 300)) * 100));
+        label = `LASER OVERDRIVE (${(overdriveTimer / 60).toFixed(1)}s)`;
+        isReady = true;
+      } else {
+        laserPct = Math.max(0, Math.min(100, (1 - (laserCd / laserMax)) * 100));
+        const bloodCount = (typeof f._getActiveBloodCount === 'function')
+          ? f._getActiveBloodCount()
+          : (f.bloodNodes ? f.bloodNodes.filter(n => n && !n.isDead && (n.lifespan > 0)).length : 0);
+        isReady = laserPct >= 99 && laserCd <= 0 && bloodCount > 0;
+        if (laserCd <= 0) {
+          label = bloodCount > 0 ? `CRIMSON LASER MATRIX (${bloodCount} BLOOD)` : 'CRIMSON LASER MATRIX (AWAITING BLOOD)';
+        } else {
+          label = `CRIMSON LASER MATRIX: ${Math.ceil(laserCd / 60)}s`;
+        }
+      }
+
+      skills.push({
+        id: 'laser_matrix',
+        pct: laserPct,
+        ready: isReady,
+        color: '#FF2A55',
+        label: label,
+        isUltimate: true,
+        isSignature: true,
+        signature: true,
+        fullWidth: true
+      });
+    }
+
+    return skills;
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
     return [];
   }
@@ -2714,7 +2809,8 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     avatar: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
     shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction'],
     spartan: ['javelin_throw', 'javelin', 'JAVELIN'],
-    guts: ['berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON']
+    guts: ['berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
+    choso: ['laser_matrix', 'laser', 'matrix', 'laser matrix', 'CRIMSON LASER MATRIX', 'piercing_blood', 'PIERCING BLOOD']
   };
 
   const keys = signatureMap[fId];

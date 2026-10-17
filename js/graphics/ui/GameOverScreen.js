@@ -497,11 +497,8 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode, isMatchEnd) {
   if (timer > 0 && isFinalMatchWin) {
     stopArenaBgm(true);
   }
-  const isShiroWinnerMatch = Boolean(
-    effectiveWinner && (effectiveWinner.characterId === 'shiro' || effectiveWinner.type === 'shiro' || (effectiveWinner._def && effectiveWinner._def.id === 'shiro'))
-  );
-  // For Shiro: let faah play completely first (120 frames), then trigger YOU WIN announcer!
-  const youWinDelayMatch = isShiroWinnerMatch ? 120 : 45;
+  // Let faah death audio play completely first (120 frames), then trigger YOU WIN announcer!
+  const youWinDelayMatch = 120;
 
   if (!state._hasPlayedChampionYouWinVoice && timer >= youWinDelayMatch) {
     state._hasPlayedChampionYouWinVoice = true;
@@ -728,11 +725,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     stopArenaBgm(true);
   }
 
-  const isShiroWinnerLayout = Boolean(
-    winner && (winner.characterId === 'shiro' || winner.type === 'shiro' || (winner._def && winner._def.id === 'shiro'))
-  );
-  // For Shiro: let faah play completely first (120 frames), then trigger YOU WIN announcer!
-  const youWinDelayLayout = isShiroWinnerLayout ? 120 : 45;
+  // Let faah death audio play completely first (120 frames), then trigger YOU WIN announcer!
+  const youWinDelayLayout = 120;
 
   if (!state._hasPlayedChampionYouWinVoice && timer >= youWinDelayLayout) {
     state._hasPlayedChampionYouWinVoice = true;
@@ -751,8 +745,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     }
   }
 
-  // 0b. Play Champion Victory Voiceline strictly when match is won AFTER announcer finishes (Frame 130)
-  if (!state._hasPlayedChampionVictoryVoice && timer >= 130 && isFinalMatchWin) {
+  // 0b. Play Champion Victory Voiceline strictly when match is won AFTER announcer finishes (Frame 200 = 120f faah + 80f YOU WIN)
+  if (!state._hasPlayedChampionVictoryVoice && timer >= 200 && isFinalMatchWin) {
     state._hasPlayedChampionVictoryVoice = true;
 
     const isTodo = winner && (winner.characterId === 'todo' || winner.type === 'todo' || winner._def?.id === 'todo');

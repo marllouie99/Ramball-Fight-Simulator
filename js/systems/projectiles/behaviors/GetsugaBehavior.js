@@ -4,12 +4,25 @@ import { state, triggerGlobalScreenShake } from '../../../core/state.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { applyDamageToTarget, suppressAfterimagesAndAttackEffects, isSuppressedByGetsuga } from '../../../entities/fighter.js';
 import { spawnImpactFlash, spawnMeleeClashShockwave, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
-import { resolveProjectilePlusObstacleCollision } from '../../../systems/arenaObstacleSystem.js';
+import { resolveProjectilePlusObstacleCollision, checkRayIntersectsPlusObstacle } from '../../../systems/arenaObstacleSystem.js';
+
+const _candidatePool = [];
 
 export class GetsugaBehavior extends ProjectileBehavior {
   update(projectile, fighters, system) {
-    // 0. Gojo Limitless Infinity Stasis Guard: projectile frozen motionless in space
-    if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0) {
+    // 0. Gojo Limitless Infinity Stasis / Fading / Expiration Guard
+    if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0 || projectile.fadingOut || (projectile.life !== undefined && projectile.life <= 0)) {
+      if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
+        for (const [target] of projectile.draggedTargets.entries()) {
+          if (target) {
+            target.isDraggedByGetsuga = false;
+            target.preventKnockbackBounce = false;
+            target.z = 0;
+          }
+        }
+        projectile.draggedTargets.clear();
+      }
+      if (projectile.dragTimers) projectile.dragTimers.clear();
       return false;
     }
 
@@ -24,7 +37,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
     const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : null;
 
     // ── Continuous arena screen shake while Getsuga Tensho travels across the arena ──
-    if (projectile.vx !== 0 || projectile.vy !== 0) {
+    if (!projectile.hasHitWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
       projectile.getsugaTravelShakeCounter = (projectile.getsugaTravelShakeCounter || 0) + 1;
       const shakeInterval = isFinal
         ? (CONFIG.ichigo?.bankaiFinalGetsugaTravelShakeInterval || 4)
@@ -49,7 +62,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
       }
     }
 
-    // ── Getsuga Tensho Wall Pinning & Clamping (Calculates true visual crescent scale extent) ──
+    // ── Getsuga Tensho Wall Collision, Slow Forward Penetration & Arena Clipping ──
     if (arena) {
       const owner = (fighters && typeof projectile.owner === 'number') ? fighters[projectile.owner] : ((typeof state !== 'undefined' && state.fighters && typeof projectile.owner === 'number') ? state.fighters[projectile.owner] : projectile.owner);
       const form = projectile.getsugaForm || 'shikai';
@@ -80,48 +93,76 @@ export class GetsugaBehavior extends ProjectileBehavior {
         ang = 0;
       }
 
-      // Middle top cutting edge (apex) of Getsuga Tensho
-      const apexOffsetX = Math.cos(ang) * effectiveRadius;
-      const apexOffsetY = Math.sin(ang) * effectiveRadius;
+      // Top center cutting apex of Getsuga Tensho (anchored strictly at the crescent outer center curve)
+      const apexDist = effectiveRadius * 0.872;
+      const apexOffsetX = Math.cos(ang) * apexDist;
+      const apexOffsetY = Math.sin(ang) * apexDist;
+      const apexX = projectile.x + apexOffsetX;
+      const apexY = projectile.y + apexOffsetY;
 
-      let hitWall = false;
+      // Reduced stopping radius: tight circle at the top center of the crescent instead of wide full-body circle
+      const stoppingRadius = projectile.stoppingRadius || (isFinal
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaStoppingRadius ?? 16)
+        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaStoppingRadius ?? 14) : (CONFIG.ichigo?.getsugaStoppingRadius ?? 12)));
 
-      const obsHit = resolveProjectilePlusObstacleCollision(projectile, arena);
-      if (obsHit) {
-        projectile.x = obsHit.wallX;
-        projectile.y = obsHit.wallY;
-        hitWall = true;
-      }
+      const creepSpeed = isFinal
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaWallCreepSpeed ?? 1.5)
+        : (CONFIG.ichigo?.getsugaWallCreepSpeed ?? 1.2);
 
-      if (!hitWall && projectile.vx < 0 && projectile.x + apexOffsetX <= arena.x) {
-        projectile.x = arena.x - apexOffsetX;
-        hitWall = true;
-      }
-      if (!hitWall && projectile.vx > 0 && projectile.x + apexOffsetX >= arena.x + arena.width) {
-        projectile.x = arena.x + arena.width - apexOffsetX;
-        hitWall = true;
-      }
-      if (!hitWall && projectile.vy < 0 && projectile.y + apexOffsetY <= arena.y) {
-        projectile.y = arena.y - apexOffsetY;
-        hitWall = true;
-      }
-      if (!hitWall && projectile.vy > 0 && projectile.y + apexOffsetY >= arena.y + arena.height) {
-        projectile.y = arena.y + arena.height - apexOffsetY;
-        hitWall = true;
-      }
+      if (!projectile.hasHitWall) {
+        let hitWall = false;
 
-      if (hitWall) {
-        if (projectile.vx !== 0 || projectile.vy !== 0) {
-          projectile.angle = Math.atan2(projectile.vy, projectile.vx);
-          projectile.launchAngle = projectile.angle;
+        // Check center obstacle collision strictly at the top center apex using the reduced stopping radius
+        const prevApexX = (typeof projectile.vx === 'number' && Number.isFinite(projectile.vx))
+          ? (projectile.x - projectile.vx) + apexOffsetX
+          : apexX;
+        const prevApexY = (typeof projectile.vy === 'number' && Number.isFinite(projectile.vy))
+          ? (projectile.y - projectile.vy) + apexOffsetY
+          : apexY;
+
+        const obsHit = checkRayIntersectsPlusObstacle(prevApexX, prevApexY, apexX, apexY, arena, stoppingRadius);
+        if (obsHit) {
+          hitWall = true;
+        }
+
+        if (!hitWall) {
+          if (arena.shape === 'circle') {
+            const cx = arena.x + arena.width / 2;
+            const cy = arena.y + arena.height / 2;
+            const ar = arena.radius || (arena.width / 2);
+            const distFromCenter = Math.hypot(apexX - cx, apexY - cy);
+            if (distFromCenter + stoppingRadius >= ar) {
+              hitWall = true;
+            }
+          } else {
+            if (projectile.vx < 0 && apexX - stoppingRadius <= arena.x) {
+              hitWall = true;
+            } else if (projectile.vx > 0 && apexX + stoppingRadius >= arena.x + arena.width) {
+              hitWall = true;
+            }
+            if (!hitWall && projectile.vy < 0 && apexY - stoppingRadius <= arena.y) {
+              hitWall = true;
+            } else if (!hitWall && projectile.vy > 0 && apexY + stoppingRadius >= arena.y + arena.height) {
+              hitWall = true;
+            }
+          }
+        }
+
+        if (hitWall) {
+          projectile.hasHitWall = true;
+          projectile.isWallPenetrating = true;
+          projectile.angle = ang;
+          projectile.launchAngle = ang;
           projectile._resumeVx = projectile.vx;
           projectile._resumeVy = projectile.vy;
-          projectile.vx = 0;
-          projectile.vy = 0;
 
-          // Wall impact burst & heavy screen shake on initial wall collision
+          // Transition to slow forward movement as it cuts into and clips out of the arena
+          projectile.vx = Math.cos(ang) * creepSpeed;
+          projectile.vy = Math.sin(ang) * creepSpeed;
+
+          // Wall impact burst & heavy screen shake on initial wall collision at the apex contact plane
           if (typeof spawnImpactFlash === 'function') {
-            spawnImpactFlash(projectile.x, projectile.y, isFinal ? 45 : 35, projectile.color || '#00E5FF');
+            spawnImpactFlash(apexX, apexY, isFinal ? 45 : 35, projectile.color || '#00E5FF');
           }
           if (typeof triggerGlobalScreenShake === 'function') {
             triggerGlobalScreenShake(isFinal ? 6.5 : 4.5, isFinal ? 12 : 8);
@@ -129,26 +170,34 @@ export class GetsugaBehavior extends ProjectileBehavior {
           const hitSfx = CONFIG.ichigo?.sounds?.getsugaHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
           audioSystem.playSFX(hitSfx, 1.0);
         }
+      } else {
+        // Projectile is already wall-penetrating: maintain slow forward creep speed as it clips out of the arena
+        projectile.vx = Math.cos(ang) * creepSpeed;
+        projectile.vy = Math.sin(ang) * creepSpeed;
+        projectile.angle = ang;
+        projectile.launchAngle = ang;
       }
 
-      // Continuous wall grinding effects while pinned on the wall
-      if (projectile.vx === 0 && projectile.vy === 0) {
+      // Continuous wall grinding effects and screen shake while penetrating/clipping through the wall
+      if (projectile.hasHitWall) {
         projectile.getsugaWallShakeCounter = (projectile.getsugaWallShakeCounter || 0) + 1;
-        if (projectile.getsugaWallShakeCounter >= 6) {
-          projectile.getsugaWallShakeCounter = 0;
+        if (projectile.getsugaWallShakeCounter % 6 === 0) {
           if (typeof triggerGlobalScreenShake === 'function') {
             triggerGlobalScreenShake(isFinal ? 2.5 : 1.8, 6);
           }
+        }
+        if (typeof spawnSparks === 'function' && projectile.getsugaWallShakeCounter % 4 === 0) {
+          spawnSparks(apexX, apexY, 3, projectile.color || '#00E5FF');
         }
       }
     }
 
     // 1. History tracking for speed trail rendering
     if (!projectile.history) projectile.history = [];
-    projectile.history.unshift({ x: projectile.x, y: projectile.y });
+    projectile.history.push({ x: projectile.x, y: projectile.y });
     const maxHist = projectile.historyMax || 10;
     if (projectile.history.length > maxHist) {
-      projectile.history.pop();
+      projectile.history.shift();
     }
 
     // 2. Decrement target re-hit cooldown timers
@@ -164,12 +213,67 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
     // 3. Continuous Wave Drag: Carry trapped targets along the wave's path while projectile travels
     if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
+      const isBankaiWave = form === 'bankai' || form === 'bankai_hollow' || isFinal;
+      const waveRadius = projectile.r || (isFinal
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 120)
+        : (form === 'bankai_hollow'
+          ? (CONFIG.ichigo?.bankaiHollowGetsugaRadius || (CONFIG.ichigo?.getsugaRadius || 100))
+          : (form === 'hollow'
+            ? (CONFIG.ichigo?.hollowGetsugaRadius || (CONFIG.ichigo?.getsugaRadius || 100))
+            : (isBankaiWave ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100)))));
+
+      if (!projectile.dragTimers) projectile.dragTimers = new Map();
+
       for (const [target] of projectile.draggedTargets.entries()) {
         if (!target || target.hp <= 0 || target.isDead || target.dead) {
           projectile.draggedTargets.delete(target);
+          if (projectile.dragTimers) projectile.dragTimers.delete(target);
+          if (target) {
+            target.isDraggedByGetsuga = false;
+            target.preventKnockbackBounce = false;
+          }
           continue;
         }
+
+        const dragFrames = (projectile.dragTimers.get(target) || 0) + 1;
+        projectile.dragTimers.set(target, dragFrames);
+
+        const distToTarget = Math.hypot(target.x - projectile.x, target.y - projectile.y);
+        const tRadius = target.hitRadius || target.r || 25;
+
+        // Check if target is behind the projectile along its forward travel vector
+        let isBehindWave = false;
+        const travelVx = projectile.vx !== 0 ? projectile.vx : (projectile._resumeVx || 0);
+        const travelVy = projectile.vy !== 0 ? projectile.vy : (projectile._resumeVy || 0);
+        if (travelVx !== 0 || travelVy !== 0) {
+          const moveAngle = Math.atan2(travelVy, travelVx);
+          const angleToTarget = Math.atan2(target.y - projectile.y, target.x - projectile.x);
+          const angleDiff = Math.atan2(Math.sin(angleToTarget - moveAngle), Math.cos(angleToTarget - moveAngle));
+          // If target is behind the forward crescent arc (> 95 deg off travel direction) and past crescent interior
+          isBehindWave = Math.abs(angleDiff) > Math.PI * 0.52 && distToTarget > waveRadius * 0.35;
+        }
+
+        // Release pinned/dragged target once the wave has clipped past them (at wall or in mid-air),
+        // or if they have fallen behind the wave, or if max drag duration (90 frames) exceeded
+        const isOutOfReach = distToTarget > waveRadius + tRadius + 20;
+        const maxDragFrames = projectile.maxLife || 90;
+        if (isOutOfReach || isBehindWave || dragFrames >= maxDragFrames) {
+          projectile.draggedTargets.delete(target);
+          if (projectile.dragTimers) projectile.dragTimers.delete(target);
+          target.isDraggedByGetsuga = false;
+          target.preventKnockbackBounce = false;
+          continue;
+        }
+
         target.isDraggedByGetsuga = true;
+        if (!projectile.hasHitWall && (projectile.vx !== 0 || projectile.vy !== 0)) {
+          // Carry trapped target smoothly along with the moving wave
+          const dragSpeed = 0.65;
+          target.vx = (target.vx || 0) * 0.35 + projectile.vx * dragSpeed;
+          target.vy = (target.vy || 0) * 0.35 + projectile.vy * dragSpeed;
+          target.knockbackVx = projectile.vx * 0.85;
+          target.knockbackVy = projectile.vy * 0.85;
+        }
         if (target.characterId === 'eye_of_cthulhu' || target.type === 'eye_of_cthulhu') {
           if (projectile.vx !== 0 || projectile.vy !== 0) {
             target.knockbackVx = projectile.vx * 0.90;
@@ -181,10 +285,16 @@ export class GetsugaBehavior extends ProjectileBehavior {
       }
     }
 
-    const allCandidates = [];
-    if (fighters) allCandidates.push(...fighters);
-    if (typeof state !== 'undefined' && state.illusions) allCandidates.push(...state.illusions);
-    if (typeof state !== 'undefined' && state.cjDriveBys) allCandidates.push(...state.cjDriveBys);
+    _candidatePool.length = 0;
+    if (fighters) {
+      for (let i = 0; i < fighters.length; i++) _candidatePool.push(fighters[i]);
+    }
+    if (typeof state !== 'undefined' && state.illusions) {
+      for (let i = 0; i < state.illusions.length; i++) _candidatePool.push(state.illusions[i]);
+    }
+    if (typeof state !== 'undefined' && state.cjDriveBys) {
+      for (let i = 0; i < state.cjDriveBys.length; i++) _candidatePool.push(state.cjDriveBys[i]);
+    }
 
     const isMask = form === 'hollow' || form === 'bankai_hollow';
     const isBankai = form === 'bankai' || form === 'bankai_hollow' || isFinal;
@@ -197,11 +307,11 @@ export class GetsugaBehavior extends ProjectileBehavior {
           : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 110) : (CONFIG.ichigo?.getsugaRadius || 100)))));
 
     // 4. Piercing Sweep: Cleave all valid enemy entities in the crescent wave's path
-    if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0) {
+    if (projectile.isFrozenByInfinity || projectile.isVisual || projectile.damage === 0 || projectile.fadingOut || (projectile.life !== undefined && projectile.life <= 0)) {
       return false;
     }
-    for (let i = 0; i < allCandidates.length; i++) {
-      const f = allCandidates[i];
+    for (let i = 0; i < _candidatePool.length; i++) {
+      const f = _candidatePool[i];
       if (!f || f.hp <= 0 || f.isDead || f.dead || f.isRespawning || f === attacker || f.owner === attacker) continue;
 
       const fIdx = (fighters || []).indexOf(f);
@@ -272,19 +382,23 @@ export class GetsugaBehavior extends ProjectileBehavior {
         }
 
         // Apply skill damage (continuous multi-tick damage for ALL Getsuga waves)
-        const tickDamage = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 5)
+        const baseTickDamage = isFinal
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 10)
           : (form === 'bankai_hollow'
             ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 6)
             : (form === 'hollow'
               ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 3)
               : (isBankai
                 ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4)
-                : (CONFIG.ichigo?.getsugaTickDamage || 2))));
+                : (CONFIG.ichigo?.getsugaTickDamage || 3))));
+        const tickDamage = (typeof projectile.damage === 'number' && projectile.damage > 0)
+          ? Math.max(projectile.damage, baseTickDamage)
+          : baseTickDamage;
         applyDamageToTarget(f, tickDamage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, isFinalGetsugaTick: isFinal, isFinalMassiveGetsuga: isFinal, projectile });
 
         // If the projectile became frozen by Gojo's Infinity during damage application, immediately halt and return
         if (projectile.isFrozenByInfinity || projectile.damage === 0 || projectile.isVisual) {
+          _candidatePool.length = 0;
           return false;
         }
         if (typeof f.clearAllAfterimages === 'function') {
@@ -320,11 +434,12 @@ export class GetsugaBehavior extends ProjectileBehavior {
           }
         } else if (isSaitamaCounter || isEscanorImmune) {
           f.isDraggedByGetsuga = false;
-          f.knockbackVx = 0;
-          f.knockbackVy = 0;
+          f.preventKnockbackBounce = false;
           if (projectile.draggedTargets && projectile.draggedTargets.has(f)) {
             projectile.draggedTargets.delete(f);
           }
+          f.knockbackVx = 0;
+          f.knockbackVy = 0;
         } else if (projectile.vx !== 0 || projectile.vy !== 0 || projectile._resumeVx !== undefined || projectile.launchAngle !== undefined) {
           f.isDraggedByGetsuga = true;
           if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
@@ -341,8 +456,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
               : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6)));
           if (typeof f.applyKnockback === 'function') {
             f.applyKnockback(
-              Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce),
-              Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce),
+              Math.cos(angle) * kbForce,
+              Math.sin(angle) * kbForce,
               0,
               { isGetsuga: true, isDrag: true, isPull: true }
             );
@@ -413,6 +528,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
         audioSystem.playSFX(hitSfx, hitVol);
       }
     }
+    _candidatePool.length = 0;
 
     // 4. Piercing Wave: Destroy regular enemy bullets in the path of Getsuga Tensho
     if (system && system.projectiles) {
@@ -448,78 +564,30 @@ export class GetsugaBehavior extends ProjectileBehavior {
       return false; // Stays suspended in air during Infinity freeze
     }
 
-    const form = projectile.getsugaForm || 'shikai';
-    const isFinal = form === 'final_bankai';
     const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
-
-    // ── All Getsuga Tensho Waves Stay Pinned to the Wall Until Lifespan Ends (Does not clip out of arena) ──
-    if (arena) {
-      if (projectile.life <= 0) {
-        if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
-          for (const [target] of projectile.draggedTargets.entries()) {
-            if (target) {
-              target.isDraggedByGetsuga = false;
-              target.preventKnockbackBounce = false;
-              target.z = 0;
-            }
-          }
-          projectile.draggedTargets.clear();
-        }
-        if (typeof spawnSparks === 'function') {
-          spawnSparks(projectile.x, projectile.y, 16, projectile.color || '#00E5FF');
-        }
-        return true;
-      }
-
-      // Clamp position to arena boundaries so it sits flush against walls
-      const pad = 24;
-      let isAtWall = false;
-
-      if (projectile.vx < 0 && projectile.x - pad < arena.x) {
-        projectile.x = arena.x + pad;
-        isAtWall = true;
-      }
-      if (projectile.vx > 0 && projectile.x + pad > arena.x + arena.width) {
-        projectile.x = arena.x + arena.width - pad;
-        isAtWall = true;
-      }
-      if (projectile.vy < 0 && projectile.y - pad < arena.y) {
-        projectile.y = arena.y + pad;
-        isAtWall = true;
-      }
-      if (projectile.vy > 0 && projectile.y + pad > arena.y + arena.height) {
-        projectile.y = arena.y + arena.height - pad;
-        isAtWall = true;
-      }
-
-      if (isAtWall) {
-        if (projectile.vx !== 0 || projectile.vy !== 0) {
-          projectile.angle = Math.atan2(projectile.vy, projectile.vx);
-          projectile.launchAngle = projectile.angle;
-          projectile._resumeVx = projectile.vx;
-          projectile._resumeVy = projectile.vy;
-          projectile.vx = 0;
-          projectile.vy = 0;
-        }
-      }
-
-      return false; // Never expire from wall collision — stays at the wall for its full duration!
-    }
-
     const canvas = (typeof state !== 'undefined' && state.canvas) || null;
-    const screenW = canvas ? canvas.width : (typeof window !== 'undefined' ? window.innerWidth : 2400);
-    const screenH = canvas ? canvas.height : (typeof window !== 'undefined' ? window.innerHeight : 1400);
-    const margin = (projectile.r || 50) + 100;
+    const screenW = canvas ? (canvas.width || 2400) : (typeof window !== 'undefined' ? window.innerWidth : 2400);
+    const screenH = canvas ? (canvas.height || 1400) : (typeof window !== 'undefined' ? window.innerHeight : 1400);
+    const margin = (projectile.r || 50) + 120;
 
-    // Slices through all arena walls unimpeded until it passes the outer screen/window edge
-    const isOutsideWindow = (
-      projectile.x < -margin ||
-      projectile.x > screenW + margin ||
-      projectile.y < -margin ||
-      projectile.y > screenH + margin
+    const boundMinX = (arena && typeof arena.x === 'number') ? arena.x - margin : -margin;
+    const boundMaxX = (arena && typeof arena.x === 'number' && typeof arena.width === 'number')
+      ? Math.max(arena.x + arena.width + margin, screenW + margin)
+      : screenW + margin;
+    const boundMinY = (arena && typeof arena.y === 'number') ? arena.y - margin : -margin;
+    const boundMaxY = (arena && typeof arena.y === 'number' && typeof arena.height === 'number')
+      ? Math.max(arena.y + arena.height + margin, screenH + margin)
+      : screenH + margin;
+
+    // Slices through all arena walls slowly until lifespan ends or it passes outer bounds
+    const isOutsideBounds = (
+      projectile.x < boundMinX ||
+      projectile.x > boundMaxX ||
+      projectile.y < boundMinY ||
+      projectile.y > boundMaxY
     );
 
-    if (projectile.life <= 0 || isOutsideWindow) {
+    if (projectile.life <= 0 || isOutsideBounds) {
       if (projectile.draggedTargets && projectile.draggedTargets.size > 0) {
         for (const [target] of projectile.draggedTargets.entries()) {
           if (target) {
@@ -530,11 +598,12 @@ export class GetsugaBehavior extends ProjectileBehavior {
         }
         projectile.draggedTargets.clear();
       }
+      if (projectile.dragTimers) projectile.dragTimers.clear();
       if (typeof spawnSparks === 'function') {
-        spawnSparks(projectile.x, projectile.y, 8, projectile.color || '#00E5FF');
+        spawnSparks(projectile.x, projectile.y, 16, projectile.color || '#00E5FF');
       }
       return true;
     }
-    return false; // Continues travelling through walls!
+    return false; // Continues slowly moving forward as it clips out to the arena!
   }
 }

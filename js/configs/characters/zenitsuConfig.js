@@ -117,6 +117,8 @@ export const zenitsuConfig = {
   // ── Audio Assets & Sound Volumes ──
   sounds: {
     // Basic Attack & Iai Slash
+    basicDash: 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
+    basicAttack: 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3',
     katanaSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     slashHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     parry: 'Assets/Sound Effects/Skills/parry.mp3',
@@ -153,6 +155,8 @@ export const zenitsuConfig = {
     ultimateImpact: 'Assets/Sound Effects/Attacks/thunderstrike.mp3'
   },
   soundVolumes: {
+    basicDash: 2.85,
+    basicAttack: 2.85,
     katanaSwing: 0.75,
     slashHit: 0.80,
     parry: 0.35,

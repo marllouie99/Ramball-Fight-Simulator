@@ -1641,6 +1641,15 @@ export class Fighter {
     );
   }
 
+  /**
+   * Validates whether this fighter is currently flagged as dragged by Getsuga Tensho.
+   * Auto-cleared by _handleTimeStop() after a 120-frame safety timeout if orphaned.
+   * @returns {boolean}
+   */
+  _isActivelyDraggedByGetsuga() {
+    return Boolean(this.isDraggedByGetsuga);
+  }
+
   _getFrameId() {
     if (typeof state !== 'undefined' && typeof state.frameCount === 'number') {
       return state.frameCount;
@@ -1698,6 +1707,18 @@ export class Fighter {
     }
     this._tickCooldowns();
     this._processKnockbackPhysics();
+
+    // Auto-clear orphaned Getsuga Tensho drag flags after safety timeout (120 frames)
+    if (this.isDraggedByGetsuga) {
+      this._getsugaDragDuration = (this._getsugaDragDuration || 0) + 1;
+      if (this._getsugaDragDuration > 120) {
+        this.isDraggedByGetsuga = false;
+        this.preventKnockbackBounce = false;
+        this._getsugaDragDuration = 0;
+      }
+    } else {
+      this._getsugaDragDuration = 0;
+    }
 
     if (this.areAttackEffectsSuppressed()) {
       if (this._hitByGetsugaTimer > 0) this._hitByGetsugaTimer--;
@@ -2313,7 +2334,8 @@ export class Fighter {
         let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
         const isGenosFlurryCaught = Boolean(this.caughtInGenosFlurry);
         const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || isGenosFlurryCaught;
-        if (this.preventKnockbackBounce || this.isDraggedByGetsuga || isBeamTrapped) bounceMult = 0; // Stick to the wall instead of bouncing
+        const isGetsugaDragged = Boolean(this.isDraggedByGetsuga);
+        if (this.preventKnockbackBounce || isGetsugaDragged || isBeamTrapped) bounceMult = 0; // Stick to the wall instead of bouncing
 
         const minX = arena.x + this.r;
         const maxX = arena.x + arena.width - this.r;
@@ -3141,7 +3163,8 @@ export class Fighter {
     const isNaoyaPinned = Boolean(this.isCurrentlyWallPinnedByNaoya || ((this.naoyaWallPinTimer || 0) > 0) || this._isFlyingToWallPin);
     const isCruelSunDragged = Boolean(this._draggedByCruelSun || this.isCaughtInCruelSun);
     const isStationaryHover = ((this.purpleRecoveryTimer || 0) > 0) || this.isChannelingPurple || this.isChannelingDomainExpansion;
-    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) || isGenosTrapped || this.preventKnockbackBounce || this.isDraggedByGetsuga || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned || isNaoyaPinned || isCruelSunDragged || isStationaryHover;
+    const isGetsugaDragged = Boolean(this.isDraggedByGetsuga);
+    const isBeamTrapped = (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam()) || (typeof this.isPulledOrDragged === 'function' && this.isPulledOrDragged()) || isGenosTrapped || this.preventKnockbackBounce || isGetsugaDragged || isSaitamaHit || isMakimaPinned || isEscanorHit || isEscanorPinned || isNaoyaPinned || isCruelSunDragged || isStationaryHover;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;

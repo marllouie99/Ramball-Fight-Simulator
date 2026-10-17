@@ -64,7 +64,6 @@
 ## 10. Universal Pulling and Dragging Attacks Stasis Rule
 - When Mahoraga is caught in, pulled by, or dragged along by any dragging/pulling attack (`fighter.isPulledOrDragged()` returns `true`):
   - Covered pulling/dragging effects include:
-    - Ichigo's Getsuga Tensho wave drag (`isDraggedByGetsuga`)
     - Gojo's Hollow Purple suction vortex (`isCaughtInPurpleVortex` or proximity to moving Purple projectile)
     - Gojo's Lapse Blue gravitational pull (`isCaughtInBluePull` or proximity to active Blue orb)
     - Black Hole gravitational vortex / event horizon suction

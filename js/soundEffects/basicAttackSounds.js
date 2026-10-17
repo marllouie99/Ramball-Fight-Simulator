@@ -462,6 +462,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     },
     delay: 0,
   },
+  // Choso — Blood Edge & Sanguine Darts
+  'choso': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
   // Carl "CJ" Johnson — Street Boxing Brass Knuckles
   'cj': {
     get src() {
@@ -753,6 +759,17 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     },
     get volume() {
       return CONFIG.nobara?.soundVolumes?.nailThrow !== undefined ? CONFIG.nobara.soundVolumes.nailThrow : 0.7;
+    },
+    delay: 0,
+  },
+
+  // Choso — Blood Manipulation Dagger Slashes
+  'choso': {
+    get src() {
+      return CONFIG.choso?.sounds?.meleeSlash || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+    },
+    get volume() {
+      return CONFIG.choso?.soundVolumes?.meleeSlash !== undefined ? CONFIG.choso.soundVolumes.meleeSlash : 0.85;
     },
     delay: 0,
   },

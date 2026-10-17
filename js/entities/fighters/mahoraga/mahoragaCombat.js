@@ -209,7 +209,8 @@ export function performMeleeAttack(fighter, opponent) {
     }
   }
 
-  const damage = CONFIG.mahoraga?.swordDamage ?? 15;
+  const dmgMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+  const damage = (CONFIG.mahoraga?.swordDamage ?? 15) * dmgMult;
   const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const baseKnockbackChance = CONFIG.mahoraga?.punchBaseKnockbackChance ?? 0.40;
   const knockbackPerStage = CONFIG.mahoraga?.punchKnockbackChancePerStage ?? 0.04;
@@ -272,7 +273,8 @@ export function executeCleave(fighter, opponent) {
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'WORLD CLEAVE!', '#FFD700');
 
   const cleaveRadius = CONFIG.mahoraga?.cleaveRadius ?? 150;
-  const damage = CONFIG.mahoraga?.cleaveDamage ?? 40;
+  const dmgMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+  const damage = (CONFIG.mahoraga?.cleaveDamage ?? 40) * dmgMult;
 
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
   const arcX = fighter.x + Math.cos(facingAngle) * (cleaveRadius * 0.4);
@@ -308,7 +310,8 @@ export function shootBladeBarrage(fighter, ownerIndex) {
   if (!projectileSystem) return;
   if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableThrowBarrage, true)) return;
 
-  const throwDamage = CONFIG.mahoraga?.throwDamage ?? 14;
+  const dmgMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+  const throwDamage = (CONFIG.mahoraga?.throwDamage ?? 14) * dmgMult;
   const throwSpeed = CONFIG.mahoraga?.throwSpeed ?? 20;
 
   const spreadAngle = (Math.random() - 0.5) * (CONFIG.mahoraga?.throwSpreadAngle || 0.28);
@@ -380,7 +383,7 @@ export function shootBladeBarrage(fighter, ownerIndex) {
 export function initiateLevel8WallSlam(fighter, opponent) {
   if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableWallSlam, true)) return;
   if (!opponent || opponent.hp <= 0 || opponent.isDead) return;
-  if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0 || fighter.isDraggedByGetsuga || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
+  if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0 || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
 
   // Block initiation if Mahoraga is caught inside Gojo's active Hollow Purple
   const activeOrbs = (projectileSystem && projectileSystem.projectiles)
@@ -689,7 +692,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       target.wallSlamPinnedY = target.y;
 
       // Deal heavy wall impact damage
-      const impactDamage = CONFIG.mahoraga?.wallSlamImpactDamage ?? 20;
+      const slamMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+      const impactDamage = (CONFIG.mahoraga?.wallSlamImpactDamage ?? 20) * slamMult;
       if (typeof target.takeDamage === 'function') {
         target.takeDamage(impactDamage, fighter, { isMelee: true, isWallSlam: true, isParalyzed: true });
       }
@@ -809,7 +813,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     fighter.swordCombo = 1;
 
     // Deal initial follow-up execution damage
-    const followupDamage = CONFIG.mahoraga?.wallSlamFollowupDamage ?? 25;
+    const followMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+    const followupDamage = (CONFIG.mahoraga?.wallSlamFollowupDamage ?? 25) * followMult;
     target.takeDamage(followupDamage, fighter, { isMelee: true, isCritical: true });
 
     const angle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
@@ -850,7 +855,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
 export function executeShout(fighter, opponent, ownerIndex) {
   if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true)) return;
   const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
-  const shoutDamage = CONFIG.mahoraga?.shoutDamage || 30;
+  const shoutMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+  const shoutDamage = (CONFIG.mahoraga?.shoutDamage || 30) * shoutMult;
   const shoutKnockback = CONFIG.mahoraga?.shoutKnockback || 18;
 
   triggerGlobalScreenShake(10, 20);

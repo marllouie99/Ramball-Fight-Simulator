@@ -103,8 +103,9 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
 
   let finalAmount = amount;
   const currentStage = fighter.goldAdaptationStage?.[type] || 0;
+  const adaptedMult = CONFIG.mahoraga?.adaptedDamageMultiplier ?? 0.25;
 
-  // ── Getsuga Tensho 2-Exposure Adaptation Tracking & 50% Damage Reduction ──
+  // ── Getsuga Tensho 2-Exposure Adaptation Tracking & 25% Damage Taken (75% Reduction) ──
   const isGetsugaHit = opts.isGetsuga || (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho' || opts.projectile.skillShotId === 'getsugaTensho'));
   const isGetsugaAdapted = fighter.adaptedGetsuga || 
                           (fighter.adaptedSkills && (fighter.adaptedSkills['getsugaTensho'] || fighter.adaptedSkills['getsuga'])) || 
@@ -112,7 +113,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
 
   if (isGetsugaHit) {
     if (isGetsugaAdapted) {
-      finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Getsuga Tensho!
+      finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Getsuga Tensho!
     } else {
       // Track distinct Getsuga wave projectile exposures
       const projId = opts.projectile ? (opts.projectile.getsugaReleaseId || opts.projectile.id || opts.projectile) : (attacker ? (attacker.getsugaReleaseCount || 1) : 1);
@@ -133,7 +134,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     }
   }
 
-  // ── 50% Damage Reduction when Adapted to Reversal Red ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Reversal Red ──
   const isRedHit = Boolean(opts.isRed || (opts.projectile && opts.projectile.isGojoRed) || (opts.skillShotId === 'red'));
   const isRedAdapted = Boolean((fighter.gojoAdapted && fighter.gojoAdapted.red) || 
                                (fighter.adaptedGojo && fighter.adaptedGojo.red) ||
@@ -141,10 +142,10 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
                                (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF1144')));
 
   if (isRedHit && isRedAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Red!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Red!
   }
 
-  // ── 50% Damage Reduction when Adapted to Hollow Purple ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Hollow Purple ──
   const isPurpleHit = Boolean(
     opts.isPurpleDPS || 
     opts.isPurpleExplosion || 
@@ -159,19 +160,19 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
                           ((fighter.adaptationStage?.skill || 0) >= 2);
 
   if (isPurpleHit && isPurpleAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Purple!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Purple!
   }
 
-  // ── 50% Damage Reduction when Adapted to Yuta's Pure Love Beam ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Yuta's Pure Love Beam ──
   const isPureLoveBeamHit = opts.isPureLoveBeam || (opts.projectile && opts.projectile.isPureLoveBeam);
   const isPureLoveBeamAdapted = fighter.adaptedPureLoveBeam || 
                                 (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF1493'));
 
   if (isPureLoveBeamHit && isPureLoveBeamAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Pure Love Beam (same as Gojo's Purple)!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Pure Love Beam!
   }
 
-  // ── 50% Damage Reduction when Adapted to Genos's Spiral Incineration Cannon Beam (same logic as Gojo's Purple) ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Genos's Spiral Incineration Cannon Beam ──
   const isGenosBeamHit = Boolean(opts.isGenosBeam || opts.isIncinerationCannon || (opts.projectile && opts.projectile.isGenosBeam));
   const isGenosBeamAdapted = Boolean(
     fighter.adaptedGenosBeam || 
@@ -180,10 +181,10 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   );
 
   if (isGenosBeamHit && isGenosBeamAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Genos's Beam!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Genos's Beam!
   }
 
-  // ── 50% Damage Reduction when Adapted to Genos's Machine Gun Blows (same logic as Gojo's Purple) ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Genos's Machine Gun Blows ──
   const isGenosFlurryHit = Boolean(opts.isMachineGunBlow || opts.isGenosMachineBlow || opts.isGenosFlurry);
   const isGenosFlurryAdapted = Boolean(
     fighter.adaptedGenosFlurry || 
@@ -193,31 +194,31 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   );
 
   if (isGenosFlurryHit && isGenosFlurryAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Genos's Machine Gun Blows!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Genos's Machine Gun Blows!
   }
 
-  // ── 50% Damage Reduction when Adapted to Soul Disfigurement ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Soul Disfigurement ──
   if (opts.isSoulDisfigurement && fighter.adaptedSoulDisfigurement) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Soul Disfigurement!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Soul Disfigurement!
   }
 
-  // ── 50% Damage Reduction when Adapted to Saitama's Serious Counter ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Saitama's Serious Counter ──
   const isSaitamaCounterHit = opts.isSaitamaCounter || (opts.isCounter && attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama'));
   if (isSaitamaCounterHit && fighter.adaptedSaitamaCounter) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Saitama's Serious Counter!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Saitama's Serious Counter!
   }
 
-  // ── 50% Damage Reduction when Adapted to Lawnmower ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Lawnmower ──
   const isLawnmowerAdapted = Boolean(
     fighter.adaptedLawnmower || 
     (fighter.adaptedSkills && (fighter.adaptedSkills['lawnmower'] || fighter.adaptedSkills['crazydave_lawnmower'])) ||
     (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#DC2626'))
   );
   if (isLawnmowerHit && isLawnmowerAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Lawnmower crush!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Lawnmower crush!
   }
 
-  // ── 50% Damage Reduction when Adapted to Sukuna's Divine Flame (Fuga) ──
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Sukuna's Divine Flame (Fuga) ──
   const isFugaHit = Boolean(opts.isDivineFlame || opts.isFuga || (opts.projectile && (opts.projectile.isSukunaFurnace || opts.projectile.skillShotId === 'divineFlame')) || (opts.skillShotId === 'divineFlame'));
   const isFugaAdapted = Boolean(
     (fighter.sukunaAdapted && fighter.sukunaAdapted.divineFlame) ||
@@ -225,14 +226,14 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF6F00'))
   );
   if (isFugaHit && isFugaAdapted) {
-    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Fuga!
+    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Fuga!
   }
 
-  // ── 50% Damage Reduction for any General Adapted Skill Shot ──
+  // ── 25% Damage Taken (75% Reduction) for any General Adapted Skill Shot ──
   const currentSkillShotId = opts.skillShotId || (opts.projectile && opts.projectile.skillShotId);
   if (currentSkillShotId && fighter.adaptedSkills && fighter.adaptedSkills[currentSkillShotId]) {
-    if (!isRedHit && !isPurpleHit && !isPureLoveBeamHit && !isGenosBeamHit && !isGenosFlurryHit && !isFugaHit && !isLawnmowerHit && !opts.isSoulDisfigurement && !isSaitamaCounterHit) {
-      finalAmount *= 0.50;
+    if (!isRedHit && !isPurpleHit && !isPureLoveBeamHit && !isGenosBeamHit && !isGenosFlurryHit && !isFugaHit && !isLawnmowerHit && !opts.isSoulDisfigurement && !isSaitamaCounterHit && !isGetsugaHit) {
+      finalAmount *= adaptedMult;
     }
   }
 
@@ -243,6 +244,11 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
   finalAmount *= (1.0 - defReduction);
+
+  // Guarantee that damaging hits deal at least 1 damage (never rounds down to 0)
+  if (amount > 0) {
+    finalAmount = Math.max(1, Math.round(finalAmount));
+  }
 
 
   // ── Toji ISOH Bypass Check ──
@@ -623,6 +629,7 @@ export function triggerAdaptation(fighter, type, attacker) {
   fighter.shieldIconTimer = 90;
 
   applyRCTHeal(fighter);
+  applyWheelClickBuff(fighter);
 
   if (totalStages >= 2 || currentStage >= 2) {
     if (!fighter.hasAnnouncedLevel2) {
@@ -632,7 +639,7 @@ export function triggerAdaptation(fighter, type, attacker) {
   }
 
   // Save attacker for smooth divine flash-dash counter (strictly disabled when dragged or pulled by any attack, or against Lawnmowers)
-  if (!fighter.isDraggedByGetsuga && !(typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) {
+  if (!(typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) {
     if (attacker && !attacker.isDead && attacker !== fighter && !attacker.isLawnmower && !attacker.isUntargetable && attacker.characterId !== 'crazydave_lawnmower') {
       fighter._pendingCounterTarget = attacker;
     } else if (typeof state !== 'undefined' && state.fighters) {
@@ -704,12 +711,12 @@ export function applyGojoAdaptation(fighter, gojoType) {
     case 'purple':
       adaptColor = '#8A2BE2';
       fighter.gojoPurpleDodgeReady = false;
-      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: PURPLE RESISTANCE (50% REDUCED)!', '#8A2BE2');
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: PURPLE RESISTANCE (25% DAMAGE)!', '#8A2BE2');
       break;
     case 'red':
       adaptColor = '#FF1144';
-      fighter.gojoRedDodgeReady = false; // Tanks Red instead of teleport-dodging away, with 50% damage reduction
-      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: RED TANK (50% REDUCED)!', '#FF1144');
+      fighter.gojoRedDodgeReady = false; // Tanks Red instead of teleport-dodging away, with 25% damage taken (75% reduction)
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: RED TANK (25% DAMAGE)!', '#FF1144');
       break;
     case 'blue':
       adaptColor = '#00FFFF';
@@ -756,6 +763,7 @@ export function applyGojoAdaptation(fighter, gojoType) {
   const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
   const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
   audioSystem.playSFX(tpSnd, tpVol);
+  applyWheelClickBuff(fighter);
 }
 
 /**
@@ -778,7 +786,7 @@ export function handleInfinityFreeze(fighter) {
       fighter.infinityFreezeCount = (fighter.infinityFreezeCount || 0) + 1;
 
       const configCount = mahoragaAdaptationConfig.gojo?.infinity?.requiredFreezes;
-      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 10);
+      const freezesNeeded = CONFIG.mahoraga?.infinityAdaptFreezeCount ?? configCount ?? 10;
       
       if (!fighter.gojoInfinityImmune && fighter.infinityFreezeCount >= freezesNeeded) {
         fighter._lastGojoHitType = 'infinity';
@@ -834,7 +842,7 @@ export function applySukunaAdaptation(fighter, sukunaType) {
     case 'divineFlame':
       adaptColor = '#FF6F00'; // Orange
       fighter.sukunaFugaDodgeReady = false;
-      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: FUGA RESISTANCE (50% REDUCED)!', '#FF6F00');
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: FUGA RESISTANCE (25% DAMAGE)!', '#FF6F00');
       break;
   }
 
@@ -852,6 +860,7 @@ export function applySukunaAdaptation(fighter, sukunaType) {
   const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
   const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
   audioSystem.playSFX(tpSnd, tpVol);
+  applyWheelClickBuff(fighter);
 }
 
 /**
@@ -917,7 +926,7 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     if (!fighter.adapted) fighter.adapted = {};
     fighter.adapted.melee = true;
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: LAWNMOWER!', color || '#DC2626');
-    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Lawnmower Damage Reduction!', '#FFFFFF');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 75% Lawnmower Damage Reduction!', '#FFFFFF');
   } else if (skillShotId === 'crazyDaveSnowPea') {
     fighter.adaptedSnowPea = true;
     fighter.iceFreezeTimer = 0;
@@ -932,7 +941,7 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     fighter.skillDodgeReady['genosBeam'] = false;
     fighter.skillDodgeReady['incinerationCannon'] = false;
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: INCINERATION CANNON!', color || '#FF5500');
-    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Beam Damage Reduction!', '#FFFFFF');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 75% Beam Damage Reduction!', '#FFFFFF');
   } else if (skillShotId === 'genosMachineBlow' || skillShotId === 'genosFlurry') {
     fighter.adaptedGenosFlurry = true;
     fighter.adaptedGenosMachineBlow = true;
@@ -941,10 +950,10 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     fighter.adapted.melee = true;
     fighter.skillDodgeReady['genosMachineBlow'] = false;
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: MACHINE GUN BLOWS!', color || '#FF5500');
-    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Flurry Damage Reduction!', '#FFFFFF');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 75% Flurry Damage Reduction!', '#FFFFFF');
   } else if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: GETSUGA TENSHO!', color || '#FF1E32');
-    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Damage Reduction & Paralyze Immune!', '#FFFFFF');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 75% Damage Reduction & Paralyze Immune!', '#FFFFFF');
   } else if (skillShotId === 'pureLoveBeam') {
     fighter.adaptedPureLoveBeam = true;
     fighter.caughtInPureLoveBeam = false;
@@ -956,7 +965,7 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     fighter.adapted.skill = true;
     fighter.skillDodgeReady['pureLoveBeam'] = false;
     spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: PURE LOVE BEAM!', color || '#FF1493');
-    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Beam Damage Reduction & Stun Immune!', '#FFFFFF');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 75% Beam Damage Reduction & Stun Immune!', '#FFFFFF');
   } else if (skillShotId === 'saitamaCounter') {
     fighter.adaptedSaitamaCounter = true;
     if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
@@ -988,13 +997,14 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Immune to Soul Disfigurement debuffs!', '#FFFFFF');
   } else {
     const displayName = skillShotId.toUpperCase().replace('_', ' ');
-    spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} RESISTANCE (50% REDUCED)!`, color);
+    spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} RESISTANCE (25% DAMAGE)!`, color);
   }
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
   const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
   const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
   audioSystem.playSFX(tpSnd, tpVol);
+  applyWheelClickBuff(fighter);
 }
 
 /**
@@ -1066,6 +1076,7 @@ export function adaptToPureLoveBeam(fighter) {
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
 
   applyRCTHeal(fighter);
+  applyWheelClickBuff(fighter);
 
   // ── COUNTER BLITZ: TELEPORT BEHIND ENEMY ONLY WHEN ENEMY IS NOT ACTIVELY FIRING A BEAM ──
   const opponent = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0) : null;
@@ -1074,7 +1085,7 @@ export function adaptToPureLoveBeam(fighter) {
     opponent.isChannelingDomain || opponent.domainActive
   );
 
-  if (opponent && !isEnemyFiringBeam && !fighter.isDraggedByGetsuga && !(typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) {
+  if (opponent && !isEnemyFiringBeam && !(typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) {
     const oldX = fighter.x;
     const oldY = fighter.y;
     const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
@@ -1173,6 +1184,7 @@ export function adaptToYutaFlurry(fighter) {
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
 
   applyRCTHeal(fighter);
+  applyWheelClickBuff(fighter);
 }
 
 /**
@@ -1238,6 +1250,7 @@ export function adaptToThinIceBreaker(fighter) {
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
 
   applyRCTHeal(fighter);
+  applyWheelClickBuff(fighter);
 }
 
 /**
@@ -1311,6 +1324,7 @@ export function adaptToSoulDisfigurement(fighter) {
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
 
   applyRCTHeal(fighter);
+  applyWheelClickBuff(fighter);
 }
 
 /**
@@ -1382,6 +1396,7 @@ export function adaptToSaitamaCounter(fighter, attacker) {
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
 
   applyRCTHeal(fighter);
+  applyWheelClickBuff(fighter);
 }
 
 export function applyRCTHeal(fighter) {
@@ -1423,3 +1438,17 @@ export function applyRCTHeal(fighter) {
   const enhVol = CONFIG.mahoraga?.soundVolumes?.wheelEnhance ?? 0.85;
   audioSystem.playSFX(enhSnd, enhVol);
 }
+
+/**
+ * Applies a temporary double damage buff to Mahoraga whenever the wheel clicks.
+ * Also triggers sword golden glow visual.
+ */
+export function applyWheelClickBuff(fighter) {
+  if (!fighter || fighter.hp <= 0 || fighter.dead || fighter.isDead) return;
+  const duration = CONFIG.mahoraga?.wheelDoubleDamageDurationFrames ?? CONFIG.mahoraga?.wheelDoubleDamageDuration ?? 240;
+  fighter.wheelDoubleDamageTimer = duration;
+  fighter.wheelDoubleDamageMaxTimer = duration;
+  const wheelY = fighter.y - fighter.r - 28;
+  spawnFloatingText(fighter.x, wheelY - 48, '⚔️ 2X SWORD DAMAGE!', '#FFD700');
+}
+

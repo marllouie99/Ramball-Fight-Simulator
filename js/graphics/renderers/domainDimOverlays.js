@@ -3273,11 +3273,20 @@ export function drawJohnWickAssassinationDimScreen() {
 
 let currentZenitsuChannelDimOpacity = 0;
 
+export function getZenitsuChannelDimOpacity() {
+  return currentZenitsuChannelDimOpacity;
+}
+
+export function resetZenitsuChannelDimOpacity() {
+  currentZenitsuChannelDimOpacity = 0;
+}
+
 /**
  * Smoothly dims the screen while Zenitsu channels his ultimate-tier wind-up
- * (Thunderclap and Flash stance channel, or Flaming Thunder God if enabled).
- * Dim ramps in with an eased curve as the channel progresses, keeps Zenitsu in a
- * crisp electric-yellow spotlight, and eases out smoothly once the dash is released or interrupted.
+ * and unleashes all consecutive godspeed lightning dashes (Thunderclap and Flash).
+ * Dim ramps in with an eased curve as the channel progresses, stays locked at full intensity
+ * across all consecutive thunderclap dashes, and only begins fading out when all
+ * thunderclapDashCount dashes were fully executed (or on interrupt/death).
  */
 export function drawZenitsuChannelDimScreen() {
   if (typeof state !== 'undefined' && state.disableDimEffects) {
@@ -3287,24 +3296,40 @@ export function drawZenitsuChannelDimScreen() {
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
-  const zenitsu = state.fighters?.find(f =>
+  const activeZenitsu = state.fighters?.find(f =>
     f && f.hp > 0 && !f.isDead &&
     (f.characterId === 'zenitsu' || f.type === 'zenitsu' || f._def?.id === 'zenitsu' || f._def?.type === 'zenitsu') &&
-    (f.isChannelingThunderclap || f.isChannelingFlamingThunderGod)
+    (
+      f.isChannelingThunderclap ||
+      f.isChannelingFlamingThunderGod ||
+      f.isExecutingThunderclapDashes ||
+      ((f.isDashingThunderclap || (f.thunderclapDashPauseTimer && f.thunderclapDashPauseTimer > 0)) && !f.isBasicDash)
+    )
   );
+
+  const fallbackZenitsu = state.fighters?.find(f =>
+    f && (f.characterId === 'zenitsu' || f.type === 'zenitsu' || f._def?.id === 'zenitsu' || f._def?.type === 'zenitsu')
+  );
+
+  const zenitsu = activeZenitsu || fallbackZenitsu;
 
   const zCfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : {};
   const maxDimAlpha = zCfg.channelDimOpacity !== undefined ? zCfg.channelDimOpacity : 0.62;
 
   let targetOpacity = 0;
-  if (zenitsu) {
-    const total = Math.max(1, zenitsu.thunderclapChannelDuration || zCfg.thunderclapChannelDuration || 60);
-    const remaining = Math.max(0, zenitsu.thunderclapChannelTimer || 0);
-    const progress = Math.min(1, Math.max(0, 1 - remaining / total));
-    targetOpacity = maxDimAlpha * Math.sin(progress * Math.PI * 0.5);
+  if (activeZenitsu) {
+    if (activeZenitsu.isChannelingThunderclap) {
+      const total = Math.max(1, activeZenitsu.thunderclapChannelDuration || zCfg.thunderclapChannelDuration || 60);
+      const remaining = Math.max(0, activeZenitsu.thunderclapChannelTimer || 0);
+      const progress = Math.min(1, Math.max(0, 1 - remaining / total));
+      targetOpacity = maxDimAlpha * Math.sin(progress * Math.PI * 0.5);
+    } else {
+      // Hold full dim intensity throughout all consecutive thunderclap dashes until every dash is executed
+      targetOpacity = maxDimAlpha;
+    }
   }
 
-  // Smooth ease-in while channeling, slower ease-out after release/interrupt
+  // Smooth ease-in while channeling (0.10), slower smooth ease-out after all dashes are executed (0.07)
   const lerp = targetOpacity > currentZenitsuChannelDimOpacity ? 0.10 : 0.07;
   currentZenitsuChannelDimOpacity += (targetOpacity - currentZenitsuChannelDimOpacity) * lerp;
 

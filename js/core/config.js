@@ -50,6 +50,7 @@ import { enderDragonConfig } from '../configs/characters/enderDragonConfig.js';
 import { knightConfig } from '../configs/characters/knightConfig.js';
 import { spartanConfig } from '../configs/characters/spartanConfig.js';
 import { gutsConfig } from '../configs/characters/gutsConfig.js';
+import { chosoConfig } from '../configs/characters/chosoConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { interactionConfigs } from '../configs/interactions/index.js';
@@ -139,6 +140,8 @@ export const CONFIG = {
   guts: gutsConfig,
   Guts: gutsConfig,
   berserker: gutsConfig,
+  choso: chosoConfig,
+  Choso: chosoConfig,
   camera: {
     minZoom: 0.65,
     maxZoom: 1.18,
@@ -1963,6 +1966,30 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: gutsConfig.ability || 'Dragon Slayer & Berserker Armor',
     desc: gutsConfig.desc || 'Wielder of the monstrous 400-pound Dragon Slayer. Struggles against fate with unyielding poise, a high-explosive arm cannon, and the dwarf-forged Berserker Armor.',
+  },
+  {
+    id: 61,
+    name: 'CHOSO',
+    displayName: 'CHOSO',
+    category: 'Anime',
+    color: chosoConfig.color || '#A31D1D',
+    themeColor: chosoConfig.themeColor || '#A31D1D',
+    secondaryColor: chosoConfig.secondaryColor || '#FF2A55',
+    startX: 300,
+    startY: 250,
+    startVx: 1.1,
+    startVy: 1.1,
+    radius: chosoConfig.radius || chosoConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'choso',
+    hp: chosoConfig.hp || 420,
+    damage: chosoConfig.damage || 22,
+    cooldown: chosoConfig.cooldown || 36,
+    moveSpeed: chosoConfig.moveSpeed || chosoConfig.speed || 5.3,
+    projectileSpeedMultiplier: 1.0,
+    ability: chosoConfig.ability || 'Blood Manipulation: Crimson Laser Matrix',
+    desc: chosoConfig.desc || 'Eldest brother of the Cursed Womb: Death Paintings from Jujutsu Kaisen. Converts cursed energy into inexhaustible blood reserves, seeds the arena with poisonous blood droplets, and transmutates all blood particles into a deadly multi-angle piercing laser crossfire grid.',
   }
 ];
 

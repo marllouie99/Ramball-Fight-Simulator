@@ -40,6 +40,7 @@ import { drawNanamiSkin, _drawNanamiHair, _getNanamiHairImage } from '../fighter
 import { drawMahitoSkin, _drawMahitoHair, _getMahitoHairImage } from '../fighters/mahitoSkin.js';
 import { drawNaoyaSkin, _drawNaoyaHair, _getNaoyaHairImage } from '../fighters/naoyaSkin.js';
 import { drawMakiSkin, _drawMakiHair, _getMakiHairImage } from '../fighters/makiSkin.js';
+import { drawChosoSkin, _drawChosoHair, _getChosoHairImage } from '../fighters/chosoSkin.js';
 import { drawGenosSkin, drawGenosHands, _drawGenosHair, _getGenosHairImage } from '../fighters/genosSkin.js';
 import { drawEscanorSkin, _drawEscanorHair, _getEscanorHairImage } from '../fighters/escanorSkin.js';
 import { drawEngineerSkin, _drawEngineerHair, _getEngineerHairImage } from '../fighters/engineerSkin.js';
@@ -134,7 +135,7 @@ let _copyToastTimer = 0;
 // Fighter Category Tabs in Skin Studio Modal
 export const SKIN_STUDIO_CATEGORIES = [
   { id: 'ALL', label: 'ALL', filter: () => true },
-  { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito', 'naoya', 'maki'].includes(f.key) },
+  { id: 'JJK', label: 'JJK', filter: (f) => ['ichigo', 'gojo', 'sukuna', 'yuji', 'yuta', 'toji', 'todo', 'nanami', 'mahito', 'naoya', 'maki', 'choso'].includes(f.key) },
     { id: 'NGNL', label: 'NGNL', filter: (fighter) => fighter.key === 'shiro' },
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
@@ -563,6 +564,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     themeColor: '#014913ff',
     forms: [
       { id: 'default', label: 'AWAKENED' }
+    ]
+  },
+  {
+    key: 'choso',
+    label: 'CHOSO',
+    asset: 'Choso-hair.png',
+    assetDims: '1200 x 900',
+    baseW: 3.05,
+    baseH: 2.20,
+    baseCrownY: -1.35,
+    visW: 1000,
+    visH: 750,
+    centerX: 600,
+    topY: 50,
+    themeColor: '#A31D1D',
+    forms: [
+      { id: 'default', label: 'BLOOD MANIPULATION' }
     ]
   },
   {
@@ -1554,6 +1572,8 @@ export function drawSkinStudioScreen() {
         drawNaoyaSkin(ctx, dummyFighter);
       } else if (fDef.key === 'maki') {
         drawMakiSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'choso') {
+        drawChosoSkin(ctx, dummyFighter);
       } else if (fDef.key === 'genos') {
         drawGenosSkin(ctx, dummyFighter);
         drawGenosHands(ctx, dummyFighter);

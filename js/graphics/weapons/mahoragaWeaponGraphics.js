@@ -716,6 +716,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 
       const totalStages = ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0));
       const isLevel8 = totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted;
+      const isDoubleDamage = Boolean(fighterObj && (fighterObj.wheelDoubleDamageTimer > 0));
 
       const P = 2.0; // Discrete pixel art grid unit matching Ichigo & Saitama
       const snap = (v) => Math.round(v / P) * P;
@@ -790,6 +791,16 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
             } else {
               col = '#8B0000';
             }
+          } else if (isDoubleDamage) {
+            if (depthFromApex < P * 1.4) {
+              col = '#FFFFFF';
+            } else if (depthFromApex < P * 3.0) {
+              col = '#FFF176';
+            } else if (depthFromApex < P * 5.5) {
+              col = '#FFD54F';
+            } else {
+              col = '#FF8F00';
+            }
           } else {
             if (depthFromApex < P * 1.4) {
               col = '#FFFFEE';
@@ -808,14 +819,14 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       }
 
       // Trailing Divine / Fiery Pixel Sparks
-      const numEmbers = isLevel8 ? 8 : 5;
+      const numEmbers = isLevel8 ? 8 : (isDoubleDamage ? 7 : 5);
       for (let eb = 0; eb < numEmbers; eb++) {
         const ebT = (eb / numEmbers + (Date.now() / 250)) % 1.0;
         const ebAng = currentTailOffset + ebT * span;
         const ebDist = outerRadius - 8 - eb * 3.5;
         const ex = snap(Math.cos(ebAng) * ebDist);
         const ey = snap(Math.sin(ebAng) * ebDist);
-        const col = isLevel8 ? ((eb % 2 === 0) ? '#FF4500' : '#FFFFFF') : ((eb % 2 === 0) ? '#FFD700' : '#FFFFFF');
+        const col = isLevel8 ? ((eb % 2 === 0) ? '#FF4500' : '#FFFFFF') : (isDoubleDamage ? ((eb % 2 === 0) ? '#FFF176' : '#FFD700') : ((eb % 2 === 0) ? '#FFD700' : '#FFFFFF'));
 
         ctx.fillStyle = col;
         ctx.fillRect(ex, ey, P, P);
@@ -1035,27 +1046,32 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 
     const totalStages = fighterObj ? ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0)) : 0;
     const isLevel8 = fighterObj && (totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted || (fighterObj.goldStages >= 8));
+    const isDoubleDamage = Boolean(fighterObj && (fighterObj.wheelDoubleDamageTimer > 0));
+    const isGoldenSword = isLevel8 || isDoubleDamage;
 
     // Build blade pixel map — tapered diamond blade shape
     // Blade extends from x=1 to x=bladeLength, width from -bladeWidth/2 to +bladeWidth/2
     const halfW = bladeWidth / 2;
     const taperStart = bladeLength - 16; // Point where blade starts narrowing to tip
 
-    // Level 8 Golden Aura (outer glow pixels)
-    if (isLevel8) {
-      const auraExpand = 3;
-      for (let bx = -1; bx <= bladeLength + 5; bx += sP) {
+    // Golden Aura (outer glow pixels when double damage active or Level 8)
+    if (isGoldenSword) {
+      const auraExpand = isDoubleDamage ? 4.0 : 3.0;
+      const pulse = isDoubleDamage ? (0.75 + 0.25 * Math.sin(Date.now() / 90)) : 1.0;
+      for (let bx = -2; bx <= bladeLength + 6; bx += sP) {
         let maxHalfW;
         if (bx < 1) maxHalfW = halfW + auraExpand;
         else if (bx < taperStart) maxHalfW = halfW + auraExpand - (bx / taperStart) * 1;
         else {
-          const tipT = (bx - taperStart) / (bladeLength + 5 - taperStart);
+          const tipT = (bx - taperStart) / (bladeLength + 6 - taperStart);
           maxHalfW = (halfW + auraExpand) * (1 - tipT);
         }
         for (let by = -maxHalfW; by <= maxHalfW; by += sP) {
           const px = sSnap(bx);
           const py = sSnap(by);
-          ctx.fillStyle = 'rgba(255, 215, 0, 0.35)';
+          const distNorm = Math.abs(by) / Math.max(1, maxHalfW);
+          const alpha = ((0.55 - distNorm * 0.28) * pulse).toFixed(2);
+          ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
           ctx.fillRect(px - sP * 0.5, py - sP * 0.5, sP, sP);
         }
       }
@@ -1083,17 +1099,17 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
         let pixColor;
         if (normY > 0.85) {
           // Border edge
-          pixColor = isLevel8 ? '#B78103' : '#000000';
+          pixColor = isGoldenSword ? '#D4A017' : '#000000';
         } else if (normY < 0.25 && normX < 0.62) {
           // Central bevel inset (dark core)
-          pixColor = isLevel8 ? '#4E342E' : '#22252A';
+          pixColor = isGoldenSword ? '#78350F' : '#22252A';
         } else if (normY < 0.08) {
-          // Ridge spine center line
-          pixColor = isLevel8 ? '#FFF8E1' : '#FFFFFF';
+          // Ridge spine center line (radiant pure white-gold glint)
+          pixColor = isGoldenSword ? '#FFFBE6' : '#FFFFFF';
         } else {
           // Main blade surface
-          if (isLevel8) {
-            pixColor = normY < 0.4 ? '#FFEE58' : (normY < 0.65 ? '#FFD54F' : '#FFA000');
+          if (isGoldenSword) {
+            pixColor = normY < 0.4 ? '#FFF176' : (normY < 0.65 ? '#FFD54F' : '#FFA000');
           } else {
             pixColor = normY < 0.3 ? '#FFFFFF' : (normY < 0.5 ? '#E2E8F0' : (normY < 0.7 ? '#CBD5E1' : '#94A3B8'));
           }
@@ -1113,7 +1129,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
         edgeHalfW = (halfW - 1) * (1 - tipT);
       }
       const px = sSnap(bx);
-      const borderColor = isLevel8 ? '#B78103' : '#000000';
+      const borderColor = isGoldenSword ? '#D4A017' : '#000000';
       // Top edge
       ctx.fillStyle = borderColor;
       ctx.fillRect(px - sP * 0.5, sSnap(-edgeHalfW) - sP * 0.5, sP, sP);
@@ -1123,8 +1139,22 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 
     // Base cap (left edge of blade)
     for (let by = -halfW; by <= halfW; by += sP) {
-      ctx.fillStyle = isLevel8 ? '#B78103' : '#000000';
+      ctx.fillStyle = isGoldenSword ? '#D4A017' : '#000000';
       ctx.fillRect(sSnap(1) - sP * 0.5, sSnap(by) - sP * 0.5, sP, sP);
+    }
+
+    // Golden sparks around the blade during double damage / golden sword mode
+    if (isGoldenSword) {
+      const now = Date.now();
+      const sparkCount = isDoubleDamage ? 6 : 3;
+      for (let i = 0; i < sparkCount; i++) {
+        const seed = (now * 0.003 + i * 1.618) % 1;
+        const sparkX = sSnap(10 + seed * (bladeLength - 14));
+        const sparkY = sSnap(Math.sin(now * 0.005 + i * 2.3) * (halfW + 4));
+        const sparkAlpha = Math.max(0.2, (0.4 + 0.6 * Math.sin(now * 0.01 + i))).toFixed(2);
+        ctx.fillStyle = `rgba(255, 235, 59, ${sparkAlpha})`;
+        ctx.fillRect(sparkX - sP * 0.5, sparkY - sP * 0.5, sP, sP);
+      }
     }
 
     ctx.restore();

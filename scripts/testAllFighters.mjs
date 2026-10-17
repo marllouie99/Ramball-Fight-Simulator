@@ -6592,7 +6592,8 @@ async function main() {
       throw new Error(`Played 'youwin' audio on 1 win in 1v1 mode!`);
     }
 
-    // Round 2 end: 2 wins in 1v1 -> MUST play youwin audio after death audio finishes (timer >= 45)
+    // Round 2 end: 2 wins in 1v1
+    // Step 2a: At timer = 45 (while faah.mp3 is still playing), youwin MUST NOT play yet!
     state.gameState = 'matchEnd';
     state.matchWinner = state.fighters[0];
     state.roundNum = 2;
@@ -6601,16 +6602,24 @@ async function main() {
     state._hasPlayedChampionYouWinVoice = false;
     playedSounds = [];
     drawRoundEndScreen();
-    if (!playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
-      throw new Error(`Failed to play 'youwin' audio when fighter won 2 times in 1v1 mode!`);
+    if (playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
+      throw new Error(`Played 'youwin' audio too early while faah.mp3 was still playing (timer = 45)!`);
     }
 
-    // 2. Stand Off Mode: 1 round -> MUST play youwin audio on 1st win after death audio
+    // Step 2b: At timer = 120 (faah.mp3 finished completely), youwin MUST play!
+    state.roundEndTimer = 120;
+    playedSounds = [];
+    drawRoundEndScreen();
+    if (!playedSounds.some(s => typeof s === 'string' && s.includes('you-win'))) {
+      throw new Error(`Failed to play 'youwin' audio when faah finished at frame 120 in 1v1 mode!`);
+    }
+
+    // 2. Stand Off Mode: 1 round -> MUST play youwin audio at frame 120 after faah death audio finishes
     state.mode = 'Stand Off';
     state.roundNum = 1;
     state.scores = [1, 0];
-    state.roundEndTimer = 45;
-    state.matchEndTimer = 45;
+    state.roundEndTimer = 120;
+    state.matchEndTimer = 120;
     state.matchWinner = state.fighters[0];
     state.roundWinner = state.fighters[0];
     state.gameState = 'matchEnd';
@@ -6621,12 +6630,12 @@ async function main() {
       throw new Error(`Failed to play 'youwin' audio on match end in Stand Off mode!`);
     }
 
-    // 3. 1v2 Stand Off Mode: 1 round -> MUST play youwin audio on match win after death audio
+    // 3. 1v2 Stand Off Mode: 1 round -> MUST play youwin audio at frame 120 after faah death audio finishes
     state.mode = '1v2 Stand Off';
     state.roundNum = 1;
     state.teamScores = [1, 0];
-    state.roundEndTimer = 45;
-    state.matchEndTimer = 45;
+    state.roundEndTimer = 120;
+    state.matchEndTimer = 120;
     state.matchWinner = state.fighters[0];
     state.roundWinner = state.fighters[0];
     state.gameState = 'matchEnd';
@@ -6637,12 +6646,12 @@ async function main() {
       throw new Error(`Failed to play 'youwin' audio on match end in 1v2 Stand Off mode!`);
     }
 
-    // 4. FFA Mode: 1 round -> MUST play youwin audio on match win after death audio
+    // 4. FFA Mode: 1 round -> MUST play youwin audio at frame 120 after faah death audio finishes
     state.mode = 'FFA';
     state.roundNum = 1;
     state.scores = [1, 0, 0, 0];
-    state.roundEndTimer = 45;
-    state.matchEndTimer = 45;
+    state.roundEndTimer = 120;
+    state.matchEndTimer = 120;
     state.matchWinner = state.fighters[0];
     state.roundWinner = state.fighters[0];
     state.ffaMatchComplete = true;
@@ -7071,7 +7080,8 @@ async function main() {
     ichigo.hp = preHollowHp;
     ichigo.activateHollowMask();
 
-    const expectedHealedHp = Math.min(ichigo.maxHp, preHollowHp + Math.round(ichigo.maxHp * 0.50));
+    const healRatio = CONFIG.ichigo?.hollowHpRecovery ?? CONFIG.ichigo?.hollowHealPercent ?? 0.50;
+    const expectedHealedHp = Math.min(ichigo.maxHp, preHollowHp + Math.round(ichigo.maxHp * healRatio));
     if (ichigo.hp !== expectedHealedHp) {
       throw new Error(`Expected Ichigo HP to recover to ${expectedHealedHp}, got ${ichigo.hp}`);
     }
@@ -10146,20 +10156,79 @@ async function main() {
       throw new Error('Expected dummyEnemy to receive stun / paralyze debuff on Skill 1 hit');
     }
 
+    // 11.6.4.1 Zenitsu Screen Dim Hold Across All Dashes & Fadeout Test
+    const { drawZenitsuChannelDimScreen, getZenitsuChannelDimOpacity, resetZenitsuChannelDimOpacity } = await import('../js/graphics/draw.js');
+    resetZenitsuChannelDimOpacity();
+    state.fighters = [zenitsu, dummyEnemy];
+
+    // Ramp up dim during channeling
+    zenitsu.isChannelingThunderclap = true;
+    zenitsu.thunderclapChannelDuration = 30;
+    zenitsu.thunderclapChannelTimer = 0; // Fully charged
+    mockCtx.resetStackDepth();
+    for (let c = 0; c < 20; c++) {
+      drawZenitsuChannelDimScreen();
+    }
+    assertCanvasStackBalance('drawZenitsuChannelDimScreen during channel');
+    const chargedDimOpacity = getZenitsuChannelDimOpacity();
+    if (chargedDimOpacity < 0.50) {
+      throw new Error(`Expected Zenitsu channel dim opacity to ramp up (>= 0.50), got ${chargedDimOpacity}`);
+    }
+
+    // Start multi-dash execution: dim must NOT fade out during dashes!
+    zenitsu._executeThunderclapDash(dummyEnemy);
+    if (!zenitsu.isExecutingThunderclapDashes) {
+      throw new Error('Expected isExecutingThunderclapDashes to be true upon unleashing thunderclap dash');
+    }
+
     // Simulate all dashes + pauses (dynamically accounts for configured dash count, duration, and pause frames)
     const totalDashes = zenitsu.thunderclapTotalDashes || cfg.thunderclapDashCount || 4;
     const dashDuration = cfg.thunderclapDashDuration || 5;
     const pauseFrames = cfg.thunderclapDashPauseFrames !== undefined ? cfg.thunderclapDashPauseFrames : 2;
     const totalSimFrames = (totalDashes * dashDuration) + ((totalDashes - 1) * pauseFrames) + 15;
+    let checkedMidDashDim = false;
+
     for (let f = 0; f < totalSimFrames; f++) {
       mockCtx.resetStackDepth();
       drawZenitsuSkin(mockCtx, zenitsu);
       assertCanvasStackBalance(`drawZenitsuSkin during consecutive multi-dash frame ${f}`);
+
+      mockCtx.resetStackDepth();
+      drawZenitsuChannelDimScreen();
+      assertCanvasStackBalance(`drawZenitsuChannelDimScreen during multi-dash frame ${f}`);
+
+      if (zenitsu.isExecutingThunderclapDashes) {
+        const currentOpacity = getZenitsuChannelDimOpacity();
+        if (currentOpacity < 0.50) {
+          throw new Error(`Zenitsu dim effect faded out prematurely during dash execution (frame ${f})! Opacity: ${currentOpacity}`);
+        }
+        checkedMidDashDim = true;
+      }
+
       zenitsu.update(null, 0, state.arena);
+    }
+    if (!checkedMidDashDim) {
+      throw new Error('Expected to verify mid-dash dim opacity while isExecutingThunderclapDashes was true');
+    }
+    if (zenitsu.isExecutingThunderclapDashes) {
+      throw new Error('Expected isExecutingThunderclapDashes to be false after all dashes are completed');
     }
     if (zenitsu.isDashingThunderclap || zenitsu.thunderclapDashPauseTimer > 0) {
       throw new Error(`Expected Zenitsu ${totalDashes} consecutive dashes and pauses to be completed after ${totalSimFrames} frames`);
     }
+
+    // After all dashes are executed: verify dim effect fades out smoothly to 0
+    const postDashOpacity = getZenitsuChannelDimOpacity();
+    for (let fade = 0; fade < 60; fade++) {
+      mockCtx.resetStackDepth();
+      drawZenitsuChannelDimScreen();
+      assertCanvasStackBalance(`drawZenitsuChannelDimScreen post-dash fadeout frame ${fade}`);
+    }
+    const finalOpacity = getZenitsuChannelDimOpacity();
+    if (finalOpacity >= postDashOpacity || finalOpacity > 0.05) {
+      throw new Error(`Expected Zenitsu dim effect to fade out after all dashes were executed! Initial: ${postDashOpacity}, Final: ${finalOpacity}`);
+    }
+
     if (!Array.isArray(zenitsu.thunderclapDashVFXList) || zenitsu.thunderclapDashVFXList.length === 0) {
       throw new Error('Expected active dash VFX trails in thunderclapDashVFXList');
     }
@@ -11697,6 +11766,9 @@ async function main() {
     if (!CONFIG.zenitsu?.sounds?.thunderStrike || CONFIG.zenitsu.sounds.thunderStrike !== 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3') {
       throw new Error(`CONFIG.zenitsu.sounds.thunderStrike is missing or incorrect! Got: ${CONFIG.zenitsu?.sounds?.thunderStrike}`);
     }
+    if (!CONFIG.zenitsu?.sounds?.basicDash || CONFIG.zenitsu.sounds.basicDash !== 'Assets/Sound Effects/Skills/Zenitsu-dash2.mp3') {
+      throw new Error(`CONFIG.zenitsu.sounds.basicDash is missing or incorrect! Got: ${CONFIG.zenitsu?.sounds?.basicDash}`);
+    }
     if (!CONFIG.zenitsu?.sounds?.dashSFX || !CONFIG.zenitsu?.sounds?.katanaSwing || !CONFIG.zenitsu?.sounds?.slashHit) {
       throw new Error(`CONFIG.zenitsu.sounds is missing required audio mappings!`);
     }
@@ -11709,6 +11781,24 @@ async function main() {
     zenitsu._startThunderclapDashStep(dummyOpponent, 0);
     zenitsu._finalizeThunderclapDashStep(dummyOpponent, 300, 250, 400, 250, 0, 0, false);
     zenitsu._finalizeThunderclapDashStep(dummyOpponent, 300, 250, 400, 250, 0, 3, true);
+
+    // Verify basic attack dash plays Zenitsu-dash2.mp3 on impact
+    const playedSounds = [];
+    const origPlaySFX = audioSystem.playSFX;
+    try {
+      audioSystem.playSFX = (...args) => {
+        playedSounds.push(args[0]);
+        return origPlaySFX ? origPlaySFX.apply(audioSystem, args) : null;
+      };
+      zenitsu.isBasicDash = true;
+      zenitsu._finalizeThunderclapDashStep(dummyOpponent, 300, 250, 400, 250, 0, 0, true);
+    } finally {
+      audioSystem.playSFX = origPlaySFX;
+    }
+    if (!playedSounds.includes('Assets/Sound Effects/Skills/Zenitsu-dash2.mp3')) {
+      throw new Error('Expected Zenitsu basic attack dash to play Assets/Sound Effects/Skills/Zenitsu-dash2.mp3 on impact!');
+    }
+
     zenitsu.isDashingThunderclap = false;
     zenitsu._fadeOutIntermediateDashAudio(100);
     if (zenitsu._intermediateDashSounds.length !== 0) {

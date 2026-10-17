@@ -52,7 +52,7 @@ export const sansConfig = {
   damageStaminaCostMultiplier: 0.10, // Dynamic stamina cost ratio: 10% of incoming attack damage (e.g. 100 dmg -> 10 stamina)
   minDodgeStaminaCost: 1,     // Minimum stamina cost per dodge (1 stamina)
   domainDodgeStaminaCost: 1,  // Special Interaction: Stamina/Mana cost is 1 only when Sukuna's domain is open!
-  dodgeStaminaRegen: 0.05,    // Stamina recovery per frame (~10/sec)
+  dodgeStaminaRegen: 0.07,    // Stamina recovery per frame (~10/sec)
   dodgeStaminaRegenDelay: 20, // "Catch Breath" delay: frames after dodging before stamina begins recovering (~0.83s at 60fps)
   dodgeCooldown: 0,           // Min frames between consecutive dodges
   shotgunDodgeGraceWindow: 16,// Grace window (frames) where subsequent pellets from a shotgun spread/volley cost 0 stamina
@@ -74,11 +74,18 @@ export const sansConfig = {
 
   // Skill 1: Gaster Blaster Arsenal (3 Authentic Undertale Patterns)
   enableGasterBlaster: true,
-  blasterCooldown: 500,        // ~5.3s cooldown
+  blasterCooldown: 300,        // ~5.3s cooldown
   initialBlasterCooldown: 320, // Initial cooldown at round start (~3.0s at 60fps) before first Gaster Blaster barrage
   blasterInitialCooldown: 180, // Alias for initialBlasterCooldown
   blasterStaminaCost: 15,      // Stamina exhaustion cost per Gaster Blaster barrage (25 / 100 Stamina)
   blasterHpCost: 0,            // Deprecated: Stamina is consumed instead of HP
+  
+  // Stamina Recovery on Gaster Blaster Hit
+  blasterStaminaRecoverOnHit: 1,        // Stamina recovered on first impact hit per blaster
+  blasterHitStaminaRecover: 1,          // Backward-compatibility alias
+  blasterContinuousStaminaRecover: 1,   // Stamina recovered on continuous beam contact ticks
+  blasterGigaStaminaRecoverOnHit: 2,    // Stamina recovered on Gigablaster first impact
+  blasterGigaContinuousStaminaRecover: 1, // Stamina recovered on Gigablaster continuous tick
   
   // General Beam Dimension & Height Tuning
   blasterBeamHeight: 36,       // Standard Gaster Blaster beam thickness / vertical height (pixels)
@@ -128,6 +135,8 @@ export const sansConfig = {
   // Skill 2: Bone Zone & Rising Spears
   enableBoneZone: true,
   boneZoneCooldown: 240,       // ~4.0s cooldown
+  initialBoneZoneCooldown: 240,// Initial cooldown at round start (~3.0s at 60fps) before first Bone Zone wave
+  boneZoneInitialCooldown: 180,// Alias for initialBoneZoneCooldown
   boneCount: 6,
   boneSpeed: 7.5,
   boneDamage: 5,               // 5 dmg per bone (6-bone wave = up to 30 max point blank)
@@ -141,6 +150,10 @@ export const sansConfig = {
   // Ultimate / Skill 3: Blue Soul Gravity Slam ("Bad Time")
   enableGravitySlam: true,
   gravitySlamCooldown: 800,    // ~9.6s cooldown
+  initialGravitySlamCooldown: 800, // Initial cooldown at round start (~8.0s at 60fps) before Bad Time / Gravity Slam
+  gravitySlamInitialCooldown: 480, // Alias for initialGravitySlamCooldown
+  initialBadTimeCooldown: 480,     // Alias for initialGravitySlamCooldown
+  badTimeInitialCooldown: 480,     // Alias for initialGravitySlamCooldown
   gravitySlamDuration: 80,     // Total channeling duration
   gravityForce: 18,            // Physics impulse slammed into walls
   gravitySlamDamage: 22,       // Balanced initial slam impact damage

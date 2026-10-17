@@ -192,7 +192,7 @@ export function updateGame() {
         state._shiroVictoryShutdown ||
         (state.fighters && state.fighters.some(f => f && (f.characterId === 'shiro' || f.type === 'shiro') && (f._hasSaidWinQuote || f.dead || f.hp <= 0)))
       );
-      const autoDelay = isRespectPlaying ? 620 : (hasOverlay ? 480 : (isDragonDying ? 340 : (isSansDying ? 340 : (isShiroDyingOrWinning ? 380 : 180))));
+      const autoDelay = isRespectPlaying ? 620 : (hasOverlay ? 480 : (isDragonDying ? 340 : (isSansDying ? 340 : (isShiroDyingOrWinning ? 380 : 200))));
       const isTodoUltPlaying = Boolean(state.fighters && state.fighters.some(f => 
         f && (f.characterId === 'todo' || f.type === 'todo') &&
         f.hp > 0 && !f.isDead && !f.dead &&
@@ -234,7 +234,7 @@ export function updateGame() {
         state._shiroVictoryShutdown ||
         (state.fighters && state.fighters.some(f => f && (f.characterId === 'shiro' || f.type === 'shiro') && (f._hasSaidWinQuote || f.dead || f.hp <= 0)))
       );
-      const matchEndAutoDelay = isRespectPlaying ? 640 : (hasOverlay ? 600 : (isDragonDying ? 360 : (isSansDying ? 360 : (isShiroDyingOrWinning ? 400 : 210))));
+      const matchEndAutoDelay = isRespectPlaying ? 640 : (hasOverlay ? 600 : (isDragonDying ? 360 : (isSansDying ? 360 : (isShiroDyingOrWinning ? 400 : 280))));
       const isTodoUltPlaying = Boolean(state.fighters && state.fighters.some(f => 
         f && (f.characterId === 'todo' || f.type === 'todo') &&
         f.hp > 0 && !f.isDead && !f.dead &&

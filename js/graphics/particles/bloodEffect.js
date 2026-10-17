@@ -497,7 +497,7 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
     const vx = Math.cos(pAngle) * speed;
     const vy = Math.sin(pAngle) * speed - (upImpulse + Math.random() * upImpulseVar);
 
-    addOrOverwriteBloodParticle({
+    const particleData = {
       x: startX,
       y: startY,
       vx: vx,
@@ -508,8 +508,20 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
       decay: decayRate,
       airResistance: physCfg.airResistance ?? 0.982,
       friction: physCfg.floorFriction ?? 0.85,
-      onGround: false
-    }, MAX_BLOOD_PARTICLES);
+      onGround: false,
+      sourceEntity: (opts && opts.sourceEntity) || entity,
+      sourceCharacterId: (opts && opts.sourceCharacterId) || entity?.characterId || null,
+      isChosoBlood: Boolean((opts && opts.isChosoBlood) || (entity && (entity.characterId === 'choso' || entity.type === 'choso')))
+    };
+
+    addOrOverwriteBloodParticle(particleData, MAX_BLOOD_PARTICLES);
+
+    const targetCallback = (opts && typeof opts.onBloodParticleSpawned === 'function')
+      ? opts.onBloodParticleSpawned
+      : (entity && typeof entity.onBloodParticleSpawned === 'function' ? entity.onBloodParticleSpawned.bind(entity) : null);
+    if (targetCallback) {
+      targetCallback(particleData);
+    }
   }
 }
 
@@ -838,6 +850,21 @@ export function updateBloodEffects() {
   const airRes = physCfg.airResistance ?? 0.982;
 
   fastCleanArray(state.bloodEffects, (effect) => {
+    // Choso Convergence / Laser Transmutation stasis: Suspends blood droplets frozen in mid-air
+    if (effect.isIgnitedAsLaser) {
+      effect.vx = 0;
+      effect.vy = 0;
+      if (effect.sprite) {
+        effect.sprite.x = effect.x;
+        effect.sprite.y = effect.y;
+        effect.sprite.width = effect.size;
+        effect.sprite.height = effect.size;
+        effect.sprite.alpha = 1.0;
+        effect.sprite.rotation = 0;
+      }
+      return true;
+    }
+
     if (!effect.onGround) {
       // 1. Natural fluid gravity arc in the air — preserve horizontal momentum
       const drag = effect.airResistance ?? airRes;

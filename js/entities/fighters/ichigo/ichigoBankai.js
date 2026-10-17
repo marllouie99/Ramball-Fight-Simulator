@@ -529,8 +529,8 @@ export function updateBankai(fighter, opponent, isMatchEnded) {
       if (distMoved > 60) {
         fighter._lastBankaiTrailX = fighter.x;
         fighter._lastBankaiTrailY = fighter.y;
-      } else if (distMoved >= 14) {
-        const steps = Math.min(4, Math.floor(distMoved / 14));
+      } else if (distMoved >= 20) {
+        const steps = Math.min(2, Math.floor(distMoved / 20));
         for (let s = 1; s <= steps; s++) {
           const t = s / steps;
           const subX = fighter._lastBankaiTrailX + (fighter.x - fighter._lastBankaiTrailX) * t;
@@ -545,9 +545,9 @@ export function updateBankai(fighter, opponent, isMatchEnded) {
             color: (Math.random() < 0.5) ? 'rgba(12, 4, 10, 0.75)' : 'rgba(220, 20, 20, 0.55)',
             strokeColor: 'rgba(220, 20, 20, 0.90)',
             isBankai: true,
-            timer: 16,
-            maxTimer: 16
-          }, 32);
+            timer: 12,
+            maxTimer: 12
+          }, 18);
         }
         fighter._lastBankaiTrailX = fighter.x;
         fighter._lastBankaiTrailY = fighter.y;

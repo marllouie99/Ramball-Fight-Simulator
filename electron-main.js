@@ -332,6 +332,7 @@ function createWindow () {
     frame: false, // Removes the Windows title bar and borders for a perfect 9:16 capture
     autoHideMenuBar: true
   });
+  win.webContents.session.clearCache();
   // win.setAspectRatio(9 / 16); // Removed to allow black bars (letterboxing) on taller window sizes
   
   // Intercept reload shortcuts to perform a clean relaunch of the process.
@@ -342,8 +343,10 @@ function createWindow () {
       const isF5 = input.key === 'F5';
       if (isF5 || (input.control && isR) || (input.meta && isR)) {
         event.preventDefault();
-        app.relaunch();
-        app.exit(0);
+        session.defaultSession.clearCache().finally(() => {
+          app.relaunch();
+          app.exit(0);
+        });
       }
 
       // F11 or Alt+Enter: Toggle standard Fullscreen

@@ -209,9 +209,9 @@ export function performShunpoGetsugaCombo(fighter, target) {
     color: (isBankai || isMask) ? 'rgba(12, 4, 10, 0.75)' : 'rgba(0, 213, 255, 0.45)',
     strokeColor: (isBankai || isMask) ? 'rgba(220, 20, 20, 0.90)' : null,
     isBankai: (isBankai || isMask),
-    timer: 16,
-    maxTimer: 16
-  }, 32);
+    timer: 12,
+    maxTimer: 12
+  }, 18);
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, isBankai ? 'TENSA SHUNPO!' : 'SHUNPO!', isBankai ? '#DC143C' : '#FFFFFF');
   fighter._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
@@ -738,7 +738,8 @@ export function updateShunpoCombat(fighter, opponent) {
     const isMask = fighter.hollowMaskActive;
     const isBankai = fighter.bankaiActive || fighter.skin === 'bankai';
     const stepDist = Math.hypot(curX - prevX, curY - prevY);
-    const subSteps = Math.max(1, Math.ceil(stepDist / 14));
+    const stepGap = 24; // Streamlined spacing matching fighter radius
+    const subSteps = Math.min(8, Math.max(1, Math.ceil(stepDist / stepGap)));
 
     for (let s = 1; s <= subSteps; s++) {
       const t = s / subSteps;
@@ -754,9 +755,9 @@ export function updateShunpoCombat(fighter, opponent) {
         color: (isBankai || isMask) ? 'rgba(12, 4, 10, 0.75)' : 'rgba(0, 213, 255, 0.45)',
         strokeColor: (isBankai || isMask) ? 'rgba(220, 20, 20, 0.90)' : null,
         isBankai: (isBankai || isMask),
-        timer: 16,
-        maxTimer: 16
-      }, 32);
+        timer: 12,
+        maxTimer: 12
+      }, 18);
     }
 
     if (fighter.shunpoDashTimer <= 0) {
@@ -1001,9 +1002,9 @@ export function updateShunpoCombat(fighter, opponent) {
             color: (isBankai || isMask) ? 'rgba(12, 4, 10, 0.75)' : 'rgba(0, 213, 255, 0.45)',
             strokeColor: (isBankai || isMask) ? 'rgba(220, 20, 20, 0.90)' : null,
             isBankai: (isBankai || isMask),
-            timer: 16,
-            maxTimer: 16
-          }, 32);
+            timer: 12,
+            maxTimer: 12
+          }, 18);
 
           spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, isBankai ? 'TENSA STEP!' : 'FLASH STEP!', isBankai ? '#DC143C' : '#00D5FF');
           fighter._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.95);
@@ -1061,9 +1062,9 @@ export function updateShunpoCombat(fighter, opponent) {
             color: (isBankai || isMask) ? 'rgba(12, 4, 10, 0.75)' : 'rgba(0, 213, 255, 0.45)',
             strokeColor: (isBankai || isMask) ? 'rgba(220, 20, 20, 0.90)' : null,
             isBankai: (isBankai || isMask),
-            timer: 16,
-            maxTimer: 16
-          }, 32);
+            timer: 12,
+            maxTimer: 12
+          }, 18);
 
           spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, isBankai ? 'TENSA STEP!' : 'FLASH STEP!', isBankai ? '#DC143C' : '#00D5FF');
           fighter._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', isBankai ? 0.95 : 0.9);

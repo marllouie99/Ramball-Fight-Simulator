@@ -68,12 +68,22 @@ export class SansFighter extends Fighter {
     this.gasterBlasters = [];
 
     // Skill 2: Bone Zone & Traps
-    this.boneZoneCooldown = 0;
+    const initBoneZoneCd = (cfg.initialBoneZoneCooldown !== undefined)
+      ? cfg.initialBoneZoneCooldown
+      : ((cfg.boneZoneInitialCooldown !== undefined) ? cfg.boneZoneInitialCooldown : 180);
+    this.boneZoneCooldown = initBoneZoneCd;
     this.boneProjectiles = [];
     this.boneTraps = [];
 
     // Skill 3: Bad Time & Blue Soul Gravity
-    this.gravitySlamCooldown = 0;
+    const initGravitySlamCd = (cfg.initialGravitySlamCooldown !== undefined)
+      ? cfg.initialGravitySlamCooldown
+      : ((cfg.gravitySlamInitialCooldown !== undefined)
+        ? cfg.gravitySlamInitialCooldown
+        : ((cfg.initialBadTimeCooldown !== undefined)
+          ? cfg.initialBadTimeCooldown
+          : ((cfg.badTimeInitialCooldown !== undefined) ? cfg.badTimeInitialCooldown : 480)));
+    this.gravitySlamCooldown = initGravitySlamCd;
     this.isBadTimeActive = false;
     this.badTimeTimer = 0;
     this.blueSoulActive = false;
@@ -166,8 +176,19 @@ export class SansFighter extends Fighter {
       ? cfg.initialBlasterCooldown
       : ((cfg.blasterInitialCooldown !== undefined) ? cfg.blasterInitialCooldown : 180);
     this.blasterCooldown = initBlasterCd;
-    this.boneZoneCooldown = 0;
-    this.gravitySlamCooldown = 0;
+    const initBoneZoneCd = (cfg.initialBoneZoneCooldown !== undefined)
+      ? cfg.initialBoneZoneCooldown
+      : ((cfg.boneZoneInitialCooldown !== undefined) ? cfg.boneZoneInitialCooldown : 180);
+    this.boneZoneCooldown = initBoneZoneCd;
+
+    const initGravitySlamCd = (cfg.initialGravitySlamCooldown !== undefined)
+      ? cfg.initialGravitySlamCooldown
+      : ((cfg.gravitySlamInitialCooldown !== undefined)
+        ? cfg.gravitySlamInitialCooldown
+        : ((cfg.initialBadTimeCooldown !== undefined)
+          ? cfg.initialBadTimeCooldown
+          : ((cfg.badTimeInitialCooldown !== undefined) ? cfg.badTimeInitialCooldown : 480)));
+    this.gravitySlamCooldown = initGravitySlamCd;
     this.isBadTimeActive = false;
     this.badTimeTimer = 0;
     this.blueSoulActive = false;
@@ -459,6 +480,24 @@ export class SansFighter extends Fighter {
    */
   clearAllAfterimages() {
     if (this.afterImages) this.afterImages.length = 0;
+  }
+
+  /**
+   * Recovers stamina for Sans up to maxStamina (e.g. when Gaster Blaster beams strike enemies).
+   * @param {number} amount - Amount of stamina to recover
+   * @param {string} [source='blaster'] - Source of the recovery
+   * @returns {number} Actual amount of stamina recovered
+   */
+  recoverStamina(amount, source = 'blaster') {
+    if (this.hp <= 0 || !amount || amount <= 0) return 0;
+    const oldStamina = this.stamina;
+    this.stamina = Math.min(this.maxStamina, this.stamina + amount);
+    const recovered = this.stamina - oldStamina;
+    if (recovered > 0) {
+      this._lastHealAmount = (this._lastHealAmount || 0) + recovered;
+      this._healthBarHealTimer = 10;
+    }
+    return recovered;
   }
 
   /**
@@ -1498,6 +1537,12 @@ export class SansFighter extends Fighter {
                 }
                 this.applyKarma(target);
 
+                // Recover stamina whenever Gaster Blaster strikes an enemy
+                const recoverAmount = (b.pattern === 2)
+                  ? (cfg.blasterGigaStaminaRecoverOnHit ?? 8)
+                  : (cfg.blasterStaminaRecoverOnHit ?? cfg.blasterHitStaminaRecover ?? 4);
+                this.recoverStamina(recoverAmount, 'blaster_impact');
+
                 // Concussive first impact screen shake & knockback
                 if (b.scale >= 2.0) {
                   triggerGlobalScreenShake(4.0, 10);
@@ -1523,6 +1568,12 @@ export class SansFighter extends Fighter {
                     });
                   }
                   this.applyKarma(target);
+
+                  // Recover stamina on continuous beam contact ticks
+                  const contRecover = (b.pattern === 2)
+                    ? (cfg.blasterGigaContinuousStaminaRecover ?? 2)
+                    : (cfg.blasterContinuousStaminaRecover ?? 1);
+                  this.recoverStamina(contRecover, 'blaster_continuous');
 
                   // Continuous subtle beam knockback
                   if (target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {

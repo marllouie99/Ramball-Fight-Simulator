@@ -65,6 +65,7 @@ import { MakiFighter } from '../fighters/MakiFighter.js';
 import { ShiroFighter } from '../fighters/ShiroFighter.js';
 import { SoraFighter } from '../fighters/SoraFighter.js';
 import { GutsFighter } from '../fighters/GutsFighter.js';
+import { ChosoFighter } from '../fighters/ChosoFighter.js?v=81';
 
 export const FIGHTER_CLASS_MAP = {
   'guts':       GutsFighter,
@@ -122,6 +123,9 @@ export const FIGHTER_CLASS_MAP = {
   'naoya_zenin': NaoyaFighter,
   'maki': MakiFighter,
   'maki_zenin': MakiFighter,
+  'choso': ChosoFighter,
+  'Choso': ChosoFighter,
+  'CHOSO': ChosoFighter,
   'nobara': NobaraFighter,
   'megumi': MegumiFighter,
   'megumin': MeguminFighter,
