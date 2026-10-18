@@ -33,12 +33,12 @@ export const engineerConfig = {
 
   // Primary Ranged Attack: Shotgun
   enableShotgun: true,         // Master toggle for Shotgun primary ranged attack
-  shotgunCooldown: 80,
+  shotgunCooldown: 100,
   shotgunPellets: 8,
   shotgunSpread: 0.45,         // Spread angle in radians (~26°)
   shotgunDamage: 2.20,         // Damage per pellet
   shotgunSpeed: 30,            // Initial projectile velocity
-  shotgunRange: 400,           // Max distance to trigger shotgun
+  shotgunRange: 300,           // Max distance to trigger shotgun
   shotgunRecoilForce: 3.5,     // Pushback impulse on firing
   shotgunRecoilDuration: 28,   // Multi-phase weapon recoil & pump racking animation frames
   shotgunMuzzleOffset: 62,     // Distance from center to shotgun muzzle

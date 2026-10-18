@@ -7,7 +7,7 @@ export const zenitsuConfig = {
   assets: {
     hair: 'Assets/model/zenitsu/Zenitsu-hair.png',
     weapon: 'Assets/model/zenitsu/Zenitsu-weapon.png',
-    katanaAssembly: 'Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png',
+    katanaAssembly: 'Assets/model/zenitsu/Zenitsu-weapon.png',
     sixFrameSequence: 'Assets/model/zenitsu/Thunderclap and Flash Six-Frame Attack Sequence.png',
     blueLightningEnergy: 'Assets/model/zenitsu/Zenitsu-Blue Lightning Energy Sprite Sheet-2.png',
     goldLightningEnergy: 'Assets/model/zenitsu/Zenitsu-Golden Lightning Energy Sprite Sheet-2.png',

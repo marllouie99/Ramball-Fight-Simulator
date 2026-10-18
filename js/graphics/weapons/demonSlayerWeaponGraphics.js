@@ -133,7 +133,7 @@ export function drawNezukoDemonClaws(ctx, x, y, angle, r = 25, opts = {}) {
   ctx.restore();
 }
 
-// ─── Zenitsu Weapon Sprite Sheet Asset Loader ───
+// ─── Zenitsu Weapon Asset Loader ───
 let _zenitsuAssemblyImage = null;
 let _zenitsuAssemblyImageLoading = false;
 
@@ -149,10 +149,10 @@ export function _getZenitsuAssemblyImage() {
       _zenitsuAssemblyImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Zenitsu assembly sprite sheet at Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png', e);
+      console.warn('Failed to load Zenitsu weapon at Assets/model/zenitsu/Zenitsu-weapon.png', e);
       _zenitsuAssemblyImageLoading = false;
     };
-    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png?v=1');
+    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-weapon.png?v=5');
     _zenitsuAssemblyImage = img;
   }
   return _zenitsuAssemblyImage;
@@ -168,14 +168,10 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Zenitsu's Modular Lightning Nichirin Katana from:
- * "Assets/model/zenitsu/Zenitsu-Pixel-Art Katana Assembly Sprite Sheet.png"
- * Supports independent per-part tuning in Weapon Studio:
- * 1. Blade (Nagasa)
- * 2. Guard (Tsuba)
- * 3. Collar (Habaki)
- * 4. Handle (Tsuka)
- * 5. Hands Grip (Rear & Lead Hands)
+ * Draws Zenitsu's Lightning Nichirin Katana from:
+ * "Assets/model/zenitsu/Zenitsu-weapon.png"
+ * Anchored directly at the Tsuba guard (0, 0), with authentic pixel-art scaling,
+ * two-handed tsuka grip (Rule 20), and Weapon Studio customization support.
  * Falls back to procedural pixel art if the image has not loaded yet.
  */
 export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) {
@@ -200,109 +196,32 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
   ctx.scale(customScale * customLengthScale, customScale * customWidthScale);
 
   if (isPreview) {
-    ctx.translate(-24, 0); // Center the full katana in the preview window
+    ctx.translate(11, 0); // Center the full katana in preview (-40 + 11 = -29, exact midpoint of 130px katana)
   }
 
-  // ─── Try Assembled Sprite Sheet First ───
+  // ─── Try Assembled Weapon Asset First ───
   const img = _getZenitsuAssemblyImage();
   if (img && img.complete && img.naturalWidth > 0) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor pixel art scaling
 
-    // Base scale maps 1130px blade to ~94px gameplay size
-    const baseScale = 94.0 / 1130.0;
+    // Base scale maps 1525px blade to ~94px gameplay size
+    const baseScale = 94.0 / 1525.0;
 
     const parts = custom.parts || {};
-    const handleCfg = parts.handle || {};
-    const tsubaCfg = parts.tsuba || {};
-    const habakiCfg = parts.habaki || {};
-    const bladeCfg = parts.blade || {};
 
-    // ── 1. HANDLE (Tsuka) ──
-    // Source: sx=16, sy=78, sw=475, sh=108
-    // Connects flush to left face of Tsuba (attachX = -4.53px)
-    {
-      const hw = 475 * baseScale;
-      const hh = 108 * baseScale;
-      const hScale = handleCfg.scale ?? 1.0;
-      const hL = handleCfg.lengthScale ?? 1.0;
-      const hW = handleCfg.widthScale ?? 1.0;
-      const hRot = handleCfg.angleOffset ?? 0;
-      const hOffX = handleCfg.offsetX ?? 0;
-      const hOffY = handleCfg.offsetY ?? 0;
+    // 1. Assembled Katana (Tsuba guard centered at (0, 0))
+    // Image dimensions: 2172 x 724. Tsuba center is at (614, 356)
+    const tsubaX = 614;
+    const tsubaY = 356;
+    const dx = -tsubaX * baseScale;
+    const dy = -tsubaY * baseScale;
+    const dw = img.naturalWidth * baseScale;
+    const dh = img.naturalHeight * baseScale;
 
-      ctx.save();
-      ctx.translate(-4.53 + hOffX, hOffY);
-      ctx.rotate(hRot);
-      ctx.scale(hScale * hL, hScale * hW);
-      ctx.drawImage(img, 16, 78, 475, 108, -hw, -4.45, hw, hh);
-      ctx.restore();
-    }
+    ctx.drawImage(img, dx, dy, dw, dh);
 
-    // ── 2. GUARD (Tsuba) ──
-    // Source: sx=505, sy=30, sw=121, sh=210
-    // Centered at (0, 0)
-    {
-      const tw = 121 * baseScale;
-      const th = 210 * baseScale;
-      const tScale = tsubaCfg.scale ?? 1.0;
-      const tL = tsubaCfg.lengthScale ?? 1.0;
-      const tW = tsubaCfg.widthScale ?? 1.0;
-      const tRot = tsubaCfg.angleOffset ?? 0;
-      const tOffX = tsubaCfg.offsetX ?? 0;
-      const tOffY = tsubaCfg.offsetY ?? 0;
-
-      ctx.save();
-      ctx.translate(tOffX, tOffY);
-      ctx.rotate(tRot);
-      ctx.scale(tScale * tL, tScale * tW);
-      ctx.drawImage(img, 505, 30, 121, 210, -tw / 2, -th / 2, tw, th);
-      ctx.restore();
-    }
-
-    // ── 3. COLLAR (Habaki) ──
-    // Source: sx=656, sy=93, sw=80, sh=93
-    // Connects flush to right face of Tsuba (attachX = 4.53px)
-    {
-      const hbw = 80 * baseScale;
-      const hbh = 93 * baseScale;
-      const hbScale = habakiCfg.scale ?? 1.0;
-      const hbL = habakiCfg.lengthScale ?? 1.0;
-      const hbW = habakiCfg.widthScale ?? 1.0;
-      const hbRot = habakiCfg.angleOffset ?? 0;
-      const hbOffX = habakiCfg.offsetX ?? 0;
-      const hbOffY = habakiCfg.offsetY ?? 0;
-
-      ctx.save();
-      ctx.translate(4.53 + hbOffX, hbOffY);
-      ctx.rotate(hbRot);
-      ctx.scale(hbScale * hbL, hbScale * hbW);
-      ctx.drawImage(img, 656, 93, 80, 93, 0, -hbh / 2, hbw, hbh);
-      ctx.restore();
-    }
-
-    // ── 4. BLADE (Nagasa) ──
-    // Source: sx=751, sy=100, sw=1130, sh=98
-    // Connects flush to right face of Habaki (attachX = 10.68px)
-    {
-      const bw = 1130 * baseScale;
-      const bh = 98 * baseScale;
-      const bScale = bladeCfg.scale ?? 1.0;
-      const bL = bladeCfg.lengthScale ?? 1.0;
-      const bW = bladeCfg.widthScale ?? 1.0;
-      const bRot = bladeCfg.angleOffset ?? 0;
-      const bOffX = bladeCfg.offsetX ?? 0;
-      const bOffY = bladeCfg.offsetY ?? 0;
-
-      ctx.save();
-      ctx.translate(10.68 + bOffX, bOffY);
-      ctx.rotate(bRot);
-      ctx.scale(bScale * bL, bScale * bW);
-      ctx.drawImage(img, 751, 100, 1130, 98, 0, -3.24, bw, bh);
-      ctx.restore();
-    }
-
-    // ── 5. HANDS (Two-Hand Grip on Tsuka Handle) ──
+    // ─── 2. HANDS (Two-Hand Grip on Tsuka Handle) ───
     const shouldDrawHands = opts.drawHands || (isPreview && opts.showHands !== false);
     if (shouldDrawHands) {
       const handsCfg = parts.hands || {};
@@ -312,17 +231,17 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
       const handsSpacing = handsCfg.spacing ?? 1.0;
       const skinColor = opts.skinColor || '#FEE8D6';
 
-      // Rear Hand (near pommel)
+      // Rear Hand (near pommel at X = -25px)
       if (!opts.hideBackHand) {
         const backR = (getHandSize ? getHandSize(4.4) : 4.4) * handsScale;
-        const backX = -20.5 - 6.5 * handsSpacing + handsOffX;
+        const backX = -18.5 - 6.5 * handsSpacing + handsOffX;
         drawPixelHand(ctx, backX, handsOffY, backR, skinColor, '#000000');
       }
 
-      // Front Hand (lead grip)
+      // Front Hand (lead grip near tsuba at X = -12px)
       if (!opts.hideFrontHand) {
         const frontR = (getHandSize ? getHandSize(4.8) : 4.8) * handsScale;
-        const frontX = -20.5 + 6.5 * handsSpacing + handsOffX;
+        const frontX = -18.5 + 6.5 * handsSpacing + handsOffX;
         drawPixelHand(ctx, frontX, handsOffY, frontR, skinColor, '#000000');
       }
     }
