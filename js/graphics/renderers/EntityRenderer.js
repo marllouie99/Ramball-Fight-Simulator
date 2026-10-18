@@ -12,6 +12,7 @@ import { draw24FPSFrameStasisOverlay } from '../weapons/naoyaWeaponGraphics.js';
 import { drawMakiImpaledTargetOverlay } from '../weapons/makiWeaponGraphics.js';
 import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
+import { drawFighterInkOutline } from './fighterOutlineRenderer.js';
 
 let _sortedFightersBuffer = [];
 
@@ -379,6 +380,9 @@ export function drawFighters() {
     }
 
     try {
+      if (!fighter.hasUnderBodyAura) {
+        drawFighterInkOutline(ctx, fighter);
+      }
       fighter.draw(ctx, opponent);
       
       // Universal Status Overlays Fallback: ensures debuffs/electrified visuals render even if fighter completely overrode draw()

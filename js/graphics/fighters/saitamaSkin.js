@@ -105,7 +105,7 @@ export function drawSaitamaSkin(ctx, fighter) {
 
   // 0. Draw afterimages (Teleport / sidestep ghost model skin) at their absolute coordinates
   const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : isSuppressedByGetsuga(fighter);
-  if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
+  if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed && !fighter._isSilhouettePass) {
     ctx.save();
     for (let i = 0; i < fighter.afterImages.length; i++) {
       const ai = fighter.afterImages[i];

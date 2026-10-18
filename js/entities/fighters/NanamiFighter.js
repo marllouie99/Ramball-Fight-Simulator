@@ -2037,6 +2037,13 @@ export class NanamiFighter extends Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
   }
+
+  /**
+   * Required drawBody hook for engine previews and standard render loops (Rule 21).
+   */
+  drawBody(ctx) {
+    drawNanamiSkin(ctx, this);
+  }
 }
 
 

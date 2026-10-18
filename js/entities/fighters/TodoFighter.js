@@ -7,6 +7,7 @@ import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRep
 import { audioSystem } from '../../systems/audioSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
+import { drawFighterInkOutline } from '../../graphics/renderers/fighterOutlineRenderer.js';
 
 /**
  * Aoi Todo - The Boogie Woogie Brawler
@@ -17,6 +18,7 @@ export class TodoFighter extends Fighter {
     this.characterId = 'todo';
     this.type = 'todo';
     this.combatAuraOpacity = 0.0; // Starts at 0, builds up dynamically during claps/attacks
+    this.hasUnderBodyAura = true;
     
     // Core Combat Variables
     this.punchAnimTimer = 0;
@@ -573,6 +575,7 @@ export class TodoFighter extends Fighter {
     // Draw exact JJK Cursed Energy Sakuga Flame Aura (matching Gojo and Sukuna)
     GojoRenderer._drawJJKCursedEnergyAura(ctx, this, 'blue');
 
+    drawFighterInkOutline(ctx, this);
     drawTodoSkin(ctx, this);
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);

@@ -81,6 +81,7 @@ export class SukunaFighter extends Fighter {
     this.critChance = CONFIG.sukuna?.baseCritChance || 0.25;
     this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 0.25;
     this.damageNumberColor = '#ff4455';
+    this.hasUnderBodyAura = true;
     this._registerSkills();
   }
 

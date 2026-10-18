@@ -776,7 +776,7 @@ export function drawArenaBorder(ctx = state.ctx, alreadyInCameraSpace = false) {
   }
 
   // ── Draw Saitama Shattered Wall Breaches & Flying Line Shards ──
-  if ((state.shatteredWalls && state.shatteredWalls.length > 0) || (state.hudShatters && state.hudShatters.bottomHudShatter)) {
+  if ((state.shatteredWalls && state.shatteredWalls.length > 0) || (CONFIG.saitama?.enableHudShatter && state.hudShatters && state.hudShatters.bottomHudShatter)) {
     if (!alreadyInCameraSpace) {
       updateSaitamaWallShatters();
     }
@@ -1393,7 +1393,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   }
 
   // If Top HUD Name Shatter is active, render the natural hanging/falling letter shards
-  const isShattered = drawTopHudNameShatters(ctx, isDark, arena);
+  const isShattered = CONFIG.saitama?.enableHudShatter ? drawTopHudNameShatters(ctx, isDark, arena) : false;
   if (isShattered) {
     ctx.restore();
     return;

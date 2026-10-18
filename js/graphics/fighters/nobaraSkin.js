@@ -31,6 +31,7 @@ const _NOBARA_HAIRLINE = [
  */
 export function drawNobaraCursedEnergyAura(ctx, fighter) {
   if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+  if (fighter && (fighter._isSilhouettePass || fighter.hideCursedEnergy)) return;
   const r = fighter.r || 25;
   const isEcstasy = Boolean(fighter.isEcstasyActive || ((fighter.hp / (fighter.maxHp || 400)) <= 0.50));
   const isBlitzing = Boolean(fighter.isBlitzing || (fighter.blackFlashAuraTimer && fighter.blackFlashAuraTimer > 0));

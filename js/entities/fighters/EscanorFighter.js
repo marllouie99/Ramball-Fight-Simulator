@@ -2549,4 +2549,11 @@ export class EscanorFighter extends Fighter {
     // 5. Draw Escanor Main Skin Model
     drawEscanorSkin(ctx, this);
   }
+
+  /**
+   * Required drawBody hook for engine previews and standard render loops (Rule 21).
+   */
+  drawBody(ctx) {
+    drawEscanorSkin(ctx, this);
+  }
 }

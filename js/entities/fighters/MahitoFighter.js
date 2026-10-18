@@ -1499,6 +1499,20 @@ export class MahitoFighter extends Fighter {
     this.drawFreezeTimer(ctx);
   }
 
+  /**
+   * Required drawBody hook for engine previews and standard render loops (Rule 21).
+   */
+  drawBody(ctx) {
+    drawMahitoSkin(ctx, this);
+  }
+
+  /**
+   * Overrides base Fighter.drawGun() to suppress default generic gun rendering (Rule 20 / Rule 23).
+   */
+  drawGun(ctx) {
+    // Intentionally empty: Mahito fights with soul disfigurement blades / hands
+  }
+
   onFrozenSkillDurationTick(isInsideGojoDomain) {
     if (this.isTransformed && this.transformDuration <= 0) {
       this.revertTransformation();

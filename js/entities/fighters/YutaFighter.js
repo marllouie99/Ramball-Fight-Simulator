@@ -76,6 +76,7 @@ export class YutaFighter extends Fighter {
     this.themeColor = def?.themeColor || CONFIG.yuta?.themeColor || '#FF1493';
     this.damageNumberColor = '#FF1493';
     this.skinColor = '#FABC95';
+    this.hasUnderBodyAura = true;
     this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 34;
     this.meleeCooldown = 0;
     this.swordComboStep = 1;

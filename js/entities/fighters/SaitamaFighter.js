@@ -163,6 +163,20 @@ export class SaitamaFighter extends Fighter {
   }
 
   /**
+   * Required drawBody hook for engine previews and standard render loops (Rule 21).
+   */
+  drawBody(ctx) {
+    drawSaitamaSkin(ctx, this);
+  }
+
+  /**
+   * Overrides base Fighter.drawGun() to suppress default generic gun rendering (Rule 20 / Rule 23).
+   */
+  drawGun(ctx) {
+    // Intentionally empty: Saitama fights exclusively with bare fists / gloves
+  }
+
+  /**
    * Calculates Saitama's base Normal Punch damage as a percentage of the current game mode's fixed HP.
    * @returns {number}
    */
@@ -1879,7 +1893,7 @@ export class SaitamaFighter extends Fighter {
         spawnSaitamaCounterFrontalBlast(this.x, this.y, pushAngle, frontalReach, frontalArc);
       }
 
-      // Unique Interaction: Shatter the arena line wall and HUD in the punch direction
+      // Unique Interaction: Shatter the arena line wall in the punch direction (HUD destruction disabled)
       const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
       if (arena && typeof triggerSaitamaWallShatter === 'function') {
         triggerSaitamaWallShatter(this.x, this.y, pushAngle, arena);
@@ -2454,7 +2468,7 @@ export class SaitamaFighter extends Fighter {
       spawnSaitamaCounterFrontalBlast(fistX, fistY, aimAngle, punchBlastReach, punchBlastArc);
     }
 
-    // Unique Interaction: Shatter the arena line wall and HUD in normal punch trajectory
+    // Unique Interaction: Shatter the arena line wall in normal punch trajectory (HUD destruction disabled)
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
     if (arena && typeof triggerSaitamaWallShatter === 'function') {
       triggerSaitamaWallShatter(fistX, fistY, aimAngle, arena);
@@ -3134,7 +3148,7 @@ export class SaitamaFighter extends Fighter {
           this._flurryFinalPunchReleaseOriginY = this.y - (this.z || 0);
           this._flurryAccumulatedDamage = 0;
 
-          // Unique Interaction: Shatter the arena line wall and HUD on flurry final blow
+          // Unique Interaction: Shatter the arena line wall on flurry final blow (HUD destruction disabled)
           const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
           if (arena && typeof triggerSaitamaWallShatter === 'function') {
             triggerSaitamaWallShatter(this.x, this.y, this._flurryFinalPunchReleaseAngle, arena);

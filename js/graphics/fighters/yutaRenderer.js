@@ -13,6 +13,7 @@ import { drawYutaGhostSkin } from './yutaSkin.js';
 import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 import { drawBurnEffect } from '../statusEffects.js';
 import { YutaBushEntrance } from '../../bosses/animations/YutaBushEntrance.js';
+import { drawFighterInkOutline } from '../renderers/fighterOutlineRenderer.js';
 
 // Pre-seeded static data for Yuta Domain Channeling VFX (0 GC per Rule #12 & #16)
 const _YUTA_DOMAIN_EMBERS = Array.from({ length: 32 }, (_, i) => ({
@@ -63,6 +64,7 @@ export class YutaRenderer {
     // Draw sword bag on his back (behind body)
     fighter._drawYutaSwordBag(ctx);
 
+    drawFighterInkOutline(ctx, fighter);
     Fighter.prototype.draw.call(fighter, ctx, opponent);
 
     // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
@@ -1080,6 +1082,7 @@ export class YutaRenderer {
 
   static _drawRikaCursedEnergyAura(ctx, fighter, opponent, renderState = null) {
     if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+    if (fighter && (fighter._isSilhouettePass || fighter.hideCursedEnergy)) return;
     const rk = fighter.rika;
     if (!rk) return;
 
@@ -1270,6 +1273,7 @@ export class YutaRenderer {
 
   static _drawYutaCursedEnergyAura(ctx, fighter) {
     if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+    if (fighter && (fighter._isSilhouettePass || fighter.hideCursedEnergy)) return;
 
     const isRCT = (fighter.rctRevivalTimer > 0) || (fighter.rctHealTimer > 0);
 

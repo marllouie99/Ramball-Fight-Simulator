@@ -155,6 +155,7 @@ export class FighterRenderer {
     fighter._statusOverlaysRenderedFrame = currentFrame;
 
     if (
+      fighter._isSilhouettePass ||
       fighter.suppressDebuffs ||
       fighter.suppressStatusOverlays ||
       fighter.isChessTroop ||

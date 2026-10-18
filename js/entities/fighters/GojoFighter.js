@@ -95,6 +95,7 @@ export class GojoFighter extends Fighter {
     this.is200PercentChannel = false;
     this.damageNumberColor = '#00E5FF';
     this.isParalyzingDomain = true;
+    this.hasUnderBodyAura = true;
 
     // Declarative Skill Registration
     const skills = [];

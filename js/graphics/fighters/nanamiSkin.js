@@ -125,6 +125,7 @@ const _BANGS_COORDS = [
  */
 export function drawNanamiCursedEnergyAura(ctx, fighter) {
   if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+  if (fighter && (fighter._isSilhouettePass || fighter.hideCursedEnergy)) return;
   const r = fighter.r || 25;
   const isOvertime = Boolean(fighter.isOvertimeActive || ((fighter.hp / (fighter.maxHp || 420)) <= 0.40));
   

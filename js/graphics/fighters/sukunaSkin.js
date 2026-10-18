@@ -290,7 +290,7 @@ export function drawSukunaBody(ctx, fighter) {
   const r = fighter.r;
 
   // Ground shadow when levitating
-  if (z > 0) {
+  if (z > 0 && !fighter._isSilhouettePass) {
     const levFactor = Math.min(1.0, z / 35);
     ctx.save();
     ctx.translate(fighter.x, fighter.y);

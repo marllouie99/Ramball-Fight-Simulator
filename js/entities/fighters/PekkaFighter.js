@@ -907,6 +907,10 @@ export class PekkaFighter extends Fighter {
     drawPekkaSkin(ctx, this);
   }
 
+  drawBody(ctx) {
+    drawPekkaSkin(ctx, this);
+  }
+
   drawSkin(ctx) {
     drawPekkaSkin(ctx, this);
   }

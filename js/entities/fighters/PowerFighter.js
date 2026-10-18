@@ -362,4 +362,11 @@ export class PowerFighter extends Fighter {
     // 3. Main Skin Body & Weapon
     drawPowerSkin(ctx, this);
   }
+
+  /**
+   * Required drawBody hook for engine previews and standard render loops (Rule 21).
+   */
+  drawBody(ctx) {
+    drawPowerSkin(ctx, this);
+  }
 }

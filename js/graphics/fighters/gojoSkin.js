@@ -145,7 +145,7 @@ export function drawGojoBody(ctx, fighter) {
     const z = fighter.z || 0;
     
     // Draw high-contrast ground shadow silhouette when levitating in the air
-    if (z > 0) {
+    if (z > 0 && !fighter._isSilhouettePass) {
       const levFactor = Math.min(1.0, z / 35);
       ctx.save();
       ctx.translate(fighter.x, fighter.y);
@@ -197,7 +197,7 @@ export function drawGojoBody(ctx, fighter) {
     const isNaoyaStasisOrUlt = (typeof fighter.isCaughtInNaoyaStasisOrUlt === 'function')
       ? fighter.isCaughtInNaoyaStasisOrUlt()
       : Boolean(fighter.isCaughtInNaoyaUlt || fighter._isFlyingToWallPin || fighter.isCurrentlyWallPinnedByNaoya || (fighter.naoyaWallPinTimer && fighter.naoyaWallPinTimer > 0));
-    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode || isNaoyaStasisOrUlt || (fighter.infinityCooldown || 0) > 0 || !fighter.infinityActive || (fighter.infinityBarrierHp !== undefined && fighter.infinityBarrierHp <= 0));
+    const isBarrierSuppressed = Boolean(fighter._isSilhouettePass || fighter.isTargetOfAmbush || isInsideRubbickStolenVoid(fighter) || isPurpleInFlight || fighter.isChainedByMakima || fighter.isMeleeMode || isNaoyaStasisOrUlt || (fighter.infinityCooldown || 0) > 0 || !fighter.infinityActive || (fighter.infinityBarrierHp !== undefined && fighter.infinityBarrierHp <= 0));
     const fadeOpacity = isBarrierSuppressed ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();

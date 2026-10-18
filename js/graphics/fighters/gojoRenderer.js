@@ -7,6 +7,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../g
 import { drawGojoBody } from './gojoSkin.js';
 import { drawGojoWeapon, drawGojoOrb, drawAnamorphicLensFlare } from '../weapons/gojoWeaponGraphics.js';
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
+import { drawFighterInkOutline } from '../renderers/fighterOutlineRenderer.js';
 
 export class GojoRenderer {
   static draw(ctx, fighter) {
@@ -386,7 +387,8 @@ export class GojoRenderer {
       GojoRenderer._draw3DOrbitingOrbs(ctx, fighter, 'back');
     }
 
-    // 2. Draw fighter body
+    // 2. Draw fighter body (with ink outline on top of CE aura)
+    drawFighterInkOutline(ctx, fighter);
     drawGojoBody(ctx, fighter);
 
     if (!fighter.isChannelingPurple) {
@@ -796,6 +798,7 @@ export class GojoRenderer {
    */
   static _drawJJKCursedEnergyAura(ctx, fighter, colorTheme = 'blue', overrideX = null, overrideY = null, overrideRadius = null) {
     if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+    if (fighter && (fighter._isSilhouettePass || fighter.hideCursedEnergy)) return;
 
     // Calculate smooth fade-in & fade-out progress
     let progress = 1.0;

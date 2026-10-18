@@ -8,6 +8,7 @@ import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
 import { renderSukunaDomainBackground, renderSukunaDomainForeground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { drawSukunaBody } from './sukunaSkin.js';
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
+import { drawFighterInkOutline } from '../renderers/fighterOutlineRenderer.js';
 
 let _sukunaShrineImage = null;
 let _sukunaShrineImageLoading = false;
@@ -168,6 +169,7 @@ export class SukunaRenderer {
     // 1. Draw Back Hand BEHIND body
     fighter._drawHandCursedEnergy(ctx, 'back');
 
+    drawFighterInkOutline(ctx, fighter);
     Fighter.prototype.draw.call(fighter, ctx);
 
     // 2. Draw Front Hand ON TOP of body
@@ -560,6 +562,7 @@ export class SukunaRenderer {
   // Draw Sukuna's Cursed Energy Aura
   static _drawSukunaCursedEnergyAura(ctx, fighter, colorTheme = 'red', overrideX = null, overrideY = null, overrideRadius = null) {
     if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
+    if (fighter && (fighter._isSilhouettePass || fighter.hideCursedEnergy)) return;
 
     // Calculate smooth fade-in & fade-out progress
     let progress = 1.0;

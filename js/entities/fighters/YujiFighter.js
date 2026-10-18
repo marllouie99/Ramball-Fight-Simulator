@@ -13,6 +13,7 @@ import { playSound, playLoopingSound, stopLoopingSound, pauseLoopingSound, resum
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { spawnTeleportAfterimages } from './sukuna/sukunaCombat.js';
+import { drawFighterInkOutline } from '../../graphics/renderers/fighterOutlineRenderer.js';
 
 /**
  * Yuji Itadori — The Black Flash Brawler
@@ -25,6 +26,7 @@ export class YujiFighter extends Fighter {
 
     // Visual aura
     this.combatAuraOpacity = 0.0;
+    this.hasUnderBodyAura = true;
 
     // Core combat variables
     this.punchAnimTimer = 0;
@@ -1155,6 +1157,7 @@ export class YujiFighter extends Fighter {
     const auraTheme = this.isChannelingDivineFlame ? 'fuga' : (this.soulSwapActive ? 'red' : (this.isChannelingRCT ? 'rct' : 'blue'));
     GojoRenderer._drawJJKCursedEnergyAura(ctx, this, auraTheme);
 
+    drawFighterInkOutline(ctx, this);
     drawYujiSkin(ctx, this);
 
     // Draw Fuga Volcanic Magma Flame Arrow Construct in Canvas 2D fallback mode (when WebGL layer is inactive)
@@ -1215,6 +1218,20 @@ export class YujiFighter extends Fighter {
 
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+  }
+
+  /**
+   * Required drawBody hook for engine previews and standard render loops (Rule 21).
+   */
+  drawBody(ctx) {
+    drawYujiSkin(ctx, this);
+  }
+
+  /**
+   * Overrides base Fighter.drawGun() to suppress default generic gun rendering (Rule 20 / Rule 23).
+   */
+  drawGun(ctx) {
+    // Intentionally empty: Yuji fights exclusively with martial arts / Divergent Fist
   }
 
   onFrozenSkillDurationTick(isInsideGojoDomain) {

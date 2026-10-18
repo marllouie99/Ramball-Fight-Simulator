@@ -8,6 +8,7 @@ import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel,
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { previewProjectileSystem, updateIndexDetailDemo, resetIndexDetailState, indexDetailState } from '../preview.js';
 import { drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaUltimateBullet, drawLaylaBasicBullet } from '../renderers/projectileRenderer.js';
+import { drawFighterInkOutline } from '../renderers/fighterOutlineRenderer.js';
 
 let indexDetailAngle = 0;
 let indexDetailAnimFrame = 0;
@@ -651,6 +652,9 @@ function drawIndexDetailScreen() {
   });
 
   // Render Fighter Body & Animations
+  if (!fighter.hasUnderBodyAura) {
+    drawFighterInkOutline(ctx, fighter);
+  }
   fighter.draw(ctx, target);
 
   ctx.restore(); // Restore Arena Clip

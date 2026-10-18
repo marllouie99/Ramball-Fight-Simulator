@@ -57,6 +57,10 @@ export function isInsideSaitamaFrontalBlast(px, py, originX, originY, punchAngle
  * @param {object|Array} [hits=null] - Precalculated wall intersection details (single hit or array)
  */
 export function triggerHudShatter(originX, originY, punchAngle, arena, hits = null) {
+  // Saitama interaction with HUD is disabled — he can only destroy arena walls
+  if (!CONFIG.saitama?.enableHudShatter) {
+    return;
+  }
   if (!arena && typeof state !== 'undefined') arena = state.arena;
   if (!arena) return;
 
@@ -878,7 +882,7 @@ function generateBottomHudShatters(arena, punchAngle, hitX, maxLife, originX, or
  * Updates physics for all active HUD shatter effects.
  */
 export function updateHudShatters() {
-  if (!state.hudShatters) return;
+  if (!CONFIG.saitama?.enableHudShatter || !state.hudShatters) return;
 
   const hs = state.hudShatters;
 
@@ -971,7 +975,7 @@ export function updateHudShatters() {
  * @returns {boolean} Whether shattered names were rendered
  */
 export function drawTopHudNameShatters(ctx, isDark, arena) {
-  if (!state.hudShatters || !state.hudShatters.topNameShatter) {
+  if (!CONFIG.saitama?.enableHudShatter || !state.hudShatters || !state.hudShatters.topNameShatter) {
     return false;
   }
 
@@ -1037,7 +1041,7 @@ export function drawTopHudNameShatters(ctx, isDark, arena) {
  * @param {object} arena - Arena object
  */
 export function drawBottomHudShatters(ctx, isDark, arena) {
-  if (!state.hudShatters || !state.hudShatters.bottomHudShatter) {
+  if (!CONFIG.saitama?.enableHudShatter || !state.hudShatters || !state.hudShatters.bottomHudShatter) {
     return;
   }
 

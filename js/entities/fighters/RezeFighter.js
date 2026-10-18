@@ -1966,6 +1966,13 @@ export class RezeFighter extends Fighter {
     this.drawFreezeTimer(ctx);
   }
 
+  /**
+   * Required drawBody hook for engine previews and standard render loops (Rule 21).
+   */
+  drawBody(ctx) {
+    drawRezeSkin(ctx, this);
+  }
+
   onFrozenSkillDurationTick(isInsideGojoDomain) {
     // Bomb Devil Form is permanent once activated — no duration to tick down
   }

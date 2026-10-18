@@ -200,6 +200,9 @@ export const CONFIG = {
   hudHideSkillBars: false,      // Toggle to completely hide all HUD skill progress bars with zero exceptions
   hudHideStats: false,          // Toggle to completely hide all fighter HUD stats lines
   hudHideOverheadHp: false,      // Toggle to hide overhead canvas health numbers and bars on fighters
+  enableFighterInkOutline: true, // Global manga-style ink outline around live in-arena fighters
+  fighterInkOutlineWidth: 1.5,   // Ink outline stroke width (matches Top HUD frame badge standard 1.5px)
+  fighterInkOutlineColor: '#050609', // Dark ink outline stroke color (matches Top HUD frame badge standard #050609)
   hudSkillBarsMode: 'all',      // 'all' = show all skill bars, 'signature' = signature only, 'none' = completely hide all skill bars
   hudGhostBarEnabled: true,      // Master toggle for fighting-game trailing damage ghost bar on healthbars
   hudGhostBarHoldFrames: 8,      // Responsive delay in frames (~133ms) before trailing ghost bar begins catch-up decay
