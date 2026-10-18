@@ -58,7 +58,7 @@ export function drawNezukoSkin(ctx, fighter) {
     : (isPunching ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14))) : 0);
 
   // 3. LAYER 0: BACK HAND (Behind Body Layer)
-  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand;
+  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && !fighter.hideWeapon;
   if (showBackHand) {
     _drawNezukoBackHand(ctx, fighter, r, isClawSlashing, isPunching, animPhase);
   }
@@ -67,7 +67,7 @@ export function drawNezukoSkin(ctx, fighter) {
   drawNezukoPixelBody(ctx, r);
 
   // 5. LAYER 2: FRONT HAND & DEMON CLAWS (On Top of Body)
-  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand;
+  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand && !fighter.hideWeapon;
   if (showFrontHand) {
     _drawNezukoFrontHand(ctx, fighter, r, isClawSlashing, isPunching, animPhase);
   }

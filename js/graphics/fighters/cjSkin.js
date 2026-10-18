@@ -1389,7 +1389,7 @@ export function drawCjSkin(ctx, fighter) {
     frontY = baseHandY;
   }
 
-  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter.hideWeapon;
   if (hideHandsAndWeapon || fighter.hideFrontHand) hideFrontHand = true;
   if (hideHandsAndWeapon || fighter.hideBackHand) hideBackHand = true;
 

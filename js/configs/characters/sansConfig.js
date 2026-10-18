@@ -37,7 +37,7 @@ export const sansConfig = {
   desc: 'The laid-back skeleton judge from Undertale. Dodges incoming attacks with instant teleportation afterimages. Attacks with rapid bone barrages, summons heavy Gaster Blaster laser cannons, applies Karmic Retribution (KR) damage over time, and controls battlefield gravity with Blue Soul telekinesis slams.',
 
   // Passive 1: Karmic Retribution (KR)
-  enableKarma: 0,
+  enableKarma: 1,
   karmaTickDamage: 1,
   karmaTickInterval: 14,       // Frames between poison ticks (~0.23s)
   karmaMaxStacks: 12,          // Up to 12 stacks for sustained pressure

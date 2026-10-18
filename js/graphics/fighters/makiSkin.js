@@ -352,7 +352,7 @@ export function drawMakiSkin(ctx, fighter) {
   _drawMakiHair(ctx, r, facingLeft);
 
   // 5. Weapon & Combat VFX (Always drawn during combat; suppressed only in showSkinOnly preview)
-  const isSkinOnly = typeof state !== 'undefined' && state.showSkinOnly;
+  const isSkinOnly = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideWeapon;
   if (!isSkinOnly) {
     drawMakiWeapons(ctx, fighter, r, facingLeft);
     drawMakiComboSlashVFX(ctx, fighter, r, facingLeft);

@@ -466,7 +466,7 @@ export function drawMusashiSkin(ctx, fighter) {
   _drawMusashiHair(ctx, r, facingLeft);
 
   // 6. LAYER 4: DUAL WEAPONS & HANDS (On Top of Body)
-  if (!fighter.isSheathed && !Boolean(state.showSkinOnly)) {
+  if (!fighter.isSheathed && !Boolean(state.showSkinOnly) && !fighter.hideWeapon) {
     drawMusashiWeapons(ctx, fighter, true); // true = local coordinate mode
   }
 

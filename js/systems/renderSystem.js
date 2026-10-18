@@ -7,7 +7,7 @@ import {
   drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay
 } from '../graphics/ui.js';
 import {
-  drawArena, drawArenaMatchNames, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
+  drawArena, drawArenaBorder, drawArenaMatchNames, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
@@ -369,15 +369,6 @@ export function renderGame() {
           }
         }
 
-        // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) on top of the arena border, floor & idol overlay, but behind fighters
-        if (state.fighters) {
-          for (const f of state.fighters) {
-            if (f && f.hp > 0 && (f.domainActive || f.stolenDomainActive) && typeof f.drawDomainForeground === 'function') {
-              f.drawDomainForeground(state.ctx);
-            }
-          }
-        }
-
         // Draw Boss ground aura sigils and phase transition effects underneath the boss body
         if (state.fighters) {
           for (const f of state.fighters) {
@@ -392,6 +383,18 @@ export function renderGame() {
               if (EyeOfCthulhuEntrance.isActive) {
                 EyeOfCthulhuEntrance.drawGround(state.ctx, f);
               }
+            }
+          }
+        }
+
+        // ── Arena Border Top Layer: Rendered ON TOP of Domain Backgrounds & Dim Screens ──
+        drawArenaBorder(state.ctx, true);
+
+        // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) OVERLAYING the arena border, underneath fighters
+        if (state.fighters) {
+          for (const f of state.fighters) {
+            if (f && f.hp > 0 && (f.domainActive || f.stolenDomainActive) && typeof f.drawDomainForeground === 'function') {
+              f.drawDomainForeground(state.ctx);
             }
           }
         }

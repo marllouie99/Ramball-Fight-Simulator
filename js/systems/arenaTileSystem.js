@@ -371,34 +371,58 @@ function _renderNoTilesFloor(oc, width, height, isDark) {
 }
 
 function _renderPixelCleanFloor(oc, width, height, cols, rows, cellW, cellH, isDark) {
-  const bgColor = isDark ? '#070a13' : '#f8fafc';
-  const gridDotColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.12)';
-  const frameColor = isDark ? '#334155' : '#cbd5e1';
-  const bracketColor = isDark ? '#64748b' : '#475569';
+  const bgColor = isDark ? '#080B14' : '#F6F8FC';
+  const crossColor = isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.22)';
+  const crossDotColor = isDark ? 'rgba(255, 255, 255, 0.38)' : 'rgba(15, 23, 42, 0.38)';
+  const centerEmblemColor = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(15, 23, 42, 0.18)';
+  const centerCoreColor = isDark ? 'rgba(255, 255, 255, 0.28)' : 'rgba(15, 23, 42, 0.28)';
+  const cornerMarkColor = isDark ? 'rgba(255, 255, 255, 0.16)' : 'rgba(15, 23, 42, 0.16)';
 
+  // 1. Clean comic paper / slate base fill
   _pixelRect(oc, 0, 0, width, height, bgColor);
 
+  // 2. Subtle floor edge vignette wash (keeps center bright and edges grounded)
+  const edgeWashColor = isDark ? 'rgba(0, 0, 0, 0.40)' : 'rgba(15, 23, 42, 0.04)';
+  _pixelRect(oc, 0, 0, width, 4, edgeWashColor);
+  _pixelRect(oc, 0, height - 4, width, 4, edgeWashColor);
+  _pixelRect(oc, 0, 0, 4, height, edgeWashColor);
+  _pixelRect(oc, width - 4, 0, 4, height, edgeWashColor);
+
+  // 3. Crisp anime intersection crosshairs (+) across all grid nodes
   for (let r = 1; r < rows; r++) {
     for (let c = 1; c < cols; c++) {
       const gx = Math.round(c * cellW);
       const gy = Math.round(r * cellH);
-      _pixelRect(oc, gx - 1, gy, 3, 1, gridDotColor);
-      _pixelRect(oc, gx, gy - 1, 1, 3, gridDotColor);
+      // 7px crosshair
+      _pixelRect(oc, gx - 3, gy, 7, 1, crossColor);
+      _pixelRect(oc, gx, gy - 3, 1, 7, crossColor);
+      // Center solid core
+      _pixelRect(oc, gx - 1, gy - 1, 3, 3, crossDotColor);
     }
   }
 
-  const pad = 6;
-  _pixelRect(oc, pad, pad, width - pad * 2, 2, frameColor);
-  _pixelRect(oc, pad, height - pad - 2, width - pad * 2, 2, frameColor);
-  _pixelRect(oc, pad, pad, 2, height - pad * 2, frameColor);
-  _pixelRect(oc, width - pad - 2, pad, 2, height - pad * 2, frameColor);
+  // 4. Subtle Anime Tournament Center Stage Diamond & Reticle
+  const cx = Math.round(width / 2);
+  const cy = Math.round(height / 2);
+  // Outer Diamond
+  _pixelDiamond(oc, cx, cy, 18, centerEmblemColor);
+  _pixelDiamond(oc, cx, cy, 16, bgColor); // Hollow out diamond
+  // Inner Diamond
+  _pixelDiamond(oc, cx, cy, 8, centerEmblemColor);
+  _pixelDiamond(oc, cx, cy, 6, bgColor);
+  // Center Solid Core & Axis Ticks
+  _pixelCross(oc, cx, cy, 12, 1, centerCoreColor);
+  _pixelRect(oc, cx - 2, cy - 2, 5, 5, centerCoreColor);
+  _pixelRect(oc, cx - 1, cy - 1, 3, 3, isDark ? '#FFFFFF' : '#050609');
 
-  const bLen = 14;
-  const bThick = 3;
-  _pixelLBracket(oc, pad + 2, pad + 2, bLen, bThick, 1, 1, bracketColor);
-  _pixelLBracket(oc, width - pad - 2 - bThick, pad + 2, bLen, bThick, -1, 1, bracketColor);
-  _pixelLBracket(oc, pad + 2, height - pad - 2 - bThick, bLen, bThick, 1, -1, bracketColor);
-  _pixelLBracket(oc, width - pad - 2 - bThick, height - pad - 2 - bThick, bLen, bThick, -1, -1, bracketColor);
+  // 5. Tactical Inner Combat Zone Corner Ticks (at pad = 14)
+  const pad = 14;
+  const tickLen = 10;
+  const tickThick = 2;
+  _pixelLBracket(oc, pad, pad, tickLen, tickThick, 1, 1, cornerMarkColor);
+  _pixelLBracket(oc, width - pad - tickThick, pad, tickLen, tickThick, -1, 1, cornerMarkColor);
+  _pixelLBracket(oc, pad, height - pad - tickThick, tickLen, tickThick, 1, -1, cornerMarkColor);
+  _pixelLBracket(oc, width - pad - tickThick, height - pad - tickThick, tickLen, tickThick, -1, -1, cornerMarkColor);
 }
 
 function _renderPixelPvzGrassFloor(oc, width, height, cols, rows, cellW, cellH, isDark) {
@@ -937,7 +961,7 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
   const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
   const height = Math.max(64, Math.ceil(arena.height + fBleed * 2));
   const shape = arena.shape || 'rect';
-  const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}`;
+  const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}_v2`;
 
   if (!state._arenaFloorCanvasCache) {
     state._arenaFloorCanvasCache = {};
@@ -1100,29 +1124,27 @@ export function drawArenaFloorSelector(ctx, x, y, w, h) {
   const label = `${activeDef.icon} FLOOR: ${activeDef.shortName}`;
 
   ctx.save();
-  // 3D Shadow
-  ctx.fillStyle = '#baa88c';
+  ctx.fillStyle = '#0F1116';
   drawChamferedRect(ctx, x, y + 2, w, h, 3);
   ctx.fill();
 
-  // Button Body
-  ctx.fillStyle = '#faedf0';
-  ctx.strokeStyle = activeDef.themeColor || '#21050c';
-  ctx.lineWidth = 1.6;
+  ctx.fillStyle = '#181A22';
+  ctx.strokeStyle = activeDef.themeColor || '#F5A623';
+  ctx.lineWidth = 1.4;
   drawChamferedRect(ctx, x, y, w, h, 3);
   ctx.fill();
   ctx.stroke();
 
   // Accent Pip
-  ctx.fillStyle = activeDef.themeColor || '#b81c3b';
-  ctx.fillRect(x + 4, y + 2, 3, h - 4);
+  ctx.fillStyle = activeDef.themeColor || '#F5A623';
+  ctx.fillRect(x + 3, y + 2, 2.5, h - 4);
 
   // Text
-  ctx.fillStyle = '#21050c';
-  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(fitSingleLineText(ctx, label, w - 12), x + w / 2 + 1, y + h / 2);
+  ctx.fillText(fitSingleLineText(ctx, label, w - 12), x + w / 2 + 2, y + h / 2);
   ctx.restore();
 
   _registerButton(x, y, w, h + 2, () => {

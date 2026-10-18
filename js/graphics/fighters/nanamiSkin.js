@@ -486,7 +486,7 @@ export function drawNanamiSkin(ctx, fighter) {
     frontY = r * 0.25;
   }
 
-  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter.hideWeapon;
   const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand;
   const handRadius = getHandSize(5.2);
   const skinColor = '#F3CBB0';

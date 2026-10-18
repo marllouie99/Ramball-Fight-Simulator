@@ -6,7 +6,17 @@ import { Fighter } from '../../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { clearHealthHud } from '../hudManager.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, fitSingleLineText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
-import { getFighterPreview } from './FighterPreviewCache.js';
+import { getFighterPreview, getFighterStickerPreview } from './FighterPreviewCache.js';
+import {
+  drawCollectorFighterCard,
+  drawCollectorModalBackdrop,
+  drawCollectorShowcaseHeader,
+  drawCompactFighterDossierBar,
+  drawHazardStripes,
+  drawCornerBrackets,
+  drawTacticalStatBar,
+  getFighterCollectorTheme,
+} from './CollectorCardRenderer.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -15,34 +25,57 @@ import { drawArenaFloorSelector, isArenaFloorModalOpen, drawArenaFloorModal, clo
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
 
+const MODAL_ITEMS_PER_PAGE = 12;
+
 let selectingSlot = null;
 let modalInspectIndex = 0;
 let modalPage = 0;
 let _lastModalWheelTime = 0;
 let _lastCardWheelTime = 0;
+let _lastCardClickTime = 0;
+let _lastCardClickIdx = -1;
 let _playerCardBounds = [];
 
 function drawTlfsEnemyPoolGrid(x, y, w, h) {
   const { ctx } = state;
-  drawPanel(x, y, w, h, 0.98, 6, '#21050c');
+  // Deep Tactical Shadow
+  ctx.save();
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.70)';
+  drawChamferedRect(ctx, x + 3, y + 4, w, h, 6);
+  ctx.fill();
+
+  // Dark Tactical Carbon Base
+  ctx.fillStyle = '#141720';
+  ctx.strokeStyle = '#282E3C';
+  ctx.lineWidth = 1.6;
+  drawChamferedRect(ctx, x, y, w, h, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  // Tech Corner Brackets
+  drawCornerBrackets(ctx, x + 3, y + 3, w - 6, h - 6, 12, '#F5A623', 1.8);
 
   // Header band
-  ctx.fillStyle = '#21050c';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.5;
+  ctx.fillStyle = '#181C26';
+  ctx.strokeStyle = '#282E3C';
+  ctx.lineWidth = 1.4;
   drawChamferedRect(ctx, x + 2, y + 2, w - 4, 26, 4);
   ctx.fill();
   ctx.stroke();
 
   // Top accent line
-  ctx.fillStyle = '#f59e0b';
-  ctx.fillRect(x + 12, y + 2, w - 24, 2);
+  ctx.fillStyle = '#F5A623';
+  ctx.fillRect(x + 10, y + 2, w - 20, 2);
 
-  ctx.fillStyle = '#ffffff';
+  // Bottom hazard stripe
+  drawHazardStripes(ctx, x + 6, y + 23, w - 12, 3, 4, '#F5A623', '#101217');
+
+  ctx.fillStyle = '#FFFFFF';
   ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('ENEMY GAUNTLET POOL', x + w / 2, y + 15);
+  ctx.fillText('ENEMY GAUNTLET POOL', x + w / 2, y + 14);
+  ctx.restore();
 
   const cols = 4;
   const padding = 12;
@@ -67,24 +100,16 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
     
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = '#5e0d1f';
-      drawChamferedRect(ctx, cellX, cellY + 2, cellW, cellH, 3);
-      ctx.fill();
-
-      ctx.fillStyle = '#f26f88';
-      ctx.strokeStyle = '#21050c';
+      ctx.fillStyle = '#1E2330';
+      ctx.strokeStyle = '#F5A623';
       ctx.lineWidth = 1.6;
       drawChamferedRect(ctx, cellX, cellY, cellW, cellH, 3);
       ctx.fill();
       ctx.stroke();
     } else {
-      ctx.fillStyle = '#baa88c';
-      drawChamferedRect(ctx, cellX, cellY + 2, cellW, cellH, 3);
-      ctx.fill();
-
-      ctx.fillStyle = '#fff5f7';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.4;
+      ctx.fillStyle = '#111319';
+      ctx.strokeStyle = '#232733';
+      ctx.lineWidth = 1.2;
       drawChamferedRect(ctx, cellX, cellY, cellW, cellH, 3);
       ctx.fill();
       ctx.stroke();
@@ -100,17 +125,17 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
     }
 
     // Name tag
-    ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
-    ctx.font = '700 6px "Press Start 2P", monospace';
+    ctx.fillStyle = isSelected ? '#FFD043' : '#64748B';
+    ctx.font = '900 8.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     let nameStr = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
-    if (nameStr.length > 7) nameStr = nameStr.substring(0, 6) + '.';
+    if (nameStr.length > 9) nameStr = nameStr.substring(0, 8) + '..';
     ctx.fillText(nameStr.toUpperCase(), cellX + cellW / 2, cellY + cellH - 3);
     
     if (!isSelected) {
-      ctx.strokeStyle = '#cc2b4d';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
       ctx.moveTo(cellX + 4, cellY + 4);
       ctx.lineTo(cellX + cellW - 4, cellY + cellH - 4);
@@ -138,11 +163,11 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
   
   drawButton('SELECT ALL', x + 16 + halfBtnW / 2, poolBtnY + 16, () => {
     state.tlfsAllowedEnemies = poolFighters.map(f => f.idx);
-  }, halfBtnW - 4, 30, null, 4);
+  }, halfBtnW - 4, 30, '#20242E', 4);
 
   drawButton('CLEAR ALL', x + w - 16 - halfBtnW / 2, poolBtnY + 16, () => {
     state.tlfsAllowedEnemies = poolFighters.slice(0, 5).map(f => f.idx);
-  }, halfBtnW - 4, 30, null, 4);
+  }, halfBtnW - 4, 30, '#20242E', 4);
 }
 
 function drawSmallFighterBadge(ctx, def, cx, cy, size = 16) {
@@ -157,6 +182,8 @@ function drawSmallFighterBadge(ctx, def, cx, cy, size = 16) {
     badge.vy = 0;
     badge.angle = 0;
     badge.gunAngle = 0;
+    badge.hideHpText = true;
+    badge._isPreview = true;
 
     ctx.save();
     ctx.translate(cx, cy);
@@ -178,8 +205,6 @@ function drawSmallFighterBadge(ctx, def, cx, cy, size = 16) {
     ctx.fillText((def.name || '?').charAt(0).toUpperCase(), cx, cy);
   }
 }
-
-
 
 function applyFighterSelection() {
   if (selectingSlot) {
@@ -214,33 +239,118 @@ function applyFighterSelection() {
   selectingSlot = null;
 }
 
+function _handleCollectorCardSelect(idx) {
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  if (modalInspectIndex === idx && _lastCardClickIdx === idx && now - _lastCardClickTime < 360) {
+    applyFighterSelection();
+    return;
+  }
+  _lastCardClickIdx = idx;
+  _lastCardClickTime = now;
+  if (modalInspectIndex !== idx) {
+    modalInspectIndex = idx;
+    preloadFighterAssets(idx);
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_dash5', 0.14);
+    }
+  }
+}
+
+function _drawModalPaginationDock(ctx, x, y, w, h, totalPages) {
+  ctx.save();
+  // Tactical carbon plate with subtle hazard amber edge line
+  ctx.fillStyle = '#161922';
+  ctx.strokeStyle = '#2B313E';
+  ctx.lineWidth = 1.4;
+  drawChamferedRect(ctx, x, y, w, h, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Top yellow accent hairline
+  ctx.fillStyle = '#F5A623';
+  ctx.fillRect(x + 10, y, w - 20, 1.5);
+  ctx.restore();
+
+  const btnW = 34;
+  const btnH = h - 6;
+  const btnCenterY = y + h / 2;
+
+  drawButton('◄', x + 6 + btnW / 2, btnCenterY, () => {
+    if (modalPage > 0) {
+      modalPage--;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
+    }
+  }, btnW, btnH, '#20242E', 3);
+
+  drawButton('►', x + w - 6 - btnW / 2, btnCenterY, () => {
+    if (modalPage < totalPages - 1) {
+      modalPage++;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
+    }
+  }, btnW, btnH, '#20242E', 3);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const curP = String(modalPage + 1).padStart(2, '0');
+  const totP = String(totalPages).padStart(2, '0');
+  ctx.fillText(`PAGE // [ ${curP} / ${totP} ]`, x + w / 2 - 34, btnCenterY);
+
+  const dotSpacing = 14;
+  const dotsStartX = x + w / 2 + 24;
+  for (let p = 0; p < totalPages; p++) {
+    const dotX = dotsStartX + p * dotSpacing;
+    const isCurrentPage = p === modalPage;
+    ctx.fillStyle = isCurrentPage ? '#F5A623' : '#333846';
+    ctx.save();
+    ctx.translate(dotX, btnCenterY);
+    ctx.rotate(Math.PI / 4);
+    const size = isCurrentPage ? 6 : 4;
+    ctx.fillRect(-size / 2, -size / 2, size, size);
+    ctx.restore();
+
+    _registerButton(dotX - 6, btnCenterY - 6, 12, 12, () => {
+      if (modalPage !== p) {
+        modalPage = p;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash5', 0.12);
+        }
+      }
+    });
+  }
+}
+
 function drawFighterSelectModal() {
   const { ctx, canvas } = state;
   const isLandscape = canvas.width > 600 || state.viewOrientation === 'horizontal';
-  const modalW = isLandscape ? Math.min(canvas.width - 40, 900) : Math.min(canvas.width - 20, 510);
-  const modalH = isLandscape ? Math.min(canvas.height - 30, 490) : Math.min(canvas.height - 40, 600);
-  const mx = (canvas.width - modalW) / 2;
-  const my = (canvas.height - modalH) / 2;
+  const modalW = isLandscape ? Math.min(canvas.width - 28, 912) : Math.min(canvas.width - 20, 508);
+  const modalH = isLandscape ? Math.min(canvas.height - 20, 508) : Math.min(canvas.height - 44, 896);
+  const mx = Math.round((canvas.width - modalW) / 2);
+  const my = Math.round((canvas.height - modalH) / 2);
 
-  // Retro dim backdrop overlay
-  ctx.fillStyle = 'rgba(33, 5, 12, 0.88)';
+  // Darken arena/menu behind modal
+  ctx.fillStyle = 'rgba(20, 5, 10, 0.86)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Backdrop click closes modal
+  // Click outside closes modal
   _registerButton(0, 0, canvas.width, canvas.height, () => {
     selectingSlot = null;
   });
-
-  // Blocker over modal panel window
   _registerButton(mx, my, modalW, modalH, () => {});
 
   const currentDefs = getActiveFighterDefs();
   const selectedDef = currentDefs[modalInspectIndex] || currentDefs[0] || FIGHTER_DEFS[0];
+  const modalWeaponInfo = getFighterWeaponInfo(selectedDef);
 
-  // Draw main outer retro cream-pink panel
-  drawPanel(mx, my, modalW, modalH, 0.98, 6, '#21050c');
+  // 1. Warm Cream Checkered Paper Showcase Board (Reference 1 Backdrop)
+  drawCollectorModalBackdrop(ctx, mx, my, modalW, modalH);
 
-  // Header Banner
+  // 2. Top-Left Golden Chevron Header Banner (Reference 1 Header)
   const pNumMatch = selectingSlot ? String(selectingSlot).match(/\d+/) : null;
   let slotLabel = 'PLAYER';
   if (selectingSlot) {
@@ -251,700 +361,1121 @@ function drawFighterSelectModal() {
       slotLabel = `PLAYER ${pNumMatch[0]}`;
     }
   }
+  drawCollectorShowcaseHeader(ctx, mx, my, modalW, slotLabel, () => {
+    selectingSlot = null;
+  });
 
-  ctx.fillStyle = '#b81c3b';
-  ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText('FIGHTER ROSTER // PROTOCOL 01', mx + 18, my + 12);
-
-  ctx.fillStyle = '#21050c';
-  ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
-  ctx.fillText(`CHOOSE FIGHTER (${slotLabel})`, mx + 18, my + 24);
-
-  // Header accent line
-  ctx.fillStyle = '#21050c';
-  ctx.fillRect(mx + 18, my + 42, modalW - 36, 2);
-
-  const modalAvailableFighters = currentDefs.map((def, idx) => ({ def, idx }))
+  const modalAvailableFighters = currentDefs
+    .map((def, idx) => ({ def, idx }))
     .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
 
+  const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / MODAL_ITEMS_PER_PAGE));
+  modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
+
+  const startIdx = modalPage * MODAL_ITEMS_PER_PAGE;
+  const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + MODAL_ITEMS_PER_PAGE);
+
   if (isLandscape) {
-    // ── LANDSCAPE 16:9 DUAL-STAGE ROSTER MODAL ──
-    const cols = 5;
-    const rows = 3;
-    const itemsPerPage = cols * rows; // 15
-    const gap = 6;
-    const gridW = 460;
-    const listX = mx + 16;
-    const listY = my + 50;
+    // ── LANDSCAPE (960x540): 6x2 Collector Card Grid + Top Pagination + Bottom Dossier & Lock-In ──
+    _drawModalPaginationDock(ctx, mx + 410, my + 10, modalW - 456, 28, totalPages);
 
-    const cellW = Math.floor((gridW - (cols - 1) * gap) / cols); // ~87px
-    const cellH = 92;
-
-    const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
-    modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
-
-    const startIdx = modalPage * itemsPerPage;
-    const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + itemsPerPage);
-
-    // Render 5x3 Grid
-    pageFighters.forEach(({ def, idx }, localPos) => {
-      const col = localPos % cols;
-      const row = Math.floor(localPos / cols);
-
-      const itemX = listX + col * (cellW + gap);
-      const itemY = listY + row * (cellH + gap);
-      const isSelected = idx === modalInspectIndex;
-
-      ctx.save();
-      if (isSelected) {
-        ctx.fillStyle = '#5e0d1f';
-        drawChamferedRect(ctx, itemX, itemY + 2.5, cellW, cellH, 3);
-        ctx.fill();
-
-        ctx.fillStyle = '#f26f88';
-        ctx.strokeStyle = '#21050c';
-        ctx.lineWidth = 1.8;
-        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.strokeStyle = '#ffaec0';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(itemX + 2, itemY + 1.5);
-        ctx.lineTo(itemX + cellW - 2, itemY + 1.5);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = '#baa88c';
-        drawChamferedRect(ctx, itemX, itemY + 2, cellW, cellH, 3);
-        ctx.fill();
-
-        ctx.fillStyle = '#fff5f7';
-        ctx.strokeStyle = '#21050c';
-        ctx.lineWidth = 1.5;
-        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
-        ctx.fill();
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Avatar
-      const avatarX = itemX + cellW / 2;
-      const avatarY = itemY + cellH / 2 - 8;
-      const previewImg = getFighterPreview(idx);
-      if (previewImg) {
-        const avatarSize = cellW - 16;
-        ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
-      } else {
-        ctx.fillStyle = def.color || '#fff';
-        ctx.beginPath();
-        ctx.arc(avatarX, avatarY, 16, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Name Tag
-      ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
-      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-      let shortName = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
-      if (shortName.length > 10) shortName = shortName.substring(0, 9) + '.';
-      ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
-
-      _registerButton(itemX, itemY, cellW, cellH + 2, () => {
-        if (modalInspectIndex !== idx) {
-          modalInspectIndex = idx;
-          preloadFighterAssets(idx);
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('skill_dash5', 0.12);
-          }
-        }
-      });
-    });
-
-    // Pagination Controls Dock
-    const paginationY = listY + rows * (cellH + gap) + 4;
-    const paginationH = 32;
-
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.5;
-    drawChamferedRect(ctx, listX, paginationY, gridW, paginationH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    const pageBtnW = 34;
-    const pageBtnH = 22;
-    const pageBtnY = paginationY + paginationH / 2;
-
-    drawButton('◄', listX + 8 + pageBtnW / 2, pageBtnY, () => {
-      if (modalPage > 0) {
-        modalPage--;
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('skill_dash5', 0.12);
-        }
-      }
-    }, pageBtnW, pageBtnH, null, 3);
-
-    drawButton('►', listX + gridW - 8 - pageBtnW / 2, pageBtnY, () => {
-      if (modalPage < totalPages - 1) {
-        modalPage++;
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('skill_dash5', 0.12);
-        }
-      }
-    }, pageBtnW, pageBtnH, null, 3);
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, paginationY + 11);
-
-    const dotSpacing = 14;
-    const dotsStartX = listX + gridW / 2 - ((totalPages - 1) * dotSpacing) / 2;
-    for (let p = 0; p < totalPages; p++) {
-      const dotX = dotsStartX + p * dotSpacing;
-      const dotY = paginationY + 23;
-      const isCurrentPage = p === modalPage;
-      ctx.fillStyle = isCurrentPage ? '#b81c3b' : '#baa88c';
-      ctx.beginPath();
-      ctx.arc(dotX, dotY, isCurrentPage ? 3.5 : 2.5, 0, Math.PI * 2);
-      ctx.fill();
-      _registerButton(dotX - 6, dotY - 6, 12, 12, () => {
-        if (modalPage !== p) {
-          modalPage = p;
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('skill_dash5', 0.12);
-          }
-        }
-      });
-    }
-
-    // Cancel / Lock In action buttons below grid
-    const footerY = my + modalH - 34;
-    const actionBtnW = 210;
-    const actionBtnH = 30;
-
-    drawButton('CANCEL', listX + gridW / 4, footerY, () => {
-      selectingSlot = null;
-    }, actionBtnW, actionBtnH, null, 4);
-
-    drawButton('LOCK IN', listX + (gridW * 3) / 4, footerY, () => {
-      applyFighterSelection();
-    }, actionBtnW, actionBtnH, '#cc2b4d', 4);
-
-    // ── Right Side: 2-Column Champion & Weapon Showcase Stage ──
-    const detailX = listX + gridW + 16;
-    const detailW = modalW - (detailX - mx) - 16; // ~392px
-    const detailY = listY;
-    const detailH = 414;
-
-    ctx.save();
-    ctx.fillStyle = '#baa88c';
-    drawChamferedRect(ctx, detailX, detailY + 3, detailW, detailH, 4);
-    ctx.fill();
-
-    ctx.fillStyle = '#fff5f7';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.8;
-    drawChamferedRect(ctx, detailX, detailY, detailW, detailH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    // Split Right Side into Left Sub-panel (Stats/Hero) and Right Sub-panel (Weapon/Ability)
-    const subLeftX = detailX + 10;
-    const subLeftW = 175;
-    const subRightX = detailX + 192;
-    const subRightW = detailW - 202;
-
-    // Champion Preview Avatar
-    const previewX = subLeftX + subLeftW / 2;
-    const previewY = detailY + 44;
-    const previewSize = 64;
-
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(previewX, previewY + 26, 36, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    const previewImage = getFighterPreview(modalInspectIndex);
-    if (previewImage) {
-      ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
-    }
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(fitSingleLineText(ctx, selectedDef.name.toUpperCase(), subLeftW - 8), previewX, detailY + 86);
-
-    // Class Badge Pill
-    const pillW = Math.min(subLeftW - 12, 110);
-    const pillH = 16;
-    ctx.fillStyle = '#b81c3b';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.4;
-    drawChamferedRect(ctx, previewX - pillW / 2, detailY + 98, pillW, pillH, 3);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(`CLASS // ${selectedDef.type.toUpperCase()}`, previewX, detailY + 106.5);
-
-    let statBarY = detailY + 124;
-    if (selectedDef.type === 'reze') {
-      const isHybrid = Boolean(state.showRezeTransformation);
-      drawButton(
-        isHybrid ? '💣 BOMB DEVIL' : '🌸 HUMAN FORM',
-        previewX,
-        statBarY + 8,
-        () => {
-          state.showRezeTransformation = !state.showRezeTransformation;
-          try {
-            if (state.showRezeTransformation) audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
-            else audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-          } catch (e) {}
-        },
-        subLeftW - 16,
-        18,
-        isHybrid ? '#b81c3b' : null,
-        3
-      );
-      statBarY += 24;
-    } else if (selectedDef.type === 'eye_of_cthulhu') {
-      const isP2 = Boolean(state.showEyeOfCthulhuPhase2);
-      drawButton(
-        isP2 ? '🦷 PHASE 2' : '👁️ PHASE 1',
-        previewX,
-        statBarY + 8,
-        () => {
-          state.showEyeOfCthulhuPhase2 = !state.showEyeOfCthulhuPhase2;
-          try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
-        },
-        subLeftW - 16,
-        18,
-        isP2 ? '#e11d48' : null,
-        3
-      );
-      statBarY += 24;
-    }
-
-    drawStatBar(ctx, 'HP', selectedDef.hp, 150, subLeftX, statBarY, subLeftW, '#cc2b4d');
-    statBarY += 16;
-    drawStatBar(ctx, 'DMG', selectedDef.damage, 60, subLeftX, statBarY, subLeftW, '#f59e0b');
-    statBarY += 16;
-    drawStatBar(ctx, 'SPD', selectedDef.speed || 2, 4, subLeftX, statBarY, subLeftW, '#7c2d37');
-
-    // Right Sub-panel: Ability Box + Weapon Visual Box
-    const modalWeaponInfo = getFighterWeaponInfo(selectedDef);
-
-    // Ability Sub-box
-    const abY = detailY + 8;
-    const abH = 86;
-    ctx.save();
-    ctx.fillStyle = '#fff5f7';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.4;
-    drawChamferedRect(ctx, subRightX, abY, subRightW, abH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.fillStyle = '#b81c3b';
-    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${selectedDef.ability.toUpperCase()}`, subRightW - 12), subRightX + 6, abY + 6);
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    wrapText(ctx, selectedDef.desc, subRightX + 6, abY + 18, subRightW - 12, 12, 4);
-
-    // Weapon Visual Box
-    const wpY = abY + abH + 8;
-    const wpH = detailH - (wpY - detailY) - 8;
-    ctx.save();
-    ctx.fillStyle = '#faedf0';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.6;
-    drawChamferedRect(ctx, subRightX, wpY, subRightW, wpH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.fillStyle = '#b81c3b';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${modalWeaponInfo.name}`, subRightW - 12), subRightX + 6, wpY + 6);
-
-    ctx.fillStyle = '#8b1524';
-    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(fitSingleLineText(ctx, `[ ${modalWeaponInfo.category} ]`, subRightW - 12), subRightX + 6, wpY + 19);
-
-    const mStageX = subRightX + subRightW / 2;
-    const mStageY = wpY + 95;
-
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(mStageX, mStageY + 20, 44, 9, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.translate(mStageX, mStageY);
-    ctx.scale(1.05, 1.05);
-    drawWeaponPreview(ctx, selectedDef.type, selectedDef.color);
-    ctx.restore();
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    wrapText(ctx, modalWeaponInfo.desc, mStageX, wpY + 190, subRightW - 12, 12, 4);
-
-  } else {
-    // ── PORTRAIT (540x960) ORIGINAL MODAL LAYOUT (Rule 28 Baseline Preserved) ──
-    const cols = 3;
-    const rows = 5;
-    const itemsPerPage = cols * rows;
-    const gap = 6;
-    const gridW = 210;
+    const cols = 6;
+    const cardW = 130;
+    const cardH = 140;
+    const gapX = Math.floor((modalW - 36 - cols * cardW) / (cols - 1));
+    const rowStride = cardH + 21;
     const listX = mx + 18;
-    const listY = my + 58;
+    const listY = my + 48;
 
-    const cellW = Math.floor((gridW - (cols - 1) * gap) / cols);
-    const cellH = 68;
-
-    const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
-    modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
-
-    const startIdx = modalPage * itemsPerPage;
-    const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + itemsPerPage);
-
-    // Render Current Page Roster Grid
     pageFighters.forEach(({ def, idx }, localPos) => {
       const col = localPos % cols;
       const row = Math.floor(localPos / cols);
-
-      const itemX = listX + col * (cellW + gap);
-      const itemY = listY + row * (cellH + gap);
-
-      const isSelected = idx === modalInspectIndex;
-
-      ctx.save();
-      if (isSelected) {
-        ctx.fillStyle = '#5e0d1f';
-        drawChamferedRect(ctx, itemX, itemY + 2.5, cellW, cellH, 3);
-        ctx.fill();
-
-        ctx.fillStyle = '#f26f88';
-        ctx.strokeStyle = '#21050c';
-        ctx.lineWidth = 1.8;
-        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.strokeStyle = '#ffaec0';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(itemX + 2, itemY + 1.5);
-        ctx.lineTo(itemX + cellW - 2, itemY + 1.5);
-        ctx.stroke();
-      } else {
-        ctx.fillStyle = '#baa88c';
-        drawChamferedRect(ctx, itemX, itemY + 2, cellW, cellH, 3);
-        ctx.fill();
-
-        ctx.fillStyle = '#fff5f7';
-        ctx.strokeStyle = '#21050c';
-        ctx.lineWidth = 1.5;
-        drawChamferedRect(ctx, itemX, itemY, cellW, cellH, 3);
-        ctx.fill();
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Fighter Preview Avatar inside card
-      const avatarX = itemX + cellW / 2;
-      const avatarY = itemY + cellH / 2 - 7;
-      const previewImg = getFighterPreview(idx);
-      if (previewImg) {
-        const avatarSize = cellW - 14;
-        ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
-      } else {
-        ctx.fillStyle = def.color || '#fff';
-        ctx.beginPath();
-        ctx.arc(avatarX, avatarY, 14, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Card Name Tag
-      ctx.fillStyle = isSelected ? '#ffffff' : '#21050c';
-      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'bottom';
-
-      let shortName = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
-      if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
-      ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
-
-      _registerButton(itemX, itemY, cellW, cellH + 2, () => {
-        if (modalInspectIndex !== idx) {
-          modalInspectIndex = idx;
-          preloadFighterAssets(idx);
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('skill_dash5', 0.12);
-          }
-        }
-      });
+      const cardX = listX + col * (cardW + gapX);
+      const cardY = listY + row * rowStride;
+      drawCollectorFighterCard(
+        ctx,
+        def,
+        idx,
+        cardX,
+        cardY,
+        cardW,
+        cardH,
+        idx === modalInspectIndex,
+        () => _handleCollectorCardSelect(idx)
+      );
     });
 
-    // Pagination Controls Dock at Bottom of Roster Grid
-    const paginationY = listY + rows * (cellH + gap) + 4;
-    const paginationH = 34;
+    // Bottom Dossier Bar + Action Buttons
+    const bottomY = my + modalH - 96;
+    const dossierW = modalW - 220;
+    drawCompactFighterDossierBar(ctx, selectedDef, modalWeaponInfo, listX, bottomY, dossierW, 84);
 
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.5;
-    drawChamferedRect(ctx, listX, paginationY, gridW, paginationH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    const btnCenterX = listX + dossierW + 14 + 84;
+    drawButton('LOCK IN // 确认', btnCenterX, bottomY + 21, () => applyFighterSelection(), 168, 40, '#F5A623', 4);
+    drawButton('CANCEL', btnCenterX, bottomY + 65, () => { selectingSlot = null; }, 168, 34, '#20242E', 4);
+  } else {
+    // ── PORTRAIT (540x960): Reference 1 3x4 Full-Width Collector Card Grid (12 Cards) ──
+    const cols = 3;
+    const cardW = 136;
+    const cardH = 138;
+    const listX = mx + 20;
+    const availW = modalW - 40;
+    const gapX = Math.floor((availW - cols * cardW) / (cols - 1));
+    const rowStride = cardH + 21;
+    const listY = my + 46;
 
-    const pageBtnW = 32;
-    const pageBtnH = 24;
-    const pageBtnY = paginationY + paginationH / 2;
-
-    drawButton('◄', listX + 8 + pageBtnW / 2, pageBtnY, () => {
-      if (modalPage > 0) {
-        modalPage--;
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('skill_dash5', 0.12);
-        }
-      }
-    }, pageBtnW, pageBtnH, null, 3);
-
-    drawButton('►', listX + gridW - 8 - pageBtnW / 2, pageBtnY, () => {
-      if (modalPage < totalPages - 1) {
-        modalPage++;
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('skill_dash5', 0.12);
-        }
-      }
-    }, pageBtnW, pageBtnH, null, 3);
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, paginationY + 11);
-
-    const dotSpacing = 14;
-    const dotsStartX = listX + gridW / 2 - ((totalPages - 1) * dotSpacing) / 2;
-    for (let p = 0; p < totalPages; p++) {
-      const dotX = dotsStartX + p * dotSpacing;
-      const dotY = paginationY + 24;
-      const isCurrentPage = p === modalPage;
-
-      ctx.fillStyle = isCurrentPage ? '#b81c3b' : '#baa88c';
-      ctx.beginPath();
-      ctx.arc(dotX, dotY, isCurrentPage ? 3.5 : 2.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      _registerButton(dotX - 6, dotY - 6, 12, 12, () => {
-        if (modalPage !== p) {
-          modalPage = p;
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('skill_dash5', 0.12);
-          }
-        }
-      });
-    }
-
-    // Right Side: Champion Showcase Stage
-    const detailX = listX + gridW + 16;
-    const detailW = modalW - (detailX - mx) - 18;
-    const detailY = my + 58;
-    const detailH = 444;
-
-    ctx.save();
-    ctx.fillStyle = '#baa88c';
-    drawChamferedRect(ctx, detailX, detailY + 3, detailW, detailH, 4);
-    ctx.fill();
-
-    ctx.fillStyle = '#fff5f7';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.8;
-    drawChamferedRect(ctx, detailX, detailY, detailW, detailH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    const previewX = detailX + detailW / 2;
-    const previewY = detailY + 54;
-
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.ellipse(previewX, previewY + 32, 40, 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    const previewImage = getFighterPreview(modalInspectIndex);
-    if (previewImage) {
-      const previewSize = 78;
-      ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
-    }
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '900 13.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 104);
-
-    const pillW = 96;
-    const pillH = 16;
-    ctx.fillStyle = '#b81c3b';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.4;
-    drawChamferedRect(ctx, previewX - pillW / 2, detailY + 116, pillW, pillH, 3);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(`CLASS // ${selectedDef.type.toUpperCase()}`, previewX, detailY + 124.5);
-
-    let textY = detailY + 146;
-    if (selectedDef.type === 'reze') {
-      const isHybrid = Boolean(state.showRezeTransformation);
-      drawButton(
-        isHybrid ? '💣 BOMB DEVIL' : '🌸 HUMAN FORM',
-        previewX,
-        detailY + 142,
-        () => {
-          state.showRezeTransformation = !state.showRezeTransformation;
-          try {
-            if (state.showRezeTransformation) audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.95);
-            else audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
-          } catch (e) {}
-        },
-        115,
-        18,
-        isHybrid ? '#b81c3b' : null,
-        3
+    pageFighters.forEach(({ def, idx }, localPos) => {
+      const col = localPos % cols;
+      const row = Math.floor(localPos / cols);
+      const cardX = listX + col * (cardW + gapX);
+      const cardY = listY + row * rowStride;
+      drawCollectorFighterCard(
+        ctx,
+        def,
+        idx,
+        cardX,
+        cardY,
+        cardW,
+        cardH,
+        idx === modalInspectIndex,
+        () => _handleCollectorCardSelect(idx)
       );
-      textY += 20;
-    } else if (selectedDef.type === 'eye_of_cthulhu') {
-      const isP2 = Boolean(state.showEyeOfCthulhuPhase2);
-      drawButton(
-        isP2 ? '🦷 PHASE 2 (FANGED MAW)' : '👁️ PHASE 1 (OCULAR)',
-        previewX,
-        detailY + 142,
-        () => {
-          state.showEyeOfCthulhuPhase2 = !state.showEyeOfCthulhuPhase2;
-          try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
-        },
-        135,
-        18,
-        isP2 ? '#e11d48' : null,
-        3
-      );
-      textY += 20;
-    }
-    const barW = detailW - 20;
-    const barX = detailX + 10;
+    });
 
-    drawStatBar(ctx, 'HP', selectedDef.hp, 150, barX, textY, barW, '#cc2b4d');
-    textY += 16;
-    drawStatBar(ctx, 'DMG', selectedDef.damage, 60, barX, textY, barW, '#f59e0b');
-    textY += 16;
-    drawStatBar(ctx, 'SPD', selectedDef.speed || 2, 4, barX, textY, barW, '#7c2d37');
-    textY += 22;
+    // Pagination Dock
+    const paginationY = listY + 4 * rowStride + 2;
+    _drawModalPaginationDock(ctx, listX, paginationY, availW, 28, totalPages);
 
-    const modalWeaponInfo = getFighterWeaponInfo(selectedDef);
+    // Compact Selected Fighter Dossier Bar (Stats, Ability, Live Weapon Stage)
+    const dossierY = paginationY + 34;
+    drawCompactFighterDossierBar(ctx, selectedDef, modalWeaponInfo, listX, dossierY, availW, 86);
 
-    // Weapon Visual Showcase Box in Modal
-    const mWeaponBoxY = textY;
-    const mWeaponBoxH = 110;
-    ctx.save();
-    ctx.fillStyle = '#faedf0';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.6;
-    drawChamferedRect(ctx, barX, mWeaponBoxY, barW, mWeaponBoxH, 4);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.fillStyle = '#b81c3b';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${modalWeaponInfo.name}`, barW - 16), barX + 8, mWeaponBoxY + 7);
-
-    ctx.fillStyle = '#8b1524';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(fitSingleLineText(ctx, `[ ${modalWeaponInfo.category} ]`, barW - 16), barX + 8, mWeaponBoxY + 20);
-
-    const mStageX = barX + barW / 2;
-    const mStageY = mWeaponBoxY + 58;
-
-    ctx.save();
-    ctx.fillStyle = '#eed8dc';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.ellipse(mStageX, mStageY + 16, 36, 8, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.translate(mStageX, mStageY);
-    ctx.scale(0.9, 0.9);
-    drawWeaponPreview(ctx, selectedDef.type, selectedDef.color);
-    ctx.restore();
-
-    const mAbilityY = mWeaponBoxY + mWeaponBoxH + 8;
-    ctx.fillStyle = '#b81c3b';
-    ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${selectedDef.ability.toUpperCase()}`, barW), barX, mAbilityY);
-
-    ctx.fillStyle = '#21050c';
-    ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    wrapText(ctx, selectedDef.desc, barX, mAbilityY + 14, barW, 13, 4);
-
-    const footerY = my + modalH - 34;
-    const btnW = 130;
-    const btnH = 34;
-
-    drawButton('CANCEL', listX + gridW / 2, footerY, () => {
+    // Bottom Action Footer: CANCEL & LOCK IN
+    const footerY = dossierY + 86 + 24;
+    const btnW = Math.floor((availW - 16) / 2);
+    drawButton('CANCEL', listX + btnW / 2, footerY, () => {
       selectingSlot = null;
-    }, btnW, btnH, null, 4);
-
-    drawButton('LOCK IN', detailX + detailW / 2, footerY, () => {
+    }, btnW, 36, '#20242E', 4);
+    drawButton('LOCK IN // 确认', listX + availW - btnW / 2, footerY, () => {
       applyFighterSelection();
-    }, btnW, btnH, '#cc2b4d', 4);
+    }, btnW, 36, '#F5A623', 4);
   }
+}
+
+function drawSlantedParallelogram(ctx, x, y, w, h, slant = 10, fillStyle = null, strokeStyle = null, lineWidth = 1) {
+  ctx.beginPath();
+  ctx.moveTo(x + slant, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w - slant, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.closePath();
+  if (fillStyle) {
+    ctx.fillStyle = fillStyle;
+    ctx.fill();
+  }
+  if (strokeStyle && lineWidth > 0) {
+    ctx.strokeStyle = strokeStyle;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+  }
+}
+
+function drawSlantedStatBar(ctx, label, value, max, x, y, w, h, color, slant = 6) {
+  const ratio = Math.min(1, Math.max(0, value / max));
+  const barX = x + 30;
+  const barW = Math.max(20, w - 66);
+  const fillW = Math.max(4, Math.round(barW * ratio));
+
+  // 1. Label
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y + h / 2);
+
+  // 2. Slanted track background
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(barX + slant, y);
+  ctx.lineTo(barX + barW, y);
+  ctx.lineTo(barX + barW - slant, y + h);
+  ctx.lineTo(barX, y + h);
+  ctx.closePath();
+  ctx.fillStyle = '#0B0D14';
+  ctx.fill();
+  ctx.strokeStyle = '#222838';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.clip();
+
+  // 3. Slanted active fill
+  ctx.beginPath();
+  ctx.moveTo(barX + slant, y);
+  ctx.lineTo(barX + fillW + slant, y);
+  ctx.lineTo(barX + fillW, y + h);
+  ctx.lineTo(barX, y + h);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+
+  // 4. Subtle top gloss line
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+  ctx.fillRect(barX, y, fillW + slant, 1.5);
+  ctx.restore();
+
+  // 5. Value telemetry text on right
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 10px "Outfit", "Rajdhani", monospace';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${value}`, x + w, y + h / 2);
+}
+
+function drawDynamicVsClashEmblem(ctx, vsX, vsY, isLandscape) {
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  ctx.save();
+
+  // 1. Horizontal dramatic lightning slash beam across the divide (Animated Electric Surge)
+  const beamW = isLandscape ? 40 : 220;
+  
+  if (!isLandscape) {
+    const beamPulse = 0.85 + Math.sin(now * 8.0) * 0.15;
+    // Horizontal energy slash across the seam
+    const grad = ctx.createLinearGradient(vsX - beamW, vsY, vsX + beamW, vsY);
+    grad.addColorStop(0, 'rgba(245, 166, 35, 0)');
+    grad.addColorStop(0.3, `rgba(245, 166, 35, ${(0.45 * beamPulse).toFixed(3)})`);
+    grad.addColorStop(0.5, `rgba(255, 255, 255, ${(0.95 * beamPulse).toFixed(3)})`);
+    grad.addColorStop(0.7, `rgba(245, 166, 35, ${(0.45 * beamPulse).toFixed(3)})`);
+    grad.addColorStop(1, 'rgba(245, 166, 35, 0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(vsX - beamW, vsY - 2, beamW * 2, 4);
+
+    // Dynamic jagged lightning ticks (Electric Crackle)
+    const tickJitter = Math.sin(now * 25) * 2.0;
+    ctx.strokeStyle = Math.sin(now * 16) > 0.0 ? '#FFD043' : '#FFFFFF';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(vsX - 90, vsY - 1);
+    ctx.lineTo(vsX - 45, vsY - 6 + tickJitter);
+    ctx.lineTo(vsX - 35, vsY + 5 - tickJitter);
+    ctx.lineTo(vsX - 18, vsY);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(vsX + 18, vsY);
+    ctx.lineTo(vsX + 35, vsY - 5 - tickJitter);
+    ctx.lineTo(vsX + 45, vsY + 6 + tickJitter);
+    ctx.lineTo(vsX + 90, vsY - 1);
+    ctx.stroke();
+  }
+
+  // 2. Heavy 3D comic ink drop shadow for central crest (Dynamic Floating Pulse)
+  const shieldScale = 1.0 + Math.sin(now * 3.6) * 0.04;
+  const shieldJitter = Math.sin(now * 35) * 0.4;
+
+  ctx.fillStyle = '#06070A';
+  ctx.beginPath();
+  ctx.ellipse(vsX + 2, vsY + 3.5, 25 * shieldScale, 21 * shieldScale, -0.08, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Outer Diamond / Hexagonal Shield Base
+  const crestW = 46 * shieldScale;
+  const crestH = 34 * shieldScale;
+  ctx.save();
+  ctx.translate(vsX + shieldJitter, vsY);
+  ctx.rotate(-0.06);
+
+  ctx.beginPath();
+  ctx.moveTo(0, -crestH / 2);
+  ctx.lineTo(crestW / 2, -crestH / 4);
+  ctx.lineTo(crestW / 2, crestH / 4);
+  ctx.lineTo(0, crestH / 2);
+  ctx.lineTo(-crestW / 2, crestH / 4);
+  ctx.lineTo(-crestW / 2, -crestH / 4);
+  ctx.closePath();
+  ctx.fillStyle = '#11131C';
+  ctx.fill();
+  ctx.strokeStyle = '#F5A623';
+  ctx.lineWidth = 2.4;
+  ctx.stroke();
+
+  // Inner metallic rim
+  ctx.beginPath();
+  ctx.moveTo(0, -crestH / 2 + 3);
+  ctx.lineTo(crestW / 2 - 3, -crestH / 4 + 1.5);
+  ctx.lineTo(crestW / 2 - 3, crestH / 4 - 1.5);
+  ctx.lineTo(0, crestH / 2 - 3);
+  ctx.lineTo(-crestW / 2 + 3, crestH / 4 - 1.5);
+  ctx.lineTo(-crestW / 2 + 3, -crestH / 4 + 1.5);
+  ctx.closePath();
+  ctx.strokeStyle = '#FFE169';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 4. Stylized 3D Dual-Tone VS Typography (Animated Glow)
+  ctx.font = '900 16px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Ink drop shadow
+  ctx.fillStyle = '#05070B';
+  ctx.fillText('VS', 1.5, 2);
+
+  // Gradient / Dual text fill
+  ctx.fillStyle = Math.sin(now * 12) > 0.6 ? '#FFE145' : '#FFFFFF';
+  ctx.fillText('VS', 0, 0.5);
+
+  ctx.restore();
+  ctx.restore();
+}
+
+function drawTacticalVsCrest(ctx, vsX, vsY) {
+  drawDynamicVsClashEmblem(ctx, vsX, vsY, true);
+}
+
+function _drawComicHalftoneField(ctx, x0, y0, w, h, dotColor) {
+  ctx.save();
+  ctx.fillStyle = dotColor;
+  const step = 11;
+  for (let gy = y0; gy < y0 + h; gy += step) {
+    const rowShift = (Math.floor((gy - y0) / step) % 2) * (step * 0.5);
+    for (let gx = x0 + rowShift; gx < x0 + w; gx += step) {
+      const distFactor = Math.max(0.28, 1 - (gx - x0) / (w * 1.15));
+      const r = 1.2 + distFactor * 2.6;
+      ctx.beginPath();
+      ctx.arc(gx, gy, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function _drawComicStar5(ctx, cx, cy, outerR, innerR, fillStyle) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const rad = i % 2 === 0 ? outerR : innerR;
+    const angle = -Math.PI / 2 + (i * Math.PI) / 5;
+    const px = cx + Math.cos(angle) * rad;
+    const py = cy + Math.sin(angle) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+}
+
+function _drawSpikyMangaExplosion(ctx, cx, cy, rx, ry, burstColor = '#DC2626', rot = 0, pulseScale = 1.0) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (rot !== 0) ctx.rotate(rot);
+  if (pulseScale !== 1.0) ctx.scale(pulseScale, pulseScale);
+  const drawBurstLayer = (scaleX, scaleY, fill, stroke, lw) => {
+    const pts = [
+      [0.0, -1.05], [0.22, -0.52], [0.55, -0.95], [0.48, -0.38],
+      [0.98, -0.58], [0.66, -0.08], [1.08, 0.18], [0.58, 0.34],
+      [0.82, 0.78], [0.32, 0.52], [0.12, 0.96], [-0.14, 0.50],
+      [-0.52, 0.88], [-0.46, 0.32], [-1.02, 0.38], [-0.62, -0.05],
+      [-1.06, -0.48], [-0.48, -0.44], [-0.64, -0.96], [-0.18, -0.54],
+    ];
+    ctx.beginPath();
+    pts.forEach(([px, py], idx) => {
+      const vx = px * scaleX;
+      const vy = py * scaleY;
+      if (idx === 0) ctx.moveTo(vx, vy);
+      else ctx.lineTo(vx, vy);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = stroke;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+  };
+
+  drawBurstLayer(rx, ry, burstColor, '#050609', 3.2);
+  drawBurstLayer(rx * 0.64, ry * 0.64, '#FFFFFF', '#050609', 2.4);
+  ctx.restore();
+}
+
+function _drawComicBannerBackdrop(ctx, def, palette, isMirrored = false) {
+  const mx = (px) => isMirrored ? (508 - px) : px;
+
+  // 1. Deep Comic Slate Base
+  ctx.fillStyle = '#14151D';
+  ctx.fillRect(0, 0, 508, 280);
+
+  // 2. Golden-Amber Halftone Comic Wedge (Top-Left on P1, Top-Right on P2)
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mx(0), 0);
+  ctx.lineTo(mx(312), 0);
+  ctx.lineTo(mx(216), 280);
+  ctx.lineTo(mx(156), 280);
+  ctx.lineTo(mx(0), 122);
+  ctx.closePath();
+  const goldGrad = ctx.createLinearGradient(mx(0), 0, mx(260), 240);
+  goldGrad.addColorStop(0, '#FBBF24');
+  goldGrad.addColorStop(1, '#EA8C0C');
+  ctx.fillStyle = goldGrad;
+  ctx.fill();
+  ctx.clip();
+  _drawComicHalftoneField(ctx, isMirrored ? 190 : -10, -10, 330, 290, 'rgba(204, 78, 8, 0.40)');
+  ctx.restore();
+
+  // 3. Dark Corner with Diagonal Slash & Giant Tilted Watermark
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mx(0), 122);
+  ctx.lineTo(mx(164), 280);
+  ctx.lineTo(mx(0), 280);
+  ctx.closePath();
+  ctx.fillStyle = '#13151E';
+  ctx.fill();
+  ctx.clip();
+
+  ctx.translate(mx(56), 226);
+  ctx.rotate(isMirrored ? 0.38 : -0.38);
+  ctx.fillStyle = '#1E212E';
+  ctx.font = '900 54px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(def.name.substring(0, 4).toUpperCase(), 0, 0);
+  ctx.restore();
+
+  // Heavy Black Diagonal Divider Slash
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 7;
+  ctx.beginPath();
+  ctx.moveTo(mx(-4), 120);
+  ctx.lineTo(mx(168), 284);
+  ctx.stroke();
+}
+
+function _drawComicCutInStage(ctx, def, fighterIndex, weaponInfo, isP1, palette, isMirrored = false) {
+  const stickerImg = getFighterStickerPreview(fighterIndex) || getFighterPreview(fighterIndex);
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  const phase = isP1 ? 0.0 : 1.7;
+  const mx = (px) => isMirrored ? (508 - px) : px;
+
+  // 1. Outer Tilted Cut-In Trapezoid Drop Shadow
+  const traceCutInTrap = (ox = 0, oy = 0) => {
+    ctx.beginPath();
+    ctx.moveTo(mx(226) + ox, 8 + oy);
+    ctx.lineTo(mx(486) + ox, 20 + oy);
+    ctx.lineTo(mx(498) + ox, 268 + oy);
+    ctx.lineTo(mx(202) + ox, 272 + oy);
+    ctx.closePath();
+  };
+
+  traceCutInTrap(isMirrored ? -6 : 6, 6);
+  ctx.fillStyle = '#050609';
+  ctx.fill();
+
+  // 2. Clipped Interior of Character Cut-In Stage Background
+  ctx.save();
+  traceCutInTrap(0, 0);
+  ctx.fillStyle = '#1A1115';
+  ctx.fill();
+  ctx.clip();
+
+  // Dramatic dark character-tinted backdrop gradient
+  const stageGrad = ctx.createLinearGradient(mx(210), 10, mx(495), 270);
+  stageGrad.addColorStop(0, palette.dark);
+  stageGrad.addColorStop(0.65, '#160E13');
+  stageGrad.addColorStop(1, '#0D090D');
+  ctx.fillStyle = stageGrad;
+  ctx.fillRect(isMirrored ? 0 : 195, 0, 315, 280);
+
+  // Golden-Yellow Halftone Triangle Wedge inside Cut-In
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mx(388), 12);
+  ctx.lineTo(mx(504), 16);
+  ctx.lineTo(mx(504), 224);
+  ctx.lineTo(mx(348), 168);
+  ctx.closePath();
+  ctx.fillStyle = '#FBBF24';
+  ctx.fill();
+  ctx.clip();
+  _drawComicHalftoneField(ctx, isMirrored ? 0 : 345, 10, 165, 220, 'rgba(208, 82, 10, 0.42)');
+  ctx.restore();
+
+  ctx.beginPath();
+  ctx.moveTo(mx(388), 12);
+  ctx.lineTo(mx(348), 168);
+  ctx.lineTo(mx(504), 224);
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 4.5;
+  ctx.stroke();
+
+  // Rule 16 Manga Speed-Line Needles behind character (Dynamic Hypersonic Surging)
+  const avatarCX = mx(328);
+  const avatarCY = 118;
+  ctx.save();
+  for (let i = -5; i <= 5; i++) {
+    const ang = (isMirrored ? Math.PI : 0) + i * 0.24 * (isMirrored ? -1 : 1);
+    const nx = Math.cos(ang);
+    const ny = Math.sin(ang);
+    const needlePhase = now * 7.5 + i * 1.6 + phase;
+    const pulse = Math.sin(needlePhase);
+    const lengthMod = 165 + pulse * 32;
+    const startDist = 24 + Math.sin(now * 9.0 + i * 2.2) * 5;
+    const lineAlpha = Math.max(0.04, 0.12 + pulse * 0.07);
+    ctx.fillStyle = `rgba(255, 255, 255, ${lineAlpha.toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(avatarCX + nx * startDist, avatarCY + ny * startDist);
+    ctx.lineTo(avatarCX + nx * (lengthMod - 18) - ny * 4, avatarCY + ny * (lengthMod - 18) + nx * 4);
+    ctx.lineTo(avatarCX + nx * lengthMod, avatarCY + ny * lengthMod);
+    ctx.lineTo(avatarCX + nx * (lengthMod - 18) + ny * 4, avatarCY + ny * (lengthMod - 18) - nx * 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Stylized Comic Fire / Energy Aura at bottom of character cut-in (Dynamic 3-Tier Undulating Flame Wave)
+  const flameTime = now * 4.6 + phase;
+  const drawFlamePoly = (pts, fill) => {
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => {
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = '#050609';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  };
+  drawFlamePoly([
+    [mx(245), 265],
+    [mx(268), 196 + Math.sin(flameTime * 1.1 + 0.3) * 8],
+    [mx(295), 222 + Math.sin(flameTime * 0.9 + 1.2) * 6],
+    [mx(326), 174 + Math.sin(flameTime * 1.3 + 2.1) * 11],
+    [mx(352), 212 + Math.sin(flameTime * 1.0 + 3.2) * 7],
+    [mx(388), 168 + Math.sin(flameTime * 1.4 + 4.1) * 12],
+    [mx(408), 210 + Math.sin(flameTime * 1.1 + 5.0) * 8],
+    [mx(442), 184 + Math.sin(flameTime * 1.2 + 5.9) * 9],
+    [mx(456), 265]
+  ], palette.primary);
+  drawFlamePoly([
+    [mx(268), 265],
+    [mx(286), 214 + Math.sin(flameTime * 1.2 + 1.1) * 7],
+    [mx(312), 232 + Math.sin(flameTime * 1.0 + 2.2) * 6],
+    [mx(338), 194 + Math.sin(flameTime * 1.4 + 3.4) * 9],
+    [mx(362), 224 + Math.sin(flameTime * 1.1 + 4.5) * 6],
+    [mx(392), 192 + Math.sin(flameTime * 1.3 + 5.3) * 10],
+    [mx(418), 265]
+  ], palette.border || '#FFE145');
+  drawFlamePoly([
+    [mx(295), 265],
+    [mx(316), 226 + Math.sin(flameTime * 1.3 + 2.1) * 6],
+    [mx(342), 208 + Math.sin(flameTime * 1.5 + 3.6) * 8],
+    [mx(365), 234 + Math.sin(flameTime * 1.2 + 4.9) * 5],
+    [mx(386), 212 + Math.sin(flameTime * 1.4 + 6.1) * 7],
+    [mx(400), 265]
+  ], '#FFFFFF');
+
+  ctx.restore(); // End cut-in interior clip
+
+  // 3. Cut-In Trapezoid Comic Frame Borders (Themed to character)
+  traceCutInTrap(0, 0);
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 6.5;
+  ctx.stroke();
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 3.6;
+  ctx.stroke();
+
+  // 4. Spiky Red & White Explosion Burst behind top-left of character head (Dynamic Pulsing & Rotation)
+  const burstRot = Math.sin(now * 1.6 + phase) * 0.04;
+  const burstScale = 1.0 + Math.sin(now * 4.4 + phase) * 0.055;
+  _drawSpikyMangaExplosion(ctx, mx(296), 52, 64, 38, palette.primary, isMirrored ? -burstRot : burstRot, burstScale);
+
+  // 5. UNCLIPPED POPPED-OUT HEROIC FIGHTER + FULL WEAPONS (ANIMATED BREATHING & COMBAT FLOAT)
+  if (stickerImg) {
+    const srcW = stickerImg.width || 256;
+    const srcH = stickerImg.height || 256;
+    const destSize = 296;
+
+    // Organic breathing, float bob, idle sway & engine rev jitter
+    const charBobY = Math.sin(now * 2.8 + phase) * 4.2;
+    const charSwayX = (isMirrored ? -1 : 1) * Math.cos(now * 1.4 + phase) * 1.8;
+    const charRot = (isMirrored ? -1 : 1) * Math.sin(now * 1.4 + phase) * 0.016;
+    const charBreathScaleY = 1.0 + Math.sin(now * 2.8 + phase) * 0.018;
+    const charBreathScaleX = (isMirrored ? -1.0 : 1.0) * (1.0 - Math.sin(now * 2.8 + phase) * 0.008);
+    const revJitter = (Math.sin(now * 40 + phase) * 0.65);
+
+    // Dynamic ground shadow under the fighter's feet (expands/contracts with breathing cycle)
+    ctx.save();
+    const shadowW = (destSize * 0.32) + Math.sin(now * 2.8 + phase) * 6;
+    const shadowH = 13 + Math.sin(now * 2.8 + phase) * 2;
+    const shadowY = avatarCY + 84 + charBobY * 0.25;
+    ctx.beginPath();
+    ctx.ellipse(avatarCX + charSwayX * 0.5, shadowY, shadowW, shadowH, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(5, 6, 9, 0.40)';
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(avatarCX + charSwayX, avatarCY + charBobY + revJitter);
+    ctx.rotate(charRot);
+    ctx.scale(charBreathScaleX, charBreathScaleY);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      stickerImg,
+      0, 0, srcW, srcH,
+      -destSize / 2, -destSize / 2, destSize, destSize
+    );
+    ctx.restore();
+  }
+
+  // 6. Top Role Blocks & Chunky Yellow Lightning Arrow (Dynamic Sway & Jitter)
+  ctx.save();
+  const blockTilt = (isMirrored ? -1 : 1) * (0.20 + Math.sin(now * 1.6 + phase) * 0.012);
+  const blockSwayY = Math.sin(now * 2.2 + phase) * 1.5;
+  ctx.translate(mx(416), 14 + blockSwayY);
+  ctx.rotate(blockTilt);
+  const blocks = isMirrored ? [
+    { txt: isP1 ? 'P1' : 'P2', bg: '#090A0F', fg: '#FFFFFF' },
+    { txt: isP1 ? 'RED' : 'BLU', bg: palette.primary, fg: '#FFFFFF' },
+    { txt: '▶', bg: '#090A0F', fg: '#FFFFFF' },
+    { txt: '◀', bg: '#090A0F', fg: '#FFFFFF' },
+  ] : [
+    { txt: isP1 ? 'P1' : 'P2', bg: '#090A0F', fg: '#FFFFFF' },
+    { txt: isP1 ? 'RED' : 'BLU', bg: palette.primary, fg: '#FFFFFF' },
+    { txt: '◀', bg: '#090A0F', fg: '#FFFFFF' },
+    { txt: '▶', bg: '#090A0F', fg: '#FFFFFF' },
+  ];
+  blocks.forEach((b, idx) => {
+    const bx = isMirrored ? (44 - (idx + 1) * 24) : (-44 + idx * 24);
+    const by = -11;
+    ctx.fillStyle = '#050609';
+    ctx.fillRect(bx + 2, by + 2, 22, 22);
+    ctx.fillStyle = b.bg;
+    ctx.fillRect(bx, by, 22, 22);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.8;
+    ctx.strokeRect(bx, by, 22, 22);
+    ctx.fillStyle = b.fg;
+    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(b.txt, bx + 11, by + 11.5);
+  });
+  ctx.restore();
+
+  // Chunky Yellow Comic Lightning Arrow at Top Corner (Electric Micro-Jitter)
+  ctx.save();
+  const arrowJitterX = (isMirrored ? -1 : 1) * Math.sin(now * 26 + phase) * 1.2;
+  const arrowJitterY = Math.cos(now * 30 + phase) * 1.0;
+  const arrowScale = 1.0 + Math.sin(now * 6.0 + phase) * 0.04;
+  ctx.translate(mx(484) + arrowJitterX, 14 + arrowJitterY);
+  ctx.scale((isMirrored ? -1 : 1) * arrowScale, arrowScale);
+  ctx.beginPath();
+  ctx.moveTo(-14, -8);
+  ctx.lineTo(4, -12);
+  ctx.lineTo(-2, -2);
+  ctx.lineTo(14, -2);
+  ctx.lineTo(-6, 12);
+  ctx.lineTo(-2, 2);
+  ctx.lineTo(-14, 2);
+  ctx.closePath();
+  ctx.fillStyle = '#FFE145';
+  ctx.fill();
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 2.8;
+  ctx.stroke();
+  ctx.restore();
+
+  // 7. Bottom Tilted Black & Accent Slash Button ("SELECT CHARACTER" with Animated Light Sheen & Floating Arrow)
+  const btnFloatY = Math.sin(now * 2.4 + phase) * 1.8;
+  const btnTilt = (isMirrored ? 1 : -1) * (0.085 + Math.sin(now * 1.4 + phase) * 0.008);
+
+  ctx.save();
+  // Drop Shadow
+  ctx.beginPath();
+  ctx.moveTo(mx(214) + (isMirrored ? -5 : 5), 234 + 6 + btnFloatY);
+  ctx.lineTo(mx(496) + (isMirrored ? -5 : 5), 206 + 6 + btnFloatY);
+  ctx.lineTo(mx(503) + (isMirrored ? -5 : 5), 266 + 6 + btnFloatY);
+  ctx.lineTo(mx(222) + (isMirrored ? -5 : 5), 280 + 6 + btnFloatY);
+  ctx.closePath();
+  ctx.fillStyle = '#050609';
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(mx(214), 234 + btnFloatY);
+  ctx.lineTo(mx(496), 206 + btnFloatY);
+  ctx.lineTo(mx(503), 266 + btnFloatY);
+  ctx.lineTo(mx(222), 280 + btnFloatY);
+  ctx.closePath();
+  ctx.fillStyle = '#07080C';
+  ctx.fill();
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 3.2;
+  ctx.stroke();
+  ctx.clip();
+
+  _drawComicHalftoneField(ctx, isMirrored ? 200 : 214, 220 + btnFloatY, 85, 60, palette.primary);
+
+  // Dynamic diagonal light sheen sweep traveling across the button
+  const sheenProgress = ((now * 0.65 + (isP1 ? 0 : 0.5)) % 1.0);
+  const sheenBaseX = isMirrored ? (320 - sheenProgress * 320) : (190 + sheenProgress * 320);
+  const sheenGrad = ctx.createLinearGradient(sheenBaseX - 35, 200, sheenBaseX + 35, 290);
+  sheenGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  sheenGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.18)');
+  sheenGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(isMirrored ? 0 : 180, 190, 340, 100);
+
+  ctx.translate(mx(362), 245 + btnFloatY);
+  ctx.rotate(btnTilt);
+  const arrowSlide = Math.sin(now * 5.5 + phase) * 3.5;
+  const bannerLabel = 'SELECT CHARACTER';
+  ctx.font = '900 18.5px "Outfit", "Impact", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 4.5;
+  ctx.strokeText(bannerLabel, isMirrored ? 8 : -8, 0);
+  ctx.fillStyle = palette.primary;
+  ctx.fillText(bannerLabel, isMirrored ? 8 : -8, 0);
+
+  // Animated sliding chevron arrow
+  ctx.save();
+  ctx.translate(isMirrored ? (-92 - arrowSlide) : (92 + arrowSlide), 0);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 4.5;
+  const chevron = isMirrored ? '⯇' : '⯈';
+  ctx.strokeText(chevron, 0, 0);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText(chevron, 0, 0);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMirrored = false) {
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  const phase = isP1 ? 0.0 : 1.7;
+  const mx = (px) => isMirrored ? (508 - px) : px;
+
+  // ── PLATE 1: Top Z-Stepped Name & Level Polygon (Popped out over top frame with Floating Parallax) ──
+  const p1FloatY = Math.sin(now * 2.4 + phase + 0.0) * 2.2;
+  const p1FloatX = (isMirrored ? -1 : 1) * Math.cos(now * 1.2 + phase + 0.0) * 1.0;
+  ctx.save();
+  ctx.translate(p1FloatX, p1FloatY);
+
+  const plateOy = -15;
+  const traceRedPlate = (ox = 0, oy = 0) => {
+    ctx.beginPath();
+    ctx.moveTo(mx(44) + ox, 5 + oy + plateOy);
+    ctx.lineTo(mx(252) + ox, 34 + oy + plateOy);
+    ctx.lineTo(mx(247) + ox, 66 + oy + plateOy);
+    ctx.lineTo(mx(274) + ox, 70 + oy + plateOy);
+    ctx.lineTo(mx(268) + ox, 104 + oy + plateOy);
+    ctx.lineTo(mx(80) + ox, 82 + oy + plateOy);
+    ctx.lineTo(mx(84) + ox, 56 + oy + plateOy);
+    ctx.lineTo(mx(52) + ox, 51 + oy + plateOy);
+    ctx.closePath();
+  };
+
+  // Heavy Black Ink Drop Shadow & Character-Themed Outer Rim
+  traceRedPlate(isMirrored ? -5 : 5, 5);
+  ctx.fillStyle = '#050609';
+  ctx.fill();
+
+  traceRedPlate(0, 0);
+  const plateGrad = ctx.createLinearGradient(mx(44), 5 + plateOy, mx(268), 104 + plateOy);
+  plateGrad.addColorStop(0, palette.dark);
+  plateGrad.addColorStop(0.55, palette.primary);
+  plateGrad.addColorStop(1, palette.border || palette.primary);
+  ctx.fillStyle = plateGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 5;
+  ctx.stroke();
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 2.2;
+  ctx.stroke();
+
+  // Upper Row Content (Circular Emblem + Bold Fighter Name tilted with plate)
+  ctx.save();
+  ctx.translate(mx(68), 30 + plateOy);
+  ctx.rotate(isMirrored ? -0.138 : 0.138);
+
+  // Circular Comic Emblem (Themed ring)
+  ctx.beginPath();
+  ctx.arc(0, 0, 12, 0, Math.PI * 2);
+  ctx.fillStyle = '#08090D';
+  ctx.fill();
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 9px "Outfit", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(isP1 ? 'P1' : 'P2', 0, 0.5);
+
+  // Bold Comic Fighter Name
+  ctx.font = '900 22px "Outfit", "Impact", "Rajdhani", sans-serif';
+  ctx.textAlign = isMirrored ? 'right' : 'left';
+  ctx.textBaseline = 'middle';
+  const nameText = fitSingleLineText(ctx, def.name.toUpperCase(), 158);
+  const nameX = isMirrored ? -18 : 18;
+  const shadowX = isMirrored ? -19.5 : 19.5;
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 5.5;
+  ctx.strokeText(nameText, nameX, 1);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText(nameText, shadowX, 2.5);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(nameText, nameX, 1);
+  ctx.restore();
+
+  // Lower Stepped Sub-Bar (Sub-gauge + LV Text + Animated Gloss Sheen)
+  ctx.save();
+  ctx.translate(mx(92), 66 + plateOy);
+  ctx.rotate(isMirrored ? -0.118 : 0.118);
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(isMirrored ? -112 : -2, -7, 114, 15);
+  ctx.fillStyle = isP1 ? '#38BDF8' : '#FFE145';
+  ctx.fillRect(isMirrored ? -109 : 1, -4, 108, 9);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.fillRect(isMirrored ? -109 : 1, -4, 108, 3);
+
+  // Sliding gloss sheen glint on the gauge bar
+  const sheenCycle = ((now * 0.9 + phase * 0.3) % 1.0);
+  const sheenGX = isMirrored ? (16 - sheenCycle * 135) : (-10 + sheenCycle * 135);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(isMirrored ? -109 : 1, -4, 108, 9);
+  ctx.clip();
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.52)';
+  ctx.fillRect(sheenGX, -4, 18, 9);
+  ctx.restore();
+
+  const lvNum = Math.min(99, Math.max(50, Math.round((def.hp || 100) * 0.48 + (def.damage || 15))));
+  ctx.font = '900 13px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = isMirrored ? 'right' : 'left';
+  ctx.textBaseline = 'middle';
+  const lvX = isMirrored ? -118 : 118;
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 4;
+  ctx.strokeText(`LV.${lvNum}`, lvX, 1);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText(`LV.${lvNum}`, lvX, 1);
+  ctx.restore();
+
+  ctx.restore(); // End Plate 1
+
+  // ── PLATE 2: Middle White-Outlined Black Polygon (Popped out past frame with Floating Parallax) ──
+  const p2FloatY = Math.sin(now * 2.4 + phase + 1.2) * 2.8;
+  const p2FloatX = (isMirrored ? -1 : 1) * Math.cos(now * 1.2 + phase + 0.8) * 1.4;
+  ctx.save();
+  ctx.translate(p2FloatX, p2FloatY);
+
+  const traceMidPlate = (ox = 0, oy = 0) => {
+    ctx.beginPath();
+    ctx.moveTo(mx(16) + ox, 82 + oy);
+    ctx.lineTo(mx(76) + ox, 78 + oy);
+    ctx.lineTo(mx(80) + ox, 92 + oy);
+    ctx.lineTo(mx(238) + ox, 98 + oy);
+    ctx.lineTo(mx(214) + ox, 176 + oy);
+    ctx.lineTo(mx(60) + ox, 184 + oy);
+    ctx.lineTo(mx(58) + ox, 168 + oy);
+    ctx.lineTo(mx(22) + ox, 170 + oy);
+    ctx.lineTo(mx(-4) + ox, 112 + oy);
+    ctx.lineTo(mx(18) + ox, 108 + oy);
+    ctx.closePath();
+  };
+
+  traceMidPlate(isMirrored ? -5 : 5, 5);
+  ctx.fillStyle = '#050609';
+  ctx.fill();
+
+  traceMidPlate(0, 0);
+  ctx.fillStyle = '#090A0F';
+  ctx.fill();
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Giant 3D Slanted 'S' / 'A' Emblem on Wing (Rhythmic Rank Breathing)
+  const sScale = 1.0 + Math.sin(now * 3.2 + phase) * 0.035;
+  ctx.save();
+  ctx.translate(mx(38), 130);
+  ctx.rotate(isMirrored ? 0.22 : -0.22);
+  ctx.scale(sScale, sScale);
+  ctx.font = '900 54px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const rankLetter = (def.hp >= 100 || def.damage >= 15) ? 'S' : 'A';
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 9;
+  ctx.strokeText(rankLetter, isMirrored ? 2 : -2, 2);
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 4.5;
+  ctx.strokeText(rankLetter, 0, 0);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText(rankLetter, 0, 0);
+  ctx.restore();
+
+  // 'RANK' Label + Technical VX Code + Bold Class Title (De-duplicated)
+  ctx.save();
+  ctx.translate(mx(80), 146);
+  ctx.rotate(isMirrored ? 0.06 : -0.06);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 8.5px "Outfit", sans-serif';
+  ctx.textAlign = isMirrored ? 'right' : 'left';
+  ctx.fillText('RANK', isMirrored ? 12 : -12, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(mx(94), 126);
+  ctx.rotate(isMirrored ? 0.04 : -0.04);
+  ctx.fillStyle = palette.primary;
+  ctx.font = '900 17px "Outfit", "Impact", "Rajdhani", sans-serif';
+  ctx.textAlign = isMirrored ? 'right' : 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(fitSingleLineText(ctx, (def.type || 'BRAWLER').toUpperCase(), 92), 0, 0);
+
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '800 8px "Outfit", monospace';
+  ctx.textAlign = isMirrored ? 'left' : 'right';
+  ctx.fillText(`VX:${String(fighterIndex + 1).padStart(2, '0')}-${isP1 ? 'A' : 'B'}`, isMirrored ? -134 : 134, -14);
+  ctx.restore();
+
+  // Row of 10 Comic 5-Pointed Stars (with 2 oversized accent stars, 1:1 Reference + Animated Twinkle)
+  const activeStars = Math.min(10, Math.max(7, Math.round((def.hp || 100) / 35 + (def.damage || 15) / 5)));
+  for (let s = 0; s < 10; s++) {
+    const isBigStar = s >= 7 && s < activeStars;
+    const baseSx = 70 + s * 12.8 + (s >= 8 ? (s - 7) * 2.5 : 0);
+    const starX = mx(baseSx);
+    const starY = 165 - s * 0.7;
+    const starShimmer = Math.sin(now * 5.0 + s * 0.75 + phase);
+    const starScale = isBigStar ? (1.0 + starShimmer * 0.08) : 1.0;
+    const outerR = (isBigStar ? 7.8 : 5.2) * starScale;
+    const innerR = outerR * 0.44;
+    _drawComicStar5(ctx, starX, starY, outerR, innerR, s < activeStars ? (starShimmer > 0.65 ? '#FFFFFF' : '#FFE145') : '#333846');
+  }
+
+  ctx.restore(); // End Plate 2
+
+  // ── PLATE 3: Bottom 2-Step Staircase White-Outlined Black Polygon (HP & ATK Bars with Floating Parallax) ──
+  const p3FloatY = Math.sin(now * 2.4 + phase + 2.4) * 2.0;
+  const p3FloatX = (isMirrored ? -1 : 1) * Math.cos(now * 1.2 + phase + 1.6) * 1.0;
+  ctx.save();
+  ctx.translate(p3FloatX, p3FloatY);
+
+  // Golden-Yellow Accent Triangle underneath bottom corner
+  ctx.beginPath();
+  ctx.moveTo(mx(152), 254);
+  ctx.lineTo(mx(222), 246);
+  ctx.lineTo(mx(210), 276);
+  ctx.closePath();
+  ctx.fillStyle = '#F5A623';
+  ctx.fill();
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  const traceBotPlate = (ox = 0, oy = 0) => {
+    ctx.beginPath();
+    ctx.moveTo(mx(44) + ox, 190 + oy);
+    ctx.lineTo(mx(230) + ox, 178 + oy);
+    ctx.lineTo(mx(238) + ox, 246 + oy);
+    ctx.lineTo(mx(70) + ox, 262 + oy);
+    ctx.lineTo(mx(64) + ox, 226 + oy);
+    ctx.lineTo(mx(52) + ox, 227 + oy);
+    ctx.closePath();
+  };
+
+  traceBotPlate(isMirrored ? -5 : 5, 5);
+  ctx.fillStyle = '#050609';
+  ctx.fill();
+
+  traceBotPlate(0, 0);
+  ctx.fillStyle = '#090A0F';
+  ctx.fill();
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2.8;
+  ctx.stroke();
+
+  // 2 Tilted Stat Rows inside Staircase Polygon (Number | Colored Bar | Label)
+  const drawSteppedStatRow = (cx, cy, numVal, pct, barColor, labelTxt) => {
+    ctx.save();
+    ctx.translate(mx(cx), cy);
+    ctx.rotate(isMirrored ? 0.075 : -0.075);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 15px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = isMirrored ? 'right' : 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${numVal}`, 0, 0);
+
+    // Slanted Bar Track
+    const bx = 34;
+    const bw = 82;
+    const bh = 7.5;
+    ctx.beginPath();
+    if (isMirrored) {
+      ctx.moveTo(-bx - 4, -bh / 2);
+      ctx.lineTo(-bx - bw - 4, -bh / 2);
+      ctx.lineTo(-bx - bw, bh / 2);
+      ctx.lineTo(-bx, bh / 2);
+    } else {
+      ctx.moveTo(bx + 4, -bh / 2);
+      ctx.lineTo(bx + bw + 4, -bh / 2);
+      ctx.lineTo(bx + bw, bh / 2);
+      ctx.lineTo(bx, bh / 2);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#252A3A';
+    ctx.fill();
+
+    // Slanted Active Fill
+    const fw = Math.max(8, Math.min(bw, bw * pct));
+    ctx.beginPath();
+    if (isMirrored) {
+      ctx.moveTo(-bx - 4, -bh / 2);
+      ctx.lineTo(-bx - fw - 4, -bh / 2);
+      ctx.lineTo(-bx - fw, bh / 2);
+      ctx.lineTo(-bx, bh / 2);
+    } else {
+      ctx.moveTo(bx + 4, -bh / 2);
+      ctx.lineTo(bx + fw + 4, -bh / 2);
+      ctx.lineTo(bx + fw, bh / 2);
+      ctx.lineTo(bx, bh / 2);
+    }
+    ctx.closePath();
+    ctx.fillStyle = barColor;
+    ctx.fill();
+
+    // Stat Label on Inner Edge
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = isMirrored ? 'left' : 'right';
+    ctx.fillText(labelTxt, isMirrored ? -158 : 158, 0);
+    ctx.restore();
+  };
+
+  const hpPulse = 1.0 + Math.sin(now * 3.6 + phase) * 0.02;
+  const atkPulse = 1.0 + Math.sin(now * 3.6 + phase + 1.0) * 0.02;
+  drawSteppedStatRow(60, 208, def.hp, Math.min(1, ((def.hp || 100) / 250) * hpPulse), '#EF4444', 'HP');
+  drawSteppedStatRow(74, 239, def.damage, Math.min(1, ((def.damage || 15) / 45) * atkPulse), '#38BDF8', 'ATK');
+
+  ctx.restore(); // End Plate 3
+}
+
+function drawHeroicFighterCard(slotProp, title, x, y, w, h, isP1, enabled) {
+  const { ctx } = state;
+  const isAnyModalOpen = (selectingSlot !== null || isArenaBgmModalOpen() || isArenaFloorModalOpen());
+  const isInteractive = enabled && !isAnyModalOpen;
+  const isMirrored = !isP1;
+
+  if (isInteractive) {
+    _playerCardBounds.push({ slotProp, x, y, w, h });
+  }
+
+  const currentDefs = getActiveFighterDefs();
+  const fighterIndex = state[slotProp] ?? 0;
+  const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
+  const weaponInfo = getFighterWeaponInfo(def);
+
+  // Derive rich character-specific theme palette
+  const theme = getFighterCollectorTheme(def) || {};
+  const themeColor = def.themeColor || def.color || theme.primary || (isP1 ? '#EF4444' : '#38BDF8');
+  const palette = {
+    primary: themeColor,
+    dark: theme.dark || '#1A1115',
+    title: theme.title || themeColor,
+    border: theme.border || themeColor,
+  };
+
+  const cycleFighter = (direction) => {
+    if (!isInteractive) return;
+    const availableFighters = currentDefs.map((d, idx) => ({ d, idx }))
+      .filter(({ d }) => !(!state.dummyEnabled && d.type === 'dummy'));
+    const pos = availableFighters.findIndex(f => f.idx === state[slotProp]);
+    const count = availableFighters.length;
+    if (count > 0) {
+      const nextPos = (pos + direction + count) % count;
+      state[slotProp] = availableFighters[nextPos].idx;
+      if (slotProp === 'p1Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[0] = state.p1Index;
+      else if (slotProp === 'p2Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[1] = state.p2Index;
+      else if (slotProp === 'p3Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[2] = state.p3Index;
+      else if (slotProp === 'p4Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[3] = state.p4Index;
+      else if (slotProp === 'p5Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[4] = state.p5Index;
+      else if (slotProp === 'p6Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[5] = state.p6Index;
+      saveFighterSelections();
+      preloadFighterAssets(state[slotProp]);
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
+    }
+  };
+
+  const sx = w / 508;
+  const sy = h / 280;
+
+  // Register interactive hit zones (expanded to cover popped-out top and left/right areas)
+  if (isInteractive) {
+    const prevBtnX = x + Math.round((isMirrored ? 38 : 416) * sx);
+    const prevBtnY = y + Math.round(2 * sy);
+    const nextBtnX = x + Math.round((isMirrored ? 62 : 444) * sx);
+    const btnW = Math.round(36 * sx);
+    const btnH = Math.round(36 * sy);
+
+    _registerButton(x - Math.round(25 * sx), y - Math.round(35 * sy), w + Math.round(50 * sx), h + Math.round(42 * sy), () => {
+      openFighterSelectModal(slotProp, state[slotProp] ?? 0);
+    });
+    _registerButton(prevBtnX, prevBtnY, btnW, btnH, () => cycleFighter(-1));
+    _registerButton(nextBtnX, prevBtnY, btnW, btnH, () => cycleFighter(1));
+  }
+
+  // Subtle Slot Index Tag ('A' / 'B') above top corner of banner (1:1 Reference)
+  ctx.save();
+  ctx.fillStyle = '#7DD3FC';
+  ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = isMirrored ? 'left' : 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(isP1 ? 'A' : 'B', isMirrored ? (x + 8) : (x + w - 6), y - 5);
+  ctx.restore();
+
+  // Outer Drop Shadow for base card frame
+  ctx.save();
+  ctx.fillStyle = 'rgba(4, 5, 8, 0.75)';
+  ctx.fillRect(x + 5, y + 6, w, h);
+  ctx.restore();
+
+  // Render Reference 5 Comic Banner in normalized 508x280 coordinate space
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+
+  // 1. Base card backdrop (Clipped to the card frame so halftone and watermarks stay inside)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, 508, 280);
+  ctx.clip();
+  _drawComicBannerBackdrop(ctx, def, palette, isMirrored);
+  ctx.restore();
+
+  // 2. Solid Black Manga Ink Outer Frame
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 3.5;
+  ctx.strokeRect(0, 0, 508, 280);
+
+  // 3. Popped-out elements drawn on top WITHOUT card-level clipping:
+  //    - Heroic Fighter Avatar (Pops out above top border y = -29!)
+  //    - Stepped Info Stack (Name plate pops out at top y = -10, Rank plate pops out at left/right)
+  _drawComicCutInStage(ctx, def, fighterIndex, weaponInfo, isP1, palette, isMirrored);
+  _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMirrored);
+
+  ctx.restore();
 }
 
 function drawSelectScreen() {
@@ -954,44 +1485,61 @@ function drawSelectScreen() {
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Retro Crimson Pixel Backdrop
-  ctx.fillStyle = '#5c0f1c';
+  // Clean Dark Matte Backdrop (Matching Reference 5 outer canvas)
+  ctx.fillStyle = '#181A22';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Pixel Dither Grid
-  ctx.fillStyle = '#3d0711';
-  for (let y = 0; y < canvas.height; y += 6) {
-    for (let x = 0; x < canvas.width; x += 6) {
-      ctx.fillRect(x, y, 2, 2);
-      ctx.fillRect(x + 3, y + 3, 2, 2);
+  // Subtle Dot Grid
+  ctx.fillStyle = 'rgba(245, 166, 35, 0.035)';
+  const dotStep = 18;
+  for (let y = 8; y < canvas.height; y += dotStep) {
+    for (let x = 8; x < canvas.width; x += dotStep) {
+      ctx.fillRect(x - 1, y - 1, 2, 2);
     }
   }
+
+  // Outer Screen Tech Corner Brackets
+  drawCornerBrackets(ctx, 6, 6, canvas.width - 12, canvas.height - 12, 16, 'rgba(245, 166, 35, 0.35)', 1.8);
 
   updatePreviewBalls();
 
   const isLandscape = canvas.width > 600 || state.viewOrientation === 'horizontal';
-  const backBtnY = isLandscape ? 30 : 64;
-  const titleY = isLandscape ? 30 : 64;
-  const tmY = isLandscape ? 56 : 96;
+  const backBtnY = isLandscape ? 30 : 54;
+  const titleY = isLandscape ? 30 : 54;
+  const tmY = isLandscape ? 56 : 84;
 
-  // ── Unified Top Back Button ──
-  drawButton('◀ BACK', 52, backBtnY, () => { goToTitle(); }, 76, 26);
+  // ── Unified Top Back Button (Tactical Dark Carbon + Amber border) ──
+  drawButton('◀ BACK', 52, backBtnY, () => { goToTitle(); }, 76, 26, '#20242E', 4);
 
   // ── Header Section ──
   const isTag = mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH';
   const isRegular1v2 = mode === '1v2' || mode === GAME_MODES.ONE_VS_TWO;
 
-  // Screen Title: FIGHT OF LARPERS 101
+  // Screen Title Badge
   ctx.save();
-  const titleText = isTag ? '[ 3 VS 3 TAG MATCH ]' : (isRegular1v2 ? '[ 1 VS 2 BATTLE ]' : '[ FIGHT OF LARPERS 101 ]');
-  
-  ctx.fillStyle = '#21050c';
-  ctx.font = '700 12px "Press Start 2P", monospace';
+  const rawTitle = isTag ? '3 VS 3 TAG MATCH' : (isRegular1v2 ? '1 VS 2 BATTLE' : 'FIGHT OF LARPERS 101');
+  const titleW = isLandscape ? 320 : 270;
+  const titleH = 28;
+  const titleX = canvas.width / 2 - titleW / 2;
+  const titleBoxY = titleY - titleH / 2;
+
+  // Chamfered Dark Carbon Badge Base
+  ctx.fillStyle = '#161922';
+  ctx.strokeStyle = '#F5A623';
+  ctx.lineWidth = 1.6;
+  drawChamferedRect(ctx, titleX, titleBoxY, titleW, titleH, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Bottom hazard stripe accent line
+  drawHazardStripes(ctx, titleX + 8, titleBoxY + titleH - 4, titleW - 16, 3, 4, '#F5A623', '#101217');
+
+  // Title typography
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(titleText, canvas.width / 2 + 1, titleY + 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(titleText, canvas.width / 2, titleY);
+  ctx.fillText(`[ ${rawTitle} // DEPLOYMENT ]`, canvas.width / 2, titleY - 1);
   ctx.restore();
 
   // Sub-Controls (Boss Battle Team Toggle, Arena BGM & Arena Floor Selector)
@@ -1010,18 +1558,18 @@ function drawSelectScreen() {
     const toggleLabel = isSolo ? '👤 SOLO (1v1)' : '👥 DUO (1v2)';
 
     ctx.save();
-    ctx.fillStyle = '#baa88c';
+    ctx.fillStyle = '#0B0C10';
     drawChamferedRect(ctx, curCtrlX, tmY + 2, teamToggleW, ctrlH, 3);
     ctx.fill();
 
-    ctx.fillStyle = isSolo ? '#fff5f7' : '#faedf0';
-    ctx.strokeStyle = isSolo ? '#b81c3b' : '#21050c';
-    ctx.lineWidth = 1.6;
+    ctx.fillStyle = isSolo ? '#20242E' : '#181A22';
+    ctx.strokeStyle = '#F5A623';
+    ctx.lineWidth = 1.4;
     drawChamferedRect(ctx, curCtrlX, tmY, teamToggleW, ctrlH, 3);
     ctx.fill();
     ctx.stroke();
 
-    ctx.fillStyle = isSolo ? '#b81c3b' : '#21050c';
+    ctx.fillStyle = isSolo ? '#FFD043' : '#F5A623';
     ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1046,112 +1594,82 @@ function drawSelectScreen() {
   drawArenaFloorSelector(ctx, curCtrlX, tmY, floorW, ctrlH);
 
   // ── Main Combatant Grid ──
-  const topY = isLandscape ? 88 : 134;
-  const margin = isLandscape ? 40 : 16;
-  const cardGap = isLandscape ? 40 : 12;
+  const topY = isLandscape ? 88 : 132;
+  const margin = isLandscape ? 24 : 18;
+  const cardGap = isLandscape ? 24 : 12;
   const totalCardW = canvas.width - margin * 2;
-  const cardW = Math.floor((totalCardW - cardGap) / 2); // ~390px in landscape, 248px in portrait
+  const cardW = Math.floor((totalCardW - cardGap) / 2);
   const fullCardH = isLandscape ? 380 : 680;
 
-  if (mode === '1v1' || mode === 'Stand Off' || !mode || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF) {
-    const leftX = margin;
-    const rightX = margin + cardW + cardGap;
+  if (mode === '1v1' || mode === 'Stand Off' || !mode || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel') {
+    if (isLandscape) {
+      // Landscape 1v1: Left vs Right Reference 5 Comic Cut-In Banners
+      const bannerW = Math.floor((totalCardW - cardGap) / 2);
+      const bannerH = 264;
+      const leftX = margin;
+      const rightX = margin + bannerW + cardGap;
+      const bannerY = topY + 34;
 
-    const p1Title = 'PLAYER 1 // RED';
-    const p2Title = 'PLAYER 2 // BLUE';
-    const p1Color = '#cc2b4d';
-    const p2Color = '#38bdf8';
+      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', leftX, bannerY, bannerW, bannerH, true, true);
+      drawHeroicFighterCard('p2Index', 'PLAYER 2 // BLUE', rightX, bannerY, bannerW, bannerH, false, true);
 
-    drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, fullCardH, p1Color, true, true);
-    drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, fullCardH, p2Color, true, true);
+      // Center Dynamic VS Emblem
+      const vsX = canvas.width / 2;
+      const vsY = bannerY + bannerH / 2;
+      drawDynamicVsClashEmblem(ctx, vsX, vsY, true);
 
-    // Center Retro Pixel VS Crest
-    const vsX = canvas.width / 2;
-    const vsY = topY + fullCardH / 2 - 10;
-    
-    ctx.save();
-    // 3D Shadow
-    ctx.fillStyle = '#5e0d1f';
-    ctx.beginPath();
-    ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
-    ctx.fill();
+      drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomize1v1Fighters());
+    } else {
+      // Portrait 1v1: Top (Banner A) & Bottom (Banner B) with clean Reference 5 aspect ratio & spacing
+      const bannerW = canvas.width - 36; // 504px
+      const bannerH = 280;
+      const bannerX = 18;
+      const p1Y = 128;
+      const p2Y = 468;
 
-    // Center berry badge
-    ctx.fillStyle = '#b81c3b';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', bannerX, p1Y, bannerW, bannerH, true, true);
+      drawHeroicFighterCard('p2Index', 'PLAYER 2 // BLUE', bannerX, p2Y, bannerW, bannerH, false, true);
 
-    // Inset highlight
-    ctx.strokeStyle = '#ffaec0';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
-    ctx.stroke();
+      // Center Dynamic VS Emblem in the breathing space between Banner A and Banner B
+      const vsX = canvas.width / 2;
+      const vsY = Math.round((p1Y + bannerH + p2Y) / 2);
+      drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('VS', vsX, vsY + 0.5);
-    ctx.restore();
-
-    // Bottom Command Dock
-    const btnText = 'START BATTLE';
-    drawBottomCommandDeck(btnText, () => startGame(), () => randomize1v1Fighters());
+      drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomize1v1Fighters());
+    }
 
   } else if (isRegular1v2) {
-    const leftX = margin;
-    const rightX = margin + cardW + cardGap;
-    const stackedH = Math.floor((fullCardH - cardGap) / 2);
-    const bottomY = topY + stackedH + cardGap;
+    if (isLandscape) {
+      const leftX = margin;
+      const rightX = margin + cardW + cardGap;
+      const stackedH = Math.floor((fullCardH - cardGap) / 2);
+      const bottomY = topY + stackedH + cardGap;
 
-    drawPlayerCard('p1Index', 'PLAYER 1 // RED', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
-    drawPlayerCard('p2Index', 'PLAYER 2 // BLUE', rightX, topY, cardW, stackedH, '#38bdf8', true);
-    drawPlayerCard('p3Index', 'PLAYER 3 // BLUE', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', leftX, topY + 34, cardW, 264, true, true);
+      drawPlayerCard('p2Index', 'PLAYER 2 // BLUE', rightX, topY, cardW, stackedH, '#38bdf8', true);
+      drawPlayerCard('p3Index', 'PLAYER 3 // BLUE', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
 
-    // Center Retro Pixel VS Crest
-    const vsX = canvas.width / 2;
-    const vsY = topY + fullCardH / 2 - 10;
-    
-    ctx.save();
-    // 3D Shadow
-    ctx.fillStyle = '#5e0d1f';
-    ctx.beginPath();
-    ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
-    ctx.fill();
+      drawBottomCommandDeck('START 1V2 BATTLE', () => startGame(), () => randomize1v2Fighters());
+    } else {
+      const bannerW = canvas.width - 36;
+      const p1Y = 124;
+      const p1H = 276;
+      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', 18, p1Y, bannerW, p1H, true, true);
 
-    // Center berry badge
-    ctx.fillStyle = '#b81c3b';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+      const duoCardW = Math.floor((canvas.width - 44) / 2);
+      const duoY = p1Y + p1H + 38;
+      const duoH = 340;
+      drawPlayerCard('p2Index', 'PLAYER 2 // BLUE', 18, duoY, duoCardW, duoH, '#38bdf8', true);
+      drawPlayerCard('p3Index', 'PLAYER 3 // BLUE', 18 + duoCardW + 8, duoY, duoCardW, duoH, '#38bdf8', true);
 
-    // Inset highlight
-    ctx.strokeStyle = '#ffaec0';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
-    ctx.stroke();
+      const vsX = canvas.width / 2;
+      const vsY = p1Y + p1H + 19;
+      drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('VS', vsX, vsY + 0.5);
-    ctx.restore();
-
-    drawBottomCommandDeck('START 1V2 BATTLE', () => startGame(), () => randomize1v2Fighters());
+      drawBottomCommandDeck('START 1V2 BATTLE', () => startGame(), () => randomize1v2Fighters());
+    }
 
   } else if (isBossBattleMode) {
-    const leftX = margin;
-    const rightX = margin + cardW + cardGap;
     const isSolo = Boolean(state.bossBattleNoTeammate);
     const currentDefs = getActiveFighterDefs();
     const p1Def = currentDefs[state.p1Index] || currentDefs[0];
@@ -1160,55 +1678,68 @@ function drawSelectScreen() {
     const bossCardTitle = (p1BossTitle && p1BossTitle !== 'BOSS') ? `BOSS // ${p1BossTitle}` : 'THE BOSS';
 
     if (isSolo) {
-      // 1v1 Solo Challenger vs Boss
-      drawPlayerCard('p1Index', bossCardTitle, leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
-      drawPlayerCard('p2Index', 'SOLO CHALLENGER', rightX, topY, cardW, fullCardH, '#38bdf8', true, true);
+      if (isLandscape) {
+        const bannerW = Math.floor((totalCardW - cardGap) / 2);
+        const bannerH = 264;
+        const leftX = margin;
+        const rightX = margin + bannerW + cardGap;
+        const bannerY = topY + 34;
 
-      // Center Retro Pixel VS Crest
-      const vsX = canvas.width / 2;
-      const vsY = topY + fullCardH / 2 - 10;
-      
-      ctx.save();
-      // 3D Shadow
-      ctx.fillStyle = '#5e0d1f';
-      ctx.beginPath();
-      ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
-      ctx.fill();
+        drawHeroicFighterCard('p1Index', bossCardTitle, leftX, bannerY, bannerW, bannerH, true, true);
+        drawHeroicFighterCard('p2Index', 'SOLO CHALLENGER', rightX, bannerY, bannerW, bannerH, false, true);
 
-      // Center berry badge
-      ctx.fillStyle = '#b81c3b';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+        const vsX = canvas.width / 2;
+        const vsY = bannerY + bannerH / 2;
+        drawDynamicVsClashEmblem(ctx, vsX, vsY, true);
 
-      // Inset highlight
-      ctx.strokeStyle = '#ffaec0';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
-      ctx.stroke();
+        drawBottomCommandDeck('START SOLO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+      } else {
+        const bannerW = canvas.width - 36;
+        const bannerH = 280;
+        const bannerX = 18;
+        const p1Y = 128;
+        const p2Y = 468;
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('VS', vsX, vsY + 0.5);
-      ctx.restore();
+        drawHeroicFighterCard('p1Index', bossCardTitle, bannerX, p1Y, bannerW, bannerH, true, true);
+        drawHeroicFighterCard('p2Index', 'SOLO CHALLENGER', bannerX, p2Y, bannerW, bannerH, false, true);
 
-      drawBottomCommandDeck('START SOLO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+        const vsX = canvas.width / 2;
+        const vsY = Math.round((p1Y + bannerH + p2Y) / 2);
+        drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
+
+        drawBottomCommandDeck('START SOLO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+      }
     } else {
       // 1v2 Duo Challengers vs Boss
-      const stackedH = Math.floor((fullCardH - cardGap) / 2);
-      const bottomY = topY + stackedH + cardGap;
+      if (isLandscape) {
+        const leftX = margin;
+        const rightX = margin + cardW + cardGap;
+        const stackedH = Math.floor((fullCardH - cardGap) / 2);
+        const bottomY = topY + stackedH + cardGap;
 
-      drawPlayerCard('p1Index', bossCardTitle, leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
-      drawPlayerCard('p2Index', 'CHALLENGER 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
-      drawPlayerCard('p3Index', 'CHALLENGER 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+        drawHeroicFighterCard('p1Index', bossCardTitle, leftX, topY + 34, cardW, 264, true, true);
+        drawPlayerCard('p2Index', 'CHALLENGER 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
+        drawPlayerCard('p3Index', 'CHALLENGER 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
 
-      drawBottomCommandDeck('START DUO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+        drawBottomCommandDeck('START DUO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+      } else {
+        const bannerW = canvas.width - 36;
+        const p1Y = 124;
+        const p1H = 276;
+        drawHeroicFighterCard('p1Index', bossCardTitle, 18, p1Y, bannerW, p1H, true, true);
+
+        const duoCardW = Math.floor((canvas.width - 44) / 2);
+        const duoY = p1Y + p1H + 38;
+        const duoH = 340;
+        drawPlayerCard('p2Index', 'CHALLENGER 1', 18, duoY, duoCardW, duoH, '#38bdf8', true);
+        drawPlayerCard('p3Index', 'CHALLENGER 2', 18 + duoCardW + 8, duoY, duoCardW, duoH, '#38bdf8', true);
+
+        const vsX = canvas.width / 2;
+        const vsY = p1Y + p1H + 19;
+        drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
+
+        drawBottomCommandDeck('START DUO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
+      }
     }
 
   } else if (mode === '2v2' || mode === 'FFA') {
@@ -1245,37 +1776,11 @@ function drawSelectScreen() {
       drawPlayerCard('p4Index', p4Title, rightX, bottomY, cardW, stackedH, p4Color, true);
     }
 
-    // Center Holographic VS Crest for team mode
+    // Center Tactical VS Crest for team mode
     if (isTeamMode) {
       const vsX = canvas.width / 2;
       const vsY = topY + fullCardH / 2 - 10;
-      
-      ctx.save();
-      ctx.fillStyle = '#5e0d1f';
-      ctx.beginPath();
-      ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#b81c3b';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.strokeStyle = '#ffaec0';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('VS', vsX, vsY + 0.5);
-      ctx.restore();
+      drawTacticalVsCrest(ctx, vsX, vsY);
     }
 
     drawBottomCommandDeck(mode === '2v2' ? 'START 2V2 DUO' : 'START BATTLE', () => startGame(), () => randomizeFfaFighters());
@@ -1299,39 +1804,10 @@ function drawSelectScreen() {
     drawPlayerCard('p4Index', 'BLUE // SQUAD 2', rightX, y1, cardW, stackedH, '#38bdf8', true);
     drawPlayerCard('p6Index', 'BLUE // SQUAD 3', rightX, y2, cardW, stackedH, '#38bdf8', true);
 
-    // Center Retro Pixel VS Crest
+    // Center Tactical VS Crest
     const vsX = canvas.width / 2;
     const vsY = topY + fullCardH / 2 - 10;
-    
-    ctx.save();
-    // 3D Shadow
-    ctx.fillStyle = '#5e0d1f';
-    ctx.beginPath();
-    ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Center berry badge
-    ctx.fillStyle = '#b81c3b';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Inset highlight
-    ctx.strokeStyle = '#ffaec0';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '700 9.5px "Press Start 2P", monospace';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('VS', vsX, vsY + 0.5);
-    ctx.restore();
+    drawTacticalVsCrest(ctx, vsX, vsY);
 
     drawBottomCommandDeck('START TAG MATCH', () => startGame(), () => randomizeTagMatchFighters());
 
@@ -1379,11 +1855,11 @@ function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
   const actionRowY = isLandscape ? 498 : 852;
   const btnH = isLandscape ? 38 : 46;
 
-  drawButton(primaryLabel, startBtnX, actionRowY, onStart, startBtnW, btnH, '#cc2b4d', 6);
+  drawButton(primaryLabel, startBtnX, actionRowY, onStart, startBtnW, btnH, '#F5A623', 6);
   drawButton('📸 THUMBNAIL', thumbBtnX, actionRowY, () => {
     startFaceOffScreen(true);
-  }, thumbBtnW, btnH, '#d97706', 6);
-  drawButton('RANDOMIZE', randBtnX, actionRowY, onRandomize, randBtnW, btnH, null, 6);
+  }, thumbBtnW, btnH, '#D97706', 6);
+  drawButton('RANDOMIZE', randBtnX, actionRowY, onRandomize, randBtnW, btnH, '#20242E', 6);
 }
 
 function randomize1v1Fighters() {
@@ -1575,45 +2051,61 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     _playerCardBounds.push({ slotProp, x, y, w, h });
   }
 
-  // Retro Cream-Pink Window Panel with dark chocolate border
-  drawPanel(x, y, w, h, 0.98, 6, '#21050c');
+  // 1. Deep Drop Shadow
+  ctx.save();
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.70)';
+  drawChamferedRect(ctx, x + 3, y + 4, w, h, 6);
+  ctx.fill();
 
-  // Header band with dark chocolate background and team accent indicator
-  ctx.fillStyle = '#21050c';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.5;
-  drawChamferedRect(ctx, x + 2, y + 2, w - 4, 26, 4);
+  // 2. Dark Tactical Carbon Armor Plate Base
+  ctx.fillStyle = '#141720';
+  ctx.strokeStyle = '#282E3C';
+  ctx.lineWidth = 1.6;
+  drawChamferedRect(ctx, x, y, w, h, 6);
   ctx.fill();
   ctx.stroke();
 
-  // Top accent pip line
-  ctx.fillStyle = accentColor || '#b81c3b';
-  ctx.fillRect(x + 12, y + 2, w - 24, 2);
+  // 3. Tech Corner Brackets in Hazard Amber
+  drawCornerBrackets(ctx, x + 3, y + 3, w - 6, h - 6, 12, '#F5A623', 1.8);
 
-  ctx.fillStyle = '#ffffff';
+  // 4. Header band with dark carbon plate, team accent line & hazard stripes
+  const headerH = 26;
+  ctx.fillStyle = '#181C26';
+  ctx.strokeStyle = '#282E3C';
+  ctx.lineWidth = 1.4;
+  drawChamferedRect(ctx, x + 2, y + 2, w - 4, headerH, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Team accent pip line on top of header
+  ctx.fillStyle = accentColor || '#F5A623';
+  ctx.fillRect(x + 10, y + 2, w - 20, 2);
+
+  // Hazard stripe accent bar along bottom of header
+  drawHazardStripes(ctx, x + 6, y + headerH - 3, w - 12, 3, 4, accentColor || '#F5A623', '#101217');
+
+  // Header Title Text
+  ctx.fillStyle = '#FFFFFF';
   ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(title, x + w / 2, y + 15);
+  ctx.fillText(title, x + w / 2, y + 14);
+  ctx.restore();
 
   const currentDefs = getActiveFighterDefs();
   const fighterIndex = state[slotProp] ?? 0;
   const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
+  const theme = getFighterCollectorTheme(def);
 
   // Register click on card to open character selection modal
   if (isInteractive) {
     _registerButton(x, y, w, h, () => {
-      selectingSlot = slotProp;
-      modalInspectIndex = state[slotProp] ?? 0;
-      modalPage = Math.floor(modalInspectIndex / 15);
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash1', 0.2);
-      }
+      openFighterSelectModal(slotProp, state[slotProp] ?? 0);
     });
   }
 
   if (!enabled) {
-    ctx.fillStyle = '#8b1524';
+    ctx.fillStyle = '#EF4444';
     ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -1662,17 +2154,23 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const avatarSize = 64;
 
       // Quick cycle arrows on avatar sides
-      drawButton('◄', subLeftX + 16, avatarY, () => cycleFighter(-1), 24, 24, null, 3);
-      drawButton('►', subLeftX + subLeftW - 16, avatarY, () => cycleFighter(1), 24, 24, null, 3);
+      drawButton('◄', subLeftX + 16, avatarY, () => cycleFighter(-1), 24, 24, '#20242E', 3);
+      drawButton('►', subLeftX + subLeftW - 16, avatarY, () => cycleFighter(1), 24, 24, '#20242E', 3);
 
-      // Warm pedestal ring
+      // Glowing pedestal ring
       ctx.save();
-      ctx.fillStyle = '#eed8dc';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#101217';
+      ctx.strokeStyle = theme.primary || '#F5A623';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.ellipse(avatarX, avatarY + 30, avatarSize * 0.44, 8, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(245, 166, 35, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(avatarX, avatarY + 30, avatarSize * 0.52, 10, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
 
@@ -1681,7 +2179,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       }
 
       // Fighter Name
-      ctx.fillStyle = '#21050c';
+      ctx.fillStyle = '#FFFFFF';
       ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1699,21 +2197,21 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const measuredPillW = Math.max(90, ctx.measureText(pillText).width + 16);
       const pillW = Math.min(subLeftW - 12, measuredPillW);
       const pillH = 16;
-      ctx.fillStyle = '#b81c3b';
-      ctx.strokeStyle = '#21050c';
+      ctx.fillStyle = '#1A1D26';
+      ctx.strokeStyle = theme.primary || '#F5A623';
       ctx.lineWidth = 1.4;
       drawChamferedRect(ctx, avatarX - pillW / 2, y + 136, pillW, pillH, 3);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = theme.primary || '#F5A623';
       ctx.fillText(pillText, avatarX, y + 144.5);
 
       // Stat Telemetry Block
       const statBoxY = y + 160;
-      drawStatBar(ctx, 'HP', def.hp, 150, subLeftX, statBoxY, subLeftW, '#cc2b4d');
-      drawStatBar(ctx, 'DMG', def.damage, 60, subLeftX, statBoxY + 16, subLeftW, '#f59e0b');
-      drawStatBar(ctx, 'SPD', def.speed || 2, 4, subLeftX, statBoxY + 32, subLeftW, '#7c2d37');
+      drawTacticalStatBar(ctx, 'HP', def.hp, 150, subLeftX, statBoxY, subLeftW, '#EF4444');
+      drawTacticalStatBar(ctx, 'DMG', def.damage, 60, subLeftX, statBoxY + 16, subLeftW, '#F5A623');
+      drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, subLeftX, statBoxY + 32, subLeftW, theme.primary || '#38BDF8');
 
       // Change Fighter Button
       const btnW = subLeftW;
@@ -1722,27 +2220,28 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
       drawButton('CHANGE (ROSTER)', avatarX, btnY + btnH / 2, () => {
         openFighterSelectModal(slotProp, fighterIndex);
-      }, btnW, btnH, null, 3);
+      }, btnW, btnH, '#20242E', 3);
 
       // Right Side: Ability Box + Live Weapon Box
       const abY = y + 32;
       const abH = 80;
       ctx.save();
-      ctx.fillStyle = '#fff5f7';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#0F1116';
+      ctx.strokeStyle = '#252A36';
+      ctx.lineWidth = 1.4;
       drawChamferedRect(ctx, subRightX, abY, subRightW, abH, 4);
       ctx.fill();
       ctx.stroke();
+      drawCornerBrackets(ctx, subRightX, abY, subRightW, abH, 6, 'rgba(245, 166, 35, 0.4)', 1.2);
       ctx.restore();
 
-      ctx.fillStyle = '#b81c3b';
+      ctx.fillStyle = '#F5A623';
       ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, subRightW - 12), subRightX + 6, abY + 6);
 
-      ctx.fillStyle = '#21050c';
+      ctx.fillStyle = '#CBD5E1';
       ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
       wrapText(ctx, def.desc, subRightX + 6, abY + 18, subRightW - 12, 12, 4);
 
@@ -1750,21 +2249,22 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const wpY = abY + abH + 6;
       const wpH = h - (wpY - y) - 12;
       ctx.save();
-      ctx.fillStyle = '#fff5f7';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#0F1116';
+      ctx.strokeStyle = '#252A36';
+      ctx.lineWidth = 1.4;
       drawChamferedRect(ctx, subRightX, wpY, subRightW, wpH, 4);
       ctx.fill();
       ctx.stroke();
+      drawCornerBrackets(ctx, subRightX, wpY, subRightW, wpH, 8, '#F5A623', 1.4);
       ctx.restore();
 
-      ctx.fillStyle = '#b81c3b';
+      ctx.fillStyle = '#F5A623';
       ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, subRightW - 12), subRightX + 6, wpY + 6);
 
-      ctx.fillStyle = '#8b1524';
+      ctx.fillStyle = '#94A3B8';
       ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
       ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, subRightW - 12), subRightX + 6, wpY + 19);
 
@@ -1772,8 +2272,8 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const wStageY = wpY + 86;
 
       ctx.save();
-      ctx.fillStyle = '#eed8dc';
-      ctx.strokeStyle = '#21050c';
+      ctx.fillStyle = '#151822';
+      ctx.strokeStyle = '#F5A623';
       ctx.lineWidth = 1.2;
       ctx.beginPath();
       ctx.ellipse(wStageX, wStageY + 20, 44, 9, 0, 0, Math.PI * 2);
@@ -1785,7 +2285,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       drawWeaponPreview(ctx, def.type, def.color);
       ctx.restore();
 
-      ctx.fillStyle = '#21050c';
+      ctx.fillStyle = '#CBD5E1';
       ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
@@ -1798,17 +2298,23 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const avatarSize = 80;
 
       // Quick cycle arrows on large card avatar sides
-      drawButton('◄', x + 24, avatarY, () => cycleFighter(-1), 26, 26, null, 3);
-      drawButton('►', x + w - 24, avatarY, () => cycleFighter(1), 26, 26, null, 3);
+      drawButton('◄', x + 24, avatarY, () => cycleFighter(-1), 26, 26, '#20242E', 3);
+      drawButton('►', x + w - 24, avatarY, () => cycleFighter(1), 26, 26, '#20242E', 3);
 
-      // Warm stage pedestal ring
+      // Glowing high-tech pedestal ring (themed to character's accent)
       ctx.save();
-      ctx.fillStyle = '#eed8dc';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#101217';
+      ctx.strokeStyle = theme.primary || '#F5A623';
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
       ctx.ellipse(avatarX, avatarY + 38, avatarSize * 0.44, 10, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(245, 166, 35, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(avatarX, avatarY + 38, avatarSize * 0.52, 13, 0, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
 
@@ -1817,8 +2323,8 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       }
 
       // Fighter Name
-      ctx.fillStyle = '#21050c';
-      ctx.font = '900 14px "Outfit", "Rajdhani", sans-serif';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 15px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(def.name.toUpperCase(), avatarX, y + 144);
@@ -1835,69 +2341,71 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const measuredPillW = Math.max(96, ctx.measureText(pillText).width + 18);
       const pillW = Math.min(w - 24, measuredPillW);
       const pillH = 16;
-      ctx.fillStyle = '#b81c3b';
-      ctx.strokeStyle = '#21050c';
+      ctx.fillStyle = '#1A1D26';
+      ctx.strokeStyle = theme.primary || '#F5A623';
       ctx.lineWidth = 1.4;
       drawChamferedRect(ctx, avatarX - pillW / 2, y + 156, pillW, pillH, 3);
       ctx.fill();
       ctx.stroke();
 
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = theme.primary || '#F5A623';
       ctx.fillText(pillText, avatarX, y + 164.5);
 
-      // Stat Telemetry Block
+      // Stat Telemetry Block (Tactical gauges matching Image 1)
       const statBoxX = x + 10;
       const statBoxY = y + 180;
       const statBoxW = w - 20;
 
-      drawStatBar(ctx, 'HP', def.hp, 150, statBoxX, statBoxY, statBoxW, '#cc2b4d');
-      drawStatBar(ctx, 'DMG', def.damage, 60, statBoxX, statBoxY + 16, statBoxW, '#f59e0b');
-      drawStatBar(ctx, 'SPD', def.speed || 2, 4, statBoxX, statBoxY + 32, statBoxW, '#7c2d37');
+      drawTacticalStatBar(ctx, 'HP', def.hp, 150, statBoxX, statBoxY, statBoxW, '#EF4444');
+      drawTacticalStatBar(ctx, 'DMG', def.damage, 60, statBoxX, statBoxY + 16, statBoxW, '#F5A623');
+      drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, statBoxX, statBoxY + 32, statBoxW, theme.primary || '#38BDF8');
 
-      // ── Ability Dossier Sub-Panel (Warm Cream Sub-box) ──
+      // ── Ability Dossier Sub-Panel (Dark Carbon Recessed Sub-box) ──
       const abilityY = y + 224;
       const abilityH = 88;
       
       ctx.save();
-      ctx.fillStyle = '#fff5f7';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.6;
+      ctx.fillStyle = '#0F1116';
+      ctx.strokeStyle = '#252A36';
+      ctx.lineWidth = 1.4;
       drawChamferedRect(ctx, statBoxX, abilityY, statBoxW, abilityH, 4);
       ctx.fill();
       ctx.stroke();
+      drawCornerBrackets(ctx, statBoxX, abilityY, statBoxW, abilityH, 6, 'rgba(245, 166, 35, 0.4)', 1.2);
       ctx.restore();
 
-      ctx.fillStyle = '#b81c3b';
+      ctx.fillStyle = '#F5A623';
       ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, statBoxW - 16), statBoxX + 8, abilityY + 7);
 
-      ctx.fillStyle = '#21050c';
+      ctx.fillStyle = '#CBD5E1';
       ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-      wrapText(ctx, def.desc, statBoxX + 8, abilityY + 20, statBoxW - 16, 13, 5);
+      wrapText(ctx, def.desc, statBoxX + 8, abilityY + 22, statBoxW - 16, 13, 5);
 
-      // ── Live Weapon Graphic Visual Stage Sub-Panel (Warm Cream Sub-box) ──
+      // ── Live Weapon Graphic Visual Stage Sub-Panel (Dark Carbon Recessed Sub-box) ──
       const weaponY = abilityY + abilityH + 8;
       const weaponH = 296;
 
       ctx.save();
-      ctx.fillStyle = '#fff5f7';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.6;
+      ctx.fillStyle = '#0F1116';
+      ctx.strokeStyle = '#252A36';
+      ctx.lineWidth = 1.4;
       drawChamferedRect(ctx, statBoxX, weaponY, statBoxW, weaponH, 5);
       ctx.fill();
       ctx.stroke();
+      drawCornerBrackets(ctx, statBoxX, weaponY, statBoxW, weaponH, 8, '#F5A623', 1.4);
       ctx.restore();
 
       // Weapon Header & Category
-      ctx.fillStyle = '#b81c3b';
+      ctx.fillStyle = '#F5A623';
       ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
       ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, statBoxW - 16), statBoxX + 8, weaponY + 7);
 
-      ctx.fillStyle = '#8b1524';
+      ctx.fillStyle = '#94A3B8';
       ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
       ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, statBoxW - 16), statBoxX + 8, weaponY + 20);
 
@@ -1905,14 +2413,20 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       const wStageX = statBoxX + statBoxW / 2;
       const wStageY = weaponY + 114;
 
-      // Stage pedestal ring
+      // High-tech weapon pedestal
       ctx.save();
-      ctx.fillStyle = '#eed8dc';
-      ctx.strokeStyle = '#21050c';
-      ctx.lineWidth = 1.5;
+      ctx.fillStyle = '#151822';
+      ctx.strokeStyle = '#F5A623';
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
       ctx.ellipse(wStageX, wStageY + 28, 54, 12, 0, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(245, 166, 35, 0.25)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(wStageX, wStageY + 28, 62, 15, 0, 0, Math.PI * 2);
       ctx.stroke();
 
       // Render LIVE WEAPON GRAPHIC
@@ -1922,20 +2436,20 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
       ctx.restore();
 
       // Weapon Description Telemetry
-      ctx.fillStyle = '#21050c';
+      ctx.fillStyle = '#CBD5E1';
       ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
       wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 222, statBoxW - 16, 13, 4);
 
-      // Change Fighter Button
+      // Change Fighter Button (Dark Tactical Carbon with Amber Border)
       const btnW = w - 24;
       const btnH = 36;
       const btnY = y + h - btnH - 12;
 
       drawButton('CHANGE FIGHTER (ROSTER)', x + w / 2, btnY + btnH / 2, () => {
         openFighterSelectModal(slotProp, fighterIndex);
-      }, btnW, btnH, null, 4);
+      }, btnW, btnH, '#20242E', 4);
     }
 
   } else if (h < 260) {
@@ -1944,6 +2458,17 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const avatarY = y + 54;
     const avatarSize = 44;
 
+    // Glowing pedestal
+    ctx.save();
+    ctx.fillStyle = '#101217';
+    ctx.strokeStyle = theme.primary || '#F5A623';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(avatarX, avatarY + 22, avatarSize * 0.44, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
     if (previewImage) {
       ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
     }
@@ -1951,19 +2476,19 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const detailX = x + 58;
     const detailW = w - 68;
 
-    ctx.fillStyle = '#21050c';
+    ctx.fillStyle = '#FFFFFF';
     ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 28);
 
-    ctx.fillStyle = '#8b1524';
+    ctx.fillStyle = theme.primary || '#F5A623';
     ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 40);
 
-    drawStatBar(ctx, 'HP', def.hp, 150, detailX, y + 50, detailW, '#cc2b4d');
-    drawStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 64, detailW, '#f59e0b');
-    drawStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, y + 78, detailW, '#7c2d37');
+    drawTacticalStatBar(ctx, 'HP', def.hp, 150, detailX, y + 50, detailW, '#EF4444');
+    drawTacticalStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 64, detailW, '#F5A623');
+    drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, y + 78, detailW, theme.primary || '#38BDF8');
 
     // Mini Live Weapon preview sub-box
     const weaponBoxY = y + 96;
@@ -1971,15 +2496,16 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const boxW = w - 16;
 
     ctx.save();
-    ctx.fillStyle = '#fff5f7';
-    ctx.strokeStyle = '#21050c';
+    ctx.fillStyle = '#0F1116';
+    ctx.strokeStyle = '#252A36';
     ctx.lineWidth = 1.4;
     drawChamferedRect(ctx, x + 8, weaponBoxY, boxW, weaponBoxH, 4);
     ctx.fill();
     ctx.stroke();
+    drawCornerBrackets(ctx, x + 8, weaponBoxY, boxW, weaponBoxH, 5, 'rgba(245, 166, 35, 0.4)', 1.2);
     ctx.restore();
 
-    ctx.fillStyle = '#b81c3b';
+    ctx.fillStyle = '#F5A623';
     ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -1994,7 +2520,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     drawWeaponPreview(ctx, def.type, def.color);
     ctx.restore();
 
-    ctx.fillStyle = '#21050c';
+    ctx.fillStyle = '#CBD5E1';
     ctx.font = '800 9px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
     ctx.textAlign = 'left';
     wrapText(ctx, `${def.ability}: ${def.desc}`, x + 12, weaponBoxY + 17, boxW - 55, 11, 3);
@@ -2005,17 +2531,28 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const btnH = 22;
     const btnY = y + h - btnH - 6;
 
-    drawButton('◄', x + 8 + arrowW / 2, btnY + btnH / 2, () => cycleFighter(-1), arrowW, btnH, null, 3);
+    drawButton('◄', x + 8 + arrowW / 2, btnY + btnH / 2, () => cycleFighter(-1), arrowW, btnH, '#20242E', 3);
     drawButton('CHANGE', x + 8 + arrowW + 3 + changeBtnW / 2, btnY + btnH / 2, () => {
       openFighterSelectModal(slotProp, fighterIndex);
-    }, changeBtnW, btnH, null, 3);
-    drawButton('►', x + w - 8 - arrowW / 2, btnY + btnH / 2, () => cycleFighter(1), arrowW, btnH, null, 3);
+    }, changeBtnW, btnH, '#20242E', 3);
+    drawButton('►', x + w - 8 - arrowW / 2, btnY + btnH / 2, () => cycleFighter(1), arrowW, btnH, '#20242E', 3);
 
   } else {
     // ── MEDIUM CARD (2v2 / 1v2 Duo Stacked / FFA: H ~ 334px) ──
     const avatarX = x + 36;
     const avatarY = y + 64;
     const avatarSize = 54;
+
+    // Glowing pedestal
+    ctx.save();
+    ctx.fillStyle = '#101217';
+    ctx.strokeStyle = theme.primary || '#F5A623';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(avatarX, avatarY + 26, avatarSize * 0.44, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
 
     if (previewImage) {
       ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
@@ -2024,19 +2561,19 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const detailX = x + 72;
     const detailW = w - 82;
 
-    ctx.fillStyle = '#21050c';
+    ctx.fillStyle = '#FFFFFF';
     ctx.font = '900 12.5px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 32);
 
-    ctx.fillStyle = '#8b1524';
+    ctx.fillStyle = theme.primary || '#F5A623';
     ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
     ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 46);
 
-    drawStatBar(ctx, 'HP', def.hp, 150, detailX, y + 58, detailW, '#cc2b4d');
-    drawStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 74, detailW, '#f59e0b');
-    drawStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, y + 90, detailW, '#7c2d37');
+    drawTacticalStatBar(ctx, 'HP', def.hp, 150, detailX, y + 58, detailW, '#EF4444');
+    drawTacticalStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 74, detailW, '#F5A623');
+    drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, y + 90, detailW, theme.primary || '#38BDF8');
 
     // Live Weapon preview sub-box
     const weaponBoxY = y + 112;
@@ -2044,15 +2581,16 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const boxW = w - 18;
 
     ctx.save();
-    ctx.fillStyle = '#fff5f7';
-    ctx.strokeStyle = '#21050c';
-    ctx.lineWidth = 1.5;
+    ctx.fillStyle = '#0F1116';
+    ctx.strokeStyle = '#252A36';
+    ctx.lineWidth = 1.4;
     drawChamferedRect(ctx, x + 9, weaponBoxY, boxW, weaponBoxH, 4);
     ctx.fill();
     ctx.stroke();
+    drawCornerBrackets(ctx, x + 9, weaponBoxY, boxW, weaponBoxH, 6, 'rgba(245, 166, 35, 0.4)', 1.2);
     ctx.restore();
 
-    ctx.fillStyle = '#b81c3b';
+    ctx.fillStyle = '#F5A623';
     ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
@@ -2067,7 +2605,7 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     drawWeaponPreview(ctx, def.type, def.color);
     ctx.restore();
 
-    ctx.fillStyle = '#21050c';
+    ctx.fillStyle = '#CBD5E1';
     ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
     ctx.textAlign = 'left';
     wrapText(ctx, `${def.ability}: ${def.desc}`, x + 15, weaponBoxY + 18, boxW - 75, 12, 4);
@@ -2078,11 +2616,11 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
     const btnH = 26;
     const btnY = y + h - btnH - 10;
 
-    drawButton('◄', x + 9 + arrowW / 2, btnY + btnH / 2, () => cycleFighter(-1), arrowW, btnH, null, 3);
+    drawButton('◄', x + 9 + arrowW / 2, btnY + btnH / 2, () => cycleFighter(-1), arrowW, btnH, '#20242E', 3);
     drawButton('CHANGE', x + 9 + arrowW + 4 + changeBtnW / 2, btnY + btnH / 2, () => {
       openFighterSelectModal(slotProp, fighterIndex);
-    }, changeBtnW, btnH, null, 3);
-    drawButton('►', x + w - 9 - arrowW / 2, btnY + btnH / 2, () => cycleFighter(1), arrowW, btnH, null, 3);
+    }, changeBtnW, btnH, '#20242E', 3);
+    drawButton('►', x + w - 9 - arrowW / 2, btnY + btnH / 2, () => cycleFighter(1), arrowW, btnH, '#20242E', 3);
   }
 }
 
@@ -2094,7 +2632,7 @@ function openFighterSelectModal(slotProp, fighterIndex) {
   const pos = modalAvailableFighters.findIndex(f => f.idx === fighterIndex);
   
   if (pos !== -1) {
-    modalPage = Math.floor(pos / 15);
+    modalPage = Math.floor(pos / MODAL_ITEMS_PER_PAGE);
   } else {
     modalPage = 0;
   }
@@ -2151,7 +2689,7 @@ window.addEventListener('keydown', (e) => {
         e.preventDefault();
         const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
           .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / 15));
+        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / MODAL_ITEMS_PER_PAGE));
         if (modalPage < totalPages - 1) {
           modalPage++;
           if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
@@ -2208,8 +2746,8 @@ window.addEventListener('wheel', (e) => {
   if (selectingSlot !== null) {
     // Modal scroll: flip to next / previous page on scroll!
     const isLandscape = (state.canvas && state.canvas.width > 600) || state.viewOrientation === 'horizontal';
-    const modalW = isLandscape ? Math.min(state.canvas.width - 40, 900) : Math.min(state.canvas.width - 20, 510);
-    const modalH = isLandscape ? Math.min(state.canvas.height - 30, 490) : Math.min(state.canvas.height - 40, 600);
+    const modalW = isLandscape ? Math.min(state.canvas.width - 28, 912) : Math.min(state.canvas.width - 20, 508);
+    const modalH = isLandscape ? Math.min(state.canvas.height - 20, 508) : Math.min(state.canvas.height - 44, 896);
     const mx = (state.canvas.width - modalW) / 2;
     const my = (state.canvas.height - modalH) / 2;
 
@@ -2220,8 +2758,7 @@ window.addEventListener('wheel', (e) => {
       if (now - _lastModalWheelTime > 140) {
         const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
           .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-        const itemsPerPage = isLandscape ? 15 : 15;
-        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
+        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / MODAL_ITEMS_PER_PAGE));
         
         if (e.deltaY > 0) {
           if (modalPage < totalPages - 1) {
@@ -2275,4 +2812,4 @@ window.addEventListener('wheel', (e) => {
   }
 }, { passive: false });
 
-export { drawPlayerCard, drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, randomize1v1Fighters, selectingSlot, modalInspectIndex, modalPage, openFighterSelectModal, isFighterSelectModalOpen, closeFighterSelectModal, getSelectingSlot };
+export { drawPlayerCard, drawHeroicFighterCard, drawDynamicVsClashEmblem, drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, randomize1v1Fighters, selectingSlot, modalInspectIndex, modalPage, openFighterSelectModal, isFighterSelectModalOpen, closeFighterSelectModal, getSelectingSlot };

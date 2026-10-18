@@ -324,7 +324,8 @@ export function drawCrazyDaveSkin(ctx, fighter) {
 
   const swingTimer = fighter.shovelSwingTimer || fighter.plantingAnimTimer || 0;
   const swingMax = fighter.plantingAnimDuration || 20;
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter.hideFrontHand || isPodiumPreview;
+  const shouldHideWeapon = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideWeapon || isPodiumPreview;
 
   // Compute shovel dig swing angle & offsets during planting
   let shovelAngle = 0;
@@ -398,20 +399,22 @@ export function drawCrazyDaveSkin(ctx, fighter) {
   ctx.restore();
 
   // 4. In-Hand Weapon: Garden Shovel (Animated with dig & scoop motion + breathing sway)
-  ctx.save();
-  ctx.translate(chestExpansionX * 0.4, breathLiftY * 0.5);
-  drawCrazyDaveShovel(ctx, shovelOffsetX, shovelOffsetY, shovelAngle, r, true, swingTimer, false, fighter.color || '#84CC16', true);
+  if (!shouldHideWeapon) {
+    ctx.save();
+    ctx.translate(chestExpansionX * 0.4, breathLiftY * 0.5);
+    drawCrazyDaveShovel(ctx, shovelOffsetX, shovelOffsetY, shovelAngle, r, true, swingTimer, false, fighter.color || '#84CC16', true);
 
-  // 5. Front Hand (Holding shovel handle at animated angle and position)
-  if (!shouldHideHands) {
-    const frontHandRadius = getHandSize(4.2);
-    const cosA = Math.cos(shovelAngle);
-    const sinA = Math.sin(shovelAngle);
-    const frontHandX = shovelOffsetX + (r * 0.65) * cosA;
-    const frontHandY = shovelOffsetY + (r * 0.65) * sinA;
-    drawPixelHand(ctx, frontHandX, frontHandY, frontHandRadius, '#FFE0BD', '#0E0F14');
+    // 5. Front Hand (Holding shovel handle at animated angle and position)
+    if (!shouldHideHands) {
+      const frontHandRadius = getHandSize(4.2);
+      const cosA = Math.cos(shovelAngle);
+      const sinA = Math.sin(shovelAngle);
+      const frontHandX = shovelOffsetX + (r * 0.65) * cosA;
+      const frontHandY = shovelOffsetY + (r * 0.65) * sinA;
+      drawPixelHand(ctx, frontHandX, frontHandY, frontHandRadius, '#FFE0BD', '#0E0F14');
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   ctx.restore();
 }

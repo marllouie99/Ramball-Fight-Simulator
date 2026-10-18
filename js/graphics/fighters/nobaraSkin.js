@@ -131,7 +131,7 @@ export function drawNobaraSkin(ctx, fighter) {
   const backX = r * 0.30;
   const backY = -r * 0.42;
 
-  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter.hideWeapon;
   const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand;
   const hideBackHand = hideHandsAndWeapon || fighter.hideBackHand;
   const handRadius = getHandSize(6.8);

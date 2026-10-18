@@ -3,7 +3,8 @@ import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { HORIZONTAL_MAPS, getActiveHorizontalMap, setActiveHorizontalMap } from '../../systems/horizontalMapSystem.js';
 import { _clearButtons, _registerButton, drawPanel, drawButton, drawStatBar, drawChamferedRect, fitSingleLineText, wrapText } from './uiFramework.js';
-import { openFighterSelectModal, isFighterSelectModalOpen, drawFighterSelectModal, drawPlayerCard, getFighterWeaponInfo } from './CharacterSelectScreen.js';
+import { openFighterSelectModal, isFighterSelectModalOpen, drawFighterSelectModal, drawPlayerCard, getFighterWeaponInfo, drawHeroicFighterCard, drawDynamicVsClashEmblem } from './CharacterSelectScreen.js';
+import { drawCornerBrackets, drawHazardStripes } from './CollectorCardRenderer.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, openArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
@@ -178,38 +179,55 @@ export function drawHorizontalTeamSelectScreen(ctx) {
 
   ctx.save();
 
-  // 1. Retro Crimson Pixel Backdrop (Unified with Vertical Mode)
-  ctx.fillStyle = '#5c0f1c';
+  // 1. Clean Dark Matte Backdrop (Unified with Character Select Screen & Reference 5)
+  ctx.fillStyle = '#181A22';
   ctx.fillRect(0, 0, w, h);
 
-  // Pixel Dither Grid
-  ctx.fillStyle = '#3d0711';
-  for (let y = 0; y < h; y += 6) {
-    for (let x = 0; x < w; x += 6) {
-      ctx.fillRect(x, y, 2, 2);
-      ctx.fillRect(x + 3, y + 3, 2, 2);
+  // Subtle Dot Grid
+  ctx.fillStyle = 'rgba(245, 166, 35, 0.035)';
+  const dotStep = 18;
+  for (let y = 8; y < h; y += dotStep) {
+    for (let x = 8; x < w; x += dotStep) {
+      ctx.fillRect(x - 1, y - 1, 2, 2);
     }
   }
 
-  // 2. Top-Left Back Button
+  // Outer Screen Tech Corner Brackets
+  drawCornerBrackets(ctx, 6, 6, w - 12, h - 12, 16, 'rgba(245, 166, 35, 0.35)', 1.8);
+
+  // 2. Top-Left Back Button (Tactical Dark Carbon + Amber Trim)
   drawButton('◀ BACK', 52, 28, () => {
     goToTitle();
-  }, 76, 26);
+  }, 76, 26, '#20242E', 4);
 
   // 3. Header Title & Sub-Controls
   const isFfa = (state.mode === GAME_MODES.FFA || state.mode === 'FFA');
-  const modeTitle = isFfa ? '[ FREE FOR ALL • 4 FIGHTERS ]' : '[ 1 VS 1 WIDESCREEN DUEL ]';
+  const rawModeTitle = isFfa ? 'FREE FOR ALL • 4 COMBATANTS' : '1 VS 1 WIDESCREEN DUEL';
 
-  // Title Text
+  // Screen Title Badge (Chamfered Dark Carbon Badge Base with Hazard Stripe Accent)
   const titleY = 28;
+  const titleW = 340;
+  const titleH = 28;
+  const titleX = w / 2 - titleW / 2;
+  const titleBoxY = titleY - titleH / 2;
+
   ctx.save();
-  ctx.fillStyle = '#21050c';
-  ctx.font = '700 12px "Press Start 2P", monospace';
+  ctx.fillStyle = '#161922';
+  ctx.strokeStyle = '#F5A623';
+  ctx.lineWidth = 1.6;
+  drawChamferedRect(ctx, titleX, titleBoxY, titleW, titleH, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Bottom hazard stripe accent line
+  drawHazardStripes(ctx, titleX + 8, titleBoxY + titleH - 4, titleW - 16, 3, 4, '#F5A623', '#101217');
+
+  // Title typography
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(modeTitle, w / 2 + 1, titleY + 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(modeTitle, w / 2, titleY);
+  ctx.fillText(`[ ${rawModeTitle} // DEPLOYMENT ]`, w / 2, titleY - 1);
   ctx.restore();
 
   // Sub-Controls Bar (Arena BGM & Arena Floor / Tiles)
@@ -411,62 +429,33 @@ function _drawFfaSelectLayout(ctx, defs, w, h) {
 }
 
 /**
- * Layout 1: Dedicated 1v1 Widescreen Duel (P1 vs P2 Unified 16:9 Large Cards)
+ * Layout 1: Dedicated 1v1 Widescreen Duel (P1 vs P2 Reference 5 Comic Cut-In Banners)
  */
 function _draw1v1SelectLayout(ctx, defs, w, h) {
-  const topY = 88;
-  const margin = 40;
-  const cardGap = 40;
+  const margin = 28;
+  const cardGap = 32;
   const totalCardW = w - margin * 2;
-  const cardW = Math.floor((totalCardW - cardGap) / 2); // ~390px
-  const fullCardH = 380;
+  const bannerW = Math.floor((totalCardW - cardGap) / 2); // 436px
+  const bannerH = 290;
+  const bannerY = 126;
 
   const leftX = margin;
-  const rightX = margin + cardW + cardGap;
+  const rightX = margin + bannerW + cardGap;
 
   // Sync state.horizontalRosterSlots with p1Index and p2Index
   state.p1Index = state.horizontalRosterSlots?.[0] ?? state.p1Index ?? 0;
   state.p2Index = state.horizontalRosterSlots?.[1] ?? state.p2Index ?? 1;
 
   // Left Card (Player 1 // Red Challenger)
-  drawPlayerCard('p1Index', 'PLAYER 1 // RED', leftX, topY, cardW, fullCardH, '#cc2b4d', true, true);
+  drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', leftX, bannerY, bannerW, bannerH, true, true);
 
   // Right Card (Player 2 // Blue Opponent)
-  drawPlayerCard('p2Index', 'PLAYER 2 // BLUE', rightX, topY, cardW, fullCardH, '#38bdf8', true, true);
+  drawHeroicFighterCard('p2Index', 'PLAYER 2 // BLUE', rightX, bannerY, bannerW, bannerH, false, true);
 
-  // Center Retro Pixel VS Crest
+  // Center Dynamic VS Clash Emblem
   const vsX = w / 2;
-  const vsY = topY + fullCardH / 2 - 10;
-
-  ctx.save();
-  // 3D Shadow
-  ctx.fillStyle = '#5e0d1f';
-  ctx.beginPath();
-  ctx.arc(vsX, vsY + 2.5, 18, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Center berry badge
-  ctx.fillStyle = '#b81c3b';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Inset highlight
-  ctx.strokeStyle = '#ffaec0';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('VS', vsX, vsY + 0.5);
-  ctx.restore();
+  const vsY = bannerY + bannerH / 2;
+  drawDynamicVsClashEmblem(ctx, vsX, vsY, true);
 
   // Bottom Command Deck
   _drawUnifiedBottomCommandDeck(w, h, 'START DUEL');
@@ -789,15 +778,15 @@ function _drawUnifiedBottomCommandDeck(w, h, primaryLabel) {
   const actionRowY = 498;
   const btnH = 38;
 
-  // 1. Primary Action Button (Start Battle)
+  // 1. Primary Action Button (Start Battle - Tactical Amber)
   drawButton(primaryLabel, startBtnX, actionRowY, () => {
     startGame();
-  }, startBtnW, btnH, '#cc2b4d', 6);
+  }, startBtnW, btnH, '#F5A623', 6);
 
   // 2. Thumbnail / Face-Off Button
   drawButton('📸 THUMBNAIL', thumbBtnX, actionRowY, () => {
     startFaceOffScreen(true);
-  }, thumbBtnW, btnH, '#d97706', 6);
+  }, thumbBtnW, btnH, '#D97706', 6);
 
   // 3. Randomize Roster Button
   drawButton('RANDOMIZE', randBtnX, actionRowY, () => {
@@ -805,7 +794,7 @@ function _drawUnifiedBottomCommandDeck(w, h, primaryLabel) {
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
       audioSystem.playSFX('skill_dash1', 0.2);
     }
-  }, randBtnW, btnH, null, 6);
+  }, randBtnW, btnH, '#20242E', 6);
 }
 
 /**

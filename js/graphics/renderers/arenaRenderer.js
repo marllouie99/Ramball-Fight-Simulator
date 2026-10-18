@@ -190,157 +190,6 @@ function drawSolidVectorCrack(ctx, crack, isDark = false) {
   ctx.restore();
 }
 
-// ──────────────────────────────────────────
-// ANIME GRAPHIC DETAILS OVERLAY SYSTEM
-// (Halftone Dots, Action Triangles, Diagonal Speed Needles - OUTSIDE ARENA ONLY)
-// ──────────────────────────────────────────
-
-/**
- * Draws the Halftone Dot Matrix ("circle thingy"), Action Triangles, and Speed Needles
- * strictly OUTSIDE the arena playing field onto the outer canvas margins.
- */
-function drawOuterArenaGraphicDetails(ctx, canvasWidth, canvasHeight, arena, isDark) {
-  ctx.save();
-
-  // Exclude the arena bounding box so details render strictly OUTSIDE the arena
-  ctx.beginPath();
-  ctx.rect(0, 0, canvasWidth, canvasHeight);
-  ctx.rect(arena.x, arena.y, arena.width, arena.height);
-  ctx.clip('evenodd');
-
-  // 1. Halftone Dot Matrix ("circle thingy") in outer margins
-  const dotColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)';
-  drawArenaHalftoneGrid(ctx, 0, 0, canvasWidth, canvasHeight, dotColor);
-
-  // 2. Action Triangles ("the small triangles") & Diagonal Speed Needles in outer margins
-  drawOuterActionTrianglesAndNeedles(ctx, canvasWidth, canvasHeight, arena, isDark);
-
-  ctx.restore();
-}
-
-function drawArenaHalftoneGrid(ctx, startX, startY, gridW, gridH, dotColor) {
-  const spacing = 14;
-  const cols = Math.floor(gridW / spacing);
-  const rows = Math.floor(gridH / spacing);
-
-  ctx.save();
-  ctx.fillStyle = dotColor;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const x = startX + c * spacing + (r % 2 === 0 ? 0 : spacing * 0.5);
-      const y = startY + r * spacing;
-
-      const normX = c / cols;
-      const normY = r / rows;
-      const dist = Math.hypot(normX - 0.5, normY - 0.5);
-      const radiusFactor = Math.max(0.2, 1.0 - dist * 0.75);
-      const radius = Math.min(3.2, Math.max(0.8, radiusFactor * 3.0));
-
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  ctx.restore();
-}
-
-function drawOuterActionTrianglesAndNeedles(ctx, width, height, arena, isDark) {
-  ctx.save();
-
-  // 1. Action Triangles in the outer margins
-  const triangleColors = [
-    'rgba(56, 189, 248, 0.75)',  // Cyan
-    'rgba(235, 60, 80, 0.70)',   // Crimson / Coral
-    isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(30, 35, 45, 0.65)', // Contrast Neutral
-    'rgba(96, 165, 250, 0.70)'   // Electric Blue
-  ];
-
-  for (let i = 0; i < 28; i++) {
-    // Distribute triangles primarily in the left, right, top, and bottom margins
-    let tx, ty;
-    if (i % 4 === 0) {
-      // Left margin
-      tx = ((i * 37.3 + 15) % Math.max(20, arena.x - 15)) + 10;
-      ty = ((i * 123.7) % height);
-    } else if (i % 4 === 1) {
-      // Right margin
-      const rightMarginW = Math.max(20, width - (arena.x + arena.width) - 20);
-      tx = arena.x + arena.width + 10 + ((i * 43.1) % rightMarginW);
-      ty = ((i * 137.9) % height);
-    } else if (i % 4 === 2) {
-      // Top margin
-      tx = ((i * 89.5) % width);
-      ty = ((i * 29.1 + 10) % Math.max(20, arena.y - 15)) + 5;
-    } else {
-      // Bottom margin
-      const bottomMarginH = Math.max(20, height - (arena.y + arena.height) - 15);
-      tx = ((i * 93.7) % width);
-      ty = arena.y + arena.height + 5 + ((i * 31.3) % bottomMarginH);
-    }
-
-    const tr = 4.5 + (i % 5) * 1.6;
-    const rot = (i * 0.58) % (Math.PI * 2);
-    const color = triangleColors[i % triangleColors.length];
-    const isSolid = (i % 4 === 0);
-
-    ctx.save();
-    ctx.translate(tx, ty);
-    ctx.rotate(rot);
-    ctx.globalAlpha = 0.60 + (i % 3) * 0.15;
-
-    ctx.beginPath();
-    ctx.moveTo(0, -tr);
-    ctx.lineTo(tr * 0.86, tr * 0.5);
-    ctx.lineTo(-tr * 0.86, tr * 0.5);
-    ctx.closePath();
-
-    if (isSolid) {
-      ctx.fillStyle = color;
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // 2. Diagonal Needle Speed Lines across the outer margins
-  const needleColors = [
-    'rgba(56, 189, 248, 0.65)',
-    'rgba(96, 165, 250, 0.60)',
-    isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(40, 50, 70, 0.55)'
-  ];
-
-  for (let i = 0; i < 18; i++) {
-    let sx, sy;
-    if (i % 2 === 0) {
-      // Left side needle
-      sx = ((i * 47.1 + 10) % Math.max(20, arena.x - 10));
-      sy = ((i * 111.3 + 30) % height);
-    } else {
-      // Right side needle
-      const rightMarginW = Math.max(20, width - (arena.x + arena.width) - 20);
-      sx = arena.x + arena.width + 10 + ((i * 53.7) % rightMarginW);
-      sy = ((i * 119.7 + 30) % height);
-    }
-
-    const len = 45 + (i % 5) * 18;
-    const angle = -0.68 + ((i % 3) - 1) * 0.06;
-    const color = needleColors[i % needleColors.length];
-
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len);
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = 0.55 + (i % 3) * 0.15;
-    ctx.lineWidth = 1.2 + (i % 2) * 0.6;
-    ctx.stroke();
-  }
-
-  ctx.restore();
-}
 
 /**
  * Renders the Shiro & Sora Disboard Virtual Chessboard on the arena floor.
@@ -534,6 +383,411 @@ export function renderShiroChessboardFloor(ctx, arena) {
   }
 }
 
+/**
+ * Draws a rounded rectangle path with cross-environment fallback.
+ */
+function _drawRoundRectPath(ctx, rx, ry, rw, rh, rad) {
+  rad = Math.min(rad, rw / 2, rh / 2);
+  if (typeof ctx.roundRect === 'function') {
+    ctx.beginPath();
+    ctx.roundRect(rx, ry, rw, rh, rad);
+    return;
+  }
+  ctx.beginPath();
+  ctx.moveTo(rx + rad, ry);
+  ctx.lineTo(rx + rw - rad, ry);
+  ctx.arcTo(rx + rw, ry, rx + rw, ry + rad, rad);
+  ctx.lineTo(rx + rw, ry + rh - rad);
+  ctx.arcTo(rx + rw, ry + rh, rx + rw - rad, ry + rh, rad);
+  ctx.lineTo(rx + rad, ry + rh);
+  ctx.arcTo(rx, ry + rh, rx, ry + rh - rad, rad);
+  ctx.lineTo(rx, ry + rad);
+  ctx.arcTo(rx, ry, rx + rad, ry, rad);
+  ctx.closePath();
+}
+
+/**
+ * Draws the polygonal boundary of a turnbuckle corner pauldron plate with inner diagonal brace.
+ */
+function _drawCornerCleatPolygon(ctx, cx, cy, sx, sy, armLen, thick, brace) {
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + sx * armLen, cy);
+  ctx.lineTo(cx + sx * armLen, cy + sy * thick);
+  ctx.lineTo(cx + sx * (thick + brace), cy + sy * thick);
+  ctx.lineTo(cx + sx * thick, cy + sy * (thick + brace));
+  ctx.lineTo(cx + sx * thick, cy + sy * armLen);
+  ctx.lineTo(cx, cy + sy * armLen);
+  ctx.closePath();
+}
+
+/**
+ * Renders the high-octane comic anime arena border frame onto an offscreen canvas.
+ * Perfectly mirrors the manga ink border, inner white highlight rim, 3D hard drop shadow,
+ * and turnbuckle corner cleats of the fighter profile HUD.
+ */
+function _renderComicArenaBorder(oc, padding, arena, isDark) {
+  const shape = arena.shape || 'rect';
+  const x = padding;
+  const y = padding;
+  const w = arena.width;
+  const h = arena.height;
+  const cornerR = 8.0;
+
+  oc.save();
+  oc.imageSmoothingEnabled = true;
+
+  if (shape === 'circle') {
+    const cx = padding + w / 2;
+    const cy = padding + h / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (w / 2));
+
+    // 1. 3D Comic Hard Drop Shadow (stepped strokes, Rule 11 compliant)
+    const shadowDistX = 3.5;
+    const shadowDistY = 4.5;
+    oc.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.95)' : 'rgba(5, 6, 9, 0.65)';
+    oc.lineWidth = 5.0;
+    oc.beginPath();
+    oc.arc(cx + shadowDistX, cy + shadowDistY, ar, 0, Math.PI * 2);
+    oc.stroke();
+
+    oc.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.40)' : 'rgba(5, 6, 9, 0.22)';
+    oc.lineWidth = 6.5;
+    oc.beginPath();
+    oc.arc(cx + shadowDistX + 1.0, cy + shadowDistY + 1.0, ar, 0, Math.PI * 2);
+    oc.stroke();
+
+    // 2. Heavy Manga Ink Outer Ring (#050609)
+    oc.strokeStyle = '#050609';
+    oc.lineWidth = 5.0;
+    oc.beginPath();
+    oc.arc(cx, cy, ar, 0, Math.PI * 2);
+    oc.stroke();
+
+    // 3. Crisp Inner White Highlight Rim (#FFFFFF, inset 2.2px)
+    const inset = 2.2;
+    oc.strokeStyle = '#FFFFFF';
+    oc.lineWidth = 2.0;
+    oc.beginPath();
+    oc.arc(cx, cy, ar - inset, 0, Math.PI * 2);
+    oc.stroke();
+
+    // 4. Tactical Inset Contrast Track (inset 4.2px)
+    const inset2 = 4.2;
+    oc.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.26)';
+    oc.lineWidth = 1.0;
+    oc.beginPath();
+    oc.arc(cx, cy, ar - inset2, 0, Math.PI * 2);
+    oc.stroke();
+
+    // 5. 4 Cardinal Turnbuckle Cleats (0, 90, 180, 270 deg)
+    const angles = [0, Math.PI * 0.5, Math.PI, Math.PI * 1.5];
+    for (const ang of angles) {
+      const cosA = Math.cos(ang);
+      const sinA = Math.sin(ang);
+      const bx = cx + cosA * ar;
+      const by = cy + sinA * ar;
+
+      // Drop shadow for turnbuckle
+      oc.save();
+      oc.translate(bx + shadowDistX * 0.6, by + shadowDistY * 0.6);
+      oc.rotate(ang);
+      oc.fillStyle = '#050609';
+      oc.fillRect(-4, -8, 8, 16);
+      oc.restore();
+
+      // Turnbuckle body
+      oc.save();
+      oc.translate(bx, by);
+      oc.rotate(ang);
+      oc.fillStyle = '#050609';
+      oc.fillRect(-4, -8, 8, 16);
+      oc.fillStyle = '#FFFFFF';
+      oc.fillRect(-2, -6, 4, 12);
+      // Center rivet
+      oc.beginPath();
+      oc.arc(0, 0, 2.5, 0, Math.PI * 2);
+      oc.fillStyle = '#050609';
+      oc.fill();
+      oc.beginPath();
+      oc.arc(0, 0, 1.2, 0, Math.PI * 2);
+      oc.fillStyle = '#FFFFFF';
+      oc.fill();
+      oc.restore();
+    }
+  } else {
+    // ── RECTANGULAR ARENA (Canonical Vertical & Standard Mode) ──
+
+    // 1. 3D Comic Hard Drop Shadow (Down & Right, Rule 11 compliant)
+    const shadowDistX = 3.5;
+    const shadowDistY = 4.5;
+    oc.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.95)' : 'rgba(5, 6, 9, 0.65)';
+    oc.lineWidth = 5.0;
+    oc.lineJoin = 'round';
+    oc.lineCap = 'round';
+    _drawRoundRectPath(oc, x + shadowDistX, y + shadowDistY, w, h, cornerR);
+    oc.stroke();
+
+    // Secondary softer edge shadow
+    oc.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.40)' : 'rgba(5, 6, 9, 0.22)';
+    oc.lineWidth = 6.5;
+    _drawRoundRectPath(oc, x + shadowDistX + 1.0, y + shadowDistY + 1.0, w, h, cornerR);
+    oc.stroke();
+
+    // 2. Heavy Manga Ink Outer Frame (#050609)
+    oc.strokeStyle = '#050609';
+    oc.lineWidth = 5.0;
+    oc.lineJoin = 'round';
+    oc.lineCap = 'round';
+    _drawRoundRectPath(oc, x, y, w, h, cornerR);
+    oc.stroke();
+
+    // 3. Crisp Inner White Highlight Rim (#FFFFFF, inset 2.2px)
+    const inset = 2.2;
+    oc.strokeStyle = '#FFFFFF';
+    oc.lineWidth = 2.0;
+    oc.lineJoin = 'round';
+    oc.lineCap = 'round';
+    _drawRoundRectPath(oc, x + inset, y + inset, w - inset * 2, h - inset * 2, Math.max(2, cornerR - inset));
+    oc.stroke();
+
+    // 4. Tactical Inset Contrast Track (inset 4.2px)
+    const inset2 = 4.2;
+    oc.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.26)';
+    oc.lineWidth = 1.0;
+    oc.lineJoin = 'round';
+    _drawRoundRectPath(oc, x + inset2, y + inset2, w - inset2 * 2, h - inset2 * 2, Math.max(1, cornerR - inset2));
+    oc.stroke();
+
+    // 5. Chunky Comic Corner Turnbuckle Cleats
+    const armLen = 26;
+    const thick = 6.5;
+    const brace = 8.5;
+    const corners = [
+      { cx: x, cy: y, sx: 1, sy: 1 },         // Top-Left
+      { cx: x + w, cy: y, sx: -1, sy: 1 },     // Top-Right
+      { cx: x, cy: y + h, sx: 1, sy: -1 },     // Bottom-Left
+      { cx: x + w, cy: y + h, sx: -1, sy: -1 } // Bottom-Right
+    ];
+
+    for (const c of corners) {
+      // 5a. Drop shadow for cleat
+      _drawCornerCleatPolygon(oc, c.cx + c.sx * 2.0, c.cy + c.sy * 2.5, c.sx, c.sy, armLen, thick, brace);
+      oc.fillStyle = isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(5, 6, 9, 0.55)';
+      oc.fill();
+
+      // 5b. Solid Comic Ink Outer Shell
+      _drawCornerCleatPolygon(oc, c.cx, c.cy, c.sx, c.sy, armLen, thick, brace);
+      oc.fillStyle = '#050609';
+      oc.fill();
+      oc.strokeStyle = '#050609';
+      oc.lineWidth = 1.5;
+      oc.lineJoin = 'miter';
+      oc.stroke();
+
+      // 5c. Inner Crisp White Highlight Core
+      oc.strokeStyle = '#FFFFFF';
+      oc.lineWidth = 1.8;
+      oc.lineCap = 'round';
+      // Horizontal arm core
+      oc.beginPath();
+      oc.moveTo(c.cx + c.sx * 6.5, c.cy + c.sy * 3.25);
+      oc.lineTo(c.cx + c.sx * (armLen - 3), c.cy + c.sy * 3.25);
+      oc.stroke();
+      // Vertical arm core
+      oc.beginPath();
+      oc.moveTo(c.cx + c.sx * 3.25, c.cy + c.sy * 6.5);
+      oc.lineTo(c.cx + c.sx * 3.25, c.cy + c.sy * (armLen - 3));
+      oc.stroke();
+      // Diagonal brace core
+      oc.beginPath();
+      oc.moveTo(c.cx + c.sx * 10.5, c.cy + c.sy * 3.25);
+      oc.lineTo(c.cx + c.sx * 3.25, c.cy + c.sy * 10.5);
+      oc.stroke();
+
+      // 5d. Primary Vertex Turnbuckle Bolt
+      const vx = c.cx + c.sx * 6.5;
+      const vy = c.cy + c.sy * 6.5;
+      oc.beginPath();
+      oc.arc(vx, vy, 3.2, 0, Math.PI * 2);
+      oc.fillStyle = '#050609';
+      oc.fill();
+      oc.beginPath();
+      oc.arc(vx, vy, 2.2, 0, Math.PI * 2);
+      oc.fillStyle = '#FFFFFF';
+      oc.fill();
+      oc.beginPath();
+      oc.arc(vx, vy, 1.0, 0, Math.PI * 2);
+      oc.fillStyle = '#050609';
+      oc.fill();
+
+      // 5e. Secondary Arm Rivets
+      // Horizontal Arm Rivet
+      const hx = c.cx + c.sx * 19;
+      const hy = c.cy + c.sy * 3.25;
+      oc.beginPath();
+      oc.arc(hx, hy, 2.0, 0, Math.PI * 2);
+      oc.fillStyle = '#050609';
+      oc.fill();
+      oc.beginPath();
+      oc.arc(hx, hy, 1.2, 0, Math.PI * 2);
+      oc.fillStyle = '#FFFFFF';
+      oc.fill();
+
+      // Vertical Arm Rivet
+      const vix = c.cx + c.sx * 3.25;
+      const viy = c.cy + c.sy * 19;
+      oc.beginPath();
+      oc.arc(vix, viy, 2.0, 0, Math.PI * 2);
+      oc.fillStyle = '#050609';
+      oc.fill();
+      oc.beginPath();
+      oc.arc(vix, viy, 1.2, 0, Math.PI * 2);
+      oc.fillStyle = '#FFFFFF';
+      oc.fill();
+    }
+
+    // 6. Tactical Midpoint Alignment Tabs
+    const midpoints = [
+      { mx: x + w * 0.5, my: y, isHoriz: true },         // Top Center
+      { mx: x + w * 0.5, my: y + h, isHoriz: true },     // Bottom Center
+      { mx: x, my: y + h * 0.5, isHoriz: false },        // Left Center
+      { mx: x + w, my: y + h * 0.5, isHoriz: false }     // Right Center
+    ];
+
+    for (const m of midpoints) {
+      if (m.isHoriz) {
+        // Drop shadow
+        oc.fillStyle = isDark ? 'rgba(0, 0, 0, 0.70)' : 'rgba(5, 6, 9, 0.40)';
+        oc.fillRect(m.mx - 9 + 1.5, m.my - 2.5 + 2.0, 18, 5);
+        // Outer black ink tab
+        oc.fillStyle = '#050609';
+        oc.fillRect(m.mx - 9, m.my - 2.5, 18, 5);
+        // Inner white highlight core
+        oc.fillStyle = '#FFFFFF';
+        oc.fillRect(m.mx - 7, m.my - 1.0, 14, 2);
+        // Center diamond pointer
+        oc.beginPath();
+        oc.moveTo(m.mx, m.my - 3);
+        oc.lineTo(m.mx + 3, m.my);
+        oc.lineTo(m.mx, m.my + 3);
+        oc.lineTo(m.mx - 3, m.my);
+        oc.closePath();
+        oc.fillStyle = '#050609';
+        oc.fill();
+        oc.fillStyle = '#FFFFFF';
+        oc.fillRect(m.mx - 0.75, m.my - 0.75, 1.5, 1.5);
+      } else {
+        // Drop shadow
+        oc.fillStyle = isDark ? 'rgba(0, 0, 0, 0.70)' : 'rgba(5, 6, 9, 0.40)';
+        oc.fillRect(m.mx - 2.5 + 1.5, m.my - 9 + 2.0, 5, 18);
+        // Outer black ink tab
+        oc.fillStyle = '#050609';
+        oc.fillRect(m.mx - 2.5, m.my - 9, 5, 18);
+        // Inner white highlight core
+        oc.fillStyle = '#FFFFFF';
+        oc.fillRect(m.mx - 1.0, m.my - 7, 2, 14);
+        // Center diamond pointer
+        oc.beginPath();
+        oc.moveTo(m.mx - 3, m.my);
+        oc.lineTo(m.mx, m.my + 3);
+        oc.lineTo(m.mx + 3, m.my);
+        oc.lineTo(m.mx, m.my - 3);
+        oc.closePath();
+        oc.fillStyle = '#050609';
+        oc.fill();
+        oc.fillStyle = '#FFFFFF';
+        oc.fillRect(m.mx - 0.75, m.my - 0.75, 1.5, 1.5);
+      }
+    }
+  }
+
+  oc.restore();
+}
+
+/**
+ * Renders the high-octane comic arena border, turnbuckle cleats, center obstacles,
+ * wall cracks, and Saitama wall breaches.
+ * Can be called during background setup and/or on the foreground layer to guarantee
+ * that domain visuals, dim overlays, and shrine structures never cover or overlay the border.
+ */
+export function drawArenaBorder(ctx = state.ctx, alreadyInCameraSpace = false) {
+  const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
+  if (!arena || !ctx) return;
+  const isDark = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
+  const shape = arena.shape || 'rect';
+  const borderKey = `${arena.width}_${arena.height}_${shape}_${isDark ? 'dark_comic' : 'light_comic'}_v2`;
+  if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
+    const padding = 60;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = arena.width + padding * 2;
+    offCanvas.height = arena.height + padding * 2;
+    const oc = offCanvas.getContext('2d');
+    _renderComicArenaBorder(oc, padding, arena, isDark);
+    offCanvas._key = borderKey;
+    state._arenaBorderCanvas = offCanvas;
+  }
+
+  if (!alreadyInCameraSpace) {
+    ctx.save();
+    applyCameraToCtx(ctx);
+  }
+
+  // Draw cached comic arena border
+  ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
+
+  // ── Draw Center Plus (+) Arena Wall (FFA Obstacle) ──
+  drawCenterPlusObstacle(ctx, arena, isDark);
+
+  // ── Draw Wall Cracks (Decals) ──
+  if (state.wallCracks && state.wallCracks.length > 0) {
+    ctx.save();
+    ctx.beginPath();
+    const clipMarginTop = 75;
+    const clipMarginBottom = 75;
+    const clipMarginSides = 42;
+    ctx.rect(
+      arena.x - clipMarginSides,
+      arena.y - clipMarginTop,
+      arena.width + clipMarginSides * 2,
+      arena.height + clipMarginTop + clipMarginBottom
+    );
+    ctx.clip();
+
+    for (let i = state.wallCracks.length - 1; i >= 0; i--) {
+      const crack = state.wallCracks[i];
+      if (!alreadyInCameraSpace) {
+        crack.life--;
+      }
+      if (crack.life <= 0) {
+        state.wallCracks.splice(i, 1);
+        continue;
+      }
+      drawSolidVectorCrack(ctx, crack, isDark);
+    }
+    ctx.restore();
+  }
+
+  // ── Draw Saitama Shattered Wall Breaches & Flying Line Shards ──
+  if ((state.shatteredWalls && state.shatteredWalls.length > 0) || (state.hudShatters && state.hudShatters.bottomHudShatter)) {
+    if (!alreadyInCameraSpace) {
+      updateSaitamaWallShatters();
+    }
+    drawSaitamaWallShatters(ctx, isDark, arena);
+  }
+
+  if (!alreadyInCameraSpace) {
+    ctx.restore();
+  }
+}
+
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
   const isDark = Boolean(
@@ -575,8 +829,8 @@ export function drawArena() {
       return { color: 0x000000, alpha: 1 };
     };
 
-    const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#ffffffff'));
-    const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff'));
+    const canvasBg = parseColor(isDark ? '#0A0C13' : (CONFIG.canvasBgColor === '#ffffffff' ? '#141622' : (CONFIG.canvasBgColor || '#141622')));
+    const outerBg = parseColor(isDark ? '#0A0C13' : (CONFIG.arenaOuterBgColor === '#ffffffff' ? '#141622' : (CONFIG.arenaOuterBgColor || '#141622')));
     const innerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffffff'));
 
     const bleed = 4000;
@@ -629,8 +883,8 @@ export function drawArena() {
     ctx.save();
     applyCameraToCtx(ctx);
     const bleed = 4000;
-    const canvasBg = isDark ? '#000000' : (CONFIG.canvasBgColor || '#ffffffff');
-    const outerBg = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+    const canvasBg = isDark ? '#0A0C13' : (CONFIG.canvasBgColor === '#ffffffff' ? '#141622' : (CONFIG.canvasBgColor || '#141622'));
+    const outerBg = isDark ? '#0A0C13' : (CONFIG.arenaOuterBgColor === '#ffffffff' ? '#141622' : (CONFIG.arenaOuterBgColor || '#141622'));
     ctx.fillStyle = canvasBg;
     ctx.fillRect(-bleed, -bleed, canvas.width + bleed * 2, canvas.height + bleed * 2);
     if (!suppressArenaFloor) {
@@ -643,38 +897,13 @@ export function drawArena() {
     ctx.restore();
   }
 
-  // 3. Outer background theme details (Halftone Dots, Action Triangles, Speed Needles) removed for clean minimalist background
+  // 3. Clean solid background (no textures) matching HUD vibe
+  if (state._arenaOuterDetailsCanvas) {
+    state._arenaOuterDetailsCanvas = null;
+  }
 
-  // 4. Draw Arena Borders
+  // 4. Draw Arena Floor Background in Canvas 2D (Synchronized under Camera)
   {
-    const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
-    const shape = arena.shape || 'rect';
-    const borderKey = `${arena.width}_${arena.height}_${shape}_${isDark ? 'dark_clean' : 'light_clean'}`;
-    if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
-      const padding = 60;
-      const offCanvas = document.createElement('canvas');
-      offCanvas.width = arena.width + padding * 2;
-      offCanvas.height = arena.height + padding * 2;
-      const oc = offCanvas.getContext('2d');
-      oc.strokeStyle = borderColor;
-      oc.lineWidth = 2.5;
-      oc.lineJoin = 'miter';
-      oc.lineCap = 'square';
-      if (arena.shape === 'circle') {
-        const cx = padding + arena.width / 2;
-        const cy = padding + arena.height / 2;
-        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2));
-        oc.beginPath();
-        oc.arc(cx, cy, ar, 0, Math.PI * 2);
-        oc.stroke();
-      } else {
-        oc.strokeRect(padding, padding, arena.width, arena.height);
-      }
-      offCanvas._key = borderKey;
-      state._arenaBorderCanvas = offCanvas;
-    }
-
-    // ── Draw Floor Background in Canvas 2D (Synchronized under Camera) ──
     if (!suppressArenaFloor) {
       ctx.save();
       applyCameraToCtx(ctx);
@@ -700,47 +929,8 @@ export function drawArena() {
       }
     }
 
-    ctx.save();
-    applyCameraToCtx(ctx);
-    ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
-
-    // ── Draw Center Plus (+) Arena Wall (FFA Obstacle) ──
-    drawCenterPlusObstacle(ctx, arena, isDark);
-
-    // ── Draw Wall Cracks (Decals) ──
-    if (state.wallCracks && state.wallCracks.length > 0) {
-      ctx.save();
-      ctx.beginPath();
-      const clipMarginTop = 75;
-      const clipMarginBottom = 75;
-      const clipMarginSides = 42;
-      ctx.rect(
-        arena.x - clipMarginSides,
-        arena.y - clipMarginTop,
-        arena.width + clipMarginSides * 2,
-        arena.height + clipMarginTop + clipMarginBottom
-      );
-      ctx.clip();
-
-      for (let i = state.wallCracks.length - 1; i >= 0; i--) {
-        const crack = state.wallCracks[i];
-        crack.life--;
-        if (crack.life <= 0) {
-          state.wallCracks.splice(i, 1);
-          continue;
-        }
-        drawSolidVectorCrack(ctx, crack, isDark);
-      }
-      ctx.restore();
-    }
-
-    // ── Draw Saitama Shattered Wall Breaches & Flying Line Shards ──
-    if ((state.shatteredWalls && state.shatteredWalls.length > 0) || (state.hudShatters && state.hudShatters.bottomHudShatter)) {
-      updateSaitamaWallShatters();
-      drawSaitamaWallShatters(ctx, isDark, arena);
-    }
-
-    ctx.restore();
+    // Draw initial arena border layer
+    drawArenaBorder(ctx, false);
   }
 
   // 5. Watermark removed for clean arena floor
@@ -1269,10 +1459,11 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   const is1v2 = (state.mode === 'Boss Battle' || state.mode === GAME_MODES?.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
   const is2v2 = (state.mode === '2v2' || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES?.TWO_VS_TWO || state.mode === GAME_MODES?.TACTICAL_2V2);
   const is4v4 = (state.mode === '4v4' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES?.TACTICAL_4V4);
+  const isDuel1v1 = !isHorizontal && (mainFighters.length === 2 && !is2v2 && !is4v4 && !is1v2);
 
-  // In Boss Battle mode, the Boss Name is rendered directly on top of the Boss Health Bar in #hudTopContainer,
-  // and challengers are displayed in their dedicated bottom cards. Skip canvas names to prevent duplicate clashing.
-  if (is1v2) {
+  // In Boss Battle and 1v1 Duel modes, fighter names and healthbars are rendered in DOM (#hudTopContainer).
+  // Skip canvas names to prevent duplicate clashing behind the Top HUD.
+  if (is1v2 || isDuel1v1) {
     ctx.restore();
     return;
   }

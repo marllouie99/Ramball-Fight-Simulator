@@ -120,7 +120,25 @@ function drawButton(text, cx, cy, action, w = 200, h = 40, customColor = null, r
   let textColor = '#2d080c';
   let strokeColor = '#2d080c';
 
-  if (isPrimary) {
+  if (customColor) {
+    shadowColor = '#0b0c10';
+    const isAmber = customColor === '#F5A623' || customColor === '#FFB800' || customColor === '#FFD043' || customColor === '#F5B841' || customColor === '#EAB308';
+    const isDarkCarbon = customColor === '#20242E' || customColor === '#181A22' || customColor === '#151820' || customColor === '#1A1D26';
+    
+    if (isAmber) {
+      faceColor = isHovered ? '#FFD043' : customColor;
+      textColor = '#111215';
+      strokeColor = '#0F1014';
+    } else if (isDarkCarbon) {
+      faceColor = isHovered ? '#2D3442' : customColor;
+      textColor = isHovered ? '#FFD043' : '#F1F5F9';
+      strokeColor = '#F5A623';
+    } else {
+      faceColor = customColor;
+      textColor = '#ffffff';
+      strokeColor = '#2d080c';
+    }
+  } else if (isPrimary) {
     shadowColor = '#4d0a13';
     faceColor = isHovered ? '#b51f33' : '#9e1a2b';
     textColor = '#ffffff';
@@ -129,11 +147,6 @@ function drawButton(text, cx, cy, action, w = 200, h = 40, customColor = null, r
     shadowColor = '#7c2d37';
     faceColor = isHovered ? '#f7cad0' : '#f0b6ba';
     textColor = '#2d080c';
-    strokeColor = '#2d080c';
-  } else if (customColor) {
-    shadowColor = '#4d0a13';
-    faceColor = customColor;
-    textColor = '#ffffff';
     strokeColor = '#2d080c';
   } else {
     shadowColor = '#baa88c';

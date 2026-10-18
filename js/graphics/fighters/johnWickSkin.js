@@ -686,7 +686,7 @@ export function drawJohnWickSkin(ctx, fighter) {
     backY = r * 0.42;
   }
 
-  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isRolling;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isRolling || fighter.hideWeapon;
   if (hideHandsAndWeapon || fighter.hideFrontHand) hideFrontHand = true;
   if (hideHandsAndWeapon || fighter.hideBackHand) hideBackHand = true;
   const handRadius = getHandSize(7.2);

@@ -6,13 +6,14 @@ import { state } from '../../core/state.js';
 // --- Fighter Preview Cache ---
 const fighterPreviewCache = {};
 
-function renderPreviewForDef(def, cacheKey) {
+function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
   if (!def) return null;
-  const previewSize = 128;
+  const previewSize = 256;
   const canvas = document.createElement('canvas');
   canvas.width = previewSize;
   canvas.height = previewSize;
   const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
   
   const FighterClass = (typeof FIGHTER_CLASS_MAP !== 'undefined' && FIGHTER_CLASS_MAP && FIGHTER_CLASS_MAP[def.type]) ? FIGHTER_CLASS_MAP[def.type] : Fighter;
   const previewFighter = new FighterClass({
@@ -22,9 +23,18 @@ function renderPreviewForDef(def, cacheKey) {
   });
   const isUpright = def.type === 'guts' || def.category === 'Anime & Dark Fantasy' || def.type === 'sans' || def.type === 'pekka' || def.type === 'Engineer' || def.type === 'engineer' || def.type === 'crazydave' || def.type === 'crazy_dave' || def.type === 'tanjiro' || def.type === 'nezuko' || def.type === 'zenitsu' || def.type === 'inosuke' || def.type === 'denji' || def.type === 'power' || def.type === 'uryu' || def.type === 'ulquiorra' || def.type === 'reze' || def.type === 'makima' || def.type === 'toji' || def.type === 'maki' || def.type === 'nanami' || def.type === 'yuji' || def.type === 'yuta' || def.type === 'gojo' || def.type === 'sukuna' || def.type === 'saitama' || def.type === 'genos' || def.type === 'ichigo' || def.type === 'mahito' || def.type === 'megumi' || def.type === 'megumin' || def.type === 'nobara' || def.type === 'escanor' || def.type === 'zeus' || def.type === 'cronos' || def.type === 'bomber' || def.type === 'black' || def.type === 'knight' || def.type === 'eye_of_cthulhu' || def.type === 'ender_dragon' || def.type === 'namelessdeity' || def.type === 'nameless_deity' || def.category === 'Anime' || def.category === 'Greek Mythology';
   previewFighter.angle = 0; // Static angle for consistent previews
-  previewFighter.gunAngle = isUpright ? 0 : Math.PI / 4; // Upright fighters aim forward
-  if (def.type === 'ender_dragon') {
-    previewFighter._isPreview = true;
+  previewFighter.gunAngle = (isUpright || bodyOnly) ? 0 : Math.PI / 4; // Upright fighters aim forward
+  previewFighter.hideHpText = true;
+  previewFighter._isPreview = true;
+  if (bodyOnly) {
+    previewFighter.hideHands = true;
+    previewFighter.hideWeapon = true;
+    previewFighter.hideFrontHand = true;
+    previewFighter.hideBackHand = true;
+    previewFighter.showSkinOnly = true;
+    previewFighter.hideChainsaws = true;
+    previewFighter.hideChainsaw = true;
+    previewFighter.hideSwordAura = true;
   }
   if (def.type === 'uryu') {
     previewFighter.smoothDrawProgress = 0.30;
@@ -40,8 +50,12 @@ function renderPreviewForDef(def, cacheKey) {
     previewFighter._isPhase2 = Boolean(state.showEyeOfCthulhuPhase2);
   }
   
+  const prevShowSkinOnly = typeof state !== 'undefined' ? state.showSkinOnly : false;
   try {
-    if (typeof previewFighter.aim === 'function' && !isUpright) {
+    if (bodyOnly && typeof state !== 'undefined') {
+      state.showSkinOnly = true;
+    }
+    if (typeof previewFighter.aim === 'function' && !isUpright && !bodyOnly) {
       previewFighter.aim({ x: previewSize, y: previewSize });
     }
     previewFighter.draw(ctx);
@@ -52,7 +66,55 @@ function renderPreviewForDef(def, cacheKey) {
   } catch (e) {
     console.error('Failed to pre-render fighter preview:', def.name, e);
     return null;
+  } finally {
+    if (bodyOnly && typeof state !== 'undefined') {
+      state.showSkinOnly = prevShowSkinOnly;
+    }
   }
+}
+
+function renderStickerPreviewFromBase(baseCanvas, cacheKey) {
+  if (!baseCanvas) return null;
+  const w = baseCanvas.width || 128;
+  const h = baseCanvas.height || 128;
+  const outCanvas = document.createElement('canvas');
+  outCanvas.width = w;
+  outCanvas.height = h;
+  const ctx = outCanvas.getContext('2d');
+  if (!ctx) return baseCanvas;
+
+  try {
+    const silCanvas = document.createElement('canvas');
+    silCanvas.width = w;
+    silCanvas.height = h;
+    const silCtx = silCanvas.getContext('2d');
+    if (silCtx && typeof silCtx.drawImage === 'function') {
+      // 1. Subtle drop-shadow silhouette offset (+2.5, +3)
+      silCtx.drawImage(baseCanvas, 0, 0);
+      silCtx.globalCompositeOperation = 'source-in';
+      silCtx.fillStyle = 'rgba(20, 14, 28, 0.20)';
+      silCtx.fillRect(0, 0, w, h);
+      ctx.drawImage(silCanvas, 2.5, 3);
+
+      // 2. Pure white die-cut sticker outline (8-way 2.4px offset)
+      silCtx.globalCompositeOperation = 'source-in';
+      silCtx.fillStyle = '#FFFFFF';
+      silCtx.fillRect(0, 0, w, h);
+      const R = 2.4;
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI * 2) / 8;
+        ctx.drawImage(silCanvas, Math.cos(a) * R, Math.sin(a) * R);
+      }
+    }
+    ctx.drawImage(baseCanvas, 0, 0);
+  } catch (e) {
+    ctx.drawImage(baseCanvas, 0, 0);
+  }
+
+  if (cacheKey !== undefined) {
+    fighterPreviewCache[cacheKey] = outCanvas;
+  }
+  return outCanvas;
 }
 
 function preRenderFighterPreviews() {
@@ -62,23 +124,55 @@ function preRenderFighterPreviews() {
   });
 }
 
+function _getToggleSuffix(def) {
+  if (!def) return '';
+  if (def.type === 'reze') {
+    return state.showRezeTransformation ? '_bomb' : '_human';
+  }
+  if (def.type === 'denji') {
+    return (state.showDenjiTransformation === false) ? '_human' : '_chainsaw';
+  }
+  if (def.type === 'eye_of_cthulhu') {
+    return state.showEyeOfCthulhuPhase2 ? '_phase2' : '_phase1';
+  }
+  return '';
+}
+
 function getFighterPreview(index, category = null) {
   const cat = category || (typeof state !== 'undefined' ? state.gameCategory : 'foc');
   const defs = getActiveFighterDefs(cat);
   const def = defs[index] || FIGHTER_DEFS[index];
-  let toggleSuffix = '';
-  if (def && def.type === 'reze') {
-    toggleSuffix = state.showRezeTransformation ? '_bomb' : '_human';
-  } else if (def && def.type === 'denji') {
-    toggleSuffix = (state.showDenjiTransformation === false) ? '_human' : '_chainsaw';
-  } else if (def && def.type === 'eye_of_cthulhu') {
-    toggleSuffix = state.showEyeOfCthulhuPhase2 ? '_phase2' : '_phase1';
-  }
+  const toggleSuffix = _getToggleSuffix(def);
   const cacheKey = `${cat}_${index}${toggleSuffix}`;
-  if (!fighterPreviewCache[cacheKey]) {
-    renderPreviewForDef(def, cacheKey);
+  if (!fighterPreviewCache[cacheKey] || fighterPreviewCache[cacheKey].width !== 256) {
+    renderPreviewForDef(def, cacheKey, false);
   }
   return fighterPreviewCache[cacheKey] || fighterPreviewCache[index];
+}
+
+function getFighterBodyOnlyPreview(index, category = null) {
+  const cat = category || (typeof state !== 'undefined' ? state.gameCategory : 'foc');
+  const defs = getActiveFighterDefs(cat);
+  const def = defs[index] || FIGHTER_DEFS[index];
+  const toggleSuffix = _getToggleSuffix(def);
+  const cacheKey = `${cat}_${index}${toggleSuffix}_bodyonly`;
+  if (!fighterPreviewCache[cacheKey] || fighterPreviewCache[cacheKey].width !== 256) {
+    renderPreviewForDef(def, cacheKey, true);
+  }
+  return fighterPreviewCache[cacheKey] || getFighterPreview(index, category);
+}
+
+function getFighterStickerPreview(index, category = null) {
+  const cat = category || (typeof state !== 'undefined' ? state.gameCategory : 'foc');
+  const defs = getActiveFighterDefs(cat);
+  const def = defs[index] || FIGHTER_DEFS[index];
+  const toggleSuffix = _getToggleSuffix(def);
+  const cacheKey = `${cat}_${index}${toggleSuffix}_sticker`;
+  if (!fighterPreviewCache[cacheKey] || fighterPreviewCache[cacheKey].width !== 256) {
+    const baseCanvas = getFighterPreview(index, category);
+    renderStickerPreviewFromBase(baseCanvas, cacheKey);
+  }
+  return fighterPreviewCache[cacheKey] || getFighterPreview(index, category);
 }
 
 export function clearFighterPreviewCache() {
@@ -91,4 +185,4 @@ if (typeof window !== 'undefined') {
   window.__clearFighterPreviewCache = clearFighterPreviewCache;
 }
 
-export { fighterPreviewCache, preRenderFighterPreviews, getFighterPreview };
+export { fighterPreviewCache, preRenderFighterPreviews, getFighterPreview, getFighterBodyOnlyPreview, getFighterStickerPreview };

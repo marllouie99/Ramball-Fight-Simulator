@@ -417,14 +417,17 @@ export function drawEngineerSkin(ctx, fighter) {
   const wrenchSlashFade = fighter.wrenchSlashFadeTimer || 0;
   const shotgunRecoil = fighter.shotgunRecoilTimer || 0;
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter.hideFrontHand || isPodiumPreview;
+  const shouldHideWeapon = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideWeapon || isPodiumPreview;
 
   // ── LAYER 1: BACK WEAPON (STOWED ON BACK LAYER) ──
-  if (isWrenchActive) {
-    // Shotgun stowed on back
-    drawEngineerShotgun(ctx, 0, 0, 0, r, true, 0, true, fighter.color, shouldHideHands, isPodiumPreview);
-  } else {
-    // Wrench stowed on back
-    drawEngineerWrench(ctx, 0, 0, 0, r, true, 0, true, fighter.color, 0, shouldHideHands, isPodiumPreview);
+  if (!shouldHideWeapon) {
+    if (isWrenchActive) {
+      // Shotgun stowed on back
+      drawEngineerShotgun(ctx, 0, 0, 0, r, true, 0, true, fighter.color, shouldHideHands, isPodiumPreview);
+    } else {
+      // Wrench stowed on back
+      drawEngineerWrench(ctx, 0, 0, 0, r, true, 0, true, fighter.color, 0, shouldHideHands, isPodiumPreview);
+    }
   }
 
   // ── LAYER 2: 100% DISCRETE PROCEDURAL PIXEL ART BODY (SAITAMA TECH & RULE 19 COMPLIANT) ──
@@ -434,10 +437,12 @@ export function drawEngineerSkin(ctx, fighter) {
   _drawEngineerHair(ctx, r, facingLeft);
 
   // ── LAYER 4: FRONT WEAPON (ACTIVE WEAPON ON TOP OF BODY) ──
-  if (isWrenchActive) {
-    drawEngineerWrench(ctx, 0, 0, (fighter.wrenchActive ? wrenchAngle : 0), r, true, (fighter.wrenchActive ? wrenchTimer : 0), false, fighter.color, wrenchSlashFade, shouldHideHands, isPodiumPreview);
-  } else {
-    drawEngineerShotgun(ctx, 0, 0, 0, r, true, shotgunRecoil, false, fighter.color, shouldHideHands, isPodiumPreview);
+  if (!shouldHideWeapon) {
+    if (isWrenchActive) {
+      drawEngineerWrench(ctx, 0, 0, (fighter.wrenchActive ? wrenchAngle : 0), r, true, (fighter.wrenchActive ? wrenchTimer : 0), false, fighter.color, wrenchSlashFade, shouldHideHands, isPodiumPreview);
+    } else {
+      drawEngineerShotgun(ctx, 0, 0, 0, r, true, shotgunRecoil, false, fighter.color, shouldHideHands, isPodiumPreview);
+    }
   }
 
   // Status Overlays

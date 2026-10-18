@@ -225,12 +225,12 @@ export const CONFIG = {
   arenaXOverride: 45,              // Absolute X override (px) - Rule 28 locked at 45
   arenaYOverride: 240,             // Absolute Y override (px) - Rule 28 locked at 240
   arenaTheme: 'light',               // Arena visual theme: 'light' | 'dark'
-  canvasBgColor: '#ffffffff',          // Canvas background color (hex string or hex number)
-  arenaOuterBgColor: '#ffffffff',      // Background color of the container area outside the arena (under HUD and sides)
-  arenaInnerBgColor: '#ffffffff',      // Background color inside the arena boundaries
-  lightCanvasBgColor: '#ffffffff',
-  lightArenaOuterBgColor: '#ffffffff',
-  lightArenaInnerBgColor: '#ffffffff',
+  canvasBgColor: '#141622',          // Canvas background color (hex string or hex number)
+  arenaOuterBgColor: '#141622',      // Background color of the container area outside the arena (under HUD and sides)
+  arenaInnerBgColor: '#919298ff',      // Background color inside the arena boundaries
+  lightCanvasBgColor: '#141622',
+  lightArenaOuterBgColor: '#141622',
+  lightArenaInnerBgColor: '#3d3f51ff',
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 22,              // Font size for fighter name in HUD (px)
   hudDescFontSize: 20,               // Font size for fighter description in HUD (px)

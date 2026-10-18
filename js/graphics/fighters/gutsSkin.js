@@ -429,7 +429,7 @@ export function drawGutsSkin(ctx, fighter) {
   _drawGutsCape(ctx, r, isCountdown);
 
   // 0.8. Stance 1 (IDLE / Countdown): Dragon Slayer slung across shoulder (Layer 0.8 behind helmet)
-  if (isCountdown && !fighter.hideWeapon) {
+  if (isCountdown && !fighter.hideWeapon && !(typeof state !== 'undefined' && state.showSkinOnly)) {
     const customWeapon = (typeof state !== 'undefined' && state.weaponCustomizations?.guts) || {};
     drawGutsShoulderSword(ctx, r, customWeapon, isBerserker);
   }
@@ -487,7 +487,7 @@ export function drawGutsSkin(ctx, fighter) {
   }
 
   // 4. Weapons & Slash Combos (Combat Battle Stance - clamped in jaws / mouth)
-  if (!fighter.hideWeapon && !isCountdown) {
+  if (!fighter.hideWeapon && !(typeof state !== 'undefined' && state.showSkinOnly) && !isCountdown) {
     drawGutsWeapons(ctx, fighter, r, facingLeft);
   }
 

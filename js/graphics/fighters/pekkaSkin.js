@@ -479,7 +479,7 @@ export function drawPekkaSkin(ctx, fighter) {
   if (!ctx || !fighter) return;
 
   const r = fighter.r || 28;
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || fighter.hideWeapon;
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);

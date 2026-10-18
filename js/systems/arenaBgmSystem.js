@@ -694,25 +694,30 @@ export function drawArenaBgmSelector(ctx, x, y, width, height) {
   const isOff = currentTrack.id === 'off';
 
   ctx.save();
-  ctx.fillStyle = !isOff ? '#5e0d1f' : '#baa88c';
+  ctx.fillStyle = '#0F1116';
   drawChamferedRect(ctx, x, y + 2, width, height, 3);
   ctx.fill();
 
-  ctx.fillStyle = !isOff ? '#f26f88' : '#faedf0';
-  ctx.strokeStyle = '#21050c';
-  ctx.lineWidth = 1.6;
+  ctx.fillStyle = '#181A22';
+  ctx.strokeStyle = !isOff ? '#F5A623' : '#333846';
+  ctx.lineWidth = 1.4;
   drawChamferedRect(ctx, x, y, width, height, 3);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = !isOff ? '#ffffff' : '#21050c';
-  ctx.font = '700 6.5px "Press Start 2P", monospace';
+  if (!isOff) {
+    ctx.fillStyle = '#F5A623';
+    ctx.fillRect(x + 3, y + 2, 2.5, height - 4);
+  }
+
+  ctx.fillStyle = !isOff ? '#F5A623' : '#94A3B8';
+  ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   
-  const rawLabel = isOff ? 'BGM: OFF' : `BGM:${currentTrack.shortName || currentTrack.name}`;
+  const rawLabel = isOff ? 'BGM: OFF' : `BGM: ${currentTrack.shortName || currentTrack.name}`;
   const displayLabel = fitSingleLineText(ctx, rawLabel, width - 12);
-  ctx.fillText(displayLabel, x + width / 2, y + height / 2 + 0.5);
+  ctx.fillText(displayLabel, x + width / 2 + (!isOff ? 2 : 0), y + height / 2 + 0.5);
 
   ctx.restore();
 

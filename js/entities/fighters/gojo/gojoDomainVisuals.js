@@ -188,14 +188,15 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   ctx.save();
 
   // 1. Clip strictly inside the arena bounds
+  const ww = isLocal ? 0 : ((arena.wallWidth !== undefined) ? arena.wallWidth : 4);
   ctx.beginPath();
   if (arena.shape === 'circle') {
     const acx = ax + aw / 2;
     const acy = ay + ah / 2;
     const ar = arena.radius !== undefined ? arena.radius : (aw / 2);
-    ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
+    ctx.arc(acx, acy, Math.max(0, ar - ww), 0, Math.PI * 2);
   } else {
-    ctx.rect(ax, ay, aw, ah);
+    ctx.rect(ax + ww, ay + ww, aw - ww * 2, ah - ww * 2);
   }
   ctx.clip();
 

@@ -234,7 +234,7 @@ export function drawEscanorSkin(ctx, fighter) {
   }
 
   // 4. LAYER 0: BACK HAND & RESTING WEAPON (Behind Body Layer)
-  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand;
+  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && !fighter.hideWeapon;
   if (showBackHand) {
     _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase);
   }
@@ -249,7 +249,7 @@ export function drawEscanorSkin(ctx, fighter) {
   _drawEscanorHair(ctx, r, facingLeft);
 
   // 8. LAYER 4: FRONT HAND / POINTING GAUNTLET (On Top of Body, Mustache & Hair)
-  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand;
+  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand && !fighter.hideWeapon;
   if (showFrontHand) {
     _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhase, now, facingLeft);
   }

@@ -60,7 +60,7 @@ export function drawDenjiSkin(ctx, fighter) {
   );
 
   const isHybrid = (fighter.isHybridModeActive !== false) || Boolean(fighter.isExecutingMassacre);
-  const hideChainsaws = Boolean(fighter.hideChainsaws || fighter.hideChainsaw || (typeof state !== 'undefined' && (state.hideDenjiChainsaws || state.showSkinOnly)));
+  const hideChainsaws = Boolean(fighter.hideChainsaws || fighter.hideChainsaw || fighter.hideWeapon || (typeof state !== 'undefined' && (state.hideDenjiChainsaws || state.showSkinOnly)));
   const hideHands = Boolean(fighter.hideHands || fighter.hideFrontHand || fighter.hideBackHand || hideChainsaws || (typeof state !== 'undefined' && state.showSkinOnly));
 
   let denjiShakeX = 0;

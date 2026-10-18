@@ -75,7 +75,7 @@ export function drawTanjiroSkin(ctx, fighter) {
     : (isPunching ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14))) : 0);
 
   // 3. LAYER 0: BACK HAND (Behind Body Layer)
-  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand;
+  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && !fighter.hideWeapon;
   if (showBackHand) {
     _drawTanjiroBackHand(ctx, fighter, r, isKatanaSwinging, isPunching, animPhase);
   }
@@ -84,7 +84,7 @@ export function drawTanjiroSkin(ctx, fighter) {
   drawTanjiroPixelBody(ctx, r);
 
   // 5. LAYER 2: FRONT HAND & NICHIRIN KATANA (On Top of Body)
-  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand;
+  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand && !fighter.hideWeapon;
   if (showFrontHand) {
     _drawTanjiroFrontHand(ctx, fighter, r, isKatanaSwinging, isPunching, animPhase);
   }

@@ -42,6 +42,8 @@ function setSafeStyle(el, prop, val, priority) {
  * This prevents HUD drift during browser zoom changes.
  */
 export function syncHudPosition() {
+  _lastTopHudStyle = '';
+  _lastBottomHudStyle = '';
   if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
   if (!_cachedPixiView) _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
   if (!_cachedGameBox || !_cachedPixiView) return;
@@ -254,73 +256,24 @@ export function initHudSync() {
   }
 }
 
+let _lastTopHudStyle = '';
+
 /**
- * Dynamically updates the Top HUD Container (#hudTopContainer) position & transform
- * to remain anchored to the arena top edge when fixed camera zooms, dynamic camera tracks, or screen shakes.
+ * Dynamically ensures the Top HUD Container (#hudTopContainer)
+ * remains strictly screen-locked in viewport space with ZERO camera tracking drift or arena tethering,
+ * matching updateBottomHudCameraTracking standard.
  */
 export function updateTopHudCameraTracking(topContainer) {
   if (!topContainer) return;
-  if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
-  if (!_cachedPixiView) _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
-  if (!_cachedGameBox || !_cachedPixiView) return;
-
-  const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
-  const canvasHeight = (typeof state !== 'undefined' && state.canvas && state.canvas.height) || CONFIG.canvasHeight || 960;
-  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-  const arenaCenterX = arena.x + arena.width / 2;
-  const arenaCenterY = arena.y + arena.height / 2;
-  const screenCenterY = arenaCenterY;
-
-  const cam = (typeof state !== 'undefined') ? state.camera : null;
-  const isFixed = Boolean(!cam || !cam.enabled || cam.mode === 'fixed');
-  const camZoom = cam ? (cam.zoom || 1.0) : 1.0;
-
 
   const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
   const scale = CONFIG.internalScale || 1.0;
   const baseHudScale = isHorizontal ? 0.80 : (scale * 0.9);
+  const curStyle = `${baseHudScale}`;
+  if (_lastTopHudStyle === curStyle) return;
+  _lastTopHudStyle = curStyle;
 
-  const is1v2 = Boolean(
-    typeof state !== 'undefined' && (
-      state.mode === 'Boss Battle' ||
-      state.mode === '1v2 Stand Off' ||
-      state.mode === '1v2' ||
-      state.mode === 'Stand Off 1v2' ||
-      (typeof GAME_MODES !== 'undefined' && (state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2))
-    )
-  );
-
-  if (_cachedBoxHeight <= 0 || _cachedCanvasHeight <= 0) {
-    syncHudPosition();
-    if (_cachedBoxHeight <= 0 || _cachedCanvasHeight <= 0) return;
-  }
-
-  const boxHeight = _cachedBoxHeight;
-  const canvasHeightPx = _cachedCanvasHeight;
-  const canvasWidthPx = _cachedCanvasWidth;
-  const canvasTopInBox = _cachedCanvasTopInBox;
-  const topOffsetPx = isHorizontal ? 28 : (is1v2 ? 100 : 90);
-
-  const camX = isFixed ? arenaCenterX : (cam ? cam.x : arenaCenterX);
-  const camY = isFixed ? arenaCenterY : (cam ? cam.y : arenaCenterY);
-
-  const screenArenaTop = screenCenterY + (arena.y - camY) * camZoom;
-  const hudTopCanvasY = screenArenaTop - (topOffsetPx * camZoom);
-  const effectiveHudScale = baseHudScale * camZoom;
-
-  const hudTopPxInBox = canvasTopInBox + (canvasHeightPx * (hudTopCanvasY / canvasHeight));
-  const hudTopPercent = (hudTopPxInBox / boxHeight) * 100;
-
-  const displayRatio = canvasWidthPx / canvasWidth;
-  const panOffsetX = (arenaCenterX - camX) * camZoom;
-  const shakeX = ((cam ? cam.shakeX : (state ? state.shakeX : 0)) || 0);
-  const shakeY = ((cam ? cam.shakeY : (state ? state.shakeY : 0)) || 0);
-
-  const totalTranslateX = (panOffsetX + shakeX) * displayRatio;
-  const totalTranslateY = shakeY * displayRatio;
-
-  setSafeStyle(topContainer, 'top', `${hudTopPercent.toFixed(3)}%`);
-  setSafeStyle(topContainer, 'transform', `translate(${totalTranslateX.toFixed(2)}px, ${totalTranslateY.toFixed(2)}px) scale(${effectiveHudScale.toFixed(4)})`, 'important');
+  setSafeStyle(topContainer, 'transform', `scale(${baseHudScale})`, 'important');
   setSafeStyle(topContainer, 'transform-origin', 'top center', 'important');
 }
 
