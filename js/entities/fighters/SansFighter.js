@@ -2065,6 +2065,14 @@ export class SansFighter extends Fighter {
   /**
    * Main Fighter Draw Loop
    */
+  drawBody(ctx) {
+    drawSansSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Sans attacks with bones and blasters, suppresses default generic gun barrel
+  }
+
   draw(ctx) {
     // 1. Draw ground traps in world coordinates
     for (const trap of this.boneTraps) {

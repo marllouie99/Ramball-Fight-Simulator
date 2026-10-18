@@ -592,6 +592,14 @@ export class MegumiFighter extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    drawMegumiSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Megumi uses shadow shikigami and hand signs, suppresses generic gun
+  }
+
   draw(ctx, opponent) {
     // 1. Draw Underfoot Liquid Shadow Reservoir Aura
     drawMegumiShadowAura(ctx, this);

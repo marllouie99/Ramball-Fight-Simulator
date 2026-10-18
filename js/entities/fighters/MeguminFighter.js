@@ -375,10 +375,17 @@ export class MeguminFighter extends Fighter {
     }
   }
 
-  /**
-   * Skin Renderer hook.
-   */
+  drawBody(ctx) {
+    drawMeguminSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Megumin uses an explosion staff, suppresses generic gun
+  }
+
   draw(ctx) {
     drawMeguminSkin(ctx, this);
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
   }
 }

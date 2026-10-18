@@ -280,7 +280,17 @@ export class TanjiroFighter extends Fighter {
     spawnFloatingText(this.x, this.y - 40, '日運の竜 DRAGON SUN DANCE!', '#EF4444');
   }
 
+  drawBody(ctx) {
+    drawTanjiroSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Tanjiro is a Nichirin sword user, suppresses default generic gun barrel
+  }
+
   draw(ctx) {
     drawTanjiroSkin(ctx, this);
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
   }
 }

@@ -280,7 +280,17 @@ export class NezukoFighter extends Fighter {
     spawnFloatingText(this.x, this.y - 40, '鬼化覚醒 DEMON AWAKENING!', '#EC4899');
   }
 
+  drawBody(ctx) {
+    drawNezukoSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Nezuko is an unarmed demon brawler, suppresses default generic gun barrel
+  }
+
   draw(ctx) {
     drawNezukoSkin(ctx, this);
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
   }
 }

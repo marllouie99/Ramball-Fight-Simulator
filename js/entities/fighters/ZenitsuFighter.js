@@ -1470,8 +1470,17 @@ export class ZenitsuFighter extends Fighter {
     spawnFloatingText(this.x, this.y - 40, '火雷神 FLAMING THUNDER GOD!', '#F59E0B');
   }
 
+  drawBody(ctx) {
+    drawZenitsuSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Zenitsu is a katana swordsman, suppresses default generic gun barrel
+  }
+
   draw(ctx) {
     drawZenitsuSkin(ctx, this);
     this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
   }
 }

@@ -268,7 +268,17 @@ export class InosukeFighter extends Fighter {
     spawnFloatingText(this.x, this.y - 40, '山の王 KING OF THE MOUNTAINS!', '#3B82F6');
   }
 
+  drawBody(ctx) {
+    drawInosukeSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Inosuke is a dual Nichirin swordsman, suppresses default generic gun barrel
+  }
+
   draw(ctx) {
     drawInosukeSkin(ctx, this);
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
   }
 }

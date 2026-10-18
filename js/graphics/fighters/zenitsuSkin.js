@@ -1195,7 +1195,7 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
     : _getThunderclapBurst(total, elapsed);
 
   // Proximity lighting on nearby entities during active lightning burst surges
-  if (currentBurst) {
+  if (currentBurst && !fighter._isSilhouettePass) {
     _drawZenitsuChannelingEntityLighting(ctx, fighter.x, fighter.y - (fighter.z || 0), currentBurst, isDark, fighter);
   }
 
@@ -1267,7 +1267,7 @@ export function _drawZenitsuThunderclapChannel(ctx, fighter, r) {
   }
 
   // LAYER 4: Sporadic Golden Lightning & Energy Bursts (Channel + Aftermath + Basic Prep)
-  if (!isDashingOrPause) {
+  if (!isDashingOrPause && !fighter._isSilhouettePass) {
     if (isBasicPrep) {
       const feetY = r * 0.85;
       ctx.save();
@@ -1308,7 +1308,7 @@ export function drawZenitsuSkin(ctx, fighter) {
   const isPodiumPreview = Boolean(fighter._isWinnerReveal);
 
   // 0. Render Consecutive Lightning Dash Animations along trajectory in World Coordinates
-  if (!isPodiumPreview) {
+  if (!isPodiumPreview && !fighter._isSilhouettePass) {
     if (Array.isArray(fighter.thunderclapDashVFXList) && fighter.thunderclapDashVFXList.length > 0) {
       for (const vfx of fighter.thunderclapDashVFXList) {
         if (vfx && vfx.timer < vfx.maxTimer) {

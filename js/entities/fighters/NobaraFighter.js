@@ -243,6 +243,14 @@ export class NobaraFighter extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    drawNobaraSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Nobara is a hammer & nail user, suppresses generic gun
+  }
+
   draw(ctx) {
     // 1. Draw Embedded Nails on Enemies
     if (state.fighters) {

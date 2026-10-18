@@ -47,10 +47,12 @@ function _ensureBuffers() {
  * Suppresses in-game overhead HP numbers, freeze bars, wide beams, and ground auras.
  */
 function _drawFighterModel(sourceCtx, fighter) {
-  if (typeof fighter.drawBody === 'function') {
+  if (typeof fighter.drawBody === 'function' && fighter.drawBody !== Fighter.prototype.drawBody) {
     fighter.drawBody(sourceCtx);
   } else if (typeof fighter.drawSkin === 'function') {
     fighter.drawSkin(sourceCtx);
+  } else if (typeof fighter.draw === 'function' && fighter.draw !== Fighter.prototype.draw) {
+    fighter.draw(sourceCtx);
   } else {
     FighterRenderer.drawBody(sourceCtx, fighter);
   }
@@ -58,8 +60,10 @@ function _drawFighterModel(sourceCtx, fighter) {
   // Only render weapons via drawGun if:
   // 1. The fighter has a dedicated, custom drawGun (e.g. GunSlinger, John Wick, Aimbot, Laser), OR
   // 2. The fighter is a vanilla generic fighter without a custom skin/body
-  // This strictly suppresses the base Fighter.prototype.drawGun from drawing generic pistol barrels on brawlers/swordsmen (Saitama, Yuji, Toji, etc.)
-  const hasCustomSkin = Boolean(fighter.drawSkin) || (typeof fighter.drawBody === 'function' && fighter.drawBody !== Fighter.prototype.drawBody);
+  // This strictly suppresses the base Fighter.prototype.drawGun from drawing generic pistol barrels on brawlers/swordsmen (Saitama, Yuji, Toji, Zenitsu, etc.)
+  const hasCustomSkin = Boolean(fighter.drawSkin) || 
+    (typeof fighter.drawBody === 'function' && fighter.drawBody !== Fighter.prototype.drawBody) ||
+    (typeof fighter.draw === 'function' && fighter.draw !== Fighter.prototype.draw);
   const isGenericGun = !fighter.drawGun || fighter.drawGun === Fighter.prototype.drawGun;
 
   if (!hasCustomSkin || !isGenericGun) {

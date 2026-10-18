@@ -333,6 +333,14 @@ export class UlquiorraFighter extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    drawUlquiorraSkin(ctx, this);
+  }
+
+  drawGun(ctx) {
+    // Intentionally empty: Ulquiorra is a sword/lance fighter, suppresses generic gun
+  }
+
   draw(ctx, opponent) {
     const isSuppressed = this.areAttackEffectsSuppressed();
 
