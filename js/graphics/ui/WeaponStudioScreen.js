@@ -11,9 +11,11 @@ import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawChamferedRect } from './uiFramework.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { _getZenitsuAssemblyImage } from '../weapons/demonSlayerWeaponGraphics.js';
+import { _getEscanorWeaponImage } from '../weapons/escanorWeaponGraphics.js';
 
 if (typeof window !== 'undefined') {
   _getZenitsuAssemblyImage?.();
+  _getEscanorWeaponImage?.();
 }
 
 // Currently selected weapon key in studio: 'mahito' | 'yuta' | 'toji' | 'cronos' | 'ruby'
@@ -437,6 +439,7 @@ export function drawWeaponStudioScreen() {
       let offsetX = -40;
       if (activeWeaponKey === 'cronos') offsetX = -55;
       else if (activeWeaponKey === 'ruby') offsetX = -75;
+      else if (activeWeaponKey === 'escanor') offsetX = -40;
       else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
 
       const baseLx = offsetX + custom.offsetX;
@@ -1333,6 +1336,7 @@ if (typeof window !== 'undefined') {
         let offsetX = -40;
         if (activeWeaponKey === 'cronos') offsetX = -55;
         else if (activeWeaponKey === 'ruby') offsetX = -75;
+        else if (activeWeaponKey === 'escanor') offsetX = -40;
         else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
 
         const baseLx = offsetX + custom.offsetX;
@@ -1461,6 +1465,7 @@ if (typeof window !== 'undefined') {
         let offsetX = -40;
         if (activeWeaponKey === 'cronos') offsetX = -55;
         else if (activeWeaponKey === 'ruby') offsetX = -75;
+        else if (activeWeaponKey === 'escanor') offsetX = -40;
         else if (activeWeaponKey === 'rubbick' || activeWeaponKey === 'uryu') offsetX = 0;
 
         if (isDraggingBase && state.studioSelectedDetail === 'position') {

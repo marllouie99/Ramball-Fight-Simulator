@@ -755,12 +755,9 @@ canvas {
   padding: 0 !important;
 }
 
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__info {
-  justify-items: flex-start !important;
-}
-
+.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__info,
 .health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__info {
-  justify-items: flex-end !important;
+  justify-items: flex-start !important;
 }
 
 .health-hud .health-card:not(.tactical-card) .health-card__info > div,
@@ -780,14 +777,10 @@ canvas {
   grid-column: 1 / -1 !important;
 }
 
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__info > div {
+.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__info > div,
+.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__info > div {
   justify-content: flex-start !important;
   text-align: left !important;
-}
-
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__info > div {
-  justify-content: flex-end !important;
-  text-align: right !important;
 }
 
 .health-hud .health-card:not(.tactical-card) .health-card__info .hud-stat-label,
@@ -1370,12 +1363,31 @@ canvas {
   box-shadow: inset 0 0 0 2px #FDE047, 2px 3px 0px #050609, 0 4px 14px rgba(244, 63, 94, 0.50);
 }
 
+.hud-top-player[data-grade="SSR"] .hud-top-profile__bg,
+.hud-top-profile[data-grade="SSR"] .hud-top-profile__bg {
+  background: linear-gradient(to top, #040508 0%, rgba(6, 7, 11, 0.94) 18%, rgba(12, 14, 22, 0.60) 34%, rgba(16, 20, 30, 0.20) 44%, rgba(10, 12, 18, 0) 50%, rgba(0, 0, 0, 0) 100%);
+  box-shadow: inset 0 0 0 2px #FFFFFF, 2px 3px 0px #050609, 0 4px 18px rgba(0, 0, 0, 0.85);
+}
+
 .hud-top-player.hud-top-p1 .hud-top-profile__bg {
   transform: skewX(-8deg);
 }
 
 .hud-top-player.hud-top-p2 .hud-top-profile__bg {
   transform: skewX(8deg);
+}
+
+/* Nameless Deity: Clean Transparent Halo Frame (Zero rectangular box clipping/glow) */
+.hud-top-player[data-character="namelessdeity"] .hud-top-profile__bg,
+.hud-top-profile[data-character="namelessdeity"] .hud-top-profile__bg {
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+.hud-top-player[data-character="namelessdeity"] .hud-top-profile__canvas,
+.hud-top-profile[data-character="namelessdeity"] .hud-top-profile__canvas {
+  filter: none !important;
 }
 
 .hud-top-profile__canvas {
@@ -4965,8 +4977,8 @@ body.arena-dark-mode {
   padding: 0 !important;
 }
 
-.sans-bolt-wrapper,
-.health-card__bar.hud-bar-sans-stamina .sans-bolt-wrapper {
+.sans-bolt-wrapper:not(.hud-top-bar .sans-bolt-wrapper),
+.health-card__bar.hud-bar-sans-stamina:not(.hud-top-bar) .sans-bolt-wrapper {
   position: absolute !important;
   left: -4px !important;
   top: 50% !important;
@@ -5036,8 +5048,8 @@ body.arena-dark-mode {
   display: none !important;
 }
 
-.sans-stamina-dividers,
-.health-card__bar.hud-bar-sans-stamina .sans-stamina-dividers {
+.sans-stamina-dividers:not(.hud-top-bar .sans-stamina-dividers),
+.health-card__bar.hud-bar-sans-stamina:not(.hud-top-bar) .sans-stamina-dividers {
   position: absolute !important;
   top: 0 !important;
   left: 0 !important;
@@ -5047,8 +5059,8 @@ body.arena-dark-mode {
   z-index: 5 !important;
 }
 
-.sans-stamina-divider,
-.health-card__bar.hud-bar-sans-stamina .sans-stamina-divider {
+.sans-stamina-divider:not(.hud-top-bar .sans-stamina-divider),
+.health-card__bar.hud-bar-sans-stamina:not(.hud-top-bar) .sans-stamina-divider {
   position: absolute !important;
   top: 0 !important;
   bottom: 0 !important;
@@ -5058,7 +5070,7 @@ body.arena-dark-mode {
 }
 
 .sans-stamina-pixel-track .health-card__bar-text,
-.health-card__bar.hud-bar-sans-stamina .health-card__bar-text {
+.health-card__bar.hud-bar-sans-stamina:not(.hud-top-bar) .health-card__bar-text {
   position: absolute !important;
   right: 14px !important;
   top: 50% !important;
@@ -5072,4 +5084,73 @@ body.arena-dark-mode {
   pointer-events: none !important;
   z-index: 6 !important;
   line-height: 1 !important;
+}
+
+/* ─────────────────────────────────────────────
+   Sans Custom Stamina Bar in Top Duel HUD
+───────────────────────────────────────────── */
+.hud-top-bar.hud-bar-sans-stamina {
+  background: #080c18 !important;
+  outline: 1.5px solid rgba(56, 189, 248, 0.92) !important;
+  outline-offset: -5px !important;
+  box-shadow: 2px 3px 0px #050609, 0 0 10px rgba(44, 77, 224, 0.45), inset 0 2px 4px rgba(0, 0, 0, 0.85) !important;
+}
+
+.hud-top-bar.hud-bar-sans-stamina .health-card__ghost {
+  background: #f59e0b !important;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.7) !important;
+}
+
+.hud-top-bar.hud-bar-sans-stamina .health-card__fill {
+  background: linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%);
+  box-shadow: inset 0 1.5px 0 rgba(255, 255, 255, 0.85), inset 0 -1.5px 0 rgba(0, 0, 0, 0.6) !important;
+}
+
+.hud-top-bar .sans-stamina-dividers {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  pointer-events: none !important;
+  z-index: 3 !important;
+}
+
+.hud-top-bar .sans-stamina-divider {
+  position: absolute !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  width: 2.5px !important;
+  background: #050609 !important;
+  box-shadow: 0 0 1px #050609 !important;
+}
+
+.hud-top-player.hud-top-p1 .hud-top-bar .sans-bolt-wrapper {
+  position: absolute !important;
+  left: -8px !important;
+  right: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) skewX(8deg) !important;
+  width: 22px !important;
+  height: 30px !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 1px #000) !important;
+}
+
+.hud-top-player.hud-top-p2 .hud-top-bar .sans-bolt-wrapper {
+  position: absolute !important;
+  right: -8px !important;
+  left: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) skewX(-8deg) scaleX(-1) !important;
+  width: 22px !important;
+  height: 30px !important;
+  z-index: 10 !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.95)) drop-shadow(0 0 1px #000) !important;
+}
+
+.hud-top-bar.hud-bar-sans-stamina .health-card__bar-text {
+  text-shadow: 1.5px 1.5px 0 #050609, -1px -1px 0 #050609, 1px -1px 0 #050609, -1px 1px 0 #050609, 0 0 8px rgba(56, 189, 248, 0.8) !important;
 }

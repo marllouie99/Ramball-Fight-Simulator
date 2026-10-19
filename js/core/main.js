@@ -20,6 +20,7 @@ import { initImageBgRemoverUI, processAndRenderImage } from '../graphics/ui/Imag
 import { BossEntranceSequence } from '../bosses/index.js';
 import { setViewportOrientation, toggleViewportOrientation, getViewportOrientation } from './viewportManager.js';
 import { initHorizontalTeamSelectScreen, handleHorizontalTeamSelectClick } from '../graphics/ui/HorizontalTeamSelectScreen.js';
+import { toggleArenaDecorations, setArenaDecorationsEnabled, setArenaDecorationTheme, isArenaDecorationsEnabled } from '../systems/arenaDecorationSystem.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
@@ -1711,3 +1712,11 @@ setInterval(syncMobileQuickBar, 100);
 
 // Initialize aspect scaling on initial boot
 updateAspectScaling();
+
+// Global Arena Decoration System Controls
+if (typeof window !== 'undefined') {
+  window.toggleArenaDecorations = toggleArenaDecorations;
+  window.setArenaDecorationsEnabled = setArenaDecorationsEnabled;
+  window.setArenaDecorationTheme = setArenaDecorationTheme;
+  window.isArenaDecorationsEnabled = isArenaDecorationsEnabled;
+}

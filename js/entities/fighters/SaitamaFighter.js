@@ -5,6 +5,7 @@ import { MODE_SETTINGS } from '../../core/modeConfig.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnPunchWindSpeedLines, spawnSaitamaCounterFrontalBlast } from '../../graphics/particles/sparkEffect.js';
 import { triggerSaitamaWallShatter } from '../../graphics/particles/saitamaWallShatter.js';
+import { blowAwayArenaDecorations } from '../../systems/arenaDecorationSystem.js';
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { fadeOutSound } from '../../systems/soundSystem.js';
@@ -1357,6 +1358,16 @@ export class SaitamaFighter extends Fighter {
   }
 
   /**
+   * Blow away active arena decorations (candles, cobwebs, skulls, bones) caught in punch blast shockwaves.
+   * On Serious Punch, clears all decorations across the entire arena instantly.
+   */
+  _blowAwayArenaDecorations(originX, originY, punchAngle, reach, halfArc = Math.PI * 0.35, power = 1.0, isSeriousPunch = false) {
+    if (typeof blowAwayArenaDecorations === 'function') {
+      blowAwayArenaDecorations(originX, originY, punchAngle, reach, halfArc, power, isSeriousPunch);
+    }
+  }
+
+  /**
    * Check team alignment in 2v2 / team battle modes.
    */
   _isSameTeam(target) {
@@ -1899,6 +1910,7 @@ export class SaitamaFighter extends Fighter {
         triggerSaitamaWallShatter(this.x, this.y, pushAngle, arena);
       }
       this._blowAwayCrazyDaveLawnmowers(this._counterReleaseOriginX, this._counterReleaseOriginY, pushAngle, frontalReach, halfArc);
+      this._blowAwayArenaDecorations(this.x, this.y, pushAngle, frontalReach, halfArc, 3.5, true);
 
       // Screen Shake & Sakuga Impact FX
       if (typeof triggerGlobalScreenShake === 'function') {
@@ -2474,6 +2486,7 @@ export class SaitamaFighter extends Fighter {
       triggerSaitamaWallShatter(fistX, fistY, aimAngle, arena);
     }
     this._blowAwayCrazyDaveLawnmowers(this._normalPunchReleaseOriginX, this._normalPunchReleaseOriginY, aimAngle, punchBlastReach, halfBlastArc);
+    this._blowAwayArenaDecorations(fistX, fistY, aimAngle, punchBlastReach, halfBlastArc, 1.2);
 
     const validHits = [];
     for (const target of targetsToScan) {
@@ -3032,6 +3045,7 @@ export class SaitamaFighter extends Fighter {
         const rapidDamage = Math.round(baseDmg * boredomMult);
         const finalDamage = Math.round(slamDmg * boredomMult);
         this._blowAwayCrazyDaveLawnmowers(this.x, this.y, aimAngle, currentReach, currentHalfArc);
+        this._blowAwayArenaDecorations(this.x, this.y, aimAngle, currentReach, currentHalfArc, isFinalHit ? 2.0 : 0.8);
 
         for (const target of targetsToScan) {
           const dist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -3153,6 +3167,7 @@ export class SaitamaFighter extends Fighter {
           if (arena && typeof triggerSaitamaWallShatter === 'function') {
             triggerSaitamaWallShatter(this.x, this.y, this._flurryFinalPunchReleaseAngle, arena);
           }
+          this._blowAwayArenaDecorations(this.x, this.y, this._flurryFinalPunchReleaseAngle, 500, Math.PI * 0.45, 2.0);
           if (this.flurryTarget) {
             this.flurryTarget.caughtInSaitamaFlurry = false;
             this.flurryTarget.timeStopTimer = 0;

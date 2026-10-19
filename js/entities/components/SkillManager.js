@@ -48,6 +48,8 @@ export class Skill {
     this.onExpire = def.onExpire || null;
     this.onFrozenTick = def.onFrozenTick || null;
     this.canCast = def.canCast || null;
+    this.canTickCooldown = def.canTickCooldown || null;
+    this._isChannelingFn = typeof def.isChanneling === 'function' ? def.isChanneling : null;
     this.canTickDuration = def.canTickDuration || null;
     this.getHudData = def.getHudData || null;
 
@@ -156,6 +158,8 @@ export class Skill {
 
   isChanneling() {
     if (!this.fighter) return false;
+    if (this._isChannelingFn) return Boolean(this._isChannelingFn(this.fighter, this));
+    if (this.canTickCooldown && !this.canTickCooldown(this.fighter, this)) return true;
     if (this.channelingKey && this.fighter[this.channelingKey]) return true;
     if (this.channelTimerKey && (this.fighter[this.channelTimerKey] || 0) > 0) return true;
     return false;

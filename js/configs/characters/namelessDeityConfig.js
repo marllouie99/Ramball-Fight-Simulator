@@ -7,7 +7,7 @@ export const namelessDeityConfig = {
   id: 'namelessdeity',
   name: 'Nameless Deity',
   displayName: 'DEITY',
-  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SSR',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Gaming',
   bossTitle: 'Transcendent Cosmic Entity',
   title: 'Transcendent Cosmic Entity',
@@ -89,7 +89,7 @@ export const namelessDeityConfig = {
   // ──────────────────────────────────────────
   enableNamelessDestroyer: true,
   destroyerCooldown: 1500,
-  destroyerInitialCooldown: 1000, // Initial cooldown at round start (~6.67s @ 60fps) before first super-beam
+  destroyerInitialCooldown: 1500, // Initial cooldown at round start (~6.67s @ 60fps) before first super-beam
 
   // Sequential Step-by-Step Animation Phase Frame Timers (Matched directly to Audio Durations)
   destroyerWindupFrames: 393,       // Exact duration of CosmicLaserChargeUp.ogg (6.551s = 393 frames @ 60fps)

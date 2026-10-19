@@ -1291,6 +1291,24 @@ document.addEventListener('mousedown', (e) => {
   }
 });
 
+let _deityCosmicLightImage = null;
+
+function getDeityCosmicLightImage() {
+  if (_deityCosmicLightImage && _deityCosmicLightImage.complete && (_deityCosmicLightImage.naturalWidth > 0 || _deityCosmicLightImage.width > 0)) {
+    return _deityCosmicLightImage;
+  }
+  if (typeof Image !== 'undefined') {
+    const img = new Image();
+    img.src = 'Assets/model/NamelessDeity/CosmicLightCircleCenter1.png';
+    _deityCosmicLightImage = img;
+  }
+  return _deityCosmicLightImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  getDeityCosmicLightImage();
+}
+
 /**
  * Renders a fighter's avatar headshot/body onto a profile canvas element.
  * Implements the Pop-Out Portrait Standard:
@@ -1313,6 +1331,51 @@ export function renderTopHudProfileCanvas(canvasEl, fighter) {
       (d.type && String(d.type).toLowerCase() === charId) ||
       (d.name && String(d.name).toLowerCase() === charId)
     ));
+  }
+
+  // Nameless Deity: Display iconic Cosmic Light Center asset instead of the massive multi-limbed entity body
+  const isNamelessDeity = Boolean(
+    fighter.characterId === 'namelessdeity' ||
+    fighter.characterId === 'nameless_deity' ||
+    fighter.type === 'namelessdeity' ||
+    fighter.type === 'nameless_deity' ||
+    (fighter.name && fighter.name.toLowerCase().includes('nameless')) ||
+    (fIdx !== undefined && fIdx >= 0 && (FIGHTER_DEFS[fIdx]?.type === 'namelessdeity' || FIGHTER_DEFS[fIdx]?.type === 'nameless_deity'))
+  );
+
+  if (isNamelessDeity) {
+    const deityImg = getDeityCosmicLightImage();
+    const destX = Math.round(w / 2);
+    const destY = Math.round(h / 2);
+    const drawSize = 820; // Perfectly frames the cosmic starlight emblem in the 58x52px top profile badge
+    const applyHaloDraw = () => {
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(deityImg, destX - drawSize / 2, destY - drawSize / 2, drawSize, drawSize);
+      // Soft radial circular feathering to guarantee zero straight rectangular cutoffs on starlight rays
+      const maxR = Math.min(w, h) * 0.46;
+      const maskGrad = ctx.createRadialGradient(destX, destY, maxR * 0.45, destX, destY, maxR);
+      maskGrad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');
+      maskGrad.addColorStop(0.70, 'rgba(0, 0, 0, 0.90)');
+      maskGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+      ctx.globalCompositeOperation = 'destination-in';
+      ctx.fillStyle = maskGrad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
+    };
+
+    if (deityImg && (deityImg.complete || deityImg.width > 0)) {
+      applyHaloDraw();
+    } else if (deityImg) {
+      deityImg.onload = () => {
+        try {
+          applyHaloDraw();
+        } catch (_) {}
+      };
+    }
+    return;
   }
 
   const preview = (fIdx !== undefined && fIdx >= 0)
@@ -1375,6 +1438,8 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
 
   const isF1Sans = Boolean(f1.characterId === 'sans' || f1.type === 'sans' || (f1.name && f1.name.toLowerCase() === 'sans'));
   const isF2Sans = Boolean(f2.characterId === 'sans' || f2.type === 'sans' || (f2.name && f2.name.toLowerCase() === 'sans'));
+  const isF1NamelessDeity = Boolean(f1.characterId === 'namelessdeity' || f1.characterId === 'nameless_deity' || f1.type === 'namelessdeity' || f1.type === 'nameless_deity' || (f1.name && f1.name.toLowerCase().includes('nameless')));
+  const isF2NamelessDeity = Boolean(f2.characterId === 'namelessdeity' || f2.characterId === 'nameless_deity' || f2.type === 'namelessdeity' || f2.type === 'nameless_deity' || (f2.name && f2.name.toLowerCase().includes('nameless')));
 
   let f1Percent, f1BarColor, f1HpText;
   if (isF1Sans) {
@@ -1383,7 +1448,9 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
     const maxStam = f1.maxStamina || 100;
     const stamRatio = (!isF1Dead && maxStam > 0) ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 0;
     f1Percent = isF1Dead ? 0 : Math.min(100, Math.max(0, Math.round(stamRatio * 100)));
-    f1BarColor = (stamRatio < 0.25) ? '#FFE600' : '#2c4de0ff';
+    f1BarColor = (stamRatio < 0.25)
+      ? 'linear-gradient(180deg, #fef08a 0%, #facc15 25%, #eab308 60%, #a16207 100%)'
+      : 'linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%)';
     f1HpText = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
   } else {
     const f1Hp = (typeof f1.getDisplayHp === 'function') ? f1.getDisplayHp() : f1.hp;
@@ -1401,7 +1468,9 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
     const maxStam = f2.maxStamina || 100;
     const stamRatio = (!isF2Dead && maxStam > 0) ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 0;
     f2Percent = isF2Dead ? 0 : Math.min(100, Math.max(0, Math.round(stamRatio * 100)));
-    f2BarColor = (stamRatio < 0.25) ? '#FFE600' : '#2c4de0ff';
+    f2BarColor = (stamRatio < 0.25)
+      ? 'linear-gradient(180deg, #fef08a 0%, #facc15 25%, #eab308 60%, #a16207 100%)'
+      : 'linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%)';
     f2HpText = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
   } else {
     const f2Hp = (typeof f2.getDisplayHp === 'function') ? f2.getDisplayHp() : f2.hp;
@@ -1431,17 +1500,44 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
   return `
     <div class="hud-top-duel">
       <!-- Player 1 (Left): Portrait on Outer Left -> Connected Top Health Bar -> Lower Name -->
-      <div class="hud-top-player hud-top-p1" style="--fighter-theme: ${f1ThemeColor}; --grade-color: ${f1GradeMeta.color};" data-grade="${f1Grade}">
-        <div class="hud-top-profile" data-grade="${f1Grade}">
+      <div class="hud-top-player hud-top-p1" style="--fighter-theme: ${f1ThemeColor}; --grade-color: ${f1GradeMeta.color};" data-grade="${f1Grade}"${isF1NamelessDeity ? ' data-character="namelessdeity"' : ''}>
+        <div class="hud-top-profile" data-grade="${f1Grade}"${isF1NamelessDeity ? ' data-character="namelessdeity"' : ''}>
           <div class="hud-top-profile__bg"></div>
           <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
           <canvas class="hud-top-profile__grade-canvas" data-grade="${f1Grade}" width="128" height="88"></canvas>
         </div>
         <div class="hud-top-content">
-          <div class="health-card__bar hud-top-bar">
+          <div class="health-card__bar hud-top-bar${isF1Sans ? ' hud-bar-sans-stamina' : ''}">
+            ${isF1Sans ? `
+            <div class="sans-bolt-wrapper">
+              <svg class="sans-bolt-icon" width="22" height="30" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 1L2 14H10L3 29L20 14H12L17 1H12Z" fill="#000000" stroke="#000000" stroke-width="2.5" stroke-linejoin="miter"/>
+                <path d="M12 2L3 14H10L4 27L19 14H12L16 2H12Z" fill="url(#sansBoltGradTopP1)"/>
+                <path d="M12 3L5 14H10L6 22L16 14H11L14 3H12Z" fill="#ffffff" opacity="0.6"/>
+                <defs>
+                  <linearGradient id="sansBoltGradTopP1" x1="3" y1="2" x2="19" y2="28" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#93c5fd"/>
+                    <stop offset="25%" stop-color="#38bdf8"/>
+                    <stop offset="60%" stop-color="#2c4de0"/>
+                    <stop offset="100%" stop-color="#1e3a8a"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <div class="health-card__ghost" style="width: ${f1Percent}%;"></div>
+            <div class="health-card__fill" style="width: ${f1Percent}%; background: ${f1BarColor};"></div>
+            <div class="sans-stamina-dividers">
+              <span class="sans-stamina-divider" style="left: 20%;"></span>
+              <span class="sans-stamina-divider" style="left: 40%;"></span>
+              <span class="sans-stamina-divider" style="left: 60%;"></span>
+              <span class="sans-stamina-divider" style="left: 80%;"></span>
+            </div>
+            <span class="health-card__bar-text">${f1HpText}</span>
+            ` : `
             <div class="health-card__ghost" style="width: ${f1Percent}%;"></div>
             <div class="health-card__fill" style="width: ${f1Percent}%; background: ${f1BarColor};"></div>
             <span class="health-card__bar-text">${f1HpText}</span>
+            `}
           </div>
           <div class="hud-top-header">
             <span class="hud-top-name${f1SansClass}">${f1NameHtml}</span>
@@ -1457,18 +1553,45 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
       </div>
 
       <!-- Player 2 (Right): Connected Top Health Bar -> Lower Name -> Portrait on Outer Right -->
-      <div class="hud-top-player hud-top-p2" style="--fighter-theme: ${f2ThemeColor}; --grade-color: ${f2GradeMeta.color};" data-grade="${f2Grade}">
+      <div class="hud-top-player hud-top-p2" style="--fighter-theme: ${f2ThemeColor}; --grade-color: ${f2GradeMeta.color};" data-grade="${f2Grade}"${isF2NamelessDeity ? ' data-character="namelessdeity"' : ''}>
         <div class="hud-top-content">
-          <div class="health-card__bar hud-top-bar">
+          <div class="health-card__bar hud-top-bar${isF2Sans ? ' hud-bar-sans-stamina' : ''}">
+            ${isF2Sans ? `
+            <div class="sans-bolt-wrapper">
+              <svg class="sans-bolt-icon" width="22" height="30" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 1L2 14H10L3 29L20 14H12L17 1H12Z" fill="#000000" stroke="#000000" stroke-width="2.5" stroke-linejoin="miter"/>
+                <path d="M12 2L3 14H10L4 27L19 14H12L16 2H12Z" fill="url(#sansBoltGradTopP2)"/>
+                <path d="M12 3L5 14H10L6 22L16 14H11L14 3H12Z" fill="#ffffff" opacity="0.6"/>
+                <defs>
+                  <linearGradient id="sansBoltGradTopP2" x1="3" y1="2" x2="19" y2="28" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#93c5fd"/>
+                    <stop offset="25%" stop-color="#38bdf8"/>
+                    <stop offset="60%" stop-color="#2c4de0"/>
+                    <stop offset="100%" stop-color="#1e3a8a"/>
+                  </linearGradient>
+                </defs>
+              </svg>
+            </div>
+            <div class="health-card__ghost" style="width: ${f2Percent}%;"></div>
+            <div class="health-card__fill" style="width: ${f2Percent}%; background: ${f2BarColor};"></div>
+            <div class="sans-stamina-dividers">
+              <span class="sans-stamina-divider" style="left: 20%;"></span>
+              <span class="sans-stamina-divider" style="left: 40%;"></span>
+              <span class="sans-stamina-divider" style="left: 60%;"></span>
+              <span class="sans-stamina-divider" style="left: 80%;"></span>
+            </div>
+            <span class="health-card__bar-text">${f2HpText}</span>
+            ` : `
             <div class="health-card__ghost" style="width: ${f2Percent}%;"></div>
             <div class="health-card__fill" style="width: ${f2Percent}%; background: ${f2BarColor};"></div>
             <span class="health-card__bar-text">${f2HpText}</span>
+            `}
           </div>
           <div class="hud-top-header">
             <span class="hud-top-name${f2SansClass}">${f2NameHtml}</span>
           </div>
         </div>
-        <div class="hud-top-profile" data-grade="${f2Grade}">
+        <div class="hud-top-profile" data-grade="${f2Grade}"${isF2NamelessDeity ? ' data-character="namelessdeity"' : ''}>
           <div class="hud-top-profile__bg"></div>
           <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
           <canvas class="hud-top-profile__grade-canvas" data-grade="${f2Grade}" width="128" height="88"></canvas>
@@ -3810,7 +3933,9 @@ function updateHealthHud() {
         const maxStam = fighter.maxStamina || 100;
         const stamRatio = (!isDead && maxStam > 0) ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 0;
         percent = isDead ? 0 : Math.min(100, Math.max(0, Math.round(stamRatio * 100)));
-        barColor = (stamRatio < 0.25) ? '#FFE600' : '#2c4de0ff';
+        barColor = (stamRatio < 0.25)
+          ? 'linear-gradient(180deg, #fef08a 0%, #facc15 25%, #eab308 60%, #a16207 100%)'
+          : 'linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%)';
         metaValue = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
       } else {
         const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
@@ -3860,7 +3985,7 @@ function updateHealthHud() {
       if (cachedCard.hpBar) {
         const topBarClass = (cachedCard.hpBar && cachedCard.hpBar.classList.contains('hud-top-bar')) ? ' hud-top-bar' : '';
         const cjBarClass = (isCj && !topBarClass) ? ' hud-bar-cj' : '';
-        const sansBarClass = (isSans && !topBarClass) ? ' hud-bar-sans-stamina' : '';
+        const sansBarClass = isSans ? ' hud-bar-sans-stamina' : '';
         const bossBarClass = isBossBar ? ' boss-bar' : '';
         cachedCard.hpBar.className = `health-card__bar${topBarClass}${bossBarClass}${cjBarClass}${sansBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
         const shakeTimer = fighter._healthBarShakeTimer || 0;

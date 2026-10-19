@@ -418,52 +418,108 @@ function _traceCollectorCardPath(ctx, x, y, w, h, r = 4) {
 export function getZeusGradeCardTheme(grade = 'B') {
   const g = String(grade || 'B').toUpperCase();
   switch (g) {
+    case 'SSR':
+      // SSR - ABYSS BLACK (VOID CHARCOAL & ORBITING BLACK SMOKE) - Supreme Tier
+      return {
+        grade: 'SSR',
+        primary: '#FFFFFF',
+        bgBase: '#090A0F',
+        bgDark: '#010204',
+        glowHot: 'rgba(255, 255, 255, 0.90)',
+        glowCenter: 'rgba(22, 25, 36, 0.75)',
+        glowMid: 'rgba(14, 16, 24, 0.85)',
+        glowRim: 'rgba(8, 9, 14, 0.90)',
+        glowOuter: 'rgba(2, 3, 5, 0.98)',
+        sheenTint: 'rgba(255, 255, 255, 0.08)',
+        sheenAccent: 'rgba(255, 255, 255, 0.18)',
+        dotColor: 'rgba(255, 255, 255, 0.04)',
+        halftoneDotColor: 'rgba(18, 20, 30, 0.60)',
+        beamColor: 'rgba(255, 255, 255, 0.04)',
+        accentBar: '#FFFFFF',
+        borderOuter: '#050609',
+        borderInner: '#FFFFFF',
+        rayBase: '#0A0B12',
+        rayHighlight: '#161925',
+        rayCore: '#1F2436',
+        plateBg: '#08090D',
+        plateBorder: '#FFFFFF',
+        starColor: '#FFFFFF',
+        stars: 7,
+        wingBase: '#FFFFFF',
+        wingShade: '#CBD5E1',
+        burstOuter: '#050609',
+        burstInner: '#12141F',
+        letterFill: '#FFFFFF',
+        ribbonFill: '#0D0E15',
+        ribbonBorder: '#FFFFFF',
+        ribbonText: '#FFFFFF',
+        sashBase: '#090A0F',
+        sashHighlight: '#FFFFFF',
+        sparkle: '#FFFFFF',
+      };
     case 'SS':
-      // SS - RED (Crimson / Scarlet Phoenix)
+      // SS - RED (Dark Crimson Red / Blood Phoenix) - Dramatic & Intense
       return {
         grade: 'SS',
-        primary: '#F43F5E',
-        glowCenter: 'rgba(244, 63, 94, 0.46)',
-        glowMid: 'rgba(159, 18, 57, 0.22)',
-        accentBar: '#F43F5E',
+        primary: '#DC2626',
+        bgBase: '#360813',
+        bgDark: '#1A0309',
+        glowHot: 'rgba(255, 235, 238, 0.96)',
+        glowCenter: 'rgba(220, 38, 38, 0.90)',
+        glowMid: 'rgba(185, 28, 28, 0.75)',
+        glowRim: 'rgba(153, 27, 27, 0.52)',
+        glowOuter: 'rgba(127, 29, 29, 0.35)',
+        sheenTint: 'rgba(254, 202, 202, 0.10)',
+        sheenAccent: 'rgba(220, 38, 38, 0.20)',
+        dotColor: 'rgba(252, 165, 165, 0.08)',
+        halftoneDotColor: 'rgba(127, 29, 29, 0.44)',
+        beamColor: 'rgba(254, 202, 202, 0.14)',
+        accentBar: '#DC2626',
         borderOuter: '#050609',
         borderInner: '#FFFFFF',
         rayBase: '#7F1D1D',
-        rayHighlight: '#F43F5E',
-        rayCore: '#FFE4E6',
-        plateBg: '#130A0D',
-        plateBorder: '#F43F5E',
+        rayHighlight: '#EF4444',
+        rayCore: '#FEE2E2',
+        plateBg: '#1F050B',
+        plateBorder: '#DC2626',
         starColor: '#FFD700',
         stars: 6,
         wingBase: '#FFFFFF',
-        wingShade: '#FECDD3',
-        burstOuter: '#9F1239',
-        burstInner: '#FFF1F2',
-        letterFill: '#F43F5E',
-        ribbonFill: '#E11D48',
+        wingShade: '#FCA5A5',
+        burstOuter: '#991B1B',
+        burstInner: '#FEF2F2',
+        letterFill: '#DC2626',
+        ribbonFill: '#B91C1C',
         ribbonBorder: '#0A0C10',
         ribbonText: '#FFFFFF',
-        sashBase: '#BE123C',
-        sashHighlight: '#FDA4AF',
-        sparkle: '#FFE4E6',
+        sashBase: '#991B1B',
+        sashHighlight: '#F87171',
+        sparkle: '#FECACA',
       };
     case 'S':
-      // S - GOLD (The Zeus Radiant 24K Solar Master)
+      // S - GOLD (The Zeus Radiant 24K Solar Master) - Warm, Bright & Lustrous
       return {
         grade: 'S',
         primary: '#FFD700',
-        glowCenter: 'rgba(255, 252, 215, 0.92)',
-        glowMid: 'rgba(255, 215, 0, 0.72)',
-        glowWarm: 'rgba(245, 175, 10, 0.45)',
-        bgBase: '#120E04',
-        bgDark: '#0A0803',
+        glowHot: 'rgba(255, 254, 235, 1.0)',
+        glowCenter: 'rgba(255, 225, 45, 0.95)',
+        glowMid: 'rgba(245, 180, 0, 0.82)',
+        glowRim: 'rgba(217, 119, 6, 0.60)',
+        glowOuter: 'rgba(180, 83, 9, 0.38)',
+        bgBase: '#382706',
+        bgDark: '#221703',
+        sheenTint: 'rgba(255, 245, 180, 0.10)',
+        sheenAccent: 'rgba(255, 215, 0, 0.22)',
+        dotColor: 'rgba(255, 235, 120, 0.07)',
+        halftoneDotColor: 'rgba(217, 119, 6, 0.44)',
+        beamColor: 'rgba(255, 255, 230, 0.22)',
         accentBar: '#FFD700',
         borderOuter: '#050609',
         borderInner: '#FFD700',
         rayBase: '#D97706',
         rayHighlight: '#FFF59D',
         rayCore: '#FFFDF0',
-        plateBg: '#181204',
+        plateBg: '#2A1D05',
         plateBorder: '#FFD700',
         starColor: '#FFD700',
         stars: 5,
@@ -480,55 +536,75 @@ export function getZeusGradeCardTheme(grade = 'B') {
         sparkle: '#FFFDF0',
       };
     case 'A':
-      // A - PURPLE (Amethyst / Royal Violet)
+      // A - PURPLE (Amethyst / Royal Violet) - Slightly Dark Purple
       return {
         grade: 'A',
-        primary: '#A855F7',
-        glowCenter: 'rgba(168, 85, 247, 0.42)',
-        glowMid: 'rgba(107, 33, 168, 0.20)',
-        accentBar: '#A855F7',
+        primary: '#7C3AED',
+        bgBase: '#260A3D',
+        bgDark: '#140422',
+        glowHot: 'rgba(245, 235, 255, 0.96)',
+        glowCenter: 'rgba(124, 58, 237, 0.90)',
+        glowMid: 'rgba(109, 40, 217, 0.75)',
+        glowRim: 'rgba(91, 33, 182, 0.52)',
+        glowOuter: 'rgba(76, 29, 149, 0.35)',
+        sheenTint: 'rgba(233, 213, 255, 0.10)',
+        sheenAccent: 'rgba(124, 58, 237, 0.20)',
+        dotColor: 'rgba(216, 180, 254, 0.08)',
+        halftoneDotColor: 'rgba(76, 29, 149, 0.44)',
+        beamColor: 'rgba(233, 213, 255, 0.14)',
+        accentBar: '#7C3AED',
         borderOuter: '#050609',
         borderInner: '#FFFFFF',
         rayBase: '#581C87',
         rayHighlight: '#A855F7',
         rayCore: '#FAF5FF',
-        plateBg: '#120A1A',
-        plateBorder: '#A855F7',
+        plateBg: '#170526',
+        plateBorder: '#7C3AED',
         starColor: '#E9D5FF',
         stars: 4,
         wingBase: '#FFFFFF',
-        wingShade: '#E9D5FF',
+        wingShade: '#D8B4FE',
         burstOuter: '#6B21A8',
         burstInner: '#FAF5FF',
-        letterFill: '#C084FC',
-        ribbonFill: '#A855F7',
+        letterFill: '#8B5CF6',
+        ribbonFill: '#7C3AED',
         ribbonBorder: '#0A0C10',
         ribbonText: '#FFFFFF',
-        sashBase: '#7E22CE',
-        sashHighlight: '#E9D5FF',
-        sparkle: '#E9D5FF',
+        sashBase: '#6D28D9',
+        sashHighlight: '#C4B5FD',
+        sparkle: '#DDD6FE',
       };
     case 'B':
     default:
-      // B - GREEN (Emerald / Jade / Mint)
+      // B - GREEN (Emerald / Jade / Mint) - Vibrant, Bright & Luminous
       return {
         grade: 'B',
         primary: '#10B981',
-        glowCenter: 'rgba(16, 185, 129, 0.42)',
-        glowMid: 'rgba(6, 95, 70, 0.20)',
+        bgBase: '#144630',
+        bgDark: '#0B2B1D',
+        glowHot: 'rgba(240, 255, 250, 1.0)',
+        glowCenter: 'rgba(16, 185, 129, 0.95)',
+        glowMid: 'rgba(16, 185, 129, 0.82)',
+        glowRim: 'rgba(5, 150, 105, 0.60)',
+        glowOuter: 'rgba(4, 120, 87, 0.38)',
+        sheenTint: 'rgba(215, 255, 238, 0.12)',
+        sheenAccent: 'rgba(16, 185, 129, 0.22)',
+        dotColor: 'rgba(175, 250, 220, 0.08)',
+        halftoneDotColor: 'rgba(6, 95, 70, 0.38)',
+        beamColor: 'rgba(255, 255, 255, 0.15)',
         accentBar: '#10B981',
         borderOuter: '#050609',
         borderInner: '#FFFFFF',
-        rayBase: '#064E3B',
-        rayHighlight: '#10B981',
+        rayBase: '#047857',
+        rayHighlight: '#34D399',
         rayCore: '#ECFDF5',
-        plateBg: '#05140F',
+        plateBg: '#0B2A1D',
         plateBorder: '#10B981',
         starColor: '#6EE7B7',
         stars: 3,
         wingBase: '#FFFFFF',
         wingShade: '#A7F3D0',
-        burstOuter: '#065F46',
+        burstOuter: '#047857',
         burstInner: '#F0FDF4',
         letterFill: '#34D399',
         ribbonFill: '#10B981',
@@ -693,11 +769,12 @@ const _gradeBannerImages = {
   B: null,
   S: null,
   SS: null,
+  SSR: null,
 };
 
 export function getGradeBannerImage(grade = 'B') {
   const g = String(grade || 'B').toUpperCase();
-  const validKey = ['A', 'B', 'S', 'SS'].includes(g) ? g : 'B';
+  const validKey = ['A', 'B', 'S', 'SS', 'SSR'].includes(g) ? g : 'B';
   if (_gradeBannerImages[validKey] && _gradeBannerImages[validKey].complete && _gradeBannerImages[validKey].naturalWidth > 0) {
     return _gradeBannerImages[validKey];
   }
@@ -713,7 +790,7 @@ export function getGradeBannerImage(grade = 'B') {
 }
 
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  ['A', 'B', 'S', 'SS'].forEach(getGradeBannerImage);
+  ['A', 'B', 'S', 'SS', 'SSR'].forEach(getGradeBannerImage);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -899,7 +976,7 @@ function _drawGradeVFX_A_Midground(ctx, cx, cy, drawW, drawH, t) {
 function _drawGradeVFX_S_Backdrop(ctx, cx, cy, drawW, drawH, t) {
   // Radiant Golden Amber Corona
   const pulse = Math.sin(t * 3.4) * 0.5 + 0.5;
-  const coronaR = drawW * 0.44 + pulse * 6;
+  const coronaR = Math.min(drawW * 0.44 + pulse * 6, (drawH || drawW) * 0.45);
   const coronaGrad = ctx.createRadialGradient(cx, cy, coronaR * 0.25, cx, cy, coronaR);
   coronaGrad.addColorStop(0, 'rgba(254, 240, 138, 0.35)');
   coronaGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.26)');
@@ -1081,11 +1158,22 @@ function _drawSSParticlesMidground(ctx, cx, cy, drawW, drawH, t) {
   }
 }
 
+// ── TIER 5: GRADE SSR VFX (Particle effects on SSR banner removed per user request) ──
+
+function _drawGradeVFX_SSR_Backdrop(ctx, cx, cy, drawW, drawH, t) {
+  // Particle effects on SSR banner intentionally removed per user request
+}
+
+function _drawGradeVFX_SSR_Midground(ctx, cx, cy, drawW, drawH, t) {
+  // Particle effects on SSR banner intentionally removed per user request
+}
+
 /**
  * Draws a flowing specular gleam directly ONTO the letter glyphs
  * via ctx.fillText(grade, letterX, letterY) — zero rect clipping, zero cropping!
  */
 function _drawGradeLetterGlintOnText(ctx, letterX, letterY, grade, t) {
+  const isSSR = grade === 'SSR';
   const isSS = grade === 'SS';
 
   if (grade === 'B') {
@@ -1141,6 +1229,39 @@ function _drawGradeLetterGlintOnText(ctx, letterX, letterY, grade, t) {
         _drawRotatedComicSparkle(ctx, gx, letterY, 4.8 * gleamAlpha, t * 3.0, `rgba(254, 240, 138, ${gleamAlpha})`, `rgba(255, 255, 255, ${gleamAlpha})`);
       }
     }
+  } else if (isSSR) {
+    // ── SSR: Sweeping specular iridescent SHINY RAINBOW gleam across "SSR" ──
+    const cycle = (t * 0.55) % 1.0;
+    if (cycle < 0.42) {
+      const cp = cycle / 0.42;
+      const gx = letterX - 28 + cp * 56;
+      const grad = ctx.createLinearGradient(gx - 16, letterY - 14, gx + 16, letterY + 14);
+      grad.addColorStop(0.00, 'rgba(255, 46, 116, 0)');
+      grad.addColorStop(0.18, 'rgba(255, 46, 116, 0.90)'); // Vivid Rose Ruby
+      grad.addColorStop(0.36, 'rgba(255, 170, 0, 0.90)');  // Radiant Solar Amber
+      grad.addColorStop(0.50, 'rgba(255, 255, 255, 0.98)'); // Specular Incandescent Core
+      grad.addColorStop(0.64, 'rgba(0, 229, 255, 0.92)');  // Electric Cyan
+      grad.addColorStop(0.82, 'rgba(176, 56, 255, 0.90)'); // Celestial Amethyst
+      grad.addColorStop(1.00, 'rgba(176, 56, 255, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillText(grade, letterX, letterY);
+
+      // Specular diamond sparkle riding the rainbow gleam with dynamic chromatic flare
+      const gleamAlpha = Math.sin(cp * Math.PI);
+      if (gleamAlpha > 0.22) {
+        const starHue = (t * 4.0) % (Math.PI * 2);
+        const starColor = `hsl(${Math.round((starHue / (Math.PI * 2)) * 360)}, 100%, 75%)`;
+        _drawRotatedComicSparkle(
+          ctx,
+          gx,
+          letterY,
+          5.4 * gleamAlpha,
+          t * 3.2,
+          starColor,
+          `rgba(255, 255, 255, ${gleamAlpha})`
+        );
+      }
+    }
   } else if (isSS) {
     // ── SS (RED): Searing Crimson-Gold-White slash gleam across double "SS" ──
     const cycle = (t * 0.60) % 1.0;
@@ -1173,15 +1294,41 @@ export function drawWingedGradeLetter(ctx, letterX, letterY, grade, theme, cardI
   const phaseOffset = (cardIdx * 0.73 + letterX * 0.04) % (Math.PI * 2);
   const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
   const t = now * 0.001 + phaseOffset;
-  const fontSize = grade === 'SS' ? 17.5 : 21.5;
+  const fontSize = grade === 'SSR' ? 20.5 : (grade === 'SS' ? 17.5 : 21.5);
+
+  // Effect bounding dimensions:
+  // When includeGradeEffects is enabled on constrained canvas surfaces (such as the Top HUD grade canvas),
+  // effects (radial aura coronas, compression rings, orbiting particles) must gracefully fade to 100%
+  // transparency BEFORE reaching the canvas edges to completely eliminate hard rectangular edge clipping.
+  let maxSafeR = 40;
+  if (ctx && ctx.canvas && typeof ctx.canvas.width === 'number' && typeof ctx.canvas.height === 'number') {
+    const leftMargin = letterX;
+    const rightMargin = ctx.canvas.width - letterX;
+    const topMargin = letterY;
+    const botMargin = ctx.canvas.height - letterY;
+    const minMargin = Math.min(leftMargin, rightMargin, topMargin, botMargin);
+    if (minMargin > 0) {
+      maxSafeR = Math.max(22, minMargin - 6);
+    }
+  }
+
+  // Base effect dimensions scaled to comfortably frame the letter without ever exceeding the canvas safe boundary
+  const baseW = grade === 'SSR' ? 24 : 22;
+  const baseH = grade === 'SSR' ? 18 : 16;
+  const rawEffW = baseW * scale;
+  const rawEffH = baseH * scale;
+  const effW = Math.min(rawEffW, maxSafeR * 1.50);
+  const effH = Math.min(rawEffH, maxSafeR * 1.15);
 
   if (includeGradeEffects) {
-    if (grade === 'SS') {
-      _drawSSParticlesBackdrop(ctx, letterX, letterY, 76, 54, t);
+    if (grade === 'SSR') {
+      // Particle effects on SSR banner intentionally removed per user request
+    } else if (grade === 'SS') {
+      _drawSSParticlesBackdrop(ctx, letterX, letterY, effW, effH, t);
     } else if (grade === 'S') {
-      _drawGradeVFX_S_Backdrop(ctx, letterX, letterY, 76, 54, t);
+      _drawGradeVFX_S_Backdrop(ctx, letterX, letterY, effW, effH, t);
     } else if (grade === 'A') {
-      _drawGradeVFX_A_Backdrop(ctx, letterX, letterY, 76, 54, t);
+      _drawGradeVFX_A_Backdrop(ctx, letterX, letterY, effW, effH, t);
     }
   }
 
@@ -1191,27 +1338,72 @@ export function drawWingedGradeLetter(ctx, letterX, letterY, grade, theme, cardI
   ctx.font = `900 ${fontSize}px "Impact", "Outfit", "Rajdhani", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.strokeStyle = '#0B0C10';
-  ctx.lineWidth = 4.2;
-  ctx.strokeText(grade, 0, 0);
-  ctx.fillStyle = theme.letterFill;
-  ctx.fillText(grade, 0, 0);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(grade, -0.5, -0.5);
-  ctx.fillStyle = theme.letterFill;
-  ctx.fillText(grade, 0, 0);
+
+  if (grade === 'SSR') {
+    // ── SSR: PURE BRILLIANT WHITE FONT WITH FLOWING SHINY RAINBOW RIM & CRISP INK CONTOUR ──
+    // 1. Deep Manga Outer Shadow Stroke
+    ctx.strokeStyle = '#050609';
+    ctx.lineWidth = 6.2;
+    ctx.strokeText(grade, 0, 0);
+
+    // 2. Animated Flowing Shiny Rainbow Outer Rim
+    const rainbowAngle = t * 2.4;
+    const rCos = Math.cos(rainbowAngle);
+    const rSin = Math.sin(rainbowAngle);
+    const rDiag = 28;
+    const textRainbow = ctx.createLinearGradient(
+      -rCos * rDiag, -rSin * rDiag,
+      rCos * rDiag, rSin * rDiag
+    );
+    textRainbow.addColorStop(0.00, '#FF2E74'); // Vivid Rose Ruby
+    textRainbow.addColorStop(0.18, '#FF8A00'); // Radiant Orange
+    textRainbow.addColorStop(0.36, '#FFEA00'); // Solar Gold Yellow
+    textRainbow.addColorStop(0.52, '#00FF9D'); // Electric Emerald Green
+    textRainbow.addColorStop(0.70, '#00D8FF'); // Bright Cyan
+    textRainbow.addColorStop(0.86, '#B038FF'); // Neon Purple
+    textRainbow.addColorStop(1.00, '#FF2E74'); // Wrap
+
+    ctx.strokeStyle = textRainbow;
+    ctx.lineWidth = 3.8;
+    ctx.strokeText(grade, 0, 0);
+
+    // 3. Crisp Dark Boundary Stroke (inner ink shadow to pop white font against bright rainbow colors)
+    ctx.strokeStyle = '#050609';
+    ctx.lineWidth = 1.8;
+    ctx.strokeText(grade, 0, 0);
+
+    // 4. Subtle Silver/Pearl 3D Relief Shadow
+    ctx.fillStyle = '#CBD5E1';
+    ctx.fillText(grade, 0.6, 0.6);
+
+    // 5. Solid Pure White Core Lettering
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(grade, 0, 0);
+  } else {
+    ctx.strokeStyle = '#0B0C10';
+    ctx.lineWidth = 4.2;
+    ctx.strokeText(grade, 0, 0);
+    ctx.fillStyle = theme.letterFill;
+    ctx.fillText(grade, 0, 0);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(grade, -0.5, -0.5);
+    ctx.fillStyle = theme.letterFill;
+    ctx.fillText(grade, 0, 0);
+  }
   _drawGradeLetterGlintOnText(ctx, 0, 0, grade, t);
   ctx.restore();
 
   if (includeGradeEffects) {
-    if (grade === 'SS') {
-      _drawSSParticlesMidground(ctx, letterX, letterY, 76, 54, t);
+    if (grade === 'SSR') {
+      // Particle effects on SSR banner intentionally removed per user request
+    } else if (grade === 'SS') {
+      _drawSSParticlesMidground(ctx, letterX, letterY, effW, effH, t);
     } else if (grade === 'S') {
-      _drawGradeVFX_S_Midground(ctx, letterX, letterY, 76, 54, t);
+      _drawGradeVFX_S_Midground(ctx, letterX, letterY, effW, effH, t);
     } else if (grade === 'A') {
-      _drawGradeVFX_A_Midground(ctx, letterX, letterY, 76, 54, t);
+      _drawGradeVFX_A_Midground(ctx, letterX, letterY, effW, effH, t);
     } else {
-      _drawGradeVFX_B_Midground(ctx, letterX, letterY, 76, 54, t);
+      _drawGradeVFX_B_Midground(ctx, letterX, letterY, effW, effH, t);
     }
   }
 }
@@ -1220,7 +1412,7 @@ const _gradeBannerOutlinedCache = {};
 
 function _getOutlinedGradeBannerCanvas(grade, targetW, targetH) {
   const g = String(grade || 'B').toUpperCase();
-  const validKey = ['A', 'B', 'S', 'SS'].includes(g) ? g : 'B';
+  const validKey = ['A', 'B', 'S', 'SS', 'SSR'].includes(g) ? g : 'B';
   const cacheKey = `${validKey}_${targetW}_${targetH}`;
   if (_gradeBannerOutlinedCache[cacheKey]) {
     return _gradeBannerOutlinedCache[cacheKey];
@@ -1295,9 +1487,10 @@ export function drawWingedGradeSeal(ctx, sealCx, sealCy, grade, theme, cardIdx =
   }
 
   const bannerImg = getGradeBannerImage(grade);
+  const isSSR = grade === 'SSR';
   const isSS = grade === 'SS';
-  const drawW = isSS ? 88 : (grade === 'A' ? 76 : 82);
-  const imgAspect = isSS ? (284 / 203) : (grade === 'S' ? (250 / 173) : (grade === 'A' ? (226 / 186) : (239 / 174)));
+  const drawW = isSSR ? 92 : (isSS ? 88 : (grade === 'A' ? 76 : 82));
+  const imgAspect = isSSR ? (600 / 448) : (isSS ? (284 / 203) : (grade === 'S' ? (250 / 173) : (grade === 'A' ? (226 / 186) : (239 / 174))));
   const drawH = Math.round(drawW / imgAspect);
 
   const drawX = Math.round(sealCx - drawW / 2);
@@ -1306,7 +1499,9 @@ export function drawWingedGradeSeal(ctx, sealCx, sealCy, grade, theme, cardIdx =
   // ─────────────────────────────────────────────────────────────
   // 1. BACKDROP SPECIAL EFFECTS (Behind Banner Artwork)
   // ─────────────────────────────────────────────────────────────
-  if (isSS) {
+  if (isSSR) {
+    // Particle effects on SSR banner intentionally removed per user request
+  } else if (isSS) {
     _drawSSParticlesBackdrop(ctx, sealCx, sealCy, drawW, drawH, t);
   } else if (grade === 'S') {
     _drawGradeVFX_S_Backdrop(ctx, sealCx, sealCy, drawW, drawH, t);
@@ -1350,7 +1545,9 @@ export function drawWingedGradeSeal(ctx, sealCx, sealCy, grade, theme, cardIdx =
   // ─────────────────────────────────────────────────────────────
   // 3. MIDGROUND SPECIAL EFFECTS (On Wings & Starburst Perimeter)
   // ─────────────────────────────────────────────────────────────
-  if (isSS) {
+  if (isSSR) {
+    // Particle effects on SSR banner intentionally removed per user request
+  } else if (isSS) {
     _drawSSParticlesMidground(ctx, sealCx, sealCy, drawW, drawH, t);
   } else if (grade === 'S') {
     _drawGradeVFX_S_Midground(ctx, sealCx, sealCy, drawW, drawH, t);
@@ -1363,7 +1560,7 @@ export function drawWingedGradeSeal(ctx, sealCx, sealCy, grade, theme, cardIdx =
   // ─────────────────────────────────────────────────────────────
   // 4. 3D GRADE LETTER IN HOLLOW STARBURST CENTER
   // ─────────────────────────────────────────────────────────────
-  const letterY = Math.round(drawY + drawH * 0.55);
+  const letterY = Math.round(drawY + drawH * (isSSR ? 0.54 : 0.55));
   drawWingedGradeLetter(ctx, sealCx, letterY, grade, theme, cardIdx);
 
   ctx.restore();
@@ -1415,47 +1612,284 @@ function _drawShinyGoldSparkles(ctx, x, y, w, h, charCx, charCy) {
 }
 
 /**
- * Draws the HUD Top style interior background: dark carbon with central theme radial glow and blueprint dots.
+ * Draws the fiery ember slivers, floating glowing cinder motes, and crimson/gold sparkles
+ * across the SS Card stage, matching the SS Grade Banner visual effects standard.
+ */
+function _drawSSCardStageEffects(ctx, x, y, w, h, charCx, charCy, t) {
+  ctx.save();
+
+  // 1. Razor-Sharp Intimidating Ember Slivers (10 slivers rising across card stage)
+  const slivers = [
+    { relX: 0.14, relY: 0.72, ang: -0.28, len: 6.2, w: 2.0, ph: 0.00, dark: false },
+    { relX: 0.86, relY: 0.68, ang:  0.28, len: 6.2, w: 2.0, ph: 0.50, dark: false },
+    { relX: 0.22, relY: 0.84, ang: -0.18, len: 5.4, w: 1.8, ph: 0.25, dark: true  },
+    { relX: 0.78, relY: 0.82, ang:  0.22, len: 5.4, w: 1.8, ph: 0.75, dark: true  },
+    { relX: 0.32, relY: 0.76, ang: -0.14, len: 5.8, w: 1.9, ph: 0.15, dark: false },
+    { relX: 0.68, relY: 0.74, ang:  0.16, len: 5.8, w: 1.9, ph: 0.65, dark: false },
+    { relX: 0.12, relY: 0.45, ang: -0.32, len: 5.0, w: 1.6, ph: 0.35, dark: true  },
+    { relX: 0.88, relY: 0.48, ang:  0.30, len: 5.0, w: 1.6, ph: 0.85, dark: false },
+    { relX: 0.40, relY: 0.88, ang: -0.08, len: 4.8, w: 1.6, ph: 0.45, dark: false },
+    { relX: 0.60, relY: 0.86, ang:  0.10, len: 4.8, w: 1.6, ph: 0.95, dark: true  },
+  ];
+
+  for (let i = 0; i < slivers.length; i++) {
+    const s = slivers[i];
+    const cycle = (t * 0.72 + s.ph) % 1.0;
+    const rise = cycle * (h * 0.48);
+    const sway = Math.sin(cycle * Math.PI * 2 + i * 1.3) * 3.2;
+    const px = x + s.relX * w + sway;
+    const py = y + s.relY * h - rise;
+    const alpha = Math.sin(cycle * Math.PI) * 0.92;
+
+    if (alpha > 0.08) {
+      const scale = 0.75 + Math.sin(cycle * Math.PI) * 0.35;
+      _drawSharpEmberSliver(ctx, px, py, s.len * scale, s.w * scale, s.ang + sway * 0.05, alpha, s.dark);
+    }
+  }
+
+  // 2. Floating Glowing Cinder Motes (14 fine embers drifting upward across card)
+  const numMotes = 14;
+  for (let i = 0; i < numMotes; i++) {
+    const p = (t * 0.58 + i * (1 / numMotes)) % 1.0;
+    const relX = 0.12 + ((i * 0.17) % 0.76);
+    const mx = x + relX * w + Math.sin(t * 2.4 + i * 1.8) * 3.5;
+    const my = y + h * 0.88 - p * (h * 0.78);
+    const mAlpha = Math.sin(p * Math.PI) * 0.88;
+
+    if (mAlpha > 0.06) {
+      const r = 1.0 + Math.sin(p * Math.PI) * 0.9;
+      // Soft crimson-orange cinder halo
+      ctx.fillStyle = `rgba(239, 68, 68, ${mAlpha * 0.36})`;
+      ctx.beginPath();
+      ctx.arc(mx, my, r * 2.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Incandescent gold/orange pinpoint core
+      ctx.fillStyle = (i % 3 === 0)
+        ? `rgba(254, 240, 138, ${mAlpha})`
+        : `rgba(255, 120, 40, ${mAlpha})`;
+      ctx.beginPath();
+      ctx.arc(mx, my, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 3. Crisp 4-Point Crimson/Gold Star Glints
+  const glints = [
+    { rx: 0.16, ry: 0.28, phase: 0.00 },
+    { rx: 0.84, ry: 0.32, phase: 0.50 },
+    { rx: 0.18, ry: 0.75, phase: 0.25 },
+    { rx: 0.82, ry: 0.78, phase: 0.75 },
+    { rx: 0.50, ry: 0.16, phase: 0.40 },
+  ];
+  for (let i = 0; i < glints.length; i++) {
+    const g = glints[i];
+    const gAlpha = Math.max(0, Math.sin(t * 2.8 + g.phase * Math.PI * 2));
+    if (gAlpha > 0.18) {
+      _drawRotatedComicSparkle(
+        ctx,
+        x + g.rx * w,
+        y + g.ry * h,
+        4.5 * gAlpha,
+        t * 1.8,
+        `rgba(220, 38, 38, ${gAlpha})`,
+        `rgba(255, 245, 210, ${gAlpha * 0.95})`
+      );
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+/**
+ * Draws drifting abyss smoke plumes, void ash wisps, and subtle silver diamond stardust
+ * across the SSR Card stage in the deep abyss void (Zero gold glow).
+ */
+function _drawSSRCardStageEffects(ctx, x, y, w, h, charCx, charCy, t) {
+  ctx.save();
+
+  // 1. Drifting Dark Void Smoke Wisps & Ash Plumes rising through the abyss
+  const wisps = [
+    { relX: 0.12, relY: 0.74, r: 7.2, ph: 0.00 },
+    { relX: 0.88, relY: 0.70, r: 7.5, ph: 0.50 },
+    { relX: 0.20, relY: 0.86, r: 6.2, ph: 0.25 },
+    { relX: 0.80, relY: 0.84, r: 6.4, ph: 0.75 },
+    { relX: 0.30, relY: 0.78, r: 6.8, ph: 0.15 },
+    { relX: 0.70, relY: 0.76, r: 6.6, ph: 0.65 },
+    { relX: 0.10, relY: 0.44, r: 5.6, ph: 0.35 },
+    { relX: 0.90, relY: 0.46, r: 5.8, ph: 0.85 },
+  ];
+
+  for (let i = 0; i < wisps.length; i++) {
+    const s = wisps[i];
+    const cycle = (t * 0.55 + s.ph) % 1.0;
+    const rise = cycle * (h * 0.48);
+    const sway = Math.sin(cycle * Math.PI * 2 + i * 1.5) * 4.0;
+    const px = x + s.relX * w + sway;
+    const py = y + s.relY * h - rise;
+    const alpha = Math.sin(cycle * Math.PI) * 0.75;
+
+    if (alpha > 0.05) {
+      const curR = s.r * (0.8 + cycle * 0.5);
+      const smokeGrad = ctx.createRadialGradient(px, py, curR * 0.1, px, py, curR);
+      smokeGrad.addColorStop(0, `rgba(4, 5, 8, ${alpha * 0.85})`);
+      smokeGrad.addColorStop(0.5, `rgba(18, 22, 32, ${alpha * 0.50})`);
+      smokeGrad.addColorStop(1, 'rgba(10, 12, 16, 0)');
+      ctx.fillStyle = smokeGrad;
+      ctx.beginPath();
+      ctx.arc(px, py, curR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 2. Rising Fine Void Ash Motes (Monochrome / Silver, Zero Gold)
+  const numMotes = 14;
+  for (let i = 0; i < numMotes; i++) {
+    const p = (t * 0.50 + i * (1 / numMotes)) % 1.0;
+    const relX = 0.10 + ((i * 0.17) % 0.80);
+    const mx = x + relX * w + Math.sin(t * 2.0 + i * 1.6) * 3.0;
+    const my = y + h * 0.90 - p * (h * 0.82);
+    const mAlpha = Math.sin(p * Math.PI) * 0.80;
+
+    if (mAlpha > 0.05) {
+      const r = 0.9 + Math.sin(p * Math.PI) * 0.8;
+      // Charcoal ash halo
+      ctx.fillStyle = `rgba(10, 12, 18, ${mAlpha * 0.60})`;
+      ctx.beginPath();
+      ctx.arc(mx, my, r * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Faint platinum-silver ash pinpoint (zero gold)
+      ctx.fillStyle = (i % 2 === 0)
+        ? `rgba(255, 255, 255, ${mAlpha * 0.85})`
+        : `rgba(180, 195, 220, ${mAlpha * 0.70})`;
+      ctx.beginPath();
+      ctx.arc(mx, my, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 3. Crisp Silver Diamond Starlight Glints (✦) (Pure Platinum / Ice-White, Zero Gold)
+  const glints = [
+    { rx: 0.15, ry: 0.26, phase: 0.00 },
+    { rx: 0.85, ry: 0.30, phase: 0.50 },
+    { rx: 0.16, ry: 0.76, phase: 0.25 },
+    { rx: 0.84, ry: 0.78, phase: 0.75 },
+    { rx: 0.50, ry: 0.14, phase: 0.40 },
+    { rx: 0.50, ry: 0.86, phase: 0.60 },
+  ];
+  for (let i = 0; i < glints.length; i++) {
+    const g = glints[i];
+    const gAlpha = Math.max(0, Math.sin(t * 2.6 + g.phase * Math.PI * 2));
+    if (gAlpha > 0.18) {
+      _drawRotatedComicSparkle(
+        ctx,
+        x + g.rx * w,
+        y + g.ry * h,
+        4.6 * gAlpha,
+        t * 1.8,
+        `rgba(255, 255, 255, ${gAlpha * 0.90})`,
+        `rgba(240, 245, 255, ${gAlpha})`
+      );
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws the authentic Comic Halftone Ben Day polka dot pattern and static action flare streaks
+ * matching the pop-art comic card reference.
+ */
+function _drawComicHalftoneTexture(ctx, x, y, w, h, theme) {
+  ctx.save();
+
+  // 1. Static Comic Action Rays / Fan Streaks (originating from left-flank)
+  const originX = x - w * 0.08;
+  const originY = y + h * 0.34;
+  const beamAngles = [-0.68, -0.40, -0.12, 0.16, 0.44, 0.72];
+  const maxR = Math.hypot(w, h) * 1.35;
+  const beamColor = theme.beamColor || 'rgba(255, 255, 255, 0.15)';
+
+  ctx.fillStyle = beamColor;
+  for (let i = 0; i < beamAngles.length; i++) {
+    const ang = beamAngles[i];
+    const halfW = 0.085;
+    ctx.beginPath();
+    ctx.moveTo(originX, originY);
+    ctx.arc(originX, originY, maxR, ang - halfW, ang + halfW);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // 2. Comic Halftone / Ben Day Polka Dots (staggered offset circular grid)
+  const stepX = 11.5;
+  const stepY = 10.0;
+  const dotR = 2.4;
+  const dotColor = theme.halftoneDotColor || 'rgba(0, 0, 0, 0.22)';
+
+  ctx.fillStyle = dotColor;
+  ctx.beginPath();
+  let row = 0;
+  for (let py = y + 4; py < y + h - 2; py += stepY) {
+    const offsetX = (row % 2 === 1) ? stepX * 0.5 : 0;
+    for (let px = x + 4 + offsetX; px < x + w - 2; px += stepX) {
+      ctx.moveTo(px + dotR, py);
+      ctx.arc(px, py, dotR, 0, Math.PI * 2);
+    }
+    row++;
+  }
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draws the HUD Top style interior background: dark carbon with central theme radial glow,
+ * comic action streaks, and Ben Day halftone dots.
  */
 function _drawHudTopCardInterior(ctx, x, y, w, h, charCx, charCy, theme, fighterColor) {
+  const isGradeSSR = theme.grade === 'SSR';
   const isGradeS = theme.grade === 'S';
 
+  if (isGradeSSR) {
+    // 1. Bottom-to-Middle Fade-Out Gradient:
+    // Instead of filling the card with solid color, renders an abyss dark gradient starting from the bottom of the card
+    // that smoothly fades out to 0 opacity at the middle part of the card (top half remains transparent).
+    const bottomGrad = ctx.createLinearGradient(x, y + h, x, y);
+    bottomGrad.addColorStop(0.00, '#040508');                  // Bottom of card: deep solid abyss black
+    bottomGrad.addColorStop(0.18, 'rgba(6, 7, 11, 0.94)');     // Lower zone: rich abyss charcoal
+    bottomGrad.addColorStop(0.34, 'rgba(12, 14, 22, 0.60)');   // Lower-mid: smooth smoky transition
+    bottomGrad.addColorStop(0.44, 'rgba(16, 20, 30, 0.20)');   // Feathered transition
+    bottomGrad.addColorStop(0.50, 'rgba(10, 12, 18, 0.00)');   // Middle part of card: fully faded out
+    bottomGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0.00)');      // Upper card: completely transparent
+    ctx.fillStyle = bottomGrad;
+    ctx.fillRect(x, y, w, h);
+    return;
+  }
+
   if (isGradeS) {
-    // 1. Rich Obsidian Gold Carbon Base (warm deep carbon instead of cold blue-gray #0E1019)
-    ctx.fillStyle = '#120E04';
+    // 1. Rich Warm Solar Gold Base
+    const baseGrad = ctx.createLinearGradient(x, y, x, y + h);
+    baseGrad.addColorStop(0, theme.bgBase || '#382706');
+    baseGrad.addColorStop(1, theme.bgDark || '#221703');
+    ctx.fillStyle = baseGrad;
     ctx.fillRect(x, y, w, h);
 
     // 2. Multi-stop Brilliant Solar Gold Radial Aura
-    const radR = Math.max(w, h) * 0.72;
+    const radR = Math.max(w, h) * 0.95;
     const radGrad = ctx.createRadialGradient(charCx, charCy - 4, 2, charCx, charCy - 4, radR);
-    radGrad.addColorStop(0, 'rgba(255, 253, 220, 0.94)'); // Specular hot white-gold core
-    radGrad.addColorStop(0.16, 'rgba(255, 220, 30, 0.80)'); // Radiant 24k Solar Gold (#FFDC1E)
-    radGrad.addColorStop(0.38, 'rgba(255, 185, 0, 0.54)'); // Deep luminous gold
-    radGrad.addColorStop(0.68, 'rgba(180, 110, 0, 0.24)'); // Burnished gold perimeter
-    radGrad.addColorStop(1, '#0C0A04'); // Deep obsidian gold rim
+    radGrad.addColorStop(0, 'rgba(255, 254, 235, 1.0)'); // Specular hot white-gold core
+    radGrad.addColorStop(0.18, 'rgba(255, 225, 45, 0.95)'); // Radiant 24k Solar Gold (#FFDC1E)
+    radGrad.addColorStop(0.46, 'rgba(245, 180, 0, 0.82)'); // Deep luminous gold
+    radGrad.addColorStop(0.74, 'rgba(217, 119, 6, 0.58)'); // Burnished gold perimeter
+    radGrad.addColorStop(1, theme.glowOuter || '#221703'); // Rich warm gold rim
     ctx.fillStyle = radGrad;
     ctx.fillRect(x, y, w, h);
 
-    // 3. Radiant Gold Sunburst Flare Rays behind character (crisp, elegant, ultra-shiny)
-    ctx.save();
-    ctx.translate(charCx, charCy - 4);
-    const numRays = 12;
-    const rayMaxR = radR * 0.95;
-    for (let i = 0; i < numRays; i++) {
-      const angle = (i * (Math.PI * 2) / numRays) + 0.12;
-      const halfW = 0.082;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, rayMaxR, angle - halfW, angle + halfW);
-      ctx.closePath();
-      const rayGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, rayMaxR);
-      rayGrad.addColorStop(0, 'rgba(255, 245, 160, 0.35)');
-      rayGrad.addColorStop(0.45, 'rgba(255, 210, 20, 0.16)');
-      rayGrad.addColorStop(1, 'rgba(255, 180, 0, 0)');
-      ctx.fillStyle = rayGrad;
-      ctx.fill();
-    }
-    ctx.restore();
+    // 3. Comic Halftone Texture: Action Flare Rays + Amber Ben Day Dots
+    _drawComicHalftoneTexture(ctx, x, y, w, h, theme);
 
     // 4. Subtle Concentric Golden Halo Rings
     ctx.save();
@@ -1474,72 +1908,72 @@ function _drawHudTopCardInterior(ctx, x, y, w, h, charCx, charCy, theme, fighter
 
     // 5. Diagonal Metallic Specular Luster (The "Shiny Gold" sheen sweep)
     const sheenGrad = ctx.createLinearGradient(x, y, x + w, y + h);
-    sheenGrad.addColorStop(0, 'rgba(255, 245, 180, 0.05)');
-    sheenGrad.addColorStop(0.38, 'rgba(255, 255, 240, 0.26)'); // Brilliant diagonal glint
-    sheenGrad.addColorStop(0.46, 'rgba(255, 215, 0, 0.16)');
-    sheenGrad.addColorStop(1, 'rgba(255, 200, 50, 0.02)');
+    sheenGrad.addColorStop(0, 'rgba(255, 245, 180, 0.08)');
+    sheenGrad.addColorStop(0.35, 'rgba(255, 255, 240, 0.30)'); // Brilliant diagonal glint
+    sheenGrad.addColorStop(0.48, 'rgba(255, 215, 0, 0.20)');
+    sheenGrad.addColorStop(1, 'rgba(255, 200, 50, 0.04)');
     ctx.fillStyle = sheenGrad;
     ctx.fillRect(x, y, w, h);
 
     // 6. Specular Golden Diamond Stars (✦) floating on stage
     _drawShinyGoldSparkles(ctx, x, y, w, h, charCx, charCy);
-
-    // 7. Subtle Industrial Blueprint Dot Grid with golden tint
-    ctx.fillStyle = 'rgba(255, 235, 120, 0.04)';
-    const step = 14;
-    for (let py = y + 4; py < y + h; py += step) {
-      for (let px = x + 4; px < x + w; px += step) {
-        ctx.fillRect(px, py, 1.2, 1.2);
-      }
-    }
     return;
   }
 
-  // Base dark carbon fill for other grades
-  ctx.fillStyle = theme.bgBase || '#0E1019';
+  // Base rich vibrant gradient fill for all cards (SS, A, B, and custom)
+  const baseGrad = ctx.createLinearGradient(x, y, x, y + h);
+  baseGrad.addColorStop(0, theme.bgBase || '#263147');
+  baseGrad.addColorStop(1, theme.bgDark || '#141B28');
+  ctx.fillStyle = baseGrad;
   ctx.fillRect(x, y, w, h);
 
-  // Radial gradient: circle at (charCx, charCy - 4)
-  const radR = Math.max(w, h) * 0.65;
-  const radGrad = ctx.createRadialGradient(charCx, charCy - 4, 3, charCx, charCy - 4, radR);
-  radGrad.addColorStop(0, theme.glowCenter || 'rgba(56, 189, 248, 0.42)');
-  radGrad.addColorStop(0.55, theme.glowMid || 'rgba(30, 41, 59, 0.25)');
-  radGrad.addColorStop(1, theme.bgDark || '#090B10');
+  // Multi-stop brilliant radiant aura: circle at (charCx, charCy - 2)
+  const radR = Math.max(w, h) * 0.96;
+  const radGrad = ctx.createRadialGradient(charCx, charCy - 2, 2, charCx, charCy - 2, radR);
+  radGrad.addColorStop(0, theme.glowHot || 'rgba(255, 255, 255, 1.0)'); // Specular hot core
+  radGrad.addColorStop(0.22, theme.glowCenter || 'rgba(56, 189, 248, 0.95)'); // Saturated primary color
+  radGrad.addColorStop(0.50, theme.glowMid || 'rgba(30, 41, 59, 0.82)'); // Luminous mid tone
+  radGrad.addColorStop(0.76, theme.glowRim || 'rgba(15, 23, 42, 0.58)'); // Vibrant outer zone
+  radGrad.addColorStop(1, theme.glowOuter || theme.bgDark || '#141B28'); // Deep colorful rim at perimeter
   ctx.fillStyle = radGrad;
   ctx.fillRect(x, y, w, h);
 
-  // Subtle industrial blueprint dot grid
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.025)';
-  const step = 14;
-  for (let py = y + 4; py < y + h; py += step) {
-    for (let px = x + 4; px < x + w; px += step) {
-      ctx.fillRect(px, py, 1.2, 1.2);
-    }
-  }
+  // Comic Halftone Texture: Action Flare Rays + Staggered Ben Day Dots
+  _drawComicHalftoneTexture(ctx, x, y, w, h, theme);
+
+  // Diagonal Metallic Specular Luster (The Sheen Sweep)
+  const sheenGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+  sheenGrad.addColorStop(0, theme.sheenTint || 'rgba(255, 255, 255, 0.10)');
+  sheenGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.28)'); // Brilliant diagonal glint
+  sheenGrad.addColorStop(0.48, theme.sheenAccent || 'rgba(255, 255, 255, 0.20)');
+  sheenGrad.addColorStop(1, 'rgba(255, 255, 255, 0.04)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(x, y, w, h);
 }
 
 /**
- * Draws the fighter's name directly as clean italic bold comic typography (zero container card/box).
+ * Draws the fighter's name directly as clean italic bold comic typography in the BOTTOM CENTER of the card.
  */
 function _drawHudTopCardNameText(ctx, cardX, cardY, cardW, cardH, name) {
   ctx.save();
-  const textX = cardX + 10;
-  const textY = cardY + 10;
-  const maxW = cardW - 52; // keep clearance from the top-right winged grade banner
+  const textX = Math.round(cardX + cardW * 0.50);
+  const textY = Math.round(cardY + cardH - 8);
+  const maxW = cardW - 16; // full width clearance from card borders
 
   ctx.font = '900 italic 13px "Outfit", "Impact", "Rajdhani", sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
 
   const fittedName = fitSingleLineText(ctx, name, maxW);
 
-  // Heavy black manga ink stroke & drop shadow (matching SPIKE in Top HUD)
+  // Heavy black manga ink stroke & drop shadow (matching comic title typography)
   ctx.strokeStyle = '#050609';
-  ctx.lineWidth = 3.2;
+  ctx.lineWidth = 3.4;
+  ctx.lineJoin = 'round';
   ctx.strokeText(fittedName, textX, textY);
 
   ctx.fillStyle = '#050609';
-  ctx.fillText(fittedName, textX + 1.2, textY + 1.5);
+  ctx.fillText(fittedName, textX + 1.0, textY + 1.2);
 
   // Crisp white text fill
   ctx.fillStyle = '#FFFFFF';
@@ -1562,13 +1996,25 @@ export function drawCollectorFighterCard(ctx, def, idx, x, y, w, h, isSelected, 
   const grade = def?.grade || 'B';
   const theme = getZeusGradeCardTheme(grade);
   const fighterColor = def?.themeColor || def?.color || theme.primary;
+  const isSSR = grade === 'SSR';
+  const isSS = grade === 'SS';
 
   ctx.save();
 
   // 1. HUD Top Style Solid Hard Cell Drop Shadow (2.5px 3.5px 0px #050609 + ambient shadow)
   const shadowX = x + (isSelected ? 3.0 : 2.0);
   const shadowY = y + (isSelected ? 4.0 : 2.8);
-  ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.45)' : 'rgba(5, 6, 9, 0.75)';
+  if (isSSR) {
+    // For SSR fade-out card: drop shadow matches the bottom-to-middle fade so the top stays clean and transparent
+    const shadowGrad = ctx.createLinearGradient(shadowX, shadowY + h, shadowX, shadowY);
+    shadowGrad.addColorStop(0.00, 'rgba(5, 6, 9, 0.75)');
+    shadowGrad.addColorStop(0.35, 'rgba(5, 6, 9, 0.45)');
+    shadowGrad.addColorStop(0.50, 'rgba(5, 6, 9, 0.00)');
+    shadowGrad.addColorStop(1.00, 'rgba(5, 6, 9, 0.00)');
+    ctx.fillStyle = shadowGrad;
+  } else {
+    ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.45)' : 'rgba(5, 6, 9, 0.75)';
+  }
   _traceCollectorCardPath(ctx, shadowX, shadowY, w, h, 6);
   ctx.fill();
 
@@ -1578,7 +2024,7 @@ export function drawCollectorFighterCard(ctx, def, idx, x, y, w, h, isSelected, 
   ctx.clip();
 
   const charCx = Math.round(x + w * 0.50);
-  const charCy = Math.round(y + h * 0.52);
+  const charCy = Math.round(y + h * 0.46);
 
   // A. HUD Top Frame Dark Carbon Background with Radiant Center Glow
   _drawHudTopCardInterior(ctx, x, y, w, h, charCx, charCy, theme, fighterColor);
@@ -1610,12 +2056,22 @@ export function drawCollectorFighterCard(ctx, def, idx, x, y, w, h, isSelected, 
     ctx.stroke();
   }
 
-  // D. Floating Fighter Name (Clean bold italic text, zero container card)
+  // D. SSR / SS Card Stage Visual Effects (Ember Slivers, Floating Cinder Motes & Star Glints)
+  if (isSSR) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const t = now * 0.001 + (idx * 0.73);
+    _drawSSRCardStageEffects(ctx, x, y, w, h, charCx, charCy, t);
+  } else if (isSS) {
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const t = now * 0.001 + (idx * 0.73);
+    _drawSSCardStageEffects(ctx, x, y, w, h, charCx, charCy, t);
+  }
+
+  // E. Floating Fighter Name in Bottom Center
   const rawLabel = String(def?.name || def?.type || 'FIGHTER');
   let displayName = rawLabel.includes(' - ') ? rawLabel.split(' - ')[0] : rawLabel;
   displayName = displayName.toUpperCase();
   _drawHudTopCardNameText(ctx, x, y, w, h, displayName);
-
 
   ctx.restore(); // Restore clip so borders, grade seal and corner badge pop out!
 
@@ -1627,8 +2083,51 @@ export function drawCollectorFighterCard(ctx, def, idx, x, y, w, h, isSelected, 
   ctx.stroke();
 
   // Inner Beveled White/Highlight Outline (The Signature HUD Top Inset Stroke: inset 0 0 0 2px #FFFFFF)
-  _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
-  if (grade === 'S') {
+  if (isSSR) {
+    // Vibrant Animated Flowing Golden Rainbow Gradient Border for SSR-Grade
+    // Grounded in radiant 24k Solar Gold with an iridescent spectrum cycle
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const rainbowAngle = (now * 0.0022) + (idx * 0.65);
+    const rCos = Math.cos(rainbowAngle);
+    const rSin = Math.sin(rainbowAngle);
+    const rDiag = Math.hypot(w, h) * 0.58;
+    const goldenRainbow = ctx.createLinearGradient(
+      charCx - rCos * rDiag, charCy - rSin * rDiag,
+      charCx + rCos * rDiag, charCy + rSin * rDiag
+    );
+    goldenRainbow.addColorStop(0.00, '#FFD700'); // Radiant 24K Solar Gold
+    goldenRainbow.addColorStop(0.12, '#FFA000'); // Luminous Gold-Amber
+    goldenRainbow.addColorStop(0.25, '#FF2E74'); // Vivid Rose Ruby
+    goldenRainbow.addColorStop(0.38, '#B038FF'); // Celestial Amethyst Violet
+    goldenRainbow.addColorStop(0.50, '#00E5FF'); // Bright Aurora Cyan
+    goldenRainbow.addColorStop(0.62, '#00FF88'); // Electric Mint Emerald
+    goldenRainbow.addColorStop(0.75, '#FFE600'); // Solar Gold Yellow
+    goldenRainbow.addColorStop(0.88, '#FFFFFF'); // Specular Incandescent Diamond White-Gold
+    goldenRainbow.addColorStop(1.00, '#FFD700'); // Wrap back to Radiant Solar Gold
+
+    // Soft glowing iridescent corona pass (Rule 2.2 compliant: 0 shadowBlur)
+    ctx.save();
+    ctx.globalAlpha = 0.45;
+    ctx.strokeStyle = goldenRainbow;
+    ctx.lineWidth = isSelected ? 5.2 : 4.2;
+    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+    ctx.stroke();
+    ctx.restore();
+
+    // Crisp Core Golden Rainbow Border
+    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+    ctx.strokeStyle = goldenRainbow;
+    ctx.lineWidth = isSelected ? 3.2 : 2.5;
+    ctx.stroke();
+
+    // Corner Diamond Sparkles along the golden rainbow border
+    const cornerGlintAlpha = Math.sin(now * 0.003 + idx) * 0.5 + 0.5;
+    if (cornerGlintAlpha > 0.3) {
+      _drawRotatedComicSparkle(ctx, x + 5, y + 5, 3.8 * cornerGlintAlpha, now * 0.002, '#FFFFFF', '#FFFFFF');
+      _drawRotatedComicSparkle(ctx, x + w - 5, y + h - 5, 3.8 * cornerGlintAlpha, -now * 0.002, '#00E5FF', '#FFFFFF');
+    }
+  } else if (grade === 'S') {
+    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
     const goldBevel = ctx.createLinearGradient(x, y, x + w, y + h);
     goldBevel.addColorStop(0, '#FFFDE7');
     goldBevel.addColorStop(0.30, '#FFD700');
@@ -1636,18 +2135,46 @@ export function drawCollectorFighterCard(ctx, def, idx, x, y, w, h, isSelected, 
     goldBevel.addColorStop(1, '#FFF59D');
     ctx.strokeStyle = isSelected ? '#FFFFFF' : goldBevel;
     ctx.lineWidth = isSelected ? 2.5 : 2.0;
-  } else if (grade === 'SS') {
-    const redBevel = ctx.createLinearGradient(x, y, x + w, y + h);
-    redBevel.addColorStop(0, '#FFE4E6');
-    redBevel.addColorStop(0.40, '#F43F5E');
-    redBevel.addColorStop(1, '#FDA4AF');
-    ctx.strokeStyle = isSelected ? '#FFFFFF' : redBevel;
-    ctx.lineWidth = isSelected ? 2.5 : 2.0;
+    ctx.stroke();
+  } else if (isSS) {
+    // Vibrant Animated Flowing Rainbow Gradient Border for SS-Grade
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const rainbowAngle = (now * 0.0022) + (idx * 0.65);
+    const rCos = Math.cos(rainbowAngle);
+    const rSin = Math.sin(rainbowAngle);
+    const rDiag = Math.hypot(w, h) * 0.55;
+    const rainbowBevel = ctx.createLinearGradient(
+      charCx - rCos * rDiag, charCy - rSin * rDiag,
+      charCx + rCos * rDiag, charCy + rSin * rDiag
+    );
+    rainbowBevel.addColorStop(0.00, '#FF2E74'); // Vivid Magenta-Rose
+    rainbowBevel.addColorStop(0.18, '#FF8A00'); // Radiant Neon Orange
+    rainbowBevel.addColorStop(0.36, '#FFEA00'); // Solar Gold Yellow
+    rainbowBevel.addColorStop(0.52, '#00FF9D'); // Electric Emerald Green
+    rainbowBevel.addColorStop(0.70, '#00D8FF'); // Bright Aqua/Cyan
+    rainbowBevel.addColorStop(0.86, '#B038FF'); // Neon Purple/Violet
+    rainbowBevel.addColorStop(1.00, '#FF2E74'); // Wrap back to Magenta-Rose
+
+    // Soft neon rim along the border path (Rule 11 compliant: 0 shadowBlur)
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = rainbowBevel;
+    ctx.lineWidth = isSelected ? 4.6 : 3.8;
+    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+    ctx.stroke();
+    ctx.restore();
+
+    // Crisp core rainbow border
+    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+    ctx.strokeStyle = rainbowBevel;
+    ctx.lineWidth = isSelected ? 3.0 : 2.4;
+    ctx.stroke();
   } else {
+    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
     ctx.strokeStyle = isSelected ? '#FFD700' : 'rgba(255, 255, 255, 0.92)';
     ctx.lineWidth = isSelected ? 2.2 : 1.8;
+    ctx.stroke();
   }
-  ctx.stroke();
 
   // 4. Top-Right Winged Comic Grade Seal with Special Effects
   const sealCx = x + w - 24;

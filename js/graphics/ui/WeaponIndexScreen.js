@@ -1916,7 +1916,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
   else if (type === 'cronos') offsetX = -55;
   else if (type === 'ruby') offsetX = -75;
-  else if (type === 'toji' || type === 'denji' || type === 'power' || type === 'tanjiro' || type === 'zenitsu' || type === 'inosuke' || type === 'reze' || type === 'crazydave' || type === 'crazy_dave' || type === 'guts') offsetX = -40;
+  else if (type === 'toji' || type === 'denji' || type === 'power' || type === 'tanjiro' || type === 'zenitsu' || type === 'inosuke' || type === 'reze' || type === 'crazydave' || type === 'crazy_dave' || type === 'guts' || type === 'escanor') offsetX = -40;
   else if (type === 'nezuko') offsetX = -35;
   else if (type === 'yuta') offsetX = -40;
   else if (type === 'megumi') offsetX = -45;
@@ -2304,7 +2304,11 @@ function drawWeaponPreview(ctx, type, color) {
         return;
 
       case 'escanor':
-        drawDivineAxeRhitta(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        drawDivineAxeRhitta(ctx, 0, 0, gunAngle, r, {
+          isPreview: state.gameState !== 'weaponStudio',
+          isStudio: state.gameState === 'weaponStudio',
+          showHands: true
+        });
         return;
 
       case 'reze':

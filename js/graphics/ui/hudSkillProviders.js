@@ -144,19 +144,23 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
     // 2. Nameless Destroyer (Ultimate Super-Beam)
     if (isSkillEnabled(cfg.enableNamelessDestroyer, true)) {
-      const beamMax = cfg.destroyerCooldown || 2000;
+      const beamMax = cfg.destroyerCooldown || 1500;
       const beamTimer = f.destroyerCooldown !== undefined ? f.destroyerCooldown : 0;
       let beamPct = 0;
       let beamReady = false;
 
-      if ((f.destroyerWindupTimer || 0) > 0) {
+      if (f.isRebouncingToCenter || (f.destroyerWindupTimer || 0) > 0) {
         const windupMax = f.destroyerWindupMax || cfg.destroyerWindupFrames || 393;
-        beamPct = Math.max(0, Math.min(100, ((windupMax - f.destroyerWindupTimer) / windupMax) * 100));
+        const curWindup = f.destroyerWindupTimer || 0;
+        beamPct = Math.max(0, Math.min(100, ((windupMax - curWindup) / windupMax) * 100));
         beamReady = true;
       } else if ((f.destroyerFireTimer || 0) > 0) {
-        const fireMax = f.destroyerFireFrames || cfg.destroyerFireFrames || 800;
+        const fireMax = f.destroyerFireFrames || cfg.destroyerFireFrames || 400;
         beamPct = Math.max(0, Math.min(100, (f.destroyerFireTimer / fireMax) * 100));
         beamReady = true;
+      } else if ((f.destroyerRecoveryTimer || 0) > 0) {
+        beamPct = 0;
+        beamReady = false;
       } else {
         beamPct = Math.max(0, Math.min(100, (1 - (beamTimer / beamMax)) * 100));
         beamReady = (beamPct >= 99 && beamTimer <= 0);
@@ -2722,6 +2726,98 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skills;
   }
 
+  // ─────────────────────────────────────────────
+  // EYE OF CTHULHU (Ancient Ocular Horror)
+  // ─────────────────────────────────────────────
+  if (f.characterId === 'eye_of_cthulhu' || f.type === 'eye_of_cthulhu' || (f.name && f.name.toLowerCase().includes('cthulhu'))) {
+    const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.eye_of_cthulhu || CONFIG.eyeOfCthulhu)) ? (CONFIG.eye_of_cthulhu || CONFIG.eyeOfCthulhu) : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#E11D48';
+    const skills = [];
+
+    // 1. Signature Skill: Servants of Cthulhu Summons (Phase 1)
+    if (isSkillEnabled(cfg.enableServantSummons, cfg.enableServants, true)) {
+      if (!f.isPhase2 && !f.isTransforming) {
+        const spawnInterval = cfg.servantSpawnIntervalInHover || 140;
+        const spawnTimer = f.servantSpawnTimer !== undefined ? f.servantSpawnTimer : 0;
+        const spawnPct = Math.max(0, Math.min(100, (1 - (spawnTimer / spawnInterval)) * 100));
+        const activeServants = (typeof state !== 'undefined' && state.illusions)
+          ? state.illusions.filter(ill => ill && ill.isServantOfCthulhu && ill.owner === f && ill.hp > 0).length
+          : 0;
+        const maxActive = cfg.servantMaxActive || 4;
+        const isReady = (spawnPct >= 99 || activeServants < maxActive) && spawnTimer <= 0;
+
+        skills.push({
+          id: 'servants_of_cthulhu',
+          pct: spawnPct,
+          ready: isReady,
+          color: themeColor,
+          label: activeServants > 0 ? `SERVANTS OF CTHULHU (${activeServants}/${maxActive})` : 'SERVANTS OF CTHULHU',
+          isSignature: true,
+          signature: true,
+          icon: '👁️'
+        });
+      }
+    }
+
+    // 2. Triple Ram Charge (Phase 1)
+    if (!f.isPhase2 && !f.isTransforming) {
+      if (isSkillEnabled(cfg.enableRam, true)) {
+        const hoverMax = cfg.hoverDurationFrames || 260;
+        const isRamming = Boolean(f.isRamming || f.isWindupTelegraph || f.aiState === 'RAM_DASH' || f.aiState === 'WINDUP_RAM' || f.aiState === 'TURNAROUND');
+        let ramPct = 100;
+        if (f.aiState === 'HOVER') {
+          const rem = f.stateTimer !== undefined ? f.stateTimer : 0;
+          ramPct = Math.max(0, Math.min(100, (1 - (rem / hoverMax)) * 100));
+        } else if (isRamming) {
+          ramPct = 100;
+        }
+        const ramReady = ramPct >= 99 || isRamming;
+        const ramsLeft = f.ramsRemaining || 0;
+        const ramLabel = isRamming ? `TRIPLE RAM (${ramsLeft > 0 ? ramsLeft : 1}/3)` : 'TRIPLE RAM';
+
+        skills.push({
+          id: 'triple_ram',
+          pct: ramPct,
+          ready: ramReady,
+          color: '#F43F5E',
+          label: ramLabel
+        });
+      }
+    }
+
+    // 3. Phase 2: Berserk Chain Dash & Crimson Roar
+    if (f.isPhase2 || f.hasTransformed) {
+      if (isSkillEnabled(cfg.enableChainDash, true)) {
+        const dashMax = cfg.chainDashCooldown || 480;
+        const dashTimer = f.p2ChainDashCooldown !== undefined ? f.p2ChainDashCooldown : 0;
+        const dashPct = Math.max(0, Math.min(100, (1 - (dashTimer / dashMax)) * 100));
+        skills.push({
+          id: 'chain_dash',
+          pct: dashPct,
+          ready: dashPct >= 99 && dashTimer <= 0,
+          color: '#FB7185',
+          label: 'BERSERK RAM',
+          isSignature: true,
+          signature: true
+        });
+      }
+      if (isSkillEnabled(cfg.enableRoar, true)) {
+        const roarMax = cfg.roarCooldown || 840;
+        const roarTimer = f.p2RoarCooldown !== undefined ? f.p2RoarCooldown : 0;
+        const roarPct = Math.max(0, Math.min(100, (1 - (roarTimer / roarMax)) * 100));
+        skills.push({
+          id: 'crimson_roar',
+          pct: roarPct,
+          ready: roarPct >= 99 && roarTimer <= 0,
+          color: themeColor,
+          label: 'CRIMSON ROAR'
+        });
+      }
+    }
+
+    if (skills.length > 0) return skills;
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
     return [];
   }
@@ -2762,12 +2858,18 @@ export function getSkillDataForFighter(f, getProjectiles) {
  */
 export function isSkillExceptionInDarkMode(fighter, skill) {
   if (!fighter || !skill) return false;
-  if (skill.isSignature || skill.isUltimate || skill.isDomain || skill.signature) {
-    return true;
-  }
   const fId = String(fighter.characterId || fighter.type || (fighter._def && fighter._def.type) || '').toLowerCase();
   const sId = String(skill.id || '').toLowerCase();
   const sLabel = String(skill.label || '').toUpperCase();
+
+  // Explicit suppression: Eye of Cthulhu Phase 2 Crimson Roar is a secondary special, hidden when Signature Skills Only is enabled
+  if ((fId === 'eye_of_cthulhu' || fId === 'eyeofcthulhu') && (sId === 'crimson_roar' || sLabel.includes('CRIMSON ROAR') || sId.includes('roar'))) {
+    return false;
+  }
+
+  if (skill.isSignature || skill.isUltimate || skill.isDomain || skill.signature) {
+    return true;
+  }
 
   // Specific character signature skill mapping
   const signatureMap = {
@@ -2810,7 +2912,9 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction'],
     spartan: ['javelin_throw', 'javelin', 'JAVELIN'],
     guts: ['berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
-    choso: ['laser_matrix', 'laser', 'matrix', 'laser matrix', 'CRIMSON LASER MATRIX', 'piercing_blood', 'PIERCING BLOOD']
+    choso: ['laser_matrix', 'laser', 'matrix', 'laser matrix', 'CRIMSON LASER MATRIX', 'piercing_blood', 'PIERCING BLOOD'],
+    eye_of_cthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM'],
+    eyeofcthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM']
   };
 
   const keys = signatureMap[fId];

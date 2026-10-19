@@ -20,6 +20,7 @@ import { ParticleSystem } from '../systems/particles/ParticleSystem.js';
 import { clearAllPools } from '../graphics/objectPool.js';
 import { clearHealthHud } from '../graphics/hudManager.js';
 import { clearHudShatters } from '../graphics/particles/hudShatterEffect.js';
+import { resetBlownDecorations } from '../systems/arenaDecorationSystem.js';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 import { clearDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { clearDriveBys } from '../systems/cjDriveBySystem.js';
@@ -242,6 +243,7 @@ export function reinitFighters(isNewMatch = false) {
   if (state.bloodEffects) state.bloodEffects.length = 0;
   if (state.sparkEffects) state.sparkEffects.length = 0;
   if (state.deathEffects) state.deathEffects.length = 0;
+  if (state.tombstoneDeathEffects) state.tombstoneDeathEffects.length = 0;
   if (state.illusionDeathEffects) state.illusionDeathEffects.length = 0;
   if (state.doppelgangerDeathEffects) state.doppelgangerDeathEffects.length = 0;
   if (state.illusionSpawnEffects) state.illusionSpawnEffects.length = 0;
@@ -251,6 +253,7 @@ export function reinitFighters(isNewMatch = false) {
   if (state.wallCracks) state.wallCracks.length = 0;
   if (state.shatteredWalls) state.shatteredWalls.length = 0;
   clearHudShatters();
+  resetBlownDecorations();
   if (state.thermobaricExplosions) state.thermobaricExplosions.length = 0;
   if (state.purpleExplosions) state.purpleExplosions.length = 0;
   if (state.soulSwapBeams) state.soulSwapBeams.length = 0;
@@ -1231,6 +1234,7 @@ export function startNextRound() {
   state.wallCracks = []; // Clear all wall crack decals on new round
   state.shatteredWalls = []; // Clear all shattered wall breaches on new round
   clearHudShatters();
+  resetBlownDecorations();
   if (state.announcerSoundHandle) {
     stopSound(state.announcerSoundHandle);
     state.announcerSoundHandle = null;
@@ -1273,6 +1277,7 @@ export function restartCurrentRound() {
   state.wallCracks = []; // Clear all wall crack decals
   state.shatteredWalls = []; // Clear all shattered wall breaches
   clearHudShatters();
+  resetBlownDecorations();
   if (state.announcerSoundHandle) {
     stopSound(state.announcerSoundHandle);
     state.announcerSoundHandle = null;
@@ -1400,6 +1405,7 @@ export function resetMatch(showFaceOff = true) {
   state.wallCracks = []; // Clear all wall crack decals on match reset
   state.shatteredWalls = []; // Clear all shattered wall breaches on match reset
   clearHudShatters();
+  resetBlownDecorations();
   state.matchKills = [[], [], [], []];
 
   if (state.announcerSoundHandle) {
@@ -1466,6 +1472,7 @@ export function goToTitle() {
   state.wallCracks = []; // Clear all wall crack decals on return to title
   state.shatteredWalls = []; // Clear all shattered wall breaches on return to title
   clearHudShatters();
+  resetBlownDecorations();
   clearHealthHud(); // Flush DOM and Map cache cleanly
   clearDroppedMagazines(); // Clear all John Wick debris
   clearDriveBys();

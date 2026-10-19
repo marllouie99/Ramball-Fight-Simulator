@@ -73,6 +73,7 @@ export class DenjiFighter extends Fighter {
     this.lastShredAudioTime = 0;
     this._multiBladeIndicatorTimer = 0;
     this.continuousShredTimer = 0;
+    this.consecutiveShredTicks = 0;
     this.chainsawSmokeParticles = [];
 
     // Passive 1: Pochita Heart Revive
@@ -297,6 +298,7 @@ export class DenjiFighter extends Fighter {
     }
     if (!this.isShredding) {
       this.shredCount = 0;
+      this.consecutiveShredTicks = 0;
     }
 
     // Temporary speed boost decay & afterimages after Skill 1 breather
@@ -525,6 +527,7 @@ export class DenjiFighter extends Fighter {
       this._shredSustainTimer = 0;
       this._shredAudioPlayTimer = 0;
       this.shredBladeCount = 0;
+      this.consecutiveShredTicks = 0;
       return;
     }
 
@@ -551,6 +554,7 @@ export class DenjiFighter extends Fighter {
         }
         this.isShredding = false;
         this.shredBladeCount = 0;
+        this.consecutiveShredTicks = 0;
         if (this._wasShredding) {
           this._wasShredding = false;
         }
@@ -678,6 +682,14 @@ export class DenjiFighter extends Fighter {
         this.shredTickTimer = shredInterval;
         this.shredShakeTimer = Math.max(2, Math.min(4, shredInterval));
         this.shredShakeIntensity = 2.0;
+        this.consecutiveShredTicks = (this.consecutiveShredTicks || 0) + 1;
+
+        // Continuous Shred Ramping Engine (Damage & Lifesteal Scaling Per Tick)
+        const enableShredRamp = this.isSkillEnabled(cfg.enableShredRamp, true);
+        const maxRampTicks = cfg.maxShredRampTicks ?? 10;
+        const rampTick = enableShredRamp ? Math.min(maxRampTicks, Math.max(0, this.consecutiveShredTicks - 1)) : 0;
+        const rampDamageBonus = (cfg.shredDamageIncreasePerTick ?? 1) * rampTick;
+        const rampLifestealBonus = (cfg.shredLifestealIncreasePerTick ?? 0.02) * rampTick;
 
         let maxBladesInFrame = 1;
 
@@ -685,6 +697,7 @@ export class DenjiFighter extends Fighter {
           if (bladeCount > maxBladesInFrame) {
             maxBladesInFrame = bladeCount;
           }
+          t.denjiConsecutiveShredTicks = this.consecutiveShredTicks;
 
           // 1. Calculate Multi-Blade Scaled Parameters
           let damageMultiplier = 1.0;
@@ -710,8 +723,9 @@ export class DenjiFighter extends Fighter {
             sparkCount = 10;
           }
 
-          // 2. Deal scaled shred damage (marked as skill to prevent generic basic attack timeStop interruptions)
-          const finalDamage = Math.max(1, Math.round(baseDamage * damageMultiplier));
+          // 2. Deal scaled shred damage with per-tick ramp and multi-blade multipliers
+          const rampedBaseDamage = baseDamage + rampDamageBonus;
+          const finalDamage = Math.max(1, Math.round(rampedBaseDamage * damageMultiplier));
           const targetPrevHp = typeof t.hp === 'number' ? t.hp : 0;
           const damageResult = applyDamageToTarget(t, finalDamage, this, { isSkill: true, isContinuousShred: true });
           const targetActualDamage = Math.max(0, targetPrevHp - (typeof t.hp === 'number' ? t.hp : 0));
@@ -728,21 +742,22 @@ export class DenjiFighter extends Fighter {
 
           // 5. Spawn Blood Splatters & Chainsaw Sparks at all contacting blade points
           const bloodAngle = Math.atan2(t.y - this.y, t.x - this.x);
+          const rampSparks = Math.min(4, Math.floor(rampTick * 0.4));
           for (let seg of blades) {
             const contactX = (t.x + (seg.startX + seg.endX) * 0.5) * 0.5;
             const contactY = (t.y + (seg.startY + seg.endY) * 0.5) * 0.5;
             if (didDamage) {
               spawnBloodEffect(contactX, contactY, bloodAngle);
             }
-            spawnSparks(contactX, contactY, bladeCount >= 3 ? '#EF4444' : (bladeCount === 2 ? '#F59E0B' : '#F97316'), Math.ceil(sparkCount / blades.length));
+            spawnSparks(contactX, contactY, bladeCount >= 3 ? '#EF4444' : (bladeCount === 2 ? '#F59E0B' : '#F97316'), Math.ceil((sparkCount + rampSparks) / blades.length));
           }
 
-          // 6. Blood Siphon Lifesteal (Passive 2 with Multi-Blade bonus)
+          // 6. Blood Siphon Lifesteal (Passive 2 with Multi-Blade and Per-Tick Ramp bonuses)
           // Strictly only siphons when damage was actually dealt to an enemy
           if (didDamage && this.isSkillEnabled(cfg.enableBloodSiphon, true)) {
             const damageForHeal = targetActualDamage > 0 ? targetActualDamage : finalDamage;
             const baseRatio = t.isBleeding ? (cfg.bleedingTargetLifestealRatio || 0.35) : (cfg.lifestealRatio || 0.25);
-            const lifestealRatio = baseRatio * lifestealBonus;
+            const lifestealRatio = (baseRatio + rampLifestealBonus) * lifestealBonus;
             const heal = Math.max(1, Math.round(damageForHeal * lifestealRatio));
             const prevHp = this.hp;
             this.hp = Math.min(this.maxHp, this.hp + heal);
@@ -808,13 +823,14 @@ export class DenjiFighter extends Fighter {
           this._multiBladeIndicatorTimer--;
         }
 
-        // 9. Arena shake and character shake scaled dynamically to max blades colliding
+        // 9. Arena shake and character shake scaled dynamically to max blades colliding and continuous ramp
         const baseArenaShake = cfg.shredArenaShakeIntensity || 4.0;
         const arenaShakeDuration = cfg.shredArenaShakeDuration || Math.max(3, shredInterval);
         const bladeMultiplier = maxBladesInFrame >= 3 ? 1.6 : (maxBladesInFrame === 2 ? 1.25 : 1.0);
-        const finalArenaShake = baseArenaShake * bladeMultiplier;
+        const rampShakeMultiplier = 1 + Math.min(0.5, rampTick * 0.05);
+        const finalArenaShake = baseArenaShake * bladeMultiplier * rampShakeMultiplier;
 
-        this.shredShakeIntensity = maxBladesInFrame >= 3 ? 3.5 : (maxBladesInFrame === 2 ? 2.5 : 1.8);
+        this.shredShakeIntensity = (maxBladesInFrame >= 3 ? 3.5 : (maxBladesInFrame === 2 ? 2.5 : 1.8)) * rampShakeMultiplier;
         triggerGlobalScreenShake(finalArenaShake, arenaShakeDuration);
       }
     } else {
@@ -831,6 +847,7 @@ export class DenjiFighter extends Fighter {
         }
         this.isShredding = false;
         this.shredBladeCount = 0;
+        this.consecutiveShredTicks = 0;
         if (this._wasShredding) {
           this._wasShredding = false;
         }
@@ -986,17 +1003,22 @@ export class DenjiFighter extends Fighter {
     // Continuous chainsaw shredding active during dash movement as well
     this._updateChainsawShredCollision(this.lungeTarget);
 
-    // Spawn ghost model afterimage snapshot (Chainsaw Devil form with 3 chainsaws attached)
+    // Spawn ghost model afterimage snapshot every 2 frames with capped buffer
     if (!this.afterImages) this.afterImages = [];
-    this.afterImages.push({
-      x: this.x,
-      y: this.y,
-      r: this.r || 25,
-      angle: this.gunAngle || this.angle || 0,
-      gunAngle: this.gunAngle || this.angle || 0,
-      timer: 16,
-      maxTimer: 16
-    });
+    if (this.lungeTimer % 2 === 0) {
+      while (this.afterImages.length >= 8) {
+        this.afterImages.shift();
+      }
+      this.afterImages.push({
+        x: this.x,
+        y: this.y,
+        r: this.r || 25,
+        angle: this.gunAngle || this.angle || 0,
+        gunAngle: this.gunAngle || this.angle || 0,
+        timer: 14,
+        maxTimer: 14
+      });
+    }
 
     const damage = cfg.lungeDamage || 38;
     const stunDuration = cfg.lungeStunDuration || cfg.lungeWallStunFrames || 24;
@@ -1037,7 +1059,12 @@ export class DenjiFighter extends Fighter {
         }
       }
 
-      applyDamageToTarget(hitTarget, damage, this, { isSkill: true });
+      const damageResult = applyDamageToTarget(hitTarget, damage, this, { isSkill: true });
+
+      // If damage was negated or target successfully dodged (teleported away), whiff past without grabbing or stunning them:
+      if (damageResult === false || (hitTarget.dodgeCooldown && hitTarget.dodgeCooldown > 0 && Math.hypot(hitTarget.x - this.x, hitTarget.y - this.y) > (this.r || 25) + (hitTarget.r || 20) + 15)) {
+        return;
+      }
 
       // Apply Hard Stun / Paralyze mechanic to immobilize the victim while Denji shreds them!
       if (typeof hitTarget.applyParalyze === 'function') {
@@ -1436,6 +1463,7 @@ export class DenjiFighter extends Fighter {
     this._wasShredding = false;
     this.shredCount = 0;
     this.continuousShredTimer = 0;
+    this.consecutiveShredTicks = 0;
     if (this.chainsawSmokeParticles) this.chainsawSmokeParticles.length = 0;
     super.onDeath();
   }
@@ -1451,6 +1479,7 @@ export class DenjiFighter extends Fighter {
     this._shredAudioPlayTimer = 0;
     this._lastEngineIdlePlayTime = 0;
     this.continuousShredTimer = 0;
+    this.consecutiveShredTicks = 0;
     if (this.chainsawSmokeParticles) this.chainsawSmokeParticles.length = 0;
     this.reviveStocks = this.reviveStocksMax || 1;
     this.isHybridModeActive = true;
@@ -1479,6 +1508,7 @@ export class DenjiFighter extends Fighter {
       this._shredAudioPlayTimer = 0;
       this._wasShredding = false;
       this.continuousShredTimer = 0;
+      this.consecutiveShredTicks = 0;
       if (this.chainsawSmokeParticles) this.chainsawSmokeParticles.length = 0;
     }
   }

@@ -223,6 +223,15 @@ export const CONFIG = {
   hudSkillBarsMode: 'all',      // 'all' = show all skill bars, 'signature' = signature only, 'none' = completely hide all skill bars
   hudGhostBarEnabled: true,      // Master toggle for fighting-game trailing damage ghost bar on healthbars
   hudGhostBarHoldFrames: 8,      // Responsive delay in frames (~133ms) before trailing ghost bar begins catch-up decay
+  arenaDecorations: {
+    enabled: true,               // Master toggle: set to false to completely disable all seasonal decorations when event ends
+    theme: 'halloween',          // Active event theme: 'halloween' | 'none'
+    opacity: 1.0,               // Visual opacity (0.0 to 1.0)
+    scaleMultiplier: 1.0,       // Custom scale factor
+    swayAnimation: true,         // Subtle atmospheric swaying on hanging spider silk
+    candleFlicker: true,         // Dynamic flickering flame & warm halo on bone candles
+    enableGravestoneDeath: true, // Gravestone pop & ascending ghost soul when fighters die
+  },
   hudGhostBarDecaySpeed: 3.5,    // Fast linear decay rate (% per frame) for ghost bar catch-up
   hudGhostBarColor: '#dc2626',   // Trailing damage ghost bar color (fighting game red)
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)

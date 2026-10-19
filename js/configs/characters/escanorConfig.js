@@ -17,7 +17,7 @@ export const escanorConfig = {
 
   name: 'Escanor',
   displayName: 'Escanor',
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Lion Sin of Pride',
   title: 'Lion Sin of Pride',
 

@@ -22,6 +22,7 @@ import { spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
 import { drawArenaFloorSelector, isArenaFloorModalOpen, drawArenaFloorModal, closeArenaFloorModal } from '../../systems/arenaTileSystem.js';
+import { drawArenaDecorationSelector } from '../../systems/arenaDecorationSystem.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
 import { drawGradeBadge } from '../../configs/gradeConfig.js';
@@ -1548,14 +1549,15 @@ function drawSelectScreen() {
   ctx.fillText(`[ ${rawTitle} // DEPLOYMENT ]`, canvas.width / 2, titleY - 1);
   ctx.restore();
 
-  // Sub-Controls (Boss Battle Team Toggle, Arena BGM & Arena Floor Selector)
+  // Sub-Controls (Boss Battle Team Toggle, Arena BGM, Arena Floor & Arena Decoration)
   const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
-  const teamToggleW = isBossBattleMode ? 135 : 0;
-  const bgmW = 115;
-  const floorW = 115;
+  const teamToggleW = isBossBattleMode ? 120 : 0;
+  const bgmW = isBossBattleMode ? 96 : 110;
+  const floorW = isBossBattleMode ? 96 : 110;
+  const decoW = isBossBattleMode ? 96 : 110;
   const ctrlH = 24;
-  const gap = 8;
-  const totalCtrlW = (isBossBattleMode ? teamToggleW + gap : 0) + bgmW + gap + floorW;
+  const gap = isBossBattleMode ? 6 : 8;
+  const totalCtrlW = (isBossBattleMode ? teamToggleW + gap : 0) + bgmW + gap + floorW + gap + decoW;
   const startCtrlX = canvas.width / 2 - totalCtrlW / 2;
   
   let curCtrlX = startCtrlX;
@@ -1598,6 +1600,10 @@ function drawSelectScreen() {
 
   // Arena Floor / Tiles Selector Button
   drawArenaFloorSelector(ctx, curCtrlX, tmY, floorW, ctrlH);
+  curCtrlX += floorW + gap;
+
+  // Arena Decoration / Seasonal Event Toggle Button
+  drawArenaDecorationSelector(ctx, curCtrlX, tmY, decoW, ctrlH);
 
   // ── Main Combatant Grid ──
   const topY = isLandscape ? 88 : 132;

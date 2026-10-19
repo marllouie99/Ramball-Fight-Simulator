@@ -948,6 +948,101 @@ function _drawPixelForearmChainsaw(ctx, cx, cy, angle, handRadius, now, isFront,
  * Each ghost model renders Denji's full Chainsaw Devil body circle along with all 3 chainsaws
  * (forehead saw + left & right arm chainsaws) fading smoothly in his wake.
  */
+let _cachedDenjiDevilGhostCanvas = null;
+let _cachedDenjiDevilGhostR = 0;
+let _cachedDenjiDevilGhostOriginX = 0;
+let _cachedDenjiDevilGhostOriginY = 0;
+
+function _getDenjiDevilGhostCanvas(r) {
+  const intR = Math.round(r);
+  const devilImg = _getDenjiDevilSkinImage();
+  const hasDevilImg = Boolean(devilImg && devilImg.complete && devilImg.naturalWidth > 0);
+
+  if (_cachedDenjiDevilGhostCanvas && _cachedDenjiDevilGhostR === intR) {
+    return {
+      canvas: _cachedDenjiDevilGhostCanvas,
+      originX: _cachedDenjiDevilGhostOriginX,
+      originY: _cachedDenjiDevilGhostOriginY
+    };
+  }
+  if (typeof document === 'undefined') return null;
+
+  const w = Math.ceil(intR * 7.5);
+  const h = Math.ceil(intR * 4.6);
+  const originX = Math.round(intR * 2.5);
+  const originY = Math.round(h / 2);
+
+  _cachedDenjiDevilGhostCanvas = document.createElement('canvas');
+  _cachedDenjiDevilGhostCanvas.width = w;
+  _cachedDenjiDevilGhostCanvas.height = h;
+  const cctx = _cachedDenjiDevilGhostCanvas.getContext('2d');
+  cctx.imageSmoothingEnabled = false;
+
+  cctx.save();
+  cctx.translate(originX, originY);
+
+  const ghostOpts = {
+    isAttacking: false,
+    isLunging: true,
+    isSawing: false,
+    shredBladeCount: 1,
+    isMassacre: false,
+    isGhost: true
+  };
+
+  // 1. Ghost Body Model (Chainsaw Devil)
+  if (hasDevilImg) {
+    cctx.save();
+    cctx.imageSmoothingEnabled = false;
+    const drawW = intR * (1150 / 368);
+    const drawH = intR * (1150 / 368);
+    const shiftX = intR * (600 / 368);
+    const shiftY = intR * (620 / 368);
+    cctx.drawImage(devilImg, -shiftX, -shiftY, drawW, drawH);
+    cctx.restore();
+
+    // Ghost Golden Vent Glow
+    _drawDenjiHelmetVentGlow(cctx, intR, 1.0, 0);
+
+    // Ghost Forehead Chainsaw Blade
+    _drawDenjiForeheadChainsaw(cctx, intR, 0, ghostOpts);
+  } else {
+    drawDenjiChainsawHybridBody(cctx, intR, 0, false, ghostOpts);
+    _drawDenjiHelmetVentGlow(cctx, intR, 1.0, 0);
+  }
+
+  // 2. Ghost Hands & Left / Right Forearm Chainsaws
+  const handRadius = getHandSize(intR * 0.30);
+  _drawPixelForearmChainsaw(cctx, -intR * 0.82 + intR * 0.5, intR * 0.38, 0.0, handRadius, 0, false, ghostOpts, intR);
+  _drawPixelForearmChainsaw(cctx, intR * 0.82 + intR * 0.5, intR * 0.38, 0.0, handRadius, 0, true, ghostOpts, intR);
+
+  // 3. Amber Energy Aura Ring
+  cctx.beginPath();
+  cctx.arc(0, 0, intR + 2, 0, Math.PI * 2);
+  cctx.strokeStyle = 'rgba(234, 179, 8, 0.75)';
+  cctx.lineWidth = 1.5;
+  cctx.stroke();
+
+  cctx.restore();
+
+  if (hasDevilImg) {
+    _cachedDenjiDevilGhostR = intR;
+  }
+  _cachedDenjiDevilGhostOriginX = originX;
+  _cachedDenjiDevilGhostOriginY = originY;
+
+  return {
+    canvas: _cachedDenjiDevilGhostCanvas,
+    originX: _cachedDenjiDevilGhostOriginX,
+    originY: _cachedDenjiDevilGhostOriginY
+  };
+}
+
+/**
+ * Renders Denji's Chainsaw Devil Ghost Model afterimages at recorded absolute world coordinates.
+ * Each ghost model renders Denji's full Chainsaw Devil body circle along with all 3 chainsaws
+ * (forehead saw + left & right arm chainsaws) fading smoothly in his wake.
+ */
 export function drawDenjiAfterImages(ctx, fighter) {
   const isSuppressed = Boolean(
     fighter && (
@@ -957,7 +1052,8 @@ export function drawDenjiAfterImages(ctx, fighter) {
   );
   if (!fighter || !fighter.afterImages || fighter.afterImages.length === 0 || isSuppressed) return;
   const r = fighter.r || 25;
-  const now = Date.now();
+
+  const ghost = _getDenjiDevilGhostCanvas(r);
 
   ctx.save();
   for (let i = 0; i < fighter.afterImages.length; i++) {
@@ -975,50 +1071,46 @@ export function drawDenjiAfterImages(ctx, fighter) {
     const facingLeft = Math.abs(angle) > Math.PI / 2;
     if (facingLeft) ctx.scale(1, -1);
 
-    const ghostOpts = {
-      isAttacking: false,
-      isLunging: true,
-      isSawing: false,
-      shredBladeCount: 1,
-      isMassacre: false,
-      isGhost: true
-    };
-
-    // 1. Ghost Body Model (Chainsaw Devil)
-    const devilImg = _getDenjiDevilSkinImage();
-    if (devilImg && devilImg.complete && devilImg.naturalWidth > 0) {
-      ctx.save();
-      ctx.imageSmoothingEnabled = false;
-      const drawW = r * (1150 / 368);
-      const drawH = r * (1150 / 368);
-      const shiftX = r * (600 / 368);
-      const shiftY = r * (620 / 368);
-      ctx.drawImage(devilImg, -shiftX, -shiftY, drawW, drawH);
-      ctx.restore();
-
-      // Ghost Golden Vent Glow
-      _drawDenjiHelmetVentGlow(ctx, r, 1.0, now);
-
-      // Ghost Forehead Chainsaw Blade
-      _drawDenjiForeheadChainsaw(ctx, r, now, ghostOpts);
+    if (ghost && ghost.canvas) {
+      ctx.drawImage(ghost.canvas, -ghost.originX, -ghost.originY);
     } else {
-      drawDenjiChainsawHybridBody(ctx, r, now, false, ghostOpts);
-      _drawDenjiHelmetVentGlow(ctx, r, 1.0, now);
+      const ghostOpts = {
+        isAttacking: false,
+        isLunging: true,
+        isSawing: false,
+        shredBladeCount: 1,
+        isMassacre: false,
+        isGhost: true
+      };
+
+      const devilImg = _getDenjiDevilSkinImage();
+      if (devilImg && devilImg.complete && devilImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const drawW = r * (1150 / 368);
+        const drawH = r * (1150 / 368);
+        const shiftX = r * (600 / 368);
+        const shiftY = r * (620 / 368);
+        ctx.drawImage(devilImg, -shiftX, -shiftY, drawW, drawH);
+        ctx.restore();
+
+        _drawDenjiHelmetVentGlow(ctx, r, 1.0, 0);
+        _drawDenjiForeheadChainsaw(ctx, r, 0, ghostOpts);
+      } else {
+        drawDenjiChainsawHybridBody(ctx, r, 0, false, ghostOpts);
+        _drawDenjiHelmetVentGlow(ctx, r, 1.0, 0);
+      }
+
+      const handRadius = getHandSize(r * 0.30);
+      _drawPixelForearmChainsaw(ctx, -r * 0.82 + r * 0.5, r * 0.38, 0.0, handRadius, 0, false, ghostOpts, r);
+      _drawPixelForearmChainsaw(ctx, r * 0.82 + r * 0.5, r * 0.38, 0.0, handRadius, 0, true, ghostOpts, r);
+
+      ctx.beginPath();
+      ctx.arc(0, 0, r + 2, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(234, 179, 8, ${alpha * 0.8})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
     }
-
-    // 2. Ghost Hands & Left / Right Forearm Chainsaws
-    const handRadius = getHandSize(r * 0.30);
-    // Left Arm Chainsaw (pointing forward at 0.0 rad)
-    _drawPixelForearmChainsaw(ctx, -r * 0.82 + r * 0.5, r * 0.38, 0.0, handRadius, now, false, ghostOpts, r);
-    // Right Arm Chainsaw (pointing forward at 0.0 rad)
-    _drawPixelForearmChainsaw(ctx, r * 0.82 + r * 0.5, r * 0.38, 0.0, handRadius, now, true, ghostOpts, r);
-
-    // 3. Amber Energy Aura Ring
-    ctx.beginPath();
-    ctx.arc(0, 0, r + 2, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(234, 179, 8, ${alpha * 0.8})`;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
 
     ctx.restore();
   }

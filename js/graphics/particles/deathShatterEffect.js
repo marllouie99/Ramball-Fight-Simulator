@@ -13,14 +13,23 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { drawHeartShatterEffect, drawSansSpeechBubble } from '../weapons/sansWeaponGraphics.js';
 import { sansConfig } from '../../configs/characters/sansConfig.js';
 import { drawChessTroopShatterShard, spawnChessTroopShatter } from '../weapons/shiroChessGraphics.js';
+import {
+  spawnTombstoneDeath,
+  updateTombstoneDeathEffects,
+  drawTombstoneDeathEffects,
+  clearTombstoneDeathEffects,
+} from './tombstoneDeathEffect.js';
 
-export { spawnChessTroopShatter };
+export { spawnChessTroopShatter, spawnTombstoneDeath, updateTombstoneDeathEffects, drawTombstoneDeathEffects, clearTombstoneDeathEffects };
 
 /**
  * Spawns a death shatter effect at the fighter's position.
  * @param {Object} fighter - The fighter that died
  */
 export function spawnDeathShatter(fighter) {
+  // Spawn gravestone pop & ascending ghost soul
+  spawnTombstoneDeath(fighter);
+
   if (fighter.characterId === 'sans' || fighter.type === 'sans') {
     return spawnSansHeartShatterDeath(fighter);
   }
@@ -678,6 +687,8 @@ export function spawnEnderDragonXPFountain(x, y, count = 40) {
  * Updates all death shatter effects.
  */
 export function updateDeathEffects() {
+  updateTombstoneDeathEffects();
+
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { x: 40, y: 240, width: 450, height: 450 });
   const wallW = (arena && arena.wallWidth) || 4;
   const arenaBottom = (arena ? arena.y + arena.height : 800) - wallW;
@@ -1279,6 +1290,8 @@ export function spawnHollowMaskShatter(fighter) {
  */
 export function drawDeathEffects() {
   const { ctx } = state;
+  drawTombstoneDeathEffects(ctx);
+
   for (const effect of state.deathEffects) {
     if (effect.isSansHeartShatter) {
       drawHeartShatterEffect(ctx, effect);

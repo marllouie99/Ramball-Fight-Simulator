@@ -40,7 +40,7 @@ export const nanamiConfig = {
   enableOvertime: true,             // Master toggle for Overtime (Jigai)
   overtimeThresholdSeconds: 25,     // Activates after 25s elapsed in the round
   overtimeHpThreshold: 0.40,        // Or when HP drops below 40%
-  overtimeDamageMultiplier: 1.20,   // Balanced +20% damage boost
+  overtimeDamageMultiplier: 2.20,   // Balanced +20% damage boost
   overtimeSpeedMultiplier: 1.50,    // +20% move speed boost
   overtimeSpeechWalkDuration: 105,  // Duration (frames @ 60fps) to walk calmly towards enemy while finishing speech (~1.75s)
   overtimeSpeechWalkSpeed: 2.0,     // Calm steady walk speed during speech
@@ -85,8 +85,8 @@ export const nanamiConfig = {
   enableCleaver: true,              // Master toggle for Primary Melee: Blunt Cleaver Chop
   cleaverRange: 55,                 // 65px melee reach
   cleaverArc: (130 * Math.PI) / 180,// 130° frontal arc
-  cleaverDamage: 7,                 // Base chop damage
-  cleaverCooldown: 50,              // Frames between swings (~0.92s)
+  cleaverDamage: 30,                 // Base chop damage
+  cleaverCooldown: 100,              // Frames between swings (~0.92s)
   cleaverKnockback: 16,             // Base physical knockback force
   chopStrikeFrames: 10,             // Cutting sweep frames (frame-by-frame blade collision check)
   chopRecoveryFrames: 8,            // Follow-through and recovery frames

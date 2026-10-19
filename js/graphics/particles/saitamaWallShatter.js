@@ -15,6 +15,7 @@ import { CONFIG } from '../../core/config.js';
 import { spawnImpactFlash, spawnSparks } from './sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { triggerHudShatter, updateHudShatters, drawBottomHudShatters, clearHudShatters, isInsideSaitamaFrontalBlast } from './hudShatterEffect.js';
+import { blowAwayArenaDecorations, blowAwayArenaDecorationsNearWall } from '../../systems/arenaDecorationSystem.js';
 
 /**
  * Calculates ray intersection with rectangular or circular arena boundaries.
@@ -508,6 +509,11 @@ export function triggerSaitamaWallShatter(originX, originY, punchAngle, arena, c
   const hits = findAllArenaWallIntersections(originX, originY, punchAngle, arena, halfArc);
   if (!hits || hits.length === 0) return;
 
+  // Dislodge & blow away arena decorations in supersonic punch blast cone
+  if (typeof blowAwayArenaDecorations === 'function') {
+    blowAwayArenaDecorations(originX, originY, punchAngle, (arena.width || 450) * 1.5, halfArc, 2.0);
+  }
+
   if (!state.shatteredWalls) {
     state.shatteredWalls = [];
   }
@@ -555,6 +561,11 @@ export function triggerSaitamaWallShatter(originX, originY, punchAngle, arena, c
 
   // ── 2. Process Hits: Merge with overlapping existing breaches OR create new breach ──
   for (const hit of hits) {
+    // Dislodge decorations perched on or near this shattered wall section
+    if (typeof blowAwayArenaDecorationsNearWall === 'function') {
+      blowAwayArenaDecorationsNearWall(hit, arena);
+    }
+
     const span = Math.min(300, Math.max(70, hit.span || 140));
     const tanX = Math.cos(hit.tangentAngle);
     const tanY = Math.sin(hit.tangentAngle);

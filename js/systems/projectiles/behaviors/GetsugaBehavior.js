@@ -97,13 +97,10 @@ export class GetsugaBehavior extends ProjectileBehavior {
       const apexDist = effectiveRadius * 0.872;
       const apexOffsetX = Math.cos(ang) * apexDist;
       const apexOffsetY = Math.sin(ang) * apexDist;
-      const apexX = projectile.x + apexOffsetX;
-      const apexY = projectile.y + apexOffsetY;
-
-      // Reduced stopping radius: tight circle at the top center of the crescent instead of wide full-body circle
-      const stoppingRadius = projectile.stoppingRadius || (isFinal
-        ? (CONFIG.ichigo?.bankaiFinalGetsugaStoppingRadius ?? 16)
-        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaStoppingRadius ?? 14) : (CONFIG.ichigo?.getsugaStoppingRadius ?? 12)));
+      const curApexX = projectile.x + apexOffsetX;
+      const curApexY = projectile.y + apexOffsetY;
+      const nextApexX = curApexX + projectile.vx;
+      const nextApexY = curApexY + projectile.vy;
 
       const creepSpeed = isFinal
         ? (CONFIG.ichigo?.bankaiFinalGetsugaWallCreepSpeed ?? 1.5)
@@ -111,18 +108,15 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
       if (!projectile.hasHitWall) {
         let hitWall = false;
+        let hitContactX = nextApexX;
+        let hitContactY = nextApexY;
 
-        // Check center obstacle collision strictly at the top center apex using the reduced stopping radius
-        const prevApexX = (typeof projectile.vx === 'number' && Number.isFinite(projectile.vx))
-          ? (projectile.x - projectile.vx) + apexOffsetX
-          : apexX;
-        const prevApexY = (typeof projectile.vy === 'number' && Number.isFinite(projectile.vy))
-          ? (projectile.y - projectile.vy) + apexOffsetY
-          : apexY;
-
-        const obsHit = checkRayIntersectsPlusObstacle(prevApexX, prevApexY, apexX, apexY, arena, stoppingRadius);
+        // Check center obstacle collision strictly at the cutting apex ray without false-positive padding
+        const obsHit = checkRayIntersectsPlusObstacle(curApexX, curApexY, nextApexX, nextApexY, arena, 0);
         if (obsHit) {
           hitWall = true;
+          hitContactX = obsHit.hitX;
+          hitContactY = obsHit.hitY;
         }
 
         if (!hitWall) {
@@ -130,20 +124,108 @@ export class GetsugaBehavior extends ProjectileBehavior {
             const cx = arena.x + arena.width / 2;
             const cy = arena.y + arena.height / 2;
             const ar = arena.radius || (arena.width / 2);
-            const distFromCenter = Math.hypot(apexX - cx, apexY - cy);
-            if (distFromCenter + stoppingRadius >= ar) {
+            const curDist = Math.hypot(curApexX - cx, curApexY - cy);
+            const nextDist = Math.hypot(nextApexX - cx, nextApexY - cy);
+
+            if ((curDist < ar && nextDist >= ar) || (curDist >= ar && nextDist >= curDist)) {
               hitWall = true;
+              const contactAngle = Math.atan2(nextApexY - cy, nextApexX - cx);
+              hitContactX = cx + Math.cos(contactAngle) * ar;
+              hitContactY = cy + Math.sin(contactAngle) * ar;
             }
           } else {
-            if (projectile.vx < 0 && apexX - stoppingRadius <= arena.x) {
-              hitWall = true;
-            } else if (projectile.vx > 0 && apexX + stoppingRadius >= arena.x + arena.width) {
-              hitWall = true;
+            const minX = arena.x;
+            const maxX = arena.x + arena.width;
+            const minY = arena.y;
+            const maxY = arena.y + arena.height;
+
+            let bestT = Infinity;
+            let bestX = nextApexX;
+            let bestY = nextApexY;
+
+            // Check Right Wall (X = maxX)
+            if (projectile.vx > 0) {
+              if (curApexX >= maxX && curApexY >= minY && curApexY <= maxY) {
+                bestT = 0;
+                bestX = maxX;
+                bestY = curApexY;
+                hitWall = true;
+              } else if (curApexX < maxX && nextApexX >= maxX) {
+                const t = (maxX - curApexX) / projectile.vx;
+                const yCross = curApexY + t * projectile.vy;
+                if (yCross >= minY && yCross <= maxY && t < bestT) {
+                  bestT = t;
+                  bestX = maxX;
+                  bestY = yCross;
+                  hitWall = true;
+                }
+              }
             }
-            if (!hitWall && projectile.vy < 0 && apexY - stoppingRadius <= arena.y) {
-              hitWall = true;
-            } else if (!hitWall && projectile.vy > 0 && apexY + stoppingRadius >= arena.y + arena.height) {
-              hitWall = true;
+
+            // Check Left Wall (X = minX)
+            if (projectile.vx < 0) {
+              if (curApexX <= minX && curApexY >= minY && curApexY <= maxY) {
+                bestT = 0;
+                bestX = minX;
+                bestY = curApexY;
+                hitWall = true;
+              } else if (curApexX > minX && nextApexX <= minX) {
+                const t = (minX - curApexX) / projectile.vx;
+                const yCross = curApexY + t * projectile.vy;
+                if (yCross >= minY && yCross <= maxY && t < bestT) {
+                  bestT = t;
+                  bestX = minX;
+                  bestY = yCross;
+                  hitWall = true;
+                }
+              }
+            }
+
+            // Check Top Wall (Y = minY)
+            if (projectile.vy < 0) {
+              if (curApexY <= minY && curApexX >= minX && curApexX <= maxX) {
+                if (0 < bestT) {
+                  bestT = 0;
+                  bestX = curApexX;
+                  bestY = minY;
+                  hitWall = true;
+                }
+              } else if (curApexY > minY && nextApexY <= minY) {
+                const t = (minY - curApexY) / projectile.vy;
+                const xCross = curApexX + t * projectile.vx;
+                if (xCross >= minX && xCross <= maxX && t < bestT) {
+                  bestT = t;
+                  bestX = xCross;
+                  bestY = minY;
+                  hitWall = true;
+                }
+              }
+            }
+
+            // Check Bottom Wall (Y = maxY)
+            if (projectile.vy > 0) {
+              if (curApexY >= maxY && curApexX >= minX && curApexX <= maxX) {
+                if (0 < bestT) {
+                  bestT = 0;
+                  bestX = curApexX;
+                  bestY = maxY;
+                  hitWall = true;
+                }
+              } else if (curApexY < maxY && nextApexY >= maxY) {
+                const t = (maxY - curApexY) / projectile.vy;
+                const xCross = curApexX + t * projectile.vx;
+                if (xCross >= minX && xCross <= maxX && t < bestT) {
+                  bestT = t;
+                  bestX = xCross;
+                  bestY = maxY;
+                  hitWall = true;
+                }
+              }
+            }
+
+            if (hitWall) {
+              hitContactX = bestX;
+              hitContactY = bestY;
             }
           }
         }
@@ -155,6 +237,8 @@ export class GetsugaBehavior extends ProjectileBehavior {
           projectile.launchAngle = ang;
           projectile._resumeVx = projectile.vx;
           projectile._resumeVy = projectile.vy;
+          projectile.wallContactX = hitContactX;
+          projectile.wallContactY = hitContactY;
 
           // Transition to slow forward movement as it cuts into and clips out of the arena
           projectile.vx = Math.cos(ang) * creepSpeed;
@@ -162,7 +246,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
           // Wall impact burst & heavy screen shake on initial wall collision at the apex contact plane
           if (typeof spawnImpactFlash === 'function') {
-            spawnImpactFlash(apexX, apexY, isFinal ? 45 : 35, projectile.color || '#00E5FF');
+            spawnImpactFlash(hitContactX, hitContactY, isFinal ? 45 : 35, projectile.color || '#00E5FF');
           }
           if (typeof triggerGlobalScreenShake === 'function') {
             triggerGlobalScreenShake(isFinal ? 6.5 : 4.5, isFinal ? 12 : 8);
@@ -186,8 +270,10 @@ export class GetsugaBehavior extends ProjectileBehavior {
             triggerGlobalScreenShake(isFinal ? 2.5 : 1.8, 6);
           }
         }
+        const sparkX = projectile.wallContactX !== undefined ? projectile.wallContactX : curApexX;
+        const sparkY = projectile.wallContactY !== undefined ? projectile.wallContactY : curApexY;
         if (typeof spawnSparks === 'function' && projectile.getsugaWallShakeCounter % 4 === 0) {
-          spawnSparks(apexX, apexY, 3, projectile.color || '#00E5FF');
+          spawnSparks(sparkX, sparkY, 3, projectile.color || '#00E5FF');
         }
       }
     }

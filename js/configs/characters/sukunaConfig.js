@@ -2,7 +2,7 @@
 // Ryomen Sukuna — King of Curses Config
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     hair: 'Assets/model/sukuna/Sukuna-hair.png',
     shrine: 'Assets/model/sukuna/sukuna-shrine.png',

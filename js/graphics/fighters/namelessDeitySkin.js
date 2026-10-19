@@ -798,29 +798,7 @@ export function drawNamelessDeitySkin(ctx, fighter) {
     ctx.translate(haloOffX * rScale, hoverBob + haloOffY * rScale);
     ctx.rotate(haloAngle);
 
-    // Subtle celestial bloom aura (Rule 11 compliant: radial gradient, no shadowBlur)
-    const bloomPulse = 0.92 + 0.08 * Math.sin(gameTimer * 0.08);
-    const glowRadius = r * 1.85 * Math.max(haloScaleW, haloScaleH) * bloomPulse;
-    const bloomGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRadius);
-    if (isSkin2) {
-      // Celestial radiant cyan & sapphire blue seraph flare aura
-      bloomGrad.addColorStop(0, `rgba(255, 255, 255, ${0.48 * bloomPulse})`);
-      bloomGrad.addColorStop(0.25, `rgba(180, 235, 255, ${0.32 * bloomPulse})`);
-      bloomGrad.addColorStop(0.55, `rgba(0, 200, 255, ${0.18 * bloomPulse})`);
-      bloomGrad.addColorStop(0.80, `rgba(0, 110, 255, ${0.08 * bloomPulse})`);
-      bloomGrad.addColorStop(1.0, 'rgba(0, 50, 200, 0)');
-    } else {
-      // Celestial cosmic starlight aura
-      bloomGrad.addColorStop(0, `rgba(255, 255, 255, ${0.35 * bloomPulse})`);
-      bloomGrad.addColorStop(0.35, `rgba(255, 245, 215, ${0.18 * bloomPulse})`);
-      bloomGrad.addColorStop(0.70, `rgba(180, 215, 255, ${0.08 * bloomPulse})`);
-      bloomGrad.addColorStop(1.0, 'rgba(140, 180, 255, 0)');
-    }
-    ctx.beginPath();
-    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-    ctx.fillStyle = bloomGrad;
-    ctx.fill();
-
+    // Halo asset (CosmicLightCircleCenter1.png) possesses its own crisp starlight flares (zero artificial clipped bloom aura)
     const flarePivotX = 0.5396;
     const flarePivotY = 0.5362;
     _drawAtPivot(ctx, cosmicLight, 0, 0, hScaleX, hScaleY, flarePivotX, flarePivotY);

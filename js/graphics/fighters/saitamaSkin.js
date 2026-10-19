@@ -7,6 +7,18 @@ let _saitamaGloveSpriteImage = null;
 let _saitamaGloveSpriteCanvas = null;
 let _saitamaGloveSpriteLoading = false;
 
+// ─── Offscreen Canvas Caches for Saitama Body, Ghost Model, and Gloves (Rule 3.5 & Rule 24) ───
+let _cachedSaitamaBodyCanvas = null;
+let _cachedSaitamaBodyR = 0;
+
+let _cachedSaitamaGhostCanvas = null;
+let _cachedSaitamaGhostR = 0;
+let _cachedSaitamaGhostOriginX = 0;
+let _cachedSaitamaGhostOriginY = 0;
+
+let _cachedSaitamaGloveCanvas = null;
+let _cachedSaitamaGloveRadius = 0;
+
 export function _getSaitamaGloveSpriteCanvas() {
   if (_saitamaGloveSpriteCanvas) {
     return _saitamaGloveSpriteCanvas;
@@ -561,7 +573,7 @@ function drawSeriousCounterImpactVFX(ctx, r, fistX, fistY, fRadius, rawProgress,
 /**
  * Draws an authentic stepped pixel-art red brawler glove for Saitama.
  */
-function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
+function _renderSaitamaPixelGloveToCanvas(ctx, handX, handY, handRadius, alpha = 1.0) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha = alpha;
@@ -607,6 +619,46 @@ function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
   ctx.fillRect(hx + P, hy, P, P);
 
   ctx.restore();
+}
+
+function _getSaitamaGloveCanvas(handRadius) {
+  const intRadius = Math.round(handRadius * 10) / 10;
+  if (_cachedSaitamaGloveCanvas && _cachedSaitamaGloveRadius === intRadius) {
+    return _cachedSaitamaGloveCanvas;
+  }
+  if (typeof document === 'undefined') return null;
+
+  const P = 2.0;
+  const gridR = Math.max(P * 2, intRadius);
+  const steps = Math.ceil((gridR + P) / P);
+  const size = (steps * 2 + 1) * P;
+
+  _cachedSaitamaGloveCanvas = document.createElement('canvas');
+  _cachedSaitamaGloveCanvas.width = size;
+  _cachedSaitamaGloveCanvas.height = size;
+  const cctx = _cachedSaitamaGloveCanvas.getContext('2d');
+  cctx.imageSmoothingEnabled = false;
+
+  cctx.save();
+  cctx.translate(size / 2, size / 2);
+  _renderSaitamaPixelGloveToCanvas(cctx, 0, 0, gridR, 1.0);
+  cctx.restore();
+
+  _cachedSaitamaGloveRadius = intRadius;
+  return _cachedSaitamaGloveCanvas;
+}
+
+function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
+  const gloveCanvas = _getSaitamaGloveCanvas(handRadius);
+  if (gloveCanvas) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    if (alpha !== 1.0) ctx.globalAlpha = (ctx.globalAlpha || 1.0) * alpha;
+    ctx.drawImage(gloveCanvas, Math.round(handX - gloveCanvas.width / 2), Math.round(handY - gloveCanvas.height / 2));
+    ctx.restore();
+    return;
+  }
+  _renderSaitamaPixelGloveToCanvas(ctx, handX, handY, handRadius, alpha);
 }
 
 /**
@@ -731,7 +783,7 @@ function quadBezierPt(p0, p1, p2, t) {
  * Draws Saitama's entire body circle model in authentic Pixel Art Style.
  * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
  */
-function drawSaitamaPixelBody(ctx, r, isGhost = false) {
+function _renderSaitamaPixelBodyToCanvas(ctx, r, isGhost = false) {
   ctx.save();
   const P = 2.0;
   const steps = Math.ceil((r + P) / P);
@@ -826,6 +878,46 @@ function drawSaitamaPixelBody(ctx, r, isGhost = false) {
   }
 
   ctx.restore();
+}
+
+function _getSaitamaBodyCanvas(r) {
+  const intR = Math.round(r);
+  if (_cachedSaitamaBodyCanvas && _cachedSaitamaBodyR === intR) {
+    return _cachedSaitamaBodyCanvas;
+  }
+  if (typeof document === 'undefined') return null;
+
+  const P = 2.0;
+  const steps = Math.ceil((intR + P) / P);
+  const size = (steps * 2 + 1) * P;
+
+  _cachedSaitamaBodyCanvas = document.createElement('canvas');
+  _cachedSaitamaBodyCanvas.width = size;
+  _cachedSaitamaBodyCanvas.height = size;
+  const cctx = _cachedSaitamaBodyCanvas.getContext('2d');
+  cctx.imageSmoothingEnabled = false;
+
+  cctx.save();
+  cctx.translate(size / 2, size / 2);
+  _renderSaitamaPixelBodyToCanvas(cctx, intR, false);
+  cctx.restore();
+
+  _cachedSaitamaBodyR = intR;
+  return _cachedSaitamaBodyCanvas;
+}
+
+function drawSaitamaPixelBody(ctx, r, isGhost = false) {
+  if (!isGhost) {
+    const bodyCanvas = _getSaitamaBodyCanvas(r);
+    if (bodyCanvas) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(bodyCanvas, -bodyCanvas.width / 2, -bodyCanvas.height / 2);
+      ctx.restore();
+      return;
+    }
+  }
+  _renderSaitamaPixelBodyToCanvas(ctx, r, isGhost);
 }
 
 /**
@@ -987,28 +1079,84 @@ function drawSaitamaPixelCape(ctx, r, inertiaX = 0, inertiaY = 0, gentleSway1 = 
   ctx.restore();
 }
 
-/**
- * Draws a full Saitama model ghost skin afterimage
- */
-function drawSaitamaGhostModel(ctx, r) {
-  // 1. Cape (Pixel Art)
-  drawSaitamaPixelCape(ctx, r, 0, 0, 0, 0, 0, true);
+function _getSaitamaGhostCanvas(r) {
+  const intR = Math.round(r);
+  if (_cachedSaitamaGhostCanvas && _cachedSaitamaGhostR === intR) {
+    return {
+      canvas: _cachedSaitamaGhostCanvas,
+      originX: _cachedSaitamaGhostOriginX,
+      originY: _cachedSaitamaGhostOriginY
+    };
+  }
+  if (typeof document === 'undefined') return null;
+
+  const w = Math.ceil(intR * 5.6);
+  const h = Math.ceil(intR * 4.4);
+  const originX = Math.round(w * 0.58);
+  const originY = Math.round(h * 0.50);
+
+  _cachedSaitamaGhostCanvas = document.createElement('canvas');
+  _cachedSaitamaGhostCanvas.width = w;
+  _cachedSaitamaGhostCanvas.height = h;
+  const cctx = _cachedSaitamaGhostCanvas.getContext('2d');
+  cctx.imageSmoothingEnabled = false;
+
+  cctx.save();
+  cctx.translate(originX, originY);
+
+  // 1. Cape (Pixel Art static rest pose for ghost trail)
+  drawSaitamaPixelCape(cctx, intR, 0, 0, 0, 0, 0, true);
 
   // 2. Hands (Back & Front - Pixel Art Drawing)
-  const handRadius = Math.max(r * 0.38, 8.5);
-  const backHandX = 0, backHandY = r * 0.10;
-
-  // Back Hand
-  drawSaitamaPixelGlove(ctx, backHandX, backHandY, handRadius);
+  const handRadius = Math.max(intR * 0.38, 8.5);
+  const backHandX = 0, backHandY = intR * 0.10;
+  drawSaitamaPixelGlove(cctx, backHandX, backHandY, handRadius);
 
   // 3. Body Circle (Pixel Art)
-  drawSaitamaPixelBody(ctx, r, true);
+  drawSaitamaPixelBody(cctx, intR, true);
 
   // Front Hand
-  const frontHandX = r * 0.95, frontHandY = r * 0.25;
-  drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
+  const frontHandX = intR * 0.95, frontHandY = intR * 0.25;
+  drawSaitamaPixelGlove(cctx, frontHandX, frontHandY, handRadius);
 
   // Golden Speed Aura Overlay Ring
+  cctx.beginPath();
+  cctx.arc(0, 0, intR + 4, 0, Math.PI * 2);
+  cctx.strokeStyle = 'rgba(255, 230, 100, 0.6)';
+  cctx.lineWidth = 2.0;
+  cctx.stroke();
+
+  cctx.restore();
+
+  _cachedSaitamaGhostR = intR;
+  _cachedSaitamaGhostOriginX = originX;
+  _cachedSaitamaGhostOriginY = originY;
+
+  return {
+    canvas: _cachedSaitamaGhostCanvas,
+    originX: _cachedSaitamaGhostOriginX,
+    originY: _cachedSaitamaGhostOriginY
+  };
+}
+
+/**
+ * Draws a full Saitama model ghost skin afterimage with offscreen canvas cache
+ */
+function drawSaitamaGhostModel(ctx, r) {
+  const ghost = _getSaitamaGhostCanvas(r);
+  if (ghost && ghost.canvas) {
+    ctx.drawImage(ghost.canvas, -ghost.originX, -ghost.originY);
+    return;
+  }
+
+  // Fallback
+  drawSaitamaPixelCape(ctx, r, 0, 0, 0, 0, 0, true);
+  const handRadius = Math.max(r * 0.38, 8.5);
+  const backHandX = 0, backHandY = r * 0.10;
+  drawSaitamaPixelGlove(ctx, backHandX, backHandY, handRadius);
+  drawSaitamaPixelBody(ctx, r, true);
+  const frontHandX = r * 0.95, frontHandY = r * 0.25;
+  drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
   ctx.beginPath();
   ctx.arc(0, 0, r + 4, 0, Math.PI * 2);
   ctx.strokeStyle = 'rgba(255, 230, 100, 0.6)';

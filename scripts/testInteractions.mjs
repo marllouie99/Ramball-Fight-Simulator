@@ -3221,6 +3221,61 @@ async function runInteractionTests() {
         assert(letterFont === '900 17.5px "Impact", "Outfit", "Rajdhani", sans-serif', 'HUD grade letters must share the card seal Impact font');
         assert(gradeAuraCount > 0, 'Top HUD grade letters must include their matching card-grade aura effect');
         assert(mockCtx.getStackDepth() === 0, 'Grade letter rendering must restore the Canvas 2D stack');
+
+        // Test SSR Grade support
+        mockCtx.resetStackDepth();
+        drawWingedGradeLetter(mockCtx, 32, 32, 'SSR', null, 1, 1.3, true);
+        assert(letterFont === '900 20.5px "Impact", "Outfit", "Rajdhani", sans-serif', 'SSR HUD grade letter must use enlarged 20.5px font');
+        assert(mockCtx.getStackDepth() === 0, 'SSR grade letter rendering must restore the Canvas 2D stack');
+
+        const { getZeusGradeCardTheme, drawWingedGradeSeal } = await import('../js/graphics/ui/CollectorCardRenderer.js');
+        const ssrTheme = getZeusGradeCardTheme('SSR');
+        assert(ssrTheme && ssrTheme.grade === 'SSR', 'SSR theme must be defined');
+        assert(ssrTheme.bgBase === '#090A0F', 'SSR theme must use Abyss Black bgBase');
+        assert(ssrTheme.primary === '#FFFFFF', 'SSR theme must use crisp white/silver primary');
+
+        mockCtx.resetStackDepth();
+        drawWingedGradeSeal(mockCtx, 50, 50, 'SSR', ssrTheme, 0, 1.0);
+        assert(mockCtx.getStackDepth() === 0, 'SSR grade seal rendering must restore Canvas 2D stack');
+
+        // Test Nameless Deity Top HUD Profile rendering uses CosmicLightCircleCenter1.png
+        const { renderTopHudProfileCanvas } = await import('../js/graphics/hudManager.js');
+        let drawImageSrc = '';
+        let drawImageArgs = null;
+        const originalDrawImage = mockCtx.drawImage;
+        mockCtx.drawImage = (img, ...args) => {
+          drawImageSrc = img?.src || '';
+          drawImageArgs = args;
+        };
+        try {
+          const testCanvas = { width: 1400, height: 1400, getContext: () => mockCtx };
+          renderTopHudProfileCanvas(testCanvas, { characterId: 'namelessdeity', type: 'namelessdeity' });
+          assert(drawImageSrc.includes('CosmicLightCircleCenter1.png'), 'Top HUD profile must render CosmicLightCircleCenter1.png for Nameless Deity');
+          assert(drawImageArgs && drawImageArgs.length >= 4, 'Top HUD profile must render deity asset centered');
+        } finally {
+          mockCtx.drawImage = originalDrawImage;
+        }
+
+        // Test Sans Top HUD Custom Stamina Bar
+        const sansP1Html = buildTopDuelHUD(
+          { name: 'Sans', characterId: 'sans', type: 'sans', stamina: 80, maxStamina: 100, hp: 1, maxHp: 1 },
+          { name: 'Gojo', characterId: 'gojo', type: 'gojo', hp: 100, maxHp: 100 }
+        );
+        assert(sansP1Html.includes('hud-bar-sans-stamina'), 'Top HUD must include hud-bar-sans-stamina for Sans P1');
+        assert(sansP1Html.includes('sans-bolt-wrapper'), 'Top HUD must render lightning bolt icon for Sans P1');
+        assert(sansP1Html.includes('sansBoltGradTopP1'), 'Top HUD must declare sansBoltGradTopP1 gradient for Sans P1');
+        assert(sansP1Html.includes('sans-stamina-dividers'), 'Top HUD must render stamina segment dividers for Sans P1');
+
+        const sansP2Html = buildTopDuelHUD(
+          { name: 'Gojo', characterId: 'gojo', type: 'gojo', hp: 100, maxHp: 100 },
+          { name: 'Sans', characterId: 'sans', type: 'sans', stamina: 100, maxStamina: 100, hp: 1, maxHp: 1 }
+        );
+        assert(sansP2Html.includes('hud-bar-sans-stamina'), 'Top HUD must include hud-bar-sans-stamina for Sans P2');
+        assert(sansP2Html.includes('sans-bolt-wrapper'), 'Top HUD must render lightning bolt icon for Sans P2');
+        assert(sansP2Html.includes('sansBoltGradTopP2'), 'Top HUD must declare sansBoltGradTopP2 gradient for Sans P2');
+        assert(sansP2Html.includes('sans-stamina-dividers'), 'Top HUD must render stamina segment dividers for Sans P2');
+        assert(hudStyles.includes('.hud-top-bar.hud-bar-sans-stamina'), 'style.css must define .hud-top-bar.hud-bar-sans-stamina');
+        assert(hudStyles.includes('.hud-top-player.hud-top-p2 .hud-top-bar .sans-bolt-wrapper'), 'style.css must position P2 bolt wrapper');
       } finally {
         mockCtx.strokeText = originalStrokeText;
         mockCtx.createRadialGradient = originalRadialGradient;
@@ -4714,6 +4769,55 @@ async function runInteractionTests() {
     mockCtx.resetStackDepth();
     drawDeathEffects();
     assert(mockCtx.getStackDepth() === 0, 'drawDeathEffects stack depth for Nameless Deity assets must be 0');
+
+    // Verify Nameless Deity Ultimate CD non-ticking during activation
+    {
+      const { NamelessDeityFighter } = await import('../js/entities/fighters/NamelessDeityFighter.js');
+      const testDeity = new NamelessDeityFighter({ radius: 28, x: 200, y: 200 });
+      const dummyOpp = { hp: 100, maxHp: 100, x: 400, y: 200, vx: 0, vy: 0, dead: false, isEffectivelyAlive: () => true };
+      const testArena = { x: 0, y: 0, width: 800, height: 600, shape: 'rectangle' };
+      testDeity.destroyerCooldown = 0;
+
+      // 1. Cast ultimate
+      testDeity.castNamelessDestroyer(dummyOpp, true);
+      const expectedFullCD = 1500;
+      assert(testDeity.destroyerCooldown === expectedFullCD, `Ultimate CD immediately upon cast must be ${expectedFullCD}, got ${testDeity.destroyerCooldown}`);
+      assert(testDeity.destroyerWindupTimer > 0, 'Windup timer must be active upon cast');
+
+      // 2. Simulate 10 frames during windup
+      for (let f = 0; f < 10; f++) {
+        testDeity.update(dummyOpp, 0, testArena);
+      }
+      assert(testDeity.destroyerCooldown === expectedFullCD, `Ultimate CD must NOT tick during windup phase (expected ${expectedFullCD}, got ${testDeity.destroyerCooldown})`);
+
+      // 3. Simulate fire phase
+      testDeity.destroyerWindupTimer = 0;
+      testDeity.destroyerFireTimer = 100;
+      for (let f = 0; f < 10; f++) {
+        testDeity.update(dummyOpp, 0, testArena);
+      }
+      assert(testDeity.destroyerCooldown === expectedFullCD, `Ultimate CD must NOT tick during firing phase (expected ${expectedFullCD}, got ${testDeity.destroyerCooldown})`);
+
+      // 4. Simulate recovery phase
+      testDeity.destroyerFireTimer = 0;
+      testDeity.destroyerRecoveryTimer = 25;
+      for (let f = 0; f < 10; f++) {
+        testDeity.update(dummyOpp, 0, testArena);
+      }
+      assert(testDeity.destroyerCooldown === expectedFullCD, `Ultimate CD must NOT tick during recovery phase (expected ${expectedFullCD}, got ${testDeity.destroyerCooldown})`);
+
+      // 5. Complete recovery (ultimate is done)
+      testDeity.destroyerRecoveryTimer = 1;
+      testDeity.update(dummyOpp, 0, testArena); // recovery reaches 0 here
+      assert(testDeity.destroyerRecoveryTimer === 0, 'Recovery must be 0 after completing recovery frame');
+      assert(testDeity.destroyerCooldown === expectedFullCD, `Ultimate CD must be reset to ${expectedFullCD} upon ultimate completion`);
+
+      // 6. Next 5 frames: ultimate is done, cooldown MUST tick down
+      for (let f = 0; f < 5; f++) {
+        testDeity.update(dummyOpp, 0, testArena);
+      }
+      assert(testDeity.destroyerCooldown === expectedFullCD - 5, `Ultimate CD must tick down after ultimate is done (expected ${expectedFullCD - 5}, got ${testDeity.destroyerCooldown})`);
+    }
 
     console.log('      ✅ Nameless Deity modular asset death shatter (wings, halo, antlers, body, eye, arms, hands, crystals & permanent preservation) verified successfully.');
   }
@@ -7657,7 +7761,69 @@ async function runInteractionTests() {
       assert(dummy.denjiShredCount === 0, 'Dummy denjiShredCount must decay to 0 after inactivity');
       assert(denji.shredCount === 0, 'Denji shredCount must be 0 when not actively shredding');
 
-      console.log('      ✅ Denji Chainsaw Shred Count & Bleed Debuff mechanic verified successfully.');
+      // ── Per-Tick Damage & Lifesteal Continuous Ramping Test ──
+      denji.x = 100;
+      denji.y = 300;
+      denji.vx = 0;
+      denji.vy = 0;
+      denji.gunAngle = 0;
+      denji.angle = 0;
+      denji.lungeCooldown = 999;
+      denji.cleaveCooldown = 999;
+      denji.massacreCooldown = 999;
+      denji.isEngineLunging = false;
+      denji.isExecutingMassacre = false;
+      denji.lungeHitRecoveryTimer = 0;
+      dummy.x = 135;
+      dummy.y = 300;
+      dummy.hp = 1000;
+      dummy.maxHp = 1000;
+      dummy.isBleeding = false;
+      dummy.bleedTimer = 0;
+      dummy.denjiShredCount = 0;
+      denji.hp = 200; // Damage Denji so he can receive lifesteal
+      denji.consecutiveShredTicks = 0;
+
+      let prevDamage = 0;
+      let prevHeal = 0;
+      let firstDamage = 0;
+      let firstHeal = 0;
+
+      for (let tick = 1; tick <= 6; tick++) {
+        denji.shredTickTimer = 0;
+        const dummyHpBefore = dummy.hp;
+        const denjiHpBefore = denji.hp;
+
+        denji.update(dummy, 0, state.arena);
+
+        const damageDealt = dummyHpBefore - dummy.hp;
+        const healReceived = denji.hp - denjiHpBefore;
+
+        assert(denji.consecutiveShredTicks === tick, `Denji consecutiveShredTicks must be ${tick} on tick ${tick} (got ${denji.consecutiveShredTicks})`);
+        assert(damageDealt > 0, `Damage dealt on tick ${tick} must be > 0 (got ${damageDealt})`);
+
+        if (tick === 1) {
+          firstDamage = damageDealt;
+          firstHeal = healReceived;
+        } else {
+          assert(damageDealt >= prevDamage, `Shred damage must monotonically scale during continuous shred (tick ${tick} dmg ${damageDealt} >= prev ${prevDamage})`);
+          assert(healReceived >= prevHeal, `Shred lifesteal must monotonically scale during continuous shred (tick ${tick} heal ${healReceived} >= prev ${prevHeal})`);
+        }
+
+        prevDamage = damageDealt;
+        prevHeal = healReceived;
+      }
+
+      assert(prevDamage > firstDamage, `Sustained continuous shred must scale total tick damage above initial tick (got final ${prevDamage} > initial ${firstDamage})`);
+
+      // Disengage test: moving dummy away must reset consecutiveShredTicks to 0
+      dummy.x = 1200;
+      for (let f = 0; f < 30; f++) {
+        denji.update(dummy, 0, state.arena);
+      }
+      assert(denji.consecutiveShredTicks === 0, 'Denji consecutiveShredTicks must reset to 0 after disengaging from target');
+
+      console.log('      ✅ Denji Chainsaw Shred Count, Bleed Debuff & Per-Tick Damage/Lifesteal Ramping verified successfully.');
     } finally {
       state.getFighterTeam = prevGetTeam;
       state.mode = prevMode;
@@ -7889,7 +8055,20 @@ async function runInteractionTests() {
       }
       assert(projectileSystem.projectiles.length === 0, 'Getsuga Tensho must expire and be returned to pool');
 
-      console.log('      ✅ Ichigo Getsuga Tensho wall impact transition, slow forward creep & arena clipping verified successfully.');
+      // 4. Verify that starting a new match / recycling projectile from pool cleanly resets hasHitWall and maintains full flight speed
+      projectileSystem.clear();
+      ichigo.x = 200;
+      ichigo.y = 300;
+      const getsuga2 = projectileSystem.fireGetsugaTensho(ichigo, 0, 15, 14, 'bankai');
+      assert(getsuga2.hasHitWall === false, 'Recycled Getsuga Tensho must have hasHitWall = false on spawn');
+      assert(getsuga2.isWallPenetrating === false, 'Recycled Getsuga Tensho must have isWallPenetrating = false on spawn');
+      assert(getsuga2.wallContactX === undefined, 'Recycled Getsuga Tensho must have wallContactX = undefined on spawn');
+      assert(getsuga2.wallContactY === undefined, 'Recycled Getsuga Tensho must have wallContactY = undefined on spawn');
+      projectileSystem.update(state.fighters);
+      assert(getsuga2.hasHitWall === false, 'Getsuga Tensho must not prematurely hit wall on mid-arena travel');
+      assert(getsuga2.vx === 14, `Getsuga Tensho must maintain full travel velocity on spawn (expected 14, got: ${getsuga2.vx})`);
+
+      console.log('      ✅ Ichigo Getsuga Tensho wall impact transition, slow forward creep, pool recycling & arena clipping verified successfully.');
     } finally {
       state.getFighterTeam = prevGetTeam;
       state.mode = prevMode;
@@ -8149,6 +8328,44 @@ async function runInteractionTests() {
 
     console.log('      ✅ Choso Infinite Blood Generation, Laser Transmutation Matrix & Piercing Blood verified successfully.');
     state.fighters = [];
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // TEST 80: Discrete Floating Damage Numbers (Zero Summing / Zero Accumulation)
+  // ─────────────────────────────────────────────────────────────────────────────
+  {
+    console.log('   80. Testing Discrete Floating Damage Numbers (Zero Summing / Zero Stacking)...');
+    const { spawnFloatingText } = await import('../js/core/state.js');
+    state.floatingTexts = [];
+
+    // Simulate 4 consecutive rapid hits on target at the exact same location
+    spawnFloatingText(250, 200, '3', '#EF4444');
+    spawnFloatingText(250, 200, '3', '#EF4444');
+    spawnFloatingText(250, 200, '4', '#EF4444');
+    spawnFloatingText(250, 200, '5', '#EF4444');
+
+    // Verify all 4 discrete hits spawned as individual numbers
+    assert(state.floatingTexts.length === 4, `Expected exactly 4 floating text entries, got ${state.floatingTexts.length}`);
+
+    // Verify numbers were NOT summed up (none of them accumulated into 6, 10, or 15)
+    assert(state.floatingTexts[0].text === '3', `Entry 0 text must be '3', got '${state.floatingTexts[0].text}'`);
+    assert(state.floatingTexts[1].text === '3', `Entry 1 text must be '3' (not summed into '6'), got '${state.floatingTexts[1].text}'`);
+    assert(state.floatingTexts[2].text === '4', `Entry 2 text must be '4' (not summed into '10'), got '${state.floatingTexts[2].text}'`);
+    assert(state.floatingTexts[3].text === '5', `Entry 3 text must be '5' (not summed into '15'), got '${state.floatingTexts[3].text}'`);
+
+    // Verify alternating fountain velocities and slight scatter offsets so numbers are clearly visible
+    assert(state.floatingTexts[0].vx * state.floatingTexts[1].vx < 0, 'Entry 0 and 1 should arc in alternating directions');
+    assert(state.floatingTexts[1].vx * state.floatingTexts[2].vx < 0, 'Entry 1 and 2 should arc in alternating directions');
+    assert(state.floatingTexts[2].vx * state.floatingTexts[3].vx < 0, 'Entry 2 and 3 should arc in alternating directions');
+
+    // Verify non-damage duplicate suppression still functions for status texts (e.g. 'MISS!')
+    state.floatingTexts = [];
+    spawnFloatingText(250, 200, 'MISS!', '#A0AEC0');
+    spawnFloatingText(250, 200, 'MISS!', '#A0AEC0');
+    assert(state.floatingTexts.length === 1, `Status 'MISS!' duplicates within proximity must be suppressed to 1 entry, got ${state.floatingTexts.length}`);
+
+    state.floatingTexts = [];
+    console.log('      ✅ Discrete floating damage numbers (zero summing, zero accumulation, alternating fountain arc) verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

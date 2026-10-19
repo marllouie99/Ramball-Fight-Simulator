@@ -83,6 +83,12 @@ export const denjiConfig = {
   sawReach: 75,
   sawHitKnockback: 6,
 
+  // Continuous Shred Ramping Engine (Damage & Lifesteal Scaling Per Tick)
+  enableShredRamp: true,                 // Master toggle for damage & lifesteal scaling per tick during continuous shred
+  shredDamageIncreasePerTick: 1,         // Additional flat damage per consecutive shred tick (+1 dmg/tick)
+  shredLifestealIncreasePerTick: 0.02,   // Additional lifesteal ratio per consecutive shred tick (+2% lifesteal/tick)
+  maxShredRampTicks: 10,                 // Maximum consecutive ticks for damage & lifesteal ramp scaling (cap at 10 ticks)
+
   // Chainsaw Overheat & Continuous Shred Steam Smoke Effect
   enableChainsawSmoke: true,            // Master toggle for continuous shred steam smoke effect
   enableChainsawOverheatSmoke: true,    // Alias toggle

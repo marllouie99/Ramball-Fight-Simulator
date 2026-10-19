@@ -263,6 +263,7 @@ export class NamelessDeityFighter extends Fighter {
         cooldownKey: 'destroyerCooldown',
         cooldownMax: () => getNamelessSetting(cfg, 'destroyerCooldown'),
         color: getNamelessSetting(cfg, 'destroyerColor') || '#00F0FF',
+        canTickCooldown: () => false, // Handled exclusively in NamelessDeityFighter.update() to prevent ticking during active ultimate
         onActivate: (fighter, opponent) => {
           fighter.castNamelessDestroyer(opponent);
         }
@@ -286,11 +287,17 @@ export class NamelessDeityFighter extends Fighter {
     if (!forceCancelAll && (this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.isRebouncingToCenter)) {
       return; // Transcendent Celestial Hyper-Armor: Never cancel Nameless Destroyer beam from transient hits/stuns
     }
+    const wasChanneling = Boolean(this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.destroyerRecoveryTimer > 0 || this.isRebouncingToCenter);
     this._stopDestroyerLoopSounds(0);
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
+    this.destroyerRecoveryTimer = 0;
     this.isRebouncingToCenter = false;
     this.rebounceTimer = 0;
+    if (wasChanneling) {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
+      this.destroyerCooldown = getNamelessSetting(cfg, 'destroyerCooldown') || 1500;
+    }
     super.interruptAttacks?.(forceCancelAll);
   }
 
@@ -298,6 +305,7 @@ export class NamelessDeityFighter extends Fighter {
     this._stopDestroyerLoopSounds(0);
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
+    this.destroyerRecoveryTimer = 0;
     this.isRebouncingToCenter = false;
     this.rebounceTimer = 0;
     super.onDeath?.();
@@ -639,6 +647,10 @@ export class NamelessDeityFighter extends Fighter {
   castNamelessDestroyer(opponent, bypassRebounce = false) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
 
+    // Immediately put ultimate on full cooldown and lock it throughout activation
+    const fullCooldown = getNamelessSetting(cfg, 'destroyerCooldown') || 1500;
+    this.destroyerCooldown = fullCooldown;
+
     // Ultimate Pre-Cast Lifecycle Hook (e.g. center rebounce or special repositioning)
     const stateObj = typeof state !== 'undefined' ? state : null;
     if (interactionManager.handleUltimatePreCast(this, opponent, stateObj, bypassRebounce)) {
@@ -662,12 +674,6 @@ export class NamelessDeityFighter extends Fighter {
     const circleFrames = getNamelessSetting(cfg, 'destroyerCircleFadeInFrames') ?? 150;
     const holdFrames = getNamelessSetting(cfg, 'destroyerHoldFrames') ?? 43;
     const totalWindup = Math.max(1, flareFrames + circleFrames + holdFrames);
-    const fireFrames = (typeof this.destroyerFireFrames === 'number' && this.destroyerFireFrames > 0)
-      ? this.destroyerFireFrames
-      : (getNamelessSetting(cfg, 'destroyerFireFrames') ?? 800);
-    const baseCooldown = getNamelessSetting(cfg, 'destroyerCooldown') || 850;
-
-    this.destroyerCooldown = Math.max(baseCooldown, totalWindup + fireFrames + 300);
 
     this.destroyerFlareWindupFrames = flareFrames;
     this.destroyerCircleFadeInFrames = circleFrames;
@@ -750,7 +756,13 @@ export class NamelessDeityFighter extends Fighter {
     if (this.superclusterDetonationTimer > 0) this.superclusterDetonationTimer--;
     if (this.dimensionCleaveCooldown > 0) this.dimensionCleaveCooldown--;
     if (this.singularityCooldown > 0) this.singularityCooldown--;
-    if (this.destroyerCooldown > 0) this.destroyerCooldown--;
+
+    // Ultimate Cooldown: MUST NOT tick during activation (rebounce, windup, firing, recovery).
+    // Ticks down ONLY after the ultimate is completely done!
+    const isDestroyerActive = Boolean(this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.destroyerRecoveryTimer > 0 || this.isRebouncingToCenter);
+    if (!isDestroyerActive && this.destroyerCooldown > 0) {
+      this.destroyerCooldown--;
+    }
 
     // Active Supercluster Star Mandala (Orbiting Stars & Inward Nova Detonation)
     if (this.superclusterActiveTimer > 0) {
@@ -915,6 +927,7 @@ export class NamelessDeityFighter extends Fighter {
         this._stopDestroyerLoopSounds(350);
         playSound(getNamelessSetting(cfg, 'sounds')?.chuckle || 'Assets/Sound Effects/NamelessDeity/Chuckle.ogg', getNamelessSetting(cfg, 'chuckleVolume') || 1.10);
         if (this.destroyerRecoveryTimer === 0) {
+          this.destroyerCooldown = getNamelessSetting(cfg, 'destroyerCooldown') || 1500;
           const livingCount = (typeof state !== 'undefined' && state.fighters)
             ? state.fighters.filter(f => f && (typeof f.isEffectivelyAlive === 'function' ? f.isEffectivelyAlive() : (f.hp > 0 && !f.dead))).length
             : 0;
@@ -1051,6 +1064,7 @@ export class NamelessDeityFighter extends Fighter {
     } else if (this.destroyerRecoveryTimer > 0) {
       this.destroyerRecoveryTimer--;
       if (this.destroyerRecoveryTimer === 0) {
+        this.destroyerCooldown = getNamelessSetting(cfg, 'destroyerCooldown') || 1500;
         const livingCount = (typeof state !== 'undefined' && state.fighters)
           ? state.fighters.filter(f => f && (typeof f.isEffectivelyAlive === 'function' ? f.isEffectivelyAlive() : (f.hp > 0 && !f.dead))).length
           : 0;

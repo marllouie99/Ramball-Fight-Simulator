@@ -316,8 +316,8 @@ async function verifyAll() {
     const isAliasSpread = /^\s*\.\.\.\w+Config\s*,/m.test(content);
     const gradeMatch = content.match(/^\s+grade\s*:\s*['"]([^'"]*)['"]/m);
     if (!gradeMatch && isAliasSpread) continue; // alias configs inherit the spread grade
-    if (!gradeMatch || !['B', 'A', 'S', 'SS'].includes(gradeMatch[1])) {
-      console.error(`❌ [INVALID GRADE in ${relPath}]: expected grade: 'B' | 'A' | 'S' | 'SS' (found ${gradeMatch ? `'${gradeMatch[1]}'` : 'none'}).`);
+    if (!gradeMatch || !['B', 'A', 'S', 'SS', 'SSR'].includes(gradeMatch[1])) {
+      console.error(`❌ [INVALID GRADE in ${relPath}]: expected grade: 'B' | 'A' | 'S' | 'SS' | 'SSR' (found ${gradeMatch ? `'${gradeMatch[1]}'` : 'none'}).`);
       hasErrors = true;
       gradeErrors++;
     }

@@ -9,6 +9,7 @@ import { getFighterPreview } from './FighterPreviewCache.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, openArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
 import { drawArenaFloorSelector, isArenaFloorModalOpen, drawArenaFloorModal, openArenaFloorModal, closeArenaFloorModal } from '../../systems/arenaTileSystem.js';
+import { drawArenaDecorationSelector } from '../../systems/arenaDecorationSystem.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { goToTitle, startGame, startFaceOffScreen } from '../../core/gameFlow.js';
 
@@ -230,16 +231,18 @@ export function drawHorizontalTeamSelectScreen(ctx) {
   ctx.fillText(`[ ${rawModeTitle} // DEPLOYMENT ]`, w / 2, titleY - 1);
   ctx.restore();
 
-  // Sub-Controls Bar (Arena BGM & Arena Floor / Tiles)
+  // Sub-Controls Bar (Arena BGM, Arena Floor / Tiles & Arena Decoration)
   const tmY = 54;
   const bgmW = 115;
   const floorW = 115;
+  const decoW = 115;
   const gap = 8;
-  const totalCtrlW = bgmW + gap + floorW;
+  const totalCtrlW = bgmW + gap + floorW + gap + decoW;
   const startCtrlX = w / 2 - totalCtrlW / 2;
 
   drawArenaBgmSelector(ctx, startCtrlX, tmY, bgmW, 24);
   drawArenaFloorSelector(ctx, startCtrlX + bgmW + gap, tmY, floorW, 24);
+  drawArenaDecorationSelector(ctx, startCtrlX + bgmW + gap + floorW + gap, tmY, decoW, 24);
 
   // 4. Layout
   if (isFfa) {

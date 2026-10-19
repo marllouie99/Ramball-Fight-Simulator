@@ -1,28 +1,29 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Fighter Grade Registry — Cosmetic Tier Labels (B < A < S < SS)
+// Fighter Grade Registry — Cosmetic Tier Labels (B < A < S < SS < SSR)
 // ─────────────────────────────────────────────────────────────────────────────
 // Grades are purely cosmetic: they drive roster / select / HUD badges and never
-// modify combat stats. Each fighter config declares `grade: 'B' | 'A' | 'S' | 'SS'`.
+// modify combat stats. Each fighter config declares `grade: 'B' | 'A' | 'S' | 'SS' | 'SSR'`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Ordered list of valid grades (lowest → highest). */
-export const GRADES = Object.freeze(['B', 'A', 'S', 'SS']);
+export const GRADES = Object.freeze(['B', 'A', 'S', 'SS', 'SSR']);
 
 /** Grade assigned when a config omits or mistypes its grade. */
 export const DEFAULT_GRADE = 'B';
 
 /** Badge palette & sort order per grade. */
 export const GRADE_META = Object.freeze({
-  B:  Object.freeze({ label: 'B',  order: 0, color: '#10B981', rim: '#065F46', text: '#022C22' }), // Emerald Green
-  A:  Object.freeze({ label: 'A',  order: 1, color: '#A855F7', rim: '#581C87', text: '#FAF5FF' }), // Royal Purple
-  S:  Object.freeze({ label: 'S',  order: 2, color: '#FFD700', rim: '#B45309', text: '#1A0F02' }), // Radiant 24K Gold
-  SS: Object.freeze({ label: 'SS', order: 3, color: '#F43F5E', rim: '#FCD34D', text: '#FFFFFF' }), // Crimson Red + Gold Rim
+  B:   Object.freeze({ label: 'B',   order: 0, color: '#10B981', rim: '#065F46', text: '#022C22' }), // Emerald Green
+  A:   Object.freeze({ label: 'A',   order: 1, color: '#A855F7', rim: '#581C87', text: '#FAF5FF' }), // Royal Purple
+  S:   Object.freeze({ label: 'S',   order: 2, color: '#FFD700', rim: '#B45309', text: '#1A0F02' }), // Radiant 24K Gold
+  SS:  Object.freeze({ label: 'SS',  order: 3, color: '#F43F5E', rim: '#FCD34D', text: '#FFFFFF' }), // Crimson Red + Gold Rim
+  SSR: Object.freeze({ label: 'SSR', order: 4, color: '#050609', rim: '#FFFFFF', text: '#FFFFFF' }), // Abyss Black + Crisp Silver/White Rim & Text
 });
 
 /**
  * Normalizes any grade input into a valid grade string.
  * @param {unknown} grade
- * @returns {'B'|'A'|'S'|'SS'}
+ * @returns {'B'|'A'|'S'|'SS'|'SSR'}
  */
 export function normalizeGrade(grade) {
   const g = typeof grade === 'string' ? grade.trim().toUpperCase() : '';
@@ -75,7 +76,7 @@ export function compareByGradeDesc(a, b) {
 export function drawGradeBadge(ctx, x, y, grade, options = {}) {
   const meta = getGradeMeta(grade);
   const scale = options.scale || 1.0;
-  const baseW = (meta.label.length > 1 ? 28 : 20) * scale;
+  const baseW = (meta.label.length > 2 ? 36 : (meta.label.length > 1 ? 28 : 20)) * scale;
   const w = options.w ? options.w * scale : baseW;
   const h = (options.h || 16) * scale;
   const c = Math.max(2, Math.round(3.5 * scale)); // chamfer cut size

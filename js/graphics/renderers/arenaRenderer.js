@@ -12,6 +12,7 @@ import { drawCenterPlusObstacle } from '../../systems/arenaObstacleSystem.js';
 import { drawDisboardChessboard, drawTroopThreatTiles } from '../weapons/shiroChessGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { shiroConfig } from '../../configs/characters/shiroConfig.js';
+import { drawArenaDecorations } from '../../systems/arenaDecorationSystem.js';
 
 /**
  * Renders a solid vector fissure crack (matching manga comic / PNG crack art).
@@ -742,6 +743,9 @@ export function drawArenaBorder(ctx = state.ctx, alreadyInCameraSpace = false) {
 
   // Draw cached comic arena border
   ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
+
+  // ── Draw Seasonal Arena Corner Decorations (e.g. Halloween Cobwebs) ──
+  drawArenaDecorations(ctx, arena);
 
   // ── Draw Center Plus (+) Arena Wall (FFA Obstacle) ──
   drawCenterPlusObstacle(ctx, arena, isDark);

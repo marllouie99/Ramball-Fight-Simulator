@@ -1591,8 +1591,8 @@ async function main() {
         fighter.y = 200;
         dummyOpponent.x = 230; // Point blank range in chainsaw contact
         dummyOpponent.y = 200;
-        dummyOpponent.hp = 10000;
         dummyOpponent.maxHp = 10000;
+        dummyOpponent.hp = 10000;
         dummyOpponent.isDead = false;
         state.fighters = [fighter, dummyOpponent];
 
@@ -1600,6 +1600,8 @@ async function main() {
         for (let f = 0; f < 20; f++) {
           dummyOpponent.x = fighter.x + 30;
           dummyOpponent.y = fighter.y;
+          dummyOpponent.hp = 10000;
+          dummyOpponent.isDead = false;
           fighter.update(dummyOpponent, 0, state.arena);
         }
         if (fighter.continuousShredTimer < 15) {
@@ -1613,6 +1615,8 @@ async function main() {
         for (let f = 0; f < 70; f++) {
           dummyOpponent.x = fighter.x + 30;
           dummyOpponent.y = fighter.y;
+          dummyOpponent.hp = 10000;
+          dummyOpponent.isDead = false;
           fighter.update(dummyOpponent, 0, state.arena);
         }
         if (fighter.continuousShredTimer < 80) {

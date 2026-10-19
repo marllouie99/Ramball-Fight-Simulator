@@ -5,7 +5,7 @@
 export const saitamaConfig = {
   name: 'Saitama',
   displayName: 'Saitama',
-  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SSR',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   // Base stats
   hp: 420,
   speed: 6.0,

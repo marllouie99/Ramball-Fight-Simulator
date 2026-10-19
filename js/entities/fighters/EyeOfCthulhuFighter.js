@@ -213,11 +213,17 @@ export class EyeOfCthulhuFighter extends Fighter {
   }
 
   _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)
+      ? CONFIG.eye_of_cthulhu
+      : eyeOfCthulhuConfig;
+
     this.skills = [
       {
         id: 'servants_of_cthulhu',
         name: 'Servants of Cthulhu',
-        cooldown: 720,
+        isSignature: true,
+        signature: true,
+        cooldown: cfg.servantSpawnIntervalInHover || 140,
         currentCooldown: 0,
         icon: '👁️',
         description: 'Summons mini Servant eyeballs to swarm the target.'
@@ -225,12 +231,29 @@ export class EyeOfCthulhuFighter extends Fighter {
       {
         id: 'triple_ram',
         name: 'Triple Ram Charge',
-        cooldown: 600,
+        cooldown: cfg.ramCooldown || 600,
         currentCooldown: 0,
         icon: '⚡',
         description: 'Winds up and executes 3 sequential high-speed rams.'
       }
     ];
+
+    if (this.skillManager) {
+      this.skillManager.registerSkills([
+        {
+          id: 'servants_of_cthulhu',
+          name: 'Servants of Cthulhu',
+          type: 'active',
+          isSignature: true,
+          signature: true,
+          cooldownKey: 'servantSpawnTimer',
+          cooldownMax: () => {
+            const c = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu) ? CONFIG.eye_of_cthulhu : eyeOfCthulhuConfig;
+            return c.servantSpawnIntervalInHover || 140;
+          }
+        }
+      ]);
+    }
   }
 
   _playAudio(soundKey, defaultPath, defaultVol = 1.0) {
@@ -338,6 +361,11 @@ export class EyeOfCthulhuFighter extends Fighter {
     // Decrement action noise cooldown timer
     if (this.actionNoiseCooldown > 0) {
       this.actionNoiseCooldown--;
+    }
+
+    // Sync Signature Skill (Servants of Cthulhu) cooldown
+    if (this.skills && this.skills.length > 0) {
+      this.skills[0].currentCooldown = Math.max(0, this.servantSpawnTimer || 0);
     }
 
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.eye_of_cthulhu)

@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER WEAPON CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Weapon Studio on 2026-10-18T23:49:39.069Z
+ * Generated from Weapon Studio on 2026-10-19T02:35:08.602Z
  * =============================================================================
  */
 
@@ -64,7 +64,7 @@ export const WEAPON_CUSTOMIZATIONS_DATABASE = {
   rubbick: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   uryu: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   ulquiorra: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
-  nanami: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
+  nanami: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.10, lengthScale: 1.20, angleOffset: 0 },
   megumi: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   john_wick: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   cj: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },

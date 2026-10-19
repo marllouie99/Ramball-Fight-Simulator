@@ -62,7 +62,7 @@ export const naoyaConfig = {
   // Primary Attack: Rapid 24 FPS Hypersonic Brawler Punch Flurry Barrage (Attack-Teleport-Attack Sequence)
   meleeReach: 72,
   meleeArc: (140 * Math.PI) / 180,  // 140° frontal arc
-  basicComboHits: 10,               // ⚡ How many total punches in a flurry sequence (e.g. 10, 20, 30)
+  basicComboHits: 15,               // ⚡ How many total punches in a flurry sequence (e.g. 10, 20, 30)
   flurryPunchesPerTeleport: 0,      // ⚡ How many punches Naoya throws at each teleport angle (e.g. 1 = teleport every punch, 3 = 3 punches per teleport)
   flurryStrikeIntervalFrames: 8,   // ⚡ Speed of each attack (lower = faster! 3 frames = 20 attacks/sec)
   flurryAngleStep: (155 * Math.PI) / 180, // ⚡ Increased teleport jump angle (~155° cross-jump across victim)
@@ -70,11 +70,11 @@ export const naoyaConfig = {
   flurryOrbitDistance: 24,         // Surround distance when teleporting around the target
   flurryRandomOrbitJitter: 16,      // ⚡ Random distance variation (px) for close/far punch depth (16px jitter)
   flurryLungeSpeed: 2.5,
-  punchDamage: 5,                  // Damage per flurry punch
+  punchDamage: 8,                  // Damage per flurry punch
   punchComboFinisherDamage: 18,    // Bonus damage on the final finisher punch
   punchCooldown: 40,               // Cooldown between full flurry bursts (~0.66s)
   punchKnockback: 16,              // Knockback applied ONLY on the final finisher punch
-  tantoDamage: 4,                  // Backward compatibility alias
+  tantoDamage: 8,                  // Backward compatibility alias
   tantoComboFinisherDamage: 30,
   tantoCooldown: 500,
   knifeStabFrames: 50,              // ⚡ Total duration of the smooth tanto stab finisher animation (frames)

@@ -142,6 +142,18 @@ export function drawAuthenticChainsawBlade(ctx, length, thickness, now = Date.no
       ctx.drawImage(bladeImg, 547, 168, 1594, 369, 0, -bladeH / 2, bladeW, bladeH);
     }
 
+    // Ghost afterimage: fast static blade rendering without running per-tooth transformation loop
+    if (opts.isGhost) {
+      if (hasTeeth) {
+        const topH = Math.round(bladeH * (172 / 369));
+        const botH = bladeH - topH;
+        ctx.drawImage(teethImg, 547, 168, 1594, 172, 0, -bladeH / 2, bladeW, topH);
+        ctx.drawImage(teethImg, 547, 340, 1594, 197, 0, -bladeH / 2 + topH, bladeW, botH);
+      }
+      ctx.restore();
+      return;
+    }
+
     // Layer 2: Modular Animated Chain Loop using chainsaw-chain-teeth-block.png
     if (hasBlock) {
       const R = Math.max(2.5, bladeH * 0.46);

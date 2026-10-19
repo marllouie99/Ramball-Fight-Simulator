@@ -21,91 +21,24 @@ const snap = (v) => Math.round(v / P) * P;
  * @param {Object} opts Extra options (isPreview, isSwinging, heatLevel, now)
  */
 let _escanorWeaponImage = null;
-let _escanorWeaponStrokedCanvas = null;
 let _escanorWeaponImageLoading = false;
 
-function _generateStrokedWeaponCanvas(img) {
-  if (typeof document === 'undefined') return img;
-  try {
-    const w = img.naturalWidth || img.width;
-    const h = img.naturalHeight || img.height;
-    if (!w || !h) return img;
-
-    const offCanvas = document.createElement('canvas');
-    offCanvas.width = w;
-    offCanvas.height = h;
-    const offCtx = offCanvas.getContext('2d', { willReadFrequently: true });
-    if (!offCtx || typeof offCtx.drawImage !== 'function' || typeof offCtx.getImageData !== 'function' || typeof offCtx.putImageData !== 'function') return img;
-
-    offCtx.drawImage(img, 0, 0);
-    const imgData = offCtx.getImageData(0, 0, w, h);
-    const src = imgData.data;
-    const dst = new Uint8ClampedArray(src.length);
-    for (let i = 0; i < src.length; i++) dst[i] = src[i];
-
-    const strokeRadius = 3;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const idx = (y * w + x) * 4;
-        if (src[idx + 3] > 30) continue;
-
-        let hasNeighbor = false;
-        for (let dy = -strokeRadius; dy <= strokeRadius; dy++) {
-          const ny = y + dy;
-          if (ny < 0 || ny >= h) continue;
-          for (let dx = -strokeRadius; dx <= strokeRadius; dx++) {
-            const nx = x + dx;
-            if (nx < 0 || nx >= w) continue;
-            if (dx * dx + dy * dy <= strokeRadius * strokeRadius) {
-              const nIdx = (ny * w + nx) * 4;
-              if (src[nIdx + 3] > 80) {
-                hasNeighbor = true;
-                break;
-              }
-            }
-          }
-          if (hasNeighbor) break;
-        }
-
-        if (hasNeighbor) {
-          dst[idx + 0] = 15;
-          dst[idx + 1] = 15;
-          dst[idx + 2] = 20;
-          dst[idx + 3] = 255;
-        }
-      }
-    }
-
-    for (let i = 0; i < src.length; i++) imgData.data[i] = dst[i];
-    offCtx.putImageData(imgData, 0, 0);
-    return offCanvas;
-  } catch (err) {
-    console.warn('Failed to generate stroked weapon canvas', err);
-    return img;
-  }
-}
-
 export function _getEscanorWeaponImage() {
-  if (_escanorWeaponStrokedCanvas) {
-    return _escanorWeaponStrokedCanvas;
-  }
   if (_escanorWeaponImage && _escanorWeaponImage.complete && _escanorWeaponImage.naturalWidth > 0) {
-    _escanorWeaponStrokedCanvas = _generateStrokedWeaponCanvas(_escanorWeaponImage);
-    return _escanorWeaponStrokedCanvas;
+    return _escanorWeaponImage;
   }
   if (!_escanorWeaponImageLoading && typeof Image !== 'undefined') {
     _escanorWeaponImageLoading = true;
     const img = new Image();
     img.onload = () => {
       _escanorWeaponImage = img;
-      _escanorWeaponStrokedCanvas = _generateStrokedWeaponCanvas(img);
       _escanorWeaponImageLoading = false;
     };
     img.onerror = (e) => {
       console.warn('Failed to load Escanor weapon image at Assets/model/escanor/Escanor-Weapon.png', e);
       _escanorWeaponImageLoading = false;
     };
-    img.src = 'Assets/model/escanor/Escanor-Weapon.png?v=1';
+    img.src = 'Assets/model/escanor/Escanor-Weapon.png?v=3';
     _escanorWeaponImage = img;
   }
   return _escanorWeaponImage;
@@ -231,18 +164,63 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getEscanorSlashEffectImage();
 }
 
-// Geometry constants for Assets/model/escanor/Escanor-Weapon.png (1774 x 887)
-const WEAPON_BLUE_GRIP_X = 1525.5;
-const WEAPON_BLUE_GRIP_Y = 742.3;
-const WEAPON_WIELD_GRIP_X = 1150.0; // Shaft grip balance point
-const WEAPON_WIELD_GRIP_Y = 575.0;
-const WEAPON_HUB_X = 422.7;
-const WEAPON_HUB_Y = 251.0;
-const WEAPON_MID_X = (WEAPON_BLUE_GRIP_X + WEAPON_HUB_X) / 2.0; // 974.1
-const WEAPON_MID_Y = (WEAPON_BLUE_GRIP_Y + WEAPON_HUB_Y) / 2.0; // 496.6
-const WEAPON_SHAFT_LEN = 1207.3;
-// Natural angle pointing from Grip to Hub in raw image: -155.99° = -2.722496 rad
-const WEAPON_ROT_ALIGN = 2.722496;
+// Geometry constants for Assets/model/escanor/Escanor-Weapon.png (600 x 334)
+const WEAPON_BLUE_GRIP_X = 532.0;
+const WEAPON_BLUE_GRIP_Y = 293.4;
+const WEAPON_WIELD_GRIP_X = 400.0; // Shaft grip balance point
+const WEAPON_WIELD_GRIP_Y = 227.0;
+const WEAPON_HUB_X = 162.9;
+const WEAPON_HUB_Y = 109.0;
+const WEAPON_MID_X = (WEAPON_BLUE_GRIP_X + WEAPON_HUB_X) / 2.0; // 347.45
+const WEAPON_MID_Y = (WEAPON_BLUE_GRIP_Y + WEAPON_HUB_Y) / 2.0; // 201.20
+const WEAPON_SHAFT_LEN = 412.6;
+// Natural angle pointing from Grip to Hub in raw image: -153.45° = -2.678244 rad
+const WEAPON_ROT_ALIGN = 2.678244;
+
+/**
+ * Escanor Holy Knight Gauntlet for Weapon Studio Showcase
+ */
+function _drawEscanorPreviewGauntlet(ctx, cx, cy, radius, isTheOne = false) {
+  if (radius <= 0) return;
+  const steps = Math.ceil((radius + P) / P);
+
+  // 1. Dark Bronze Outline Shell
+  ctx.fillStyle = isTheOne ? '#92400E' : '#78350F';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const d = Math.hypot(gx * P, gy * P);
+      if (d <= radius + P * 0.85) {
+        ctx.fillRect(snap(cx + gx * P), snap(cy + gy * P), P, P);
+      }
+    }
+  }
+
+  // 2. Armor Gold Plate Fill with Specular Sheen
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const d = Math.hypot(rx, ry);
+      if (d > radius) continue;
+
+      const px = snap(cx + rx);
+      const py = snap(cy + ry);
+
+      if (ry < -radius * 0.25 && rx > -radius * 0.35) {
+        ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FFF795'; // Brilliant armor shine
+      } else if (ry > radius * 0.40) {
+        ctx.fillStyle = isTheOne ? '#B45309' : '#D97706'; // Warm amber gold shadow
+      } else {
+        ctx.fillStyle = isTheOne ? '#FEF08A' : '#FDC236'; // Holy Knight armor gold
+      }
+      ctx.fillRect(px, py, P, P);
+    }
+  }
+
+  // Segmented Knuckle Ridge Specular Pixel
+  ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FFF795';
+  ctx.fillRect(snap(cx - radius * 0.2), snap(cy - radius * 0.2), P, P);
+}
 
 /**
  * Draws Escanor's Sacred Treasure: Divine Axe Rhitta (神斧 リッタ)
@@ -252,10 +230,11 @@ const WEAPON_ROT_ALIGN = 2.722496;
  * @param {number} y Offset Y
  * @param {number} angle Facing/Wielding angle
  * @param {number} r Fighter body radius
- * @param {Object} opts Extra options (isPreview, isSwinging, heatLevel, now)
+ * @param {Object} opts Extra options (isPreview, isStudio, showHands, isSwinging, heatLevel, now)
  */
 export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
   const isPreview = Boolean(opts.isPreview);
+  const isStudio = Boolean(opts.isStudio || (typeof state !== 'undefined' && state.gameState === 'weaponStudio'));
   const now = opts.now || Date.now();
   const heatLevel = opts.heatLevel !== undefined ? opts.heatLevel : 1.0;
   const isTheOne = Boolean(opts.isTheOne);
@@ -280,7 +259,25 @@ export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
     const drawW = weaponImg.naturalWidth || weaponImg.width;
     const drawH = weaponImg.naturalHeight || weaponImg.height;
 
-    if (isPreview) {
+    if (isStudio) {
+      // Weapon Studio Viewport: Perfect grip anchor at (0, 0) aligned horizontally along +X axis
+      const baseScale = ((r * 4.25) / WEAPON_SHAFT_LEN) * customScale;
+      ctx.rotate(-WEAPON_ROT_ALIGN);
+      ctx.scale(baseScale * customLengthScale, -baseScale * customWidthScale);
+      ctx.drawImage(
+        weaponImg,
+        -WEAPON_BLUE_GRIP_X,
+        -WEAPON_BLUE_GRIP_Y,
+        drawW,
+        drawH
+      );
+
+      // Gauntlet holding the grip in Weapon Studio preview
+      if (opts.showHands !== false) {
+        const handR = r * 0.28;
+        _drawEscanorPreviewGauntlet(ctx, 0, 0, handR, isTheOne);
+      }
+    } else if (isPreview) {
       // Centered diagonal showcase for Weapon Menu Card & Selection Screen
       const previewScale = ((r * 3.4) / WEAPON_SHAFT_LEN) * customScale;
       ctx.rotate(-0.50 - WEAPON_ROT_ALIGN);
@@ -293,7 +290,7 @@ export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
         drawH
       );
     } else {
-      // Wielded in Hand: Align Blue Hilt Grip Center at (0, 0)
+      // Wielded in Hand (Combat Gameplay): Align Blue Hilt Grip Center at (0, 0)
       const baseScale = ((r * 4.25) / WEAPON_SHAFT_LEN) * customScale;
       const prideScaleMult = 1.0 + (opts.prideStacks || 0) * 0.04;
       const wieldScale = baseScale * (isTheOne ? 1.35 : prideScaleMult);
@@ -313,19 +310,19 @@ export function drawDivineAxeRhitta(ctx, x, y, angle, r = 28, opts = {}) {
   }
 
   // Procedural Fallback
-  _drawDivineAxeRhittaProcedural(ctx, r, isPreview, isTheOne, heatLevel, now, opts.prideStacks || 0, customScale);
+  _drawDivineAxeRhittaProcedural(ctx, r, isPreview, isTheOne, heatLevel, now, opts.prideStacks || 0, customScale, isStudio, customLengthScale, customWidthScale);
   ctx.restore();
 }
 
 /**
  * Procedural Pixel-Art Axe Fallback
  */
-function _drawDivineAxeRhittaProcedural(ctx, r, isPreview, isTheOne, heatLevel, now, prideStacks = 0, customScale = 1.0) {
-  const rScale = isPreview ? 1.0 : Math.max(1.0, r / 28);
+function _drawDivineAxeRhittaProcedural(ctx, r, isPreview, isTheOne, heatLevel, now, prideStacks = 0, customScale = 1.0, isStudio = false, customLengthScale = 1.0, customWidthScale = 1.0) {
+  const rScale = (isPreview && !isStudio) ? 1.0 : Math.max(1.0, r / 28);
   const sizeMult = (isTheOne ? 1.35 : (1.0 + prideStacks * 0.04)) * rScale * customScale;
-  const startX = isPreview ? snap(-14) : snap(r * 0.60);
-  const shaftLength = snap(46 * sizeMult);
-  const shaftWidth = snap(4 * sizeMult);
+  const startX = (isPreview && !isStudio) ? snap(-14) : snap(r * 0.60);
+  const shaftLength = snap(46 * sizeMult * customLengthScale);
+  const shaftWidth = snap(4 * sizeMult * customWidthScale);
 
   // 2. Heavy Golden Grip & Haft (Handle)
   ctx.fillStyle = '#1C1917';
@@ -335,6 +332,10 @@ function _drawDivineAxeRhittaProcedural(ctx, r, isPreview, isTheOne, heatLevel, 
   ctx.fillStyle = '#D97706';
   for (let gx = startX - 8; gx < startX + shaftLength - 12; gx += 6) {
     ctx.fillRect(gx, -shaftWidth / 2, 2, shaftWidth);
+  }
+
+  if (isStudio) {
+    _drawEscanorPreviewGauntlet(ctx, startX - 4, 0, snap(r * 0.28), isTheOne);
   }
 
   // Golden Lion Head / Spiked Pommel (Rear Cap)

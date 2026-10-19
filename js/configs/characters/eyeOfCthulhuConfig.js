@@ -33,6 +33,8 @@ export const eyeOfCthulhuConfig = {
   bossTitle: 'Ancient Ocular Horror',
   title: 'Ancient Ocular Horror',
   desc: 'Floats freely through terrain. Summons Servants of Cthulhu and executes telegraphed triple rams. At 50% HP, tears into a ravenous berserk fanged maw.',
+  signatureSkill: 'Servants of Cthulhu',
+  signatureSkillDesc: 'Summons swarms of Servants of Cthulhu during hover flight to overwhelm and bite the target.',
 
   // ── Sprites & Texture Paths ──
   phase1SpriteSrc: 'Assets/model/eyeOfCthulhu/Eye of Cthulhu.png',
@@ -58,8 +60,10 @@ export const eyeOfCthulhuConfig = {
   defensePhase1: 12,
   defenseReductionPhase1: 0.15,
 
-  // ── Phase 1: Servant of Cthulhu Summons ──
-  servantSpawnCooldown: 720, // 12.0s at 60 FPS
+  // ── Signature Skill: Servant of Cthulhu Summons (Phase 1) ──
+  enableServantSummons: true,
+  enableServants: true,
+  servantSpawnCooldown: 300, // 5.0s at 60 FPS
   servantSpawnIntervalInHover: 140, // spawns a minion every ~2.3s during hover state
   servantCountPerSpawn: 1,
   servantMaxActive: 4,

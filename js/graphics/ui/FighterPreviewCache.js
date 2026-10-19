@@ -6,6 +6,23 @@ import { state } from '../../core/state.js';
 // --- Fighter Preview Cache ---
 const fighterPreviewCache = {};
 
+let _deityPreviewCosmicLightImg = null;
+function _getDeityCosmicLightPreviewImage() {
+  if (_deityPreviewCosmicLightImg && _deityPreviewCosmicLightImg.complete && (_deityPreviewCosmicLightImg.naturalWidth > 0 || _deityPreviewCosmicLightImg.width > 0)) {
+    return _deityPreviewCosmicLightImg;
+  }
+  if (typeof Image !== 'undefined') {
+    const img = new Image();
+    img.src = 'Assets/model/NamelessDeity/CosmicLightCircleCenter1.png';
+    _deityPreviewCosmicLightImg = img;
+  }
+  return _deityPreviewCosmicLightImg;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getDeityCosmicLightPreviewImage();
+}
+
 function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
   if (!def) return null;
   const previewSize = 256;
@@ -52,6 +69,32 @@ function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
   
   const prevShowSkinOnly = typeof state !== 'undefined' ? state.showSkinOnly : false;
   try {
+    if (bodyOnly && (def.type === 'namelessdeity' || def.type === 'nameless_deity')) {
+      const deityImg = _getDeityCosmicLightPreviewImage();
+      if (deityImg && (deityImg.complete || deityImg.width > 0)) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = true;
+        const pSize = 180;
+        const destX = previewSize / 2;
+        const destY = previewSize / 2;
+        ctx.drawImage(deityImg, (previewSize - pSize) / 2, (previewSize - pSize) / 2, pSize, pSize);
+        // Soft circular feathering mask to ensure no hard rectangular edge clipping
+        const maxR = (pSize / 2) * 0.95;
+        const maskGrad = ctx.createRadialGradient(destX, destY, maxR * 0.55, destX, destY, maxR);
+        maskGrad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');
+        maskGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.90)');
+        maskGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+        ctx.globalCompositeOperation = 'destination-in';
+        ctx.fillStyle = maskGrad;
+        ctx.fillRect(0, 0, previewSize, previewSize);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.restore();
+        if (cacheKey !== undefined) {
+          fighterPreviewCache[cacheKey] = canvas;
+        }
+        return canvas;
+      }
+    }
     if (bodyOnly && typeof state !== 'undefined') {
       state.showSkinOnly = true;
     }

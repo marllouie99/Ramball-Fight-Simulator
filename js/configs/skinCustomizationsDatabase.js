@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-15T18:34:02.457Z
+ * Generated from Skin Studio on 2026-10-19T16:55:24.037Z
  * =============================================================================
  */
 
@@ -43,14 +43,14 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   eye_of_cthulhu: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity: { widthScale: 0.76, heightScale: 1.03, offsetX: 1, offsetY: -4, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_body: { widthScale: 1.00, heightScale: 0.86, offsetX: 0, offsetY: 1, angleOffset: 0, flipX: false, flipY: false },
-  nameless_deity_antlers: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false, gap: 0 },
+  nameless_deity_antlers: { widthScale: 0.30, heightScale: 0.20, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false, gap: 0 },
   nameless_deity_antler_vines: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_cicada: { widthScale: 1.00, heightScale: 0.70, offsetX: 0, offsetY: -6, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_censor: { widthScale: 1.02, heightScale: 0.72, offsetX: 0, offsetY: -4, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_vines: { widthScale: 1.30, heightScale: 0.86, offsetX: -11, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_flowers: { widthScale: 1.50, heightScale: 1.04, offsetX: 6, offsetY: 19, angleOffset: 0, flipX: false, flipY: false },
-  nameless_deity_wings: { widthScale: 1.20, heightScale: 1.32, offsetX: -22, offsetY: -19, angleOffset: 0, flipX: false, flipY: false },
-  nameless_deity_halo: { widthScale: 2.16, heightScale: 1.52, offsetX: 0, offsetY: 13, angleOffset: 0, flipX: false, flipY: false },
+  nameless_deity_wings: { widthScale: 1.60, heightScale: 1.32, offsetX: -18, offsetY: -19, angleOffset: 0, flipX: false, flipY: false },
+  nameless_deity_halo: { widthScale: 2.18, heightScale: 1.52, offsetX: 7, offsetY: 13, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_wheel: { widthScale: 0.84, heightScale: 0.56, offsetX: 0, offsetY: -34, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_arm: { widthScale: 1.00, heightScale: 1.00, offsetX: 13, offsetY: 6, angleOffset: 0, flipX: false, flipY: false },
   nameless_deity_forearm: { widthScale: 0.82, heightScale: 1.86, offsetX: 0, offsetY: -15, angleOffset: 1.1868, flipX: false, flipY: false },

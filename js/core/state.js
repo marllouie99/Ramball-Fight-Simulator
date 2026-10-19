@@ -402,6 +402,9 @@ export const state = {
   // Death shatter effects
   deathEffects: [],
 
+  // Tombstone & ascending ghost soul death effects
+  tombstoneDeathEffects: [],
+
   // Illusion death effects (ethereal dissolving)
   illusionDeathEffects: [],
 
@@ -1071,7 +1074,7 @@ if (typeof window !== 'undefined') {
 // FLOATING TEXT LABELS
 // ─────────────────────────────────────────────
 
-const MAX_FLOATING_TEXTS = 16; // Capacity for juicy arcing fountains and combo counters
+const MAX_FLOATING_TEXTS = 32; // Capacity for discrete damage numbers and arcing fountains
 const MINIMAL_FLOATING_TEXT = true; // Only show damage/heal numbers and key skill labels
 const SKILL_TEXT_WHITELIST = [
   'BLACK FLASH',
@@ -1308,42 +1311,11 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     return;
   }
 
-  // 1. Fast Combo Stacking & Rapid Damage Accumulation:
-  // If an active text already exists at this location (< 45px) within the accumulation window (< 18 frames):
-  // Accumulate the damage into a single climbing counter instead of spawning duplicate overlapping numbers.
-  if (isDamage && state.floatingTexts && state.floatingTexts.length > 0) {
-    const MAX_COMBO_STACKS = 5;
-    for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
-      const activeText = state.floatingTexts[i];
-      if (activeText && activeText.isDamage &&
-          (activeText.stackCount || 1) < MAX_COMBO_STACKS &&
-          Math.hypot(activeText.originX - posX, activeText.originY - posY) < 45 &&
-          activeText.timer < 18) {
-        activeText.stackCount = (activeText.stackCount || 1) + 1;
-        activeText.damageValue = (activeText.damageValue || 0) + numericVal;
-        const valText = String(Math.round(activeText.damageValue));
-        activeText.text = (activeText.isCrit || isCrit) ? `CRIT! ${valText}` : valText;
-        if (isCrit) activeText.isCrit = true;
-        activeText.popFrames = 5;
-        activeText.timer = Math.min(activeText.timer, 4);
-        activeText.vy = Math.max(-2.0, (activeText.vy || 0) * 0.3 - 0.6);
-        if (activeText.y < activeText.originY - 24) {
-          activeText.y = activeText.originY - 24;
-          activeText.vy = Math.max(0, activeText.vy);
-        }
-        activeText.originX = posX;
-        activeText.originY = posY;
-        activeText.x += (posX - activeText.x) * 0.35;
-        activeText.baseScale = Math.min(1.55, 1.25 + Math.log10(1 + activeText.damageValue / 20) * 0.28);
-        return;
-      }
-    }
-  }
-
-  // 2. Exact Duplicate Text Suppression:
-  // If an identical floating text is already active at this location (< 40px) within recent frames (< 18 frames),
+  // 1. Exact Duplicate Non-Damage Text Suppression:
+  // If an identical non-damage text (e.g. "MISS!") is already active at this location (< 40px) within recent frames (< 18 frames),
   // refresh the existing active text rather than spawning a duplicate clone overlapping directly on top of it.
-  if (state.floatingTexts && state.floatingTexts.length > 0) {
+  // NOTE: Discrete damage numbers MUST NEVER be suppressed or summed, ensuring players see exact per-hit values.
+  if (!isDamage && state.floatingTexts && state.floatingTexts.length > 0) {
     for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
       const activeText = state.floatingTexts[i];
       if (activeText && activeText.text === displayText &&
@@ -1356,18 +1328,20 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     }
   }
 
-  // 3. Proximity Spam Prevention Cache
-  const now = Date.now();
-  const hashKey = fastHash(displayText, Math.round(posX / 30), Math.round(posY / 30));
-  const lastSpawnedTime = spamPreventionCache.get(hashKey);
-  if (lastSpawnedTime && (now - lastSpawnedTime) < 120) {
-    return;
-  }
-  spamPreventionCache.set(hashKey, now);
+  // 2. Proximity Spam Prevention Cache (Non-Damage text only)
+  if (!isDamage) {
+    const now = Date.now();
+    const hashKey = fastHash(displayText, Math.round(posX / 30), Math.round(posY / 30));
+    const lastSpawnedTime = spamPreventionCache.get(hashKey);
+    if (lastSpawnedTime && (now - lastSpawnedTime) < 120) {
+      return;
+    }
+    spamPreventionCache.set(hashKey, now);
 
-  if (spamPreventionCache.size > 100) {
-    for (const [key, val] of spamPreventionCache.entries()) {
-      if (now - val > 1500) spamPreventionCache.delete(key);
+    if (spamPreventionCache.size > 100) {
+      for (const [key, val] of spamPreventionCache.entries()) {
+        if (now - val > 1500) spamPreventionCache.delete(key);
+      }
     }
   }
 
@@ -1386,18 +1360,22 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   let rotation = 0;
   let popAmount = 0.35;
   let popFrames = 5;
-  let maxTimer = 40;
+  let maxTimer = 38;
   let baseScale = 1.20;
   let finalColor = textColor;
+  let spawnOffsetX = 0;
+  let spawnOffsetY = 0;
 
   if (isCrit) {
-    vx = spreadDir * (1.2 + Math.random() * 0.6);
-    vy = -4.5;
+    spawnOffsetX = spreadDir * (4 + Math.random() * 6);
+    spawnOffsetY = (Math.random() - 0.5) * 6;
+    vx = spreadDir * (1.3 + Math.random() * 0.7);
+    vy = -4.6 - Math.random() * 0.6;
     gravity = 0.16;
-    popAmount = 0.55;
+    popAmount = 0.50;
     popFrames = 6;
-    rotation = spreadDir * (0.08 + Math.random() * 0.06);
-    maxTimer = 46;
+    rotation = spreadDir * (0.06 + Math.random() * 0.05);
+    maxTimer = 44;
     baseScale = 1.30;
     if (!finalColor || finalColor === '#ffffff' || finalColor === '#fff') {
       finalColor = '#FF3B30'; // Punchy red/orange crit
@@ -1414,21 +1392,23 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
       finalColor = '#E2E8F0'; // Clean silver/white miss
     }
   } else {
-    // Standard damage number takes a parabolic fountain arc
-    vx = spreadDir * (1.1 + Math.random() * 0.6);
-    vy = -3.6;
+    // Standard discrete damage number takes an alternating parabolic fountain arc with slight scatter
+    spawnOffsetX = spreadDir * (4 + Math.random() * 6);
+    spawnOffsetY = (Math.random() - 0.5) * 6;
+    vx = spreadDir * (1.1 + Math.random() * 0.7);
+    vy = -3.5 - Math.random() * 0.6;
     gravity = 0.14;
-    popAmount = 0.40;
+    popAmount = 0.38;
     popFrames = 5;
-    maxTimer = 38;
+    maxTimer = 36;
     const val = isNaN(numericVal) ? 20 : Math.abs(numericVal);
-    baseScale = Math.min(1.50, 1.25 + Math.log10(1 + val / 20) * 0.25);
+    baseScale = Math.min(1.45, 1.20 + Math.log10(1 + val / 20) * 0.22);
     if (!finalColor) finalColor = '#FFFFFF';
   }
 
   state.floatingTexts.push({
-    x: posX + (Math.random() - 0.5) * 4,
-    y: posY - 6,
+    x: posX + spawnOffsetX,
+    y: posY - 6 + spawnOffsetY,
     vx,
     vy,
     gravity,
