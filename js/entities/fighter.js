@@ -1759,6 +1759,9 @@ export class Fighter {
           this.statusEffects.paralyzeTimer = 0;
         }
         if (!this.isParalyzedByMahoraga && !this.isWallSlammed) {
+          if (typeof this.resumeMovement === 'function' && Math.hypot(this.vx, this.vy) < 0.2) {
+            this.resumeMovement();
+          }
           return false;
         }
       }
@@ -3697,6 +3700,9 @@ export class Fighter {
     if (this.hitStunTimer > 0) {
       this.hitStunTimer--;
       targetSpeed *= this.hitStunMultiplier;
+      if (this.hitStunTimer <= 0) {
+        this.hitStunMultiplier = 1.0;
+      }
     }
     // Pure Love Beam slow (both during beam hit and recovery phase)
     if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.pureLoveBeamRecoveryTimer > 0)) {

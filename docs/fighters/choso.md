@@ -3,7 +3,7 @@
 **Category:** Anime & Jujutsu Sorcerers  
 **Theme Color:** Deep Crimson Blood (`#A31D1D` / `#8B0000`)  
 **Secondary Accents:** Laser Core Radiant White-Pink (`#FF2A55` / `#FFFFFF`), Cursed Violet Shroud (`#6B1736` / `#4A0E2E`), Robe Charcoal Plum (`#261B2E`)  
-**Role:** Sanguine Tactician, Arena Carpet Zoner, Laser Matrix Burst Finisher  
+**Role:** Sanguine Tactician, Arena Carpet Zoner, Convergence Burst Finisher
 
 ---
 
@@ -57,7 +57,7 @@ Choso's fighter model, facial silhouette, hair knots, and traditional Noritoshi 
   - Sanguine particles decay naturally over 12.0 seconds (`720 frames`), but Choso can seize command of them at any moment to transmute them into laser beams.
 
 ### 4. Crimson Laser Transmutation Visuals (Unique Signature Aesthetic)
-- When Choso activates **Blood Transmutation: Crimson Laser Matrix**:
+- When Choso activates **Blood Manipulation: Convergence**:
   - **Phase 1 — Gravitational Singularity Lock**: All active blood particles in the arena instantly stop all velocity (`vx = 0, vy = 0`), floating weightlessly.
   - **Phase 2 — Photonic Ionization**: Each blood droplet pulses violently, blooming into a blinding miniature crimson-white laser diode ring (`#FF2A55` outer halo, `#FFFFFF` pure core) with an expanding 2-stage compression ripple (Rule 26 compliant, no cobwebs or starburst spokes).
   - **Phase 3 — Optical Needle Telegraph**: Hair-thin target lock-on laser guidance beams (`0.75px`, `rgba(255, 42, 85, 0.65)`) snap from every blood node directly toward the opponent's center coordinate.
@@ -154,7 +154,7 @@ By manipulating his internal blood composition, Choso accelerates his pulse, bod
 
 ---
 
-### 🔴⚡ UNIQUE SIGNATURE SKILL: Blood Transmutation: Crimson Laser Matrix (*Shuren: Kōsen Ketsurui — 収斂・光線血流*)
+### 🔴⚡ UNIQUE SIGNATURE SKILL: Blood Manipulation: Convergence
 * **Type**: Arena-Wide Particle-to-Laser Conversion & Hitscan Piercing Crossfire
 * **Cooldown**: `14.0 seconds` (`840 frames`)
 * **Cast Time**: `16 frames` (Tense Convergence Clasp Stance)
@@ -176,7 +176,7 @@ By manipulating his internal blood composition, Choso accelerates his pulse, bod
 
 ---
 
-### 🩸⚡ ULTIMATE: Piercing Blood: True Convergence (*Teisō / Fuga — 穿血・真収斂*)
+### 🩸⚡ SKILL 3: Piercing Blood (*Teisō / Fuga — 穿血・真収斂*)
 * **Type**: Cinematic Supersonic Pressure Cannon & Full-Arena Line Cleave
 * **Cooldown**: `28.0 seconds` (`1680 frames`)
 * **Total Damage**: `145 True Damage` (`45 Shockwave Blast` + `100 Sustained Supersonic Beam`)
@@ -193,7 +193,7 @@ By manipulating his internal blood composition, Choso accelerates his pulse, bod
      - Pierces end-to-end through the entire arena, obliterating all enemy projectiles, traps, and barriers in its path.
   3. **Phase 3 — Sanguine Vapor Fallout & Laser Ignition**:
      - As the colossal beam disperses, it leaves a vapor trail of **12 fresh Blood Droplet Nodes** along its line of fire.
-     - If *Blood Transmutation: Crimson Laser Matrix* is currently active, these 12 vapor nodes immediately ignite into supplementary laser beams, executing a devastating double-burst finale!
+      - If *Blood Manipulation: Convergence* is currently active, these 12 vapor nodes immediately ignite into supplementary laser beams, executing a devastating double-burst finale!
 
 ---
 
@@ -208,8 +208,8 @@ All HUD skill progress bars and card accents strictly use Choso's unified **Deep
 │                                                             │
 │ [Skill 1: Slicing Exorcist]    [  READY  ] #A31D1D (Blood)  │
 │ [Skill 2: Supernova]           [  READY  ] #A31D1D (Blood)  │
-│ [Skill 3: Crimson Laser Matrix][  READY  ] #FF2A55 (Laser)  │
-│ [Ultimate: Piercing Blood]     [  READY  ] #A31D1D (Blood)  │
+│ [Skill 3: Piercing Blood]      [  READY  ] #A31D1D (Blood)  │
+│ [Ultimate: Convergence]        [  READY  ] #FF2A55 (Laser)  │
 │ [Active Blood Nodes in Arena: ◆◆◆◆◆◆◆◆◆◇ (18/32)]           │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -222,7 +222,7 @@ All HUD skill progress bars and card accents strictly use Choso's unified **Deep
 | :--- | :--- |
 | **vs Yuji Itadori** | **"My Little Brother!" Resonance**: Choso feels a deep, instinctual soul resonance with Yuji. Choso's blood poison does not harm Yuji. If Yuji and Choso are paired on the same team, both gain **+15% Attack Power** and Choso prioritizes body-blocking projectiles targeting Yuji. |
 | **vs Naoya Zenin** | **Sanguine Counter to Projection Sorcery**: True to their Shibuya/Itadori Extermination arc duel, Naoya's supersonic 24 FPS speed is crippled by Choso's blood-carpeted arena! Stepping on Choso's blood floor applies poison and viscosity friction, reducing Naoya's movement speed and disrupting his predetermined 24-frame paths. |
-| **vs Satoru Gojo** | **Limitless Barrier Physics (Rule 1.7)**: Gojo's Infinity halts standard blood droplets, chakrams, and physical slashes. However, Choso's **Crimson Laser Matrix** fires high-frequency photonic energy from 20+ simultaneous angles, testing the spatial barrier, while *Piercing Blood* requires Gojo's full barrier concentration. |
+| **vs Satoru Gojo** | **Limitless Barrier Physics (Rule 1.7)**: Gojo's Infinity halts standard blood droplets, chakrams, and physical slashes. However, Choso's **Convergence** fires high-frequency photonic energy from 20+ simultaneous angles, testing the spatial barrier, while *Piercing Blood* requires Gojo's full barrier concentration. |
 | **vs Mahito** | **Poison to Cursed Spirits**: Mahito cannot manipulate Choso's soul without touching him, while Choso's cursed blood is inherently toxic to cursed spirits, dealing +25% bonus poison tick damage to Mahito. |
 | **vs Toji Fushiguro** | **Zenin / Heavenly Restriction Clash**: Toji's high-speed dashes can evade *Piercing Blood* narrow trajectories; however, Choso's 360° *Supernova* and omnidirectional *Laser Matrix* create unavoidable area coverage that Toji cannot slip through without taking chip damage. |
 

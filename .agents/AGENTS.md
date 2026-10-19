@@ -388,5 +388,6 @@ After completing ANY code modification, update, or fix in the project, the agent
 - **Layered Fleshy "Slap" Audio Palette**:
   - Combat hits MUST layer `attack_fleshhit` (1.0 volume) with blade slicing SFX (`sukuna_slice` or `attack_swordswing` at 0.90 volume) and heavy sub-bass punches (`attack_heavypunch1` on combo finishers) to deliver a visceral concussive slap impact rather than a generic metallic whoosh.
 - **Reference Playbook**: For detailed math, schemas, and templates, see dedicated skills `melee-attack-animator` (`.agents/skills/melee-attack-animator/SKILL.md`) and `chemical-katana-animator` (`.agents/skills/chemical-katana-animator/SKILL.md`).
+- **12-Frame Visual Animation Playbook**: When generating, extracting, or formatting 12-frame visual animations (explosions, bursts, slashes, impacts), see dedicated skill `twelve-frame-animation-generator` (`.agents/skills/twelve-frame-animation-generator/SKILL.md`) referencing Reze's canonical model (`Assets/model/reze/explosion/`).
 
 

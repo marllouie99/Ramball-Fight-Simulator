@@ -57,7 +57,7 @@ export class KnightFighter extends Fighter {
     this.swordSwingRecFrames = 10;
     this.swordSwingDamage = 28;
     this.swordSwingKnockback = 6.0;
-    this.swordSwingLunge = 6.5;
+    this.swordSwingLunge = 0;
     this.swordSwingHitPause = 7;
     this.swordSwingHitStun = 10;
     this.swordHitDelivered = false;
@@ -290,13 +290,19 @@ export class KnightFighter extends Fighter {
 
     triggerGlobalScreenShake(7.0, 14);
 
-    // Floating text: "🛡️ SHIELD SHATTERED!"
+    // Floating text: "🛡️ SHIELD SHATTERED!" & "🗡️ MINECRAFT GOLD SWORD! 2X DMG!"
     if (typeof state !== 'undefined' && state.spawnFloatingText) {
-      state.spawnFloatingText('🛡️ SHIELD SHATTERED!', this.x, this.y - this.r - 20, {
+      state.spawnFloatingText('🛡️ SHIELD SHATTERED!', this.x, this.y - this.r - 28, {
         color: '#ef4444',
         font: '900 14px "Rajdhani", sans-serif',
         rise: 26,
         duration: 55
+      });
+      state.spawnFloatingText('🗡️ MINECRAFT GOLD SWORD! 2X DMG!', this.x, this.y - this.r - 12, {
+        color: '#FFD700',
+        font: '900 15px "Rajdhani", sans-serif',
+        rise: 34,
+        duration: 75
       });
     }
 
@@ -385,8 +391,6 @@ export class KnightFighter extends Fighter {
       if (this.blockHitPauseTimer <= 0) {
         this.blockHitPauseTimer = pauseFrames;
         this.blockHitPauseMax = pauseFrames;
-        this.vx = 0;
-        this.vy = 0;
 
         // If blocked a melee attacker, stagger/pause the attacker as well!
         if (opts.isMelee && attacker && attacker !== this && attacker.hp > 0 && !attacker.isDead) {
@@ -562,7 +566,7 @@ export class KnightFighter extends Fighter {
       recF = cfg.hit1RecoveryFrames ?? 10;
       dmg = cfg.hit1Damage ?? 28;
       kb = cfg.hit1Knockback ?? 6.0;
-      lunge = cfg.hit1LungeSpeed ?? 6.5;
+      lunge = cfg.hit1LungeSpeed ?? 0;
       hitPause = cfg.hit1HitPauseFrames ?? 7;
       hitStun = cfg.hit1HitStunFrames ?? 10;
     } else {
@@ -573,7 +577,7 @@ export class KnightFighter extends Fighter {
       recF = cfg.hit2RecoveryFrames ?? 12;
       dmg = cfg.hit2Damage ?? 34;
       kb = cfg.hit2Knockback ?? 8.5;
-      lunge = cfg.hit2LungeSpeed ?? 7.2;
+      lunge = cfg.hit2LungeSpeed ?? 0;
       hitPause = cfg.hit2HitPauseFrames ?? 9;
       hitStun = cfg.hit2HitStunFrames ?? 14;
     }
@@ -586,6 +590,12 @@ export class KnightFighter extends Fighter {
     this.swordSwingStrikeFrames = strikeF;
     this.swordSwingImpactLockFrames = pinF;
     this.swordSwingRecFrames = recF;
+
+    // Minecraft Gold Sword Mechanic: Deals 2x damage when shield is broken
+    const damageMultiplier = this.isShieldBroken ? (cfg.brokenShieldSwordDamageMultiplier ?? 2.0) : 1.0;
+    dmg = Math.round(dmg * damageMultiplier);
+    this.damage = (this._baseDamage || 10) * damageMultiplier;
+
     this.swordSwingDamage = dmg;
     this.swordSwingKnockback = kb;
     this.swordSwingLunge = lunge;
@@ -622,11 +632,9 @@ export class KnightFighter extends Fighter {
   _updateSwordSwing(opponent, arena) {
     if (this.swordSwingTimer <= 0) return;
 
-    // ── Sword Hit-Pause Active (Freezes attacker & targets in impact stasis) ──
+    // ── Sword Hit-Pause Active (Freezes targets in impact stasis) ──
     if (this.swordHitPauseTimer > 0) {
       this.swordHitPauseTimer--;
-      this.vx = 0;
-      this.vy = 0;
 
       // Jitter tremor against collision resistance (Rule 30)
       this.swordTremorX = (Math.random() - 0.5) * 2.6;
@@ -673,8 +681,6 @@ export class KnightFighter extends Fighter {
         this.swordSlashAngle = Math.atan2(trackTarget.y - this.y, trackTarget.x - this.x);
         this.swipeAngle = this.swordSlashAngle;
       }
-      this.vx *= 0.88;
-      this.vy *= 0.88;
     } else if (elapsed < strikeEnd) {
       // Phase 3: Hypersonic Whip Strike Window
       const strikeElapsed = elapsed - strikeStart;
@@ -690,11 +696,6 @@ export class KnightFighter extends Fighter {
           }
         } catch (e) {}
       }
-
-      // Forward lunging momentum impulse
-      const lungeP = Math.sin(strikeP * Math.PI);
-      this.vx = Math.cos(this.swordSlashAngle) * this.swordSwingLunge * lungeP;
-      this.vy = Math.sin(this.swordSlashAngle) * this.swordSwingLunge * lungeP;
 
       // Deliver impact at mid-strike (strikeP >= 0.50)
       if (strikeP >= 0.50 && !this.swordHitDelivered) {
@@ -724,8 +725,6 @@ export class KnightFighter extends Fighter {
           this.swordHitPauseMax = pauseFrames;
           this.swordHitPauseTargets = targets;
           this.swordHitPauseAngle = this.swordSlashAngle;
-          this.vx = 0;
-          this.vy = 0;
 
           // Blade impact spark point at blade tip (Rule 26)
           this.swordImpactX = this.x + Math.cos(this.swordSlashAngle) * (this.r + 76);
@@ -760,8 +759,6 @@ export class KnightFighter extends Fighter {
       }
     } else if (elapsed < pinEnd) {
       // Phase 4: THE IMPACT LOCK / LATCH (Rule 30)
-      this.vx = 0;
-      this.vy = 0;
       this.swordTremorX = (Math.random() - 0.5) * 2.2;
       this.swordTremorY = (Math.random() - 0.5) * 2.2;
     } else {
@@ -819,6 +816,7 @@ export class KnightFighter extends Fighter {
 
     this.swordTremorX = 0;
     this.swordTremorY = 0;
+    const lastTarget = (this.swordHitPauseTargets && this.swordHitPauseTargets[0]) ? this.swordHitPauseTargets[0] : null;
     this.swordHitPauseTargets = [];
   }
 
@@ -847,47 +845,9 @@ export class KnightFighter extends Fighter {
     triggerGlobalScreenShake(3.5, 6);
   }
 
-  // ── Smart Wall bounce (Melee Approach Vector) ──
+  // ── Natural Arena Wall Bounce ──
   resolveWallBounce(arena, opponent) {
-    if (!opponent || this.isCaughtInBeam() || this.isDraggedByGetsuga || this.isWallPinnedByMakima || this.isWallPinnedBySaitama || this.isWallPinnedByEscanor || this.isCurrentlyWallPinnedByEscanor) {
-      return super.resolveWallBounce(arena, opponent);
-    }
-
-    let bounced = false;
-    if (this.x - this.r < arena.x) {
-      this.x = arena.x + this.r;
-      bounced = true;
-    } else if (this.x + this.r > arena.x + arena.width) {
-      this.x = arena.x + arena.width - this.r;
-      bounced = true;
-    }
-
-    if (this.y - this.r < arena.y) {
-      this.y = arena.y + this.r;
-      bounced = true;
-    } else if (this.y + this.r > arena.y + arena.height) {
-      this.y = arena.y + arena.height - this.r;
-      bounced = true;
-    }
-
-    if (bounced) {
-      const wbSound = CONFIG.knight?.sounds?.wallBounce;
-      const wbVol = CONFIG.knight?.soundVolumes?.wallBounce;
-      if (wbSound && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX(wbSound, wbVol ?? 0.50);
-      } else {
-        this.playWallBounceSound();
-      }
-      // Melee approach: reflect directly toward the enemy to close combat distance!
-      const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
-      const dx = opponent.x - this.x;
-      const dy = opponent.y - this.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > 0) {
-        this.vx = (dx / dist) * currentSpeed;
-        this.vy = (dy / dist) * currentSpeed;
-      }
-    }
+    return super.resolveWallBounce(arena, opponent);
   }
 
   // ── Aiming ──
@@ -930,16 +890,16 @@ export class KnightFighter extends Fighter {
 
     this.handleStatusEffects();
 
-    // Time stop - freeze ALL movement, spinning, and actions
-    if (this._handleTimeStop()) {
+    // Rule 1.1 Freeze & TimeStop Guard: Stop execution and interrupt attacks while frozen or ambushed
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
       return;
     }
 
     // ── Shield Block Deflection Hit-Pause ──
     if (this.blockHitPauseTimer > 0) {
       this.blockHitPauseTimer--;
-      this.vx = 0;
-      this.vy = 0;
       this.shieldTremorX = (Math.random() - 0.5) * 2.2;
       this.shieldTremorY = (Math.random() - 0.5) * 2.2;
 
@@ -1006,15 +966,10 @@ export class KnightFighter extends Fighter {
       this.fsm.update(1);
     }
 
-    // Normal movement / Deceleration (prevent movement while hit-pausing)
-    if (!this.isHitPausing()) {
-      this.applyMovementPhysics();
-      this.aim(opponent);
-      this.resolveWallBounce(arena, opponent);
-    } else {
-      this.vx = 0;
-      this.vy = 0;
-    }
+    // Normal natural movement & wall bouncing
+    this.applyMovementPhysics();
+    this.aim(opponent);
+    this.resolveWallBounce(arena, opponent);
 
     // Cooldown and combo timer ticks
     if (this.comboResetTimer > 0) this.comboResetTimer--;
@@ -1149,8 +1104,8 @@ export class KnightFighter extends Fighter {
     const tx = ((this.swipeActive || this.swordHitPauseTimer > 0) && this.swordTremorX) ? this.swordTremorX : 0;
     const ty = ((this.swipeActive || this.swordHitPauseTimer > 0) && this.swordTremorY) ? this.swordTremorY : 0;
 
-    // Draw Main Sword (on the left side in idle, lunging forward when swinging)
-    drawGraySword(ctx, this.x + tx, this.y + ty, swordAngle, this.r, null, false, isSwinging);
+    // Draw Main Sword (on the left side in idle, lunging forward when swinging; transforms into Minecraft Gold Sword if shield broken)
+    drawGraySword(ctx, this.x + tx, this.y + ty, swordAngle, this.r, null, false, isSwinging, this.isShieldBroken);
     
     // Draw Sword Hand (drawn over sword hilt on the left flank)
     ctx.save();

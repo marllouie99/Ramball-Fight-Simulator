@@ -15,7 +15,7 @@ export const ichigoConfig = {
 
   name: 'Ichigo',
   displayName: 'Ichigo',
-  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SSR',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Substitute Soul Reaper',
   title: 'Substitute Soul Reaper',
 

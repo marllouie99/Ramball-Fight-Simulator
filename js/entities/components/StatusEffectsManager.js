@@ -384,6 +384,9 @@ export class StatusEffectsManager {
         fighter.iceFreezeTimer = 0;
         fighter.isFrozenBySnowPea = false;
         fighter.isFrozenByBlueBone = false;
+        if (typeof fighter.resumeMovement === 'function' && Math.hypot(fighter.vx, fighter.vy) < 0.2) {
+          fighter.resumeMovement();
+        }
       }
       return true;
     } else {
@@ -408,6 +411,11 @@ export class StatusEffectsManager {
       if (typeof fighter._handleFrozenSkillCooldowns === 'function') {
         fighter._handleFrozenSkillCooldowns();
       }
+      if (fighter.crimsonElectrifiedTimer <= 0) {
+        if (typeof fighter.resumeMovement === 'function' && Math.hypot(fighter.vx, fighter.vy) < 0.2) {
+          fighter.resumeMovement();
+        }
+      }
       return true;
     }
 
@@ -419,11 +427,21 @@ export class StatusEffectsManager {
     // Electric stun - immobilize the fighter completely.
     if (fighter.electricStunTimer > 0) {
       fighter.electricStunTimer--;
+      if (fighter.electricStunTimer <= 0 && fighter.dubstepStunTimer <= 0) {
+        if (typeof fighter.resumeMovement === 'function' && Math.hypot(fighter.vx, fighter.vy) < 0.2) {
+          fighter.resumeMovement();
+        }
+      }
     }
     
     if (fighter.dubstepStunTimer > 0) {
       fighter.dubstepStunTimer--;
       fighter.dubstepStunVisualTimer = 45; // 0.75 seconds of visual fade out
+      if (fighter.dubstepStunTimer <= 0 && fighter.electricStunTimer <= 0) {
+        if (typeof fighter.resumeMovement === 'function' && Math.hypot(fighter.vx, fighter.vy) < 0.2) {
+          fighter.resumeMovement();
+        }
+      }
     } else if (fighter.dubstepStunVisualTimer > 0) {
       fighter.dubstepStunVisualTimer--;
     }

@@ -1063,6 +1063,7 @@ function _drawCrispFireballBody(ctx, curR, p, alpha, isNuke) {
  */
 function _drawCrispSparks(ctx, curR, p, alpha, isNuke, P) {
   const sparks = isNuke ? REZE_NUKE_SPARKS : REZE_PALM_SPARKS;
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha *= alpha;
 
   for (let i = 0; i < sparks.length; i++) {
@@ -1075,14 +1076,193 @@ function _drawCrispSparks(ctx, curR, p, alpha, isNuke, P) {
     ctx.fillStyle = (i % 3 === 0) ? '#FFFFFF' : ((i % 3 === 1) ? '#FFE600' : '#FF6B1A');
     ctx.fillRect(sx - size / 2, sy - size / 2, size, size);
   }
+  ctx.globalAlpha = prevAlpha;
+}
 
+const REZE_EXPLOSION_FRAME_COUNT = 12;
+const REZE_EXPLOSION_FRAME_PATHS = Array.from({ length: 12 }, (_, i) => `Assets/model/reze/explosion/explosion-${i + 1}.png`);
+let _rezeExplosionFrames = [];
+let _rezeExplosionFramesLoading = false;
+
+export function _getRezeExplosionFrames() {
+  if (_rezeExplosionFrames.length === REZE_EXPLOSION_FRAME_COUNT && _rezeExplosionFrames.every(img => img && img.complete && img.naturalWidth > 0)) {
+    return _rezeExplosionFrames;
+  }
+  if (!_rezeExplosionFramesLoading && typeof Image !== 'undefined') {
+    _rezeExplosionFramesLoading = true;
+    _rezeExplosionFrames = [];
+    REZE_EXPLOSION_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _rezeExplosionFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Reze explosion frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _rezeExplosionFrames[idx] = img;
+    });
+  }
+  return _rezeExplosionFrames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getRezeExplosionFrames();
+}
+
+/**
+ * Draws the 12-frame retro pixel art explosion sprite (explosion-1.png to explosion-12.png)
+ * Scaled 1:1 with nearest-neighbor crispness to match blast reach without altering canvas stack depth.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} maxR Blast radius
+ * @param {number} p Progress 0.0 to 1.0
+ * @param {number} alpha Blast opacity
+ * @returns {boolean} True if frame was successfully rendered
+ */
+function _drawRezeAnimatedExplosionSprite(ctx, maxR, p, alpha) {
+  const frames = _getRezeExplosionFrames();
+  const frameIndex = Math.min(11, Math.max(0, Math.floor(p * 12)));
+  const frameImg = frames[frameIndex];
+
+  if (!frameImg || !frameImg.complete || frameImg.naturalWidth <= 0) {
+    return false;
+  }
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.imageSmoothingEnabled = false;
+
+  // Natural fade-out on late dissipating frames (frames 1-9 are solid, frames 10-12 dissolve)
+  const fadeAlpha = p > 0.82 ? Math.max(0, (1.0 - p) / 0.18) : 1.0;
+  ctx.globalAlpha = prevAlpha * fadeAlpha;
+
+  // Frame is 256x256px with detonation center calibrated at (126, 118)
+  const scale = (maxR * 1.10) / 105.0;
+  const drawW = 256 * scale;
+  const drawH = 256 * scale;
+  const anchorX = 126 * scale;
+  const anchorY = 118 * scale;
+
+  ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  return true;
+}
+
+const REZE_BURST_FRAME_COUNT = 12;
+const REZE_BURST_FRAME_PATHS = Array.from({ length: 12 }, (_, i) => `Assets/model/reze/Burst_explosion/burst_explosion-${i + 1}.png`);
+let _rezeBurstFrames = [];
+let _rezeBurstFramesLoading = false;
+
+export function _getRezeBurstFrames() {
+  if (_rezeBurstFrames.length === REZE_BURST_FRAME_COUNT && _rezeBurstFrames.every(img => img && img.complete && img.naturalWidth > 0)) {
+    return _rezeBurstFrames;
+  }
+  if (!_rezeBurstFramesLoading && typeof Image !== 'undefined') {
+    _rezeBurstFramesLoading = true;
+    _rezeBurstFrames = [];
+    REZE_BURST_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _rezeBurstFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Reze burst explosion frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _rezeBurstFrames[idx] = img;
+    });
+  }
+  return _rezeBurstFrames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getRezeBurstFrames();
+}
+
+/**
+ * Draws the 12-frame retro pixel art burst explosion sprite for Reze's transformation
+ * (burst_explosion-1.png to burst_explosion-12.png)
+ * Scaled 1:1 with nearest-neighbor crispness.
+ * Detonation ground baseline is anchored at (128, 205).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} maxR Blast radius
+ * @param {number} p Progress 0.0 to 1.0
+ * @param {number} alpha Blast opacity
+ * @returns {boolean} True if frame was successfully rendered
+ */
+function _drawRezeAnimatedBurstSprite(ctx, maxR, p, alpha) {
+  const frames = _getRezeBurstFrames();
+  const frameCount = frames.length || 12;
+  const frameIndex = Math.min(frameCount - 1, Math.max(0, Math.floor(p * frameCount)));
+  const frameImg = frames[frameIndex];
+
+  if (!frameImg || !frameImg.complete || frameImg.naturalWidth <= 0) {
+    return false;
+  }
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.imageSmoothingEnabled = false;
+
+  // Natural fade-out on late dissipating frames
+  const fadeAlpha = p > 0.82 ? Math.max(0, (1.0 - p) / 0.18) : 1.0;
+  ctx.globalAlpha = prevAlpha * fadeAlpha;
+
+  // Frame is 256x256px with anchor calibrated at (128, 226) so baseline aligns with Reze's feet (+22px)
+  const baseScale = 1.08 * Math.max(0.85, Math.min(1.25, (maxR || 175) / 175.0));
+  const drawW = 256 * baseScale;
+  const drawH = 256 * baseScale;
+  const anchorX = 128 * baseScale;
+  const anchorY = 226 * baseScale;
+
+  ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  return true;
+}
+
+/**
+ * Dedicated renderer for Reze's 12-frame Bomb Devil Transformation Burst Explosion
+ * (burst_explosion-1.png to burst_explosion-12.png)
+ */
+export function drawRezeBurstExplosion(ctx, blast) {
+  if (!blast || blast.timer <= 0) return;
+
+  const p = Math.max(0, Math.min(1.0, 1.0 - (blast.timer / blast.maxTimer)));
+  const maxR = blast.radius || 175;
+  const curR = maxR * Math.pow(p, 0.48);
+  const alpha = 1.0 - Math.pow(p, 1.25);
+  if (alpha <= 0.01) return;
+
+  const P = 2.0;
+
+  ctx.save();
+  ctx.translate(blast.x, blast.y);
+
+  // 1. 12-Frame Authentic Retro Pixel Art Burst Animation
+  const renderedSprite = _drawRezeAnimatedBurstSprite(ctx, maxR, p, alpha);
+
+  // 2. Standalone Pixel Spark Embers
+  _drawCrispSparks(ctx, curR, p, alpha, true, P);
+
+  // 3. Fallback: Procedural fireball body ONLY when animated sprite is unavailable
+  if (!renderedSprite) {
+    _drawCrispFireballBody(ctx, curR, p, alpha, true);
+    _drawCrispShockwaveRings(ctx, maxR, p, alpha, true, true);
+  }
+
+  ctx.restore();
 }
 
 /**
  * Draws Reze's Punch AOE Explosion Detonation (Bomb Devil Hybrid Combat)
  * Features:
+ * - 12-Frame authentic pixel art explosion animation (explosion-1.png to explosion-12.png)
  * - Crisp concentric supersonic Mach shockwave rings with 1-by-1 water-ripple wave extension
- * - Volumetric stepped fireball plasma clouds & white-hot detonation core
+ * - Volumetric stepped fireball plasma clouds
  * - Standalone pixel spark embers
  * - Zero cobweb/net lines
  * - Zero shadowBlur (Rule 11) & Discrete P=2.0px grid snapping
@@ -1108,23 +1288,32 @@ export function drawRezePalmBlast(ctx, blast) {
   ctx.save();
   ctx.translate(blast.x, blast.y);
 
-  // 1. Volumetric Fireball Body & Detonation Core
-  _drawCrispFireballBody(ctx, curR, p, alpha, false);
+  // 1. 12-Frame Authentic Retro Pixel Art Explosion Animation (explosion-1.png to explosion-12.png)
+  const renderedSprite = _drawRezeAnimatedExplosionSprite(ctx, maxR, p, alpha);
 
-  // 2. Crisp Concentric Supersonic Mach Shockwave Rings (Water-Ripple Wave Propagation)
-  _drawCrispShockwaveRings(ctx, maxR, p, alpha, false, false);
-
-  // 3. Standalone Pixel Spark Embers
+  // 2. Standalone Pixel Spark Embers
   _drawCrispSparks(ctx, curR, p, alpha, false, P);
+
+  // 3. Fallback: Procedural shockwaves and fireball body ONLY when animated sprite is unavailable
+  if (!renderedSprite) {
+    _drawCrispFireballBody(ctx, curR, p, alpha, false);
+    _drawCrispShockwaveRings(ctx, maxR, p, alpha, false, false);
+  }
 
   ctx.restore();
 }
 
 /**
- * Draws Megaton Tsar Nuke Ultimate Visuals (Clean Supernova Mach Rings, Volumetric Fireball, Spark Embers)
+ * Draws Megaton Tsar Nuke Ultimate Visuals (12-Frame Supernova Explosion & Spark Embers)
  */
 export function drawRezeMegatonNuke(ctx, nuke) {
   if (!nuke || nuke.timer <= 0) return;
+
+  // For transformation blast: forward to dedicated ground-burst mushroom cloud renderer
+  if (nuke.isTransformationBlast) {
+    drawRezeBurstExplosion(ctx, nuke);
+    return;
+  }
 
   const p = Math.max(0, Math.min(1.0, 1.0 - (nuke.timer / nuke.maxTimer)));
   const maxR = nuke.radius || 240;
@@ -1133,19 +1322,21 @@ export function drawRezeMegatonNuke(ctx, nuke) {
   if (alpha <= 0.01) return;
 
   const P = 2.0;
-  const isTransformation = Boolean(nuke.isTransformationBlast);
 
   ctx.save();
   ctx.translate(nuke.x, nuke.y);
 
-  // 1. Volumetric Nuclear Fireball Body & Detonation Core
-  _drawCrispFireballBody(ctx, curR, p, alpha, true);
+  // 1. 12-Frame Retro Pixel Art Explosion Animation (Massive Supernova scale)
+  const renderedSprite = _drawRezeAnimatedExplosionSprite(ctx, maxR * 1.15, p, alpha);
 
-  // 2. Multi-Band Concentric Supersonic Mach Shockwave Rings (Water-Ripple Wave Propagation)
-  _drawCrispShockwaveRings(ctx, maxR, p, alpha, true, isTransformation);
-
-  // 3. Standalone Pixel Spark Embers
+  // 2. Standalone Pixel Spark Embers
   _drawCrispSparks(ctx, curR, p, alpha, true, P);
+
+  // 3. Fallback: Procedural shockwaves and fireball body ONLY when animated sprite is unavailable
+  if (!renderedSprite) {
+    _drawCrispFireballBody(ctx, curR, p, alpha, true);
+    _drawCrispShockwaveRings(ctx, maxR, p, alpha, true, false);
+  }
 
   ctx.restore();
 }

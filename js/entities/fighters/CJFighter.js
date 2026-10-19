@@ -1687,39 +1687,47 @@ export class CJFighter extends Fighter {
     const angle = (this.gunAngle || this.angle || 0);
     const backX = this.x - Math.cos(angle) * (this.r * 1.15);
     const backY = this.y - Math.sin(angle) * (this.r * 1.15);
+    const hitRadius = this.r + 28;
+    const hitRadiusSq = hitRadius * hitRadius;
 
-    const allCandidates = [
-      ...(state.fighters || []),
-      ...(state.illusions || [])
-    ];
+    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+    const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && myIndex >= 0) ? state.getFighterTeam(myIndex) : null;
 
-    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
-
-    for (const ent of allCandidates) {
-      if (!ent || ent === this || ent.dead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.owner === this) continue;
+    const checkEntity = (ent) => {
+      if (!ent || ent === this || ent.dead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.owner === this) return;
 
       if (typeof state.getFighterTeam === 'function') {
         if (ent.owner) {
           const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
-          if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+          if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) return;
         } else {
           const entTeam = state.getFighterTeam(state.fighters.indexOf(ent));
-          if (myTeam !== null && entTeam !== null && myTeam === entTeam) continue;
+          if (myTeam !== null && entTeam !== null && myTeam === entTeam) return;
         }
       }
 
-      const d = Math.hypot(ent.x - backX, ent.y - backY);
-      if (d <= (this.r + 28)) {
+      const dx = ent.x - backX;
+      const dy = ent.y - backY;
+      if (dx * dx + dy * dy <= hitRadiusSq) {
         if (typeof ent.takeDamage === 'function') {
           ent.takeDamage(burnDmg, this, { isMelee: false });
         } else {
           ent.hp -= burnDmg;
         }
-        spawnFloatingText(ent.x, ent.y - ent.r - 10, `${burnDmg}`, '#EA580C');
+        if (typeof spawnFloatingText === 'function') {
+          spawnFloatingText(ent.x, ent.y - ent.r - 10, `${burnDmg}`, '#EA580C');
+        }
         if (typeof spawnSparks === 'function') {
           spawnSparks(ent.x, ent.y, '#F97316', 3);
         }
       }
+    };
+
+    if (state.fighters) {
+      for (let i = 0; i < state.fighters.length; i++) checkEntity(state.fighters[i]);
+    }
+    if (state.illusions) {
+      for (let i = 0; i < state.illusions.length; i++) checkEntity(state.illusions[i]);
     }
   }
 
@@ -2001,10 +2009,6 @@ export class CJFighter extends Fighter {
         spawnSparks(this.x + 40, this.y, 10, 'gold', '#FEF08A');
       }
     }
-  }
-
-  interruptAttacks() {
-    this.punchAnimTimer = 0;
   }
 
   /**

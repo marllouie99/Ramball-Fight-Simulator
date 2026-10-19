@@ -96,7 +96,7 @@ export class ChosoFighter extends Fighter {
     this.piercingBloodWidth = cfg.ultBeamWidth || 26;
     this.piercingBloodProgress = 0;
 
-    // ULTIMATE: Blood Transmutation: Crimson Laser Matrix (Shuren: Kōsen Ketsurui)
+    // ULTIMATE: Blood Manipulation: Convergence
     // As long as Ultimate is UP and blood exists in the arena, converts all blood droplets into laser beams!
     this.ultCooldown = 0;
     this.ultCooldownMax = cfg.ultCooldown || 840; // 14.0s
@@ -575,7 +575,7 @@ export class ChosoFighter extends Fighter {
       this.aim(target);
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
-      // 1. ULTIMATE: Blood Transmutation: Crimson Laser Matrix
+      // 1. ULTIMATE: Blood Manipulation: Convergence
       // As long as Ultimate is UP and blood exists in the arena, turn them all into beams!
       const isUltUp = (this.ultCooldown <= 0 || this.skill3Cooldown <= 0);
       if (isUltUp && isSkillEnabled(cfg.enableLaserMatrix, true)) {
@@ -626,7 +626,7 @@ export class ChosoFighter extends Fighter {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // UNIQUE SIGNATURE SKILL: CRIMSON LASER MATRIX
+  // UNIQUE SIGNATURE SKILL: CONVERGENCE
   // ═══════════════════════════════════════════════════════════
 
   /**
@@ -717,7 +717,7 @@ export class ChosoFighter extends Fighter {
   }
 
   /**
-   * Initiates the Blood Transmutation: Crimson Laser Matrix.
+    * Initiates Blood Manipulation: Convergence.
    * Freezes all active blood particles currently in the arena and turns them into laser diodes!
    * MANDATORY: Does NOT activate if the blood particles are gone!
    * Only fires the currently existing blood particles in the arena (no fixed number).
@@ -862,7 +862,7 @@ export class ChosoFighter extends Fighter {
       // Check Gojo Limitless Infinity (Rule 1.7)
       const isInfinity = (typeof target.hasActiveInfinity === 'function') && target.hasActiveInfinity();
       if (!isInfinity) {
-        applyDamageToTarget(target, damagePerNode, this, { isTrueDamage: true, hitType: 'laser' });
+        applyDamageToTarget(target, damagePerNode, this, { isTrueDamage: true, hitType: 'laser', skipKnockback: true });
         hitCount++;
         spawnSparks(target.x, target.y, 4, '#FF2A55', '#FFFFFF');
       } else {
@@ -880,6 +880,22 @@ export class ChosoFighter extends Fighter {
         node.particleRef.vy = 0;
       }
       spawnSparks(node.x, node.y, 4, '#FF2A55', '#FFFFFF');
+    }
+
+    if (hitCount > 0) {
+      const pullX = this.x - target.x;
+      const pullY = this.y - target.y;
+      const pullDistance = Math.hypot(pullX, pullY);
+      if (pullDistance > 0 && typeof target.applyKnockback === 'function') {
+        const dragForce = cfg.laserMatrixDragForce ?? 2.8;
+        target.applyKnockback((pullX / pullDistance) * dragForce, (pullY / pullDistance) * dragForce);
+      }
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(
+          cfg.laserMatrixSlowDurationFrames ?? 90,
+          cfg.laserMatrixSlowMultiplier ?? 0.55
+        );
+      }
     }
 
     // Inflict Sanguine Stun if 3+ simultaneous beams hit

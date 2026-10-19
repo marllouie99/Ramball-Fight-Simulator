@@ -5994,6 +5994,12 @@ async function runInteractionTests() {
     let fillRectCalls = 0;
     let rectCalls = 0;
     let fillCalls = 0;
+    let drawImageCalls = 0;
+    const originalDrawImage = mockCtx.drawImage;
+    mockCtx.drawImage = (...args) => {
+      drawImageCalls++;
+      return originalDrawImage(...args);
+    };
     mockCtx.save = (...args) => {
       saveCalls++;
       return originalSave(...args);
@@ -6025,18 +6031,18 @@ async function runInteractionTests() {
     });
     assert(saveCalls === 1 && restoreCalls === 1,
       `Reze palm blast must use one balanced canvas state scope (saves ${saveCalls}, restores ${restoreCalls})`);
-    assert(arcCalls === 9, `Reze palm blast must reuse each shockwave path for its fills and outlines (got ${arcCalls})`);
+    assert(drawImageCalls >= 1, `Reze palm blast must render 12-frame animated explosion sprite (got ${drawImageCalls} drawImage calls)`);
     assert(mockCtx.getStackDepth() === 0, 'Reze palm blast must leave the canvas state stack balanced');
 
     saveCalls = 0;
     restoreCalls = 0;
-    arcCalls = 0;
+    drawImageCalls = 0;
     drawRezeMegatonNuke(mockCtx, {
       x: 200, y: 200, radius: 240, timer: 15, maxTimer: 30, isTransformationBlast: true
     });
     assert(saveCalls === 1 && restoreCalls === 1,
       `Reze nuke blast must use one balanced canvas state scope (saves ${saveCalls}, restores ${restoreCalls})`);
-    assert(arcCalls === 11, `Reze nuke blast must reuse each shockwave path and retain transformation accents (got ${arcCalls})`);
+    assert(drawImageCalls >= 1, `Reze nuke blast must render 12-frame animated explosion sprite (got ${drawImageCalls} drawImage calls)`);
     assert(mockCtx.getStackDepth() === 0, 'Reze nuke blast must leave the canvas state stack balanced');
 
     fillRectCalls = 0;
@@ -6057,7 +6063,8 @@ async function runInteractionTests() {
     mockCtx.arc = originalArc;
     mockCtx.fillRect = originalFillRect;
     mockCtx.rect = originalRect;
-    console.log('      ✅ Reze palm and nuke blast renderers preserve shockwave geometry with one balanced canvas state scope.');
+    mockCtx.drawImage = originalDrawImage;
+    console.log('      ✅ Reze palm and nuke blast renderers preserve 12-frame explosion animation with one balanced canvas state scope.');
   }
 
   // -------------------------------------------------------------
@@ -8122,11 +8129,25 @@ async function runInteractionTests() {
     // Advance telegraph and discharge
     choso.laserMatrixTimer = 0;
     choso.laserTelegraphTimer = 1;
+    dummy.vx = 0;
+    dummy.vy = 0;
     const initialDummyHp = dummy.hp;
     choso.update(dummy, 0, state.arena);
     assert(choso.activeLaserBeams.length >= 4, `All active blood nodes must discharge laser beams (got ${choso.activeLaserBeams.length})`);
     assert(dummy.hp < initialDummyHp, 'Laser Matrix beams must deal damage to target');
+    assert(dummy.vx < 0, `A target hit by Convergence beams must be dragged toward Choso (vx=${dummy.vx}, targetX=${dummy.x}, chosoX=${choso.x})`);
+    assert(dummy.slowTimer >= 90, 'A target hit by Convergence beams must receive the timed slow debuff');
+    assert(dummy.slowMultiplier === 0.55, 'Convergence slow must use the configured movement multiplier');
     assert(choso.laserTransmutationOverdriveTimer > 0, 'Overdrive transmutation buff must be active after discharge');
+
+    const infinityTarget = new Fighter({ x: 350, y: 300, hp: 300, maxHp: 300 });
+    infinityTarget.vx = 0;
+    infinityTarget.vy = 0;
+    infinityTarget.hasActiveInfinity = () => true;
+    infinityTarget.triggerInfinityBlock = () => {};
+    choso._dischargeLaserMatrix(infinityTarget);
+    assert(infinityTarget.vx === 0, 'Infinity-blocked Convergence beams must not drag the target');
+    assert(infinityTarget.slowTimer === 0, 'Infinity-blocked Convergence beams must not apply slow');
 
     // Verify blood particles are consumed and Skill 3 does NOT activate when blood is gone
     choso.isCastingLaserMatrix = false;

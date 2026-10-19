@@ -71,7 +71,7 @@ export class RezeFighter extends Fighter {
     // Passive 1: Hybrid Physiology (Collar Pin Revive)
     this.reviveStocksMax = cfg.maxReviveStocks || 1;
     this.reviveStocks = this.reviveStocksMax;
-    this.isHybridModeActive = false;
+    this.isHybridModeActive = Boolean(cfg.startInHybridMode || (typeof state !== 'undefined' && state.showRezeTransformation));
     this.hybridModeTimer = 0;
     this.hybridModeMaxTimer = Infinity;
 
@@ -201,7 +201,7 @@ export class RezeFighter extends Fighter {
     this.hp = this.maxHp;
 
     this.reviveStocks = this.reviveStocksMax || 1;
-    this.isHybridModeActive = false;
+    this.isHybridModeActive = Boolean(cfg.startInHybridMode || (typeof state !== 'undefined' && state.showRezeTransformation));
     this.hybridModeTimer = 0;
     this.isPullingPin = false;
     this.pinPullTimer = 0;
@@ -396,8 +396,13 @@ export class RezeFighter extends Fighter {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
 
-    // 1. Ultimate: Megaton Tsar Nuke (Single-use per round: Bomb Devil Form is permanent)
-    if (!this.hasUsedNuke && this.nukeCooldown <= 0 && this.isSkillEnabled(cfg.enableMegatonNuke, true) && dist < 350) {
+    // 1. Ultimate Transformation / Megaton Tsar Nuke (Bomb Devil Form is permanent)
+    // Human Form: Reze pulls her collar pin to transform when cooldown expires OR when pressured (HP <= 60%)
+    // Hybrid Form: Executes aerial dive living warhead assault
+    const shouldActivateNuke = !this.hasUsedNuke && this.isSkillEnabled(cfg.enableMegatonNuke, true) && dist < 350 && (
+      this.nukeCooldown <= 0 || (!this.isHybridModeActive && this.hp <= this.maxHp * 0.60)
+    );
+    if (shouldActivateNuke) {
       this._activateMegatonNuke(target);
       return;
     }
@@ -810,7 +815,8 @@ export class RezeFighter extends Fighter {
       timer: isFinisher ? 18 : 14,
       maxTimer: isFinisher ? 18 : 14,
       isFinisher: isFinisher,
-      isPunchExplosion: true
+      isPunchExplosion: true,
+      isHybrid: true
     });
   }
 
@@ -917,6 +923,18 @@ export class RezeFighter extends Fighter {
     audioSystem.playSFX(cfg.sounds?.sparkExplosion || 'Assets/Sound Effects/Attacks/explosion.mp3', cfg.soundVolumes?.sparkExplosion ?? 0.40);
     spawnSparks(f.x, f.y, 14, '#FFE600');
     triggerGlobalScreenShake(2.0, 6);
+
+    if (this.isHybridModeActive) {
+      this.activePalmBlasts.push({
+        x: f.x,
+        y: f.y,
+        radius: f.explosionRadius || 42,
+        timer: 12,
+        maxTimer: 12,
+        isPunchExplosion: true,
+        isHybrid: true
+      });
+    }
 
     const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
     const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters?.indexOf(this)) : null;
@@ -1348,6 +1366,16 @@ export class RezeFighter extends Fighter {
         spawnSparks(t.x, t.y, 22, this.themeColor);
         triggerGlobalScreenShake(4.0, 12);
 
+        this.activePalmBlasts.push({
+          x: t.x,
+          y: t.y,
+          radius: 80,
+          timer: 16,
+          maxTimer: 16,
+          isPunchExplosion: true,
+          isHybrid: true
+        });
+
         if (!isPerformingSkill) {
           const kb = cfg.rocketHitKnockback || 34;
           const speed = Math.hypot(this.rocketLungeVx, this.rocketLungeVy) || 1;
@@ -1650,13 +1678,13 @@ export class RezeFighter extends Fighter {
     const damage = cfg.transformationExplosionDamage || 50;
     const knockback = cfg.transformationKnockback || 34;
 
-    // 1. Radial Blast Shockwave Visual
+    // 1. Radial Blast Shockwave Visual (Dedicated 12-Frame Burst Explosion Animation)
     this.activeNukeBlasts.push({
       x: this.x,
       y: this.y,
       radius: radius,
-      timer: 30,
-      maxTimer: 30,
+      timer: 36,
+      maxTimer: 36,
       isTransformationBlast: true
     });
 
@@ -1857,7 +1885,7 @@ export class RezeFighter extends Fighter {
     const rawDamage = typeof amount === 'number' ? amount : (amount?.damage || 0);
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : rezeConfig;
     if (this.hp <= rawDamage && this.reviveStocks > 0) {
-      if (this.isSkillEnabled(cfg.enableCollarPinRevive, false)) {
+      if (this.isSkillEnabled(cfg.enableCollarPinRevive, true)) {
         this.reviveStocks--;
         this.hp = Math.round((this.maxHp || 340) * (cfg.reviveHpPercent || 0.50));
         this.isHybridModeActive = true;
@@ -1869,7 +1897,7 @@ export class RezeFighter extends Fighter {
         this.vx = 0;
         this.vy = 0;
 
-        // Radial shockwave on collar pin revive
+        // Radial shockwave on collar pin revive (Dedicated 12-Frame Burst Explosion Animation)
         const shockR = cfg.reviveShockwaveRadius || 140;
         const shockDmg = cfg.reviveShockwaveDamage || 40;
         const shockKb = cfg.reviveShockwaveKnockback || 28;
@@ -1878,8 +1906,8 @@ export class RezeFighter extends Fighter {
           x: this.x,
           y: this.y,
           radius: shockR,
-          timer: 25,
-          maxTimer: 25,
+          timer: 36,
+          maxTimer: 36,
           isTransformationBlast: true
         });
 

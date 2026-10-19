@@ -26,11 +26,11 @@ export const chosoConfig = {
   damage: 22,
   cooldown: 36,
   projectileSpeedMultiplier: 1.0,
-  ability: 'Blood Manipulation: Crimson Laser Matrix',
+  ability: 'Blood Manipulation: Convergence',
   desc: 'Eldest brother of the Cursed Womb: Death Paintings from Jujutsu Kaisen. Converts cursed energy into inexhaustible blood reserves, seeds the arena with poisonous blood droplets, and transmutates all blood particles into a deadly multi-angle piercing laser crossfire grid.',
 
   // Passive 1: Mugen Ketsuryū (Infinite Sanguine Reserves)
-  enableInfiniteBlood: 1,
+  enableInfiniteBlood: 0,
   maxBloodNodesInArena: 999, // No artificial 32 limit: converts all currently existing arena blood into beams
   bloodNodeLifespanFrames: 720, // 12.0 seconds
   bloodNodesPerDamageTakenMin: 2,
@@ -41,7 +41,7 @@ export const chosoConfig = {
   bloodPoisonTickDamage: 3,
 
   // Passive 2: Flowing Red Scale: Stack (Sekirin Ketsurui: Chō)
-  enableFlowingRedScale: 1,
+  enableFlowingRedScale: 0,
   redScaleHpThreshold: 0.60,      // Below 60% HP
   redScaleSpeedMultiplier: 1.25,  // +25% movement speed
   redScaleDropMultiplier: 2,      // 2x blood droplet spawning rate
@@ -63,7 +63,7 @@ export const chosoConfig = {
   comboDropletsOnFinisher: 3,
 
   // Skill 1: Slicing Exorcist / Blood Chakram (Karisō)
-  enableChakram: 1,
+  enableChakram: 0,
   skill1Cooldown: 360,           // 6.0s (360 frames)
   chakramDamage: 36,
   chakramSpeed: 11,
@@ -72,7 +72,7 @@ export const chosoConfig = {
   chakramDropInterval: 6,        // Emits a droplet every 6 frames
 
   // Skill 2: Supernova (Chōshinsei)
-  enableSupernova: 1,
+  enableSupernova: 0,
   skill2Cooldown: 540,           // 9.0s (540 frames)
   supernovaOrbCount: 8,
   supernovaPelletCount: 12,
@@ -80,7 +80,7 @@ export const chosoConfig = {
   supernovaPelletSpeed: 13,
   supernovaRange: 210,
 
-  // ULTIMATE: Blood Transmutation: Crimson Laser Matrix (Shuren: Kōsen Ketsurui)
+  // ULTIMATE: Blood Manipulation: Convergence
   // As long as Ultimate is UP, turns all active blood particles currently in the arena into piercing laser beams!
   enableLaserMatrix: true,
   ultCooldown: 840,              // 14.0s (840 frames)
@@ -89,6 +89,9 @@ export const chosoConfig = {
   laserTelegraphFrames: 12,      // Razor needle targeting lines
   laserDischargeFrames: 22,      // Supersonic beam firing duration
   laserDamagePerNode: 14,        // True damage per active node beam
+  laserMatrixDragForce: 2.8,     // Pull impulse toward Choso after a beam volley hits
+  laserMatrixSlowDurationFrames: 90,
+  laserMatrixSlowMultiplier: 0.55,
   laserMatrixMaxBeams: 999,      // No fixed limit: fires all existing blood particles
   laserMatrixStunThreshold: 3,   // 3+ beams hitting simultaneously inflicts stun
   laserMatrixStunDuration: 30,   // 0.5s stun

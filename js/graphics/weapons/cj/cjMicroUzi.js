@@ -337,7 +337,31 @@ export function drawCjPixelMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTim
  * - Furniture (Grip and Handguard): Molded dark charcoal / black polymer with tactile ribs
  * - Small Details: Darker pins, ejection port, and stamped & welded sheet metal sights
  * - Left-side Folded Steel Stock with hinge bracket, longitudinal strut, and rubber buttpad
- * - Stamped 32-Round Straight Steel Box Magazine with Stamped Spine Flute & Baseplate
+ */
+let _cachedMicroUziBodyCanvas = null;
+
+function _getMicroUziBodyCanvas() {
+  if (_cachedMicroUziBodyCanvas) return _cachedMicroUziBodyCanvas;
+  if (typeof document === 'undefined') return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 110;
+  canvas.height = 80;
+  const c = canvas.getContext('2d');
+  _initUziGradients(c);
+
+  c.save();
+  c.translate(35, 20);
+  _renderMicroUziStaticBody(c);
+  c.restore();
+
+  _cachedMicroUziBodyCanvas = canvas;
+  return _cachedMicroUziBodyCanvas;
+}
+
+/**
+ * Draws Authentic 1980s IMI Micro-Uzi 9mm Submachine Gun
+ * High-performance offscreen canvas cached for dual-wield locked 60 FPS
  * Rule 11 (Zero shadowBlur) & Rule 20 Compliant
  */
 export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 0) {
@@ -346,7 +370,7 @@ export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 
     return;
   }
 
-  _initUziGradients(ctx);
+  const cachedCanvas = _getMicroUziBodyCanvas();
 
   ctx.save();
   const recoilOffset = recoil * 0.9;
@@ -358,6 +382,49 @@ export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 
   }
   ctx.scale(scale, scale);
 
+  if (cachedCanvas) {
+    ctx.drawImage(cachedCanvas, -35, -20);
+  } else {
+    _initUziGradients(ctx);
+    _renderMicroUziStaticBody(ctx);
+  }
+
+  // ── LAYER 9: FLYING EJECTED BRASS CASING PARTICLE ──
+  if (flashTimer > 0) {
+    ctx.save();
+    const caseProgress = (3 - flashTimer) / 3;
+    const caseX = 3.0 + caseProgress * 5.0;
+    const caseY = -8.0 - caseProgress * 6.5;
+    const caseAngle = caseProgress * Math.PI * 1.8;
+
+    ctx.translate(caseX, caseY);
+    ctx.rotate(caseAngle);
+
+    // 9mm brass casing
+    ctx.fillStyle = '#F59E0B';
+    ctx.strokeStyle = '#B45309';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.roundRect(-2.0, -0.8, 4.0, 1.6, 0.4);
+    ctx.fill();
+    ctx.stroke();
+
+    // Extractor groove & rim
+    ctx.fillStyle = '#FEF08A';
+    ctx.fillRect(-1.8, -0.5, 0.7, 1.0);
+    ctx.restore();
+  }
+
+  // ── LAYER 10: REALISTIC MUZZLE FLASH BURST ──
+  if (flashTimer > 0) {
+    const muzzleTipX = 41.5;
+    drawCjMuzzleFlash(ctx, muzzleTipX, 0, 1.25);
+  }
+
+  ctx.restore();
+}
+
+function _renderMicroUziStaticBody(ctx) {
   // ── LAYER 1: EXTENDED 32-ROUND STRAIGHT STEEL BOX MAGAZINE ──
   const magX = 0;
   const magTopY = 22.0;
@@ -554,7 +621,7 @@ export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 
   const ejectW = 8.5;
   const ejectTopY = -5.0;
   const ejectH = 4.2;
-  const boltRecoilOffset = recoil * 1.2;
+  const boltRecoilOffset = 0;
 
   // Stamped Ejection Port Cutout
   ctx.fillStyle = '#020617';
@@ -715,7 +782,7 @@ export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 
   ctx.fillRect(-12.0, recTopY - 1.2, 28.0, 1.4);
 
   // Low-profile Cylindrical Cocking Knob (Right on the top slide)
-  const knobRecoilOffset = recoil * 1.2;
+  const knobRecoilOffset = 0;
   const knobX = 4.0 - knobRecoilOffset;
   const knobW = 3.6;
   const knobH = 4.0;
@@ -805,39 +872,6 @@ export function drawCjMicroUzi(ctx, x, y, scale = 1.0, recoil = 0, flashTimer = 
   // Textured Rubber Buttpad Lining on back edge
   ctx.fillStyle = '#09090B';
   ctx.fillRect(-26.2, -2.0, 1.2, 16.0);
-
-  ctx.restore();
-
-  // ── LAYER 9: FLYING EJECTED BRASS CASING PARTICLE ──
-  if (flashTimer > 0) {
-    ctx.save();
-    const caseProgress = (3 - flashTimer) / 3;
-    const caseX = 3.0 + caseProgress * 5.0;
-    const caseY = -8.0 - caseProgress * 6.5;
-    const caseAngle = caseProgress * Math.PI * 1.8;
-
-    ctx.translate(caseX, caseY);
-    ctx.rotate(caseAngle);
-
-    // 9mm brass casing
-    ctx.fillStyle = '#F59E0B';
-    ctx.strokeStyle = '#B45309';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    ctx.roundRect(-2.0, -0.8, 4.0, 1.6, 0.4);
-    ctx.fill();
-    ctx.stroke();
-
-    // Extractor groove & rim
-    ctx.fillStyle = '#FEF08A';
-    ctx.fillRect(-1.8, -0.5, 0.7, 1.0);
-    ctx.restore();
-  }
-
-  // ── LAYER 10: REALISTIC MUZZLE FLASH BURST ──
-  if (flashTimer > 0) {
-    drawCjMuzzleFlash(ctx, barrelX + barrelLen + 2.0, 0, 1.25);
-  }
 
   ctx.restore();
 }

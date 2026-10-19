@@ -8,6 +8,8 @@ export const rezeConfig = {
     hair: 'Assets/model/reze/Reze-hair.png',
     skin: 'Assets/model/reze/REZE-MODEL-SKIN.png',
     weapon: 'Assets/model/reze/REZE-WEAPON.png',
+    explosion: 'Assets/model/reze/explosion/explosion-b.png',
+    burstExplosion: 'Assets/model/reze/Burst_explosion/burst_explosion-b.png',
   },
 
   name: 'Reze',
@@ -39,13 +41,14 @@ export const rezeConfig = {
   desc: 'The Bomb Devil Hybrid. High-speed explosive brawler and Soviet assassin. Pulls collar pin to trigger an explosive revive and Bomb Devil transformation. Attacks with 120° blast punches, Spark Flechette projectile spreads, Decoy Bombs, Rocket Lunges, and the apocalyptic Megaton Tsar Nuke.',
 
   // Passive 1: Collar Pin Hybrid Physiology (Explosive Revive)
-  enableCollarPinRevive: 0,         // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
+  enableCollarPinRevive: 1,         // Master toggle for Passive 1: Hybrid Physiology Collar Pin Revive
   maxReviveStocks: 1,               // 1 pin-pull revive per round
   reviveHpPercent: 0.50,            // Restores 50% Max HP (170 HP)
   reviveShockwaveRadius: 140,       // Radial explosion blast radius on trigger
   reviveShockwaveDamage: 40,        // Radial blast damage
   reviveShockwaveKnockback: 28,     // Repel force
   hybridModeDurationFrames: Infinity, // Permanent Bomb Devil Form once activated (no duration timer)
+  startInHybridMode: false,         // ⚡ Debug / testing toggle to start battle directly in Bomb Devil Form
 
   // Passive 2: Blast Propulsion
   enableBlastPropulsion: 0,         // Master toggle for Passive 2: Rocket Jet Blast Dash

@@ -237,7 +237,7 @@ async function main() {
   const { drawPixelCruelSunSphere, spawnCruelSunHitImpact, updateCruelSunHitImpacts, drawCruelSunHitImpacts, clearCruelSunHitImpacts, _getEscanorCruelSunSpriteImage, ESCANOR_CRUEL_SUN_FRAMES, _getEscanorSunExplosionSpriteImage, ESCANOR_SUN_EXPLOSION_FRAMES, drawProceduralPixelCruelSunExplosion, drawPixelCruelSunExplosion, drawCruelSunFloorLighting, drawCruelSunProximityEntityLighting, spawnCruelSunExplosion, updateCruelSunExplosions, drawCruelSunExplosions, clearCruelSunExplosions } = await import('../js/graphics/weapons/escanorWeaponGraphics.js');
   const { drawEscanorSkin } = await import('../js/graphics/fighters/escanorSkin.js');
   const { _getKnightHairImage, _drawKnightHair, drawKnightPixelBody, drawKnightSkin } = await import('../js/graphics/fighters/knightSkin.js');
-  const { _getKnightShieldImage, _getKnightSwordImage, drawGrayShield, drawGraySword, drawGrayBrokenSword } = await import('../js/graphics/weapons/knightWeaponGraphics.js');
+  const { _getKnightShieldImage, _getKnightSwordImage, _getKnightGoldSwordImage, drawGrayShield, drawGraySword, drawGrayBrokenSword } = await import('../js/graphics/weapons/knightWeaponGraphics.js');
   const { _getSpartanCrestImage, _drawSpartanCrest, drawSpartanPixelBody, drawSpartanSkin } = await import('../js/graphics/fighters/spartanSkin.js');
   const { _getSpartanShieldImage, _getSpartanSpearImage, drawSpartanHoplon, drawSpartanSpear, drawSpartanJavelin, drawSpartanThrustVFX } = await import('../js/graphics/weapons/spartanWeaponGraphics.js');
 
@@ -9581,7 +9581,7 @@ async function main() {
   }
 
   // 11.25. Knight Model Assets & Weapons Canvas Stack Test
-  console.log('🛡️ [Knight Model Assets & Weapons Test] Verifying Knight_hair, Knight_shield, Knight_sword loaders & Canvas stack balance...');
+  console.log('🛡️ [Knight Model Assets & Weapons Test] Verifying Knight_hair, Knight_shield, Knight_sword, Knight_goldsword loaders & Canvas stack balance...');
   try {
     const hairImg = _getKnightHairImage();
     if (!hairImg) throw new Error('_getKnightHairImage() returned null');
@@ -9589,6 +9589,8 @@ async function main() {
     if (!shieldImg) throw new Error('_getKnightShieldImage() returned null');
     const swordImg = _getKnightSwordImage();
     if (!swordImg) throw new Error('_getKnightSwordImage() returned null');
+    const goldSwordImg = _getKnightGoldSwordImage();
+    if (!goldSwordImg) throw new Error('_getKnightGoldSwordImage() returned null');
 
     mockCtx.resetStackDepth();
     drawKnightPixelBody(mockCtx, 25);
@@ -9615,8 +9617,12 @@ async function main() {
     assertCanvasStackBalance('drawGrayShield(mockCtx, ..., isBroken=true)');
 
     mockCtx.resetStackDepth();
-    drawGraySword(mockCtx, 100, 100, 0, 25, null, false, true);
+    drawGraySword(mockCtx, 100, 100, 0, 25, null, false, true, false);
     assertCanvasStackBalance('drawGraySword(mockCtx, ...)');
+
+    mockCtx.resetStackDepth();
+    drawGraySword(mockCtx, 100, 100, 0, 25, null, false, true, true);
+    assertCanvasStackBalance('drawGraySword(mockCtx, ..., isGoldSword=true)');
 
     mockCtx.resetStackDepth();
     drawGrayBrokenSword(mockCtx, 100, 100, 0, 25, null, false, false);

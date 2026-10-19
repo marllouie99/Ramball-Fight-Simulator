@@ -2079,7 +2079,7 @@ export const FIGHTER_DEFS = [
     cooldown: chosoConfig.cooldown || 36,
     moveSpeed: chosoConfig.moveSpeed || chosoConfig.speed || 5.3,
     projectileSpeedMultiplier: 1.0,
-    ability: chosoConfig.ability || 'Blood Manipulation: Crimson Laser Matrix',
+    ability: chosoConfig.ability || 'Blood Manipulation: Convergence',
     desc: chosoConfig.desc || 'Eldest brother of the Cursed Womb: Death Paintings from Jujutsu Kaisen. Converts cursed energy into inexhaustible blood reserves, seeds the arena with poisonous blood droplets, and transmutates all blood particles into a deadly multi-angle piercing laser crossfire grid.',
   }
 ];

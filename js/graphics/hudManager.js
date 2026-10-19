@@ -2551,13 +2551,7 @@ function updateHealthHud() {
   };
 
   const generateCjStarsHTML = (fighter, align = 'left') => {
-    const starCount = getCjStarLevel(fighter);
-    const justify = align === 'right' ? 'flex-end' : 'flex-start';
-    return `
-      <div class="hud-cj-stars" data-cj-stars="true" style="display: flex; align-items: center; justify-content: ${justify}; gap: 3px;">
-        ${generateCjStarsSVGs(starCount)}
-      </div>
-    `;
+    return '';
   };
 
   const getCjMoneyText = (fighter) => {
@@ -2608,13 +2602,7 @@ function updateHealthHud() {
   };
 
   const generateCjMoneyHTML = (fighter, align = 'left') => {
-    const moneyText = getCjMoneyText(fighter);
-    const justify = align === 'right' ? 'flex-end' : 'flex-start';
-    return `
-      <div class="hud-cj-money" style="display: flex; align-items: center; justify-content: ${justify}; width: 100%;">
-        <span class="hud-cj-money-text">${moneyText}</span>
-      </div>
-    `;
+    return '';
   };
 
   const getMatchTimeString = () => {
@@ -2708,16 +2696,6 @@ function updateHealthHud() {
               <span class="health-card__bar-text" style="display: none;">${metaValue}</span>
             </div>
           </div>
-        </div>
-
-        <!-- Middle: GTA Cash Money ($00000000) -->
-        <div class="hud-cj-money-row" style="${(CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0 || CONFIG.hudHideAll) ? 'display: none;' : ''}">
-          <span class="hud-cj-money-text">${moneyText}</span>
-        </div>
-
-        <!-- Bottom of Widget: 6 Wanted Stars (Filling Right to Left) -->
-        <div class="hud-cj-stars" data-cj-stars="true" style="${(CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0 || CONFIG.hudHideAll) ? 'display: none;' : ''}">
-          ${generateCjStarsSVGs(starCount)}
         </div>
       </div>
     `;

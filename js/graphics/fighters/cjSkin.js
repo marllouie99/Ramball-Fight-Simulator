@@ -53,18 +53,11 @@ function _getFadeGrad(ctx, r) {
   return g;
 }
 
-/**
- * Draws CJ's hand equipped with authentic vintage cast-brass knuckles or gripping weapons
- * in authentic Pixel Art Style (Rule 20 compliant, Saitama Tech).
- */
-export function drawCjPixelHand(ctx, x, y, radius, skinColor, punchProgress = 0, isHoldingGun = false) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+const _cachedCjPixelHand = {};
+
+function _renderCjPixelHandDirect(ctx, handX, handY, radius, skinColor, isHoldingGun) {
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
-
-  const handX = snap(x);
-  const handY = snap(y);
   const gridR = Math.max(P * 2, radius);
   const steps = Math.ceil(gridR / P);
 
@@ -139,18 +132,104 @@ export function drawCjPixelHand(ctx, x, y, radius, skinColor, punchProgress = 0,
       ctx.fillRect(kX + P * 0.5, hy, snap(kW * 0.5), snap(holeStep * 0.6));
     }
   }
+}
 
+function _getCachedCjPixelHand(radius, skinColor, isHoldingGun) {
+  const roundedR = Math.round(radius * 10) / 10;
+  const key = `${roundedR}_${skinColor || ''}_${isHoldingGun ? 1 : 0}`;
+  if (_cachedCjPixelHand[key]) return _cachedCjPixelHand[key];
+  if (typeof document === 'undefined') return null;
+
+  const size = 36;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const c = canvas.getContext('2d');
+  c.imageSmoothingEnabled = false;
+
+  c.save();
+  c.translate(size / 2, size / 2);
+  _renderCjPixelHandDirect(c, 0, 0, roundedR, skinColor, isHoldingGun);
+  c.restore();
+
+  _cachedCjPixelHand[key] = { canvas, size };
+  return _cachedCjPixelHand[key];
+}
+
+/**
+ * Draws CJ's hand equipped with authentic vintage cast-brass knuckles or gripping weapons
+ * in authentic Pixel Art Style (Rule 20 compliant, Saitama Tech).
+ * Optimized with offscreen canvas cache for locked 60 FPS.
+ */
+export function drawCjPixelHand(ctx, x, y, radius, skinColor, punchProgress = 0, isHoldingGun = false) {
+  if (punchProgress === 0) {
+    const cached = _getCachedCjPixelHand(radius, skinColor, isHoldingGun);
+    if (cached && cached.canvas) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      const P = 2.0;
+      const snap = (v) => Math.round(v / P) * P;
+      ctx.drawImage(cached.canvas, snap(x) - cached.size / 2, snap(y) - cached.size / 2);
+      ctx.restore();
+      return;
+    }
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  _renderCjPixelHandDirect(ctx, x, y, radius, skinColor, isHoldingGun);
   ctx.restore();
+}
+
+const _cachedCjPixelBody = {};
+
+function _getCachedCjPixelBody(r, isJetpackActive) {
+  const roundedR = Math.round(r * 10) / 10;
+  const key = `${roundedR}_${isJetpackActive ? 1 : 0}`;
+  if (_cachedCjPixelBody[key]) return _cachedCjPixelBody[key];
+  if (typeof document === 'undefined') return null;
+
+  const P = 2.0;
+  const steps = Math.ceil((roundedR + P) / P);
+  const size = (steps * 2 + 1) * P;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const destCtx = canvas.getContext('2d');
+  destCtx.imageSmoothingEnabled = false;
+
+  destCtx.save();
+  destCtx.translate(size / 2, size / 2);
+  _renderCjPixelBodyDirect(destCtx, roundedR, isJetpackActive);
+  destCtx.restore();
+
+  _cachedCjPixelBody[key] = { canvas, size };
+  return _cachedCjPixelBody[key];
 }
 
 /**
  * Authentic 1:1 Procedural Pixel Art Body for Carl "CJ" Johnson ("The Grove Street Cheatmaster")
- * Uses pure discrete 2D grid-scan rasterization loop with zero subpixel bleed (P = 2.0px, Rule #19 & Rule #35 compliant).
+ * Uses pure discrete 2D grid-scan rasterization loop with offscreen canvas cache (P = 2.0px, Rule #19 & Rule #35 compliant).
  * Exact same tech, grid resolution, and border calculation as Saitama's skin.
  */
 export function drawCjPixelBody(ctx, r, isJetpackActive = false) {
+  const cached = _getCachedCjPixelBody(r, isJetpackActive);
+  if (cached && cached.canvas) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cached.canvas, -cached.size / 2, -cached.size / 2);
+    ctx.restore();
+    return;
+  }
+
   ctx.save();
   ctx.imageSmoothingEnabled = false;
+  _renderCjPixelBodyDirect(ctx, r, isJetpackActive);
+  ctx.restore();
+}
+
+function _renderCjPixelBodyDirect(ctx, r, isJetpackActive = false) {
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
@@ -347,8 +426,6 @@ export function drawCjPixelBody(ctx, r, isJetpackActive = false) {
       ctx.fillRect(px, py, P, P);
     }
   }
-
-  ctx.restore();
 }
 
 /**
@@ -490,28 +567,9 @@ export function drawCjPixelJetpack(ctx, r, isJetpackActive) {
 }
 
 /**
- * Draws CJ's 1:1 Authentic GTA San Andreas DARPA Jetpack (ROCKETMAN)
- * Correctly oriented along CJ's body axes:
- * - Mounted firmly on CJ's back (-X)
- * - Top Manifold & Capsule Dome Caps at Upper Back (-Y / Head & Shoulder level)
- * - Twin Brushed Slate-Blue Cylinders extending vertically down the back
- * - Central Olive-Drab Avionics Box with Orange Bays & Hazard Chevrons
- * - Nozzles & Rocket Exhaust Flames blasting DOWNWARD (+Y direction towards ground/feet)
- * Rule 11 Compliant (Zero shadowBlur CPU filters)
+ * Renders the static GTA San Andreas DARPA Jetpack Chassis directly to an offscreen buffer.
  */
-function _drawCjJetpack(ctx, r, isJetpackActive) {
-  if (!isJetpackActive) return;
-
-  if (_isDarkMode()) {
-    drawCjPixelJetpack(ctx, r, isJetpackActive);
-    return;
-  }
-
-  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-  const time = now * 0.006;
-
-  ctx.save();
-
+function _renderCjJetpackChassisDirect(ctx, r) {
   // Jetpack base anchor on CJ's back (-X direction)
   const jpX = -r * 0.78;
   const tankW = r * 0.34;
@@ -871,65 +929,138 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
     ctx.beginPath();
     ctx.ellipse(nX, coneBtmY, coneBtmW * 0.5, 1.1, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
+  }
+}
 
-    // ── 5. VIBRANT DOWNWARD ROCKET THRUST FLAMES (Shooting in +Y direction) ──
+let _cachedCjJetpackChassis = null;
+let _cachedCjJetpackChassisR = 0;
+
+function _getCachedCjJetpackChassis(r) {
+  if (_cachedCjJetpackChassis && _cachedCjJetpackChassisR === r) {
+    return _cachedCjJetpackChassis;
+  }
+  const canvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+  if (!canvas) return null;
+  const canvasW = Math.ceil(r * 4.0 + 30);
+  const canvasH = Math.ceil(r * 3.0 + 30);
+  const originX = Math.round(canvasW * 0.75);
+  const originY = Math.round(canvasH * 0.55);
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.save();
+  ctx.translate(originX, originY);
+  _renderCjJetpackChassisDirect(ctx, r);
+  ctx.restore();
+
+  _cachedCjJetpackChassis = { canvas, originX, originY };
+  _cachedCjJetpackChassisR = r;
+  return _cachedCjJetpackChassis;
+}
+
+let _cachedFlameCanvas = null;
+function _getFlameCanvas() {
+  if (_cachedFlameCanvas) return _cachedFlameCanvas;
+  const canvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+  if (!canvas) return null;
+  const w = 64;
+  const h = 128;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const midX = w * 0.5;
+
+  // Stage 1: Outer Orange / Amber Jet Plume
+  const outerGrad = ctx.createLinearGradient(midX, 0, midX, h);
+  outerGrad.addColorStop(0, 'rgba(255, 170, 0, 0.98)');
+  outerGrad.addColorStop(0.35, 'rgba(249, 115, 22, 0.88)');
+  outerGrad.addColorStop(0.70, 'rgba(234, 88, 12, 0.50)');
+  outerGrad.addColorStop(1, 'rgba(220, 38, 38, 0)');
+  ctx.fillStyle = outerGrad;
+  ctx.beginPath();
+  ctx.moveTo(midX - 26, 0);
+  ctx.quadraticCurveTo(midX - 30, h * 0.45, midX, h);
+  ctx.quadraticCurveTo(midX + 30, h * 0.45, midX + 26, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Stage 2: Bright Yellow Core Flame
+  const coreGrad = ctx.createLinearGradient(midX, 0, midX, h * 0.65);
+  coreGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+  coreGrad.addColorStop(0.30, 'rgba(255, 230, 0, 0.95)');
+  coreGrad.addColorStop(0.75, 'rgba(245, 158, 11, 0.60)');
+  coreGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.moveTo(midX - 15, 0);
+  ctx.quadraticCurveTo(midX - 18, h * 0.28, midX, h * 0.65);
+  ctx.quadraticCurveTo(midX + 18, h * 0.28, midX + 15, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Stage 3: Intense White-Hot Throat Stream
+  const throatGrad = ctx.createLinearGradient(midX, 0, midX, h * 0.30);
+  throatGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+  throatGrad.addColorStop(0.60, 'rgba(254, 240, 138, 0.90)');
+  throatGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = throatGrad;
+  ctx.beginPath();
+  ctx.moveTo(midX - 7, 0);
+  ctx.quadraticCurveTo(midX - 8, h * 0.14, midX, h * 0.30);
+  ctx.quadraticCurveTo(midX + 8, h * 0.14, midX + 7, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  _cachedFlameCanvas = canvas;
+  return canvas;
+}
+
+/**
+ * Draws CJ's 1:1 Authentic GTA San Andreas DARPA Jetpack (ROCKETMAN)
+ * Fast 60 FPS cached offscreen canvas architecture
+ */
+function _drawCjJetpack(ctx, r, isJetpackActive) {
+  if (!isJetpackActive) return;
+
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const time = now * 0.006;
+
+  ctx.save();
+
+  // 1. Draw static cached jetpack chassis with a single GPU blit
+  const cache = _getCachedCjJetpackChassis(r);
+  if (cache && cache.canvas) {
+    ctx.drawImage(cache.canvas, -cache.originX, -cache.originY);
+  }
+
+  // 2. Draw dynamic rocket thruster flames & trailing sparks at nozzles
+  const jpX = -r * 0.78;
+  const tankW = r * 0.34;
+  const tankTopY = -r * 0.54;
+  const tankXPositions = [jpX - tankW * 0.75, jpX + tankW * 0.25];
+  const archLeftX = tankXPositions[0] - tankW * 0.45;
+  const archRightX = tankXPositions[1] + tankW * 1.45;
+  const coneBtmY = tankTopY + 16.7;
+  const nozzleXs = [archLeftX, archRightX];
+  const flameCanvas = _getFlameCanvas();
+
+  for (let nIdx = 0; nIdx < nozzleXs.length; nIdx++) {
+    const nX = nozzleXs[nIdx];
     const flameWobble = Math.sin(time * 16 + nIdx * 7) * 0.15 + Math.cos(time * 24 + nIdx * 11) * 0.10;
     const flameLen = (r * 1.60) * (1.0 + flameWobble);
     const flameSpread = (r * 0.36) * (1.0 + flameWobble * 0.5);
 
-    // Stage 1: Outer Orange / Amber Jet Plume
-    const outerFlameGrad = ctx.createLinearGradient(nX, coneBtmY, nX, coneBtmY + flameLen);
-    outerFlameGrad.addColorStop(0, 'rgba(255, 170, 0, 0.98)');
-    outerFlameGrad.addColorStop(0.35, 'rgba(249, 115, 22, 0.88)');
-    outerFlameGrad.addColorStop(0.70, 'rgba(234, 88, 12, 0.50)');
-    outerFlameGrad.addColorStop(1, 'rgba(220, 38, 38, 0)');
+    if (flameCanvas) {
+      ctx.drawImage(flameCanvas, nX - flameSpread * 0.5, coneBtmY, flameSpread, flameLen);
+    }
 
-    ctx.fillStyle = outerFlameGrad;
-    ctx.beginPath();
-    ctx.moveTo(nX - flameSpread * 0.50, coneBtmY);
-    ctx.quadraticCurveTo(nX - flameSpread * 0.85, coneBtmY + flameLen * 0.45, nX, coneBtmY + flameLen);
-    ctx.quadraticCurveTo(nX + flameSpread * 0.85, coneBtmY + flameLen * 0.45, nX + flameSpread * 0.50, coneBtmY);
-    ctx.closePath();
-    ctx.fill();
-
-    // Stage 2: Bright Yellow Core Flame (1:1 with GTA San Andreas)
-    const coreFlameGrad = ctx.createLinearGradient(nX, coneBtmY, nX, coneBtmY + flameLen * 0.65);
-    coreFlameGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-    coreFlameGrad.addColorStop(0.30, 'rgba(255, 230, 0, 0.95)');
-    coreFlameGrad.addColorStop(0.75, 'rgba(245, 158, 11, 0.60)');
-    coreFlameGrad.addColorStop(1, 'rgba(245, 158, 11, 0)');
-
-    ctx.fillStyle = coreFlameGrad;
-    ctx.beginPath();
-    ctx.moveTo(nX - flameSpread * 0.30, coneBtmY);
-    ctx.quadraticCurveTo(nX - flameSpread * 0.45, coneBtmY + flameLen * 0.28, nX, coneBtmY + flameLen * 0.65);
-    ctx.quadraticCurveTo(nX + flameSpread * 0.45, coneBtmY + flameLen * 0.28, nX + flameSpread * 0.30, coneBtmY);
-    ctx.closePath();
-    ctx.fill();
-
-    // Stage 3: Intense White-Hot Throat Stream
-    const throatGrad = ctx.createLinearGradient(nX, coneBtmY, nX, coneBtmY + flameLen * 0.30);
-    throatGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-    throatGrad.addColorStop(0.60, 'rgba(254, 240, 138, 0.90)');
-    throatGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-    ctx.fillStyle = throatGrad;
-    ctx.beginPath();
-    ctx.moveTo(nX - flameSpread * 0.15, coneBtmY);
-    ctx.quadraticCurveTo(nX - flameSpread * 0.20, coneBtmY + flameLen * 0.14, nX, coneBtmY + flameLen * 0.30);
-    ctx.quadraticCurveTo(nX + flameSpread * 0.20, coneBtmY + flameLen * 0.14, nX + flameSpread * 0.15, coneBtmY);
-    ctx.closePath();
-    ctx.fill();
-
-    // Stage 4: Micro Sparks Trailing in the Downward Jet Wash
+    // Micro Sparks Trailing in the Downward Jet Wash
+    ctx.fillStyle = '#FFE600';
     for (let s = 0; s < 2; s++) {
       const sparkPhase = ((time * 32 + s * 19 + nIdx * 29) % 45);
       const sparkX = nX + Math.sin(sparkPhase * 1.8) * (flameSpread * 0.35);
       const sparkY = coneBtmY + flameLen * 0.25 + sparkPhase * 1.5;
-      const sparkAlpha = Math.max(0, 1.0 - sparkPhase / 45);
-
-      ctx.fillStyle = `rgba(255, 230, 0, ${sparkAlpha.toFixed(2)})`;
       ctx.beginPath();
       ctx.arc(sparkX, sparkY, 1.2, 0, Math.PI * 2);
       ctx.fill();
@@ -1236,6 +1367,47 @@ function _drawCjCheatAura(ctx, r, isHesoyamActive, isRespectAura = false) {
   ctx.restore();
 }
 
+let _heatSpotCanvas = null;
+function _getHeatSpotCanvas() {
+  if (_heatSpotCanvas) return _heatSpotCanvas;
+  const size = 64;
+  const canvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+  if (!canvas) return null;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const half = size / 2;
+  const grad = ctx.createRadialGradient(half, half, 2, half, half, half);
+  grad.addColorStop(0, 'rgba(251, 191, 36, 0.65)');
+  grad.addColorStop(0.35, 'rgba(249, 115, 22, 0.45)');
+  grad.addColorStop(0.75, 'rgba(234, 88, 12, 0.20)');
+  grad.addColorStop(1, 'rgba(234, 88, 12, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  _heatSpotCanvas = canvas;
+  return canvas;
+}
+
+let _ambientShadowCanvas = null;
+function _getAmbientShadowCanvas() {
+  if (_ambientShadowCanvas) return _ambientShadowCanvas;
+  const size = 128;
+  const canvas = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+  if (!canvas) return null;
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const half = size / 2;
+  const grad = ctx.createRadialGradient(half, half, half * 0.2, half, half, half);
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0.78)');
+  grad.addColorStop(0.60, 'rgba(0, 0, 0, 0.45)');
+  grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  _ambientShadowCanvas = canvas;
+  return canvas;
+}
+
 /**
  * Draws High-Contrast Ground Shadow Silhouette & Thruster Scorch beneath CJ when flying
  * Gives the 3D optical depth illusion of levitation/floating in mid-air (similar to Rubbick & Gojo)
@@ -1262,40 +1434,31 @@ function _drawCjGroundShadow(ctx, fighter, r, z, isJetpackActive) {
   const perpY = cosA;
   const backDist = r * 0.75;
   const nozzleSpread = 16;
+  const heatCanvas = _getHeatSpotCanvas();
 
-  // Left & Right Nozzle floor heat spots
-  [-1, 1].forEach(side => {
-    const spotX = -cosA * backDist + perpX * (side * nozzleSpread);
-    const spotY = -sinA * backDist + perpY * (side * nozzleSpread);
+  if (heatCanvas) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, heatPulse * levFactor));
     const spotR = 24;
-
-    const heatGlow = ctx.createRadialGradient(spotX, spotY, 2, spotX, spotY, spotR);
-    heatGlow.addColorStop(0, `rgba(251, 191, 36, ${(0.65 * heatPulse * levFactor).toFixed(3)})`);
-    heatGlow.addColorStop(0.35, `rgba(249, 115, 22, ${(0.45 * heatPulse * levFactor).toFixed(3)})`);
-    heatGlow.addColorStop(0.75, `rgba(234, 88, 12, ${(0.20 * heatPulse * levFactor).toFixed(3)})`);
-    heatGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
-
-    ctx.fillStyle = heatGlow;
-    ctx.beginPath();
-    ctx.arc(spotX, spotY, spotR, 0, Math.PI * 2);
-    ctx.fill();
-  });
+    // Left & Right Nozzle floor heat spots
+    for (let side = -1; side <= 1; side += 2) {
+      const spotX = -cosA * backDist + perpX * (side * nozzleSpread);
+      const spotY = -sinA * backDist + perpY * (side * nozzleSpread);
+      ctx.drawImage(heatCanvas, spotX - spotR, spotY - spotR, spotR * 2, spotR * 2);
+    }
+  }
 
   // 2. Soft Ambient Outer Ground Shadow
   const shadowR = r * (1.45 + levFactor * 0.20);
-  const ambientShadow = ctx.createRadialGradient(0, 0, r * 0.30, 0, 0, shadowR);
-  ambientShadow.addColorStop(0, `rgba(0, 0, 0, ${(0.78 * levFactor).toFixed(3)})`);
-  ambientShadow.addColorStop(0.60, `rgba(0, 0, 0, ${(0.45 * levFactor).toFixed(3)})`);
-  ambientShadow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-  ctx.fillStyle = ambientShadow;
-  ctx.beginPath();
-  ctx.arc(0, 0, shadowR, 0, Math.PI * 2);
-  ctx.fill();
+  const shadowCanvas = _getAmbientShadowCanvas();
+  if (shadowCanvas) {
+    ctx.globalAlpha = Math.max(0, Math.min(1, levFactor));
+    ctx.drawImage(shadowCanvas, -shadowR, -shadowR, shadowR * 2, shadowR * 2);
+  }
 
   // 3. Crisp High-Contrast Inner Ground Silhouette Core (Body & Backpack)
   const coreR = r * (1.10 - levFactor * 0.15);
-  ctx.fillStyle = `rgba(8, 10, 18, ${(0.88 * levFactor).toFixed(3)})`;
+  ctx.globalAlpha = Math.max(0, Math.min(1, 0.88 * levFactor));
+  ctx.fillStyle = '#080A12';
   ctx.beginPath();
   ctx.arc(0, 0, coreR, 0, Math.PI * 2);
   // Backpack silhouette lobe extending backward

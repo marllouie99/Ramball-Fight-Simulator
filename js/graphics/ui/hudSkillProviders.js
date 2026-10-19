@@ -2684,18 +2684,18 @@ export function getSkillDataForFighter(f, getProjectiles) {
       });
     }
 
-    // 4. ULTIMATE: Crimson Laser Matrix (Transmutes all current arena blood into piercing laser beams)
+    // 4. ULTIMATE: Blood Manipulation: Convergence
     if (isSkillEnabled(cfg.enableLaserMatrix, true)) {
       const laserMax = f.ultCooldownMax || f.skill3CooldownMax || cfg.ultCooldown || cfg.skill3Cooldown || 840;
       const laserCd = (f.ultCooldown !== undefined ? f.ultCooldown : f.skill3Cooldown) || 0;
       const overdriveTimer = f.laserTransmutationOverdriveTimer || 0;
       let laserPct = 0;
       let isReady = false;
-      let label = 'CRIMSON LASER MATRIX';
+      let label = 'CONVERGENCE';
 
       if (overdriveTimer > 0) {
         laserPct = Math.max(0, Math.min(100, (overdriveTimer / (cfg.laserTransmutationOverdriveFrames || 300)) * 100));
-        label = `LASER OVERDRIVE (${(overdriveTimer / 60).toFixed(1)}s)`;
+        label = `CONVERGENCE OVERDRIVE (${(overdriveTimer / 60).toFixed(1)}s)`;
         isReady = true;
       } else {
         laserPct = Math.max(0, Math.min(100, (1 - (laserCd / laserMax)) * 100));
@@ -2704,9 +2704,9 @@ export function getSkillDataForFighter(f, getProjectiles) {
           : (f.bloodNodes ? f.bloodNodes.filter(n => n && !n.isDead && (n.lifespan > 0)).length : 0);
         isReady = laserPct >= 99 && laserCd <= 0 && bloodCount > 0;
         if (laserCd <= 0) {
-          label = bloodCount > 0 ? `CRIMSON LASER MATRIX (${bloodCount} BLOOD)` : 'CRIMSON LASER MATRIX (AWAITING BLOOD)';
+          label = bloodCount > 0 ? `CONVERGENCE (${bloodCount} BLOOD)` : 'CONVERGENCE (AWAITING BLOOD)';
         } else {
-          label = `CRIMSON LASER MATRIX: ${Math.ceil(laserCd / 60)}s`;
+          label = `CONVERGENCE: ${Math.ceil(laserCd / 60)}s`;
         }
       }
 
@@ -2912,7 +2912,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction'],
     spartan: ['javelin_throw', 'javelin', 'JAVELIN'],
     guts: ['berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
-    choso: ['laser_matrix', 'laser', 'matrix', 'laser matrix', 'CRIMSON LASER MATRIX', 'piercing_blood', 'PIERCING BLOOD'],
+    choso: ['laser_matrix', 'convergence', 'blood manipulation: convergence', 'laser', 'matrix', 'laser matrix', 'piercing_blood', 'PIERCING BLOOD'],
     eye_of_cthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM'],
     eyeofcthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM']
   };

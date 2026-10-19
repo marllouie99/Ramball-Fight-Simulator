@@ -55,9 +55,33 @@ export function _getKnightSwordImage() {
   return _knightSwordImage;
 }
 
+let _knightGoldSwordImage = null;
+let _knightGoldSwordImageLoading = false;
+
+export function _getKnightGoldSwordImage() {
+  if (_knightGoldSwordImage && _knightGoldSwordImage.complete && _knightGoldSwordImage.naturalWidth > 0) {
+    return _knightGoldSwordImage;
+  }
+  if (!_knightGoldSwordImageLoading && typeof Image !== 'undefined') {
+    _knightGoldSwordImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _knightGoldSwordImage = img;
+      _knightGoldSwordImageLoading = false;
+    };
+    img.onerror = () => {
+      _knightGoldSwordImageLoading = false;
+    };
+    img.src = 'Assets/model/Knight/Knight_goldsword.png?v=1';
+    _knightGoldSwordImage = img;
+  }
+  return _knightGoldSwordImage;
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getKnightShieldImage();
   _getKnightSwordImage();
+  _getKnightGoldSwordImage();
 }
 
 export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = 0, isBroken = false) {
@@ -519,7 +543,156 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
   ctx.fill();
 }
 
-export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false, isSwinging = false) {
+// ─────────────────────────────────────────────
+// MINECRAFT GOLDEN SWORD RENDERER (OFFSCREEN CACHE)
+// ─────────────────────────────────────────────
+
+const MC_GOLD_SWORD_MAP = [
+  "...............O", // 0
+  "..............OT", // 1
+  ".............OGH", // 2
+  "............OGHO", // 3
+  "...........OGHO.", // 4
+  "..........OGHO..", // 5
+  ".........OGHO...", // 6
+  "........OGHO....", // 7
+  ".O.....OGHO.....", // 8
+  ".OCc..OSHO......", // 9
+  "..OCCcCCO.......", // 10
+  "...OWCCO........", // 11
+  "..OwWO.O........", // 12
+  ".OWwO...........", // 13
+  ".OPCO...........", // 14
+  "..O............."  // 15
+];
+
+const MC_PALETTE = {
+  'O': '#2A1806', // Iconic dark outline
+  'W': '#5A361A', // Dark oak wood handle
+  'w': '#88542A', // Light oak wood handle
+  'P': '#E5A016', // Pommel gold
+  'C': '#B57407', // Dark crossguard gold
+  'c': '#F8D838', // Mid crossguard gold
+  'G': '#F8D838', // Bright butter gold blade
+  'H': '#FFF9A6', // Specular blade edge highlight
+  'S': '#C78508', // Shadow gold blade edge
+  'T': '#FFFFFF'  // Diamond-sharp tip glint
+};
+
+let _cachedMinecraftGoldSwordCanvas = null;
+
+function _getMinecraftGoldSwordCanvas() {
+  if (_cachedMinecraftGoldSwordCanvas) return _cachedMinecraftGoldSwordCanvas;
+
+  if (typeof document === 'undefined') return null;
+
+  const P = 3.8;
+  const canvasW = 120;
+  const canvasH = 70;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const c = canvas.getContext('2d');
+  c.imageSmoothingEnabled = false;
+
+  const originX = 26;
+  const originY = 35;
+
+  c.save();
+  c.translate(originX, originY);
+  c.rotate(Math.PI / 4);
+
+  const gripCol = 3.5;
+  const gripRow = 12.0;
+
+  for (let r = 0; r < 16; r++) {
+    const row = MC_GOLD_SWORD_MAP[r];
+    for (let col = 0; col < 16; col++) {
+      const ch = row[col];
+      if (ch === '.' || !MC_PALETTE[ch]) continue;
+
+      const px = Math.round((col - gripCol) * P);
+      const py = Math.round((r - gripRow) * P);
+
+      c.fillStyle = MC_PALETTE[ch];
+      c.fillRect(px, py, Math.ceil(P), Math.ceil(P));
+    }
+  }
+
+  c.restore();
+
+  _cachedMinecraftGoldSwordCanvas = canvas;
+  return _cachedMinecraftGoldSwordCanvas;
+}
+
+export function drawMinecraftGoldSword(ctx, isSwinging = false, isTrail = false, swordScale = 1.0) {
+  const goldImg = _getKnightGoldSwordImage();
+  const hasGoldImg = goldImg && goldImg.complete && goldImg.naturalWidth > 0;
+
+  if (hasGoldImg) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    // Subtle enchanted golden aura when swinging
+    if (isSwinging && !isTrail) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.22)';
+      ctx.beginPath();
+      ctx.arc(44 * swordScale, 0, 32 * swordScale, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sharp golden glint stars at the blade tip
+      ctx.fillStyle = '#FFF9A6';
+      ctx.fillRect(72 * swordScale, -2 * swordScale, 4 * swordScale, 4 * swordScale);
+      ctx.fillStyle = '#FFE082';
+      ctx.fillRect(66 * swordScale, 2 * swordScale, 3 * swordScale, 3 * swordScale);
+      ctx.restore();
+    }
+
+    // Align Minecraft Gold Sword along +X axis matching Knight's default broadsword
+    // Rotate +52.76 deg (+0.9209 rad) around grip (35, 125) to tip (130, 0)
+    ctx.rotate(0.9209);
+
+    // Scale calibrated to 1:1 match default broadsword: 75.0px blade reach, ~99px total length
+    const scale = (75.0 * swordScale) / 157.0;
+    ctx.scale(scale, scale);
+    ctx.drawImage(goldImg, -35, -125);
+
+    ctx.restore();
+    return;
+  }
+
+  const cachedCanvas = _getMinecraftGoldSwordCanvas();
+  if (cachedCanvas) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.translate(-13, 0);
+
+    // Subtle enchanted golden aura when swinging
+    if (isSwinging && !isTrail) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.20)';
+      ctx.beginPath();
+      ctx.arc(32, 0, 24, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sharp golden glint stars at the blade tip
+      ctx.fillStyle = '#FFF9A6';
+      ctx.fillRect(48, -2, 3, 3);
+      ctx.fillStyle = '#FFE082';
+      ctx.fillRect(44, 2, 2, 2);
+      ctx.restore();
+    }
+
+    ctx.drawImage(cachedCanvas, -26, -35);
+    ctx.restore();
+  } else {
+    // Fallback: draw regular sword base with gold accent
+    drawSwordBase(ctx, 1.0, false, isTrail);
+  }
+}
+
+export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null, isTrail = false, isSwinging = false, isGoldSword = false) {
   ctx.save();
   ctx.translate(x, y);
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
@@ -534,7 +707,12 @@ export function drawGraySword(ctx, x, y, gunAngle, r, dashState = null, isTrail 
     ctx.translate(-(r + 10), 4);
     ctx.rotate(-Math.PI / 2);
   }
-  drawSwordBase(ctx, 1.0, false, isTrail);
+
+  if (isGoldSword) {
+    drawMinecraftGoldSword(ctx, isSwinging, isTrail);
+  } else {
+    drawSwordBase(ctx, 1.0, false, isTrail);
+  }
   ctx.restore();
 }
 

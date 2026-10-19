@@ -26,6 +26,7 @@ export const knightConfig = {
     hair: 'Assets/model/Knight/Knight_hair.jpg',
     shield: 'Assets/model/Knight/Knight_shield.jpg',
     sword: 'Assets/model/Knight/Knight_sword.jpg',
+    goldSword: 'Assets/model/Knight/Knight_goldsword.png',
   },
 
   // Shield Defense & Deflection Hit-Pause
@@ -50,6 +51,7 @@ export const knightConfig = {
   swipeCooldown: 38,
   swipeDuration: 30,
   swordDamage: 30,
+  brokenShieldSwordDamageMultiplier: 2.0, // When shield is shattered, sword transforms into Minecraft Gold Sword dealing 2x damage
   comboResetFrames: 90,
 
   // Hit 1: Horizontal Cross Cleave (Rule 30: 5-Phase Timing)
@@ -60,7 +62,7 @@ export const knightConfig = {
   hit1RecoveryFrames: 10,
   hit1Damage: 28,
   hit1Knockback: 6.0,
-  hit1LungeSpeed: 6.5,
+  hit1LungeSpeed: 0,
   hit1HitPauseFrames: 7,          // Visceral impact freeze when Hit 1 connects
   hit1HitStunFrames: 10,
 
@@ -72,7 +74,7 @@ export const knightConfig = {
   hit2RecoveryFrames: 12,
   hit2Damage: 34,
   hit2Knockback: 8.5,
-  hit2LungeSpeed: 7.2,
+  hit2LungeSpeed: 0,
   hit2HitPauseFrames: 9,          // Heavier finisher impact freeze when Hit 2 connects
   hit2HitStunFrames: 14,
 

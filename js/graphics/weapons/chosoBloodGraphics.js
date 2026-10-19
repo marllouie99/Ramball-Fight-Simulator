@@ -2,7 +2,7 @@
 // CHOSO BLOOD MANIPULATION & LASER GRAPHICS
 // Renders:
 // - Interactive Blood Droplet Nodes (Normal & Diode Ignition States)
-// - Blood Transmutation: Crimson Laser Matrix Beams & Targeting Needles
+// - Blood Manipulation: Convergence Beams & Targeting Needles
 // - Blood Edge 5-Phase Melee Slashes & Dynamic Arm Linkages
 // - Slicing Exorcist (Chakram) Rotary Blood Disc
 // - Supernova Fragmentation Orbs & Detonations
