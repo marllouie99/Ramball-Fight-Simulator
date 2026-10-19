@@ -51,6 +51,21 @@ import { knightConfig } from '../configs/characters/knightConfig.js';
 import { spartanConfig } from '../configs/characters/spartanConfig.js';
 import { gutsConfig } from '../configs/characters/gutsConfig.js';
 import { chosoConfig } from '../configs/characters/chosoConfig.js';
+import { sharpshooterConfig } from '../configs/characters/sharpshooterConfig.js';
+import { jazzConfig } from '../configs/characters/jazzConfig.js';
+import { circeConfig } from '../configs/characters/circeConfig.js';
+import { hyperionConfig } from '../configs/characters/hyperionConfig.js';
+import { erebusConfig } from '../configs/characters/erebusConfig.js';
+import { shinobiConfig } from '../configs/characters/shinobiConfig.js';
+import { emberConfig } from '../configs/characters/emberConfig.js';
+import { berserkerConfig } from '../configs/characters/berserkerConfig.js';
+import { cronusConfig } from '../configs/characters/cronusConfig.js';
+import { bombardierConfig } from '../configs/characters/bombardierConfig.js';
+import { doppelgangerConfig } from '../configs/characters/doppelgangerConfig.js';
+import { rubyConfig } from '../configs/characters/rubyConfig.js';
+import { musashiConfig } from '../configs/characters/musashiConfig.js';
+import { hydraConfig } from '../configs/characters/hydraConfig.js';
+import { DEFAULT_GRADE } from '../configs/gradeConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 import { interactionConfigs } from '../configs/interactions/index.js';
@@ -201,8 +216,10 @@ export const CONFIG = {
   hudHideStats: false,          // Toggle to completely hide all fighter HUD stats lines
   hudHideOverheadHp: false,      // Toggle to hide overhead canvas health numbers and bars on fighters
   enableFighterInkOutline: true, // Global manga-style ink outline around live in-arena fighters
-  fighterInkOutlineWidth: 1.5,   // Ink outline stroke width (matches Top HUD frame badge standard 1.5px)
+  fighterInkOutlineWidth: 2.2,   // Ink outline stroke width (2.2px cleanly frames 2.0px pixel body borders, weapons & tendrils)
   fighterInkOutlineColor: '#050609', // Dark ink outline stroke color (matches Top HUD frame badge standard #050609)
+  enableFighterFloorShadow: true, // Universal ground contact depth shadow anchoring all fighters to the arena floor
+  fighterFloorShadowColor: 'rgba(5, 6, 9, 0.32)', // Dark grounded ambient floor shadow color
   hudSkillBarsMode: 'all',      // 'all' = show all skill bars, 'signature' = signature only, 'none' = completely hide all skill bars
   hudGhostBarEnabled: true,      // Master toggle for fighting-game trailing damage ghost bar on healthbars
   hudGhostBarHoldFrames: 8,      // Responsive delay in frames (~133ms) before trailing ghost bar begins catch-up decay
@@ -677,42 +694,45 @@ export const FIGHTER_DEFS = [
   {
     id: 1,
     name: 'Sharpshooter',
-    category: 'Sci-Fi & Modern',
-    color: '#ff4d4d',
+    grade: sharpshooterConfig.grade ?? DEFAULT_GRADE,
+    category: sharpshooterConfig.category ?? 'Sci-Fi & Modern',
+    color: sharpshooterConfig.color ?? '#ff4d4d',
     startX: 140, startY: 180,
     startVx: 1.4, startVy: 1.0,
-    radius: 25,
+    radius: sharpshooterConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.01,
     type: 'normal',
-    hp: 65,
-    damage: 15,
-    cooldown: 70, // 1 second at 60fps
-    moveSpeed: 5.0,
-    projectileSpeedMultiplier: 3.0,
-    ability: 'Straight Fire',
-    desc: 'Fires heavy projectiles straight ahead. High damage, slow reload rate.',
+    hp: sharpshooterConfig.hp ?? 65,
+    damage: sharpshooterConfig.damage ?? 15,
+    cooldown: sharpshooterConfig.cooldown ?? 70, // 1 second at 60fps
+    moveSpeed: sharpshooterConfig.moveSpeed ?? 5.0,
+    projectileSpeedMultiplier: sharpshooterConfig.projectileSpeedMultiplier ?? 3.0,
+    ability: sharpshooterConfig.ability ?? 'Straight Fire',
+    desc: sharpshooterConfig.desc ?? 'Fires heavy projectiles straight ahead. High damage, slow reload rate.',
   },
   {
     id: 2,
     name: 'Jazz',
-    category: 'Sci-Fi & Modern',
-    color: '#4da3ff',
+    grade: jazzConfig.grade ?? DEFAULT_GRADE,
+    category: jazzConfig.category ?? 'Sci-Fi & Modern',
+    color: jazzConfig.color ?? '#4da3ff',
     startX: 460, startY: 280,
     startVx: -1.2, startVy: -0.9,
-    radius: 25,
+    radius: jazzConfig.radius ?? 25,
     aimbot: true,
     type: 'aimbot',
-    hp: 60,
-    damage: 5,
-    cooldown: 30,  // 1 second at 60fps
-    moveSpeed: 5.0,
-    ability: 'Aimbot Laser',
-    desc: 'Wields a dubstep gun that fires musical notes and triggers an instant follow-up projectile on hit.',
+    hp: jazzConfig.hp ?? 60,
+    damage: jazzConfig.damage ?? 5,
+    cooldown: jazzConfig.cooldown ?? 30,  // 1 second at 60fps
+    moveSpeed: jazzConfig.moveSpeed ?? 5.0,
+    ability: jazzConfig.ability ?? 'Aimbot Laser',
+    desc: jazzConfig.desc ?? 'Wields a dubstep gun that fires musical notes and triggers an instant follow-up projectile on hit.',
   },
   {
     id: 3,
     name: 'Spike',
+    grade: spikeConfig.grade ?? DEFAULT_GRADE,
     category: 'Fantasy & Magic',
     color: '#e5c158',
     startX: 300, startY: 240, // start center
@@ -731,41 +751,44 @@ export const FIGHTER_DEFS = [
   {
     id: 4,
     name: 'Circe',
-    category: 'Greek Mythology',
-    color: '#4dff4d',
+    grade: circeConfig.grade ?? DEFAULT_GRADE,
+    category: circeConfig.category ?? 'Greek Mythology',
+    color: circeConfig.color ?? '#4dff4d',
     startX: 220, startY: 240,
     startVx: 1.3, startVy: 1.1,
-    radius: 25,
+    radius: circeConfig.radius ?? 25,
     aimbot: false,
     type: 'grenadier',
-    hp: 75,
-    damage: 15,
-    cooldown: 0,
-    moveSpeed: 4.7,
-    ability: 'Poison Grenade',
-    desc: 'Throws a poison and deals AOE damage and poisons them.',
+    hp: circeConfig.hp ?? 75,
+    damage: circeConfig.damage ?? 15,
+    cooldown: circeConfig.cooldown ?? 0,
+    moveSpeed: circeConfig.moveSpeed ?? 4.7,
+    ability: circeConfig.ability ?? 'Poison Grenade',
+    desc: circeConfig.desc ?? 'Throws a poison and deals AOE damage and poisons them.',
   },
   {
     id: 5,
     name: 'Hyperion',
-    category: 'Greek Mythology',
-    color: '#ffffff',
+    grade: hyperionConfig.grade ?? DEFAULT_GRADE,
+    category: hyperionConfig.category ?? 'Greek Mythology',
+    color: hyperionConfig.color ?? '#ffffff',
     startX: 300, startY: 210,
     startVx: 1.4, startVy: 1.0,
-    radius: 25,
+    radius: hyperionConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.03,
     type: 'laser',
-    hp: 80,
-    damage: 15,
-    cooldown: 300, // 3 seconds cooldown
-    moveSpeed: 4.0,
-    ability: 'Sustained Laser',
-    desc: 'Fires a continuous laser beam.',
+    hp: hyperionConfig.hp ?? 80,
+    damage: hyperionConfig.damage ?? 15,
+    cooldown: hyperionConfig.cooldown ?? 300, // 3 seconds cooldown
+    moveSpeed: hyperionConfig.moveSpeed ?? 4.0,
+    ability: hyperionConfig.ability ?? 'Sustained Laser',
+    desc: hyperionConfig.desc ?? 'Fires a continuous laser beam.',
   },
   {
     id: 6,
     name: 'Knight',
+    grade: knightConfig.grade ?? DEFAULT_GRADE,
     category: 'Fantasy & Magic',
     color: '#9e9e9e',
     themeColor: '#9e9e9e',
@@ -784,122 +807,129 @@ export const FIGHTER_DEFS = [
   {
     id: 7,
     name: 'Erebus',
-    category: 'Greek Mythology',
-    color: '#6200a0',
+    grade: erebusConfig.grade ?? DEFAULT_GRADE,
+    category: erebusConfig.category ?? 'Greek Mythology',
+    color: erebusConfig.color ?? '#6200a0',
     startX: 250, startY: 260,
     startVx: 1.0, startVy: 0.8,
-    radius: 25,
+    radius: erebusConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.07,
     type: 'black',
-    hp: 70,
-    damage: 10,
-    cooldown: 35,
-    moveSpeed: 5.0,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Black Hole',
-    desc: 'Summons a black hole near the opponent, dragging them in and dealing damage over time.',
+    hp: erebusConfig.hp ?? 70,
+    damage: erebusConfig.damage ?? 10,
+    cooldown: erebusConfig.cooldown ?? 35,
+    moveSpeed: erebusConfig.moveSpeed ?? 5.0,
+    projectileSpeedMultiplier: erebusConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: erebusConfig.ability ?? 'Black Hole',
+    desc: erebusConfig.desc ?? 'Summons a black hole near the opponent, dragging them in and dealing damage over time.',
   },
   {
     id: 8,
     name: 'Shinobi',
-    category: 'Japanese',
-    color: '#2f4f4f',
+    grade: shinobiConfig.grade ?? DEFAULT_GRADE,
+    category: shinobiConfig.category ?? 'Japanese',
+    color: shinobiConfig.color ?? '#2f4f4f',
     startX: 280, startY: 250,
     startVx: 1.2, startVy: -0.8,
-    radius: 25,
+    radius: shinobiConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.05,
     type: 'darkslategray',
-    hp: 50,
-    damage: 5,
-    cooldown: 25,
-    moveSpeed: 5.5,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Shadow Arts',
-    desc: 'Fighter with stealthy moves. Passively dodges projectiles. After 3 dodges, becomes invisible with speed boost and deals 2x backstab damage.',
+    hp: shinobiConfig.hp ?? 50,
+    damage: shinobiConfig.damage ?? 5,
+    cooldown: shinobiConfig.cooldown ?? 25,
+    moveSpeed: shinobiConfig.moveSpeed ?? 5.5,
+    projectileSpeedMultiplier: shinobiConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: shinobiConfig.ability ?? 'Shadow Arts',
+    desc: shinobiConfig.desc ?? 'Fighter with stealthy moves. Passively dodges projectiles. After 3 dodges, becomes invisible with speed boost and deals 2x backstab damage.',
   },
   {
     id: 9,
     name: 'Ember',
-    category: 'Fantasy & Magic',
-    color: '#ff8c00',
+    grade: emberConfig.grade ?? DEFAULT_GRADE,
+    category: emberConfig.category ?? 'Fantasy & Magic',
+    color: emberConfig.color ?? '#ff8c00',
     startX: 300, startY: 230,
     startVx: 1.3, startVy: 1.0,
-    radius: 25,
+    radius: emberConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.02,
     type: 'orange',
-    hp: 100,
-    damage: 10,
-    cooldown: 30,
-    moveSpeed: 4.0,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Auto-Lock Flamethrower',
-    desc: 'Burns enemies with burning effect.',
+    hp: emberConfig.hp ?? 100,
+    damage: emberConfig.damage ?? 10,
+    cooldown: emberConfig.cooldown ?? 30,
+    moveSpeed: emberConfig.moveSpeed ?? 4.0,
+    projectileSpeedMultiplier: emberConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: emberConfig.ability ?? 'Auto-Lock Flamethrower',
+    desc: emberConfig.desc ?? 'Burns enemies with burning effect.',
   },
   {
     id: 10,
     name: 'Berserker',
-    category: 'Fantasy & Magic',
-    color: '#8b0000',
+    grade: berserkerConfig.grade ?? DEFAULT_GRADE,
+    category: berserkerConfig.category ?? 'Fantasy & Magic',
+    color: berserkerConfig.color ?? '#8b0000',
     startX: 320, startY: 260,
     startVx: 1.5, startVy: -1.0,
-    radius: 25,
+    radius: berserkerConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.04,
     type: 'berserker',
-    hp: 80,
-    damage: 15,
-    cooldown: 40,
-    moveSpeed: 5.0,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Rage',
-    desc: 'Gains rage when taking damage. During rage: increased damage, attack speed, movement speed, and lifesteal.',
+    hp: berserkerConfig.hp ?? 80,
+    damage: berserkerConfig.damage ?? 15,
+    cooldown: berserkerConfig.cooldown ?? 40,
+    moveSpeed: berserkerConfig.moveSpeed ?? 5.0,
+    projectileSpeedMultiplier: berserkerConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: berserkerConfig.ability ?? 'Rage',
+    desc: berserkerConfig.desc ?? 'Gains rage when taking damage. During rage: increased damage, attack speed, movement speed, and lifesteal.',
   },
   {
     id: 11,
     name: 'Cronus',
-    category: 'Greek Mythology',
-    color: '#07cdfa',
+    grade: cronusConfig.grade ?? DEFAULT_GRADE,
+    category: cronusConfig.category ?? 'Greek Mythology',
+    color: cronusConfig.color ?? '#07cdfa',
     startX: 300, startY: 240,
     startVx: 1.2, startVy: 0.8,
-    radius: 25,
+    radius: cronusConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.03,
     type: 'cronos',
-    hp: 120,
-    damage: 10,
-    cooldown: 35,
-    moveSpeed: 4.8,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Time Stop',
-    desc: 'Deploys a time stop sphere that freezes enemies. Gain movement speed and attack speed.',
+    hp: cronusConfig.hp ?? 120,
+    damage: cronusConfig.damage ?? 10,
+    cooldown: cronusConfig.cooldown ?? 35,
+    moveSpeed: cronusConfig.moveSpeed ?? 4.8,
+    projectileSpeedMultiplier: cronusConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: cronusConfig.ability ?? 'Time Stop',
+    desc: cronusConfig.desc ?? 'Deploys a time stop sphere that freezes enemies. Gain movement speed and attack speed.',
   },
   {
     id: 12,
     name: 'Bombardier',
-    category: 'Sci-Fi & Modern',
-    color: '#6A3F1E',
-    skinColor: '#5A3B1A',
-    skinAccentColor: '#E0B05B',
+    grade: bombardierConfig.grade ?? DEFAULT_GRADE,
+    category: bombardierConfig.category ?? 'Sci-Fi & Modern',
+    color: bombardierConfig.color ?? '#6A3F1E',
+    skinColor: bombardierConfig.skinColor ?? '#5A3B1A',
+    skinAccentColor: bombardierConfig.skinAccentColor ?? '#E0B05B',
     startX: 280, startY: 260,
     startVx: 1.3, startVy: -0.9,
-    radius: 25,
+    radius: bombardierConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.04,
     type: 'bomber',
-    hp: 85,
-    damage: 12,
-    cooldown: 45,
-    moveSpeed: 4.5,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Explosive Expert',
-    desc: 'Throws grenades that explode on impact dealing AOE damag. Leaves a powerful C4 bomb on death.',
+    hp: bombardierConfig.hp ?? 85,
+    damage: bombardierConfig.damage ?? 12,
+    cooldown: bombardierConfig.cooldown ?? 45,
+    moveSpeed: bombardierConfig.moveSpeed ?? 4.5,
+    projectileSpeedMultiplier: bombardierConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: bombardierConfig.ability ?? 'Explosive Expert',
+    desc: bombardierConfig.desc ?? 'Throws grenades that explode on impact dealing AOE damag. Leaves a powerful C4 bomb on death.',
   },
   {
     id: 13,
     name: 'Alucard',
+    grade: gunslingerConfig.grade ?? DEFAULT_GRADE,
     category: gunslingerConfig.category || 'Anime & Supernatural',
     color: gunslingerConfig.color || '#8B0000',
     startX: gunslingerConfig.startX || 260,
@@ -921,25 +951,27 @@ export const FIGHTER_DEFS = [
   {
     id: 14,
     name: 'Doppelganger',
-    category: 'Fantasy & Magic',
-    color: '#9b59b6',
+    grade: doppelgangerConfig.grade ?? DEFAULT_GRADE,
+    category: doppelgangerConfig.category ?? 'Fantasy & Magic',
+    color: doppelgangerConfig.color ?? '#9b59b6',
     startX: 300, startY: 240,
     startVx: 1.3, startVy: -1.0,
-    radius: 25,
+    radius: doppelgangerConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0,
     type: 'doppleganger',
-    hp: 100,
-    damage: 15,
-    cooldown: 45,
-    moveSpeed: 5.5,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Mirror Image',
-    desc: 'Summons illusions of itself every 25% health lost.',
+    hp: doppelgangerConfig.hp ?? 100,
+    damage: doppelgangerConfig.damage ?? 15,
+    cooldown: doppelgangerConfig.cooldown ?? 45,
+    moveSpeed: doppelgangerConfig.moveSpeed ?? 5.5,
+    projectileSpeedMultiplier: doppelgangerConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: doppelgangerConfig.ability ?? 'Mirror Image',
+    desc: doppelgangerConfig.desc ?? 'Summons illusions of itself every 25% health lost.',
   },
   {
     id: 15,
     name: 'Engineer',
+    grade: engineerConfig.grade ?? DEFAULT_GRADE,
     category: 'Sci-Fi & Modern',
     color: engineerConfig.color || '#b8860b',
     startX: engineerConfig.startX || 280,
@@ -960,44 +992,47 @@ export const FIGHTER_DEFS = [
   {
     id: 16,
     name: 'Ruby',
-    category: 'Fantasy & Magic',
-    color: '#E0115F',
+    grade: rubyConfig.grade ?? DEFAULT_GRADE,
+    category: rubyConfig.category ?? 'Fantasy & Magic',
+    color: rubyConfig.color ?? '#E0115F',
     startX: 310, startY: 250,
     startVx: 1.4, startVy: 0.9,
-    radius: 25,
+    radius: rubyConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.05,
     type: 'ruby',
-    hp: 90,
-    damage: 12,
-    cooldown: 40,
-    moveSpeed: 4.8,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Scythe Dance',
-    desc: 'Casting abilities triggers a short dash. Swings and pulls scythe to lifesteal.',
+    hp: rubyConfig.hp ?? 90,
+    damage: rubyConfig.damage ?? 12,
+    cooldown: rubyConfig.cooldown ?? 40,
+    moveSpeed: rubyConfig.moveSpeed ?? 4.8,
+    projectileSpeedMultiplier: rubyConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: rubyConfig.ability ?? 'Scythe Dance',
+    desc: rubyConfig.desc ?? 'Casting abilities triggers a short dash. Swings and pulls scythe to lifesteal.',
   },
   {
     id: 17,
     name: 'Musashi',
-    category: 'Japanese',
-    color: '#34495e',
+    grade: musashiConfig.grade ?? DEFAULT_GRADE,
+    category: musashiConfig.category ?? 'Japanese',
+    color: musashiConfig.color ?? '#34495e',
     startX: 290, startY: 240,
     startVx: 1.2, startVy: -1.0,
-    radius: 25,
+    radius: musashiConfig.radius ?? 25,
     aimbot: false,
     spinRate: 0.03,
     type: 'musashi',
-    hp: 100,
-    damage: 10, // (Katana + Wakizashi)
-    cooldown: 45,
-    moveSpeed: 4.8,
-    projectileSpeedMultiplier: 1.0,
-    ability: 'Dual Stances',
-    desc: 'Switches between five stances (Earth, Water, Fire, Wind, Void) giving passive effects and unique skills.',
+    hp: musashiConfig.hp ?? 100,
+    damage: musashiConfig.damage ?? 10, // (Katana + Wakizashi)
+    cooldown: musashiConfig.cooldown ?? 45,
+    moveSpeed: musashiConfig.moveSpeed ?? 4.8,
+    projectileSpeedMultiplier: musashiConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: musashiConfig.ability ?? 'Dual Stances',
+    desc: musashiConfig.desc ?? 'Switches between five stances (Earth, Water, Fire, Wind, Void) giving passive effects and unique skills.',
   },
   {
     id: 18,
     name: 'Rubbick',
+    grade: rubbickConfig.grade ?? DEFAULT_GRADE,
     category: 'Fantasy & Magic',
     color: rubbickConfig.color || '#03e631ff',
     startX: rubbickConfig.startX || 310,
@@ -1019,6 +1054,7 @@ export const FIGHTER_DEFS = [
   {
     id: 19,
     name: 'Zeus',
+    grade: zeusConfig.grade ?? DEFAULT_GRADE,
     category: 'Greek Mythology',
     color: zeusConfig.color || '#00BFFF',
     startX: zeusConfig.startX || 300,
@@ -1040,25 +1076,27 @@ export const FIGHTER_DEFS = [
   {
     id: 20,
     name: 'Hydra',
-    category: 'Fantasy & Magic',
-    color: '#4B0082', // Dark Purple
+    grade: hydraConfig.grade ?? DEFAULT_GRADE,
+    category: hydraConfig.category ?? 'Fantasy & Magic',
+    color: hydraConfig.color ?? '#4B0082', // Dark Purple
     startX: 300, startY: 250,
     startVx: 0.8, startVy: 0.7,
-    radius: 25, // Standard size
+    radius: hydraConfig.radius ?? 25, // Standard size
     aimbot: false,
     spinRate: 0,
     type: 'hydra',
-    hp: 1000, // 5x health
-    damage: 8, // Very low base damage. When stealing a weapon, uses the copied fighter's exact damage value.
-    cooldown: 0, // Doesn't fire normally
-    moveSpeed: 8.5, // Slow
-    projectileSpeedMultiplier: 1.0,
-    ability: 'The Overdrive',
-    desc: 'Extremely tanky. Steals physical weapons upon being hit (copying their exact damage). Passively destroys incoming projectiles. Ultimate grants CC immunity.',
+    hp: hydraConfig.hp ?? 1000, // 5x health
+    damage: hydraConfig.damage ?? 8, // Very low base damage. When stealing a weapon, uses the copied fighter's exact damage value.
+    cooldown: hydraConfig.cooldown ?? 0, // Doesn't fire normally
+    moveSpeed: hydraConfig.moveSpeed ?? 8.5, // Slow
+    projectileSpeedMultiplier: hydraConfig.projectileSpeedMultiplier ?? 1.0,
+    ability: hydraConfig.ability ?? 'The Overdrive',
+    desc: hydraConfig.desc ?? 'Extremely tanky. Steals physical weapons upon being hit (copying their exact damage). Passively destroys incoming projectiles. Ultimate grants CC immunity.',
   },
   {
     id: 21,
     name: 'GOJO',
+    grade: gojoConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: gojoConfig.color || '#E0FFFF', // Light Cyan
     startX: gojoConfig.startX || 300,
@@ -1080,6 +1118,7 @@ export const FIGHTER_DEFS = [
   {
     id: 22,
     name: 'SUKUNA',
+    grade: sukunaConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: sukunaConfig.color || '#8B0000', // Dark Crimson
     startX: sukunaConfig.startX || 300,
@@ -1101,6 +1140,7 @@ export const FIGHTER_DEFS = [
   {
     id: 23,
     name: 'YUTA',
+    grade: yutaConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: yutaConfig.color || '#EEEEEE', // Soft Silver / White
     themeColor: yutaConfig.themeColor || '#FF1493', // Cursed Pink theme
@@ -1123,6 +1163,7 @@ export const FIGHTER_DEFS = [
   {
     id: 99,
     name:'TOJI',
+    grade: tojiConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: tojiConfig.color || '#281438', // Dark Shadow Purple
     startX: tojiConfig.startX || 350,
@@ -1144,6 +1185,7 @@ export const FIGHTER_DEFS = [
   {
     id: 24,
     name: 'TODO',
+    grade: todoConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: todoConfig.color || '#D2691E', // Chocolate / Brown
     startX: todoConfig.startX || 300,
@@ -1165,6 +1207,7 @@ export const FIGHTER_DEFS = [
   {
     id: 25,
     name: 'YUJI',
+    grade: yujiConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: yujiConfig.color || '#D95C7E', // Deep pink JJK uniform
     startX: yujiConfig.startX || 300,
@@ -1186,6 +1229,7 @@ export const FIGHTER_DEFS = [
   {
     id: 26,
     name: 'Layla',
+    grade: laylaConfig.grade ?? DEFAULT_GRADE,
     category: 'Sci-Fi & Modern',
     color: laylaConfig.color || '#00E5FF', // Blue Cosmic Theme
     startX: laylaConfig.startX || 300,
@@ -1207,6 +1251,7 @@ export const FIGHTER_DEFS = [
   {
     id: 27,
     name: 'SAITAMA',
+    grade: saitamaConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: saitamaConfig.color || '#F5C400', // Bright Safety Yellow
     startX: saitamaConfig.startX || 300,
@@ -1228,6 +1273,7 @@ export const FIGHTER_DEFS = [
   {
     id: 28,
     name: 'GENOS',
+    grade: genosConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: genosConfig.color || '#FF5500', // Incineration Orange
     startX: genosConfig.startX || 300,
@@ -1249,6 +1295,7 @@ export const FIGHTER_DEFS = [
   {
     id: 29,
     name: 'ICHIGO',
+    grade: ichigoConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: ichigoConfig.color || '#FF5500', // Orange details
     startX: ichigoConfig.startX || 300,
@@ -1270,6 +1317,7 @@ export const FIGHTER_DEFS = [
   {
     id: 30,
     name: 'MAHITO',
+    grade: mahitoConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: mahitoConfig.color || '#C026D3', // Vivid Magenta-Violet / Cursed Energy
     startX: mahitoConfig.startX || 300,
@@ -1291,6 +1339,7 @@ export const FIGHTER_DEFS = [
   {
     id: 31,
     name: 'NANAMI',
+    grade: nanamiConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: nanamiConfig.color || '#D4AF37', // Refined Golden Sand / Warm Ochre
     startX: nanamiConfig.startX || 300,
@@ -1312,6 +1361,7 @@ export const FIGHTER_DEFS = [
   {
     id: 32,
     name: 'NOBARA',
+    grade: nobaraConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: nobaraConfig.color || '#D94E68', // Deep Rose Crimson
     startX: nobaraConfig.startX || 300,
@@ -1333,6 +1383,7 @@ export const FIGHTER_DEFS = [
   {
     id: 33,
     name: 'John Wick',
+    grade: johnWickConfig.grade ?? DEFAULT_GRADE,
     category: 'Pop Culture & Action',
     color: johnWickConfig.color || '#2b2d31', // Tactical Charcoal Gunmetal
     startX: johnWickConfig.startX || 300,
@@ -1354,6 +1405,7 @@ export const FIGHTER_DEFS = [
   {
     id: 34,
     name: 'CJ',
+    grade: cjConfig.grade ?? DEFAULT_GRADE,
     category: 'Pop Culture & Action',
     color: cjConfig.color || '#16A34A', // Grove Street Families Green
     startX: cjConfig.startX || 300,
@@ -1375,6 +1427,7 @@ export const FIGHTER_DEFS = [
   {
     id: 35,
     name: 'MEGUMI',
+    grade: megumiConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: megumiConfig.color || '#1C2D4A', // Midnight Navy
     startX: megumiConfig.startX || 300,
@@ -1396,6 +1449,7 @@ export const FIGHTER_DEFS = [
   {
     id: 36,
     name: 'ISHIDA',
+    grade: uryuConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: uryuConfig.color || '#00E5FF', // Quincy Radiant Cyan
     startX: uryuConfig.startX || 300,
@@ -1417,6 +1471,7 @@ export const FIGHTER_DEFS = [
   {
     id: 37,
     name: 'ULQUIORRA',
+    grade: ulquiorraConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: ulquiorraConfig.color || '#00FF88', // Emerald Green Reiatsu
     themeColor: ulquiorraConfig.themeColor || '#00FF88',
@@ -1439,6 +1494,7 @@ export const FIGHTER_DEFS = [
   {
     id: 38,
     name: 'MAKIMA',
+    grade: makimaConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: makimaConfig.color || '#A31D24', // Velvet Blood Crimson
     themeColor: makimaConfig.themeColor || '#A31D24',
@@ -1462,6 +1518,7 @@ export const FIGHTER_DEFS = [
   {
     id: 39,
     name: 'REZE',
+    grade: rezeConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: rezeConfig.color || '#430363ff',
     themeColor: rezeConfig.themeColor || '#430363ff',
@@ -1485,6 +1542,7 @@ export const FIGHTER_DEFS = [
   {
     id: 40,
     name: 'DENJI',
+    grade: denjiConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: denjiConfig.color || '#EAB308', // Chainsaw Amber Gold
     themeColor: denjiConfig.themeColor || '#EAB308',
@@ -1508,6 +1566,7 @@ export const FIGHTER_DEFS = [
   {
     id: 41,
     name: 'POWER',
+    grade: powerConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: powerConfig.color || '#EF4444', // Crimson Blood Red
     themeColor: powerConfig.themeColor || '#EF4444',
@@ -1531,6 +1590,7 @@ export const FIGHTER_DEFS = [
   {
     id: 42,
     name: 'TANJIRO',
+    grade: tanjiroConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: tanjiroConfig.color || '#10B981',
     themeColor: tanjiroConfig.themeColor || '#10B981',
@@ -1554,6 +1614,7 @@ export const FIGHTER_DEFS = [
   {
     id: 43,
     name: 'NEZUKO',
+    grade: nezukoConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: nezukoConfig.color || '#EC4899',
     themeColor: nezukoConfig.themeColor || '#EC4899',
@@ -1577,6 +1638,7 @@ export const FIGHTER_DEFS = [
   {
     id: 44,
     name: 'ZENITSU',
+    grade: zenitsuConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: zenitsuConfig.color || '#F59E0B',
     themeColor: zenitsuConfig.themeColor || '#F59E0B',
@@ -1600,6 +1662,7 @@ export const FIGHTER_DEFS = [
   {
     id: 45,
     name: 'INOSUKE',
+    grade: inosukeConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: inosukeConfig.color || '#3B82F6',
     themeColor: inosukeConfig.themeColor || '#3B82F6',
@@ -1623,6 +1686,7 @@ export const FIGHTER_DEFS = [
   {
     id: 46,
     name: 'ESCANOR',
+    grade: escanorConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: escanorConfig.color || '#F59E0B',
     themeColor: escanorConfig.themeColor || '#F59E0B',
@@ -1646,6 +1710,7 @@ export const FIGHTER_DEFS = [
   {
     id: 47,
     name: 'Eye of Cthulhu',
+    grade: eyeOfCthulhuConfig.grade ?? DEFAULT_GRADE,
     category: 'Terraria & Bosses',
     color: eyeOfCthulhuConfig.color || '#E11D48',
     themeColor: eyeOfCthulhuConfig.themeColor || '#E11D48',
@@ -1669,6 +1734,7 @@ export const FIGHTER_DEFS = [
   {
     id: 48,
     name: 'Ender Dragon',
+    grade: enderDragonConfig.grade ?? DEFAULT_GRADE,
     category: 'Terraria & Bosses',
     color: enderDragonConfig.color || '#18181B',
     themeColor: enderDragonConfig.themeColor || '#C026D3',
@@ -1692,6 +1758,7 @@ export const FIGHTER_DEFS = [
   {
     id: 49,
     name: 'MEGUMIN',
+    grade: meguminConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: meguminConfig.color || '#C81D25',
     themeColor: meguminConfig.themeColor || '#C81D25',
@@ -1715,6 +1782,7 @@ export const FIGHTER_DEFS = [
   {
     id: 50,
     name: 'PLANTS',
+    grade: crazyDaveConfig.grade ?? DEFAULT_GRADE,
     displayName: 'PLANTS',
     category: 'Gaming',
     color: crazyDaveConfig.color || '#84CC16',
@@ -1739,6 +1807,7 @@ export const FIGHTER_DEFS = [
   {
     id: 51,
     name: 'P.E.K.K.A',
+    grade: pekkaConfig.grade ?? DEFAULT_GRADE,
     category: 'Gaming',
     color: pekkaConfig.color || '#8B5CF6',
     themeColor: pekkaConfig.themeColor || '#8B5CF6',
@@ -1762,6 +1831,7 @@ export const FIGHTER_DEFS = [
   {
     id: 52,
     name: 'NAMELESS DEITY',
+    grade: namelessDeityConfig.grade ?? DEFAULT_GRADE,
     category: 'Gaming',
     color: namelessDeityConfig.color || '#00F0FF',
     themeColor: namelessDeityConfig.themeColor || '#00F0FF',
@@ -1785,6 +1855,7 @@ export const FIGHTER_DEFS = [
   {
     id: 53,
     name: 'DRAEDON',
+    grade: draedonConfig.grade ?? DEFAULT_GRADE,
     category: 'Gaming',
     color: draedonConfig.color || '#06B6D4',
     themeColor: draedonConfig.themeColor || '#06B6D4',
@@ -1808,6 +1879,7 @@ export const FIGHTER_DEFS = [
   {
     id: 54,
     name: 'SANS',
+    grade: sansConfig.grade ?? DEFAULT_GRADE,
     category: 'Gaming',
     color: sansConfig.color || '#03d5f1ff',
     themeColor: sansConfig.themeColor || '#03d5f1ff',
@@ -1832,6 +1904,7 @@ export const FIGHTER_DEFS = [
   {
     id: 55,
     name: 'AVATAR OF EMPTINESS',
+    grade: avatarOfEmptinessConfig.grade ?? DEFAULT_GRADE,
     category: 'Gaming',
     color: avatarOfEmptinessConfig.color || '#9D4EDD',
     themeColor: avatarOfEmptinessConfig.themeColor || '#9D4EDD',
@@ -1855,6 +1928,7 @@ export const FIGHTER_DEFS = [
   {
     id: 56,
     name: 'NAOYA',
+    grade: naoyaConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: naoyaConfig.color || '#76E042',
     themeColor: naoyaConfig.themeColor || '#76E042',
@@ -1878,6 +1952,7 @@ export const FIGHTER_DEFS = [
   {
     id: 57,
     name: 'MAKI',
+    grade: makiConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: makiConfig.color || '#18181B',
     themeColor: makiConfig.themeColor || '#014913ff',
@@ -1901,6 +1976,7 @@ export const FIGHTER_DEFS = [
   {
     id: 58,
     name: 'SHIRO',
+    grade: shiroConfig.grade ?? DEFAULT_GRADE,
     displayName: '『SHIRO』',
     category: 'Anime',
     color: shiroConfig.color || '#A855F7',
@@ -1925,6 +2001,7 @@ export const FIGHTER_DEFS = [
   {
     id: 59,
     name: 'SPARTAN',
+    grade: spartanConfig.grade ?? DEFAULT_GRADE,
     displayName: 'SPARTAN',
     category: 'Greek Mythology',
     color: spartanConfig.color || '#b91c1c',
@@ -1949,6 +2026,7 @@ export const FIGHTER_DEFS = [
   {
     id: 60,
     name: 'GUTS',
+    grade: gutsConfig.grade ?? DEFAULT_GRADE,
     displayName: 'GUTS',
     category: 'Anime & Dark Fantasy',
     color: gutsConfig.color || '#18181b',
@@ -1973,6 +2051,7 @@ export const FIGHTER_DEFS = [
   {
     id: 61,
     name: 'CHOSO',
+    grade: chosoConfig.grade ?? DEFAULT_GRADE,
     displayName: 'CHOSO',
     category: 'Anime',
     color: chosoConfig.color || '#A31D1D',
@@ -2001,6 +2080,7 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
   FIGHTER_DEFS.push({
     id: 100,
     name: 'MAHORAGA',
+    grade: mahoragaConfig.grade ?? DEFAULT_GRADE,
     category: 'Anime',
     color: mahoragaConfig.color || '#F5F5DC', // Beige / Off-White
     themeColor: mahoragaConfig.themeColor || '#FFD700',

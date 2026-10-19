@@ -9,6 +9,8 @@ import { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomH
 import { getSkillDataForFighter, isSkillExceptionInDarkMode, shouldShowFighterSkill, shouldShowHudSkillBars, shouldShowHudStats } from './ui/hudSkillProviders.js';
 import { applyCameraToCtx } from '../systems/cameraSystem.js';
 import { getBossConfig } from '../configs/bosses/bossConfigRegistry.js';
+import { getFighterGrade, getGradeMeta } from '../configs/gradeConfig.js';
+import { drawWingedGradeLetter, getZeusGradeCardTheme } from './ui/CollectorCardRenderer.js';
 
 export { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking };
 
@@ -1419,15 +1421,21 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
   const f1SansClass = isF1Sans ? ' hud-sans-name' : '';
   const f2SansClass = isF2Sans ? ' hud-sans-name' : '';
 
+  const f1Grade = getFighterGrade(f1);
+  const f2Grade = getFighterGrade(f2);
+  const f1GradeMeta = getGradeMeta(f1Grade);
+  const f2GradeMeta = getGradeMeta(f2Grade);
+
   const timerStr = getTopDuelTimerSecondsString();
 
   return `
     <div class="hud-top-duel">
       <!-- Player 1 (Left): Portrait on Outer Left -> Connected Top Health Bar -> Lower Name -->
-      <div class="hud-top-player hud-top-p1" style="--fighter-theme: ${f1ThemeColor};">
-        <div class="hud-top-profile">
+      <div class="hud-top-player hud-top-p1" style="--fighter-theme: ${f1ThemeColor}; --grade-color: ${f1GradeMeta.color};" data-grade="${f1Grade}">
+        <div class="hud-top-profile" data-grade="${f1Grade}">
           <div class="hud-top-profile__bg"></div>
           <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
+          <canvas class="hud-top-profile__grade-canvas" data-grade="${f1Grade}" width="128" height="88"></canvas>
         </div>
         <div class="hud-top-content">
           <div class="health-card__bar hud-top-bar">
@@ -1449,7 +1457,7 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
       </div>
 
       <!-- Player 2 (Right): Connected Top Health Bar -> Lower Name -> Portrait on Outer Right -->
-      <div class="hud-top-player hud-top-p2" style="--fighter-theme: ${f2ThemeColor};">
+      <div class="hud-top-player hud-top-p2" style="--fighter-theme: ${f2ThemeColor}; --grade-color: ${f2GradeMeta.color};" data-grade="${f2Grade}">
         <div class="hud-top-content">
           <div class="health-card__bar hud-top-bar">
             <div class="health-card__ghost" style="width: ${f2Percent}%;"></div>
@@ -1460,9 +1468,10 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
             <span class="hud-top-name${f2SansClass}">${f2NameHtml}</span>
           </div>
         </div>
-        <div class="hud-top-profile">
+        <div class="hud-top-profile" data-grade="${f2Grade}">
           <div class="hud-top-profile__bg"></div>
           <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
+          <canvas class="hud-top-profile__grade-canvas" data-grade="${f2Grade}" width="128" height="88"></canvas>
         </div>
       </div>
     </div>
@@ -3344,6 +3353,7 @@ function updateHealthHud() {
         const p2Canvas = _cachedTopContainer.querySelector('.hud-top-p2 .hud-top-profile__canvas');
         if (p1Canvas) renderTopHudProfileCanvas(p1Canvas, mainFighters[0]);
         if (p2Canvas) renderTopHudProfileCanvas(p2Canvas, mainFighters[1]);
+
         _cachedTopTimerEl = _cachedTopContainer.querySelector('.hud-top-timer-text');
         _lastTopTimerText = _cachedTopTimerEl ? _cachedTopTimerEl.textContent : '';
       }
@@ -3463,6 +3473,7 @@ function updateHealthHud() {
         let topPlayerEl = null;
         let topNameEl = null;
         let topProfileEl = null;
+        let topGradeCanvas = null;
 
         const mainIdx = mainFighters.indexOf(fighter);
         if (isDuelTopHud && _cachedTopContainer && mainIdx >= 0) {
@@ -3475,6 +3486,7 @@ function updateHealthHud() {
             winBullets = Array.from(topPlayerEl.querySelectorAll('.health-card__win-bullet'));
             topNameEl = topPlayerEl.querySelector('.hud-top-name');
             topProfileEl = topPlayerEl.querySelector('.hud-top-profile');
+            topGradeCanvas = topPlayerEl.querySelector('.hud-top-profile__grade-canvas');
           }
         }
 
@@ -3511,6 +3523,10 @@ function updateHealthHud() {
           topPlayerEl,
           topNameEl,
           topProfileEl,
+          topGradeCanvas,
+          topGradeCtx: null,
+          mainIdx,
+          lastGrade: getFighterGrade(fighter),
           lastTopOpacity: 1,
           starsContainer,
           moneyTextEl,
@@ -3874,6 +3890,43 @@ function updateHealthHud() {
         }
       }
 
+      if (cachedCard.topPlayerEl || cachedCard.topProfileEl || cachedCard.topGradeCanvas) {
+        const curGrade = getFighterGrade(fighter);
+        if (cachedCard.lastGrade !== curGrade) {
+          const meta = getGradeMeta(curGrade);
+          if (cachedCard.topPlayerEl) {
+            cachedCard.topPlayerEl.setAttribute('data-grade', curGrade);
+            cachedCard.topPlayerEl.style.setProperty('--grade-color', meta.color);
+          }
+          if (cachedCard.topProfileEl) {
+            cachedCard.topProfileEl.setAttribute('data-grade', curGrade);
+          }
+          if (cachedCard.topGradeCanvas) {
+            cachedCard.topGradeCanvas.setAttribute('data-grade', curGrade);
+          }
+          cachedCard.lastGrade = curGrade;
+        }
+
+        if (cachedCard.topGradeCanvas) {
+          if (!cachedCard.topGradeCtx) {
+            cachedCard.topGradeCtx = cachedCard.topGradeCanvas.getContext('2d');
+          }
+          if (cachedCard.topGradeCtx) {
+            cachedCard.topGradeCtx.clearRect(0, 0, cachedCard.topGradeCanvas.width, cachedCard.topGradeCanvas.height);
+            drawWingedGradeLetter(
+              cachedCard.topGradeCtx,
+              cachedCard.topGradeCanvas.width / 2,
+              cachedCard.topGradeCanvas.height / 2,
+              curGrade,
+              getZeusGradeCardTheme(curGrade),
+              cachedCard.mainIdx,
+              2.8,
+              true
+            );
+          }
+        }
+      }
+
       // ── FFA Eliminated State: Grayscale card + huge red X overlay ──
       // Applied whenever this fighter is dead in any FFA game mode.
       // Overlay div is lazy-created once, then shown/hidden per frame via dirty-check.
@@ -4198,5 +4251,3 @@ function updateHealthHud() {
 }
 
 export { updateHealthHud };
-
-

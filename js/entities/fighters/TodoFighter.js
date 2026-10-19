@@ -7,7 +7,6 @@ import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRep
 import { audioSystem } from '../../systems/audioSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
-import { drawFighterInkOutline } from '../../graphics/renderers/fighterOutlineRenderer.js';
 
 /**
  * Aoi Todo - The Boogie Woogie Brawler
@@ -558,6 +557,22 @@ export class TodoFighter extends Fighter {
     return res;
   }
 
+  /**
+   * Dedicated drawBody implementation per Rule 21.
+   * Renders Todo's faceless manga body, scars, and hands into the standard engine render passes.
+   */
+  drawBody(ctx) {
+    drawTodoSkin(ctx, this);
+  }
+
+  /**
+   * Overrides base Fighter.drawGun() to suppress default generic gun rendering (Rule 20 / Rule 23).
+   * Todo is an unarmed martial artist / brawler who fights with bare hands and Boogie Woogie.
+   */
+  drawGun(ctx) {
+    // Intentionally empty: Todo fights exclusively with martial arts / Boogie Woogie claps
+  }
+
   draw(ctx) {
     // If vanished (vanishTimer > 0), do not draw Todo's body or auras
     if (this.vanishTimer && this.vanishTimer > 0) {
@@ -575,7 +590,6 @@ export class TodoFighter extends Fighter {
     // Draw exact JJK Cursed Energy Sakuga Flame Aura (matching Gojo and Sukuna)
     GojoRenderer._drawJJKCursedEnergyAura(ctx, this, 'blue');
 
-    drawFighterInkOutline(ctx, this);
     drawTodoSkin(ctx, this);
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);

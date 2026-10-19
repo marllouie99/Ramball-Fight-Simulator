@@ -2002,7 +2002,7 @@ export class TojiFighter extends Fighter {
     this._updateChainPhysics();
 
     // Render Channel Sense Interrupt Indicator above Toji's head when triggered!
-    if (this.channelSenseIndicatorTimer > 0) {
+    if (!this._isSilhouettePass && this.channelSenseIndicatorTimer > 0) {
       this.channelSenseIndicatorTimer--;
       // Skip decorative indicator in low quality mode
       if (!isLowQuality) {
@@ -2634,7 +2634,7 @@ export class TojiFighter extends Fighter {
 
     // 4. HIGH-IMPACT ANIME SLASH VISUAL EFFECTS (Impact & Recovery Phase)
     const isTojiPausedOrFrozen = this._isFrozenOrPaused();
-    if (slashArcAlpha > 0 && !isTojiPausedOrFrozen && !this.isAmbushThrust) {
+    if (slashArcAlpha > 0 && !isTojiPausedOrFrozen && !this.isAmbushThrust && !this._isSilhouettePass) {
       ctx.save();
       // Use the world-space origin snapshotted at swing-start so the slash arc stays
       // fixed in place and does NOT follow Toji as he moves during or after the swing.

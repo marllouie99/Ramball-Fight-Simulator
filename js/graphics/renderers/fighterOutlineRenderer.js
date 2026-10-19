@@ -4,16 +4,18 @@ import { Fighter } from '../../entities/fighter.js';
 import { FighterRenderer } from './fighterRenderer.js';
 
 // Dedicated persistent offscreen buffers for zero-GC silhouette caching (preserves locked 60 FPS)
-const BUFFER_SIZE = 256;
+// 160x160 buffer reduces pixel composite fill-rate by 61% compared to 256x256
+const BUFFER_SIZE = 160;
 const HALF_BUFFER = BUFFER_SIZE / 2;
 
-// 8-directional normalized offsets around circle for smooth, gap-free manga ink stroke
-const NUM_OFFSETS = 8;
-const _cachedOffsets = [];
-for (let i = 0; i < NUM_OFFSETS; i++) {
-  const angle = (i * Math.PI * 2) / NUM_OFFSETS;
-  _cachedOffsets.push({ cos: Math.cos(angle), sin: Math.sin(angle) });
-}
+// 4 cardinal offsets (+X, -X, +Y, -Y) for crisp, clean 2.2px manga ink stroke without diagonal overdraw
+const NUM_OFFSETS = 4;
+const _cachedOffsets = [
+  { cos: 1, sin: 0 },
+  { cos: -1, sin: 0 },
+  { cos: 0, sin: 1 },
+  { cos: 0, sin: -1 }
+];
 
 let _sourceCanvas = null;
 let _sourceCtx = null;
@@ -42,50 +44,105 @@ function _ensureBuffers() {
 }
 
 /**
+ * Checks whether an entity is a non-hero entity (minion, plant, turret, building,
+ * deployable, illusion, lawnmower, chess piece, or projectile/VFX) that must be
+ * strictly excluded from silhouette ink outline and floor contact passes.
+ */
+function _isExcludedFromSilhouette(fighter) {
+  if (!fighter) return true;
+  return Boolean(
+    fighter.isMinion || fighter.isPlant || fighter.isPlantMinion ||
+    fighter.isTurret || fighter.isBuilding || fighter.isDeployable ||
+    fighter.isIllusion || fighter.isProjectile || fighter.isVfx || fighter.isVisualEffect ||
+    fighter.isChessPiece || fighter.isChessTroop || fighter.isChessMinion ||
+    fighter.isTransfiguredHuman || fighter.isServantOfCthulhu || fighter.isLawnmower ||
+    fighter.characterId === 'crazydave_plant' || fighter.characterId === 'crazydave_lawnmower' ||
+    fighter.characterId === 'crazydave_potato_mine' ||
+    fighter.characterId?.startsWith('chess_') ||
+    fighter.name === 'Peashooter' || fighter.name === 'Snow Pea' || fighter.name === 'Wall-nut' ||
+    fighter.name === 'Torchwood' || fighter.name === 'Potato Mine' || fighter.name === 'Lawnmower' ||
+    fighter.name === 'Sun' || fighter.isSunDrop
+  );
+}
+
+/**
  * Renders the fighter's base visual model (body, skin, hair, cape, arms/hands)
  * into an offscreen buffer for silhouette ink outline generation.
- * Suppresses in-game overhead HP numbers, freeze bars, wide beams, and ground auras.
+ * Strictly uses drawBody/drawSkin to prevent triggering world effects, sun drops,
+ * lawnmowers, particle systems, or in-game overhead HP numbers.
  */
 function _drawFighterModel(sourceCtx, fighter) {
+  // Use drawBody or drawSkin directly. NEVER call fighter.draw() as it invokes
+  // world effects, sun drop arrays, lawnmowers, and particle loops.
+  // Weapons (drawGun) are strictly excluded so weapons never receive an unnatural black outline/silhouette.
   if (typeof fighter.drawBody === 'function' && fighter.drawBody !== Fighter.prototype.drawBody) {
     fighter.drawBody(sourceCtx);
   } else if (typeof fighter.drawSkin === 'function') {
     fighter.drawSkin(sourceCtx);
-  } else if (typeof fighter.draw === 'function' && fighter.draw !== Fighter.prototype.draw) {
-    fighter.draw(sourceCtx);
   } else {
     FighterRenderer.drawBody(sourceCtx, fighter);
-  }
-
-  // Only render weapons via drawGun if:
-  // 1. The fighter has a dedicated, custom drawGun (e.g. GunSlinger, John Wick, Aimbot, Laser), OR
-  // 2. The fighter is a vanilla generic fighter without a custom skin/body
-  // This strictly suppresses the base Fighter.prototype.drawGun from drawing generic pistol barrels on brawlers/swordsmen (Saitama, Yuji, Toji, Zenitsu, etc.)
-  const hasCustomSkin = Boolean(fighter.drawSkin) || 
-    (typeof fighter.drawBody === 'function' && fighter.drawBody !== Fighter.prototype.drawBody) ||
-    (typeof fighter.draw === 'function' && fighter.draw !== Fighter.prototype.draw);
-  const isGenericGun = !fighter.drawGun || fighter.drawGun === Fighter.prototype.drawGun;
-
-  if (!hasCustomSkin || !isGenericGun) {
-    if (typeof fighter.drawGun === 'function' && !fighter.hideWeapon && !fighter.hideGun && !fighter.isTargetOfAmbush) {
-      fighter.drawGun(sourceCtx);
-    }
   }
 }
 
 /**
+ * Draws a subtle, grounded floor contact shadow ellipse on the arena floor
+ * directly beneath live in-game fighters (Rule 29 & Arcade standard).
+ * Anchors the entity in 3D space and scales/fades dynamically with vertical height (z).
+ *
+ * @param {CanvasRenderingContext2D} destCtx - Destination canvas context
+ * @param {Object} fighter - Fighter instance to ground
+ */
+export function drawFighterFloorShadow(destCtx, fighter) {
+  if (!destCtx || !fighter) return;
+  if (_isExcludedFromSilhouette(fighter)) return;
+  if (fighter.hp <= 0 && !fighter.isRevivingFromContract && !fighter.isShatterReviving && !fighter.isDying) return;
+  if (fighter.vanishTimer > 0 || fighter._hideInBush) return;
+  if (fighter.suppressFloorShadow || fighter._suppressFloorShadow) return;
+  if (typeof state !== 'undefined' && state.enableFighterFloorShadow === false) return;
+  if (typeof CONFIG !== 'undefined' && CONFIG.enableFighterFloorShadow === false) return;
+  if (fighter._isSilhouettePass) return;
+
+  const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+  if (fighter._floorShadowDrawnFrame === currentFrame) return;
+  fighter._floorShadowDrawnFrame = currentFrame;
+
+  const r = fighter.r || 25;
+  const z = Math.max(0, fighter.z || 0);
+
+  // Height scaling: shadow contracts and softens as fighter jumps or floats higher
+  const heightFactor = Math.max(0.35, 1.0 - (z / 180));
+  const rx = r * 0.94 * heightFactor;
+  const ry = r * 0.38 * heightFactor;
+
+  // Contact shadow stays on the ground floor plane (fighter.x, fighter.y)
+  const floorX = fighter.x;
+  const floorY = fighter.y;
+
+  const baseAlpha = 0.32;
+  const alpha = Math.max(0.06, baseAlpha * (1.0 - z / 220)) * (fighter.alpha ?? fighter.opacity ?? 1.0);
+
+  destCtx.save();
+  destCtx.beginPath();
+  destCtx.ellipse(floorX, floorY, rx, ry, 0, 0, Math.PI * 2);
+  destCtx.fillStyle = `rgba(5, 6, 9, ${alpha.toFixed(3)})`;
+  destCtx.fill();
+  destCtx.restore();
+}
+
+/**
  * Draws a clean, solid manga-style dark ink outline stroke around live in-game fighters
- * matching the Top HUD duel profile badge aesthetic (1.5px stroke, #050609).
+ * matching the Top HUD duel profile badge aesthetic (2.2px stroke, #050609).
  * Uses persistent offscreen source-in masking to eliminate GC overhead and preserve 60 FPS.
+ * Strictly excludes minions, plants, deployables, and VFX.
  *
  * @param {CanvasRenderingContext2D} destCtx - Destination canvas context
  * @param {Object} fighter - Fighter instance to outline
  */
 export function drawFighterInkOutline(destCtx, fighter) {
   if (!destCtx || !fighter) return;
-  if (fighter.hp <= 0 && !fighter.isRevivingFromContract && !fighter.isShatterReviving) return;
+  if (_isExcludedFromSilhouette(fighter)) return;
+  if (fighter.hp <= 0 && !fighter.isRevivingFromContract && !fighter.isShatterReviving && !fighter.isDying) return;
   if (fighter.vanishTimer > 0 || fighter._hideInBush) return;
-  if (fighter.isTurret || fighter.isBuilding || fighter.isDeployable || fighter.isPlant || fighter.isEndCrystal) return;
   if (fighter.suppressInkOutline || fighter._suppressInkOutline) return;
   if (typeof state !== 'undefined' && state.enableFighterInkOutline === false) return;
   if (typeof CONFIG !== 'undefined' && CONFIG.enableFighterInkOutline === false) return;
@@ -97,13 +154,13 @@ export function drawFighterInkOutline(destCtx, fighter) {
 
   if (!_ensureBuffers()) return;
 
-  const outlineWidth = (typeof CONFIG !== 'undefined' && CONFIG.fighterInkOutlineWidth) || 1.5;
+  const outlineWidth = (typeof CONFIG !== 'undefined' && CONFIG.fighterInkOutlineWidth) || 2.2;
   const outlineColor = (typeof CONFIG !== 'undefined' && CONFIG.fighterInkOutlineColor) || '#050609';
 
   const fighterX = fighter.x;
   const drawY = fighter.y - (fighter.z || 0);
 
-  // 1. Clear offscreen source buffer
+  // 1. Clear offscreen source buffer (160x160)
   _sourceCtx.clearRect(0, 0, BUFFER_SIZE, BUFFER_SIZE);
 
   // 2. Center and render the fighter model inside source buffer
@@ -113,16 +170,25 @@ export function drawFighterInkOutline(destCtx, fighter) {
   const prevIsSilhouette = fighter._isSilhouettePass;
   const prevHideHp = fighter.hideHpText;
   const prevSuppressFreeze = fighter._suppressFreezeTimer;
+  const prevHideWeapon = fighter.hideWeapon;
+  const prevSuppressWeapons = fighter._suppressWeaponsInSilhouettePass;
+  const prevShowSkinOnly = state.showSkinOnly;
 
   fighter._isSilhouettePass = true;
   fighter.hideHpText = true;
   fighter._suppressFreezeTimer = true;
+  fighter.hideWeapon = true;
+  fighter._suppressWeaponsInSilhouettePass = true;
+  state.showSkinOnly = true;
 
   try {
     _drawFighterModel(_sourceCtx, fighter);
   } catch (err) {
     // Graceful recovery: prevent skin rendering exceptions from interrupting the combat loop
   } finally {
+    state.showSkinOnly = prevShowSkinOnly;
+    fighter._suppressWeaponsInSilhouettePass = prevSuppressWeapons;
+    fighter.hideWeapon = prevHideWeapon;
     fighter._isSilhouettePass = prevIsSilhouette;
     fighter.hideHpText = prevHideHp;
     fighter._suppressFreezeTimer = prevSuppressFreeze;
@@ -137,7 +203,7 @@ export function drawFighterInkOutline(destCtx, fighter) {
   _silCtx.fillRect(0, 0, BUFFER_SIZE, BUFFER_SIZE);
   _silCtx.globalCompositeOperation = 'source-over';
 
-  // 4. Blit the solid ink silhouette onto destination ctx at 8 cardinal and diagonal offsets
+  // 4. Blit the solid ink silhouette onto destination ctx at 4 cardinal offsets
   const destX = fighterX - HALF_BUFFER;
   const destY = drawY - HALF_BUFFER;
 
@@ -156,4 +222,3 @@ export function drawFighterInkOutline(destCtx, fighter) {
 
   destCtx.restore();
 }
-

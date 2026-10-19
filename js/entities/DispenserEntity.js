@@ -285,6 +285,12 @@ export class DispenserEntity extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    if (this.hp > 0) {
+      drawDispenser(ctx, this);
+    }
+  }
+
   draw(ctx) {
     if (this.hp <= 0) return;
 

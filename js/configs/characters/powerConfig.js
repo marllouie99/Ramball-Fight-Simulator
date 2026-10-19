@@ -12,6 +12,7 @@ export const powerConfig = {
 
   name: 'Power',
   displayName: 'Power',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Blood Fiend',
   title: 'Blood Fiend',
 

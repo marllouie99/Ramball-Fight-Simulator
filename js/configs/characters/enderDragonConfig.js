@@ -2,6 +2,7 @@
 // Ender Dragon — Ruler of The End Character Config
 // ─────────────────────────────────────────────
 export const enderDragonConfig = {
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     model: 'Assets/model/enderDragon/Ender-Dragon-Model.png',
     bossMap: 'Assets/model/enderDragon/Enderdragon.jpg',

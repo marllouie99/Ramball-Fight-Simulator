@@ -11,6 +11,7 @@ export const tanjiroConfig = {
 
   name: 'Tanjiro',
   displayName: 'Tanjiro',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Sun Breathing Slayer',
   title: 'Sun Breathing Slayer',
 

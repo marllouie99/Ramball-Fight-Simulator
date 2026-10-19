@@ -1196,7 +1196,7 @@ export function drawTurret(ctx, turret) {
   // ═══════════════════════════════════════════
   // 1. CONSTRUCTION PHASE (Welding Sparks & Scaffolding)
   // ═══════════════════════════════════════════
-  if (isBuilding && bp < 1) {
+  if (isBuilding && bp < 1 && !turret._isSilhouettePass) {
     const now = Date.now();
     ctx.fillStyle = 'rgba(14, 165, 233, 0.35)';
     ctx.fillRect(-22, -22, 44, 44);
@@ -1224,10 +1224,12 @@ export function drawTurret(ctx, turret) {
   ctx.translate(recoilOff, 0);
 
   // Red Targeting Laser Beam
-  ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
-  ctx.fillRect(14, 0, 100, 2);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(114, -1, 3, 3); // Reticle point
+  if (!turret._isSilhouettePass) {
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.85)';
+    ctx.fillRect(14, 0, 100, 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(114, -1, 3, 3); // Reticle point
+  }
 
   // Level-specific Swivel Head
   if (level === 1) {
@@ -1239,7 +1241,7 @@ export function drawTurret(ctx, turret) {
   }
 
   // Muzzle Blast when firing
-  if (recoilTimer > 0) {
+  if (recoilTimer > 0 && !turret._isSilhouettePass) {
     if (level === 1) {
       drawEngineerMuzzleBlast(ctx, 32, 0, 0.2);
     } else if (level === 2) {
@@ -1271,7 +1273,7 @@ export function drawDispenser(ctx, dispenser) {
   // 1. CONSTRUCTION PHASE (Blueprint Hologram & Sparks)
   // ═══════════════════════════════════════════
   const bp = (isBuilding && buildProgress !== undefined) ? buildProgress : 1;
-  if (isBuilding && bp < 1) {
+  if (isBuilding && bp < 1 && !dispenser._isSilhouettePass) {
     const now = Date.now();
     ctx.fillStyle = 'rgba(14, 165, 233, 0.35)';
     ctx.fillRect(-20, -32, 40, 56);

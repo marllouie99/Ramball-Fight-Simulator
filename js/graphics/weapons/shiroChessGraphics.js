@@ -548,7 +548,7 @@ export function drawChessTroop(ctx, troop) {
   }
 
   // When leaping (Knight L-jump), render subtle ground shadow underneath
-  if (troop.z && troop.z > 0) {
+  if (troop.z && troop.z > 0 && !troop._isSilhouettePass) {
     ctx.save();
     ctx.fillStyle = 'rgba(14, 15, 20, 0.45)';
     ctx.beginPath();
@@ -558,7 +558,7 @@ export function drawChessTroop(ctx, troop) {
   }
 
   // Telegraphing charge aura when about to attack (Matching magenta/violet & cyan glow from screenshot)
-  if (troop.isTelegraphing) {
+  if (troop.isTelegraphing && !troop._isSilhouettePass) {
     const pulse = 0.5 + 0.5 * Math.sin((typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.02);
     ctx.save();
     // Outer Radiant Magenta Silhouette Aura
@@ -621,7 +621,7 @@ export function drawChessTroop(ctx, troop) {
     const drawY = -drawH * 0.58 - processed.pad * scale;
 
     // Under-glow for living chess troops: Radiant Elkia Gold if buffed by Blank Never Loses, else classic cyan
-    if (troop.isMinion) {
+    if (troop.isMinion && !troop._isSilhouettePass) {
       if (troop.blankBuffTimer > 0) {
         _drawTroopBlankBuffAura(ctx, r, drawH);
       } else {
@@ -645,7 +645,7 @@ export function drawChessTroop(ctx, troop) {
     const drawY = -drawH * 0.58;
 
     // Under-glow for living chess troops: Radiant Elkia Gold if buffed by Blank Never Loses, else classic cyan
-    if (troop.isMinion) {
+    if (troop.isMinion && !troop._isSilhouettePass) {
       if (troop.blankBuffTimer > 0) {
         _drawTroopBlankBuffAura(ctx, r, drawH);
       } else {
@@ -665,7 +665,7 @@ export function drawChessTroop(ctx, troop) {
     const facingLeft = (troop.x > 270);
 
     // Under-glow for living chess troops: Radiant Elkia Gold if buffed by Blank Never Loses, else classic cyan
-    if (troop.isMinion) {
+    if (troop.isMinion && !troop._isSilhouettePass) {
       if (troop.blankBuffTimer > 0) {
         _drawTroopBlankBuffAura(ctx, r, 0);
       } else {
@@ -699,7 +699,7 @@ export function drawChessTroop(ctx, troop) {
   }
 
   // Overhead Lifetime / Health Ring
-  if (troop.isMinion && troop.maxHp) {
+  if (troop.isMinion && troop.maxHp && !troop._isSilhouettePass && !troop.hideHpText) {
     _drawTroopOverheadHud(ctx, troop, r);
   }
 

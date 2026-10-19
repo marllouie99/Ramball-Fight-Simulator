@@ -5,6 +5,7 @@
 export const megumiConfig = {
   name: 'Megumi',
   displayName: 'Megumi',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Ten Shadows Summoner',
   title: 'Ten Shadows Summoner',
 

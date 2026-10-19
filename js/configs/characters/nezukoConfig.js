@@ -10,6 +10,7 @@ export const nezukoConfig = {
 
   name: 'Nezuko',
   displayName: 'Nezuko',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Demon Princess',
   title: 'Demon Princess',
 

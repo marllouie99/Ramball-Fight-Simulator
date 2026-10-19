@@ -1284,12 +1284,20 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   const upper = displayText.toUpperCase();
   const isCrit = /^CRIT/i.test(upper) || upper.includes('💥');
   const isMiss = /^MISS/i.test(upper);
-  const numericVal = parseFloat(displayText);
+
+  // Robust numeric extraction: extract number even if formatted with prefixes like "CRIT! 25", "-25", or "+25"
+  let numericVal = NaN;
+  const numMatch = displayText.match(/\d+(\.\d+)?/);
+  if (numMatch) {
+    numericVal = parseFloat(numMatch[0]);
+  }
   const isDamage = !isMiss && !isNaN(numericVal) && isFinite(numericVal);
 
   // Normalize display text
   if (isCrit) {
-    if (upper === 'CRIT' || upper === 'CRIT!') {
+    if (isDamage) {
+      displayText = `CRIT! ${Math.round(numericVal)}`;
+    } else {
       displayText = 'CRIT!';
     }
   } else if (isMiss) {
@@ -1300,19 +1308,22 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     return;
   }
 
-  // Fast Combo Stacking: Accumulate rapid damage on same target into climbing counter
-  // Prevents spawning 20 floating numbers on screen at once during rapid combos (e.g. Sukuna slashes, Toji flurries, Denji shred)
-  if (isDamage && !isCrit) {
-    const MAX_COMBO_STACKS = 4;
+  // 1. Fast Combo Stacking & Rapid Damage Accumulation:
+  // If an active text already exists at this location (< 45px) within the accumulation window (< 18 frames):
+  // Accumulate the damage into a single climbing counter instead of spawning duplicate overlapping numbers.
+  if (isDamage && state.floatingTexts && state.floatingTexts.length > 0) {
+    const MAX_COMBO_STACKS = 5;
     for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
       const activeText = state.floatingTexts[i];
-      if (activeText && activeText.isDamage && !activeText.isCrit &&
+      if (activeText && activeText.isDamage &&
           (activeText.stackCount || 1) < MAX_COMBO_STACKS &&
-          Math.hypot(activeText.originX - posX, activeText.originY - posY) < 40 &&
-          activeText.timer < 12) {
+          Math.hypot(activeText.originX - posX, activeText.originY - posY) < 45 &&
+          activeText.timer < 18) {
         activeText.stackCount = (activeText.stackCount || 1) + 1;
         activeText.damageValue = (activeText.damageValue || 0) + numericVal;
-        activeText.text = String(Math.round(activeText.damageValue));
+        const valText = String(Math.round(activeText.damageValue));
+        activeText.text = (activeText.isCrit || isCrit) ? `CRIT! ${valText}` : valText;
+        if (isCrit) activeText.isCrit = true;
         activeText.popFrames = 5;
         activeText.timer = Math.min(activeText.timer, 4);
         activeText.vy = Math.max(-2.0, (activeText.vy || 0) * 0.3 - 0.6);
@@ -1329,11 +1340,27 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     }
   }
 
-  // Filter duplicate spam in close proximity
+  // 2. Exact Duplicate Text Suppression:
+  // If an identical floating text is already active at this location (< 40px) within recent frames (< 18 frames),
+  // refresh the existing active text rather than spawning a duplicate clone overlapping directly on top of it.
+  if (state.floatingTexts && state.floatingTexts.length > 0) {
+    for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+      const activeText = state.floatingTexts[i];
+      if (activeText && activeText.text === displayText &&
+          Math.hypot(activeText.originX - posX, activeText.originY - posY) < 40 &&
+          activeText.timer < 18) {
+        activeText.popFrames = 5;
+        activeText.timer = Math.min(activeText.timer, 4);
+        return;
+      }
+    }
+  }
+
+  // 3. Proximity Spam Prevention Cache
   const now = Date.now();
-  const hashKey = fastHash(displayText, Math.round(posX / 40), Math.round(posY / 40));
+  const hashKey = fastHash(displayText, Math.round(posX / 30), Math.round(posY / 30));
   const lastSpawnedTime = spamPreventionCache.get(hashKey);
-  if (lastSpawnedTime && (now - lastSpawnedTime) < FLOATING_TEXT_SPAM_COOLDOWN) {
+  if (lastSpawnedTime && (now - lastSpawnedTime) < 120) {
     return;
   }
   spamPreventionCache.set(hashKey, now);

@@ -12,6 +12,7 @@ export const rezeConfig = {
 
   name: 'Reze',
   displayName: 'Reze',
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Bomb Devil',
   title: 'Bomb Devil',
 

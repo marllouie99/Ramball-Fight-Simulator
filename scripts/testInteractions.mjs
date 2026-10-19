@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { ARENA_TILE_COUNT } from '../js/systems/arenaTileGrid.js';
+import { readFileSync } from 'node:fs';
 
 // 1. Mock browser DOM & WebGL environment
 function createMockCtx() {
@@ -3127,6 +3128,104 @@ async function runInteractionTests() {
     mockCtx.resetStackDepth();
     drawWeaponPreview(mockCtx, 'crazydave', '#84CC16');
     assert(mockCtx.getStackDepth() === 0, `drawWeaponPreview('crazydave') must maintain 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // Zenitsu Weapon Studio exposes and applies independent length and width adjustments.
+    {
+      const { drawWeaponStudioScreen } = await import('../js/graphics/ui/WeaponStudioScreen.js');
+      const { handleUIClick } = await import('../js/graphics/ui/uiFramework.js');
+      const originalState = {
+        gameState: state.gameState,
+        ctx: state.ctx,
+        canvas: state.canvas,
+        canvasWidth: mockCanvas.width,
+        canvasHeight: mockCanvas.height,
+        weapon: state.studioSelectedWeapon,
+        detail: state.studioSelectedDetail,
+        zenitsuPart: state.studioZenitsuPart,
+        zenitsu: JSON.parse(JSON.stringify(state.weaponCustomizations.zenitsu))
+      };
+      const renderedLabels = [];
+      const originalFillText = mockCtx.fillText;
+      mockCtx.fillText = (text, ...args) => {
+        renderedLabels.push(String(text));
+        originalFillText.call(mockCtx, text, ...args);
+      };
+
+      try {
+        state.gameState = 'weaponStudio';
+        state.ctx = mockCtx;
+        state.canvas = mockCanvas;
+        mockCanvas.width = 540;
+        mockCanvas.height = 960;
+        state.studioSelectedWeapon = 'yuta';
+        state.studioSelectedDetail = null;
+        drawWeaponStudioScreen();
+
+        assert(handleUIClick(312, 151), 'Zenitsu must be selectable in Weapon Studio');
+        assert(state.studioSelectedDetail === 'proportions', 'Selecting Zenitsu must open its length and width controls');
+        state.studioZenitsuPart = 'overall';
+        drawWeaponStudioScreen();
+
+        assert(renderedLabels.some(label => label.includes('WIDTH:')), 'Zenitsu proportions panel must display weapon width');
+        assert(renderedLabels.some(label => label.includes('LENGTH:')), 'Zenitsu proportions panel must display weapon length');
+
+        const initialWidth = state.weaponCustomizations.zenitsu.widthScale;
+        assert(handleUIClick(498, 606), 'Zenitsu width increase control must be clickable');
+        assert(state.weaponCustomizations.zenitsu.widthScale > initialWidth, 'Zenitsu width control must update its weapon customization');
+
+        drawWeaponStudioScreen();
+        const initialLength = state.weaponCustomizations.zenitsu.lengthScale;
+        assert(handleUIClick(498, 642), 'Zenitsu length increase control must be clickable');
+        assert(state.weaponCustomizations.zenitsu.lengthScale > initialLength, 'Zenitsu length control must update its weapon customization');
+      } finally {
+        mockCtx.fillText = originalFillText;
+        state.gameState = originalState.gameState;
+        state.ctx = originalState.ctx;
+        state.canvas = originalState.canvas;
+        mockCanvas.width = originalState.canvasWidth;
+        mockCanvas.height = originalState.canvasHeight;
+        state.studioSelectedWeapon = originalState.weapon;
+        state.studioSelectedDetail = originalState.detail;
+        state.studioZenitsuPart = originalState.zenitsuPart;
+        state.weaponCustomizations.zenitsu = originalState.zenitsu;
+      }
+    }
+
+    // Top duel HUD reuses the character-card grade-letter renderer at each portrait corner.
+    {
+      const { buildTopDuelHUD } = await import('../js/graphics/hudManager.js');
+      const { drawWingedGradeLetter } = await import('../js/graphics/ui/CollectorCardRenderer.js');
+      const html = buildTopDuelHUD(
+        { name: 'High Grade', grade: 'SS', hp: 100, maxHp: 100 },
+        { name: 'Standard Grade', grade: 'B', hp: 100, maxHp: 100 }
+      );
+      assert(html.includes('class="hud-top-profile__grade-canvas"'), 'Top HUD must render grade letters using a dedicated canvas');
+      assert(!html.includes('hud-top-profile__grade-seal'), 'Top HUD grade letters must not include the decorative seal artwork');
+      const hudStyles = readFileSync(new URL('../css/style.css', import.meta.url), 'utf8');
+      const gradeCanvasStyles = hudStyles.match(/\.hud-top-profile__grade-canvas\s*\{([^}]*)\}/)?.[1] || '';
+      assert(/right:\s*-14px/.test(gradeCanvasStyles), 'Grade letters must stay in the top-right corner of both portrait frames');
+      assert(!/\.hud-top-player\.hud-top-p[12]\s+\.hud-top-profile__grade-canvas/.test(hudStyles), 'Grade letter placement must not be mirrored between players');
+
+      const originalStrokeText = mockCtx.strokeText;
+      const originalRadialGradient = mockCtx.createRadialGradient;
+      let letterFont = '';
+      let gradeAuraCount = 0;
+      mockCtx.strokeText = () => { letterFont = mockCtx.font; };
+      mockCtx.createRadialGradient = (...args) => {
+        gradeAuraCount++;
+        return originalRadialGradient(...args);
+      };
+      try {
+        mockCtx.resetStackDepth();
+        drawWingedGradeLetter(mockCtx, 32, 32, 'SS', null, 1, 1.3, true);
+        assert(letterFont === '900 17.5px "Impact", "Outfit", "Rajdhani", sans-serif', 'HUD grade letters must share the card seal Impact font');
+        assert(gradeAuraCount > 0, 'Top HUD grade letters must include their matching card-grade aura effect');
+        assert(mockCtx.getStackDepth() === 0, 'Grade letter rendering must restore the Canvas 2D stack');
+      } finally {
+        mockCtx.strokeText = originalStrokeText;
+        mockCtx.createRadialGradient = originalRadialGradient;
+      }
+    }
 
     // 18. Test Crazy Dave plant avoidance of occupied building & plant tiles and full-arena blocking
     const daveTestOccupancy = new CrazyDaveClass({ startX: 100, startY: 300, radius: 25, hp: 390 });

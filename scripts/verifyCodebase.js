@@ -307,6 +307,37 @@ async function verifyAll() {
     console.log(`✅ Verified audio volume definitions across ${configFiles.length} character configs!`);
   }
 
+  // 2.65 Fighter Grade Validator (cosmetic B / A / S / SS tiers — js/configs/gradeConfig.js)
+  console.log('🔍 [Fighter Grade Validator] Checking grade attributes on character configs & FIGHTER_DEFS...');
+  let gradeErrors = 0;
+  for (const cfgFile of configFiles) {
+    const relPath = path.relative(process.cwd(), cfgFile).replace(/\\/g, '/');
+    const content = fs.readFileSync(cfgFile, 'utf8');
+    const isAliasSpread = /^\s*\.\.\.\w+Config\s*,/m.test(content);
+    const gradeMatch = content.match(/^\s+grade\s*:\s*['"]([^'"]*)['"]/m);
+    if (!gradeMatch && isAliasSpread) continue; // alias configs inherit the spread grade
+    if (!gradeMatch || !['B', 'A', 'S', 'SS'].includes(gradeMatch[1])) {
+      console.error(`❌ [INVALID GRADE in ${relPath}]: expected grade: 'B' | 'A' | 'S' | 'SS' (found ${gradeMatch ? `'${gradeMatch[1]}'` : 'none'}).`);
+      hasErrors = true;
+      gradeErrors++;
+    }
+  }
+  const coreConfigPath = path.join(process.cwd(), 'js/core/config.js');
+  if (fs.existsSync(coreConfigPath)) {
+    const coreSrc = fs.readFileSync(coreConfigPath, 'utf8');
+    const defsSrc = coreSrc.slice(coreSrc.indexOf('export const FIGHTER_DEFS'));
+    const entryCount = (defsSrc.match(/^\s{4}id:\s*\d+\s*,/gm) || []).length;
+    const gradeCount = (defsSrc.match(/^\s{4}grade:\s*/gm) || []).length;
+    if (entryCount !== gradeCount) {
+      console.error(`❌ [MISSING FIGHTER_DEFS GRADE]: ${entryCount} fighter entries but only ${gradeCount} grade keys in js/core/config.js.`);
+      hasErrors = true;
+      gradeErrors++;
+    }
+  }
+  if (gradeErrors === 0) {
+    console.log(`✅ Verified fighter grades across ${configFiles.length} character configs & FIGHTER_DEFS!`);
+  }
+
   // 2.7 YouTube Shorts Thumbnail & Vertical Arena Alignment Validator (Rule 28)
   console.log('🔍 [Rule 28 Validator] Checking YouTube Shorts vertical arena alignment...');
   let rule28Errors = 0;

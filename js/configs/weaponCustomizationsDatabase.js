@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER WEAPON CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Weapon Studio on 2026-10-15T00:29:08.763Z
+ * Generated from Weapon Studio on 2026-10-18T23:49:39.069Z
  * =============================================================================
  */
 
@@ -71,44 +71,12 @@ export const WEAPON_CUSTOMIZATIONS_DATABASE = {
   escanor: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   zenitsu: {
       "offsetX": 0,
-      "offsetY": 0,
+      "offsetY": 1,
       "scale": 1,
       "widthScale": 1,
-      "lengthScale": 1,
+      "lengthScale": 1.1,
       "angleOffset": 0,
       "parts": {
-          "blade": {
-              "offsetX": 0,
-              "offsetY": 0,
-              "scale": 1,
-              "widthScale": 1,
-              "lengthScale": 1,
-              "angleOffset": 0
-          },
-          "tsuba": {
-              "offsetX": 0,
-              "offsetY": 0,
-              "scale": 1,
-              "widthScale": 1,
-              "lengthScale": 1,
-              "angleOffset": 0
-          },
-          "habaki": {
-              "offsetX": 0,
-              "offsetY": 0,
-              "scale": 1,
-              "widthScale": 1,
-              "lengthScale": 1,
-              "angleOffset": 0
-          },
-          "handle": {
-              "offsetX": 0,
-              "offsetY": 0,
-              "scale": 1,
-              "widthScale": 1,
-              "lengthScale": 1,
-              "angleOffset": 0
-          },
           "hands": {
               "offsetX": 0,
               "offsetY": 0,

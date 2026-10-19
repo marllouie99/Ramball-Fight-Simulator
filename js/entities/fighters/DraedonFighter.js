@@ -476,6 +476,14 @@ export class DraedonFighter extends Fighter {
   }
 
   /**
+   * Dedicated drawBody implementation per Rule 21.
+   */
+  drawBody(ctx) {
+    drawDraedonSkin(ctx, this);
+    drawExoElectricDisintegratorWeapon(ctx, this);
+  }
+
+  /**
    * Renders the Exo Electric Disintegrator super-beam on the absolute top layer in renderSystem.js.
    */
   drawTopLayerBeams(ctx) {

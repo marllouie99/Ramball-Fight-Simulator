@@ -160,6 +160,7 @@ async function run() {
   console.log(`   1. Run 'npm run verify' to test codebase integrity.`);
   console.log(`   2. Customize abilities in js/entities/fighters/${className}.js.`);
   console.log(`   3. Refine hair and clothing in js/graphics/fighters/${rawId}Skin.js.`);
+  console.log(`   4. Declare grade: 'B' | 'A' | 'S' | 'SS' in js/configs/characters/${rawId}Config.js and wire grade: ${rawId}Config.grade ?? DEFAULT_GRADE into FIGHTER_DEFS (required by npm run verify).`);
 }
 
 function generateEntityCode(id, className, name, archetype, themeColor) {

@@ -13,6 +13,7 @@ export const uryuConfig = {
 
   name: 'Uryu',
   displayName: 'Uryu',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Last Quincy',
   title: 'Last Quincy',
 

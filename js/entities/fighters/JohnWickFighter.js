@@ -1760,7 +1760,6 @@ export class JohnWickFighter extends Fighter {
 
   drawBody(ctx) {
     drawJohnWickSkin(ctx, this);
-    this.drawHealth(ctx);
   }
 
   interruptAttacks() {

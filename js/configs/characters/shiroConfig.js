@@ -12,6 +12,7 @@ export const shiroConfig = {
 
   name: 'Shiro',
   displayName: '『SHIRO』',
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   // Base Attributes (Rule 24 Standard Humanoid Radius)
   hp: 340,
   maxHp: 340,

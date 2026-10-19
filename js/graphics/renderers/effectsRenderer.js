@@ -193,7 +193,7 @@ export function drawBlackHoleEffects() {
   }
 }
 
-const FONT_CRIT = '900 22px "Silkscreen", "Press Start 2P", monospace';
+const FONT_CRIT = '700 22px "Silkscreen", "Press Start 2P", monospace';
 const FONT_DEFAULT = '700 18px "Silkscreen", "Press Start 2P", monospace';
 
 export function drawFloatingTexts() {
@@ -221,8 +221,6 @@ export function drawFloatingTexts() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-
-  let currentFont = '';
 
   fastCleanArray(texts, (t) => {
     t.timer++;
@@ -270,13 +268,8 @@ export function drawFloatingTexts() {
       ctx.scale(scale, scale);
     }
 
-    // Static Font Switch — cached font string, zero dynamic string interpolation
     const isCrit = Boolean(t.isCrit || /^CRIT/i.test(t.text));
-    const fontToUse = isCrit ? FONT_CRIT : FONT_DEFAULT;
-    if (currentFont !== fontToUse) {
-      ctx.font = fontToUse;
-      currentFont = fontToUse;
-    }
+    ctx.font = isCrit ? FONT_CRIT : FONT_DEFAULT;
 
     // Single crisp solid black outline (Rule 11 compliant, no CPU blur, no multi-pass)
     ctx.lineWidth = isCrit ? 4.0 : 3.2;

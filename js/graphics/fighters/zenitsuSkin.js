@@ -244,14 +244,16 @@ function _drawZenitsuWaistGripKatana(ctx, fighter, r, isChargePhase, jitterX = 0
   ctx.rotate(swordAngle);
   ctx.scale(-1, 1); // Mirrored: blade points backwards (-X), handle points forward (+X) to waist
 
-  // Modular Katana with two-handed grip on tsuka handle at his waist
-  drawZenitsuLightningKatana(ctx, 0, 0, 0, r, {
-    drawHands: !shouldHideHands,
-    skinColor: skinColor,
-    hideBackHand: Boolean(fighter.hideBackHand),
-    hideFrontHand: Boolean(fighter.hideFrontHand),
-    isPreview: false
-  });
+  // The katana is attached to the skin render, so exclude it from the arena outline source.
+  if (!fighter._suppressWeaponsInSilhouettePass) {
+    drawZenitsuLightningKatana(ctx, 0, 0, 0, r, {
+      drawHands: !shouldHideHands,
+      skinColor: skinColor,
+      hideBackHand: Boolean(fighter.hideBackHand),
+      hideFrontHand: Boolean(fighter.hideFrontHand),
+      isPreview: false
+    });
+  }
 
   ctx.restore();
 }
@@ -1628,4 +1630,3 @@ function _drawZenitsuFrontHand(ctx, fighter, r, isKatanaSwinging, isPunching, an
 
   ctx.restore();
 }
-

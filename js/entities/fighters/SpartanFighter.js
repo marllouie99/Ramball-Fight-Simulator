@@ -727,10 +727,8 @@ export class SpartanFighter extends Fighter {
       }
     }
 
-    // 5. Base Entity Pipeline & Mandatory Rule 21 Overhead HP/Status
+    // 5. Base Entity Pipeline (renders body, gun, overhead health, and freeze timer)
     super.draw(ctx);
-    this.drawHealth(ctx);
-    this.drawFreezeTimer(ctx);
   }
 
   /**

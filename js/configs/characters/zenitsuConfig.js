@@ -19,6 +19,7 @@ export const zenitsuConfig = {
 
   name: 'Zenitsu',
   displayName: 'Zenitsu',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Thunder Breathing Slayer',
   title: 'Thunder Breathing Slayer',
 

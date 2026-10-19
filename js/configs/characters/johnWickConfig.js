@@ -13,6 +13,7 @@ export const johnWickConfig = {
 
   name: 'John Wick',
   displayName: 'John Wick',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Baba Yaga',
   title: 'Baba Yaga',
 

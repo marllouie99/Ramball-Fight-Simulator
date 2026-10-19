@@ -614,6 +614,10 @@ export class ShiroFighter extends Fighter {
       drawChessTroop(ctx, troop);
     };
 
+    troop.drawBody = (ctx) => {
+      drawChessTroop(ctx, troop);
+    };
+
     if (arena) {
       const cols = ARENA_TILE_COUNT;
       const rows = ARENA_TILE_COUNT;
@@ -1886,10 +1890,6 @@ export class ShiroFighter extends Fighter {
 
     // 3. Draw Fighter Body & Skin
     super.draw(ctx, opponent);
-
-    // 4. Mandatory Overhead HP & Freeze Timer (Rule 21)
-    this.drawHealth(ctx);
-    this.drawFreezeTimer(ctx);
 
     // 5. Victory Dialogue Speech Bubble ("Checkmate!")
     drawShiroSpeechBubble(ctx, this);

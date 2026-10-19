@@ -6,6 +6,7 @@ export const spikeConfig = {
   id: 3,
   name: 'Spike',
   displayName: 'Spike',
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Fantasy & Magic',
   title: 'Thorn Brawler',
   bossTitle: 'Thorn Brawler',

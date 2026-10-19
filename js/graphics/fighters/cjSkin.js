@@ -1322,7 +1322,9 @@ export function drawCjSkin(ctx, fighter) {
   const isUziActive = Boolean(previewIdx === 2 || (isJetpackActive && previewIdx !== 1 && !isMinigunActive && !isTec9Active));
 
   // ── LAYER -1: GROUND SHADOW SILHOUETTE (Drawn on ground plane before Z-elevation) ──
-  _drawCjGroundShadow(ctx, fighter, r, z, isJetpackActive);
+  if (!fighter._isSilhouettePass) {
+    _drawCjGroundShadow(ctx, fighter, r, z, isJetpackActive);
+  }
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y - z);
@@ -1406,12 +1408,17 @@ export function drawCjSkin(ctx, fighter) {
   );
 
   // ── LAYER 0: JETPACK, CHEAT AURA & BAGUVIX ANIMATED KI AURA (Background Layer) ──
-  if (isGodMode) {
-    _drawCjBaguvixAnimatedAura(ctx, r);
-    _drawCjBaguvixPixelSparks(ctx, r, fighter);
+  if (!fighter._isSilhouettePass) {
+    if (isGodMode) {
+      _drawCjBaguvixAnimatedAura(ctx, r);
+      _drawCjBaguvixPixelSparks(ctx, r, fighter);
+    }
+    _drawCjCheatAura(ctx, r, isHesoyamActive, isRespectAura);
+    _drawCjJetpack(ctx, r, isJetpackActive);
+  } else if (isJetpackActive) {
+    // During silhouette pass, only render physical jetpack model (suppress sparks and glowing auras)
+    _drawCjJetpack(ctx, r, isJetpackActive);
   }
-  _drawCjCheatAura(ctx, r, isHesoyamActive, isRespectAura);
-  _drawCjJetpack(ctx, r, isJetpackActive);
 
   // ── LAYER 1: BACK HAND (Behind Body Layer — Left Micro-Uzi / Fist) ──
   if (!hideBackHand) {

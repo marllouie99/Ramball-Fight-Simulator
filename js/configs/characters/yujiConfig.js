@@ -10,6 +10,7 @@ export const yujiConfig = {
 
   name: 'Yuji',
   displayName: 'Yuji',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Tiger of West Junior High',
   title: 'Tiger of West Junior High',
 

@@ -6,6 +6,7 @@
 export const pekkaConfig = {
   name: 'P.E.K.K.A',
   displayName: 'P.E.K.K.A',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Heavy Armored Juggernaut',
   title: 'Heavy Armored Juggernaut',
 

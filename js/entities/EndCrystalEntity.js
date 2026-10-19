@@ -328,6 +328,10 @@ export class EndCrystalEntity extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    this.draw(ctx);
+  }
+
   draw(ctx) {
     if (!ctx) return;
     const sheetImg = getEndCrystalSpriteSheet();
@@ -369,24 +373,26 @@ export class EndCrystalEntity extends Fighter {
     }
 
     // 2. Retro Arcade Pixel Energy Motes (2.0px discrete grid)
-    const P = 2.0;
-    const moteTicks = Math.floor(this.animTimer / 4);
-    for (let m = 0; m < 4; m++) {
-      const angle = (m / 4) * Math.PI * 2 + moteTicks * 0.20;
-      const dist = 26 + ((moteTicks + m * 2) % 3) * 2.0;
-      const mx = Math.round((Math.cos(angle) * dist) / P) * P;
-      const my = Math.round((Math.sin(angle) * dist * 0.65) / P) * P;
-      const mSize = (m % 2 === 0) ? P : P * 1.5;
-      const mColor = (m % 3 === 0) ? '#FFFFFF' : (m % 2 === 0 ? '#F5D0FE' : '#E879F9');
+    if (!this._isSilhouettePass) {
+      const P = 2.0;
+      const moteTicks = Math.floor(this.animTimer / 4);
+      for (let m = 0; m < 4; m++) {
+        const angle = (m / 4) * Math.PI * 2 + moteTicks * 0.20;
+        const dist = 26 + ((moteTicks + m * 2) % 3) * 2.0;
+        const mx = Math.round((Math.cos(angle) * dist) / P) * P;
+        const my = Math.round((Math.sin(angle) * dist * 0.65) / P) * P;
+        const mSize = (m % 2 === 0) ? P : P * 1.5;
+        const mColor = (m % 3 === 0) ? '#FFFFFF' : (m % 2 === 0 ? '#F5D0FE' : '#E879F9');
 
-      ctx.fillStyle = mColor;
-      ctx.fillRect(mx - mSize / 2, my - mSize / 2, mSize, mSize);
-    }
+        ctx.fillStyle = mColor;
+        ctx.fillRect(mx - mSize / 2, my - mSize / 2, mSize, mSize);
+      }
 
-    // 3. Retro Hit Flash Overlay (Stepped 1-bit strobe)
-    if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer) % 2 === 0) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-      ctx.fillRect(-this.r * 0.9, -this.r * 1.1, this.r * 1.8, this.r * 2.0);
+      // 3. Retro Hit Flash Overlay (Stepped 1-bit strobe)
+      if (this.hitFlashTimer > 0 && Math.floor(this.hitFlashTimer) % 2 === 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.fillRect(-this.r * 0.9, -this.r * 1.1, this.r * 1.8, this.r * 2.0);
+      }
     }
 
     ctx.restore();

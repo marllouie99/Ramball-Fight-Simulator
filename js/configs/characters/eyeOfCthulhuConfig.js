@@ -2,6 +2,7 @@
 // Eye of Cthulhu — Ancient Ocular Horror Config
 // ─────────────────────────────────────────────
 export const eyeOfCthulhuConfig = {
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     phase1: 'Assets/model/eyeOfCthulhu/Eye of Cthulhu.png',
     phase2: 'Assets/model/eyeOfCthulhu/eye of cthulhu phase 2.png',

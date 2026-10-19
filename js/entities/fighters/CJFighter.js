@@ -2013,7 +2013,7 @@ export class CJFighter extends Fighter {
   drawHealth(ctx) {
     if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
     if (CONFIG.hudHideOverheadHp) return;
-    if (this.hp <= 0 || this._isWinnerReveal || this._isFaceOff || (this.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
+    if (this.hp <= 0 || this._isWinnerReveal || this._isFaceOff || this.hideHpText || this._isSilhouettePass) return;
 
     const z = this.z || 0;
     const drawY = this.y - z;
@@ -2040,7 +2040,6 @@ export class CJFighter extends Fighter {
    */
   drawBody(ctx) {
     drawCjSkin(ctx, this);
-    this.drawHealth(ctx);
   }
 
   draw(ctx, opponent) {

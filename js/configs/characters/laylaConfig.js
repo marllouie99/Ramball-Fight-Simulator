@@ -2,6 +2,7 @@
 // Layla — Cosmic Marksman Config
 // ─────────────────────────────────────────────
 export const laylaConfig = {
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
     name: 'Layla',
     displayName: 'Layla',
     bossTitle: 'Cosmic Gunner',

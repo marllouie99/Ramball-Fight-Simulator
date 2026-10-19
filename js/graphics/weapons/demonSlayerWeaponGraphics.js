@@ -152,7 +152,7 @@ export function _getZenitsuAssemblyImage() {
       console.warn('Failed to load Zenitsu weapon at Assets/model/zenitsu/Zenitsu-weapon.png', e);
       _zenitsuAssemblyImageLoading = false;
     };
-    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-weapon.png?v=5');
+    img.src = encodeURI('Assets/model/zenitsu/Zenitsu-weapon.png?v=6');
     _zenitsuAssemblyImage = img;
   }
   return _zenitsuAssemblyImage;
@@ -196,7 +196,7 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
   ctx.scale(customScale * customLengthScale, customScale * customWidthScale);
 
   if (isPreview) {
-    ctx.translate(11, 0); // Center the full katana in preview (-40 + 11 = -29, exact midpoint of 130px katana)
+    ctx.translate(22, 0); // Center the full katana in preview (-40 from WeaponIndexScreen + 22 = -18, exact midpoint of 94.5px katana)
   }
 
   // ─── Try Assembled Weapon Asset First ───
@@ -205,21 +205,24 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor pixel art scaling
 
-    // Base scale maps 1525px blade to ~94px gameplay size
-    const baseScale = 94.0 / 1525.0;
-
     const parts = custom.parts || {};
 
     // 1. Assembled Katana (Tsuba guard centered at (0, 0))
-    // Image dimensions: 2172 x 724. Tsuba center is at (614, 356)
-    const tsubaX = 614;
-    const tsubaY = 356;
-    const dx = -tsubaX * baseScale;
-    const dy = -tsubaY * baseScale;
-    const dw = img.naturalWidth * baseScale;
-    const dh = img.naturalHeight * baseScale;
+    // Asset: "Assets/model/zenitsu/Zenitsu-weapon.png" (600 x 334)
+    // Tsuba center is at (218, 191). Tip at (579, 10). Pommel at (54, 273).
+    // Native diagonal angle: atan2(10 - 191, 579 - 218) = -0.4643 rad (-26.60 deg).
+    // Rotating by +0.4643 rad aligns blade along +X and handle along -X.
+    // Blade diagonal length is 403.8px. Base scale 65.0 / 403.8 = 0.1610 maps to 65px reach.
+    const tsubaX = 218;
+    const tsubaY = 191;
+    const ASSET_ANGLE = 0.4643;
+    const baseScale = 65.0 / 403.8;
 
-    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.save();
+    ctx.rotate(ASSET_ANGLE);
+    ctx.scale(baseScale, baseScale);
+    ctx.drawImage(img, -tsubaX, -tsubaY);
+    ctx.restore();
 
     // ─── 2. HANDS (Two-Hand Grip on Tsuka Handle) ───
     const shouldDrawHands = opts.drawHands || (isPreview && opts.showHands !== false);
@@ -231,17 +234,21 @@ export function drawZenitsuLightningKatana(ctx, x, y, angle, r = 25, opts = {}) 
       const handsSpacing = handsCfg.spacing ?? 1.0;
       const skinColor = opts.skinColor || '#FEE8D6';
 
-      // Rear Hand (near pommel at X = -25px)
+      // Tsuka handle extends from X = 0 (tsuba) to X = -29.5px (pommel)
+      const midX = -15.5;
+      const spread = 6.0 * handsSpacing;
+      const backX = midX - spread + handsOffX;   // ~ -21.5px (near pommel)
+      const frontX = midX + spread + handsOffX;  // ~ -9.5px (near tsuba)
+
+      // Rear Hand (near pommel)
       if (!opts.hideBackHand) {
         const backR = (getHandSize ? getHandSize(4.4) : 4.4) * handsScale;
-        const backX = -18.5 - 6.5 * handsSpacing + handsOffX;
         drawPixelHand(ctx, backX, handsOffY, backR, skinColor, '#000000');
       }
 
-      // Front Hand (lead grip near tsuba at X = -12px)
+      // Front Hand (lead grip near tsuba)
       if (!opts.hideFrontHand) {
         const frontR = (getHandSize ? getHandSize(4.8) : 4.8) * handsScale;
-        const frontX = -18.5 + 6.5 * handsSpacing + handsOffX;
         drawPixelHand(ctx, frontX, handsOffY, frontR, skinColor, '#000000');
       }
     }

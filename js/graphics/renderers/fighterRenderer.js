@@ -340,6 +340,7 @@ export class FighterRenderer {
 
   static drawFreezeTimer(ctx, fighter) {
     if (!fighter) return;
+
     if (
       fighter._suppressFreezeTimer ||
       fighter.suppressFreezeTimer ||
@@ -424,16 +425,19 @@ export class FighterRenderer {
   static draw(ctx, fighter) {
     const zOffset = fighter.z || 0;
     const hasZ = zOffset > 0;
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
 
     if (hasZ) {
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y);
-      ctx.scale(1, 0.5); 
-      ctx.beginPath();
-      ctx.arc(0, 0, fighter.r, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(0,0,0,${Math.max(0.1, 0.6 - (zOffset / 150))})`;
-      ctx.fill();
-      ctx.restore();
+      if (fighter._floorShadowDrawnFrame !== currentFrame && !fighter._isSilhouettePass) {
+        ctx.save();
+        ctx.translate(fighter.x, fighter.y);
+        ctx.scale(1, 0.5); 
+        ctx.beginPath();
+        ctx.arc(0, 0, fighter.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0,0,0,${Math.max(0.1, 0.6 - (zOffset / 150))})`;
+        ctx.fill();
+        ctx.restore();
+      }
 
       ctx.save();
       ctx.translate(fighter.x, fighter.y - zOffset);
@@ -444,7 +448,6 @@ export class FighterRenderer {
     fighter.drawOutline(ctx);
     
     // Safety check: ensure status overlays are rendered even if fighter's custom skin didn't call it
-    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
     if (fighter._statusOverlaysRenderedFrame !== currentFrame) {
       ctx.save();
       ctx.translate(fighter.x, fighter.y - (fighter.z || 0));

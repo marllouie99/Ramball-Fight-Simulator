@@ -10,6 +10,7 @@ export const ulquiorraConfig = {
 
   name: 'Ulquiorra',
   displayName: 'Ulquiorra',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: '4th Espada',
   title: '4th Espada',
 

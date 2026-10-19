@@ -2,6 +2,7 @@
 // Ryomen Sukuna — King of Curses Config
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     hair: 'Assets/model/sukuna/Sukuna-hair.png',
     shrine: 'Assets/model/sukuna/sukuna-shrine.png',
@@ -39,11 +40,11 @@ export const sukunaConfig = {
 
     // Stacking Slash Crit Passive
     enableCritPassive: true,          // Master toggle for Stacking Slash Crit Passive
-    baseCritChance: 1.00,             // 10% base crit chance
+    baseCritChance: 0.01,             // 10% base crit chance
     baseCritMultiplier: 1.00,         // 1.50x base crit damage multiplier
     critChancePerSlashHit: 0.01 ,      // +2% crit chance per landed slash hit
     critMultiplierPerSlashHit: 0.01,  // +0.05x crit multiplier per landed slash hit
-    maxCritChance: 1.50,              // 80% max crit chance cap
+    maxCritChance: 0.50,              // 80% max crit chance cap
     maxCritMultiplier: 1.50,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)

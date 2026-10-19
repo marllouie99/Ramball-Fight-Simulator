@@ -1175,7 +1175,7 @@ canvas {
 .health-card__desc {
   margin-top: 10px;
   font-family: 'Glast Blitch', Arial, sans-serif;
-  font-size: 16px;
+  font-size: 21px;
   color: rgba(255, 255, 255, 0.6);
   line-height: 1.4;
   text-align: left;
@@ -1337,11 +1337,37 @@ canvas {
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--fighter-theme, #38BDF8) 58%, #1E293B) 0%, #0E1019 90%);
+  background: radial-gradient(circle at 50% 35%, color-mix(in srgb, var(--grade-color, #10B981) 85%, #FFFFFF) 0%, var(--grade-color, #10B981) 40%, color-mix(in srgb, var(--grade-color, #10B981) 60%, #000) 80%, #050609 100%);
   border: 3.5px solid #050609;
   border-radius: 6px;
   box-shadow: inset 0 0 0 2px #FFFFFF, 2px 3px 0px #050609, 0 4px 10px rgba(0, 0, 0, 0.55);
   box-sizing: border-box;
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Grade-Specific Tactical Frame Fills (B / A / S / SS) */
+.hud-top-player[data-grade="B"] .hud-top-profile__bg,
+.hud-top-profile[data-grade="B"] .hud-top-profile__bg {
+  background: radial-gradient(circle at 50% 35%, #34D399 0%, #10B981 35%, #059669 68%, #064E3B 90%, #05140F 100%);
+  box-shadow: inset 0 0 0 2px #ECFDF5, 2px 3px 0px #050609, 0 4px 10px rgba(16, 185, 129, 0.35);
+}
+
+.hud-top-player[data-grade="A"] .hud-top-profile__bg,
+.hud-top-profile[data-grade="A"] .hud-top-profile__bg {
+  background: radial-gradient(circle at 50% 35%, #D8B4FE 0%, #A855F7 35%, #7E22CE 68%, #4C1D95 90%, #1A0A26 100%);
+  box-shadow: inset 0 0 0 2px #FAF5FF, 2px 3px 0px #050609, 0 4px 10px rgba(168, 85, 247, 0.35);
+}
+
+.hud-top-player[data-grade="S"] .hud-top-profile__bg,
+.hud-top-profile[data-grade="S"] .hud-top-profile__bg {
+  background: radial-gradient(circle at 50% 35%, #FFFDE7 0%, #FFD700 35%, #F59E0B 68%, #78350F 90%, #181204 100%);
+  box-shadow: inset 0 0 0 2px #FFFDF0, 2px 3px 0px #050609, 0 4px 14px rgba(245, 158, 11, 0.50);
+}
+
+.hud-top-player[data-grade="SS"] .hud-top-profile__bg,
+.hud-top-profile[data-grade="SS"] .hud-top-profile__bg {
+  background: radial-gradient(circle at 50% 35%, #FFE4E6 0%, #F43F5E 35%, #BE123C 68%, #4C0519 90%, #1A080C 100%);
+  box-shadow: inset 0 0 0 2px #FDE047, 2px 3px 0px #050609, 0 4px 14px rgba(244, 63, 94, 0.50);
 }
 
 .hud-top-player.hud-top-p1 .hud-top-profile__bg {
@@ -1376,6 +1402,19 @@ canvas {
 
 .hud-top-player.hud-top-p2 .hud-top-profile__canvas {
   transform: translate(-50%, -50%) scaleX(-1);
+}
+
+/* Character-card grade lettering on the top outer corner of each profile frame */
+.hud-top-profile__grade-canvas {
+  position: absolute;
+  z-index: 7;
+  top: -15px;
+  right: -14px;
+  width: 52px;
+  height: 36px;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* 2. Connected Content Column: Health Bar on Top, Fighter Name Below */

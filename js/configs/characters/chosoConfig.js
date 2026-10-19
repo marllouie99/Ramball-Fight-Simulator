@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 
 export const chosoConfig = {
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Death Painting Womb: Eldest Brother',
   title: 'Master of Blood Manipulation',
 

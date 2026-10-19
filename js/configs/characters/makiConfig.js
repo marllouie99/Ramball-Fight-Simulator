@@ -11,6 +11,7 @@ export const makiConfig = {
 
   name: 'Maki',
   displayName: 'Maki',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   // Base Attributes
   hp: 440,
   maxHp: 440,

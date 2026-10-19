@@ -2,6 +2,7 @@
 // Aoi Todo — Boogie Woogie Brawler Config
 // ─────────────────────────────────────────────
 export const todoConfig = {
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     hair: 'Assets/model/todo/Todo-hair.png',
     ultimateOverlay: 'Assets/Overlays/Todo-ultimate-overlay.png',
@@ -54,7 +55,7 @@ export const todoConfig = {
     vanishDurationFrames: 15,     // Duration in frames (at 60fps) where Todo and swapped entities vanish during swap (~0.05s)
     swapDisorientationFrames: 20, // Attack reaction delay in frames applied to enemies when Todo/partner reappears from a swap (~0.33s)
     evadeBuffDurationFrames: 50,  // Duration in frames (~0.83s) where Todo and teammate gain evasion buff after swap
-    evadeChance: 0.40,            // 40% chance to completely evade/miss incoming enemy basic attacks
+    evadeChance: 0.80,            // 40% chance to completely evade/miss incoming enemy basic attacks
     disengageDistance: 180,       // Distance teleported away when clapping to take a breather after combo
     disengageDelayFrames: 18,     // Delay in frames after final punch before Todo claps away for breather (~0.3s pause)
     rescueDamageThreshold: 35,    // Cumulative damage taken by teammate in 2.0s window that triggers emergency rescue swap

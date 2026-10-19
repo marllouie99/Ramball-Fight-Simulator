@@ -692,9 +692,13 @@ export class PeashooterEntity extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    drawPeashooter(ctx, this);
+  }
+
   draw(ctx) {
     drawPeashooter(ctx, this);
-    if (this.hp < this.maxHp && this.hp > 0) {
+    if (this.hp < this.maxHp && this.hp > 0 && !this.hideHpText && !this._isSilhouettePass) {
       const topY = this.y - Math.round(this.r * 2.1 + 8);
       drawMinionHealthBar(ctx, this.x, topY, 34, 5, this.hp, this.maxHp);
     }
@@ -1106,9 +1110,13 @@ export class SnowPeaEntity extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    drawSnowPea(ctx, this);
+  }
+
   draw(ctx) {
     drawSnowPea(ctx, this);
-    if (this.hp < this.maxHp && this.hp > 0) {
+    if (this.hp < this.maxHp && this.hp > 0 && !this.hideHpText && !this._isSilhouettePass) {
       const topY = this.y - Math.round(this.r * 2.1 + 8);
       drawMinionHealthBar(ctx, this.x, topY, 34, 5, this.hp, this.maxHp);
     }
@@ -1428,9 +1436,13 @@ export class WallnutEntity extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    drawWallnut(ctx, this);
+  }
+
   draw(ctx) {
     drawWallnut(ctx, this);
-    if (this.hp < this.maxHp && this.hp > 0) {
+    if (this.hp < this.maxHp && this.hp > 0 && !this.hideHpText && !this._isSilhouettePass) {
       const topY = this.y - Math.round(this.r * 2.1 + 8);
       drawMinionHealthBar(ctx, this.x, topY, 38, 5, this.hp, this.maxHp);
     }
@@ -1888,9 +1900,13 @@ export class TorchwoodEntity extends Fighter {
     this._interceptProjectiles();
   }
 
+  drawBody(ctx) {
+    drawTorchwood(ctx, this);
+  }
+
   draw(ctx) {
     drawTorchwood(ctx, this);
-    if (this.hp < this.maxHp && this.hp > 0) {
+    if (this.hp < this.maxHp && this.hp > 0 && !this.hideHpText && !this._isSilhouettePass) {
       const topY = this.y - Math.round(this.r * 3.2 + 8);
       drawMinionHealthBar(ctx, this.x, topY, 36, 5, this.hp, this.maxHp);
     }
@@ -2288,10 +2304,15 @@ export class PotatoMineEntity extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    if (this.hasDetonated && !this.isExploding) return;
+    drawPotatoMine(ctx, this);
+  }
+
   draw(ctx) {
     if (this.hasDetonated && !this.isExploding) return;
     drawPotatoMine(ctx, this);
-    if (!this.isExploding && this.hp < this.maxHp && this.hp > 0) {
+    if (!this.isExploding && this.hp < this.maxHp && this.hp > 0 && !this.hideHpText && !this._isSilhouettePass) {
       const topY = this.y - Math.round(this.r * 2.2 + 8);
       drawMinionHealthBar(ctx, this.x, topY, 30, 5, this.hp, this.maxHp);
     }
@@ -2640,6 +2661,11 @@ export class LawnmowerEntity extends Fighter {
 
   drawStatusOverlays() {
     this._statusOverlaysRenderedFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : Date.now();
+  }
+
+  drawBody(ctx) {
+    if (this.state === 'despawned') return;
+    drawLawnmower(ctx, this);
   }
 
   draw(ctx) {
@@ -3711,6 +3737,14 @@ export class CrazyDaveFighter extends Fighter {
 
     // 5. Centralized Movement & Physics Standard (Rule 1.2)
     super.update(opponent, ownerIndex, arena);
+  }
+
+  /**
+   * Dedicated drawBody implementation per Rule 21 / silhouette pipeline.
+   * Renders Crazy Dave's skin, pot, hands, and shovel without world sun drops or lawnmowers.
+   */
+  drawBody(ctx) {
+    drawCrazyDaveSkin(ctx, this);
   }
 
   /**

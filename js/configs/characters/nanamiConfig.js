@@ -14,6 +14,7 @@ export const nanamiConfig = {
 
   name: 'Nanami',
   displayName: 'Nanami',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: '7:3 Ratio Sorcerer',
   title: '7:3 Ratio Sorcerer',
 

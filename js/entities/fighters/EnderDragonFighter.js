@@ -1816,6 +1816,11 @@ export class EnderDragonFighter extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    if (!ctx) return;
+    drawEnderDragonSkin(ctx, this);
+  }
+
   draw(ctx) {
     if (!ctx) return;
 

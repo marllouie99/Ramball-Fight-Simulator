@@ -359,6 +359,7 @@ export class Fighter {
     this.type = def.type;
     this.name = def.name;
     this.color = def.color;
+    this.grade = def.grade || 'B';
     
     const sizeMult = CONFIG.globalFighter?.sizeMultiplier ?? 1.0;
     const internalScale = CONFIG.internalScale ?? 1.0;

@@ -11,6 +11,7 @@ export const mahitoConfig = {
 
   name: 'Mahito',
   displayName: 'Mahito',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Curse of Humanity',
   title: 'Curse of Humanity',
 

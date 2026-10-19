@@ -9,6 +9,7 @@ export const denjiConfig = {
   },
   name: 'Denji',
   displayName: 'Denji',
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Chainsaw Man',
   title: 'Chainsaw Man',
 

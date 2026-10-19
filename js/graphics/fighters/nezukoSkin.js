@@ -211,7 +211,9 @@ function _drawNezukoFrontHand(ctx, fighter, r, isClawSlashing, isPunching, animP
   const frontY = 0;
 
   // Draw Demon Claws Weapon Preview / Visuals
-  drawNezukoDemonClaws(ctx, 0, 0, isClawSlashing ? (animPhase - 0.5) * 1.4 : 0, r);
+  if (!fighter._suppressWeaponsInSilhouettePass) {
+    drawNezukoDemonClaws(ctx, 0, 0, isClawSlashing ? (animPhase - 0.5) * 1.4 : 0, r);
+  }
 
   // Front Pixel Claw Fist
   const handSize = getHandSize(5.8);

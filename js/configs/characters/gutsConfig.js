@@ -7,6 +7,7 @@
 export const gutsConfig = {
   name: 'Guts',
   displayName: 'GUTS',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Anime & Dark Fantasy',
   color: '#18181b', // Deep Obsidian Black
   themeColor: '#71717a', // Cold Steel / Iron Gray

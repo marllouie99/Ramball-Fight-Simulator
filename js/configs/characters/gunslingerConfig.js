@@ -23,6 +23,7 @@ export const gunslingerConfig = {
   id: 13,
   name: 'Alucard',
   displayName: 'Alucard',
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   characterId: 'gunslinger',
   category: 'Anime & Supernatural',
   title: 'The No-Life King',

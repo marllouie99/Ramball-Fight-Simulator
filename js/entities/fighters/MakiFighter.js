@@ -1608,9 +1608,5 @@ export class MakiFighter extends Fighter {
     }
 
     super.draw(ctx, opponent);
-
-    // Rule 21: Mandatory In-Game Overlay HP & Status Drawing
-    this.drawHealth(ctx);
-    this.drawFreezeTimer(ctx);
   }
 }

@@ -601,13 +601,15 @@ export function drawPekkaSkin(ctx, fighter) {
     const gripOffset = r * 0.32;
     const bladeOriginX = rightHandX + Math.cos(swordOffsetAngle) * gripOffset;
     const bladeOriginY = rightHandY + Math.sin(swordOffsetAngle) * gripOffset;
-    drawPekkaBlade(ctx, bladeOriginX, bladeOriginY, swordOffsetAngle, r, {
-      momentumStage,
-      isSwinging,
-      isWindingUp,
-      isHitPausing,
-      now: Date.now()
-    });
+    if (!fighter._suppressWeaponsInSilhouettePass) {
+      drawPekkaBlade(ctx, bladeOriginX, bladeOriginY, swordOffsetAngle, r, {
+        momentumStage,
+        isSwinging,
+        isWindingUp,
+        isHitPausing,
+        now: Date.now()
+      });
+    }
 
     // Right Hand with slate-steel gauntlet on front layer over hilt grip & bracer spikes
     _drawPekkaBracerSpikes(ctx, rightHandX, rightHandY, handRadius, false);

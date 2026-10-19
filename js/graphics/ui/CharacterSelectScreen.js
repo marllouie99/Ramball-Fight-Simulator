@@ -24,6 +24,7 @@ import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeAren
 import { drawArenaFloorSelector, isArenaFloorModalOpen, drawArenaFloorModal, closeArenaFloorModal } from '../../systems/arenaTileSystem.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
+import { drawGradeBadge } from '../../configs/gradeConfig.js';
 
 const MODAL_ITEMS_PER_PAGE = 12;
 
@@ -1167,6 +1168,11 @@ function _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMir
   ctx.strokeText(`LV.${lvNum}`, lvX, 1);
   ctx.fillStyle = '#FFE145';
   ctx.fillText(`LV.${lvNum}`, lvX, 1);
+
+  // Grade Badge next to LV on Plate 1
+  const gradeBadgeX = isMirrored ? (lvX - 58) : (lvX + 44);
+  drawGradeBadge(ctx, gradeBadgeX, -8, def.grade, { scale: 0.88 });
+
   ctx.restore();
 
   ctx.restore(); // End Plate 1
@@ -2178,12 +2184,16 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
         ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
       }
 
-      // Fighter Name
+      // Fighter Name + Grade Badge
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), subLeftW - 8), avatarX, y + 124);
+      const nameText = fitSingleLineText(ctx, def.name.toUpperCase(), subLeftW - 34);
+      const measuredNameW = ctx.measureText(nameText).width;
+      const nameCx = avatarX - 10;
+      ctx.fillText(nameText, nameCx, y + 124);
+      drawGradeBadge(ctx, nameCx + measuredNameW / 2 + 4, y + 116, def.grade, { scale: 0.8 });
 
       // Class / Boss Tag Pill
       const isBossCard = isBossBattleMode && slotProp === 'p1Index';
@@ -2322,12 +2332,16 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
         ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
       }
 
-      // Fighter Name
+      // Fighter Name + Grade Badge
       ctx.fillStyle = '#FFFFFF';
       ctx.font = '900 15px "Outfit", "Rajdhani", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(def.name.toUpperCase(), avatarX, y + 144);
+      const nameText = fitSingleLineText(ctx, def.name.toUpperCase(), w - 46);
+      const measuredNameW = ctx.measureText(nameText).width;
+      const nameCx = avatarX - 10;
+      ctx.fillText(nameText, nameCx, y + 144);
+      drawGradeBadge(ctx, nameCx + measuredNameW / 2 + 4, y + 136, def.grade, { scale: 0.8 });
 
       // Class / Boss Tag Pill
       const isBossCard = isBossBattleMode && slotProp === 'p1Index';

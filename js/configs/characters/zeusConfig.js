@@ -25,6 +25,7 @@ export const zeusConfig = {
   ability: 'Storm Bringer',
   name: 'Zeus',
   displayName: 'Zeus',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'King of Olympus',
   title: 'King of Olympus',
   desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',

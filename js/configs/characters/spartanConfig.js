@@ -6,6 +6,7 @@
 export const spartanConfig = {
   name: 'Spartan',
   displayName: 'Spartan',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Greek Mythology',
   color: '#b91c1c',                // Spartan crimson cloak
   themeColor: '#d97706',           // Ancient bronze gold

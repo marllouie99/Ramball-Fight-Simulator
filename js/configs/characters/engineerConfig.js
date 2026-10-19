@@ -9,6 +9,7 @@ export const engineerConfig = {
 
   name: 'Engineer',
   displayName: 'Engineer',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Combat Engineer',
   title: 'Combat Engineer',
 

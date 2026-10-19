@@ -20,6 +20,7 @@ export const draedonConfig = {
   id: 'draedon',
   name: 'Draedon',
   displayName: 'Draedon',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Gaming',
   bossTitle: 'Architect of the Exo Mechs',
   title: 'Architect of the Exo Mechs',

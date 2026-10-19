@@ -7,6 +7,7 @@ export const namelessDeityConfig = {
   id: 'namelessdeity',
   name: 'Nameless Deity',
   displayName: 'DEITY',
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Gaming',
   bossTitle: 'Transcendent Cosmic Entity',
   title: 'Transcendent Cosmic Entity',

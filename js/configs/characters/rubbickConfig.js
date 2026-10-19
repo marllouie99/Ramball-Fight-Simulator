@@ -4,6 +4,7 @@
 export const rubbickConfig = {
   name: 'Rubbick',
   displayName: 'Rubbick',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Grand Magus',
   title: 'Grand Magus',
 

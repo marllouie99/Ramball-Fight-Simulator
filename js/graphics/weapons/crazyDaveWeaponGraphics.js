@@ -620,11 +620,13 @@ export function drawPeashooter(ctx, peashooter) {
   ctx.translate(x, y);
   ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
-  // Ground leaf base shadow
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.7, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
-  ctx.fill();
+  // Ground leaf base shadow (only in gameplay render, not in silhouette mask)
+  if (!peashooter._isSilhouettePass) {
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.7, r * 0.9, r * 0.3, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.38)';
+    ctx.fill();
+  }
 
   // Horizontal flip if facing left
   if (isFacingLeft) {
@@ -675,10 +677,12 @@ export function drawSnowPea(ctx, snowpea) {
   ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Ground frost shadow
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.7, r * 0.95, r * 0.32, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(14, 116, 144, 0.42)';
-  ctx.fill();
+  if (!snowpea._isSilhouettePass) {
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.7, r * 0.95, r * 0.32, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(14, 116, 144, 0.42)';
+    ctx.fill();
+  }
 
   // Horizontal flip if facing left
   if (isFacingLeft) {
@@ -828,10 +832,12 @@ export function drawWallnut(ctx, wallnut) {
   ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Ground soil shadow
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.72, r * 1.05, r * 0.35, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
-  ctx.fill();
+  if (!wallnut._isSilhouettePass) {
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.72, r * 1.05, r * 0.35, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
+    ctx.fill();
+  }
 
   // Horizontal flip if facing left
   if (isFacingLeft) {
@@ -1156,22 +1162,24 @@ export function drawTorchwood(ctx, torchwood) {
   ctx.translate(x, y);
   ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
-  // Warm ambient fire glow centered on the upper flaming crown (Zero shadowBlur - Rule 2.2)
-  const glowRadius = r * 2.8;
-  const fireGlow = ctx.createRadialGradient(0, -drawHeight * 0.45, r * 0.25, 0, -drawHeight * 0.45, glowRadius);
-  fireGlow.addColorStop(0, 'rgba(251, 146, 60, 0.32)');
-  fireGlow.addColorStop(0.45, 'rgba(249, 115, 22, 0.14)');
-  fireGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
-  ctx.fillStyle = fireGlow;
-  ctx.beginPath();
-  ctx.arc(0, -drawHeight * 0.45, glowRadius, 0, Math.PI * 2);
-  ctx.fill();
+  // Warm ambient fire glow and ground ember shadow
+  if (!torchwood._isSilhouettePass) {
+    const glowRadius = r * 2.8;
+    const fireGlow = ctx.createRadialGradient(0, -drawHeight * 0.45, r * 0.25, 0, -drawHeight * 0.45, glowRadius);
+    fireGlow.addColorStop(0, 'rgba(251, 146, 60, 0.32)');
+    fireGlow.addColorStop(0.45, 'rgba(249, 115, 22, 0.14)');
+    fireGlow.addColorStop(1, 'rgba(234, 88, 12, 0)');
+    ctx.fillStyle = fireGlow;
+    ctx.beginPath();
+    ctx.arc(0, -drawHeight * 0.45, glowRadius, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Ground ember shadow underneath tree stump roots
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.72, r * 1.25, r * 0.42, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(120, 53, 15, 0.45)';
-  ctx.fill();
+    // Ground ember shadow underneath tree stump roots
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.72, r * 1.25, r * 0.42, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(120, 53, 15, 0.45)';
+    ctx.fill();
+  }
 
   // Horizontal flip if facing left
   if (isFacingLeft) {
@@ -1410,10 +1418,12 @@ export function drawLawnmower(ctx, mower) {
   ctx.translate(x, y);
 
   // Ground wheel shadow
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.65, r * 1.35, r * 0.38, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
-  ctx.fill();
+  if (!mower._isSilhouettePass) {
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.65, r * 1.35, r * 0.38, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.42)';
+    ctx.fill();
+  }
 
   // Flip if facing left
   if (isFacingLeft) {
@@ -1546,10 +1556,12 @@ export function drawPotatoMine(ctx, mine) {
   ctx.scale(PLANT_VISUAL_SCALE, PLANT_VISUAL_SCALE);
 
   // Ground dirt shadow
-  ctx.beginPath();
-  ctx.ellipse(0, r * 0.65, r * 0.85, r * 0.28, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(60, 30, 10, 0.45)';
-  ctx.fill();
+  if (!mine._isSilhouettePass) {
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.65, r * 0.85, r * 0.28, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(60, 30, 10, 0.45)';
+    ctx.fill();
+  }
 
   // Determine which sprite frame to use based on mine state
   let frameIdx = 0;

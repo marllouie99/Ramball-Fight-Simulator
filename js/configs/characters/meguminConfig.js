@@ -11,6 +11,7 @@ export const meguminConfig = {
 
   name: 'Megumin',
   displayName: 'Megumin',
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Crimson Archmage',
   title: 'Crimson Demon',
 

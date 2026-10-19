@@ -1113,12 +1113,14 @@ export function drawNaoyaSkin(ctx, fighter) {
       }
 
       // Draw Tanto Knife attached to the right hand
-      drawNaoyaTanto(ctx, 0, 0, 0, r, true, rawProgress, {
-        handX: rightX,
-        handY: rightY,
-        angleOffset: handAngleOffset,
-        isStab: true
-      });
+      if (!fighter._suppressWeaponsInSilhouettePass) {
+        drawNaoyaTanto(ctx, 0, 0, 0, r, true, rawProgress, {
+          handX: rightX,
+          handY: rightY,
+          angleOffset: handAngleOffset,
+          isStab: true
+        });
+      }
 
       // Draw Guarding Hand (left) then Front Stabbing Hand (right over handle)
       drawPixelHand(ctx, leftX, leftY, handR * 0.95, skinTone, handOutline);

@@ -164,7 +164,9 @@ export function drawNobaraSkin(ctx, fighter) {
   // ── LAYER 4: FRONT HAND & WEAPON (On Top of Body) ──
   if (!hideFrontHand) {
     // Draw Nobara's Steel Carpenter Claw Hammer
-    drawNobaraHammer(ctx, frontX, frontY, (isSwinging ? (rawProgress * 0.85 - 0.2) : 0), r, isSwinging, isBlitzing);
+    if (!fighter._suppressWeaponsInSilhouettePass) {
+      drawNobaraHammer(ctx, frontX, frontY, (isSwinging ? (rawProgress * 0.85 - 0.2) : 0), r, isSwinging, isBlitzing);
+    }
 
     // Front Grip Fist
     _drawFist(ctx, frontX, frontY, handRadius, skinBase, skinShadow);

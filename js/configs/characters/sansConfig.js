@@ -10,6 +10,7 @@ export const sansConfig = {
 
   name: 'sans',
   displayName: 'sans',
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'The Judge of the Underground',
   title: 'The Judge of the Underground',
 

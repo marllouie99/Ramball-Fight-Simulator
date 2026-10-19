@@ -7,6 +7,7 @@ export const avatarOfEmptinessConfig = {
   id: 'avatarofemptiness',
   name: 'Avatar of Emptiness',
   displayName: 'Avatar of Emptiness',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Gaming',
   bossTitle: 'Sovereign of the Three Universes',
   title: 'Sovereign of the Three Universes',

@@ -6,6 +6,7 @@
 export const inosukeConfig = {
   name: 'Inosuke',
   displayName: 'Inosuke',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Beast Breathing Slayer',
   title: 'Beast Breathing Slayer',
 

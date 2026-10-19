@@ -12,7 +12,7 @@ import { draw24FPSFrameStasisOverlay } from '../weapons/naoyaWeaponGraphics.js';
 import { drawMakiImpaledTargetOverlay } from '../weapons/makiWeaponGraphics.js';
 import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
-import { drawFighterInkOutline } from './fighterOutlineRenderer.js';
+import { drawFighterInkOutline, drawFighterFloorShadow } from './fighterOutlineRenderer.js';
 
 let _sortedFightersBuffer = [];
 
@@ -380,8 +380,17 @@ export function drawFighters() {
     }
 
     try {
-      if (!fighter.hasUnderBodyAura) {
-        drawFighterInkOutline(ctx, fighter);
+      const isHeroFighter = !fighter.isMinion && !fighter.isPlant && !fighter.isPlantMinion &&
+        !fighter.isTurret && !fighter.isBuilding && !fighter.isDeployable && !fighter.isIllusion &&
+        !fighter.isProjectile && !fighter.isChessPiece && !fighter.isChessTroop &&
+        !fighter.isChessMinion && !fighter.isTransfiguredHuman && !fighter.isServantOfCthulhu &&
+        !fighter.isLawnmower && fighter.characterId !== 'crazydave_plant' && fighter.characterId !== 'crazydave_lawnmower';
+
+      if (isHeroFighter) {
+        drawFighterFloorShadow(ctx, fighter);
+        if (!fighter.hasUnderBodyAura) {
+          drawFighterInkOutline(ctx, fighter);
+        }
       }
       fighter.draw(ctx, opponent);
       
@@ -1298,13 +1307,6 @@ export function drawIllusions() {
     }
 
     if (illusion.isTransfiguredHuman) {
-      ctx.save();
-      // Draw transfigured human body at location
-      ctx.translate(illusion.x + shiverX, illusion.y + shiverY);
-      if (hasScale) {
-        ctx.scale(scale, scale);
-      }
-      
       // Deformed transfigured humans roll/rotate continuously over time while moving
       if (illusion._rollRotation === undefined) {
         illusion._rollRotation = 0;
@@ -1316,6 +1318,13 @@ export function drawIllusions() {
       }
       
       const drawAngle = (illusion.angle || 0) + (illusion._rollRotation || 0);
+
+      ctx.save();
+      // Draw transfigured human body at location
+      ctx.translate(illusion.x + shiverX, illusion.y + shiverY);
+      if (hasScale) {
+        ctx.scale(scale, scale);
+      }
       ctx.rotate(drawAngle);
 
       drawStitchedPatchworkBall(ctx, illusion);
@@ -1359,6 +1368,8 @@ export function drawIllusions() {
       continue;
     }
 
+    const animTime = illusion.animationTime || Date.now();
+
     ctx.save();
     ctx.globalAlpha = 0.85;
 
@@ -1368,8 +1379,6 @@ export function drawIllusions() {
       ctx.scale(scale, scale);
     }
     ctx.rotate(illusion.angle || 0);
-
-
 
     // Purple ethereal glow
     ctx.save();
@@ -1381,7 +1390,6 @@ export function drawIllusions() {
     ctx.restore();
 
     ctx.beginPath();
-    const animTime = illusion.animationTime || Date.now();
 
     // Draw the haze and void core UNDER the body
     drawDopplegangerBodyEffect(ctx, 0, 0, illusion.r, 0, 'under', animTime);

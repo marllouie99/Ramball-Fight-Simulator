@@ -6,6 +6,7 @@
 export const knightConfig = {
   name: 'Knight',
   displayName: 'Knight',
+  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Fantasy & Magic',
   color: '#9e9e9e',
   themeColor: '#9e9e9e',

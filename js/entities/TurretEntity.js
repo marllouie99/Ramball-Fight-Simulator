@@ -518,6 +518,12 @@ export class TurretEntity extends Fighter {
     triggerGlobalScreenShake(10, 8);
   }
 
+  drawBody(ctx) {
+    if (this.hp > 0) {
+      drawTurret(ctx, this);
+    }
+  }
+
   draw(ctx) {
     if (this.hp <= 0) return;
 

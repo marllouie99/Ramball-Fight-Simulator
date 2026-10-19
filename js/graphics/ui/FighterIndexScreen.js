@@ -8,10 +8,13 @@ import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel,
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { previewProjectileSystem, updateIndexDetailDemo, resetIndexDetailState, indexDetailState } from '../preview.js';
 import { drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaUltimateBullet, drawLaylaBasicBullet } from '../renderers/projectileRenderer.js';
-import { drawFighterInkOutline } from '../renderers/fighterOutlineRenderer.js';
+import { drawFighterInkOutline, drawFighterFloorShadow } from '../renderers/fighterOutlineRenderer.js';
+import { drawGradeBadge } from '../../configs/gradeConfig.js';
 
 let indexDetailAngle = 0;
 let indexDetailAnimFrame = 0;
+
+
 
 function updatePreviewBalls() {
   const { ctx, canvas } = state;
@@ -194,6 +197,9 @@ function drawIndexScreen() {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(def.name.toUpperCase(), cardX + 104, cardY + 14);
+
+    // Grade Badge (B / A / S / SS) — top-right corner of the card
+    drawGradeBadge(ctx, cardX + cardW - 42, cardY + 12, def.grade, { scale: 1.1 });
 
     // Category / Class Pill
     ctx.fillStyle = '#64748b';
@@ -652,6 +658,7 @@ function drawIndexDetailScreen() {
   });
 
   // Render Fighter Body & Animations
+  drawFighterFloorShadow(ctx, fighter);
   if (!fighter.hasUnderBodyAura) {
     drawFighterInkOutline(ctx, fighter);
   }

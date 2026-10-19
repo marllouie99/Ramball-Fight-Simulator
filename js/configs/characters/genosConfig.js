@@ -7,6 +7,7 @@ export const genosConfig = {
 
   name: 'Genos',
   displayName: 'Genos',
+  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Demon Cyborg',
   title: 'Demon Cyborg',
 

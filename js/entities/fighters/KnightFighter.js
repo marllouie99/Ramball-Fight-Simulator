@@ -1572,8 +1572,6 @@ export class KnightFighter extends Fighter {
     }
 
     super.draw(ctx);
-    this.drawHealth(ctx);
-    this.drawFreezeTimer(ctx);
     this.drawShieldHealth(ctx);
   }
 
