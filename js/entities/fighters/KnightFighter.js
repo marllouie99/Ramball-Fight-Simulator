@@ -6,6 +6,7 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { FighterStateMachine, FighterState } from '../../core/fighterStateMachine.js';
 import { drawGrayShield, drawGraySword } from '../../graphics/weaponVisuals.js';
 import { drawKnightPixelBody, drawKnightSkin, _drawKnightHair } from '../../graphics/fighters/knightSkin.js';
+import { spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
 
 // ─────────────────────────────────────────────
 // KNIGHT FSM STATES
@@ -102,6 +103,19 @@ export class KnightFighter extends Fighter {
     this.shieldShatterRingTimer = 0;
     this.shieldShatterX = 0;
     this.shieldShatterY = 0;
+
+    // ── Forward Dash Ability (Every 5 seconds) ──
+    this.dashCooldown = 120; // Initial delay 2s before first dash, then 300 (5s)
+    this.dashTimer = 0;
+    this.isDashing = false;
+    this.dashAngle = 0;
+    this.dashTrail = [];
+
+    // ── Shield Break Parry Mechanics ──
+    this.parryAnimationTimer = 0;
+    this.parryFlashTimer = 0;
+    this.parryX = 0;
+    this.parryY = 0;
   }
 
   /**
@@ -166,6 +180,19 @@ export class KnightFighter extends Fighter {
     this.shieldShatterRingTimer = 0;
     this.shieldShatterX = 0;
     this.shieldShatterY = 0;
+
+    // ── Forward Dash Ability (Every 5 seconds) ──
+    this.dashCooldown = 120; // Initial delay 2s before first dash, then 300 (5s)
+    this.dashTimer = 0;
+    this.isDashing = false;
+    this.dashAngle = 0;
+    this.dashTrail = [];
+
+    // ── Shield Break Parry Mechanics ──
+    this.parryAnimationTimer = 0;
+    this.parryFlashTimer = 0;
+    this.parryX = 0;
+    this.parryY = 0;
   }
 
   /**
@@ -180,22 +207,22 @@ export class KnightFighter extends Fighter {
     this.swordTremorY = 0;
     this.swordSwingTarget = null;
     this.swordHitDelivered = false;
+    this.isDashing = false;
+    this.dashTimer = 0;
 
-    // Release hit-pause targets
-    if (this.swordHitPauseTargets && this.swordHitPauseTargets.length > 0) {
-      for (const tgt of this.swordHitPauseTargets) {
-        if (tgt) tgt.suppressFreezeOverlay = false;
-      }
-      this.swordHitPauseTargets = [];
+    // Cleanly unpause and release sword hit-pause targets
+    if (this.swordHitPauseTimer > 0) {
+      this._resolveSwordUnpause();
     }
     this.swordHitPauseTimer = 0;
+    this.swordHitPauseTargets = [];
 
-    // Release block attacker
-    if (this.blockHitPauseAttacker) {
-      this.blockHitPauseAttacker.suppressFreezeOverlay = false;
-      this.blockHitPauseAttacker = null;
+    // Cleanly unpause and release shield block attacker
+    if (this.blockHitPauseTimer > 0) {
+      this._resolveBlockUnpause();
     }
     this.blockHitPauseTimer = 0;
+    this.blockHitPauseAttacker = null;
     this.shieldTremorX = 0;
     this.shieldTremorY = 0;
   }
@@ -211,22 +238,27 @@ export class KnightFighter extends Fighter {
     this.swordTremorY = 0;
     this.swordSwingTarget = null;
     this.swordHitDelivered = false;
+    this.isDashing = false;
+    this.dashTimer = 0;
 
-    if (this.swordHitPauseTargets && this.swordHitPauseTargets.length > 0) {
-      for (const tgt of this.swordHitPauseTargets) {
-        if (tgt) tgt.suppressFreezeOverlay = false;
-      }
-      this.swordHitPauseTargets = [];
+    if (this.swordHitPauseTimer > 0) {
+      this._resolveSwordUnpause();
     }
     this.swordHitPauseTimer = 0;
+    this.swordHitPauseTargets = [];
 
-    if (this.blockHitPauseAttacker) {
-      this.blockHitPauseAttacker.suppressFreezeOverlay = false;
-      this.blockHitPauseAttacker = null;
+    if (this.blockHitPauseTimer > 0) {
+      this._resolveBlockUnpause();
     }
     this.blockHitPauseTimer = 0;
+    this.blockHitPauseAttacker = null;
     this.shieldTremorX = 0;
     this.shieldTremorY = 0;
+  }
+
+  clearAllAfterimages() {
+    super.clearAllAfterimages();
+    if (this.dashTrail) this.dashTrail.length = 0;
   }
 
   /**
@@ -237,14 +269,14 @@ export class KnightFighter extends Fighter {
   }
 
   canAim() {
-    if (this.isHitPausing()) {
+    if (this.swipeActive || this.swordSwingTimer > 0 || this.isHitPausing() || this.isDashing) {
       return false;
     }
     return super.canAim();
   }
 
   canPerformBasicAttack() {
-    if (this.isHitPausing()) {
+    if (this.swipeActive || this.swordSwingTimer > 0 || this.isHitPausing() || this.isDashing) {
       return false;
     }
     return super.canPerformBasicAttack();
@@ -267,8 +299,10 @@ export class KnightFighter extends Fighter {
 
   /**
    * Triggers the shield break event when shield HP reaches 0.
+   * Executes an authentic 12-frame Global Parry explosion animation, layered parry sound,
+   * stuns and knocks back the attacker, and transforms the sword into Minecraft Gold Sword.
    */
-  _triggerShieldBreak(shieldAngle) {
+  _triggerShieldBreak(shieldAngle, attacker = null, opts = {}) {
     this.isShieldBroken = true;
     this.shieldHp = 0;
     this.shieldBreakEffectTimer = 60;
@@ -279,26 +313,71 @@ export class KnightFighter extends Fighter {
     this.shieldShatterX = contactX;
     this.shieldShatterY = contactY;
 
-    // Concussive shield shatter audio
+    // ── 1. Authentic 12-Frame Global Parry Explosion Animation & Spark Burst ──
+    try {
+      spawnParrySparksEffect(contactX, contactY, 32);
+    } catch (e) {}
+
+    // Parry animation and flash state on Knight
+    this.parryAnimationTimer = CONFIG.knight?.parryAnimationFrames || 24;
+    this.parryFlashTimer = 18;
+    this.parryX = contactX;
+    this.parryY = contactY;
+
+    // ── 2. Parry Audio: Layered Parry Stinger & Concussive Shield Shatter ──
     try {
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        const parrySound = CONFIG.knight?.sounds?.parry || 'Assets/Sound Effects/Skills/parry.mp3';
+        const parryVol = CONFIG.knight?.soundVolumes?.parry ?? 1.0;
+        audioSystem.playSFX(parrySound, parryVol);
+
         const breakSound = CONFIG.knight?.sounds?.shieldBreak || 'Assets/Sound Effects/SkillEffects/shield-break.mp3';
         const breakVol = CONFIG.knight?.soundVolumes?.shieldBreak ?? 1.0;
         audioSystem.playSFX(breakSound, breakVol);
       }
     } catch (e) {}
 
-    triggerGlobalScreenShake(7.0, 14);
+    triggerGlobalScreenShake(10.0, 16);
 
-    // Floating text: "🛡️ SHIELD SHATTERED!" & "🗡️ MINECRAFT GOLD SWORD! 2X DMG!"
+    // ── 3. Parry Counter: Stun, Hit-Pause & Knockback on Breaking Attacker ──
+    if (attacker && attacker !== this && attacker.hp > 0 && !attacker.isDead) {
+      const stunFrames = CONFIG.knight?.parryHitStunFrames || 28;
+      const pauseFrames = CONFIG.knight?.parryTimeStopFrames || 16;
+      const knockbackForce = CONFIG.knight?.parryKnockback || 11.0;
+
+      if (typeof attacker.applyHitStun === 'function') {
+        attacker.applyHitStun(stunFrames);
+      }
+      if (typeof attacker.applyTimeStop === 'function') {
+        attacker.applyTimeStop(pauseFrames);
+      }
+      attacker.suppressFreezeOverlay = true;
+
+      const pushAngle = Math.atan2(attacker.y - this.y, attacker.x - this.x);
+      attacker.vx += Math.cos(pushAngle) * knockbackForce;
+      attacker.vy += Math.sin(pushAngle) * knockbackForce;
+    }
+
+    // Destroy incoming projectile that shattered the shield
+    if (opts && opts.projectile) {
+      opts.projectile.life = 0;
+    }
+
+    // ── 4. Floating text: "⚡ PERFECT PARRY!", "🛡️ SHIELD SHATTERED!", "🗡️ MINECRAFT GOLD SWORD! 2X DMG!" ──
     if (typeof state !== 'undefined' && state.spawnFloatingText) {
-      state.spawnFloatingText('🛡️ SHIELD SHATTERED!', this.x, this.y - this.r - 28, {
+      state.spawnFloatingText('⚡ PERFECT PARRY!', this.x, this.y - this.r - 42, {
+        color: '#FFD700',
+        font: '900 16px "Rajdhani", sans-serif',
+        rise: 30,
+        duration: 65
+      });
+      state.spawnFloatingText('🛡️ SHIELD SHATTERED!', this.x, this.y - this.r - 26, {
         color: '#ef4444',
         font: '900 14px "Rajdhani", sans-serif',
         rise: 26,
         duration: 55
       });
-      state.spawnFloatingText('🗡️ MINECRAFT GOLD SWORD! 2X DMG!', this.x, this.y - this.r - 12, {
+      state.spawnFloatingText('🗡️ MINECRAFT GOLD SWORD! 2X DMG!', this.x, this.y - this.r - 10, {
         color: '#FFD700',
         font: '900 15px "Rajdhani", sans-serif',
         rise: 34,
@@ -443,7 +522,7 @@ export class KnightFighter extends Fighter {
 
       // Check if this attack shattered the shield!
       if (this.shieldHp <= 0) {
-        this._triggerShieldBreak(shieldAngle);
+        this._triggerShieldBreak(shieldAngle, attacker, opts);
       }
 
       // Destroy non-piercing projectile upon impact with the solid tower shield
@@ -543,7 +622,7 @@ export class KnightFighter extends Fighter {
 
   // ── Sword Combo Swipe (Chemical Katana 2-Hit Motion & Rule 30 5-Phase Architecture) ──
   _trySwordSwipe(opponent, ownerIndex) {
-    if (this.swipeCooldown > 0 || this.isCaughtInBeam() || this.swordSwingTimer > 0 || this.isHitPausing()) return;
+    if (this.swipeCooldown > 0 || this.isCaughtInBeam() || this.swordSwingTimer > 0 || this.isHitPausing() || this.isDashing) return;
     const reach = (CONFIG.knight?.swordRange || 75);
     const target = this._findBestMeleeTarget(opponent, reach);
     if (!target) return;
@@ -630,38 +709,20 @@ export class KnightFighter extends Fighter {
    * Updates 5-phase melee combo lifecycle, forward lunge physics, impact lock, and layered slap audio.
    */
   _updateSwordSwing(opponent, arena) {
-    if (this.swordSwingTimer <= 0) return;
-
-    // ── Sword Hit-Pause Active (Freezes targets in impact stasis) ──
-    if (this.swordHitPauseTimer > 0) {
-      this.swordHitPauseTimer--;
-
-      // Jitter tremor against collision resistance (Rule 30)
-      this.swordTremorX = (Math.random() - 0.5) * 2.6;
-      this.swordTremorY = (Math.random() - 0.5) * 2.6;
-
-      // Hold targets in hit-pause stasis
-      for (const tgt of (this.swordHitPauseTargets || [])) {
-        if (!tgt || tgt.hp <= 0 || tgt.isDead) continue;
-        tgt.vx = 0;
-        tgt.vy = 0;
-        if (typeof tgt.applyTimeStop === 'function') {
-          tgt.applyTimeStop(this.swordHitPauseTimer);
-        }
-        tgt.suppressFreezeOverlay = true;
-      }
-
-      // On Hit-Pause Completion: UNPAUSE RELEASE!
-      if (this.swordHitPauseTimer === 0) {
-        this._resolveSwordUnpause();
-      }
-
-      // Pause sword swing frame progression while hit-paused
+    if (this.swordSwingTimer <= 0) {
+      this.swipeActive = false;
+      this.swordSwingTimer = 0;
+      this.slashFadeTimer = 15;
+      this.swordSwingTarget = null;
       return;
     }
 
+    if (this.swordHitPauseTimer > 0) {
+      return; // Progression held in hit-pause stasis
+    }
+
     const totalF = this.swordSwingMax || 30;
-    const elapsed = totalF - this.swordSwingTimer;
+    const elapsed = Math.max(0, Math.min(totalF, totalF - this.swordSwingTimer));
     const liftF = this.swordSwingLiftFrames || 7;
     const holdF = this.swordSwingHoldFrames || 2;
     const strikeF = this.swordSwingStrikeFrames || 5;
@@ -680,11 +741,13 @@ export class KnightFighter extends Fighter {
       if (trackTarget) {
         this.swordSlashAngle = Math.atan2(trackTarget.y - this.y, trackTarget.x - this.x);
         this.swipeAngle = this.swordSlashAngle;
+        this.gunAngle = this.swordSlashAngle;
+        this.angle = this.swordSlashAngle;
       }
     } else if (elapsed < strikeEnd) {
       // Phase 3: Hypersonic Whip Strike Window
       const strikeElapsed = elapsed - strikeStart;
-      const strikeP = strikeElapsed / Math.max(1, strikeF);
+      const strikeP = Math.max(0, Math.min(1.0, strikeElapsed / Math.max(1, strikeF)));
 
       if (!this.swordSwingSoundPlayed) {
         this.swordSwingSoundPlayed = true;
@@ -725,6 +788,8 @@ export class KnightFighter extends Fighter {
           this.swordHitPauseMax = pauseFrames;
           this.swordHitPauseTargets = targets;
           this.swordHitPauseAngle = this.swordSlashAngle;
+          this.vx = 0;
+          this.vy = 0;
 
           // Blade impact spark point at blade tip (Rule 26)
           this.swordImpactX = this.x + Math.cos(this.swordSlashAngle) * (this.r + 76);
@@ -759,6 +824,8 @@ export class KnightFighter extends Fighter {
       }
     } else if (elapsed < pinEnd) {
       // Phase 4: THE IMPACT LOCK / LATCH (Rule 30)
+      this.vx = 0;
+      this.vy = 0;
       this.swordTremorX = (Math.random() - 0.5) * 2.2;
       this.swordTremorY = (Math.random() - 0.5) * 2.2;
     } else {
@@ -771,6 +838,7 @@ export class KnightFighter extends Fighter {
     this.swipeTimer = this.swordSwingTimer;
     if (this.swordSwingTimer <= 0) {
       this.swipeActive = false;
+      this.swordSwingTimer = 0;
       this.slashFadeTimer = 15;
       this.swordSwingTarget = null;
     }
@@ -816,7 +884,7 @@ export class KnightFighter extends Fighter {
 
     this.swordTremorX = 0;
     this.swordTremorY = 0;
-    const lastTarget = (this.swordHitPauseTargets && this.swordHitPauseTargets[0]) ? this.swordHitPauseTargets[0] : null;
+    this.swordHitPauseTimer = 0;
     this.swordHitPauseTargets = [];
   }
 
@@ -839,6 +907,7 @@ export class KnightFighter extends Fighter {
         att.applyHitStun(12);
       }
     }
+    this.blockHitPauseTimer = 0;
     this.blockHitPauseAttacker = null;
     this.shieldTremorX = 0;
     this.shieldTremorY = 0;
@@ -868,10 +937,20 @@ export class KnightFighter extends Fighter {
   // ── Main update ──
   update(opponent, ownerIndex, arena) {
     // 0. Rule 25: Visual effect timers decay continuously before freeze guard
+    if (this.parryAnimationTimer > 0) this.parryAnimationTimer--;
+    if (this.parryFlashTimer > 0) this.parryFlashTimer--;
     if (this.swordImpactTimer > 0) this.swordImpactTimer--;
     if (this.shieldImpactTimer > 0) this.shieldImpactTimer--;
     if (this.shieldShatterRingTimer > 0) this.shieldShatterRingTimer--;
     if (this.shieldBreakEffectTimer > 0) this.shieldBreakEffectTimer--;
+    if (this.dashTrail && this.dashTrail.length > 0) {
+      for (let i = this.dashTrail.length - 1; i >= 0; i--) {
+        this.dashTrail[i].alpha -= 0.08;
+        if (this.dashTrail[i].alpha <= 0) {
+          this.dashTrail.splice(i, 1);
+        }
+      }
+    }
     if (this.shieldBreakParticles && this.shieldBreakParticles.length > 0) {
       for (let i = this.shieldBreakParticles.length - 1; i >= 0; i--) {
         const p = this.shieldBreakParticles[i];
@@ -894,6 +973,36 @@ export class KnightFighter extends Fighter {
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
       this.interruptAttacks();
+      return;
+    }
+
+    // ── Sword Hit-Pause Active (Freezes attacker & targets in impact stasis - Rule 30) ──
+    if (this.swordHitPauseTimer > 0) {
+      this.swordHitPauseTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Jitter tremor against collision resistance (Rule 30)
+      this.swordTremorX = (Math.random() - 0.5) * 2.6;
+      this.swordTremorY = (Math.random() - 0.5) * 2.6;
+
+      // Hold targets in hit-pause stasis
+      for (const tgt of (this.swordHitPauseTargets || [])) {
+        if (!tgt || tgt.hp <= 0 || tgt.isDead) continue;
+        tgt.vx = 0;
+        tgt.vy = 0;
+        if (typeof tgt.applyTimeStop === 'function') {
+          tgt.applyTimeStop(this.swordHitPauseTimer);
+        }
+        tgt.suppressFreezeOverlay = true;
+      }
+
+      // On Hit-Pause Completion: UNPAUSE RELEASE!
+      if (this.swordHitPauseTimer === 0) {
+        this._resolveSwordUnpause();
+      }
+
+      // Pause update progression while in sword hit-pause stasis
       return;
     }
 
@@ -966,22 +1075,81 @@ export class KnightFighter extends Fighter {
       this.fsm.update(1);
     }
 
-    // Normal natural movement & wall bouncing
-    this.applyMovementPhysics();
-    this.aim(opponent);
-    this.resolveWallBounce(arena, opponent);
+    // ── 5-Second Tactical Forward Dash Cooldown & Trigger ──
+    if (this.dashCooldown > 0) {
+      this.dashCooldown--;
+    }
+
+    const kCfg = CONFIG.knight || {};
+    if (kCfg.enableDash !== false && this.dashCooldown <= 0 && !this.isDashing && !this.isHitPausing() && !this.swipeActive) {
+      if (opponent && !opponent.isDead && opponent.hp > 0) {
+        const dx = opponent.x - this.x;
+        const dy = opponent.y - this.y;
+        const dist = Math.hypot(dx, dy);
+        const minRange = kCfg.dashMinRange || 55;
+        const maxRange = kCfg.dashMaxRange || 420;
+        if (dist > minRange && dist <= maxRange) {
+          this._performForwardDash(opponent);
+        }
+      }
+    }
+
+    // ── Movement: Forward Dash vs Normal Natural Movement ──
+    if (this.isDashing && this.dashTimer > 0) {
+      this.dashTimer--;
+      const dashSpeed = kCfg.dashSpeed || 15.5;
+      this.vx = Math.cos(this.dashAngle) * dashSpeed;
+      this.vy = Math.sin(this.dashAngle) * dashSpeed;
+      this.applyMovementPhysics(1.0);
+      this.resolveWallBounce(arena, opponent);
+
+      // Dash trail afterimages
+      if (!this.dashTrail) this.dashTrail = [];
+      if (this.dashTrail.length < 5) {
+        this.dashTrail.push({
+          x: this.x,
+          y: this.y,
+          angle: this.gunAngle,
+          alpha: 0.60
+        });
+      }
+
+      // Check if reached close melee contact with target
+      if (opponent && !opponent.isDead && opponent.hp > 0) {
+        const curDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+        if (curDist <= this.r + (opponent.r || 25) + 20) {
+          this.dashTimer = 0;
+        }
+      }
+
+      if (this.dashTimer === 0) {
+        this.isDashing = false;
+        this.vx *= 0.25;
+        this.vy *= 0.25;
+      }
+    } else {
+      this.isDashing = false;
+      this.applyMovementPhysics();
+      this.aim(opponent);
+      this.resolveWallBounce(arena, opponent);
+    }
+
+    // Firmly lock gunAngle to committed attack angle during melee combo (Rule 1.4)
+    if (this.swipeActive && this.swordSlashAngle !== undefined) {
+      this.gunAngle = this.swordSlashAngle;
+      this.angle = this.swordSlashAngle;
+    }
 
     // Cooldown and combo timer ticks
     if (this.comboResetTimer > 0) this.comboResetTimer--;
     if (this.swipeCooldown > 0) this.swipeCooldown--;
 
     // Update 5-phase sword combo swing
-    if (this.swipeActive) {
+    if (this.swipeActive && this.swordSwingTimer > 0) {
       this._updateSwordSwing(opponent, arena);
     } else {
-      if (this.swordSwingTimer > 0) {
-        this.swordSwingTimer = 0; // Fail-safe: never allow swordSwingTimer to soft-lock Knight
-      }
+      this.swipeActive = false;
+      this.swordSwingTimer = 0;
       if (this.slashFadeTimer > 0) {
         this.slashFadeTimer--;
       }
@@ -989,6 +1157,82 @@ export class KnightFighter extends Fighter {
 
     // Try auto-swipe combo
     this._trySwordSwipe(opponent, ownerIndex);
+  }
+
+  /**
+   * Executes a short forward dash towards the target enemy (triggers every 5 seconds).
+   */
+  _performForwardDash(opponent, dashAngle = null) {
+    const angle = dashAngle !== null ? dashAngle : Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    this.isDashing = true;
+    this.dashTimer = CONFIG.knight?.dashDuration || 10;
+    this.dashAngle = angle;
+    this.gunAngle = angle;
+    this.angle = angle;
+    this.dashCooldown = CONFIG.knight?.dashCooldown || 300; // 5 seconds at 60 FPS
+
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        const dashSound = CONFIG.knight?.sounds?.dash || 'Assets/Sound Effects/Skills/dash1.mp3';
+        const dashVol = CONFIG.knight?.soundVolumes?.dash ?? 0.85;
+        audioSystem.playSFX(dashSound, dashVol);
+      }
+    } catch (e) {}
+
+    const dashSpeed = CONFIG.knight?.dashSpeed || 15.5;
+    this.vx = Math.cos(angle) * dashSpeed;
+    this.vy = Math.sin(angle) * dashSpeed;
+  }
+
+  /**
+   * Rule 16 Manga Action Speed Lines Standard: 4-point filled needle polygons trailing behind Knight during dash.
+   */
+  _drawDashSpeedLines(ctx) {
+    const aimAngle = this.dashAngle || this.gunAngle || this.angle || 0;
+    const cosA = Math.cos(aimAngle);
+    const sinA = Math.sin(aimAngle);
+    const normX = -sinA;
+    const normY = cosA;
+
+    const clusterWidth = this.r * 1.35;
+    const palette = ['#FFFFFF', '#E2E8F0', '#9E9E9E', '#0E0F14'];
+
+    ctx.save();
+    for (let i = 0; i < 6; i++) {
+      const seed1 = Math.abs(Math.sin((i + 1) * 19.33));
+      const seed2 = Math.abs(Math.sin((i + 1) * 43.17));
+      const seed3 = Math.abs(Math.sin((i + 1) * 71.91));
+
+      const perpOffset = (seed1 * 2 - 1) * clusterWidth;
+      const trailDist = this.r + 6 + seed2 * 26;
+      const needleLen = 14 + seed3 * 22;
+      const halfThick = 0.6 + seed1 * 0.7;
+
+      const tailX = this.x - cosA * (trailDist + needleLen) + normX * perpOffset;
+      const tailY = this.y - sinA * (trailDist + needleLen) + normY * perpOffset;
+
+      const headX = this.x - cosA * trailDist + normX * perpOffset;
+      const headY = this.y - sinA * trailDist + normY * perpOffset;
+
+      const midX = (tailX + headX) * 0.5;
+      const midY = (tailY + headY) * 0.5;
+
+      const topMidX = midX + normX * halfThick;
+      const topMidY = midY + normY * halfThick;
+
+      const botMidX = midX - normX * halfThick;
+      const botMidY = midY - normY * halfThick;
+
+      ctx.fillStyle = palette[i % palette.length];
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(topMidX, topMidY);
+      ctx.lineTo(headX, headY);
+      ctx.lineTo(botMidX, botMidY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   /**
@@ -1000,7 +1244,7 @@ export class KnightFighter extends Fighter {
     }
 
     const totalF = this.swordSwingMax || 30;
-    const elapsed = Math.max(0, totalF - this.swordSwingTimer);
+    const elapsed = Math.max(0, Math.min(totalF, totalF - this.swordSwingTimer));
     const liftF = this.swordSwingLiftFrames || 7;
     const holdF = this.swordSwingHoldFrames || 2;
     const strikeF = this.swordSwingStrikeFrames || 5;
@@ -1011,7 +1255,7 @@ export class KnightFighter extends Fighter {
     const strikeEnd = strikeStart + strikeF;
     const pinEnd = strikeEnd + pinF;
 
-    const baseAngle = this.swordSlashAngle || this.swipeAngle || this.gunAngle || 0;
+    const baseAngle = this.swordSlashAngle !== undefined ? this.swordSlashAngle : (this.swipeAngle || this.gunAngle || 0);
     const isHit2 = (this.swordComboStep === 2);
     const swingTotal = Math.PI * (isHit2 ? 1.40 : 1.30);
 
@@ -1021,19 +1265,19 @@ export class KnightFighter extends Fighter {
       const endAngle = baseAngle - swingTotal * 0.55;
 
       if (elapsed < liftF) {
-        const p = elapsed / Math.max(1, liftF);
+        const p = Math.max(0, Math.min(1.0, elapsed / Math.max(1, liftF)));
         return baseAngle + (startAngle - baseAngle) * Math.sin(p * Math.PI * 0.5);
       } else if (elapsed < strikeStart) {
         return startAngle;
       } else if (elapsed < strikeEnd) {
-        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+        const sp = Math.max(0, Math.min(1.0, (elapsed - strikeStart) / Math.max(1, strikeF)));
         const ease = Math.pow(sp, 2.4);
         return startAngle + (endAngle - startAngle) * ease;
       } else if (elapsed < pinEnd) {
         return endAngle;
       } else {
-        const rp = (elapsed - pinEnd) / Math.max(1, recF);
-        const ease = Math.pow(1 - rp, 1.8);
+        const rp = Math.max(0, Math.min(1.0, (elapsed - pinEnd) / Math.max(1, recF)));
+        const ease = Math.pow(Math.max(0, 1.0 - rp), 1.8);
         return baseAngle + (endAngle - baseAngle) * ease;
       }
     } else {
@@ -1042,19 +1286,19 @@ export class KnightFighter extends Fighter {
       const endAngle = baseAngle + swingTotal * 0.5;
 
       if (elapsed < liftF) {
-        const p = elapsed / Math.max(1, liftF);
+        const p = Math.max(0, Math.min(1.0, elapsed / Math.max(1, liftF)));
         return baseAngle + (startAngle - baseAngle) * Math.sin(p * Math.PI * 0.5);
       } else if (elapsed < strikeStart) {
         return startAngle;
       } else if (elapsed < strikeEnd) {
-        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+        const sp = Math.max(0, Math.min(1.0, (elapsed - strikeStart) / Math.max(1, strikeF)));
         const ease = Math.pow(sp, 2.4);
         return startAngle + (endAngle - startAngle) * ease;
       } else if (elapsed < pinEnd) {
         return endAngle;
       } else {
-        const rp = (elapsed - pinEnd) / Math.max(1, recF);
-        const ease = Math.pow(1 - rp, 1.8);
+        const rp = Math.max(0, Math.min(1.0, (elapsed - pinEnd) / Math.max(1, recF)));
+        const ease = Math.pow(Math.max(0, 1.0 - rp), 1.8);
         return baseAngle + (endAngle - baseAngle) * ease;
       }
     }
@@ -1096,13 +1340,13 @@ export class KnightFighter extends Fighter {
     // Draw shield on the right flank
     drawGrayShield(ctx, this.x + stx, this.y + sty, ga, this.blockFlashTimer, null, this.r, 0, shieldOffset, this.isShieldBroken);
 
-    // Sword: if swiping or hit-pausing, animate using 5-phase Chemical Katana combo angle; otherwise aim angle.
-    const swordAngle = this._getSwordSwingAngle();
+    // Sword: if swiping or hit-pausing, animate using 5-phase Chemical Katana combo angle; otherwise upright ready guard.
     const isSwinging = Boolean((this.swipeActive && this.swordSwingTimer > 0) || this.swordHitPauseTimer > 0);
+    const swordAngle = isSwinging ? this._getSwordSwingAngle() : (ga || 0);
 
     // Apply tremor jitter during Impact Lock & Hit-Pause (Rule 30)
-    const tx = ((this.swipeActive || this.swordHitPauseTimer > 0) && this.swordTremorX) ? this.swordTremorX : 0;
-    const ty = ((this.swipeActive || this.swordHitPauseTimer > 0) && this.swordTremorY) ? this.swordTremorY : 0;
+    const tx = (isSwinging && this.swordTremorX) ? this.swordTremorX : 0;
+    const ty = (isSwinging && this.swordTremorY) ? this.swordTremorY : 0;
 
     // Draw Main Sword (on the left side in idle, lunging forward when swinging; transforms into Minecraft Gold Sword if shield broken)
     drawGraySword(ctx, this.x + tx, this.y + ty, swordAngle, this.r, null, false, isSwinging, this.isShieldBroken);
@@ -1135,6 +1379,66 @@ export class KnightFighter extends Fighter {
   }
 
   draw(ctx) {
+    // ── Dash Trail Afterimages ──
+    if (this.dashTrail && this.dashTrail.length > 0) {
+      for (const trail of this.dashTrail) {
+        if (!trail || trail.alpha <= 0) continue;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, Math.min(1, trail.alpha * 0.45));
+        ctx.translate(trail.x, trail.y);
+        ctx.rotate(trail.angle || 0);
+        const facingLeft = Math.abs(trail.angle || 0) > Math.PI / 2;
+        if (facingLeft) ctx.scale(1, -1);
+        drawKnightPixelBody(ctx, this.r, false);
+        ctx.restore();
+      }
+    }
+
+    // ── Speed Lines during Active Dash (Rule 16) ──
+    if (this.isDashing) {
+      this._drawDashSpeedLines(ctx);
+    }
+
+    // ── Shield Break Parry Animation (12-Frame Parry Shockwave & Flash Aura) ──
+    if (this.parryAnimationTimer > 0) {
+      const maxF = CONFIG.knight?.parryAnimationFrames || 24;
+      const progress = 1 - (this.parryAnimationTimer / maxF);
+      const alpha = Math.max(0, 1 - progress);
+      const px = this.parryX || this.x;
+      const py = this.parryY || this.y;
+
+      ctx.save();
+      // Wave 1: Expanding radiant golden parry ring
+      const ringRadius = 14 + Math.pow(progress, 0.6) * 55;
+      ctx.beginPath();
+      ctx.arc(px, py, ringRadius, 0, Math.PI * 2);
+      ctx.lineWidth = 3.5 * (1 - progress);
+      ctx.strokeStyle = `rgba(255, 215, 0, ${0.95 * alpha})`;
+      ctx.stroke();
+
+      // Wave 2: Inner supersonic white core
+      const coreRadius = 8 + Math.pow(progress, 0.5) * 35;
+      ctx.beginPath();
+      ctx.arc(px, py, coreRadius, 0, Math.PI * 2);
+      ctx.lineWidth = 2.0 * (1 - progress);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.stroke();
+
+      // Wave 3: 4-point cross star glint at detonation center
+      if (progress < 0.6) {
+        const starLen = (1 - progress / 0.6) * 22;
+        ctx.beginPath();
+        ctx.moveTo(px - starLen, py);
+        ctx.lineTo(px + starLen, py);
+        ctx.moveTo(px, py - starLen);
+        ctx.lineTo(px, py + starLen);
+        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
     // ── Shield Shatter Debris & Faceted Shards ──
     if (this.shieldBreakParticles && this.shieldBreakParticles.length > 0) {
       ctx.save();
@@ -1307,7 +1611,7 @@ export class KnightFighter extends Fighter {
     // ── Anime Vibe 5-Phase Melee Slash Ribbon (Chemical Katana Combo) ──
     if (this.swipeActive && this.swordSwingTimer > 0) {
       const totalF = this.swordSwingMax || 30;
-      const elapsed = Math.max(0, totalF - this.swordSwingTimer);
+      const elapsed = Math.max(0, Math.min(totalF, totalF - this.swordSwingTimer));
       const liftF = this.swordSwingLiftFrames || 7;
       const holdF = this.swordSwingHoldFrames || 2;
       const strikeF = this.swordSwingStrikeFrames || 5;
@@ -1322,7 +1626,7 @@ export class KnightFighter extends Fighter {
       if (elapsed >= strikeStart) {
         const isHit2 = (this.swordComboStep === 2);
         const swingTotal = Math.PI * (isHit2 ? 1.40 : 1.30);
-        const baseAngle = this.swordSlashAngle || this.swipeAngle || this.gunAngle || 0;
+        const baseAngle = this.swordSlashAngle !== undefined ? this.swordSlashAngle : (this.swipeAngle || this.gunAngle || 0);
 
         // Reach calibration matching drawSwordBase blade geometry:
         // Crossguard hilt begins at this.r + 14 (39px), blade tip kissaki reaches this.r + 84 (109px)
@@ -1355,7 +1659,7 @@ export class KnightFighter extends Fighter {
           recP = 0;
         } else {
           // Phase 5: Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & 30)
-          const rp = (elapsed - pinEnd) / Math.max(1, recF);
+          const rp = Math.max(0, Math.min(1.0, (elapsed - pinEnd) / Math.max(1, recF)));
           recP = Math.pow(rp, 1.4);
           currentStartAngle = localStart + (localEnd - localStart) * recP;
           currentEndAngle = localEnd;

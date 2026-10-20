@@ -13,6 +13,10 @@ export const ichigoConfig = {
     bankaiAttack: 'Assets/model/ichigo/attack/attack-b.png',
     attackAnimation: 'Assets/model/ichigo/attack/attack-b.png',
     bankaiTransformation: 'Assets/model/ichigo/bankai_transformation/bankai_transformation-b.png',
+    bankaiTransformationFrames: Array.from(
+      { length: 12 },
+      (_, i) => `Assets/model/ichigo/bankai_transformation/bankai_transformation-${i + 1}.png`
+    ),
   },
 
   name: 'Ichigo',
@@ -195,6 +199,7 @@ export const ichigoConfig = {
   bankaiRechargeHpRatio: 0.20,   // Damage required to reactivate Bankai after it expires (20% of max HP)
   bankaiDuration: 500,           // Bankai form duration in frames (~13.3s)
   bankaiChargeFrames: 66,        // Channeling duration frames for transformation (~1.10s)
+  bankaiTransformationScale: 1.05, // Bounding scale for 12-frame Bankai transformation animation
   bankaiBurstFrames: 36,         // Shatter burst duration frames
   bankaiRibbonDuration: 300,     // Lifespan frames of flowing 3D ribbon
   bankaiScreenShake: 7.0,        // Screen shake intensity upon Bankai release

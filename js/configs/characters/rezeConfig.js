@@ -10,6 +10,10 @@ export const rezeConfig = {
     weapon: 'Assets/model/reze/REZE-WEAPON.png',
     explosion: 'Assets/model/reze/explosion/explosion-b.png',
     burstExplosion: 'Assets/model/reze/Burst_explosion/burst_explosion-b.png',
+    burstExplosionFrames: Array.from(
+      { length: 12 },
+      (_, i) => `Assets/model/reze/Burst_explosion/burst_explosion-${i + 1}.png`
+    ),
   },
 
   name: 'Reze',

@@ -32,6 +32,7 @@ import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
 import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { resetCamera } from '../systems/cameraSystem.js';
+import { resetComboTrackers } from '../systems/comboTracker.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 import { getFocMapForBoss } from '../../FOC Maps/index.js';
 import { setViewportOrientation, getArenaConfigForMode } from './viewportManager.js';
@@ -265,6 +266,7 @@ export function reinitFighters(isNewMatch = false) {
   state._hadSansDeath = false;
   state._hadDragonDeath = false;
   state.cheatNotification = null;
+  resetComboTrackers();
   state._isChampionLayoutActive = false;
   state._winnerStartPositions = null;
  
@@ -1398,6 +1400,7 @@ export function resetMatch(showFaceOff = true) {
   state._hadSansDeath = false;
   state._hadDragonDeath = false;
   state.cheatNotification = null;
+  resetComboTrackers();
   state._hasPlayedChampionVictoryVoice = false;
   state._hasPlayedChampionYouWinVoice = false;
   state._hasPlayedFollowForMoreSfx = false;

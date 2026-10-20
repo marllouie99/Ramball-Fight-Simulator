@@ -51,9 +51,44 @@ export function _getIchigoHairImage() {
   return _ichigoHairImage;
 }
 
+const ICHIGO_BANKAI_TRANSFORMATION_FRAME_COUNT = 12;
+const ICHIGO_BANKAI_TRANSFORMATION_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/model/ichigo/bankai_transformation/bankai_transformation-${i + 1}.png`
+);
+
+let _ichigoBankaiTransformationFrames = [];
+let _ichigoBankaiTransformationFramesLoading = false;
+
+export function _getIchigoBankaiTransformationFrames() {
+  if (
+    _ichigoBankaiTransformationFrames.length === ICHIGO_BANKAI_TRANSFORMATION_FRAME_COUNT &&
+    _ichigoBankaiTransformationFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _ichigoBankaiTransformationFrames;
+  }
+  if (!_ichigoBankaiTransformationFramesLoading && typeof Image !== 'undefined') {
+    _ichigoBankaiTransformationFramesLoading = true;
+    _ichigoBankaiTransformationFrames = [];
+    ICHIGO_BANKAI_TRANSFORMATION_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _ichigoBankaiTransformationFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Ichigo Bankai transformation frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _ichigoBankaiTransformationFrames[idx] = img;
+    });
+  }
+  return _ichigoBankaiTransformationFrames;
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getHollowMaskImage();
   _getIchigoHairImage();
+  _getIchigoBankaiTransformationFrames();
 }
 
 export function drawIchigoSkin(ctx, fighter) {
@@ -1551,6 +1586,50 @@ function _drawBankaiChargingAura(ctx, tipX, tipY, heelX, heelY, cutoutCenterX, c
   ctx.restore();
 }
 
+/**
+ * Draws the 12-frame Bankai transformation animation sprite from Assets/model/ichigo/bankai_transformation/.
+ * Serves as the authentic animated replacement of the Bankai sky burst.
+ * Anchored at Ichigo's feet in world-aligned space (surges vertically skyward).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r Fighter radius
+ * @param {number} burstProg Progress 0.0 to 1.0 (elapsed / bankaiBurstFrames)
+ * @param {number} now Timestamp
+ * @param {object} fighter Fighter entity
+ * @param {number} [alpha=1.0] Base opacity
+ * @returns {boolean} True if frame was successfully rendered
+ */
+export function _drawIchigoAnimatedBankaiTransformationSprite(ctx, r, burstProg = 0, now = 0, fighter = null, alpha = 1.0) {
+  const frames = _getIchigoBankaiTransformationFrames();
+  const frameIndex = Math.min(11, Math.max(0, Math.floor(burstProg * 12)));
+  const frameImg = frames[frameIndex];
+
+  if (!frameImg || !frameImg.complete || ((frameImg.naturalWidth || frameImg.width || 0) <= 0)) {
+    return false;
+  }
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.imageSmoothingEnabled = false;
+
+  // Natural fade-out on late dissipating frames (frames 10-12 dissolve smoothly)
+  const fadeAlpha = burstProg > 0.82 ? Math.max(0, (1.0 - burstProg) / 0.18) : 1.0;
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * alpha * fadeAlpha));
+
+  const baseScale = (CONFIG.ichigo?.bankaiTransformationScale || 1.15) * (r / 25);
+  const drawW = 256 * baseScale;
+  const drawH = 256 * baseScale;
+  const anchorX = 128 * baseScale;
+  const anchorY = 235 * baseScale;
+  const drawX = -anchorX;
+  const drawY = (r * 0.88) - anchorY;
+
+  ctx.drawImage(frameImg, drawX, drawY, drawW, drawH);
+
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  return true;
+}
+
 function _drawBankaiTransformationVortex(ctx, r, bankaiProg, now, fighter) {
   // Pixel blocks removed for a clean Bankai transformation aesthetic
 }
@@ -1729,7 +1808,13 @@ function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
 
   ctx.save();
 
-  _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now);
+  // 12-Frame Authentic Bankai Sky Burst Sprite from Assets/model/ichigo/bankai_transformation/
+  const rendered = _drawIchigoAnimatedBankaiTransformationSprite(ctx, r, burstProg, now, fighter, alpha);
+
+  // Fallback to procedural skyward pillar if frames are not yet ready
+  if (!rendered) {
+    _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now);
+  }
 
   ctx.restore();
 }
@@ -2093,8 +2178,9 @@ function _drawHollowChannelingReiatsuAura(ctx, r, formationProg, now, fighter) {
   ctx.ellipse(0, r * 0.35, poolR * 1.25, poolR * 0.70, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Inward Ghost-White Suction / Gravity Distortion Shock Rings (pixel-art stepped ring)
+  // 2. Inward Ghost-White Suction / Gravity Distortion Shock Rings (Rule 26 Clean Concentric Bands)
   const ringCount = 3;
+  ctx.lineWidth = pSize;
   for (let i = 0; i < ringCount; i++) {
     const ringPhase = ((time * 1.6 + i * (1.0 / ringCount)) % 1.0);
     const ringR = r * (3.4 - ringPhase * 2.4);
@@ -2103,16 +2189,10 @@ function _drawHollowChannelingReiatsuAura(ctx, r, formationProg, now, fighter) {
       ? `rgba(248, 248, 255, ${ringAlpha.toFixed(2)})`
       : `rgba(200, 218, 240, ${(ringAlpha * 0.9).toFixed(2)})`;
 
-    const steps = Math.max(16, Math.ceil((ringR * Math.PI * 2) / 8));
-    ctx.fillStyle = ringColor;
-    for (let s = 0; s < steps; s++) {
-      const ang = (s / steps) * Math.PI * 2;
-      const px = Math.cos(ang) * ringR;
-      const py = Math.sin(ang) * (ringR * 0.72) - r * 0.2;
-      const x = Math.round(px / pSize) * pSize;
-      const y = Math.round(py / pSize) * pSize;
-      ctx.fillRect(x, y, pSize, pSize);
-    }
+    ctx.strokeStyle = ringColor;
+    ctx.beginPath();
+    ctx.ellipse(0, -r * 0.2, ringR, ringR * 0.72, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
 
   // 3. Rising Ghost-White Flame Wisps, Spectral Embers & Hollow Mask Shard Motes
@@ -2207,7 +2287,15 @@ function _drawBankaiActiveFlameWisps(ctx, r, now) {
  * Uses discrete stepped pixel grid rasterization matching Saitama (Rule #19 compliant).
  * Minimalist circle brawler aesthetic, upright front POV, faceless.
  */
-function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
+let _cachedShikaiBodyCanvasR = null;
+let _cachedShikaiBodyCanvasL = null;
+let _cachedBankaiBodyCanvas = null;
+let _cachedIchigoBodyR = 0;
+
+/**
+ * Rasterizes Ichigo's discrete pixel art model into an axis-aligned canvas (Rule 3.5 High-Performance Offscreen Cache).
+ */
+function _renderIchigoPixelBodyToCanvas(ctx, r, isShikai = false, facingLeft = false) {
   ctx.save();
   ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
   const P = 2.0;
@@ -2357,6 +2445,80 @@ function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
   }
 
   ctx.restore();
+}
+
+/**
+ * Draws Ichigo's entire body circle model in authentic Pixel Art Style.
+ * Uses discrete stepped pixel grid rasterization matching Saitama (Rule #19 compliant)
+ * with Rule 3.5 Offscreen Canvas Caching for 60 FPS performance.
+ */
+function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
+  if (typeof document === 'undefined') {
+    _renderIchigoPixelBodyToCanvas(ctx, r, isShikai, facingLeft);
+    return;
+  }
+
+  const intR = Math.round(r);
+  if (_cachedIchigoBodyR !== intR) {
+    _cachedShikaiBodyCanvasR = null;
+    _cachedShikaiBodyCanvasL = null;
+    _cachedBankaiBodyCanvas = null;
+    _cachedIchigoBodyR = intR;
+  }
+
+  const P = 2.0;
+  const steps = Math.ceil((intR + P) / P);
+  const size = (steps * 2 + 1) * P;
+
+  let targetCanvas = null;
+  if (isShikai) {
+    if (facingLeft) {
+      if (!_cachedShikaiBodyCanvasL) {
+        _cachedShikaiBodyCanvasL = document.createElement('canvas');
+        _cachedShikaiBodyCanvasL.width = size;
+        _cachedShikaiBodyCanvasL.height = size;
+        const cctx = _cachedShikaiBodyCanvasL.getContext('2d');
+        if (cctx) {
+          cctx.translate(size / 2, size / 2);
+          _renderIchigoPixelBodyToCanvas(cctx, intR, true, true);
+        }
+      }
+      targetCanvas = _cachedShikaiBodyCanvasL;
+    } else {
+      if (!_cachedShikaiBodyCanvasR) {
+        _cachedShikaiBodyCanvasR = document.createElement('canvas');
+        _cachedShikaiBodyCanvasR.width = size;
+        _cachedShikaiBodyCanvasR.height = size;
+        const cctx = _cachedShikaiBodyCanvasR.getContext('2d');
+        if (cctx) {
+          cctx.translate(size / 2, size / 2);
+          _renderIchigoPixelBodyToCanvas(cctx, intR, true, false);
+        }
+      }
+      targetCanvas = _cachedShikaiBodyCanvasR;
+    }
+  } else {
+    if (!_cachedBankaiBodyCanvas) {
+      _cachedBankaiBodyCanvas = document.createElement('canvas');
+      _cachedBankaiBodyCanvas.width = size;
+      _cachedBankaiBodyCanvas.height = size;
+      const cctx = _cachedBankaiBodyCanvas.getContext('2d');
+      if (cctx) {
+        cctx.translate(size / 2, size / 2);
+        _renderIchigoPixelBodyToCanvas(cctx, intR, false, false);
+      }
+    }
+    targetCanvas = _cachedBankaiBodyCanvas;
+  }
+
+  if (targetCanvas) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(targetCanvas, -size / 2, -size / 2);
+    ctx.restore();
+  } else {
+    _renderIchigoPixelBodyToCanvas(ctx, r, isShikai, facingLeft);
+  }
 }
 
 /**
@@ -3536,11 +3698,77 @@ const _MASK_FORMATION_SHARDS = [
   }
 ];
 
+function _getHollowSkinShardCanvas(shard, maskImg) {
+  if (shard.skinCanvas) return shard.skinCanvas;
+  if (!maskImg || !maskImg.complete || !maskImg.naturalWidth) return null;
+  if (typeof document === 'undefined') return null;
+
+  const pts = shard.poly;
+  let minU = 1, maxU = 0, minV = 1, maxV = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const u = pts[i][0];
+    const v = pts[i][1];
+    if (u < minU) minU = u;
+    if (u > maxU) maxU = u;
+    if (v < minV) minV = v;
+    if (v > maxV) maxV = v;
+  }
+
+  const pad = 0.02;
+  const cropU = Math.max(0, minU - pad);
+  const cropV = Math.max(0, minV - pad);
+  const cropW = Math.min(1.0, maxU + pad) - cropU;
+  const cropH = Math.min(1.0, maxV + pad) - cropV;
+
+  // Source mask coordinates on maskImg: sx=266, sy=143, sw=492, sh=747
+  const baseSx = 266, baseSy = 143, baseSw = 492, baseSh = 747;
+  const srcX = baseSx + cropU * baseSw;
+  const srcY = baseSy + cropV * baseSh;
+  const srcW = Math.max(4, Math.ceil(cropW * baseSw));
+  const srcH = Math.max(4, Math.ceil(cropH * baseSh));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = srcW;
+  canvas.height = srcH;
+  const cctx = canvas.getContext('2d');
+  if (!cctx) return null;
+
+  cctx.imageSmoothingEnabled = true;
+  // 1. Solid bone ivory base
+  cctx.beginPath();
+  pts.forEach((pt, idx) => {
+    const lx = (pt[0] - cropU) * baseSw;
+    const ly = (pt[1] - cropV) * baseSh;
+    if (idx === 0) cctx.moveTo(lx, ly);
+    else cctx.lineTo(lx, ly);
+  });
+  cctx.closePath();
+  cctx.fillStyle = '#F8F7F2';
+  cctx.fill();
+
+  // 2. Authentic mask texture
+  cctx.save();
+  cctx.clip();
+  cctx.drawImage(maskImg, baseSx - srcX, baseSy - srcY, baseSw, baseSh);
+  cctx.restore();
+
+  shard.skinCanvas = canvas;
+  shard.cropU = cropU;
+  shard.cropV = cropV;
+  shard.cropW = cropW;
+  shard.cropH = cropH;
+  return canvas;
+}
+
 function _drawHollowMaskFormationAttached(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH) {
   if (formationProg < 0.06) return;
   const hasImg = Boolean(maskImg && maskImg.complete && maskImg.naturalWidth > 0);
   const maskAssemblyProg = Math.min(1.0, Math.max(0.0, (formationProg - 0.06) / 0.78));
 
+  // 1. Batched Compound Clip & Single Draw Pass (Rule 3.5 High Performance)
+  let hasAttached = false;
+  ctx.save();
+  ctx.beginPath();
   for (let i = 0; i < _MASK_FORMATION_SHARDS.length; i++) {
     const shard = _MASK_FORMATION_SHARDS[i];
     if (maskAssemblyProg < shard.delay) continue;
@@ -3548,8 +3776,7 @@ function _drawHollowMaskFormationAttached(ctx, r, formationProg, now, fighter, m
     const rawProg = (maskAssemblyProg - shard.delay) / 0.16;
     if (rawProg < 1.0) continue; // Only draw once it has arrived and attached to the face!
 
-    // Draw high-contrast solid bone-white shard base
-    ctx.beginPath();
+    hasAttached = true;
     shard.poly.forEach((pt, idx) => {
       const px = destX + pt[0] * destW;
       const py = destY + pt[1] * destH;
@@ -3557,55 +3784,68 @@ function _drawHollowMaskFormationAttached(ctx, r, formationProg, now, fighter, m
       else ctx.lineTo(px, py);
     });
     ctx.closePath();
+  }
 
+  if (hasAttached) {
     ctx.fillStyle = '#F8F7F2'; // Authentic bone porcelain ivory
     ctx.fill();
 
-    // Clip strictly to polygon boundary for high-res mask texture
     ctx.save();
     ctx.clip();
-
     if (hasImg) {
-      // Draw the authentic Hollow Mask PNG inside this clipped fragment
       ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
     } else {
-      // Procedural fallback: Crimson stripes on right-side shards
-      if (shard.name.includes('right') || shard.name === 'chin_tip') {
-        ctx.strokeStyle = '#DC143C';
-        ctx.lineWidth = 3.0;
-        ctx.beginPath();
-        ctx.moveTo(destX + destW * 0.45, destY + destH * 0.20);
-        ctx.lineTo(destX + destW * 0.85, destY + destH * 0.55);
-        ctx.moveTo(destX + destW * 0.55, destY + destH * 0.15);
-        ctx.lineTo(destX + destW * 0.92, destY + destH * 0.45);
-        ctx.stroke();
-      }
-      if (shard.name === 'upper_teeth' || shard.name.includes('jaw')) {
-        ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        for (let tx = destX + destW * 0.25; tx < destX + destW * 0.75; tx += 4.5) {
-          ctx.moveTo(tx, destY + destH * 0.60);
-          ctx.lineTo(tx, destY + destH * 0.85);
+      // Procedural fallback
+      for (let i = 0; i < _MASK_FORMATION_SHARDS.length; i++) {
+        const shard = _MASK_FORMATION_SHARDS[i];
+        if (maskAssemblyProg < shard.delay) continue;
+        const rawProg = (maskAssemblyProg - shard.delay) / 0.16;
+        if (rawProg < 1.0) continue;
+        if (shard.name.includes('right') || shard.name === 'chin_tip') {
+          ctx.strokeStyle = '#DC143C';
+          ctx.lineWidth = 3.0;
+          ctx.beginPath();
+          ctx.moveTo(destX + destW * 0.45, destY + destH * 0.20);
+          ctx.lineTo(destX + destW * 0.85, destY + destH * 0.55);
+          ctx.moveTo(destX + destW * 0.55, destY + destH * 0.15);
+          ctx.lineTo(destX + destW * 0.92, destY + destH * 0.45);
+          ctx.stroke();
         }
-        ctx.stroke();
+        if (shard.name === 'upper_teeth' || shard.name.includes('jaw')) {
+          ctx.strokeStyle = '#222222';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          for (let tx = destX + destW * 0.25; tx < destX + destW * 0.75; tx += 4.5) {
+            ctx.moveTo(tx, destY + destH * 0.60);
+            ctx.lineTo(tx, destY + destH * 0.85);
+          }
+          ctx.stroke();
+        }
       }
     }
     ctx.restore();
 
-    // Crisp dark ink seam outline around the attached shard polygon
+    // Crisp dark ink seam outline around all attached shard polygons (batched single stroke pass)
     ctx.strokeStyle = (formationProg < 0.84) ? '#1A1A1A' : 'rgba(20, 20, 20, 0.65)';
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    shard.poly.forEach((pt, idx) => {
-      const px = destX + pt[0] * destW;
-      const py = destY + pt[1] * destH;
-      if (idx === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.closePath();
+    for (let i = 0; i < _MASK_FORMATION_SHARDS.length; i++) {
+      const shard = _MASK_FORMATION_SHARDS[i];
+      if (maskAssemblyProg < shard.delay) continue;
+      const rawProg = (maskAssemblyProg - shard.delay) / 0.16;
+      if (rawProg < 1.0) continue;
+
+      shard.poly.forEach((pt, idx) => {
+        const px = destX + pt[0] * destW;
+        const py = destY + pt[1] * destH;
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+    }
     ctx.stroke();
   }
+  ctx.restore();
 }
 
 function _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH) {
@@ -3656,33 +3896,44 @@ function _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, mas
         ctx.scale(curScale, curScale);
         ctx.translate(-cx, -cy);
 
-        // Solid bone base
-        ctx.beginPath();
-        shard.poly.forEach((pt, idx) => {
-          const px = destX + pt[0] * destW;
-          const py = destY + pt[1] * destH;
-          if (idx === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        });
-        ctx.closePath();
-        ctx.fillStyle = '#F8F7F2';
-        ctx.fill();
-
-        ctx.save();
-        ctx.clip();
-        if (hasImg) {
-          ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
+        const shardCanvas = _getHollowSkinShardCanvas(shard, maskImg);
+        if (shardCanvas && shard.cropW) {
+          const sx = destX + shard.cropU * destW;
+          const sy = destY + shard.cropV * destH;
+          const sw = shard.cropW * destW;
+          const sh = shard.cropH * destH;
+          ctx.drawImage(shardCanvas, sx, sy, sw, sh);
         } else {
-          if (shard.name.includes('right') || shard.name === 'chin_tip') {
-            ctx.strokeStyle = '#DC143C';
-            ctx.lineWidth = 3.0;
-            ctx.beginPath();
-            ctx.moveTo(destX + destW * 0.45, destY + destH * 0.20);
-            ctx.lineTo(destX + destW * 0.85, destY + destH * 0.55);
-            ctx.stroke();
+          // Solid bone base fallback
+          ctx.beginPath();
+          shard.poly.forEach((pt, idx) => {
+            const px = destX + pt[0] * destW;
+            const py = destY + pt[1] * destH;
+            if (idx === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          });
+          ctx.closePath();
+          ctx.fillStyle = "#F8F7F2";
+          ctx.fill();
+
+          ctx.save();
+          ctx.clip();
+          if (hasImg) {
+            ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
+          } else {
+            if (shard.name.includes("right") || shard.name === "chin_tip") {
+              ctx.strokeStyle = "#DC143C";
+              ctx.lineWidth = 3.0;
+              ctx.beginPath();
+              ctx.moveTo(destX + destW * 0.45, destY + destH * 0.20);
+              ctx.lineTo(destX + destW * 0.85, destY + destH * 0.55);
+              ctx.moveTo(destX + destW * 0.55, destY + destH * 0.15);
+              ctx.lineTo(destX + destW * 0.92, destY + destH * 0.45);
+              ctx.stroke();
+            }
           }
+          ctx.restore();
         }
-        ctx.restore();
 
         // Glowing white-crimson outline while flying
         ctx.strokeStyle = `rgba(255, 255, 255, ${(0.90 * (1.0 - shardProg)).toFixed(2)})`;

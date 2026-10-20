@@ -5,6 +5,7 @@ import { isFighterEffectivelyAlive } from '../../systems/physics.js';
 import { TEAM_PALETTES, ROYALE_PALETTES } from './HorizontalTeamSelectScreen.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { drawChamferedRect } from './uiFramework.js';
+import { drawComboCounter } from '../hudManager.js';
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -41,6 +42,9 @@ export function drawHorizontalPanoramicHud(ctx) {
   } else {
     _drawMultiTeamPanoramicHud(ctx, mainFighters, w);
   }
+
+  // Mirrored combo counter cards at each window edge (grand/panoramic battle path)
+  drawComboCounter(ctx);
 
   ctx.restore();
 }

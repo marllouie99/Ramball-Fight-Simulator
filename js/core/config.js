@@ -222,6 +222,21 @@ export const CONFIG = {
   fighterFloorShadowColor: 'rgba(5, 6, 9, 0.32)', // Dark grounded ambient floor shadow color
   hudSkillBarsMode: 'all',      // 'all' = show all skill bars, 'signature' = signature only, 'none' = completely hide all skill bars
   hudGhostBarEnabled: true,      // Master toggle for fighting-game trailing damage ghost bar on healthbars
+
+  // ── Combo Counter HUD ──
+  // Mirrored "COMBO" cards that slide in at each window edge, just below the TOP HUD,
+  // counting consecutive damaging hits per side (see js/systems/comboTracker.js).
+  comboCounter: {
+    enabled: true,             // Master toggle for the on-screen combo counter
+    windowFrames: 90,          // Frames without a hit before the chain expires (90 = 1.5s at 60 FPS)
+    minHits: 1,                // Minimum chain length before a card is shown
+    edgeInset: 10,             // Horizontal inset from the window edge, in canvas px
+    topGapBelowHud: 44,        // Card top = arena.y - this value (keeps it below the TOP HUD)
+    slideFrames: 10,           // Slide-in / slide-out animation duration, in frames
+    popFrames: 8,              // Impact pop animation duration on every new hit, in frames
+    tierThresholds: [1, 5, 10, 20],               // Hit counts that promote the beat-'em-up color tier
+    tierColors: ['#E11D2E', '#FF3B30', '#FF7A00', '#FFD400'], // Deep red, bright red, orange, gold
+  },
   hudGhostBarHoldFrames: 8,      // Responsive delay in frames (~133ms) before trailing ghost bar begins catch-up decay
   arenaDecorations: {
     enabled: true,               // Master toggle: set to false to completely disable all seasonal decorations when event ends

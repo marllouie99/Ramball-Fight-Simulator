@@ -40,6 +40,9 @@ export const cjConfig = {
   ability: 'Brass Knuckles & Cheats',
   desc: 'Carl Johnson from Grove Street. Master of cheats and street brawling. Wields metallic brass knuckles, HESOYAM armor bursts, Area 69 Jetpack flight, Grove Street drive-by backup, and BAGUVIX God Mode.',
 
+  // ── 1.0 CUSTOM HUD ──
+  enableCustomHud: false,      // Master toggle for CJ's GTA-style HUD card (weapon box, clock, money, wanted stars, red HP bar, Pricedown name). false = use the standard fighter health card
+
   // ── 1.1 STAMINA & FATIGUE SYSTEM ──
   enableStaminaSystem: true,   // Master toggle for stamina & fatigue mechanics
   maxStamina: 100,             // 100 max stamina

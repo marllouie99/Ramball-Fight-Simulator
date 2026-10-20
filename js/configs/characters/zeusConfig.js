@@ -5,7 +5,7 @@ export const zeusConfig = {
   assets: {
     hair: 'Assets/model/zeus/Zeus-hair.png',
     crown: 'Assets/model/zeus/Zeus-crown.png',
-    thunderstrike: 'Assets/model/zeus/thunderstrike/explosion-b.png',
+    thunderstrike: 'Assets/effects/Impact/explosion-b.png',
   },
 
   // ── Base Attributes ──

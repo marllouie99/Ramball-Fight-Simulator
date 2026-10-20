@@ -557,6 +557,19 @@ export function getSkillDataForFighter(f, getProjectiles) {
       fullWidth: true
     });
 
+    if (cfg.enableDash !== false) {
+      const dashMax = cfg.dashCooldown || 300;
+      const dashCur = f.dashCooldown !== undefined ? f.dashCooldown : 0;
+      const dashPct = Math.max(0, Math.min(100, (1 - (dashCur / dashMax)) * 100));
+      skills.push({
+        id: 'forward_dash',
+        pct: dashPct,
+        ready: dashPct >= 99,
+        color: themeColor,
+        label: 'FORWARD DASH'
+      });
+    }
+
     return skills;
   }
 

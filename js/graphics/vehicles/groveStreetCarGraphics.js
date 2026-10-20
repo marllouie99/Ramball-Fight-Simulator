@@ -20,11 +20,13 @@ let _cachedRimGrad = null;
 let _cachedWheelCanvas = null;
 
 function _getHeadlightGrad(ctx, length) {
-  _cachedHeadlightGrad = ctx.createLinearGradient(0, 0, length, 0);
-  _cachedHeadlightGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
-  _cachedHeadlightGrad.addColorStop(0.3, 'rgba(253, 224, 71, 0.20)');
-  _cachedHeadlightGrad.addColorStop(0.7, 'rgba(250, 204, 21, 0.06)');
-  _cachedHeadlightGrad.addColorStop(1, 'rgba(234, 179, 8, 0)');
+  if (!_cachedHeadlightGrad) {
+    _cachedHeadlightGrad = ctx.createLinearGradient(0, 0, length, 0);
+    _cachedHeadlightGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+    _cachedHeadlightGrad.addColorStop(0.3, 'rgba(253, 224, 71, 0.20)');
+    _cachedHeadlightGrad.addColorStop(0.7, 'rgba(250, 204, 21, 0.06)');
+    _cachedHeadlightGrad.addColorStop(1, 'rgba(234, 179, 8, 0)');
+  }
   return _cachedHeadlightGrad;
 }
 
@@ -785,23 +787,23 @@ function _drawPixelGroveHomie(ctx, x, y, targetAngle, recoil = 0, flashTimer = 0
   ctx.restore();
 }
 
+let _cachedPixelCarCanvas = null;
+let _cachedPixelCarW = 0;
+let _cachedPixelCarH = 0;
+
 /**
- * Draws Authentic Grove Street Greenwood Sedan in 100% Discrete Pixel Art Style (Saitama Tech)
- * Uses pure discrete 2D grid-scan rasterization loop with stepped #0E0F14 4-neighbor attached border.
+ * Pre-renders the static layers of the 1980s Greenwood Sedan in discrete pixel art style
+ * into an axis-aligned offscreen canvas (Rule 3.5 High-Performance Offscreen Cache).
+ * Contains: Layer 0 Drop shadow, Layer 1 Whitewall wheels base, Layer 2 Grid-scan rasterized body,
+ * Layer 3 Chrome front bumper/grille/headlights, Layer 4 Chrome rear bumper/taillights/handles.
  */
-export function drawPixelGroveStreetCar(ctx, car) {
-  if (!car || car.dead) return;
-
-  const length = car.length || 152;
-  const width = car.width || 72;
-  const halfL = length * 0.5;
-  const halfW = width * 0.5;
-
+function _renderPixelCarToOffscreenCanvas(ctx, length = 152, width = 72, pad = 16) {
   ctx.save();
   ctx.imageSmoothingEnabled = false;
-  ctx.translate(Math.round(car.x), Math.round(car.y));
-  ctx.rotate(car.angle || 0);
+  ctx.translate(pad + length * 0.5, pad + width * 0.5);
 
+  const halfL = length * 0.5;
+  const halfW = width * 0.5;
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
 
@@ -809,10 +811,9 @@ export function drawPixelGroveStreetCar(ctx, car) {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
   ctx.fillRect(snap(-halfL - 6), snap(-halfW - 4), snap(length + 12), snap(width + 8));
 
-  // ── LAYER 1: 4 WHITEWALL LOWRIDER WHEELS ──
+  // ── LAYER 1: 4 WHITEWALL LOWRIDER WHEELS (BASE TIRES & RIMS) ──
   const wheelXPositions = [halfL * 0.55, -halfL * 0.55];
   const wheelOffsetY = halfW * 0.92;
-  const wheelRot = car.wheelRotation || 0;
 
   for (let wx = 0; wx < 2; wx++) {
     const wX = snap(wheelXPositions[wx]);
@@ -835,10 +836,9 @@ export function drawPixelGroveStreetCar(ctx, car) {
       ctx.fillStyle = '#CBD5E1';
       ctx.fillRect(wX - 8, centerY - 2, 16, 4);
 
-      // Chrome wheel center cap & rotating spokes
+      // Chrome wheel center cap
       ctx.fillStyle = '#0E0F14';
-      const spokeOff = snap(Math.sin(wheelRot) * 4);
-      ctx.fillRect(wX + spokeOff - 1, centerY - 2, 2, 4);
+      ctx.fillRect(wX - 2, centerY - 2, 4, 4);
     });
   }
 
@@ -1045,9 +1045,87 @@ export function drawPixelGroveStreetCar(ctx, car) {
   ctx.fillRect(snap(halfL * 0.05), snap(-halfW + 6), 6, 2);
   ctx.fillRect(snap(-halfL * 0.32), snap(-halfW + 6), 6, 2);
   ctx.fillRect(snap(halfL * 0.05), snap(halfW - 8), 6, 2);
-  ctx.fillRect(-halfL * 0.32, snap(halfW - 8), 6, 2);
+  ctx.fillRect(snap(-halfL * 0.32), snap(halfW - 8), 6, 2);
+
+  ctx.restore();
+}
+
+export function _getPixelCarCanvas(length = 152, width = 72) {
+  if (
+    _cachedPixelCarCanvas &&
+    _cachedPixelCarW === length &&
+    _cachedPixelCarH === width
+  ) {
+    return _cachedPixelCarCanvas;
+  }
+
+  if (typeof document !== 'undefined') {
+    const pad = 16;
+    const cvsW = length + pad * 2;
+    const cvsH = width + pad * 2;
+    _cachedPixelCarCanvas = document.createElement('canvas');
+    _cachedPixelCarCanvas.width = cvsW;
+    _cachedPixelCarCanvas.height = cvsH;
+    const cctx = _cachedPixelCarCanvas.getContext('2d');
+    if (cctx) {
+      cctx.imageSmoothingEnabled = false;
+      _renderPixelCarToOffscreenCanvas(cctx, length, width, pad);
+      _cachedPixelCarW = length;
+      _cachedPixelCarH = width;
+    }
+  }
+  return _cachedPixelCarCanvas;
+}
+
+// Proactive eager initialization in browser environment
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+  _getPixelCarCanvas();
+}
+
+/**
+ * Draws Authentic Grove Street Greenwood Sedan in 100% Discrete Pixel Art Style (Saitama Tech)
+ * Blits pre-rendered offscreen chassis cache (Rule 3.5) with dynamic rotating wheels and leaning homies.
+ */
+export function drawPixelGroveStreetCar(ctx, car) {
+  if (!car || car.dead) return;
+
+  const length = car.length || 152;
+  const width = car.width || 72;
+  const halfL = length * 0.5;
+  const halfW = width * 0.5;
+  const pad = 16;
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.translate(Math.round(car.x), Math.round(car.y));
+  ctx.rotate(car.angle || 0);
+
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // ── BLIT PRE-CACHED PIXEL ART CHASSIS CANVAS (Rule 3.5 Offscreen Cache) ──
+  const carCvs = _getPixelCarCanvas(length, width);
+  if (carCvs) {
+    ctx.drawImage(carCvs, -halfL - pad, -halfW - pad);
+  } else {
+    _renderPixelCarToOffscreenCanvas(ctx, length, width, 0);
+  }
+
+  // ── DYNAMIC LAYER 1: ROTATING WHEEL SPOKES ──
+  const wheelXPositions = [halfL * 0.55, -halfL * 0.55];
+  const wheelOffsetY = halfW * 0.92;
+  const wheelRot = car.wheelRotation || 0;
+  const spokeOff = snap(Math.sin(wheelRot) * 4);
+  ctx.fillStyle = '#0E0F14';
+  for (let wx = 0; wx < 2; wx++) {
+    const wX = snap(wheelXPositions[wx]);
+    ctx.fillRect(wX + spokeOff - 1, snap(-wheelOffsetY) - 2, 2, 4);
+    ctx.fillRect(wX + spokeOff - 1, snap(wheelOffsetY) - 2, 2, 4);
+  }
 
   // ── LAYER 5: TWO GROVE STREET HOMIES LEANING OUT (PIXEL ART STYLE) ──
+  const cabinX = -halfL * 0.13;
+  const cabinW = length * 0.54;
   const h1Aim = car.homie1Aim || 0;
   const h1Recoil = car.homie1Recoil || 0;
   const h1Flash = car.homie1Flash || 0;

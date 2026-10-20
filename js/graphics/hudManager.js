@@ -8,6 +8,7 @@ import { getFighterPreview, getFighterBodyOnlyPreview } from './ui/FighterPrevie
 import { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomHudCameraTracking } from './ui/hudLayout.js';
 import { getSkillDataForFighter, isSkillExceptionInDarkMode, shouldShowFighterSkill, shouldShowHudSkillBars, shouldShowHudStats } from './ui/hudSkillProviders.js';
 import { applyCameraToCtx } from '../systems/cameraSystem.js';
+import { ensureComboTrackers, getComboConfig, tickComboTrackers } from '../systems/comboTracker.js';
 import { getBossConfig } from '../configs/bosses/bossConfigRegistry.js';
 import { getFighterGrade, getGradeMeta } from '../configs/gradeConfig.js';
 import { drawWingedGradeLetter, getZeusGradeCardTheme } from './ui/CollectorCardRenderer.js';
@@ -117,10 +118,24 @@ export function isDarkModeActive() {
   );
 }
 
+/**
+ * Whether CJ's GTA San Andreas custom HUD is active for this fighter.
+ * The widget (weapon box, match clock, money, wanted stars, white stamina bar,
+ * red HP bar, Pricedown name font) is toggled by CONFIG.cj.enableCustomHud.
+ * When disabled, CJ renders through the standard health card like every other fighter.
+ */
+export function isCjCustomHudActive(fighter) {
+  if (!fighter) return false;
+  const isCj = fighter.characterId === 'cj' || fighter.type === 'cj';
+  if (!isCj) return false;
+  const cfg = CONFIG.cj || {};
+  return cfg.enableCustomHud !== false;
+}
+
 export function getFighterHealthBarColor(fighter, ratio, isDark = null) {
   if (!fighter) return '#22c55e';
   const isDarkTheme = isDark !== null ? isDark : isDarkModeActive();
-  const isCj = fighter.characterId === 'cj' || fighter.type === 'cj';
+  const isCj = isCjCustomHudActive(fighter);
   if (isCj) {
     return '#DC2626';
   }
@@ -482,6 +497,9 @@ export function drawHUD() {
     // Draw authentic GTA San Andreas "Cheat activated" top-left arena slide banner
     drawCheatNotification(ctx);
 
+    // Draw mirrored combo counter cards at each window edge, below the TOP HUD
+    drawComboCounter(ctx);
+
     ctx.restore();
   }
 }
@@ -670,6 +688,16 @@ export function drawCheatNotification(ctx) {
   const fontSize = 15;
   const fontStr = `900 ${fontSize}px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif`;
 
+  // ── Window-edge spawn (pure screen space, camera-independent) ──
+  // This is a HUD notification, not a world object: it spawns pinned to the left edge of the window
+  // and never touches the camera transform, so dynamic camera tracking (pan/zoom/shake) can neither
+  // drag it around nor scale its type. Vertical position follows the arena's top band so the banner
+  // clears the DOM match-title HUD above the arena.
+  const arena = (state.arena && state.arena.y !== undefined) ? state.arena : (CONFIG.arena || {});
+  const arenaY = Number.isFinite(arena.y) ? arena.y : 180;
+  const targetX = 10;
+  const targetY = arenaY + 10;
+
   ctx.save();
   ctx.font = fontStr;
   ctx.textAlign = 'left';
@@ -679,12 +707,6 @@ export function drawCheatNotification(ctx) {
   // Authentic GTA San Andreas rectangular bar with wide right-side extension
   const boxWidth = Math.max(195, textWidth + 60);
   const boxHeight = 26;
-
-  // Position directly at top-left inside the arena (pops out in place)
-  const arenaX = (state.arena && state.arena.x !== undefined) ? state.arena.x : 20;
-  const arenaY = (state.arena && state.arena.y !== undefined) ? state.arena.y : 180;
-  const targetX = arenaX + 10;
-  const targetY = arenaY + 10;
 
   // 1. Box Background: dark-gray in Dark Mode (#262930), authentic GTA dark teal-slate in Light Mode (#1d3336)
   const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
@@ -703,6 +725,224 @@ export function drawCheatNotification(ctx) {
   ctx.fillText(text, textX, textY);
 
   ctx.restore();
+}
+
+/**
+ * Draws the mirrored beat-'em-up combo banners (left/right window edges, just below the TOP HUD).
+ * Rendered with high-contrast floating arcade typography (heavy comic ink stroke + white crown glint)
+ * with zero dark placard background, giving maximum visibility over arena action.
+ * Pure screen space: camera pan, zoom and shake never move or scale these banners.
+ * Counts consecutive damaging hits per side (see js/systems/comboTracker.js).
+ */
+export function drawComboCounter(ctx) {
+  if (!ctx) return;
+  const cfg = getComboConfig();
+  if (!cfg.enabled || CONFIG.hudHideAll) return;
+
+  const slots = ensureComboTrackers();
+  tickComboTrackers();
+
+  let hasActiveCard = false;
+  for (let i = 0; i < slots.length; i++) {
+    if (slots[i].phase !== 'hidden') { hasActiveCard = true; break; }
+  }
+  if (!hasActiveCard) return;
+
+  const canvasW = (state.canvas && Number.isFinite(state.canvas.width)) ? state.canvas.width : (CONFIG.canvasWidth || 540);
+  const arena = state.arena || CONFIG.arena || {};
+  const arenaY = Number.isFinite(arena.y) ? arena.y : 240;
+  // Sits just under the scaled TOP HUD cards, hanging into the arena's empty top corner
+  const cardTop = Math.max(40, arenaY - cfg.topGapBelowHud);
+  const minHits = Math.max(1, cfg.minHits | 0);
+  const thresholds = cfg.tierThresholds || [1, 5, 10, 20];
+  const tierColors = cfg.tierColors || ['#E11D2E', '#FF3B30', '#FF7A00', '#FFD400'];
+  const CARD_H = 68;
+
+  const numFont = 'italic 900 38px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif';
+  const hitFont = 'italic 900 18px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif';
+  const dmgFont = '900 14px "Press Start 2P", "Silkscreen", "Rajdhani", monospace, sans-serif';
+
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    if (slot.phase === 'hidden' || slot.hits < minHits) continue;
+
+    const eased = 1 - Math.pow(1 - Math.max(0, Math.min(1, slot.slideP)), 3);
+    if (eased <= 0) continue;
+
+    // Color tier climbs with the chain length (deep red -> bright red -> orange -> gold)
+    let tier = 0;
+    for (let t = 0; t < thresholds.length; t++) {
+      if (slot.hits >= thresholds[t]) tier = t;
+    }
+    const accent = tierColors[Math.min(tier, tierColors.length - 1)] || '#E11D2E';
+
+    const numberText = String(slot.hits);
+    // Bottom row always shows the chain's total damage, zero-padded like an arcade score
+    const damageText = String(Math.max(0, Math.round(slot.damage))).padStart(5, '0');
+
+    ctx.font = numFont;
+    const numberW = ctx.measureText(numberText).width;
+    ctx.font = hitFont;
+    const hitW = ctx.measureText('HIT!').width;
+    ctx.font = dmgFont;
+    const damageW = ctx.measureText(damageText).width;
+
+    const topRowW = numberW + 4 + hitW;
+    const contentW = Math.ceil(Math.max(topRowW, damageW));
+    const CARD_W = Math.max(86, contentW + 10);
+
+    // Slide in from outside the window edge; right card mirrors the left
+    const inset = cfg.edgeInset || 12;
+    const targetX = slot.side === 0 ? inset : (canvasW - inset - CARD_W);
+    const off = (1 - eased) * (CARD_W + 16);
+    const x = slot.side === 0 ? targetX - off : targetX + off;
+
+    // Impact pop: damped sine over popFrames
+    const popT = slot.pop > 0 ? 1 - (slot.pop / Math.max(1, cfg.popFrames)) : 0;
+    const scale = 1 + 0.14 * Math.sin(popT * Math.PI);
+
+    const isRight = slot.side === 1;
+
+    ctx.save();
+    ctx.globalAlpha = eased;
+    ctx.translate(x + CARD_W / 2, cardTop + CARD_H / 2);
+    ctx.scale(scale, scale);
+    ctx.translate(-CARD_W / 2, -CARD_H / 2); // local origin = card top-left
+
+    // ZERO dark background: no placard polygon and no dark drop-shadow rectangle.
+    // Instead, rendering uses high-contrast floating arcade typography with heavy ink strokes,
+    // a subtle drop shadow, and a metallic crown glint for 100% legibility over any arena floor.
+
+    const numBaseX = isRight ? (CARD_W - 4 - topRowW) : 4;
+    const numBaseY = 36;
+    const hitBaseX = numBaseX + numberW + 4;
+    const hitBaseY = 36;
+    const dmgX = isRight ? (CARD_W - 4) : 4;
+    const dmgY = 53;
+
+    // ── Big hit count: heavy ink outline with specular arcade crown glint ──
+    ctx.save();
+    ctx.transform(1, 0, -0.10, 1, 0, 0);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = numFont;
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 2.4;
+
+    // Deep ink drop shadow for 3D comic depth
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = 'rgba(5, 6, 9, 0.75)';
+    ctx.strokeText(numberText, numBaseX + 1.5, numBaseY + 2);
+
+    // Crisp outer black ink outline
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#050609';
+    ctx.strokeText(numberText, numBaseX, numBaseY);
+
+    // Dynamic gradient fill with top white crown glint
+    const numGrad = ctx.createLinearGradient(0, numBaseY - 32, 0, numBaseY);
+    numGrad.addColorStop(0, '#FFFFFF');
+    numGrad.addColorStop(0.32, accent);
+    numGrad.addColorStop(1.0, accent);
+    ctx.fillStyle = numGrad;
+    ctx.fillText(numberText, numBaseX, numBaseY);
+    ctx.restore();
+
+    // ── "HIT!" tag tucked right next to the number ──
+    ctx.save();
+    ctx.transform(1, 0, -0.14, 1, 0, 0);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = hitFont;
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 2.4;
+
+    // Drop shadow
+    ctx.lineWidth = 5.5;
+    ctx.strokeStyle = 'rgba(5, 6, 9, 0.75)';
+    ctx.strokeText('HIT!', hitBaseX + 1.2, hitBaseY + 1.8);
+
+    // Outer ink outline
+    ctx.lineWidth = 4.5;
+    ctx.strokeStyle = '#050609';
+    ctx.strokeText('HIT!', hitBaseX, hitBaseY);
+
+    // Gradient fill
+    const hitGrad = ctx.createLinearGradient(0, hitBaseY - 18, 0, hitBaseY);
+    hitGrad.addColorStop(0, '#FFFFFF');
+    hitGrad.addColorStop(0.35, accent);
+    hitGrad.addColorStop(1.0, accent);
+    ctx.fillStyle = hitGrad;
+    ctx.fillText('HIT!', hitBaseX, hitBaseY);
+    ctx.restore();
+
+    // ── Bottom row: total damage of the chain (crisp white pixel digits with ink stroke) ──
+    ctx.save();
+    ctx.textAlign = isRight ? 'right' : 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.font = dmgFont;
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 2.4;
+
+    // Drop shadow
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(5, 6, 9, 0.75)';
+    ctx.strokeText(damageText, dmgX + (isRight ? -1 : 1), dmgY + 1.5);
+
+    // Outer ink outline
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = '#050609';
+    ctx.strokeText(damageText, dmgX, dmgY);
+
+    // Crisp white fill
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(damageText, dmgX, dmgY);
+    ctx.restore();
+
+    // ── Floating combo window drain micro-gauge ──
+    const barW = Math.max(48, CARD_W - 8);
+    const barH = 4;
+    const barY = 59;
+    const barX = isRight ? (CARD_W - 4 - barW) : 4;
+    const maxFrames = Math.max(1, slot.maxTimer || cfg.windowFrames || 90);
+    const ratio = Math.max(0, Math.min(1, slot.timer / maxFrames));
+
+    // Gauge track (capsule pill with 1px border)
+    ctx.fillStyle = 'rgba(5, 6, 9, 0.82)';
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(barX, barY, barW, barH, 2);
+    } else {
+      ctx.rect(barX, barY, barW, barH);
+    }
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.stroke();
+
+    // Draining progress fill
+    const fillW = Math.max(0, barW * ratio);
+    if (fillW > 0) {
+      ctx.fillStyle = accent;
+      const fillX = isRight ? (barX + barW - fillW) : barX;
+      ctx.beginPath();
+      if (typeof ctx.roundRect === 'function') {
+        ctx.roundRect(fillX, barY, fillW, barH, 2);
+      } else {
+        ctx.fillRect(fillX, barY, fillW, barH);
+      }
+      ctx.fill();
+
+      // Leading white spark pip at the drain head
+      if (fillW > 3 && ratio < 0.98) {
+        ctx.fillStyle = '#FFFFFF';
+        const sparkX = isRight ? fillX : (fillX + fillW - 1.5);
+        ctx.fillRect(sparkX, barY, 1.5, barH);
+      }
+    }
+
+    ctx.restore();
+  }
 }
 
 /**
@@ -2720,7 +2960,7 @@ function updateHealthHud() {
     if (!skills || skills.length === 0) return '';
 
     const isDarkTheme = isDarkModeActive();
-    const isCj = f && (f.characterId === 'cj' || f.type === 'cj');
+    const isCj = isCjCustomHudActive(f);
     const cjSkillClass = isCj ? ' hud-skill-box-cj' : '';
 
     return skills.map((s, index) => {
@@ -2931,7 +3171,7 @@ function updateHealthHud() {
     let barsHTML = '';
     if (members && members.length > 0) {
       barsHTML = members.map((m, mIndex) => {
-        const isMemberCj = m && (m.characterId === 'cj' || m.type === 'cj');
+        const isMemberCj = isCjCustomHudActive(m);
         const isMemberSans = m && (m.characterId === 'sans' || m.type === 'sans' || (m.name && m.name.toLowerCase() === 'sans'));
         let ratio, percent, barColor, hpText;
         if (isMemberSans) {
@@ -3032,7 +3272,7 @@ function updateHealthHud() {
         `;
       }).join('');
     } else {
-      const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
+      const isTargetCj = isCjCustomHudActive(targetFighter);
       const isTargetSans = targetFighter && (targetFighter.characterId === 'sans' || targetFighter.type === 'sans' || (targetFighter.name && targetFighter.name.toLowerCase() === 'sans'));
       let percent, barColor, displayValue;
       if (isTargetSans) {
@@ -3666,7 +3906,7 @@ function updateHealthHud() {
           fighter._lastHealAmount = 0;
         }
 
-        const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
+        const isCj = isCjCustomHudActive(fighter);
         const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
 
         if (m.nameEl) {
@@ -3900,7 +4140,7 @@ function updateHealthHud() {
         fighter._lastHealAmount = 0;
       }
 
-      const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
+      const isCj = isCjCustomHudActive(fighter);
       const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
       const isBossBar = Boolean(isBossBattle && _cachedTopContainer && cachedCard.hpBar && _cachedTopContainer.contains(cachedCard.hpBar));
       let percent, barColor, metaValue;

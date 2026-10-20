@@ -300,13 +300,13 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
 }
 
 // ═══════════════════════════════════════════════
-// 6. 12-FRAME THUNDERSTRIKE ANIMATION ENGINE
+// 6. 12-FRAME THUNDERSTRIKE IMPACT ANIMATION ENGINE
 // ═══════════════════════════════════════════════
 
 const ZEUS_THUNDERSTRIKE_FRAME_COUNT = 12;
 const ZEUS_THUNDERSTRIKE_FRAME_PATHS = Array.from(
   { length: 12 },
-  (_, i) => `Assets/model/zeus/thunderstrike/explosion-${i + 1}.png`
+  (_, i) => `Assets/effects/Impact/explosion-${i + 1}.png`
 );
 
 let _zeusThunderstrikeFrames = [];
@@ -328,7 +328,7 @@ export function _getZeusThunderstrikeFrames() {
         _zeusThunderstrikeFrames[idx] = img;
       };
       img.onerror = (e) => {
-        console.warn(`Failed to load Zeus thunderstrike frame ${idx + 1} at ${src}:`, e);
+        console.warn(`Failed to load Zeus thunderstrike impact frame ${idx + 1} at ${src}:`, e);
       };
       img.src = `${src}?v=1`;
       _zeusThunderstrikeFrames[idx] = img;
@@ -343,8 +343,8 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws the 12-frame retro pixel art Zeus thunderstrike animation sprite.
- * Anchored at ground impact baseline (128, 228) so lightning descends from above.
+ * Draws the 12-frame Zeus thunderstrike impact animation sprite from Assets/effects/Impact/.
+ * Centered at ground impact epicenter (128, 128).
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} scale Drawing scale
  * @param {number} p Progress 0.0 to 1.0 (elapsed / maxTimer)
@@ -369,11 +369,11 @@ export function _drawZeusAnimatedThunderstrikeSprite(ctx, scale = 1.15, p = 0, a
   const fadeAlpha = p > 0.82 ? Math.max(0, (1.0 - p) / 0.18) : 1.0;
   ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * alpha * fadeAlpha));
 
-  // Frame is 256x256px with ground contact point at (128, 228)
+  // Frame is 256x256px with radial explosion epicenter at (128, 128)
   const drawW = 256 * scale;
   const drawH = 256 * scale;
   const anchorX = 128 * scale;
-  const anchorY = 228 * scale;
+  const anchorY = 128 * scale;
 
   if (isGreen) {
     ctx.save();
@@ -393,7 +393,8 @@ export function _drawZeusAnimatedThunderstrikeSprite(ctx, scale = 1.15, p = 0, a
 /**
  * Draws a Zeus Thunderstrike effect.
  * Features:
- * - 12-Frame authentic pixel art thunderstrike animation
+ * - 12-Frame authentic thunderstrike impact animation from Assets/effects/Impact/
+ * - Descending high-voltage sky lightning bolt during strike detonation
  * - Anchored at target impact coordinates
  * - Ground luminance bloom & impact ring
  * - Procedural fallback if frames are not yet ready
@@ -414,10 +415,17 @@ export function drawZeusThunderstrike(ctx, strike) {
   ctx.save();
   ctx.translate(strike.x, strike.y);
 
-  // 1. Render 12-Frame Animated Thunderstrike Sprite
+  // 1. Render 12-Frame Animated Thunderstrike Impact Sprite
   const spriteRendered = _drawZeusAnimatedThunderstrikeSprite(ctx, scale, p, alpha, isGreen);
 
-  // 2. Ground Luminance Shine Bloom Effect (lighter composite for intense radiance)
+  // 2. Descending high-voltage sky bolt connecting cloud to impact epicenter during initial strike
+  if (p < 0.35) {
+    const boltP = p / 0.35;
+    const boltAlpha = Math.pow(1.0 - boltP, 1.3) * alpha;
+    _drawSkyLightningBolt(ctx, boltAlpha, isGreen, scale);
+  }
+
+  // 3. Ground Luminance Shine Bloom Effect (lighter composite for intense radiance)
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
   const bloomRadius = (isGreen ? 130 : 150) * scale * (0.8 + 0.4 * (1.0 - p));
@@ -440,11 +448,11 @@ export function drawZeusThunderstrike(ctx, strike) {
   ctx.fill();
   ctx.restore();
 
-  // 3. Ground Impact Animation (Pre-impact glint, concussive core flash, Rule 26 concentric shockwaves, Lichtenberg fractures, manga needles & scorch)
+  // 4. Ground Impact Animation (Pre-impact glint, concussive core flash, Rule 26 concentric shockwaves, Lichtenberg fractures, manga needles & scorch)
   _drawThunderstrikeImpactAnimation(ctx, scale, p, alpha, isGreen);
 
-  // 4. Fallback procedural lightning bolt if sprite frames have not loaded yet (e.g. headless tests)
-  if (!spriteRendered) {
+  // 5. Fallback procedural lightning bolt if sprite frames have not loaded yet (e.g. headless tests)
+  if (!spriteRendered && p >= 0.35) {
     _drawFallbackProceduralBolt(ctx, lifeRatio, isGreen, scale);
   }
 
@@ -758,6 +766,53 @@ function _drawImpactGroundScorch(ctx, scale, impP, alpha, isGreen) {
       : `rgba(200, 245, 255, ${scorchAlpha * 0.85})`;
     ctx.fill();
   }
+
+  ctx.restore();
+}
+
+/**
+ * Descending high-voltage sky lightning bolt connecting heaven to ground zero during initial strike.
+ */
+function _drawSkyLightningBolt(ctx, alpha, isGreen, scale = 1.0) {
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'miter';
+
+  ctx.beginPath();
+  let curX = 0;
+  let curY = -360 * scale; // Start high up in the sky
+  ctx.moveTo(curX, curY);
+
+  const steps = 8;
+  for (let s = 1; s <= steps; s++) {
+    const t = s / steps;
+    const targetX = 0;
+    const targetY = 0;
+    const jitter = (Math.sin(s * 99 + alpha * 10) - 0.5) * 36 * (1 - t * 0.7);
+    const nextX = curX + (targetX - curX) * (1 / steps) + jitter;
+    const nextY = curY + (targetY - curY) * (1 / steps);
+    ctx.lineTo(s === steps ? 0 : nextX, s === steps ? 0 : nextY);
+    curX = nextX;
+    curY = nextY;
+  }
+
+  // Outer neon glow stroke
+  ctx.strokeStyle = isGreen ? `rgba(50, 255, 120, ${0.85 * alpha})` : `rgba(0, 220, 255, ${0.85 * alpha})`;
+  ctx.lineWidth = 10 * scale;
+  ctx.stroke();
+
+  // Mid intense electric core
+  ctx.strokeStyle = isGreen ? `rgba(180, 255, 200, ${0.95 * alpha})` : `rgba(186, 230, 253, ${0.95 * alpha})`;
+  ctx.lineWidth = 5 * scale;
+  ctx.stroke();
+
+  // Pure white-hot core
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke();
 
   ctx.restore();
 }

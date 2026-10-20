@@ -8519,6 +8519,301 @@ async function runInteractionTests() {
     console.log('      ✅ Zeus 12-frame thunderstrike animation, coordinator integration & 100% balanced Canvas 2D stack depths verified successfully.');
   }
 
+  // ── TEST 84: Knight 5-Phase Melee Combat, Hit-Pause Unpause & Anti-Softlock Failsafes ──
+  {
+    console.log('   84. Testing Knight 5-Phase Melee Combat, Hit-Pause Unpause & Anti-Softlock Failsafes...');
+    const { KnightFighter } = await import('../js/entities/fighters/KnightFighter.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+
+    const knight = new KnightFighter({ x: 100, y: 300, radius: 25, hp: 450, maxHp: 450 });
+    const target = new Fighter({ x: 155, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    knight.team = 0;
+    target.team = 1;
+
+    const prevGetTeam = state.getFighterTeam;
+    state.getFighterTeam = (idx) => idx;
+    const prevMode = state.mode;
+    state.mode = '1v1';
+    state.fighters = [knight, target];
+    state.arena = { x: 0, y: 0, width: 800, height: 600, centerObstacle: null };
+
+    try {
+      // 1. Initial State: idle, ready stance, not swinging
+      assert(knight.swipeActive === false, 'Knight must not be swiping initially');
+      assert(knight.swordSwingTimer === 0, 'Knight swordSwingTimer must be 0 initially');
+      assert(knight.swordHitPauseTimer === 0, 'Knight swordHitPauseTimer must be 0 initially');
+      assert(knight.isHitPausing() === false, 'Knight isHitPausing must return false initially');
+      assert(knight.canAim() === true, 'Knight canAim must be true initially');
+      assert(knight.canPerformBasicAttack() === true, 'Knight canPerformBasicAttack must be true initially');
+
+      // 2. Trigger Hit 1 (Horizontal Cross Cleave)
+      knight._trySwordSwipe(target, 0);
+      assert(knight.swipeActive === true, 'Knight swipeActive must be true after swipe initiation');
+      assert(knight.swordSwingTimer > 0, 'Knight swordSwingTimer must be > 0 during swing');
+      assert(knight.swordComboStep === 1, 'Knight first swing must be combo step 1');
+      assert(knight.canAim() === false, 'Knight canAim must return false during active swing');
+      assert(knight.canPerformBasicAttack() === false, 'Knight canPerformBasicAttack must return false during active swing');
+
+      // 3. Step through strike phase until impact connects
+      const initTargetHp = target.hp;
+      const strikeStart = (knight.swordSwingLiftFrames || 7) + (knight.swordSwingHoldFrames || 2);
+      for (let f = 0; f < strikeStart + 6; f++) {
+        knight.update(target, 0, state.arena);
+        if (knight.swordHitDelivered) break;
+      }
+      assert(knight.swordHitDelivered === true, 'Knight sword hit must be delivered at strike phase');
+      assert(target.hp < initTargetHp, 'Target must take damage from Knight sword cleave');
+      assert(knight.swordHitPauseTimer > 0, 'Knight must enter sword hit-pause stasis on impact');
+      assert(knight.isHitPausing() === true, 'Knight isHitPausing must return true while hit-paused');
+
+      // 4. Resolve hit-pause and verify knockback & stasis release
+      while (knight.swordHitPauseTimer > 0) {
+        knight.update(target, 0, state.arena);
+      }
+      assert(knight.swordHitPauseTimer === 0, 'Knight swordHitPauseTimer must reach 0');
+      assert(target.suppressFreezeOverlay === false, 'Target stasis must release on unpause');
+      assert(target.vx > 0, 'Target must receive forward knockback impulse from cleave');
+
+      // 5. Complete Phase 4 (pin) and Phase 5 (recovery)
+      for (let f = 0; f < 30; f++) {
+        if (!knight.swipeActive && knight.swordSwingTimer === 0) break;
+        knight.update(target, 0, state.arena);
+      }
+      assert(knight.swipeActive === false, 'Knight swipeActive must become false after recovery');
+      assert(knight.swordSwingTimer === 0, 'Knight swordSwingTimer must be 0 after recovery');
+      assert(knight.canAim() === true, 'Knight canAim must return true after swing completes');
+      assert(knight.canPerformBasicAttack() === true, 'Knight canPerformBasicAttack must return true after swing completes');
+
+      // 6. Test Interrupt during Hit-Pause stasis (anti-softlock verification)
+      knight.swipeCooldown = 0;
+      knight._trySwordSwipe(target, 0);
+      assert(knight.swipeActive === true, 'Knight swipeActive must be true on combo step 2');
+      assert(knight.swordComboStep === 2, 'Knight second swing must be combo step 2');
+
+      for (let f = 0; f < 20; f++) {
+        knight.update(target, 0, state.arena);
+        if (knight.swordHitPauseTimer > 0) break;
+      }
+      assert(knight.swordHitPauseTimer > 0, 'Knight must be in hit-pause for interrupt test');
+
+      // Interruption triggers (CC, stasis, knockback, death)
+      knight.interruptAttacks();
+      assert(knight.swordHitPauseTimer === 0, 'Knight swordHitPauseTimer must be 0 after interruptAttacks');
+      assert(knight.swipeActive === false, 'Knight swipeActive must be false after interruptAttacks');
+      assert(knight.swordSwingTimer === 0, 'Knight swordSwingTimer must be 0 after interruptAttacks');
+      assert(knight.isHitPausing() === false, 'Knight isHitPausing must be false after interruptAttacks');
+      assert(target.timeStopTimer === 0, 'Target stasis must be cleared by unpause on interrupt');
+      assert(knight.canAim() === true, 'Knight canAim must return true after interrupt');
+      assert(knight.canPerformBasicAttack() === true, 'Knight canPerformBasicAttack must return true after interrupt');
+
+      // 7. Verify Canvas 2D stack depths across idle and swinging states
+      mockCtx.resetStackDepth();
+      knight.draw(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'knight.draw corrupted canvas stack depth in idle');
+      knight.drawGun(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'knight.drawGun corrupted canvas stack depth in idle');
+
+      knight.swipeCooldown = 0;
+      knight._trySwordSwipe(target, 0);
+      knight.draw(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'knight.draw corrupted canvas stack depth while swinging');
+      knight.drawGun(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'knight.drawGun corrupted canvas stack depth while swinging');
+
+      // 8. Test 5-Second Tactical Forward Dash Ability
+      knight.interruptAttacks();
+      target.x = 300;
+      target.y = 300;
+      knight.x = 100;
+      knight.y = 300;
+      knight.dashCooldown = 0;
+      knight.update(target, 0, state.arena);
+      assert(knight.isDashing === true, 'Knight must be dashing forward when dashCooldown reaches 0');
+      assert(knight.dashTimer > 0, 'Knight dashTimer must be > 0 during dash burst');
+      assert(knight.dashCooldown === (CONFIG.knight?.dashCooldown || 300), 'Knight dashCooldown must reset to 300 (5s)');
+      assert(knight.vx > 0, 'Knight vx must be positive dashing right towards target');
+
+      // Step until dash finishes or arrives at target
+      const preDashX = knight.x;
+      for (let f = 0; f < 12; f++) {
+        if (!knight.isDashing) break;
+        knight.update(target, 0, state.arena);
+      }
+      assert(knight.x > preDashX, 'Knight must have moved forward closer to target during dash');
+      assert(knight.isDashing === false, 'Knight isDashing must complete');
+
+      // 9. Test Shield Break Parry & 12-Frame Animation
+      knight.interruptAttacks();
+      knight.shieldMaxHp = 200;
+      knight.shieldHp = 30;
+      knight.isShieldBroken = false;
+      target.x = knight.x + 35;
+      target.y = knight.y;
+      target.vx = 0;
+      target.vy = 0;
+      target.hitStunTimer = 0;
+      target.timeStopTimer = 0;
+      state.sparkEffects = [];
+
+      const initialTargetHp = target.hp;
+      knight.takeDamage(60, target, { isMelee: true });
+      assert(knight.isShieldBroken === true, 'Knight shield must be broken after taking fatal shield damage');
+      assert(knight.shieldHp === 0, 'Knight shieldHp must be 0 after shield break');
+      assert(knight.parryAnimationTimer > 0, 'Knight parryAnimationTimer must be active on shield break');
+      assert(state.sparkEffects.some(p => p.type === 'parryExplosion'), 'Shield break parry must spawn 12-frame parryExplosion in state.sparkEffects');
+      assert(target.hitStunTimer > 0, 'Attacker must be staggered with hit stun on shield break parry');
+      assert(target.timeStopTimer > 0, 'Attacker must receive timeStop stasis on shield break parry');
+      assert(target.vx > 0, 'Attacker must receive parry knockback impulse');
+
+      // 10. Verify Canvas 2D stack depths during parry animation and active dash
+      mockCtx.resetStackDepth();
+      knight.draw(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'knight.draw corrupted canvas stack depth during parry animation');
+      knight.isDashing = true;
+      knight.dashTimer = 5;
+      knight.dashAngle = 0;
+      knight.draw(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'knight.draw corrupted canvas stack depth during active dash');
+      knight.isDashing = false;
+
+      console.log('      ✅ Knight 5-Phase Melee Combat, Hit-Pause Unpause, 5s Forward Dash & Shield Break Parry verified successfully.');
+    } finally {
+      state.getFighterTeam = prevGetTeam;
+      state.mode = prevMode;
+      state.fighters = [];
+    }
+  }
+
+  // ── TEST 85: Combo Counter Refactor: Non-Resetting On-Hit Accumulation & Duration Expiration ──
+  {
+    console.log('   85. Testing Combo Counter Refactor: Non-Resetting On-Hit Accumulation & Duration Expiration...');
+    const { registerComboHit, ensureComboTrackers, tickComboTrackers, resetComboTrackers } = await import('../js/systems/comboTracker.js');
+    const { drawComboCounter } = await import('../js/graphics/hudManager.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+
+    const p1 = new Fighter({ x: 100, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    const p2 = new Fighter({ x: 200, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    p1.fighterIndex = 15; // Non-zero character roster index (e.g. Knight)
+    p2.fighterIndex = 52; // Non-zero character roster index (e.g. CJ)
+    p1.team = 0;
+    p2.team = 1;
+
+    const prevGetTeam = state.getFighterTeam;
+    state.getFighterTeam = (idx) => idx === 0 ? 0 : 1;
+    const prevMode = state.mode;
+    state.mode = '1v1';
+    state.fighters = [p1, p2];
+    const prevGameState = state.gameState;
+    state.gameState = 'playing';
+
+    try {
+      resetComboTrackers();
+      const slots = ensureComboTrackers();
+
+      // 1. Initial State: both slots are hidden and 0 hits
+      assert(slots[0].hits === 0, 'Slot 0 hits must initially be 0');
+      assert(slots[1].hits === 0, 'Slot 1 hits must initially be 0');
+      assert(slots[0].phase === 'hidden', 'Slot 0 phase must initially be hidden');
+
+      // 2. Hit 1: Player 1 hits Player 2 (Enemy)
+      registerComboHit(p1, p2, 35);
+      assert(slots[0].hits === 1, `Slot 0 hits must be 1 on first hit (got ${slots[0].hits})`);
+      assert(slots[0].damage === 35, `Slot 0 damage must be 35 on first hit (got ${slots[0].damage})`);
+      assert(slots[0].timer === 90, `Slot 0 timer must be initialized to 90 (got ${slots[0].timer})`);
+      assert(slots[0].phase === 'in', `Slot 0 phase must transition to 'in' on first hit (got ${slots[0].phase})`);
+      assert(slots[1].hits === 0, 'Slot 1 must remain untouched when P1 hits P2');
+
+      // Advance frames and verify duration is draining
+      for (let f = 0; f < 15; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        tickComboTrackers();
+      }
+      assert(slots[0].timer === 75, `Slot 0 timer must drain to 75 (got ${slots[0].timer})`);
+      assert(slots[0].phase === 'hold', `Slot 0 phase must be 'hold' (got ${slots[0].phase})`);
+
+      // 3. Hit 2: Player 1 hits Player 2 again BEFORE duration ends
+      // CRITICAL REQUIREMENT: IT MUST NOT RESET! It must accumulate hits and damage!
+      registerComboHit(p1, p2, 40);
+      assert(slots[0].hits === 2, `Slot 0 hits must increment to 2 (got ${slots[0].hits})`);
+      assert(slots[0].damage === 75, `Slot 0 damage must accumulate to 75 (got ${slots[0].damage})`);
+      assert(slots[0].timer === 90, `Slot 0 timer must refresh back to 90 (got ${slots[0].timer})`);
+
+      // 4. Hit 3: Player 1's minion/companion hits Player 2
+      const minion = { owner: p1, isMinion: true };
+      registerComboHit(minion, p2, 25);
+      assert(slots[0].hits === 3, `Slot 0 hits must increment to 3 from minion hit (got ${slots[0].hits})`);
+      assert(slots[0].damage === 100, `Slot 0 damage must accumulate to 100 (got ${slots[0].damage})`);
+      assert(slots[0].timer === 90, `Slot 0 timer must refresh back to 90 (got ${slots[0].timer})`);
+
+      // 5. Player 2 hits Player 1 back!
+      // CRITICAL REQUIREMENT: Player 2's hit must go to Slot 1, and Player 1's Slot 0 MUST NOT RESET!
+      registerComboHit(p2, p1, 50);
+      assert(slots[1].hits === 1, `Slot 1 hits must be 1 when P2 hits P1 (got ${slots[1].hits})`);
+      assert(slots[1].damage === 50, `Slot 1 damage must be 50 (got ${slots[1].damage})`);
+      assert(slots[0].hits === 3, `Slot 0 hits MUST NOT RESET when opponent hits back (got ${slots[0].hits})`);
+      assert(slots[0].damage === 100, `Slot 0 damage MUST NOT RESET when opponent hits back (got ${slots[0].damage})`);
+
+      // 6. Friendly fire guard: Player 1 damaging self or teammate must NOT increment combo
+      registerComboHit(p1, p1, 20);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment from self damage');
+
+      // 6b. Zero and negative damage guards: only positive actual damage counts
+      registerComboHit(p1, p2, 0);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment on 0 damage');
+      registerComboHit(p1, p2, -15);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment on negative damage');
+
+      // 6c. Inanimate props & dead target guards: only active enemies count
+      registerComboHit(p1, { isTurret: true, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against turrets/buildings');
+      registerComboHit(p1, { isLawnmower: true, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against lawnmowers');
+      registerComboHit(p1, { isDead: true, hp: 0, _hasDied: true, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against dead corpses');
+
+      // 7. Drain duration timer to 0 and verify duration expiration & slide-out
+      for (let f = 0; f < 90; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        tickComboTrackers();
+      }
+      assert(slots[0].timer === 0, `Slot 0 timer must reach 0 (got ${slots[0].timer})`);
+      assert(slots[0].phase === 'out', `Slot 0 must enter 'out' phase when duration ends (got ${slots[0].phase})`);
+
+      // Slide-out finishes over 10 frames
+      for (let f = 0; f < 10; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        tickComboTrackers();
+      }
+      assert(slots[0].phase === 'hidden', `Slot 0 phase must become hidden after slide-out (got ${slots[0].phase})`);
+      assert(slots[0].hits === 0, `Slot 0 hits must reset to 0 after duration ends and slide-out completes (got ${slots[0].hits})`);
+
+      // 8. Canvas 2D Stack Depth Integrity
+      mockCtx.resetStackDepth();
+      slots[0].phase = 'hold';
+      slots[0].hits = 5;
+      slots[0].damage = 180;
+      slots[0].slideP = 1.0;
+      slots[0].timer = 60;
+      drawComboCounter(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'drawComboCounter corrupted canvas stack depth');
+
+      // 9. Verify hit counts exceeding 99 render actual number (NEVER '99+')
+      slots[0].hits = 150;
+      slots[0].damage = 2500;
+      mockCtx.resetStackDepth();
+      drawComboCounter(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, 'drawComboCounter with 150 hits corrupted canvas stack depth');
+
+      console.log('      ✅ Combo Counter Refactor: Non-Resetting On-Hit Accumulation & Duration Expiration verified successfully.');
+    } finally {
+      resetComboTrackers();
+      state.getFighterTeam = prevGetTeam;
+      state.mode = prevMode;
+      state.fighters = [];
+      state.gameState = prevGameState;
+    }
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

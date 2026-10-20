@@ -2749,17 +2749,11 @@ export function drawBankaiImpactDimScreen() {
             ? `rgba(220, 20, 20, ${ringAlpha.toFixed(3)})`
             : `rgba(255, 45, 20, ${ringAlpha.toFixed(3)})`);
 
-        const pxStep = 3;
-        const ringSteps = Math.max(18, Math.ceil((ringR * Math.PI * 2) / pxStep));
-        ctx.fillStyle = ringColor;
-        ctx.imageSmoothingEnabled = false;
-
-        for (let step = 0; step < ringSteps; step++) {
-          const ang = (step / ringSteps) * Math.PI * 2;
-          const px = Math.round((cx + Math.cos(ang) * ringR) / pxStep) * pxStep;
-          const py = Math.round((cy + Math.sin(ang) * ringR) / pxStep) * pxStep;
-          ctx.fillRect(px, py, pxStep, pxStep);
-        }
+        ctx.strokeStyle = ringColor;
+        ctx.lineWidth = 3.0;
+        ctx.beginPath();
+        ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+        ctx.stroke();
       }
     }
   }
@@ -3025,11 +3019,70 @@ const _HOLLOW_MASK_OVERLAY_SHARDS = [
   }
 ];
 
+function _getHollowOverlayShardCanvas(shard, maskImg) {
+  if (shard.cachedCanvas) return shard.cachedCanvas;
+  if (!maskImg || !maskImg.complete || !maskImg.naturalWidth) return null;
+  if (typeof document === 'undefined') return null;
+
+  const pts = shard.poly;
+  let minU = 1, maxU = 0, minV = 1, maxV = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const u = pts[i][0];
+    const v = pts[i][1];
+    if (u < minU) minU = u;
+    if (u > maxU) maxU = u;
+    if (v < minV) minV = v;
+    if (v > maxV) maxV = v;
+  }
+
+  const pad = 0.015;
+  const cropU = Math.max(0, minU - pad);
+  const cropV = Math.max(0, minV - pad);
+  const cropW = Math.min(1.0, maxU + pad) - cropU;
+  const cropH = Math.min(1.0, maxV + pad) - cropV;
+
+  const nw = maskImg.naturalWidth || 1024;
+  const nh = maskImg.naturalHeight || 1024;
+  const srcX = cropU * nw;
+  const srcY = cropV * nh;
+  const srcW = Math.max(4, Math.ceil(cropW * nw));
+  const srcH = Math.max(4, Math.ceil(cropH * nh));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = srcW;
+  canvas.height = srcH;
+  const cctx = canvas.getContext('2d');
+  if (!cctx) return null;
+
+  cctx.imageSmoothingEnabled = true;
+  cctx.beginPath();
+  pts.forEach((pt, idx) => {
+    const lx = (pt[0] - cropU) * nw;
+    const ly = (pt[1] - cropV) * nh;
+    if (idx === 0) cctx.moveTo(lx, ly);
+    else cctx.lineTo(lx, ly);
+  });
+  cctx.closePath();
+  cctx.clip();
+  cctx.drawImage(maskImg, -srcX, -srcY, nw, nh);
+
+  shard.cachedCanvas = canvas;
+  shard.cropU = cropU;
+  shard.cropV = cropV;
+  shard.cropW = cropW;
+  shard.cropH = cropH;
+  return canvas;
+}
+
 function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFormProg, maskImg, currentOpacity, arenaW, arenaH) {
   const maskAssemblyProg = Math.min(1.0, Math.max(0.0, currentFormProg / 0.86));
   const shardFlightDuration = 0.22;
 
-  // 1. Attached Shards
+  // 1. Attached Shards: Batched compound clip & single draw pass (Rule 3.5 High Performance)
+  let hasAttached = false;
+  ctx.save();
+  ctx.globalAlpha = currentOpacity;
+  ctx.beginPath();
   for (let i = 0; i < _HOLLOW_MASK_OVERLAY_SHARDS.length; i++) {
     const shard = _HOLLOW_MASK_OVERLAY_SHARDS[i];
     if (maskAssemblyProg < shard.delay) continue;
@@ -3037,9 +3090,7 @@ function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFo
     const rawProg = (maskAssemblyProg - shard.delay) / shardFlightDuration;
     if (rawProg < 1.0) continue;
 
-    ctx.save();
-    ctx.globalAlpha = currentOpacity;
-    ctx.beginPath();
+    hasAttached = true;
     shard.poly.forEach((pt, idx) => {
       const px = destX + pt[0] * destW;
       const py = destY + pt[1] * destH;
@@ -3047,26 +3098,47 @@ function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFo
       else ctx.lineTo(px, py);
     });
     ctx.closePath();
+  }
+
+  if (hasAttached) {
     ctx.clip();
     ctx.drawImage(maskImg, destX, destY, destW, destH);
-    ctx.restore();
+  }
+  ctx.restore();
 
+  // Outlines for all attached shards in one batched stroke pass
+  if (hasAttached) {
     ctx.save();
     ctx.globalAlpha = currentOpacity;
     ctx.strokeStyle = 'rgba(20, 2, 8, 0.75)';
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    shard.poly.forEach((pt, idx) => {
-      const px = destX + pt[0] * destW;
-      const py = destY + pt[1] * destH;
-      if (idx === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.closePath();
+    for (let i = 0; i < _HOLLOW_MASK_OVERLAY_SHARDS.length; i++) {
+      const shard = _HOLLOW_MASK_OVERLAY_SHARDS[i];
+      if (maskAssemblyProg < shard.delay) continue;
+
+      const rawProg = (maskAssemblyProg - shard.delay) / shardFlightDuration;
+      if (rawProg < 1.0) continue;
+
+      shard.poly.forEach((pt, idx) => {
+        const px = destX + pt[0] * destW;
+        const py = destY + pt[1] * destH;
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+    }
     ctx.stroke();
     ctx.restore();
+  }
 
-    if (rawProg < 1.40) {
+  // Arrival snap flashes for freshly attached shards (rawProg between 1.0 and 1.40)
+  for (let i = 0; i < _HOLLOW_MASK_OVERLAY_SHARDS.length; i++) {
+    const shard = _HOLLOW_MASK_OVERLAY_SHARDS[i];
+    if (maskAssemblyProg < shard.delay) continue;
+
+    const rawProg = (maskAssemblyProg - shard.delay) / shardFlightDuration;
+    if (rawProg >= 1.0 && rawProg < 1.40) {
       const flashAlpha = Math.max(0, 1.0 - (rawProg - 1.0) / 0.40);
       ctx.save();
       ctx.globalAlpha = flashAlpha * currentOpacity * 1.5;
@@ -3085,7 +3157,7 @@ function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFo
     }
   }
 
-  // 2. In-Flight Shards
+  // 2. In-Flight Shards: Fast pre-clipped offscreen shard blitting (Zero runtime clip cost)
   for (let i = 0; i < _HOLLOW_MASK_OVERLAY_SHARDS.length; i++) {
     const shard = _HOLLOW_MASK_OVERLAY_SHARDS[i];
     if (maskAssemblyProg < shard.delay) continue;
@@ -3118,18 +3190,27 @@ function _drawHollowMaskOverlayShards(ctx, destX, destY, destW, destH, currentFo
     ctx.scale(curScale, curScale);
     ctx.translate(-cx, -cy);
 
-    ctx.save();
-    ctx.beginPath();
-    shard.poly.forEach((pt, idx) => {
-      const px = destX + pt[0] * destW;
-      const py = destY + pt[1] * destH;
-      if (idx === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    });
-    ctx.closePath();
-    ctx.clip();
-    ctx.drawImage(maskImg, destX, destY, destW, destH);
-    ctx.restore();
+    const shardCanvas = _getHollowOverlayShardCanvas(shard, maskImg);
+    if (shardCanvas && shard.cropW) {
+      const sx = destX + shard.cropU * destW;
+      const sy = destY + shard.cropV * destH;
+      const sw = shard.cropW * destW;
+      const sh = shard.cropH * destH;
+      ctx.drawImage(shardCanvas, sx, sy, sw, sh);
+    } else {
+      ctx.save();
+      ctx.beginPath();
+      shard.poly.forEach((pt, idx) => {
+        const px = destX + pt[0] * destW;
+        const py = destY + pt[1] * destH;
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+      ctx.clip();
+      ctx.drawImage(maskImg, destX, destY, destW, destH);
+      ctx.restore();
+    }
 
     ctx.strokeStyle = 'rgba(235, 25, 60, 0.92)';
     ctx.lineWidth = 2.4;

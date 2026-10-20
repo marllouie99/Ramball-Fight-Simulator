@@ -44,6 +44,21 @@ export const knightConfig = {
   shieldPassiveDefBuff: 0.40,     // 40% passive damage reduction applied while shield is active
   shieldBrokenDefPenalty: 0.50,   // Loses 50% of passive DEF buff when shield breaks (40% drops to 20%)
 
+  // Shield Break Parry
+  enableShieldBreakParry: true,
+  parryHitStunFrames: 28,         // Attacker stun duration on shield break parry
+  parryTimeStopFrames: 16,        // Attacker hit-pause duration on shield break parry
+  parryKnockback: 11.0,           // Attacker knockback impulse on shield break parry
+  parryAnimationFrames: 24,       // Visual parry animation duration
+
+  // Forward Dash Ability (Every 5 seconds)
+  enableDash: true,
+  dashCooldown: 300,              // 5 seconds at 60 FPS
+  dashDuration: 10,               // 10 frames active dash burst (~0.16s)
+  dashSpeed: 15.5,                // Forward burst speed
+  dashMaxRange: 420,              // Max range to initiate dash
+  dashMinRange: 55,               // Won't waste dash if already in close melee contact
+
   // Broadsword 2-Hit Cleave & Hit-Pause
   enableMeleeCombo: true,
   swordRange: 75,
@@ -99,6 +114,8 @@ export const knightConfig = {
 
     // Arena Mobility & Physics
     wallBounce: 'Assets/Sound Effects/Skills/dash1.mp3',              // Arena wall bounce deflection
+    dash: 'Assets/Sound Effects/Skills/dash1.mp3',                    // 5-second tactical forward burst
+    parry: 'Assets/Sound Effects/Skills/parry.mp3',                   // Shield break parry counter stinger
   },
 
   soundVolumes: {
@@ -114,6 +131,8 @@ export const knightConfig = {
     heavyImpact: 0.85,
     unpauseHit: 0.85,
     wallBounce: 0.00,
+    dash: 0.85,
+    parry: 1.0,
   },
 
   audioVolumes: {
@@ -129,6 +148,8 @@ export const knightConfig = {
     heavyImpact: 0.85,
     unpauseHit: 0.85,
     wallBounce: 0.50,
+    dash: 0.85,
+    parry: 1.0,
   },
 
   soundDelays: {
@@ -144,5 +165,7 @@ export const knightConfig = {
     heavyImpact: 0,
     unpauseHit: 0,
     wallBounce: 0,
+    dash: 0,
+    parry: 0,
   },
 };

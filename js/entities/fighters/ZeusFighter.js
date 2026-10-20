@@ -460,59 +460,101 @@ export class ZeusFighter extends Fighter {
       const flashValue = Math.sin(this.auraPhase * 2.5 + i * 13);
       const isFlashing = flashValue > flashThreshold;
 
-      // ── AUTHENTIC RETRO PIXEL ART CUMULUS CLOUD PUFF (P = 2.0px) ──
-      const scx = Math.round(cx / 2) * 2;
-      const scy = Math.round(cy / 2) * 2;
-      const rad = Math.max(6, Math.round(cloudSize / 2) * 2);
+      // ── VOLUMETRIC ORGANIC CUMULUS CLOUD PUFF (Smooth Non-Pixel Art) ──
+      const rad = Math.max(8, cloudSize);
 
       ctx.save();
       if (isFlashing) {
-        // Flashing lightning puff: Electric cyan border + pure white core
+        // High-energy ionized lightning cloud puff
+        // 1. Soft atmospheric outer ion bloom wash
+        const bloomGrad = ctx.createRadialGradient(cx, cy, rad * 0.3, cx, cy, rad * 1.4);
+        bloomGrad.addColorStop(0, 'rgba(0, 229, 255, 0.45)');
+        bloomGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.22)');
+        bloomGrad.addColorStop(1, 'rgba(0, 229, 255, 0)');
         ctx.beginPath();
-        ctx.arc(scx, scy, rad, 0, Math.PI * 2);
-        ctx.fillStyle = '#00E5FF';
+        ctx.arc(cx, cy, rad * 1.4, 0, Math.PI * 2);
+        ctx.fillStyle = bloomGrad;
         ctx.fill();
-        ctx.strokeStyle = '#0E0F14';
-        ctx.lineWidth = 1.6;
-        ctx.stroke();
 
+        // 2. Main illuminated cloud disc with soft electric gradient
+        const puffGrad = ctx.createRadialGradient(cx, cy - rad * 0.2, rad * 0.1, cx, cy, rad);
+        puffGrad.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
+        puffGrad.addColorStop(0.45, 'rgba(224, 247, 255, 0.92)');
+        puffGrad.addColorStop(0.85, 'rgba(0, 229, 255, 0.85)');
+        puffGrad.addColorStop(1, 'rgba(0, 180, 240, 0.55)');
         ctx.beginPath();
-        ctx.arc(scx, scy - 1, rad * 0.70, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFFFFF';
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.fillStyle = puffGrad;
+        ctx.fill();
+
+        // 3. Crisp white-hot core
+        ctx.beginPath();
+        ctx.arc(cx, cy - rad * 0.15, rad * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
         ctx.fill();
       } else {
-        // Retro Pixel Cumulus Cloud: Dark ink border, shadow base, sky blue body, white highlight
-        // 1. Dark ink boundary outline
+        // Organic Cumulus Cloud Puff: Volumetric depth, soft base shading, sky tint, and silver-lining rim
+        // 1. Soft ambient outer fog rim
+        const ambientGrad = ctx.createRadialGradient(cx, cy, rad * 0.5, cx, cy, rad * 1.25);
+        const ambientColor = this.stormActive ? 'rgba(2, 132, 199, 0.25)' : 'rgba(186, 230, 253, 0.25)';
+        ambientGrad.addColorStop(0, ambientColor);
+        ambientGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
         ctx.beginPath();
-        ctx.arc(scx, scy, rad, 0, Math.PI * 2);
-        ctx.fillStyle = '#0E0F14';
+        ctx.arc(cx, cy, rad * 1.25, 0, Math.PI * 2);
+        ctx.fillStyle = ambientGrad;
         ctx.fill();
 
-        // 2. Lower under-shadow crescent
+        // 2. Lower under-belly storm shadow (soft crescent wash on bottom)
+        const shadowGrad = ctx.createRadialGradient(cx, cy + rad * 0.35, rad * 0.1, cx, cy + rad * 0.2, rad * 0.9);
+        if (this.stormActive) {
+          shadowGrad.addColorStop(0, 'rgba(3, 105, 161, 0.70)');
+          shadowGrad.addColorStop(0.7, 'rgba(2, 132, 199, 0.50)');
+          shadowGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+        } else {
+          shadowGrad.addColorStop(0, 'rgba(100, 116, 139, 0.55)');
+          shadowGrad.addColorStop(0.7, 'rgba(148, 163, 184, 0.35)');
+          shadowGrad.addColorStop(1, 'rgba(203, 213, 225, 0)');
+        }
         ctx.beginPath();
-        ctx.arc(scx, scy, rad - 1.5, 0, Math.PI * 2);
-        ctx.fillStyle = this.stormActive ? '#0284C7' : '#94A3B8';
+        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+        ctx.fillStyle = shadowGrad;
         ctx.fill();
 
-        // 3. Main cloud body
+        // 3. Volumetric main body (smooth spherical radial gradient shifted slightly upward)
+        const bodyGrad = ctx.createRadialGradient(cx, cy - rad * 0.3, rad * 0.1, cx, cy, rad);
+        if (this.stormActive) {
+          bodyGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+          bodyGrad.addColorStop(0.4, 'rgba(186, 230, 253, 0.88)');
+          bodyGrad.addColorStop(0.8, 'rgba(56, 189, 248, 0.78)');
+          bodyGrad.addColorStop(1, 'rgba(2, 132, 199, 0.60)');
+        } else {
+          bodyGrad.addColorStop(0, 'rgba(255, 255, 255, 0.96)');
+          bodyGrad.addColorStop(0.45, 'rgba(240, 249, 255, 0.90)');
+          bodyGrad.addColorStop(0.85, 'rgba(186, 230, 253, 0.80)');
+          bodyGrad.addColorStop(1, 'rgba(148, 163, 184, 0.45)');
+        }
         ctx.beginPath();
-        ctx.arc(scx, scy - 2, rad - 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = this.stormActive ? '#38BDF8' : '#BAE6FD';
+        ctx.arc(cx, cy, rad - 1.2, 0, Math.PI * 2);
+        ctx.fillStyle = bodyGrad;
         ctx.fill();
 
-        // 4. Upper crown highlight
+        // 4. Upper silver-lining crown glint
+        const crownGrad = ctx.createRadialGradient(cx, cy - rad * 0.45, 0, cx, cy - rad * 0.45, rad * 0.55);
+        crownGrad.addColorStop(0, 'rgba(255, 255, 255, 0.90)');
+        crownGrad.addColorStop(0.7, 'rgba(255, 255, 255, 0.45)');
+        crownGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
         ctx.beginPath();
-        ctx.arc(scx, scy - 4, rad * 0.55, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFFFFF';
+        ctx.arc(cx, cy - rad * 0.35, rad * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = crownGrad;
         ctx.fill();
       }
       ctx.restore();
 
-      // Draw erratic branching arcs & sparks (same as weapon) when flashing
+      // Smooth electric arcs & organic sparks when flashing
       if (isFlashing) {
         ctx.save();
-        ctx.lineCap = 'square';
-        ctx.lineJoin = 'miter';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
         const now = Date.now();
         const branchCount = 2; // Arcs per flashing cloud
 
@@ -527,29 +569,38 @@ export class ZeusFighter extends Fighter {
           const dirY = (pseudoRand(2) - 0.5) * 2;
 
           ctx.beginPath();
-          ctx.moveTo(scx, scy);
+          ctx.moveTo(cx, cy);
 
-          let bx = scx;
-          let by = scy;
-          const segments = 2 + Math.floor(pseudoRand(3) * 2);
+          let bx = cx;
+          let by = cy;
+          const segments = 3 + Math.floor(pseudoRand(3) * 2);
           const branchLen = 8 + pseudoRand(4) * 12;
 
           for (let s = 0; s < segments; s++) {
-            bx += Math.round((dirX * (branchLen / segments) + (pseudoRand(5 + s) - 0.5) * 8) / 2) * 2;
-            by += Math.round((dirY * (branchLen / segments) + (pseudoRand(6 + s) - 0.5) * 8) / 2) * 2;
+            bx += dirX * (branchLen / segments) + (pseudoRand(5 + s) - 0.5) * 6;
+            by += dirY * (branchLen / segments) + (pseudoRand(6 + s) - 0.5) * 6;
             ctx.lineTo(bx, by);
           }
 
-          ctx.strokeStyle = '#00E5FF';
-          ctx.lineWidth = 1.5;
+          // Outer cyan ionization glow
+          ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+          ctx.lineWidth = 2.0;
           ctx.stroke();
 
-          // Discrete 2x2 detached grounding sparks
+          // Inner white-hot core
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+
+          // Organic round detached sparks
           if (pseudoRand(9) > 0.4) {
-            const spX = Math.round((bx + (pseudoRand(10) - 0.5) * 10) / 2) * 2;
-            const spY = Math.round((by + (pseudoRand(11) - 0.5) * 10) / 2) * 2;
+            const spX = bx + (pseudoRand(10) - 0.5) * 10;
+            const spY = by + (pseudoRand(11) - 0.5) * 10;
+            const sparkR = 1.0 + pseudoRand(12) * 1.0;
+            ctx.beginPath();
+            ctx.arc(spX, spY, sparkR, 0, Math.PI * 2);
             ctx.fillStyle = pseudoRand(13) > 0.5 ? '#FFFFFF' : '#00FFFF';
-            ctx.fillRect(spX - 1, spY - 1, 2, 2);
+            ctx.fill();
           }
         }
         ctx.restore();
