@@ -727,6 +727,165 @@ export function drawCheatNotification(ctx) {
   ctx.restore();
 }
 
+function _parseHexOrRgb(colorStr) {
+  if (!colorStr || typeof colorStr !== 'string') return null;
+  const s = colorStr.trim().toLowerCase();
+  if (s.startsWith('#') || /^[0-9a-f]{3,8}$/.test(s)) {
+    const raw = s.startsWith('#') ? s.slice(1) : s;
+    if (raw.length === 3 || raw.length === 4) {
+      return {
+        r: parseInt(raw[0] + raw[0], 16) || 0,
+        g: parseInt(raw[1] + raw[1], 16) || 0,
+        b: parseInt(raw[2] + raw[2], 16) || 0,
+      };
+    }
+    if (raw.length >= 6) {
+      return {
+        r: parseInt(raw.substring(0, 2), 16) || 0,
+        g: parseInt(raw.substring(2, 4), 16) || 0,
+        b: parseInt(raw.substring(4, 6), 16) || 0,
+      };
+    }
+  }
+  if (s.startsWith('rgb')) {
+    const m = s.match(/\d+/g);
+    if (m && m.length >= 3) {
+      return { r: parseInt(m[0], 10) || 0, g: parseInt(m[1], 10) || 0, b: parseInt(m[2], 10) || 0 };
+    }
+  }
+  const NAMED = {
+    white: { r: 255, g: 255, b: 255 },
+    black: { r: 14, g: 15, b: 20 },
+    red: { r: 239, g: 68, b: 68 },
+    green: { r: 34, g: 197, b: 94 },
+    blue: { r: 59, g: 130, b: 246 },
+    yellow: { r: 250, g: 204, b: 21 },
+    cyan: { r: 6, g: 182, b: 212 },
+    magenta: { r: 236, g: 72, b: 153 },
+    orange: { r: 249, g: 115, b: 22 },
+    gold: { r: 250, g: 204, b: 21 },
+    purple: { r: 168, g: 85, b: 247 },
+    pink: { r: 244, g: 63, b: 94 },
+  };
+  return NAMED[s] || null;
+}
+
+function _rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h *= 60;
+  }
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
+/**
+ * Resolves or dynamically generates the 4-tier beat-'em-up combo counter color palette for a fighter.
+ * Derives dynamic tiers from the fighter's signature themeColor, secondaryColor, or character config.
+ *
+ * @param {Object} fighter Attacking Fighter entity or definition
+ * @param {string} fallbackBase Fallback hex color if fighter has no theme (e.g. '#38BDF8' for P1, '#EF4444' for P2)
+ * @param {Object} [cfg] Optional comboCounter config object
+ * @returns {string[]} Array of 4 tier color strings [Tier 0 (base), Tier 1 (heated), Tier 2 (surge), Tier 3 (radiant apex)]
+ */
+export function getFighterComboTierColors(fighter, fallbackBase = '#38BDF8', cfg = null) {
+  // If useFighterTheme is explicitly disabled, fall back to global tierColors
+  if (cfg && cfg.useFighterTheme === false && Array.isArray(cfg.tierColors) && cfg.tierColors.length > 0) {
+    return cfg.tierColors;
+  }
+
+  const charId = fighter?.characterId || fighter?.type || (fighter?._def && (fighter._def.id || fighter._def.type));
+  const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
+
+  // 1. Explicit per-character comboTierColors override if defined in character config or fighter entity
+  if (Array.isArray(charCfg?.comboTierColors) && charCfg.comboTierColors.length >= 4) {
+    return charCfg.comboTierColors;
+  }
+  if (Array.isArray(fighter?.comboTierColors) && fighter.comboTierColors.length >= 4) {
+    return fighter.comboTierColors;
+  }
+
+  // 2. Resolve primary theme color and secondary color
+  const baseColor = getFighterThemeColor(fighter, fallbackBase);
+  const secondaryColor = charCfg?.secondaryColor || fighter?.secondaryColor || null;
+
+  const rgb = _parseHexOrRgb(baseColor);
+  if (!rgb) {
+    return [baseColor, baseColor, secondaryColor || baseColor, '#FFD400'];
+  }
+
+  const hsl = _rgbToHsl(rgb.r, rgb.g, rgb.b);
+  const h = hsl.h;
+  const s = hsl.s;
+  const l = hsl.l;
+
+  // Handle neutral / monochrome / steel palettes (e.g. Guts, John Wick)
+  if (s < 18) {
+    const l0 = Math.max(50, Math.min(68, l));
+    const t0 = `hsl(${h}, ${s}%, ${l0}%)`;
+    const t1 = `hsl(${h}, ${s}%, ${Math.min(80, l0 + 14)}%)`;
+    const secRgb = secondaryColor ? _parseHexOrRgb(secondaryColor) : null;
+    const t2 = secRgb ? secondaryColor : `hsl(${h}, ${Math.min(100, s + 30)}%, ${Math.min(88, l0 + 24)}%)`;
+    const t3 = '#FDE047'; // Radiant kinetic glint
+    return [t0, t1, t2, t3];
+  }
+
+  // Standard chromatic palette:
+  // Tier 0 (Hits 1-4): Authentic fighter theme color, normalized for floating dark outline contrast
+  const l0 = Math.max(46, Math.min(58, l));
+  const s0 = Math.max(68, s);
+  const tier0 = `hsl(${h}, ${s0}%, ${l0}%)`;
+
+  // Tier 1 (Hits 5-9): Heated chain - boosted luminance & saturation
+  const l1 = Math.min(68, l0 + 8);
+  const s1 = Math.min(100, s0 + 8);
+  const tier1 = `hsl(${h}, ${s1}%, ${l1}%)`;
+
+  // Tier 2 (Hits 10-19): Combo Surge - transitions into secondary color if present, else energetic hue shift
+  let tier2;
+  if (secondaryColor) {
+    const secRgb = _parseHexOrRgb(secondaryColor);
+    if (secRgb) {
+      const secHsl = _rgbToHsl(secRgb.r, secRgb.g, secRgb.b);
+      const secL = Math.max(50, Math.min(68, secHsl.l));
+      const secS = Math.max(70, secHsl.s);
+      tier2 = `hsl(${secHsl.h}, ${secS}%, ${secL}%)`;
+    } else {
+      tier2 = secondaryColor;
+    }
+  } else {
+    // Hue-shifted luminous energetic tone
+    const shiftH = (h >= 30 && h <= 150) ? Math.max(38, h - 14) : (h + 12) % 360;
+    tier2 = `hsl(${shiftH}, 100%, ${Math.min(74, l1 + 8)}%)`;
+  }
+
+  // Tier 3 (Hits 20+): Radiant Apex - hyper-luminescent crown
+  let tier3;
+  if (h >= 0 && h <= 55) {
+    // Warm fire / crimson / orange -> Radiant Sun Gold
+    tier3 = '#FDE047';
+  } else if (h >= 56 && h <= 165) {
+    // Yellow-green / green / lime -> Radiant Solar Yellow-Lime / Gold
+    tier3 = '#FACC15';
+  } else if (h >= 166 && h <= 250) {
+    // Cyan / Ice / Blue -> Radiant Ice Glint
+    tier3 = '#E0FFFF';
+  } else {
+    // Purple / Magenta / Pink -> Radiant Astral White-Pink
+    tier3 = '#FDF2F8';
+  }
+
+  return [tier0, tier1, tier2, tier3];
+}
+
 /**
  * Draws the mirrored beat-'em-up combo banners (left/right window edges, just below the TOP HUD).
  * Rendered with high-contrast floating arcade typography (heavy comic ink stroke + white crown glint)
@@ -755,7 +914,6 @@ export function drawComboCounter(ctx) {
   const cardTop = Math.max(40, arenaY - cfg.topGapBelowHud);
   const minHits = Math.max(1, cfg.minHits | 0);
   const thresholds = cfg.tierThresholds || [1, 5, 10, 20];
-  const tierColors = cfg.tierColors || ['#E11D2E', '#FF3B30', '#FF7A00', '#FFD400'];
   const CARD_H = 68;
 
   const numFont = 'italic 900 38px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif';
@@ -769,12 +927,25 @@ export function drawComboCounter(ctx) {
     const eased = 1 - Math.pow(1 - Math.max(0, Math.min(1, slot.slideP)), 3);
     if (eased <= 0) continue;
 
-    // Color tier climbs with the chain length (deep red -> bright red -> orange -> gold)
+    // Resolve attacking fighter entity for this combo slot
+    let fighter = slot.attackerFighter;
+    if (!fighter && slot.attackerFighterIndex >= 0 && Array.isArray(state.fighters)) {
+      fighter = state.fighters[slot.attackerFighterIndex];
+    }
+    if (!fighter && Array.isArray(state.fighters)) {
+      fighter = state.fighters[slot.side] || state.fighters[0];
+    }
+
+    // Resolve tiered color theme derived dynamically from the fighter's signature color theme
+    const fallbackBase = slot.side === 0 ? '#38BDF8' : '#EF4444';
+    const tierColors = getFighterComboTierColors(fighter, fallbackBase, cfg);
+
+    // Color tier climbs with the chain length
     let tier = 0;
     for (let t = 0; t < thresholds.length; t++) {
       if (slot.hits >= thresholds[t]) tier = t;
     }
-    const accent = tierColors[Math.min(tier, tierColors.length - 1)] || '#E11D2E';
+    const accent = tierColors[Math.min(tier, tierColors.length - 1)] || tierColors[0] || fallbackBase;
 
     const numberText = String(slot.hits);
     // Bottom row always shows the chain's total damage, zero-padded like an arcade score
@@ -792,9 +963,11 @@ export function drawComboCounter(ctx) {
     const CARD_W = Math.max(86, contentW + 10);
 
     // Slide in from outside the window edge; right card mirrors the left
-    const inset = cfg.edgeInset || 12;
+    // Aligns with the Top HUD frame and arena boundary (default: arenaX / 45px)
+    const arenaX = Number.isFinite(arena.x) ? arena.x : 45;
+    const inset = (typeof cfg.edgeInset === 'number') ? cfg.edgeInset : arenaX;
     const targetX = slot.side === 0 ? inset : (canvasW - inset - CARD_W);
-    const off = (1 - eased) * (CARD_W + 16);
+    const off = (1 - eased) * (inset + CARD_W + 16);
     const x = slot.side === 0 ? targetX - off : targetX + off;
 
     // Impact pop: damped sine over popFrames
@@ -923,8 +1096,17 @@ export function drawComboCounter(ctx) {
     // Draining progress fill
     const fillW = Math.max(0, barW * ratio);
     if (fillW > 0) {
-      ctx.fillStyle = accent;
       const fillX = isRight ? (barX + barW - fillW) : barX;
+      const primaryTheme = tierColors[0] || accent;
+      const barGrad = ctx.createLinearGradient(fillX, barY, fillX + fillW, barY);
+      if (isRight) {
+        barGrad.addColorStop(0, accent);
+        barGrad.addColorStop(1, primaryTheme);
+      } else {
+        barGrad.addColorStop(0, primaryTheme);
+        barGrad.addColorStop(1, accent);
+      }
+      ctx.fillStyle = barGrad;
       ctx.beginPath();
       if (typeof ctx.roundRect === 'function') {
         ctx.roundRect(fillX, barY, fillW, barH, 2);

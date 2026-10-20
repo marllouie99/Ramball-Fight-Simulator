@@ -93,6 +93,8 @@ export class KnightFighter extends Fighter {
 
     // ── Tower Shield HP, Defense Buff & Broken State Mechanics ──
     const kConfig = CONFIG.knight || {};
+    this._baseDamage = Number(kConfig.damage ?? this.damage ?? 10);
+    this.damage = this._baseDamage;
     this.shieldMaxHp = kConfig.shieldMaxHp !== undefined ? kConfig.shieldMaxHp : 90;
     this.shieldHp = kConfig.shieldHp !== undefined ? kConfig.shieldHp : this.shieldMaxHp;
     this.shieldPassiveDefBuff = kConfig.shieldPassiveDefBuff !== undefined ? kConfig.shieldPassiveDefBuff : 0.40;
@@ -175,6 +177,7 @@ export class KnightFighter extends Fighter {
     this.shieldPassiveDefBuff = kConfig.shieldPassiveDefBuff !== undefined ? kConfig.shieldPassiveDefBuff : 0.40;
     this.shieldBrokenDefPenalty = kConfig.shieldBrokenDefPenalty !== undefined ? kConfig.shieldBrokenDefPenalty : 0.50;
     this.isShieldBroken = false;
+    this.damage = this._baseDamage;
     this.shieldBreakEffectTimer = 0;
     this.shieldBreakParticles = [];
     this.shieldShatterRingTimer = 0;
@@ -305,6 +308,9 @@ export class KnightFighter extends Fighter {
   _triggerShieldBreak(shieldAngle, attacker = null, opts = {}) {
     this.isShieldBroken = true;
     this.shieldHp = 0;
+    const kConfig = CONFIG.knight || {};
+    const damageMultiplier = kConfig.brokenShieldSwordDamageMultiplier ?? 2.0;
+    this.damage = Math.round(this._baseDamage * damageMultiplier);
     this.shieldBreakEffectTimer = 60;
 
     const contactX = this.shieldImpactX || (this.x + Math.cos(shieldAngle || 0) * (this.r + 14));
@@ -673,7 +679,7 @@ export class KnightFighter extends Fighter {
     // Minecraft Gold Sword Mechanic: Deals 2x damage when shield is broken
     const damageMultiplier = this.isShieldBroken ? (cfg.brokenShieldSwordDamageMultiplier ?? 2.0) : 1.0;
     dmg = Math.round(dmg * damageMultiplier);
-    this.damage = (this._baseDamage || 10) * damageMultiplier;
+    this.damage = Math.round(this._baseDamage * damageMultiplier);
 
     this.swordSwingDamage = dmg;
     this.swordSwingKnockback = kb;

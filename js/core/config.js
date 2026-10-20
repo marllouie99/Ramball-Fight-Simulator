@@ -228,9 +228,10 @@ export const CONFIG = {
   // counting consecutive damaging hits per side (see js/systems/comboTracker.js).
   comboCounter: {
     enabled: true,             // Master toggle for the on-screen combo counter
+    useFighterTheme: true,     // Dynamically adapt banner color theme to attacking fighter's signature colors
     windowFrames: 90,          // Frames without a hit before the chain expires (90 = 1.5s at 60 FPS)
     minHits: 1,                // Minimum chain length before a card is shown
-    edgeInset: 10,             // Horizontal inset from the window edge, in canvas px
+    edgeInset: 45,             // Horizontal inset aligned with the Top HUD frame & arena bounds (in canvas px)
     topGapBelowHud: 44,        // Card top = arena.y - this value (keeps it below the TOP HUD)
     slideFrames: 10,           // Slide-in / slide-out animation duration, in frames
     popFrames: 8,              // Impact pop animation duration on every new hit, in frames

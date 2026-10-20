@@ -20,9 +20,10 @@ import { state, isGlobalHitPauseActive } from '../core/state.js';
 
 const COMBO_DEFAULTS = Object.freeze({
   enabled: true,
+  useFighterTheme: true,   // Adapt banner color theme dynamically to each attacking fighter's signature color
   windowFrames: 90,        // 1.5 s at fixed 60 FPS before the chain expires
   minHits: 1,              // Shows from the first hit with active duration drain bar
-  edgeInset: 10,           // px from the window edge
+  edgeInset: 45,           // px from window edge aligned with Top HUD frame & arena bounds
   topGapBelowHud: 44,      // card top = arena.y - this (sits below the TOP HUD)
   slideFrames: 10,         // slide-in / slide-out duration
   popFrames: 8,            // impact pop duration on every new hit
@@ -59,6 +60,8 @@ function _makeSlot(side) {
     pop: 0,
     slideP: 0,
     phase: 'hidden', // 'hidden' | 'in' | 'hold' | 'out'
+    attackerFighter: null,
+    attackerFighterIndex: -1,
   };
 }
 
@@ -208,6 +211,29 @@ export function registerComboHit(attacker, target, actualDamage) {
   const windowFrames = Math.max(1, cfg.windowFrames || 90);
   slot.maxTimer = windowFrames;
 
+  // Resolve the root attacking fighter entity so the combo banner can reflect their signature color theme
+  const fIdx = resolveAttackerFighterIndex(attacker);
+  let attackerFighter = null;
+  if (fIdx >= 0 && Array.isArray(state.fighters) && state.fighters[fIdx]) {
+    attackerFighter = state.fighters[fIdx];
+  } else if (attacker && typeof attacker === 'object') {
+    if (attacker.isFighter || attacker.characterId) {
+      attackerFighter = attacker;
+    } else if (attacker.parentFighter && (attacker.parentFighter.isFighter || attacker.parentFighter.characterId)) {
+      attackerFighter = attacker.parentFighter;
+    } else if (attacker.fighter && (attacker.fighter.isFighter || attacker.fighter.characterId)) {
+      attackerFighter = attacker.fighter;
+    } else if (attacker.owner && (attacker.owner.isFighter || attacker.owner.characterId)) {
+      attackerFighter = attacker.owner;
+    }
+  }
+  if (attackerFighter) {
+    slot.attackerFighter = attackerFighter;
+  }
+  if (fIdx >= 0) {
+    slot.attackerFighterIndex = fIdx;
+  }
+
   // If previous combo has expired / duration ended (phase is hidden, sliding out, or timer expired):
   // Start a new combo chain
   if (slot.phase === 'hidden' || slot.phase === 'out' || slot.timer <= 0) {
@@ -290,6 +316,8 @@ export function tickComboTrackers() {
         slot.damage = 0;
         slot.timer = 0;
         slot.slideP = 0;
+        slot.attackerFighter = null;
+        slot.attackerFighterIndex = -1;
       }
     }
   }
@@ -310,5 +338,7 @@ export function resetComboTrackers() {
     slot.pop = 0;
     slot.slideP = 0;
     slot.phase = 'hidden';
+    slot.attackerFighter = null;
+    slot.attackerFighterIndex = -1;
   }
 }

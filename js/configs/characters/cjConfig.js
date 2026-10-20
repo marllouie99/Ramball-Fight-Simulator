@@ -68,7 +68,7 @@ export const cjConfig = {
   enableBrassKnuckles: true,   // Master toggle for Brass Knuckles street boxing
   meleePunchReach: 30,         // 50px punch reach
   meleePunchArc: (120 * Math.PI) / 180, // 120° wide multi-target frontal arc (Rule 8)
-  meleePunchDamage: 4,        // Punch damage
+  meleePunchDamage: 3,        // Punch damage
   meleePunchCooldown: 18,      // 18 frames (~0.30s) fast boxing cadence
   meleeKnockback: 0.0,        // Physical pushback impulse
   meleeHitShakeIntensity: 2.2, // Screen shake on brass knuckle connection
@@ -130,7 +130,7 @@ export const cjConfig = {
   baguvixDuration: 800,        // 5.0s (300 frames) invulnerability
   baguvixSpeedMultiplier: 0.28,// Significantly reduced slow walking speed (~1.54 px/frame) while wielding heavy minigun
   minigunFireRate: 5,          // Ultra-fast fire (every 2 frames = 30-45 rounds/sec)
-  minigunBulletDamage: 2,     // 12 damage per armor-piercing round
+  minigunBulletDamage: 3,     // 12 damage per armor-piercing round
   minigunBulletSpeed: 26.0,    // Supersonic armor-piercing projectile speed
   minigunKnockback: 0.0,       // Physical bullet pushback impulse (removed)
   minigunSpread: 0.05,         // Tight high-velocity spread

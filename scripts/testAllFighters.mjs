@@ -9639,6 +9639,10 @@ async function main() {
     if (knight.shieldHp !== initialShieldHp || knight.isShieldBroken !== false) {
       throw new Error(`Expected initial knight shieldHp=${initialShieldHp}, isShieldBroken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
     }
+    const baseDamage = CONFIG.knight?.damage ?? 28;
+    if (knight.damage !== baseDamage) {
+      throw new Error(`Expected Knight HUD damage=${baseDamage} with shield active, got ${knight.damage}`);
+    }
 
     const initialHp = knight.hp;
     // 1. Attack active shield: 30 incoming damage, with 40% DEF buff -> 18 damage to shield
@@ -9658,6 +9662,10 @@ async function main() {
     knight.takeDamage(1000, null, {});
     if (knight.shieldHp !== 0 || knight.isShieldBroken !== true) {
       throw new Error(`Expected shieldHp=0 and isShieldBroken=true after heavy hit, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
+    }
+    const brokenShieldDamage = Math.round(baseDamage * (CONFIG.knight?.brokenShieldSwordDamageMultiplier ?? 2));
+    if (knight.damage !== brokenShieldDamage) {
+      throw new Error(`Expected Knight HUD damage=${brokenShieldDamage} after shield break, got ${knight.damage}`);
     }
     if (knight.hp !== initialHp) {
       throw new Error(`Expected Knight HP to remain ${initialHp} on the shield-breaking blow, got ${knight.hp}`);
@@ -9681,6 +9689,9 @@ async function main() {
     knight.reset();
     if (knight.shieldHp !== initialShieldHp || knight.isShieldBroken !== false) {
       throw new Error(`Expected reset to restore shieldHp=${initialShieldHp}, broken=false, got shieldHp=${knight.shieldHp}, broken=${knight.isShieldBroken}`);
+    }
+    if (knight.damage !== baseDamage) {
+      throw new Error(`Expected Knight HUD damage=${baseDamage} after reset, got ${knight.damage}`);
     }
 
     // 6. Test SKILL DAMAGE absorption on active shield

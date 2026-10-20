@@ -8688,7 +8688,7 @@ async function runInteractionTests() {
   {
     console.log('   85. Testing Combo Counter Refactor: Non-Resetting On-Hit Accumulation & Duration Expiration...');
     const { registerComboHit, ensureComboTrackers, tickComboTrackers, resetComboTrackers } = await import('../js/systems/comboTracker.js');
-    const { drawComboCounter } = await import('../js/graphics/hudManager.js');
+    const { drawComboCounter, getFighterComboTierColors } = await import('../js/graphics/hudManager.js');
     const { Fighter } = await import('../js/entities/fighter.js');
 
     const p1 = new Fighter({ x: 100, y: 300, radius: 25, hp: 500, maxHp: 500 });
@@ -8721,6 +8721,7 @@ async function runInteractionTests() {
       assert(slots[0].damage === 35, `Slot 0 damage must be 35 on first hit (got ${slots[0].damage})`);
       assert(slots[0].timer === 90, `Slot 0 timer must be initialized to 90 (got ${slots[0].timer})`);
       assert(slots[0].phase === 'in', `Slot 0 phase must transition to 'in' on first hit (got ${slots[0].phase})`);
+      assert(slots[0].attackerFighter === p1, 'Slot 0 must record p1 as attackerFighter');
       assert(slots[1].hits === 0, 'Slot 1 must remain untouched when P1 hits P2');
 
       // Advance frames and verify duration is draining
@@ -8750,6 +8751,7 @@ async function runInteractionTests() {
       registerComboHit(p2, p1, 50);
       assert(slots[1].hits === 1, `Slot 1 hits must be 1 when P2 hits P1 (got ${slots[1].hits})`);
       assert(slots[1].damage === 50, `Slot 1 damage must be 50 (got ${slots[1].damage})`);
+      assert(slots[1].attackerFighter === p2, 'Slot 1 must record p2 as attackerFighter');
       assert(slots[0].hits === 3, `Slot 0 hits MUST NOT RESET when opponent hits back (got ${slots[0].hits})`);
       assert(slots[0].damage === 100, `Slot 0 damage MUST NOT RESET when opponent hits back (got ${slots[0].damage})`);
 
@@ -8803,6 +8805,19 @@ async function runInteractionTests() {
       mockCtx.resetStackDepth();
       drawComboCounter(mockCtx);
       assert(mockCtx.getStackDepth() === 0, 'drawComboCounter with 150 hits corrupted canvas stack depth');
+
+      // 10. Verify Fighter Color Theme Palette Resolution
+      const cjTiers = getFighterComboTierColors({ characterId: 'cj' }, '#EF4444');
+      assert(Array.isArray(cjTiers) && cjTiers.length === 4, 'CJ must produce 4 combo tier colors');
+      // CJ's Grove Street green base (#16A34A / hue ~142)
+      assert(cjTiers[0].includes('142'), `CJ Tier 0 must be derived from Grove Street green hue 142 (got ${cjTiers[0]})`);
+      // CJ's secondary color Sunset Gold (#F59E0B / hue ~38)
+      assert(cjTiers[2].includes('38') || cjTiers[2] === '#F59E0B', `CJ Tier 2 must incorporate San Andreas Sunset Gold (got ${cjTiers[2]})`);
+
+      // 11. Verify Custom comboTierColors override takes precedence if defined
+      const customFighter = { comboTierColors: ['#111111', '#222222', '#333333', '#444444'] };
+      const customTiers = getFighterComboTierColors(customFighter, '#38BDF8');
+      assert(customTiers[0] === '#111111' && customTiers[3] === '#444444', 'Explicit comboTierColors must take precedence');
 
       console.log('      ✅ Combo Counter Refactor: Non-Resetting On-Hit Accumulation & Duration Expiration verified successfully.');
     } finally {
