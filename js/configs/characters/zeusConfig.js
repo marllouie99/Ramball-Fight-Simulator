@@ -5,6 +5,7 @@ export const zeusConfig = {
   assets: {
     hair: 'Assets/model/zeus/Zeus-hair.png',
     crown: 'Assets/model/zeus/Zeus-crown.png',
+    thunderstrike: 'Assets/model/zeus/thunderstrike/explosion-b.png',
   },
 
   // ── Base Attributes ──
@@ -84,7 +85,7 @@ export const zeusConfig = {
   stormCastShakeFrames: 20,    // Duration of activation screen shake
   stormStrikeShakeIntensity: 4,// Screen shake impulse on each individual lightning strike
   stormStrikeShakeFrames: 10,  // Duration of strike impact screen shake
-  stormStrikeVisualLife: 15,   // Lifespan of sky-to-ground thunder bolt particle in frames
+  stormStrikeVisualLife: 18,   // Lifespan of sky-to-ground thunder bolt particle in frames (12-frame animation)
   stormStrikeFlashRadius: 50,  // Impact flash radius on storm strike
   stormStrikeSparkCount: 10,   // Spark particle count on storm strike
 };

@@ -8,6 +8,7 @@ export const gojoConfig = {
     pixelSkin: 'Assets/model/gojo/Saturo-Gojo-PIXEL-SKIN.png',
     skillIcons: 'Assets/model/gojo/Gojo-Skill-icons.png',
     domainOverlay: 'Assets/Overlays/gojo-domainexpansion.png',
+    purpleExplosion: 'Assets/model/gojo/purple_explosion/purple_explosion-b.png',
   },
 
   name: 'Gojo',

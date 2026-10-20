@@ -583,3 +583,120 @@ export function drawAnamorphicLensFlare(ctx, x, y, flareP, colorType = 'purple')
 
     ctx.restore();
 }
+
+// ─────────────────────────────────────────────
+// Gojo Hollow Purple 12-Frame Explosion Animation
+// ─────────────────────────────────────────────
+const GOJO_PURPLE_EXPLOSION_FRAME_COUNT = 12;
+const GOJO_PURPLE_EXPLOSION_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/model/gojo/purple_explosion/explosion-${i + 1}.png`
+);
+
+let _gojoPurpleExplosionFrames = [];
+let _gojoPurpleExplosionFramesLoading = false;
+
+export function _getGojoPurpleExplosionFrames() {
+  if (
+    _gojoPurpleExplosionFrames.length === GOJO_PURPLE_EXPLOSION_FRAME_COUNT &&
+    _gojoPurpleExplosionFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _gojoPurpleExplosionFrames;
+  }
+  if (!_gojoPurpleExplosionFramesLoading && typeof Image !== 'undefined') {
+    _gojoPurpleExplosionFramesLoading = true;
+    _gojoPurpleExplosionFrames = [];
+    GOJO_PURPLE_EXPLOSION_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _gojoPurpleExplosionFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Gojo Purple explosion frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _gojoPurpleExplosionFrames[idx] = img;
+    });
+  }
+  return _gojoPurpleExplosionFrames;
+}
+
+// Proactive eager initialization in browser environment
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getGojoPurpleExplosionFrames();
+}
+
+/**
+ * Draws the 12-frame retro pixel art Hollow Purple explosion animation.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} maxR Effect radius in arena pixels
+ * @param {number} p Progress 0.0 to 1.0 (elapsed / maxTimer)
+ * @param {number} alpha Base opacity
+ * @param {boolean} is200 True if 200% empowered cast
+ * @param {boolean} isGreen True if Rubbick stolen purple
+ * @returns {boolean} True if frame was successfully rendered
+ */
+export function _drawGojoAnimatedPurpleExplosionSprite(ctx, maxR, p, alpha = 1.0, is200 = false, isGreen = false) {
+  const frames = _getGojoPurpleExplosionFrames();
+  const frameIndex = Math.min(11, Math.max(0, Math.floor(p * 12)));
+  const frameImg = frames[frameIndex];
+
+  if (!frameImg || !frameImg.complete || ((frameImg.naturalWidth || frameImg.width || 0) <= 0)) {
+    return false;
+  }
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.imageSmoothingEnabled = false;
+
+  // Natural fade-out on late dissipating frames (frames 1-9 solid, 10-12 dissolve)
+  const fadeAlpha = p > 0.82 ? Math.max(0, (1.0 - p) / 0.18) : 1.0;
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * alpha * fadeAlpha));
+
+  // Frame is 256x256px centered at (128, 128)
+  const scaleMult = is200 ? 1.45 : 1.15;
+  const scale = (maxR * scaleMult) / 115.0;
+  const drawW = 256 * scale;
+  const drawH = 256 * scale;
+  const anchorX = 128 * scale;
+  const anchorY = 128 * scale;
+
+  if (isGreen) {
+    ctx.save();
+    ctx.filter = 'hue-rotate(240deg)';
+    ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+    ctx.restore();
+  } else {
+    ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+  }
+
+  // Restore context state cleanly (Rule 2.4 Stack Integrity)
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  return true;
+}
+
+/**
+ * Draws Gojo's Hollow Purple detonation explosion.
+ * Features:
+ * - 12-Frame authentic pixel art Hollow Purple explosion animation
+ * - Scaled and centered on detonation epicenter
+ * - Zero shadowBlur (Rule 11) & balanced Canvas 2D transform stack depth (Rule 2.4)
+ */
+export function drawGojoPurpleExplosion(ctx, blast) {
+  if (!blast) return;
+
+  const p = blast.p !== undefined ? blast.p : (blast.maxTimer ? Math.max(0, Math.min(1.0, 1.0 - (blast.timer / blast.maxTimer))) : 0);
+  const maxR = blast.radius || 280;
+  const alpha = blast.alpha !== undefined ? blast.alpha : 1.0;
+  const is200 = Boolean(blast.is200);
+  const isGreen = Boolean(blast.isGreen);
+
+  ctx.save();
+  ctx.translate(blast.x, blast.y);
+
+  _drawGojoAnimatedPurpleExplosionSprite(ctx, maxR, p, alpha, is200, isGreen);
+
+  ctx.restore();
+}
+

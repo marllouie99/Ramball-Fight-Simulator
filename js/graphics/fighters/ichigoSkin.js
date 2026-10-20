@@ -2607,7 +2607,7 @@ export function getIchigoSwingKinematics(fighter) {
         } else if (elapsed < strikeEnd) {
           phase = 3;
           strikeP = (elapsed - strikeStart) / Math.max(1, strikeF);
-          const whipEase = Math.pow(strikeP, 2.5);
+          const whipEase = Math.pow(strikeP, 1.25);
           swingAngle = -1.55 + (1.20 - (-1.55)) * whipEase;
           thrustDistance = -8.0 + 22.0 * Math.sin(strikeP * Math.PI * 0.5);
           bodyShiftX = -3.0 + 7.0 * Math.sin(strikeP * Math.PI * 0.5);
@@ -2651,7 +2651,7 @@ export function getIchigoSwingKinematics(fighter) {
         } else if (elapsed < strikeEnd) {
           phase = 3;
           strikeP = (elapsed - strikeStart) / Math.max(1, strikeF);
-          const whipEase = Math.pow(strikeP, 2.4);
+          const whipEase = Math.pow(strikeP, 1.25);
           swingAngle = 1.10 + (-1.40 - 1.10) * whipEase;
           thrustDistance = -6.0 + 20.0 * Math.sin(strikeP * Math.PI * 0.5);
           bodyShiftX = -2.5 + 6.5 * Math.sin(strikeP * Math.PI * 0.5);
@@ -2696,7 +2696,7 @@ export function getIchigoSwingKinematics(fighter) {
         } else if (elapsed < strikeEnd) {
           phase = 3;
           strikeP = (elapsed - strikeStart) / Math.max(1, strikeF);
-          const whipEase = Math.pow(strikeP, 2.6);
+          const whipEase = Math.pow(strikeP, 1.25);
           swingAngle = -1.95 + (1.35 - (-1.95)) * whipEase;
           thrustDistance = -10.0 + 26.0 * Math.sin(strikeP * Math.PI * 0.5);
           bodyShiftX = -4.0 + 9.5 * Math.sin(strikeP * Math.PI * 0.5);
@@ -2840,6 +2840,81 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   }
 
   // Apply fighter body angle
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  const worldX = fighter.x + (localX * cosA - localY * sinA);
+  const worldY = fighter.y + (localX * sinA + localY * cosA);
+
+  return { x: worldX, y: worldY };
+}
+
+/**
+ * Returns the exact world coordinates of Zangetsu's blade tip kissaki.
+ * Calculates forward kinematics matching renderZangetsu to anchor slash effects,
+ * sparks, and impact compression rings directly at the weapon tip.
+ * @param {Object} fighter
+ * @param {boolean} [isBankai=false]
+ * @returns {{ x: number, y: number }}
+ */
+export function getZangetsuTipWorldPos(fighter, isBankai = false) {
+  if (!fighter) return { x: 0, y: 0 };
+  const r = fighter.r || 25;
+  let angle = (fighter.swordSlashAngle !== undefined)
+    ? fighter.swordSlashAngle
+    : ((fighter.gunAngle !== undefined) ? fighter.gunAngle : (fighter.angle || 0));
+  while (angle > Math.PI) angle -= Math.PI * 2;
+  while (angle < -Math.PI) angle += Math.PI * 2;
+  const facingLeft = Math.cos(angle) < 0;
+
+  const isBackSlungPose = Boolean(
+    fighter._isWinnerReveal || 
+    (typeof state !== 'undefined' && (
+      state.gameState === 'faceoff' ||
+      state.gameState === 'weaponIndex' || 
+      state.gameState === 'characterSelect' || 
+      state.gameState === 'indexDetail' || 
+      state._isFaceOffScreenActive ||
+      state.isRandomRollShowoff
+    )) ||
+    fighter.isDemoFighter ||
+    fighter._isFaceOff
+  );
+
+  const isHollowChanneling = Boolean((fighter.hollowMaskFormationTimer && fighter.hollowMaskFormationTimer > 0) || (fighter.hollowBurstTimer && fighter.hollowBurstTimer > 0) || fighter._hollowVoicelineWait);
+  const isSlashing = Boolean(fighter.slashSwingTimer > 0);
+  const isBankaiForm = Boolean(isBankai || fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask');
+  const isBankaiStance = isBackSlungPose && isBankaiForm;
+
+  const kin = getIchigoSwingKinematics(fighter);
+  const swingAngle = kin.swingAngle;
+  const thrustDistance = kin.thrustDistance;
+  const bodyShiftX = kin.bodyShiftX;
+
+  const swordStartX = isHollowChanneling ? 0 : (isBankaiStance ? (r * 0.82 + 16) : ((isSlashing || !isBackSlungPose) ? (r * (isBankaiForm ? 0.65 : 0.68)) : (-r * (isBankaiForm ? 0.65 : 0.72))));
+  const scale = isBankaiForm ? 1.0 : 0.90;
+  
+  // Forward kinematics to blade tip kissaki:
+  const innerX = isBankaiForm ? (swordStartX + 94) : (swordStartX + 120 * scale);
+  const innerY = isBankaiForm ? 0 : (-10 * scale);
+  const theta = swingAngle;
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+
+  const gripOffsetY = (!isBackSlungPose || isBankaiStance) ? (r * 0.52) : 0;
+  const localX = isHollowChanneling
+    ? (r * 0.48 + innerX * cosT - innerY * sinT)
+    : (innerX * cosT - innerY * sinT + (thrustDistance + bodyShiftX + (fighter.swordTremorX || 0)));
+  let localY = isHollowChanneling
+    ? (r * 0.52 + innerX * sinT + innerY * cosT)
+    : (innerX * sinT + innerY * cosT + gripOffsetY + (fighter.swordTremorY || 0));
+
+  if (facingLeft) {
+    localY = -localY;
+  }
+  if (isBankaiStance) {
+    localY = -localY;
+  }
+
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
   const worldX = fighter.x + (localX * cosA - localY * sinA);

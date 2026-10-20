@@ -5,7 +5,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { stopSound } from '../../systems/soundSystem.js';
 import { drawIchigoSkin, updateZangetsuRibbonPhysics, updateTensaZangetsuChainPhysics } from '../../graphics/fighters/ichigoSkin.js';
 import { fastCleanArray } from '../../graphics/particles/visualTrailSystem.js';
-import { drawIchigoSlashArc } from '../../graphics/weapons/ichigoWeaponGraphics.js';
+import { drawIchigoSlashArc, updateIchigoSlashEffects } from '../../graphics/weapons/ichigoWeaponGraphics.js';
 import { spawnHollowMaskShatter } from '../../graphics/particles/deathShatterEffect.js';
 import {
   activateHollowMask,
@@ -149,6 +149,7 @@ export class IchigoFighter extends Fighter {
     this.blockPoseTimer = 0;
     this.parryHitAnimTimer = 0;
     this.isMeleeCleave = false;
+    this.activeSlashEffects = [];
     this.isShunpoDashing = false;
     this.shunpoDashTimer = 0;
     this.shunpoStartX = 0;
@@ -452,6 +453,7 @@ export class IchigoFighter extends Fighter {
     this.blockPoseTimer = 0;
     this.parryHitAnimTimer = 0;
     this.isMeleeCleave = false;
+    this.activeSlashEffects = [];
     this.isShunpoDashing = false;
     this.shunpoDashTimer = 0;
     this.shunpoComboActive = false;
@@ -988,8 +990,12 @@ export class IchigoFighter extends Fighter {
     if (this.isDead || this.isRespawning || this.hp <= 0) {
       this.stopAllSkillAudios(true);
       this.afterImages = [];
+      if (this.activeSlashEffects) this.activeSlashEffects.length = 0;
       return;
     }
+
+    // 0. Update visual effects & transient particle lifecycles before freeze guard (Rule 25)
+    updateIchigoSlashEffects(this);
 
     this._tickCooldowns();
 

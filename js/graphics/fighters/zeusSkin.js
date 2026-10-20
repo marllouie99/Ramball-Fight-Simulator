@@ -12,6 +12,7 @@
 
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 const P = 2.0; // 2.0px authentic retro pixel grid
 
@@ -78,7 +79,7 @@ export function _drawZeusHair(ctx, r, isStormActive = false, facingLeft = false)
   const hairImg = _getZeusHairImage();
   if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
     ctx.save();
-    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp retro pixel art fidelity (Rule 22)
 
     const custom = (typeof state !== 'undefined' && (state.skinCustomizations?.zeus || state.skinCustomizations?.zeus_hair)) || {};
     const wMult = custom.widthScale ?? 1.0;
@@ -126,7 +127,7 @@ export function _drawZeusCrown(ctx, r, isStormActive = false, facingLeft = false
   const crownImg = _getZeusCrownImage();
   if (crownImg && crownImg.complete && crownImg.naturalWidth > 0) {
     ctx.save();
-    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp retro pixel art fidelity (Rule 22)
 
     const custom = (typeof state !== 'undefined' && (state.skinCustomizations?.zeus_crown || state.skinCustomizations?.zeus?.crown)) || {};
     const wMult = custom.widthScale ?? 1.0;
@@ -164,77 +165,41 @@ export function _drawZeusCrown(ctx, r, isStormActive = false, facingLeft = false
 }
 
 /**
- * Draws a smooth Olympian hand with golden wrist vambrace for Zeus.
+ * Draws a retro pixel art hand with golden wrist vambrace for Zeus (Rule 20).
  */
-export function drawZeusHand(ctx, cx, cy, radius = 5.6, skinColor = '#FCD34D', isStorm = false, angle = 0) {
+export function drawZeusHand(ctx, cx, cy, radius = 5.6, skinColor = '#F3BF9F', isStorm = false, angle = 0) {
   ctx.save();
   ctx.translate(cx, cy);
   if (angle !== 0) {
     ctx.rotate(angle);
   }
 
-  // 1. Golden Olympian Armored Vambrace / Gauntlet
-  const cuffW = radius * 1.5;
-  const cuffH = radius * 0.9;
-  const bx = -cuffW * 0.5;
-  const by = -radius * 0.35 - cuffH;
+  // 1. Golden Olympian Armored Vambrace / Gauntlet (Discrete Stepped Pixel Rectangles)
+  const cuffW = Math.round(radius * 1.6);
+  const cuffH = Math.round(radius * 0.9);
+  const bx = Math.round(-cuffW * 0.5);
+  const by = Math.round(-radius * 0.35 - cuffH);
 
-  const vambraceGrad = ctx.createLinearGradient(bx, by, bx + cuffW, by);
-  if (isStorm) {
-    vambraceGrad.addColorStop(0, '#0284C7');
-    vambraceGrad.addColorStop(0.5, '#E0F2FE');
-    vambraceGrad.addColorStop(1, '#0284C7');
-  } else {
-    vambraceGrad.addColorStop(0, '#CA8A04');
-    vambraceGrad.addColorStop(0.3, '#FEF08A');
-    vambraceGrad.addColorStop(0.6, '#FACC15');
-    vambraceGrad.addColorStop(1, '#A16207');
-  }
-
-  ctx.beginPath();
-  ctx.rect(bx, by, cuffW, cuffH);
-  ctx.fillStyle = vambraceGrad;
-  ctx.fill();
-  ctx.strokeStyle = isStorm ? '#0369A1' : '#78350F';
+  // Vambrace base gold / electric cyan
+  ctx.fillStyle = isStorm ? '#0284C7' : '#CA8A04';
+  ctx.fillRect(bx, by, cuffW, cuffH);
+  // Highlight facet band
+  ctx.fillStyle = isStorm ? '#38BDF8' : '#FACC15';
+  ctx.fillRect(bx + 1, by + 1, cuffW - 2, Math.max(1, cuffH - 2));
+  // Vambrace ink outline
+  ctx.strokeStyle = '#0E0F14';
   ctx.lineWidth = 1.0;
-  ctx.stroke();
+  ctx.strokeRect(bx - 0.5, by - 0.5, cuffW + 1, cuffH + 1);
 
-  // 2. Smooth Hand / Fist
-  const handGrad = ctx.createRadialGradient(-radius * 0.2, -radius * 0.2, radius * 0.1, 0, 0, radius);
-  if (isStorm) {
-    handGrad.addColorStop(0, '#FFFFFF');
-    handGrad.addColorStop(0.5, '#BAE6FD');
-    handGrad.addColorStop(1, '#0284C7');
-  } else {
-    handGrad.addColorStop(0, '#FFF0E4');
-    handGrad.addColorStop(0.4, '#FDE68A');
-    handGrad.addColorStop(0.8, '#FCD34D');
-    handGrad.addColorStop(1, '#B87E60');
-  }
-
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fillStyle = handGrad;
-  ctx.fill();
-  ctx.strokeStyle = isStorm ? '#0284C7' : '#1E293B';
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
-
-  // 3. Knuckles & Finger Grip Definition wrapping over the weapon shaft
-  ctx.strokeStyle = isStorm ? 'rgba(2, 132, 199, 0.65)' : 'rgba(120, 53, 15, 0.55)';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.65, -0.4, 0.8);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.35, -0.3, 0.7);
-  ctx.stroke();
+  // 2. Canonical Round Pixel Hand (Rule 20)
+  const actualSkin = skinColor || (isStorm ? '#BAE6FD' : '#F3BF9F');
+  drawPixelHand(ctx, 0, 0, radius, actualSkin, '#0E0F14');
 
   ctx.restore();
 }
 
 export function _drawZeusVambrace(ctx, cx, cy, radius = 6.4, isStorm = false) {
-  drawZeusHand(ctx, cx, cy, radius, '#FCD34D', isStorm);
+  drawZeusHand(ctx, cx, cy, radius, isStorm ? '#BAE6FD' : '#F3BF9F', isStorm);
 }
 
 let _cachedZeusCanvas = null;
@@ -242,14 +207,14 @@ let _cachedZeusR = 0;
 let _cachedZeusStorm = false;
 
 /**
- * Solid 2D Pixel-Art Body for Zeus (Offscreen Cache Pattern)
+ * Solid 2D Pixel-Art Body for Zeus (Offscreen Cache Pattern, Rule 24 Toji Standard)
  */
 export function drawZeusBody(ctx, r = 25, isStormActive = false) {
   const intR = Math.round(r);
   if (!_cachedZeusCanvas || _cachedZeusR !== intR || _cachedZeusStorm !== isStormActive) {
     const P = 2.0;
     const steps = Math.ceil((intR + P) / P);
-    const size = (steps + 2) * P * 2;
+    const size = (steps * 2 + 1) * P;
     const offscreen = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
     if (offscreen) {
       offscreen.width = size;
@@ -267,7 +232,8 @@ export function drawZeusBody(ctx, r = 25, isStormActive = false) {
   if (_cachedZeusCanvas) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(_cachedZeusCanvas, -_cachedZeusCanvas.width / 2, -_cachedZeusCanvas.height / 2);
+    const size = _cachedZeusCanvas.width;
+    ctx.drawImage(_cachedZeusCanvas, -size / 2, -size / 2);
     ctx.restore();
   } else {
     _renderZeusPixelBodyToCanvas(ctx, intR, isStormActive);
@@ -275,11 +241,17 @@ export function drawZeusBody(ctx, r = 25, isStormActive = false) {
 }
 
 /**
- * Procedural discrete grid rasterization of Zeus's body
+ * Procedural discrete grid rasterization of Zeus's body matching Rule 24 (Toji standard):
+ * - Stepped dark manga ink outline (#0E0F14) with 4-neighbor boundary test
+ * - Zone 1: Pure Face Dome (tan athletic Olympian god skin tone, forehead highlight, side contour, faceless)
+ * - Zone 2: Upper Torso (golden gorget collar + draped white royal toga on left + bare muscular chest on right)
+ * - Zone 3: Golden Armored Belt & Diamond Buckle
+ * - Zone 4: Pleated White Himation / Skirt
  */
-function _renderZeusPixelBodyToCanvas(ctx, r, isStorm = false) {
+function _renderZeusPixelBodyToCanvas(destCtx, r, isStorm = false) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
   const P = 2.0;
-  const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
   for (let gy = -steps; gy <= steps; gy++) {
@@ -289,13 +261,10 @@ function _renderZeusPixelBodyToCanvas(ctx, r, isStorm = false) {
       const dist = Math.hypot(rx, ry);
       if (dist > r) continue;
 
-      const px = snap(rx);
-      const py = snap(ry);
-      const normY = ry / r;
-      const normX = rx / r;
-      const absGx = Math.abs(gx);
+      const px = rx - P / 2;
+      const py = ry - P / 2;
 
-      // 4-neighbor attached boundary test for solid dark manga ink outline
+      // 4-neighbor attached boundary test for solid dark manga ink outline (Rule 24)
       const isBorder = (
         Math.hypot((gx + 1) * P, gy * P) > r ||
         Math.hypot((gx - 1) * P, gy * P) > r ||
@@ -304,62 +273,99 @@ function _renderZeusPixelBodyToCanvas(ctx, r, isStorm = false) {
       );
 
       if (isBorder) {
-        ctx.fillStyle = isStorm ? '#00E5FF' : '#0E0F14';
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = '#0E0F14';
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
-      // ── ZONE 1: Pure Face Dome (normY < 0.30) ──
-      if (normY < 0.30) {
-        if (normY < -0.40) {
-          ctx.fillStyle = isStorm ? '#FFFFFF' : '#FFF0E4'; // Forehead highlight
-        } else if (normY < 0.10) {
-          ctx.fillStyle = isStorm ? '#BAE6FD' : '#F3BF9F'; // Sun-kissed Olympian god skin base
-        } else {
-          ctx.fillStyle = isStorm ? '#38BDF8' : '#D4A373'; // Lower chin & jaw contour
+      // ──────────────────────────────────────────
+      // ZONE 1: Face Dome & Cheeks (ry < r * 0.28)
+      // ──────────────────────────────────────────
+      if (ry < r * 0.28) {
+        let col = isStorm ? '#BAE6FD' : '#F3BF9F'; // Sun-kissed Olympian god skin base
+        if (ry < -r * 0.40) {
+          col = isStorm ? '#FFFFFF' : '#FFF0E4'; // Upper forehead highlight
+        } else if (Math.abs(rx) > r * 0.70) {
+          col = isStorm ? '#38BDF8' : '#D4A373'; // Cheek & jaw contour
         }
-        ctx.fillRect(px, py, P, P);
-        continue;
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
       }
-
-      // ── ZONE 2: Draped White Toga & Bare Muscular God Chest (0.30 <= normY < 0.68) ──
-      const isGorget = gy >= 3 && gy <= 5 && absGx <= 5;
-      const isToga = gx <= 1 && (normY >= 0.30 && normY < 0.68);
-
-      if (isGorget) {
-        // Golden Gorget Collar
-        if (absGx <= 1) {
-          ctx.fillStyle = isStorm ? '#FFFFFF' : '#FEF08A'; // Center glint
-        } else {
-          ctx.fillStyle = isStorm ? '#38BDF8' : '#FACC15'; // Olympian gold
+      // ──────────────────────────────────────────
+      // ZONE 2: Upper Torso / Royal Toga & Gorget (r * 0.28 <= ry < r * 0.64)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.64) {
+        // Upper Gorget Collar rim (ry < r * 0.36 && |rx| <= r * 0.45)
+        if (ry < r * 0.36 && Math.abs(rx) <= r * 0.45) {
+          if (Math.abs(rx) <= P * 0.8) {
+            destCtx.fillStyle = isStorm ? '#FFFFFF' : '#FEF08A'; // Center glint
+          } else if (Math.abs(rx) <= r * 0.28) {
+            destCtx.fillStyle = isStorm ? '#38BDF8' : '#FACC15'; // Olympian gold
+          } else {
+            destCtx.fillStyle = isStorm ? '#0284C7' : '#CA8A04'; // Gorget dark edge
+          }
         }
-      } else if (isToga) {
-        // White Draped Toga (Left side)
-        const isTogaShadow = absGx === 3 || gy === 7;
-        ctx.fillStyle = isTogaShadow ? (isStorm ? '#BAE6FD' : '#CBD5E1') : (isStorm ? '#FFFFFF' : '#F8FAFC');
-      } else if (normY >= 0.68 && normY < 0.78) {
-        // ── ZONE 3: Golden Armored Belt & Diamond Buckle (0.68 <= normY < 0.78) ──
-        if (absGx <= 2) {
-          ctx.fillStyle = isStorm ? '#FFFFFF' : '#FEF08A'; // Buckle diamond plate
-        } else {
-          ctx.fillStyle = isStorm ? '#0284C7' : '#FACC15'; // Golden belt band
+        // Left Side: Draped Royal White Toga (rx <= r * 0.12)
+        else if (rx <= r * 0.12) {
+          if (Math.abs(rx - r * 0.08) <= P * 0.6) {
+            destCtx.fillStyle = isStorm ? '#0284C7' : '#94A3B8'; // Center draped fold crease
+          } else if (Math.abs(rx + r * 0.36) <= P * 0.8 || ry > r * 0.56) {
+            destCtx.fillStyle = isStorm ? '#BAE6FD' : '#CBD5E1'; // Toga fold shadow
+          } else {
+            destCtx.fillStyle = isStorm ? '#FFFFFF' : '#F8FAFC'; // Crisp white toga fabric
+          }
         }
-      } else if (normY >= 0.78) {
-        // ── ZONE 4: White Pleated Himation / Skirt (normY >= 0.78) ──
-        const isPleat = absGx === 0 || absGx === 4 || absGx === 8;
-        ctx.fillStyle = isPleat ? (isStorm ? '#38BDF8' : '#CBD5E1') : (isStorm ? '#BAE6FD' : '#FFFFFF');
-      } else {
-        // Bare Muscular God Chest (Right side)
-        const isPectoralLine = (gy === 7 && gx >= 2 && gx <= 7);
-        if (isPectoralLine) {
-          ctx.fillStyle = isStorm ? '#0284C7' : '#B87E60'; // Pectoral shadow underline
-        } else {
-          ctx.fillStyle = isStorm ? '#7DD3FC' : '#E8AC8B'; // Muscular tanned chest
+        // Right Side: Bare Muscular Olympian God Chest (rx > r * 0.12)
+        else {
+          if (ry >= r * 0.52 && ry <= r * 0.58 && rx >= r * 0.20 && rx <= r * 0.68) {
+            destCtx.fillStyle = isStorm ? '#0284C7' : '#B87E60'; // Pectoral shadow line
+          } else if (ry >= r * 0.38 && ry < r * 0.50 && rx >= r * 0.25 && rx <= r * 0.65) {
+            destCtx.fillStyle = isStorm ? '#E0F2FE' : '#F8CDB1'; // Pectoral muscle highlight
+          } else {
+            destCtx.fillStyle = isStorm ? '#7DD3FC' : '#E8AC8B'; // Muscular tanned chest
+          }
         }
+        destCtx.fillRect(px, py, P, P);
       }
-      ctx.fillRect(px, py, P, P);
+      // ──────────────────────────────────────────
+      // ZONE 3: Golden Armored Belt & Diamond Buckle (r * 0.64 <= ry < r * 0.78)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.78) {
+        // Center Diamond Buckle (|rx| <= r * 0.16)
+        if (Math.abs(rx) <= r * 0.16) {
+          if (Math.abs(rx) <= P * 0.6) {
+            destCtx.fillStyle = isStorm ? '#FFFFFF' : '#FEF08A'; // Center diamond shine
+          } else {
+            destCtx.fillStyle = isStorm ? '#38BDF8' : '#FACC15'; // Buckle plate
+          }
+        } else {
+          if (ry < r * 0.68) {
+            destCtx.fillStyle = isStorm ? '#7DD3FC' : '#FEF08A'; // Belt upper rim glint
+          } else if (ry > r * 0.73) {
+            destCtx.fillStyle = isStorm ? '#0369A1' : '#CA8A04'; // Belt lower shadow
+          } else {
+            destCtx.fillStyle = isStorm ? '#0284C7' : '#FACC15'; // Belt gold band
+          }
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 4: Lower Pleated Himation Skirt (ry >= r * 0.78)
+      // ──────────────────────────────────────────
+      else {
+        if (Math.abs(rx) <= P * 0.6) {
+          destCtx.fillStyle = isStorm ? '#0284C7' : '#94A3B8'; // Center inseam crease
+        } else if (Math.abs(Math.abs(rx) - r * 0.38) <= P * 0.6 || Math.abs(Math.abs(rx) - r * 0.70) <= P * 0.6) {
+          destCtx.fillStyle = isStorm ? '#38BDF8' : '#CBD5E1'; // Pleat fold shadows
+        } else {
+          destCtx.fillStyle = isStorm ? '#BAE6FD' : '#FFFFFF'; // White pleated himation
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
     }
   }
+
+  destCtx.restore();
 }
 
 export const drawZeusPixelBody = drawZeusBody;
@@ -382,28 +388,32 @@ function _drawZeusElectricAura(ctx, r, fighter, now) {
 
   // 2. Middle Radiant Electric Ring
   ctx.strokeStyle = isStorm ? 'rgba(224, 242, 254, 0.85)' : 'rgba(56, 189, 248, 0.50)';
-  ctx.lineWidth = isStorm ? 2.5 : 1.5;
+  ctx.lineWidth = isStorm ? 2.0 : 1.5;
   ctx.beginPath();
   ctx.arc(0, 0, auraR - 2.5, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 3. Crackling Micro-Lightning Sparks along the perimeter
+  // 3. Crackling Micro-Lightning Sparks along the perimeter (Discrete stepped line segments & pixel motes)
   const numSparks = isStorm ? 6 : 3;
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = 1.5;
   for (let i = 0; i < numSparks; i++) {
     const angle = (now * 0.004 * (i % 2 === 0 ? 1 : -1)) + (i * Math.PI * 2 / numSparks);
     const sparkDist = r + 4 + (Math.sin(now * 0.02 + i) * 6);
-    const sx = Math.cos(angle) * sparkDist;
-    const sy = Math.sin(angle) * sparkDist;
-    const jx = (Math.sin(now * 0.05 + i * 3) - 0.5) * 8;
-    const jy = (Math.cos(now * 0.05 + i * 3) - 0.5) * 8;
+    const sx = Math.round(Math.cos(angle) * sparkDist / 2) * 2;
+    const sy = Math.round(Math.sin(angle) * sparkDist / 2) * 2;
+    const jx = Math.round(((Math.sin(now * 0.05 + i * 3) - 0.5) * 8) / 2) * 2;
+    const jy = Math.round(((Math.cos(now * 0.05 + i * 3) - 0.5) * 8) / 2) * 2;
 
     ctx.beginPath();
     ctx.moveTo(sx - jx, sy - jy);
     ctx.lineTo(sx, sy);
     ctx.lineTo(sx + jx, sy + jy);
     ctx.stroke();
+
+    // Discrete 2x2 spark motes
+    ctx.fillStyle = i % 2 === 0 ? '#FFFFFF' : '#00E5FF';
+    ctx.fillRect(sx - 1, sy - 1, 2, 2);
   }
 
   ctx.restore();
@@ -450,6 +460,23 @@ export function drawZeusSkin(ctx, fighter) {
 
   // LAYER 3: GOLDEN OLYMPIAN CROWN HEADBAND (Assets/model/zeus/Zeus-crown.png)
   _drawZeusCrown(ctx, r, isStorm, facingLeft);
+
+  // LAYER 4: CANONICAL DEFAULT HANDS (Rule 20)
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  if (!shouldHideHands) {
+    const handRadius = getHandSize(r * 0.30);
+    const skinTone = isStorm ? '#BAE6FD' : '#F3BF9F';
+
+    // Left Hand (Off-hand): Always at (-r * 0.82, +r * 0.38)
+    drawPixelHand(ctx, -r * 0.82, r * 0.38, handRadius, skinTone, '#0E0F14');
+
+    // Right Hand (Main-hand):
+    // Displayed when weapon is hidden, in podium preview, or during storm channel (weapon launched to sky)
+    const isWieldingWeapon = !fighter.hideWeapon && !fighter.isChargingStorm && !isPodiumPreview;
+    if (!isWieldingWeapon) {
+      drawPixelHand(ctx, r * 0.82, r * 0.38, handRadius, skinTone, '#0E0F14');
+    }
+  }
 
   // Status Overlays (Stun, Freeze, Paralyze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {

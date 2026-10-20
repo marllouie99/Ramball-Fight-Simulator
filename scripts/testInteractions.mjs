@@ -8389,6 +8389,136 @@ async function runInteractionTests() {
     console.log('      ✅ Discrete floating damage numbers (zero summing, zero accumulation, alternating fountain arc) verified successfully.');
   }
 
+  // ── 81. Testing Gojo Hollow Purple 12-Frame Explosion Animation & Particle System Stack Depth ──
+  {
+    console.log('   81. Testing Gojo Hollow Purple 12-Frame Explosion Animation & Particle System...');
+    const { _getGojoPurpleExplosionFrames, drawGojoPurpleExplosion } = await import('../js/graphics/weapons/gojoWeaponGraphics.js');
+    const { spawnPurpleExplosion, spawnPurpleShockwaveRings } = await import('../js/graphics/particles/sparkEffect.js');
+    const { drawPurpleExplosion } = await import('../js/graphics/particles/renderers/blastShockwaveRenderers.js');
+
+    // 1. Verify 12 frames loaded
+    const frames = _getGojoPurpleExplosionFrames();
+    assert(frames && frames.length === 12, `Expected 12 frames in _getGojoPurpleExplosionFrames, got ${frames?.length}`);
+
+    // 2. Test drawGojoPurpleExplosion Canvas 2D stack balance across all 12 phases
+    mockCtx.resetStackDepth();
+    for (let i = 0; i < 12; i++) {
+      const p = i / 11;
+      drawGojoPurpleExplosion(mockCtx, { x: 250, y: 250, radius: 280, p: p, alpha: 1.0, is200: false, isGreen: false });
+      assert(mockCtx.getStackDepth() === 0, `drawGojoPurpleExplosion corrupted canvas stack depth at frame ${i + 1}`);
+      drawGojoPurpleExplosion(mockCtx, { x: 250, y: 250, radius: 350, p: p, alpha: 0.8, is200: true, isGreen: true });
+      assert(mockCtx.getStackDepth() === 0, `drawGojoPurpleExplosion (200% green) corrupted canvas stack depth at frame ${i + 1}`);
+    }
+
+    // 3. Test spawnPurpleExplosion Particle System creation
+    state.sparkEffects = [];
+    const expParticle = spawnPurpleExplosion(250, 250, 280, false, false);
+    assert(expParticle && expParticle.type === 'purpleExplosion', `Expected particle type 'purpleExplosion', got '${expParticle?.type}'`);
+    assert(state.sparkEffects.includes(expParticle), 'ParticleSystem must register purpleExplosion in state.sparkEffects');
+
+    // 4. Test drawPurpleExplosion renderer stack depth
+    mockCtx.resetStackDepth();
+    drawPurpleExplosion(mockCtx, expParticle);
+    assert(mockCtx.getStackDepth() === 0, 'drawPurpleExplosion corrupted canvas stack depth');
+
+    // 5. Test spawnPurpleShockwaveRings spawns both shockwave rings AND the 12-frame explosion
+    state.sparkEffects = [];
+    spawnPurpleShockwaveRings(250, 250, 280, false, false);
+    const hasExplosion = state.sparkEffects.some(p => p.type === 'purpleExplosion');
+    const hasRings = state.sparkEffects.some(p => p.type === 'purpleShockwaveRing');
+    assert(hasExplosion, 'spawnPurpleShockwaveRings must spawn purpleExplosion 12-frame particle');
+    assert(hasRings, 'spawnPurpleShockwaveRings must spawn purpleShockwaveRing particles');
+
+    state.sparkEffects = [];
+    console.log('      ✅ Gojo Hollow Purple 12-frame explosion animation, particle system integration & 100% balanced Canvas 2D stack depths verified successfully.');
+  }
+
+  // ── 82. Testing Global Parry 12-Frame Animation & Particle System Stack Depth ──
+  {
+    console.log('   82. Testing Global Parry 12-Frame Animation & Particle System...');
+    const { _getParryExplosionFrames, drawParryExplosion } = await import('../js/graphics/particles/renderers/blastShockwaveRenderers.js');
+    const { spawnParryExplosion, spawnParrySparksEffect } = await import('../js/graphics/particles/sparkEffect.js');
+
+    // 1. Verify 12 frames loaded
+    const frames = _getParryExplosionFrames();
+    assert(frames && frames.length === 12, `Expected 12 frames in _getParryExplosionFrames, got ${frames?.length}`);
+
+    // 2. Test drawParryExplosion Canvas 2D stack balance across all 12 phases
+    mockCtx.resetStackDepth();
+    for (let i = 0; i < 12; i++) {
+      const p = i / 11;
+      drawParryExplosion(mockCtx, { x: 250, y: 250, size: 85, targetSize: 85, life: 1.0 - p });
+      assert(mockCtx.getStackDepth() === 0, `drawParryExplosion corrupted canvas stack depth at frame ${i + 1}`);
+    }
+
+    // 3. Test spawnParryExplosion Particle System creation
+    state.sparkEffects = [];
+    const parryParticle = spawnParryExplosion(250, 250, 85);
+    assert(parryParticle && parryParticle.type === 'parryExplosion', `Expected particle type 'parryExplosion', got '${parryParticle?.type}'`);
+    assert(state.sparkEffects.includes(parryParticle), 'ParticleSystem must register parryExplosion in state.sparkEffects');
+
+    // 4. Test drawParryExplosion renderer stack depth with active particle
+    mockCtx.resetStackDepth();
+    drawParryExplosion(mockCtx, parryParticle);
+    assert(mockCtx.getStackDepth() === 0, 'drawParryExplosion corrupted canvas stack depth');
+
+    // 5. Test spawnParrySparksEffect spawns parryExplosion 12-frame particle alongside sparks
+    state.sparkEffects = [];
+    spawnParrySparksEffect(250, 250, 28);
+    const hasParryExplosion = state.sparkEffects.some(p => p.type === 'parryExplosion');
+    const hasParrySparks = state.sparkEffects.some(p => p.type === 'parrySpark');
+    const hasParryEmberStars = state.sparkEffects.some(p => p.type === 'parryEmberStar');
+    assert(hasParryExplosion, 'spawnParrySparksEffect must spawn parryExplosion 12-frame particle');
+    assert(hasParrySparks, 'spawnParrySparksEffect must spawn parrySpark particles');
+    assert(hasParryEmberStars, 'spawnParrySparksEffect must spawn parryEmberStar particles');
+
+    state.sparkEffects = [];
+    console.log('      ✅ Global Parry 12-frame explosion animation, particle system integration & 100% balanced Canvas 2D stack depths verified successfully.');
+  }
+
+  // ── 83. Testing Zeus 12-Frame Thunderstrike Animation & Particle System Stack Depth ──
+  {
+    console.log('   83. Testing Zeus 12-Frame Thunderstrike Animation & Particle System...');
+    const { _getZeusThunderstrikeFrames, drawZeusThunderstrike, _drawThunderstrikeImpactAnimation } = await import('../js/graphics/weapons/zeusWeaponGraphics.js');
+    const { drawLightningEffects, updateLightningEffects } = await import('../js/graphics/particles/lightningEffects.js');
+
+    // 1. Verify 12 frames loaded
+    const frames = _getZeusThunderstrikeFrames();
+    assert(frames && frames.length === 12, `Expected 12 frames in _getZeusThunderstrikeFrames, got ${frames?.length}`);
+
+    // 2. Test drawZeusThunderstrike & _drawThunderstrikeImpactAnimation Canvas 2D stack balance across all 12 phases
+    mockCtx.resetStackDepth();
+    for (let i = 0; i < 12; i++) {
+      const p = i / 11;
+      const life = Math.round((1.0 - p) * 18);
+      drawZeusThunderstrike(mockCtx, { x: 250, y: 250, life: life, maxLife: 18, scale: 1.15, color: '#00BFFF' });
+      assert(mockCtx.getStackDepth() === 0, `drawZeusThunderstrike corrupted canvas stack depth at frame ${i + 1}`);
+      drawZeusThunderstrike(mockCtx, { x: 250, y: 250, life: life, maxLife: 18, scale: 1.25, color: 'green' });
+      assert(mockCtx.getStackDepth() === 0, `drawZeusThunderstrike (stolen green) corrupted canvas stack depth at frame ${i + 1}`);
+
+      _drawThunderstrikeImpactAnimation(mockCtx, 1.15, p, 1.0, false);
+      assert(mockCtx.getStackDepth() === 0, `_drawThunderstrikeImpactAnimation corrupted stack depth at p=${p}`);
+      _drawThunderstrikeImpactAnimation(mockCtx, 1.15, p, 1.0, true);
+      assert(mockCtx.getStackDepth() === 0, `_drawThunderstrikeImpactAnimation (green) corrupted stack depth at p=${p}`);
+    }
+
+    // 3. Test drawLightningEffects coordinator stack depth
+    state.zeusStormStrikes = [
+      { x: 200, y: 200, life: 18, maxLife: 18, scale: 1.15 },
+      { x: 300, y: 300, life: 9, maxLife: 18, scale: 1.25, color: 'green' }
+    ];
+    mockCtx.resetStackDepth();
+    drawLightningEffects(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'drawLightningEffects corrupted canvas stack depth');
+
+    // 4. Test updateLightningEffects decay lifecycle
+    updateLightningEffects();
+    assert(state.zeusStormStrikes[0].life === 17, 'updateLightningEffects must decrement strike.life');
+    state.zeusStormStrikes = [];
+
+    console.log('      ✅ Zeus 12-frame thunderstrike animation, coordinator integration & 100% balanced Canvas 2D stack depths verified successfully.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

@@ -1,6 +1,6 @@
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
-import { getIchigoSwingKinematics } from '../fighters/ichigoSkin.js';
+import { getIchigoSwingKinematics, getZangetsuTipWorldPos } from '../fighters/ichigoSkin.js';
 
 const _GETSUGA_CANVAS_SIZE = 228;
 const _GETSUGA_HALF_SIZE = 114;
@@ -1218,13 +1218,13 @@ let _ichigoBankaiFrame1 = null;
 let _ichigoBankaiFrame1Loading = false;
 let _ichigoBankaiFrame2 = null;
 let _ichigoBankaiFrame2Loading = false;
-// Calibrated geometry for Ichigo Bankai & Shikai attack effects
+// Calibrated geometry for Ichigo Bankai & Shikai attack effects (12-Frame Animation)
 export const ICHIGO_BANKAI_ATTACK_CONFIG = {
   cx: 156.77,
   cy: 732.07,
   baseR: 688.66,
   rotOffset: -0.027,
-  src: 'Assets/model/ichigo/Ichigo-bankai-attack.png'
+  src: 'Assets/model/ichigo/attack/attack-b.png'
 };
 
 export const ICHIGO_SHIKAI_ATTACK_CONFIG = {
@@ -1232,8 +1232,42 @@ export const ICHIGO_SHIKAI_ATTACK_CONFIG = {
   cy: 732.07,
   baseR: 688.66,
   rotOffset: -0.027,
-  src: 'Assets/model/ichigo/Ichigo-shikai-attack.png'
+  src: 'Assets/model/ichigo/attack/attack-b.png'
 };
+
+const ICHIGO_ATTACK_FRAME_COUNT = 12;
+const ICHIGO_ATTACK_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/model/ichigo/attack/attack-${i + 1}.png`
+);
+
+let _ichigoAttackFrames = [];
+let _ichigoAttackFramesLoading = false;
+
+export function _getIchigoAttackFrames() {
+  if (
+    _ichigoAttackFrames.length === ICHIGO_ATTACK_FRAME_COUNT &&
+    _ichigoAttackFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _ichigoAttackFrames;
+  }
+  if (!_ichigoAttackFramesLoading && typeof Image !== 'undefined') {
+    _ichigoAttackFramesLoading = true;
+    _ichigoAttackFrames = [];
+    ICHIGO_ATTACK_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _ichigoAttackFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Ichigo attack frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _ichigoAttackFrames[idx] = img;
+    });
+  }
+  return _ichigoAttackFrames;
+}
 
 let _ichigoBankaiAttackImg = null;
 let _ichigoBankaiAttackImgLoading = false;
@@ -1241,32 +1275,39 @@ let _ichigoShikaiAttackImg = null;
 let _ichigoShikaiAttackImgLoading = false;
 
 export function _getIchigoBankaiAttackImage() {
+  const frames = _getIchigoAttackFrames();
+  if (frames && frames[5] && frames[5].complete) return frames[5];
   if (_ichigoBankaiAttackImg && _ichigoBankaiAttackImg.complete && _ichigoBankaiAttackImg.naturalWidth > 0) return _ichigoBankaiAttackImg;
   if (!_ichigoBankaiAttackImgLoading && typeof Image !== 'undefined') {
     _ichigoBankaiAttackImgLoading = true;
     const img = new Image();
     img.onload = () => { _ichigoBankaiAttackImg = img; _ichigoBankaiAttackImgLoading = false; };
     img.onerror = () => { _ichigoBankaiAttackImgLoading = false; };
-    img.src = `${ICHIGO_BANKAI_ATTACK_CONFIG.src}?v=4`;
+    img.src = `${ICHIGO_BANKAI_ATTACK_CONFIG.src}?v=5`;
     _ichigoBankaiAttackImg = img;
   }
   return _ichigoBankaiAttackImg;
 }
 
 export function _getIchigoShikaiAttackImage() {
+  const frames = _getIchigoAttackFrames();
+  if (frames && frames[5] && frames[5].complete) return frames[5];
   if (_ichigoShikaiAttackImg && _ichigoShikaiAttackImg.complete && _ichigoShikaiAttackImg.naturalWidth > 0) return _ichigoShikaiAttackImg;
   if (!_ichigoShikaiAttackImgLoading && typeof Image !== 'undefined') {
     _ichigoShikaiAttackImgLoading = true;
     const img = new Image();
     img.onload = () => { _ichigoShikaiAttackImg = img; _ichigoShikaiAttackImgLoading = false; };
     img.onerror = () => { _ichigoShikaiAttackImgLoading = false; };
-    img.src = `${ICHIGO_SHIKAI_ATTACK_CONFIG.src}?v=4`;
+    img.src = `${ICHIGO_SHIKAI_ATTACK_CONFIG.src}?v=5`;
     _ichigoShikaiAttackImg = img;
   }
   return _ichigoShikaiAttackImg;
 }
 
 export function _getIchigoBankaiAttackFrame(frameNumber = 2) {
+  const frames = _getIchigoAttackFrames();
+  const idx = Math.max(0, Math.min(11, (frameNumber || 1) - 1));
+  if (frames && frames[idx] && frames[idx].complete) return frames[idx];
   return _getIchigoBankaiAttackImage();
 }
 
@@ -1275,6 +1316,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getShikaiSwordBladeImage();
   _getBankaiSwordImage();
   _getBankaiSwordBladeImage();
+  _getIchigoAttackFrames();
   _getIchigoBankaiAttackImage();
   _getIchigoShikaiAttackImage();
 }
@@ -1942,261 +1984,281 @@ export function drawTensaZangetsu(ctx, x, y, angle, r, opts = {}) {
 }
 
 /**
- * Draws Ichigo's signature Crescent Blade Slash Arc (Rule 15 Compliant).
- * Renders in world coordinates underneath/around the blade during active basic chops.
- * Form-specific palettes:
- *  - Shikai: Silver steel with sky-blue/cyan Reiatsu glow
- *  - Bankai: Deep Getsuga black void core with electric cyan Reiatsu edge
- *  - Hollow Mask: Black void core with flaming crimson/orange edge
- *  - Vasto Lorde: Demonic pitch-black core with blazing blood-red trim
+ * Spawns an independent 12-frame crescent slash effect anchored at the strike coordinates.
+ * Runs for exactly 12 ticks, displaying each frame in sequence (attack-1.png through attack-12.png).
+ * Spawns directly at the very tip of the weapon (blade kissaki) and sweeps along the blade arc.
+ * @param {Object} fighter
+ * @param {number} [step=1] Combo step (1: Cleave, 2: Rising Scoop, 3: Sunder)
  */
-export function drawIchigoSlashArc(ctx, fighter) {
-  if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isGetsugaSlash || fighter.isChannelingGetsuga || fighter.isChannelingBankai || (fighter.shikaiReversionBurstTimer && fighter.shikaiReversionBurstTimer > 0)) return;
-
-  const isFrozen = Boolean(
-    fighter.isFrozenByInfinity ||
-    (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
-    (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0) ||
-    (fighter.electricStunTimer && fighter.electricStunTimer > 0) ||
-    (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
-    (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
-    fighter.isParalyzed ||
-    fighter.isGrabbedByMahoraga ||
-    fighter.isParalyzedByMahoraga ||
-    fighter.isWallSlammed ||
-    fighter.wallSlamPinnedX !== undefined ||
-    fighter.isTargetOfAmbush
-  );
-  if (isFrozen) return;
-
-  const kin = getIchigoSwingKinematics(fighter);
-  if (kin.phase <= 2) {
-    // Phase 1 (Lift) & Phase 2 (Poised Hold): Slash trail is hidden during anticipation
-    return;
+export function spawnIchigoSlashEffect(fighter, step = 1) {
+  if (!fighter) return;
+  if (!fighter.activeSlashEffects) {
+    fighter.activeSlashEffects = [];
   }
 
-  const r = fighter.r || 25;
-  const baseAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
-  const facingLeft = Math.abs(baseAngle) > Math.PI / 2;
+  const slashAngle = (fighter.swordSlashAngle !== undefined)
+    ? fighter.swordSlashAngle
+    : ((fighter.gunAngle !== undefined) ? fighter.gunAngle : (fighter.angle || 0));
 
+  const facingLeft = Math.abs(slashAngle) > Math.PI / 2;
+  const isBankai = Boolean(fighter.bankaiActive || fighter.skin === 'bankai' || fighter.skin === 'bankai_mask');
   const isMask = Boolean(fighter.hollowMaskActive);
-  const isBankai = Boolean(fighter.bankaiActive || fighter.skin === 'bankai');
-  const isShikai = !isBankai;
   const isBankaiOrMask = isBankai || isMask;
 
-  const startOffset = kin.startAngle;
-  const endOffset = kin.endAngle;
-  const isReverseSweep = (startOffset > endOffset); // Step 2 (Rising Scoop) sweeps upward!
+  // Exact forward kinematics: spawn position at the very tip of the weapon kissaki
+  const tipPos = getZangetsuTipWorldPos(fighter, isBankai);
 
-  let currentStartA = startOffset;
-  let currentEndA = endOffset;
-  let recP = 0;
+  const r = fighter.r || 25;
+  const kin = getIchigoSwingKinematics(fighter);
+  const gripOffsetY = (r * 0.52);
+  const pivotX = kin.thrustDistance + kin.bodyShiftX + (fighter.swordTremorX || 0);
+  let pivotY = gripOffsetY + (fighter.swordTremorY || 0);
+  if (facingLeft) pivotY = -pivotY;
 
-  if (kin.phase === 3) {
-    // Phase 3: Hypersonic Whip Strike Window — leading edge is 100% locked to kissaki (Rule 30)
-    if (!isReverseSweep) {
-      currentStartA = startOffset;
-      currentEndA = kin.swingAngle;
-    } else {
-      currentStartA = kin.swingAngle;
-      currentEndA = startOffset;
+  const cosA = Math.cos(slashAngle);
+  const sinA = Math.sin(slashAngle);
+  const pivotWorldX = fighter.x + (pivotX * cosA - pivotY * sinA);
+  const pivotWorldY = fighter.y + (pivotX * sinA + pivotY * cosA);
+
+  const swordStartX = (r * (isBankai ? 0.65 : 0.68));
+  const bladeReach = isBankai ? (swordStartX + 94) : (swordStartX + 120 * 0.90);
+
+  fighter.activeSlashEffects.push({
+    x: tipPos.x,
+    y: tipPos.y,
+    tipX: tipPos.x,
+    tipY: tipPos.y,
+    pivotWorldX: pivotWorldX,
+    pivotWorldY: pivotWorldY,
+    bladeReach: bladeReach,
+    fighterX: fighter.x,
+    fighterY: fighter.y,
+    angle: slashAngle,
+    facingLeft: facingLeft,
+    isReverseSweep: (step === 2),
+    step: step,
+    timer: 12,
+    maxTimer: 12,
+    isBankaiOrMask: isBankaiOrMask,
+    fighter: fighter
+  });
+
+  // Limit array to prevent unbounded growth in extreme cases
+  if (fighter.activeSlashEffects.length > 8) {
+    fighter.activeSlashEffects.shift();
+  }
+}
+
+/**
+ * Universal decay routine for active 12-frame slash effects.
+ * Complies with Rule 25: called at top of update before freeze guards so effects decay smoothly across all states.
+ * @param {Object} fighter
+ */
+export function updateIchigoSlashEffects(fighter) {
+  if (!fighter || !fighter.activeSlashEffects || fighter.activeSlashEffects.length === 0) return;
+  for (let i = fighter.activeSlashEffects.length - 1; i >= 0; i--) {
+    const effect = fighter.activeSlashEffects[i];
+    effect.timer--;
+    if (effect.timer <= 0) {
+      fighter.activeSlashEffects.splice(i, 1);
     }
-    recP = 0;
-  } else if (kin.phase === 4) {
-    // Phase 4: THE IMPACT LOCK / LATCH (Rule 30)
-    // Full glorious slash ribbon held firmly 100% unfurled on the impact plane across the impact freeze!
-    if (!isReverseSweep) {
-      currentStartA = startOffset;
-      currentEndA = endOffset;
-    } else {
-      currentStartA = endOffset;
-      currentEndA = startOffset;
+  }
+}
+
+/**
+ * Draws Ichigo's signature 12-Frame Crescent Blade Slash Arc Animation.
+ * Iterates through fighter.activeSlashEffects so every basic attack and Shunpo flurry strike
+ * completes its full 12-frame sequence without premature cancellation.
+ * Form-specific palettes:
+ *  - Shikai: Silver steel with sky-blue/cyan Reiatsu glow (via hue-rotate filter)
+ *  - Bankai / Hollow Mask: Scarlet & obsidian Kuroi Getsuga palette
+ */
+export function drawIchigoSlashArc(ctx, fighter) {
+  if (!fighter) return;
+
+  // Fallback auto-spawn: If an active melee swing reaches strike phase but activeSlashEffects is empty
+  if ((!fighter.activeSlashEffects || fighter.activeSlashEffects.length === 0) &&
+      fighter.slashSwingTimer > 0 &&
+      fighter.isMeleeCleave &&
+      !fighter.isGetsugaSlash &&
+      !fighter.isChannelingGetsuga &&
+      !fighter.isChannelingBankai &&
+      !(fighter.shikaiReversionBurstTimer && fighter.shikaiReversionBurstTimer > 0)) {
+    const totalF = fighter.slashSwingMaxTimer || 28;
+    const elapsed = totalF - fighter.slashSwingTimer;
+    const liftF = fighter.slashSwingLiftFrames || 6;
+    const holdF = fighter.slashSwingHoldFrames || 2;
+    if (elapsed >= (liftF + holdF)) {
+      spawnIchigoSlashEffect(fighter, fighter.slashSwingVariant || fighter.swordComboStep || 1);
     }
-    recP = 0;
-  } else if (kin.phase === 5) {
-    // Phase 5: Extraction & Recovery Settle
-    // Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & Rule 30):
-    // The leading edge stays locked at the cleave plane while the trailing tail chases it!
-    const rp = Math.min(1.0, Math.max(0, kin.recP));
-    recP = Math.pow(rp, 1.4);
-    if (!isReverseSweep) {
-      currentStartA = startOffset + (endOffset - startOffset) * recP;
-      currentEndA = endOffset;
-    } else {
-      currentStartA = endOffset;
-      currentEndA = startOffset + (endOffset - startOffset) * recP;
-    }
-  } else {
-    return;
   }
 
-  const angularSpan = Math.abs(currentEndA - currentStartA);
-  if (angularSpan <= 0.04) return;
+  const effects = fighter.activeSlashEffects;
+  if (!effects || effects.length === 0) return;
 
-  const trailAlpha = Math.max(0, 1.0 - recP * 0.85);
-  if (trailAlpha <= 0.01) return;
+  const frames = _getIchigoAttackFrames();
+  if (!frames || frames.length === 0) return;
 
-  const minAng = Math.min(currentStartA, currentEndA);
-  const maxAng = Math.max(currentStartA, currentEndA);
-  const span = maxAng - minAng;
-  if (span <= 0.02) return;
-
-  const tx = fighter.swordTremorX || 0;
-  const ty = fighter.swordTremorY || 0;
-
-  ctx.save();
-  ctx.translate(fighter.x + tx, fighter.y + ty);
-  ctx.rotate(baseAngle);
-  ctx.imageSmoothingEnabled = false; // Authentic nearest-neighbor pixel art rendering
-
-  // Mirror vertically when aiming left so swing remains natural
-  if (facingLeft) {
-    ctx.scale(1, -1);
-  }
-
-  const P = 2.0; // Exact discrete pixel art grid unit matching Yuta & Saitama standard
+  const r = fighter.r || 25;
+  const P = 2.0; // Discrete pixel art grid unit
   const snap = (v) => Math.round(v / P) * P;
 
-  // Full-Length Geometric Enveloping Standard (Rule 30):
-  // Inner radius clamped to r + 10 so the crescent wraps from blade collar/hilt to kissaki tip
-  const outerRadius = r + 92;
-  const innerRadius = r + 10;
-  const maxThick = 26.0;
+  for (let i = 0; i < effects.length; i++) {
+    const effect = effects[i];
+    if (!effect || effect.timer <= 0) continue;
 
-  const outlineCol = isBankaiOrMask
-    ? `rgba(20, 2, 8, ${(0.96 * trailAlpha).toFixed(2)})` // Deep Obsidian Crimson ink shell
-    : `rgba(0, 16, 44, ${(0.94 * trailAlpha).toFixed(2)})`; // Deep Abyssal Indigo ink shell
+    let frameIndex = 0;
+    const isCurrentActiveSwing = Boolean(
+      effect.fighter === fighter &&
+      fighter.isMeleeCleave &&
+      fighter.slashSwingTimer > 0 &&
+      (fighter.slashSwingVariant || fighter.swordComboStep || 1) === effect.step &&
+      !fighter.isGetsugaSlash
+    );
 
-  const isInsideSlash = (rx, ry) => {
-    const dist = Math.hypot(rx, ry);
-    if (dist <= 0) return false;
-    let ang = Math.atan2(ry, rx);
-    while (ang < minAng - Math.PI) ang += Math.PI * 2;
-    while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
+    let drawPivotX = effect.pivotWorldX;
+    let drawPivotY = effect.pivotWorldY;
+    let drawAngle = effect.angle;
+    let drawFacingLeft = effect.facingLeft;
+    let bladeReach = effect.bladeReach || (effect.isBankaiOrMask ? (r * 0.65 + 94) : (r * 0.68 + 108));
 
-    if (ang < minAng || ang > maxAng) return false;
-
-    let t = 0.5;
-    if (Math.abs(currentEndA - currentStartA) >= 0.0001) {
-      t = (ang - currentStartA) / (currentEndA - currentStartA);
-    }
-    t = Math.max(0, Math.min(1.0, t));
-
-    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-    const thick = maxThick * taper;
-    const outR = outerRadius + taper * 2.0;
-    const inR = Math.max(innerRadius, outR - thick);
-    return dist >= inR && dist <= outR;
-  };
-
-  const minX = Math.floor((-outerRadius - P * 2) / P) * P;
-  const maxX = Math.ceil((outerRadius + P * 2) / P) * P;
-  const minY = Math.floor((-outerRadius - P * 2) / P) * P;
-  const maxY = Math.ceil((outerRadius + P * 2) / P) * P;
-
-  const step = kin.step || fighter.slashSwingVariant || fighter.swordComboStep || 1;
-
-  // ── 2D Discrete Crescent Grid with 4-Neighbor Attached Border (Rule 30) ──
-  for (let gy = minY; gy <= maxY; gy += P) {
-    for (let gx = minX; gx <= maxX; gx += P) {
-      if (!isInsideSlash(gx, gy)) continue;
-
-      const pxX = snap(gx);
-      const pyY = snap(gy);
-
-      // 4-neighbor attached border test matching Yuta & Saitama standard
-      const isBorder = !isInsideSlash(gx + P, gy) ||
-                       !isInsideSlash(gx - P, gy) ||
-                       !isInsideSlash(gx, gy + P) ||
-                       !isInsideSlash(gx, gy - P);
-
-      if (isBorder) {
-        ctx.fillStyle = outlineCol;
-        ctx.fillRect(pxX, pyY, P, P);
+    if (isCurrentActiveSwing) {
+      const kin = getIchigoSwingKinematics(fighter);
+      if (kin.phase <= 2) {
+        // Phase 1 (Lift) & Phase 2 (Poised Hold): Sword is raising behind shoulder.
+        // Slash effect is hidden during anticipation so it NEVER precedes the sword blade!
         continue;
-      }
-
-      const dist = Math.hypot(gx, gy);
-      let ang = Math.atan2(gy, gx);
-      while (ang < minAng - Math.PI) ang += Math.PI * 2;
-      while (ang > maxAng + Math.PI) ang -= Math.PI * 2;
-
-      let t = 0.5;
-      if (Math.abs(currentEndA - currentStartA) >= 0.0001) {
-        t = (ang - currentStartA) / (currentEndA - currentStartA);
-      }
-      t = Math.max(0, Math.min(1.0, t));
-
-      const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.26 + 0.74 * t);
-      const outR = outerRadius + taper * 2.0;
-      const depthFromApex = outR - dist;
-
-      let col;
-      if (depthFromApex < P * 1.4) {
-        col = '#FFFFFF'; // Razor-sharp white-hot cutting edge apex
-      } else if (isBankaiOrMask) {
-        // Kuroi Getsuga Authentic Black-Red Crimson Theme
-        if (depthFromApex < P * 3.0) {
-          col = '#FFF0F2'; // Glowing pastel crimson highlight rim
-        } else if (depthFromApex < P * 5.2) {
-          col = '#FF0033'; // Vibrant electric blood-crimson
-        } else if (depthFromApex < P * 7.5) {
-          col = (step === 3) ? '#800012' : '#B80020'; // Deep saturated burning crimson layer
+      } else if (kin.phase === 3) {
+        // Phase 3: Hypersonic Whip Strike!
+        // Sword blade leads: effect ONLY appears as the blade whips forward, trailing behind it!
+        if (kin.strikeP < 0.25) {
+          // Sword is still accelerating forward from load; effect has not spawned yet
+          continue;
+        } else if (kin.strikeP < 0.50) {
+          frameIndex = 0; // attack-1: initial crescent trailing behind cutting edge
+        } else if (kin.strikeP < 0.75) {
+          frameIndex = 1; // attack-2: mid-arc
         } else {
-          col = '#080003'; // Abyssal pitch-black obsidian void core
+          frameIndex = 2; // attack-3: high-velocity sweep
         }
+      } else if (kin.phase === 4) {
+        // Phase 4: Impact Lock / Latch!
+        // Full peak crescent held firm at the weapon tip with tremor!
+        frameIndex = (kin.lockP < 0.50) ? 3 : 4; // attack-4 / attack-5
       } else {
-        // Shikai Azure / Cyan Theme
-        if (depthFromApex < P * 3.0) {
-          col = '#E0FFFF'; // Glowing pastel cyan highlight rim
-        } else if (depthFromApex < P * 5.2) {
-          col = '#00E5FF'; // Vibrant electric cyan
-        } else if (depthFromApex < P * 7.5) {
-          col = (step === 3) ? '#0038A8' : '#0055DD'; // Deep saturated cobalt layer
-        } else {
-          col = '#00143A'; // Abyssal midnight-blue void core
-        }
+        // Phase 5: Recovery Settle!
+        // Sword dislodges and recovers to guard stance.
+        // Crescent dissolves from tail to tip (frames 5 to 11 = attack-6 to attack-12)
+        frameIndex = Math.min(11, 5 + Math.floor(kin.recP * 7));
       }
 
-      ctx.fillStyle = col;
-      ctx.fillRect(pxX, pyY, P, P);
+      drawAngle = (fighter.swordSlashAngle !== undefined)
+        ? fighter.swordSlashAngle
+        : ((fighter.gunAngle !== undefined) ? fighter.gunAngle : (fighter.angle || 0));
+      drawFacingLeft = Math.abs(drawAngle) > Math.PI / 2;
+
+      const gripOffsetY = (r * 0.52);
+      const pivotX = kin.thrustDistance + kin.bodyShiftX + (fighter.swordTremorX || 0);
+      let pivotY = gripOffsetY + (fighter.swordTremorY || 0);
+      if (drawFacingLeft) pivotY = -pivotY;
+
+      const cosA = Math.cos(drawAngle);
+      const sinA = Math.sin(drawAngle);
+      drawPivotX = fighter.x + (pivotX * cosA - pivotY * sinA);
+      drawPivotY = fighter.y + (pivotX * sinA + pivotY * cosA);
+
+      // Keep real-time tip position locked to the blade kissaki
+      const tipPos = getZangetsuTipWorldPos(fighter, effect.isBankaiOrMask);
+      effect.x = tipPos.x;
+      effect.y = tipPos.y;
+      effect.tipX = tipPos.x;
+      effect.tipY = tipPos.y;
+      effect.pivotWorldX = drawPivotX;
+      effect.pivotWorldY = drawPivotY;
+      effect.angle = drawAngle;
+      effect.facingLeft = drawFacingLeft;
+    } else {
+      // Decoupled / finished swing: play remaining frames across effect.timer in world space
+      frameIndex = Math.min(11, Math.max(0, 12 - effect.timer));
     }
-  }
 
-  // ── Discrete Reiatsu Stepped Pixel Sparks along crescent span ──
-  const numEmbers = 12;
-  const primaryColor = isBankaiOrMask ? '#FF0033' : '#00E5FF';
-  for (let eb = 0; eb < numEmbers; eb++) {
-    const ebT = (eb / numEmbers + (Date.now() / 280)) % 1.0;
-    const ebAng = minAng + ebT * span;
-    const ebDist = outerRadius - 8 - eb * 3.5;
-    const ex = snap(Math.cos(ebAng) * ebDist);
-    const ey = snap(Math.sin(ebAng) * ebDist);
-    const col = (eb % 2 === 0) ? primaryColor : '#FFFFFF';
+    const frameImg = frames[frameIndex];
 
-    ctx.fillStyle = col;
-    ctx.fillRect(ex, ey, P, P);
-  }
+    ctx.save();
+    ctx.translate(drawPivotX, drawPivotY);
+    ctx.rotate(drawAngle);
+    ctx.imageSmoothingEnabled = false; // Nearest-neighbor pixel art rendering
 
-  // ── Impact Lock Kissaki Sparks & Detonation (During Pin Phase / Phase 4) ──
-  if (kin.phase === 4) {
-    const tipAng = isReverseSweep ? minAng : maxAng;
-    const tipX = snap(Math.cos(tipAng) * (outerRadius - 4));
-    const tipY = snap(Math.sin(tipAng) * (outerRadius - 4));
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(tipX - P, tipY - P, P * 2, P * 2);
-
-    for (let s = 0; s < 6; s++) {
-      const sAng = tipAng + (Math.sin(s * 1.7 + Date.now() * 0.02)) * 0.7;
-      const sDist = (outerRadius - 4) + (s * 2.5);
-      const sx = snap(Math.cos(sAng) * sDist);
-      const sy = snap(Math.sin(sAng) * sDist);
-      ctx.fillStyle = (s % 2 === 0) ? primaryColor : '#FFFFFF';
-      ctx.fillRect(sx, sy, P, P);
+    // Mirror vertically when aiming left so swing orientation remains natural
+    if (drawFacingLeft) {
+      ctx.scale(1, -1);
     }
-  }
 
-  ctx.restore();
+    // Reverse sweep vertical flip on Step 2 (Upward Rising Scoop)
+    if (effect.isReverseSweep) {
+      ctx.scale(1, -1);
+    }
+
+    const fadeAlpha = (effect.timer <= 2) ? (effect.timer / 2) : 1.0;
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * fadeAlpha));
+
+    // Shikai / Bankai palette handling:
+    // Bankai / Hollow Mask uses authentic scarlet & obsidian Kuroi Getsuga palette
+    // Shikai uses hue rotation to electric cyan
+    if (!effect.isBankaiOrMask) {
+      ctx.filter = 'hue-rotate(185deg) saturate(1.2)';
+    }
+
+    // Scale calibrated so outer leading tip (100px from pivot in sprite) matches blade reach
+    const scale = (bladeReach / 100) * ((effect.step === 3) ? 1.15 : 1.0);
+    const drawW = 256 * scale;
+    const drawH = 256 * scale;
+    // Anchor at (95, 135) puts the center of curvature at the sword pivot (0, 0)
+    // and places the leading edge tip at (bladeReach, tipAngle), exactly at the weapon tip!
+    const anchorX = 95 * scale;
+    const anchorY = 135 * scale;
+
+    if (frameImg && frameImg.complete && ((frameImg.naturalWidth || frameImg.width || 0) > 0)) {
+      ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+    }
+
+    if (!effect.isBankaiOrMask) {
+      ctx.filter = 'none';
+    }
+
+    // ── Discrete Reiatsu Stepped Pixel Sparks along crescent span during peak cutting frames (frames 3 to 7) ──
+    if (frameIndex >= 3 && frameIndex <= 7) {
+      const outerRadius = bladeReach;
+      const primaryColor = effect.isBankaiOrMask ? '#FF0033' : '#00E5FF';
+      const numEmbers = 6;
+      const span = Math.PI * 0.65;
+      const startA = -span * 0.5;
+
+      for (let eb = 0; eb < numEmbers; eb++) {
+        const ebT = (eb / numEmbers + (frameIndex * 0.18)) % 1.0;
+        const ebAng = startA + ebT * span;
+        const ebDist = outerRadius - 4 - eb * 2.5;
+        const ex = snap(Math.cos(ebAng) * ebDist);
+        const ey = snap(Math.sin(ebAng) * ebDist);
+        const col = (eb % 2 === 0) ? primaryColor : '#FFFFFF';
+
+        ctx.fillStyle = col;
+        ctx.fillRect(ex, ey, P, P);
+      }
+
+      // Tip spark detonating at the very tip of the weapon during impact frames (frames 4 and 5)
+      if (frameIndex === 4 || frameIndex === 5) {
+        const tipAng = 1.33; // Exactly at the weapon tip kissaki
+        const tipX = snap(Math.cos(tipAng) * (outerRadius - 2));
+        const tipY = snap(Math.sin(tipAng) * (outerRadius - 2));
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(tipX - P, tipY - P, P * 2, P * 2);
+      }
+    }
+
+    ctx.globalAlpha = prevAlpha;
+    ctx.restore();
+  }
 }
 

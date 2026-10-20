@@ -7,6 +7,7 @@ import { applyDamageToTarget } from '../../fighter.js';
 import { isHollowTransformationVoicelinePlaying, stopHollowTransformationVoiceline } from './ichigoHollow.js';
 import { stopBankaiVoiceline } from './ichigoBankai.js';
 import { fireGetsuga, isAboutToUnleashNormalGetsuga, isGetsugaActive, isGetsugaVoicelinePlaying, isFinalGetsugaVoicelinePlaying, stopFinalGetsugaVoiceline, getCardinalAimAngle, snapToCardinalAngle } from './ichigoGetsuga.js';
+import { spawnIchigoSlashEffect } from '../../../graphics/weapons/ichigoWeaponGraphics.js';
 
 /**
  * Clamps coordinates strictly inside the arena bounds to prevent flash stepping outside arena walls.
@@ -398,6 +399,7 @@ export function updateMeleeSwing(fighter, opponent, arena) {
     if (!fighter.swordSwingSoundPlayed) {
       fighter.swordSwingSoundPlayed = true;
       fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.90);
+      spawnIchigoSlashEffect(fighter, fighter.slashSwingVariant || fighter.swordComboStep || 1);
     }
 
     // Forward lunging momentum step
@@ -895,13 +897,14 @@ export function updateShunpoCombat(fighter, opponent) {
 
     // 5-phase melee strike mechanics during active swing
     if (fighter.slashSwingTimer > 0) {
+      fighter.slashSwingTimer--;
       const totalF = fighter.slashSwingMaxTimer || 20;
       const elapsed = Math.max(0, totalF - fighter.slashSwingTimer);
-      const liftF = fighter.slashSwingLiftFrames || 3;
-      const holdF = fighter.slashSwingHoldFrames || 2;
-      const strikeF = fighter.slashSwingStrikeFrames || 4;
-      const lockF = fighter.slashSwingImpactLockFrames || 5;
-      const recF = fighter.slashSwingRecFrames || 5;
+      const liftF = fighter.slashSwingLiftFrames ?? 1;
+      const holdF = fighter.slashSwingHoldFrames ?? 1;
+      const strikeF = fighter.slashSwingStrikeFrames ?? 2;
+      const lockF = fighter.slashSwingImpactLockFrames ?? 1;
+      const recF = fighter.slashSwingRecFrames ?? 1;
       const strikeStart = liftF + holdF;
       const strikeEnd = strikeStart + strikeF;
       const lockEnd = strikeEnd + lockF;
@@ -918,6 +921,7 @@ export function updateShunpoCombat(fighter, opponent) {
         if (!fighter.swordSwingSoundPlayed) {
           fighter.swordSwingSoundPlayed = true;
           fighter._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.90);
+          spawnIchigoSlashEffect(fighter, fighter.slashSwingVariant || fighter.swordComboStep || 1);
         }
 
         const lungeP = Math.sin(strikeP * Math.PI);

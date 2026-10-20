@@ -31,12 +31,17 @@ Assets/model/<characterId>/<effectName>/
 ```
 
 ### The Reference Source of Truth
-- **Folder Location**: `Assets/model/reze/explosion/`
-- **Frames**: `explosion-1.png` through `explosion-12.png`
-- **Master Strip**: `explosion-b.png` ($3072 \times 256\text{px}$)
-- **Config Reference**: `js/configs/characters/rezeConfig.js` (`assets.explosion`)
-- **Weapon Graphics Renderer**: `js/graphics/weapons/rezeWeaponGraphics.js` (`_getRezeExplosionFrames`, `_drawRezeAnimatedExplosionSprite`)
-- **Fighter Entity Dispatch**: `js/entities/fighters/RezeFighter.js` (`activePalmBlasts`, `activeNukeBlasts`)
+- **Explosion & Detonation Baseline**: `Assets/model/reze/explosion/`
+  - Frames: `explosion-1.png` through `explosion-12.png`
+  - Master Strip: `explosion-b.png` ($3072 \times 256\text{px}$)
+  - Config Reference: `js/configs/characters/rezeConfig.js` (`assets.explosion`)
+  - Weapon Graphics Renderer: `js/graphics/weapons/rezeWeaponGraphics.js` (`_getRezeExplosionFrames`, `_drawRezeAnimatedExplosionSprite`)
+  - Fighter Entity Dispatch: `js/entities/fighters/RezeFighter.js` (`activePalmBlasts`, `activeNukeBlasts`)
+- **Weapon Slash Attack Baseline (MANDATORY FOR MELEE/SWORDS)**: `Assets/effects/Slash Attack/`
+  - Whenever generating or implementing an animation for any melee attack or sword slash, the agent **MUST ALWAYS look for `Assets/effects/Slash Attack/` FIRST**!
+  - See dedicated skill [`slash-animation-generator`](../slash-animation-generator/SKILL.md).
+  - Frames: `slash-1.png` through `slash-12.png`, master strip `slash-b.png` ($3072 \times 256\text{px}$).
+  - Must spawn at the weapon tip (`get[Weapon]TipWorldPos()`), anchored at `(95, 135)`, and trail strictly behind the cutting blade.
 
 ---
 

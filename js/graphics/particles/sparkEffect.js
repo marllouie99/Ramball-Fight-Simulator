@@ -16,6 +16,8 @@ import {
   drawMahoragaShoutShockwave,
   drawRikaRoarShockwave,
   drawPurpleShockwaveRing,
+  drawPurpleExplosion,
+  drawParryExplosion,
   drawAnimeImpactFrame,
   drawPunchWindSpeedLine,
   drawSaitamaCounterFrontalBlast,
@@ -1212,6 +1214,8 @@ const SPARK_RENDERERS = {
   mahoragaShoutShockwave: drawMahoragaShoutShockwave,
   rikaRoarShockwave: drawRikaRoarShockwave,
   purpleShockwaveRing: drawPurpleShockwaveRing,
+  purpleExplosion: drawPurpleExplosion,
+  parryExplosion: drawParryExplosion,
   animeImpactFrame: drawAnimeImpactFrame,
   punchWindSpeedLine: drawPunchWindSpeedLine,
   saitamaCounterFrontalBlast: drawSaitamaCounterFrontalBlast,
@@ -1845,7 +1849,33 @@ export function spawnTodoClapCEParticles(x, y, angle = 0) {
  * Spawns a high-contrast visual spark explosion on sword/guard parries.
  * Uses a uniform bright gold & white-hot spark palette across all parries.
  */
+/**
+ * Spawns the 12-Frame Authentic Retro Pixel Art Global Parry Explosion Animation.
+ * @param {number} x - Clash center X
+ * @param {number} y - Clash center Y
+ * @param {number} radius - Target explosion radius (default 85px)
+ * @returns {Object} Particle instance
+ */
+export function spawnParryExplosion(x, y, radius = 85) {
+  const explosion = ParticleSystem.getParticle();
+  explosion.x = x;
+  explosion.y = y;
+  explosion.vx = 0;
+  explosion.vy = 0;
+  explosion.size = radius;
+  explosion.targetSize = radius;
+  explosion.life = 1.0;
+  explosion.decay = 1.0 / 18; // 18 frames duration (~0.30s at 60fps) for crisp parry feel
+  explosion.type = 'parryExplosion';
+  explosion.isProtected = true;
+  state.sparkEffects.push(explosion);
+  return explosion;
+}
+
 export function spawnParrySparksEffect(x, y, count = 28) {
+  // 0. 12-Frame Authentic Retro Pixel Art Global Parry Explosion Animation
+  spawnParryExplosion(x, y, 85);
+
   const mainColor = '#FFD700'; // Bright Gold
   const coreColor = '#FFFFFF'; // White-hot core
 
@@ -2250,8 +2280,37 @@ export function spawnPurpleShockwaveRings(x, y, radius = 280, is200 = false, isG
     }
   }
 
+  // Spawn 12-Frame Authentic Retro Pixel Art Hollow Purple Explosion Animation
+  spawnPurpleExplosion(x, y, radius, is200, isGreen);
+
   // Also spawn clean impact flash & lightning sparks
   spawnImpactFlash(x, y, radius * 0.35, isGreen ? '#00FF64' : '#BF5AF2');
   spawnSparks(x, y, is200 ? 16 : 10, 'lightningTrail', isGreen ? '#00FF64' : '#8A2BE2');
   spawnSparks(x, y, is200 ? 8 : 4, 'lightningTrail', isGreen ? '#B3FFCC' : '#00FFFF');
-}
+}
+
+/**
+ * Spawns the 12-Frame Authentic Retro Pixel Art Hollow Purple Explosion Animation.
+ * @param {number} x - Explosion center X
+ * @param {number} y - Explosion center Y
+ * @param {number} radius - Target explosion radius
+ * @param {boolean} is200 - True if 200% empowered cast
+ * @param {boolean} isGreen - True if Rubbick copied purple
+ */
+export function spawnPurpleExplosion(x, y, radius = 280, is200 = false, isGreen = false) {
+  const explosion = ParticleSystem.getParticle();
+  explosion.x = x;
+  explosion.y = y;
+  explosion.vx = 0;
+  explosion.vy = 0;
+  explosion.size = radius;
+  explosion.targetSize = radius;
+  explosion.life = 1.0;
+  explosion.decay = 1.0 / 22; // 22 frames duration (~0.36s) for 12-frame animation
+  explosion.type = 'purpleExplosion';
+  explosion.is200 = is200;
+  explosion.isGreen = isGreen;
+  explosion.isProtected = true;
+  state.sparkEffects.push(explosion);
+  return explosion;
+}

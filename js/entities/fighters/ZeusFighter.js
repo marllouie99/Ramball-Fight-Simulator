@@ -37,8 +37,8 @@ export class ZeusFighter extends Fighter {
     // Aura animation state
     this.auraPhase = 0;
 
-    // Suppress ALL default pixel art hand rendering (Zeus skin handles its own body)
-    this.hideHands = true;
+    // Rule 20: Canonical symmetrical pixel hands enabled (Zeus skin & weapon renderers handle placement)
+    this.hideHands = false;
     
     // Thunder cloud sound flag (play once when throwing thunderbolt to sky)
     this._thunderCloudSoundPlayed = false;
@@ -192,7 +192,17 @@ export class ZeusFighter extends Fighter {
     
     spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'AEGIS!', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
     
-    // Visuals
+    // Visuals & smiting thunderstrike on attacker
+    if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
+    const aegisStrikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 18;
+    state.zeusStormStrikes.push({
+      x: attacker.x,
+      y: attacker.y,
+      life: aegisStrikeLife,
+      maxLife: aegisStrikeLife,
+      scale: 0.95
+    });
+
     spawnImpactFlash(attacker.x, attacker.y, CONFIG.zeus?.aegisFlashRadius ?? 40, 'lightningTrail');
     spawnSparks(attacker.x, attacker.y, CONFIG.zeus?.aegisSparkCount ?? 15, 'thunderSpark');
     triggerGlobalScreenShake(CONFIG.zeus?.aegisShakeIntensity ?? 4, CONFIG.zeus?.aegisShakeFrames ?? 5);
@@ -400,12 +410,13 @@ export class ZeusFighter extends Fighter {
     
     // Register storm strike visual globally
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
-    const strikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 15;
+    const strikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 18;
     state.zeusStormStrikes.push({
       x: target.x,
       y: target.y,
       life: strikeLife,
-      maxLife: strikeLife
+      maxLife: strikeLife,
+      scale: 1.25
     });
   }
 
@@ -447,39 +458,65 @@ export class ZeusFighter extends Fighter {
       }
       
       const flashValue = Math.sin(this.auraPhase * 2.5 + i * 13);
-      const isFlashing = flashValue > flashThreshold; 
-      
-      ctx.beginPath();
-      ctx.arc(cx, cy, cloudSize, 0, Math.PI * 2);
-      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cloudSize);
-      
+      const isFlashing = flashValue > flashThreshold;
+
+      // ── AUTHENTIC RETRO PIXEL ART CUMULUS CLOUD PUFF (P = 2.0px) ──
+      const scx = Math.round(cx / 2) * 2;
+      const scy = Math.round(cy / 2) * 2;
+      const rad = Math.max(6, Math.round(cloudSize / 2) * 2);
+
+      ctx.save();
       if (isFlashing) {
-        // Bright radiant internal lightning flash
-        grad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-        grad.addColorStop(0.35, 'rgba(240, 249, 255, 0.90)');
-        grad.addColorStop(0.70, 'rgba(56, 189, 248, 0.50)');
-        grad.addColorStop(1, 'rgba(2, 132, 199, 0)');
+        // Flashing lightning puff: Electric cyan border + pure white core
+        ctx.beginPath();
+        ctx.arc(scx, scy, rad, 0, Math.PI * 2);
+        ctx.fillStyle = '#00E5FF';
+        ctx.fill();
+        ctx.strokeStyle = '#0E0F14';
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(scx, scy - 1, rad * 0.70, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
       } else {
-        // Smooth celestial cumulus storm cloud (luminous Olympian sky blue & white)
-        grad.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
-        grad.addColorStop(0.35, 'rgba(224, 242, 254, 0.65)');
-        grad.addColorStop(0.70, 'rgba(125, 211, 252, 0.28)');
-        grad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+        // Retro Pixel Cumulus Cloud: Dark ink border, shadow base, sky blue body, white highlight
+        // 1. Dark ink boundary outline
+        ctx.beginPath();
+        ctx.arc(scx, scy, rad, 0, Math.PI * 2);
+        ctx.fillStyle = '#0E0F14';
+        ctx.fill();
+
+        // 2. Lower under-shadow crescent
+        ctx.beginPath();
+        ctx.arc(scx, scy, rad - 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = this.stormActive ? '#0284C7' : '#94A3B8';
+        ctx.fill();
+
+        // 3. Main cloud body
+        ctx.beginPath();
+        ctx.arc(scx, scy - 2, rad - 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = this.stormActive ? '#38BDF8' : '#BAE6FD';
+        ctx.fill();
+
+        // 4. Upper crown highlight
+        ctx.beginPath();
+        ctx.arc(scx, scy - 4, rad * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fill();
       }
-      
-      ctx.fillStyle = grad;
-      ctx.fill();
-      
+      ctx.restore();
+
       // Draw erratic branching arcs & sparks (same as weapon) when flashing
       if (isFlashing) {
         ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
+        ctx.lineCap = 'square';
+        ctx.lineJoin = 'miter';
         const now = Date.now();
         const branchCount = 2; // Arcs per flashing cloud
-        
+
         for (let b = 0; b < branchCount; b++) {
-          // Use Date.now() / 80 for that aggressive flickering effect
           const seed = Math.floor(now / 80) * 137 + b * 53 + i * 17;
           const pseudoRand = (n) => {
             const x = Math.sin(seed + n * 9.1) * 43758.5453;
@@ -490,30 +527,29 @@ export class ZeusFighter extends Fighter {
           const dirY = (pseudoRand(2) - 0.5) * 2;
 
           ctx.beginPath();
-          // Start from the center of the cloud
-          ctx.moveTo(cx, cy);
+          ctx.moveTo(scx, scy);
 
-          let bx = cx;
-          let by = cy;
+          let bx = scx;
+          let by = scy;
           const segments = 2 + Math.floor(pseudoRand(3) * 2);
           const branchLen = 8 + pseudoRand(4) * 12;
 
           for (let s = 0; s < segments; s++) {
-            bx += dirX * (branchLen / segments) + (pseudoRand(5 + s) - 0.5) * 8;
-            by += dirY * (branchLen / segments) + (pseudoRand(6 + s) - 0.5) * 8;
+            bx += Math.round((dirX * (branchLen / segments) + (pseudoRand(5 + s) - 0.5) * 8) / 2) * 2;
+            by += Math.round((dirY * (branchLen / segments) + (pseudoRand(6 + s) - 0.5) * 8) / 2) * 2;
             ctx.lineTo(bx, by);
           }
 
-          ctx.strokeStyle = `rgba(0, 220, 255, ${0.5 + pseudoRand(7) * 0.5})`;
-          ctx.lineWidth = 1 + pseudoRand(8) * 1.5;
+          ctx.strokeStyle = '#00E5FF';
+          ctx.lineWidth = 1.5;
           ctx.stroke();
-          
-          // Tiny detached grounding sparks floating near the arc
+
+          // Discrete 2x2 detached grounding sparks
           if (pseudoRand(9) > 0.4) {
-            ctx.beginPath();
-            ctx.arc(bx + (pseudoRand(10) - 0.5) * 10, by + (pseudoRand(11) - 0.5) * 10, 1 + pseudoRand(12) * 1.5, 0, Math.PI * 2);
+            const spX = Math.round((bx + (pseudoRand(10) - 0.5) * 10) / 2) * 2;
+            const spY = Math.round((by + (pseudoRand(11) - 0.5) * 10) / 2) * 2;
             ctx.fillStyle = pseudoRand(13) > 0.5 ? '#FFFFFF' : '#00FFFF';
-            ctx.fill();
+            ctx.fillRect(spX - 1, spY - 1, 2, 2);
           }
         }
         ctx.restore();
@@ -664,13 +700,13 @@ export class ZeusFighter extends Fighter {
       const alphaMulti = drawBackground ? 0.3 : 1.0;
       
       // Outer cyan glow
-      ctx.lineWidth = (3 + Math.random() * 2) * alphaMulti;
-      ctx.strokeStyle = `rgba(0, 220, 255, ${0.7 * alphaMulti})`;
+      ctx.lineWidth = Math.max(1, Math.round(2.5 * alphaMulti));
+      ctx.strokeStyle = `rgba(0, 220, 255, ${0.75 * alphaMulti})`;
       ctx.stroke();
       
       // Inner bright core
-      ctx.lineWidth = 1 + Math.random() * 1.5;
-      ctx.strokeStyle = drawBackground ? `rgba(0, 255, 255, ${0.5 * alphaMulti})` : `rgba(255, 255, 255, 0.9)`;
+      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = drawBackground ? `rgba(0, 255, 255, ${0.5 * alphaMulti})` : 'rgba(255, 255, 255, 0.95)';
       ctx.stroke();
     }
     

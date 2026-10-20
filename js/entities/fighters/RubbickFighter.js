@@ -787,9 +787,10 @@ export class RubbickFighter extends Fighter {
     state.zeusStormStrikes.push({
       x: target.x,
       y: target.y,
-      life: 15,
-      maxLife: 15,
-      color: 'green'
+      life: 18,
+      maxLife: 18,
+      color: 'green',
+      scale: 1.25
     });
   }
 

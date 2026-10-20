@@ -810,12 +810,13 @@ export const HitImpactSystem = {
       
       // Add vertical thunder strike visual and electric roots
       if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
-      const strikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 15;
+      const strikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 18;
       state.zeusStormStrikes.push({
         x: target.x,
         y: target.y,
         life: strikeLife,
-        maxLife: strikeLife
+        maxLife: strikeLife,
+        scale: 1.05
       });
       
       spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius ?? 50, 'lightningTrail');

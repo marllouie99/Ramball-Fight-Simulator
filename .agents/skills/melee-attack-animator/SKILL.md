@@ -347,5 +347,6 @@ ctx.rotate(baseAngle);
 - [ ] **Always apply backward recoil impulse and spring damping (Section 2.1)**: Heavy swings must kick back on the body (`this.vx -= Math.cos(angle) * recoilKick`) with damped spring settle.
 - [ ] **Always decay effect timers before freeze guard (Rule 25)**: `swordHitTremorTimer` must update before `_handleTimeStop()`.
 - [ ] **Always use concentric rings for ground impact (Rule 26)**: No radial spiderweb meshes or cobweb lines.
+- [ ] **Always look for the 12-Frame Slash Template in Assets/effects/Slash Attack/ first**: When generating, extracting, or implementing an animated sprite slash for weapon attacks, ALWAYS check the canonical template in `Assets/effects/Slash Attack/` first before searching elsewhere (see `slash-animation-generator` skill at `.agents/skills/slash-animation-generator/SKILL.md`). Never wrap over the body; always spawn at the weapon tip kissaki.
 - [ ] **Reference Implementation**: See [chemical-katana-animator](file:///c:/Users/asus/OneDrive/Desktop/Circle%20Mini-Battle/.agents/skills/chemical-katana-animator/SKILL.md) for the 2-hit Chemical Katana combo specification (Horizontal Cross Cleave & Upward Rising Scoop).
 

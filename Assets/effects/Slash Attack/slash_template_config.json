@@ -1,0 +1,61 @@
+{
+  "name": "canonical-12-frame-slash-template",
+  "category": "melee-weapon-slash",
+  "version": "1.0.0",
+  "frameCount": 12,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "stripWidth": 3072,
+  "stripHeight": 256,
+  "pivotAnchor": {
+    "x": 95,
+    "y": 135,
+    "description": "Center of curvature in 256x256 frame space. Aligns 1:1 with sword rotation pivot (gripX, gripY)."
+  },
+  "kissakiTip": {
+    "x": 119,
+    "y": 232,
+    "radius": 100.0,
+    "angleRad": 1.328,
+    "angleDeg": 76.1,
+    "description": "Leading tip coordinates at impact lock (frames 4-5). Positioned at 100px reach from pivot at +1.33 rad."
+  },
+  "arcGeometry": {
+    "minRadius": 58.4,
+    "maxRadius": 130.2,
+    "meanRadius": 95.9,
+    "minAngleRad": -2.24,
+    "maxAngleRad": 1.33,
+    "totalSpanRad": 3.57
+  },
+  "scaling": {
+    "formula": "scale = (bladeReach / 100.0) * (isComboFinisher ? 1.15 : 1.0)",
+    "drawWidth": "256 * scale",
+    "drawHeight": "256 * scale",
+    "drawAnchorX": "95 * scale",
+    "drawAnchorY": "135 * scale"
+  },
+  "phaseMapping": {
+    "phase1_lift": { "frames": "hidden", "description": "Sword coiling back; slash hidden" },
+    "phase2_hold": { "frames": "hidden", "description": "Tense hold at apex; slash hidden" },
+    "phase3_strike": {
+      "strikeP_0_to_25": "hidden (blade accelerates from behind shoulder)",
+      "strikeP_25_to_50": "frame 0 (slash-1.png: initial crescent trailing behind cutting edge)",
+      "strikeP_50_to_75": "frame 1 (slash-2.png: mid-arc)",
+      "strikeP_75_to_100": "frame 2 (slash-3.png: high-velocity sweep)"
+    },
+    "phase4_impact_lock": {
+      "lockP_0_to_50": "frame 3 (slash-4.png: full crescent locked at blade tip)",
+      "lockP_50_to_100": "frame 4 (slash-5.png: peak impact hold with micro-tremor)"
+    },
+    "phase5_recovery_settle": {
+      "recP_0_to_100": "frames 5-11 (slash-6.png to slash-12.png: dissolves tail-to-tip into Reiatsu embers)"
+    }
+  },
+  "colorPalettes": {
+    "shikai_cyan": "ctx.filter = 'hue-rotate(185deg) saturate(1.2)';",
+    "scarlet_kuroi": "Default authentic obsidian & crimson Getsuga palette (no filter needed)",
+    "golden_holy": "ctx.filter = 'hue-rotate(45deg) saturate(1.4) brightness(1.2)';",
+    "purple_void": "ctx.filter = 'hue-rotate(270deg) saturate(1.3)';"
+  }
+}

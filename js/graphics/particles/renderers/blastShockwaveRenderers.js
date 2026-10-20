@@ -3,6 +3,7 @@
 // High-draw visual effects for impact rings, blasts, and shockwaves
 // ─────────────────────────────────────────────
 import { state } from '../../../core/state.js';
+import { drawGojoPurpleExplosion } from '../../weapons/gojoWeaponGraphics.js';
 
 function _isDarkMode() {
   return Boolean(
@@ -787,6 +788,128 @@ export function drawPurpleShockwaveRing(ctx, effect) {
 
     ctx.globalCompositeOperation = 'source-over';
   }
+  ctx.restore();
+}
+
+/**
+ * Draws the 12-Frame Authentic Retro Pixel Art Hollow Purple Explosion Animation.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} effect Particle effect from ParticleSystem
+ */
+export function drawPurpleExplosion(ctx, effect) {
+  if (!effect || effect.life <= 0) return;
+  const p = Math.max(0, Math.min(1.0, 1.0 - effect.life));
+  const maxR = effect.targetSize || effect.size || 280;
+  const alpha = Math.min(1.0, effect.life * 1.35);
+  if (alpha <= 0.01) return;
+
+  drawGojoPurpleExplosion(ctx, {
+    x: effect.x,
+    y: effect.y,
+    radius: maxR,
+    p: p,
+    alpha: alpha,
+    is200: Boolean(effect.is200),
+    isGreen: Boolean(effect.isGreen),
+  });
+}
+
+// ─────────────────────────────────────────────
+// Global 12-Frame Retro Pixel Art Parry Explosion
+// ─────────────────────────────────────────────
+const PARRY_EXPLOSION_FRAME_COUNT = 12;
+const PARRY_EXPLOSION_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/effects/Parry/explosion-${i + 1}.png`
+);
+
+let _parryExplosionFrames = [];
+let _parryExplosionFramesLoading = false;
+
+export function _getParryExplosionFrames() {
+  if (
+    _parryExplosionFrames.length === PARRY_EXPLOSION_FRAME_COUNT &&
+    _parryExplosionFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _parryExplosionFrames;
+  }
+  if (!_parryExplosionFramesLoading && typeof Image !== 'undefined') {
+    _parryExplosionFramesLoading = true;
+    _parryExplosionFrames = [];
+    PARRY_EXPLOSION_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _parryExplosionFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Parry explosion frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _parryExplosionFrames[idx] = img;
+    });
+  }
+  return _parryExplosionFrames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getParryExplosionFrames();
+}
+
+/**
+ * Draws the 12-frame retro pixel art parry explosion animation sprite.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} maxR Effect radius in arena pixels
+ * @param {number} p Progress 0.0 to 1.0 (elapsed / maxTimer)
+ * @param {number} alpha Base opacity
+ * @returns {boolean} True if frame was successfully rendered
+ */
+export function _drawParryAnimatedSprite(ctx, maxR, p, alpha = 1.0) {
+  const frames = _getParryExplosionFrames();
+  const frameIndex = Math.min(11, Math.max(0, Math.floor(p * 12)));
+  const frameImg = frames[frameIndex];
+
+  if (!frameImg || !frameImg.complete || ((frameImg.naturalWidth || frameImg.width || 0) <= 0)) {
+    return false;
+  }
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.imageSmoothingEnabled = false;
+
+  // Natural fade-out on late dissipating frames (frames 1-9 solid, 10-12 dissolve)
+  const fadeAlpha = p > 0.80 ? Math.max(0, (1.0 - p) / 0.20) : 1.0;
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * alpha * fadeAlpha));
+
+  // Frame is 256x256px centered at (128, 128)
+  const scale = (maxR * 1.0) / 100.0;
+  const drawW = 256 * scale;
+  const drawH = 256 * scale;
+  const anchorX = 128 * scale;
+  const anchorY = 128 * scale;
+
+  ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+
+  // Restore context state cleanly (Rule 2.4 Stack Integrity)
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  return true;
+}
+
+/**
+ * Draws the 12-Frame Authentic Retro Pixel Art Global Parry Explosion Animation.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} effect Particle effect from ParticleSystem
+ */
+export function drawParryExplosion(ctx, effect) {
+  if (!effect || effect.life <= 0) return;
+  const p = Math.max(0, Math.min(1.0, 1.0 - effect.life));
+  const maxR = effect.targetSize || effect.size || 85;
+  const alpha = Math.min(1.0, effect.life * 1.45);
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  _drawParryAnimatedSprite(ctx, maxR, p, alpha);
   ctx.restore();
 }
 

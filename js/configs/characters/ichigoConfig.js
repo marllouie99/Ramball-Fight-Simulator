@@ -9,8 +9,10 @@ export const ichigoConfig = {
     shikaiSwordBlade: 'Assets/model/ichigo/ICHIGO-SHIKAI-SWORD-BLADE.png',
     bankaiSword: 'Assets/model/ichigo/ICHIGO-BANKAI-SWORD.png',
     bankaiSwordBlade: 'Assets/model/ichigo/ICHIGO-BANKAI-SWORD-BLADE.png',
-    shikaiAttack: 'Assets/model/ichigo/Ichigo-shikai-attack.png',
-    bankaiAttack: 'Assets/model/ichigo/Ichigo-bankai-attack.png',
+    shikaiAttack: 'Assets/model/ichigo/attack/attack-b.png',
+    bankaiAttack: 'Assets/model/ichigo/attack/attack-b.png',
+    attackAnimation: 'Assets/model/ichigo/attack/attack-b.png',
+    bankaiTransformation: 'Assets/model/ichigo/bankai_transformation/bankai_transformation-b.png',
   },
 
   name: 'Ichigo',
