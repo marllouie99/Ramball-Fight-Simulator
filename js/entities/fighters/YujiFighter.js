@@ -1181,7 +1181,9 @@ export class YujiFighter extends Fighter {
     const auraTheme = this.isChannelingDivineFlame ? 'fuga' : (this.soulSwapActive ? 'red' : (this.isChannelingRCT ? 'rct' : 'blue'));
     GojoRenderer._drawJJKCursedEnergyAura(ctx, this, auraTheme);
 
-    drawFighterInkOutline(ctx, this);
+    if (!this._isPreview) {
+      drawFighterInkOutline(ctx, this);
+    }
     drawYujiSkin(ctx, this);
 
     // Draw Fuga Volcanic Magma Flame Arrow Construct in Canvas 2D fallback mode (when WebGL layer is inactive)

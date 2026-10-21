@@ -27,7 +27,13 @@ import { GAME_MODES } from '../../core/modeConfig.js';
 import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
 import { drawGradeBadge } from '../../configs/gradeConfig.js';
 
-const MODAL_ITEMS_PER_PAGE = 12;
+const MODAL_ITEMS_PER_PAGE_PORTRAIT = 9;  // 3x3 grid in Portrait Mode
+const MODAL_ITEMS_PER_PAGE_LANDSCAPE = 12; // 6x2 grid in Landscape Mode
+
+function _getModalItemsPerPage() {
+  const isLandscape = typeof state !== 'undefined' && state.canvas && (state.canvas.width > 600 || state.viewOrientation === 'horizontal');
+  return isLandscape ? MODAL_ITEMS_PER_PAGE_LANDSCAPE : MODAL_ITEMS_PER_PAGE_PORTRAIT;
+}
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
@@ -330,8 +336,8 @@ function _drawModalPaginationDock(ctx, x, y, w, h, totalPages) {
 function drawFighterSelectModal() {
   const { ctx, canvas } = state;
   const isLandscape = canvas.width > 600 || state.viewOrientation === 'horizontal';
-  const modalW = isLandscape ? Math.min(canvas.width - 28, 912) : Math.min(canvas.width - 20, 508);
-  const modalH = isLandscape ? Math.min(canvas.height - 20, 508) : Math.min(canvas.height - 44, 896);
+  const modalW = isLandscape ? Math.min(canvas.width - 28, 912) : Math.min(canvas.width - 20, 516);
+  const modalH = isLandscape ? Math.min(canvas.height - 20, 508) : Math.min(canvas.height - 36, 760);
   const mx = Math.round((canvas.width - modalW) / 2);
   const my = Math.round((canvas.height - modalH) / 2);
 
@@ -371,11 +377,12 @@ function drawFighterSelectModal() {
     .map((def, idx) => ({ def, idx }))
     .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
 
-  const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / MODAL_ITEMS_PER_PAGE));
+  const itemsPerPage = _getModalItemsPerPage();
+  const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
   modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
 
-  const startIdx = modalPage * MODAL_ITEMS_PER_PAGE;
-  const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + MODAL_ITEMS_PER_PAGE);
+  const startIdx = modalPage * itemsPerPage;
+  const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + itemsPerPage);
 
   if (isLandscape) {
     // ── LANDSCAPE (960x540): 6x2 Collector Card Grid + Top Pagination + Bottom Dossier & Lock-In ──
@@ -416,15 +423,16 @@ function drawFighterSelectModal() {
     drawButton('LOCK IN // 确认', btnCenterX, bottomY + 21, () => applyFighterSelection(), 168, 40, '#F5A623', 4);
     drawButton('CANCEL', btnCenterX, bottomY + 65, () => { selectingSlot = null; }, 168, 34, '#20242E', 4);
   } else {
-    // ── PORTRAIT (540x960): Reference 1 3x4 Full-Width Collector Card Grid (12 Cards) ──
+    // ── PORTRAIT (540x960): Scaled-Up 3x3 Full-Width Collector Card Grid (9 Cards) ──
     const cols = 3;
-    const cardW = 136;
-    const cardH = 138;
-    const listX = mx + 20;
-    const availW = modalW - 40;
+    const cardW = 156;
+    const cardH = 170;
+    const listX = mx + 12;
+    const availW = modalW - 24;
     const gapX = Math.floor((availW - cols * cardW) / (cols - 1));
-    const rowStride = cardH + 21;
-    const listY = my + 46;
+    const gapY = 12;
+    const rowStride = cardH + gapY;
+    const listY = my + 44;
 
     pageFighters.forEach(({ def, idx }, localPos) => {
       const col = localPos % cols;
@@ -444,16 +452,16 @@ function drawFighterSelectModal() {
       );
     });
 
-    // Pagination Dock
-    const paginationY = listY + 4 * rowStride + 2;
+    // Pagination Dock (Immediately below 3rd row of scaled cards)
+    const paginationY = listY + 2 * rowStride + cardH + 6;
     _drawModalPaginationDock(ctx, listX, paginationY, availW, 28, totalPages);
 
     // Compact Selected Fighter Dossier Bar (Stats, Ability, Live Weapon Stage)
     const dossierY = paginationY + 34;
-    drawCompactFighterDossierBar(ctx, selectedDef, modalWeaponInfo, listX, dossierY, availW, 86);
+    drawCompactFighterDossierBar(ctx, selectedDef, modalWeaponInfo, listX, dossierY, availW, 84);
 
     // Bottom Action Footer: CANCEL & LOCK IN
-    const footerY = dossierY + 86 + 24;
+    const footerY = dossierY + 84 + 24;
     const btnW = Math.floor((availW - 16) / 2);
     drawButton('CANCEL', listX + btnW / 2, footerY, () => {
       selectingSlot = null;
@@ -2652,7 +2660,8 @@ function openFighterSelectModal(slotProp, fighterIndex) {
   const pos = modalAvailableFighters.findIndex(f => f.idx === fighterIndex);
   
   if (pos !== -1) {
-    modalPage = Math.floor(pos / MODAL_ITEMS_PER_PAGE);
+    const itemsPerPage = _getModalItemsPerPage();
+    modalPage = Math.floor(pos / itemsPerPage);
   } else {
     modalPage = 0;
   }
@@ -2709,7 +2718,8 @@ window.addEventListener('keydown', (e) => {
         e.preventDefault();
         const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
           .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / MODAL_ITEMS_PER_PAGE));
+        const itemsPerPage = _getModalItemsPerPage();
+        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
         if (modalPage < totalPages - 1) {
           modalPage++;
           if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
@@ -2766,8 +2776,8 @@ window.addEventListener('wheel', (e) => {
   if (selectingSlot !== null) {
     // Modal scroll: flip to next / previous page on scroll!
     const isLandscape = (state.canvas && state.canvas.width > 600) || state.viewOrientation === 'horizontal';
-    const modalW = isLandscape ? Math.min(state.canvas.width - 28, 912) : Math.min(state.canvas.width - 20, 508);
-    const modalH = isLandscape ? Math.min(state.canvas.height - 20, 508) : Math.min(state.canvas.height - 44, 896);
+    const modalW = isLandscape ? Math.min(state.canvas.width - 28, 912) : Math.min(state.canvas.width - 20, 516);
+    const modalH = isLandscape ? Math.min(state.canvas.height - 20, 508) : Math.min(state.canvas.height - 36, 760);
     const mx = (state.canvas.width - modalW) / 2;
     const my = (state.canvas.height - modalH) / 2;
 
@@ -2778,7 +2788,8 @@ window.addEventListener('wheel', (e) => {
       if (now - _lastModalWheelTime > 140) {
         const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
           .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / MODAL_ITEMS_PER_PAGE));
+        const itemsPerPage = _getModalItemsPerPage();
+        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
         
         if (e.deltaY > 0) {
           if (modalPage < totalPages - 1) {

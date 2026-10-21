@@ -389,7 +389,9 @@ export class GojoRenderer {
     }
 
     // 2. Draw fighter body (with ink outline on top of CE aura)
-    drawFighterInkOutline(ctx, fighter);
+    if (!fighter._isPreview) {
+      drawFighterInkOutline(ctx, fighter);
+    }
     drawGojoBody(ctx, fighter);
 
     if (!fighter.isChannelingPurple) {

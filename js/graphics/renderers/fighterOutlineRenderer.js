@@ -144,6 +144,7 @@ export function drawFighterInkOutline(destCtx, fighter) {
   if (fighter.hp <= 0 && !fighter.isRevivingFromContract && !fighter.isShatterReviving && !fighter.isDying) return;
   if (fighter.vanishTimer > 0 || fighter._hideInBush) return;
   if (fighter.suppressInkOutline || fighter._suppressInkOutline) return;
+  if (fighter._isPreview || fighter._isCardPreview) return; // Prevent combat ink outline on card previews & UI stickers
   if (typeof state !== 'undefined' && state.enableFighterInkOutline === false) return;
   if (typeof CONFIG !== 'undefined' && CONFIG.enableFighterInkOutline === false) return;
   if (fighter._isSilhouettePass) return; // Prevent recursive outline rendering

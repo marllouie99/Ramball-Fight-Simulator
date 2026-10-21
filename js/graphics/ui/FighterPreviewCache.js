@@ -43,6 +43,8 @@ function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
   previewFighter.gunAngle = (isUpright || bodyOnly) ? 0 : Math.PI / 4; // Upright fighters aim forward
   previewFighter.hideHpText = true;
   previewFighter._isPreview = true;
+  previewFighter.suppressInkOutline = true;
+  previewFighter._suppressInkOutline = true;
   if (bodyOnly) {
     previewFighter.hideHands = true;
     previewFighter.hideWeapon = true;

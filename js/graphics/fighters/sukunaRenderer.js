@@ -169,7 +169,9 @@ export class SukunaRenderer {
     // 1. Draw Back Hand BEHIND body
     fighter._drawHandCursedEnergy(ctx, 'back');
 
-    drawFighterInkOutline(ctx, fighter);
+    if (!fighter._isPreview) {
+      drawFighterInkOutline(ctx, fighter);
+    }
     Fighter.prototype.draw.call(fighter, ctx);
 
     // 2. Draw Front Hand ON TOP of body

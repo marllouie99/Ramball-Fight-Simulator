@@ -3,7 +3,8 @@ import { getFighterPreview, getFighterBodyOnlyPreview, getFighterStickerPreview 
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { _registerButton, drawButton, drawStatBar, drawChamferedRect, fitSingleLineText, wrapText } from './uiFramework.js';
 import { audioSystem } from '../../systems/audioSystem.js';
-import { drawGradeBadge } from '../../configs/gradeConfig.js';
+import { drawGradeBadge, getFighterGrade } from '../../configs/gradeConfig.js';
+import { getFighterCardElement, drawEnergyOrb } from '../../configs/cardElementConfig.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // COLLECTOR CARD THEME ENGINE (Reference 1 Aotu-Style Pastel & Vibrant Palettes)
@@ -1982,204 +1983,788 @@ function _drawHudTopCardNameText(ctx, cardX, cardY, cardW, cardH, name) {
   ctx.restore();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 16-BIT RETRO POKÉMON-STYLE COLLECTOR CARD ENGINE
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Renders a single Collector Fighter Card using the HUD TOP FRAME architecture.
- * Features:
- *  - Signature double border (outer 3.5px #050609 + inner 1.8px #FFFFFF bevel)
- *  - Dark tactical carbon interior with vibrant character/grade radial aura
- *  - Connected HUD Top style header bar with italic comic typography
- *  - Bottom tactical spec strip with HP / Class readout
- *  - Top-Right Winged Grade Seal with special effects
- *  - Bottom-Left HUD Top corner grade badge
+ * Draws floating 4-point rotating starlight holo sparkles across the Pokemon card stage.
  */
-export function drawCollectorFighterCard(ctx, def, idx, x, y, w, h, isSelected, onSelect) {
-  const grade = def?.grade || 'B';
-  const theme = getZeusGradeCardTheme(grade);
-  const fighterColor = def?.themeColor || def?.color || theme.primary;
-  const isSSR = grade === 'SSR';
-  const isSS = grade === 'SS';
+function _drawPokemonHoloSparkles(ctx, x, y, w, h, charCx, charCy, t, element) {
+  const glints = [
+    { rx: 0.16, ry: 0.28, phase: 0.00, size: 3.4 },
+    { rx: 0.84, ry: 0.32, phase: 0.45, size: 3.8 },
+    { rx: 0.18, ry: 0.62, phase: 0.25, size: 3.0 },
+    { rx: 0.82, ry: 0.66, phase: 0.70, size: 3.2 },
+  ];
 
-  ctx.save();
-
-  // 1. HUD Top Style Solid Hard Cell Drop Shadow (2.5px 3.5px 0px #050609 + ambient shadow)
-  const shadowX = x + (isSelected ? 3.0 : 2.0);
-  const shadowY = y + (isSelected ? 4.0 : 2.8);
-  if (isSSR) {
-    // For SSR fade-out card: drop shadow matches the bottom-to-middle fade so the top stays clean and transparent
-    const shadowGrad = ctx.createLinearGradient(shadowX, shadowY + h, shadowX, shadowY);
-    shadowGrad.addColorStop(0.00, 'rgba(5, 6, 9, 0.75)');
-    shadowGrad.addColorStop(0.35, 'rgba(5, 6, 9, 0.45)');
-    shadowGrad.addColorStop(0.50, 'rgba(5, 6, 9, 0.00)');
-    shadowGrad.addColorStop(1.00, 'rgba(5, 6, 9, 0.00)');
-    ctx.fillStyle = shadowGrad;
-  } else {
-    ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.45)' : 'rgba(5, 6, 9, 0.75)';
+  for (let i = 0; i < glints.length; i++) {
+    const g = glints[i];
+    const alpha = Math.max(0, Math.sin(t * 2.5 + g.phase * Math.PI * 2));
+    if (alpha > 0.15) {
+      _drawRotatedComicSparkle(
+        ctx,
+        x + g.rx * w,
+        y + g.ry * h,
+        g.size * alpha,
+        t * 1.5 + g.phase,
+        element.accent || '#FFFFFF',
+        '#FFFFFF'
+      );
+    }
   }
-  _traceCollectorCardPath(ctx, shadowX, shadowY, w, h, 6);
-  ctx.fill();
+}
 
-  // 2. Clipped Card Interior
-  ctx.save();
-  _traceCollectorCardPath(ctx, x, y, w, h, 6);
-  ctx.clip();
+/**
+ * Returns the grade-based palette configuration for the 16-Bit Pokémon card background:
+ *  - Grade B: Emerald Green
+ *  - Grade A: Royal Purple / Amethyst
+ *  - Grade S: Radiant 24K Solar Gold
+ *  - Grade SS: Dark Crimson / Scarlet Flame
+ *  - Grade SSR: Abyss Void / Celestial Platinum
+ */
+export function getGradeCardBackground(grade = 'B') {
+  const g = String(grade || 'B').toUpperCase();
+  switch (g) {
+    case 'SSR':
+      return {
+        grade: 'SSR',
+        name: 'Abyss Platinum',
+        bgGrad: ['#141724', '#090B12', '#020306'],
+        radialCore: 'rgba(255, 255, 255, 0.52)',
+        radialMid: 'rgba(203, 213, 225, 0.32)',
+        radialOuter: 'rgba(51, 65, 85, 0.20)',
+        scanline: 'rgba(255, 255, 255, 0.05)',
+        hasShine: true,
+        shineHalo: 'rgba(255, 255, 255, 0.14)',
+        shineAccent: 'rgba(203, 213, 225, 0.40)',
+        shineCore: 'rgba(255, 255, 255, 0.95)',
+        shineSecondary: 'rgba(226, 232, 240, 0.45)',
+      };
+    case 'SS':
+      return {
+        grade: 'SS',
+        name: 'Crimson Flame',
+        bgGrad: ['#450915', '#29040C', '#120105'],
+        radialCore: 'rgba(254, 202, 202, 0.55)',
+        radialMid: 'rgba(239, 68, 68, 0.42)',
+        radialOuter: 'rgba(153, 27, 27, 0.20)',
+        scanline: 'rgba(248, 113, 113, 0.04)',
+        hasShine: true,
+        shineHalo: 'rgba(254, 202, 202, 0.12)',
+        shineAccent: 'rgba(239, 68, 68, 0.40)',
+        shineCore: 'rgba(255, 241, 242, 0.92)',
+        shineSecondary: 'rgba(254, 202, 202, 0.40)',
+      };
+    case 'S':
+      return {
+        grade: 'S',
+        name: 'Radiant Gold',
+        bgGrad: ['#3E2A06', '#271A03', '#140C01'],
+        radialCore: 'rgba(254, 240, 138, 0.58)',
+        radialMid: 'rgba(245, 158, 11, 0.42)',
+        radialOuter: 'rgba(180, 83, 9, 0.20)',
+        scanline: 'rgba(253, 224, 71, 0.045)',
+        hasShine: true,
+        shineHalo: 'rgba(254, 240, 138, 0.14)',
+        shineAccent: 'rgba(245, 158, 11, 0.42)',
+        shineCore: 'rgba(255, 254, 235, 0.95)',
+        shineSecondary: 'rgba(254, 240, 138, 0.45)',
+      };
+    case 'A':
+      return {
+        grade: 'A',
+        name: 'Royal Purple',
+        bgGrad: ['#280C44', '#18062B', '#0B0215'],
+        radialCore: 'rgba(233, 213, 255, 0.52)',
+        radialMid: 'rgba(168, 85, 247, 0.40)',
+        radialOuter: 'rgba(109, 40, 217, 0.18)',
+        scanline: 'rgba(192, 132, 252, 0.04)',
+        hasShine: true,
+        shineHalo: 'rgba(216, 180, 254, 0.12)',
+        shineAccent: 'rgba(168, 85, 247, 0.38)',
+        shineCore: 'rgba(250, 245, 255, 0.92)',
+        shineSecondary: 'rgba(233, 213, 255, 0.40)',
+      };
+    case 'B':
+    default:
+      return {
+        grade: 'B',
+        name: 'Emerald Green',
+        bgGrad: ['#0A341E', '#062113', '#020F08'],
+        radialCore: 'rgba(167, 243, 208, 0.48)',
+        radialMid: 'rgba(16, 185, 129, 0.36)',
+        radialOuter: 'rgba(5, 150, 105, 0.16)',
+        scanline: 'rgba(52, 211, 153, 0.035)',
+        hasShine: false, // Grade B cards remain clean and non-holo
+      };
+  }
+}
 
-  const charCx = Math.round(x + w * 0.50);
-  const charCy = Math.round(y + h * 0.46);
+/**
+ * Draws the Full-Art 16-bit retro Pokemon card interior stage:
+ * Grade-driven background gradient, scanline grid, dynamic radial burst,
+ * floor shadow, and the crisp 16-bit character sprite.
+ */
+function _drawPokemonCardStage(ctx, x, y, w, h, charCx, charCy, def, idx, element, grade, t) {
+  const gradeBg = getGradeCardBackground(grade);
 
-  // A. HUD Top Frame Dark Carbon Background with Radiant Center Glow
-  _drawHudTopCardInterior(ctx, x, y, w, h, charCx, charCy, theme, fighterColor);
+  // 1. Stage Grade Background Gradient (Driven 1:1 by Fighter Grade)
+  const stageGrad = ctx.createLinearGradient(x, y, x, y + h);
+  stageGrad.addColorStop(0.00, gradeBg.bgGrad[0]);
+  stageGrad.addColorStop(0.50, gradeBg.bgGrad[1]);
+  stageGrad.addColorStop(1.00, gradeBg.bgGrad[2]);
+  ctx.fillStyle = stageGrad;
+  ctx.fillRect(x, y, w, h);
 
-  // B. Floor Shadow Ellipse under character
-  const floorShadowY = Math.round(charCy + 22 * (h / 138));
+  // 2. Subtle 16-Bit Retro Scanline Texture (Tinted with Grade Palette)
+  ctx.fillStyle = gradeBg.scanline;
+  for (let gy = y + 4; gy < y + h - 4; gy += 4) {
+    ctx.fillRect(x + 4, gy, w - 8, 1);
+  }
+
+  // 3. Central Grade Radiant Burst behind Sprite
+  const radR = Math.max(w, h) * 0.78;
+  const radGrad = ctx.createRadialGradient(charCx, charCy - 4, 2, charCx, charCy - 4, radR);
+  radGrad.addColorStop(0.00, gradeBg.radialCore);
+  radGrad.addColorStop(0.28, gradeBg.radialMid);
+  radGrad.addColorStop(0.65, gradeBg.radialOuter);
+  radGrad.addColorStop(1.00, 'rgba(5, 7, 10, 0.00)');
+  ctx.fillStyle = radGrad;
+  ctx.fillRect(x, y, w, h);
+
+  // 4. Subtle Ambient Metallic Foil Luster
+  const sheenGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+  sheenGrad.addColorStop(0.00, 'rgba(255, 255, 255, 0.02)');
+  sheenGrad.addColorStop(0.35, 'rgba(255, 255, 255, 0.14)');
+  sheenGrad.addColorStop(0.48, 'rgba(255, 255, 255, 0.06)');
+  sheenGrad.addColorStop(1.00, 'rgba(255, 255, 255, 0.00)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(x, y, w, h);
+
+  // 5. Floor Contact Shadow Ellipse
+  const floorShadowY = Math.round(charCy + 19 * (h / 138));
   const shadowRx = Math.round(w * 0.22);
-  const shadowRy = Math.max(5, Math.round(h * 0.05));
+  const shadowRy = Math.max(4, Math.round(h * 0.045));
   ctx.save();
-  ctx.fillStyle = 'rgba(5, 6, 9, 0.62)';
+  ctx.fillStyle = 'rgba(5, 6, 9, 0.65)';
   ctx.beginPath();
   ctx.ellipse(charCx, floorShadowY, shadowRx, shadowRy, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // C. Character Sprite Preview
-  const stickerSize = Math.round(Math.min(w * 1.58, h * 1.54));
+  // 6. 16-Bit Character Sprite Preview (Nearest Neighbor for authentic pixel fidelity)
+  const stickerSize = Math.round(Math.min(w * 1.54, h * 1.50));
   const stickerImg = getFighterStickerPreview(idx);
   if (stickerImg) {
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(stickerImg, charCx - stickerSize / 2, charCy - stickerSize / 2, stickerSize, stickerSize);
   } else {
-    const fallbackR = Math.round(21 * (w / 136));
-    ctx.fillStyle = fighterColor;
+    ctx.fillStyle = def?.color || '#38BDF8';
     ctx.beginPath();
-    ctx.arc(charCx, charCy, fallbackR, 0, Math.PI * 2);
+    ctx.arc(charCx, charCy, 20 * (w / 136), 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = '#050609';
     ctx.lineWidth = 2.4;
     ctx.stroke();
   }
+}
 
-  // D. SSR / SS Card Stage Visual Effects (Ember Slivers, Floating Cinder Motes & Star Glints)
-  if (isSSR) {
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const t = now * 0.001 + (idx * 0.73);
-    _drawSSRCardStageEffects(ctx, x, y, w, h, charCx, charCy, t);
-  } else if (isSS) {
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const t = now * 0.001 + (idx * 0.73);
-    _drawSSCardStageEffects(ctx, x, y, w, h, charCx, charCy, t);
-  }
+/**
+ * Renders a clean, luminous diagonal holographic swipe shine across the card face
+ * for Grade A-S fighters (A, S, SS, SSR). Grade B cards remain non-holo.
+ * 
+ * Features:
+ *  - Organic 3.2s cadence with 1.15s active swipe and 2.05s calm rest
+ *  - Staggered phase offset per card index so grid cards don't shine in lockstep
+ *  - Smooth acceleration/deceleration cubic easing curve
+ *  - Razor-sharp white/specular core flanked by grade-tinted prismatic halo
+ *  - Companion parallel thin secondary glint band for authentic TCG foil luster
+ *  - 100% compliant with Rule 2.2 (zero shadowBlur) and Rule 2.4 (balanced transform stack)
+ */
+function _drawPokemonCardSwipeShine(ctx, x, y, w, h, grade, t, idx) {
+  const gradeBg = getGradeCardBackground(grade);
+  if (!gradeBg.hasShine) return;
 
-  // E. Floating Fighter Name in Bottom Center
-  const rawLabel = String(def?.name || def?.type || 'FIGHTER');
-  let displayName = rawLabel.includes(' - ') ? rawLabel.split(' - ')[0] : rawLabel;
-  displayName = displayName.toUpperCase();
-  _drawHudTopCardNameText(ctx, x, y, w, h, displayName);
+  const cycleDuration = 3.2;
+  const swipeDuration = 1.15;
+  const localT = (t + idx * 0.42) % cycleDuration;
+  if (localT > swipeDuration) return; // In calm rest phase
 
-  ctx.restore(); // Restore clip so borders, grade seal and corner badge pop out!
+  const p = localT / swipeDuration;
+  // Smooth cubic ease (swift, energetic sweep across card)
+  const ease = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
 
-  // 3. Double Card Borders (The Signature HUD Top Profile Frame)
-  // Outer Heavy Manga Border (#050609, 3.5px)
-  _traceCollectorCardPath(ctx, x, y, w, h, 6);
-  ctx.strokeStyle = '#050609';
-  ctx.lineWidth = isSelected ? 4.0 : 3.5;
+  const diag = Math.hypot(w, h);
+  const cardCx = x + w / 2;
+  const cardCy = y + h / 2;
+
+  ctx.save();
+  // Clip strictly to card interior bounds so shine stays inside the frame
+  _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+  ctx.clip();
+
+  ctx.translate(cardCx, cardCy);
+  ctx.rotate(-0.58); // Slanted diagonal angle (~ -33 degrees)
+
+  const startX = -diag * 0.85;
+  const endX = diag * 0.85;
+  const beamX = startX + ease * (endX - startX);
+
+  // 1. Primary Holographic Beam (Dual-tapered specular ribbon)
+  const mainW = Math.round(w * 0.20);
+  const mainGrad = ctx.createLinearGradient(beamX - mainW, 0, beamX + mainW, 0);
+  mainGrad.addColorStop(0.00, 'rgba(255, 255, 255, 0.00)');
+  mainGrad.addColorStop(0.22, gradeBg.shineHalo);
+  mainGrad.addColorStop(0.42, gradeBg.shineAccent);
+  mainGrad.addColorStop(0.48, 'rgba(255, 255, 255, 0.70)');
+  mainGrad.addColorStop(0.50, gradeBg.shineCore);
+  mainGrad.addColorStop(0.52, 'rgba(255, 255, 255, 0.70)');
+  mainGrad.addColorStop(0.58, gradeBg.shineAccent);
+  mainGrad.addColorStop(0.78, gradeBg.shineHalo);
+  mainGrad.addColorStop(1.00, 'rgba(255, 255, 255, 0.00)');
+
+  ctx.fillStyle = mainGrad;
+  ctx.fillRect(-diag, -diag, diag * 2, diag * 2);
+
+  // 2. Trailing Companion Thin Glint Band
+  const compX = beamX - 14;
+  const compW = 6;
+  const compGrad = ctx.createLinearGradient(compX - compW, 0, compX + compW, 0);
+  compGrad.addColorStop(0.00, 'rgba(255, 255, 255, 0.00)');
+  compGrad.addColorStop(0.50, gradeBg.shineSecondary);
+  compGrad.addColorStop(1.00, 'rgba(255, 255, 255, 0.00)');
+
+  ctx.fillStyle = compGrad;
+  ctx.fillRect(-diag, -diag, diag * 2, diag * 2);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Classic Pokémon TCG Top Header Bar:
+ * [BASIC] Capsule Pill, Bold Retro Fighter Name, Specular Glint, HP [value], and Circular Energy Orb.
+ */
+function _drawPokemonCardHeader(ctx, x, y, w, h, def, element, isBoss = false) {
+  ctx.save();
+
+  // Top Dark Glass Header Strip
+  ctx.fillStyle = 'rgba(8, 10, 16, 0.72)';
+  ctx.fillRect(x + 3, y + 3, w - 6, 17);
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+  ctx.fillRect(x + 3, y + 20, w - 6, 0.8);
+
+  // 1. Stage Pill Badge ([BASIC] / [BOSS])
+  const pillW = 24;
+  const pillH = 11;
+  const pillX = x + 5;
+  const pillY = y + 5;
+  drawChamferedRect(ctx, pillX, pillY, pillW, pillH, 2.5);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 0.9;
   ctx.stroke();
 
-  // Inner Beveled White/Highlight Outline (The Signature HUD Top Inset Stroke: inset 0 0 0 2px #FFFFFF)
+  ctx.fillStyle = '#0F172A';
+  ctx.font = '900 6.5px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(isBoss ? 'BOSS' : 'BASIC', pillX + pillW / 2, pillY + pillH / 2 + 0.3);
+
+  // 2. Fighter Name (Bold Retro Typography)
+  ctx.font = '900 10.5px "Outfit", "Impact", "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const rawName = String(def?.name || def?.type || 'FIGHTER');
+  const displayName = (rawName.includes(' - ') ? rawName.split(' - ')[0] : rawName).toUpperCase();
+  const nameMaxW = w - 82; // Clearance for stage pill on left and HP + orb on right
+  const fittedName = fitSingleLineText(ctx, displayName, nameMaxW);
+
+  // Dark manga outline + crisp white fill
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 2.4;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(fittedName, x + 32, y + 11);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(fittedName, x + 32, y + 11);
+
+  // Specular Golden Star Glint (✦) right after the name
+  const nameW = ctx.measureText(fittedName).width;
+  ctx.fillStyle = '#FDE047';
+  ctx.font = '800 7px sans-serif';
+  ctx.fillText('✦', x + 33 + nameW, y + 10.5);
+
+  // 3. HP [value] Readout
+  ctx.font = '900 9px "Outfit", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  const hpText = `HP ${def?.hp || 100}`;
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 2.0;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(hpText, x + w - 24, y + 11);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(hpText, x + w - 24, y + 11);
+
+  // 4. Circular Elemental Energy Orb
+  drawEnergyOrb(ctx, element.key, x + w - 14, y + 11, 5.8);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Lower Pokémon TCG Section:
+ * Red Capsule [Ability] Row, Attack Move Row with Energy Pips and Damage Value,
+ * and Collector Set Number Footer.
+ */
+function _drawPokemonCardBottomSection(ctx, x, y, w, h, def, idx, element) {
+  ctx.save();
+
+  // Glass Container Pod for Lower Card Text
+  const podY = y + h - 45;
+  const podH = 40;
+  ctx.fillStyle = 'rgba(7, 9, 14, 0.84)';
+  drawChamferedRect(ctx, x + 4, podY, w - 8, podH, 3);
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // 1. Ability Row
+  const pillX = x + 7;
+  const pillY = podY + 3;
+  const pillW = 32;
+  const pillH = 11;
+  const redGrad = ctx.createLinearGradient(pillX, pillY, pillX + pillW, pillY + pillH);
+  redGrad.addColorStop(0.00, '#DC2626');
+  redGrad.addColorStop(1.00, '#991B1B');
+  drawChamferedRect(ctx, pillX, pillY, pillW, pillH, 2.5);
+  ctx.fillStyle = redGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '800 italic 7px "Outfit", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Ability', pillX + pillW / 2, pillY + pillH / 2 + 0.3);
+
+  // Ability Name
+  const abX = pillX + pillW + 5;
+  const abMaxW = w - (abX - x) - 8;
+  ctx.font = '900 8.5px "Outfit", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const abName = fitSingleLineText(ctx, String(def?.ability || 'TECHNIQUE').toUpperCase(), abMaxW);
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 2.0;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(abName, abX, pillY + pillH / 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(abName, abX, pillY + pillH / 2);
+
+  // 2. Attack Move Row
+  const atkY = podY + 18;
+
+  // Energy Cost Pips (Elemental + Colorless)
+  drawEnergyOrb(ctx, element.key, x + 11, atkY + 5, 3.4);
+  drawEnergyOrb(ctx, 'colorless', x + 19, atkY + 5, 3.4);
+
+  // Attack Move Name
+  const atkX = x + 26;
+  const atkMaxW = w - 66;
+  const rawMove = def?.ability ? `${def.ability}` : (def?.name || 'STRIKE');
+  ctx.font = '800 8px "Outfit", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const moveFitted = fitSingleLineText(ctx, rawMove.toUpperCase(), atkMaxW);
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 1.8;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(moveFitted, atkX, atkY + 5);
+  ctx.fillStyle = '#E2E8F0';
+  ctx.fillText(moveFitted, atkX, atkY + 5);
+
+  // Attack Damage Number (Right Aligned)
+  const dmgX = x + w - 8;
+  const dmgVal = String(def?.damage || 25);
+  ctx.font = '900 11.5px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 2.6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(dmgVal, dmgX, atkY + 5);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(dmgVal, dmgX, atkY + 5);
+
+  // 3. Collector Set Footer & Divider
+  const footerY = podY + 32;
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.fillRect(x + 7, footerY - 2, w - 14, 0.6);
+
+  // Set Number: e.g. 023/064 ★
+  const setStr = `${String(idx + 1).padStart(3, '0')}/064 ★`;
+  ctx.font = '800 6px "Silkscreen", monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#94A3B8';
+  ctx.fillText(setStr, x + 8, footerY + 3);
+
+  // Illustrator Credit
+  ctx.font = '700 5.5px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#64748B';
+  ctx.fillText('Illus. CMB', x + w - 14, footerY + 3);
+
+  // Miniature Holographic Foil Stamp
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(x + w - 11, footerY + 1, 3, 3);
+
+  ctx.restore();
+}
+
+/**
+ * Helper to trace the angled wedge / pennant banner polygon.
+ */
+function _traceWedgeBannerPath(ctx, x0, y0, topW, botW, h_left, h_bot) {
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x0 + topW, y0);
+  ctx.lineTo(x0 + botW, y0 + h_bot);
+  ctx.lineTo(x0, y0 + h_left);
+  ctx.closePath();
+}
+
+/**
+ * Draws a single golden 5-point star with metallic fill, dark outline, and specular core.
+ */
+function _drawGoldMiniStar(ctx, cx, cy, r) {
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const ang = i * (Math.PI / 5) - Math.PI / 2;
+    const rad = i % 2 === 0 ? r : r * 0.44;
+    const px = cx + Math.cos(ang) * rad;
+    const py = cy + Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+
+  // Dark drop shadow outline
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 1.0;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Warm metallic gold star fill
+  const starGrad = ctx.createLinearGradient(cx, cy - r, cx, cy + r);
+  starGrad.addColorStop(0.00, '#FFFBEB');
+  starGrad.addColorStop(0.35, '#FBBF24');
+  starGrad.addColorStop(1.00, '#B45309');
+  ctx.fillStyle = starGrad;
+  ctx.fill();
+
+  // Specular top sparkle glint
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(cx - 0.3, cy - 0.3, r * 0.28, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draws the 16-Bit Pokémon TCG Angled Wedge Rarity Banner in top-left
+ * (Matching the user's reference image: gold-beveled pennant, wine velvet field,
+ * embossed gold grade lettering, and golden stars).
+ */
+function _drawPokemonWedgeRarityBanner(ctx, x, y, w, h, grade, theme, idx, t) {
+  const x0 = x + 3.5;
+  const y0 = y + 20.0;
+  const topW = Math.round(w * 0.28);
+  const botW = Math.round(topW * 0.80);
+  const h_left = Math.round(h * 0.22);
+  const h_bot = Math.round(h * 0.28);
+
+  ctx.save();
+
+  // 1. Drop Shadow behind the banner
+  ctx.fillStyle = 'rgba(5, 6, 9, 0.72)';
+  _traceWedgeBannerPath(ctx, x0 + 1.6, y0 + 1.6, topW, botW, h_left, h_bot);
+  ctx.fill();
+
+  // 2. Clipped Jewel Plate Interior (Velvet Gradient + Diagonal Sheen Luster)
+  ctx.save();
+  _traceWedgeBannerPath(ctx, x0, y0, topW, botW, h_left, h_bot);
+  ctx.clip();
+
+  const plateGrad = ctx.createLinearGradient(x0, y0, x0 + topW, y0 + h_bot);
+  if (grade === 'SSR') {
+    plateGrad.addColorStop(0.00, '#7A142A'); // Rich crimson-wine
+    plateGrad.addColorStop(0.50, '#540D1D');
+    plateGrad.addColorStop(1.00, '#2E060F'); // Deep abyss maroon
+  } else if (grade === 'SS') {
+    plateGrad.addColorStop(0.00, '#881337'); // Rose ruby
+    plateGrad.addColorStop(0.50, '#5C0D24');
+    plateGrad.addColorStop(1.00, '#310613');
+  } else if (grade === 'S') {
+    plateGrad.addColorStop(0.00, '#662208'); // Warm solar amber-crimson
+    plateGrad.addColorStop(0.50, '#421404');
+    plateGrad.addColorStop(1.00, '#240A02');
+  } else if (grade === 'A') {
+    plateGrad.addColorStop(0.00, '#581C87'); // Royal amethyst
+    plateGrad.addColorStop(0.50, '#3B0764');
+    plateGrad.addColorStop(1.00, '#1E0436');
+  } else {
+    plateGrad.addColorStop(0.00, '#064E3B'); // Forest emerald
+    plateGrad.addColorStop(0.50, '#022C22');
+    plateGrad.addColorStop(1.00, '#011711');
+  }
+  ctx.fillStyle = plateGrad;
+  ctx.fillRect(x0 - 2, y0 - 2, topW + 6, h_bot + 6);
+
+  // Diagonal Light Beam Sheen across the velvet field (Signature image highlight)
+  const sheenGrad = ctx.createLinearGradient(x0, y0, x0 + topW, y0 + h_bot);
+  sheenGrad.addColorStop(0.00, 'rgba(255, 255, 255, 0.00)');
+  sheenGrad.addColorStop(0.24, 'rgba(255, 255, 255, 0.28)'); // Luminous white beam
+  sheenGrad.addColorStop(0.40, 'rgba(255, 255, 255, 0.12)');
+  sheenGrad.addColorStop(1.00, 'rgba(255, 255, 255, 0.00)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(x0 - 2, y0 - 2, topW + 6, h_bot + 6);
+
+  ctx.restore(); // End plate clip
+
+  // 3. Double Gold Rim Bevel Frame
+  const goldRim = ctx.createLinearGradient(x0, y0, x0 + topW, y0 + h_bot);
+  goldRim.addColorStop(0.00, '#FFF3B0'); // Incandescent light gold
+  goldRim.addColorStop(0.30, '#FFD700'); // Radiant 24k gold
+  goldRim.addColorStop(0.70, '#D99B1E'); // Amber gold
+  goldRim.addColorStop(1.00, '#8C590E'); // Warm bronze gold
+
+  // Outer Gold Line
+  _traceWedgeBannerPath(ctx, x0, y0, topW, botW, h_left, h_bot);
+  ctx.strokeStyle = goldRim;
+  ctx.lineWidth = 1.8;
+  ctx.lineJoin = 'miter';
+  ctx.stroke();
+
+  // Inner Thin Gold Line
+  _traceWedgeBannerPath(ctx, x0 + 1.2, y0 + 1.0, topW - 2.2, botW - 2.0, h_left - 1.8, h_bot - 2.2);
+  ctx.strokeStyle = 'rgba(255, 245, 180, 0.40)';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // 4. Embossed Metallic Gold Grade Text ("SSR" / "S" / "SS" / "A" / "B")
+  const letterCx = x0 + (topW * 0.48);
+  const letterCy = y0 + (h_bot * 0.36);
+  const fontSize = grade === 'SSR' ? 13.5 : (grade === 'SS' ? 13.0 : 15.0);
+
+  ctx.save();
+  ctx.font = `900 ${fontSize}px "Impact", "Outfit", "Rajdhani", sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Dark 3D Drop Shadow underneath letters
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 3.2;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(grade, letterCx, letterCy);
+
+  ctx.fillStyle = '#050609';
+  ctx.fillText(grade, letterCx + 0.8, letterCy + 1.2);
+
+  // Metallic Gold Letter Gradient Fill
+  const textGold = ctx.createLinearGradient(letterCx, letterCy - fontSize * 0.5, letterCx, letterCy + fontSize * 0.5);
+  textGold.addColorStop(0.00, '#FFFDE7'); // Incandescent glint highlight
+  textGold.addColorStop(0.25, '#FFD700'); // Radiant Solar Gold
+  textGold.addColorStop(0.65, '#E5A512'); // Amber gold
+  textGold.addColorStop(1.00, '#8C5406'); // Deep bronze base shadow
+  ctx.fillStyle = textGold;
+  ctx.fillText(grade, letterCx, letterCy);
+
+  // Top Specular Highlight on letters
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.fillText(grade, letterCx - 0.3, letterCy - 0.4);
+  ctx.fillStyle = textGold;
+  ctx.fillText(grade, letterCx, letterCy);
+
+  ctx.restore();
+
+  // 5. Golden Stars Underneath (★ ★ ★)
+  const starsY = letterCy + (fontSize * 0.46) + 4;
+  const starCount = grade === 'B' ? 1 : (grade === 'A' ? 2 : 3);
+  const starSpacing = 5.8;
+  const startStarX = letterCx - ((starCount - 1) * starSpacing) / 2;
+
+  for (let s = 0; s < starCount; s++) {
+    const sx = startStarX + s * starSpacing;
+    _drawGoldMiniStar(ctx, sx, starsY, 2.4);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Metallic Silver / Titanium Holo Foil Card Frame with pixel bevels,
+ * dynamic rainbow holographic foil sheen, and corner sparkles.
+ */
+function _drawPokemonCardHoloFrame(ctx, x, y, w, h, isSelected, grade, t, idx) {
+  const isSSR = grade === 'SSR';
+  const isSS = grade === 'SS';
+  const isS = grade === 'S';
+
+  // 1. Outer Dark Manga Border (#090A0E)
+  _traceCollectorCardPath(ctx, x, y, w, h, 6);
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = isSelected ? 3.8 : 3.2;
+  ctx.stroke();
+
+  // 2. Base Metallic Silver/Titanium Frame Bevel
+  const silverFrame = ctx.createLinearGradient(x, y, x + w, y + h);
+  silverFrame.addColorStop(0.00, '#F8FAFC'); // Incandescent silver highlight
+  silverFrame.addColorStop(0.25, '#E2E8F0'); // Platinum
+  silverFrame.addColorStop(0.60, '#CBD5E1'); // Cool titanium
+  silverFrame.addColorStop(1.00, '#94A3B8'); // Matte silver shadow
+
+  // 3. Dynamic Holographic Rainbow Foil Sheen for High Grades
   if (isSSR) {
-    // Vibrant Animated Flowing Golden Rainbow Gradient Border for SSR-Grade
-    // Grounded in radiant 24k Solar Gold with an iridescent spectrum cycle
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const rainbowAngle = (now * 0.0022) + (idx * 0.65);
+    const rainbowAngle = (t * 1.8) + (idx * 0.65);
     const rCos = Math.cos(rainbowAngle);
     const rSin = Math.sin(rainbowAngle);
     const rDiag = Math.hypot(w, h) * 0.58;
     const goldenRainbow = ctx.createLinearGradient(
-      charCx - rCos * rDiag, charCy - rSin * rDiag,
-      charCx + rCos * rDiag, charCy + rSin * rDiag
+      (x + w / 2) - rCos * rDiag, (y + h / 2) - rSin * rDiag,
+      (x + w / 2) + rCos * rDiag, (y + h / 2) + rSin * rDiag
     );
-    goldenRainbow.addColorStop(0.00, '#FFD700'); // Radiant 24K Solar Gold
-    goldenRainbow.addColorStop(0.12, '#FFA000'); // Luminous Gold-Amber
-    goldenRainbow.addColorStop(0.25, '#FF2E74'); // Vivid Rose Ruby
-    goldenRainbow.addColorStop(0.38, '#B038FF'); // Celestial Amethyst Violet
-    goldenRainbow.addColorStop(0.50, '#00E5FF'); // Bright Aurora Cyan
-    goldenRainbow.addColorStop(0.62, '#00FF88'); // Electric Mint Emerald
-    goldenRainbow.addColorStop(0.75, '#FFE600'); // Solar Gold Yellow
-    goldenRainbow.addColorStop(0.88, '#FFFFFF'); // Specular Incandescent Diamond White-Gold
-    goldenRainbow.addColorStop(1.00, '#FFD700'); // Wrap back to Radiant Solar Gold
+    goldenRainbow.addColorStop(0.00, '#FFD700'); // Solar Gold
+    goldenRainbow.addColorStop(0.15, '#FFA000'); // Amber
+    goldenRainbow.addColorStop(0.30, '#FF2E74'); // Rose Ruby
+    goldenRainbow.addColorStop(0.48, '#B038FF'); // Amethyst Violet
+    goldenRainbow.addColorStop(0.65, '#00E5FF'); // Aurora Cyan
+    goldenRainbow.addColorStop(0.82, '#00FF88'); // Mint Emerald
+    goldenRainbow.addColorStop(1.00, '#FFD700'); // Wrap back to Solar Gold
 
-    // Soft glowing iridescent corona pass (Rule 2.2 compliant: 0 shadowBlur)
+    // Corona glow (Rule 2.2 compliant: 0 shadowBlur)
     ctx.save();
-    ctx.globalAlpha = 0.45;
+    ctx.globalAlpha = 0.40;
     ctx.strokeStyle = goldenRainbow;
-    ctx.lineWidth = isSelected ? 5.2 : 4.2;
-    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+    ctx.lineWidth = isSelected ? 4.8 : 3.8;
+    _traceCollectorCardPath(ctx, x + 2.2, y + 2.2, w - 4.4, h - 4.4, 4.5);
     ctx.stroke();
     ctx.restore();
 
-    // Crisp Core Golden Rainbow Border
-    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+    // Core crisp golden rainbow border
+    _traceCollectorCardPath(ctx, x + 2.2, y + 2.2, w - 4.4, h - 4.4, 4.5);
     ctx.strokeStyle = goldenRainbow;
-    ctx.lineWidth = isSelected ? 3.2 : 2.5;
-    ctx.stroke();
-
-    // Corner Diamond Sparkles along the golden rainbow border
-    const cornerGlintAlpha = Math.sin(now * 0.003 + idx) * 0.5 + 0.5;
-    if (cornerGlintAlpha > 0.3) {
-      _drawRotatedComicSparkle(ctx, x + 5, y + 5, 3.8 * cornerGlintAlpha, now * 0.002, '#FFFFFF', '#FFFFFF');
-      _drawRotatedComicSparkle(ctx, x + w - 5, y + h - 5, 3.8 * cornerGlintAlpha, -now * 0.002, '#00E5FF', '#FFFFFF');
-    }
-  } else if (grade === 'S') {
-    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
-    const goldBevel = ctx.createLinearGradient(x, y, x + w, y + h);
-    goldBevel.addColorStop(0, '#FFFDE7');
-    goldBevel.addColorStop(0.30, '#FFD700');
-    goldBevel.addColorStop(0.70, '#F59E0B');
-    goldBevel.addColorStop(1, '#FFF59D');
-    ctx.strokeStyle = isSelected ? '#FFFFFF' : goldBevel;
-    ctx.lineWidth = isSelected ? 2.5 : 2.0;
+    ctx.lineWidth = isSelected ? 3.0 : 2.4;
     ctx.stroke();
   } else if (isSS) {
-    // Vibrant Animated Flowing Rainbow Gradient Border for SS-Grade
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const rainbowAngle = (now * 0.0022) + (idx * 0.65);
+    const rainbowAngle = (t * 1.8) + (idx * 0.65);
     const rCos = Math.cos(rainbowAngle);
     const rSin = Math.sin(rainbowAngle);
     const rDiag = Math.hypot(w, h) * 0.55;
     const rainbowBevel = ctx.createLinearGradient(
-      charCx - rCos * rDiag, charCy - rSin * rDiag,
-      charCx + rCos * rDiag, charCy + rSin * rDiag
+      (x + w / 2) - rCos * rDiag, (y + h / 2) - rSin * rDiag,
+      (x + w / 2) + rCos * rDiag, (y + h / 2) + rSin * rDiag
     );
-    rainbowBevel.addColorStop(0.00, '#FF2E74'); // Vivid Magenta-Rose
-    rainbowBevel.addColorStop(0.18, '#FF8A00'); // Radiant Neon Orange
-    rainbowBevel.addColorStop(0.36, '#FFEA00'); // Solar Gold Yellow
-    rainbowBevel.addColorStop(0.52, '#00FF9D'); // Electric Emerald Green
-    rainbowBevel.addColorStop(0.70, '#00D8FF'); // Bright Aqua/Cyan
-    rainbowBevel.addColorStop(0.86, '#B038FF'); // Neon Purple/Violet
-    rainbowBevel.addColorStop(1.00, '#FF2E74'); // Wrap back to Magenta-Rose
+    rainbowBevel.addColorStop(0.00, '#FF2E74');
+    rainbowBevel.addColorStop(0.20, '#FF8A00');
+    rainbowBevel.addColorStop(0.40, '#FFEA00');
+    rainbowBevel.addColorStop(0.60, '#00FF9D');
+    rainbowBevel.addColorStop(0.80, '#00D8FF');
+    rainbowBevel.addColorStop(1.00, '#FF2E74');
 
-    // Soft neon rim along the border path (Rule 11 compliant: 0 shadowBlur)
-    ctx.save();
-    ctx.globalAlpha = 0.35;
+    _traceCollectorCardPath(ctx, x + 2.2, y + 2.2, w - 4.4, h - 4.4, 4.5);
     ctx.strokeStyle = rainbowBevel;
-    ctx.lineWidth = isSelected ? 4.6 : 3.8;
-    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
+    ctx.lineWidth = isSelected ? 2.8 : 2.2;
     ctx.stroke();
-    ctx.restore();
-
-    // Crisp core rainbow border
-    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
-    ctx.strokeStyle = rainbowBevel;
-    ctx.lineWidth = isSelected ? 3.0 : 2.4;
+  } else if (isS) {
+    _traceCollectorCardPath(ctx, x + 2.2, y + 2.2, w - 4.4, h - 4.4, 4.5);
+    const goldBevel = ctx.createLinearGradient(x, y, x + w, y + h);
+    goldBevel.addColorStop(0.00, '#FFFDE7');
+    goldBevel.addColorStop(0.35, '#FFD700');
+    goldBevel.addColorStop(0.70, '#F59E0B');
+    goldBevel.addColorStop(1.00, '#FFF59D');
+    ctx.strokeStyle = isSelected ? '#FFFFFF' : goldBevel;
+    ctx.lineWidth = isSelected ? 2.6 : 2.0;
     ctx.stroke();
   } else {
-    _traceCollectorCardPath(ctx, x + 2.5, y + 2.5, w - 5, h - 5, 4.5);
-    ctx.strokeStyle = isSelected ? '#FFD700' : 'rgba(255, 255, 255, 0.92)';
-    ctx.lineWidth = isSelected ? 2.2 : 1.8;
+    // Silver / Titanium Bevel for A and B tiers
+    _traceCollectorCardPath(ctx, x + 2.2, y + 2.2, w - 4.4, h - 4.4, 4.5);
+    ctx.strokeStyle = isSelected ? '#FFD700' : silverFrame;
+    ctx.lineWidth = isSelected ? 2.4 : 1.8;
     ctx.stroke();
   }
 
-  // 4. Top-Right Winged Comic Grade Seal with Special Effects
-  const sealCx = x + w - 24;
-  const sealCy = y + 17;
-  _drawWingedGradeSeal(ctx, sealCx, sealCy, grade, theme, idx);
+  // 4. Inset Dark Bezel separating frame from art face
+  _traceCollectorCardPath(ctx, x + 3.2, y + 3.2, w - 6.4, h - 6.4, 3.8);
+  ctx.strokeStyle = '#0F172A';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+}
+
+/**
+ * Renders a single 16-Bit Retro Pokémon-Style Collector Fighter Card:
+ * Features:
+ *  - Prismatic Metallic Silver / Titanium Holo Foil Border with corner diamond sparkles
+ *  - Classic TCG Top Header Bar: [BASIC] capsule pill + Name + HP + Circular Elemental Energy Orb
+ *  - Full-Art 16-Bit Character Sprite Showcase with dynamic elemental background and floor shadow
+ *  - Red Capsule [Ability] Box with ability name
+ *  - Attack Move Row with Energy Pips and Damage Value
+ *  - Collector Set Number Footer
+ *  - PRESERVED: Top-Right Winged Grade Seal with special effects
+ */
+export function drawCollectorFighterCard(ctx, def, idx, x, y, w, h, isSelected, onSelect) {
+  const grade = getFighterGrade(def);
+  const theme = getZeusGradeCardTheme(grade);
+  const element = getFighterCardElement(def);
+  const isBoss = def?.type === 'boss' || Boolean(def?.bossTitle);
+
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const t = now * 0.001 + (idx * 0.73);
+
+  ctx.save();
+
+  // 1. Drop Shadow
+  const shadowX = x + (isSelected ? 3.0 : 2.0);
+  const shadowY = y + (isSelected ? 4.0 : 2.8);
+  ctx.fillStyle = isSelected ? 'rgba(245, 158, 11, 0.45)' : 'rgba(5, 6, 9, 0.75)';
+  _traceCollectorCardPath(ctx, shadowX, shadowY, w, h, 6);
+  ctx.fill();
+
+  // 2. Clipped Card Interior (Full-Art Stage + Classic TCG Header + Bottom Section)
+  ctx.save();
+  _traceCollectorCardPath(ctx, x, y, w, h, 6);
+  ctx.clip();
+
+  const charCx = Math.round(x + w * 0.50);
+  const charCy = Math.round(y + h * 0.44);
+
+  // A. Full-Art 16-Bit Pokémon Stage (Grade-Driven Background & Radiant Aura)
+  _drawPokemonCardStage(ctx, x, y, w, h, charCx, charCy, def, idx, element, grade, t);
+
+  // B. Classic Pokémon TCG Top Header Bar ([BASIC], Name, HP, Energy Orb)
+  _drawPokemonCardHeader(ctx, x, y, w, h, def, element, isBoss);
+
+  // C. Lower Pokémon TCG Section (Ability Capsule + Attack Move + Set Footer)
+  _drawPokemonCardBottomSection(ctx, x, y, w, h, def, idx, element);
+
+  // D. Clean Holographic Foil Swipe Shiny Effect (Grades A, S, SS, SSR)
+  _drawPokemonCardSwipeShine(ctx, x, y, w, h, grade, t, idx);
+
+  ctx.restore(); // Restore clip so borders, grade seal, and selection ring pop out!
+
+  // 3. Metallic Silver / Holo Foil Card Frame & Corner Sparkles
+  _drawPokemonCardHoloFrame(ctx, x, y, w, h, isSelected, grade, t, idx);
+
+  // 4. Pokémon TCG Wedge Rarity Banner (Top-Left under header, matching user reference image)
+  _drawPokemonWedgeRarityBanner(ctx, x, y, w, h, grade, theme, idx, t);
 
   // 5. Active Selection Ring
   if (isSelected) {
@@ -2358,7 +2943,8 @@ export function drawCompactFighterDossierBar(ctx, selectedDef, weaponInfo, x, y,
   ctx.fillStyle = '#1B1E28';
   ctx.strokeStyle = theme.primary;
   ctx.lineWidth = 1.2;
-  drawChamferedRect(ctx, col1X, y + 23, Math.min(col1W - 8, 110), 14, 3);
+  const pillW = Math.min(col1W - 24, 96);
+  drawChamferedRect(ctx, col1X, y + 23, pillW, 14, 3);
   ctx.fill();
   ctx.stroke();
 
@@ -2366,7 +2952,11 @@ export function drawCompactFighterDossierBar(ctx, selectedDef, weaponInfo, x, y,
   ctx.font = '900 8.5px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(fitSingleLineText(ctx, `CLASS // ${String(selectedDef.type || selectedDef.name || 'FIGHTER').toUpperCase()}`, 104), col1X + Math.min(col1W - 8, 110) / 2, y + 30);
+  ctx.fillText(fitSingleLineText(ctx, `CLASS // ${String(selectedDef.type || selectedDef.name || 'FIGHTER').toUpperCase()}`, pillW - 6), col1X + pillW / 2, y + 30);
+
+  // Elemental Energy Orb beside Class Pill
+  const element = getFighterCardElement(selectedDef);
+  drawEnergyOrb(ctx, element.key, col1X + pillW + 11, y + 30, 6.0);
 
   // Optional form toggle (Reze / Eye of Cthulhu)
   if (selectedDef.type === 'reze') {
@@ -2394,15 +2984,36 @@ export function drawCompactFighterDossierBar(ctx, selectedDef, weaponInfo, x, y,
   const col3W = 92;
   const col2W = w - (col2X - x) - col3W - 10;
 
+  // Red Ability Capsule Pill
+  const abPillW = 34;
+  const abPillH = 12;
+  const redGrad = ctx.createLinearGradient(col2X, y + 6, col2X + abPillW, y + 6 + abPillH);
+  redGrad.addColorStop(0.00, '#DC2626');
+  redGrad.addColorStop(1.00, '#991B1B');
+  drawChamferedRect(ctx, col2X, y + 6, abPillW, abPillH, 2.5);
+  ctx.fillStyle = redGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#090A0E';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '800 italic 7px "Outfit", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Ability', col2X + abPillW / 2, y + 6 + abPillH / 2 + 0.3);
+
+  // Ability Name
   ctx.fillStyle = '#F5A623';
   ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(fitSingleLineText(ctx, `SPEC // ${(String(selectedDef.ability || 'DEFAULT')).toUpperCase()}`, col2W), col2X, y + 8);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(fitSingleLineText(ctx, (String(selectedDef.ability || 'DEFAULT')).toUpperCase(), col2W - abPillW - 6), col2X + abPillW + 6, y + 6 + abPillH / 2);
 
   ctx.fillStyle = '#CBD5E1';
   ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-  wrapText(ctx, String(selectedDef.desc || ''), col2X, y + 21, col2W, 11.5, 4);
+  ctx.textBaseline = 'top';
+  wrapText(ctx, String(selectedDef.desc || ''), col2X, y + 22, col2W, 11.5, 4);
 
   // Column 3: Live Weapon Containment Cell
   const col3X = x + w - col3W - 6;

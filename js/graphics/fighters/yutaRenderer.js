@@ -64,7 +64,9 @@ export class YutaRenderer {
     // Draw sword bag on his back (behind body)
     fighter._drawYutaSwordBag(ctx);
 
-    drawFighterInkOutline(ctx, fighter);
+    if (!fighter._isPreview) {
+      drawFighterInkOutline(ctx, fighter);
+    }
     Fighter.prototype.draw.call(fighter, ctx, opponent);
 
     // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
