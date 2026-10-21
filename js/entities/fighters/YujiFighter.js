@@ -866,17 +866,39 @@ export class YujiFighter extends Fighter {
       }
     }
 
-    if (this.blackFlashTimer > 0 && Math.hypot(this.vx, this.vy) > 0.8) {
-      if (!this.afterImages) this.afterImages = [];
-      pushTrailCap(this.afterImages, {
-        x: this.x,
-        y: this.y,
-        r: this.r,
-        angle: this.angle,
-        color: this.color || '#D95C7E',
-        timer: 16,
-        maxTimer: 16
-      }, 12);
+    // Black Flash Zone Ghost Trail Afterimages (Stepped distance intervals to prevent clumping/caterpillar artifact)
+    if (this.blackFlashTimer > 0) {
+      const speed = Math.hypot(this.vx, this.vy);
+      if (speed <= 0.6) {
+        this._lastBfTrailX = undefined;
+        this._lastBfTrailY = undefined;
+      } else {
+        const minStepDist = (this.r || 25) * 0.85;
+        const movedDist = (this._lastBfTrailX !== undefined && this._lastBfTrailY !== undefined)
+          ? Math.hypot(this.x - this._lastBfTrailX, this.y - this._lastBfTrailY)
+          : 999;
+        if (movedDist >= minStepDist) {
+          this._lastBfTrailX = this.x;
+          this._lastBfTrailY = this.y;
+          if (!this.afterImages) this.afterImages = [];
+          const facingAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+          pushTrailCap(this.afterImages, {
+            x: this.x,
+            y: this.y,
+            r: this.r || 25,
+            gunAngle: facingAngle,
+            angle: facingAngle,
+            isSukunaForm: Boolean(this.soulSwapActive),
+            isBlackFlash: true,
+            color: '#D95C7E',
+            timer: 14,
+            maxTimer: 14
+          }, 5);
+        }
+      }
+    } else {
+      this._lastBfTrailX = undefined;
+      this._lastBfTrailY = undefined;
     }
   }
 

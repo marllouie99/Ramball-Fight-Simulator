@@ -1,4 +1,4 @@
-import { state, isGlobalHitPauseActive } from '../core/state.js';
+import { state, isGlobalHitPauseActive, triggerGlobalScreenShake } from '../core/state.js';
 import { updateFighters, updateProjectiles } from './physics.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatchWithRandomTagMatchFighters, resetMatch, startCountdown, startMatchDirectlyFromFaceOff, launchMatchOrBossEntrance } from '../core/gameFlow.js';
@@ -20,6 +20,7 @@ import { updateArenaBgm, startArenaBgm, stopArenaBgm } from './arenaBgmSystem.js
 import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
+import { audioSystem } from './audioSystem.js';
 import { updateFocMap, getActiveFocMap, resetFocMapState } from '../../FOC Maps/index.js';
 import { isFfaMode } from '../core/viewportManager.js';
 
@@ -55,47 +56,15 @@ export function updateGame() {
     if (state.gameState === 'countdown') {
       state.countdownTimer = (state.countdownTimer || 0) + 1;
 
-      const is1v1Mode = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE || state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel');
-      let requiredCountdownFrames = 120;
-
-      if (is1v1Mode) {
-        // 1v1 Mode: Round Announcer only ("Round 1, Fight!", "Round 2, Fight!", "Final Round, Fight!")
-        let roundKey = 'round1';
-        if (state.roundNum === 1) {
-          roundKey = 'round1';
-        } else if (state.roundNum === 2) {
-          roundKey = 'round2';
-        } else {
-          roundKey = 'finalround';
-        }
-        const snd = getAnnouncerSound(roundKey);
-        if (state.countdownTimer === 1) {
-          if (snd && typeof audioSystem !== 'undefined') {
-            audioSystem.playSFX(snd.src, snd.volume, snd.speed, snd.offset || 0);
-          }
-        }
-        // Calculate audio duration in frames + small breathing delay (~25 frames / 0.42s)
-        const audioDurationSec = (snd && snd.duration) ? (snd.duration / (snd.speed || 1.0)) : 2.2;
-        const delayFrames = 25;
-        requiredCountdownFrames = Math.round(audioDurationSec * 60) + delayFrames;
-      } else {
-        // All Other Modes: Standard Arcade Countdown (3 -> 2 -> 1 -> FIGHT! + Gong Bell)
-        const tickSnd = getAnnouncerSound('timertick');
-        if (state.countdownTimer === 1 && tickSnd) audioSystem.playSFX(tickSnd.src, tickSnd.volume, tickSnd.speed, tickSnd.offset || 0);
-        if (state.countdownTimer === 30 && tickSnd) audioSystem.playSFX(tickSnd.src, tickSnd.volume, tickSnd.speed, tickSnd.offset || 0);
-        if (state.countdownTimer === 60 && tickSnd) audioSystem.playSFX(tickSnd.src, tickSnd.volume, tickSnd.speed, tickSnd.offset || 0);
-        if (state.countdownTimer === 90) {
-          const fightSnd = getAnnouncerSound('fight');
-          const bellSnd = getAnnouncerSound('ringbell');
-          if (fightSnd && typeof audioSystem !== 'undefined') {
-            audioSystem.playSFX(fightSnd.src, fightSnd.volume, fightSnd.speed, fightSnd.offset || 0);
-          }
-          if (bellSnd && typeof audioSystem !== 'undefined') {
-            audioSystem.playSFX(bellSnd.src, bellSnd.volume, bellSnd.speed, bellSnd.offset || 0);
-          }
-        }
-        requiredCountdownFrames = 135;
+      // Micro screen rumble on VS badge slam at frame 21
+      if (state.countdownTimer === 21 && typeof triggerGlobalScreenShake === 'function') {
+        triggerGlobalScreenShake(2.0, 4);
       }
+
+      // Fast, high-energy anime battle intro cinematic duration (70 frames / ~1.16s)
+      // (1-2-3 countdown tick sounds and premature countdown fight/bell sounds completely removed)
+      const requiredCountdownFrames = 70;
+      state.requiredCountdownFrames = requiredCountdownFrames;
 
       // Update fighters during countdown to aim guns/weapons at opponents
       updateArenaBgm();
@@ -119,7 +88,13 @@ export function updateGame() {
       if (state.countdownTimer >= requiredCountdownFrames) {
         state.gameState = 'playing';
         state._isChampionLayoutActive = false;
-        state.battleStartDelayTimer = 0;
+        // Sequential Pre-Battle Animation:
+        // Phase 1: FIGHT! banner pops first (frames 80 down to 44, duration 36 frames)
+        // Phase 2: Poke Ball summon materializes fighters (frames 44 down to 0, duration 44 frames)
+        state.battleStartDelayTimer = 80;
+        state.battleStartDelayMax = 80;
+        state.fightBannerTimer = 44;
+        state.fightBannerMax = 44;
         state.countdownTimer = state.countdownDuration || 180;
         startArenaBgm(false);
         // Instant Battle Start Readiness: Clear initial spawn cooldowns so fighters attack & engage immediately
@@ -127,7 +102,7 @@ export function updateGame() {
           state.fighters.forEach(f => {
             if (f && f.hp > 0) {
               f._isFaceOff = false;
-              f.hideHpText = false;
+              f.hideHpText = true; // Hidden during Poke Ball summon
               f.shootCooldown = 0;
               f.cooldown = 0;
               f.meleeCooldown = 0;
@@ -147,11 +122,36 @@ export function updateGame() {
             }
           });
         }
+        return;
       }
       return;
     }
     
     if (state.gameState === 'playing') {
+      if (state.fightBannerTimer > 0) {
+        state.fightBannerTimer--;
+        // Play fight announcer SFX + boxing ring bell on the FIGHT! banner slam impact (frame 5 of banner)
+        if (state.fightBannerTimer === (state.fightBannerMax - 5)) {
+          if (typeof triggerGlobalScreenShake === 'function') {
+            triggerGlobalScreenShake(3.0, 5);
+          }
+          const fightSnd = getAnnouncerSound('fight');
+          const bellSnd = getAnnouncerSound('ringbell');
+          if (fightSnd && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX(fightSnd.src, fightSnd.volume, fightSnd.speed, fightSnd.offset || 0);
+          }
+          if (bellSnd && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX(bellSnd.src, bellSnd.volume, bellSnd.speed, bellSnd.offset || 0);
+          }
+        }
+      }
+
+      // Trigger Poke Ball summon sound exactly when the fighters begin materializing (at frame 44)
+      if (state.battleStartDelayTimer === 44) {
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('Assets/Sound Effects/Skills/summinillusion.mp3', 0.85);
+        }
+      }
       const isGlobalHitPausing = isGlobalHitPauseActive(state);
       if (!isGlobalHitPausing) {
         state.matchTimer = (state.matchTimer || 0) + 1;

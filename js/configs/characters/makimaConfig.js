@@ -70,8 +70,9 @@ export const makimaConfig = {
   chainsThrowSpeed: 0.40,           // Chain throw projectile speed (0.10 = 10% speed / ~1.55s slow throw, 1.0 or 45 = default fast throw)
   // chainsLaunchFrames: 9,         // Optional: explicit throw animation duration in frames (overridden by chainsThrowSpeed if set)
   chainsMinDistance: 175,           // Minimum leash distance to prevent enemies getting too close to Makima
-  chainsDamage: 2,                 // Initial latch damage
-  chainsBleedDps: 0,                // Internal bleeding DPS
+  chainsDamage: 50,                 // Initial latch damage
+  chainsBleedDps: 3,                // Internal bleeding DPS (damage per tick while chained)
+  chainsTickInterval: 30,           // Frames between each bleed tick (~0.5s at 60 FPS)
   chainsDuration: 300,              // 4.0s (240 frames) tether & stasis duration for enemy fighters
   chainsDurationFrames: 300,        // Alias duration in frames for fighters
   chainsStasisFrames: 240,          // Alias duration in frames for fighters

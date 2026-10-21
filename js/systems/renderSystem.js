@@ -28,6 +28,7 @@ import { drawLightningEffects } from '../graphics/particles/lightningEffects.js'
 import { drawGetsugaImpactEffects, updateGetsugaImpactEffects } from '../graphics/particles/getsugaImpactEffect.js';
 import { drawTojiImpactEffects, updateTojiImpactEffects } from '../graphics/particles/tojiImpactEffect.js';
 import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaDomainVisuals.js';
+import { drawFightBanner } from '../graphics/renderers/PokeBallSummonRenderer.js';
 import { drawHorizontalTeamSelectScreen } from '../graphics/ui/HorizontalTeamSelectScreen.js';
 import { drawHorizontalPanoramicHud } from '../graphics/ui/horizontalHudManager.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -399,15 +400,17 @@ export function renderGame() {
           }
         }
 
-        drawFighters(); // Draw fighters ON TOP of dim screens & domain structures so fighters stay 100% visible & un-tinted!
-        if (state.fighters && (YutaBushEntrance.isActive || EyeOfCthulhuEntrance.isActive)) {
-          for (const f of state.fighters) {
-            if (f && f.isBoss && f.hp > 0) {
-              if (YutaBushEntrance.isActive) {
-                YutaBushEntrance.drawForeground(state.ctx, f);
-              }
-              if (EyeOfCthulhuEntrance.isActive) {
-                EyeOfCthulhuEntrance.drawForeground(state.ctx, f);
+        if (state.gameState !== 'countdown') {
+          drawFighters(); // Draw fighters ON TOP of dim screens & domain structures so fighters stay 100% visible & un-tinted!
+          if (state.fighters && (YutaBushEntrance.isActive || EyeOfCthulhuEntrance.isActive)) {
+            for (const f of state.fighters) {
+              if (f && f.isBoss && f.hp > 0) {
+                if (YutaBushEntrance.isActive) {
+                  YutaBushEntrance.drawForeground(state.ctx, f);
+                }
+                if (EyeOfCthulhuEntrance.isActive) {
+                  EyeOfCthulhuEntrance.drawForeground(state.ctx, f);
+                }
               }
             }
           }
@@ -573,6 +576,11 @@ export function renderGame() {
       if (state.gameState === 'playing') {
         const isDarkPlaying = (state.arenaTheme === 'dark');
 
+        // Draw High-Impact FIGHT! Banner during battle start
+        if (state.fightBannerTimer && state.fightBannerTimer > 0) {
+          drawFightBanner(state.topLevelUiCtx || state.ctx, state.canvas.width, state.canvas.height);
+        }
+
         // Smooth White Flash Veil Dissolve when entering arena from Face-Off Countdown (disabled in Dark Mode)
         if (!isDarkPlaying && state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
           state.battleStartFadeTimer--;
@@ -591,17 +599,6 @@ export function renderGame() {
         BossEntranceSequence.draw(state.topLevelUiCtx || state.ctx);
       } else if (state.gameState === 'countdown') {
         drawCountdown();
-
-        const isDarkCountdown = Boolean(state.arenaTheme === 'dark' || state.darkMode);
-        // Smooth Arena Entrance Flash Fade (disabled in Dark Mode)
-        if (!isDarkCountdown && (state.countdownTimer || 0) < 14) {
-          const uiCtx = state.topLevelUiCtx || state.ctx;
-          const flashAlpha = Math.max(0, 1 - (state.countdownTimer || 0) / 14);
-          uiCtx.save();
-          uiCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.95})`;
-          uiCtx.fillRect(0, 0, state.canvas.width, state.canvas.height);
-          uiCtx.restore();
-        }
       } else if (state.gameState === 'paused') {
         drawPauseScreen();
       } else if (state.gameState === 'roundEnd') {

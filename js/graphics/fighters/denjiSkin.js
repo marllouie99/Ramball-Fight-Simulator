@@ -60,6 +60,7 @@ export function drawDenjiSkin(ctx, fighter) {
   );
 
   const isHybrid = (fighter.isHybridModeActive !== false) || Boolean(fighter.isExecutingMassacre);
+  const hideForeheadChainsaw = Boolean(fighter.hideHeadChainsaw || fighter.hideForeheadChainsaw);
   const hideChainsaws = Boolean(fighter.hideChainsaws || fighter.hideChainsaw || fighter.hideWeapon || (typeof state !== 'undefined' && (state.hideDenjiChainsaws || state.showSkinOnly)));
   const hideHands = Boolean(fighter.hideHands || fighter.hideFrontHand || fighter.hideBackHand || hideChainsaws || (typeof state !== 'undefined' && state.showSkinOnly));
 
@@ -146,12 +147,12 @@ export function drawDenjiSkin(ctx, fighter) {
       _drawDenjiHelmetVentGlow(ctx, r, lungeGlowAlpha, now);
     }
 
-    // Central Forehead Chainsaw Blade (Protruding Forward along Top Crest)
-    if (!hideChainsaws && !(typeof state !== 'undefined' && state.showSkinOnly)) {
+    // Central Forehead Chainsaw Blade (Protruding Forward along Top Crest — Part of Devil Head Model)
+    if (!hideForeheadChainsaw) {
       _drawDenjiForeheadChainsaw(ctx, r, now, combatOpts);
     }
   } else {
-    drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaws, combatOpts);
+    drawDenjiChainsawHybridBody(ctx, r, now, hideForeheadChainsaw, combatOpts);
     if (lungeGlowAlpha > 0) {
       _drawDenjiHelmetVentGlow(ctx, r, lungeGlowAlpha, now);
     }
@@ -742,8 +743,8 @@ export function drawDenjiChainsawHybridBody(ctx, r, now, hideChainsaw = false, o
     }
   }
 
-  // ── Central Forehead Chainsaw Blade (Protruding Forward along Top Crest) ──
-  if (!hideChainsaw && !(typeof state !== 'undefined' && state.showSkinOnly)) {
+  // ── Central Forehead Chainsaw Blade (Protruding Forward along Top Crest — Part of Devil Head Model) ──
+  if (!hideChainsaw) {
     _drawDenjiForeheadChainsaw(ctx, r, now);
   }
 

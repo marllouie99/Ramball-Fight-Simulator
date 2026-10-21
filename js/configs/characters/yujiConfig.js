@@ -73,7 +73,7 @@ export const yujiConfig = {
 
   // Skill 2: Reverse Cursed Technique (RCT) — Passive
   enableRCT: true,                // Master toggle for Reverse Cursed Technique
-  rctHealPercent: 0.20,         // Percentage of max HP restored upon reverting from Sukuna transformation
+  rctHealPercent: 0.50,         // Percentage of max HP restored upon reverting from Sukuna transformation
 
   // Ultimate: Soul Swap — Sukuna Takes Over
   enableSoulSwap: true,           // Master toggle for Soul Swap ultimate

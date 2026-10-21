@@ -84,45 +84,119 @@ export function _drawYujiHair(ctx, r, facingLeft = false) {
 }
 
 /**
+ * Renders Yuji Itadori's authentic Ghost Model Afterimage (Rule 19 / Rule 24 / Rule 22).
+ * Features pixel-art body rasterization, authentic hair asset overlay, and clean concentric cursed aura.
+ */
+export function drawYujiGhostSkin(ctx, x, y, angle = 0, r = 25, alpha = 0.45, isSukunaForm = false, isBlackFlash = false) {
+  if (alpha <= 0.01) return;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x, y);
+
+  const normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
+  const facingLeft = Math.abs(normAngle) > Math.PI / 2;
+  ctx.rotate(angle);
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
+
+  // 1. Cursed Energy Outer Glow Aura (Rule 11 compliant: concentric arcs, zero shadowBlur)
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.25, 0, Math.PI * 2);
+  if (isSukunaForm) {
+    ctx.fillStyle = 'rgba(220, 20, 40, 0.28)'; // Sukuna Malevolent Crimson
+  } else if (isBlackFlash) {
+    ctx.fillStyle = 'rgba(180, 20, 60, 0.26)'; // Black Flash Crimson
+  } else {
+    ctx.fillStyle = 'rgba(217, 92, 126, 0.22)'; // Cursed Energy Pink
+  }
+  ctx.fill();
+
+  // 2. Procedural Pixel-Art Body (Rule 24 Toji standard architecture, cached offscreen)
+  drawYujiPixelBody(ctx, r, isSukunaForm);
+
+  // 3. Authentic Hair Model Overlay (Rule 22)
+  if (isSukunaForm) {
+    _drawSukunaHair(ctx, r, facingLeft);
+  } else {
+    _drawYujiHair(ctx, r, facingLeft);
+  }
+
+  // 4. Spectral Body Outline & Manga Rim
+  ctx.strokeStyle = isSukunaForm 
+    ? 'rgba(255, 36, 0, 0.85)' 
+    : (isBlackFlash ? 'rgba(240, 20, 50, 0.80)' : 'rgba(255, 120, 160, 0.75)');
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+/**
  * Main entry point — draws Yuji's body circle.
  */
 export function drawYujiSkin(ctx, fighter) {
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const now = Date.now();
-  // 1. Draw afterimages (Zone trails) at their absolute coordinates
+  // 1. Draw afterimages (Zone & dash ghost trails) at their absolute coordinates
   const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
     f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
   );
   const isSuppressed = typeof fighter.areAttackEffectsSuppressed === 'function' ? fighter.areAttackEffectsSuppressed() : (isGojoDomainActive || isSuppressedByGetsuga(fighter));
   if (!isLowQuality && fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
+    // A. Draw subtle Dash Motion Trajectory Line if teleport occurred
+    let lastDrawnFromKey = null;
     for (let i = 0; i < fighter.afterImages.length; i++) {
-      const ai = fighter.afterImages[i];
-      if (ai.timer <= 0) continue;
-      const progress = ai.timer / ai.maxTimer;
-      const alpha = progress * 0.35; // Soft trail opacity
+      const img = fighter.afterImages[i];
+      if (!img || img.timer <= 0 || img.fromX === undefined || img.toX === undefined) continue;
+      const key = `${Math.round(img.fromX)}_${Math.round(img.fromY)}_${Math.round(img.toX)}_${Math.round(img.toY)}`;
+      if (key === lastDrawnFromKey) continue;
+      lastDrawnFromKey = key;
+
+      const maxT = img.maxTimer || 18;
+      const progress = Math.max(0, Math.min(1, img.timer / maxT));
+      const lineAlpha = Math.pow(progress, 0.8) * 0.45;
+
+      const ldx = img.toX - img.fromX;
+      const ldy = img.toY - img.fromY;
+      const ldist = Math.hypot(ldx, ldy);
+      const cutoff = (fighter.r || 25) * 0.9;
+      const endX = ldist > cutoff ? (img.toX - (ldx / ldist) * cutoff) : img.fromX;
+      const endY = ldist > cutoff ? (img.toY - (ldy / ldist) * cutoff) : img.fromY;
 
       ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.translate(ai.x, ai.y);
-      ctx.rotate(ai.angle);
-
-      // Flip vertically if facing left
-      if (Math.abs(ai.angle) > Math.PI / 2) {
-        ctx.scale(1, -1);
-      }
-
-      // Draw the afterimage body circle - a semi-transparent blooming red/pink silhouette!
+      ctx.globalAlpha = lineAlpha;
+      ctx.strokeStyle = img.isSukunaForm || fighter.soulSwapActive ? '#FF2400' : '#D95C7E';
+      ctx.lineWidth = 2.4;
       ctx.beginPath();
-      ctx.arc(0, 0, ai.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(217, 92, 126, 0.4)'; // Yuji's skin theme pink silhouette
-      ctx.fill();
-
-      // Add a soft red glow outline to the afterimage
-      ctx.strokeStyle = 'rgba(230, 0, 30, 0.5)';
-      ctx.lineWidth = 1.8;
+      ctx.moveTo(img.fromX, img.fromY);
+      ctx.lineTo(endX, endY);
       ctx.stroke();
 
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(img.fromX, img.fromY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
       ctx.restore();
+    }
+
+    // B. Draw authentic Ghost Model afterimages
+    for (let i = 0; i < fighter.afterImages.length; i++) {
+      const ai = fighter.afterImages[i];
+      if (!ai || ai.timer <= 0) continue;
+      const maxT = ai.maxTimer || 16;
+      const progress = Math.max(0, Math.min(1, ai.timer / maxT));
+      const alpha = Math.pow(progress, 0.75) * 0.42;
+
+      const aiAngle = ai.gunAngle !== undefined ? ai.gunAngle : (ai.angle !== undefined ? ai.angle : 0);
+      const isSukuna = ai.isSukunaForm !== undefined ? ai.isSukunaForm : Boolean(fighter.soulSwapActive);
+      const isBf = ai.isBlackFlash !== undefined ? ai.isBlackFlash : Boolean(fighter.blackFlashTimer > 0);
+
+      drawYujiGhostSkin(ctx, ai.x, ai.y, aiAngle, ai.r || fighter.r || 25, alpha, isSukuna, isBf);
     }
   }
 

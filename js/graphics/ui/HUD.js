@@ -1,4 +1,5 @@
 import { drawHUD } from '../hudManager.js';
+import { drawCountdownIntro } from './CountdownIntro.js';
 import { restartCurrentRound, goToTitle } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
 import { toggleCameraMode } from '../../systems/cameraSystem.js';
@@ -225,6 +226,10 @@ function drawPauseScreen() {
 
 function drawCountdown() {
   drawHUD();
+  const uiCtx = state.topLevelUiCtx || state.ctx;
+  if (uiCtx && state.canvas) {
+    drawCountdownIntro(uiCtx, state.canvas.width, state.canvas.height);
+  }
 }
 
 

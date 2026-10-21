@@ -1060,12 +1060,20 @@ export function updateFighters() {
   if (state.gameState === 'countdown' || isStartDelayed) {
     if (isStartDelayed) {
       state.battleStartDelayTimer--;
+      if (state.battleStartDelayTimer === 0) {
+        state.fighters.forEach((fighter) => {
+          if (!fighter || fighter.hp <= 0) return;
+          fighter.hideHpText = false;
+        });
+      }
     }
     // Keep bodies upright and update gun angles for all fighters so they face opponents during countdown / start pause
     state.fighters.forEach((fighter) => {
       if (!fighter || fighter.hp <= 0) return;
-      fighter.vx = 0;
-      fighter.vy = 0;
+      if (state.gameState === 'countdown') {
+        fighter.vx = 0;
+        fighter.vy = 0;
+      }
       const opponent = getClosestOpponent(fighter);
       if (opponent && !opponent.isSubmerged) {
         fighter.aim(opponent, null);

@@ -1525,6 +1525,33 @@ export class MakimaFighter extends Fighter {
       }
     }
 
+    // ── CHAIN BLEED TICK DAMAGE (DPS) ──
+    // Apply periodic bleeding damage to all chained targets at configurable tick intervals.
+    // Uses Rule 27 compliant healthbar-only feedback (no floating text for continuous DPS ticks).
+    const bleedDps = cfg.chainsBleedDps || 0;
+    const tickInterval = cfg.chainsTickInterval || 30;
+    if (bleedDps > 0 && tickInterval > 0 && this.chainTimer % tickInterval === 0) {
+      const bleedSnd = cfg.sounds?.chainsBleed || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+      const bleedVol = cfg.soundVolumes?.chainsBleed ?? 0.45;
+      for (let t of this.chainedTargets) {
+        if (!t || t.isDead || (t.hp !== undefined && t.hp <= 0)) continue;
+        // Skip tick damage on mind-controlled minions fighting for Makima
+        if (t.isIllusion || t.isClone || t.type === 'turret' || t.isRika) continue;
+
+        applyDamageToTarget(t, bleedDps, this, 'curse');
+        spawnSparks(t.x, t.y, 5, '#A31D24');
+
+        // Healthbar heal pulse on Makima (visual feedback that chains are draining)
+        this._lastHealAmount = (this._lastHealAmount || 0);
+        this._healthBarHealTimer = Math.max(this._healthBarHealTimer || 0, 8);
+
+        // Subtle chain rattle SFX (only once per tick, not per target)
+        if (t === this.chainedTargets[0]) {
+          audioSystem.playSFX(bleedSnd, bleedVol);
+        }
+      }
+    }
+
     if (this.chainedTargets.length === 0) {
       this.isChainingActive = false;
       this.chainTimer = 0;

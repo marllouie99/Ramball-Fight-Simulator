@@ -2477,7 +2477,7 @@ async function main() {
           throw new Error("Gojo triggerInfinityBlock returned true while chained by Makima!");
         }
 
-        // Advance until the chain expires and verify zero tick damage is dealt by the chain
+        // Advance until the chain expires and verify tick damage IS dealt by the chain (chainsBleedDps > 0)
         fighter.bangCooldown = 9999;
         fighter.angelCooldown = 9999;
         fighter.shrineCooldown = 9999;
@@ -2485,8 +2485,12 @@ async function main() {
         while (fighter.chainTimer > 0) {
           fighter.update(mockGojo, 0, state.arena);
         }
-        if (mockGojo.hp < hpBeforeTicks) {
-          throw new Error(`Target took tick damage while chained by Makima! hpBefore=${hpBeforeTicks}, hpAfter=${mockGojo.hp}`);
+        const bleedDps = CONFIG.makima?.chainsBleedDps || 0;
+        if (bleedDps > 0 && mockGojo.hp >= hpBeforeTicks) {
+          throw new Error(`Target should have taken bleed tick damage while chained by Makima! hpBefore=${hpBeforeTicks}, hpAfter=${mockGojo.hp}, chainsBleedDps=${bleedDps}`);
+        }
+        if (bleedDps === 0 && mockGojo.hp < hpBeforeTicks) {
+          throw new Error(`Target took tick damage while chained by Makima but chainsBleedDps is 0! hpBefore=${hpBeforeTicks}, hpAfter=${mockGojo.hp}`);
         }
 
         if (mockGojo.isChainedByMakima) {

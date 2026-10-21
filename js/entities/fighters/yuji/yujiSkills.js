@@ -100,17 +100,23 @@ export function modUpdateDivergentDash(target) {
   this.vx = Math.cos(angle) * dashSpeed;
   this.vy = Math.sin(angle) * dashSpeed;
 
-  // Spawn dynamic afterimages
+  // Spawn dynamic ghost afterimages during dash
   if (!this.afterImages) this.afterImages = [];
-  pushTrailCap(this.afterImages, {
-    x: this.x,
-    y: this.y,
-    r: this.r,
-    angle: this.gunAngle || this.angle || 0,
-    color: this.color || '#D95C7E',
-    timer: 14,
-    maxTimer: 14
-  }, 10);
+  if ((this.divergentDashTimer || 0) % 2 === 0) {
+    const facingAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || angle);
+    pushTrailCap(this.afterImages, {
+      x: this.x,
+      y: this.y,
+      r: this.r || 25,
+      gunAngle: facingAngle,
+      angle: facingAngle,
+      isSukunaForm: Boolean(this.soulSwapActive),
+      isBlackFlash: Boolean(this.blackFlashTimer > 0),
+      color: '#D95C7E',
+      timer: 14,
+      maxTimer: 14
+    }, 6);
+  }
 
   this.divergentDashTimer = (this.divergentDashTimer || 0) - 1;
 

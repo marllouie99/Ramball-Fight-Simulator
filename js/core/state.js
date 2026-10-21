@@ -480,6 +480,10 @@ export const state = {
   countdownTimer: 0,
   countdownDuration: 120, // 2 seconds at 60fps
   isCountdownActive: false,
+  battleStartDelayTimer: 0,
+  battleStartDelayMax: 80,
+  fightBannerTimer: 0,
+  fightBannerMax: 44,
   announcerPlayingSequence: false,
   announcerTimeoutIds: [],
   announcerSubtitle: '',

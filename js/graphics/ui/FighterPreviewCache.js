@@ -52,6 +52,10 @@ function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
     previewFighter.hideChainsaws = true;
     previewFighter.hideChainsaw = true;
     previewFighter.hideSwordAura = true;
+    if (def.type === 'denji') {
+      previewFighter.hideHeadChainsaw = false;
+      previewFighter.hideForeheadChainsaw = false;
+    }
   }
   if (def.type === 'uryu') {
     previewFighter.smoothDrawProgress = 0.30;
@@ -61,6 +65,8 @@ function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
   }
   if (def.type === 'denji') {
     previewFighter.isHybridModeActive = true; // Permanently devil form
+    previewFighter.hideHeadChainsaw = false;
+    previewFighter.hideForeheadChainsaw = false;
   }
   if (def.type === 'eye_of_cthulhu') {
     previewFighter.isPhase2 = Boolean(state.showEyeOfCthulhuPhase2);

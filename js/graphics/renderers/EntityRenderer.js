@@ -13,6 +13,7 @@ import { drawMakiImpaledTargetOverlay } from '../weapons/makiWeaponGraphics.js';
 import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
 import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
 import { drawFighterInkOutline, drawFighterFloorShadow } from './fighterOutlineRenderer.js';
+import { drawPokeBallSummonUnder, drawPokeBallSummonOver } from './PokeBallSummonRenderer.js';
 
 let _sortedFightersBuffer = [];
 
@@ -30,6 +31,9 @@ export function updateEntityVisualScale(entity, speed = 0.12) {
 }
 
 export function drawFighters() {
+  if (typeof state !== 'undefined' && state && state.gameState === 'countdown') {
+    return;
+  }
   const { ctx, fighters, mode } = state;
   // Removed debug overlay hiding to prevent DOM layout thrashing
 
@@ -325,7 +329,38 @@ export function drawFighters() {
     // Only skip drawing living fighter when GameOverScreen is actively rendering the in-arena champion layout
     if (state._isChampionLayoutActive && fighter.hp > 0) return;
 
-    updateEntityVisualScale(fighter);
+    const isHeroFighter = !fighter.isMinion && !fighter.isPlant && !fighter.isPlantMinion &&
+      !fighter.isTurret && !fighter.isBuilding && !fighter.isDeployable && !fighter.isIllusion &&
+      !fighter.isProjectile && !fighter.isChessPiece && !fighter.isChessTroop &&
+      !fighter.isChessMinion && !fighter.isTransfiguredHuman && !fighter.isServantOfCthulhu &&
+      !fighter.isLawnmower && fighter.characterId !== 'crazydave_plant' && fighter.characterId !== 'crazydave_lawnmower';
+
+    // Phase 1: While FIGHT! banner pops first (delay timer > 44), fighters are not yet summoned onto the arena
+    const isPreSummon = Boolean(typeof state !== 'undefined' && state && state.gameState === 'playing' && (state.battleStartDelayTimer || 0) > 44 && isHeroFighter);
+    if (isPreSummon) {
+      return;
+    }
+
+    // Phase 2: Poke Ball summon materialization (delay timer 44 down to 0)
+    const isSummoning = Boolean(typeof state !== 'undefined' && state && state.gameState === 'playing' && (state.battleStartDelayTimer || 0) > 0 && isHeroFighter);
+    const summonP = isSummoning ? Math.max(0, Math.min(1.0, 1.0 - (state.battleStartDelayTimer / 44))) : 1.0;
+
+    if (isSummoning) {
+      if (summonP < 0.35) {
+        const p = summonP / 0.35;
+        const c1 = 1.35;
+        const c3 = c1 + 1;
+        const ease = 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2);
+        fighter.visualScale = Math.max(0.15, 0.15 + 1.05 * ease);
+      } else if (summonP < 0.70) {
+        const settleP = (summonP - 0.35) / 0.35;
+        fighter.visualScale = 1.20 - 0.20 * Math.sin(settleP * Math.PI * 0.5);
+      } else {
+        fighter.visualScale = 1.0;
+      }
+    } else {
+      updateEntityVisualScale(fighter);
+    }
 
     const scale = fighter.visualScale !== undefined ? fighter.visualScale : 1.0;
     const hasScale = scale !== 1.0 && scale > 0;
@@ -380,11 +415,9 @@ export function drawFighters() {
     }
 
     try {
-      const isHeroFighter = !fighter.isMinion && !fighter.isPlant && !fighter.isPlantMinion &&
-        !fighter.isTurret && !fighter.isBuilding && !fighter.isDeployable && !fighter.isIllusion &&
-        !fighter.isProjectile && !fighter.isChessPiece && !fighter.isChessTroop &&
-        !fighter.isChessMinion && !fighter.isTransfiguredHuman && !fighter.isServantOfCthulhu &&
-        !fighter.isLawnmower && fighter.characterId !== 'crazydave_plant' && fighter.characterId !== 'crazydave_lawnmower';
+      if (isSummoning) {
+        drawPokeBallSummonUnder(ctx, fighter, summonP);
+      }
 
       if (isHeroFighter) {
         drawFighterFloorShadow(ctx, fighter);
@@ -393,6 +426,10 @@ export function drawFighters() {
         }
       }
       fighter.draw(ctx, opponent);
+
+      if (isSummoning) {
+        drawPokeBallSummonOver(ctx, fighter, summonP);
+      }
       
       // Universal Status Overlays Fallback: ensures debuffs/electrified visuals render even if fighter completely overrode draw()
       const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
