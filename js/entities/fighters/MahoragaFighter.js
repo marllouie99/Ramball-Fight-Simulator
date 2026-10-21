@@ -110,7 +110,13 @@ export class MahoragaFighter extends Fighter {
 
     this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown || 1000;
     this.isShouting = false;
+    this.shoutPhase = null;
     this.shoutWindupTimer = 0;
+    this.shoutWindupMax = 0;
+    this.shoutRecoveryTimer = 0;
+    this.shoutRecoveryMax = 0;
+    this.shoutAimAngle = 0;
+    this.activeSonicBooms = [];
 
     this.throwCooldown = CONFIG.mahoraga?.initialThrowCooldown ?? (CONFIG.mahoraga?.throwCooldown || 1000);
     this.isThrowing = false;
@@ -207,7 +213,13 @@ export class MahoragaFighter extends Fighter {
 
     this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown || 1000;
     this.isShouting = false;
+    this.shoutPhase = null;
     this.shoutWindupTimer = 0;
+    this.shoutWindupMax = 0;
+    this.shoutRecoveryTimer = 0;
+    this.shoutRecoveryMax = 0;
+    this.shoutAimAngle = 0;
+    this.activeSonicBooms = [];
 
     this.throwCooldown = CONFIG.mahoraga?.initialThrowCooldown ?? (CONFIG.mahoraga?.throwCooldown || 1000);
     this.isThrowing = false;
@@ -240,7 +252,9 @@ export class MahoragaFighter extends Fighter {
     this.hasAnnouncedLevel2 = false;
 
     this.isShouting = false;
+    this.shoutPhase = null;
     this.shoutWindupTimer = 0;
+    this.shoutRecoveryTimer = 0;
     this.isThrowing = false;
     this.throwBarrageShotsLeft = 0;
     this.throwBarrageTimer = 0;
@@ -251,6 +265,13 @@ export class MahoragaFighter extends Fighter {
     super.interruptAttacks(forceCancelAll);
     this.postDashPauseTimer = 0;
     this.isWallReboundDashing = false;
+    this.isShouting = false;
+    this.shoutPhase = null;
+    this.shoutWindupTimer = 0;
+    this.shoutRecoveryTimer = 0;
+    if (forceCancelAll && this.activeSonicBooms) {
+      this.activeSonicBooms.length = 0;
+    }
   }
 
   /**
@@ -259,6 +280,7 @@ export class MahoragaFighter extends Fighter {
    */
   canAim() {
     if (this.hp <= 0 || this.isDead) return false;
+    if (this.isShouting) return false;
     if (this.isTargetOfAmbush || (this.timeStopTimer > 0 && !this.isChainedByMakima)) return false;
     const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
                      (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
@@ -418,6 +440,21 @@ export class MahoragaFighter extends Fighter {
   _performMeleeAttack(opponent) { performMeleeAttack(this, opponent); }
   _executeCleave(opponent) { executeCleave(this, opponent); }
   _executeShout(opponent, ownerIndex) { executeShout(this, opponent, ownerIndex); }
+  _updateSonicBooms() {
+    if (this.activeSonicBooms && this.activeSonicBooms.length > 0) {
+      for (let i = this.activeSonicBooms.length - 1; i >= 0; i--) {
+        const sb = this.activeSonicBooms[i];
+        if (!sb || typeof sb.timer !== 'number') {
+          this.activeSonicBooms.splice(i, 1);
+          continue;
+        }
+        sb.timer++;
+        if (sb.timer >= (sb.maxTimer || 24)) {
+          this.activeSonicBooms.splice(i, 1);
+        }
+      }
+    }
+  }
   _playRandomHeavyPunchSound(volume = null) {
     const vol = volume !== null ? volume : (CONFIG.mahoraga?.soundVolumes?.punch !== undefined ? CONFIG.mahoraga.soundVolumes.punch : 1.0);
     playRandomHeavyPunchSound(vol);
@@ -514,7 +551,9 @@ export class MahoragaFighter extends Fighter {
       this.isCleaving = false;
       this.cleaveWindupTimer = 0;
       this.isShouting = false;
+      this.shoutPhase = null;
       this.shoutWindupTimer = 0;
+      this.shoutRecoveryTimer = 0;
       this.isThrowing = false;
       this.throwBarrageShotsLeft = 0;
       this.throwBarrageTimer = 0;
@@ -903,6 +942,9 @@ export class MahoragaFighter extends Fighter {
         this.totalAccumDamage = 0;
       }
     }
+
+    // Rule 25: Non-freezing active visual effects decay routine
+    this._updateSonicBooms();
 
     const isInfinityFrozen = handleInfinityFreeze(this);
     const isFrozen = this._handleTimeStop() || isInfinityFrozen;
@@ -1301,12 +1343,79 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
-    // ── Divine Shout (Instant Release on the Move) ──
+    // ── Divine Shout: Stop Movement -> Windup -> Fire -> Recovery -> Resume Movement ──
     if (this.isShouting) {
-      this._executeShout(opponent, ownerIndex);
-      this.isShouting = false;
-      this.shoutWindupTimer = 0;
-      this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
+      const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
+                              (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 ||
+                              this.isPulledOrDragged();
+      if (isInHitReaction) {
+        this.isShouting = false;
+        this.shoutPhase = null;
+        this.shoutWindupTimer = 0;
+        this.shoutRecoveryTimer = 0;
+        this.shoutCooldown = Math.max(this.shoutCooldown || 0, 180);
+        return;
+      }
+
+      if (this.shoutPhase === 'windup') {
+        // 1. STOP MOVEMENT & LOCK AIM
+        this.vx = 0;
+        this.vy = 0;
+        if (this.knockbackVx !== undefined) this.knockbackVx = 0;
+        if (this.knockbackVy !== undefined) this.knockbackVy = 0;
+        this.applyMovementPhysics(0);
+
+        if (this.shoutAimAngle !== undefined) {
+          this.gunAngle = this.shoutAimAngle;
+          this.angle = this.shoutAimAngle;
+        }
+
+        // Golden intake charging sparks converging toward mouth
+        if (Math.random() < 0.55) {
+          const mouthDist = (this.r || 30) * 0.45;
+          const mx = this.x + Math.cos(this.shoutAimAngle || 0) * mouthDist;
+          const my = (this.y - (this.z || 0)) + Math.sin(this.shoutAimAngle || 0) * mouthDist;
+          const spawnAngle = Math.random() * Math.PI * 2;
+          const spawnDist = (this.r || 30) * (0.8 + Math.random() * 0.9);
+          const px = mx + Math.cos(spawnAngle) * spawnDist;
+          const py = my + Math.sin(spawnAngle) * spawnDist;
+          spawnSparks(px, py, 1, 'arcaneAscendLine', '#FFD700');
+        }
+
+        this.shoutWindupTimer--;
+        if (this.shoutWindupTimer <= 0) {
+          // 2. FIRE THE DIVINE SHOUT
+          this._executeShout(opponent, ownerIndex);
+          this.shoutPhase = 'recovery';
+          this.shoutRecoveryTimer = CONFIG.mahoraga?.shoutRecoveryFrames ?? 18;
+          this.shoutRecoveryMax = this.shoutRecoveryTimer;
+          this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
+
+          // Kinetic backward recoil impulse pushing opposite to roar (Rule 30)
+          const recoil = 4.2;
+          this.vx = -Math.cos(this.shoutAimAngle || 0) * recoil;
+          this.vy = -Math.sin(this.shoutAimAngle || 0) * recoil;
+        }
+        return;
+      } else if (this.shoutPhase === 'recovery') {
+        // 3. RECOVERY & FOLLOW-THROUGH
+        this.shoutRecoveryTimer--;
+        this.vx *= 0.82;
+        this.vy *= 0.82;
+        this.applyMovementPhysics(1.0);
+        if (arena) this.resolveWallBounce(arena, opponent);
+
+        if (this.shoutRecoveryTimer <= 0) {
+          // 4. RESUME MOVEMENT
+          this.isShouting = false;
+          this.shoutPhase = null;
+          this.shoutWindupTimer = 0;
+          this.shoutRecoveryTimer = 0;
+          const target = this._findClosestEnemy(opponent);
+          this.resumeMovement(target || opponent);
+        }
+        return;
+      }
     }
 
     // ── Conditional Rapid Barrage Throw ──
@@ -1682,7 +1791,7 @@ export class MahoragaFighter extends Fighter {
       );
 
       // ── AI SKILL DECISION TREE ──
-      const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
+      const shoutRadius = CONFIG.mahoraga?.shoutRange || CONFIG.mahoraga?.shoutRadius || 350;
       const frontTargetsForAttack = this._getFrontRadiusTargets(swordRange, swordArc);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
       const isTargetReforming = Boolean(target && (target.isRevivingFromContract || target.isShatterReviving));
@@ -1699,12 +1808,25 @@ export class MahoragaFighter extends Fighter {
         if (this.isSkillEnabled(CONFIG.mahoraga?.enableSwordOfExtermination, true) && isAnyTargetInRange && this.swordCooldown <= 0) {
           this._performMeleeAttack(target);
         }
-        // Priority 1: Divine Shout (Instant AoE shockwave roar without stopping or windup pause)
+        // Priority 1: Divine Shout (Stop movement -> Windup animation -> Fire Divine Shout -> Resume movement)
         else if (this.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true) && this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
-          this._executeShout(target, ownerIndex);
-          this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
-          this.isShouting = false;
-          this.shoutWindupTimer = 0;
+          this.isShouting = true;
+          this.shoutPhase = 'windup';
+          this.shoutWindupTimer = CONFIG.mahoraga?.shoutWindupFrames ?? 24;
+          this.shoutWindupMax = this.shoutWindupTimer;
+          this.vx = 0;
+          this.vy = 0;
+          if (this.knockbackVx !== undefined) this.knockbackVx = 0;
+          if (this.knockbackVy !== undefined) this.knockbackVy = 0;
+
+          const shoutAngle = Math.atan2(target.y - this.y, target.x - this.x);
+          this.shoutAimAngle = shoutAngle;
+          this.gunAngle = shoutAngle;
+          this.angle = shoutAngle;
+          const windupSnd = CONFIG.mahoraga?.sounds?.shoutWindup || 'Assets/Sound Effects/MahoragaSFX/divine-shout-wind-up-enogc4bcarbonmk2bladeidlestartup.wav';
+          const windupVol = CONFIG.mahoraga?.soundVolumes?.shoutWindup ?? 0.85;
+          audioSystem.playSFX(windupSnd, windupVol);
+          spawnFloatingText(this.x, this.y - this.r - 25, 'INHALING...', '#FFD700');
         }
         // Priority 2: World Cleave (Heavy Cleave in close-medium range - Instant AoE execute on the move)
         else if (this.isSkillEnabled(CONFIG.mahoraga?.enableCleave, true) && this.cleaveCooldown <= 0 && distToOpponent <= meleeDist + 40) {
@@ -1777,52 +1899,55 @@ export class MahoragaFighter extends Fighter {
     const isGuarding = (this.defensePoseType === 'guard' && (this.defensePoseTimer || 0) > 0);
 
     if (punchAnimTimer > 0) {
-      const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
-      const swingDuration = 12.0;
+      const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 22.0;
       const elapsed = maxTimer - punchAnimTimer;
+      const progress = Math.min(1.0, Math.max(0.0, elapsed / maxTimer));
       const comboIndex = this.isInfinityBlitz ? (1 + (swordCombo % 2)) : (swordCombo % 3);
 
-      if (elapsed <= swingDuration) {
-        const p = Math.min(1.0, elapsed / swingDuration);
+      const coilP = 0.23;
+      const holdP = 0.32;
+      const strikeP = 0.55;
+      const lockP = 0.73;
 
-        if (comboIndex === 1) {
-          // Combo 1: Sweeps backhand from +0.65 to -0.55
-          const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
-          swingAngle = (Math.PI * 0.65) - (Math.PI * 1.20) * easedP;
-          extendDist = Math.sin(p * Math.PI) * 28;
-        } else if (comboIndex === 2) {
-          // Combo 2: Heavy Overhead Chop (Windup -0.55 -> -0.85, then heavy chop -0.85 -> +0.85)
-          if (p < 0.15) {
-            const w = p / 0.15;
-            swingAngle = (-Math.PI * 0.55) + (-Math.PI * 0.30) * Math.sin(w * Math.PI * 0.5);
-          } else {
-            const s = (p - 0.15) / 0.85;
-            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
-            swingAngle = (-Math.PI * 0.85) + (Math.PI * 1.70) * easedS;
-          }
-          extendDist = Math.sin(p * Math.PI) * 30;
-        } else {
-          // Combo 0: Smooth windup back from idle (0 -> -0.45), then slash forward (-0.45 -> +0.65)
-          if (p < 0.20) {
-            const w = p / 0.20;
-            swingAngle = (-Math.PI * 0.45) * Math.sin(w * Math.PI * 0.5);
-          } else {
-            const s = (p - 0.20) / 0.80;
-            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
-            swingAngle = (-Math.PI * 0.45) + (Math.PI * 1.10) * easedS;
-          }
-          extendDist = Math.sin(p * Math.PI) * 28;
-        }
+      let startAngle = -0.45;
+      let impactAngle = 0.65;
+      let coilLunge = -10.0;
+      let maxLunge = 32.0;
+
+      if (comboIndex === 1) {
+        startAngle = 0.75;
+        impactAngle = -0.55;
+        coilLunge = -8.0;
+        maxLunge = 30.0;
+      } else if (comboIndex === 2) {
+        startAngle = -0.95;
+        impactAngle = 0.85;
+        coilLunge = -14.0;
+        maxLunge = 36.0;
+      }
+
+      if (progress < coilP) {
+        const wp = progress / coilP;
+        const easeW = Math.sin(wp * Math.PI * 0.5);
+        swingAngle = startAngle * easeW;
+        extendDist = coilLunge * easeW;
+      } else if (progress < holdP) {
+        swingAngle = startAngle;
+        extendDist = coilLunge;
+      } else if (progress < strikeP) {
+        const sp = (progress - holdP) / (strikeP - holdP);
+        const whipEase = Math.pow(sp, 2.5);
+        swingAngle = startAngle + (impactAngle - startAngle) * whipEase;
+        extendDist = coilLunge + (maxLunge - coilLunge) * whipEase;
+      } else if (progress < lockP) {
+        swingAngle = impactAngle;
+        extendDist = maxLunge;
       } else {
-        // Recovery phase: Smoothly return from swing end angle to 0 idle guard
-        const recP = Math.min(1.0, (elapsed - swingDuration) / (maxTimer - swingDuration));
-        const easeRec = recP * (2 - recP);
-        let endAngle = Math.PI * 0.65;
-        if (comboIndex === 1) endAngle = -Math.PI * 0.55;
-        else if (comboIndex === 2) endAngle = Math.PI * 0.85;
-
-        swingAngle = endAngle * (1.0 - easeRec);
-        extendDist = (1.0 - easeRec) * 12;
+        const rp = (progress - lockP) / (1.0 - lockP);
+        const settleEase = Math.pow(1.0 - rp, 1.8);
+        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
+        swingAngle = impactAngle * settleEase - 0.20 * springWave;
+        extendDist = maxLunge * settleEase - 5.0 * springWave;
       }
     } else if (isParrying) {
       const maxT = this.defensePoseMaxTimer || 25;

@@ -410,7 +410,7 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
 
   const isMobile = (typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) || (typeof window !== 'undefined' && ('ontouchstart' in window || (navigator.maxTouchPoints && navigator.maxTouchPoints > 0)) && window.innerWidth < 1024);
   const qualityMultiplier = state.qualityLevel || 1.0;
-  const MAX_BLOOD_PARTICLES = isMobile ? Math.floor(60 * qualityMultiplier) : Math.floor(300 * qualityMultiplier);
+  const MAX_BLOOD_PARTICLES = isMobile ? Math.floor(50 * qualityMultiplier) : Math.floor(70 * qualityMultiplier);
 
   // Scaled down: standard hits spawn 2-4 droplets
   const divisor = hitCfg.damageDivisor ?? 10.0;
@@ -504,6 +504,7 @@ export function spawnBloodEffect(arg0, arg1 = 10, arg2 = null, arg3 = null, arg4
       vy: vy,
       size: size,
       numericColor: numericColor,
+      hexColor: '#' + numericColor.toString(16).padStart(6, '0'),
       life: 1.0,
       decay: decayRate,
       airResistance: physCfg.airResistance ?? 0.982,
@@ -962,11 +963,15 @@ export function drawBloodEffects(ctx) {
   for (let i = 0; i < state.bloodEffects.length; i++) {
     const e = state.bloodEffects[i];
     if (!e || e.life <= 0) continue;
-    const r = (e.numericColor >> 16) & 0xFF;
-    const g = (e.numericColor >> 8) & 0xFF;
-    const b = e.numericColor & 0xFF;
     const alpha = e.onGround ? Math.max(0, Math.min(1, e.life)) : 1.0;
-    drawCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
+    if (e.onGround) {
+      const r = (e.numericColor >> 16) & 0xFF;
+      const g = (e.numericColor >> 8) & 0xFF;
+      const b = e.numericColor & 0xFF;
+      drawCtx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(2)})`;
+    } else {
+      drawCtx.fillStyle = e.hexColor || '#DC2626';
+    }
     if (e.onGround) {
       drawCtx.fillRect(e.x - e.size * 0.75, e.y - e.size * 0.325, e.size * 1.5, e.size * 0.65);
     } else {

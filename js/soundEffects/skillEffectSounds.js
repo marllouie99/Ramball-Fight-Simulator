@@ -161,9 +161,14 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 1.5,
       speed: 1.0,
     },
+    shoutWindup: {
+      src: 'Assets/Sound Effects/MahoragaSFX/divine-shout-wind-up-enogc4bcarbonmk2bladeidlestartup.wav',
+      volume: 0.85,
+      speed: 1.0,
+    },
     shout: {
-      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-      volume: 2.2,
+      src: 'Assets/Sound Effects/MahoragaSFX/divine-shout-enocarboncswitchpoweredupnew.wav',
+      volume: 0.95,
       speed: 1.0,
     },
     shout_impact: {
@@ -244,10 +249,17 @@ export function getSkillEffectSound(fighterName, effectName) {
         speed: 1.0
       };
     }
+    if (lowerEffect === 'shoutwindup' || lowerEffect === 'shout_windup') {
+      return {
+        src: CONFIG.mahoraga.sounds?.shoutWindup || 'Assets/Sound Effects/MahoragaSFX/divine-shout-wind-up-enogc4bcarbonmk2bladeidlestartup.wav',
+        volume: CONFIG.mahoraga.soundVolumes?.shoutWindup !== undefined ? CONFIG.mahoraga.soundVolumes.shoutWindup : 0.85,
+        speed: 1.0
+      };
+    }
     if (lowerEffect === 'shout') {
       return {
-        src: CONFIG.mahoraga.sounds?.shout || 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-        volume: CONFIG.mahoraga.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 2.2,
+        src: CONFIG.mahoraga.sounds?.shout || 'Assets/Sound Effects/MahoragaSFX/divine-shout-enocarboncswitchpoweredupnew.wav',
+        volume: CONFIG.mahoraga.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 0.95,
         speed: 1.0
       };
     }

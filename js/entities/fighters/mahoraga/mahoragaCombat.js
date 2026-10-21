@@ -152,8 +152,8 @@ export function performMeleeAttack(fighter, opponent) {
   const punchFrequency = isStanceOnCooldown ? punchFreqNormal : punchFreqStance;
   const isPunch = (fighter.attackCount % punchFrequency === 0);
 
-  const punchAnimDuration = CONFIG.mahoraga?.punchAnimFrames ?? 18;
-  const swordAnimDuration = CONFIG.mahoraga?.swordAnimFrames ?? 18;
+  const punchAnimDuration = CONFIG.mahoraga?.punchAnimFrames ?? 22;
+  const swordAnimDuration = CONFIG.mahoraga?.swordAnimFrames ?? 22;
 
   if (isPunch) {
     fighter.leftPunchTimer = punchAnimDuration;
@@ -255,6 +255,13 @@ export function performMeleeAttack(fighter, opponent) {
     const targetObj = opponent || frontTargets[0];
     spawnImpactFlash(targetObj.x, targetObj.y, 45, '#FFD700');
     triggerGlobalScreenShake(5, 8);
+    // Rule 30 Layered Fleshy Slap Audio Palette
+    audioSystem.playSFX('attack_fleshhit', 1.0);
+    if (isPunch) {
+      audioSystem.playSFX('attack_heavypunch1', 0.95);
+    } else {
+      audioSystem.playSFX('sukuna_slice', 0.88);
+    }
   }
 }
 
@@ -850,33 +857,64 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
 }
 
 /**
- * Execute Divine Shout — AoE shockwave roar.
+ * Execute Divine Shout — Long-Range Conical Sonic Boom Roar.
+ * Unleashes a 12-frame directional golden supersonic cone, damaging, slowing,
+ * and heavily knocking back all enemies caught in its conical path.
  */
 export function executeShout(fighter, opponent, ownerIndex) {
   if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true)) return;
-  const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
+  const shoutRange = CONFIG.mahoraga?.shoutRange || 350;
+  const shoutConeAngle = CONFIG.mahoraga?.shoutConeAngle || 1.35; // ~77° wide supersonic cone
+  const shoutAnimFrames = CONFIG.mahoraga?.shoutAnimFrames || 50;
   const shoutMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
   const shoutDamage = (CONFIG.mahoraga?.shoutDamage || 30) * shoutMult;
-  const shoutKnockback = CONFIG.mahoraga?.shoutKnockback || 18;
+  const shoutKnockback = CONFIG.mahoraga?.shoutKnockback || 22;
+  const shoutHitStun = CONFIG.mahoraga?.shoutHitStun || 20;
 
-  triggerGlobalScreenShake(10, 20);
-  
-  // Play heavy ground impact and shockwave burst SFX
+  // Aim towards opponent/target (Preserve committed aim lock from windup if present)
+  const target = opponent || fighter._pendingCounterTarget || fighter.target;
+  let shoutAngle = fighter.shoutAimAngle !== undefined ? fighter.shoutAimAngle : (fighter.gunAngle || 0);
+  if (fighter.shoutAimAngle === undefined && target && typeof target.x === 'number') {
+    shoutAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+  }
+  fighter.gunAngle = shoutAngle;
+  fighter.angle = shoutAngle;
+
+  triggerGlobalScreenShake(12, 22);
+
+  // Play supersonic roar SFX upon firing Divine Shout
   playSkillEffectSound('mahoraga', 'shout');
-  const shoutImpactSnd = CONFIG.mahoraga?.sounds?.shoutImpact || 'attack_groundsmash';
-  const shoutImpactVol = CONFIG.mahoraga?.soundVolumes?.shoutImpact ?? 1.8;
-  const shoutExpSnd = CONFIG.mahoraga?.sounds?.shoutExplosion || 'attack_explosion';
-  const shoutExpVol = CONFIG.mahoraga?.soundVolumes?.shoutExplosion ?? 0.85;
-  audioSystem.playSFX(shoutImpactSnd, shoutImpactVol);
-  audioSystem.playSFX(shoutExpSnd, shoutExpVol);
+  const shoutImpactVol = CONFIG.mahoraga?.soundVolumes?.shoutImpact ?? 0.0;
+  if (shoutImpactVol > 0) {
+    const shoutImpactSnd = CONFIG.mahoraga?.sounds?.shoutImpact || 'attack_groundsmash';
+    audioSystem.playSFX(shoutImpactSnd, shoutImpactVol);
+  }
+  const shoutExpVol = CONFIG.mahoraga?.soundVolumes?.shoutExplosion ?? 0.0;
+  if (shoutExpVol > 0) {
+    const shoutExpSnd = CONFIG.mahoraga?.sounds?.shoutExplosion || 'attack_explosion';
+    audioSystem.playSFX(shoutExpSnd, shoutExpVol);
+  }
 
-  // Spawn the improved Concentric Gold/Silver Shockwave and Outward Spark Burst
-  spawnMahoragaShoutBurst(fighter.x, fighter.y, shoutRadius);
-  spawnImpactFlash(fighter.x, fighter.y, shoutRadius * 0.7, '#FFD700');
+  // Spawn active 12-frame golden sonic boom instance
+  if (!fighter.activeSonicBooms) fighter.activeSonicBooms = [];
+  if (fighter.activeSonicBooms.length >= 4) {
+    fighter.activeSonicBooms.shift();
+  }
+  fighter.activeSonicBooms.push({
+    x: fighter.x,
+    y: fighter.y - (fighter.z || 0),
+    angle: shoutAngle,
+    timer: 0,
+    maxTimer: shoutAnimFrames,
+    range: shoutRange,
+    coneAngle: shoutConeAngle
+  });
 
-  spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'DIVINE SHOUT!', '#E0E8FF');
+  // Conical muzzle flash at mouth/origin
+  spawnImpactFlash(fighter.x + Math.cos(shoutAngle) * 45, fighter.y + Math.sin(shoutAngle) * 45, 75, '#FFD700');
+  spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'DIVINE SONIC BOOM!', '#FFD700');
 
-  // Damage all enemies (fighters & illusions) within shout radius
+  // Damage all enemies (fighters & illusions) caught in the long-range cone
   if (state.fighters) {
     const myIndex = state.fighters.indexOf(fighter);
     const myTeam = state.getFighterTeam(myIndex);
@@ -899,29 +937,48 @@ export function executeShout(fighter, opponent, ownerIndex) {
       }
       if (isTeammate) return;
 
-      const dist = Math.hypot(fighter.x - f.x, fighter.y - f.y);
-      if (dist <= shoutRadius) {
-        f.takeDamage(shoutDamage, fighter, { isSkill: true });
-        f.applyHitStun(18);
+      const dx = f.x - fighter.x;
+      const dy = f.y - fighter.y;
+      const dist = Math.hypot(dx, dy);
+      const enemyR = f.r || 25;
 
-        // Apply brief slow movement debuff
-        const slowDur = CONFIG.mahoraga?.shoutSlowDurationFrames || 120;
-        const slowMult = CONFIG.mahoraga?.shoutSlowMultiplier || 0.50;
-        if (typeof f.applySlow === 'function') {
-          f.applySlow(slowDur, slowMult, { isMahoragaShout: true });
-        } else {
-          f.slowTimer = slowDur;
-          f.slowMultiplier = slowMult;
-        }
+      // 1. Distance check along cone reach
+      if (dist <= shoutRange + enemyR) {
+        // 2. Angular cone spread check
+        const angleToEnemy = Math.atan2(dy, dx);
+        let angleDiff = angleToEnemy - shoutAngle;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
-        const pushAngle = Math.atan2(f.y - fighter.y, f.x - fighter.x);
-        const kbX = Math.cos(pushAngle) * shoutKnockback;
-        const kbY = Math.sin(pushAngle) * shoutKnockback;
-        if (typeof f.applyKnockback === 'function') {
-          f.applyKnockback(kbX, kbY);
-        } else {
-          f.vx += kbX;
-          f.vy += kbY;
+        const angularMargin = enemyR / Math.max(30, dist);
+        if (Math.abs(angleDiff) <= (shoutConeAngle * 0.5) + angularMargin) {
+          // Target is caught inside the golden sonic boom cone!
+          f.takeDamage(shoutDamage, fighter, { isSkill: true });
+          f.applyHitStun(shoutHitStun);
+
+          // Apply slow movement debuff
+          const slowDur = CONFIG.mahoraga?.shoutSlowDurationFrames || 120;
+          const slowMult = CONFIG.mahoraga?.shoutSlowMultiplier || 0.45;
+          if (typeof f.applySlow === 'function') {
+            f.applySlow(slowDur, slowMult, { isMahoragaShout: true });
+          } else {
+            f.slowTimer = slowDur;
+            f.slowMultiplier = slowMult;
+          }
+
+          // Heavy directional supersonic knockback pushing back along shout trajectory
+          const pushAngle = shoutAngle + angleDiff * 0.35;
+          const kbX = Math.cos(pushAngle) * shoutKnockback;
+          const kbY = Math.sin(pushAngle) * shoutKnockback;
+          if (typeof f.applyKnockback === 'function') {
+            f.applyKnockback(kbX, kbY);
+          } else {
+            f.vx += kbX;
+            f.vy += kbY;
+          }
+
+          // Golden supersonic impact sparks on victim
+          spawnSparks(f.x, f.y, 12, 'gold', '#FFFFFF');
         }
       }
     });

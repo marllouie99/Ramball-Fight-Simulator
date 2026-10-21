@@ -974,29 +974,11 @@ export function _drawPunchAttackAnimatedSprite(ctx, radius, p, alpha = 1.0, colo
 
   const prevSmoothing = ctx.imageSmoothingEnabled;
   const prevAlpha = ctx.globalAlpha;
-  const prevFilter = ctx.filter;
   ctx.imageSmoothingEnabled = false;
 
   // Natural fade-out on late dissipating frames (frames 1-9 solid, 10-12 dissolve)
   const fadeAlpha = p > 0.82 ? Math.max(0, (1.0 - p) / 0.18) : 1.0;
   ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * alpha * fadeAlpha));
-
-  // Thematic palette filter if requested
-  if (color === 'gold' || color === 'yellow') {
-    ctx.filter = 'hue-rotate(45deg) saturate(1.5) brightness(1.1)';
-  } else if (color === 'orange') {
-    ctx.filter = 'hue-rotate(30deg) saturate(1.6) brightness(1.1)';
-  } else if (color === 'crimson' || color === 'red') {
-    ctx.filter = 'hue-rotate(145deg) saturate(1.8) contrast(1.1)';
-  } else if (color === 'blackpink' || color === 'pink') {
-    ctx.filter = 'hue-rotate(170deg) saturate(1.9) contrast(1.15)';
-  } else if (color === 'cyan' || color === 'blue' || color === 'infinity' || color === 'gojo') {
-    ctx.filter = 'hue-rotate(210deg) saturate(1.4)';
-  } else if (color === 'purple' || color === 'boogie') {
-    ctx.filter = 'hue-rotate(270deg) saturate(1.3)';
-  } else if (color === 'lime' || color === 'green') {
-    ctx.filter = 'hue-rotate(85deg) saturate(1.5)';
-  }
 
   // Frame is 256x256px centered at (128, 128)
   const scale = (radius * 2.6) / 256.0;
@@ -1010,7 +992,6 @@ export function _drawPunchAttackAnimatedSprite(ctx, radius, p, alpha = 1.0, colo
   // Restore context state cleanly (Rule 2.4 Stack Integrity)
   ctx.imageSmoothingEnabled = prevSmoothing;
   ctx.globalAlpha = prevAlpha;
-  ctx.filter = prevFilter;
   return true;
 }
 

@@ -12,25 +12,23 @@ function _isDarkMode() {
 
 function drawPixelDisc(ctx, cx, cy, r, P) {
   const snapR = Math.round(r / P) * P;
-  for (let gy = -snapR; gy <= snapR; gy += P) {
-    const halfW = Math.round(Math.sqrt(Math.max(0, snapR * snapR - gy * gy)) / P) * P;
-    if (halfW > 0) {
-      ctx.fillRect(cx - halfW, cy + gy, halfW * 2, P);
-    }
-  }
+  if (snapR <= 0) return;
+  ctx.beginPath();
+  ctx.arc(cx, cy, snapR, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawPixelRing(ctx, cx, cy, r, thick, P) {
   const snapR = Math.round(r / P) * P;
   if (snapR <= 0) return;
   const snapThick = Math.max(P, Math.round(thick / P) * P);
-  const numPts = Math.max(36, Math.floor(snapR * 2.2 / P));
-  const stepA = (Math.PI * 2) / numPts;
-  for (let a = 0; a < Math.PI * 2; a += stepA) {
-    const rx = Math.round((Math.cos(a) * snapR) / P) * P;
-    const ry = Math.round((Math.sin(a) * snapR) / P) * P;
-    ctx.fillRect(cx + rx - snapThick / 2, cy + ry - snapThick / 2, snapThick, snapThick);
-  }
+  ctx.save();
+  ctx.lineWidth = snapThick;
+  ctx.strokeStyle = ctx.fillStyle;
+  ctx.beginPath();
+  ctx.arc(cx, cy, snapR, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
 }
 
 export function drawThermobaricExplosions(ctx) {
@@ -236,8 +234,9 @@ export function drawThermobaricExplosions(ctx) {
       // 3. Stepped Pixel Thermal Blast Pillar (Rising Fire Column)
       const pH = snap(R * 3.0 * Math.sin(Math.min(1.0, explosionProgress * 1.35) * Math.PI));
       const pW = snap(R * 0.7 * (1 - explosionProgress * 0.4));
-      if (pH > P) {
-        for (let gy = 0; gy >= -pH; gy -= P) {
+      const pillarStep = P * 2;
+      if (pH > pillarStep) {
+        for (let gy = 0; gy >= -pH; gy -= pillarStep) {
           const t = -gy / pH; // 0 at ground, 1 at top
           const profile = Math.sin(t * Math.PI) * (1.1 - t * 0.35) + 0.15 * Math.pow(1 - t, 2);
           const w = snap(pW * profile);
@@ -248,28 +247,28 @@ export function drawThermobaricExplosions(ctx) {
 
           // Dark obsidian flame outline:
           ctx.fillStyle = `rgba(20, 5, 0, ${0.85 * expAlpha})`;
-          ctx.fillRect(snap(-effW / 2 - P), gy, P, P);
-          ctx.fillRect(snap(effW / 2), gy, P, P);
+          ctx.fillRect(snap(-effW / 2 - P), gy, P, pillarStep);
+          ctx.fillRect(snap(effW / 2), gy, P, pillarStep);
 
           // Magma crimson body:
           ctx.fillStyle = `rgba(220, 30, 0, ${0.9 * expAlpha})`;
-          ctx.fillRect(snap(-effW / 2), gy, snap(effW), P);
+          ctx.fillRect(snap(-effW / 2), gy, snap(effW), pillarStep);
 
           // Saturated fiery orange core:
           const orangeW = snap(effW * 0.7);
           ctx.fillStyle = `rgba(255, 120, 0, ${0.95 * expAlpha})`;
-          ctx.fillRect(snap(-orangeW / 2), gy, orangeW, P);
+          ctx.fillRect(snap(-orangeW / 2), gy, orangeW, pillarStep);
 
           // Hot solar gold plasma:
           const goldW = snap(effW * 0.4);
           ctx.fillStyle = `rgba(255, 220, 40, ${expAlpha})`;
-          ctx.fillRect(snap(-goldW / 2), gy, goldW, P);
+          ctx.fillRect(snap(-goldW / 2), gy, goldW, pillarStep);
 
           // White-hot central spine:
           const whiteW = snap(effW * 0.18);
           if (whiteW >= P) {
             ctx.fillStyle = `rgba(255, 255, 255, ${expAlpha})`;
-            ctx.fillRect(snap(-whiteW / 2), gy, whiteW, P);
+            ctx.fillRect(snap(-whiteW / 2), gy, whiteW, pillarStep);
           }
         }
       }

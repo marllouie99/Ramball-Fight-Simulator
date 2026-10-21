@@ -4,7 +4,7 @@
 // afterimage rendering, and HUD ring overlays
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
-import { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch } from '../../../graphics/weapons/mahoragaWeaponGraphics.js';
+import { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch, drawMahoragaSonicBoom } from '../../../graphics/weapons/mahoragaWeaponGraphics.js';
 import { drawMahoragaFaceWings, drawMahoragaChestNecklace, drawMahoragaSkin, drawMahoragaPixelBody } from '../../../graphics/fighters/mahoragaSkin.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
 import { isChampionScreenActive, state } from '../../../core/state.js';
@@ -307,6 +307,120 @@ export function drawMahoragaGammaRayRainbowOverlay(ctx, fighter) {
 }
 
 /**
+ * Renders the windup animation and acoustic intake compression visuals for Divine Shout.
+ * Mahoraga draws in divine cursed energy with contracting golden acoustic rings and particle convergence,
+ * building up intense physical tension before unleashing the Sonic Boom roar.
+ */
+export function drawMahoragaShoutWindup(ctx, fighter) {
+  if (!fighter || !fighter.isShouting) return;
+
+  const r = fighter.r || 30;
+  const aimAngle = fighter.shoutAimAngle !== undefined ? fighter.shoutAimAngle : (fighter.gunAngle || 0);
+  const mouthDist = r * 0.42;
+  const mx = fighter.x + Math.cos(aimAngle) * mouthDist;
+  const my = (fighter.y - (fighter.z || 0)) + Math.sin(aimAngle) * mouthDist;
+
+  if (fighter.shoutPhase === 'windup') {
+    const maxW = fighter.shoutWindupMax || 24;
+    const curW = fighter.shoutWindupTimer || 0;
+    const p = Math.max(0, Math.min(1.0, 1.0 - (curW / maxW)));
+
+    ctx.save();
+
+    // 1. Concentric Golden Acoustic Intake Rings (contracting smoothly inward to the mouth)
+    for (let k = 0; k < 3; k++) {
+      const ringCycle = (p * 2.2 + k * 0.33) % 1.0;
+      const ringR = (1.0 - Math.pow(ringCycle, 0.85)) * (r * 2.4);
+      if (ringR <= 3) continue;
+
+      const ringAlpha = Math.sin(ringCycle * Math.PI) * (0.35 + 0.65 * p);
+
+      ctx.save();
+      ctx.translate(mx, my);
+      ctx.rotate(aimAngle);
+
+      // Acoustic compression crescent (Rule 26 clean crescent compression band)
+      ctx.beginPath();
+      ctx.arc(ringR * 0.55, 0, ringR, -Math.PI * 0.42, Math.PI * 0.42, false);
+      ctx.strokeStyle = `rgba(255, 220, 90, ${(0.80 * ringAlpha).toFixed(3)})`;
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(ringR * 0.55, 0, ringR, -Math.PI * 0.36, Math.PI * 0.36, false);
+      ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * ringAlpha).toFixed(3)})`;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // 2. Converging Golden Intake Energy Needles
+    const needleCount = 6;
+    for (let i = 0; i < needleCount; i++) {
+      const seed = (i * 0.166 + p * 1.8) % 1.0;
+      const needleDist = (1.0 - seed) * (r * 2.5);
+      const spread = (Math.sin(i * 2.3 + p * 4.5)) * 0.42;
+      const nAngle = aimAngle + spread;
+      const nx = mx + Math.cos(nAngle) * needleDist;
+      const ny = my + Math.sin(nAngle) * needleDist;
+      const len = 14 * seed;
+      const endX = nx - Math.cos(nAngle) * len;
+      const endY = ny - Math.sin(nAngle) * len;
+
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 215, 0, ${(0.75 * p).toFixed(3)})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(nx, ny);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 3. Dense Compressed Energy Core at the Mouth (grows with tension)
+    ctx.save();
+    ctx.translate(mx, my);
+    const coreScale = Math.pow(p, 1.6);
+
+    // Warm golden ambient glow
+    ctx.beginPath();
+    ctx.arc(0, 0, 15 * coreScale, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 170, 0, ${(0.45 * p).toFixed(3)})`;
+    ctx.fill();
+
+    // Bright golden ring
+    ctx.beginPath();
+    ctx.arc(0, 0, 9 * coreScale, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 230, 80, ${(0.80 * p).toFixed(3)})`;
+    ctx.fill();
+
+    // Hot white core
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.5 * coreScale, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * p).toFixed(3)})`;
+    ctx.fill();
+
+    ctx.restore();
+    ctx.restore();
+  } else if (fighter.shoutPhase === 'recovery') {
+    // Subtle residual dissipation smoke/flash at the mouth
+    const maxRec = fighter.shoutRecoveryMax || 18;
+    const curRec = fighter.shoutRecoveryTimer || 0;
+    const recP = 1.0 - Math.max(0, Math.min(1.0, curRec / maxRec));
+    const alpha = (1.0 - recP) * 0.45;
+
+    ctx.save();
+    ctx.translate(mx, my);
+    ctx.beginPath();
+    ctx.arc(0, 0, 6 + recP * 14, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 215, 0, ${alpha.toFixed(3)})`;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/**
  * Main draw method for Mahoraga fighter.
  * Renders afterimages, Level 8 glow, stance rings, body, wings, necklace, wheel,
  * cleave windup, sakuga impact, and health bar.
@@ -331,6 +445,59 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
   if (!isGojoDomainActive) {
     drawMahoragaGammaRayRainbowUnderlay(ctx, fighter);
   }
+
+  // 0c. Bodily Inhale Pullback during Shout Windup OR Bodily Kinetic Lunge during Melee Strikes
+  let pullOffsetX = 0;
+  let pullOffsetY = 0;
+  if (fighter.isShouting && fighter.shoutPhase === 'windup') {
+    const maxW = fighter.shoutWindupMax || 24;
+    const curW = fighter.shoutWindupTimer || 0;
+    const p = Math.max(0, Math.min(1.0, 1.0 - (curW / maxW)));
+    const aimAngle = fighter.shoutAimAngle !== undefined ? fighter.shoutAimAngle : (fighter.gunAngle || 0);
+    const pullDist = Math.sin(p * Math.PI * 0.85) * 6.5;
+    const jitter = (p > 0.6) ? (Math.random() - 0.5) * 1.6 * ((p - 0.6) / 0.4) : 0;
+    pullOffsetX = -Math.cos(aimAngle) * pullDist + (Math.random() - 0.5) * jitter;
+    pullOffsetY = -Math.sin(aimAngle) * pullDist + (Math.random() - 0.5) * jitter;
+  } else if ((fighter.punchAnimTimer || 0) > 0) {
+    const maxTimer = fighter.punchAnimMaxTimer || 22;
+    const p = 1.0 - (fighter.punchAnimTimer / maxTimer);
+    const aimAngle = fighter.gunAngle || fighter.angle || 0;
+    let bodilyLunge = 0;
+    if (p < 0.32) {
+      bodilyLunge = -3.5 * Math.sin((p / 0.32) * Math.PI * 0.5); // Phase 1 & 2: Coil back into potential tension
+    } else if (p < 0.55) {
+      const sp = (p - 0.32) / 0.23;
+      bodilyLunge = -3.5 + 9.5 * Math.pow(sp, 2.5); // Phase 3: Hypersonic whip thrust forward
+    } else if (p < 0.73) {
+      bodilyLunge = 6.0; // Phase 4: Locked in lunging strike stance
+    } else {
+      const rp = (p - 0.73) / 0.27;
+      bodilyLunge = 6.0 * Math.pow(1.0 - rp, 1.8); // Phase 5: Recovery settle
+    }
+    pullOffsetX = Math.cos(aimAngle) * bodilyLunge;
+    pullOffsetY = Math.sin(aimAngle) * bodilyLunge;
+  } else if ((fighter.leftPunchTimer || 0) > 0) {
+    const maxTimer = fighter.leftPunchMaxTimer || 22;
+    const p = 1.0 - (fighter.leftPunchTimer / maxTimer);
+    const aimAngle = fighter.gunAngle || fighter.angle || 0;
+    let bodilyLunge = 0;
+    if (p < 0.30) {
+      bodilyLunge = -4.0 * Math.sin((p / 0.30) * Math.PI * 0.5); // Phase 1 & 2: Torso coils deep behind left hip
+    } else if (p < 0.52) {
+      const sp = (p - 0.30) / 0.22;
+      bodilyLunge = -4.0 + 11.0 * Math.pow(sp, 2.6); // Phase 3: Heavy shoulder drive into punch
+    } else if (p < 0.72) {
+      bodilyLunge = 7.0; // Phase 4: Locked at full punch impact extension
+    } else {
+      const rp = (p - 0.72) / 0.28;
+      bodilyLunge = 7.0 * Math.pow(1.0 - rp, 1.8); // Phase 5: Elastic settle
+    }
+    pullOffsetX = Math.cos(aimAngle) * bodilyLunge;
+    pullOffsetY = Math.sin(aimAngle) * bodilyLunge;
+  }
+
+  fighter.x += pullOffsetX;
+  fighter.y += pullOffsetY;
 
   ctx.save();
 
@@ -361,6 +528,10 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
 
   ctx.restore();
 
+  // Restore fighter coordinates
+  fighter.x -= pullOffsetX;
+  fighter.y -= pullOffsetY;
+
   // 6. Draw Cleave Windup Visual
   if (fighter.isCleaving && !isGojoDomainActive) {
     const maxWindup = CONFIG.mahoraga?.cleaveWindupFrames || 30;
@@ -377,8 +548,19 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
     ctx.restore();
   }
 
+  // 6b. Draw Divine Shout Windup & Acoustic Intake Visuals
+  if (!isGojoDomainActive) {
+    drawMahoragaShoutWindup(ctx, fighter);
+  }
 
+  // 7. Draw Active 12-Frame Golden Sonic Booms
+  if (fighter.activeSonicBooms && fighter.activeSonicBooms.length > 0 && !isGojoDomainActive) {
+    for (let i = 0; i < fighter.activeSonicBooms.length; i++) {
+      drawMahoragaSonicBoom(ctx, fighter.activeSonicBooms[i]);
+    }
+  }
 
-  // Always draw Health Text on TOP
+  // Always draw Health Text and Freeze Timer on TOP (Rule 21 compliance)
   fighter.drawHealth(ctx);
+  fighter.drawFreezeTimer?.(ctx);
 }

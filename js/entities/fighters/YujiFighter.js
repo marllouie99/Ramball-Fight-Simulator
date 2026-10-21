@@ -465,8 +465,8 @@ export class YujiFighter extends Fighter {
           this.divineFlameChargeTimer++;
 
           // Subtle arena tremor while channeling Fuga
-          if (this.divineFlameChargeTimer % 6 === 0) {
-            triggerGlobalScreenShake(2.5, 4);
+          if (this.divineFlameChargeTimer % 12 === 0) {
+            triggerGlobalScreenShake(2.0, 6);
           }
 
           // Play "Fuga" voice line exactly 45 frames before firing
@@ -729,8 +729,8 @@ export class YujiFighter extends Fighter {
 
         spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
         triggerGlobalScreenShake(6, 8);
-        spawnSparks(ft.x, ft.y, 18, 'crimsonSniper', '#8B0000');
-        spawnSparks(ft.x, ft.y, 8, 'slashRicochet');
+        spawnSparks(ft.x, ft.y, 8, 'crimsonSniper', '#8B0000');
+        spawnSparks(ft.x, ft.y, 4, 'slashRicochet');
         this.punchAnimTimer = 0;
         this.slashGlowTimer = 25;
         this.slashSwingTimer = 14;

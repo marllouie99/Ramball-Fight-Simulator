@@ -9,6 +9,7 @@ import { drawGojoWeapon, drawGojoOrb, drawAnamorphicLensFlare } from '../weapons
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
 import { drawFighterInkOutline } from '../renderers/fighterOutlineRenderer.js';
 
+const _jjkAuraPoints = Array.from({ length: 32 }, () => ({ x: 0, y: 0 }));
 export class GojoRenderer {
   static draw(ctx, fighter) {
     if (fighter.isDead) return;
@@ -866,10 +867,10 @@ export class GojoRenderer {
     // (Removed shadowBlur for 60 FPS performance)
 
     // Generate smooth flame contour points (Viscous Liquid Fire Silhouette - stretching Sakuga tongues)
-    const numPoints = 28;
+        const numPoints = 28;
     const isHandBlob = (overrideRadius !== null && overrideRadius < (r * 0.8));
     const baseRadius = isHandBlob ? (r + 9.0) : (r + 15);
-    const points = [];
+    const points = _jjkAuraPoints;
     const moveOffset = (fighter.x + fighter.y) * 0.015;
     const stretchMult = isHandBlob ? 0.2 : 1.0;
 
@@ -890,10 +891,8 @@ export class GojoRenderer {
 
       const totalRadius = baseRadius + baseTongue1 + baseTongue2 + tongueFlicker + sideWave;
 
-      points.push({
-        x: Math.cos(angle) * totalRadius,
-        y: Math.sin(angle) * totalRadius
-      });
+      points[i].x = Math.cos(angle) * totalRadius;
+      points[i].y = Math.sin(angle) * totalRadius;
     }
 
     // Draw smooth closed curve through midpoints (no sharp corners)

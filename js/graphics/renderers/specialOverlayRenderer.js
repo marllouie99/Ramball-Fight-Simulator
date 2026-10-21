@@ -738,6 +738,80 @@ export function isYujiSoulSwapOverlayActive() {
  * Renders Assets/Overlays/Yuji-soulswap-overlay.png inside the arena with smooth fade transitions,
  * authentic pixel-art rasterization, semi-transparency, and clean rectangular/circular arena boundary clipping.
  */
+let _cachedSoulSwapArenaCanvas = null;
+let _cachedSoulSwapArenaW = 0;
+let _cachedSoulSwapArenaH = 0;
+let _cachedSoulSwapArenaShape = null;
+let _cachedSoulSwapOverlayLoaded = false;
+let _cachedSoulSwapEffectiveZoom = 0;
+let _cachedSoulSwapOffX = 0;
+let _cachedSoulSwapOffY = 0;
+
+function _getSoulSwapArenaOverlayCanvas(innerW, innerH, shape, effectiveZoom, offX, offY) {
+  const img = getYujiSoulSwapOverlayImage();
+  const isImgLoaded = Boolean(img && (img.complete || img.width > 0) && (img.naturalWidth === undefined || img.naturalWidth > 0 || img.width > 0));
+
+  if (_cachedSoulSwapArenaCanvas &&
+      _cachedSoulSwapArenaW === innerW &&
+      _cachedSoulSwapArenaH === innerH &&
+      _cachedSoulSwapArenaShape === shape &&
+      _cachedSoulSwapOverlayLoaded === isImgLoaded &&
+      _cachedSoulSwapEffectiveZoom === effectiveZoom &&
+      _cachedSoulSwapOffX === offX &&
+      _cachedSoulSwapOffY === offY) {
+    return _cachedSoulSwapArenaCanvas;
+  }
+
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = innerW;
+  c.height = innerH;
+  const bctx = c.getContext('2d');
+  bctx.imageSmoothingEnabled = false;
+
+  bctx.save();
+  if (shape === 'circle') {
+    bctx.beginPath();
+    bctx.arc(innerW / 2, innerH / 2, Math.min(innerW, innerH) / 2, 0, Math.PI * 2);
+    bctx.clip();
+  }
+
+  // Subtle cursed crimson ambient wash inside arena
+  bctx.fillStyle = 'rgba(180, 10, 25, 0.16)';
+  bctx.fillRect(0, 0, innerW, innerH);
+
+  if (isImgLoaded) {
+    const baseSize = Math.min(innerW, innerH);
+    const drawW = baseSize * effectiveZoom;
+    const drawH = baseSize * effectiveZoom;
+    const drawX = innerW / 2 - drawW / 2 + offX;
+    const drawY = innerH / 2 - drawH / 2 + offY;
+    bctx.drawImage(img, drawX, drawY, drawW, drawH);
+  }
+
+  // Atmospheric cursed blood-red & shadow perimeter vignette framing the arena
+  const maxR = Math.max(innerW, innerH) * 0.70;
+  const vignetteGrad = bctx.createRadialGradient(innerW / 2, innerH / 2, Math.min(innerW, innerH) * 0.25, innerW / 2, innerH / 2, maxR);
+  vignetteGrad.addColorStop(0.00, 'rgba(0, 0, 0, 0)');
+  vignetteGrad.addColorStop(0.65, 'rgba(120, 5, 20, 0.22)');
+  vignetteGrad.addColorStop(1.00, 'rgba(15, 0, 4, 0.55)');
+  bctx.fillStyle = vignetteGrad;
+  bctx.fillRect(0, 0, innerW, innerH);
+
+  bctx.restore();
+
+  _cachedSoulSwapArenaCanvas = c;
+  _cachedSoulSwapArenaW = innerW;
+  _cachedSoulSwapArenaH = innerH;
+  _cachedSoulSwapArenaShape = shape;
+  _cachedSoulSwapOverlayLoaded = isImgLoaded;
+  _cachedSoulSwapEffectiveZoom = effectiveZoom;
+  _cachedSoulSwapOffX = offX;
+  _cachedSoulSwapOffY = offY;
+
+  return _cachedSoulSwapArenaCanvas;
+}
+
 export function drawYujiSoulSwapArenaOverlay(customCtx = null, customOpacity = null) {
   if (typeof state !== 'undefined' && state.disableDimEffects) return;
   if (typeof CONFIG !== 'undefined' && CONFIG.yuji?.enableSoulSwapOverlay === false) return;
@@ -767,22 +841,11 @@ export function drawYujiSoulSwapArenaOverlay(customCtx = null, customOpacity = n
   const arenaY = arenaScreenCenter.y - arenaH / 2;
   const wallW = (arena.wallWidth || 4) * zoom;
 
-  ctx.save();
-  ctx.beginPath();
-  if (arena.shape === 'circle') {
-    const ar = (arena.radius || ((arena.width || 800) / 2)) * zoom - wallW;
-    ctx.arc(arenaScreenCenter.x, arenaScreenCenter.y, Math.max(0, ar), 0, Math.PI * 2);
-  } else {
-    ctx.rect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
-  }
-  ctx.clip();
+  const innerW = Math.max(1, Math.round(arenaW - wallW * 2));
+  const innerH = Math.max(1, Math.round(arenaH - wallW * 2));
+  const innerX = arenaX + wallW;
+  const innerY = arenaY + wallW;
 
-  // Subtle cursed crimson ambient wash inside arena
-  ctx.fillStyle = `rgba(180, 10, 25, ${(opacity * 0.16).toFixed(3)})`;
-  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
-
-  // Draw Sukuna Face Markings Art (Assets/Overlays/Yuji-soulswap-overlay.png) with semi-transparency
-  const img = getYujiSoulSwapOverlayImage();
   const baseOverlayAlpha = (typeof CONFIG !== 'undefined' && CONFIG.yuji?.soulSwapOverlayAlpha !== undefined)
     ? CONFIG.yuji.soulSwapOverlayAlpha
     : 0.68;
@@ -794,39 +857,95 @@ export function drawYujiSoulSwapArenaOverlay(customCtx = null, customOpacity = n
   const offX = (custom.offsetX ?? ((typeof CONFIG !== 'undefined' && CONFIG.yuji?.soulSwapOverlayOffsetX !== undefined) ? CONFIG.yuji.soulSwapOverlayOffsetX : 0)) * zoom;
   const offY = (custom.offsetY ?? ((typeof CONFIG !== 'undefined' && CONFIG.yuji?.soulSwapOverlayOffsetY !== undefined) ? CONFIG.yuji.soulSwapOverlayOffsetY : 0)) * zoom;
 
-  if (img && (img.complete || img.width > 0) && (img.naturalWidth === undefined || img.naturalWidth > 0 || img.width > 0)) {
+  const cachedArenaCanvas = _getSoulSwapArenaOverlayCanvas(innerW, innerH, arena.shape, effectiveZoom, offX, offY);
+  if (cachedArenaCanvas) {
     ctx.save();
-    ctx.imageSmoothingEnabled = false; // Nearest-neighbor preserves crisp pixel art
-    const innerW = arenaW - wallW * 2;
-    const innerH = arenaH - wallW * 2;
-    // Keep proportional square aspect ratio based on arena dimensions
-    const baseSize = Math.min(innerW, innerH);
-    const drawW = baseSize * effectiveZoom;
-    const drawH = baseSize * effectiveZoom;
-
-    const drawX = arenaScreenCenter.x - drawW / 2 + offX;
-    const drawY = arenaScreenCenter.y - drawH / 2 + offY;
-
     ctx.globalAlpha = opacity * baseOverlayAlpha;
-    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(cachedArenaCanvas, innerX, innerY);
     ctx.restore();
   }
-
-  // Atmospheric cursed blood-red & shadow perimeter vignette framing the arena
-  const maxR = Math.max(arenaW, arenaH) * 0.70;
-  const vignetteGrad = ctx.createRadialGradient(arenaScreenCenter.x, arenaScreenCenter.y, Math.min(arenaW, arenaH) * 0.25, arenaScreenCenter.x, arenaScreenCenter.y, maxR);
-  vignetteGrad.addColorStop(0.00, 'rgba(0, 0, 0, 0)');
-  vignetteGrad.addColorStop(0.65, `rgba(120, 5, 20, ${(opacity * 0.22).toFixed(3)})`);
-  vignetteGrad.addColorStop(1.00, `rgba(15, 0, 4, ${(opacity * 0.55).toFixed(3)})`);
-  ctx.fillStyle = vignetteGrad;
-  ctx.fillRect(arenaX + wallW, arenaY + wallW, arenaW - wallW * 2, arenaH - wallW * 2);
-
-  ctx.restore();
 }
 
 /**
  * Draws Yuji's Soul Swap (Sukuna Takeover) Full-Screen Dim Screen & Arena Overlay.
  */
+let _cachedSoulSwapBgCanvas = null;
+let _cachedSoulSwapBgW = 0;
+let _cachedSoulSwapBgH = 0;
+
+function _getSoulSwapBgCanvas(w, h) {
+  if (_cachedSoulSwapBgCanvas && _cachedSoulSwapBgW === w && _cachedSoulSwapBgH === h) {
+    return _cachedSoulSwapBgCanvas;
+  }
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const bctx = c.getContext('2d');
+
+  // 1. Ominous Cursed Blood-Red & Pitch Black Linear Gradient Across Full Screen
+  const linearGrad = bctx.createLinearGradient(0, 0, 0, h);
+  linearGrad.addColorStop(0.0, 'rgba(5, 0, 1, 0.96)');
+  linearGrad.addColorStop(0.20, 'rgba(32, 2, 8, 0.92)');
+  linearGrad.addColorStop(0.50, 'rgba(60, 4, 15, 0.88)');
+  linearGrad.addColorStop(0.80, 'rgba(32, 2, 8, 0.92)');
+  linearGrad.addColorStop(1.0, 'rgba(5, 0, 1, 0.96)');
+  bctx.fillStyle = linearGrad;
+  bctx.fillRect(0, 0, w, h);
+
+  // 2. Dark Outer Edge Screen Corner Vignette
+  const cornerGrad = bctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.30, w / 2, h / 2, Math.max(w, h) * 0.85);
+  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+  cornerGrad.addColorStop(0.60, 'rgba(15, 0, 4, 0.55)');
+  cornerGrad.addColorStop(1.0, 'rgba(2, 0, 1, 0.95)');
+  bctx.fillStyle = cornerGrad;
+  bctx.fillRect(0, 0, w, h);
+
+  _cachedSoulSwapBgCanvas = c;
+  _cachedSoulSwapBgW = w;
+  _cachedSoulSwapBgH = h;
+  return _cachedSoulSwapBgCanvas;
+}
+
+let _cachedSoulSwapAuraCanvas = null;
+function _getSoulSwapAuraCanvas() {
+  if (_cachedSoulSwapAuraCanvas) return _cachedSoulSwapAuraCanvas;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 256;
+  const actx = c.getContext('2d');
+  const grad = actx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0.00, 'rgba(220, 20, 60, 0.50)');
+  grad.addColorStop(0.15, 'rgba(178, 10, 40, 0.38)');
+  grad.addColorStop(0.35, 'rgba(100, 5, 25, 0.25)');
+  grad.addColorStop(0.60, 'rgba(40, 2, 10, 0.12)');
+  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+  actx.fillStyle = grad;
+  actx.fillRect(0, 0, 256, 256);
+  _cachedSoulSwapAuraCanvas = c;
+  return _cachedSoulSwapAuraCanvas;
+}
+
+let _cachedSoulSwapSpotlightCanvas = null;
+function _getSoulSwapSpotlightCanvas() {
+  if (_cachedSoulSwapSpotlightCanvas) return _cachedSoulSwapSpotlightCanvas;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 128;
+  const sctx = c.getContext('2d');
+  const grad = sctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255, 60, 80, 0.35)');
+  grad.addColorStop(0.40, 'rgba(200, 15, 45, 0.18)');
+  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  sctx.fillStyle = grad;
+  sctx.fillRect(0, 0, 128, 128);
+  _cachedSoulSwapSpotlightCanvas = c;
+  return _cachedSoulSwapSpotlightCanvas;
+}
+
 export function drawYujiSoulSwapDimScreen() {
   if (typeof state !== 'undefined' && state.disableDimEffects) return;
   if (typeof CONFIG !== 'undefined' && CONFIG.yuji?.enableSoulSwapOverlay === false) return;
@@ -869,60 +988,47 @@ export function drawYujiSoulSwapDimScreen() {
   const w = canvas.width;
   const h = canvas.height;
 
-  ctx.save();
+    ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Ominous Cursed Blood-Red & Pitch Black Linear Gradient Across Full Screen
-  const linearGrad = ctx.createLinearGradient(0, 0, 0, h);
-  linearGrad.addColorStop(0.0, `rgba(5, 0, 1, ${(opacity * 0.96).toFixed(3)})`);       // Pitch obsidian-crimson top
-  linearGrad.addColorStop(0.20, `rgba(32, 2, 8, ${(opacity * 0.92).toFixed(3)})`);     // Dark sinister crimson
-  linearGrad.addColorStop(0.50, `rgba(60, 4, 15, ${(opacity * 0.88).toFixed(3)})`);    // Malevolent soul takeover core
-  linearGrad.addColorStop(0.80, `rgba(32, 2, 8, ${(opacity * 0.92).toFixed(3)})`);     // Dark sinister crimson
-  linearGrad.addColorStop(1.0, `rgba(5, 0, 1, ${(opacity * 0.96).toFixed(3)})`);       // Pitch obsidian-crimson bottom
-  ctx.fillStyle = linearGrad;
-  ctx.fillRect(0, 0, w, h);
+  // 1. Blit pre-rendered static full-screen dim background (linear & corner vignette)
+  const bgCanvas = _getSoulSwapBgCanvas(w, h);
+  if (bgCanvas) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(bgCanvas, 0, 0);
+    ctx.restore();
+  }
 
-  // 2. High-contrast radial cursed energy aura centered on Yuji / Sukuna
+  // 2. High-contrast radial cursed energy aura centered on Yuji / Sukuna (pre-rendered sprite)
   const screenPos = yujiFighter ? worldToScreen(yujiFighter.x, yujiFighter.y - (yujiFighter.z || 0)) : { x: w / 2, y: h / 2 };
   const cx = screenPos.x;
   const cy = screenPos.y;
   const maxDim = Math.max(w, h) * 0.90;
 
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxDim);
-  grad.addColorStop(0.00, `rgba(220, 20, 60, ${(opacity * 0.50).toFixed(3)})`);       // Radiant crimson core (#dc143c)
-  grad.addColorStop(0.15, `rgba(178, 10, 40, ${(opacity * 0.38).toFixed(3)})`);       // Deep cursed scarlet ring
-  grad.addColorStop(0.35, `rgba(100, 5, 25, ${(opacity * 0.25).toFixed(3)})`);        // Dark maroon transition
-  grad.addColorStop(0.60, `rgba(40, 2, 10, ${(opacity * 0.12).toFixed(3)})`);         // Abyssal burgundy void
-  grad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');                                         // Outer blend
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
+  const auraCanvas = _getSoulSwapAuraCanvas();
+  if (auraCanvas) {
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    ctx.drawImage(auraCanvas, cx - maxDim, cy - maxDim, maxDim * 2, maxDim * 2);
+    ctx.restore();
+  }
 
-  // 3. Dark Outer Edge Screen Corner Vignette
-  const cornerGrad = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.30, w / 2, h / 2, Math.max(w, h) * 0.85);
-  cornerGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-  cornerGrad.addColorStop(0.60, `rgba(15, 0, 4, ${(opacity * 0.55).toFixed(3)})`);
-  cornerGrad.addColorStop(1.0, `rgba(2, 0, 1, ${(opacity * 0.95).toFixed(3)})`);
-  ctx.fillStyle = cornerGrad;
-  ctx.fillRect(0, 0, w, h);
-
-  // 3.5. Render Yuji Soul Swap Arena PNG Overlay clipped to arena bounds
+  // 3. Render Yuji Soul Swap Arena PNG Overlay inside arena bounds (Zero per-frame clipping or image scaling)
   drawYujiSoulSwapArenaOverlay(ctx, opacity);
 
-  // 4. Subtle Sukuna Cursed Aura Spotlight on Yuji
+  // 4. Subtle Sukuna Cursed Aura Spotlight on Yuji (pre-rendered screen composite)
   if (yujiFighter) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    const zoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
-    const spotR = (yujiFighter.r || 25) * 4.2 * zoom;
-    const spotGrad = ctx.createRadialGradient(cx, cy, 5 * zoom, cx, cy, spotR);
-    spotGrad.addColorStop(0, `rgba(255, 60, 80, ${(opacity * 0.35).toFixed(3)})`);
-    spotGrad.addColorStop(0.40, `rgba(200, 15, 45, ${(opacity * 0.18).toFixed(3)})`);
-    spotGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = spotGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, spotR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    const spotCanvas = _getSoulSwapSpotlightCanvas();
+    if (spotCanvas) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = opacity;
+      const zoom = (state.camera && state.camera.enabled && state.camera.mode === 'dynamic') ? (state.camera.zoom || 1.0) : 1.0;
+      const spotR = (yujiFighter.r || 25) * 4.2 * zoom;
+      ctx.drawImage(spotCanvas, cx - spotR, cy - spotR, spotR * 2, spotR * 2);
+      ctx.restore();
+    }
   }
 
   // 5. Exclude Gojo Limitless Infinity Barrier from dimming

@@ -727,7 +727,13 @@ export class DenjiFighter extends Fighter {
           const rampedBaseDamage = baseDamage + rampDamageBonus;
           const finalDamage = Math.max(1, Math.round(rampedBaseDamage * damageMultiplier));
           const targetPrevHp = typeof t.hp === 'number' ? t.hp : 0;
-          const damageResult = applyDamageToTarget(t, finalDamage, this, { isSkill: true, isContinuousShred: true });
+          const isOddTick = (this.consecutiveShredTicks % 2 === 1);
+          const damageResult = applyDamageToTarget(t, finalDamage, this, {
+            isSkill: true,
+            isContinuousShred: true,
+            suppressBlood: true,
+            skipStandardDamageText: isOddTick
+          });
           const targetActualDamage = Math.max(0, targetPrevHp - (typeof t.hp === 'number' ? t.hp : 0));
           const didDamage = Boolean(damageResult && (targetActualDamage > 0 || (typeof damageResult === 'number' && damageResult > 0)));
 
@@ -740,17 +746,22 @@ export class DenjiFighter extends Fighter {
             t.applySlow(pauseFrames + 3, dragFactor, { isChainsawFriction: true });
           }
 
-          // 5. Spawn Blood Splatters & Chainsaw Sparks at all contacting blade points
+          // 5. Spawn Blood Splatters & Chainsaw Sparks at contacting blade points
           const bloodAngle = Math.atan2(t.y - this.y, t.x - this.x);
           const rampSparks = Math.min(4, Math.floor(rampTick * 0.4));
-          for (let seg of blades) {
-            const contactX = (t.x + (seg.startX + seg.endX) * 0.5) * 0.5;
-            const contactY = (t.y + (seg.startY + seg.endY) * 0.5) * 0.5;
-            if (didDamage) {
-              spawnBloodEffect(contactX, contactY, bloodAngle);
-            }
-            spawnSparks(contactX, contactY, bladeCount >= 3 ? '#EF4444' : (bladeCount === 2 ? '#F59E0B' : '#F97316'), Math.ceil((sparkCount + rampSparks) / blades.length));
+          const primaryBlade = blades[0] || { startX: t.x, startY: t.y, endX: this.x, endY: this.y };
+          const midContactX = (t.x + (primaryBlade.startX + primaryBlade.endX) * 0.5) * 0.5;
+          const midContactY = (t.y + (primaryBlade.startY + primaryBlade.endY) * 0.5) * 0.5;
+          if (didDamage) {
+            spawnBloodEffect(midContactX, midContactY, bloodAngle);
           }
+          // Spawn sparks on alternating blade to keep active particles tightly budgeted
+          const activeBladeIdx = (this.consecutiveShredTicks || 0) % blades.length;
+          const seg = blades[activeBladeIdx] || primaryBlade;
+          const contactX = (t.x + (seg.startX + seg.endX) * 0.5) * 0.5;
+          const contactY = (t.y + (seg.startY + seg.endY) * 0.5) * 0.5;
+          const sparkColor = bladeCount >= 3 ? '#EF4444' : (bladeCount === 2 ? '#F59E0B' : '#F97316');
+          spawnSparks(contactX, contactY, Math.min(3, 1 + rampSparks), 'default', sparkColor);
 
           // 6. Blood Siphon Lifesteal (Passive 2 with Multi-Blade and Per-Tick Ramp bonuses)
           // Strictly only siphons when damage was actually dealt to an enemy

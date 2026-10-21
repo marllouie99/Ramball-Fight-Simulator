@@ -1586,59 +1586,65 @@ async function main() {
         assertCanvasStackBalance("Denji idle Chainsaw Devil model");
 
         // 2. Continuous Shred Smoke Simulation
-        fighter.reset();
-        fighter.x = 200;
-        fighter.y = 200;
-        dummyOpponent.x = 230; // Point blank range in chainsaw contact
-        dummyOpponent.y = 200;
-        dummyOpponent.maxHp = 10000;
-        dummyOpponent.hp = 10000;
-        dummyOpponent.isDead = false;
-        state.fighters = [fighter, dummyOpponent];
-
-        // Simulate 20 frames of shredding - smoke should slowly start coming out
-        for (let f = 0; f < 20; f++) {
-          dummyOpponent.x = fighter.x + 30;
-          dummyOpponent.y = fighter.y;
+        const prevSmokeToggle = CONFIG.denji?.enableChainsawSmoke;
+        if (CONFIG.denji) CONFIG.denji.enableChainsawSmoke = true;
+        try {
+          fighter.reset();
+          fighter.x = 200;
+          fighter.y = 200;
+          dummyOpponent.x = 230; // Point blank range in chainsaw contact
+          dummyOpponent.y = 200;
+          dummyOpponent.maxHp = 10000;
           dummyOpponent.hp = 10000;
           dummyOpponent.isDead = false;
-          fighter.update(dummyOpponent, 0, state.arena);
-        }
-        if (fighter.continuousShredTimer < 15) {
-          throw new Error(`Denji continuousShredTimer did not advance properly! Timer: ${fighter.continuousShredTimer}`);
-        }
-        if (fighter.chainsawSmokeParticles.length === 0) {
-          throw new Error("Denji failed to slowly start emitting steam smoke particles upon beginning shredding!");
-        }
+          state.fighters = [fighter, dummyOpponent];
 
-        // Simulate further to 90 frames (1.5s) - smoke density and timer should steadily scale
-        for (let f = 0; f < 70; f++) {
-          dummyOpponent.x = fighter.x + 30;
-          dummyOpponent.y = fighter.y;
-          dummyOpponent.hp = 10000;
-          dummyOpponent.isDead = false;
-          fighter.update(dummyOpponent, 0, state.arena);
-        }
-        if (fighter.continuousShredTimer < 80) {
-          throw new Error(`Denji continuousShredTimer did not advance to sustained duration! Timer: ${fighter.continuousShredTimer}`);
-        }
-        if (fighter.chainsawSmokeParticles.length === 0) {
-          throw new Error("Denji steam smoke particles disappeared during continuous shredding!");
-        }
+          // Simulate 20 frames of shredding - smoke should slowly start coming out
+          for (let f = 0; f < 20; f++) {
+            dummyOpponent.x = fighter.x + 30;
+            dummyOpponent.y = fighter.y;
+            dummyOpponent.hp = 10000;
+            dummyOpponent.isDead = false;
+            fighter.update(dummyOpponent, 0, state.arena);
+          }
+          if (fighter.continuousShredTimer < 15) {
+            throw new Error(`Denji continuousShredTimer did not advance properly! Timer: ${fighter.continuousShredTimer}`);
+          }
+          if (fighter.chainsawSmokeParticles.length === 0) {
+            throw new Error("Denji failed to slowly start emitting steam smoke particles upon beginning shredding!");
+          }
 
-        // Render with active smoke particles and verify 100% balanced Canvas 2D stack
-        mockCtx.resetStackDepth();
-        fighter.draw(mockCtx, null);
-        assertCanvasStackBalance("Denji drawing with active chainsaw overheat smoke particles");
+          // Simulate further to 90 frames (1.5s) - smoke density and timer should steadily scale
+          for (let f = 0; f < 70; f++) {
+            dummyOpponent.x = fighter.x + 30;
+            dummyOpponent.y = fighter.y;
+            dummyOpponent.hp = 10000;
+            dummyOpponent.isDead = false;
+            fighter.update(dummyOpponent, 0, state.arena);
+          }
+          if (fighter.continuousShredTimer < 80) {
+            throw new Error(`Denji continuousShredTimer did not advance to sustained duration! Timer: ${fighter.continuousShredTimer}`);
+          }
+          if (fighter.chainsawSmokeParticles.length === 0) {
+            throw new Error("Denji steam smoke particles disappeared during continuous shredding!");
+          }
 
-        // Disengage opponent and verify smoke cool down decay
-        dummyOpponent.x = 800; // Move far away
-        const prevTimer = fighter.continuousShredTimer;
-        for (let f = 0; f < 20; f++) {
-          fighter.update(dummyOpponent, 0, state.arena);
-        }
-        if (fighter.continuousShredTimer >= prevTimer) {
-          throw new Error("Denji continuousShredTimer failed to decay when disengaged from target!");
+          // Render with active smoke particles and verify 100% balanced Canvas 2D stack
+          mockCtx.resetStackDepth();
+          fighter.draw(mockCtx, null);
+          assertCanvasStackBalance("Denji drawing with active chainsaw overheat smoke particles");
+
+          // Disengage opponent and verify smoke cool down decay
+          dummyOpponent.x = 800; // Move far away
+          const prevTimer = fighter.continuousShredTimer;
+          for (let f = 0; f < 20; f++) {
+            fighter.update(dummyOpponent, 0, state.arena);
+          }
+          if (fighter.continuousShredTimer >= prevTimer) {
+            throw new Error("Denji continuousShredTimer failed to decay when disengaged from target!");
+          }
+        } finally {
+          if (CONFIG.denji) CONFIG.denji.enableChainsawSmoke = prevSmokeToggle;
         }
 
         fighter.reset();

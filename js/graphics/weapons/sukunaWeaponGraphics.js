@@ -1,24 +1,84 @@
 import { state } from '../../core/state.js';
 import { fastCleanArray } from '../particles/visualTrailSystem.js';
 
-let _sukunaSlashBuffer = null;
-let _sukunaSlashLow = null;
-let _sukunaSlashHighCtx = null;
-let _sukunaSlashLowCtx = null;
+const _cachedDiscreteSlashCanvases = {
+  sukunaSlash_normal: null,
+  sukunaSlash_frozen: null,
+  ghostBlade_normal: null,
+  ghostBlade_frozen: null,
+  cleave_normal: null,
+  cleave_frozen: null
+};
 
-function _getSukunaSlashBuffers() {
-  if (!_sukunaSlashBuffer) {
-    _sukunaSlashBuffer = document.createElement('canvas');
-    _sukunaSlashBuffer.width = 64;
-    _sukunaSlashBuffer.height = 64;
-    _sukunaSlashHighCtx = _sukunaSlashBuffer.getContext('2d');
+function _renderDiscreteSlashCanvas(type, isFrozen) {
+  if (typeof document === 'undefined') return null;
+  const key = `${type}_${isFrozen ? 'frozen' : 'normal'}`;
+  if (_cachedDiscreteSlashCanvases[key]) return _cachedDiscreteSlashCanvases[key];
 
-    _sukunaSlashLow = document.createElement('canvas');
-    _sukunaSlashLow.width = 32;
-    _sukunaSlashLow.height = 32;
-    _sukunaSlashLowCtx = _sukunaSlashLow.getContext('2d', { willReadFrequently: true });
+  const high = document.createElement('canvas');
+  high.width = 64;
+  high.height = 64;
+  const highCtx = high.getContext('2d');
+  highCtx.save();
+  highCtx.translate(32, 32);
+
+  const r = 24;
+  if (type === 'sukunaSlash') {
+    _renderVectorSukunaSlash(highCtx, r, 1.0, isFrozen);
+  } else if (type === 'ghostBlade') {
+    _renderVectorGhostBlade(highCtx, r, 1.0, isFrozen);
+  } else if (type === 'cleave') {
+    _renderVectorSukunaCleave(highCtx, r, 1.0, isFrozen);
   }
-  return { high: _sukunaSlashBuffer, low: _sukunaSlashLow, highCtx: _sukunaSlashHighCtx, lowCtx: _sukunaSlashLowCtx };
+  highCtx.restore();
+
+  const low = document.createElement('canvas');
+  low.width = 32;
+  low.height = 32;
+  const lowCtx = low.getContext('2d', { willReadFrequently: true });
+  lowCtx.imageSmoothingEnabled = false;
+  lowCtx.drawImage(high, 0, 0, 32, 32);
+
+  const imgData = lowCtx.getImageData(0, 0, 32, 32);
+  const data = imgData.data;
+  const w = 32, h = 32;
+  const grid = new Array(h);
+  for (let y = 0; y < h; y++) {
+    grid[y] = new Uint8Array(w);
+    for (let x = 0; x < w; x++) {
+      if (data[(y * w + x) * 4 + 3] > 30) grid[y][x] = 1;
+    }
+  }
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const idx = (y * w + x) * 4;
+      if (!grid[y][x]) {
+        data[idx + 3] = 0;
+        continue;
+      }
+
+      const isBorder = (
+        y === 0 || !grid[y - 1][x] ||
+        y === h - 1 || !grid[y + 1][x] ||
+        x === 0 || !grid[y][x - 1] ||
+        x === w - 1 || !grid[y][x + 1]
+      );
+
+      if (isBorder) {
+        data[idx] = 14;     // #0E
+        data[idx + 1] = 15; // #0F
+        data[idx + 2] = 20; // #14
+        data[idx + 3] = 255;
+      } else {
+        data[idx + 3] = 255;
+      }
+    }
+  }
+  lowCtx.putImageData(imgData, 0, 0);
+
+  _cachedDiscreteSlashCanvases[key] = low;
+  return low;
 }
 
 function _renderVectorSukunaSlash(ctx, r, lifeRatio, isFrozen) {
@@ -54,63 +114,10 @@ export function drawSukunaSlash(ctx, p) {
   const owner = state.fighters && state.fighters[p.owner];
   const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
-
   const isFrozen = Boolean(p.isFrozenByInfinity);
-  const r = 24;
 
-  const { high, low, highCtx, lowCtx } = _getSukunaSlashBuffers();
-
-  // Render high-res vector slash
-  highCtx.clearRect(0, 0, 64, 64);
-  highCtx.save();
-  highCtx.translate(32, 32);
-  _renderVectorSukunaSlash(highCtx, r, lifeRatio, isFrozen);
-  highCtx.restore();
-
-  // Downsample to low-res discrete grid (32x32, P=2.0)
-  lowCtx.clearRect(0, 0, 32, 32);
-  lowCtx.imageSmoothingEnabled = false;
-  lowCtx.drawImage(high, 0, 0, 32, 32);
-
-  // Apply discrete outline & color snapping
-  const imgData = lowCtx.getImageData(0, 0, 32, 32);
-  const data = imgData.data;
-  const w = 32, h = 32;
-  const grid = new Array(h);
-  for (let y = 0; y < h; y++) {
-    grid[y] = new Uint8Array(w);
-    for (let x = 0; x < w; x++) {
-      const a = data[(y * w + x) * 4 + 3];
-      if (a > 30) grid[y][x] = 1;
-    }
-  }
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const idx = (y * w + x) * 4;
-      if (!grid[y][x]) {
-        data[idx + 3] = 0;
-        continue;
-      }
-
-      const isBorder = (
-        y === 0 || !grid[y - 1][x] ||
-        y === h - 1 || !grid[y + 1][x] ||
-        x === 0 || !grid[y][x - 1] ||
-        x === w - 1 || !grid[y][x + 1]
-      );
-
-      if (isBorder) {
-        data[idx] = 14;     // #0E
-        data[idx + 1] = 15; // #0F
-        data[idx + 2] = 20; // #14
-        data[idx + 3] = 255;
-      } else {
-        data[idx + 3] = 255;
-      }
-    }
-  }
-  lowCtx.putImageData(imgData, 0, 0);
+  const low = _renderDiscreteSlashCanvas('sukunaSlash', isFrozen);
+  if (!low) return;
 
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -129,7 +136,10 @@ export function drawSukunaSlash(ctx, p) {
   }
 
   // 2. Main Pixelated Sukuna Slash Blade
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.70, 0.95 * lifeRatio);
   ctx.drawImage(low, 0, 0, 32, 32, -32, -32, 64, 64);
+  ctx.restore();
 
   // 3. Discrete trailing pixel sparks
   const sparkCol = isFrozen ? '#00E5FF' : '#FF2400';
@@ -202,66 +212,10 @@ export function drawGhostBlade(ctx, p) {
   const owner = state.fighters && state.fighters[p.owner];
   const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
-
   const isFrozen = Boolean(p.isFrozenByInfinity);
-  const r = 24;
 
-  const { high, low, highCtx, lowCtx } = _getGhostBladeBuffers();
-
-  // Render high-res vector blade
-  highCtx.clearRect(0, 0, 64, 64);
-  highCtx.save();
-  highCtx.translate(32, 32);
-  _renderVectorGhostBlade(highCtx, r, lifeRatio, isFrozen);
-  highCtx.restore();
-
-  // Downsample to low-res discrete grid (32x32, P=2.0)
-  lowCtx.clearRect(0, 0, 32, 32);
-  lowCtx.imageSmoothingEnabled = false;
-  lowCtx.drawImage(high, 0, 0, 32, 32);
-
-  // Apply Saitama discrete outline & color snapping
-  const imgData = lowCtx.getImageData(0, 0, 32, 32);
-  const data = imgData.data;
-
-  // First pass: identify non-empty pixels
-  const w = 32, h = 32;
-  const grid = new Array(h);
-  for (let y = 0; y < h; y++) {
-    grid[y] = new Uint8Array(w);
-    for (let x = 0; x < w; x++) {
-      const a = data[(y * w + x) * 4 + 3];
-      if (a > 30) grid[y][x] = 1;
-    }
-  }
-
-  // Second pass: apply Saitama dark border (#0E0F14) and snap fill
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const idx = (y * w + x) * 4;
-      if (!grid[y][x]) {
-        data[idx + 3] = 0;
-        continue;
-      }
-
-      const isBorder = (
-        y === 0 || !grid[y - 1][x] ||
-        y === h - 1 || !grid[y + 1][x] ||
-        x === 0 || !grid[y][x - 1] ||
-        x === w - 1 || !grid[y][x + 1]
-      );
-
-      if (isBorder) {
-        data[idx] = 14;     // #0E
-        data[idx + 1] = 15; // #0F
-        data[idx + 2] = 20; // #14
-        data[idx + 3] = 255;
-      } else {
-        data[idx + 3] = 255;
-      }
-    }
-  }
-  lowCtx.putImageData(imgData, 0, 0);
+  const low = _renderDiscreteSlashCanvas('ghostBlade', isFrozen);
+  if (!low) return;
 
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -280,7 +234,10 @@ export function drawGhostBlade(ctx, p) {
   }
 
   // 2. Main Pixelated Ghost Blade (Saitama Style)
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.70, 0.95 * lifeRatio);
   ctx.drawImage(low, 0, 0, 32, 32, -32, -32, 64, 64);
+  ctx.restore();
 
   // 3. Discrete trailing pixel sparks
   const sparkCol = isFrozen ? '#00E5FF' : '#FF6666';
@@ -339,60 +296,10 @@ export function drawSukunaCleave(ctx, p) {
   const owner = state.fighters && state.fighters[p.owner];
   const scale = owner ? Math.max(1.1, owner.r / 16) : 1.3;
   const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
-
   const isFrozen = Boolean(p.isFrozenByInfinity);
-  const r = 24;
 
-  const { high, low, highCtx, lowCtx } = _getCleaveBuffers();
-
-  highCtx.clearRect(0, 0, 64, 64);
-  highCtx.save();
-  highCtx.translate(32, 32);
-  _renderVectorSukunaCleave(highCtx, r, lifeRatio, isFrozen);
-  highCtx.restore();
-
-  lowCtx.clearRect(0, 0, 32, 32);
-  lowCtx.imageSmoothingEnabled = false;
-  lowCtx.drawImage(high, 0, 0, 32, 32);
-
-  const imgData = lowCtx.getImageData(0, 0, 32, 32);
-  const data = imgData.data;
-  const w = 32, h = 32;
-  const grid = new Array(h);
-  for (let y = 0; y < h; y++) {
-    grid[y] = new Uint8Array(w);
-    for (let x = 0; x < w; x++) {
-      const a = data[(y * w + x) * 4 + 3];
-      if (a > 30) grid[y][x] = 1;
-    }
-  }
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const idx = (y * w + x) * 4;
-      if (!grid[y][x]) {
-        data[idx + 3] = 0;
-        continue;
-      }
-
-      const isBorder = (
-        y === 0 || !grid[y - 1][x] ||
-        y === h - 1 || !grid[y + 1][x] ||
-        x === 0 || !grid[y][x - 1] ||
-        x === w - 1 || !grid[y][x + 1]
-      );
-
-      if (isBorder) {
-        data[idx] = 14;     // #0E
-        data[idx + 1] = 15; // #0F
-        data[idx + 2] = 20; // #14
-        data[idx + 3] = 255;
-      } else {
-        data[idx + 3] = 255;
-      }
-    }
-  }
-  lowCtx.putImageData(imgData, 0, 0);
+  const low = _renderDiscreteSlashCanvas('cleave', isFrozen);
+  if (!low) return;
 
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -411,7 +318,10 @@ export function drawSukunaCleave(ctx, p) {
   }
 
   // 2. Main Pixelated Cleave Blade
+  ctx.save();
+  ctx.globalAlpha = Math.max(0.75, 0.98 * lifeRatio);
   ctx.drawImage(low, 0, 0, 32, 32, -32, -32, 64, 64);
+  ctx.restore();
 
   // 3. Trailing pixel sparks
   const sparkCol = isFrozen ? '#00E5FF' : '#FFFFFF';
@@ -699,7 +609,7 @@ export function drawDivineFlameArrowConstruct(ctx, {
 function _renderVectorDivineFlameArrow(ctx, {
   scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
 }) {
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.2)));
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 54)));
 
   const notchX = -32 * progress;
   const tipX = 28 * progress;
@@ -734,7 +644,7 @@ function _renderVectorDivineFlameArrow(ctx, {
   // 2. ROARING FLAME TONGUES — long, turbulent, curling backward
   // Uses traveling wave + multi-frequency turbulence for fluid motion
   // ═════════════════════════════════════════════════════════
-  const numTendrils = isLowQuality ? 4 : 16;
+  const numTendrils = isLowQuality ? 4 : 8;
   for (let i = 0; i < numTendrils; i++) {
     const side = i % 2 === 0 ? 1 : -1;
     const ratio = i / (numTendrils - 1);

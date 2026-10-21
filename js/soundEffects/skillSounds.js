@@ -636,17 +636,24 @@ export const SKILL_SOUNDS = {
         delay: CONFIG.mahoraga?.soundDelays?.shieldBlock || 0
       };
     },
+    get shoutwindup() {
+      return {
+        src: CONFIG.mahoraga?.sounds?.shoutWindup || 'Assets/Sound Effects/MahoragaSFX/divine-shout-wind-up-enogc4bcarbonmk2bladeidlestartup.wav',
+        volume: CONFIG.mahoraga?.soundVolumes?.shoutWindup !== undefined ? CONFIG.mahoraga.soundVolumes.shoutWindup : 0.85,
+        delay: CONFIG.mahoraga?.soundDelays?.shoutWindup || 0
+      };
+    },
     get shout() {
       return {
-        src: CONFIG.mahoraga?.sounds?.shout || 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-        volume: CONFIG.mahoraga?.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 2.2,
+        src: CONFIG.mahoraga?.sounds?.shout || 'Assets/Sound Effects/MahoragaSFX/divine-shout-enocarboncswitchpoweredupnew.wav',
+        volume: CONFIG.mahoraga?.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 0.95,
         delay: CONFIG.mahoraga?.soundDelays?.shout || 0
       };
     },
     get divineshout() {
       return {
-        src: CONFIG.mahoraga?.sounds?.shout || 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-        volume: CONFIG.mahoraga?.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 2.2,
+        src: CONFIG.mahoraga?.sounds?.shout || 'Assets/Sound Effects/MahoragaSFX/divine-shout-enocarboncswitchpoweredupnew.wav',
+        volume: CONFIG.mahoraga?.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 0.95,
         delay: CONFIG.mahoraga?.soundDelays?.shout || 0
       };
     }

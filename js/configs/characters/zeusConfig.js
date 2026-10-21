@@ -6,6 +6,14 @@ export const zeusConfig = {
     hair: 'Assets/model/zeus/Zeus-hair.png',
     crown: 'Assets/model/zeus/Zeus-crown.png',
     thunderstrike: 'Assets/effects/Impact/explosion-b.png',
+    clouds: [
+      'Assets/model/zeus/Clouds/cloud-6.png',
+      'Assets/model/zeus/Clouds/cloud-1.png',
+      'Assets/model/zeus/Clouds/cloud-2.png',
+      'Assets/model/zeus/Clouds/cloud-3.png',
+      'Assets/model/zeus/Clouds/cloud-4.png',
+      'Assets/model/zeus/Clouds/cloud-5.png',
+    ],
   },
 
   // ── Base Attributes ──

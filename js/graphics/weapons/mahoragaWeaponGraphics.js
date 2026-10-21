@@ -639,7 +639,187 @@ export function drawMahoragaDharmaWheelCore(ctx, wheelData) {
 /**
  * Draws Mahoraga's Sword of Extermination Wrist Blade (Matching Reference Image 2 & 3).
  */
-export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punchAnimTimer = 0, isCleaving = false, color = '#F5F5DC', swordCombo = 0, isThrowing = false, bladeRetractProgress = 1.0, maxAnimTimer = 18, isWorldCutting = false, worldCuttingTimer = 0) {
+/**
+ * Renders a muscular, jointed anime arm segment connecting shoulder to wrist with dynamic elbow kinematics.
+ * Adheres to Rule 30 Dynamic Arm Linkage & Physical Force Drive standard.
+ *
+ * @param {CanvasRenderingContext2D} ctx Context
+ * @param {number} sx Shoulder X
+ * @param {number} sy Shoulder Y
+ * @param {number} hx Hand/Wrist X
+ * @param {number} hy Hand/Wrist Y
+ * @param {boolean} isRightArm True for right sword arm, false for left punch arm
+ * @param {number} r Fighter radius
+ * @param {string} skinColor Base divine flesh color (#F4F4EC)
+ * @param {boolean} isBandaged True to draw ritual bandage wraps on forearm
+ * @param {number} [flexDirection=1] +1 or -1 elbow flexion orientation
+ */
+function _drawMahoragaKinematicArm(ctx, sx, sy, hx, hy, isRightArm, r, skinColor, isBandaged = true, flexDirection = 1) {
+  const dx = hx - sx;
+  const dy = hy - sy;
+  const D = Math.hypot(dx, dy);
+  if (D < 2) return;
+
+  // 1. Two-Bone Inverse Kinematics
+  const naturalL1 = r * 0.56;
+  const naturalL2 = r * 0.52;
+  const naturalReach = naturalL1 + naturalL2;
+
+  let L1 = naturalL1;
+  let L2 = naturalL2;
+  if (D > naturalReach - 2.0) {
+    L1 = D * 0.52;
+    L2 = D * 0.48;
+  }
+
+  const mx = (sx + hx) * 0.5;
+  const my = (sy + hy) * 0.5;
+  const theta = Math.atan2(dy, dx);
+  const perpTheta = theta + (flexDirection * Math.PI * 0.5);
+
+  let hElbow = Math.sqrt(Math.max(0, (L1 * L1) - (D * 0.5) * (D * 0.5)));
+  hElbow = Math.min(hElbow, r * 0.50);
+
+  const ex = mx + Math.cos(perpTheta) * hElbow;
+  const ey = my + Math.sin(perpTheta) * hElbow;
+
+  // 2. Anatomical Muscle Widths (deltoid, bicep, elbow, forearm, wrist)
+  const wShoulder = Math.max(14.0, r * 0.50);
+  const wElbow = Math.max(11.0, r * 0.38);
+  const wWrist = Math.max(12.0, r * 0.42);
+
+  const drawSegment = (p1x, p1y, p2x, p2y, w1, w2, isForearm) => {
+    const segDx = p2x - p1x;
+    const segDy = p2y - p1y;
+    const segLen = Math.hypot(segDx, segDy);
+    if (segLen < 1.0) return;
+
+    const segAngle = Math.atan2(segDy, segDx);
+    const segPerpX = -Math.sin(segAngle);
+    const segPerpY = Math.cos(segAngle);
+
+    const halfW1 = w1 * 0.5;
+    const halfW2 = w2 * 0.5;
+
+    // 4 polygon corners
+    const c1x = p1x + segPerpX * halfW1;
+    const c1y = p1y + segPerpY * halfW1;
+    const c2x = p2x + segPerpX * halfW2;
+    const c2y = p2y + segPerpY * halfW2;
+    const c3x = p2x - segPerpX * halfW2;
+    const c3y = p2y - segPerpY * halfW2;
+    const c4x = p1x - segPerpX * halfW1;
+    const c4y = p1y - segPerpY * halfW1;
+
+    // Manga ink outline
+    ctx.beginPath();
+    ctx.moveTo(c1x, c1y);
+    ctx.lineTo(c2x, c2y);
+    ctx.lineTo(c3x, c3y);
+    ctx.lineTo(c4x, c4y);
+    ctx.closePath();
+    ctx.fillStyle = '#0E0F14';
+    ctx.fill();
+    ctx.lineWidth = 2.4;
+    ctx.strokeStyle = '#0E0F14';
+    ctx.stroke();
+
+    // Interior Fill
+    const inHalfW1 = Math.max(1.0, halfW1 - 1.2);
+    const inHalfW2 = Math.max(1.0, halfW2 - 1.2);
+
+    const ic1x = p1x + segPerpX * inHalfW1;
+    const ic1y = p1y + segPerpY * inHalfW1;
+    const ic2x = p2x + segPerpX * inHalfW2;
+    const ic2y = p2y + segPerpY * inHalfW2;
+    const ic3x = p2x - segPerpX * inHalfW2;
+    const ic3y = p2y - segPerpY * inHalfW2;
+    const ic4x = p1x - segPerpX * inHalfW1;
+    const ic4y = p1y - segPerpY * inHalfW1;
+
+    ctx.beginPath();
+    ctx.moveTo(ic1x, ic1y);
+    ctx.lineTo(ic2x, ic2y);
+    ctx.lineTo(ic3x, ic3y);
+    ctx.lineTo(ic4x, ic4y);
+    ctx.closePath();
+
+    if (isForearm && isBandaged) {
+      // White ritual bandages
+      ctx.fillStyle = '#EBEBE6';
+      ctx.fill();
+
+      // Bandage wraps / cross-hatched pixel stripes
+      const numWraps = Math.max(3, Math.floor(segLen / 6.0));
+      ctx.save();
+      ctx.strokeStyle = '#AFAFA5';
+      ctx.lineWidth = 1.4;
+      for (let w = 1; w < numWraps; w++) {
+        const wt = w / numWraps;
+        const wx = p1x + segDx * wt;
+        const wy = p1y + segDy * wt;
+        const curW = inHalfW1 + (inHalfW2 - inHalfW1) * wt;
+        ctx.beginPath();
+        ctx.moveTo(wx + segPerpX * curW - segDx * 0.12, wy + segPerpY * curW - segDy * 0.12);
+        ctx.lineTo(wx - segPerpX * curW + segDx * 0.12, wy - segPerpY * curW + segDy * 0.12);
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else {
+      // Bare muscular bicep/tricep
+      ctx.fillStyle = skinColor || '#F4F4EC';
+      ctx.fill();
+
+      // Muscle shadow on inner flex
+      ctx.beginPath();
+      ctx.moveTo(ic4x, ic4y);
+      ctx.lineTo(ic3x, ic3y);
+      ctx.lineTo(p2x - segPerpX * (inHalfW2 * 0.3), p2y - segPerpY * (inHalfW2 * 0.3));
+      ctx.lineTo(p1x - segPerpX * (inHalfW1 * 0.3), p1y - segPerpY * (inHalfW1 * 0.3));
+      ctx.closePath();
+      ctx.fillStyle = '#D0D0C4';
+      ctx.fill();
+
+      // Muscle crest glint
+      ctx.beginPath();
+      ctx.moveTo(ic1x, ic1y);
+      ctx.lineTo(ic2x, ic2y);
+      ctx.lineTo(p2x + segPerpX * (inHalfW2 * 0.5), p2y + segPerpY * (inHalfW2 * 0.5));
+      ctx.lineTo(p1x + segPerpX * (inHalfW1 * 0.5), p1y + segPerpY * (inHalfW1 * 0.5));
+      ctx.closePath();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+    }
+  };
+
+  // Draw Upper Arm: Shoulder -> Elbow
+  drawSegment(sx, sy, ex, ey, wShoulder, wElbow, false);
+
+  // Rounded elbow joint cap
+  ctx.beginPath();
+  ctx.arc(ex, ey, wElbow * 0.48, 0, Math.PI * 2);
+  ctx.fillStyle = '#0E0F14';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(ex, ey, wElbow * 0.48 - 1.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#EBEBE6';
+  ctx.fill();
+
+  // Draw Forearm: Elbow -> Wrist
+  drawSegment(ex, ey, hx, hy, wElbow, wWrist, true);
+
+  // Rounded wrist joint cap
+  ctx.beginPath();
+  ctx.arc(hx, hy, wWrist * 0.48, 0, Math.PI * 2);
+  ctx.fillStyle = '#0E0F14';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(hx, hy, wWrist * 0.48 - 1.2, 0, Math.PI * 2);
+  ctx.fillStyle = '#EBEBE6';
+  ctx.fill();
+}
+
+export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punchAnimTimer = 0, isCleaving = false, color = '#F5F5DC', swordCombo = 0, isThrowing = false, bladeRetractProgress = 1.0, maxAnimTimer = 22, isWorldCutting = false, worldCuttingTimer = 0) {
   let fighterObj = null;
   if (typeof x === 'object' && x !== null) {
     fighterObj = x;
@@ -670,7 +850,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   const isSuppressed = fighterObj?.isTargetOfAmbush || (typeof fighterObj?.areAttackEffectsSuppressed === 'function' && fighterObj.areAttackEffectsSuppressed());
 
   if (fighterObj && !isGojoDomainActive && !isSuppressed && isSwinging) {
-    const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
+    const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 22.0;
     const elapsed = maxTimer - punchAnimTimer;
     const rawP = Math.min(1.0, Math.max(0.0, elapsed / maxTimer));
     const comboIndex = (fighterObj.isInfinityBlitz) ? (1 + ((swordCombo || 0) % 2)) : ((swordCombo || 0) % 3);
@@ -692,14 +872,29 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     let currentTailOffset = startOffset;
     let trailAlpha = 1.0;
 
-    if (rawP < 0.65) {
-      const t = rawP / 0.65;
-      const eased = 1.0 - Math.pow(1.0 - t, 2.2);
+    const coilP = 0.23;
+    const holdP = 0.32;
+    const strikeP = 0.55;
+    const lockP = 0.73;
+
+    if (rawP < holdP) {
+      currentTipOffset = startOffset;
+      currentTailOffset = startOffset;
+      trailAlpha = 0;
+    } else if (rawP < strikeP) {
+      const sp = (rawP - holdP) / (strikeP - holdP);
+      const eased = Math.pow(sp, 2.5);
       currentTipOffset = startOffset + eased * (endOffset - startOffset);
       currentTailOffset = startOffset;
-      trailAlpha = Math.min(1.0, t * 2.5);
+      trailAlpha = Math.min(1.0, sp * 2.2);
+    } else if (rawP < lockP) {
+      // Phase 4: THE IMPACT LOCK — 100% UNFURLED & LATCHED ON CLEAVE PLANE!
+      currentTipOffset = endOffset;
+      currentTailOffset = startOffset;
+      trailAlpha = 1.0;
     } else {
-      const recP = (rawP - 0.65) / 0.35;
+      // Phase 5: Dynamic Eraser Wipe
+      const recP = (rawP - lockP) / (1.0 - lockP);
       const easedRec = Math.pow(1.0 - recP, 1.4);
       currentTipOffset = endOffset;
       currentTailOffset = endOffset - (endOffset - startOffset) * easedRec;
@@ -849,52 +1044,61 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   const isGuarding = (fighterObj && fighterObj.defensePoseType === 'guard' && (fighterObj.defensePoseTimer || 0) > 0);
 
   if (punchAnimTimer > 0) {
-    const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
-    const swingDuration = 12.0;
+    const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 22.0;
     const elapsed = maxTimer - punchAnimTimer;
+    const progress = Math.min(1.0, Math.max(0.0, elapsed / maxTimer));
     const comboIndex = (fighterObj && fighterObj.isInfinityBlitz) ? (1 + ((swordCombo || 0) % 2)) : ((swordCombo || 0) % 3);
 
-    if (elapsed <= swingDuration) {
-      const p = Math.min(1.0, elapsed / swingDuration);
+    const coilP = 0.23;
+    const holdP = 0.32;
+    const strikeP = 0.55;
+    const lockP = 0.73;
 
-      if (comboIndex === 1) {
-        // Combo 1: Sweeps backhand from +0.65 to -0.55
-        const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
-        swingAngle = (Math.PI * 0.65) - (Math.PI * 1.20) * easedP;
-        extendDist = Math.sin(p * Math.PI) * 28;
-      } else if (comboIndex === 2) {
-        // Combo 2: Heavy Overhead Chop (Windup -0.55 -> -0.85, then heavy chop -0.85 -> +0.85)
-        if (p < 0.15) {
-          const w = p / 0.15;
-          swingAngle = (-Math.PI * 0.55) + (-Math.PI * 0.30) * Math.sin(w * Math.PI * 0.5);
-        } else {
-          const s = (p - 0.15) / 0.85;
-          const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
-          swingAngle = (-Math.PI * 0.85) + (Math.PI * 1.70) * easedS;
-        }
-        extendDist = Math.sin(p * Math.PI) * 30;
-      } else {
-        // Combo 0: Smooth windup back from idle (0 -> -0.45), then slash forward (-0.45 -> +0.65)
-        if (p < 0.20) {
-          const w = p / 0.20;
-          swingAngle = (-Math.PI * 0.45) * Math.sin(w * Math.PI * 0.5);
-        } else {
-          const s = (p - 0.20) / 0.80;
-          const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
-          swingAngle = (-Math.PI * 0.45) + (Math.PI * 1.10) * easedS;
-        }
-        extendDist = Math.sin(p * Math.PI) * 28;
+    let startAngle = -0.45;
+    let impactAngle = 0.65;
+    let coilLunge = -10.0;
+    let maxLunge = 32.0;
+
+    if (comboIndex === 1) {
+      startAngle = 0.75;
+      impactAngle = -0.55;
+      coilLunge = -8.0;
+      maxLunge = 30.0;
+    } else if (comboIndex === 2) {
+      startAngle = -0.95;
+      impactAngle = 0.85;
+      coilLunge = -14.0;
+      maxLunge = 36.0;
+    }
+
+    if (progress < coilP) {
+      const wp = progress / coilP;
+      const easeW = Math.sin(wp * Math.PI * 0.5);
+      swingAngle = startAngle * easeW;
+      extendDist = coilLunge * easeW;
+    } else if (progress < holdP) {
+      swingAngle = startAngle;
+      extendDist = coilLunge;
+    } else if (progress < strikeP) {
+      const sp = (progress - holdP) / (strikeP - holdP);
+      const whipEase = Math.pow(sp, 2.5);
+      swingAngle = startAngle + (impactAngle - startAngle) * whipEase;
+      extendDist = coilLunge + (maxLunge - coilLunge) * whipEase;
+    } else if (progress < lockP) {
+      const pp = (progress - strikeP) / (lockP - strikeP);
+      const tremor = (1.0 - pp) * (CONFIG.mahoraga?.swordTremorIntensity ?? 1.8);
+      swingAngle = impactAngle + (Math.random() - 0.5) * 0.06 * tremor;
+      extendDist = maxLunge + (Math.random() - 0.5) * tremor;
+      if (fighterObj && (fighterObj.knockbackStunTimer || 0) <= 0) {
+        fighterObj.vx = 0;
+        fighterObj.vy = 0;
       }
     } else {
-      // Recovery phase: Smoothly return from swing end angle to 0 idle guard
-      const recP = Math.min(1.0, (elapsed - swingDuration) / (maxTimer - swingDuration));
-      const easeRec = recP * (2 - recP);
-      let endAngle = Math.PI * 0.65;
-      if (comboIndex === 1) endAngle = -Math.PI * 0.55;
-      else if (comboIndex === 2) endAngle = Math.PI * 0.85;
-
-      swingAngle = endAngle * (1.0 - easeRec);
-      extendDist = (1.0 - easeRec) * 12;
+      const rp = (progress - lockP) / (1.0 - lockP);
+      const settleEase = Math.pow(1.0 - rp, 1.8);
+      const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
+      swingAngle = impactAngle * settleEase - 0.20 * springWave;
+      extendDist = maxLunge * settleEase - 5.0 * springWave;
     }
   } else if (isParrying) {
     // Parry Pose: snappy blade deflection swing
@@ -967,7 +1171,14 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
-  ctx.translate(r * 0.3 + extendDist, 0);
+  const isDark = _isDarkMode();
+  const fistColor = isDark ? '#FFFFFF' : (fighterObj?.skinColor || (color !== '#FFD700' && color !== '#FFEE58' ? color : '#F4F4EC'));
+  const handDist = r * 0.3 + extendDist;
+
+  // Render Dynamic Muscular Kinematic Arm connecting right shoulder (0, 0) to wrist (handDist, 0)
+  _drawMahoragaKinematicArm(ctx, 0, 0, handDist, 0, true, r, fistColor, true, 1);
+
+  ctx.translate(handDist, 0);
 
   // ── SWORD PIXEL ART HELPERS (P = 2.0px grid) ──
   const sP = 2.0;
@@ -999,8 +1210,6 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   // 2. Pixel Art Clenched Fist
   const fistRadius = 14.0;
   const fistGridR = Math.ceil(fistRadius / sP);
-  const isDark = _isDarkMode();
-  const fistColor = isDark ? '#FFFFFF' : (fighterObj?.skinColor || (color !== '#FFD700' && color !== '#FFEE58' ? color : '#F4F4EC'));
   for (let gy = -fistGridR; gy <= fistGridR; gy++) {
     for (let gx = -fistGridR; gx <= fistGridR; gx++) {
       const dist = Math.sqrt(gx * gx + gy * gy) * sP;
@@ -1175,7 +1384,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
 
   // Smooth continuous progress tracking with multi-frame recovery easing to eliminate 1-frame snaps
   if (fighter.leftPunchTimer > 0) {
-    const maxT = (fighter.leftPunchMaxTimer && fighter.leftPunchMaxTimer > 0) ? fighter.leftPunchMaxTimer : 18.0;
+    const maxT = (fighter.leftPunchMaxTimer && fighter.leftPunchMaxTimer > 0) ? fighter.leftPunchMaxTimer : 22.0;
     fighter.currentPunchProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.leftPunchTimer / maxT)));
   } else if (fighter.currentPunchProgress > 0) {
     fighter.currentPunchProgress = Math.max(0.0, fighter.currentPunchProgress - 0.12);
@@ -1184,6 +1393,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   }
 
   let lungeProgress = 0;
+  let punchTremor = 0;
   const isThrowing = fighter.isThrowing || false;
   const isGuarding = fighter.defensePoseType === 'guard' && (fighter.defensePoseTimer || 0) > 0;
   const isWallSlamGrab = fighter.isWallSlamActive && fighter.wallSlamPhase === 'grab';
@@ -1207,16 +1417,45 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     }
   } else if (isGuarding) {
     lungeProgress = 0;
-  } else {
+  } else if (fighter.leftPunchTimer > 0) {
+    // 5-Phase Melee Combat Kinematics (Rule 30)
     const rawProgress = fighter.currentPunchProgress || 0.0;
-    let easePunch = 0;
-    if (rawProgress < 0.28) {
-      easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
+    const coilP = 0.22;
+    const holdP = 0.30;
+    const strikeP = 0.52;
+    const lockP = 0.72;
+
+    if (rawProgress < coilP) {
+      // Phase 1: Deep muscular coil pull behind left shoulder
+      const wp = rawProgress / coilP;
+      const easeW = Math.sin(wp * Math.PI * 0.5);
+      lungeProgress = -0.15 * easeW;
+    } else if (rawProgress < holdP) {
+      // Phase 2: Poised tension hold
+      lungeProgress = -0.15;
+    } else if (rawProgress < strikeP) {
+      // Phase 3: Explosive forward punch stroke
+      const sp = (rawProgress - holdP) / (strikeP - holdP);
+      const punchEase = Math.pow(sp, 2.6);
+      lungeProgress = -0.15 + 1.15 * punchEase;
+    } else if (rawProgress < lockP) {
+      // Phase 4: THE IMPACT LOCK (Fist locked deep in target impact plane!)
+      const pp = (rawProgress - strikeP) / (lockP - strikeP);
+      punchTremor = (1.0 - pp) * 2.2;
+      lungeProgress = 1.0;
+      if (fighter && (fighter.knockbackStunTimer || 0) <= 0) {
+        fighter.vx = 0;
+        fighter.vy = 0;
+      }
     } else {
-      const retractT = (rawProgress - 0.28) / 0.72;
-      easePunch = Math.cos(retractT * (Math.PI / 2));
+      // Phase 5: Extraction & Spring-Damped Settle
+      const rp = (rawProgress - lockP) / (1.0 - lockP);
+      const settleEase = Math.pow(1.0 - rp, 1.8);
+      const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
+      lungeProgress = settleEase - 0.12 * springWave;
     }
-    lungeProgress = easePunch;
+  } else {
+    lungeProgress = 0;
   }
 
   const progress = isThrowing ? lungeProgress : (isGuarding ? 0 : (fighter.currentPunchProgress || 0.0));
@@ -1251,30 +1490,38 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   ctx.translate(rotatedShoulderX, rotatedShoulderY);
   
   // Rotate the fist & visual trails by gunAngle toward target
+  let handAngle = gunAngle;
+  let handDist = -r * 0.35 + punchLunge;
   if (isGuarding) {
-    ctx.rotate(gunAngle - Math.PI * 0.35);
-    ctx.translate(-r * 0.15, 0);
+    handAngle = gunAngle - Math.PI * 0.35;
+    handDist = -r * 0.15;
   } else if (isWallSlamGrab && grabWindupProgress > 0) {
     // Deep menacing power windup coil behind shoulder
     const windupAngle = -Math.PI * 0.42 * grabWindupProgress;
-    const windupOffset = -r * 0.35 - 14 * grabWindupProgress;
-    ctx.rotate(gunAngle + windupAngle);
-    ctx.translate(windupOffset, 0);
-  } else {
-    ctx.rotate(gunAngle);
-    // When idle: rests on left side edge (-r * 0.35). When punching: lunges forward toward target (+punchLunge)
-    ctx.translate(-r * 0.35 + punchLunge, 0);
+    handAngle = gunAngle + windupAngle;
+    handDist = -r * 0.35 - 14 * grabWindupProgress;
   }
 
-  // Intense kinetic vibration while gathering execution punch power
-  if (isGrabPowerCharging) {
-    const jitter = (Math.random() - 0.5) * 2.2;
+  ctx.rotate(handAngle);
+
+  // Intense kinetic vibration while gathering execution punch power or during Phase 4 impact lock
+  if (isGrabPowerCharging || punchTremor > 0) {
+    const tremorVal = isGrabPowerCharging ? 2.2 : punchTremor;
+    const jitter = (Math.random() - 0.5) * tremorVal;
     ctx.translate(jitter, jitter);
   }
 
   // Flip Y when facing left
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
+
+  const isDarkLeft = _isDarkMode();
+  const fistColor = isDarkLeft ? '#FFFFFF' : (fighter?.skinColor || fighter?.bodyColor || '#F4F4EC');
+
+  // Render Dynamic Muscular Kinematic Arm connecting left shoulder (0, 0) to wrist (handDist, 0)
+  _drawMahoragaKinematicArm(ctx, 0, 0, handDist, 0, false, r, fistColor, true, -1);
+
+  ctx.translate(handDist, 0);
 
   // Radiant Golden Divine Adaptation Aura around the fist while charging execution smash
   if (isGrabPowerCharging) {
@@ -1295,8 +1542,6 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   const _lP = 2.0;
   const _lSnap = (v) => Math.round(v / _lP) * _lP;
   const _lGridR = Math.ceil(fistRadius / _lP);
-  const isDarkLeft = _isDarkMode();
-  const fistColor = isDarkLeft ? '#FFFFFF' : (fighter?.skinColor || fighter?.bodyColor || '#F4F4EC');
   for (let gy = -_lGridR; gy <= _lGridR; gy++) {
     for (let gx = -_lGridR; gx <= _lGridR; gx++) {
       const dist = Math.sqrt(gx * gx + gy * gy) * _lP;
@@ -1678,4 +1923,149 @@ export function drawMahoragaThrow(ctx, p) {
 
 if (typeof window !== 'undefined') {
   window.drawMahoragaLeftPunch = drawMahoragaLeftPunch;
+  window.drawMahoragaSonicBoom = drawMahoragaSonicBoom;
+}
+
+// ─────────────────────────────────────────────
+// 12-FRAME GOLDEN SONIC BOOM ASSET LOADER & RENDERER
+// ─────────────────────────────────────────────
+const MAHORAGA_SONIC_BOOM_FRAME_COUNT = 12;
+const MAHORAGA_SONIC_BOOM_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/model/mahoraga/Sonic Boom/sonic-boom-${i + 1}.png`
+);
+
+let _mahoragaSonicBoomFrames = [];
+let _mahoragaSonicBoomFramesLoading = false;
+
+export function _getMahoragaSonicBoomFrames() {
+  if (
+    _mahoragaSonicBoomFrames.length === MAHORAGA_SONIC_BOOM_FRAME_COUNT &&
+    _mahoragaSonicBoomFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _mahoragaSonicBoomFrames;
+  }
+  if (!_mahoragaSonicBoomFramesLoading && typeof Image !== 'undefined') {
+    _mahoragaSonicBoomFramesLoading = true;
+    _mahoragaSonicBoomFrames = [];
+    MAHORAGA_SONIC_BOOM_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _mahoragaSonicBoomFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Mahoraga Sonic Boom frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _mahoragaSonicBoomFrames[idx] = img;
+    });
+  }
+  return _mahoragaSonicBoomFrames;
+}
+
+// Proactive eager initialization in browser environment
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getMahoragaSonicBoomFrames();
+}
+
+/**
+ * Procedural fallback for headless test runners or when images are buffering.
+ * Uses discrete pixel art stepped boxes (P = 2.0px) to match the retro sprite aesthetic.
+ */
+function _drawProceduralSonicBoomFallback(ctx, sb, p, scale) {
+  const range = sb.range || 350;
+  const numRings = 5;
+  const leadDist = range * Math.min(1.0, p * 1.3);
+  const P = 2.0;
+
+  for (let i = 0; i < numRings; i++) {
+    const ringFrac = (numRings - 1 - i) / (numRings - 1);
+    const rx = Math.round((leadDist * ringFrac) / P) * P;
+    if (rx < 10) continue;
+    const ry = Math.round((12 + rx * 0.42) / P) * P;
+    const rWidth = Math.round((ry * 0.52) / P) * P;
+
+    ctx.fillStyle = 'rgba(251, 191, 36, 0.22)';
+    ctx.fillRect(rx - rWidth, -ry, rWidth * 2, ry * 2);
+
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2.0;
+    ctx.strokeRect(rx - rWidth, -ry, rWidth * 2, ry * 2);
+
+    // Inner bright crest
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(rx + rWidth - P, -ry * 0.5, P, ry);
+  }
+}
+
+/**
+ * Draws Mahoraga's 12-Frame Long-Range Golden Conical Sonic Boom.
+ * Anchored directly at Mahoraga's mouth/body (24, 128), rotated along shout aim angle,
+ * expanding forward in a supersonic conical shockwave.
+ *
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} sb Active sonic boom data object
+ */
+export function drawMahoragaSonicBoom(ctx, sb) {
+  if (!sb || !ctx) return;
+  const maxTimer = sb.maxTimer || 50;
+  const p = Math.min(1.0, Math.max(0, (sb.timer || 0) / maxTimer));
+  if (p >= 1.0) return;
+
+  const frames = _getMahoragaSonicBoomFrames();
+  // 1. Non-linear power ease for explosive expansion and smooth deceleration
+  const pEase = 1.0 - Math.pow(1.0 - p, 1.5);
+  // 2. Physical forward momentum: the supersonic shockwave rolls forward naturally
+  const creepX = pEase * 42.0;
+  // 3. Smooth frame interpolation between consecutive frames
+  const rawFrame = pEase * 11.0;
+  const f1 = Math.min(11, Math.floor(rawFrame));
+  const f2 = Math.min(11, f1 + 1);
+  const frac = rawFrame - f1;
+  const frameIndex = f1;
+  const img = frames[frameIndex];
+
+  ctx.save();
+  ctx.translate(sb.x + Math.cos(sb.angle || 0) * creepX, sb.y + Math.sin(sb.angle || 0) * creepX);
+  ctx.rotate(sb.angle || 0);
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.imageSmoothingEnabled = false;
+
+  // Luxurious cosine dissipation over the final 45% of lifecycle
+  let fadeAlpha = 1.0;
+  if (p > 0.55) {
+    const fadeP = (p - 0.55) / 0.45;
+    fadeAlpha = Math.cos(fadeP * Math.PI * 0.5);
+  }
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * fadeAlpha));
+
+  // The 256x256 sprite has its apex at (24, 128) and reaches to ~240 (span ~216px).
+  // Target cone reach in arena is sb.range (default 350px).
+  const range = sb.range || 350;
+  const scale = range / 216.0;
+  const originX = 24.0 * scale;
+  const originY = 128.0 * scale;
+  const drawW = 256.0 * scale;
+  const drawH = 256.0 * scale;
+
+  const img1 = img;
+  const img2 = (f2 !== f1 && frames[f2]) ? frames[f2] : null;
+  const isImg1Ready = img1 && img1.complete && ((img1.naturalWidth || img1.width || 0) > 0);
+  const isImg2Ready = img2 && img2.complete && ((img2.naturalWidth || img2.width || 0) > 0);
+
+  if (isImg1Ready) {
+    ctx.drawImage(img1, -originX, -originY, drawW, drawH);
+    if (isImg2Ready && frac > 0.04) {
+      ctx.globalAlpha = Math.max(0, Math.min(1.0, ctx.globalAlpha * (frac * 0.70)));
+      ctx.drawImage(img2, -originX, -originY, drawW, drawH);
+    }
+  } else {
+    _drawProceduralSonicBoomFallback(ctx, sb, pEase, scale);
+  }
+
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  ctx.restore();
 }

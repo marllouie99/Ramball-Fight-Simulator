@@ -6,6 +6,7 @@ export const mahoragaConfig = {
   assets: {
     eyeWings: 'Assets/model/mahoraga/Mahoraga-eyewings.png',
     wheelOverlay: 'Assets/Overlays/Mahoraga-wheel-overlay.png',
+    sonicBoom: 'Assets/model/mahoraga/Sonic Boom/sonic-boom-b.png',
   },
 
     name: 'Mahoraga',
@@ -102,8 +103,15 @@ export const mahoragaConfig = {
     swordCooldown: 20,              // Frames between sword strikes (0.5s at 60fps)
     swordDamage: 6,                // True damage dealt by Sword of Extermination
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
-    swordAnimFrames: 18,            // Duration (frames) of sword chop swing animation
-    punchAnimFrames: 18,            // Duration (frames) of off-hand heavy punch animation
+    swordAnimFrames: 22,            // Duration (frames) of 5-phase sword chop swing animation
+    punchAnimFrames: 22,            // Duration (frames) of 5-phase off-hand heavy punch animation
+    meleeLiftFrames: 5,             // Phase 1: Coil / Lift anticipation frames
+    meleeHoldFrames: 2,             // Phase 2: Poised tension hold frames
+    meleeStrikeFrames: 5,           // Phase 3: Hypersonic whip strike frames
+    meleeImpactLockFrames: 4,       // Phase 4: Impact Lock / Latch held at cleave plane
+    meleeRecoveryFrames: 6,         // Phase 5: Extraction & spring-damped settle frames
+    swordTremorIntensity: 1.8,      // Micro-tremor amplitude during impact lock
+
     punchFrequencyStance: 7,        // Every Nth basic attack is a heavy punch inside stance
     punchFrequencyNormal: 5,        // Every Nth basic attack is a heavy punch outside stance
     punchBaseKnockbackChance: 0.40, // Base chance (40%) for heavy punch to trigger explosive knockback
@@ -137,7 +145,13 @@ export const mahoragaConfig = {
     // ── Divine Shout (AoE Shockwave Roar) ──
     enableDivineShout: true,         // Master toggle for Divine Shout shockwave
     shoutCooldown: 1000,             // Cooldown (frames) between divine shouts (~16.6s)
-    shoutRadius: 180,                // Shockwave blast radius
+    shoutRange: 350,                 // Long-range directional sonic boom reach (350px forward reach)
+    shoutRadius: 180,                // Backward compatibility alias
+    shoutConeAngle: 1.35,            // Directional cone spread angle (~77° wide supersonic cone)
+    shoutWindupFrames: 24,           // Windup / inhalation anticipation frames before roaring (~0.4s @ 60fps)
+    shoutAnimFrames: 50,             // Duration (frames) of 12-frame Sonic Boom animation lifecycle (~0.83s @ 60fps)
+    shoutRecoveryFrames: 18,         // Recovery / follow-through pause frames before resuming normal movement (~0.3s @ 60fps)
+    shoutHitStun: 20,                // Hitstun applied to caught enemies
     shoutDamage: 10,                 // Damage dealt to enemies caught in shockwave
     shoutKnockback: 18,              // Knockback force applied to caught enemies
     shoutSlowDurationFrames: 120,    // Slow duration in frames applied to caught enemies (120 = 2.0s)
@@ -235,7 +249,8 @@ export const mahoragaConfig = {
         teleportDash: 'Assets/Sound Effects/Skills/dash3.mp3',
 
         // Divine Shout & Ground Impact
-        shout: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+        shoutWindup: 'Assets/Sound Effects/MahoragaSFX/divine-shout-wind-up-enogc4bcarbonmk2bladeidlestartup.wav',
+        shout: 'Assets/Sound Effects/MahoragaSFX/divine-shout-enocarboncswitchpoweredupnew.wav',
         shoutImpact: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
         shoutExplosion: 'Assets/Sound Effects/Attacks/explosion.mp3',
 
@@ -256,9 +271,10 @@ export const mahoragaConfig = {
         shieldBlock: 0.50,
         dash: 0.50,
         teleportDash: 0.50,
-        shout: 0.50,
-        shoutImpact: 0.50,
-        shoutExplosion: 0.50,
+        shoutWindup: 0.85,
+        shout: 0.95,
+        shoutImpact: 0.0,
+        shoutExplosion: 0.0,
         wallSlamLunge: 0.50,
         wallSlamImpale: 0.50,
         wallSlamImpact: 0.50
@@ -275,6 +291,7 @@ export const mahoragaConfig = {
         shieldBlock: 0,
         dash: 0,
         teleportDash: 0,
+        shoutWindup: 0,
         shout: 0,
         shoutImpact: 0,
         shoutExplosion: 0,

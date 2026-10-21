@@ -93,7 +93,29 @@ function getUnitRadialGradient(ctx, key, stops) {
  * @param {number} count - Number of sparks to spawn
  * @param {string} type - 'crimson' for red/orange sparks, 'flash' for impact flash
  */
-export function spawnSparks(x, y, count = 8, type = 'crimson', customColor = null) {
+export function spawnSparks(x, y, arg2 = 8, arg3 = 'crimson', arg4 = null) {
+  let count = 8;
+  let type = 'crimson';
+  let customColor = null;
+
+  if (typeof arg2 === 'number') {
+    count = arg2;
+    if (typeof arg3 === 'string') type = arg3;
+    if (arg4) customColor = arg4;
+  } else if (typeof arg2 === 'string') {
+    if (arg2.startsWith('#') || arg2.startsWith('rgb')) {
+      customColor = arg2;
+      type = 'default';
+      if (typeof arg3 === 'number') count = arg3;
+      else if (typeof arg3 === 'string') type = arg3;
+      if (arg4 && typeof arg4 === 'number') count = arg4;
+    } else {
+      type = arg2;
+      if (typeof arg3 === 'number') count = arg3;
+      if (arg4) customColor = arg4;
+    }
+  }
+
   let overrideProps = {};
   if (customColor) {
     if (typeof customColor === 'object') {
@@ -742,12 +764,9 @@ export function updateSparkEffects(frozen = false) {
       effect.sprite.rotation = effect.rotation;
     }
 
-    // Remove dead effects
+    // Remove dead effects and safely return to object & PixiJS sprite pools
     if (effect.life <= 0) {
-      if (effect.isPixi && effect.sprite && effect.sprite.parent) {
-        effect.sprite.parent.removeChild(effect.sprite);
-        effect.sprite.destroy();
-      }
+      ParticleSystem.returnParticle(effect);
       return false;
     }
     return true;
@@ -1383,6 +1402,23 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
 }
 
 export function spawnAnimePunchImpactFrame(x, y, radius = 60, hitAngle = 0, color = 'black', options = null) {
+  // Prevent duplicate overlapping punch animations at the exact same location during rapid multi-hit combos
+  if (state.sparkEffects && state.sparkEffects.length > 0) {
+    for (let i = state.sparkEffects.length - 1; i >= 0; i--) {
+      const p = state.sparkEffects[i];
+      if (p && p.type === 'animeImpactFrame') {
+        const dx = p.x - x;
+        const dy = p.y - y;
+        if (dx * dx + dy * dy < 22 * 22 && p.life > 0.65) {
+          p.hitAngle = hitAngle;
+          p.size = Math.max(p.size, radius);
+          p.targetSize = Math.max(p.targetSize, radius);
+          return;
+        }
+      }
+    }
+  }
+
   const shockwave = ParticleSystem.getParticle();
   shockwave.x = x;
   shockwave.y = y;

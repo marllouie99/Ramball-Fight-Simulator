@@ -1025,9 +1025,7 @@ function _getDenjiDevilGhostCanvas(r) {
 
   cctx.restore();
 
-  if (hasDevilImg) {
-    _cachedDenjiDevilGhostR = intR;
-  }
+  _cachedDenjiDevilGhostR = intR;
   _cachedDenjiDevilGhostOriginX = originX;
   _cachedDenjiDevilGhostOriginY = originY;
 

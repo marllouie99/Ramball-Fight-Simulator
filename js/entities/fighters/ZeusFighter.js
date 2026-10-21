@@ -12,6 +12,48 @@ import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEff
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state } from '../../core/state.js';
 
+export const ZEUS_CLOUD_FRAME_PATHS = [
+  'Assets/model/zeus/Clouds/cloud-6.png',
+  'Assets/model/zeus/Clouds/cloud-1.png',
+  'Assets/model/zeus/Clouds/cloud-2.png',
+  'Assets/model/zeus/Clouds/cloud-3.png',
+  'Assets/model/zeus/Clouds/cloud-4.png',
+  'Assets/model/zeus/Clouds/cloud-5.png'
+];
+
+const ZEUS_CLOUD_FRAME_COUNT = 6;
+let _zeusCloudFrames = [];
+let _zeusCloudFramesLoading = false;
+
+export function _getZeusCloudFrames() {
+  if (
+    _zeusCloudFrames.length === ZEUS_CLOUD_FRAME_COUNT &&
+    _zeusCloudFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _zeusCloudFrames;
+  }
+  if (!_zeusCloudFramesLoading && typeof Image !== 'undefined') {
+    _zeusCloudFramesLoading = true;
+    _zeusCloudFrames = [];
+    ZEUS_CLOUD_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _zeusCloudFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Zeus cloud frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _zeusCloudFrames[idx] = img;
+    });
+  }
+  return _zeusCloudFrames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getZeusCloudFrames();
+}
+
 export class ZeusFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -421,191 +463,323 @@ export class ZeusFighter extends Fighter {
   }
 
   _drawClouds(ctx, isBehind) {
-    const numClouds = 10;
     const zOffset = this.z || 0;
-    
-    for (let i = 0; i < numClouds; i++) {
-      // Fixed base position to form a tighter cluster
-      const angle = (i * Math.PI * 2) / numClouds;
-      // Adjusted distance multiplier to form a nice base
-      const dist = (i % 3 === 0 ? 0.2 : 0.8) * this.r;
-      
-      const baseOffsetX = Math.cos(angle) * dist;
-      const baseOffsetY = Math.sin(angle) * dist * 0.4; // Squashed for 3D ground perspective
-      
-      const isCloudBehind = baseOffsetY < 0;
-      if (isCloudBehind !== isBehind) continue;
-      
-      // Natural billowing and drifting movement
-      const driftX = Math.sin(this.auraPhase * 0.4 + i * 2.1) * 5;
-      const driftY = Math.cos(this.auraPhase * 0.3 + i * 1.7) * 3;
-      
-      const cx = this.x + baseOffsetX + driftX;
-      // Position clouds at the bottom edge of Zeus's hovering body
-      // (this.y - zOffset is his floating center, + this.r puts them at his feet)
-      const cy = this.y - zOffset + this.r * 0.8 + baseOffsetY + driftY;
-      
-      // Cloud puffs billow in size
-      const baseSize = i % 2 === 0 ? 18 : 13;
-      const cloudSize = baseSize + Math.sin(this.auraPhase * 1.2 + i) * 4;
-      
-      // Determine if this cloud puff is flashing with internal lightning
-      let flashThreshold = 0.92; // Short intense flash
-      if (this.isChargingStorm) {
-        flashThreshold = 0.4; // Flash very frequently while charging
-      } else if (this.stormActive) {
-        flashThreshold = 0.2; // Almost constantly flashing during the storm
-      }
-      
-      const flashValue = Math.sin(this.auraPhase * 2.5 + i * 13);
-      const isFlashing = flashValue > flashThreshold;
+    const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+    const isStorm = Boolean(this.isChargingStorm || this.stormActive);
 
-      // ── VOLUMETRIC ORGANIC CUMULUS CLOUD PUFF (Smooth Non-Pixel Art) ──
-      const rad = Math.max(8, cloudSize);
+    // Natural buoyant drifting movement
+    const driftX = Math.sin(this.auraPhase * 0.4) * 2.5;
+    const driftY = Math.cos(this.auraPhase * 0.3) * 1.5;
+
+    // Anchor cloud directly at Zeus's floating base/feet
+    const cx = this.x + driftX;
+    const cy = this.y - zOffset + this.r * 0.72 + driftY;
+
+    // 1. LAYER BEHIND ZEUS: Main Animated Pixel Art Cloud Body
+    if (isBehind) {
+      const frames = _getZeusCloudFrames();
+      const frameDuration = isStorm ? 75 : 115; // Faster billowing during storm
+      const frameIndex = Math.floor(now / frameDuration) % ZEUS_CLOUD_FRAME_COUNT;
+      const img = frames[frameIndex];
+
+      const targetWidth = this.r * 3.8;
+      const baseRefWidth = 355;
+      const scale = targetWidth / baseRefWidth;
 
       ctx.save();
-      if (isFlashing) {
-        // High-energy ionized lightning cloud puff
-        // 1. Soft atmospheric outer ion bloom wash
-        const bloomGrad = ctx.createRadialGradient(cx, cy, rad * 0.3, cx, cy, rad * 1.4);
-        bloomGrad.addColorStop(0, 'rgba(0, 229, 255, 0.45)');
-        bloomGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.22)');
-        bloomGrad.addColorStop(1, 'rgba(0, 229, 255, 0)');
-        ctx.beginPath();
-        ctx.arc(cx, cy, rad * 1.4, 0, Math.PI * 2);
-        ctx.fillStyle = bloomGrad;
-        ctx.fill();
+      ctx.imageSmoothingEnabled = false;
 
-        // 2. Main illuminated cloud disc with soft electric gradient
-        const puffGrad = ctx.createRadialGradient(cx, cy - rad * 0.2, rad * 0.1, cx, cy, rad);
-        puffGrad.addColorStop(0, 'rgba(255, 255, 255, 0.98)');
-        puffGrad.addColorStop(0.45, 'rgba(224, 247, 255, 0.92)');
-        puffGrad.addColorStop(0.85, 'rgba(0, 229, 255, 0.85)');
-        puffGrad.addColorStop(1, 'rgba(0, 180, 240, 0.55)');
+      // Divine atmospheric storm glow underneath the cloud when charging or active (Rule 11 compliant: NO shadowBlur)
+      if (isStorm) {
+        const glowR = this.r * 1.8;
+        const glowGrad = ctx.createRadialGradient(cx, cy, glowR * 0.2, cx, cy, glowR * 1.3);
+        glowGrad.addColorStop(0, 'rgba(0, 229, 255, 0.40)');
+        glowGrad.addColorStop(0.55, 'rgba(56, 189, 248, 0.18)');
+        glowGrad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+        ctx.fillStyle = glowGrad;
         ctx.beginPath();
-        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-        ctx.fillStyle = puffGrad;
-        ctx.fill();
-
-        // 3. Crisp white-hot core
-        ctx.beginPath();
-        ctx.arc(cx, cy - rad * 0.15, rad * 0.55, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
-        ctx.fill();
-      } else {
-        // Organic Cumulus Cloud Puff: Volumetric depth, soft base shading, sky tint, and silver-lining rim
-        // 1. Soft ambient outer fog rim
-        const ambientGrad = ctx.createRadialGradient(cx, cy, rad * 0.5, cx, cy, rad * 1.25);
-        const ambientColor = this.stormActive ? 'rgba(2, 132, 199, 0.25)' : 'rgba(186, 230, 253, 0.25)';
-        ambientGrad.addColorStop(0, ambientColor);
-        ambientGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
-        ctx.beginPath();
-        ctx.arc(cx, cy, rad * 1.25, 0, Math.PI * 2);
-        ctx.fillStyle = ambientGrad;
-        ctx.fill();
-
-        // 2. Lower under-belly storm shadow (soft crescent wash on bottom)
-        const shadowGrad = ctx.createRadialGradient(cx, cy + rad * 0.35, rad * 0.1, cx, cy + rad * 0.2, rad * 0.9);
-        if (this.stormActive) {
-          shadowGrad.addColorStop(0, 'rgba(3, 105, 161, 0.70)');
-          shadowGrad.addColorStop(0.7, 'rgba(2, 132, 199, 0.50)');
-          shadowGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
-        } else {
-          shadowGrad.addColorStop(0, 'rgba(100, 116, 139, 0.55)');
-          shadowGrad.addColorStop(0.7, 'rgba(148, 163, 184, 0.35)');
-          shadowGrad.addColorStop(1, 'rgba(203, 213, 225, 0)');
-        }
-        ctx.beginPath();
-        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-        ctx.fillStyle = shadowGrad;
-        ctx.fill();
-
-        // 3. Volumetric main body (smooth spherical radial gradient shifted slightly upward)
-        const bodyGrad = ctx.createRadialGradient(cx, cy - rad * 0.3, rad * 0.1, cx, cy, rad);
-        if (this.stormActive) {
-          bodyGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-          bodyGrad.addColorStop(0.4, 'rgba(186, 230, 253, 0.88)');
-          bodyGrad.addColorStop(0.8, 'rgba(56, 189, 248, 0.78)');
-          bodyGrad.addColorStop(1, 'rgba(2, 132, 199, 0.60)');
-        } else {
-          bodyGrad.addColorStop(0, 'rgba(255, 255, 255, 0.96)');
-          bodyGrad.addColorStop(0.45, 'rgba(240, 249, 255, 0.90)');
-          bodyGrad.addColorStop(0.85, 'rgba(186, 230, 253, 0.80)');
-          bodyGrad.addColorStop(1, 'rgba(148, 163, 184, 0.45)');
-        }
-        ctx.beginPath();
-        ctx.arc(cx, cy, rad - 1.2, 0, Math.PI * 2);
-        ctx.fillStyle = bodyGrad;
-        ctx.fill();
-
-        // 4. Upper silver-lining crown glint
-        const crownGrad = ctx.createRadialGradient(cx, cy - rad * 0.45, 0, cx, cy - rad * 0.45, rad * 0.55);
-        crownGrad.addColorStop(0, 'rgba(255, 255, 255, 0.90)');
-        crownGrad.addColorStop(0.7, 'rgba(255, 255, 255, 0.45)');
-        crownGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.beginPath();
-        ctx.arc(cx, cy - rad * 0.35, rad * 0.55, 0, Math.PI * 2);
-        ctx.fillStyle = crownGrad;
+        ctx.arc(cx, cy, glowR * 1.3, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      if (img && img.complete && ((img.naturalWidth || img.width || 0) > 0)) {
+        const drawW = (img.naturalWidth || img.width) * scale;
+        const drawH = (img.naturalHeight || img.height) * scale;
+        ctx.drawImage(
+          img,
+          Math.round(cx - drawW / 2),
+          Math.round(cy - drawH / 2),
+          Math.round(drawW),
+          Math.round(drawH)
+        );
+      } else {
+        // Fallback for headless test environments or while image loads
+        ctx.fillStyle = isStorm ? 'rgba(56, 189, 248, 0.70)' : 'rgba(240, 249, 255, 0.85)';
+        ctx.beginPath();
+        ctx.ellipse(cx, cy, this.r * 1.8, this.r * 0.9, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       ctx.restore();
+    }
 
-      // Smooth electric arcs & organic sparks when flashing
-      if (isFlashing) {
-        ctx.save();
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        const now = Date.now();
-        const branchCount = 2; // Arcs per flashing cloud
+    // 2. JAGGED THUNDER BOLT MOVING AROUND THE CLOUDS (3D Orbital Arc)
+    this._drawJaggedCloudThunderbolt(ctx, cx, cy, this.r, now, isStorm, isBehind);
 
-        for (let b = 0; b < branchCount; b++) {
-          const seed = Math.floor(now / 80) * 137 + b * 53 + i * 17;
-          const pseudoRand = (n) => {
-            const x = Math.sin(seed + n * 9.1) * 43758.5453;
-            return x - Math.floor(x);
-          };
+    // 3. ELECTRIC ARCS & IONIZED SPARKS (Behind or In-Front 3D layering)
+    const flashThreshold = this.isChargingStorm ? 0.35 : (this.stormActive ? 0.20 : 0.92);
+    const flashValue = Math.sin(this.auraPhase * 2.5);
+    const isFlashing = flashValue > flashThreshold;
 
-          const dirX = (pseudoRand(1) - 0.5) * 2;
-          const dirY = (pseudoRand(2) - 0.5) * 2;
+    if (isFlashing) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-          ctx.beginPath();
-          ctx.moveTo(cx, cy);
+      const branchCount = isStorm ? 3 : 1;
+      const timeTick = Math.floor(now / 75);
 
-          let bx = cx;
-          let by = cy;
-          const segments = 3 + Math.floor(pseudoRand(3) * 2);
-          const branchLen = 8 + pseudoRand(4) * 12;
+      for (let b = 0; b < branchCount; b++) {
+        // Distribute arcs: odd branches in front, even behind for depth
+        const isArcBehind = (b % 2 === 0);
+        if (isArcBehind !== isBehind) continue;
 
-          for (let s = 0; s < segments; s++) {
-            bx += dirX * (branchLen / segments) + (pseudoRand(5 + s) - 0.5) * 6;
-            by += dirY * (branchLen / segments) + (pseudoRand(6 + s) - 0.5) * 6;
-            ctx.lineTo(bx, by);
-          }
+        const seed = timeTick * 137 + b * 53 + (isBehind ? 11 : 29);
+        const pseudoRand = (n) => {
+          const x = Math.sin(seed + n * 9.1) * 43758.5453;
+          return x - Math.floor(x);
+        };
 
-          // Outer cyan ionization glow
-          ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
-          ctx.lineWidth = 2.0;
-          ctx.stroke();
+        const sideAngle = (b / branchCount) * Math.PI + (pseudoRand(1) - 0.5) * 0.8;
+        const startRad = this.r * (0.8 + pseudoRand(2) * 0.6);
+        const startX = cx + Math.cos(sideAngle) * startRad;
+        const startY = cy + Math.sin(sideAngle) * (startRad * 0.5);
 
-          // Inner white-hot core
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
+        const dirX = (pseudoRand(3) - 0.5) * 2;
+        const dirY = (pseudoRand(4) - 0.5) * 2;
 
-          // Organic round detached sparks
-          if (pseudoRand(9) > 0.4) {
-            const spX = bx + (pseudoRand(10) - 0.5) * 10;
-            const spY = by + (pseudoRand(11) - 0.5) * 10;
-            const sparkR = 1.0 + pseudoRand(12) * 1.0;
-            ctx.beginPath();
-            ctx.arc(spX, spY, sparkR, 0, Math.PI * 2);
-            ctx.fillStyle = pseudoRand(13) > 0.5 ? '#FFFFFF' : '#00FFFF';
-            ctx.fill();
-          }
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+
+        let bx = startX;
+        let by = startY;
+        const segments = 3 + Math.floor(pseudoRand(5) * 2);
+        const branchLen = 8 + pseudoRand(6) * 12;
+
+        for (let s = 0; s < segments; s++) {
+          bx += dirX * (branchLen / segments) + (pseudoRand(7 + s) - 0.5) * 6;
+          by += dirY * (branchLen / segments) + (pseudoRand(8 + s) - 0.5) * 6;
+          ctx.lineTo(bx, by);
         }
-        ctx.restore();
+
+        // Outer cyan ionization glow
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+
+        // Inner white-hot core
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Organic round detached sparks
+        if (pseudoRand(9) > 0.4) {
+          const spX = bx + (pseudoRand(10) - 0.5) * 8;
+          const spY = by + (pseudoRand(11) - 0.5) * 8;
+          const sparkR = 1.0 + pseudoRand(12) * 1.0;
+          ctx.beginPath();
+          ctx.arc(spX, spY, sparkR, 0, Math.PI * 2);
+          ctx.fillStyle = pseudoRand(13) > 0.5 ? '#FFFFFF' : '#00FFFF';
+          ctx.fill();
+        }
+      }
+
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Renders violent, jagged electric lightning crackling and leaping around Zeus's cloud mount.
+   * Stroboscopically steps between discrete perimeter nodes (~14-21 jumps/sec) with high-frequency (45 Hz)
+   * restrike micro-jitter, sharp acute-angle kinks, dendritic branch tendrils, and 3D depth-sorting.
+   */
+  _drawJaggedCloudThunderbolt(ctx, cx, cy, r, now, isStorm, isBehind) {
+    const rx = r * 1.92;
+    const ry = r * 0.98;
+
+    // Stroboscopic stepped timing: electricity snaps instantaneously between discharge sectors
+    const stepDuration = isStorm ? 48 : 72; // ms per stepped discharge
+    const stepIndex = Math.floor(now / stepDuration);
+    const jitterTick = Math.floor(now / 22); // 45 Hz micro-jitter restrike frequency
+
+    // Fast integer bitwise hash for deterministic, zero-allocation procedural lightning noise
+    const boltHash = (a, b, c) => {
+      let h = (a * 374761393 + b * 668265263 + c * 127412617) | 0;
+      h = (h ^ (h >> 13)) * 127412617;
+      return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+    };
+
+    const boltCount = isStorm ? 2 : 1;
+    const numStepsPerRev = 14; // Complete orbit around cloud every ~1.0s (normal) or ~0.67s (storm)
+
+    ctx.save();
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 4;
+
+    for (let b = 0; b < boltCount; b++) {
+      const boltPhaseOffset = b * Math.PI;
+      // Step around the cloud perimeter in discrete, crackling leaps
+      const revProgress = (stepIndex % numStepsPerRev) / numStepsPerRev;
+      const angleJitter = (boltHash(stepIndex, b, 7) - 0.5) * 0.28;
+      const centerAngle = revProgress * Math.PI * 2 + boltPhaseOffset + angleJitter;
+
+      // Arc span covers ~60 to 80 degrees of the cloud perimeter
+      const arcSpan = 1.10 + (boltHash(stepIndex, b, 13) - 0.5) * 0.35;
+      const startAngle = centerAngle - arcSpan * 0.5;
+      const endAngle = centerAngle + arcSpan * 0.5;
+
+      const segments = 8;
+      const vertices = [];
+
+      for (let k = 0; k <= segments; k++) {
+        const u = k / segments;
+        const ang = startAngle + u * (endAngle - startAngle);
+        const bx = cx + Math.cos(ang) * rx;
+        const by = cy + Math.sin(ang) * ry;
+
+        // Radial normal and tangent vectors aligned to ellipse boundary
+        const nx = Math.cos(ang);
+        const ny = Math.sin(ang) * (rx / ry);
+        const nLen = Math.hypot(nx, ny) || 1;
+        const unx = nx / nLen;
+        const uny = ny / nLen;
+        const utx = -uny;
+        const uty = unx;
+
+        let radDisp = 0;
+        let tanDisp = 0;
+
+        if (k > 0 && k < segments) {
+          // Sharp acute kinks: violent perpendicular steps with sinusoidal envelope
+          const envelope = Math.sin(u * Math.PI);
+          const hRad = boltHash(stepIndex, k + b * 20, jitterTick);
+          const hTan = boltHash(stepIndex + 97, k + b * 20, jitterTick);
+          radDisp = (hRad - 0.5) * 22 * envelope; // +/- 11px acute jagged spike
+          tanDisp = (hTan - 0.5) * 10 * envelope; // +/- 5px tangential stretch
+        } else {
+          // Endpoint contact jitter
+          const hEnd = boltHash(stepIndex, k + b * 15, jitterTick);
+          radDisp = (hEnd - 0.5) * 4;
+        }
+
+        vertices.push({
+          x: bx + unx * radDisp + utx * tanDisp,
+          y: by + uny * radDisp + uty * tanDisp,
+          baseY: by,
+          ang
+        });
+      }
+
+      // Filter segments matching the current depth layer (behind vs in front of Zeus)
+      const activeSegments = [];
+      for (let k = 0; k < segments; k++) {
+        const midBaseY = (vertices[k].baseY + vertices[k + 1].baseY) * 0.5;
+        const segBehind = midBaseY < cy;
+        if (segBehind === isBehind) {
+          activeSegments.push(k);
+        }
+      }
+
+      // 1. Draw Main Jagged Trunk (if any segment is in this layer)
+      if (activeSegments.length > 0) {
+        // Outer vivid electric cyan ionization aura
+        ctx.strokeStyle = isStorm ? 'rgba(0, 240, 255, 0.95)' : 'rgba(56, 189, 248, 0.88)';
+        ctx.lineWidth = 3.6;
+        ctx.beginPath();
+        for (let i = 0; i < activeSegments.length; i++) {
+          const k = activeSegments[i];
+          if (i === 0 || activeSegments[i - 1] !== k - 1) {
+            ctx.moveTo(vertices[k].x, vertices[k].y);
+          }
+          ctx.lineTo(vertices[k + 1].x, vertices[k + 1].y);
+        }
+        ctx.stroke();
+
+        // Inner white-hot blazing core
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+
+      // 2. Dendritic Branch Tendrils (Sharp forks shooting out into air or into cloud)
+      const forkIndices = [2, 5];
+      for (let f = 0; f < forkIndices.length; f++) {
+        const fIdx = forkIndices[f];
+        const fVertex = vertices[fIdx];
+        const isForkBehind = fVertex.baseY < cy;
+        if (isForkBehind !== isBehind) continue;
+
+        const fSeed = stepIndex * 29 + fIdx * 41 + b * 17;
+        const outDir = (f === 0) ? 1.0 : -0.7; // Fork 0 shoots outward into air; Fork 1 sinks inward into cloud
+        const normX = (fVertex.x - cx) / rx;
+        const normY = (fVertex.y - cy) / ry;
+        const nLen = Math.hypot(normX, normY) || 1;
+        const dirX = (normX / nLen) * outDir;
+        const dirY = (normY / nLen) * outDir;
+        const perpX = -dirY;
+        const perpY = dirX;
+
+        const hLen = boltHash(fSeed, 1, jitterTick);
+        const branchLen = 7 + hLen * 9;
+        const midKink = (boltHash(fSeed, 2, jitterTick) - 0.5) * 8;
+        const endKink = (boltHash(fSeed, 3, jitterTick) - 0.5) * 8;
+
+        const fMidX = fVertex.x + dirX * (branchLen * 0.5) + perpX * midKink;
+        const fMidY = fVertex.y + dirY * (branchLen * 0.5) + perpY * midKink;
+        const fEndX = fVertex.x + dirX * branchLen + perpX * endKink;
+        const fEndY = fVertex.y + dirY * branchLen + perpY * endKink;
+
+        ctx.strokeStyle = isStorm ? 'rgba(0, 240, 255, 0.85)' : 'rgba(56, 189, 248, 0.75)';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(fVertex.x, fVertex.y);
+        ctx.lineTo(fMidX, fMidY);
+        ctx.lineTo(fEndX, fEndY);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // Micro spark bead at branch tip
+        if (boltHash(fSeed, 4, jitterTick) > 0.45) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(Math.round(fEndX - 0.75), Math.round(fEndY - 0.75), 1.5, 1.5);
+        }
+      }
+
+      // 3. Ionization Contact Sparks at Terminal Strike Nodes
+      const endNodes = [vertices[0], vertices[segments]];
+      for (let e = 0; e < endNodes.length; e++) {
+        const ep = endNodes[e];
+        const isEpBehind = ep.baseY < cy;
+        if (isEpBehind !== isBehind) continue;
+
+        const epSeed = stepIndex * 53 + e * 37 + b * 23;
+        const sparkCount = 2 + Math.floor(boltHash(epSeed, 1, jitterTick) * 2);
+        for (let s = 0; s < sparkCount; s++) {
+          const spAngle = boltHash(epSeed, s * 2 + 2, jitterTick) * Math.PI * 2;
+          const spDist = 3 + boltHash(epSeed, s * 2 + 3, jitterTick) * 7;
+          const spX = ep.x + Math.cos(spAngle) * spDist;
+          const spY = ep.y + Math.sin(spAngle) * spDist;
+          ctx.fillStyle = (s % 2 === 0) ? '#FFFFFF' : '#00E5FF';
+          ctx.fillRect(Math.round(spX - 0.75), Math.round(spY - 0.75), 1.5, 1.5);
+        }
       }
     }
+
+    ctx.restore();
   }
 
   draw(ctx) {

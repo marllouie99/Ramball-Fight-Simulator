@@ -294,7 +294,7 @@ export function spawnGetsugaExplosion(x, y, blastRadius = 110, form = 'shikai', 
   }
 
   // 3. Exploding Reiatsu Needle Sparks (360-degree omnidirectional needle emission)
-  const needleCount = isFinal ? 34 : (isHollow || isBankai ? 26 : 20);
+  const needleCount = isFinal ? 26 : (isHollow || isBankai ? 20 : 16);
   for (let i = 0; i < needleCount; i++) {
     const sp = _getParticle();
     sp.type = 'needle';
@@ -318,7 +318,7 @@ export function spawnGetsugaExplosion(x, y, blastRadius = 110, form = 'shikai', 
   }
 
   // 4. Spiritual Pressure Smoke / Miasma Wisps (Billowing upward from crater)
-  const smokeCount = isFinal ? 12 : (isBankai || isHollow ? 9 : 7);
+  const smokeCount = isFinal ? 8 : (isBankai || isHollow ? 6 : 5);
   for (let m = 0; m < smokeCount; m++) {
     const sm = _getParticle();
     sm.type = 'smoke';
@@ -393,10 +393,8 @@ export function updateGetsugaImpactEffects() {
 export function drawGetsugaImpactEffects(ctx) {
   if (_activeEffects.length === 0) return;
 
-  const P = 2.4; // Pixel art grid scale
-  const snap = (v) => Math.round(v / P) * P;
-
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
 
   for (let i = 0; i < _activeEffects.length; i++) {
     const p = _activeEffects[i];
@@ -412,7 +410,6 @@ export function drawGetsugaImpactEffects(ctx) {
       if (p.life < p.delay || p.alpha <= 0.01 || p.size <= 1) continue;
 
       ctx.save();
-      ctx.imageSmoothingEnabled = false;
 
       const curR = p.size;
       const washAlpha = p.alpha * 0.35;
@@ -455,70 +452,84 @@ export function drawGetsugaImpactEffects(ctx) {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 1. SPATIAL CLEAVE SCAR (True 2D Grid Scan Pixel Art Crescent Slice)
+    // 1. SPATIAL CLEAVE SHARDS (High-Performance 3-Layer Polygon Cleave)
     // ─────────────────────────────────────────────────────────────
-    if (p.type === 'slice') {
+    else if (p.type === 'slice') {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
-      ctx.imageSmoothingEnabled = false;
 
       const halfL = p.length * 0.5;
       const maxThick = p.thickness * p.alpha;
+      const curve = p.curve || 0;
+      const STEPS = 8;
 
-      const isInsideSlice = (rx, ry) => {
-        if (Math.abs(rx) > halfL) return false;
-        const normX = rx / halfL; // -1 to 1
-        const taper = 1 - normX * normX;
-        const curveOff = taper * p.curve * 8;
-        const curThick = taper * maxThick;
-        return ry >= -curThick * 0.5 + curveOff && ry <= curThick * 0.5 + curveOff;
-      };
-
-      const minX = Math.floor((-halfL - P) / P) * P;
-      const maxX = Math.ceil((halfL + P) / P) * P;
-      const minY = Math.floor((-maxThick - P * 4) / P) * P;
-      const maxY = Math.ceil((maxThick + P * 4) / P) * P;
-
-      for (let gy = minY; gy <= maxY; gy += P) {
-        for (let gx = minX; gx <= maxX; gx += P) {
-          if (!isInsideSlice(gx, gy)) continue;
-
-          const pxX = snap(gx);
-          const pyY = snap(gy);
-
-          const isBorder = !isInsideSlice(gx + P, gy) ||
-                           !isInsideSlice(gx - P, gy) ||
-                           !isInsideSlice(gx, gy + P) ||
-                           !isInsideSlice(gx, gy - P);
-
-          if (isBorder) {
-            ctx.fillStyle = p.color; // Outer energy shell
-            ctx.fillRect(pxX, pyY, P, P);
-            continue;
-          }
-
-          const normX = gx / halfL;
-          const taper = 1 - normX * normX;
-          const curveOff = taper * p.curve * 8;
-          const distFromCenter = Math.abs(gy - curveOff);
-
-          if (distFromCenter < P * 0.8) {
-            ctx.fillStyle = p.accentColor; // White-hot core spine
-          } else if (isBankai || isHollow) {
-            ctx.fillStyle = p.voidColor; // Deep crimson or void
-          } else {
-            ctx.fillStyle = p.color;
-          }
-          ctx.fillRect(pxX, pyY, P, P);
-        }
+      // Layer 1: Outer energetic shell polygon
+      ctx.globalAlpha = p.alpha * 0.95;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(-halfL, 0);
+      for (let s = 1; s < STEPS; s++) {
+        const u = -1 + (2 * s) / STEPS;
+        const taper = 1 - u * u;
+        const curveOff = taper * curve * 8;
+        const topY = -taper * maxThick * 0.5 + curveOff;
+        ctx.lineTo(u * halfL, topY);
       }
+      ctx.lineTo(halfL, 0);
+      for (let s = STEPS - 1; s >= 1; s--) {
+        const u = -1 + (2 * s) / STEPS;
+        const taper = 1 - u * u;
+        const curveOff = taper * curve * 8;
+        const botY = taper * maxThick * 0.5 + curveOff;
+        ctx.lineTo(u * halfL, botY);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Layer 2: Void / dark core for Bankai / Hollow forms
+      if (isBankai || isHollow) {
+        ctx.fillStyle = p.voidColor;
+        ctx.beginPath();
+        ctx.moveTo(-halfL * 0.88, 0);
+        for (let s = 1; s < STEPS; s++) {
+          const u = -1 + (2 * s) / STEPS;
+          const taper = 1 - u * u;
+          const curveOff = taper * curve * 8;
+          const topY = -taper * maxThick * 0.32 + curveOff;
+          ctx.lineTo(u * halfL * 0.88, topY);
+        }
+        ctx.lineTo(halfL * 0.88, 0);
+        for (let s = STEPS - 1; s >= 1; s--) {
+          const u = -1 + (2 * s) / STEPS;
+          const taper = 1 - u * u;
+          const curveOff = taper * curve * 8;
+          const botY = taper * maxThick * 0.32 + curveOff;
+          ctx.lineTo(u * halfL * 0.88, botY);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Layer 3: White-hot core spine line
+      ctx.strokeStyle = p.accentColor;
+      ctx.lineWidth = Math.max(1.5, 2.2 * p.alpha);
+      ctx.beginPath();
+      ctx.moveTo(-halfL * 0.78, 0);
+      for (let s = 1; s < STEPS; s++) {
+        const u = -1 + (2 * s) / STEPS;
+        const taper = 1 - u * u;
+        const curveOff = taper * curve * 8;
+        ctx.lineTo(u * halfL * 0.78, curveOff);
+      }
+      ctx.lineTo(halfL * 0.78, 0);
+      ctx.stroke();
 
       ctx.restore();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 2. EXPANDING REIATSU SHOCKWAVE RING (Stepped Pixel Ring)
+    // 2. EXPANDING REIATSU SHOCKWAVE RING (High-Performance Ellipse Ring)
     // ─────────────────────────────────────────────────────────────
     else if (p.type === 'ring') {
       ctx.save();
@@ -527,33 +538,28 @@ export function drawGetsugaImpactEffects(ctx) {
 
       const rX = p.size;
       const rY = p.size * 0.65;
-      const ringSteps = Math.max(14, Math.round((Math.PI * 2 * rX) / (P * 2)));
 
-      ctx.fillStyle = p.color;
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = Math.max(2, (p.thickness || 3.5) * p.alpha);
       ctx.globalAlpha = p.alpha * 0.80;
-      for (let s = 0; s <= ringSteps; s++) {
-        const ang = (s / ringSteps) * Math.PI * 2;
-        const px = snap(Math.cos(ang) * rX);
-        const py = snap(Math.sin(ang) * rY);
-        ctx.fillRect(px, py, P, P);
-      }
+      ctx.beginPath();
+      ctx.ellipse(0, 0, rX, rY, 0, 0, Math.PI * 2);
+      ctx.stroke();
 
-      if (p.alpha > 0.4) {
-        ctx.fillStyle = p.accentColor;
+      if (p.alpha > 0.4 && p.accentColor) {
+        ctx.strokeStyle = p.accentColor;
+        ctx.lineWidth = Math.max(1.5, ((p.thickness || 3.5) * 0.55) * p.alpha);
         ctx.globalAlpha = p.alpha * 0.65;
-        for (let s = 0; s <= ringSteps; s += 2) {
-          const ang = (s / ringSteps) * Math.PI * 2;
-          const px = snap(Math.cos(ang) * rX * 0.85);
-          const py = snap(Math.sin(ang) * rY * 0.85);
-          ctx.fillRect(px, py, P, P);
-        }
+        ctx.beginPath();
+        ctx.ellipse(0, 0, Math.max(1, rX * 0.85), Math.max(1, rY * 0.85), 0, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
       ctx.restore();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 3. EXPLODING NEEDLE SPARKS (Stepped Pixel Needle Streaks)
+    // 3. EXPLODING NEEDLE SPARKS (Rule 16 Manga Action Needle Polygons)
     // ─────────────────────────────────────────────────────────────
     else if (p.type === 'needle') {
       ctx.save();
@@ -561,44 +567,64 @@ export function drawGetsugaImpactEffects(ctx) {
       ctx.rotate(p.angle);
 
       const len = p.length;
-      const th = Math.max(P, p.thickness * p.alpha);
-      const steps = Math.max(4, Math.round(len / P));
+      const halfTh = Math.max(1.0, (p.thickness * p.alpha) * 0.5);
+      const midX = len * 0.42;
 
-      ctx.fillStyle = p.color;
       ctx.globalAlpha = p.alpha * 0.95;
-      for (let s = 0; s <= steps; s++) {
-        const t = s / steps;
-        const lx = snap(t * len);
-        const bulge = Math.sin(t * Math.PI) * th;
-        const topY = snap(-bulge * 0.5);
-        const botY = snap(bulge * 0.5);
-        ctx.fillRect(lx, topY, P, Math.max(P, botY - topY));
-      }
 
-      // White-Hot Leading Tip
-      ctx.fillStyle = p.accentColor;
-      ctx.fillRect(snap(len * 0.8), 0, P, P);
+      // 4-point filled needle polygon (Rule 16 standard)
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.moveTo(0, 0); // sharp trailing tail
+      ctx.lineTo(midX, -halfTh); // top shoulder
+      ctx.lineTo(len, 0); // sharp leading tip
+      ctx.lineTo(midX, halfTh); // bottom shoulder
+      ctx.closePath();
+      ctx.fill();
+
+      // White-hot inner core needle
+      if (p.accentColor) {
+        ctx.fillStyle = p.accentColor;
+        ctx.beginPath();
+        ctx.moveTo(len * 0.25, 0);
+        ctx.lineTo(len * 0.60, -halfTh * 0.45);
+        ctx.lineTo(len * 0.95, 0);
+        ctx.lineTo(len * 0.60, halfTh * 0.45);
+        ctx.closePath();
+        ctx.fill();
+      }
 
       ctx.restore();
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 4. RISING SPIRITUAL PRESSURE SMOKE WISPS (Stepped Pixel Clusters)
+    // 4. RISING SPIRITUAL PRESSURE SMOKE WISPS (Layered Reiatsu Cloud Puffs)
     // ─────────────────────────────────────────────────────────────
     else if (p.type === 'smoke') {
       ctx.save();
       ctx.globalAlpha = p.alpha * 0.55;
       const smokeR = p.size;
-      const gR = Math.ceil(smokeR / P);
-      for (let gy = -gR; gy <= gR; gy++) {
-        for (let gx = -gR; gx <= gR; gx++) {
-          const dist = Math.sqrt(gx * gx + gy * gy) * P;
-          if (dist <= smokeR) {
-            ctx.fillStyle = (dist < smokeR * 0.5 && (isBankai || isHollow)) ? p.voidColor : p.color;
-            ctx.fillRect(snap(p.x + gx * P), snap(p.y + gy * P), P, P);
-          }
-        }
+
+      // Outer billowing spiritual pressure cloud disc
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, smokeR, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Organic puff volume (subtle satellite lobes for anime cloud texture)
+      ctx.beginPath();
+      ctx.arc(p.x - smokeR * 0.28, p.y - smokeR * 0.20, smokeR * 0.70, 0, Math.PI * 2);
+      ctx.arc(p.x + smokeR * 0.25, p.y - smokeR * 0.15, smokeR * 0.65, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Dense void/shadow center for Bankai or Hollow
+      if (isBankai || isHollow) {
+        ctx.fillStyle = p.voidColor;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, smokeR * 0.50, 0, Math.PI * 2);
+        ctx.fill();
       }
+
       ctx.restore();
     }
   }

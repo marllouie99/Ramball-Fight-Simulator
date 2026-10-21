@@ -66,6 +66,9 @@ export class ParticleSystem {
     if (!spark) return;
     if (spark.sprite) {
       spark.sprite.visible = false;
+      if (typeof window !== 'undefined' && window.PIXI) {
+        spark.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+      }
       pixiSpritePool.push(spark.sprite);
       spark.sprite = null;
     }
@@ -140,7 +143,7 @@ export class ParticleSystem {
     const mobileBudgetFactor = isMobile ? 0.40 : 1.0;
 
     // Stand Off mode has high-frequency clashes across 2000-2500 HP: limit max active particles to prevent FPS drop and mobile heating
-    const MAX_PARTICLES = isDomainClash ? (isMobile ? 12 : 25) : isStandOff ? (isMobile ? 18 : 40) : is1v2 ? (isMobile ? 20 : 45) : Math.floor((isMulti ? (isMobile ? 25 : 80) : (isMobile ? 35 : 160)) * dynamicQuality);
+    const MAX_PARTICLES = isDomainClash ? (isMobile ? 12 : 25) : isStandOff ? (isMobile ? 18 : 40) : is1v2 ? (isMobile ? 20 : 45) : Math.floor((isMulti ? (isMobile ? 25 : 80) : (isMobile ? 35 : 70)) * dynamicQuality);
     const countScale = (isDomainClash ? 0.30 : isStandOff ? 0.35 : is1v2 ? 0.45 : isMulti ? 0.60 : 1.0) * mobileBudgetFactor;
     const adjustedCount = Math.max(1, Math.floor(count * countScale * dynamicQuality));
 

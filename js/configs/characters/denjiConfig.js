@@ -75,7 +75,7 @@ export const denjiConfig = {
   shredDamagePerTooth: 1,           // Rapid shred damage per chain tooth collision tick
   shredTickInterval: 6,             // Interval in frames between chain teeth hits (matches animation RPM)
   shredHitPauseFrames: 2,           // Micro hit-pause frames applied to enemy on each tooth strike
-  shredArenaShakeIntensity: 6.0,    // Arena / screen shake intensity on each shred tick
+  shredArenaShakeIntensity: 3.0,    // Arena / screen shake intensity on each shred tick
   shredAudioLingerFrames: 4,        // Debounce frames (~66ms) to prevent single-frame physics micro-gaps
   shredLoopStartSec: 0.0,           // Start of active grinding loop
   shredLoopEndSec: 4.0,             // Loop end point before natural fade-out (0:04 mark)
@@ -85,12 +85,12 @@ export const denjiConfig = {
 
   // Continuous Shred Ramping Engine (Damage & Lifesteal Scaling Per Tick)
   enableShredRamp: true,                 // Master toggle for damage & lifesteal scaling per tick during continuous shred
-  shredDamageIncreasePerTick: 0.2,         // Additional flat damage per consecutive shred tick (+1 dmg/tick)
+  shredDamageIncreasePerTick: 0.5,         // Additional flat damage per consecutive shred tick (+1 dmg/tick)
   shredLifestealIncreasePerTick: 0.02,   // Additional lifesteal ratio per consecutive shred tick (+2% lifesteal/tick)
   maxShredRampTicks: 10,                 // Maximum consecutive ticks for damage & lifesteal ramp scaling (cap at 10 ticks)
 
   // Chainsaw Overheat & Continuous Shred Steam Smoke Effect
-  enableChainsawSmoke: true,            // Master toggle for continuous shred steam smoke effect
+  enableChainsawSmoke: 0,            // Master toggle for continuous shred steam smoke effect
   enableChainsawOverheatSmoke: true,    // Alias toggle
   continuousShredSmokeStartFrames: 4,   // Frames (~0.06s) after initial shred contact when wisps of steam smoke begin emerging
   continuousShredSmokeRampFrames: 90,   // Frames (~1.5s) continuous shred duration where smoke density steadily scales up

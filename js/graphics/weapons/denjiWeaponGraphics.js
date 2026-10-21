@@ -86,6 +86,26 @@ export function _getDenjiChainsawBlockImage() {
   return _denjiChainsawBlockImage;
 }
 
+let _denjiChainsawBlockFlippedCanvas = null;
+export function _getDenjiChainsawBlockFlippedImage() {
+  if (_denjiChainsawBlockFlippedCanvas) return _denjiChainsawBlockFlippedCanvas;
+  const blockImg = _getDenjiChainsawBlockImage();
+  if (!blockImg || !blockImg.complete || blockImg.naturalWidth <= 0) return null;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = blockImg.naturalWidth;
+  c.height = blockImg.naturalHeight;
+  const ctx = c.getContext('2d');
+  ctx.save();
+  ctx.translate(c.width / 2, c.height / 2);
+  ctx.rotate(Math.PI);
+  ctx.drawImage(blockImg, -c.width / 2, -c.height / 2);
+  ctx.restore();
+  _denjiChainsawBlockFlippedCanvas = c;
+  return _denjiChainsawBlockFlippedCanvas;
+}
+
+
 // Proactive eager initialization in browser environment
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getDenjiChainsawBladeImage();
@@ -175,35 +195,42 @@ export function drawAuthenticChainsawBlade(ctx, length, thickness, now = Date.no
 
       for (let i = 0; i < numTeeth; i++) {
         const d = (i * toothSpacing + chainOffset) % totalPerimeter;
-        let tx = 0;
-        let ty = 0;
-        let rot = 0;
 
         if (d < trackStraight) {
-          // Top Rail: cutting tooth travels forward (+X towards blade tip)
-          tx = d;
-          ty = -bladeH * 0.44;
-          rot = 0;
+          // Top Rail: cutting tooth travels forward (+X towards blade tip, rot = 0)
+          // Direct axis-aligned blit eliminates per-tooth ctx.save() / translate() / rotate() / restore() overhead
+          const tx = d;
+          const ty = -bladeH * 0.44;
+          ctx.drawImage(blockImg, tx - toothW * 0.5, ty - toothH * 0.70, toothW, toothH);
         } else if (d < trackStraight + noseArcLen) {
           // Nose Curve: cutting tooth revolves smoothly 180° around the tip
           const u = (d - trackStraight) / noseArcLen;
           const th = -Math.PI / 2 + u * Math.PI;
-          tx = trackStraight + Math.cos(th) * R;
-          ty = Math.sin(th) * R;
-          rot = th + Math.PI / 2;
+          const tx = trackStraight + Math.cos(th) * R;
+          const ty = Math.sin(th) * R;
+          const rot = th + Math.PI / 2;
+          ctx.save();
+          ctx.translate(tx, ty);
+          ctx.rotate(rot);
+          ctx.drawImage(blockImg, -toothW * 0.5, -toothH * 0.70, toothW, toothH);
+          ctx.restore();
         } else {
-          // Bottom Rail: chain link returns backward (-X towards engine)
+          // Bottom Rail: chain link returns backward (-X towards engine, rot = Math.PI)
+          // Direct axis-aligned blit with pre-flipped block eliminates per-tooth ctx.save() / translate() / rotate() / restore()
           const u = d - (trackStraight + noseArcLen);
-          tx = trackStraight - u;
-          ty = bladeH * 0.44;
-          rot = Math.PI;
+          const tx = trackStraight - u;
+          const ty = bladeH * 0.44;
+          const flippedBlock = _getDenjiChainsawBlockFlippedImage();
+          if (flippedBlock) {
+            ctx.drawImage(flippedBlock, tx - toothW * 0.5, ty - toothH * 0.30, toothW, toothH);
+          } else {
+            ctx.save();
+            ctx.translate(tx, ty);
+            ctx.rotate(Math.PI);
+            ctx.drawImage(blockImg, -toothW * 0.5, -toothH * 0.70, toothW, toothH);
+            ctx.restore();
+          }
         }
-
-        ctx.save();
-        ctx.translate(tx, ty);
-        ctx.rotate(rot);
-        ctx.drawImage(blockImg, -toothW * 0.5, -toothH * 0.70, toothW, toothH);
-        ctx.restore();
       }
     } else if (hasTeeth) {
       // Fallback: static/texture chain teeth overlay if block image is not yet loaded
@@ -617,6 +644,30 @@ function _drawDoubleTaperedSlashArc(ctx, radius, startAngle, endAngle, maxThick,
   ctx.stroke();
 }
 
+// Pre-rendered offscreen steam puff canvas (eliminates 45 runtime createRadialGradient allocations per frame)
+let _cachedSteamPuffCanvas = null;
+function _getSteamPuffCanvas() {
+  if (_cachedSteamPuffCanvas) return _cachedSteamPuffCanvas;
+  if (typeof document === 'undefined') return null;
+  const size = 64;
+  const half = size / 2;
+  const c = document.createElement('canvas');
+  c.width = size;
+  c.height = size;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(half, half, half * 0.15, half, half, half);
+  grad.addColorStop(0.0, 'rgba(255, 255, 255, 0.85)');
+  grad.addColorStop(0.45, 'rgba(255, 255, 255, 0.45)');
+  grad.addColorStop(0.85, 'rgba(255, 255, 255, 0.15)');
+  grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(half, half, half, 0, Math.PI * 2);
+  ctx.fill();
+  _cachedSteamPuffCanvas = c;
+  return _cachedSteamPuffCanvas;
+}
+
 /**
  * Renders billowing steam smoke particles and sizzling vapor emitting from Denji's chainsaws
  * after continuous shred damage (1.5s to 2.5s+ continuous damage threshold).
@@ -633,6 +684,7 @@ export function drawDenjiChainsawSmoke(ctx, fighter) {
   ctx.save();
   ctx.imageSmoothingEnabled = true;
 
+  const puffCanvas = _getSteamPuffCanvas();
   const particles = fighter.chainsawSmokeParticles;
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i];
@@ -681,17 +733,19 @@ export function drawDenjiChainsawSmoke(ctx, fighter) {
       ctx.arc(px, py, 1.0, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      // 100% Pure White Ultra-Translucent Soft Steam Vapor (High Transparency & Smooth Dispersion)
-      const puffGrad = ctx.createRadialGradient(px, py, pr * 0.15, px, py, pr + 1.2);
-      puffGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(curAlpha * 0.18).toFixed(3)})`);
-      puffGrad.addColorStop(0.45, `rgba(255, 255, 255, ${(curAlpha * 0.09).toFixed(3)})`);
-      puffGrad.addColorStop(0.85, `rgba(255, 255, 255, ${(curAlpha * 0.03).toFixed(3)})`);
-      puffGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)');
-
-      ctx.fillStyle = puffGrad;
-      ctx.beginPath();
-      ctx.arc(px, py, pr + 1.2, 0, Math.PI * 2);
-      ctx.fill();
+      // 100% Pure White Ultra-Translucent Soft Steam Vapor (High-Performance Cached Offscreen Texture)
+      const drawR = pr + 1.2;
+      if (puffCanvas) {
+        const prevA = ctx.globalAlpha;
+        ctx.globalAlpha = Math.max(0, Math.min(1.0, prevA * curAlpha * 0.22));
+        ctx.drawImage(puffCanvas, px - drawR, py - drawR, drawR * 2, drawR * 2);
+        ctx.globalAlpha = prevA;
+      } else {
+        ctx.fillStyle = `rgba(255, 255, 255, ${(curAlpha * 0.18).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(px, py, drawR, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Delicate micro-wisp center
       if (pr > 3.5 && curAlpha > 0.18) {
