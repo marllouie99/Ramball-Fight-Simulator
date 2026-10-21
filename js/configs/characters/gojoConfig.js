@@ -13,7 +13,7 @@ export const gojoConfig = {
 
   name: 'Gojo',
   displayName: 'Gojo',
-  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SSR',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   // ── Base Attributes ──
   hp: 200,
   speed: 5.5,

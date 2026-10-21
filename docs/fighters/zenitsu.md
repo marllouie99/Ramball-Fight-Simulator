@@ -45,15 +45,16 @@ Zenitsu's body model, hair silhouette, and attire strictly adhere to the front-p
 | **Body Radius** | `25px` | Standard fighter collision circle |
 | **Katana Reach** | `78px` | 140° Frontal Arc AOE Multi-Target |
 | **Dash / Iai Speed** | `36.0 px/frame` | Near-instant teleport slash speed |
-| **Crit Damage** | `1.75×` | High burst critical strike damage |
+| **Crit Rate** | `20%` (Base) | Scales +5% per consecutive dash up to 50% max (100% in Battle Trance) |
+| **Crit Damage** | `1.75×` (Base) | High burst critical strike damage (amped to 2.0× in Battle Trance) |
 
 ---
 
 ## ⚡ Passives & Inherent Mechanics
 
 ### 1. 💤 Slumbering Thunderclap & Battle Trance (*Nemuri no Kaminari — 眠りの雷*)
-* When Zenitsu is stunned, frozen, or drops below 35% HP, he enters **Battle Trance**.
-* Immediately breaks free of crowd control, reduces incoming damage by 25%, and guarantees a **100% Critical Strike** on his next skill or attack.
+* When Zenitsu drops below 35% HP, he enters **Battle Trance**.
+* Immediately breaks free of crowd control, reduces incoming damage by 25%, and guarantees **100% Critical Strike Chance** with **2.0× Critical Damage** on all skills, dashes, and melee combos.
 
 ---
 
@@ -77,12 +78,19 @@ Zenitsu's body model, hair silhouette, and attire strictly adhere to the front-p
 ---
 
 ### 🌩️ Skill 1: Thunder Breathing First Form: Thunderclap and Flash (*Hekireki Issen — 霹靂一閃*)
-* **Type**: Instantaneous Lightspeed Straight-Line Teleport Slash
+* **Type**: Instantaneous Lightspeed Straight-Line Teleport Slash & Godspeed Combo
 * **Cooldown**: `3.8s` (`228 frames`)
 * **Mechanics**:
   * Zenitsu assumes the low iai stance and teleports forward in a straight line at `36 px/frame`.
-  * Slices through all enemies in his path, dealing `38` lightning damage and a 12-frame electric shock stun.
+  * Slices through all enemies in his path with rapid zig-zag slashes and a thunderous finisher.
   * Leaves a crackling golden lightning trail across the arena floor.
+  * **⚡ Static Debuff (Enemy Stigmatization)**:
+    * Striking enemies with Skill 1 afflicts them with a **Static Debuff** (`180 frames` / 3.0s on intermediate dashes, `240 frames` / 4.0s on finisher).
+    * **Movement Slow**: Debuffed enemies suffer a **30% movement speed slow** (`staticDebuffSlowMultiplier: 0.70`).
+    * **Damage Vulnerability**: Debuffed enemies take **+20% bonus damage** from all Zenitsu attacks and combos (`staticDebuffVulnerability: 0.20`).
+    * **Critical Vulnerability**: Zenitsu gains **+15% increased Critical Strike Chance** against static-debuffed targets (`staticDebuffCritChanceBonus: 0.15`).
+    * **Periodic Electric Discharge**: The static charge periodically zaps the debuffed target for `3` lightning damage every `45 frames` (~0.75s).
+    * **Visual Indicator**: Enemies display orbiting golden electric arcs, sparking nodes, and an upright `⚡ STATIC (+20%)` amber badge over their heads.
 
 ---
 

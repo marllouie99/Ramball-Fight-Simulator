@@ -2517,7 +2517,7 @@ export class GojoFighter extends Fighter {
       const angle = Math.atan2(target.y - this.y, target.x - this.x);
       
       // Manga Spiky Crescent Impact Frame (matching Gojo's limitless blue/cursed theme, shockwave ring omitted)
-      spawnAnimePunchImpactFrame(target.x, target.y, 55, angle, 'blue', { hideShockwaveRing: true });
+      spawnAnimePunchImpactFrame(target.x, target.y, 60, angle, 'blue', { hideShockwaveRing: true });
 
       // Punch hit physics: pushback disabled for basic/melee hits
 

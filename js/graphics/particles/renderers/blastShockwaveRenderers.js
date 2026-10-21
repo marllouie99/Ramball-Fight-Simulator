@@ -913,6 +913,127 @@ export function drawParryExplosion(ctx, effect) {
   ctx.restore();
 }
 
+// ─────────────────────────────────────────────
+// Global 12-Frame Punch Attack Impact Animation (Assets/effects/Punch Attack/)
+// ─────────────────────────────────────────────
+const PUNCH_ATTACK_FRAME_COUNT = 12;
+const PUNCH_ATTACK_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/effects/Punch Attack/punch-${i + 1}.png`
+);
+
+let _punchAttackFrames = [];
+let _punchAttackFramesLoading = false;
+
+export function _getPunchAttackFrames() {
+  if (
+    _punchAttackFrames.length === PUNCH_ATTACK_FRAME_COUNT &&
+    _punchAttackFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _punchAttackFrames;
+  }
+  if (!_punchAttackFramesLoading && typeof Image !== 'undefined') {
+    _punchAttackFramesLoading = true;
+    _punchAttackFrames = [];
+    PUNCH_ATTACK_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _punchAttackFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load Punch Attack frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _punchAttackFrames[idx] = img;
+    });
+  }
+  return _punchAttackFrames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getPunchAttackFrames();
+}
+
+/**
+ * Draws the 12-frame punch attack animation sprite.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} radius Effect radius in arena pixels
+ * @param {number} p Progress 0.0 to 1.0 (elapsed / maxTimer)
+ * @param {number} alpha Base opacity
+ * @param {string} color Custom theme color palette filter
+ * @returns {boolean} True if frame was successfully rendered
+ */
+export function _drawPunchAttackAnimatedSprite(ctx, radius, p, alpha = 1.0, color = null) {
+  const frames = _getPunchAttackFrames();
+  const frameIndex = Math.min(11, Math.max(0, Math.floor(p * 12)));
+  const frameImg = frames[frameIndex];
+
+  if (!frameImg || !frameImg.complete || ((frameImg.naturalWidth || frameImg.width || 0) <= 0)) {
+    return false;
+  }
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  const prevFilter = ctx.filter;
+  ctx.imageSmoothingEnabled = false;
+
+  // Natural fade-out on late dissipating frames (frames 1-9 solid, 10-12 dissolve)
+  const fadeAlpha = p > 0.82 ? Math.max(0, (1.0 - p) / 0.18) : 1.0;
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * alpha * fadeAlpha));
+
+  // Thematic palette filter if requested
+  if (color === 'gold' || color === 'yellow') {
+    ctx.filter = 'hue-rotate(45deg) saturate(1.5) brightness(1.1)';
+  } else if (color === 'orange') {
+    ctx.filter = 'hue-rotate(30deg) saturate(1.6) brightness(1.1)';
+  } else if (color === 'crimson' || color === 'red') {
+    ctx.filter = 'hue-rotate(145deg) saturate(1.8) contrast(1.1)';
+  } else if (color === 'blackpink' || color === 'pink') {
+    ctx.filter = 'hue-rotate(170deg) saturate(1.9) contrast(1.15)';
+  } else if (color === 'cyan' || color === 'blue' || color === 'infinity' || color === 'gojo') {
+    ctx.filter = 'hue-rotate(210deg) saturate(1.4)';
+  } else if (color === 'purple' || color === 'boogie') {
+    ctx.filter = 'hue-rotate(270deg) saturate(1.3)';
+  } else if (color === 'lime' || color === 'green') {
+    ctx.filter = 'hue-rotate(85deg) saturate(1.5)';
+  }
+
+  // Frame is 256x256px centered at (128, 128)
+  const scale = (radius * 2.6) / 256.0;
+  const drawW = 256 * scale;
+  const drawH = 256 * scale;
+  const anchorX = 128 * scale;
+  const anchorY = 128 * scale;
+
+  ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+
+  // Restore context state cleanly (Rule 2.4 Stack Integrity)
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  ctx.filter = prevFilter;
+  return true;
+}
+
+/**
+ * Draws the 12-Frame Authentic Retro Pixel Art Global Punch Attack Impact Animation.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} effect Particle effect from ParticleSystem
+ */
+export function drawPunchAttackImpact(ctx, effect) {
+  if (!effect || effect.life <= 0) return;
+  const p = Math.max(0, Math.min(1.0, 1.0 - effect.life));
+  const radius = effect.targetSize || effect.size || 55;
+  const alpha = effect.life > 0.15 ? 1.0 : (effect.life / 0.15);
+  if (alpha <= 0.01) return;
+
+  ctx.save();
+  ctx.translate(effect.x, effect.y);
+  const hitAngle = effect.hitAngle !== undefined ? effect.hitAngle : (effect.angle || 0);
+  ctx.rotate(hitAngle);
+  _drawPunchAttackAnimatedSprite(ctx, radius, p, alpha, effect.color);
+  ctx.restore();
+}
+
 export function drawAnimeImpactFrame(ctx, effect) {
   const isDark = _isDarkMode();
 
@@ -928,7 +1049,13 @@ export function drawAnimeImpactFrame(ctx, effect) {
   ctx.rotate(hitAngle);
 
   const progress = Math.min(1.0, Math.max(0.0, 1.0 - effect.life));
-  const alpha = Math.min(1.0, effect.life * 1.45);
+  const alpha = effect.life > 0.15 ? 1.0 : (effect.life / 0.15);
+
+  // 0. Render 12-Frame Authentic Punch Attack Animation Sprite from Assets/effects/Punch Attack/
+  if (_drawPunchAttackAnimatedSprite(ctx, effect.size || 55, progress, alpha, effect.color)) {
+    ctx.restore();
+    return;
+  }
   const P = 2.0;
 
   // Fast non-linear expansion (Mach sonic burst profile)

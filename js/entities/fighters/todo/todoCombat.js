@@ -111,9 +111,13 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
 
 
   // Effects
+  if (didDamage !== false) {
+    spawnAnimePunchImpactFrame(target.x, target.y, isBlackFlash ? 70 : 60, angle, 'purple');
+  }
+
   if (isBlackFlash) {
     if (didDamage !== false) {
-      // Full JJK-style Black Flash — void implosion + crimson screen flash + cursed energy bolts (No punch attack visual)
+      // Full JJK-style Black Flash — void implosion + crimson screen flash + cursed energy bolts
       spawnBlackFlash(target.x, target.y);
       const bfAudioCfg = CONFIG.blackFlash?.audio || {};
       const sound = getSkillSound(this.id, 'blackflash');
@@ -135,10 +139,6 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     }
     playTodoPunchSound(this, isCombo);
   } else {
-    // Shockwave Ring Impact for normal punch
-    if (didDamage !== false) {
-      spawnAnimePunchImpactFrame(target.x, target.y, 55, angle, 'purple');
-    }
     playTodoPunchSound(this, isCombo);
   }
 

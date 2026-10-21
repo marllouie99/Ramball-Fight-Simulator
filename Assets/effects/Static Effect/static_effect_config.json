@@ -1,0 +1,45 @@
+{
+  "name": "canonical-12-frame-static-effect-template",
+  "category": "status-effect-lightning",
+  "referenceSource": "C:/Users/asus/OneDrive/Documents/Gani References/1OQOh2.gif",
+  "version": "2.0.0",
+  "frameCount": 12,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "stripWidth": 3072,
+  "stripHeight": 256,
+  "epicenterAnchor": {
+    "x": 128,
+    "y": 128,
+    "description": "Geometric epicenter of the electric field in 256x256 frame space. Aligns 1:1 with fighter body center (x, y)."
+  },
+  "bodyRadius": 25.0,
+  "scaling": {
+    "formula": "drawSize = (fighterRadius * 3.20)",
+    "drawAnchorX": "drawSize / 2",
+    "drawAnchorY": "drawSize / 2"
+  },
+  "animationLoop": {
+    "cadenceFps": 30,
+    "msPerFrame": 33,
+    "loopBehavior": "continuous-cycling",
+    "description": "Cycles seamlessly through frames 1-12 matching the 30ms/frame speed of reference 1OQOh2.gif."
+  },
+  "colorPalettes": {
+    "cyan_zeus": {
+      "path": "Assets/effects/Static Effect/static-b.png",
+      "frames": "static-1.png through static-12.png",
+      "description": "High-voltage electric cyan & supersonic white core for Zeus and generic electric procs"
+    },
+    "gold_zenitsu": {
+      "path": "Assets/effects/Static Effect/static-gold-b.png",
+      "frames": "static-gold-1.png through static-gold-12.png",
+      "description": "Lightning gold & solar amber core for Zenitsu Skill 1 Static Debuff"
+    },
+    "dual_reference": {
+      "path": "Assets/effects/Static Effect/static-dual-b.png",
+      "frames": "static-dual-1.png through static-dual-12.png",
+      "description": "Authentic dual-color palette extracted directly from 1OQOh2.gif"
+    }
+  }
+}

@@ -13,7 +13,7 @@ export const cjConfig = {
 
   name: 'CJ',
   displayName: 'CJ',
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Grove Street Legend',
   title: 'Grove Street Legend',
 

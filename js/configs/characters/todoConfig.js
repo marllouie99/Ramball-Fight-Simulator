@@ -2,7 +2,7 @@
 // Aoi Todo — Boogie Woogie Brawler Config
 // ─────────────────────────────────────────────
 export const todoConfig = {
-  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     hair: 'Assets/model/todo/Todo-hair.png',
     ultimateOverlay: 'Assets/Overlays/Todo-ultimate-overlay.png',

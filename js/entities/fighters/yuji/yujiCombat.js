@@ -159,11 +159,9 @@ export function modUpdateMeleeCombat(customTarget = null) {
           }
         }
 
-        // Visual effects (Suppress standard punch impact visual when Black Flash is triggered)
-        if (!isBlackFlash) {
-          if (didDamage !== false) {
-            spawnAnimePunchImpactFrame(target.x, target.y, 55, angleToTarget, 'blackpink');
-          }
+        // Visual effects (Punch impact animation for CQC combos & Black Flash strikes)
+        if (didDamage !== false) {
+          spawnAnimePunchImpactFrame(target.x, target.y, isBlackFlash ? 70 : 60, angleToTarget, 'blackpink');
         }
 
         if (isBlackFlash) {

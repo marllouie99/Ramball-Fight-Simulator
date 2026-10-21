@@ -11,7 +11,7 @@ export const tojiConfig = {
 
   name: 'Toji',
   displayName: 'Toji',
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   // Base Attributes
   hp: 420,
   speed: 5.6,

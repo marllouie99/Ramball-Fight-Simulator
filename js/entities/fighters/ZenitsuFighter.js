@@ -72,6 +72,10 @@ export class ZenitsuFighter extends Fighter {
     this.inBattleTrance = false;
     this._intermediateDashSounds = [];
 
+    // Critical Strike Mechanics & Attributes
+    this.critChance = cfg.critChance !== undefined ? cfg.critChance : (cfg.baseCritChance ?? 0.20);
+    this.critMultiplier = cfg.critMultiplier !== undefined ? cfg.critMultiplier : 1.75;
+
     // Basic Attack: Single Thunderclap Dash State (Hekireki Issen: Single Dash)
     this.isBasicDash = false;
     this.isBasicDashPreparing = false;
@@ -204,6 +208,10 @@ export class ZenitsuFighter extends Fighter {
     this.thunderclapDashVFXList = [];
     this.inBattleTrance = false;
     this._intermediateDashSounds = [];
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    this.critChance = cfg.critChance !== undefined ? cfg.critChance : (cfg.baseCritChance ?? 0.20);
+    this.critMultiplier = cfg.critMultiplier !== undefined ? cfg.critMultiplier : 1.75;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -212,10 +220,12 @@ export class ZenitsuFighter extends Fighter {
     const hpRatio = (this.hp - rawDamage) / (this.maxHp || 310);
     let finalAmount = amount;
 
-    // Passive 1: Battle Trance (25% damage reduction below 35% HP)
+    // Passive 1: Battle Trance (25% damage reduction below 35% HP + 100% Critical Strike Chance)
     if (this.isSkillEnabled(cfg.enableBattleTrance, true) && hpRatio <= (cfg.tranceHpThreshold || 0.35)) {
       if (!this.inBattleTrance) {
         this.inBattleTrance = true;
+        this.critChance = cfg.tranceCritChance !== undefined ? cfg.tranceCritChance : 1.0;
+        this.critMultiplier = cfg.tranceCritMultiplier !== undefined ? cfg.tranceCritMultiplier : 2.0;
         spawnFloatingText(this.x, this.y - 35, 'BATTLE TRANCE AWAKENED!', '#F59E0B');
         spawnImpactFlash(this.x, this.y, '#FBBF24', 30);
       }
@@ -224,6 +234,53 @@ export class ZenitsuFighter extends Fighter {
     }
 
     return super.takeDamage(finalAmount, attacker, opts);
+  }
+
+  /**
+   * Evaluates Zenitsu's Critical Strike roll and calculates final damage.
+   * @param {number} baseDamage - Unscaled base damage of the attack
+   * @param {Object} opts - Attack context (e.g. { dashIndex, isFinisher, isBasic, forceCrit })
+   * @returns {{ finalDamage: number, isCrit: boolean, critMultiplier: number, critChance: number }}
+   */
+  evaluateCrit(baseDamage = 26, opts = {}) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    if (!this.isSkillEnabled(cfg.enableCrit, true)) {
+      return { finalDamage: baseDamage, isCrit: false, critMultiplier: 1.0, critChance: 0 };
+    }
+
+    const inTrance = Boolean(this.isSkillEnabled(cfg.enableBattleTrance, true) && this.inBattleTrance);
+    const baseChance = cfg.critChance !== undefined ? cfg.critChance : (cfg.baseCritChance ?? 0.20);
+    const tranceChance = cfg.tranceCritChance !== undefined ? cfg.tranceCritChance : 1.0;
+    const bonusDashChance = (opts.dashIndex !== undefined && cfg.critChancePerDash)
+      ? opts.dashIndex * cfg.critChancePerDash
+      : 0;
+
+    // Bonus Crit Chance against enemies afflicted by Static Debuff (+15%)
+    const hasStatic = Boolean(
+      opts.hasStaticDebuff ||
+      (opts.target && (((opts.target.zenitsuStaticDebuffTimer || 0) > 0) || ((opts.target.staticDebuffTimer || 0) > 0)))
+    );
+    const staticBonus = (hasStatic && cfg.staticDebuffCritChanceBonus) ? cfg.staticDebuffCritChanceBonus : 0;
+
+    const maxNormalChance = cfg.maxCritChance ?? 0.50;
+
+    const effectiveCritChance = inTrance
+      ? tranceChance
+      : Math.min(maxNormalChance, (this.critChance !== undefined ? this.critChance : baseChance) + bonusDashChance + staticBonus);
+
+    const baseMult = cfg.critMultiplier !== undefined ? cfg.critMultiplier : 1.75;
+    const tranceMult = cfg.tranceCritMultiplier !== undefined ? cfg.tranceCritMultiplier : 2.0;
+    const effectiveCritMult = inTrance ? tranceMult : (this.critMultiplier !== undefined ? this.critMultiplier : baseMult);
+
+    const isCrit = Boolean(opts.forceCrit || (!opts.isCrit && Math.random() < effectiveCritChance));
+    const finalDamage = isCrit ? Math.round(baseDamage * effectiveCritMult) : baseDamage;
+
+    return {
+      finalDamage,
+      isCrit,
+      critMultiplier: effectiveCritMult,
+      critChance: effectiveCritChance
+    };
   }
 
   canPerformBasicAttack(target = null, arena = null) {
@@ -509,7 +566,50 @@ export class ZenitsuFighter extends Fighter {
     }
   }
 
+  /**
+   * Rule 25 Non-freezing active visual effects & periodic status ticks decay routine.
+   * Ticks down static debuffs on enemy targets and inflicts periodic electric zap damage.
+   */
+  _updateEnemyStaticDebuff() {
+    if (typeof state === 'undefined') return;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    if (!this.isSkillEnabled(cfg.enableStaticDebuff, true)) return;
+
+    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+    const tickInterval = cfg.staticDebuffTickInterval || 45;
+    const zapDmg = cfg.staticDebuffTickDamage || 3;
+
+    for (const target of allTargets) {
+      if (!target || target === this || target.hp <= 0 || target.isDead) continue;
+      if (typeof this.isTeammate === 'function' && this.isTeammate(target)) continue;
+      if (this.team !== undefined && this.team !== null && target.team !== undefined && target.team !== null && target.team === this.team) continue;
+
+      if ((target.zenitsuStaticDebuffTimer || 0) > 0) {
+        target.zenitsuStaticDebuffTimer--;
+
+        // Periodic electric zap damage while debuff is active
+        if (target.zenitsuStaticDebuffTimer % tickInterval === 0 && target.zenitsuStaticDebuffTimer > 0) {
+          applyDamageToTarget(target, zapDmg, this, { isStaticZap: true, silent: true });
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(target.x, target.y, 4, 'gold', '#FBBF24');
+          }
+        }
+
+        if (target.zenitsuStaticDebuffTimer <= 0) {
+          if (target.staticDebuffSource === 'zenitsu') {
+            target.staticDebuffSource = null;
+          }
+        }
+      }
+    }
+  }
+
   update(opponent, ownerIndex, arena) {
+    // 0. Rule 25 Visual Effect & Particle Decay Processing before freeze guard
+    // (Ensures active dash VFX & periodic debuff ticks decay naturally even when movement is stopped)
+    this._updateDashVFX();
+    this._updateEnemyStaticDebuff();
+
     // 1. Rule 1 Freeze / TimeStop Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || (this.isTargetOfAmbush && !this.isDashingThunderclap && this.thunderclapDashPauseTimer <= 0)) {
@@ -519,10 +619,22 @@ export class ZenitsuFighter extends Fighter {
       return;
     }
 
-    // Always tick dash VFX timer so air linger and disappearance fadeout never freeze during channeling
-    this._updateDashVFX();
-
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+
+    // Keep dynamic crit stats synchronized with Battle Trance state and dash momentum
+    if (this.inBattleTrance) {
+      this.critChance = cfg.tranceCritChance !== undefined ? cfg.tranceCritChance : 1.0;
+      this.critMultiplier = cfg.tranceCritMultiplier !== undefined ? cfg.tranceCritMultiplier : 2.0;
+    } else {
+      const baseChance = cfg.critChance !== undefined ? cfg.critChance : (cfg.baseCritChance ?? 0.20);
+      const bonusDashChance = (this.isExecutingThunderclapDashes && cfg.critChancePerDash)
+        ? (this.thunderclapDashIndex || 0) * cfg.critChancePerDash
+        : 0;
+      const maxNormalChance = cfg.maxCritChance ?? 0.50;
+      this.critChance = Math.min(maxNormalChance, baseChance + bonusDashChance);
+      this.critMultiplier = cfg.critMultiplier !== undefined ? cfg.critMultiplier : 1.75;
+    }
+
     const target = this.getNearestTarget(opponent);
 
     // Basic Attack Wind-up / Preparation Phase
@@ -918,11 +1030,8 @@ export class ZenitsuFighter extends Fighter {
     const angle = this.gunAngle || 0;
 
     const damages = [18, 22, 28];
-    let dmg = damages[this.iaiComboCount];
+    const baseDmg = damages[this.iaiComboCount];
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
-    if (this.isSkillEnabled(cfg.enableBattleTrance, true) && this.inBattleTrance) {
-      dmg = Math.round(dmg * 1.5);
-    }
 
     let didHit = false;
     const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
@@ -940,8 +1049,20 @@ export class ZenitsuFighter extends Fighter {
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
         if (Math.abs(angleDiff) <= arc / 2) {
-          applyDamageToTarget(ent, dmg, this);
-          spawnSparks(ent.x, ent.y, 8, 'gold', '#F59E0B');
+          const hasStatic = Boolean((ent.zenitsuStaticDebuffTimer > 0) || (ent.staticDebuffTimer > 0));
+          const critResult = this.evaluateCrit(baseDmg, { hasStaticDebuff: hasStatic, target: ent });
+          let entDmg = critResult.finalDamage;
+          const isCrit = critResult.isCrit;
+          if (hasStatic && this.isSkillEnabled(cfg.enableStaticDebuff, true)) {
+            const vuln = cfg.staticDebuffVulnerability !== undefined ? cfg.staticDebuffVulnerability : 0.20;
+            entDmg = Math.round(entDmg * (1 + vuln));
+          }
+
+          applyDamageToTarget(ent, entDmg, this, { isCrit, isCritical: isCrit, hasStaticDebuff: hasStatic });
+          spawnSparks(ent.x, ent.y, isCrit ? 14 : 8, 'gold', isCrit ? '#FBBF24' : '#F59E0B');
+          if (isCrit) {
+            spawnImpactFlash(ent.x, ent.y, '#F59E0B', 24);
+          }
           spawnBloodEffect(ent.x, ent.y, ent.bloodColor || '#DC2626');
           didHit = true;
           if (this.iaiComboCount === 2) {
@@ -1362,10 +1483,22 @@ export class ZenitsuFighter extends Fighter {
     const baseDmg = isBasic
       ? (cfg.basicDashDamage || cfg.damage || 26)
       : (isFinisher ? (cfg.thunderclapFinisherDamage || 50) : (cfg.thunderclapDamage || 20));
-    let dmg = (this.isSkillEnabled(cfg.enableBattleTrance, true) && this.inBattleTrance) ? Math.round(baseDmg * 1.5) : baseDmg;
 
     for (const hitEnt of hitEntities) {
-      applyDamageToTarget(hitEnt, dmg, this);
+      const hasStaticDebuff = Boolean((hitEnt.zenitsuStaticDebuffTimer > 0) || (hitEnt.staticDebuffTimer > 0));
+
+      // Roll for Critical Strike (guaranteed in Battle Trance; bonus chance on consecutive dashes & static debuff)
+      const critResult = this.evaluateCrit(baseDmg, { dashIndex, isFinisher, isBasic, hasStaticDebuff, target: hitEnt });
+      let entDmg = critResult.finalDamage;
+      const isCrit = critResult.isCrit;
+
+      // Enemy takes +20% vulnerability bonus damage if already afflicted with Static Debuff
+      if (hasStaticDebuff && this.isSkillEnabled(cfg.enableStaticDebuff, true)) {
+        const vuln = cfg.staticDebuffVulnerability !== undefined ? cfg.staticDebuffVulnerability : 0.20;
+        entDmg = Math.round(entDmg * (1 + vuln));
+      }
+
+      applyDamageToTarget(hitEnt, entDmg, this, { isCrit, isCritical: isCrit, hasStaticDebuff });
 
       // Apply Stun / Paralyze debuff to stop enemy entity movement
       const stunDur = isBasic
@@ -1387,12 +1520,38 @@ export class ZenitsuFighter extends Fighter {
         hitEnt.hitStunTimer = Math.max(hitEnt.hitStunTimer || 0, stunDur);
       }
 
+      // Skill 1: Apply Static Debuff (3.0s on intermediate dashes, 4.0s on finisher)
+      if (!isBasic && this.isSkillEnabled(cfg.enableStaticDebuff, true)) {
+        const staticDur = isFinisher
+          ? (cfg.staticDebuffFinisherDuration || 240)
+          : (cfg.staticDebuffDuration || 180);
+        hitEnt.staticDebuffTimer = Math.max(hitEnt.staticDebuffTimer || 0, staticDur);
+        hitEnt.zenitsuStaticDebuffTimer = Math.max(hitEnt.zenitsuStaticDebuffTimer || 0, staticDur);
+        hitEnt.staticDebuffSource = 'zenitsu';
+
+        const slowMult = cfg.staticDebuffSlowMultiplier !== undefined ? cfg.staticDebuffSlowMultiplier : 0.70;
+        if (typeof hitEnt.applySlow === 'function') {
+          hitEnt.applySlow(staticDur, slowMult, { isElectric: true });
+        } else {
+          hitEnt.slowTimer = Math.max(hitEnt.slowTimer || 0, staticDur);
+          hitEnt.slowMultiplier = Math.min(hitEnt.slowMultiplier || 1.0, slowMult);
+        }
+
+        if (!hasStaticDebuff) {
+          spawnFloatingText(hitEnt.x, hitEnt.y - (hitEnt.r || 25) - 14, '⚡ STATIC', '#F59E0B');
+        }
+        spawnSparks(hitEnt.x, hitEnt.y, 8, 'gold', '#FBBF24');
+      }
+
       // Ricochet Hit Effect: High-velocity welding needle sparks, star embers, clash ring, lightning & blood
       const isFullFinisher = isFinisher && !isBasic;
       spawnParrySparksEffect(hitEnt.x, hitEnt.y, isFullFinisher ? 32 : (isBasic ? 14 : 18));
       spawnMeleeClashShockwave(hitEnt.x, hitEnt.y, isFullFinisher ? 70 : 42, isBasic ? 'gojo' : '#F59E0B');
-      spawnSparks(hitEnt.x, hitEnt.y, isFullFinisher ? 20 : 12, isBasic ? 'cyan' : 'gold', isBasic ? '#38BDF8' : '#F59E0B');
-      spawnImpactFlash(hitEnt.x, hitEnt.y, isBasic ? '#38BDF8' : '#F59E0B', isFullFinisher ? 40 : 22);
+      spawnSparks(hitEnt.x, hitEnt.y, isFullFinisher ? (isCrit ? 26 : 20) : (isCrit ? 18 : 12), isBasic ? 'cyan' : 'gold', isBasic ? '#38BDF8' : '#F59E0B');
+      spawnImpactFlash(hitEnt.x, hitEnt.y, isBasic ? '#38BDF8' : '#F59E0B', isFullFinisher ? (isCrit ? 48 : 40) : (isCrit ? 30 : 22));
+      if (isCrit) {
+        spawnSparks(hitEnt.x, hitEnt.y, 10, 'gold', '#FBBF24');
+      }
       spawnBloodEffect(hitEnt.x, hitEnt.y, hitEnt.bloodColor || '#DC2626');
 
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
@@ -1445,10 +1604,25 @@ export class ZenitsuFighter extends Fighter {
     this.rokurenCooldown = this.rokurenCooldownMax;
     this.slashSwingTimer = this.slashSwingMaxTimer;
 
-    applyDamageToTarget(target, 48, this);
-    target.applyKnockback?.(Math.cos(this.gunAngle || 0) * 30, Math.sin(this.gunAngle || 0) * 30);
-    spawnSparks(target.x, target.y, 18, 'gold', '#F59E0B');
-    triggerGlobalScreenShake(6, 14);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    const baseDmg = (cfg.rokurenDamagePerHit || 8) * (cfg.rokurenBounces || 6);
+    const hasStatic = Boolean((target.zenitsuStaticDebuffTimer > 0) || (target.staticDebuffTimer > 0));
+    const critResult = this.evaluateCrit(baseDmg, { hasStaticDebuff: hasStatic, target });
+    let finalDmg = critResult.finalDamage;
+    const isCrit = critResult.isCrit;
+
+    if (hasStatic && this.isSkillEnabled(cfg.enableStaticDebuff, true)) {
+      const vuln = cfg.staticDebuffVulnerability !== undefined ? cfg.staticDebuffVulnerability : 0.20;
+      finalDmg = Math.round(finalDmg * (1 + vuln));
+    }
+
+    applyDamageToTarget(target, finalDmg, this, { isCrit, isCritical: isCrit, hasStaticDebuff: hasStatic });
+    target.applyKnockback?.(Math.cos(this.gunAngle || 0) * (cfg.rokurenFinisherKnockback || 30), Math.sin(this.gunAngle || 0) * (cfg.rokurenFinisherKnockback || 30));
+    spawnSparks(target.x, target.y, isCrit ? 24 : 18, 'gold', isCrit ? '#FBBF24' : '#F59E0B');
+    if (isCrit) {
+      spawnImpactFlash(target.x, target.y, '#F59E0B', 32);
+    }
+    triggerGlobalScreenShake(isCrit ? 8 : 6, 14);
     spawnFloatingText(this.x, this.y - 30, '霹靂一閃・六連 ROKUREN!', '#F59E0B');
   }
 
@@ -1461,12 +1635,24 @@ export class ZenitsuFighter extends Fighter {
     this.x = target.x - Math.cos(angle) * 45;
     this.y = target.y - Math.sin(angle) * 45;
 
-    applyDamageToTarget(target, 85, this);
-    target.applyKnockback?.(Math.cos(angle) * 48, Math.sin(angle) * 48);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : zenitsuConfig;
+    const baseDmg = cfg.ultimateDamage || 85;
+    const hasStatic = Boolean((target.zenitsuStaticDebuffTimer > 0) || (target.staticDebuffTimer > 0));
+    const critResult = this.evaluateCrit(baseDmg, { forceCrit: true, hasStaticDebuff: hasStatic, target });
+    let finalDmg = critResult.finalDamage;
+    const isCrit = critResult.isCrit;
 
-    spawnSparks(target.x, target.y, 24, 'flame', '#FBBF24');
-    spawnImpactFlash(target.x, target.y, '#EF4444', 45);
-    triggerGlobalScreenShake(9, 20);
+    if (hasStatic && this.isSkillEnabled(cfg.enableStaticDebuff, true)) {
+      const vuln = cfg.staticDebuffVulnerability !== undefined ? cfg.staticDebuffVulnerability : 0.20;
+      finalDmg = Math.round(finalDmg * (1 + vuln));
+    }
+
+    applyDamageToTarget(target, finalDmg, this, { isCrit, isCritical: isCrit, isUltimate: true, hasStaticDebuff: hasStatic });
+    target.applyKnockback?.(Math.cos(angle) * (cfg.ultimateKnockback || 48), Math.sin(angle) * (cfg.ultimateKnockback || 48));
+
+    spawnSparks(target.x, target.y, 28, 'flame', '#FBBF24');
+    spawnImpactFlash(target.x, target.y, '#EF4444', 48);
+    triggerGlobalScreenShake(10, 22);
     spawnFloatingText(this.x, this.y - 40, '火雷神 FLAMING THUNDER GOD!', '#F59E0B');
   }
 

@@ -9,7 +9,7 @@ export const denjiConfig = {
   },
   name: 'Denji',
   displayName: 'Denji',
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Chainsaw Man',
   title: 'Chainsaw Man',
 
@@ -29,7 +29,7 @@ export const denjiConfig = {
   startY: 250,
   startVx: 1.1,
   startVy: 1.0,
-  damage: 5,
+  damage: 1,
   cooldown: 24,
   projectileSpeedMultiplier: 1.0,
   ability: 'Chainsaw Devil & "Massacre Engine"',
@@ -72,7 +72,7 @@ export const denjiConfig = {
 
   // Hybrid Form: Continuous 3-Blade Chainsaw Collision Shred
   enableChainsawShred: true,        // Master toggle for Continuous 3-Blade Chainsaw Collision Shred
-  shredDamagePerTooth: 4,           // Rapid shred damage per chain tooth collision tick
+  shredDamagePerTooth: 1,           // Rapid shred damage per chain tooth collision tick
   shredTickInterval: 6,             // Interval in frames between chain teeth hits (matches animation RPM)
   shredHitPauseFrames: 2,           // Micro hit-pause frames applied to enemy on each tooth strike
   shredArenaShakeIntensity: 6.0,    // Arena / screen shake intensity on each shred tick
@@ -85,7 +85,7 @@ export const denjiConfig = {
 
   // Continuous Shred Ramping Engine (Damage & Lifesteal Scaling Per Tick)
   enableShredRamp: true,                 // Master toggle for damage & lifesteal scaling per tick during continuous shred
-  shredDamageIncreasePerTick: 1,         // Additional flat damage per consecutive shred tick (+1 dmg/tick)
+  shredDamageIncreasePerTick: 0.2,         // Additional flat damage per consecutive shred tick (+1 dmg/tick)
   shredLifestealIncreasePerTick: 0.02,   // Additional lifesteal ratio per consecutive shred tick (+2% lifesteal/tick)
   maxShredRampTicks: 10,                 // Maximum consecutive ticks for damage & lifesteal ramp scaling (cap at 10 ticks)
 

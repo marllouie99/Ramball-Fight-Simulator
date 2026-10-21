@@ -462,9 +462,17 @@ export function drawRezeHumanPixelBody(ctx, r, now) {
  * - Waist bandolier of dark charcoal cylindrical bomb cartridges (tactical artillery shells, no cartoon red)
  * - Dark slate-charcoal lower shorts
  */
-export function drawRezeBombHybridBody(ctx, r, now) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+// Offscreen canvas cache for Reze's Bomb Devil Hybrid Body model (avoids 1,200 fillRect calls per frame)
+let _cachedRezeHybridCanvas = null;
+let _cachedRezeHybridR = 0;
+
+function _renderRezeBombHybridBodyToCanvas(destCtx, r) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
+  const cx = destCtx.canvas ? destCtx.canvas.width / 2 : 0;
+  const cy = destCtx.canvas ? destCtx.canvas.height / 2 : 0;
+  destCtx.translate(cx, cy);
+
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
@@ -473,11 +481,11 @@ export function drawRezeBombHybridBody(ctx, r, now) {
   // 1. REAR TORPEDO STABILIZER FINS & TAIL CONE (Top-Left / Rear Silhouette Breaker)
   // Drawn outside circle bounds on the REAR (-X) side to break the silhouette
   // ──────────────────────────────────────────
-  ctx.save();
+  destCtx.save();
 
   const drawPixel = (gx, gy, col) => {
-    ctx.fillStyle = col;
-    ctx.fillRect(snap(gx * P), snap(gy * P), P, P);
+    destCtx.fillStyle = col;
+    destCtx.fillRect(snap(gx * P), snap(gy * P), P, P);
   };
 
   // ── Tail Cylinder Cone (linking bomb body to fins: gx = -12..-6, gy = -12..-6) ──
@@ -579,15 +587,15 @@ export function drawRezeBombHybridBody(ctx, r, now) {
   ];
   for (let pt of _WICKS) drawPixel(pt.gx, pt.gy, pt.col);
 
-  ctx.restore();
+  destCtx.restore();
 
   // ──────────────────────────────────────────
   // 3. MAIN BODY CIRCLE & TORPEDO WARHEAD CASING (Pixel Grid)
   // ──────────────────────────────────────────
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
+  destCtx.save();
+  destCtx.beginPath();
+  destCtx.arc(0, 0, r, 0, Math.PI * 2);
+  destCtx.clip();
 
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -601,8 +609,8 @@ export function drawRezeBombHybridBody(ctx, r, now) {
 
       // Pixelated Dark Ink Border Shell
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#0E0F14';
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = '#0E0F14';
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -613,11 +621,11 @@ export function drawRezeBombHybridBody(ctx, r, now) {
         // ── 1. SEGMENTED METALLIC NECK COLLAR (gy = 1..2, gx = -3..3) ──
         if (gy >= 1 && Math.abs(gx) <= 3) {
           if (gy === 1) {
-            ctx.fillStyle = '#4A5576'; // Upper neck ring highlight
+            destCtx.fillStyle = '#4A5576'; // Upper neck ring highlight
           } else {
-            ctx.fillStyle = (Math.abs(gx) <= 1) ? '#2B3044' : '#181A25'; // Vertebra shadow
+            destCtx.fillStyle = (Math.abs(gx) <= 1) ? '#2B3044' : '#181A25'; // Vertebra shadow
           }
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillRect(px, py, P, P);
           continue;
         }
 
@@ -626,17 +634,17 @@ export function drawRezeBombHybridBody(ctx, r, now) {
         if (isMouthCavity) {
           // A. Mechanical Jaw Hinge Rivet at rear corner (gx = -2..-1, gy = 0..1)
           if (gx <= -1 && gy >= 0) {
-            ctx.fillStyle = (gx === -1 && gy === 0) ? '#627196' : '#1E2230';
-            ctx.fillRect(px, py, P, P);
+            destCtx.fillStyle = (gx === -1 && gy === 0) ? '#627196' : '#1E2230';
+            destCtx.fillRect(px, py, P, P);
             continue;
           }
 
           // B. Sharp Angular Chin Guard Plate (gy = 1, gx = 0..6)
           if (gy === 1 && gx >= 0) {
-            if (gx === 6) ctx.fillStyle = '#0E1017'; // Sharp chin corner outline
-            else if (gx >= 3 && gx <= 5) ctx.fillStyle = '#485474'; // Chin leading edge highlight
-            else ctx.fillStyle = '#24293A'; // Chin plate body
-            ctx.fillRect(px, py, P, P);
+            if (gx === 6) destCtx.fillStyle = '#0E1017'; // Sharp chin corner outline
+            else if (gx >= 3 && gx <= 5) destCtx.fillStyle = '#485474'; // Chin leading edge highlight
+            else destCtx.fillStyle = '#24293A'; // Chin plate body
+            destCtx.fillRect(px, py, P, P);
             continue;
           }
 
@@ -646,21 +654,21 @@ export function drawRezeBombHybridBody(ctx, r, now) {
             // Gap slits separating individual square teeth at gx = 1, 3, 5
             const isToothGap = (gx === 1 || gx === 3 || gx === 5);
             if (isToothGap) {
-              ctx.fillStyle = '#08090E'; // Deep vertical slit between teeth
+              destCtx.fillStyle = '#08090E'; // Deep vertical slit between teeth
             } else if (gy === -2) {
-              ctx.fillStyle = '#FFFFFF'; // Upper tooth crown highlight
+              destCtx.fillStyle = '#FFFFFF'; // Upper tooth crown highlight
             } else if (gy === -1) {
-              ctx.fillStyle = '#E8F0FA'; // Solid clean square white tooth
+              destCtx.fillStyle = '#E8F0FA'; // Solid clean square white tooth
             } else {
-              ctx.fillStyle = '#A0AFC7'; // Lower tooth edge shadow
+              destCtx.fillStyle = '#A0AFC7'; // Lower tooth edge shadow
             }
-            ctx.fillRect(px, py, P, P);
+            destCtx.fillRect(px, py, P, P);
             continue;
           }
 
           // D. Dark Hollow Mouth Void interior behind teeth
-          ctx.fillStyle = '#08090E';
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillStyle = '#08090E';
+          destCtx.fillRect(px, py, P, P);
           continue;
         }
 
@@ -676,8 +684,8 @@ export function drawRezeBombHybridBody(ctx, r, now) {
         const isBracketHinge = (gx >= -1 && gx <= 0 && gy >= -8 && gy <= -7);
 
         if (isBracketHinge) {
-          ctx.fillStyle = (gx === 0 && gy === -8) ? '#8697C2' : '#525F82'; // Metallic hinge bracket
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillStyle = (gx === 0 && gy === -8) ? '#8697C2' : '#525F82'; // Metallic hinge bracket
+          destCtx.fillRect(px, py, P, P);
           continue;
         } else if (seam1 || seam2 || seam3) {
           col = '#0C0E14'; // Deep panel groove seam
@@ -694,8 +702,8 @@ export function drawRezeBombHybridBody(ctx, r, now) {
           col = '#151824'; // Outer flank depth shadow
         }
 
-        ctx.fillStyle = col;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -706,13 +714,13 @@ export function drawRezeBombHybridBody(ctx, r, now) {
         // ── 1. Bare Porcelain Skin Shoulders on Flanks (|gx| >= 6) ──
         if (Math.abs(gx) >= 6) {
           if (gy === 3) {
-            ctx.fillStyle = '#EDBFAF'; // Shoulder drop shadow from warhead
+            destCtx.fillStyle = '#EDBFAF'; // Shoulder drop shadow from warhead
           } else if (Math.abs(gx) >= 10) {
-            ctx.fillStyle = '#F2C8B6'; // Outer arm curve shading
+            destCtx.fillStyle = '#F2C8B6'; // Outer arm curve shading
           } else {
-            ctx.fillStyle = '#FFE6D8'; // Fair porcelain skin
+            destCtx.fillStyle = '#FFE6D8'; // Fair porcelain skin
           }
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillRect(px, py, P, P);
           continue;
         }
 
@@ -723,18 +731,18 @@ export function drawRezeBombHybridBody(ctx, r, now) {
           const isRibbonKnot = (gx === 0 && gy === 3);
 
           if (isRibbonKnot) {
-            ctx.fillStyle = '#425174'; // Knot silk sheen
-            ctx.fillRect(px, py, P, P);
+            destCtx.fillStyle = '#425174'; // Knot silk sheen
+            destCtx.fillRect(px, py, P, P);
             continue;
           } else if (isRibbonTie) {
-            ctx.fillStyle = (gx === 0) ? '#32405D' : '#192030'; // Cascading silk tails
-            ctx.fillRect(px, py, P, P);
+            destCtx.fillStyle = (gx === 0) ? '#32405D' : '#192030'; // Cascading silk tails
+            destCtx.fillRect(px, py, P, P);
             continue;
           }
 
           // Crisp White Collared Shirt Fabric & Pointed Collar Wings
-          ctx.fillStyle = (gy === 3) ? '#FFFFFF' : '#F6F4EE';
-          ctx.fillRect(px, py, P, P);
+          destCtx.fillStyle = (gy === 3) ? '#FFFFFF' : '#F6F4EE';
+          destCtx.fillRect(px, py, P, P);
           continue;
         }
 
@@ -745,8 +753,8 @@ export function drawRezeBombHybridBody(ctx, r, now) {
         } else {
           ropeCol = '#11121A'; // Deep rope crevice
         }
-        ctx.fillStyle = ropeCol;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = ropeCol;
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -768,8 +776,8 @@ export function drawRezeBombHybridBody(ctx, r, now) {
           cordCol = '#0E0F16'; // Deep braided crevice groove
         }
 
-        ctx.fillStyle = cordCol;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = cordCol;
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -780,13 +788,13 @@ export function drawRezeBombHybridBody(ctx, r, now) {
       if (gy >= 10 && gy <= 11) {
         const isDivider = (Math.abs(gx) % 2 === 0);
         if (isDivider) {
-          ctx.fillStyle = '#0D0E14'; // Shadow groove between shell cartridges
+          destCtx.fillStyle = '#0D0E14'; // Shadow groove between shell cartridges
         } else if (gy === 10) {
-          ctx.fillStyle = '#4D5573'; // Rounded cartridge top metallic rim highlight
+          destCtx.fillStyle = '#4D5573'; // Rounded cartridge top metallic rim highlight
         } else {
-          ctx.fillStyle = '#2A2E40'; // Solid dark gunmetal cylindrical shell body
+          destCtx.fillStyle = '#2A2E40'; // Solid dark gunmetal cylindrical shell body
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -794,15 +802,47 @@ export function drawRezeBombHybridBody(ctx, r, now) {
       // ZONE E: LOWER DARK SLATE SHORTS (gy >= 12)
       // ══════════════════════════════════════════
       if (gy === 12) {
-        ctx.fillStyle = '#101118'; // Belt rim
+        destCtx.fillStyle = '#101118'; // Belt rim
       } else {
-        ctx.fillStyle = '#161824'; // Dark matte shorts
+        destCtx.fillStyle = '#161824'; // Dark matte shorts
       }
-      ctx.fillRect(px, py, P, P);
+      destCtx.fillRect(px, py, P, P);
     }
   }
 
-  ctx.restore();
+  destCtx.restore();
+  destCtx.restore();
+}
+
+/**
+ * Draws Reze's Bomb Devil Hybrid Form (Authentic Chainsaw Man Bomb Girl / Bomb Devil Figure)
+ * 1:1 Match with the official Chainsaw Man reference figure.
+ * Uses high-performance offscreen canvas caching to eliminate 1,200 rotated fillRect calls per frame (Rule #35 compliant).
+ */
+export function drawRezeBombHybridBody(ctx, r, now) {
+  if (typeof document === 'undefined') {
+    _renderRezeBombHybridBodyToCanvas(ctx, r);
+    return;
+  }
+
+  const intR = Math.round(r);
+  if (!_cachedRezeHybridCanvas || _cachedRezeHybridR !== intR) {
+    _cachedRezeHybridR = intR;
+    const P = 2.0;
+    const steps = Math.ceil((intR + P) / P);
+    const padSteps = steps + 8; // fully encompass rear fins (gx = -17, gy = -19) and wicks (gx = 15)
+    const size = padSteps * P * 2;
+    _cachedRezeHybridCanvas = document.createElement('canvas');
+    _cachedRezeHybridCanvas.width = size;
+    _cachedRezeHybridCanvas.height = size;
+    const offCtx = _cachedRezeHybridCanvas.getContext('2d');
+    _renderRezeBombHybridBodyToCanvas(offCtx, intR);
+  }
+
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const size = _cachedRezeHybridCanvas.width;
+  ctx.drawImage(_cachedRezeHybridCanvas, -size / 2, -size / 2);
   ctx.restore();
 }
 

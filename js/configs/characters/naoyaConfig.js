@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 
 export const naoyaConfig = {
-  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Projection Sorcery Prodigy',
   title: 'Hei Commander',
 

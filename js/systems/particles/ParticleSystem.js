@@ -16,7 +16,7 @@ export function isProtectedParticle(spark) {
   if (spark.isProtected) return true;
   if (spark.type === 'mahitoDomainSoulTendrilStrike' || spark.type === 'mahitoSoulShockwave') return true;
   if (spark.type === 'saitamaCounterFrontalBlast' || spark.type === 'gojoRedFrontalBlast') return true;
-  if (spark.type === 'animeImpactFrame' || spark.type === 'animePunchImpactFrame') return true;
+  if (spark.type === 'animeImpactFrame' || spark.type === 'animePunchImpactFrame' || spark.type === 'punchAttackImpact') return true;
   if (spark.type === 'groundScorch' || spark.type === 'arcaneGroundScorch') return true;
   if (spark.type === 'yutaBeamPinkCore') return true;
   if (spark.type === 'slashingBlast' || spark.type === 'ceroOscurasBeam') return true;

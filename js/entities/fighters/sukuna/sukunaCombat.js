@@ -362,7 +362,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
 
     if (didDamage !== false) {
       // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
-      spawnAnimePunchImpactFrame(target.x, target.y, 55, punchAngle, 'crimson');
+      spawnAnimePunchImpactFrame(target.x, target.y, 60, punchAngle, 'crimson');
     }
   }
 

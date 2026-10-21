@@ -1,6 +1,6 @@
 ---
 description: Enforce clean architecture, function size limits, and early-return guard clauses across the codebase.
-globs: ["**/*.js", "**/*.mjs"]
+globs: "**/*.js, **/*.mjs"
 ---
 
 # Anti-Spaghetti & Clean Code Standards

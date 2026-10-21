@@ -11,7 +11,7 @@ export const yutaConfig = {
 
   name: 'Yuta',
   displayName: 'Yuta',
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   // ── Base Attributes ──
   hp: 200,
   speed: 5.8,

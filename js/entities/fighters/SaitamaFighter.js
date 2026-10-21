@@ -1921,7 +1921,7 @@ export class SaitamaFighter extends Fighter {
       if (typeof spawnAnimePunchImpactFrame === 'function') {
         const impactTargetX = (target && target.x !== undefined) ? target.x : (fistX + Math.cos(pushAngle) * 45);
         const impactTargetY = (target && target.y !== undefined) ? target.y : (fistY + Math.sin(pushAngle) * 45);
-        spawnAnimePunchImpactFrame(impactTargetX, impactTargetY, 85, pushAngle, 'gold');
+        spawnAnimePunchImpactFrame(impactTargetX, impactTargetY, 95, pushAngle, 'gold');
       }
       if (typeof spawnMeleeClashShockwave === 'function') {
         const impactTargetX = (target && target.x !== undefined) ? target.x : (fistX + Math.cos(pushAngle) * 45);
@@ -3136,7 +3136,10 @@ export class SaitamaFighter extends Fighter {
                   target.y = Math.max(arena.y + tR, Math.min(arena.y + arena.height - tR, target.y));
                 }
 
-                // Visual sparks feedback
+                // Visual punch animation & sparks feedback
+                if (typeof spawnAnimePunchImpactFrame === 'function' && (this.flurryHitsLeft % 2 === 0)) {
+                  spawnAnimePunchImpactFrame(target.x, target.y, 52, aimAngle, 'gold');
+                }
                 if (typeof spawnSparks === 'function') {
                   spawnSparks(target.x, target.y, 6, 'crimson', '#F5C400');
                 }

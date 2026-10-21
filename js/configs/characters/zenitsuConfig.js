@@ -19,7 +19,7 @@ export const zenitsuConfig = {
 
   name: 'Zenitsu',
   displayName: 'Zenitsu',
-  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Thunder Breathing Slayer',
   title: 'Thunder Breathing Slayer',
 
@@ -45,13 +45,21 @@ export const zenitsuConfig = {
   cooldown: 60,
   projectileSpeedMultiplier: 1.0,
   ability: 'Thunder Breathing ("Thunderclap and Flash")',
-  desc: 'Thunder Breathing godspeed iai swordsman. Awakens unstoppable Battle Trance during crises. Wields 140° Thunder Iai quickdraw slashes, lightspeed First Form: Thunderclap and Flash teleport slashes, Sixfold wall-ricochet flurries, and the Flaming Thunder God dragon ultimate.',
+  desc: 'Thunder Breathing godspeed iai swordsman. Masters Thunderclap and Flash with high-voltage Critical Strikes (20% base Crit Rate, 1.75x Crit DMG). Consecutive dashes build static charge and momentum (+5% Crit Rate/dash). In Battle Trance (<35% HP), gains 25% damage reduction and guaranteed 100% Critical Strikes with 2.0x Crit DMG.',
+
+  // Critical Strike Mechanics & Scaling
+  enableCrit: true,                 // Master toggle for Zenitsu's Critical Strike mechanic
+  critChance: 0.20,                 // Base critical hit chance (20% / 1 in 5 attacks)
+  critMultiplier: 1.75,             // Base critical hit damage multiplier (1.75x / 175%)
+  critChancePerDash: 0.05,          // Momentum increase (+5% crit chance per consecutive dash step)
+  maxCritChance: 0.50,              // Maximum crit chance cap outside of Battle Trance (50%)
 
   // Passive 1: Slumbering Thunderclap & Battle Trance
   enableBattleTrance: true,         // Master toggle for Passive 1: Battle Trance
   tranceHpThreshold: 0.35,
   tranceDamageReduction: 0.25,
-  tranceCritChance: 1.0,
+  tranceCritChance: 1.0,            // Guaranteed 100% Critical Strike Chance during Battle Trance
+  tranceCritMultiplier: 2.0,        // 2.0x Critical Strike Damage Multiplier during Battle Trance
 
   // Passive 2: Hyper-Sonic Static Charge
   enableStaticCharge: true,         // Master toggle for Passive 2: Hyper-Sonic Static Charge
@@ -96,6 +104,16 @@ export const zenitsuConfig = {
   thunderclapSlideFriction: 0.88,   // Slide deceleration friction multiplier per frame
   thunderclapBreatherFrames: 45,    // Stance hold & breather pause duration in frames (~0.75s)
   thunderclapBreatherExitFrames: 0,  // Duration in frames to transition from stance back to normal pose (0 = stay in stance permanently)
+
+  // Skill 1: Static Debuff Mechanics
+  enableStaticDebuff: true,            // Master toggle for Static Debuff on Skill 1
+  staticDebuffDuration: 180,           // 3.0s (180 frames) static electricity duration on intermediate dashes
+  staticDebuffFinisherDuration: 240,   // 4.0s (240 frames) extended duration on finisher dash
+  staticDebuffSlowMultiplier: 0.70,    // 30% movement slow on debuffed enemies
+  staticDebuffVulnerability: 0.20,     // Struck enemies take +20% bonus damage from Zenitsu
+  staticDebuffCritChanceBonus: 0.15,   // +15% increased Crit Chance against static-debuffed enemies
+  staticDebuffTickDamage: 3,           // Periodic electric zap damage while afflicted
+  staticDebuffTickInterval: 45,        // Zap interval in frames (~0.75s)
 
   // Voice Line Play Chances (0.0 = never, 1.0 = always)
   firstFormVoiceChance: 0.45,        // Chance to play "First Form..." voiceline on channel start

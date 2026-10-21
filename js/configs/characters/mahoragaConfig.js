@@ -2,7 +2,7 @@
 // Mahoraga — Divine General Config
 // ─────────────────────────────────────────────
 export const mahoragaConfig = {
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     eyeWings: 'Assets/model/mahoraga/Mahoraga-eyewings.png',
     wheelOverlay: 'Assets/Overlays/Mahoraga-wheel-overlay.png',

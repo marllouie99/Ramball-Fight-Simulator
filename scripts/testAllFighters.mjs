@@ -10160,6 +10160,8 @@ async function main() {
 
     // Test entity pass-through collision solver during active dash
     const dummyEnemy = new ZenitsuClass({ x: zenitsu.x + 10, y: zenitsu.y, color: '#ff0000', controls: {} });
+    dummyEnemy.maxHp = 9999;
+    dummyEnemy.hp = 9999;
     dummyEnemy.vx = 0; dummyEnemy.vy = 0;
     resolveFighterCollision(zenitsu, dummyEnemy);
     if (dummyEnemy.vx !== 0 || dummyEnemy.vy !== 0) {
@@ -10324,6 +10326,140 @@ async function main() {
       drawZenitsuSkin(mockCtx, zenitsu);
       assertCanvasStackBalance(`drawZenitsuSkin with basic attack blue dash VFX at timer ${testTimer}`);
     }
+
+    // 11.6.6 Zenitsu Critical Strike & Damage Scaling Test
+    console.log('⚡ [Zenitsu Crit Mechanic Test] Verifying Crit Chance, Crit DMG multiplier, dash momentum scaling, and Battle Trance 100% auto-crit...');
+    zenitsu.reset();
+
+    // 1. Verify baseline attributes from config
+    if (zenitsu.critChance !== 0.20) {
+      throw new Error(`Zenitsu expected base critChance 0.20, got ${zenitsu.critChance}`);
+    }
+    if (zenitsu.critMultiplier !== 1.75) {
+      throw new Error(`Zenitsu expected base critMultiplier 1.75, got ${zenitsu.critMultiplier}`);
+    }
+
+    // 2. Test evaluateCrit() with forced crit and non-crit
+    const forcedCrit = zenitsu.evaluateCrit(100, { forceCrit: true });
+    if (!forcedCrit.isCrit || forcedCrit.finalDamage !== 175) {
+      throw new Error(`Zenitsu forcedCrit failed! Expected isCrit=true and finalDamage=175, got isCrit=${forcedCrit.isCrit}, finalDamage=${forcedCrit.finalDamage}`);
+    }
+
+    // 3. Test momentum scaling with consecutive dashes (dashIndex = 4 gives +0.20 crit chance -> 0.40 total)
+    const dash4Crit = zenitsu.evaluateCrit(100, { dashIndex: 4 });
+    if (Math.abs(dash4Crit.critChance - 0.40) > 1e-4) {
+      throw new Error(`Zenitsu dash momentum crit chance failed! Expected 0.40 at dashIndex 4, got ${dash4Crit.critChance}`);
+    }
+
+    // 4. Test Battle Trance guaranteed 100% Crit & 2.0x Crit DMG
+    zenitsu.hp = 310;
+    zenitsu.takeDamage(210, null); // Drops HP to 100 (100 / 310 <= 0.35 threshold)
+    if (!zenitsu.inBattleTrance) {
+      throw new Error('Zenitsu expected inBattleTrance=true when dropping below 35% HP');
+    }
+    if (zenitsu.critChance !== 1.0) {
+      throw new Error(`Zenitsu expected critChance=1.0 in Battle Trance, got ${zenitsu.critChance}`);
+    }
+    if (zenitsu.critMultiplier !== 2.0) {
+      throw new Error(`Zenitsu expected critMultiplier=2.0 in Battle Trance, got ${zenitsu.critMultiplier}`);
+    }
+
+    // All strikes in Battle Trance must critically hit for 2.0x damage
+    const tranceHit = zenitsu.evaluateCrit(50);
+    if (!tranceHit.isCrit || tranceHit.finalDamage !== 100) {
+      throw new Error(`Zenitsu Battle Trance crit evaluation failed! Expected isCrit=true and finalDamage=100, got isCrit=${tranceHit.isCrit}, finalDamage=${tranceHit.finalDamage}`);
+    }
+
+    // 5. Test reset() restores normal baseline stats
+    zenitsu.reset();
+    if (zenitsu.inBattleTrance !== false || zenitsu.critChance !== 0.20 || zenitsu.critMultiplier !== 1.75) {
+      throw new Error(`Zenitsu reset() failed to restore baseline crit stats! inBattleTrance=${zenitsu.inBattleTrance}, critChance=${zenitsu.critChance}, critMultiplier=${zenitsu.critMultiplier}`);
+    }
+
+    // 11.6.7 Zenitsu Skill 1 Static Debuff Mechanics Test
+    console.log('⚡ [Zenitsu Skill 1 Static Debuff Test] Verifying Static Debuff affliction, duration, vulnerability (+20%), crit bonus (+15%), slow, periodic zap ticks, and visual rendering...');
+    zenitsu.reset();
+    const testEnemy = new ZenitsuClass({ x: 150, y: 150, color: '#00ff00', controls: {} });
+    testEnemy.reset();
+    testEnemy.ownerIndex = 1;
+    zenitsu.ownerIndex = 0;
+    state.fighters = [zenitsu, testEnemy];
+
+    // A. Verify baseline target state has no debuffs
+    if ((testEnemy.staticDebuffTimer || 0) > 0 || (testEnemy.zenitsuStaticDebuffTimer || 0) > 0) {
+      throw new Error('Expected dummy enemy to start with 0 static debuff timers');
+    }
+
+    // B. Simulate Skill 1 dash impact on enemy
+    zenitsu.isBasicDash = false;
+    zenitsu._finalizeThunderclapDashStep(testEnemy, 100, 100, 150, 150, 0, 1, false);
+
+    // Verify Static Debuff is applied
+    if (testEnemy.staticDebuffTimer !== 180 || testEnemy.zenitsuStaticDebuffTimer !== 180) {
+      throw new Error(`Expected enemy staticDebuffTimer & zenitsuStaticDebuffTimer to be 180, got ${testEnemy.staticDebuffTimer} and ${testEnemy.zenitsuStaticDebuffTimer}`);
+    }
+    if (testEnemy.staticDebuffSource !== 'zenitsu') {
+      throw new Error(`Expected staticDebuffSource to be 'zenitsu', got ${testEnemy.staticDebuffSource}`);
+    }
+    if ((testEnemy.slowTimer || 0) < 180 || testEnemy.slowMultiplier > 0.70) {
+      throw new Error(`Expected enemy to be slowed with slowMultiplier <= 0.70, got slowTimer=${testEnemy.slowTimer}, slowMultiplier=${testEnemy.slowMultiplier}`);
+    }
+
+    // C. Verify Finisher Dash applies extended duration (240 frames)
+    zenitsu._finalizeThunderclapDashStep(testEnemy, 100, 100, 150, 150, 0, 4, true);
+    if (testEnemy.staticDebuffTimer !== 240 || testEnemy.zenitsuStaticDebuffTimer !== 240) {
+      throw new Error(`Expected finisher dash to apply 240 frames static debuff, got ${testEnemy.staticDebuffTimer}`);
+    }
+
+    // D. Verify Damage Vulnerability (+20% bonus damage) and Crit Chance Bonus (+15%)
+    const critEvalWithStatic = zenitsu.evaluateCrit(50, { target: testEnemy, forceCrit: false });
+    // Base 0.20 + 0.15 = 0.35 crit chance against static debuffed enemy
+    if (Math.abs(critEvalWithStatic.critChance - 0.35) > 1e-4) {
+      throw new Error(`Expected critChance against static-debuffed target to be 0.35, got ${critEvalWithStatic.critChance}`);
+    }
+
+    // E. Verify Periodic Zap Ticks in _updateEnemyStaticDebuff()
+    const hpBeforeZap = testEnemy.hp;
+    testEnemy.zenitsuStaticDebuffTimer = 46; // 1 frame before tick interval 45
+    zenitsu._updateEnemyStaticDebuff();
+    if (testEnemy.zenitsuStaticDebuffTimer !== 45) {
+      throw new Error(`Expected zenitsuStaticDebuffTimer to decrement to 45, got ${testEnemy.zenitsuStaticDebuffTimer}`);
+    }
+    if (testEnemy.hp >= hpBeforeZap) {
+      throw new Error(`Expected enemy to take periodic zap damage at frame 45! Before: ${hpBeforeZap}, After: ${testEnemy.hp}`);
+    }
+
+    // F. Verify Basic Dash does NOT apply Static Debuff
+    testEnemy.reset();
+    zenitsu.isBasicDash = true;
+    zenitsu._finalizeThunderclapDashStep(testEnemy, 100, 100, 150, 150, 0, 0, true);
+    if ((testEnemy.staticDebuffTimer || 0) > 0 || (testEnemy.zenitsuStaticDebuffTimer || 0) > 0) {
+      throw new Error('Basic dash must NOT apply static debuff on enemy');
+    }
+
+    // G. Verify Canvas stack balance for Zeus & Zenitsu static debuff effect rendering & 12-frame animation
+    const { drawZeusStaticDebuffEffect, _getStaticCyanFrames, _getStaticGoldFrames, _getStaticEffectFrames } = await import('../js/graphics/statusEffects.js');
+    const cyanFrames = _getStaticCyanFrames();
+    const goldFrames = _getStaticGoldFrames();
+    if (!cyanFrames || cyanFrames.length !== 12) {
+      throw new Error(`Expected 12 cyan static frames, got ${cyanFrames?.length}`);
+    }
+    if (!goldFrames || goldFrames.length !== 12) {
+      throw new Error(`Expected 12 gold static frames, got ${goldFrames?.length}`);
+    }
+
+    mockCtx.resetStackDepth();
+    testEnemy.staticDebuffSource = 'zenitsu';
+    testEnemy.zenitsuStaticDebuffTimer = 180;
+    drawZeusStaticDebuffEffect(mockCtx, 25, 180, testEnemy);
+    assertCanvasStackBalance('drawZeusStaticDebuffEffect with Zenitsu golden static debuff');
+
+    mockCtx.resetStackDepth();
+    testEnemy.staticDebuffSource = null;
+    testEnemy.zenitsuStaticDebuffTimer = 0;
+    testEnemy.staticDebuffTimer = 180;
+    drawZeusStaticDebuffEffect(mockCtx, 25, 180, testEnemy);
+    assertCanvasStackBalance('drawZeusStaticDebuffEffect with Zeus cyan static debuff');
 
     zenitsu.interruptAttacks(true);
   } catch (err) {

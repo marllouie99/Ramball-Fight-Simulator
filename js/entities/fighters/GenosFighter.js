@@ -1283,6 +1283,9 @@ export class GenosFighter extends Fighter {
         applyDamageToTarget(target, damage, this, { isSkill: true });
         const pushForce = CONFIG.genos?.dashes?.rocketDash?.stompKnockback ?? CONFIG.genos?.stompKnockback ?? 14;
         const pushAngle = Math.atan2(target.y - this.y, target.x - this.x);
+        if (typeof spawnAnimePunchImpactFrame === 'function') {
+          spawnAnimePunchImpactFrame(target.x, target.y, 65, pushAngle, 'orange');
+        }
         if (typeof target.applyKnockback === 'function') {
           target.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce);
         } else if (!target.immuneToPush && !target.immuneToKnockback && target.characterId !== 'escanor') {

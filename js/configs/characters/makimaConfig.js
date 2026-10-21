@@ -12,7 +12,7 @@ export const makimaConfig = {
 
   name: 'Makima',
   displayName: 'Makima',
-  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SSR',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'Control Devil',
   title: 'Control Devil',
 

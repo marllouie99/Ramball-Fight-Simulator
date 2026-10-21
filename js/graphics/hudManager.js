@@ -914,6 +914,7 @@ export function drawComboCounter(ctx) {
   const cardTop = Math.max(40, arenaY - cfg.topGapBelowHud);
   const minHits = Math.max(1, cfg.minHits | 0);
   const thresholds = cfg.tierThresholds || [1, 5, 10, 20];
+  const tierColors = cfg.tierColors || ['#E11D2E', '#FF3B30', '#FF7A00', '#FFD400'];
   const CARD_H = 68;
 
   const numFont = 'italic 900 38px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif';
@@ -927,6 +928,7 @@ export function drawComboCounter(ctx) {
     const eased = 1 - Math.pow(1 - Math.max(0, Math.min(1, slot.slideP)), 3);
     if (eased <= 0) continue;
 
+    // Color tier climbs with the chain length (deep red -> bright red -> orange -> gold)
     // Resolve attacking fighter entity for this combo slot
     let fighter = slot.attackerFighter;
     if (!fighter && slot.attackerFighterIndex >= 0 && Array.isArray(state.fighters)) {
@@ -945,7 +947,7 @@ export function drawComboCounter(ctx) {
     for (let t = 0; t < thresholds.length; t++) {
       if (slot.hits >= thresholds[t]) tier = t;
     }
-    const accent = tierColors[Math.min(tier, tierColors.length - 1)] || tierColors[0] || fallbackBase;
+    const accent = tierColors[Math.min(tier, tierColors.length - 1)] || tierColors[0] || fallbackBase || '#E11D2E';
 
     const numberText = String(slot.hits);
     // Bottom row always shows the chain's total damage, zero-padded like an arcade score
@@ -963,11 +965,9 @@ export function drawComboCounter(ctx) {
     const CARD_W = Math.max(86, contentW + 10);
 
     // Slide in from outside the window edge; right card mirrors the left
-    // Aligns with the Top HUD frame and arena boundary (default: arenaX / 45px)
-    const arenaX = Number.isFinite(arena.x) ? arena.x : 45;
-    const inset = (typeof cfg.edgeInset === 'number') ? cfg.edgeInset : arenaX;
+    const inset = cfg.edgeInset || 12;
     const targetX = slot.side === 0 ? inset : (canvasW - inset - CARD_W);
-    const off = (1 - eased) * (inset + CARD_W + 16);
+    const off = (1 - eased) * (CARD_W + 16);
     const x = slot.side === 0 ? targetX - off : targetX + off;
 
     // Impact pop: damped sine over popFrames
@@ -1096,6 +1096,7 @@ export function drawComboCounter(ctx) {
     // Draining progress fill
     const fillW = Math.max(0, barW * ratio);
     if (fillW > 0) {
+      ctx.fillStyle = accent;
       const fillX = isRight ? (barX + barW - fillW) : barX;
       const primaryTheme = tierColors[0] || accent;
       const barGrad = ctx.createLinearGradient(fillX, barY, fillX + fillW, barY);
@@ -2593,6 +2594,37 @@ function updateHealthHud() {
         let critDmgStr = `${baseCritMult}% (True DMG)`;
         if (isOvertime) {
           critDmgStr = `${overtimeCritMult}% (True DMG)`;
+        }
+
+        info.push(`<b>Crit Rate:</b> ${critRateStr}`);
+        info.push(`<b>Crit DMG:</b> ${critDmgStr}`);
+      } else if (f.characterId === 'zenitsu' || f.type === 'zenitsu') {
+        const isTrance = Boolean(f.inBattleTrance);
+        const baseCritRate = Math.round((CONFIG.zenitsu?.critChance ?? 0.20) * 100);
+        const tranceCritRate = Math.round((CONFIG.zenitsu?.tranceCritChance ?? 1.0) * 100);
+        const currentCritRate = isTrance ? tranceCritRate : Math.round((f.critChance !== undefined ? f.critChance : (CONFIG.zenitsu?.critChance ?? 0.20)) * 100);
+
+        let critRateStr = `${baseCritRate}%`;
+        if (isTrance) {
+          critRateStr = `${tranceCritRate}% <span style="color: #F59E0B; font-size: 10px; font-weight: bold;">(TRANCE) ▲</span>`;
+        } else if (currentCritRate > baseCritRate) {
+          const boost = currentCritRate - baseCritRate;
+          critRateStr = `${baseCritRate}% + ${boost}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
+        } else if (currentCritRate < baseCritRate) {
+          const debuff = baseCritRate - currentCritRate;
+          critRateStr = `${baseCritRate}% - ${debuff}% <span style="color: #ef4444; font-size: 10px;">▼</span>`;
+        }
+
+        const baseCritMult = Math.round((CONFIG.zenitsu?.critMultiplier ?? 1.75) * 100);
+        const tranceCritMult = Math.round((CONFIG.zenitsu?.tranceCritMultiplier ?? 2.00) * 100);
+        const currentCritMult = isTrance ? tranceCritMult : Math.round((f.critMultiplier !== undefined ? f.critMultiplier : (CONFIG.zenitsu?.critMultiplier ?? 1.75)) * 100);
+
+        let critDmgStr = `${baseCritMult}%`;
+        if (isTrance) {
+          critDmgStr = `${tranceCritMult}% <span style="color: #F59E0B; font-size: 10px; font-weight: bold;">(TRANCE) ▲</span>`;
+        } else if (currentCritMult > baseCritMult) {
+          const boost = currentCritMult - baseCritMult;
+          critDmgStr = `${baseCritMult}% + ${boost}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
         }
 
         info.push(`<b>Crit Rate:</b> ${critRateStr}`);

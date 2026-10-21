@@ -274,22 +274,22 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   ctx.restore();
 }
 
-/**
- * Draws Genos's entire body circle model in authentic Pixel Art Style.
- * Minimalist circle cyborg aesthetic, upright front POV, faceless (Rule #19 & Rule #35 compliant).
- */
-export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = false, isSelfDestructing = false, isMeleeStance = false, now = Date.now()) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+// Offscreen canvas cache for Genos's procedural pixel body model (avoids 900 fillRect calls per frame)
+let _cachedGenosBodyCanvas = null;
+let _cachedGenosBodyR = 0;
+
+function _renderGenosPixelBodyToCanvas(destCtx, r) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
+  const cx = destCtx.canvas ? destCtx.canvas.width / 2 : 0;
+  const cy = destCtx.canvas ? destCtx.canvas.height / 2 : 0;
+  destCtx.translate(cx, cy);
+
   const P = 2.0;
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
-
-  // Core pulse parameters (lowered to chest center)
-  const pulseFreq = isSelfDestructing ? 0.03 : 0.008;
-  const cyanPulse = 0.5 + Math.sin(now * pulseFreq) * 0.5;
   const coreY = r * 0.40;
-  const activeCoreR = isSelfDestructing ? r * 0.20 : r * 0.15;
+  const activeCoreR = r * 0.15;
 
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
@@ -303,8 +303,8 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
 
       // 4-neighbor attached border test (Rule #35 & Saitama standard)
       if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
-        ctx.fillStyle = '#0E0F14'; // Dark manga ink border
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = '#0E0F14'; // Dark manga ink border
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
@@ -318,21 +318,19 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
         } else if (ry > r * 0.12) {
           skinCol = '#F2C6A7'; // Lower neck shadow
         }
-        ctx.fillStyle = skinCol;
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillStyle = skinCol;
+        destCtx.fillRect(px, py, P, P);
       }
       // Zone 2: Tactical Vest, Shoulders, Collar, & Chest Core (r * 0.30 <= ry < r * 0.68)
       else if (ry < r * 0.68) {
         const coreDist = Math.hypot(rx, ry - coreY);
 
-        // B1. Central Glowing Energy Core
+        // B1. Central Energy Core Bezel & Dark Socket Recess
         if (coreDist <= activeCoreR + P * 1.5) {
-          if (coreDist <= activeCoreR * 0.45) {
-            ctx.fillStyle = '#FFFFFF'; // Superheated fusion center
-          } else if (coreDist <= activeCoreR) {
-            ctx.fillStyle = isSelfDestructing ? '#00FFFF' : (cyanPulse > 0.6 ? '#00E5FF' : '#00B8D4'); // Glowing cyan core
+          if (coreDist <= activeCoreR) {
+            destCtx.fillStyle = '#0D1117'; // Dark core socket recess
           } else {
-            ctx.fillStyle = isSelfDestructing ? '#00FFFF' : '#D4AF37'; // Golden bezel frame
+            destCtx.fillStyle = '#D4AF37'; // Golden bezel frame
           }
         }
         // B2. Metallic Silver Cybernetic Shoulders (left & right)
@@ -340,20 +338,20 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
           const shoulderCX = rx > 0 ? r * 0.72 : -r * 0.72;
           const sDist = Math.hypot((rx - shoulderCX) * 1.2, ry - (r * 0.38));
           if (sDist <= r * 0.08) {
-            ctx.fillStyle = '#E6ECF2'; // Joint bolt glint
+            destCtx.fillStyle = '#E6ECF2'; // Joint bolt glint
           } else if (sDist <= r * 0.16) {
-            ctx.fillStyle = '#22262E'; // Bolt core
+            destCtx.fillStyle = '#22262E'; // Bolt core
           } else {
-            ctx.fillStyle = (ry < r * 0.34) ? '#D8E2EC' : '#A8B4C0'; // Metallic shoulder plate
+            destCtx.fillStyle = (ry < r * 0.34) ? '#D8E2EC' : '#A8B4C0'; // Metallic shoulder plate
           }
         }
         // B3. V-Neck Metallic Collar Trim
         else if (Math.abs(ry - (r * 0.30 + Math.abs(rx) * 0.24)) < P * 0.9 && Math.abs(rx) <= r * 0.32 && ry <= r * 0.40) {
-          ctx.fillStyle = '#B0B8C2'; // Metallic collar trim
+          destCtx.fillStyle = '#B0B8C2'; // Metallic collar trim
         }
         // B4. Armor Panel Seam Lines
         else if (Math.abs(Math.abs(rx) - r * 0.40) < P * 0.6 && ry >= r * 0.36) {
-          ctx.fillStyle = '#181C24'; // Seam line
+          destCtx.fillStyle = '#181C24'; // Seam line
         }
         // B5. Tactical Vest Body
         else {
@@ -363,9 +361,9 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
           } else if (Math.abs(rx) > r * 0.50 || ry > r * 0.58) {
             vestCol = '#1A1E26'; // Vest shadow
           }
-          ctx.fillStyle = vestCol;
+          destCtx.fillStyle = vestCol;
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
       // Zone 3: Tactical Belt & Gold Buckle (r * 0.68 <= ry < r * 0.78)
       else if (ry < r * 0.78) {
@@ -373,30 +371,30 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
         const isBuckle = (Math.abs(rx) <= r * 0.26);
         if (isBuckle) {
           if (Math.abs(rx) <= r * 0.10 && Math.abs(ry - r * 0.73) <= r * 0.04) {
-            ctx.fillStyle = '#241D09'; // Buckle inner slot notch
+            destCtx.fillStyle = '#241D09'; // Buckle inner slot notch
           } else if (rx < -P && ry < r * 0.73) {
-            ctx.fillStyle = '#FFF2A8'; // Metallic buckle glint
+            destCtx.fillStyle = '#FFF2A8'; // Metallic buckle glint
           } else {
-            ctx.fillStyle = '#D4AF37'; // Gold buckle plate
+            destCtx.fillStyle = '#D4AF37'; // Gold buckle plate
           }
         } else if (Math.abs(Math.abs(rx) - r * 0.37) < P * 0.8) {
-          ctx.fillStyle = '#A0AAB5'; // Silver belt loop
+          destCtx.fillStyle = '#A0AAB5'; // Silver belt loop
         } else {
-          ctx.fillStyle = (ry < r * 0.73) ? '#262A36' : '#1C202A'; // Belt strap
+          destCtx.fillStyle = (ry < r * 0.73) ? '#262A36' : '#1C202A'; // Belt strap
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
       // Zone 4: Black Combat Pants (ry >= r * 0.78)
       else {
         // Center fly seam line
         if (Math.abs(rx) < P * 0.6 && ry <= r * 0.94) {
-          ctx.fillStyle = '#323846'; // Pants seam line
+          destCtx.fillStyle = '#323846'; // Pants seam line
         } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.90) {
-          ctx.fillStyle = '#1A1E26'; // Pants shadow
+          destCtx.fillStyle = '#1A1E26'; // Pants shadow
         } else {
-          ctx.fillStyle = '#242834'; // Combat pants body (Y >= 24)
+          destCtx.fillStyle = '#242834'; // Combat pants body (Y >= 24)
         }
-        ctx.fillRect(px, py, P, P);
+        destCtx.fillRect(px, py, P, P);
       }
     }
   }
@@ -411,20 +409,71 @@ export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = fals
   for (const co of clampOffsets) {
     const cx = snap(co.x);
     const cy = snap(co.y);
-    ctx.fillStyle = '#0D1117';
-    ctx.fillRect(cx - P, cy - P, P * 2, P * 2);
-    ctx.fillStyle = '#4A5260';
-    ctx.fillRect(cx, cy, P, P);
+    destCtx.fillStyle = '#0D1117';
+    destCtx.fillRect(cx - P, cy - P, P * 2, P * 2);
+    destCtx.fillStyle = '#4A5260';
+    destCtx.fillRect(cx, cy, P, P);
   }
 
-  ctx.restore();
+  destCtx.restore();
 }
 
 /**
- * Hand Renderer for Genos — High-tech multi-layered mechanical arms with segmented armor,
- * panel lines, energy conduit grooves, joint bolts, and a glowing palm blast port cannon (Pixel Art).
- * Implements the Mahoraga Kinematic Shoulder Anchor pattern (Rule #19 Front POV compliant).
+ * Draws Genos's entire body circle model in authentic Pixel Art Style.
+ * Minimalist circle cyborg aesthetic, upright front POV, faceless (Rule #19 & Rule #35 compliant).
+ * Uses offscreen canvas caching to eliminate 900 rotated fillRect calls per frame.
  */
+export function drawGenosPixelBody(ctx, r, isGhost = false, isChargingUlt = false, isSelfDestructing = false, isMeleeStance = false, now = Date.now()) {
+  const intR = Math.round(r);
+  const P = 2.0;
+
+  if (typeof document === 'undefined') {
+    _renderGenosPixelBodyToCanvas(ctx, intR);
+  } else {
+    if (!_cachedGenosBodyCanvas || _cachedGenosBodyR !== intR) {
+      _cachedGenosBodyR = intR;
+      const steps = Math.ceil((intR + P) / P);
+      const size = (steps * 2 + 2) * P;
+      _cachedGenosBodyCanvas = document.createElement('canvas');
+      _cachedGenosBodyCanvas.width = size;
+      _cachedGenosBodyCanvas.height = size;
+      const offCtx = _cachedGenosBodyCanvas.getContext('2d');
+      _renderGenosPixelBodyToCanvas(offCtx, intR);
+    }
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const size = _cachedGenosBodyCanvas.width;
+    ctx.drawImage(_cachedGenosBodyCanvas, -size / 2, -size / 2);
+    ctx.restore();
+  }
+
+  // Central Glowing Energy Core (Dynamic 60 FPS overlay)
+  ctx.save();
+  const pulseFreq = isSelfDestructing ? 0.03 : 0.008;
+  const cyanPulse = 0.5 + Math.sin(now * pulseFreq) * 0.5;
+  const coreY = r * 0.40;
+  const activeCoreR = isSelfDestructing ? r * 0.20 : r * 0.15;
+
+  if (isSelfDestructing) {
+    ctx.fillStyle = '#00FFFF';
+    ctx.beginPath();
+    ctx.arc(0, coreY, activeCoreR + P * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = isSelfDestructing ? '#00FFFF' : (cyanPulse > 0.6 ? '#00E5FF' : '#00B8D4');
+  ctx.beginPath();
+  ctx.arc(0, coreY, activeCoreR, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(0, coreY, activeCoreR * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 /**
  * Hand Renderer for Genos — High-tech multi-layered mechanical arms with segmented armor,
  * panel lines, energy conduit grooves, joint bolts, and a glowing palm blast port cannon (Pixel Art).

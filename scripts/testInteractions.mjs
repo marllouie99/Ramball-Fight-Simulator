@@ -8586,6 +8586,8 @@ async function runInteractionTests() {
 
       // 6. Test Interrupt during Hit-Pause stasis (anti-softlock verification)
       knight.swipeCooldown = 0;
+      target.x = knight.x + 55;
+      target.y = knight.y;
       knight._trySwordSwipe(target, 0);
       assert(knight.swipeActive === true, 'Knight swipeActive must be true on combo step 2');
       assert(knight.swordComboStep === 2, 'Knight second swing must be combo step 2');
@@ -8827,6 +8829,144 @@ async function runInteractionTests() {
       state.fighters = [];
       state.gameState = prevGameState;
     }
+  }
+
+  // ⚡ 86. Testing 12-Frame Animated Static Debuff Effect & Canvas 2D Stack Balance ⚡
+  {
+    console.log('   86. Testing 12-Frame Animated Static Debuff Effect & Canvas 2D Stack Balance...');
+    const {
+      _getStaticCyanFrames,
+      _getStaticGoldFrames,
+      _getStaticEffectFrames,
+      drawZeusStaticDebuffEffect,
+      STATUS_OVERLAY_REGISTRY
+    } = await import('../js/graphics/statusEffects.js');
+
+    // 1. Verify 12 frames loaded for Cyan palette (Zeus/generic)
+    const cyanFrames = _getStaticCyanFrames();
+    assert(cyanFrames && cyanFrames.length === 12, `Expected 12 cyan static frames, got ${cyanFrames?.length}`);
+
+    // 2. Verify 12 frames loaded for Gold palette (Zenitsu)
+    const goldFrames = _getStaticGoldFrames();
+    assert(goldFrames && goldFrames.length === 12, `Expected 12 gold static frames, got ${goldFrames?.length}`);
+
+    // 3. Verify helper resolver selects correct palette
+    assert(_getStaticEffectFrames(false) === cyanFrames, '_getStaticEffectFrames(false) must return cyan frames');
+    assert(_getStaticEffectFrames(true) === goldFrames, '_getStaticEffectFrames(true) must return gold frames');
+
+    // 4. Test Canvas 2D stack balance across multiple simulated timeframes for Zenitsu
+    const testZenitsuVictim = {
+      x: 200,
+      y: 200,
+      r: 25,
+      staticDebuffSource: 'zenitsu',
+      zenitsuStaticDebuffTimer: 180
+    };
+    mockCtx.resetStackDepth();
+    for (let frame = 0; frame < 12; frame++) {
+      drawZeusStaticDebuffEffect(mockCtx, 25, 180 - frame * 5, testZenitsuVictim);
+      assert(mockCtx.getStackDepth() === 0, `drawZeusStaticDebuffEffect (Zenitsu) corrupted stack depth at frame ${frame}`);
+    }
+
+    // 5. Test Canvas 2D stack balance for Zeus (Cyan)
+    const testZeusVictim = {
+      x: 200,
+      y: 200,
+      r: 25,
+      staticDebuffSource: null,
+      staticDebuffTimer: 180
+    };
+    mockCtx.resetStackDepth();
+    for (let frame = 0; frame < 12; frame++) {
+      drawZeusStaticDebuffEffect(mockCtx, 25, 180 - frame * 5, testZeusVictim);
+      assert(mockCtx.getStackDepth() === 0, `drawZeusStaticDebuffEffect (Zeus) corrupted stack depth at frame ${frame}`);
+    }
+
+    // 6. Verify STATUS_OVERLAY_REGISTRY recognizes both Zeus and Zenitsu static debuffs
+    const zeusEntry = STATUS_OVERLAY_REGISTRY.find(e => e.id === 'zeusStaticDebuff');
+    assert(zeusEntry, 'STATUS_OVERLAY_REGISTRY must contain zeusStaticDebuff entry');
+    assert(zeusEntry.isActive({ staticDebuffTimer: 10 }), 'zeusStaticDebuff must be active when staticDebuffTimer > 0');
+    assert(zeusEntry.isActive({ zenitsuStaticDebuffTimer: 10 }), 'zeusStaticDebuff must be active when zenitsuStaticDebuffTimer > 0');
+    assert(!zeusEntry.isActive({}), 'zeusStaticDebuff must be inactive when no timers present');
+
+    console.log('      ✅ 12-Frame Animated Static Debuff Effect (Cyan & Gold palettes) & 100% balanced Canvas 2D stack depths verified successfully.');
+  }
+
+  // ── 87. Testing 12-Frame Animated Punch Attack Template & Canvas 2D Stack Balance ──
+  {
+    console.log('   87. Testing 12-Frame Animated Punch Attack Template & Canvas 2D Stack Balance...');
+    const fs = await import('fs');
+    const path = await import('path');
+    const { _getPunchAttackFrames, _drawPunchAttackAnimatedSprite, drawPunchAttackImpact, drawAnimeImpactFrame } = await import('../js/graphics/particles/renderers/blastShockwaveRenderers.js');
+    const { spawnAnimePunchImpactFrame } = await import('../js/graphics/particles/sparkEffect.js');
+
+    // 1. Verify all 12 punch frames exist on disk in Assets/effects/Punch Attack/
+    const punchDir = path.resolve(process.cwd(), 'Assets/effects/Punch Attack');
+    for (let i = 1; i <= 12; i++) {
+      const punchFile = path.join(punchDir, `punch-${i}.png`);
+      const attackFile = path.join(punchDir, `attack-${i}.png`);
+      assert(fs.existsSync(punchFile), `Missing punch frame: ${punchFile}`);
+      assert(fs.existsSync(attackFile), `Missing attack alias frame: ${attackFile}`);
+      const stats = fs.statSync(punchFile);
+      assert(stats.size > 500, `punch-${i}.png file size too small: ${stats.size} bytes`);
+    }
+
+    // 2. Verify master strips exist
+    assert(fs.existsSync(path.join(punchDir, 'punch-b.png')), 'Missing punch-b.png');
+    assert(fs.existsSync(path.join(punchDir, 'attack-b.png')), 'Missing attack-b.png');
+    assert(fs.existsSync(path.join(punchDir, 'punch_template_config.json')), 'Missing punch_template_config.json');
+    assert(fs.existsSync(path.join(punchDir, 'README.md')), 'Missing README.md');
+
+    // 3. Verify _getPunchAttackFrames loader
+    const frames = _getPunchAttackFrames();
+    assert(frames && frames.length === 12, `Expected 12 punch frames loaded, got ${frames?.length}`);
+
+    // 4. Test drawPunchAttackImpact Canvas 2D stack balance across all 12 phases
+    mockCtx.resetStackDepth();
+    for (let frame = 0; frame < 12; frame++) {
+      const effect = {
+        x: 250,
+        y: 250,
+        size: 55,
+        targetSize: 55,
+        life: 1.0 - (frame / 12),
+        hitAngle: Math.PI / 4,
+        color: 'gold'
+      };
+      drawPunchAttackImpact(mockCtx, effect);
+      assert(mockCtx.getStackDepth() === 0, `drawPunchAttackImpact corrupted canvas stack depth at frame ${frame}`);
+    }
+
+    // 5. Test drawAnimeImpactFrame Canvas 2D stack balance across all color themes
+    const testColors = ['gold', 'blackpink', 'crimson', 'cyan', 'purple', 'black', 'lime'];
+    for (const color of testColors) {
+      mockCtx.resetStackDepth();
+      for (let frame = 0; frame < 12; frame++) {
+        const effect = {
+          x: 200,
+          y: 200,
+          size: 60,
+          life: 1.0 - (frame / 12),
+          hitAngle: 0.5,
+          color: color
+        };
+        drawAnimeImpactFrame(mockCtx, effect);
+        assert(mockCtx.getStackDepth() === 0, `drawAnimeImpactFrame (${color}) corrupted canvas stack depth at frame ${frame}`);
+      }
+    }
+
+    // 6. Test spawnAnimePunchImpactFrame correctly populates sparkEffects
+    state.sparkEffects = [];
+    spawnAnimePunchImpactFrame(180, 220, 75, 1.2, 'crimson');
+    assert(state.sparkEffects.length === 1, 'Expected 1 effect pushed to state.sparkEffects');
+    const spawned = state.sparkEffects[0];
+    assert(spawned.type === 'animeImpactFrame', `Expected type animeImpactFrame, got ${spawned.type}`);
+    assert(spawned.hitAngle === 1.2, `Expected hitAngle 1.2, got ${spawned.hitAngle}`);
+    assert(spawned.color === 'crimson', `Expected color crimson, got ${spawned.color}`);
+    assert(spawned.size === 75, `Expected size 75, got ${spawned.size}`);
+
+    state.sparkEffects = [];
+    console.log('      ✅ 12-Frame Animated Punch Attack Template & 100% balanced Canvas 2D stack depths verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

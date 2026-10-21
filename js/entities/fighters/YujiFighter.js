@@ -7,7 +7,7 @@ import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { modUpdateMeleeCombat } from './yuji/yujiCombat.js';
 import { modUpdateDivergentDash, modUpdateReverseCursedTechnique, isSukunaPresentInMatch } from './yuji/yujiSkills.js';
-import { spawnMeleeClashShockwave, spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
+import { spawnMeleeClashShockwave, spawnSparks, spawnImpactFlash, spawnAnimePunchImpactFrame } from '../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { playSound, playLoopingSound, stopLoopingSound, pauseLoopingSound, resumeLoopingSound } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -790,8 +790,10 @@ export class YujiFighter extends Fighter {
           if (target && !target.isDead && target.hp > 0) {
             applyDamageToTarget(target, sw.damage, this, { isDivergentFist: true });
             
-            // Spawn hot-pink clash shockwave ring (Yuta style)
+            // Spawn Divergent Fist 12-frame punch impact & hot-pink clash shockwave
             const shockRadius = CONFIG.yuji?.shockwaveRadius || 40;
+            const punchAngle = Math.atan2(target.y - this.y, target.x - this.x);
+            spawnAnimePunchImpactFrame(target.x, target.y, 60, punchAngle, 'blackpink');
             spawnMeleeClashShockwave(target.x, target.y, shockRadius, 'gojo');
 
             // Play secondary impact sound

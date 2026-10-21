@@ -1874,6 +1874,17 @@ export class RezeFighter extends Fighter {
         if (n.timer <= 0) this.activeNukeBlasts.splice(i, 1);
       }
     }
+
+    // Safety bounds: prevent runaway array growth during extreme stasis or rapid multi-hit combos
+    if (this.activeMartialArcs && this.activeMartialArcs.length > 8) {
+      this.activeMartialArcs.splice(0, this.activeMartialArcs.length - 8);
+    }
+    if (this.activePalmBlasts && this.activePalmBlasts.length > 8) {
+      this.activePalmBlasts.splice(0, this.activePalmBlasts.length - 8);
+    }
+    if (this.activeNukeBlasts && this.activeNukeBlasts.length > 4) {
+      this.activeNukeBlasts.splice(0, this.activeNukeBlasts.length - 4);
+    }
   }
 
   /**

@@ -19,6 +19,7 @@ import {
   drawPurpleExplosion,
   drawParryExplosion,
   drawAnimeImpactFrame,
+  drawPunchAttackImpact,
   drawPunchWindSpeedLine,
   drawSaitamaCounterFrontalBlast,
   drawGojoRedFrontalBlast,
@@ -1217,6 +1218,7 @@ const SPARK_RENDERERS = {
   purpleExplosion: drawPurpleExplosion,
   parryExplosion: drawParryExplosion,
   animeImpactFrame: drawAnimeImpactFrame,
+  punchAttackImpact: drawPunchAttackImpact,
   punchWindSpeedLine: drawPunchWindSpeedLine,
   saitamaCounterFrontalBlast: drawSaitamaCounterFrontalBlast,
   gojoRedFrontalBlast: drawGojoRedFrontalBlast,
@@ -1380,7 +1382,7 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
   }
 }
 
-export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, color = 'black', options = null) {
+export function spawnAnimePunchImpactFrame(x, y, radius = 60, hitAngle = 0, color = 'black', options = null) {
   const shockwave = ParticleSystem.getParticle();
   shockwave.x = x;
   shockwave.y = y;
@@ -1389,7 +1391,7 @@ export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, colo
   shockwave.size = radius; // start at full size
   shockwave.targetSize = radius;
   shockwave.life = 1.0;
-  shockwave.decay = 0.055; // ~18 frames of high-visibility sakuga impact
+  shockwave.decay = 0.040; // ~25 frames of high-visibility sakuga impact (~2 ticks per animation frame at 60 FPS)
   shockwave.type = 'animeImpactFrame';
   shockwave.hitAngle = hitAngle;
   shockwave.color = color;

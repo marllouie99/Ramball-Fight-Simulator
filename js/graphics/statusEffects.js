@@ -498,51 +498,173 @@ export function drawThunderRootsEffect(ctx, baseRadius, timer = 45) {
   ctx.restore();
 }
 
+// ---------------------------------------------------------------------------
+// 12-Frame Animated Static Effect Sprite Loader (Assets/effects/Static Effect/)
+// ---------------------------------------------------------------------------
+const STATIC_EFFECT_FRAME_COUNT = 12;
+const STATIC_CYAN_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/effects/Static Effect/static-${i + 1}.png`
+);
+const STATIC_GOLD_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/effects/Static Effect/static-gold-${i + 1}.png`
+);
+
+let _staticCyanFrames = [];
+let _staticCyanFramesLoading = false;
+let _staticGoldFrames = [];
+let _staticGoldFramesLoading = false;
+
 /**
- * Renders static electricity debuff visual with crackling electric rings ORBITING around enemy body.
+ * Loads and caches the 12 cyan electric static effect sprite frames.
+ * @returns {HTMLImageElement[]}
  */
-export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 100) {
+export function _getStaticCyanFrames() {
+  if (
+    _staticCyanFrames.length === STATIC_EFFECT_FRAME_COUNT &&
+    _staticCyanFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _staticCyanFrames;
+  }
+  if (!_staticCyanFramesLoading && typeof Image !== 'undefined') {
+    _staticCyanFramesLoading = true;
+    _staticCyanFrames = [];
+    STATIC_CYAN_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _staticCyanFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load static effect cyan frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _staticCyanFrames[idx] = img;
+    });
+  }
+  return _staticCyanFrames;
+}
+
+/**
+ * Loads and caches the 12 golden lightning static effect sprite frames for Zenitsu.
+ * @returns {HTMLImageElement[]}
+ */
+export function _getStaticGoldFrames() {
+  if (
+    _staticGoldFrames.length === STATIC_EFFECT_FRAME_COUNT &&
+    _staticGoldFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _staticGoldFrames;
+  }
+  if (!_staticGoldFramesLoading && typeof Image !== 'undefined') {
+    _staticGoldFramesLoading = true;
+    _staticGoldFrames = [];
+    STATIC_GOLD_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _staticGoldFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load static effect gold frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _staticGoldFrames[idx] = img;
+    });
+  }
+  return _staticGoldFrames;
+}
+
+/**
+ * Returns either cyan or golden static effect frames.
+ * @param {boolean} isZenitsu
+ * @returns {HTMLImageElement[]}
+ */
+export function _getStaticEffectFrames(isZenitsu = false) {
+  return isZenitsu ? _getStaticGoldFrames() : _getStaticCyanFrames();
+}
+
+// Proactive eager initialization in browser environment
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getStaticCyanFrames();
+  _getStaticGoldFrames();
+}
+
+/**
+ * Renders static electricity debuff visual with authentic 12-frame animated electric sprite
+ * extracted directly from the canonical Graal reference 1OQOh2.gif (VFX 6).
+ * Supports Cyan (Zeus/generic) and Gold (Zenitsu Thunderclap) palettes.
+ */
+export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 100, fighter = null) {
   ctx.save();
-  const now = Date.now();
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   const pulse = Math.sin(now * 0.015) * 0.5 + 0.5;
   const alpha = Math.max(0.3, Math.min(1.0, (timer || 100) / 40));
 
-  // 1. Faint buzzing electric halo
-  ctx.strokeStyle = `rgba(0, 235, 255, ${0.45 * alpha * (0.8 + pulse * 0.2)})`;
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.arc(0, 0, baseRadius * (1.06 + pulse * 0.06), 0, Math.PI * 2);
-  ctx.stroke();
+  const isZenitsu = Boolean(fighter && (fighter.staticDebuffSource === 'zenitsu' || (fighter.zenitsuStaticDebuffTimer || 0) > 0));
+  const primaryColor = isZenitsu
+    ? `rgba(245, 158, 11, ${0.45 * alpha * (0.8 + pulse * 0.2)})`
+    : `rgba(0, 235, 255, ${0.45 * alpha * (0.8 + pulse * 0.2)})`;
+  const sparkColor = isZenitsu ? '#FFFBEB' : '#FFFFFF';
+  const badgeTextColor = isZenitsu ? '#FBBF24' : '#00F3FF';
+  const badgeText = isZenitsu ? '⚡ STATIC (+20%)' : '⚡ STATIC (+33%)';
+  const arcGlow = isZenitsu ? 'rgba(245, 158, 11, ' : 'rgba(0, 220, 255, ';
+  const arcCore = isZenitsu ? 'rgba(255, 251, 235, ' : 'rgba(255, 255, 255, ';
 
-  // 2. Persistent static electric arcs ORBITING around the body
-  const staticOrbits = [
-    { tilt: 0.40,  rMult: 1.24, bRatio: 0.50, speed: 0.0050, span: 1.7, jitter: 3.2, phase: 0.5 },
-    { tilt: -0.70, rMult: 1.30, bRatio: 0.45, speed: -0.0045, span: 1.9, jitter: 3.6, phase: 3.2 }
-  ];
+  // 1. 12-Frame Authentic Animated Static Electric Sprite (Assets/effects/Static Effect/)
+  // Cadence: 30 FPS (33ms per frame, matching reference 1OQOh2.gif)
+  const frames = _getStaticEffectFrames(isZenitsu);
+  const frameIndex = Math.floor((now * 0.030) % STATIC_EFFECT_FRAME_COUNT);
+  const frameImg = frames[frameIndex];
 
-  for (let i = 0; i < staticOrbits.length; i++) {
-    const ob = staticOrbits[i];
-    const orbitR = baseRadius * ob.rMult;
-    const curAngle = now * ob.speed + ob.phase;
-    _drawOrbitingElectricArc(ctx, orbitR, ob.bRatio, ob.tilt, curAngle, ob.span, alpha * 0.85, ob.jitter, now + i * 93);
+  let spriteDrawn = false;
+  if (frameImg && frameImg.complete && ((frameImg.naturalWidth || frameImg.width || 0) > 0)) {
+    const drawSize = (baseRadius || 25) * 3.20; // 80px envelope hugging 25px radius body perimeter
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    const prevAlpha = ctx.globalAlpha;
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
+    ctx.drawImage(frameImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+    ctx.imageSmoothingEnabled = prevSmoothing;
+    ctx.globalAlpha = prevAlpha;
+    spriteDrawn = true;
   }
 
-  // Orbiting static spark nodes
-  const numStaticSparks = 4;
-  ctx.fillStyle = '#FFFFFF';
-  for (let s = 0; s < numStaticSparks; s++) {
-    const ob = staticOrbits[s % staticOrbits.length];
-    const sparkAngle = (now * ob.speed * 1.2) + (s * (Math.PI * 2 / numStaticSparks));
-    const ex = Math.cos(sparkAngle) * (baseRadius * ob.rMult);
-    const ey = Math.sin(sparkAngle) * (baseRadius * ob.rMult * ob.bRatio);
-    const cosT = Math.cos(ob.tilt);
-    const sinT = Math.sin(ob.tilt);
-    const sx = ex * cosT - ey * sinT;
-    const sy = ex * sinT + ey * cosT;
-    ctx.fillRect(sx - 1.2, sy - 1.2, 2.4, 2.4);
+  // Fallback to procedural electric halo & arcs if 12-frame sprite assets are still loading or in headless tests
+  if (!spriteDrawn) {
+    ctx.strokeStyle = primaryColor;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, baseRadius * (1.04 + pulse * 0.04), 0, Math.PI * 2);
+    ctx.stroke();
+
+    const staticOrbits = [
+      { tilt: 0.40,  rMult: 1.24, bRatio: 0.50, speed: 0.0050, span: 1.7, jitter: 3.2, phase: 0.5 },
+      { tilt: -0.70, rMult: 1.30, bRatio: 0.45, speed: -0.0045, span: 1.9, jitter: 3.6, phase: 3.2 }
+    ];
+
+    for (let i = 0; i < staticOrbits.length; i++) {
+      const ob = staticOrbits[i];
+      const orbitR = baseRadius * ob.rMult;
+      const curAngle = now * ob.speed + ob.phase;
+      _drawOrbitingElectricArc(ctx, orbitR, ob.bRatio, ob.tilt, curAngle, ob.span, alpha * 0.85, ob.jitter, now + i * 93, arcGlow, arcCore);
+    }
+
+    const numStaticSparks = 4;
+    ctx.fillStyle = sparkColor;
+    for (let s = 0; s < numStaticSparks; s++) {
+      const ob = staticOrbits[s % staticOrbits.length];
+      const sparkAngle = (now * ob.speed * 1.2) + (s * (Math.PI * 2 / numStaticSparks));
+      const ex = Math.cos(sparkAngle) * (baseRadius * ob.rMult);
+      const ey = Math.sin(sparkAngle) * (baseRadius * ob.rMult * ob.bRatio);
+      const cosT = Math.cos(ob.tilt);
+      const sinT = Math.sin(ob.tilt);
+      const sx = ex * cosT - ey * sinT;
+      const sy = ex * sinT + ey * cosT;
+      ctx.fillRect(sx - 1.2, sy - 1.2, 2.4, 2.4);
+    }
   }
 
-  // 3. Upright floating "⚡ STATIC (+33%)" status badge above head
+  // 2. Upright floating status badge above head
   ctx.save();
   if (typeof ctx.getTransform === 'function') {
     const m = ctx.getTransform();
@@ -558,9 +680,9 @@ export function drawZeusStaticDebuffEffect(ctx, baseRadius, timer = 100) {
   ctx.textBaseline = 'bottom';
   ctx.lineWidth = 2.8;
   ctx.strokeStyle = 'rgba(10, 20, 35, 0.90)';
-  ctx.strokeText('⚡ STATIC (+33%)', 0, badgeY);
-  ctx.fillStyle = '#00F3FF';
-  ctx.fillText('⚡ STATIC (+33%)', 0, badgeY);
+  ctx.strokeText(badgeText, 0, badgeY);
+  ctx.fillStyle = badgeTextColor;
+  ctx.fillText(badgeText, 0, badgeY);
 
   ctx.restore();
   ctx.restore();
@@ -1807,8 +1929,8 @@ export const STATUS_OVERLAY_REGISTRY = [
   },
   {
     id: 'zeusStaticDebuff',
-    isActive: (f) => (f.staticDebuffTimer || 0) > 0,
-    render: (ctx, baseRadius, f) => drawZeusStaticDebuffEffect(ctx, baseRadius, f.staticDebuffTimer)
+    isActive: (f) => (f.staticDebuffTimer || 0) > 0 || (f.zenitsuStaticDebuffTimer || 0) > 0,
+    render: (ctx, baseRadius, f) => drawZeusStaticDebuffEffect(ctx, baseRadius, Math.max(f.staticDebuffTimer || 0, f.zenitsuStaticDebuffTimer || 0), f)
   },
   {
     id: 'nanamiArmorFracture',

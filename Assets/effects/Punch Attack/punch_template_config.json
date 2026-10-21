@@ -1,0 +1,97 @@
+{
+  "name": "canonical-12-frame-punch-template",
+  "category": "melee-martial-punch",
+  "version": "1.0.0",
+  "frameCount": 12,
+  "frameWidth": 256,
+  "frameHeight": 256,
+  "stripWidth": 3072,
+  "stripHeight": 256,
+  "pivotAnchor": {
+    "x": 128,
+    "y": 128,
+    "description": "True geometric detonation center in 256x256 frame space. Aligns directly with fist/impact contact point."
+  },
+  "impactEpicenter": {
+    "x": 128,
+    "y": 128,
+    "radius": 115.0,
+    "description": "Detonation epicenter of the concussive punch shockwave and compression core."
+  },
+  "scaling": {
+    "formula": "scale = (fighterRadius / 25.0) * (isHeavyPunch ? 1.25 : 1.0)",
+    "drawWidth": "256 * scale",
+    "drawHeight": "256 * scale",
+    "drawAnchorX": "128 * scale",
+    "drawAnchorY": "128 * scale"
+  },
+  "phaseMapping": {
+    "phase1_ignition": {
+      "frame": "punch-1.png",
+      "index": 0,
+      "description": "Point-of-contact ignition spark (sharp diamond flash flare)"
+    },
+    "phase2_bloom": {
+      "frame": "punch-2.png",
+      "index": 1,
+      "description": "Expanding golden starburst contact disc bloom"
+    },
+    "phase3_starburst": {
+      "frame": "punch-3.png",
+      "index": 2,
+      "description": "Peak volumetric starburst with brilliant cyan & golden flare points"
+    },
+    "phase4_compression": {
+      "frame": "punch-4.png",
+      "index": 3,
+      "description": "High-pressure purple core compression disc with white cross and orange tension spokes"
+    },
+    "phase5_supersonic_ring": {
+      "frame": "punch-5.png",
+      "index": 4,
+      "description": "Supersonic Mach compression ring with vibrant orange ionization rim"
+    },
+    "phase6_expanding_ring": {
+      "frame": "punch-6.png",
+      "index": 5,
+      "description": "Expanding shockwave wavefront with velocity particulate debris"
+    },
+    "phase7_kinetic_cleave": {
+      "frame": "punch-7.png",
+      "index": 6,
+      "description": "High-velocity directional kinetic cleave lines through target flesh"
+    },
+    "phase8_force_propagation": {
+      "frame": "punch-8.png",
+      "index": 7,
+      "description": "Expanding force cleave pushing outward across the impact plane"
+    },
+    "phase9_flying_sparks": {
+      "frame": "punch-9.png",
+      "index": 8,
+      "description": "Concussive ember and spark scatter bursting outward"
+    },
+    "phase10_impact_cloud": {
+      "frame": "punch-10.png",
+      "index": 9,
+      "description": "Centralized concussive impact smoke cloud with cooling sparks"
+    },
+    "phase11_smoke_dissolution": {
+      "frame": "punch-11.png",
+      "index": 10,
+      "description": "Dissolving smoke clumps breaking into micro-particulates"
+    },
+    "phase12_residue_fade": {
+      "frame": "punch-12.png",
+      "index": 11,
+      "description": "Final residue embers dispersing into nothingness"
+    }
+  },
+  "colorPalettes": {
+    "default_concussive": "Default vibrant golden starburst, purple compression core, supersonic blue ring, and orange sparks",
+    "black_flash_crimson": "ctx.filter = 'hue-rotate(145deg) saturate(1.8) contrast(1.2)';",
+    "curse_blue": "ctx.filter = 'hue-rotate(210deg) saturate(1.4)';",
+    "holy_gold": "ctx.filter = 'hue-rotate(45deg) saturate(1.5) brightness(1.1)';"
+  }
+}
+

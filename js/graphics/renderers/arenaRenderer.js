@@ -937,7 +937,41 @@ export function drawArena() {
     drawArenaBorder(ctx, false);
   }
 
-  // 5. Watermark removed for clean arena floor
+  // 5. In-Arena Floor Watermark Brand Tag (@CronosphereFOC) positioned below in the arena near bottom wall
+  {
+    const watermarkCfg = (typeof CONFIG !== 'undefined' && CONFIG.arenaWatermark) ? CONFIG.arenaWatermark : null;
+    const showWatermark = watermarkCfg ? watermarkCfg.enabled !== false : true;
+    if (showWatermark && !suppressArenaFloor) {
+      ctx.save();
+      applyCameraToCtx(ctx);
+      const text = watermarkCfg?.text || '@CronosphereFOC';
+      const fontSize = watermarkCfg?.fontSize || 14;
+      const font = `700 ${fontSize}px ${watermarkCfg?.fontFamily || '"Outfit", "Rajdhani", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}`;
+      ctx.font = font;
+      if ('letterSpacing' in ctx) {
+        ctx.letterSpacing = watermarkCfg?.letterSpacing || '1px';
+      }
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const watermarkX = arena.x + arena.width / 2;
+      const bottomOffset = watermarkCfg?.bottomOffset || 22;
+      const watermarkY = Math.round(arena.y + arena.height - bottomOffset);
+
+      // Contrast stroke outline so bright font pops clearly against all arena tiles/floors
+      const strokeWidth = watermarkCfg?.strokeWidth ?? 2.5;
+      if (strokeWidth > 0) {
+        ctx.strokeStyle = watermarkCfg?.strokeColor || 'rgba(0, 0, 0, 0.75)';
+        ctx.lineWidth = strokeWidth;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(text, watermarkX, watermarkY);
+      }
+
+      // Bright font fill color
+      ctx.fillStyle = watermarkCfg?.color || (isDark ? '#FFFFFF' : '#FFFFFF');
+      ctx.fillText(text, watermarkX, watermarkY);
+      ctx.restore();
+    }
+  }
 
   // 6. Cached Title Header (text only)
   const showTitle = (typeof CONFIG !== 'undefined' && CONFIG.showArenaTitle !== undefined) ? CONFIG.showArenaTitle : false;
@@ -1693,20 +1727,6 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
       ctx.fillText(roundText, centerX, arena.y + 0.5);
       ctx.restore();
     }
-
-    // ── Bottom / Footer Brand Handle: @CronosphereFOC (Anchored to Arena in Camera Space) ──
-    ctx.save();
-    applyCameraToCtx(ctx);
-    const footerFont = '500 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
-    ctx.font = footerFont;
-    if ('letterSpacing' in ctx) ctx.letterSpacing = '0.2px';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillStyle = isDark ? '#94A3B8' : '#64748B';
-    const arenaCenterX = arena.x + arena.width / 2;
-    const footerY = Math.round(arena.y + arena.height + 42);
-    ctx.fillText('@CronosphereFOC', arenaCenterX, footerY);
-    ctx.restore();
 
     // ── Horizontal Side Character Dolls (Occupying Space Below Left & Right HUDs in 1v1 Mode) ──
     const shouldRenderDolls = renderDolls && leftData.length === 1 && rightData.length === 1 && leftFighters[0] && rightFighters[0];

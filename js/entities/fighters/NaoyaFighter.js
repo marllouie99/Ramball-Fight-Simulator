@@ -682,6 +682,9 @@ export class NaoyaFighter extends Fighter {
           if (typeof t.applyKnockback === 'function') {
             t.applyKnockback(Math.cos(aimAngle) * 6, Math.sin(aimAngle) * 6, 8);
           }
+          if (typeof spawnAnimePunchImpactFrame === 'function') {
+            spawnAnimePunchImpactFrame(t.x, t.y, 60, aimAngle, 'crimson');
+          }
           spawnBloodEffect(t.x, t.y, 8);
         }
       }
@@ -1432,6 +1435,9 @@ export class NaoyaFighter extends Fighter {
               target.vy = (target.vy || 0) + Math.sin(kAngle) * knockback;
             }
 
+            if (typeof spawnAnimePunchImpactFrame === 'function' && (isFinisher || (this.flurryHitsDone % 2 === 0))) {
+              spawnAnimePunchImpactFrame(target.x, target.y, isFinisher ? 70 : 50, targetAngle, 'lime');
+            }
             spawnBloodEffect(target.x, target.y, isFinisher ? 10 : 3);
             spawnImpactFlash(target.x, target.y, isFinisher ? 18 : 10, isFinisher ? '#FFFFFF' : this.themeColor);
           }

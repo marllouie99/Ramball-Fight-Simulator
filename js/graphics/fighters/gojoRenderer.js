@@ -1047,7 +1047,7 @@ export class GojoRenderer {
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha * 1.5));
 
     // 1. Bright white center void
-    ctx.fillStyle = '#FFFFFF';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
     ctx.beginPath();
     ctx.arc(0, 0, 70 * (1 + progress * 0.3), 0, Math.PI * 2);
     ctx.fill();

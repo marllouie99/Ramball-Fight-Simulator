@@ -628,6 +628,9 @@ export class Fighter {
 
     this.slowTimer = 0;
     this.voidMarkTimer = 0;
+    this.staticDebuffTimer = 0;
+    this.zenitsuStaticDebuffTimer = 0;
+    this.staticDebuffSource = null;
     this.slowMultiplier = 1;
     this.hitStunTimer = 0;
     this.hitStunMultiplier = 1;

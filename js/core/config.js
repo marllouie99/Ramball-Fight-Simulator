@@ -284,6 +284,17 @@ export const CONFIG = {
   hudWidthModifier: 1.0,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
   bottomHudWidthModifier: 1.007,    // Bottom HUD width relative to raw arena width (1.007 = aligns flush with arena side borders)
   showArenaTitle: false,             // Set to true to display the "Fight of Characters / Ball Fight Simulator" title header above the arena, false to hide it
+  arenaWatermark: {
+    enabled: true,
+    text: '@CronosphereFOC',
+    fontSize: 14,
+    fontFamily: '"Outfit", "Rajdhani", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    letterSpacing: '1px',
+    bottomOffset: 22,
+    color: '#FFFFFF',                 // Bright font color
+    strokeColor: 'rgba(0, 0, 0, 0.75)', // High-contrast ink outline
+    strokeWidth: 2.5
+  },
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // PER-FIGHTER TUNINGs

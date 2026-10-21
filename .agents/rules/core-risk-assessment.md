@@ -1,6 +1,6 @@
 ---
 description: Mandatory risk assessment protocol when modifying core engine and shared system files.
-globs: ["js/entities/fighter.js", "js/core/state.js", "js/systems/projectileSystem.js", "js/systems/physics.js", "js/systems/renderSystem.js", "js/graphics/hudManager.js", "js/systems/updateSystem.js", "gameLoop.js", "js/core/main.js"]
+globs: "js/entities/fighter.js, js/core/state.js, js/systems/projectileSystem.js, js/systems/physics.js, js/systems/renderSystem.js, js/graphics/hudManager.js, js/systems/updateSystem.js, gameLoop.js, js/core/main.js"
 ---
 
 # Core Changes Risk Assessment Standard
