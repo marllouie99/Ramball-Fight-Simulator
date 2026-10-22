@@ -53,71 +53,47 @@ export const tojiConfig = {
   postUltimateInitialSlowMultiplier: 0.20, // Initial slow movement multiplier (20% speed) immediately after final blow before accelerating back to normal
   ultimateCraterSlashFadeFrames: 28, // Smooth visual follow-through and dissipation fadeout duration (frames) for 360 final blow crescent slash
 
-  // Primary Melee: Inverted Spear of Heaven (Amanosakahoko - "Stab & Rip" 2-Hit Assassin Dagger Combo)
+  // Primary Melee: Inverted Spear of Heaven (Amanosakahoko)
   enableSpear: true,                 // Master toggle for Primary Melee: Inverted Spear of Heaven
-  spearRange: 55,                    // Distance required to land melee hit (55px dagger reach)
-  spearReach: 55,                    // Alias for reach
+  spearRange: 50,                    // Distance required to land melee hit (50px reach)
+  spearReach: 50,                    // Alias for reach
   spearCooldown: 32,                 // Crisp assassin attack cooldown (~0.53s swing cadence)
   spearTremorIntensity: 1.8,         // Micro-tremor amplitude (px) during impact lock (±1.8px)
-  spearComboResetFrames: 60,         // Frame window to chain into Hit 2 before resetting to Hit 1 (~1.0s at 60fps)
 
-  // ── Hit 1: The Piston Plunge (Hypersonic Linear Needle Penetration Thrust) ──
-  hit1LiftFrames: 10,                 // Fast coil pullback tight to chest/ribs (~0.06s)
-  hit1HoldFrames: 10,                 // Tense poised hold at coil apex (~0.016s)
-  hit1StrikeFrames: 4,               // Hypersonic forward plunge straight into torso (~0.06s)
-  hit1ImpactLockFrames: 10,           // CANONICAL IMPACT LOCK: Dagger embedded deep inside target flesh (~0.06s)
-  hit1LockFrames: 4,                 // Shorthand alias
-  hit1PinFrames: 4,                  // Melee pin alias
-  hit1GroundPinFrames: 4,            // Alias
-  hit1RecoveryFrames: 5,             // Clean linear extraction and snap to ready stance (~0.08s)
-  hit1HitPauseFrames: 3,             // Meaty freeze-frame hit-pause on blade puncture
-  hit1LungeSpeed: 8.5,               // Explosive forward lunging puncture step
-  hit1ArcAngle: (45 * Math.PI) / 180, // Narrow 45° piercing cone angle
-  hit1Damage: 14,                    // Puncture wound True Damage
-  hit1Knockback: 2.2,                // Controlled piercing flinch impulse
-  hit1HitStunFrames: 0,              // Hit stun frames on basic attack hit
-  hit1ImpactShake: 3.0,              // Concussive screen shake on puncture
-  hit1ImpactShakeDuration: 6,        // Screen shake duration in frames
-
-  // ── Hit 2: The Throat Carve / Vicious Cross-Rip (Horizontal Cleave out of Puncture) ──
-  hit2LiftFrames: 3,                 // Snap-coil blade sideways for cross-tear (~0.05s)
-  hit2HoldFrames: 1,                 // Coiled tension at strike plane (~0.016s)
-  hit2StrikeFrames: 5,               // Hypersonic horizontal whip-rip tearing across chest (~0.08s)
-  hit2ImpactLockFrames: 5,           // CANONICAL IMPACT LOCK: Dagger latches firmly at cleave apex (~0.08s)
-  hit2LockFrames: 5,                 // Shorthand alias
-  hit2PinFrames: 5,                  // Melee pin alias
-  hit2GroundPinFrames: 5,            // Alias
-  hit2RecoveryFrames: 7,             // Settle back to low assassin guard stance (~0.12s)
-  hit2HitPauseFrames: 4,             // Heavy freeze-frame hit-pause on flesh tear
-  hit2LungeSpeed: 7.0,               // Forward cross-cleave step momentum
-  hit2ArcAngle: (125 * Math.PI) / 180, // 125° horizontal ripping arc cone
-  hit2Damage: 20,                    // Finisher cross-cleave True Damage
-  hit2Knockback: 4.5,                // Concussive knockback impulse launching enemy back
-  hit2HitStunFrames: 0,              // Hit stun frames
-  hit2ImpactShake: 4.5,              // Heavy concussive screen shake
-  hit2ImpactShakeDuration: 8,        // Screen shake duration in frames
+  // ── Hit 1: The Chemical Cleave (High-Angle Shoulder Coil & Hypersonic Slash — Maki Standard) ──
+  hit1LiftFrames: 5,                 // Frames to lift weapon into high shoulder anticipation coil (~0.08s)
+  hit1HoldFrames: 2,                 // Poised hold at overhead apex before snapping down (~0.03s)
+  hit1StrikeFrames: 6,               // Hypersonic downward whip-chop stroke (~0.10s) with power curve
+  hit1ImpactLockFrames: 6,           // CANONICAL IMPACT LOCK: Exact frames weapon locks firmly at impact before recovery begins (~0.10s)
+  hit1LockFrames: 6,                 // Shorthand alias
+  hit1PinFrames: 6,                  // Melee floor/ground pin alias
+  hit1GroundPinFrames: 6,            // Alias
+  hit1RecoveryFrames: 9,             // Frames for lifting blade from impact lock & settling stance (~0.15s)
+  hit1HitPauseFrames: 3,             // Meaty freeze-frame hit-pause on blade contact
+  hit1LungeSpeed: 5.5,               // Forward lunging step momentum speed during the strike
+  hit1ArcAngle: (160 * Math.PI) / 180, // ~160° frontal cleave arc
+  hit1Damage: 14,                    // Base true damage per swing
+  hit1Knockback: 2.5,                // Physical push velocity impulse on basic attack hit
+  hit1HitStunFrames: 0,              // Hit stun frames on basic attack hit (0 = no freeze/hit-stun on basic attacks)
+  hit1ImpactShake: 3.5,              // Concussive screen shake on hit (Rule 30 satisfying slap)
+  hit1ImpactShakeDuration: 8,        // Screen shake duration in frames
 
   // Direct spear* aliases for full backward compatibility
-  spearLiftFrames: 4,
-  spearHoldFrames: 1,
-  spearStrikeFrames: 4,
-  spearImpactLockFrames: 4,
-  spearRecoveryFrames: 5,
+  spearLiftFrames: 5,
+  spearHoldFrames: 2,
+  spearStrikeFrames: 6,
+  spearImpactLockFrames: 6,
+  spearRecoveryFrames: 9,
   spearDamage: 14,
-  spearKnockback: 2.2,
+  spearKnockback: 2.5,
   spearHitStun: 0,
 
   // Legacy fallback aliases
-  comboHit1Frames: 18,
+  comboHit1Frames: 28,
   comboHit1Damage: 14,
-  comboHit1Knockback: 2.2,
-  comboHit1Lunge: 8.5,
-  comboHit1Arc: (45 * Math.PI) / 180,
-  comboHit2Frames: 21,
-  comboHit2Damage: 20,
-  comboHit2Knockback: 4.5,
-  comboHit2Lunge: 7.0,
-  comboHit2Arc: (125 * Math.PI) / 180,
+  comboHit1Knockback: 2.5,
+  comboHit1Lunge: 5.5,
+  comboHit1Arc: (160 * Math.PI) / 180,
   silenceDuration: 180,              // Frames target is Silenced on hit (3.0 seconds at 60fps)
   pierceInfinity: false,             // Does not bypass Gojo's Limitless Infinity barrier
   regenDebuffDuration: 300,          // Duration in frames (5.0s) for Decrease Regen debuff applied on basic attack hit

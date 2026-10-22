@@ -1042,6 +1042,7 @@ function endRoundIfTlfsEnded() {
 
         // Replace the old enemy
         state.fighters[1] = newEnemy;
+        if (typeof state.clearHealthHud === 'function') state.clearHealthHud();
         
         // Spawn "NEXT FIGHTER!" text
         spawnFloatingText(newEnemy.x, newEnemy.y - newEnemy.r - 20, 'NEW CHALLENGER!', '#ff4d4d');

@@ -132,13 +132,12 @@ export function updateChainPhysics(fighter) {
       }
     } else {
       // 5-Phase Melee Combat & Impact Lock (Rule 30 / Chemical Katana Motion Pattern — Maki Standard)
-      const isStep2 = (fighter.spearComboStep === 2);
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
-      const liftF = isStep2 ? (cfg.hit2LiftFrames ?? 3) : (cfg.hit1LiftFrames ?? 4);
-      const holdF = isStep2 ? (cfg.hit2HoldFrames ?? 1) : (cfg.hit1HoldFrames ?? 1);
-      const strikeF = isStep2 ? (cfg.hit2StrikeFrames ?? 5) : (cfg.hit1StrikeFrames ?? 4);
-      const lockF = isStep2 ? (cfg.hit2ImpactLockFrames ?? 5) : (cfg.hit1ImpactLockFrames ?? 4);
-      const recF = isStep2 ? (cfg.hit2RecoveryFrames ?? 7) : (cfg.hit1RecoveryFrames ?? 5);
+      const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+      const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+      const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+      const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+      const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
       const totalF = Math.max(1, liftF + holdF + strikeF + lockF + recF);
 
       const t1 = liftF / totalF;
@@ -146,64 +145,32 @@ export function updateChainPhysics(fighter) {
       const t3 = (liftF + holdF + strikeF) / totalF;
       const t4 = (liftF + holdF + strikeF + lockF) / totalF;
 
-      if (!isStep2) {
-        // ── HIT 1: THE PISTON PLUNGE (Pure Linear Penetration Thrust) ──
-        if (t < t1) {
-          const p = t / Math.max(0.001, t1);
-          const easeP = Math.sin(p * Math.PI * 0.5);
-          thrustDistance = -16 * easeP;
-          offsetAngle = (0.42 + (0.05 - 0.42) * easeP) * flipSign;
-        } else if (t < t2) {
-          thrustDistance = -16;
-          offsetAngle = 0.05 * flipSign;
-        } else if (t < t3) {
-          const p = (t - t2) / Math.max(0.001, t3 - t2);
-          const plungeCurve = 1 - Math.pow(1 - p, 2.6);
-          thrustDistance = -16 + (38 - (-16)) * plungeCurve;
-          offsetAngle = 0; // Pure linear alignment along aim vector!
-        } else if (t < t4) {
-          const pLock = (t - t3) / Math.max(0.001, t4 - t3);
-          const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
-          const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
-          const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.015);
-          thrustDistance = 38 + jitter;
-          offsetAngle = angJitter * flipSign;
-        } else {
-          const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
-          const easeRec = Math.pow(recP, 1.8);
-          const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.05;
-          thrustDistance = 38 * (1.0 - easeRec);
-          offsetAngle = (0.42 * easeRec + dampedWave) * flipSign;
-        }
+      if (t < t1) {
+        const p = t / Math.max(0.001, t1);
+        const easeP = Math.sin(p * Math.PI * 0.5); // sinusoidal anticipation ease
+        thrustDistance = -12 * easeP;
+        offsetAngle = (0.42 + (-2.35 - 0.42) * easeP) * flipSign;
+      } else if (t < t2) {
+        thrustDistance = -12;
+        offsetAngle = -2.35 * flipSign;
+      } else if (t < t3) {
+        const p = (t - t2) / Math.max(0.001, t3 - t2);
+        const sweepCurve = 1 - Math.pow(1 - p, 2.2); // explosive cleave acceleration
+        thrustDistance = -12 + 38 * Math.sin(p * Math.PI * 0.75); // reaches +26px forward
+        offsetAngle = (-2.35 + 3.70 * sweepCurve) * flipSign; // sweeps across 160°+ arc
+      } else if (t < t4) {
+        const pLock = (t - t3) / Math.max(0.001, t4 - t3);
+        const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
+        const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
+        const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.026);
+        thrustDistance = 26 + jitter;
+        offsetAngle = (1.35 + angJitter) * flipSign;
       } else {
-        // ── HIT 2: THE THROAT CARVE / CROSS-RIP (Horizontal Cleave out of Puncture) ──
-        if (t < t1) {
-          const p = t / Math.max(0.001, t1);
-          const easeP = Math.sin(p * Math.PI * 0.5);
-          thrustDistance = 10 * easeP;
-          offsetAngle = (0.42 + (-1.10 - 0.42) * easeP) * flipSign;
-        } else if (t < t2) {
-          thrustDistance = 10;
-          offsetAngle = -1.10 * flipSign;
-        } else if (t < t3) {
-          const p = (t - t2) / Math.max(0.001, t3 - t2);
-          const sweepCurve = 1 - Math.pow(1 - p, 2.4);
-          thrustDistance = 10 + 18 * Math.sin(p * Math.PI * 0.70);
-          offsetAngle = (-1.10 + 2.10 * sweepCurve) * flipSign; // Sweeps from -1.10 to +1.00 rad
-        } else if (t < t4) {
-          const pLock = (t - t3) / Math.max(0.001, t4 - t3);
-          const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
-          const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
-          const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.026);
-          thrustDistance = 28 + jitter;
-          offsetAngle = (1.00 + angJitter) * flipSign;
-        } else {
-          const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
-          const easeRec = Math.pow(recP, 1.8);
-          const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.06;
-          thrustDistance = 28 * (1.0 - easeRec);
-          offsetAngle = (1.00 + (0.42 - 1.00) * easeRec + dampedWave) * flipSign;
-        }
+        const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
+        const easeRec = Math.pow(recP, 1.8);
+        const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.06;
+        thrustDistance = 26 * (1.0 - easeRec);
+        offsetAngle = (1.35 + (0.42 - 1.35) * easeRec + dampedWave) * flipSign;
       }
     }
   } else {
@@ -392,11 +359,10 @@ export function deliverInvertedSpearImpact(fighter, primaryTarget, ownerIndex = 
   if (fighter.spearHitDelivered) return [];
   fighter.spearHitDelivered = true;
 
-  const isStep2 = (fighter.spearComboStep === 2) && !isAmbushThrust;
   const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
   const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
-  const reach = isAmbushThrust ? (cfg.ambushSpearReach || 80) : (cfg.spearRange || fighter.spearRange || 55);
-  const arc = isAmbushThrust ? (Math.PI * 0.67) : (isStep2 ? (cfg.hit2ArcAngle || ((125 * Math.PI) / 180)) : (cfg.hit1ArcAngle || ((45 * Math.PI) / 180)));
+  const reach = isAmbushThrust ? (cfg.ambushSpearReach || 80) : (cfg.spearRange || fighter.spearRange || 50);
+  const arc = isAmbushThrust ? (Math.PI * 0.67) : (cfg.hit1ArcAngle || (Math.PI * 0.88));
   let targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, arc);
 
   if (targets.length === 0 && primaryTarget && primaryTarget !== fighter && primaryTarget.hp > 0 && !primaryTarget.isDead) {
@@ -406,31 +372,22 @@ export function deliverInvertedSpearImpact(fighter, primaryTarget, ownerIndex = 
   // ── THE VISCERAL MEATY FLESH SLAP AUDIO COMBINATION (Rule 30 & Melee Animator Guide) ──
   try {
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      if (isStep2) {
-        // Hit 2: The Throat Carve / Vicious Cross-Rip
-        audioSystem.playSFX('attack_fleshhit', 1.15);     // Visceral meaty slap!
-        audioSystem.playSFX('sukuna_slice', 1.0);         // Lethal razor cutting cleave!
-        audioSystem.playSFX('attack_swordswing', 0.85);   // Swishing steel resonance
-        audioSystem.playSFX('skill_backstab', 0.60);
-      } else {
-        // Hit 1: The Piston Plunge (Hypersonic needle puncture)
-        audioSystem.playSFX('skill_backstab', 1.0);       // Signature Inverted Spear piercing puncture!
-        audioSystem.playSFX('attack_fleshhit', 1.0);      // High-speed concussive body slap!
-        audioSystem.playSFX('sukuna_slice', 0.50);
-      }
+      audioSystem.playSFX('attack_fleshhit', 1.0);     // The authentic visceral fleshy slap!
+      audioSystem.playSFX('sukuna_slice', 0.90);        // Razor cutting bite of the blade!
+      audioSystem.playSFX('skill_backstab', 0.70);      // Signature Inverted Spear piercing layer!
     }
   } catch (e) {}
 
-  const hitShake = isAmbushThrust ? 6 : (isStep2 ? (cfg.hit2ImpactShake || 4.5) : (cfg.hit1ImpactShake || 3.0));
-  const hitShakeDur = isAmbushThrust ? 8 : (isStep2 ? (cfg.hit2ImpactShakeDuration || 8) : (cfg.hit1ImpactShakeDuration || 6));
+  const hitShake = isAmbushThrust ? 6 : (cfg.hit1ImpactShake || 3.5);
+  const hitShakeDur = isAmbushThrust ? 8 : (cfg.hit1ImpactShakeDuration || 8);
   if (hitShake > 0 && hitShakeDur > 0) {
     triggerGlobalScreenShake(hitShake, hitShakeDur);
   }
 
-  const hitPause = isAmbushThrust ? 5 : (isStep2 ? (cfg.hit2HitPauseFrames || 4) : (cfg.hit1HitPauseFrames || 3));
+  const hitPause = isAmbushThrust ? 5 : (cfg.hit1HitPauseFrames || 3);
   fighter.spearHitTremorTimer = hitPause + 1;
 
-  const thrustDamage = isAmbushThrust ? (cfg.ambushBackThrustDamage ?? 50) : (isStep2 ? (cfg.hit2Damage || 20) : (cfg.hit1Damage || 14));
+  const thrustDamage = isAmbushThrust ? (cfg.ambushBackThrustDamage ?? 50) : (cfg.hit1Damage || fighter.spearDamage || 14);
 
   for (const target of targets) {
     let wasInfinityActive = false;
@@ -525,7 +482,7 @@ export function deliverInvertedSpearImpact(fighter, primaryTarget, ownerIndex = 
     if (!target.isTurret && !target.cannotBeKnockbacked) {
       target.isFirstHitKnockback = isAmbushThrust;
       const pushAngle = isAmbushThrust ? Math.atan2(target.y - fighter.y, target.x - fighter.x) : attackAngle;
-      const knockbackSpeed = isAmbushThrust ? (cfg.ambushSpearThrustKnockback || 8.5) : (isStep2 ? (cfg.hit2Knockback || 4.5) : (cfg.hit1Knockback || 2.2));
+      const knockbackSpeed = isAmbushThrust ? (cfg.ambushSpearThrustKnockback || 8.5) : (cfg.hit1Knockback || cfg.spearKnockback || 2.5);
       
       const kbVx = Math.cos(pushAngle) * knockbackSpeed;
       const kbVy = Math.sin(pushAngle) * knockbackSpeed;
@@ -606,24 +563,13 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
   fighter._slashOriginY = fighter.y;
   fighter._lastSpearTimer = 0;
 
-  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
-
-  if (!isAmbushThrust) {
-    if ((fighter.spearComboResetTimer || 0) <= 0) {
-      fighter.spearComboStep = 1;
-    } else {
-      fighter.spearComboStep = (fighter.spearComboStep === 1) ? 2 : 1;
-    }
-    fighter.spearComboResetTimer = cfg.spearComboResetFrames || 60;
-  }
-
-  const isStep2 = (fighter.spearComboStep === 2) && !isAmbushThrust;
   const speedMult = TOJI_WEAPON_CONFIG?.spearSwingAnimSpeed || 1.0;
-  const liftF = isStep2 ? (cfg.hit2LiftFrames ?? 3) : (cfg.hit1LiftFrames ?? 4);
-  const holdF = isStep2 ? (cfg.hit2HoldFrames ?? 1) : (cfg.hit1HoldFrames ?? 1);
-  const strikeF = isStep2 ? (cfg.hit2StrikeFrames ?? 5) : (cfg.hit1StrikeFrames ?? 4);
-  const lockF = isStep2 ? (cfg.hit2ImpactLockFrames ?? 5) : (cfg.hit1ImpactLockFrames ?? 4);
-  const recF = isStep2 ? (cfg.hit2RecoveryFrames ?? 7) : (cfg.hit1RecoveryFrames ?? 5);
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+  const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+  const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+  const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+  const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+  const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
   const baseSwingFrames = Math.max(1, liftF + holdF + strikeF + lockF + recF);
   fighter.spearSwingMax = Math.round((isAmbushThrust ? 36 : baseSwingFrames) / speedMult);
   fighter.spearSwingTimer = fighter.spearSwingMax;
@@ -633,14 +579,10 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     audioSystem.playSFX('skill_backstab', 0.85);
     return deliverInvertedSpearImpact(fighter, primaryTarget, ownerIndex, true);
   } else {
-    // Phase 1 anticipation coil swoosh
+    // Phase 1 anticipation coil swoosh!
     try {
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        if (isStep2) {
-          audioSystem.playSFX('attack_swordswing', 0.40);
-        } else {
-          audioSystem.playSFX('skill_dash1', 0.35);
-        }
+        audioSystem.playSFX('skill_dash1', 0.35);
       }
     } catch (e) {}
     return [];

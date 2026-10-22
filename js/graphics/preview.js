@@ -374,12 +374,11 @@ export function updateIndexDetailDemo(def, demoArea) {
 
         if (fighter.spearSwingTimer > 0) {
           const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
-          const isHit2 = (fighter.spearComboStep === 2);
-          const liftF = isHit2 ? (cfg.hit2LiftFrames ?? 3) : (cfg.hit1LiftFrames ?? 4);
-          const holdF = isHit2 ? (cfg.hit2HoldFrames ?? 1) : (cfg.hit1HoldFrames ?? 1);
-          const strikeF = isHit2 ? (cfg.hit2StrikeFrames ?? 5) : (cfg.hit1StrikeFrames ?? 4);
-          const lockF = isHit2 ? (cfg.hit2ImpactLockFrames ?? 5) : (cfg.hit1ImpactLockFrames ?? 4);
-          const recF = isHit2 ? (cfg.hit2RecoveryFrames ?? 7) : (cfg.hit1RecoveryFrames ?? 5);
+          const liftF = cfg.hit1LiftFrames ?? 5;
+          const holdF = cfg.hit1HoldFrames ?? 2;
+          const strikeF = cfg.hit1StrikeFrames ?? 6;
+          const lockF = cfg.hit1ImpactLockFrames ?? 6;
+          const recF = cfg.hit1RecoveryFrames ?? 9;
           const totalF = fighter.spearSwingMax || Math.max(1, liftF + holdF + strikeF + lockF + recF);
           const t2 = (liftF + holdF) / totalF;
           const t3 = (liftF + holdF + strikeF) / totalF;
@@ -389,13 +388,13 @@ export function updateIndexDetailDemo(def, demoArea) {
           // Phase 3 lunging step momentum toward dummy target
           if (progress >= t2 && progress < t3) {
             const pStrike = (progress - t2) / Math.max(0.001, t3 - t2);
-            fighter.x += Math.sin(pStrike * Math.PI) * (isHit2 ? 1.0 : 1.2);
+            fighter.x += Math.sin(pStrike * Math.PI) * 1.2;
             if (pStrike >= 0.50 && !pstate.tojiHitDelivered) {
               pstate.tojiHitDelivered = true;
               if (target) {
-                target.x += isHit2 ? 18 : 16;
-                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#EF4444' : '#A855F7', 0, isHit2 ? 30 : 26);
-                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#F59E0B' : '#EF4444', 0, 18);
+                target.x += 16;
+                previewProjectileSystem.addImpact(target.x, target.y, '#A855F7', 0, 26);
+                previewProjectileSystem.addImpact(target.x, target.y, '#EF4444', 0, 18);
               }
               fighter.deliverInvertedSpearImpact?.(target, 0, false);
             }
@@ -404,9 +403,9 @@ export function updateIndexDetailDemo(def, demoArea) {
             if (!pstate.tojiHitDelivered) {
               pstate.tojiHitDelivered = true;
               if (target) {
-                target.x += isHit2 ? 18 : 16;
-                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#EF4444' : '#A855F7', 0, isHit2 ? 30 : 26);
-                previewProjectileSystem.addImpact(target.x, target.y, isHit2 ? '#F59E0B' : '#EF4444', 0, 18);
+                target.x += 16;
+                previewProjectileSystem.addImpact(target.x, target.y, '#A855F7', 0, 26);
+                previewProjectileSystem.addImpact(target.x, target.y, '#EF4444', 0, 18);
               }
               fighter.deliverInvertedSpearImpact?.(target, 0, false);
             }
@@ -422,24 +421,11 @@ export function updateIndexDetailDemo(def, demoArea) {
         } else {
           fighter.x = demoArea.x + demoArea.width / 2 - 40;
           pstate.tojiCycleTimer = (pstate.tojiCycleTimer || 0) + 1;
-          const isHit2 = (fighter.spearComboStep === 2);
-          const recoveryWait = isHit2
-            ? ((CONFIG.toji?.hit2RecoveryFrames || 7) + 14)
-            : ((CONFIG.toji?.hit1RecoveryFrames || 5) + 12);
+          const recoveryWait = (CONFIG.toji?.hit1RecoveryFrames || 9) + 12;
           if (pstate.tojiCycleTimer >= recoveryWait || !pstate.tojiInitialized) {
             pstate.tojiInitialized = true;
             pstate.tojiHitDelivered = false;
-            let nextStep = 1;
-            if (currentAnim === 'toji_hit1') {
-              nextStep = 1;
-            } else if (currentAnim === 'toji_hit2') {
-              nextStep = 2;
-            } else {
-              // toji_combo, toji_basic, basic, spear
-              pstate.tojiComboStep = (pstate.tojiComboStep === 1) ? 2 : 1;
-              nextStep = pstate.tojiComboStep;
-            }
-            fighter.playBasicAttackPattern(nextStep, target);
+            fighter.playBasicAttackPattern(1, target);
             pstate.tojiCycleTimer = 0;
           }
         }

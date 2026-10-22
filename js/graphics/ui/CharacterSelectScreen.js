@@ -46,46 +46,48 @@ let _playerCardBounds = [];
 
 function drawTlfsEnemyPoolGrid(x, y, w, h) {
   const { ctx } = state;
-  // Deep Tactical Shadow
+  // Deep Comic Shadow
   ctx.save();
-  ctx.fillStyle = 'rgba(5, 7, 10, 0.70)';
-  drawChamferedRect(ctx, x + 3, y + 4, w, h, 6);
-  ctx.fill();
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  ctx.fillRect(x + 4, y + 5, w, h);
 
-  // Dark Tactical Carbon Base
-  ctx.fillStyle = '#141720';
-  ctx.strokeStyle = '#282E3C';
-  ctx.lineWidth = 1.6;
-  drawChamferedRect(ctx, x, y, w, h, 6);
-  ctx.fill();
-  ctx.stroke();
+  // Dark Comic Slate Base
+  ctx.fillStyle = '#14151D';
+  ctx.fillRect(x, y, w, h);
 
-  // Tech Corner Brackets
-  drawCornerBrackets(ctx, x + 3, y + 3, w - 6, h - 6, 12, '#F5A623', 1.8);
+  // Solid Black Manga Ink Outer Frame
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 3.5;
+  ctx.strokeRect(x, y, w, h);
 
   // Header band
-  ctx.fillStyle = '#181C26';
-  ctx.strokeStyle = '#282E3C';
-  ctx.lineWidth = 1.4;
-  drawChamferedRect(ctx, x + 2, y + 2, w - 4, 26, 4);
-  ctx.fill();
-  ctx.stroke();
+  const headerH = 28;
+  ctx.fillStyle = '#10121A';
+  ctx.fillRect(x + 2, y + 2, w - 4, headerH);
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 2, y + 2, w - 4, headerH);
 
-  // Top accent line
+  // Top accent pinstripe
   ctx.fillStyle = '#F5A623';
-  ctx.fillRect(x + 10, y + 2, w - 20, 2);
+  ctx.fillRect(x + 8, y + 2, w - 16, 2.5);
 
-  // Bottom hazard stripe
-  drawHazardStripes(ctx, x + 6, y + 23, w - 12, 3, 4, '#F5A623', '#101217');
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('ENEMY GAUNTLET POOL', x + w / 2, y + 14);
+  // Halftone wash in header
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x + 2, y + 2, w - 4, headerH);
+  ctx.clip();
+  _drawComicHalftoneField(ctx, x + 4, y + 2, w - 8, headerH, 'rgba(245, 166, 35, 0.25)');
   ctx.restore();
 
-  const cols = 4;
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('[ ENEMY GAUNTLET POOL ]', x + w / 2, y + 16);
+  ctx.restore();
+
+  const cols = w > 400 ? 6 : 4;
   const padding = 12;
   const availableW = w - padding * 2;
   const gap = 6;
@@ -93,7 +95,7 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
   const cellH = 56;
   
   const startX = x + padding;
-  let startY = y + 36;
+  let startY = y + 38;
   
   const currentDefs = getActiveFighterDefs();
   const poolFighters = currentDefs.map((def, idx) => ({ def, idx })).filter(({ def }) => def.type !== 'dummy');
@@ -109,18 +111,19 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
     ctx.save();
     if (isSelected) {
       ctx.fillStyle = '#1E2330';
+      ctx.fillRect(cellX, cellY, cellW, cellH);
       ctx.strokeStyle = '#F5A623';
-      ctx.lineWidth = 1.6;
-      drawChamferedRect(ctx, cellX, cellY, cellW, cellH, 3);
-      ctx.fill();
-      ctx.stroke();
+      ctx.lineWidth = 2.0;
+      ctx.strokeRect(cellX, cellY, cellW, cellH);
+      // Small gold corner pip
+      ctx.fillStyle = '#FFE145';
+      ctx.fillRect(cellX + 2, cellY + 2, 4, 4);
     } else {
-      ctx.fillStyle = '#111319';
+      ctx.fillStyle = '#101218';
+      ctx.fillRect(cellX, cellY, cellW, cellH);
       ctx.strokeStyle = '#232733';
       ctx.lineWidth = 1.2;
-      drawChamferedRect(ctx, cellX, cellY, cellW, cellH, 3);
-      ctx.fill();
-      ctx.stroke();
+      ctx.strokeRect(cellX, cellY, cellW, cellH);
     }
     ctx.restore();
     
@@ -640,7 +643,7 @@ function drawDynamicVsClashEmblem(ctx, vsX, vsY, isLandscape) {
 }
 
 function drawTacticalVsCrest(ctx, vsX, vsY) {
-  drawDynamicVsClashEmblem(ctx, vsX, vsY, true);
+  drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
 }
 
 function _drawComicHalftoneField(ctx, x0, y0, w, h, dotColor) {
@@ -762,7 +765,7 @@ function _drawComicBannerBackdrop(ctx, def, palette, isMirrored = false) {
   ctx.stroke();
 }
 
-function _drawComicCutInStage(ctx, def, fighterIndex, weaponInfo, isP1, palette, isMirrored = false) {
+function _drawComicCutInStage(ctx, def, fighterIndex, weaponInfo, isP1, palette, isMirrored = false, slotTag = null, teamTag = null) {
   const stickerImg = getFighterStickerPreview(fighterIndex) || getFighterPreview(fighterIndex);
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
   const phase = isP1 ? 0.0 : 1.7;
@@ -947,14 +950,16 @@ function _drawComicCutInStage(ctx, def, fighterIndex, weaponInfo, isP1, palette,
   const blockSwayY = Math.sin(now * 2.2 + phase) * 1.5;
   ctx.translate(mx(416), 14 + blockSwayY);
   ctx.rotate(blockTilt);
+  const displaySlot = slotTag || (isP1 ? 'P1' : 'P2');
+  const displayTeam = teamTag || (isP1 ? 'RED' : 'BLU');
   const blocks = isMirrored ? [
-    { txt: isP1 ? 'P1' : 'P2', bg: '#090A0F', fg: '#FFFFFF' },
-    { txt: isP1 ? 'RED' : 'BLU', bg: palette.primary, fg: '#FFFFFF' },
+    { txt: displaySlot, bg: '#090A0F', fg: '#FFFFFF' },
+    { txt: displayTeam, bg: palette.primary, fg: '#FFFFFF' },
     { txt: '▶', bg: '#090A0F', fg: '#FFFFFF' },
     { txt: '◀', bg: '#090A0F', fg: '#FFFFFF' },
   ] : [
-    { txt: isP1 ? 'P1' : 'P2', bg: '#090A0F', fg: '#FFFFFF' },
-    { txt: isP1 ? 'RED' : 'BLU', bg: palette.primary, fg: '#FFFFFF' },
+    { txt: displaySlot, bg: '#090A0F', fg: '#FFFFFF' },
+    { txt: displayTeam, bg: palette.primary, fg: '#FFFFFF' },
     { txt: '◀', bg: '#090A0F', fg: '#FFFFFF' },
     { txt: '▶', bg: '#090A0F', fg: '#FFFFFF' },
   ];
@@ -1066,7 +1071,7 @@ function _drawComicCutInStage(ctx, def, fighterIndex, weaponInfo, isP1, palette,
   ctx.restore();
 }
 
-function _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMirrored = false) {
+function _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMirrored = false, slotTag = null, slotLetter = null) {
   const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
   const phase = isP1 ? 0.0 : 1.7;
   const mx = (px) => isMirrored ? (508 - px) : px;
@@ -1127,7 +1132,7 @@ function _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMir
   ctx.font = '900 9px "Outfit", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(isP1 ? 'P1' : 'P2', 0, 0.5);
+  ctx.fillText(slotTag || (isP1 ? 'P1' : 'P2'), 0, 0.5);
 
   // Bold Comic Fighter Name
   ctx.font = '900 22px "Outfit", "Impact", "Rajdhani", sans-serif';
@@ -1260,7 +1265,7 @@ function _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMir
   ctx.fillStyle = '#CBD5E1';
   ctx.font = '800 8px "Outfit", monospace';
   ctx.textAlign = isMirrored ? 'left' : 'right';
-  ctx.fillText(`VX:${String(fighterIndex + 1).padStart(2, '0')}-${isP1 ? 'A' : 'B'}`, isMirrored ? -134 : 134, -14);
+  ctx.fillText(`VX:${String(fighterIndex + 1).padStart(2, '0')}-${slotLetter || (isP1 ? 'A' : 'B')}`, isMirrored ? -134 : 134, -14);
   ctx.restore();
 
   // Row of 10 Comic 5-Pointed Stars (with 2 oversized accent stars, 1:1 Reference + Animated Twinkle)
@@ -1385,30 +1390,35 @@ function _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMir
   ctx.restore(); // End Plate 3
 }
 
-function drawHeroicFighterCard(slotProp, title, x, y, w, h, isP1, enabled) {
+function drawTcgFighterSlotCard(slotProp, title, x, y, w, h, isP1, enabled, isMirrored = null, customSlotTag = null, customSlotLetter = null) {
   const { ctx } = state;
   const isAnyModalOpen = (selectingSlot !== null || isArenaBgmModalOpen() || isArenaFloorModalOpen());
   const isInteractive = enabled && !isAnyModalOpen;
-  const isMirrored = !isP1;
-
-  if (isInteractive) {
-    _playerCardBounds.push({ slotProp, x, y, w, h });
-  }
 
   const currentDefs = getActiveFighterDefs();
   const fighterIndex = state[slotProp] ?? 0;
   const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
-  const weaponInfo = getFighterWeaponInfo(def);
 
-  // Derive rich character-specific theme palette
-  const theme = getFighterCollectorTheme(def) || {};
-  const themeColor = def.themeColor || def.color || theme.primary || (isP1 ? '#EF4444' : '#38BDF8');
-  const palette = {
-    primary: themeColor,
-    dark: theme.dark || '#1A1115',
-    title: theme.title || themeColor,
-    border: theme.border || themeColor,
-  };
+  const slotTag = customSlotTag || (
+    slotProp === 'p1Index' ? 'P1' :
+    slotProp === 'p2Index' ? 'P2' :
+    slotProp === 'p3Index' ? 'P3' :
+    slotProp === 'p4Index' ? 'P4' :
+    slotProp === 'p5Index' ? 'P5' :
+    slotProp === 'p6Index' ? 'P6' : (isP1 ? 'P1' : 'P2')
+  );
+
+  const slotLetter = customSlotLetter || (
+    slotProp === 'p1Index' ? 'A' :
+    slotProp === 'p2Index' ? 'B' :
+    slotProp === 'p3Index' ? 'C' :
+    slotProp === 'p4Index' ? 'D' :
+    slotProp === 'p5Index' ? 'E' :
+    slotProp === 'p6Index' ? 'F' : (isP1 ? 'A' : 'B')
+  );
+
+  const teamTag = isP1 ? 'RED' : 'BLU';
+  const teamColor = isP1 ? '#EF4444' : '#38BDF8';
 
   const cycleFighter = (direction) => {
     if (!isInteractive) return;
@@ -1433,64 +1443,205 @@ function drawHeroicFighterCard(slotProp, title, x, y, w, h, isP1, enabled) {
     }
   };
 
-  const sx = w / 508;
-  const sy = h / 280;
+  // Dimensions & Aspect ratio matching Pokémon TCG Collector Card (156 : 170)
+  const isCompact = w < 180;
+  const hdrH = isCompact ? 24 : 26;
+  const btnH = isCompact ? 26 : 28;
+  const gap = isCompact ? 5 : 6;
 
-  // Register interactive hit zones (expanded to cover popped-out top and left/right areas)
+  // Compute maximum card dimensions that preserve the authentic TCG aspect ratio
+  const maxCardH = Math.max(130, h - hdrH - btnH - gap * 2);
+  const idealCardW = Math.round(maxCardH * (156 / 170));
+  const cardW = Math.min(w, idealCardW);
+  const cardH = Math.round(cardW * (170 / 156));
+
+  const totalSlotW = cardW;
+  const slotX = Math.round(x + (w - totalSlotW) / 2);
+  const cardY = y + hdrH + gap;
+  const btnY = cardY + cardH + gap;
+
   if (isInteractive) {
-    const prevBtnX = x + Math.round((isMirrored ? 38 : 416) * sx);
-    const prevBtnY = y + Math.round(2 * sy);
-    const nextBtnX = x + Math.round((isMirrored ? 62 : 444) * sx);
-    const btnW = Math.round(36 * sx);
-    const btnH = Math.round(36 * sy);
-
-    _registerButton(x - Math.round(25 * sx), y - Math.round(35 * sy), w + Math.round(50 * sx), h + Math.round(42 * sy), () => {
-      openFighterSelectModal(slotProp, state[slotProp] ?? 0);
-    });
-    _registerButton(prevBtnX, prevBtnY, btnW, btnH, () => cycleFighter(-1));
-    _registerButton(nextBtnX, prevBtnY, btnW, btnH, () => cycleFighter(1));
+    _playerCardBounds.push({ slotProp, x: slotX, y, w: totalSlotW, h: (btnY + btnH - y) });
   }
 
-  // Subtle Slot Index Tag ('A' / 'B') above top corner of banner (1:1 Reference)
+  // ── 1. Top Tactical Slot Header (Team Badge + Quick Cycle Buttons) ──
   ctx.save();
-  ctx.fillStyle = '#7DD3FC';
-  ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = isMirrored ? 'left' : 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText(isP1 ? 'A' : 'B', isMirrored ? (x + 8) : (x + w - 6), y - 5);
-  ctx.restore();
+  // Drop shadow
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  drawChamferedRect(ctx, slotX + 2, y + 2, totalSlotW, hdrH, 3);
+  ctx.fill();
 
-  // Outer Drop Shadow for base card frame
+  // Header base
+  ctx.fillStyle = '#12151E';
+  ctx.strokeStyle = teamColor;
+  ctx.lineWidth = 1.4;
+  drawChamferedRect(ctx, slotX, y, totalSlotW, hdrH, 3);
+  ctx.fill();
+  ctx.stroke();
+
+  // Left team color stripe
+  ctx.fillStyle = teamColor;
+  ctx.fillRect(slotX + 3, y + 3, 4, hdrH - 6);
+
+  // Role title text: [P1 // RED] or [BOSS // RED]
+  const displayTitle = customSlotTag ? `[ ${slotTag} ]` : (title ? `[ ${slotTag} // ${teamTag} ]` : `[ ${slotTag} ]`);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = isCompact ? '900 9.5px "Outfit", "Rajdhani", sans-serif' : '900 10.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(displayTitle, slotX + 11, y + hdrH / 2);
+
+  // Quick-cycle buttons on right: [◀] and [▶]
+  const arrowSize = isCompact ? 16 : 18;
+  const prevX = slotX + totalSlotW - arrowSize * 2 - (isCompact ? 5 : 8);
+  const nextX = slotX + totalSlotW - arrowSize - (isCompact ? 3 : 4);
+  const arrowY = y + (hdrH - arrowSize) / 2;
+
+  const drawCycleBtn = (bx, by, label, onClk) => {
+    ctx.save();
+    ctx.fillStyle = '#090B10';
+    ctx.strokeStyle = '#282D3C';
+    ctx.lineWidth = 1.2;
+    drawChamferedRect(ctx, bx, by, arrowSize, arrowSize, 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#FFE145';
+    ctx.font = '900 9px "Outfit", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bx + arrowSize / 2, by + arrowSize / 2 + 0.5);
+    ctx.restore();
+
+    if (isInteractive) {
+      _registerButton(bx, by, arrowSize, arrowSize, onClk);
+    }
+  };
+
+  drawCycleBtn(prevX, arrowY, '◀', () => cycleFighter(-1));
+  drawCycleBtn(nextX, arrowY, '▶', () => cycleFighter(1));
+
+  ctx.restore(); // End Header
+
+  // ── 2. Pokémon TCG Collector Card (Direct from Character Selection Menu) ──
+  drawCollectorFighterCard(
+    ctx,
+    def,
+    fighterIndex,
+    slotX,
+    cardY,
+    cardW,
+    cardH,
+    false,
+    () => openFighterSelectModal(slotProp, fighterIndex)
+  );
+
+  // ── 3. Bottom "SELECT FIGHTER ⯈" Action Button ──
   ctx.save();
-  ctx.fillStyle = 'rgba(4, 5, 8, 0.75)';
-  ctx.fillRect(x + 5, y + 6, w, h);
-  ctx.restore();
+  // Button drop shadow
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  drawChamferedRect(ctx, slotX + 2, btnY + 2, totalSlotW, btnH, 3);
+  ctx.fill();
 
-  // Render Reference 5 Comic Banner in normalized 508x280 coordinate space
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(sx, sy);
+  // Button body
+  ctx.fillStyle = '#0D1017';
+  ctx.strokeStyle = teamColor;
+  ctx.lineWidth = 1.4;
+  drawChamferedRect(ctx, slotX, btnY, totalSlotW, btnH, 3);
+  ctx.fill();
+  ctx.stroke();
 
-  // 1. Base card backdrop (Clipped to the card frame so halftone and watermarks stay inside)
+  // Sheen sweep across button
+  const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const t = now * 0.001 + (fighterIndex * 0.5);
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, 508, 280);
+  drawChamferedRect(ctx, slotX, btnY, totalSlotW, btnH, 3);
   ctx.clip();
-  _drawComicBannerBackdrop(ctx, def, palette, isMirrored);
+  const sheenP = (t * 0.75) % 1.0;
+  const sheenX = slotX - 30 + sheenP * (totalSlotW + 60);
+  const sheenGrad = ctx.createLinearGradient(sheenX - 15, btnY, sheenX + 15, btnY + btnH);
+  sheenGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  sheenGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.16)');
+  sheenGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(slotX, btnY, totalSlotW, btnH);
   ctx.restore();
 
-  // 2. Solid Black Manga Ink Outer Frame
-  ctx.strokeStyle = '#050609';
-  ctx.lineWidth = 3.5;
-  ctx.strokeRect(0, 0, 508, 280);
+  // Button text + animated arrow
+  const arrowSlide = Math.sin(t * 6.0) * 2.0;
+  const isCompactBtn = totalSlotW < 170;
+  const btnTxt = isCompactBtn ? 'SELECT' : 'SELECT FIGHTER';
+  ctx.font = isCompactBtn ? '900 10px "Outfit", "Impact", "Rajdhani", sans-serif' : '900 11px "Outfit", "Impact", "Rajdhani", sans-serif';
+  const txtW = ctx.measureText(btnTxt).width;
+  const contentW = txtW + 16;
+  const startX = slotX + (totalSlotW - contentW) / 2;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(btnTxt, startX, btnY + btnH / 2 + 0.5);
 
-  // 3. Popped-out elements drawn on top WITHOUT card-level clipping:
-  //    - Heroic Fighter Avatar (Pops out above top border y = -29!)
-  //    - Stepped Info Stack (Name plate pops out at top y = -10, Rank plate pops out at left/right)
-  _drawComicCutInStage(ctx, def, fighterIndex, weaponInfo, isP1, palette, isMirrored);
-  _drawComicSteppedInfoStack(ctx, def, fighterIndex, isP1, palette, isMirrored);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText('⯈', startX + txtW + 8 + arrowSlide, btnY + btnH / 2 + 0.5);
+  ctx.restore();
+
+  if (isInteractive) {
+    _registerButton(slotX, btnY, totalSlotW, btnH, () => {
+      openFighterSelectModal(slotProp, fighterIndex);
+    });
+  }
+}
+
+function _drawTeamHeaderBar(ctx, x, y, w, h, title, teamColor, isP1) {
+  ctx.save();
+  // Drop shadow
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  drawChamferedRect(ctx, x + 2, y + 2, w, h, 3);
+  ctx.fill();
+
+  // Dark tactical carbon base
+  ctx.fillStyle = '#141720';
+  ctx.strokeStyle = teamColor;
+  ctx.lineWidth = 1.4;
+  drawChamferedRect(ctx, x, y, w, h, 3);
+  ctx.fill();
+  ctx.stroke();
+
+  // Color accent stripe on leading edge
+  ctx.fillStyle = teamColor;
+  ctx.fillRect(isP1 ? x + 4 : x + w - 10, y + 3, 6, h - 6);
+
+  // Subtle interior gradient glow
+  const glowGrad = ctx.createLinearGradient(x, y, x + w, y);
+  if (isP1) {
+    glowGrad.addColorStop(0.0, 'rgba(239, 68, 68, 0.18)');
+    glowGrad.addColorStop(0.35, 'rgba(239, 68, 68, 0.0)');
+  } else {
+    glowGrad.addColorStop(0.65, 'rgba(56, 189, 248, 0.0)');
+    glowGrad.addColorStop(1.0, 'rgba(56, 189, 248, 0.18)');
+  }
+  ctx.fillStyle = glowGrad;
+  drawChamferedRect(ctx, x + 1, y + 1, w - 2, h - 2, 2.5);
+  ctx.fill();
+
+  // Squad Title text
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, x + w / 2, y + h / 2 + 0.5);
+
+  // Squad tag on flank
+  ctx.fillStyle = teamColor;
+  ctx.font = '900 9px "Outfit", sans-serif';
+  ctx.textAlign = isP1 ? 'right' : 'left';
+  ctx.fillText(isP1 ? 'TEAM RED' : 'TEAM BLUE', isP1 ? x + w - 14 : x + 18, y + h / 2 + 0.5);
 
   ctx.restore();
+}
+
+function drawHeroicFighterCard(slotProp, title, x, y, w, h, isP1, enabled, isMirrored = null, customSlotTag = null, customSlotLetter = null) {
+  return drawTcgFighterSlotCard(slotProp, title, x, y, w, h, isP1, enabled, isMirrored, customSlotTag, customSlotLetter);
 }
 
 function drawSelectScreen() {
@@ -1659,32 +1810,43 @@ function drawSelectScreen() {
     }
 
   } else if (isRegular1v2) {
+    const currentDefs = getActiveFighterDefs();
+
     if (isLandscape) {
+      const bannerW = Math.floor((totalCardW - cardGap) / 2);
+      const bannerH = 280;
       const leftX = margin;
-      const rightX = margin + cardW + cardGap;
-      const stackedH = Math.floor((fullCardH - cardGap) / 2);
-      const bottomY = topY + stackedH + cardGap;
+      const rightX = margin + bannerW + cardGap;
+      const duoW = Math.floor((bannerW - 10) / 2);
 
-      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', leftX, topY + 34, cardW, 264, true, true);
-      drawPlayerCard('p2Index', 'PLAYER 2 // BLUE', rightX, topY, cardW, stackedH, '#38bdf8', true);
-      drawPlayerCard('p3Index', 'PLAYER 3 // BLUE', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', leftX, topY + 10, bannerW, bannerH, true, true, false, 'P1', 'A');
+      drawHeroicFighterCard('p2Index', 'PLAYER 2 // BLUE', rightX, topY + 10, duoW, bannerH, false, true, true, 'P2', 'B');
+      drawHeroicFighterCard('p3Index', 'PLAYER 3 // BLUE', rightX + duoW + 10, topY + 10, duoW, bannerH, false, true, true, 'P3', 'C');
 
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, topY + bannerH / 2 + 10, true);
       drawBottomCommandDeck('START 1V2 BATTLE', () => startGame(), () => randomize1v2Fighters());
     } else {
-      const bannerW = canvas.width - 36;
-      const p1Y = 124;
-      const p1H = 276;
-      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', 18, p1Y, bannerW, p1H, true, true);
+      // Portrait: Exactly matches user's comic deployment screen!
+      // Top: Player 1 (Red) full-width Heroic Banner
+      // Center: Dynamic VS Clash Emblem
+      // Bottom: Two side-by-side Heroic Banners (P2 on left, P3 on right, both mirrored)
+      const bannerW = canvas.width - 36; // 504px
+      const bannerX = 18;
+      const p1Y = 120;
+      const p1H = 270;
 
-      const duoCardW = Math.floor((canvas.width - 44) / 2);
-      const duoY = p1Y + p1H + 38;
-      const duoH = 340;
-      drawPlayerCard('p2Index', 'PLAYER 2 // BLUE', 18, duoY, duoCardW, duoH, '#38bdf8', true);
-      drawPlayerCard('p3Index', 'PLAYER 3 // BLUE', 18 + duoCardW + 8, duoY, duoCardW, duoH, '#38bdf8', true);
+      drawHeroicFighterCard('p1Index', 'PLAYER 1 // RED', bannerX, p1Y, bannerW, p1H, true, true, false, 'P1', 'A');
 
-      const vsX = canvas.width / 2;
-      const vsY = p1Y + p1H + 19;
-      drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
+      const vsY = Math.round(p1Y + p1H + 32); // ~422
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, vsY, false);
+
+      const duoGap = 10;
+      const duoCardW = Math.floor((bannerW - duoGap) / 2); // 247px
+      const duoY = vsY + 34; // ~456
+      const duoH = 270; // Clean uniform proportion matching the TCG aesthetic
+
+      drawHeroicFighterCard('p2Index', 'PLAYER 2 // BLUE', bannerX, duoY, duoCardW, duoH, false, true, true, 'P2', 'B');
+      drawHeroicFighterCard('p3Index', 'PLAYER 3 // BLUE', bannerX + duoCardW + duoGap, duoY, duoCardW, duoH, false, true, true, 'P3', 'C');
 
       drawBottomCommandDeck('START 1V2 BATTLE', () => startGame(), () => randomize1v2Fighters());
     }
@@ -1705,13 +1867,10 @@ function drawSelectScreen() {
         const rightX = margin + bannerW + cardGap;
         const bannerY = topY + 34;
 
-        drawHeroicFighterCard('p1Index', bossCardTitle, leftX, bannerY, bannerW, bannerH, true, true);
-        drawHeroicFighterCard('p2Index', 'SOLO CHALLENGER', rightX, bannerY, bannerW, bannerH, false, true);
+        drawHeroicFighterCard('p1Index', bossCardTitle, leftX, bannerY, bannerW, bannerH, true, true, false, 'BOSS', 'A');
+        drawHeroicFighterCard('p2Index', 'SOLO CHALLENGER', rightX, bannerY, bannerW, bannerH, false, true, true, 'P1', 'B');
 
-        const vsX = canvas.width / 2;
-        const vsY = bannerY + bannerH / 2;
-        drawDynamicVsClashEmblem(ctx, vsX, vsY, true);
-
+        drawDynamicVsClashEmblem(ctx, canvas.width / 2, bannerY + bannerH / 2, true);
         drawBottomCommandDeck('START SOLO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
       } else {
         const bannerW = canvas.width - 36;
@@ -1720,127 +1879,218 @@ function drawSelectScreen() {
         const p1Y = 128;
         const p2Y = 468;
 
-        drawHeroicFighterCard('p1Index', bossCardTitle, bannerX, p1Y, bannerW, bannerH, true, true);
-        drawHeroicFighterCard('p2Index', 'SOLO CHALLENGER', bannerX, p2Y, bannerW, bannerH, false, true);
+        drawHeroicFighterCard('p1Index', bossCardTitle, bannerX, p1Y, bannerW, bannerH, true, true, false, 'BOSS', 'A');
+        drawHeroicFighterCard('p2Index', 'SOLO CHALLENGER', bannerX, p2Y, bannerW, bannerH, false, true, true, 'P1', 'B');
 
-        const vsX = canvas.width / 2;
-        const vsY = Math.round((p1Y + bannerH + p2Y) / 2);
-        drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
-
+        drawDynamicVsClashEmblem(ctx, canvas.width / 2, Math.round((p1Y + bannerH + p2Y) / 2), false);
         drawBottomCommandDeck('START SOLO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
       }
     } else {
-      // 1v2 Duo Challengers vs Boss
+      // 1v2 Duo Challengers vs Boss (Boss top, Duo Challengers side-by-side bottom)
       if (isLandscape) {
+        const bannerW = Math.floor((totalCardW - cardGap) / 2);
+        const bannerH = 280;
         const leftX = margin;
-        const rightX = margin + cardW + cardGap;
-        const stackedH = Math.floor((fullCardH - cardGap) / 2);
-        const bottomY = topY + stackedH + cardGap;
+        const rightX = margin + bannerW + cardGap;
+        const duoW = Math.floor((bannerW - 10) / 2);
 
-        drawHeroicFighterCard('p1Index', bossCardTitle, leftX, topY + 34, cardW, 264, true, true);
-        drawPlayerCard('p2Index', 'CHALLENGER 1', rightX, topY, cardW, stackedH, '#38bdf8', true);
-        drawPlayerCard('p3Index', 'CHALLENGER 2', rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+        drawHeroicFighterCard('p1Index', bossCardTitle, leftX, topY + 10, bannerW, bannerH, true, true, false, 'BOSS', 'A');
+        drawHeroicFighterCard('p2Index', 'CHALLENGER 1', rightX, topY + 10, duoW, bannerH, false, true, true, 'P1', 'B');
+        drawHeroicFighterCard('p3Index', 'CHALLENGER 2', rightX + duoW + 10, topY + 10, duoW, bannerH, false, true, true, 'P2', 'C');
 
+        drawDynamicVsClashEmblem(ctx, canvas.width / 2, topY + bannerH / 2 + 10, true);
         drawBottomCommandDeck('START DUO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
       } else {
         const bannerW = canvas.width - 36;
-        const p1Y = 124;
-        const p1H = 276;
-        drawHeroicFighterCard('p1Index', bossCardTitle, 18, p1Y, bannerW, p1H, true, true);
+        const bannerX = 18;
+        const p1Y = 120;
+        const p1H = 270;
 
-        const duoCardW = Math.floor((canvas.width - 44) / 2);
-        const duoY = p1Y + p1H + 38;
-        const duoH = 340;
-        drawPlayerCard('p2Index', 'CHALLENGER 1', 18, duoY, duoCardW, duoH, '#38bdf8', true);
-        drawPlayerCard('p3Index', 'CHALLENGER 2', 18 + duoCardW + 8, duoY, duoCardW, duoH, '#38bdf8', true);
+        drawHeroicFighterCard('p1Index', bossCardTitle, bannerX, p1Y, bannerW, p1H, true, true, false, 'BOSS', 'A');
 
-        const vsX = canvas.width / 2;
-        const vsY = p1Y + p1H + 19;
-        drawDynamicVsClashEmblem(ctx, vsX, vsY, false);
+        const vsY = Math.round(p1Y + p1H + 32);
+        drawDynamicVsClashEmblem(ctx, canvas.width / 2, vsY, false);
+
+        const duoGap = 10;
+        const duoCardW = Math.floor((bannerW - duoGap) / 2);
+        const duoY = vsY + 34;
+        const duoH = 270;
+
+        drawHeroicFighterCard('p2Index', 'CHALLENGER 1', bannerX, duoY, duoCardW, duoH, false, true, true, 'P1', 'B');
+        drawHeroicFighterCard('p3Index', 'CHALLENGER 2', bannerX + duoCardW + duoGap, duoY, duoCardW, duoH, false, true, true, 'P2', 'C');
 
         drawBottomCommandDeck('START DUO BOSS BATTLE', () => startGame(), () => randomize1v2Fighters());
       }
     }
 
-  } else if (mode === '2v2' || mode === 'FFA') {
-    const leftX = margin;
-    const rightX = margin + cardW + cardGap;
-    const stackedH = Math.floor((fullCardH - cardGap) / 2);
-    const bottomY = topY + stackedH + cardGap;
+  } else if (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'TWO_VS_TWO') {
+    if (isLandscape) {
+      const colW = Math.floor((totalCardW - cardGap) / 2);
+      const leftX = margin;
+      const rightX = margin + colW + cardGap;
+      const bannerH = 280;
+      const duoW = Math.floor((colW - 10) / 2);
 
-    const isTeamMode = mode === '2v2';
+      // Red Team (P1, P3 side-by-side)
+      drawHeroicFighterCard('p1Index', 'RED // SQUAD 1', leftX, topY + 10, duoW, bannerH, true, true, false, 'P1', 'A');
+      drawHeroicFighterCard('p3Index', 'RED // SQUAD 2', leftX + duoW + 10, topY + 10, duoW, bannerH, true, true, false, 'P3', 'B');
 
-    const p1Title = mode === '2v2' ? 'RED // SQUAD 1' : 'PLAYER 1';
-    const p2Title = mode === '2v2' ? 'BLUE // SQUAD 1' : 'PLAYER 2';
-    const p3Title = mode === '2v2' ? 'RED // SQUAD 2' : 'PLAYER 3';
-    const p4Title = mode === '2v2' ? 'BLUE // SQUAD 2' : 'PLAYER 4';
+      // Blue Team (P2, P4 side-by-side)
+      drawHeroicFighterCard('p2Index', 'BLUE // SQUAD 1', rightX, topY + 10, duoW, bannerH, false, true, true, 'P2', 'C');
+      drawHeroicFighterCard('p4Index', 'BLUE // SQUAD 2', rightX + duoW + 10, topY + 10, duoW, bannerH, false, true, true, 'P4', 'D');
 
-    const p1Color = mode === '2v2' ? '#cc2b4d' : '#ef4444';
-    const p2Color = mode === '2v2' ? '#38bdf8' : '#38bdf8';
-    const p3Color = mode === '2v2' ? '#cc2b4d' : '#f59e0b';
-    const p4Color = mode === '2v2' ? '#38bdf8' : '#a855f7';
-
-    const isFfa3 = (mode === 'FFA' || mode === GAME_MODES.FFA) && !isLandscape;
-
-    if (isFfa3) {
-      // Vertical FFA: Exactly 3 players (P1 top-left, P2 top-right, P3 bottom-center)
-      const centerX = canvas.width / 2;
-      const p3X = Math.round(centerX - cardW / 2);
-      drawPlayerCard('p1Index', 'PLAYER 1', leftX, topY, cardW, stackedH, '#ef4444', true);
-      drawPlayerCard('p2Index', 'PLAYER 2', rightX, topY, cardW, stackedH, '#38bdf8', true);
-      drawPlayerCard('p3Index', 'PLAYER 3', p3X, bottomY, cardW, stackedH, '#f59e0b', true);
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, topY + bannerH / 2 + 10, true);
+      drawBottomCommandDeck('START 2V2 DUO', () => startGame(), () => randomizeFfaFighters());
     } else {
-      drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, stackedH, p1Color, true);
-      drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, stackedH, p2Color, true);
-      drawPlayerCard('p3Index', p3Title, leftX, bottomY, cardW, stackedH, p3Color, true);
-      drawPlayerCard('p4Index', p4Title, rightX, bottomY, cardW, stackedH, p4Color, true);
+      // Portrait: 4 cards visible on screen simultaneously!
+      // Top row: Red Team (P1 on left, P3 on right)
+      // Center: Dynamic VS Clash Emblem
+      // Bottom row: Blue Team (P2 on left, P4 on right)
+      const bannerW = canvas.width - 36;
+      const bannerX = 18;
+      const duoGap = 10;
+      const duoCardW = Math.floor((bannerW - duoGap) / 2);
+      const cardH = 270;
+
+      const topY0 = 120;
+      drawHeroicFighterCard('p1Index', 'RED // SQUAD 1', bannerX, topY0, duoCardW, cardH, true, true, false, 'P1', 'A');
+      drawHeroicFighterCard('p3Index', 'RED // SQUAD 2', bannerX + duoCardW + duoGap, topY0, duoCardW, cardH, true, true, false, 'P3', 'B');
+
+      const vsY = topY0 + cardH + 30; // ~420
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, vsY, false);
+
+      const botY0 = vsY + 32; // ~452
+      drawHeroicFighterCard('p2Index', 'BLUE // SQUAD 1', bannerX, botY0, duoCardW, cardH, false, true, true, 'P2', 'C');
+      drawHeroicFighterCard('p4Index', 'BLUE // SQUAD 2', bannerX + duoCardW + duoGap, botY0, duoCardW, cardH, false, true, true, 'P4', 'D');
+
+      drawBottomCommandDeck('START 2V2 DUO', () => startGame(), () => randomizeFfaFighters());
     }
 
-    // Center Tactical VS Crest for team mode
-    if (isTeamMode) {
-      const vsX = canvas.width / 2;
-      const vsY = topY + fullCardH / 2 - 10;
-      drawTacticalVsCrest(ctx, vsX, vsY);
-    }
+  } else if (mode === 'FFA' || mode === GAME_MODES.FFA || mode === 'FFA 4-Way') {
+    const isHorizontal = state.viewOrientation === 'horizontal';
+    if (isHorizontal) {
+      const colW = Math.floor((totalCardW - cardGap) / 2);
+      const leftX = margin;
+      const rightX = margin + colW + cardGap;
+      const bannerH = 280;
+      const duoW = Math.floor((colW - 10) / 2);
 
-    drawBottomCommandDeck(mode === '2v2' ? 'START 2V2 DUO' : 'START BATTLE', () => startGame(), () => randomizeFfaFighters());
+      drawHeroicFighterCard('p1Index', 'PLAYER 1', leftX, topY + 10, duoW, bannerH, true, true, false, 'P1', 'A');
+      drawHeroicFighterCard('p3Index', 'PLAYER 3', leftX + duoW + 10, topY + 10, duoW, bannerH, false, true, false, 'P3', 'C');
+      drawHeroicFighterCard('p2Index', 'PLAYER 2', rightX, topY + 10, duoW, bannerH, false, true, true, 'P2', 'B');
+      drawHeroicFighterCard('p4Index', 'PLAYER 4', rightX + duoW + 10, topY + 10, duoW, bannerH, false, true, true, 'P4', 'D');
+
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, topY + bannerH / 2 + 10, true);
+      drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomizeFfaFighters());
+    } else {
+      // 3-player vertical layout: P1 full-width on top, P2 and P3 side-by-side at bottom!
+      const bannerW = canvas.width - 36;
+      const bannerX = 18;
+      const p1Y = 120;
+      const p1H = 270;
+
+      drawHeroicFighterCard('p1Index', 'PLAYER 1', bannerX, p1Y, bannerW, p1H, true, true, false, 'P1', 'A');
+
+      const vsY = Math.round(p1Y + p1H + 32);
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, vsY, false);
+
+      const duoGap = 10;
+      const duoCardW = Math.floor((bannerW - duoGap) / 2);
+      const duoY = vsY + 34;
+      const duoH = 270;
+
+      drawHeroicFighterCard('p2Index', 'PLAYER 2', bannerX, duoY, duoCardW, duoH, false, true, true, 'P2', 'B');
+      drawHeroicFighterCard('p3Index', 'PLAYER 3', bannerX + duoCardW + duoGap, duoY, duoCardW, duoH, false, true, true, 'P3', 'C');
+
+      drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomizeFfaFighters());
+    }
 
   } else if (mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH') {
-    const leftX = margin;
-    const rightX = margin + cardW + cardGap;
-    const stackedH = Math.floor((fullCardH - cardGap * 2) / 3);
-    const slotGap = cardGap;
-    const y0 = topY;
-    const y1 = topY + stackedH + slotGap;
-    const y2 = topY + (stackedH + slotGap) * 2;
+    if (isLandscape) {
+      // Landscape 3v3 Tag Match: Left (Red Squad 3 Cards) vs Right (Blue Squad 3 Cards)
+      const bannerW = Math.floor((totalCardW - cardGap) / 2);
+      const bannerH = 268;
+      const leftX = margin;
+      const rightX = margin + bannerW + cardGap;
+      const headerH = 22;
+      const headerY = topY + 4;
+      const cardY = headerY + headerH + 6;
+      const slotGap = 8;
+      const slotW = Math.floor((bannerW - slotGap * 2) / 3);
 
-    // Team 1 / Red Squad (Slots 1, 2, 3 -> p1, p3, p5)
-    drawPlayerCard('p1Index', 'RED // SQUAD 1', leftX, y0, cardW, stackedH, '#cc2b4d', true);
-    drawPlayerCard('p3Index', 'RED // SQUAD 2', leftX, y1, cardW, stackedH, '#cc2b4d', true);
-    drawPlayerCard('p5Index', 'RED // SQUAD 3', leftX, y2, cardW, stackedH, '#cc2b4d', true);
+      _drawTeamHeaderBar(ctx, leftX, headerY, bannerW, headerH, '[ RED SQUAD // 3 COMBATANTS ]', '#EF4444', true);
+      _drawTeamHeaderBar(ctx, rightX, headerY, bannerW, headerH, '[ BLUE SQUAD // 3 COMBATANTS ]', '#38BDF8', false);
 
-    // Team 2 / Blue Squad (Slots 1, 2, 3 -> p2, p4, p6)
-    drawPlayerCard('p2Index', 'BLUE // SQUAD 1', rightX, y0, cardW, stackedH, '#38bdf8', true);
-    drawPlayerCard('p4Index', 'BLUE // SQUAD 2', rightX, y1, cardW, stackedH, '#38bdf8', true);
-    drawPlayerCard('p6Index', 'BLUE // SQUAD 3', rightX, y2, cardW, stackedH, '#38bdf8', true);
+      drawHeroicFighterCard('p1Index', 'LEAD', leftX, cardY, slotW, bannerH, true, true, false, 'SLOT 1', 'A');
+      drawHeroicFighterCard('p3Index', 'MID', leftX + slotW + slotGap, cardY, slotW, bannerH, true, true, false, 'SLOT 2', 'B');
+      drawHeroicFighterCard('p5Index', 'ANCHOR', leftX + (slotW + slotGap) * 2, cardY, slotW, bannerH, true, true, false, 'SLOT 3', 'C');
 
-    // Center Tactical VS Crest
-    const vsX = canvas.width / 2;
-    const vsY = topY + fullCardH / 2 - 10;
-    drawTacticalVsCrest(ctx, vsX, vsY);
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, cardY + bannerH / 2, true);
 
-    drawBottomCommandDeck('START TAG MATCH', () => startGame(), () => randomizeTagMatchFighters());
+      drawHeroicFighterCard('p2Index', 'LEAD', rightX, cardY, slotW, bannerH, false, true, true, 'SLOT 1', 'D');
+      drawHeroicFighterCard('p4Index', 'MID', rightX + slotW + slotGap, cardY, slotW, bannerH, false, true, true, 'SLOT 2', 'E');
+      drawHeroicFighterCard('p6Index', 'ANCHOR', rightX + (slotW + slotGap) * 2, cardY, slotW, bannerH, false, true, true, 'SLOT 3', 'F');
+
+      drawBottomCommandDeck('START TAG MATCH', () => startGame(), () => randomizeTagMatchFighters());
+    } else {
+      // Portrait 3v3 Tag Match: All 6 Pokémon TCG Collector Cards visible simultaneously!
+      // Top: Red Squad (3 Cards Side-by-Side)
+      // Center: Dynamic VS Clash Emblem
+      // Bottom: Blue Squad (3 Cards Side-by-Side)
+      const bannerW = canvas.width - 36; // 504px
+      const bannerX = 18;
+      const cardGap = 12;
+      const slotW = Math.floor((bannerW - cardGap * 2) / 3); // 160px
+      const cardSlotH = 248;
+      const teamHdrH = 24;
+
+      // 1. Red Squad Section
+      const redHdrY = 114;
+      _drawTeamHeaderBar(ctx, bannerX, redHdrY, bannerW, teamHdrH, '[ RED SQUAD // 3 COMBATANTS ]', '#EF4444', true);
+      const row1Y = redHdrY + teamHdrH + 6; // 144
+      drawHeroicFighterCard('p1Index', 'LEAD', bannerX, row1Y, slotW, cardSlotH, true, true, false, 'SLOT 1', 'A');
+      drawHeroicFighterCard('p3Index', 'MID', bannerX + slotW + cardGap, row1Y, slotW, cardSlotH, true, true, false, 'SLOT 2', 'B');
+      drawHeroicFighterCard('p5Index', 'ANCHOR', bannerX + (slotW + cardGap) * 2, row1Y, slotW, cardSlotH, true, true, false, 'SLOT 3', 'C');
+
+      // 2. Dynamic Center VS Clash Emblem
+      const vsY = 428;
+      drawDynamicVsClashEmblem(ctx, canvas.width / 2, vsY, false);
+
+      // 3. Blue Squad Section
+      const blueHdrY = 464;
+      _drawTeamHeaderBar(ctx, bannerX, blueHdrY, bannerW, teamHdrH, '[ BLUE SQUAD // 3 COMBATANTS ]', '#38BDF8', false);
+      const row2Y = blueHdrY + teamHdrH + 6; // 494
+      drawHeroicFighterCard('p2Index', 'LEAD', bannerX, row2Y, slotW, cardSlotH, false, true, true, 'SLOT 1', 'D');
+      drawHeroicFighterCard('p4Index', 'MID', bannerX + slotW + cardGap, row2Y, slotW, cardSlotH, false, true, true, 'SLOT 2', 'E');
+      drawHeroicFighterCard('p6Index', 'ANCHOR', bannerX + (slotW + cardGap) * 2, row2Y, slotW, cardSlotH, false, true, true, 'SLOT 3', 'F');
+
+      drawBottomCommandDeck('START TAG MATCH', () => startGame(), () => randomizeTagMatchFighters());
+    }
 
   } else if (mode === 'TLFS') {
-    const leftX = margin;
-    const rightX = margin + cardW + cardGap;
+    if (isLandscape) {
+      const leftX = margin;
+      const rightX = margin + cardW + cardGap;
 
-    drawPlayerCard('p1Index', 'GAUNTLET HERO', leftX, topY, cardW, fullCardH, '#f59e0b', true, true);
-    drawTlfsEnemyPoolGrid(rightX, topY, cardW, fullCardH);
+      drawHeroicFighterCard('p1Index', 'GAUNTLET HERO', leftX, topY + 34, cardW, 264, true, true);
+      drawTlfsEnemyPoolGrid(rightX, topY + 34, cardW, 300);
 
-    drawBottomCommandDeck('START GAUNTLET', () => startGame(), () => {
-      state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
-    });
+      drawBottomCommandDeck('START GAUNTLET', () => startGame(), () => {
+        state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
+      });
+    } else {
+      const bannerW = canvas.width - 36;
+      const bannerX = 18;
+      const p1Y = 124;
+      const p1H = 276;
+
+      drawHeroicFighterCard('p1Index', 'GAUNTLET HERO', bannerX, p1Y, bannerW, p1H, true, true);
+      drawTlfsEnemyPoolGrid(bannerX, 414, bannerW, 436);
+
+      drawBottomCommandDeck('START GAUNTLET', () => startGame(), () => {
+        state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
+      });
+    }
   }
 
   if (selectingSlot !== null) {
@@ -2060,596 +2310,1340 @@ export function getFighterWeaponInfo(def) {
   }
 }
 
-function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLarge = false) {
-  const { ctx, mode } = state;
-  const isBossBattleMode = (mode === 'Boss Battle' || mode === GAME_MODES.BOSS_BATTLE || mode === '1v2 Stand Off' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2');
-  const isAnyModalOpen = (selectingSlot !== null || isArenaBgmModalOpen() || isArenaFloorModalOpen());
-  const isInteractive = enabled && !isAnyModalOpen;
+// ── COMIC MANGA POP-ART CARDS FOR 2V2, 1V2, FFA, TAG MATCH & TLFS ──
 
-  // Track card bounds for direct mouse wheel cycling (only when interactive)
-  if (isInteractive) {
-    _playerCardBounds.push({ slotProp, x, y, w, h });
-  }
+function _drawComicMediumCard(slotProp, title, x, y, w, h, accentColor, enabled, isInteractive, isMirrored, cycleFighter) {
+  const { ctx } = state;
+  const currentDefs = getActiveFighterDefs();
+  const fighterIndex = state[slotProp] ?? 0;
+  const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
+  const weaponInfo = getFighterWeaponInfo(def);
+  const theme = getFighterCollectorTheme(def) || {};
+  const themeColor = def.themeColor || def.color || theme.primary || accentColor || '#F5A623';
+  const palette = {
+    primary: accentColor || themeColor,
+    dark: theme.dark || '#161219',
+    title: theme.title || themeColor,
+    border: themeColor,
+  };
 
-  // 1. Deep Drop Shadow
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  const phase = isMirrored ? 1.7 : 0.0;
+
+  // Normalized coordinate space: 244 x 338
+  const sx = w / 244;
+  const sy = h / 338;
+  const mx = (px) => isMirrored ? (244 - px) : px;
+
+  // Outer Comic Drop Shadow
   ctx.save();
-  ctx.fillStyle = 'rgba(5, 7, 10, 0.70)';
-  drawChamferedRect(ctx, x + 3, y + 4, w, h, 6);
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  ctx.fillRect(x + 4, y + 5, w, h);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+
+  // 1. Base card backdrop (Clipped to the card frame)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, 244, 338);
+  ctx.clip();
+
+  // Deep slate base
+  ctx.fillStyle = '#14151D';
+  ctx.fillRect(0, 0, 244, 338);
+
+  // Team-colored halftone wedge
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mx(0), 0);
+  ctx.lineTo(mx(180), 0);
+  ctx.lineTo(mx(108), 182);
+  ctx.lineTo(mx(0), 146);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(mx(0), 0, mx(160), 160);
+  grad.addColorStop(0, palette.primary);
+  grad.addColorStop(1, '#0C0D13');
+  ctx.fillStyle = grad;
   ctx.fill();
+  ctx.clip();
+  _drawComicHalftoneField(ctx, isMirrored ? 64 : 0, 0, 180, 185, 'rgba(0, 0, 0, 0.35)');
+  ctx.restore();
 
-  // 2. Dark Tactical Carbon Armor Plate Base
-  ctx.fillStyle = '#141720';
-  ctx.strokeStyle = '#282E3C';
-  ctx.lineWidth = 1.6;
-  drawChamferedRect(ctx, x, y, w, h, 6);
+  // Dark diagonal corner with giant tilted watermark
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mx(0), 146);
+  ctx.lineTo(mx(108), 182);
+  ctx.lineTo(mx(0), 224);
+  ctx.closePath();
+  ctx.fillStyle = '#10121A';
   ctx.fill();
-  ctx.stroke();
-
-  // 3. Tech Corner Brackets in Hazard Amber
-  drawCornerBrackets(ctx, x + 3, y + 3, w - 6, h - 6, 12, '#F5A623', 1.8);
-
-  // 4. Header band with dark carbon plate, team accent line & hazard stripes
-  const headerH = 26;
-  ctx.fillStyle = '#181C26';
-  ctx.strokeStyle = '#282E3C';
-  ctx.lineWidth = 1.4;
-  drawChamferedRect(ctx, x + 2, y + 2, w - 4, headerH, 4);
-  ctx.fill();
-  ctx.stroke();
-
-  // Team accent pip line on top of header
-  ctx.fillStyle = accentColor || '#F5A623';
-  ctx.fillRect(x + 10, y + 2, w - 20, 2);
-
-  // Hazard stripe accent bar along bottom of header
-  drawHazardStripes(ctx, x + 6, y + headerH - 3, w - 12, 3, 4, accentColor || '#F5A623', '#101217');
-
-  // Header Title Text
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.clip();
+  ctx.translate(mx(40), 175);
+  ctx.rotate(isMirrored ? 0.35 : -0.35);
+  ctx.fillStyle = '#181B26';
+  ctx.font = '900 36px "Outfit", "Impact", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(title, x + w / 2, y + 14);
+  ctx.fillText(def.name.substring(0, 4).toUpperCase(), 0, 0);
   ctx.restore();
+
+  // Solid black diagonal divider slash
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(mx(180), 0);
+  ctx.lineTo(mx(108), 182);
+  ctx.stroke();
+
+  ctx.restore(); // End base backdrop clip
+
+  // 2. Solid Black Manga Ink Outer Frame
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 3.5;
+  ctx.strokeRect(0, 0, 244, 338);
+
+  // Top accent pinstripe
+  ctx.fillStyle = palette.primary;
+  ctx.fillRect(8, 0, 228, 2.5);
+
+  // 3. Top Header Bar: Team Badge & Quick Cycle Blocks
+  const hdrY = 8;
+  const isLeft = !isMirrored;
+
+  // Title pill
+  ctx.save();
+  const titleW = 144;
+  const titleH = 20;
+  const titleX = isLeft ? 10 : (244 - 10 - titleW);
+  ctx.fillStyle = '#090A0F';
+  ctx.fillRect(titleX + 2, hdrY + 2, titleW, titleH);
+  ctx.fillStyle = '#12141D';
+  ctx.fillRect(titleX, hdrY, titleW, titleH);
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(titleX, hdrY, titleW, titleH);
+
+  ctx.fillStyle = palette.primary;
+  ctx.fillRect(titleX + 2, hdrY + 2, 4, titleH - 4);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, titleX + titleW / 2 + 2, hdrY + titleH / 2);
+  ctx.restore();
+
+  // Comic Cycle Blocks [◀] [▶]
+  const cycleBtnSize = 20;
+  const btn1X = isLeft ? 190 : 10;
+  const btn2X = isLeft ? 214 : 34;
+
+  const drawCycleBtn = (bx, by, label) => {
+    ctx.save();
+    ctx.fillStyle = '#050609';
+    ctx.fillRect(bx + 1.5, by + 1.5, cycleBtnSize, cycleBtnSize);
+    ctx.fillStyle = '#10121A';
+    ctx.fillRect(bx, by, cycleBtnSize, cycleBtnSize);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(bx, by, cycleBtnSize, cycleBtnSize);
+    ctx.fillStyle = '#FFE145';
+    ctx.font = '900 9px "Outfit", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bx + cycleBtnSize / 2, by + cycleBtnSize / 2);
+    ctx.restore();
+  };
+
+  drawCycleBtn(btn1X, hdrY, '◀');
+  drawCycleBtn(btn2X, hdrY, '▶');
+
+  // Mini lightning accent next to cycle buttons
+  ctx.save();
+  const boltX = isLeft ? 178 : 60;
+  ctx.translate(boltX, hdrY + 10);
+  ctx.scale(0.8, 0.8);
+  ctx.beginPath();
+  ctx.moveTo(-6, -6);
+  ctx.lineTo(2, -7);
+  ctx.lineTo(-1, -1);
+  ctx.lineTo(6, -1);
+  ctx.lineTo(-4, 7);
+  ctx.lineTo(-1, 1);
+  ctx.lineTo(-6, 1);
+  ctx.closePath();
+  ctx.fillStyle = '#FFE145';
+  ctx.fill();
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 1.8;
+  ctx.stroke();
+  ctx.restore();
+
+  // 4. Character Cut-In Stage
+  const avatarCX = mx(122);
+  const avatarCY = 96;
+
+  // Spiky manga explosion burst behind head
+  const burstRot = Math.sin(now * 1.6 + phase) * 0.04;
+  const burstScale = 1.0 + Math.sin(now * 4.4 + phase) * 0.055;
+  _drawSpikyMangaExplosion(ctx, avatarCX + (isMirrored ? -10 : 10), 66, 36, 22, palette.primary, isMirrored ? -burstRot : burstRot, burstScale);
+
+  // Undulating comic flame wave at bottom of character
+  const flameTime = now * 4.6 + phase;
+  const drawFlamePoly = (pts, fill) => {
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => {
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = '#050609';
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+  };
+  drawFlamePoly([
+    [avatarCX - 60, 154],
+    [avatarCX - 40, 126 + Math.sin(flameTime + 0.3) * 6],
+    [avatarCX - 15, 140 + Math.sin(flameTime * 1.2 + 1.2) * 5],
+    [avatarCX + 10, 120 + Math.sin(flameTime * 1.1 + 2.5) * 7],
+    [avatarCX + 35, 138 + Math.sin(flameTime + 3.8) * 5],
+    [avatarCX + 60, 154]
+  ], palette.primary);
+  drawFlamePoly([
+    [avatarCX - 40, 154],
+    [avatarCX - 22, 136 + Math.sin(flameTime * 1.2 + 1.1) * 5],
+    [avatarCX + 4, 142 + Math.sin(flameTime + 2.4) * 4],
+    [avatarCX + 28, 132 + Math.sin(flameTime * 1.3 + 3.6) * 6],
+    [avatarCX + 45, 154]
+  ], '#FFE145');
+
+  // Ground shadow under feet
+  ctx.save();
+  const shadowW = 48 + Math.sin(now * 2.8 + phase) * 4;
+  const shadowH = 9 + Math.sin(now * 2.8 + phase) * 1.5;
+  ctx.beginPath();
+  ctx.ellipse(avatarCX, 146, shadowW, shadowH, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(5, 6, 9, 0.45)';
+  ctx.fill();
+  ctx.restore();
+
+  // Large Animated Character Avatar
+  const stickerImg = getFighterStickerPreview(fighterIndex) || getFighterPreview(fighterIndex);
+  if (stickerImg) {
+    const srcW = stickerImg.width || 256;
+    const srcH = stickerImg.height || 256;
+    const destSize = 114;
+
+    const charBobY = Math.sin(now * 2.8 + phase) * 3.2;
+    const charSwayX = (isMirrored ? -1 : 1) * Math.cos(now * 1.4 + phase) * 1.2;
+    const charRot = (isMirrored ? -1 : 1) * Math.sin(now * 1.4 + phase) * 0.015;
+    const charBreathScaleY = 1.0 + Math.sin(now * 2.8 + phase) * 0.018;
+    const charBreathScaleX = (isMirrored ? -1.0 : 1.0) * (1.0 - Math.sin(now * 2.8 + phase) * 0.008);
+
+    ctx.save();
+    ctx.translate(avatarCX + charSwayX, avatarCY + charBobY);
+    ctx.rotate(charRot);
+    ctx.scale(charBreathScaleX, charBreathScaleY);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      stickerImg,
+      0, 0, srcW, srcH,
+      -destSize / 2, -destSize / 2, destSize, destSize
+    );
+    ctx.restore();
+  }
+
+  // 5. Stepped Info Stack: Name & Grade
+  const nameBoxY = 158;
+  const nameBoxH = 26;
+  const nameBoxW = 224;
+  const nameBoxX = 10;
+
+  // Name plate base
+  ctx.save();
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(nameBoxX + 2, nameBoxY + 2, nameBoxW, nameBoxH);
+  ctx.fillStyle = '#161922';
+  ctx.fillRect(nameBoxX, nameBoxY, nameBoxW, nameBoxH);
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 1.8;
+  ctx.strokeRect(nameBoxX, nameBoxY, nameBoxW, nameBoxH);
+
+  // Character Name
+  ctx.font = '900 13px "Outfit", "Impact", "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const nameMaxW = nameBoxW - 46;
+  const nameStr = fitSingleLineText(ctx, def.name.toUpperCase(), nameMaxW);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.5;
+  ctx.strokeText(nameStr, nameBoxX + 8, nameBoxY + nameBoxH / 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(nameStr, nameBoxX + 8, nameBoxY + nameBoxH / 2);
+
+  // Grade Badge
+  const measuredNameW = ctx.measureText(nameStr).width;
+  drawGradeBadge(ctx, nameBoxX + 8 + measuredNameW + 12, nameBoxY + nameBoxH / 2 - 8, def.grade, { scale: 0.72 });
+  ctx.restore();
+
+  // Sub-tag / Weapon Row & Shimmering Stars
+  const subY = 188;
+  ctx.save();
+  ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = palette.primary;
+  const subText = fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name.toUpperCase()}`, 130);
+  ctx.fillText(subText, 14, subY);
+
+  // Level Pill on right
+  const lvlW = 44;
+  const lvlH = 14;
+  const lvlX = 244 - 14 - lvlW;
+  ctx.fillStyle = '#0B0D13';
+  ctx.fillRect(lvlX, subY - lvlH / 2, lvlW, lvlH);
+  ctx.strokeStyle = '#FFE145';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(lvlX, subY - lvlH / 2, lvlW, lvlH);
+  ctx.fillStyle = '#FFE145';
+  ctx.textAlign = 'center';
+  ctx.fillText('LV.99', lvlX + lvlW / 2, subY + 0.5);
+
+  // 5 Comic Shimmering Stars
+  const starStartX = 14;
+  const starY = 202;
+  const starShimmer = Math.sin(now * 3.5);
+  for (let s = 0; s < 5; s++) {
+    const starFill = s < 4 ? (starShimmer > 0.6 ? '#FFFFFF' : '#FFE145') : '#4B5563';
+    _drawComicStar5(ctx, starStartX + s * 10, starY, 4, 1.8, starFill);
+  }
+  ctx.restore();
+
+  // 6. Slanted Comic Stat Bars (HP, ATK, SPD)
+  const statBoxX = 10;
+  const statBoxY = 212;
+  const statBoxW = 224;
+  const statBoxH = 68;
+
+  ctx.save();
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(statBoxX + 2, statBoxY + 2, statBoxW, statBoxH);
+  ctx.fillStyle = '#0C0E14';
+  ctx.fillRect(statBoxX, statBoxY, statBoxW, statBoxH);
+  ctx.strokeStyle = '#222634';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(statBoxX, statBoxY, statBoxW, statBoxH);
+
+  // Slanted bars helper
+  const drawComicStatRow = (label, val, maxVal, barY, col) => {
+    ctx.save();
+    ctx.fillStyle = col;
+    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, statBoxX + 6, barY);
+
+    const bX = statBoxX + 32;
+    const bW = statBoxW - 68;
+    const bH = 10;
+    const bY = barY - bH / 2;
+
+    // Track
+    drawSlantedParallelogram(ctx, bX, bY, bW, bH, 4, '#161922', '#282E3E', 1);
+
+    // Fill
+    const fillRatio = Math.min(1, Math.max(0.08, val / maxVal));
+    const fillW = Math.max(6, bW * fillRatio);
+    drawSlantedParallelogram(ctx, bX, bY, fillW, bH, 4, col, null, 0);
+
+    // Number
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 9.5px "Outfit", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${val}`, statBoxX + statBoxW - 6, barY);
+    ctx.restore();
+  };
+
+  drawComicStatRow('HP', def.hp, 200, statBoxY + 14, '#EF4444');
+  drawComicStatRow('ATK', def.damage, 50, statBoxY + 34, '#38BDF8');
+  drawComicStatRow('SPD', def.speed || 2, 4, statBoxY + 54, '#F59E0B');
+  ctx.restore();
+
+  // 7. Bottom Action Button: "SELECT FIGHTER ⯈"
+  const btnX = 10;
+  const btnY = 288;
+  const btnW = 224;
+  const btnH = 38;
+
+  ctx.save();
+  // Drop shadow
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(btnX + 2, btnY + 2, btnW, btnH);
+
+  // Button base
+  ctx.fillStyle = '#07080C';
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 2.4;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+  // Light sheen sweep
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(btnX, btnY, btnW, btnH);
+  ctx.clip();
+  const sheenProgress = ((now * 0.65 + (isMirrored ? 0.5 : 0)) % 1.0);
+  const sheenX = btnX - 40 + sheenProgress * (btnW + 80);
+  const sheenGrad = ctx.createLinearGradient(sheenX - 25, btnY, sheenX + 25, btnY + btnH);
+  sheenGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  sheenGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.22)');
+  sheenGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.restore();
+
+  // Text & Arrow
+  const arrowSlide = Math.sin(now * 5.5 + phase) * 2.5;
+  ctx.font = '900 13px "Outfit", "Impact", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const btnLabel = 'SELECT FIGHTER';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.5;
+  ctx.strokeText(btnLabel, btnX + btnW / 2 - 8, btnY + btnH / 2);
+  ctx.fillStyle = palette.primary;
+  ctx.fillText(btnLabel, btnX + btnW / 2 - 8, btnY + btnH / 2);
+
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.5;
+  ctx.strokeText('⯈', btnX + btnW / 2 + 58 + arrowSlide, btnY + btnH / 2);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText('⯈', btnX + btnW / 2 + 58 + arrowSlide, btnY + btnH / 2);
+
+  ctx.restore();
+
+  ctx.restore(); // End normalized scale & translate
+
+  // Register interactive hit zones (in real screen coordinates)
+  if (isInteractive) {
+    _registerButton(x, y, w, h, () => {
+      openFighterSelectModal(slotProp, fighterIndex);
+    });
+    _registerButton(x + btn1X * sx, y + hdrY * sy, cycleBtnSize * sx, cycleBtnSize * sy, () => cycleFighter(-1));
+    _registerButton(x + btn2X * sx, y + hdrY * sy, cycleBtnSize * sx, cycleBtnSize * sy, () => cycleFighter(1));
+    _registerButton(x + btnX * sx, y + btnY * sy, btnW * sx, btnH * sy, () => {
+      openFighterSelectModal(slotProp, fighterIndex);
+    });
+  }
+}
+
+function _drawComicCompactCard(slotProp, title, x, y, w, h, accentColor, enabled, isInteractive, isMirrored, cycleFighter) {
+  const { ctx } = state;
+  const currentDefs = getActiveFighterDefs();
+  const fighterIndex = state[slotProp] ?? 0;
+  const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
+  const weaponInfo = getFighterWeaponInfo(def);
+  const theme = getFighterCollectorTheme(def) || {};
+  const themeColor = def.themeColor || def.color || theme.primary || accentColor || '#F5A623';
+  const palette = {
+    primary: accentColor || themeColor,
+    dark: theme.dark || '#161219',
+    title: theme.title || themeColor,
+    border: themeColor,
+  };
+
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  const phase = isMirrored ? 1.7 : 0.0;
+
+  // Normalized coordinate space: 244 x 218
+  const sx = w / 244;
+  const sy = h / 218;
+  const mx = (px) => isMirrored ? (244 - px) : px;
+
+  // Outer Comic Drop Shadow
+  ctx.save();
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  ctx.fillRect(x + 3, y + 4, w, h);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+
+  // 1. Base card backdrop
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, 244, 218);
+  ctx.clip();
+
+  ctx.fillStyle = '#14151D';
+  ctx.fillRect(0, 0, 244, 218);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(mx(0), 0);
+  ctx.lineTo(mx(160), 0);
+  ctx.lineTo(mx(80), 170);
+  ctx.lineTo(mx(0), 130);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(mx(0), 0, mx(140), 140);
+  grad.addColorStop(0, palette.primary);
+  grad.addColorStop(1, '#0C0D13');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.clip();
+  _drawComicHalftoneField(ctx, isMirrored ? 84 : 0, 0, 160, 170, 'rgba(0, 0, 0, 0.35)');
+  ctx.restore();
+
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(mx(160), 0);
+  ctx.lineTo(mx(80), 170);
+  ctx.stroke();
+
+  ctx.restore(); // End base clip
+
+  // 2. Solid Black Manga Ink Outer Frame
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 3.0;
+  ctx.strokeRect(0, 0, 244, 218);
+
+  // Top accent pinstripe
+  ctx.fillStyle = palette.primary;
+  ctx.fillRect(8, 0, 228, 2.5);
+
+  // 3. Header Bar
+  const hdrY = 6;
+  const isLeft = !isMirrored;
+  const titleW = 140;
+  const titleH = 18;
+  const titleX = isLeft ? 8 : (244 - 8 - titleW);
+
+  ctx.save();
+  ctx.fillStyle = '#090A0F';
+  ctx.fillRect(titleX + 1.5, hdrY + 1.5, titleW, titleH);
+  ctx.fillStyle = '#12141D';
+  ctx.fillRect(titleX, hdrY, titleW, titleH);
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(titleX, hdrY, titleW, titleH);
+
+  ctx.fillStyle = palette.primary;
+  ctx.fillRect(titleX + 2, hdrY + 2, 3, titleH - 4);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, titleX + titleW / 2 + 2, hdrY + titleH / 2);
+  ctx.restore();
+
+  // Cycle buttons
+  const cycleBtnSize = 18;
+  const btn1X = isLeft ? 192 : 8;
+  const btn2X = isLeft ? 214 : 30;
+
+  const drawCycleBtn = (bx, by, label) => {
+    ctx.save();
+    ctx.fillStyle = '#050609';
+    ctx.fillRect(bx + 1, by + 1, cycleBtnSize, cycleBtnSize);
+    ctx.fillStyle = '#10121A';
+    ctx.fillRect(bx, by, cycleBtnSize, cycleBtnSize);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(bx, by, cycleBtnSize, cycleBtnSize);
+    ctx.fillStyle = '#FFE145';
+    ctx.font = '900 8.5px "Outfit", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bx + cycleBtnSize / 2, by + cycleBtnSize / 2);
+    ctx.restore();
+  };
+
+  drawCycleBtn(btn1X, hdrY, '◀');
+  drawCycleBtn(btn2X, hdrY, '▶');
+
+  // 4. Left Half: Character Cut-In Stage
+  const avatarCX = isLeft ? 54 : (244 - 54);
+  const avatarCY = 92;
+
+  // Spiky burst behind avatar
+  const burstRot = Math.sin(now * 1.6 + phase) * 0.04;
+  const burstScale = 1.0 + Math.sin(now * 4.4 + phase) * 0.055;
+  _drawSpikyMangaExplosion(ctx, avatarCX, 72, 28, 18, palette.primary, isMirrored ? -burstRot : burstRot, burstScale);
+
+  // Flame wave
+  const flameTime = now * 4.6 + phase;
+  const drawFlamePoly = (pts, fill) => {
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => {
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    });
+    ctx.closePath();
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = '#050609';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+  };
+  drawFlamePoly([
+    [avatarCX - 40, 134],
+    [avatarCX - 24, 114 + Math.sin(flameTime + 0.3) * 5],
+    [avatarCX - 8, 124 + Math.sin(flameTime * 1.2 + 1.2) * 4],
+    [avatarCX + 10, 110 + Math.sin(flameTime * 1.1 + 2.5) * 5],
+    [avatarCX + 26, 122 + Math.sin(flameTime + 3.8) * 4],
+    [avatarCX + 40, 134]
+  ], palette.primary);
+
+  // Ground shadow
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(avatarCX, 128, 36, 7, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(5, 6, 9, 0.45)';
+  ctx.fill();
+  ctx.restore();
+
+  // Character Sprite
+  const stickerImg = getFighterStickerPreview(fighterIndex) || getFighterPreview(fighterIndex);
+  if (stickerImg) {
+    const srcW = stickerImg.width || 256;
+    const srcH = stickerImg.height || 256;
+    const destSize = 82;
+
+    const charBobY = Math.sin(now * 2.8 + phase) * 2.5;
+    const charSwayX = (isMirrored ? -1 : 1) * Math.cos(now * 1.4 + phase) * 1.0;
+    const charBreathScaleY = 1.0 + Math.sin(now * 2.8 + phase) * 0.016;
+    const charBreathScaleX = (isMirrored ? -1.0 : 1.0) * (1.0 - Math.sin(now * 2.8 + phase) * 0.008);
+
+    ctx.save();
+    ctx.translate(avatarCX + charSwayX, avatarCY + charBobY);
+    ctx.scale(charBreathScaleX, charBreathScaleY);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(
+      stickerImg,
+      0, 0, srcW, srcH,
+      -destSize / 2, -destSize / 2, destSize, destSize
+    );
+    ctx.restore();
+  }
+
+  // 5. Right Half: Name, Grade & Slanted Stat Bars
+  const rightX = isLeft ? 112 : 10;
+  const rightW = 122;
+
+  // Name plate
+  ctx.save();
+  const nameBoxY = 28;
+  const nameBoxH = 22;
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(rightX + 1.5, nameBoxY + 1.5, rightW, nameBoxH);
+  ctx.fillStyle = '#161922';
+  ctx.fillRect(rightX, nameBoxY, rightW, nameBoxH);
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(rightX, nameBoxY, rightW, nameBoxH);
+
+  ctx.font = '900 11px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const nameStr = fitSingleLineText(ctx, def.name.toUpperCase(), rightW - 32);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3;
+  ctx.strokeText(nameStr, rightX + 6, nameBoxY + nameBoxH / 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(nameStr, rightX + 6, nameBoxY + nameBoxH / 2);
+
+  const measuredNameW = ctx.measureText(nameStr).width;
+  drawGradeBadge(ctx, rightX + 6 + measuredNameW + 8, nameBoxY + nameBoxH / 2 - 7, def.grade, { scale: 0.64 });
+  ctx.restore();
+
+  // Class & Level
+  ctx.save();
+  const subY = 56;
+  ctx.font = '900 8.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.fillStyle = palette.primary;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, 74), rightX + 2, subY);
+
+  const lvlW = 38;
+  const lvlH = 13;
+  const lvlX = rightX + rightW - lvlW;
+  ctx.fillStyle = '#0B0D13';
+  ctx.fillRect(lvlX, subY - lvlH / 2, lvlW, lvlH);
+  ctx.strokeStyle = '#FFE145';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(lvlX, subY - lvlH / 2, lvlW, lvlH);
+  ctx.fillStyle = '#FFE145';
+  ctx.textAlign = 'center';
+  ctx.fillText('LV.99', lvlX + lvlW / 2, subY + 0.5);
+
+  // Slanted mini bars
+  const statBoxY = 68;
+  const drawMiniStat = (label, val, maxVal, by, col) => {
+    ctx.save();
+    ctx.fillStyle = col;
+    ctx.font = '900 8px "Outfit", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, rightX + 2, by);
+
+    const bX = rightX + 24;
+    const bW = rightW - 48;
+    const bH = 8;
+    drawSlantedParallelogram(ctx, bX, by - bH / 2, bW, bH, 3, '#161922', '#282E3E', 1);
+
+    const fillRatio = Math.min(1, Math.max(0.08, val / maxVal));
+    const fillW = Math.max(4, bW * fillRatio);
+    drawSlantedParallelogram(ctx, bX, by - bH / 2, fillW, bH, 3, col, null, 0);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 8.5px "Outfit", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${val}`, rightX + rightW - 2, by);
+    ctx.restore();
+  };
+
+  drawMiniStat('HP', def.hp, 200, statBoxY + 8, '#EF4444');
+  drawMiniStat('ATK', def.damage, 50, statBoxY + 22, '#38BDF8');
+  drawMiniStat('SPD', def.speed || 2, 4, statBoxY + 36, '#F59E0B');
+
+  // Mini weapon label
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '900 8px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(fitSingleLineText(ctx, `WEAPON: ${weaponInfo.name.toUpperCase()}`, rightW - 4), rightX + 2, statBoxY + 50);
+
+  ctx.restore();
+
+  // 6. Bottom Action Button
+  const btnX = 8;
+  const btnY = 176;
+  const btnW = 228;
+  const btnH = 32;
+
+  ctx.save();
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(btnX + 1.5, btnY + 1.5, btnW, btnH);
+  ctx.fillStyle = '#07080C';
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.strokeStyle = palette.primary;
+  ctx.lineWidth = 2.0;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+  // Sheen
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(btnX, btnY, btnW, btnH);
+  ctx.clip();
+  const sheenProgress = ((now * 0.65 + (isMirrored ? 0.5 : 0)) % 1.0);
+  const sheenX = btnX - 30 + sheenProgress * (btnW + 60);
+  const sheenGrad = ctx.createLinearGradient(sheenX - 20, btnY, sheenX + 20, btnY + btnH);
+  sheenGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  sheenGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.20)');
+  sheenGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.restore();
+
+  const arrowSlide = Math.sin(now * 5.5 + phase) * 2;
+  ctx.font = '900 11.5px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const btnLabel = 'SELECT FIGHTER';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.0;
+  ctx.strokeText(btnLabel, btnX + btnW / 2 - 8, btnY + btnH / 2);
+  ctx.fillStyle = palette.primary;
+  ctx.fillText(btnLabel, btnX + btnW / 2 - 8, btnY + btnH / 2);
+
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.0;
+  ctx.strokeText('⯈', btnX + btnW / 2 + 54 + arrowSlide, btnY + btnH / 2);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText('⯈', btnX + btnW / 2 + 54 + arrowSlide, btnY + btnH / 2);
+  ctx.restore();
+
+  ctx.restore(); // End scale/translate
+
+  if (isInteractive) {
+    _registerButton(x, y, w, h, () => openFighterSelectModal(slotProp, fighterIndex));
+    _registerButton(x + btn1X * sx, y + hdrY * sy, cycleBtnSize * sx, cycleBtnSize * sy, () => cycleFighter(-1));
+    _registerButton(x + btn2X * sx, y + hdrY * sy, cycleBtnSize * sx, cycleBtnSize * sy, () => cycleFighter(1));
+    _registerButton(x + btnX * sx, y + btnY * sy, btnW * sx, btnH * sy, () => openFighterSelectModal(slotProp, fighterIndex));
+  }
+}
+
+function _drawComicTallCard(slotProp, title, x, y, w, h, accentColor, enabled, isInteractive, isMirrored, cycleFighter) {
+  const { ctx } = state;
+  const isLandscape = (state.canvas && state.canvas.width > 600) || state.viewOrientation === 'horizontal';
 
   const currentDefs = getActiveFighterDefs();
   const fighterIndex = state[slotProp] ?? 0;
   const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
-  const theme = getFighterCollectorTheme(def);
+  const weaponInfo = getFighterWeaponInfo(def);
+  const theme = getFighterCollectorTheme(def) || {};
+  const themeColor = def.themeColor || def.color || theme.primary || accentColor || '#F5A623';
+  const palette = {
+    primary: accentColor || themeColor,
+    dark: theme.dark || '#161219',
+    title: theme.title || themeColor,
+    border: themeColor,
+  };
 
-  // Register click on card to open character selection modal
-  if (isInteractive) {
-    _registerButton(x, y, w, h, () => {
-      openFighterSelectModal(slotProp, state[slotProp] ?? 0);
-    });
-  }
+  const now = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.001;
+  const phase = isMirrored ? 1.7 : 0.0;
 
-  if (!enabled) {
-    ctx.fillStyle = '#EF4444';
-    ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+  if (isLandscape && h <= 420) {
+    // ── WIDESCREEN 16:9 LARGE COMIC CARD (Horizontal Duel) ──
+    const sx = w / 390;
+    const sy = h / 380;
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+    ctx.fillRect(x + 4, y + 5, w, h);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(sx, sy);
+
+    ctx.fillStyle = '#14151D';
+    ctx.fillRect(0, 0, 390, 380);
+
+    ctx.strokeStyle = '#050609';
+    ctx.lineWidth = 3.5;
+    ctx.strokeRect(0, 0, 390, 380);
+
+    ctx.fillStyle = palette.primary;
+    ctx.fillRect(8, 0, 374, 2.5);
+
+    // Left sub-column: Avatar & Stats
+    const subLeftW = 168;
+    const subLeftX = 10;
+    const subRightX = 184;
+    const subRightW = 390 - 194;
+
+    const avatarCX = subLeftX + subLeftW / 2;
+    const avatarCY = 76;
+
+    _drawSpikyMangaExplosion(ctx, avatarCX, avatarCY - 10, 38, 22, palette.primary, 0, 1.0);
+
+    const stickerImg = getFighterStickerPreview(fighterIndex) || getFighterPreview(fighterIndex);
+    if (stickerImg) {
+      const charBobY = Math.sin(now * 2.8 + phase) * 2.8;
+      ctx.save();
+      ctx.translate(avatarCX, avatarCY + charBobY);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(stickerImg, 0, 0, stickerImg.width || 256, stickerImg.height || 256, -42, -42, 84, 84);
+      ctx.restore();
+    }
+
+    // Name + Grade
+    ctx.save();
+    ctx.font = '900 13px "Outfit", "Impact", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('SLOT UNAVAILABLE', x + w / 2, y + h / 2);
+    const nameStr = fitSingleLineText(ctx, def.name.toUpperCase(), subLeftW - 32);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(nameStr, avatarCX, 128);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(nameStr, avatarCX, 128);
+    drawGradeBadge(ctx, avatarCX + ctx.measureText(nameStr).width / 2 + 10, 121, def.grade, { scale: 0.72 });
+    ctx.restore();
+
+    // Stats
+    const drawTacticalBar = (label, val, maxVal, by, col) => {
+      ctx.save();
+      ctx.fillStyle = col;
+      ctx.font = '900 9px "Outfit", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, subLeftX, by);
+      drawSlantedParallelogram(ctx, subLeftX + 28, by - 5, subLeftW - 56, 10, 3, '#161922', '#282E3E', 1);
+      const fw = Math.max(4, (subLeftW - 56) * Math.min(1, val / maxVal));
+      drawSlantedParallelogram(ctx, subLeftX + 28, by - 5, fw, 10, 3, col, null, 0);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = '900 9px "Outfit", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${val}`, subLeftX + subLeftW, by);
+      ctx.restore();
+    };
+
+    drawTacticalBar('HP', def.hp, 200, 156, '#EF4444');
+    drawTacticalBar('ATK', def.damage, 50, 174, '#38BDF8');
+    drawTacticalBar('SPD', def.speed || 2, 4, 192, '#F59E0B');
+
+    // Right sub-column: Ability & Live Weapon
+    const abY = 32;
+    const abH = 76;
+    ctx.save();
+    ctx.fillStyle = '#0F1116';
+    ctx.fillRect(subRightX, abY, subRightW, abH);
+    ctx.strokeStyle = '#252A36';
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(subRightX, abY, subRightW, abH);
+    ctx.fillStyle = '#FFE145';
+    ctx.font = '900 10px "Outfit", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, subRightW - 12), subRightX + 6, abY + 6);
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = '800 9px "Outfit", sans-serif';
+    wrapText(ctx, def.desc, subRightX + 6, abY + 20, subRightW - 12, 11, 4);
+    ctx.restore();
+
+    // Weapon Preview
+    const wpY = abY + abH + 8;
+    const wpH = 236;
+    ctx.save();
+    ctx.fillStyle = '#0F1116';
+    ctx.fillRect(subRightX, wpY, subRightW, wpH);
+    ctx.strokeStyle = '#252A36';
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(subRightX, wpY, subRightW, wpH);
+
+    ctx.fillStyle = '#FFE145';
+    ctx.font = '900 10px "Outfit", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name.toUpperCase()}`, subRightW - 12), subRightX + 6, wpY + 6);
+
+    const wStageX = subRightX + subRightW / 2;
+    const wStageY = wpY + 66;
+    ctx.translate(wStageX, wStageY);
+    ctx.scale(1.0, 1.0);
+    drawWeaponPreview(ctx, def.type, def.color);
+    ctx.restore();
+
+    ctx.save();
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = '800 9px "Outfit", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    wrapText(ctx, weaponInfo.desc, subRightX + subRightW / 2, wpY + 140, subRightW - 12, 11, 4);
+    ctx.restore();
+
+    // Bottom Action Button
+    const btnW = subLeftW;
+    const btnH = 36;
+    const btnX = subLeftX;
+    const btnY = 320;
+    ctx.save();
+    ctx.fillStyle = '#07080C';
+    ctx.fillRect(btnX, btnY, btnW, btnH);
+    ctx.strokeStyle = palette.primary;
+    ctx.lineWidth = 2.0;
+    ctx.strokeRect(btnX, btnY, btnW, btnH);
+    ctx.font = '900 12px "Outfit", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = palette.primary;
+    ctx.fillText('CHANGE FIGHTER', btnX + btnW / 2, btnY + btnH / 2);
+    ctx.restore();
+
+    ctx.restore(); // End scale/translate
+
+    if (isInteractive) {
+      _registerButton(x, y, w, h, () => openFighterSelectModal(slotProp, fighterIndex));
+      _registerButton(x + btnX * sx, y + btnY * sy, btnW * sx, btnH * sy, () => openFighterSelectModal(slotProp, fighterIndex));
+    }
     return;
   }
 
-  const previewImage = getFighterPreview(fighterIndex);
-  const weaponInfo = getFighterWeaponInfo(def);
+  // ── PORTRAIT TALL COMIC CARD (TLFS: H ~ 680) ──
+  const sx = w / 244;
+  const sy = h / 680;
 
-  // Helper function to cycle fighters for this slot
-  const cycleFighter = (direction) => {
-    if (!isInteractive) return;
-    const availableFighters = currentDefs.map((d, idx) => ({ d, idx }))
-      .filter(({ d }) => !(!state.dummyEnabled && d.type === 'dummy'));
-    const pos = availableFighters.findIndex(f => f.idx === state[slotProp]);
-    const count = availableFighters.length;
-    if (count > 0) {
-      const nextPos = (pos + direction + count) % count;
-      state[slotProp] = availableFighters[nextPos].idx;
-      if (slotProp === 'p1Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[0] = state.p1Index;
-      else if (slotProp === 'p2Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[1] = state.p2Index;
-      else if (slotProp === 'p3Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[2] = state.p3Index;
-      else if (slotProp === 'p4Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[3] = state.p4Index;
-      else if (slotProp === 'p5Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[4] = state.p5Index;
-      else if (slotProp === 'p6Index' && state.horizontalRosterSlots) state.horizontalRosterSlots[5] = state.p6Index;
-      saveFighterSelections();
-      preloadFighterAssets(state[slotProp]);
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash5', 0.12);
-      }
-    }
+  ctx.save();
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  ctx.fillRect(x + 4, y + 5, w, h);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(sx, sy);
+
+  // 1. Base card backdrop
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, 244, 680);
+  ctx.clip();
+
+  ctx.fillStyle = '#14151D';
+  ctx.fillRect(0, 0, 244, 680);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(190, 0);
+  ctx.lineTo(110, 240);
+  ctx.lineTo(0, 190);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, 0, 180, 220);
+  grad.addColorStop(0, '#F5A623');
+  grad.addColorStop(1, '#0C0D13');
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.clip();
+  _drawComicHalftoneField(ctx, 0, 0, 200, 240, 'rgba(0, 0, 0, 0.35)');
+  ctx.restore();
+
+  // Watermark
+  ctx.save();
+  ctx.translate(46, 230);
+  ctx.rotate(-0.35);
+  ctx.fillStyle = '#181B26';
+  ctx.font = '900 48px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(def.name.substring(0, 4).toUpperCase(), 0, 0);
+  ctx.restore();
+
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 4.5;
+  ctx.beginPath();
+  ctx.moveTo(190, 0);
+  ctx.lineTo(110, 240);
+  ctx.stroke();
+
+  ctx.restore(); // End base clip
+
+  // 2. Solid Black Outer Frame
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 3.5;
+  ctx.strokeRect(0, 0, 244, 680);
+
+  ctx.fillStyle = '#F5A623';
+  ctx.fillRect(8, 0, 228, 2.5);
+
+  // 3. Header
+  const hdrY = 8;
+  const titleW = 144;
+  const titleH = 22;
+  const titleX = 10;
+
+  ctx.save();
+  ctx.fillStyle = '#090A0F';
+  ctx.fillRect(titleX + 2, hdrY + 2, titleW, titleH);
+  ctx.fillStyle = '#12141D';
+  ctx.fillRect(titleX, hdrY, titleW, titleH);
+  ctx.strokeStyle = '#F5A623';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(titleX, hdrY, titleW, titleH);
+
+  ctx.fillStyle = '#F5A623';
+  ctx.fillRect(titleX + 2, hdrY + 2, 4, titleH - 4);
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, titleX + titleW / 2 + 2, hdrY + titleH / 2);
+  ctx.restore();
+
+  // Cycle buttons
+  const cycleBtnSize = 22;
+  const btn1X = 188;
+  const btn2X = 214;
+
+  const drawCycleBtn = (bx, by, label) => {
+    ctx.save();
+    ctx.fillStyle = '#050609';
+    ctx.fillRect(bx + 1.5, by + 1.5, cycleBtnSize, cycleBtnSize);
+    ctx.fillStyle = '#10121A';
+    ctx.fillRect(bx, by, cycleBtnSize, cycleBtnSize);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.4;
+    ctx.strokeRect(bx, by, cycleBtnSize, cycleBtnSize);
+    ctx.fillStyle = '#FFE145';
+    ctx.font = '900 9.5px "Outfit", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, bx + cycleBtnSize / 2, by + cycleBtnSize / 2);
+    ctx.restore();
   };
 
-  if (isLarge) {
-    const isLandscape = (state.canvas && state.canvas.width > 600) || state.viewOrientation === 'horizontal';
-    if (isLandscape && h <= 420) {
-      // ── WIDESCREEN 16:9 LARGE CARD (1v1 / Stand-Off Solo in Horizontal Mode: H ~ 380, W ~ 390) ──
-      const subLeftX = x + 10;
-      const subLeftW = 168;
-      const subRightX = x + 184;
-      const subRightW = w - 194;
+  drawCycleBtn(btn1X, hdrY, '◀');
+  drawCycleBtn(btn2X, hdrY, '▶');
 
-      const avatarX = subLeftX + subLeftW / 2;
-      const avatarY = y + 76;
-      const avatarSize = 64;
+  // 4. Cut-In Stage
+  const avatarCX = 122;
+  const avatarCY = 114;
 
-      // Quick cycle arrows on avatar sides
-      drawButton('◄', subLeftX + 16, avatarY, () => cycleFighter(-1), 24, 24, '#20242E', 3);
-      drawButton('►', subLeftX + subLeftW - 16, avatarY, () => cycleFighter(1), 24, 24, '#20242E', 3);
+  _drawSpikyMangaExplosion(ctx, avatarCX, 82, 46, 28, '#F5A623', 0, 1.0);
 
-      // Glowing pedestal ring
-      ctx.save();
-      ctx.fillStyle = '#101217';
-      ctx.strokeStyle = theme.primary || '#F5A623';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.ellipse(avatarX, avatarY + 30, avatarSize * 0.44, 8, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+  // Ground shadow
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(avatarCX, 172, 60, 11, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(5, 6, 9, 0.45)';
+  ctx.fill();
+  ctx.restore();
 
-      ctx.strokeStyle = 'rgba(245, 166, 35, 0.25)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(avatarX, avatarY + 30, avatarSize * 0.52, 10, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+  // Character Sprite
+  const stickerImg = getFighterStickerPreview(fighterIndex) || getFighterPreview(fighterIndex);
+  if (stickerImg) {
+    const srcW = stickerImg.width || 256;
+    const srcH = stickerImg.height || 256;
+    const destSize = 138;
 
-      if (previewImage) {
-        ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
-      }
-
-      // Fighter Name + Grade Badge
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const nameText = fitSingleLineText(ctx, def.name.toUpperCase(), subLeftW - 34);
-      const measuredNameW = ctx.measureText(nameText).width;
-      const nameCx = avatarX - 10;
-      ctx.fillText(nameText, nameCx, y + 124);
-      drawGradeBadge(ctx, nameCx + measuredNameW / 2 + 4, y + 116, def.grade, { scale: 0.8 });
-
-      // Class / Boss Tag Pill
-      const isBossCard = isBossBattleMode && slotProp === 'p1Index';
-      const p1BossCfg = isBossCard ? getBossConfig(def) : null;
-      const p1BossTitle = isBossCard ? (p1BossCfg?.bossTitle || def?.bossTitle || '').toUpperCase() : '';
-      const pillText = (isBossCard && p1BossTitle && p1BossTitle !== 'BOSS')
-        ? `BOSS // ${p1BossTitle}`
-        : `CLASS // ${def.type.toUpperCase()}`;
-
-      ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
-      const measuredPillW = Math.max(90, ctx.measureText(pillText).width + 16);
-      const pillW = Math.min(subLeftW - 12, measuredPillW);
-      const pillH = 16;
-      ctx.fillStyle = '#1A1D26';
-      ctx.strokeStyle = theme.primary || '#F5A623';
-      ctx.lineWidth = 1.4;
-      drawChamferedRect(ctx, avatarX - pillW / 2, y + 136, pillW, pillH, 3);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = theme.primary || '#F5A623';
-      ctx.fillText(pillText, avatarX, y + 144.5);
-
-      // Stat Telemetry Block
-      const statBoxY = y + 160;
-      drawTacticalStatBar(ctx, 'HP', def.hp, 150, subLeftX, statBoxY, subLeftW, '#EF4444');
-      drawTacticalStatBar(ctx, 'DMG', def.damage, 60, subLeftX, statBoxY + 16, subLeftW, '#F5A623');
-      drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, subLeftX, statBoxY + 32, subLeftW, theme.primary || '#38BDF8');
-
-      // Change Fighter Button
-      const btnW = subLeftW;
-      const btnH = 32;
-      const btnY = y + h - btnH - 12;
-
-      drawButton('CHANGE (ROSTER)', avatarX, btnY + btnH / 2, () => {
-        openFighterSelectModal(slotProp, fighterIndex);
-      }, btnW, btnH, '#20242E', 3);
-
-      // Right Side: Ability Box + Live Weapon Box
-      const abY = y + 32;
-      const abH = 80;
-      ctx.save();
-      ctx.fillStyle = '#0F1116';
-      ctx.strokeStyle = '#252A36';
-      ctx.lineWidth = 1.4;
-      drawChamferedRect(ctx, subRightX, abY, subRightW, abH, 4);
-      ctx.fill();
-      ctx.stroke();
-      drawCornerBrackets(ctx, subRightX, abY, subRightW, abH, 6, 'rgba(245, 166, 35, 0.4)', 1.2);
-      ctx.restore();
-
-      ctx.fillStyle = '#F5A623';
-      ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, subRightW - 12), subRightX + 6, abY + 6);
-
-      ctx.fillStyle = '#CBD5E1';
-      ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-      wrapText(ctx, def.desc, subRightX + 6, abY + 18, subRightW - 12, 12, 4);
-
-      // Live Weapon Visual Box
-      const wpY = abY + abH + 6;
-      const wpH = h - (wpY - y) - 12;
-      ctx.save();
-      ctx.fillStyle = '#0F1116';
-      ctx.strokeStyle = '#252A36';
-      ctx.lineWidth = 1.4;
-      drawChamferedRect(ctx, subRightX, wpY, subRightW, wpH, 4);
-      ctx.fill();
-      ctx.stroke();
-      drawCornerBrackets(ctx, subRightX, wpY, subRightW, wpH, 8, '#F5A623', 1.4);
-      ctx.restore();
-
-      ctx.fillStyle = '#F5A623';
-      ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, subRightW - 12), subRightX + 6, wpY + 6);
-
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
-      ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, subRightW - 12), subRightX + 6, wpY + 19);
-
-      const wStageX = subRightX + subRightW / 2;
-      const wStageY = wpY + 86;
-
-      ctx.save();
-      ctx.fillStyle = '#151822';
-      ctx.strokeStyle = '#F5A623';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.ellipse(wStageX, wStageY + 20, 44, 9, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.translate(wStageX, wStageY);
-      ctx.scale(1.0, 1.0);
-      drawWeaponPreview(ctx, def.type, def.color);
-      ctx.restore();
-
-      ctx.fillStyle = '#CBD5E1';
-      ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      wrapText(ctx, weaponInfo.desc, wStageX, wpY + 172, subRightW - 12, 12, 4);
-
-    } else {
-      // ── TALL SHOWCASE CARD (1v1 / Stand-Off Solo / TLFS: H = 680 in Portrait) ──
-      const avatarX = x + w / 2;
-      const avatarY = y + 84;
-      const avatarSize = 80;
-
-      // Quick cycle arrows on large card avatar sides
-      drawButton('◄', x + 24, avatarY, () => cycleFighter(-1), 26, 26, '#20242E', 3);
-      drawButton('►', x + w - 24, avatarY, () => cycleFighter(1), 26, 26, '#20242E', 3);
-
-      // Glowing high-tech pedestal ring (themed to character's accent)
-      ctx.save();
-      ctx.fillStyle = '#101217';
-      ctx.strokeStyle = theme.primary || '#F5A623';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.ellipse(avatarX, avatarY + 38, avatarSize * 0.44, 10, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(245, 166, 35, 0.25)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(avatarX, avatarY + 38, avatarSize * 0.52, 13, 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-
-      if (previewImage) {
-        ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
-      }
-
-      // Fighter Name + Grade Badge
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = '900 15px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const nameText = fitSingleLineText(ctx, def.name.toUpperCase(), w - 46);
-      const measuredNameW = ctx.measureText(nameText).width;
-      const nameCx = avatarX - 10;
-      ctx.fillText(nameText, nameCx, y + 144);
-      drawGradeBadge(ctx, nameCx + measuredNameW / 2 + 4, y + 136, def.grade, { scale: 0.8 });
-
-      // Class / Boss Tag Pill
-      const isBossCard = isBossBattleMode && slotProp === 'p1Index';
-      const p1BossCfg = isBossCard ? getBossConfig(def) : null;
-      const p1BossTitle = isBossCard ? (p1BossCfg?.bossTitle || def?.bossTitle || '').toUpperCase() : '';
-      const pillText = (isBossCard && p1BossTitle && p1BossTitle !== 'BOSS')
-        ? `BOSS // ${p1BossTitle}`
-        : `CLASS // ${def.type.toUpperCase()}`;
-
-      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-      const measuredPillW = Math.max(96, ctx.measureText(pillText).width + 18);
-      const pillW = Math.min(w - 24, measuredPillW);
-      const pillH = 16;
-      ctx.fillStyle = '#1A1D26';
-      ctx.strokeStyle = theme.primary || '#F5A623';
-      ctx.lineWidth = 1.4;
-      drawChamferedRect(ctx, avatarX - pillW / 2, y + 156, pillW, pillH, 3);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = theme.primary || '#F5A623';
-      ctx.fillText(pillText, avatarX, y + 164.5);
-
-      // Stat Telemetry Block (Tactical gauges matching Image 1)
-      const statBoxX = x + 10;
-      const statBoxY = y + 180;
-      const statBoxW = w - 20;
-
-      drawTacticalStatBar(ctx, 'HP', def.hp, 150, statBoxX, statBoxY, statBoxW, '#EF4444');
-      drawTacticalStatBar(ctx, 'DMG', def.damage, 60, statBoxX, statBoxY + 16, statBoxW, '#F5A623');
-      drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, statBoxX, statBoxY + 32, statBoxW, theme.primary || '#38BDF8');
-
-      // ── Ability Dossier Sub-Panel (Dark Carbon Recessed Sub-box) ──
-      const abilityY = y + 224;
-      const abilityH = 88;
-      
-      ctx.save();
-      ctx.fillStyle = '#0F1116';
-      ctx.strokeStyle = '#252A36';
-      ctx.lineWidth = 1.4;
-      drawChamferedRect(ctx, statBoxX, abilityY, statBoxW, abilityH, 4);
-      ctx.fill();
-      ctx.stroke();
-      drawCornerBrackets(ctx, statBoxX, abilityY, statBoxW, abilityH, 6, 'rgba(245, 166, 35, 0.4)', 1.2);
-      ctx.restore();
-
-      ctx.fillStyle = '#F5A623';
-      ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, statBoxW - 16), statBoxX + 8, abilityY + 7);
-
-      ctx.fillStyle = '#CBD5E1';
-      ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-      wrapText(ctx, def.desc, statBoxX + 8, abilityY + 22, statBoxW - 16, 13, 5);
-
-      // ── Live Weapon Graphic Visual Stage Sub-Panel (Dark Carbon Recessed Sub-box) ──
-      const weaponY = abilityY + abilityH + 8;
-      const weaponH = 296;
-
-      ctx.save();
-      ctx.fillStyle = '#0F1116';
-      ctx.strokeStyle = '#252A36';
-      ctx.lineWidth = 1.4;
-      drawChamferedRect(ctx, statBoxX, weaponY, statBoxW, weaponH, 5);
-      ctx.fill();
-      ctx.stroke();
-      drawCornerBrackets(ctx, statBoxX, weaponY, statBoxW, weaponH, 8, '#F5A623', 1.4);
-      ctx.restore();
-
-      // Weapon Header & Category
-      ctx.fillStyle = '#F5A623';
-      ctx.font = '900 10.5px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, statBoxW - 16), statBoxX + 8, weaponY + 7);
-
-      ctx.fillStyle = '#94A3B8';
-      ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-      ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, statBoxW - 16), statBoxX + 8, weaponY + 20);
-
-      // Live Weapon Center Stage
-      const wStageX = statBoxX + statBoxW / 2;
-      const wStageY = weaponY + 114;
-
-      // High-tech weapon pedestal
-      ctx.save();
-      ctx.fillStyle = '#151822';
-      ctx.strokeStyle = '#F5A623';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.ellipse(wStageX, wStageY + 28, 54, 12, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.strokeStyle = 'rgba(245, 166, 35, 0.25)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.ellipse(wStageX, wStageY + 28, 62, 15, 0, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Render LIVE WEAPON GRAPHIC
-      ctx.translate(wStageX, wStageY);
-      ctx.scale(1.15, 1.15);
-      drawWeaponPreview(ctx, def.type, def.color);
-      ctx.restore();
-
-      // Weapon Description Telemetry
-      ctx.fillStyle = '#CBD5E1';
-      ctx.font = '800 10px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      wrapText(ctx, weaponInfo.desc, wStageX, weaponY + 222, statBoxW - 16, 13, 4);
-
-      // Change Fighter Button (Dark Tactical Carbon with Amber Border)
-      const btnW = w - 24;
-      const btnH = 36;
-      const btnY = y + h - btnH - 12;
-
-      drawButton('CHANGE FIGHTER (ROSTER)', x + w / 2, btnY + btnH / 2, () => {
-        openFighterSelectModal(slotProp, fighterIndex);
-      }, btnW, btnH, '#20242E', 4);
-    }
-
-  } else if (h < 260) {
-    // ── COMPACT STACKED CARD (Tag Match 3-Stack: H ~ 218px) ──
-    const avatarX = x + 30;
-    const avatarY = y + 54;
-    const avatarSize = 44;
-
-    // Glowing pedestal
+    const charBobY = Math.sin(now * 2.8 + phase) * 3.5;
     ctx.save();
-    ctx.fillStyle = '#101217';
-    ctx.strokeStyle = theme.primary || '#F5A623';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.ellipse(avatarX, avatarY + 22, avatarSize * 0.44, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    ctx.translate(avatarCX, avatarCY + charBobY);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(stickerImg, 0, 0, srcW, srcH, -destSize / 2, -destSize / 2, destSize, destSize);
     ctx.restore();
-
-    if (previewImage) {
-      ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
-    }
-
-    const detailX = x + 58;
-    const detailW = w - 68;
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 11.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 28);
-
-    ctx.fillStyle = theme.primary || '#F5A623';
-    ctx.font = '900 9px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 40);
-
-    drawTacticalStatBar(ctx, 'HP', def.hp, 150, detailX, y + 50, detailW, '#EF4444');
-    drawTacticalStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 64, detailW, '#F5A623');
-    drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, y + 78, detailW, theme.primary || '#38BDF8');
-
-    // Mini Live Weapon preview sub-box
-    const weaponBoxY = y + 96;
-    const weaponBoxH = h - (weaponBoxY - y) - 34;
-    const boxW = w - 16;
-
-    ctx.save();
-    ctx.fillStyle = '#0F1116';
-    ctx.strokeStyle = '#252A36';
-    ctx.lineWidth = 1.4;
-    drawChamferedRect(ctx, x + 8, weaponBoxY, boxW, weaponBoxH, 4);
-    ctx.fill();
-    ctx.stroke();
-    drawCornerBrackets(ctx, x + 8, weaponBoxY, boxW, weaponBoxH, 5, 'rgba(245, 166, 35, 0.4)', 1.2);
-    ctx.restore();
-
-    ctx.fillStyle = '#F5A623';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, boxW - 50), x + 12, weaponBoxY + 5);
-
-    // Mini Live Weapon render on right
-    const miniWX = x + boxW - 24;
-    const miniWY = weaponBoxY + weaponBoxH / 2 + 3;
-    ctx.save();
-    ctx.translate(miniWX, miniWY);
-    ctx.scale(0.55, 0.55);
-    drawWeaponPreview(ctx, def.type, def.color);
-    ctx.restore();
-
-    ctx.fillStyle = '#CBD5E1';
-    ctx.font = '800 9px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    ctx.textAlign = 'left';
-    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 12, weaponBoxY + 17, boxW - 55, 11, 3);
-
-    // Quick cycle arrows + Change Fighter Button
-    const arrowW = 24;
-    const changeBtnW = w - 16 - arrowW * 2 - 6;
-    const btnH = 22;
-    const btnY = y + h - btnH - 6;
-
-    drawButton('◄', x + 8 + arrowW / 2, btnY + btnH / 2, () => cycleFighter(-1), arrowW, btnH, '#20242E', 3);
-    drawButton('CHANGE', x + 8 + arrowW + 3 + changeBtnW / 2, btnY + btnH / 2, () => {
-      openFighterSelectModal(slotProp, fighterIndex);
-    }, changeBtnW, btnH, '#20242E', 3);
-    drawButton('►', x + w - 8 - arrowW / 2, btnY + btnH / 2, () => cycleFighter(1), arrowW, btnH, '#20242E', 3);
-
-  } else {
-    // ── MEDIUM CARD (2v2 / 1v2 Duo Stacked / FFA: H ~ 334px) ──
-    const avatarX = x + 36;
-    const avatarY = y + 64;
-    const avatarSize = 54;
-
-    // Glowing pedestal
-    ctx.save();
-    ctx.fillStyle = '#101217';
-    ctx.strokeStyle = theme.primary || '#F5A623';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.ellipse(avatarX, avatarY + 26, avatarSize * 0.44, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-
-    if (previewImage) {
-      ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
-    }
-
-    const detailX = x + 72;
-    const detailW = w - 82;
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = '900 12.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, def.name.toUpperCase(), detailW - 4), detailX, y + 32);
-
-    ctx.fillStyle = theme.primary || '#F5A623';
-    ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.fillText(fitSingleLineText(ctx, `CLASS // ${def.type.toUpperCase()}`, detailW - 4), detailX, y + 46);
-
-    drawTacticalStatBar(ctx, 'HP', def.hp, 150, detailX, y + 58, detailW, '#EF4444');
-    drawTacticalStatBar(ctx, 'DMG', def.damage, 60, detailX, y + 74, detailW, '#F5A623');
-    drawTacticalStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, y + 90, detailW, theme.primary || '#38BDF8');
-
-    // Live Weapon preview sub-box
-    const weaponBoxY = y + 112;
-    const weaponBoxH = h - (weaponBoxY - y) - 44;
-    const boxW = w - 18;
-
-    ctx.save();
-    ctx.fillStyle = '#0F1116';
-    ctx.strokeStyle = '#252A36';
-    ctx.lineWidth = 1.4;
-    drawChamferedRect(ctx, x + 9, weaponBoxY, boxW, weaponBoxH, 4);
-    ctx.fill();
-    ctx.stroke();
-    drawCornerBrackets(ctx, x + 9, weaponBoxY, boxW, weaponBoxH, 6, 'rgba(245, 166, 35, 0.4)', 1.2);
-    ctx.restore();
-
-    ctx.fillStyle = '#F5A623';
-    ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name}`, boxW - 65), x + 15, weaponBoxY + 6);
-
-    // Mini Live Weapon render on right
-    const miniWX = x + boxW - 35;
-    const miniWY = weaponBoxY + weaponBoxH / 2 + 6;
-    ctx.save();
-    ctx.translate(miniWX, miniWY);
-    ctx.scale(0.65, 0.65);
-    drawWeaponPreview(ctx, def.type, def.color);
-    ctx.restore();
-
-    ctx.fillStyle = '#CBD5E1';
-    ctx.font = '800 9.5px "Outfit", "Rajdhani", "Segoe UI", sans-serif';
-    ctx.textAlign = 'left';
-    wrapText(ctx, `${def.ability}: ${def.desc}`, x + 15, weaponBoxY + 18, boxW - 75, 12, 4);
-
-    // Quick cycle arrows + Change Fighter Button
-    const arrowW = 28;
-    const changeBtnW = w - 18 - arrowW * 2 - 8;
-    const btnH = 26;
-    const btnY = y + h - btnH - 10;
-
-    drawButton('◄', x + 9 + arrowW / 2, btnY + btnH / 2, () => cycleFighter(-1), arrowW, btnH, '#20242E', 3);
-    drawButton('CHANGE', x + 9 + arrowW + 4 + changeBtnW / 2, btnY + btnH / 2, () => {
-      openFighterSelectModal(slotProp, fighterIndex);
-    }, changeBtnW, btnH, '#20242E', 3);
-    drawButton('►', x + w - 9 - arrowW / 2, btnY + btnH / 2, () => cycleFighter(1), arrowW, btnH, '#20242E', 3);
   }
+
+  // 5. Stepped Info Stack
+  const nameBoxY = 192;
+  const nameBoxH = 28;
+  const nameBoxW = 224;
+  const nameBoxX = 10;
+
+  ctx.save();
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(nameBoxX + 2, nameBoxY + 2, nameBoxW, nameBoxH);
+  ctx.fillStyle = '#161922';
+  ctx.fillRect(nameBoxX, nameBoxY, nameBoxW, nameBoxH);
+  ctx.strokeStyle = '#F5A623';
+  ctx.lineWidth = 1.8;
+  ctx.strokeRect(nameBoxX, nameBoxY, nameBoxW, nameBoxH);
+
+  ctx.font = '900 14px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const nameStr = fitSingleLineText(ctx, def.name.toUpperCase(), nameBoxW - 46);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.5;
+  ctx.strokeText(nameStr, nameBoxX + 8, nameBoxY + nameBoxH / 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(nameStr, nameBoxX + 8, nameBoxY + nameBoxH / 2);
+
+  drawGradeBadge(ctx, nameBoxX + 8 + ctx.measureText(nameStr).width + 12, nameBoxY + nameBoxH / 2 - 8, def.grade, { scale: 0.75 });
+  ctx.restore();
+
+  // Class & Level
+  const subY = 228;
+  ctx.save();
+  ctx.font = '900 9.5px "Outfit", "Rajdhani", sans-serif';
+  ctx.fillStyle = '#F5A623';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`CLASS // ${def.type.toUpperCase()}`, 14, subY);
+
+  const lvlW = 46;
+  const lvlH = 15;
+  const lvlX = 244 - 14 - lvlW;
+  ctx.fillStyle = '#0B0D13';
+  ctx.fillRect(lvlX, subY - lvlH / 2, lvlW, lvlH);
+  ctx.strokeStyle = '#FFE145';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(lvlX, subY - lvlH / 2, lvlW, lvlH);
+  ctx.fillStyle = '#FFE145';
+  ctx.textAlign = 'center';
+  ctx.fillText('SSR V.99', lvlX + lvlW / 2, subY + 0.5);
+
+  for (let s = 0; s < 5; s++) {
+    _drawComicStar5(ctx, 14 + s * 11, 242, 4.5, 2, '#FFE145');
+  }
+  ctx.restore();
+
+  // 6. Slanted Stat Bars
+  const statBoxX = 10;
+  const statBoxY = 254;
+  const statBoxW = 224;
+  const statBoxH = 72;
+
+  ctx.save();
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(statBoxX + 2, statBoxY + 2, statBoxW, statBoxH);
+  ctx.fillStyle = '#0C0E14';
+  ctx.fillRect(statBoxX, statBoxY, statBoxW, statBoxH);
+  ctx.strokeStyle = '#222634';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(statBoxX, statBoxY, statBoxW, statBoxH);
+
+  const drawTallStatRow = (label, val, maxVal, by, col) => {
+    ctx.save();
+    ctx.fillStyle = col;
+    ctx.font = '900 9.5px "Outfit", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(label, statBoxX + 6, by);
+
+    const bX = statBoxX + 34;
+    const bW = statBoxW - 72;
+    const bH = 10;
+    drawSlantedParallelogram(ctx, bX, by - bH / 2, bW, bH, 4, '#161922', '#282E3E', 1);
+
+    const fillRatio = Math.min(1, Math.max(0.08, val / maxVal));
+    const fillW = Math.max(6, bW * fillRatio);
+    drawSlantedParallelogram(ctx, bX, by - bH / 2, fillW, bH, 4, col, null, 0);
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = '900 9.5px "Outfit", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(`${val}`, statBoxX + statBoxW - 6, by);
+    ctx.restore();
+  };
+
+  drawTallStatRow('HP', def.hp, 200, statBoxY + 15, '#EF4444');
+  drawTallStatRow('DMG', def.damage, 50, statBoxY + 36, '#F5A623');
+  drawTallStatRow('SPD', def.speed || 2, 4, statBoxY + 57, '#38BDF8');
+  ctx.restore();
+
+  // 7. Ability Dossier Box
+  const abY = 336;
+  const abH = 76;
+  ctx.save();
+  ctx.fillStyle = '#0F1116';
+  ctx.fillRect(statBoxX, abY, statBoxW, abH);
+  ctx.strokeStyle = '#252A36';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(statBoxX, abY, statBoxW, abH);
+  ctx.fillStyle = '#FFE145';
+  ctx.font = '900 10px "Outfit", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(fitSingleLineText(ctx, `ABILITY // ${def.ability.toUpperCase()}`, statBoxW - 12), statBoxX + 6, abY + 6);
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '800 9px "Outfit", sans-serif';
+  wrapText(ctx, def.desc, statBoxX + 6, abY + 20, statBoxW - 12, 11, 4);
+  ctx.restore();
+
+  // 8. Live Weapon Showcase Box
+  const wpY = 420;
+  const wpH = 196;
+  ctx.save();
+  ctx.fillStyle = '#0F1116';
+  ctx.fillRect(statBoxX, wpY, statBoxW, wpH);
+  ctx.strokeStyle = '#252A36';
+  ctx.lineWidth = 1.4;
+  ctx.strokeRect(statBoxX, wpY, statBoxW, wpH);
+
+  ctx.fillStyle = '#FFE145';
+  ctx.font = '900 10px "Outfit", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(fitSingleLineText(ctx, `WEAPON // ${weaponInfo.name.toUpperCase()}`, statBoxW - 12), statBoxX + 6, wpY + 6);
+
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '900 9px "Outfit", sans-serif';
+  ctx.fillText(fitSingleLineText(ctx, `[ ${weaponInfo.category} ]`, statBoxW - 12), statBoxX + 6, wpY + 18);
+
+  const wStageX = statBoxX + statBoxW / 2;
+  const wStageY = wpY + 74;
+
+  ctx.save();
+  ctx.fillStyle = '#151822';
+  ctx.strokeStyle = '#F5A623';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.ellipse(wStageX, wStageY + 20, 44, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.translate(wStageX, wStageY);
+  ctx.scale(1.0, 1.0);
+  drawWeaponPreview(ctx, def.type, def.color);
+  ctx.restore();
+
+  ctx.fillStyle = '#CBD5E1';
+  ctx.font = '800 9.5px "Outfit", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  wrapText(ctx, weaponInfo.desc, wStageX, wpY + 148, statBoxW - 12, 11, 4);
+  ctx.restore();
+
+  // 9. Bottom Action Button
+  const btnX = 10;
+  const btnY = 626;
+  const btnW = 224;
+  const btnH = 42;
+
+  ctx.save();
+  ctx.fillStyle = '#050609';
+  ctx.fillRect(btnX + 2, btnY + 2, btnW, btnH);
+  ctx.fillStyle = '#07080C';
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.strokeStyle = '#F5A623';
+  ctx.lineWidth = 2.4;
+  ctx.strokeRect(btnX, btnY, btnW, btnH);
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(btnX, btnY, btnW, btnH);
+  ctx.clip();
+  const sheenProgress = ((now * 0.65) % 1.0);
+  const sheenX = btnX - 40 + sheenProgress * (btnW + 80);
+  const sheenGrad = ctx.createLinearGradient(sheenX - 25, btnY, sheenX + 25, btnY + btnH);
+  sheenGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  sheenGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.22)');
+  sheenGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+  ctx.fillStyle = sheenGrad;
+  ctx.fillRect(btnX, btnY, btnW, btnH);
+  ctx.restore();
+
+  const arrowSlide = Math.sin(now * 5.5 + phase) * 2.5;
+  ctx.font = '900 13.5px "Outfit", "Impact", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const btnLabel = 'CHANGE HERO';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.5;
+  ctx.strokeText(btnLabel, btnX + btnW / 2 - 8, btnY + btnH / 2);
+  ctx.fillStyle = '#F5A623';
+  ctx.fillText(btnLabel, btnX + btnW / 2 - 8, btnY + btnH / 2);
+
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.5;
+  ctx.strokeText('⯈', btnX + btnW / 2 + 58 + arrowSlide, btnY + btnH / 2);
+  ctx.fillStyle = '#FFE145';
+  ctx.fillText('⯈', btnX + btnW / 2 + 58 + arrowSlide, btnY + btnH / 2);
+  ctx.restore();
+
+  ctx.restore(); // End scale/translate
+
+  if (isInteractive) {
+    _registerButton(x, y, w, h, () => openFighterSelectModal(slotProp, fighterIndex));
+    _registerButton(x + btn1X * sx, y + hdrY * sy, cycleBtnSize * sx, cycleBtnSize * sy, () => cycleFighter(-1));
+    _registerButton(x + btn2X * sx, y + hdrY * sy, cycleBtnSize * sx, cycleBtnSize * sy, () => cycleFighter(1));
+    _registerButton(x + btnX * sx, y + btnY * sy, btnW * sx, btnH * sy, () => openFighterSelectModal(slotProp, fighterIndex));
+  }
+}
+
+function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLarge = false, isMirrored = undefined) {
+  if (!enabled) {
+    const { ctx } = state;
+    ctx.save();
+    ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+    ctx.fillRect(x + 4, y + 5, w, h);
+    ctx.fillStyle = '#101217';
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = '#EF4444';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(x, y, w, h);
+    ctx.fillStyle = '#EF4444';
+    ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SLOT UNAVAILABLE', x + w / 2, y + h / 2);
+    ctx.restore();
+    return;
+  }
+  const isP1 = slotProp === 'p1Index' || slotProp === 'p3Index' || slotProp === 'p5Index';
+  const mirrored = isMirrored ?? (x > (state.canvas?.width || 540) / 2 - 20);
+  return drawHeroicFighterCard(slotProp, title, x, y, w, h, isP1, enabled, mirrored);
 }
 
 function openFighterSelectModal(slotProp, fighterIndex) {

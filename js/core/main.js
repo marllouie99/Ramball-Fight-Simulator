@@ -993,6 +993,11 @@ export function executeTacticalAction(action) {
     state.p6Index = state.p6Index ?? 5;
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
+  } else if (action === 'mode-tlfs' || action === 'mode-gauntlet') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.TLFS || 'TLFS';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
   }
 
   // 16:9 Widescreen 1v1 Duel Mode Launcher

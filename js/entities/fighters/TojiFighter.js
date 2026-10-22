@@ -47,15 +47,15 @@ export class TojiFighter extends Fighter {
     this.ambushPhase = null;
     this.ambushTimer = 0;
 
-    // Inverted Spear of Heaven (Basic Attack — 2-Hit "Stab & Rip" Combo)
+    // Inverted Spear of Heaven (Basic Attack)
     this.spearCooldown = 0;
     this.spearCooldownMax = CONFIG.toji?.spearCooldown || 32;
-    this.spearRange = CONFIG.toji?.spearRange || 55;
+    this.spearRange = CONFIG.toji?.spearRange || 50;
     this.spearSwingTimer = 0;
     this.spearComboStep = 1;
     this.spearComboResetTimer = 0;
     const _c = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
-    this.spearSwingMax = (_c.hit1LiftFrames ?? 4) + (_c.hit1HoldFrames ?? 1) + (_c.hit1StrikeFrames ?? 4) + (_c.hit1ImpactLockFrames ?? 4) + (_c.hit1RecoveryFrames ?? 5);
+    this.spearSwingMax = (_c.hit1LiftFrames ?? 5) + (_c.hit1HoldFrames ?? 2) + (_c.hit1StrikeFrames ?? 6) + (_c.hit1ImpactLockFrames ?? 6) + (_c.hit1RecoveryFrames ?? 9);
 
     // Split Soul Katana
     // Physics Chain simulation
@@ -116,20 +116,28 @@ export class TojiFighter extends Fighter {
    * Heavenly Restriction: Zero Cursed Energy. 
    * Toji is completely immune to domain effects and sensory overload slow effects (like Gojo's Limitless).
    */
-  playBasicAttackPattern(step = 1, target = null) {
-    const opp = target || {
-      x: this.x + Math.cos(this.gunAngle || 0) * 55,
-      y: this.y + Math.sin(this.gunAngle || 0) * 55,
-      r: 25,
-      hp: 100,
-      maxHp: 100,
-      vx: 0,
-      vy: 0,
-      applyKnockback: () => {},
-      applySlow: () => {},
-      applyTimeStop: () => {},
-      takeDamage: () => {}
-    };
+  playBasicAttackPattern(stepOrTarget = null, target = null) {
+    let opp = null;
+    if (stepOrTarget && typeof stepOrTarget === 'object') {
+      opp = stepOrTarget;
+    } else if (target && typeof target === 'object') {
+      opp = target;
+    }
+    if (!opp) {
+      opp = {
+        x: this.x + Math.cos(this.gunAngle || 0) * (CONFIG.toji?.spearRange || 50),
+        y: this.y + Math.sin(this.gunAngle || 0) * (CONFIG.toji?.spearRange || 50),
+        r: 25,
+        hp: 100,
+        maxHp: 100,
+        vx: 0,
+        vy: 0,
+        applyKnockback: () => {},
+        applySlow: () => {},
+        applyTimeStop: () => {},
+        takeDamage: () => {}
+      };
+    }
     if (opp) {
       const dx = opp.x - this.x;
       const dy = opp.y - this.y;
@@ -145,8 +153,8 @@ export class TojiFighter extends Fighter {
     this._slashOriginX = this.x;
     this._slashOriginY = this.y;
     this._lastSpearTimer = 0;
-    this.spearComboStep = (step === 2) ? 2 : 1;
-    this.spearComboResetTimer = 60;
+    this.spearComboStep = 1;
+    this.spearComboResetTimer = 0;
     this.spearCooldown = 0;
     this.postUltimateRecoveryTimer = 0;
     this.isAmbushing = false;
@@ -156,10 +164,7 @@ export class TojiFighter extends Fighter {
   }
 
   triggerDemoAttack(step = null) {
-    const nextStep = (step !== null && step !== undefined) 
-      ? step 
-      : ((this.spearComboStep === 1) ? 2 : 1);
-    this.playBasicAttackPattern(nextStep);
+    this.playBasicAttackPattern();
   }
 
   isStationarySkillActive() {
@@ -1710,9 +1715,6 @@ export class TojiFighter extends Fighter {
       }
     }
     if (this.spearComboResetTimer > 0) this.spearComboResetTimer--;
-    if (this.spearComboResetTimer <= 0 && this.spearSwingTimer <= 0) {
-      this.spearComboStep = 1;
-    }
     if (this.phantomSlashTimer > 0) this.phantomSlashTimer--;
     if (this.ultimateCooldown > 0) this.ultimateCooldown--;
     if (this._parryAmbushCooldown > 0) this._parryAmbushCooldown--;
@@ -1769,13 +1771,12 @@ export class TojiFighter extends Fighter {
     }
     // 5-Phase Basic Attack Momentum & Impact Lock (Rule 30 / Maki Standard)
     if (this.spearSwingTimer > 0 && !this.isAmbushThrust) {
-      const isStep2 = (this.spearComboStep === 2);
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
-      const liftF = isStep2 ? (cfg.hit2LiftFrames ?? 3) : (cfg.hit1LiftFrames ?? 4);
-      const holdF = isStep2 ? (cfg.hit2HoldFrames ?? 1) : (cfg.hit1HoldFrames ?? 1);
-      const strikeF = isStep2 ? (cfg.hit2StrikeFrames ?? 5) : (cfg.hit1StrikeFrames ?? 4);
-      const lockF = isStep2 ? (cfg.hit2ImpactLockFrames ?? 5) : (cfg.hit1ImpactLockFrames ?? 4);
-      const recF = isStep2 ? (cfg.hit2RecoveryFrames ?? 7) : (cfg.hit1RecoveryFrames ?? 5);
+      const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+      const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+      const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+      const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+      const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
       const totalF = Math.max(1, liftF + holdF + strikeF + lockF + recF);
       const t2 = (liftF + holdF) / totalF;
       const t3 = (liftF + holdF + strikeF) / totalF;
@@ -1784,11 +1785,9 @@ export class TojiFighter extends Fighter {
       const maxTimer = this.spearSwingMax || totalF;
       const t = Math.max(0, Math.min(1.0, 1 - (this.spearSwingTimer / maxTimer)));
       if (t >= t2 && t < t3) {
-        // Phase 3: Forward lunging step momentum during hypersonic whip cleave / linear plunge
+        // Phase 3: Forward lunging step momentum during hypersonic whip cleave
         const pStrike = (t - t2) / Math.max(0.001, t3 - t2);
-        const lungeSpeed = isStep2
-          ? (typeof cfg.hit2LungeSpeed === 'number' ? cfg.hit2LungeSpeed : 7.0)
-          : (typeof cfg.hit1LungeSpeed === 'number' ? cfg.hit1LungeSpeed : 8.5);
+        const lungeSpeed = typeof cfg.hit1LungeSpeed === 'number' ? cfg.hit1LungeSpeed : 5.5;
         const lungeDecay = Math.sin(pStrike * Math.PI);
         const slashAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
         this.vx += Math.cos(slashAngle) * lungeSpeed * lungeDecay * 0.35;
@@ -2365,13 +2364,12 @@ export class TojiFighter extends Fighter {
         }
       } else {
         // Standard Melee Swing (Basic Attack — 5-Phase Chemical Katana Kinematics / Rule 30 / Maki Standard)
-        const isStep2 = (this.spearComboStep === 2);
         const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
-        const liftF = isStep2 ? (cfg.hit2LiftFrames ?? 3) : (cfg.hit1LiftFrames ?? 4);
-        const holdF = isStep2 ? (cfg.hit2HoldFrames ?? 1) : (cfg.hit1HoldFrames ?? 1);
-        const strikeF = isStep2 ? (cfg.hit2StrikeFrames ?? 5) : (cfg.hit1StrikeFrames ?? 4);
-        const lockF = isStep2 ? (cfg.hit2ImpactLockFrames ?? 5) : (cfg.hit1ImpactLockFrames ?? 4);
-        const recF = isStep2 ? (cfg.hit2RecoveryFrames ?? 7) : (cfg.hit1RecoveryFrames ?? 5);
+        const liftF = (typeof cfg.hit1LiftFrames === 'number') ? cfg.hit1LiftFrames : (cfg.spearLiftFrames || 5);
+        const holdF = (typeof cfg.hit1HoldFrames === 'number') ? cfg.hit1HoldFrames : (cfg.spearHoldFrames || 2);
+        const strikeF = (typeof cfg.hit1StrikeFrames === 'number') ? cfg.hit1StrikeFrames : (cfg.spearStrikeFrames || 6);
+        const lockF = (typeof cfg.hit1ImpactLockFrames === 'number') ? cfg.hit1ImpactLockFrames : ((typeof cfg.hit1LockFrames === 'number') ? cfg.hit1LockFrames : (cfg.spearImpactLockFrames || 6));
+        const recF = (typeof cfg.hit1RecoveryFrames === 'number') ? cfg.hit1RecoveryFrames : (cfg.spearRecoveryFrames || 9);
         const totalF = Math.max(1, liftF + holdF + strikeF + lockF + recF);
 
         const t1 = liftF / totalF;
@@ -2379,115 +2377,59 @@ export class TojiFighter extends Fighter {
         const t3 = (liftF + holdF + strikeF) / totalF;
         const t4 = (liftF + holdF + strikeF + lockF) / totalF;
 
-        if (!isStep2) {
-          // ── HIT 1: THE PISTON PLUNGE (Pure Linear Penetration Thrust) ──
-          if (t < t1) {
-            const p = t / Math.max(0.001, t1);
-            const easeP = Math.sin(p * Math.PI * 0.5);
-            thrustDistance = -16 * easeP;
-            offsetAngle = (0.42 + (0.05 - 0.42) * easeP) * _katanaFlipSign;
-            slashArcAlpha = 0;
-            this._activeSlashProgress = 0;
-            this._recoveryProgress = 0;
-          } else if (t < t2) {
-            thrustDistance = -16;
-            offsetAngle = 0.05 * _katanaFlipSign;
-            slashArcAlpha = 0;
-            this._activeSlashProgress = 0;
-            this._recoveryProgress = 0;
-          } else if (t < t3) {
-            const p = (t - t2) / Math.max(0.001, t3 - t2);
-            const plungeCurve = 1 - Math.pow(1 - p, 2.6);
-            thrustDistance = -16 + (38 - (-16)) * plungeCurve;
-            offsetAngle = 0; // Pure linear alignment along aim vector
-            slashArcAlpha = Math.min(1.0, p * 3.5);
-            this._activeSlashProgress = p;
-            this._recoveryProgress = 0;
+        if (t < t1) {
+          const p = t / Math.max(0.001, t1);
+          const easeP = Math.sin(p * Math.PI * 0.5);
+          thrustDistance = -12 * easeP;
+          offsetAngle = (0.42 + (-2.35 - 0.42) * easeP) * _katanaFlipSign;
+          slashArcAlpha = 0;
+          this._activeSlashProgress = 0;
+          this._recoveryProgress = 0;
+        } else if (t < t2) {
+          thrustDistance = -12;
+          offsetAngle = -2.35 * _katanaFlipSign;
+          slashArcAlpha = 0;
+          this._activeSlashProgress = 0;
+          this._recoveryProgress = 0;
+        } else if (t < t3) {
+          const p = (t - t2) / Math.max(0.001, t3 - t2);
+          const sweepCurve = 1 - Math.pow(1 - p, 2.2);
+          thrustDistance = -12 + 38 * Math.sin(p * Math.PI * 0.75);
+          offsetAngle = (-2.35 + 3.70 * sweepCurve) * _katanaFlipSign;
+          slashArcAlpha = Math.min(1.0, p * 3.5);
+          this._activeSlashProgress = p;
+          this._recoveryProgress = 0;
 
-            if (p > 0.04 && p < 0.45 && this.chainNodes && this.chainNodes.length > 2) {
-              const whipForce = -9.0;
-              for (let i = 1; i < this.chainNodes.length; i++) {
-                this.chainNodes[i].vx += Math.cos(baseAngle) * (whipForce / i);
-                this.chainNodes[i].vy += Math.sin(baseAngle) * (whipForce / i);
-              }
+          // Chain dynamic whip force on early stroke
+          if (p > 0.04 && p < 0.45 && this.chainNodes && this.chainNodes.length > 2) {
+            const whipForce = -8.5;
+            const sideAngle = baseAngle + offsetAngle;
+            for (let i = 1; i < this.chainNodes.length; i++) {
+              this.chainNodes[i].vx += Math.cos(sideAngle - 0.9) * (whipForce / i);
+              this.chainNodes[i].vy += Math.sin(sideAngle - 0.9) * (whipForce / i);
             }
-          } else if (t < t4) {
-            // Phase 4: Impact Lock / Latch (Embedded deep in flesh with tremor)
-            const pLock = (t - t3) / Math.max(0.001, t4 - t3);
-            const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
-            const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
-            const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.015);
-            thrustDistance = 38 + jitter;
-            offsetAngle = angJitter * _katanaFlipSign;
-            slashArcAlpha = 1.0;
-            this._activeSlashProgress = 1.0;
-            this._recoveryProgress = 0;
-          } else {
-            // Phase 5: Clean linear retraction & snap to ready stance
-            const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
-            const easeRec = Math.pow(recP, 1.8);
-            const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.05;
-            thrustDistance = 38 * (1.0 - easeRec);
-            offsetAngle = (0.42 * easeRec + dampedWave) * _katanaFlipSign;
-            slashArcAlpha = Math.pow(1.0 - recP, 0.85);
-            this._activeSlashProgress = 1.0;
-            this._recoveryProgress = recP;
           }
+        } else if (t < t4) {
+          // Phase 4: Impact Lock / Latch (Rule 30) - firmly locked at cleave apex with tremor jitter
+          const pLock = (t - t3) / Math.max(0.001, t4 - t3);
+          const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
+          const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
+          const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.026);
+          thrustDistance = 26 + jitter;
+          offsetAngle = (1.35 + angJitter) * _katanaFlipSign;
+          slashArcAlpha = 1.0;
+          this._activeSlashProgress = 1.0;
+          this._recoveryProgress = 0;
         } else {
-          // ── HIT 2: THE THROAT CARVE / CROSS-RIP (Horizontal Cleave out of Puncture) ──
-          if (t < t1) {
-            const p = t / Math.max(0.001, t1);
-            const easeP = Math.sin(p * Math.PI * 0.5);
-            thrustDistance = 10 * easeP;
-            offsetAngle = (0.42 + (-1.10 - 0.42) * easeP) * _katanaFlipSign;
-            slashArcAlpha = 0;
-            this._activeSlashProgress = 0;
-            this._recoveryProgress = 0;
-          } else if (t < t2) {
-            thrustDistance = 10;
-            offsetAngle = -1.10 * _katanaFlipSign;
-            slashArcAlpha = 0;
-            this._activeSlashProgress = 0;
-            this._recoveryProgress = 0;
-          } else if (t < t3) {
-            const p = (t - t2) / Math.max(0.001, t3 - t2);
-            const sweepCurve = 1 - Math.pow(1 - p, 2.4);
-            thrustDistance = 10 + 18 * Math.sin(p * Math.PI * 0.70);
-            offsetAngle = (-1.10 + 2.10 * sweepCurve) * _katanaFlipSign; // Sweeps -1.10 rad to +1.00 rad
-            slashArcAlpha = Math.min(1.0, p * 3.5);
-            this._activeSlashProgress = p;
-            this._recoveryProgress = 0;
-
-            if (p > 0.04 && p < 0.45 && this.chainNodes && this.chainNodes.length > 2) {
-              const whipForce = -8.5;
-              const sideAngle = baseAngle + offsetAngle;
-              for (let i = 1; i < this.chainNodes.length; i++) {
-                this.chainNodes[i].vx += Math.cos(sideAngle - 0.9) * (whipForce / i);
-                this.chainNodes[i].vy += Math.sin(sideAngle - 0.9) * (whipForce / i);
-              }
-            }
-          } else if (t < t4) {
-            // Phase 4: Impact Lock / Latch (Locked at cross-rip apex)
-            const pLock = (t - t3) / Math.max(0.001, t4 - t3);
-            const tremorInt = (typeof cfg.spearTremorIntensity === 'number') ? cfg.spearTremorIntensity : 1.5;
-            const jitter = Math.sin(pLock * Math.PI * 8.0) * (1.0 - pLock * 0.5) * tremorInt;
-            const angJitter = Math.sin(pLock * Math.PI * 10.0) * (1.0 - pLock * 0.5) * (tremorInt * 0.026);
-            thrustDistance = 28 + jitter;
-            offsetAngle = (1.00 + angJitter) * _katanaFlipSign;
-            slashArcAlpha = 1.0;
-            this._activeSlashProgress = 1.0;
-            this._recoveryProgress = 0;
-          } else {
-            // Phase 5: Settle back to low assassin guard stance
-            const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
-            const easeRec = Math.pow(recP, 1.8);
-            const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.06;
-            thrustDistance = 28 * (1.0 - easeRec);
-            offsetAngle = (1.00 + (0.42 - 1.00) * easeRec + dampedWave) * _katanaFlipSign;
-            slashArcAlpha = Math.pow(1.0 - recP, 0.85);
-            this._activeSlashProgress = 1.0;
-            this._recoveryProgress = recP;
-          }
+          // Phase 5: Damped Extraction & Recovery Settle (Rule 30 & Rule 15)
+          const recP = (t - t4) / Math.max(0.001, 1.0 - t4);
+          const easeRec = Math.pow(recP, 1.8);
+          const dampedWave = Math.sin(recP * Math.PI * 2.0) * Math.pow(1.0 - recP, 2.0) * 0.06;
+          thrustDistance = 26 * (1.0 - easeRec);
+          offsetAngle = (1.35 + (0.42 - 1.35) * easeRec + dampedWave) * _katanaFlipSign;
+          slashArcAlpha = Math.pow(1.0 - recP, 0.85);
+          this._activeSlashProgress = 1.0;
+          this._recoveryProgress = recP;
         }
       }
     } else if (this.ambushPhase === 'PHANTOM_FLURRY' || (this.phantomSlashTimer && this.phantomSlashTimer > 0)) {
@@ -2914,251 +2856,146 @@ export class TojiFighter extends Fighter {
           drawArc(-0.35 + (this.spearOffset || 0), this.r + (this.spearThrust || 0) + 85, 18, slashArcAlpha, '160, 30, 240', '220, 20, 100', '12, 4, 20');
         }
       } else if (!this.isAmbushThrust) {
-        // --- INVERTED SPEAR BASIC ATTACK: 2-HIT "STAB & RIP" COMBO (Rule 15, 26, 30) ---
-        const isStep2 = (this.spearComboStep === 2);
+        // --- INVERTED SPEAR BASIC ATTACK: 5-PHASE OVERHEAD CHEMICAL CLEAVE (Rule 15, 26, 30) ---
         const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
         if (editP) {
           ctx.translate(editP.offsetX, editP.offsetY);
           slashArcAlpha = 1.0;
         }
 
-        // Anchor directly to Toji's real-time body position so the thrust & cross-rip are aligned
-        // 1:1 with the moving dagger
+        // Anchor directly to Toji's real-time body position so the slash is aligned 1:1 with the moving dagger
         ctx.translate(this.x - _slashOriginX, this.y - _slashOriginY);
 
         const attackAngle = (this.spearCastAngle !== undefined && this.spearSwingTimer > 0)
           ? this.spearCastAngle
           : (this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle);
         
-        // For Hit 1 linear penetration thrust, align precisely with dagger's renderAngle (baseAngle + offsetAngle)
-        // For Hit 2 cross-cleave rip, anchor to attackAngle as the crescent sweeps across
-        const thrustAngle = (!isStep2) ? (attackAngle + offsetAngle) : attackAngle;
-        ctx.rotate(thrustAngle);
+        ctx.rotate(attackAngle);
         const normAngle = Math.atan2(Math.sin(attackAngle), Math.cos(attackAngle));
         if (Math.abs(normAngle) > Math.PI / 2) {
           ctx.scale(1, -1);
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // ── HIT 1: THE CHEMICAL CLEAVE (Overhead Shoulder Coil & Downward Cleave) ──
+        // 5-Phase Crescent Slash Arc with dynamic tail-to-tip eraser wipe (Rule 15)
+        // ═══════════════════════════════════════════════════════════════════════
+        const startOffset = -2.15;
+        const endOffset = 1.35;
+        const totalSweep = endOffset - startOffset; // ~3.50 rad (~200 degrees)
+
+        let currentTipOffset, currentTailOffset;
         const progress = this._activeSlashProgress !== undefined ? this._activeSlashProgress : 0;
         const recP = this._recoveryProgress !== undefined ? this._recoveryProgress : 0;
         let trailAlpha = slashArcAlpha;
 
-        if (!isStep2) {
-          // ═══════════════════════════════════════════════════════════════════════
-          // ── HIT 1: THE PISTON PLUNGE (Supersonic Linear Needle Penetration Thrust) ──
-          // Zero chopping arc! Renders an explosive piercing needle spike & concentric shockwaves (Rule 26)
-          // ═══════════════════════════════════════════════════════════════════════
-          if (trailAlpha > 0.01 && (progress > 0 || recP > 0)) {
-            // Anchor along the Inverted Spear blade axis
-            const tantoTipX = this.r + thrustDistance + 85;
-            const needleBaseX = this.r + thrustDistance + 16;
-            const reachExt = 46 * Math.min(1.0, progress * 1.5) * (1.0 - recP * 0.4);
-            const needleApexX = tantoTipX + reachExt;
-            const needleLen = Math.max(8, needleApexX - needleBaseX);
-            const halfW = (6.5 * Math.sin(Math.min(1.0, progress) * Math.PI * 0.5) * (1.0 - recP * 0.7)) * (editP ? editP.thickness : 1.0);
-
-            if (needleLen > 4 && halfW > 0.5) {
-              // 1. Outer Atmospheric Void Purple Flare Wash
-              ctx.beginPath();
-              ctx.moveTo(needleBaseX - 4, 0);
-              ctx.lineTo(needleBaseX + needleLen * 0.25, -(halfW + 3.5));
-              ctx.lineTo(needleApexX + 6, 0);
-              ctx.lineTo(needleBaseX + needleLen * 0.25, (halfW + 3.5));
-              ctx.closePath();
-              ctx.fillStyle = `rgba(140, 20, 230, ${(0.32 * trailAlpha).toFixed(2)})`;
-              ctx.fill();
-
-              // 2. Vivid Crimson Nullification Energy Shell
-              ctx.beginPath();
-              ctx.moveTo(needleBaseX - 1, 0);
-              ctx.lineTo(needleBaseX + needleLen * 0.28, -(halfW + 1.2));
-              ctx.lineTo(needleApexX + 3, 0);
-              ctx.lineTo(needleBaseX + needleLen * 0.28, (halfW + 1.2));
-              ctx.closePath();
-              ctx.fillStyle = `rgba(255, 30, 86, ${(0.55 * trailAlpha).toFixed(2)})`;
-              ctx.fill();
-
-              // 3. Manga Dark Ink Outline (Toji Ink Standard)
-              ctx.beginPath();
-              ctx.moveTo(needleBaseX, 0);
-              ctx.lineTo(needleBaseX + needleLen * 0.30, -halfW);
-              ctx.lineTo(needleApexX, 0);
-              ctx.lineTo(needleBaseX + needleLen * 0.30, halfW);
-              ctx.closePath();
-              ctx.strokeStyle = `rgba(10, 4, 18, ${(0.95 * trailAlpha).toFixed(2)})`;
-              ctx.lineWidth = 2.0;
-              ctx.stroke();
-
-              // 4. Deep Violet Core
-              ctx.fillStyle = `rgba(155, 31, 232, ${(0.92 * trailAlpha).toFixed(2)})`;
-              ctx.fill();
-
-              // 5. Specular White Supersonic Penetration Core Line & Needle Tip
-              ctx.beginPath();
-              ctx.moveTo(needleBaseX + 6, 0);
-              ctx.lineTo(needleApexX + 3, 0);
-              ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * trailAlpha).toFixed(2)})`;
-              ctx.lineWidth = 2.2;
-              ctx.stroke();
-
-              // 6. Staggered Water-Ripple Concentric Compression Rings (Rule 26 Compliant)
-              if (progress >= 0.40 && recP < 0.60) {
-                const ringP = Math.min(1.0, (progress - 0.40) / 0.60);
-                const ringAlpha = (1.0 - recP) * trailAlpha;
-                
-                // Ring 1 (Inner supersonic shock ring with expanding translucent warm wash)
-                const r1 = 18 * ringP;
-                ctx.beginPath();
-                ctx.arc(tantoTipX, 0, r1, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 30, 86, ${(0.20 * ringAlpha * (1.0 - ringP)).toFixed(2)})`;
-                ctx.fill();
-                ctx.strokeStyle = `rgba(255, 255, 255, ${(0.90 * ringAlpha * (1.0 - ringP)).toFixed(2)})`;
-                ctx.lineWidth = 1.8;
-                ctx.stroke();
-
-                // Ring 2 (Outer violet ionization compression band)
-                if (ringP > 0.30) {
-                  const p2 = (ringP - 0.30) / 0.70;
-                  const r2 = 30 * p2;
-                  ctx.beginPath();
-                  ctx.arc(tantoTipX, 0, r2, 0, Math.PI * 2);
-                  ctx.strokeStyle = `rgba(155, 31, 232, ${(0.75 * ringAlpha * (1.0 - p2)).toFixed(2)})`;
-                  ctx.lineWidth = 1.6;
-                  ctx.stroke();
-                }
-              }
-
-              // 7. Trailing Discrete Puncture Sparks (along thrust axis, NO radial spiderweb spokes)
-              const numSparks = 6;
-              for (let s = 0; s < numSparks; s++) {
-                const sT = (s / numSparks + (Date.now() / 200)) % 1.0;
-                const sx = needleBaseX + sT * needleLen;
-                const sy = (Math.sin(s * 2.8) * halfW * 0.8) * (1.0 - sT);
-                ctx.fillStyle = (s % 2 === 0) ? '#FFFFFF' : ((s % 3 === 1) ? '#A030FF' : '#FF1E56');
-                ctx.fillRect(sx - 1.5, sy - 1.5, 2.5, 2.5);
-              }
-            }
-          }
+        if (recP <= 0) {
+          // Active cleave stroke & impact lock: crescent tip sweeps smoothly from top to bottom and holds
+          const sweepEase = 1 - Math.pow(1 - Math.min(1.0, progress), 2.2);
+          currentTipOffset = startOffset + sweepEase * totalSweep;
+          currentTailOffset = startOffset;
+          trailAlpha = Math.min(1.0, progress * 3.5);
         } else {
-          // ═══════════════════════════════════════════════════════════════════════
-          // ── HIT 2: THE THROAT CARVE / VICIOUS CROSS-RIP (Horizontal Cleave) ──
-          // Razor-sharp horizontal tearing cleave sweeping across the torso
-          // ═══════════════════════════════════════════════════════════════════════
-          const startOffset = -1.10;
-          const endOffset = 1.00;
-          const totalSweep = endOffset - startOffset; // 2.10 rad (~120 degrees horizontal ripping cleave)
-
-          let currentTipOffset, currentTailOffset;
-
-          if (recP <= 0) {
-            // Active rip stroke: crescent tip sweeps across smoothly from top to bottom
-            const sweepEase = 1 - Math.pow(1 - Math.min(1.0, progress), 2.4);
-            currentTipOffset = startOffset + sweepEase * totalSweep;
+          // Follow-through & dynamic eraser wipe from tail to tip (Rule 15)
+          currentTipOffset = endOffset;
+          if (recP < 0.15) {
             currentTailOffset = startOffset;
-            trailAlpha = Math.min(1.0, progress * 3.5);
+            trailAlpha = 1.0;
           } else {
-            // Follow-through & dynamic eraser wipe from tail to tip (Rule 15)
-            currentTipOffset = endOffset;
-            if (recP < 0.15) {
-              currentTailOffset = startOffset;
-              trailAlpha = 1.0;
-            } else {
-              const eraseP = (recP - 0.15) / 0.85;
-              const easedErase = Math.pow(eraseP, 1.4);
-              currentTailOffset = startOffset + easedErase * totalSweep;
-              trailAlpha = Math.pow(1 - eraseP, 0.85);
-            }
+            const eraseP = (recP - 0.15) / 0.85;
+            const easedErase = Math.pow(eraseP, 1.4);
+            currentTailOffset = startOffset + easedErase * totalSweep;
+            trailAlpha = Math.pow(1 - eraseP, 0.85);
           }
+        }
 
-          const span = currentTipOffset - currentTailOffset;
-          if (Math.abs(span) >= 0.04 && trailAlpha > 0.01) {
-            // Directly envelops the Inverted Spear tanto blade tip (at r + thrustDistance + 85px)
-            const outerRadius = (this.r + thrustDistance + 85) * (editP ? editP.scale : 1.0);
-            const maxThick = 14.0 * (editP ? editP.thickness : 1.0);
-            const numSteps = 32;
+        const span = currentTipOffset - currentTailOffset;
+        if (Math.abs(span) >= 0.04 && trailAlpha > 0.01) {
+          const outerRadius = (this.r + thrustDistance + 92) * (editP ? editP.scale : 1.0);
+          const maxThick = 22.0 * (editP ? editP.thickness : 1.0);
+          const numSteps = 32;
 
-            const buildCrescentPath = (radOffset, thickMult, taperExp = 1.15) => {
-              ctx.beginPath();
-              for (let i = 0; i <= numSteps; i++) {
-                const st = i / numSteps;
-                const ang = currentTailOffset + st * span;
-                const taper = Math.pow(Math.sin(st * Math.PI), taperExp) * (0.28 + 0.72 * st);
-                const rad = outerRadius + radOffset + taper * 1.5;
-                const px = Math.cos(ang) * rad;
-                const py = Math.sin(ang) * rad;
-                if (i === 0) ctx.moveTo(px, py);
-                else ctx.lineTo(px, py);
-              }
-              for (let i = numSteps; i >= 0; i--) {
-                const st = i / numSteps;
-                const ang = currentTailOffset + st * span;
-                const taper = Math.pow(Math.sin(st * Math.PI), taperExp) * (0.28 + 0.72 * st);
-                const rad = outerRadius + radOffset - (maxThick * thickMult * taper);
-                const px = Math.cos(ang) * rad;
-                const py = Math.sin(ang) * rad;
-                ctx.lineTo(px, py);
-              }
-              ctx.closePath();
-            };
-
-            // 1. Outer Cursed Atmospheric Glow Flare
-            buildCrescentPath(5.0, 1.30, 1.05);
-            ctx.fillStyle = `rgba(140, 20, 230, ${(0.32 * trailAlpha).toFixed(2)})`;
-            ctx.fill();
-
-            buildCrescentPath(3.0, 1.15, 1.10);
-            ctx.fillStyle = `rgba(255, 30, 86, ${(0.38 * trailAlpha).toFixed(2)})`;
-            ctx.fill();
-
-            // 2. Dark Manga Ink Shell
-            buildCrescentPath(1.0, 1.05, 1.15);
-            ctx.fillStyle = `rgba(10, 4, 18, ${(0.96 * trailAlpha).toFixed(2)})`;
-            ctx.fill();
-            ctx.strokeStyle = `rgba(10, 4, 18, ${(0.96 * trailAlpha).toFixed(2)})`;
-            ctx.lineWidth = 2.0;
-            ctx.stroke();
-
-            // 3. Deep Cursed Violet Body
-            buildCrescentPath(0, 1.0, 1.15);
-            ctx.fillStyle = `rgba(155, 31, 232, ${(0.92 * trailAlpha).toFixed(2)})`;
-            ctx.fill();
-
-            // 4. Crimson Nullification Energy Core
-            buildCrescentPath(-1.5, 0.65, 1.20);
-            ctx.fillStyle = `rgba(255, 30, 86, ${(0.95 * trailAlpha).toFixed(2)})`;
-            ctx.fill();
-
-            // 5. Specular Razor-Sharp White Cutting Edge & Apex Core Line
-            buildCrescentPath(-0.8, 0.30, 1.25);
-            ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * trailAlpha).toFixed(2)})`;
-            ctx.fill();
-
+          const buildCrescentPath = (radOffset, thickMult, taperExp = 1.15) => {
             ctx.beginPath();
             for (let i = 0; i <= numSteps; i++) {
               const st = i / numSteps;
               const ang = currentTailOffset + st * span;
-              const taper = Math.pow(Math.sin(st * Math.PI), 1.25) * (0.28 + 0.72 * st);
-              const rad = outerRadius - 0.8 + taper * 1.2;
+              const taper = Math.pow(Math.sin(st * Math.PI), taperExp) * (0.28 + 0.72 * st);
+              const rad = outerRadius + radOffset + taper * 1.5;
               const px = Math.cos(ang) * rad;
               const py = Math.sin(ang) * rad;
               if (i === 0) ctx.moveTo(px, py);
               else ctx.lineTo(px, py);
             }
-            ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * trailAlpha).toFixed(2)})`;
-            ctx.lineWidth = 1.8;
-            ctx.stroke();
-
-            // 6. Trailing Cursed Sparks
-            const numSparks = 7;
-            for (let s = 0; s < numSparks; s++) {
-              const sT = (s / numSparks + (Date.now() / 250)) % 1.0;
-              const sAng = currentTailOffset + sT * span;
-              const sDist = outerRadius - 3 - s * 2.0;
-              const sx = Math.cos(sAng) * sDist;
-              const sy = Math.sin(sAng) * sDist;
-              ctx.fillStyle = (s % 2 === 0) ? '#FFFFFF' : ((s % 3 === 1) ? '#A030FF' : '#FF1E56');
-              ctx.fillRect(sx - 1.5, sy - 1.5, 2.5, 2.5);
+            for (let i = numSteps; i >= 0; i--) {
+              const st = i / numSteps;
+              const ang = currentTailOffset + st * span;
+              const taper = Math.pow(Math.sin(st * Math.PI), taperExp) * (0.28 + 0.72 * st);
+              const rad = outerRadius + radOffset - (maxThick * thickMult * taper);
+              const px = Math.cos(ang) * rad;
+              const py = Math.sin(ang) * rad;
+              ctx.lineTo(px, py);
             }
+            ctx.closePath();
+          };
+
+          // 1. Outer Cursed Atmospheric Glow Flare
+          buildCrescentPath(5.0, 1.30, 1.05);
+          ctx.fillStyle = `rgba(140, 20, 230, ${(0.32 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          buildCrescentPath(3.0, 1.15, 1.10);
+          ctx.fillStyle = `rgba(255, 30, 86, ${(0.38 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          // 2. Dark Manga Ink Shell
+          buildCrescentPath(1.0, 1.05, 1.15);
+          ctx.fillStyle = `rgba(10, 4, 18, ${(0.96 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+          ctx.strokeStyle = `rgba(10, 4, 18, ${(0.96 * trailAlpha).toFixed(2)})`;
+          ctx.lineWidth = 2.0;
+          ctx.stroke();
+
+          // 3. Deep Cursed Violet Body
+          buildCrescentPath(0, 1.0, 1.15);
+          ctx.fillStyle = `rgba(155, 31, 232, ${(0.92 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          // 4. Crimson Nullification Energy Core
+          buildCrescentPath(-1.5, 0.65, 1.20);
+          ctx.fillStyle = `rgba(255, 30, 86, ${(0.95 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          // 5. Specular Razor-Sharp White Cutting Edge & Apex Core Line
+          buildCrescentPath(-0.8, 0.30, 1.25);
+          ctx.fillStyle = `rgba(255, 255, 255, ${(0.98 * trailAlpha).toFixed(2)})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          for (let i = 0; i <= numSteps; i++) {
+            const st = i / numSteps;
+            const ang = currentTailOffset + st * span;
+            const taper = Math.pow(Math.sin(st * Math.PI), 1.25) * (0.28 + 0.72 * st);
+            const rad = outerRadius - 0.8 + taper * 1.2;
+            const px = Math.cos(ang) * rad;
+            const py = Math.sin(ang) * rad;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * trailAlpha).toFixed(2)})`;
+          ctx.lineWidth = 1.8;
+          ctx.stroke();
+
+          // 6. Trailing Cursed Sparks
+          const numSparks = 7;
+          for (let s = 0; s < numSparks; s++) {
+            const sT = (s / numSparks + (Date.now() / 250)) % 1.0;
+            const sAng = currentTailOffset + sT * span;
+            const sDist = outerRadius - 3 - s * 2.0;
+            const sx = Math.cos(sAng) * sDist;
+            const sy = Math.sin(sAng) * sDist;
+            ctx.fillStyle = (s % 2 === 0) ? '#FFFFFF' : ((s % 3 === 1) ? '#A030FF' : '#FF1E56');
+            ctx.fillRect(sx - 1.5, sy - 1.5, 2.5, 2.5);
           }
         }
       }

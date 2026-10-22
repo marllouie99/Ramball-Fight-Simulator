@@ -509,7 +509,7 @@ function drawIndexDetailScreen() {
 
   // Define Demo Area coordinates inside panel (Spacious 496px × 360px Arena!)
   const demoInnerY = simY + 32;
-  const demoInnerH = (def.type === 'maki' || def.type === 'toji') ? 336 : 370;
+  const demoInnerH = (def.type === 'maki') ? 336 : 370;
   const demoArea = { x: containerX + 6, y: demoInnerY, width: containerW - 12, height: demoInnerH };
 
   // Clip combat rendering inside the demo window
@@ -767,133 +767,6 @@ function drawIndexDetailScreen() {
       r2X += row2BtnW + row2Gap;
     });
 
-  } else if (def.type === 'toji') {
-    // ── Toji Fushiguro: Dedicated 2-Row Layout (Inverted Spear Basic Attacks + Ambush) ──
-    const activeAnim = state.indexDemoAnim || 'toji_basic';
-
-    // Row 1: Inverted Spear of Heaven Dagger Basic Attacks
-    const tojiBasicBtns = [
-      { id: 'toji_basic', label: 'BASIC ATTACK' },
-      { id: 'toji_hit1', label: 'HIT 1: STAB' },
-      { id: 'toji_hit2', label: 'HIT 2: RIP' },
-      { id: 'toji_combo', label: '2-HIT COMBO' }
-    ];
-    const row1Y = simY + 372;
-    const row1BtnW = 118;
-    const row1BtnH = 24;
-    const row1Gap = 6;
-    const row1TotalW = tojiBasicBtns.length * row1BtnW + (tojiBasicBtns.length - 1) * row1Gap;
-    let r1X = (canvas.width - row1TotalW) / 2;
-
-    tojiBasicBtns.forEach((btn) => {
-      const isActive = activeAnim === btn.id || (btn.id === 'toji_basic' && (activeAnim === 'basic' || activeAnim === 'spear'));
-      ctx.save();
-      if (isActive) {
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.28)';
-        ctx.strokeStyle = '#F59E0B';
-        ctx.lineWidth = 1.5;
-      } else {
-        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = 1;
-      }
-      drawChamferedRect(ctx, r1X, row1Y, row1BtnW, row1BtnH, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-
-      ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
-      ctx.font = '900 9px "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(btn.label, r1X + row1BtnW / 2, row1Y + row1BtnH / 2);
-
-      _registerButton(r1X, row1Y, row1BtnW, row1BtnH, () => {
-        unlockAudio();
-        state.indexDemoAnim = btn.id;
-        const pstate = resetIndexDetailState(def, demoArea);
-        const step = (btn.id === 'toji_hit2') ? 2 : 1;
-        if (pstate) {
-          pstate.tojiInitialized = true;
-          pstate.tojiHitDelivered = false;
-          pstate.tojiCycleTimer = 0;
-          pstate.tojiComboStep = (btn.id === 'toji_hit2') ? 2 : 1;
-          pstate.tojiTargetInitialized = true;
-          if (pstate.fighter) {
-            pstate.fighter.x = demoArea.x + demoArea.width / 2 - 40;
-            pstate.fighter.y = demoArea.y + demoArea.height / 2;
-            pstate.fighter.gunAngle = 0;
-            pstate.fighter.angle = 0;
-            pstate.fighter.spearCastAngle = 0;
-            pstate.fighter._slashStartAngle = 0;
-            pstate.fighter._slashOriginX = pstate.fighter.x;
-            pstate.fighter._slashOriginY = pstate.fighter.y;
-            pstate.fighter._lastSpearTimer = 0;
-          }
-          if (pstate.target) {
-            pstate.target.x = (demoArea.x + demoArea.width / 2 - 40) + 65;
-            pstate.target.y = demoArea.y + demoArea.height / 2;
-          }
-          if (pstate.fighter && typeof pstate.fighter.playBasicAttackPattern === 'function') {
-            pstate.fighter.playBasicAttackPattern(step, pstate.target);
-          }
-        }
-        if (btn.id === 'toji_hit2') {
-          audioSystem.playSFX('attack_fleshhit', 1.15);
-          audioSystem.playSFX('sukuna_slice', 1.0);
-        } else {
-          audioSystem.playSFX('skill_backstab', 1.0);
-          audioSystem.playSFX('attack_fleshhit', 1.0);
-        }
-      });
-
-      r1X += row1BtnW + row1Gap;
-    });
-
-    // Row 2: Tactical Assassin Skills
-    const tojiSkillBtns = [
-      { id: 'stealth', label: 'AMBUSH STRIKE' }
-    ];
-    const row2Y = simY + 400;
-    const row2BtnW = 160;
-    const row2BtnH = 24;
-    const row2Gap = 12;
-    const row2TotalW = tojiSkillBtns.length * row2BtnW + (tojiSkillBtns.length - 1) * row2Gap;
-    let r2X = (canvas.width - row2TotalW) / 2;
-
-    tojiSkillBtns.forEach((btn) => {
-      const isActive = activeAnim === btn.id;
-      ctx.save();
-      if (isActive) {
-        ctx.fillStyle = 'rgba(168, 85, 247, 0.30)';
-        ctx.strokeStyle = '#A855F7';
-        ctx.lineWidth = 1.5;
-      } else {
-        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.lineWidth = 1;
-      }
-      drawChamferedRect(ctx, r2X, row2Y, row2BtnW, row2BtnH, 4);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-
-      ctx.fillStyle = isActive ? '#ffffff' : '#94a3b8';
-      ctx.font = '900 9.5px "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(btn.label, r2X + row2BtnW / 2, row2Y + row2BtnH / 2);
-
-      _registerButton(r2X, row2Y, row2BtnW, row2BtnH, () => {
-        unlockAudio();
-        state.indexDemoAnim = btn.id;
-        resetIndexDetailState(def, demoArea);
-        audioSystem.playSFX('skill_dash5', 1.0);
-      });
-
-      r2X += row2BtnW + row2Gap;
-    });
-
   } else {
     // ── Standard 1-Row Animation Chips Bar ──
     const animDeckY = simY + 412;
@@ -905,6 +778,12 @@ function drawIndexDetailScreen() {
       animBtns.push({ id: 'mixing', label: 'LAPSE BLUE' }, { id: 'red', label: 'REVERSAL RED' }, { id: 'domain', label: 'UNLIMITED VOID' });
     } else if (def.type === 'sukuna') {
       animBtns.push({ id: 'flurry', label: 'DISMANTLE' }, { id: 'fuga', label: 'FUGA ARROW' }, { id: 'domain', label: 'MALEVOLENT SHRINE' });
+    } else if (def.type === 'toji') {
+      animBtns.length = 0;
+      animBtns.push(
+        { id: 'toji_basic', label: 'BASIC ATTACK' },
+        { id: 'stealth', label: 'AMBUSH STRIKE' }
+      );
     } else if (def.type === 'todo') {
       animBtns.push({ id: 'clap', label: 'BOOGIE WOOGIE' }, { id: 'takada', label: 'TAKADA CHAN' });
     } else if (def.type === 'saitama') {
@@ -950,9 +829,15 @@ function drawIndexDetailScreen() {
       _registerButton(animStartX, animDeckY, btnW, btnH, () => {
         unlockAudio();
         state.indexDemoAnim = btn.id;
-        resetIndexDetailState(def, demoArea);
+        const indexDetailState = resetIndexDetailState(def, demoArea);
 
-        if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
+        if (def.type === 'toji' && (btn.id === 'toji_basic' || btn.id === 'basic' || btn.id === 'spear')) {
+          audioSystem.playSFX('attack_swordswing', 0.95);
+          if (indexDetailState && indexDetailState.fighter && typeof indexDetailState.fighter.playBasicAttackPattern === 'function') {
+            indexDetailState.fighter.playBasicAttackPattern(indexDetailState.target);
+          }
+        }
+        else if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
         else if (btn.id === 'red') {
           audioSystem.playSFX('skill_redchanneling', 2.0);
           audioSystem.playSFX('skill_redcharging', 2.0);

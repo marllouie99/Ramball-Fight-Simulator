@@ -17,6 +17,7 @@ export { syncHudPosition, initHudSync, updateTopHudCameraTracking, updateBottomH
 
 // Initialize immediately
 initHudSync();
+state.clearHealthHud = clearHealthHud;
 
 /**
  * Resolves dynamic display name for a fighter directly from its character config (e.g. CONFIG[id].displayName || CONFIG[id].name).
@@ -387,9 +388,10 @@ export function drawHUD() {
   const is2v2Mode = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFSMode = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
-  const isTeamMode = is2v2Mode || is1v2Mode || isTLFSMode || (mainFighters && mainFighters.length > 2 && !isFfaMode);
+  const isTeamMode = is2v2Mode || (is1v2Mode && !isBossBattleMode) || (mainFighters && mainFighters.length > 2 && !isFfaMode);
   const isSideHud1v1 = isHorizontal && (is1v1Mode || isStandOffMode || isTLFSMode || isFfaMode || (mainFighters && mainFighters.length <= 4 && !is2v2Mode && !is1v2Mode));
-  const isDuelTopHud = !isSideHud1v1 && !isBossBattleMode && !isTeamMode && !isFfaMode && mainFighters.length === 2;
+  const isSoloBoss = isBossBattleMode && Boolean(state.bossBattleNoTeammate) && (mainFighters && mainFighters.length === 2);
+  const isDuelTopHud = !isSideHud1v1 && (!isBossBattleMode || isSoloBoss) && !isTeamMode && !isFfaMode && mainFighters.length === 2;
 
   // FOC & Tactical modes HUD visibility
   let topHudOpacity = hudOpacity;
@@ -1384,6 +1386,7 @@ function _getDimElements() {
 }
 
 export function clearHealthHud() {
+  state.clearHealthHud = clearHealthHud;
   _hudCache.teams.clear();
   _hudCache.fighters.clear();
   _tacticalCards.top = [];
@@ -1908,7 +1911,12 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
   const f2ThemeColor = getFighterThemeColor(f2, '#EF4444');
   const f1Name = getFighterDisplayName(f1, true);
   const f2Name = getFighterDisplayName(f2, true);
-  const f1NameHtml = (typeof f1Name === 'string' && f1Name.includes('『')) ? formatFighterNameHTML(f1Name) : f1Name;
+  const isF1Boss = Boolean(f1.isBoss || (state.mode && (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === 'STAND_OFF_1V2') && f1 === state.fighters?.[0]));
+  const f1Subname = isF1Boss ? getBossSubName(f1) : '';
+  let f1NameHtml = (typeof f1Name === 'string' && f1Name.includes('『')) ? formatFighterNameHTML(f1Name) : f1Name;
+  if (isF1Boss && f1Subname) {
+    f1NameHtml = `${f1NameHtml} <span style="font-size: 10px; opacity: 0.85; color: ${f1ThemeColor}; font-weight: 700;">[${f1Subname}]</span>`;
+  }
   const f2NameHtml = (typeof f2Name === 'string' && f2Name.includes('『')) ? formatFighterNameHTML(f2Name) : f2Name;
   const f1SansClass = isF1Sans ? ' hud-sans-name' : '';
   const f2SansClass = isF2Sans ? ' hud-sans-name' : '';
@@ -2075,13 +2083,14 @@ function updateHealthHud() {
   const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
   const isRegular1v2 = mode === GAME_MODES.ONE_VS_TWO || mode === '1v2';
   const isBossBattle = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === 'STAND_OFF_1V2';
-  const is1v2 = isRegular1v2 || isBossBattle;
+  const isSoloBoss = isBossBattle && Boolean(state.bossBattleNoTeammate) && mainFighters.length === 2;
+  const is1v2 = isRegular1v2 || (isBossBattle && !isSoloBoss);
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
   const isFfa = mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA';
-  const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isTLFS || isFfa || mainFighters.length > 2);
-  const isSingleColumnMode = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal') || ((is1v1 || isStandOff || isFfa) && !isTactical) || isTeamSingleColumn;
+  const isTeamSingleColumn = isCameraTracking && (is2v2 || is1v2 || isFfa || mainFighters.length > 2);
+  const isSingleColumnMode = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal') || ((is1v1 || isStandOff || isTLFS || isFfa) && !isTactical) || isTeamSingleColumn;
   const currentHpStr = mainFighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = mainFighters.map(f => {
@@ -3422,9 +3431,13 @@ function updateHealthHud() {
         const memberThemeColor = getFighterThemeColor(m, memberNameColor);
         const memberName = getFighterDisplayName(m, true);
         const memberNameClass = isMemberSans ? 'health-card__member-name hud-sans-name' : 'health-card__member-name';
+        const memberGrade = getFighterGrade(m);
+        const memberGradeMeta = getGradeMeta(memberGrade);
         const memberHeaderHTML = `
-          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${titleAlign === 'right' ? 'flex-end' : 'flex-start'};">
+          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${titleAlign === 'right' ? 'flex-end' : 'flex-start'}; gap: 6px;">
+            ${titleAlign === 'right' ? `<span class="hud-grade-badge" data-grade="${memberGrade}" style="background: ${memberGradeMeta.color}; color: #050609;">${memberGrade}</span>` : ''}
             <span class="${memberNameClass}" style="color: ${memberThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: ${isH ? '14.5px' : '15px'}; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${memberName}</span>
+            ${titleAlign !== 'right' ? `<span class="hud-grade-badge" data-grade="${memberGrade}" style="background: ${memberGradeMeta.color}; color: #050609;">${memberGrade}</span>` : ''}
           </div>
         `;
 
@@ -3621,8 +3634,8 @@ function updateHealthHud() {
     if (containerLeft) containerLeft.innerHTML = '';
     if (containerRight) containerRight.innerHTML = '';
 
-    if (isBossBattle) {
-      // BOSS BATTLE MODE:
+    if (isBossBattle && !isSoloBoss) {
+      // DUO BOSS BATTLE MODE:
       // Boss is rendered at the top of the arena (#hudTopContainer) with NO skill bars
       const bossFighter = fighters.find(f => f && f.isBoss) || fighters[0];
       if (bossFighter && !bossFighter.isTurret && !bossFighter.isEndCrystal && !bossFighter.isMinion && !bossFighter.isDeployable && _cachedTopContainer) {
@@ -3639,16 +3652,27 @@ function updateHealthHud() {
         const hpValText = `${Math.floor(Math.max(0, Number(curHp) || 0))} / ${Math.floor(maxHp)}`;
         const bossNameClass = isBossSans ? 'boss-card__name hud-sans-name' : 'boss-card__name';
 
+        const bossGrade = getFighterGrade(bossFighter);
+        const bossGradeMeta = getGradeMeta(bossGrade);
+        const isBossNamelessDeity = Boolean(bossFighter.characterId === 'namelessdeity' || bossFighter.characterId === 'nameless_deity' || bossFighter.type === 'namelessdeity' || bossFighter.type === 'nameless_deity' || (bossFighter.name && bossFighter.name.toLowerCase().includes('nameless')));
+
         const bossCardHTML = `
-          <div class="boss-card">
-            <div class="boss-card__header">
-              <span class="${bossNameClass}" style="color: ${bossColor};">${bossName}</span>
-              <span class="boss-card__subname" style="color: ${bossColor};">${bossSubname}</span>
+          <div class="boss-card has-profile" style="--fighter-theme: ${bossColor}; --grade-color: ${bossGradeMeta.color};" data-grade="${bossGrade}"${isBossNamelessDeity ? ' data-character="namelessdeity"' : ''}>
+            <div class="hud-top-profile" data-grade="${bossGrade}"${isBossNamelessDeity ? ' data-character="namelessdeity"' : ''}>
+              <div class="hud-top-profile__bg"></div>
+              <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
+              <canvas class="hud-top-profile__grade-canvas" data-grade="${bossGrade}" width="128" height="88"></canvas>
             </div>
-            <div class="health-card__bar boss-bar">
-              <div class="health-card__ghost" style="width: ${percent}%;"></div>
-              <div class="health-card__fill" style="width: ${percent}%; background: ${barColor};"></div>
-              <span class="boss-bar__text health-card__bar-text">${hpValText}</span>
+            <div class="boss-card__content">
+              <div class="boss-card__header">
+                <span class="${bossNameClass}" style="color: ${bossColor};">${bossName}</span>
+                <span class="boss-card__subname" style="color: ${bossColor};">${bossSubname}</span>
+              </div>
+              <div class="health-card__bar boss-bar">
+                <div class="health-card__ghost" style="width: ${percent}%;"></div>
+                <div class="health-card__fill" style="width: ${percent}%; background: ${barColor};"></div>
+                <span class="boss-bar__text health-card__bar-text">${hpValText}</span>
+              </div>
             </div>
           </div>
         `;
@@ -3665,6 +3689,18 @@ function updateHealthHud() {
         const hpBarText = bossCardEl ? (bossCardEl.querySelector('.boss-bar__text') || bossCardEl.querySelector('.health-card__bar-text')) : null;
         const bossCardName = bossCardEl ? bossCardEl.querySelector('.boss-card__name') : null;
         const bossCardSubname = bossCardEl ? bossCardEl.querySelector('.boss-card__subname') : null;
+        const bossProfileCanvas = bossCardEl ? bossCardEl.querySelector('.hud-top-profile__canvas') : null;
+        const bossGradeCanvas = bossCardEl ? bossCardEl.querySelector('.hud-top-profile__grade-canvas') : null;
+        let bossGradeCtx = null;
+
+        if (bossProfileCanvas) renderTopHudProfileCanvas(bossProfileCanvas, bossFighter);
+        if (bossGradeCanvas) {
+          bossGradeCtx = bossGradeCanvas.getContext('2d');
+          if (bossGradeCtx) {
+            bossGradeCtx.clearRect(0, 0, bossGradeCanvas.width, bossGradeCanvas.height);
+            drawWingedGradeLetter(bossGradeCtx, bossGradeCanvas.width / 2, bossGradeCanvas.height / 2, bossGrade, getZeusGradeCardTheme(bossGrade), 0, 2.8, true);
+          }
+        }
 
         _hudCache.fighters.set(bossFighter, {
           cardElement: bossCardEl,
@@ -3678,6 +3714,12 @@ function updateHealthHud() {
           lastBossSubname: bossSubname,
           lastBossThemeColor: bossColor,
           lastBossNameOpacity: 1,
+          topPlayerEl: bossCardEl,
+          topProfileEl: bossCardEl ? bossCardEl.querySelector('.hud-top-profile') : null,
+          topGradeCanvas: bossGradeCanvas,
+          topGradeCtx: bossGradeCtx,
+          mainIdx: 0,
+          lastGrade: bossGrade,
           starsContainer: null,
           moneyTextEl: null,
           lastMoneyText: '',
@@ -3721,10 +3763,13 @@ function updateHealthHud() {
         const matchWins = (state.scores && fighterIndex >= 0 && state.scores[fighterIndex]) ? state.scores[fighterIndex] : 0;
         const cardDesc = (fighterDef && mode !== GAME_MODES.FFA) ? fighterDef.desc : '';
         const chNameClass = isChSans ? 'challenger-name hud-sans-name' : 'challenger-name';
+        const chGrade = getFighterGrade(chFighter);
+        const chGradeMeta = getGradeMeta(chGrade);
 
         const chHeaderHTML = `
-          <div class="challenger-header">
+          <div class="challenger-header" style="display: flex; align-items: center; justify-content: flex-start; gap: 6px;">
             <span class="${chNameClass}" style="color: ${fighterThemeColor};">${fighterName}</span>
+            <span class="hud-grade-badge" data-grade="${chGrade}" style="background: ${chGradeMeta.color}; color: #050609;">${chGrade}</span>
           </div>
         `;
 
@@ -3896,7 +3941,7 @@ function updateHealthHud() {
     } else {
       // 1v1 / FFA Individual Mode
       const isSideHud = isH && (is1v1 || isStandOff || isTLFS || isFfa || mainFighters.length <= 4);
-      const isDuelTopHud = !isSideHud && !isBossBattle && !isTeamHudMode && !isFfa && mainFighters.length === 2;
+      const isDuelTopHud = !isSideHud && (!isBossBattle || isSoloBoss) && !isTeamHudMode && !isFfa && mainFighters.length === 2;
 
       if (isDuelTopHud && _cachedTopContainer) {
         _cachedTopContainer.innerHTML = buildTopDuelHUD(mainFighters[0], mainFighters[1], isDarkTheme);
@@ -3964,9 +4009,13 @@ function updateHealthHud() {
         const isFfaVertical = isFfa && !isH;
         const ffaAlign = isFfaVertical ? (index === 0 ? 'left' : (index === 2 ? 'right' : 'center')) : (index % 2 === 0 ? 'left' : 'right');
         const ffaJustify = ffaAlign === 'left' ? 'flex-start' : (ffaAlign === 'right' ? 'flex-end' : 'center');
+        const fGrade = getFighterGrade(fighter);
+        const fGradeMeta = getGradeMeta(fGrade);
         const fighterHeaderHTML = ((isSideHud && mainFighters.length > 2) || isFfaVertical) ? `
-          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${ffaJustify};">
+          <div class="health-card__member-header" style="margin-bottom: 4px; display: flex; align-items: center; justify-content: ${ffaJustify}; gap: 6px;">
+            ${ffaAlign === 'right' ? `<span class="hud-grade-badge" data-grade="${fGrade}" style="background: ${fGradeMeta.color}; color: #050609;">${fGrade}</span>` : ''}
             <span class="${nameClass}" style="color: ${fighterThemeColor}; font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif; font-size: 13.5px; font-weight: 700; letter-spacing: 0.8px; text-transform: uppercase;">${fighterName}</span>
+            ${ffaAlign !== 'right' ? `<span class="hud-grade-badge" data-grade="${fGrade}" style="background: ${fGradeMeta.color}; color: #050609;">${fGrade}</span>` : ''}
           </div>
         ` : '';
 

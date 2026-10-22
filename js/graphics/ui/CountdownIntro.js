@@ -208,13 +208,20 @@ function _drawSlantedNameplate(ctx, cx, cy, width, height, name, themeColor, ske
 
   // 3. Upright Typography (Unskewed)
   const upperName = (name || 'FIGHTER').toUpperCase();
-  ctx.font = `900 italic ${Math.round(15 * scaleFactor)}px "Outfit", "Rajdhani", sans-serif`;
+  const maxTextW = width - 16 * scaleFactor;
+  let fontSize = Math.round(22 * scaleFactor);
+  ctx.font = `900 italic ${fontSize}px "Outfit", "Rajdhani", sans-serif`;
+  let textW = ctx.measureText(upperName).width;
+  if (textW > maxTextW && maxTextW > 20) {
+    fontSize = Math.max(13 * scaleFactor, Math.round(fontSize * (maxTextW / textW)));
+    ctx.font = `900 italic ${fontSize}px "Outfit", "Rajdhani", sans-serif`;
+  }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   // Thick dark stroke
   ctx.strokeStyle = '#050609';
-  ctx.lineWidth = 4 * scaleFactor;
+  ctx.lineWidth = 4.5 * scaleFactor;
   ctx.lineJoin = 'round';
   ctx.strokeText(upperName, 0, -0.5 * scaleFactor);
 
@@ -283,9 +290,9 @@ function drawFighterCard(ctx, cx, cy, cardW, cardH, def, facingAngle, scaleFacto
   ctx.strokeRect(-cardW / 2, -cardH / 2, cardW, cardH);
 
   // 5. Slanted Tactical Manga Nameplate directly below the card
-  const nameY = cardH / 2 + 20 * scaleFactor;
+  const nameY = cardH / 2 + 24 * scaleFactor;
   const skew = (facingAngle === 0) ? (-10 * Math.PI / 180) : (10 * Math.PI / 180);
-  _drawSlantedNameplate(ctx, 0, nameY, cardW + 8 * scaleFactor, 26 * scaleFactor, def.name, themeColor, skew, scaleFactor);
+  _drawSlantedNameplate(ctx, 0, nameY, cardW + 18 * scaleFactor, 34 * scaleFactor, def.name, themeColor, skew, scaleFactor);
 
   ctx.restore();
 }
