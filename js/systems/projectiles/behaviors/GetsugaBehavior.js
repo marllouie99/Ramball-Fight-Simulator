@@ -469,14 +469,14 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
         // Apply skill damage (continuous multi-tick damage for ALL Getsuga waves)
         const baseTickDamage = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 10)
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20)
           : (form === 'bankai_hollow'
-            ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 6)
+            ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 16)
             : (form === 'hollow'
-              ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 3)
+              ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 12)
               : (isBankai
-                ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4)
-                : (CONFIG.ichigo?.getsugaTickDamage || 3))));
+                ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 12)
+                : (CONFIG.ichigo?.getsugaTickDamage || 12))));
         const tickDamage = (typeof projectile.damage === 'number' && projectile.damage > 0)
           ? Math.max(projectile.damage, baseTickDamage)
           : baseTickDamage;

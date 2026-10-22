@@ -29,6 +29,21 @@ export const VIEWPORT_CONFIGS = {
     arena: { x: 280, y: 70, width: 400, height: 400, wallWidth: 4, shape: 'rect' },
     ffaArena: { x: 80, y: -130, width: 800, height: 800, wallWidth: 4, shape: 'rect', centerObstacle: { type: 'plus', size: 280, thickness: 90 } },
     grandArena: { x: -220, y: -430, width: 1400, height: 1400, wallWidth: 4, shape: 'rect' },
+    survivorArena: {
+      x: -300,
+      y: -430,
+      width: 1560,
+      height: 1400,
+      wallWidth: 6,
+      shape: 'rect',
+      obstacles: [
+        { type: 'rect', x: 20, y: -160, width: 80, height: 260 },
+        { type: 'rect', x: 860, y: -160, width: 80, height: 260 },
+        { type: 'rect', x: 20, y: 440, width: 80, height: 260 },
+        { type: 'rect', x: 860, y: 440, width: 80, height: 260 },
+        { type: 'plus', cx: 480, cy: 270, size: 240, thickness: 70 },
+      ],
+    },
     label: '🖥️ Horizontal (16:9 Widescreen)',
   },
 };
@@ -36,6 +51,17 @@ export const VIEWPORT_CONFIGS = {
 /**
  * Helper to check if the current or target game mode is an FFA mode.
  */
+/**
+ * Helper to check if the current or target game mode is Survivor horde mode.
+ */
+export function isSurvivorMode(mode) {
+  const m = mode || (typeof state !== 'undefined' ? state.mode : '');
+  return Boolean(
+    m === 'Survivor' ||
+    (typeof GAME_MODES !== 'undefined' && m === GAME_MODES.SURVIVOR)
+  );
+}
+
 export function isFfaMode(mode) {
   const m = mode || (typeof state !== 'undefined' ? state.mode : '');
   return Boolean(
@@ -70,6 +96,10 @@ export function isGrandBattleMode(mode) {
  * Resolves the appropriate arena geometry for a given mode and orientation.
  */
 export function getArenaConfigForMode(mode, orientation) {
+  if (isSurvivorMode(mode)) {
+    return { ...VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL].survivorArena };
+  }
+
   const isH = (orientation === VIEWPORT_MODES.HORIZONTAL || (typeof state !== 'undefined' && state.viewOrientation === VIEWPORT_MODES.HORIZONTAL));
   if (isH) {
     if (isGrandBattleMode(mode)) {

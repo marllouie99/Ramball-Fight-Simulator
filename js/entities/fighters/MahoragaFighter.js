@@ -573,6 +573,22 @@ export class MahoragaFighter extends Fighter {
   }
 
   /**
+   * Mahoraga Boss Poise & Tenacity standard:
+   * - Hyper-Armor during Divine Shout or Cleave (cannot be flinched out by light hits).
+   * - Melee Adaptation Immunity (if adapted to melee, resists standard weapon hit-stuns).
+   * - Boss Tenacity: Shrugs off negligible micro-flinches (<= 3 frames) and reduces hit-stun duration by 50%.
+   */
+  applyHitStun(frames, opts = {}) {
+    if (this.isShouting || this.isCleaving) return;
+    if (this.adapted?.melee || (this.adaptationStage?.melee || 0) >= 2) {
+      if (!opts.isPurple && !opts.isRed && !opts.isDomain) return;
+    }
+    const tenacityDuration = Math.round(Number(frames) * 0.5) || 0;
+    if (tenacityDuration <= 3) return; // Shrug off negligible micro-flinches
+    super.applyHitStun(tenacityDuration, opts);
+  }
+
+  /**
    * Returns true if Mahoraga is currently being pulled, dragged, trapped in a beam/vortex,
    * or pinned to a wall by any attack with a pulling or dragging effect.
    */
@@ -674,6 +690,7 @@ export class MahoragaFighter extends Fighter {
    */
   isStationarySkillActive() {
     return Boolean(
+      this.isDraggedByGetsuga ||
       this.isPulledOrDragged() ||
       this.isWallSlamActive ||
       this.isThrowing ||
@@ -804,7 +821,7 @@ export class MahoragaFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
-    if (!this.canPerformBasicAttack() || this.isPulledOrDragged()) return false;
+    if (!this.canPerformBasicAttack()) return false;
     const opponent = this._findClosestEnemy();
     if (opponent && !opponent.isDead) {
       this.aim(opponent);
@@ -828,7 +845,7 @@ export class MahoragaFighter extends Fighter {
     if (!opponent || opponent.isDead || opponent.hp <= 0) return;
     if (this.isTeammate(opponent)) return;
     if (!this.canPerformBasicAttack()) return;
-    if (this.isWallSlamActive || this.isThrowing || this.isTargetOfAmbush || this.isBlitzActive || this.isInfinityBlitz || this.isPulledOrDragged()) return;
+    if (this.isWallSlamActive || this.isThrowing || this.isTargetOfAmbush || this.isBlitzActive || this.isInfinityBlitz) return;
 
     if (this.isWallReboundDashing) {
       this.isWallReboundDashing = false;
@@ -988,9 +1005,11 @@ export class MahoragaFighter extends Fighter {
       this.blitzTimer = 0;
       this.wallBounceCount = 0;
       this._pendingCounterTarget = null;
-      this.isCleaving = false;
-      this.isShouting = false;
-      this.isThrowing = false;
+      if (!this.isDraggedByGetsuga) {
+        this.isCleaving = false;
+        this.isShouting = false;
+        this.isThrowing = false;
+      }
 
       if (this.isWallSlamActive) {
         this.isWallSlamActive = false;
@@ -1345,10 +1364,10 @@ export class MahoragaFighter extends Fighter {
 
     // ── Divine Shout: Stop Movement -> Windup -> Fire -> Recovery -> Resume Movement ──
     if (this.isShouting) {
-      const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
-                              (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 ||
-                              this.isPulledOrDragged();
-      if (isInHitReaction) {
+      const isHardInterrupted = (this.timeStopTimer || 0) > 0 || (this.electricStunTimer || 0) > 0 || 
+                                (this.dubstepStunTimer || 0) > 0 || (this.paralyzeTimer || 0) > 0 ||
+                                this.isFrozenByInfinity;
+      if (isHardInterrupted) {
         this.isShouting = false;
         this.shoutPhase = null;
         this.shoutWindupTimer = 0;
@@ -1420,10 +1439,10 @@ export class MahoragaFighter extends Fighter {
 
     // ── Conditional Rapid Barrage Throw ──
     if (this.isThrowing) {
-      const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
-                              (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 ||
-                              this.isPulledOrDragged();
-      if (isInHitReaction) {
+      const isHardInterrupted = (this.timeStopTimer || 0) > 0 || (this.electricStunTimer || 0) > 0 || 
+                                (this.dubstepStunTimer || 0) > 0 || (this.paralyzeTimer || 0) > 0 ||
+                                this.isFrozenByInfinity;
+      if (isHardInterrupted) {
         this.isThrowing = false;
         this.throwBarrageShotsLeft = 0;
         this.throwBarrageTimer = 0;
@@ -1795,21 +1814,23 @@ export class MahoragaFighter extends Fighter {
       const frontTargetsForAttack = this._getFrontRadiusTargets(swordRange, swordArc);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
       const isTargetReforming = Boolean(target && (target.isRevivingFromContract || target.isShatterReviving));
-      const canActSkills = !isInHitReaction && !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isPulledOrDragged();
+      // Priority 0: Close-Quarters Proximity Attack (Instantly strikes when in melee contact/reach)
+      // Mahoraga always counter-cleaves enemies who enter his melee reach as long as he isn't in hard stasis
+      const canMeleeStrike = !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && (this.timeStopTimer || 0) <= 0 && !this.isFrozenByInfinity && (this.paralyzeTimer || 0) <= 0;
+      if (this.isSkillEnabled(CONFIG.mahoraga?.enableSwordOfExtermination, true) && isAnyTargetInRange && this.swordCooldown <= 0 && canMeleeStrike) {
+        this._performMeleeAttack(target);
+      } else {
+        const canActSkills = !isInHitReaction && !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isPulledOrDragged();
 
-      if (canActSkills) {
-        const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;
-        const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
-        const hasWallSlam = totalStages >= 8 || this.isMaxAdapted || (this.goldStages >= 8);
+        if (canActSkills) {
+          const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;
+          const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+          const hasWallSlam = totalStages >= 8 || this.isMaxAdapted || (this.goldStages >= 8);
 
-        const shoutTriggerDist = shoutRadius + (target.r || 25);
+          const shoutTriggerDist = shoutRadius + (target.r || 25);
 
-        // Priority 0: Close-Quarters Proximity Attack (Instantly strikes when in melee contact/reach)
-        if (this.isSkillEnabled(CONFIG.mahoraga?.enableSwordOfExtermination, true) && isAnyTargetInRange && this.swordCooldown <= 0) {
-          this._performMeleeAttack(target);
-        }
-        // Priority 1: Divine Shout (Stop movement -> Windup animation -> Fire Divine Shout -> Resume movement)
-        else if (this.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true) && this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
+          // Priority 1: Divine Shout (Stop movement -> Windup animation -> Fire Divine Shout -> Resume movement)
+          if (this.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true) && this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
           this.isShouting = true;
           this.shoutPhase = 'windup';
           this.shoutWindupTimer = CONFIG.mahoraga?.shoutWindupFrames ?? 24;
@@ -1850,6 +1871,7 @@ export class MahoragaFighter extends Fighter {
           this._performMeleeAttack(target);
         }
       }
+    }
     } else {
       this.isMeleeMode = false;
     }

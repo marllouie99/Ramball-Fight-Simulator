@@ -69,7 +69,7 @@ export const mahoragaConfig = {
     rctHealPercent: 0.35,           // Percentage of max HP healed on each wheel rotation click (12% max HP)
     maxRctHealingPool: Infinity,    // Uncapped RCT healing capacity across a match
     rctCombatDamagePauseFrames: 45, // Duration (frames) passive RCT is paused upon taking direct damage (45 frames = 0.75s)
-    defBuffPerClickPercent: 0.05,   // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
+    defBuffPerClickPercent: 0.01,   // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,        // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     adaptedDamageMultiplier: 0.25,  // Damage multiplier taken when adapted to an attack/skill (0.25 = 25% damage taken / 75% reduction)
     wheelDoubleDamageDurationFrames: 240, // Duration (frames) of temporary double damage buff on wheel click (240 frames = 4.0s @ 60fps)
@@ -77,7 +77,7 @@ export const mahoragaConfig = {
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,     // Maximum speed/KB resistance factor under stasis (60% max)
     fatalAdaptWindowFrames: 400,    // Rolling damage accumulator window (~6.6 seconds at 60fps)
-    fatalDamageThresholdPct: 0.50,  // 15% max HP damage threshold within window triggers wheel adaptation click
+    fatalDamageThresholdPct: 0.40,  // 15% max HP damage threshold within window triggers wheel adaptation click
     fatalAdaptCooldownFrames: 500,  // Cooldown frames between wheel clicks (180 frames = 3.0s cooldown before progressing again)
     infinityAdaptFreezeCount: 5,   // Required Limitless Infinity freeze exposures to adapt (10 exposures)
 
@@ -145,17 +145,17 @@ export const mahoragaConfig = {
     // ── Divine Shout (AoE Shockwave Roar) ──
     enableDivineShout: true,         // Master toggle for Divine Shout shockwave
     shoutCooldown: 1000,             // Cooldown (frames) between divine shouts (~16.6s)
-    shoutRange: 350,                 // Long-range directional sonic boom reach (350px forward reach)
+    shoutRange: 500,                 // Long-range directional sonic boom reach (350px forward reach)
     shoutRadius: 180,                // Backward compatibility alias
     shoutConeAngle: 1.35,            // Directional cone spread angle (~77° wide supersonic cone)
     shoutWindupFrames: 24,           // Windup / inhalation anticipation frames before roaring (~0.4s @ 60fps)
     shoutAnimFrames: 50,             // Duration (frames) of 12-frame Sonic Boom animation lifecycle (~0.83s @ 60fps)
-    shoutRecoveryFrames: 18,         // Recovery / follow-through pause frames before resuming normal movement (~0.3s @ 60fps)
-    shoutHitStun: 20,                // Hitstun applied to caught enemies
-    shoutDamage: 10,                 // Damage dealt to enemies caught in shockwave
+    shoutRecoveryFrames: 30,         // Recovery / follow-through pause frames before resuming normal movement (~0.3s @ 60fps)
+    shoutHitStun: 50,                // Hitstun applied to caught enemies
+    shoutDamage: 100,                 // Damage dealt to enemies caught in shockwave
     shoutKnockback: 18,              // Knockback force applied to caught enemies
     shoutSlowDurationFrames: 120,    // Slow duration in frames applied to caught enemies (120 = 2.0s)
-    shoutSlowMultiplier: 0.50,       // Slow speed multiplier (0.50 = 50% slow movement)
+    shoutSlowMultiplier: 0.30,       // Slow speed multiplier (0.50 = 50% slow movement)
 
     // ── Cursed Energy Debris Throw (Rapid Barrage Ranged Skill) ──
     throwCooldown: 1600,             // Cooldown between rapid throw barrages

@@ -10,6 +10,10 @@ export const AUDIO_CONFIG = {
   'ring_bell': 'Assets/Sound Effects/Announcer/ring-bell.mp3',
   'youwin': 'Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3',
   'street_fighter_you_win': 'Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3',
+  'battleintro_transitions': 'Assets/Sound Effects/Announcer/era_dev-duplicispear-swing.wav',
+  'battleintro-transitions': 'Assets/Sound Effects/Announcer/era_dev-duplicispear-swing.wav',
+  'fighter_summon': 'Assets/Sound Effects/Announcer/era_eno_clericstaffhit.wav',
+  'era_eno_clericstaffhit': 'Assets/Sound Effects/Announcer/era_eno_clericstaffhit.wav',
 
   // Attacks
   'attack_explosion': 'Assets/Sound Effects/Attacks/explosion.mp3',
@@ -244,7 +248,12 @@ export const AUDIO_CONFIG = {
   'shiro_enhance': 'Assets/Sound Effects/Shiro/BookSynthFirstTier.ogg',
   'knight_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'queen_slam': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-  'chess_snap': 'Assets/Sound Effects/Shiro/FingerSnap.ogg'
+  'chess_snap': 'Assets/Sound Effects/Shiro/FingerSnap.ogg',
+
+  // Ichigo Kurosaki
+  'ichigo_getsuga_fire': 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
+  'fire_getsugatensho': 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
+  'fire-getsugatensho': 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav'
 };
 
 

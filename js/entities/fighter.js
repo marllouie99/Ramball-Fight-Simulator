@@ -2037,7 +2037,7 @@ export class Fighter {
     if (this._hitByGetsugaTimer > 0) this._hitByGetsugaTimer--;
     if (this._hitByFugaTimer > 0) this._hitByFugaTimer--;
     if (this._hitByDivineFlameTimer > 0) this._hitByDivineFlameTimer--;
-    if (this.hitStunTimer > 0) this.hitStunTimer--;
+    // NOTE: hitStunTimer is decremented in applyMovementPhysics() — do NOT double-decrement here
     if (this.caughtInLaserBeamTimer > 0) this.caughtInLaserBeamTimer--;
     if (this.caughtInLaylaBeamTimer > 0) this.caughtInLaylaBeamTimer--;
     if (this.caughtInNamelessBeamTimer > 0) {

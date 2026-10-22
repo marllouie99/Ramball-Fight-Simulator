@@ -360,8 +360,11 @@ export const state = {
     const is1v2 = state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2' || state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2';
     const isTagMatch = state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match' || state.mode === 'TAG_MATCH';
     const isH1v1 = state.mode === GAME_MODES.HORIZONTAL_1V1 || state.mode === '1v1 Widescreen Duel';
+    const isSurvivor = state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor';
 
-    if (is3v3v3v3) {
+    if (isSurvivor) {
+      return fighterIndex === 0 ? 0 : 1;
+    } else if (is3v3v3v3) {
       return Math.floor(fighterIndex / 3); // 0..2: Team 0, 3..5: Team 1, 6..8: Team 2, 9..11: Team 3
     } else if (is2v2v2v2) {
       return Math.floor(fighterIndex / 2); // 0..1: Team 0, 2..3: Team 1, 4..5: Team 2, 6..7: Team 3
@@ -445,6 +448,7 @@ export const state = {
   weaponScroll: 0,
   weaponPage: 0,
   selectedWeapon: null,
+  survivorState: null,
   missionPassedOverlay: null,
   _isRespectMusicPlaying: false,
   _respectMusicHandle: null,

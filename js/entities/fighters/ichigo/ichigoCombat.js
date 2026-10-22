@@ -273,7 +273,7 @@ export function performMeleeCleave(fighter, target) {
     kb = cfg.hit1Knockback ?? 4.5;
     lunge = cfg.hit1LungeSpeed ?? 6.2;
     hitPause = cfg.hit1HitPauseFrames ?? 4;
-    hitStun = cfg.hit1HitStunFrames ?? 12;
+    hitStun = cfg.hit1HitStunFrames ?? 0;
     shake = cfg.hit1ImpactShake ?? 4.0;
   } else if (step === 2) {
     liftF = cfg.hit2LiftFrames ?? 6;
@@ -285,7 +285,7 @@ export function performMeleeCleave(fighter, target) {
     kb = cfg.hit2Knockback ?? 6.5;
     lunge = cfg.hit2LungeSpeed ?? 7.0;
     hitPause = cfg.hit2HitPauseFrames ?? 4;
-    hitStun = cfg.hit2HitStunFrames ?? 14;
+    hitStun = cfg.hit2HitStunFrames ?? 3;
     shake = cfg.hit2ImpactShake ?? 5.5;
   } else {
     liftF = cfg.hit3LiftFrames ?? 8;
@@ -297,7 +297,7 @@ export function performMeleeCleave(fighter, target) {
     kb = cfg.hit3Knockback ?? 9.0;
     lunge = cfg.hit3LungeSpeed ?? 8.5;
     hitPause = cfg.hit3HitPauseFrames ?? 5;
-    hitStun = cfg.hit3HitStunFrames ?? 18;
+    hitStun = cfg.hit3HitStunFrames ?? 8;
     shake = cfg.hit3ImpactShake ?? 8.0;
   }
 
@@ -459,7 +459,7 @@ function _deliverMeleeImpact(fighter) {
   const finalDamage = fighter.swordSwingDamage || (CONFIG.ichigo?.swordDamage || 12);
   const kbForce = fighter.swordSwingKnockback || 5;
   const hitPause = fighter.swordSwingHitPause || 4;
-  const hitStun = fighter.swordSwingHitStun || 14;
+  const hitStun = fighter.swordSwingHitStun ?? 0;
   const arc = ((CONFIG.ichigo?.swordArc || 140) * Math.PI) / 180;
   const reach = (CONFIG.ichigo?.swordRange || 75);
 
@@ -853,7 +853,7 @@ export function updateShunpoCombat(fighter, opponent) {
         fighter.swordSwingDamage = baseSlashDmg * damageMult;
         fighter.swordSwingKnockback = (step === 3) ? (CONFIG.ichigo?.hit3Knockback || 8.0) : (step === 2 ? (CONFIG.ichigo?.hit2Knockback || 5.5) : (CONFIG.ichigo?.hit1Knockback || 4.0));
         fighter.swordSwingHitPause = (step === 3) ? 5 : 4;
-        fighter.swordSwingHitStun = (step === 3) ? 18 : (step === 2 ? 14 : 12);
+        fighter.swordSwingHitStun = (step === 3) ? (CONFIG.ichigo?.hit3HitStunFrames ?? 8) : 0;
         fighter.swordSwingImpactShake = (step === 3) ? 7.0 : (step === 2 ? 5.0 : 3.5);
 
         const stepText = (step === 1) ? 'HIT 1: CLEAVE!' : (step === 2 ? 'HIT 2: RISING SCOOP!' : 'HIT 3: SUNDER!');

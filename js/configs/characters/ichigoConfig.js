@@ -68,7 +68,7 @@ export const ichigoConfig = {
   hit1ImpactLockFrames: 10,       // IMPACT LOCK: Blade latches into impact plane with zero velocity
   hit1RecoveryFrames: 9,         // Extraction & recovery settle
   hit1HitPauseFrames: 4,         // Target hit-pause freeze frames
-  hit1HitStunFrames: 12,         // Target hitstun duration
+  hit1HitStunFrames: 0,          // Target hitstun duration (0 on Hit 1 so enemies aren't perma-locked and can retaliate)
   hit1LungeSpeed: 6.2,           // Forward lunging momentum step
   hit1Damage: 12,                // Hit 1 damage
   hit1Knockback: 4.5,            // Horizontal push force
@@ -81,7 +81,7 @@ export const ichigoConfig = {
   hit2ImpactLockFrames: 10,       // IMPACT LOCK: Blade latches at peak rising cleave apex
   hit2RecoveryFrames: 10,
   hit2HitPauseFrames: 4,
-  hit2HitStunFrames: 14,
+  hit2HitStunFrames: 3,          // Target hitstun duration (micro-flinch)
   hit2LungeSpeed: 7.0,
   hit2Damage: 16,
   hit2Knockback: 6.5,
@@ -94,7 +94,7 @@ export const ichigoConfig = {
   hit3ImpactLockFrames: 10,       // IMPACT LOCK: Blade embedded in ground/target with heavy tremor
   hit3RecoveryFrames: 14,
   hit3HitPauseFrames: 5,
-  hit3HitStunFrames: 18,
+  hit3HitStunFrames: 8,          // Target hitstun duration on finisher
   hit3LungeSpeed: 8.5,
   hit3Damage: 24,
   hit3Knockback: 9.0,
@@ -126,8 +126,8 @@ export const ichigoConfig = {
 
   // ── Special Attack: Getsuga Tensho Wave ──
   enableGetsuga: true,           // Master toggle for Getsuga Tensho Wave
-  getsugaDamage: 6,              // Base damage / tick damage for Getsuga wave
-  getsugaTickDamage: 3,          // Multi-tick shredding damage per hit in Shikai
+  getsugaDamage: 12,              // Base damage / tick damage for Getsuga wave
+  getsugaTickDamage: 12,          // Multi-tick shredding damage per hit in Shikai
   getsugaSpeed: 11,              // Base projectile travel speed (px/frame)
   getsugaTravelSpeed: 11,        // Alias
   getsugaRadius: 100,            // Base crescent projectile radius
@@ -170,8 +170,8 @@ export const ichigoConfig = {
   hollowDamageReduction: 0.10,   // 10% incoming damage mitigation (Hierro)
   hollowLifesteal: 0.2,         // 10% vampiric lifesteal heal on damage dealt
   hollowComboCooldownMultiplier: 0.60, // 40% combo cooldown reduction during Hollow Mask
-  hollowGetsugaDamage: 3,        // Upgraded Black Getsuga damage
-  hollowGetsugaTickDamage: 3,    // Upgraded multi-tick damage per hit in Hollow form
+  hollowGetsugaDamage: 14,        // Upgraded Black Getsuga damage
+  hollowGetsugaTickDamage: 12,    // Upgraded multi-tick damage per hit in Hollow form (12 dmg per tick)
   hollowGetsugaSpeed: 15,        // Hollow Mask Getsuga travel speed
   hollowGetsugaRadius: 100,      // Hollow Mask Getsuga radius
   hollowGetsugaDuration: 85,     // Sustained wall duration in Hollow form
@@ -211,9 +211,9 @@ export const ichigoConfig = {
   bankaiShunpoStrike2Duration: 18, // Bankai finisher strike duration
   bankaiShunpoDashDuration: 3,   // Supersonic flash step duration in Bankai
   bankaiComboDisengageDistance: 350, // Extended disengage back-step distance in Bankai
-  bankaiGetsugaDamage: 6,        // Kuroi Getsuga damage during Bankai
-  bankaiGetsugaTickDamage: 4,    // Multi-tick damage per hit in Bankai
-  bankaiHollowGetsugaTickDamage: 6, // Multi-tick damage during Bankai + Hollow Mask (6 dmg per tick)
+  bankaiGetsugaDamage: 12,        // Kuroi Getsuga damage during Bankai
+  bankaiGetsugaTickDamage: 12,    // Multi-tick damage per hit in Bankai (12 dmg per tick)
+  bankaiHollowGetsugaTickDamage: 16, // Multi-tick damage during Bankai + Hollow Mask (16 dmg per tick)
   bankaiGetsugaSpeed: 10,        // Bankai Getsuga travel speed
   bankaiGetsugaRadius: 110,      // Bankai Getsuga projectile radius
   bankaiGetsugaStoppingRadius: 14, // Bankai reduced stopping radius at top center/apex
@@ -231,7 +231,7 @@ export const ichigoConfig = {
   bankaiWindReach: 240,          // Range of the frontal wind blast cone
   bankaiWindArc: 140,            // Angle cone of frontal wind blast in degrees
   bankaiWindKnockback: 14,       // Knockback force blowing enemies back
-  bankaiWindHitStun: 24,         // Hit stun duration from wind blast
+  bankaiWindHitStun: 12,         // Hit stun duration from wind blast
   bankaiWindFreezeDuration: 12,  // Hit pause stasis frames from wind blast
 
   // ── Grand Finisher: Final Massive Kuroi Getsuga ──
@@ -239,8 +239,8 @@ export const ichigoConfig = {
   bankaiFinalGetsugaTriggerTimer: 108,  // Bankai duration threshold frames when Grand Finisher triggers (80 frames charge + 28 frames slash wave release -> seamlessly awakens Hollow Mask)
   bankaiFinalGetsugaChargeFrames: 80,  // Gathering charge frames matching voiceline (~1.33s)
   bankaiFinalGetsugaRecoveryFrames: 24, // Post-release slash follow-through frames
-  bankaiFinalGetsugaDamage: 20,         // Final Getsuga damage
-  bankaiFinalGetsugaTickDamage: 10,      // Continuous multi-hit tick damage
+  bankaiFinalGetsugaDamage: 24,         // Final Getsuga damage
+  bankaiFinalGetsugaTickDamage: 20,      // Continuous multi-hit tick damage (20 dmg per tick)
   bankaiFinalGetsugaSpeed: 7,           // Wave travel speed
   bankaiFinalGetsugaRadius: 100,        // Huge crescent radius
   bankaiFinalGetsugaStoppingRadius: 16, // Final Getsuga reduced stopping radius at top center/apex
@@ -275,7 +275,8 @@ export const ichigoConfig = {
     ],
     hollowFlurryNoise: 'Assets/Sound Effects/Attacks/ichigo-attack-hollow-noise.mp3',
     getsugaReleaseSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
-    getsugaReleaseFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
+    getsugaFire: 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
+    getsugaReleaseFlare: 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
     getsugaHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     getsugaExplosion: 'Assets/Sound Effects/Attacks/explosion.mp3',
     hollowAwakenVoice: 'Assets/Sound Effects/Skills/ichigo-hollowtransformation-voiceline.mp3',
@@ -302,7 +303,8 @@ export const ichigoConfig = {
     hollowGetsugaVoice: 3.0,
     hollowFlurryNoise: 2.8,
     getsugaReleaseSwing: 0.95,
-    getsugaReleaseFlare: 0.85,
+    getsugaFire: 1.0,
+    getsugaReleaseFlare: 1.0,
     getsugaHit: 0.75,
     getsugaExplosion: 0.90,
     hollowAwakenVoice: 3.0,

@@ -1,3 +1,4 @@
+import { survivorSystem } from './survivorSystem.js';
 import { state, isGlobalHitPauseActive, triggerGlobalScreenShake } from '../core/state.js';
 import { updateFighters, updateProjectiles } from './physics.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -56,14 +57,25 @@ export function updateGame() {
     if (state.gameState === 'countdown') {
       state.countdownTimer = (state.countdownTimer || 0) + 1;
 
-      // Micro screen rumble on VS badge slam at frame 21
-      if (state.countdownTimer === 21 && typeof triggerGlobalScreenShake === 'function') {
-        triggerGlobalScreenShake(2.0, 4);
+      // Sequential 1-by-1 battle intro slide SFX with acoustic call-and-response pitch shifting
+      if (state.countdownTimer === 1 && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('battleintro_transitions', 1.0, 0.95); // Deep, weighty initial whoosh
+      } else if (state.countdownTimer === 22 && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('battleintro_transitions', 1.0, 1.06); // Crisp, high-velocity counter whoosh
       }
 
-      // Fast, high-energy anime battle intro cinematic duration (70 frames / ~1.16s)
-      // (1-2-3 countdown tick sounds and premature countdown fight/bell sounds completely removed)
-      const requiredCountdownFrames = 70;
+      // VS banner slam SFX and micro screen rumble at frame 44
+      if (state.countdownTimer === 44) {
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('timertick', 1.0);
+        }
+        if (typeof triggerGlobalScreenShake === 'function') {
+          triggerGlobalScreenShake(2.0, 4);
+        }
+      }
+
+      // Fast, high-energy anime battle intro cinematic duration (95 frames / ~1.58s)
+      const requiredCountdownFrames = 95;
       state.requiredCountdownFrames = requiredCountdownFrames;
 
       // Update fighters during countdown to aim guns/weapons at opponents
@@ -146,10 +158,10 @@ export function updateGame() {
         }
       }
 
-      // Trigger Poke Ball summon sound exactly when the fighters begin materializing (at frame 44)
+      // Trigger fighter summon sound exactly when the fighters begin materializing (at frame 44)
       if (state.battleStartDelayTimer === 44) {
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX('Assets/Sound Effects/Skills/summinillusion.mp3', 0.85);
+          audioSystem.playSFX('fighter_summon', 1.0);
         }
       }
       const isGlobalHitPausing = isGlobalHitPauseActive(state);
@@ -161,6 +173,9 @@ export function updateGame() {
       BossManager.update(1);
       updateProjectiles();
       updateDriveBys();
+      if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
+        survivorSystem.update(state.fighters[0], state.arena);
+      }
       if (!isGlobalHitPausing) {
         // Update flame particle system
         const dt = Math.min(FRAME_TIME / 1000, 0.1); // Convert to seconds, cap at 100ms

@@ -913,12 +913,12 @@ class ProjectileSystem {
     proj.damage = Number.isFinite(Number(damage)) 
       ? Number(damage) 
       : (isFinal 
-        ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 5) 
+        ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20) 
         : (form === 'bankai_hollow'
-          ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 6)
+          ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 16)
           : (form === 'hollow'
-            ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 3) 
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4) : (CONFIG.ichigo?.getsugaTickDamage || 2)))));
+            ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 12) 
+            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 12) : (CONFIG.ichigo?.getsugaTickDamage || 12)))));
     proj.isGetsuga = true;
     proj.getsugaForm = form;
     proj.form = form;

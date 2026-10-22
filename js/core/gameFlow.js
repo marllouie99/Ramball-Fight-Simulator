@@ -1,3 +1,4 @@
+import { survivorSystem } from '../systems/survivorSystem.js';
 import { stopAllSounds, stopAllLoopingSounds, preloadSound, preloadAudioBuffer, preloadAudioBufferBatch, stopSound, unlockAudio } from '../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // GAME FLOW — State transitions and round management
@@ -341,6 +342,8 @@ export function reinitFighters(isNewMatch = false) {
     state.p1Index = slots[0] ?? state.p1Index ?? 0;
     state.p2Index = slots[1] ?? state.p2Index ?? 1;
     fighterIndexes = [state.p1Index, state.p2Index];
+  } else if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
+    fighterIndexes = [state.p1Index ?? 0];
   } else if (state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match') {
     if (isNewMatch || !state.tagMatch || !state.tagMatch.team0Roster || state.tagMatch.team0Roster.length === 0) {
       state.tagMatch = {
@@ -1351,6 +1354,11 @@ export function startCountdown() {
   state.announcerTimeoutIds.forEach(id => clearTimeout(id));
   state.announcerTimeoutIds = [];
 
+  // Preload battle intro transition, VS slam, and fighter summon sounds with highest priority
+  preloadSound('Assets/Sound Effects/Announcer/era_dev-duplicispear-swing.wav').catch(() => {});
+  preloadSound('Assets/Sound Effects/Announcer/timertick.mp3').catch(() => {});
+  preloadSound('Assets/Sound Effects/Announcer/era_eno_clericstaffhit.wav').catch(() => {});
+
   // Start background music if not already playing (forceNew = false ensures continuous playback across rounds for all modes)
   startArenaBgm(false);
 
@@ -1369,7 +1377,9 @@ export function startCountdown() {
 
 export function resetMatch(showFaceOff = true) {
   state._isChampionLayoutActive = false;
-  if (state.mode === 'TLFS') {
+  if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
+    survivorSystem.initMatch(state.fighters[0]);
+  } else if (state.mode === 'TLFS') {
     state.tlfsDefeatedEnemies = 0;
     if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
       state.p2Index = state.tlfsAllowedEnemies[Math.floor(Math.random() * state.tlfsAllowedEnemies.length)];

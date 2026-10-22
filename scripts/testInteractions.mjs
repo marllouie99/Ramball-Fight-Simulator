@@ -7960,6 +7960,12 @@ async function runInteractionTests() {
       assert(adaptedDmg > 0, `Adapted Mahoraga must still take non-zero damage from Getsuga Tensho (got ${adaptedDmg})`);
       assert(adaptedDmg >= 1, `Adapted Mahoraga damage must be at least 1 (got ${adaptedDmg})`);
 
+      // Verify adapted Mahoraga takes strictly 25% damage on 12-tick damage (12 * 0.25 = 3)
+      const hpBefore12Dmg = mahoraga.hp;
+      mahoraga.takeDamage(12, ichigo, { isGetsuga: true });
+      const dmg12 = hpBefore12Dmg - mahoraga.hp;
+      assert(dmg12 === 3, `Adapted Mahoraga must take strictly 25% of 12 tick damage (expected 3, got ${dmg12})`);
+
       // Verify adapted Mahoraga is STILL pulled/dragged by Getsuga Tensho
       assert(mahoraga.isDraggedByGetsuga === true, 'Adapted Mahoraga must still have isDraggedByGetsuga = true');
       assert(mahoraga.isPulledOrDragged() === true, 'Adapted Mahoraga isPulledOrDragged() must still be true');

@@ -94,13 +94,16 @@ export function performMeleeAttack(fighter, opponent) {
 
   const isCaughtInBeam = (
     fighter.caughtInGenosFlurry ||
-    fighter.isDraggedByGetsuga ||
-    (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())
+    (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam())
   );
 
-  const isInHitReaction = (fighter.knockbackStunTimer || 0) > 0 || (fighter.hitStunTimer || 0) > 0 || (fighter.electricStunTimer || 0) > 0 || (fighter.dubstepStunTimer || 0) > 0;
-  const isParalyzed = isInsideDomain || (fighter.timeStopTimer || 0) > 0 || isCaughtInBeam || fighter.isTargetOfAmbush || fighter.isFrozenByInfinity;
-  if (isParalyzed || isInHitReaction) {
+  // Hard CCs that completely prevent melee attacks
+  const isHardParalyzed = isInsideDomain || (fighter.timeStopTimer || 0) > 0 || (fighter.electricStunTimer || 0) > 0 || 
+                          (fighter.dubstepStunTimer || 0) > 0 || (fighter.paralyzeTimer || 0) > 0 ||
+                          isCaughtInBeam || fighter.isTargetOfAmbush || fighter.isFrozenByInfinity;
+  // Major hit-stun lockout (allows counter-striking through light flinches <= 8 frames)
+  const isHeavyStunned = (fighter.knockbackStunTimer || 0) > 8 || (fighter.hitStunTimer || 0) > 8;
+  if (isHardParalyzed || isHeavyStunned) {
     fighter.neutralStanceTimer = 0;
     fighter.adaptationDashTimer = 0;
     return;

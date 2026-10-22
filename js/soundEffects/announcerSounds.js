@@ -88,6 +88,20 @@ export const ANNOUNCER_SOUNDS = {
         speed: 1.0,
         offset: 0.0,
         duration: 2.5,
+    },
+    battleintro_transitions: {
+        src: 'Assets/Sound Effects/Announcer/era_dev-duplicispear-swing.wav',
+        volume: 1.0,
+        speed: 1.0,
+        offset: 0.0,
+        duration: 1.0,
+    },
+    fighter_summon: {
+        src: 'Assets/Sound Effects/Announcer/era_eno_clericstaffhit.wav',
+        volume: 1.0,
+        speed: 1.0,
+        offset: 0.0,
+        duration: 1.5,
     }
 };
 

@@ -21,6 +21,49 @@ export const DEFAULT_FFA_PLUS_OBSTACLE = {
 /**
  * Retrieves the active center obstacle definition for the given arena, if any.
  */
+/**
+ * Retrieves all active obstacle definitions for the given arena.
+ * Supports both multi-obstacle array (arena.obstacles) and legacy centerObstacle.
+ */
+export function getArenaObstacles(arena) {
+  const ar = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+  if (!ar) return [];
+
+  if (Array.isArray(ar.obstacles) && ar.obstacles.length > 0) {
+    return ar.obstacles.map(obs => {
+      if (obs.type === 'plus') {
+        const cx = obs.cx !== undefined ? obs.cx : (ar.x + ar.width / 2);
+        const cy = obs.cy !== undefined ? obs.cy : (ar.y + ar.height / 2);
+        const size = obs.size || DEFAULT_FFA_PLUS_OBSTACLE.size;
+        const thickness = obs.thickness || DEFAULT_FFA_PLUS_OBSTACLE.thickness;
+        return {
+          type: 'plus',
+          cx,
+          cy,
+          size,
+          thickness,
+          halfSize: size / 2,
+          halfThick: thickness / 2,
+        };
+      }
+      return {
+        type: 'rect',
+        x: obs.x,
+        y: obs.y,
+        width: obs.width,
+        height: obs.height,
+        cx: obs.x + obs.width / 2,
+        cy: obs.y + obs.height / 2,
+        halfW: obs.width / 2,
+        halfH: obs.height / 2,
+      };
+    });
+  }
+
+  const centerObs = getArenaCenterObstacle(ar);
+  return centerObs ? [centerObs] : [];
+}
+
 export function getArenaCenterObstacle(arena) {
   const ar = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
   if (!ar) return null;
@@ -115,10 +158,32 @@ export function isPointInsidePlusObstacle(px, py, cx, cy, halfSize, halfThick) {
  * Resolves collision between an entity circle (fighter / minion / boss) and the arena center plus obstacle.
  * Returns true if a collision occurred and position/velocity was adjusted.
  */
-export function resolveEntityPlusObstacleCollision(entity, arena) {
+/**
+ * Resolves collision between an entity circle and all arena obstacles.
+ */
+export function resolveEntityObstaclesCollision(entity, arena) {
   if (!entity || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)) return false;
-  const obs = getArenaCenterObstacle(arena);
-  if (!obs || obs.type !== 'plus') return false;
+  const obstacles = getArenaObstacles(arena);
+  if (!obstacles || obstacles.length === 0) return false;
+
+  let anyBounced = false;
+  for (let i = 0; i < obstacles.length; i++) {
+    const obs = obstacles[i];
+    if (obs.type === 'plus') {
+      if (_resolveSinglePlusObstacle(entity, obs)) anyBounced = true;
+    } else if (obs.type === 'rect') {
+      if (resolveEntityRectObstacleCollision(entity, obs)) anyBounced = true;
+    }
+  }
+  return anyBounced;
+}
+
+export function resolveEntityPlusObstacleCollision(entity, arena) {
+  return resolveEntityObstaclesCollision(entity, arena);
+}
+
+function _resolveSinglePlusObstacle(entity, obs) {
+  if (!entity || !obs || obs.type !== 'plus') return false;
 
   const r = Number.isFinite(entity.r) ? entity.r : 25;
   const cx = obs.cx;
@@ -271,8 +336,34 @@ export function resolveEntityPlusObstacleCollision(entity, arena) {
  * Checks if a line segment / ray from (x1, y1) to (x2, y2) intersects the plus (+) obstacle.
  * Returns intersection details or null if no intersection.
  */
+/**
+ * Checks if a ray intersects any arena obstacle.
+ */
+export function checkRayIntersectsObstacles(x1, y1, x2, y2, arena, padding = 0) {
+  const obstacles = getArenaObstacles(arena);
+  if (!obstacles || obstacles.length === 0) return null;
+
+  let bestHit = null;
+  for (let i = 0; i < obstacles.length; i++) {
+    const obs = obstacles[i];
+    let hit = null;
+    if (obs.type === 'plus') {
+      hit = _checkSingleRayIntersectsPlus(x1, y1, x2, y2, obs, padding);
+    } else if (obs.type === 'rect') {
+      hit = checkRayIntersectsRectObstacle(x1, y1, x2, y2, obs, padding);
+    }
+    if (hit && (!bestHit || hit.t < bestHit.t)) {
+      bestHit = hit;
+    }
+  }
+  return bestHit;
+}
+
 export function checkRayIntersectsPlusObstacle(x1, y1, x2, y2, arena, padding = 0) {
-  const obs = getArenaCenterObstacle(arena);
+  return checkRayIntersectsObstacles(x1, y1, x2, y2, arena, padding);
+}
+
+function _checkSingleRayIntersectsPlus(x1, y1, x2, y2, obs, padding = 0) {
   if (!obs || obs.type !== 'plus') return null;
 
   const cx = obs.cx;
@@ -451,7 +542,43 @@ export function resolveProjectilePlusObstacleCollision(p, arena) {
 /**
  * Draws the plus (+) center obstacle on the arena context.
  */
+/**
+ * Draws all arena obstacles (plus walls and rectangular blocks).
+ */
+export function drawArenaObstacles(ctx, arena, isDark = false) {
+  const obstacles = getArenaObstacles(arena);
+  if (!obstacles || obstacles.length === 0) return;
+
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
+  const outerBg = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+
+  ctx.save();
+  ctx.fillStyle = outerBg;
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'square';
+
+  for (let i = 0; i < obstacles.length; i++) {
+    const obs = obstacles[i];
+    ctx.beginPath();
+    if (obs.type === 'plus') {
+      _tracePlusPath(ctx, obs.cx, obs.cy, obs.halfSize, obs.halfThick);
+    } else if (obs.type === 'rect') {
+      ctx.rect(obs.x, obs.y, obs.width, obs.height);
+    }
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 export function drawCenterPlusObstacle(ctx, arena, isDark = false) {
+  drawArenaObstacles(ctx, arena, isDark);
+}
+
+function _legacyDrawSinglePlus(ctx, arena, isDark = false) {
   const obs = getArenaCenterObstacle(arena);
   if (!obs || obs.type !== 'plus') return;
 
@@ -500,4 +627,151 @@ function _tracePlusPath(ctx, cx, cy, S, T) {
   ctx.lineTo(cx - S, cy - T);
   ctx.lineTo(cx - T, cy - T);
   ctx.closePath();
+}
+
+
+/**
+ * Resolves collision between an entity circle and a rectangular obstacle.
+ */
+export function resolveEntityRectObstacleCollision(entity, obs) {
+  if (!entity || !Number.isFinite(entity.x) || !Number.isFinite(entity.y)) return false;
+  const r = Number.isFinite(entity.r) ? entity.r : 25;
+  const rx = obs.x;
+  const ry = obs.y;
+  const rw = obs.width;
+  const rh = obs.height;
+
+  // Broadphase AABB
+  if (entity.x + r < rx || entity.x - r > rx + rw || entity.y + r < ry || entity.y - r > ry + rh) {
+    return false;
+  }
+
+  const closestX = Math.max(rx, Math.min(rx + rw, entity.x));
+  const closestY = Math.max(ry, Math.min(ry + rh, entity.y));
+
+  const dx = entity.x - closestX;
+  const dy = entity.y - closestY;
+  const distSq = dx * dx + dy * dy;
+
+  let normalX = 0;
+  let normalY = 0;
+  let bounced = false;
+
+  if (distSq === 0) {
+    const dLeft = entity.x - rx;
+    const dRight = (rx + rw) - entity.x;
+    const dTop = entity.y - ry;
+    const dBottom = (ry + rh) - entity.y;
+    const minDist = Math.min(dLeft, dRight, dTop, dBottom);
+
+    if (minDist === dLeft) {
+      entity.x = rx - r;
+      normalX = -1;
+    } else if (minDist === dRight) {
+      entity.x = rx + rw + r;
+      normalX = 1;
+    } else if (minDist === dTop) {
+      entity.y = ry - r;
+      normalY = -1;
+    } else {
+      entity.y = ry + rh + r;
+      normalY = 1;
+    }
+    bounced = true;
+  } else if (distSq < r * r) {
+    const dist = Math.sqrt(distSq) || 0.001;
+    normalX = dx / dist;
+    normalY = dy / dist;
+    entity.x = closestX + normalX * r;
+    entity.y = closestY + normalY * r;
+    bounced = true;
+  }
+
+  if (bounced) {
+    const restitution = CONFIG.collision?.restitution ?? 0.92;
+    if (Number.isFinite(entity.vx) && Number.isFinite(entity.vy)) {
+      const dot = entity.vx * normalX + entity.vy * normalY;
+      if (dot < 0) {
+        entity.vx = (entity.vx - 2 * dot * normalX) * restitution;
+        entity.vy = (entity.vy - 2 * dot * normalY) * restitution;
+        entity.vx += (Math.random() - 0.5) * 0.3;
+        entity.vy += (Math.random() - 0.5) * 0.3;
+      }
+    }
+
+    if (Number.isFinite(entity.knockbackVx) && Number.isFinite(entity.knockbackVy)) {
+      const kbDot = entity.knockbackVx * normalX + entity.knockbackVy * normalY;
+      if (kbDot < 0) {
+        entity.knockbackVx = (entity.knockbackVx - 2 * kbDot * normalX) * 0.85;
+        entity.knockbackVy = (entity.knockbackVy - 2 * kbDot * normalY) * 0.85;
+      }
+    }
+  }
+
+  return bounced;
+}
+
+/**
+ * Checks if a ray from (x1, y1) to (x2, y2) intersects a rectangular obstacle.
+ */
+export function checkRayIntersectsRectObstacle(x1, y1, x2, y2, obs, padding = 0) {
+  const minX = obs.x - padding;
+  const maxX = obs.x + obs.width + padding;
+  const minY = obs.y - padding;
+  const maxY = obs.y + obs.height + padding;
+
+  if (x1 >= minX && x1 <= maxX && y1 >= minY && y1 <= maxY) {
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const dx = x1 - cx;
+    const dy = y1 - cy;
+    let normalX = 0, normalY = 0;
+    if (Math.abs(dx) > Math.abs(dy)) {
+      normalX = dx >= 0 ? 1 : -1;
+    } else {
+      normalY = dy >= 0 ? 1 : -1;
+    }
+    return { hit: true, t: 0, hitX: x1, hitY: y1, normalX, normalY };
+  }
+
+  if (Math.max(x1, x2) < minX || Math.min(x1, x2) > maxX || Math.max(y1, y2) < minY || Math.min(y1, y2) > maxY) {
+    return null;
+  }
+
+  const segments = [
+    { x1: minX, y1: minY, x2: maxX, y2: minY, nx: 0, ny: -1 },
+    { x1: maxX, y1: minY, x2: maxX, y2: maxY, nx: 1, ny: 0 },
+    { x1: maxX, y1: maxY, x2: minX, y2: maxY, nx: 0, ny: 1 },
+    { x1: minX, y1: maxY, x2: minX, y2: minY, nx: -1, ny: 0 }
+  ];
+
+  const dx1 = x2 - x1;
+  const dy1 = y2 - y1;
+  let bestHit = null;
+
+  for (let i = 0; i < 4; i++) {
+    const seg = segments[i];
+    const dx2 = seg.x2 - seg.x1;
+    const dy2 = seg.y2 - seg.y1;
+    const denom = dx1 * dy2 - dy1 * dx2;
+    if (Math.abs(denom) < 1e-6) continue;
+
+    const s = ((seg.x1 - x1) * dy2 - (seg.y1 - y1) * dx2) / denom;
+    const t = ((seg.x1 - x1) * dy1 - (seg.y1 - y1) * dx1) / denom;
+
+    if (s >= 0 && s <= 1 && t >= 0 && t <= 1) {
+      if (!bestHit || s < bestHit.t) {
+        bestHit = {
+          hit: true,
+          t: s,
+          hitX: x1 + s * dx1,
+          hitY: y1 + s * dy1,
+          normalX: seg.nx,
+          normalY: seg.ny
+        };
+      }
+    }
+  }
+
+  return bestHit;
 }

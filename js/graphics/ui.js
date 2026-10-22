@@ -34,6 +34,9 @@ import {
   drawSkinStudioScreen 
 } from './ui/SkinStudioScreen.js';
 import { 
+  drawSurvivorStudioScreen 
+} from './ui/SurvivorStudioScreen.js';
+import { 
   drawSelectScreen 
 } from './ui/CharacterSelectScreen.js';
 import { 
@@ -68,6 +71,7 @@ export {
   drawWeaponDetailScreen,
   drawWeaponStudioScreen,
   drawSkinStudioScreen,
+  drawSurvivorStudioScreen,
   drawYutaKatana,
   drawIndexDetailScreen,
   drawSelectScreen,

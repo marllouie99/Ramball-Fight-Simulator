@@ -576,12 +576,12 @@ export function releaseGetsuga(fighter) {
   }
 
   const baseDmg = isFinal
-    ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 5) * (isMask ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.1) : 1.0)
+    ? (CONFIG.ichigo?.bankaiFinalGetsugaTickDamage || 20) * (isMask ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.1) : 1.0)
     : (isBankai && isMask
-      ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 6)
+      ? (CONFIG.ichigo?.bankaiHollowGetsugaTickDamage || 16)
       : (isMask
-        ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 3)
-        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 4) : (CONFIG.ichigo?.getsugaTickDamage || 2))));
+        ? (CONFIG.ichigo?.hollowGetsugaTickDamage || 12)
+        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaTickDamage || 12) : (CONFIG.ichigo?.getsugaTickDamage || 12))));
   const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 11;
   const speed = isFinal
     ? (CONFIG.ichigo?.bankaiFinalGetsugaSpeed ?? 24)
@@ -647,7 +647,11 @@ export function releaseGetsuga(fighter) {
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, text, textColor);
   fighter._playSound('getsugaReleaseSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
-  fighter._playSound('getsugaReleaseFlare', 'Assets/Sound Effects/SkillEffects/flare.mp3', 0.85);
+  fighter._playSound(
+    'getsugaFire',
+    CONFIG.ichigo?.sounds?.getsugaFire || 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
+    1.0
+  );
   if (typeof triggerGlobalScreenShake === 'function') {
     triggerGlobalScreenShake(shakeAmt, 14);
   }

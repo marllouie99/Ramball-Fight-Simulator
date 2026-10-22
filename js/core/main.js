@@ -7,6 +7,8 @@ import { initFlameCanvas, resizeFlameCanvas } from '../graphics/canvasManager.js
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown, preloadEssentialCoreSounds, preloadFighterAssets, goToTitle } from './gameFlow.js';
 import { FIGHTER_DEFS, CONFIG } from './config.js';
 import { handleUIClick, handleUIMove, getHoveredButton, captureFaceOffScreenshot } from '../graphics/ui.js';
+import { survivorSystem } from '../systems/survivorSystem.js';
+import { handleUpgradeMouseMove, handleUpgradeClick, handleUpgradeKeyDown } from '../graphics/ui/SurvivorUpgradeModal.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { getSelectedArenaBgmTrack, cycleNextArenaBgmTrack } from '../systems/arenaBgmSystem.js';
 import { initGraphicsCache } from '../graphics/graphicsCache.js';
@@ -109,6 +111,10 @@ let activeTacticalAction = 'mode-1v1';
 window.addEventListener('keydown', (e) => {
   unlockAudio();
 
+  if (state.survivorState && state.survivorState.isPausedForUpgrade) {
+    if (handleUpgradeKeyDown(e, survivorSystem)) return;
+  }
+
   if (BossEntranceSequence.isActive) {
     if (BossEntranceSequence.timer >= 15 && e.key === 'Escape') {
       BossEntranceSequence.skip();
@@ -118,6 +124,10 @@ window.addEventListener('keydown', (e) => {
 
   if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
     if (state.gameState === 'faceoff') {
+      state.gameState = 'select';
+      return;
+    }
+    if (state.gameState === 'survivorStudio') {
       state.gameState = 'select';
       return;
     }
@@ -200,6 +210,10 @@ inputTarget.addEventListener('mousedown', (e) => {
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
 
+  if (state.survivorState && state.survivorState.isPausedForUpgrade) {
+    if (handleUpgradeClick(mx, my, survivorSystem)) return;
+  }
+
   if (state.gameState === 'paused') {
     const cx = state.pauseMenuX !== undefined ? state.pauseMenuX : state.canvas.width / 2;
     const cy = state.pauseMenuY !== undefined ? state.pauseMenuY : 180;
@@ -252,6 +266,9 @@ inputTarget.addEventListener('mousemove', (e) => {
   }
 
   handleUIMove(mx, my);
+  if (state.survivorState && state.survivorState.isPausedForUpgrade) {
+    handleUpgradeMouseMove(mx, my);
+  }
 
   if (state.gameState === 'paused' && !state.isDraggingPauseMenu) {
     const cx = state.pauseMenuX !== undefined ? state.pauseMenuX : state.canvas.width / 2;
@@ -1008,6 +1025,11 @@ export function executeTacticalAction(action) {
     initHorizontalTeamSelectScreen();
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'horizontal_select';
+  } else if (action === 'mode-survivor') {
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.SURVIVOR || 'Survivor';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
   } else if (action === 'mode-hffa') {
     state.gameCategory = 'foc';
     state.mode = GAME_MODES.FFA;
@@ -1031,6 +1053,8 @@ export function executeTacticalAction(action) {
     state.gameState = 'weaponStudio';
   } else if (action === 'screen-skinstudio') {
     state.gameState = 'skinStudio';
+  } else if (action === 'screen-survivorstudio') {
+    state.gameState = 'survivorStudio';
   } else if (action === 'screen-weapons') {
     state.weaponSelectedFighter = null;
     state.weaponPage = 0;

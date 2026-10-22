@@ -23,7 +23,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
 import { drawArenaFloorSelector, isArenaFloorModalOpen, drawArenaFloorModal, closeArenaFloorModal } from '../../systems/arenaTileSystem.js';
 import { drawArenaDecorationSelector } from '../../systems/arenaDecorationSystem.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
+import { GAME_MODES, MODE_SETTINGS } from '../../core/modeConfig.js';
 import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
 import { drawGradeBadge } from '../../configs/gradeConfig.js';
 
@@ -43,6 +43,91 @@ let _lastCardWheelTime = 0;
 let _lastCardClickTime = 0;
 let _lastCardClickIdx = -1;
 let _playerCardBounds = [];
+
+
+function drawSurvivorBriefingCard(x, y, w, h) {
+  const { ctx } = state;
+  ctx.save();
+
+  // Shadow
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
+  ctx.fillRect(x + 4, y + 5, w, h);
+
+  // Background
+  ctx.fillStyle = '#0F1715';
+  ctx.fillRect(x, y, w, h);
+
+  // Border
+  ctx.strokeStyle = '#00FF66';
+  ctx.lineWidth = 2.5;
+  ctx.strokeRect(x, y, w, h);
+
+  // Header band
+  const headerH = 34;
+  ctx.fillStyle = '#064E3B';
+  ctx.fillRect(x + 2, y + 2, w - 4, headerH);
+  ctx.strokeStyle = '#00FF66';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(x + 2, y + 2, w - 4, headerH);
+
+  ctx.fillStyle = '#00FF66';
+  ctx.font = 'bold 13px "Segoe UI", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🦇 CIRCLE SURVIVOR // MISSION BRIEFING', x + 12, y + headerH / 2 + 2);
+
+  // Studio Config Button in Header
+  drawButton('⚙️ STUDIO', x + w - 58, y + headerH / 2 + 1, () => {
+    state.gameState = 'survivorStudio';
+  }, 92, 22, '#059669', 3);
+
+  // Content lines
+  const sCfg = (typeof MODE_SETTINGS !== 'undefined' && MODE_SETTINGS[GAME_MODES.SURVIVOR]) || {};
+  const sPool = Array.isArray(sCfg.enemyPool) && sCfg.enemyPool.length > 0 ? sCfg.enemyPool : ['knight'];
+  const enemyNames = sPool.map(id => id.charAt(0).toUpperCase() + id.slice(1)).join(', ');
+  const enemyDesc = sPool.length === 1 && sPool[0].toLowerCase() === 'knight'
+    ? 'Endless waves of Armored Knights swarming inward'
+    : `Endless swarms of ${enemyNames} swarming inward`;
+
+  const startY = y + headerH + 20;
+  const lines = [
+    { icon: '⚔️', title: 'ENEMY SWARMS', desc: enemyDesc },
+    { icon: '💎', title: 'XP GEMS & MAGNET', desc: 'Slain foes drop gems; vacuum pull to level up' },
+    { icon: '⚡', title: '3-CARD UPGRADES', desc: 'Choose Orbiters, Garlic Aura, Kunai, Thunder, Scythe' },
+    { icon: '🧱', title: 'BOUNCING WALLS', desc: 'Tactical ricochets off 5 interior walls & obstacles' },
+    { icon: '⏱️', title: 'FINAL CLIMAX', desc: 'Survive to 3:00 and defeat The Dark Overlord!' }
+  ];
+
+  ctx.font = '11px "Segoe UI", Roboto, sans-serif';
+  let curY = startY;
+  for (let i = 0; i < lines.length; i++) {
+    const item = lines[i];
+    ctx.fillStyle = '#00FF66';
+    ctx.fillText(`${item.icon} ${item.title}:`, x + 16, curY);
+    ctx.fillStyle = '#CBD5E0';
+    ctx.fillText(item.desc, x + 34, curY + 16);
+    curY += 40;
+  }
+
+  // Footer badge
+  const badgeY = y + h - 32;
+  ctx.fillStyle = 'rgba(0, 255, 102, 0.12)';
+  ctx.fillRect(x + 10, badgeY, w - 20, 24);
+  ctx.strokeStyle = 'rgba(0, 255, 102, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 10, badgeY, w - 20, 24);
+
+  ctx.fillStyle = '#00FF66';
+  ctx.font = 'bold 9.5px monospace';
+  ctx.textAlign = 'center';
+  const startHp = sCfg.playerFixedHp || 500;
+  const matchSec = sCfg.matchDurationSec || 180;
+  const mins = Math.floor(matchSec / 60);
+  const secs = (matchSec % 60).toString().padStart(2, '0');
+  ctx.fillText(`STARTING HP: ${startHp}  •  DURATION: ${mins}:${secs}  •  AUTO-ATTACK ENABLED`, x + w / 2, badgeY + 12);
+
+  ctx.restore();
+}
 
 function drawTlfsEnemyPoolGrid(x, y, w, h) {
   const { ctx } = state;
@@ -2088,6 +2173,30 @@ function drawSelectScreen() {
       drawTlfsEnemyPoolGrid(bannerX, 414, bannerW, 436);
 
       drawBottomCommandDeck('START GAUNTLET', () => startGame(), () => {
+        state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
+      });
+    }
+  } else if (mode === 'Survivor' || mode === GAME_MODES.SURVIVOR) {
+    if (isLandscape) {
+      const leftX = margin;
+      const rightX = margin + cardW + cardGap;
+
+      drawHeroicFighterCard('p1Index', 'SURVIVOR HERO', leftX, topY + 34, cardW, 264, true, true);
+      drawSurvivorBriefingCard(rightX, topY + 34, cardW, 264);
+
+      drawBottomCommandDeck('START SURVIVAL', () => startGame(), () => {
+        state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
+      });
+    } else {
+      const bannerW = canvas.width - 36;
+      const bannerX = 18;
+      const p1Y = 124;
+      const p1H = 280;
+
+      drawHeroicFighterCard('p1Index', 'SURVIVOR HERO', bannerX, p1Y, bannerW, p1H, true, true);
+      drawSurvivorBriefingCard(bannerX, 420, bannerW, 320);
+
+      drawBottomCommandDeck('START SURVIVAL', () => startGame(), () => {
         state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
       });
     }

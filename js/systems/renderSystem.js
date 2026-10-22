@@ -1,9 +1,10 @@
+import { survivorSystem } from './survivorSystem.js';
 import { state, isChampionScreenActive } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
-  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawSkinStudioScreen, drawFaceOffThumbnailScreen, drawHUD, 
+  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawSkinStudioScreen, drawSurvivorStudioScreen, drawFaceOffThumbnailScreen, drawHUD, 
   drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay
 } from '../graphics/ui.js';
 import {
@@ -63,7 +64,7 @@ export function renderGame() {
 
     // Toggle WebGL layers visibility based on game state to prevent leftover battle visuals
     // and dim effects from glitching behind/above panels on menu/select/index screens.
-    const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail', 'weaponStudio', 'skinStudio', 'faceoff'].includes(state.gameState);
+    const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail', 'weaponStudio', 'skinStudio', 'survivorStudio', 'faceoff'].includes(state.gameState);
     if (state.pixiLayers) {
       if (state.pixiLayers.background) state.pixiLayers.background.visible = isBattleState;
       if (state.pixiLayers.arena) state.pixiLayers.arena.visible = isBattleState;
@@ -182,6 +183,8 @@ export function renderGame() {
       drawWeaponStudioScreen();
     } else if (state.gameState === 'skinStudio') {
       drawSkinStudioScreen();
+    } else if (state.gameState === 'survivorStudio') {
+      drawSurvivorStudioScreen();
     } else if (state.gameState === 'horizontal_select') {
       drawHorizontalTeamSelectScreen(state.ctx);
     } else if (state.gameState === 'faceoff') {
@@ -415,6 +418,9 @@ export function renderGame() {
             }
           }
         }
+        if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
+          survivorSystem.drawInCameraSpace(state.ctx);
+        }
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke
         drawIllusions(); // Draw Doppleganger illusions
         drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
@@ -594,6 +600,9 @@ export function renderGame() {
         // Dark Mode: Skip white flash but still tick down the timer
         if (isDarkPlaying && state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
           state.battleStartFadeTimer = 0;
+        }
+        if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
+          survivorSystem.drawScreenSpaceUI(state.topLevelUiCtx || state.ctx);
         }
       } else if (state.gameState === 'boss_intro' || BossEntranceSequence.isActive) {
         BossEntranceSequence.draw(state.topLevelUiCtx || state.ctx);

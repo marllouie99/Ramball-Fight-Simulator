@@ -1119,6 +1119,10 @@ export function updateFighters() {
         }
         return;
       }
+      if (fighter.isSurvivorMob) {
+        // Survivor horde mobs are managed exclusively by survivorSystem to provide locked 60 FPS horde physics
+        return;
+      }
       const opponent = getClosestOpponent(fighter);
       if (typeof fighter.update === 'function') {
         fighter.update(opponent, fi, state.arena);

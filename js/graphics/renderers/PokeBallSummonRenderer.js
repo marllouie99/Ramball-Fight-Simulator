@@ -61,23 +61,6 @@ function draw4PointStar(ctx, cx, cy, radius, color, alpha) {
 }
 
 /**
- * Draws a chamfered polygon path (45-degree angled corner notches).
- */
-function drawChamferedPath(ctx, x, y, w, h, ch) {
-  ch = Math.min(ch, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + ch, y);
-  ctx.lineTo(x + w - ch, y);
-  ctx.lineTo(x + w, y + ch);
-  ctx.lineTo(x + w, y + h - ch);
-  ctx.lineTo(x + w - ch, y + h);
-  ctx.lineTo(x + ch, y + h);
-  ctx.lineTo(x, y + h - ch);
-  ctx.lineTo(x, y + ch);
-  ctx.closePath();
-}
-
-/**
  * Draws the UNDER-layer elements of the Poke Ball summon:
  * Floor energy disc, descending laser beam, and expanding concentric shockwave rings.
  */
@@ -291,92 +274,27 @@ export function drawFightBanner(ctx, width, height) {
   ctx.rotate(-0.105);
   ctx.scale(scale, scale);
 
-  const bannerW = 280;
-  const bannerH = 76;
-  const ch = 16;
-
-  // 1. 3D Comic Hard Drop Shadow (Rule 11 compliant)
-  ctx.save();
-  ctx.translate(4, 5);
-  drawChamferedPath(ctx, -bannerW / 2, -bannerH / 2, bannerW, bannerH, ch);
-  ctx.fillStyle = '#050609';
-  ctx.fill();
-  ctx.restore();
-
-  // 2. Banner Dark Slate Body
-  drawChamferedPath(ctx, -bannerW / 2, -bannerH / 2, bannerW, bannerH, ch);
-  ctx.fillStyle = '#080A12';
-  ctx.fill();
-
-  // 3. Heavy Outer Manga Ink Border
-  ctx.strokeStyle = '#050609';
-  ctx.lineWidth = 4.5;
-  ctx.stroke();
-
-  // 4. Inner White Highlight Rim
-  drawChamferedPath(ctx, -bannerW / 2 + 2.5, -bannerH / 2 + 2.5, bannerW - 5, bannerH - 5, ch - 2);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // 5. Flanking Manga Speed Chevrons (« FIGHT! »)
-  const chevX = bannerW / 2 - 22;
-  // Left Chevrons
-  ctx.fillStyle = '#FFD700';
-  ctx.beginPath();
-  ctx.moveTo(-chevX, -12);
-  ctx.lineTo(-chevX + 10, 0);
-  ctx.lineTo(-chevX, 12);
-  ctx.lineTo(-chevX - 4, 12);
-  ctx.lineTo(-chevX + 6, 0);
-  ctx.lineTo(-chevX - 4, -12);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(-chevX - 10, -12);
-  ctx.lineTo(-chevX, 0);
-  ctx.lineTo(-chevX - 10, 12);
-  ctx.lineTo(-chevX - 14, 12);
-  ctx.lineTo(-chevX - 4, 0);
-  ctx.lineTo(-chevX - 14, -12);
-  ctx.closePath();
-  ctx.fill();
-
-  // Right Chevrons
-  ctx.beginPath();
-  ctx.moveTo(chevX, -12);
-  ctx.lineTo(chevX - 10, 0);
-  ctx.lineTo(chevX, 12);
-  ctx.lineTo(chevX + 4, 12);
-  ctx.lineTo(chevX - 6, 0);
-  ctx.lineTo(chevX + 4, -12);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(chevX + 10, -12);
-  ctx.lineTo(chevX, 0);
-  ctx.lineTo(chevX + 10, 12);
-  ctx.lineTo(chevX + 14, 12);
-  ctx.lineTo(chevX + 4, 0);
-  ctx.lineTo(chevX + 14, -12);
-  ctx.closePath();
-  ctx.fill();
-
-  // 6. High-Impact "FIGHT!" Typography
-  ctx.font = '900 italic 56px "Outfit", "Rajdhani", "Impact", sans-serif';
+  // High-Impact "FIGHT!" Typography (Text Only)
+  const fontSize = 68;
+  ctx.font = `900 italic ${fontSize}px "Outfit", "Rajdhani", "Impact", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
 
-  // Heavy 14px Manga Ink Outline
+  // 1. 3D Comic Hard Drop Shadow (Rule 11 compliant)
+  ctx.save();
+  ctx.translate(5, 6);
+  ctx.fillStyle = '#050609';
+  ctx.fillText('FIGHT!', 0, 0);
+  ctx.restore();
+
+  // 2. Heavy 16px Manga Ink Outline
   ctx.strokeStyle = '#050609';
-  ctx.lineWidth = 14;
+  ctx.lineWidth = 16;
   ctx.strokeText('FIGHT!', 0, 0);
 
-  // Fiery Electric Gradient Fill
-  const fightGrad = ctx.createLinearGradient(0, -26, 0, 24);
+  // 3. Fiery Electric Gradient Fill
+  const fightGrad = ctx.createLinearGradient(0, -30, 0, 28);
   fightGrad.addColorStop(0.0, '#FFFFFF'); // white hot core
   fightGrad.addColorStop(0.24, '#FFE043'); // electric yellow
   fightGrad.addColorStop(0.65, '#FF5722'); // blazing manga orange
@@ -384,9 +302,9 @@ export function drawFightBanner(ctx, width, height) {
   ctx.fillStyle = fightGrad;
   ctx.fillText('FIGHT!', 0, 0);
 
-  // Top Specular Highlight Edge
+  // 4. Top Specular Highlight Edge
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText('FIGHT!', -1, -2);
+  ctx.fillText('FIGHT!', -1.5, -2.5);
 
   ctx.restore();
 }

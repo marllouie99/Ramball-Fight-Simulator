@@ -1974,8 +1974,11 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
  */
 function _drawProceduralSonicBoomFallback(ctx, sb, p, scale) {
   const range = sb.range || 350;
+  const BASELINE_RANGE = 350;
+  // Soft-cap visual size at 1.5× baseline to match sprite renderer
+  const visualRange = Math.min(range, BASELINE_RANGE * 1.5);
   const numRings = 5;
-  const leadDist = range * Math.min(1.0, p * 1.3);
+  const leadDist = visualRange * Math.min(1.0, p * 1.3);
   const P = 2.0;
 
   for (let i = 0; i < numRings; i++) {
@@ -2013,10 +2016,19 @@ export function drawMahoragaSonicBoom(ctx, sb) {
   if (p >= 1.0) return;
 
   const frames = _getMahoragaSonicBoomFrames();
+  const range = sb.range || 350;
+  const BASELINE_RANGE = 350;
+
   // 1. Non-linear power ease for explosive expansion and smooth deceleration
   const pEase = 1.0 - Math.pow(1.0 - p, 1.5);
-  // 2. Physical forward momentum: the supersonic shockwave rolls forward naturally
-  const creepX = pEase * 42.0;
+
+  // 2. Physical forward momentum: the shockwave TRAVELS forward proportional to range.
+  //    At baseline (350), creep is ~42px. Extra range beyond baseline adds forward travel
+  //    so the cone rolls out to cover the full damage reach without stretching the sprite.
+  const baseCreep = 42.0;
+  const extraCreep = Math.max(0, range - BASELINE_RANGE) * 0.65;
+  const creepX = pEase * (baseCreep + extraCreep);
+
   // 3. Smooth frame interpolation between consecutive frames
   const rawFrame = pEase * 11.0;
   const f1 = Math.min(11, Math.floor(rawFrame));
@@ -2042,9 +2054,10 @@ export function drawMahoragaSonicBoom(ctx, sb) {
   ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * fadeAlpha));
 
   // The 256x256 sprite has its apex at (24, 128) and reaches to ~240 (span ~216px).
-  // Target cone reach in arena is sb.range (default 350px).
-  const range = sb.range || 350;
-  const scale = range / 216.0;
+  // UNIFORM scaling: sprite stays proportional. Allow mild upscale for larger ranges
+  // (soft cap at ~1.5× baseline) so the cone is slightly bigger but not distorted.
+  const visualScale = Math.min(range, BASELINE_RANGE * 1.5) / 216.0;
+  const scale = visualScale;
   const originX = 24.0 * scale;
   const originY = 128.0 * scale;
   const drawW = 256.0 * scale;

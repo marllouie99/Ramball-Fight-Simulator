@@ -104,6 +104,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   let finalAmount = amount;
   const currentStage = fighter.goldAdaptationStage?.[type] || 0;
   const adaptedMult = CONFIG.mahoraga?.adaptedDamageMultiplier ?? 0.25;
+  let isAdaptedAbility = false;
 
   // ── Getsuga Tensho 2-Exposure Adaptation Tracking & 25% Damage Taken (75% Reduction) ──
   const isGetsugaHit = opts.isGetsuga || (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho' || opts.projectile.skillShotId === 'getsugaTensho'));
@@ -113,7 +114,8 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
 
   if (isGetsugaHit) {
     if (isGetsugaAdapted) {
-      finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Getsuga Tensho!
+      finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Getsuga Tensho!
+      isAdaptedAbility = true;
     } else {
       // Track distinct Getsuga wave projectile exposures
       const projId = opts.projectile ? (opts.projectile.getsugaReleaseId || opts.projectile.id || opts.projectile) : (attacker ? (attacker.getsugaReleaseCount || 1) : 1);
@@ -142,7 +144,8 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
                                (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF1144')));
 
   if (isRedHit && isRedAdapted) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Red!
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Red!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Hollow Purple ──
@@ -160,16 +163,45 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
                           ((fighter.adaptationStage?.skill || 0) >= 2);
 
   if (isPurpleHit && isPurpleAdapted) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Purple!
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Purple!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Yuta's Pure Love Beam ──
-  const isPureLoveBeamHit = opts.isPureLoveBeam || (opts.projectile && opts.projectile.isPureLoveBeam);
+  const isPureLoveBeamHit = opts.isPureLoveBeam || opts.isLoveBeam || (opts.projectile && opts.projectile.isPureLoveBeam);
   const isPureLoveBeamAdapted = fighter.adaptedPureLoveBeam || 
+                                (fighter.adaptedSkills && fighter.adaptedSkills['pureLoveBeam']) ||
                                 (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF1493'));
 
   if (isPureLoveBeamHit && isPureLoveBeamAdapted) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Pure Love Beam!
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Pure Love Beam!
+    isAdaptedAbility = true;
+  }
+
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Thin Ice Breaker ──
+  const isThinIceHit = Boolean(opts.isThinIceBreaker || opts.isThinIce);
+  const isThinIceAdapted = Boolean(
+    fighter.adaptedThinIceBreaker || 
+    (fighter.adaptedSkills && fighter.adaptedSkills['thinIceBreaker']) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#00FFFF'))
+  );
+
+  if (isThinIceHit && isThinIceAdapted) {
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Thin Ice Breaker!
+    isAdaptedAbility = true;
+  }
+
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Yuta's Flurry ──
+  const isYutaFlurryHit = Boolean(opts.isYutaFlurry);
+  const isYutaFlurryAdapted = Boolean(
+    fighter.adaptedYutaFlurry || 
+    (fighter.adaptedSkills && fighter.adaptedSkills['yutaFlurry']) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FFD700'))
+  );
+
+  if (isYutaFlurryHit && isYutaFlurryAdapted) {
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Yuta's Flurry!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Genos's Spiral Incineration Cannon Beam ──
@@ -181,7 +213,8 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   );
 
   if (isGenosBeamHit && isGenosBeamAdapted) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Genos's Beam!
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Genos's Beam!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Genos's Machine Gun Blows ──
@@ -194,18 +227,27 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   );
 
   if (isGenosFlurryHit && isGenosFlurryAdapted) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Genos's Machine Gun Blows!
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Genos's Machine Gun Blows!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Soul Disfigurement ──
-  if (opts.isSoulDisfigurement && fighter.adaptedSoulDisfigurement) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Soul Disfigurement!
+  const isSoulDisfigurementHit = Boolean(opts.isSoulDisfigurement || opts.isIdleTransfiguration);
+  const isSoulDisfigurementAdapted = Boolean(
+    fighter.adaptedSoulDisfigurement || 
+    (fighter.adaptedSkills && fighter.adaptedSkills['soulDisfigurement']) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#C026D3'))
+  );
+  if (isSoulDisfigurementHit && isSoulDisfigurementAdapted) {
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Soul Disfigurement!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Saitama's Serious Counter ──
   const isSaitamaCounterHit = opts.isSaitamaCounter || (opts.isCounter && attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama'));
-  if (isSaitamaCounterHit && fighter.adaptedSaitamaCounter) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Saitama's Serious Counter!
+  if (isSaitamaCounterHit && (fighter.adaptedSaitamaCounter || (fighter.adaptedSkills && fighter.adaptedSkills['saitamaCounter']))) {
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Saitama's Serious Counter!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Lawnmower ──
@@ -215,7 +257,8 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#DC2626'))
   );
   if (isLawnmowerHit && isLawnmowerAdapted) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Lawnmower crush!
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Lawnmower crush!
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) when Adapted to Sukuna's Divine Flame (Fuga) ──
@@ -226,24 +269,40 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF6F00'))
   );
   if (isFugaHit && isFugaAdapted) {
-    finalAmount *= adaptedMult; // 25% damage taken (75% reduction) when adapted to Fuga!
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Fuga!
+    isAdaptedAbility = true;
+  }
+
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Sukuna's Cleave / Dismantle ──
+  const isSukunaSlashHit = Boolean((opts.isCleave || opts.isDismantle) && attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna'));
+  const isSukunaSlashAdapted = Boolean(
+    (fighter.sukunaAdapted && (fighter.sukunaAdapted.cleave || fighter.sukunaAdapted.dismantle || fighter.sukunaAdapted.slashes)) ||
+    (fighter.adaptedSkills && (fighter.adaptedSkills['cleave'] || fighter.adaptedSkills['dismantle']))
+  );
+  if (isSukunaSlashHit && isSukunaSlashAdapted) {
+    finalAmount = amount * adaptedMult;
+    isAdaptedAbility = true;
   }
 
   // ── 25% Damage Taken (75% Reduction) for any General Adapted Skill Shot ──
   const currentSkillShotId = opts.skillShotId || (opts.projectile && opts.projectile.skillShotId);
   if (currentSkillShotId && fighter.adaptedSkills && fighter.adaptedSkills[currentSkillShotId]) {
-    if (!isRedHit && !isPurpleHit && !isPureLoveBeamHit && !isGenosBeamHit && !isGenosFlurryHit && !isFugaHit && !isLawnmowerHit && !opts.isSoulDisfigurement && !isSaitamaCounterHit && !isGetsugaHit) {
-      finalAmount *= adaptedMult;
+    if (!isAdaptedAbility) {
+      finalAmount = amount * adaptedMult;
+      isAdaptedAbility = true;
     }
   }
 
   // ── General Defense Buff per Wheel Click ──
   // Each wheel click (adaptation stage) increases defense by defBuffPerClickPercent (reduces incoming damage), capped at maxDefBuffPercent.
-  const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent ?? 0.01;
-  const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent ?? 0.50;
-  const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
-  const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
-  finalAmount *= (1.0 - defReduction);
+  // Only applies to unadapted attacks so adapted abilities cleanly take strictly 25% damage without double-dipping reductions.
+  if (!isAdaptedAbility) {
+    const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent ?? 0.01;
+    const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent ?? 0.50;
+    const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
+    const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
+    finalAmount *= (1.0 - defReduction);
+  }
 
   // Guarantee that damaging hits deal at least 1 damage (never rounds down to 0)
   if (amount > 0) {

@@ -301,8 +301,8 @@ function drawFighterCard(ctx, cx, cy, cardW, cardH, def, facingAngle, scaleFacto
  * Draws the high-impact cyber-manga "VS" badge with metallic duel plate and punch-scale slam.
  */
 function drawVsBadge(ctx, cx, cy, timer, scaleFactor, exitP, p1Color, p2Color) {
-  if (timer < 21) return;
-  const t = timer - 21;
+  if (timer < 44) return;
+  const t = timer - 44;
   const vsScale = getVsScale(t);
   if (vsScale <= 0) return;
 
@@ -400,8 +400,8 @@ function drawVsBadge(ctx, cx, cy, timer, scaleFactor, exitP, p1Color, p2Color) {
  * Draws the tactical manga "WHO WINS?" challenger banner with scale punch-bloom.
  */
 function drawWhoWinsBadge(ctx, cx, cy, timer, scaleFactor, exitP, p1Color, p2Color) {
-  if (timer < 21) return;
-  const t = timer - 21;
+  if (timer < 44) return;
+  const t = timer - 44;
   const wwScale = getWhoWinsScale(t);
   if (wwScale <= 0) return;
 
@@ -415,82 +415,31 @@ function drawWhoWinsBadge(ctx, cx, cy, timer, scaleFactor, exitP, p1Color, p2Col
   const totalScale = wwScale * scaleFactor * exitScale;
   ctx.scale(totalScale, totalScale);
 
-  const bannerW = 240;
-  const bannerH = 36;
-  const ch = 7;
-
-  // 1. Drop shadow
-  ctx.save();
-  ctx.translate(2.5, 3.5);
-  _drawChamferedRectPath(ctx, -bannerW / 2, -bannerH / 2, bannerW, bannerH, ch);
-  ctx.fillStyle = '#050609';
-  ctx.fill();
-  ctx.restore();
-
-  // 2. Banner Body
-  _drawChamferedRectPath(ctx, -bannerW / 2, -bannerH / 2, bannerW, bannerH, ch);
-  ctx.fillStyle = '#080A12';
-  ctx.fill();
-
-  // 3. Manga Outer Border
-  ctx.strokeStyle = '#050609';
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
-
-  // 4. Inner White Highlight Rim
-  _drawChamferedRectPath(ctx, -bannerW / 2 + 2, -bannerH / 2 + 2, bannerW - 4, bannerH - 4, ch - 1);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // 5. Side Tactical Accent Pips (Diamond Chevrons)
-  const pipOffset = bannerW / 2 - 14;
-  // Left Pip (P1)
-  ctx.save();
-  ctx.translate(-pipOffset, 0);
-  ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = p1Color || '#38BDF8';
-  ctx.fillRect(-3, -3, 6, 6);
-  ctx.restore();
-
-  // Right Pip (P2)
-  ctx.save();
-  ctx.translate(pipOffset, 0);
-  ctx.rotate(Math.PI / 4);
-  ctx.fillStyle = p2Color || '#F43F5E';
-  ctx.fillRect(-3, -3, 6, 6);
-  ctx.restore();
-
-  // 6. Bottom Dual-Color Accent Line
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(-bannerW / 2 + ch, bannerH / 2 - 3, bannerW - ch * 2, 2.5);
-  ctx.clip();
-  // Left half
-  ctx.fillStyle = p1Color || '#38BDF8';
-  ctx.fillRect(-bannerW / 2, bannerH / 2 - 3, bannerW / 2, 2.5);
-  // Right half
-  ctx.fillStyle = p2Color || '#F43F5E';
-  ctx.fillRect(0, bannerH / 2 - 3, bannerW / 2, 2.5);
-  // Center white tick
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(-2, bannerH / 2 - 3, 4, 2.5);
-  ctx.restore();
-
-  // 7. "WHO WINS?" Typography
-  ctx.font = '900 italic 20px "Outfit", "Rajdhani", sans-serif';
+  // "WHO WINS?" Typography (Text Only)
+  ctx.font = '900 italic 26px "Outfit", "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
 
-  // Solid dark manga outline
-  ctx.strokeStyle = '#050609';
-  ctx.lineWidth = 6;
-  ctx.strokeText('WHO WINS?', 0, -0.5);
+  // 1. Drop shadow for comic pop (Rule 11 compliant)
+  ctx.save();
+  ctx.translate(2.5, 3.5);
+  ctx.fillStyle = '#050609';
+  ctx.fillText('WHO WINS?', 0, 0);
+  ctx.restore();
 
-  // Pure white fill
+  // 2. Solid dark manga outline
+  ctx.strokeStyle = '#050609';
+  ctx.lineWidth = 7;
+  ctx.strokeText('WHO WINS?', 0, 0);
+
+  // 3. Pure white fill
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillText('WHO WINS?', 0, -0.5);
+  ctx.fillText('WHO WINS?', 0, 0);
+
+  // 4. Top highlight
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.fillText('WHO WINS?', -0.5, -1);
 
   ctx.restore();
 }
@@ -502,18 +451,27 @@ function draw1v1CountdownLayout(ctx, width, height, timer, p1Def, p2Def, maxFram
   const p1Color = getFaceOffThemeColor(p1Def, '#38BDF8');
   const p2Color = getFaceOffThemeColor(p2Def, '#F43F5E');
 
-  // Entrance & Exit Interpolation
-  const entryProg = Math.min(1.0, timer / 20);
-  const easeEntry = easeOutBack(entryProg);
-  const entryOffset = (1 - easeEntry) * 400 * scaleFactor;
+  // Sequential 1-by-1 Entrance & Exit Interpolation
+  const slideDist = Math.max(width, 500) * scaleFactor;
 
+  // Phase 1: Player 1 (Upper-Left Slab) enters frames 0..20
+  const p1Prog = Math.max(0, Math.min(1.0, timer / 20));
+  const easeP1 = easeOutBack(p1Prog);
+  const p1EntryOffset = (1 - easeP1) * slideDist;
+
+  // Phase 2: Player 2 (Lower-Right Slab) enters frames 22..42
+  const p2Prog = Math.max(0, Math.min(1.0, (timer - 22) / 20));
+  const easeP2 = easeOutBack(p2Prog);
+  const p2EntryOffset = (1 - easeP2) * slideDist;
+
+  // Phase 4: Slabs exit slide-out
   const exitStart = Math.max(48, maxFrames - 16);
   const exitProg = (timer >= exitStart) ? Math.min(1.0, (timer - exitStart) / 16) : 0;
   const easeExit = Math.pow(exitProg, 2.2);
   const exitOffset = easeExit * 420 * scaleFactor;
 
-  const leftOffX = -entryOffset - exitOffset;
-  const rightOffX = entryOffset + exitOffset;
+  const leftOffX = -p1EntryOffset - exitOffset;
+  const rightOffX = p2EntryOffset + exitOffset;
 
   const centerX = width / 2;
   const centerY = height * 0.485;
@@ -646,17 +604,27 @@ function draw1v2CountdownLayout(ctx, width, height, timer, p1Def, p2Def, p3Def, 
   const p1Color = getFaceOffThemeColor(p1Def, '#38BDF8');
   const p2Color = getFaceOffThemeColor(p2Def, '#F43F5E');
 
-  const entryProg = Math.min(1.0, timer / 20);
-  const easeEntry = easeOutBack(entryProg);
-  const entryOffset = (1 - easeEntry) * 400 * scaleFactor;
+  // Sequential 1-by-1 Entrance & Exit Interpolation
+  const slideDist = Math.max(width, 500) * scaleFactor;
 
+  // Phase 1: Player 1 (Upper-Left Slab) enters frames 0..20
+  const p1Prog = Math.max(0, Math.min(1.0, timer / 20));
+  const easeP1 = easeOutBack(p1Prog);
+  const p1EntryOffset = (1 - easeP1) * slideDist;
+
+  // Phase 2: Enemy Team Slab (Player 2 + Player 3) enters frames 22..42
+  const p2Prog = Math.max(0, Math.min(1.0, (timer - 22) / 20));
+  const easeP2 = easeOutBack(p2Prog);
+  const p2EntryOffset = (1 - easeP2) * slideDist;
+
+  // Phase 4: Slabs exit slide-out
   const exitStart = Math.max(48, maxFrames - 16);
   const exitProg = (timer >= exitStart) ? Math.min(1.0, (timer - exitStart) / 16) : 0;
   const easeExit = Math.pow(exitProg, 2.2);
   const exitOffset = easeExit * 420 * scaleFactor;
 
-  const leftOffX = -entryOffset - exitOffset;
-  const rightOffX = entryOffset + exitOffset;
+  const leftOffX = -p1EntryOffset - exitOffset;
+  const rightOffX = p2EntryOffset + exitOffset;
 
   const centerX = width / 2;
   const centerY = height * 0.485;
@@ -768,7 +736,7 @@ function draw1v2CountdownLayout(ctx, width, height, timer, p1Def, p2Def, p3Def, 
 export function drawCountdownIntro(ctx, width, height) {
   if (typeof state === 'undefined' || !state) return;
   const timer = state.countdownTimer || 0;
-  const maxFrames = state.requiredCountdownFrames || 70;
+  const maxFrames = state.requiredCountdownFrames || 95;
 
   _clearButtons();
   // Click-to-Skip: Register full screen click area to skip straight to fight exit
