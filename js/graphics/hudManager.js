@@ -320,6 +320,7 @@ let _cachedBottomRight = null;
 
 
 export function drawHUD() {
+  _isHudAlreadyCleared = false;
   const { ctx, canvas, fighters, scores, roundNum, mode, gameState, matchEndTimer, roundEndTimer, roundWinner, ffaMatchComplete } = state;
 
 
@@ -1395,8 +1396,15 @@ function _getDimElements() {
   return _cachedDimEls;
 }
 
-export function clearHealthHud() {
+let _isHudAlreadyCleared = false;
+export function markHudDirty() {
+  _isHudAlreadyCleared = false;
+}
+
+export function clearHealthHud(force = false) {
   state.clearHealthHud = clearHealthHud;
+  if (_isHudAlreadyCleared && !force) return;
+  _isHudAlreadyCleared = true;
   _hudCache.teams.clear();
   _hudCache.fighters.clear();
   _tacticalCards.top = [];

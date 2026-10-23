@@ -77,7 +77,7 @@ export const ashConfig = {
       themeColor: '#FACC15',
       secondaryColor: '#FEF08A',
       hp: 155,
-      radius: 20,
+      radius: 25,
       speed: 5.4,
       scale: 1.45,
       meleeDamage: 18,

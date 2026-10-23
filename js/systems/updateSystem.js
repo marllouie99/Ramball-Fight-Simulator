@@ -269,8 +269,9 @@ export function updateGame() {
       }
     }
 
-    // Update death effects (always update, even between rounds)
-    updateDeathEffects();
+    // Update death effects (only update when active match/screen is running)
+    if (state.gameState !== 'title') {
+      updateDeathEffects();
     updateDoppelgangerDeathEffects();
     updateIllusionDeathEffects();
     updateIllusionSpawnEffects();
@@ -283,6 +284,7 @@ export function updateGame() {
     updateBlackFlashEffects();
     // Update lightning effects for Zeus storm strikes
     updateLightningEffects();
+    }
     // Update burn effects (always update, even between rounds)
     const dtGlobal = Math.min(FRAME_TIME / 1000, 0.1);
     if (state.gameState !== 'title' && state.gameState !== 'select' && state.gameState !== 'index' && state.gameState !== 'leaderboard') {
@@ -294,7 +296,9 @@ export function updateGame() {
         }
       });
     }
-    burnEffectSystem.update(dtGlobal);
+    if (state.gameState !== 'title') {
+      burnEffectSystem.update(dtGlobal);
+    }
     // Update active FOC map physics (bush sway, rustle, leaf particles) strictly during battle
     const isBattleActive = Boolean(
       state.gameState === 'playing' ||

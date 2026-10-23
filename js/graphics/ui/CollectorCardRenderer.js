@@ -2106,6 +2106,24 @@ export function getGradeCardBackground(grade = 'B') {
  * Grade-driven background gradient, scanline grid, dynamic radial burst,
  * floor shadow, and the crisp 16-bit character sprite.
  */
+const _scanlinePatternCache = new Map();
+function _getScanlinePattern(ctx, color) {
+  let pat = _scanlinePatternCache.get(color);
+  if (!pat && typeof document !== 'undefined') {
+    const pc = document.createElement('canvas');
+    pc.width = 4;
+    pc.height = 4;
+    const pctx = pc.getContext('2d');
+    if (pctx) {
+      pctx.fillStyle = color;
+      pctx.fillRect(0, 0, 4, 1);
+      pat = ctx.createPattern(pc, 'repeat');
+      if (pat) _scanlinePatternCache.set(color, pat);
+    }
+  }
+  return pat;
+}
+
 function _drawPokemonCardStage(ctx, x, y, w, h, charCx, charCy, def, idx, element, grade, t) {
   const gradeBg = getGradeCardBackground(grade);
 
@@ -2117,10 +2135,11 @@ function _drawPokemonCardStage(ctx, x, y, w, h, charCx, charCy, def, idx, elemen
   ctx.fillStyle = stageGrad;
   ctx.fillRect(x, y, w, h);
 
-  // 2. Subtle 16-Bit Retro Scanline Texture (Tinted with Grade Palette)
-  ctx.fillStyle = gradeBg.scanline;
-  for (let gy = y + 4; gy < y + h - 4; gy += 4) {
-    ctx.fillRect(x + 4, gy, w - 8, 1);
+  // 2. Subtle 16-Bit Retro Scanline Texture (Tinted with Grade Palette, Cached Pattern)
+  const scanPat = _getScanlinePattern(ctx, gradeBg.scanline);
+  if (scanPat) {
+    ctx.fillStyle = scanPat;
+    ctx.fillRect(x + 4, y + 4, w - 8, h - 8);
   }
 
   // 3. Central Grade Radiant Burst behind Sprite

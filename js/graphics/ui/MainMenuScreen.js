@@ -72,18 +72,26 @@ export function drawPreloadProgressBar(ctx, canvas) {
   ctx.restore();
 }
 
+let _cachedTitleGradient = null;
+let _cachedGradW = 0;
+let _cachedGradH = 0;
+
 function drawTitleScreen() {
   const { ctx, canvas } = state;
   _clearButtons();
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Black and white cinematic background
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, '#060709');
-  gradient.addColorStop(0.5, '#151820');
-  gradient.addColorStop(1, '#08090c');
-  ctx.fillStyle = gradient;
+  // Black and white cinematic background (cached)
+  if (!_cachedTitleGradient || _cachedGradW !== canvas.width || _cachedGradH !== canvas.height) {
+    _cachedGradW = canvas.width;
+    _cachedGradH = canvas.height;
+    _cachedTitleGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    _cachedTitleGradient.addColorStop(0, '#060709');
+    _cachedTitleGradient.addColorStop(0.5, '#151820');
+    _cachedTitleGradient.addColorStop(1, '#08090c');
+  }
+  ctx.fillStyle = _cachedTitleGradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Animated background particles

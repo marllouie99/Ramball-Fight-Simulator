@@ -720,6 +720,10 @@ if (todoBgmBtn) {
 }
 
 state.performanceMode = localStorage.getItem('performanceMode') === 'true';
+const engineBtn = document.getElementById('btn-render-engine');
+if (engineBtn) {
+  engineBtn.innerText = (state.rendererMode === 'webgl') ? 'WEBGL HYBRID' : 'CANVAS 2D (5% CPU)';
+}
 const perfBtn = document.getElementById('btn-performance');
 if (perfBtn) {
   perfBtn.innerText = state.performanceMode ? 'ON' : 'OFF';
@@ -1208,6 +1212,13 @@ export function executeTacticalAction(action) {
     localStorage.setItem('disableDimEffects', state.disableDimEffects);
     const btn = document.getElementById('btn-dimeffects');
     if (btn) btn.innerText = state.disableDimEffects ? 'OFF' : 'ON';
+  } else if (action === 'toggle-render-engine') {
+    const cur = (typeof localStorage !== 'undefined') ? localStorage.getItem('ramball_renderer_engine') : null;
+    const next = (cur === 'webgl') ? 'canvas2d' : 'webgl';
+    localStorage.setItem('ramball_renderer_engine', next);
+    const btn = document.getElementById('btn-render-engine');
+    if (btn) btn.innerText = (next === 'webgl') ? 'WEBGL HYBRID' : 'CANVAS 2D (5% CPU)';
+    setTimeout(() => location.reload(), 200);
   } else if (action === 'toggle-perf') {
     state.performanceMode = !state.performanceMode;
     localStorage.setItem('performanceMode', state.performanceMode);
@@ -1397,6 +1408,15 @@ document.getElementById('btn-dimeffects')?.addEventListener('click', (e) => {
   state.disableDimEffects = !state.disableDimEffects;
   localStorage.setItem('disableDimEffects', state.disableDimEffects);
   e.target.innerText = state.disableDimEffects ? 'OFF' : 'ON';
+});
+
+document.getElementById('btn-render-engine')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const cur = (typeof localStorage !== 'undefined') ? localStorage.getItem('ramball_renderer_engine') : null;
+  const next = (cur === 'webgl') ? 'canvas2d' : 'webgl';
+  localStorage.setItem('ramball_renderer_engine', next);
+  e.target.innerText = (next === 'webgl') ? 'WEBGL HYBRID' : 'CANVAS 2D (5% CPU)';
+  setTimeout(() => location.reload(), 200);
 });
 
 document.getElementById('btn-performance')?.addEventListener('click', (e) => {

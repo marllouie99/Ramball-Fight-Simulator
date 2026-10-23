@@ -32,15 +32,30 @@ export function animate(timestamp) {
     return;
   }
 
-  // Strict 60 FPS frame rate lock for high-Hz displays (120Hz/144Hz/240Hz)
-  // Ensures low CPU/GPU temperature, consistent battery life, and rock-solid 60 FPS simulation
+  // Dynamic frame pacing: 30 FPS for all non-combat menus (title, battle mode select, index, studios) saves 50%+ CPU;
+  // strict 60 FPS for active combat simulation and gameplay (playing, countdown, paused, roundEnd, matchEnd).
+  const isMenuState = [
+    'title',
+    'select',
+    'horizontal_select',
+    'index',
+    'indexDetail',
+    'leaderboard',
+    'weapons',
+    'weaponDetail',
+    'weaponStudio',
+    'skinStudio',
+    'survivorStudio'
+  ].includes(state.gameState);
+  const targetFrameTime = isMenuState ? (1000 / 30) : FRAME_TIME;
+
   if (!lastFrameTime) lastFrameTime = timestamp;
   const elapsed = timestamp - lastFrameTime;
-  if (elapsed < FRAME_TIME - 1.0) {
+  if (elapsed < targetFrameTime - 1.0) {
     requestAnimationFrame(animate);
     return;
   }
-  lastFrameTime = timestamp - (elapsed % FRAME_TIME);
+  lastFrameTime = timestamp - (elapsed % targetFrameTime);
 
   try {
     // FPS calculation
@@ -50,6 +65,11 @@ export function animate(timestamp) {
       state.fps = state.fpsFrames;
       state.fpsFrames = 0;
       state.fpsLastTime = timestamp;
+      if (state._frameDurationCount > 0) {
+        state.cpuFrameMs = (state._frameDurationSum / state._frameDurationCount).toFixed(1);
+        state._frameDurationSum = 0;
+        state._frameDurationCount = 0;
+      }
 
       // Adaptive particle and LOD quality: 100% on desktop, 45% on mobile (eliminates mobile CPU/GPU thermal choke)
       state.qualityLevel = state.performanceMode ? 0.2 : (isMobile ? 0.45 : 1.0);
@@ -176,8 +196,12 @@ export function animate(timestamp) {
     state.frameAudioTime = getAudioCurrentTime();
 
     // The abstracted core updates and renders in clean 60 FPS lockstep!
+    const _t0 = performance.now();
     updateGame();
     renderGame();
+    const _frameCost = performance.now() - _t0;
+    state._frameDurationSum = (state._frameDurationSum || 0) + _frameCost;
+    state._frameDurationCount = (state._frameDurationCount || 0) + 1;
 
     // Sync HTML UI Screens
     if (state.lastGameState !== state.gameState) {

@@ -493,7 +493,8 @@ export function renderGame() {
         state.ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(0, 0, 0, 0.85)'; // Light FPS text in dark mode, dark in light mode
         const audioLat = getAudioLatencyMs();
         const audioLatStr = audioLat > 0 ? ` | Lat: ${audioLat}ms` : '';
-        state.ctx.fillText(`FPS: ${state.fps}${audioLatStr}`, 10, 20);
+        const cpuStr = state.cpuFrameMs ? ` | CPU: ${state.cpuFrameMs}ms` : '';
+        state.ctx.fillText(`FPS: ${state.fps}${cpuStr}${audioLatStr}`, 10, 20);
 
         // Draw FPS Drop Causes as a log list
         if (state.fpsLogs && state.fpsLogs.length > 0) {
@@ -528,7 +529,7 @@ export function renderGame() {
       }
 
       // In native Canvas 2D mode, composite floating text canvas onto main canvas in identity space
-      if (!state.pixiApp && state.floatingTextCanvas) {
+      if (!state.pixiApp && state.floatingTextCanvas && state.floatingTexts && state.floatingTexts.length > 0) {
         state.ctx.drawImage(state.floatingTextCanvas, 0, 0);
       }
 
@@ -678,5 +679,10 @@ export function renderGame() {
           state.topLevelUiSprite.texture.update();
         }
       }
+    }
+
+    // Explicit single WebGL render per 60 FPS game tick
+    if (state.pixiApp && typeof state.pixiApp.render === 'function') {
+      state.pixiApp.render();
     }
 }

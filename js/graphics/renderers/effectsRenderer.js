@@ -207,7 +207,6 @@ export function drawFloatingTexts() {
       state._floatingTextCanvasDirty = false;
       if (state.floatingTextSprite && state.floatingTextSprite.texture) {
         state.floatingTextSprite.visible = false;
-        state.floatingTextSprite.texture.update();
       }
     }
     return;

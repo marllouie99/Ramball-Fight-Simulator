@@ -1729,6 +1729,22 @@ function drawHeroicFighterCard(slotProp, title, x, y, w, h, isP1, enabled, isMir
   return drawTcgFighterSlotCard(slotProp, title, x, y, w, h, isP1, enabled, isMirrored, customSlotTag, customSlotLetter);
 }
 
+let _cachedDotGridPattern = null;
+function _getDotGridPattern(ctx) {
+  if (_cachedDotGridPattern) return _cachedDotGridPattern;
+  if (typeof document === 'undefined') return null;
+  const pCanvas = document.createElement('canvas');
+  pCanvas.width = 18;
+  pCanvas.height = 18;
+  const pCtx = pCanvas.getContext('2d');
+  if (pCtx) {
+    pCtx.fillStyle = 'rgba(245, 166, 35, 0.035)';
+    pCtx.fillRect(8, 8, 2, 2);
+    _cachedDotGridPattern = ctx.createPattern(pCanvas, 'repeat');
+  }
+  return _cachedDotGridPattern;
+}
+
 function drawSelectScreen() {
   const { ctx, canvas, mode } = state;
   _clearButtons();
@@ -1740,13 +1756,11 @@ function drawSelectScreen() {
   ctx.fillStyle = '#181A22';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Subtle Dot Grid
-  ctx.fillStyle = 'rgba(245, 166, 35, 0.035)';
-  const dotStep = 18;
-  for (let y = 8; y < canvas.height; y += dotStep) {
-    for (let x = 8; x < canvas.width; x += dotStep) {
-      ctx.fillRect(x - 1, y - 1, 2, 2);
-    }
+  // Subtle Dot Grid (Cached Pattern)
+  const dotPattern = _getDotGridPattern(ctx);
+  if (dotPattern) {
+    ctx.fillStyle = dotPattern;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
   // Outer Screen Tech Corner Brackets
