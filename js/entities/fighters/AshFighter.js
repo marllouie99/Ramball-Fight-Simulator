@@ -32,12 +32,7 @@ function _getAshCfg() {
 }
 
 function _playAshSound(key) {
-  const cfg = _getAshCfg();
-  const src = cfg.sounds?.[key] ?? ashConfig.sounds?.[key];
-  const vol = cfg.soundVolumes?.[key] ?? ashConfig.soundVolumes?.[key] ?? 0.85;
-  if (src && typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
-    audioSystem.playSFX(src, vol);
-  }
+  // Intentionally suppressed: All Ash SFX removed per user instruction
 }
 
 // Canonical Empress Pokemon 2D Arena (audio.bytes) windup (-1.ogg) -> cast (-2.ogg) sequence table
@@ -356,15 +351,7 @@ export class AshFighter extends Fighter {
    * - Queues main cast (-2.ogg) after the exact windup frame delay
    */
   _playMoveAudioSequence(moveKey) {
-    if (!moveKey) return;
-    _playAshSound(moveKey);
-    const followup = EMPRESS_MOVE_CAST_FOLLOWUPS[moveKey];
-    if (followup && Array.isArray(this._queuedSoundEffects)) {
-      this._queuedSoundEffects.push({
-        key: followup.castKey,
-        timer: followup.delayFrames
-      });
-    }
+    // Intentionally suppressed: All Ash SFX removed per user instruction
   }
 
   /**

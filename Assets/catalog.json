@@ -2,11 +2,11 @@
   "project": "Circle Mini-Battle (Fight of Larpers 101)",
   "schemaVersion": "1.0.0",
   "summary": {
-    "totalFiles": 1576,
-    "totalSizeMB": 340.9,
+    "totalFiles": 1542,
+    "totalSizeMB": 340.56,
     "fighterCount": 44,
     "imageFiles": 957,
-    "audioFiles": 590,
+    "audioFiles": 556,
     "fontFiles": 4
   },
   "fighters": [
@@ -2542,46 +2542,6 @@
       "Assets/Sound Effects/Sprites SFX/walk-on-grass.mp3"
     ],
     "fighters": {
-      "Ash": {
-        "folder": "Assets/Sound Effects/AshSFX",
-        "count": 34,
-        "files": [
-          "Assets/Sound Effects/AshSFX/aurasphere-1.ogg",
-          "Assets/Sound Effects/AshSFX/aurasphere-2.ogg",
-          "Assets/Sound Effects/AshSFX/charge.ogg",
-          "Assets/Sound Effects/AshSFX/charizard-megax.ogg",
-          "Assets/Sound Effects/AshSFX/charizard.ogg",
-          "Assets/Sound Effects/AshSFX/closecombat.ogg",
-          "Assets/Sound Effects/AshSFX/dragonclaw.ogg",
-          "Assets/Sound Effects/AshSFX/faint.ogg",
-          "Assets/Sound Effects/AshSFX/fireblast.ogg",
-          "Assets/Sound Effects/AshSFX/flamethrower.ogg",
-          "Assets/Sound Effects/AshSFX/greninja.ogg",
-          "Assets/Sound Effects/AshSFX/hit.ogg",
-          "Assets/Sound Effects/AshSFX/hit_strong.ogg",
-          "Assets/Sound Effects/AshSFX/irontail-1.ogg",
-          "Assets/Sound Effects/AshSFX/irontail-2.ogg",
-          "Assets/Sound Effects/AshSFX/level_up_fanfare.ogg",
-          "Assets/Sound Effects/AshSFX/lucario-mega.ogg",
-          "Assets/Sound Effects/AshSFX/lucario.ogg",
-          "Assets/Sound Effects/AshSFX/nightslash-1.ogg",
-          "Assets/Sound Effects/AshSFX/nightslash-2.ogg",
-          "Assets/Sound Effects/AshSFX/pb_rel.ogg",
-          "Assets/Sound Effects/AshSFX/pb_throw.ogg",
-          "Assets/Sound Effects/AshSFX/pikachu-starter.ogg",
-          "Assets/Sound Effects/AshSFX/pikachu.ogg",
-          "Assets/Sound Effects/AshSFX/quickattack.ogg",
-          "Assets/Sound Effects/AshSFX/restore.ogg",
-          "Assets/Sound Effects/AshSFX/thunder.ogg",
-          "Assets/Sound Effects/AshSFX/thunderbolt-1.ogg",
-          "Assets/Sound Effects/AshSFX/thunderbolt-2.ogg",
-          "Assets/Sound Effects/AshSFX/thunderwave.ogg",
-          "Assets/Sound Effects/AshSFX/volttackle-1.ogg",
-          "Assets/Sound Effects/AshSFX/volttackle-2.ogg",
-          "Assets/Sound Effects/AshSFX/waterpulse-1.ogg",
-          "Assets/Sound Effects/AshSFX/waterpulse-2.ogg"
-        ]
-      },
       "Avatar": {
         "folder": "Assets/Sound Effects/Avatar",
         "count": 127,
