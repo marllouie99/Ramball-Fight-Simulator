@@ -30,12 +30,12 @@ export function _getSpartanCrestImage() {
     };
     img.onerror = () => {
       if (!img.src.includes('.jpg')) {
-        img.src = 'Assets/model/Spartan/spartan_helmet.jpg?v=1';
+        img.src = 'Assets/model/spartan/spartan_helmet.jpg?v=1';
       } else {
         _spartanCrestLoading = false;
       }
     };
-    img.src = 'Assets/model/Spartan/spartan_helmet.png?v=1';
+    img.src = 'Assets/model/spartan/spartan_helmet.png?v=1';
     _spartanCrestImage = img;
   }
   return _spartanCrestImage;
@@ -48,7 +48,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Spartan's iconic Corinthian bronze helmet and horsehair crest from Assets/model/Spartan/spartan_helmet.png.
+ * Draws Spartan's iconic Corinthian bronze helmet and horsehair crest from Assets/model/spartan/spartan_helmet.png.
  * Falls back seamlessly to procedural rasterization if image is not yet loaded or in test mocks.
  */
 export function _drawSpartanCrest(ctx, r, facingLeft = false) {

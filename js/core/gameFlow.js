@@ -35,7 +35,7 @@ import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRe
 import { resetCamera } from '../systems/cameraSystem.js';
 import { resetComboTrackers } from '../systems/comboTracker.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
-import { getFocMapForBoss } from '../../FOC Maps/index.js';
+import { getFocMapForBoss } from '../maps/index.js';
 import { setViewportOrientation, getArenaConfigForMode } from './viewportManager.js';
 import { getFfaPlusQuadrantSpawns } from '../systems/arenaObstacleSystem.js';
 

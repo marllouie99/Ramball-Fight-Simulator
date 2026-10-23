@@ -1735,7 +1735,7 @@ function getDeityCosmicLightImage() {
   }
   if (typeof Image !== 'undefined') {
     const img = new Image();
-    img.src = 'Assets/model/NamelessDeity/CosmicLightCircleCenter1.png';
+    img.src = 'Assets/model/namelessDeity/CosmicLightCircleCenter1.png';
     _deityCosmicLightImage = img;
   }
   return _deityCosmicLightImage;

@@ -29,7 +29,7 @@ export function _getGutsSwordImage() {
     img.onerror = () => {
       _gutsSwordLoading = false;
     };
-    img.src = 'Assets/model/Guts/Guts_heavy_sword.png';
+    img.src = 'Assets/model/guts/Guts_heavy_sword.png';
     _gutsSwordImage = img;
   }
   return _gutsSwordImage;
@@ -41,7 +41,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 
 /**
  * Draws the Dragon Slayer base blade model rotated around its grip hilt.
- * Specifically calibrated for Assets/model/Guts/Guts_heavy_sword.png:
+ * Specifically calibrated for Assets/model/guts/Guts_heavy_sword.png:
  * - Dimensions: 500x500
  * - Grip hilt center: (117, 374)
  * - Blade tip: (471, 28)

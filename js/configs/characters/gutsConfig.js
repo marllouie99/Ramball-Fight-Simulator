@@ -26,16 +26,16 @@ export const gutsConfig = {
   desc: 'Wielder of the monstrous 400-pound Dragon Slayer. Struggles against fate with unyielding poise, a high-explosive arm cannon, and the dwarf-forged Berserker Armor.',
 
   assets: {
-    hair: 'Assets/model/Guts/Guts-hair.png',
-    helmet: 'Assets/model/Guts/Guts_helmet.png',
-    sword: 'Assets/model/Guts/Guts_heavy_sword.png',
-    helmetJpg: 'Assets/model/Guts/Guts_helmet.jpg',
-    swordJpg: 'Assets/model/Guts/Guts_heavy_sword.jpg',
-    slashEffect: 'Assets/model/Guts/Guts_heavy_sword_slash_effect.jpg',
-    neutralCountdown: 'Assets/model/Guts/Guts_neutral_countdown.png',
-    battleStance: 'Assets/model/Guts/Guts_battle_stance.png',
-    doll: 'Assets/model/Guts/Guts_battle_stance.png',
-    dollCountdown: 'Assets/model/Guts/Guts_neutral_countdown.png',
+    hair: 'Assets/model/guts/Guts-hair.png',
+    helmet: 'Assets/model/guts/Guts_helmet.png',
+    sword: 'Assets/model/guts/Guts_heavy_sword.png',
+    helmetJpg: 'Assets/model/guts/Guts_helmet.jpg',
+    swordJpg: 'Assets/model/guts/Guts_heavy_sword.jpg',
+    slashEffect: 'Assets/model/guts/Guts_heavy_sword_slash_effect.jpg',
+    neutralCountdown: 'Assets/model/guts/Guts_neutral_countdown.png',
+    battleStance: 'Assets/model/guts/Guts_battle_stance.png',
+    doll: 'Assets/model/guts/Guts_battle_stance.png',
+    dollCountdown: 'Assets/model/guts/Guts_neutral_countdown.png',
   },
 
   // ──────────────────────────────────────────

@@ -2094,7 +2094,7 @@ function _getLightDaggerCanvas() {
   if (_cachedLightDaggerCanvas) return _cachedLightDaggerCanvas;
   if (!_rawLightDaggerImg && typeof Image !== 'undefined') {
     const img = new Image();
-    img.src = 'Assets/model/NamelessDeity/LightDagger.png';
+    img.src = 'Assets/model/namelessDeity/LightDagger.png';
     img.onload = () => { _cachedLightDaggerCanvas = _processTransparentCanvas(img, false); };
     _rawLightDaggerImg = img;
   }
@@ -2108,7 +2108,7 @@ function _getLightDaggerAfterimageCanvas() {
   if (_cachedLightDaggerAfterimageCanvas) return _cachedLightDaggerAfterimageCanvas;
   if (!_rawLightDaggerAfterimageImg && typeof Image !== 'undefined') {
     const img = new Image();
-    img.src = 'Assets/model/NamelessDeity/LightDaggerAfterimage.png';
+    img.src = 'Assets/model/namelessDeity/LightDaggerAfterimage.png';
     img.onload = () => { _cachedLightDaggerAfterimageCanvas = _processTransparentCanvas(img, true); };
     _rawLightDaggerAfterimageImg = img;
   }
@@ -2122,7 +2122,7 @@ function _getLightDaggerBloomCanvas() {
   if (_cachedLightDaggerBloomCanvas) return _cachedLightDaggerBloomCanvas;
   if (!_rawLightDaggerBloomImg && typeof Image !== 'undefined') {
     const img = new Image();
-    img.src = 'Assets/model/NamelessDeity/LightDaggerBloom.png';
+    img.src = 'Assets/model/namelessDeity/LightDaggerBloom.png';
     img.onload = () => { _cachedLightDaggerBloomCanvas = _processTransparentCanvas(img, true); };
     _rawLightDaggerBloomImg = img;
   }
@@ -2136,7 +2136,7 @@ function _getLightDaggerGlowmaskCanvas() {
   if (_cachedLightDaggerGlowmaskCanvas) return _cachedLightDaggerGlowmaskCanvas;
   if (!_rawLightDaggerGlowmaskImg && typeof Image !== 'undefined') {
     const img = new Image();
-    img.src = 'Assets/model/NamelessDeity/LightDaggerGlowmask.png';
+    img.src = 'Assets/model/namelessDeity/LightDaggerGlowmask.png';
     img.onload = () => { _cachedLightDaggerGlowmaskCanvas = _processTransparentCanvas(img, true); };
     _rawLightDaggerGlowmaskImg = img;
   }
@@ -2150,7 +2150,7 @@ function _getStarburstCanvas() {
   if (_cachedStarburstCanvas) return _cachedStarburstCanvas;
   if (!_rawStarburstImg && typeof Image !== 'undefined') {
     const img = new Image();
-    img.src = 'Assets/model/NamelessDeity/Starburst.png';
+    img.src = 'Assets/model/namelessDeity/Starburst.png';
     img.onload = () => { _cachedStarburstCanvas = _processTransparentCanvas(img, true); };
     _rawStarburstImg = img;
   }

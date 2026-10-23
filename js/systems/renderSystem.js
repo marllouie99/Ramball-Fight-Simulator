@@ -42,7 +42,7 @@ import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.
 import { getAudioLatencyMs } from './soundSystem.js';
 import { syncPixiCanvasTextureSize } from '../core/viewportManager.js';
 import { BossAuraRenderer, BossPhaseTransitionVfx, BossEntranceSequence, YutaBushEntrance, EyeOfCthulhuEntrance } from '../bosses/index.js';
-import { drawFocMap, getActiveFocMap } from '../../FOC Maps/index.js';
+import { drawFocMap, getActiveFocMap } from '../maps/index.js';
 // Cached DOM elements to adhere strictly to Rule 13 (UI & DOM Query Caching Requirement)
 let _cachedHudTop = null;
 let _cachedHudBot = null;

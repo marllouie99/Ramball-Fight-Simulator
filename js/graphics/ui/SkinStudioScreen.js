@@ -56,6 +56,7 @@ import { drawAvatarOfEmptinessSkin, AVATAR_OF_EMPTINESS_DEFAULT_CONFIGS } from '
 import { drawUryuSkin, _drawUryuHair, _getUryuHairImage, _drawUryuGlasses, _getUryuGlassesImage } from '../fighters/uryuSkin.js';
 import { drawAlucardSkin, _drawAlucardHat, _getAlucardHatImage, _drawAlucardGlasses, _getAlucardGlassesImage } from '../fighters/gunSlingerSkin.js';
 import { drawGutsSkin, _drawGutsHelmet, _getGutsHelmetImage, _drawGutsHair, _getGutsHairImage } from '../fighters/gutsSkin.js';
+import { drawAshSkin, _drawAshHair, _getAshHairImage } from '../fighters/ashSkin.js';
 
 
 
@@ -78,8 +79,8 @@ if (state.studioSkinShiroPart === undefined) state.studioSkinShiroPart = 'hair';
 if (state.studioSkinAlucardPart === undefined) state.studioSkinAlucardPart = 'hat';
 
 export const ALUCARD_PARTS = [
-  { id: 'hat', label: '🎩 FEDORA HAT', shortLabel: 'HAT', fullLabel: 'CRIMSON FEDORA & HAIR', asset: 'Assets/model/Alucard/Red-hat.png', desc: 'Fedora hat scale, shift & angle' },
-  { id: 'glasses', label: '👓 GLASSES', shortLabel: 'GLASSES', fullLabel: 'AMBER ROUND EYE GLASSES', asset: 'Assets/model/Alucard/Red-eye-glasses.png', desc: 'Eye glasses scale, shift & angle' }
+  { id: 'hat', label: '🎩 FEDORA HAT', shortLabel: 'HAT', fullLabel: 'CRIMSON FEDORA & HAIR', asset: 'Assets/model/alucard/Red-hat.png', desc: 'Fedora hat scale, shift & angle' },
+  { id: 'glasses', label: '👓 GLASSES', shortLabel: 'GLASSES', fullLabel: 'AMBER ROUND EYE GLASSES', asset: 'Assets/model/alucard/Red-eye-glasses.png', desc: 'Eye glasses scale, shift & angle' }
 ];
 
 export const URYU_PARTS = [
@@ -94,28 +95,28 @@ export const SHIRO_PARTS = [
 
 export const NAMELESS_DEITY_PARTS = [
   { id: 'overall', label: '⭐ ALL', fullLabel: 'ALL / OVERALL', asset: 'Body + Antlers + Cicada + Censor + Vines + Flowers + Wings + Halo + Wheel + Limbs', desc: 'Overall model scale & shift' },
-  { id: 'body', label: '🫀 BODY', shortLabel: 'BODY', fullLabel: 'DIVINE BODY TORSO', asset: 'Assets/model/NamelessDeity/DivineBody.png', desc: 'Torso scale, shift & angle' },
-  { id: 'antlers', label: '🦌 ANTLERS', shortLabel: 'ANTLERS', fullLabel: 'SACRED DEITY ANTLERS', asset: 'Assets/model/NamelessDeity/antlers9.png', desc: 'Antler crown scale, shift & angle' },
-  { id: 'antler_vines', label: '🌿 A-VINES', shortLabel: 'A-VINES', fullLabel: 'ANTLER HANGING VINES', asset: 'Assets/model/NamelessDeity/Vines1.png', desc: 'Vines draped from antler branches' },
-  { id: 'cicada', label: '🪲 CICADA', shortLabel: 'CICADA', fullLabel: 'CICADA CROWN / BROOCH', asset: 'Assets/model/NamelessDeity/Cicada.png', desc: 'Head crown / chest cicada moth' },
-  { id: 'censor', label: '📜 CENSOR', shortLabel: 'CENSOR', fullLabel: 'TAPED CENSOR SKETCH', asset: 'Assets/model/NamelessDeity/Censor.png', desc: 'Face/torso taped censor paper note' },
-  { id: 'vines', label: '🌿 VINES', shortLabel: 'VINES', fullLabel: 'HANGING VINES / ROBES', asset: 'Assets/model/NamelessDeity/Vines.png', desc: 'Lower vines scale, shift & angle' },
-  { id: 'flowers', label: '🩶 FLOWERS', shortLabel: 'FLOWERS', fullLabel: 'GRAY CELESTIAL FLOWERS', asset: 'Assets/model/NamelessDeity/SideFlower2.png', desc: 'Dual gray flanking lotus flowers' },
-  { id: 'wings', label: '🪽 WINGS', fullLabel: 'WINGS', asset: 'Assets/model/NamelessDeity/Wings.png', desc: 'Wing span & flap attachment' },
-  { id: 'halo', label: '☀️ HALO', shortLabel: 'HALO', fullLabel: 'COSMIC LIGHT HALO', asset: 'Assets/model/NamelessDeity/CosmicLightCircleCenter1.png', desc: 'Back starburst halo ring' },
-  { id: 'wheel', label: '☸️ WHEEL', shortLabel: 'WHEEL', fullLabel: 'CELESTIAL CLOCK WHEEL', asset: 'Assets/model/NamelessDeity/Wheel.png', desc: 'Back clockwork wheel' },
-  { id: 'arm', label: '💪 ARM', fullLabel: 'UPPER ARM', asset: 'Assets/model/NamelessDeity/Arm.png', desc: 'Upper arm length & shoulder shift' },
-  { id: 'forearm', label: '🦾 FOREARM', fullLabel: 'FOREARM', asset: 'Assets/model/NamelessDeity/Forearm.png', desc: 'Forearm length, elbow & wrist alignment' },
-  { id: 'hand', label: '✋ HAND', fullLabel: 'HAND', asset: 'Assets/model/NamelessDeity/Hand.png', desc: 'Hand size, wrist angle & offset' }
+  { id: 'body', label: '🫀 BODY', shortLabel: 'BODY', fullLabel: 'DIVINE BODY TORSO', asset: 'Assets/model/namelessDeity/DivineBody.png', desc: 'Torso scale, shift & angle' },
+  { id: 'antlers', label: '🦌 ANTLERS', shortLabel: 'ANTLERS', fullLabel: 'SACRED DEITY ANTLERS', asset: 'Assets/model/namelessDeity/antlers9.png', desc: 'Antler crown scale, shift & angle' },
+  { id: 'antler_vines', label: '🌿 A-VINES', shortLabel: 'A-VINES', fullLabel: 'ANTLER HANGING VINES', asset: 'Assets/model/namelessDeity/Vines1.png', desc: 'Vines draped from antler branches' },
+  { id: 'cicada', label: '🪲 CICADA', shortLabel: 'CICADA', fullLabel: 'CICADA CROWN / BROOCH', asset: 'Assets/model/namelessDeity/Cicada.png', desc: 'Head crown / chest cicada moth' },
+  { id: 'censor', label: '📜 CENSOR', shortLabel: 'CENSOR', fullLabel: 'TAPED CENSOR SKETCH', asset: 'Assets/model/namelessDeity/Censor.png', desc: 'Face/torso taped censor paper note' },
+  { id: 'vines', label: '🌿 VINES', shortLabel: 'VINES', fullLabel: 'HANGING VINES / ROBES', asset: 'Assets/model/namelessDeity/Vines.png', desc: 'Lower vines scale, shift & angle' },
+  { id: 'flowers', label: '🩶 FLOWERS', shortLabel: 'FLOWERS', fullLabel: 'GRAY CELESTIAL FLOWERS', asset: 'Assets/model/namelessDeity/SideFlower2.png', desc: 'Dual gray flanking lotus flowers' },
+  { id: 'wings', label: '🪽 WINGS', fullLabel: 'WINGS', asset: 'Assets/model/namelessDeity/Wings.png', desc: 'Wing span & flap attachment' },
+  { id: 'halo', label: '☀️ HALO', shortLabel: 'HALO', fullLabel: 'COSMIC LIGHT HALO', asset: 'Assets/model/namelessDeity/CosmicLightCircleCenter1.png', desc: 'Back starburst halo ring' },
+  { id: 'wheel', label: '☸️ WHEEL', shortLabel: 'WHEEL', fullLabel: 'CELESTIAL CLOCK WHEEL', asset: 'Assets/model/namelessDeity/Wheel.png', desc: 'Back clockwork wheel' },
+  { id: 'arm', label: '💪 ARM', fullLabel: 'UPPER ARM', asset: 'Assets/model/namelessDeity/Arm.png', desc: 'Upper arm length & shoulder shift' },
+  { id: 'forearm', label: '🦾 FOREARM', fullLabel: 'FOREARM', asset: 'Assets/model/namelessDeity/Forearm.png', desc: 'Forearm length, elbow & wrist alignment' },
+  { id: 'hand', label: '✋ HAND', fullLabel: 'HAND', asset: 'Assets/model/namelessDeity/Hand.png', desc: 'Hand size, wrist angle & offset' }
 ];
 
 export const AVATAR_OF_EMPTINESS_PARTS = [
   { id: 'overall', label: '⭐ ALL', fullLabel: 'ALL / OVERALL', asset: 'Body Circle + Left/Right Arms + Forearms', desc: 'Overall model scale & shift' },
   { id: 'body', label: '🫀 BODY', shortLabel: 'BODY', fullLabel: 'VOID CORE BODY', asset: 'Procedural Void Core Circle & Aura', desc: 'Body scale, shift & event horizon' },
-  { id: 'arm_left', label: '💪 L-ARM', shortLabel: 'L-ARM', fullLabel: 'FRONT LEFT ARM', asset: 'Assets/model/Avatar/FrontArmLeft.png', desc: 'Left arm scale, shoulder shift & angle' },
-  { id: 'arm_right', label: '💪 R-ARM', shortLabel: 'R-ARM', fullLabel: 'FRONT RIGHT ARM', asset: 'Assets/model/Avatar/FrontArmRight.png', desc: 'Right arm scale, shoulder shift & angle' },
-  { id: 'forearm_left', label: '🦾 L-FORE', shortLabel: 'L-FORE', fullLabel: 'FRONT LEFT FOREARM', asset: 'Assets/model/Avatar/FrontForearmLeft.png', desc: 'Left forearm scale, elbow shift & angle' },
-  { id: 'forearm_right', label: '🦾 R-FORE', shortLabel: 'R-FORE', fullLabel: 'FRONT RIGHT FOREARM', asset: 'Assets/model/Avatar/FrontForearmRight.png', desc: 'Right forearm scale, elbow shift & angle' }
+  { id: 'arm_left', label: '💪 L-ARM', shortLabel: 'L-ARM', fullLabel: 'FRONT LEFT ARM', asset: 'Assets/model/avatar/FrontArmLeft.png', desc: 'Left arm scale, shoulder shift & angle' },
+  { id: 'arm_right', label: '💪 R-ARM', shortLabel: 'R-ARM', fullLabel: 'FRONT RIGHT ARM', asset: 'Assets/model/avatar/FrontArmRight.png', desc: 'Right arm scale, shoulder shift & angle' },
+  { id: 'forearm_left', label: '🦾 L-FORE', shortLabel: 'L-FORE', fullLabel: 'FRONT LEFT FOREARM', asset: 'Assets/model/avatar/FrontForearmLeft.png', desc: 'Left forearm scale, elbow shift & angle' },
+  { id: 'forearm_right', label: '🦾 R-FORE', shortLabel: 'R-FORE', fullLabel: 'FRONT RIGHT FOREARM', asset: 'Assets/model/avatar/FrontForearmRight.png', desc: 'Right forearm scale, elbow shift & angle' }
 ];
 
 const ZOOM_MIN = 0.6;
@@ -771,7 +772,7 @@ export const SKIN_STUDIO_FIGHTERS = [
   {
     key: 'guts',
     label: 'GUTS',
-    asset: 'Assets/model/Guts/Guts_helmet.png',
+    asset: 'Assets/model/guts/Guts_helmet.png',
     assetDims: '500 x 500',
     baseW: 2.30,
     baseH: 2.92,
@@ -785,6 +786,23 @@ export const SKIN_STUDIO_FIGHTERS = [
       { id: 'default', label: 'IDLE (SHOULDER REST)' },
       { id: 'combat', label: 'COMBAT (SWORD IN MOUTH)' },
       { id: 'hair', label: 'STRUGGLER (UNMASKED)' }
+    ]
+  },
+  {
+    key: 'ash',
+    label: 'ASH KETCHUM',
+    asset: 'Assets/model/ash/Ash-hair.png',
+    assetDims: '128 x 96',
+    baseW: 2.95,
+    baseH: 2.15,
+    baseCrownY: -1.35,
+    visW: 120,
+    visH: 90,
+    centerX: 64,
+    topY: 8,
+    themeColor: '#E53935',
+    forms: [
+      { id: 'default', label: 'PALLET TOWN TRAINER' }
     ]
   }
 ];
@@ -970,7 +988,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -686 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 136 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'knight') {
-    return `// Calibrated Helmet for Knight (Assets/model/Knight/Knight_hair.jpg)\n` +
+    return `// Calibrated Helmet for Knight (Assets/model/knight/Knight_hair.jpg)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
            `const drawX = -targetHairWidth / 2${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
@@ -1055,7 +1073,7 @@ function generateJsCode(fDef, custom) {
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 234 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'gunslinger' || fDef.key === 'alucard') {
     const partName = (typeof state !== 'undefined' && state.studioSkinAlucardPart === 'glasses') ? 'Eye Glasses' : 'Fedora Hat';
-    return `// Calibrated Alucard Head Assets (Assets/model/Alucard/Red-hat.png & Red-eye-glasses.png)\n` +
+    return `// Calibrated Alucard Head Assets (Assets/model/alucard/Red-hat.png & Red-eye-glasses.png)\n` +
            `// Selected Part: ${partName}\n` +
            `widthScale: ${wMult},\n` +
            `heightScale: ${hMult},\n` +
@@ -1136,7 +1154,7 @@ function generateJsCode(fDef, custom) {
     if (state.studioSkinForm === 'hair') {
       const curW = (2.20 * (custom.widthScale ?? 1.0)).toFixed(2);
       const curH = (2.05 * (custom.heightScale ?? 1.0)).toFixed(2);
-      return `// Calibrated Hair for Guts (Assets/model/Guts/Guts-hair.png)\n` +
+      return `// Calibrated Hair for Guts (Assets/model/guts/Guts-hair.png)\n` +
              `const targetHairWidth = r * ${curW};\n` +
              `const targetHairHeight = r * ${curH};\n` +
              `const drawX = -targetHairWidth / 2${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
@@ -1144,7 +1162,7 @@ function generateJsCode(fDef, custom) {
     }
     const curW = (2.30 * (custom.widthScale ?? 1.0)).toFixed(2);
     const curH = (2.92 * (custom.heightScale ?? 1.0)).toFixed(2);
-    return `// Calibrated Helmet for Guts (Assets/model/Guts/Guts_helmet.png)\n` +
+    return `// Calibrated Helmet for Guts (Assets/model/guts/Guts_helmet.png)\n` +
            `const targetHairWidth = r * ${curW};\n` +
            `const targetHairHeight = r * ${curH};\n` +
            `const drawX = -targetHairWidth / 2${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
@@ -1611,6 +1629,9 @@ export function drawSkinStudioScreen() {
         dummyFighter.isUnmasked = (state.studioSkinForm === 'hair');
         dummyFighter.hideWeapon = false;
         drawGutsSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'ash') {
+        dummyFighter._isStudioDummy = true;
+        drawAshSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -1681,6 +1702,8 @@ export function drawSkinStudioScreen() {
       } else {
         _drawGutsHelmet(ctx, baseRadius, isFacingLeft, false);
       }
+    } else if (fDef.key === 'ash') {
+      _drawAshHair(ctx, baseRadius, isFacingLeft);
     }
 
     ctx.restore();
@@ -2259,7 +2282,7 @@ export function drawSkinStudioScreen() {
     ctx.fillText(`TARGET: ${activeCustomKey}`, infoCardX + 8, infoCardY + 56);
   } else {
     const isGutsHair = (fDef.key === 'guts' && state.studioSkinForm === 'hair');
-    const assetName = isGutsHair ? 'Assets/model/Guts/Guts-hair.png' : fDef.asset;
+    const assetName = isGutsHair ? 'Assets/model/guts/Guts-hair.png' : fDef.asset;
     const assetDims = isGutsHair ? '44 x 41' : (fDef.assetDims || 'Standard');
     const baseW = isGutsHair ? 2.20 : fDef.baseW;
     const baseH = isGutsHair ? 2.05 : fDef.baseH;

@@ -12,10 +12,10 @@ let _frontArmRightImage = null;
 let _frontForearmLeftImage = null;
 let _frontForearmRightImage = null;
 
-const _ARM_LEFT_PATH = 'Assets/model/Avatar/FrontArmLeft.png';
-const _ARM_RIGHT_PATH = 'Assets/model/Avatar/FrontArmRight.png';
-const _FOREARM_LEFT_PATH = 'Assets/model/Avatar/FrontForearmLeft.png';
-const _FOREARM_RIGHT_PATH = 'Assets/model/Avatar/FrontForearmRight.png';
+const _ARM_LEFT_PATH = 'Assets/model/avatar/FrontArmLeft.png';
+const _ARM_RIGHT_PATH = 'Assets/model/avatar/FrontArmRight.png';
+const _FOREARM_LEFT_PATH = 'Assets/model/avatar/FrontForearmLeft.png';
+const _FOREARM_RIGHT_PATH = 'Assets/model/avatar/FrontForearmRight.png';
 
 function _isImageReady(img) {
   if (!img) return false;

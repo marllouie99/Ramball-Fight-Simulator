@@ -4,8 +4,8 @@
 // and 6-frame pixel rustle sprite sheet animation when fighters step into foliage.
 // ─────────────────────────────────────────────
 
-import { state } from '../js/core/state.js';
-import { audioSystem } from '../js/systems/audioSystem.js';
+import { state } from '../core/state.js';
+import { audioSystem } from '../systems/audioSystem.js';
 
 // Pre-computed default frame bounding boxes (420x420) from Bush- Rustling Pixel Bush Sprite Sheet.png
 const DEFAULT_BUSH_FRAME_RECTS = [

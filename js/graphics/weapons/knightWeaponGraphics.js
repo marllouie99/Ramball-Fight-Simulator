@@ -17,12 +17,12 @@ export function _getKnightShieldImage() {
     };
     img.onerror = () => {
       if (!img.src.includes('.jpg')) {
-        img.src = 'Assets/model/Knight/Knight_shield.jpg?v=1';
+        img.src = 'Assets/model/knight/Knight_shield.jpg?v=1';
       } else {
         _knightShieldImageLoading = false;
       }
     };
-    img.src = 'Assets/model/Knight/Knight_shield.png?v=1';
+    img.src = 'Assets/model/knight/Knight_shield.png?v=1';
     _knightShieldImage = img;
   }
   return _knightShieldImage;
@@ -44,12 +44,12 @@ export function _getKnightSwordImage() {
     };
     img.onerror = () => {
       if (!img.src.includes('.jpg')) {
-        img.src = 'Assets/model/Knight/Knight_sword.jpg?v=1';
+        img.src = 'Assets/model/knight/Knight_sword.jpg?v=1';
       } else {
         _knightSwordImageLoading = false;
       }
     };
-    img.src = 'Assets/model/Knight/Knight_sword.png?v=1';
+    img.src = 'Assets/model/knight/Knight_sword.png?v=1';
     _knightSwordImage = img;
   }
   return _knightSwordImage;
@@ -72,7 +72,7 @@ export function _getKnightGoldSwordImage() {
     img.onerror = () => {
       _knightGoldSwordImageLoading = false;
     };
-    img.src = 'Assets/model/Knight/Knight_goldsword.png?v=1';
+    img.src = 'Assets/model/knight/Knight_goldsword.png?v=1';
     _knightGoldSwordImage = img;
   }
   return _knightGoldSwordImage;
@@ -275,7 +275,7 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
   const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
-  // ── PIXEL ART WEAPON RENDERING (Assets/model/Knight/Knight_sword.png) ──
+  // ── PIXEL ART WEAPON RENDERING (Assets/model/knight/Knight_sword.png) ──
   const swordImg = _getKnightSwordImage();
   const hasSwordImg = swordImg && swordImg.complete && swordImg.naturalWidth > 0;
 

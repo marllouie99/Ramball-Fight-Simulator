@@ -24,12 +24,12 @@ export function _getSpartanShieldImage() {
     };
     img.onerror = () => {
       if (!img.src.includes('.jpg')) {
-        img.src = 'Assets/model/Spartan/spartan_shield.jpg?v=1';
+        img.src = 'Assets/model/spartan/spartan_shield.jpg?v=1';
       } else {
         _spartanShieldLoading = false;
       }
     };
-    img.src = 'Assets/model/Spartan/spartan_shield.png?v=1';
+    img.src = 'Assets/model/spartan/spartan_shield.png?v=1';
     _spartanShieldImage = img;
   }
   return _spartanShieldImage;
@@ -51,12 +51,12 @@ export function _getSpartanSpearImage() {
     };
     img.onerror = () => {
       if (!img.src.includes('.jpg')) {
-        img.src = 'Assets/model/Spartan/spartan_spear.jpg?v=1';
+        img.src = 'Assets/model/spartan/spartan_spear.jpg?v=1';
       } else {
         _spartanSpearLoading = false;
       }
     };
-    img.src = 'Assets/model/Spartan/spartan_spear.png?v=1';
+    img.src = 'Assets/model/spartan/spartan_spear.png?v=1';
     _spartanSpearImage = img;
   }
   return _spartanSpearImage;
@@ -69,7 +69,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 
 /**
  * Draws the iconic round bronze Spartan Hoplon shield with red Lambda (Λ) crest.
- * Uses Assets/model/Spartan/spartan_shield.png with procedural fallback.
+ * Uses Assets/model/spartan/spartan_shield.png with procedural fallback.
  * Anchored to the left hand flank (-r * 0.82, +r * 0.38 in local space).
  */
 export function drawSpartanHoplon(ctx, x, y, gunAngle, blockFlashTimer = 0, r = 25, shieldVisualOffset = 0) {
@@ -89,7 +89,7 @@ export function drawSpartanHoplon(ctx, x, y, gunAngle, blockFlashTimer = 0, r = 
   const shieldR = r * 0.72; // Round Hoplon radius (~18px)
   const isFlashing = blockFlashTimer > 0;
 
-  // ── SPRITE MODEL: Assets/model/Spartan/spartan_shield.png ──
+  // ── SPRITE MODEL: Assets/model/spartan/spartan_shield.png ──
   const shieldImg = _getSpartanShieldImage();
   const hasShieldImg = shieldImg && shieldImg.complete && shieldImg.naturalWidth > 0;
 
@@ -187,7 +187,7 @@ export function drawSpartanHoplon(ctx, x, y, gunAngle, blockFlashTimer = 0, r = 
 
 /**
  * Draws the Dory spear (spearhead, ashwood shaft, and bronze sauroter counter-spike).
- * Uses Assets/model/Spartan/spartan_spear.png with procedural fallback.
+ * Uses Assets/model/spartan/spartan_spear.png with procedural fallback.
  * Anchored to the right hand flank.
  */
 export function drawSpartanSpear(ctx, x, y, spearAngle, r = 25, thrustLunge = 0, isThrusting = false) {
@@ -204,7 +204,7 @@ export function drawSpartanSpear(ctx, x, y, spearAngle, r = 25, thrustLunge = 0,
   const baseY = r * 0.32;
   ctx.translate(thrustLunge, baseY);
 
-  // ── SPRITE MODEL: Assets/model/Spartan/spartan_spear.png ──
+  // ── SPRITE MODEL: Assets/model/spartan/spartan_spear.png ──
   const spearImg = _getSpartanSpearImage();
   const hasSpearImg = spearImg && spearImg.complete && spearImg.naturalWidth > 0;
 
@@ -301,7 +301,7 @@ export function drawSpartanSpear(ctx, x, y, spearAngle, r = 25, thrustLunge = 0,
 
 /**
  * Draws the airborne Javelin projectile hurled across the arena.
- * Uses Assets/model/Spartan/spartan_spear.png with procedural fallback.
+ * Uses Assets/model/spartan/spartan_spear.png with procedural fallback.
  */
 export function drawSpartanJavelin(ctx, x, y, angle, length = 55) {
   ctx.save();
@@ -318,7 +318,7 @@ export function drawSpartanJavelin(ctx, x, y, angle, length = 55) {
   ctx.lineTo(-halfLen, 0);
   ctx.stroke();
 
-  // ── SPRITE MODEL: Assets/model/Spartan/spartan_spear.png ──
+  // ── SPRITE MODEL: Assets/model/spartan/spartan_spear.png ──
   const spearImg = _getSpartanSpearImage();
   const hasSpearImg = spearImg && spearImg.complete && spearImg.naturalWidth > 0;
 

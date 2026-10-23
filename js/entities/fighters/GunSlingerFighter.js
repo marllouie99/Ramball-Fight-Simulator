@@ -26,11 +26,11 @@ export function _getHellhoundFrames() {
   if (!_hellhoundFramesLoading && typeof Image !== 'undefined') {
     _hellhoundFramesLoading = true;
     const paths = [
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame1.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame2.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame3.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame4.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame5.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame1.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame2.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame3.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame4.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame5.png',
     ];
     _hellhoundFrames = paths.map((src) => {
       const img = new Image();

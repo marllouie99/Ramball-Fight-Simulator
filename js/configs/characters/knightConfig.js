@@ -23,10 +23,10 @@ export const knightConfig = {
   desc: 'Wields an HP-backed tower shield with passive DEF buff that absorbs all incoming damage until broken, leaving him vulnerable with 50% reduced DEF.',
 
   assets: {
-    hair: 'Assets/model/Knight/Knight_hair.jpg',
-    shield: 'Assets/model/Knight/Knight_shield.jpg',
-    sword: 'Assets/model/Knight/Knight_sword.jpg',
-    goldSword: 'Assets/model/Knight/Knight_goldsword.png',
+    hair: 'Assets/model/knight/Knight_hair.jpg',
+    shield: 'Assets/model/knight/Knight_shield.jpg',
+    sword: 'Assets/model/knight/Knight_sword.jpg',
+    goldSword: 'Assets/model/knight/Knight_goldsword.png',
   },
 
   // Shield Defense & Deflection Hit-Pause

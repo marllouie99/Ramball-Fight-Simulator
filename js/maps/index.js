@@ -6,7 +6,7 @@
 import { YUTA_BUSH_MAP } from './yutaBushMap.js';
 import { ENDER_DRAGON_MAP } from './enderDragonMap.js';
 import { drawFocMap, updateFocMap, getBushSprite, resetFocMapState } from './focMapRenderer.js';
-import { state } from '../js/core/state.js';
+import { state } from '../core/state.js';
 
 export const FOC_MAPS = {
   foc_yuta_bush_map: YUTA_BUSH_MAP,

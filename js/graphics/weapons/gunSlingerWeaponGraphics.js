@@ -6,8 +6,8 @@ import { drawAlucardHand } from '../fighters/gunSlingerSkin.js';
 // ─────────────────────────────────────────────
 // ALUCARD WEAPON GRAPHICS (The .454 Casull & 13mm Jackal)
 // Uses authentic pixel art weapon assets:
-// - Right Gun (.454 Casull): Assets/model/Alucard/Hellsing_.454_Casull_Pixel_Pistol.png
-// - Left Gun (13mm Jackal): Assets/model/Alucard/Alucard-pistol-gun.png
+// - Right Gun (.454 Casull): Assets/model/alucard/Hellsing_.454_Casull_Pixel_Pistol.png
+// - Left Gun (13mm Jackal): Assets/model/alucard/Alucard-pistol-gun.png
 // With complete procedural 2D discrete grid fallbacks (Rule 3.5),
 // white combat gloves with red Hellsing sigil (Rule 20),
 // and zero shadowBlur CPU filters (Rule 11).
@@ -28,10 +28,10 @@ export function _getCasullWeaponImage() {
       _casullWeaponImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Casull weapon image at Assets/model/Alucard/Hellsing_.454_Casull_Pixel_Pistol.png', e);
+      console.warn('Failed to load Casull weapon image at Assets/model/alucard/Hellsing_.454_Casull_Pixel_Pistol.png', e);
       _casullWeaponImageLoading = false;
     };
-    img.src = 'Assets/model/Alucard/Hellsing_.454_Casull_Pixel_Pistol.png?v=1';
+    img.src = 'Assets/model/alucard/Hellsing_.454_Casull_Pixel_Pistol.png?v=1';
     _casullWeaponImage = img;
   }
   return _casullWeaponImage;
@@ -52,10 +52,10 @@ export function _getJackalWeaponImage() {
       _jackalWeaponImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Jackal weapon image at Assets/model/Alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png', e);
+      console.warn('Failed to load Jackal weapon image at Assets/model/alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png', e);
       _jackalWeaponImageLoading = false;
     };
-    img.src = 'Assets/model/Alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png?v=1';
+    img.src = 'Assets/model/alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png?v=1';
     _jackalWeaponImage = img;
   }
   return _jackalWeaponImage;
@@ -207,7 +207,7 @@ export const GUNSLINGER_WEAPON_GRAPHICS = {
 
 /**
  * Draws the .454 Casull (Right Gun — Sacred Silver Long Slide Semi-Auto).
- * Prioritizes loading Assets/model/Alucard/Hellsing_.454_Casull_Pixel_Pistol.png
+ * Prioritizes loading Assets/model/alucard/Hellsing_.454_Casull_Pixel_Pistol.png
  * with procedural discrete pixel art fallback.
  */
 function renderCasullPistol(ctx, isFiring, flashFrame, scale = 1) {
@@ -277,7 +277,7 @@ function renderCasullPistol(ctx, isFiring, flashFrame, scale = 1) {
 
 /**
  * Draws the Jackal (Left Gun — 13mm Matte Black Anti-Freak Combat Pistol).
- * Prioritizes loading Assets/model/Alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png
+ * Prioritizes loading Assets/model/alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png
  * with procedural discrete pixel art fallback.
  */
 function renderJackalPistol(ctx, isFiring, flashFrame, scale = 1) {

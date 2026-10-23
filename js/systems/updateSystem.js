@@ -22,7 +22,7 @@ import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { BossManager, BossEntranceSequence } from '../bosses/index.js';
 import { audioSystem } from './audioSystem.js';
-import { updateFocMap, getActiveFocMap, resetFocMapState } from '../../FOC Maps/index.js';
+import { updateFocMap, getActiveFocMap, resetFocMapState } from '../maps/index.js';
 import { isFfaMode } from '../core/viewportManager.js';
 
 export function updateGame() {

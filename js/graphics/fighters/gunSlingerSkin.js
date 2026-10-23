@@ -38,7 +38,7 @@ export function _getAlucardHatImage() {
     img.onerror = () => {
       _alucardHatImageLoading = false;
     };
-    img.src = 'Assets/model/Alucard/Red-hat.png?v=1';
+    img.src = 'Assets/model/alucard/Red-hat.png?v=1';
     _alucardHatImage = img;
   }
   return _alucardHatImage;
@@ -68,7 +68,7 @@ export function _getAlucardGlassesImage() {
     img.onerror = () => {
       _alucardGlassesImageLoading = false;
     };
-    img.src = 'Assets/model/Alucard/Red-eye-glasses.png?v=1';
+    img.src = 'Assets/model/alucard/Red-eye-glasses.png?v=1';
     _alucardGlassesImage = img;
   }
   return _alucardGlassesImage;
@@ -81,7 +81,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Alucard's dedicated eye glasses asset model (Assets/model/Alucard/Red-eye-glasses.png)
+ * Draws Alucard's dedicated eye glasses asset model (Assets/model/alucard/Red-eye-glasses.png)
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character radius
  * @param {boolean} [facingLeft=false]
@@ -125,7 +125,7 @@ export function _drawAlucardGlasses(ctx, r, facingLeft = false) {
 }
 
 /**
- * Draws Alucard's wide-brimmed crimson fedora from dedicated image asset (Assets/model/Alucard/Red-hat.png).
+ * Draws Alucard's wide-brimmed crimson fedora from dedicated image asset (Assets/model/alucard/Red-hat.png).
  * Uses nearest-neighbor scaling for crisp pixel art fidelity (Rule 19 / Rule 22).
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius

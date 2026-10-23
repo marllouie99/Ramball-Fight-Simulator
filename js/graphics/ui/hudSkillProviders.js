@@ -2864,6 +2864,71 @@ export const HUD_SKILL_PROVIDERS = {
     if (skills.length > 0) return skills;
   },
 
+  ash(f) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ash) ? CONFIG.ash : {};
+    const themeColor = f.themeColor || cfg.themeColor || '#E53935';
+    const skills = [];
+
+    const hasPokemon = Boolean(f.activePokemon && !f.activePokemon.isDead && f.activePokemon.hp > 0);
+    if (isSkillEnabled(cfg.enableHoneycombSummon, cfg.enableSummon, true)) {
+      const pokeName = hasPokemon ? (f.activePokemon.spec?.name || f.activePokemon.name || 'PIKACHU') : '';
+      const sumMax = cfg.summonCooldownFrames || cfg.summonCooldown || 210;
+      const sumTimer = f.summonCooldown || 0;
+      const sumPct = hasPokemon ? 100 : Math.max(0, Math.min(100, (1 - (sumTimer / sumMax)) * 100));
+      skills.push({
+        id: 'honeycomb_summon',
+        pct: sumPct,
+        ready: hasPokemon || (sumPct >= 99 && sumTimer <= 0),
+        color: themeColor,
+        label: hasPokemon ? `SHIELD + ${pokeName}` : 'POKEBALL SUMMON'
+      });
+    }
+
+    if (isSkillEnabled(cfg.enableTrainerCommand, cfg.enableSkill1, true)) {
+      const activeSpec = f.activePokemon?.spec;
+      const moveLabel = hasPokemon
+        ? ((f.activePokemon.isMega && activeSpec?.megaHudSkillLabel)
+            ? activeSpec.megaHudSkillLabel
+            : (activeSpec?.hudSkillLabel || activeSpec?.specialName?.replace(/!$/, '') || 'THUNDERBOLT'))
+        : 'THUNDERBOLT';
+      const pokeSpecMax = f.activePokemon?.specialCooldownMax || activeSpec?.specialCooldown || 135;
+      const pokeSpecTimer = f.activePokemon?.specialCooldown ?? 0;
+      const cmdMax = cfg.commandCooldownFrames || cfg.commandSkillCooldown || 150;
+      const cmdTimer = f.commandCooldown ?? f.commandSkillCooldown ?? 0;
+      const cmdPct = hasPokemon
+        ? Math.max(
+            Math.max(0, Math.min(100, (1 - (pokeSpecTimer / pokeSpecMax)) * 100)),
+            Math.max(0, Math.min(100, (1 - (cmdTimer / cmdMax)) * 100))
+          )
+        : Math.max(0, Math.min(100, (1 - (cmdTimer / cmdMax)) * 100));
+      skills.push({
+        id: 'trainer_command',
+        pct: cmdPct,
+        ready: cmdPct >= 99 && hasPokemon,
+        color: themeColor,
+        label: moveLabel
+      });
+    }
+
+    if (isSkillEnabled(cfg.enableMegaAwakening, cfg.enableBondAwakening, cfg.enableUltimate, true)) {
+      const ultMax = cfg.ultimateCooldownFrames || cfg.ultimateCooldown || 780;
+      const ultTimer = f.ultimateCooldown || 0;
+      const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      skills.push({
+        id: 'mega_awakening',
+        pct: ultPct,
+        ready: ultPct >= 99 && ultTimer <= 0,
+        color: themeColor,
+        label: f.activePokemon?.isMega ? 'MEGA AWAKENED!' : 'BOND AWAKENING',
+        isSignature: true,
+        signature: true,
+        isUltimate: true
+      });
+    }
+
+    if (skills.length > 0) return skills;
+  },
+
   doppleganger(f) {
     return [];
   },
@@ -2993,6 +3058,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     spartan: ['javelin_throw', 'javelin', 'JAVELIN'],
     guts: ['berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
     choso: ['laser_matrix', 'convergence', 'blood manipulation: convergence', 'laser', 'matrix', 'laser matrix', 'piercing_blood', 'PIERCING BLOOD'],
+    ash: ['mega_awakening', 'BOND AWAKENING', 'MEGA AWAKENED!', '10,000,000 VOLT'],
     eye_of_cthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM'],
     eyeofcthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM']
   };

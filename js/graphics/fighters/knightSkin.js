@@ -196,12 +196,12 @@ export function _getKnightHairImage() {
     };
     img.onerror = () => {
       if (!img.src.includes('.jpg')) {
-        img.src = 'Assets/model/Knight/Knight_hair.jpg?v=1';
+        img.src = 'Assets/model/knight/Knight_hair.jpg?v=1';
       } else {
         _knightHairImageLoading = false;
       }
     };
-    img.src = 'Assets/model/Knight/Knight_hair.png?v=1';
+    img.src = 'Assets/model/knight/Knight_hair.png?v=1';
     _knightHairImage = img;
   }
   return _knightHairImage;
@@ -212,7 +212,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Knight's authentic anime helmet/hair from Assets/model/Knight/Knight_hair.jpg (Rule 22 compliant).
+ * Draws Knight's authentic anime helmet/hair from Assets/model/knight/Knight_hair.jpg (Rule 22 compliant).
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]

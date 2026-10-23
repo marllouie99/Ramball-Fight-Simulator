@@ -8,7 +8,7 @@ import { CONFIG } from '../../core/config.js';
 import { namelessDeityConfig } from '../../configs/characters/namelessDeityConfig.js';
 
 let _cosmicLightCircleImage = null;
-const _COSMIC_LIGHT_CIRCLE_PATH = 'Assets/model/NamelessDeity/CosmicLightCircle.png';
+const _COSMIC_LIGHT_CIRCLE_PATH = 'Assets/model/namelessDeity/CosmicLightCircle.png';
 
 function _getCosmicLightCircleImage() {
   if (_cosmicLightCircleImage && _cosmicLightCircleImage.complete && _cosmicLightCircleImage.naturalWidth > 0) return _cosmicLightCircleImage;
@@ -21,7 +21,7 @@ function _getCosmicLightCircleImage() {
 }
 
 let _cosmicSpaceImage = null;
-const _COSMIC_SPACE_PATH = 'Assets/model/NamelessDeity/Neon Cosmic Nebula Texture.png';
+const _COSMIC_SPACE_PATH = 'Assets/model/namelessDeity/Neon Cosmic Nebula Texture.png';
 
 function _getCosmicSpaceImage() {
   if (_cosmicSpaceImage && _cosmicSpaceImage.complete && _cosmicSpaceImage.naturalWidth > 0) return _cosmicSpaceImage;
@@ -35,7 +35,7 @@ function _getCosmicSpaceImage() {
 
 let _beamTexture2Image = null;
 let _cachedBlueBeamTexture2Canvas = null;
-const _BEAM_TEXTURE2_PATH = 'Assets/model/NamelessDeity/beam-texture2.png';
+const _BEAM_TEXTURE2_PATH = 'Assets/model/namelessDeity/beam-texture2.png';
 
 function _getBeamTexture2Image() {
   if (_beamTexture2Image && _beamTexture2Image.complete && _beamTexture2Image.naturalWidth > 0) return _beamTexture2Image;

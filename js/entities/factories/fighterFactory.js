@@ -66,8 +66,13 @@ import { ShiroFighter } from '../fighters/ShiroFighter.js';
 import { SoraFighter } from '../fighters/SoraFighter.js';
 import { GutsFighter } from '../fighters/GutsFighter.js';
 import { ChosoFighter } from '../fighters/ChosoFighter.js?v=81';
+import { AshFighter } from '../fighters/AshFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
+  'ash':        AshFighter,
+  'Ash':        AshFighter,
+  'ASH':        AshFighter,
+  'ash_ketchum': AshFighter,
   'guts':       GutsFighter,
   'Guts':       GutsFighter,
   'GUTS':       GutsFighter,

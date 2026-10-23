@@ -35,31 +35,31 @@ let _antlers2Image = null;
 let _antlerVinesImage = null;
 let _vines2Image = null;
 
-const _WINGS_PATH = 'Assets/model/NamelessDeity/Wings.png';
-const _COSMIC_LIGHT_CENTER_PATH = 'Assets/model/NamelessDeity/CosmicLightCircleCenter1.png';
-const _WHEEL_PATH = 'Assets/model/NamelessDeity/Wheel.png';
-const _DIVINE_BODY_PATH = 'Assets/model/NamelessDeity/DivineBody.png';
-const _ANTLERS_PATH = 'Assets/model/NamelessDeity/Antlers1.png';
-const _VINES_PATH = 'Assets/model/NamelessDeity/Vines.png';
-const _CICADA_PATH = 'Assets/model/NamelessDeity/Cicada.png';
-const _CENSOR_PATH = 'Assets/model/NamelessDeity/Censor.png';
-const _SIDE_FLOWER_PATH = 'Assets/model/NamelessDeity/SideFlower2.png';
-const _ARM_PATH = 'Assets/model/NamelessDeity/Arm.png';
-const _FOREARM_PATH = 'Assets/model/NamelessDeity/Forearm.png';
-const _ELBOW_JOINT_PATH = 'Assets/model/NamelessDeity/ElbowJoint.png';
-const _HAND_PATH = 'Assets/model/NamelessDeity/Hand.png';
+const _WINGS_PATH = 'Assets/model/namelessDeity/Wings.png';
+const _COSMIC_LIGHT_CENTER_PATH = 'Assets/model/namelessDeity/CosmicLightCircleCenter1.png';
+const _WHEEL_PATH = 'Assets/model/namelessDeity/Wheel.png';
+const _DIVINE_BODY_PATH = 'Assets/model/namelessDeity/DivineBody.png';
+const _ANTLERS_PATH = 'Assets/model/namelessDeity/Antlers1.png';
+const _VINES_PATH = 'Assets/model/namelessDeity/Vines.png';
+const _CICADA_PATH = 'Assets/model/namelessDeity/Cicada.png';
+const _CENSOR_PATH = 'Assets/model/namelessDeity/Censor.png';
+const _SIDE_FLOWER_PATH = 'Assets/model/namelessDeity/SideFlower2.png';
+const _ARM_PATH = 'Assets/model/namelessDeity/Arm.png';
+const _FOREARM_PATH = 'Assets/model/namelessDeity/Forearm.png';
+const _ELBOW_JOINT_PATH = 'Assets/model/namelessDeity/ElbowJoint.png';
+const _HAND_PATH = 'Assets/model/namelessDeity/Hand.png';
 
 // Skin 2 Asset Paths
-const _WHEEL3_PATH = 'Assets/model/NamelessDeity/wheel9.png';
-const _WINGS2_PATH = 'Assets/model/NamelessDeity/Wings9.png';
-const _SIDE_FLOWER2_PATH = 'Assets/model/NamelessDeity/sideflower9.png';
-const _HAND2_PATH = 'Assets/model/NamelessDeity/hands9.png';
-const _FOREARM2_PATH = 'Assets/model/NamelessDeity/forearm9.png';
-const _ARM5_PATH = 'Assets/model/NamelessDeity/arm9.png';
-const _DIVINE_BODY2_PATH = 'Assets/model/NamelessDeity/deitybody9.png';
-const _ANTLERS2_PATH = 'Assets/model/NamelessDeity/antlers9.png';
-const _ANTLER_VINES_PATH = 'Assets/model/NamelessDeity/Vines1.png';
-const _VINES2_PATH = 'Assets/model/NamelessDeity/vines9.png';
+const _WHEEL3_PATH = 'Assets/model/namelessDeity/wheel9.png';
+const _WINGS2_PATH = 'Assets/model/namelessDeity/Wings9.png';
+const _SIDE_FLOWER2_PATH = 'Assets/model/namelessDeity/sideflower9.png';
+const _HAND2_PATH = 'Assets/model/namelessDeity/hands9.png';
+const _FOREARM2_PATH = 'Assets/model/namelessDeity/forearm9.png';
+const _ARM5_PATH = 'Assets/model/namelessDeity/arm9.png';
+const _DIVINE_BODY2_PATH = 'Assets/model/namelessDeity/deitybody9.png';
+const _ANTLERS2_PATH = 'Assets/model/namelessDeity/antlers9.png';
+const _ANTLER_VINES_PATH = 'Assets/model/namelessDeity/Vines1.png';
+const _VINES2_PATH = 'Assets/model/namelessDeity/vines9.png';
 
 function _getWingsImage() {
   if (_wingsImage && _wingsImage.complete && _wingsImage.naturalWidth > 0) return _wingsImage;

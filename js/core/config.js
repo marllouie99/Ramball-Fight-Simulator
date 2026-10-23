@@ -51,6 +51,7 @@ import { knightConfig } from '../configs/characters/knightConfig.js';
 import { spartanConfig } from '../configs/characters/spartanConfig.js';
 import { gutsConfig } from '../configs/characters/gutsConfig.js';
 import { chosoConfig } from '../configs/characters/chosoConfig.js';
+import { ashConfig } from '../configs/characters/ashConfig.js';
 import { sharpshooterConfig } from '../configs/characters/sharpshooterConfig.js';
 import { jazzConfig } from '../configs/characters/jazzConfig.js';
 import { circeConfig } from '../configs/characters/circeConfig.js';
@@ -93,6 +94,9 @@ export const CONFIG = {
   Sora: shiroConfig,
   sora_ngnl: shiroConfig,
   blank: shiroConfig,
+  ash: ashConfig,
+  Ash: ashConfig,
+  ash_ketchum: ashConfig,
   nobara: nobaraConfig,
   megumi: megumiConfig,
   megumin: meguminConfig,
@@ -1762,6 +1766,31 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: chosoConfig.ability || 'Blood Manipulation: Convergence',
     desc: chosoConfig.desc || 'Eldest brother of the Cursed Womb: Death Paintings from Jujutsu Kaisen. Converts cursed energy into inexhaustible blood reserves, seeds the arena with poisonous blood droplets, and transmutates all blood particles into a deadly multi-angle piercing laser crossfire grid.',
+  },
+  {
+    id: 62,
+    name: ashConfig.name || 'ASH',
+    grade: ashConfig.grade ?? DEFAULT_GRADE,
+    displayName: ashConfig.displayName || ashConfig.name || 'ASH',
+    category: 'Anime',
+    color: ashConfig.color || '#E53935',
+    themeColor: ashConfig.themeColor || '#E53935',
+    secondaryColor: ashConfig.secondaryColor || '#1E88E5',
+    startX: 300,
+    startY: 250,
+    startVx: 1.1,
+    startVy: 1.1,
+    radius: ashConfig.radius || ashConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'ash',
+    hp: ashConfig.hp || 420,
+    damage: ashConfig.damage || 22,
+    cooldown: ashConfig.cooldown || 45,
+    moveSpeed: ashConfig.moveSpeed || ashConfig.speed || 5.2,
+    projectileSpeedMultiplier: 1.0,
+    ability: ashConfig.ability || 'Pokémon Master & Honeycomb Barrier',
+    desc: ashConfig.desc || 'World Monarch Pokémon Trainer from Pallet Town. Summons Pikachu, Charizard, Greninja, and Lucario while projecting an impenetrable hexagonal Honeycomb Forcefield Barrier, and awakens Mega Evolution & 10,000,000 Volt Thunderbolt.',
   }
 ];
 

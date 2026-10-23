@@ -1243,6 +1243,11 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.8,
     delay: 0,
   },
+  'ash': {
+    src: 'Assets/Sound Effects/AshSFX/pb_throw.ogg',
+    volume: 0.85,
+    delay: 0,
+  },
   'spartan': {
     src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     volume: 0.9,

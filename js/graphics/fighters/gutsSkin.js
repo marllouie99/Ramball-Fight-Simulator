@@ -29,12 +29,12 @@ export function _getGutsHelmetImage() {
     };
     img.onerror = () => {
       if (!img.src.includes('.jpg')) {
-        img.src = 'Assets/model/Guts/Guts_helmet.jpg?v=1';
+        img.src = 'Assets/model/guts/Guts_helmet.jpg?v=1';
       } else {
         _gutsHelmetLoading = false;
       }
     };
-    img.src = 'Assets/model/Guts/Guts_helmet.png?v=1';
+    img.src = 'Assets/model/guts/Guts_helmet.png?v=1';
     _gutsHelmetImage = img;
   }
   return _gutsHelmetImage;
@@ -57,7 +57,7 @@ export function _getGutsHairImage() {
     img.onerror = () => {
       _gutsHairLoading = false;
     };
-    img.src = 'Assets/model/Guts/Guts-hair.png?v=1';
+    img.src = 'Assets/model/guts/Guts-hair.png?v=1';
     _gutsHairImage = img;
   }
   return _gutsHairImage;
@@ -168,7 +168,7 @@ function _renderGutsPixelBodyToCanvas(destCtx, r, isBerserker = false) {
 }
 
 /**
- * Draws Guts' authentic Berserker wolf helmet from Assets/model/Guts/Guts_helmet.png (Rule 22 compliant).
+ * Draws Guts' authentic Berserker wolf helmet from Assets/model/guts/Guts_helmet.png (Rule 22 compliant).
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r
  * @param {boolean} [facingLeft=false]
@@ -311,7 +311,7 @@ function _drawGutsCape(ctx, r, isCountdown = false) {
 
 /**
  * Draws Guts' signature spiky black hair with undercut & facial scar (Stance 1 Countdown / Neutral).
- * Imports Assets/model/Guts/Guts-hair.png (Rule 22 compliant) with procedural manga fallback.
+ * Imports Assets/model/guts/Guts-hair.png (Rule 22 compliant) with procedural manga fallback.
  */
 export function _drawGutsHair(ctx, r, facingLeft = false) {
   const hairImg = _getGutsHairImage();

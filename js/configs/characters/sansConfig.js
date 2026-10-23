@@ -5,7 +5,7 @@
 
 export const sansConfig = {
   assets: {
-    gasterBlasterSheet: 'Assets/model/Sans/Sans-gaster-blaster-sprite-sheet.png',
+    gasterBlasterSheet: 'Assets/model/sans/Sans-gaster-blaster-sprite-sheet.png',
   },
 
   name: 'sans',

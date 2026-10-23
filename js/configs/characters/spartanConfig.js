@@ -22,10 +22,10 @@ export const spartanConfig = {
   desc: 'Fights with a long-reach Dory spear and Hoplon shield, hurling heavy piercing Javelins at distant targets.',
 
   assets: {
-    hair: 'Assets/model/Spartan/spartan_helmet.png',
-    crest: 'Assets/model/Spartan/spartan_helmet.png',
-    shield: 'Assets/model/Spartan/spartan_shield.png',
-    spear: 'Assets/model/Spartan/spartan_spear.png',
+    hair: 'Assets/model/spartan/spartan_helmet.png',
+    crest: 'Assets/model/spartan/spartan_helmet.png',
+    shield: 'Assets/model/spartan/spartan_shield.png',
+    spear: 'Assets/model/spartan/spartan_spear.png',
   },
 
   // ── Hoplon Round Bronze Shield (Passive Frontal Deflection) ──

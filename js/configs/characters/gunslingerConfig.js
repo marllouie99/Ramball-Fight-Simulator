@@ -5,17 +5,17 @@
 
 export const gunslingerConfig = {
   assets: {
-    hair: 'Assets/model/Alucard/Red-hat.png',
-    hat: 'Assets/model/Alucard/Red-hat.png',
-    glasses: 'Assets/model/Alucard/Red-eye-glasses.png',
-    weaponCasull: 'Assets/model/Alucard/Hellsing_.454_Casull_Pixel_Pistol.png',
-    weaponJackal: 'Assets/model/Alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png',
+    hair: 'Assets/model/alucard/Red-hat.png',
+    hat: 'Assets/model/alucard/Red-hat.png',
+    glasses: 'Assets/model/alucard/Red-eye-glasses.png',
+    weaponCasull: 'Assets/model/alucard/Hellsing_.454_Casull_Pixel_Pistol.png',
+    weaponJackal: 'Assets/model/alucard/Hellsing_13mm_Jackal_Pixel_Pistol.png',
     hellhoundFrames: [
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame1.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame2.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame3.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame4.png',
-      'Assets/model/Alucard/Hellbound animation/Hellhound_frame5.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame1.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame2.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame3.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame4.png',
+      'Assets/model/alucard/Hellbound animation/Hellhound_frame5.png',
     ],
   },
 

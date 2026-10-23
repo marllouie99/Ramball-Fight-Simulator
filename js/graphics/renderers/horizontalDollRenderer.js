@@ -95,8 +95,8 @@ export const DOLL_METADATA = {
     facingRight: false,
   },
   guts: {
-    src: 'Assets/model/Guts/Guts_battle_stance.png',
-    srcCountdown: 'Assets/model/Guts/Guts_neutral_countdown.png',
+    src: 'Assets/model/guts/Guts_battle_stance.png',
+    srcCountdown: 'Assets/model/guts/Guts_neutral_countdown.png',
     type: 'static',
     drawW: 205,
     drawH: 155,
@@ -105,8 +105,8 @@ export const DOLL_METADATA = {
     facingRight: true,
   },
   berserker: {
-    src: 'Assets/model/Guts/Guts_battle_stance.png',
-    srcCountdown: 'Assets/model/Guts/Guts_neutral_countdown.png',
+    src: 'Assets/model/guts/Guts_battle_stance.png',
+    srcCountdown: 'Assets/model/guts/Guts_neutral_countdown.png',
     type: 'static',
     drawW: 205,
     drawH: 155,

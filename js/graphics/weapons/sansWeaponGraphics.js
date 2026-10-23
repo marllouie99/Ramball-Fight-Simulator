@@ -15,12 +15,12 @@ function _loadBlasterSprites() {
   _blasterFramesLoaded = true;
 
   const paths = [
-    'Assets/model/Sans/Animations/GasterBlaster/Default/000.png',
-    'Assets/model/Sans/Animations/GasterBlaster/Fire/000.png',
-    'Assets/model/Sans/Animations/GasterBlaster/Fire/001.png',
-    'Assets/model/Sans/Animations/GasterBlaster/Fire/002.png',
-    'Assets/model/Sans/Animations/GasterBlaster/Fire/003.png',
-    'Assets/model/Sans/Animations/GasterBlaster/Fire/004.png'
+    'Assets/model/sans/Animations/GasterBlaster/Default/000.png',
+    'Assets/model/sans/Animations/GasterBlaster/Fire/000.png',
+    'Assets/model/sans/Animations/GasterBlaster/Fire/001.png',
+    'Assets/model/sans/Animations/GasterBlaster/Fire/002.png',
+    'Assets/model/sans/Animations/GasterBlaster/Fire/003.png',
+    'Assets/model/sans/Animations/GasterBlaster/Fire/004.png'
   ];
 
   for (let i = 0; i < paths.length; i++) {
