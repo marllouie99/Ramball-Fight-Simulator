@@ -101,18 +101,21 @@ export const ashConfig = {
           id: 'thunderbolt',
           name: 'THUNDERBOLT!',
           hudLabel: 'THUNDERBOLT',
+          windupCallout: 'PIKA...',
+          attackCallout: '...CHUUUUUU!',
           cooldown: 135,             // Autonomous Thunderbolt cooldown (2.25s at 60 FPS)
-          windupFrames: 20,          // High-voltage cheek charging & spark gathering (~0.33s)
-          beamDurationFrames: 55,    // Continuous sustained lightning torrent (~0.92s)
-          beamTickRate: 6,           // Multi-tick damage delivered every 6 frames (~9 ticks total)
-          beamDamagePerTick: 5,      // Base damage per tick (~45 total damage across full beam)
-          beamWidth: 38,             // Width/thickness of crackling electrical beam
-          beamRange: 650,            // Screen-spanning reach across arena
-          beamKnockbackPerTick: 1.8, // Continuous directional pushback driving enemy along beam
+          windupFrames: 24,          // High-voltage cheek charging & spark gathering (~0.40s)
+          beamDurationFrames: 58,    // Continuous sustained lightning torrent (~0.97s)
+          beamTickRate: 5,           // Multi-tick damage delivered every 5 frames (~11 ticks)
+          beamDamagePerTick: 4,      // Base damage per tick (~44 total damage across full beam)
+          beamWidth: 42,             // Width/thickness of crackling electrical beam
+          beamRange: 680,            // Screen-spanning reach across arena
+          beamKnockbackPerTick: 1.6, // Continuous directional pushback driving enemy along beam
           paralyzeFramesPerTick: 20, // Electric stasis locks enemy inside the lightning stream
-          recoilPush: 1.2,           // Kinetic backward recoil kick on Pikachu while firing
-          screenShake: 4.5,          // Sustained rumble during active beam discharge
-          recoveryFrames: 14,        // Post-beam smoke cooling & recovery settle
+          stunAftermathFrames: 45,   // Aftermath electric stun duration on targets hit by beam (~0.75s)
+          recoilPush: 1.3,           // Kinetic backward recoil kick on Pikachu while firing
+          screenShake: 5.0,          // Sustained rumble during active beam discharge
+          recoveryFrames: 16,        // Post-beam smoke cooling & recovery settle
           specialSfx: 'thunderbolt',
           // Backward compatibility aliases
           specialDamage: 45,
@@ -130,6 +133,9 @@ export const ashConfig = {
       get specialCooldown() { return this.skills.special.cooldown; },
       get specialName() { return this.skills.special.name; },
       get hudSkillLabel() { return this.skills.special.hudLabel; },
+      get windupCallout() { return this.skills.special.windupCallout; },
+      get attackCallout() { return this.skills.special.attackCallout; },
+      get stunAftermathFrames() { return this.skills.special.stunAftermathFrames; },
       get specialDamage() { return this.skills.special.specialDamage; },
       get specialRadius() { return this.skills.special.specialRadius; },
       get thunderboltSpeed() { return this.skills.special.thunderboltSpeed; },

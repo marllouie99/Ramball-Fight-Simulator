@@ -9209,6 +9209,71 @@ async function runInteractionTests() {
     console.log('      ✅ Horizontal Mode Wide Arena (940x444), Camera Zoom (1.0), and Top Header HUD verified successfully.');
   }
 
+  // ⚡ 89. Testing Pikachu Thunderbolt Callout Sequence, Continuous Beam & Stun Aftermath with Electric Shock Sprite ⚡
+  {
+    console.log('   89. Testing Pikachu Thunderbolt Callout Sequence, Continuous Beam & Stun Aftermath with Electric Shock Sprite...');
+    const AshClass = FIGHTER_CLASS_MAP['ash'];
+    const CJClass = FIGHTER_CLASS_MAP['cj'];
+    assert(AshClass, 'Ash fighter class must exist in FIGHTER_CLASS_MAP');
+
+    const ash = new AshClass(100, 250, 0);
+    const cj = new CJClass(250, 250, 1);
+    state.fighters = [ash, cj];
+
+    // Verify Pokemon skills configuration schema in ashConfig
+    const { ashConfig } = await import('../js/configs/characters/ashConfig.js');
+    const pikaConfig = ashConfig.pokemonRoster.pikachu;
+    assert(pikaConfig.skills, 'Pikachu config must declare dedicated skills object');
+    assert(pikaConfig.skills.special, 'Pikachu config must declare skills.special');
+    assert(pikaConfig.skills.special.windupCallout === 'PIKA...', `Expected windupCallout 'PIKA...', got ${pikaConfig.skills.special.windupCallout}`);
+    assert(pikaConfig.skills.special.attackCallout === '...CHUUUUUU!', `Expected attackCallout '...CHUUUUUU!', got ${pikaConfig.skills.special.attackCallout}`);
+    assert(pikaConfig.skills.special.stunAftermathFrames === 45, `Expected stunAftermathFrames 45, got ${pikaConfig.skills.special.stunAftermathFrames}`);
+
+    // Spawn Pikachu
+    const { PokemonCompanionEntity } = await import('../js/entities/fighters/AshFighter.js');
+    const pika = new PokemonCompanionEntity(ash, 'pikachu', 150, 250);
+    ash.activePokemon = pika;
+    state.fighters.push(pika);
+    assert(pika && pika.speciesId === 'pikachu', 'Pikachu must be the active Pokemon');
+
+    // 1. Verify Phase 1: Windup charging & "PIKA..." callout
+    pika.startThunderbolt(cj, false);
+    assert(pika.thunderboltState === 'windup', `Expected thunderboltState 'windup', got ${pika.thunderboltState}`);
+    assert(pika.thunderboltTimer === 24, `Expected windup frames 24, got ${pika.thunderboltTimer}`);
+
+    // 2. Advance through windup to trigger Phase 2: Active Beam & "...CHUUUUUU!" callout
+    for (let f = 0; f < 24; f++) {
+      pika.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
+    }
+    assert(pika.thunderboltState === 'active', `Expected thunderboltState 'active', got ${pika.thunderboltState}`);
+    assert(pika.thunderboltTimer === 58, `Expected beam duration 58, got ${pika.thunderboltTimer}`);
+
+    // 3. Advance through active beam: verify multi-tick damage and ongoing stasis
+    const initialCjHp = cj.hp;
+    for (let f = 0; f < 30; f++) {
+      pika.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
+    }
+    assert(cj.hp < initialCjHp, `CJ must take damage from continuous Thunderbolt beam! (Before: ${initialCjHp}, After: ${cj.hp})`);
+    assert(cj.electricStunTimer > 0, 'CJ must be afflicted with electricStunTimer during Thunderbolt beam');
+    assert(cj.isParalyzed === true, 'CJ must be in paralyzed stasis during Thunderbolt beam');
+
+    // 4. Advance through remainder of beam into Phase 3: Stun Aftermath & Recovery
+    while (pika.thunderboltState === 'active') {
+      pika.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
+    }
+    assert(pika.thunderboltState === 'recovery', `Expected thunderboltState 'recovery', got ${pika.thunderboltState}`);
+    assert(cj.electricStunTimer >= 40, `CJ must retain >= 40 frames of electric stun aftermath, got ${cj.electricStunTimer}`);
+    assert(cj.paralyzeTimer >= 40, `CJ must retain >= 40 frames of paralyze stasis, got ${cj.paralyzeTimer}`);
+
+    // 5. Verify 12-Frame Golden Static Electric Shock Sprite renders with 100% Canvas 2D stack balance
+    const { drawElectricStunEffect } = await import('../js/graphics/statusEffects.js');
+    mockCtx.resetStackDepth();
+    drawElectricStunEffect(mockCtx, cj.r, false, cj);
+    assert(mockCtx.getStackDepth() === 0, 'drawElectricStunEffect must maintain balanced Canvas 2D stack depths');
+
+    console.log('      ✅ Pikachu Thunderbolt Callout Sequence ("PIKA..." -> "...CHUUUUUU!"), Continuous Beam, Stun Aftermath & 12-Frame Electric Shock Sprite verified successfully.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

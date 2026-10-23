@@ -560,12 +560,12 @@ export function drawPokemonCompanion(ctx, pokemon) {
       ctx.arc(originX, originY, Math.max(2, coronaR * 0.35), 0, Math.PI * 2);
       ctx.fill();
     } else if (pokemon.thunderboltState === 'active') {
-      const beamW = specSkill?.beamWidth || 38;
-      const maxRange = specSkill?.beamRange || 650;
+      const beamW = specSkill?.beamWidth || 42;
+      const maxRange = specSkill?.beamRange || 680;
       let beamLen = maxRange;
       if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0) {
         const distToTgt = Math.hypot(pokemon.thunderboltTarget.x - pokemon.x, pokemon.thunderboltTarget.y - pokemon.y);
-        beamLen = Math.min(maxRange, Math.max(130, distToTgt + 24));
+        beamLen = Math.min(maxRange, Math.max(distToTgt + 120, maxRange * 0.85));
       }
       const endX = originX + cosA * beamLen;
       const endY = originY + sinA * beamLen;
@@ -611,6 +611,33 @@ export function drawPokemonCompanion(ctx, pokemon) {
 
       // Layer 6: Continuous Concentric Supersonic Impact Compression Rings (Rule 26 Compliant)
       const wavePhase = (tick * 0.25) % 1.0;
+
+      // Impact blast directly on target's position
+      if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0) {
+        const tgtLocalX = pokemon.thunderboltTarget.x - pokemon.x;
+        const tgtLocalY = (pokemon.thunderboltTarget.y - (pokemon.thunderboltTarget.z || 0)) - pokemon.y;
+        for (let k = 0; k < 2; k++) {
+          const ringP = (wavePhase + k * 0.5) % 1.0;
+          const ringR = (beamW * 0.9) + ringP * (beamW * 1.5);
+          const ringAlpha = (1.0 - ringP) * 0.85;
+
+          ctx.strokeStyle = k === 0 ? '#FFFFFF' : '#FACC15';
+          ctx.lineWidth = (k === 0 ? 2.8 : 1.8) * (1.0 - ringP * 0.4);
+          ctx.globalAlpha = ringAlpha;
+          ctx.beginPath();
+          ctx.arc(tgtLocalX, tgtLocalY, ringR, 0, Math.PI * 2);
+          ctx.stroke();
+
+          if (k === 0) {
+            ctx.fillStyle = `rgba(250, 204, 21, ${(0.28 * ringAlpha).toFixed(3)})`;
+            ctx.beginPath();
+            ctx.arc(tgtLocalX, tgtLocalY, ringR * 0.7, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // Beam terminus compression rings
       for (let k = 0; k < 2; k++) {
         const ringP = (wavePhase + k * 0.45) % 1.0;
         const ringR = (beamW * 0.8) + ringP * (beamW * 1.4);

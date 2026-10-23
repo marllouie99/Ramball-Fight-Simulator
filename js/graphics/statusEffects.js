@@ -128,17 +128,124 @@ export function drawSlowEffect(ctx, baseRadius) {
   }
 }
 
-export function drawElectricStunEffect(ctx, baseRadius, useAggressiveMode) {
+// ---------------------------------------------------------------------------
+// 12-Frame Animated Static Effect Sprite Loader (Assets/effects/Static Effect/)
+// ---------------------------------------------------------------------------
+const STATIC_EFFECT_FRAME_COUNT = 12;
+const STATIC_CYAN_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/effects/Static Effect/static-${i + 1}.png`
+);
+const STATIC_GOLD_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/effects/Static Effect/static-gold-${i + 1}.png`
+);
+
+let _staticCyanFrames = [];
+let _staticCyanFramesLoading = false;
+let _staticGoldFrames = [];
+let _staticGoldFramesLoading = false;
+
+/**
+ * Loads and caches the 12 cyan electric static effect sprite frames.
+ * @returns {HTMLImageElement[]}
+ */
+export function _getStaticCyanFrames() {
+  if (
+    _staticCyanFrames.length === STATIC_EFFECT_FRAME_COUNT &&
+    _staticCyanFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _staticCyanFrames;
+  }
+  if (!_staticCyanFramesLoading && typeof Image !== 'undefined') {
+    _staticCyanFramesLoading = true;
+    _staticCyanFrames = [];
+    STATIC_CYAN_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _staticCyanFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load static effect cyan frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _staticCyanFrames[idx] = img;
+    });
+  }
+  return _staticCyanFrames;
+}
+
+/**
+ * Loads and caches the 12 golden lightning static effect sprite frames for Zenitsu and Pikachu.
+ * @returns {HTMLImageElement[]}
+ */
+export function _getStaticGoldFrames() {
+  if (
+    _staticGoldFrames.length === STATIC_EFFECT_FRAME_COUNT &&
+    _staticGoldFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _staticGoldFrames;
+  }
+  if (!_staticGoldFramesLoading && typeof Image !== 'undefined') {
+    _staticGoldFramesLoading = true;
+    _staticGoldFrames = [];
+    STATIC_GOLD_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => {
+        _staticGoldFrames[idx] = img;
+      };
+      img.onerror = (e) => {
+        console.warn(`Failed to load static effect gold frame ${idx + 1} at ${src}:`, e);
+      };
+      img.src = `${src}?v=1`;
+      _staticGoldFrames[idx] = img;
+    });
+  }
+  return _staticGoldFrames;
+}
+
+/**
+ * Returns either cyan or golden static effect frames.
+ * @param {boolean} isZenitsu
+ * @returns {HTMLImageElement[]}
+ */
+export function _getStaticEffectFrames(isZenitsu = false) {
+  return isZenitsu ? _getStaticGoldFrames() : _getStaticCyanFrames();
+}
+
+// Proactive eager initialization in browser environment
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getStaticCyanFrames();
+  _getStaticGoldFrames();
+}
+
+export function drawElectricStunEffect(ctx, baseRadius, useAggressiveMode, fighter = null) {
   ctx.save();
-  const now = Date.now();
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
   
-  // 1. Clean electric gold pulse on the body
+  // 1. 12-Frame Authentic Animated Golden Static Electric Sprite (Assets/effects/Static Effect/)
+  // Cadence: 30 FPS (33ms per frame, matching canonical sprite sheet timing)
+  const frames = _getStaticGoldFrames();
+  const frameIndex = Math.floor((now * 0.030) % STATIC_EFFECT_FRAME_COUNT);
+  const frameImg = frames[frameIndex];
+
+  let spriteDrawn = false;
+  if (frameImg && frameImg.complete && ((frameImg.naturalWidth || frameImg.width || 0) > 0)) {
+    const drawSize = (baseRadius || 25) * 3.20; // 80px envelope hugging 25px radius body perimeter
+    const prevSmoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(frameImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+    ctx.imageSmoothingEnabled = prevSmoothing;
+    spriteDrawn = true;
+  }
+
+  // 2. Clean electric gold pulse on the body
   ctx.fillStyle = 'rgba(255, 215, 0, 0.16)';
   ctx.beginPath();
-  ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+  ctx.arc(0, 0, baseRadius * 1.05, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Tilted 3D Golden/Cyan Electric Arcs ORBITING around the enemy's body
+  // 3. Tilted 3D Golden/Cyan Electric Arcs ORBITING around the enemy's body
   const stunOrbits = [
     { tilt: -0.38, rMult: 1.26, bRatio: 0.50, speed: 0.0080, span: 1.8, jitter: 3.8, phase: 0 },
     { tilt: 0.58,  rMult: 1.32, bRatio: 0.44, speed: -0.0070, span: 2.0, jitter: 4.2, phase: 2.8 }
@@ -154,7 +261,7 @@ export function drawElectricStunEffect(ctx, baseRadius, useAggressiveMode) {
     );
   }
 
-  // 3. Orbiting golden spark particles
+  // 4. Orbiting golden spark particles
   const numSparks = 4;
   ctx.fillStyle = '#FFFFFF';
   for (let s = 0; s < numSparks; s++) {
@@ -169,25 +276,62 @@ export function drawElectricStunEffect(ctx, baseRadius, useAggressiveMode) {
     ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
   }
 
-  // OPTIMIZATION: Skip shockwaves on low-end machines
-  if (!useAggressiveMode) {
-    const timeFactor1 = (now % 200) / 200; // Loops every 200ms
-    const timeFactor2 = ((now + 100) % 200) / 200; // Offset by 100ms
-    
-    // Inner thicker shockwave
-    ctx.strokeStyle = `rgba(255, 235, 120, ${1 - timeFactor1})`;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, baseRadius * (1 + timeFactor1 * 1.5), 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Outer thinner shockwave
-    ctx.strokeStyle = `rgba(255, 215, 0, ${1 - timeFactor2})`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, baseRadius * (1 + timeFactor2 * 2.5), 0, Math.PI * 2);
-    ctx.stroke();
+  // 5. Classic anime dizzy stun stars orbiting overhead
+  ctx.save();
+  if (fighter) {
+    const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft && !fighter.isSpinning) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(-angle);
   }
+
+  const starTime = now * 0.005;
+  const numStars = 2;
+  const starYOffset = -baseRadius - 14;
+  const starOrbitR = baseRadius * 0.70;
+
+  for (let s = 0; s < numStars; s++) {
+    const starAngle = (starTime * 2.2) + (s * Math.PI);
+    const sx = Math.cos(starAngle) * starOrbitR;
+    const sy = starYOffset + Math.sin(starAngle) * (starOrbitR * 0.35); // 3D squish
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.beginPath();
+    ctx.moveTo(0, -5.5);
+    ctx.lineTo(1.5, -1.5);
+    ctx.lineTo(5.5, 0);
+    ctx.lineTo(1.5, 1.5);
+    ctx.lineTo(0, 5.5);
+    ctx.lineTo(-1.5, 1.5);
+    ctx.lineTo(-5.5, 0);
+    ctx.lineTo(-1.5, -1.5);
+    ctx.closePath();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.95)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+  ctx.restore();
+
+  // 6. Clean Concentric Shockwave Pulse (Rule 26 Compliant - zero radial spokes)
+  if (!useAggressiveMode) {
+    const loopPhase = (now % 300) / 300;
+    for (let k = 0; k < 2; k++) {
+      const ringP = (loopPhase + k * 0.5) % 1.0;
+      const ringR = baseRadius * (1.0 + ringP * 0.85);
+      const ringAlpha = (1.0 - ringP) * 0.75;
+      ctx.strokeStyle = k === 0 ? `rgba(255, 255, 255, ${ringAlpha})` : `rgba(250, 204, 21, ${ringAlpha})`;
+      ctx.lineWidth = (k === 0 ? 2.0 : 1.4) * (1.0 - ringP * 0.3);
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
   ctx.restore();
 }
 
@@ -496,97 +640,6 @@ export function drawThunderRootsEffect(ctx, baseRadius, timer = 45) {
   }
 
   ctx.restore();
-}
-
-// ---------------------------------------------------------------------------
-// 12-Frame Animated Static Effect Sprite Loader (Assets/effects/Static Effect/)
-// ---------------------------------------------------------------------------
-const STATIC_EFFECT_FRAME_COUNT = 12;
-const STATIC_CYAN_FRAME_PATHS = Array.from(
-  { length: 12 },
-  (_, i) => `Assets/effects/Static Effect/static-${i + 1}.png`
-);
-const STATIC_GOLD_FRAME_PATHS = Array.from(
-  { length: 12 },
-  (_, i) => `Assets/effects/Static Effect/static-gold-${i + 1}.png`
-);
-
-let _staticCyanFrames = [];
-let _staticCyanFramesLoading = false;
-let _staticGoldFrames = [];
-let _staticGoldFramesLoading = false;
-
-/**
- * Loads and caches the 12 cyan electric static effect sprite frames.
- * @returns {HTMLImageElement[]}
- */
-export function _getStaticCyanFrames() {
-  if (
-    _staticCyanFrames.length === STATIC_EFFECT_FRAME_COUNT &&
-    _staticCyanFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
-  ) {
-    return _staticCyanFrames;
-  }
-  if (!_staticCyanFramesLoading && typeof Image !== 'undefined') {
-    _staticCyanFramesLoading = true;
-    _staticCyanFrames = [];
-    STATIC_CYAN_FRAME_PATHS.forEach((src, idx) => {
-      const img = new Image();
-      img.onload = () => {
-        _staticCyanFrames[idx] = img;
-      };
-      img.onerror = (e) => {
-        console.warn(`Failed to load static effect cyan frame ${idx + 1} at ${src}:`, e);
-      };
-      img.src = `${src}?v=1`;
-      _staticCyanFrames[idx] = img;
-    });
-  }
-  return _staticCyanFrames;
-}
-
-/**
- * Loads and caches the 12 golden lightning static effect sprite frames for Zenitsu.
- * @returns {HTMLImageElement[]}
- */
-export function _getStaticGoldFrames() {
-  if (
-    _staticGoldFrames.length === STATIC_EFFECT_FRAME_COUNT &&
-    _staticGoldFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
-  ) {
-    return _staticGoldFrames;
-  }
-  if (!_staticGoldFramesLoading && typeof Image !== 'undefined') {
-    _staticGoldFramesLoading = true;
-    _staticGoldFrames = [];
-    STATIC_GOLD_FRAME_PATHS.forEach((src, idx) => {
-      const img = new Image();
-      img.onload = () => {
-        _staticGoldFrames[idx] = img;
-      };
-      img.onerror = (e) => {
-        console.warn(`Failed to load static effect gold frame ${idx + 1} at ${src}:`, e);
-      };
-      img.src = `${src}?v=1`;
-      _staticGoldFrames[idx] = img;
-    });
-  }
-  return _staticGoldFrames;
-}
-
-/**
- * Returns either cyan or golden static effect frames.
- * @param {boolean} isZenitsu
- * @returns {HTMLImageElement[]}
- */
-export function _getStaticEffectFrames(isZenitsu = false) {
-  return isZenitsu ? _getStaticGoldFrames() : _getStaticCyanFrames();
-}
-
-// Proactive eager initialization in browser environment
-if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
-  _getStaticCyanFrames();
-  _getStaticGoldFrames();
 }
 
 /**
@@ -1849,7 +1902,7 @@ export const STATUS_OVERLAY_REGISTRY = [
   {
     id: 'electricStun',
     isActive: (f) => f.electricStunTimer > 0,
-    render: (ctx, baseRadius, f) => drawElectricStunEffect(ctx, baseRadius, false)
+    render: (ctx, baseRadius, f) => drawElectricStunEffect(ctx, baseRadius, false, f)
   },
   {
     id: 'grievousWounds',
