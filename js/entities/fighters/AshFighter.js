@@ -45,6 +45,15 @@ const EMPRESS_MOVE_CAST_FOLLOWUPS = {
   auraSphere:    { castKey: 'auraSphereCast',    delayFrames: 8 }
 };
 
+function _distToSegment(px, py, x1, y1, x2, y2) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+}
+
 /**
  * Autonomous Pokémon Companion Entity (Pikachu, Charizard, Greninja, Lucario).
  * Exists in state.fighters while deployed so enemies target and clash with the Pokémon.
@@ -112,10 +121,55 @@ class PokemonCompanionEntity extends Fighter {
     this.comboStep = 0;
     this.hurtAnimTimer = 0;
     this.faintTimer = 0;
+    this.thunderboltState = null;
+    this.thunderboltTimer = 0;
   }
 
   shoot() {
     // Intentionally empty (Rule 23): Pokémon uses dedicated melee blitz & elemental specials
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    this.thunderboltState = null;
+    this.thunderboltTimer = 0;
+    if (typeof super.interruptAttacks === 'function') {
+      super.interruptAttacks(forceCancelAll);
+    }
+  }
+
+  /**
+   * Initiates Pikachu's canonical Thunderbolt:
+   * Phase 1 (Windup): Coils, cheek pouches spark violently with gathered electricity (~0.33s).
+   * Phase 2 (Beam): Continuous blazing lightning beam torrent active for ~1 second with multi-tick damage, paralysis, and pushback!
+   * Phase 3 (Recovery): Residual electric discharge cools down.
+   */
+  startThunderbolt(target, isTrainerCommand = false) {
+    if (this.hp <= 0) return;
+    const specSkill = this.spec.skills?.special;
+    const castAngle = target
+      ? Math.atan2(target.y - this.y, target.x - this.x)
+      : (this.gunAngle || this.angle || 0);
+
+    this.thunderboltState = 'windup';
+    this.thunderboltTimer = specSkill?.windupFrames || 20;
+    this.thunderboltMaxWindup = this.thunderboltTimer;
+    this.thunderboltTarget = target;
+    this.thunderboltCastAngle = castAngle;
+    this.gunAngle = castAngle;
+    this.angle = castAngle;
+    this.animState = 'special';
+    this.actionAnimTimer = this.thunderboltTimer + (specSkill?.beamDurationFrames || 55) + 14;
+    this.animTick = 0;
+    this.thunderboltCmdMult = isTrainerCommand ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0;
+
+    // Tension coil brake: Pikachu plants its feet to charge electricity
+    this.vx *= 0.2;
+    this.vy *= 0.2;
+
+    spawnFloatingText(this.x, this.y - this.r - 22, specSkill?.name || 'THUNDERBOLT!', this.themeColor);
+    if (this.owner) {
+      this.owner._playMoveAudioSequence(specSkill?.specialSfx || 'thunderbolt');
+    }
   }
 
   awakenMega() {
@@ -168,6 +222,99 @@ class PokemonCompanionEntity extends Fighter {
     if (this.actionAnimTimer > 0) this.actionAnimTimer--;
     if (this.hurtAnimTimer > 0) this.hurtAnimTimer--;
 
+    // ── Pikachu Thunderbolt Windup, Sustained Active Beam, and Recovery Lifecycle ──
+    if (this.thunderboltState) {
+      const specSkill = this.spec.skills?.special;
+      const target = this.thunderboltTarget || opponent;
+
+      if (this.thunderboltState === 'windup') {
+        this.thunderboltTimer--;
+        this.animState = 'special';
+        this.gunAngle = this.thunderboltCastAngle;
+        this.angle = this.thunderboltCastAngle;
+        this.vx *= 0.5;
+        this.vy *= 0.5;
+
+        // Micro-rumble during high-voltage cheek charging
+        if (this.thunderboltTimer % 5 === 0) {
+          triggerGlobalScreenShake(1.5, 3);
+        }
+
+        if (this.thunderboltTimer <= 0) {
+          this.thunderboltState = 'active';
+          this.thunderboltTimer = specSkill?.beamDurationFrames || 55;
+          this.thunderboltMaxActive = this.thunderboltTimer;
+          triggerGlobalScreenShake(specSkill?.screenShake || 4.5, 8);
+        }
+      } else if (this.thunderboltState === 'active') {
+        this.thunderboltTimer--;
+        this.animState = 'special';
+
+        // Smooth micro-tracking towards target
+        if (this.thunderboltTarget && this.thunderboltTarget.hp > 0) {
+          const desiredAngle = Math.atan2(this.thunderboltTarget.y - this.y, this.thunderboltTarget.x - this.x);
+          const angleDiff = Math.atan2(Math.sin(desiredAngle - this.thunderboltCastAngle), Math.cos(desiredAngle - this.thunderboltCastAngle));
+          this.thunderboltCastAngle += Math.max(-0.035, Math.min(0.035, angleDiff));
+        }
+        this.gunAngle = this.thunderboltCastAngle;
+        this.angle = this.thunderboltCastAngle;
+
+        // Continuous kinetic recoil kick pushes Pikachu backward
+        const recoil = specSkill?.recoilPush || 1.2;
+        this.vx = -Math.cos(this.thunderboltCastAngle) * recoil;
+        this.vy = -Math.sin(this.thunderboltCastAngle) * recoil;
+
+        if (this.thunderboltTimer % 4 === 0) {
+          triggerGlobalScreenShake(specSkill?.screenShake || 4.5, 3);
+        }
+
+        // Multi-tick continuous lightning stream collision
+        const tickRate = specSkill?.beamTickRate || 6;
+        if (this.thunderboltTimer % tickRate === 0 && this.owner) {
+          const bonusMult = (this.thunderboltCmdMult || 1.0) * (this.isMega ? 1.25 : 1.0);
+          const dmg = Math.round((specSkill?.beamDamagePerTick || 5) * bonusMult);
+          const beamRange = specSkill?.beamRange || 650;
+          const beamW = specSkill?.beamWidth || 38;
+          const cosA = Math.cos(this.thunderboltCastAngle);
+          const sinA = Math.sin(this.thunderboltCastAngle);
+          const startX = this.x + cosA * (this.r * 0.7);
+          const startY = this.y - 12 + sinA * (this.r * 0.7);
+          const endX = startX + cosA * beamRange;
+          const endY = startY + sinA * beamRange;
+
+          const validEnemies = this.owner._getValidEnemyTargets(this.thunderboltTarget);
+          for (const enemy of validEnemies) {
+            const dist = _distToSegment(enemy.x, enemy.y, startX, startY, endX, endY);
+            if (dist <= (beamW / 2) + (enemy.r || 25)) {
+              this.owner._dealPokemonDamage(enemy, dmg, {
+                angle: this.thunderboltCastAngle,
+                knockback: specSkill?.beamKnockbackPerTick || 1.8,
+                paralyzeFrames: specSkill?.paralyzeFramesPerTick || 20,
+                isSpecial: true
+              });
+              spawnSparks(enemy.x, enemy.y, 4, 'gold', '#FACC15');
+            }
+          }
+        }
+
+        if (this.thunderboltTimer <= 0) {
+          this.thunderboltState = 'recovery';
+          this.thunderboltTimer = specSkill?.recoveryFrames || 14;
+        }
+      } else if (this.thunderboltState === 'recovery') {
+        this.thunderboltTimer--;
+        this.animState = 'idle';
+        this.vx *= 0.85;
+        this.vy *= 0.85;
+        if (this.thunderboltTimer <= 0) {
+          this.thunderboltState = null;
+        }
+      }
+
+      super.update(target, ownerIndex, arena);
+      return;
+    }
+
     // Acquire nearest valid enemy target
     const target = this.owner?._findBestTarget(opponent) || opponent;
     if (target && target.hp > 0) {
@@ -184,9 +331,13 @@ class PokemonCompanionEntity extends Fighter {
       this.vy = this.vy * 0.84 + Math.sin(targetAngle) * curSpd * 0.16;
 
       // Autonomous Signature Special Skill (e.g. Pikachu's THUNDERBOLT!) when ready
-      if (this.specialCooldown <= 0 && dist <= 440 && this.owner) {
+      if (this.specialCooldown <= 0 && dist <= 550 && this.owner) {
         this.specialCooldown = this.specialCooldownMax;
-        this.owner._executePokemonSpecial(this, target, false);
+        if (this.speciesId === 'pikachu') {
+          this.startThunderbolt(target, false);
+        } else {
+          this.owner._executePokemonSpecial(this, target, false);
+        }
       } else {
         // Melee Attack when within reach
         const reach = (this.spec.meleeReach || 68) + (target.r || 25);
@@ -727,41 +878,9 @@ export class AshFighter extends Fighter {
     const bonusMult = cmdMult * (p.isMega ? 1.25 : 1.0);
 
     if (p.speciesId === 'pikachu') {
-      // 1. Canonical Empress Thunderbolt Projectile (catalog.bytes: speed 830px/s -> 13.8px/frame, radius 16)
-      const boltSpeed = spec.thunderboltSpeed || 13.8;
-      const boltRadius = spec.thunderboltRadius || 16;
-      this.activeElementalProjectiles.push({
-        kind: 'thunderbolt',
-        homing: true,
-        target,
-        x: p.x + Math.cos(castAngle) * (p.r + 8),
-        y: p.y + Math.sin(castAngle) * (p.r + 8),
-        vx: Math.cos(castAngle) * boltSpeed,
-        vy: Math.sin(castAngle) * boltSpeed,
-        r: boltRadius,
-        life: 55,
-        damage: Math.round((spec.specialDamage || 28) * 0.55 * bonusMult),
-        knockback: 10,
-        paralyzeFrames: Math.round((spec.specialParalyzeFrames || 36) * 0.65),
-        color: '#FACC15'
-      });
-
-      // 2. Sky-Splitting Thunderbolt Lightning Column & Electric Arc Discharge onto Target
-      const strikeX = target ? target.x : (p.x + Math.cos(castAngle) * 110);
-      const strikeY = target ? target.y : (p.y + Math.sin(castAngle) * 110);
-      const rad = spec.specialRadius || 105;
-      this._spawnThunderboltStrikeEffect(p.x, p.y, strikeX, strikeY, rad, 24);
-      triggerGlobalScreenShake(6, 10);
-
-      for (const enemy of this._getValidEnemyTargets(target)) {
-        if (Math.hypot(enemy.x - strikeX, enemy.y - strikeY) <= rad + (enemy.r || 25)) {
-          this._dealPokemonDamage(enemy, Math.round((spec.specialDamage || 28) * 0.65 * bonusMult), {
-            knockback: 14,
-            angle: castAngle,
-            paralyzeFrames: spec.specialParalyzeFrames || 36,
-            isSpecial: true
-          });
-        }
+      if (typeof p.startThunderbolt === 'function') {
+        p.startThunderbolt(target, isTrainerCommand);
+        return;
       }
     } else if (p.speciesId === 'charizard') {
       // Flamethrower / Blue Flare Blitz Fire Stream + AOE Burst

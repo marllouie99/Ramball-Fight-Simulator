@@ -521,6 +521,119 @@ export function drawPokemonCompanion(ctx, pokemon) {
     ctx.stroke();
   }
 
+  // 3. Pikachu Thunderbolt Charging Windup & Continuous Lightning Torrent Beam
+  if (pokemon.thunderboltState) {
+    const castAngle = pokemon.thunderboltCastAngle || pokemon.gunAngle || 0;
+    const cosA = Math.cos(castAngle);
+    const sinA = Math.sin(castAngle);
+    const scale = pokemon.spriteScale || 1.5;
+    const ay = clipSpec.ay !== undefined ? clipSpec.ay : (clipSpec.fh * 0.6);
+    // Origin at Pikachu's cheek pouch
+    const originX = cosA * (r * 0.70);
+    const originY = groundY - (ay * scale * 0.45) + sinA * 4;
+    const specSkill = pokemon.spec?.skills?.special;
+    const tick = pokemon.animTick || 0;
+
+    if (pokemon.thunderboltState === 'windup') {
+      const p = 1.0 - Math.max(0, pokemon.thunderboltTimer / Math.max(1, pokemon.thunderboltMaxWindup || 20));
+      const coronaR = (r * 0.65) * (0.4 + 0.6 * p);
+
+      // High-voltage cheek charge aura
+      ctx.fillStyle = `rgba(250, 204, 21, ${(0.15 + 0.25 * p).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.arc(originX, originY, coronaR * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Converging jagged electric sparks into cheek pouches
+      ctx.strokeStyle = '#FACC15';
+      ctx.lineWidth = 1.8 + p * 1.2;
+      for (let s = 0; s < 4; s++) {
+        const sa = (Math.PI / 2) * s + (tick * 0.35);
+        const sparkStartX = originX + Math.cos(sa) * (coronaR * (1.8 - 0.7 * p));
+        const sparkStartY = originY + Math.sin(sa) * (coronaR * (1.8 - 0.7 * p));
+        _drawJaggedLightningPath(ctx, sparkStartX, sparkStartY, originX, originY, 4, 7, tick * 0.5 + s);
+      }
+
+      // White-hot plasma spark core at cheeks
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(originX, originY, Math.max(2, coronaR * 0.35), 0, Math.PI * 2);
+      ctx.fill();
+    } else if (pokemon.thunderboltState === 'active') {
+      const beamW = specSkill?.beamWidth || 38;
+      const maxRange = specSkill?.beamRange || 650;
+      let beamLen = maxRange;
+      if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0) {
+        const distToTgt = Math.hypot(pokemon.thunderboltTarget.x - pokemon.x, pokemon.thunderboltTarget.y - pokemon.y);
+        beamLen = Math.min(maxRange, Math.max(130, distToTgt + 24));
+      }
+      const endX = originX + cosA * beamLen;
+      const endY = originY + sinA * beamLen;
+
+      // Layer 1: Translucent Outer Golden Plasma Wash (Rule 11 compliant: zero shadowBlur)
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.34)';
+      ctx.lineWidth = beamW * 1.35;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      // Layer 2: High-Voltage Golden Ionization Sheath
+      ctx.strokeStyle = '#FACC15';
+      ctx.lineWidth = beamW * 0.65;
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      // Layer 3: Supersonic Pure White Laser Core
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = beamW * 0.28;
+      ctx.beginPath();
+      ctx.moveTo(originX, originY);
+      ctx.lineTo(endX, endY);
+      ctx.stroke();
+
+      // Layer 4: Branching Dynamic Jagged Lightning Paths
+      const numBranches = 3;
+      for (let b = 0; b < numBranches; b++) {
+        ctx.strokeStyle = b === 0 ? '#FFFFFF' : (b === 1 ? '#FEF08A' : '#FACC15');
+        ctx.lineWidth = b === 0 ? 1.6 : (b === 1 ? 2.4 : 3.2);
+        _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 12, beamW * 0.42, tick * 0.45 + b * 2.1);
+      }
+
+      // Layer 5: Cheeks Plasma Eruption Core
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(originX, originY, beamW * 0.40, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Layer 6: Continuous Concentric Supersonic Impact Compression Rings (Rule 26 Compliant)
+      const wavePhase = (tick * 0.25) % 1.0;
+      for (let k = 0; k < 2; k++) {
+        const ringP = (wavePhase + k * 0.45) % 1.0;
+        const ringR = (beamW * 0.8) + ringP * (beamW * 1.4);
+        const ringAlpha = (1.0 - ringP) * 0.85;
+
+        ctx.strokeStyle = k === 0 ? '#FFFFFF' : '#FACC15';
+        ctx.lineWidth = (k === 0 ? 2.6 : 1.8) * (1.0 - ringP * 0.4);
+        ctx.globalAlpha = ringAlpha;
+        ctx.beginPath();
+        ctx.arc(endX, endY, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        if (k === 0) {
+          ctx.fillStyle = `rgba(250, 204, 21, ${(0.24 * ringAlpha).toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(endX, endY, ringR * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      ctx.globalAlpha = 1.0;
+    }
+  }
+
   ctx.restore();
 
   // 3. Minion Health Bar cleanly anchored above Pokemon's head / crown

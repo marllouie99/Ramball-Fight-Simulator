@@ -80,22 +80,64 @@ export const ashConfig = {
       radius: 25,
       speed: 5.4,
       scale: 2.00,
-      meleeDamage: 18,
-      meleeReach: 64,
-      meleeCooldown: 34,
-      specialCooldown: 135,      // Autonomous Thunderbolt cooldown (2.25s)
-      specialName: 'THUNDERBOLT!',
-      hudSkillLabel: 'THUNDERBOLT',
-      specialDamage: 28,
-      specialRadius: 105,
-      thunderboltSpeed: 13.8,    // Canonical catalog.bytes speed: 830 px/s (~13.8 px/frame)
-      thunderboltRadius: 16,     // Canonical catalog.bytes radius: 16
-      specialParalyzeFrames: 36,
       cryKey: 'cryPikachu',
       megaCryKey: 'cryPikachuStarter',
-      meleeSfx: 'ironTail',
-      altMeleeSfx: 'quickAttack',
-      specialSfx: 'thunderbolt'
+
+      // ── Dedicated Skills Configuration (Fighter-Standard Schema) ──
+      skills: {
+        melee: {
+          id: 'quickAttack_ironTail',
+          name: 'QUICK ATTACK & IRON TAIL',
+          damage: 18,
+          reach: 64,
+          cooldown: 34,
+          knockback: 6,
+          hitStun: 12,
+          dashMultiplier: 1.60,
+          meleeSfx: 'ironTail',
+          altMeleeSfx: 'quickAttack'
+        },
+        special: {
+          id: 'thunderbolt',
+          name: 'THUNDERBOLT!',
+          hudLabel: 'THUNDERBOLT',
+          cooldown: 135,             // Autonomous Thunderbolt cooldown (2.25s at 60 FPS)
+          windupFrames: 20,          // High-voltage cheek charging & spark gathering (~0.33s)
+          beamDurationFrames: 55,    // Continuous sustained lightning torrent (~0.92s)
+          beamTickRate: 6,           // Multi-tick damage delivered every 6 frames (~9 ticks total)
+          beamDamagePerTick: 5,      // Base damage per tick (~45 total damage across full beam)
+          beamWidth: 38,             // Width/thickness of crackling electrical beam
+          beamRange: 650,            // Screen-spanning reach across arena
+          beamKnockbackPerTick: 1.8, // Continuous directional pushback driving enemy along beam
+          paralyzeFramesPerTick: 20, // Electric stasis locks enemy inside the lightning stream
+          recoilPush: 1.2,           // Kinetic backward recoil kick on Pikachu while firing
+          screenShake: 4.5,          // Sustained rumble during active beam discharge
+          recoveryFrames: 14,        // Post-beam smoke cooling & recovery settle
+          specialSfx: 'thunderbolt',
+          // Backward compatibility aliases
+          specialDamage: 45,
+          specialRadius: 105,
+          thunderboltSpeed: 13.8,
+          thunderboltRadius: 16,
+          specialParalyzeFrames: 36
+        }
+      },
+
+      // Backward compatibility getters
+      get meleeDamage() { return this.skills.melee.damage; },
+      get meleeReach() { return this.skills.melee.reach; },
+      get meleeCooldown() { return this.skills.melee.cooldown; },
+      get specialCooldown() { return this.skills.special.cooldown; },
+      get specialName() { return this.skills.special.name; },
+      get hudSkillLabel() { return this.skills.special.hudLabel; },
+      get specialDamage() { return this.skills.special.specialDamage; },
+      get specialRadius() { return this.skills.special.specialRadius; },
+      get thunderboltSpeed() { return this.skills.special.thunderboltSpeed; },
+      get thunderboltRadius() { return this.skills.special.thunderboltRadius; },
+      get specialParalyzeFrames() { return this.skills.special.specialParalyzeFrames; },
+      get meleeSfx() { return this.skills.melee.meleeSfx; },
+      get altMeleeSfx() { return this.skills.melee.altMeleeSfx; },
+      get specialSfx() { return this.skills.special.specialSfx; }
     },
     charizard: {
       id: 'charizard',
@@ -109,22 +151,65 @@ export const ashConfig = {
       radius: 26,
       speed: 5.0,
       scale: 1.65,
-      meleeDamage: 24,
-      meleeReach: 78,
-      meleeCooldown: 42,
-      specialCooldown: 150,
-      specialName: 'FLAMETHROWER!',
-      megaSpecialName: 'BLUE FLARE BLITZ!',
-      hudSkillLabel: 'FLAMETHROWER',
-      megaHudSkillLabel: 'BLUE FLARE BLITZ',
-      specialDamage: 32,
-      specialRadius: 120,
-      burnDps: 5,
-      burnDurationFrames: 150,
       cryKey: 'cryCharizard',
       megaCryKey: 'cryCharizardMega',
-      meleeSfx: 'dragonClaw',
-      specialSfx: 'flamethrower'
+
+      // ── Dedicated Skills Configuration ──
+      skills: {
+        melee: {
+          id: 'dragonClaw',
+          name: 'DRAGON CLAW',
+          damage: 24,
+          reach: 78,
+          cooldown: 42,
+          knockback: 8,
+          hitStun: 14,
+          meleeSfx: 'dragonClaw'
+        },
+        special: {
+          id: 'flamethrower',
+          name: 'FLAMETHROWER!',
+          hudLabel: 'FLAMETHROWER',
+          cooldown: 150,
+          windupFrames: 18,
+          streamDurationFrames: 45,
+          damage: 32,
+          specialRadius: 120,
+          burnDps: 5,
+          burnDurationFrames: 150,
+          specialSfx: 'flamethrower'
+        },
+        megaSpecial: {
+          id: 'blueFlareBlitz',
+          name: 'BLUE FLARE BLITZ!',
+          hudLabel: 'BLUE FLARE BLITZ',
+          cooldown: 150,
+          windupFrames: 16,
+          streamDurationFrames: 50,
+          damage: 42,
+          specialRadius: 140,
+          burnDps: 8,
+          burnDurationFrames: 180,
+          megaColor: '#38BDF8',
+          specialSfx: 'flamethrower'
+        }
+      },
+
+      // Backward compatibility getters
+      get meleeDamage() { return this.skills.melee.damage; },
+      get meleeReach() { return this.skills.melee.reach; },
+      get meleeCooldown() { return this.skills.melee.cooldown; },
+      get specialCooldown() { return this.skills.special.cooldown; },
+      get specialName() { return this.skills.special.name; },
+      get megaSpecialName() { return this.skills.megaSpecial?.name; },
+      get hudSkillLabel() { return this.skills.special.hudLabel; },
+      get megaHudSkillLabel() { return this.skills.megaSpecial?.hudLabel; },
+      get specialDamage() { return this.skills.special.damage; },
+      get specialRadius() { return this.skills.special.specialRadius; },
+      get burnDps() { return this.skills.special.burnDps; },
+      get burnDurationFrames() { return this.skills.special.burnDurationFrames; },
+      get meleeSfx() { return this.skills.melee.meleeSfx; },
+      get specialSfx() { return this.skills.special.specialSfx; }
     },
     greninja: {
       id: 'greninja',
@@ -136,18 +221,46 @@ export const ashConfig = {
       radius: 22,
       speed: 6.8,
       scale: 1.50,
-      meleeDamage: 20,
-      meleeReach: 70,
-      meleeCooldown: 30,
-      specialCooldown: 135,
-      specialName: 'WATER SHURIKEN!',
-      hudSkillLabel: 'WATER SHURIKEN',
-      specialDamage: 14, // Fires 3 piercing shurikens
-      shurikenCount: 3,
-      shurikenSpeed: 11.5,
       cryKey: 'cryGreninja',
-      meleeSfx: 'nightSlash',
-      specialSfx: 'waterShuriken'
+
+      // ── Dedicated Skills Configuration ──
+      skills: {
+        melee: {
+          id: 'nightSlash',
+          name: 'NIGHT SLASH',
+          damage: 20,
+          reach: 70,
+          cooldown: 30,
+          knockback: 6,
+          hitStun: 10,
+          meleeSfx: 'nightSlash'
+        },
+        special: {
+          id: 'waterShuriken',
+          name: 'WATER SHURIKEN!',
+          hudLabel: 'WATER SHURIKEN',
+          cooldown: 135,
+          windupFrames: 14,
+          damage: 14,
+          shurikenCount: 3,
+          shurikenSpeed: 11.5,
+          specialRadius: 90,
+          specialSfx: 'waterShuriken'
+        }
+      },
+
+      // Backward compatibility getters
+      get meleeDamage() { return this.skills.melee.damage; },
+      get meleeReach() { return this.skills.melee.reach; },
+      get meleeCooldown() { return this.skills.melee.cooldown; },
+      get specialCooldown() { return this.skills.special.cooldown; },
+      get specialName() { return this.skills.special.name; },
+      get hudSkillLabel() { return this.skills.special.hudLabel; },
+      get specialDamage() { return this.skills.special.damage; },
+      get shurikenCount() { return this.skills.special.shurikenCount; },
+      get shurikenSpeed() { return this.skills.special.shurikenSpeed; },
+      get meleeSfx() { return this.skills.melee.meleeSfx; },
+      get specialSfx() { return this.skills.special.specialSfx; }
     },
     lucario: {
       id: 'lucario',
@@ -161,20 +274,61 @@ export const ashConfig = {
       radius: 23,
       speed: 5.8,
       scale: 1.55,
-      meleeDamage: 22,
-      meleeReach: 68,
-      meleeCooldown: 35,
-      specialCooldown: 145,
-      specialName: 'AURA SPHERE!',
-      megaSpecialName: 'MAX AURA SPHERE!',
-      hudSkillLabel: 'AURA SPHERE',
-      megaHudSkillLabel: 'MAX AURA SPHERE',
-      specialDamage: 30,
-      auraSphereSpeed: 9.5,
       cryKey: 'cryLucario',
       megaCryKey: 'cryLucarioMega',
-      meleeSfx: 'closeCombat',
-      specialSfx: 'auraSphere'
+
+      // ── Dedicated Skills Configuration ──
+      skills: {
+        melee: {
+          id: 'closeCombat',
+          name: 'CLOSE COMBAT',
+          damage: 22,
+          reach: 68,
+          cooldown: 35,
+          knockback: 9,
+          hitStun: 16,
+          meleeSfx: 'closeCombat'
+        },
+        special: {
+          id: 'auraSphere',
+          name: 'AURA SPHERE!',
+          hudLabel: 'AURA SPHERE',
+          cooldown: 145,
+          windupFrames: 22,
+          damage: 30,
+          auraSphereSpeed: 9.5,
+          radius: 22,
+          specialRadius: 100,
+          specialSfx: 'auraSphere'
+        },
+        megaSpecial: {
+          id: 'maxAuraSphere',
+          name: 'MAX AURA SPHERE!',
+          hudLabel: 'MAX AURA SPHERE',
+          cooldown: 145,
+          windupFrames: 24,
+          damage: 44,
+          auraSphereSpeed: 11.0,
+          radius: 30,
+          specialRadius: 130,
+          megaColor: '#F43F5E',
+          specialSfx: 'auraSphere'
+        }
+      },
+
+      // Backward compatibility getters
+      get meleeDamage() { return this.skills.melee.damage; },
+      get meleeReach() { return this.skills.melee.reach; },
+      get meleeCooldown() { return this.skills.melee.cooldown; },
+      get specialCooldown() { return this.skills.special.cooldown; },
+      get specialName() { return this.skills.special.name; },
+      get megaSpecialName() { return this.skills.megaSpecial?.name; },
+      get hudSkillLabel() { return this.skills.special.hudLabel; },
+      get megaHudSkillLabel() { return this.skills.megaSpecial?.hudLabel; },
+      get specialDamage() { return this.skills.special.damage; },
+      get auraSphereSpeed() { return this.skills.special.auraSphereSpeed; },
+      get meleeSfx() { return this.skills.melee.meleeSfx; },
+      get specialSfx() { return this.skills.special.specialSfx; }
     }
   },
 
