@@ -488,6 +488,70 @@ body:not(.arena-dark-mode) .horizontal-viewport-mode .health-hud-side .health-ca
   text-align: right !important;
 }
 
+/* ─────────────────────────────────────────────────────────
+   HORIZONTAL MODE TOP DUEL COMBAT HUD
+   Header across the top of the window directly above wide arena
+   ───────────────────────────────────────────────────────── */
+.horizontal-viewport-mode .hud-top-container {
+  top: 6px !important;
+  left: 10px !important;
+  right: 10px !important;
+  width: calc(100% - 20px) !important;
+  max-width: 940px !important;
+  transform: none !important;
+}
+
+.horizontal-viewport-mode .hud-top-duel {
+  width: 100% !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+}
+
+.horizontal-viewport-mode .hud-top-player {
+  max-width: 410px !important;
+  flex: 1 1 410px !important;
+}
+
+.horizontal-viewport-mode .hud-top-bar {
+  height: 26px !important;
+}
+
+.horizontal-viewport-mode .hud-top-skills {
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+}
+
+.horizontal-viewport-mode .hud-top-p1 .hud-top-skills {
+  margin-left: 10px !important;
+  justify-content: flex-start !important;
+}
+
+.horizontal-viewport-mode .hud-top-p2 .hud-top-skills {
+  margin-right: 10px !important;
+  justify-content: flex-end !important;
+}
+
+.horizontal-viewport-mode .hud-top-skills .hud-skill-box {
+  min-width: 60px !important;
+  max-width: 110px !important;
+  height: 18px !important;
+  padding: 0 5px !important;
+  box-sizing: border-box !important;
+}
+
+.horizontal-viewport-mode .hud-top-skills .hud-skill-box-text {
+  font-size: 11px !important;
+  line-height: 18px !important;
+}
+
+.horizontal-viewport-mode .hud-top-skills .hud-skill-box-fill {
+  height: 100% !important;
+}
+
 .game-box h2 {
   margin: 0 0 12px;
   font-size: 24px;

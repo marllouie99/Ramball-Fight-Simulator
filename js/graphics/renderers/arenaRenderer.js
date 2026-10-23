@@ -1497,7 +1497,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   const is1v2 = (state.mode === 'Boss Battle' || state.mode === GAME_MODES?.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'Stand Off 1v2' || state.mode === GAME_MODES?.STAND_OFF_1V2);
   const is2v2 = (state.mode === '2v2' || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES?.TWO_VS_TWO || state.mode === GAME_MODES?.TACTICAL_2V2);
   const is4v4 = (state.mode === '4v4' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES?.TACTICAL_4V4);
-  const isDuel1v1 = !isHorizontal && (mainFighters.length === 2 && !is2v2 && !is4v4 && !is1v2);
+  const isDuel1v1 = (mainFighters.length === 2 && !is2v2 && !is4v4 && !is1v2);
 
   // In Boss Battle and 1v1 Duel modes, fighter names and healthbars are rendered in DOM (#hudTopContainer).
   // Skip canvas names to prevent duplicate clashing behind the Top HUD.

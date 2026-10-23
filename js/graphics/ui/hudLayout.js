@@ -53,7 +53,7 @@ export function syncHudPosition() {
 
   const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
   const isGrandBattle = isHorizontal && Boolean(typeof state !== 'undefined' && (
-    (state.arena && state.arena.width > 600) ||
+    (state.arena && state.arena.width >= 1200) ||
     state.mode === '3v3v3v3' ||
     state.mode === '2v2v2v2' ||
     state.mode === '4v4' ||
@@ -124,7 +124,7 @@ export function syncHudPosition() {
 
   // 1. Position Top HUD Container
   const topRatio = isHorizontal
-    ? ((arena.y - 28) / canvasHeight)
+    ? (6 / canvasHeight)
     : (is1v2 ? ((arena.y - 100) / canvasHeight) : ((arena.y - 90) / canvasHeight));
   const topPx = canvasTopInBox + canvasRect.height * topRatio;
   const topPercent = (topPx / boxRect.height) * 100;
@@ -132,12 +132,12 @@ export function syncHudPosition() {
   if (!_cachedTopContainer) _cachedTopContainer = document.getElementById('hudTopContainer');
   if (_cachedTopContainer) {
     setSafeStyle(_cachedTopContainer, 'top', `${topPercent.toFixed(3)}%`);
-    setSafeStyle(_cachedTopContainer, 'width', `${topVisualWidthPercent.toFixed(3)}%`, 'important');
-    setSafeStyle(_cachedTopContainer, 'max-width', 'none', 'important');
-    setSafeStyle(_cachedTopContainer, 'left', `${topVisualLeftPercent.toFixed(3)}%`, 'important');
-    setSafeStyle(_cachedTopContainer, 'right', 'auto', 'important');
-    setSafeStyle(_cachedTopContainer, 'margin', '0', 'important');
-    setSafeStyle(_cachedTopContainer, 'transform', isTactical ? 'none' : `scale(${hudScale})`);
+    setSafeStyle(_cachedTopContainer, 'width', isHorizontal ? 'calc(100% - 20px)' : `${topVisualWidthPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedTopContainer, 'max-width', isHorizontal ? '940px' : 'none', 'important');
+    setSafeStyle(_cachedTopContainer, 'left', isHorizontal ? '10px' : `${topVisualLeftPercent.toFixed(3)}%`, 'important');
+    setSafeStyle(_cachedTopContainer, 'right', isHorizontal ? '10px' : 'auto', 'important');
+    setSafeStyle(_cachedTopContainer, 'margin', isHorizontal ? '0 auto' : '0', 'important');
+    setSafeStyle(_cachedTopContainer, 'transform', isHorizontal ? 'none' : (isTactical ? 'none' : `scale(${hudScale})`));
     setSafeStyle(_cachedTopContainer, 'transform-origin', 'top center', 'important');
   }
 
@@ -190,7 +190,7 @@ export function syncHudPosition() {
     // are anchored cleanly at screen top (24px) spanning the screen height (canvasHeight - 48px).
     // In standard 1v1 mode, top is arena.y + 38px (below the 34px canvas name).
     // In standard multi-fighter mode, top is arena.y (aligned with the arena top wall).
-    const isLargeArena = Boolean(arena && arena.width > 600);
+    const isLargeArena = Boolean(arena && arena.width >= 1200);
     const sideTopPxInCanvas = isLargeArena ? 24 : (isMultiFighter ? arena.y : (arena.y + 38));
     const sideTopRatio = sideTopPxInCanvas / canvasHeight;
     const sideTopPx = canvasTopInBox + canvasRect.height * sideTopRatio;
@@ -267,8 +267,15 @@ export function updateTopHudCameraTracking(topContainer) {
   if (!topContainer) return;
 
   const isHorizontal = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+  if (isHorizontal) {
+    if (_lastTopHudStyle === 'horizontal') return;
+    _lastTopHudStyle = 'horizontal';
+    setSafeStyle(topContainer, 'transform', 'none', 'important');
+    return;
+  }
+
   const scale = CONFIG.internalScale || 1.0;
-  const baseHudScale = isHorizontal ? 0.80 : (scale * 0.9);
+  const baseHudScale = scale * 0.9;
   const curStyle = `${baseHudScale}`;
   if (_lastTopHudStyle === curStyle) return;
   _lastTopHudStyle = curStyle;

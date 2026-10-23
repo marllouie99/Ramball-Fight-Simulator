@@ -7,6 +7,7 @@ import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import { interactionManager } from '../interactions/index.js';
+import { isFfaMode } from '../core/viewportManager.js';
 
 /**
  * Camera System for Circle Mini-Battle
@@ -48,7 +49,7 @@ export function isGrandBattleActive() {
   if (!isH) return false;
   const m = (typeof state !== 'undefined' && state.mode) ? state.mode : '';
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
-  const isGrandSize = Boolean(arena && arena.width > 600);
+  const isGrandSize = Boolean(arena && arena.width >= 1200);
   return isGrandSize || Boolean(
     m === '3v3v3v3' ||
     m === '4v4' ||
@@ -94,7 +95,7 @@ export function resetCamera(immediate = false) {
   const centerX = arena.x + arena.width / 2;
   const centerY = arena.y + arena.height / 2;
   const isGrandBattle = isGrandBattleActive();
-  const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+  const isFfaArena = isGrandBattle && Boolean(arena && (isFfaMode(state.mode) || arena.centerObstacle));
   const defaultZoom = isGrandBattle ? (isFfaArena ? 0.58 : 0.36) : 1.0;
 
   if (!state.camera) {
@@ -183,7 +184,7 @@ export function updateCamera() {
 
   if (!isCombatActive) {
     const isGrand = isGrandBattleActive();
-    const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+    const isFfaArena = isGrand && Boolean(arena && (isFfaMode(state.mode) || arena.centerObstacle));
     const defaultZoom = isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0;
     camera.targetX = arenaCenterX;
     camera.targetY = arenaCenterY;
@@ -419,7 +420,7 @@ export function updateCamera() {
 
     if (!camera.enabled || camera.mode === 'fixed' || state.gameState === 'countdown') {
       const isGrand = isGrandBattleActive();
-      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+      const isFfaArena = isGrand && Boolean(arena && (isFfaMode(state.mode) || arena.centerObstacle));
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
       camera.targetZoom = isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0;
@@ -497,7 +498,7 @@ export function updateCamera() {
       const screenW = state.canvas ? state.canvas.width : 540;
       const screenH = state.canvas ? state.canvas.height : 960;
       const isGrand = isGrandBattleActive();
-      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+      const isFfaArena = isGrand && Boolean(arena && (isFfaMode(state.mode) || arena.centerObstacle));
       const safeW = isGrand ? (isFfaArena ? (screenW - 390) : (screenW - 40)) : (screenW - 90);
       const safeH = isGrand ? (screenH - 50) : Math.min(screenH - 120, 640);
       const padX = isGrand ? (isFfaArena ? 80 : 100) : 60;
@@ -508,10 +509,11 @@ export function updateCamera() {
       const envelopeFit = Math.min(fitZoomX, fitZoomY);
 
       // Distance curve mapping (Smooth Hermite from close melee to wide spread)
+      const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
       const minD = camCfg.minDist ?? 70;
-      const maxD = isGrand ? (isFfaArena ? 1100 : 1900) : (camCfg.maxDist ?? 520);
-      const effectiveMinZ = isGrand ? (isFfaArena ? 0.52 : 0.28) : minZ;
-      const effectiveMaxZ = isGrand ? (isFfaArena ? 0.64 : 0.70) : maxZ;
+      const maxD = isGrand ? (isFfaArena ? 1100 : 1900) : (isH ? 920 : (camCfg.maxDist ?? 520));
+      const effectiveMinZ = isGrand ? (isFfaArena ? 0.52 : 0.28) : (isH ? 0.95 : minZ);
+      const effectiveMaxZ = isGrand ? (isFfaArena ? 0.64 : 0.70) : (isH ? 1.05 : maxZ);
       const normDist = Math.max(0, Math.min(1, (diagDist - minD) / (maxD - minD)));
       const smoothT = normDist * normDist * (3 - 2 * normDist);
       const distanceZoom = effectiveMaxZ - smoothT * (effectiveMaxZ - effectiveMinZ);
@@ -530,7 +532,7 @@ export function updateCamera() {
     } else if (aliveFighters.length === 1) {
       // Winner focus during victory or solo stance
       const isGrand = isGrandBattleActive();
-      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+      const isFfaArena = isGrand && Boolean(arena && (isFfaMode(state.mode) || arena.centerObstacle));
       const winner = aliveFighters[0];
 
       // Delay camera focus transition to Makima if enemy died from Crucifixion
@@ -555,16 +557,17 @@ export function updateCamera() {
         camera.targetY = Math.max(minCamY, Math.min(maxCamY, holdY));
         camera.targetZoom = holdZoom;
       } else {
+        const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
         const winX = Number.isFinite(winner.x) ? winner.x : arenaCenterX;
         const winY = Number.isFinite(winner.y) ? (winner.y - (winner.z ? winner.z * 0.35 : 0)) : arenaCenterY;
 
         camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
         camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));
-        camera.targetZoom = isGrand ? (isFfaArena ? 0.65 : (camCfg.winnerZoom ?? 0.55)) : (camCfg.winnerZoom ?? 1.10);
+        camera.targetZoom = isGrand ? (isFfaArena ? 0.65 : (camCfg.winnerZoom ?? 0.55)) : (isH ? 1.0 : (camCfg.winnerZoom ?? 1.10));
       }
     } else {
       const isGrand = isGrandBattleActive();
-      const isFfaArena = Boolean(arena && arena.width > 600 && arena.width <= 1000);
+      const isFfaArena = isGrand && Boolean(arena && (isFfaMode(state.mode) || arena.centerObstacle));
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
       camera.targetZoom = isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0;

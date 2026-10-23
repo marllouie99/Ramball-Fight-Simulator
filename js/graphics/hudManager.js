@@ -388,9 +388,9 @@ export function drawHUD() {
   const isTLFSMode = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
   const isTeamMode = is2v2Mode || (is1v2Mode && !isBossBattleMode) || (mainFighters && mainFighters.length > 2 && !isFfaMode);
-  const isSideHud1v1 = isHorizontal && (is1v1Mode || isStandOffMode || isTLFSMode || isFfaMode || (mainFighters && mainFighters.length <= 4 && !is2v2Mode && !is1v2Mode));
   const isSoloBoss = isBossBattleMode && Boolean(state.bossBattleNoTeammate) && (mainFighters && mainFighters.length === 2);
-  const isDuelTopHud = !isSideHud1v1 && (!isBossBattleMode || isSoloBoss) && !isTeamMode && !isFfaMode && mainFighters.length === 2;
+  const isDuelTopHud = (!isBossBattleMode || isSoloBoss) && !isTeamMode && !isFfaMode && mainFighters.length === 2;
+  const isSideHud1v1 = isHorizontal && !isDuelTopHud && (is1v1Mode || isStandOffMode || isTLFSMode || isFfaMode || (mainFighters && mainFighters.length <= 4 && !is2v2Mode && !is1v2Mode));
 
   // FOC & Tactical modes HUD visibility
   let topHudOpacity = hudOpacity;
@@ -433,7 +433,7 @@ export function drawHUD() {
     containerBottom.classList.toggle('ffa-hud', isFfaMode && !isTactical);
     containerBottom.classList.toggle('tactical-hud', isTactical);
     const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
-    if (isSideHud1v1) {
+    if (isSideHud1v1 || (isHorizontal && isDuelTopHud)) {
       containerBottom.style.visibility = 'hidden';
       containerBottom.style.pointerEvents = 'none';
       containerBottom.style.display = 'none';
@@ -456,7 +456,7 @@ export function drawHUD() {
   if (containerLeft) {
     const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
     const mainF = (fighters || []).filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
-    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.HORIZONTAL_1V1 || (mainF && mainF.length <= 4 && mode !== GAME_MODES.TWO_VS_TWO && mode !== '2v2'));
+    const isSide1v1 = isH && !isDuelTopHud && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.HORIZONTAL_1V1 || (mainF && mainF.length <= 4 && mode !== GAME_MODES.TWO_VS_TWO && mode !== '2v2'));
     const sideOpacity = (CONFIG.saitama?.enableHudShatter && state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
     if (sideOpacity <= 0 || !containerLeft.children || !containerLeft.children.length || (!isSide1v1 && state.mode !== 'FFA' && !isTacticalMatch(state) && mainF.length <= 4)) {
       containerLeft.style.visibility = 'hidden';
@@ -472,7 +472,7 @@ export function drawHUD() {
   if (containerRight) {
     const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
     const mainF = (fighters || []).filter(f => f && !f.isTurret && !f.isEndCrystal && !f.isMinion && !f.isDeployable);
-    const isSide1v1 = isH && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.HORIZONTAL_1V1 || (mainF && mainF.length <= 4 && mode !== GAME_MODES.TWO_VS_TWO && mode !== '2v2'));
+    const isSide1v1 = isH && !isDuelTopHud && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TLFS || mode === 'TLFS' || mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.HORIZONTAL_1V1 || (mainF && mainF.length <= 4 && mode !== GAME_MODES.TWO_VS_TWO && mode !== '2v2'));
     const sideOpacity = (CONFIG.saitama?.enableHudShatter && state.hudShatters && state.hudShatters.bottomHudShatter) ? 0 : hudOpacity;
     if (sideOpacity <= 0 || !containerRight.children || !containerRight.children.length || (!isSide1v1 && state.mode !== 'FFA' && !isTacticalMatch(state) && mainF.length <= 4)) {
       containerRight.style.visibility = 'hidden';
@@ -908,11 +908,19 @@ export function drawComboCounter(ctx) {
   }
   if (!hasActiveCard) return;
 
-  const canvasW = (state.canvas && Number.isFinite(state.canvas.width)) ? state.canvas.width : (CONFIG.canvasWidth || 540);
+  const isH = Boolean(typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
+  const canvasW = (state.canvas && Number.isFinite(state.canvas.width)) ? state.canvas.width : (CONFIG.canvasWidth || (isH ? 960 : 540));
   const arena = state.arena || CONFIG.arena || {};
-  const arenaY = Number.isFinite(arena.y) ? arena.y : 240;
-  // Sits just under the scaled TOP HUD cards, hanging into the arena's empty top corner
-  const cardTop = Math.max(40, arenaY - cfg.topGapBelowHud);
+  const arenaY = Number.isFinite(arena.y) ? arena.y : (isH ? 84 : 240);
+  const arenaX = Number.isFinite(arena.x) ? arena.x : (isH ? 10 : 45);
+
+  // In horizontal widescreen mode with the top header HUD (arena Y = 84),
+  // position neatly below the top HUD frame and corner brackets inside the arena's top corners (Y = 92).
+  // In vertical mode (arena Y = 240), preserve exact legacy behavior (arenaY - topGapBelowHud = 196).
+  const isHArenaHeader = isH && Number.isFinite(arena.y) && arena.y >= 60;
+  const cardTop = isHArenaHeader
+    ? (Number.isFinite(cfg.horizontalTop) ? cfg.horizontalTop : (arenaY + 8))
+    : Math.max(40, arenaY - cfg.topGapBelowHud);
   const minHits = Math.max(1, cfg.minHits | 0);
   const thresholds = cfg.tierThresholds || [1, 5, 10, 20];
   const tierColors = cfg.tierColors || ['#E11D2E', '#FF3B30', '#FF7A00', '#FFD400'];
@@ -966,7 +974,10 @@ export function drawComboCounter(ctx) {
     const CARD_W = Math.max(86, contentW + 10);
 
     // Slide in from outside the window edge; right card mirrors the left
-    const inset = cfg.edgeInset || 12;
+    // Aligns with the Top HUD frame and arena boundary (18px in horizontal header mode, 45px in vertical mode)
+    const inset = isHArenaHeader
+      ? (Number.isFinite(cfg.horizontalEdgeInset) ? cfg.horizontalEdgeInset : (arenaX + 8))
+      : (cfg.edgeInset || 12);
     const targetX = slot.side === 0 ? inset : (canvasW - inset - CARD_W);
     const off = (1 - eased) * (CARD_W + 16);
     const x = slot.side === 0 ? targetX - off : targetX + off;
@@ -1857,7 +1868,7 @@ function getTopDuelTimerSecondsString() {
 /**
  * Builds the HTML structure for the Top Duel Combat HUD (Pop-Out Portrait Badge + Connected Top Health Bar + Lower Fighter Name & Win Badges + Center Timer).
  */
-export function buildTopDuelHUD(f1, f2, isDark = false) {
+export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2SkillsHTML = '') {
   if (!f1 || !f2) return '';
 
   const isF1Sans = Boolean(f1.characterId === 'sans' || f1.type === 'sans');
@@ -1970,6 +1981,7 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
           </div>
           <div class="hud-top-header">
             <span class="hud-top-name${f1SansClass}">${f1NameHtml}</span>
+            ${f1SkillsHTML ? `<div class="hud-top-skills">${f1SkillsHTML}</div>` : ''}
           </div>
         </div>
       </div>
@@ -2017,6 +2029,7 @@ export function buildTopDuelHUD(f1, f2, isDark = false) {
             `}
           </div>
           <div class="hud-top-header">
+            ${f2SkillsHTML ? `<div class="hud-top-skills">${f2SkillsHTML}</div>` : ''}
             <span class="hud-top-name${f2SansClass}">${f2NameHtml}</span>
           </div>
         </div>
@@ -3938,11 +3951,14 @@ function updateHealthHud() {
       });
     } else {
       // 1v1 / FFA Individual Mode
-      const isSideHud = isH && (is1v1 || isStandOff || isTLFS || isFfa || mainFighters.length <= 4);
-      const isDuelTopHud = !isSideHud && (!isBossBattle || isSoloBoss) && !isTeamHudMode && !isFfa && mainFighters.length === 2;
+      const isDuelTopHud = (!isBossBattle || isSoloBoss) && !isTeamHudMode && !isFfa && mainFighters.length === 2;
+      const isSideHud = isH && !isDuelTopHud && (is1v1 || isStandOff || isTLFS || isFfa || mainFighters.length <= 4);
 
       if (isDuelTopHud && _cachedTopContainer) {
-        _cachedTopContainer.innerHTML = buildTopDuelHUD(mainFighters[0], mainFighters[1], isDarkTheme);
+        const showSkills = isH && !CONFIG.hudHideAll && !CONFIG.hudHideSkillBars;
+        const f1Skills = showSkills ? generateFighterSkillsHTML(mainFighters[0], 'left', false) : '';
+        const f2Skills = showSkills ? generateFighterSkillsHTML(mainFighters[1], 'right', false) : '';
+        _cachedTopContainer.innerHTML = buildTopDuelHUD(mainFighters[0], mainFighters[1], isDarkTheme, f1Skills, f2Skills);
         _cachedTopContainer.style.display = 'flex';
         _cachedTopContainer.style.visibility = 'visible';
         _cachedTopContainer.style.opacity = '1';
@@ -4101,9 +4117,11 @@ function updateHealthHud() {
         const infoContainer = cardElement.querySelector('.health-card__info');
         const checkbox = cardElement.querySelector('input[type="checkbox"]');
 
-        const skillsContainer = cardElement.querySelector('.health-card__skills');
+        const topSkillsEl = (isDuelTopHud && topPlayerEl) ? topPlayerEl.querySelector('.hud-top-skills') : null;
+        const skillsContainer = topSkillsEl || cardElement.querySelector('.health-card__skills');
         const skillBars = new Map();
-        cardElement.querySelectorAll('.hud-skill-box').forEach(box => {
+        const skillSourceEl = topSkillsEl || cardElement;
+        skillSourceEl.querySelectorAll('.hud-skill-box').forEach(box => {
           const id = box.getAttribute('data-skill-id');
           const fill = box.querySelector('.hud-skill-box-fill');
           const text = box.querySelector('.hud-skill-box-text');

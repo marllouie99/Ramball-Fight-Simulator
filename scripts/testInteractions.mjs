@@ -9104,6 +9104,111 @@ async function runInteractionTests() {
     console.log('      ✅ 12-Frame Animated Punch Attack Template & 100% balanced Canvas 2D stack depths verified successfully.');
   }
 
+  // ── TEST 88: Horizontal Mode Wide Arena Geometry, Camera Zoom & Header HUD Placement ──
+  console.log('   88. Testing Horizontal Mode Wide Arena Geometry, Camera Zoom & Header HUD Placement...');
+  {
+    const { VIEWPORT_CONFIGS, VIEWPORT_MODES, getArenaConfigForMode } = await import('../js/core/viewportManager.js');
+    const { isGrandBattleActive, resetCamera } = await import('../js/systems/cameraSystem.js');
+    const { drawHUD, buildTopDuelHUD } = await import('../js/graphics/hudManager.js');
+
+    // 1. Verify Horizontal Arena Geometry
+    const hConfig = VIEWPORT_CONFIGS[VIEWPORT_MODES.HORIZONTAL];
+    assert(hConfig.arena.x === 10, `Expected horizontal arena x: 10, got ${hConfig.arena.x}`);
+    assert(hConfig.arena.y === 84, `Expected horizontal arena y: 84, got ${hConfig.arena.y}`);
+    assert(hConfig.arena.width === 940, `Expected horizontal arena width: 940, got ${hConfig.arena.width}`);
+    assert(hConfig.arena.height === 444, `Expected horizontal arena height: 444, got ${hConfig.arena.height}`);
+
+    // 2. Verify Viewport Isolation: Vertical Mode remains 100% unaltered (Rule 28 & Rule 0.8)
+    const vConfig = VIEWPORT_CONFIGS[VIEWPORT_MODES.VERTICAL];
+    assert(vConfig.arena.x === 45, `Vertical arena x altered! Expected 45, got ${vConfig.arena.x}`);
+    assert(vConfig.arena.y === 240, `Vertical arena y altered! Expected 240, got ${vConfig.arena.y}`);
+    assert(vConfig.arena.width === 450, `Vertical arena width altered! Expected 450, got ${vConfig.arena.width}`);
+    assert(vConfig.arena.height === 450, `Vertical arena height altered! Expected 450, got ${vConfig.arena.height}`);
+
+    const hDuelArena = getArenaConfigForMode('1v1', VIEWPORT_MODES.HORIZONTAL);
+    assert(hDuelArena.width === 940, `Expected getArenaConfigForMode 940 width, got ${hDuelArena.width}`);
+    assert(hDuelArena.height === 444, `Expected getArenaConfigForMode 444 height, got ${hDuelArena.height}`);
+
+    // 3. Verify Camera Zoom: Wide 940-width Duel Arena does NOT trigger Grand Battle zoom (zoom stays 1.0)
+    state.viewOrientation = 'horizontal';
+    state.mode = '1v1';
+    state.arena = { ...hConfig.arena };
+    assert(isGrandBattleActive() === false, 'Wide 940 duel arena must NOT trigger isGrandBattleActive');
+
+    resetCamera(true);
+    assert(state.camera.zoom === 1.0, `Expected camera zoom 1.0 in horizontal 1v1, got ${state.camera.zoom}`);
+    assert(state.camera.x === 480, `Expected camera center X 480, got ${state.camera.x}`);
+    assert(state.camera.y === 306, `Expected camera center Y 306, got ${state.camera.y}`);
+
+    // Grand battle mode still correctly activates
+    state.mode = '3v3v3v3';
+    assert(isGrandBattleActive() === true, '3v3v3v3 mode must trigger isGrandBattleActive');
+
+    // 4. Verify HUD Visibility & Top Duel HUD in Horizontal Mode
+    state.mode = '1v1';
+    const YujiClass = FIGHTER_CLASS_MAP['yuji'];
+    const CJClass = FIGHTER_CLASS_MAP['cj'];
+    const f1 = new YujiClass(200, 300, 0);
+    const f2 = new CJClass(700, 300, 1);
+    state.fighters = [f1, f2];
+
+    const topEl = globalThis.document.getElementById('hudTopContainer');
+    const bottomEl = globalThis.document.getElementById('healthHud');
+    const leftEl = globalThis.document.getElementById('healthHudLeft');
+    const rightEl = globalThis.document.getElementById('healthHudRight');
+
+    drawHUD();
+
+    // Top Duel HUD container must be visible in horizontal 1v1
+    assert(topEl.style.display === 'flex', `Expected topContainer display flex, got ${topEl.style.display}`);
+    // Bottom and side pods must be hidden in horizontal 1v1
+    assert(bottomEl.style.display === 'none', `Expected containerBottom display none, got ${bottomEl.style.display}`);
+    assert(leftEl.style.display === 'none', `Expected containerLeft display none, got ${leftEl.style.display}`);
+    assert(rightEl.style.display === 'none', `Expected containerRight display none, got ${rightEl.style.display}`);
+
+    // 5. Verify buildTopDuelHUD contains arcade profile, bar, and name
+    const topHtml = buildTopDuelHUD(f1, f2, false);
+    assert(topHtml.includes('hud-top-duel'), 'buildTopDuelHUD must contain hud-top-duel class');
+    assert(topHtml.includes('hud-top-profile'), 'buildTopDuelHUD must contain hud-top-profile avatar tile');
+    assert(topHtml.includes('hud-top-bar'), 'buildTopDuelHUD must contain arcade health bar hud-top-bar');
+    assert(topHtml.includes('hud-top-name'), 'buildTopDuelHUD must contain hud-top-name');
+
+    // 6. Verify Combo Banner Alignment in Horizontal Header Mode
+    const { ensureComboTrackers, resetComboTrackers } = await import('../js/systems/comboTracker.js');
+    const { drawComboCounter } = await import('../js/graphics/hudManager.js');
+    resetComboTrackers();
+    const cSlots = ensureComboTrackers();
+    cSlots[0].phase = 'hold';
+    cSlots[0].hits = 3;
+    cSlots[0].damage = 60;
+    cSlots[0].slideP = 1.0;
+    cSlots[0].timer = 60;
+
+    let translatedY = null;
+    let translatedX = null;
+    const origTranslate = mockCtx.translate;
+    mockCtx.translate = (tx, ty) => {
+      if (translatedY === null) {
+        translatedX = tx;
+        translatedY = ty;
+      }
+    };
+    mockCtx.resetStackDepth();
+    drawComboCounter(mockCtx);
+    mockCtx.translate = origTranslate;
+    assert(mockCtx.getStackDepth() === 0, 'drawComboCounter in horizontal mode corrupted canvas stack depth');
+    assert(translatedY === 92 + 34, `Expected horizontal cardTop center Y 126 (cardTop=92), got ${translatedY}`);
+    resetComboTrackers();
+
+    // Reset state to vertical defaults
+    state.viewOrientation = 'vertical';
+    state.mode = '1v1';
+    state.arena = { ...vConfig.arena };
+    resetCamera(true);
+
+    console.log('      ✅ Horizontal Mode Wide Arena (940x444), Camera Zoom (1.0), and Top Header HUD verified successfully.');
+  }
+
   console.log('───────────────────────────────────────────────────────');
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

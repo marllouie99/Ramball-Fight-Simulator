@@ -26,7 +26,7 @@ export const VIEWPORT_CONFIGS = {
   [VIEWPORT_MODES.HORIZONTAL]: {
     width: 960,
     height: 540,
-    arena: { x: 280, y: 70, width: 400, height: 400, wallWidth: 4, shape: 'rect' },
+    arena: { x: 10, y: 84, width: 940, height: 444, wallWidth: 4, shape: 'rect' },
     ffaArena: { x: 80, y: -130, width: 800, height: 800, wallWidth: 4, shape: 'rect', centerObstacle: { type: 'plus', size: 280, thickness: 90 } },
     grandArena: { x: -220, y: -430, width: 1400, height: 1400, wallWidth: 4, shape: 'rect' },
     survivorArena: {
