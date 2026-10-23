@@ -763,6 +763,20 @@ export function reinitFighters(isNewMatch = false) {
         state.fighters[2].vy = Math.sin(randAngle2) * state.fighters[2].speed;
       }
     }
+  } else if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
+    // Survivor Mode: Player spawns at rest in the exact center of the arena
+    const cx = arena.x + arena.width / 2;
+    const cy = arena.y + arena.height / 2;
+    if (state.fighters[0]) {
+      state.fighters[0].x = cx;
+      state.fighters[0].y = cy;
+      state.fighters[0].angle = 0;
+      state.fighters[0].gunAngle = 0;
+      state.fighters[0].rightGunAngle = 0;
+      state.fighters[0].leftGunAngle = 0;
+      state.fighters[0].vx = 0;
+      state.fighters[0].vy = 0;
+    }
   } else {
     // 1v1: Fighters on opposite sides, aligned horizontally, facing each other
     const centerY = arena.y + arena.height * 0.5;
@@ -1379,7 +1393,10 @@ export function resetMatch(showFaceOff = true) {
   state._isChampionLayoutActive = false;
   if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
     survivorSystem.initMatch(state.fighters[0]);
-  } else if (state.mode === 'TLFS') {
+  } else {
+    survivorSystem.reset();
+  }
+  if (state.mode === 'TLFS') {
     state.tlfsDefeatedEnemies = 0;
     if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
       state.p2Index = state.tlfsAllowedEnemies[Math.floor(Math.random() * state.tlfsAllowedEnemies.length)];

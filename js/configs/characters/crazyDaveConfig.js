@@ -21,8 +21,8 @@ export const crazyDaveConfig = {
 
   id: 'crazydave',
   name: 'Crazy Dave',
-  displayName: 'PLANTS',
-  grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  displayName: 'Crazy Dave',
+  grade: 'S',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Gaming',
   color: '#84CC16',          // Plant Lime Green
   themeColor: '#84CC16',     // Primary Theme Color

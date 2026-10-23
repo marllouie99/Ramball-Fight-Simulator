@@ -1,5 +1,11 @@
+export function isSurvivorModeActive() {
+  const m = (typeof state !== 'undefined' && state.mode) ? state.mode : '';
+  return m === 'Survivor' || m === 'survivor' || m === 'Circle Survivor' || (typeof GAME_MODES !== 'undefined' && m === GAME_MODES.SURVIVOR);
+}
+
 import { state } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
+import { GAME_MODES } from '../core/modeConfig.js';
 import { interactionManager } from '../interactions/index.js';
 
 /**
@@ -59,6 +65,31 @@ export function isGrandBattleActive() {
 }
 
 export function resetCamera(immediate = false) {
+  const isSurvivor = isSurvivorModeActive();
+  if (isSurvivor) {
+    const player = state.fighters && state.fighters[0];
+    const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: -300, y: -430, width: 1560, height: 1400 };
+    const px = (player && Number.isFinite(player.x)) ? player.x : (arena.x + arena.width / 2);
+    const py = (player && Number.isFinite(player.y)) ? (player.y - (player.z ? player.z * 0.35 : 0)) : (arena.y + arena.height / 2);
+    const defaultZoom = 0.85;
+
+    if (!state.camera) {
+      state.camera = initCameraState();
+    }
+
+    state.camera.targetX = px;
+    state.camera.targetY = py;
+    state.camera.targetZoom = defaultZoom;
+    state.camera.cinematicOverride = true;
+
+    if (immediate) {
+      state.camera.x = px;
+      state.camera.y = py;
+      state.camera.zoom = defaultZoom;
+    }
+    return;
+  }
+
   const arena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena || { x: 45, y: 240, width: 450, height: 450 };
   const centerX = arena.x + arena.width / 2;
   const centerY = arena.y + arena.height / 2;
@@ -161,6 +192,46 @@ export function updateCamera() {
     camera.y = arenaCenterY;
     camera.zoom = defaultZoom;
     camera.cinematicOverride = false;
+    return;
+  }
+
+  // Survivor Mode: Player is the absolute center of focus across all match states
+  // HoloCure Bounded Stage Standard: 1:1 camera lock with soft arena perimeter framing
+  if (isSurvivorModeActive()) {
+    camera.cinematicOverride = true;
+    const player = state.fighters && state.fighters[0];
+    const targetZoom = 0.85;
+    camera.targetZoom = targetZoom;
+
+    if (player && Number.isFinite(player.x) && Number.isFinite(player.y)) {
+      const px = player.x;
+      const py = player.y - (player.z ? player.z * 0.35 : 0);
+
+      // HoloCure Bounded Stage Pattern:
+      // Soft boundary clamp keeps the arena perimeter framed within the screen
+      const canvasW = (state.canvas && state.canvas.width) ? state.canvas.width : 960;
+      const canvasH = (state.canvas && state.canvas.height) ? state.canvas.height : 540;
+      const halfVisibleW = (canvasW / 2) / targetZoom;
+      const halfVisibleH = (canvasH / 2) / targetZoom;
+      const margin = 70; // Soft border margin
+
+      const minX = arena.x + halfVisibleW - margin;
+      const maxX = arena.x + arena.width - halfVisibleW + margin;
+      const minY = arena.y + halfVisibleH - margin;
+      const maxY = arena.y + arena.height - halfVisibleH + margin;
+
+      camera.targetX = (minX < maxX) ? Math.max(minX, Math.min(maxX, px)) : arenaCenterX;
+      camera.targetY = (minY < maxY) ? Math.max(minY, Math.min(maxY, py)) : arenaCenterY;
+    } else {
+      camera.targetX = arenaCenterX;
+      camera.targetY = arenaCenterY;
+    }
+
+    camera.x = camera.targetX;
+    camera.y = camera.targetY;
+
+    const zoomSmoothing = 0.08;
+    camera.zoom += (camera.targetZoom - camera.zoom) * zoomSmoothing;
     return;
   }
 
@@ -534,14 +605,20 @@ export function applyCameraToCtx(ctx) {
   const arenaCenterX = (arena.x || 0) + (arena.width || 450) / 2;
   const arenaCenterY = (arena.y || 0) + (arena.height || 450) / 2;
   const screenCenterX = (state.canvas && Number.isFinite(state.canvas.width)) ? (state.canvas.width / 2) : 270;
-  const screenCenterY = arenaCenterY;
+  const isSurvivor = isSurvivorModeActive();
+  const screenCenterY = isSurvivor
+    ? ((state.canvas && Number.isFinite(state.canvas.height)) ? (state.canvas.height / 2) : 270)
+    : arenaCenterY;
 
   const isDynamic = Boolean(cam && cam.enabled && (cam.mode === 'dynamic' || cam.cinematicOverride));
   const isZooming = Boolean(cam && Math.abs((cam.zoom || 1.0) - 1.0) > 0.0005);
 
   if (isDynamic || isZooming) {
-    const camX = (cam && Number.isFinite(cam.x)) ? cam.x : arenaCenterX;
-    const camY = (cam && Number.isFinite(cam.y)) ? cam.y : arenaCenterY;
+    const rawCamX = (cam && Number.isFinite(cam.x)) ? cam.x : arenaCenterX;
+    const rawCamY = (cam && Number.isFinite(cam.y)) ? cam.y : arenaCenterY;
+    // HoloCure Integer Pixel Snapping (eliminates sub-pixel swimming on pixel art):
+    const camX = isSurvivor ? Math.round(rawCamX) : rawCamX;
+    const camY = isSurvivor ? Math.round(rawCamY) : rawCamY;
     const camZoom = (cam && Number.isFinite(cam.zoom) && cam.zoom > 0) ? cam.zoom : 1.0;
     const shakeX = (cam && Number.isFinite(cam.shakeX)) ? cam.shakeX : 0;
     const shakeY = (cam && Number.isFinite(cam.shakeY)) ? cam.shakeY : 0;
@@ -570,7 +647,10 @@ export function worldToScreen(worldX, worldY) {
   const arenaCenterX = (arena.x || 0) + (arena.width || 450) / 2;
   const arenaCenterY = (arena.y || 0) + (arena.height || 450) / 2;
   const screenCenterX = (state.canvas && Number.isFinite(state.canvas.width)) ? (state.canvas.width / 2) : 270;
-  const screenCenterY = arenaCenterY;
+  const isSurvivor = isSurvivorModeActive();
+  const screenCenterY = isSurvivor
+    ? ((state.canvas && Number.isFinite(state.canvas.height)) ? (state.canvas.height / 2) : 270)
+    : arenaCenterY;
 
   const safeWorldX = Number.isFinite(worldX) ? worldX : arenaCenterX;
   const safeWorldY = Number.isFinite(worldY) ? worldY : arenaCenterY;
@@ -579,8 +659,10 @@ export function worldToScreen(worldX, worldY) {
   const isZooming = Boolean(cam && Math.abs((cam.zoom || 1.0) - 1.0) > 0.0005);
 
   if (isDynamic || isZooming) {
-    const camX = (cam && Number.isFinite(cam.x)) ? cam.x : arenaCenterX;
-    const camY = (cam && Number.isFinite(cam.y)) ? cam.y : arenaCenterY;
+    const rawCamX = (cam && Number.isFinite(cam.x)) ? cam.x : arenaCenterX;
+    const rawCamY = (cam && Number.isFinite(cam.y)) ? cam.y : arenaCenterY;
+    const camX = isSurvivor ? Math.round(rawCamX) : rawCamX;
+    const camY = isSurvivor ? Math.round(rawCamY) : rawCamY;
     const camZoom = (cam && Number.isFinite(cam.zoom) && cam.zoom > 0) ? cam.zoom : 1.0;
     const sx = screenCenterX + (safeWorldX - camX) * camZoom;
     const sy = screenCenterY + (safeWorldY - camY) * camZoom;

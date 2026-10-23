@@ -41,7 +41,6 @@ export const VIEWPORT_CONFIGS = {
         { type: 'rect', x: 860, y: -160, width: 80, height: 260 },
         { type: 'rect', x: 20, y: 440, width: 80, height: 260 },
         { type: 'rect', x: 860, y: 440, width: 80, height: 260 },
-        { type: 'plus', cx: 480, cy: 270, size: 240, thickness: 70 },
       ],
     },
     label: '🖥️ Horizontal (16:9 Widescreen)',

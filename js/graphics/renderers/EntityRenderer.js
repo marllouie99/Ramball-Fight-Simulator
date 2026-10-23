@@ -255,6 +255,9 @@ export function drawFighters() {
     if (!a.f) return -1;
     if (!b.f) return 1;
 
+    // Fast-path: Survivor horde mobs sort purely by Y depth (HoloCure pattern)
+    if (a.f.isSurvivorMob && b.f.isSurvivorMob) return a.f.y - b.f.y;
+
     // Target of ambush / counter MUST always render underneath the ambush/counter attacker
     const aIsTarget = a.f.isTargetOfAmbush;
     const bIsTarget = b.f.isTargetOfAmbush;
@@ -322,6 +325,11 @@ export function drawFighters() {
   _sortedFightersBuffer.forEach((item) => {
     const fighter = item.f;
     const fi = item.i;
+
+    // ── Skip survivor horde mobs — rendered by fast batch renderer ──
+    // (survivorMobRenderer.js via survivorSystem.drawInCameraSpace)
+    if (fighter && fighter.isSurvivorMob) return;
+
     const isParalyzedInSoulDisfigurement = Boolean(fighter && fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0);
     const isMakimaReviving = Boolean(fighter && (fighter.isRevivingFromContract || fighter.isShatterReviving || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0)));
     if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement && !isMakimaReviving) || (fighter.vanishTimer && fighter.vanishTimer > 0) || fighter._hideInBush) return;

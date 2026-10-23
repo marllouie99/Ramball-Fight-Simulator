@@ -6,11 +6,21 @@ import { FIGHTER_CLASS_MAP } from '../entities/factories/fighterFactory.js';
 import { resolveEntityPlusObstacleCollision, getArenaObstacles } from './arenaObstacleSystem.js';
 import { drawSurvivorUpgradeModal } from '../graphics/ui/SurvivorUpgradeModal.js';
 import { spawnSparks } from '../graphics/particles/sparkEffect.js';
+import { SurvivorSpatialHash } from './survivorSpatialHash.js';
+import { drawSurvivorMobsFast, clearMobStampCache } from '../graphics/renderers/survivorMobRenderer.js';
+import { resetCamera } from './cameraSystem.js';
+
 function _playSfx(id, volume = 1.0) {
   if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
     audioSystem.playSFX(id, volume);
   }
 }
+
+// ── HoloCure-Style Performance Constants ──
+const MOB_AI_STAGGER_FRAMES = 4;      // Mob direction recalculated every 4 frames (staggered)
+const MAX_ACTIVE_GEMS = 35;            // Gem consolidation cap (HoloCure pattern)
+const GEM_MERGE_DISTANCE_SQ = 80 * 80; // Distance² threshold for gem merging
+const OBSTACLE_BROADPHASE_MARGIN = 60;  // AABB margin for obstacle collision skip
 
 
 /**
@@ -24,6 +34,18 @@ function _playSfx(id, volume = 1.0) {
 
 export class SurvivorSystem {
   constructor() {
+    // ── Spatial Hash Grid for O(1) weapon hit queries (HoloCure pattern) ──
+    this._spatialHash = new SurvivorSpatialHash(128);
+
+    // ── Object Pools to reduce GC churn (HoloCure pattern) ──
+    this._mobPool = [];       // Recycled mob objects
+    this._gemPool = [];       // Recycled gem objects
+    this._nextMobStaggerId = 0; // Rolling stagger ID assignment
+
+    // ── Cached obstacle bounding boxes for AABB broadphase culling ──
+    this._obstacleAABBs = null;
+    this._obstacleAABBsArenaKey = '';
+
     this.reset();
   }
 
@@ -47,6 +69,14 @@ export class SurvivorSystem {
       finalBossDefeated: false,
       runVictory: false,
       runDefeat: false,
+
+      // HoloCure Stage Mode State:
+      bossWarningTimer: 0,
+      bossWarningText: '',
+      lastStampedeSec: -1,
+      lastSurroundSec: -1,
+      stageClearTimer: 0,
+      treasureUnboxTimer: 0,
 
       // Active Survivor Weapons & Ranks (0 = not acquired, 1-5 = rank)
       weapons: {
@@ -75,6 +105,11 @@ export class SurvivorSystem {
 
     this.gems = [];
     this.hordeMobs = [];
+    this._spatialHash.clear();
+    clearMobStampCache();
+    if (typeof state !== 'undefined') {
+      state.survivorState = this.state;
+    }
   }
 
   /**
@@ -110,6 +145,9 @@ export class SurvivorSystem {
     this.state.finalBossTime = (typeof cfg.finalBossTimeSec === 'number' ? cfg.finalBossTimeSec : matchDurationSec) * 60;
 
     state.survivorState = this.state;
+
+    // Center camera on player immediately at match start
+    resetCamera(true);
   }
 
   /**
@@ -145,11 +183,21 @@ export class SurvivorSystem {
     // 5. Player Auto-Aim Helper
     this._updatePlayerAutoAim(playerFighter);
 
-    // 6. Check Win Condition
+    // 6. Check Win Condition (HoloCure Stage Clear Sequence)
     if (this.state.finalBossSpawned && this.state.finalBossDefeated && !this.state.runVictory) {
       this.state.runVictory = true;
-      state.gameState = 'matchEnd';
-      state.matchWinner = 0; // Player 1 Wins!
+      this.state.stageClearTimer = 300; // 5 seconds of celebration before ending match
+      spawnFloatingText('🏆 STAGE COMPLETE! 🏆', playerFighter.x, playerFighter.y - 60, '#00FF66', 36);
+      triggerGlobalScreenShake(5.0, 24);
+      _playSfx('select', 1.0);
+    }
+
+    if (this.state.stageClearTimer > 0) {
+      this.state.stageClearTimer--;
+      if (this.state.stageClearTimer === 0) {
+        state.gameState = 'matchEnd';
+        state.matchWinner = 0; // Player 1 Wins!
+      }
     }
   }
 
@@ -192,8 +240,30 @@ export class SurvivorSystem {
     this.state.spawnInterval = Math.max(minInterval, Math.round(dynamicInterval / rateMultiplier));
     this.state.maxConcurrentMobs = maxMobs;
 
-    // Milestone: Mini-Boss 1 (Chest drop on defeat)
+    // Milestone Warning Sirens (HoloCure 3-second alert banner before boss arrival)
     const mb1Time = this.state.miniBoss1Time || 3600;
+    const mb2Time = this.state.miniBoss2Time || 7200;
+    const fbTime = this.state.finalBossTime || (this.state.maxDuration || 10800);
+
+    if (this.state.timer === mb1Time - 180) {
+      this.state.bossWarningTimer = 180;
+      this.state.bossWarningText = '⚠️ WARNING: ELITE COMMANDER INBOUND ⚠️';
+      _playSfx('menu_move', 0.9);
+    } else if (this.state.timer === mb2Time - 180) {
+      this.state.bossWarningTimer = 180;
+      this.state.bossWarningText = '⚠️ WARNING: PALADIN CHAMPIONS INBOUND ⚠️';
+      _playSfx('menu_move', 0.9);
+    } else if (this.state.timer === fbTime - 180) {
+      this.state.bossWarningTimer = 180;
+      this.state.bossWarningText = '⚠️ DANGER: THE DARK OVERLORD DESCENDS ⚠️';
+      _playSfx('menu_move', 1.0);
+    }
+
+    if (this.state.bossWarningTimer > 0) {
+      this.state.bossWarningTimer--;
+    }
+
+    // Milestone: Mini-Boss 1 (Chest drop on defeat)
     if (this.state.timer >= mb1Time && !this.state.miniBoss1Spawned) {
       this.state.miniBoss1Spawned = true;
       const bCfg = cfg.bosses?.miniBoss1;
@@ -210,7 +280,6 @@ export class SurvivorSystem {
     }
 
     // Milestone: Mini-Boss 2 (Twin Paladins / Champions)
-    const mb2Time = this.state.miniBoss2Time || 7200;
     if (this.state.timer >= mb2Time && !this.state.miniBoss2Spawned) {
       this.state.miniBoss2Spawned = true;
       const bCfg = cfg.bosses?.miniBoss2;
@@ -241,10 +310,34 @@ export class SurvivorSystem {
       }
     }
 
-    // Milestone: Climax Final Boss
-    const fbTime = this.state.finalBossTime || (this.state.maxDuration || 10800);
+    // Milestone: Climax Final Boss (HoloCure 20:00 Climax: wipe regular horde)
     if (this.state.timer >= fbTime && !this.state.finalBossSpawned) {
       this.state.finalBossSpawned = true;
+
+      // HoloCure 20:00 Climax: Wipe all regular horde mobs with an explosion
+      for (let i = this.hordeMobs.length - 1; i >= 0; i--) {
+        const mob = this.hordeMobs[i];
+        if (mob && !mob.isMiniBoss && !mob.isFinalBoss) {
+          this.gems.push({
+            x: mob.x,
+            y: mob.y,
+            vx: 0,
+            vy: 0,
+            type: 'blue',
+            color: '#00E5FF',
+            xp: 5,
+            radius: 5,
+            bobOffset: Math.random() * Math.PI * 2,
+          });
+          spawnSparks(mob.x, mob.y, 6, '#EF4444', 18);
+          mob.hp = 0;
+          mob.isDead = true;
+          this.hordeMobs.splice(i, 1);
+        }
+      }
+      triggerGlobalScreenShake(4.5, 16);
+      spawnFloatingText('⚔️ STAGE CLIMAX: THE FINAL BATTLE ⚔️', playerFighter.x, playerFighter.y - 60, '#EF4444', 30);
+
       const bCfg = cfg.bosses?.finalBoss;
       this._spawnConfiguredBoss(playerFighter, ar, bCfg, {
         characterId: 'knight',
@@ -256,6 +349,17 @@ export class SurvivorSystem {
         isChestDrop: false,
         isFinalBoss: true,
       });
+    }
+
+    // HoloCure Dynamic Formations (Stampedes & Ambush Rings)
+    if (seconds > 0 && !this.state.finalBossSpawned) {
+      if (seconds % 45 === 0 && this.state.lastStampedeSec !== seconds) {
+        this.state.lastStampedeSec = seconds;
+        this._spawnStampedeFormation(playerFighter, ar);
+      } else if (seconds % 70 === 0 && this.state.lastSurroundSec !== seconds) {
+        this.state.lastSurroundSec = seconds;
+        this._spawnSurroundRingFormation(playerFighter, ar);
+      }
     }
 
     // Regular Swarm Spawns
@@ -273,6 +377,111 @@ export class SurvivorSystem {
   }
 
   /**
+   * Helper to instantiate and initialize a single horde mob.
+   */
+  _createHordeMobInstance(rawCharId, x, y, hp, speed, damage, isElite = false) {
+    const charKey = String(rawCharId).toLowerCase().trim();
+    const FighterClass = FIGHTER_CLASS_MAP[charKey] || FIGHTER_CLASS_MAP[rawCharId] || FIGHTER_CLASS_MAP['knight'];
+    if (!FighterClass) return null;
+
+    const baseDef = (typeof FIGHTER_DEFS !== 'undefined' && FIGHTER_DEFS.find(d => d && (d.type === charKey || d.characterId === charKey || d.name?.toLowerCase() === charKey))) || {};
+
+    const effectiveHp = isElite ? Math.round(hp * 2.5) : hp;
+    const effectiveRadius = isElite ? Math.round((baseDef.radius || 20) * 1.25) : (baseDef.radius || 20);
+    const effectiveSpeed = isElite ? speed * 1.08 : speed;
+    const effectiveDmg = isElite ? Math.round(damage * 1.35) : damage;
+
+    const def = {
+      ...baseDef,
+      id: 9000 + Math.floor(Math.random() * 99999),
+      name: baseDef.name ? `${isElite ? 'Elite ' : ''}${baseDef.name} Swarm` : `${rawCharId} Swarm`,
+      color: baseDef.color || '#9e9e9e',
+      themeColor: baseDef.themeColor || '#718096',
+      startX: x,
+      startY: y,
+      startVx: 0,
+      startVy: 0,
+      radius: effectiveRadius,
+      type: rawCharId,
+      characterId: rawCharId,
+      hp: effectiveHp,
+      maxHp: effectiveHp,
+      damage: effectiveDmg,
+      cooldown: 40,
+      moveSpeed: effectiveSpeed,
+      isMinion: true,
+      isSurvivorMob: true,
+      team: 1,
+    };
+
+    const mob = new FighterClass(def);
+    mob.x = x;
+    mob.y = y;
+    mob.team = 1;
+    mob.characterId = rawCharId;
+    mob.type = rawCharId;
+    mob.isSurvivorMob = true;
+    mob.isMinion = true;
+    mob.touchAttackCooldown = 0;
+    mob.maxHp = effectiveHp;
+    mob.hp = effectiveHp;
+    mob.damage = effectiveDmg;
+    mob.moveSpeed = effectiveSpeed;
+    mob.r = effectiveRadius;
+    mob.radius = effectiveRadius;
+    mob.isElite = isElite;
+
+    // HoloCure stagger ID for distributed AI ticks
+    mob._staggerId = this._nextMobStaggerId++;
+    mob._cachedDirX = 0;
+    mob._cachedDirY = 0;
+    mob._hitStunDuration = 6;
+
+    return mob;
+  }
+
+  /**
+   * Spawns a synchronized wall/line stampede formation of mobs (HoloCure Stampede).
+   */
+  _spawnStampedeFormation(playerFighter, ar) {
+    if (this.hordeMobs.length >= this.state.maxConcurrentMobs - 6) return;
+    const count = 7;
+    const fromRight = Math.random() > 0.5;
+    const spawnX = fromRight ? (ar.x + ar.width + 40) : (ar.x - 40);
+    const startY = Math.max(ar.y + 60, Math.min(ar.y + ar.height - 350, playerFighter.y - 140));
+    const stepY = 46;
+    for (let i = 0; i < count; i++) {
+      const sy = startY + i * stepY;
+      const mob = this._createHordeMobInstance('knight', spawnX, sy, 55, 2.0, 12, false);
+      if (mob) {
+        this.hordeMobs.push(mob);
+        state.fighters.push(mob);
+      }
+    }
+    spawnFloatingText('⚠️ HORDE STAMPEDE!', playerFighter.x, playerFighter.y - 45, '#F59E0B', 24);
+  }
+
+  /**
+   * Spawns an enclosing 360° ring formation of mobs around the player (HoloCure Ambush).
+   */
+  _spawnSurroundRingFormation(playerFighter, ar) {
+    if (this.hordeMobs.length >= this.state.maxConcurrentMobs - 8) return;
+    const count = 12;
+    const ringRadius = 400;
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const sx = playerFighter.x + Math.cos(angle) * ringRadius;
+      const sy = playerFighter.y + Math.sin(angle) * ringRadius;
+      const mob = this._createHordeMobInstance('knight', sx, sy, 45, 1.8, 10, false);
+      if (mob) {
+        this.hordeMobs.push(mob);
+        state.fighters.push(mob);
+      }
+    }
+    spawnFloatingText('⭕ AMBUSH SURROUND!', playerFighter.x, playerFighter.y - 45, '#A855F7', 24);
+  }
+
+  /**
    * Spawns a regular horde mob chosen randomly from cfg.enemyPool.
    */
   _spawnRegularMob(playerFighter, ar) {
@@ -287,10 +496,6 @@ export class SurvivorSystem {
     }
 
     const rawCharId = pool[Math.floor(Math.random() * pool.length)] || 'knight';
-    const charKey = String(rawCharId).toLowerCase().trim();
-    const FighterClass = FIGHTER_CLASS_MAP[charKey] || FIGHTER_CLASS_MAP[rawCharId] || FIGHTER_CLASS_MAP['knight'];
-    if (!FighterClass) return;
-
     const coords = this._getRandomPerimeterPosition(ar);
     const seconds = Math.floor(this.state.timer / 60);
 
@@ -298,48 +503,13 @@ export class SurvivorSystem {
     const hp = 45 + Math.min(100, seconds * 0.8);
     const speed = 1.6 + Math.min(1.0, seconds * 0.005);
     const damage = 10 + Math.min(15, Math.floor(seconds * 0.1));
+    const isElite = Math.random() < 0.07; // 7% Elite mob chance
 
-    const baseDef = (typeof FIGHTER_DEFS !== 'undefined' && FIGHTER_DEFS.find(d => d && (d.type === charKey || d.characterId === charKey || d.name?.toLowerCase() === charKey))) || {};
-
-    const def = {
-      ...baseDef,
-      id: 9000 + Math.floor(Math.random() * 99999),
-      name: baseDef.name ? `${baseDef.name} Swarm` : `${rawCharId} Swarm`,
-      color: baseDef.color || '#9e9e9e',
-      themeColor: baseDef.themeColor || '#718096',
-      startX: coords.x,
-      startY: coords.y,
-      startVx: 0,
-      startVy: 0,
-      radius: baseDef.radius || 20,
-      type: rawCharId,
-      characterId: rawCharId,
-      hp: hp,
-      maxHp: hp,
-      damage: damage,
-      cooldown: 40,
-      moveSpeed: speed,
-      isMinion: true,
-      isSurvivorMob: true,
-      team: 1,
-    };
-
-    const mob = new FighterClass(def);
-    mob.x = coords.x;
-    mob.y = coords.y;
-    mob.team = 1;
-    mob.characterId = rawCharId;
-    mob.type = rawCharId;
-    mob.isSurvivorMob = true;
-    mob.isMinion = true;
-    mob.touchAttackCooldown = 0;
-    mob.maxHp = hp;
-    mob.hp = hp;
-    mob.damage = damage;
-    mob.moveSpeed = speed;
-
-    this.hordeMobs.push(mob);
-    state.fighters.push(mob);
+    const mob = this._createHordeMobInstance(rawCharId, coords.x, coords.y, hp, speed, damage, isElite);
+    if (mob) {
+      this.hordeMobs.push(mob);
+      state.fighters.push(mob);
+    }
   }
 
   /**
@@ -422,6 +592,12 @@ export class SurvivorSystem {
     boss.damage = damage;
     boss.moveSpeed = speed;
 
+    // ── HoloCure stagger ID for distributed AI ticks ──
+    boss._staggerId = this._nextMobStaggerId++;
+    boss._cachedDirX = 0;
+    boss._cachedDirY = 0;
+    boss._hitStunDuration = 6;
+
     this.hordeMobs.push(boss);
     state.fighters.push(boss);
 
@@ -456,10 +632,15 @@ export class SurvivorSystem {
   }
 
   /**
-   * Updates all active horde mobs.
+   * Updates all active horde mobs with staggered AI ticks (HoloCure pattern).
+   * Direction recalculation is staggered across frames to reduce per-frame Math.atan2 calls.
    */
   _updateHordeMobs(playerFighter, arena) {
     const ar = arena || state.arena;
+    const timer = this.state.timer;
+
+    // ── Rebuild spatial hash for this frame (weapon queries use it) ──
+    this._spatialHash.clear();
 
     for (let i = this.hordeMobs.length - 1; i >= 0; i--) {
       const mob = this.hordeMobs[i];
@@ -484,26 +665,34 @@ export class SurvivorSystem {
       if (mob.katanaSlashTimer > 0) mob.katanaSlashTimer--;
       if (mob.hitStunTimer > 0) mob.hitStunTimer--;
 
-      // Track & advance toward player
+      // ── Staggered Direction Update (HoloCure optimization) ──
+      // Only recalculate atan2 every MOB_AI_STAGGER_FRAMES frames per mob,
+      // using the mob's stagger ID to distribute work across frames.
       const dx = playerFighter.x - mob.x;
       const dy = playerFighter.y - mob.y;
       const dist = Math.hypot(dx, dy) || 0.001;
+
+      if ((timer + mob._staggerId) % MOB_AI_STAGGER_FRAMES === 0) {
+        // Full direction recalc on this mob's stagger frame
+        mob._cachedDirX = dx / dist;
+        mob._cachedDirY = dy / dist;
+        mob.gunAngle = Math.atan2(dy, dx);
+        mob.angle = mob.gunAngle;
+      }
+
       let speed = mob.moveSpeed || 1.8;
       if (mob.hitStunTimer > 0) speed *= 0.35;
       if (mob.freezeTimer > 0) speed = 0;
 
-      mob.gunAngle = Math.atan2(dy, dx);
-      mob.angle = mob.gunAngle;
-
       if (speed > 0) {
-        mob.vx = (dx / dist) * speed;
-        mob.vy = (dy / dist) * speed;
+        mob.vx = (mob._cachedDirX || 0) * speed;
+        mob.vy = (mob._cachedDirY || 0) * speed;
         mob.x += mob.vx;
         mob.y += mob.vy;
       }
 
-      // Obstacle & Wall Collisions
-      resolveEntityPlusObstacleCollision(mob, ar);
+      // ── AABB Broadphase Obstacle Collision (skip distant mobs) ──
+      this._resolveObstacleCollisionFast(mob, ar);
 
       // Arena boundary clamp
       if (mob.x < ar.x + mob.r) { mob.x = ar.x + mob.r; mob.vx = Math.abs(mob.vx); }
@@ -528,10 +717,56 @@ export class SurvivorSystem {
           spawnSparks(playerFighter.x, playerFighter.y, 8, '#FF3366');
 
           // Knockback push away from player
-          mob.x -= (dx / dist) * 16;
-          mob.y -= (dy / dist) * 16;
+          mob.x -= (mob._cachedDirX || (dx / dist)) * 16;
+          mob.y -= (mob._cachedDirY || (dy / dist)) * 16;
         }
       }
+
+      // Insert surviving mob into spatial hash for weapon queries
+      this._spatialHash.insert(mob);
+    }
+  }
+
+  /**
+   * AABB broadphase obstacle collision — skips expensive polygon tests
+   * for mobs that are far from any obstacle.
+   */
+  _resolveObstacleCollisionFast(mob, ar) {
+    // Cache obstacle AABBs once per arena configuration
+    const arenaKey = `${ar.x},${ar.y},${ar.width},${ar.height}`;
+    if (this._obstacleAABBsArenaKey !== arenaKey) {
+      this._obstacleAABBsArenaKey = arenaKey;
+      const obstacles = getArenaObstacles(ar);
+      this._obstacleAABBs = [];
+      if (obstacles) {
+        for (let i = 0; i < obstacles.length; i++) {
+          const obs = obstacles[i];
+          if (obs && obs.type === 'plus') {
+            const S = obs.halfSize || 0;
+            this._obstacleAABBs.push({
+              obs,
+              minX: obs.cx - S - OBSTACLE_BROADPHASE_MARGIN,
+              maxX: obs.cx + S + OBSTACLE_BROADPHASE_MARGIN,
+              minY: obs.cy - S - OBSTACLE_BROADPHASE_MARGIN,
+              maxY: obs.cy + S + OBSTACLE_BROADPHASE_MARGIN,
+            });
+          }
+        }
+      }
+    }
+
+    // Quick AABB check — only run full collision if mob is near any obstacle
+    let nearObstacle = false;
+    for (let i = 0; i < this._obstacleAABBs.length; i++) {
+      const bb = this._obstacleAABBs[i];
+      if (mob.x >= bb.minX && mob.x <= bb.maxX && mob.y >= bb.minY && mob.y <= bb.maxY) {
+        nearObstacle = true;
+        break;
+      }
+    }
+
+    if (nearObstacle) {
+      resolveEntityPlusObstacleCollision(mob, ar);
     }
   }
 
@@ -568,7 +803,23 @@ export class SurvivorSystem {
         radius: 12,
         bobOffset: Math.random() * Math.PI * 2,
       });
-    } else {
+      return;
+    }
+
+    if (mob.isElite) {
+      this.gems.push({
+        x: mob.x,
+        y: mob.y,
+        vx: 0,
+        vy: 0,
+        type: 'gold',
+        xp: 75,
+        color: '#FFD700',
+        radius: 9,
+        bobOffset: Math.random() * Math.PI * 2,
+      });
+      return;
+    }
       const isGreen = Math.random() < 0.22;
       this.gems.push({
         x: mob.x,
@@ -581,11 +832,11 @@ export class SurvivorSystem {
         radius: isGreen ? 7 : 5,
         bobOffset: Math.random() * Math.PI * 2,
       });
-    }
   }
 
   /**
    * Updates XP gems and vacuum magnetism toward player.
+   * Includes HoloCure-style gem consolidation to cap active entities.
    */
   _updateGems(playerFighter) {
     const magnetRadius = 80 * (this.state.passives.magnet || 1.0);
@@ -615,13 +866,79 @@ export class SurvivorSystem {
         this.gems.splice(i, 1);
       }
     }
+
+    // ── HoloCure Gem Consolidation ──
+    // When total gems exceed cap, merge the furthest gem into the nearest gem
+    // to keep total active gem entities bounded.
+    this._consolidateGems(playerFighter);
+  }
+
+  /**
+   * HoloCure-style gem consolidation: merges distant gems into nearby super-gems
+   * when total active gems exceed MAX_ACTIVE_GEMS.
+   */
+  _consolidateGems(playerFighter) {
+    while (this.gems.length > MAX_ACTIVE_GEMS) {
+      // Find the gem furthest from the player
+      let maxDist = 0;
+      let maxIdx = -1;
+      for (let i = 0; i < this.gems.length; i++) {
+        const g = this.gems[i];
+        if (g.type === 'chest') continue; // Never consolidate chests
+        const d = Math.hypot(g.x - playerFighter.x, g.y - playerFighter.y);
+        if (d > maxDist) {
+          maxDist = d;
+          maxIdx = i;
+        }
+      }
+      if (maxIdx === -1) break;
+
+      const farGem = this.gems[maxIdx];
+
+      // Find the nearest non-chest gem to merge into
+      let minDist = Infinity;
+      let mergeIdx = -1;
+      for (let j = 0; j < this.gems.length; j++) {
+        if (j === maxIdx) continue;
+        const g = this.gems[j];
+        if (g.type === 'chest') continue;
+        const d = Math.hypot(g.x - farGem.x, g.y - farGem.y);
+        if (d < minDist) {
+          minDist = d;
+          mergeIdx = j;
+        }
+      }
+
+      if (mergeIdx !== -1) {
+        // Merge: add XP value, upgrade to green tier if enough XP accumulated
+        this.gems[mergeIdx].xp += farGem.xp;
+        if (this.gems[mergeIdx].xp >= 25 && this.gems[mergeIdx].type === 'blue') {
+          this.gems[mergeIdx].type = 'green';
+          this.gems[mergeIdx].color = '#00FF66';
+          this.gems[mergeIdx].radius = 7;
+        }
+        if (this.gems[mergeIdx].xp >= 75) {
+          // Upgrade to gold super-gem
+          this.gems[mergeIdx].type = 'gold';
+          this.gems[mergeIdx].color = '#FFD700';
+          this.gems[mergeIdx].radius = 9;
+        }
+      }
+
+      this.gems.splice(maxIdx, 1);
+    }
   }
 
   _absorbGem(gem, playerFighter) {
     if (gem.type === 'chest') {
       _playSfx('select');
-      playerFighter.hp = Math.min(playerFighter.maxHp, playerFighter.hp + 60);
-      spawnFloatingText('🎁 TREASURE CHEST!', playerFighter.x, playerFighter.y - 45, '#FFD700', 28);
+      const heal = Math.round(playerFighter.maxHp * 0.35);
+      playerFighter.hp = Math.min(playerFighter.maxHp, playerFighter.hp + heal);
+      playerFighter._lastHealAmount = (playerFighter._lastHealAmount || 0) + heal;
+      playerFighter._healthBarHealTimer = 24;
+      spawnSparks(playerFighter.x, playerFighter.y, 16, '#FFD700', 30);
+      spawnFloatingText('🎁 HOLOZON TREASURE BOX!', playerFighter.x, playerFighter.y - 45, '#FFD700', 28);
+      this.state.xp += 150;
       this._triggerLevelUp();
     } else {
       this.state.xp += gem.xp;
@@ -792,6 +1109,7 @@ export class SurvivorSystem {
 
   /**
    * Updates all active survivor modular weapons.
+   * Uses spatial hash for O(1) nearby mob queries instead of O(N) brute force.
    */
   _updateSurvivorWeapons(playerFighter, arena) {
     const ar = arena || state.arena;
@@ -810,9 +1128,10 @@ export class SurvivorSystem {
         const ox = playerFighter.x + Math.cos(ang) * radius;
         const oy = playerFighter.y + Math.sin(ang) * radius;
 
-        // Check collision against horde mobs
-        for (let m = 0; m < this.hordeMobs.length; m++) {
-          const mob = this.hordeMobs[m];
+        // ── Spatial hash query instead of full mob array scan ──
+        const nearby = this._spatialHash.getNearby(ox, oy, 30);
+        for (let m = 0; m < nearby.length; m++) {
+          const mob = nearby[m];
           const dist = Math.hypot(mob.x - ox, mob.y - oy);
           if (dist < mob.r + 10) {
             const dmg = (18 + orbiters.level * 4) * might;
@@ -837,8 +1156,10 @@ export class SurvivorSystem {
         const maxR = garlic.maxRadius + garlic.level * 20;
         const dmg = (14 + garlic.level * 3) * might;
 
-        for (let m = 0; m < this.hordeMobs.length; m++) {
-          const mob = this.hordeMobs[m];
+        // ── Spatial hash query for garlic AOE ──
+        const nearby = this._spatialHash.getNearby(playerFighter.x, playerFighter.y, maxR);
+        for (let m = 0; m < nearby.length; m++) {
+          const mob = nearby[m];
           const dist = Math.hypot(mob.x - playerFighter.x, mob.y - playerFighter.y);
           if (dist < maxR) {
             mob.hp -= dmg;
@@ -876,16 +1197,17 @@ export class SurvivorSystem {
       }
     }
 
-    // Update Kunais
+    // Update Kunais — spatial hash for hit detection
     for (let k = this.state.activeKunais.length - 1; k >= 0; k--) {
       const p = this.state.activeKunais[k];
       p.x += p.vx;
       p.y += p.vy;
       p.life--;
 
-      // Mob hit
-      for (let m = 0; m < this.hordeMobs.length; m++) {
-        const mob = this.hordeMobs[m];
+      // ── Spatial hash query for kunai hits ──
+      const nearby = this._spatialHash.getNearby(p.x, p.y, 30);
+      for (let m = 0; m < nearby.length; m++) {
+        const mob = nearby[m];
         if (Math.hypot(mob.x - p.x, mob.y - p.y) < mob.r + 6) {
           mob.hp -= p.damage;
           p.pierce--;
@@ -939,7 +1261,7 @@ export class SurvivorSystem {
       }
     }
 
-    // Update Bouncing Scythes
+    // Update Bouncing Scythes — spatial hash for hit detection
     for (let s = this.state.activeScythes.length - 1; s >= 0; s--) {
       const sc = this.state.activeScythes[s];
       sc.x += sc.vx;
@@ -953,9 +1275,10 @@ export class SurvivorSystem {
         if (sc.y < ar.y + 10 || sc.y > ar.y + ar.height - 10) { sc.vy = -sc.vy; sc.bounces--; }
       }
 
-      // Damage mobs
-      for (let m = 0; m < this.hordeMobs.length; m++) {
-        const mob = this.hordeMobs[m];
+      // ── Spatial hash query for scythe hits ──
+      const nearby = this._spatialHash.getNearby(sc.x, sc.y, 30);
+      for (let m = 0; m < nearby.length; m++) {
+        const mob = nearby[m];
         if (Math.hypot(mob.x - sc.x, mob.y - sc.y) < mob.r + 14) {
           mob.hp -= sc.damage;
           spawnSparks(sc.x, sc.y, 4, '#E53E3E');
@@ -971,11 +1294,12 @@ export class SurvivorSystem {
   _triggerThunderSmite(playerFighter, level, might) {
     if (this.hordeMobs.length === 0) return;
 
-    // Pick closest mob
+    // ── Spatial hash query for closest mob within range ──
+    const nearby = this._spatialHash.getNearby(playerFighter.x, playerFighter.y, 350);
     let closestMob = null;
     let minDist = 350;
-    for (let i = 0; i < this.hordeMobs.length; i++) {
-      const mob = this.hordeMobs[i];
+    for (let i = 0; i < nearby.length; i++) {
+      const mob = nearby[i];
       const d = Math.hypot(mob.x - playerFighter.x, mob.y - playerFighter.y);
       if (d < minDist) {
         minDist = d;
@@ -1022,15 +1346,18 @@ export class SurvivorSystem {
 
   /**
    * Helper that automatically aims Player 1 at the closest enemy mob.
+   * Uses spatial hash for faster nearest-mob lookup.
    */
   _updatePlayerAutoAim(playerFighter) {
     if (this.hordeMobs.length === 0) return;
 
+    // ── Spatial hash query for closest mob ──
+    const nearby = this._spatialHash.getNearby(playerFighter.x, playerFighter.y, 400);
     let closest = null;
     let minDist = 400;
 
-    for (let i = 0; i < this.hordeMobs.length; i++) {
-      const mob = this.hordeMobs[i];
+    for (let i = 0; i < nearby.length; i++) {
+      const mob = nearby[i];
       const d = Math.hypot(mob.x - playerFighter.x, mob.y - playerFighter.y);
       if (d < minDist) {
         minDist = d;
@@ -1048,12 +1375,15 @@ export class SurvivorSystem {
   }
 
   /**
-   * Renders gems, weapons, and upgrade modal in camera space and screen space.
+   * Renders gems, weapons, and horde mobs in camera space using cached stamps.
    */
   drawInCameraSpace(ctx) {
     if (!this.state.active) return;
 
-    // 1. Draw XP Gems
+    // 0. Draw Horde Mobs using cached sprite stamps (HoloCure fast batch renderer)
+    drawSurvivorMobsFast(ctx, this.hordeMobs, this.state.timer);
+
+    // 1. Draw XP Gems (Rule 2.2 compliant — NO shadowBlur)
     for (let i = 0; i < this.gems.length; i++) {
       const gem = this.gems[i];
       const bob = Math.sin((this.state.timer * 0.08) + gem.bobOffset) * 2;
@@ -1061,9 +1391,19 @@ export class SurvivorSystem {
 
       ctx.save();
       ctx.fillStyle = gem.color;
-      ctx.shadowColor = gem.color;
-      ctx.shadowBlur = 6;
 
+      // Simulated glow using concentric semi-transparent fill (Rule 2.2 compliant)
+      ctx.globalAlpha = 0.25;
+      ctx.beginPath();
+      if (gem.type === 'chest') {
+        ctx.rect(gem.x - 11, gy - 9, 22, 18);
+      } else {
+        ctx.arc(gem.x, gy, gem.radius + 3, 0, Math.PI * 2);
+      }
+      ctx.fill();
+
+      // Solid gem core
+      ctx.globalAlpha = 1.0;
       ctx.beginPath();
       if (gem.type === 'chest') {
         ctx.rect(gem.x - 8, gy - 6, 16, 12);
@@ -1191,7 +1531,11 @@ export class SurvivorSystem {
     const totalSec = Math.floor(this.state.timer / 60);
     const mins = Math.floor(totalSec / 60);
     const secs = totalSec % 60;
-    const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} / 03:00`;
+    const maxSec = Math.floor((this.state.maxDuration || 10800) / 60);
+    const maxMins = Math.floor(maxSec / 60);
+    const maxSecs = maxSec % 60;
+    const maxStr = `${String(maxMins).padStart(2, '0')}:${String(maxSecs).padStart(2, '0')}`;
+    const timeStr = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')} / ${maxStr}`;
 
     ctx.fillStyle = '#FFFFFF';
     ctx.font = 'bold 13px monospace';
@@ -1207,7 +1551,89 @@ export class SurvivorSystem {
     ctx.fillStyle = '#FF3366';
     ctx.fillText(`💀 ${this.state.kills}`, panelX + 240, panelY + panelH / 2);
 
+    // 2.5 HoloCure Weapon Inventory Bar
+    const activeWeps = [];
+    if (this.state.weapons.orbiters.level > 0) activeWeps.push({ name: 'ORBITER', lvl: this.state.weapons.orbiters.level, color: '#38BDF8' });
+    if (this.state.weapons.garlic.level > 0)   activeWeps.push({ name: 'GARLIC', lvl: this.state.weapons.garlic.level, color: '#FACC15' });
+    if (this.state.weapons.kunai.level > 0)    activeWeps.push({ name: 'KUNAI', lvl: this.state.weapons.kunai.level, color: '#A855F7' });
+    if (this.state.weapons.thunder.level > 0)  activeWeps.push({ name: 'THUNDER', lvl: this.state.weapons.thunder.level, color: '#FDE047' });
+    if (this.state.weapons.scythe.level > 0)   activeWeps.push({ name: 'SCYTHE', lvl: this.state.weapons.scythe.level, color: '#EF4444' });
+
+    if (activeWeps.length > 0) {
+      const slotW = 56;
+      const slotH = 18;
+      const totalW = activeWeps.length * (slotW + 6) - 6;
+      let startX = (w - totalW) / 2;
+      const slotY = panelY + panelH + 6;
+      const toRoman = (num) => ['0', 'I', 'II', 'III', 'IV', 'MAX'][num] || String(num);
+
+      for (let s = 0; s < activeWeps.length; s++) {
+        const item = activeWeps[s];
+        ctx.fillStyle = 'rgba(10, 14, 20, 0.85)';
+        ctx.strokeStyle = item.color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.roundRect(startX, slotY, slotW, slotH, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = item.color;
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`${item.name} ${toRoman(item.lvl)}`, startX + slotW / 2, slotY + slotH / 2);
+        startX += slotW + 6;
+      }
+    }
+
     ctx.restore();
+
+    // 3. HoloCure Boss Danger Warning Banner
+    if (this.state.bossWarningTimer > 0) {
+      const bannerH = 46;
+      const bannerY = ctx.canvas.height * 0.38;
+      const alpha = Math.min(1.0, this.state.bossWarningTimer / 30);
+      const pulse = (Math.sin(this.state.timer * 0.22) + 1) * 0.5;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = `rgba(185, 28, 28, ${0.72 + 0.22 * pulse})`;
+      ctx.fillRect(0, bannerY, w, bannerH);
+
+      ctx.strokeStyle = '#FBBF24';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(0, bannerY, w, bannerH);
+
+      ctx.font = 'bold 16px "Segoe UI", Roboto, monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(this.state.bossWarningText || '⚠️ WARNING: POWERFUL FOE INBOUND ⚠️', w / 2, bannerY + bannerH / 2);
+      ctx.restore();
+    }
+
+    // 4. HoloCure Stage Complete Victory Overlay
+    if (this.state.stageClearTimer > 0) {
+      const alpha = Math.min(1.0, (300 - this.state.stageClearTimer) / 35);
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.90;
+      ctx.fillStyle = 'rgba(5, 8, 15, 0.85)';
+      ctx.fillRect(0, 0, w, ctx.canvas.height);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#00FF66';
+      ctx.font = 'bold 36px "Segoe UI", Roboto, sans-serif';
+      ctx.fillText('🏆 STAGE COMPLETE! 🏆', w / 2, ctx.canvas.height * 0.36);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 17px monospace';
+      const mm = String(mins).padStart(2, '0');
+      const ss = String(secs).padStart(2, '0');
+      ctx.fillText(`⏱️ Time Survived: ${mm}:${ss}`, w / 2, ctx.canvas.height * 0.46);
+      ctx.fillText(`💀 Enemies Defeated: ${this.state.kills}`, w / 2, ctx.canvas.height * 0.52);
+      ctx.fillText(`⭐ Final Level: Lv. ${this.state.level}`, w / 2, ctx.canvas.height * 0.58);
+      ctx.restore();
+    }
 
     // 3. Draw Level-Up Upgrade Modal (if active)
     if (this.state.isPausedForUpgrade) {

@@ -404,6 +404,10 @@ export function renderGame() {
         }
 
         if (state.gameState !== 'countdown') {
+          // Draw survivor horde mobs BEFORE hero fighters so player renders on top
+          if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
+            survivorSystem.drawInCameraSpace(state.ctx);
+          }
           drawFighters(); // Draw fighters ON TOP of dim screens & domain structures so fighters stay 100% visible & un-tinted!
           if (state.fighters && (YutaBushEntrance.isActive || EyeOfCthulhuEntrance.isActive)) {
             for (const f of state.fighters) {
@@ -417,9 +421,6 @@ export function renderGame() {
               }
             }
           }
-        }
-        if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
-          survivorSystem.drawInCameraSpace(state.ctx);
         }
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke
         drawIllusions(); // Draw Doppleganger illusions

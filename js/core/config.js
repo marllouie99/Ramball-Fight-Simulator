@@ -1817,9 +1817,9 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 50,
-    name: 'PLANTS',
+    name: crazyDaveConfig.name || 'Crazy Dave',
     grade: crazyDaveConfig.grade ?? DEFAULT_GRADE,
-    displayName: 'PLANTS',
+    displayName: crazyDaveConfig.displayName || crazyDaveConfig.name || 'Crazy Dave',
     category: 'Gaming',
     color: crazyDaveConfig.color || '#84CC16',
     themeColor: crazyDaveConfig.themeColor || '#84CC16',

@@ -2682,10 +2682,9 @@ export class CrazyDaveFighter extends Fighter {
     super(def);
     this.characterId = 'crazydave';
     this.type = 'crazydave';
-    this.name = 'PLANTS';
-    this.displayName = 'PLANTS';
-
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
+    this.name = def?.name ?? getCrazyDaveSetting(cfg, 'name') ?? 'Crazy Dave';
+    this.displayName = def?.displayName ?? getCrazyDaveSetting(cfg, 'displayName') ?? this.name;
     this.color = def?.color ?? getCrazyDaveSetting(cfg, 'color');
     this.themeColor = def?.themeColor ?? getCrazyDaveSetting(cfg, 'themeColor');
     this.secondaryColor = def?.secondaryColor ?? getCrazyDaveSetting(cfg, 'secondaryColor');

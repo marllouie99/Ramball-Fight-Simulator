@@ -93,13 +93,10 @@ export function drawSurvivorUpgradeModal(ctx, survivorState) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // Glow halo
-  ctx.shadowColor = '#00FF66';
-  ctx.shadowBlur = 15;
+  // Header Title with clean high-contrast stroke (Rule 2.2 compliant — NO shadowBlur)
   ctx.fillStyle = '#00FF66';
   ctx.font = 'bold 26px "Segoe UI", Roboto, "Trebuchet MS", sans-serif';
   ctx.fillText('⚡ LEVEL UP! CHOOSE AN UPGRADE', centerX, headerY);
-  ctx.shadowBlur = 0;
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
   ctx.font = '13px "Segoe UI", Roboto, sans-serif';

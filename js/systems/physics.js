@@ -1205,6 +1205,9 @@ export function updateFighters() {
         if (j <= i) continue; // Only check each pair once
         if (!b || b.hp <= 0) continue;
         
+        // Skip physical collision between horde mobs in survivor mode (HoloCure / Vampire Survivors swarm pattern)
+        if (a.isSurvivorMob && b.isSurvivorMob) continue;
+
         // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, Naoya ult runway stasis, or when submerged/erupting in liquid shadow
         if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush || a.isCaughtInNaoyaUlt || b.isCaughtInNaoyaUlt || a._isFlyingToWallPin || b._isFlyingToWallPin || a.isCurrentlyWallPinnedByNaoya || b.isCurrentlyWallPinnedByNaoya || (a.isExecutingUlt && (a.characterId === 'naoya' || a.type === 'naoya')) || (b.isExecutingUlt && (b.characterId === 'naoya' || b.type === 'naoya'))) continue;
 
