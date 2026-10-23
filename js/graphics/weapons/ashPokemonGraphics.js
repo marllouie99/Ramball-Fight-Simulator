@@ -481,20 +481,30 @@ export function drawAshVisualEffects(ctx, fighter) {
           ctx.save();
           ctx.globalAlpha = boltAlpha;
 
-          // Sky-to-target lightning bolt column
-          const skyX = fx.x + Math.sin(seed) * 18;
-          const skyY = fx.y - 235;
-          ctx.strokeStyle = '#FACC15';
-          ctx.lineWidth = 7.5 * (1 - progress * 0.45);
-          _drawJaggedLightningPath(ctx, skyX, skyY, fx.x, fx.y, 8, 18, seed);
+          // Authentic 12-Frame Animated Thunderbolt Sprite crashing down from the sky
+          const tbFrames = _getThunderboltFrames();
+          const tbFrameIdx = Math.min(11, Math.floor((progress / 0.78) * 12));
+          const tbImg = tbFrames[tbFrameIdx];
+          if (tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0)) {
+            const boltH = 270;
+            const boltW = 85;
+            ctx.drawImage(tbImg, fx.x - boltW / 2, fx.y - boltH, boltW, boltH);
+          } else {
+            // Fallback jagged lightning path
+            const skyX = fx.x + Math.sin(seed) * 18;
+            const skyY = fx.y - 235;
+            ctx.strokeStyle = '#FACC15';
+            ctx.lineWidth = 7.5 * (1 - progress * 0.45);
+            _drawJaggedLightningPath(ctx, skyX, skyY, fx.x, fx.y, 8, 18, seed);
 
-          ctx.strokeStyle = '#FEF08A';
-          ctx.lineWidth = 4.2 * (1 - progress * 0.45);
-          _drawJaggedLightningPath(ctx, skyX, skyY, fx.x, fx.y, 8, 18, seed);
+            ctx.strokeStyle = '#FEF08A';
+            ctx.lineWidth = 4.2 * (1 - progress * 0.45);
+            _drawJaggedLightningPath(ctx, skyX, skyY, fx.x, fx.y, 8, 18, seed);
 
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 2.0;
-          _drawJaggedLightningPath(ctx, skyX, skyY, fx.x, fx.y, 8, 18, seed);
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 2.0;
+            _drawJaggedLightningPath(ctx, skyX, skyY, fx.x, fx.y, 8, 18, seed);
+          }
 
           // Direct electric arc from Pikachu's cheeks to target
           if (fx.fromX !== undefined && fx.fromY !== undefined) {
@@ -638,7 +648,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
       const endX = originX + cosA * beamLen;
       const endY = originY + sinA * beamLen;
 
-      // Layer 1: Authentic 12-Frame Animated Thunderbolt Sprite (Assets/model/ash/pokemon/pikachu/Thunderbolt/)
+      // Layer 1: Authentic 12-Frame Serpentine Thunderbolt Sprite (Assets/model/ash/pokemon/pikachu/Thunderbolt/)
       const tbFrames = _getThunderboltFrames();
       const tbIndex = Math.floor((tick * 0.45) % 12);
       const tbImg = tbFrames[tbIndex];
@@ -646,49 +656,38 @@ export function drawPokemonCompanion(ctx, pokemon) {
       if (tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0)) {
         ctx.save();
         ctx.translate(originX, originY);
-        ctx.rotate(castAngle);
+        // Sprite is vertical (needle origin at 128, 12; grounding tip at 128, 246)
+        // Rotating by castAngle - PI/2 directs +Y along castAngle directly towards the target
+        ctx.rotate(castAngle - Math.PI / 2);
         ctx.imageSmoothingEnabled = false;
-        const scaleX = beamLen / 228.0;
-        const scaleY = (beamW * 2.8) / 256.0;
-        ctx.drawImage(tbImg, -20 * scaleX, -128 * scaleY, 256 * scaleX, 256 * scaleY);
+        const scaleL = beamLen / 234.0;
+        const scaleW = (beamW * 2.4) / 256.0;
+        ctx.drawImage(tbImg, -128 * scaleW, -12 * scaleL, 256 * scaleW, 256 * scaleL);
         ctx.restore();
         tbDrawn = true;
       }
 
-      // Layer 2: Translucent Outer Golden Plasma Wash (Rule 11 compliant: zero shadowBlur)
-      ctx.strokeStyle = 'rgba(250, 204, 21, 0.34)';
-      ctx.lineWidth = beamW * 1.35;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(originX, originY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
+      // Layer 2: Sky-Splitting Thunderbolt Lightning Strike crashing down onto the target
+      if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0 && tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0)) {
+        const tgtLocalX = pokemon.thunderboltTarget.x - pokemon.x;
+        const tgtLocalY = (pokemon.thunderboltTarget.y - (pokemon.thunderboltTarget.z || 0)) - pokemon.y;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const skyH = 260;
+        const skyW = beamW * 2.5;
+        ctx.drawImage(tbImg, tgtLocalX - skyW / 2, tgtLocalY - skyH, skyW, skyH);
+        ctx.restore();
+      }
 
-      // Layer 3: High-Voltage Golden Ionization Sheath
-      ctx.strokeStyle = '#FACC15';
-      ctx.lineWidth = beamW * 0.65;
-      ctx.beginPath();
-      ctx.moveTo(originX, originY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-
-      // Layer 4: Supersonic Pure White Laser Core
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = beamW * 0.28;
-      ctx.beginPath();
-      ctx.moveTo(originX, originY);
-      ctx.lineTo(endX, endY);
-      ctx.stroke();
-
-      // Layer 5: Branching Dynamic Jagged Lightning Paths
+      // Layer 3: Dynamic Branching Jagged Lightning Arcs snapping between Pikachu and Target
       const numBranches = 3;
       for (let b = 0; b < numBranches; b++) {
         ctx.strokeStyle = b === 0 ? '#FFFFFF' : (b === 1 ? '#FEF08A' : '#FACC15');
-        ctx.lineWidth = b === 0 ? 1.6 : (b === 1 ? 2.4 : 3.2);
-        _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 12, beamW * 0.42, tick * 0.45 + b * 2.1);
+        ctx.lineWidth = b === 0 ? 1.8 : (b === 1 ? 2.6 : 3.4);
+        _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 12, beamW * 0.45, tick * 0.45 + b * 2.1);
       }
 
-      // Layer 6: Cheeks Plasma Eruption Core
+      // Layer 4: Cheeks High-Voltage Plasma Eruption Core
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.arc(originX, originY, beamW * 0.40, 0, Math.PI * 2);
@@ -705,7 +704,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
         const tgtLocalX = pokemon.thunderboltTarget.x - pokemon.x;
         const tgtLocalY = (pokemon.thunderboltTarget.y - (pokemon.thunderboltTarget.z || 0)) - pokemon.y;
         if (impImg && impImg.complete && ((impImg.naturalWidth || impImg.width || 0) > 0)) {
-          const impSize = beamW * 3.6;
+          const impSize = beamW * 4.2;
           ctx.save();
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(impImg, tgtLocalX - impSize / 2, tgtLocalY - impSize / 2, impSize, impSize);
@@ -736,7 +735,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
 
       // Beam terminus 12-frame impact & compression rings
       if (impImg && impImg.complete && ((impImg.naturalWidth || impImg.width || 0) > 0)) {
-        const endImpSize = beamW * 2.8;
+        const endImpSize = beamW * 3.4;
         ctx.save();
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(impImg, endX - endImpSize / 2, endY - endImpSize / 2, endImpSize, endImpSize);
