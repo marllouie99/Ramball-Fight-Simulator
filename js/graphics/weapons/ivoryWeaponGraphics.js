@@ -58,8 +58,6 @@ export const IVORY_WEAPON_GRAPHICS = {
 };
 
 export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
   const prevShadowOffsetY = ctx.shadowOffsetY;
   const prevFillStyle = ctx.fillStyle;
   const prevStrokeStyle = ctx.strokeStyle;
@@ -81,9 +79,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   const cfg = IVORY_WEAPON_GRAPHICS;
   const scale = cfg.positioning.scale;
 
-  // Shadow for depth (OPTIMIZED: removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
 
   // -- 1. Back Stock / Battery Pack --
@@ -101,9 +96,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   ctx.stroke();
 
   // blue battery indicator
-  // Shadow for depth (OPTIMIZED: removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
 
   // -- 2. Main Gun Body (Sleek White/Silver) --
@@ -136,7 +128,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   ctx.stroke();
 
   // -- 3. Energy Chamber (Exposed Core) --
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   
   // Inner dark cutout
@@ -145,12 +136,10 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   
   // Glowing core
   ctx.fillStyle = cfg.railgun.chamberCore;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.fillRect(9 * scale, -3 * scale, 12 * scale, 3 * scale);
   
   // Bright center line
   ctx.fillStyle = cfg.railgun.chamberCenter;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.fillRect(10 * scale, -2 * scale, 10 * scale, 1 * scale);
   
   // Grill over core
@@ -171,7 +160,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   
   // Power nodes
   ctx.fillStyle = `rgba(0, 255, 255, ${0.8 + pulse * 0.2})`;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.beginPath();
   ctx.arc(22 * scale, 1 * scale, 1.5 * scale, 0, Math.PI * 2);
   ctx.fill();
@@ -179,9 +167,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   ctx.arc(26 * scale, 3 * scale, 1.5 * scale, 0, Math.PI * 2);
   ctx.fill();
 
-  // Shadow for depth (OPTIMIZED: removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
 
   // -- 4. Lower Grip --
@@ -224,15 +209,12 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   ctx.stroke();
 
   // Glowing Emitter Opening
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   ctx.beginPath();
   ctx.arc(56 * scale, -0.5 * scale, 2 * scale, 0, Math.PI * 2);
   ctx.fillStyle = cfg.railgun.emitterColor;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.fill();
   ctx.fillStyle = cfg.railgun.emitterHighlight;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.beginPath();
   ctx.arc(56 * scale, -0.5 * scale, 1 * scale, 0, Math.PI * 2);
   ctx.fill();
@@ -262,8 +244,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r) {
   ctx.translate(-x, -y);
 
   // Manual state restore
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
   ctx.shadowOffsetY = prevShadowOffsetY;
   ctx.fillStyle = prevFillStyle;
   ctx.strokeStyle = prevStrokeStyle;
@@ -277,8 +257,6 @@ export function drawWhiteChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
   const prevFillStyle = ctx.fillStyle;
   const prevStrokeStyle = ctx.strokeStyle;
   const prevLineWidth = ctx.lineWidth;
-  const prevShadowBlur = ctx.shadowBlur;
-  const prevShadowColor = ctx.shadowColor;
 
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
@@ -296,14 +274,10 @@ export function drawWhiteChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
   const alpha = 0.2 + chargeNorm * 0.6;
   const time = Date.now() / 80;
   
-  // Central concentrated energy core (OPTIMIZED: removed shadowBlur - expensive operation)
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = '#00ffff';
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.arc(tipDist, 0, 3 + chargeNorm * 5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.shadowBlur = 0;
 
   // Expanding pulsing energy rings
   for (let i = 0; i < 3; i++) {
@@ -356,6 +330,4 @@ export function drawWhiteChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
   ctx.fillStyle = prevFillStyle;
   ctx.strokeStyle = prevStrokeStyle;
   ctx.lineWidth = prevLineWidth;
-  ctx.shadowBlur = prevShadowBlur;
-  ctx.shadowColor = prevShadowColor;
 }

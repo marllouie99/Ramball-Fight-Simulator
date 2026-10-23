@@ -32,8 +32,8 @@ export class ShiroFighter extends Fighter {
     super(def);
     this.characterId = 'shiro';
     this.type = 'shiro';
-    this.name = shiroConfig.name || 'Shiro';
-    this.displayName = shiroConfig.displayName || '『SHIRO』';
+    this.name = def?.name || shiroConfig.name || 'Shiro';
+    this.displayName = def?.displayName || shiroConfig.displayName || '『SHIRO』';
     this.hideHands = true;
     this.themeColor = shiroConfig.themeColor || '#8B5CF6';
     this.color = shiroConfig.color || '#A855F7';

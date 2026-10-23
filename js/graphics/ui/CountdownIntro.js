@@ -39,7 +39,7 @@ function getWhoWinsScale(t) {
 
 function getFaceOffThemeColor(def, fallback = '#38BDF8') {
   if (!def) return fallback;
-  if (def.type === 'yuta' || def.id === 23 || def.id === 'yuta' || (def.name && def.name.toUpperCase().includes('YUTA'))) {
+  if (def.type === 'yuta' || def.id === 23 || def.id === 'yuta') {
     return '#FF1493';
   }
   const charId = def.type || def.id || def.key;

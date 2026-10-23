@@ -18,8 +18,9 @@ export class MakiFighter extends Fighter {
     super(def);
     this.characterId = 'maki';
     this.type = 'maki';
-    this.name = 'Maki';
     const cfg = CONFIG.maki || {};
+    this.name = def?.name || cfg.name || 'Maki';
+    this.displayName = def?.displayName || cfg.displayName || this.name;
     this.themeColor = def?.themeColor || cfg.themeColor || '#014913ff';
     this.color = def?.color || cfg.color || '#18181B';
     this.damageNumberColor = cfg.damageNumberColor || this.themeColor;

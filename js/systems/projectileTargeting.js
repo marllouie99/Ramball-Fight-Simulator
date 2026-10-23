@@ -47,10 +47,30 @@ export function shouldSkipProjectileTarget(projectile, fighter, fighterIndex, is
   const isPlantProjectile = projectile.isPlantProjectile || projectile.visual === 'peaBullet' || projectile.visual === 'snowPeaBullet' || projectile.visual === 'firePeaBullet';
   const isMindControlledPlantProjectile = Boolean(projectile.ownerFighter?.isChainedByMakima && projectile.ownerFighter?.isMindControlledByMakima);
   const isMindControlledPlantTarget = Boolean(fighter.isChainedByMakima && fighter.isMindControlledByMakima);
-  if (isPlantProjectile && !isMindControlledPlantProjectile && !isMindControlledPlantTarget && (fighter.isPlant || fighter.isPlantMinion || fighter === projectile.ownerFighter?.owner || fighter.characterId === 'crazydave')) return true;
+  const projOwnerDave = projectile.ownerFighter?.owner || projectile.ownerFighter || null;
+  const projOwnerDaveIndex = (projOwnerDave && fighters) ? fighters.indexOf(projOwnerDave) : (typeof projectile.owner === 'number' ? projectile.owner : -1);
+  const targetCompareEntity = (fighter.isPlant || fighter.isPlantMinion) ? (fighter.owner || fighter) : fighter;
+  const targetCompareIndex = (targetCompareEntity && fighters) ? fighters.indexOf(targetCompareEntity) : fighterIndex;
+  const isFriendlyToPlantProjectile = Boolean(
+    targetCompareEntity === projOwnerDave ||
+    (projOwnerDaveIndex !== -1 && targetCompareIndex !== -1 && (projOwnerDaveIndex === targetCompareIndex || isSameTeam(projOwnerDaveIndex, targetCompareIndex))) ||
+    (typeof projOwnerDave?.isTeammate === 'function' && projOwnerDave.isTeammate(targetCompareEntity))
+  );
+  if (isPlantProjectile && !isMindControlledPlantProjectile && !isMindControlledPlantTarget && isFriendlyToPlantProjectile) return true;
 
   if (fighter.isPlant || fighter.isPlantMinion) {
-    if (!isMindControlledPlantProjectile && !isMindControlledPlantTarget && projectile.ownerFighter && (projectile.ownerFighter === fighter.owner || projectile.ownerFighter.owner === fighter.owner || projectile.ownerFighter.isPlant || projectile.ownerFighter.characterId === 'crazydave')) return true;
+    const plantOwner = fighter.owner || null;
+    const plantOwnerIndex = (plantOwner && fighters) ? fighters.indexOf(plantOwner) : -1;
+    const isSameOrTeammatePlantOwner = Boolean(
+      !plantOwner ||
+      (projectile.ownerFighter && (
+        projectile.ownerFighter === plantOwner ||
+        projectile.ownerFighter.owner === plantOwner ||
+        (typeof plantOwner.isTeammate === 'function' && plantOwner.isTeammate(projOwnerDave))
+      )) ||
+      (plantOwnerIndex !== -1 && projOwnerDaveIndex !== -1 && (plantOwnerIndex === projOwnerDaveIndex || isSameTeam(projOwnerDaveIndex, plantOwnerIndex)))
+    );
+    if (!isMindControlledPlantProjectile && !isMindControlledPlantTarget && isSameOrTeammatePlantOwner) return true;
   }
 
   if (projectile.hitFighters && projectile.hitFighters.has(fighter)) return true;

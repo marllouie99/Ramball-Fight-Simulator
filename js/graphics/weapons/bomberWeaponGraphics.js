@@ -333,7 +333,6 @@ function drawSparkLines(ctx, x, y, radius, count, alpha, color) {
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.lineCap = 'round';
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
 
   for (let i = 0; i < count; i++) {
     const angle = (i / count) * Math.PI * 2 + seededRand(i * 17) * 0.3;
@@ -393,7 +392,6 @@ function drawEmberParticles(ctx, x, y, radius, count, alpha, seed, color) {
     ctx.beginPath();
     ctx.arc(ex, ey, er, 0, Math.PI * 2);
     ctx.fillStyle = color;
-    // OPTIMIZED: Removed shadowBlur (expensive operation)
     ctx.fill();
   }
   ctx.globalAlpha = prevAlpha;
@@ -671,7 +669,6 @@ export function drawBomberExplosionGraphic(p) {
     const isPoison = p.explosionType === 'poison';
     if (isPoison) {
       // Poison bubbles — bright green with glow
-      // OPTIMIZED: Removed shadowBlur (expensive operation)
       ctx.fillStyle = `rgba(144,238,144,${emberAlpha})`;
     } else {
       // Fire embers — orange glow
@@ -785,30 +782,19 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   }
 
   // ── SHADOW ────────────────────────────────────────────────────────────────
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
   const prevShadowOffsetY = ctx.shadowOffsetY;
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
   ctx.beginPath();
   ctx.ellipse(0, radius * 0.9, radius * 0.85, radius * 0.25, 0, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
   ctx.fill();
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
   ctx.shadowOffsetY = prevShadowOffsetY;
 
   // ── GRENADE ROTATION ─────────────────────────────────────────────────────
   ctx.rotate(rotation);
 
   // ── GRENADE BODY (main sphere) ────────────────────────────────────────────
-  // Outer glow for depth (OPTIMIZED: removed shadowBlur)
-  const prevBodyShadowColor = ctx.shadowColor;
-  const prevBodyShadowBlur = ctx.shadowBlur;
   const prevBodyShadowOffsetY = ctx.shadowOffsetY;
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 3;
 
   // Main body gradient (olive green with metallic sheen)
@@ -824,8 +810,6 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = bodyGrad;
   ctx.fill();
-  ctx.shadowColor = prevBodyShadowColor;
-  ctx.shadowBlur = prevBodyShadowBlur;
   ctx.shadowOffsetY = prevBodyShadowOffsetY;
 
   // ── BODY SEGMENT BANDS (horizontal grooves) ─────────────────────────────
@@ -874,11 +858,7 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.restore();
 
   // ── FUSE NECK (top section) ──────────────────────────────────────────────
-  const prevNeckShadowColor = ctx.shadowColor;
-  const prevNeckShadowBlur = ctx.shadowBlur;
   const prevNeckShadowOffsetY = ctx.shadowOffsetY;
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
 
   // Neck base
@@ -902,8 +882,6 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.fillStyle = cfg.bandHighlight;
   ctx.fill();
 
-  ctx.shadowColor = prevNeckShadowColor;
-  ctx.shadowBlur = prevNeckShadowBlur;
   ctx.shadowOffsetY = prevNeckShadowOffsetY;
 
   // ── FUSE CORD ─────────────────────────────────────────────────────────────
@@ -1002,7 +980,6 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
     ctx.beginPath();
     ctx.arc(sparkX, sparkY, radius * 0.08, 0, Math.PI * 2);
     ctx.fillStyle = cfg.sparkCore;
-    // OPTIMIZED: Removed shadowBlur (expensive operation)
     ctx.fill();
   }
 
@@ -1173,11 +1150,7 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.scale(pulse, pulse);
 
   // ── C4 MAIN BODY (rectangular block) ─────────────────────────────────────
-  // Shadow for depth (OPTIMIZED: removed shadowBlur)
-  const prevShadowColor = ctx.shadowColor;
   const prevShadowOffsetY = ctx.shadowOffsetY;
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 4;
 
   // Main body gradient - tan/beige plastic with 3D effect
@@ -1199,7 +1172,6 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.fill();
 
   // Reset shadow
-  ctx.shadowColor = prevShadowColor;
   ctx.shadowOffsetY = prevShadowOffsetY;
 
   // ── BODY TEXTURE (subtle plastic texture lines) ─────────────────────────
@@ -1265,11 +1237,7 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.globalAlpha = prevTextAlpha;
 
   // ── DETONATOR CAP (top center) ──────────────────────────────────────────
-  // Shadow for depth (OPTIMIZED: removed shadowBlur)
-  const prevCapShadowColor = ctx.shadowColor;
   const prevCapShadowOffsetY = ctx.shadowOffsetY;
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
 
   const capWidth = radius * 0.5;
@@ -1294,7 +1262,6 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.fill();
 
   // Reset shadow
-  ctx.shadowColor = prevCapShadowColor;
   ctx.shadowOffsetY = prevCapShadowOffsetY;
 
   // ── DETONATOR NECK (connection to body) ──────────────────────────────────

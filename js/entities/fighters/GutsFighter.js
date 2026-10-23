@@ -26,8 +26,8 @@ export class GutsFighter extends Fighter {
 
     this.characterId = 'guts';
     this.type = 'guts';
-    this.name = cfg.name || 'Guts';
-    this.displayName = cfg.displayName || 'GUTS';
+    this.name = def?.name || cfg.name || 'Guts';
+    this.displayName = def?.displayName || cfg.displayName || this.name;
     this.themeColor = cfg.themeColor || '#71717a';
     this.color = cfg.color || '#18181b';
     this.damageNumberColor = cfg.damageNumberColor || '#dc2626';

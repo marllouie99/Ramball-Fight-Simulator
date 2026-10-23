@@ -208,7 +208,7 @@ function getPrimaryFighters() {
  */
 function getFighterThemeColor(f, fallbackColor = '#38BDF8') {
   if (!f) return fallbackColor;
-  const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
+  const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')));
   if (isYuta) return '#FF1493';
   const charId = f.characterId || f.type || (f._def && (f._def.id || f._def.type));
   const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
@@ -272,12 +272,12 @@ function getMatchNamesData(arena) {
   if (!isTeamMatch) return null;
 
   const team0Data = team0.map(f => ({
-    name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+    name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
     color: getFighterThemeColor(f, '#38BDF8')
   }));
 
   const team1Data = team1.map(f => ({
-    name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+    name: (f.displayName || f.name || f._def?.displayName || f._def?.name || f.characterId || 'P').toUpperCase(),
     color: getFighterThemeColor(f, '#F87171')
   }));
 

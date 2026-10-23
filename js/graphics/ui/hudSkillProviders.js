@@ -49,19 +49,53 @@ export function isSkillEnabled(...args) {
 }
 
 /**
- * Calculates skill bar HUD data for any given fighter.
- * Only returns skills that are currently enabled in the character's config.
- * @param {Object} f Fighter instance
- * @param {Function} getProjectiles Function reference to active projectiles getter
- * @returns {Array<{id: string, pct: number, ready: boolean, color: string, label: string}>}
+ * Alias map normalizing variant character/type identifiers to their canonical HUD skill provider key.
  */
-export function getSkillDataForFighter(f, getProjectiles) {
-  if (!f) return [];
+const HUD_SKILL_PROVIDER_ALIASES = {
+  nameless_deity: 'namelessdeity',
+  avatar_of_emptiness: 'avatarofemptiness',
+  cronus: 'cronos',
+  alucard: 'gunslinger',
+  hyperion: 'laser',
+  johnwick: 'john_wick',
+  rifle: 'tactical',
+  m4a1: 'tactical',
+  shotgun: 'tactical',
+  spas12: 'tactical',
+  spas_12: 'tactical',
+  pistol: 'tactical',
+  desert_eagle: 'tactical',
+  deserteagle: 'tactical',
+  sniper: 'tactical',
+  awp: 'tactical',
+  barrett: 'tactical',
+  barrett50cal: 'tactical',
+  tactical_commando: 'tactical',
+  tactical_guerilla: 'tactical',
+  tactical_breacher: 'tactical',
+  tactical_gunslinger: 'tactical',
+  tactical_infiltrator: 'tactical',
+  tactical_marksman: 'tactical',
+  tactical_barrett: 'tactical',
+  tactical_sniper: 'tactical',
+  tactical_heavy: 'tactical',
+  ishida: 'uryu',
+  trickster: 'rubbick',
+  melee: 'spike',
+  sora: 'shiro',
+  eyeofcthulhu: 'eye_of_cthulhu',
+  doppelganger: 'doppleganger',
+};
 
+/**
+ * Modular per-character HUD skill provider registry.
+ * Each provider returns an Array of skill bar descriptors (or undefined to fall through to generic skills).
+ */
+export const HUD_SKILL_PROVIDERS = {
   // ─────────────────────────────────────────────
   // SANS (The Judge of the Underground)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')) {
+  sans(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.sans) ? CONFIG.sans : {};
     const themeColor = f.themeColor || cfg.themeColor || '#03d5f1ff';
     const skills = [];
@@ -111,12 +145,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // NAMELESS DEITY (Wrath of the Gods)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'namelessdeity' || f.characterId === 'nameless_deity' || f.type === 'namelessdeity' || f.type === 'nameless_deity' || f.name === 'Nameless Deity') {
+  namelessdeity(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : {};
     const themeColor = f.themeColor || cfg.superclusterColor || '#00F0FF';
     const skills = [];
@@ -169,12 +203,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // AVATAR OF EMPTINESS (Terraria: Wrath of the Gods)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'avatarofemptiness' || f.characterId === 'avatar_of_emptiness' || f.type === 'avatarofemptiness' || f.type === 'avatar_of_emptiness' || f.name === 'Avatar of Emptiness') {
+  avatarofemptiness(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.avatarofemptiness) ? CONFIG.avatarofemptiness : {};
     const themeColor = f.themeColor || cfg.themeColor || '#9D4EDD';
     const skills = [];
@@ -224,12 +258,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // GOJO SATORU (Limitless & Six Eyes)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'gojo' || f.type === 'gojo') {
+  gojo(f, getProjectiles) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gojo) ? CONFIG.gojo : {};
     const themeColor = '#00E5FF'; 
     const skills = [];
@@ -295,12 +329,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // TOJI FUSHIGURO (Sorcerer Killer)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'toji' || f.type === 'toji') {
+  toji(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
     const themeColor = '#a855f7';
     const skills = [];
@@ -352,12 +386,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // SUKUNA (King of Curses)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'sukuna' || f.type === 'sukuna') {
+  sukuna(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.sukuna) ? CONFIG.sukuna : {};
     const themeColor = f.color || '#ff4500';
     const skills = [];
@@ -405,12 +439,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // EIGHT-HANDLED MAHORAGA (Divine General)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
+  mahoraga(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga) ? CONFIG.mahoraga : {};
     const themeColor = '#FFD700';
     const skills = [];
@@ -497,12 +531,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // SAITAMA (One Punch Man)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'saitama' || f.type === 'saitama') {
+  saitama(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.saitama) ? CONFIG.saitama : {};
     const themeColor = cfg.hudSkillBarColor || cfg.themeColor || cfg.color || f.color || '#F5C400';
     const isFlurryEnabled = cfg.disableConsecutivePunches !== true && cfg.disableFlurry !== true && isSkillEnabled(cfg.enableConsecutivePunches, cfg.enableFlurry, cfg.consecutivePunchesEnabled, cfg.flurryEnabled, true);
@@ -531,12 +565,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
       list.push({ id: 'flurry', pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'CONSECUTIVE PUNCHES' });
     }
     return list;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // KNIGHT (Tower Shield & Broadsword)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'knight' || f.type === 'knight' || (f.name && f.name.toLowerCase() === 'knight')) {
+  knight(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.knight) ? CONFIG.knight : {};
     const themeColor = cfg.hudSkillBarColor || cfg.themeColor || f.color || '#9e9e9e';
     const skills = [];
@@ -571,12 +605,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // LAYLA (Energy Gunner)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'layla' || f.type === 'layla') {
+  layla(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.layla) ? CONFIG.layla : {};
     const themeColor = '#00E5FF'; 
     const skills = [];
@@ -608,12 +642,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // AOI TODO (Boogie Woogie)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'todo' || f.type === 'todo') {
+  todo(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.todo) ? CONFIG.todo : {};
     const themeColor = f.color || '#eab308';
     const skills = [];
@@ -665,12 +699,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // YUJI ITADORI (Vessel & Divergent Fist)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'yuji' || f.type === 'yuji') {
+  yuji(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.yuji) ? CONFIG.yuji : {};
     const themeColor = f.color || cfg.themeColor || '#D95C7E';
     const skills = [];
@@ -709,12 +743,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // MAHITO (Idle Transfiguration)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'mahito' || f.type === 'mahito') {
+  mahito(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
     const themeColor = f.color || '#C026D3';
     const skills = [];
@@ -807,12 +841,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // KENTO NANAMI (7:3 Ratio Sorcerer)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'nanami' || f.type === 'nanami') {
+  nanami(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nanami) ? CONFIG.nanami : {};
     const themeColor = f.color || '#D4AF37';
     const skills = [];
@@ -878,12 +912,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // NOBARA KUGISAKI (Straw Doll Technique)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'nobara' || f.type === 'nobara') {
+  nobara(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nobara) ? CONFIG.nobara : {};
     const themeColor = f.color || '#D94E68';
     const skills = [];
@@ -923,12 +957,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // MAKIMA (Control Devil)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'makima' || f.type === 'makima') {
+  makima(f) {
     const mcfg = (typeof CONFIG !== 'undefined' && CONFIG.makima) ? CONFIG.makima : {};
     const themeColor = mcfg.hudSkillBarColor || mcfg.themeColor || f.color || '#A31D24';
     const skills = [];
@@ -1090,12 +1124,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // MEGUMI FUSHIGURO (Ten Shadows Technique)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'megumi' || f.type === 'megumi') {
+  megumi(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.megumi) ? CONFIG.megumi : {};
     const themeColor = f.color || '#1C2D4A';
     const skills = [];
@@ -1133,12 +1167,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // GENOS (Demon Cyborg)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'genos' || f.type === 'genos') {
+  genos(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.genos) ? CONFIG.genos : {};
     const themeColor = cfg.themeColor || cfg.color || f.color || '#FF5500';
     const isSelfDestructing = Boolean(f.isSelfDestructing || (f.selfDestructTimer && f.selfDestructTimer > 0));
@@ -1212,12 +1246,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // CRONOS (Time Manipulation)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'cronos' || f.type === 'cronos') {
+  cronos(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.cronos) ? CONFIG.cronos : {};
     if (!isSkillEnabled(cfg.enableTimeSphere, cfg.enableSphere, true)) return [];
     const themeColor = f.color || '#00e5ff';
@@ -1225,12 +1259,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const sphereTimer = f.sphereCooldown !== undefined ? f.sphereCooldown : sphereMax;
     const spherePct = Math.max(0, Math.min(100, (1 - (sphereTimer / sphereMax)) * 100));
     return [{ id: 'sphere', pct: spherePct, ready: spherePct >= 99, color: themeColor, label: 'TIME SPHERE' }];
-  }
+  },
 
   // ─────────────────────────────────────────────
   // MUSASHI (Blade Master)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'musashi' || f.type === 'musashi') {
+  musashi(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.musashi) ? CONFIG.musashi : {};
     if (!isSkillEnabled(cfg.enableNitenIchiryu, cfg.enableFlurry, true)) return [];
     const themeColor = f.color || '#3cb371';
@@ -1238,12 +1272,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
     const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
     return [{ id: 'flurry', pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'NITEN ICHIRYU FLURRY' }];
-  }
+  },
 
   // ─────────────────────────────────────────────
   // YUTA OKKOTSU (Special Grade Sorcerer)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'yuta' || f.type === 'yuta') {
+  yuta(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.yuta) ? CONFIG.yuta : {};
     const themeColor = '#ff69b4';
     const skills = [];
@@ -1334,12 +1368,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // ALUCARD / GUNSLINGER
   // ─────────────────────────────────────────────
-  if (f.characterId === 'gunslinger' || f.type === 'gunslinger' || f.characterId === 'alucard' || f.type === 'alucard') {
+  gunslinger(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.gunslinger) ? CONFIG.gunslinger : {};
     const themeColor = f.themeColor || f.color || '#B91C1C';
     const skills = [];
@@ -1381,12 +1415,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     });
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // LASER
   // ─────────────────────────────────────────────
-  if (f.characterId === 'laser' || f.type === 'laser') {
+  laser(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.laser) ? CONFIG.laser : {};
     if (!isSkillEnabled(cfg.enableLaserBeam, true)) return [];
     const themeColor = f.color || '#ffaa00';
@@ -1414,12 +1448,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return [
       { id: 'laser_beam', pct: pct, ready: ready, color: themeColor, label: 'LASER BEAM' }
     ];
-  }
+  },
 
   // ─────────────────────────────────────────────
   // ZEUS (King of Olympus & God of Thunder)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'zeus' || f.type === 'zeus') {
+  zeus(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : {};
     const themeColor = f.color || '#00BFFF';
     const skills = [];
@@ -1475,12 +1509,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // ICHIGO KUROSAKI (Substitute Soul Reaper)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'ichigo' || f.type === 'ichigo') {
+  ichigo(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ichigo) ? CONFIG.ichigo : {};
     const themeColor = f.color || '#FF5500';
     const curHp = f.hp !== undefined ? f.hp : (f.maxHp || 100);
@@ -1559,12 +1593,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // JOHN WICK (Baba Yaga)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'john_wick' || f.type === 'john_wick' || f.characterId === 'johnwick' || f.type === 'johnwick') {
+  john_wick(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.john_wick || CONFIG.johnWick)) ? (CONFIG.john_wick || CONFIG.johnWick) : {};
     const themeColor = cfg.themeColor || '#64748B'; // Tactical Gunmetal Slate
     const skills = [];
@@ -1642,12 +1676,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // ENGINEER (TF2)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'engineer' || f.type === 'Engineer' || f.type === 'engineer' || f._def?.type === 'Engineer') {
+  engineer(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.engineer || CONFIG.Engineer)) ? (CONFIG.engineer || CONFIG.Engineer) : {};
     const themeColor = f.color || '#ffcc00';
     const skills = [];
@@ -1711,12 +1745,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // CJ (Carl Johnson — GTA San Andreas)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'cj' || f.type === 'cj') {
+  cj(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.cj) ? CONFIG.cj : {};
     const skillColor = cfg.skillBarColor || '#8BB5E8'; // GTA San Andreas Authentic Sky Blue Skill/Armor Bar
     const skills = [];
@@ -1806,11 +1840,10 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ── Tactical Force Operatives: Magazine Ammo / Reload Bar ──
-  const fType = (f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
-  if (['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal', 'tactical_commando', 'tactical_guerilla', 'tactical_breacher', 'tactical_gunslinger', 'tactical_infiltrator', 'tactical_marksman', 'tactical_barrett', 'tactical_sniper', 'tactical_heavy'].includes(fType)) {
+  tactical(f) {
     const tacCfg = (typeof CONFIG !== 'undefined' && (CONFIG.tactical || CONFIG.tacticalMain)) ? (CONFIG.tactical || CONFIG.tacticalMain) : {};
     if (!isSkillEnabled(tacCfg.enableMagazine, true)) return [];
     const maxMag = f.maxMagazine || 30;
@@ -1831,10 +1864,10 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return [
       { id: 'magazine', pct: ammoPct, ready: !f.isReloading && curAmmo > 0, color: themeColor, label: label }
     ];
-  }
+  },
 
   // ── Uryu Ishida: The Last Quincy HUD Skill Bars ──
-  if (f.characterId === 'uryu' || f.type === 'uryu' || f.characterId === 'ishida' || f.type === 'ishida') {
+  uryu(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : {};
     const themeColor = f.color || '#00E5FF';
     const skills = [];
@@ -1889,10 +1922,10 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ── Ulquiorra Cifer: Cuatro Espada HUD Skill Bars ──
-  if (f.characterId === 'ulquiorra' || f.type === 'ulquiorra') {
+  ulquiorra(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ulquiorra) ? CONFIG.ulquiorra : {};
     const themeColor = f.color || '#00FF88';
     const skills = [];
@@ -1935,12 +1968,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // RUBBICK / TRICKSTER (Grand Magus)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'rubbick' || f.type === 'rubbick' || f.characterId === 'trickster' || f.type === 'trickster') {
+  rubbick(f, getProjectiles) {
     const themeColor = f.color || '#00FF64';
     const rcfg = (typeof CONFIG !== 'undefined' && (CONFIG.rubbick || CONFIG.trickster)) ? (CONFIG.rubbick || CONFIG.trickster) : {};
     const skills = [];
@@ -2071,12 +2104,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // REZE (Bomb Devil Hybrid)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'reze' || f.type === 'reze') {
+  reze(f) {
     const themeColor = f.color || '#430363ff';
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.reze) ? CONFIG.reze : {};
     const isNukeEnabled = isSkillEnabled(cfg.enableMegatonNuke, cfg.enableUltimate, cfg.enableNuke, true);
@@ -2132,12 +2165,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // TANJIRO KAMADO (Water & Sun Breathing)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'tanjiro' || f.type === 'tanjiro') {
+  tanjiro(f) {
     const themeColor = f.color || '#10B981';
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.tanjiro) ? CONFIG.tanjiro : {};
     const skills = [];
@@ -2164,12 +2197,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // NEZUKO KAMADO (Awakened Demon & Bakketsu)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'nezuko' || f.type === 'nezuko') {
+  nezuko(f) {
     const themeColor = f.color || '#EC4899';
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.nezuko) ? CONFIG.nezuko : {};
     const skills = [];
@@ -2196,12 +2229,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // ZENITSU AGATSUMA (Thunder Breathing)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'zenitsu' || f.type === 'zenitsu') {
+  zenitsu(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zenitsu) ? CONFIG.zenitsu : {};
     const themeColor = f.color || '#F59E0B';
     const skills = [];
@@ -2303,12 +2336,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // INOSUKE HASHIBIRA (Beast Breathing)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'inosuke' || f.type === 'inosuke') {
+  inosuke(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.inosuke) ? CONFIG.inosuke : {};
     const themeColor = f.color || '#3B82F6';
     const skills = [];
@@ -2335,12 +2368,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // ESCANOR (Lion's Sin of Pride — Sunshine)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'escanor' || f.type === 'escanor') {
+  escanor(f) {
     const themeColor = f.color || '#F59E0B';
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
     const skills = [];
@@ -2399,12 +2432,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // SPIKE (Thorn Brawler)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'spike' || f.characterId === 'melee' || f.type === 'melee' || f.type === 'spike') {
+  spike(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.spike || CONFIG.melee)) ? (CONFIG.spike || CONFIG.melee) : {};
     const themeColor = f.color || cfg.themeColor || '#e5c158';
     const skills = [];
@@ -2431,12 +2464,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // NAOYA ZENIN (24 FPS Projection Sorcery)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'naoya' || f.type === 'naoya') {
+  naoya(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
     const themeColor = f.color || cfg.themeColor || '#76E042';
     const skills = [];
@@ -2492,12 +2525,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // SHIRO (Elkia Queen / 『　　』 Blank)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'shiro' || f.type === 'shiro' || (f.name && f.name.toLowerCase().includes('shiro')) || (f.displayName && f.displayName.includes('SHIRO'))) {
+  shiro(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.shiro || CONFIG.Shiro)) ? (CONFIG.shiro || CONFIG.Shiro) : {};
     const themeColor = f.themeColor || cfg.themeColor || '#8B5CF6';
     const skills = [];
@@ -2542,12 +2575,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // SPARTAN (Greek Hoplite - Javelin Hurl)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'spartan' || f.type === 'spartan' || (f.name && f.name.toLowerCase() === 'spartan')) {
+  spartan(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.spartan || CONFIG.Spartan)) ? (CONFIG.spartan || CONFIG.Spartan) : {};
     const themeColor = f.themeColor || cfg.themeColor || '#d97706';
     const javMax = cfg.javelinCooldown || 360;
@@ -2564,12 +2597,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
       signature: true,
       fullWidth: true
     }];
-  }
+  },
 
   // ─────────────────────────────────────────────
   // GUTS (The Black Swordsman / The Struggler)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'guts' || f.type === 'guts' || (f.name && f.name.toLowerCase() === 'guts')) {
+  guts(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.guts || CONFIG.Guts)) ? (CONFIG.guts || CONFIG.Guts) : {};
     const themeColor = f.themeColor || cfg.themeColor || '#71717a';
     const skills = [];
@@ -2644,12 +2677,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // CHOSO (Death Painting Eldest - Blood & Laser Transmutation)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'choso' || f.type === 'choso' || (f.name && f.name.toLowerCase() === 'choso')) {
+  choso(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.choso || CONFIG.Choso)) ? (CONFIG.choso || CONFIG.Choso) : {};
     const themeColor = f.themeColor || cfg.themeColor || '#A31D1D';
     const skills = [];
@@ -2737,12 +2770,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return skills;
-  }
+  },
 
   // ─────────────────────────────────────────────
   // EYE OF CTHULHU (Ancient Ocular Horror)
   // ─────────────────────────────────────────────
-  if (f.characterId === 'eye_of_cthulhu' || f.type === 'eye_of_cthulhu' || (f.name && f.name.toLowerCase().includes('cthulhu'))) {
+  eye_of_cthulhu(f) {
     const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.eye_of_cthulhu || CONFIG.eyeOfCthulhu)) ? (CONFIG.eye_of_cthulhu || CONFIG.eyeOfCthulhu) : {};
     const themeColor = f.themeColor || cfg.themeColor || '#E11D48';
     const skills = [];
@@ -2829,12 +2862,46 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     if (skills.length > 0) return skills;
-  }
+  },
 
-  if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger' || f.characterId === 'namelessdeity' || f.type === 'namelessdeity' || f.characterId === 'nameless_deity') {
+  doppleganger(f) {
     return [];
-  }
+  },
+};
 
+/**
+ * Resolves the HUD skill provider function for a fighter instance.
+ * @param {Object} f Fighter instance
+ * @returns {Function|null}
+ */
+function resolveHudSkillProvider(f) {
+  const candidates = [f.characterId, f.type, f._def?.id, f._def?.type];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    const key = String(raw).toLowerCase();
+    const canonical = HUD_SKILL_PROVIDER_ALIASES[key] || key;
+    if (HUD_SKILL_PROVIDERS[canonical]) {
+      return HUD_SKILL_PROVIDERS[canonical];
+    }
+  }
+  return null;
+}
+
+/**
+ * Calculates skill bar HUD data for any given fighter.
+ * Only returns skills that are currently enabled in the character's config.
+ * @param {Object} f Fighter instance
+ * @param {Function} getProjectiles Function reference to active projectiles getter
+ * @returns {Array<{id: string, pct: number, ready: boolean, color: string, label: string}>}
+ */
+export function getSkillDataForFighter(f, getProjectiles) {
+  if (!f) return [];
+
+  const provider = resolveHudSkillProvider(f);
+  if (provider) {
+    const skills = provider(f, getProjectiles);
+    if (Array.isArray(skills)) return skills;
+  }
   const def = f.fighterIndex !== undefined ? FIGHTER_DEFS[f.fighterIndex] : null;
   const color = f.color || (def && def.color) || '#a491d3';
 

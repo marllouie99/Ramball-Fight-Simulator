@@ -122,7 +122,7 @@ export function drawFurnaceDimScreen() {
 
   // Find Sukuna fighters channeling Furnace or in post-fire recovery (Yuji Soul Swap uses drawYujiSoulSwapDimScreen)
   const sukunaFuga = state.fighters?.find(f => 
-    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna' || f._def?.name === 'Sukuna' || f._def?.name === 'Ryomen Sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
+    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
   );
   
   // Also check if Furnace fire arrow is actively flying

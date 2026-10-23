@@ -528,8 +528,6 @@ export function drawRedSniperGun(
  * @param {boolean} isRubbick - Whether this is stolen by Rubbick (turns green)
  */
 export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false, isRubbick = false) {
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
   const prevFillStyle = ctx.fillStyle;
   const prevStrokeStyle = ctx.strokeStyle;
   const prevLineWidth = ctx.lineWidth;
@@ -816,8 +814,6 @@ export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false, isRubbick = 
   ctx.restore();
 
   // Restore context state
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
   ctx.fillStyle = prevFillStyle;
   ctx.strokeStyle = prevStrokeStyle;
   ctx.lineWidth = prevLineWidth;

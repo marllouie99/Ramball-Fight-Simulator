@@ -161,8 +161,7 @@ export function getFighterThemeColor(f, fallbackColor = '#38bdf8') {
   const isYuta = Boolean(
     f.characterId === 'yuta' ||
     f.type === 'yuta' ||
-    (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta' || f._def.id === 23)) ||
-    (f.name && f.name.toUpperCase().includes('YUTA'))
+    (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta' || f._def.id === 23))
   );
   if (isYuta) return '#FF1493';
   const charId = f.characterId || f.type || (f._def && (f._def.id || f._def.type));
@@ -287,7 +286,7 @@ export function isTacticalMatch(s) {
  */
 export function getTacticalCaliber(f) {
   if (!f) return 'TACTICAL';
-  const t = String(f.characterId || f.type || (f._def && f._def.type) || (f.name) || '').toLowerCase();
+  const t = String(f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
   if (t.includes('rifle') || t.includes('m4a1')) return '5.56 NATO';
   if (t.includes('shotgun') || t.includes('spas')) return '12-GAUGE';
   if (t.includes('pistol') || t.includes('desert') || t.includes('eagle')) return '.50 AE';
@@ -301,7 +300,7 @@ export function getTacticalCaliber(f) {
  */
 export function getTacticalDamageDisplay(f) {
   if (!f) return '0';
-  const t = String(f.characterId || f.type || (f._def && f._def.type) || (f.name) || '').toLowerCase();
+  const t = String(f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
   const baseDmg = Math.round(Number(f.damage !== undefined ? f.damage : (f._def && f._def.damage)) || 0);
   if (t.includes('shotgun') || t.includes('spas')) return `${baseDmg}×6`;
   if (t.includes('rifle') || t.includes('m4a1')) return `${baseDmg}×3`;
@@ -1599,7 +1598,7 @@ function updateTacticalCard(cardObj, f, index, accentColor) {
   }
   if (cardObj.card.style.display !== '') cardObj.card.style.display = '';
 
-  const isSans = f && (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans'));
+  const isSans = f && (f.characterId === 'sans' || f.type === 'sans' );
   const isDead = f.hp <= 0;
   let maxHp, hp, ratio, percent, barColor;
   if (isSans) {
@@ -1765,7 +1764,6 @@ export function renderTopHudProfileCanvas(canvasEl, fighter) {
     fighter.characterId === 'nameless_deity' ||
     fighter.type === 'namelessdeity' ||
     fighter.type === 'nameless_deity' ||
-    (fighter.name && fighter.name.toLowerCase().includes('nameless')) ||
     (fIdx !== undefined && fIdx >= 0 && (FIGHTER_DEFS[fIdx]?.type === 'namelessdeity' || FIGHTER_DEFS[fIdx]?.type === 'nameless_deity'))
   );
 
@@ -1862,10 +1860,10 @@ function getTopDuelTimerSecondsString() {
 export function buildTopDuelHUD(f1, f2, isDark = false) {
   if (!f1 || !f2) return '';
 
-  const isF1Sans = Boolean(f1.characterId === 'sans' || f1.type === 'sans' || (f1.name && f1.name.toLowerCase() === 'sans'));
-  const isF2Sans = Boolean(f2.characterId === 'sans' || f2.type === 'sans' || (f2.name && f2.name.toLowerCase() === 'sans'));
-  const isF1NamelessDeity = Boolean(f1.characterId === 'namelessdeity' || f1.characterId === 'nameless_deity' || f1.type === 'namelessdeity' || f1.type === 'nameless_deity' || (f1.name && f1.name.toLowerCase().includes('nameless')));
-  const isF2NamelessDeity = Boolean(f2.characterId === 'namelessdeity' || f2.characterId === 'nameless_deity' || f2.type === 'namelessdeity' || f2.type === 'nameless_deity' || (f2.name && f2.name.toLowerCase().includes('nameless')));
+  const isF1Sans = Boolean(f1.characterId === 'sans' || f1.type === 'sans');
+  const isF2Sans = Boolean(f2.characterId === 'sans' || f2.type === 'sans');
+  const isF1NamelessDeity = Boolean(f1.characterId === 'namelessdeity' || f1.characterId === 'nameless_deity' || f1.type === 'namelessdeity' || f1.type === 'nameless_deity');
+  const isF2NamelessDeity = Boolean(f2.characterId === 'namelessdeity' || f2.characterId === 'nameless_deity' || f2.type === 'namelessdeity' || f2.type === 'nameless_deity');
 
   let f1Percent, f1BarColor, f1HpText;
   if (isF1Sans) {
@@ -2177,7 +2175,7 @@ function updateHealthHud() {
     const baseDmg = parseFloat(Math.max(0, Number(f.damage) || 0).toFixed(1));
     const fType = (f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
 
-    if (f.characterId === 'sans' || f.type === 'sans' || (f.name && f.name.toLowerCase() === 'sans')) {
+    if (f.characterId === 'sans' || f.type === 'sans' ) {
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.sans) ? CONFIG.sans : {};
       const baseBoneDmg = cfg.damage || 8;
       const isBadTime = Boolean(f.isBadTimeActive);
@@ -2478,7 +2476,7 @@ function updateHealthHud() {
     } else if (f.characterId === 'crazydave' || f.type === 'crazydave' || f._def?.id === 'crazydave' || f._def?.type === 'crazydave' || f.isCrazyDave) {
       const sun = Math.max(0, Math.round(f.sunCount || 0));
       info.push(`<b>$UN:</b> ${sun}`);
-    } else if (f.characterId === 'shiro' || f.type === 'shiro' || fType === 'shiro' || (f.name && f.name.toLowerCase().includes('shiro')) || (f.displayName && f.displayName.includes('SHIRO'))) {
+    } else if (f.characterId === 'shiro' || f.type === 'shiro' || fType === 'shiro' || f.characterId === 'sora' || f.type === 'sora') {
       const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.shiro || CONFIG.Shiro)) ? (CONFIG.shiro || CONFIG.Shiro) : {};
       const baseDmg = f.damage || cfg.damage || 24;
       if (f.blankActiveTimer > 0) {
@@ -2884,7 +2882,7 @@ function updateHealthHud() {
     }
 
     // Spike (Thorn Brawler / Melee) stats info
-    if (f.characterId === 'spike' || f.characterId === 'melee' || fType === 'spike' || fType === 'melee' || f._def?.type === 'melee' || (f._def && f._def.name === 'Spike')) {
+    if (f.characterId === 'spike' || f.characterId === 'melee' || fType === 'spike' || fType === 'melee' || f._def?.type === 'melee') {
       const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.spike || CONFIG.melee)) ? (CONFIG.spike || CONFIG.melee) : {};
       const baseDmg = cfg.contactDamage ?? (f.damage || 25);
       info.push(`<b>DMG:</b> ${baseDmg}`);
@@ -2905,7 +2903,7 @@ function updateHealthHud() {
     }
 
     // Naoya (24 FPS Projection Sorcery) stats info
-    if (f.characterId === 'naoya' || fType === 'naoya' || (f._def && (f._def.name === 'Naoya' || f._def.name === 'Naoya Zenin')) || f.name === 'Naoya') {
+    if (f.characterId === 'naoya' || fType === 'naoya') {
       const cfg = (typeof CONFIG !== 'undefined' && CONFIG.naoya) ? CONFIG.naoya : {};
       const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
       const baseSpd = (f.baseSpeed || cfg.speed || 5.6) * modeMult;
@@ -3395,7 +3393,7 @@ function updateHealthHud() {
     if (members && members.length > 0) {
       barsHTML = members.map((m, mIndex) => {
         const isMemberCj = isCjCustomHudActive(m);
-        const isMemberSans = m && (m.characterId === 'sans' || m.type === 'sans' || (m.name && m.name.toLowerCase() === 'sans'));
+        const isMemberSans = m && (m.characterId === 'sans' || m.type === 'sans');
         let ratio, percent, barColor, hpText;
         if (isMemberSans) {
           const isDead = m.hp <= 0;
@@ -3426,7 +3424,7 @@ function updateHealthHud() {
         const skillsGridStyle = isSingleCol ? 'grid-template-columns: 1fr;' : '';
         const infoGridStyle = `grid-template-columns: 1fr;`;
 
-        const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta' || (m.name && m.name.toUpperCase().includes('YUTA')));
+        const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta');
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
         const memberThemeColor = getFighterThemeColor(m, memberNameColor);
         const memberName = getFighterDisplayName(m, true);
@@ -3500,7 +3498,7 @@ function updateHealthHud() {
       }).join('');
     } else {
       const isTargetCj = isCjCustomHudActive(targetFighter);
-      const isTargetSans = targetFighter && (targetFighter.characterId === 'sans' || targetFighter.type === 'sans' || (targetFighter.name && targetFighter.name.toLowerCase() === 'sans'));
+      const isTargetSans = targetFighter && (targetFighter.characterId === 'sans' || targetFighter.type === 'sans');
       let percent, barColor, displayValue;
       if (isTargetSans) {
         const isDead = targetFighter.hp <= 0;
@@ -3645,7 +3643,7 @@ function updateHealthHud() {
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const barColor = getFighterHealthBarColor(bossFighter, ratio, isDark);
-        const isBossSans = Boolean(bossFighter.characterId === 'sans' || bossFighter.type === 'sans' || (bossFighter.name && bossFighter.name.toLowerCase() === 'sans'));
+        const isBossSans = Boolean(bossFighter.characterId === 'sans' || bossFighter.type === 'sans');
         const bossName = getFighterDisplayName(bossFighter, true);
         const bossSubname = getBossSubName(bossFighter);
         const bossColor = getFighterThemeColor(bossFighter, '#ef4444');
@@ -3654,7 +3652,7 @@ function updateHealthHud() {
 
         const bossGrade = getFighterGrade(bossFighter);
         const bossGradeMeta = getGradeMeta(bossGrade);
-        const isBossNamelessDeity = Boolean(bossFighter.characterId === 'namelessdeity' || bossFighter.characterId === 'nameless_deity' || bossFighter.type === 'namelessdeity' || bossFighter.type === 'nameless_deity' || (bossFighter.name && bossFighter.name.toLowerCase().includes('nameless')));
+        const isBossNamelessDeity = Boolean(bossFighter.characterId === 'namelessdeity' || bossFighter.characterId === 'nameless_deity' || bossFighter.type === 'namelessdeity' || bossFighter.type === 'nameless_deity');
 
         const bossCardHTML = `
           <div class="boss-card has-profile" style="--fighter-theme: ${bossColor}; --grade-color: ${bossGradeMeta.color};" data-grade="${bossGrade}"${isBossNamelessDeity ? ' data-character="namelessdeity"' : ''}>
@@ -3751,7 +3749,7 @@ function updateHealthHud() {
         const fighterThemeColor = getFighterThemeColor(chFighter, chIdx === 0 ? '#38bdf8' : '#f43f5e');
         const chColor = chFighter.color || fighterThemeColor;
         let nameColor = isDark ? (fighterThemeColor || '#ffffff') : '#000000';
-        const isChSans = Boolean(chFighter.characterId === 'sans' || chFighter.type === 'sans' || (chFighter.name && chFighter.name.toLowerCase() === 'sans'));
+        const isChSans = Boolean(chFighter.characterId === 'sans' || chFighter.type === 'sans');
         const fighterName = getFighterDisplayName(chFighter, true);
         const fighterStats = state.leaderboard ? (state.leaderboard[chFighter.fighterIndex] || { wins: 0, losses: 0 }) : { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
@@ -3962,7 +3960,7 @@ function updateHealthHud() {
         if (!fighter || fighter.isTurret || fighter.isEndCrystal || fighter.isMinion || fighter.isDeployable) return;
         const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
         const color = fighter.color || '#fff';
-        const isYutaFighter = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+        const isYutaFighter = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' );
         let nameColor = (state.arenaTheme === 'dark') ? (isYutaFighter ? '#FF1493' : '#ffffff') : '#000000';
         const fighterName = getFighterDisplayName(fighter, true);
         const fighterStats = state.leaderboard ? (state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 }) : { wins: 0, losses: 0 };
@@ -4003,7 +4001,7 @@ function updateHealthHud() {
         const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel');
         const maxBulletsCount = (is1v1Mode && !isSideHud) ? 2 : 0;
 
-        const isSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        const isSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' );
         const fighterThemeColor = getFighterThemeColor(fighter, nameColor);
         const nameClass = isSans ? 'health-card__member-name hud-sans-name' : 'health-card__member-name';
         const isFfaVertical = isFfa && !isH;
@@ -4170,11 +4168,11 @@ function updateHealthHud() {
         }
 
         const isCj = isCjCustomHudActive(fighter);
-        const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' );
 
         if (m.nameEl) {
           const currentName = getFighterDisplayName(fighter, true);
-          const isMemberYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+          const isMemberYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' );
           const defaultNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : '#ffffff') : '#000000';
           const memberThemeColor = getFighterThemeColor(fighter, defaultNameColor);
           if (m.lastMemberName !== currentName) {
@@ -4404,7 +4402,7 @@ function updateHealthHud() {
       }
 
       const isCj = isCjCustomHudActive(fighter);
-      const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+      const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' );
       const isBossBar = Boolean(isBossBattle && _cachedTopContainer && cachedCard.hpBar && _cachedTopContainer.contains(cachedCard.hpBar));
       let percent, barColor, metaValue;
 
@@ -4581,7 +4579,7 @@ function updateHealthHud() {
             cachedCard.lastBossNameOpacity = 1;
           }
         }
-        const isBossSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        const isBossSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' );
         const bossName = getFighterDisplayName(fighter, true);
         if (cachedCard.lastBossName !== bossName) {
           cachedCard.bossCardName.textContent = bossName;
@@ -4612,7 +4610,7 @@ function updateHealthHud() {
             cachedCard.lastChOpacity = 1;
           }
         }
-        const isChSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' || (fighter.name && fighter.name.toLowerCase() === 'sans'));
+        const isChSans = Boolean(fighter.characterId === 'sans' || fighter.type === 'sans' );
         const chName = getFighterDisplayName(fighter, true);
         if (cachedCard.lastChName !== chName) {
           cachedCard.chCardName.textContent = chName;
@@ -4627,7 +4625,7 @@ function updateHealthHud() {
 
       if (cachedCard.nameEl) {
         const currentName = getFighterDisplayName(fighter, true);
-        const isFighterYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+        const isFighterYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' );
         const defaultNameColor = (state.arenaTheme === 'dark') ? (isFighterYuta ? '#FF1493' : '#ffffff') : '#000000';
         const fighterThemeColor = getFighterThemeColor(fighter, defaultNameColor);
         if (cachedCard.lastMemberName !== currentName) {

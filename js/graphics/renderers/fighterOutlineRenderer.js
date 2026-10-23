@@ -59,9 +59,7 @@ function _isExcludedFromSilhouette(fighter) {
     fighter.characterId === 'crazydave_plant' || fighter.characterId === 'crazydave_lawnmower' ||
     fighter.characterId === 'crazydave_potato_mine' ||
     fighter.characterId?.startsWith('chess_') ||
-    fighter.name === 'Peashooter' || fighter.name === 'Snow Pea' || fighter.name === 'Wall-nut' ||
-    fighter.name === 'Torchwood' || fighter.name === 'Potato Mine' || fighter.name === 'Lawnmower' ||
-    fighter.name === 'Sun' || fighter.isSunDrop
+    fighter.plantType !== undefined || fighter.isSunDrop
   );
 }
 

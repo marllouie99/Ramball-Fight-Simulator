@@ -28,8 +28,9 @@ export function isNamelessDeityEntity(target) {
     target.characterId === 'namelessdeity' ||
     target.characterId === 'nameless_deity' ||
     target.type === 'namelessdeity' ||
+    target.type === 'nameless_deity' ||
     target._def?.id === 'namelessdeity' ||
-    (typeof target.name === 'string' && target.name.toLowerCase().includes('nameless'))
+    target._def?.type === 'namelessdeity'
   );
 }
 
@@ -44,7 +45,7 @@ export function isSaitamaEntity(target) {
     target.characterId === 'saitama' ||
     target.type === 'saitama' ||
     target._def?.id === 'saitama' ||
-    (typeof target.name === 'string' && target.name.toLowerCase().includes('saitama'))
+    target._def?.type === 'saitama'
   );
 }
 

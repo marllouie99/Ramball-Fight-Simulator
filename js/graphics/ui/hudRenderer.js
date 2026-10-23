@@ -45,7 +45,7 @@ export function renderTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColo
 
     const isDimmed = (typeof state !== 'undefined' && state.currentHUDDimOpacity !== undefined && state.currentHUDDimOpacity > 0.1);
     const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-    const isYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta' || (fighter.name && fighter.name.toUpperCase().includes('YUTA')));
+    const isYuta = fighter && (fighter.characterId === 'yuta' || fighter.type === 'yuta');
     ctx.fillStyle = isDark ? (isYuta ? '#FF1493' : '#ffffff') : (isDimmed ? '#ffffff' : '#000000');
     ctx.font = '800 12px "Outfit", "Rajdhani", sans-serif';
     ctx.textAlign = 'left';

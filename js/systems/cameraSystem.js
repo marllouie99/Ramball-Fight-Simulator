@@ -536,7 +536,7 @@ export function updateCamera() {
       // Delay camera focus transition to Makima if enemy died from Crucifixion
       const isMakimaCrucifixHold = Boolean(
         winner &&
-        (winner.characterId === 'makima' || winner.type === 'makima' || winner.name === 'Makima') &&
+        (winner.characterId === 'makima' || winner.type === 'makima') &&
         (winner.isExecutingCrucifixion || ((winner.crucifixionKillCameraHoldTimer || 0) > 0))
       );
 

@@ -50,8 +50,6 @@ const DUBSTEP_COLORS = {
 };
 
 export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
   const prevShadowOffsetX = ctx.shadowOffsetX;
   const prevShadowOffsetY = ctx.shadowOffsetY;
   const prevFillStyle = ctx.fillStyle;
@@ -145,8 +143,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   };
 
   // Drop shadow for depth
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 2;
   ctx.lineJoin = 'round';
@@ -341,8 +337,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 4. RGB LED STRIPS
   // ═══════════════════════════════════════════════
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
 
   // Bottom edge LED strip
@@ -374,7 +368,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   ctx.globalAlpha = 1;
 
   // Restore shadow
-  // OPTIMIZED: Removed shadowColor
   ctx.shadowOffsetY = 2;
 
   // ═══════════════════════════════════════════════
@@ -460,7 +453,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  // OPTIMIZED: Removed shadowBlur
 
   // Glass panel overlay on magazine
   ctx.fillStyle = 'rgba(100, 200, 255, 0.08)';
@@ -597,8 +589,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 8. EXPOSED WIRING / CABLES
   // ═══════════════════════════════════════════════
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
 
   // Orange cable: from tweeter box → looping under barrel → back into chassis
@@ -633,7 +623,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 9. TOP SOUNDBAR SCOPE
   // ═══════════════════════════════════════════════
-  // OPTIMIZED: Removed shadowColor
   ctx.shadowOffsetY = 2;
 
   // Top rail
@@ -668,8 +657,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 10. ENERGY EFFECTS (Animated)
   // ═══════════════════════════════════════════════
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
 
   // ─── Glowing Orange Energy Ring around subwoofer ───
@@ -733,7 +720,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // 11. FLOATING MUSIC NOTES
   // ═══════════════════════════════════════════════
   if (fighter && fighter._musicNotes && fighter._musicNotes.length > 0) {
-    // OPTIMIZED: Removed shadowBlur
     ctx.shadowOffsetY = 0;
     for (let i = fighter._musicNotes.length - 1; i >= 0; i--) {
       const note = fighter._musicNotes[i];
@@ -778,8 +764,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   ctx.translate(-x, -y);
 
   // Restore context state
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
   ctx.shadowOffsetX = prevShadowOffsetX;
   ctx.shadowOffsetY = prevShadowOffsetY;
   ctx.fillStyle = prevFillStyle;
@@ -814,8 +798,6 @@ const WAVE_COLORS = [
  * @param {Object} p - The projectile object
  */
 export function drawRangerBullet(ctx, p) {
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
   const prevFillStyle = ctx.fillStyle;
   const prevStrokeStyle = ctx.strokeStyle;
   const prevLineWidth = ctx.lineWidth;
@@ -857,8 +839,6 @@ export function drawRangerBullet(ctx, p) {
   ctx.restore();
 
   // Restore context state
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
   ctx.fillStyle = prevFillStyle;
   ctx.strokeStyle = prevStrokeStyle;
   ctx.lineWidth = prevLineWidth;

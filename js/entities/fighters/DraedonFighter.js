@@ -25,9 +25,9 @@ export class DraedonFighter extends Fighter {
     super(def);
     this.characterId = 'draedon';
     this.type = 'draedon';
-    this.name = 'Draedon';
-
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.draedon) ? CONFIG.draedon : draedonConfig;
+    this.name = def?.name ?? getDraedonSetting(cfg, 'name') ?? 'Draedon';
+    this.displayName = def?.displayName ?? getDraedonSetting(cfg, 'displayName') ?? this.name;
     this.color = def?.color ?? getDraedonSetting(cfg, 'color');
     this.themeColor = def?.themeColor ?? getDraedonSetting(cfg, 'themeColor');
     this.secondaryColor = def?.secondaryColor ?? getDraedonSetting(cfg, 'secondaryColor');

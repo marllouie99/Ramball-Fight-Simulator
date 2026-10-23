@@ -462,7 +462,7 @@ class ProjectileSystem {
     if (!visualType && fighter._def && fighter._def.type === 'aimbot') {
       visualType = 'rangerBullet';
     }
-    if (!visualType && fighter._def && (fighter._def.type === 'sukuna' || fighter._def.name === 'Sukuna' || fighter._def.name === 'Ryomen Sukuna')) {
+    if (!visualType && (fighter.characterId === 'sukuna' || fighter.type === 'sukuna' || fighter._def?.type === 'sukuna')) {
       visualType = 'sukunaSlash';
     }
     if (!visualType && fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {

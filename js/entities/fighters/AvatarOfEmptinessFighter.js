@@ -29,9 +29,9 @@ export class AvatarOfEmptinessFighter extends Fighter {
     super(def);
     this.characterId = 'avatarofemptiness';
     this.type = 'avatarofemptiness';
-    this.name = 'Avatar of Emptiness';
-
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.avatarofemptiness) ? CONFIG.avatarofemptiness : avatarOfEmptinessConfig;
+    this.name = def?.name ?? getAvatarSetting(cfg, 'name') ?? 'Avatar of Emptiness';
+    this.displayName = def?.displayName ?? getAvatarSetting(cfg, 'displayName') ?? this.name;
     this.color = def?.color ?? getAvatarSetting(cfg, 'color');
     this.themeColor = def?.themeColor ?? getAvatarSetting(cfg, 'themeColor');
     this.secondaryColor = def?.secondaryColor ?? getAvatarSetting(cfg, 'secondaryColor');

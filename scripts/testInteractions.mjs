@@ -2402,6 +2402,119 @@ async function runInteractionTests() {
     assert(teamDaveA.suns.length === 0, 'Dead Dave A suns must be transferred');
     assert(teamDaveB.suns.length === 1, 'Living teammate Dave B must inherit uncollected suns from dead Dave A');
 
+    // 4. Crazy Dave vs Crazy Dave (Mirror Match) Plant Targeting & Projectile Damage Verification
+    {
+      const { isEnemyPlantTarget, PeashooterEntity, SnowPeaEntity, TorchwoodEntity, PotatoMineEntity, WallnutEntity, LawnmowerEntity } = await import('../js/entities/fighters/CrazyDaveFighter.js');
+      const { resolveFighterCollision } = await import('../js/systems/physics.js');
+      const mirrorDave1 = new CrazyDaveClass({ radius: 25, x: 120, y: 300, hp: 390, maxHp: 390 });
+      const mirrorDave2 = new CrazyDaveClass({ radius: 25, x: 380, y: 300, hp: 390, maxHp: 390 });
+      state.fighters = [mirrorDave1, mirrorDave2];
+
+      const dave1Pea = new PeashooterEntity(180, 300, mirrorDave1, 1);
+      const dave2Pea = new PeashooterEntity(320, 300, mirrorDave2, -1);
+      const dave1Wallnut = new WallnutEntity(210, 300, mirrorDave1, 1);
+      const dave2Wallnut = new WallnutEntity(290, 300, mirrorDave2, -1);
+      state.fighters.push(dave1Pea, dave2Pea, dave1Wallnut, dave2Wallnut);
+
+      // Verify both Daves' plants recognize the opposing Crazy Dave AND opposing plants as valid enemy targets
+      assert(isEnemyPlantTarget(dave1Pea, mirrorDave2) === true, 'Dave 1 Peashooter must recognize Enemy Dave 2 as a valid target');
+      assert(isEnemyPlantTarget(dave1Pea, dave2Pea) === true, 'Dave 1 Peashooter must recognize Enemy Dave 2 Peashooter as a valid target');
+      assert(isEnemyPlantTarget(dave1Pea, dave2Wallnut) === true, 'Dave 1 Peashooter must recognize Enemy Dave 2 Wall-nut as a valid target');
+      assert(isEnemyPlantTarget(dave1Pea, mirrorDave1) === false, 'Dave 1 Peashooter must NOT target Friendly Dave 1');
+      assert(isEnemyPlantTarget(dave1Pea, dave1Wallnut) === false, 'Dave 1 Peashooter must NOT target Friendly Dave 1 Wall-nut');
+      assert(isEnemyPlantTarget(dave2Pea, mirrorDave1) === true, 'Dave 2 Peashooter must recognize Enemy Dave 1 as a valid target');
+      assert(isEnemyPlantTarget(dave2Pea, dave1Pea) === true, 'Dave 2 Peashooter must recognize Enemy Dave 1 Peashooter as a valid target');
+      assert(isEnemyPlantTarget(dave2Pea, mirrorDave2) === false, 'Dave 2 Peashooter must NOT target Friendly Dave 2');
+
+      // Verify Dave 1 Peashooter projectile hits and damages Enemy Dave 2 AND Enemy Plants (and skips Friendly Dave 1 & Friendly Plants)
+      const projsArr = (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) ? projectileSystem.projectiles : state.projectiles;
+      projsArr.length = 0;
+      dave1Pea._firePea(0, 2);
+      const peaFromDave1 = projsArr[projsArr.length - 1];
+      assert(peaFromDave1 !== undefined, 'Dave 1 Peashooter must spawn a pea projectile');
+
+      // Passing over Friendly Dave 1 and Friendly Wall-nut deals 0 damage
+      const dave1HpBefore = mirrorDave1.hp;
+      peaFromDave1.x = mirrorDave1.x;
+      peaFromDave1.y = mirrorDave1.y;
+      projectileSystem.checkProjectileHits(peaFromDave1, state.fighters);
+      assert(mirrorDave1.hp === dave1HpBefore, 'Friendly Dave 1 must NOT take damage from his own Peashooter');
+
+      const dave1WallnutHpBefore = dave1Wallnut.hp;
+      peaFromDave1.x = dave1Wallnut.x;
+      peaFromDave1.y = dave1Wallnut.y;
+      projectileSystem.checkProjectileHits(peaFromDave1, state.fighters);
+      assert(dave1Wallnut.hp === dave1WallnutHpBefore, 'Friendly Dave 1 Wall-nut must NOT take damage from friendly Peashooter');
+
+      // Hitting Enemy Dave 2 Wall-nut deals full pea damage
+      const dave2WallnutHpBefore = dave2Wallnut.hp;
+      peaFromDave1.x = dave2Wallnut.x;
+      peaFromDave1.y = dave2Wallnut.y;
+      projectileSystem.checkProjectileHits(peaFromDave1, state.fighters);
+      assert(dave2Wallnut.hp < dave2WallnutHpBefore, `Enemy Dave 2 Wall-nut must take damage from Dave 1 Peashooter (${dave2WallnutHpBefore} -> ${dave2Wallnut.hp})`);
+
+      // Hitting Enemy Dave 2 deals full pea damage
+      projsArr.length = 0;
+      dave1Pea._firePea(0, 2);
+      const peaToEnemyDave = projsArr[projsArr.length - 1];
+      const dave2HpBefore = mirrorDave2.hp;
+      peaToEnemyDave.x = mirrorDave2.x;
+      peaToEnemyDave.y = mirrorDave2.y;
+      projectileSystem.checkProjectileHits(peaToEnemyDave, state.fighters);
+      assert(mirrorDave2.hp < dave2HpBefore, `Enemy Dave 2 must take damage from Dave 1 Peashooter (${dave2HpBefore} -> ${mirrorDave2.hp})`);
+
+      // Verify Dave 2 Snow Pea projectile hits and damages Enemy Dave 1 and Enemy Dave 1 Peashooter
+      projsArr.length = 0;
+      const dave2Snow = new SnowPeaEntity(320, 300, mirrorDave2, -1);
+      state.fighters.push(dave2Snow);
+      dave2Snow._fireSnowPea(Math.PI, 4);
+      const snowFromDave2 = projsArr[projsArr.length - 1];
+      const dave1PeaHpBeforeSnow = dave1Pea.hp;
+      snowFromDave2.x = dave1Pea.x;
+      snowFromDave2.y = dave1Pea.y;
+      projectileSystem.checkProjectileHits(snowFromDave2, state.fighters);
+      assert(dave1Pea.hp < dave1PeaHpBeforeSnow, `Enemy Dave 1 Peashooter must take damage from Dave 2 Snow Pea (${dave1PeaHpBeforeSnow} -> ${dave1Pea.hp})`);
+
+      // Verify Lawnmower 1-hits Enemy Dave 2's plants (even a 600 HP Wall-nut exceeding base 180 mower damage!) while ignoring friendly plants
+      const dave2FullWallnut = new WallnutEntity(260, 300, mirrorDave2, -1);
+      dave2FullWallnut.maxHp = 600;
+      dave2FullWallnut.hp = 600;
+      state.fighters.push(dave2FullWallnut);
+      assert(dave2FullWallnut.hp === 600, 'Enemy Wall-nut has 600 HP (exceeding base Lawnmower damage)');
+      const dave1Mower = new LawnmowerEntity(100, 300, mirrorDave1, 1, 2);
+      state.fighters.push(dave1Mower);
+      dave1Mower.state = 'charging';
+      // Pass over friendly Wall-nut: must NOT damage friendly plant
+      dave1Mower.x = dave1Wallnut.x;
+      dave1Mower.y = dave1Wallnut.y;
+      dave1Mower._shredEnemies();
+      assert(dave1Wallnut.hp === dave1WallnutHpBefore, 'Dave 1 Lawnmower must NOT damage friendly Dave 1 Wall-nut');
+      // Pass over enemy 600 HP Wall-nut: must 1-HIT KILL it!
+      dave1Mower.x = dave2FullWallnut.x;
+      dave1Mower.y = dave2FullWallnut.y;
+      dave1Mower._shredEnemies();
+      assert(dave2FullWallnut.hp <= 0 && dave2FullWallnut.dead === true, `Dave 1 Lawnmower must 1-hit kill Enemy Dave 2 Wall-nut (remaining HP: ${dave2FullWallnut.hp})`);
+
+      // Verify Torchwood only ignites friendly peas and NOT enemy peas
+      projsArr.length = 0;
+      const dave1Torch = new TorchwoodEntity(220, 300, mirrorDave1, 1);
+      dave2Pea._firePea(Math.PI, 3);
+      const enemyPeaAtTorch = projsArr[projsArr.length - 1];
+      enemyPeaAtTorch.x = dave1Torch.x;
+      enemyPeaAtTorch.y = dave1Torch.y;
+      dave1Torch._interceptProjectiles();
+      assert(enemyPeaAtTorch.visual === 'peaBullet', 'Dave 1 Torchwood must NOT ignite Enemy Dave 2 peas into Fire Peas');
+
+      // Verify Wall-nut blocks Enemy Dave 2 while letting Friendly Dave 1 pass through
+      mirrorDave2.x = dave1Wallnut.x + 5;
+      mirrorDave2.y = dave1Wallnut.y + 5;
+      const preEnemyDaveX = mirrorDave2.x;
+      const preEnemyDaveY = mirrorDave2.y;
+      resolveFighterCollision(dave1Wallnut, mirrorDave2);
+      assert(mirrorDave2.x !== preEnemyDaveX || mirrorDave2.y !== preEnemyDaveY, 'Enemy Crazy Dave must be physically blocked by opponent Wall-nut');
+      projsArr.length = 0;
+    }
+
     state.fighters = priorFighters;
 
     const wallnutEntity = plantEntities.find(p => p.type === 'Wallnut');
@@ -8773,9 +8886,25 @@ async function runInteractionTests() {
       registerComboHit(p1, p2, -15);
       assert(slots[0].hits === 3, 'Slot 0 hits must not increment on negative damage');
 
-      // 6c. Inanimate props & dead target guards: only active enemies count
+      // 6c. Minions, plants, troops, buildings, summons & dead target guards: only primary active enemy fighters count
       registerComboHit(p1, { isTurret: true, team: 1 }, 50);
       assert(slots[0].hits === 3, 'Slot 0 hits must not increment against turrets/buildings');
+      registerComboHit(p1, { isDispenser: true, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against dispensers');
+      registerComboHit(p1, { isBuilding: true, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against buildings');
+      registerComboHit(p1, { isPlant: true, isPlantMinion: true, owner: p2, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against Crazy Dave plants');
+      registerComboHit(p1, { isWallnut: true, isPlantBarrier: true, owner: p2, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against Wall-nut barriers');
+      registerComboHit(p1, { isChessTroop: true, isChessPiece: true, owner: p2, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against Shiro chess troops');
+      registerComboHit(p1, { isMinion: true, owner: p2, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against enemy minions');
+      registerComboHit(p1, { isCompanion: true, isRika: true, owner: p2, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against companion summons');
+      registerComboHit(p1, { isIllusion: true, owner: p2, team: 1 }, 50);
+      assert(slots[0].hits === 3, 'Slot 0 hits must not increment against illusions/clones');
       registerComboHit(p1, { isLawnmower: true, team: 1 }, 50);
       assert(slots[0].hits === 3, 'Slot 0 hits must not increment against lawnmowers');
       registerComboHit(p1, { isDead: true, hp: 0, _hasDied: true, team: 1 }, 50);

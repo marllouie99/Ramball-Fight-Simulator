@@ -335,8 +335,6 @@ export const FLAMEWARDEN_WEAPON_GRAPHICS = {
 };
 
 export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
   const prevShadowOffsetY = ctx.shadowOffsetY;
   const prevFillStyle = ctx.fillStyle;
   const prevStrokeStyle = ctx.strokeStyle;
@@ -358,9 +356,6 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
   const cfg = FLAMEWARDEN_WEAPON_GRAPHICS;
   const scale = cfg.positioning.scale;
 
-  // Setup generic shadow (OPTIMIZED: removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
 
   // -- 1. Rear Fuel Tank / Base --
@@ -447,16 +442,12 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
   }
 
   // Glowing heat inside vents
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   ctx.fillStyle = cfg.flamethrower.ventGlow;
   for (let i = 0; i < 3; i++) {
     const vx = (27.5 + i * 4) * scale;
     ctx.fillRect(vx, -1.5 * scale, 0.5 * scale, 4 * scale);
   }
-  // Shadow for depth (OPTIMIZED: removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
 
   // -- 5. Muzzle Nozzle --
@@ -476,7 +467,6 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
   ctx.stroke();
 
   // -- 6. Pilot Light --
-  ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;
   
   // Pilot light bracket
@@ -487,13 +477,11 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
   ctx.beginPath();
   ctx.arc(44.75 * scale, -6 * scale, 1.5 * scale, 0, Math.PI * 2);
   ctx.fillStyle = cfg.flamethrower.pilotCore;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.fill();
   
   ctx.beginPath();
   ctx.arc(44.75 * scale, -6 * scale, 0.8 * scale, 0, Math.PI * 2);
   ctx.fillStyle = cfg.flamethrower.pilotHighlight;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.fill();
 
   // Reset transformations
@@ -505,8 +493,6 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
   ctx.translate(-x, -y);
 
   // Restore state
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
   ctx.shadowOffsetY = prevShadowOffsetY;
   ctx.fillStyle = prevFillStyle;
   ctx.strokeStyle = prevStrokeStyle;

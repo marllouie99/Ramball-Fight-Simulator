@@ -25,8 +25,7 @@ export function isSukunaPresentInMatch(excludeFighter = null) {
         f.characterId === 'sukuna' ||
         f.type === 'sukuna' ||
         f._def?.id === 'sukuna' ||
-        f._def?.type === 'sukuna' ||
-        (typeof f._def?.name === 'string' && f._def.name.toLowerCase().includes('sukuna'))
+        f._def?.type === 'sukuna'
       ) {
         return true;
       }
@@ -46,8 +45,7 @@ export function isSukunaPresentInMatch(excludeFighter = null) {
         return def && (
           def.id === 'sukuna' ||
           def.type === 'sukuna' ||
-          def.characterId === 'sukuna' ||
-          (typeof def.name === 'string' && def.name.toLowerCase().includes('sukuna'))
+          def.characterId === 'sukuna'
         );
       });
     };
@@ -64,8 +62,7 @@ export function isSukunaPresentInMatch(excludeFighter = null) {
       bf.characterId === 'sukuna' ||
       bf.type === 'sukuna' ||
       bf._def?.id === 'sukuna' ||
-      bf._def?.type === 'sukuna' ||
-      (typeof bf._def?.name === 'string' && bf._def.name.toLowerCase().includes('sukuna'))
+      bf._def?.type === 'sukuna'
     ) {
       return true;
     }

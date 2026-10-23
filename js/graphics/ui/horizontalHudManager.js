@@ -150,7 +150,7 @@ function _draw1v1HeroPod(ctx, x, y, w, h, fighter, pal, isP1) {
   ctx.font = '900 13px "Outfit", "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const name = (fighter.name || fighter._def?.name || fighter.characterId || 'FIGHTER').toUpperCase();
+  const name = (fighter.displayName || fighter.name || fighter._def?.displayName || fighter._def?.name || fighter.characterId || 'FIGHTER').toUpperCase();
   ctx.fillText(name.charAt(0), avatarX, avatarY + 1);
 
   // Content positioning (Clean Left aligned)

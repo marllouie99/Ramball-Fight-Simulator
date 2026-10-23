@@ -64,8 +64,6 @@ export function drawMachineGun(ctx, options) {
   const prevLineWidth = ctx.lineWidth;
   const prevGlobalCompositeOperation = ctx.globalCompositeOperation;
   const prevGlobalAlpha = ctx.globalAlpha;
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
 
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
@@ -185,10 +183,7 @@ export function drawMachineGun(ctx, options) {
     const heatIntensity = isOverheated ? 1.0 : heat / 100;
     const glowColor = isOverheated ? colors.heatGlow : `rgba(255, ${150 - heatIntensity * 100}, 0, ${heatIntensity * 0.6})`;
     
-    // Heat glow from barrel vents (OPTIMIZED: removed shadowBlur - expensive operation)
     ctx.fillStyle = glowColor;
-    ctx.shadowColor = colors.heatGlow;
-    // OPTIMIZED: Removed shadowBlur
     ctx.fillRect(pos.receiverWidth - 2, -pos.barrelAssemblyHeight / 2 + 2, 8, pos.barrelAssemblyHeight - 4);
     
     // Steam/vapor particles when hot
@@ -217,10 +212,7 @@ export function drawMachineGun(ctx, options) {
     const flashSize = 8 + Math.random() * 6;
     const flashX = pos.receiverWidth + pos.barrelAssemblyWidth + pos.muzzleLength + pos.muzzleFlare + 2;
     
-    // Main flash (OPTIMIZED: removed shadowBlur - expensive operation)
     ctx.fillStyle = colors.muzzleFlash;
-    // OPTIMIZED: Removed shadowColor
-    // OPTIMIZED: Removed shadowBlur
     ctx.beginPath();
     ctx.arc(flashX, 0, flashSize, 0, Math.PI * 2);
     ctx.fill();
@@ -260,8 +252,6 @@ export function drawMachineGun(ctx, options) {
   ctx.lineWidth = prevLineWidth;
   ctx.globalCompositeOperation = prevGlobalCompositeOperation;
   ctx.globalAlpha = prevGlobalAlpha;
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
 }
 
 // ─────────────────────────────────────────────
@@ -272,8 +262,6 @@ export function drawMachineGunBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   const bulletWidth = 3 * scale;
   
   const prevFillStyle = ctx.fillStyle;
-  const prevShadowColor = ctx.shadowColor;
-  const prevShadowBlur = ctx.shadowBlur;
 
   ctx.translate(x, y);
   ctx.rotate(angle);
@@ -292,10 +280,7 @@ export function drawMachineGunBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   ctx.fillStyle = trailGradient;
   ctx.fill();
   
-  // Bullet body (OPTIMIZED: removed shadowBlur - expensive operation)
   ctx.fillStyle = '#c0c0c0';
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
   ctx.beginPath();
   ctx.ellipse(0, 0, bulletLength / 2, bulletWidth / 2, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -312,8 +297,6 @@ export function drawMachineGunBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
 
   // Manual state restore
   ctx.fillStyle = prevFillStyle;
-  ctx.shadowColor = prevShadowColor;
-  ctx.shadowBlur = prevShadowBlur;
 }
 
 // ─────────────────────────────────────────────

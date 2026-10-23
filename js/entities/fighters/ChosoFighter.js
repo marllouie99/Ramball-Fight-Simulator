@@ -42,9 +42,9 @@ export class ChosoFighter extends Fighter {
     super(def);
     this.characterId = 'choso';
     this.type = 'choso';
-    this.name = 'Choso';
-
     const cfg = CONFIG.choso || {};
+    this.name = def?.name || cfg.name || 'Choso';
+    this.displayName = def?.displayName || cfg.displayName || this.name;
     this.themeColor = cfg.themeColor || '#A31D1D';
     this.color = this.themeColor;
     this.damageNumberColor = this.themeColor;

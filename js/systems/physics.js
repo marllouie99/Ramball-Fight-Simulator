@@ -174,7 +174,11 @@ export function resolveFighterCollision(a, b) {
   if (aIsBarrier || bIsBarrier) {
     const barrier = aIsBarrier ? a : b;
     const other = aIsBarrier ? b : a;
-    const isFriendly = (other === barrier.owner) || (barrier.owner && other.owner === barrier.owner) || (other.characterId === 'crazydave') || (other.isPlant || other.isPlantMinion) || (typeof barrier.isTeammate === 'function' && barrier.isTeammate(other));
+    const isFriendly = (other === barrier.owner) ||
+      (barrier.owner && other.owner === barrier.owner) ||
+      (other.isPlant || other.isPlantMinion) ||
+      (typeof barrier.isTeammate === 'function' && barrier.isTeammate(other)) ||
+      (barrier.owner && typeof barrier.owner.isTeammate === 'function' && barrier.owner.isTeammate(other));
     if (isFriendly) return;
   }
 
@@ -186,7 +190,7 @@ export function resolveFighterCollision(a, b) {
     const other = aIsBuilding ? b : a;
     const isFriendly = (other === building.owner) ||
       (building.owner && other.owner === building.owner) ||
-      (other.characterId === 'engineer' || other.type === 'engineer' || other._def?.type === 'engineer' || other.name === 'Engineer') ||
+      (other.characterId === 'engineer' || other.type === 'engineer' || other.type === 'Engineer' || other._def?.type === 'engineer' || other._def?.type === 'Engineer') ||
       (other.isTurret || other.isDispenser || other.isDeployable) ||
       (typeof building.isTeammate === 'function' && building.isTeammate(other)) ||
       (typeof other.isTeammate === 'function' && building.owner && other.isTeammate(building.owner));
@@ -247,8 +251,8 @@ export function resolveFighterCollision(a, b) {
   }
 
   // Toji phases through fighters during his Ultimate sequence (ethereal assassin)
-  if ((a.ultimateActive || a._wasFinalBlowSpin) && (a.characterId === 'toji' || a.type === 'toji' || a.name === 'Toji' || a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
-  if ((b.ultimateActive || b._wasFinalBlowSpin) && (b.characterId === 'toji' || b.type === 'toji' || b.name === 'Toji' || b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
+  if ((a.ultimateActive || a._wasFinalBlowSpin) && (a.characterId === 'toji' || a.type === 'toji' || a.id === 'toji')) return;
+  if ((b.ultimateActive || b._wasFinalBlowSpin) && (b.characterId === 'toji' || b.type === 'toji' || b.id === 'toji')) return;
 
   // Naoya Projection Sorcery Runway Ultimate: victim locked in stasis, sprinting Naoya, and ragdoll wall flight ignore circle-circle collision push
   const aIsNaoyaUlt = (a.characterId === 'naoya' || a.type === 'naoya') && a.isExecutingUlt;

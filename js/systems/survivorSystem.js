@@ -384,7 +384,7 @@ export class SurvivorSystem {
     const FighterClass = FIGHTER_CLASS_MAP[charKey] || FIGHTER_CLASS_MAP[rawCharId] || FIGHTER_CLASS_MAP['knight'];
     if (!FighterClass) return null;
 
-    const baseDef = (typeof FIGHTER_DEFS !== 'undefined' && FIGHTER_DEFS.find(d => d && (d.type === charKey || d.characterId === charKey || d.name?.toLowerCase() === charKey))) || {};
+    const baseDef = (typeof FIGHTER_DEFS !== 'undefined' && FIGHTER_DEFS.find(d => d && (d.type === charKey || d.characterId === charKey))) || {};
 
     const effectiveHp = isElite ? Math.round(hp * 2.5) : hp;
     const effectiveRadius = isElite ? Math.round((baseDef.radius || 20) * 1.25) : (baseDef.radius || 20);
@@ -547,7 +547,7 @@ export class SurvivorSystem {
     if (!FighterClass) return;
 
     const coords = this._getRandomPerimeterPosition(ar);
-    const baseDef = (typeof FIGHTER_DEFS !== 'undefined' && FIGHTER_DEFS.find(d => d && (d.type === charKey || d.characterId === charKey || d.name?.toLowerCase() === charKey))) || {};
+    const baseDef = (typeof FIGHTER_DEFS !== 'undefined' && FIGHTER_DEFS.find(d => d && (d.type === charKey || d.characterId === charKey))) || {};
 
     const def = {
       ...baseDef,

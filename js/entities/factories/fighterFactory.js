@@ -71,8 +71,8 @@ export const FIGHTER_CLASS_MAP = {
   'guts':       GutsFighter,
   'Guts':       GutsFighter,
   'GUTS':       GutsFighter,
-  'berserker':  GutsFighter,
-  'Berserker':  GutsFighter,
+
+
   'shiro':      ShiroFighter,
   'Shiro':      ShiroFighter,
   'shiro_ngnl': ShiroFighter,
@@ -230,7 +230,7 @@ function wrapFighterDraw(FighterClass) {
       fighter.characterId === 'alucard' ||
       fighter.type === 'gunslinger' ||
       fighter.type === 'alucard' ||
-      fighter.name === 'Alucard' ||
+      fighter.type === 'alucard' ||
       fighter.characterId === 'zeus' ||
       fighter.type === 'zeus' ||
       isNamelessDeity ||

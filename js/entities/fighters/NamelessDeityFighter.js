@@ -28,9 +28,9 @@ export class NamelessDeityFighter extends Fighter {
     super(def);
     this.characterId = 'namelessdeity';
     this.type = 'namelessdeity';
-    this.name = 'Nameless Deity';
-
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
+    this.name = def?.name ?? getNamelessSetting(cfg, 'name') ?? 'Nameless Deity';
+    this.displayName = def?.displayName ?? getNamelessSetting(cfg, 'displayName') ?? this.name;
     this.color = def?.color ?? getNamelessSetting(cfg, 'color');
     this.themeColor = def?.themeColor ?? getNamelessSetting(cfg, 'themeColor');
     this.secondaryColor = def?.secondaryColor ?? getNamelessSetting(cfg, 'secondaryColor');

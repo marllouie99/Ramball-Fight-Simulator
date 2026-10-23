@@ -96,7 +96,7 @@ export function isCrazyDavePresent() {
         f.type === 'crazy_dave' || 
         f._def?.id === 'crazydave' || 
         f._def?.id === 'crazy_dave' ||
-        f.name === 'Crazy Dave' ||
+        f._def?.type === 'crazydave' ||
         f.isCrazyDave === true
       )
     );
@@ -113,7 +113,7 @@ export function isCrazyDavePresent() {
       pf.type === 'crazy_dave' || 
       pf._def?.id === 'crazydave' || 
       pf._def?.id === 'crazy_dave' ||
-      pf.name === 'Crazy Dave' ||
+      pf._def?.type === 'crazydave' ||
       pf.isCrazyDave === true
     ) {
       return true;
@@ -123,7 +123,7 @@ export function isCrazyDavePresent() {
   // Selected fighters in lobby / character select screen
   if (state.selectedFighters && Array.isArray(state.selectedFighters)) {
     const selected = state.selectedFighters.some(f => 
-      f && (f.id === 'crazydave' || f.id === 'crazy_dave' || f.name === 'Crazy Dave')
+      f && (f.id === 'crazydave' || f.id === 'crazy_dave' || f.type === 'crazydave' || f.type === 'crazy_dave' || f.characterId === 'crazydave')
     );
     if (selected && state.currentScreen === 'game') return true;
   }

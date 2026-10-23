@@ -92,7 +92,7 @@ export class StatusEffectsManager {
       let volume = opts.volume ?? 0.85;
 
       if (!sfx) {
-        if (opts.isBlueBone || (attacker && (attacker.characterId === 'sans' || attacker.name === 'SANS' || attacker.isSans))) {
+        if (opts.isBlueBone || (attacker && (attacker.characterId === 'sans' || attacker.type === 'sans' || attacker.isSans))) {
           sfx = CONFIG.sans?.sounds?.ding || 'Assets/Sound Effects/Sans/Ding.ogg';
           volume = 0.85;
         } else {

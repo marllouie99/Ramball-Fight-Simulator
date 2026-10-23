@@ -210,7 +210,9 @@ export class ${className} extends Fighter {
     super(def);
     this.characterId = '${id}';
     this.type = '${id}';
-    this.name = '${name}';
+    const cfg = CONFIG.${id} || {};
+    this.name = def?.name || cfg.name || '${name}';
+    this.displayName = def?.displayName || cfg.displayName || this.name;
     this.themeColor = '${themeColor}';
     this.color = '${themeColor}';
     this.damageNumberColor = '${themeColor}';

@@ -21,7 +21,7 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
 import { state, isGlobalHitPauseActive, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay } from '../core/state.js';
-import { registerComboHit } from '../systems/comboTracker.js';
+import { registerComboHit, isNonFighterComboTarget } from '../systems/comboTracker.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahitoSoulExplosion, spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
@@ -359,6 +359,7 @@ export class Fighter {
     this.id = def.id;
     this.type = def.type;
     this.name = def.name;
+    this.displayName = def.displayName || def.name;
     this.color = def.color;
     this.grade = def.grade || 'B';
     
@@ -2844,7 +2845,7 @@ export class Fighter {
         if (actualAttacker && typeof actualAttacker === 'object') {
           actualAttacker.damageDealt = (actualAttacker.damageDealt || 0) + actualDamage;
           // Combo counter: only real HP damage extends a chain (immunity/evade already filtered above)
-          registerComboHit(actualAttacker, this, actualDamage);
+          if (!isNonFighterComboTarget(this)) registerComboHit(actualAttacker, this, actualDamage);
         }
       }
     }

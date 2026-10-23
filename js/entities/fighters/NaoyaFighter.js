@@ -33,9 +33,9 @@ export class NaoyaFighter extends Fighter {
     super(def);
     this.characterId = 'naoya';
     this.type = 'naoya';
-    this.name = 'Naoya';
-
     const cfg = CONFIG.naoya || {};
+    this.name = def?.name || cfg.name || 'Naoya';
+    this.displayName = def?.displayName || cfg.displayName || this.name;
     this.themeColor = cfg.themeColor || '#76E042';
     this.color = this.themeColor;
     this.damageNumberColor = this.themeColor;

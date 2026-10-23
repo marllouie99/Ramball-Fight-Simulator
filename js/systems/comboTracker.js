@@ -93,33 +93,41 @@ export function resolveAttackerFighterIndex(attacker) {
 
   if (typeof attacker !== 'object') return -1;
 
-  if (Array.isArray(state.fighters)) {
-    const directIdx = state.fighters.indexOf(attacker);
-    if (directIdx >= 0) return directIdx;
-  }
-
   let curr = attacker;
   let depth = 0;
   while (curr && depth < 8) {
-    if (Array.isArray(state.fighters)) {
-      const idx = state.fighters.indexOf(curr);
-      if (idx >= 0) return idx;
-    }
     if (typeof curr.owner === 'number' && Array.isArray(state.fighters) && curr.owner >= 0 && curr.owner < state.fighters.length) {
       return curr.owner;
     }
-    if (curr.owner && typeof curr.owner === 'object') {
+    if (curr.owner && typeof curr.owner === 'object' && curr.owner !== curr) {
       curr = curr.owner;
-    } else if (curr.creator && typeof curr.creator === 'object') {
-      curr = curr.creator;
-    } else if (curr.parentFighter && typeof curr.parentFighter === 'object') {
-      curr = curr.parentFighter;
-    } else if (curr.fighter && typeof curr.fighter === 'object') {
-      curr = curr.fighter;
-    } else {
-      break;
+      depth++;
+      continue;
     }
-    depth++;
+    if (curr.creator && typeof curr.creator === 'object' && curr.creator !== curr) {
+      curr = curr.creator;
+      depth++;
+      continue;
+    }
+    if (curr.parentFighter && typeof curr.parentFighter === 'object' && curr.parentFighter !== curr) {
+      curr = curr.parentFighter;
+      depth++;
+      continue;
+    }
+    if (curr.fighter && typeof curr.fighter === 'object' && curr.fighter !== curr) {
+      curr = curr.fighter;
+      depth++;
+      continue;
+    }
+    if (typeof curr.ownerIndex === 'number' && Array.isArray(state.fighters) && curr.ownerIndex >= 0 && curr.ownerIndex < state.fighters.length && state.fighters[curr.ownerIndex] && state.fighters[curr.ownerIndex] !== curr) {
+      return curr.ownerIndex;
+    }
+    break;
+  }
+
+  if (curr && Array.isArray(state.fighters)) {
+    const idx = state.fighters.indexOf(curr);
+    if (idx >= 0) return idx;
   }
   return -1;
 }
@@ -146,15 +154,64 @@ function _resolveSide(attacker) {
 }
 
 /**
- * Verifies that the target is a genuine combat enemy and not self, a teammate, or an inert prop.
- * Prevents friendly fire, self-damage, recoil, or hitting inanimate objects from activating combos.
+ * Returns true if the target is a minion, plant, chess troop, building, turret, dispenser,
+ * deployable, summon, clone, illusion, companion, servant, barrier, or owned sub-entity
+ * rather than a primary combat fighter.
+ * Hitting these entities must NEVER increment the hit combo counter.
+ */
+export function isNonFighterComboTarget(target) {
+  if (!target || typeof target !== 'object') return true;
+  if (
+    target.isMinion ||
+    target.isMinionEntity ||
+    target.isPlant ||
+    target.isPlantMinion ||
+    target.isPlantBarrier ||
+    target.isWallnut ||
+    target.isLawnmower ||
+    target.isChessTroop ||
+    target.isChessMinion ||
+    target.isChessPiece ||
+    target.isBuilding ||
+    target.isTurret ||
+    target.isDispenser ||
+    target.isSentry ||
+    target.isDeployable ||
+    target.isEndCrystal ||
+    target.isIceWall ||
+    target.isBarrier ||
+    target.isSummon ||
+    target.isClone ||
+    target.isIllusion ||
+    target.isTransfiguredHuman ||
+    target.isServant ||
+    target.isServantOfCthulhu ||
+    target.isSubEntity ||
+    target.isCompanion ||
+    target.isRika ||
+    target.isBaskerville ||
+    target.owner ||
+    target.parentFighter ||
+    target.creator ||
+    (typeof target.characterId === 'string' && (target.characterId.startsWith('crazydave_') || target.characterId.startsWith('chess_'))) ||
+    (typeof target.type === 'string' && ['pawn', 'knight', 'bishop', 'rook', 'queen', 'peashooter', 'snowpea', 'wallnut', 'torchwood', 'potatomine', 'lawnmower'].includes(target.type.toLowerCase()))
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Verifies that the target is a genuine primary combat enemy fighter and not self,
+ * a teammate, a minion/plant/troop/building/summon, or an inert prop.
+ * Prevents friendly fire, self-damage, recoil, or hitting non-fighter entities from activating combos.
  */
 function _isEnemy(attacker, target) {
   if (!attacker || !target) return false;
   if (attacker === target) return false;
 
-  // Inanimate props, buildings, turrets, dispensers, and lawnmowers do not count as enemy fighters
-  if (target.isLawnmower || target.isBuilding || target.isTurret || target.isDispenser || target.isEndCrystal) {
+  // Minions, plants, troops, buildings, turrets, dispensers, summons, illusions, and props do not count for hit combo
+  if (isNonFighterComboTarget(target)) {
     return false;
   }
 

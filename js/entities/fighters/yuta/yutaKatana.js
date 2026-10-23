@@ -290,11 +290,12 @@ function _deliverKatanaImpact(fighter) {
     }
 
     // Clash with Sukuna or Gojo
-    if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter' || enemy.type === 'sukuna')) {
+    const isEnemySukuna = enemy.characterId === 'sukuna' || enemy.type === 'sukuna' || enemy._def?.id === 'sukuna' || enemy._def?.type === 'sukuna';
+    const isEnemyGojo = enemy.characterId === 'gojo' || enemy.type === 'gojo' || enemy._def?.id === 'gojo' || enemy._def?.type === 'gojo';
+    if (isEnemySukuna || isEnemyGojo) {
       const midX = (fighter.x + enemy.x) / 2;
       const midY = (fighter.y + enemy.y) / 2;
-      const isSukuna = (enemy._def?.id === 'sukuna' || enemy.type === 'sukuna' || enemy._def?.name === 'SukunaFighter');
-      spawnMeleeClashShockwave(midX, midY, 100, isSukuna ? 'yuta' : 'gojo');
+      spawnMeleeClashShockwave(midX, midY, 100, isEnemySukuna ? 'yuta' : 'gojo');
       triggerGlobalScreenShake(8, 10);
     }
   }

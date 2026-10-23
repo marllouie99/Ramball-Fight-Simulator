@@ -1458,7 +1458,7 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
 
   const getFighterThemeColor = (f, fallbackColor = '#38BDF8') => {
     if (!f) return fallbackColor;
-    const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')) || (f.name && f.name.toUpperCase().includes('YUTA')));
+    const isYuta = Boolean(f.characterId === 'yuta' || f.type === 'yuta' || (f._def && (f._def.id === 'yuta' || f._def.type === 'yuta')));
     if (isYuta) return '#FF1493';
     const charId = f.characterId || f.type || (f._def && (f._def.id || f._def.type));
     const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;

@@ -264,7 +264,7 @@ export function isBloodSuppressedEntity(entity) {
     entity.characterId === 'namelessdeity' ||
     entity.type === 'namelessdeity' ||
     entity.characterId === 'nameless_deity' ||
-    entity.name === 'Nameless Deity'
+    entity.type === 'nameless_deity'
   );
 }
 

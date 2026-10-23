@@ -168,9 +168,61 @@ function isMakimaControlledPlant(plant) {
   return Boolean(plant?.isChainedByMakima && plant?.isMindControlledByMakima && plant?._makimaChainer);
 }
 
+function resolveDaveOwnerIndex(ownerFighter, fallbackIndex = -1) {
+  if (ownerFighter && state && Array.isArray(state.fighters)) {
+    const idx = state.fighters.indexOf(ownerFighter);
+    if (idx !== -1) return idx;
+  }
+  if (typeof ownerFighter?.fighterIndex === 'number' && ownerFighter.fighterIndex >= 0) {
+    return ownerFighter.fighterIndex;
+  }
+  return fallbackIndex;
+}
+
+function isFriendlyCrazyDaveOrAlly(plant, entity) {
+  if (!entity) return false;
+  const myOwner = plant?.owner || null;
+  if (!myOwner) return false;
+  const entityOwner = entity.owner || entity;
+  if (entity === myOwner || entityOwner === myOwner) return true;
+  if (typeof myOwner.isTeammate === 'function' && myOwner.isTeammate(entityOwner)) return true;
+  if (typeof plant?.isTeammate === 'function' && plant.isTeammate(entityOwner)) return true;
+  return false;
+}
+
+function shouldPlantIgnoreDamage(plant, attacker, opts = {}) {
+  const isMindControlled = isMakimaControlledPlant(plant);
+  const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
+  if (!isMindControlled && !isMindControlledPlantAttacker) {
+    if (attacker && isFriendlyCrazyDaveOrAlly(plant, attacker)) {
+      return true;
+    }
+    const proj = opts?.projectile;
+    if (proj && (proj.isPlantProjectile || proj.visual === 'peaBullet' || proj.visual === 'snowPeaBullet' || proj.visual === 'firePeaBullet')) {
+      const projOwner = proj.ownerFighter || (typeof proj.owner === 'number' && state?.fighters ? state.fighters[proj.owner] : null) || attacker;
+      if (isFriendlyCrazyDaveOrAlly(plant, projOwner)) {
+        return true;
+      }
+    }
+  }
+  if (opts) {
+    const isDirectPlantFireHit = Boolean(opts.isFirePea || opts.isTorchwood);
+    if (opts.isPoison || (opts.isBurn && !isDirectPlantFireHit) || opts.isBleed || opts.isElectrified) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function getPlantProjectileOwnership(plant, ownerIndex) {
   if (!isMakimaControlledPlant(plant)) {
-    return { owner: ownerIndex !== undefined ? ownerIndex : 0, ownerFighter: plant.owner || plant };
+    const resolvedOwnerIdx = resolveDaveOwnerIndex(
+      plant?.owner,
+      (typeof plant?.ownerIndex === 'number' && plant.ownerIndex >= 0)
+        ? plant.ownerIndex
+        : (ownerIndex !== undefined ? ownerIndex : 0)
+    );
+    return { owner: resolvedOwnerIdx, ownerFighter: plant.owner || plant };
   }
 
   const plantIndex = state.fighters?.indexOf(plant) ?? -1;
@@ -216,6 +268,15 @@ export function getAllPlantTargetCandidates() {
       if (f.dispenserEntity && f.dispenserEntity.hp > 0 && !list.includes(f.dispenserEntity)) {
         list.push(f.dispenserEntity);
       }
+      const plantLists = [f.activeWallnuts, f.activePeashooters, f.activeSnowPeas, f.activeTorchwoods, f.activePotatoMines];
+      for (const pList of plantLists) {
+        if (!Array.isArray(pList)) continue;
+        for (const p of pList) {
+          if (p && p.hp > 0 && !p.dead && !p.isDead && !list.includes(p)) {
+            list.push(p);
+          }
+        }
+      }
     }
   }
   if (Array.isArray(state.illusions)) {
@@ -251,19 +312,23 @@ export function isEnemyPlantTarget(plant, f) {
   }
 
   const myOwner = plant.owner;
-  let myOwnerIdx = (typeof plant.ownerIndex === 'number') ? plant.ownerIndex : -1;
-  if (myOwnerIdx === -1 && myOwner && state && state.fighters) {
-    myOwnerIdx = state.fighters.indexOf(myOwner);
+  let myOwnerIdx = (myOwner && state && Array.isArray(state.fighters)) ? state.fighters.indexOf(myOwner) : -1;
+  if (myOwnerIdx === -1 && typeof plant.ownerIndex === 'number' && plant.ownerIndex >= 0) {
+    myOwnerIdx = plant.ownerIndex;
   }
 
   // Resolve target f's owner
   let fOwner = f.owner || null;
-  let fOwnerIdx = (typeof f.ownerIndex === 'number') ? f.ownerIndex : null;
+  let fOwnerIdx = null;
   if (typeof fOwner === 'number') {
     fOwnerIdx = fOwner;
     fOwner = (state && state.fighters && state.fighters[fOwner]) || null;
-  } else if (fOwner && fOwnerIdx === null && state && state.fighters) {
-    fOwnerIdx = state.fighters.indexOf(fOwner);
+  } else if (fOwner && state && Array.isArray(state.fighters)) {
+    const idx = state.fighters.indexOf(fOwner);
+    if (idx !== -1) fOwnerIdx = idx;
+  }
+  if (fOwnerIdx === null && typeof f.ownerIndex === 'number' && f.ownerIndex >= 0) {
+    fOwnerIdx = f.ownerIndex;
   }
 
   // Same owner / Dave's own plants or self
@@ -279,19 +344,9 @@ export function isEnemyPlantTarget(plant, f) {
     return false;
   }
 
-  // Plants do not target or burn other plants unless one is mind-controlled by Makima or on an opposing team
-  if (f.isPlant || f.isPlantMinion) {
-    if (!isMindControlled && !isMakimaControlledPlant(f)) {
-      if (state && typeof state.getFighterTeam === 'function' && myOwnerIdx !== -1 && fOwnerIdx !== null && fOwnerIdx !== -1) {
-        const myTeam = state.getFighterTeam(myOwnerIdx);
-        const targetTeam = state.getFighterTeam(fOwnerIdx);
-        if (myTeam === null || targetTeam === null || myTeam === targetTeam) {
-          return false;
-        }
-      } else {
-        return false;
-      }
-    }
+  // Unowned neutral plants are ignored unless mind-controlled; enemy-owned plants ARE valid targets
+  if ((f.isPlant || f.isPlantMinion) && !fOwner && fOwnerIdx === null && !isMindControlled && !isMakimaControlledPlant(f)) {
+    return false;
   }
 
   // Team index resolution in team modes
@@ -343,7 +398,7 @@ export class PeashooterEntity extends Fighter {
     super(def);
 
     this.owner = ownerFighter;
-    this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.ownerIndex = resolveDaveOwnerIndex(ownerFighter, 0);
     this.characterId = 'crazydave_plant';
     this.isDeployable = true;
     this.isMinion = true;
@@ -533,20 +588,11 @@ export class PeashooterEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    // Friendly fire check: ignore damage from other plants or Crazy Dave
-    const isMindControlled = isMakimaControlledPlant(this);
-    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
-    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+    // Friendly fire & passive DoT check: ignore damage from friendly plants/Crazy Dave, allow enemy plants & lawnmowers
+    if (shouldPlantIgnoreDamage(this, attacker, opts)) {
       return false;
     }
-    // Ignore debuff DoT tick damages (poison ticks, burn ticks, bleed ticks, electrified ticks)
     if (opts) {
-      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
-        return false;
-      }
-      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
-        return false;
-      }
       opts.knockback = false;
       opts.skipKnockback = true;
       opts.skipInterrupt = true;
@@ -739,7 +785,7 @@ export class SnowPeaEntity extends Fighter {
     super(def);
 
     this.owner = ownerFighter;
-    this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.ownerIndex = resolveDaveOwnerIndex(ownerFighter, 0);
     this.characterId = 'crazydave_plant';
     this.isDeployable = true;
     this.isMinion = true;
@@ -928,20 +974,11 @@ export class SnowPeaEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    // Friendly fire check: ignore damage from other plants or Crazy Dave
-    const isMindControlled = isMakimaControlledPlant(this);
-    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
-    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+    // Friendly fire & passive DoT check: ignore damage from friendly plants/Crazy Dave, allow enemy plants & lawnmowers
+    if (shouldPlantIgnoreDamage(this, attacker, opts)) {
       return false;
     }
-    // Ignore debuff DoT tick damages (poison ticks, burn ticks, bleed ticks, electrified ticks)
     if (opts) {
-      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
-        return false;
-      }
-      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
-        return false;
-      }
       opts.knockback = false;
       opts.skipKnockback = true;
       opts.skipInterrupt = true;
@@ -1159,7 +1196,7 @@ export class WallnutEntity extends Fighter {
     super(def);
 
     this.owner = ownerFighter;
-    this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.ownerIndex = resolveDaveOwnerIndex(ownerFighter, 0);
     this.characterId = 'crazydave_plant';
     this.isDeployable = true;
     this.isMinion = true;
@@ -1262,7 +1299,7 @@ export class WallnutEntity extends Fighter {
   }
 
   onCollide(opponent) {
-    if (!opponent || opponent === this.owner || (this.owner && opponent.owner === this.owner) || opponent.characterId === 'crazydave' || opponent.isPlant || opponent.isPlantMinion) return;
+    if (!opponent || isFriendlyCrazyDaveOrAlly(this, opponent) || opponent.isPlant || opponent.isPlantMinion) return;
     if (typeof this.isTeammate === 'function' && this.isTeammate(opponent)) return;
 
     if (this.collisionSoundCooldown <= 0) {
@@ -1361,20 +1398,11 @@ export class WallnutEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    // Friendly fire check: ignore damage from other friendly plants or Crazy Dave
-    const isMindControlled = isMakimaControlledPlant(this);
-    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
-    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+    // Friendly fire & passive DoT check: ignore damage from friendly plants/Crazy Dave, allow enemy plants & lawnmowers
+    if (shouldPlantIgnoreDamage(this, attacker, opts)) {
       return false;
     }
-    // Ignore debuff DoT tick damages
     if (opts) {
-      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
-        return false;
-      }
-      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
-        return false;
-      }
       opts.knockback = false;
       opts.skipKnockback = true;
       opts.skipInterrupt = true;
@@ -1486,7 +1514,7 @@ export class TorchwoodEntity extends Fighter {
     super(def);
 
     this.owner = ownerFighter;
-    this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.ownerIndex = resolveDaveOwnerIndex(ownerFighter, 0);
     this.characterId = 'crazydave_plant';
     this.isDeployable = true;
     this.isMinion = true;
@@ -1679,18 +1707,10 @@ export class TorchwoodEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    const isMindControlled = isMakimaControlledPlant(this);
-    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
-    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+    if (shouldPlantIgnoreDamage(this, attacker, opts)) {
       return false;
     }
     if (opts) {
-      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) {
-        return false;
-      }
-      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet' || opts.projectile.visual === 'firePeaBullet')) {
-        return false;
-      }
       opts.knockback = false;
       opts.skipKnockback = true;
       opts.skipInterrupt = true;
@@ -1750,6 +1770,12 @@ export class TorchwoodEntity extends Fighter {
       const isSnowPeaBullet = (p.visual === 'snowPeaBullet');
       if (!isPeaBullet && !isSnowPeaBullet) continue;
 
+      // Only intercept friendly peas from this Torchwood's owner or teammates (never buff enemy peas)
+      const projOwner = p.ownerFighter?.owner || p.ownerFighter || null;
+      if (!isMakimaControlledPlant(this) && projOwner) {
+        if (!isFriendlyCrazyDaveOrAlly(this, projOwner)) continue;
+      }
+
       // Skip if already processed by this (or any) Torchwood
       if (p._ignitedByTorchwood || this._ignitedSet.has(p)) continue;
 
@@ -1783,6 +1809,17 @@ export class TorchwoodEntity extends Fighter {
         p.onHit = (target) => {
           // Call existing onHit if present
           if (typeof existingOnHit === 'function') existingOnHit(target);
+
+          // Apply burn to direct hit target if valid enemy
+          if (target && target.hp > 0 && !target.dead && isEnemyPlantTarget(this, target)) {
+            const directBurnAttacker = p.ownerFighter || this.owner || this;
+            if (typeof target.applyBurn === 'function') {
+              target.applyBurn(directBurnAttacker, this._burnDuration);
+            } else {
+              target.burnTimer = Math.max(target.burnTimer || 0, this._burnDuration);
+              target.lastBurnAttacker = directBurnAttacker;
+            }
+          }
 
           // Fire pea splash AoE: damage and burn nearby enemies & enemy minions
           const splashDmg = baseDmg * splashDamageMult;
@@ -1949,7 +1986,7 @@ export class PotatoMineEntity extends Fighter {
     super(def);
 
     this.owner = ownerFighter;
-    this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.ownerIndex = resolveDaveOwnerIndex(ownerFighter, 0);
     this.characterId = 'crazydave_plant';
     this.isDeployable = true;
     this.isMinion = true;
@@ -2120,17 +2157,11 @@ export class PotatoMineEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    // Friendly fire check
-    const isMindControlled = isMakimaControlledPlant(this);
-    const isMindControlledPlantAttacker = isMakimaControlledPlant(attacker);
-    if (!isMindControlled && !isMindControlledPlantAttacker && attacker && (attacker.isPlant || attacker.isPlantMinion || attacker === this.owner || (this.owner && attacker.owner === this.owner) || attacker.characterId === 'crazydave')) {
+    // Friendly fire & passive DoT check
+    if (shouldPlantIgnoreDamage(this, attacker, opts)) {
       return false;
     }
     if (opts) {
-      if (opts.isPoison || opts.isBurn || opts.isBleed || opts.isElectrified) return false;
-      if (!isMindControlled && !isMindControlledPlantAttacker && opts.projectile && (opts.projectile.isPlantProjectile || opts.projectile.visual === 'peaBullet' || opts.projectile.visual === 'snowPeaBullet')) {
-        return false;
-      }
       opts.knockback = false;
       opts.skipKnockback = true;
       opts.skipInterrupt = true;
@@ -2209,8 +2240,7 @@ export class PotatoMineEntity extends Fighter {
 
     for (const f of candidates) {
       if (!isEnemyPlantTarget(this, f)) continue;
-      // Only trigger on actual fighters, not on other plants or deployables
-      if (f.isPlant || f.isPlantMinion || f.isLawnmower) continue;
+      if (f.isLawnmower) continue;
 
       const dist = Math.hypot(f.x - this.x, f.y - this.y);
       const combinedRadius = triggerRadius + (f.r || 20);
@@ -2356,7 +2386,7 @@ export class LawnmowerEntity extends Fighter {
     super(def);
 
     this.owner = ownerFighter;
-    this.ownerIndex = ownerFighter?.fighterIndex ?? 0;
+    this.ownerIndex = resolveDaveOwnerIndex(ownerFighter, 0);
     this.team = ownerFighter?.team;
     this.characterId = 'crazydave_lawnmower';
     this.isDeployable = true;
@@ -2536,8 +2566,20 @@ export class LawnmowerEntity extends Fighter {
             return;
           }
 
-          // Devastating steamroller shred damage
-          const crushLanded = dealPlantDamage(f, this._damage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
+          // Devastating steamroller shred damage (1-hit kill against enemy plants)
+          const isEnemyPlant = Boolean(f.isPlant || f.isPlantMinion);
+          const shredDamage = isEnemyPlant
+            ? Math.max(this._damage, (f.hp || 0) + (f.maxHp || 0) + 9999)
+            : this._damage;
+          const crushLanded = dealPlantDamage(f, shredDamage, this.owner || this, { isLawnmower: true, damageType: 'crush', isUnblockable: true });
+          if (isEnemyPlant && crushLanded && f.hp > 0) {
+            f.hp = 0;
+            f.dead = true;
+            f.isDead = true;
+            if (typeof f._processFighterDeath === 'function') {
+              f._processFighterDeath(this.owner || this, { isLawnmower: true });
+            }
+          }
 
           // Dodged / blocked / immune → no knockback, no splat, and NO stun
           if (!crushLanded) continue;
@@ -3167,7 +3209,7 @@ export class CrazyDaveFighter extends Fighter {
     if (!targetEnemy && state && Array.isArray(state.fighters)) {
       let closestDist = Infinity;
       for (const f of state.fighters) {
-        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead) {
+        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead && !(typeof this.isTeammate === 'function' && this.isTeammate(f))) {
           const d = Math.hypot(f.x - tileCenter.x, f.y - tileCenter.y);
           if (d < closestDist) {
             closestDist = d;
@@ -3240,7 +3282,7 @@ export class CrazyDaveFighter extends Fighter {
     if (!targetEnemy && state && Array.isArray(state.fighters)) {
       let closestDist = Infinity;
       for (const f of state.fighters) {
-        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead) {
+        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead && !(typeof this.isTeammate === 'function' && this.isTeammate(f))) {
           const d = Math.hypot(f.x - tileCenter.x, f.y - tileCenter.y);
           if (d < closestDist) {
             closestDist = d;
@@ -3313,7 +3355,7 @@ export class CrazyDaveFighter extends Fighter {
     if (!targetEnemy && state && Array.isArray(state.fighters)) {
       let closestDist = Infinity;
       for (const f of state.fighters) {
-        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead) {
+        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead && !(typeof this.isTeammate === 'function' && this.isTeammate(f))) {
           const d = Math.hypot(f.x - tileCenter.x, f.y - tileCenter.y);
           if (d < closestDist) {
             closestDist = d;
@@ -3393,7 +3435,7 @@ export class CrazyDaveFighter extends Fighter {
     if (!targetEnemy && state && Array.isArray(state.fighters)) {
       let closestDist = Infinity;
       for (const f of state.fighters) {
-        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead) {
+        if (f && f !== this && !f.isDeployable && !f.isMinion && f.hp > 0 && !f.dead && !(typeof this.isTeammate === 'function' && this.isTeammate(f))) {
           const d = Math.hypot(f.x - tileCenter.x, f.y - tileCenter.y);
           if (d < closestDist) {
             closestDist = d;
@@ -3590,6 +3632,9 @@ export class CrazyDaveFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    if (typeof ownerIndex === 'number' && ownerIndex >= 0) {
+      this.fighterIndex = ownerIndex;
+    }
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.crazydave) ? CONFIG.crazydave : crazyDaveConfig;
 
     // Environmental lawnmowers initialization at match start / round start

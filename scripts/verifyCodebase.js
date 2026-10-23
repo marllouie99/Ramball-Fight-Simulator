@@ -338,6 +338,72 @@ async function verifyAll() {
     console.log(`✅ Verified fighter grades across ${configFiles.length} character configs & FIGHTER_DEFS!`);
   }
 
+  // 2.68 Roster Name Source-of-Truth & .name Identity Guardrail
+  console.log('🔍 [Name Source-of-Truth & Identity Guardrail] Checking config names, FIGHTER_DEFS bindings, and .name logic checks...');
+  let nameGuardrailErrors = 0;
+  for (const cfgFile of configFiles) {
+    const relPath = path.relative(process.cwd(), cfgFile).replace(/\\/g, '/');
+    const content = fs.readFileSync(cfgFile, 'utf8');
+    const isAliasSpread = /^\s*\.\.\.\w+Config\s*,/m.test(content);
+    if (isAliasSpread) continue;
+    const hasName = /^\s+name\s*:\s*['"][^'"]+['"]/m.test(content);
+    const hasDisplayName = /^\s+displayName\s*:\s*['"][^'"]+['"]/m.test(content);
+    if (!hasName || !hasDisplayName) {
+      console.error(`❌ [MISSING CONFIG NAME in ${relPath}]: character config must define both 'name' and 'displayName'.`);
+      hasErrors = true;
+      nameGuardrailErrors++;
+    }
+  }
+  if (fs.existsSync(coreConfigPath)) {
+    const coreSrc = fs.readFileSync(coreConfigPath, 'utf8');
+    const defsSrc = coreSrc.slice(coreSrc.indexOf('export const FIGHTER_DEFS'));
+    const entryCount = (defsSrc.match(/^\s{4}id:\s*\d+\s*,/gm) || []).length;
+    const nameLines = defsSrc.split(/\r?\n/).filter(l => /^\s{4}(name|displayName)\s*:/.test(l));
+    if (nameLines.length < entryCount * 2) {
+      console.error(`❌ [MISSING FIGHTER_DEFS NAME/DISPLAYNAME]: expected ${entryCount * 2} name/displayName lines in FIGHTER_DEFS, found ${nameLines.length}.`);
+      hasErrors = true;
+      nameGuardrailErrors++;
+    }
+    for (const line of nameLines) {
+      if (!/\w+Config\??\.(name|displayName)/.test(line)) {
+        console.error(`❌ [HARDCODED FIGHTER_DEFS NAME in js/core/config.js]: '${line.trim()}' must read from <char>Config.name / <char>Config.displayName.`);
+        hasErrors = true;
+        nameGuardrailErrors++;
+      }
+    }
+  }
+  const FORBIDDEN_FIGHTER_NAME_CHECK = /\b(?:f|fighter|enemy|target|opponent|other|a|b|m|p|d|def|f1|f2|bossFighter|chFighter|targetFighter|owner|attacker|victim|ally|member|entity)(?:\??\._def)?\.name(?:\??\.(?:toLowerCase|toUpperCase)\(\))?\s*(?:(?:===|!==|==|!=)\s*['"`]|\.(?:includes|startsWith|endsWith)\(\s*['"`])/;
+  for (const file of files) {
+    const relPath = path.relative(process.cwd(), file).replace(/\\/g, '/');
+    const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+    for (let idx = 0; idx < lines.length; idx++) {
+      const line = lines[idx];
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+      if (
+        FORBIDDEN_FIGHTER_NAME_CHECK.test(line) &&
+        !line.includes("includes(' - ')")
+      ) {
+        console.error(`❌ [FORBIDDEN .name IDENTITY CHECK in ${relPath}:${idx + 1}]: Use characterId or type instead of .name comparison: ${trimmed}`);
+        hasErrors = true;
+        nameGuardrailErrors++;
+      }
+      if (
+        relPath.startsWith('js/entities/fighters/') &&
+        relPath.endsWith('Fighter.js') &&
+        /^\s*this\.name\s*=\s*['"][^'"]+['"]\s*;/.test(line) &&
+        !relPath.endsWith('KnightFighter.js')
+      ) {
+        console.error(`❌ [HARDCODED FIGHTER CONSTRUCTOR NAME in ${relPath}:${idx + 1}]: Read def?.name || cfg.name instead of hardcoding this.name: ${trimmed}`);
+        hasErrors = true;
+        nameGuardrailErrors++;
+      }
+    }
+  }
+  if (nameGuardrailErrors === 0) {
+    console.log(`✅ Verified config-driven names, FIGHTER_DEFS bindings, and zero .name identity checks across ${files.length} files!`);
+  }
+
   // 2.7 YouTube Shorts Thumbnail & Vertical Arena Alignment Validator (Rule 28)
   console.log('🔍 [Rule 28 Validator] Checking YouTube Shorts vertical arena alignment...');
   let rule28Errors = 0;

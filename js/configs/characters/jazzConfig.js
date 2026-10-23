@@ -1,10 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Jazz Character Config
-// Legacy roster fighter — baseline identity, grade & stats (mirrored from FIGHTER_DEFS).
-// Skill-specific tuning for legacy fighters still lives inline in CONFIG (js/core/config.js).
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const jazzConfig = {
+  id: 'aimbot',
   name: 'Jazz',
   displayName: 'Jazz',
   grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
@@ -19,4 +18,9 @@ export const jazzConfig = {
   moveSpeed: 5.0,
   ability: 'Aimbot Laser',
   desc: 'Wields a dubstep gun that fires musical notes and triggers an instant follow-up projectile on hit.',
+
+  // Skill Tuning (CONFIG.aimbot)
+  followUpMinCooldown: 10, // minimum frames of cooldown forced after a follow-up shot
+  electricStunDuration: 8, // frames the target is stunned after being hit (10 frames = ~0.16s)
+  electricStunChance: 0.40,  // 0.0 to 1.0 chance of triggering the stun on hit (0.5 = 50%)
 };

@@ -24,7 +24,8 @@ function isCrazyDaveFighter(fighter) {
     candidate.type === 'crazy_dave' ||
     candidate._def?.id === 'crazydave' ||
     candidate._def?.id === 'crazy_dave' ||
-    candidate.name === 'Crazy Dave' ||
+    candidate._def?.type === 'crazydave' ||
+    candidate._def?.type === 'crazy_dave' ||
     candidate.isCrazyDave === true
   ));
 }
