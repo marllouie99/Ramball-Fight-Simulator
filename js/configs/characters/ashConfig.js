@@ -352,7 +352,9 @@ export const ashConfig = {
       shoot: 'Assets/model/ash/pokemon/pikachu/Shoot-Anim.png',
       hurt: 'Assets/model/ash/pokemon/pikachu/Hurt-Anim.png',
       faint: 'Assets/model/ash/pokemon/pikachu/Faint-Anim.png',
-      charge: 'Assets/model/ash/pokemon/pikachu/Charge-Anim.png'
+      charge: 'Assets/model/ash/pokemon/pikachu/Charge-Anim.png',
+      thunderbolt: 'Assets/model/ash/pokemon/pikachu/Thunderbolt/thunderbolt-b.png',
+      thunderboltImpact: 'Assets/model/ash/pokemon/pikachu/Thunderbolt_impact/impact-b.png'
     },
     charizard: {
       idle: 'Assets/model/ash/pokemon/charizard/Idle-Anim.png',

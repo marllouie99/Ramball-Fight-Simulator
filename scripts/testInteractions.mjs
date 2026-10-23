@@ -9271,7 +9271,34 @@ async function runInteractionTests() {
     drawElectricStunEffect(mockCtx, cj.r, false, cj);
     assert(mockCtx.getStackDepth() === 0, 'drawElectricStunEffect must maintain balanced Canvas 2D stack depths');
 
-    console.log('      ✅ Pikachu Thunderbolt Callout Sequence ("PIKA..." -> "...CHUUUUUU!"), Continuous Beam, Stun Aftermath & 12-Frame Electric Shock Sprite verified successfully.');
+    // 6. Verify 12-Frame Thunderbolt & Thunderbolt Impact Sprite Animations on disk & loader functions
+    const fs = await import('fs');
+    const path = await import('path');
+    const tbDir = path.resolve(process.cwd(), 'Assets/model/ash/pokemon/pikachu/Thunderbolt');
+    const impDir = path.resolve(process.cwd(), 'Assets/model/ash/pokemon/pikachu/Thunderbolt_impact');
+
+    for (let i = 1; i <= 12; i++) {
+      assert(fs.existsSync(path.join(tbDir, `thunderbolt-${i}.png`)), `Missing thunderbolt-${i}.png`);
+      assert(fs.existsSync(path.join(impDir, `impact-${i}.png`)), `Missing impact-${i}.png`);
+    }
+    assert(fs.existsSync(path.join(tbDir, 'thunderbolt-b.png')), 'Missing thunderbolt-b.png master strip');
+    assert(fs.existsSync(path.join(impDir, 'impact-b.png')), 'Missing impact-b.png master strip');
+
+    const { _getThunderboltFrames, _getThunderboltImpactFrames, drawPokemonCompanion } = await import('../js/graphics/weapons/ashPokemonGraphics.js');
+    const tbFrames = _getThunderboltFrames();
+    const impFrames = _getThunderboltImpactFrames();
+    assert(tbFrames && tbFrames.length === 12, `Expected 12 Thunderbolt frames, got ${tbFrames?.length}`);
+    assert(impFrames && impFrames.length === 12, `Expected 12 Thunderbolt Impact frames, got ${impFrames?.length}`);
+
+    // Verify drawPokemonCompanion Canvas 2D stack balance while active Thunderbolt is firing
+    pika.thunderboltState = 'active';
+    pika.thunderboltTimer = 30;
+    pika.thunderboltTarget = cj;
+    mockCtx.resetStackDepth();
+    drawPokemonCompanion(mockCtx, pika);
+    assert(mockCtx.getStackDepth() === 0, 'drawPokemonCompanion must maintain 100% balanced Canvas 2D stack depth during active Thunderbolt');
+
+    console.log('      ✅ Pikachu Thunderbolt Callout Sequence ("PIKA..." -> "...CHUUUUUU!"), 12-Frame Thunderbolt & Impact Sprites, Stun Aftermath & Electric Shock Sprite verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

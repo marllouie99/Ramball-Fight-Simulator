@@ -78,6 +78,74 @@ function _getPokemonSheet(srcPath) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// 12-Frame Pikachu Thunderbolt & Thunderbolt Impact Sprite Animations
+// (Assets/model/ash/pokemon/pikachu/Thunderbolt/ & Thunderbolt_impact/)
+// ---------------------------------------------------------------------------
+const THUNDERBOLT_FRAME_COUNT = 12;
+const THUNDERBOLT_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/model/ash/pokemon/pikachu/Thunderbolt/thunderbolt-${i + 1}.png`
+);
+const THUNDERBOLT_IMPACT_FRAME_COUNT = 12;
+const THUNDERBOLT_IMPACT_FRAME_PATHS = Array.from(
+  { length: 12 },
+  (_, i) => `Assets/model/ash/pokemon/pikachu/Thunderbolt_impact/impact-${i + 1}.png`
+);
+
+let _thunderboltFrames = [];
+let _thunderboltFramesLoading = false;
+let _thunderboltImpactFrames = [];
+let _thunderboltImpactFramesLoading = false;
+
+export function _getThunderboltFrames() {
+  if (
+    _thunderboltFrames.length === THUNDERBOLT_FRAME_COUNT &&
+    _thunderboltFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _thunderboltFrames;
+  }
+  if (!_thunderboltFramesLoading && typeof Image !== 'undefined') {
+    _thunderboltFramesLoading = true;
+    _thunderboltFrames = [];
+    THUNDERBOLT_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => { _thunderboltFrames[idx] = img; };
+      img.onerror = (e) => { console.warn(`Failed to load Thunderbolt frame ${idx + 1} at ${src}:`, e); };
+      img.src = `${src}?v=1`;
+      _thunderboltFrames[idx] = img;
+    });
+  }
+  return _thunderboltFrames;
+}
+
+export function _getThunderboltImpactFrames() {
+  if (
+    _thunderboltImpactFrames.length === THUNDERBOLT_IMPACT_FRAME_COUNT &&
+    _thunderboltImpactFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _thunderboltImpactFrames;
+  }
+  if (!_thunderboltImpactFramesLoading && typeof Image !== 'undefined') {
+    _thunderboltImpactFramesLoading = true;
+    _thunderboltImpactFrames = [];
+    THUNDERBOLT_IMPACT_FRAME_PATHS.forEach((src, idx) => {
+      const img = new Image();
+      img.onload = () => { _thunderboltImpactFrames[idx] = img; };
+      img.onerror = (e) => { console.warn(`Failed to load Thunderbolt impact frame ${idx + 1} at ${src}:`, e); };
+      img.src = `${src}?v=1`;
+      _thunderboltImpactFrames[idx] = img;
+    });
+  }
+  return _thunderboltImpactFrames;
+}
+
+// Proactive eager initialization in browser environment
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getThunderboltFrames();
+  _getThunderboltImpactFrames();
+}
+
 /**
  * Converts a continuous radians angle into PMD's 8-direction row index:
  * 0=Down (+Y), 1=DownRight, 2=Right (+X), 3=UpRight, 4=Up (-Y), 5=UpLeft, 6=Left (-X), 7=DownLeft
@@ -570,7 +638,24 @@ export function drawPokemonCompanion(ctx, pokemon) {
       const endX = originX + cosA * beamLen;
       const endY = originY + sinA * beamLen;
 
-      // Layer 1: Translucent Outer Golden Plasma Wash (Rule 11 compliant: zero shadowBlur)
+      // Layer 1: Authentic 12-Frame Animated Thunderbolt Sprite (Assets/model/ash/pokemon/pikachu/Thunderbolt/)
+      const tbFrames = _getThunderboltFrames();
+      const tbIndex = Math.floor((tick * 0.45) % 12);
+      const tbImg = tbFrames[tbIndex];
+      let tbDrawn = false;
+      if (tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0)) {
+        ctx.save();
+        ctx.translate(originX, originY);
+        ctx.rotate(castAngle);
+        ctx.imageSmoothingEnabled = false;
+        const scaleX = beamLen / 228.0;
+        const scaleY = (beamW * 2.8) / 256.0;
+        ctx.drawImage(tbImg, -20 * scaleX, -128 * scaleY, 256 * scaleX, 256 * scaleY);
+        ctx.restore();
+        tbDrawn = true;
+      }
+
+      // Layer 2: Translucent Outer Golden Plasma Wash (Rule 11 compliant: zero shadowBlur)
       ctx.strokeStyle = 'rgba(250, 204, 21, 0.34)';
       ctx.lineWidth = beamW * 1.35;
       ctx.lineCap = 'round';
@@ -579,7 +664,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
       ctx.lineTo(endX, endY);
       ctx.stroke();
 
-      // Layer 2: High-Voltage Golden Ionization Sheath
+      // Layer 3: High-Voltage Golden Ionization Sheath
       ctx.strokeStyle = '#FACC15';
       ctx.lineWidth = beamW * 0.65;
       ctx.beginPath();
@@ -587,7 +672,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
       ctx.lineTo(endX, endY);
       ctx.stroke();
 
-      // Layer 3: Supersonic Pure White Laser Core
+      // Layer 4: Supersonic Pure White Laser Core
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = beamW * 0.28;
       ctx.beginPath();
@@ -595,7 +680,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
       ctx.lineTo(endX, endY);
       ctx.stroke();
 
-      // Layer 4: Branching Dynamic Jagged Lightning Paths
+      // Layer 5: Branching Dynamic Jagged Lightning Paths
       const numBranches = 3;
       for (let b = 0; b < numBranches; b++) {
         ctx.strokeStyle = b === 0 ? '#FFFFFF' : (b === 1 ? '#FEF08A' : '#FACC15');
@@ -603,19 +688,31 @@ export function drawPokemonCompanion(ctx, pokemon) {
         _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 12, beamW * 0.42, tick * 0.45 + b * 2.1);
       }
 
-      // Layer 5: Cheeks Plasma Eruption Core
+      // Layer 6: Cheeks Plasma Eruption Core
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.arc(originX, originY, beamW * 0.40, 0, Math.PI * 2);
       ctx.fill();
 
-      // Layer 6: Continuous Concentric Supersonic Impact Compression Rings (Rule 26 Compliant)
+      // Layer 7: Authentic 12-Frame Animated Thunderbolt Impact VFX Sprite (Assets/model/ash/pokemon/pikachu/Thunderbolt_impact/)
+      const impFrames = _getThunderboltImpactFrames();
+      const impIndex = Math.floor((tick * 0.45) % 12);
+      const impImg = impFrames[impIndex];
       const wavePhase = (tick * 0.25) % 1.0;
 
       // Impact blast directly on target's position
       if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0) {
         const tgtLocalX = pokemon.thunderboltTarget.x - pokemon.x;
         const tgtLocalY = (pokemon.thunderboltTarget.y - (pokemon.thunderboltTarget.z || 0)) - pokemon.y;
+        if (impImg && impImg.complete && ((impImg.naturalWidth || impImg.width || 0) > 0)) {
+          const impSize = beamW * 3.6;
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(impImg, tgtLocalX - impSize / 2, tgtLocalY - impSize / 2, impSize, impSize);
+          ctx.restore();
+        }
+
+        // Concentric electric impact blast rings on target (Rule 26 Compliant)
         for (let k = 0; k < 2; k++) {
           const ringP = (wavePhase + k * 0.5) % 1.0;
           const ringR = (beamW * 0.9) + ringP * (beamW * 1.5);
@@ -637,7 +734,15 @@ export function drawPokemonCompanion(ctx, pokemon) {
         }
       }
 
-      // Beam terminus compression rings
+      // Beam terminus 12-frame impact & compression rings
+      if (impImg && impImg.complete && ((impImg.naturalWidth || impImg.width || 0) > 0)) {
+        const endImpSize = beamW * 2.8;
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(impImg, endX - endImpSize / 2, endY - endImpSize / 2, endImpSize, endImpSize);
+        ctx.restore();
+      }
+
       for (let k = 0; k < 2; k++) {
         const ringP = (wavePhase + k * 0.45) % 1.0;
         const ringR = (beamW * 0.8) + ringP * (beamW * 1.4);
