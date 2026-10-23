@@ -90,7 +90,7 @@ export const ashConfig = {
           name: 'QUICK ATTACK & IRON TAIL',
           damage: 18,
           reach: 64,
-          cooldown: 34,
+          cooldown: 500,
           knockback: 6,
           hitStun: 12,
           dashMultiplier: 1.60,
@@ -103,7 +103,7 @@ export const ashConfig = {
           hudLabel: 'THUNDERBOLT',
           windupCallout: 'PIKA...',
           attackCallout: '...CHUUUUUU!',
-          cooldown: 135,             // Autonomous Thunderbolt cooldown (2.25s at 60 FPS)
+          cooldown: 500,             // Autonomous Thunderbolt cooldown (2.25s at 60 FPS)
           windupFrames: 24,          // High-voltage cheek charging & spark gathering (~0.40s)
           beamDurationFrames: 58,    // Continuous sustained lightning torrent (~0.97s)
           beamTickRate: 5,           // Multi-tick damage delivered every 5 frames (~11 ticks)
@@ -113,7 +113,7 @@ export const ashConfig = {
           beamKnockbackPerTick: 1.6, // Continuous directional pushback driving enemy along beam
           paralyzeFramesPerTick: 20, // Electric stasis locks enemy inside the lightning stream
           stunAftermathFrames: 45,   // Aftermath electric stun duration on targets hit by beam (~0.75s)
-          recoilPush: 1.3,           // Kinetic backward recoil kick on Pikachu while firing
+          recoilPush: 0,             // Stationary stance: Pikachu plants feet firmly with zero backward recoil drift
           screenShake: 5.0,          // Sustained rumble during active beam discharge
           recoveryFrames: 16,        // Post-beam smoke cooling & recovery settle
           specialSfx: 'thunderbolt',

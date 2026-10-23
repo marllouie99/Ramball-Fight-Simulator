@@ -2893,18 +2893,18 @@ export const HUD_SKILL_PROVIDERS = {
         : 'THUNDERBOLT';
       const pokeSpecMax = f.activePokemon?.specialCooldownMax || activeSpec?.specialCooldown || 135;
       const pokeSpecTimer = f.activePokemon?.specialCooldown ?? 0;
-      const cmdMax = cfg.commandCooldownFrames || cfg.commandSkillCooldown || 150;
-      const cmdTimer = f.commandCooldown ?? f.commandSkillCooldown ?? 0;
+      const cmdMax = Math.max(cfg.commandCooldownFrames || cfg.commandSkillCooldown || 150, pokeSpecMax);
+      const effectiveTimer = Math.max(pokeSpecTimer, f.commandCooldown ?? f.commandSkillCooldown ?? 0);
+      const effectiveMax = Math.max(cmdMax, pokeSpecMax);
+      const isChanneling = Boolean(f.activePokemon?.thunderboltState || f.activePokemon?.isChannelingSkill?.());
       const cmdPct = hasPokemon
-        ? Math.max(
-            Math.max(0, Math.min(100, (1 - (pokeSpecTimer / pokeSpecMax)) * 100)),
-            Math.max(0, Math.min(100, (1 - (cmdTimer / cmdMax)) * 100))
-          )
-        : Math.max(0, Math.min(100, (1 - (cmdTimer / cmdMax)) * 100));
+        ? (isChanneling ? 0 : Math.max(0, Math.min(100, (1 - (effectiveTimer / effectiveMax)) * 100)))
+        : Math.max(0, Math.min(100, (1 - ((f.commandCooldown ?? f.commandSkillCooldown ?? 0) / cmdMax)) * 100));
+      const isReady = hasPokemon && !isChanneling && cmdPct >= 99 && (f.activePokemon?.specialCooldown || 0) <= 0 && (f.commandCooldown || 0) <= 0;
       skills.push({
         id: 'trainer_command',
         pct: cmdPct,
-        ready: cmdPct >= 99 && hasPokemon,
+        ready: isReady,
         color: themeColor,
         label: moveLabel
       });

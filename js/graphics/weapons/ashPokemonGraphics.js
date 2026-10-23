@@ -10,6 +10,66 @@
 import { ashConfig } from '../../configs/characters/ashConfig.js';
 import { drawMinionHealthBar } from '../statusEffects.js';
 
+/**
+ * Computes maximum ray distance from (startX, startY) along angle to the arena walls.
+ * Prevents beams and effects from clipping outside the arena boundaries without degenerate 0-distance clamps.
+ */
+function _getRayArenaIntersection(startX, startY, angle, arena, innerMargin = 4) {
+  if (!arena) return 700;
+  const wallW = arena.wallWidth || 4;
+  const margin = wallW + innerMargin;
+
+  if (arena.shape === 'circle' || arena.radius) {
+    const cx = arena.x + arena.width / 2;
+    const cy = arena.y + arena.height / 2;
+    const r = Math.max(20, (arena.radius || arena.width / 2) - margin);
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const dx = startX - cx;
+    const dy = startY - cy;
+    const b = 2 * (dx * cosA + dy * sinA);
+    const c = dx * dx + dy * dy - r * r;
+    const disc = b * b - 4 * c;
+    if (disc < 0) return 700;
+    const t = (-b + Math.sqrt(disc)) / 2;
+    return Math.max(40, t);
+  }
+
+  const minX = arena.x + margin;
+  const maxX = arena.x + arena.width - margin;
+  const minY = arena.y + margin;
+  const maxY = arena.y + arena.height - margin;
+
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  let maxDist = Infinity;
+
+  // Vertical boundary collisions (X-axis)
+  if (cosA > 0.0001) {
+    const d = (maxX - startX) / cosA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  } else if (cosA < -0.0001) {
+    const d = (minX - startX) / cosA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  }
+
+  // Horizontal boundary collisions (Y-axis)
+  if (sinA > 0.0001) {
+    const d = (maxY - startY) / sinA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  } else if (sinA < -0.0001) {
+    const d = (minY - startY) / sinA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  }
+
+  if (maxDist === Infinity || maxDist < 40 || Number.isNaN(maxDist)) {
+    const fallbackReach = Math.min(arena.width, arena.height) || 450;
+    return Math.max(120, fallbackReach * 0.9);
+  }
+
+  return maxDist;
+}
+
 // Exact 8-directional PMD sprite sheet frame specs & canonical ground anchors (from animData/catalog.bytes)
 const POKEMON_CLIP_SPECS = {
   pikachu: {
@@ -112,7 +172,7 @@ export function _getThunderboltFrames() {
       const img = new Image();
       img.onload = () => { _thunderboltFrames[idx] = img; };
       img.onerror = (e) => { console.warn(`Failed to load Thunderbolt frame ${idx + 1} at ${src}:`, e); };
-      img.src = `${src}?v=1`;
+      img.src = `${src}?v=2`;
       _thunderboltFrames[idx] = img;
     });
   }
@@ -133,7 +193,7 @@ export function _getThunderboltImpactFrames() {
       const img = new Image();
       img.onload = () => { _thunderboltImpactFrames[idx] = img; };
       img.onerror = (e) => { console.warn(`Failed to load Thunderbolt impact frame ${idx + 1} at ${src}:`, e); };
-      img.src = `${src}?v=1`;
+      img.src = `${src}?v=2`;
       _thunderboltImpactFrames[idx] = img;
     });
   }
@@ -181,6 +241,23 @@ function _drawHexagon(ctx, cx, cy, hexR) {
   ctx.closePath();
 }
 
+/**
+ * Draws a crisp retro Pokémon pixel-art 4-point diamond spark (stepped 2x2 pixel blocks).
+ */
+function _drawPixelElectricSpark(ctx, cx, cy, size = 4) {
+  const s = Math.max(2, Math.round(size / 2) * 2);
+  const bx = Math.round(cx / 2) * 2;
+  const by = Math.round(cy / 2) * 2;
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(bx - s - 2, by - 2, (s + 2) * 2, 4);
+  ctx.fillRect(bx - 2, by - s - 2, 4, (s + 2) * 2);
+  ctx.fillStyle = '#FACC15';
+  ctx.fillRect(bx - s, by - 2, s * 2, 4);
+  ctx.fillRect(bx - 2, by - s, 4, s * 2);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(bx - 2, by - 2, 4, 4);
+}
+
 function _drawJaggedLightningPath(ctx, x1, y1, x2, y2, segments = 6, amp = 12, seed = 0) {
   const dx = x2 - x1;
   const dy = y2 - y1;
@@ -189,45 +266,64 @@ function _drawJaggedLightningPath(ctx, x1, y1, x2, y2, segments = 6, amp = 12, s
   const ny = dx / len;
 
   ctx.beginPath();
-  ctx.moveTo(x1, y1);
+  ctx.moveTo(Math.round(x1 / 2) * 2, Math.round(y1 / 2) * 2);
   for (let s = 1; s < segments; s++) {
     const t = s / segments;
-    const wave = Math.sin(seed * 3.7 + s * 2.3) * amp * Math.sin(t * Math.PI);
-    const px = x1 + dx * t + nx * wave;
-    const py = y1 + dy * t + ny * wave;
+    // Crisp alternating Pokémon zigzag kink with 2px pixel-grid snapping
+    const alt = (s % 2 === 0 ? 1 : -1) * (0.65 + 0.35 * Math.sin(seed * 3.7 + s * 1.9));
+    const wave = alt * amp * Math.sin(t * Math.PI);
+    const px = Math.round((x1 + dx * t + nx * wave) / 2) * 2;
+    const py = Math.round((y1 + dy * t + ny * wave) / 2) * 2;
     ctx.lineTo(px, py);
   }
-  ctx.lineTo(x2, y2);
+  ctx.lineTo(Math.round(x2 / 2) * 2, Math.round(y2 / 2) * 2);
   ctx.stroke();
 }
 
 /**
- * Draws the Hexagonal Honeycomb Forcefield Dome protecting Ash while his Pokémon is deployed.
+ * Draws the Directional Hexagonal Honeycomb Forcefield Shield protecting Ash while his Pokémon is deployed.
+ * Stays hidden normally; dynamically manifests at the incoming attack/threat angle when attacked.
  * Adheres strictly to Rule 11 (Zero shadowBlur).
  */
 export function drawAshHoneycombBarrier(ctx, fighter) {
   if (!fighter || !fighter.isProtectedByHoneycombBarrier) return;
 
+  // Stays hidden until incoming threat or attack arrives
+  const hitFlash = Math.max(0, (fighter.barrierHitFlashTimer || 0) / 16);
+  const activeRatio = Math.max(0, (fighter.barrierActiveTimer || 0) / 22);
+  const barrierAlpha = Math.max(hitFlash, activeRatio);
+  if (barrierAlpha <= 0.01) return;
+
   const barrierR = fighter.honeycombBarrierRadius || ashConfig.honeycombBarrierRadius || 46;
   const tick = fighter._animTick || 0;
-  const hitFlash = Math.max(0, (fighter.barrierHitFlashTimer || 0) / 14);
   const isMega = fighter.ultimateActiveTimer > 0;
+  const barrierAngle = fighter.barrierAngle !== undefined ? fighter.barrierAngle : (fighter.gunAngle || 0);
+
+  // Directional arc: projects a ~105-degree shielding sector centered at the incoming attack angle
+  const arcSpan = Math.PI * 0.58; // ~105 degrees
+  const startAngle = barrierAngle - arcSpan / 2;
+  const endAngle = barrierAngle + arcSpan / 2;
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
-  // 1. Clip interior to the circular dome perimeter
+  // 1. Clip to the directional arc sector facing the attack angle
   ctx.beginPath();
-  ctx.arc(0, 0, barrierR, 0, Math.PI * 2);
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, barrierR + 2, startAngle, endAngle);
+  ctx.closePath();
   ctx.clip();
 
-  // 2. Translucent energy dome wash
-  ctx.fillStyle = hitFlash > 0
-    ? `rgba(250, 204, 21, ${0.22 + hitFlash * 0.25})`
-    : (isMega ? 'rgba(250, 204, 21, 0.14)' : 'rgba(56, 189, 248, 0.13)');
-  ctx.fillRect(-barrierR, -barrierR, barrierR * 2, barrierR * 2);
+  // 2. Translucent directional energy dome wash
+  const baseAlpha = hitFlash > 0
+    ? (0.28 + hitFlash * 0.35)
+    : (isMega ? 0.22 : 0.18) * barrierAlpha;
+  ctx.fillStyle = (isMega || hitFlash > 0.2)
+    ? `rgba(250, 204, 21, ${baseAlpha.toFixed(3)})`
+    : `rgba(56, 189, 248, ${baseAlpha.toFixed(3)})`;
+  ctx.fillRect(-barrierR - 4, -barrierR - 4, (barrierR + 4) * 2, (barrierR + 4) * 2);
 
-  // 3. Tessellated Honeycomb Hexagon Cells
+  // 3. Tessellated Honeycomb Hexagon Cells in the directional sector
   const cellR = 11.5;
   const dxStep = cellR * 1.5;
   const dyStep = cellR * Math.sqrt(3);
@@ -236,42 +332,67 @@ export function drawAshHoneycombBarrier(ctx, fighter) {
     const cell = HEX_LATTICE_OFFSETS[i];
     const hx = cell.q * dxStep;
     const hy = (cell.r + cell.q * 0.5) * dyStep;
-    const distRatio = Math.min(1, Math.hypot(hx, hy) / barrierR);
-    const wave = 0.5 + 0.5 * Math.sin(tick * 0.10 - distRatio * 3.2 + i * 0.4);
+    const cellDist = Math.hypot(hx, hy);
+    if (cellDist > barrierR + cellR) continue;
+
+    // Check angular alignment with attack direction for progressive falloff
+    const cellAngle = Math.atan2(hy, hx);
+    let angleDiff = Math.abs(Math.atan2(Math.sin(cellAngle - barrierAngle), Math.cos(cellAngle - barrierAngle)));
+    if (angleDiff > arcSpan / 2 + 0.35) continue;
+
+    const angleFalloff = Math.max(0, 1.0 - angleDiff / (arcSpan / 2 + 0.35));
+    const distRatio = Math.min(1, cellDist / barrierR);
+    const wave = 0.5 + 0.5 * Math.sin(tick * 0.12 - distRatio * 3.2 + i * 0.4);
 
     _drawHexagon(ctx, hx, hy, cellR - 1.0);
 
-    // Individual hex cell fill pulse
-    const cellAlpha = (0.08 + wave * 0.14 + hitFlash * 0.35) * (1 - distRatio * 0.25);
+    // Individual hex cell fill pulse focused on the attack angle
+    const cellAlpha = (0.12 + wave * 0.16 + hitFlash * 0.45) * angleFalloff * barrierAlpha;
     ctx.fillStyle = (isMega || hitFlash > 0.2)
       ? `rgba(250, 204, 21, ${cellAlpha.toFixed(3)})`
       : `rgba(56, 189, 248, ${cellAlpha.toFixed(3)})`;
     ctx.fill();
 
-    ctx.strokeStyle = hitFlash > 0
-      ? `rgba(254, 240, 138, ${(0.55 + hitFlash * 0.4).toFixed(3)})`
-      : `rgba(250, 204, 21, ${(0.28 + wave * 0.30).toFixed(3)})`;
-    ctx.lineWidth = 1.2;
+    const strokeAlpha = (hitFlash > 0 ? (0.60 + hitFlash * 0.4) : (0.35 + wave * 0.35)) * angleFalloff * barrierAlpha;
+    ctx.strokeStyle = (isMega || hitFlash > 0.2)
+      ? `rgba(254, 240, 138, ${strokeAlpha.toFixed(3)})`
+      : `rgba(186, 230, 253, ${strokeAlpha.toFixed(3)})`;
+    ctx.lineWidth = 1.4;
     ctx.stroke();
   }
 
   ctx.restore();
 
-  // 4. Crisp Outer Hexagonal-Rim & Concentric Dome Ring (Outside clip)
+  // 4. Directional Curved Shield Rim & Edge Accents (Outside clip)
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
+  const rimAlpha = Math.min(1.0, barrierAlpha * (0.75 + hitFlash * 0.25));
+  ctx.globalAlpha = rimAlpha;
+
+  // Primary outer arc facing the attack
   ctx.strokeStyle = hitFlash > 0 ? '#FEF08A' : (isMega ? '#FACC15' : '#38BDF8');
-  ctx.lineWidth = 2.4 + hitFlash * 1.5;
+  ctx.lineWidth = 2.8 + hitFlash * 1.5;
   ctx.beginPath();
-  ctx.arc(0, 0, barrierR, 0, Math.PI * 2);
+  ctx.arc(0, 0, barrierR, startAngle, endAngle);
   ctx.stroke();
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-  ctx.lineWidth = 1.0;
+  // Crisp inner laser glint arc
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.arc(0, 0, barrierR - 3, 0, Math.PI * 2);
+  ctx.arc(0, 0, barrierR - 2.5, startAngle + 0.08, endAngle - 0.08);
   ctx.stroke();
+
+  // Impact flash shockwave ring on hard block
+  if (hitFlash > 0.15) {
+    const pulseR = barrierR + (1.0 - hitFlash) * 12;
+    ctx.strokeStyle = `rgba(254, 240, 138, ${(hitFlash * 0.8).toFixed(3)})`;
+    ctx.lineWidth = 2.0 * hitFlash;
+    ctx.beginPath();
+    ctx.arc(0, 0, pulseR, startAngle - 0.1, endAngle + 0.1);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
@@ -343,36 +464,23 @@ export function drawAshVisualEffects(ctx, fighter) {
         const tr = proj.r || 16;
         const travelAngle = Math.atan2(proj.vy || 0, proj.vx || 1);
 
-        // Outer golden plasma corona (Rule 11 compliant — concentric shapes, zero shadowBlur)
-        ctx.fillStyle = 'rgba(250, 204, 21, 0.34)';
-        ctx.beginPath();
-        ctx.arc(0, 0, tr * 1.35, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Trailing jagged lightning tail
-        ctx.strokeStyle = '#FACC15';
-        ctx.lineWidth = 3.2;
+        // Trailing pixel-art jagged lightning tail with dark ink outline
         const tailX = -Math.cos(travelAngle) * (tr * 2.4);
         const tailY = -Math.sin(travelAngle) * (tr * 2.4);
+        ctx.strokeStyle = '#0E0F14';
+        ctx.lineWidth = 4.8;
+        _drawJaggedLightningPath(ctx, 0, 0, tailX, tailY, 5, 9, tick * 0.45 + i);
+
+        ctx.strokeStyle = '#FACC15';
+        ctx.lineWidth = 3.0;
         _drawJaggedLightningPath(ctx, 0, 0, tailX, tailY, 5, 9, tick * 0.45 + i);
 
         ctx.strokeStyle = '#FFFFFF';
         ctx.lineWidth = 1.6;
         _drawJaggedLightningPath(ctx, 0, 0, tailX, tailY, 5, 9, tick * 0.45 + i);
 
-        // High-voltage electric core
-        ctx.fillStyle = '#FACC15';
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2.2;
-        ctx.beginPath();
-        ctx.arc(0, 0, tr * 0.85, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(0, 0, tr * 0.45, 0, Math.PI * 2);
-        ctx.fill();
+        // Retro Pokémon pixel diamond spark head
+        _drawPixelElectricSpark(ctx, 0, 0, tr * 0.85);
       } else if (proj.kind === 'waterShuriken') {
         ctx.rotate(proj.rot || 0);
         const sr = proj.r || 13;
@@ -481,14 +589,17 @@ export function drawAshVisualEffects(ctx, fighter) {
           ctx.save();
           ctx.globalAlpha = boltAlpha;
 
-          // Authentic 12-Frame Animated Thunderbolt Sprite crashing down from the sky
+          // Authentic 12-Frame Pixel-Art Thunderbolt Sprite crashing down from the sky
           const tbFrames = _getThunderboltFrames();
           const tbFrameIdx = Math.min(11, Math.floor((progress / 0.78) * 12));
           const tbImg = tbFrames[tbFrameIdx];
           if (tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0)) {
             const boltH = 270;
-            const boltW = 85;
-            ctx.drawImage(tbImg, fx.x - boltW / 2, fx.y - boltH, boltW, boltH);
+            const boltW = 92;
+            const prevSmooth = ctx.imageSmoothingEnabled;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(tbImg, Math.round(fx.x - boltW / 2), Math.round(fx.y - boltH), boltW, boltH);
+            ctx.imageSmoothingEnabled = prevSmooth;
           } else {
             // Fallback jagged lightning path
             const skyX = fx.x + Math.sin(seed) * 18;
@@ -616,15 +727,9 @@ export function drawPokemonCompanion(ctx, pokemon) {
       const p = 1.0 - Math.max(0, pokemon.thunderboltTimer / Math.max(1, pokemon.thunderboltMaxWindup || 20));
       const coronaR = (r * 0.65) * (0.4 + 0.6 * p);
 
-      // High-voltage cheek charge aura
-      ctx.fillStyle = `rgba(250, 204, 21, ${(0.15 + 0.25 * p).toFixed(3)})`;
-      ctx.beginPath();
-      ctx.arc(originX, originY, coronaR * 1.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Converging jagged electric sparks into cheek pouches
-      ctx.strokeStyle = '#FACC15';
-      ctx.lineWidth = 1.8 + p * 1.2;
+      // Retro Pokémon Pixel-Art Cheek Charge Sparks & Jagged Arcs
+      ctx.strokeStyle = '#0E0F14';
+      ctx.lineWidth = 4.0;
       for (let s = 0; s < 4; s++) {
         const sa = (Math.PI / 2) * s + (tick * 0.35);
         const sparkStartX = originX + Math.cos(sa) * (coronaR * (1.8 - 0.7 * p));
@@ -632,133 +737,106 @@ export function drawPokemonCompanion(ctx, pokemon) {
         _drawJaggedLightningPath(ctx, sparkStartX, sparkStartY, originX, originY, 4, 7, tick * 0.5 + s);
       }
 
-      // White-hot plasma spark core at cheeks
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(originX, originY, Math.max(2, coronaR * 0.35), 0, Math.PI * 2);
-      ctx.fill();
+      ctx.strokeStyle = '#FACC15';
+      ctx.lineWidth = 2.2;
+      for (let s = 0; s < 4; s++) {
+        const sa = (Math.PI / 2) * s + (tick * 0.35);
+        const sparkStartX = originX + Math.cos(sa) * (coronaR * (1.8 - 0.7 * p));
+        const sparkStartY = originY + Math.sin(sa) * (coronaR * (1.8 - 0.7 * p));
+        _drawJaggedLightningPath(ctx, sparkStartX, sparkStartY, originX, originY, 4, 7, tick * 0.5 + s);
+        _drawPixelElectricSpark(ctx, sparkStartX, sparkStartY, 4);
+      }
+
+      // Stepped pixel diamond spark core at Pikachu's cheeks
+      _drawPixelElectricSpark(ctx, originX, originY, Math.max(4, coronaR * 0.55));
     } else if (pokemon.thunderboltState === 'active') {
       const beamW = specSkill?.beamWidth || 42;
-      const maxRange = specSkill?.beamRange || 680;
-      let beamLen = maxRange;
-      if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0) {
-        const distToTgt = Math.hypot(pokemon.thunderboltTarget.x - pokemon.x, pokemon.thunderboltTarget.y - pokemon.y);
-        beamLen = Math.min(maxRange, Math.max(distToTgt + 120, maxRange * 0.85));
+      const maxSkillRange = specSkill?.beamRange || 680;
+      let beamLen = maxSkillRange;
+
+      // Primary source of truth: beam length computed in AshFighter.js update loop
+      if (typeof pokemon.thunderboltCurrentBeamLen === 'number' && pokemon.thunderboltCurrentBeamLen > 20) {
+        beamLen = pokemon.thunderboltCurrentBeamLen;
+      } else {
+        const curArena = typeof state !== 'undefined' ? state.arena : null;
+        const worldStartX = pokemon.x + originX;
+        const worldStartY = pokemon.y - z + originY;
+        const wallDist = curArena ? _getRayArenaIntersection(worldStartX, worldStartY, castAngle, curArena, 8) : maxSkillRange;
+        beamLen = Math.min(maxSkillRange, wallDist);
+        if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0) {
+          const distToTgt = Math.hypot(pokemon.thunderboltTarget.x - pokemon.x, pokemon.thunderboltTarget.y - pokemon.y);
+          beamLen = Math.min(beamLen, distToTgt);
+        }
       }
       const endX = originX + cosA * beamLen;
       const endY = originY + sinA * beamLen;
 
-      // Layer 1: Authentic 12-Frame Serpentine Thunderbolt Sprite (Assets/model/ash/pokemon/pikachu/Thunderbolt/)
+      // Layer 1: Authentic 12-Frame Pixel-Art Pokémon Thunderbolt Sprite Stream (Assets/model/ash/pokemon/pikachu/Thunderbolt/)
       const tbFrames = _getThunderboltFrames();
-      const tbIndex = Math.floor((tick * 0.45) % 12);
+      const tbIndex = Math.floor((tick * 0.50) % 12);
       const tbImg = tbFrames[tbIndex];
-      let tbDrawn = false;
-      if (tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0)) {
+      const hasSprite = tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0);
+      if (hasSprite && beamLen > 4) {
         ctx.save();
         ctx.translate(originX, originY);
-        // Sprite is vertical (needle origin at 128, 12; grounding tip at 128, 246)
+        // Sprite is vertical (origin at 128, 12; grounding tip at 128, 246)
         // Rotating by castAngle - PI/2 directs +Y along castAngle directly towards the target
         ctx.rotate(castAngle - Math.PI / 2);
         ctx.imageSmoothingEnabled = false;
-        const scaleL = beamLen / 234.0;
-        const scaleW = (beamW * 2.4) / 256.0;
-        ctx.drawImage(tbImg, -128 * scaleW, -12 * scaleL, 256 * scaleW, 256 * scaleL);
-        ctx.restore();
-        tbDrawn = true;
-      }
-
-      // Layer 2: Sky-Splitting Thunderbolt Lightning Strike crashing down onto the target
-      if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0 && tbImg && tbImg.complete && ((tbImg.naturalWidth || tbImg.width || 0) > 0)) {
-        const tgtLocalX = pokemon.thunderboltTarget.x - pokemon.x;
-        const tgtLocalY = (pokemon.thunderboltTarget.y - (pokemon.thunderboltTarget.z || 0)) - pokemon.y;
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        const skyH = 260;
-        const skyW = beamW * 2.5;
-        ctx.drawImage(tbImg, tgtLocalX - skyW / 2, tgtLocalY - skyH, skyW, skyH);
+        // Tile/repeat or scale cleanly to preserve crisp pixel block aspect ratio
+        const segLen = 234.0;
+        const scaleW = (beamW * 2.5) / 256.0;
+        const numSegs = Math.max(1, Math.ceil(beamLen / segLen));
+        const stepLen = beamLen / numSegs;
+        const scaleL = stepLen / 234.0;
+        for (let seg = 0; seg < numSegs; seg++) {
+          const segFrame = tbFrames[(tbIndex + seg * 3) % 12] || tbImg;
+          ctx.drawImage(segFrame, -128 * scaleW, seg * stepLen - 12 * scaleL, 256 * scaleW, 256 * scaleL);
+        }
         ctx.restore();
       }
 
-      // Layer 3: Dynamic Branching Jagged Lightning Arcs snapping between Pikachu and Target
-      const numBranches = 3;
-      for (let b = 0; b < numBranches; b++) {
-        ctx.strokeStyle = b === 0 ? '#FFFFFF' : (b === 1 ? '#FEF08A' : '#FACC15');
-        ctx.lineWidth = b === 0 ? 1.8 : (b === 1 ? 2.6 : 3.4);
-        _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 12, beamW * 0.45, tick * 0.45 + b * 2.1);
+      // Layer 2: Core Pixel-Stepped Jagged Pokémon Lightning Stream & Arcs
+      if (beamLen > 8) {
+        ctx.strokeStyle = '#0E0F14';
+        ctx.lineWidth = 6.0;
+        _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 10, beamW * 0.42, tick * 0.45);
+        ctx.strokeStyle = '#FACC15';
+        ctx.lineWidth = 4.0;
+        _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 10, beamW * 0.42, tick * 0.45);
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 2.0;
+        _drawJaggedLightningPath(ctx, originX, originY, endX, endY, 10, beamW * 0.42, tick * 0.45);
+
+        // High-voltage diamond star sparks along beam trajectory
+        const sparkCount = Math.max(2, Math.floor(beamLen / 70));
+        for (let s = 1; s <= sparkCount; s++) {
+          const spT = (s / (sparkCount + 1)) + Math.sin(tick * 0.2 + s) * 0.05;
+          const sx = originX + cosA * (beamLen * spT) + (-sinA) * ((s % 2 === 0 ? 1 : -1) * 8);
+          const sy = originY + sinA * (beamLen * spT) + (cosA) * ((s % 2 === 0 ? 1 : -1) * 8);
+          _drawPixelElectricSpark(ctx, sx, sy, 5);
+        }
       }
 
-      // Layer 4: Cheeks High-Voltage Plasma Eruption Core
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(originX, originY, beamW * 0.40, 0, Math.PI * 2);
-      ctx.fill();
+      // Layer 4: Cheeks High-Voltage Pixel Star Burst Core
+      _drawPixelElectricSpark(ctx, originX, originY, beamW * 0.35);
 
-      // Layer 7: Authentic 12-Frame Animated Thunderbolt Impact VFX Sprite (Assets/model/ash/pokemon/pikachu/Thunderbolt_impact/)
+      // Layer 5: Authentic 12-Frame Pixel-Art Thunderbolt Impact VFX Sprite (Assets/model/ash/pokemon/pikachu/Thunderbolt_impact/)
+      // Plays once per strike at ~1.2 ticks per frame (14 frames total lifecycle)
       const impFrames = _getThunderboltImpactFrames();
-      const impIndex = Math.floor((tick * 0.45) % 12);
-      const impImg = impFrames[impIndex];
-      const wavePhase = (tick * 0.25) % 1.0;
-
-      // Impact blast directly on target's position
-      if (pokemon.thunderboltTarget && pokemon.thunderboltTarget.hp > 0) {
-        const tgtLocalX = pokemon.thunderboltTarget.x - pokemon.x;
-        const tgtLocalY = (pokemon.thunderboltTarget.y - (pokemon.thunderboltTarget.z || 0)) - pokemon.y;
-        if (impImg && impImg.complete && ((impImg.naturalWidth || impImg.width || 0) > 0)) {
-          const impSize = beamW * 4.2;
-          ctx.save();
-          ctx.imageSmoothingEnabled = false;
-          ctx.drawImage(impImg, tgtLocalX - impSize / 2, tgtLocalY - impSize / 2, impSize, impSize);
-          ctx.restore();
-        }
-
-        // Concentric electric impact blast rings on target (Rule 26 Compliant)
-        for (let k = 0; k < 2; k++) {
-          const ringP = (wavePhase + k * 0.5) % 1.0;
-          const ringR = (beamW * 0.9) + ringP * (beamW * 1.5);
-          const ringAlpha = (1.0 - ringP) * 0.85;
-
-          ctx.strokeStyle = k === 0 ? '#FFFFFF' : '#FACC15';
-          ctx.lineWidth = (k === 0 ? 2.8 : 1.8) * (1.0 - ringP * 0.4);
-          ctx.globalAlpha = ringAlpha;
-          ctx.beginPath();
-          ctx.arc(tgtLocalX, tgtLocalY, ringR, 0, Math.PI * 2);
-          ctx.stroke();
-
-          if (k === 0) {
-            ctx.fillStyle = `rgba(250, 204, 21, ${(0.28 * ringAlpha).toFixed(3)})`;
-            ctx.beginPath();
-            ctx.arc(tgtLocalX, tgtLocalY, ringR * 0.7, 0, Math.PI * 2);
-            ctx.fill();
+      if (typeof pokemon.thunderboltImpactTimer === 'number') {
+        const impIndex = Math.floor(pokemon.thunderboltImpactTimer / 1.2);
+        if (impIndex >= 0 && impIndex < 12) {
+          const impImg = impFrames[impIndex];
+          if (impImg && impImg.complete && ((impImg.naturalWidth || impImg.width || 0) > 0)) {
+            const endImpSize = Math.round(beamW * 4.0);
+            ctx.save();
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(impImg, Math.round(endX - endImpSize / 2), Math.round(endY - endImpSize / 2), endImpSize, endImpSize);
+            ctx.restore();
+          } else {
+            _drawPixelElectricSpark(ctx, endX, endY, Math.round(beamW * 0.9));
           }
-        }
-      }
-
-      // Beam terminus 12-frame impact & compression rings
-      if (impImg && impImg.complete && ((impImg.naturalWidth || impImg.width || 0) > 0)) {
-        const endImpSize = beamW * 3.4;
-        ctx.save();
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(impImg, endX - endImpSize / 2, endY - endImpSize / 2, endImpSize, endImpSize);
-        ctx.restore();
-      }
-
-      for (let k = 0; k < 2; k++) {
-        const ringP = (wavePhase + k * 0.45) % 1.0;
-        const ringR = (beamW * 0.8) + ringP * (beamW * 1.4);
-        const ringAlpha = (1.0 - ringP) * 0.85;
-
-        ctx.strokeStyle = k === 0 ? '#FFFFFF' : '#FACC15';
-        ctx.lineWidth = (k === 0 ? 2.6 : 1.8) * (1.0 - ringP * 0.4);
-        ctx.globalAlpha = ringAlpha;
-        ctx.beginPath();
-        ctx.arc(endX, endY, ringR, 0, Math.PI * 2);
-        ctx.stroke();
-
-        if (k === 0) {
-          ctx.fillStyle = `rgba(250, 204, 21, ${(0.24 * ringAlpha).toFixed(3)})`;
-          ctx.beginPath();
-          ctx.arc(endX, endY, ringR * 0.75, 0, Math.PI * 2);
-          ctx.fill();
         }
       }
       ctx.globalAlpha = 1.0;

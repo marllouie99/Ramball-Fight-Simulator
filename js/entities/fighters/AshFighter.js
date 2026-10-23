@@ -55,6 +55,66 @@ function _distToSegment(px, py, x1, y1, x2, y2) {
 }
 
 /**
+ * Computes maximum ray distance from (startX, startY) along angle to the arena walls.
+ * Prevents beams and effects from clipping outside the arena boundaries without degenerate 0-distance clamps.
+ */
+function _getRayArenaIntersection(startX, startY, angle, arena, innerMargin = 4) {
+  if (!arena) return 700;
+  const wallW = arena.wallWidth || 4;
+  const margin = wallW + innerMargin;
+
+  if (arena.shape === 'circle' || arena.radius) {
+    const cx = arena.x + arena.width / 2;
+    const cy = arena.y + arena.height / 2;
+    const r = Math.max(20, (arena.radius || arena.width / 2) - margin);
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const dx = startX - cx;
+    const dy = startY - cy;
+    const b = 2 * (dx * cosA + dy * sinA);
+    const c = dx * dx + dy * dy - r * r;
+    const disc = b * b - 4 * c;
+    if (disc < 0) return 700;
+    const t = (-b + Math.sqrt(disc)) / 2;
+    return Math.max(40, t);
+  }
+
+  const minX = arena.x + margin;
+  const maxX = arena.x + arena.width - margin;
+  const minY = arena.y + margin;
+  const maxY = arena.y + arena.height - margin;
+
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  let maxDist = Infinity;
+
+  // Vertical boundary collisions (X-axis)
+  if (cosA > 0.0001) {
+    const d = (maxX - startX) / cosA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  } else if (cosA < -0.0001) {
+    const d = (minX - startX) / cosA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  }
+
+  // Horizontal boundary collisions (Y-axis)
+  if (sinA > 0.0001) {
+    const d = (maxY - startY) / sinA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  } else if (sinA < -0.0001) {
+    const d = (minY - startY) / sinA;
+    if (d > 0 && d < maxDist) maxDist = d;
+  }
+
+  if (maxDist === Infinity || maxDist < 40 || Number.isNaN(maxDist)) {
+    const fallbackReach = Math.min(arena.width, arena.height) || 450;
+    return Math.max(120, fallbackReach * 0.9);
+  }
+
+  return maxDist;
+}
+
+/**
  * Autonomous Pokémon Companion Entity (Pikachu, Charizard, Greninja, Lucario).
  * Exists in state.fighters while deployed so enemies target and clash with the Pokémon.
  */
@@ -115,9 +175,9 @@ export class PokemonCompanionEntity extends Fighter {
     this.actionAnimTimer = 0;
     this.meleeCooldown = 14;
     this.meleeCooldownMax = spec.meleeCooldown || 34;
-    this.specialCooldownMax = spec.specialCooldown || 135;
-    // Start with a short initial charge so Pikachu unleashes THUNDERBOLT right after entering!
-    this.specialCooldown = 28;
+    const specialCooldownCfg = spec.skills?.special?.cooldown ?? spec.specialCooldown ?? (_getAshCfg().pokemonRoster?.[speciesKey]?.skills?.special?.cooldown ?? 135);
+    this.specialCooldownMax = specialCooldownCfg;
+    this.specialCooldown = spec.initialSpecialDelayFrames ?? Math.min(28, this.specialCooldownMax);
     this.comboStep = 0;
     this.hurtAnimTimer = 0;
     this.faintTimer = 0;
@@ -130,9 +190,28 @@ export class PokemonCompanionEntity extends Fighter {
     // Intentionally empty (Rule 23): Pokémon uses dedicated melee blitz & elemental specials
   }
 
+  /**
+   * Rule 1.4: Lock aim rotation while Pikachu is casting Thunderbolt (windup, active beam, or recovery).
+   */
+  canAim() {
+    if (this.thunderboltState) return false;
+    return super.canAim();
+  }
+
+  isStationarySkillActive() {
+    return Boolean(this.thunderboltState || super.isStationarySkillActive?.());
+  }
+
+  isChannelingSkill() {
+    return Boolean(this.thunderboltState || super.isChannelingSkill?.());
+  }
+
   interruptAttacks(forceCancelAll = false) {
     this.thunderboltState = null;
     this.thunderboltTimer = 0;
+    this.thunderboltCurrentBeamLen = null;
+    this.thunderboltClosestEnemy = null;
+    this.thunderboltImpactTimer = undefined;
     if (this.thunderboltHitEnemies) {
       this.thunderboltHitEnemies.clear();
     }
@@ -148,7 +227,7 @@ export class PokemonCompanionEntity extends Fighter {
    * Phase 3 (Aftermath Stun & Recovery): All victims caught in the beam suffer full electric shock stun aftermath (~0.75s).
    */
   startThunderbolt(target, isTrainerCommand = false) {
-    if (this.hp <= 0) return;
+    if (this.hp <= 0 || this.thunderboltState) return;
     const specSkill = this.spec.skills?.special;
     const castAngle = target
       ? Math.atan2(target.y - this.y, target.x - this.x)
@@ -165,13 +244,21 @@ export class PokemonCompanionEntity extends Fighter {
     this.actionAnimTimer = this.thunderboltTimer + (specSkill?.beamDurationFrames || 58) + 16;
     this.animTick = 0;
     this.thunderboltCmdMult = isTrainerCommand ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0;
+    const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+    this.specialCooldown = cd;
+    if (this.owner) {
+      this.owner.commandCooldown = cd;
+    }
+    this.thunderboltCurrentBeamLen = null;
+    this.thunderboltClosestEnemy = null;
+    this.thunderboltImpactTimer = undefined;
     if (this.thunderboltHitEnemies) {
       this.thunderboltHitEnemies.clear();
     }
 
-    // Tension coil brake: Pikachu plants its feet to charge electricity
-    this.vx *= 0.15;
-    this.vy *= 0.15;
+    // Tension coil brake: Pikachu plants its feet firmly to charge electricity
+    this.vx = 0;
+    this.vy = 0;
 
     // Iconic Phase 1 Callout: "PIKA..."
     const windupCallout = specSkill?.windupCallout || 'PIKA...';
@@ -227,9 +314,12 @@ export class PokemonCompanionEntity extends Fighter {
 
     this.handleStatusEffects();
     if (this.meleeCooldown > 0) this.meleeCooldown--;
-    if (this.specialCooldown > 0) this.specialCooldown--;
+    if (!this.thunderboltState && this.specialCooldown > 0) this.specialCooldown--;
     if (this.actionAnimTimer > 0) this.actionAnimTimer--;
     if (this.hurtAnimTimer > 0) this.hurtAnimTimer--;
+    if (typeof this.thunderboltImpactTimer === 'number') {
+      this.thunderboltImpactTimer++;
+    }
 
     // ── Pikachu Thunderbolt Windup, Sustained Active Beam, and Recovery Lifecycle ──
     if (this.thunderboltState) {
@@ -241,8 +331,8 @@ export class PokemonCompanionEntity extends Fighter {
         this.animState = 'special';
         this.gunAngle = this.thunderboltCastAngle;
         this.angle = this.thunderboltCastAngle;
-        this.vx *= 0.4;
-        this.vy *= 0.4;
+        this.vx = 0;
+        this.vy = 0;
 
         // High-voltage cheek pouch charging micro-rumble
         if (this.thunderboltTimer % 5 === 0) {
@@ -263,61 +353,92 @@ export class PokemonCompanionEntity extends Fighter {
         this.thunderboltTimer--;
         this.animState = 'special';
 
-        // Smooth micro-tracking towards target
-        if (this.thunderboltTarget && this.thunderboltTarget.hp > 0) {
-          const desiredAngle = Math.atan2(this.thunderboltTarget.y - this.y, this.thunderboltTarget.x - this.x);
-          const angleDiff = Math.atan2(Math.sin(desiredAngle - this.thunderboltCastAngle), Math.cos(desiredAngle - this.thunderboltCastAngle));
-          this.thunderboltCastAngle += Math.max(-0.035, Math.min(0.035, angleDiff));
-        }
+        // Rule 1.4: Aim rotation is disabled during Thunderbolt cast — strictly clamp angle to committed castAngle
         this.gunAngle = this.thunderboltCastAngle;
         this.angle = this.thunderboltCastAngle;
 
-        // Continuous kinetic recoil kick pushes Pikachu backward
-        const recoil = specSkill?.recoilPush || 1.3;
-        this.vx = -Math.cos(this.thunderboltCastAngle) * recoil;
-        this.vy = -Math.sin(this.thunderboltCastAngle) * recoil;
+        // Stationary stance: Pikachu plants feet firmly on the ground while discharging Thunderbolt (zero recoil drift)
+        const recoil = specSkill?.recoilPush || 0;
+        if (recoil > 0) {
+          this.vx = -Math.cos(this.thunderboltCastAngle) * recoil;
+          this.vy = -Math.sin(this.thunderboltCastAngle) * recoil;
+        } else {
+          this.vx = 0;
+          this.vy = 0;
+        }
 
         if (this.thunderboltTimer % 4 === 0) {
           triggerGlobalScreenShake(specSkill?.screenShake || 5.0, 3);
         }
 
-        // Multi-tick continuous lightning stream collision
-        const tickRate = specSkill?.beamTickRate || 5;
-        if (this.thunderboltTimer % tickRate === 0 && this.owner) {
-          const bonusMult = (this.thunderboltCmdMult || 1.0) * (this.isMega ? 1.25 : 1.0);
-          const dmg = Math.round((specSkill?.beamDamagePerTick || 4) * bonusMult);
-          const beamRange = specSkill?.beamRange || 680;
-          const beamW = specSkill?.beamWidth || 42;
-          const cosA = Math.cos(this.thunderboltCastAngle);
-          const sinA = Math.sin(this.thunderboltCastAngle);
-          const startX = this.x + cosA * (this.r * 0.7);
-          const startY = this.y - 12 + sinA * (this.r * 0.7);
-          const endX = startX + cosA * beamRange;
-          const endY = startY + sinA * beamRange;
+        // Calculate beam length: stops at first enemy hit (does NOT penetrate/pass through)
+        // and strictly clamped to arena walls when missing so it NEVER clips outside the arena.
+        const maxSkillRange = specSkill?.beamRange || 680;
+        const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+        const cosA = Math.cos(this.thunderboltCastAngle);
+        const sinA = Math.sin(this.thunderboltCastAngle);
+        const startX = this.x + cosA * (this.r * 0.7);
+        const startY = this.y - 12 + sinA * (this.r * 0.7);
+        const wallDist = curArena ? _getRayArenaIntersection(startX, startY, this.thunderboltCastAngle, curArena, 8) : maxSkillRange;
+        const beamRange = Math.min(maxSkillRange, Math.max(10, wallDist));
+        const beamW = specSkill?.beamWidth || 42;
 
-          const validEnemies = this.owner._getValidEnemyTargets(this.thunderboltTarget);
-          for (const enemy of validEnemies) {
-            const dist = _distToSegment(enemy.x, enemy.y, startX, startY, endX, endY);
-            if (dist <= (beamW / 2) + (enemy.r || 25)) {
-              if (this.thunderboltHitEnemies) {
-                this.thunderboltHitEnemies.add(enemy);
+        // Find closest enemy along the beam path
+        let closestHitEnemy = null;
+        let closestHitDist = beamRange;
+        const validEnemies = this.owner ? this.owner._getValidEnemyTargets(this.thunderboltTarget) : [];
+
+        for (const enemy of validEnemies) {
+          if (!enemy || enemy.hp <= 0) continue;
+          const enemyR = enemy.r || 25;
+          const edx = enemy.x - startX;
+          const edy = enemy.y - startY;
+          const projDist = edx * cosA + edy * sinA;
+          // Must be in front of Pikachu along the cast angle within wall-clamped beamRange
+          if (projDist >= -enemyR && projDist <= beamRange + enemyR) {
+            const perpDist = Math.abs(-edx * sinA + edy * cosA);
+            if (perpDist <= (beamW / 2) + enemyR) {
+              const hitContactDist = Math.max(0, projDist);
+              if (hitContactDist < closestHitDist) {
+                closestHitDist = hitContactDist;
+                closestHitEnemy = enemy;
               }
-              this.owner._dealPokemonDamage(enemy, dmg, {
-                angle: this.thunderboltCastAngle,
-                knockback: specSkill?.beamKnockbackPerTick || 1.6,
-                paralyzeFrames: specSkill?.paralyzeFramesPerTick || 20,
-                isSpecial: true
-              });
-
-              // Apply active electric shock & stasis while trapped inside beam
-              enemy.electricStunTimer = Math.max(enemy.electricStunTimer || 0, 18);
-              enemy.paralyzeTimer = Math.max(enemy.paralyzeTimer || 0, 18);
-              enemy.isParalyzed = true;
-              if (typeof enemy.applyTimeStop === 'function') enemy.applyTimeStop(18);
-              if (typeof enemy.applyParalyze === 'function') enemy.applyParalyze(18);
-              spawnSparks(enemy.x, enemy.y, 4, 'gold', '#FACC15');
             }
           }
+        }
+        // Cache beam length for rendering so visual lightning terminates exactly at the hit enemy
+        // or strictly at the arena wall boundary (zero clipping outside arena)
+        this.thunderboltCurrentBeamLen = closestHitEnemy ? closestHitDist : beamRange;
+        this.thunderboltClosestEnemy = closestHitEnemy;
+
+        // Trigger the 12-frame impact VFX only ONCE per strike when the lightning first connects with the target
+        if (closestHitEnemy && this.thunderboltImpactTimer === undefined) {
+          this.thunderboltImpactTimer = 0; // Starts 1-shot 12-frame impact animation
+        }
+
+        // Multi-tick continuous lightning collision on the hit target
+        const tickRate = specSkill?.beamTickRate || 5;
+        if (this.thunderboltTimer % tickRate === 0 && this.owner && closestHitEnemy) {
+          const bonusMult = (this.thunderboltCmdMult || 1.0) * (this.isMega ? 1.25 : 1.0);
+          const dmg = Math.round((specSkill?.beamDamagePerTick || 4) * bonusMult);
+
+          if (this.thunderboltHitEnemies) {
+            this.thunderboltHitEnemies.add(closestHitEnemy);
+          }
+          this.owner._dealPokemonDamage(closestHitEnemy, dmg, {
+            angle: this.thunderboltCastAngle,
+            knockback: specSkill?.beamKnockbackPerTick || 1.6,
+            paralyzeFrames: specSkill?.paralyzeFramesPerTick || 20,
+            isSpecial: true
+          });
+
+          // Apply active electric shock & stasis while trapped inside beam
+          closestHitEnemy.electricStunTimer = Math.max(closestHitEnemy.electricStunTimer || 0, 18);
+          closestHitEnemy.paralyzeTimer = Math.max(closestHitEnemy.paralyzeTimer || 0, 18);
+          closestHitEnemy.isParalyzed = true;
+          if (typeof closestHitEnemy.applyTimeStop === 'function') closestHitEnemy.applyTimeStop(18);
+          if (typeof closestHitEnemy.applyParalyze === 'function') closestHitEnemy.applyParalyze(18);
+          spawnSparks(closestHitEnemy.x, closestHitEnemy.y, 4, 'gold', '#FACC15');
         }
 
         if (this.thunderboltTimer <= 0) {
@@ -344,14 +465,31 @@ export class PokemonCompanionEntity extends Fighter {
       } else if (this.thunderboltState === 'recovery') {
         this.thunderboltTimer--;
         this.animState = 'idle';
-        this.vx *= 0.85;
-        this.vy *= 0.85;
+        this.gunAngle = this.thunderboltCastAngle;
+        this.angle = this.thunderboltCastAngle;
+        this.vx = 0;
+        this.vy = 0;
         if (this.thunderboltTimer <= 0) {
           this.thunderboltState = null;
+          this.thunderboltCurrentBeamLen = null;
+          this.thunderboltClosestEnemy = null;
+          this.thunderboltImpactTimer = undefined;
+          const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+          this.specialCooldown = cd;
+          if (this.owner) {
+            this.owner.commandCooldown = cd;
+          }
         }
       }
 
-      super.update(target, ownerIndex, arena);
+      // Plant feet firmly: zero velocity and zero recoil displacement while casting Thunderbolt
+      this.vx = 0;
+      this.vy = 0;
+      if (this.thunderboltState) {
+        this.gunAngle = this.thunderboltCastAngle;
+        this.angle = this.thunderboltCastAngle;
+      }
+      this.resolveWallBounce(arena, target);
       return;
     }
 
@@ -371,8 +509,10 @@ export class PokemonCompanionEntity extends Fighter {
       this.vy = this.vy * 0.84 + Math.sin(targetAngle) * curSpd * 0.16;
 
       // Autonomous Signature Special Skill (e.g. Pikachu's THUNDERBOLT!) when ready
-      if (this.specialCooldown <= 0 && dist <= 550 && this.owner) {
-        this.specialCooldown = this.specialCooldownMax;
+      if (this.specialCooldown <= 0 && !this.thunderboltState && dist <= 550 && this.owner) {
+        const cd = Math.max(this.specialCooldownMax, this.owner.commandCooldownMax || 0);
+        this.specialCooldown = cd;
+        this.owner.commandCooldown = cd;
         if (this.speciesId === 'pikachu') {
           this.startThunderbolt(target, false);
         } else {
@@ -485,6 +625,8 @@ export class AshFighter extends Fighter {
     this.isProtectedByHoneycombBarrier = false;
     this.honeycombBarrierRadius = cfg.honeycombBarrierRadius || 46;
     this.barrierHitFlashTimer = 0;
+    this.barrierActiveTimer = 0;
+    this.barrierAngle = 0;
     this._barrierTextCooldown = 0;
 
     // Summon Cooldown (Mobile Evasion State when > 0 and no Pokémon active)
@@ -514,6 +656,8 @@ export class AshFighter extends Fighter {
     this.thrownPokeball = null;
     this.isProtectedByHoneycombBarrier = false;
     this.barrierHitFlashTimer = 0;
+    this.barrierActiveTimer = 0;
+    this.barrierAngle = 0;
     this.summonCooldown = _getAshCfg().initialSummonDelayFrames ?? 24;
     this.commandCooldown = 48;
     this.ultimateCooldown = 240;
@@ -574,9 +718,22 @@ export class AshFighter extends Fighter {
     if (this.isProtectedByHoneycombBarrier && this.activePokemon && this.activePokemon.hp > 0) {
       const isTojiIsoh = Boolean(attacker && (attacker.characterId === 'toji' || attacker.type === 'toji'));
       if (!isTojiIsoh && !opts.bypassHoneycombBarrier) {
-        this.barrierHitFlashTimer = 14;
+        // Calculate incoming attack angle
+        let atkAngle = 0;
+        if (opts.angle !== undefined) {
+          atkAngle = opts.angle;
+        } else if (attacker && typeof attacker.x === 'number') {
+          atkAngle = Math.atan2(attacker.y - this.y, attacker.x - this.x);
+        } else if (attacker && typeof attacker.gunAngle === 'number') {
+          atkAngle = attacker.gunAngle;
+        }
+        this.barrierAngle = atkAngle;
+        this.barrierActiveTimer = 22; // Visible directional barrier shield
+        this.barrierHitFlashTimer = 16;
         _playAshSound('barrierBlock');
-        spawnSparks(this.x, this.y, 6, '#FACC15');
+        const contactX = this.x + Math.cos(atkAngle) * (this.honeycombBarrierRadius || 46);
+        const contactY = this.y + Math.sin(atkAngle) * (this.honeycombBarrierRadius || 46);
+        spawnSparks(contactX, contactY, 6, '#FACC15');
         if (this._barrierTextCooldown <= 0) {
           this._barrierTextCooldown = 28;
           spawnFloatingText(this.x, this.y - this.r - 18, 'HONEYCOMB BARRIER!', '#38BDF8');
@@ -593,6 +750,7 @@ export class AshFighter extends Fighter {
   _updateVisualEffects() {
     this._animTick = (this._animTick || 0) + 1;
     if (this.barrierHitFlashTimer > 0) this.barrierHitFlashTimer--;
+    if (this.barrierActiveTimer > 0) this.barrierActiveTimer--;
     if (this._barrierTextCooldown > 0) this._barrierTextCooldown--;
 
     // Process 2-stage Empress move cast audio followups (-2.ogg)
@@ -818,6 +976,8 @@ export class AshFighter extends Fighter {
     const isMega = Boolean(ball.isMega || (this.ultimateActiveTimer > 0 && (ball.speciesKey === 'charizard' || ball.speciesKey === 'lucario')));
     const pokemon = new PokemonCompanionEntity(this, ball.speciesKey, ball.targetX, ball.targetY, isMega);
     this.activePokemon = pokemon;
+    // Synchronize commandCooldown with the spawned Pokémon's initial cooldown
+    this.commandCooldown = Math.max(this.commandCooldown, pokemon.specialCooldown);
     this.isProtectedByHoneycombBarrier = true;
     this.vx = 0;
     this.vy = 0;
@@ -891,9 +1051,13 @@ export class AshFighter extends Fighter {
    */
   _executeTrainerCommand(opponent) {
     if (!this.activePokemon || this.activePokemon.hp <= 0) return;
-    this.commandCooldown = this.commandCooldownMax;
-    // Prevent autonomous special from firing on the exact same frame
-    this.activePokemon.specialCooldown = Math.max(this.activePokemon.specialCooldown || 0, 50);
+    if (this.activePokemon.specialCooldown > 0 || this.activePokemon.thunderboltState || this.activePokemon.isChannelingSkill?.()) return;
+    if (this.commandCooldown > 0) return;
+
+    const cd = Math.max(this.commandCooldownMax, this.activePokemon.specialCooldownMax || 0);
+    this.commandCooldown = cd;
+    this.activePokemon.specialCooldown = cd;
+
     const target = this._findBestTarget(opponent);
     this._executePokemonSpecial(this.activePokemon, target, true);
   }
@@ -907,6 +1071,10 @@ export class AshFighter extends Fighter {
    */
   _executePokemonSpecial(p, target, isTrainerCommand = false) {
     if (!p || p.hp <= 0) return;
+    const cd = Math.max(p.specialCooldownMax || 0, this.commandCooldownMax || 0);
+    p.specialCooldown = cd;
+    this.commandCooldown = cd;
+
     if (p.speciesId === 'pikachu') {
       if (typeof p.startThunderbolt === 'function') {
         p.startThunderbolt(target, isTrainerCommand);
@@ -1062,7 +1230,11 @@ export class AshFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    if (this.commandCooldown > 0) this.commandCooldown--;
+    if (this.activePokemon && this.activePokemon.hp > 0) {
+      this.commandCooldown = this.activePokemon.specialCooldown;
+    } else if (this.commandCooldown > 0) {
+      this.commandCooldown--;
+    }
     if (this.ultimateCooldown > 0) this.ultimateCooldown--;
     if (this.ultimateActiveTimer > 0) this.ultimateActiveTimer--;
 
@@ -1110,10 +1282,19 @@ export class AshFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
 
-      // Trigger Trainer Command Special Move when ready
-      if (this.activePokemon && this.activePokemon.hp > 0 && isSkillEnabled(cfg.enableTrainerCommand, true) && this.commandCooldown <= 0) {
+      // Trigger Trainer Command Special Move when ready (both Ash and Pokémon must be ready and not mid-cast)
+      if (this.activePokemon &&
+          this.activePokemon.hp > 0 &&
+          isSkillEnabled(cfg.enableTrainerCommand, true) &&
+          this.commandCooldown <= 0 &&
+          this.activePokemon.specialCooldown <= 0 &&
+          !this.activePokemon.thunderboltState &&
+          !this.activePokemon.isChannelingSkill?.()) {
         this._executeTrainerCommand(bestTarget);
       }
+
+      // Check for incoming attacks or nearby threatening enemies to project the directional barrier
+      this._checkIncomingThreats(bestTarget);
 
       // Clamp Ash within arena walls while stationary
       this.resolveWallBounce(arena, bestTarget);
@@ -1142,6 +1323,58 @@ export class AshFighter extends Fighter {
 
     // Centralized Movement Physics & Wall Bounce (Rule 1.2)
     super.update(bestTarget, ownerIndex, arena);
+  }
+
+  /**
+   * Evaluates incoming projectile threats or approaching enemies to activate the directional barrier shield.
+   */
+  _checkIncomingThreats(primaryTarget = null) {
+    if (!this.isProtectedByHoneycombBarrier) return;
+    const bRadius = this.honeycombBarrierRadius || 46;
+    const threatDist = bRadius + 110;
+
+    // 1. Check incoming projectiles moving toward Ash
+    if (typeof state !== 'undefined' && Array.isArray(state.projectiles)) {
+      for (let i = 0; i < state.projectiles.length; i++) {
+        const p = state.projectiles[i];
+        if (!p || p.dead || p.life <= 0) continue;
+        if (p.owner === this || p.owner === this.activePokemon) continue;
+        if (this.teamId !== undefined && p.teamId !== undefined && this.teamId === p.teamId) continue;
+
+        const pdx = this.x - p.x;
+        const pdy = this.y - p.y;
+        const pDist = Math.hypot(pdx, pdy);
+        if (pDist <= threatDist) {
+          // Check if projectile is flying toward Ash
+          const dot = (p.vx || 0) * pdx + (p.vy || 0) * pdy;
+          if (dot > 0 || pDist <= bRadius + 25) {
+            const incomingAngle = Math.atan2(p.y - this.y, p.x - this.x);
+            this.barrierAngle = incomingAngle;
+            this.barrierActiveTimer = Math.max(this.barrierActiveTimer || 0, 12);
+            return;
+          }
+        }
+      }
+    }
+
+    // 2. Check nearby enemy fighters attacking or moving toward Ash
+    const enemies = this._getValidEnemyTargets(primaryTarget);
+    for (const enemy of enemies) {
+      if (!enemy || enemy.hp <= 0) continue;
+      const edx = enemy.x - this.x;
+      const edy = enemy.y - this.y;
+      const dist = Math.hypot(edx, edy);
+      if (dist <= threatDist) {
+        const enemyAimingAtAsh = Math.abs(Math.atan2(-edy, -edx) - (enemy.gunAngle || 0)) < 1.0;
+        const enemyMovingToAsh = ((enemy.vx || 0) * -edx + (enemy.vy || 0) * -edy) > 0;
+        if (enemyAimingAtAsh || enemyMovingToAsh || dist <= bRadius + 30) {
+          const enemyAngle = Math.atan2(edy, edx);
+          this.barrierAngle = enemyAngle;
+          this.barrierActiveTimer = Math.max(this.barrierActiveTimer || 0, 10);
+          return;
+        }
+      }
+    }
   }
 
   drawBody(ctx) {

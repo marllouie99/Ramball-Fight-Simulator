@@ -9218,6 +9218,8 @@ async function runInteractionTests() {
 
     const ash = new AshClass(100, 250, 0);
     const cj = new CJClass(250, 250, 1);
+    ash.x = 100; ash.y = 250; ash.teamId = 0;
+    cj.x = 250; cj.y = 250; cj.teamId = 1;
     state.fighters = [ash, cj];
 
     // Verify Pokemon skills configuration schema in ashConfig
@@ -9247,13 +9249,16 @@ async function runInteractionTests() {
     }
     assert(pika.thunderboltState === 'active', `Expected thunderboltState 'active', got ${pika.thunderboltState}`);
     assert(pika.thunderboltTimer === 58, `Expected beam duration 58, got ${pika.thunderboltTimer}`);
+    const pikaXBefore = pika.x;
+    const pikaYBefore = pika.y;
 
-    // 3. Advance through active beam: verify multi-tick damage and ongoing stasis
+    // 3. Advance through active beam: verify multi-tick damage, ongoing stasis & zero recoil drift
     const initialCjHp = cj.hp;
     for (let f = 0; f < 30; f++) {
       pika.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
     }
     assert(cj.hp < initialCjHp, `CJ must take damage from continuous Thunderbolt beam! (Before: ${initialCjHp}, After: ${cj.hp})`);
+    assert(pika.x === pikaXBefore && pika.y === pikaYBefore, `Pikachu must remain stationary with zero backward recoil drift (Before: ${pikaXBefore}, After: ${pika.x})`);
     assert(cj.electricStunTimer > 0, 'CJ must be afflicted with electricStunTimer during Thunderbolt beam');
     assert(cj.isParalyzed === true, 'CJ must be in paralyzed stasis during Thunderbolt beam');
 
@@ -9264,6 +9269,31 @@ async function runInteractionTests() {
     assert(pika.thunderboltState === 'recovery', `Expected thunderboltState 'recovery', got ${pika.thunderboltState}`);
     assert(cj.electricStunTimer >= 40, `CJ must retain >= 40 frames of electric stun aftermath, got ${cj.electricStunTimer}`);
     assert(cj.paralyzeTimer >= 40, `CJ must retain >= 40 frames of paralyze stasis, got ${cj.paralyzeTimer}`);
+
+    // Advance through recovery to finish Thunderbolt and verify configured Cooldown is strictly enforced
+    while (pika.thunderboltState === 'recovery') {
+      pika.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
+    }
+    assert(pika.thunderboltState === null, 'thunderboltState must be null after recovery completes');
+    assert(pika.specialCooldownMax === pikaConfig.skills.special.cooldown, `Pikachu specialCooldownMax must match config cooldown (${pikaConfig.skills.special.cooldown}), got ${pika.specialCooldownMax}`);
+    assert(pika.specialCooldown === pika.specialCooldownMax, `Pikachu specialCooldown must be reset to specialCooldownMax (${pika.specialCooldownMax}), got ${pika.specialCooldown}`);
+
+    // Advance 50 frames and verify cooldown decrements naturally without early re-trigger
+    for (let f = 0; f < 50; f++) {
+      pika.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
+      ash.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
+    }
+    assert(pika.specialCooldown === pika.specialCooldownMax - 50, `Pikachu specialCooldown must decrement to ${pika.specialCooldownMax - 50}, got ${pika.specialCooldown}`);
+    assert(pika.thunderboltState === null, 'Pikachu must NOT re-trigger Thunderbolt while specialCooldown is active');
+
+    // 4b. Verify Ash Trainer Command strictly respects Pikachu's specialCooldown (Zero spamming)
+    assert(ash.commandCooldown === pika.specialCooldown, `Ash commandCooldown (${ash.commandCooldown}) must sync with Pikachu specialCooldown (${pika.specialCooldown})`);
+    ash.commandCooldown = 0; // Force Ash command timer to 0
+    ash._executeTrainerCommand(cj);
+    assert(pika.thunderboltState === null, 'Ash must NOT trigger Trainer Command while Pikachu specialCooldown is active');
+    ash.commandCooldown = 0;
+    ash.update(cj, 0, { x: 45, y: 240, width: 450, height: 450 });
+    assert(pika.thunderboltState === null, 'Ash update() must NOT trigger Trainer Command while Pikachu specialCooldown is active');
 
     // 5. Verify 12-Frame Golden Static Electric Shock Sprite renders with 100% Canvas 2D stack balance
     const { drawElectricStunEffect } = await import('../js/graphics/statusEffects.js');
@@ -9298,7 +9328,39 @@ async function runInteractionTests() {
     drawPokemonCompanion(mockCtx, pika);
     assert(mockCtx.getStackDepth() === 0, 'drawPokemonCompanion must maintain 100% balanced Canvas 2D stack depth during active Thunderbolt');
 
-    console.log('      ✅ Pikachu Thunderbolt Callout Sequence ("PIKA..." -> "...CHUUUUUU!"), 12-Frame Thunderbolt & Impact Sprites, Stun Aftermath & Electric Shock Sprite verified successfully.');
+    // 7. Verify Arena Clamping when Thunderbolt Misses (Zero Arena Boundary Clipping)
+    pika.thunderboltTarget = null;
+    pika.x = 250;
+    pika.y = 250;
+    pika.thunderboltCastAngle = 0; // firing right toward arena maxX = 45 + 450 - 12 = 483
+    pika.thunderboltState = 'active';
+    pika.thunderboltTimer = 20;
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+    pika.update(null, 0, testArena);
+    assert(pika.thunderboltCurrentBeamLen !== null && pika.thunderboltCurrentBeamLen <= (483 - 250 + 10), `Thunderbolt beam must clamp to arena wall, got ${pika.thunderboltCurrentBeamLen}`);
+
+    // 8. Verify Directional Honeycomb Barrier (Hidden until attacked, directional arc on incoming threat)
+    const { drawAshHoneycombBarrier } = await import('../js/graphics/weapons/ashPokemonGraphics.js');
+    ash.isProtectedByHoneycombBarrier = true;
+    ash.barrierActiveTimer = 0;
+    ash.barrierHitFlashTimer = 0;
+
+    // Normal state: barrier is hidden (zero draw calls / stack depth preserved)
+    mockCtx.resetStackDepth();
+    drawAshHoneycombBarrier(mockCtx, ash);
+    assert(mockCtx.getStackDepth() === 0, 'drawAshHoneycombBarrier must maintain 0 stack depth while hidden');
+
+    // Attack interception: barrier activates facing the attacker
+    ash.takeDamage(20, cj, { angle: 0 });
+    assert(ash.barrierActiveTimer > 0, `barrierActiveTimer must be > 0 when attacked, got ${ash.barrierActiveTimer}`);
+    assert(ash.barrierAngle === 0, `barrierAngle must be oriented toward attack angle 0, got ${ash.barrierAngle}`);
+
+    // Verify directional barrier rendering with balanced Canvas 2D stack depth
+    mockCtx.resetStackDepth();
+    drawAshHoneycombBarrier(mockCtx, ash);
+    assert(mockCtx.getStackDepth() === 0, 'drawAshHoneycombBarrier must maintain 100% balanced Canvas 2D stack depth when active');
+
+    console.log('      ✅ Pikachu Thunderbolt Callout Sequence, 12-Frame Sprites, Arena Wall Clamping & Directional Honeycomb Barrier verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');
