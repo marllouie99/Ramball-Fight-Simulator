@@ -34,6 +34,9 @@ export const zeusBossConfig = {
   profileOffsetX: 0,               // Centered horizontally in the HUD profile badge
   profileOffsetY: 0,               // Centered vertically in the HUD profile badge
 
+  // ── Character Model & Hands ──
+  handScale: 0.75,                 // Decreased hand size multiplier (5.6px radius, matching canonical anime fist proportions)
+
   // ── Critical Strike Mechanics & Scaling ──
   enableThunderCrit: true,         // Master toggle for Thunder Strike Critical mechanic
   thunderCritChance: 0.25,         // Base critical hit chance on thunder strikes (25%)

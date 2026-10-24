@@ -1840,8 +1840,26 @@ export function getFighterById(id) {
 }
 
 /** Helper function to scale hand radius globally */
-export function getHandSize(baseSize = 6) {
-  return baseSize * (CONFIG.globalFighter?.handSizeMultiplier ?? 1.0);
+export function getHandSize(baseSize = 6, fighter = null) {
+  let scale = CONFIG.globalFighter?.handSizeMultiplier ?? 1.0;
+  if (fighter) {
+    const charId = typeof fighter === 'string' ? fighter : (fighter.characterId || fighter.type || fighter.key);
+    const globalCustom = (typeof state !== 'undefined' && state?.skinCustomizations?.[charId])
+      ? state.skinCustomizations[charId]
+      : (typeof window !== 'undefined' && window.state?.skinCustomizations?.[charId])
+        ? window.state.skinCustomizations[charId]
+        : null;
+    if (globalCustom && typeof globalCustom.handScale === 'number') {
+      scale *= globalCustom.handScale;
+    } else if (typeof fighter.handScale === 'number') {
+      scale *= fighter.handScale;
+    } else if (typeof fighter._def?.handScale === 'number') {
+      scale *= fighter._def.handScale;
+    } else if (charId && typeof CONFIG?.[charId]?.handScale === 'number') {
+      scale *= CONFIG[charId].handScale;
+    }
+  }
+  return baseSize * scale;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

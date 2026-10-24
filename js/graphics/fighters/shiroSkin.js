@@ -421,7 +421,9 @@ export function drawShiroSkin(ctx, fighter) {
   // 4. Symmetrical Lower-Flank Hands (Layer 3 - Rule 20)
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   if (!shouldHideHands) {
-    const handR = getHandSize(r * 0.30);
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.shiro) || {};
+    const handScale = custom.handScale ?? (fighter && fighter.handScale) ?? 1.0;
+    const handR = getHandSize(r * 0.30 * handScale);
     const handLeftX = -r * 0.82;
     const handRightX = r * 0.82;
     const handY = r * 0.38;

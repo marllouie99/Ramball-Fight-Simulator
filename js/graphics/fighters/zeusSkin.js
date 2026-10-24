@@ -10,7 +10,8 @@
 // - Rule 20 (Fighter Hand Visibility & Skin Only Guard)
 // ─────────────────────────────────────────────
 
-import { getHandSize } from '../../core/config.js';
+import { getHandSize, CONFIG } from '../../core/config.js';
+import { zeusConfig } from '../../configs/characters/zeusConfig.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
@@ -464,7 +465,10 @@ export function drawZeusSkin(ctx, fighter) {
   // LAYER 4: CANONICAL DEFAULT HANDS (Rule 20)
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   if (!shouldHideHands) {
-    const handRadius = getHandSize(r * 0.30);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.zeus) || {};
+    const handScale = custom.handScale ?? (fighter && (fighter.handScale ?? fighter._def?.handScale)) ?? cfg?.handScale ?? 0.75;
+    const handRadius = getHandSize(r * 0.30 * handScale);
     const skinTone = isStorm ? '#BAE6FD' : '#F3BF9F';
 
     // Left Hand (Off-hand): Always at (-r * 0.82, +r * 0.38)

@@ -133,7 +133,9 @@ function _drawMakiMuscularArm(ctx, shoulderX, shoulderY, handX, handY, handRadiu
  * - Hit 3: Two-Handed Armor-Piercing Jet Thrust (Linear forward thrust & radial spatial soul rupture)
  */
 export function drawMakiWeapons(ctx, fighter, r, facingLeft = false) {
-  const handRadius = getHandSize(r * 0.30);
+  const custom = (typeof state !== 'undefined' && state.skinCustomizations?.maki) || {};
+  const handScale = custom.handScale ?? (fighter && fighter.handScale) ?? 1.0;
+  const handRadius = getHandSize(r * 0.30 * handScale);
   let leftX = -r * 0.82;
   let leftY = r * 0.38;
   const rightX = r * 0.82;

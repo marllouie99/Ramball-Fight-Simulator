@@ -26,7 +26,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   gunslinger: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   crazydave: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   megumin: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
-  zeus: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -11, angleOffset: 0, flipX: false, flipY: false },
+  zeus: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -11, angleOffset: 0, flipX: false, flipY: false, handScale: 0.75 },
   tanjiro: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   zenitsu: { widthScale: 0.92, heightScale: 0.90, offsetX: -1, offsetY: 5, angleOffset: -0.0698, flipX: false, flipY: false },
   nezuko: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
@@ -72,7 +72,8 @@ export const DEFAULT_SKIN_CUSTOMIZATIONS = SKIN_CUSTOMIZATIONS_DATABASE;
 
 export function getDatabaseDefault(key) {
   if (SKIN_CUSTOMIZATIONS_DATABASE[key]) return { ...SKIN_CUSTOMIZATIONS_DATABASE[key] };
-  return { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false };
+  const baseHandScale = (typeof CONFIG !== 'undefined' && CONFIG[key]?.handScale) ? CONFIG[key].handScale : (key === 'zeus' ? 0.75 : 1.0);
+  return { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false, handScale: baseHandScale };
 }
 
 export function getAllDatabaseDefaults() {
@@ -108,9 +109,10 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {\n`;
     if (entry.flipX !== undefined) pairs.push(`flipX: ${Boolean(entry.flipX)}`);
     if (entry.flipY !== undefined) pairs.push(`flipY: ${Boolean(entry.flipY)}`);
     if (entry.gap !== undefined) pairs.push(`gap: ${entry.gap}`);
+    if (entry.handScale !== undefined) pairs.push(`handScale: ${Number(entry.handScale).toFixed(2)}`);
 
     for (const prop of Object.keys(entry)) {
-      if (!['widthScale', 'heightScale', 'offsetX', 'offsetY', 'angleOffset', 'flipX', 'flipY', 'gap'].includes(prop)) {
+      if (!['widthScale', 'heightScale', 'offsetX', 'offsetY', 'angleOffset', 'flipX', 'flipY', 'gap', 'handScale'].includes(prop)) {
         pairs.push(`${prop}: ${JSON.stringify(entry[prop])}`);
       }
     }

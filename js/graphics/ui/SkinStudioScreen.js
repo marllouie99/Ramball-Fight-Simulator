@@ -1121,6 +1121,7 @@ function generateJsCode(fDef, custom) {
            `const drawX = -626.5 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 209 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   } else if (fDef.key === 'zeus') {
+    const handScaleLine = custom.handScale !== undefined ? `\n// Hand Scale: ${custom.handScale.toFixed(2)}x` : '';
     return `// Calibrated Hair for Zeus (Assets/model/zeus/Zeus-hair.png)\n` +
            `const targetHairWidth = r * ${targetW};\n` +
            `const targetHairHeight = r * ${targetH};\n` +
@@ -1129,7 +1130,8 @@ function generateJsCode(fDef, custom) {
            `const drawW = 1254 * scaleX;\n` +
            `const drawH = 1254 * scaleY;\n` +
            `const drawX = -638 * scaleX${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
-           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 31 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
+           `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)} - 31 * scaleY${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};` +
+           handScaleLine;
   } else if (fDef.key === 'nameless_deity') {
     const part = state.studioSkinNamelessPart || 'overall';
     const activeKey = (part !== 'overall') ? `nameless_deity_${part}` : 'nameless_deity';
@@ -1168,12 +1170,16 @@ function generateJsCode(fDef, custom) {
            `const drawX = -targetHairWidth / 2${offX !== 0 ? (offX > 0 ? ` + ${offX}` : ` - ${Math.abs(offX)}`) : ''};\n` +
            `const drawY = -r * ${Math.abs(Number(crownY)).toFixed(2)}${offY !== 0 ? (offY > 0 ? ` + ${offY}` : ` - ${Math.abs(offY)}`) : ''};`;
   }
+  let extra = '';
+  if (custom.handScale !== undefined) {
+    extra += `,\nhandScale: ${custom.handScale.toFixed(2)}`;
+  }
   return `// Skin Customization Parameters\n` +
          `widthScale: ${wMult},\n` +
          `heightScale: ${hMult},\n` +
          `offsetX: ${offX},\n` +
          `offsetY: ${offY},\n` +
-         `angleOffset: ${rot}`;
+         `angleOffset: ${rot}${extra}`;
 }
 
 /**
@@ -1253,6 +1259,10 @@ export function validateAndMergeSkinPresets(importedObj) {
 
     if (typeof val.gap === 'number' && isFinite(val.gap)) {
       sanitized.gap = Math.round(val.gap);
+    }
+
+    if (typeof val.handScale === 'number' && isFinite(val.handScale)) {
+      sanitized.handScale = Number(val.handScale.toFixed(2));
     }
 
     state.skinCustomizations[key] = {
@@ -1508,6 +1518,7 @@ export function drawSkinStudioScreen() {
     color: themeColor,
     hideFrontHand: true,
     hideBackHand: true,
+    handScale: custom.handScale ?? (fDef.key === 'zeus' ? 0.75 : (CONFIG?.[fDef.key]?.handScale ?? 1.0)),
     isShikai: state.studioSkinForm === 'shikai',
     isBankai: state.studioSkinForm === 'bankai' || state.studioSkinForm === 'mask',
     isHybridModeActive: state.studioSkinForm === 'bomb',
@@ -2189,7 +2200,7 @@ export function drawSkinStudioScreen() {
   ctx.textBaseline = 'top';
 
   const tabs = [
-    { id: 'scale', label: '1. HAIR SCALE / SIZE', desc: 'Width & Height multipliers' },
+    { id: 'scale', label: '1. HAIR & HAND SCALE', desc: 'Hair W/H & Hand Size multipliers' },
     { id: 'position', label: '2. POSITION & SHIFT', desc: 'X/Y & Crown elevation offsets' },
     { id: 'rotation', label: '3. ROTATION & FLIP', desc: 'Tilt, angle & horizontal/vertical flip' },
     { id: 'export', label: '4. CODE & BULK PRESETS', desc: 'Export JS & Bulk JSON Presets' },
@@ -2412,6 +2423,47 @@ export function drawSkinStudioScreen() {
     }, 18, btnSize, null, 2);
     curY += 46;
 
+    // ── HAND SCALE ROW ──
+    if ((!isNamelessDeity && !isAvatarOfEmptiness) || activePartId === 'overall' || activePartId === 'hand') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(18, 22, 32, 0.92)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+      ctx.lineWidth = 1;
+      drawChamferedRect(ctx, rowX, curY, rowW, rowH, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      const charDefHandScale = (fDef.key === 'zeus' ? 0.75 : (CONFIG?.[fDef.key]?.handScale ?? 1.0));
+      const activeHandScale = custom.handScale ?? charDefHandScale;
+      const baseHandRadius = baseRadius * 0.30;
+      const curHandR = (baseHandRadius * activeHandScale).toFixed(1);
+
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 10.5px "Rajdhani", sans-serif';
+      ctx.fillText(`HANDS: ${activeHandScale.toFixed(2)}x (${curHandR}px)`, rowX + 8, curY + rowH / 2);
+
+      drawButton('−−', rowX + rowW - 74, curY + rowH / 2, () => {
+        custom.handScale = Math.max(0.30, Number((activeHandScale - 0.10).toFixed(2)));
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('−', rowX + rowW - 52, curY + rowH / 2, () => {
+        custom.handScale = Math.max(0.30, Number((activeHandScale - 0.02).toFixed(2)));
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('+', rowX + rowW - 30, curY + rowH / 2, () => {
+        custom.handScale = Math.min(2.50, Number((activeHandScale + 0.02).toFixed(2)));
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      drawButton('++', rowX + rowW - 8, curY + rowH / 2, () => {
+        custom.handScale = Math.min(2.50, Number((activeHandScale + 0.10).toFixed(2)));
+        saveSkinCustomizations();
+      }, 18, btnSize, null, 2);
+      curY += 46;
+    }
+
     if (isNamelessDeity && activePartId === 'antlers') {
       // ── ANTLER GAP / SPREAD ROW ──
       ctx.save();
@@ -2454,9 +2506,14 @@ export function drawSkinStudioScreen() {
       const def = getFighterDefaultCustom(activeCustomKey);
       custom.widthScale = def.widthScale ?? 1.0;
       custom.heightScale = def.heightScale ?? 1.0;
+      if (def.handScale !== undefined) {
+        custom.handScale = def.handScale;
+      } else if (custom.handScale !== undefined) {
+        delete custom.handScale;
+      }
       if (custom.gap !== undefined) custom.gap = def.gap ?? 0;
       saveSkinCustomizations();
-      _copyToastText = `✓ RESET SCALE TO DEFAULT (${custom.widthScale}x, ${custom.heightScale}x)!`;
+      _copyToastText = `✓ RESET SCALE TO DEFAULT!`;
       _copyToastTimer = 90;
     }, halfW, 22, null, 3);
 

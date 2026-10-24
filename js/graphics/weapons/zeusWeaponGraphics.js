@@ -1,5 +1,6 @@
 import { state } from '../../core/state.js';
-import { getHandSize } from '../../core/config.js';
+import { getHandSize, CONFIG } from '../../core/config.js';
+import { zeusConfig } from '../../configs/characters/zeusConfig.js';
 import { drawZeusHand } from '../fighters/zeusSkin.js';
 
 
@@ -275,9 +276,12 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
   // ═══════════════════════════════════════════════
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly);
   if (!shouldHideHands) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    const custom = (typeof state !== 'undefined' && state.skinCustomizations?.zeus) || {};
+    const handScale = custom.handScale ?? cfg?.handScale ?? 0.75;
     const isStorm = Boolean(isChannelingStorm || chargeProgress >= 1.0);
     const armAngle = Math.atan2(-holdDistY, -holdDistX) - (-Math.PI / 4 + weaponAngle);
-    const handRadius = getHandSize(r * 0.30);
+    const handRadius = getHandSize(r * 0.30 * handScale);
     const skinTone = isStorm ? '#BAE6FD' : '#F3BF9F';
     drawZeusHand(ctx, 0, 0, handRadius, skinTone, isStorm, armAngle + Math.PI / 2);
   }

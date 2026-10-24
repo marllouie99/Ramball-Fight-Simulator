@@ -8676,7 +8676,20 @@ async function runInteractionTests() {
     const normalRes = zeusInstance.evaluateThunderCrit(20, { hasStatic: false });
     assert(normalRes.critChance === 0.25, `Expected baseCritChance=0.25, got: ${normalRes.critChance}`);
 
-    console.log('      ✅ Zeus 12-frame thunderstrike animation, critical strike mechanics, coordinator integration & 100% balanced Canvas 2D stack depths verified successfully.');
+    // 6. Test Zeus Hand Scale Reduction (0.75x)
+    const { zeusConfig } = await import('../js/configs/characters/zeusConfig.js');
+    const { zeusBossConfig } = await import('../js/configs/bosses/zeusBossConfig.js');
+    assert(zeusConfig.handScale === 0.75, `Expected zeusConfig.handScale=0.75, got: ${zeusConfig.handScale}`);
+    assert(zeusBossConfig.handScale === 0.75, `Expected zeusBossConfig.handScale=0.75, got: ${zeusBossConfig.handScale}`);
+    const { drawZeusSkin } = await import('../js/graphics/fighters/zeusSkin.js');
+    const { drawZeusWeapon } = await import('../js/graphics/weapons/zeusWeaponGraphics.js');
+    mockCtx.resetStackDepth();
+    drawZeusSkin(mockCtx, zeusInstance);
+    assert(mockCtx.getStackDepth() === 0, 'drawZeusSkin must keep Canvas 2D transform stack depth balanced');
+    drawZeusWeapon(mockCtx, zeusInstance.x, zeusInstance.y, zeusInstance.gunAngle, zeusInstance.r, 0, 1.0, '#00BFFF', false, 0);
+    assert(mockCtx.getStackDepth() === 0, 'drawZeusWeapon must keep Canvas 2D transform stack depth balanced');
+
+    console.log('      ✅ Zeus 12-frame thunderstrike animation, critical strike mechanics, coordinator integration, 0.75x hand scale & 100% balanced Canvas 2D stack depths verified successfully.');
   }
 
   // ── TEST 84: Knight 5-Phase Melee Combat, Hit-Pause Unpause & Anti-Softlock Failsafes ──
@@ -9402,6 +9415,47 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, 'drawAshHoneycombBarrier must maintain 100% balanced Canvas 2D stack depth when active');
 
     console.log('      ✅ Pikachu Thunderbolt Callout Sequence, 12-Frame Sprites, Arena Wall Clamping & Directional Honeycomb Barrier verified successfully.');
+  }
+
+  // =========================================================================
+  // 90. Skin Studio Per-Fighter Hand Scale Customization & Stack Balance
+  // =========================================================================
+  {
+    console.log('   90. Testing Skin Studio Per-Fighter Hand Scale Customization & Stack Balance...');
+    const { getDatabaseDefault, SKIN_CUSTOMIZATIONS_DATABASE } = await import('../js/configs/skinCustomizationsDatabase.js');
+    const { validateAndMergeSkinPresets } = await import('../js/graphics/ui/SkinStudioScreen.js');
+    const { drawZeusSkin } = await import('../js/graphics/fighters/zeusSkin.js');
+    const { getHandSize } = await import('../js/core/config.js');
+    const { state } = await import('../js/core/state.js');
+    const ZeusClass = FIGHTER_CLASS_MAP['zeus'];
+    const zeus = new ZeusClass(200, 200, 0);
+
+    // 1. Verify Zeus default hand scale in database is 0.75
+    const zeusDef = getDatabaseDefault('zeus');
+    assert(zeusDef.handScale === 0.75, `Expected zeus default handScale 0.75, got ${zeusDef.handScale}`);
+
+    // 2. Verify getHandSize scales dynamically with fighter / state.skinCustomizations
+    state.skinCustomizations = state.skinCustomizations || {};
+    state.skinCustomizations.zeus = { ...zeusDef, handScale: 1.20 };
+    const baseR = 25 * 0.30; // 7.5
+    const scaledR = getHandSize(baseR, zeus);
+    const expectedR = baseR * (CONFIG.globalFighter?.handSizeMultiplier ?? 1.0) * 1.20;
+    assert(Math.abs(scaledR - expectedR) < 0.001, `getHandSize must scale to ${expectedR}, got ${scaledR}`);
+
+    // 3. Verify validateAndMergeSkinPresets sanitizes and saves handScale
+    validateAndMergeSkinPresets({
+      zeus: { handScale: 0.85 }
+    });
+    assert(state.skinCustomizations.zeus.handScale === 0.85, `Expected sanitized handScale 0.85, got ${state.skinCustomizations.zeus.handScale}`);
+
+    // 4. Verify rendering with custom handScale preserves 100% Canvas 2D stack balance
+    mockCtx.resetStackDepth();
+    drawZeusSkin(mockCtx, zeus);
+    assert(mockCtx.getStackDepth() === 0, 'drawZeusSkin must maintain 0 stack depth with custom hand scale');
+
+    // 5. Restore default
+    state.skinCustomizations.zeus.handScale = 0.75;
+    console.log('      ✅ Skin Studio Per-Fighter Hand Scale Customization & Canvas 2D Stack Balance verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');
