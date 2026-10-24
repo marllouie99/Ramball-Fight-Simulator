@@ -58,7 +58,10 @@ When generating, extracting, or formatting a new 12-frame visual animation:
 
 ### 2.2 Image Dimensions & Alpha Standards
 - **Uniform Square Resolution**: Each individual frame cell MUST be a square power-of-two or clean grid (canonical baseline: $256 \times 256\text{px}$).
-- **100% Alpha Cleanliness**: Background MUST be 100% transparent RGBA (`png`). Zero dither artifacts, zero window frame borders, and zero background halos.
+- **100% Alpha Cleanliness & Zero-Cropping Standard (Rule 31)**:
+  - Background MUST be 100% transparent RGBA (`png`). Zero dither artifacts, zero window frame borders, and zero background halos.
+  - **MANDATORY ANTI-RECTANGULAR CLIPPING RULE**: Visual elements MUST NEVER touch the frame boundary (`y = 0`, `y = height - 1`, `x = 0`). Maintain at least 15–30px of pure transparent padding so effects never render with ugly, razor-sharp rectangular box edges.
+  - For directional travel beams, only the forward-extending edge may meet the travel border; non-travel borders must remain 100% transparent.
 - **Pixel Art Fidelity**: Maintain nearest-neighbor pixel aesthetics (`ctx.imageSmoothingEnabled = false;`). Never apply blur filters to pixel art frames.
 
 ### 2.3 Centering & Anchor Calibration

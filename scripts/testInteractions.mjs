@@ -5092,6 +5092,49 @@ async function runInteractionTests() {
     assert(saitama.y !== 100, 'Saitama must have dodged away from y=100 during Deity beam update tick');
     assert(sans.hp === 1, 'Sans must NOT take damage on dodged beam tick');
 
+    // Test multi-tick re-dodge for Sans and Saitama
+    // Tick 1: Entities are outside beam -> deity removes them from _dodgedBeamEntities
+    deity.update(sans, 0, state.arena);
+    assert(deity._dodgedBeamEntities.has(sans) === false, 'Sans outside beam must be removed from _dodgedBeamEntities');
+    assert(deity._dodgedBeamEntities.has(saitama) === false, 'Saitama outside beam must be removed from _dodgedBeamEntities');
+
+    // Tick 2: Both fighters step back into beam stream with cooldown ready
+    sans.x = 300;
+    sans.y = 100;
+    sans.dodgeCooldown = 0;
+    sans.stamina = 100;
+    saitama.x = 350;
+    saitama.y = 100;
+    saitama.dodgeCooldown = 0;
+
+    deity.update(sans, 0, state.arena);
+    assert(sans.y !== 100 || sans.x < deity.x - sans.r, 'Sans must dodge again when re-entering beam stream');
+    assert(saitama.y !== 100 || saitama.x < deity.x - saitama.r, 'Saitama must dodge again when re-entering beam stream');
+    assert(sans.isCaughtInNamelessBeam !== true, 'Sans must NOT be caught in beam stasis on re-dodge');
+    assert(saitama.isCaughtInNamelessBeam !== true, 'Saitama must NOT be caught in beam stasis on re-dodge');
+
+    // Test future / generic teleport fighter dodging Deity's beam
+    const { Fighter } = await import('../js/entities/fighter.js');
+    const futureFighter = new Fighter({ radius: 25, x: 280, y: 100 });
+    futureFighter.teleportDodgeChance = 1.0;
+    futureFighter.dodgeCooldown = 0;
+    state.fighters.push(futureFighter);
+
+    const futureDidDodge = futureFighter.dodgeBeam(sansBeamData);
+    assert(futureDidDodge === true, 'Future / generic fighter with teleportDodgeChance must dodge Deity beam');
+    const futurePerpDist = Math.abs(futureFighter.y - deity.y);
+    const futureProjLen = futureFighter.x - deity.x;
+    const isSafelyOutside = futurePerpDist >= 142.5 || futureProjLen < -futureFighter.r;
+    assert(isSafelyOutside === true, 'Future fighter must be placed safely outside the beam aperture or behind caster');
+
+    // Test multi-tick re-dodge for future / generic fighter
+    futureFighter.x = 320;
+    futureFighter.y = 100; // Put back into beam
+    futureFighter.dodgeCooldown = 0;
+    deity.update(futureFighter, 0, state.arena);
+    assert(futureFighter.y !== 100 || futureFighter.x < deity.x - futureFighter.r, 'Future fighter must successfully dodge again on subsequent beam tick');
+    assert(futureFighter.isCaughtInNamelessBeam !== true, 'Future fighter must not be caught in nameless beam stasis');
+
     // 9. Hollow Purple & Yuta Pure Love Beam Evasion for Saitama and Sans
     const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
     const { YutaPureLoveBeamBehavior } = await import('../js/systems/projectiles/behaviors/YutaPureLoveBeamBehavior.js');

@@ -39,8 +39,8 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
       ];
 
       // Calculate line segment for collision
-      const beamLength = p.length || 2500;
-      const beamRadius = p.r || 120;
+      const beamLength = p.length || CONFIG.yuta?.pureLoveBeamLength || 2500;
+      const beamRadius = p.r || CONFIG.yuta?.pureLoveBeamWidth || 200;
       const startX = ownerFighter.x - Math.cos(p.angle) * 60;
       const startY = ownerFighter.y - Math.sin(p.angle) * 60;
       const endX = ownerFighter.x + Math.cos(p.angle) * beamLength;

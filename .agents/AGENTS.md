@@ -240,6 +240,27 @@ After completing ANY code modification, update, or fix in the project, the agent
 
 ---
 
+### 2.13 Mandatory Uncropped Visual Effects & Anti-Rectangular Clipping Standard (Rule 31)
+Whenever Uncropped Visual Effects & Anti-Rectangular Clipping Standard (Rule 31 — Anti-Box & Feathered Boundary Standard)
+
+Whenever creating, extracting, formatting, or rendering visual effects, sprite animations, beams, bursts, auras, shockwaves, portals, or projectile graphics:
+- **STRICT PROHIBITION of Rectangular Bounding Box Clipping ("The Box Artifact")**:
+  - Visual effects MUST NEVER be clipped or truncated by the boundaries of their sprite frame or draw calls.
+  - NEVER crop sprite frames tightly into expanding or organic visual elements where non-zero alpha pixels touch the top (`y = 0`), bottom (`y = height - 1`), or origin edges (`x = 0`). Doing so causes the sprite to render with amateurish, razor-sharp flat rectangular cutoffs that destroy combat immersion.
+- **Mandatory Generous Transparent Padding on Sprites**:
+  - When extracting or generating animation frames and sprite sequences (e.g. 12-frame animations, bursts, explosions, charging orbs):
+    - All non-continuous borders MUST maintain generous 100% transparent alpha margins (minimum 15–30px of `alpha = 0` padding) around all visual elements.
+    - Top row (`y = 0`), bottom row (`y = height - 1`), and non-travel origin borders MUST have `max(alpha) === 0`.
+    - For directional linear beams, ONLY the forward travel edge (extending down the length) is permitted to meet the right border; the origin/back edge, top flank, and bottom flank MUST remain 100% transparent.
+- **Prohibition of Flat `fillRect` Aura Cuts**:
+  - Renderers MUST NEVER use `ctx.fillRect()` with hard perpendicular start lines (e.g. `ctx.fillRect(0, -auraH, length, auraH * 2)`) to render atmospheric energy auras or beam glows. When rotated, a `fillRect` starting at `x = 0` renders a sharp diagonal cut across the screen.
+  - Atmospheric auras and energy washes MUST use smooth rounded caps at the origin (e.g. `ctx.arc(0, 0, auraH, Math.PI / 2, -Math.PI / 2, false)`) combined with a soft 360° radial gradient bloom (`ctx.createRadialGradient(0, 0, 0, 0, 0, auraH * 1.15)`), guaranteeing organic, soft, non-linear dissipation around the fighter's body.
+- **Calibrated Centroid Anchor for Origin Portals**:
+  - When drawing origin portals, muzzle accelerator rings, or charging spheres at a fighter's hands `(0, 0)`, the draw origin MUST be anchored to the true visual centroid of the orb/swirl (`portalOriginX = orbCentroidX * scale`, `portalOriginY = portalDrawH / 2`), ensuring the circular geometry blooms symmetrically from the hands without flat rectangular clipping.
+
+
+---
+
 ## 3. Upright Faceless Pixel Art & Character Model Standards
 
 ### 3.1 Upright Front POV Orientation (Rule 19)

@@ -283,6 +283,7 @@ export class SkillManager {
 
     // Dodge cooldowns and passive reflexes must ALWAYS tick down even while time-stopped
     if (this.fighter.dodgeCooldown > 0) this.fighter.dodgeCooldown--;
+    if (this.fighter.dodgeStallTimer > 0) this.fighter.dodgeStallTimer--;
 
     const isParalyzed = Boolean(typeof this.fighter.isParalyzedDebuffActive === 'function' && this.fighter.isParalyzedDebuffActive());
     const isSilenced = Boolean(this.fighter.silenceTimer && this.fighter.silenceTimer > 0);

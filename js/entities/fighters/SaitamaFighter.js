@@ -1079,25 +1079,35 @@ export class SaitamaFighter extends Fighter {
     this._lastDodgeSideLeft = !this._lastDodgeSideLeft;
     let sideSign = cross !== 0 ? (cross > 0 ? 1 : -1) : (this._lastDodgeSideLeft ? 1 : -1);
 
-    const beamHalfWidth = beamData.beamHalfWidth || 142.5;
-    const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 110), beamHalfWidth + this.r + 40);
+    const safePos = (typeof this.findSafeBeamDodgePosition === 'function')
+      ? this.findSafeBeamDodgePosition(beamData, arena)
+      : null;
 
-    let targetX = this.x + nx * sideSign * jumpDist;
-    let targetY = this.y + ny * sideSign * jumpDist;
+    let targetX, targetY;
+    if (safePos) {
+      targetX = safePos.x;
+      targetY = safePos.y;
+    } else {
+      const beamHalfWidth = beamData.beamHalfWidth || 142.5;
+      const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 110), beamHalfWidth + this.r + 40);
 
-    if (arena) {
-      const minX = arena.x + this.r + 15;
-      const maxX = arena.x + arena.width - this.r - 15;
-      const minY = arena.y + this.r + 15;
-      const maxY = arena.y + arena.height - this.r - 15;
+      targetX = this.x + nx * sideSign * jumpDist;
+      targetY = this.y + ny * sideSign * jumpDist;
 
-      if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
-        targetX = this.x - nx * sideSign * jumpDist;
-        targetY = this.y - ny * sideSign * jumpDist;
+      if (arena) {
+        const minX = arena.x + this.r + 15;
+        const maxX = arena.x + arena.width - this.r - 15;
+        const minY = arena.y + this.r + 15;
+        const maxY = arena.y + arena.height - this.r - 15;
+
+        if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
+          targetX = this.x - nx * sideSign * jumpDist;
+          targetY = this.y - ny * sideSign * jumpDist;
+        }
+
+        targetX = Math.max(minX, Math.min(maxX, targetX));
+        targetY = Math.max(minY, Math.min(maxY, targetY));
       }
-
-      targetX = Math.max(minX, Math.min(maxX, targetX));
-      targetY = Math.max(minY, Math.min(maxY, targetY));
     }
 
     // Spawn afterimages
@@ -1105,6 +1115,9 @@ export class SaitamaFighter extends Fighter {
 
     this.x = targetX;
     this.y = targetY;
+    this.vx = 0;
+    this.vy = 0;
+    this.dodgeStallTimer = (cfg.dodgeStallDuration !== undefined) ? cfg.dodgeStallDuration : 8;
 
     // Clear any hitstun, paralyze, beam trap state
     this.hitStunTimer = 0;

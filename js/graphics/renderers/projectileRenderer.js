@@ -24,6 +24,7 @@ import { drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet } from '../weapons/
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawPixelFlameProjectile } from '../weapons/flamewardenWeaponGraphics.js';
 import { drawServantOfCthulhuProjectile } from '../fighters/eyeOfCthulhuSkin.js';
+import { drawYutaPureLoveBeam } from '../weapons/yutaLoveBeamGraphics.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
@@ -717,153 +718,9 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
 
-    // --- Yuta's Pure Love Beam (Pixel Art Mega-Beam) ---
+    // --- Yuta's Pure Love Beam (12-Frame Animated Celestial Mega-Beam) ---
     if (p.visual === 'yuta_pure_love_beam') {
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.angle);
-      
-      const length = p.length || 2500;
-      const radius = p.r || 170;
-      const P = 4.0; // Pixel art unit grid scale for mega energy beam
-      
-      let beamAlpha = 0.85;
-      let sizeScale = 1.0;
-      if (p.life < 30) {
-        beamAlpha = Math.max(0, (p.life / 30) * 0.85);
-        sizeScale = Math.max(0, p.life / 30);
-      }
-      
-      const frameStep20 = Math.floor(Date.now() / 50);
-      const throb = Math.sin(frameStep20 * 0.4) * 16;
-      const currentRadius = (radius + throb) * sizeScale;
-      
-      const startBaseR = currentRadius * 0.25;
-      const endBaseR = currentRadius * 2.7;
-
-      const colStep = P * 2; // 8px per pixel beam column
-
-      // ── 1. STEPPED PIXEL-ART BEAM ENERGY BODY ──
-      ctx.globalAlpha = beamAlpha;
-      for (let x = 0; x <= length; x += colStep) {
-        const prog = x / length;
-        const currentR = startBaseR + (endBaseR - startBaseR) * Math.pow(prog, 0.95);
-        const px = Math.round(x / P) * P;
-        const pw = P * 2;
-
-        // A. Outer Pitch-Black Manga Ink Shell
-        const outH = Math.round((currentR + P * 2) / P) * P;
-        ctx.fillStyle = '#111114';
-        ctx.fillRect(px, -outH, pw, outH * 2);
-
-        // B. Abyssal Violet Energy Band
-        const vioH = Math.round(currentR / P) * P;
-        ctx.fillStyle = '#3A004C';
-        ctx.fillRect(px, -vioH, pw, vioH * 2);
-
-        // C. Hot Magenta Band
-        const magH = Math.round((currentR * 0.8) / P) * P;
-        ctx.fillStyle = '#C7007A';
-        ctx.fillRect(px, -magH, pw, magH * 2);
-
-        // D. Neon Cursed Pink Core
-        const pnkH = Math.round((currentR * 0.52) / P) * P;
-        ctx.fillStyle = '#FF1493';
-        ctx.fillRect(px, -pnkH, pw, pnkH * 2);
-
-        // E. Pure White-Hot Center Spine
-        const whtH = Math.round((currentR * 0.22) / P) * P;
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(px, -whtH, pw, Math.max(P, whtH * 2));
-
-        // Stepped Pixel Energy Shockwave Bands along the beam
-        const bandPhase = ((x - (Date.now() * 0.45)) % 140 + 140) % 140;
-        if (bandPhase < colStep * 2) {
-          const ringH = Math.round((currentR * 1.15) / P) * P;
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(px, -ringH, pw, P);
-          ctx.fillRect(px, ringH - P, pw, P);
-          ctx.fillStyle = 'rgba(255, 20, 147, 0.8)';
-          ctx.fillRect(px, -ringH - P, pw, P);
-          ctx.fillRect(px, ringH, pw, P);
-        }
-      }
-
-      // ── 2. STEPPED PIXEL LIGHTNING CRACKLES & JAGGED ELECTRIC BOLTS ──
-      const pseudoRand = (seed) => {
-        const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
-        return x - Math.floor(x);
-      };
-      const numLightning = 6;
-      for (let i = 0; i < numLightning; i++) {
-        const side = (i % 2 === 0 ? -1 : 1);
-        const ratio = 0.85 + (i % 3) * 0.25;
-        const seed = frameStep20 * 37 + i * 53;
-        ctx.fillStyle = (pseudoRand(seed) > 0.4) ? '#FFFFFF' : '#FF1493';
-
-        const steps = 18;
-        const stepLen = length / steps;
-        for (let s = 0; s < steps; s++) {
-          const prog = s / steps;
-          const currentSpreadY = side * (startBaseR + (endBaseR - startBaseR) * prog) * ratio;
-          const jag = (pseudoRand(seed + s * 17) - 0.5) * (20 + prog * 30);
-          const lx = Math.round((s * stepLen) / P) * P;
-          const ly = Math.round((currentSpreadY + jag) / P) * P;
-          ctx.fillRect(lx, ly, P * 1.5, P * 1.5);
-        }
-      }
-
-      // ── 3. STREAMING SPARK EMBERS SPREADING ALONG BEAM ──
-      const numBeamEmbers = 30;
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      for (let i = 0; i < numBeamEmbers; i++) {
-        const seed = i * 47.11;
-        const emberX = ((frameStep20 * 18 + seed * 100) % length);
-        const spreadFactor = (emberX / length);
-        const maxSpreadY = startBaseR + (endBaseR - startBaseR) * spreadFactor;
-        const emberY = ((pseudoRand(frameStep20 * 13 + i * 29) - 0.5) * maxSpreadY * 1.7);
-        const emberR = 1.5 + (i % 3) * 1.0;
-        ctx.moveTo(emberX + emberR, emberY);
-        ctx.arc(emberX, emberY, emberR, 0, Math.PI * 2);
-      }
-      ctx.fill();
-
-      ctx.fillStyle = 'rgba(255, 105, 180, 0.85)';
-      ctx.beginPath();
-      for (let i = 0; i < 16; i++) {
-        const seed = (i + 31) * 33.7;
-        const emberX = ((frameStep20 * 22 + seed * 80) % length);
-        const spreadFactor = (emberX / length);
-        const maxSpreadY = startBaseR + (endBaseR - startBaseR) * spreadFactor;
-        const emberY = ((pseudoRand(frameStep20 * 17 + i * 43) - 0.5) * maxSpreadY * 1.5);
-        const emberR = 2.0 + (i % 2) * 1.5;
-        ctx.moveTo(emberX + emberR, emberY);
-        ctx.arc(emberX, emberY, emberR, 0, Math.PI * 2);
-      }
-      ctx.fill();
-
-      // ── 4. PIXEL-ART ORIGIN MUZZLE FLARE (Stepped Pixel Diamond Blast at Hand) ──
-      ctx.globalAlpha = 0.90 * beamAlpha;
-      const flareR = Math.round((startBaseR * 2.2) / P) * P;
-      const flareSteps = Math.ceil(flareR / P);
-      for (let gy = -flareSteps; gy <= flareSteps; gy++) {
-        for (let gx = -flareSteps; gx <= flareSteps; gx++) {
-          const manhattan = Math.abs(gx * P) + Math.abs(gy * P);
-          if (manhattan <= flareR) {
-            const fx = Math.round((gx * P) / P) * P;
-            const fy = Math.round((gy * P) / P) * P;
-            let col = '#FFFFFF';
-            if (manhattan > flareR * 0.7) col = '#111114';
-            else if (manhattan > flareR * 0.45) col = '#FF1493';
-            else if (manhattan > flareR * 0.25) col = '#FF69B4';
-            ctx.fillStyle = col;
-            ctx.fillRect(fx, fy, P, P);
-          }
-        }
-      }
-
-      ctx.restore();
+      drawYutaPureLoveBeam(ctx, p);
       return;
     }
 

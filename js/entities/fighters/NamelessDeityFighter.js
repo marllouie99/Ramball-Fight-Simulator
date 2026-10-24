@@ -292,6 +292,9 @@ export class NamelessDeityFighter extends Fighter {
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
     this.destroyerRecoveryTimer = 0;
+    if (this._dodgedBeamEntities) {
+      this._dodgedBeamEntities.clear();
+    }
     this.isRebouncingToCenter = false;
     this.rebounceTimer = 0;
     if (wasChanneling) {
@@ -306,6 +309,9 @@ export class NamelessDeityFighter extends Fighter {
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
     this.destroyerRecoveryTimer = 0;
+    if (this._dodgedBeamEntities) {
+      this._dodgedBeamEntities.clear();
+    }
     this.isRebouncingToCenter = false;
     this.rebounceTimer = 0;
     super.onDeath?.();
@@ -922,6 +928,9 @@ export class NamelessDeityFighter extends Fighter {
       this.knockbackVy = 0;
 
       if (this.destroyerFireTimer === 0) {
+        if (this._dodgedBeamEntities) {
+          this._dodgedBeamEntities.clear();
+        }
         this.destroyerRecoveryTimer = getNamelessSetting(cfg, 'destroyerRecoveryFrames') || 25;
         this.destroyerRecoveryMax = this.destroyerRecoveryTimer;
         this._stopDestroyerLoopSounds(350);
@@ -1058,6 +1067,16 @@ export class NamelessDeityFighter extends Fighter {
               });
               spawnSparks(f.x, f.y, 4, '#00F0FF');
             }
+          } else {
+            // Target is outside the beam width — remove from dodged set so they can dodge again if they re-enter
+            if (this._dodgedBeamEntities && this._dodgedBeamEntities.has(f)) {
+              this._dodgedBeamEntities.delete(f);
+            }
+          }
+        } else {
+          // Target is behind or beyond the beam length — remove from dodged set so they can dodge again if they re-enter
+          if (this._dodgedBeamEntities && this._dodgedBeamEntities.has(f)) {
+            this._dodgedBeamEntities.delete(f);
           }
         }
       }

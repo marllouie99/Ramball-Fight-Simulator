@@ -16,6 +16,7 @@ import { getNextCopiedTechnique, executeCopiedTechnique, executeThinIceBreaker }
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { drawYutaKatana } from '../../graphics/ui/WeaponIndexScreen.js';
+import { drawYutaLoveBeamWindup } from '../../graphics/weapons/yutaLoveBeamGraphics.js';
 
 /**
  * Computes minimum squared distance from point (px, py) to line segment [A, B] and closest projected point.
@@ -2759,33 +2760,20 @@ export class YutaFighter extends Fighter {
         ctx.fillRect(tailX, tailY, P, P);
       }
 
-      // Early Gathering Phase (pVal < 0.25): ONLY pixel embers gather into a small spark core!
-      if (pVal < 0.25 && !isFiring) {
-        const sparkR = Math.max(P, Math.round((pVal * 16) / P) * P);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(Math.round(handX / P) * P - sparkR / 2, Math.round(handY / P) * P - sparkR / 2, sparkR, sparkR);
-        ctx.restore();
-        return;
-      }
-
-      // 20 FPS Quantized Frame Step (50ms interval)
+      // 20 FPS Quantized Frame Step (50ms interval) for dynamic ambient lightning
       const frameStep20 = Math.floor(Date.now() / 50);
       const pseudoRand = (seed) => {
         const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
         return x - Math.floor(x);
       };
 
-      // Stage 2: Concentric Stepped Pixel Orb Formation & Expansion
-      const orbScale = isFiring ? 1.0 : Math.max(0, (pVal - 0.25) / 0.75);
-      const baseRadius = (4 + orbScale * 20) * (0.2 + 0.8 * fadeAlpha);
-      const pulse = Math.sin(frameStep20 * 0.4) * 2 * fadeAlpha;
-      const r = Math.max(1, baseRadius + pulse);
-
       // 1. Snappy Stepped Pixel Lightning Arcs (Randomized non-repetitive 20 FPS electric crackles)
+      const orbScale = isFiring ? 1.0 : pVal;
+      const baseRadius = (8 + orbScale * 26) * (0.2 + 0.8 * fadeAlpha);
       const numLightning = 6;
       for (let i = 0; i < numLightning; i++) {
         const lAngle = (i / numLightning) * Math.PI * 2 + (pseudoRand(frameStep20 * 13 + i * 47) - 0.5) * 0.8;
-        const maxLDist = r * (2.2 + pseudoRand(frameStep20 * 19 + i * 29) * 0.8);
+        const maxLDist = baseRadius * (1.8 + pseudoRand(frameStep20 * 19 + i * 29) * 0.8);
         ctx.fillStyle = (pseudoRand(frameStep20 * 7 + i * 3) > 0.4) ? '#FF007F' : '#FFFFFF';
         
         const steps = 6;
@@ -2798,31 +2786,8 @@ export class YutaFighter extends Fighter {
         }
       }
 
-      // 2. Stepped Pixel Orb Concentric Shells
-      const orbSteps = Math.ceil((r + P * 2) / P);
-      for (let gy = -orbSteps; gy <= orbSteps; gy++) {
-        for (let gx = -orbSteps; gx <= orbSteps; gx++) {
-          const d = Math.hypot(gx * P, gy * P);
-          if (d <= r + P * 1.5) {
-            const px = Math.round((handX + gx * P) / P) * P;
-            const py = Math.round((handY + gy * P) / P) * P;
-
-            let col = '#111114';
-            if (d > r + P * 0.5) {
-              col = '#111114'; // Dark ink pixel outline
-            } else if (d > r * 0.65) {
-              col = '#E6007A'; // Hot magenta pixel shell
-            } else if (d > r * 0.35) {
-              col = '#FF1493'; // Vibrant neon pink core
-            } else {
-              col = '#FFFFFF'; // Pure white-hot center block
-            }
-
-            ctx.fillStyle = col;
-            ctx.fillRect(px, py, P, P);
-          }
-        }
-      }
+      // 2. Authentic 12-Frame Pure Love Beam Windup & Charge Gathering Animation
+      drawYutaLoveBeamWindup(ctx, handX, handY, 0, pVal, 95, 1.0);
 
       ctx.restore();
     }

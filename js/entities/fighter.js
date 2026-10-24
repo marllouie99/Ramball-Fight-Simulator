@@ -931,6 +931,8 @@ export class Fighter {
     this.delayedShockwaves = [];
     this.blackFlashHitsLeft = 0;
     this.blackFlashTimer = 0;
+    this.dodgeCooldown = 0;
+    this.dodgeStallTimer = 0;
 
     // Attached attack visual effects & trails
     if (this.swordTrail) this.swordTrail.length = 0;
@@ -1152,6 +1154,178 @@ export class Fighter {
       (this.caughtInLaylaBeamTimer || 0) > 0 ||
       (this.caughtInNamelessBeamTimer || 0) > 0
     );
+  }
+
+  /**
+   * Calculates a safe arena coordinate outside an incoming continuous beam aperture.
+   * Evaluates perpendicular side jumps with safe margin, and falls back to flanking/behind
+   * the caster if sideways jumps are cramped against arena walls.
+   * @param {Object} beamData - { attacker, startX, startY, angle, beamLength, beamHalfWidth }
+   * @param {Object} [arena] - { x, y, width, height }
+   * @returns {{ x: number, y: number, type: string } | null}
+   */
+  findSafeBeamDodgePosition(beamData = {}, arena = null) {
+    const currentArena = arena || (typeof state !== 'undefined' && state.arena) || (CONFIG.arena || { width: 500, height: 500, x: 50, y: 50 });
+    const attacker = beamData.attacker;
+    const beamAngle = beamData.angle !== undefined ? beamData.angle : (attacker?.gunAngle ?? this.gunAngle ?? 0);
+    const bStartX = beamData.startX !== undefined ? beamData.startX : (attacker?.x ?? this.x);
+    const bStartY = beamData.startY !== undefined ? beamData.startY : (attacker?.y ?? this.y);
+    const beamHalfWidth = beamData.beamHalfWidth || 142.5;
+    const beamLength = beamData.beamLength || 1400;
+    const r = this.r || 25;
+    const padding = r + 15;
+
+    const minX = currentArena.x + padding;
+    const maxX = currentArena.x + currentArena.width - padding;
+    const minY = currentArena.y + padding;
+    const maxY = currentArena.y + currentArena.height - padding;
+
+    const checkBeam = (px, py) => {
+      const dx = px - bStartX;
+      const dy = py - bStartY;
+      const projLen = dx * Math.cos(beamAngle) + dy * Math.sin(beamAngle);
+      const perpDist = Math.abs(-dx * Math.sin(beamAngle) + dy * Math.cos(beamAngle));
+      const isInside = (projLen >= -r * 0.5 && projLen <= beamLength + r) && (perpDist <= beamHalfWidth + r + 5);
+      return { isInside, projLen, perpDist };
+    };
+
+    const attR = attacker?.r || 28;
+    const behindDist = attR + r + 35;
+    const flankDist = attR + r + 45;
+    const nx = -Math.sin(beamAngle);
+    const ny = Math.cos(beamAngle);
+    const sideDist = beamHalfWidth + r + 40;
+
+    // 1. Try perpendicular evasion first (preserves standard side-step feel and existing contracts)
+    const dx = this.x - bStartX;
+    const dy = this.y - bStartY;
+    const cross = -dx * Math.sin(beamAngle) + dy * Math.cos(beamAngle);
+    const sideSign = cross !== 0 ? (cross > 0 ? 1 : -1) : 1;
+
+    const perpCandidates = [
+      { x: this.x + nx * sideSign * sideDist, y: this.y + ny * sideSign * sideDist, type: 'perp_primary' },
+      { x: this.x - nx * sideSign * sideDist, y: this.y - ny * sideSign * sideDist, type: 'perp_secondary' }
+    ];
+
+    for (const pc of perpCandidates) {
+      const clampedX = Math.max(minX, Math.min(maxX, pc.x));
+      const clampedY = Math.max(minY, Math.min(maxY, pc.y));
+      const { isInside, perpDist } = checkBeam(clampedX, clampedY);
+      if (!isInside && (perpDist >= beamHalfWidth + r + 25)) {
+        return { x: clampedX, y: clampedY, type: pc.type, perpDist };
+      }
+    }
+
+    // 2. If perpendicular jump is too cramped by walls, fallback to behind / flank behind caster
+    const behindCandidates = [
+      { x: bStartX - Math.cos(beamAngle) * behindDist, y: bStartY - Math.sin(beamAngle) * behindDist, type: 'behind' },
+      { x: bStartX + Math.cos(beamAngle + 2.356) * flankDist, y: bStartY + Math.sin(beamAngle + 2.356) * flankDist, type: 'flank_left' },
+      { x: bStartX + Math.cos(beamAngle - 2.356) * flankDist, y: bStartY + Math.sin(beamAngle - 2.356) * flankDist, type: 'flank_right' }
+    ];
+
+    let bestBehind = null;
+    let bestScore = -Infinity;
+    for (const bc of behindCandidates) {
+      const clampedX = Math.max(minX, Math.min(maxX, bc.x));
+      const clampedY = Math.max(minY, Math.min(maxY, bc.y));
+      const { isInside, projLen, perpDist } = checkBeam(clampedX, clampedY);
+      if (!isInside) {
+        const score = Math.abs(projLen) + perpDist;
+        if (score > bestScore) {
+          bestScore = score;
+          bestBehind = { x: clampedX, y: clampedY, type: bc.type, perpDist, projLen };
+        }
+      }
+    }
+
+    if (bestBehind) return bestBehind;
+
+    // 3. Fallback: pick perpendicular candidate with greatest distance from beam
+    let bestPerp = null;
+    let bestPerpDist = -Infinity;
+    for (const pc of perpCandidates) {
+      const clampedX = Math.max(minX, Math.min(maxX, pc.x));
+      const clampedY = Math.max(minY, Math.min(maxY, pc.y));
+      const { perpDist } = checkBeam(clampedX, clampedY);
+      if (perpDist > bestPerpDist) {
+        bestPerpDist = perpDist;
+        bestPerp = { x: clampedX, y: clampedY, type: pc.type, perpDist };
+      }
+    }
+    return bestPerp;
+  }
+
+  /**
+   * Universal Beam Evasion / Teleport Dodge Handler.
+   * Enables fighters with dodge or teleport mechanics (Sans, Saitama, Sukuna, Gojo, Toji, Shinobi,
+   * or future fighters declaring dodgeChance, teleportDodgeChance, stealthDodgeChance, or enableTeleportDodge)
+   * to teleport dodge out of continuous lethal super-beams such as Nameless Deity's Destroyer Beam.
+   * @param {Object} beamData - Beam intersection details { attacker, startX, startY, angle, beamLength, beamHalfWidth }
+   * @returns {boolean} True if successfully dodged, false otherwise.
+   */
+  dodgeBeam(beamData = {}) {
+    const cfg = (typeof CONFIG !== 'undefined' && this.characterId && CONFIG[this.characterId]) ? CONFIG[this.characterId] : {};
+
+    if (this.isSkillEnabled && !this.isSkillEnabled(cfg.enableTeleportDodge, true)) {
+      return false;
+    }
+
+    // Teleport dodge is enabled for fighters with teleport dodge mechanics (e.g. teleportDodgeChance or enableTeleportDodge)
+    const dodgeChance = (typeof this.teleportDodgeChance === 'number' && this.teleportDodgeChance > 0) ? this.teleportDodgeChance :
+      (typeof cfg.teleportDodgeChance === 'number' && cfg.teleportDodgeChance > 0) ? cfg.teleportDodgeChance :
+      (this.enableTeleportDodge || cfg.enableTeleportDodge) ? 1.0 : 0;
+
+    if (dodgeChance <= 0) return false;
+
+    // CC, channel lock, and state checks
+    const isChanneling = (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) ||
+      Boolean(this.takadaChannelTimer && this.takadaChannelTimer > 0) || Boolean(this.isTakadaChanneling);
+    if (isChanneling) return false;
+
+    if (this.hp <= 0 || this.isDead || (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.paralyzeTimer > 0) || this.isChainedByMakima || this.isTargetOfAmbush) {
+      return false;
+    }
+
+    if (this.dodgeCooldown > 0) return false;
+    if (dodgeChance < 1.0 && Math.random() >= dodgeChance) return false;
+
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : (CONFIG.arena || { width: 500, height: 500, x: 50, y: 50 });
+    const safePos = this.findSafeBeamDodgePosition(beamData, arena);
+    if (!safePos) return false;
+
+    const startX = this.x;
+    const startY = this.y;
+
+    this.x = safePos.x;
+    this.y = safePos.y;
+    this.vx = 0;
+    this.vy = 0;
+    this.dodgeCooldown = (beamData.isNamelessBeam || beamData.isNamelessDeityBeam || beamData.isBeam) ? 2 : (this.teleportDodgeCooldown || cfg.teleportDodgeCooldown || this.dodgeCooldownMax || 45);
+    this.dodgeStallTimer = 8;
+    this.caughtInNamelessBeamTimer = 0;
+    this.isCaughtInNamelessBeam = false;
+    this.caughtInPureLoveBeam = false;
+    this.wasCaughtInPureLoveBeam = false;
+    this.pureLoveBeamTimer = 0;
+
+    if (typeof this.aim === 'function' && beamData.attacker) {
+      this.aim(beamData.attacker);
+    }
+
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(startX, startY, 20, '#00F0FF');
+      spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
+    }
+
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 12, 'DODGE!', '#00F0FF');
+    }
+
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX('skill_dash3', 0.8);
+    }
+
+    return true;
   }
 
   /**
@@ -1681,6 +1855,7 @@ export class Fighter {
       this.skillManager.update(true, isInsideGojoDomain);
     } else {
       if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+      if (this.dodgeStallTimer > 0) this.dodgeStallTimer--;
       if (!this.isParalyzedDebuffActive()) {
         this._decrementSkillCooldowns();
       }
@@ -3737,6 +3912,7 @@ export class Fighter {
     const isStationaryState = (typeof this.isStationarySkillActive === 'function' && this.isStationarySkillActive()) ||
                               (typeof this.isPerformingSkill === 'function' && this.isPerformingSkill()) || 
                               (typeof this.isChannelingSkill === 'function' && this.isChannelingSkill()) ||
+                              ((this.dodgeStallTimer || 0) > 0) ||
                               ((this.comboHitsLeft || 0) > 0) ||
                               ((this.rockCounterComboLeft || 0) > 0) ||
                               ((this.knockbackStunTimer || 0) > 0) ||

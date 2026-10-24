@@ -57,3 +57,14 @@ Use this skill when creating or optimizing visual effects, particle bursts, blad
    - NEVER draw connecting radial ray lines, spoke needles, or intersecting meshes across shockwave rings.
 6. **No Spinning Line Ticks**:
    - Never draw rotating line segments around shockwaves. Use standalone point particles/embers without radial lines.
+
+
+## Phase 6: Mandatory Uncropped Visual Effects & Anti-Rectangular Clipping Standard (Rule 31)
+1. **Zero Rectangular Box Cuts**:
+   - Visual effects MUST NEVER be truncated by frame edges. Maintain generous transparent padding on all sprite frames (minimum 15–30px).
+   - Zero non-zero alpha pixels touching `y = 0`, `y = height - 1`, or origin borders.
+2. **Prohibition of Flat `fillRect` Auras**:
+   - NEVER use `ctx.fillRect(0, -auraH, length, auraH * 2)` which creates a flat diagonal cut at `x = 0`.
+   - Use rounded semicircular caps (`ctx.arc(0, 0, auraH, Math.PI / 2, -Math.PI / 2, false)`) combined with radial gradient blooms at origin.
+3. **True Centroid Portal Anchoring**:
+   - Always anchor origin swirls and portals to the true visual centroid (`(orbCentroidX * scale, orbCentroidY * scale)`), allowing circular energy to expand organically without bounding box seams.

@@ -7,6 +7,9 @@ export const yutaConfig = {
     pixelSkin: 'Assets/model/yuta/Yuta-Pixel-Skin.png',
     bossMap: 'Assets/model/yuta/Yuta-bossmap.png',
     domainOverlay: 'Assets/Overlays/Yuta-domain-overlay.png',
+    loveBeam: 'Assets/model/yuta/Love_beam/Love_beam-b.png',
+    loveBeamOut: 'Assets/model/yuta/love_beam_out/love_beam_out-b.png',
+    loveBeamWindup: 'Assets/model/yuta/Love_beam_windup/Love_beam_windup-b.png',
   },
 
   name: 'Yuta',

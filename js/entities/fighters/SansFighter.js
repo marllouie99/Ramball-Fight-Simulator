@@ -653,39 +653,49 @@ export class SansFighter extends Fighter {
     const startY = this.y;
     const startAngle = this.gunAngle || this.angle || 0;
 
-    // Calculate safe evasion point strictly perpendicular to the beam axis
+    // Calculate safe evasion point outside the beam aperture (perpendicular or flank/behind caster)
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : { width: 500, height: 500, x: 50, y: 50 };
-    const beamAngle = beamData.angle !== undefined ? beamData.angle : 0;
-    const nx = -Math.sin(beamAngle);
-    const ny = Math.cos(beamAngle);
+    const safePos = (typeof this.findSafeBeamDodgePosition === 'function')
+      ? this.findSafeBeamDodgePosition(beamData, arena)
+      : null;
 
-    // Determine current side relative to beam centerline
-    const bStartX = beamData.startX !== undefined ? beamData.startX : (beamData.attacker?.x ?? 0);
-    const bStartY = beamData.startY !== undefined ? beamData.startY : (beamData.attacker?.y ?? 0);
-    const dx = this.x - bStartX;
-    const dy = this.y - bStartY;
-    const cross = -dx * Math.sin(beamAngle) + dy * Math.cos(beamAngle);
-    let sideSign = cross >= 0 ? 1 : -1;
+    let finalX, finalY;
+    if (safePos) {
+      finalX = safePos.x;
+      finalY = safePos.y;
+    } else {
+      const beamAngle = beamData.angle !== undefined ? beamData.angle : 0;
+      const nx = -Math.sin(beamAngle);
+      const ny = Math.cos(beamAngle);
 
-    // Jump distance must place Sans safely outside the beam aperture
-    const beamHalfWidth = beamData.beamHalfWidth || 142.5;
-    const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 150), beamHalfWidth + this.r + 40);
+      // Determine current side relative to beam centerline
+      const bStartX = beamData.startX !== undefined ? beamData.startX : (beamData.attacker?.x ?? 0);
+      const bStartY = beamData.startY !== undefined ? beamData.startY : (beamData.attacker?.y ?? 0);
+      const dx = this.x - bStartX;
+      const dy = this.y - bStartY;
+      const cross = -dx * Math.sin(beamAngle) + dy * Math.cos(beamAngle);
+      let sideSign = cross >= 0 ? 1 : -1;
 
-    let targetX = this.x + nx * sideSign * jumpDist;
-    let targetY = this.y + ny * sideSign * jumpDist;
+      // Jump distance must place Sans safely outside the beam aperture
+      const beamHalfWidth = beamData.beamHalfWidth || 142.5;
+      const jumpDist = Math.max((cfg.dodgeDistance !== undefined ? cfg.dodgeDistance : 150), beamHalfWidth + this.r + 40);
 
-    const minX = arena.x + this.r + 20;
-    const maxX = arena.x + arena.width - this.r - 20;
-    const minY = arena.y + this.r + 20;
-    const maxY = arena.y + arena.height - this.r - 20;
+      let targetX = this.x + nx * sideSign * jumpDist;
+      let targetY = this.y + ny * sideSign * jumpDist;
 
-    if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
-      targetX = this.x - nx * sideSign * jumpDist;
-      targetY = this.y - ny * sideSign * jumpDist;
+      const minX = arena.x + this.r + 20;
+      const maxX = arena.x + arena.width - this.r - 20;
+      const minY = arena.y + this.r + 20;
+      const maxY = arena.y + arena.height - this.r - 20;
+
+      if (targetX < minX || targetX > maxX || targetY < minY || targetY > maxY) {
+        targetX = this.x - nx * sideSign * jumpDist;
+        targetY = this.y - ny * sideSign * jumpDist;
+      }
+
+      finalX = Math.max(minX, Math.min(maxX, targetX));
+      finalY = Math.max(minY, Math.min(maxY, targetY));
     }
-
-    const finalX = Math.max(minX, Math.min(maxX, targetX));
-    const finalY = Math.max(minY, Math.min(maxY, targetY));
 
     // Spawn afterimages
     this._spawnDodgeAfterimages(startX, startY, finalX, finalY, startAngle, startAngle);
@@ -709,6 +719,8 @@ export class SansFighter extends Fighter {
     }
 
     // Clear beam capture flags
+    this.caughtInNamelessBeamTimer = 0;
+    this.isCaughtInNamelessBeam = false;
     this.caughtInPureLoveBeam = false;
     this.wasCaughtInPureLoveBeam = false;
     this.pureLoveBeamTimer = 0;
