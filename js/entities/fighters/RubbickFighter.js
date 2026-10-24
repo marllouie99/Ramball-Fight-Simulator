@@ -765,23 +765,33 @@ export class RubbickFighter extends Fighter {
 
   _strikeEnemyWithStolenStorm(target) {
     const dmgMulti = getStolenMultiplier('zeus', 'damageMultiplier');
-    let damage = (CONFIG.zeus.stormStrikeDamage || 6) * dmgMulti;
+    let baseDmg = (CONFIG.zeus?.stormStrikeDamage || 6) * dmgMulti;
     
-    target.takeDamage(damage, this, { isStorm: true });
+    // Evaluate thunder crit for stolen storm
+    const baseChance = CONFIG.zeus?.thunderCritChance ?? 0.25;
+    const staticBonus = (target.staticDebuffTimer > 0 || target.zenitsuStaticDebuffTimer > 0) ? (CONFIG.zeus?.staticCritBonus ?? 0.25) : 0;
+    const effectiveChance = Math.min(CONFIG.zeus?.maxThunderCritChance ?? 0.75, baseChance + staticBonus);
+    const isCrit = (CONFIG.zeus?.enableThunderCrit !== false) && Math.random() < effectiveChance;
+    const critMult = CONFIG.zeus?.thunderCritMultiplier ?? 1.80;
+    const damage = isCrit ? Math.round(baseDmg * critMult) : Math.round(baseDmg);
+
+    target.takeDamage(damage, this, { isStorm: true, isCrit: isCrit, isCritical: isCrit });
     
     if (target.applySlow) {
-      target.applySlow(CONFIG.zeus.paralyzeDuration || 50, CONFIG.zeus.paralyzeSlowMultiplier || 0.5);
+      target.applySlow(CONFIG.zeus?.paralyzeDuration || 50, CONFIG.zeus?.paralyzeSlowMultiplier || 0.5);
     }
     
-    triggerGlobalScreenShake(CONFIG.zeus.stormStrikeShakeIntensity || 4, CONFIG.zeus.stormStrikeShakeFrames || 10);
-    spawnImpactFlash(target.x, target.y, 50, 'ghostTrail');
-    spawnSparks(target.x, target.y, 10, 'arcane');
+    const shakeIntensity = isCrit ? (CONFIG.zeus?.stormStrikeCritShakeIntensity ?? 7) : (CONFIG.zeus?.stormStrikeShakeIntensity || 4);
+    const shakeFrames = isCrit ? (CONFIG.zeus?.stormStrikeCritShakeFrames ?? 14) : (CONFIG.zeus?.stormStrikeShakeFrames || 10);
+    triggerGlobalScreenShake(shakeIntensity, shakeFrames);
+    spawnImpactFlash(target.x, target.y, isCrit ? 70 : 50, 'ghostTrail');
+    spawnSparks(target.x, target.y, isCrit ? 20 : 10, 'arcane');
     
     const stormSound = getSkillSound(99, 'storm');
     if (stormSound) this.playStolenSFX(stormSound, 0.6);
 
     const thunderSound = getSkillSound('zeus', 'thunderstrike');
-    if (thunderSound) this.playStolenSFX(thunderSound, (thunderSound.volume || 1.0) * 0.6);
+    if (thunderSound) this.playStolenSFX(thunderSound, (thunderSound.volume || 1.0) * (isCrit ? 0.95 : 0.6));
     
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
     state.zeusStormStrikes.push({
@@ -790,7 +800,8 @@ export class RubbickFighter extends Fighter {
       life: 18,
       maxLife: 18,
       color: 'green',
-      scale: 1.25
+      scale: isCrit ? 1.55 : 1.25,
+      isCrit: isCrit
     });
   }
 

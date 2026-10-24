@@ -138,18 +138,18 @@ export function _drawZeusCrown(ctx, r, isStormActive = false, facingLeft = false
     const flipX = custom.flipX ? -1 : 1;
     const flipY = custom.flipY ? -1 : 1;
 
-    // Zeus-crown.png (1627x967). True visible crown bounding box:
-    // X: [0, 1587] (width 1588, horizontal center at 793.5)
-    // Y: [62, 966] (height 905, top crown peak at 62)
-    // Scales to sit naturally across the brow at y ~ -0.08r with central peak reaching -1.05r
-    const targetCrownWidth = r * 1.70 * wMult;
-    const targetCrownHeight = (r * 1.70 * (905 / 1588)) * hMult;
-    const scaleX = targetCrownWidth / 1588;
-    const scaleY = targetCrownHeight / 905;
+    // Zeus-crown.png (1627x967). True visible crown bounding box (black background removed):
+    // X: [230, 1398] (width 1169, horizontal center at 814.0)
+    // Y: [108, 869] (height 762, top crown peak at 108)
+    // Scales to sit naturally across the brow framing hair and face with central peak at -1.05r
+    const targetCrownWidth = r * 1.85 * wMult;
+    const targetCrownHeight = (r * 1.85 * (762 / 1169)) * hMult;
+    const scaleX = targetCrownWidth / 1169;
+    const scaleY = targetCrownHeight / 762;
     const drawW = 1627 * scaleX;
     const drawH = 967 * scaleY;
-    const drawX = -793.5 * scaleX + offX;
-    const drawY = -r * 1.05 - 62 * scaleY + offY;
+    const drawX = -814.0 * scaleX + offX;
+    const drawY = -r * 1.05 - 108 * scaleY + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);

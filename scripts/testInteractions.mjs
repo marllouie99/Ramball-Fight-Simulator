@@ -3369,6 +3369,22 @@ async function runInteractionTests() {
           mockCtx.drawImage = originalDrawImage;
         }
 
+        // Test Zeus Top HUD Profile rendering excludes cloud assets
+        const drawnZeusImages = [];
+        mockCtx.drawImage = (img, ...args) => {
+          if (img && img.src) drawnZeusImages.push(img.src);
+        };
+        try {
+          mockCtx.resetStackDepth();
+          const testCanvas = { width: 1400, height: 1400, getContext: () => mockCtx };
+          renderTopHudProfileCanvas(testCanvas, { characterId: 'zeus', type: 'zeus', r: 25 });
+          const hasClouds = drawnZeusImages.some(src => src.includes('/Clouds/') || src.includes('cloud-'));
+          assert(!hasClouds, 'Top HUD profile for Zeus must NOT display cloud assets');
+          assert(mockCtx.getStackDepth() === 0, 'Zeus Top HUD profile rendering must restore Canvas 2D stack');
+        } finally {
+          mockCtx.drawImage = originalDrawImage;
+        }
+
         // Test Sans Top HUD Custom Stamina Bar
         const sansP1Html = buildTopDuelHUD(
           { name: 'Sans', characterId: 'sans', type: 'sans', stamina: 80, maxStamina: 100, hp: 1, maxHp: 1 },
@@ -8614,17 +8630,22 @@ async function runInteractionTests() {
       assert(mockCtx.getStackDepth() === 0, `drawZeusThunderstrike corrupted canvas stack depth at frame ${i + 1}`);
       drawZeusThunderstrike(mockCtx, { x: 250, y: 250, life: life, maxLife: 18, scale: 1.25, color: 'green' });
       assert(mockCtx.getStackDepth() === 0, `drawZeusThunderstrike (stolen green) corrupted canvas stack depth at frame ${i + 1}`);
+      drawZeusThunderstrike(mockCtx, { x: 250, y: 250, life: life, maxLife: 18, scale: 1.35, color: '#00BFFF', isCrit: true });
+      assert(mockCtx.getStackDepth() === 0, `drawZeusThunderstrike (critical) corrupted canvas stack depth at frame ${i + 1}`);
 
       _drawThunderstrikeImpactAnimation(mockCtx, 1.15, p, 1.0, false);
       assert(mockCtx.getStackDepth() === 0, `_drawThunderstrikeImpactAnimation corrupted stack depth at p=${p}`);
       _drawThunderstrikeImpactAnimation(mockCtx, 1.15, p, 1.0, true);
       assert(mockCtx.getStackDepth() === 0, `_drawThunderstrikeImpactAnimation (green) corrupted stack depth at p=${p}`);
+      _drawThunderstrikeImpactAnimation(mockCtx, 1.15, p, 1.0, false, true);
+      assert(mockCtx.getStackDepth() === 0, `_drawThunderstrikeImpactAnimation (critical) corrupted stack depth at p=${p}`);
     }
 
     // 3. Test drawLightningEffects coordinator stack depth
     state.zeusStormStrikes = [
       { x: 200, y: 200, life: 18, maxLife: 18, scale: 1.15 },
-      { x: 300, y: 300, life: 9, maxLife: 18, scale: 1.25, color: 'green' }
+      { x: 300, y: 300, life: 9, maxLife: 18, scale: 1.25, color: 'green' },
+      { x: 250, y: 250, life: 14, maxLife: 18, scale: 1.35, isCrit: true }
     ];
     mockCtx.resetStackDepth();
     drawLightningEffects(mockCtx);
@@ -8635,7 +8656,27 @@ async function runInteractionTests() {
     assert(state.zeusStormStrikes[0].life === 17, 'updateLightningEffects must decrement strike.life');
     state.zeusStormStrikes = [];
 
-    console.log('      ✅ Zeus 12-frame thunderstrike animation, coordinator integration & 100% balanced Canvas 2D stack depths verified successfully.');
+    // 5. Test ZeusFighter Critical Strike Mechanic on Thunder Strikes
+    const { ZeusFighter } = await import('../js/entities/fighters/ZeusFighter.js');
+    const zeusInstance = new ZeusFighter({ x: 200, y: 200, color: '#00BFFF' });
+
+    assert(zeusInstance.thunderCritChance === 0.25, `Expected thunderCritChance=0.25, got: ${zeusInstance.thunderCritChance}`);
+    assert(zeusInstance.thunderCritMultiplier === 1.80, `Expected thunderCritMultiplier=1.80, got: ${zeusInstance.thunderCritMultiplier}`);
+
+    // Test evaluateThunderCrit forced crit
+    const critRes = zeusInstance.evaluateThunderCrit(20, { forceCrit: true });
+    assert(critRes.isCrit === true, 'evaluateThunderCrit with forceCrit must return isCrit: true');
+    assert(critRes.finalDamage === 36, `Expected crit damage 36 (20 * 1.8), got: ${critRes.finalDamage}`);
+
+    // Test evaluateThunderCrit static debuff synergy bonus
+    const staticRes = zeusInstance.evaluateThunderCrit(20, { hasStatic: true });
+    assert(staticRes.critChance === 0.50, `Expected staticCritChance=0.50 (0.25 + 0.25), got: ${staticRes.critChance}`);
+
+    // Test evaluateThunderCrit without static debuff
+    const normalRes = zeusInstance.evaluateThunderCrit(20, { hasStatic: false });
+    assert(normalRes.critChance === 0.25, `Expected baseCritChance=0.25, got: ${normalRes.critChance}`);
+
+    console.log('      ✅ Zeus 12-frame thunderstrike animation, critical strike mechanics, coordinator integration & 100% balanced Canvas 2D stack depths verified successfully.');
   }
 
   // ── TEST 84: Knight 5-Phase Melee Combat, Hit-Pause Unpause & Anti-Softlock Failsafes ──

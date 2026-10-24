@@ -396,7 +396,7 @@ export function _drawZeusAnimatedThunderstrikeSprite(ctx, scale = 1.15, p = 0, a
  * - 12-Frame authentic thunderstrike impact animation from Assets/effects/Impact/
  * - Descending high-voltage sky lightning bolt during strike detonation
  * - Anchored at target impact coordinates
- * - Ground luminance bloom & impact ring
+ * - Ground luminance bloom
  * - Procedural fallback if frames are not yet ready
  * - 100% Canvas 2D transform stack balance
  * @param {CanvasRenderingContext2D} ctx
@@ -409,7 +409,8 @@ export function drawZeusThunderstrike(ctx, strike) {
   const lifeRatio = Math.max(0, Math.min(1.0, strike.life / maxLife));
   const p = Math.max(0, Math.min(1.0, 1.0 - lifeRatio));
   const isGreen = strike.color === 'green';
-  const scale = strike.scale || 1.15;
+  const isCrit = Boolean(strike.isCrit);
+  const scale = (strike.scale || 1.15) * (isCrit ? 1.20 : 1.0);
   const alpha = strike.alpha !== undefined ? strike.alpha : 1.0;
 
   ctx.save();
@@ -428,7 +429,7 @@ export function drawZeusThunderstrike(ctx, strike) {
   // 3. Ground Luminance Shine Bloom Effect (lighter composite for intense radiance)
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const bloomRadius = (isGreen ? 130 : 150) * scale * (0.8 + 0.4 * (1.0 - p));
+  const bloomRadius = (isGreen ? 130 : 150) * scale * (0.8 + 0.4 * (1.0 - p)) * (isCrit ? 1.35 : 1.0);
   const shineGlow = ctx.createRadialGradient(0, 0, 8, 0, 0, bloomRadius);
 
   if (isGreen) {
@@ -448,8 +449,8 @@ export function drawZeusThunderstrike(ctx, strike) {
   ctx.fill();
   ctx.restore();
 
-  // 4. Ground Impact Animation (Pre-impact glint, concussive core flash, Rule 26 concentric shockwaves, Lichtenberg fractures, manga needles & scorch)
-  _drawThunderstrikeImpactAnimation(ctx, scale, p, alpha, isGreen);
+  // 4. Ground Impact Animation (Pre-impact glint, concussive core flash, Lichtenberg fractures, manga needles & scorch)
+  _drawThunderstrikeImpactAnimation(ctx, scale, p, alpha, isGreen, isCrit);
 
   // 5. Fallback procedural lightning bolt if sprite frames have not loaded yet (e.g. headless tests)
   if (!spriteRendered && p >= 0.35) {
@@ -495,62 +496,66 @@ const ZEUS_NEEDLE_ANGLES = [
  * Features:
  * - Pre-strike gathering ion spark (p < 0.20)
  * - Concussive ground core detonation flash (p >= 0.20)
- * - Rule 26 Staggered Water-Ripple Shockwave Propagation (Anti-Cobweb)
  * - Lichtenberg electric ground fracture fissures
  * - Rule 16 Manga Action speed line needles
  * - Isometric ground scorch footprint & detached embers
+ * - Dynamic golden/cyan divine radiance on Critical Strikes
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} scale Overall scaling factor
  * @param {number} p Overall strike progress 0.0 to 1.0
  * @param {number} alpha Base opacity
  * @param {boolean} isGreen True if Rubbick stolen lightning
+ * @param {boolean} isCrit True if Critical Strike
  */
-export function _drawThunderstrikeImpactAnimation(ctx, scale, p, alpha, isGreen) {
+export function _drawThunderstrikeImpactAnimation(ctx, scale, p, alpha, isGreen, isCrit = false) {
   // Phase 1: Pre-impact gathering ion spark while bolt descends through sky (p < 0.20)
   if (p < 0.20) {
-    _drawThunderstrikePreImpactGlint(ctx, scale, p, alpha, isGreen);
+    _drawThunderstrikePreImpactGlint(ctx, scale, p, alpha, isGreen, isCrit);
     return;
   }
 
-  // Phase 2: Ground detonation & shockwave lifecycle (p >= 0.20)
+  // Phase 2: Ground detonation lifecycle (p >= 0.20)
   const impP = Math.min(1.0, Math.max(0.0, (p - 0.20) / 0.80));
 
   // 1. Isometric ground scorch footprint & discrete embers
   _drawImpactGroundScorch(ctx, scale, impP, alpha, isGreen);
 
   // 2. Lichtenberg electric ground fracture fissures
-  _drawImpactGroundFractures(ctx, scale, impP, alpha, isGreen);
+  _drawImpactGroundFractures(ctx, scale, impP, alpha, isGreen, isCrit);
 
-  // 3. Rule 26 Staggered Concentric Compression Shockwave Rings
-  _drawImpactConcentricShockwaves(ctx, scale, impP, alpha, isGreen);
+  // 3. Shockwave rings removed per user request
 
   // 4. Rule 16 Supersonic Manga Action Speed Needles
-  _drawImpactMangaNeedles(ctx, scale, impP, alpha, isGreen);
+  _drawImpactMangaNeedles(ctx, scale, impP, alpha, isGreen, isCrit);
 
   // 5. Concussive Ground Core Flash
   if (impP < 0.35) {
-    _drawImpactCoreFlash(ctx, scale, impP, alpha, isGreen);
+    _drawImpactCoreFlash(ctx, scale, impP, alpha, isGreen, isCrit);
   }
 }
 
 /**
  * Pre-impact gathering ion spark at ground zero before the bolt strikes down.
  */
-function _drawThunderstrikePreImpactGlint(ctx, scale, p, alpha, isGreen) {
+function _drawThunderstrikePreImpactGlint(ctx, scale, p, alpha, isGreen, isCrit = false) {
   const chargeP = p / 0.20; // 0.0 -> 1.0
-  const glintR = (2.5 + chargeP * 5.5) * scale;
+  const glintR = (2.5 + chargeP * (isCrit ? 7.0 : 5.5)) * scale;
   const glintAlpha = chargeP * alpha;
 
   ctx.save();
   ctx.beginPath();
   ctx.arc(0, 0, glintR, 0, Math.PI * 2);
-  ctx.fillStyle = isGreen ? `rgba(180, 255, 200, ${glintAlpha})` : `rgba(220, 245, 255, ${glintAlpha})`;
+  ctx.fillStyle = isGreen
+    ? `rgba(180, 255, 200, ${glintAlpha})`
+    : `rgba(220, 245, 255, ${glintAlpha})`;
   ctx.fill();
 
   // Diamond glint cross
-  ctx.strokeStyle = isGreen ? `rgba(50, 255, 120, ${glintAlpha * 0.8})` : `rgba(0, 220, 255, ${glintAlpha * 0.8})`;
-  ctx.lineWidth = 1.5 * scale;
-  const crossLen = glintR * 1.8;
+  ctx.strokeStyle = isGreen
+    ? `rgba(50, 255, 120, ${glintAlpha * 0.8})`
+    : `rgba(0, 220, 255, ${glintAlpha * 0.8})`;
+  ctx.lineWidth = (isCrit ? 1.8 : 1.5) * scale;
+  const crossLen = glintR * (isCrit ? 2.0 : 1.8);
   ctx.beginPath();
   ctx.moveTo(-crossLen, 0); ctx.lineTo(crossLen, 0);
   ctx.moveTo(0, -crossLen * 0.7); ctx.lineTo(0, crossLen * 0.7);
@@ -559,76 +564,38 @@ function _drawThunderstrikePreImpactGlint(ctx, scale, p, alpha, isGreen) {
 }
 
 /**
- * Concussive Ground Core Flash at ground zero upon impact.
+ * Concussive Ground Core Flash at ground zero upon impact (soft radial bloom without stroke ring).
  */
-function _drawImpactCoreFlash(ctx, scale, impP, alpha, isGreen) {
+function _drawImpactCoreFlash(ctx, scale, impP, alpha, isGreen, isCrit = false) {
   const flashP = impP / 0.35; // 0.0 -> 1.0
-  const flashR = (12 + 28 * Math.pow(flashP, 0.6)) * scale;
+  const flashR = (12 + (isCrit ? 34 : 28) * Math.pow(flashP, 0.6)) * scale;
   const flashAlpha = Math.pow(1.0 - flashP, 1.2) * alpha;
 
   ctx.save();
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, flashR);
+  if (isGreen) {
+    grad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * flashAlpha})`);
+    grad.addColorStop(0.35, `rgba(200, 255, 220, ${0.75 * flashAlpha})`);
+    grad.addColorStop(1, 'rgba(50, 255, 120, 0)');
+  } else {
+    grad.addColorStop(0, `rgba(255, 255, 255, ${(isCrit ? 1.0 : 0.98) * flashAlpha})`);
+    grad.addColorStop(0.35, `rgba(200, 245, 255, ${(isCrit ? 0.90 : 0.80) * flashAlpha})`);
+    grad.addColorStop(0.70, `rgba(0, 200, 255, ${(isCrit ? 0.45 : 0.25) * flashAlpha})`);
+    grad.addColorStop(1, 'rgba(0, 100, 255, 0)');
+  }
   ctx.beginPath();
   ctx.arc(0, 0, flashR, 0, Math.PI * 2);
-  ctx.fillStyle = isGreen ? `rgba(200, 255, 220, ${0.9 * flashAlpha})` : `rgba(240, 250, 255, ${0.95 * flashAlpha})`;
+  ctx.fillStyle = grad;
   ctx.fill();
-
-  ctx.strokeStyle = isGreen ? `rgba(50, 255, 120, ${0.8 * flashAlpha})` : `rgba(0, 220, 255, ${0.85 * flashAlpha})`;
-  ctx.lineWidth = 2.0 * scale;
-  ctx.stroke();
   ctx.restore();
 }
 
 /**
- * Rule 26 Staggered Water-Ripple Shockwave Propagation ("Dipping Fingers in Steady Water").
+ * Shockwave rings intentionally removed on Zeus Thunderstrike per user request.
+ * Preserved as a clean no-op function to ensure interface stability and zero canvas stack mutations.
  */
 function _drawImpactConcentricShockwaves(ctx, scale, impP, alpha, isGreen) {
-  // 3 staggered waves with progressive time offsets
-  const WAVES = [
-    { t0: 0.00, maxR: 82 * scale },
-    { t0: 0.14, maxR: 66 * scale },
-    { t0: 0.28, maxR: 50 * scale }
-  ];
-
-  ctx.save();
-  // Squashed Y axis to match arena isometric ground perspective
-  ctx.scale(1.0, 0.72);
-
-  for (let i = 0; i < WAVES.length; i++) {
-    const wave = WAVES[i];
-    if (impP < wave.t0) continue;
-
-    const lp = (impP - wave.t0) / (1.0 - wave.t0); // 0.0 -> 1.0
-    const curR = wave.maxR * Math.pow(lp, 0.52);
-    const popIn = Math.min(1.0, lp / 0.12);
-    const fadeOut = Math.pow(1.0 - lp, 1.25);
-    const waveAlpha = popIn * fadeOut * alpha;
-    if (waveAlpha <= 0.01) continue;
-
-    // Translucent interior color wash
-    ctx.beginPath();
-    ctx.arc(0, 0, curR, 0, Math.PI * 2);
-    ctx.fillStyle = isGreen ? `rgba(50, 255, 120, ${0.14 * waveAlpha})` : `rgba(0, 220, 255, ${0.15 * waveAlpha})`;
-    ctx.fill();
-
-    // Dark manga ink boundary rim
-    ctx.beginPath();
-    ctx.arc(0, 0, curR, 0, Math.PI * 2);
-    ctx.strokeStyle = isGreen ? `rgba(10, 35, 15, ${0.85 * waveAlpha})` : `rgba(10, 22, 40, ${0.85 * waveAlpha})`;
-    ctx.lineWidth = 3.6 * scale;
-    ctx.stroke();
-
-    // Vibrant theme electric energy stroke
-    ctx.strokeStyle = isGreen ? `rgba(50, 255, 120, ${0.95 * waveAlpha})` : `rgba(0, 220, 255, ${0.95 * waveAlpha})`;
-    ctx.lineWidth = 2.2 * scale;
-    ctx.stroke();
-
-    // Supersonic white leading edge core
-    ctx.strokeStyle = `rgba(255, 255, 255, ${1.0 * waveAlpha})`;
-    ctx.lineWidth = 1.0 * scale;
-    ctx.stroke();
-  }
-
-  ctx.restore();
+  // Intentionally empty: concentric shockwave rings removed on Zeus thunderstrike
 }
 
 /**
@@ -677,20 +644,20 @@ function _drawImpactGroundFractures(ctx, scale, impP, alpha, isGreen) {
 /**
  * Rule 16 Supersonic Manga Action Speed Needles erupting along ground plane.
  */
-function _drawImpactMangaNeedles(ctx, scale, impP, alpha, isGreen) {
+function _drawImpactMangaNeedles(ctx, scale, impP, alpha, isGreen, isCrit = false) {
   // Needle burst window: impP in [0.00, 0.45]
   if (impP > 0.45) return;
   const np = impP / 0.45; // 0.0 -> 1.0
   const needleAlpha = Math.pow(1.0 - np, 1.2) * alpha;
   if (needleAlpha <= 0.01) return;
 
-  const maxLen = 58 * scale;
+  const maxLen = (isCrit ? 68 : 58) * scale;
   const leadDist = maxLen * Math.pow(np, 0.65);
   const trailDist = maxLen * Math.pow(np, 1.35);
   const curLen = Math.max(0, leadDist - trailDist);
   if (curLen <= 1.0) return;
 
-  const maxThick = 2.2 * scale * (1.0 - np * 0.5);
+  const maxThick = (isCrit ? 2.6 : 2.2) * scale * (1.0 - np * 0.5);
 
   ctx.save();
   for (let i = 0; i < ZEUS_NEEDLE_ANGLES.length; i++) {
@@ -715,9 +682,13 @@ function _drawImpactMangaNeedles(ctx, scale, impP, alpha, isGreen) {
     ctx.lineTo(midX - perpX * (maxThick * 0.5), midY - perpY * (maxThick * 0.5));
     ctx.closePath();
 
-    ctx.fillStyle = (i % 2 === 0)
-      ? `rgba(255, 255, 255, ${0.95 * needleAlpha})`
-      : (isGreen ? `rgba(50, 255, 120, ${0.90 * needleAlpha})` : `rgba(0, 220, 255, ${0.90 * needleAlpha})`);
+    if (i % 2 === 0) {
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.95 * needleAlpha})`;
+    } else if (isGreen) {
+      ctx.fillStyle = `rgba(50, 255, 120, ${0.90 * needleAlpha})`;
+    } else {
+      ctx.fillStyle = `rgba(0, 220, 255, ${0.90 * needleAlpha})`;
+    }
     ctx.fill();
   }
   ctx.restore();

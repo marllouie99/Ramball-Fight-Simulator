@@ -1821,17 +1821,26 @@ export function renderTopHudProfileCanvas(canvasEl, fighter) {
     return;
   }
 
+  // Zeus: Exclude orbiting cloud mount sprites and cloud thunderbolts from the top HUD profile frame
+  const isZeus = Boolean(
+    fighter.characterId === 'zeus' ||
+    fighter.type === 'zeus' ||
+    (fIdx !== undefined && fIdx >= 0 && (FIGHTER_DEFS[fIdx]?.type === 'zeus' || FIGHTER_DEFS[fIdx]?.id === 'zeus'))
+  );
+
   const preview = (fIdx !== undefined && fIdx >= 0)
-    ? (getFighterBodyOnlyPreview(fIdx) || getFighterPreview(fIdx))
+    ? (isZeus ? getFighterBodyOnlyPreview(fIdx) : (getFighterBodyOnlyPreview(fIdx) || getFighterPreview(fIdx)))
     : null;
 
-  const baseR = (fighter && (fighter.r || fighter.radius)) ? (fighter.r || fighter.radius) : 25;
+  const fDef = (fIdx !== undefined && fIdx >= 0) ? FIGHTER_DEFS[fIdx] : null;
+  const baseR = (fighter && (fighter.r || fighter.radius)) ? (fighter.r || fighter.radius) : (fDef?.r || fDef?.radius || 25);
   // Keep the enlarged model centered, with transparent room for headgear and hair outside the fixed frame.
-  const customScale = (fighter && fighter.profileScale) || 1.0;
-  const customOffY = (fighter && fighter.profileOffsetY) || 0;
+  const customScale = (fighter && (fighter.profileScale ?? fighter._def?.profileScale)) ?? fDef?.profileScale ?? 1.0;
+  const customOffX = (fighter && (fighter.profileOffsetX ?? fighter._def?.profileOffsetX)) ?? fDef?.profileOffsetX ?? 0;
+  const customOffY = (fighter && (fighter.profileOffsetY ?? fighter._def?.profileOffsetY)) ?? fDef?.profileOffsetY ?? 0;
   const targetR = Math.round(192 * customScale);
   const scale = targetR / baseR;
-  const destX = Math.round(w / 2);
+  const destX = Math.round(w / 2 + customOffX);
   const destY = Math.round(h / 2 + customOffY);
 
   if (preview) {
@@ -1850,7 +1859,10 @@ export function renderTopHudProfileCanvas(canvasEl, fighter) {
     ctx.scale(scale, scale);
     const origX = fighter.x, origY = fighter.y;
     fighter.x = 0; fighter.y = 0;
+    const prevHideClouds = fighter.hideClouds;
+    fighter.hideClouds = true;
     fighter.drawBody(ctx);
+    fighter.hideClouds = prevHideClouds;
     fighter.x = origX; fighter.y = origY;
     ctx.restore();
   }
@@ -2723,6 +2735,19 @@ function updateHealthHud() {
         if ((f.aegisTimer || 0) > 0) {
           info.push(`<b>Aegis:</b> ACTIVE <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
+        const baseCritRate = Math.round((CONFIG.zeus?.thunderCritChance ?? 0.25) * 100);
+        const currentCritRate = Math.round((f.thunderCritChance !== undefined ? f.thunderCritChance : (CONFIG.zeus?.thunderCritChance ?? 0.25)) * 100);
+        const baseCritMult = Math.round((CONFIG.zeus?.thunderCritMultiplier ?? 1.80) * 100);
+        const currentCritMult = Math.round((f.thunderCritMultiplier !== undefined ? f.thunderCritMultiplier : (CONFIG.zeus?.thunderCritMultiplier ?? 1.80)) * 100);
+
+        let critRateStr = `${baseCritRate}%`;
+        if (currentCritRate > baseCritRate) {
+          critRateStr = `${baseCritRate}% + ${currentCritRate - baseCritRate}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
+        } else if (currentCritRate < baseCritRate) {
+          critRateStr = `${baseCritRate}% - ${baseCritRate - currentCritRate}% <span style="color: #ef4444; font-size: 10px;">▼</span>`;
+        }
+        info.push(`<b>Crit Rate:</b> ${critRateStr}`);
+        info.push(`<b>Crit DMG:</b> ${currentCritMult}%`);
       } else if (f.characterId === 'john_wick' || f.type === 'john_wick') {
         const isExcommunicado = (f.currentEquippedWeapon === 'rifle');
         const baseDef = CONFIG.john_wick?.ballisticSuitDamageReduction || 0.40;

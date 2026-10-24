@@ -108,11 +108,18 @@ function _getBlueCosmicLightCenterCanvas() {
     const data = imgData.data;
     for (let i = 0; i < data.length; i += 4) {
       const a = data[i + 3];
-      if (a === 0) continue;
+      if (a <= 1) {
+        data[i + 3] = 0;
+        continue;
+      }
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
       const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+      if (lum <= 1) {
+        data[i + 3] = 0;
+        continue;
+      }
 
       if (lum > 225) {
         // Pure blinding starlight diamond core (preserve brilliant white/ice core)

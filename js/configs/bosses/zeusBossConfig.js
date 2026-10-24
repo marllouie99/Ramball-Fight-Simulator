@@ -27,7 +27,21 @@ export const zeusBossConfig = {
   cooldown: 120,
   projectileSpeedMultiplier: 1.0,
   ability: 'Storm Bringer',
-  desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',
+  desc: 'Throws chain lightning. Passively shocks melee attackers with Aegis. Ultimate summons a map-wide thunderstorm with high-voltage Thunder Strike Criticals (25% base Crit Rate, 1.8x DMG; +25% vs Static targets).',
+
+  // ── Top HUD Profile Framing ──
+  profileScale: 1.0,               // Standard portrait scale
+  profileOffsetX: 0,               // Centered horizontally in the HUD profile badge
+  profileOffsetY: 0,               // Centered vertically in the HUD profile badge
+
+  // ── Critical Strike Mechanics & Scaling ──
+  enableThunderCrit: true,         // Master toggle for Thunder Strike Critical mechanic
+  thunderCritChance: 0.25,         // Base critical hit chance on thunder strikes (25%)
+  thunderCritMultiplier: 1.80,     // Base critical hit damage multiplier (1.80x / 180%)
+  staticCritBonus: 0.25,           // Synergistic bonus crit chance against targets afflicted with Static (+25% -> 50% total)
+  maxThunderCritChance: 0.75,      // Maximum crit chance cap (75%)
+  stormStrikeCritShakeIntensity: 7,// Screen shake impulse on critical thunderstrike
+  stormStrikeCritShakeFrames: 14,  // Duration of critical strike impact screen shake
 
   // ── Basic Attack: Chain Lightning (Fast Projectile) ──
   lightningDamage: 20,         // Base damage per lightning hit

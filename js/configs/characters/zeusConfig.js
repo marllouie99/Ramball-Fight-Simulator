@@ -37,11 +37,25 @@ export const zeusConfig = {
   grade: 'A',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   bossTitle: 'King of Olympus',
   title: 'King of Olympus',
-  desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',
+  desc: 'Throws chain lightning. Passively shocks melee attackers with Aegis. Ultimate summons a map-wide thunderstorm with high-voltage Thunder Strike Criticals (25% base Crit Rate, 1.8x DMG; +25% vs Static targets).',
+
+  // ── Top HUD Profile Framing ──
+  profileScale: 1.0,               // Standard portrait scale
+  profileOffsetX: 0,               // Centered horizontally in the HUD profile badge
+  profileOffsetY: 0,               // Centered vertically in the HUD profile badge
+
+  // ── Critical Strike Mechanics & Scaling ──
+  enableThunderCrit: true,         // Master toggle for Thunder Strike Critical mechanic
+  thunderCritChance: 0.25,         // Base critical hit chance on thunder strikes (25%)
+  thunderCritMultiplier: 1.80,     // Base critical hit damage multiplier (1.80x / 180%)
+  staticCritBonus: 0.25,           // Synergistic bonus crit chance against targets afflicted with Static (+25% -> 50% total)
+  maxThunderCritChance: 0.75,      // Maximum crit chance cap (75%)
+  stormStrikeCritShakeIntensity: 7,// Screen shake impulse on critical thunderstrike
+  stormStrikeCritShakeFrames: 14,  // Duration of critical strike impact screen shake
 
   // ── Basic Attack: Chain Lightning (Fast Projectile) ──
   enableChainLightning: true,  // Master toggle for Chain Lightning basic attack
-  lightningDamage: 20,         // Base damage per lightning hit (balanced with Sukuna slashes & Gojo basic)
+  lightningDamage: 30,         // Base damage per lightning hit (balanced with Sukuna slashes & Gojo basic)
   lightningSpeed: 30,          // Supersonic bolt speed (px/frame)
   lightningRadius: 6,          // Radius of chain lightning bolt projectile
   lightningLife: 100,          // Lifespan of lightning projectile in frames
@@ -84,7 +98,7 @@ export const zeusConfig = {
   stormCooldown: 1000,         // 25.0s Cooldown (balanced with Gojo Hollow Purple & Sukuna Fuga / Domain)
   stormDuration: 300,          // 5.0 seconds total active storm duration
   stormStrikesPerSec: 3,       // Frequency of lightning strikes per enemy (3 per sec = 15 strikes total)
-  stormStrikeDamage: 20,        // Base damage per strike (15 strikes * 6 = 90 base dmg; ~115-120 with static bonus)
+  stormStrikeDamage: 30,        // Base damage per strike (15 strikes * 6 = 90 base dmg; ~115-120 with static bonus)
 
   // ── Storm Visuals & Screen FX ──
   stormTelegraphFrames: 120,   // Channeling wind-up duration before storm unleashes (2.0s at 60fps)

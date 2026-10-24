@@ -73,8 +73,14 @@ export class ZeusFighter extends Fighter {
     this.maxStunChance = CONFIG.zeus?.maxStunChance ?? 0.50;
     this.stunChanceIncrease = CONFIG.zeus?.stunChanceIncrease ?? 0.05;
 
+    // Critical Strike Mechanic on Thunder Strikes
+    this.thunderCritChance = CONFIG.zeus?.thunderCritChance ?? 0.25;
+    this.thunderCritMultiplier = CONFIG.zeus?.thunderCritMultiplier ?? 1.80;
+    this.critChance = this.thunderCritChance;
+    this.critMultiplier = this.thunderCritMultiplier;
+
     // Initial hovering state so clouds are positioned correctly in menus before update()
-    this.z = 25;
+    this.z = (def && (def._isPreview || def.hideClouds || def.showSkinOnly)) ? 0 : 25;
     
     // Aura animation state
     this.auraPhase = 0;
@@ -153,8 +159,44 @@ export class ZeusFighter extends Fighter {
     this.stunChance = this.baseStunChance;
     this.maxStunChance = CONFIG.zeus?.maxStunChance ?? 0.50;
     this.stunChanceIncrease = CONFIG.zeus?.stunChanceIncrease ?? 0.05;
+    this.thunderCritChance = CONFIG.zeus?.thunderCritChance ?? 0.25;
+    this.thunderCritMultiplier = CONFIG.zeus?.thunderCritMultiplier ?? 1.80;
+    this.critChance = this.thunderCritChance;
+    this.critMultiplier = this.thunderCritMultiplier;
     this.auraPhase = 0;
     this._thunderCloudSoundPlayed = false;
+  }
+
+  /**
+   * Evaluates Zeus's Thunder Strike Critical Hit roll and calculates final damage.
+   * Features:
+   * - Base thunder crit rate & multiplier
+   * - Static debuff synergy: +staticCritBonus crit chance against targets with active static
+   * - Returns { finalDamage, isCrit, critMultiplier, critChance }
+   * @param {number} baseDamage Unscaled base damage
+   * @param {object} opts Context options { hasStatic, forceCrit, target }
+   * @returns {{ finalDamage: number, isCrit: boolean, critMultiplier: number, critChance: number }}
+   */
+  evaluateThunderCrit(baseDamage = 20, opts = {}) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    if (!this.isSkillEnabled(cfg.enableThunderCrit, true)) {
+      return { finalDamage: baseDamage, isCrit: false, critMultiplier: 1.0, critChance: 0 };
+    }
+
+    const baseChance = this.thunderCritChance !== undefined ? this.thunderCritChance : (cfg.thunderCritChance ?? 0.25);
+    const staticBonus = opts.hasStatic ? (cfg.staticCritBonus ?? 0.25) : 0;
+    const effectiveCritChance = Math.min(cfg.maxThunderCritChance ?? 0.75, baseChance + staticBonus);
+    const effectiveCritMult = this.thunderCritMultiplier !== undefined ? this.thunderCritMultiplier : (cfg.thunderCritMultiplier ?? 1.80);
+
+    const isCrit = Boolean(opts.forceCrit || (!opts.isCrit && Math.random() < effectiveCritChance));
+    const finalDamage = isCrit ? Math.round(baseDamage * effectiveCritMult) : Math.round(baseDamage);
+
+    return {
+      finalDamage,
+      isCrit,
+      critMultiplier: effectiveCritMult,
+      critChance: effectiveCritChance
+    };
   }
 
   getAttackProgress() {
@@ -163,6 +205,10 @@ export class ZeusFighter extends Fighter {
   }
   
   getBodyPullback() {
+    if (this._isPreview || this.hideWeapon || (typeof state !== 'undefined' && state.showSkinOnly) || this._isTopHudProfile || this.hideClouds) {
+      return 0;
+    }
+    if (this.shootCooldown <= 0 || !this.shootCooldownMax) return 0;
     const progress = this.getAttackProgress();
     if (progress >= 0.5) {
       return -8 * Math.pow((progress - 0.5) / 0.5, 2);
@@ -219,38 +265,45 @@ export class ZeusFighter extends Fighter {
   }
 
   _triggerAegisShield(attacker) {
-    this.aegisCooldown = CONFIG.zeus?.aegisCooldown ?? 300;
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+    this.aegisCooldown = cfg.aegisCooldown ?? 300;
     
-    // Deal shock damage
-    const damage = CONFIG.zeus?.aegisShockDamage ?? 12;
-    attacker.takeDamage(damage, this, { isZeusShock: true });
+    // Deal shock damage with thunder crit evaluation
+    const baseDamage = cfg.aegisShockDamage ?? 12;
+    const hasStatic = Boolean((attacker.staticDebuffTimer > 0) || (attacker.zenitsuStaticDebuffTimer > 0));
+    const critRes = this.evaluateThunderCrit(baseDamage, { hasStatic, target: attacker });
+    const damage = critRes.finalDamage;
+    const isCrit = critRes.isCrit;
+    attacker.takeDamage(damage, this, { isZeusShock: true, isCrit: isCrit, isCritical: isCrit });
     
     // Apply paralyze (we'll implement this as a combination of slow and electric stun)
     if (attacker.applySlow) {
-      attacker.applySlow(CONFIG.zeus?.aegisParalyzeDuration ?? 60, CONFIG.zeus?.paralyzeSlowMultiplier ?? 0.5);
+      attacker.applySlow(cfg.aegisParalyzeDuration ?? 60, cfg.paralyzeSlowMultiplier ?? 0.5);
     }
-    attacker.electricStunTimer = Math.max(attacker.electricStunTimer || 0, CONFIG.zeus?.stunDuration ?? 24);
-    attacker.thunderRootsTimer = Math.max(attacker.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration ?? 45);
+    attacker.electricStunTimer = Math.max(attacker.electricStunTimer || 0, cfg.stunDuration ?? 24);
+    attacker.thunderRootsTimer = Math.max(attacker.thunderRootsTimer || 0, cfg.electricVisualDuration ?? 45);
     
-    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'AEGIS!', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
+    const calloutColor = isCrit ? '#FF3B30' : (cfg.themeColor ?? cfg.color ?? '#00BFFF');
+    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, isCrit ? 'AEGIS CRIT!' : 'AEGIS!', calloutColor);
     
     // Visuals & smiting thunderstrike on attacker
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
-    const aegisStrikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 18;
+    const aegisStrikeLife = cfg.stormStrikeVisualLife ?? 18;
     state.zeusStormStrikes.push({
       x: attacker.x,
       y: attacker.y,
       life: aegisStrikeLife,
       maxLife: aegisStrikeLife,
-      scale: 0.95
+      scale: isCrit ? 1.35 : 0.95,
+      isCrit: isCrit
     });
 
-    spawnImpactFlash(attacker.x, attacker.y, CONFIG.zeus?.aegisFlashRadius ?? 40, 'lightningTrail');
-    spawnSparks(attacker.x, attacker.y, CONFIG.zeus?.aegisSparkCount ?? 15, 'thunderSpark');
-    triggerGlobalScreenShake(CONFIG.zeus?.aegisShakeIntensity ?? 4, CONFIG.zeus?.aegisShakeFrames ?? 5);
+    spawnImpactFlash(attacker.x, attacker.y, isCrit ? (cfg.aegisFlashRadius ?? 40) * 1.5 : (cfg.aegisFlashRadius ?? 40), 'lightningTrail');
+    spawnSparks(attacker.x, attacker.y, isCrit ? (cfg.aegisSparkCount ?? 15) * 1.5 : (cfg.aegisSparkCount ?? 15), 'thunderSpark');
+    triggerGlobalScreenShake(isCrit ? (cfg.stormStrikeCritShakeIntensity ?? 7) : (cfg.aegisShakeIntensity ?? 4), isCrit ? 10 : (cfg.aegisShakeFrames ?? 5));
     
     const sound = getSkillSound(this._def?.id, 'aegis');
-    if (sound) audioSystem.playSFX(sound.src, sound.volume);
+    if (sound) audioSystem.playSFX(sound.src, isCrit ? sound.volume * 1.2 : sound.volume);
   }
 
   update(opponent, ownerIndex, arena) {
@@ -421,48 +474,79 @@ export class ZeusFighter extends Fighter {
   _strikeEnemyWithStorm(target) {
     if (!target || target.hp <= 0 || target.isDead || target.dead) return;
 
-    // Calculate damage based on static debuff
-    let damage = CONFIG.zeus?.stormStrikeDamage ?? 20;
-    if (target.staticDebuffTimer > 0) {
-      damage *= (CONFIG.zeus?.staticDamageBonus ?? 1.33);
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.zeus) ? CONFIG.zeus : zeusConfig;
+
+    // Calculate base damage based on static debuff
+    let baseDamage = cfg.stormStrikeDamage ?? 20;
+    const hasStatic = Boolean((target.staticDebuffTimer > 0) || (target.zenitsuStaticDebuffTimer > 0));
+    if (hasStatic) {
+      baseDamage *= (cfg.staticDamageBonus ?? 1.33);
     }
+
+    // Evaluate Thunder Strike Critical Hit
+    const critRes = this.evaluateThunderCrit(baseDamage, { hasStatic, target });
+    const finalDamage = critRes.finalDamage;
+    const isCrit = critRes.isCrit;
     
-    target.takeDamage(damage, this, { isStorm: true, isUltimate: true });
+    target.takeDamage(finalDamage, this, { isStorm: true, isUltimate: true, isCrit: isCrit, isCritical: isCrit });
     
     // Apply static and paralyze
-    target.staticDebuffTimer = CONFIG.zeus?.staticDuration ?? 100;
+    target.staticDebuffTimer = cfg.staticDuration ?? 100;
     if (target.applySlow) {
-      target.applySlow(CONFIG.zeus?.paralyzeDuration ?? 50, CONFIG.zeus?.paralyzeSlowMultiplier ?? 0.5);
+      target.applySlow(cfg.paralyzeDuration ?? 50, cfg.paralyzeSlowMultiplier ?? 0.5);
     }
     
     // Apply visual thunder roots effect
-    target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, CONFIG.zeus?.electricVisualDuration ?? 45);
+    target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, cfg.electricVisualDuration ?? 45);
     
-    // Visuals
-    triggerGlobalScreenShake(CONFIG.zeus?.stormStrikeShakeIntensity ?? 4, CONFIG.zeus?.stormStrikeShakeFrames ?? 10);
-    spawnImpactFlash(target.x, target.y, CONFIG.zeus?.stormStrikeFlashRadius ?? 50, 'lightningTrail');
-    spawnSparks(target.x, target.y, CONFIG.zeus?.stormStrikeSparkCount ?? 10, 'lightningTrail', CONFIG.zeus?.themeColor ?? CONFIG.zeus?.color ?? '#00BFFF');
+    // Visuals & Screen Shake (intensified on critical hit)
+    const shakeIntensity = isCrit ? (cfg.stormStrikeCritShakeIntensity ?? 7) : (cfg.stormStrikeShakeIntensity ?? 4);
+    const shakeFrames = isCrit ? (cfg.stormStrikeCritShakeFrames ?? 14) : (cfg.stormStrikeShakeFrames ?? 10);
+    triggerGlobalScreenShake(shakeIntensity, shakeFrames);
+
+    const flashRadius = isCrit ? ((cfg.stormStrikeFlashRadius ?? 50) * 1.4) : (cfg.stormStrikeFlashRadius ?? 50);
+    spawnImpactFlash(target.x, target.y, flashRadius, 'lightningTrail');
+
+    const sparkCount = isCrit ? ((cfg.stormStrikeSparkCount ?? 10) * 2) : (cfg.stormStrikeSparkCount ?? 10);
+    const sparkColor = cfg.themeColor ?? cfg.color ?? '#00BFFF';
+    spawnSparks(target.x, target.y, sparkCount, 'lightningTrail', sparkColor);
     
     // Play storm strike sound for each hit (both stormstrike.mp3 & thunderstrike.mp3)
     const stormSound = getSkillSound(this._def?.id, 'storm');
-    if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.6);
+    if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * (isCrit ? 0.9 : 0.6));
 
     const thunderSound = getSkillSound(this._def?.id, 'thunderstrike');
-    if (thunderSound) audioSystem.playSFX(thunderSound.src, (thunderSound.volume || 1.0) * 0.6);
+    if (thunderSound) audioSystem.playSFX(thunderSound.src, (thunderSound.volume || 1.0) * (isCrit ? 0.95 : 0.6));
+
+    if (isCrit) {
+      const punchSound = getSkillSound('zenitsu', 'ultimateImpact') || getSkillSound(this._def?.id, 'aegis');
+      if (punchSound) audioSystem.playSFX(punchSound.src || punchSound, 0.75);
+    }
     
     // Register storm strike visual globally
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
-    const strikeLife = CONFIG.zeus?.stormStrikeVisualLife ?? 18;
+    const strikeLife = cfg.stormStrikeVisualLife ?? 18;
     state.zeusStormStrikes.push({
       x: target.x,
       y: target.y,
       life: strikeLife,
       maxLife: strikeLife,
-      scale: 1.25
+      scale: isCrit ? 1.55 : 1.25,
+      isCrit: isCrit
     });
   }
 
   _drawClouds(ctx, isBehind) {
+    // Suppress cloud rendering when explicitly hidden, in profile preview, or when showSkinOnly is enabled (e.g. top HUD frame)
+    const shouldHideClouds = Boolean(
+      this.hideClouds ||
+      this.hideCloud ||
+      (typeof state !== 'undefined' && state.showSkinOnly) ||
+      this._isTopHudProfile ||
+      this._isProfilePreview
+    );
+    if (shouldHideClouds) return;
+
     const zOffset = this.z || 0;
     const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
     const isStorm = Boolean(this.isChargingStorm || this.stormActive);

@@ -45,6 +45,7 @@ function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
   previewFighter._isPreview = true;
   previewFighter.suppressInkOutline = true;
   previewFighter._suppressInkOutline = true;
+  previewFighter.z = 0; // Previews must always be anchored on the ground/center plane (z = 0)
   if (bodyOnly) {
     previewFighter.hideHands = true;
     previewFighter.hideWeapon = true;
@@ -54,6 +55,9 @@ function renderPreviewForDef(def, cacheKey, bodyOnly = false) {
     previewFighter.hideChainsaws = true;
     previewFighter.hideChainsaw = true;
     previewFighter.hideSwordAura = true;
+    previewFighter.hideClouds = true;
+    previewFighter.hideCloud = true;
+    previewFighter._isProfilePreview = true;
     if (def.type === 'denji') {
       previewFighter.hideHeadChainsaw = false;
       previewFighter.hideForeheadChainsaw = false;
