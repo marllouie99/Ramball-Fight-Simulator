@@ -1,207 +1,27 @@
-// ─────────────────────────────────────────────
-// THUMBNAIL & FACE-OFF OVERLAY SCREEN
-// Anime Grunge Split Aesthetic with Dynamic Fighter Color Themes & Engineer-Style Glows
-// Cinematic 1-by-1 Entrance + Central "VS" to Countdown Transition (3... 2... 1... FIGHT!)
-// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// THUMBNAIL & BATTLE SHOWCASE SCREEN
+// Authentic Comic Battle Card Format: Full-Bleed Diagonal Split Canvas,
+// Dynamic Mode-Driven Card Layout (1v1, 1v2, 2v2, Tag Match, Boss Battle),
+// Authentic Pokémon TCG Collector Cards from Character Card Selection,
+// Center Comic "VS" Slam, and "WHO WINS?" Challenger Tag.
+// Reference: media_1792819747328_ad46acf3.png (Collector Card Selection Standard)
+// ─────────────────────────────────────────────────────────────────────────────
 import { state } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
-import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
-import { Fighter } from '../../entities/fighter.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { _clearButtons, _registerButton, drawChamferedRect } from './uiFramework.js';
-import { proceedFromFaceOffToCountdown, startMatchDirectlyFromFaceOff } from '../../core/gameFlow.js';
-import { clearHealthHud } from '../hudManager.js';
-import { getBossConfig } from '../../configs/bosses/bossConfigRegistry.js';
+import { proceedFromFaceOffToCountdown } from '../../core/gameFlow.js';
+import {
+  getFaceOffThemeColor,
+  getDarkThemeTone
+} from './CountdownIntro.js';
+import { drawCollectorFighterCard } from './CollectorCardRenderer.js';
 
-// Cache for live fighter preview instances (Pooled by character type to eliminate GC churn)
-const _fighterTypePreviewCache = {};
-
-// Static seed arrays for background particles and floating debris
-let _floatingDebris = null;
-let _bgCacheCanvas = null;
-let _bgCacheCtx = null;
-let _lastBgKey = '';
-let _ffaBgCacheCanvas = null;
-let _ffaBgCacheCtx = null;
-let _lastFfaBgKey = '';
-const _textWidthCache = Object.create(null);
-
-// Pre-computed ink splatter points for VS emblem
-const _inkSplatterPoints = [];
-for (let i = 0; i < 16; i++) {
-  const angle = (i / 16) * Math.PI * 2;
-  const baseR = (i % 2 === 0) ? 58 : 36;
-  const offset = ((i * 7) % 11) - 5;
-  const r = baseR + offset;
-  _inkSplatterPoints.push({
-    x: Math.cos(angle) * r,
-    y: Math.sin(angle) * r
-  });
-}
-
-const _splatterDots = [];
-for (let s = 0; s < 8; s++) {
-  const sAngle = s * 0.8;
-  const sDist = 52 + (s * 7) % 25;
-  _splatterDots.push({
-    x: Math.cos(sAngle) * sDist,
-    y: Math.sin(sAngle) * sDist,
-    r: 2.4 + (s % 3),
-    isLeft: (s % 2 === 0)
-  });
-}
-
-// Easing Functions
-function easeOutBack(t) {
-  const c1 = 1.25;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-}
-
-// Memoized Color Utility Helpers to eliminate per-frame regex & string allocations
-const _brightnessCache = Object.create(null);
-function adjustBrightness(hex, percent) {
-  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return hex || '#ffffff';
-  const key = hex + '_' + percent;
-  let res = _brightnessCache[key];
-  if (res) return res;
-
-  let cleanHex = hex.replace('#', '');
-  if (cleanHex.length === 3) {
-    cleanHex = cleanHex.split('').map(c => c + c).join('');
-  }
-  let num = parseInt(cleanHex, 16);
-  if (isNaN(num)) return hex;
-  let r = (num >> 16) + Math.round(255 * (percent / 100));
-  let g = ((num >> 8) & 0x00FF) + Math.round(255 * (percent / 100));
-  let b = (num & 0x0000FF) + Math.round(255 * (percent / 100));
-  r = Math.min(255, Math.max(0, r));
-  g = Math.min(255, Math.max(0, g));
-  b = Math.min(255, Math.max(0, b));
-  res = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-  _brightnessCache[key] = res;
-  return res;
-}
-
-const _rgbaCache = Object.create(null);
-function hexToRgba(hex, alpha) {
-  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(255, 255, 255, ${alpha})`;
-  const key = hex + '_' + alpha;
-  let res = _rgbaCache[key];
-  if (res) return res;
-
-  let cleanHex = hex.replace('#', '');
-  if (cleanHex.length === 3) {
-    cleanHex = cleanHex.split('').map(c => c + c).join('');
-  }
-  let num = parseInt(cleanHex, 16);
-  if (isNaN(num)) return `rgba(255, 255, 255, ${alpha})`;
-  let r = (num >> 16) & 255;
-  let g = (num >> 8) & 255;
-  let b = num & 255;
-  res = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  _rgbaCache[key] = res;
-  return res;
-}
-
-function initDebrisAndScratches(width, height) {
-  _floatingDebris = [];
-  for (let i = 0; i < 24; i++) {
-    const colorType = (i % 3 === 0) ? 'left' : ((i % 3 === 1) ? 'right' : 'white');
-    _floatingDebris.push({
-      x: ((i * 137.5 + 45) % width),
-      y: ((i * 211.3 + 30) % height),
-      size: 4 + (i % 5) * 1.5,
-      rotation: (i * 0.45) % (Math.PI * 2),
-      isSolid: (i % 2 === 0),
-      colorType: colorType,
-      alpha: 0.50 + ((i * 7) % 5) * 0.08
-    });
-  }
-}
-
-// Slot seed calculation helper to ensure exact synchrony between reel strip and background roll
-function getSlotSeed(slotKey) {
-  if (!slotKey) return 0;
-  return (slotKey.charCodeAt(0) * 7 + (slotKey.charCodeAt(1) || 3) * 13) % 31;
-}
-
-function getStripFighterDef(slotIndex, totalSlots, targetDef, seed) {
-  if (slotIndex >= totalSlots) return targetDef;
-  const currentDefs = getActiveFighterDefs();
-  const clampedIdx = Math.max(0, slotIndex);
-  const hashIdx = (clampedIdx * 7 + seed) % currentDefs.length;
-  return currentDefs[hashIdx] || targetDef;
-}
-
-/** Prepares a fresh, properly styled fighter model for the face-off layout (Singleton pool by character type) */
-function getFaceOffFighter(slotKey, def, targetAngle) {
-  if (!def) return null;
-  const type = def.type || def.id || 'fighter';
-  if (!_fighterTypePreviewCache[type]) {
-    const FighterClass = (typeof FIGHTER_CLASS_MAP !== 'undefined' && FIGHTER_CLASS_MAP && FIGHTER_CLASS_MAP[type]) ? FIGHTER_CLASS_MAP[type] : Fighter;
-    _fighterTypePreviewCache[type] = new FighterClass({
-      ...def,
-      startX: 0,
-      startY: 0,
-      startVx: 0,
-      startVy: 0,
-    });
-  }
-  const f = _fighterTypePreviewCache[type];
-  f.x = 0;
-  f.y = 0;
-  f.vx = 0;
-  f.vy = 0;
-  f.z = 0;
-  f.angle = targetAngle;
-  f.gunAngle = targetAngle;
-  f.rightGunAngle = targetAngle;
-  f.leftGunAngle = targetAngle;
-  f.shootCooldown = 0;
-  f.cooldown = 0;
-  f.combatAuraOpacity = 1.0;
-  f._isFaceOff = true;
-  f._isWinnerReveal = false;
-  f.hideHpText = true;
-  f.hideHands = false;
-  f.hideFrontHand = false;
-  f.hideBackHand = false;
-  f.afterImages = [];
-  f.attackCooldown = 0;
-  f.attackSwingTimer = 0;
-
-  if (type === 'rubbick' || type === 'trickster') {
-    f.tkTarget = null;
-    f.tkTimer = 0;
-    f.stolenType = null;
-    f.stolenWindUpTimer = 0;
-    f.beamCharge = 0;
-    f.beamTimer = 0;
-    f.activePullActive = false;
-    f.flurryHitsLeft = 0;
-    f.flurryTimer = 0;
-    f.stormActive = false;
-  } else if (type === 'gojo') {
-    f.isMeleeMode = true;
-    f.orbTransition = 0;
-    f.hideWeapon = true;
-    f.hideHands = true;
-    f.hideFrontHand = true;
-    f.hideBackHand = true;
-    f.redEffectTimer = 0;
-    f.domainActive = false;
-  } else if (type === 'sukuna') {
-    f.hideHands = true;
-    f.hideFrontHand = true;
-    f.hideBackHand = true;
-    f.combatAuraOpacity = 1.0;
-  } else if (type === 'yuta' || type === 'yuji') {
-    f.combatAuraOpacity = 1.0;
-  }
-
-  return f;
+/** Robust Fighter Type Resolver (works across def.type, def.characterId, and def.name) */
+function _getFighterType(def) {
+  if (!def) return '';
+  return (def.type || def.characterId || def.name || '').toString().toLowerCase();
 }
 
 /** Audio SFX Trigger Helper for Face-Off Sequences */
@@ -211,16 +31,58 @@ export function triggerFaceOffSFX(soundName, volume = 0.25) {
   }
 }
 
-/** Direct full-resolution PNG capture & download for YouTube / Showcase thumbnails */
+/**
+ * Screenshot saved popup notification toast.
+ */
+function drawSavedToast(ctx, width, height, timer, leftColor = '#38bdf8', rightColor = '#e51a2e') {
+  const alpha = Math.min(1.0, timer / 20);
+  const toastW = 300;
+  const toastH = 42;
+  const toastX = width / 2 - toastW / 2;
+  const toastY = 88;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // Solid comic drop shadow
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(toastX + 4, toastY + 4, toastW, toastH);
+
+  ctx.fillStyle = '#11141E';
+  ctx.strokeStyle = rightColor || '#E52521';
+  ctx.lineWidth = 2.0;
+  drawChamferedRect(ctx, toastX, toastY, toastW, toastH, 6);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 13px "Rajdhani", "Outfit", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('📸 THUMBNAIL PNG SAVED TO DOWNLOADS!', width / 2, toastY + toastH / 2);
+
+  ctx.restore();
+}
+
+/**
+ * Direct full-resolution PNG capture & download for YouTube / Showcase thumbnails.
+ * Guarantees that any transient toast notifications are cleanly excluded from the saved PNG.
+ */
 export function captureFaceOffScreenshot() {
   const canvas = state.canvas;
   if (!canvas) return;
   try {
+    state._isCapturingThumbnail = true;
+    drawFaceOffThumbnailScreen();
+
     const dataUrl = canvas.toDataURL('image/png');
+    state._isCapturingThumbnail = false;
+
     const currentDefs = getActiveFighterDefs();
     const p1Name = currentDefs[state.p1Index]?.name || 'Fighter-1';
     const p2Name = currentDefs[state.p2Index]?.name || 'Fighter-2';
-    const fileName = `circle-battle-thumbnail-${p1Name}-vs-${p2Name}.png`.toLowerCase().replace(/\s+/g, '-');
+    const modeName = (state.mode || '1v1').toLowerCase().replace(/\s+/g, '-');
+    const fileName = `circle-battle-${modeName}-${p1Name}-vs-${p2Name}.png`.toLowerCase().replace(/\s+/g, '-');
 
     if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.showSaveImageDialog === 'function') {
       window.electronAPI.showSaveImageDialog({ defaultName: fileName, base64Data: dataUrl }).then((res) => {
@@ -240,11 +102,823 @@ export function captureFaceOffScreenshot() {
     state.faceOffSavedToastTimer = 140;
     triggerFaceOffSFX('skill_dash5', 0.25);
   } catch (e) {
+    state._isCapturingThumbnail = false;
     console.error('Failed to export thumbnail PNG:', e);
   }
 }
 
-/** Main entry point for drawing the Face-Off & Countdown Overlay Screen */
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. High-Impact 3D Comic Typography Helper (Rule 11 Compliant)
+// ─────────────────────────────────────────────────────────────────────────────
+function _draw3DComicText(ctx, text, x, y, font, fillStyle, strokeStyle, strokeW, shadowOffsets, align = 'left') {
+  ctx.save();
+  ctx.font = font;
+  ctx.textAlign = align;
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 2;
+
+  // 1. Solid Black 3D Extrusion Shadow Passes
+  ctx.fillStyle = '#0E0F14';
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = strokeW;
+  for (const [ox, oy] of shadowOffsets) {
+    ctx.strokeText(text, x + ox, y + oy);
+    ctx.fillText(text, x + ox, y + oy);
+  }
+
+  // 2. Outer Black Manga Ink Border
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = strokeW;
+  ctx.strokeText(text, x, y);
+
+  // 3. Crisp Foreground Fill
+  ctx.fillStyle = fillStyle;
+  ctx.fillText(text, x, y);
+
+  ctx.restore();
+}
+
+/**
+ * Renders high-impact 3D comic fighter titles calibrated to fit within quadrant safe zones.
+ * Supports smart multi-word 2-line stacking for long names (e.g. "NAMELESS DEITY" or "ALUCARD & GUNSLINGER")
+ * and dynamic auto-scaling to guarantee 100% visibility on mobile FYP feeds.
+ */
+function _drawFighterQuadrantTitle(ctx, title, cx, cy, maxW = 220, align = 'center') {
+  if (!title) return;
+  ctx.save();
+
+  // Test single-line fit at bold starting size
+  let fontSize = 40;
+  ctx.font = `900 italic ${fontSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+
+  const words = title.trim().split(/\s+/);
+  // If multiple words and total width exceeds maxW, stack cleanly across 2 lines
+  if (words.length >= 2 && ctx.measureText(title).width > maxW) {
+    const mid = Math.ceil(words.length / 2);
+    const line1 = words.slice(0, mid).join(' ');
+    const line2 = words.slice(mid).join(' ');
+
+    let subSize = 32;
+    ctx.font = `900 italic ${subSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+    while (subSize > 16 && (ctx.measureText(line1).width > maxW || ctx.measureText(line2).width > maxW)) {
+      subSize -= 2;
+      ctx.font = `900 italic ${subSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+    }
+
+    const lineH = subSize * 1.10;
+    const fontStr = `900 italic ${subSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+    _draw3DComicText(ctx, line1, cx, cy - lineH * 0.52, fontStr, '#FFFFFF', '#0E0F14', 7, [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]], align);
+    _draw3DComicText(ctx, line2, cx, cy + lineH * 0.52, fontStr, '#FFFFFF', '#0E0F14', 7, [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]], align);
+  } else {
+    // Single line: auto-scale down if still exceeding maxW
+    while (fontSize > 16 && ctx.measureText(title).width > maxW) {
+      fontSize -= 2;
+      ctx.font = `900 italic ${fontSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+    }
+    const fontStr = `900 italic ${fontSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+    _draw3DComicText(ctx, title, cx, cy, fontStr, '#FFFFFF', '#0E0F14', 7, [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5]], align);
+  }
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Manga Panel Texture Helpers (Halftone Screentones, Speed Needles, Tonbo Marks)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Draws a 4-point filled needle polygon conforming strictly to Rule 16
+ * (sharp trailing tip, swelling body, sharp leading tip).
+ */
+function _drawMangaSpeedNeedle(ctx, x1, y1, x2, y2, thickness, color) {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const halfThick = thickness * 0.5;
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x1 + dx * 0.45 + nx * halfThick, y1 + dy * 0.45 + ny * halfThick);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x1 + dx * 0.45 - nx * halfThick, y1 + dy * 0.45 - ny * halfThick);
+  ctx.closePath();
+  ctx.fill();
+}
+
+/**
+ * Renders an authentic manga halftone / Ben-Day screentone dot matrix across a clipped polygon panel.
+ * Uses a single beginPath() / fill() batch for optimal 60 FPS performance.
+ */
+function _drawMangaHalftoneScreentone(ctx, polygon, dotColor = 'rgba(14, 15, 20, 0.16)', stepX = 13.0, stepY = 11.0, dotR = 1.8) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(polygon[0][0], polygon[0][1]);
+  for (let i = 1; i < polygon.length; i++) {
+    ctx.lineTo(polygon[i][0], polygon[i][1]);
+  }
+  ctx.closePath();
+  ctx.clip();
+
+  let minX = polygon[0][0], maxX = polygon[0][0];
+  let minY = polygon[0][1], maxY = polygon[0][1];
+  for (let i = 1; i < polygon.length; i++) {
+    if (polygon[i][0] < minX) minX = polygon[i][0];
+    if (polygon[i][0] > maxX) maxX = polygon[i][0];
+    if (polygon[i][1] < minY) minY = polygon[i][1];
+    if (polygon[i][1] > maxY) maxY = polygon[i][1];
+  }
+
+  ctx.fillStyle = dotColor;
+  ctx.beginPath();
+  let row = 0;
+  for (let py = minY - stepY; py <= maxY + stepY; py += stepY) {
+    const offsetX = (row % 2 === 1) ? stepX * 0.5 : 0;
+    for (let px = minX - stepX + offsetX; px <= maxX + stepX; px += stepX) {
+      ctx.moveTo(px + dotR, py);
+      ctx.arc(px, py, dotR, 0, Math.PI * 2);
+    }
+    row++;
+  }
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Renders dynamic manga focus speed needle clusters (Shūchū-sen) radiating from behind the cards.
+ */
+function _drawMangaFocusNeedles(ctx, cx, cy, polygon, lines) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(polygon[0][0], polygon[0][1]);
+  for (let i = 1; i < polygon.length; i++) {
+    ctx.lineTo(polygon[i][0], polygon[i][1]);
+  }
+  ctx.closePath();
+  ctx.clip();
+
+  for (let i = 0; i < lines.length; i++) {
+    const [ang, r1, r2, thick, col] = lines[i];
+    const cosA = Math.cos(ang);
+    const sinA = Math.sin(ang);
+    const x1 = cx + cosA * r1;
+    const y1 = cy + sinA * r1;
+    const x2 = cx + cosA * r2;
+    const y2 = cy + sinA * r2;
+    _drawMangaSpeedNeedle(ctx, x1, y1, x2, y2, thick, col);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws fine manga kakeami (カケアミ) ink cross-hatching in corners.
+ */
+function _drawMangaKakeamiHatching(ctx, startX, startY, endX, endY, angleDeg, spacing, color) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+
+  const rad = (angleDeg * Math.PI) / 180;
+  const cosA = Math.cos(rad);
+  const sinA = Math.sin(rad);
+  const len = Math.hypot(endX - startX, endY - startY) * 0.65;
+
+  const width = Math.abs(endX - startX);
+  const height = Math.abs(endY - startY);
+  const diag = Math.hypot(width, height);
+
+  ctx.rect(Math.min(startX, endX), Math.min(startY, endY), width, height);
+  ctx.clip();
+
+  for (let d = -diag; d <= diag; d += spacing) {
+    const ox = (startX + endX) / 2 + (-sinA) * d;
+    const oy = (startY + endY) / 2 + cosA * d;
+    ctx.moveTo(ox - cosA * len, oy - sinA * len);
+    ctx.lineTo(ox + cosA * len, oy + sinA * len);
+  }
+
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Draws authentic serialized manga manuscript guide marks (トンボ Tonbo registration marks & outer panel frame).
+ */
+function _drawMangaManuscriptMarks(ctx, width, height) {
+  ctx.save();
+
+  // 1. Outer Inked Comic Panel Border
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 3.0;
+  ctx.strokeRect(12, 12, width - 24, height - 24);
+
+  // Inner White Inset Hairline
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.0;
+  ctx.strokeRect(14, 14, width - 28, height - 28);
+
+  // 2. Tonbo Manuscript Registration Marks (L-brackets at corners and edge center ticks)
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+
+  // Top-Left L-bracket
+  ctx.moveTo(4, 12); ctx.lineTo(24, 12);
+  ctx.moveTo(12, 4); ctx.lineTo(12, 24);
+
+  // Top-Right L-bracket
+  ctx.moveTo(width - 24, 12); ctx.lineTo(width - 4, 12);
+  ctx.moveTo(width - 12, 4);  ctx.lineTo(width - 12, 24);
+
+  // Bottom-Left L-bracket
+  ctx.moveTo(4, height - 12); ctx.lineTo(24, height - 12);
+  ctx.moveTo(12, height - 24); ctx.lineTo(12, height - 4);
+
+  // Bottom-Right L-bracket
+  ctx.moveTo(width - 24, height - 12); ctx.lineTo(width - 4, height - 12);
+  ctx.moveTo(width - 12, height - 24); ctx.lineTo(width - 12, height - 4);
+
+  // Edge Center Registration Cross Ticks
+  const midX = width / 2;
+  const midY = height / 2;
+  ctx.moveTo(midX, 2);  ctx.lineTo(midX, 14);
+  ctx.moveTo(midX, height - 14); ctx.lineTo(midX, height - 2);
+  ctx.moveTo(2, midY);  ctx.lineTo(14, midY);
+  ctx.moveTo(width - 14, midY); ctx.lineTo(width - 2, midY);
+
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. Full-Bleed Diagonal Split Background & Manga Panel Texture
+// ─────────────────────────────────────────────────────────────────────────────
+function _drawFullBleedBackground(ctx, width, height, p1Def, p2Def, splitY1, splitY2) {
+  ctx.save();
+
+  const topPolygon = [
+    [0, 0],
+    [width, 0],
+    [width, splitY2],
+    [0, splitY1]
+  ];
+
+  const botPolygon = [
+    [0, splitY1],
+    [width, splitY2],
+    [width, height],
+    [0, height]
+  ];
+
+  // ── UPPER HALF: Player 1 Theme (Gold & Amber baseline reference) ─────────
+  const p1Type = _getFighterType(p1Def);
+  const isP1Gold = p1Type === 'ash' || p1Type === 'zenitsu' || p1Type === 'escanor';
+
+  const topGrad = ctx.createLinearGradient(0, 0, width, splitY2);
+  if (isP1Gold) {
+    topGrad.addColorStop(0.0, '#FCD34D');
+    topGrad.addColorStop(0.45, '#F59E0B');
+    topGrad.addColorStop(1.0, '#D97706');
+  } else {
+    const baseColor = getFaceOffThemeColor(p1Def, '#F59E0B');
+    topGrad.addColorStop(0.0, '#FFFFFF');
+    topGrad.addColorStop(0.2, baseColor);
+    topGrad.addColorStop(1.0, getDarkThemeTone(baseColor, 0.45));
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(width, 0);
+  ctx.lineTo(width, splitY2);
+  ctx.lineTo(0, splitY1);
+  ctx.closePath();
+  ctx.fillStyle = topGrad;
+  ctx.fill();
+
+  // ── LOWER HALF: Player 2 Theme (Fighter Signature Color) ────────────────
+  const p2Type = _getFighterType(p2Def);
+  const isP2Gold = p2Type === 'ash' || p2Type === 'zenitsu' || p2Type === 'escanor';
+  const bothGold = isP1Gold && isP2Gold; // Only force contrast if BOTH fighters share yellow/gold
+
+  const botGrad = ctx.createLinearGradient(0, splitY1, width, height);
+  if (bothGold) {
+    // Mirror clash: Both are gold (e.g. Zenitsu vs Escanor), give P2 high-contrast crimson
+    botGrad.addColorStop(0.0, '#EF4444');
+    botGrad.addColorStop(0.45, '#DC2626');
+    botGrad.addColorStop(1.0, '#991B1B');
+  } else if (isP2Gold) {
+    // Zenitsu / Ash / Escanor as Player 2 gets authentic Lightning Gold & Amber!
+    botGrad.addColorStop(0.0, '#FDE68A');
+    botGrad.addColorStop(0.45, '#F59E0B');
+    botGrad.addColorStop(1.0, '#B45309');
+  } else {
+    // Dynamic theme color driven directly by P2's configuration
+    const baseColor = getFaceOffThemeColor(p2Def, '#DC2626');
+    botGrad.addColorStop(0.0, baseColor);
+    botGrad.addColorStop(0.65, getDarkThemeTone(baseColor, 0.55));
+    botGrad.addColorStop(1.0, getDarkThemeTone(baseColor, 0.25));
+  }
+
+  ctx.beginPath();
+  ctx.moveTo(0, splitY1);
+  ctx.lineTo(width, splitY2);
+  ctx.lineTo(width, height);
+  ctx.lineTo(0, height);
+  ctx.closePath();
+  ctx.fillStyle = botGrad;
+  ctx.fill();
+
+  // ── MANGA HALFTONE SCREENTONE TEXTURE (網点 Amiten) ────────────────────
+  _drawMangaHalftoneScreentone(ctx, topPolygon, 'rgba(14, 15, 20, 0.15)', 13.0, 11.0, 1.8);
+  _drawMangaHalftoneScreentone(ctx, botPolygon, 'rgba(14, 15, 20, 0.20)', 13.0, 11.0, 1.8);
+
+  // ── RADIAL MANGA FOCUS SPEED NEEDLES (集中線 Shūchū-sen - Rule 16) ──────
+  // Card 1 Focus Needles (bursting outward from behind P1 card)
+  const p1FocusLines = [
+    [-3.10, 110, 370, 2.8, 'rgba(255, 255, 255, 0.28)'],
+    [-2.85, 120, 390, 1.8, 'rgba(14, 15, 20, 0.22)'],
+    [-2.60, 105, 350, 3.0, 'rgba(255, 255, 255, 0.32)'],
+    [-2.35, 115, 410, 2.0, 'rgba(14, 15, 20, 0.20)'],
+    [-2.10, 100, 380, 3.2, 'rgba(255, 255, 255, 0.30)'],
+    [-1.85, 125, 420, 2.2, 'rgba(14, 15, 20, 0.24)'],
+    [-1.60, 110, 400, 3.4, 'rgba(255, 255, 255, 0.35)'],
+    [-1.35, 120, 370, 1.9, 'rgba(14, 15, 20, 0.20)'],
+    [-1.10, 105, 390, 2.9, 'rgba(255, 255, 255, 0.28)'],
+    [-0.85, 115, 350, 2.1, 'rgba(14, 15, 20, 0.22)'],
+    [-0.60, 100, 400, 3.2, 'rgba(255, 255, 255, 0.32)'],
+    [-0.35, 125, 430, 2.2, 'rgba(14, 15, 20, 0.24)'],
+    [-0.10, 110, 380, 2.9, 'rgba(255, 255, 255, 0.28)'],
+    [0.15, 120, 350, 1.9, 'rgba(14, 15, 20, 0.20)'],
+    [0.40, 105, 400, 3.0, 'rgba(255, 255, 255, 0.30)'],
+    [0.65, 115, 370, 2.1, 'rgba(14, 15, 20, 0.22)'],
+    [0.90, 100, 340, 2.8, 'rgba(255, 255, 255, 0.28)'],
+    [1.15, 120, 360, 2.2, 'rgba(14, 15, 20, 0.24)'],
+    [1.40, 110, 330, 2.7, 'rgba(255, 255, 255, 0.26)'],
+    [1.65, 105, 310, 1.9, 'rgba(14, 15, 20, 0.20)']
+  ];
+  _drawMangaFocusNeedles(ctx, 158, 264, topPolygon, p1FocusLines);
+
+  // Card 2 Focus Needles (bursting outward from behind P2 card)
+  const p2FocusLines = [
+    [-2.80, 110, 350, 2.0, 'rgba(14, 15, 20, 0.24)'],
+    [-2.50, 120, 370, 3.0, 'rgba(255, 255, 255, 0.28)'],
+    [-2.20, 105, 340, 2.2, 'rgba(14, 15, 20, 0.22)'],
+    [-1.90, 115, 380, 3.2, 'rgba(255, 255, 255, 0.30)'],
+    [-1.60, 100, 330, 2.1, 'rgba(14, 15, 20, 0.20)'],
+    [-1.30, 125, 400, 3.1, 'rgba(255, 255, 255, 0.32)'],
+    [-1.00, 110, 360, 2.3, 'rgba(14, 15, 20, 0.24)'],
+    [-0.70, 120, 390, 3.3, 'rgba(255, 255, 255, 0.34)'],
+    [-0.40, 105, 350, 1.9, 'rgba(14, 15, 20, 0.20)'],
+    [-0.10, 115, 380, 2.8, 'rgba(255, 255, 255, 0.28)'],
+    [0.20, 100, 400, 3.2, 'rgba(255, 255, 255, 0.32)'],
+    [0.50, 125, 420, 2.2, 'rgba(14, 15, 20, 0.24)'],
+    [0.80, 110, 390, 2.9, 'rgba(255, 255, 255, 0.29)'],
+    [1.10, 120, 370, 2.0, 'rgba(14, 15, 20, 0.22)'],
+    [1.40, 105, 400, 3.4, 'rgba(255, 255, 255, 0.34)'],
+    [1.70, 115, 380, 2.1, 'rgba(14, 15, 20, 0.20)'],
+    [2.00, 100, 410, 3.0, 'rgba(255, 255, 255, 0.30)'],
+    [2.30, 120, 360, 2.2, 'rgba(14, 15, 20, 0.24)'],
+    [2.60, 110, 390, 2.8, 'rgba(255, 255, 255, 0.28)'],
+    [2.90, 105, 340, 1.9, 'rgba(14, 15, 20, 0.20)']
+  ];
+  _drawMangaFocusNeedles(ctx, 382, 672, botPolygon, p2FocusLines);
+
+  // ── DIAGONAL CLASH MOTION NEEDLES (Parallel to Seam) ───────────────────
+  const seamAngle = Math.atan2(splitY2 - splitY1, width);
+  const cosS = Math.cos(seamAngle);
+  const sinS = Math.sin(seamAngle);
+  const normX = -sinS;
+  const normY = cosS;
+
+  const seamStreaks = [
+    { dist: -90, t: 0.12, len: 210, thick: 2.8, col: 'rgba(255, 255, 255, 0.25)' },
+    { dist: -50, t: 0.50, len: 170, thick: 2.0, col: 'rgba(14, 15, 20, 0.22)' },
+    { dist: -26, t: 0.22, len: 250, thick: 3.2, col: 'rgba(255, 255, 255, 0.30)' },
+    { dist: 26,  t: 0.38, len: 240, thick: 3.0, col: 'rgba(255, 255, 255, 0.28)' },
+    { dist: 58,  t: 0.62, len: 190, thick: 2.2, col: 'rgba(14, 15, 20, 0.24)' },
+    { dist: 100, t: 0.16, len: 210, thick: 2.6, col: 'rgba(255, 255, 255, 0.22)' }
+  ];
+
+  for (let i = 0; i < seamStreaks.length; i++) {
+    const s = seamStreaks[i];
+    const baseX = s.t * width;
+    const baseY = splitY1 + s.t * (splitY2 - splitY1);
+    const startX = baseX + normX * s.dist - cosS * (s.len * 0.5);
+    const startY = baseY + normY * s.dist - sinS * (s.len * 0.5);
+    const endX = baseX + normX * s.dist + cosS * (s.len * 0.5);
+    const endY = baseY + normY * s.dist + sinS * (s.len * 0.5);
+    _drawMangaSpeedNeedle(ctx, startX, startY, endX, endY, s.thick, s.col);
+  }
+
+  // ── CORNER MANGA KAKEAMI INK HATCHING (カケアミ) ───────────────────────
+  // Top-Right Outer Inked Hatching (P1 corner)
+  _drawMangaKakeamiHatching(ctx, width - 120, 16, width - 16, 120, -35, 7, 'rgba(14, 15, 20, 0.22)');
+  // Bottom-Left Outer Inked Hatching (P2 corner)
+  _drawMangaKakeamiHatching(ctx, 16, height - 120, 120, height - 16, -35, 7, 'rgba(14, 15, 20, 0.26)');
+
+  // ── THE DIAGONAL MANGA PANEL GUTTER (コマ割り Inked Slice) ─────────────
+  // 1. Deep Black Gutter Trench
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 16;
+  ctx.beginPath();
+  ctx.moveTo(-10, splitY1);
+  ctx.lineTo(width + 10, splitY2);
+  ctx.stroke();
+
+  // 2. Inner White Channel
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(-10, splitY1);
+  ctx.lineTo(width + 10, splitY2);
+  ctx.stroke();
+
+  // 3. Dynamic Manga Slash Accents along Gutter
+  ctx.fillStyle = '#0E0F14';
+  const gutterTicks = [55, 115, 175, 235, 305, 365, 425, 485];
+  for (let i = 0; i < gutterTicks.length; i++) {
+    const gx = gutterTicks[i];
+    const gy = splitY1 + (gx / width) * (splitY2 - splitY1);
+    ctx.beginPath();
+    ctx.moveTo(gx - normX * 8 - cosS * 3, gy - normY * 8 - sinS * 3);
+    ctx.lineTo(gx + normX * 8 + cosS * 3, gy + normY * 8 + sinS * 3);
+    ctx.lineTo(gx + normX * 8 - cosS * 1, gy + normY * 8 - sinS * 1);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── MANGA MANUSCRIPT MARKS (トンボ Tonbo Registration Marks & Border) ──
+  _drawMangaManuscriptMarks(ctx, width, height);
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Pokémon TCG Collector Card from Character Card Selection
+// ─────────────────────────────────────────────────────────────────────────────
+/**
+ * Renders the authentic Pokémon TCG Collector Card directly from Character Selection.
+ * Features:
+ * - High-impact solid black 3D drop shadow
+ * - Full-art stage with grade-driven radiant aura and 16-bit sprite showcase
+ * - Classic TCG Top Header Bar: [BASIC] + Name + HP + Energy Orb
+ * - Top-left wedge rarity banner (e.g. SS ★★★)
+ * - Lower Ability Capsule + Attack Move + Energy Pips + Set Number
+ * - Prismatic Metallic / Holographic Foil Frame with corner diamond sparkles
+ */
+function _drawFighterCollectorCard(ctx, cx, cy, w, h, angle, def, idx) {
+  if (!def) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (angle) ctx.rotate(angle);
+
+  // Solid Black 3D Comic Drop Shadow underneath the TCG card
+  ctx.fillStyle = '#0E0F14';
+  drawChamferedRect(ctx, -w / 2 + 5, -h / 2 + 7, w, h, 8);
+  ctx.fill();
+
+  // Draw the official Pokémon TCG Collector Card from Character Select
+  drawCollectorFighterCard(
+    ctx,
+    def,
+    idx,
+    -w / 2,
+    -h / 2,
+    w,
+    h,
+    false,
+    null
+  );
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Center Diamond-Faceted Anime Battle "VS" Duel Crest
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Draws an aggressive, chiseled diamond-faceted anime battle duel crest
+ * with dual-tone signature aura bevels, radiant electrum gold core,
+ * and high-impact interlocking 3D "VS" comic lettering.
+ */
+function _drawCenterVsBadge(ctx, cx, cy, rot, leftColor = '#38BDF8', rightColor = '#F59E0B') {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rot);
+
+  const w = 118;
+  const h = 72;
+  const tipX = 14; // Arrow spikes extending horizontally along the seam
+
+  // Helper: Traces the 8-sided faceted diamond duel crest
+  const traceVsCrest = (inset = 0) => {
+    const hw = w / 2 - inset;
+    const hh = h / 2 - inset;
+    const tx = tipX - inset * 0.35;
+    const chamferX = hw * 0.50;
+
+    ctx.beginPath();
+    ctx.moveTo(-hw - tx, 0);              // Left diamond arrow tip
+    ctx.lineTo(-chamferX, -hh);           // Top-left shoulder
+    ctx.lineTo(0, -hh - 2);               // Top crown point
+    ctx.lineTo(chamferX, -hh);            // Top-right shoulder
+    ctx.lineTo(hw + tx, 0);               // Right diamond arrow tip
+    ctx.lineTo(chamferX, hh);             // Bottom-right shoulder
+    ctx.lineTo(0, hh + 2);                // Bottom crown point
+    ctx.lineTo(-chamferX, hh);            // Bottom-left shoulder
+    ctx.closePath();
+  };
+
+  // 1. Solid Pitch-Black 3D Extruded Drop Shadow (+5.5px, +7.5px)
+  ctx.save();
+  ctx.translate(5.5, 7.5);
+  traceVsCrest(0);
+  ctx.fillStyle = '#08090C';
+  ctx.fill();
+  ctx.restore();
+
+  // 2. Heavy Outer Manga Ink Boundary (#0E0F14, lineWidth 4.5)
+  traceVsCrest(0);
+  ctx.fillStyle = '#0E0F14';
+  ctx.fill();
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 4.5;
+  ctx.lineJoin = 'miter';
+  ctx.stroke();
+
+  // 3. Two-Tone Thematic Clash Bevel Frame (P1 leftColor vs P2 rightColor)
+  ctx.save();
+  traceVsCrest(2.2);
+  ctx.clip();
+
+  // Left side: P1 signature aura color
+  ctx.beginPath();
+  ctx.rect(-w, -h, w, h * 2);
+  const leftGrad = ctx.createLinearGradient(-w / 2, 0, 0, 0);
+  leftGrad.addColorStop(0.0, leftColor || '#38BDF8');
+  leftGrad.addColorStop(0.7, '#FFFFFF');
+  leftGrad.addColorStop(1.0, '#CBD5E1');
+  ctx.fillStyle = leftGrad;
+  ctx.fill();
+
+  // Right side: P2 signature aura color
+  ctx.beginPath();
+  ctx.rect(0, -h, w, h * 2);
+  const rightGrad = ctx.createLinearGradient(0, 0, w / 2, 0);
+  rightGrad.addColorStop(0.0, '#CBD5E1');
+  rightGrad.addColorStop(0.3, '#FFFFFF');
+  rightGrad.addColorStop(1.0, rightColor || '#F59E0B');
+  ctx.fillStyle = rightGrad;
+  ctx.fill();
+
+  // Vertical center division seam
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(0, -h);
+  ctx.lineTo(0, h);
+  ctx.stroke();
+  ctx.restore();
+
+  // 4. Inner Radiant Electrum Gold & Molten Amber Core
+  ctx.save();
+  traceVsCrest(5.5);
+  ctx.clip();
+
+  const coreGrad = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+  coreGrad.addColorStop(0.00, '#FFFDE0'); // Incandescent light gold
+  coreGrad.addColorStop(0.24, '#FFE600'); // Radiant solar gold
+  coreGrad.addColorStop(0.55, '#FF9900'); // Molten amber
+  coreGrad.addColorStop(0.85, '#D97706'); // Deep amber
+  coreGrad.addColorStop(1.00, '#78350F'); // Bronze base shadow
+  ctx.fillStyle = coreGrad;
+  ctx.fill();
+
+  // Subtle diagonal speed cuts across gold plate
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+  ctx.fillRect(-w / 2, -12, w, 2.5);
+  ctx.fillStyle = 'rgba(120, 53, 15, 0.35)';
+  ctx.fillRect(-w / 2, 8, w, 2.0);
+
+  ctx.restore();
+
+  // 5. Crisp Inner Chrome Hairline
+  traceVsCrest(5.5);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  // 6. Flanking Sharp Speed Cuts on the side tips
+  const drawTipChevron = (tipSign) => {
+    ctx.save();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.moveTo(tipSign * (w / 2 + tipX - 2), 0);
+    ctx.lineTo(tipSign * (w / 2 + 3), -5);
+    ctx.lineTo(tipSign * (w / 2 + 5), 0);
+    ctx.lineTo(tipSign * (w / 2 + 3), 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+  drawTipChevron(-1);
+  drawTipChevron(1);
+
+  // 7. Visceral Chiseled Manga "VS" Typography
+  _draw3DComicText(
+    ctx,
+    'VS',
+    0,
+    1.5,
+    '900 italic 44px "Outfit", "Arial Black", "Impact", sans-serif',
+    '#FFFFFF',
+    '#08090C',
+    8.5,
+    [[1.5, 1.5], [3.0, 3.0], [4.5, 4.5], [6.0, 6.0]],
+    'center'
+  );
+
+  // Specular top highlight on letters
+  ctx.save();
+  ctx.font = '900 italic 44px "Outfit", "Arial Black", "Impact", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#FFF8D0';
+  ctx.fillText('VS', -0.8, -1.2);
+  ctx.restore();
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Bottom-Left Challenger Banner ("WHO WILL TAKE THE L?" & Match Mode Tag)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// High-CTR YouTube Shorts Viral Hooks
+export const THUMBNAIL_HOOKS = [
+  'WHO WILL TAKE THE L?', // Primary: High-engagement gaming & anime showdown hook
+  'WHO SURVIVES?',        // Intense anime deathmatch hook
+  'WHO IS STRONGER?',     // Powerscaling / debate driver
+  'THE STRONGEST?',       // Manga clash homage
+  'FINAL SHOWDOWN',       // Cinematic tournament climax
+];
+
+/**
+ * Draws the redesigned bottom-left challenger banner:
+ *  - Top: Angled Cyber-Manga Strike Ribbon with customizable high-CTR hook (default: "WHO WILL TAKE THE L?")
+ *  - Bottom: Tactical Frosted Titanium Match Slab with clean mode label (zero "MT. SILVER")
+ */
+function _drawBottomLeftBanner(ctx, x, y, modeTagText = 'STAND OFF DUEL', hookText = null) {
+  ctx.save();
+
+  const hookIdx = (typeof state._thumbnailHookIndex === 'number') ? state._thumbnailHookIndex : 0;
+  const currentHook = hookText || THUMBNAIL_HOOKS[hookIdx % THUMBNAIL_HOOKS.length] || 'WHO WILL TAKE THE L?';
+
+  // ── 1. Redesigned Cyber-Manga Strike Ribbon (Top Hook Banner) ─────────────
+  const redW = 212;
+  const redH = 40;
+  const slantX = 14;
+  const notch = 7;
+
+  // Solid Black 3D Drop Shadow (+5px, +6px)
+  ctx.fillStyle = '#08090C';
+  ctx.beginPath();
+  ctx.moveTo(x + notch + 5, y + 6);
+  ctx.lineTo(x + redW + 5, y + 6);
+  ctx.lineTo(x + redW - slantX + 5, y + redH + 6);
+  ctx.lineTo(x - slantX + 5, y + redH + 6);
+  ctx.lineTo(x - slantX + 5, y + notch + 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Outer Manga Border (#0E0F14, lineWidth 4.0)
+  ctx.beginPath();
+  ctx.moveTo(x + notch, y);
+  ctx.lineTo(x + redW, y);
+  ctx.lineTo(x + redW - slantX, y + redH);
+  ctx.lineTo(x - slantX, y + redH);
+  ctx.lineTo(x - slantX, y + notch);
+  ctx.closePath();
+
+  // Dynamic Crimson-to-Ruby Core Gradient
+  const redGrad = ctx.createLinearGradient(x, y, x + redW, y + redH);
+  redGrad.addColorStop(0.00, '#FF2252'); // Electric rose crimson
+  redGrad.addColorStop(0.40, '#DC2626'); // Radiant red
+  redGrad.addColorStop(1.00, '#991B1B'); // Deep ruby
+  ctx.fillStyle = redGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 4.0;
+  ctx.lineJoin = 'miter';
+  ctx.stroke();
+
+  // Top Specular Sheen Beam across upper third
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+  ctx.fillRect(x + notch + 2, y + 2, redW - notch - 16, 2.0);
+
+  // Left Tactical Hazard Chevrons (/// in Gold)
+  ctx.fillStyle = '#FFD700';
+  for (let ci = 0; ci < 3; ci++) {
+    const cx0 = x + 4 + ci * 6;
+    ctx.beginPath();
+    ctx.moveTo(cx0 + 3, y + 8);
+    ctx.lineTo(cx0 + 6, y + 8);
+    ctx.lineTo(cx0 + 2, y + redH - 8);
+    ctx.lineTo(cx0 - 1, y + redH - 8);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Auto-scale font size dynamically to fit comfortably within the ribbon
+  let hookFontSize = 19.5;
+  const maxHookW = redW - notch - slantX - 28;
+  ctx.font = `900 italic ${hookFontSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+  while (hookFontSize > 13 && ctx.measureText(currentHook).width > maxHookW) {
+    hookFontSize -= 0.5;
+    ctx.font = `900 italic ${hookFontSize}px "Outfit", "Arial Black", "Impact", sans-serif`;
+  }
+
+  // Bold Italic 3D Comic Hook Typography
+  _draw3DComicText(
+    ctx,
+    currentHook,
+    x + (redW / 2) + 7 - (slantX / 2),
+    y + redH / 2 + 0.5,
+    `900 italic ${hookFontSize}px "Outfit", "Arial Black", "Impact", sans-serif`,
+    '#FFFFFF',
+    '#08090C',
+    5.2,
+    [[1.5, 1.5], [3.0, 3.0]],
+    'center'
+  );
+
+  // ── 2. Redesigned Tactical Frosted Titanium Slab (Bottom Mode Tag) ────────
+  const whiteY = y + redH + 8;
+  const whiteW = 210;
+  const whiteH = 32;
+  const whiteSlant = 11;
+
+  // Solid Black 3D Drop Shadow (+5px, +6px)
+  ctx.fillStyle = '#08090C';
+  ctx.beginPath();
+  ctx.moveTo(x + 5, whiteY + 6);
+  ctx.lineTo(x + whiteW + 5, whiteY + 6);
+  ctx.lineTo(x + whiteW - whiteSlant + 5, whiteY + whiteH + 6);
+  ctx.lineTo(x + 5, whiteY + whiteH + 6);
+  ctx.closePath();
+  ctx.fill();
+
+  // Frosted Brushed Titanium Slab
+  ctx.beginPath();
+  ctx.moveTo(x, whiteY);
+  ctx.lineTo(x + whiteW, whiteY);
+  ctx.lineTo(x + whiteW - whiteSlant, whiteY + whiteH);
+  ctx.lineTo(x, whiteY + whiteH);
+  ctx.closePath();
+
+  const platGrad = ctx.createLinearGradient(x, whiteY, x, whiteY + whiteH);
+  platGrad.addColorStop(0.00, '#FFFFFF'); // Clean top reflection
+  platGrad.addColorStop(0.35, '#F8FAFC'); // Frosted white
+  platGrad.addColorStop(0.80, '#E2E8F0'); // Titanium platinum
+  platGrad.addColorStop(1.00, '#CBD5E1'); // Grounded metal
+  ctx.fillStyle = platGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 4.0;
+  ctx.lineJoin = 'miter';
+  ctx.stroke();
+
+  // Left Golden Tactical Edge Tab
+  ctx.fillStyle = '#F59E0B';
+  ctx.fillRect(x + 1.5, whiteY + 1.5, 4.5, whiteH - 3.0);
+
+  // Clean Bold Charcoal Typography (NEVER containing "MT. SILVER")
+  ctx.fillStyle = '#0E0F14';
+  ctx.font = '900 13px "Outfit", "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(modeTagText, x + (whiteW / 2) + 3 - (whiteSlant / 2), whiteY + whiteH / 2 + 0.5);
+
+  ctx.restore();
+
+  // Interactive Click Region: Register button so clicking the banner cycles through viral hooks!
+  _registerButton(x - slantX, y, Math.max(redW, whiteW) + slantX, redH + whiteH + 8, () => {
+    state._thumbnailHookIndex = ((state._thumbnailHookIndex || 0) + 1) % THUMBNAIL_HOOKS.length;
+    triggerFaceOffSFX('menu_select', 0.25);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. Main Render Entry Point (Strictly Driven by state.mode)
+// ─────────────────────────────────────────────────────────────────────────────
 export function drawFaceOffThumbnailScreen() {
   const { ctx, canvas } = state;
   _clearButtons();
@@ -252,1118 +926,161 @@ export function drawFaceOffThumbnailScreen() {
   ctx.resetTransform();
   ctx.globalAlpha = 1.0;
   ctx.globalCompositeOperation = 'source-over';
-  ctx.shadowBlur = 0;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.shadowBlur = 0; // Strictly Rule 11 compliant
 
-  const timer = state.faceOffTimer || 0;
-  const scale = state.faceOffScale || 1.35;
-  const mode = state.mode || GAME_MODES.ONE_VS_ONE;
-  const exitProgress = Math.min(1.0, Math.max(0, (timer - 216) / 24));
+  const width = canvas.width;
+  const height = canvas.height;
 
-  // Resolve fighter definitions and theme colors
-  const currentDefs = getActiveFighterDefs();
-  const p1Def = currentDefs[state.p1Index] || currentDefs[0] || FIGHTER_DEFS[0];
-  const p2Def = currentDefs[state.p2Index] || currentDefs[1] || currentDefs[0];
-  const p3Def = currentDefs[state.p3Index] || currentDefs[2] || currentDefs[0];
-  const p4Def = currentDefs[state.p4Index] || currentDefs[3] || currentDefs[0];
-
-  const getFaceOffThemeColor = (def, fallback = '#38bdf8') => {
-    if (!def) return fallback;
-    if (def.type === 'yuta' || def.id === 23 || def.id === 'yuta') {
-      return '#FF1493';
-    }
-    const charId = def.type || def.id || def.key;
-    const charCfg = (charId && CONFIG && CONFIG[charId]) ? CONFIG[charId] : null;
-    let color = charCfg?.themeColor || def.themeColor || charCfg?.color || def.color || fallback;
-    if (typeof color === 'string' && /^[0-9a-fA-F]{3,8}$/.test(color)) {
-      color = '#' + color;
-    }
-    return color;
-  };
-
-  let leftThemeColor = getFaceOffThemeColor(p1Def, '#38bdf8');
-  let rightThemeColor = getFaceOffThemeColor(p2Def, '#e51a2e');
-
-  if (mode === GAME_MODES.ONE_VS_TWO || mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
-    const t1 = Math.min(1.0, timer / 36);
-    const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
-    const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
-    leftThemeColor = getFaceOffThemeColor(rollP1Def, leftThemeColor);
-
-    const t2 = Math.min(1.0, timer / 48);
-    const k2 = Math.min(20, Math.round(20 * (1 - Math.pow(1 - t2, 3.8))));
-    const rollP2Def = getStripFighterDef(k2, 20, p2Def, getSlotSeed('p2'));
-    rightThemeColor = getFaceOffThemeColor(rollP2Def, rightThemeColor);
-  } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2') {
-    const t1 = Math.min(1.0, timer / 34);
-    const k1 = Math.min(14, Math.round(14 * (1 - Math.pow(1 - t1, 3.8))));
-    const rollP1Def = getStripFighterDef(k1, 14, p1Def, getSlotSeed('p1'));
-    leftThemeColor = getFaceOffThemeColor(rollP1Def, leftThemeColor);
-
-    const t2 = Math.min(1.0, timer / 54);
-    const k2 = Math.min(22, Math.round(22 * (1 - Math.pow(1 - t2, 3.8))));
-    const rollP2Def = getStripFighterDef(k2, 22, p2Def, getSlotSeed('p2'));
-    rightThemeColor = getFaceOffThemeColor(rollP2Def, rightThemeColor);
-  } else {
-    // 1v1 Duel / Stand Off / Tactical 1v1 / Tactical Standoff / TLFS
-    const t1 = Math.min(1.0, timer / 38);
-    const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
-    const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
-    leftThemeColor = getFaceOffThemeColor(rollP1Def, leftThemeColor);
-
-    const t2 = Math.min(1.0, timer / 58);
-    const k2 = Math.min(22, Math.round(22 * (1 - Math.pow(1 - t2, 3.8))));
-    const rollP2Def = getStripFighterDef(k2, 22, p2Def, getSlotSeed('p2'));
-    rightThemeColor = getFaceOffThemeColor(rollP2Def, rightThemeColor);
-  }
-
-  if (timer <= 2) {
-    clearHealthHud();
-    state._hasPlayedCjFaceOffIntroVoice = false;
-  }
-
-  // Play CJ intro voiceline ONCE when the countdown in the show-off screen is about to end
-  if (timer >= 180 && !state._hasPlayedCjFaceOffIntroVoice) {
-    const hasCj = [p1Def, p2Def, p3Def, p4Def].some(d => d && (d.type === 'cj' || d.id === 'cj'));
-    if (hasCj) {
-      state._hasPlayedCjFaceOffIntroVoice = true;
-      const cjSnd = CONFIG.cj?.sounds?.introVoiceline || 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3';
-      const cjVol = CONFIG.cj?.soundVolumes?.introVoiceline ?? 3.0;
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX(cjSnd, cjVol);
-      }
-    }
-  }
-
-  // Full-Screen Click to skip straight to "FIGHT!" and enter arena
-  _registerButton(0, 0, canvas.width, canvas.height, () => {
+  // Full-screen click proceeds to countdown
+  _registerButton(0, 0, width, height, () => {
     proceedFromFaceOffToCountdown();
   });
 
-  // 1. Draw Anime Grunge Background (4-Way Zigzag Split for FFA, Diagonal 2-Way Split for others)
-  const isFFA = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
-  if (isFFA) {
-    const isVertical = (state.viewOrientation !== 'horizontal');
-    const ffaDefs = isVertical ? [p1Def, p2Def, p3Def] : [p1Def, p2Def, p3Def, p4Def];
-    const ffaDurations = [34, 44, 54, 64];
-    const ffaSlots = [14, 18, 22, 26];
-    const ffaColors = ffaDefs.map((def, i) => {
-      const t = Math.min(1.0, timer / ffaDurations[i]);
-      const k = Math.min(ffaSlots[i], Math.round(ffaSlots[i] * (1 - Math.pow(1 - t, 3.8))));
-      const rollDef = getStripFighterDef(k, ffaSlots[i], def, getSlotSeed(`ffa_${i}`));
-      return getFaceOffThemeColor(rollDef, ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][i]);
-    });
-    drawFfaAnimeGrungeZigzagBackground(ctx, canvas.width, canvas.height, ffaColors, timer);
-    drawFfaFaceOff(ctx, canvas.width, canvas.height, ffaDefs, scale, timer, exitProgress);
+  // ── 1. Resolve Active Game Mode directly from state.mode ──────────────────
+  const activeMode = state.mode || GAME_MODES.ONE_VS_ONE;
+
+  const is1v1 = (
+    activeMode === '1v1' ||
+    activeMode === GAME_MODES.ONE_VS_ONE ||
+    activeMode === 'Stand Off' ||
+    activeMode === GAME_MODES.STAND_OFF ||
+    activeMode === GAME_MODES.HORIZONTAL_1V1 ||
+    activeMode === '1v1 Widescreen Duel' ||
+    !state.mode
+  );
+
+  const is1v2 = (
+    activeMode === '1v2' ||
+    activeMode === GAME_MODES.ONE_VS_TWO ||
+    activeMode === '1v2 Stand Off' ||
+    activeMode === GAME_MODES.STAND_OFF_1V2 ||
+    (activeMode === 'Boss Battle' && !state.bossBattleNoTeammate)
+  );
+
+  const is2v2 = (
+    activeMode === '2v2' ||
+    activeMode === GAME_MODES.TWO_VS_TWO ||
+    activeMode === '2v2v2v2 Quad' ||
+    activeMode === GAME_MODES.TEAMFIGHT_2V2V2V2
+  );
+
+  const isTag = (
+    activeMode === 'Tag Match' ||
+    activeMode === GAME_MODES.TAG_MATCH ||
+    activeMode === 'TAG_MATCH'
+  );
+
+  const isBoss = (
+    activeMode === 'Boss Battle' ||
+    activeMode === GAME_MODES.BOSS_BATTLE
+  );
+
+  const isSurvivor = (
+    activeMode === 'Survivor' ||
+    activeMode === GAME_MODES.SURVIVOR
+  );
+
+  // ── 2. Resolve Active Combatant Definitions ──────────────────────────────
+  const currentDefs = getActiveFighterDefs();
+  const p1Idx = (typeof state.p1Index === 'number') ? state.p1Index : 0;
+  const p2Idx = (typeof state.p2Index === 'number') ? state.p2Index : 1;
+  const p3Idx = (typeof state.p3Index === 'number') ? state.p3Index : 2;
+  const p4Idx = (typeof state.p4Index === 'number') ? state.p4Index : 3;
+
+  const p1Def = currentDefs[p1Idx] || currentDefs[0] || FIGHTER_DEFS[0];
+  const p2Def = currentDefs[p2Idx] || currentDefs[1] || currentDefs[0];
+  const p3Def = currentDefs[p3Idx] || currentDefs[2];
+  const p4Def = currentDefs[p4Idx] || currentDefs[3];
+
+  // ── 3. Full-Bleed Diagonal Split Background ──────────────────────────────
+  const splitY1 = height * 0.59; // Left edge split ~566px
+  const splitY2 = height * 0.39; // Right edge split ~374px
+  _drawFullBleedBackground(ctx, width, height, p1Def, p2Def, splitY1, splitY2);
+
+  // ── 4. Player 1 Title Typography (P1 Name or Team Name) ──────────────────
+  let p1Title = p1Def.name.toUpperCase();
+  if (is2v2 && p3Def) {
+    p1Title = `${p1Def.name.toUpperCase()} & ${p3Def.name.toUpperCase()}`;
+    // 2v2 Mode: Centered above dual cards, lowered safely away from top crop
+    _drawFighterQuadrantTitle(ctx, p1Title, width / 2, 108, 460, 'center');
   } else {
-    drawAnimeGrungeSplitBackground(ctx, canvas.width, canvas.height, leftThemeColor, rightThemeColor, timer);
-
-    // 2. Render Mode-Specific Side-by-Side Face-Off Layout with "VS" to Countdown Transition
-    if (mode === GAME_MODES.ONE_VS_TWO || mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === '1v2') {
-      if (state.bossBattleNoTeammate) {
-        draw1v1FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
-      } else {
-        draw1v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, p3Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
-      }
-    } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2') {
-      draw2v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p3Def, p2Def, p4Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
-    } else if (mode === 'TLFS') {
-      drawTlfsFaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
-    } else {
-      // Default: 1v1 Duel / Stand Off / Tactical 1v1 / Tactical Standoff
-      draw1v1FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
-    }
+    // 1v1 & 1v2 Mode: Placed in Top-Right Quadrant (opposing Card 1) inside FYP safe zone
+    _drawFighterQuadrantTitle(ctx, p1Title, 405, 240, 220, 'center');
   }
 
-  // 3. Draw Spatial Slash Shockwave & Flash Dissolve during Final FIGHT! Exit
-  if (exitProgress > 0) {
-    drawExitArenaTransitionWipe(ctx, canvas.width, canvas.height, exitProgress, leftThemeColor, rightThemeColor);
-  }
-
-  // 4. Draw Screenshot Saved Toast Notification (if triggered)
-  if (state.faceOffSavedToastTimer > 0) {
-    drawSavedToast(ctx, canvas.width, canvas.height, state.faceOffSavedToastTimer, leftThemeColor, rightThemeColor);
-  }
-}
-
-/** Renders the Static Background Elements onto a Cached Offscreen Canvas */
-function renderCachedBackground(width, height, leftColor, rightColor) {
-  if (!_bgCacheCanvas) {
-    _bgCacheCanvas = document.createElement('canvas');
-    _bgCacheCtx = _bgCacheCanvas.getContext('2d');
-  }
-  if (_bgCacheCanvas.width !== width || _bgCacheCanvas.height !== height) {
-    _bgCacheCanvas.width = width;
-    _bgCacheCanvas.height = height;
-  }
-
-  const ctx = _bgCacheCtx;
-  ctx.clearRect(0, 0, width, height);
-
-  // Simply White Background
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width, height);
-}
-
-/** Draws the Dynamic Anime Grunge Split Background with High-Performance Offscreen Caching */
-function drawAnimeGrungeSplitBackground(ctx, width, height, leftColor, rightColor, timer) {
-  const bgKey = `${width}_${height}_${leftColor}_${rightColor}`;
-  if (bgKey !== _lastBgKey || !_bgCacheCanvas) {
-    _lastBgKey = bgKey;
-    renderCachedBackground(width, height, leftColor, rightColor);
-  }
-
-  // 1-Call Blit of the pre-rendered background
-  if (_bgCacheCanvas) {
-    ctx.drawImage(_bgCacheCanvas, 0, 0);
-  }
-}
-
-/** Horizontal zigzag coordinates for FFA 4-way screen division */
-function getFfaHorizontalZigzagPoints(width, midY) {
-  return [
-    { x: 0,             y: midY },
-    { x: width * 0.12,  y: midY - 14 },
-    { x: width * 0.22,  y: midY + 16 },
-    { x: width * 0.35,  y: midY - 18 },
-    { x: width * 0.50,  y: midY },
-    { x: width * 0.65,  y: midY + 18 },
-    { x: width * 0.78,  y: midY - 16 },
-    { x: width * 0.88,  y: midY + 14 },
-    { x: width,         y: midY }
-  ];
-}
-
-/** Vertical zigzag coordinates for FFA 4-way screen division */
-function getFfaVerticalZigzagPoints(height, midX) {
-  return [
-    { x: midX,        y: 0 },
-    { x: midX - 16,   y: height * 0.14 },
-    { x: midX + 18,   y: height * 0.28 },
-    { x: midX,        y: height * 0.44 },
-    { x: midX - 18,   y: height * 0.60 },
-    { x: midX + 16,   y: height * 0.76 },
-    { x: midX - 12,   y: height * 0.90 },
-    { x: midX,        y: height }
-  ];
-}
-
-/** Renders the FFA 4-Way Background with 4 Distinct Theme Colors & Frames Occupying 100% of each section */
-function renderCachedFfaBackground(width, height, colors) {
-  if (!_ffaBgCacheCanvas) {
-    _ffaBgCacheCanvas = document.createElement('canvas');
-    _ffaBgCacheCtx = _ffaBgCacheCanvas.getContext('2d');
-  }
-  if (_ffaBgCacheCanvas.width !== width || _ffaBgCacheCanvas.height !== height) {
-    _ffaBgCacheCanvas.width = width;
-    _ffaBgCacheCanvas.height = height;
-  }
-
-  const ctx = _ffaBgCacheCtx;
-  ctx.clearRect(0, 0, width, height);
-
-  // Simply White Background
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(0, 0, width, height);
-}
-
-/** Draws the 4-way FFA Background */
-function drawFfaAnimeGrungeZigzagBackground(ctx, width, height, colors, timer) {
-  const bgKey = `${width}_${height}_${colors.join('_')}`;
-  if (bgKey !== _lastFfaBgKey || !_ffaBgCacheCanvas) {
-    _lastFfaBgKey = bgKey;
-    renderCachedFfaBackground(width, height, colors);
-  }
-
-  if (_ffaBgCacheCanvas) {
-    ctx.drawImage(_ffaBgCacheCanvas, 0, 0);
-  }
-}
-
-function drawFfaJaggedZigzagDividers() {}
-
-/** Draws floating geometric action debris in 4 FFA colors */
-function drawFloatingFfaDebris(ctx, width, height, colors) {
-  if (!_floatingDebris) return;
-
-  ctx.save();
-  _floatingDebris.forEach((d, idx) => {
-    ctx.save();
-    ctx.translate(d.x, d.y);
-    ctx.rotate(d.rotation);
-    ctx.globalAlpha = d.alpha * 0.9;
-
-    ctx.beginPath();
-    const r = d.size;
-    ctx.moveTo(0, -r);
-    ctx.lineTo(r * 0.86, r * 0.5);
-    ctx.lineTo(-r * 0.86, r * 0.5);
-    ctx.closePath();
-
-    const color = colors[idx % colors.length] || '#ffffff';
-    if (d.isSolid) {
-      ctx.fillStyle = color;
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-    }
-    ctx.restore();
-  });
-  ctx.restore();
-}
-
-/** Draws procedural halftone dot grids */
-function drawHalftoneGrid(ctx, startX, startY, gridW, gridH, dotColor, invertDensity) {
-  const spacing = 12;
-  const cols = Math.floor(gridW / spacing);
-  const rows = Math.floor(gridH / spacing);
-
-  ctx.save();
-  ctx.fillStyle = dotColor;
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const x = startX + c * spacing + (r % 2 === 0 ? 0 : spacing * 0.5);
-      const y = startY + r * spacing;
-
-      const normX = c / cols;
-      const normY = r / rows;
-      const dist = Math.hypot(normX, normY);
-      const radiusFactor = invertDensity ? Math.max(0.2, 1.0 - dist * 0.8) : Math.max(0.2, dist * 0.85);
-      const radius = Math.min(3.5, Math.max(0.8, radiusFactor * 3.2));
-
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-  ctx.restore();
-}
-
-/** Draws authentic anime grunge brush scratches & paint strokes along the diagonal split */
-function drawGrungeBrushStrokes(ctx, width, height, topSplitX, botSplitX, leftColor, rightColor) {
-  ctx.save();
-
-  // 1. Heavy Left-Side Paint Spikes extending into the Right side
-  ctx.fillStyle = leftColor;
-  const leftSplats = [
-    { y: height * 0.22, length: 110, h: 26 },
-    { y: height * 0.32, length: 140, h: 34 },
-    { y: height * 0.48, length: 160, h: 48 },
-    { y: height * 0.65, length: 125, h: 30 },
-    { y: height * 0.78, length: 95,  h: 22 }
-  ];
-
-  leftSplats.forEach((s) => {
-    const t = s.y / height;
-    const splitX = topSplitX + (botSplitX - topSplitX) * t;
-
-    ctx.beginPath();
-    ctx.moveTo(splitX - 10, s.y - s.h / 2);
-    ctx.lineTo(splitX + s.length, s.y);
-    ctx.lineTo(splitX + s.length * 0.85, s.y + s.h * 0.2);
-    ctx.lineTo(splitX + s.length * 0.95, s.y + s.h * 0.4);
-    ctx.lineTo(splitX - 10, s.y + s.h / 2);
-    ctx.closePath();
-    ctx.fill();
-  });
-
-  // 2. Heavy Right-Side Paint Spikes extending into the Left side
-  ctx.fillStyle = rightColor;
-  const rightSplats = [
-    { y: height * 0.15, length: 100, h: 22 },
-    { y: height * 0.28, length: 130, h: 32 },
-    { y: height * 0.42, length: 155, h: 42 },
-    { y: height * 0.58, length: 135, h: 36 },
-    { y: height * 0.72, length: 115, h: 28 },
-    { y: height * 0.85, length: 85,  h: 20 }
-  ];
-
-  rightSplats.forEach((s) => {
-    const t = s.y / height;
-    const splitX = topSplitX + (botSplitX - topSplitX) * t;
-
-    ctx.beginPath();
-    ctx.moveTo(splitX + 10, s.y - s.h / 2);
-    ctx.lineTo(splitX - s.length, s.y);
-    ctx.lineTo(splitX - s.length * 0.85, s.y + s.h * 0.2);
-    ctx.lineTo(splitX - s.length * 0.95, s.y + s.h * 0.4);
-    ctx.lineTo(splitX + 10, s.y + s.h / 2);
-    ctx.closePath();
-    ctx.fill();
-  });
-
-  ctx.restore();
-}
-
-/** Draws the sharp, jagged white lightning bolt crack (suppressed) */
-function drawJaggedLightningCrack() {}
-
-/** Draws floating geometric action triangles & ink particles */
-function drawFloatingActionDebris(ctx, width, height, leftColor, rightColor) {
-  if (!_floatingDebris) return;
-
-  ctx.save();
-  _floatingDebris.forEach(d => {
-    ctx.save();
-    ctx.translate(d.x, d.y);
-    ctx.rotate(d.rotation);
-    ctx.globalAlpha = d.alpha;
-
-    ctx.beginPath();
-    const r = d.size;
-    ctx.moveTo(0, -r);
-    ctx.lineTo(r * 0.86, r * 0.5);
-    ctx.lineTo(-r * 0.86, r * 0.5);
-    ctx.closePath();
-
-    const color = d.colorType === 'left' ? leftColor : (d.colorType === 'right' ? rightColor : '#ffffff');
-
-    if (d.isSolid) {
-      ctx.fillStyle = color;
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-    }
-
-    ctx.restore();
-  });
-  ctx.restore();
-}
-
-// Dynamic variables for rolling animation
-const _lastSlotMap = {};
-const _lockedMap = {};
-let _lastAudioTickTimer = -1;
-
-function drawSmoothReelColumn(ctx, centerX, centerY, targetDef, slotKey, totalSlots, duration, timer, scale, themeColor, facingAngle, isLeft) {
-  const slotH = 140 * (scale / 1.35);
-  const totalDist = totalSlots * slotH;
-
-  const t = Math.min(1.0, timer / duration);
-  // Ultra-smooth quintic ease-out deceleration
-  const easeProgress = 1 - Math.pow(1 - t, 3.8);
-  const scrollY = totalDist * easeProgress;
-
-  // Damped spring settle bounce on lock
-  const settleTime = timer - duration;
-  let bounceY = 0;
-  if (settleTime >= 0 && settleTime < 16) {
-    bounceY = Math.sin(settleTime * 0.48) * Math.exp(-settleTime * 0.28) * 10;
-  }
-
-  const isLocked = (t >= 1.0);
-  const currentSlotFloat = scrollY / slotH;
-  const baseSlot = Math.floor(currentSlotFloat);
-
-  // Audio tick on each new slot entering center (throttled to max 1 SFX per frame)
-  if (!isLocked && baseSlot !== _lastSlotMap[slotKey]) {
-    _lastSlotMap[slotKey] = baseSlot;
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX && timer !== _lastAudioTickTimer) {
-      _lastAudioTickTimer = timer;
-      const vol = Math.min(0.25, 0.08 + (1 - t) * 0.16);
-      audioSystem.playSFX('Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3', vol);
-    }
-  }
-
-  // Lock-in trigger SFX
-  if (isLocked && !_lockedMap[slotKey]) {
-    _lockedMap[slotKey] = true;
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.60);
-    }
-  }
-
-  // Render visible characters on the clean conveyor roll with smooth alpha falloff
-  const maxReach = 135 * (scale / 1.35);
-  const seed = getSlotSeed(slotKey);
-  const nonTargetFade = isLocked ? 0 : (t > 0.75 ? Math.max(0, 1 - (t - 0.75) / 0.25) : 1.0);
-
-  // If locked, we only draw the single finalized target fighter
-  const startSlot = isLocked ? totalSlots : baseSlot - 1;
-  const endSlot = isLocked ? totalSlots : baseSlot + 2;
-
-  for (let k = startSlot; k <= endSlot; k++) {
-    if (k < 0 || k > totalSlots) continue;
-
-    const isFinalSlot = (k === totalSlots);
-    if (isLocked && !isFinalSlot) continue;
-
-    const slotDy = (currentSlotFloat - k) * slotH + bounceY;
-    const dist = Math.abs(slotDy);
-    if (!isLocked && dist > maxReach) continue;
-
-    const def = getStripFighterDef(k, totalSlots, targetDef, seed);
-    let itemAlpha = isLocked ? 1.0 : Math.max(0, Math.pow(1 - dist / maxReach, 1.8));
-    if (!isFinalSlot) {
-      itemAlpha *= nonTargetFade;
-    }
-    if (itemAlpha <= 0.005) continue;
-
-    const itemScale = scale * (isLocked ? 1.0 : (1.0 - (dist / (maxReach * 1.3)) * 0.18));
-
-    const f = getFaceOffFighter(isLocked ? slotKey : `${slotKey}_reel_${k % 8}`, def, facingAngle);
-    if (f) {
-      ctx.save();
-      ctx.globalAlpha = itemAlpha;
-
-      if (dist < 32 || isLocked) {
-        drawEngineerStyleHeroGlow(ctx, centerX, centerY - (isLocked ? -bounceY : slotDy), f.r * itemScale, def.color || themeColor);
-      }
-
-      ctx.translate(centerX, centerY - (isLocked ? -bounceY : slotDy));
-      ctx.scale(itemScale, itemScale);
-      try {
-        f.draw(ctx, null);
-      } catch (e) {}
-      ctx.restore();
-    }
-  }
-
-  // Active Current Center Definition for Name Plate
-  const centerK = Math.min(totalSlots, Math.round(currentSlotFloat));
-  const activeDef = getStripFighterDef(centerK, totalSlots, targetDef, seed);
-  return { activeDef, isLocked };
-}
-
-/** 1v1 Face-Off Layout: Dynamic Color Theming, Engineer Glows, Entrance & Arena Dash Exit */
-function draw1v1FaceOff(ctx, width, height, p1Def, p2Def, scale, timer, leftColor, rightColor, exitProgress = 0) {
-  const targetLeftX = width * 0.24;
-  const targetRightX = width * 0.76;
-  const centerY = height * 0.44;
-
-  if (timer <= 1) {
-    _lastSlotMap['p1'] = -1;
-    _lastSlotMap['p2'] = -1;
-    _lockedMap['p1'] = false;
-    _lockedMap['p2'] = false;
-  }
-
-  let leftX = targetLeftX;
-  let rightX = targetRightX;
-
-  // ── High-Speed Dash Forward during Final "FIGHT!" Stage ──
-  if (exitProgress > 0) {
-    const easeExit = Math.pow(exitProgress, 2.2);
-    leftX += easeExit * 340;
-    rightX -= easeExit * 340;
-  }
-
-  // 1. Left Fighter (P1) Smooth Physics Reel Column
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, leftX - 60, centerY, 140, leftColor, exitProgress);
-  }
-  const { activeDef: activeP1Def } = drawSmoothReelColumn(
-    ctx, leftX, centerY, p1Def, 'p1', 16, 38, timer, scale, leftColor, 0, true
-  );
-  ctx.restore();
-
-  // P1 Fighter Name Plate
-  const nameY = centerY + 120 * (scale / 1.35);
-  const p1NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (p1NameAlpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = p1NameAlpha;
-    drawFighterCleanName(ctx, leftX, nameY, activeP1Def?.name || '', activeP1Def?.color || leftColor);
-
-    const isBossBattleMode = (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === 'STAND_OFF_1V2');
-    if (isBossBattleMode && activeP1Def) {
-      const bossCfg = getBossConfig(activeP1Def);
-      const bossSub = bossCfg?.bossTitle || bossCfg?.bossSubtitle || (typeof CONFIG !== 'undefined' && CONFIG[activeP1Def.id || activeP1Def.type]?.bossTitle);
-      if (bossSub && String(bossSub).trim().toUpperCase() !== 'BOSS') {
-        const subY = nameY + 22;
-        ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
-        ctx.fillStyle = activeP1Def?.color || leftColor;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`- ${String(bossSub).trim().toUpperCase()} -`, leftX, subY);
-      }
-    }
-    ctx.restore();
-  }
-
-  // 2. Right Fighter (P2) Smooth Physics Reel Column
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, rightX + 60, centerY, -140, rightColor, exitProgress);
-  }
-  const { activeDef: activeP2Def } = drawSmoothReelColumn(
-    ctx, rightX, centerY, p2Def, 'p2', 22, 58, timer, scale, rightColor, Math.PI, false
-  );
-  ctx.restore();
-
-  // P2 Fighter Name Plate
-  const p2NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (p2NameAlpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = p2NameAlpha;
-    drawFighterCleanName(ctx, rightX, nameY, activeP2Def?.name || '', activeP2Def?.color || rightColor);
-    ctx.restore();
-  }
-
-  // 3. Center "VS" to Countdown Transition (VS -> 3 -> 2 -> 1 -> FIGHT!) with Standoff Pause Frame
-  if (timer >= 96) {
-    drawCenterUnifiedCountdown(ctx, width / 2, centerY, timer, activeP1Def?.color || leftColor, activeP2Def?.color || rightColor, exitProgress);
-  }
-}
-
-/** 1v2 Stand Off Layout */
-function draw1v2FaceOff(ctx, width, height, p1Def, p2Def, p3Def, scale, timer, leftColor, rightColor, exitProgress = 0) {
-  const targetLeftX = width * 0.24;
-  const targetRightX = width * 0.76;
-  const centerY = height * 0.44;
-
-  // Unified scale: Everyone (Solo P1, Duo P2, Duo P3) has the exact same scale size in 1v2 showoff
-  const unifiedScale = scale * 0.96;
-
-  const duo1Y = centerY - 82;
-  const duo2Y = centerY + 82;
-
-  if (timer <= 1) {
-    _lastSlotMap['p1'] = -1;
-    _lastSlotMap['p2'] = -1;
-    _lastSlotMap['p3'] = -1;
-    _lockedMap['p1'] = false;
-    _lockedMap['p2'] = false;
-    _lockedMap['p3'] = false;
-  }
-
-  let leftX = targetLeftX;
-  let d1X = targetRightX;
-  let d2X = targetRightX;
-
-  if (exitProgress > 0) {
-    const easeExit = Math.pow(exitProgress, 2.2);
-    leftX += easeExit * 340;
-    d1X -= easeExit * 340;
-    d2X -= easeExit * 340;
-  }
-
-  // 1. Solo Boss (Left) - Staggered lock 1 (36)
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, leftX - 60, centerY, 140, leftColor, exitProgress);
-  }
-  const { activeDef: activeP1Def } = drawSmoothReelColumn(
-    ctx, leftX, centerY, p1Def, 'p1', 16, 36, timer, unifiedScale, leftColor, 0, true
-  );
-  ctx.restore();
-
-  // Solo Boss Name Plate (directly below Solo fighter)
-  const soloNameY = centerY + 78 * (unifiedScale / 1.35);
-  const soloNameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (soloNameAlpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = soloNameAlpha;
-    drawFighterCleanName(ctx, leftX, soloNameY, activeP1Def?.name || '', activeP1Def?.color || leftColor, 1.0);
-
-    if (activeP1Def) {
-      const bossCfg = getBossConfig(activeP1Def);
-      const bossSub = bossCfg?.bossTitle || bossCfg?.bossSubtitle || (typeof CONFIG !== 'undefined' && CONFIG[activeP1Def.id || activeP1Def.type]?.bossTitle);
-      if (bossSub && String(bossSub).trim().toUpperCase() !== 'BOSS') {
-        const subY = soloNameY + 22;
-        ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
-        ctx.fillStyle = activeP1Def?.color || leftColor;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(`- ${String(bossSub).trim().toUpperCase()} -`, leftX, subY);
-      }
-    }
-    ctx.restore();
-  }
-
-  // 2. Duo 1 (Top Right) - Staggered lock 2 (48)
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, d1X + 60, duo1Y, -140, p2Def?.color || rightColor, exitProgress);
-  }
-  const { activeDef: activeP2Def } = drawSmoothReelColumn(
-    ctx, d1X, duo1Y, p2Def, 'p2', 20, 48, timer, unifiedScale, p2Def?.color || rightColor, Math.PI, false
-  );
-  ctx.restore();
-
-  // Duo 1 Name Plate (displayed directly at Duo 1's bottom)
-  const duo1NameY = duo1Y + 54 * (unifiedScale / 1.35);
-  const duo1NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (duo1NameAlpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = duo1NameAlpha;
-    drawFighterCleanName(ctx, d1X, duo1NameY, activeP2Def?.name || '', activeP2Def?.color || p2Def?.color || rightColor, 0.82);
-    ctx.restore();
-  }
-
-  // 3. Duo 2 (Bottom Right) - Staggered lock 3 (60)
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, d2X + 60, duo2Y, -140, p3Def?.color || rightColor, exitProgress);
-  }
-  const { activeDef: activeP3Def } = drawSmoothReelColumn(
-    ctx, d2X, duo2Y, p3Def, 'p3', 24, 60, timer, unifiedScale, p3Def?.color || rightColor, Math.PI, false
-  );
-  ctx.restore();
-
-  // Duo 2 Name Plate (displayed directly at Duo 2's bottom)
-  const duo2NameY = duo2Y + 54 * (unifiedScale / 1.35);
-  const duo2NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (duo2NameAlpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = duo2NameAlpha;
-    drawFighterCleanName(ctx, d2X, duo2NameY, activeP3Def?.name || '', activeP3Def?.color || p3Def?.color || rightColor, 0.82);
-    ctx.restore();
-  }
-
-  // 4. Center "BOSS BATTLE" to Countdown Transition
-  if (timer >= 96) {
-    drawCenterUnifiedCountdown(ctx, width / 2, centerY, timer, activeP1Def?.color || leftColor, rightColor, exitProgress, 'BOSS BATTLE');
-  }
-}
-
-/** 2v2 Team Battle Layout */
-function draw2v2FaceOff(ctx, width, height, t1p1Def, t1p2Def, t2p1Def, t2p2Def, scale, timer, leftColor, rightColor, exitProgress = 0) {
-  const targetLeftX = width * 0.24;
-  const targetRightX = width * 0.76;
-  const centerY = height * 0.44;
-
-  const teamScale = scale * 0.88;
-  const topY = centerY - 65;
-  const botY = centerY + 65;
-
-  if (timer <= 1) {
-    _lastSlotMap['p1'] = -1;
-    _lastSlotMap['p3'] = -1;
-    _lastSlotMap['p2'] = -1;
-    _lastSlotMap['p4'] = -1;
-    _lockedMap['p1'] = false;
-    _lockedMap['p3'] = false;
-    _lockedMap['p2'] = false;
-    _lockedMap['p4'] = false;
-  }
-
-  let leftX = targetLeftX;
-  let rightX = targetRightX;
-
-  if (exitProgress > 0) {
-    const easeExit = Math.pow(exitProgress, 2.2);
-    leftX += easeExit * 340;
-    rightX -= easeExit * 340;
-  }
-
-  // Team 1 Top (P1) - Lock at 34
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, leftX - 60, topY, 140, leftColor, exitProgress);
-  }
-  const { activeDef: activeT1P1Def } = drawSmoothReelColumn(
-    ctx, leftX, topY, t1p1Def, 'p1', 14, 34, timer, teamScale, leftColor, 0, true
-  );
-  ctx.restore();
-
-  // Team 1 Bot (P3) - Lock at 44
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, leftX - 60, botY, 140, t1p2Def?.color || leftColor, exitProgress);
-  }
-  const { activeDef: activeT1P2Def } = drawSmoothReelColumn(
-    ctx, leftX, botY, t1p2Def, 'p3', 18, 44, timer, teamScale, t1p2Def?.color || leftColor, 0, true
-  );
-  ctx.restore();
-
-  // Team 1 Combined Name
-  const t1NameY = centerY + 135;
-  const t1NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (t1NameAlpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = t1NameAlpha;
-    drawFighterCleanName(ctx, leftX, t1NameY, `${activeT1P1Def?.name || ''} & ${activeT1P2Def?.name || ''}`, leftColor);
-    ctx.restore();
-  }
-
-  // Team 2 Top (P2) - Lock at 54
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, rightX + 60, topY, -140, rightColor, exitProgress);
-  }
-  const { activeDef: activeT2P1Def } = drawSmoothReelColumn(
-    ctx, rightX, topY, t2p1Def, 'p2', 22, 54, timer, teamScale, rightColor, Math.PI, false
-  );
-  ctx.restore();
-
-  // Team 2 Bot (P4) - Lock at 64
-  ctx.save();
-  if (exitProgress > 0.05) {
-    drawExitDashSpeedLines(ctx, rightX + 60, botY, -140, t2p2Def?.color || rightColor, exitProgress);
-  }
-  const { activeDef: activeT2P2Def } = drawSmoothReelColumn(
-    ctx, rightX, botY, t2p2Def, 'p4', 26, 64, timer, teamScale, t2p2Def?.color || rightColor, Math.PI, false
-  );
-  ctx.restore();
-
-  // Team 2 Combined Name
-  const t2NameY = centerY + 135;
-  const t2NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (t2NameAlpha > 0) {
-    ctx.save();
-    ctx.globalAlpha = t2NameAlpha;
-    drawFighterCleanName(ctx, rightX, t2NameY, `${activeT2P1Def?.name || ''} & ${activeT2P2Def?.name || ''}`, rightColor);
-    ctx.restore();
-  }
-
-  if (timer >= 96) {
-    drawCenterUnifiedCountdown(ctx, width / 2, centerY, timer, leftColor, rightColor, exitProgress, '2 VS 2');
-  }
-}
-
-/** FFA 4-Way or 3-Way Arena Layout */
-function drawFfaFaceOff(ctx, width, height, defs, scale, timer, exitProgress = 0) {
-  const cx = width / 2;
-  const cy = height * 0.44;
-  const ffaScale = scale * 0.82;
-  const spreadX = width * 0.25;
-  const spreadY = 65;
-
-  let positions;
-  if (defs.length === 3) {
-    // 3-Player Vertical FFA: Balanced Triangular Staggered Layout
-    positions = [
-      { targetX: cx, targetY: cy - spreadY - 12, angle: 0, slots: 14, duration: 34, labelY: cy - spreadY - 12 + 48 },
-      { targetX: cx - spreadX * 1.15, targetY: cy + spreadY * 0.75, angle: -0.35, slots: 18, duration: 44, labelY: cy + spreadY * 0.75 + 48 },
-      { targetX: cx + spreadX * 1.15, targetY: cy + spreadY * 0.75, angle: Math.PI + 0.35, slots: 22, duration: 54, labelY: cy + spreadY * 0.75 + 48 }
-    ];
+  // ── 5. Official Pokémon TCG Collector Cards from Character Select ─────────
+  if (is2v2 && p3Def) {
+    // 2v2 Mode: Team Red (P1 & P3) vs Team Blue (P2 & P4) — Scaled up for clarity
+    _drawFighterCollectorCard(ctx, 136, 258, 154, 212, -2.5 * Math.PI / 180, p1Def, p1Idx);
+    _drawFighterCollectorCard(ctx, 304, 258, 154, 212, 1.5 * Math.PI / 180, p3Def, p3Idx);
+
+    const p4Actual = p4Def || currentDefs[3] || p2Def;
+    _drawFighterCollectorCard(ctx, 236, 668, 154, 212, -1.5 * Math.PI / 180, p2Def, p2Idx);
+    _drawFighterCollectorCard(ctx, 404, 668, 154, 212, 2.0 * Math.PI / 180, p4Actual, p4Idx);
+  } else if (is1v2 && p3Def) {
+    // 1v2 Mode: Solo Challenger (P1) vs Duo Team (P2 & P3)
+    _drawFighterCollectorCard(ctx, 158, 264, 236, 314, -2.5 * Math.PI / 180, p1Def, p1Idx);
+
+    _drawFighterCollectorCard(ctx, 236, 668, 154, 212, -1.5 * Math.PI / 180, p2Def, p2Idx);
+    _drawFighterCollectorCard(ctx, 404, 668, 154, 212, 2.0 * Math.PI / 180, p3Def, p3Idx);
   } else {
-    positions = [
-      { targetX: cx - spreadX, targetY: cy - spreadY, angle: 0.35, slots: 14, duration: 34, labelY: cy - spreadY + 48 },
-      { targetX: cx + spreadX, targetY: cy - spreadY, angle: Math.PI - 0.35, slots: 18, duration: 44, labelY: cy - spreadY + 48 },
-      { targetX: cx - spreadX, targetY: cy + spreadY, angle: -0.35, slots: 22, duration: 54, labelY: cy + spreadY + 48 },
-      { targetX: cx + spreadX, targetY: cy + spreadY, angle: Math.PI + 0.35, slots: 26, duration: 64, labelY: cy + spreadY + 48 }
-    ];
+    // 1v1 Mode (Default, Stand Off, Tag Match Anchor, Boss Solo, Survivor):
+    // Heroic, large, prominent Pokémon TCG Collector Cards displaying crystal-clear card details
+    // Positioned with guaranteed clearance so the center VS badge NEVER covers the bottom card or Grade badge
+    _drawFighterCollectorCard(ctx, 158, 264, 236, 314, -2.5 * Math.PI / 180, p1Def, p1Idx);
+    _drawFighterCollectorCard(ctx, 382, 672, 236, 314, 2.2 * Math.PI / 180, p2Def, p2Idx);
   }
 
-  if (timer <= 1) {
-    positions.forEach((_, i) => {
-      _lastSlotMap[`ffa_${i}`] = -1;
-      _lockedMap[`ffa_${i}`] = false;
-    });
+  // ── 6. Center Diamond-Faceted "VS" Duel Crest ────────────────────────────
+  const vsRot = Math.atan2(splitY2 - splitY1, width); // Aligned directly with the seam line
+  const leftColor = getFaceOffThemeColor(p1Def, '#38BDF8');
+  const rightColor = getFaceOffThemeColor(p2Def, '#F59E0B');
+  _drawCenterVsBadge(ctx, width / 2, (splitY1 + splitY2) / 2 - 6, vsRot, leftColor, rightColor);
+
+  // ── 7. Player 2 Title Typography (P2 Name or Team Name) ───────────────────
+  let p2Title = p2Def.name.toUpperCase();
+  if (is2v2 && p4Def) {
+    p2Title = `${p2Def.name.toUpperCase()} & ${p4Def.name.toUpperCase()}`;
+  } else if (is1v2 && p3Def) {
+    p2Title = `${p2Def.name.toUpperCase()} & ${p3Def.name.toUpperCase()}`;
+  } else if (isSurvivor) {
+    p2Title = 'THE HORDE';
   }
 
-  const activeDefs = [];
-  defs.forEach((def, i) => {
-    if (!def) return;
-    const pos = positions[i];
-    let currX = pos.targetX;
-    let currY = pos.targetY;
-
-    if (exitProgress > 0) {
-      const easeExit = Math.pow(exitProgress, 2.2);
-      currX += (cx - currX) * easeExit * 1.5;
-      currY += (cy - currY) * easeExit * 1.5;
-    }
-
-    ctx.save();
-    const { activeDef } = drawSmoothReelColumn(
-      ctx, currX, currY, def, `ffa_${i}`, pos.slots, pos.duration, timer, ffaScale, def.color || '#f59e0b', pos.angle, i % 2 === 0
-    );
-    ctx.restore();
-
-    const finalDef = activeDef || def;
-    activeDefs.push(finalDef);
-
-    // Draw individual fighter nameplate inside their own quadrant frame
-    if (exitProgress < 0.6) {
-      const nameAlpha = Math.max(0, 1 - exitProgress * 2.0);
-      ctx.save();
-      ctx.globalAlpha = nameAlpha;
-      drawFighterCleanName(ctx, currX, pos.labelY, finalDef.name, finalDef.color || '#ffffff', 0.80);
-      ctx.restore();
-    }
-  });
-
-  if (timer >= 96) {
-    drawCenterUnifiedCountdown(ctx, cx, cy, timer, activeDefs[0]?.color || '#f59e0b', activeDefs[1]?.color || '#3b82f6', exitProgress, 'FFA');
-  }
-}
-
-/** TLFS Gauntlet Mode Layout */
-function drawTlfsFaceOff(ctx, width, height, p1Def, enemyDef, scale, timer, leftColor, rightColor, exitProgress = 0) {
-  draw1v1FaceOff(ctx, width, height, p1Def, enemyDef, scale, timer, leftColor, rightColor, exitProgress);
-}
-
-/** Speed lines streaming behind fighters during the exit dash (suppressed for minimalist design) */
-function drawExitDashSpeedLines(ctx, startX, startY, length, color, progress) {
-  // Suppressed for clean minimalist thumbnail
-}
-
-/**
- * Clean Subtle Hero Ground Shadow
- */
-function drawEngineerStyleHeroGlow(ctx, cx, cy, radius, glowColor = '#38bdf8') {
-  ctx.save();
-  ctx.translate(cx, cy);
-
-  // Soft clean ground oval drop shadow base
-  ctx.beginPath();
-  ctx.ellipse(0, radius * 0.95, radius * 1.25, radius * 0.40, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
-  ctx.fill();
-
-  ctx.restore();
-}
-
-/**
- * Unified Center Emblem: Transitions "VS" -> 3 -> 2 -> 1 -> FIGHT!
- */
-function drawCenterUnifiedCountdown(ctx, cx, cy, timer, leftColor = '#38bdf8', rightColor = '#e51a2e', exitProgress = 0, customLabel = 'VS') {
-  // Stage 1: "VS" Initial Clash (Timer 96 - 126)
-  if (timer < 126) {
-    const prog = Math.min(1.0, (timer - 96) / 18);
-    const ease = easeOutBack(prog);
-    drawAnimeBrushVsClash(ctx, cx, cy, customLabel, ease, leftColor, rightColor);
-    return;
-  }
-
-  // Stage 2: Countdown "3" (Timer 126 - 156)
-  if (timer < 156) {
-    const prog = Math.min(1.0, (timer - 126) / 16);
-    const ease = easeOutBack(prog);
-    drawCountdownDigit(ctx, cx, cy, '3', ease, leftColor, rightColor);
-    return;
-  }
-
-  // Stage 3: Countdown "2" (Timer 156 - 186)
-  if (timer < 186) {
-    const prog = Math.min(1.0, (timer - 156) / 16);
-    const ease = easeOutBack(prog);
-    drawCountdownDigit(ctx, cx, cy, '2', ease, leftColor, rightColor);
-    return;
-  }
-
-  // Stage 4: Countdown "1" (Timer 186 - 216)
-  if (timer < 216) {
-    const prog = Math.min(1.0, (timer - 186) / 16);
-    const ease = easeOutBack(prog);
-    drawCountdownDigit(ctx, cx, cy, '1', ease, leftColor, rightColor);
-    return;
-  }
-
-  // Stage 5: Final "FIGHT!" Burst (Timer 216+)
-  const prog = Math.min(1.0, (timer - 216) / 16);
-  const ease = easeOutBack(prog);
-  drawCountdownDigit(ctx, cx, cy, 'FIGHT!', ease, leftColor, rightColor, exitProgress);
-}
-
-/** Draws clean "VS" text emblem with white font fill & black stroke outline (both V & S in identical font size) */
-function drawAnimeBrushVsClash(ctx, cx, cy, label = 'VS', ease = 1.0, leftColor, rightColor) {
-  ctx.save();
-  ctx.translate(cx, cy);
-
-  const scale = Math.min(1.0, ease);
-  ctx.scale(scale, scale);
-
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-
-  if (label === 'VS' || label === 'Vs') {
-    const fontSize = 54;
-    const fontStr = `900 ${fontSize}px "Outfit", "Rajdhani", "Permanent Marker", sans-serif`;
-
-    // Upper 'V'
-    ctx.save();
-    ctx.translate(-14, -10);
-    ctx.font = fontStr;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 9;
-    ctx.strokeText('V', 0, 0);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('V', 0, 0);
-    ctx.restore();
-
-    // Lower 'S' (Identical font size & uppercase S, staggered down-right)
-    ctx.save();
-    ctx.translate(14, 10);
-    ctx.font = fontStr;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 9;
-    ctx.strokeText('S', 0, 0);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText('S', 0, 0);
-    ctx.restore();
+  if (is2v2 || (is1v2 && p3Def)) {
+    // Team modes with dual cards at bottom: Centered below cards, raised safely away from bottom crop
+    _drawFighterQuadrantTitle(ctx, p2Title, width / 2, 820, 440, 'center');
   } else {
-    ctx.font = '900 44px "Outfit", "Rajdhani", "Permanent Marker", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 8;
-    ctx.strokeText(label, 0, 0);
-
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(label, 0, 0);
+    // 1v1 Mode: Placed in Bottom-Left Quadrant (opposing Card 2) inside FYP safe zone
+    _drawFighterQuadrantTitle(ctx, p2Title, 140, 690, 220, 'center');
   }
 
-  ctx.restore();
-}
+  // ── 8. Bottom-Left Challenger Banner ("WHO WILL TAKE THE L?" & Match Mode Tag) ──────
+  // Hidden per user request to keep the thumbnail clean, spacious, and focused on the cards
+  if (Boolean(state.showThumbnailBanners)) {
+    let modeTag = '1 VS 1 SHOWDOWN';
 
-/** Draws Countdown Digits ("3", "2", "1", "FIGHT!") with clean typography */
-function drawCountdownDigit(ctx, cx, cy, digitStr, ease, leftColor, rightColor, exitProgress = 0) {
-  ctx.save();
-  ctx.translate(cx, cy);
+    if (is2v2) {
+      modeTag = '2 VS 2 TEAM CLASH';
+    } else if (is1v2) {
+      modeTag = '1 VS 2 HANDICAP DUEL';
+    } else if (isTag) {
+      modeTag = 'TAG TEAM RELAY';
+    } else if (isBoss) {
+      modeTag = 'SUPREME BOSS RAID';
+    } else if (isSurvivor) {
+      modeTag = 'SURVIVOR HORDE CLASH';
+    } else if (activeMode === 'Stand Off' || activeMode === GAME_MODES.STAND_OFF) {
+      modeTag = 'STAND OFF DUEL';
+    }
 
-  const isFight = digitStr.length > 2;
-  const exitScale = 1.0 + exitProgress * 1.5;
-  const scale = (0.85 + ease * 0.25) * exitScale;
-  ctx.scale(scale, scale);
-
-  const _isDarkCD = (state.arenaTheme === 'dark');
-  const _cdFontFamily = _isDarkCD ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
-  const fontSize = _isDarkCD ? (isFight ? 48 : 72) : (isFight ? 64 : 96);
-  ctx.font = `900 ${fontSize}px ${_cdFontFamily}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = isFight ? 10 : 8;
-  ctx.lineJoin = 'round';
-  ctx.strokeText(digitStr, 0, isFight ? 2 : 4);
-
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillText(digitStr, 0, isFight ? 2 : 4);
-
-  ctx.restore();
-}
-
-/** Draws the Arena Out-Transition Spatial Slash & Flash Wipe */
-function drawExitArenaTransitionWipe(ctx, width, height, exitProgress, leftColor, rightColor) {
-  ctx.save();
-
-  // 1. Diagonal Slash Beam Shockwave expanding across the seam
-  const slashWidth = Math.pow(exitProgress, 1.8) * width * 1.8;
-  const topSplitX = width * 0.62;
-  const botSplitX = width * 0.38;
-
-  ctx.beginPath();
-  ctx.moveTo(topSplitX - slashWidth * 0.5, 0);
-  ctx.lineTo(topSplitX + slashWidth * 0.5, 0);
-  ctx.lineTo(botSplitX + slashWidth * 0.5, height);
-  ctx.lineTo(botSplitX - slashWidth * 0.5, height);
-  ctx.closePath();
-
-  const slashGrad = ctx.createLinearGradient(0, 0, width, height);
-  slashGrad.addColorStop(0, hexToRgba(leftColor, 0.7));
-  slashGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.95)');
-  slashGrad.addColorStop(1, hexToRgba(rightColor, 0.7));
-  ctx.fillStyle = slashGrad;
-  ctx.fill();
-
-  // 2. Full-Screen Cinematic Lens Flare / White Flash Dissolve (disabled in Dark Mode)
-  const isDarkWipe = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-  if (!isDarkWipe) {
-    const flashAlpha = Math.min(1.0, Math.pow(exitProgress, 1.6));
-    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
-    ctx.fillRect(0, 0, width, height);
+    _drawBottomLeftBanner(ctx, 32, 628, modeTag);
   }
 
-  ctx.restore();
-}
-
-/** Draws ONLY the Fighter's Name with Multi-Layer Laser Glow Underline */
-function drawFighterCleanName(ctx, cx, cy, name, accentColor, fontScale = 1.0) {
-  if (!name) return;
-
-  const upperName = name.toUpperCase();
-  ctx.save();
-
-  const _isDarkName = (state.arenaTheme === 'dark');
-  if (_isDarkName && (upperName.includes('YUTA') || upperName.includes('OKKOTSU'))) {
-    accentColor = '#FF1493';
+  // ── 9. Saved Toast Notification (only shown briefly on pressing S) ───────
+  if (!state._isCapturingThumbnail && state.faceOffSavedToastTimer > 0) {
+    const leftColor = getFaceOffThemeColor(p1Def, '#F59E0B');
+    const rightColor = getFaceOffThemeColor(p2Def, '#DC2626');
+    drawSavedToast(ctx, width, height, state.faceOffSavedToastTimer, leftColor, rightColor);
   }
-  const _nameFontFamily = '"Outfit", "Rajdhani", "Segoe UI", sans-serif';
-  const baseFontSize = _isDarkName
-    ? (upperName.length > 16 ? 14 : (upperName.length > 10 ? 16 : (upperName.length > 7 ? 20 : 24)))
-    : (upperName.length > 16 ? 18 : (upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30)));
-  const fontSize = Math.round(baseFontSize * fontScale);
-  ctx.font = `900 ${fontSize}px ${_nameFontFamily}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-
-  ctx.strokeStyle = hexToRgba(accentColor, 0.40);
-  ctx.lineWidth = 10 * fontScale;
-  ctx.strokeText(upperName, cx, cy);
-
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 5 * fontScale;
-  ctx.lineJoin = 'round';
-  ctx.strokeText(upperName, cx, cy);
-
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText(upperName, cx, cy);
-
-  const cacheKey = `${upperName}_${fontSize}`;
-  let underlineW = _textWidthCache[cacheKey];
-  if (underlineW === undefined) {
-    underlineW = ctx.measureText(upperName).width * 0.90;
-    _textWidthCache[cacheKey] = underlineW;
-  }
-  const lineY = cy + fontSize * 0.65;
-
-  ctx.strokeStyle = hexToRgba(accentColor, 0.35);
-  ctx.lineWidth = 6.5 * fontScale;
-  ctx.beginPath();
-  ctx.moveTo(cx - underlineW / 2, lineY);
-  ctx.lineTo(cx + underlineW / 2, lineY);
-  ctx.stroke();
-
-  ctx.strokeStyle = accentColor || '#ffffff';
-  ctx.lineWidth = 2.6 * fontScale;
-  ctx.beginPath();
-  ctx.moveTo(cx - underlineW / 2, lineY);
-  ctx.lineTo(cx + underlineW / 2, lineY);
-  ctx.stroke();
-
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.0 * fontScale;
-  ctx.beginPath();
-  ctx.moveTo(cx - underlineW / 2 + 6 * fontScale, lineY);
-  ctx.lineTo(cx + underlineW / 2 - 6 * fontScale, lineY);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
-/** Screenshot saved popup notification toast */
-function drawSavedToast(ctx, width, height, timer, leftColor = '#38bdf8', rightColor = '#e51a2e') {
-  const alpha = Math.min(1.0, timer / 20);
-  const toastW = 280;
-  const toastH = 40;
-  const toastX = width / 2 - toastW / 2;
-  const toastY = 88;
-
-  ctx.save();
-  ctx.globalAlpha = alpha;
-
-  ctx.fillStyle = 'rgba(12, 16, 24, 0.94)';
-  ctx.strokeStyle = rightColor || '#e51a2e';
-  ctx.lineWidth = 1.5;
-  drawChamferedRect(ctx, toastX, toastY, toastW, toastH, 6);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '900 12.5px "Rajdhani", "Outfit", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('📸 THUMBNAIL PNG SAVED TO DOWNLOADS!', width / 2, toastY + toastH / 2);
-
-  ctx.restore();
 }

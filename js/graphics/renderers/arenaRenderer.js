@@ -792,6 +792,65 @@ export function drawArenaBorder(ctx = state.ctx, alreadyInCameraSpace = false) {
   }
 }
 
+/**
+ * Renders the In-Arena Floor Watermark Brand Tag (@CronosphereFOC) positioned near the bottom arena wall.
+ * Rendered on the top layer in camera space so it remains 100% bright, crisp, and never obscured/dimmed
+ * by Zeus's ultimate dim effect, Gojo/Sukuna domain expansions, or environmental screen overlays.
+ *
+ * @param {CanvasRenderingContext2D} [ctx=state.ctx]
+ * @param {boolean} [alreadyInCameraSpace=false]
+ */
+export function drawArenaWatermark(ctx = state.ctx, alreadyInCameraSpace = false) {
+  if (!ctx) return;
+  const arena = (typeof state !== 'undefined' && state.arena) || (typeof CONFIG !== 'undefined' && CONFIG.arena);
+  if (!arena) return;
+
+  const watermarkCfg = (typeof CONFIG !== 'undefined' && CONFIG.arenaWatermark) ? CONFIG.arenaWatermark : null;
+  const showWatermark = watermarkCfg ? watermarkCfg.enabled !== false : true;
+  if (!showWatermark) return;
+
+  const isDark = Boolean(
+    typeof state !== 'undefined' && (
+      state.arenaTheme === 'dark' ||
+      state.darkMode ||
+      (typeof document !== 'undefined' && document.body && document.body.classList && document.body.classList.contains('arena-dark-mode'))
+    )
+  );
+
+  ctx.save();
+  if (!alreadyInCameraSpace) {
+    applyCameraToCtx(ctx);
+  }
+
+  const text = watermarkCfg?.text || '@CronosphereFOC';
+  const fontSize = watermarkCfg?.fontSize || 14;
+  const font = `700 ${fontSize}px ${watermarkCfg?.fontFamily || '"Outfit", "Rajdhani", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}`;
+  ctx.font = font;
+  if ('letterSpacing' in ctx) {
+    ctx.letterSpacing = watermarkCfg?.letterSpacing || '1px';
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const watermarkX = arena.x + arena.width / 2;
+  const bottomOffset = watermarkCfg?.bottomOffset || 22;
+  const watermarkY = Math.round(arena.y + arena.height - bottomOffset);
+
+  // Contrast stroke outline so bright font pops clearly against all arena tiles/floors/dim screens
+  const strokeWidth = watermarkCfg?.strokeWidth ?? 2.5;
+  if (strokeWidth > 0) {
+    ctx.strokeStyle = watermarkCfg?.strokeColor || 'rgba(0, 0, 0, 0.75)';
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.strokeText(text, watermarkX, watermarkY);
+  }
+
+  // Bright font fill color
+  ctx.fillStyle = watermarkCfg?.color || (isDark ? '#FFFFFF' : '#FFFFFF');
+  ctx.fillText(text, watermarkX, watermarkY);
+
+  ctx.restore();
+}
+
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
   const isDark = Boolean(
@@ -937,41 +996,8 @@ export function drawArena() {
     drawArenaBorder(ctx, false);
   }
 
-  // 5. In-Arena Floor Watermark Brand Tag (@CronosphereFOC) positioned below in the arena near bottom wall
-  {
-    const watermarkCfg = (typeof CONFIG !== 'undefined' && CONFIG.arenaWatermark) ? CONFIG.arenaWatermark : null;
-    const showWatermark = watermarkCfg ? watermarkCfg.enabled !== false : true;
-    if (showWatermark && !suppressArenaFloor) {
-      ctx.save();
-      applyCameraToCtx(ctx);
-      const text = watermarkCfg?.text || '@CronosphereFOC';
-      const fontSize = watermarkCfg?.fontSize || 14;
-      const font = `700 ${fontSize}px ${watermarkCfg?.fontFamily || '"Outfit", "Rajdhani", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'}`;
-      ctx.font = font;
-      if ('letterSpacing' in ctx) {
-        ctx.letterSpacing = watermarkCfg?.letterSpacing || '1px';
-      }
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const watermarkX = arena.x + arena.width / 2;
-      const bottomOffset = watermarkCfg?.bottomOffset || 22;
-      const watermarkY = Math.round(arena.y + arena.height - bottomOffset);
-
-      // Contrast stroke outline so bright font pops clearly against all arena tiles/floors
-      const strokeWidth = watermarkCfg?.strokeWidth ?? 2.5;
-      if (strokeWidth > 0) {
-        ctx.strokeStyle = watermarkCfg?.strokeColor || 'rgba(0, 0, 0, 0.75)';
-        ctx.lineWidth = strokeWidth;
-        ctx.lineJoin = 'round';
-        ctx.strokeText(text, watermarkX, watermarkY);
-      }
-
-      // Bright font fill color
-      ctx.fillStyle = watermarkCfg?.color || (isDark ? '#FFFFFF' : '#FFFFFF');
-      ctx.fillText(text, watermarkX, watermarkY);
-      ctx.restore();
-    }
-  }
+  // 5. In-Arena Floor Watermark Brand Tag (@CronosphereFOC) is rendered on the top layer via drawArenaWatermark()
+  // (Rendered in camera space on top of domain backgrounds & Zeus ultimate dim screen overlays so it never gets obscured)
 
   // 6. Cached Title Header (text only)
   const showTitle = (typeof CONFIG !== 'undefined' && CONFIG.showArenaTitle !== undefined) ? CONFIG.showArenaTitle : false;

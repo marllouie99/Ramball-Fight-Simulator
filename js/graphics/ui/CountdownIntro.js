@@ -37,7 +37,7 @@ function getWhoWinsScale(t) {
   return 1.00;
 }
 
-function getFaceOffThemeColor(def, fallback = '#38BDF8') {
+export function getFaceOffThemeColor(def, fallback = '#38BDF8') {
   if (!def) return fallback;
   if (def.type === 'yuta' || def.id === 23 || def.id === 'yuta') {
     return '#FF1493';
@@ -89,7 +89,7 @@ function parseColorToRgb(colorStr) {
  * @param {string} colorStr - Source theme color (hex or rgb)
  * @param {number} weight - Weight of theme color (0.0 = dark slate #0D101A, 1.0 = raw bright theme color)
  */
-function getDarkThemeTone(colorStr, weight = 0.45) {
+export function getDarkThemeTone(colorStr, weight = 0.45) {
   const c = parseColorToRgb(colorStr);
   const baseR = 13;
   const baseG = 16;
@@ -101,7 +101,7 @@ function getDarkThemeTone(colorStr, weight = 0.45) {
   return `rgb(${r}, ${g}, ${b})`;
 }
 
-function getPreviewFighter(def, targetAngle = 0) {
+export function getPreviewFighter(def, targetAngle = 0) {
   if (!def) return null;
   const type = def.type || def.id || 'fighter';
   if (!_previewFighterCache[type]) {
@@ -733,25 +733,27 @@ function draw1v2CountdownLayout(ctx, width, height, timer, p1Def, p2Def, p3Def, 
  * Main entry point invoked every frame during state.gameState === 'countdown'.
  * Draws the high-energy anime VS intro sequence over the arena with dynamic fighter theme colors.
  */
-export function drawCountdownIntro(ctx, width, height) {
+export function drawCountdownIntro(ctx, width, height, customTimer = null, customP1Def = null, customP2Def = null, customP3Def = null) {
   if (typeof state === 'undefined' || !state) return;
-  const timer = state.countdownTimer || 0;
+  const timer = (customTimer !== null && customTimer !== undefined) ? customTimer : (state.countdownTimer || 0);
   const maxFrames = state.requiredCountdownFrames || 95;
 
-  _clearButtons();
-  // Click-to-Skip: Register full screen click area to skip straight to fight exit
-  _registerButton(0, 0, width, height, () => {
-    const exitTarget = Math.max(48, maxFrames - 16);
-    if ((state.countdownTimer || 0) < exitTarget) {
-      state.countdownTimer = exitTarget;
-    }
-  });
+  if (customTimer === null || customTimer === undefined) {
+    _clearButtons();
+    // Click-to-Skip: Register full screen click area to skip straight to fight exit
+    _registerButton(0, 0, width, height, () => {
+      const exitTarget = Math.max(48, maxFrames - 16);
+      if ((state.countdownTimer || 0) < exitTarget) {
+        state.countdownTimer = exitTarget;
+      }
+    });
+  }
 
   // Resolve active fighter definitions
   const currentDefs = getActiveFighterDefs();
-  const p1Def = state.fighters?.[0]?._def || currentDefs[state.p1Index] || currentDefs[0] || FIGHTER_DEFS[0];
-  const p2Def = state.fighters?.[1]?._def || currentDefs[state.p2Index] || currentDefs[1] || currentDefs[0];
-  const p3Def = state.fighters?.[2]?._def || currentDefs[state.p3Index] || currentDefs[2];
+  const p1Def = customP1Def || (state.gameState === 'faceoff' ? currentDefs[state.p1Index] : (state.fighters?.[0]?._def || currentDefs[state.p1Index])) || currentDefs[0] || FIGHTER_DEFS[0];
+  const p2Def = customP2Def || (state.gameState === 'faceoff' ? currentDefs[state.p2Index] : (state.fighters?.[1]?._def || currentDefs[state.p2Index])) || currentDefs[1] || currentDefs[0];
+  const p3Def = customP3Def || state.fighters?.[2]?._def || currentDefs[state.p3Index] || currentDefs[2];
 
   const isHorizontal = (state.viewOrientation === 'horizontal');
   const scaleFactor = isHorizontal ? Math.min(width / 540, height / 960) * 1.15 : 1.0;

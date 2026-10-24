@@ -252,6 +252,17 @@ export function updateCamera() {
   );
 
   const aliveFighters = (state.fighters || []).filter(isPrimaryCombatant);
+
+  // When Ash summons an active Pokémon companion, focus dynamic camera tracking on the active Pokémon and enemy
+  const getCombatCameraTarget = (f) => {
+    if (f && (f.characterId === 'ash' || f.type === 'ash' || (f._def && (f._def.id === 'ash' || f._def.type === 'ash')))) {
+      if (f.activePokemon && f.activePokemon.hp > 0 && !f.activePokemon.isDead && !f.activePokemon.dead) {
+        return f.activePokemon;
+      }
+    }
+    return f;
+  };
+  const combatFighters = aliveFighters.map(getCombatCameraTarget);
   const minZ = camera.minZoom ?? camCfg.minZoom ?? 0.65;
   const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.18;
 
@@ -312,10 +323,10 @@ export function updateCamera() {
     const isFixed = (!camera.enabled || camera.mode === 'fixed');
 
     let startCombatZoom = 1.0;
-    if (!isFixed && aliveFighters.length >= 2) {
+    if (!isFixed && combatFighters.length >= 2) {
       // Base envelope zoom for combatants in dynamic mode
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (const f of aliveFighters) {
+      for (const f of combatFighters) {
         const fx = f.x;
         const fy = f.y - (f.z ? f.z * 0.35 : 0);
         const r = f.r || 22;
@@ -374,7 +385,7 @@ export function updateCamera() {
       camera.targetY = arenaCenterY;
     } else {
       // In dynamic tracking mode, pan between combatants
-      const aliveOpponents = aliveFighters.filter(f => f !== castingDeity);
+      const aliveOpponents = combatFighters.filter(f => f !== castingDeity);
       let focusX = castingDeity.x;
       let focusY = castingDeity.y - (castingDeity.z ? castingDeity.z * 0.35 : 0);
 
@@ -424,7 +435,7 @@ export function updateCamera() {
       camera.targetX = arenaCenterX;
       camera.targetY = arenaCenterY;
       camera.targetZoom = isGrand ? (isFfaArena ? 0.58 : 0.36) : 1.0;
-    } else if (aliveFighters.length >= 2) {
+    } else if (combatFighters.length >= 2) {
       // Compute full bounding envelope across all active combatants
       let minX = Infinity;
       let maxX = -Infinity;
@@ -432,7 +443,7 @@ export function updateCamera() {
       let maxY = -Infinity;
       let validCombatantsCount = 0;
 
-      for (const f of aliveFighters) {
+      for (const f of combatFighters) {
         if (!f || !Number.isFinite(f.x) || !Number.isFinite(f.y)) continue;
         const fx = f.x;
         const fy = f.y - (f.z ? f.z * 0.35 : 0);
@@ -469,8 +480,8 @@ export function updateCamera() {
       );
 
       if (is1v2) {
-        const boss = aliveFighters.find(f => f === state.fighters?.[0] || f.isBoss || f.fighterIndex === 0) || aliveFighters[0];
-        const challengers = aliveFighters.filter(f => f !== boss);
+        const boss = combatFighters.find(f => f === state.fighters?.[0] || f.isBoss || f.fighterIndex === 0) || combatFighters[0];
+        const challengers = combatFighters.filter(f => f !== boss);
         if (boss && challengers.length > 0 && Number.isFinite(boss.x) && Number.isFinite(boss.y)) {
           let closestCh = challengers[0];
           let minDistSq = Infinity;

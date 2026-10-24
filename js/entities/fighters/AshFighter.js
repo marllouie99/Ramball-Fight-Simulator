@@ -164,7 +164,10 @@ export class PokemonCompanionEntity extends Fighter {
     this.baseSpeed = this.speed;
     this.spriteScale = spec.scale || 1.5;
 
-    const launchAngle = owner.gunAngle || 0;
+    const launchTarget = owner?._findBestTarget ? owner._findBestTarget() : null;
+    const launchAngle = (launchTarget && launchTarget.hp > 0)
+      ? Math.atan2(launchTarget.y - spawnY, launchTarget.x - spawnX)
+      : (owner.gunAngle || 0);
     this.vx = Math.cos(launchAngle) * this.speed;
     this.vy = Math.sin(launchAngle) * this.speed;
     this.gunAngle = launchAngle;
@@ -479,6 +482,10 @@ export class PokemonCompanionEntity extends Fighter {
           if (this.owner) {
             this.owner.commandCooldown = cd;
           }
+          // Resume natural bounce velocity immediately upon exiting Thunderbolt
+          const resumeAngle = this.thunderboltCastAngle + (Math.random() - 0.5) * 1.0;
+          this.vx = Math.cos(resumeAngle) * this.speed;
+          this.vy = Math.sin(resumeAngle) * this.speed;
         }
       }
 
@@ -503,10 +510,7 @@ export class PokemonCompanionEntity extends Fighter {
       this.gunAngle = targetAngle;
       this.angle = targetAngle;
 
-      // Steer toward enemy target
-      const curSpd = Math.max(2.5, Math.hypot(this.vx, this.vy));
-      this.vx = this.vx * 0.84 + Math.cos(targetAngle) * curSpd * 0.16;
-      this.vy = this.vy * 0.84 + Math.sin(targetAngle) * curSpd * 0.16;
+
 
       // Autonomous Signature Special Skill (e.g. Pikachu's THUNDERBOLT!) when ready
       if (this.specialCooldown <= 0 && !this.thunderboltState && dist <= 550 && this.owner) {
@@ -527,7 +531,12 @@ export class PokemonCompanionEntity extends Fighter {
       }
     }
 
-    // Update animation state
+    // Natural bounce momentum: if velocity ever stalls or drops to zero, recover natural speed immediately
+    if (Math.hypot(this.vx, this.vy) < 0.2 && !this.thunderboltState) {
+      const resumeAngle = this.gunAngle || (Math.random() * Math.PI * 2);
+      this.vx = Math.cos(resumeAngle) * this.speed;
+      this.vy = Math.sin(resumeAngle) * this.speed;
+    }
     if (this.actionAnimTimer > 0) {
       // Keep active 'attack' or 'special' state
     } else if (this.hurtAnimTimer > 0) {
@@ -588,6 +597,15 @@ export class PokemonCompanionEntity extends Fighter {
     drawPokemonCompanion(ctx, this);
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+  }
+
+  /**
+   * Centralized physical wall bounce reflection:
+   * Pokémon rebound naturally off arena walls with standard restitution and angle jitter,
+   * exactly like standard Fighter entities.
+   */
+  resolveWallBounce(arena, opponent) {
+    return super.resolveWallBounce(arena, opponent);
   }
 
   drawBody(ctx) {

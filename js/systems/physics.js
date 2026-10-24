@@ -212,6 +212,20 @@ export function resolveFighterCollision(a, b) {
     if (isFriendly) return;
   }
 
+  // Ash's Honeycomb Barrier: allows friendly Pokemon and teammates to pass freely, while enemies collide with the barrier
+  const aIsAshBarrier = Boolean(a.isProtectedByHoneycombBarrier);
+  const bIsAshBarrier = Boolean(b.isProtectedByHoneycombBarrier);
+  if (aIsAshBarrier || bIsAshBarrier) {
+    const ash = aIsAshBarrier ? a : b;
+    const other = aIsAshBarrier ? b : a;
+    const isFriendly = (other === ash) ||
+      (other.owner === ash) ||
+      (other.isPokemon || other.isPokemonMinion) ||
+      (typeof ash.isTeammate === 'function' && ash.isTeammate(other)) ||
+      (typeof other.isTeammate === 'function' && other.isTeammate(ash));
+    if (isFriendly) return;
+  }
+
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
   const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
   const bIsTojiAssault = (b.characterId === 'toji' || b.type === 'toji') && (b.isAmbushing || b.ultimateActive || b._wasFinalBlowSpin || (b.postUltimateRecoveryTimer && b.postUltimateRecoveryTimer > 0));
@@ -497,8 +511,8 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless;
-  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless;
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless || a.isProtectedByHoneycombBarrier;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless || b.isProtectedByHoneycombBarrier;
 
   let aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
   let bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
@@ -566,8 +580,8 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isImmovable || aIsNameless || (aIsGojoInfinity && !b.gojoInfinityImmune);
-  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isImmovable || bIsNameless || (bIsGojoInfinity && !a.gojoInfinityImmune);
+  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isImmovable || aIsNameless || a.isProtectedByHoneycombBarrier || (aIsGojoInfinity && !b.gojoInfinityImmune);
+  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isImmovable || bIsNameless || b.isProtectedByHoneycombBarrier || (bIsGojoInfinity && !a.gojoInfinityImmune);
 
   if (aIsAnchor) {
     a.vx = 0;

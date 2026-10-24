@@ -168,6 +168,11 @@ window.addEventListener('keydown', (e) => {
       navigator.clipboard.writeText(logText).catch(err => console.error('Failed to copy logs:', err));
       state.fpsLogsCopiedTimer = 120; // Show copied message for 2 seconds
     }
+  } else if (e.key.toLowerCase() === 'h') {
+    if (state.gameState === 'faceoff') {
+      state._thumbnailHookIndex = ((state._thumbnailHookIndex || 0) + 1) % 5;
+      return;
+    }
   } else if (e.key.toLowerCase() === 't') {
     if (state.gameState === 'faceoff') {
       const themes = ['neon', 'manga', 'arena'];

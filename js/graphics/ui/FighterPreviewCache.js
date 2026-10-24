@@ -144,20 +144,21 @@ function renderStickerPreviewFromBase(baseCanvas, cacheKey) {
     silCanvas.height = h;
     const silCtx = silCanvas.getContext('2d');
     if (silCtx && typeof silCtx.drawImage === 'function') {
-      // 1. Subtle drop-shadow silhouette offset (+2.5, +3)
+      // 1. Subtle drop-shadow silhouette offset (+2.0, +2.5)
       silCtx.drawImage(baseCanvas, 0, 0);
       silCtx.globalCompositeOperation = 'source-in';
-      silCtx.fillStyle = 'rgba(20, 14, 28, 0.20)';
+      silCtx.fillStyle = 'rgba(10, 12, 18, 0.35)';
       silCtx.fillRect(0, 0, w, h);
-      ctx.drawImage(silCanvas, 2.5, 3);
+      ctx.drawImage(silCanvas, 2.0, 2.5);
 
-      // 2. Pure white die-cut sticker outline (8-way 2.4px offset)
+      // 2. Solid Black Manga Ink Outline (12-way 2.2px radial stroke)
       silCtx.globalCompositeOperation = 'source-in';
-      silCtx.fillStyle = '#FFFFFF';
+      silCtx.fillStyle = '#0E0F14';
       silCtx.fillRect(0, 0, w, h);
-      const R = 2.4;
-      for (let i = 0; i < 8; i++) {
-        const a = (i * Math.PI * 2) / 8;
+      const R = 2.2;
+      const numAngles = 12;
+      for (let i = 0; i < numAngles; i++) {
+        const a = (i * Math.PI * 2) / numAngles;
         ctx.drawImage(silCanvas, Math.cos(a) * R, Math.sin(a) * R);
       }
     }
@@ -222,7 +223,7 @@ function getFighterStickerPreview(index, category = null) {
   const defs = getActiveFighterDefs(cat);
   const def = defs[index] || FIGHTER_DEFS[index];
   const toggleSuffix = _getToggleSuffix(def);
-  const cacheKey = `${cat}_${index}${toggleSuffix}_sticker`;
+  const cacheKey = `${cat}_${index}${toggleSuffix}_sticker_black`;
   if (!fighterPreviewCache[cacheKey] || fighterPreviewCache[cacheKey].width !== 256) {
     const baseCanvas = getFighterPreview(index, category);
     renderStickerPreviewFromBase(baseCanvas, cacheKey);

@@ -3331,7 +3331,7 @@ async function runInteractionTests() {
       try {
         mockCtx.resetStackDepth();
         drawWingedGradeLetter(mockCtx, 32, 32, 'SS', null, 1, 1.3, true);
-        assert(letterFont === '900 17.5px "Impact", "Outfit", "Rajdhani", sans-serif', 'HUD grade letters must share the card seal Impact font');
+        assert(letterFont === '900 20.5px "Impact", "Outfit", "Rajdhani", sans-serif', 'HUD grade letters must share the card seal Impact font');
         assert(gradeAuraCount > 0, 'Top HUD grade letters must include their matching card-grade aura effect');
         assert(mockCtx.getStackDepth() === 0, 'Grade letter rendering must restore the Canvas 2D stack');
 
@@ -9456,6 +9456,184 @@ async function runInteractionTests() {
     // 5. Restore default
     state.skinCustomizations.zeus.handScale = 0.75;
     console.log('      ✅ Skin Studio Per-Fighter Hand Scale Customization & Canvas 2D Stack Balance verified successfully.');
+  }
+
+  // =========================================================================
+  // 91. Arena Floor Watermark Top Layer Rendering, Stack Balance & Zeus Storm Resilience
+  // =========================================================================
+  {
+    console.log('   91. Testing Arena Floor Watermark Top Layer Rendering, Stack Balance & Zeus Storm Resilience...');
+    const { drawArenaWatermark } = await import('../js/graphics/renderers/arenaRenderer.js');
+    const { state } = await import('../js/core/state.js');
+    const ZeusClass = FIGHTER_CLASS_MAP['zeus'];
+    const zeus = new ZeusClass(200, 200, 0);
+
+    // 1. Verify standard drawArenaWatermark maintains 0 Canvas 2D stack depth
+    mockCtx.resetStackDepth();
+    drawArenaWatermark(mockCtx, false);
+    assert(mockCtx.getStackDepth() === 0, `drawArenaWatermark(mockCtx, false) must maintain 0 stack depth, got ${mockCtx.getStackDepth()}`);
+
+    mockCtx.resetStackDepth();
+    drawArenaWatermark(mockCtx, true);
+    assert(mockCtx.getStackDepth() === 0, `drawArenaWatermark(mockCtx, true) must maintain 0 stack depth, got ${mockCtx.getStackDepth()}`);
+
+    // 2. Verify watermark renders during Zeus storm charging and active storm
+    zeus.isChargingStorm = true;
+    zeus.stormActive = true;
+    state.fighters = [zeus];
+
+    mockCtx.resetStackDepth();
+    drawArenaWatermark(mockCtx, true);
+    assert(mockCtx.getStackDepth() === 0, 'drawArenaWatermark must render with 0 stack depth on top of active storm');
+
+    // 3. Verify watermark toggling when enabled=false
+    const origWatermarkCfg = CONFIG.arenaWatermark;
+    CONFIG.arenaWatermark = { ...CONFIG.arenaWatermark, enabled: false };
+    mockCtx.resetStackDepth();
+    drawArenaWatermark(mockCtx, true);
+    assert(mockCtx.getStackDepth() === 0, 'drawArenaWatermark must return cleanly with 0 stack depth when disabled');
+    CONFIG.arenaWatermark = origWatermarkCfg;
+
+    // Cleanup state
+    zeus.isChargingStorm = false;
+    zeus.stormActive = false;
+    state.fighters = [];
+    console.log('      ✅ Arena Floor Watermark Top Layer Rendering, Stack Balance & Zeus Storm Resilience verified successfully.');
+  }
+
+  // =========================================================================
+  // 92. Dynamic Camera Tracking Focus on Ash's Active Pokémon & Enemy
+  // =========================================================================
+  {
+    console.log('   92. Testing Dynamic Camera Tracking Focus on Ash Active Pokémon & Enemy...');
+    const { updateCamera } = await import('../js/systems/cameraSystem.js');
+    const { state } = await import('../js/core/state.js');
+    const { PokemonCompanionEntity } = await import('../js/entities/fighters/AshFighter.js');
+    const AshClass = FIGHTER_CLASS_MAP['ash'];
+    const ash = new AshClass({ x: 100, y: 300 });
+    ash.x = 100;
+    ash.y = 300;
+
+    const ZenitsuClass = FIGHTER_CLASS_MAP['zenitsu'];
+    const enemy = new ZenitsuClass({ x: 400, y: 300 });
+    enemy.x = 400;
+    enemy.y = 300;
+
+    state.fighters = [ash, enemy];
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.camera = state.camera || {};
+    state.camera.enabled = true;
+    state.camera.mode = 'dynamic';
+    state.arena = state.arena || { x: 45, y: 240, width: 450, height: 450 };
+
+    // 1. Without summoned Pokémon: camera must center between Ash (100) and Enemy (400) -> targetX = 250
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 250) < 5, `Expected camera.targetX ~250 for Ash & Enemy, got ${state.camera.targetX}`);
+
+    // 2. Ash summons Pikachu at (350, 300): camera must focus on Pikachu (350) and Enemy (400) -> targetX ~ 375
+    const pikachu = new PokemonCompanionEntity(ash, 'pikachu', 350, 300);
+    ash.activePokemon = pikachu;
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 375) < 5, `Expected camera.targetX ~375 for Pikachu & Enemy, got ${state.camera.targetX}`);
+
+    // 3. When Pokémon faints: camera target smoothly returns to Ash (100) and Enemy (400) -> targetX = 250
+    ash.activePokemon = null;
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 250) < 5, `Expected camera.targetX ~250 after Pokémon faints, got ${state.camera.targetX}`);
+
+    // 4. In Fixed Camera mode: targetX must lock strictly to arena center (270)
+    state.camera.mode = 'fixed';
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 270) < 1, `Expected camera.targetX locked to arena center 270 in fixed mode, got ${state.camera.targetX}`);
+
+    // Cleanup state
+    state.camera.mode = 'dynamic';
+    state.fighters = [];
+    console.log('      ✅ Dynamic Camera Tracking Focus on Ash Active Pokémon & Enemy verified successfully.');
+  }
+
+  // =========================================================================
+  // 93. Natural Pokémon Wall Bouncing & Fighter Collision Elasticity
+  // =========================================================================
+  {
+    console.log('   93. Testing Natural Pokémon Wall Bouncing & Fighter Collision Elasticity...');
+    const { PokemonCompanionEntity } = await import('../js/entities/fighters/AshFighter.js');
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+    const { state } = await import('../js/core/state.js');
+    const arena = { x: 45, y: 240, width: 450, height: 450, shape: 'rect' };
+    state.arena = arena;
+    state.gameState = 'playing';
+
+    const AshClass = FIGHTER_CLASS_MAP['ash'];
+    const ash = new AshClass({ x: 100, y: 300 });
+    ash.x = 100;
+    ash.y = 300;
+    ash.isProtectedByHoneycombBarrier = true;
+    ash.vx = 0;
+    ash.vy = 0;
+
+    const ZenitsuClass = FIGHTER_CLASS_MAP['zenitsu'];
+    const enemy = new ZenitsuClass({ x: 400, y: 300 });
+    enemy.x = 400;
+    enemy.y = 300;
+
+    // 1. Natural Wall Bounce Reflection & Momentum Preservation
+    const pikachu = new PokemonCompanionEntity(ash, 'pikachu', arena.x + arena.width - 10, 300);
+    ash.activePokemon = pikachu;
+    pikachu.vx = 5.0;
+    pikachu.vy = 0.5;
+
+    const bounced = pikachu.resolveWallBounce(arena, enemy);
+    assert(bounced === true, 'Pikachu must register wall bounce when colliding with arena perimeter');
+    assert(pikachu.vx < -1.0, `Pikachu vx must reflect inward away from right wall (< -1.0), got ${pikachu.vx}`);
+    assert(pikachu.x <= arena.x + arena.width - pikachu.r, 'Pikachu x position must stay within arena bounds');
+
+    // On subsequent update ticks, Pikachu must naturally coast across the arena without instantly canceling its bounce
+    const preTickVx = pikachu.vx;
+    pikachu.update(enemy, 2, arena);
+    assert(pikachu.vx < 0, `Pikachu must preserve inward bounce momentum across update ticks, got vx: ${pikachu.vx}`);
+
+    // 2. Natural Fighter-to-Fighter Elastic Collision Impulse
+    pikachu.x = 200;
+    pikachu.y = 300;
+    pikachu.vx = 5.0;
+    pikachu.vy = 0.0;
+
+    enemy.x = 220;
+    enemy.y = 300;
+    enemy.vx = -5.0;
+    enemy.vy = 0.0;
+
+    resolveFighterCollision(pikachu, enemy);
+    assert(pikachu.vx < 0, `Pikachu must rebound backward on colliding with enemy, got vx: ${pikachu.vx}`);
+    assert(enemy.vx > 0, `Enemy must rebound backward on colliding with Pikachu, got vx: ${enemy.vx}`);
+    assert(pikachu.x < enemy.x, 'Collision resolution must physically separate Pikachu and enemy bodies');
+
+    // 3. Ash Honeycomb Barrier: Friendly Pokémon Pass-Through & Enemy Anchor Block
+    pikachu.x = ash.x + 5;
+    pikachu.y = ash.y;
+    pikachu.vx = 4.0;
+    pikachu.vy = 0.0;
+    ash.vx = 0;
+    ash.vy = 0;
+
+    resolveFighterCollision(ash, pikachu);
+    assert(ash.vx === 0 && ash.vy === 0, 'Ash must remain completely stationary when friendly Pokémon passes through barrier');
+
+    enemy.x = ash.x + 10;
+    enemy.y = ash.y;
+    enemy.vx = -5.0;
+    enemy.vy = 0.0;
+
+    resolveFighterCollision(ash, enemy);
+    assert(ash.vx === 0 && ash.vy === 0, 'Ash must remain an immovable anchor against enemy collisions while Honeycomb Barrier is active');
+    assert(enemy.x > ash.x, 'Enemy must be physically pushed outside Ash Honeycomb Barrier');
+
+    // Cleanup state
+    ash._cleanupActivePokemon?.();
+    state.fighters = [];
+    console.log('      ✅ Natural Pokémon Wall Bouncing & Fighter Collision Elasticity verified successfully.');
   }
 
   console.log('───────────────────────────────────────────────────────');

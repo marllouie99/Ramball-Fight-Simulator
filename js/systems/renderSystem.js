@@ -8,7 +8,7 @@ import {
   drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay
 } from '../graphics/ui.js';
 import {
-  drawArena, drawArenaBorder, drawArenaMatchNames, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
+  drawArena, drawArenaBorder, drawArenaWatermark, drawArenaMatchNames, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
@@ -393,6 +393,7 @@ export function renderGame() {
 
         // ── Arena Border Top Layer: Rendered ON TOP of Domain Backgrounds & Dim Screens ──
         drawArenaBorder(state.ctx, true);
+        drawArenaWatermark(state.ctx, true);
 
         // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) OVERLAYING the arena border, underneath fighters
         if (state.fighters) {

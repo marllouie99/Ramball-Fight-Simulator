@@ -34,6 +34,14 @@ export function updateGame() {
       if (state.faceOffSavedToastTimer > 0) {
         state.faceOffSavedToastTimer--;
       }
+      if (state.faceOffTimer === 1 && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('battleintro_transitions', 1.0, 0.95);
+      } else if (state.faceOffTimer === 22 && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('battleintro_transitions', 1.0, 1.06);
+      } else if (state.faceOffTimer === 44) {
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) audioSystem.playSFX('timertick', 1.0);
+        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(2.0, 4);
+      }
 
       if (state.faceOffAutoStart) {
         // Launch in-arena countdown or boss entrance sequence directly!
@@ -41,8 +49,8 @@ export function updateGame() {
         return;
       } else {
         // Manual thumbnail hold mode: hold at frame 120 (VS settled)
-        if (state.faceOffTimer > 120) {
-          state.faceOffTimer = 120;
+        if (state.faceOffTimer > 60) {
+          state.faceOffTimer = 60;
         }
       }
       return;
