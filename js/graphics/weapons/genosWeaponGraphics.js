@@ -11,7 +11,7 @@ import { CONFIG } from '../../core/config.js';
 const FRAME_COUNT = 12;
 const FRAME_WIDTH = 800;
 const FRAME_HEIGHT = 384;
-const BEAM_BODY_HEIGHT = 180; // Calibrated core body height in the 384px frame
+const BEAM_BODY_HEIGHT = 240; // Calibrated visible beam body height (240px) ensuring 1:1 on-screen match with ultBeamWidth
 
 let _genosSpiralCannonStrip = null;
 let _genosSpiralCannonLoading = false;

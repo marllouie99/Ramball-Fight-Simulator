@@ -1792,7 +1792,7 @@ export class GenosFighter extends Fighter {
       }
 
       const range = CONFIG.genos?.ultBeamRange || 1200;
-      const width = CONFIG.genos?.ultBeamWidth || 140;
+      const width = CONFIG.genos?.ultBeamWidth || 130;
 
       const targetsToScan = [];
       if (state.fighters) {
