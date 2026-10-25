@@ -914,12 +914,17 @@ export class Fighter {
     this.recoilTimer = 0;
     this.swipeActive = false;
     this.swipeTimer = 0;
+    this.swordSwingTimer = 0;
+    this.swordHitDelivered = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
     this.basicAttackHitPauseTimer = 0;
 
     // Flurries, combos, and rushes
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
+    this.flurrySlashTimer = 0;
     this.flurryTarget = null;
     this.flurryVoiceTimer = 0;
     this.rapidSlashHitsLeft = 0;
@@ -3885,6 +3890,9 @@ export class Fighter {
       if (this.hitStunTimer <= 0) {
         this.hitStunMultiplier = 1.0;
       }
+    }
+    if (this.stunTimer > 0) {
+      this.stunTimer--;
     }
     // Pure Love Beam slow (both during beam hit and recovery phase)
     if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.pureLoveBeamRecoveryTimer > 0)) {

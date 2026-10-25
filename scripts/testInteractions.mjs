@@ -1316,6 +1316,171 @@ async function runInteractionTests() {
     console.log('      ✅ Yuta Pure Love Beam smooth tracking during channel & committed release lock verified.');
   }
 
+  // ── TEST 15b: Yuta Pure Love Beam Suction (Pulling Mechanic) ──
+  console.log('   15b. Testing Yuta Pure Love Beam Suction (Pulling Mechanic) & Pull Immunity...');
+  {
+    const { YutaPureLoveBeamBehavior } = await import('../js/systems/projectiles/behaviors/YutaPureLoveBeamBehavior.js');
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const EscanorClass = FIGHTER_CLASS_MAP['escanor'];
+    const behavior = new YutaPureLoveBeamBehavior();
+
+    const previousArena = state.arena;
+    const previousIllusions = state.illusions;
+    const previousDriveBys = state.cjDriveBys;
+
+    const runSuction = (target, frames = 5) => {
+      const yuta = new YutaClass({ x: 300, y: 300, color: '#FFFFFF', controls: {} });
+      yuta.reset();
+      yuta.x = 300;
+      yuta.y = 300;
+      yuta.z = 0;
+      yuta.hp = yuta.maxHp;
+      yuta.gunAngle = 0;
+      yuta.angle = 0;
+      yuta.isFiringPureLoveBeam = true;
+      yuta.pureLoveBeamLockedAngle = 0;
+      yuta.pureLoveBeamActiveTimer = 200;
+
+      target.x = 480;
+      target.y = 300;
+      target.vx = 0;
+      target.vy = 0;
+
+      state.fighters = [yuta, target];
+      state.arena = { x: 0, y: 0, width: 800, height: 600 };
+      state.illusions = [];
+      state.cjDriveBys = [];
+
+      const projectile = {
+        owner: 0,
+        ownerFighter: yuta,
+        angle: 0,
+        x: yuta.x + 39,
+        y: yuta.y,
+        length: CONFIG.yuta?.pureLoveBeamLength || 2500,
+        r: CONFIG.yuta?.pureLoveBeamWidth || 200,
+        damage: 5,
+        knockback: CONFIG.yuta?.pureLoveBeamKnockback || 2,
+        hitTargets: new Set(),
+        hitTickTimer: 0,
+        life: 200,
+        maxLife: 200
+      };
+
+      const startDist = Math.hypot(target.x - yuta.x, target.y - yuta.y);
+      for (let f = 0; f < frames; f++) {
+        behavior.update(projectile, state.fighters, {});
+      }
+      const endDist = Math.hypot(target.x - yuta.x, target.y - yuta.y);
+      return { yuta, target, startDist, endDist };
+    };
+
+    try {
+      // 1. Normal fighter inside the beam is reeled IN toward Yuta
+      const gojo = new GojoClass({ x: 480, y: 300, color: '#00F0FF', controls: {} });
+      gojo.reset();
+      const pulled = runSuction(gojo);
+      assert(pulled.target.caughtInPureLoveBeam === true, 'Target inside Pure Love Beam must be flagged as caught');
+      assert(
+        pulled.endDist < pulled.startDist - 10,
+        `Pure Love Beam must PULL caught targets toward Yuta (start ${pulled.startDist.toFixed(1)} -> end ${pulled.endDist.toFixed(1)})`
+      );
+
+      // 2. Suction never overshoots past Yuta's own body radius (no slingshot through him)
+      const closeGojo = new GojoClass({ x: 480, y: 300, color: '#00F0FF', controls: {} });
+      closeGojo.reset();
+      const closeRun = (() => {
+        const result = runSuction(closeGojo, 0);
+        closeGojo.x = result.yuta.x + (result.yuta.r || 25) + 8;
+        closeGojo.y = result.yuta.y;
+        const startDist = Math.hypot(closeGojo.x - result.yuta.x, closeGojo.y - result.yuta.y);
+        const projectile = {
+          owner: 0, ownerFighter: result.yuta, angle: 0,
+          x: result.yuta.x + 39, y: result.yuta.y,
+          length: CONFIG.yuta?.pureLoveBeamLength || 2500,
+          r: CONFIG.yuta?.pureLoveBeamWidth || 200,
+          damage: 5, knockback: 2, hitTargets: new Set(), hitTickTimer: 0, life: 200, maxLife: 200
+        };
+        for (let f = 0; f < 5; f++) behavior.update(projectile, state.fighters, {});
+        const endDist = Math.hypot(closeGojo.x - result.yuta.x, closeGojo.y - result.yuta.y);
+        return { startDist, endDist };
+      })();
+      assert(closeRun.endDist > 0, 'Suction must never drag a target through/behind Yuta');
+
+      // 3. Pull-immune fighters stay planted (Escanor is explicitly immune to all suction)
+      const escanor = new EscanorClass({ x: 480, y: 300, color: '#FFD700', controls: {} });
+      escanor.reset();
+      const escanorRun = runSuction(escanor);
+      assert(
+        Math.abs(escanorRun.endDist - escanorRun.startDist) < 0.001,
+        `Escanor must remain immune to Pure Love Beam suction (start ${escanorRun.startDist.toFixed(1)} -> end ${escanorRun.endDist.toFixed(1)})`
+      );
+
+      console.log('      ✅ Pure Love Beam suction pulls caught targets inward, respects pull immunity & never overshoots.');
+    } finally {
+      state.arena = previousArena;
+      state.illusions = previousIllusions;
+      state.cjDriveBys = previousDriveBys;
+    }
+  }
+
+  // ── TEST 15c: Yuta Attack Dashes Are Silent (Dash SFX Removed) ──
+  console.log('   15c. Testing Yuta Attack Dash Silence (Dash SFX Removed By Design)...');
+  {
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const cfg = CONFIG.yuta;
+
+    // 1. Yuta must not ship config entries for attack-dash SFX anymore
+    assert(!cfg.sounds?.flurryDash, 'Yuta must NOT define a flurryDash SFX');
+    assert(!cfg.sounds?.phantomFlurryDash, 'Yuta must NOT define a phantomFlurryDash SFX');
+    assert(!cfg.sounds?.thinIceBreakerDash, 'Yuta must NOT define a thinIceBreakerDash SFX');
+    assert(!cfg.sounds?.beamDash, 'Yuta must NOT define a beamDash SFX');
+    assert(!cfg.soundVolumes?.flurryDash && !cfg.soundVolumes?.phantomFlurryDash, 'Yuta must NOT define dash SFX volumes');
+
+    // 2. Phantom Flurry teleport must not emit any dash sound
+    const yuta = new YutaClass({ x: 300, y: 300, color: '#FFFFFF', controls: {} });
+    const gojo = new GojoClass({ x: 380, y: 300, color: '#00F0FF', controls: {} });
+    yuta.reset();
+    gojo.reset();
+    yuta.x = 300; yuta.y = 300;
+    yuta.isChannelingDomain = false;
+    yuta.domainActive = false;
+    gojo.x = 380; gojo.y = 300;
+    gojo.hp = gojo.maxHp;
+    state.fighters = [yuta, gojo];
+
+    const played = [];
+    const origPlaySFX = audioSystem.playSFX;
+    audioSystem.playSFX = (src, vol) => { played.push([src, vol]); };
+    try {
+      yuta.triggerPhantomFlurry(gojo);
+      const dashPlays = played.filter(([src]) => typeof src === 'string' && /skill_dash|dash\d|dash\.mp3/i.test(src));
+      assert(
+        dashPlays.length === 0,
+        `Yuta's attack dashes must be silent, but dash SFX were played: ${JSON.stringify(dashPlays)}`
+      );
+
+      // 3. Katana basic attack (5-phase combo) must also be dash-SFX free
+      played.length = 0;
+      yuta.meleeCooldown = 0;
+      yuta.swordSwingTimer = 0;
+      yuta.swipeActive = false;
+      yuta.executeKatanaMelee(0);
+      assert(yuta.swipeActive === true && yuta.swordSwingTimer > 0, 'Katana basic attack must actually start its swing (test precondition)');
+      const katanaDashPlays = played.filter(([src]) => typeof src === 'string' && /skill_dash|dash\d|dash\.mp3/i.test(src));
+      assert(
+        katanaDashPlays.length === 0,
+        `Yuta's katana basic attack must NOT play any dash SFX (Assets/Sound Effects/Skills/dash1.mp3), got: ${JSON.stringify(katanaDashPlays)}`
+      );
+    } finally {
+      audioSystem.playSFX = origPlaySFX;
+    }
+
+    console.log('      ✅ Yuta attack dashes verified silent (no dash SFX plays on flurry/teleport attacks).');
+  }
+
   // ── TEST 16: Team Match Winner Overlay Dual/Compound Name Display Verification ──
   console.log('   16. Testing Team Match Winner Overlay Dual Name Display (2v2, 1v2, Tag Match)...');
   {
@@ -4325,6 +4490,61 @@ async function runInteractionTests() {
     // Restore auto
     setSelectedArenaFloor('auto');
     console.log('      ✅ Arena Tile System, themes, snapping math & 100% balanced Canvas 2D stacks verified.');
+  }
+
+  // ─────────────────────────────────────────────
+  // 30b. Testing Arena Domain Overlay Visibility (Native Canvas 2D Must Never Erase Arena Art)
+  // ─────────────────────────────────────────────
+  {
+    console.log('   30b. Testing Arena Domain Overlay Visibility in Native Canvas 2D Mode...');
+    const { state } = await import('../js/core/state.js');
+    const { applyDomainArenaVignetteCutout } = await import('../js/graphics/renderers/domainDimOverlays.js');
+
+    const previousPixiApp = state.pixiApp;
+    const previousPixiLayers = state.pixiLayers;
+    const previousArena = state.arena;
+    const previousCamera = state.camera;
+    const previousFill = mockCtx.fill;
+    const previousFillRect = mockCtx.fillRect;
+
+    let erasePaintCount = 0;
+    const trackComposite = () => {
+      if (mockCtx.globalCompositeOperation === 'destination-out') erasePaintCount++;
+    };
+    mockCtx.fill = function () { trackComposite(); };
+    mockCtx.fillRect = function () { trackComposite(); };
+
+    try {
+      state.arena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+      state.camera = { enabled: false, mode: 'fixed', zoom: 1 };
+
+      // Native Canvas 2D mode: there is no lower WebGL layer, so erasing would delete the domain art itself
+      state.pixiApp = null;
+      state.pixiLayers = {};
+      erasePaintCount = 0;
+      mockCtx.resetStackDepth();
+      applyDomainArenaVignetteCutout(mockCtx);
+      assert(erasePaintCount === 0, `Native Canvas 2D mode must NOT erase arena pixels during domain dims (got ${erasePaintCount} destination-out paints)`);
+      assert(mockCtx.getStackDepth() === 0, 'applyDomainArenaVignetteCutout must keep a balanced canvas stack in native mode');
+
+      // WebGL hybrid mode keeps the original cutout so lower-layer domain sprites show through
+      state.pixiApp = { screen: { width: 540, height: 960 }, stage: { position: { set: () => {} } }, render: () => {} };
+      state.pixiLayers = { environment: {}, effects: {} };
+      erasePaintCount = 0;
+      mockCtx.resetStackDepth();
+      applyDomainArenaVignetteCutout(mockCtx);
+      assert(erasePaintCount > 0, 'WebGL hybrid mode must still cut the arena interior out of the dim layer');
+      assert(mockCtx.getStackDepth() === 0, 'applyDomainArenaVignetteCutout must keep a balanced canvas stack in WebGL mode');
+    } finally {
+      mockCtx.fill = previousFill;
+      mockCtx.fillRect = previousFillRect;
+      mockCtx.globalCompositeOperation = 'source-over';
+      state.pixiApp = previousPixiApp;
+      state.pixiLayers = previousPixiLayers;
+      state.arena = previousArena;
+      state.camera = previousCamera;
+    }
+    console.log('      ✅ Native Canvas 2D domain overlays preserved while WebGL cutout behavior stays intact.');
   }
 
   {

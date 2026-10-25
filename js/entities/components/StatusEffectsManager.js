@@ -330,6 +330,7 @@ export class StatusEffectsManager {
       fighter.crimsonElectrifiedTimer = 0;
       fighter.dubstepStunTimer = 0;
       fighter.hitStunTimer = 0;
+      fighter.stunTimer = 0;
       fighter.paralyzeTimer = 0;
       fighter.iceFreezeTimer = 0;
       fighter.isFrozenBySnowPea = false;

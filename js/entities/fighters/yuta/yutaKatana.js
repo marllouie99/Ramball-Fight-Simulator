@@ -104,19 +104,26 @@ export function modExecuteKatanaMelee(fighter, angle) {
     }
   }
 
-  // Anticipation flutter swoosh
-  try {
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX('skill_dash1', 0.40);
-    }
-  } catch (e) {}
+  // Dash SFX removed per design: the katana anticipation flutter swoosh (skill_dash1 -> dash1.mp3) is silent
 }
 
 /**
  * Updates 5-phase melee combo lifecycle, forward lunge physics, impact lock, and layered slap audio.
  */
 export function modUpdateKatanaSwing(fighter, opponent, arena) {
-  if (!fighter.swipeActive || fighter.swordSwingTimer <= 0) return;
+  if (!fighter.swipeActive || fighter.swordSwingTimer <= 0) {
+    if (fighter.swordSwingTimer > 0 || fighter.swipeActive) {
+      if (fighter.swordSwingTimer > 0 && !fighter.swordHitDelivered) {
+        fighter.meleeCooldown = 0;
+      }
+      fighter.swordSwingTimer = 0;
+      fighter.swipeTimer = 0;
+      fighter.swipeActive = false;
+      fighter.swordTremorX = 0;
+      fighter.swordTremorY = 0;
+    }
+    return;
+  }
 
   const totalF = fighter.swordSwingMax || 30;
   const elapsed = totalF - fighter.swordSwingTimer;

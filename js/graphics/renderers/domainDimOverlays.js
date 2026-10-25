@@ -89,6 +89,13 @@ export function excludeGojoInfinityFromDim(ctx) {
 // leaving dark atmospheric color framing outside the arena with a subtle edge vignette.
 // ──────────────────────────────────────────
 export function applyDomainArenaVignetteCutout(ctx) {
+  // The cutout erases (destination-out) the arena interior so domain artwork living on the lower
+  // WebGL environment layer shines through 100% undimmed. Native Canvas 2D mode has no lower layer:
+  // erasing here would delete the arena floor & domain overlay art that drawArena() already painted
+  // onto this very canvas, leaving the arena interior blank. Native mode instead repaints the active
+  // domain artwork ON TOP of the dim wash in renderSystem.js (see "Re-composite arena domain artwork").
+  if (typeof state !== 'undefined' && !state.pixiApp) return;
+
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
   if (!arena || !ctx) return;
 

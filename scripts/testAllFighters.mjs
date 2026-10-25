@@ -12648,6 +12648,85 @@ async function main() {
     errorList.push(`[ZEUS THUNDER STORM TEST]: ${err.stack || err.message}`);
   }
 
+  // ───────────────────────────────────────────────────────
+  // YUTA STUN RECOVERY & BASIC ATTACK CONTINUITY TEST SUITE
+  // ───────────────────────────────────────────────────────
+  try {
+    const { YutaFighter } = await import('../js/entities/fighters/YutaFighter.js');
+    const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+    const { state } = await import('../js/core/state.js');
+
+    const yuta = new YutaFighter({ id: 'yuta', name: 'Yuta Okkotsu', color: '#FF1493', hp: 200 });
+    const dummy = new NormalFighter({ id: 'normal', name: 'Dummy', color: '#FF0000', hp: 500 });
+
+    state.gameState = 'playing';
+    state.fighters = [yuta, dummy];
+    state.getFighterTeam = (idx) => idx === 0 ? 0 : 1;
+    state.arena = { x: 45, y: 240, width: 450, height: 450, shape: 'rect' };
+
+    yuta.x = 200;
+    yuta.y = 300;
+    dummy.x = 245;
+    dummy.y = 300;
+    yuta.meleeCooldown = 0;
+    yuta.swordSwingTimer = 0;
+
+    // 1. Verify clearAllAttackEffects mid-swing resets both swordSwingTimer and meleeCooldown
+    yuta.executeKatanaMelee(0);
+    if (!yuta.swipeActive || yuta.swordSwingTimer <= 0) {
+      throw new Error('Expected Yuta executeKatanaMelee to start katana swing!');
+    }
+    yuta.clearAllAttackEffects();
+    if (yuta.swordSwingTimer !== 0 || yuta.swipeActive !== false || yuta.meleeCooldown !== 0) {
+      throw new Error(`clearAllAttackEffects mid-windup failed to reset swing/cooldown! timer=${yuta.swordSwingTimer}, swipe=${yuta.swipeActive}, cd=${yuta.meleeCooldown}`);
+    }
+
+    // 2. Verify short contact hit-pause (timeStopTimer <= 6 with suppressFreezeOverlay) pauses rather than aborts Yuta's katana swing
+    yuta.executeKatanaMelee(0);
+    const timerBeforePause = yuta.swordSwingTimer;
+    yuta.applyTimeStop(3);
+    yuta.update(dummy, 0, state.arena);
+    if (!yuta.swipeActive || yuta.swordSwingTimer !== timerBeforePause) {
+      throw new Error(`Short contact hit-pause aborted Yuta katana swing instead of pausing! swipe=${yuta.swipeActive}, timer=${yuta.swordSwingTimer}`);
+    }
+    while (yuta.timeStopTimer > 0) {
+      yuta.update(dummy, 0, state.arena);
+    }
+    yuta.update(dummy, 0, state.arena);
+    if (!yuta.swipeActive || yuta.swordSwingTimer <= 0) {
+      throw new Error('Yuta katana swing did not resume after short contact hit-pause!');
+    }
+
+    // 3. Verify hard interrupt mid-windup resets meleeCooldown so Yuta can immediately attack after stun recovery
+    yuta.interruptAttacks(true);
+    if (yuta.meleeCooldown !== 0 || yuta.swordSwingTimer !== 0) {
+      throw new Error(`Hard interrupt mid-windup left meleeCooldown=${yuta.meleeCooldown}, swordSwingTimer=${yuta.swordSwingTimer}`);
+    }
+
+    // 4. Verify basic attack execution while in hitStunTimer > 0 and stunTimer decay
+    yuta.hitStunTimer = 10;
+    yuta.stunTimer = 5;
+    yuta.knockbackStunTimer = 0;
+    yuta.x = 200;
+    yuta.y = 300;
+    dummy.x = 160;
+    dummy.y = 300;
+    yuta.gunAngle = 0;
+    yuta.update(dummy, 0, state.arena);
+    if (!yuta.swipeActive || yuta.swordSwingTimer <= 0) {
+      throw new Error('Yuta failed to initiate basic katana attack while in hitStunTimer > 0!');
+    }
+    if (yuta.stunTimer !== 4) {
+      throw new Error(`Fighter stunTimer failed to decrement in _tickCooldowns! Expected 4, got ${yuta.stunTimer}`);
+    }
+
+    console.log('✅ [Yuta Stun Recovery & Basic Attack Test] Successfully verified Yuta katana basic attack continuity across stuns, hit-pauses, and interrupts!');
+  } catch (err) {
+    console.error('❌ [YUTA STUN RECOVERY TEST ERROR]:', err.message || err);
+    errors++;
+    errorList.push(`[YUTA STUN RECOVERY TEST]: ${err.stack || err.message}`);
+  }
+
   // ═════════════════════════════════════════════════════════════════════════
   // SPRITE SHEET ASSET PALETTE & PREMULTIPLICATION HEALTH SUITE
   // ═════════════════════════════════════════════════════════════════════════

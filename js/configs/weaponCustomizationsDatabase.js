@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER WEAPON CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Weapon Studio on 2026-10-19T02:35:08.602Z
+ * Generated from Weapon Studio on 2026-10-25T15:18:01.002Z
  * =============================================================================
  */
 
@@ -57,7 +57,7 @@ export const WEAPON_CUSTOMIZATIONS_DATABASE = {
       ],
       "weaponScale": 1
   },
-  yuta: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
+  yuta: { offsetX: 0, offsetY: 14, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   toji: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   cronos: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   ruby: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },

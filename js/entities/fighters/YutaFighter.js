@@ -505,7 +505,7 @@ export class YutaFighter extends Fighter {
         this.aim(target);
         this.isChannelingThinIceBreaker = true;
         this.thinIceBreakerChargeTimer = 8;
-        audioSystem.playSFX('skill_dash5', 0.9);
+        // Dash SFX removed per design: Yuta's attack dashes are silent
         spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
         const punchAngle = Math.atan2(target.y - this.y, target.x - this.x);
         this.vx = Math.cos(punchAngle) * 4.0;
@@ -543,7 +543,7 @@ export class YutaFighter extends Fighter {
     this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
     spawnImpactFlash(oldX, oldY, 15, 'silver');
     spawnImpactFlash(this.x, this.y, 20, 'silver');
-    audioSystem.playSFX('skill_dash3', 0.7);
+    // Dash SFX removed per design: Yuta's flurry teleports are silent
 
     this.activeSlashType = (this.activeSlashType === undefined) ? 0 : (this.activeSlashType + 1) % 3;
     this.trailGenTimer = 40;
@@ -666,6 +666,7 @@ export class YutaFighter extends Fighter {
     }
 
     const isStasisFrozen = this.isSkillPreservedInStasis();
+    const hadShortHitPause = ((this.timeStopTimer > 0 && this.timeStopTimer <= 6) || (this.basicAttackHitPauseTimer > 0 && this.basicAttackHitPauseTimer <= 6));
     const isFrozen = isStasisFrozen || (!this.isChannelingDomain && !this.domainActive && !this.isFiringPureLoveBeam && !this.isChannelingPureLoveBeam && this._handleTimeStop()) || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
 
     if (this.rctCooldown > 0) this.rctCooldown--;
@@ -733,8 +734,15 @@ export class YutaFighter extends Fighter {
       }
 
       // Domain channeling, Pure Love Beam, Rika Emergence/Call, & active domain have hyper-armor — do NOT cancel them via interruptAttacks().
-      if (!this.isSkillPreservedInStasis() && !this.isChannelingDomain && !this.domainActive && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.rikaEmergingForBeamTimer && (this.rikaCallTimer <= 0) && !this.isChannelingThinIceBreaker) {
+      // Short contact hit-pauses (timeStopTimer <= 6 with suppressFreezeOverlay) pause Yuta's katana swing in place rather than aborting it.
+      const isShortHitPauseOnly = !isStasisFrozen && !isEnemyDomainActive && !this.isTargetOfAmbush &&
+        hadShortHitPause &&
+        !(this.crimsonElectrifiedTimer > 0 || this.electricStunTimer > 0 || this.dubstepStunTimer > 0 || (this.iceFreezeTimer || 0) > 0 || this.isFrozenBySnowPea || this.isFrozenByInfinity || (this.paralyzeTimer || 0) > 0 || this.isParalyzed);
+      if (!isShortHitPauseOnly && !this.isSkillPreservedInStasis() && !this.isChannelingDomain && !this.domainActive && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.rikaEmergingForBeamTimer && (this.rikaCallTimer <= 0) && !this.isChannelingThinIceBreaker) {
         this.interruptAttacks();
+      }
+      if (this.meleeCooldown > 0 && !isEnemyDomainActive && !this.isFrozenByInfinity) {
+        this.meleeCooldown--;
       }
       return;
     }
@@ -1578,27 +1586,24 @@ export class YutaFighter extends Fighter {
           }
         }
 
-        // Initial dash slide sound & tremor
-        audioSystem.playSFX('skill_dash5', 1.2);
+        // Dash SFX removed per design: the beam launch slide is silent (tremor stays)
         spawnImpactFlash(oldX, oldY, 35, '#FF1493');
         triggerGlobalScreenShake(8, 30);
       }
       }
 
-    // --- Hyper-armor Melee Override ---
-    // Allow Yuta to swing his katana while in hitstun ONLY if not actively taking knockback,
-    // so he doesn't get infinitely stun-locked by Gojo or Sukuna's rapid punches.
+    // --- Hyper-armor Melee & Post-Stun Basic Attack Override ---
+    // Allow Yuta to swing his katana while in hitstun (if not actively taking knockback)
+    // AND immediately upon recovering from hitstun/knockback on the current frame, so he never
+    // gets stun-locked or misses basic attack windows when super.update() skips shoot().
     const isKnockedBack = (this.knockbackStunTimer || 0) > 0;
+    const isParalyzedOrBeam = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || this.isCaughtInBeam();
     const isKatanaAllowed = this.isSkillEnabled(CONFIG.yuta?.enableKatanaMelee, true);
-    if (isKatanaAllowed && this.hitStunTimer > 0 && !isKnockedBack && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.pureLoveBeamBreatherTimer || 0) <= 0 && this.hp > 0 && this.meleeCooldown <= 0 && this.swordSwingTimer <= 0) {
-      let enemyInMelee = false;
+    if (isKatanaAllowed && !isKnockedBack && !isParalyzedOrBeam && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.pureLoveBeamBreatherTimer || 0) <= 0 && !this.isSummoningRika() && this.hp > 0 && this.meleeCooldown <= 0 && this.swordSwingTimer <= 0) {
+      let closestEnemy = null;
+      let closestDist = Infinity;
       const range = CONFIG.yuta.meleeRange || 70;
-      const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
-      const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-
-      if (opponent && !isKnockedBack) {
-        this.aim(opponent);
-      }
+      const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
 
       const allTargets = [
         ...(state.fighters || []),
@@ -1608,35 +1613,32 @@ export class YutaFighter extends Fighter {
       for (let i = 0; i < allTargets.length; i++) {
         const enemy = allTargets[i];
         const isControlledRika = this.isMakimaControlledRikaTarget(enemy);
-        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || enemy.isLawnmower || enemy.isUntargetable || enemy.untargetable || enemy.cannotBeTargeted || enemy.isTargetable === false || !this.isValidAimTarget(enemy)) continue;
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed || (!isControlledRika && (enemy.isRika || enemy.owner === this)) || (enemy.vanishTimer && enemy.vanishTimer > 0) || enemy.isLawnmower || enemy.isUntargetable || enemy.untargetable || enemy.cannotBeTargeted || enemy.isTargetable === false || !this.isValidAimTarget(enemy)) continue;
 
         if (enemy.owner) {
-          const ownerTeam = state.getFighterTeam(state.fighters.indexOf(enemy.owner));
-          if (!isControlledRika && myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+          const ownerTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy.owner)) : enemy.owner.team;
+          if (!isControlledRika && myTeam !== null && myTeam !== undefined && ownerTeam !== null && ownerTeam !== undefined && myTeam === ownerTeam) continue;
         } else {
-          const enemyTeam = state.getFighterTeam(state.fighters.indexOf(enemy));
-          if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+          const enemyTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy)) : enemy.team;
+          if (myTeam !== null && myTeam !== undefined && enemyTeam !== null && enemyTeam !== undefined && myTeam === enemyTeam) continue;
         }
 
         const dx = enemy.x - this.x;
         const dy = enemy.y - this.y;
         const dist = Math.hypot(dx, dy);
 
-        if (dist <= range + this.r + (enemy.r || 20)) {
-          const enemyAngle = Math.atan2(dy, dx);
-          let angleDiff = Math.abs(enemyAngle - this.gunAngle);
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          angleDiff = Math.abs(angleDiff);
-
-          if (angleDiff <= arc / 2) {
-            enemyInMelee = true;
-            break;
-          }
+        if (dist <= range + this.r + (enemy.r || 20) && dist < closestDist) {
+          closestDist = dist;
+          closestEnemy = enemy;
         }
       }
 
-      if (enemyInMelee) {
-        this.executeKatanaMelee(this.gunAngle);
+      if (closestEnemy) {
+        this.aim(closestEnemy);
+        const swingAngle = Math.atan2(closestEnemy.y - this.y, closestEnemy.x - this.x);
+        this.gunAngle = swingAngle;
+        this.angle = swingAngle;
+        this.executeKatanaMelee(swingAngle);
       }
     }
 
@@ -1749,7 +1751,7 @@ export class YutaFighter extends Fighter {
 
     spawnImpactFlash(oldX, oldY, 25, 'silver');
     spawnImpactFlash(this.x, this.y, 30, 'silver');
-    audioSystem.playSFX('skill_dash3', 0.8);
+    // Dash SFX removed per design: Phantom Flurry teleport is silent
     triggerGlobalScreenShake(8, 10);
 
     // Trigger Phantom Flurry counter/combo (which automatically completes into Thin Ice Breaker!)
@@ -2005,9 +2007,13 @@ export class YutaFighter extends Fighter {
         let nearest = null;
         let nearestDist = Infinity;
         const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
+        const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
         for (const f of allEntities) {
           if (!f || f === this || f.hp <= 0) continue;
-          if (f.team === this.team) continue;
+          const fTeam = f.owner
+            ? ((state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(f.owner)) : f.owner.team)
+            : ((state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(f)) : f.team);
+          if (myTeam !== null && myTeam !== undefined && fTeam !== null && fTeam !== undefined && fTeam === myTeam) continue;
           const dist = Math.hypot(f.x - this.x, f.y - this.y);
           if (dist < nearestDist) {
             nearestDist = dist;
@@ -2396,7 +2402,16 @@ export class YutaFighter extends Fighter {
     const wasRetreating = (this.beamRetreatSlideTimer > 0);
     const currentRetreat = this.beamRetreatSlideTimer;
 
+    const wasSwingingBeforeHit = (this.swordSwingTimer > 0 && !this.swordHitDelivered);
     super.clearAllAttackEffects();
+    if (wasSwingingBeforeHit) {
+      this.meleeCooldown = 0;
+    }
+    this.swordSwingTimer = 0;
+    this.swipeActive = false;
+    this.swordHitDelivered = false;
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
 
     // Preserve Pure Love Beam hyper-armor unless Yuta is truly dead or silenced
     const isHardCancelled = this.hp <= 0 || this.isDead || this.isTargetOfAmbush || (this.silenceTimer || 0) > 0;
@@ -2495,9 +2510,14 @@ export class YutaFighter extends Fighter {
     const currentFlurryTarget = this.flurryTarget;
     const currentFlurryGhost = this.flurryGhost;
 
+    const wasSwingingBeforeHit = (this.swordSwingTimer > 0 && !this.swordHitDelivered);
     super.interruptAttacks(forceCancelAll);
+    if (wasSwingingBeforeHit) {
+      this.meleeCooldown = 0;
+    }
     this.swordSwingTimer = 0;
     this.swipeActive = false;
+    this.swordHitDelivered = false;
     this.swordTremorX = 0;
     this.swordTremorY = 0;
 
@@ -2839,7 +2859,8 @@ export class YutaFighter extends Fighter {
 
     const isChannelingOrPunchingBreaker = this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0);
     const isFlurryActive = (this.flurryHitsLeft > 0) || ((this.flurryTimer || 0) > 0) || ((this.flurrySlashTimer || 0) > 0);
-    const isSuppressed = this.isTargetOfAmbush || isChannelingOrPunchingBreaker || (typeof this.areAttackEffectsSuppressed === 'function' && this.areAttackEffectsSuppressed());
+    const isActivelySwingingKatana = (this.swipeActive && this.swordSwingTimer > 0 && !isFlurryActive && (this.knockbackStunTimer || 0) <= 0);
+    const isSuppressed = this.isTargetOfAmbush || isChannelingOrPunchingBreaker || (!isActivelySwingingKatana && typeof this.areAttackEffectsSuppressed === 'function' && this.areAttackEffectsSuppressed());
 
     if (!isGojoDomainActive && !isSuppressed) {
       const r = this.r || 22;

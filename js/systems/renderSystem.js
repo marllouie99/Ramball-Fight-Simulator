@@ -324,6 +324,38 @@ export function renderGame() {
           updateHybridEnvironment(); // Cleans up and detaches any active WebGL dim sprites
         }
 
+        // ── NATIVE CANVAS 2D MODE: Re-composite arena domain artwork ON TOP of the full-screen dim wash ──
+        // In WebGL mode the domain dims "cut out" the arena interior with destination-out so domain art
+        // rendered on the lower environment layer stays 100% visible. Native mode has no lower layer, and
+        // that cutout is suppressed (it would erase the arena art itself), so the active domain background
+        // is repainted here — clipped to the arena — restoring the artwork after the dim wash.
+        if (!state.pixiApp && !state.disableDimEffects && state.fighters) {
+          const activeDomainFighter = state.fighters.find(f =>
+            f && f.hp > 0 &&
+            (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) &&
+            typeof f.drawDomainBackground === 'function'
+          );
+          if (activeDomainFighter) {
+            const domainArena = (typeof state !== 'undefined' && state.arena) || CONFIG.arena;
+            state.ctx.save();
+            applyCameraToCtx(state.ctx);
+            if (domainArena) {
+              state.ctx.beginPath();
+              if (domainArena.shape === 'circle') {
+                const acx = domainArena.x + domainArena.width / 2;
+                const acy = domainArena.y + domainArena.height / 2;
+                const ar = domainArena.radius !== undefined ? domainArena.radius : (domainArena.width / 2);
+                state.ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
+              } else {
+                state.ctx.rect(domainArena.x, domainArena.y, domainArena.width, domainArena.height);
+              }
+              state.ctx.clip();
+            }
+            activeDomainFighter.drawDomainBackground(state.ctx);
+            state.ctx.restore();
+          }
+        }
+
         // Apply Camera Viewport Transform (Dynamic Tracking, Distance Zoom, and Shake)
         state.ctx.save();
         applyCameraToCtx(state.ctx);

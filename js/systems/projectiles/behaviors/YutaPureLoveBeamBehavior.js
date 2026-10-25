@@ -3,6 +3,7 @@ import { CONFIG } from '../../../core/config.js';
 import { state } from '../../../core/state.js';
 import { spawnImpactFlash, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
 import { isLineOfSightBlockedByObstacle } from '../../../systems/arenaObstacleSystem.js';
+import { isEntityImmuneToGravitationalPull } from '../../../entities/fighter.js';
 
 export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
   update(p, fighters, system) {
@@ -266,6 +267,8 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             const isIchigo = ent.characterId === 'ichigo' || ent.type === 'ichigo' || (ent._def && (ent._def.id === 'ichigo' || ent._def.type === 'ichigo'));
             const isEscanor = ent.characterId === 'escanor' || ent.type === 'escanor' || ent.immuneToKnockback || ent.immuneToPush;
             const isYujiSoulSwapCombo = Boolean(ent.characterId === 'yuji' && ent.soulSwapActive && ent.rapidSlashPhase && ent.rapidSlashPhase !== 'COMPLETE' && ent.rapidSlashPhase !== 'IDLE');
+            const isSuctionImmune = isIchigo || isEscanor || isYujiSoulSwapCombo || isEntityImmuneToGravitationalPull(ent, 'yuta_beam');
+
             if (isMakimaShatter) {
               ent.vx = 0;
               ent.vy = 0;
@@ -275,7 +278,36 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
                 ent.x = ent._shatterLockedX;
                 ent.y = ent._shatterLockedY;
               }
+            } else if (!isSuctionImmune) {
+              // ── PURE LOVE BEAM SUCTION (PULLING MECHANIC) ──
+              // Caught targets are dragged INWARD toward Yuta instead of being shoved away, so the
+              // beam visibly reels enemies in and pins them in front of him. Suction strength tapers
+              // toward the far edge of the beam (t = 0 at Yuta's hand, 1 at the beam tip) and never
+              // overshoots past Yuta's own body radius.
+              const pullStrength = CONFIG.yuta?.pureLoveBeamPullStrength ?? 3.4;
+              const dxToYuta = ownerFighter.x - ent.x;
+              const dyToYuta = ownerFighter.y - ent.y;
+              const distToYuta = Math.hypot(dxToYuta, dyToYuta);
+              const stopDist = (ownerFighter.r || 22) + radius + 4;
+
+              if (distToYuta > stopDist) {
+                const axialFalloff = Math.max(0.35, 1 - t * 0.6);
+                const step = Math.min(pullStrength * axialFalloff, distToYuta - stopDist);
+                ent.x += (dxToYuta / distToYuta) * step;
+                ent.y += (dyToYuta / distToYuta) * step;
+
+                // Velocity dampening makes the suction read as a sustained hold rather than a hop
+                const suctionDamp = CONFIG.yuta?.pureLoveBeamPullVelocityDamp ?? 0.55;
+                ent.vx = (ent.vx || 0) * suctionDamp;
+                ent.vy = (ent.vy || 0) * suctionDamp;
+              }
+
+              if (arena) {
+                ent.x = Math.max(minX, Math.min(maxX, ent.x));
+                ent.y = Math.max(minY, Math.min(maxY, ent.y));
+              }
             } else if (!isIchigo && !isEscanor && !isYujiSoulSwapCombo) {
+              // Fallback shove for targets that are immune to suction (immovable/entrenched units)
               const pushForce = p.knockback || 6;
               const pushAngle = p.angle;
               if (typeof ent.applyKnockback === 'function') {

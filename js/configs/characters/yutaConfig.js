@@ -14,7 +14,7 @@ export const yutaConfig = {
 
   name: 'Yuta',
   displayName: 'Yuta',
-  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SSR',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   // ── Base Attributes ──
   hp: 200,
   speed: 5.8,
@@ -61,7 +61,7 @@ export const yutaConfig = {
   meleeArc: Math.PI * 0.85,                // ~153-degree frontal arc cone for multi-enemy cleaves
   meleeKnockback: 4.5,                     // Outward push force on katana melee strike
   meleeHitStun: 14,                        // Hit stun frames on katana melee strike
-  weaponOffsetY: 4.5,                      // Y-offset shift positioning hands & katana lower on Yuta's body/chest
+  weaponOffsetY: 5.5,                      // Y-offset shift positioning hands & katana lower on Yuta's body/chest
   comboResetFrames: 85,                    // Frames window before combo resets back to Hit 1
   swordTremorIntensity: 2.2,               // Screen & blade tremor amplitude (px) during impact lock (Rule 30)
 
@@ -195,10 +195,12 @@ export const yutaConfig = {
   pureLoveBeamChannelTurnRate: 0.030,      // Turn rate during beam charge/channeling (smooth tracking, reduced slightly for heavier feel)
   pureLoveBeamDuration: 450,               // Frames the beam stays active (3 seconds)
   pureLoveBeamActiveDuration: 350,         // Alias matching pureLoveBeamDuration for skill and HUD consistency
-  pureLoveBeamDamagePerTick: 5,           // Rapid multi-hit damage
-  pureLoveBeamWidth: 200,                  // Massive beam radius/width
+  pureLoveBeamDamagePerTick: 7,           // Rapid multi-hit damage
+  pureLoveBeamWidth: 250,                  // Massive beam radius/width
   pureLoveBeamLength: 2500,                // Screen spanning length
-  pureLoveBeamKnockback: 2,                // Outward push per tick
+  pureLoveBeamKnockback: 2,                // Outward shove per tick (only for targets immune to beam suction)
+  pureLoveBeamPullStrength: 3.4,           // Inward suction drag per frame toward Yuta while caught in the beam (px/frame)
+  pureLoveBeamPullVelocityDamp: 0.55,      // Velocity multiplier per frame on caught targets so suction reads as a hold
   pureLoveBeamSlowMultiplier: 0.20,        // Speed reduction multiplier applied during beam recovery phase
   pureLoveBeamStunDuration: 50,           // Recovery stun duration frames after beam exposure
   pureLoveBeamShakeIntensity: 6,            // Arena shake intensity while beam is active (decays in final 30%)
@@ -211,6 +213,7 @@ export const yutaConfig = {
   // ─────────────────────────────────────────────
   sounds: {
     katanaSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+
     comeRika: 'Assets/Sound Effects/Skills/comerika.mp3',
     rikaAppearance: 'Assets/Sound Effects/Skills/rikaAppearance1.mp3',
     rikaAttack: 'Assets/Sound Effects/Skills/backstab.mp3',
@@ -232,7 +235,7 @@ export const yutaConfig = {
     pureLoveBeamBackground: 'Assets/Sound Effects/Skills/yuta-lovebeam-background.mp3',
   },
   soundVolumes: {
-    katanaSwing: 0.7,
+    katanaSwing: 0.30,
     comeRika: 2.0,
     rikaAppearance: 2.5,
     rikaAttack: 0.8,
