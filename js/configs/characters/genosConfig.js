@@ -3,6 +3,7 @@ export const genosConfig = {
     hair: 'Assets/model/genos/Genos-hair.png',
     fist: 'Assets/model/genos/Genos-fist.png',
     ultimateOverlay: 'Assets/Overlays/Genos-ultimate-overlay.png',
+    spiralIncinerationCannon: 'Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-b.png',
   },
 
   name: 'Genos',
@@ -113,6 +114,7 @@ export const genosConfig = {
   ultTickInterval: 10, // 10 ticks per second (300 total damage)
   ultBeamWidth: 130,
   ultBeamRange: 1200, // 1200px beam range across full arena (matches Hyperion's beam length)
+  ultBeamSpriteTicksPerFrame: 3, // Animation playback cadence: 3 ticks/frame = 20 FPS cycle across 12 frames
   ultKnockbackForce: 1, // Directional beam push speed (prevents hyper-accel rebounce)
   ultSlowMultiplier: 0.01, // Speed multiplier for targets caught in beam (0.45 = 45% speed allows moving a little)
   ultBeamCenterPull: 0.04, // Axis alignment pull strength (0.04 allows enemies to steer/move inside beam)

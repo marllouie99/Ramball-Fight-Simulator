@@ -6425,65 +6425,16 @@ async function main() {
         throw new Error(`Genos auto-aim snapped or rotated during active beam firing! Expected ${lockedAngle}, got gunAngle=${genos.gunAngle}`);
       }
 
-      // Draw beam overlay to verify Canvas 2D transform stack balance
-      const previousPath2D = globalThis.Path2D;
-      const originalDateNow = Date.now;
-      const originalFillRect = mockCtx.fillRect;
-      const originalFill = mockCtx.fill;
-      let pathRectCalls = 0;
-      let pathFillCalls = 0;
-      let fillRectCalls = 0;
-      class MockBeamPath {
-        rect() {
-          pathRectCalls++;
-        }
-      }
+      // Draw beam overlay to verify Canvas 2D transform stack balance and animated 12-frame sprite rendering
+      mockCtx.resetStackDepth();
+      genos.ultTimer = 80;
+      genos.drawBeamOverlay(mockCtx);
+      assertCanvasStackBalance('Genos Spiral Incineration Cannon Beam Draw');
 
-      try {
-        globalThis.Path2D = MockBeamPath;
-        Date.now = () => 100000;
-        mockCtx.fillRect = () => {
-          fillRectCalls++;
-        };
-        mockCtx.fill = (path) => {
-          if (path instanceof MockBeamPath) pathFillCalls++;
-        };
-        genos.ultTimer = (CONFIG.genos?.ultDurationFrames || 120) - 6;
-        genos._pixelBeamPathCache?.clear();
-        mockCtx.resetStackDepth();
-        genos.drawBeamOverlay(mockCtx);
-        assertCanvasStackBalance('Genos Spiral Incineration Cannon Flare Draw');
-        if (fillRectCalls >= 700) {
-          throw new Error(`Genos beam startup flare should batch pixel drawing (got ${fillRectCalls} fillRect calls)`);
-        }
-
-        fillRectCalls = 0;
-        pathFillCalls = 0;
-        pathRectCalls = 0;
-        genos.ultTimer = 80;
-        genos._pixelBeamPathCache?.clear();
-        mockCtx.resetStackDepth();
-        genos.drawBeamOverlay(mockCtx);
-        assertCanvasStackBalance('Genos Spiral Incineration Cannon Beam Draw');
-        if (fillRectCalls >= 700) {
-          throw new Error(`Genos beam should avoid per-pixel fillRect calls (got ${fillRectCalls})`);
-        }
-        if (pathFillCalls < 6) {
-          throw new Error('Genos beam should draw cached aura and color-batched muzzle paths');
-        }
-
-        const cachedPathRectCalls = pathRectCalls;
-        genos.drawBeamOverlay(mockCtx);
-        if (pathRectCalls !== cachedPathRectCalls) {
-          throw new Error('Genos beam pixel paths should be reused across frames');
-        }
-        assertCanvasStackBalance('Genos Spiral Incineration Cannon Cached Beam Draw');
-      } finally {
-        globalThis.Path2D = previousPath2D;
-        Date.now = originalDateNow;
-        mockCtx.fillRect = originalFillRect;
-        mockCtx.fill = originalFill;
-      }
+      // Verify second render pass at mid-phase also preserves 100% stack balance
+      genos.ultTimer = 40;
+      genos.drawBeamOverlay(mockCtx);
+      assertCanvasStackBalance('Genos Spiral Incineration Cannon Animated Beam Draw (Mid-Phase)');
     }
   } catch (err) {
     console.error('❌ [GENOS SPIRAL INCINERATION CANNON 360 TEST ERROR]:', err);

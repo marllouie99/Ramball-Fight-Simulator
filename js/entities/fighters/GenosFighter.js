@@ -6,6 +6,7 @@ import { stopSound, stopSoundBySrc } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnGenosThrusterDashVisual, spawnLaserSmoke, spawnGenosSelfDestructExplosion } from '../../graphics/particles/sparkEffect.js';
 import { drawGenosSkin, drawGenosHands } from '../../graphics/fighters/genosSkin.js';
+import { drawGenosSpiralIncinerationCannon } from '../../graphics/weapons/genosWeaponGraphics.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { isLineOfSightBlockedByObstacle } from '../../systems/arenaObstacleSystem.js';
@@ -334,7 +335,8 @@ export class GenosFighter extends Fighter {
     if (this.isChargingUlt) {
       ctx.save();
       // Start guide line right at the mechanical hands
-      const startOffset = this.r + 5;
+      // Set startOffset to anchor directly at mechanical palm nozzle (nozzleDist = r * 0.90)
+    const startOffset = Math.round(this.r * 0.90);
       const startX = this.x + Math.cos(beamAngle) * startOffset;
       const startY = this.y + Math.sin(beamAngle) * startOffset;
       const range = CONFIG.genos?.ultBeamRange || 700;
@@ -458,10 +460,10 @@ export class GenosFighter extends Fighter {
     const beamAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.ultAngle || this.angle || 0);
     const now = Date.now();
 
-    const beamW = CONFIG.genos?.ultBeamWidth || 140;
+    const beamW = CONFIG.genos?.ultBeamWidth || 130;
     const range = CONFIG.genos?.ultBeamRange || 1200;
     // Set startOffset to emerging right from mechanical hands
-    const startOffset = this.r + 5;
+    const startOffset = Math.round(this.r * 0.90);
     const startX = this.x + Math.cos(beamAngle) * startOffset;
     const startY = this.y + Math.sin(beamAngle) * startOffset;
     const endX = startX + Math.cos(beamAngle) * range;
@@ -470,333 +472,9 @@ export class GenosFighter extends Fighter {
     // Flickering beam width
     const flickerW = beamW * (0.94 + Math.sin(now * 0.12) * 0.06);
 
-    this._drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY, startOffset);
+    drawGenosSpiralIncinerationCannon(ctx, this, beamAngle, startX, startY, range, flickerW, now);
   }
 
-  _getPixelBeamPaths(range, tier4Half, auraHalf, muzzleR) {
-    if (typeof Path2D !== 'function') return null;
-
-    const cache = this._pixelBeamPathCache || (this._pixelBeamPathCache = new Map());
-    const key = `${range}:${tier4Half}:${auraHalf}:${muzzleR}`;
-    if (cache.has(key)) return cache.get(key);
-
-    const P = 2;
-    const ditherStep = P * 2;
-    const aura = new Path2D();
-    for (let u = 0; u <= range; u += ditherStep) {
-      for (let v = -auraHalf; v <= auraHalf; v += ditherStep) {
-        if (Math.abs(v) <= tier4Half) continue;
-        if (((u / ditherStep) + (v / ditherStep)) % 2 === 0) {
-          aura.rect(u, v, P, P);
-        }
-      }
-    }
-
-    const muzzle = {
-      '#800A00': new Path2D(),
-      '#CC2A00': new Path2D(),
-      '#FF5500': new Path2D(),
-      '#FFE600': new Path2D(),
-      '#FFFFFF': new Path2D()
-    };
-    for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
-      const spanX = Math.round(muzzleR * (1.0 - Math.abs(dy) / muzzleR) / P) * P;
-      for (let dx = -spanX; dx <= spanX; dx += P) {
-        const normDist = (Math.abs(dx) + Math.abs(dy)) / muzzleR;
-        if (normDist > 1.0) continue;
-
-        const color = normDist >= 0.90 ? '#800A00'
-          : normDist <= 0.22 ? '#FFFFFF'
-            : normDist <= 0.48 ? '#FFE600'
-              : normDist <= 0.74 ? '#FF5500'
-                : '#CC2A00';
-        muzzle[color].rect(dx, dy, P, P);
-      }
-    }
-
-    const paths = { aura, muzzle };
-    if (cache.size >= 8) cache.delete(cache.keys().next().value);
-    cache.set(key, paths);
-    return paths;
-  }
-
-  /**
-   * Authentic 2D discrete grid-scan pixel art rasterizer for Genos's Spiral Incineration Cannon Beam.
-   * Renders with multi-tiered plasma core, 3D stepped spiral helix coils, obsidian manga borders,
-   * diamond mach shockwaves, and stepped anamorphic starburst flare matching Rule #35.
-   */
-  _drawPixelBeamOverlay(ctx, beamAngle, now, flickerW, beamW, range, startX, startY, endX, endY, startOffset) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
-    const P = 2.0;
-    const snap = (v) => Math.round(v / P) * P;
-
-    const cosA = Math.cos(beamAngle);
-    const sinA = Math.sin(beamAngle);
-
-    const halfW = Math.max(P * 3, snap(flickerW * 0.5));
-    const tier1Half = Math.max(P, snap(halfW * 0.18)); // Superheated white fusion core
-    const tier2Half = Math.max(P * 2, snap(halfW * 0.40)); // Solar golden plasma
-    const tier3Half = Math.max(P * 3, snap(halfW * 0.68)); // Saturated fiery orange column
-    const tier4Half = halfW;                              // Magma crimson outer body
-    const auraHalf  = snap(halfW * 1.30);                 // Stepped pixel thermal aura
-    const muzzleR = snap(halfW * 1.15);
-    const beamPaths = this._getPixelBeamPaths(range, tier4Half, auraHalf, muzzleR);
-
-    const totalDuration = CONFIG.genos?.ultDurationFrames || 120;
-    const timeFired = totalDuration - (this.ultTimer || 0);
-
-    // ── 1. Anamorphic Stepped Pixel Flare & Starburst (First 18 frames) ──
-    if (timeFired <= 18) {
-      const flareProg = timeFired / 18;
-      const flareAlpha = Math.sin(flareProg * Math.PI);
-      const flareR = snap(flickerW * (1.6 + flareProg * 1.4));
-
-      ctx.save();
-      ctx.globalAlpha = flareAlpha;
-      const createFlarePixelBatch = () => {
-        if (typeof Path2D !== 'function') {
-          return {
-            add(color, x, y) {
-              ctx.fillStyle = color;
-              ctx.fillRect(x, y, P, P);
-            },
-            draw() {}
-          };
-        }
-
-        const paths = {
-          '#FFFFFF': new Path2D(),
-          '#FFE600': new Path2D(),
-          '#FF5500': new Path2D()
-        };
-        return {
-          add(color, x, y) {
-            paths[color].rect(x, y, P, P);
-          },
-          draw() {
-            for (const [color, path] of Object.entries(paths)) {
-              ctx.fillStyle = color;
-              ctx.fill(path);
-            }
-          }
-        };
-      };
-
-      // A. Vertical Anamorphic Stepped Lens Flare Line in World Space
-      const verticalFlare = createFlarePixelBatch();
-      for (let gy = -flareR * 2.2; gy <= flareR * 2.2; gy += P) {
-        const absY = Math.abs(gy);
-        const normY = absY / (flareR * 2.2);
-        const thick = Math.max(P, snap((1.0 - normY) * P * 3.5));
-
-        for (let gx = -thick; gx <= thick; gx += P) {
-          const wx = snap(startX + gx);
-          const wy = snap(startY + gy);
-          let color;
-          if (Math.abs(gx) < P && normY < 0.45) {
-            color = '#FFFFFF';
-          } else if (normY < 0.7) {
-            color = '#FFE600';
-          } else {
-            color = '#FF5500';
-          }
-          verticalFlare.add(color, wx, wy);
-        }
-      }
-      verticalFlare.draw();
-
-      // B. 8-Point Stepped Diamond Starburst Rays in World Space
-      for (let k = 0; k < 8; k++) {
-        const rayFlare = createFlarePixelBatch();
-        const rAngle = (k * Math.PI) / 4;
-        const rLen = flareR * (k % 2 === 0 ? 1.4 : 0.8);
-        const cosR = Math.cos(rAngle);
-        const sinR = Math.sin(rAngle);
-
-        for (let st = 0; st <= rLen; st += P * 1.5) {
-          const wx = snap(startX + cosR * st);
-          const wy = snap(startY + sinR * st);
-          const color = (st < rLen * 0.35) ? '#FFFFFF' : ((st < rLen * 0.75) ? '#FFE600' : '#FF5500');
-          rayFlare.add(color, wx, wy);
-        }
-        rayFlare.draw();
-      }
-
-      // C. Central White-Hot Core Diamond
-      const coreFlare = createFlarePixelBatch();
-      const coreR = snap(flareR * 0.40);
-      for (let dy = -coreR; dy <= coreR; dy += P) {
-        const spanX = coreR - Math.abs(dy);
-        for (let dx = -spanX; dx <= spanX; dx += P) {
-          const wx = snap(startX + dx);
-          const wy = snap(startY + dy);
-          const color = (Math.abs(dx) + Math.abs(dy) < coreR * 0.5) ? '#FFFFFF' : '#FFE600';
-          coreFlare.add(color, wx, wy);
-        }
-      }
-      coreFlare.draw();
-
-      ctx.restore();
-    }
-
-    // ── 2. Pixel Art Beam Body Alignment ──
-    ctx.save();
-    ctx.translate(startX, startY);
-    ctx.rotate(beamAngle);
-
-    // ── 0. Palm Root Funnel (Seamless bridging from Genos's hands to beam origin) ──
-    const startOffsetVal = startOffset || (this.r + 5);
-    const minX = -snap(startOffsetVal - 6);
-    for (let fx = minX; fx <= 0; fx += P) {
-      const progress = (fx - minX) / (-minX || 1);
-      const curT4 = Math.max(P * 2, snap((0.35 + 0.65 * progress) * tier4Half));
-      const curT3 = Math.max(P, snap((0.35 + 0.65 * progress) * tier3Half));
-      const curT2 = Math.max(P, snap((0.35 + 0.65 * progress) * tier2Half));
-      const curT1 = Math.max(P, snap((0.35 + 0.65 * progress) * tier1Half));
-
-      // Border rim
-      ctx.fillStyle = '#800A00';
-      ctx.fillRect(fx, -curT4 - P, P, (curT4 + P) * 2);
-
-      // Tier 4 Magma Crimson
-      ctx.fillStyle = '#CC2A00';
-      ctx.fillRect(fx, -curT4, P, curT4 * 2);
-
-      // Tier 3 Fiery Orange
-      ctx.fillStyle = '#FF5500';
-      ctx.fillRect(fx, -curT3, P, curT3 * 2);
-
-      // Tier 2 Solar Gold
-      ctx.fillStyle = '#FFE600';
-      ctx.fillRect(fx, -curT2, P, curT2 * 2);
-
-      // Tier 1 Lemon-White
-      ctx.fillStyle = '#FFFFEE';
-      ctx.fillRect(fx, -curT1, P, curT1 * 2);
-
-      // White Core Fusion Line
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(fx, -P, P, P * 2);
-    }
-
-    // A. Outer Atmosphere Dithered Pixel Aura
-    ctx.fillStyle = 'rgba(255, 68, 0, 0.25)';
-    if (beamPaths) {
-      ctx.fill(beamPaths.aura);
-    } else {
-      const ditherStep = P * 2;
-      ctx.beginPath();
-      for (let u = 0; u <= range; u += ditherStep) {
-        for (let v = -auraHalf; v <= auraHalf; v += ditherStep) {
-          if (Math.abs(v) <= tier4Half) continue;
-          if (((u / ditherStep) + (v / ditherStep)) % 2 === 0) {
-            ctx.rect(u, v, P, P);
-          }
-        }
-      }
-      ctx.fill();
-    }
-
-    // B. Deep Incineration Crimson Outer Border (Fiery pixel perimeter with NO black stripes)
-    ctx.fillStyle = '#800A00';
-    ctx.fillRect(0, -tier4Half - P, range, (tier4Half + P) * 2);
-
-    // C. Tier 4 Magma Crimson Outer Body
-    ctx.fillStyle = '#CC2A00';
-    ctx.fillRect(0, -tier4Half, range, tier4Half * 2);
-
-    // D. Tier 3 Saturated Fiery Orange Column (Genos Signature Flame)
-    ctx.fillStyle = '#FF5500';
-    ctx.fillRect(0, -tier3Half, range, tier3Half * 2);
-
-    // E. Tier 2 Solar Golden Plasma
-    ctx.fillStyle = '#FFE600';
-    ctx.fillRect(0, -tier2Half, range, tier2Half * 2);
-
-    // F. Tier 1 Superheated Lemon-White Fusion Core
-    ctx.fillStyle = '#FFFFEE';
-    ctx.fillRect(0, -tier1Half, range, tier1Half * 2);
-
-    // G. Ultra Pure White Center Fusion Line
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, -P, range, P * 2);
-
-    // ── 3. Longitudinal High-Energy Stepped Plasma Wave Pulses (Superheated White & Solar Gold) ──
-    const pulseCount = 6;
-    for (let pl = 0; pl < pulseCount; pl++) {
-      const pSpeed = 28 + (pl % 3) * 8;
-      const pTravel = snap((now * 0.06 * pSpeed + pl * 200) % range);
-      const pLen = snap(48 + (pl % 3) * 32);
-      const pY = snap(((pl % 3) - 1) * (tier2Half * 0.5));
-
-      ctx.fillStyle = (pl % 2 === 0) ? '#FFFFFF' : '#FFE600';
-      ctx.fillRect(pTravel, pY - P, Math.min(pLen, range - pTravel), P * 2);
-    }
-
-    // ── 4. Stepped Transonic Mach Condensation Diamond Shockwaves (Pure Luminous Plasma) ──
-    const ringCount = 3;
-    for (let i = 0; i < ringCount; i++) {
-      const ringDist = snap(((now * 0.24) + i * (range / ringCount)) % range);
-      const alphaRing = (1.0 - ringDist / range);
-      if (alphaRing < 0.05) continue;
-
-      const ringW = snap(P * 4);
-      const ringH = snap(halfW * 1.35);
-
-      ctx.fillStyle = (i % 2 === 0) ? '#FFE600' : '#FF7700';
-      for (let dy = -ringH; dy <= ringH; dy += P) {
-        const spanX = Math.round(((ringH - Math.abs(dy)) / ringH) * ringW);
-        ctx.fillRect(ringDist - spanX, dy, P, P);
-        ctx.fillRect(ringDist + spanX, dy, P, P);
-      }
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(ringDist, -ringH, P, P * 2);
-      ctx.fillRect(ringDist, ringH - P, P, P * 2);
-    }
-
-    // ── 5. Stepped Pixel Embers & Sparks ──
-    for (let e = 0; e < 14; e++) {
-      const eDist = snap((now * 0.15 * (12 + (e % 5) * 4) + e * 95) % range);
-      const eSide = (e % 2 === 0) ? 1 : -1;
-      const eY = snap(eSide * (tier3Half + P * 2 + ((e * 7) % 18)));
-      ctx.fillStyle = (e % 3 === 0) ? '#FFFFFF' : ((e % 3 === 1) ? '#FFE600' : '#FF5500');
-      ctx.fillRect(eDist, eY, P, P);
-    }
-
-    // ── 6. Stepped Muzzle Diamond Flare at Local (0, 0) (Seamless Origin & Zero Cutoffs) ──
-    if (beamPaths) {
-      for (const [color, path] of Object.entries(beamPaths.muzzle)) {
-        ctx.fillStyle = color;
-        ctx.fill(path);
-      }
-    } else {
-      for (let dy = -muzzleR; dy <= muzzleR; dy += P) {
-        const spanX = snap(muzzleR * (1.0 - Math.abs(dy) / muzzleR));
-        for (let dx = -spanX; dx <= spanX; dx += P) {
-          const normDist = (Math.abs(dx) + Math.abs(dy)) / muzzleR;
-          if (normDist > 1.0) continue;
-
-          if (normDist >= 0.90) {
-            ctx.fillStyle = '#800A00';
-          } else if (normDist <= 0.22) {
-            ctx.fillStyle = '#FFFFFF';
-          } else if (normDist <= 0.48) {
-            ctx.fillStyle = '#FFE600';
-          } else if (normDist <= 0.74) {
-            ctx.fillStyle = '#FF5500';
-          } else {
-            ctx.fillStyle = '#CC2A00';
-          }
-          ctx.fillRect(dx, dy, P, P);
-        }
-      }
-    }
-
-    ctx.restore();
-    ctx.restore();
-  }
 
   applyKnockback(vx, vy, opts = 0) {
     if (this.isChargingUlt || this.isFiringUlt || this.isFlurrying || this.immuneToKnockback || this.immuneToPush) {
