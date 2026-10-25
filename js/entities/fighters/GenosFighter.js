@@ -455,7 +455,12 @@ export class GenosFighter extends Fighter {
 
   // Draw the beam overlay on top of all fighters, outlines, and hands in authentic Pixel Art style!
   drawBeamOverlay(ctx) {
-    if (this.hp <= 0 || !this.isFiringUlt) return; // Beam geometry only renders while actively firing
+    if (this.hp <= 0) return;
+    const isFiring = Boolean(this.isFiringUlt);
+    const isRecovering = Boolean(this.isUltRecovering && this.ultRecoveryTimer !== undefined);
+    const recoveryTotal = CONFIG.genos?.ultRecoveryFrames || 45;
+    const elapsedRecovery = recoveryTotal - (this.ultRecoveryTimer || 0);
+    if (!isFiring && (!isRecovering || elapsedRecovery >= 36)) return;
 
     const beamAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.ultAngle || this.angle || 0);
     const now = Date.now();

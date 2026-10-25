@@ -4,6 +4,7 @@ export const genosConfig = {
     fist: 'Assets/model/genos/Genos-fist.png',
     ultimateOverlay: 'Assets/Overlays/Genos-ultimate-overlay.png',
     spiralIncinerationCannon: 'Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-b.png',
+    spiralIncinerationCannonOut: 'Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-b.png',
   },
 
   name: 'Genos',

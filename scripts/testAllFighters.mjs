@@ -6435,6 +6435,14 @@ async function main() {
       genos.ultTimer = 40;
       genos.drawBeamOverlay(mockCtx);
       assertCanvasStackBalance('Genos Spiral Incineration Cannon Animated Beam Draw (Mid-Phase)');
+
+      // Verify Beam-Out dissipation phase also preserves 100% stack balance
+      genos.isFiringUlt = false;
+      genos.isUltRecovering = true;
+      genos.ultRecoveryTimer = 30;
+      mockCtx.resetStackDepth();
+      genos.drawBeamOverlay(mockCtx);
+      assertCanvasStackBalance('Genos Spiral Incineration Cannon Beam-Out Dissipation Draw');
     }
   } catch (err) {
     console.error('❌ [GENOS SPIRAL INCINERATION CANNON 360 TEST ERROR]:', err);

@@ -3,8 +3,9 @@ import { CONFIG } from '../../core/config.js';
 /**
  * Genos Weapon & Ultimate Graphics Renderer: Spiral Incineration Cannon
  * 16-bit 12-Frame Animated Mega-Beam Sprite Strip Renderer
- * Master strip path: Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-b.png
- * Geometry: 12 frames, each 900x384px, centered at y=192px with seamless root nozzle and thick white-hot core.
+ * Master strip (active): Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-b.png
+ * Master strip (beam out): Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-b.png
+ * Geometry: 12 frames, each 800x384px, centered at y=192px with palm nozzle anchoring and thick white-hot core.
  */
 
 const FRAME_COUNT = 12;
@@ -15,8 +16,11 @@ const BEAM_BODY_HEIGHT = 180; // Calibrated core body height in the 384px frame
 let _genosSpiralCannonStrip = null;
 let _genosSpiralCannonLoading = false;
 
+let _genosSpiralCannonOutStrip = null;
+let _genosSpiralCannonOutLoading = false;
+
 /**
- * Eagerly loads and caches the 12-frame master horizontal strip.
+ * Eagerly loads and caches the active 12-frame master horizontal strip.
  * @returns {HTMLImageElement|null}
  */
 export function _getGenosSpiralCannonStrip() {
@@ -40,9 +44,35 @@ export function _getGenosSpiralCannonStrip() {
   return _genosSpiralCannonStrip;
 }
 
+/**
+ * Eagerly loads and caches the 12-frame Beam-Out dissipation master horizontal strip.
+ * @returns {HTMLImageElement|null}
+ */
+export function _getGenosSpiralCannonOutStrip() {
+  if (_genosSpiralCannonOutStrip && _genosSpiralCannonOutStrip.complete && _genosSpiralCannonOutStrip.naturalWidth > 0) {
+    return _genosSpiralCannonOutStrip;
+  }
+  if (!_genosSpiralCannonOutLoading && typeof Image !== 'undefined') {
+    _genosSpiralCannonOutLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _genosSpiralCannonOutStrip = img;
+      _genosSpiralCannonOutLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Genos Spiral Incineration Cannon Out strip:', e);
+      _genosSpiralCannonOutLoading = false;
+    };
+    img.src = 'Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-b.png';
+    _genosSpiralCannonOutStrip = img;
+  }
+  return _genosSpiralCannonOutStrip;
+}
+
 // Proactive eager initialization in browser environment
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getGenosSpiralCannonStrip();
+  _getGenosSpiralCannonOutStrip();
 }
 
 /**
@@ -63,7 +93,19 @@ function _getSpiralCannonFrameIndex(fighter, now) {
 }
 
 /**
- * Renders the 16-bit 12-frame animated Spiral Incineration Cannon sprite.
+ * Calculates current 0-indexed frame index for the Beam-Out dissipation sequence.
+ * @param {object} fighter
+ * @returns {number} frameIndex [0..11]
+ */
+function _getSpiralCannonOutFrameIndex(fighter) {
+  const totalRecovery = CONFIG.genos?.ultRecoveryFrames || 45;
+  const ticksPerFrame = CONFIG.genos?.ultBeamSpriteTicksPerFrame || 3;
+  const elapsed = Math.max(0, totalRecovery - (fighter?.ultRecoveryTimer || 0));
+  return Math.min(FRAME_COUNT - 1, Math.floor(elapsed / ticksPerFrame));
+}
+
+/**
+ * Renders the 16-bit 12-frame animated Spiral Incineration Cannon sprite (Active or Dissipation Beam-Out).
  *
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} fighter
@@ -75,8 +117,9 @@ function _getSpiralCannonFrameIndex(fighter, now) {
  * @param {number} now
  */
 export function drawGenosAnimatedSpiralCannonSprite(ctx, fighter, beamAngle, startX, startY, range, beamW, now) {
-  const strip = _getGenosSpiralCannonStrip();
-  const frameIndex = _getSpiralCannonFrameIndex(fighter, now);
+  const isDissipating = Boolean(fighter && fighter.isUltRecovering);
+  const strip = isDissipating ? _getGenosSpiralCannonOutStrip() : _getGenosSpiralCannonStrip();
+  const frameIndex = isDissipating ? _getSpiralCannonOutFrameIndex(fighter) : _getSpiralCannonFrameIndex(fighter, now);
 
   ctx.save();
   ctx.imageSmoothingEnabled = false;
@@ -96,8 +139,10 @@ export function drawGenosAnimatedSpiralCannonSprite(ctx, fighter, beamAngle, sta
 
     ctx.drawImage(strip, sx, sy, sWidth, sHeight, 0, drawY, drawW, drawH);
   } else {
-    // Graceful procedural plasma fallback while image is loading
-    _drawSpiralCannonFallback(ctx, range, beamW);
+    // Graceful procedural plasma fallback while image is loading (only during active fire)
+    if (!isDissipating) {
+      _drawSpiralCannonFallback(ctx, range, beamW);
+    }
   }
 
   ctx.restore();
