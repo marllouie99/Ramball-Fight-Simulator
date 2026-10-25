@@ -77,48 +77,48 @@ const POKEMON_CLIP_SPECS = {
     walk:    { src: 'Assets/model/ash/pokemon/pikachu/Walk-Anim.png',   fw: 32, fh: 40, frames: 4,  dirs: 8, ticksPerFrame: 5, ax: 16, ay: 24 },
     attack:  { src: 'Assets/model/ash/pokemon/pikachu/Attack-Anim.png', fw: 80, fh: 80, frames: 10, dirs: 8, ticksPerFrame: 3, ax: 40, ay: 43 },
     special: { src: 'Assets/model/ash/pokemon/pikachu/Shock-Anim.png',  fw: 48, fh: 64, frames: 13, dirs: 8, ticksPerFrame: 3, ax: 24, ay: 36 },
-    hurt:    { src: 'Assets/model/ash/pokemon/pikachu/Hurt-Anim.png',   fw: 48, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, ax: 24, ay: 33 },
-    faint:   { src: 'Assets/model/ash/pokemon/pikachu/Faint-Anim.png',  fw: 40, fh: 40, frames: 4,  dirs: 8, ticksPerFrame: 6, ax: 20, ay: 24 }
+    hurt:    { src: 'Assets/model/ash/pokemon/pikachu/Hurt-Anim.png',   fw: 48, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, durations: [3, 9], ax: 24, ay: 33 },
+    faint:   { src: 'Assets/model/ash/pokemon/pikachu/Faint-Anim.png',  fw: 40, fh: 40, frames: 4,  dirs: 8, ticksPerFrame: 6, durations: [8, 12, 4, 10], ax: 20, ay: 24 }
   },
   charizard: {
     idle:    { src: 'Assets/model/ash/pokemon/charizard/Idle-Anim.png',   fw: 40, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 7, ax: 20, ay: 28 },
     walk:    { src: 'Assets/model/ash/pokemon/charizard/Walk-Anim.png',   fw: 40, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, ax: 20, ay: 28 },
     attack:  { src: 'Assets/model/ash/pokemon/charizard/Attack-Anim.png', fw: 80, fh: 88, frames: 14, dirs: 8, ticksPerFrame: 3, ax: 40, ay: 47 },
     special: { src: 'Assets/model/ash/pokemon/charizard/Shoot-Anim.png',  fw: 56, fh: 56, frames: 11, dirs: 8, ticksPerFrame: 3, ax: 28, ay: 31 },
-    hurt:    { src: 'Assets/model/ash/pokemon/charizard/Hurt-Anim.png',   fw: 64, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, ax: 32, ay: 34 },
-    faint:   { src: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',  fw: 48, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, ax: 24, ay: 28 }
+    hurt:    { src: 'Assets/model/ash/pokemon/charizard/Hurt-Anim.png',   fw: 64, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, durations: [3, 9], ax: 32, ay: 34 },
+    faint:   { src: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',  fw: 48, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, durations: [8, 12, 4, 10], ax: 24, ay: 28 }
   },
   charizard_mega: {
     idle:    { src: 'Assets/model/ash/pokemon/charizard/mega/Idle-Anim.png',   fw: 48, fh: 56, frames: 4,  dirs: 8, ticksPerFrame: 7, ax: 24, ay: 32 },
     walk:    { src: 'Assets/model/ash/pokemon/charizard/mega/Walk-Anim.png',   fw: 48, fh: 56, frames: 4,  dirs: 8, ticksPerFrame: 6, ax: 24, ay: 32 },
     attack:  { src: 'Assets/model/ash/pokemon/charizard/mega/Attack-Anim.png', fw: 88, fh: 96, frames: 14, dirs: 8, ticksPerFrame: 3, ax: 44, ay: 51 },
     special: { src: 'Assets/model/ash/pokemon/charizard/mega/Shoot-Anim.png',  fw: 56, fh: 64, frames: 11, dirs: 8, ticksPerFrame: 3, ax: 28, ay: 35 },
-    hurt:    { src: 'Assets/model/ash/pokemon/charizard/mega/Hurt-Anim.png',   fw: 64, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, ax: 32, ay: 34 },
-    faint:   { src: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',       fw: 48, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, ax: 24, ay: 28 }
+    hurt:    { src: 'Assets/model/ash/pokemon/charizard/mega/Hurt-Anim.png',   fw: 64, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, durations: [3, 9], ax: 32, ay: 34 },
+    faint:   { src: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',       fw: 48, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, durations: [8, 12, 4, 10], ax: 24, ay: 28 }
   },
   greninja: {
     idle:    { src: 'Assets/model/ash/pokemon/greninja/Idle-Anim.png',   fw: 32, fh: 56, frames: 7,  dirs: 8, ticksPerFrame: 6, ax: 16, ay: 32 },
     walk:    { src: 'Assets/model/ash/pokemon/greninja/Walk-Anim.png',   fw: 32, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 5, ax: 16, ay: 28 },
     attack:  { src: 'Assets/model/ash/pokemon/greninja/Attack-Anim.png', fw: 64, fh: 72, frames: 12, dirs: 8, ticksPerFrame: 3, ax: 32, ay: 38 },
     special: { src: 'Assets/model/ash/pokemon/greninja/Shoot-Anim.png',  fw: 40, fh: 56, frames: 12, dirs: 8, ticksPerFrame: 3, ax: 20, ay: 31 },
-    hurt:    { src: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',   fw: 40, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, ax: 20, ay: 34 },
-    faint:   { src: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',   fw: 40, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, ax: 20, ay: 34 }
+    hurt:    { src: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',   fw: 40, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, durations: [3, 9], ax: 20, ay: 34 },
+    faint:   { src: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',   fw: 40, fh: 64, frames: 2,  dirs: 8, ticksPerFrame: 6, durations: [8, 16], ax: 20, ay: 34 }
   },
   lucario: {
     idle:    { src: 'Assets/model/ash/pokemon/lucario/Idle-Anim.png',   fw: 32, fh: 56, frames: 6,  dirs: 8, ticksPerFrame: 6, ax: 16, ay: 32 },
     walk:    { src: 'Assets/model/ash/pokemon/lucario/Walk-Anim.png',   fw: 32, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 5, ax: 16, ay: 28 },
     attack:  { src: 'Assets/model/ash/pokemon/lucario/Attack-Anim.png', fw: 64, fh: 72, frames: 15, dirs: 8, ticksPerFrame: 2, ax: 32, ay: 39 },
     special: { src: 'Assets/model/ash/pokemon/lucario/RearUp-Anim.png', fw: 32, fh: 56, frames: 12, dirs: 8, ticksPerFrame: 3, ax: 16, ay: 32 },
-    hurt:    { src: 'Assets/model/ash/pokemon/lucario/Hurt-Anim.png',   fw: 40, fh: 56, frames: 2,  dirs: 8, ticksPerFrame: 6, ax: 20, ay: 30 },
-    faint:   { src: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',  fw: 32, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, ax: 16, ay: 28 }
+    hurt:    { src: 'Assets/model/ash/pokemon/lucario/Hurt-Anim.png',   fw: 40, fh: 56, frames: 2,  dirs: 8, ticksPerFrame: 6, durations: [3, 9], ax: 20, ay: 30 },
+    faint:   { src: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',  fw: 32, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, durations: [8, 12, 4, 10], ax: 16, ay: 28 }
   },
   lucario_mega: {
     idle:    { src: 'Assets/model/ash/pokemon/lucario/mega/Idle-Anim.png',   fw: 32, fh: 48, frames: 10, dirs: 8, ticksPerFrame: 5, ax: 16, ay: 28 },
     walk:    { src: 'Assets/model/ash/pokemon/lucario/mega/Walk-Anim.png',   fw: 32, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 5, ax: 16, ay: 28 },
     attack:  { src: 'Assets/model/ash/pokemon/lucario/mega/Attack-Anim.png', fw: 64, fh: 80, frames: 13, dirs: 8, ticksPerFrame: 2, ax: 33, ay: 42 },
     special: { src: 'Assets/model/ash/pokemon/lucario/mega/RearUp-Anim.png', fw: 32, fh: 56, frames: 12, dirs: 8, ticksPerFrame: 3, ax: 16, ay: 32 },
-    hurt:    { src: 'Assets/model/ash/pokemon/lucario/mega/Hurt-Anim.png',   fw: 40, fh: 56, frames: 2,  dirs: 8, ticksPerFrame: 6, ax: 20, ay: 30 },
-    faint:   { src: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',       fw: 32, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, ax: 16, ay: 28 }
+    hurt:    { src: 'Assets/model/ash/pokemon/lucario/mega/Hurt-Anim.png',   fw: 40, fh: 56, frames: 2,  dirs: 8, ticksPerFrame: 6, durations: [3, 9], ax: 20, ay: 30 },
+    faint:   { src: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',       fw: 32, fh: 48, frames: 4,  dirs: 8, ticksPerFrame: 6, durations: [8, 12, 4, 10], ax: 16, ay: 28 }
   }
 };
 
@@ -136,6 +136,17 @@ function _getPokemonSheet(srcPath) {
     return img;
   }
   return null;
+}
+
+// Eagerly preload all Pokémon PMD sprite sheets into memory cache
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  try {
+    for (const group of Object.values(POKEMON_CLIP_SPECS)) {
+      for (const spec of Object.values(group)) {
+        if (spec && spec.src) _getPokemonSheet(spec.src);
+      }
+    }
+  } catch (_) {}
 }
 
 // ---------------------------------------------------------------------------
@@ -639,20 +650,32 @@ export function drawAshVisualEffects(ctx, fighter) {
  * Renders the active Pokémon companion with 8-directional PMD sprite sheets & overhead minion HP bar.
  */
 export function drawPokemonCompanion(ctx, pokemon) {
-  if (!pokemon || (pokemon.hp <= 0 && (pokemon.faintTimer || 0) <= 0)) return;
+  const isFainting = Boolean(pokemon && pokemon.hp <= 0 && (pokemon.isFainting || pokemon.animState === 'faint'));
+  if (!pokemon || (pokemon.hp <= 0 && !isFainting)) return;
 
   const r = pokemon.r || 22;
   const speciesKey = (pokemon.isMega && POKEMON_CLIP_SPECS[`${pokemon.speciesId}_mega`])
     ? `${pokemon.speciesId}_mega`
     : (pokemon.speciesId || 'pikachu');
   const specGroup = POKEMON_CLIP_SPECS[speciesKey] || POKEMON_CLIP_SPECS.pikachu;
-  const stateKey = pokemon.animState || 'idle';
+  const stateKey = isFainting ? 'faint' : (pokemon.animState || 'idle');
   const clipSpec = specGroup[stateKey] || specGroup.idle;
   const sheetImg = _getPokemonSheet(clipSpec.src);
 
   // Ground plane contact baseline: feet anchor squarely on the ground plane at groundY
   const groundY = r * 0.45;
   const z = Math.max(0, pokemon.z || 0);
+
+  const faintTick = pokemon.faintTick || 0;
+  const maxFaintTicks = pokemon.maxFaintTicks || 48;
+
+  // Smooth opacity dissolution during Poké Ball recall beam
+  let spriteAlpha = 1.0;
+  let recallProgress = 0;
+  if (isFainting && faintTick >= 26) {
+    recallProgress = Math.min(1.0, (faintTick - 26) / Math.max(1, maxFaintTicks - 26));
+    spriteAlpha = Math.max(0.0, Math.pow(1.0 - recallProgress, 1.35));
+  }
 
   ctx.save();
   ctx.translate(pokemon.x, pokemon.y - z);
@@ -663,21 +686,59 @@ export function drawPokemonCompanion(ctx, pokemon) {
   const shadowRx = r * 0.95 * heightFactor;
   const shadowRy = r * 0.36 * heightFactor;
 
-  ctx.fillStyle = `rgba(15, 23, 42, ${(0.38 * heightFactor).toFixed(3)})`;
+  ctx.fillStyle = `rgba(15, 23, 42, ${(0.38 * heightFactor * spriteAlpha).toFixed(3)})`;
   ctx.beginPath();
   ctx.ellipse(0, shadowY, shadowRx, shadowRy, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = pokemon.isMega ? (pokemon.megaColor || '#38BDF8') : (pokemon.themeColor || '#FACC15');
-  ctx.lineWidth = (pokemon.isMega ? 2.5 : 1.6) * heightFactor;
-  ctx.beginPath();
-  ctx.ellipse(0, shadowY, shadowRx * 1.15, shadowRy * 1.20, 0, 0, Math.PI * 2);
-  ctx.stroke();
+  if (!isFainting) {
+    ctx.strokeStyle = pokemon.isMega ? (pokemon.megaColor || '#38BDF8') : (pokemon.themeColor || '#FACC15');
+    ctx.lineWidth = (pokemon.isMega ? 2.5 : 1.6) * heightFactor;
+    ctx.beginPath();
+    ctx.ellipse(0, shadowY, shadowRx * 1.15, shadowRy * 1.20, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   // 2. Render 8-Directional PMD Sprite Sheet Frame (anchored 1:1 at ground feet position)
   if (sheetImg && sheetImg.complete && sheetImg.naturalWidth > 0) {
-    const dirRow = Math.min(clipSpec.dirs - 1, _angleToPmdDirectionRow(pokemon.gunAngle || 0));
-    const frameCol = Math.floor((pokemon.animTick || 0) / clipSpec.ticksPerFrame) % clipSpec.frames;
+    const facingAngle = isFainting
+      ? (pokemon.faintAngle !== undefined ? pokemon.faintAngle : (pokemon.gunAngle || pokemon.angle || 0))
+      : (pokemon.gunAngle || pokemon.angle || 0);
+    const dirRow = Math.min(clipSpec.dirs - 1, _angleToPmdDirectionRow(facingAngle));
+
+    let frameCol = 0;
+    if (isFainting) {
+      if (clipSpec.durations && Array.isArray(clipSpec.durations)) {
+        let acc = 0;
+        frameCol = clipSpec.frames - 1;
+        for (let i = 0; i < clipSpec.durations.length; i++) {
+          acc += clipSpec.durations[i];
+          if (faintTick < acc) {
+            frameCol = i;
+            break;
+          }
+        }
+      } else if (clipSpec.frames === 4) {
+        if (faintTick < 8) frameCol = 0;
+        else if (faintTick < 20) frameCol = 1;
+        else if (faintTick < 24) frameCol = 2;
+        else frameCol = 3;
+      } else if (clipSpec.frames === 2) {
+        frameCol = faintTick < 8 ? 0 : 1;
+      } else {
+        frameCol = Math.min(clipSpec.frames - 1, Math.floor(faintTick / (clipSpec.ticksPerFrame || 6)));
+      }
+    } else if (stateKey === 'hurt') {
+      const hTick = pokemon.hurtTick || 0;
+      if (clipSpec.frames === 2) {
+        frameCol = hTick < 3 ? 0 : 1;
+      } else {
+        frameCol = Math.min(clipSpec.frames - 1, Math.floor(hTick / (clipSpec.ticksPerFrame || 6)));
+      }
+    } else {
+      frameCol = Math.floor((pokemon.animTick || 0) / (clipSpec.ticksPerFrame || 6)) % clipSpec.frames;
+    }
+
     const sx = frameCol * clipSpec.fw;
     const sy = dirRow * clipSpec.fh;
     const scale = pokemon.spriteScale || 1.5;
@@ -688,6 +749,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
     const ay = clipSpec.ay !== undefined ? clipSpec.ay : (clipSpec.fh * 0.6);
 
     ctx.imageSmoothingEnabled = false;
+    ctx.globalAlpha = spriteAlpha;
     ctx.drawImage(
       sheetImg,
       sx,
@@ -699,6 +761,27 @@ export function drawPokemonCompanion(ctx, pokemon) {
       drawW,
       drawH
     );
+
+    // If dissolving in Poké Ball recall beam: draw glowing crimson/white energy aura overlay & rising motes
+    if (isFainting && recallProgress > 0) {
+      const recallGlow = Math.sin(recallProgress * Math.PI);
+      ctx.save();
+      ctx.globalAlpha = 0.40 * recallGlow;
+      ctx.fillStyle = '#EF4444';
+      ctx.beginPath();
+      ctx.ellipse(0, groundY - (ay * scale * 0.45), drawW * 0.42, drawH * 0.38, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rising red recall energy particles
+      ctx.fillStyle = '#FFFFFF';
+      for (let pIdx = 0; pIdx < 3; pIdx++) {
+        const pOffset = ((faintTick * 3 + pIdx * 7) % 22);
+        const pY = groundY - (pOffset * 1.6);
+        const pX = Math.sin(faintTick * 0.4 + pIdx * 1.5) * 12;
+        ctx.fillRect(pX - 1.5, pY - 1.5, 3, 3);
+      }
+      ctx.restore();
+    }
   } else {
     // Procedural elemental emblem fallback while image loads
     ctx.fillStyle = pokemon.themeColor || '#FACC15';

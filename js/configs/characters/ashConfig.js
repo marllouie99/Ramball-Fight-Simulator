@@ -19,7 +19,7 @@ export const ashConfig = {
 
   // Universal Humanoid Baseline (Rule 24 — Toji Reference Standard)
   r: 25,
-  radius: 25,
+  radius: 30,
   hp: 360,
   maxHp: 360,
   speed: 5.5,
@@ -370,6 +370,7 @@ export const ashConfig = {
       megaAttack: 'Assets/model/ash/pokemon/charizard/mega/Attack-Anim.png',
       megaSpecial: 'Assets/model/ash/pokemon/charizard/mega/Shoot-Anim.png',
       megaHurt: 'Assets/model/ash/pokemon/charizard/mega/Hurt-Anim.png',
+      megaFaint: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',
       megaCharge: 'Assets/model/ash/pokemon/charizard/mega/Charge-Anim.png'
     },
     greninja: {
@@ -379,6 +380,7 @@ export const ashConfig = {
       special: 'Assets/model/ash/pokemon/greninja/Shoot-Anim.png',
       shoot: 'Assets/model/ash/pokemon/greninja/Shoot-Anim.png',
       hurt: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',
+      faint: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',
       charge: 'Assets/model/ash/pokemon/greninja/Charge-Anim.png'
     },
     lucario: {
@@ -395,13 +397,18 @@ export const ashConfig = {
       megaAttack: 'Assets/model/ash/pokemon/lucario/mega/Attack-Anim.png',
       megaSpecial: 'Assets/model/ash/pokemon/lucario/mega/RearUp-Anim.png',
       megaHurt: 'Assets/model/ash/pokemon/lucario/mega/Hurt-Anim.png',
+      megaFaint: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',
       megaCharge: 'Assets/model/ash/pokemon/lucario/mega/Charge-Anim.png'
     }
   },
 
   // ──────────────────────────────────────────
-  // Audio Configuration (All SFX removed per user instruction)
+  // Audio Configuration
   // ──────────────────────────────────────────
-  sounds: {},
-  soundVolumes: {}
+  sounds: {
+    faint: 'Assets/Sound Effects/PokemonSFX/faint.ogg'
+  },
+  soundVolumes: {
+    faint: 0.90
+  }
 };

@@ -254,6 +254,12 @@ export function isBloodSuppressedEntity(entity) {
     entity.characterId === 'crazydave_lawnmower' ||
     (typeof entity.characterId === 'string' && entity.characterId.startsWith('crazydave_')) ||
     (typeof entity.type === 'string' && ['peashooter', 'snowpea', 'wallnut', 'torchwood', 'potatomine', 'lawnmower'].includes(entity.type.toLowerCase())) ||
+    // Pokémon (Smooth fainting & elemental VFX instead of blood)
+    entity.isPokemon ||
+    entity.isPokemonCompanion ||
+    entity.isPokemonMinion ||
+    (typeof entity.characterId === 'string' && entity.characterId.startsWith('pokemon_')) ||
+    (typeof entity.type === 'string' && entity.type.startsWith('pokemon_')) ||
     // Troops (Shiro's chess pieces & inorganic troops)
     entity.isChessTroop ||
     entity.isChessMinion ||

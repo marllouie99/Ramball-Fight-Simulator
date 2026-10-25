@@ -253,7 +253,11 @@ export const AUDIO_CONFIG = {
   // Ichigo Kurosaki
   'ichigo_getsuga_fire': 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
   'fire_getsugatensho': 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
-  'fire-getsugatensho': 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav'
+  'fire-getsugatensho': 'Assets/Sound Effects/IchigoSFX/fire-getsugatensho-era_enogravgunnewtransformopenportal.wav',
+
+  // Ash Ketchum & Pokémon Companions
+  'pokemon_faint': 'Assets/Sound Effects/PokemonSFX/faint.ogg',
+  'ash_pokemon_faint': 'Assets/Sound Effects/PokemonSFX/faint.ogg'
 };
 
 

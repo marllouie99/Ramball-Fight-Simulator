@@ -20,7 +20,7 @@ export const namelessDeityConfig = {
   radius: 28,
   r: 40,
   damage: 16,
-  cooldown: 35,
+  cooldown: 45,
   projectileSpeedMultiplier: 1.0,
 
   // Theme & Aesthetics Palette (Neon Cosmic Nebula Theme)
@@ -39,6 +39,7 @@ export const namelessDeityConfig = {
   // Basic Attack: Prismatic Light Darts (Homing Starlight Needles)
   // ──────────────────────────────────────────
   enableStarDarts: 1,
+  dartCooldown: 45,                        // Cooldown frames between Prismatic Light Dart volleys (~0.75s @ 60fps)
   dartDamage: 3,
   dartSpeed: 10.5,
   dartHomingStrength: 0.075,
@@ -88,8 +89,8 @@ export const namelessDeityConfig = {
   // Ultimate: Nameless Destroyer (Transcendent Cosmic Super-Beam)
   // ──────────────────────────────────────────
   enableNamelessDestroyer: true,
-  destroyerCooldown: 1500,
-  destroyerInitialCooldown: 1500, // Initial cooldown at round start (~6.67s @ 60fps) before first super-beam
+  destroyerCooldown: 1000,
+  destroyerInitialCooldown: 700, // Initial cooldown at round start (~6.67s @ 60fps) before first super-beam
 
   // Sequential Step-by-Step Animation Phase Frame Timers (Matched directly to Audio Durations)
   destroyerWindupFrames: 393,       // Exact duration of CosmicLaserChargeUp.ogg (6.551s = 393 frames @ 60fps)

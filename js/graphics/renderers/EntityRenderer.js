@@ -332,7 +332,10 @@ export function drawFighters() {
 
     const isParalyzedInSoulDisfigurement = Boolean(fighter && fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0);
     const isMakimaReviving = Boolean(fighter && (fighter.isRevivingFromContract || fighter.isShatterReviving || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0)));
-    if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement && !isMakimaReviving) || (fighter.vanishTimer && fighter.vanishTimer > 0) || fighter._hideInBush) return;
+    const isPokemonFainting = Boolean(
+      fighter && (fighter.isPokemon || fighter.isPokemonCompanion) && fighter.hp <= 0 && (fighter.isFainting || fighter.animState === 'faint')
+    );
+    if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement && !isMakimaReviving && !isPokemonFainting) || (fighter.vanishTimer && fighter.vanishTimer > 0) || fighter._hideInBush) return;
 
     // Only skip drawing living fighter when GameOverScreen is actively rendering the in-arena champion layout
     if (state._isChampionLayoutActive && fighter.hp > 0) return;
@@ -446,6 +449,9 @@ export function drawFighters() {
         const isDebuffSuppressed = Boolean(
           fighter.suppressDebuffs ||
           fighter.suppressStatusOverlays ||
+          fighter.isPokemon ||
+          fighter.isPokemonCompanion ||
+          fighter.isPokemonMinion ||
           fighter.isChessTroop ||
           fighter.isChessMinion ||
           fighter.isChessPiece ||

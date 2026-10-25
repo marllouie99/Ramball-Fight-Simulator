@@ -27,6 +27,11 @@ export { spawnChessTroopShatter, spawnTombstoneDeath, updateTombstoneDeathEffect
  * @param {Object} fighter - The fighter that died
  */
 export function spawnDeathShatter(fighter) {
+  if (!fighter) return;
+  // Pokémon companions never shatter or leave gravestones; they smoothly faint and are recalled into Poké Balls.
+  if (fighter.isPokemon || fighter.isPokemonCompanion || fighter.isPokemonMinion || (typeof fighter.characterId === 'string' && fighter.characterId.startsWith('pokemon_')) || (typeof fighter.type === 'string' && fighter.type.startsWith('pokemon_'))) {
+    return;
+  }
   // Spawn gravestone pop & ascending ghost soul
   spawnTombstoneDeath(fighter);
 

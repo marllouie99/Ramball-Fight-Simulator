@@ -1,11 +1,22 @@
 ---
 name: twelve-frame-animation-generator
-description: Generate, extract, format, and integrate 12-frame visual animations and sprite sequences (explosions, slashes, impacts, energy bursts) into the combat engine by taking reference on the Reze explosion directory structure (Assets/model/reze/explosion/) and copying its file naming, frame calibration, and rendering pipeline standards.
+description: Generate, extract, format, and integrate 12-frame visual animations and sprite sequences (explosions, slashes, impacts, energy bursts). Whenever the user asks to create a 12-frame animation, the agent MUST go to Assets/model/, navigate into the fighter's model folder (Assets/model/<characterId>/), create a dedicated folder for that certain visual (Assets/model/<characterId>/<effectName>/), and put the animation frames and master strip in there.
 ---
 
 # 💥 12-Frame Visual Animation & Sprite Sequence Generator (`twelve-frame-animation-generator`)
 
-Use this skill whenever the user asks to generate, extract, format, animate, or integrate a **12-frame visual animation** (explosions, bursts, slashes, shockwaves, or spell impacts). The agent **MUST ALWAYS take direct reference from the canonical Reze explosion file location (`Assets/model/reze/explosion/`) and strictly copy its folder structure, file naming format, bounding box calibration, and 60 FPS combat rendering pipeline**.
+Use this skill whenever the user asks to generate, extract, format, animate, or integrate a **12-frame visual animation** (explosions, bursts, slashes, shockwaves, beam travels, fireballs, or spell impacts).
+
+> [!IMPORTANT]
+> **MANDATORY DIRECTORY WORKFLOW — GO TO FIGHTER'S MODEL FOLDER & CREATE VISUAL FOLDER**:
+> Whenever the user asks to create a 12-frame animation:
+> 1. Go to `Assets/model/`.
+> 2. Locate and enter the targeted fighter's model folder: `Assets/model/<characterId>/` (e.g. `Assets/model/gojo/`, `Assets/model/sukuna/`, `Assets/model/reze/`, `Assets/model/ash/pokemon/charizard/`).
+> 3. **CREATE A DEDICATED FOLDER FOR THAT CERTAIN VISUAL**: Create a new subfolder specifically named after the visual effect: `Assets/model/<characterId>/<effectName>/` (e.g. `Assets/model/gojo/Purple_idle_travel/`, `Assets/model/sukuna/Fuga_explosion/`, `Assets/model/reze/explosion/`, `Assets/model/ash/pokemon/charizard/Flame/`).
+> 4. **PUT THE ANIMATION FILES DIRECTLY IN THERE**:
+>    - Individual 12 frames: `<effectName>-1.png` through `<effectName>-12.png`
+>    - Master 12-cell horizontal strip: `<effectName>-b.png` ($12 \times \text{cellWidth}$ by $\text{cellHeight}$, e.g. $3072 \times 256\text{px}$).
+> 5. The agent **MUST ALWAYS take direct reference from the canonical Reze explosion file location (`Assets/model/reze/explosion/`) and strictly copy its folder structure, file naming format, bounding box calibration, and 60 FPS combat rendering pipeline**.
 
 ---
 

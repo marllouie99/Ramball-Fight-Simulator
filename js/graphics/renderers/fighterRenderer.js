@@ -158,6 +158,9 @@ export class FighterRenderer {
       fighter._isSilhouettePass ||
       fighter.suppressDebuffs ||
       fighter.suppressStatusOverlays ||
+      fighter.isPokemon ||
+      fighter.isPokemonCompanion ||
+      fighter.isPokemonMinion ||
       fighter.isChessTroop ||
       fighter.isChessMinion ||
       fighter.isChessPiece ||
@@ -177,6 +180,9 @@ export class FighterRenderer {
     const hasCustomHitFlash = Boolean(
       fighter.customHitFlash ||
       fighter.suppressHitFlash ||
+      fighter.isPokemon ||
+      fighter.isPokemonCompanion ||
+      fighter.isPokemonMinion ||
       fighter.isChessTroop ||
       fighter.isChessMinion ||
       fighter.isChessPiece ||

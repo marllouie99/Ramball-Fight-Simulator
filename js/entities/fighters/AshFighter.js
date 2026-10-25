@@ -32,7 +32,12 @@ function _getAshCfg() {
 }
 
 function _playAshSound(key) {
-  // Intentionally suppressed: All Ash SFX removed per user instruction
+  const cfg = _getAshCfg();
+  const src = cfg.sounds?.[key] ?? ashConfig.sounds?.[key];
+  const vol = cfg.soundVolumes?.[key] ?? ashConfig.soundVolumes?.[key] ?? 0.85;
+  if (src && typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+    audioSystem.playSFX(src, vol);
+  }
 }
 
 // Canonical Empress Pokemon 2D Arena (audio.bytes) windup (-1.ogg) -> cast (-2.ogg) sequence table
@@ -141,6 +146,13 @@ export class PokemonCompanionEntity extends Fighter {
     this.isMinion = true;
     this.isPokemon = true;
     this.isPokemonMinion = true;
+    this.isPokemonCompanion = true;
+    this.customHitFlash = true;
+    this.suppressHitFlash = true;
+    this.suppressStatusOverlays = true;
+    this.suppressDebuffs = true;
+    this.noBlood = true;
+    this.suppressBlood = true;
     this.hideHands = true;
 
     this.speciesId = speciesKey;
@@ -183,7 +195,13 @@ export class PokemonCompanionEntity extends Fighter {
     this.specialCooldown = spec.initialSpecialDelayFrames ?? Math.min(28, this.specialCooldownMax);
     this.comboStep = 0;
     this.hurtAnimTimer = 0;
+    this.hurtTick = 0;
     this.faintTimer = 0;
+    this.faintTick = 0;
+    this.maxFaintTicks = 48;
+    this.isFainting = false;
+    this.faintCompleted = false;
+    this.faintAngle = launchAngle;
     this.thunderboltState = null;
     this.thunderboltTimer = 0;
     this.thunderboltHitEnemies = new Set();
@@ -292,20 +310,113 @@ export class PokemonCompanionEntity extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    // If already fainting or dead, ignore further damage
+    if (this.isFainting || this.hp <= 0) {
+      return false;
+    }
+
     // Friendly-fire immunity from owner Ash
     if (attacker && (attacker === this.owner || (attacker.teamId !== undefined && this.teamId !== undefined && attacker.teamId === this.teamId))) {
       return false;
     }
     const landed = super.takeDamage(amount, attacker, opts);
-    if (landed && this.hp > 0) {
-      this.hurtAnimTimer = 12;
-      this.animState = 'hurt';
+    if (landed) {
+      this.hitFlashTimer = 0; // PMD sprite sheets handle their own Hurt-Anim / Faint-Anim without circular 2D flash artifacts
+      if (this.hp <= 0) {
+        this.startFaint();
+      } else {
+        this.hurtAnimTimer = 14;
+        this.hurtTick = 0;
+        this.animState = 'hurt';
+        this.actionAnimTimer = 0; // Interrupt basic melee strike windup so hurt reaction is crisp and visible
+      }
     }
     return landed;
   }
 
+  /**
+   * Overrides base Fighter.onDeath() to suppress default bloody explosion and body shatter shards.
+   * Pokémon do not bleed or shatter into geometric shards; they smoothly faint and return to Poké Balls.
+   */
+  onDeath() {
+    if (!this.isFainting) {
+      this.startFaint();
+    }
+  }
+
+  startFaint() {
+    if (this.isFainting) return;
+    this.isFainting = true;
+    this.hp = 0;
+    this.dead = true;
+    this.isDead = true;
+    this.hitFlashTimer = 0;
+    this.faintTick = 0;
+    this.maxFaintTicks = 48;
+    this.faintCompleted = false;
+    this.animState = 'faint';
+    this.faintAngle = this.gunAngle || this.angle || 0;
+    this.interruptAttacks(true);
+
+    if (!this._faintSoundPlayed) {
+      this._faintSoundPlayed = true;
+      _playAshSound('faint');
+    }
+
+    // Initial fainting momentum: slide gently to a stop
+    this.vx *= 0.35;
+    this.vy *= 0.35;
+
+    // Mega evolution reverts on faint
+    if (this.isMega) {
+      this.isMega = false;
+      this.name = this.spec.name || this.speciesId;
+      this.displayName = this.name;
+    }
+  }
+
+  updateFaint(arena) {
+    this.faintTick = (this.faintTick || 0) + 1;
+    this.animState = 'faint';
+
+    // Slide smoothly to a halt
+    this.vx *= 0.85;
+    this.vy *= 0.85;
+    if (Math.hypot(this.vx, this.vy) < 0.05) {
+      this.vx = 0;
+      this.vy = 0;
+    }
+    this.x += this.vx;
+    this.y += this.vy;
+
+    if (arena) {
+      this.resolveWallBounce(arena);
+    }
+
+    // Trigger recall beam around tick 26 (once Pokémon has collapsed to the ground)
+    if (this.faintTick === 26 && this.owner) {
+      this.owner._triggerPokemonRecall?.(this);
+    }
+
+    if (this.faintTick >= this.maxFaintTicks) {
+      this.faintCompleted = true;
+      if (this.owner) {
+        this.owner._onActivePokemonFainted?.(this);
+      }
+    }
+  }
+
   update(opponent, ownerIndex, arena) {
     this.animTick = (this.animTick || 0) + 1;
+
+    // Rule 1.9 / Rule 25: Decay transient visual effects at top of update
+    this._updateVisualExplosions?.();
+    this._updateVisualEffects?.();
+
+    if (this.isFainting) {
+      this.updateFaint(arena);
+      return;
+    }
 
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -313,13 +424,19 @@ export class PokemonCompanionEntity extends Fighter {
       return;
     }
 
-    if (this.hp <= 0) return;
+    if (this.hp <= 0) {
+      this.startFaint();
+      return;
+    }
 
     this.handleStatusEffects();
     if (this.meleeCooldown > 0) this.meleeCooldown--;
     if (!this.thunderboltState && this.specialCooldown > 0) this.specialCooldown--;
     if (this.actionAnimTimer > 0) this.actionAnimTimer--;
-    if (this.hurtAnimTimer > 0) this.hurtAnimTimer--;
+    if (this.hurtAnimTimer > 0) {
+      this.hurtAnimTimer--;
+      this.hurtTick = (this.hurtTick || 0) + 1;
+    }
     if (typeof this.thunderboltImpactTimer === 'number') {
       this.thunderboltImpactTimer++;
     }
@@ -537,10 +654,10 @@ export class PokemonCompanionEntity extends Fighter {
       this.vx = Math.cos(resumeAngle) * this.speed;
       this.vy = Math.sin(resumeAngle) * this.speed;
     }
-    if (this.actionAnimTimer > 0) {
-      // Keep active 'attack' or 'special' state
-    } else if (this.hurtAnimTimer > 0) {
+    if (this.hurtAnimTimer > 0 && !this.thunderboltState) {
       this.animState = 'hurt';
+    } else if (this.actionAnimTimer > 0) {
+      // Keep active 'attack' or 'special' state
     } else if (Math.hypot(this.vx, this.vy) > 0.6) {
       this.animState = 'walk';
     } else {
@@ -595,8 +712,10 @@ export class PokemonCompanionEntity extends Fighter {
 
   draw(ctx) {
     drawPokemonCompanion(ctx, this);
-    this.drawHealth(ctx);
-    this.drawFreezeTimer(ctx);
+    if (this.hp > 0) {
+      this.drawHealth(ctx);
+      this.drawFreezeTimer(ctx);
+    }
   }
 
   /**
@@ -1022,26 +1141,36 @@ export class AshFighter extends Fighter {
   }
 
   /**
-   * Handles when the active Pokémon faints:
-   * - Plays faint sound & recall beam
-   * - Drops Ash's Honeycomb Barrier
-   * - Restores Ash's movement velocity while starting the Summon Cooldown!
+   * Triggers the Poké Ball recall beam when Pokémon has completed its fainting collapse.
    */
-  _onActivePokemonFainted() {
-    const fainted = this.activePokemon;
+  _triggerPokemonRecall(faintedPokemon) {
+    const fainted = faintedPokemon || this.activePokemon;
     if (!fainted) return;
 
-    _playAshSound('faint');
+    if (fainted && !fainted._faintSoundPlayed) {
+      fainted._faintSoundPlayed = true;
+      _playAshSound('faint');
+    }
     this.activeVisualEffects.push({
       type: 'recallBeam',
       fromX: fainted.x,
       fromY: fainted.y,
       toX: this.x,
       toY: this.y,
-      timer: 16,
-      maxTimer: 16
+      timer: 22,
+      maxTimer: 22
     });
     spawnFloatingText(this.x, this.y - this.r - 20, `${fainted.name} RETURN!`, '#EF4444');
+  }
+
+  /**
+   * Handles when the active Pokémon faints and finishes recall:
+   * - Drops Ash's Honeycomb Barrier
+   * - Restores Ash's movement velocity while starting the Summon Cooldown!
+   */
+  _onActivePokemonFainted(faintedPokemon) {
+    const fainted = faintedPokemon || this.activePokemon;
+    if (!fainted) return;
 
     this._cleanupActivePokemon();
 
@@ -1258,8 +1387,11 @@ export class AshFighter extends Fighter {
 
     // 2. Check if active Pokémon fainted
     if (this.activePokemon) {
-      if (this.activePokemon.hp <= 0 || this.activePokemon.dead || this.activePokemon.isDead) {
-        this._onActivePokemonFainted();
+      if (this.activePokemon.hp <= 0 && !this.activePokemon.isFainting) {
+        this.activePokemon.startFaint();
+      }
+      if (this.activePokemon.faintCompleted) {
+        this._onActivePokemonFainted(this.activePokemon);
       } else if (typeof state !== 'undefined' && Array.isArray(state.fighters) && state.fighters.includes(this)) {
         // Re-ensure active Pokémon is in state.fighters during live matches
         if (!state.fighters.includes(this.activePokemon)) {
@@ -1294,8 +1426,8 @@ export class AshFighter extends Fighter {
     }
 
     // 5. CORE STATE MACHINE:
-    // STATE A: Pokémon is Active (or Poké Ball in flight) -> ASH STOPS MOVING & PROJECTS HONEYCOMB BARRIER!
-    if ((this.activePokemon && this.activePokemon.hp > 0) || this.thrownPokeball) {
+    // STATE A: Pokémon is Active (or Poké Ball in flight or fainting/recalling) -> ASH STOPS MOVING & PROJECTS HONEYCOMB BARRIER!
+    if ((this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting)) || this.thrownPokeball) {
       this.isProtectedByHoneycombBarrier = true;
       this.vx = 0;
       this.vy = 0;
@@ -1393,6 +1525,11 @@ export class AshFighter extends Fighter {
         }
       }
     }
+  }
+
+  onDeath() {
+    this._cleanupActivePokemon();
+    super.onDeath();
   }
 
   drawBody(ctx) {

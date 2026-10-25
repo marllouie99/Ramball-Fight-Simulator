@@ -1019,9 +1019,10 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
   }
 
   const isCombatSound = srcLower.includes('fleshhit') || srcLower.includes('sword') || srcLower.includes('slash') || srcLower.includes('illusion') || srcLower.includes('hit') || srcLower.includes('punch') || srcLower.includes('smash');
-  const minInterval = isCombatSound ? 20 : 15;
+  const isUltimate = isUltimateVoiceline(src);
+  const minInterval = isUltimate ? 0 : (isCombatSound ? 20 : 15);
 
-  if (now - lastTime < minInterval) {
+  if (minInterval > 0 && now - lastTime < minInterval) {
     return null;
   }
   _lastPlayTimes.set(src, now);
@@ -1495,7 +1496,12 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
       continue; // Todo Takada BG music ALWAYS plays until ultimate duration expires!
     }
     if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(handle.src)) {
-      continue;
+      // Do not protect finisher audio if the casting fighter is dead or dying
+      if (handle.isFinisher && handle.fighter && (handle.fighter.isDead || handle.fighter.dead || handle.fighter.hp <= 0)) {
+        // Fall through to stopSound
+      } else {
+        continue;
+      }
     }
     if (!forceStopAll && handle.isFinisher && handle.fighter && !handle.fighter.isDead && !handle.fighter.dead && handle.fighter.hp > 0) {
       continue; // Active finisher sound belonging to living caster is preserved!
@@ -1523,7 +1529,11 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
         return; // Todo Takada BG music ALWAYS plays until ultimate duration expires!
       }
       if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(audio.src)) {
-        return;
+        if (audio.isFinisher && audio.fighter && (audio.fighter.isDead || audio.fighter.dead || audio.fighter.hp <= 0)) {
+          // Fall through to stop
+        } else {
+          return;
+        }
       }
       if (fadeDelayMs > 0) {
         const timerId = setTimeout(() => {

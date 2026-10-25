@@ -279,6 +279,7 @@ export function resolveFighterCollision(a, b) {
 
   // Megumi phases through fighters while submerged in liquid shadow or erupting (Kage no Utsuwa)
   if (a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting) return;
+  if ((a.isFainting && a.hp <= 0) || (b.isFainting && b.hp <= 0)) return;
 
   // Mahito phases directly through fighters during Phantom Soul Slip claw dash
   if ((a.soulPhaseDashTimer && a.soulPhaseDashTimer > 0) || (b.soulPhaseDashTimer && b.soulPhaseDashTimer > 0)) return;
@@ -1114,7 +1115,10 @@ export function updateFighters() {
       const isMakimaReviving = Boolean(
         fighter && (fighter.isRevivingFromContract || fighter.isShatterReviving || (fighter.shatteredPieces && fighter.shatteredPieces.length > 0))
       );
-      if (fighter.hp <= 0 && !isMakimaReviving) {
+      const isPokemonFainting = Boolean(
+        fighter && (fighter.isPokemon || fighter.isPokemonCompanion) && fighter.hp <= 0 && (fighter.isFainting || fighter.animState === 'faint')
+      );
+      if (fighter.hp <= 0 && !isMakimaReviving && !isPokemonFainting) {
         clearFighterDomain(fighter, state);
         if (typeof fighter._healthBarShakeTimer === 'number' && fighter._healthBarShakeTimer > 0) {
           fighter._healthBarShakeTimer--;

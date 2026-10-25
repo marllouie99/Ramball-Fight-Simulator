@@ -34,6 +34,11 @@ export {
 class AudioEventEmitter {
   constructor() {
     this.listeners = {};
+    this.playSFX = this.playSFX.bind(this);
+    this.playLoop = this.playLoop.bind(this);
+    this.stopLoop = this.stopLoop.bind(this);
+    this.playFinisherAudio = this.playFinisherAudio.bind(this);
+    this.stopFinisherAudio = this.stopFinisherAudio.bind(this);
   }
 
   on(event, callback) {

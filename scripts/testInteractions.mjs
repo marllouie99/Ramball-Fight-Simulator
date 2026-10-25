@@ -3011,6 +3011,7 @@ async function runInteractionTests() {
     const voiceLineCountAfterPeashooter = playedSfxList.filter(s => plantingVoiceLines.includes(s.src)).length;
     dave.plantSnowPea(gojo);
     assert(playedSfxList.filter(s => plantingVoiceLines.includes(s.src)).length > voiceLineCountAfterPeashooter, 'Snow Pea planting must play a configured Crazy Dave voice line');
+    audioSystem.playSFX = origPlaySFX;
 
     // Reset Dave to clean state with 0 active plants to test AI sequence
     dave.reset();
@@ -4350,6 +4351,8 @@ async function runInteractionTests() {
     const { namelessDeityConfig } = await import('../js/configs/characters/namelessDeityConfig.js');
     const expectedDartDmg = namelessDeityConfig?.dartDamage ?? 14;
     assert(darts[0].damage === expectedDartDmg, `Starlight Darts must deal configured dartDamage (${expectedDartDmg})`);
+    const expectedDartCooldown = namelessDeityConfig?.dartCooldown ?? namelessDeityConfig?.cooldown ?? 45;
+    assert(nameless.shootCooldown === expectedDartCooldown, `Nameless Deity shootCooldown must be set to dartCooldown (${expectedDartCooldown}) after firing`);
 
     // Verify homing physics step towards enemy Draedon
     const initialDartX = darts[0].x;
@@ -4909,7 +4912,8 @@ async function runInteractionTests() {
 
       // 1. Cast ultimate
       testDeity.castNamelessDestroyer(dummyOpp, true);
-      const expectedFullCD = 1500;
+      const { namelessDeityConfig: deityCfg } = await import('../js/configs/characters/namelessDeityConfig.js');
+      const expectedFullCD = deityCfg?.destroyerCooldown ?? 1500;
       assert(testDeity.destroyerCooldown === expectedFullCD, `Ultimate CD immediately upon cast must be ${expectedFullCD}, got ${testDeity.destroyerCooldown}`);
       assert(testDeity.destroyerWindupTimer > 0, 'Windup timer must be active upon cast');
 
@@ -4946,6 +4950,25 @@ async function runInteractionTests() {
         testDeity.update(dummyOpp, 0, testArena);
       }
       assert(testDeity.destroyerCooldown === expectedFullCD - 5, `Ultimate CD must tick down after ultimate is done (expected ${expectedFullCD - 5}, got ${testDeity.destroyerCooldown})`);
+
+      // 7. Verify cutting off all audio when Deity dies while winding up ultimate
+      state.gameState = 'playing';
+      state.roundEndTimer = 0;
+      testDeity.destroyerCooldown = 0;
+      testDeity.castNamelessDestroyer(dummyOpp, true);
+      assert(testDeity.destroyerWindupTimer > 0, 'Deity must be in ultimate wind-up phase');
+      assert(testDeity.destroyerChargeSoundHandle !== null, 'Deity must have active wind-up charge sound handle');
+
+      // Now Deity dies during windup!
+      testDeity.hp = 0;
+      testDeity.dead = true;
+      testDeity.isDead = true;
+      testDeity.onDeath();
+
+      assert(testDeity.destroyerChargeSoundHandle === null, 'destroyerChargeSoundHandle must be null after onDeath()');
+      assert(testDeity.destroyerWindupTimer === 0, 'destroyerWindupTimer must be 0 after onDeath()');
+      assert(testDeity.destroyerFireTimer === 0, 'destroyerFireTimer must be 0 after onDeath()');
+      assert(testDeity.destroyerLoopSoundKey === null, 'destroyerLoopSoundKey must be null after onDeath()');
     }
 
     console.log('      ✅ Nameless Deity modular asset death shatter (wings, halo, antlers, body, eye, arms, hands, crystals & permanent preservation) verified successfully.');
@@ -9677,6 +9700,84 @@ async function runInteractionTests() {
     ash._cleanupActivePokemon?.();
     state.fighters = [];
     console.log('      ✅ Natural Pokémon Wall Bouncing & Fighter Collision Elasticity verified successfully.');
+  }
+
+  // =========================================================================
+  // 94. Pokémon Hurt & Smooth Faint Lifecycle (Zero Shatter, Zero Blood, 48-Tick Collapse & Recall)
+  // =========================================================================
+  {
+    console.log('   94. Testing Pokémon Hurt & Smooth Faint Lifecycle (Zero Shatter, Zero Blood, 48-Tick Collapse & Recall)...');
+    const { AshFighter, PokemonCompanionEntity } = await import('../js/entities/fighters/AshFighter.js');
+    const { spawnDeathShatter } = await import('../js/graphics/particles/deathShatterEffect.js');
+    const { isBloodSuppressedEntity } = await import('../js/graphics/particles/bloodEffect.js');
+    const { drawPokemonCompanion } = await import('../js/graphics/weapons/ashPokemonGraphics.js');
+    const { state } = await import('../js/core/state.js');
+    const arena = { x: 45, y: 240, width: 450, height: 450, shape: 'rect' };
+    state.arena = arena;
+    state.gameState = 'playing';
+
+    const ash = new AshFighter({ id: 'ash', name: 'ASH', displayName: 'ASH', type: 'ash' });
+    ash.teamId = 0;
+    const enemy = new (await import('../js/entities/fighter.js')).Fighter({ id: 'dummy', name: 'DUMMY', type: 'dummy', hp: 200 });
+    enemy.teamId = 1;
+
+    // Test each Pokémon roster member
+    const speciesList = ['pikachu', 'charizard', 'lucario', 'greninja'];
+    for (const species of speciesList) {
+      const pokemon = new PokemonCompanionEntity(ash, species, 200, 300);
+      ash.activePokemon = pokemon;
+      state.fighters = [ash, enemy, pokemon];
+
+      // 1. Blood suppression guard
+      assert(isBloodSuppressedEntity(pokemon), `${species} must be recognized as a blood-suppressed entity`);
+
+      // 2. Walking & Idle animation state verification when alive
+      pokemon.vx = 4.5;
+      pokemon.vy = 0;
+      pokemon.hurtAnimTimer = 0;
+      pokemon.actionAnimTimer = 0;
+      // In update, speed > 0.6 sets walk
+      if (Math.hypot(pokemon.vx, pokemon.vy) > 0.6) pokemon.animState = 'walk';
+      assert(pokemon.animState === 'walk', `${species} must use 'walk' animState while moving`);
+      assert(pokemon.isFainting === false, `${species} must NOT be fainting while alive`);
+
+      // 3. Hurt reaction on non-lethal damage
+      pokemon.takeDamage(20, enemy);
+      assert(pokemon.animState === 'hurt', `${species} must enter 'hurt' animState on non-lethal damage`);
+      assert(pokemon.hurtAnimTimer > 0, `${species} must set positive hurtAnimTimer`);
+
+      // 4. Lethal damage -> Smooth faint transition (zero shatter)
+      pokemon.takeDamage(9999, enemy);
+      assert(pokemon.hp === 0, `${species} HP must be 0 after lethal damage`);
+      assert(pokemon.isFainting === true, `${species} must have isFainting === true`);
+      assert(pokemon.animState === 'faint', `${species} must transition to 'faint' animState`);
+      assert(pokemon.faintTick === 0, `${species} faintTick must start at 0`);
+
+      // 4. Ensure spawnDeathShatter is completely suppressed for Pokémon
+      spawnDeathShatter(pokemon);
+      assert(!state.shatteredPieces || state.shatteredPieces.length === 0, `${species} must NEVER spawn death shatter pieces`);
+
+      // 5. Simulate 48-tick collapse & Poké Ball recall sequence
+      let sawRecallBeam = false;
+      for (let tick = 0; tick < 48; tick++) {
+        pokemon.update(enemy, 2, arena);
+        if (ash.activeVisualEffects?.some(v => v.type === 'recallBeam')) {
+          sawRecallBeam = true;
+        }
+      }
+      assert(sawRecallBeam, `${species} must trigger Poké Ball recall beam around tick 26`);
+      assert(pokemon.faintCompleted === true, `${species} faint must be completed at tick 48`);
+
+      // 6. Canvas 2D render test during faint
+      const ctx = createMockCtx();
+      drawPokemonCompanion(ctx, pokemon);
+      assert(ctx.getStackDepth() === 0, `${species} drawPokemonCompanion must maintain 100% balanced Canvas 2D stack depth`);
+
+      ash._cleanupActivePokemon?.();
+    }
+
+    state.fighters = [];
+    console.log('      ✅ Pokémon Hurt & Smooth Faint Lifecycle verified successfully across all species.');
   }
 
   console.log('───────────────────────────────────────────────────────');

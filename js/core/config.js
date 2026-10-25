@@ -1535,7 +1535,7 @@ export const FIGHTER_DEFS = [
     type: 'namelessdeity',
     hp: namelessDeityConfig.hp || 420,
     damage: namelessDeityConfig.damage || 16,
-    cooldown: namelessDeityConfig.cooldown || 35,
+    cooldown: namelessDeityConfig.dartCooldown ?? namelessDeityConfig.cooldown ?? 45,
     moveSpeed: namelessDeityConfig.moveSpeed || namelessDeityConfig.speed || 4.8,
     projectileSpeedMultiplier: namelessDeityConfig.projectileSpeedMultiplier || 1.0,
     ability: namelessDeityConfig.ability || 'Nameless Destroyer & Cosmic Singularity',

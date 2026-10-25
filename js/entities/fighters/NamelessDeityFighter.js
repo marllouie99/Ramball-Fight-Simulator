@@ -7,7 +7,15 @@ import { CONFIG } from '../../core/config.js';
 import { namelessDeityConfig } from '../../configs/characters/namelessDeityConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
-import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import {
+  playSound,
+  playLoopingSound,
+  stopSound,
+  stopSoundBySrc,
+  stopLoopingSound,
+  fadeOutSound,
+  fadeOutLoopingSound
+} from '../../systems/soundSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawNamelessDeitySkin } from '../../graphics/fighters/namelessDeitySkin.js';
 import {
@@ -48,7 +56,9 @@ export class NamelessDeityFighter extends Fighter {
 
     // Combat Stats & Timers
     this.damage = getNamelessSetting(cfg, 'damage');
-    this.cooldown = getNamelessSetting(cfg, 'cooldown');
+    const dartCooldown = getNamelessSetting(cfg, 'dartCooldown') ?? getNamelessSetting(cfg, 'cooldown') ?? 45;
+    this.cooldown = dartCooldown;
+    this.shootCooldownMax = dartCooldown;
 
     // Skill Cooldowns
     this.superclusterCooldown = 0;
@@ -77,6 +87,9 @@ export class NamelessDeityFighter extends Fighter {
     this.destroyerHoldFrames = getNamelessSetting(cfg, 'destroyerHoldFrames') ?? 43;
     this.destroyerFireFrames = getNamelessSetting(cfg, 'destroyerFireFrames') ?? 800;
     this.destroyerLoopSoundKey = null;
+    this.destroyerChargeSoundHandle = null;
+    this.destroyerStartSoundHandle = null;
+    this.destroyerChuckleSoundHandle = null;
     this.wingAnimationTimer = 0;
 
     // Special Interaction: Center Rebounce vs Saitama
@@ -283,15 +296,57 @@ export class NamelessDeityFighter extends Fighter {
     }
   }
 
+  _stopAllDestroyerSounds(fadeMs = 0) {
+    // 1. Wind-up cosmic laser charge sound
+    if (this.destroyerChargeSoundHandle) {
+      if (fadeMs > 0) fadeOutSound(this.destroyerChargeSoundHandle, fadeMs, true);
+      else stopSound(this.destroyerChargeSoundHandle, true);
+      this.destroyerChargeSoundHandle = null;
+    }
+
+    // 2. Beam blast start sound
+    if (this.destroyerStartSoundHandle) {
+      if (fadeMs > 0) fadeOutSound(this.destroyerStartSoundHandle, fadeMs, true);
+      else stopSound(this.destroyerStartSoundHandle, true);
+      this.destroyerStartSoundHandle = null;
+    }
+
+    // 3. Post-beam recovery chuckle sound
+    if (this.destroyerChuckleSoundHandle) {
+      if (fadeMs > 0) fadeOutSound(this.destroyerChuckleSoundHandle, fadeMs, true);
+      else stopSound(this.destroyerChuckleSoundHandle, true);
+      this.destroyerChuckleSoundHandle = null;
+    }
+
+    // 4. Looping cosmic laser beam drone
+    this._stopDestroyerLoopSounds(fadeMs);
+
+    // 5. Finisher audio registered via AudioSystem
+    if (typeof this.stopFinisherAudio === 'function') {
+      this.stopFinisherAudio(null, fadeMs);
+    }
+
+    // 6. Forceful fallback cutoff by file/path signature across active sound handles
+    stopSoundBySrc('CosmicLaserChargeUp', true);
+    stopSoundBySrc('CosmicLaserStart', true);
+    stopSoundBySrc('CosmicLaserLoop', true);
+    stopSoundBySrc('NamelessDeity/CosmicLaser', true);
+    stopSoundBySrc('NamelessDeity/WingFlap', true);
+    stopSoundBySrc('NamelessDeity/Supernova', true);
+    stopSoundBySrc('NamelessDeity/StarConvergence', true);
+  }
+
   interruptAttacks(forceCancelAll = false) {
     if (!forceCancelAll && (this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.isRebouncingToCenter)) {
       return; // Transcendent Celestial Hyper-Armor: Never cancel Nameless Destroyer beam from transient hits/stuns
     }
     const wasChanneling = Boolean(this.destroyerWindupTimer > 0 || this.destroyerFireTimer > 0 || this.destroyerRecoveryTimer > 0 || this.isRebouncingToCenter);
-    this._stopDestroyerLoopSounds(0);
+    this._stopAllDestroyerSounds(0);
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
     this.destroyerRecoveryTimer = 0;
+    this.superclusterActiveTimer = 0;
+    this.superclusterDetonationTimer = 0;
     if (this._dodgedBeamEntities) {
       this._dodgedBeamEntities.clear();
     }
@@ -305,10 +360,12 @@ export class NamelessDeityFighter extends Fighter {
   }
 
   onDeath() {
-    this._stopDestroyerLoopSounds(0);
+    this._stopAllDestroyerSounds(0);
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
     this.destroyerRecoveryTimer = 0;
+    this.superclusterActiveTimer = 0;
+    this.superclusterDetonationTimer = 0;
     if (this._dodgedBeamEntities) {
       this._dodgedBeamEntities.clear();
     }
@@ -332,15 +389,11 @@ export class NamelessDeityFighter extends Fighter {
     super.onCountdown?.(opponent);
   }
 
-  update(opponent, ownerIndex, arena) {
-    if (this.attackCastTimer > 0) {
-      this.attackCastTimer--;
-    }
-    super.update(opponent, ownerIndex, arena);
-  }
-
   reset() {
-    this._stopDestroyerLoopSounds(0);
+    this._stopAllDestroyerSounds(0);
+    this.destroyerChargeSoundHandle = null;
+    this.destroyerStartSoundHandle = null;
+    this.destroyerChuckleSoundHandle = null;
     super.reset();
     this.attackCastTimer = 0;
     this.superclusterCooldown = 0;
@@ -352,6 +405,9 @@ export class NamelessDeityFighter extends Fighter {
     this.activeSingularities = [];
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
     this.damage = getNamelessSetting(cfg, 'damage') || 14;
+    const dartCooldown = getNamelessSetting(cfg, 'dartCooldown') ?? getNamelessSetting(cfg, 'cooldown') ?? 45;
+    this.cooldown = dartCooldown;
+    this.shootCooldownMax = dartCooldown;
     this.destroyerCooldown = getNamelessSetting(cfg, 'destroyerInitialCooldown') ?? 400;
     this.destroyerWindupTimer = 0;
     this.destroyerFireTimer = 0;
@@ -437,6 +493,9 @@ export class NamelessDeityFighter extends Fighter {
 
     // Trigger deity eye dilation pulse & wing animation surge
     this.attackCastTimer = 18;
+    const dartCooldown = getNamelessSetting(cfg, 'dartCooldown') ?? getNamelessSetting(cfg, 'cooldown') ?? 45;
+    this.shootCooldown = dartCooldown;
+    this.shootCooldownMax = dartCooldown;
     if (typeof spawnImpactFlash === 'function') {
       spawnImpactFlash(this.x, this.y, 28, '#00F0FF');
     }
@@ -690,7 +749,15 @@ export class NamelessDeityFighter extends Fighter {
     this.destroyerRecoveryTimer = 0;
 
     // 1. laserCharge SFX: Cosmic Laser Charge-up at wind-up initiation
-    playSound(getNamelessSetting(cfg, 'sounds')?.laserCharge || 'Assets/Sound Effects/NamelessDeity/CosmicLaserChargeUp.ogg', getNamelessSetting(cfg, 'laserChargeVolume') || 1.15);
+    const chargeSound = getNamelessSetting(cfg, 'sounds')?.laserCharge || 'Assets/Sound Effects/NamelessDeity/CosmicLaserChargeUp.ogg';
+    const chargeVol = getNamelessSetting(cfg, 'laserChargeVolume') || 1.15;
+    this.destroyerChargeSoundHandle = (typeof this.playFinisherAudio === 'function')
+      ? this.playFinisherAudio({
+          src: chargeSound,
+          volume: chargeVol,
+          role: 'destroyerCharge'
+        })
+      : playSound(chargeSound, chargeVol);
 
     spawnFloatingText(this.x, this.y - 25, 'NAMELESS DESTROYER!', '#00F0FF');
     return true;
@@ -698,6 +765,11 @@ export class NamelessDeityFighter extends Fighter {
 
   update(opponent, ownerIndex, arena) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.namelessdeity) ? CONFIG.namelessdeity : namelessDeityConfig;
+
+    if (this.hp <= 0 || this.dead || this.isDead) {
+      this._stopAllDestroyerSounds(0);
+      return;
+    }
 
     // 1. Freeze / Time-Stop Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
@@ -758,6 +830,7 @@ export class NamelessDeityFighter extends Fighter {
     }
 
     // Cooldown decrements
+    if (this.attackCastTimer > 0) this.attackCastTimer--;
     if (this.superclusterCooldown > 0) this.superclusterCooldown--;
     if (this.superclusterDetonationTimer > 0) this.superclusterDetonationTimer--;
     if (this.dimensionCleaveCooldown > 0) this.dimensionCleaveCooldown--;
@@ -886,7 +959,14 @@ export class NamelessDeityFighter extends Fighter {
       }
 
       if (this.destroyerWindupTimer === 0) {
-        // Wind-up complete: SNAP spawn the super-beam along locked committed direction without snap jumping!
+        // Wind-up complete: terminate charge sound before unleashing beam
+        if (this.destroyerChargeSoundHandle) {
+          stopSound(this.destroyerChargeSoundHandle, true);
+          this.destroyerChargeSoundHandle = null;
+        }
+        stopSoundBySrc('CosmicLaserChargeUp', true);
+
+        // SNAP spawn the super-beam along locked committed direction without snap jumping!
         this.destroyerCastAngle = (this.destroyerCastAngle !== undefined) ? this.destroyerCastAngle : (this.gunAngle || 0);
         this.gunAngle = this.destroyerCastAngle;
         this.angle = this.destroyerCastAngle;
@@ -896,7 +976,15 @@ export class NamelessDeityFighter extends Fighter {
         this._dodgedBeamEntities = new Set();
 
         // 2. laserStart SFX: Initial cosmic blast burst
-        playSound(getNamelessSetting(cfg, 'sounds')?.laserStart || 'Assets/Sound Effects/NamelessDeity/CosmicLaserStart.ogg', getNamelessSetting(cfg, 'laserStartVolume') || 1.30);
+        const startSound = getNamelessSetting(cfg, 'sounds')?.laserStart || 'Assets/Sound Effects/NamelessDeity/CosmicLaserStart.ogg';
+        const startVol = getNamelessSetting(cfg, 'laserStartVolume') || 1.30;
+        this.destroyerStartSoundHandle = (typeof this.playFinisherAudio === 'function')
+          ? this.playFinisherAudio({
+              src: startSound,
+              volume: startVol,
+              role: 'destroyerStart'
+            })
+          : playSound(startSound, startVol);
         
         // 3. laserLoop SFX: Continuous roaring cosmic beam loop
         this._stopDestroyerLoopSounds(0);
@@ -931,10 +1019,23 @@ export class NamelessDeityFighter extends Fighter {
         if (this._dodgedBeamEntities) {
           this._dodgedBeamEntities.clear();
         }
+        if (this.destroyerStartSoundHandle) {
+          stopSound(this.destroyerStartSoundHandle, true);
+          this.destroyerStartSoundHandle = null;
+        }
+        stopSoundBySrc('CosmicLaserStart', true);
         this.destroyerRecoveryTimer = getNamelessSetting(cfg, 'destroyerRecoveryFrames') || 25;
         this.destroyerRecoveryMax = this.destroyerRecoveryTimer;
         this._stopDestroyerLoopSounds(350);
-        playSound(getNamelessSetting(cfg, 'sounds')?.chuckle || 'Assets/Sound Effects/NamelessDeity/Chuckle.ogg', getNamelessSetting(cfg, 'chuckleVolume') || 1.10);
+        const chuckleSound = getNamelessSetting(cfg, 'sounds')?.chuckle || 'Assets/Sound Effects/NamelessDeity/Chuckle.ogg';
+        const chuckleVol = getNamelessSetting(cfg, 'chuckleVolume') || 1.10;
+        this.destroyerChuckleSoundHandle = (typeof this.playFinisherAudio === 'function')
+          ? this.playFinisherAudio({
+              src: chuckleSound,
+              volume: chuckleVol,
+              role: 'destroyerChuckle'
+            })
+          : playSound(chuckleSound, chuckleVol);
         if (this.destroyerRecoveryTimer === 0) {
           this.destroyerCooldown = getNamelessSetting(cfg, 'destroyerCooldown') || 1500;
           const livingCount = (typeof state !== 'undefined' && state.fighters)
