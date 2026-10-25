@@ -87,15 +87,27 @@ export class SukunaFurnaceBehavior extends ProjectileBehavior {
       const explosionX = (closestDeadDist < 120) ? detonateX : projectile.x;
       const explosionY = (closestDeadDist < 120) ? detonateY : projectile.y;
       system.triggerThermobaricExplosion(explosionX, explosionY, projectile.owner, projectile.damage);
+      this._tagLastExplosionAngle(projectile);
       return true; // Destroy projectile immediately!
     }
 
     return false;
   }
 
+  _tagLastExplosionAngle(projectile) {
+    const exps = typeof state !== 'undefined' && state.thermobaricExplosions;
+    if (exps && exps.length > 0) {
+      const lastExp = exps[exps.length - 1];
+      const vx = projectile.vx === 0 && projectile.vy === 0 && projectile._resumeVx !== undefined ? projectile._resumeVx : projectile.vx;
+      const vy = projectile.vx === 0 && projectile.vy === 0 && projectile._resumeVy !== undefined ? projectile._resumeVy : projectile.vy;
+      lastExp.angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (projectile.lastAngle || projectile.angle || 0);
+    }
+  }
+
   onHit(projectile, target, attacker, fighters, system) {
     // Triggers thermobaric explosion immediately on hit
     system.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
+    this._tagLastExplosionAngle(projectile);
     return true; // Destroy the projectile
   }
 
@@ -106,6 +118,7 @@ export class SukunaFurnaceBehavior extends ProjectileBehavior {
     if (obsHit) {
       if (!projectile.isFrozenByInfinity) {
         system.triggerThermobaricExplosion(obsHit.wallX, obsHit.wallY, projectile.owner, projectile.damage);
+        this._tagLastExplosionAngle(projectile);
       }
       return true;
     }
@@ -119,6 +132,7 @@ export class SukunaFurnaceBehavior extends ProjectileBehavior {
     ) {
       if (!projectile.isFrozenByInfinity) {
         system.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
+        this._tagLastExplosionAngle(projectile);
       }
       return true; // Expire and destroy
     }

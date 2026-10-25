@@ -1,4 +1,5 @@
 import { state } from '../../core/state.js';
+import { drawSukunaFugaExplosionSprite } from '../weapons/sukunaWeaponGraphics.js';
 
 function _isDarkMode() {
   return Boolean(
@@ -186,110 +187,71 @@ export function drawThermobaricExplosions(ctx) {
       ctx.restore();
     }
 
-    // ── STEPPED PIXEL-ART EXPLOSION FLASH (Getsuga Tensho Technique) ──
+    // ── 12-FRAME PIXEL-ART FUGA EXPLOSION & RULE 26 STAGGERED SHOCKWAVES ──
     ctx.save();
     ctx.translate(cx, cy);
     ctx.imageSmoothingEnabled = false;
 
     if (explosionProgress < 1.0) {
-      // 1. Radiating Pixel Spike Rays
-      if (explosionProgress < 0.5) {
-        const spikeAlpha = (0.5 - explosionProgress) / 0.5;
-        const numSpikes = 14;
-        for (let s = 0; s < numSpikes; s++) {
-          const angle = (Math.PI * 2 / numSpikes) * s + (s % 2 === 0 ? 0.15 : -0.15);
-          const spikeLen = snap(R * (1.0 + (exp.seed || 0.5) * 0.6) * Math.min(1.0, (explosionProgress + 0.05) * 2.5));
-          const spikeW = snap((12 + s % 3 * 6) * spikeAlpha);
-          const cosA = Math.cos(angle);
-          const sinA = Math.sin(angle);
-          const stepCount = Math.max(2, Math.floor(spikeLen / P));
+      // 1. Rule 26 Sequential Water-Ripple Concentric Shockwave Rings (Zero radial spokes!)
+      const waveConfigs = [
+        { delay: 0.00, dur: 0.72, speedPow: 0.42, maxScale: 1.00, thick: 12, col: '200, 20, 0', washCol: '255, 80, 10', washA: 0.16 },
+        { delay: 0.12, dur: 0.72, speedPow: 0.46, maxScale: 0.88, thick: 8,  col: '255, 140, 0', washCol: '255, 150, 30', washA: 0.12 },
+        { delay: 0.24, dur: 0.70, speedPow: 0.50, maxScale: 0.74, thick: 5,  col: '255, 250, 220', washCol: '255, 230, 140', washA: 0.10 }
+      ];
 
-          ctx.fillStyle = `rgba(15, 5, 0, ${spikeAlpha * 0.9})`;
-          for (let st = 1; st <= stepCount; st++) {
-            const dist = st * P;
-            const t = dist / spikeLen;
-            const w = snap(Math.sin(t * Math.PI) * spikeW);
-            const cx_s = snap(cosA * dist);
-            const cy_s = snap(sinA * dist);
-            ctx.fillRect(cx_s - w / 2, cy_s - w / 2, Math.max(P, w), Math.max(P, w));
-          }
-        }
-      }
-
+      ctx.save();
       ctx.globalCompositeOperation = 'lighter';
+      for (let k = 0; k < waveConfigs.length; k++) {
+        const wc = waveConfigs[k];
+        const rawLp = (explosionProgress - wc.delay) / wc.dur;
+        if (rawLp <= 0 || rawLp >= 1) continue;
+        const popIn = Math.min(1.0, rawLp / 0.08);
+        const fadeOut = Math.pow(1.0 - rawLp, 1.25);
+        const waveAlpha = popIn * fadeOut;
+        const waveR = R * wc.maxScale * Math.pow(rawLp, wc.speedPow);
 
-      // 2. Concentric Stepped Pixel Shockwave Rings (Getsuga Tensho Palette)
-      // (A) Outer Crimson Shockwave Ring
-      ctx.fillStyle = `rgba(200, 20, 0, ${0.9 * expAlpha})`;
-      drawPixelRing(ctx, 0, 0, radius, snap(20 * (1 - explosionProgress)), P);
+        // Expanding translucent interior wash
+        ctx.fillStyle = `rgba(${wc.washCol}, ${(wc.washA * waveAlpha).toFixed(3)})`;
+        drawPixelDisc(ctx, 0, 0, waveR, P);
 
-      // (B) Mid Fiery Orange Shockwave Ring
-      ctx.fillStyle = `rgba(255, 140, 0, ${0.95 * expAlpha})`;
-      drawPixelRing(ctx, 0, 0, radius * 0.82, snap(12 * (1 - explosionProgress)), P);
+        // Crisp concentric compression band
+        ctx.fillStyle = `rgba(${wc.col}, ${(0.92 * waveAlpha).toFixed(3)})`;
+        drawPixelRing(ctx, 0, 0, waveR, Math.max(P, snap(wc.thick * (1 - rawLp * 0.65))), P);
+      }
+      ctx.restore();
 
-      // (C) Inner Incandescent White Shockwave Ring
-      ctx.fillStyle = `rgba(255, 255, 240, ${expAlpha})`;
-      drawPixelRing(ctx, 0, 0, radius * 0.60, snap(5 * (1 - explosionProgress)), P);
+      // 2. Render 12-Frame Pixel-Art Fuga Explosion Sprite (with procedural fallback if not yet loaded)
+      const drewSprite = drawSukunaFugaExplosionSprite(ctx, exp, explosionProgress);
 
-      // 3. Stepped Pixel Thermal Blast Pillar (Rising Fire Column)
-      const pH = snap(R * 3.0 * Math.sin(Math.min(1.0, explosionProgress * 1.35) * Math.PI));
-      const pW = snap(R * 0.7 * (1 - explosionProgress * 0.4));
-      const pillarStep = P * 2;
-      if (pH > pillarStep) {
-        for (let gy = 0; gy >= -pH; gy -= pillarStep) {
-          const t = -gy / pH; // 0 at ground, 1 at top
-          const profile = Math.sin(t * Math.PI) * (1.1 - t * 0.35) + 0.15 * Math.pow(1 - t, 2);
-          const w = snap(pW * profile);
-          if (w <= 0) continue;
-
-          const flicker = Math.sin(nowTime * 0.03 + gy * 0.2) * P;
-          const effW = Math.max(P, w + flicker);
-
-          // Dark obsidian flame outline:
-          ctx.fillStyle = `rgba(20, 5, 0, ${0.85 * expAlpha})`;
-          ctx.fillRect(snap(-effW / 2 - P), gy, P, pillarStep);
-          ctx.fillRect(snap(effW / 2), gy, P, pillarStep);
-
-          // Magma crimson body:
-          ctx.fillStyle = `rgba(220, 30, 0, ${0.9 * expAlpha})`;
-          ctx.fillRect(snap(-effW / 2), gy, snap(effW), pillarStep);
-
-          // Saturated fiery orange core:
-          const orangeW = snap(effW * 0.7);
-          ctx.fillStyle = `rgba(255, 120, 0, ${0.95 * expAlpha})`;
-          ctx.fillRect(snap(-orangeW / 2), gy, orangeW, pillarStep);
-
-          // Hot solar gold plasma:
-          const goldW = snap(effW * 0.4);
-          ctx.fillStyle = `rgba(255, 220, 40, ${expAlpha})`;
-          ctx.fillRect(snap(-goldW / 2), gy, goldW, pillarStep);
-
-          // White-hot central spine:
-          const whiteW = snap(effW * 0.18);
-          if (whiteW >= P) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${expAlpha})`;
-            ctx.fillRect(snap(-whiteW / 2), gy, whiteW, pillarStep);
+      if (!drewSprite) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        // Procedural fallback when running in headless Node environment
+        const pH = snap(R * 3.0 * Math.sin(Math.min(1.0, explosionProgress * 1.35) * Math.PI));
+        const pW = snap(R * 0.7 * (1 - explosionProgress * 0.4));
+        const pillarStep = P * 2;
+        if (pH > pillarStep) {
+          for (let gy = 0; gy >= -pH; gy -= pillarStep) {
+            const t = -gy / pH;
+            const profile = Math.sin(t * Math.PI) * (1.1 - t * 0.35) + 0.15 * Math.pow(1 - t, 2);
+            const w = snap(pW * profile);
+            if (w <= 0) continue;
+            const flicker = Math.sin(nowTime * 0.03 + gy * 0.2) * P;
+            const effW = Math.max(P, w + flicker);
+            ctx.fillStyle = `rgba(220, 30, 0, ${0.9 * expAlpha})`;
+            ctx.fillRect(snap(-effW / 2), gy, snap(effW), pillarStep);
           }
         }
-      }
-
-      // 4. Detonation Incandescent Fireball Core (Stepped Pixel Discs)
-      if (explosionProgress < 0.5) {
-        const coreA = (0.5 - explosionProgress) / 0.5;
-        const coreR = snap(radius * (0.75 - explosionProgress * 0.4));
-        if (coreR > P) {
-          ctx.fillStyle = `rgba(220, 40, 0, ${0.7 * coreA})`;
-          drawPixelDisc(ctx, 0, 0, coreR, P);
-
-          ctx.fillStyle = `rgba(255, 140, 0, ${0.85 * coreA})`;
-          drawPixelDisc(ctx, 0, 0, coreR * 0.7, P);
-
-          ctx.fillStyle = `rgba(255, 230, 60, ${0.95 * coreA})`;
-          drawPixelDisc(ctx, 0, 0, coreR * 0.45, P);
-
-          ctx.fillStyle = `rgba(255, 255, 255, ${coreA})`;
-          drawPixelDisc(ctx, 0, 0, coreR * 0.22, P);
+        if (explosionProgress < 0.5) {
+          const coreA = (0.5 - explosionProgress) / 0.5;
+          const coreR = snap(radius * (0.75 - explosionProgress * 0.4));
+          if (coreR > P) {
+            ctx.fillStyle = `rgba(255, 140, 0, ${0.85 * coreA})`;
+            drawPixelDisc(ctx, 0, 0, coreR * 0.7, P);
+          }
         }
+        ctx.restore();
       }
     }
 

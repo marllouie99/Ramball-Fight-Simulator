@@ -341,61 +341,58 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
   const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
-  // 30 FPS stepped animation time for anime Sakuga travel keyframes
   const step30Frame = Math.floor(Date.now() / (1000 / 30));
   const time = step30Frame * (1000 / 30) * 0.012;
   const speed = Math.hypot(vx, vy);
 
-  // Performance: Detect low quality mode (explicit performance settings only)
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.2)));
 
-  // Initialize particle systems
   if (!p._fugaFlameTimer) p._fugaFlameTimer = 0;
   p._fugaFlameTimer++;
 
   if (!p.flameParticles) p.flameParticles = [];
   if (!p.emberParticles) p.emberParticles = [];
 
-  // ─── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched (fewer in low quality)
-  const spawnRate = isLowQuality ? 1 : 3;
-  for (let i = 0; i < spawnRate; i++) {
-    const spawnOffset = -Math.random() * 20;
+  // ─── SPAWN TRANSLUCENT CHARCOAL-CRIMSON SMOKE WAKE PUFFS (firearrowvfx.mp4 rear wake)
+  const smokeRate = isLowQuality ? 1 : 2;
+  for (let i = 0; i < smokeRate; i++) {
     p.flameParticles.push({
-      x: spawnOffset,
+      x: -55 - Math.random() * 55,
       y: (Math.random() - 0.5) * 14,
-      vx: -(3.0 + Math.random() * 5.0 + speed * 0.12),
-      vy: (Math.random() - 0.5) * 2.5,
-      size: 6 + Math.random() * 10,
-      maxSize: 22 + Math.random() * 18,
+      vx: -(2.4 + Math.random() * 3.8 + speed * 0.10),
+      vy: (Math.random() - 0.5) * 1.4 - 0.25,
+      size: 7 + Math.random() * 8,
+      maxSize: 20 + Math.random() * 16,
       life: 1.0,
       maxLife: 1.0,
-      decay: isLowQuality ? (0.035 + Math.random() * 0.02) : (0.018 + Math.random() * 0.014), // Faster decay in low quality
+      decay: isLowQuality ? 0.04 : (0.022 + Math.random() * 0.014),
       wobblePhase: Math.random() * Math.PI * 2,
-      wobbleSpeed: 0.12 + Math.random() * 0.2,
+      wobbleSpeed: 0.10 + Math.random() * 0.14,
       turbSeed: Math.random() * 100,
-      layer: i % 3 // 0=white-core, 1=golden, 2=crimson-outer
+      layer: i % 2 // 0=charcoal-violet smoke, 1=crimson-ember mist
     });
   }
 
-  // ─── SPAWN EMBERS: Glowing sparks that dissolve at trail end (fewer in low quality)
-  const emberChance = isLowQuality ? 0.3 : 0.85;
-  if (Math.random() < emberChance) {
-    p.emberParticles.push({
-      x: 5 - Math.random() * 25,
-      y: (Math.random() - 0.5) * 20,
-      vx: -(4 + Math.random() * 8 + speed * 0.18),
-      vy: (Math.random() - 0.5) * 5.0,
-      size: 1.0 + Math.random() * 2.0,
-      life: 1.0,
-      maxLife: 1.0,
-      decay: isLowQuality ? (0.024 + Math.random() * 0.02) : (0.012 + Math.random() * 0.012),
-      trail: []
-    });
+  // ─── SPAWN PINPOINT GLOWING EMBERS (firearrowvfx.mp4 fine sparks drifting in wake)
+  const emberSpawnCount = isLowQuality ? 1 : 2;
+  for (let e = 0; e < emberSpawnCount; e++) {
+    if (Math.random() < (isLowQuality ? 0.45 : 0.90)) {
+      p.emberParticles.push({
+        x: -18 - Math.random() * 65,
+        y: (Math.random() - 0.5) * 24,
+        vx: -(2.8 + Math.random() * 5.5 + speed * 0.12),
+        vy: (Math.random() - 0.5) * 2.2 - 0.15,
+        size: 1.1 + Math.random() * 1.5,
+        life: 1.0,
+        maxLife: 1.0,
+        decay: isLowQuality ? 0.032 : (0.016 + Math.random() * 0.014),
+        trail: []
+      });
+    }
   }
 
-  // Cap particles for 60 FPS performance (much tighter limits in low quality)
-  const maxFlames = isLowQuality ? 8 : 25;
-  const maxEmbers = isLowQuality ? 5 : 15;
+  const maxFlames = isLowQuality ? 8 : 22;
+  const maxEmbers = isLowQuality ? 6 : 24;
   while (p.flameParticles.length > maxFlames) p.flameParticles.shift();
   while (p.emberParticles.length > maxEmbers) p.emberParticles.shift();
 
@@ -403,132 +400,39 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
 
-  // ═════════════════════════════════════════════════════════
-  // LAYER 1: FLUID FLAME BLOBS — curling, twisting smoke-fire
-  // ═════════════════════════════════════════════════════════
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-
-  // Optimized: Zero-GC swap-and-pop array cleanup
+  // 1. Render Rear Translucent Smoke Plume Wake (normal blend behind arrow)
   fastCleanArray(p.flameParticles, (fp) => {
     fp.life -= fp.decay;
     if (fp.life <= 0) return false;
 
-    // Fluid curl motion: sine wobble + turbulence offset
     fp.wobblePhase += fp.wobbleSpeed;
-    const turbX = Math.sin(fp.turbSeed + time * 3.5) * 2.0;
-    const turbY = Math.cos(fp.turbSeed * 1.7 + time * 2.8) * 3.0;
-    fp.x += fp.vx + turbX * 0.3;
-    fp.y += fp.vy + turbY * 0.3;
-    fp.vy += Math.sin(fp.wobblePhase) * 0.15; // gentle curling drift
+    fp.x += fp.vx;
+    fp.y += fp.vy + Math.sin(fp.wobblePhase) * 0.25;
 
     const prog = fp.life / fp.maxLife;
-    const ageRatio = 1 - prog; // 0=new, 1=dying
+    const ageRatio = 1 - prog;
     const curSize = fp.size + (fp.maxSize - fp.size) * ageRatio;
-    const alpha = prog * prog; // quadratic falloff for smoother fade
-    const wobY = Math.sin(fp.wobblePhase) * 3.0;
-
-    // Velocity-stretched ellipses
-    const stretchX = curSize * (1.6 + speed * 0.03);
-    const stretchY = curSize * (0.7 + ageRatio * 0.3);
+    const alpha = Math.sin(prog * Math.PI) * 0.26;
+    const stretchX = curSize * 1.85;
+    const stretchY = curSize * 0.68;
 
     if (p.isFrozenByInfinity) {
-      ctx.fillStyle = fp.layer === 0
-        ? `rgba(255, 255, 255, ${alpha * 0.85})`
-        : fp.layer === 1
-        ? `rgba(0, 229, 255, ${alpha * 0.65})`
-        : `rgba(0, 120, 255, ${alpha * 0.45})`;
+      ctx.fillStyle = `rgba(0, 160, 230, ${alpha})`;
+    } else if (fp.layer === 0) {
+      ctx.fillStyle = `rgba(76, 58, 64, ${alpha})`;
     } else {
-      ctx.fillStyle = fp.layer === 0
-        ? `rgba(255, 245, 180, ${alpha * 0.75})`
-        : fp.layer === 1
-        ? `rgba(255, 140, 20, ${alpha * 0.55})`
-        : `rgba(220, 40, 0, ${alpha * 0.35})`;
+      ctx.fillStyle = `rgba(175, 42, 24, ${alpha * 0.9})`;
     }
 
-    const isDark = _isDarkMode();
-    if (isDark) {
-      const px = Math.round(fp.x / 2) * 2;
-      const py = Math.round((fp.y + wobY) / 2) * 2;
-      const sx = Math.max(2, Math.round(stretchX / 2) * 2);
-      const sy = Math.max(2, Math.round(stretchY / 2) * 2);
-      ctx.fillRect(px - sx / 2, py - sy / 2, sx, sy);
-    } else {
-      ctx.beginPath();
-      ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.beginPath();
+    ctx.ellipse(fp.x, fp.y, stretchX, stretchY, 0, 0, Math.PI * 2);
+    ctx.fill();
     return true;
   });
 
-  // ═════════════════════════════════════════════════════════
-  // LAYER 2: GLOWING EMBER SPARKS — dissolving at trail end
-  // ═════════════════════════════════════════════════════════
-  // Optimized: Zero-GC swap-and-pop array cleanup
-  fastCleanArray(p.emberParticles, (ep) => {
-    ep.life -= ep.decay;
-    if (ep.life <= 0) return false;
+  ctx.restore();
 
-    ep.trail.push({ x: ep.x, y: ep.y });
-    const maxEmberTrail = isLowQuality ? 3 : 8;
-    while (ep.trail.length > maxEmberTrail) ep.trail.shift();
-    ep.x += ep.vx;
-    ep.y += ep.vy;
-    ep.vy += (Math.random() - 0.5) * 0.4; // random drift
-    const prog = ep.life / ep.maxLife;
-
-    const isDark = _isDarkMode();
-
-    // Ember streak trail
-    if (ep.trail.length > 1) {
-      if (isDark) {
-        ctx.fillStyle = p.isFrozenByInfinity
-          ? `rgba(0, 229, 255, ${prog * 0.7})`
-          : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
-        for (let t = 0; t < ep.trail.length; t++) {
-          const tx = Math.round(ep.trail[t].x / 2) * 2;
-          const ty = Math.round(ep.trail[t].y / 2) * 2;
-          ctx.fillRect(tx, ty, 2, 2);
-        }
-      } else {
-        ctx.beginPath();
-        ctx.moveTo(ep.trail[0].x, ep.trail[0].y);
-        for (let t = 1; t < ep.trail.length; t++) ctx.lineTo(ep.trail[t].x, ep.trail[t].y);
-        ctx.lineTo(ep.x, ep.y);
-        ctx.strokeStyle = p.isFrozenByInfinity
-          ? `rgba(0, 229, 255, ${prog * 0.7})`
-          : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
-        ctx.lineWidth = ep.size * 0.7;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-      }
-    }
-
-    // Bright ember head
-    if (isDark) {
-      const ex = Math.round(ep.x / 2) * 2;
-      const ey = Math.round(ep.y / 2) * 2;
-      const es = Math.max(2, Math.round((ep.size * (0.5 + prog * 0.8)) / 2) * 2);
-      ctx.fillStyle = p.isFrozenByInfinity
-        ? `rgba(224, 255, 255, ${prog})`
-        : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
-      ctx.fillRect(ex - es / 2, ey - es / 2, es, es);
-    } else {
-      ctx.beginPath();
-      ctx.arc(ep.x, ep.y, ep.size * (0.5 + prog * 0.8), 0, Math.PI * 2);
-      ctx.fillStyle = p.isFrozenByInfinity
-        ? `rgba(224, 255, 255, ${prog})`
-        : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
-      ctx.fill();
-    }
-    return true;
-  });
-
-  ctx.restore(); // lighter
-
-  ctx.restore(); // restore translate/rotate
-
-  // Draw main Volcanic Magma / Electric Cyan Flame Arrow construct on top
+  // 2. Render Main firearrowvfx.mp4 Flame Arrow Construct (12-Frame RGBA + Interior Spine & Parabolic Cone)
   drawDivineFlameArrowConstruct(ctx, {
     x: p.x,
     y: p.y,
@@ -539,6 +443,43 @@ export function drawSukunaFurnaceArrow(ctx, p) {
     time,
     isFrozenByInfinity: p.isFrozenByInfinity
   });
+
+  // 3. Render Pinpoint Glowing Ember Sparks on top of smoke & tail
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(angle);
+  ctx.globalCompositeOperation = 'lighter';
+
+  fastCleanArray(p.emberParticles, (ep) => {
+    ep.life -= ep.decay;
+    if (ep.life <= 0) return false;
+
+    ep.x += ep.vx;
+    ep.y += ep.vy;
+    ep.vy += (Math.random() - 0.5) * 0.18;
+    const prog = ep.life / ep.maxLife;
+    const rOuter = ep.size * (1.8 + 0.6 * prog);
+    const rCore = ep.size * (0.65 + 0.35 * prog);
+
+    // Warm red-orange outer ember halo
+    ctx.fillStyle = p.isFrozenByInfinity
+      ? `rgba(0, 210, 255, ${prog * 0.55})`
+      : `rgba(255, 72, 16, ${prog * 0.58})`;
+    ctx.beginPath();
+    ctx.arc(ep.x, ep.y, rOuter, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pinpoint incandescent yellow-white ember core
+    ctx.fillStyle = p.isFrozenByInfinity
+      ? `rgba(235, 255, 255, ${prog})`
+      : `rgba(255, 242, 160, ${prog})`;
+    ctx.beginPath();
+    ctx.arc(ep.x, ep.y, rCore, 0, Math.PI * 2);
+    ctx.fill();
+    return true;
+  });
+
+  ctx.restore();
 }
 
 function _isDarkMode() {
@@ -554,6 +495,45 @@ function _isDarkMode() {
 let _fugaArcadeCanvas = null;
 let _fugaArcadeCtx = null;
 
+// ───────────────────────────────────────────────────────────────────────────
+// 12-FRAME PIXEL-ART FUGA TRAVEL & EXPLOSION SPRITE LOADERS
+// ───────────────────────────────────────────────────────────────────────────
+const _sukunaFugaTravelFrames = [];
+let _sukunaFugaTravelFramesLoaded = false;
+
+export function _getSukunaFugaTravelFrames() {
+  if (!_sukunaFugaTravelFramesLoaded && typeof window !== 'undefined' && typeof Image !== 'undefined') {
+    _sukunaFugaTravelFramesLoaded = true;
+    for (let i = 1; i <= 12; i++) {
+      const img = new Image();
+      img.src = `Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-${i}.png`;
+      _sukunaFugaTravelFrames.push(img);
+    }
+  }
+  return _sukunaFugaTravelFrames;
+}
+
+const _sukunaFugaExplosionFrames = [];
+let _sukunaFugaExplosionFramesLoaded = false;
+const _fugaExplosionFrameNumbers = [6, 7, 8, 9, 10, 11, 12];
+
+export function _getSukunaFugaExplosionFrames() {
+  if (!_sukunaFugaExplosionFramesLoaded && typeof window !== 'undefined' && typeof Image !== 'undefined') {
+    _sukunaFugaExplosionFramesLoaded = true;
+    for (const num of _fugaExplosionFrameNumbers) {
+      const img = new Image();
+      img.src = `Assets/model/sukuna/Fuga_explosion/Fuga_explosion-${num}.png`;
+      _sukunaFugaExplosionFrames.push(img);
+    }
+  }
+  return _sukunaFugaExplosionFrames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getSukunaFugaTravelFrames();
+  _getSukunaFugaExplosionFrames();
+}
+
 function _getFugaArcadeBuffer() {
   if (!_fugaArcadeCanvas) {
     _fugaArcadeCanvas = document.createElement('canvas');
@@ -566,9 +546,69 @@ function _getFugaArcadeBuffer() {
 }
 
 export function drawDivineFlameArrowConstruct(ctx, {
-  x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
+  x, y, angle = 0, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
 }) {
   if (progress <= 0) return;
+
+  const frames = _getSukunaFugaTravelFrames();
+  const frameIdx = Math.floor(Date.now() / 45) % 12;
+  const frameImg = frames[frameIdx];
+
+  if (frameImg && frameImg.complete && frameImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    if (Math.abs(angle) > Math.PI / 2) {
+      ctx.scale(1, -1);
+    }
+    ctx.scale(scale, scale);
+
+    const pScale = isFlying ? 1.0 : (0.50 + 0.50 * Math.min(1.0, progress));
+    const drawW = (isFlying ? 290 : 260) * pScale;
+    const drawH = drawW * (192 / 640);
+    // In 640x192 tilt-corrected firearrowvfx.mp4 frames:
+    // Nose tip is at x = 96.25%, bright cone core at x = 83.6%, shaft nock at x = 57.0%, vertical axis at y = 50.0%
+    const drawX = isFlying ? (-drawW * 0.82) : (-drawW * 0.70);
+    const drawY = -drawH * 0.50;
+
+    // 1. Soft parabolic nose heat bloom (Rule 11 & Rule 31 compliant)
+    const glowCx = drawX + drawW * 0.84;
+    const glowR = (isFlying ? 46 : 40) * pScale;
+    const auraGrad = ctx.createRadialGradient(glowCx, 0, 2, glowCx, 0, glowR);
+    if (isFrozenByInfinity) {
+      auraGrad.addColorStop(0, `rgba(224, 255, 255, ${0.52 * progress})`);
+      auraGrad.addColorStop(0.45, `rgba(0, 229, 255, ${0.28 * progress})`);
+      auraGrad.addColorStop(1, 'rgba(0, 100, 255, 0)');
+    } else {
+      auraGrad.addColorStop(0, `rgba(255, 245, 175, ${0.46 * progress})`);
+      auraGrad.addColorStop(0.45, `rgba(255, 105, 15, ${0.24 * progress})`);
+      auraGrad.addColorStop(1, 'rgba(200, 20, 0, 0)');
+    }
+    ctx.fillStyle = auraGrad;
+    ctx.beginPath();
+    ctx.arc(glowCx, 0, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Render 12-frame firearrowvfx.mp4 RGBA frame
+    ctx.globalAlpha = Math.min(1.0, 0.42 + 0.58 * progress);
+    ctx.drawImage(frameImg, drawX, drawY, drawW, drawH);
+
+    // 3. Crisp firearrowvfx.mp4 Structural Core Overlay:
+    // Parabolic nose rim highlight + dark interior arrow shaft & barbed spine + helical flame coil + pinpoint sparks
+    _renderFireArrowVfxCoreOverlay(ctx, {
+      drawX,
+      drawW,
+      drawH,
+      pScale,
+      progress: Math.min(1.0, progress),
+      isFlying,
+      time,
+      isFrozenByInfinity
+    });
+
+    ctx.restore();
+    return;
+  }
 
   const isDark = _isDarkMode();
 
@@ -604,6 +644,163 @@ export function drawDivineFlameArrowConstruct(ctx, {
     });
     ctx.restore();
   }
+}
+
+/**
+ * Renders the razor-sharp interior physical arrow spine, helical flame ribbon, parabolic nose tip,
+ * and pinpoint ember sparks from firearrowvfx.mp4.
+ */
+function _renderFireArrowVfxCoreOverlay(ctx, {
+  drawX, drawW, drawH, pScale = 1.0, progress = 1.0, isFlying = false, time = 0, isFrozenByInfinity = false
+}) {
+  const tipX = drawX + drawW * 0.962;
+  const coneBaseX = drawX + drawW * 0.76;
+  const shaftStartX = drawX + drawW * 0.575;
+  const coneHalfH = drawH * 0.145;
+
+  // (A) Parabolic Supersonic Bullet-Cone Inner Glow & Helical Flame Wrap
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  const coneGrad = ctx.createLinearGradient(coneBaseX, 0, tipX, 0);
+  if (isFrozenByInfinity) {
+    coneGrad.addColorStop(0, `rgba(0, 180, 255, ${0.15 * progress})`);
+    coneGrad.addColorStop(0.6, `rgba(160, 245, 255, ${0.42 * progress})`);
+    coneGrad.addColorStop(1, `rgba(255, 255, 255, ${0.85 * progress})`);
+  } else {
+    coneGrad.addColorStop(0, `rgba(255, 95, 10, ${0.14 * progress})`);
+    coneGrad.addColorStop(0.6, `rgba(255, 215, 75, ${0.40 * progress})`);
+    coneGrad.addColorStop(1, `rgba(255, 252, 220, ${0.85 * progress})`);
+  }
+  ctx.fillStyle = coneGrad;
+  ctx.beginPath();
+  ctx.moveTo(tipX, 0);
+  ctx.quadraticCurveTo(tipX - (tipX - coneBaseX) * 0.28, -coneHalfH, coneBaseX, -coneHalfH * 0.85);
+  ctx.lineTo(coneBaseX, coneHalfH * 0.85);
+  ctx.quadraticCurveTo(tipX - (tipX - coneBaseX) * 0.28, coneHalfH, tipX, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Spiraling golden-white helical flame ribbon wrapping around the interior arrow shaft
+  ctx.strokeStyle = isFrozenByInfinity
+    ? `rgba(200, 250, 255, ${0.65 * progress})`
+    : `rgba(255, 238, 150, ${0.65 * progress})`;
+  ctx.lineWidth = Math.max(1.0, 1.35 * pScale);
+  ctx.beginPath();
+  const ribbonSteps = 16;
+  for (let s = 0; s <= ribbonSteps; s++) {
+    const t = s / ribbonSteps;
+    const rx = shaftStartX + t * (tipX - 6 * pScale - shaftStartX);
+    const amp = (1 - t * 0.65) * 3.8 * pScale;
+    const ry = Math.sin(t * Math.PI * 3.5 - time * 9.0) * amp;
+    if (s === 0) ctx.moveTo(rx, ry);
+    else ctx.lineTo(rx, ry);
+  }
+  ctx.stroke();
+
+  // Pinpoint glowing embers during stationary bow-channeling (matches flying ember wake)
+  if (!isFlying) {
+    const numSparks = 9;
+    for (let i = 0; i < numSparks; i++) {
+      const phase = ((time * 1.35 + i * 0.37) % 1.0);
+      const sx = shaftStartX + 12 * pScale - phase * (drawW * 0.44);
+      const sy = Math.sin(i * 2.7 + phase * 5.0) * (drawH * (0.08 + phase * 0.24));
+      const sparkAlpha = Math.sin(phase * Math.PI) * progress;
+      const rCore = (0.9 + (i % 3) * 0.45) * pScale;
+
+      ctx.fillStyle = isFrozenByInfinity
+        ? `rgba(0, 210, 255, ${sparkAlpha * 0.55})`
+        : `rgba(255, 70, 15, ${sparkAlpha * 0.55})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, rCore * 2.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = isFrozenByInfinity
+        ? `rgba(235, 255, 255, ${sparkAlpha})`
+        : `rgba(255, 242, 160, ${sparkAlpha})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, rCore, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  // (B) Dark Interior Arrow Shaft & Sleek Narrow Barbed Spine (Signature firearrowvfx.mp4 dark centerline)
+  ctx.save();
+  const shaftEndTipX = tipX - 1.5 * pScale;
+  const barbBaseX = tipX - 24 * pScale;
+  const barbWingX = barbBaseX - 5 * pScale;
+  const barbHalfW = 3.2 * pScale;
+
+  // Warm rim highlight along the dark shaft
+  ctx.strokeStyle = isFrozenByInfinity
+    ? `rgba(180, 245, 255, ${0.75 * progress})`
+    : `rgba(255, 210, 110, ${0.75 * progress})`;
+  ctx.lineWidth = Math.max(1.4, 2.2 * pScale);
+  ctx.beginPath();
+  ctx.moveTo(shaftStartX, 0);
+  ctx.lineTo(shaftEndTipX, 0);
+  ctx.stroke();
+
+  // Razor-sharp dark crimson-obsidian physical arrow shaft & narrow arrowhead inside the fire cone
+  ctx.strokeStyle = isFrozenByInfinity
+    ? `rgba(8, 38, 68, ${0.88 * progress})`
+    : `rgba(52, 8, 3, ${0.88 * progress})`;
+  ctx.lineWidth = Math.max(0.9, 1.25 * pScale);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(shaftStartX, 0);
+  ctx.lineTo(shaftEndTipX, 0);
+  ctx.stroke();
+
+  // Sleek narrow interior arrowhead barbs
+  ctx.fillStyle = isFrozenByInfinity
+    ? `rgba(8, 38, 68, ${0.86 * progress})`
+    : `rgba(56, 9, 4, ${0.86 * progress})`;
+  ctx.beginPath();
+  ctx.moveTo(shaftEndTipX, 0);
+  ctx.lineTo(barbWingX, -barbHalfW);
+  ctx.lineTo(barbBaseX, 0);
+  ctx.lineTo(barbWingX, barbHalfW);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * Renders the pixel-art Fuga explosion animation using frames 6 through 12.
+ * Returns true if the sprite frame was rendered, or false if images are still loading (allowing procedural fallback).
+ */
+export function drawSukunaFugaExplosionSprite(ctx, exp, explosionProgress) {
+  const frames = _getSukunaFugaExplosionFrames();
+  if (!frames || frames.length === 0) return false;
+
+  const clampedP = Math.max(0, Math.min(0.999, explosionProgress));
+  const frameIdx = Math.min(frames.length - 1, Math.floor(clampedP * frames.length));
+  const frameImg = frames[frameIdx];
+
+  if (!frameImg || !frameImg.complete || frameImg.naturalWidth <= 0) {
+    return false;
+  }
+
+  const R = exp.maxRadius || 220;
+  const angle = exp.angle || 0;
+  // Scale smoothly from initial detonation to full thermobaric blast envelope
+  const scaleGrow = 0.85 + 0.32 * Math.pow(clampedP, 0.45);
+  const drawW = R * 2.35 * scaleGrow;
+  const drawH = drawW * (280 / 580);
+  const alpha = clampedP > 0.85 ? Math.max(0, (1.0 - clampedP) / 0.15) : 1.0;
+
+  ctx.save();
+  ctx.rotate(angle);
+  if (Math.abs(angle) > Math.PI / 2) {
+    ctx.scale(1, -1);
+  }
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(frameImg, -drawW * 0.50, -drawH * 0.50, drawW, drawH);
+  ctx.restore();
+  return true;
 }
 
 function _renderVectorDivineFlameArrow(ctx, {

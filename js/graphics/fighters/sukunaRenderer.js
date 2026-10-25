@@ -221,27 +221,6 @@ export class SukunaRenderer {
         time
       });
 
-      // Cursed Flame Origin Glow (Sukuna's channeling hands)
-      ctx.save();
-      ctx.rotate(fighter.gunAngle);
-      const notchX = -32 * progress;
-      // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
-      ctx.beginPath();
-      ctx.arc(notchX, 0, 18 * progress, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 50, 0, ${0.3 * progress})`;
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(notchX, 0, 10 * progress, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 140, 20, ${0.7 * progress})`;
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(notchX, 0, 5 * progress, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 220, ${0.95 * progress})`;
-      ctx.fill();
-      ctx.restore();
-
       ctx.restore();
     }
 
@@ -427,38 +406,16 @@ export class SukunaRenderer {
     }
     ctx.restore();
 
-    // Taut glowing fiery Cursed Energy bowstring during Fuga charge!
+    // Subtle hand flame glow on Sukuna's front and back hands during Fuga charge
     if (fighter.isChannelingDivineFlame && !hideFrontHand && !hideBackHand) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const progress = Math.min(1.0, (fighter.divineFlameChargeTimer || 0) / Math.max(1, fighter.divineFlameChargeMax || 90));
-
-      const perpX = Math.cos(fighter.gunAngle + Math.PI / 2) * 22;
-      const perpY = Math.sin(fighter.gunAngle + Math.PI / 2) * 22;
-
-      const upperTipX = frontHandX + perpX;
-      const upperTipY = frontHandY + perpY;
-      const lowerTipX = frontHandX - perpX;
-      const lowerTipY = frontHandY - perpY;
-
-      // Outer flame glow bowstring
-      ctx.strokeStyle = `rgba(255, 120, 0, ${0.75 * progress})`;
-      ctx.lineWidth = 3.5;
+      ctx.fillStyle = `rgba(255, 120, 20, ${0.42 * progress})`;
       ctx.beginPath();
-      ctx.moveTo(upperTipX, upperTipY);
-      ctx.lineTo(backHandX, backHandY);
-      ctx.lineTo(lowerTipX, lowerTipY);
-      ctx.stroke();
-
-      // White-hot core bowstring
-      ctx.strokeStyle = `rgba(255, 255, 240, ${0.95 * progress})`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(upperTipX, upperTipY);
-      ctx.lineTo(backHandX, backHandY);
-      ctx.lineTo(lowerTipX, lowerTipY);
-      ctx.stroke();
-
+      ctx.arc(frontHandX, frontHandY, handRadius * 1.45, 0, Math.PI * 2);
+      ctx.arc(backHandX, backHandY, handRadius * 1.45, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
   }

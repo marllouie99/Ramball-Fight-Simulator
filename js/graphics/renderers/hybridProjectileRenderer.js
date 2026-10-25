@@ -305,26 +305,6 @@ export function updateHybridSukunaFuga() {
       time
     });
 
-    // Cursed Flame Origin Glow (Sukuna's channeling hands)
-    fugaCtx.save();
-    fugaCtx.rotate(sukuna.gunAngle);
-    const notchX = -32 * progress;
-    fugaCtx.beginPath();
-    fugaCtx.arc(notchX, 0, 18 * progress, 0, Math.PI * 2);
-    fugaCtx.fillStyle = `rgba(255, 50, 0, ${0.3 * progress})`;
-    fugaCtx.fill();
-
-    fugaCtx.beginPath();
-    fugaCtx.arc(notchX, 0, 10 * progress, 0, Math.PI * 2);
-    fugaCtx.fillStyle = `rgba(255, 140, 20, ${0.7 * progress})`;
-    fugaCtx.fill();
-
-    fugaCtx.beginPath();
-    fugaCtx.arc(notchX, 0, 5 * progress, 0, Math.PI * 2);
-    fugaCtx.fillStyle = `rgba(255, 255, 220, ${0.95 * progress})`;
-    fugaCtx.fill();
-    fugaCtx.restore();
-
     fugaCtx.restore();
     fugaTexture.update();
     _hasDrawnCurrentFuga = true;
