@@ -113,7 +113,7 @@ export const genosConfig = {
   ultDurationFrames: 150, // 2.0s beam duration
   ultDamagePerTick: 10,
   ultTickInterval: 10, // 10 ticks per second (300 total damage)
-  ultBeamWidth: 130,
+  ultBeamWidth: 400,
   ultBeamRange: 1200, // 1200px beam range across full arena (matches Hyperion's beam length)
   ultBeamSpriteTicksPerFrame: 3, // Animation playback cadence: 3 ticks/frame = 20 FPS cycle across 12 frames
   ultKnockbackForce: 1, // Directional beam push speed (prevents hyper-accel rebounce)
