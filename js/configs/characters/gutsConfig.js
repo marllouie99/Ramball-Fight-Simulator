@@ -7,7 +7,7 @@
 export const gutsConfig = {
   name: 'Guts',
   displayName: 'GUTS',
-  grade: 'B',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
+  grade: 'SS',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   category: 'Anime & Dark Fantasy',
   color: '#18181b', // Deep Obsidian Black
   themeColor: '#71717a', // Cold Steel / Iron Gray
@@ -20,10 +20,10 @@ export const gutsConfig = {
   damage: 36,
   moveSpeed: 4.6,
   speed: 4.6,
-  ability: 'Dragon Slayer & Berserker Armor',
+  ability: 'Dragon Slayer & Calamity Cleave',
   bossTitle: 'The Black Swordsman',
   title: 'The Struggler',
-  desc: 'Wielder of the monstrous 400-pound Dragon Slayer. Struggles against fate with unyielding poise, a high-explosive arm cannon, and the dwarf-forged Berserker Armor.',
+  desc: 'Wielder of the monstrous 400-pound Dragon Slayer. Slices through fate with the supersonic Calamity Cleave, ejecting golden crescent shockwaves with unyielding poise.',
 
   assets: {
     hair: 'Assets/model/guts/Guts-hair.png',
@@ -62,9 +62,10 @@ export const gutsConfig = {
   // ──────────────────────────────────────────
   // Basic Attack: Dragon Slayer 2-Hit Melee Cleaves (Knight Standard 5-Phase Swing)
   // ──────────────────────────────────────────
-  enableDragonSlayer: true,     // Master toggle for Basic Attack (Dragon Slayer Sword Swing)
+  enableDragonSlayer: 0,     // Master toggle for Basic Attack (Dragon Slayer Sword Swing)
   enableSword: true,            // Alias toggle for Dragon Slayer
   enableMeleeCombo: true,       // Alias toggle
+  enableBasicAttack: true,      // Standard alias
   baseBladeLength: 85,          // Baseline Dragon Slayer blade length (px); dynamic reach scales directly with weapon size (scale * lengthScale)
   swordBladeRadius: 22,
   swordCooldown: 36,
@@ -112,13 +113,60 @@ export const gutsConfig = {
   hit2HitPauseFrames: 9,
   hit2HitStunFrames: 16,
 
+  // ──────────────────────────────────────────
+  // Skill 1: Calamity Cleave Combo (Reference Frames 1–12)
+  // Sequence 1 (Frames 1–6): Calamity Cleave & Supersonic Crescent Wave
+  //   Frame 1–3: Golden blade ignition & deep backward coil (28f)
+  //   Frame 4: Hypersonic screen-wide horizontal flash & forward lunge (9f)
+  //   Frame 5: Detached golden crescent wave ejection & follow-through lock (18f)
+  //   Frame 6: Twin-ribbon split, discrete ember dissipation & follow-through hold (24f)
+  // Sequence 2 (Frames 7–12): Reverse Cleave & Skyward Scoop Finisher
+  //   Frame 7: High left coil & inward golden vortex energy surge (18f)
+  //   Frames 8–9: Blinding horizontal counter-cleave (5f) -> rising skyward scoop (6f) (11f total - NOT snappy!)
+  //   Frames 10–11: Skyward apex impact lock, secondary wave detonation & radiant blade hold (18f)
+  //   Frame 12: Poised settle & smooth weighted return to neutral battle stance (24f)
+  // ──────────────────────────────────────────
+  enableSkill1: true,            // Master toggle for Skill 1
+  enableCalamityCleave: true,    // Alias toggle for Calamity Cleave
+  skill1CooldownMax: 420,        // 7.0s cooldown
+  calamityCooldownMax: 420,
+
+  // Sequence 1 Timing & Combat Values (Frames 1–6)
+  calamityWindupFrames: 28,      // Frames 1–3: Frame 2 ready tilt (12f) & Frame 3 deep coil (16f) - smooth buildup
+  calamityStrikeFrames: 9,       // Frame 4: Visible, sweeping cleave stroke (smooth cleave, not snappy!)
+  calamityLockFrames: 22,        // Frames 5–6: Solid follow-through lock over opposite shoulder (-140°) while Wave 1 flies
+  calamityRecoveryFrames: 0,     // 0 recovery frames on Seq 1 so sword angle does NOT reset before Sequence 2 follow-up!
+  calamityMeleeDamage: 65,       // Direct point-blank cleave damage
+  calamityWaveDamage: 45,        // Ejected travelling crescent wave damage
+  calamityKnockback: 11.0,       // Forward knockback impulse
+  calamityLungeSpeed: 7.5,       // Forward lunge momentum during strike
+  calamityHitPauseFrames: 3,     // Attacker & target impact lock stasis
+  calamityHitStunFrames: 3,     // Target hit stun
+  calamityWaveSpeed: 10.5,       // Fluid crescent travel speed (px/frame)
+  calamityWaveMaxAge: 42,        // Travel lifetime (~440px reach, perfectly synced with Guts' recovery settle)
+  calamityWaveWidth: 140,        // Crescent width (px)
+
+  // Sequence 2 Timing & Combat Values (Frames 7–12)
+  calamitySeq2WindupFrames: 18,    // Frame 7: High left coil & golden vortex energy surge (never < 16f)
+  calamitySeq2StrikeFrames: 9,    // Frames 8–9: Blinding horizontal counter-cleave (5f) -> rising skyward scoop (6f) (11f total - NOT snappy!)
+  calamitySeq2LockFrames: 18,      // Frames 10–11: Apex impact lock & radiant blade hold at high-right
+  calamitySeq2RecoveryFrames: 24,  // Frame 12: Poised settle back to neutral battle stance
+  calamitySeq2MeleeDamage: 85,     // Heavy finisher melee damage
+  calamitySeq2WaveDamage: 55,      // Travelling Wave 2 damage
+  calamitySeq2Knockback: 13.5,     // Stronger knockback impulse
+  calamitySeq2LungeSpeed: 8.5,     // Lunging step momentum
+  calamitySeq2HitPauseFrames: 3,  // Impact lock hit pause
+  calamitySeq2HitStunFrames: 3,   // Target hit stun
+  calamitySeq2WaveSpeed: 12.0,     // Faster secondary wave
+  calamitySeq2WaveMaxAge: 45,      // Wave 2 lifetime
+  calamitySeq2WaveWidth: 165,      // Wider secondary wave
 
   // ──────────────────────────────────────────
-  // Skill 1: Prosthetic Arm Cannon & Repeating Crossbow
+  // Skill 2: Prosthetic Arm Cannon & Repeating Crossbow
   // ──────────────────────────────────────────
-  enableArmCannon: true,        // Master toggle for Skill 1 (Prosthetic Arm Cannon & Repeating Crossbow)
+  enableSkill2: 0,              // Master toggle for Skill 2 (0 = off while testing Skill 1)
+  enableArmCannon: true,        // Alias toggle for Arm Cannon
   enableCannon: true,           // Alias toggle for Arm Cannon
-  enableSkill1: true,           // Alias toggle for Skill 1
   cannonCooldownMax: 420, // 7.0s
   cannonDamage: 95,
   cannonSweetSpotDamage: 135,
@@ -133,9 +181,9 @@ export const gutsConfig = {
   // ──────────────────────────────────────────
   // Skill 2: Iron Cyclone / Cleaving Rush
   // ──────────────────────────────────────────
-  enableCyclone: true,          // Master toggle for Skill 2 (Iron Cyclone / Cleaving Rush)
+  enableCyclone: 0,             // Master toggle for Skill 2 (Iron Cyclone / Cleaving Rush)
   enableIronCyclone: true,      // Alias toggle for Iron Cyclone
-  enableSkill2: true,           // Alias toggle for Skill 2
+  enableSkill2: 0,              // Alias toggle for Skill 2
   cycloneCooldownMax: 540, // 9.0s
   cycloneDuration: 30,     // 0.5s spin
   cycloneDamage: 40,
@@ -145,7 +193,7 @@ export const gutsConfig = {
   // ──────────────────────────────────────────
   // Ultimate Skill: Awakening of the Beast (Berserker Armor)
   // ──────────────────────────────────────────
-  enableBerserkerArmor: true,   // Master toggle for Ultimate (Berserker Armor Awakening)
+  enableBerserkerArmor: 0,   // Master toggle for Ultimate (Berserker Armor Awakening)
   enableBerserker: true,        // Alias toggle for Berserker Armor
   enableUltimate: true,         // Alias toggle for Ultimate
   berserkerCooldownMax: 1800, // 30.0s

@@ -47,6 +47,11 @@ Naive sword swings transition directly from the forward swing into recovery on t
 
 ### Detailed Phase Parameters (60 FPS Engine Timing)
 
+> [!IMPORTANT]
+> **Anti-Snappy Minimum Frame Duration & Multi-Sequence Continuity Standard**:
+> - NEVER lower strike frames to snappy micro-durations (e.g. 2–4 frames). Chemical Katana represents the absolute high-speed limit for rapid basic combos (5–6 frame strike). For heavy cleaves, special skills, or colossal anime weapons (e.g. Guts, Escanor, Calamity Cleave), Phase 3 strike MUST use **8–12 frames** with generous windup (**20–30 frames**) and impact lock (**12–18 frames**).
+> - **Zero Mid-Combo Angle Reset on Sequence Attacks**: Whenever creating a multi-sequence attack animation (Sequence 1 $\rightarrow$ Sequence 2), **NEVER reset the weapon angle back to neutral stance between sequences**. Set `seq1RecoveryFrames: 0` so Sequence 1 holds its follow-through lock angle and Sequence 2 coils directly from that exact ending angle. Only the final sequence in the chain recovers back to neutral stance.
+
 | Phase | Hit 1: Cross Cleave | Hit 2: Rising Cleave | Weapon Motion & Mechanics |
 |---|---|---|---|
 | **Phase 1: Coil / Lift** | **7 frames** (~0.12s) | **6 frames** (~0.10s) | Smooth backward anticipation coil (`Math.sin(p * π/2)`). Body dampens velocity (`vx *= 0.88, vy *= 0.88`). Anticipation SFX: `skill_dash1` (0.40 vol). |

@@ -48,12 +48,20 @@ In the canonical $256 \times 256\text{px}$ frame space:
 
 The sword blade **MUST ALWAYS LEAD** the attack. The slash effect **TRAILS BEHIND** the cutting edge. The effect must NEVER precede or jump ahead of the sword:
 
+> [!IMPORTANT]
+> **Anti-Snappy Minimum Frame Duration & Multi-Sequence Continuity Mandate**:
+> NEVER lower strike frames to snappy micro-durations (e.g. 2–4 frames). At 60 FPS, 3 frames is only 50ms, rendering the swing as an instant teleporting glitch. Always adhere to minimum frame allocations:
+> - **Quick Combos**: Lift `8–12f`, Hold `2–4f`, Strike `6–8f` (NEVER 2–4f!), Impact Lock `6–8f`, Recovery `12–16f`.
+> - **Heavy / Skill Cleaves**: Windup `20–30+f`, Strike `8–12f` (NEVER 2–4f!), Impact Lock `12–18f`, Recovery `18–26f`.
+> - **Angular Delta**: Clamp maximum rotation step to $\le 35^\circ–45^\circ$ per frame.
+> - **Zero Angle Reset on Multi-Sequence Attacks**: Whenever creating a sequence attack animation (Sequence 1 $\rightarrow$ Sequence 2), **DO NOT reset the weapon angle to neutral between sequences** (`seq1RecoveryFrames: 0`). Sequence 2 MUST start its windup/coil directly from Sequence 1's ending follow-through lock angle and hand offsets; only the final sequence recovers to neutral stance.
+
 ```text
-Phase 1: Coil / Lift   (6-8f)  ──> Slash effect is 100% HIDDEN during anticipation
-Phase 2: Poised Hold   (2-4f)  ──> Slash effect remains 100% HIDDEN at tension apex
-Phase 3: Whip Strike   (5-8f)  ──> Sword blade accelerates; frames 1-3 expand behind cutting edge
-Phase 4: IMPACT LOCK   (5-7f)  ──> Sword locks into impact plane; frames 4-5 hold peak crescent
-Phase 5: Recovery Settle(9-12f) ──> Blade settles to guard; frames 6-12 dissolve tail-to-tip
+Phase 1: Coil / Lift   (8-12f quick / 20-30f heavy) ──> Slash effect is 100% HIDDEN during anticipation
+Phase 2: Poised Hold   (2-4f quick / 4-6f heavy)    ──> Slash effect remains 100% HIDDEN at tension apex
+Phase 3: Whip Strike   (6-8f quick / 8-12f heavy)   ──> Sword accelerates; frames 1-3 expand behind cutting edge (NEVER 2-4f!)
+Phase 4: IMPACT LOCK   (6-8f quick / 12-18f heavy)  ──> Sword locks into impact plane; frames 4-5 hold peak crescent
+Phase 5: Recovery      (12-16f quick / 18-26f heavy)──> Blade settles to guard; frames 6-12 dissolve tail-to-tip
 ```
 
 ### Frame-by-Frame Phase Mapping:

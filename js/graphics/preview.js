@@ -92,7 +92,7 @@ export function createPreviewFighter(def, x, y, options = {}) {
   fighter.shootCooldownMax = Math.max(18, Math.floor((def.cooldown || CONFIG.shoot.cooldown) / 3));
   fighter.meleeCooldown = 0;
 
-  const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
+  const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee', 'maki', 'guts'].includes(def.type) || fighter.isMeleeFighter;
 
   if (isMelee) {
     fighter.shoot = function() {};
@@ -168,9 +168,9 @@ export function updateIndexDetailDemo(def, demoArea) {
   const currentAnim = state.indexDemoAnim || (def.type === 'toji' ? 'toji_basic' : 'basic');
   const isTojiBasicDemo = (def.type === 'toji') && ['toji_basic', 'toji_hit1', 'toji_hit2', 'toji_combo', 'spear', 'basic'].includes(currentAnim);
   const isMakiBasicDemo = (def.type === 'maki') && ['maki_hit1', 'maki_hit2', 'maki_hit3', 'maki_combo'].includes(currentAnim);
-  const isMeleeWeaponDemo = isTojiBasicDemo || isMakiBasicDemo;
+  const isGutsCalamityDemo = (def.type === 'guts') && (currentAnim === 'calamity' || currentAnim === 'calamityCleave' || currentAnim === 'calamity_seq2');
 
-  if (currentAnim && currentAnim !== 'basic' && !isMeleeWeaponDemo) {
+  if ((currentAnim && currentAnim !== 'basic') || isTojiBasicDemo || isMakiBasicDemo || isGutsCalamityDemo) {
     pstate.hideTarget = true;
     fighter.x = demoArea.x + demoArea.width / 2;
     fighter.y = demoArea.y + demoArea.height / 2;
@@ -433,6 +433,71 @@ export function updateIndexDetailDemo(def, demoArea) {
       previewProjectileSystem.update(demoArea, fighter, target);
       pstate.frame += 1;
       return pstate;
+    } else if (isGutsCalamityDemo) {
+      pstate.hideTarget = false;
+      fighter.x = demoArea.x + demoArea.width / 2 - 45;
+      fighter.y = demoArea.y + demoArea.height / 2;
+      fighter.vx = 0;
+      fighter.vy = 0;
+      fighter.gunAngle = 0;
+      fighter.angle = 0;
+
+      const baseX = fighter.x + 85;
+      const baseY = fighter.y;
+      if (target) {
+        if (!pstate.gutsTargetInitialized) {
+          pstate.gutsTargetInitialized = true;
+          target.x = baseX;
+          target.y = baseY;
+        } else {
+          target.x += (baseX - target.x) * 0.15;
+          target.y += (baseY - target.y) * 0.15;
+        }
+        target.r = 25;
+        target.isDead = false;
+        target.hp = 1000;
+      }
+
+      if (demoSpeed > 0) {
+        // Visual effects decay (anti-freeze Rule 25)
+        fighter._updateCrescentWaves?.(demoArea);
+        fighter._updateCalamityEmbers?.();
+        fighter._updateCalamityVortex?.();
+        if (fighter.calamityFlashTimer > 0) fighter.calamityFlashTimer--;
+
+        if (fighter.calamityHitPauseTimer > 0) {
+          fighter.calamityHitPauseTimer--;
+          if (fighter.calamityHitPauseTimer === 0) {
+            fighter._resolveCalamityUnpause?.();
+          }
+        } else if (fighter.calamityActive) {
+          fighter._updateCalamityCleave?.(target, demoArea);
+        } else {
+          pstate.gutsCycleTimer = (pstate.gutsCycleTimer || 0) + 1;
+          const recoveryWait = 45;
+          if (pstate.gutsCycleTimer >= recoveryWait || !pstate.gutsInitialized) {
+            pstate.gutsInitialized = true;
+            fighter.calamityCooldown = 0;
+            fighter._castCalamityCleave?.(target);
+            pstate.gutsCycleTimer = 0;
+          }
+        }
+        // Keep Guts stationary in the Fighter Index preview so he doesn't lunge/shake across the preview box
+        fighter.x = demoArea.x + demoArea.width / 2 - 45;
+        fighter.y = demoArea.y + demoArea.height / 2;
+        fighter.vx = 0;
+        fighter.vy = 0;
+        if (target) {
+          target.x = baseX;
+          target.y = baseY;
+          target.vx = 0;
+          target.vy = 0;
+        }
+      }
+
+      previewProjectileSystem.update(demoArea, fighter, target);
+      pstate.frame += 1;
+      return pstate;
     } else if (def.type === 'maki' && currentAnim === 'jet') {
       pstate.hideTarget = false;
       const baseX = demoArea.x + demoArea.width / 2 + 55;
@@ -603,6 +668,15 @@ export function updateIndexDetailDemo(def, demoArea) {
       fighter.ultimateActive = false;
       fighter.ultimateTimer = 0;
     }
+    if (fighter.calamityActive && currentAnim !== 'calamity' && currentAnim !== 'calamityCleave' && currentAnim !== 'calamity_seq2') {
+      fighter.calamityActive = false;
+      fighter.calamityTimer = 0;
+      fighter.calamityHitPauseTimer = 0;
+      fighter.calamityFlashTimer = 0;
+      if (fighter.activeCrescentWaves) fighter.activeCrescentWaves.length = 0;
+      if (fighter.activeCalamityEmbers) fighter.activeCalamityEmbers.length = 0;
+      if (fighter.activeCalamityVortex) fighter.activeCalamityVortex.length = 0;
+    }
   }
 
   // Stop / Pause (0x speed)
@@ -623,7 +697,7 @@ export function updateIndexDetailDemo(def, demoArea) {
   }
 
   for (let s = 0; s < steps; s++) {
-    const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee', 'maki'].includes(def.type) || fighter.isMeleeFighter;
+    const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee', 'maki', 'guts'].includes(def.type) || fighter.isMeleeFighter;
 
     // Force fighter to remain perfectly stationary in the center of the demo viewport
     fighter.x = demoArea.x + demoArea.width / 2;

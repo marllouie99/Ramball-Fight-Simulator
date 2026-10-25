@@ -2425,7 +2425,7 @@ export function getFighterWeaponInfo(def) {
     case 'enderdragon':
       return { name: "DRAGON'S BREATH & VOID WINGS", category: 'VOID LEVIATHAN // KINETIC SWOOP', desc: 'Ancient draconic arsenal deploying lingering acidic Dragon Breath pools, supersonic 120° Wing Buffet kinetic swoops, and 360° Void Cataclysm shockwaves.' };
     case 'guts':
-      return { name: 'DRAGON SLAYER & PROSTHETIC CANNON', category: 'COLOSSAL MELEE // BERSERK', desc: 'Monstrous 400-pound black iron greatsword cleaving across 210° frontal arcs, concealed high-explosive wrist cannon, repeating crossbow, and dwarf-forged Berserker Armor.' };
+      return { name: 'DRAGON SLAYER & CALAMITY CLEAVE', category: 'COLOSSAL MELEE // BERSERK', desc: 'Monstrous 400-pound black iron greatsword cleaving across 210° frontal arcs, supersonic Calamity Cleave crescent shockwaves, and unyielding poise.' };
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:

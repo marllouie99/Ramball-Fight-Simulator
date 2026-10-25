@@ -33,15 +33,47 @@ The blade literally locks into the impact plane (embedded in the ground, struck 
 
 ---
 
+## 1.1 Mandatory Minimum Frame Duration Standard (Strict Prohibition of Snappy Micro-Frames)
+
+### The Root Cause of "Snappy" Attacks: Micro-Frames
+A game loop running at **60 FPS delivers exactly 16.67 milliseconds per frame**.
+- When an agent sets `strikeFrames: 3`, the entire swing passes in **50 ms (0.05 seconds)**.
+- The human eye requires ~100–150 ms to perceive continuous, fluid motion. Anything faster than 6 frames ceases to look like a physical weapon swinging through space—instead, the weapon instantly disappears from its coil position and teleports to its end position, appearing as an **instant, jarring rubber-band snap or visual glitch**.
+- When agents arbitrarily lower frame values (e.g., setting windup to 4–6 frames, strike to 2–4 frames, lock to 2–3 frames, or recovery to 4–6 frames), the animation loses all bodily weight, kinetic momentum, and visual readability.
+
+### Strict Minimum Frame Pacing Rules:
+Whenever implementing, scaffolding, or tuning attack animations, agents **MUST NEVER USE SNAPPY MICRO-FRAMES**. Adhere strictly to these canonical floors:
+
+| Attack Category | Windup / Anticipation | Strike Stroke | Impact Lock / Latch | Recovery Settle | Total Duration |
+|---|---|---|---|---|---|
+| **Special Skill Cleaves / Colossal Weapons**<br>*(e.g., Guts Dragon Slayer, Escanor Divine Axe, Charged Slashes, Boss Skills)* | **20–30+ frames**<br>(never < 16f)<br>Multi-stage: e.g., low ready drop (12f) + deep coil (16f) | **8–12 frames**<br>**(STRICT PROHIBITION of 2–4f!)**<br>Full cleave sweep tracked by eye | **12–18 frames**<br>(never < 10f)<br>Weapon stays latched while waves/sparks fly | **18–26 frames**<br>(never < 14f)<br>Weighted return with damped harmonic settle | **60–85+ frames**<br>(~1.0–1.4 seconds) |
+| **Standard / Quick Combo Strikes**<br>*(e.g., Katana, Dagger, Rapier, Brawler basic combos)* | **8–12 frames**<br>(never < 6f)<br>Lift (6–8f) + Hold (2–4f) | **6–8 frames**<br>**(STRICT PROHIBITION of 2–4f!)**<br>Clean accelerated whip | **6–8 frames**<br>(never < 5f)<br>Firm collision latch | **12–16 frames**<br>(never < 8f)<br>Elastic spring reset | **35–48+ frames**<br>(~0.6–0.8 seconds) |
+
+### Key Kinematic Rules to Prevent Snappiness:
+1. **Strict Prohibition of 2–4 Frame Strikes**: NEVER set strike duration under 6 frames for quick attacks, and NEVER under 8–12 frames for heavy/skill attacks.
+2. **Maximum Angular Delta Clamping ($\Delta \theta \le 35^\circ–45^\circ$ per frame)**:
+   - If an attack rotates through a $180^\circ$ to $300^\circ$ cleave plane, it MUST be distributed over at least 8–12 frames during Phase 3.
+   - A single frame must NEVER rotate the weapon more than $35^\circ–45^\circ$. Jumping $90^\circ$ or $180^\circ$ in 1–2 frames is strictly prohibited.
+3. **Smooth Non-Linear Acceleration (Anti-Linear Snapping)**:
+   - Never linearly interpolate angle across strike frames (`progress * angle`).
+   - Use exponential power ease (`Math.pow(sp, 2.2)` to `2.6`) so the blade gathers momentum realistically—starting deliberate, whipping across the target zone, and locking firmly into the impact plane.
+4. **Multi-Sequence / Chained Combo Continuity (STRICT PROHIBITION of Mid-Combo Angle Reset)**:
+   - Whenever creating a multi-sequence attack animation or chained combo skill (e.g. Sequence 1 $\rightarrow$ Sequence 2), **DO NOT include a recovery phase on earlier sequences that resets the weapon angle back to the neutral battle stance before the follow-up sequence begins** (`seq1RecoveryFrames: 0`).
+   - Instead, Sequence 1 MUST hold its **Phase 4 Impact / Follow-Through Lock angle and hand offsets** (`cleaveApexAngle`, `{ lunge, offY }`), and **Sequence 2 MUST start its Phase 1 Coil directly from Sequence 1's exact ending lock angle and offsets**.
+   - Only the **final sequence** in the combo chain executes Phase 5 Recovery Settle back to the neutral battle stance.
+   - Ensure `SkillManager` does NOT register `durationKey` on multi-sequence skills if the fighter's custom update method manages the sequence transition timer (`tickDurations()` would otherwise double-decrement the timer and prematurely set `activeKey = false` at the end of Sequence 1).
+
+---
+
 ## 2. The 5-Phase Animation Lifecycle
 
-| Phase | Name | Target Duration | Weapon Motion | Body Physics / Velocity | Visuals & Audio |
-|---|---|---|---|---|---|
-| **Phase 1** | **Lift / Coil** | `6–8 frames` (~0.10–0.13s) | Smooth backward anticipation lift (`-1.55 rad` overhead lift or low crouch scoop) via `Math.sin(wp * π/2)`. | Arms and center of gravity pull back into tension. | Anticipation dash/flutter swoosh (`skill_dash1`, vol 0.40). |
-| **Phase 2** | **Poised Hold** | `2–4 frames` (~0.03–0.06s) | Weapon pauses at peak anticipation load (Escanor poised hold). | Stationary, high spring potential energy. | Pure silence or wind draw. |
-| **Phase 3** | **Hypersonic Whip Strike** | `5–8 frames` (~0.08–0.13s) | Explosive acceleration into the cleave plane with exponential power curve (`Math.pow(sp, 2.2)` to `2.6`). | Lunging forward momentum impulse (`lungeSpeed * Math.sin(strikeP * π)`). | Whip swoosh (`attack_swordswing` / `skill_spinslash`). Trigger damage & impact at `strikeP >= 0.50`. |
-| **Phase 4** | **THE IMPACT LOCK / LATCH** *(The Key!)* | `5–7 frames` (~0.08–0.12s) | **Firmly locked/latched in impact plane** (embedded in floor, struck in flesh, or locked at apex, e.g. `weaponRot = 1.10`, `weaponLunge = 24px`, `weaponOffY = 14px`). | **Forward velocity clamped to zero** (`this.vx = 0; this.vy = 0;`), simulating hard collision. | **Slap audio** (`attack_fleshhit` + `sukuna_slice`), screen shake, micro-tremor jitter (`±2.2px`), slash ribbon held on plane, compression ring & sparks. |
-| **Phase 5** | **Extraction & Recovery Settle** | `9–12 frames` (~0.15–0.20s) | Weapon dislodges from impact plane and returns to guard stance with spring-damped settle (`(1 - rp)^1.8` + harmonic rebound). | Off-hand returns to canonical flank `(±0.82r, +0.38r)`. Body absorbs backward recoil kickback (`vx -= cos(angle) * recoilKick`). | Dynamic eraser wipe dissolves the slash ribbon from tail to tip (Rule 15). |
+| Phase | Name | Quick Combos | Heavy / Skill Attacks | Weapon Motion | Body Physics / Velocity | Visuals & Audio |
+|---|---|---|---|---|---|---|
+| **Phase 1** | **Lift / Coil** | `8–12 frames` (~0.13–0.20s) | `20–30+ frames` (~0.33–0.50s) | Smooth backward anticipation lift (`-1.55 rad` overhead lift or low crouch scoop) via `Math.sin(wp * π/2)`. Multi-stage on heavy skills (ready drop → deep coil). | Arms and center of gravity pull back into tension (`lunge = -coilBack`, `offY = -liftY`). | Anticipation dash/flutter swoosh (`skill_dash1`, vol 0.40). |
+| **Phase 2** | **Poised Hold** | `2–4 frames` (~0.03–0.06s) | `4–6 frames` (~0.06–0.10s) | Weapon pauses at peak anticipation load (Escanor poised hold). | Stationary, high spring potential energy. | Pure silence or wind draw. |
+| **Phase 3** | **Hypersonic Whip Strike** | `6–8 frames` (~0.10–0.13s)<br>*(NEVER 2–4f!)* | `8–12 frames` (~0.13–0.20s)<br>*(NEVER 2–4f!)* | Explosive acceleration into the cleave plane with exponential power curve (`Math.pow(sp, 2.2)` to `2.6`). Clamped $\Delta \theta \le 35^\circ–45^\circ$/frame. | Lunging forward momentum impulse (`lungeSpeed * Math.sin(strikeP * π)`). | Whip swoosh (`attack_swordswing` / `skill_spinslash`). Trigger damage & impact at `strikeP >= 0.50`. |
+| **Phase 4** | **THE IMPACT LOCK / LATCH** *(The Key!)* | `6–8 frames` (~0.10–0.13s) | `12–18 frames` (~0.20–0.30s) | **Firmly locked/latched in impact plane** (embedded in floor, struck in flesh, or locked at apex, e.g. `weaponRot = 1.10`, `weaponLunge = 24px`, `weaponOffY = 14px`). | **Forward velocity clamped to zero** (`this.vx = 0; this.vy = 0;`), simulating hard collision. | **Slap audio** (`attack_fleshhit` + `sukuna_slice`), screen shake, micro-tremor jitter (`±2.2px`), slash ribbon held on plane, compression ring & sparks, shockwave / wave launch. |
+| **Phase 5** | **Extraction & Recovery Settle** | `12–16 frames` (~0.20–0.27s) | `18–26 frames` (~0.30–0.43s) | Weapon dislodges from impact plane and returns to guard stance with spring-damped settle (`(1 - rp)^1.8` + harmonic rebound). | Off-hand returns to canonical flank `(±0.82r, +0.38r)`. Body absorbs backward recoil kickback (`vx -= cos(angle) * recoilKick`). | Dynamic eraser wipe dissolves the slash ribbon from tail to tip (Rule 15). |
 
 ---
 
@@ -334,7 +366,9 @@ ctx.rotate(baseAngle);
 
 ## 7. Mandatory Anti-Patterns & Quality Checklist
 
-- [ ] **NEVER omit Phase 4**: Every melee attack must dedicate 5–7 frames to the Impact Lock.
+- [ ] **STRICT PROHIBITION of Snappy Micro-Frames**: NEVER set strike duration to 2–4 frames. Minimum 6–8 frames for quick combos, minimum 8–12 frames for heavy/skill cleaves.
+- [ ] **Clamp Angular Delta ($\Delta \theta \le 35^\circ–45^\circ$/frame)**: Wide arcs ($180^\circ–300^\circ$) MUST be distributed over at least 8–12 frames so the eye can follow the cutting plane.
+- [ ] **NEVER omit Phase 4**: Every melee attack must dedicate 6–8 frames (quick) or 12–18 frames (heavy/skill) to the Impact Lock.
 - [ ] **NEVER start recovery at maximum extension**: Maximum stroke travel must transition into the impact lock before returning.
 - [ ] **NEVER allow forward velocity during the lock**: Clamp `vx = 0, vy = 0` during `strikeEnd <= elapsed < lockEnd`.
 - [ ] **NEVER use separate easing exponents for the slash VFX leading edge**: Always lock `currentEndAngle = swordLocalAngle` so the ribbon tracks the blade with zero angular drift.

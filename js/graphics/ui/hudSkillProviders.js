@@ -2607,8 +2607,32 @@ export const HUD_SKILL_PROVIDERS = {
     const themeColor = f.themeColor || cfg.themeColor || '#71717a';
     const skills = [];
 
-    // 1. Skill 1: Prosthetic Arm Cannon & Repeating Crossbow (Toggle: enableArmCannon)
-    if (isSkillEnabled(cfg.enableArmCannon, cfg.enableCannon, cfg.enableSkill1, true)) {
+    // 1. Skill 1: Calamity Cleave & Supersonic Crescent Wave (Toggle: enableSkill1 / enableCalamityCleave)
+    if (isSkillEnabled(cfg.enableSkill1, cfg.enableCalamityCleave, true)) {
+      const calamityMax = f.calamityCooldownMax || cfg.skill1CooldownMax || 420;
+      const calamityCd = f.calamityCooldown !== undefined ? f.calamityCooldown : 0;
+      const isCalamityActive = Boolean(f.calamityActive || (f.calamityHitPauseTimer && f.calamityHitPauseTimer > 0));
+      let calamityPct = 0;
+      let label = 'CALAMITY CLEAVE';
+
+      if (isCalamityActive) {
+        calamityPct = 100;
+        label = 'CALAMITY CLEAVE!';
+      } else {
+        calamityPct = Math.max(0, Math.min(100, (1 - (calamityCd / calamityMax)) * 100));
+      }
+
+      skills.push({
+        id: 'calamityCleave',
+        pct: calamityPct,
+        ready: calamityPct >= 99 && calamityCd <= 0 && !isCalamityActive,
+        color: '#f59e0b',
+        label: label
+      });
+    }
+
+    // 2. Skill 2: Prosthetic Arm Cannon & Repeating Crossbow (Toggle: enableSkill2 / enableArmCannon)
+    if (isSkillEnabled(cfg.enableSkill2, cfg.enableArmCannon, cfg.enableCannon, false)) {
       const cannonMax = f.cannonCooldownMax || cfg.cannonCooldownMax || 420;
       const cannonCd = f.cannonCooldown !== undefined ? f.cannonCooldown : 0;
       const cannonPct = Math.max(0, Math.min(100, (1 - (cannonCd / cannonMax)) * 100));
@@ -2616,7 +2640,7 @@ export const HUD_SKILL_PROVIDERS = {
         id: 'cannon',
         pct: cannonPct,
         ready: cannonPct >= 99 && cannonCd <= 0,
-        color: '#f59e0b',
+        color: '#71717a',
         label: 'WRIST CANNON / BOLTS'
       });
     }
@@ -3056,7 +3080,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     avatar: ['annihilation', 'UNIVERSAL ANNIHILATION', 'portal', 'PORTAL STRIKES'],
     shiro: ['blank', 'prediction', 'never loses', 'BLANK', 'PREDICTION', '『　　』', 'blank_prediction'],
     spartan: ['javelin_throw', 'javelin', 'JAVELIN'],
-    guts: ['berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
+    guts: ['calamity', 'calamitycleave', 'calamity_cleave', 'CALAMITY', 'CALAMITY CLEAVE', 'berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
     choso: ['laser_matrix', 'convergence', 'blood manipulation: convergence', 'laser', 'matrix', 'laser matrix', 'piercing_blood', 'PIERCING BLOOD'],
     ash: ['mega_awakening', 'BOND AWAKENING', 'MEGA AWAKENED!', '10,000,000 VOLT'],
     eye_of_cthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM'],

@@ -792,6 +792,10 @@ function drawIndexDetailScreen() {
       animBtns.push({ id: 'incinerate', label: 'INCINERATION CANNON' });
     } else if (def.type === 'ichigo') {
       animBtns.push({ id: 'hollow', label: 'HOLLOW MASK' }, { id: 'getsuga', label: 'GETSUGA TENSHO' }, { id: 'bankai', label: 'BANKAI' });
+    } else if (def.type === 'guts') {
+      animBtns.push(
+        { id: 'calamity', label: 'CALAMITY CLEAVE' }
+      );
     } else {
       animBtns.push({ id: 'ability', label: (def.ability || 'SPECIAL SKILL').toUpperCase() });
     }
@@ -836,6 +840,18 @@ function drawIndexDetailScreen() {
           if (indexDetailState && indexDetailState.fighter && typeof indexDetailState.fighter.playBasicAttackPattern === 'function') {
             indexDetailState.fighter.playBasicAttackPattern(indexDetailState.target);
           }
+        }
+        else if (def.type === 'guts' && btn.id === 'calamity') {
+          audioSystem.playSFX('attack_swordswing', 1.0);
+          if (indexDetailState && indexDetailState.fighter) {
+            indexDetailState.fighter.calamityCooldown = 0;
+            if (typeof indexDetailState.fighter._castCalamityCleave === 'function') {
+              indexDetailState.fighter._castCalamityCleave(indexDetailState.target);
+            }
+          }
+        }
+        else if (def.type === 'guts' && btn.id === 'basic') {
+          audioSystem.playSFX('attack_swordswing', 0.95);
         }
         else if (btn.id === 'mixing') audioSystem.playSFX('skill_mixing', 3.0);
         else if (btn.id === 'red') {

@@ -10,7 +10,7 @@
 // - Rule 30: 5-Phase melee combat animation & impact lock standard
 // ─────────────────────────────────────────────
 
-import { Fighter } from '../fighter.js';
+import { Fighter, isSkillEnabled } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { gutsConfig } from '../../configs/characters/gutsConfig.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
@@ -74,9 +74,27 @@ export class GutsFighter extends Fighter {
     this.swordImpactY = 0;
     this.swordSlashAngle = 0;
 
-    // Skill 1: Prosthetic Arm Cannon & Repeating Crossbow
+    // Skill 1: Calamity Cleave Combo (Reference Frames 1–12)
+    this.calamityCooldown = 0;
+    this.calamityCooldownMax = cfg.calamityCooldownMax || cfg.skill1CooldownMax || 420;
+    this.calamityActive = false;
+    this.calamitySeq = 1;
+    this.calamityTimer = 0;
+    this.calamityMax = 0;
+    this.calamityHitDelivered = false;
+    this.calamityWaveSpawned = false;
+    this.calamityHitPauseTimer = 0;
+    this.calamityHitPauseMax = 0;
+    this.calamityHitPauseTargets = [];
+    this.calamityFlashTimer = 0;
+    this.calamityFlashSeq = 1;
+    this.activeCrescentWaves = [];
+    this.activeCalamityEmbers = [];
+    this.activeCalamityVortex = [];
+
+    // Skill 2: Prosthetic Arm Cannon & Repeating Crossbow
     this.cannonCooldown = 0;
-    this.cannonCooldownMax = cfg.cannonCooldownMax || 420;
+    this.cannonCooldownMax = cfg.cannonCooldownMax || cfg.skill2CooldownMax || 420;
 
     // Skill 2: Iron Cyclone Cleave
     this.cycloneCooldown = 0;
@@ -91,7 +109,25 @@ export class GutsFighter extends Fighter {
     this.berserkerTimer = 0;
 
     // Declarative Skill Registration (Rule 18 HUD Theme Consistency)
+    // Note: calamityTimer & calamityActive lifecycle is managed directly by _updateCalamityCleave
+    // across Sequence 1 -> Sequence 2 (just like Toji's multi-phase Ambush) so SkillManager
+    // never double-decrements calamityTimer or prematurely terminates Sequence 1.
     this.skillManager.registerSkills([
+      {
+        id: 'calamityCleave',
+        name: 'CALAMITY CLEAVE',
+        type: 'attack',
+        cooldownKey: 'calamityCooldown',
+        cooldownMax: () => this.calamityCooldownMax,
+        activeKey: 'calamityActive',
+        enabledKey: 'enableSkill1',
+        configKey: 'enableSkill1',
+        isEnabled: () => this._isCalamityEnabled(),
+        color: '#f59e0b',
+        onActivate: (fighter, opponent) => {
+          fighter._castCalamityCleave(opponent);
+        }
+      },
       {
         id: 'cannon',
         name: 'WRIST CANNON / BOLTS',
@@ -100,7 +136,7 @@ export class GutsFighter extends Fighter {
         cooldownMax: () => this.cannonCooldownMax,
         enabledKey: 'enableArmCannon',
         configKey: 'enableArmCannon',
-        isEnabled: () => gutsConfig.enableArmCannon !== false && gutsConfig.enableCannon !== false && gutsConfig.enableSkill1 !== false,
+        isEnabled: () => this._isCannonEnabled(),
         color: '#f59e0b',
         onActivate: (fighter, opponent) => {
           fighter._castArmCannon(opponent);
@@ -117,7 +153,7 @@ export class GutsFighter extends Fighter {
         activeKey: 'cycloneActive',
         enabledKey: 'enableCyclone',
         configKey: 'enableCyclone',
-        isEnabled: () => gutsConfig.enableCyclone !== false && gutsConfig.enableIronCyclone !== false && gutsConfig.enableSkill2 !== false,
+        isEnabled: () => this._isCycloneEnabled(),
         color: '#71717a',
         onActivate: (fighter, opponent) => {
           fighter._castCycloneCleave(opponent);
@@ -137,13 +173,82 @@ export class GutsFighter extends Fighter {
         activeKey: 'isBerserkerActive',
         enabledKey: 'enableBerserkerArmor',
         configKey: 'enableBerserkerArmor',
-        isEnabled: () => gutsConfig.enableBerserkerArmor !== false && gutsConfig.enableBerserker !== false && gutsConfig.enableUltimate !== false,
+        isEnabled: () => this._isBerserkerEnabled(),
         color: '#dc2626',
         onActivate: (fighter, opponent) => {
           fighter._castBerserkerArmor(opponent);
         }
       }
     ]);
+  }
+
+
+  /**
+   * Resolves skill toggles respecting instance overrides, runtime CONFIG, and static gutsConfig.
+   * If ANY key in the active scope is explicitly disabled (false, 0, '0', 'false', 'off', 'disabled'), returns false!
+   * @param {string[]} keys
+   * @returns {boolean}
+   */
+  _resolveToggle(keys) {
+    for (const k of keys) {
+      if (this[k] !== undefined && this[k] !== null) {
+        if (!isSkillEnabled(this[k], true)) return false;
+      }
+    }
+    for (const k of keys) {
+      if (this[k] !== undefined && this[k] !== null) {
+        if (isSkillEnabled(this[k], true)) return true;
+      }
+    }
+
+    const runtimeCfg = (typeof CONFIG !== 'undefined' && (CONFIG.guts || CONFIG.Guts)) ? (CONFIG.guts || CONFIG.Guts) : null;
+    if (runtimeCfg) {
+      for (const k of keys) {
+        if (runtimeCfg[k] !== undefined && runtimeCfg[k] !== null) {
+          if (!isSkillEnabled(runtimeCfg[k], true)) return false;
+        }
+      }
+      for (const k of keys) {
+        if (runtimeCfg[k] !== undefined && runtimeCfg[k] !== null) {
+          if (isSkillEnabled(runtimeCfg[k], true)) return true;
+        }
+      }
+    }
+
+    if (typeof gutsConfig !== 'undefined' && gutsConfig) {
+      for (const k of keys) {
+        if (gutsConfig[k] !== undefined && gutsConfig[k] !== null) {
+          if (!isSkillEnabled(gutsConfig[k], true)) return false;
+        }
+      }
+      for (const k of keys) {
+        if (gutsConfig[k] !== undefined && gutsConfig[k] !== null) {
+          if (isSkillEnabled(gutsConfig[k], true)) return true;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  _isCalamityEnabled() {
+    return this._resolveToggle(['enableSkill1', 'enableCalamityCleave']);
+  }
+
+  _isBasicAttackEnabled() {
+    return this._resolveToggle(['enableDragonSlayer', 'enableSword', 'enableMeleeCombo', 'enableBasicAttack']);
+  }
+
+  _isCannonEnabled() {
+    return this._resolveToggle(['enableArmCannon', 'enableCannon', 'enableSkill1']);
+  }
+
+  _isCycloneEnabled() {
+    return this._resolveToggle(['enableCyclone', 'enableIronCyclone', 'enableSkill2']);
+  }
+
+  _isBerserkerEnabled() {
+    return this._resolveToggle(['enableBerserkerArmor', 'enableBerserker', 'enableUltimate']);
   }
 
   // Backward-compatible melee combo state descriptor for external inspection
@@ -218,6 +323,19 @@ export class GutsFighter extends Fighter {
     this.swordSlashAngle = 0;
     this.committedAttackAngle = undefined;
 
+    this.calamityActive = false;
+    this.calamitySeq = 1;
+    this.calamityTimer = 0;
+    this.calamityMax = 0;
+    this.calamityHitDelivered = false;
+    this.calamityWaveSpawned = false;
+    this.calamityHitPauseTimer = 0;
+    this.calamityFlashTimer = 0;
+    this.calamityFlashSeq = 1;
+    if (this.activeCrescentWaves) this.activeCrescentWaves.length = 0;
+    if (this.activeCalamityEmbers) this.activeCalamityEmbers.length = 0;
+    if (this.activeCalamityVortex) this.activeCalamityVortex.length = 0;
+
     this.cannonCooldown = 0;
     this.cycloneCooldown = 0;
     this.cycloneActive = false;
@@ -237,6 +355,14 @@ export class GutsFighter extends Fighter {
     this.swordTremorY = 0;
     this.swordHitPauseTimer = 0;
     this.swordHitPauseTargets = [];
+    this.calamityActive = false;
+    this.calamitySeq = 1;
+    this.calamityTimer = 0;
+    this.calamityHitPauseTimer = 0;
+    this.calamityHitPauseTargets = [];
+    this.calamityFlashTimer = 0;
+    this.calamityFlashSeq = 1;
+    if (this.activeCalamityVortex) this.activeCalamityVortex.length = 0;
   }
 
   /**
@@ -267,7 +393,7 @@ export class GutsFighter extends Fighter {
    * Mandatory Rule 1.4: Suppress auto-aim tracking during active attacks, swings, hit pauses, and cyclone cleaves.
    */
   canAim() {
-    if (this.swipeActive || this.swordSwingTimer > 0 || this.swordHitPauseTimer > 0 || this.cycloneActive) {
+    if (this.swipeActive || this.swordSwingTimer > 0 || this.swordHitPauseTimer > 0 || this.cycloneActive || this.calamityActive || this.calamityHitPauseTimer > 0) {
       return false;
     }
     return super.canAim();
@@ -278,7 +404,7 @@ export class GutsFighter extends Fighter {
    * Prevents body/gunAngle from snapping to opponent movement during attack animations.
    */
   aim(opponent) {
-    if (this.swipeActive || this.swordSwingTimer > 0 || this.swordHitPauseTimer > 0 || this.cycloneActive) {
+    if (this.swipeActive || this.swordSwingTimer > 0 || this.swordHitPauseTimer > 0 || this.cycloneActive || this.calamityActive || this.calamityHitPauseTimer > 0) {
       if (this.committedAttackAngle !== undefined) {
         this.gunAngle = this.committedAttackAngle;
         this.angle = this.committedAttackAngle;
@@ -326,6 +452,10 @@ export class GutsFighter extends Fighter {
     // 0. Update transient visual effects before freeze guard (Rule 25)
     this._updateVisualExplosions?.();
     this._updateVisualEffects?.();
+    this._updateCrescentWaves(arena);
+    this._updateCalamityEmbers();
+    this._updateCalamityVortex();
+    if (this.calamityFlashTimer > 0) this.calamityFlashTimer--;
 
     // 1. Mandatory Rule 1 Freeze & TimeStop Guard
     const isFrozen = this._handleTimeStop();
@@ -341,7 +471,32 @@ export class GutsFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
+    // ── Calamity Cleave Hit-Pause (Frame 4–5 Impact Stasis) ──
+    if (this.calamityHitPauseTimer > 0) {
+      this.calamityHitPauseTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      this.swordTremorX = 0;
+      this.swordTremorY = 0;
+
+      for (const tgt of (this.calamityHitPauseTargets || [])) {
+        if (!tgt || tgt.hp <= 0 || tgt.isDead) continue;
+        tgt.vx = 0;
+        tgt.vy = 0;
+        if (typeof tgt.applyTimeStop === 'function') {
+          tgt.applyTimeStop(this.calamityHitPauseTimer);
+        }
+        tgt.suppressFreezeOverlay = true;
+      }
+
+      if (this.calamityHitPauseTimer === 0) {
+        this._resolveCalamityUnpause();
+      }
+      return;
+    }
+
     // Cooldown ticks
+    if (this.calamityCooldown > 0 && !this.calamityActive) this.calamityCooldown--;
     if (this.lethalDefianceCooldown > 0) this.lethalDefianceCooldown--;
     if (this.deathGateInvulnTimer > 0) this.deathGateInvulnTimer--;
     if (this.deathGateBuffTimer > 0) this.deathGateBuffTimer--;
@@ -356,10 +511,8 @@ export class GutsFighter extends Fighter {
       this.swordHitPauseTimer--;
       this.vx = 0;
       this.vy = 0;
-
-      // Jitter tremor against collision resistance
-      this.swordTremorX = (Math.random() - 0.5) * 2.6;
-      this.swordTremorY = (Math.random() - 0.5) * 2.6;
+      this.swordTremorX = 0;
+      this.swordTremorY = 0;
 
       for (const tgt of (this.swordHitPauseTargets || [])) {
         if (!tgt || tgt.hp <= 0 || tgt.isDead) continue;
@@ -405,18 +558,29 @@ export class GutsFighter extends Fighter {
       this._updateSwordSwing(opponent, arena);
     }
 
+    // Update Calamity Cleave (Skill 1)
+    if (this.calamityActive) {
+      this._updateCalamityCleave(opponent, arena);
+    }
+
     // AI Decision Matrix
-    if (opponent && !this.swipeActive && !this.cycloneActive) {
+    if (opponent && !this.swipeActive && !this.cycloneActive && !this.calamityActive) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
       const cfg = gutsConfig;
 
-      const canBerserk = cfg.enableBerserkerArmor !== false && cfg.enableBerserker !== false && cfg.enableUltimate !== false;
-      const canCyclone = cfg.enableCyclone !== false && cfg.enableIronCyclone !== false && cfg.enableSkill2 !== false;
-      const canCannon = cfg.enableArmCannon !== false && cfg.enableCannon !== false && cfg.enableSkill1 !== false;
+      const canBerserk = this._isBerserkerEnabled();
+      const canCalamity = this._isCalamityEnabled();
+      const canCyclone = this._isCycloneEnabled();
+      const canCannon = this._isCannonEnabled();
+      const canBasicAttack = this._isBasicAttackEnabled();
 
       // Berserker Armor Auto-Cast on Max Od or Readied Cooldown
       if (canBerserk && (this.odGauge >= 100 || this.berserkerCooldown <= 0) && !this.isBerserkerActive && dist < 240) {
         this._castBerserkerArmor(opponent);
+      }
+      // Skill 1: Calamity Cleave & Supersonic Crescent Wave (Reference Frames 1–6)
+      else if (canCalamity && this.calamityCooldown <= 0 && dist < 260) {
+        this._castCalamityCleave(opponent);
       }
       // Cyclone Cleave in close multi-target range
       else if (canCyclone && this.cycloneCooldown <= 0 && dist < 110) {
@@ -427,7 +591,7 @@ export class GutsFighter extends Fighter {
         this._castArmCannon(opponent);
       }
       // Dragon Slayer Sword Swing (Knight Standard)
-      else {
+      else if (canBasicAttack) {
         this._trySwordSwipe(opponent, ownerIndex);
       }
     }
@@ -447,11 +611,23 @@ export class GutsFighter extends Fighter {
         this.vy = 0;
       }
     }
+    if (this.calamityActive) {
+      const cfg = gutsConfig;
+      const isSeq2 = (this.calamitySeq === 2);
+      const windupF = isSeq2 ? (cfg.calamitySeq2WindupFrames || 18) : (cfg.calamityWindupFrames || 28);
+      const strikeF = isSeq2 ? (cfg.calamitySeq2StrikeFrames || 11) : (cfg.calamityStrikeFrames || 9);
+      const lockF = isSeq2 ? (cfg.calamitySeq2LockFrames || 18) : (cfg.calamityLockFrames || 18);
+      const elapsed = (this.calamityMax || 79) - this.calamityTimer;
+      if (elapsed >= (windupF + strikeF) && elapsed < (windupF + strikeF + lockF)) {
+        this.vx = 0;
+        this.vy = 0;
+      }
+    }
 
     super.update(opponent, ownerIndex, arena);
 
-    // Firmly lock gunAngle to committed attack angle during melee combo (Rule 1.4)
-    if (this.swipeActive && this.committedAttackAngle !== undefined) {
+    // Firmly lock gunAngle to committed attack angle during attacks (Rule 1.4)
+    if ((this.swipeActive || this.calamityActive) && this.committedAttackAngle !== undefined) {
       this.gunAngle = this.committedAttackAngle;
       this.angle = this.committedAttackAngle;
     }
@@ -479,9 +655,8 @@ export class GutsFighter extends Fighter {
   // Hit 2: Reverse (210 deg from up-right through bottom back to down-left)
   _trySwordSwipe(opponent, ownerIndex = 0) {
     const cfg = gutsConfig;
-    const canSword = cfg.enableDragonSlayer !== false && cfg.enableSword !== false && cfg.enableMeleeCombo !== false;
-    if (!canSword) return;
-    if (this.swipeCooldown > 0 || this.isCaughtInBeam() || this.swordSwingTimer > 0 || this.swordHitPauseTimer > 0 || this.cycloneActive) return;
+    if (!this._isBasicAttackEnabled()) return;
+    if (this.swipeCooldown > 0 || this.isCaughtInBeam() || this.swordSwingTimer > 0 || this.swordHitPauseTimer > 0 || this.cycloneActive || this.calamityActive) return;
 
     const reach = this.getWeaponReach();
     const target = this._findBestMeleeTarget(opponent, reach);
@@ -647,14 +822,20 @@ export class GutsFighter extends Fighter {
             audioSystem.playSFX('swordswing', 0.95);
           }
         } catch (e) {}
-        // Physical screen rumble on swing (displacing massive air!)
-        triggerGlobalScreenShake(2.5, 4);
       }
 
-      // Forward lunging momentum impulse
-      const lungeP = Math.sin(strikeP * Math.PI);
-      this.vx = Math.cos(this.swordSlashAngle) * this.swordSwingLunge * lungeP;
-      this.vy = Math.sin(this.swordSlashAngle) * this.swordSwingLunge * lungeP;
+      // Forward lunging momentum impulse (clamped when already in close contact to prevent body-collision bounce shaking)
+      const distToOpp = opponent ? Math.hypot(opponent.x - this.x, opponent.y - this.y) : 999;
+      const minContactGap = this.r + (opponent?.r || 25) + 28;
+      if (distToOpp > minContactGap) {
+        const lungeP = Math.sin(strikeP * Math.PI);
+        const gapScale = Math.min(1, (distToOpp - minContactGap) / 40);
+        this.vx = Math.cos(this.swordSlashAngle) * this.swordSwingLunge * lungeP * gapScale;
+        this.vy = Math.sin(this.swordSlashAngle) * this.swordSwingLunge * lungeP * gapScale;
+      } else {
+        this.vx = 0;
+        this.vy = 0;
+      }
 
       // Deliver impact at mid-strike (strikeP >= 0.50)
       if (strikeP >= 0.50 && !this.swordHitDelivered) {
@@ -741,7 +922,6 @@ export class GutsFighter extends Fighter {
             spawnFloatingText(this.x, this.y - this.r - 20, 'HEAVY RISING CLEAVE!', this.isBerserkerActive ? '#ef4444' : '#71717a');
           }
 
-          triggerGlobalScreenShake(this.swordComboStep === 2 ? 6 : 4, 8);
           return;
         }
       }
@@ -749,15 +929,12 @@ export class GutsFighter extends Fighter {
       // Phase 4: THE IMPACT LOCK (Rule 30)
       this.vx = 0;
       this.vy = 0;
-      this.swordTremorX = (Math.random() - 0.5) * 2.8;
-      this.swordTremorY = (Math.random() - 0.5) * 2.8;
+      this.swordTremorX = 0;
+      this.swordTremorY = 0;
     } else {
-      // Phase 5: Extraction & Elastic Recoil Kickback on Guts' Body!
-      const recElapsed = elapsed - pinEnd;
-      const rp = recElapsed / Math.max(1, recF);
-      const recoilKick = (1 - rp) * 2.6;
-      this.vx -= Math.cos(this.swordSlashAngle) * recoilKick;
-      this.vy -= Math.sin(this.swordSlashAngle) * recoilKick;
+      // Phase 5: Smooth Recovery Damping (Zero backward recoil shaking)
+      this.vx *= 0.85;
+      this.vy *= 0.85;
       this.swordTremorX = 0;
       this.swordTremorY = 0;
     }
@@ -804,7 +981,6 @@ export class GutsFighter extends Fighter {
         }
       } catch (e) {}
     }
-    triggerGlobalScreenShake(isStep2 ? 8 : 5, 8);
     this.swordTremorX = 0;
     this.swordTremorY = 0;
     this.swordHitPauseTargets = [];
@@ -815,9 +991,99 @@ export class GutsFighter extends Fighter {
    */
   _getSwordSwingAngle() {
     const cfg = gutsConfig || {};
-    const startAngle = cfg.battleStanceStartAngle ?? (cfg.battleStanceAngle ?? 2.97); // ~170 deg (down-left)
-    const apexAngle = cfg.battleStanceApexAngle ?? -0.70; // ~ -40 deg (up-right)
-    const sweepArc = cfg.battleStanceSweepArc ?? (210 * Math.PI / 180); // 210 deg (3.67 rad)
+    const startAngle = cfg.battleStanceStartAngle ?? (cfg.battleStanceAngle ?? 2.97);
+    const apexAngle = cfg.battleStanceApexAngle ?? -0.70;
+    const sweepArc = cfg.battleStanceSweepArc ?? (210 * Math.PI / 180);
+
+    // Calamity Cleave (Skill 1 Reference Frames 1–12)
+    if (this.calamityActive && this.calamityTimer > 0) {
+      const sAngle = 2.97;          // Frame 1: Neutral battle stance (~170°)
+
+      // ── Sequence 2: Reverse Cleave & Skyward Scoop (Reference Frames 7–12) ──
+      if (this.calamitySeq === 2) {
+        const windupF = cfg.calamitySeq2WindupFrames || 18;
+        const strikeF = cfg.calamitySeq2StrikeFrames || 11;
+        const lockF = cfg.calamitySeq2LockFrames || 18;
+        const recF = cfg.calamitySeq2RecoveryFrames || 24;
+        const totalF = this.calamityMax || (windupF + strikeF + lockF + recF);
+        const elapsed = Math.max(0, totalF - this.calamityTimer);
+        const strikeStart = windupF;
+        const strikeEnd = strikeStart + strikeF;
+        const lockEnd = strikeEnd + lockF;
+
+        const seq2StartAngle = 3.833; // Start directly where Sequence 1 follow-through locked (-2.45 rad + 2π = +3.833 rad)
+        const seq2CoilAngle = 3.58;   // Frame 7: High left tension coil (+205° / -155°, sword tip high-left behind shoulder)
+        const seq2ScoopLow = 1.15;    // Frame 8 end / Frame 9 start: Lower-front scoop point (+66°)
+        const seq2ApexAngle = -0.65;  // Frames 10–11: Skyward high-right apex (-37°)
+
+        // Frame 7: High Left Coil & Tension Load (Smoothly coils directly from Seq 1's -2.45 rad shoulder lock without resetting!)
+        if (elapsed < strikeStart) {
+          const t = elapsed / Math.max(1, windupF);
+          const ease = (1 - Math.cos(t * Math.PI)) * 0.5;
+          return seq2StartAngle + (seq2CoilAngle - seq2StartAngle) * ease;
+        }
+
+        // Frames 8–9: Blinding Horizontal Counter-Cleave -> Skyward Scoop (11 frames - NOT snappy!)
+        if (elapsed < strikeEnd) {
+          const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+          if (sp < 0.45) {
+            // Frame 8: Counter-cleave sweep from high-left (3.58 rad) across waist to lower-front (1.15 rad)
+            const p1 = sp / 0.45;
+            const ease1 = Math.pow(p1, 1.8);
+            return seq2CoilAngle + (seq2ScoopLow - seq2CoilAngle) * ease1;
+          } else {
+            // Frame 9: Rising skyward scoop from lower-front (1.15 rad) through 0 rad up into skyward apex (-0.65 rad)
+            const p2 = (sp - 0.45) / 0.55;
+            const ease2 = Math.pow(p2, 1.6);
+            return seq2ScoopLow + (seq2ApexAngle - seq2ScoopLow) * ease2;
+          }
+        }
+
+        // Frames 10–11: Apex Impact Lock & Poised Hold
+        if (elapsed < lockEnd) {
+          return seq2ApexAngle;
+        }
+
+        // Frame 12: Weighted Settle back to Battle Stance (2.97 rad)
+        const rp = (elapsed - lockEnd) / Math.max(1, recF);
+        if (rp < 0.30) {
+          return seq2ApexAngle;
+        }
+        const settleP = (rp - 0.30) / 0.70;
+        const settleEase = (1 - Math.cos(settleP * Math.PI)) * 0.5;
+        return seq2ApexAngle + (sAngle - seq2ApexAngle) * settleEase;
+      }
+
+      // ── Sequence 1: Calamity Cleave & Supersonic Crescent Wave (Reference Frames 1–6) ──
+      const windupF = cfg.calamityWindupFrames ?? 28;
+      const strikeF = cfg.calamityStrikeFrames ?? 9;
+      const lockF = cfg.calamityLockFrames ?? 22;
+      const recF = cfg.calamityRecoveryFrames ?? 0;
+      const totalF = this.calamityMax || (windupF + strikeF + lockF + recF);
+      const elapsed = Math.max(0, totalF - this.calamityTimer);
+      const strikeStart = windupF;
+      const strikeEnd = strikeStart + strikeF;
+
+      // Canonical angles for Sequence 1 (Single monotonic backward coil -> full sweeping cleave, ZERO back-and-forth pre-swing!):
+      const coilAngle = 3.32;        // Deep backward coil behind right hip/back (~190°)
+      const cleaveApexAngle = -2.45; // Follow-through lock over opposite left shoulder (~ -140°)
+
+      // Phase 1: Monotonic Backward Windup Coil & Poised Hold (Smoothly coils back from 2.97 rad to 3.32 rad)
+      if (elapsed < strikeStart) {
+        const t = elapsed / Math.max(1, windupF);
+        const coilP = Math.min(1.0, t / 0.82); // Last 18% of windup holds poised at peak tension
+        const ease = (1 - Math.cos(coilP * Math.PI)) * 0.5;
+        return sAngle + (coilAngle - sAngle) * ease;
+      }
+      // Phase 2: Sweeping Full Cleave Stroke (Smooth continuous rotation over 9 frames from 3.32 rad to -2.45 rad)
+      if (elapsed < strikeEnd) {
+        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+        const ease = Math.pow(sp, 1.8);
+        return coilAngle + (cleaveApexAngle - coilAngle) * ease;
+      }
+      // Phase 3: Hold follow-through lock over opposite shoulder (-2.45 rad) with zero angle reset before Sequence 2!
+      return cleaveApexAngle;
+    }
 
     if (!this.swipeActive || this.swordSwingTimer <= 0) {
       return startAngle;
@@ -853,11 +1119,10 @@ export class GutsFighter extends Fighter {
         // Phase 4: Impact Lock - locked at apex plane
         return apexAngle;
       } else {
-        // Phase 5: Extraction & Spring Recoil Settle (The recoil!)
+        // Phase 5: Smooth Recovery Settle (Zero spring oscillation shaking)
         const rp = (elapsed - pinEnd) / Math.max(1, recF);
-        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
-        const settleEase = Math.pow(1 - rp, 1.8);
-        return apexAngle - 0.32 * springWave + (startAngle - apexAngle) * 0.05 * (1 - settleEase);
+        const settleEase = (1 - Math.cos(rp * Math.PI)) * 0.5;
+        return apexAngle + (startAngle - apexAngle) * 0.05 * settleEase;
       }
     } else {
       // Hit 2: Heavy Downward Launching Cleave (Overhead Top-Left -> Sky Apex -> Downward Forward Ground Slam)
@@ -881,22 +1146,144 @@ export class GutsFighter extends Fighter {
         // Phase 4: THE IMPACT LOCK - slammed and latched in the impact plane
         return hit2EndAngle;
       } else {
-        // Phase 5: Ground Bounce & Spring Recoil Settle back towards stance
+        // Phase 5: Smooth Recovery Settle back towards stance (Zero spring oscillation shaking)
         const rp = (elapsed - pinEnd) / Math.max(1, recF);
-        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
-        const settleEase = Math.pow(1 - rp, 1.8);
-        return hit2EndAngle + 0.35 * springWave + (startAngle - hit2EndAngle) * (1 - settleEase);
+        const settleEase = (1 - Math.cos(rp * Math.PI)) * 0.5;
+        return hit2EndAngle + (startAngle - hit2EndAngle) * settleEase;
       }
     }
   }
 
   /**
-   * Computes dynamic weapon & hand translation offsets (lunge, offY) for 5-phase physical kinematics.
-   * Hands and blade actively drive forward during strike and spring-recoil back upon recovery.
+   * Computes smooth, continuous 5-phase muscular arm & hilt force offsets (lunge, offY, leverTorque).
+   * Preserves 100% C1 continuity across Sequence 1 -> Sequence 2 and Hit 1 -> Hit 2
+   * with zero random jitter or spring oscillation shaking (Rule 30).
    */
   _getSwordSwingOffsets() {
+    // ── Skill 1: Calamity Cleave (2-Sequence Combo) ──
+    if (this.calamityActive && this.calamityTimer > 0) {
+      const cfg = gutsConfig || {};
+
+      // Sequence 2 (Frames 7–12: High-Left Coil -> Counter-Cleave -> Skyward Scoop Finisher)
+      if (this.calamitySeq === 2) {
+        const windupF = cfg.calamitySeq2WindupFrames || 18;
+        const strikeF = cfg.calamitySeq2StrikeFrames || 11;
+        const lockF = cfg.calamitySeq2LockFrames || 18;
+        const recF = cfg.calamitySeq2RecoveryFrames || 24;
+        const totalF = this.calamityMax || (windupF + strikeF + lockF + recF);
+        const elapsed = Math.max(0, totalF - this.calamityTimer);
+        const strikeStart = windupF;
+        const strikeEnd = strikeStart + strikeF;
+        const lockEnd = strikeEnd + lockF;
+
+        // Starts seamlessly from Sequence 1's follow-through lock (+22, -6) with zero jump!
+        const seq1EndLunge = 22;
+        const seq1EndOffY = -6;
+        const coilLunge = -13;
+        const coilOffY = -14;
+        const scoopMidLunge = 16;
+        const scoopMidOffY = 11;
+        const apexLunge = 26;
+        const apexOffY = -12;
+
+        // Phase 1 (Frame 7): High-Left Muscular Coil
+        if (elapsed < strikeStart) {
+          const t = elapsed / Math.max(1, windupF);
+          const ease = (1 - Math.cos(t * Math.PI)) * 0.5;
+          return {
+            lunge: seq1EndLunge + (coilLunge - seq1EndLunge) * ease,
+            offY: seq1EndOffY + (coilOffY - seq1EndOffY) * ease,
+            leverTorque: 1.0 + (-1.0 - 1.0) * ease
+          };
+        }
+
+        // Phase 2 (Frames 8–9): Counter-Cleave Sweep -> Rising Skyward Scoop Thrust
+        if (elapsed < strikeEnd) {
+          const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+          if (sp < 0.45) {
+            const p1 = sp / 0.45;
+            const ease1 = Math.pow(p1, 1.8);
+            return {
+              lunge: coilLunge + (scoopMidLunge - coilLunge) * ease1,
+              offY: coilOffY + (scoopMidOffY - coilOffY) * ease1,
+              leverTorque: -1.0 + 1.6 * ease1
+            };
+          } else {
+            const p2 = (sp - 0.45) / 0.55;
+            const ease2 = Math.pow(p2, 1.6);
+            return {
+              lunge: scoopMidLunge + (apexLunge - scoopMidLunge) * ease2,
+              offY: scoopMidOffY + (apexOffY - scoopMidOffY) * ease2,
+              leverTorque: 0.6 + 0.6 * ease2
+            };
+          }
+        }
+
+        // Phase 3 (Frames 10–11): Skyward Apex Impact Lock (Full muscular arm extension)
+        if (elapsed < lockEnd) {
+          return { lunge: apexLunge, offY: apexOffY, leverTorque: 1.2 };
+        }
+
+        // Phase 4 (Frame 12): Weighted Muscular Settle back to neutral stance
+        const rp = (elapsed - lockEnd) / Math.max(1, recF);
+        if (rp < 0.25) {
+          return { lunge: apexLunge, offY: apexOffY, leverTorque: 1.2 };
+        }
+        const settleP = (rp - 0.25) / 0.75;
+        const settleEase = (1 - Math.cos(settleP * Math.PI)) * 0.5;
+        return {
+          lunge: apexLunge * (1 - settleEase),
+          offY: apexOffY * (1 - settleEase),
+          leverTorque: 1.2 * (1 - settleEase)
+        };
+      }
+
+      // Sequence 1 (Frames 1–6: Ready Guard -> Deep Hip Coil -> Horizontal Cross Cleave)
+      const windupF = cfg.calamityWindupFrames ?? 28;
+      const strikeF = cfg.calamityStrikeFrames ?? 9;
+      const lockF = cfg.calamityLockFrames ?? 22;
+      const recF = cfg.calamityRecoveryFrames ?? 0;
+      const totalF = this.calamityMax || (windupF + strikeF + lockF + recF);
+      const elapsed = Math.max(0, totalF - this.calamityTimer);
+      const strikeStart = windupF;
+      const strikeEnd = strikeStart + strikeF;
+
+      const coilLunge = -15;
+      const coilOffY = 9;
+      const cleaveEndLunge = 22;
+      const cleaveEndOffY = -6;
+
+      // Phase 1: Monotonic Deep Backward Hip Coil (ZERO forward-and-back pre-swing!)
+      if (elapsed < strikeStart) {
+        const t = elapsed / Math.max(1, windupF);
+        const coilP = Math.min(1.0, t / 0.82); // Last 18% holds poised at peak coil tension
+        const ease = (1 - Math.cos(coilP * Math.PI)) * 0.5;
+        return {
+          lunge: coilLunge * ease,
+          offY: coilOffY * ease,
+          leverTorque: -1.0 * ease
+        };
+      }
+
+      // Phase 2: Explosive Horizontal Cross Cleave Drive
+      if (elapsed < strikeEnd) {
+        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+        const ease = Math.pow(sp, 2.0);
+        const swingArcOut = Math.sin(sp * Math.PI) * 7;
+        return {
+          lunge: coilLunge + (cleaveEndLunge - coilLunge) * ease,
+          offY: coilOffY + (cleaveEndOffY - coilOffY) * ease + swingArcOut,
+          leverTorque: -1.0 + 2.0 * ease
+        };
+      }
+
+      // Phase 3: Follow-Through Lock over left shoulder (Holds for Sequence 2!)
+      return { lunge: cleaveEndLunge, offY: cleaveEndOffY, leverTorque: 1.0 };
+    }
+
+    // ── Basic 2-Hit Sword Combo (Hit 1 Rising Cleave -> Hit 2 Overhead Slam) ──
     if (!this.swipeActive || this.swordSwingTimer <= 0) {
-      return { lunge: 0, offY: 0 };
+      return { lunge: 0, offY: 0, leverTorque: 0 };
     }
 
     const totalF = this.swordSwingMax || 30;
@@ -912,57 +1299,66 @@ export class GutsFighter extends Fighter {
     const pinEnd = strikeEnd + pinF;
 
     if (this.swordComboStep === 1) {
+      const coilLunge = -11;
+      const coilOffY = 6;
+      const apexLunge = 20;
+      const apexOffY = -7;
+
       if (elapsed < liftF) {
         const wp = elapsed / Math.max(1, liftF);
-        const ease = Math.sin(wp * Math.PI * 0.5);
-        return { lunge: -12.0 * ease, offY: 4.0 * ease };
+        const ease = (1 - Math.cos(wp * Math.PI)) * 0.5;
+        return { lunge: coilLunge * ease, offY: coilOffY * ease, leverTorque: -0.8 * ease };
       } else if (elapsed < strikeStart) {
-        return { lunge: -12.0, offY: 4.0 };
+        return { lunge: coilLunge, offY: coilOffY, leverTorque: -0.8 };
       } else if (elapsed < strikeEnd) {
         const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
-        const ease = Math.pow(sp, 2.5);
+        const ease = Math.pow(sp, 2.2);
+        const arcOut = Math.sin(sp * Math.PI) * 5;
         return {
-          lunge: -12.0 + 38.0 * ease,
-          offY: 4.0 - 18.0 * ease
+          lunge: coilLunge + (apexLunge - coilLunge) * ease,
+          offY: coilOffY + (apexOffY - coilOffY) * ease + arcOut,
+          leverTorque: -0.8 + 1.8 * ease
         };
-      } else if (elapsed < pinEnd) {
-        return { lunge: 26.0, offY: -14.0 };
       } else {
-        const rp = (elapsed - pinEnd) / Math.max(1, recF);
-        const settleEase = Math.pow(1 - rp, 1.8);
-        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
-        return {
-          lunge: 26.0 * settleEase - 8.0 * springWave,
-          offY: -14.0 * settleEase + 5.0 * springWave
-        };
+        // Hold follow-through arm extension so Hit 2 chains seamlessly without resetting!
+        return { lunge: apexLunge, offY: apexOffY, leverTorque: 1.0 };
       }
     } else {
-      // Hit 2: Heavy Downward Launching Cleave
+      // Hit 2 starts directly from Hit 1's follow-through (+20, -7)
+      const hit1EndLunge = 20;
+      const hit1EndOffY = -7;
+      const hoistLunge = -12;
+      const hoistOffY = -14;
+      const slamLunge = 22;
+      const slamOffY = 9;
+
       if (elapsed < liftF) {
-        // Arms pull back and lift high overhead
         const wp = elapsed / Math.max(1, liftF);
-        const ease = Math.sin(wp * Math.PI * 0.5);
-        return { lunge: -14.0 * ease, offY: -16.0 * ease };
-      } else if (elapsed < strikeStart) {
-        return { lunge: -14.0, offY: -16.0 };
-      } else if (elapsed < strikeEnd) {
-        // Plunge body forward and down into the cleave plane
-        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
-        const ease = Math.pow(sp, 2.5);
+        const ease = (1 - Math.cos(wp * Math.PI)) * 0.5;
         return {
-          lunge: -14.0 + 42.0 * ease,
-          offY: -16.0 + 32.0 * ease
+          lunge: hit1EndLunge + (hoistLunge - hit1EndLunge) * ease,
+          offY: hit1EndOffY + (hoistOffY - hit1EndOffY) * ease,
+          leverTorque: 1.0 + (-1.0 - 1.0) * ease
+        };
+      } else if (elapsed < strikeStart) {
+        return { lunge: hoistLunge, offY: hoistOffY, leverTorque: -1.0 };
+      } else if (elapsed < strikeEnd) {
+        const sp = (elapsed - strikeStart) / Math.max(1, strikeF);
+        const ease = Math.pow(sp, 2.2);
+        return {
+          lunge: hoistLunge + (slamLunge - hoistLunge) * ease,
+          offY: hoistOffY + (slamOffY - hoistOffY) * ease,
+          leverTorque: -1.0 + 2.1 * ease
         };
       } else if (elapsed < pinEnd) {
-        // Firmly latched at full extension into the ground
-        return { lunge: 28.0, offY: 16.0 };
+        return { lunge: slamLunge, offY: slamOffY, leverTorque: 1.1 };
       } else {
         const rp = (elapsed - pinEnd) / Math.max(1, recF);
-        const settleEase = Math.pow(1 - rp, 1.8);
-        const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
+        const settleEase = (1 - Math.cos(rp * Math.PI)) * 0.5;
         return {
-          lunge: 28.0 * settleEase - 8.0 * springWave,
-          offY: 16.0 * settleEase - 5.0 * springWave
+          lunge: slamLunge * (1 - settleEase),
+          offY: slamOffY * (1 - settleEase),
+          leverTorque: 1.1 * (1 - settleEase)
         };
       }
     }
@@ -1020,11 +1416,461 @@ export class GutsFighter extends Fighter {
     return targets;
   }
 
+  // ──────────────────────────────────────────
+  // Skill 1: Calamity Cleave Combo (Reference Frames 1–12)
+  // Sequence 1: Frames 1–6 (Horizontal Cross Cleave & Supersonic Crescent Wave)
+  // Sequence 2: Frames 7–12 (Reverse Cleave & Skyward Scoop Finisher)
+  // ──────────────────────────────────────────
+  _castCalamityCleave(opponent) {
+    if (!this._isCalamityEnabled()) return;
+    if (this.calamityCooldown > 0 || this.isCaughtInBeam() || this.swipeActive || this.calamityActive || this.cycloneActive) return;
+
+    const cfg = gutsConfig;
+    const windupF = cfg.calamityWindupFrames ?? 28;
+    const strikeF = cfg.calamityStrikeFrames ?? 9;
+    const lockF = cfg.calamityLockFrames ?? 22;
+    const recF = cfg.calamityRecoveryFrames ?? 0;
+    const totalF = windupF + strikeF + lockF + recF;
+
+    this.calamitySeq = 1;
+    this.calamityCooldown = this.calamityCooldownMax;
+    this.calamityActive = true;
+    this.calamityTimer = totalF;
+    this.calamityMax = totalF;
+    this.calamityHitDelivered = false;
+    this.calamityWaveSpawned = false;
+
+    const target = opponent || this;
+    const dx = target.x - this.x;
+    const dy = target.y - this.y;
+    const aim = Math.atan2(dy, dx);
+    this.committedAttackAngle = aim;
+    this.gunAngle = aim;
+    this.angle = aim;
+
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('dash1', 0.60);
+      }
+    } catch (e) {}
+  }
+
+  _startCalamitySeq2(opponent) {
+    const cfg = gutsConfig;
+    const windupF = cfg.calamitySeq2WindupFrames || 18;
+    const strikeF = cfg.calamitySeq2StrikeFrames || 11;
+    const lockF = cfg.calamitySeq2LockFrames || 18;
+    const recF = cfg.calamitySeq2RecoveryFrames || 24;
+    const totalF = windupF + strikeF + lockF + recF;
+
+    this.calamitySeq = 2;
+    this.calamityActive = true;
+    this.calamityTimer = totalF;
+    this.calamityMax = totalF;
+    this.calamityHitDelivered = false;
+    this.calamityWaveSpawned = false;
+
+    // Target tracking re-alignment at start of Sequence 2
+    const target = opponent || this;
+    if (target && !target.isDead) {
+      const dx = target.x - this.x;
+      const dy = target.y - this.y;
+      if (dx !== 0 || dy !== 0) {
+        const aim = Math.atan2(dy, dx);
+        this.committedAttackAngle = aim;
+        this.gunAngle = aim;
+        this.angle = aim;
+      }
+    }
+
+    try {
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('dash1', 0.55);
+      }
+    } catch (e) {}
+  }
+
+  _castCalamitySeq2(opponent) {
+    if (!this._isCalamityEnabled()) return;
+    if (this.isCaughtInBeam() || this.cycloneActive) return;
+    this.swipeActive = false;
+    this.swordSwingTimer = 0;
+    this.calamityCooldown = this.calamityCooldownMax;
+    this._startCalamitySeq2(opponent);
+  }
+
+  _updateCalamityCleave(opponent, arena) {
+    if (this.calamityTimer <= 0) {
+      if (this.calamitySeq === 1) {
+        this._startCalamitySeq2(opponent);
+        return;
+      }
+      this.calamityActive = false;
+      this.calamitySeq = 1;
+      this.committedAttackAngle = undefined;
+      return;
+    }
+    this.calamityTimer--;
+
+    const cfg = gutsConfig;
+
+    // ──────────────────────────────────────────
+    // SEQUENCE 1: Horizontal Cross Cleave & Wave 1 (Frames 1–6)
+    // ──────────────────────────────────────────
+    if (this.calamitySeq === 1) {
+      const windupF = cfg.calamityWindupFrames ?? 28;
+      const strikeF = cfg.calamityStrikeFrames ?? 9;
+      const lockF = cfg.calamityLockFrames ?? 22;
+      const recF = cfg.calamityRecoveryFrames ?? 0;
+
+      const totalF = this.calamityMax || (windupF + strikeF + lockF + recF);
+      const elapsed = totalF - this.calamityTimer;
+      const strikeStart = windupF;
+      const strikeEnd = strikeStart + strikeF;
+      const lockEnd = strikeEnd + lockF;
+
+      // Phase 1 (Frames 1–3): Windup & Deep Backward Coil
+      if (elapsed < strikeStart) {
+        this.vx *= 0.85;
+        this.vy *= 0.85;
+        return;
+      }
+
+      // Phase 2 (Frame 4): Sweeping Cleave Stroke (Smooth 9 frames - NOT snappy!)
+      if (elapsed >= strikeStart && elapsed < strikeEnd) {
+        const strikeElapsed = elapsed - strikeStart;
+        const distToOpp = opponent ? Math.hypot(opponent.x - this.x, opponent.y - this.y) : 999;
+        const minContactGap = this.r + (opponent?.r || 25) + 30;
+        if (distToOpp > minContactGap) {
+          const lungeSpeed = cfg.calamityLungeSpeed || 5.5;
+          const gapScale = Math.min(1, (distToOpp - minContactGap) / 45);
+          this.vx = Math.cos(this.committedAttackAngle) * lungeSpeed * gapScale;
+          this.vy = Math.sin(this.committedAttackAngle) * lungeSpeed * gapScale;
+        } else {
+          this.vx = 0;
+          this.vy = 0;
+        }
+
+        if (strikeElapsed >= Math.floor(strikeF * 0.45)) {
+          if (!this.calamityHitDelivered) {
+            this.calamityHitDelivered = true;
+            try {
+              if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+                audioSystem.playSFX('swordswing', 1.0);
+              }
+            } catch (e) {}
+            this._deliverCalamityMeleeHit(opponent, 1);
+          }
+        }
+        return;
+      }
+
+      // Phase 3 (Frames 5–6): Follow-Through Lock Hold over opposite shoulder
+      if (elapsed >= strikeEnd && elapsed < lockEnd) {
+        this.vx = 0;
+        this.vy = 0;
+      } else if (elapsed >= lockEnd) {
+        this.vx *= 0.85;
+        this.vy *= 0.85;
+      }
+
+      // When Sequence 1 completes its follow-through lock: chain directly into Sequence 2 without resetting angle!
+      if (this.calamityTimer <= 0) {
+        this._startCalamitySeq2(opponent);
+      }
+      return;
+    }
+
+    // ──────────────────────────────────────────
+    // SEQUENCE 2: Reverse Cleave & Skyward Scoop Finisher (Frames 7–12)
+    // ──────────────────────────────────────────
+    const windupF = cfg.calamitySeq2WindupFrames || 18;
+    const strikeF = cfg.calamitySeq2StrikeFrames || 11;
+    const lockF = cfg.calamitySeq2LockFrames || 18;
+    const recF = cfg.calamitySeq2RecoveryFrames || 24;
+
+    const totalF = this.calamityMax || (windupF + strikeF + lockF + recF);
+    const elapsed = totalF - this.calamityTimer;
+    const strikeStart = windupF;
+    const strikeEnd = strikeStart + strikeF;
+    const lockEnd = strikeEnd + lockF;
+
+    // Phase 1 (Frame 7): High Left Coil
+    if (elapsed < strikeStart) {
+      this.vx *= 0.85;
+      this.vy *= 0.85;
+      return;
+    }
+
+    // Phase 2 & 3 (Frames 8–9): Counter-Cleave -> Skyward Scoop (11 frames - NOT snappy!)
+    if (elapsed >= strikeStart && elapsed < strikeEnd) {
+      const strikeElapsed = elapsed - strikeStart;
+      const distToOpp = opponent ? Math.hypot(opponent.x - this.x, opponent.y - this.y) : 999;
+      const minContactGap = this.r + (opponent?.r || 25) + 30;
+      if (distToOpp > minContactGap) {
+        const lungeSpeed = cfg.calamitySeq2LungeSpeed || 6.0;
+        const gapScale = Math.min(1, (distToOpp - minContactGap) / 45);
+        this.vx = Math.cos(this.committedAttackAngle) * lungeSpeed * gapScale;
+        this.vy = Math.sin(this.committedAttackAngle) * lungeSpeed * gapScale;
+      } else {
+        this.vx = 0;
+        this.vy = 0;
+      }
+
+      // Deliver strike at ~40% through strike
+      if (strikeElapsed >= Math.floor(strikeF * 0.40)) {
+        if (!this.calamityHitDelivered) {
+          this.calamityHitDelivered = true;
+          try {
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+              audioSystem.playSFX('swordswing', 1.0);
+            }
+          } catch (e) {}
+          this._deliverCalamityMeleeHit(opponent, 2);
+        }
+      }
+      return;
+    }
+
+    // Phase 4 (Frames 10–11): Skyward Apex Impact Lock (Zero random tremor shaking)
+    if (elapsed >= strikeEnd && elapsed < lockEnd) {
+      this.vx = 0;
+      this.vy = 0;
+      this.swordTremorX = 0;
+      this.swordTremorY = 0;
+      return;
+    }
+
+    // Phase 5 (Frame 12): Smooth Recovery Damping (Zero backward recoil shaking)
+    if (elapsed >= lockEnd) {
+      this.vx *= 0.85;
+      this.vy *= 0.85;
+      this.swordTremorX = 0;
+      this.swordTremorY = 0;
+    }
+
+    if (this.calamityTimer <= 0) {
+      this.calamityActive = false;
+      this.calamitySeq = 1;
+      this.committedAttackAngle = undefined;
+    }
+  }
+
+  _deliverCalamityMeleeHit(opponent, seq = 1) {
+    const cfg = gutsConfig;
+    const weaponReach = this.getWeaponReach();
+    const reach = this.r + weaponReach + (seq === 2 ? 24 : 18);
+    const arc = (seq === 2 ? 180 : 160) * Math.PI / 180;
+    let targets = this._getTargetsInFrontalArc(reach, arc);
+
+    if (targets.length === 0) {
+      const fallback = (opponent && !opponent.isDead && opponent.hp > 0) ? opponent : null;
+      if (fallback) {
+        const dx = fallback.x - this.x;
+        const dy = fallback.y - this.y;
+        const maxDist = this.r + (fallback.r || 25) + weaponReach + (seq === 2 ? 16 : 10);
+        if ((dx * dx + dy * dy) <= maxDist * maxDist) {
+          targets = [fallback];
+        }
+      }
+    }
+
+    if (targets.length > 0) {
+      const pauseFrames = (seq === 2) ? (cfg.calamitySeq2HitPauseFrames || 10) : (cfg.calamityHitPauseFrames || 8);
+      this.calamityHitPauseTimer = pauseFrames;
+      this.calamityHitPauseMax = pauseFrames;
+      this.calamityHitPauseTargets = targets;
+      this.vx = 0;
+      this.vy = 0;
+
+      const dmg = (seq === 2) ? (cfg.calamitySeq2MeleeDamage || 85) : (cfg.calamityMeleeDamage || 65);
+      for (const tgt of targets) {
+        tgt.takeDamage(dmg, this, { isMelee: true });
+        tgt.vx = 0;
+        tgt.vy = 0;
+        if (typeof tgt.applyTimeStop === 'function') {
+          tgt.applyTimeStop(pauseFrames);
+        }
+        tgt.suppressFreezeOverlay = true;
+      }
+
+      try {
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('fleshhit', 1.0);
+          audioSystem.playSFX('Sukuna-slice', 0.95);
+          if (seq === 2) {
+            audioSystem.playSFX('heavypunch1', 0.90);
+          }
+        }
+      } catch (e) {}
+
+      spawnFloatingText(this.x, this.y - this.r - 20, seq === 2 ? 'CALAMITY FINISHER!' : 'CALAMITY CLEAVE!', '#f59e0b');
+    }
+  }
+
+  _resolveCalamityUnpause() {
+    const isSeq2 = (this.calamitySeq === 2);
+    const kb = isSeq2 ? (gutsConfig.calamitySeq2Knockback || 13.5) : (gutsConfig.calamityKnockback || 11.0);
+    const aim = this.committedAttackAngle || this.gunAngle || 0;
+    for (const tgt of (this.calamityHitPauseTargets || [])) {
+      if (!tgt || tgt.hp <= 0 || tgt.isDead) continue;
+      tgt.suppressFreezeOverlay = false;
+      tgt.timeStopTimer = 0;
+      tgt.vx += Math.cos(aim) * kb;
+      tgt.vy += Math.sin(aim) * kb;
+      if (isSeq2) {
+        tgt.vy -= 4.0; // Upward loft rebound on skyward scoop impact
+      }
+      if (typeof tgt.applyHitStun === 'function') {
+        tgt.applyHitStun(isSeq2 ? (gutsConfig.calamitySeq2HitStunFrames || 26) : (gutsConfig.calamityHitStunFrames || 18));
+      }
+    }
+    this.calamityHitPauseTargets = [];
+    this.swordTremorX = 0;
+    this.swordTremorY = 0;
+  }
+
+  _spawnCrescentWave(seq = 1) {
+    const cfg = gutsConfig;
+    const aim = this.committedAttackAngle || this.gunAngle || 0;
+    const weaponReach = this.getWeaponReach();
+    const spawnDist = this.r + weaponReach * 0.75;
+    const spawnX = this.x + Math.cos(aim) * spawnDist;
+    const spawnY = this.y + Math.sin(aim) * spawnDist;
+
+    const isSeq2 = (seq === 2);
+    const speed = isSeq2 ? (cfg.calamitySeq2WaveSpeed || 12.0) : (cfg.calamityWaveSpeed || 10.5);
+    const maxAge = isSeq2 ? (cfg.calamitySeq2WaveMaxAge || 45) : (cfg.calamityWaveMaxAge || 42);
+    const width = isSeq2 ? (cfg.calamitySeq2WaveWidth || 165) : (cfg.calamityWaveWidth || 140);
+    const damage = isSeq2 ? (cfg.calamitySeq2WaveDamage || 55) : (cfg.calamityWaveDamage || 45);
+
+    this.activeCrescentWaves.push({
+      x: spawnX,
+      y: spawnY,
+      vx: Math.cos(aim) * speed,
+      vy: Math.sin(aim) * speed,
+      angle: aim,
+      age: 0,
+      maxAge: maxAge,
+      width: width,
+      damage: damage,
+      seq: seq,
+      hitTargets: new Set(),
+      isBerserker: this.isBerserkerActive === true
+    });
+  }
+
+  _spawnCalamityVortex() {
+    this.activeCalamityVortex = [];
+    const count = 18;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      const dist = 35 + Math.random() * 45;
+      this.activeCalamityVortex.push({
+        x: this.x + Math.cos(a) * dist,
+        y: this.y + Math.sin(a) * dist,
+        originDist: dist,
+        angle: a,
+        age: 0,
+        maxAge: gutsConfig.calamitySeq2WindupFrames || 18,
+        size: 2.0 + Math.random() * 2.5
+      });
+    }
+  }
+
+  _updateCalamityVortex() {
+    if (!this.activeCalamityVortex || this.activeCalamityVortex.length === 0) return;
+    for (let i = this.activeCalamityVortex.length - 1; i >= 0; i--) {
+      const v = this.activeCalamityVortex[i];
+      v.age++;
+      if (v.age >= v.maxAge) {
+        this.activeCalamityVortex.splice(i, 1);
+        continue;
+      }
+      // Spiral inward towards Guts
+      v.angle += 0.16;
+      const progress = v.age / v.maxAge;
+      const currentDist = v.originDist * (1 - Math.pow(progress, 0.8));
+      v.x = this.x + Math.cos(v.angle) * currentDist;
+      v.y = this.y + Math.sin(v.angle) * currentDist;
+    }
+  }
+
+  _updateCrescentWaves(arena) {
+    if (!this.activeCrescentWaves || this.activeCrescentWaves.length === 0) return;
+
+    for (let i = this.activeCrescentWaves.length - 1; i >= 0; i--) {
+      const wave = this.activeCrescentWaves[i];
+      wave.age++;
+      wave.x += wave.vx;
+      wave.y += wave.vy;
+
+      if (typeof state !== 'undefined' && state.fighters) {
+        for (const f of state.fighters) {
+          if (!f || f === this || f.isDead || f.hp <= 0) continue;
+          if (typeof state.getFighterTeam === 'function' && state.getFighterTeam(f) === state.getFighterTeam(this)) continue;
+          if (wave.hitTargets.has(f)) continue;
+
+          const dx = f.x - wave.x;
+          const dy = f.y - wave.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist <= (wave.width * 0.45 + (f.r || 25))) {
+            wave.hitTargets.add(f);
+            f.takeDamage(wave.damage, this, 'blade');
+            f.vx += Math.cos(wave.angle) * 7.5;
+            f.vy += Math.sin(wave.angle) * 7.5;
+            if (typeof f.applyHitStun === 'function') f.applyHitStun(12);
+
+            try {
+              if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+                audioSystem.playSFX('fleshhit', 0.85);
+              }
+            } catch (e) {}
+          }
+        }
+      }
+
+      // Frame 6 reference: ribbon split & ground embers
+      if (wave.age >= wave.maxAge * 0.60 && wave.age % 2 === 0) {
+        const perpA = wave.angle + Math.PI / 2;
+        const spread = (Math.random() - 0.5) * (wave.width * 0.5);
+        this.activeCalamityEmbers.push({
+          x: wave.x + Math.cos(perpA) * spread,
+          y: wave.y + Math.sin(perpA) * spread,
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: (Math.random() - 0.5) * 1.5,
+          age: 0,
+          maxAge: 16 + Math.floor(Math.random() * 8),
+          size: 2.0 + Math.random() * 2.0,
+          color: wave.isBerserker ? '#ef4444' : '#fbbf24'
+        });
+      }
+
+      if (wave.age >= wave.maxAge) {
+        this.activeCrescentWaves.splice(i, 1);
+      }
+    }
+  }
+
+  _updateCalamityEmbers() {
+    if (!this.activeCalamityEmbers || this.activeCalamityEmbers.length === 0) return;
+    for (let i = this.activeCalamityEmbers.length - 1; i >= 0; i--) {
+      const e = this.activeCalamityEmbers[i];
+      e.age++;
+      e.x += e.vx;
+      e.y += e.vy;
+      e.vx *= 0.92;
+      e.vy *= 0.92;
+      if (e.age >= e.maxAge) {
+        this.activeCalamityEmbers.splice(i, 1);
+      }
+    }
+  }
+
   _castArmCannon(opponent) {
     if (!opponent) return;
     const cfg = gutsConfig;
-    const canCannon = cfg.enableArmCannon !== false && cfg.enableCannon !== false && cfg.enableSkill1 !== false;
-    if (!canCannon) return;
+    if (!this._isCannonEnabled()) return;
 
     this.cannonCooldown = this.cannonCooldownMax;
 
@@ -1075,8 +1921,7 @@ export class GutsFighter extends Fighter {
 
   _castCycloneCleave(opponent) {
     const cfg = gutsConfig;
-    const canCyclone = cfg.enableCyclone !== false && cfg.enableIronCyclone !== false && cfg.enableSkill2 !== false;
-    if (!canCyclone) return;
+    if (!this._isCycloneEnabled()) return;
 
     this.cycloneCooldown = this.cycloneCooldownMax;
     this.cycloneActive = true;
@@ -1113,8 +1958,7 @@ export class GutsFighter extends Fighter {
 
   _castBerserkerArmor(opponent) {
     const cfg = gutsConfig;
-    const canBerserk = cfg.enableBerserkerArmor !== false && cfg.enableBerserker !== false && cfg.enableUltimate !== false;
-    if (!canBerserk) return;
+    if (!this._isBerserkerEnabled()) return;
 
     this.berserkerCooldown = this.berserkerCooldownMax;
     this.isBerserkerActive = true;

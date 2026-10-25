@@ -205,8 +205,33 @@ A brutal 3-hit heavy cleave sequence demonstrating authentic 5-phase heavy weapo
 
 ---
 
-### 💥 Skill 1: *Prosthetic Arm Cannon & Repeating Crossbow* (義手砲 & 連射ボウガン)
-* **Cooldown:** `8.0s` (`480 frames`)
+### 💥 Skill 1: *Calamity Cleave Combo* (断絶・黄金斬波)
+* **Cooldown:** `7.0s` (`420 frames`)
+* **Reference Frames 1–12 Kinematic Lifecycle (Calibrated Exact Sword Angles & Positions)**:
+
+#### Sequence 1: Calamity Cleave & Supersonic Crescent Wave (Reference Frames 1–6)
+1. **Frame 1 (Neutral Battle Stance)**: Sword rests at shoulder angle (`2.97 rad` / `170°`, `lunge: 0, offY: 0`).
+2. **Frame 2 (Ignition & Low Ready Guard - 12 frames)**: The Dragon Slayer ignites with radiant golden energy. Guts smoothly lowers his hands and tilts the blade into a low forward ready angle (`1.25 rad` / `72°`, `lunge: -3px, offY: +6px`).
+3. **Frame 3 (Deep Coil Backward - 16 frames)**: Guts leans his torso backward (`lunge: -16px, offY: -3px`), smoothly drawing the incandescent golden blade high behind his back into maximum potential tension (`2.75 rad` / `158°`).
+4. **Frame 4 (Sweeping Cleave Stroke - 9 frames)**: Guts lunges forward with full bodily drive (`lunge: +22px`), whipping the heavy steel blade across a full 298° cleave plane. The swing is visible and weighted across all 9 frames, releasing a 520px horizontal flash as it passes forward (`0°`), dealing `65 Direct Melee Damage` with an 8-frame impact lock.
+5. **Frame 5 (Follow-Through Lock & Wave Detachment - 18 frames)**: The blade locks firmly high over his opposite (left) shoulder (`-2.45 rad` / `-140°`, `lunge: +22px, offY: -6px`) as the independent golden crescent wave detaches and soars forward across the floor at `10.5px/frame` (`45 Wave Damage`, `140px width`).
+6. **Frame 6 (Twin-Ribbon Split & Follow-Through Hold - 14 frames)**: Guts firmly holds the follow-through pose over his left shoulder (`-2.45 rad`) while the crescent wave travels forward, seamlessly handing off directly into Sequence 2 (Frame 7) without any pause or settle to neutral!
+
+#### Sequence 2: Reverse Cleave & Skyward Scoop Finisher (Reference Frames 7–12)
+7. **Frame 7 (High Left Coil & Golden Vortex Inward Suction - 18 frames)**: Guts pulls the colossal blade up and back behind his left shoulder (`-2.70 rad` / `-155°`, `lunge: -12px, offY: -12px`). A swirling vortex of golden flakes and energy gathers inwards toward his feet.
+8. **Frame 8 (Blinding Horizontal Counter-Cleave Flash - 5 frames)**: Guts violently drives his entire upper body forward (`lunge: +32px, offY: +2px`), cutting level across his waist from left to right (`-2.70 rad` through `0°` to `+0.35 rad` / `+20°`), detonating a 580px horizontal flash with supersonic speed needles.
+9. **Frame 9 (Skyward Scoop Cleave Arc - 6 frames)**: The horizontal cleave whips upward into the sky, arcing from waist level into a high-right apex (`-0.65 rad` / `-37°`, `lunge: +28px, offY: -14px`), trailing an immense golden flame slash ribbon and dealing `85 Heavy Melee Damage` with 10 frames of impact stasis.
+10. **Frame 10 (Skyward Apex Impact Lock & Wave 2 Detonation - 18 frames)**: Guts locks firmly in the apex plane at full extension (`vx = 0, vy = 0`), the blade vibrating with micro-tremor jitter (`±3.0px`), detonating an incandescent Golden Crescent Wave 2 (`55 Wave Damage`, `165px width`, `12.0px/frame`) and scattering shattered golden embers.
+11. **Frame 11 (Poised Apex Hold & Radiant Blade Roar)**: Guts maintains the triumphant high-guard lock with the blazing golden blade roaring with radiant heat.
+12. **Frame 12 (Poised Settle back to Battle Stance - 24 frames)**: The golden fire softly dissipates into embers, and Guts lowers the colossal iron blade with weighted inertia back across his torso to neutral battle stance (`2.97 rad` / `170°`) with damped spring recoil.
+
+* **Audio Layer**: `attack_swordswing` (1.0) + `attack_fleshhit` (1.0) + `Sukuna-slice` (0.95) + `explosion.mp3` (0.75) + `heavypunch1.mp3` (0.85).
+
+---
+
+### 💣 Skill 2: *Prosthetic Arm Cannon & Repeating Crossbow* (義手砲 & 連射ボウガン)
+* **Cooldown:** `7.0s` (`420 frames`)
+* **Toggle:** `enableSkill2: 0` (Disabled by default during Skill 1 testing)
 * **Dual Execution Mode (Tap vs Hold)**:
 
 #### Mode A: Repeating Crossbow Barrage (Quick Tap)

@@ -1739,8 +1739,8 @@ export const FIGHTER_DEFS = [
     cooldown: gutsConfig.cooldown || 36,
     moveSpeed: gutsConfig.moveSpeed || gutsConfig.speed || 4.6,
     projectileSpeedMultiplier: 1.0,
-    ability: gutsConfig.ability || 'Dragon Slayer & Berserker Armor',
-    desc: gutsConfig.desc || 'Wielder of the monstrous 400-pound Dragon Slayer. Struggles against fate with unyielding poise, a high-explosive arm cannon, and the dwarf-forged Berserker Armor.',
+    ability: gutsConfig.ability || 'Dragon Slayer & Calamity Cleave',
+    desc: gutsConfig.desc || 'Wielder of the monstrous 400-pound Dragon Slayer. Slices through fate with the supersonic Calamity Cleave, ejecting golden crescent shockwaves with unyielding poise.',
   },
   {
     id: 61,

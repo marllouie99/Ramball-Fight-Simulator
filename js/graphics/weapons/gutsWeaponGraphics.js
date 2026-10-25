@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────
 
 import { state } from '../../core/state.js';
+import { getHandSize } from '../../core/config.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
 import { gutsConfig } from '../../configs/characters/gutsConfig.js';
 
@@ -54,7 +55,7 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
  * @param {number} [widthScale=1.0]
  * @param {number} [lengthScale=1.0]
  */
-function _drawDragonSlayerModel(ctx, swordScale = 1.0, isBerserkerActive = false, widthScale = 1.0, lengthScale = 1.0) {
+function _drawDragonSlayerModel(ctx, swordScale = 1.0, isBerserkerActive = false, widthScale = 1.0, lengthScale = 1.0, isGoldenCharge = false) {
   const swordImg = _getGutsSwordImage();
   const hasSwordImg = swordImg && swordImg.complete && swordImg.naturalWidth > 0;
 
@@ -131,7 +132,7 @@ function _drawDragonSlayerModel(ctx, swordScale = 1.0, isBerserkerActive = false
 
   // 4. Massive Beveled Raw Iron Blade Slab
   // Outer Razor Cutting Bevel
-  ctx.fillStyle = isBerserkerActive ? '#b91c1c' : '#71717a';
+  ctx.fillStyle = isBerserkerActive ? '#b91c1c' : (isGoldenCharge ? '#fbbf24' : '#71717a');
   ctx.beginPath();
   ctx.moveTo(6 * swordScale * lengthScale, -bladeW * 0.5);
   ctx.lineTo(bladeLen - 12 * swordScale * lengthScale, -bladeW * 0.5);
@@ -142,7 +143,7 @@ function _drawDragonSlayerModel(ctx, swordScale = 1.0, isBerserkerActive = false
   ctx.fill();
 
   // Dark Blackened Raw Iron Core Slab
-  ctx.fillStyle = isBerserkerActive ? '#450a0a' : '#18181b';
+  ctx.fillStyle = isBerserkerActive ? '#450a0a' : (isGoldenCharge ? '#d97706' : '#18181b');
   ctx.beginPath();
   ctx.moveTo(8 * swordScale * lengthScale, -bladeW * 0.35);
   ctx.lineTo(bladeLen - 14 * swordScale * lengthScale, -bladeW * 0.35);
@@ -190,7 +191,7 @@ export function drawGutsShoulderSword(ctx, r, custom = {}, isBerserkerActive = f
   // Blade points UP-LEFT (-145.2 deg = -2.534 rad).
   // _drawDragonSlayerModel normalizes blade along +X, so rotating by -2.534 rad points it up-left!
   ctx.rotate(-2.534 + customAngle);
-  _drawDragonSlayerModel(ctx, swordScale, isBerserkerActive, customWidthScale, customLengthScale);
+  _drawDragonSlayerModel(ctx, swordScale, isBerserkerActive, customWidthScale, customLengthScale, false);
   ctx.restore();
 }
 
@@ -225,7 +226,8 @@ export function drawGutsWeapons(ctx, fighter, r, facingLeft = false) {
   const customAngle = custom.angleOffset ?? 0;
   const isBerserkerActive = fighter.isBerserkerActive === true;
 
-  const isSwinging = Boolean((fighter.swipeActive && fighter.swordSwingTimer > 0) || (fighter.swordHitPauseTimer && fighter.swordHitPauseTimer > 0));
+  const isSwinging = Boolean((fighter.swipeActive && fighter.swordSwingTimer > 0) || (fighter.swordHitPauseTimer && fighter.swordHitPauseTimer > 0) || (fighter.calamityActive && fighter.calamityTimer > 0) || (fighter.calamityHitPauseTimer && fighter.calamityHitPauseTimer > 0));
+  const isGoldenCharge = Boolean(fighter.calamityActive && fighter.calamityTimer > 0);
 
   const cfg = gutsConfig || {};
   const mouthX = (cfg.battleStanceMouthX ?? 0) + customOffX;
@@ -247,64 +249,25 @@ export function drawGutsWeapons(ctx, fighter, r, facingLeft = false) {
     : (cfg.battleStanceStartAngle ?? (cfg.battleStanceAngle ?? 2.97));
 
   const totalAngle = swordAngle + customAngle;
-  const cosS = Math.cos(totalAngle);
-  const sinS = Math.sin(totalAngle);
 
   const rHandLocalX = -4 * swordScale * customLengthScale;
   const lHandLocalX = -13 * swordScale * customLengthScale;
 
-  // World coordinates of both hands in local fighter space
-  const rHandX = hiltX + cosS * rHandLocalX;
-  const rHandY = hiltY + sinS * rHandLocalX;
-  const lHandX = hiltX + cosS * lHandLocalX;
-  const lHandY = hiltY + sinS * lHandLocalX;
+  const skinCustom = (typeof state !== 'undefined' && state.skinCustomizations?.guts) || {};
+  const handScale = skinCustom.handScale ?? (fighter && fighter.handScale) ?? 1.0;
+  const handRadius = getHandSize ? getHandSize(r * 0.30 * handScale) : (r * 0.30 * handScale);
 
-  // Shoulder anchors on upper torso
-  const lShoulderX = -r * 0.65;
-  const lShoulderY = r * 0.22;
-  const rShoulderX = r * 0.65;
-  const rShoulderY = r * 0.22;
-
-  // 1. Draw Muscular Arms connecting shoulders to hands (Visual Force of the Hands!)
-  ctx.save();
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Left Arm (Blackened Berserker iron plate prosthetic):
-  ctx.beginPath();
-  ctx.moveTo(lShoulderX, lShoulderY);
-  ctx.lineTo(lHandX, lHandY);
-  ctx.lineWidth = r * 0.28;
-  ctx.strokeStyle = '#0E0F14';
-  ctx.stroke();
-  ctx.lineWidth = r * 0.20;
-  ctx.strokeStyle = isBerserkerActive ? '#1c1e24' : '#27272a';
-  ctx.stroke();
-
-  // Right Arm (Muscular sword arm with blackened plate / tanned sleeve):
-  ctx.beginPath();
-  ctx.moveTo(rShoulderX, rShoulderY);
-  ctx.lineTo(rHandX, rHandY);
-  ctx.lineWidth = r * 0.28;
-  ctx.strokeStyle = '#0E0F14';
-  ctx.stroke();
-  ctx.lineWidth = r * 0.20;
-  ctx.strokeStyle = isBerserkerActive ? '#27272a' : '#c4906c';
-  ctx.stroke();
-  ctx.restore();
-
-  // 2. Draw Dragon Slayer Model rotated around the dynamic hilt anchor
+  // 1. Draw Dragon Slayer Model rotated around the dynamic hilt anchor
   ctx.save();
   ctx.translate(hiltX, hiltY);
   ctx.rotate(totalAngle);
-  _drawDragonSlayerModel(ctx, swordScale, isBerserkerActive, customWidthScale, customLengthScale);
+  _drawDragonSlayerModel(ctx, swordScale, isBerserkerActive, customWidthScale, customLengthScale, isGoldenCharge);
 
-  // 3. Draw Hands firmly clasped over the hilt on front layer (Rule 20 compliant)
-  const handRadius = r * 0.28;
-  // Right hand (Bandaged fist) on upper grip near crossguard
-  drawPixelHand(ctx, rHandLocalX, 0, handRadius, '#e2e8f0', '#0E0F14');
-  // Left hand (Iron prosthetic fist) on lower grip near pommel
+  // 2. Draw Guts' Canonical Default Hands directly gripping the hilt (Rule 20 compliant, zero stick-arm lines)
+  // Left hand (Iron prosthetic default hand) on lower grip near pommel
   drawPixelHand(ctx, lHandLocalX, 0, handRadius, '#4a505a', '#0E0F14');
+  // Right hand (Bandaged default hand) on upper grip near crossguard
+  drawPixelHand(ctx, rHandLocalX, 0, handRadius, '#e2e8f0', '#0E0F14');
 
   ctx.restore();
 }
@@ -478,6 +441,9 @@ export function drawGutsComboSlashVFX(ctx, fighter) {
       }
     }
   }
+
+  // 3. Skill 1 (Calamity Cleave): Smooth 2-Sequence Attack Slash Animation Only
+  drawGutsCalamitySlashVFX(ctx, fighter);
 }
 
 /**
@@ -490,6 +456,355 @@ export function drawGutsComboSlashVFX(ctx, fighter) {
  * @param {number} r
  * @param {Object} [opts={}]
  */
+
+/**
+ * Hypersonic Horizontal Cleave Flash (Frame 4 Reference)
+ * Screen-spanning horizontal lightburst with supersonic needles and warm floor illumination.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {object} fighter
+ */
+export function drawGutsCalamityFlash(ctx, fighter) {
+  if (!fighter || !fighter.calamityFlashTimer || fighter.calamityFlashTimer <= 0) return;
+
+  const aim = fighter.committedAttackAngle !== undefined ? fighter.committedAttackAngle : (fighter.gunAngle || 0);
+  const r = fighter.r || 30;
+  const weaponReach = typeof fighter.getWeaponReach === 'function' ? fighter.getWeaponReach() : 85.0;
+  const isSeq2 = (fighter.calamityFlashSeq === 2);
+
+  const fx = fighter.x + Math.cos(aim) * (r + weaponReach * (isSeq2 ? 0.75 : 0.65));
+  const fy = fighter.y + Math.sin(aim) * (r + weaponReach * (isSeq2 ? 0.75 : 0.65));
+
+  ctx.save();
+  ctx.translate(fx, fy);
+  ctx.rotate(aim);
+
+  ctx.globalCompositeOperation = 'lighter';
+  const beamW = isSeq2 ? 34.0 : 28.0;
+  const beamLen = isSeq2 ? 580.0 : 520.0;
+
+  // Ground illumination ellipse under the strike plane
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(0, 0, beamLen * 0.45, beamW * 1.6, 0, 0, Math.PI * 2);
+  ctx.fillStyle = isSeq2 ? 'rgba(251, 191, 36, 0.45)' : 'rgba(251, 191, 36, 0.35)';
+  ctx.fill();
+  ctx.restore();
+
+  // Translucent golden outer streak
+  ctx.fillStyle = isSeq2 ? 'rgba(245, 158, 11, 0.70)' : 'rgba(245, 158, 11, 0.60)';
+  ctx.beginPath();
+  ctx.moveTo(0, -beamLen * 0.5);
+  ctx.lineTo(beamW * 0.45, 0);
+  ctx.lineTo(0, beamLen * 0.5);
+  ctx.lineTo(-beamW * 0.45, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Supersonic needle core (pure white-hot lightburst - Rule 16 standard)
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(0, -beamLen * 0.45);
+  ctx.lineTo(isSeq2 ? 4.5 : 3.8, 0);
+  ctx.lineTo(0, beamLen * 0.45);
+  ctx.lineTo(isSeq2 ? -4.5 : -3.8, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // Forward speedline needles
+  const needleCount = isSeq2 ? 4 : 3;
+  for (let i = -needleCount; i <= needleCount; i++) {
+    const spdLen = 85 + Math.abs(i) * 35;
+    const off = i * 26;
+    ctx.strokeStyle = (i === 0) ? '#ffffff' : 'rgba(254, 240, 138, 0.80)';
+    ctx.lineWidth = (i === 0) ? 2.5 : 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, off);
+    ctx.lineTo(spdLen, off);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Inward Golden Vortex Particles (Frame 7 Reference)
+ * Golden swirling flakes spiraling inwards towards Guts during Sequence 2 tension load.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {object} fighter
+ */
+export function drawGutsCalamityVortex(ctx, fighter) {
+  if (!fighter || !fighter.activeCalamityVortex || fighter.activeCalamityVortex.length === 0) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const v of fighter.activeCalamityVortex) {
+    const lifeP = v.age / Math.max(1, v.maxAge);
+    const alpha = Math.max(0, 1.0 - lifeP * 0.85);
+    ctx.fillStyle = '#f59e0b';
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(v.x - v.size * 0.5, v.y - v.size * 0.5, v.size, v.size);
+    // Incandescent gold core
+    ctx.fillStyle = '#fef08a';
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.fillRect(v.x - v.size * 0.25, v.y - v.size * 0.25, v.size * 0.5, v.size * 0.5);
+  }
+  ctx.restore();
+}
+
+/**
+ * Smooth 5-Phase Attack Slash Animation for Skill 1 (Calamity Cleave Sequences 1 & 2)
+ * Renders a clean, double-tapered crescent slash ribbon locked 1:1 to the Dragon Slayer's
+ * cutting edge with a smooth tail-to-tip eraser wipe (Rule 15 & Rule 30).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {object} fighter
+ */
+export function drawGutsCalamitySlashVFX(ctx, fighter) {
+  if (!fighter || !fighter.calamityActive || !fighter.calamityTimer || fighter.calamityTimer <= 0) return;
+
+  const cfg = gutsConfig || {};
+  const isSeq2 = (fighter.calamitySeq === 2);
+  const r = fighter.r || 30;
+  const isBerserker = fighter.isBerserkerActive === true;
+
+  const windupF = isSeq2 ? (cfg.calamitySeq2WindupFrames ?? 18) : (cfg.calamityWindupFrames ?? 28);
+  const strikeF = isSeq2 ? (cfg.calamitySeq2StrikeFrames ?? 11) : (cfg.calamityStrikeFrames ?? 9);
+  const lockF = isSeq2 ? (cfg.calamitySeq2LockFrames ?? 18) : (cfg.calamityLockFrames ?? 22);
+  const recF = isSeq2 ? (cfg.calamitySeq2RecoveryFrames ?? 24) : (cfg.calamityRecoveryFrames ?? 0);
+
+  const totalF = fighter.calamityMax || (windupF + strikeF + lockF + recF);
+  const elapsed = Math.max(0, totalF - fighter.calamityTimer);
+  const strikeStart = windupF;
+  const strikeEnd = strikeStart + strikeF;
+
+  // Slash ribbon only visible starting from strike phase!
+  if (elapsed < strikeStart) return;
+
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations?.guts) || {};
+  const weaponReach = typeof fighter.getWeaponReach === 'function'
+    ? fighter.getWeaponReach()
+    : (85.0 * (custom.scale ?? 1.0) * (custom.lengthScale ?? 1.0));
+
+  const innerR = r * 0.42;
+  const outerR = r + weaponReach + 6;
+
+  // Sequence 1 sweeps from 3.32 rad down to -2.45 rad; Sequence 2 sweeps from 3.58 rad down to -0.65 rad
+  const originStart = isSeq2 ? 3.58 : 3.32;
+  const targetEnd = isSeq2 ? -0.65 : -2.45;
+  const maxArcSpan = 2.65; // ~152 deg smooth crescent arc span following the blade
+
+  const currentSwordAngle = typeof fighter._getSwordSwingAngle === 'function'
+    ? fighter._getSwordSwingAngle()
+    : targetEnd;
+
+  let currentStartAngle = Math.min(originStart, currentSwordAngle + maxArcSpan);
+  let currentEndAngle = currentSwordAngle;
+
+  if (elapsed >= strikeEnd) {
+    // Dynamic Tail-to-Tip Eraser Wipe (Rule 15 & Rule 30)
+    const wipeWindow = isSeq2 ? (lockF + recF * 0.4) : lockF;
+    const rp = Math.min(1.0, (elapsed - strikeEnd) / Math.max(1, wipeWindow));
+    const recP = Math.pow(rp, 1.35);
+    const lockStart = targetEnd + maxArcSpan;
+    currentStartAngle = lockStart + (targetEnd - lockStart) * recP;
+    currentEndAngle = targetEnd;
+  }
+
+  const angularSpan = Math.abs(currentEndAngle - currentStartAngle);
+  if (angularSpan > 0.04) {
+    const steps = 24;
+    const tx = fighter.swordTremorX || 0;
+    const ty = fighter.swordTremorY || 0;
+
+    ctx.save();
+    ctx.translate(fighter.x + tx, fighter.y + ty - (fighter.z || 0));
+    const aimAngle = fighter._isWinnerReveal ? 0 : (fighter.committedAttackAngle !== undefined ? fighter.committedAttackAngle : (fighter.gunAngle || 0));
+    ctx.rotate(aimAngle);
+    const facingLeft = Math.abs(aimAngle) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+    const mouthX = cfg.battleStanceMouthX ?? 0;
+    const mouthY = r * (cfg.battleStanceMouthY ?? 0.55);
+    const slashOffsets = typeof fighter._getSwordSwingOffsets === 'function'
+      ? fighter._getSwordSwingOffsets()
+      : { lunge: 0, offY: 0 };
+    ctx.translate(mouthX + (slashOffsets.lunge || 0), mouthY + (slashOffsets.offY || 0));
+
+    // 1. Outer Dark Iron / Amber Smoke Envelope (Double-Tapered Crescent)
+    ctx.fillStyle = isBerserker ? 'rgba(220, 38, 38, 0.42)' : 'rgba(24, 24, 27, 0.50)';
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const a = currentStartAngle + (currentEndAngle - currentStartAngle) * t;
+      const taper = Math.sin(t * Math.PI);
+      const rad = outerR + taper * 8;
+      const x = Math.cos(a) * rad;
+      const y = Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const a = currentStartAngle + (currentEndAngle - currentStartAngle) * t;
+      const taper = Math.sin(t * Math.PI);
+      const rad = innerR - taper * 4;
+      const x = Math.cos(a) * rad;
+      const y = Math.sin(a) * rad;
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // 2. Smooth Golden / Crimson Cutting Ribbon Body
+    ctx.fillStyle = isBerserker ? 'rgba(239, 68, 68, 0.55)' : 'rgba(251, 191, 36, 0.55)';
+    ctx.beginPath();
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const a = currentStartAngle + (currentEndAngle - currentStartAngle) * t;
+      const taper = Math.sin(t * Math.PI);
+      const rad = (innerR + outerR) * 0.5 + taper * 6;
+      const x = Math.cos(a) * rad;
+      const y = Math.sin(a) * rad;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    for (let i = steps; i >= 0; i--) {
+      const t = i / steps;
+      const a = currentStartAngle + (currentEndAngle - currentStartAngle) * t;
+      const taper = Math.sin(t * Math.PI);
+      const rad = (innerR + outerR) * 0.5 - taper * 6;
+      const x = Math.cos(a) * rad;
+      const y = Math.sin(a) * rad;
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Incandescent White Razor Core Line
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 3.2;
+    ctx.beginPath();
+    ctx.arc(0, 0, (innerR + outerR) * 0.5, currentStartAngle, currentEndAngle, currentStartAngle > currentEndAngle);
+    ctx.stroke();
+
+    // 4. Outer Cutting Edge Rim
+    ctx.strokeStyle = isBerserker ? '#dc2626' : '#f59e0b';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.arc(0, 0, outerR - 2, currentStartAngle, currentEndAngle, currentStartAngle > currentEndAngle);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+export function drawGutsCrescentWaves(ctx, fighter) {
+  if (!fighter || !fighter.activeCrescentWaves || fighter.activeCrescentWaves.length === 0) return;
+
+  for (const wave of fighter.activeCrescentWaves) {
+    const lifeP = Math.min(1.0, wave.age / Math.max(1, wave.maxAge));
+    const alpha = Math.max(0, 1.0 - Math.pow(lifeP, 1.4));
+    const width = wave.width || 140;
+    const isBerserker = wave.isBerserker === true;
+
+    ctx.save();
+    ctx.translate(wave.x, wave.y);
+    ctx.rotate(wave.angle);
+
+    // Warm ground light under the travelling wave
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(0, 0, width * 0.45, 18, 0, 0, Math.PI * 2);
+    ctx.fillStyle = isBerserker ? `rgba(220, 38, 38, ${0.25 * alpha})` : `rgba(251, 191, 36, ${0.28 * alpha})`;
+    ctx.fill();
+    ctx.restore();
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Frame 6 check: If wave is past 55% lifetime, split into twin trailing ribbons!
+    const isSplitting = lifeP > 0.55;
+    const splitProgress = isSplitting ? ((lifeP - 0.55) / 0.45) : 0;
+    const ribbonOffsets = isSplitting ? [-6 * splitProgress, 6 * splitProgress] : [0];
+
+    const steps = 18;
+    const isSeq2 = (wave.seq === 2);
+    const arcSpan = (isSeq2 ? 85 : 70) * Math.PI / 180;
+    const rad = width * 0.55;
+    const maxThick = isSplitting ? (isSeq2 ? 9.0 : 7.0) : (isSeq2 ? 18.0 : 14.0);
+
+    for (const ribbonOff of ribbonOffsets) {
+      ctx.save();
+      ctx.translate(ribbonOff, 0);
+
+      // Outer Golden Amber Ribbon
+      ctx.fillStyle = isBerserker
+        ? `rgba(239, 68, 68, ${0.75 * alpha})`
+        : `rgba(245, 158, 11, ${0.75 * alpha})`;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const a = -arcSpan * 0.5 + arcSpan * t;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15);
+        const rCurrent = rad + (maxThick * taper) * 0.5;
+        const x = Math.cos(a) * rCurrent - rad;
+        const y = Math.sin(a) * rCurrent;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      for (let i = steps; i >= 0; i--) {
+        const t = i / steps;
+        const a = -arcSpan * 0.5 + arcSpan * t;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15);
+        const rCurrent = rad - (maxThick * taper) * 0.5;
+        const x = Math.cos(a) * rCurrent - rad;
+        const y = Math.sin(a) * rCurrent;
+        ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fill();
+
+      // Razor-sharp Incandescent White Streak
+      ctx.strokeStyle = isBerserker ? '#ffffff' : '#fef08a';
+      ctx.lineWidth = isSplitting ? 1.8 : 3.0;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const a = -arcSpan * 0.5 + arcSpan * t;
+        const x = Math.cos(a) * rad - rad;
+        const y = Math.sin(a) * rad;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+}
+
+/**
+ * Trailing Ground Embers (Frame 6 Reference)
+ * Discrete glowing ember particles scattering along the ground (Rule 26 compliant).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {object} fighter
+ */
+export function drawGutsCalamityEmbers(ctx, fighter) {
+  if (!fighter || !fighter.activeCalamityEmbers || fighter.activeCalamityEmbers.length === 0) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (const e of fighter.activeCalamityEmbers) {
+    const lifeP = e.age / Math.max(1, e.maxAge);
+    const alpha = Math.max(0, 1.0 - lifeP);
+    ctx.fillStyle = e.color || '#fbbf24';
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(e.x - e.size * 0.5, e.y - e.size * 0.5, e.size, e.size);
+  }
+  ctx.restore();
+}
+
 export function drawGutsWeaponPreview(ctx, x = 0, y = 0, angle = 0, r = 28, opts = {}) {
   const custom = (typeof state !== 'undefined' && state.weaponCustomizations?.guts) || {};
   const customScale = custom.scale !== undefined ? custom.scale : 1.0;
@@ -507,11 +822,13 @@ export function drawGutsWeaponPreview(ctx, x = 0, y = 0, angle = 0, r = 28, opts
   _drawDragonSlayerModel(ctx, customScale, isBerserkerActive, customWidthScale, customLengthScale);
 
   if (opts.showHands !== false) {
-    const handRadius = r * 0.28;
-    // Right hand (Bandaged fist) on upper grip near crossguard
-    drawPixelHand(ctx, -4 * customScale * customLengthScale, 0, handRadius, '#e2e8f0', '#0E0F14');
-    // Left hand (Iron prosthetic fist) on lower grip near pommel
+    const skinCustom = (typeof state !== 'undefined' && state.skinCustomizations?.guts) || {};
+    const handScale = skinCustom.handScale ?? 1.0;
+    const handRadius = getHandSize ? getHandSize(r * 0.30 * handScale) : (r * 0.30 * handScale);
+    // Left hand (Iron prosthetic default hand) on lower grip near pommel
     drawPixelHand(ctx, -13 * customScale * customLengthScale, 0, handRadius, '#4a505a', '#0E0F14');
+    // Right hand (Bandaged default hand) on upper grip near crossguard
+    drawPixelHand(ctx, -4 * customScale * customLengthScale, 0, handRadius, '#e2e8f0', '#0E0F14');
   }
 
   ctx.restore();

@@ -8041,6 +8041,8 @@ async function runInteractionTests() {
 
     const guts = new GutsFighter({ x: 100, y: 300, radius: 25, hp: 460, maxHp: 460 });
     const target = new Fighter({ x: 160, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    guts.enableDragonSlayer = true;
+    guts.enableBasicAttack = true;
     guts.team = 0;
     target.team = 1;
 
@@ -8052,7 +8054,13 @@ async function runInteractionTests() {
     state.arena = { x: 0, y: 0, width: 800, height: 600, centerObstacle: null };
 
     try {
-      // 1. Initial State: not swinging, swipeCooldown is 0
+      // 0. Toggle verification: when basic attack toggle is disabled, swipeActive remains false
+      guts.enableDragonSlayer = 0;
+      guts._trySwordSwipe(target, 0);
+      assert(guts.swipeActive === false, 'Guts basic attack must be suppressed when enableDragonSlayer is 0');
+
+      // 1. Re-enable basic attack and verify initial state
+      guts.enableDragonSlayer = true;
       assert(guts.swipeActive === false, 'Guts must not be swinging initially');
       assert(guts.swordSwingTimer === 0, 'Guts swordSwingTimer must be 0 initially');
       assert(guts.swordComboStep === 1, 'Guts initial combo step must be 1');
@@ -8080,7 +8088,89 @@ async function runInteractionTests() {
       assert(target.suppressFreezeOverlay === false, 'Target stasis must release on unpause');
       assert(target.vx > 0, 'Target must receive forward knockback impulse from cleave');
 
-      console.log('      ✅ Guts Knight-Standard 5-Phase Sword Swing & Simple Attack Animation verified successfully.');
+      // Verify canvas stack balance
+      const { drawGutsComboSlashVFX, drawGutsWeapons } = await import('../js/graphics/weapons/gutsWeaponGraphics.js');
+      mockCtx.resetStackDepth();
+      drawGutsWeapons(mockCtx, guts, guts.r, false);
+      drawGutsComboSlashVFX(mockCtx, guts);
+      assert(mockCtx.getStackDepth() === 0, 'Guts sword graphics must keep Canvas 2D stack balanced');
+
+      // 5. Test Skill 1: Calamity Cleave & Supersonic Crescent Wave (Frames 1–6 Reference)
+      guts.swipeActive = false;
+      guts.swordSwingTimer = 0;
+      guts.calamityCooldown = 0;
+      guts.enableSkill1 = true;
+      guts.enableCalamityCleave = true;
+      target.hp = 500;
+      target.x = 160;
+      target.y = 300;
+
+      guts._castCalamityCleave(target);
+      assert(guts.calamityActive === true, 'Guts calamityActive must be true on cast');
+      assert(guts.calamityTimer > 0, 'Guts calamityTimer must initialize');
+
+      // Step through full 2-sequence Calamity Cleave combo (Frames 1–12)
+      let seq2ReachedInCombo = false;
+      let seq1Count = 0;
+      let seq2Count = 0;
+      for (let f = 0; f < 200; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        if (guts.calamityActive) {
+          if (guts.calamitySeq === 1) seq1Count++;
+          if (guts.calamitySeq === 2) seq2Count++;
+        }
+        guts.update(target, 0, state.arena);
+        if (guts.calamitySeq === 2) seq2ReachedInCombo = true;
+
+        mockCtx.resetStackDepth();
+        drawGutsWeapons(mockCtx, guts, guts.r, false);
+        drawGutsComboSlashVFX(mockCtx, guts);
+        assert(mockCtx.getStackDepth() === 0, 'Calamity Cleave VFX must keep Canvas 2D stack balanced');
+
+        if (!guts.calamityActive) break;
+      }
+      assert(seq2ReachedInCombo === true, 'Calamity Cleave Sequence 1 must chain seamlessly into Sequence 2');
+      assert(seq1Count >= 55, `Calamity Cleave Sequence 1 must complete its follow-through lock before Sequence 2 (got ${seq1Count} frames)`);
+      assert(seq2Count >= 65, `Calamity Cleave Sequence 2 must complete its full animation after Sequence 1 (got ${seq2Count} frames)`);
+      assert(guts.activeCrescentWaves.length === 0, 'Calamity Cleave must only use the smooth attack slash animation without extra wave projectiles');
+
+      // Test Sequence 2 directly (Frames 7–12 standalone trigger)
+      guts.calamityCooldown = 0;
+      guts._castCalamitySeq2(target);
+      assert(guts.calamityActive === true, 'Guts calamityActive must be true on Seq 2 cast');
+      assert(guts.calamitySeq === 2, 'Guts calamitySeq must be 2');
+      for (let f = 0; f < 90; f++) {
+        guts.update(target, 0, state.arena);
+
+        mockCtx.resetStackDepth();
+        drawGutsWeapons(mockCtx, guts, guts.r, false);
+        drawGutsComboSlashVFX(mockCtx, guts);
+        assert(mockCtx.getStackDepth() === 0, 'Calamity Cleave Seq 2 VFX must keep Canvas 2D stack balanced');
+        if (!guts.calamityActive) break;
+      }
+
+      // 6. Verify Fighter Index Menu & Preview Integration
+      const { FIGHTER_DEFS } = await import('../js/core/config.js');
+      const gutsDef = FIGHTER_DEFS.find(d => d.type === 'guts');
+      assert(gutsDef !== undefined, 'Guts def must exist in FIGHTER_DEFS');
+      assert(gutsDef.ability.includes('Calamity Cleave'), 'Guts def ability must display Calamity Cleave in Fighter Index');
+
+      const { updateIndexDetailDemo, resetIndexDetailState } = await import('../js/graphics/preview.js');
+      state.indexInspectIndex = FIGHTER_DEFS.findIndex(d => d.type === 'guts');
+      state.indexDemoAnim = 'calamity';
+      const demoArea = { x: 50, y: 100, width: 400, height: 350 };
+      const demoState = resetIndexDetailState(gutsDef, demoArea);
+      assert(demoState && demoState.fighter, 'Fighter Index demo state must initialize for Guts');
+
+      // Advance demo frames
+      for (let df = 0; df < 30; df++) {
+        updateIndexDetailDemo(gutsDef, demoArea);
+        mockCtx.resetStackDepth();
+        demoState.fighter.draw(mockCtx, demoState.target);
+        assert(mockCtx.getStackDepth() === 0, 'Guts Fighter Index preview draw must keep Canvas 2D stack balanced');
+      }
+
+      console.log('      ✅ Guts Knight-Standard 5-Phase Sword Swing, Skill 1 Calamity Cleave & Fighter Index Integration verified successfully.');
     } finally {
       state.getFighterTeam = prevGetTeam;
       state.mode = prevMode;
