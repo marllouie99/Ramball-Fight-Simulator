@@ -12,6 +12,7 @@ import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
 import { renderSukunaDomainBackground, renderSukunaDomainForeground, renderSukunaDomainSlashLines, clearDomainSlashLines } from './sukuna/sukunaDomainVisuals.js';
 import { checkSpiderwebTrigger as modCheckSpiderweb, activateSpiderweb as modActivateSpiderweb, fireDivineFlame as modFireDivineFlame, activateReverseCursedTechnique as modActivateRCT, doDomainRapidSlashes as modDomainRapidSlashes, applyDomainEffect as modApplyDomainEffect } from './sukuna/sukunaSkills.js';
 import { spawnTeleportAfterimages as modSpawnTeleportAfterimages, executeTeleportDodge as modExecuteTeleportDodge, teleportAwayFrom as modTeleportAwayFrom, updateMeleeCombat as modUpdateMeleeCombat, teleportToMeleeAngle as modTeleportToMeleeAngle } from './sukuna/sukunaCombat.js';
+import { initMahoragaSummon, resetMahoragaSummon, updateMahoragaSummon } from './sukuna/sukunaMahoragaSummon.js';
 import { drawSukunaBody } from '../../graphics/fighters/sukunaSkin.js';
 import { SukunaRenderer } from '../../graphics/fighters/sukunaRenderer.js';
 
@@ -82,6 +83,10 @@ export class SukunaFighter extends Fighter {
     this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 0.25;
     this.damageNumberColor = '#ff4455';
     this.hasUnderBodyAura = true;
+
+    // Optional Skill: Ten Shadows — summon Mahoraga as a temporary allied minion
+    initMahoragaSummon(this);
+
     this._registerSkills();
   }
 
@@ -135,6 +140,18 @@ export class SukunaFighter extends Fighter {
         cooldownMax: CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700,
         allowsFrozenCooldownTick: true,
         bypassParalyze: true
+      });
+    }
+    // Optional Skill: Ten Shadows — Mahoraga summon (cooldown is driven by the summon module)
+    if (this.isSkillEnabled(CONFIG.sukuna?.enableMahoragaSummon, true)) {
+      skills.push({
+        id: 'mahoraga',
+        name: 'TEN SHADOWS',
+        type: 'summon',
+        cooldownKey: 'mahoragaSummonCooldown',
+        cooldownMax: CONFIG.sukuna?.mahoragaSummonCooldown ?? 1500,
+        activeKey: 'mahoragaSummonActive',
+        allowsFrozenCooldownTick: false
       });
     }
     this.skillManager.registerSkills(skills);
@@ -297,6 +314,9 @@ export class SukunaFighter extends Fighter {
     this.slashHitCount = 0;
     this.critChance = CONFIG.sukuna?.baseCritChance || 0.10;
     this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 1.50;
+
+    // Reset Optional Skill: Ten Shadows — Mahoraga summon
+    resetMahoragaSummon(this);
   }
 
   // ── STACKING SLASH CRIT PASSIVE ──
@@ -587,6 +607,9 @@ export class SukunaFighter extends Fighter {
         return v.timer > 0;
       });
     }
+
+    // Optional Skill: Ten Shadows — Mahoraga summon lifecycle & minion AI
+    updateMahoragaSummon(this, ownerIndex, arena);
 
     // Intro Wall Rebound Stage
     if (this.introReboundActive) {

@@ -35,6 +35,13 @@ export function shouldSkipProjectileTarget(projectile, fighter, fighterIndex, is
   if (projectile.ownerFighter && projectile.ownerFighter === fighter) return true;
   if (typeof projectile.owner === 'number' && fighterIndex !== -1 && projectile.owner === fighterIndex) return true;
   if (isIllusion && fighter.owner && projectile.ownerFighter && fighter.owner === projectile.ownerFighter) return true;
+  // Summoned minions never collide with their own summoner's projectiles
+  if (fighter.isMahoragaSummon && fighter.owner) {
+    const summonOwnerIndex = (typeof fighter.ownerIndex === 'number')
+      ? fighter.ownerIndex
+      : (fighters ? fighters.indexOf(fighter.owner) : -1);
+    if (typeof projectile.owner === 'number' && projectile.owner === summonOwnerIndex) return true;
+  }
 
   if (fighterIndex !== -1 && isSameTeam(projectile.owner, fighterIndex)) return true;
   if (isIllusion && fighter.owner) {

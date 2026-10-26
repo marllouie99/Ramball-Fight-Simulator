@@ -10091,6 +10091,240 @@ async function runInteractionTests() {
   }
 
   console.log('───────────────────────────────────────────────────────');
+  // =========================================================================
+  // 95. Sukuna Optional Skill: Ten Shadows — Mahoraga Summon Minion
+  // =========================================================================
+  {
+    console.log('   95. Testing Sukuna Ten Shadows Mahoraga Summon Minion...');
+    const { CONFIG } = await import('../js/core/config.js');
+    const { state } = await import('../js/core/state.js');
+    const { updateIllusions } = await import('../js/systems/illusionSystem.js');
+    const {
+      trySummonMahoraga,
+      updateMahoragaSummon,
+      dispelMahoragaSummon,
+      drawMahoragaSummon
+    } = await import('../js/entities/fighters/sukuna/sukunaMahoragaSummon.js');
+    const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+
+    const arena = { x: 45, y: 240, width: 450, height: 450, shape: 'rect' };
+    state.arena = arena;
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.illusions = [];
+
+    // 1. Config surface is fully tunable and audio is wired
+    const sc = CONFIG.sukuna || {};
+    assert(sc.enableMahoragaSummon === true, 'Sukuna config must expose enableMahoragaSummon (optional skill master toggle)');
+    assert(typeof sc.mahoragaSummonCooldown === 'number' && sc.mahoragaSummonCooldown > 0, 'Sukuna config must define mahoragaSummonCooldown');
+    assert(sc.mahoragaSummonDuration === undefined && sc.mahoragaSummonDurationFrames === undefined, 'The Mahoraga summon must have NO lifetime cap in config');
+    assert(typeof sc.mahoragaSummonStatScale === 'number' && sc.mahoragaSummonStatScale > 0, 'Sukuna config must define mahoragaSummonStatScale (Mahoraga attribute inheritance multiplier)');
+    assert(CONFIG.mahoraga && CONFIG.mahoraga.hp > 0 && CONFIG.mahoraga.swordDamage > 0, 'CONFIG.mahoraga must expose the fighter attributes the summon inherits');
+    assert(sc.sounds && sc.sounds.mahoragaSummon, 'Sukuna config must register the Mahoraga summon audio source');
+    assert(sc.soundVolumes && typeof sc.soundVolumes.mahoragaSummon === 'number', 'Sukuna config must register the Mahoraga summon audio volume');
+
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const sukuna = new SukunaClass({ x: 150, y: 420, type: 'sukuna' });
+    sukuna.x = 150;
+    sukuna.y = 420;
+    const prey = new Fighter({ id: 'dummy', name: 'DUMMY', type: 'dummy', hp: 400, maxHp: 400 });
+    prey.x = 400;
+    prey.y = 420;
+    state.fighters = [sukuna, prey];
+
+    // 2. Skill registered on the fighter and exposed in the Sukuna HUD card row
+    assert(sukuna.skillManager.hasSkill('mahoraga'), 'Sukuna must register the optional `mahoraga` summon skill');
+    const hudSkills = getSkillDataForFighter(sukuna, () => []);
+    const hudCard = hudSkills.find((s) => s && s.id === 'mahoraga');
+    assert(hudCard, 'Sukuna HUD must expose a MAHORAGA summon skill card');
+    assert(hudCard.label === 'MAHORAGA', `Sukuna HUD card label must be MAHORAGA, got ${hudCard.label}`);
+
+    // Neutralize Sukuna's own offense so only the minion can damage the dummy
+    const originalShoot = sukuna.shoot;
+    const originalMelee = sukuna._updateMeleeCombat;
+    sukuna.shoot = () => false;
+    sukuna._updateMeleeCombat = () => {};
+    sukuna.meleeModeCooldown = 999999;
+    prey.shoot = () => false;
+
+    // 3. Summon fires once the cooldown is ready and spawns exactly one Mahoraga minion
+    sukuna.mahoragaSummonCooldown = 0;
+    const summoned = trySummonMahoraga(sukuna, 0, arena);
+    assert(summoned === true, 'trySummonMahoraga must summon Mahoraga when off cooldown with a live enemy present');
+    const minions = state.illusions.filter((m) => m && m.isMahoragaSummon);
+    assert(minions.length === 1, `Expected exactly 1 Mahoraga minion after summon, got ${minions.length}`);
+    const minion = minions[0];
+    assert(minion.owner === sukuna, 'Mahoraga minion must be owned by the summoning Sukuna');
+    // Attribute parity: the summoned general inherits Mahoraga's own fighter stats 1:1
+    const mahAttr = CONFIG.mahoraga;
+    const statScale = sc.mahoragaSummonStatScale;
+    const expectedR = (mahAttr.r ?? mahAttr.radius ?? 30) * (CONFIG.globalFighter?.sizeMultiplier ?? 1.0) * (CONFIG.internalScale ?? 1.0);
+    assert(minion.r === expectedR, `Minion radius must equal Mahoraga's (${expectedR}), got ${minion.r}`);
+    assert(minion.maxHp === Math.round(mahAttr.hp * statScale), `Minion max HP must equal Mahoraga's HP x scale (${Math.round(mahAttr.hp * statScale)}), got ${minion.maxHp}`);
+    assert(minion.moveSpeed === mahAttr.moveSpeed * statScale, `Minion move speed must equal Mahoraga's (${mahAttr.moveSpeed}), got ${minion.moveSpeed}`);
+    assert(minion.swordDamage === mahAttr.swordDamage * statScale, `Minion sword damage must equal Mahoraga's swordDamage (${mahAttr.swordDamage}), got ${minion.swordDamage}`);
+    assert(minion.attackInterval === mahAttr.swordCooldown, `Minion attack interval must equal Mahoraga's swordCooldown (${mahAttr.swordCooldown}), got ${minion.attackInterval}`);
+    assert(minion._attrs && minion._attrs.cleaveDamage === mahAttr.cleaveDamage * statScale, 'Minion AoE cleave damage must equal Mahoraga cleaveDamage');
+    assert(minion._attrs && minion._attrs.shoutDamage === mahAttr.shoutDamage * statScale, 'Minion Divine Shout damage must equal Mahoraga shoutDamage');
+    assert(minion._attrs && minion._attrs.maxStages === mahAttr.maxAdaptationStages, 'Minion wheel adaptation stack must equal Mahoraga maxAdaptationStages');
+    assert(typeof minion.takeDamage === 'function' && typeof minion.applyHitStun === 'function', 'Mahoraga minion must expose engine-compatible damage/status hooks');
+    assert(sukuna.mahoragaSummonActive === true, 'Sukuna must flag mahoragaSummonActive while the minion lives');
+    assert(sukuna.mahoragaSummonTimer === undefined || sukuna.mahoragaSummonTimer === 0, 'The summon must not run a lifetime timer');
+
+    // Duplicate summons are rejected while one is already active
+    assert(trySummonMahoraga(sukuna, 0, arena) === false, 'A second Mahoraga must not be summoned while the first is active');
+    assert(state.illusions.filter((m) => m && m.isMahoragaSummon).length === 1, 'Duplicate summon guard must keep exactly 1 minion');
+
+    // 4. Minion emerges, advances on the enemy, and lands Mahoraga's sword strikes
+    const preyHpBefore = prey.hp;
+    const distBefore = Math.hypot(prey.x - minion.x, prey.y - minion.y);
+    for (let frame = 0; frame < 220; frame++) {
+      sukuna.update(prey, 0, arena);
+    }
+    assert(prey.hp < preyHpBefore, `Summoned Mahoraga must strike the enemy with his inherited sword kit (HP stayed at ${prey.hp})`);
+    const distAfter = Math.hypot(prey.x - minion.x, prey.y - minion.y);
+    assert(distAfter < distBefore + 1, `Mahoraga must close distance on the enemy (from ${distBefore.toFixed(1)} to ${distAfter.toFixed(1)})`);
+    assert(Number.isFinite(minion.x) && Number.isFinite(minion.y), 'Mahoraga position must stay finite during the chase');
+    assert(
+      minion.x >= arena.x + minion.r - 1 && minion.x <= arena.x + arena.width - minion.r + 1 &&
+      minion.y >= arena.y + minion.r - 1 && minion.y <= arena.y + arena.height - minion.r + 1,
+      `Mahoraga must stay clamped inside the arena (got ${minion.x.toFixed(1)}, ${minion.y.toFixed(1)})`
+    );
+
+    // 5. Canvas 2D draw is stack-balanced while emerging and while fighting
+    const drawCtx = createMockCtx();
+    minion.spawnTimer = 20;
+    minion.spawnScale = 0.6;
+    drawCtx.resetStackDepth();
+    drawMahoragaSummon(drawCtx, minion);
+    assert(drawCtx.getStackDepth() === 0, `drawMahoragaSummon must balance the canvas stack during emergence, got ${drawCtx.getStackDepth()}`);
+    minion.spawnTimer = 0;
+    minion.spawnScale = 1;
+    drawCtx.resetStackDepth();
+    drawMahoragaSummon(drawCtx, minion);
+    assert(drawCtx.getStackDepth() === 0, `drawMahoragaSummon must balance the canvas stack in combat, got ${drawCtx.getStackDepth()}`);
+
+    // 6. Wheel of Adaptation clicks from accumulated damage, heals, and rotates the wheel
+    minion.spawnTimer = 0;
+    minion.spawnScale = 1;
+    minion.dodgeIFrames = 0;
+    minion.hp = minion.maxHp;
+    const stageBefore = minion.adaptStage || 0;
+    const hpBeforeAdapt = minion.hp;
+    const expectedHit = Math.ceil(minion.maxHp * 0.90);
+    minion.takeDamage(expectedHit, prey, { isMelee: true });
+    assert(minion.adaptStage === stageBefore + 1, `Accumulating >40% max HP damage must click the wheel (stage ${minion.adaptStage}, expected ${stageBefore + 1})`);
+    assert(minion.wheelTargetRotation > 0, 'Wheel must rotate to the new adaptation stage');
+    assert(minion.hp > hpBeforeAdapt - expectedHit, `Wheel click must restore RCT HP (from ${hpBeforeAdapt} to ${minion.hp})`);
+    assert(minion.doubleDamageTimer > 0, 'Wheel click must open the double-damage window');
+
+    // 7. Inherited AoE Cleave
+    minion.adaptCooldown = 0;
+    minion.cleaveTimer = 0;
+    minion.doubleDamageTimer = 0;
+    prey.hp = 400;
+    prey.x = minion.x + 40;
+    prey.y = minion.y;
+    const hpBeforeCleave = prey.hp;
+    updateMahoragaSummon(sukuna, 0, arena);
+    assert(hpBeforeCleave - prey.hp >= mahAttr.cleaveDamage * statScale, `Inherited Cleave must deal at least Mahoraga cleaveDamage (${mahAttr.cleaveDamage}) - dealt ${hpBeforeCleave - prey.hp}`);
+
+    // 8. Inherited Divine Shout (directional cone)
+    minion.shoutTimer = 0;
+    prey.hp = 400;
+    prey.x = minion.x + 120;
+    prey.y = minion.y;
+    minion.gunAngle = 0;
+    minion.angle = 0;
+    const hpBeforeShout = prey.hp;
+    updateMahoragaSummon(sukuna, 0, arena);
+    assert(hpBeforeShout - prey.hp >= mahAttr.shoutDamage * statScale, `Inherited Divine Shout must deal at least Mahoraga shoutDamage (${mahAttr.shoutDamage}) - dealt ${hpBeforeShout - prey.hp}`);
+
+    // 9. Slaying the minion removes it, clears Sukuna's state, and starts the cooldown
+    minion.takeDamage(99999, prey, { isPlayer: true });
+    updateIllusions();
+    assert(state.illusions.filter((m) => m && m.isMahoragaSummon).length === 0, 'Slain Mahoraga must be removed from state.illusions');
+    assert(sukuna.mahoragaSummonActive === false, 'Sukuna must clear mahoragaSummonActive when Mahoraga is slain');
+    assert(sukuna.mahoragaMinion === null, 'Sukuna must drop the dead minion reference');
+    assert(sukuna.mahoragaSummonCooldown === sc.mahoragaSummonCooldown, `Slaying Mahoraga must start the config cooldown (${sc.mahoragaSummonCooldown}), got ${sukuna.mahoragaSummonCooldown}`);
+
+    // 10. No lifetime cap: Mahoraga persists until slain (or his summoner dies)
+    prey.hp = 4000;
+    prey.maxHp = 4000;
+    prey.isDead = false;
+    prey.dead = false;
+    prey.x = 400;
+    prey.y = 420;
+    sukuna.mahoragaSummonCooldown = 0;
+    assert(trySummonMahoraga(sukuna, 0, arena) === true, 'Mahoraga must be re-summonable once the cooldown has elapsed');
+    const persistent = sukuna.mahoragaMinion;
+    for (let frame = 0; frame < 420; frame++) {
+      // Keep the dummy alive so the round never flips to matchEnd while we test persistence
+      prey.hp = Math.max(prey.hp, 1000);
+      prey.isDead = false;
+      prey.dead = false;
+      sukuna.update(prey, 0, arena);
+    }
+    prey.hp = 4000;
+    prey.isDead = false;
+    prey.dead = false;
+    state.gameState = 'playing';
+    assert(state.illusions.includes(persistent), 'Summoned Mahoraga must NOT expire on his own (no duration cap)');
+    assert(persistent.hp > 0 && sukuna.mahoragaSummonActive === true, 'Summoned Mahoraga must stay active indefinitely while alive');
+
+    // 11. Friendly-fire immunity: Sukuna and his team cannot damage the summon, in either direction
+    const { applyDamageToTarget } = await import('../js/entities/fighter.js');
+    const { projectileSystem: projSystem } = await import('../js/systems/projectileSystem.js');
+    const hpBeforeFriendly = persistent.hp;
+    const friendlyResult = persistent.takeDamage(60, sukuna, { isMelee: true });
+    assert(friendlyResult === false || persistent.hp === hpBeforeFriendly, 'Sukuna must NOT damage his own summoned Mahoraga');
+    assert(persistent.hp === hpBeforeFriendly, `Friendly fire must be ignored (HP changed from ${hpBeforeFriendly} to ${persistent.hp})`);
+    // Direct pipeline call (domain slashes / cleaves / AoE use this path)
+    assert(applyDamageToTarget(persistent, 55, sukuna, { isMelee: true }) === false, 'applyDamageToTarget must reject Sukuna\'s damage to his summon');
+    // Projectile-attributed damage resolves back to the summoner and is also rejected
+    assert(applyDamageToTarget(persistent, 55, { owner: 0, ownerFighter: sukuna, damage: 55 }, { isProjectile: true }) === false, 'Sukuna\'s projectiles must pass through his summon');
+    // Sukuna's Fuga thermobaric blast cannot scorch the summon
+    if (typeof projSystem.triggerThermobaricExplosion === 'function') {
+      projSystem.triggerThermobaricExplosion(persistent.x, persistent.y, 0, 150);
+      assert(persistent.hp === hpBeforeFriendly, `Divine Flame blast must not damage the summon (HP ${hpBeforeFriendly} -> ${persistent.hp})`);
+    }
+    // The summon never hurts its own summoner (cleave / shout / sword)
+    const sukunaHpBefore = sukuna.hp;
+    assert(applyDamageToTarget(sukuna, 80, persistent, { isMelee: true }) === false, 'The summon must never damage its own summoner');
+    assert(sukuna.hp === sukunaHpBefore, `Summoner HP must be untouched by his summon (${sukunaHpBefore} -> ${sukuna.hp})`);
+    // Enemy damage still lands
+    const enemyResult = persistent.takeDamage(30, prey, { isMelee: true });
+    assert(enemyResult !== false && persistent.hp < hpBeforeFriendly, 'Enemy damage must still damage the summon');
+    dispelMahoragaSummon(sukuna, { silent: true, instantCooldown: true });
+
+    // 12. Master toggle disables the skill entirely (no summon, no HUD card)
+    const originalToggle = CONFIG.sukuna.enableMahoragaSummon;
+    CONFIG.sukuna.enableMahoragaSummon = false;
+    sukuna.mahoragaSummonCooldown = 0;
+    assert(trySummonMahoraga(sukuna, 0, arena) === false, 'Disabled enableMahoragaSummon must block the summon entirely');
+    assert(state.illusions.filter((m) => m && m.isMahoragaSummon).length === 0, 'Disabled skill must not leave a minion in the arena');
+    assert(!getSkillDataForFighter(sukuna, () => []).some((s) => s && s.id === 'mahoraga'), 'Disabled skill must be hidden from the Sukuna HUD');
+    CONFIG.sukuna.enableMahoragaSummon = originalToggle;
+
+    // 13. Owner death dismisses the minion
+    sukuna.mahoragaSummonCooldown = 0;
+    trySummonMahoraga(sukuna, 0, arena);
+    assert(state.illusions.some((m) => m && m.isMahoragaSummon), 'Precondition: Mahoraga must be alive before owner death check');
+    sukuna.hp = 0;
+    sukuna.isDead = true;
+    updateMahoragaSummon(sukuna, 0, arena);
+    assert(state.illusions.filter((m) => m && m.isMahoragaSummon).length === 0, 'Mahoraga must vanish when Sukuna dies');
+
+    // Cleanup
+    dispelMahoragaSummon(sukuna, { silent: true, instantCooldown: true });
+    sukuna.shoot = originalShoot;
+    sukuna._updateMeleeCombat = originalMelee;
+    state.illusions = [];
+    state.fighters = [];
+    console.log('      ✅ Sukuna Ten Shadows Mahoraga Summon (spawn, AI, damage, no lifetime cap, friendly-fire immunity, death, toggle, HUD) verified successfully.');
+  }
+
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }
 

@@ -132,6 +132,28 @@ export const sukunaConfig = {
     domainRadius: 240,            // Target proximity radius around shrine (0 or arena-wide if open-barrier)
     domainRampRatePerSec: 0.10,   // Damage ramp multiplier per second target stays inside domain (10% per sec)
 
+    // ── OPTIONAL SKILL: Ten Shadows — Summon Mahoraga (Divine General Minion) ──
+    // Sukuna summons the Divine General Mahoraga as a temporary allied minion.
+    // Toggle `enableMahoragaSummon` off to disable the skill entirely (HUD card disappears too).
+    enableMahoragaSummon: true,       // MASTER TOGGLE for the Mahoraga summon skill
+    mahoragaSummonCooldown: 500,     // Frames before Mahoraga can be re-summoned after being slain
+    mahoragaSummonInitialCooldown: 420, // First summon availability delay (7.0s at 60fps)
+    // NOTE: the summon has NO duration — Mahoraga stays in the arena until he is slain or Sukuna dies.
+    mahoragaSummonMaxActive: 1,       // Maximum simultaneous Mahoraga minions
+    // The minion inherits ALL of Mahoraga's fighter attributes 1:1 (see CONFIG.mahoraga):
+    // radius 30, HP 250, moveSpeed 6.5, sword damage/range/cooldown, heavy punch, AoE cleave,
+    // Divine Shout and the Eight-Handled Wheel adaptation stack. This scale is the only override.
+    mahoragaSummonStatScale: 1.0,     // 1.0 = identical to the arena Mahoraga fighter
+    mahoragaSummonVolumeScale: 1.0,   // 1.0 = Mahoraga's own combat sound volumes
+    mahoragaSummonSpawnFrames: 45,    // Shadow-rise emergence duration
+    mahoragaSummonShakeIntensity: 5,  // Screen shake on emergence
+    mahoragaSummonShakeDuration: 10,  // Screen shake duration on emergence
+    mahoragaSummonBlitzCooldown: 150, // Frames between neutral close-quarters teleports
+    mahoragaSummonBlitzDistance: null, // Override teleport distance (null = Mahoraga's neutralTeleportDistance)
+    mahoragaSummonBlitzMinGap: 110,   // Minimum distance to the target before Mahoraga teleports in
+    mahoragaSummonShatterDamage: 18,  // Dispersion burst damage when the minion is slain (no lifetime cap)
+    mahoragaSummonShatterRadius: 130, // Dispersion burst radius
+
     // Audio configuration, volume & timing delay adjustments (delays measured in frames @ 60fps)
     sounds: {
       punch: 'Assets/Sound Effects/Attacks/punch.mp3',
@@ -150,6 +172,11 @@ export const sukunaConfig = {
       domainExpansion: 'Assets/Sound Effects/Skills/shrine.mp3',
       domainDeploy: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
       spiderweb: 'Assets/Sound Effects/Skills/hookchain.mp3',
+      mahoragaSummon: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
+      mahoragaArise: 'Assets/Sound Effects/Skills/mahoraga-wheelclick.mp3',
+      mahoragaAttack: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+      mahoragaImpact: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+      mahoragaDispel: 'Assets/Sound Effects/Skills/enhance.mp3',
       reverseCursedTechnique: 'Assets/Sound Effects/Skills/enhance.mp3',
       rapidSlashVoiceline: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
       championVoiceline: 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3'
@@ -171,6 +198,11 @@ export const sukunaConfig = {
       domainExpansion: 2.75,
       domainDeploy: 2.55,
       spiderweb: 0.40,
+      mahoragaSummon: 1.60,
+      mahoragaArise: 1.40,
+      mahoragaAttack: 0.70,
+      mahoragaImpact: 0.85,
+      mahoragaDispel: 0.60,
       reverseCursedTechnique: 0.55,
       rapidSlashVoiceline: 0.0,
       championVoiceline: 1.75
@@ -188,6 +220,11 @@ export const sukunaConfig = {
       fugaIgnite: 0,
       fugaTravel: 0,
       fugaExplosion: 0,
+      mahoragaSummon: 0,
+      mahoragaArise: 0,
+      mahoragaAttack: 0,
+      mahoragaImpact: 0,
+      mahoragaDispel: 0,
       domainExpansion: 0,
       championVoiceline: 68
     },

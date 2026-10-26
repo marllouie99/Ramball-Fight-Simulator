@@ -39,22 +39,22 @@ export function getFrontRadiusTargets(fighter, maxRangeOffset = 75, coneAngle = 
   const targets = [];
   if (typeof state === 'undefined' || !state || !state.fighters) return targets;
 
-  const myIndex = state.fighters.indexOf(fighter);
+  const effectiveFighter = fighter.owner || fighter;
+  const myIndex = state.fighters.indexOf(effectiveFighter);
   const myTeam = state.getFighterTeam(myIndex);
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
 
   const candidates = [...state.fighters, ...(state.illusions || [])];
   for (const f of candidates) {
     if (!f || f === fighter || f.hp <= 0 || f.isDead) continue;
+    if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) continue;
+    if (f.owner && (f.owner === fighter || f.owner === fighter.owner)) continue;
+    if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) continue;
 
-    const idx = state.fighters.indexOf(f);
+    const idx = state.fighters.indexOf(f.owner || f);
     if (idx !== -1) {
       const enemyTeam = state.getFighterTeam(idx);
       if (myTeam !== null && enemyTeam === myTeam) continue;
-    } else if (f.owner) {
-      const ownerIdx = state.fighters.indexOf(f.owner);
-      const ownerTeam = state.getFighterTeam(ownerIdx);
-      if (myTeam !== null && ownerTeam === myTeam) continue;
     }
 
     const dx = f.x - fighter.x;
@@ -393,6 +393,8 @@ export function shootBladeBarrage(fighter, ownerIndex) {
 export function initiateLevel8WallSlam(fighter, opponent) {
   if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableWallSlam, true)) return;
   if (!opponent || opponent.hp <= 0 || opponent.isDead) return;
+  if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(opponent)) return;
+  if (fighter.owner && (opponent === fighter.owner || opponent.owner === fighter.owner)) return;
   if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0 || (typeof fighter.isPulledOrDragged === 'function' && fighter.isPulledOrDragged())) return;
 
   // Block initiation if Mahoraga is caught inside Gojo's active Hollow Purple
@@ -919,23 +921,24 @@ export function executeShout(fighter, opponent, ownerIndex) {
 
   // Damage all enemies (fighters & illusions) caught in the long-range cone
   if (state.fighters) {
-    const myIndex = state.fighters.indexOf(fighter);
+    const effectiveFighter = fighter.owner || fighter;
+    const myIndex = state.fighters.indexOf(effectiveFighter);
     const myTeam = state.getFighterTeam(myIndex);
 
     const targetList = [...state.fighters, ...(state.illusions || [])];
 
     targetList.forEach((f) => {
       if (!f || f === fighter || f.hp <= 0) return;
+      if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) return;
+      if (f.owner && (f.owner === fighter || f.owner === fighter.owner)) return;
+      if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) return;
 
       // Avoid hitting teammates or friendly illusions
       let isTeammate = false;
-      if (state.fighters.includes(f)) {
-        const idx = state.fighters.indexOf(f);
+      const effectiveTarget = f.owner || f;
+      if (state.fighters.includes(effectiveTarget)) {
+        const idx = state.fighters.indexOf(effectiveTarget);
         const enemyTeam = state.getFighterTeam(idx);
-        isTeammate = myTeam !== null && enemyTeam === myTeam;
-      } else if (f.owner) {
-        const ownerIdx = state.fighters.indexOf(f.owner);
-        const enemyTeam = state.getFighterTeam(ownerIdx);
         isTeammate = myTeam !== null && enemyTeam === myTeam;
       }
       if (isTeammate) return;

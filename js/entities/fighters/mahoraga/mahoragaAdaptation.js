@@ -652,12 +652,20 @@ export function triggerAdaptation(fighter, type, attacker) {
 
   triggerMahoragaGammaRayRainbow(fighter);
 
-  // Freeze all enemy targets on screen (excluding Lawnmowers)
+  // Freeze all enemy targets on screen (excluding Lawnmowers, teammates, and summoner)
   const targetsToFreeze = [];
-  if (attacker && attacker !== fighter && attacker.hp > 0 && !attacker.isLawnmower && !attacker.isUntargetable && attacker.characterId !== 'crazydave_lawnmower') targetsToFreeze.push(attacker);
+  if (attacker && attacker !== fighter && attacker.hp > 0 && !attacker.isLawnmower && !attacker.isUntargetable && attacker.characterId !== 'crazydave_lawnmower') {
+    if (!fighter.isTeammate || !fighter.isTeammate(attacker)) {
+      if (!fighter.owner || (attacker !== fighter.owner && attacker.owner !== fighter.owner)) {
+        targetsToFreeze.push(attacker);
+      }
+    }
+  }
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0 && !f.isLawnmower && !f.isUntargetable && f.characterId !== 'crazydave_lawnmower' && !targetsToFreeze.includes(f)) {
+        if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) return;
+        if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) return;
         targetsToFreeze.push(f);
       }
     });
@@ -1113,6 +1121,8 @@ export function adaptToPureLoveBeam(fighter) {
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0) {
+        if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) return;
+        if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) return;
         f.mahoragaAdaptationFreezeTimer = pauseFrames;
         f.vx = 0;
         f.vy = 0;
@@ -1221,6 +1231,8 @@ export function adaptToYutaFlurry(fighter) {
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0) {
+        if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) return;
+        if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) return;
         f.mahoragaAdaptationFreezeTimer = pauseFrames;
         f.vx = 0;
         f.vy = 0;
@@ -1287,6 +1299,8 @@ export function adaptToThinIceBreaker(fighter) {
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0) {
+        if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) return;
+        if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) return;
         f.mahoragaAdaptationFreezeTimer = pauseFrames;
         f.vx = 0;
         f.vy = 0;
@@ -1359,6 +1373,8 @@ export function adaptToSoulDisfigurement(fighter) {
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0) {
+        if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) return;
+        if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) return;
         f.mahoragaAdaptationFreezeTimer = pauseFrames;
         f.vx = 0;
         f.vy = 0;
@@ -1431,6 +1447,8 @@ export function adaptToSaitamaCounter(fighter, attacker) {
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0) {
+        if (typeof fighter.isTeammate === 'function' && fighter.isTeammate(f)) return;
+        if (fighter.owner && (f === fighter.owner || f.owner === fighter.owner)) return;
         f.mahoragaAdaptationFreezeTimer = pauseFrames;
         f.vx = 0;
         f.vy = 0;

@@ -11,6 +11,7 @@ import { drawTargetChainsOverlay } from '../weapons/makimaWeaponGraphics.js';
 import { draw24FPSFrameStasisOverlay } from '../weapons/naoyaWeaponGraphics.js';
 import { drawMakiImpaledTargetOverlay } from '../weapons/makiWeaponGraphics.js';
 import { drawServantOfCthulhuMinion } from '../fighters/eyeOfCthulhuSkin.js';
+import { drawMahoragaSummon } from '../../entities/fighters/sukuna/sukunaMahoragaSummon.js';
 import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
 import { drawFighterInkOutline, drawFighterFloorShadow } from './fighterOutlineRenderer.js';
 import { drawPokeBallSummonUnder, drawPokeBallSummonOver } from './PokeBallSummonRenderer.js';
@@ -1338,6 +1339,11 @@ export function drawIllusions() {
         drawTargetChainsOverlay(ctx, illusion, illusion._makimaChainer || null);
       }
       continue; // Skip standard doppelganger loop
+    }
+
+    if (illusion.isMahoragaSummon) {
+      drawMahoragaSummon(ctx, illusion);
+      continue;
     }
 
     if (illusion.isServantOfCthulhu) {

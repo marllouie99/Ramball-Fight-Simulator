@@ -349,7 +349,12 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
-  const rotAngle = fighter.angle || 0;
+  const isWinnerScreen = Boolean(
+    fighter._isWinnerReveal || 
+    fighter.owner?._isWinnerReveal ||
+    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+  );
+  const rotAngle = isWinnerScreen ? 0 : (fighter.angle || 0);
   ctx.rotate(rotAngle);
   if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
 
@@ -1147,7 +1152,13 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   const shoulderY = 0;
 
   // Rotate shoulder position by bodyAngle (fighter.angle) so arm stays attached to the spinning body
-  const bodyAngle = (fighterObj && fighterObj.angle) || 0;
+  const isWinnerScreen = Boolean(
+    fighterObj?._isWinnerReveal || 
+    fighterObj?.owner?._isWinnerReveal ||
+    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+  );
+  const bodyAngle = isWinnerScreen ? 0 : ((fighterObj && fighterObj.angle) || 0);
+  const effGunAngle = isWinnerScreen ? 0 : gunAngle;
   const cosB = Math.cos(bodyAngle);
   const sinB = Math.sin(bodyAngle);
   const rotatedShoulderX = shoulderX * cosB - shoulderY * sinB;
@@ -1164,11 +1175,11 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   ctx.save();
   ctx.translate(rotatedShoulderX, rotatedShoulderY);
   
-  // Rotate by gunAngle, swingAngle, and the upward lift tilt
-  ctx.rotate(gunAngle + swingAngle + liftTilt);
+  // Rotate by effGunAngle, swingAngle, and the upward lift tilt
+  ctx.rotate(effGunAngle + swingAngle + liftTilt);
 
   // Flip Y when facing left so sword faces target correctly
-  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
+  const facingLeft = Math.abs(effGunAngle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
   const isDark = _isDarkMode();
@@ -1478,7 +1489,13 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   const leftShoulderY = 0;
 
   // Rotate shoulder position by bodyAngle (fighter.angle) so arm stays attached to the spinning body
-  const bodyAngle = fighter.angle || 0;
+  const isWinnerScreen = Boolean(
+    fighter._isWinnerReveal || 
+    fighter.owner?._isWinnerReveal ||
+    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+  );
+  const bodyAngle = isWinnerScreen ? 0 : (fighter.angle || 0);
+  const effGunAngle = isWinnerScreen ? 0 : gunAngle;
   const cosB = Math.cos(bodyAngle);
   const sinB = Math.sin(bodyAngle);
   const rotatedShoulderX = leftShoulderX * cosB - leftShoulderY * sinB;
@@ -1489,16 +1506,16 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   ctx.save();
   ctx.translate(rotatedShoulderX, rotatedShoulderY);
   
-  // Rotate the fist & visual trails by gunAngle toward target
-  let handAngle = gunAngle;
+  // Rotate the fist & visual trails by effGunAngle toward target
+  let handAngle = effGunAngle;
   let handDist = -r * 0.35 + punchLunge;
   if (isGuarding) {
-    handAngle = gunAngle - Math.PI * 0.35;
+    handAngle = effGunAngle - Math.PI * 0.35;
     handDist = -r * 0.15;
   } else if (isWallSlamGrab && grabWindupProgress > 0) {
     // Deep menacing power windup coil behind shoulder
     const windupAngle = -Math.PI * 0.42 * grabWindupProgress;
-    handAngle = gunAngle + windupAngle;
+    handAngle = effGunAngle + windupAngle;
     handDist = -r * 0.35 - 14 * grabWindupProgress;
   }
 
@@ -1512,7 +1529,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   }
 
   // Flip Y when facing left
-  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
+  const facingLeft = Math.abs(effGunAngle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
   const isDarkLeft = _isDarkMode();

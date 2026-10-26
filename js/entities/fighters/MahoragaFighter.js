@@ -17,6 +17,7 @@ import { gojoPurpleTeleportDodge, gojoRedTeleportDodge, startAdaptationFlashDash
 import { performMeleeAttack, executeCleave, shootBladeBarrage, executeShout, getFrontRadiusTargets, playRandomHeavyPunchSound, initiateLevel8WallSlam, updateLevel8WallSlam } from './mahoraga/mahoragaCombat.js';
 import { drawMahoragaFighter } from './mahoraga/mahoragaVisuals.js';
 import { SKILL_REGISTRY } from '../../configs/skills/skillRegistry.js';
+import { registerMahoragaClass } from './sukuna/sukunaMahoragaSummon.js';
 
 export class MahoragaFighter extends Fighter {
   constructor(def) {
@@ -28,6 +29,8 @@ export class MahoragaFighter extends Fighter {
     this.skinColor = (def && def.skinColor) || (CONFIG.mahoraga?.skinColor) || '#F5F5DC';
     this.baseSpeed = (def && def.moveSpeed !== undefined) ? def.moveSpeed : (CONFIG.mahoraga?.moveSpeed ?? 6.5);
     this.speed = this.baseSpeed;
+    this.spinRate = 0;
+    if (this._def && typeof this._def === 'object') this._def.spinRate = 0;
     
     // Adaptation Tracking (Multi-stage up to 8 wheel turns!)
     this.hitsTaken = {
@@ -259,19 +262,6 @@ export class MahoragaFighter extends Fighter {
     this.throwBarrageShotsLeft = 0;
     this.throwBarrageTimer = 0;
     this.wallBounceCount = 0;
-  }
-
-  interruptAttacks(forceCancelAll = false) {
-    super.interruptAttacks(forceCancelAll);
-    this.postDashPauseTimer = 0;
-    this.isWallReboundDashing = false;
-    this.isShouting = false;
-    this.shoutPhase = null;
-    this.shoutWindupTimer = 0;
-    this.shoutRecoveryTimer = 0;
-    if (forceCancelAll && this.activeSonicBooms) {
-      this.activeSonicBooms.length = 0;
-    }
   }
 
   /**
@@ -562,6 +552,12 @@ export class MahoragaFighter extends Fighter {
       this.leftPunchTimer = 0;
       this.currentPunchProgress = 0;
       this.sakugaImpactTimer = 0;
+      this.postDashPauseTimer = 0;
+      this.isWallReboundDashing = false;
+    }
+
+    if (forceCancelAll && this.activeSonicBooms) {
+      this.activeSonicBooms.length = 0;
     }
 
     // Restore afterimages that were preserved
@@ -963,6 +959,28 @@ export class MahoragaFighter extends Fighter {
     // Rule 25: Non-freezing active visual effects decay routine
     this._updateSonicBooms();
 
+    const isMatchEnded = typeof state !== 'undefined' && (
+      state.gameState === 'roundEnd' || 
+      state.gameState === 'matchEnd'
+    );
+    if (isMatchEnded) {
+      this.interruptAttacks(true);
+      this.isShouting = false;
+      this.shoutPhase = null;
+      this.shoutWindupTimer = 0;
+      this.shoutRecoveryTimer = 0;
+      this.isCleaving = false;
+      this.isThrowing = false;
+      this.isWallSlamActive = false;
+      this.isWallReboundDashing = false;
+      this.vx = 0;
+      this.vy = 0;
+      this.angle = 0;
+      this.gunAngle = 0;
+      if (this.activeSonicBooms) this.activeSonicBooms.length = 0;
+      return;
+    }
+
     const isInfinityFrozen = handleInfinityFreeze(this);
     const isFrozen = this._handleTimeStop() || isInfinityFrozen;
 
@@ -1281,7 +1299,7 @@ export class MahoragaFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
 
-      if (opponent && opponent !== this && opponent.hp > 0) {
+      if (opponent && opponent !== this && opponent.hp > 0 && (!this.isTeammate || !this.isTeammate(opponent)) && opponent !== this.owner) {
         opponent.mahoragaAdaptationFreezeTimer = Math.max(opponent.mahoragaAdaptationFreezeTimer || 0, this.adaptationPauseTimer);
         opponent.vx = 0;
         opponent.vy = 0;
@@ -2075,6 +2093,11 @@ export class MahoragaFighter extends Fighter {
     this.domainExposureCount = 0;
     this.totalAccumDamage = 0;
     this.fatalAdaptCooldown = 0;
+    this.isShouting = false;
+    this.shoutPhase = null;
+    this.shoutWindupTimer = 0;
+    this.shoutRecoveryTimer = 0;
+    if (this.activeSonicBooms) this.activeSonicBooms.length = 0;
     spawnDroppedMahoragaWheel(this);
     super.onDeath();
   }
@@ -2083,3 +2106,5 @@ export class MahoragaFighter extends Fighter {
     drawMahoragaFighter(ctx, this, opponent);
   }
 }
+
+registerMahoragaClass(MahoragaFighter);

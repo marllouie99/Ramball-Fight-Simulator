@@ -11,6 +11,7 @@ import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
 import { spawnMahitoSoulExplosion, spawnBiteAttackEffect, spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
 import { audioSystem } from './audioSystem.js';
 import { clampRikaToArena } from '../entities/fighters/yuta/rikaLogic.js';
+import { handleMahoragaSummonDeath } from '../entities/fighters/sukuna/sukunaMahoragaSummon.js';
 
 // Minimum HP an illusion must have had to be eligible for splitting on death.
 // Low threshold — even weak illusions should split as long as children get > 0 HP.
@@ -194,6 +195,12 @@ export function updateIllusions() {
     // Illusions only disappear when they die (HP <= 0), not by duration
     if (illusion.hp <= 0) {
       if (illusion.isRika) continue; // Rika handles her own death animation
+
+      // Ten Shadows: Sukuna's summoned Mahoraga disappears with a dispersion burst
+      if (illusion.isMahoragaSummon) {
+        handleMahoragaSummonDeath(illusion);
+        continue;
+      }
       
       if ((illusion.isTransfiguredHuman || illusion.isEvasionMinion) && !illusion.isDying) {
         const mahitoCfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
@@ -524,6 +531,12 @@ export function updateIllusions() {
       illusion.vx = 0;
       illusion.vy = 0;
       continue; // Completely frozen by paralyze stun!
+    }
+
+    // Ten Shadows: Sukuna's summoned Mahoraga drives its own movement, attacks, and lifetime
+    // inside sukunaMahoragaSummon.js (its HP/stun/knockback timers are still ticked above).
+    if (illusion.isMahoragaSummon) {
+      continue;
     }
 
     // Apply velocity - illusions bounce naturally off walls (frozen inside sphere)

@@ -15,6 +15,7 @@ export const mahoragaConfig = {
     hp: 250,
     speed: 6.5,
     moveSpeed: 6.5,
+    spinRate: 0,
     r: 30,
     radius: 30,
     color: '#FFD700', // Gold / divine adaptation theme

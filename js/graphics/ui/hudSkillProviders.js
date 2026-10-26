@@ -438,6 +438,18 @@ export const HUD_SKILL_PROVIDERS = {
       skills.push({ id: 'rct', pct: rctPct, ready: rctPct >= 99 && (f.reverseCursedTechniqueCooldown || 0) <= 0 && (f.rctVisualTimer || 0) <= 0, color: themeColor, label: 'RCT' });
     }
 
+    // 4. Optional Skill: Ten Shadows — Mahoraga summon
+    if (isSkillEnabled(cfg.enableMahoragaSummon, true)) {
+      const summonMax = cfg.mahoragaSummonCooldown || 1500;
+      const summonTimer = f.mahoragaSummonCooldown !== undefined ? f.mahoragaSummonCooldown : summonMax;
+      const summonLive = Boolean(f.mahoragaSummonActive && f.mahoragaMinion && f.mahoragaMinion.hp > 0);
+      // No lifetime cap: while Mahoraga is alive the card reads full/active until he is slain.
+      const summonPct = summonLive
+        ? 100
+        : Math.max(0, Math.min(100, (1 - (summonTimer / summonMax)) * 100));
+      skills.push({ id: 'mahoraga', pct: summonPct, ready: summonLive || (summonPct >= 99 && (f.mahoragaSummonCooldown || 0) <= 0), color: '#FFD700', label: 'MAHORAGA', active: summonLive });
+    }
+
     return skills;
   },
 

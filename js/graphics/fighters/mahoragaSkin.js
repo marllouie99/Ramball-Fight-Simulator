@@ -3,10 +3,23 @@
 // Contains eye-socket wings, ritual chest necklace, and facial features.
 // ─────────────────────────────────────────────
 
-let cachedWingUL = null;
-let cachedWingUR = null;
-let cachedWingLL = null;
-let cachedWingLR = null;
+import { state } from '../../core/state.js';
+
+const _cachedWingBuffersMap = new Map();
+
+function _getWingBuffers(r) {
+  let buffers = _cachedWingBuffersMap.get(r);
+  if (!buffers) {
+    buffers = {
+      ul: renderSingleWingBuffer(r, -1, true),
+      ur: renderSingleWingBuffer(r, 1, true),
+      ll: renderSingleWingBuffer(r, -1, false),
+      lr: renderSingleWingBuffer(r, 1, false)
+    };
+    _cachedWingBuffersMap.set(r, buffers);
+  }
+  return buffers;
+}
 
 function renderSingleWingBuffer(r, side, isUpper) {
   // Render at HALF resolution — when drawn at 2x with imageSmoothingEnabled=false,
@@ -264,17 +277,17 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   if (!fighter) return;
 
   const r = fighter.r || 30;
-  if (!cachedWingUL) {
-    cachedWingUL = renderSingleWingBuffer(r, -1, true);
-    cachedWingUR = renderSingleWingBuffer(r, 1, true);
-    cachedWingLL = renderSingleWingBuffer(r, -1, false);
-    cachedWingLR = renderSingleWingBuffer(r, 1, false);
-  }
+  const wingBuffers = _getWingBuffers(r);
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
   
-  const rotAngle = fighter.angle || 0;
+  const isWinnerScreen = Boolean(
+    fighter._isWinnerReveal || 
+    fighter.owner?._isWinnerReveal ||
+    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+  );
+  const rotAngle = isWinnerScreen ? 0 : (fighter.angle || 0);
   ctx.rotate(rotAngle);
   if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
 
@@ -302,7 +315,7 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   ctx.translate(ulPivotX, ulPivotY + floatY);
   ctx.rotate(ulFlap);
   ctx.translate(-ulPivotX, -ulPivotY - floatY);
-  ctx.drawImage(cachedWingUL, -180 - wingGap, -110 + floatY, dw, dh);
+  ctx.drawImage(wingBuffers.ul, -180 - wingGap, -110 + floatY, dw, dh);
   ctx.restore();
 
   // 2. Upper Right Wing
@@ -311,7 +324,7 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   ctx.translate(urPivotX, urPivotY + floatY);
   ctx.rotate(urFlap);
   ctx.translate(-urPivotX, -urPivotY - floatY);
-  ctx.drawImage(cachedWingUR, -180 + wingGap, -110 + floatY, dw, dh);
+  ctx.drawImage(wingBuffers.ur, -180 + wingGap, -110 + floatY, dw, dh);
   ctx.restore();
 
   // 3. Lower Left Wing
@@ -320,7 +333,7 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   ctx.translate(llPivotX, llPivotY + floatY * 0.8);
   ctx.rotate(llFlap);
   ctx.translate(-llPivotX, -llPivotY - floatY * 0.8);
-  ctx.drawImage(cachedWingLL, -180 - wingGap, -110 + floatY * 0.8, dw, dh);
+  ctx.drawImage(wingBuffers.ll, -180 - wingGap, -110 + floatY * 0.8, dw, dh);
   ctx.restore();
 
   // 4. Lower Right Wing
@@ -329,7 +342,7 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   ctx.translate(lrPivotX, lrPivotY + floatY * 0.8);
   ctx.rotate(lrFlap);
   ctx.translate(-lrPivotX, -lrPivotY - floatY * 0.8);
-  ctx.drawImage(cachedWingLR, -180 + wingGap, -110 + floatY * 0.8, dw, dh);
+  ctx.drawImage(wingBuffers.lr, -180 + wingGap, -110 + floatY * 0.8, dw, dh);
   ctx.restore();
 
   ctx.imageSmoothingEnabled = prevSmoothing;
@@ -345,7 +358,12 @@ export function drawMahoragaChestNecklace(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
   
-  const rotAngle = fighter.angle || 0;
+  const isWinnerScreen = Boolean(
+    fighter._isWinnerReveal || 
+    fighter.owner?._isWinnerReveal ||
+    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+  );
+  const rotAngle = isWinnerScreen ? 0 : (fighter.angle || 0);
   ctx.rotate(rotAngle);
   if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
 
@@ -594,7 +612,12 @@ export function drawMahoragaSkin(ctx, fighter) {
   const r = fighter.r || 30;
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-  const angle = fighter.angle || 0;
+  const isWinnerScreen = Boolean(
+    fighter._isWinnerReveal || 
+    fighter.owner?._isWinnerReveal ||
+    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+  );
+  const angle = isWinnerScreen ? 0 : (fighter.angle || 0);
   ctx.rotate(angle);
   if (Math.abs(angle) > Math.PI / 2) ctx.scale(1, -1);
 

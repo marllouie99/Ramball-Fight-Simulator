@@ -204,6 +204,31 @@ export function resolveDamageNumberColor(attacker, opts = {}, fallback = '#EF444
   return fallback;
 }
 
+/** Makima chains invert allegiances, so allied minion rules must stand down for chained entities. */
+function isMakimaInvertedEntity(entity) {
+  return Boolean(entity && (entity.isChainedByMakima || entity.isMindControlledByMakima));
+}
+
+/**
+ * True when `source` is the summoner of `summoned` or shares its team (FFA/Boss/2v2 team resolution).
+ * Shared by the Ten Shadows summon friendly-fire guards.
+ */
+function isFriendlyToSummon(summoned, source) {
+  if (!source || !summoned || !summoned.owner || source === summoned) return false;
+  if (source === summoned.owner) return true;
+  if (typeof state !== 'undefined' && Array.isArray(state.fighters) && state.fighters.length > 0) {
+    const ownerIdx = state.fighters.indexOf(summoned.owner);
+    const sourceIdx = state.fighters.indexOf(source);
+    if (ownerIdx !== -1 && sourceIdx !== -1 && typeof state.getFighterTeam === 'function') {
+      const ownerTeam = state.getFighterTeam(ownerIdx);
+      const sourceTeam = state.getFighterTeam(sourceIdx);
+      if (ownerTeam !== null && ownerTeam !== undefined && ownerTeam === sourceTeam) return true;
+    }
+  }
+  const ownerRawTeam = summoned.owner.team;
+  return ownerRawTeam !== undefined && ownerRawTeam !== null && source.team === ownerRawTeam;
+}
+
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
   if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
@@ -228,11 +253,46 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
     attacker = state.fighters[attacker] || null;
   }
 
+  // Summoned minions (e.g. Sukuna's Ten Shadows Mahoraga) are immune to friendly fire
+  // from their summoner and their summoner's team — projectiles, domain slashes and AoE
+  // blasts from allies pass through them harmlessly, and the minion can never hurt its
+  // own summoner or allies either.
+  let attackerRoot = attacker;
+  const isEntityLike = Boolean(attacker && typeof attacker === 'object' && (
+    typeof attacker.hp === 'number' ||
+    typeof attacker.takeDamage === 'function' ||
+    attacker.isIllusion ||
+    attacker.isMinion ||
+    (typeof state !== 'undefined' && Array.isArray(state.fighters) && state.fighters.includes(attacker))
+  ));
+  if (attacker && typeof attacker === 'object' && !isEntityLike) {
+    // Resolve indirect damage sources (projectiles, beams, blasts) back to the entity that fired them
+    if (attacker.ownerFighter && typeof attacker.ownerFighter === 'object') {
+      attackerRoot = attacker.ownerFighter;
+    } else if (typeof attacker.owner === 'number' && typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      attackerRoot = state.fighters[attacker.owner] || attacker;
+    } else if (attacker.owner && typeof attacker.owner === 'object' && typeof state !== 'undefined' && Array.isArray(state.fighters) && state.fighters.includes(attacker.owner)) {
+      attackerRoot = attacker.owner;
+    }
+  }
+
+  if (target.isMahoragaSummon || (attackerRoot && attackerRoot.isMahoragaSummon)) {
+    const summon = target.isMahoragaSummon ? target : attackerRoot;
+    const source = target.isMahoragaSummon ? attackerRoot : target;
+    if (!isMakimaInvertedEntity(target) && !isMakimaInvertedEntity(attackerRoot) && isFriendlyToSummon(summon, source)) {
+      return false;
+    }
+  }
+
   const globalDamageScale = (typeof BalanceManager !== 'undefined' && BalanceManager.getGlobalMultipliers)
     ? (BalanceManager.getGlobalMultipliers().damageScale || 1.0)
     : 1.0;
   if (!opts.isPureUnscaled) {
     amount = (Number(amount) || 0) * globalDamageScale;
+  }
+
+  if (target.isMahoragaSummon && typeof target.takeDamage === 'function') {
+    return target.takeDamage(amount, attacker, opts);
   }
 
   if (target.isIllusion) {
@@ -246,17 +306,24 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       amount = 0;
     }
 
-    const multiplier = target.isTransfiguredHuman
+    const multiplier = (target.isTransfiguredHuman || target.isMahoragaSummon)
       ? 1.0
       : Number(CONFIG.doppleganger?.illusionDamageReceivedMultiplier || 1);
     const armorMultiplier = (!opts.isTrueDamage && target.nanamiArmorFractureTimer > 0)
       ? (1.0 + (target.nanamiArmorFractureAmount || 0.20))
       : 1.0;
-    const effectiveAmount = amount * multiplier * armorMultiplier;
+    let effectiveAmount = amount * multiplier * armorMultiplier;
+    // Optional entity-side mitigation (e.g. Mahoraga's wheel adaptation defense buff)
+    if (typeof target.preprocessIncomingDamage === 'function') {
+      effectiveAmount = target.preprocessIncomingDamage(effectiveAmount, attacker, opts);
+    }
     const prevHp = currentHp;
     target.hp = Math.max(0, Number((currentHp - effectiveAmount).toFixed(2)));
 
     if (target.hp < prevHp && effectiveAmount > 0) {
+      if (typeof target.onIncomingDamageApplied === 'function') {
+        target.onIncomingDamageApplied(Math.max(0, prevHp - target.hp), attacker, opts);
+      }
       if (attacker && typeof attacker.onDamageDealt === 'function') {
         attacker.onDamageDealt(target, opts.projectile || null, (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(attacker) : -1, effectiveAmount);
       }
@@ -523,7 +590,13 @@ export class Fighter {
     }
 
     const resolvedOther = other.owner || other;
-    if (resolvedOther === this) return true;
+    const resolvedThis = this.owner || this;
+    if (resolvedOther === resolvedThis) return true;
+    if (resolvedOther === this || other === resolvedThis) return true;
+    if (this.owner && (other === this.owner || other.owner === this.owner)) return true;
+    if (other.owner && (other.owner === this || other.owner === this.owner)) return true;
+    if (this.owner && typeof this.owner.isTeammate === 'function' && this.owner.isTeammate(other)) return true;
+    if (other.owner && typeof other.owner.isTeammate === 'function' && other.owner.isTeammate(this)) return true;
     if (this.team !== undefined && resolvedOther.team !== undefined && this.team === resolvedOther.team) return true;
     if (typeof state !== 'undefined' && state && typeof state.getFighterTeam === 'function' && state.fighters) {
       const myIdx = state.fighters.indexOf(this.owner || this);
@@ -2655,6 +2728,15 @@ export class Fighter {
       }
     }
 
+    // Universal teammate friendly fire check across all modes (including summons & minions)
+    if (!isHeal && attacker && (attacker === this || (typeof this.isTeammate === 'function' && this.isTeammate(attacker)) || (typeof attacker.isTeammate === 'function' && attacker.isTeammate(this)))) {
+      const attackerIsChained = Boolean(attacker.isChainedByMakima || attacker.isMindControlledByMakima);
+      const targetIsChained = Boolean(this.isChainedByMakima || this.isMindControlledByMakima);
+      if (!attackerIsChained && !targetIsChained) {
+        return false;
+      }
+    }
+
     // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks
     const hasBushEvade = Boolean(this.isBushEvadeActive && this.isHidingInBush);
     if ((this.evadeBuffTimer > 0 || hasBushEvade) && amount > 0 && !isGuaranteedHit && !this.isChainedByMakima) {
@@ -3537,6 +3619,7 @@ export class Fighter {
       if (!ent || ent === this) continue;
       if (!this.isValidAimTarget(ent)) continue;
       if (ent.owner === this) continue;
+      if (this.owner && (ent === this.owner || ent.owner === this.owner)) continue;
       if (typeof this.isTeammate === 'function' && this.isTeammate(ent)) continue;
 
       if (myTeam !== null && myTeam !== undefined) {
