@@ -134,7 +134,7 @@ export const gutsConfig = {
   // Sequence 1 Timing & Combat Values (Frames 1–6)
   calamityWindupFrames: 28,      // Frames 1–3: Frame 2 ready tilt (12f) & Frame 3 deep coil (16f) - smooth buildup
   calamityStrikeFrames: 5,       // Frame 4: Visible, sweeping cleave stroke (smooth cleave, not snappy!)
-  calamityLockFrames: 22,        // Frames 5–6: Solid follow-through lock over opposite shoulder (-140°) while Wave 1 flies
+  calamityLockFrames: 15,        // Frames 5–6: Solid follow-through lock over opposite shoulder (-140°) while Wave 1 flies
   calamityRecoveryFrames: 0,     // 0 recovery frames on Seq 1 so sword angle does NOT reset before Sequence 2 follow-up!
   calamityMeleeDamage: 65,       // Direct point-blank cleave damage
   calamityWaveDamage: 45,        // Ejected travelling crescent wave damage
