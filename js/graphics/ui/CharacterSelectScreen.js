@@ -43,6 +43,9 @@ let _lastCardWheelTime = 0;
 let _lastCardClickTime = 0;
 let _lastCardClickIdx = -1;
 let _playerCardBounds = [];
+let tlfsPoolPage = 0;
+let _tlfsEnemyPoolBounds = null;
+let _lastTlfsWheelTime = 0;
 
 
 function drawSurvivorBriefingCard(x, y, w, h) {
@@ -130,14 +133,32 @@ function drawSurvivorBriefingCard(x, y, w, h) {
 }
 
 function drawTlfsEnemyPoolGrid(x, y, w, h) {
-  const { ctx } = state;
-  // Deep Comic Shadow
+  const { ctx, canvas } = state;
+  const isLandscape = (canvas && canvas.width > 600) || state.viewOrientation === 'horizontal';
+
+  // 1. Resolve and sanitize pool fighters (exclude dummies & hidden fighters)
+  const currentDefs = getActiveFighterDefs();
+  const poolFighters = currentDefs
+    .map((def, idx) => ({ def, idx }))
+    .filter(({ def }) => def && def.type !== 'dummy' && def.isAvailableInArena !== false);
+
+  // Auto-initialize if empty or corrupted
+  if (!Array.isArray(state.tlfsAllowedEnemies) || state.tlfsAllowedEnemies.length === 0) {
+    state.tlfsAllowedEnemies = poolFighters.map(f => f.idx);
+  } else {
+    const validIdxSet = new Set(poolFighters.map(f => f.idx));
+    state.tlfsAllowedEnemies = state.tlfsAllowedEnemies.filter(i => validIdxSet.has(i));
+    if (state.tlfsAllowedEnemies.length < 5 && poolFighters.length >= 5) {
+      state.tlfsAllowedEnemies = poolFighters.slice(0, 5).map(f => f.idx);
+    }
+  }
+
+  // 2. Base Container Frame & Deep Comic Drop Shadow
   ctx.save();
   ctx.fillStyle = 'rgba(5, 7, 10, 0.75)';
   ctx.fillRect(x + 4, y + 5, w, h);
 
-  // Dark Comic Slate Base
-  ctx.fillStyle = '#14151D';
+  ctx.fillStyle = '#12141C';
   ctx.fillRect(x, y, w, h);
 
   // Solid Black Manga Ink Outer Frame
@@ -145,15 +166,20 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
   ctx.lineWidth = 3.5;
   ctx.strokeRect(x, y, w, h);
 
-  // Header band
-  const headerH = 28;
+  // Subtle interior border
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+
+  // 3. Header Band
+  const headerH = isLandscape ? 30 : 32;
   ctx.fillStyle = '#10121A';
   ctx.fillRect(x + 2, y + 2, w - 4, headerH);
   ctx.strokeStyle = '#050609';
   ctx.lineWidth = 2;
   ctx.strokeRect(x + 2, y + 2, w - 4, headerH);
 
-  // Top accent pinstripe
+  // Top accent amber pinstripe
   ctx.fillStyle = '#F5A623';
   ctx.fillRect(x + 8, y + 2, w - 16, 2.5);
 
@@ -162,108 +188,310 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
   ctx.beginPath();
   ctx.rect(x + 2, y + 2, w - 4, headerH);
   ctx.clip();
-  _drawComicHalftoneField(ctx, x + 4, y + 2, w - 8, headerH, 'rgba(245, 166, 35, 0.25)');
+  _drawComicHalftoneField(ctx, x + 4, y + 2, w - 8, headerH, 'rgba(245, 166, 35, 0.22)');
   ctx.restore();
 
+  // Header Title
   ctx.fillStyle = '#FFFFFF';
   ctx.font = '900 12px "Outfit", "Rajdhani", sans-serif';
-  ctx.textAlign = 'center';
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillText('[ ENEMY GAUNTLET POOL ]', x + w / 2, y + 16);
-  ctx.restore();
+  ctx.fillText('⚔️ [ ENEMY GAUNTLET POOL ]', x + 14, y + headerH / 2 + 1);
 
-  const cols = w > 400 ? 6 : 4;
-  const padding = 12;
-  const availableW = w - padding * 2;
-  const gap = 6;
-  const cellW = Math.floor((availableW - gap * (cols - 1)) / cols);
-  const cellH = 56;
-  
-  const startX = x + padding;
-  let startY = y + 38;
-  
-  const currentDefs = getActiveFighterDefs();
-  const poolFighters = currentDefs.map((def, idx) => ({ def, idx })).filter(({ def }) => def.type !== 'dummy');
-  
-  poolFighters.forEach(({ def, idx }, listPos) => {
-    const col = listPos % cols;
-    const row = Math.floor(listPos / cols);
-    const cellX = startX + col * (cellW + gap);
-    const cellY = startY + row * (cellH + gap);
-    
+  // Active Count Chip in Header Right
+  const activeCount = state.tlfsAllowedEnemies.length;
+  const isAllActive = activeCount === poolFighters.length;
+  const chipText = `${activeCount} / ${poolFighters.length} ACTIVE`;
+  ctx.font = '900 10px "Outfit", "Rajdhani", sans-serif';
+  const chipW = ctx.measureText(chipText).width + 16;
+  const chipH = 20;
+  const chipX = x + w - chipW - 12;
+  const chipY = y + (headerH - chipH) / 2 + 1;
+
+  ctx.fillStyle = isAllActive ? 'rgba(245, 166, 35, 0.16)' : 'rgba(34, 197, 94, 0.16)';
+  ctx.fillRect(chipX, chipY, chipW, chipH);
+  ctx.strokeStyle = isAllActive ? '#F5A623' : '#22C55E';
+  ctx.lineWidth = 1.2;
+  ctx.strokeRect(chipX, chipY, chipW, chipH);
+
+  ctx.fillStyle = isAllActive ? '#FFE145' : '#4ADE80';
+  ctx.textAlign = 'center';
+  ctx.fillText(chipText, chipX + chipW / 2, chipY + chipH / 2 + 0.5);
+
+  // 4. Sub-Header Toolbar Row (Quick Actions)
+  const subH = isLandscape ? 26 : 28;
+  const subY = y + headerH + 2;
+  ctx.fillStyle = '#161924';
+  ctx.fillRect(x + 2, subY, w - 4, subH);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + 2, subY + subH);
+  ctx.lineTo(x + w - 2, subY + subH);
+  ctx.stroke();
+
+  // Sub-header left text: Run Info
+  ctx.fillStyle = '#8B9BB4';
+  ctx.font = '800 10px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  const chalHp = MODE_SETTINGS[GAME_MODES.TLFS]?.challengerFixedHp || 500;
+  ctx.fillText(`⚡ 5 CHALLENGERS • ${chalHp} HP`, x + 14, subY + subH / 2);
+
+  // Sub-header right action buttons (Pills)
+  const pillH = 18;
+  const pillY = subY + (subH - pillH) / 2;
+
+  // Button 1: [ ALL ]
+  const allBtnW = isLandscape ? 44 : 52;
+  const allBtnX = x + w - allBtnW - 12;
+  drawButton('ALL', allBtnX + allBtnW / 2, pillY + pillH / 2, () => {
+    state.tlfsAllowedEnemies = poolFighters.map(f => f.idx);
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_dash5', 0.12);
+    }
+  }, allBtnW, pillH, '#202636', 3);
+
+  // Button 2: [ RANDOM 5 ]
+  const rand5BtnW = isLandscape ? 66 : 74;
+  const rand5BtnX = allBtnX - rand5BtnW - 6;
+  drawButton('RANDOM 5', rand5BtnX + rand5BtnW / 2, pillY + pillH / 2, () => {
+    const shuffled = [...poolFighters].sort(() => Math.random() - 0.5);
+    state.tlfsAllowedEnemies = shuffled.slice(0, 5).map(f => f.idx);
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_dash5', 0.12);
+    }
+  }, rand5BtnW, pillH, '#202636', 3);
+
+  // Button 3: [ RANDOM 10 ]
+  const rand10BtnW = isLandscape ? 70 : 78;
+  const rand10BtnX = rand5BtnX - rand10BtnW - 6;
+  drawButton('RANDOM 10', rand10BtnX + rand10BtnW / 2, pillY + pillH / 2, () => {
+    const shuffled = [...poolFighters].sort(() => Math.random() - 0.5);
+    state.tlfsAllowedEnemies = shuffled.slice(0, Math.min(10, shuffled.length)).map(f => f.idx);
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_dash5', 0.12);
+    }
+  }, rand10BtnW, pillH, '#202636', 3);
+
+  // 5. Grid Metrics & Pagination Calculations
+  const footerH = isLandscape ? 30 : 34;
+  const gridTop = subY + subH;
+  const gridH = h - (headerH + 2) - subH - footerH;
+
+  const cols = isLandscape ? (w > 380 ? 6 : 5) : (w > 400 ? 6 : 4);
+  const rows = isLandscape ? (gridH > 180 ? 3 : 2) : 4;
+  const itemsPerPage = cols * rows;
+  const totalPages = Math.max(1, Math.ceil(poolFighters.length / itemsPerPage));
+  tlfsPoolPage = Math.max(0, Math.min(tlfsPoolPage, totalPages - 1));
+
+  // Store bounds for mouse wheel listener
+  _tlfsEnemyPoolBounds = { x, y, w, h, totalPages };
+
+  const paddingX = 10;
+  const paddingY = 6;
+  const gapX = 6;
+  const gapY = 6;
+  const cellW = Math.floor((w - paddingX * 2 - gapX * (cols - 1)) / cols);
+  const cellH = Math.floor((gridH - paddingY * 2 - gapY * (rows - 1)) / rows);
+
+  // 6. Draw Grid with Strict Bounding Clip
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x + 2, gridTop, w - 4, gridH);
+  ctx.clip();
+
+  const pageStart = tlfsPoolPage * itemsPerPage;
+  const pageSlice = poolFighters.slice(pageStart, pageStart + itemsPerPage);
+
+  pageSlice.forEach(({ def, idx }, pos) => {
+    const col = pos % cols;
+    const row = Math.floor(pos / cols);
+    const cellX = x + paddingX + col * (cellW + gapX);
+    const cellY = gridTop + paddingY + row * (cellH + gapY);
+
     const isSelected = state.tlfsAllowedEnemies.includes(idx);
-    
+
+    ctx.save();
+    // 1. Clip inside cell to prevent any overflow outside cell boundary
+    ctx.beginPath();
+    ctx.rect(cellX + 1, cellY + 1, cellW - 2, cellH - 2);
+    ctx.clip();
+
+    if (isSelected) {
+      // Selected Active Card
+      ctx.fillStyle = '#1B2130';
+      ctx.fillRect(cellX, cellY, cellW, cellH);
+
+      // Subtle top inner ambient highlight
+      const topGrad = ctx.createLinearGradient(cellX, cellY, cellX, cellY + cellH * 0.4);
+      topGrad.addColorStop(0, 'rgba(245, 166, 35, 0.16)');
+      topGrad.addColorStop(1, 'rgba(245, 166, 35, 0.0)');
+      ctx.fillStyle = topGrad;
+      ctx.fillRect(cellX, cellY, cellW, cellH * 0.4);
+    } else {
+      // Muted Excluded Card
+      ctx.fillStyle = '#0D0F15';
+      ctx.fillRect(cellX, cellY, cellW, cellH);
+    }
+
+    // 2. Fighter Character Model / Avatar Display (Scaled Boldly & Centered)
+    const stickerImg = getFighterStickerPreview(idx) || getFighterPreview(idx);
+    const availableAvatarH = cellH - 15;
+    const avatarCX = cellX + cellW / 2;
+    const avatarCY = cellY + availableAvatarH / 2 + 1;
+    const destSize = Math.round(availableAvatarH * 2.85);
+
+    if (!isSelected) {
+      ctx.globalAlpha = 0.28; // Ghosted dimmed silhouette for excluded challengers
+    }
+
+    if (stickerImg) {
+      const srcW = stickerImg.width || 256;
+      const srcH = stickerImg.height || 256;
+      ctx.drawImage(stickerImg, 0, 0, srcW, srcH, avatarCX - destSize / 2, avatarCY - destSize / 2, destSize, destSize);
+    } else {
+      drawSmallFighterBadge(ctx, def, avatarCX, avatarCY, Math.min(cellW - 14, cellH - 18, 44));
+    }
+
+    ctx.globalAlpha = 1.0;
+
+    // 3. Nameplate background pill & text
+    ctx.fillStyle = isSelected ? 'rgba(10, 12, 18, 0.72)' : 'rgba(5, 7, 10, 0.65)';
+    ctx.fillRect(cellX + 2, cellY + cellH - 14, cellW - 4, 12);
+
+    ctx.fillStyle = isSelected ? '#FFFFFF' : '#4E5A70';
+    ctx.font = '800 8.5px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    let nameStr = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
+    nameStr = nameStr.toUpperCase();
+    const maxTextW = cellW - 6;
+    if (ctx.measureText(nameStr).width > maxTextW) {
+      while (nameStr.length > 3 && ctx.measureText(nameStr + '..').width > maxTextW) {
+        nameStr = nameStr.slice(0, -1);
+      }
+      nameStr += '..';
+    }
+    ctx.fillText(nameStr, cellX + cellW / 2, cellY + cellH - 8);
+
+    ctx.restore(); // Restore cell clip
+
+    // 4. Cell Border & Corner Status Indicator (Drawn on top of clip for crisp pixel edges)
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = '#1E2330';
-      ctx.fillRect(cellX, cellY, cellW, cellH);
       ctx.strokeStyle = '#F5A623';
-      ctx.lineWidth = 2.0;
+      ctx.lineWidth = 1.8;
       ctx.strokeRect(cellX, cellY, cellW, cellH);
-      // Small gold corner pip
+
+      // Active Gold Pip in top-right corner
       ctx.fillStyle = '#FFE145';
-      ctx.fillRect(cellX + 2, cellY + 2, 4, 4);
+      ctx.fillRect(cellX + cellW - 7, cellY + 3, 4, 4);
     } else {
-      ctx.fillStyle = '#101218';
-      ctx.fillRect(cellX, cellY, cellW, cellH);
-      ctx.strokeStyle = '#232733';
-      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = '#1E2332';
+      ctx.lineWidth = 1.0;
       ctx.strokeRect(cellX, cellY, cellW, cellH);
+
+      // Inactive dash in top-right corner
+      ctx.fillStyle = '#3E465A';
+      ctx.fillRect(cellX + cellW - 8, cellY + 4, 5, 2);
     }
     ctx.restore();
-    
-    const previewImg = getFighterPreview(idx);
-    if (previewImg) {
-      const badgeSize = Math.min(cellW - 8, cellH - 16);
-      ctx.drawImage(previewImg, cellX + cellW / 2 - badgeSize / 2, cellY + 4, badgeSize, badgeSize);
-    } else {
-      drawSmallFighterBadge(ctx, def, cellX + cellW / 2, cellY + 18, 22);
-    }
 
-    // Name tag
-    ctx.fillStyle = isSelected ? '#FFD043' : '#64748B';
-    ctx.font = '900 8.5px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    let nameStr = def.name.includes(' - ') ? def.name.split(' - ')[0] : def.name;
-    if (nameStr.length > 9) nameStr = nameStr.substring(0, 8) + '..';
-    ctx.fillText(nameStr.toUpperCase(), cellX + cellW / 2, cellY + cellH - 3);
-    
-    if (!isSelected) {
-      ctx.strokeStyle = '#EF4444';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(cellX + 4, cellY + 4);
-      ctx.lineTo(cellX + cellW - 4, cellY + cellH - 4);
-      ctx.moveTo(cellX + cellW - 4, cellY + 4);
-      ctx.lineTo(cellX + 4, cellY + cellH - 4);
-      ctx.stroke();
-    }
-    
+    // Click handler to toggle selection
     _registerButton(cellX, cellY, cellW, cellH, () => {
       if (isSelected) {
         if (state.tlfsAllowedEnemies.length <= 5) {
-          spawnFloatingText(cellX + cellW / 2, cellY, 'MINIMUM 5 ENEMIES!', '#dc2626');
+          spawnFloatingText(cellX + cellW / 2, cellY + 10, 'MINIMUM 5 ENEMIES REQUIRED!', '#EF4444');
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_dash5', 0.2);
+          }
           return;
         }
         state.tlfsAllowedEnemies = state.tlfsAllowedEnemies.filter(i => i !== idx);
       } else {
         state.tlfsAllowedEnemies.push(idx);
       }
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
     });
   });
 
-  // Footer Actions for TLFS Pool
-  const poolBtnY = y + h - 44;
-  const halfBtnW = (w - 32) / 2;
-  
-  drawButton('SELECT ALL', x + 16 + halfBtnW / 2, poolBtnY + 16, () => {
-    state.tlfsAllowedEnemies = poolFighters.map(f => f.idx);
-  }, halfBtnW - 4, 30, '#20242E', 4);
+  ctx.restore(); // Restore grid clipping
 
-  drawButton('CLEAR ALL', x + w - 16 - halfBtnW / 2, poolBtnY + 16, () => {
-    state.tlfsAllowedEnemies = poolFighters.slice(0, 5).map(f => f.idx);
-  }, halfBtnW - 4, 30, '#20242E', 4);
+  // 7. Pagination Footer Bar
+  const footerY = y + h - footerH;
+  ctx.fillStyle = '#10121A';
+  ctx.fillRect(x + 2, footerY, w - 4, footerH - 2);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + 2, footerY);
+  ctx.lineTo(x + w - 2, footerY);
+  ctx.stroke();
+
+  const navBtnW = 62;
+  const navBtnH = 22;
+  const navBtnCenterY = footerY + footerH / 2 - 1;
+
+  // Previous Page Button
+  const prevDisabled = tlfsPoolPage === 0;
+  drawButton('◀ PREV', x + 12 + navBtnW / 2, navBtnCenterY, () => {
+    if (tlfsPoolPage > 0) {
+      tlfsPoolPage--;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
+    }
+  }, navBtnW, navBtnH, prevDisabled ? '#151822' : '#20242E', 3);
+
+  // Next Page Button
+  const nextDisabled = tlfsPoolPage >= totalPages - 1;
+  drawButton('NEXT ▶', x + w - 12 - navBtnW / 2, navBtnCenterY, () => {
+    if (tlfsPoolPage < totalPages - 1) {
+      tlfsPoolPage++;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
+    }
+  }, navBtnW, navBtnH, nextDisabled ? '#151822' : '#20242E', 3);
+
+  // Center Page Indicator & Diamonds
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const curP = String(tlfsPoolPage + 1).padStart(2, '0');
+  const totP = String(totalPages).padStart(2, '0');
+  ctx.fillText(`PAGE // [ ${curP} / ${totP} ]`, x + w / 2 - 28, navBtnCenterY);
+
+  // Clickable Page Diamonds
+  const dotSpacing = 12;
+  const dotsStartX = x + w / 2 + 28;
+  for (let p = 0; p < totalPages; p++) {
+    const dotX = dotsStartX + p * dotSpacing;
+    const isCurrentPage = p === tlfsPoolPage;
+    ctx.fillStyle = isCurrentPage ? '#F5A623' : '#333846';
+    ctx.save();
+    ctx.translate(dotX, navBtnCenterY);
+    ctx.rotate(Math.PI / 4);
+    const dotSize = isCurrentPage ? 6 : 4;
+    ctx.fillRect(-dotSize / 2, -dotSize / 2, dotSize, dotSize);
+    ctx.restore();
+
+    // Click diamond to jump to page
+    _registerButton(dotX - 6, navBtnCenterY - 6, 12, 12, () => {
+      if (tlfsPoolPage !== p) {
+        tlfsPoolPage = p;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash5', 0.12);
+        }
+      }
+    });
+  }
+
+  ctx.restore(); // Restore outer frame context
 }
 
 function drawSmallFighterBadge(ctx, def, cx, cy, size = 16) {
@@ -1779,10 +2007,11 @@ function drawSelectScreen() {
   // ── Header Section ──
   const isTag = mode === 'Tag Match' || mode === GAME_MODES.TAG_MATCH || mode === 'TAG_MATCH';
   const isRegular1v2 = mode === '1v2' || mode === GAME_MODES.ONE_VS_TWO;
+  const isGauntlet = mode === 'TLFS' || mode === GAME_MODES.TLFS;
 
   // Screen Title Badge
   ctx.save();
-  const rawTitle = isTag ? '3 VS 3 TAG MATCH' : (isRegular1v2 ? '1 VS 2 BATTLE' : 'FIGHT OF LARPERS 101');
+  const rawTitle = isTag ? '3 VS 3 TAG MATCH' : (isRegular1v2 ? '1 VS 2 BATTLE' : (isGauntlet ? 'THE GAUNTLET RUN' : 'FIGHT OF LARPERS 101'));
   const titleW = isLandscape ? 320 : 270;
   const titleH = 28;
   const titleX = canvas.width / 2 - titleW / 2;
@@ -2166,7 +2395,7 @@ function drawSelectScreen() {
       drawBottomCommandDeck('START TAG MATCH', () => startGame(), () => randomizeTagMatchFighters());
     }
 
-  } else if (mode === 'TLFS') {
+  } else if (mode === 'TLFS' || mode === GAME_MODES.TLFS) {
     if (isLandscape) {
       const leftX = margin;
       const rightX = margin + cardW + cardGap;
@@ -2184,7 +2413,7 @@ function drawSelectScreen() {
       const p1H = 276;
 
       drawHeroicFighterCard('p1Index', 'GAUNTLET HERO', bannerX, p1Y, bannerW, p1H, true, true);
-      drawTlfsEnemyPoolGrid(bannerX, 414, bannerW, 436);
+      drawTlfsEnemyPoolGrid(bannerX, 412, bannerW, 400);
 
       drawBottomCommandDeck('START GAUNTLET', () => startGame(), () => {
         state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length);
@@ -3930,6 +4159,34 @@ window.addEventListener('wheel', (e) => {
     return;
   }
 
+  // Gauntlet Mode: Mouse wheel over enemy pool flips pages!
+  if ((state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS) && _tlfsEnemyPoolBounds) {
+    const { x, y, w, h, totalPages } = _tlfsEnemyPoolBounds;
+    if (mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h) {
+      e.preventDefault();
+      const now = performance.now();
+      if (now - _lastTlfsWheelTime > 140) {
+        _lastTlfsWheelTime = now;
+        if (e.deltaY > 0) {
+          if (tlfsPoolPage < (totalPages || 1) - 1) {
+            tlfsPoolPage++;
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+              audioSystem.playSFX('skill_dash5', 0.12);
+            }
+          }
+        } else if (e.deltaY < 0) {
+          if (tlfsPoolPage > 0) {
+            tlfsPoolPage--;
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+              audioSystem.playSFX('skill_dash5', 0.12);
+            }
+          }
+        }
+      }
+      return;
+    }
+  }
+
   // Main character select screen: scroll over player card to cycle fighters cleanly
   const card = _playerCardBounds.find(c => mouseX >= c.x && mouseX <= c.x + c.w && mouseY >= c.y && mouseY <= c.y + c.h);
   if (card) {
@@ -3960,4 +4217,4 @@ window.addEventListener('wheel', (e) => {
   }
 }, { passive: false });
 
-export { drawPlayerCard, drawHeroicFighterCard, drawDynamicVsClashEmblem, drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, randomize1v1Fighters, selectingSlot, modalInspectIndex, modalPage, openFighterSelectModal, isFighterSelectModalOpen, closeFighterSelectModal, getSelectingSlot };
+export { drawPlayerCard, drawHeroicFighterCard, drawDynamicVsClashEmblem, drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, randomize1v1Fighters, selectingSlot, modalInspectIndex, modalPage, tlfsPoolPage, openFighterSelectModal, isFighterSelectModalOpen, closeFighterSelectModal, getSelectingSlot };

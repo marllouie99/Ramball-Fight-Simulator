@@ -332,6 +332,8 @@ export const state = {
   // TLFS gamemode state
   tlfsAllowedEnemies: [], // Will be populated with all fighter indices
   tlfsDefeatedEnemies: 0,
+  tlfsNextChallengerIndex: null,
+  tlfsRoster: [], // Pre-rolled 5-challenger queue for Gauntlet mode
 
   // Boss Battle gamemode state
   bossBattleNoTeammate: (typeof localStorage !== 'undefined' && localStorage.getItem('circleMiniBattleBossBattleNoTeammate') === 'true') || false,

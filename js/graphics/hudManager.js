@@ -1955,6 +1955,70 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
   const f1GradeMeta = getGradeMeta(f1Grade);
   const f2GradeMeta = getGradeMeta(f2Grade);
 
+  // Gauntlet Mode: Ghost TOP HUD stacking cards for queued challengers
+  const isGauntlet = (state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS);
+  let ghostStackHtml = '';
+  if (isGauntlet) {
+    const defeated = state.tlfsDefeatedEnemies || 0;
+    const totalChallengers = 5;
+    const remainingAfterCurrent = Math.max(0, totalChallengers - 1 - defeated);
+
+    if (remainingAfterCurrent > 0) {
+      const nextIdx = (state.tlfsNextChallengerIndex !== null && state.tlfsNextChallengerIndex !== undefined)
+        ? state.tlfsNextChallengerIndex
+        : (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0 ? state.tlfsAllowedEnemies[0] : 1);
+      const nextDef = (nextIdx !== undefined && FIGHTER_DEFS[nextIdx]) ? FIGHTER_DEFS[nextIdx] : null;
+      const nextThemeColor = nextDef ? getFighterThemeColor(nextDef, '#EF4444') : '#EF4444';
+      const nextGrade = nextDef ? getFighterGrade(nextDef) : 'A';
+      const nextGradeMeta = getGradeMeta(nextGrade);
+      const nextName = nextDef ? getFighterDisplayName(nextDef, true) : 'CHALLENGER';
+      const nextNameHtml = (typeof nextName === 'string' && nextName.includes('『')) ? formatFighterNameHTML(nextName) : nextName;
+      const chalHp = MODE_SETTINGS[state.mode]?.challengerFixedHp ?? MODE_SETTINGS[state.mode]?.enemyFixedHp ?? 500;
+      const nextBarColor = nextDef ? getFighterHealthBarColor(nextDef, 1.0, isDark) : 'linear-gradient(180deg, #4ade80 0%, #22c55e 100%)';
+      const isNextNamelessDeity = Boolean(nextDef && (nextDef.characterId === 'namelessdeity' || nextDef.type === 'namelessdeity'));
+
+      ghostStackHtml = `
+        <div class="hud-top-ghost-stack" data-remaining="${remainingAfterCurrent}">
+          ${remainingAfterCurrent >= 2 ? `
+            <!-- Stack Layer 2 (Deep) -->
+            <div class="hud-top-player hud-top-p2 hud-top-ghost hud-top-ghost--back" style="--fighter-theme: ${nextThemeColor}; --grade-color: ${nextGradeMeta.color};" data-grade="${nextGrade}">
+              <div class="hud-top-content hud-top-ghost-content">
+                <div class="health-card__bar hud-top-bar hud-top-ghost-bar">
+                  <div class="health-card__fill hud-top-ghost-fill" style="width: 100%; background: ${nextBarColor};"></div>
+                  <span class="health-card__bar-text hud-top-ghost-bar-text">${chalHp}</span>
+                </div>
+                <div class="hud-top-header hud-top-ghost-header">
+                  <span class="hud-top-name hud-top-ghost-name">${nextNameHtml}</span>
+                </div>
+              </div>
+              <div class="hud-top-profile hud-top-ghost-profile" data-grade="${nextGrade}">
+                <div class="hud-top-profile__bg"></div>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- Stack Layer 1 (Exact Top HUD Card with Low Opacity) -->
+          <div class="hud-top-player hud-top-p2 hud-top-ghost hud-top-ghost--mid" style="--fighter-theme: ${nextThemeColor}; --grade-color: ${nextGradeMeta.color};" data-grade="${nextGrade}"${isNextNamelessDeity ? ' data-character="namelessdeity"' : ''}>
+            <div class="hud-top-content hud-top-ghost-content">
+              <div class="health-card__bar hud-top-bar hud-top-ghost-bar">
+                <div class="health-card__fill hud-top-ghost-fill" style="width: 100%; background: ${nextBarColor};"></div>
+                <span class="health-card__bar-text hud-top-ghost-bar-text">${chalHp}</span>
+              </div>
+              <div class="hud-top-header hud-top-ghost-header">
+                <span class="hud-top-name hud-top-ghost-name">${nextNameHtml}</span>
+              </div>
+            </div>
+            <div class="hud-top-profile hud-top-ghost-profile" data-grade="${nextGrade}"${isNextNamelessDeity ? ' data-character="namelessdeity"' : ''}>
+              <div class="hud-top-profile__bg"></div>
+              <canvas class="hud-top-profile__canvas hud-top-ghost-canvas" width="1400" height="1400"></canvas>
+              <canvas class="hud-top-profile__grade-canvas hud-top-ghost-grade-canvas" data-grade="${nextGrade}" width="128" height="88"></canvas>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
+
   const timerStr = getTopDuelTimerSecondsString();
 
   return `
@@ -2011,6 +2075,7 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
         <div class="hud-top-timer">
           <span class="hud-top-timer-text" data-text="${timerStr}">${timerStr}</span>
         </div>
+        ${isGauntlet ? `<span class="hud-top-mode-label">GAUNLET</span>` : ''}
       </div>
 
       <!-- Player 2 (Right): Connected Top Health Bar -> Lower Name -> Portrait on Outer Right -->
@@ -2058,6 +2123,7 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
           <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
           <canvas class="hud-top-profile__grade-canvas" data-grade="${f2Grade}" width="128" height="88"></canvas>
         </div>
+        ${ghostStackHtml}
       </div>
     </div>
   `;
@@ -3996,10 +4062,35 @@ function updateHealthHud() {
         _cachedTopContainer.style.visibility = 'visible';
         _cachedTopContainer.style.opacity = '1';
 
-        const p1Canvas = _cachedTopContainer.querySelector('.hud-top-p1 .hud-top-profile__canvas');
-        const p2Canvas = _cachedTopContainer.querySelector('.hud-top-p2 .hud-top-profile__canvas');
+        const p1Canvas = _cachedTopContainer.querySelector('.hud-top-p1 > .hud-top-profile > .hud-top-profile__canvas') || _cachedTopContainer.querySelector('.hud-top-p1 .hud-top-profile__canvas');
+        const p2Canvas = _cachedTopContainer.querySelector('.hud-top-p2 > .hud-top-profile > .hud-top-profile__canvas');
         if (p1Canvas) renderTopHudProfileCanvas(p1Canvas, mainFighters[0]);
         if (p2Canvas) renderTopHudProfileCanvas(p2Canvas, mainFighters[1]);
+
+        const ghostCanvas = _cachedTopContainer.querySelector('.hud-top-ghost-stack .hud-top-ghost-canvas');
+        if (ghostCanvas) {
+          const nextIdx = (state.tlfsNextChallengerIndex !== null && state.tlfsNextChallengerIndex !== undefined)
+            ? state.tlfsNextChallengerIndex
+            : (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0 ? state.tlfsAllowedEnemies[0] : 1);
+          const nextDef = (nextIdx !== undefined && FIGHTER_DEFS[nextIdx]) ? FIGHTER_DEFS[nextIdx] : null;
+          if (nextDef) {
+            renderTopHudProfileCanvas(ghostCanvas, { fighterIndex: nextIdx, ...nextDef });
+          }
+        }
+
+        const ghostGradeCanvas = _cachedTopContainer.querySelector('.hud-top-ghost-stack .hud-top-ghost-grade-canvas');
+        if (ghostGradeCanvas) {
+          const nextIdx = (state.tlfsNextChallengerIndex !== null && state.tlfsNextChallengerIndex !== undefined)
+            ? state.tlfsNextChallengerIndex
+            : (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0 ? state.tlfsAllowedEnemies[0] : 1);
+          const nextDef = (nextIdx !== undefined && FIGHTER_DEFS[nextIdx]) ? FIGHTER_DEFS[nextIdx] : null;
+          const nextGrade = nextDef ? getFighterGrade(nextDef) : 'A';
+          const gCtx = ghostGradeCanvas.getContext('2d');
+          if (gCtx) {
+            gCtx.clearRect(0, 0, ghostGradeCanvas.width, ghostGradeCanvas.height);
+            drawWingedGradeLetter(gCtx, ghostGradeCanvas.width / 2, ghostGradeCanvas.height / 2, nextGrade, getZeusGradeCardTheme(nextGrade), 1, 2.8, true);
+          }
+        }
 
         _cachedTopTimerEl = _cachedTopContainer.querySelector('.hud-top-timer-text');
         _lastTopTimerText = _cachedTopTimerEl ? _cachedTopTimerEl.textContent : '';
@@ -4130,14 +4221,14 @@ function updateHealthHud() {
         if (isDuelTopHud && _cachedTopContainer && mainIdx >= 0) {
           topPlayerEl = _cachedTopContainer.querySelector(mainIdx === 0 ? '.hud-top-p1' : '.hud-top-p2');
           if (topPlayerEl) {
-            hpBar = topPlayerEl.querySelector('.hud-top-bar') || hpBar;
-            hpBarFill = topPlayerEl.querySelector('.health-card__fill') || hpBarFill;
-            hpBarGhost = topPlayerEl.querySelector('.health-card__ghost') || hpBarGhost;
-            hpBarText = topPlayerEl.querySelector('.health-card__bar-text') || hpBarText;
-            winBullets = Array.from(topPlayerEl.querySelectorAll('.health-card__win-bullet'));
-            topNameEl = topPlayerEl.querySelector('.hud-top-name');
-            topProfileEl = topPlayerEl.querySelector('.hud-top-profile');
-            topGradeCanvas = topPlayerEl.querySelector('.hud-top-profile__grade-canvas');
+            hpBar = topPlayerEl.querySelector(':scope > .hud-top-content .hud-top-bar') || topPlayerEl.querySelector('.hud-top-bar') || hpBar;
+            hpBarFill = topPlayerEl.querySelector(':scope > .hud-top-content .health-card__fill') || topPlayerEl.querySelector('.health-card__fill') || hpBarFill;
+            hpBarGhost = topPlayerEl.querySelector(':scope > .hud-top-content .health-card__ghost') || topPlayerEl.querySelector('.health-card__ghost') || hpBarGhost;
+            hpBarText = topPlayerEl.querySelector(':scope > .hud-top-content .health-card__bar-text') || topPlayerEl.querySelector('.health-card__bar-text') || hpBarText;
+            winBullets = Array.from(topPlayerEl.querySelectorAll(':scope > .hud-top-content .health-card__win-bullet'));
+            topNameEl = topPlayerEl.querySelector(':scope > .hud-top-content .hud-top-name') || topPlayerEl.querySelector('.hud-top-name');
+            topProfileEl = topPlayerEl.querySelector(':scope > .hud-top-profile') || topPlayerEl.querySelector('.hud-top-profile');
+            topGradeCanvas = topPlayerEl.querySelector(':scope > .hud-top-profile > .hud-top-profile__grade-canvas') || topPlayerEl.querySelector('.hud-top-profile__grade-canvas');
           }
         }
 

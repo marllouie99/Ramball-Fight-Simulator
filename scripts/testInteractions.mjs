@@ -10325,6 +10325,82 @@ async function runInteractionTests() {
     console.log('      ✅ Sukuna Ten Shadows Mahoraga Summon (spawn, AI, damage, no lifetime cap, friendly-fire immunity, death, toggle, HUD) verified successfully.');
   }
 
+  // ==========================================
+  // TEST 96: Gauntlet Battle Intro & 5-Challenger Queue Layout
+  // ==========================================
+  {
+    console.log('   96. Testing Gauntlet Battle Intro & 5-Challenger Queue Layout...');
+    const { drawCountdownIntro, getGauntletChallengers } = await import('../js/graphics/ui/CountdownIntro.js');
+    const { drawFaceOffThumbnailScreen } = await import('../js/graphics/ui/ThumbnailFaceOffScreen.js');
+    const { createFighterInstance } = await import('../js/core/state.js');
+    const { FIGHTER_DEFS } = await import('../js/core/config.js');
+
+    const prevMode = state.mode;
+    const prevView = state.viewOrientation;
+    const prevRoster = state.tlfsRoster;
+    const prevFighters = state.fighters;
+
+    state.mode = 'TLFS';
+    state.viewOrientation = 'vertical';
+    state.tlfsDefeatedEnemies = 0;
+    state.tlfsAllowedEnemies = [1, 2, 3, 4, 5];
+    state.p1Index = 0; // Gojo
+    state.p2Index = 1; // Naoya
+
+    const p1 = createFighterInstance(FIGHTER_DEFS[0], 0);
+    const p2 = createFighterInstance(FIGHTER_DEFS[1], 1);
+    state.fighters = [p1, p2];
+
+    // 1. Verify getGauntletChallengers produces 5 distinct challengers
+    const challengers = getGauntletChallengers();
+    assert(Array.isArray(challengers) && challengers.length === 5, `Gauntlet must resolve exactly 5 challengers, got ${challengers?.length}`);
+    assert(challengers[0].name === FIGHTER_DEFS[1].name, `Challenger 1 must match active p2, got ${challengers[0]?.name}`);
+
+    // 2. Test drawCountdownIntro across all lifecycle phases with 100% balanced Canvas 2D stack depth
+    const testFrames = [0, 15, 22, 35, 44, 60, 85, 94];
+    for (const frame of testFrames) {
+      mockCtx.resetStackDepth();
+      drawCountdownIntro(mockCtx, 540, 960, frame);
+      assert(mockCtx.getStackDepth() === 0, `Canvas 2D stack depth must be 0 at frame ${frame} (got ${mockCtx.getStackDepth()})`);
+    }
+
+    // 3. Test horizontal viewport scaling
+    state.viewOrientation = 'horizontal';
+    mockCtx.resetStackDepth();
+    drawCountdownIntro(mockCtx, 960, 540, 44);
+    assert(mockCtx.getStackDepth() === 0, `Canvas 2D stack depth must be 0 in horizontal mode (got ${mockCtx.getStackDepth()})`);
+
+    // 4. Test 10-challenger gauntlet selection & layout
+    state.viewOrientation = 'vertical';
+    state.tlfsRoster = null;
+    state.tlfsAllowedEnemies = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const challengers10 = getGauntletChallengers();
+    assert(Array.isArray(challengers10) && challengers10.length === 10, `Gauntlet must resolve 10 challengers when 10 selected, got ${challengers10?.length}`);
+    mockCtx.resetStackDepth();
+    drawCountdownIntro(mockCtx, 540, 960, 44);
+    assert(mockCtx.getStackDepth() === 0, `Canvas 2D stack depth must be 0 for 10-challenger layout (got ${mockCtx.getStackDepth()})`);
+
+    // 5. Test Gauntlet Thumbnail Face-Off Screen ("PLAYER" vs "CHALLENGERS")
+    state.ctx = mockCtx;
+    state.canvas = { width: 540, height: 960 };
+    mockCtx.resetStackDepth();
+    drawFaceOffThumbnailScreen();
+    assert(mockCtx.getStackDepth() === 0, `Canvas 2D stack depth must be 0 for 10-challenger Thumbnail Face-Off (got ${mockCtx.getStackDepth()})`);
+
+    state.tlfsRoster = [1, 2, 3, 4, 5];
+    mockCtx.resetStackDepth();
+    drawFaceOffThumbnailScreen();
+    assert(mockCtx.getStackDepth() === 0, `Canvas 2D stack depth must be 0 for 5-challenger Thumbnail Face-Off (got ${mockCtx.getStackDepth()})`);
+
+    // Restore state
+    state.mode = prevMode;
+    state.viewOrientation = prevView;
+    state.tlfsRoster = prevRoster;
+    state.fighters = prevFighters;
+
+    console.log('      ✅ Gauntlet Battle Intro & Thumbnail Face-Off ("PLAYER" vs "CHALLENGERS", lineup resolution, stack balance) verified successfully.');
+  }
+
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }
 

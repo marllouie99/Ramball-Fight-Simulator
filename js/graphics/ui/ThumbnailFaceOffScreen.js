@@ -14,7 +14,8 @@ import { _clearButtons, _registerButton, drawChamferedRect } from './uiFramework
 import { proceedFromFaceOffToCountdown } from '../../core/gameFlow.js';
 import {
   getFaceOffThemeColor,
-  getDarkThemeTone
+  getDarkThemeTone,
+  getGauntletChallengers
 } from './CountdownIntro.js';
 import { drawCollectorFighterCard } from './CollectorCardRenderer.js';
 
@@ -79,9 +80,10 @@ export function captureFaceOffScreenshot() {
     state._isCapturingThumbnail = false;
 
     const currentDefs = getActiveFighterDefs();
+    const isGauntlet = (state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS || state.mode === 'GAUNTLET' || state.mode === 'Gauntlet');
     const p1Name = currentDefs[state.p1Index]?.name || 'Fighter-1';
-    const p2Name = currentDefs[state.p2Index]?.name || 'Fighter-2';
-    const modeName = (state.mode || '1v1').toLowerCase().replace(/\s+/g, '-');
+    const p2Name = isGauntlet ? 'challengers' : (currentDefs[state.p2Index]?.name || 'Fighter-2');
+    const modeName = isGauntlet ? 'gauntlet' : (state.mode || '1v1').toLowerCase().replace(/\s+/g, '-');
     const fileName = `circle-battle-${modeName}-${p1Name}-vs-${p2Name}.png`.toLowerCase().replace(/\s+/g, '-');
 
     if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.showSaveImageDialog === 'function') {
@@ -564,6 +566,89 @@ function _drawFullBleedBackground(ctx, width, height, p1Def, p2Def, splitY1, spl
 // 4. Pokémon TCG Collector Card from Character Card Selection
 // ─────────────────────────────────────────────────────────────────────────────
 /**
+ * Pre-calibrated organic comic angles, Y-arcs, and desynchronized X-offsets
+ * for Gauntlet mode challenger cards. Replaces stiff, spreadsheet-like 2x5 grids
+ * with a dynamic, hand-dealt comic battle array where every card has personality.
+ */
+const GAUNTLET_ANGLES_ROW1 = [-3.8, +2.4, -1.2, +3.2, -2.8];
+const GAUNTLET_ANGLES_ROW2 = [+3.0, -2.6, +1.8, -3.4, +3.8];
+const GAUNTLET_Y_OFFSETS_ROW1 = [+4, -3, -7, -2, +5];
+const GAUNTLET_Y_OFFSETS_ROW2 = [+4, -5, +2, -4, +5];
+const GAUNTLET_X_OFFSETS_ROW1 = [-2, +1, 0, -1, +2];
+const GAUNTLET_X_OFFSETS_ROW2 = [+3, -2, 0, +2, -3];
+
+/**
+ * Computes organic, dynamically fanned and staggered card layout positions for Gauntlet challengers.
+ * For <= 5 challengers:
+ *  - 1 card: Centered (cx: 270, cy: 660, w: 154, h: 212, angle: +2.2°)
+ *  - 2 cards: Dynamic tilted pair (w: 138, h: 188, angles: -2.8°, +2.5°)
+ *  - 3 cards: 1 row fanned like a hand of cards (w: 126, h: 172, angles: -3.8°, +0.6°, +3.5°)
+ *  - 4 cards: 2 dynamic tiers of counter-angled pairs (w: 126, h: 172)
+ *  - 5 cards: 2 rows (2 top flanking center notch at cy: 575, 3 bottom in fanned battle arc at cy: 725, w: 126, h: 172)
+ * For 6-10 challengers:
+ *  - 2 dynamic tiers of cards with organic angles (-3.8° to +3.8°), parabolic Y-arcs, and desynchronized X-offsets (w: 90, h: 126)
+ */
+function _getGauntletCardLayouts(count) {
+  const layouts = [];
+  if (count <= 1) {
+    layouts.push({ cx: 270, cy: 660, w: 154, h: 212, angle: 2.2 * Math.PI / 180 });
+  } else if (count === 2) {
+    layouts.push({ cx: 188, cy: 660, w: 138, h: 188, angle: -2.8 * Math.PI / 180 });
+    layouts.push({ cx: 352, cy: 660, w: 138, h: 188, angle: +2.5 * Math.PI / 180 });
+  } else if (count === 3) {
+    layouts.push({ cx: 124, cy: 664, w: 126, h: 172, angle: -3.8 * Math.PI / 180 });
+    layouts.push({ cx: 270, cy: 654, w: 126, h: 172, angle: +0.6 * Math.PI / 180 });
+    layouts.push({ cx: 416, cy: 662, w: 126, h: 172, angle: +3.5 * Math.PI / 180 });
+  } else if (count === 4) {
+    const w = 126, h = 172;
+    // Row 1: dynamic fanned pair
+    layouts.push({ cx: 194, cy: 582, w, h, angle: -3.2 * Math.PI / 180 });
+    layouts.push({ cx: 346, cy: 576, w, h, angle: +2.8 * Math.PI / 180 });
+    // Row 2: counter-angled pair
+    layouts.push({ cx: 192, cy: 722, w, h, angle: +2.5 * Math.PI / 180 });
+    layouts.push({ cx: 348, cy: 728, w, h, angle: -3.0 * Math.PI / 180 });
+  } else if (count === 5) {
+    const w = 126, h = 172;
+    // Row 1: 2 cards flanking center notch with opposing tilts, leaving clearance for VS crest tip
+    layouts.push({ cx: 194, cy: 578, w, h, angle: -3.5 * Math.PI / 180 });
+    layouts.push({ cx: 346, cy: 572, w, h, angle: +3.0 * Math.PI / 180 });
+    // Row 2: 3 cards fanned in an energetic battle arc
+    layouts.push({ cx: 122, cy: 728, w, h, angle: -4.0 * Math.PI / 180 });
+    layouts.push({ cx: 270, cy: 718, w, h, angle: +0.8 * Math.PI / 180 });
+    layouts.push({ cx: 418, cy: 726, w, h, angle: +3.8 * Math.PI / 180 });
+  } else {
+    // 6 to 10 challengers: 2 dynamic tiers of cards with organic tilts and desynchronized spacing
+    const topCount = Math.floor(count / 2);
+    const botCount = count - topCount;
+    const w = 90, h = 126;
+    const gap = 10;
+
+    // Row 1
+    const totalW1 = topCount * w + (topCount - 1) * gap;
+    const startX1 = (540 - totalW1) / 2 + w / 2;
+    for (let i = 0; i < topCount; i++) {
+      const pIdx = i % GAUNTLET_ANGLES_ROW1.length;
+      const cx = startX1 + i * (w + gap) + GAUNTLET_X_OFFSETS_ROW1[pIdx];
+      const cy = 574 + GAUNTLET_Y_OFFSETS_ROW1[pIdx];
+      const angle = GAUNTLET_ANGLES_ROW1[pIdx] * Math.PI / 180;
+      layouts.push({ cx, cy, w, h, angle });
+    }
+
+    // Row 2
+    const totalW2 = botCount * w + (botCount - 1) * gap;
+    const startX2 = (540 - totalW2) / 2 + w / 2;
+    for (let i = 0; i < botCount; i++) {
+      const pIdx = i % GAUNTLET_ANGLES_ROW2.length;
+      const cx = startX2 + i * (w + gap) + GAUNTLET_X_OFFSETS_ROW2[pIdx];
+      const cy = 714 + GAUNTLET_Y_OFFSETS_ROW2[pIdx];
+      const angle = GAUNTLET_ANGLES_ROW2[pIdx] * Math.PI / 180;
+      layouts.push({ cx, cy, w, h, angle });
+    }
+  }
+  return layouts;
+}
+
+/**
  * Renders the authentic Pokémon TCG Collector Card directly from Character Selection.
  * Features:
  * - High-impact solid black 3D drop shadow
@@ -580,8 +665,11 @@ function _drawFighterCollectorCard(ctx, cx, cy, w, h, angle, def, idx) {
   if (angle) ctx.rotate(angle);
 
   // Solid Black 3D Comic Drop Shadow underneath the TCG card
+  const shadowOffX = Math.max(2, Math.round(w * 0.025));
+  const shadowOffY = Math.max(3, Math.round(h * 0.025));
+  const cornerR = Math.min(8, Math.round(w * 0.05));
   ctx.fillStyle = '#0E0F14';
-  drawChamferedRect(ctx, -w / 2 + 5, -h / 2 + 7, w, h, 8);
+  drawChamferedRect(ctx, -w / 2 + shadowOffX, -h / 2 + shadowOffY, w, h, cornerR);
   ctx.fill();
 
   // Draw the official Pokémon TCG Collector Card from Character Select
@@ -980,6 +1068,14 @@ export function drawFaceOffThumbnailScreen() {
     activeMode === GAME_MODES.SURVIVOR
   );
 
+  const isGauntlet = (
+    activeMode === 'TLFS' ||
+    activeMode === GAME_MODES.TLFS ||
+    activeMode === 'GAUNTLET' ||
+    activeMode === 'Gauntlet'
+  );
+  const challengers = isGauntlet ? getGauntletChallengers() : null;
+
   // ── 2. Resolve Active Combatant Definitions ──────────────────────────────
   const currentDefs = getActiveFighterDefs();
   const p1Idx = (typeof state.p1Index === 'number') ? state.p1Index : 0;
@@ -998,13 +1094,13 @@ export function drawFaceOffThumbnailScreen() {
   _drawFullBleedBackground(ctx, width, height, p1Def, p2Def, splitY1, splitY2);
 
   // ── 4. Player 1 Title Typography (P1 Name or Team Name) ──────────────────
-  let p1Title = p1Def.name.toUpperCase();
+  let p1Title = isGauntlet ? 'PLAYER' : p1Def.name.toUpperCase();
   if (is2v2 && p3Def) {
     p1Title = `${p1Def.name.toUpperCase()} & ${p3Def.name.toUpperCase()}`;
     // 2v2 Mode: Centered above dual cards, lowered safely away from top crop
     _drawFighterQuadrantTitle(ctx, p1Title, width / 2, 108, 460, 'center');
   } else {
-    // 1v1 & 1v2 Mode: Placed in Top-Right Quadrant (opposing Card 1) inside FYP safe zone
+    // 1v1, 1v2, & Gauntlet Mode: Placed in Top-Right Quadrant (opposing Card 1) inside FYP safe zone
     _drawFighterQuadrantTitle(ctx, p1Title, 405, 240, 220, 'center');
   }
 
@@ -1023,6 +1119,19 @@ export function drawFaceOffThumbnailScreen() {
 
     _drawFighterCollectorCard(ctx, 236, 668, 154, 212, -1.5 * Math.PI / 180, p2Def, p2Idx);
     _drawFighterCollectorCard(ctx, 404, 668, 154, 212, 2.0 * Math.PI / 180, p3Def, p3Idx);
+  } else if (isGauntlet && challengers && challengers.length > 0) {
+    // Gauntlet Mode: Player 1 Hero Card vs All Selected Challengers (5 to 10)
+    _drawFighterCollectorCard(ctx, 158, 264, 236, 314, -2.5 * Math.PI / 180, p1Def, p1Idx);
+
+    const layouts = _getGauntletCardLayouts(challengers.length);
+    for (let i = 0; i < challengers.length; i++) {
+      const cDef = challengers[i];
+      const cIdx = (state.tlfsRoster && typeof state.tlfsRoster[i] === 'number')
+        ? state.tlfsRoster[i]
+        : (currentDefs.indexOf(cDef) !== -1 ? currentDefs.indexOf(cDef) : i);
+      const pos = layouts[i] || layouts[layouts.length - 1];
+      _drawFighterCollectorCard(ctx, pos.cx, pos.cy, pos.w, pos.h, pos.angle || 0, cDef, cIdx);
+    }
   } else {
     // 1v1 Mode (Default, Stand Off, Tag Match Anchor, Boss Solo, Survivor):
     // Heroic, large, prominent Pokémon TCG Collector Cards displaying crystal-clear card details
@@ -1043,11 +1152,16 @@ export function drawFaceOffThumbnailScreen() {
     p2Title = `${p2Def.name.toUpperCase()} & ${p4Def.name.toUpperCase()}`;
   } else if (is1v2 && p3Def) {
     p2Title = `${p2Def.name.toUpperCase()} & ${p3Def.name.toUpperCase()}`;
+  } else if (isGauntlet) {
+    p2Title = 'CHALLENGERS';
   } else if (isSurvivor) {
     p2Title = 'THE HORDE';
   }
 
-  if (is2v2 || (is1v2 && p3Def)) {
+  if (isGauntlet) {
+    const titleY = (challengers && challengers.length > 5) ? 848 : 865;
+    _drawFighterQuadrantTitle(ctx, p2Title, width / 2, titleY, 460, 'center');
+  } else if (is2v2 || (is1v2 && p3Def)) {
     // Team modes with dual cards at bottom: Centered below cards, raised safely away from bottom crop
     _drawFighterQuadrantTitle(ctx, p2Title, width / 2, 820, 440, 'center');
   } else {
@@ -1066,6 +1180,8 @@ export function drawFaceOffThumbnailScreen() {
       modeTag = '1 VS 2 HANDICAP DUEL';
     } else if (isTag) {
       modeTag = 'TAG TEAM RELAY';
+    } else if (isGauntlet) {
+      modeTag = `GAUNTLET 1 VS ${challengers ? challengers.length : 5}`;
     } else if (isBoss) {
       modeTag = 'SUPREME BOSS RAID';
     } else if (isSurvivor) {

@@ -1022,6 +1022,9 @@ export function executeTacticalAction(action) {
   } else if (action === 'mode-tlfs' || action === 'mode-gauntlet') {
     state.gameCategory = 'foc';
     state.mode = GAME_MODES.TLFS || 'TLFS';
+    if (!Array.isArray(state.tlfsAllowedEnemies) || state.tlfsAllowedEnemies.length === 0) {
+      state.tlfsAllowedEnemies = FIGHTER_DEFS.map((_, i) => i);
+    }
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   }

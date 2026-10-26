@@ -1376,6 +1376,58 @@ canvas {
   justify-content: flex-end;
 }
 
+/* ─────────────────────────────────────────────────────────
+   GAUNTLET (TLFS) TOP HUD GHOST CARD STACK
+   The Ghost Top HUD: Same Top HUD card, just stacked at the top with low opacity!
+   ───────────────────────────────────────────────────────── */
+.hud-top-ghost-stack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Ensure active front card elements sit cleanly above the ghost card */
+.hud-top-player.hud-top-p2 > .hud-top-content {
+  position: relative;
+  z-index: 4;
+}
+
+.hud-top-player.hud-top-p2 > .hud-top-profile {
+  position: relative;
+  z-index: 5;
+}
+
+/* Ghost Top HUD: Same Top HUD card, stacked at the top with low opacity! */
+.hud-top-player.hud-top-ghost {
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  pointer-events: none !important;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+/* Primary Ghost Card: Lifted 20px so top half and profile peek out cleanly */
+.hud-top-ghost--mid {
+  transform: translate(6px, -20px);
+  opacity: 0.38 !important;
+  z-index: 2;
+}
+
+/* Secondary Deep Ghost Card in Stack */
+.hud-top-ghost--back {
+  transform: translate(12px, -30px);
+  opacity: 0.18 !important;
+  z-index: 1;
+}
+
 /* 1. Angled Fighter Portrait Badge with Pop-Out Head */
 .hud-top-profile {
   width: 58px;
@@ -1739,6 +1791,26 @@ canvas {
   -webkit-text-fill-color: #FFFFFF !important;
   -webkit-text-stroke: 2.5px #FFFFFF !important;
   text-shadow: none !important;
+}
+
+/* Center Match Timer Gamemode Badge (Gauntlet) */
+.hud-top-mode-label {
+  display: inline-block;
+  margin-top: 1px;
+  font-family: 'Outfit', 'Rajdhani', 'Impact', sans-serif !important;
+  font-style: italic !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  letter-spacing: 1.5px !important;
+  text-transform: uppercase !important;
+  color: #FFE145 !important;
+  -webkit-text-stroke: 2.5px #050609 !important;
+  paint-order: stroke fill !important;
+  text-shadow: 1px 1.5px 0 #050609 !important;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+  line-height: 1;
 }
 
 .hud-name-box {

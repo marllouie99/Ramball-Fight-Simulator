@@ -398,8 +398,8 @@ export function reinitFighters(isNewMatch = false) {
     fighter.reset();
   });
 
-  if (state.mode === 'TLFS' && state.fighters[0]) {
-    const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 500;
+  if ((state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS) && state.fighters[0]) {
+    const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 1000;
     if (!state.fighters[0].isTurret && !state.fighters[0].isMinion) {
       const f = state.fighters[0];
       const isSans = (f.characterId === 'sans' || f.type === 'sans');
@@ -407,6 +407,15 @@ export function reinitFighters(isNewMatch = false) {
       const hp = isSans ? ((typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : 1) : (isMakima ? Math.round(fixedHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : fixedHp);
       f.maxHp = hp;
       f.hp = hp;
+    }
+    if (state.fighters[1] && !state.fighters[1].isTurret && !state.fighters[1].isMinion) {
+      const f2 = state.fighters[1];
+      const challengerHp = MODE_SETTINGS[state.mode]?.challengerFixedHp ?? MODE_SETTINGS[state.mode]?.enemyFixedHp ?? 500;
+      const isSans2 = (f2.characterId === 'sans' || f2.type === 'sans');
+      const isMakima2 = (f2.characterId === 'makima' || f2.type === 'makima');
+      const hp2 = isSans2 ? ((typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : 1) : (isMakima2 ? Math.round(challengerHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : challengerHp);
+      f2.maxHp = hp2;
+      f2.hp = hp2;
     }
   } else if (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2') {
     const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
@@ -1396,11 +1405,22 @@ export function resetMatch(showFaceOff = true) {
   } else {
     survivorSystem.reset();
   }
-  if (state.mode === 'TLFS') {
+  if (state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS) {
     state.tlfsDefeatedEnemies = 0;
-    if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
-      state.p2Index = state.tlfsAllowedEnemies[Math.floor(Math.random() * state.tlfsAllowedEnemies.length)];
+    const currentDefs = getActiveFighterDefs();
+    const pool = (Array.isArray(state.tlfsAllowedEnemies) && state.tlfsAllowedEnemies.length > 0)
+      ? [...state.tlfsAllowedEnemies]
+      : currentDefs.map((_, i) => i);
+    // Use all selected challengers (e.g. 5, 10, or up to 10 if ALL was clicked)
+    const targetCount = (pool.length <= 10) ? Math.max(1, pool.length) : 10;
+    const shuffled = [...pool].sort(() => Math.random() - 0.5);
+    const roster = [];
+    for (let i = 0; i < targetCount; i++) {
+      roster.push(shuffled[i % shuffled.length]);
     }
+    state.tlfsRoster = roster;
+    state.p2Index = roster[0];
+    state.tlfsNextChallengerIndex = roster[1] ?? null;
   } else if (state.mode === GAME_MODES.TAG_MATCH || state.mode === 'Tag Match') {
     state.tagMatch = {
       team0Roster: [state.p1Index ?? 0, state.p3Index ?? 2, state.p5Index ?? 4],

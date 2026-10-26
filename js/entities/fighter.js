@@ -655,11 +655,17 @@ export class Fighter {
       d.type === 'makima'
     );
     const hpRatio = isMakima ? ((typeof CONFIG !== 'undefined' && CONFIG.makima?.maxHpRatio !== undefined) ? CONFIG.makima.maxHpRatio : 1.0) : 1.0;
-    const modeFixed = MODE_SETTINGS[state.mode]?.fixedHp || (isMakima ? (MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp) : null);
+    let modeFixed = MODE_SETTINGS[state.mode]?.fixedHp;
+    if (!modeFixed && (state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS)) {
+      const isP2 = Boolean(state.fighters && state.fighters[1] === this);
+      modeFixed = isP2 ? (MODE_SETTINGS[state.mode]?.challengerFixedHp ?? 500) : (MODE_SETTINGS[state.mode]?.playerFixedHp ?? 1000);
+    } else if (!modeFixed && isMakima) {
+      modeFixed = MODE_SETTINGS[state.mode]?.playerFixedHp || MODE_SETTINGS[state.mode]?.soloFixedHp;
+    }
 
     if (isSans) {
       this.maxHp = (typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : (d.hp || 1);
-    } else if (!isTurretOrMinion && (MODE_SETTINGS[state.mode]?.fixedHp || (isMakima && modeFixed))) {
+    } else if (!isTurretOrMinion && (MODE_SETTINGS[state.mode]?.fixedHp || modeFixed)) {
       const baseFixed = MODE_SETTINGS[state.mode]?.fixedHp || modeFixed;
       this.maxHp = Math.round(baseFixed * hpRatio);
     } else {
@@ -3149,6 +3155,7 @@ export class Fighter {
     const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
     const is1v2 = (state.mode === GAME_MODES.ONE_VS_TWO || state.mode === '1v2' || state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
     const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2);
+    const isTLFS = (state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS);
 
     if (isTagMatch) {
       const deadFighter = state.fighters.find(f => f && !_isEffectivelyAlive(f));
@@ -3309,8 +3316,13 @@ export class Fighter {
           state.gameState = 'roundEnd';
         }
       }
+    } else if (isTLFS) {
+      if (typeof state.endRoundIfTlfsEnded === 'function') {
+        state.endRoundIfTlfsEnded();
+      }
+      return;
     } else {
-      // 1v1 / Stand Off / Tactical 1v1 / Tactical Standoff / TLFS
+      // 1v1 / Stand Off / Tactical 1v1 / Tactical Standoff
       // If more than 1 fighter is alive, the round is still actively underway!
       if (aliveCount > 1) return;
 

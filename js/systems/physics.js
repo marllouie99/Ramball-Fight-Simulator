@@ -1010,8 +1010,8 @@ function endRoundIf1v1Ended() {
   }
 }
 
-function endRoundIfTlfsEnded() {
-  if (state.mode !== 'TLFS' || state.gameState !== 'playing') return;
+export function endRoundIfTlfsEnded() {
+  if ((state.mode !== 'TLFS' && state.mode !== GAME_MODES.TLFS) || state.gameState !== 'playing') return;
 
   const player = state.fighters[0];
   let enemy = state.fighters[1];
@@ -1021,6 +1021,9 @@ function endRoundIfTlfsEnded() {
     state.matchWinner = enemy;
     state.matchEndTimer = 0;
     state.gameState = 'matchEnd';
+    stopArenaBgm(true);
+    stopAllSounds(true, 2000, 500);
+    stopAllLoopingSounds();
     return;
   }
 
@@ -1030,23 +1033,54 @@ function endRoundIfTlfsEnded() {
     // Enemy died - increment defeated count
     state.tlfsDefeatedEnemies = (state.tlfsDefeatedEnemies || 0) + 1;
 
-    if (state.tlfsDefeatedEnemies >= 5) {
+    const totalChallengers = (Array.isArray(state.tlfsRoster) && state.tlfsRoster.length > 0)
+      ? state.tlfsRoster.length
+      : ((state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) ? state.tlfsAllowedEnemies.length : 5);
+
+    if (state.tlfsDefeatedEnemies >= totalChallengers) {
       // Player won the gauntlet
       state.matchWinner = player;
       state.matchEndTimer = 0;
       state.gameState = 'matchEnd';
+      stopArenaBgm(true);
+      stopAllSounds(true, 2000, 500);
+      stopAllLoopingSounds();
     } else {
-      // Clean up dead enemy so they don't interact while we wait for next tick?
-      // Actually, we can just instantly spawn a new one in their place!
-      let nextEnemyIndex = 1; // fallback
-      if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
+      // Instantly spawn the next challenger in the queue!
+      let nextEnemyIndex;
+      if (Array.isArray(state.tlfsRoster) && state.tlfsRoster[state.tlfsDefeatedEnemies] !== undefined) {
+        nextEnemyIndex = state.tlfsRoster[state.tlfsDefeatedEnemies];
+      } else if (state.tlfsNextChallengerIndex !== null && state.tlfsNextChallengerIndex !== undefined) {
+        nextEnemyIndex = state.tlfsNextChallengerIndex;
+      } else if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
         nextEnemyIndex = state.tlfsAllowedEnemies[Math.floor(Math.random() * state.tlfsAllowedEnemies.length)];
+      } else {
+        nextEnemyIndex = 1; // fallback
+      }
+
+      // Pre-roll or resolve next queued challenger for the ghost card stack
+      if (Array.isArray(state.tlfsRoster) && state.tlfsRoster[state.tlfsDefeatedEnemies + 1] !== undefined) {
+        state.tlfsNextChallengerIndex = state.tlfsRoster[state.tlfsDefeatedEnemies + 1];
+      } else if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
+        const remainingPool = state.tlfsAllowedEnemies.filter(i => i !== nextEnemyIndex);
+        const nextCandidates = remainingPool.length > 0 ? remainingPool : state.tlfsAllowedEnemies;
+        state.tlfsNextChallengerIndex = nextCandidates[Math.floor(Math.random() * nextCandidates.length)];
+      } else {
+        state.tlfsNextChallengerIndex = null;
       }
 
       state.p2Index = nextEnemyIndex;
       const newEnemy = createFighterInstance(FIGHTER_DEFS[nextEnemyIndex], nextEnemyIndex);
       if (newEnemy) {
         newEnemy.reset();
+
+        // Apply configured challenger fixed HP
+        const challengerHp = MODE_SETTINGS[state.mode]?.challengerFixedHp ?? MODE_SETTINGS[state.mode]?.enemyFixedHp ?? 500;
+        const isSans = (newEnemy.characterId === 'sans' || newEnemy.type === 'sans');
+        const isMakima = (newEnemy.characterId === 'makima' || newEnemy.type === 'makima');
+        const hp = isSans ? ((typeof CONFIG !== 'undefined' && CONFIG.sans?.hp !== undefined) ? CONFIG.sans.hp : 1) : (isMakima ? Math.round(challengerHp * (CONFIG.makima?.maxHpRatio ?? 1.0)) : challengerHp);
+        newEnemy.maxHp = hp;
+        newEnemy.hp = hp;
         
         // Spawn them on the right side
         const arena = state.arena;
@@ -1059,16 +1093,27 @@ function endRoundIfTlfsEnded() {
         newEnemy.vx = -newEnemy.speed;
         newEnemy.vy = 0;
 
+        // Aim towards active player
+        if (player && typeof newEnemy.aim === 'function') {
+          newEnemy.aim(player);
+        }
+
         // Replace the old enemy
         state.fighters[1] = newEnemy;
-        if (typeof state.clearHealthHud === 'function') state.clearHealthHud();
+        if (typeof state.clearHealthHud === 'function') state.clearHealthHud(true);
         
         // Spawn "NEXT FIGHTER!" text
-        spawnFloatingText(newEnemy.x, newEnemy.y - newEnemy.r - 20, 'NEW CHALLENGER!', '#ff4d4d');
+        const def = FIGHTER_DEFS[nextEnemyIndex];
+        const chalName = def ? (def.name || 'CHALLENGER').toUpperCase() : 'CHALLENGER';
+        spawnFloatingText(newEnemy.x, newEnemy.y - newEnemy.r - 20, `CHALLENGER: ${chalName}!`, '#ff4d4d', 24);
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash1', 0.5);
+        }
       }
     }
   }
 }
+state.endRoundIfTlfsEnded = endRoundIfTlfsEnded;
 
 // ─────────────────────────────────────────────
 // FIGHTER UPDATE (main loop step)

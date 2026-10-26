@@ -61,10 +61,11 @@ export const MODE_SETTINGS = {
     label: 'TLFS',
     rounds: 1, // Only 1 round in TLFS
     hpMultiplier: 1.2,
-    speedMultiplier: 1.4,
+    speedMultiplier: 1.5,
     initialFuelPickups: 2,
     supportFourFighters: false,
-    playerFixedHp: 500, // Configurable fixed HP for the player
+    playerFixedHp: 2000, // Configurable fixed HP for the player
+    challengerFixedHp: 500, // Configurable fixed HP for challengers in Gauntlet mode
   },
   [GAME_MODES.TAG_MATCH]: {
     label: 'Tag Match',
