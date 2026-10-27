@@ -11,7 +11,7 @@ const areOnSameTeam = (ownerIndex, targetIndex) => areOnSameTeamByIndex(state, o
 
 export class GojoBlueBehavior extends ProjectileBehavior {
   update(p, fighters, system) {
-    const pullRadius = p.pullRadius || CONFIG.gojo?.blueRadius || 100;
+    const pullRadius = p.pullRadius || CONFIG.gojo?.bluePullRadius || CONFIG.gojo?.blueRadius || 100;
     const ownerIndex = (typeof p.owner === 'number') ? p.owner : (state.fighters ? state.fighters.indexOf(p.owner) : -1);
     const ownerFighter = (typeof p.owner === 'number' && fighters) ? fighters[p.owner] : (p.ownerFighter || p.owner);
 

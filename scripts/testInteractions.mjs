@@ -332,6 +332,12 @@ async function runInteractionTests() {
     assert(mahoraga._findClosestEnemy(gojo) === gojo, 'Adapted Mahoraga must select Gojo as its combat target');
     mahoraga.update(gojo, 0, arena);
     assert(mahoraga.attackCount > 0, 'Infinity-adapted Mahoraga must perform normal melee attacks against Gojo');
+    if (mahoraga.isSwordWindingUp) {
+      const windupFrames = mahoraga.swordWindupTimer || 14;
+      for (let frame = 0; frame < windupFrames; frame++) {
+        mahoraga.update(gojo, 0, arena);
+      }
+    }
     assert(gojo.hp < gojoHpBeforeMelee, `Infinity-adapted Mahoraga's basic melee attack must damage Gojo (${gojoHpBeforeMelee} -> ${gojo.hp})`);
 
     mahoraga.reset();
@@ -929,6 +935,39 @@ async function runInteractionTests() {
     genos.dead = true;
     genos.interruptAttacks(true);
     assert(genos.isFiringUlt === false, 'isFiringUlt must cancel when Genos dies');
+
+    // 8. Test Post-Beam Burn Mechanic: When the beam expires, hit enemies receive burn status
+    const genosBurnTester = new FIGHTER_CLASS_MAP.genos({ radius: 25, x: 200, y: 300, hp: 320, color: '#FF5500' });
+    const enemyInBeam = new FIGHTER_CLASS_MAP.normal({ radius: 25, x: 350, y: 300, hp: 200, color: '#FFFFFF' });
+    const enemyBehind = new FIGHTER_CLASS_MAP.normal({ radius: 25, x: 100, y: 300, hp: 200, color: '#00FF00' });
+    state.fighters = [genosBurnTester, enemyInBeam, enemyBehind];
+    state.illusions = [];
+
+    genosBurnTester.gunAngle = 0; // Aiming right towards enemyInBeam (+x)
+    genosBurnTester.ultAngle = 0;
+    genosBurnTester.isFiringUlt = true;
+    genosBurnTester.ultTimer = 2; // 2 frames remaining
+    genosBurnTester.ultBeamHitTargets = new Set();
+
+    // Frame 1: Beam is firing and strikes enemyInBeam
+    genosBurnTester.update(enemyInBeam, 0, state.arena);
+    assert(genosBurnTester.ultBeamHitTargets.has(enemyInBeam), 'enemyInBeam must be registered in ultBeamHitTargets');
+    assert(!genosBurnTester.ultBeamHitTargets.has(enemyBehind), 'enemyBehind must NOT be in ultBeamHitTargets');
+    assert((enemyInBeam.burnTimer || 0) === 0, 'enemyInBeam should not have burnTimer while beam is still actively firing');
+
+    // Frame 2: Beam timer hits 0 and expires
+    genosBurnTester.update(enemyInBeam, 0, state.arena);
+    assert(genosBurnTester.isFiringUlt === false, 'isFiringUlt must be false after ultTimer reaches 0');
+    assert(genosBurnTester.isUltRecovering === true, 'isUltRecovering must be true after beam expires');
+    assert(enemyInBeam.burnTimer > 0, `enemyInBeam must have burnTimer > 0 after beam expires (got ${enemyInBeam.burnTimer})`);
+    assert((enemyBehind.burnTimer || 0) === 0, 'enemyBehind must NOT have burnTimer after beam expires');
+
+    // Test that burn deals damage over time
+    const hpBeforeBurn = enemyInBeam.hp;
+    for (let f = 0; f < 35; f++) {
+      enemyInBeam.statusEffects.handleBurn();
+    }
+    assert(enemyInBeam.hp < hpBeforeBurn, `Burned enemy must take burn damage over time (before: ${hpBeforeBurn}, after: ${enemyInBeam.hp})`);
 
     console.log('      ✅ Genos physical push, Reze explosion resilience & knockback immunity during ultimate beam verified.');
   }
@@ -9790,7 +9829,62 @@ async function runInteractionTests() {
     drawAshHoneycombBarrier(mockCtx, ash);
     assert(mockCtx.getStackDepth() === 0, 'drawAshHoneycombBarrier must maintain 100% balanced Canvas 2D stack depth when active');
 
-    console.log('      ✅ Pikachu Thunderbolt Callout Sequence, 12-Frame Sprites, Arena Wall Clamping & Directional Honeycomb Barrier verified successfully.');
+    // 9. Verify Charizard Flamethrower (Windup Frames, Steady 2-Second Stream, Breather Settle & Stack Balance)
+    const charizardConfig = ashConfig.pokemonRoster.charizard;
+    assert(charizardConfig.skills?.special, 'Charizard must declare skills.special');
+    assert(charizardConfig.skills.special.windupCallout === 'CHAR...', `Expected windupCallout 'CHAR...', got ${charizardConfig.skills.special.windupCallout}`);
+    assert(charizardConfig.skills.special.attackCallout === '...ROOOAAAR!', `Expected attackCallout '...ROOOAAAR!', got ${charizardConfig.skills.special.attackCallout}`);
+    assert(charizardConfig.skills.special.windupFrames === 28, `Expected windupFrames 28, got ${charizardConfig.skills.special.windupFrames}`);
+    assert(charizardConfig.skills.special.streamDurationFrames === 120, `Expected 2-second streamDurationFrames 120, got ${charizardConfig.skills.special.streamDurationFrames}`);
+    assert(charizardConfig.skills.special.recoveryFrames === 24, `Expected breather recoveryFrames 24, got ${charizardConfig.skills.special.recoveryFrames}`);
+
+    const charizard = new PokemonCompanionEntity(ash, 'charizard', 150, 250);
+    ash.activePokemon = charizard;
+    state.fighters.push(charizard);
+
+    // Phase 1: Windup
+    charizard.startFlamethrower(cj, false);
+    assert(charizard.flamethrowerState === 'windup', `Expected flamethrowerState 'windup', got ${charizard.flamethrowerState}`);
+    assert(charizard.flamethrowerTimer === 28, `Expected windup frames 28, got ${charizard.flamethrowerTimer}`);
+    assert(charizard.vx === 0 && charizard.vy === 0, 'Charizard must remain planted with zero velocity during windup');
+
+    // Advance through windup (28 frames) into Phase 2: Active 2-second stream
+    for (let f = 0; f < 28; f++) {
+      charizard.update(cj, 0, testArena);
+    }
+    assert(charizard.flamethrowerState === 'active', `Expected flamethrowerState 'active', got ${charizard.flamethrowerState}`);
+    assert(charizard.flamethrowerTimer === 120, `Expected 2.0s active stream duration 120, got ${charizard.flamethrowerTimer}`);
+
+    // Advance 30 frames: verify steady planted stance (zero recoil drift), multi-tick damage & burning
+    const preFlameCjHp = cj.hp;
+    for (let f = 0; f < 30; f++) {
+      charizard.update(cj, 0, testArena);
+    }
+    assert(cj.hp < preFlameCjHp, `CJ must take damage from active Flamethrower stream! (Before: ${preFlameCjHp}, After: ${cj.hp})`);
+    assert(charizard.vx === 0 && charizard.vy === 0, 'Charizard must remain steady with zero velocity drift while firing flames');
+    assert(cj.isBurning === true, 'Enemy must be inflicted with burning status during Flamethrower');
+
+    // Advance through remaining active frames into Phase 3: Breather
+    while (charizard.flamethrowerState === 'active') {
+      charizard.update(cj, 0, testArena);
+    }
+    assert(charizard.flamethrowerState === 'recovery', `Expected flamethrowerState 'recovery' (breather), got ${charizard.flamethrowerState}`);
+    assert(charizard.vx === 0 && charizard.vy === 0, 'Charizard must remain stationary catching breath during breather');
+
+    // Verify Canvas 2D stack depth during Flamethrower
+    mockCtx.resetStackDepth();
+    drawPokemonCompanion(mockCtx, charizard);
+    assert(mockCtx.getStackDepth() === 0, 'drawPokemonCompanion must maintain 0 stack depth during Flamethrower breather');
+
+    // Advance through breather frames (24 frames) to complete skill and enforce cooldown
+    while (charizard.flamethrowerState === 'recovery') {
+      charizard.update(cj, 0, testArena);
+    }
+    assert(charizard.flamethrowerState === null, 'flamethrowerState must be null after breather completes');
+    assert(charizard.specialCooldownMax === charizardConfig.skills.special.cooldown, `Special cooldown must match config (${charizardConfig.skills.special.cooldown}), got ${charizard.specialCooldownMax}`);
+    assert(charizard.specialCooldown === charizard.specialCooldownMax, `Special cooldown must be reset, got ${charizard.specialCooldown}`);
+
+    console.log('      ✅ Pikachu Thunderbolt & Charizard Flamethrower (Windup, 2s Steady Torrent, Breather Settle & Zero Stack Depth) verified successfully.');
   }
 
   // =========================================================================
@@ -10399,6 +10493,800 @@ async function runInteractionTests() {
     state.fighters = prevFighters;
 
     console.log('      ✅ Gauntlet Battle Intro & Thumbnail Face-Off ("PLAYER" vs "CHALLENGERS", lineup resolution, stack balance) verified successfully.');
+  }
+
+  // -------------------------------------------------------------------------
+  // Test 97: Ash's Pokémon Lore-Accurate Close Combat Moves (Rule 30 Kinematics & Stack Depth Balance)
+  // -------------------------------------------------------------------------
+  {
+    console.log('   97. Testing Ash\'s Pokémon Lore Close Combat Moves (Quick Attack, Iron Tail, Dragon Claw, Night Slash, Close Combat)...');
+    const { AshFighter, PokemonCompanionEntity } = await import('../js/entities/fighters/AshFighter.js');
+    const { drawPokemonCompanion } = await import('../js/graphics/weapons/ashPokemonGraphics.js');
+    const { CJFighter } = await import('../js/entities/fighters/CJFighter.js');
+
+    const ash = new AshFighter({ x: 100, y: 300, teamId: 0 });
+    const dummy = new CJFighter({ x: 160, y: 300, teamId: 1 });
+    const arena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+
+    // 1. Pikachu: Quick Attack (Supersonic white dash + impact lock)
+    const pika = new PokemonCompanionEntity(ash, 'pikachu', 100, 300);
+    pika._startCloseCombatMove(dummy, 'quickAttack');
+    assert(pika.meleeMoveKey === 'quickAttack', 'Pikachu must initiate Quick Attack');
+    assert(pika.meleeMoveState === 'windup', 'Quick Attack begins in windup phase');
+
+    let pikaHpBefore = dummy.hp;
+    let qaHit = false;
+    let maxZ_QA = 0;
+    for (let f = 0; f < 36; f++) {
+      pika.update(dummy, 0, arena);
+      if (pika.z > maxZ_QA) maxZ_QA = pika.z;
+      if (pika.meleeHitDone?.has('quickAttack')) qaHit = true;
+      mockCtx.resetStackDepth();
+      drawPokemonCompanion(mockCtx, pika);
+      assert(mockCtx.getStackDepth() === 0, `Quick Attack must maintain 0 stack depth at tick ${f}`);
+    }
+    assert(qaHit === true, 'Quick Attack must successfully connect and deliver damage');
+    assert(dummy.hp < pikaHpBefore, 'Quick Attack must deliver combat damage');
+    assert(maxZ_QA >= 15, `Quick Attack must feature hop and leapforth vertical altitude (got ${maxZ_QA})`);
+
+    // 2. Pikachu: Iron Tail (Air leap flip, hardened metallic steel crescent, stun)
+    dummy.hp = 100;
+    pika.meleeCooldown = 0;
+    pika._startCloseCombatMove(dummy, 'ironTail');
+    assert(pika.meleeMoveKey === 'ironTail', 'Pikachu must initiate Iron Tail');
+    let maxZ = 0;
+    let hitFound = false;
+    for (let f = 0; f < 46; f++) {
+      pika.update(dummy, 0, arena);
+      if (pika.z > maxZ) maxZ = pika.z;
+      if (pika.meleeHitDone?.has('ironTail')) hitFound = true;
+      mockCtx.resetStackDepth();
+      drawPokemonCompanion(mockCtx, pika);
+      assert(mockCtx.getStackDepth() === 0, `Iron Tail must maintain 0 stack depth at tick ${f}`);
+    }
+    assert(maxZ >= 15, `Iron Tail must feature dynamic airborne altitude z (got ${maxZ})`);
+    assert(hitFound === true, 'Iron Tail must successfully connect and register hit');
+
+    // 3. Charizard: Dragon Claw (Twin 3-taloned rending claw slashes & X-cleave)
+    const charizard = new PokemonCompanionEntity(ash, 'charizard', 100, 300);
+    dummy.hp = 100;
+    charizard._startCloseCombatMove(dummy, 'dragonClaw');
+    assert(charizard.meleeMoveKey === 'dragonClaw', 'Charizard must initiate Dragon Claw');
+    let c1Hit = false;
+    let c2Hit = false;
+    for (let f = 0; f < 55; f++) {
+      charizard.update(dummy, 0, arena);
+      if (charizard.meleeHitDone?.has('dragonClaw1')) c1Hit = true;
+      if (charizard.meleeHitDone?.has('dragonClaw2')) c2Hit = true;
+      mockCtx.resetStackDepth();
+      drawPokemonCompanion(mockCtx, charizard);
+      assert(mockCtx.getStackDepth() === 0, `Dragon Claw must maintain 0 stack depth at tick ${f}`);
+    }
+    assert(c1Hit && c2Hit, 'Dragon Claw must deliver both rending claw strikes');
+
+    // 4. Greninja: Night Slash (Shadow step dash & dual dark-blade cross cleave)
+    const greninja = new PokemonCompanionEntity(ash, 'greninja', 100, 300);
+    dummy.hp = 100;
+    greninja._startCloseCombatMove(dummy, 'nightSlash');
+    assert(greninja.meleeMoveKey === 'nightSlash', 'Greninja must initiate Night Slash');
+    let nsHit = false;
+    for (let f = 0; f < 45; f++) {
+      greninja.update(dummy, 0, arena);
+      if (greninja.meleeHitDone?.has('nightSlash')) nsHit = true;
+      mockCtx.resetStackDepth();
+      drawPokemonCompanion(mockCtx, greninja);
+      assert(mockCtx.getStackDepth() === 0, `Night Slash must maintain 0 stack depth at tick ${f}`);
+    }
+    assert(nsHit === true, 'Night Slash must successfully connect and deliver damage');
+
+    // 5. Lucario: Close Combat (4-hit flurry barrage + finisher Aura Palm blast)
+    const lucario = new PokemonCompanionEntity(ash, 'lucario', 100, 300);
+    dummy.hp = 100;
+    lucario._startCloseCombatMove(dummy, 'closeCombat');
+    assert(lucario.meleeMoveKey === 'closeCombat', 'Lucario must initiate Close Combat');
+    let cc1 = false, cc2 = false, cc3 = false, cc4 = false;
+    for (let f = 0; f < 58; f++) {
+      lucario.update(dummy, 0, arena);
+      if (lucario.meleeHitDone?.has('cc1')) cc1 = true;
+      if (lucario.meleeHitDone?.has('cc2')) cc2 = true;
+      if (lucario.meleeHitDone?.has('cc3')) cc3 = true;
+      if (lucario.meleeHitDone?.has('cc4')) cc4 = true;
+      mockCtx.resetStackDepth();
+      drawPokemonCompanion(mockCtx, lucario);
+      assert(mockCtx.getStackDepth() === 0, `Close Combat must maintain 0 stack depth at tick ${f}`);
+    }
+    assert(cc1 === true, 'Close Combat must connect Hit 1 (Left Jab)');
+    assert(cc2 === true, 'Close Combat must connect Hit 2 (Right Cross)');
+    assert(cc3 === true, 'Close Combat must connect Hit 3 (Roundhouse Kick)');
+    assert(cc4 === true, 'Close Combat must connect Hit 4 (Finisher Aura Palm)');
+
+    console.log('      ✅ Ash\'s Pokémon Close Combat Moves (Quick Attack, Iron Tail, Dragon Claw, Night Slash, Close Combat & 0 Stack Depth) verified successfully.');
+  }
+
+  // ── TEST 98: 1v2 Mode Authentic Top Duel HUD & 2 Teammate Cards Integration ──
+  console.log('   98. Testing 1v2 Mode Authentic Top Duel HUD & 2 Teammate Cards Integration...');
+  {
+    const { drawHUD, clearHealthHud } = await import('../js/graphics/hudManager.js');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const { KnightFighter } = await import('../js/entities/fighters/KnightFighter.js');
+
+    const previousMode = state.mode;
+    const previousFighters = state.fighters;
+
+    try {
+      state.mode = '1v2';
+      const gojo = new GojoFighter({ characterId: 'gojo', name: 'Gojo', x: 480, y: 300, color: '#00F0FF', controls: {} });
+      const sukuna = new SukunaFighter({ characterId: 'sukuna', name: 'Sukuna', x: 200, y: 200, color: '#FF0055', controls: {} });
+      const knight = new KnightFighter({ characterId: 'knight', name: 'Knight', x: 300, y: 300, color: '#CCCCCC', controls: {} });
+
+      state.fighters = [gojo, sukuna, knight];
+      clearHealthHud(true);
+      drawHUD();
+
+      const topEl = globalThis.document.getElementById('hudTopContainer');
+      const bottomEl = globalThis.document.getElementById('healthHud');
+
+      assert(topEl !== null, 'hudTopContainer must exist');
+      assert(topEl.style.display === 'flex', `hudTopContainer must be display: flex in 1v2 mode (got ${topEl.style.display})`);
+      assert(topEl.innerHTML.includes('hud-top-duel'), 'hudTopContainer must render .hud-top-duel layout in 1v2 mode');
+
+      // Left side: Solo fighter (Gojo)
+      assert(topEl.innerHTML.includes('hud-top-player hud-top-p1'), 'hudTopContainer must render .hud-top-p1 for Solo fighter');
+      assert(topEl.innerHTML.includes('GOJO'), 'hud-top-p1 must render Solo fighter Gojo name');
+      assert(topEl.innerHTML.includes('hud-top-profile__canvas'), 'hud-top-p1 must render high-res profile canvas');
+      assert(topEl.innerHTML.includes('hud-top-bar'), 'hud-top-p1 must render connected top health bar');
+
+      // Center: Match Timer
+      assert(topEl.innerHTML.includes('hud-top-center'), 'hudTopContainer must render center timer in 1v2 mode');
+      assert(topEl.innerHTML.includes('hud-top-timer-text'), 'hud-top-timer-text must exist');
+
+      // Right side: 2 Teammates stacked (.hud-top-team-col)
+      assert(topEl.innerHTML.includes('hud-top-player hud-top-p2 hud-top-team-col'), 'hudTopContainer must render .hud-top-team-col for teammates on the right side');
+      assert(topEl.innerHTML.includes('hud-top-team-card hud-top-team-p2'), 'hud-top-team-col must contain .hud-top-team-p2 (Teammate 1)');
+      assert(topEl.innerHTML.includes('hud-top-team-card hud-top-team-p3'), 'hud-top-team-col must contain .hud-top-team-p3 (Teammate 2)');
+      assert(topEl.innerHTML.includes('SUKUNA'), 'Teammate 1 must render Sukuna name');
+      assert(topEl.innerHTML.includes('KNIGHT'), 'Teammate 2 must render Knight name');
+
+      // Container and Duel modifier classes
+      assert(topEl.classList.contains('hud-top-1v2'), 'hudTopContainer must have .hud-top-1v2 class in 1v2 mode');
+      assert(topEl.innerHTML.includes('hud-top-duel-1v2'), 'hudTopContainer must render .hud-top-duel-1v2 layout class');
+
+      // Verify CSS rules
+      const hudCss = readFileSync(new URL('../css/style.css', import.meta.url), 'utf8');
+      assert(hudCss.includes('.hud-top-duel.hud-top-duel-1v2'), 'style.css must define .hud-top-duel.hud-top-duel-1v2');
+      assert(hudCss.includes('.hud-top-container.hud-top-1v2'), 'style.css must define .hud-top-container.hud-top-1v2');
+
+      // Combo Tracker 3-Slot independent verification for 1v2 Mode
+      const { ensureComboTrackers, registerComboHit } = await import('../js/systems/comboTracker.js');
+      const { drawComboCounter } = await import('../js/graphics/hudManager.js');
+
+      state.comboTrackers = null;
+      state.gameState = 'playing';
+      const slots = ensureComboTrackers();
+      assert(slots.length === 3, `ensureComboTrackers in 1v2 mode must allocate 3 slots (got ${slots.length})`);
+      assert(slots[0].side === 0, 'Slot 0 must be left side (Solo Gojo)');
+      assert(slots[1].side === 1, 'Slot 1 must be right side (Teammate 1 Sukuna)');
+      assert(slots[2].side === 1, 'Slot 2 must be right side (Teammate 2 Knight)');
+
+      // Register hits:
+      // Solo Fighter (Gojo, index 0) hits Knight (index 2)
+      registerComboHit(gojo, knight, 45);
+      assert(slots[0].hits === 1, `Slot 0 must record Gojo hit (got ${slots[0].hits})`);
+      assert(slots[0].damage === 45, `Slot 0 must record 45 damage (got ${slots[0].damage})`);
+
+      // Teammate 1 (Sukuna, index 1) hits Gojo (index 0)
+      registerComboHit(sukuna, gojo, 60);
+      assert(slots[1].hits === 1, `Slot 1 must record Sukuna hit (got ${slots[1].hits})`);
+      assert(slots[1].damage === 60, `Slot 1 must record 60 damage (got ${slots[1].damage})`);
+
+      // Teammate 2 (Knight, index 2) hits Gojo (index 0)
+      registerComboHit(knight, gojo, 30);
+      assert(slots[2].hits === 1, `Slot 2 must record Knight hit (got ${slots[2].hits})`);
+      assert(slots[2].damage === 30, `Slot 2 must record 30 damage (got ${slots[2].damage})`);
+
+      // Render combo counters to mock canvas and verify Canvas 2D stack integrity
+      mockCtx.resetStackDepth();
+      drawComboCounter(mockCtx);
+      assert(mockCtx.getStackDepth() === 0, `drawComboCounter in 1v2 mode must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+      // Banner alignment: solo card and first teammate card share one row, the second
+      // teammate card sits exactly one full card height + gap below (never overlapping).
+      const bannerAnchorsY = [];
+      const recordingCtx = new Proxy(mockCtx, {
+        get(target, prop) {
+          if (prop === 'translate') return (x, y) => { bannerAnchorsY.push(y); };
+          return target[prop];
+        }
+      });
+      drawComboCounter(recordingCtx);
+      // Each card translates twice (screen anchor, then local origin at -CARD_H / 2);
+      // keep only the positive screen anchors.
+      const bannerAnchorRows = bannerAnchorsY.filter(y => y > 0).map(y => Math.round(y));
+      const bannerRows = [...new Set(bannerAnchorRows)].sort((a, b) => a - b);
+      assert(bannerAnchorRows.length === 3, `1v2 must draw 3 combo banners (got ${bannerAnchorRows.length})`);
+      assert(bannerRows.length === 2, `1v2 combo banners must occupy exactly 2 stacked rows (got ${bannerRows.length})`);
+      assert(bannerAnchorRows.filter(y => y === bannerRows[0]).length === 2, 'Solo banner and first teammate banner must share one aligned row');
+      assert(bannerRows[1] - bannerRows[0] === 74, `1v2 combo banner rows must be spaced by full card height + 6px gap (74px, got ${bannerRows[1] - bannerRows[0]})`);
+
+      // Bottom container: Skills only with .one-vs-two-hud layout (no health bars)
+      assert(bottomEl.classList.contains('one-vs-two-hud'), 'Bottom health HUD must have .one-vs-two-hud class in 1v2 mode');
+      assert(!bottomEl.classList.contains('boss-battle-hud'), 'Bottom health HUD must NOT have .boss-battle-hud in regular 1v2 mode');
+      assert(bottomEl.children.length === 3, 'Bottom health HUD must render 3 skill cards for the 3 fighters');
+      assert(!bottomEl.innerHTML.includes('health-card__bar'), 'Bottom health HUD must NOT render health bars (skills only)');
+      assert(bottomEl.innerHTML.includes('hud-skill-box'), 'Bottom health HUD must render skill bars in 1v2 mode');
+      assert(!bottomEl.innerHTML.includes('health-card__desc'), 'Bottom health HUD must NOT render fighter descriptions in 1v2 mode');
+      assert(!bottomEl.innerHTML.includes('health-card__info'), 'Bottom health HUD must NOT render stat info blocks in 1v2 mode');
+      // 1v2 is 1 solo vs a duo: two columns (solo left, both teammates stacked right), never three.
+      assert(hudCss.includes('.health-hud.one-vs-two-hud {\n  display: grid !important;\n  grid-template-columns: 1fr 1fr !important;'), '1v2 bottom HUD must define a 2-column skills grid');
+      assert(hudCss.includes('.health-hud.one-vs-two-hud .health-card:nth-child(1) {\n  grid-column: 1 !important;\n  grid-row: 1 / span 2 !important;'), '1v2 bottom HUD must pin the solo fighter to the full left column');
+      assert(hudCss.includes('.health-hud.one-vs-two-hud .health-card:nth-child(3) {\n  grid-column: 2 !important;\n  grid-row: 2 !important;'), '1v2 bottom HUD must stack the second teammate under the first in the right column');
+
+      // Battle intro: underfoot team rings must stay hidden until fighters are actually summoned
+      const { getTeamRingIntroOpacity } = await import('../js/graphics/renderers/EntityRenderer.js');
+      const prevDelayTimer = state.battleStartDelayTimer;
+      state.gameState = 'playing';
+      state.battleStartDelayTimer = 80;
+      assert(getTeamRingIntroOpacity(state) === 0, 'Team rings must be hidden during the FIGHT! banner phase (fighters not summoned yet)');
+      state.battleStartDelayTimer = 44;
+      assert(getTeamRingIntroOpacity(state) === 0, 'Team rings must not appear before the summon materialization starts');
+      state.battleStartDelayTimer = 40;
+      const midSummonOpacity = getTeamRingIntroOpacity(state);
+      assert(midSummonOpacity > 0 && midSummonOpacity < 1, `Team rings must fade in with the summon (got ${midSummonOpacity})`);
+      state.battleStartDelayTimer = 0;
+      assert(getTeamRingIntroOpacity(state) === 1, 'Team rings must be fully visible once the fighter is summoned');
+      state.battleStartDelayTimer = prevDelayTimer;
+
+      console.log('      ✅ 1v2 Mode Authentic Top Duel HUD (1 Solo card on left, 2 Teammate cards on right, skills-only bottom, summon-gated team rings) verified successfully.');
+    } finally {
+      state.mode = previousMode;
+      state.fighters = previousFighters;
+      clearHealthHud(true);
+    }
+  }
+
+  // ── TEST 99: Zombie 20-Second Wave Progression, Variety Mechanics, 1-Minute Final Wave & Survival Mortality ──
+  console.log('   99. Testing Zombie 20-Second Wave Progression, Variety Mechanics, 1-Minute Final Wave & Survival Mortality...');
+  {
+    const { ZombieFighter } = await import('../js/entities/fighters/ZombieFighter.js');
+    const { KnightFighter } = await import('../js/entities/fighters/KnightFighter.js');
+
+    const zombie = new ZombieFighter({ characterId: 'zombie', name: 'Zombie', x: 200, y: 300, controls: {} });
+    const knight = new KnightFighter({ characterId: 'knight', name: 'Knight', x: 300, y: 300, controls: {} });
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+
+    // 1. Initial State: Wave 1
+    assert(zombie.waveNumber === 1, `Zombie must start at Wave 1 (got ${zombie.waveNumber})`);
+    assert(zombie.survivalTimer === 0, 'Zombie survival timer must start at 0');
+    assert(zombie.isFinalWaveActive === false, 'Final wave must not be active at start');
+
+    // 2. Fast-forward to 20 seconds (1200 frames) -> Wave 2 Arrival
+    zombie.survivalTimer = 1199;
+    zombie.update(knight, 0, arena);
+    assert(zombie.waveNumber === 2, `Wave must advance to 2 at 1200 frames (got ${zombie.waveNumber})`);
+    assert(zombie.waveBanner !== null, 'Wave 2 announcement banner must be triggered');
+    assert(zombie.waveBanner.text.includes('A HUGE WAVE'), `Wave 2 banner must announce huge wave (got ${zombie.waveBanner.text})`);
+    assert(zombie.armorType === 'bucket', 'Zombie boss must equip Buckethead armor on Wave 2');
+    assert(zombie.gravestones.some(g => g.variety === 'screendoor'), 'Wave 2 must spawn Screen Door Zombie gravestone');
+
+    // 3. Fast-forward to 40 seconds (2400 frames) -> Wave 3 Arrival
+    zombie.survivalTimer = 2399;
+    zombie.update(knight, 0, arena);
+    assert(zombie.waveNumber === 3, `Wave must advance to 3 at 2400 frames (got ${zombie.waveNumber})`);
+    assert(zombie.waveBanner.text.includes('A HUGE WAVE'), 'Wave 3 banner must announce huge wave');
+    assert(zombie.gravestones.some(g => g.variety === 'newspaper'), 'Wave 3 must spawn Newspaper Zombie gravestone');
+    assert(zombie.gravestones.some(g => g.variety === 'polevaulter'), 'Wave 3 must spawn Pole Vaulter Zombie gravestone');
+    assert(zombie.gravestones.some(g => g.variety === 'football'), 'Wave 3 must spawn Football Zombie gravestone');
+
+    // 4. Fast-forward to 60 seconds / 1 Minute (3600 frames) -> FINAL WAVE
+    zombie.survivalTimer = 3599;
+    zombie.update(knight, 0, arena);
+    assert(zombie.isFinalWaveActive === true, 'Final wave must activate at 3600 frames (1 minute)');
+    assert(zombie.waveNumber === 4, 'Wave number must reach 4 on Final Wave');
+    assert(zombie.waveBanner.isFinal === true, 'Wave banner must be marked isFinal on Final Wave');
+    assert(zombie.gravestones.some(g => g.variety === 'flag'), 'Final Wave must spawn Flag Zombie gravestone');
+
+    // 5. Verify Undead Rebirth Mortality Standard before 1 Minute:
+    // Depleting HP to 0 before 1 minute MUST resurrect the Zombie!
+    zombie.survivalTimer = 500;
+    zombie.isFinalWaveActive = false;
+    zombie.hp = 100;
+    zombie.takeDamage(500, knight);
+    assert(zombie.hp === zombie.maxHp, `Zombie must resurrect with full HP before 1 minute (got ${zombie.hp})`);
+
+    // 6. Verify Survival Victory during Final Wave:
+    // Defeating Zombie after 1 minute during Final Wave triggers victory!
+    zombie.survivalTimer = 3650;
+    zombie.isFinalWaveActive = true;
+    zombie.armorShieldHp = 0;
+    zombie.armorType = 'none';
+    zombie.hp = 50;
+    zombie.takeDamage(100, knight);
+    assert(zombie.finalWaveCleared === true, 'Final wave must be cleared upon defeating Zombie in Final Wave');
+    assert(zombie.victoryTimer > 0, 'Victory timer must be triggered upon clearing Final Wave');
+
+    // 7. Verify Canvas 2D Stack Integrity (Rule 2.4)
+    mockCtx.resetStackDepth();
+    zombie.draw(mockCtx, knight);
+    assert(mockCtx.getStackDepth() === 0, `Zombie draw pipeline must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+    console.log('      ✅ Zombie 20-Second Waves, Varieties (Screen Door, Newspaper, Pole, Football, Flag), 1-Minute Final Wave & Survival Mortality verified successfully.');
+  }
+
+  // ==========================================
+  // TEST 100: Mahoraga Divine Shout Single-Cast & Anti-Multi-Cast Guarantee
+  // ==========================================
+  {
+    console.log('   100. Testing Mahoraga Divine Shout Single-Cast & Anti-Multi-Cast Guarantee...');
+    const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = arena;
+
+    const mahoraga = new MahoragaClass({ type: 'mahoraga', x: 200, y: 300, hp: 450, maxHp: 450 });
+    const gojo = new GojoClass({ type: 'gojo', x: 300, y: 300, hp: 200, maxHp: 200 });
+    mahoraga.team = 0;
+    gojo.team = 1;
+    mahoraga.gojoInfinityImmune = true; // Prevent infinity barrier freezing during shout test
+    state.fighters = [mahoraga, gojo];
+
+    const fullCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
+
+    // 1. Initial State: shout off cooldown and ready
+    mahoraga.shoutCooldown = 0;
+    mahoraga.isShouting = false;
+    mahoraga.swordCooldown = 999; // Prevent melee strike priority so shout triggers
+
+    // Trigger AI decision tree update
+    mahoraga.update(gojo, 0, arena);
+
+    // 2. Windup Phase: Mahoraga must immediately place shoutCooldown on full cooldown!
+    assert(mahoraga.isShouting === true, 'Mahoraga must enter isShouting state when in range');
+    assert(mahoraga.shoutPhase === 'windup', 'Mahoraga must enter windup phase first');
+    assert(mahoraga.shoutCooldown >= fullCooldown - 2, `Mahoraga must put shoutCooldown on full cooldown immediately on windup initiation (got ${mahoraga.shoutCooldown})`);
+
+    // 3. Complete windup to trigger fire & recovery
+    const windupFrames = CONFIG.mahoraga?.shoutWindupFrames ?? 24;
+    for (let f = 0; f < windupFrames; f++) {
+      mahoraga.update(gojo, 0, arena);
+    }
+
+    assert(mahoraga.shoutPhase === 'recovery', 'Mahoraga must transition to recovery phase after firing Divine Shout');
+    assert(mahoraga.activeSonicBooms && mahoraga.activeSonicBooms.length === 1, 'Mahoraga must spawn exactly 1 sonic boom upon firing');
+    assert(mahoraga.shoutCooldown >= fullCooldown - 30, `Mahoraga shoutCooldown must remain on cooldown after firing (got ${mahoraga.shoutCooldown})`);
+
+    // 4. Complete recovery phase
+    const recoveryFrames = CONFIG.mahoraga?.shoutRecoveryFrames ?? 18;
+    for (let f = 0; f < recoveryFrames + 2; f++) {
+      mahoraga.update(gojo, 0, arena);
+    }
+
+    assert(mahoraga.isShouting === false, 'Mahoraga must exit isShouting after recovery completes');
+    assert(mahoraga.shoutPhase === null, 'shoutPhase must reset to null after recovery');
+    assert(mahoraga.shoutCooldown > 0, `shoutCooldown must remain active after recovery (${mahoraga.shoutCooldown} frames remaining)`);
+
+    // Next update: Mahoraga MUST NOT recast Divine Shout!
+    const boomsCount = mahoraga.activeSonicBooms.length;
+    mahoraga.update(gojo, 0, arena);
+    assert(mahoraga.isShouting === false, 'Mahoraga MUST NOT immediately recast Divine Shout after recovery');
+    assert(mahoraga.activeSonicBooms.length <= boomsCount, 'Mahoraga MUST NOT spawn an additional sonic boom');
+
+    // 5. Interruption during windup must NOT reset shoutCooldown to 0
+    mahoraga.shoutCooldown = 0;
+    mahoraga.swordCooldown = 999;
+    mahoraga.update(gojo, 0, arena);
+    assert(mahoraga.isShouting === true && mahoraga.shoutPhase === 'windup', 'Precondition: Mahoraga entered windup');
+    mahoraga.interruptAttacks(true);
+    assert(mahoraga.isShouting === false, 'interruptAttacks must cancel isShouting');
+    assert(mahoraga.shoutCooldown >= 180, `Interrupting windup must retain cooldown penalty of at least 180 frames (got ${mahoraga.shoutCooldown})`);
+
+    // 6. Adaptation Strike (adaptationDashIsCounter) MUST NOT fire Divine Shout
+    mahoraga.shoutCooldown = 500;
+    mahoraga.activeSonicBooms = [];
+    mahoraga.adaptationDashIsCounter = true;
+    mahoraga.adaptationDashTimer = 0;
+    mahoraga.adaptationDashTarget = gojo;
+    mahoraga.dashToX = gojo.x - 40;
+    mahoraga.dashToY = gojo.y;
+
+    // Simulate completion of counter-dash frame
+    mahoraga.update(gojo, 0, arena);
+    assert(mahoraga.activeSonicBooms.length === 0, 'Adaptation counter strike MUST NOT fire Divine Shout');
+    assert(mahoraga.isShouting === false, 'Mahoraga must not be shouting during adaptation strike');
+
+    console.log('      ✅ Mahoraga Divine Shout Single-Cast & Anti-Multi-Cast Guarantee verified successfully.');
+  }
+
+  // ==========================================
+  // TEST 101: Mahoraga Adaptation 2X Damage — Sword-Only, Slower Attack Speed, 14f Windup & Zero Punch 2X Multiplier
+  // ==========================================
+  {
+    console.log('   101. Testing Mahoraga Adaptation 2X Damage (Sword-Only, Slower Attack Speed, 14f Windup & Zero Punch 2X)...');
+    const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = arena;
+
+    const mahoraga = new MahoragaClass({ type: 'mahoraga', x: 200, y: 300, hp: 450, maxHp: 450 });
+    const gojo = new GojoClass({ type: 'gojo', x: 250, y: 300, hp: 200, maxHp: 200 });
+    mahoraga.team = 0;
+    gojo.team = 1;
+    mahoraga.gojoInfinityImmune = true;
+    state.fighters = [mahoraga, gojo];
+
+    const baseSwordDamage = CONFIG.mahoraga?.swordDamage ?? 6;
+    const basePunchDamage = CONFIG.mahoraga?.punchDamage ?? 6;
+    const normalCooldown = CONFIG.mahoraga?.swordCooldown ?? 20;
+    const slowedCooldown = CONFIG.mahoraga?.wheelDoubleDamageCooldownFrames ?? 36;
+    const windupFrames = CONFIG.mahoraga?.wheelDoubleDamageWindupFrames ?? 14;
+
+    // 1. Verify Normal Melee Cooldown & Damage (Without 2X Damage Buff)
+    mahoraga.wheelDoubleDamageTimer = 0;
+    mahoraga.swordCooldown = 0;
+    const gojoStartHp = gojo.hp;
+    mahoraga._performMeleeAttack(gojo);
+
+    assert(mahoraga.swordCooldown === normalCooldown, `Normal swordCooldown must be ${normalCooldown} (got ${mahoraga.swordCooldown})`);
+    assert(mahoraga.isSwordWindingUp === false, 'Normal sword attacks must NOT enter isSwordWindingUp');
+    assert(gojoStartHp - gojo.hp === baseSwordDamage, `Normal sword strike must deal base damage ${baseSwordDamage} (dealt ${gojoStartHp - gojo.hp})`);
+
+    // 2. Activate 2X Damage Buff (Wheel Adaptation Click Buff)
+    mahoraga.wheelDoubleDamageTimer = 240;
+    mahoraga.swordCooldown = 0;
+    const gojoHpBeforeBuff = gojo.hp;
+
+    // 3. Trigger Melee Attack during 2X Damage Buff -> Must Initiate Smooth Windup & Slower Attack Speed
+    mahoraga._performMeleeAttack(gojo);
+
+    assert(mahoraga.swordCooldown === slowedCooldown, `2X damage attack cooldown must be slowed to ${slowedCooldown} (got ${mahoraga.swordCooldown})`);
+    assert(mahoraga.isSwordWindingUp === true, 'During 2X damage, Mahoraga must enter isSwordWindingUp state');
+    assert(mahoraga.swordWindupTimer === windupFrames, `swordWindupTimer must be initialized to ${windupFrames} frames (got ${mahoraga.swordWindupTimer})`);
+    assert(mahoraga.punchAnimTimer === 36, `punchAnimTimer must be set to 36 frames for 5-phase heavy animation (got ${mahoraga.punchAnimTimer})`);
+    assert(gojo.hp === gojoHpBeforeBuff, 'During windup phase, damage must NOT be delivered prematurely (deferred hit release)');
+
+    // 4. Progress Windup Animation Frames
+    for (let f = 0; f < windupFrames - 1; f++) {
+      mahoraga.update(gojo, 0, arena);
+      assert(mahoraga.isSwordWindingUp === true, `Mahoraga must remain in windup state on frame ${f + 1}`);
+      assert(gojo.hp === gojoHpBeforeBuff, `Damage must not be dealt on frame ${f + 1} of windup`);
+    }
+
+    // Release Frame (Frame 14): swordWindupTimer reaches 0 and releases the 2X damage sword strike
+    mahoraga.update(gojo, 0, arena);
+    assert(mahoraga.isSwordWindingUp === false, 'Mahoraga must exit isSwordWindingUp upon completing windup');
+    const damageDealt = gojoHpBeforeBuff - gojo.hp;
+    const expected2xDamage = baseSwordDamage * 2.0;
+    assert(damageDealt === expected2xDamage, `2X damage sword strike must deal exactly ${expected2xDamage} damage (dealt ${damageDealt})`);
+
+    // 5. Sword-Only Guarantee: Over multiple attack counts during 2X damage, NEVER trigger heavy punch
+    mahoraga.wheelDoubleDamageTimer = 240;
+    for (let i = 0; i < 20; i++) {
+      mahoraga.swordCooldown = 0;
+      mahoraga.leftPunchTimer = 0;
+      mahoraga._performMeleeAttack(gojo);
+      assert(mahoraga.leftPunchTimer === 0, `Attack #${i + 1} during 2X damage must NOT trigger left heavy punch (leftPunchTimer was ${mahoraga.leftPunchTimer})`);
+      assert(mahoraga.isSwordWindingUp === true, `Attack #${i + 1} during 2X damage must initiate sword windup`);
+      mahoraga.isSwordWindingUp = false; // Fast-forward for loop
+      mahoraga.swordWindupTimer = 0;
+    }
+
+    // 6. Punch Damage Verification: Base punch MUST NEVER receive 2X multiplier
+    mahoraga.wheelDoubleDamageTimer = 0;
+    const testPunchTargets = [gojo];
+    const gojoHpBeforePunch = gojo.hp;
+    const { executeMeleePunch } = await import('../js/entities/fighters/mahoraga/mahoragaCombat.js');
+    executeMeleePunch(mahoraga, testPunchTargets, gojo);
+    const punchDamageDealt = gojoHpBeforePunch - gojo.hp;
+    assert(punchDamageDealt === basePunchDamage, `Heavy punch must deal exactly base punch damage ${basePunchDamage} (never doubled! dealt ${punchDamageDealt})`);
+
+    // 7. General Defense Buff Removal: Verify Mahoraga takes 100% full unmitigated damage regardless of adaptation stages
+    assert((CONFIG.mahoraga?.defBuffPerClickPercent ?? 0) === 0, 'CONFIG.mahoraga.defBuffPerClickPercent must be 0 (general DEF scaling removed)');
+    mahoraga.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+    mahoraga.maxHp = 200;
+    mahoraga.hp = 200;
+    mahoraga.takeDamage(10, gojo, { isMelee: true });
+    const damageAtStage0 = 200 - mahoraga.hp;
+    assert(damageAtStage0 === 10, `Unadapted hit must deal full 10 damage at 0 stages (got ${damageAtStage0})`);
+
+    mahoraga.adaptationStage = { melee: 8, ranged: 8, skill: 8 };
+    mahoraga.hp = 200;
+    mahoraga.takeDamage(10, gojo, { isMelee: true });
+    const damageAtStage8 = 200 - mahoraga.hp;
+    assert(damageAtStage8 === 10, `Even at max adaptation stages, Mahoraga must take full 10 damage with 0% defense buff (got ${damageAtStage8})`);
+
+    console.log('      ✅ Mahoraga Adaptation 2X Damage (Sword-Only, Slower Attack Speed, 14f Windup & Zero Punch 2X) verified successfully.');
+  }
+
+  // ==========================================
+  // TEST 102: Mahoraga Sword Arm Physics & 2-Bone Inverse Kinematics Animation Standard (Rule 30)
+  // ==========================================
+  {
+    console.log('   102. Testing Mahoraga Sword Arm Physics & 2-Bone Inverse Kinematics Animation Standard (Rule 30)...');
+    const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = arena;
+
+    const mahoraga = new MahoragaClass({ type: 'mahoraga', x: 200, y: 300, hp: 450, maxHp: 450 });
+    const gojo = new GojoClass({ type: 'gojo', x: 250, y: 300, hp: 200, maxHp: 200 });
+    mahoraga.team = 0;
+    gojo.team = 1;
+    state.fighters = [mahoraga, gojo];
+
+    const { drawMahoragaSword } = await import('../js/graphics/weapons/mahoragaWeaponGraphics.js');
+
+    // 1. Idle Resting Arm Kinematics & Stack Depth
+    mahoraga.punchAnimTimer = 0;
+    mockCtx.resetStackDepth();
+    drawMahoragaSword(mockCtx, mahoraga);
+    assert(mockCtx.getStackDepth() === 0, `drawMahoragaSword at idle must leave 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    const idleTips = mahoraga._getSwordTipPositions();
+    assert(Number.isFinite(idleTips.outer.x) && Number.isFinite(idleTips.outer.y), 'Idle sword tip coordinates must be valid finite numbers');
+
+    // 2. 5-Phase Melee Combat Kinematics: Coil Lift -> Poised Hold -> Hypersonic Whip Strike -> Impact Lock -> Recovery Settle
+    // Test normal sword cleave (combo 0)
+    mahoraga.swordCombo = 0;
+    mahoraga.punchAnimTimer = 22;
+    mahoraga.punchAnimMaxTimer = 22;
+
+    // Phase 1 (Coil): Frame 1
+    mockCtx.resetStackDepth();
+    mahoraga.draw(mockCtx, gojo);
+    assert(mockCtx.getStackDepth() === 0, `Mahoraga draw during sword coil must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+    const coilTips = mahoraga._getSwordTipPositions();
+
+    // Phase 3 (Strike): Frame 12 (approx progress 0.45)
+    mahoraga.punchAnimTimer = 10;
+    mockCtx.resetStackDepth();
+    mahoraga.draw(mockCtx, gojo);
+    assert(mockCtx.getStackDepth() === 0, `Mahoraga draw during strike whip must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+    const strikeTips = mahoraga._getSwordTipPositions();
+
+    // Verify sword tip dynamically lunges forward between coil and strike
+    assert(strikeTips.outer.x > coilTips.outer.x, `Sword tip must translate forward dynamically during strike cleave (${strikeTips.outer.x} > ${coilTips.outer.x})`);
+
+    // Phase 4 (Impact Lock): Frame 16 (approx progress 0.72)
+    mahoraga.punchAnimTimer = 6;
+    mockCtx.resetStackDepth();
+    mahoraga.draw(mockCtx, gojo);
+    assert(mockCtx.getStackDepth() === 0, `Mahoraga draw during impact lock must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // Phase 5 (Recovery): Frame 20
+    mahoraga.punchAnimTimer = 2;
+    mockCtx.resetStackDepth();
+    mahoraga.draw(mockCtx, gojo);
+    assert(mockCtx.getStackDepth() === 0, `Mahoraga draw during recovery settle must have 0 canvas stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 3. 2X Damage Heavy Sword Windup Kinematic Arm Physics (14 frames windup)
+    mahoraga.wheelDoubleDamageTimer = 240;
+    mahoraga.isSwordWindingUp = true;
+    mahoraga.swordWindupTimer = 14;
+    mahoraga.swordWindupMaxTimer = 14;
+    mahoraga.punchAnimTimer = 36;
+    mahoraga.punchAnimMaxTimer = 36;
+
+    for (let f = 14; f >= 0; f--) {
+      mahoraga.swordWindupTimer = f;
+      mahoraga.punchAnimTimer = 22 + f; // progresses 36 -> 22 across windup
+      mockCtx.resetStackDepth();
+      mahoraga.draw(mockCtx, gojo);
+      assert(mockCtx.getStackDepth() === 0, `Canvas stack depth must be 0 throughout 2X damage windup frame ${f} (got ${mockCtx.getStackDepth()})`);
+      const windupTips = mahoraga._getSwordTipPositions();
+      assert(Number.isFinite(windupTips.outer.x) && Number.isFinite(windupTips.outer.y), `Sword tip must remain valid on windup frame ${f}`);
+    }
+
+    console.log('      ✅ Mahoraga Sword Arm Physics & 2-Bone Inverse Kinematics Animation Standard (Rule 30) verified successfully.');
+  }
+
+  // ==========================================
+  // TEST 103: Gojo Limitless Cursed Techniques (Purple, Red, Blue) 18-Frame Animated Sprite Pipeline
+  // ==========================================
+  {
+    console.log('   103. Testing Gojo Limitless Cursed Techniques (Purple, Red, Blue) 18-Frame Animated Sprite Pipeline...');
+    const { gojoConfig } = await import('../js/configs/characters/gojoConfig.js');
+    const { 
+      _getGojoPurpleTravelFrames, 
+      _getGojoRedReversalFrames, 
+      _getGojoBlueTravelFrames, 
+      drawGojoPurpleTravelSprite, 
+      drawGojoOrb,
+      drawGojoWeapon 
+    } = await import('../js/graphics/weapons/gojoWeaponGraphics.js');
+    const { drawGojoPurpleOrb } = await import('../js/graphics/renderers/projectileRenderer.js');
+    const { getSkillSound } = await import('../js/soundEffects/skillSounds.js');
+    const fs = await import('fs');
+    const path = await import('path');
+
+    // 1. Asset & Radius Configuration Integrity (Purple, Red, Blue)
+    assert(
+      typeof gojoConfig.purpleRadius === 'number' && gojoConfig.purpleRadius > 0,
+      `gojoConfig.purpleRadius must be a positive number (got ${gojoConfig.purpleRadius})`
+    );
+    assert(
+      typeof gojoConfig.blueRadius === 'number' && gojoConfig.blueRadius > 0,
+      `gojoConfig.blueRadius must be a positive number (got ${gojoConfig.blueRadius})`
+    );
+    assert(
+      typeof gojoConfig.redRadius === 'number' && gojoConfig.redRadius > 0,
+      `gojoConfig.redRadius must be a positive number (got ${gojoConfig.redRadius})`
+    );
+    assert(
+      gojoConfig.assets.purpleTravel === 'Assets/model/gojo/Purple_idle_travel/purple_travel-b.png',
+      `gojoConfig.assets.purpleTravel must point to 'Assets/model/gojo/Purple_idle_travel/purple_travel-b.png' (got '${gojoConfig.assets.purpleTravel}')`
+    );
+    assert(
+      gojoConfig.assets.redReversal === 'Assets/model/gojo/Red_reversal/red_reversal-b.png',
+      `gojoConfig.assets.redReversal must point to 'Assets/model/gojo/Red_reversal/red_reversal-b.png' (got '${gojoConfig.assets.redReversal}')`
+    );
+    assert(
+      gojoConfig.assets.blueTravel === 'Assets/model/gojo/Blue_projectile/blue_travel-b.png',
+      `gojoConfig.assets.blueTravel must point to 'Assets/model/gojo/Blue_projectile/blue_travel-b.png' (got '${gojoConfig.assets.blueTravel}')`
+    );
+
+    // 1b. Projectile Spawn Radius Dynamic Config Relevance (Purple & Blue)
+    const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+    const mockSystem = { _resetProjectileProperties: () => {}, projectiles: [] };
+
+    // Dynamic purpleRadius test
+    const origPurpleR = gojoConfig.purpleRadius;
+    try {
+      gojoConfig.purpleRadius = 50;
+      mockSystem.projectiles.length = 0;
+      GojoPurpleBehavior.spawn(mockSystem, 100, 100, 5, 0, 70, 0, 150, {});
+      assert(mockSystem.projectiles[0].r === 50, `GojoPurpleBehavior.spawn with purpleRadius: 50 must set r=50 (got ${mockSystem.projectiles[0].r})`);
+
+      gojoConfig.purpleRadius = 150;
+      mockSystem.projectiles.length = 0;
+      GojoPurpleBehavior.spawn(mockSystem, 100, 100, 5, 0, 70, 0, 150, {});
+      assert(mockSystem.projectiles[0].r === 150, `GojoPurpleBehavior.spawn with purpleRadius: 150 must set r=150 (got ${mockSystem.projectiles[0].r})`);
+    } finally {
+      gojoConfig.purpleRadius = origPurpleR;
+    }
+
+    // Dynamic blueRadius test
+    const origBlueR = gojoConfig.blueRadius;
+    const origBlueScale = gojoConfig.blueScale;
+    try {
+      gojoConfig.blueScale = 1.0;
+      gojoConfig.blueRadius = 25;
+      projectileSystem.fireGojoBlue({ r: 25, x: 100, y: 100, gunAngle: 0 }, 0, 10, 100, 100, 0);
+      const blueProj25 = projectileSystem.projectiles[projectileSystem.projectiles.length - 1];
+      assert(blueProj25.r === 25, `projectileSystem.fireGojoBlue with blueRadius: 25 must set r=25 (got ${blueProj25.r})`);
+
+      gojoConfig.blueRadius = 150;
+      projectileSystem.fireGojoBlue({ r: 25, x: 100, y: 100, gunAngle: 0 }, 0, 10, 100, 100, 0);
+      const blueProj150 = projectileSystem.projectiles[projectileSystem.projectiles.length - 1];
+      assert(blueProj150.r === 150, `projectileSystem.fireGojoBlue with blueRadius: 150 must set r=150 (got ${blueProj150.r})`);
+    } finally {
+      gojoConfig.blueRadius = origBlueR;
+      gojoConfig.blueScale = origBlueScale;
+    }
+
+    // 2. Physical File Integrity on Disk for Purple, Red, and Blue
+    const directories = [
+      { name: 'Purple', dir: 'Purple_idle_travel', prefix: 'purple_travel' },
+      { name: 'Red', dir: 'Red_reversal', prefix: 'red_reversal' },
+      { name: 'Blue', dir: 'Blue_projectile', prefix: 'blue_travel' },
+    ];
+
+    for (const tech of directories) {
+      const dirPath = path.join(process.cwd(), 'Assets', 'model', 'gojo', tech.dir);
+      assert(fs.existsSync(dirPath), `${tech.name} directory must exist at ${dirPath}`);
+
+      for (let i = 1; i <= 18; i++) {
+        const framePath = path.join(dirPath, `${tech.prefix}-${i}.png`);
+        assert(fs.existsSync(framePath), `${tech.name} frame ${i} must exist on disk at ${framePath}`);
+      }
+
+      const stripPath = path.join(dirPath, `${tech.prefix}-b.png`);
+      assert(fs.existsSync(stripPath), `${tech.name} master strip must exist on disk at ${stripPath}`);
+    }
+
+    // 3. Preloader Function Pipeline across all 3 techniques
+    const purpleFrames = _getGojoPurpleTravelFrames();
+    assert(Array.isArray(purpleFrames) && purpleFrames.length === 18, `_getGojoPurpleTravelFrames must load 18 frames (got ${purpleFrames?.length})`);
+
+    const redFrames = _getGojoRedReversalFrames();
+    assert(Array.isArray(redFrames) && redFrames.length === 18, `_getGojoRedReversalFrames must load 18 frames (got ${redFrames?.length})`);
+
+    const blueFrames = _getGojoBlueTravelFrames();
+    assert(Array.isArray(blueFrames) && blueFrames.length === 18, `_getGojoBlueTravelFrames must load 18 frames (got ${blueFrames?.length})`);
+
+    // 4. Sprite Rendering & Canvas 2D Stack Integrity across all colors
+    for (const color of ['purple', 'red', 'blue', 'green']) {
+      mockCtx.resetStackDepth();
+      drawGojoPurpleTravelSprite(mockCtx, 50, 1000, false, color, 1.0);
+      assert(mockCtx.getStackDepth() === 0, `drawGojoPurpleTravelSprite (${color}) must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+      mockCtx.resetStackDepth();
+      drawGojoOrb(mockCtx, 0, 0, 25, 1000, color, 0);
+      assert(mockCtx.getStackDepth() === 0, `drawGojoOrb (${color}) must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+    }
+
+    // 5. Projectile System Flight Rendering (Purple & Blue Projectiles)
+    const mockPurpleProj = {
+      x: 270,
+      y: 480,
+      r: 50,
+      isGojoPurple: true,
+      life: 150,
+      maxLife: 200,
+      visualTime: 12345,
+      is200Percent: false
+    };
+
+    mockCtx.resetStackDepth();
+    drawGojoPurpleOrb(mockCtx, mockPurpleProj);
+    assert(mockCtx.getStackDepth() === 0, `drawGojoPurpleOrb (100% Purple) must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+    mockPurpleProj.is200Percent = true;
+    mockPurpleProj.r = 67.5;
+    mockCtx.resetStackDepth();
+    drawGojoPurpleOrb(mockCtx, mockPurpleProj);
+    assert(mockCtx.getStackDepth() === 0, `drawGojoPurpleOrb (200% Purple) must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // Blue Projectile flight
+    const mockBlueProj = {
+      x: 270,
+      y: 480,
+      r: 22.5,
+      visual: 'gojoBlue',
+      isGojoBlue: true,
+      life: 100,
+      maxLife: 100,
+      visualTime: 54321
+    };
+    mockCtx.resetStackDepth();
+    drawGojoPurpleOrb(mockCtx, mockBlueProj);
+    assert(mockCtx.getStackDepth() === 0, `drawGojoPurpleOrb (Blue projectile) must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 6. Channeling Fusion Orbs & Ranged Blue Orb in Hands Inside Gojo Weapon Graphics
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const testGojo = new GojoClass({ type: 'gojo', x: 270, y: 480, hp: 200 });
+
+    // Idle / Ranged Stance: Gojo holding Blue Orb
+    testGojo.isMeleeMode = false;
+    testGojo.shootCooldown = 0;
+    mockCtx.resetStackDepth();
+    drawGojoWeapon(mockCtx, testGojo);
+    assert(mockCtx.getStackDepth() === 0, `drawGojoWeapon (holding Blue Orb) must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 100% Purple Channeling: Red & Blue merging in hands
+    testGojo.isChannelingPurple = true;
+    testGojo.purpleCharge = 50; // < 70%: separate Red and Blue orbs in hands
+    testGojo.purpleChargeMax = 100;
+    mockCtx.resetStackDepth();
+    drawGojoWeapon(mockCtx, testGojo);
+    assert(mockCtx.getStackDepth() === 0, `drawGojoWeapon during Red/Blue mixing must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // Fused into Purple
+    testGojo.purpleCharge = 80; // >= 70%: fused into Purple
+    mockCtx.resetStackDepth();
+    drawGojoWeapon(mockCtx, testGojo);
+    assert(mockCtx.getStackDepth() === 0, `drawGojoWeapon during 100% Purple fusion must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 7. Canonical Flare SFX Audio Pipeline (Purple & Red Flare use flare.mp3, not dash SFX)
+    assert(CONFIG.gojo?.sounds?.purpleFlare === 'Assets/Sound Effects/SkillEffects/flare.mp3', `Gojo purpleFlare SFX must be Assets/Sound Effects/SkillEffects/flare.mp3 (got ${CONFIG.gojo?.sounds?.purpleFlare})`);
+    assert(CONFIG.gojo?.sounds?.redFlare === 'Assets/Sound Effects/SkillEffects/flare.mp3', `Gojo redFlare SFX must be Assets/Sound Effects/SkillEffects/flare.mp3 (got ${CONFIG.gojo?.sounds?.redFlare})`);
+    const pFlareSnd = getSkillSound('gojo', 'purple_flare');
+    assert(pFlareSnd?.src === 'Assets/Sound Effects/SkillEffects/flare.mp3', `getSkillSound('gojo', 'purple_flare') must resolve to flare.mp3 (got ${pFlareSnd?.src})`);
+    const rFlareSnd = getSkillSound('gojo', 'red_flare');
+    assert(rFlareSnd?.src === 'Assets/Sound Effects/SkillEffects/flare.mp3', `getSkillSound('gojo', 'red_flare') must resolve to flare.mp3 (got ${rFlareSnd?.src})`);
+    assert(pFlareSnd?.src !== 'Assets/Sound Effects/Skills/dash3.mp3', 'purple_flare must NOT use dash3.mp3');
+    assert(rFlareSnd?.src !== 'Assets/Sound Effects/Skills/dash3.mp3', 'red_flare must NOT use dash3.mp3');
+
+    console.log('      ✅ Gojo Limitless Cursed Techniques (Purple, Red, Blue) 18-Frame Animated Sprite Pipeline & Canonical Flare Audio verified successfully.');
   }
 
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');

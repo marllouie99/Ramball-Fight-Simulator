@@ -67,6 +67,7 @@ export class GenosFighter extends Fighter {
     this.ultTimer = 0;
     this.ultTickTimer = 0;
     this.ultAngle = 0;
+    this.ultBeamHitTargets = new Set();
 
     // Passive: Core Overdrive (Self-Destruct Stasis)
     this.isSelfDestructing = false;
@@ -218,6 +219,7 @@ export class GenosFighter extends Fighter {
     this.isUltRecovering = false;
     this.ultRecoveryTimer = 0;
     this.ultTimer = 0;
+    if (this.ultBeamHitTargets) this.ultBeamHitTargets.clear();
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
@@ -1023,6 +1025,7 @@ export class GenosFighter extends Fighter {
         this.isUltRecovering = false;
         this.ultRecoveryTimer = 0;
         this.ultTimer = 0;
+    if (this.ultBeamHitTargets) this.ultBeamHitTargets.clear();
         this.immuneToPush = false;
         this.immuneToKnockback = false;
         this.immuneToPull = false;
@@ -1140,6 +1143,7 @@ export class GenosFighter extends Fighter {
     this.speed = (this.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
     this.isUltSliding = true;
     this.ultSlideTimer = CONFIG.genos?.ultSlideFrames || 22;
+    if (this.ultBeamHitTargets) this.ultBeamHitTargets.clear();
     this.immuneToPush = true;
     this.immuneToKnockback = true;
     this.immuneToPull = true;
@@ -1388,6 +1392,7 @@ export class GenosFighter extends Fighter {
           this.isFiringUlt = false;
           this.isUltRecovering = false;
           this.ultTimer = 0;
+    if (this.ultBeamHitTargets) this.ultBeamHitTargets.clear();
           this.isSelfDestructing = false;
           this.isMeleeWallDashing = false;
           this.speedBoostTimer = 0;
@@ -1750,6 +1755,7 @@ export class GenosFighter extends Fighter {
         this.knockbackVx = 0;
         this.knockbackVy = 0;
         this.ultTimer = CONFIG.genos?.ultDurationFrames || 150;
+        this.ultBeamHitTargets = new Set();
 
         // STRICTLY PRESERVE LOCKED ANGLE: Do NOT auto-snap upon firing!
         if (this.ultAngle !== undefined && !Number.isNaN(this.ultAngle)) {
@@ -1825,6 +1831,9 @@ export class GenosFighter extends Fighter {
         const perpDist = Math.abs(-dx * Math.sin(this.ultAngle) + dy * Math.cos(this.ultAngle));
 
         if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r && !target.isBaguvixActive && !target.isGodModeActive) {
+          if (!this.ultBeamHitTargets) this.ultBeamHitTargets = new Set();
+          this.ultBeamHitTargets.add(target);
+
           // Apply movement slow so enemy can freely move and steer, but at reduced speed
           const slowMult = CONFIG.genos?.ultSlowMultiplier ?? 0.45;
           if (typeof target.applySlow === 'function') {
@@ -1854,6 +1863,8 @@ export class GenosFighter extends Fighter {
           const perpDist = Math.abs(-dx * Math.sin(this.ultAngle) + dy * Math.cos(this.ultAngle));
 
           if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r) {
+            if (!this.ultBeamHitTargets) this.ultBeamHitTargets = new Set();
+            this.ultBeamHitTargets.add(target);
             applyDamageToTarget(target, damage, this, { isSkill: true, isUltimate: true, isGenosBeam: true });
             
             // Gentle directional plasma push along the beam axis without locking velocity or steering
@@ -1911,6 +1922,32 @@ export class GenosFighter extends Fighter {
           const recSrc = CONFIG.genos?.sounds?.ultRecovery || CONFIG.genos?.ultRecoverySound || 'Assets/Sound Effects/Skills/genos-recovery.mp3';
           const recVol = CONFIG.genos?.soundVolumes?.ultRecovery ?? CONFIG.genos?.ultRecoveryVolume ?? 0.40;
           audioSystem.playSFX(recSrc, recVol);
+        }
+
+        // Apply burn mechanic to all enemies that got hit by the ultimate beam!
+        if (this.ultBeamHitTargets && this.ultBeamHitTargets.size > 0) {
+          const burnDuration = CONFIG.genos?.ultBurnDuration ?? 180;
+          const burnDmg = CONFIG.genos?.ultBurnDamagePerTick ?? 6;
+          const burnInterval = CONFIG.genos?.ultBurnInterval ?? 30;
+
+          for (const target of this.ultBeamHitTargets) {
+            if (!target || target.hp <= 0) continue;
+            if (typeof target.applyBurn === 'function') {
+              target.applyBurn(this, burnDuration, burnDmg, burnInterval);
+            } else if (target.statusEffects && typeof target.statusEffects.applyBurn === 'function') {
+              target.statusEffects.applyBurn(this, burnDuration, burnDmg, burnInterval);
+            } else {
+              target.burnTimer = Math.max(target.burnTimer || 0, burnDuration);
+              target.burnDamageTimer = 0;
+              target.lastBurnAttacker = this;
+            }
+
+            // Spawn incinerating burn embers / sparks burst on the burned enemy
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(target.x, target.y, 8, 'orange');
+            }
+          }
+          this.ultBeamHitTargets.clear();
         }
 
         // Release all targets from beam trap so their movement speed, steering, and abilities immediately recover!

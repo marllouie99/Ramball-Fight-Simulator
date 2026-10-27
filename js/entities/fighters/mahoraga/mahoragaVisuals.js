@@ -426,6 +426,10 @@ export function drawMahoragaShoutWindup(ctx, fighter) {
  * cleave windup, sakuga impact, and health bar.
  */
 export function drawMahoragaFighter(ctx, fighter, opponent) {
+  if (fighter && (fighter.isAscending || (fighter.spawnTimer && fighter.spawnTimer > 0))) {
+    fighter.angle = 0;
+    fighter.gunAngle = 0;
+  }
   const isGojoDomainActive = !fighter.domainImmunity && !fighter.gojoDomainAdapted && !fighter.gojoAdapted?.domain && typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
@@ -462,16 +466,24 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
     const maxTimer = fighter.punchAnimMaxTimer || 22;
     const p = 1.0 - (fighter.punchAnimTimer / maxTimer);
     const aimAngle = fighter.gunAngle || fighter.angle || 0;
+    const isDoubleDamage = Boolean(fighter.wheelDoubleDamageTimer > 0 || fighter.isSwordWindingUp);
+    const coilP = isDoubleDamage ? 0.28 : 0.23;
+    const holdP = isDoubleDamage ? 0.39 : 0.32;
+    const strikeP = isDoubleDamage ? 0.62 : 0.55;
+    const lockP = isDoubleDamage ? 0.78 : 0.73;
+
     let bodilyLunge = 0;
-    if (p < 0.32) {
-      bodilyLunge = -3.5 * Math.sin((p / 0.32) * Math.PI * 0.5); // Phase 1 & 2: Coil back into potential tension
-    } else if (p < 0.55) {
-      const sp = (p - 0.32) / 0.23;
+    if (p < coilP) {
+      bodilyLunge = -3.5 * Math.sin((p / coilP) * Math.PI * 0.5); // Phase 1: Coil back into potential tension
+    } else if (p < holdP) {
+      bodilyLunge = -3.5; // Phase 2: Poised hold
+    } else if (p < strikeP) {
+      const sp = (p - holdP) / (strikeP - holdP);
       bodilyLunge = -3.5 + 9.5 * Math.pow(sp, 2.5); // Phase 3: Hypersonic whip thrust forward
-    } else if (p < 0.73) {
+    } else if (p < lockP) {
       bodilyLunge = 6.0; // Phase 4: Locked in lunging strike stance
     } else {
-      const rp = (p - 0.73) / 0.27;
+      const rp = (p - lockP) / (1.0 - lockP);
       bodilyLunge = 6.0 * Math.pow(1.0 - rp, 1.8); // Phase 5: Recovery settle
     }
     pullOffsetX = Math.cos(aimAngle) * bodilyLunge;

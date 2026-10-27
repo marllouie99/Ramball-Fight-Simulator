@@ -7,7 +7,7 @@ import { drawBomberExplosionGraphic, drawBomberC4, drawBomberGrenade } from '../
 import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from '../weaponVisuals.js';
 import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawRubbickBolt } from '../weapons/rubbickWeaponGraphics.js';
-import { drawGojoOrb, drawPurpleOrbTrail } from '../weapons/gojoWeaponGraphics.js';
+import { drawGojoOrb, drawPurpleOrbTrail, drawGojoPurpleTravelSprite } from '../weapons/gojoWeaponGraphics.js';
 
 
 import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash, drawAlucardCasullBullet, drawAlucardJackalBullet } from '../weapons/gunSlingerWeaponGraphics.js';
@@ -998,65 +998,6 @@ export function drawGojoPurpleOrb(ctx, p) {
     drawPurpleOrbTrail(ctx, p, visualTime);
   }
 
-  // === 200% HOLLOW PURPLE ENHANCED VISUALS ===
-  if (is200 && p.isGojoPurple) {
-    const t = visualTime;
-    const orbR = p.r;
-
-    // 1. Massive pulsating outer void distortion field
-    const pulse = 1.0 + Math.sin(t * 0.008) * 0.12;
-    ctx.fillStyle = isGreen ? 'rgba(0, 160, 60, 0.12)' : 'rgba(80, 0, 160, 0.12)';
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, orbR * 5.5 * pulse, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 2. Electric lightning arcs (6 bolts radiating from orb center)
-    ctx.save();
-    ctx.translate(p.x, p.y);
-    ctx.lineWidth = 1.8;
-    ctx.lineCap = 'round';
-    const boltCount = 6;
-    for (let i = 0; i < boltCount; i++) {
-      const seed = i * 7919.3;
-      const baseAngle = (Math.PI * 2 / boltCount) * i + t * 0.002;
-      const boltLen = orbR * (1.8 + Math.sin(t * 0.01 + seed) * 0.6);
-      
-      ctx.strokeStyle = isGreen 
-        ? `rgba(120, 255, 160, ${0.5 + Math.sin(t * 0.015 + seed) * 0.3})`
-        : `rgba(220, 160, 255, ${0.5 + Math.sin(t * 0.015 + seed) * 0.3})`;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      
-      // Jagged 3-segment lightning path
-      let bx = 0, by = 0;
-      for (let s = 0; s < 3; s++) {
-        const segLen = boltLen / 3;
-        const jitter = (Math.sin(t * 0.02 + seed + s * 5) * 8) * (s === 1 ? 1 : 0.5);
-        bx += Math.cos(baseAngle + jitter * 0.05) * segLen;
-        by += Math.sin(baseAngle + jitter * 0.05) * segLen;
-        ctx.lineTo(bx + Math.sin(t * 0.03 + seed + s) * jitter, by + Math.cos(t * 0.03 + seed + s) * jitter);
-      }
-      ctx.stroke();
-    }
-    ctx.restore();
-
-    // 4. Bright inner glow bloom
-    const bloomGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, orbR * 2.2);
-    if (isGreen) {
-      bloomGrad.addColorStop(0, 'rgba(220, 255, 230, 0.45)');
-      bloomGrad.addColorStop(0.4, 'rgba(50, 255, 120, 0.25)');
-      bloomGrad.addColorStop(1, 'rgba(0, 180, 60, 0)');
-    } else {
-      bloomGrad.addColorStop(0, 'rgba(255, 220, 255, 0.45)');
-      bloomGrad.addColorStop(0.4, 'rgba(180, 80, 255, 0.25)');
-      bloomGrad.addColorStop(1, 'rgba(120, 0, 200, 0)');
-    }
-    ctx.fillStyle = bloomGrad;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, orbR * 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  
   // Draw the main orb (standard or 200% scaled) with dynamic flight rotation
   const drawR = is200 ? p.r * 1.35 : p.r;
   const spinSpeed = p.isGojoPurple ? 0.016 : 0.024;
@@ -1065,14 +1006,14 @@ export function drawGojoPurpleOrb(ctx, p) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(spinAngle);
-  drawGojoOrb(ctx, 0, 0, drawR, visualTime, colorType, 0);
 
-  // 200%: Extra white-hot core overlay for empowered feel
-  if (is200 && p.isGojoPurple) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
-    ctx.beginPath();
-    ctx.arc(0, 0, drawR * 0.6, 0, Math.PI * 2);
-    ctx.fill();
+  let renderedSprite = false;
+  if (p.isGojoPurple || isBlue) {
+    renderedSprite = drawGojoPurpleTravelSprite(ctx, drawR, visualTime, is200, colorType, 1.0);
+  }
+
+  if (!renderedSprite) {
+    drawGojoOrb(ctx, 0, 0, drawR, visualTime, colorType, 0);
   }
   ctx.restore();
 

@@ -131,7 +131,13 @@ export function performMeleeAttack(fighter, opponent) {
     }
   }
 
-  const attackCooldown = CONFIG.mahoraga?.swordCooldown ?? CONFIG.mahoraga?.neutralAttackInterval ?? 50;
+  const isDoubleDamage = Boolean(fighter.wheelDoubleDamageTimer && fighter.wheelDoubleDamageTimer > 0);
+
+  // During 2x double damage, attack speed slows down (longer cooldown between strikes)
+  const normalCooldown = CONFIG.mahoraga?.swordCooldown ?? CONFIG.mahoraga?.neutralAttackInterval ?? 20;
+  const attackCooldown = isDoubleDamage
+    ? (CONFIG.mahoraga?.wheelDoubleDamageCooldownFrames ?? Math.round(normalCooldown * (CONFIG.mahoraga?.wheelDoubleDamageAttackSpeedSlowMultiplier ?? 1.8)))
+    : normalCooldown;
 
   // Track stance duration window and cooldown
   const isStanceEnabled = CONFIG.mahoraga?.enableCloseQuartersTeleport !== false;
@@ -149,27 +155,33 @@ export function performMeleeAttack(fighter, opponent) {
     fighter.neutralStanceAttackCount = (fighter.neutralStanceAttackCount || 0) + 1;
   }
 
-  // Alternating sword chops (majority) and left heavy punches
+  // Alternating sword chops (majority) and left heavy punches.
+  // During 2x double damage, Mahoraga will ONLY use sword (no punches)!
   const punchFreqStance = CONFIG.mahoraga?.punchFrequencyStance ?? 7;
   const punchFreqNormal = CONFIG.mahoraga?.punchFrequencyNormal ?? 5;
   const punchFrequency = isStanceOnCooldown ? punchFreqNormal : punchFreqStance;
-  const isPunch = (fighter.attackCount % punchFrequency === 0);
+  const isPunch = !isDoubleDamage && (fighter.attackCount % punchFrequency === 0);
+
+  // If 2x double damage is active, initiate smooth windup before releasing the sword strike
+  if (isDoubleDamage) {
+    const windupDuration = CONFIG.mahoraga?.wheelDoubleDamageWindupFrames ?? 14;
+    const animDuration = CONFIG.mahoraga?.wheelDoubleDamageSwordAnimFrames ?? 36;
+    fighter.isSwordWindingUp = true;
+    fighter.swordWindupTimer = windupDuration;
+    fighter.swordWindupMaxTimer = windupDuration;
+    fighter.swordWindupTarget = opponent;
+    fighter.swordCombo = (fighter.swordCombo || 0) + 1;
+    fighter.punchAnimTimer = animDuration;
+    fighter.punchAnimMaxTimer = animDuration;
+
+    const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+    const swordVol = (CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0) * 0.75;
+    audioSystem.playSFX(swordSnd, swordVol);
+    return;
+  }
 
   const punchAnimDuration = CONFIG.mahoraga?.punchAnimFrames ?? 22;
   const swordAnimDuration = CONFIG.mahoraga?.swordAnimFrames ?? 22;
-
-  if (isPunch) {
-    fighter.leftPunchTimer = punchAnimDuration;
-    fighter.leftPunchMaxTimer = punchAnimDuration;
-    playRandomHeavyPunchSound();
-  } else {
-    fighter.swordCombo = (fighter.swordCombo || 0) + 1;
-    fighter.punchAnimTimer = swordAnimDuration;
-    fighter.punchAnimMaxTimer = swordAnimDuration;
-    const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
-    const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0;
-    audioSystem.playSFX(swordSnd, swordVol);
-  }
 
   // AOE frontal arc query (Sword reach & arc angle from config)
   const range = CONFIG.mahoraga?.swordRange ?? 110;
@@ -212,22 +224,43 @@ export function performMeleeAttack(fighter, opponent) {
     }
   }
 
-  const dmgMult = (fighter.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
-  const damage = (CONFIG.mahoraga?.swordDamage ?? 15) * dmgMult;
+  if (isPunch) {
+    fighter.leftPunchTimer = punchAnimDuration;
+    fighter.leftPunchMaxTimer = punchAnimDuration;
+    playRandomHeavyPunchSound();
+    executeMeleePunch(fighter, frontTargets, opponent);
+  } else {
+    fighter.swordCombo = (fighter.swordCombo || 0) + 1;
+    fighter.punchAnimTimer = swordAnimDuration;
+    fighter.punchAnimMaxTimer = swordAnimDuration;
+    const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+    const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0;
+    audioSystem.playSFX(swordSnd, swordVol);
+    executeSwordHit(fighter, opponent, false);
+  }
+}
+
+/**
+ * Execute off-hand heavy punch — NEVER receives 2x damage multiplier.
+ */
+export function executeMeleePunch(fighter, frontTargets, opponent) {
+  const punchDamage = CONFIG.mahoraga?.punchDamage ?? CONFIG.mahoraga?.damage ?? 6;
   const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const baseKnockbackChance = CONFIG.mahoraga?.punchBaseKnockbackChance ?? 0.40;
   const knockbackPerStage = CONFIG.mahoraga?.punchKnockbackChancePerStage ?? 0.04;
   const maxKnockbackChance = CONFIG.mahoraga?.punchMaxKnockbackChance ?? 0.65;
   const knockbackChance = Math.min(maxKnockbackChance, baseKnockbackChance + totalStages * knockbackPerStage);
-  const rollKnockback = isPunch && (Math.random() < knockbackChance);
+  const rollKnockback = Math.random() < knockbackChance;
 
   const punchHitStun = CONFIG.mahoraga?.punchHitStunFrames ?? 16;
-  const swordHitStun = CONFIG.mahoraga?.swordHitStunFrames ?? 8;
   const swordBasePush = CONFIG.mahoraga?.swordBasePushForce ?? 4.0;
 
   for (const t of frontTargets) {
     if (typeof t.takeDamage === 'function') {
-      t.takeDamage(damage, fighter, { isMelee: true });
+      t.takeDamage(punchDamage, fighter, { isMelee: true });
+    }
+    if (typeof t.applyHitStun === 'function') {
+      t.applyHitStun(punchHitStun);
     }
     const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
 
@@ -258,13 +291,89 @@ export function performMeleeAttack(fighter, opponent) {
     const targetObj = opponent || frontTargets[0];
     spawnImpactFlash(targetObj.x, targetObj.y, 45, '#FFD700');
     triggerGlobalScreenShake(5, 8);
+    audioSystem.playSFX('attack_fleshhit', 1.0);
+    audioSystem.playSFX('attack_heavypunch1', 0.95);
+  }
+}
+
+/**
+ * Execute Sword of Extermination strike — applies 2x damage multiplier when adapted.
+ */
+export function executeSwordHit(fighter, opponent, isDoubleDamage = false) {
+  if (!fighter || fighter.hp <= 0 || fighter.dead || fighter.isDead) return;
+
+  const range = CONFIG.mahoraga?.swordRange ?? 110;
+  const arcRadians = CONFIG.mahoraga?.swordArcRadians ?? (Math.PI * 1.3);
+  const frontTargets = getFrontRadiusTargets(fighter, range, arcRadians);
+
+  if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
+    const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
+    if (dist <= range + fighter.r + opponent.r) {
+      frontTargets.push(opponent);
+    }
+  }
+
+  if (typeof state !== 'undefined') {
+    const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
+    const myIndex = state.fighters ? state.fighters.indexOf(fighter) : -1;
+    const myTeam = state.getFighterTeam ? state.getFighterTeam(myIndex) : fighter.team;
+
+    for (const ent of allEntities) {
+      if (!ent || ent === fighter || ent.hp <= 0 || ent.isDead || ent.isInvulnerable) continue;
+      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
+      if (ent.owner === fighter) continue;
+      if (myTeam !== null && myTeam !== undefined) {
+        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+        if (entIdx !== -1 && state.getFighterTeam(entIdx) === myTeam) continue;
+        if (ent.team !== undefined && ent.team === myTeam) continue;
+        if (ent.owner) {
+          const ownerIdx = state.fighters.indexOf(ent.owner);
+          if (ownerIdx !== -1 && state.getFighterTeam(ownerIdx) === myTeam) continue;
+        }
+      }
+      if (!frontTargets.includes(ent)) {
+        const d = Math.hypot(ent.x - fighter.x, ent.y - fighter.y, (ent.z || 0) - (fighter.z || 0));
+        if (d <= fighter.r + ent.r + 20) {
+          frontTargets.push(ent);
+        }
+      }
+    }
+  }
+
+  const dmgMult = isDoubleDamage ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+  const damage = (CONFIG.mahoraga?.swordDamage ?? 6) * dmgMult;
+  const swordHitStun = CONFIG.mahoraga?.swordHitStunFrames ?? 8;
+  const swordBasePush = CONFIG.mahoraga?.swordBasePushForce ?? 4.0;
+
+  for (const t of frontTargets) {
+    if (typeof t.takeDamage === 'function') {
+      t.takeDamage(damage, fighter, { isMelee: true });
+    }
+    if (typeof t.applyHitStun === 'function') {
+      t.applyHitStun(swordHitStun);
+    }
+    const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
+    t.vx = (t.vx || 0) + Math.cos(pushAngle) * swordBasePush;
+    t.vy = (t.vy || 0) + Math.sin(pushAngle) * swordBasePush;
+
+    if (state && state.arena) {
+      const minX = state.arena.x + (t.r || 20);
+      const maxX = state.arena.x + state.arena.width - (t.r || 20);
+      const minY = state.arena.y + (t.r || 20);
+      const maxY = state.arena.y + state.arena.height - (t.r || 20);
+      t.x = Math.max(minX, Math.min(maxX, t.x));
+      t.y = Math.max(minY, Math.min(maxY, t.y));
+    }
+  }
+
+  if (frontTargets.length > 0) {
+    const targetObj = opponent || frontTargets[0];
+    const flashRadius = isDoubleDamage ? 60 : 45;
+    spawnImpactFlash(targetObj.x, targetObj.y, flashRadius, '#FFD700');
+    triggerGlobalScreenShake(isDoubleDamage ? 7 : 5, isDoubleDamage ? 12 : 8);
     // Rule 30 Layered Fleshy Slap Audio Palette
     audioSystem.playSFX('attack_fleshhit', 1.0);
-    if (isPunch) {
-      audioSystem.playSFX('attack_heavypunch1', 0.95);
-    } else {
-      audioSystem.playSFX('sukuna_slice', 0.88);
-    }
+    audioSystem.playSFX('sukuna_slice', isDoubleDamage ? 0.98 : 0.88);
   }
 }
 
@@ -867,7 +976,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
  * and heavily knocking back all enemies caught in its conical path.
  */
 export function executeShout(fighter, opponent, ownerIndex) {
-  if (!fighter.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true)) return;
+  if (!fighter || !fighter.isSkillEnabled(CONFIG.mahoraga?.enableDivineShout, true)) return;
+  // Universally put Divine Shout on cooldown whenever executed
+  fighter.shoutCooldown = Math.max(fighter.shoutCooldown || 0, CONFIG.mahoraga?.shoutCooldown ?? 1000);
   const shoutRange = CONFIG.mahoraga?.shoutRange || 350;
   const shoutConeAngle = CONFIG.mahoraga?.shoutConeAngle || 1.35; // ~77° wide supersonic cone
   const shoutAnimFrames = CONFIG.mahoraga?.shoutAnimFrames || 50;

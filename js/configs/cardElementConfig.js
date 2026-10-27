@@ -172,6 +172,7 @@ const TYPE_ELEMENT_MAP = {
   avatar_of_emptiness: 'dark',
   ulquiorra: 'dark',
   power: 'dark',
+  zombie: 'dark',
 
   // Grass (Flora, Botanical & Nature)
   crazydave: 'grass',

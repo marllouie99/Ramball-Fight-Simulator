@@ -269,14 +269,17 @@ export class GojoFighter extends Fighter {
     stopSoundBySrc('redchanneling');
     stopSoundBySrc('redcharging');
     stopSoundBySrc('reddeploy');
+    stopSoundBySrc('redflare');
     stopSoundBySrc('redblast');
     stopSoundBySrc('red_channeling');
     stopSoundBySrc('red_charging');
     stopSoundBySrc('red_deploy');
+    stopSoundBySrc('red_flare');
     stopSoundBySrc('red_blast');
     fadeOutSoundBySrc('redchanneling', 50);
     fadeOutSoundBySrc('redcharging', 50);
     fadeOutSoundBySrc('reddeploy', 50);
+    fadeOutSoundBySrc('redflare', 50);
     fadeOutSoundBySrc('redblast', 50);
   }
 
@@ -1612,8 +1615,8 @@ export class GojoFighter extends Fighter {
       const flareTriggerFrame = Math.floor(this.purpleChargeMax * 0.5);
       if (this.purpleChargeTimer === flareTriggerFrame) {
         const sFlare = getSkillSound(this._def?.id, 'purple_flare');
-        const flareSrc = sFlare?.src || CONFIG.gojo?.sounds?.purpleFlare || 'Assets/Sound Effects/Skills/dash3.mp3';
-        const flareVol = sFlare?.volume ?? (CONFIG.gojo?.soundVolumes?.purpleFlare ?? 0.45);
+        const flareSrc = sFlare?.src || CONFIG.gojo?.sounds?.purpleFlare || 'Assets/Sound Effects/SkillEffects/flare.mp3';
+        const flareVol = sFlare?.volume ?? (CONFIG.gojo?.soundVolumes?.purpleFlare ?? 0.85);
         audioSystem.playSFX(flareSrc, flareVol);
       }
 

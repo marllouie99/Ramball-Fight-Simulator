@@ -67,8 +67,13 @@ import { SoraFighter } from '../fighters/SoraFighter.js';
 import { GutsFighter } from '../fighters/GutsFighter.js';
 import { ChosoFighter } from '../fighters/ChosoFighter.js?v=81';
 import { AshFighter } from '../fighters/AshFighter.js';
+import { ZombieFighter } from '../fighters/ZombieFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
+  'zombie':     ZombieFighter,
+  'Zombie':     ZombieFighter,
+  'ZOMBIE':     ZombieFighter,
+  'pvz_zombie': ZombieFighter,
   'ash':        AshFighter,
   'Ash':        AshFighter,
   'ASH':        AshFighter,

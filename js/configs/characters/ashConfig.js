@@ -5,7 +5,7 @@
 // 1. Stationary Honeycomb Forcefield Barrier while Active Pokémon battles
 // 2. Mobile Evasion State while waiting for Summon Cooldown after Pokémon faints
 // 3. 4 Autonomous Anime Aces: Pikachu (#0025), Charizard (#0006), Greninja (#0658), Lucario (#0448)
-// 4. Ultimate: Bond Phenomenon / Mega Evolution (Mega Charizard X & Mega Lucario) + 10,000,000 Volt Thunderbolt
+// 4. Ultimate: 10,000,000 Volt Thunderbolt Barrage
 // ─────────────────────────────────────────────
 
 export const ashConfig = {
@@ -56,14 +56,11 @@ export const ashConfig = {
   commandDamageBonus: 1.25,     // +25% damage on commanded signature attacks
 
   // ──────────────────────────────────────────
-  // Ultimate: Bond Awakening & 10,000,000 Volt Barrage
+  // Ultimate: 10,000,000 Volt Thunderbolt Barrage
   // ──────────────────────────────────────────
-  enableMegaAwakening: true,
   ultimateCooldownFrames: 780,  // 13.0s cooldown
-  ultimateDurationFrames: 420,  // 7.0s Mega Evolution / Bond Awakening duration
-  ultimateBarrageBolts: 8,      // Multi-spectrum elemental bolts across the arena
+  ultimateDurationFrames: 420,  // 7.0s duration
   ultimateBoltDamage: 18,
-  ultimatePokemonHealRatio: 0.50, // Restores 50% HP to active Pokémon upon awakening
 
   // ──────────────────────────────────────────
   // Ash's 4 Anime Aces Roster Stats & Movesets (Canonical Empress catalog.bytes specs)
@@ -82,6 +79,7 @@ export const ashConfig = {
       scale: 2.00,
       cryKey: 'cryPikachu',
       megaCryKey: 'cryPikachuStarter',
+      get megaHudSkillLabel() { return null; },
 
       // ── Dedicated Skills Configuration (Fighter-Standard Schema) ──
       skills: {
@@ -90,7 +88,7 @@ export const ashConfig = {
           name: 'QUICK ATTACK & IRON TAIL',
           damage: 18,
           reach: 64,
-          cooldown: 500,
+          cooldown: 34,
           knockback: 6,
           hitStun: 12,
           dashMultiplier: 1.60,
@@ -149,16 +147,13 @@ export const ashConfig = {
       id: 'charizard',
       dexNumber: '0006',
       name: 'CHARIZARD',
-      megaName: 'MEGA CHARIZARD X',
       themeColor: '#F97316',
-      megaColor: '#38BDF8',
       secondaryColor: '#EF4444',
       hp: 210,
-      radius: 26,
+      radius: 50,
       speed: 5.0,
-      scale: 1.65,
+      scale: 3.65,
       cryKey: 'cryCharizard',
-      megaCryKey: 'cryCharizardMega',
 
       // ── Dedicated Skills Configuration ──
       skills: {
@@ -176,29 +171,29 @@ export const ashConfig = {
           id: 'flamethrower',
           name: 'FLAMETHROWER!',
           hudLabel: 'FLAMETHROWER',
-          cooldown: 150,
-          windupFrames: 18,
-          streamDurationFrames: 45,
+          windupCallout: 'CHAR...',
+          attackCallout: '...ROOOAAAR!',
+          cooldown: 520,                // Autonomous Flamethrower cooldown
+          windupFrames: 28,             // Deep inhale & throat fire gathering (~0.45s)
+          streamDurationFrames: 120,    // Steady 2.0s continuous raging flame torrent (120 frames at 60 FPS)
+          beamDurationFrames: 120,      // Alias for streamDurationFrames
+          streamTickRate: 6,            // Multi-tick damage delivered every 6 frames (~20 ticks across 2s)
+          streamDamagePerTick: 3,       // Damage per tick (~60 total damage across full stream)
+          streamWidth: 48,              // Width/thickness of expanding raging fire jet
+          streamRange: 680,             // Screen-spanning reach across arena
+          streamKnockbackPerTick: 1.2,  // Sustained thermal push driving enemies back
+          burnDps: 6,                   // Searing burn damage over time
+          burnDurationFrames: 180,      // 3.0s burn status aftermath
+          recoveryFrames: 24,           // Breather recovery settle: stationary smoke cooling (~0.40s)
+          breatherFrames: 24,           // Alias for recoveryFrames
+          recoilPush: 0,                // Steady planted stance: Charizard plants feet firmly with zero backward drift
+          screenShake: 4.5,             // Sustained deep rumble during active flame discharge
+          specialSfx: 'flamethrower',
+          // Backward compatibility aliases
           damage: 32,
-          specialRadius: 120,
-          burnDps: 5,
-          burnDurationFrames: 150,
-          specialSfx: 'flamethrower'
+          specialDamage: 32,
+          specialRadius: 120
         },
-        megaSpecial: {
-          id: 'blueFlareBlitz',
-          name: 'BLUE FLARE BLITZ!',
-          hudLabel: 'BLUE FLARE BLITZ',
-          cooldown: 150,
-          windupFrames: 16,
-          streamDurationFrames: 50,
-          damage: 42,
-          specialRadius: 140,
-          burnDps: 8,
-          burnDurationFrames: 180,
-          megaColor: '#38BDF8',
-          specialSfx: 'flamethrower'
-        }
       },
 
       // Backward compatibility getters
@@ -207,9 +202,19 @@ export const ashConfig = {
       get meleeCooldown() { return this.skills.melee.cooldown; },
       get specialCooldown() { return this.skills.special.cooldown; },
       get specialName() { return this.skills.special.name; },
-      get megaSpecialName() { return this.skills.megaSpecial?.name; },
       get hudSkillLabel() { return this.skills.special.hudLabel; },
-      get megaHudSkillLabel() { return this.skills.megaSpecial?.hudLabel; },
+      get windupCallout() { return this.skills.special.windupCallout; },
+      get attackCallout() { return this.skills.special.attackCallout; },
+      get windupFrames() { return this.skills.special.windupFrames; },
+      get streamDurationFrames() { return this.skills.special.streamDurationFrames; },
+      get beamDurationFrames() { return this.skills.special.streamDurationFrames; },
+      get streamTickRate() { return this.skills.special.streamTickRate; },
+      get streamDamagePerTick() { return this.skills.special.streamDamagePerTick; },
+      get streamWidth() { return this.skills.special.streamWidth; },
+      get streamRange() { return this.skills.special.streamRange; },
+      get streamKnockbackPerTick() { return this.skills.special.streamKnockbackPerTick; },
+      get recoveryFrames() { return this.skills.special.recoveryFrames; },
+      get breatherFrames() { return this.skills.special.recoveryFrames; },
       get specialDamage() { return this.skills.special.damage; },
       get specialRadius() { return this.skills.special.specialRadius; },
       get burnDps() { return this.skills.special.burnDps; },
@@ -224,9 +229,9 @@ export const ashConfig = {
       themeColor: '#3B82F6',
       secondaryColor: '#EC4899',
       hp: 165,
-      radius: 22,
+      radius: 30,
       speed: 6.8,
-      scale: 1.50,
+      scale: 2.50,
       cryKey: 'cryGreninja',
 
       // ── Dedicated Skills Configuration ──
@@ -272,16 +277,13 @@ export const ashConfig = {
       id: 'lucario',
       dexNumber: '0448',
       name: 'LUCARIO',
-      megaName: 'MEGA LUCARIO',
       themeColor: '#06B6D4',
-      megaColor: '#F43F5E',
       secondaryColor: '#1E40AF',
       hp: 190,
-      radius: 23,
+      radius: 30,
       speed: 5.8,
       scale: 1.55,
       cryKey: 'cryLucario',
-      megaCryKey: 'cryLucarioMega',
 
       // ── Dedicated Skills Configuration ──
       skills: {
@@ -306,19 +308,6 @@ export const ashConfig = {
           radius: 22,
           specialRadius: 100,
           specialSfx: 'auraSphere'
-        },
-        megaSpecial: {
-          id: 'maxAuraSphere',
-          name: 'MAX AURA SPHERE!',
-          hudLabel: 'MAX AURA SPHERE',
-          cooldown: 145,
-          windupFrames: 24,
-          damage: 44,
-          auraSphereSpeed: 11.0,
-          radius: 30,
-          specialRadius: 130,
-          megaColor: '#F43F5E',
-          specialSfx: 'auraSphere'
         }
       },
 
@@ -328,9 +317,7 @@ export const ashConfig = {
       get meleeCooldown() { return this.skills.melee.cooldown; },
       get specialCooldown() { return this.skills.special.cooldown; },
       get specialName() { return this.skills.special.name; },
-      get megaSpecialName() { return this.skills.megaSpecial?.name; },
       get hudSkillLabel() { return this.skills.special.hudLabel; },
-      get megaHudSkillLabel() { return this.skills.megaSpecial?.hudLabel; },
       get specialDamage() { return this.skills.special.damage; },
       get auraSphereSpeed() { return this.skills.special.auraSphereSpeed; },
       get meleeSfx() { return this.skills.melee.meleeSfx; },
@@ -365,13 +352,7 @@ export const ashConfig = {
       hurt: 'Assets/model/ash/pokemon/charizard/Hurt-Anim.png',
       faint: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',
       charge: 'Assets/model/ash/pokemon/charizard/Charge-Anim.png',
-      megaIdle: 'Assets/model/ash/pokemon/charizard/mega/Idle-Anim.png',
-      megaWalk: 'Assets/model/ash/pokemon/charizard/mega/Walk-Anim.png',
-      megaAttack: 'Assets/model/ash/pokemon/charizard/mega/Attack-Anim.png',
-      megaSpecial: 'Assets/model/ash/pokemon/charizard/mega/Shoot-Anim.png',
-      megaHurt: 'Assets/model/ash/pokemon/charizard/mega/Hurt-Anim.png',
-      megaFaint: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',
-      megaCharge: 'Assets/model/ash/pokemon/charizard/mega/Charge-Anim.png'
+      flame: 'Assets/model/ash/pokemon/charizard/Flame/12-Frame Pixel Fire Projectile Animation.png'
     },
     greninja: {
       idle: 'Assets/model/ash/pokemon/greninja/Idle-Anim.png',
@@ -392,13 +373,6 @@ export const ashConfig = {
       hurt: 'Assets/model/ash/pokemon/lucario/Hurt-Anim.png',
       faint: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',
       charge: 'Assets/model/ash/pokemon/lucario/Charge-Anim.png',
-      megaIdle: 'Assets/model/ash/pokemon/lucario/mega/Idle-Anim.png',
-      megaWalk: 'Assets/model/ash/pokemon/lucario/mega/Walk-Anim.png',
-      megaAttack: 'Assets/model/ash/pokemon/lucario/mega/Attack-Anim.png',
-      megaSpecial: 'Assets/model/ash/pokemon/lucario/mega/RearUp-Anim.png',
-      megaHurt: 'Assets/model/ash/pokemon/lucario/mega/Hurt-Anim.png',
-      megaFaint: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',
-      megaCharge: 'Assets/model/ash/pokemon/lucario/mega/Charge-Anim.png'
     }
   },
 
@@ -406,9 +380,80 @@ export const ashConfig = {
   // Audio Configuration
   // ──────────────────────────────────────────
   sounds: {
-    faint: 'Assets/Sound Effects/PokemonSFX/faint.ogg'
+    faint: 'Assets/Sound Effects/PokemonSFX/faint.ogg',
+    pokeballThrow: 'Assets/Sound Effects/PokemonSFX/pb_throw.ogg',
+    pokeballRelease: 'Assets/Sound Effects/PokemonSFX/pb_rel.ogg',
+    hitStrong: 'Assets/Sound Effects/PokemonSFX/hit_strong.ogg',
+    hitWeak: 'Assets/Sound Effects/PokemonSFX/hit.ogg',
+
+    // Cries
+    cryPikachu: 'Assets/Sound Effects/PokemonSFX/pikachu.ogg',
+    cryPikachuStarter: 'Assets/Sound Effects/PokemonSFX/pikachu-starter.ogg',
+    cryCharizard: 'Assets/Sound Effects/PokemonSFX/charizard.ogg',
+    cryGreninja: 'Assets/Sound Effects/PokemonSFX/greninja.ogg',
+    cryLucario: 'Assets/Sound Effects/PokemonSFX/lucario.ogg',
+
+    // Pikachu Moves
+    quickAttack: 'Assets/Sound Effects/PokemonSFX/quickattack.ogg',
+    ironTail: 'Assets/Sound Effects/PokemonSFX/irontail-1.ogg',
+    ironTailCast: 'Assets/Sound Effects/PokemonSFX/irontail-2.ogg',
+    thunderbolt: 'Assets/Sound Effects/PokemonSFX/thunderbolt-1.ogg',
+    thunderboltCast: 'Assets/Sound Effects/PokemonSFX/thunderbolt-2.ogg',
+    voltTackle: 'Assets/Sound Effects/PokemonSFX/volttackle-1.ogg',
+    voltTackleCast: 'Assets/Sound Effects/PokemonSFX/volttackle-2.ogg',
+
+    // Charizard Moves
+    dragonClaw: 'Assets/Sound Effects/PokemonSFX/dragonclaw.ogg',
+    flamethrower: 'Assets/Sound Effects/PokemonSFX/flamethrower.ogg',
+    fireBlast: 'Assets/Sound Effects/PokemonSFX/fireblast.ogg',
+
+    // Greninja Moves
+    nightSlash: 'Assets/Sound Effects/PokemonSFX/nightslash-1.ogg',
+    nightSlashCast: 'Assets/Sound Effects/PokemonSFX/nightslash-2.ogg',
+    aerialAce: 'Assets/Sound Effects/PokemonSFX/aerialace.ogg',
+    waterShuriken: 'Assets/Sound Effects/PokemonSFX/waterpulse-1.ogg',
+    waterShurikenCast: 'Assets/Sound Effects/PokemonSFX/waterpulse-2.ogg',
+
+    // Lucario Moves
+    closeCombat: 'Assets/Sound Effects/PokemonSFX/closecombat.ogg',
+    bulletPunch: 'Assets/Sound Effects/PokemonSFX/bulletpunch.ogg',
+    machPunch: 'Assets/Sound Effects/PokemonSFX/machpunch.ogg',
+    auraSphere: 'Assets/Sound Effects/PokemonSFX/aurasphere-1.ogg',
+    auraSphereCast: 'Assets/Sound Effects/PokemonSFX/aurasphere-2.ogg'
   },
   soundVolumes: {
-    faint: 0.90
+    faint: 0.90,
+    pokeballThrow: 0.85,
+    pokeballRelease: 0.90,
+    hitStrong: 0.85,
+    hitWeak: 0.70,
+    cryPikachu: 0.85,
+    cryPikachuStarter: 0.85,
+    cryCharizard: 0.90,
+    cryGreninja: 0.85,
+    cryLucario: 0.85,
+    quickAttack: 0.85,
+    ironTail: 0.90,
+    ironTailCast: 0.90,
+    thunderbolt: 0.90,
+    thunderboltCast: 0.90,
+    voltTackle: 0.95,
+    voltTackleCast: 0.95,
+    dragonClaw: 0.90,
+    flamethrower: 0.85,
+    fireBlast: 0.85,
+    nightSlash: 0.90,
+    nightSlashCast: 0.90,
+    aerialAce: 0.85,
+    waterShuriken: 0.85,
+    waterShurikenCast: 0.85,
+    closeCombat: 0.90,
+    bulletPunch: 0.80,
+    machPunch: 0.80,
+    auraSphere: 0.85,
+    auraSphereCast: 0.85
   }
 };
+
+// Explicit syntax anchor
+void 0;

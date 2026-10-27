@@ -50,6 +50,8 @@ export { drawTojiSkin, drawTojiGhostSkin, drawTojiPixelBody, _drawTojiHair, _get
 export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
 export { drawMeguminSkin, drawMeguminPixelBody, _drawMeguminHair, _getMeguminHairImage, drawMeguminMagicCircle, drawCrimsonDemonRune, drawMeguminExplosionScreenOverlay } from './fighters/meguminSkin.js';
 export { drawCrazyDaveSkin, drawCrazyDavePixelBody, _drawCrazyDaveHair, _getCrazyDaveHairImage } from './fighters/crazyDaveSkin.js';
+export { drawZombieSkin, drawZombiePixelBody, _drawZombieHair, _getZombieHairImage } from './fighters/zombieSkin.js';
+export { drawZombieChompEffect, drawZombieGravestone, drawZombieMinion, drawZombieHugeWaveBanner, drawZombieWaveProgressBar, drawZombieWaveAlertBanner, drawZombieVictoryBanner, drawZombiesAteYourBrains } from './weapons/zombieWeaponGraphics.js';
 export { drawCrazyDaveShovel, drawSunDrop, drawWallnut, drawPeashooter, drawSnowPea, drawTorchwood, drawLawnmower, drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet, drawCrazyDaveWeapon, CrazyDave_WEAPON_GRAPHICS } from './weapons/crazyDaveWeaponGraphics.js';
 export { drawPekkaSkin, drawPekkaPixelBody } from './fighters/pekkaSkin.js';
 export { drawPekkaBlade, drawPekkaWeapon, PEKKA_WEAPON_GRAPHICS } from './weapons/pekkaWeaponGraphics.js';

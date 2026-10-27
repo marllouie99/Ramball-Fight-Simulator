@@ -1,5 +1,6 @@
 import { CONFIG } from '../core/config.js';
 import { state, isGlobalHitPauseActive } from '../core/state.js';
+import { GAME_MODES } from '../core/modeConfig.js';
 
 /**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -66,11 +67,22 @@ function _makeSlot(side) {
 }
 
 /**
- * Lazily (re)creates the two preallocated slots on state.
+ * Lazily (re)creates the preallocated slots on state.
+ * In 1v2 mode with 3 fighters: 3 slots are allocated (Slot 0 = Solo Left, Slot 1 = Teammate 1 Right, Slot 2 = Teammate 2 Right).
+ * In all other modes: 2 slots are allocated (Slot 0 = Left, Slot 1 = Right).
  */
 export function ensureComboTrackers() {
-  if (!Array.isArray(state.comboTrackers) || state.comboTrackers.length !== 2) {
-    state.comboTrackers = [_makeSlot(0), _makeSlot(1)];
+  const is1v2 = Boolean(
+    state &&
+    (state.mode === '1v2' || state.mode === 'ONE_VS_TWO' || state.mode === GAME_MODES?.ONE_VS_TWO) &&
+    Array.isArray(state.fighters) &&
+    state.fighters.length >= 3
+  );
+  const neededSlots = is1v2 ? 3 : 2;
+  if (!Array.isArray(state.comboTrackers) || state.comboTrackers.length !== neededSlots) {
+    state.comboTrackers = is1v2
+      ? [_makeSlot(0), _makeSlot(1), _makeSlot(1)]
+      : [_makeSlot(0), _makeSlot(1)];
   }
   return state.comboTrackers;
 }
@@ -260,16 +272,28 @@ export function registerComboHit(attacker, target, actualDamage) {
   const dmg = Number(actualDamage);
   if (!Number.isFinite(dmg) || dmg <= 0) return;
 
-  const side = _resolveSide(attacker);
-  if (side !== 0 && side !== 1) return;
+  const is1v2 = Boolean(
+    state &&
+    (state.mode === '1v2' || state.mode === 'ONE_VS_TWO' || state.mode === GAME_MODES?.ONE_VS_TWO) &&
+    Array.isArray(state.fighters) &&
+    state.fighters.length >= 3
+  );
+
+  const fIdx = resolveAttackerFighterIndex(attacker);
+  let slotIndex = _resolveSide(attacker);
+  if (is1v2 && fIdx >= 0 && fIdx <= 2) {
+    slotIndex = fIdx;
+  }
+
+  if (slotIndex < 0) return;
 
   const slots = ensureComboTrackers();
-  const slot = slots[side];
+  if (slotIndex >= slots.length) return;
+  const slot = slots[slotIndex];
   const windowFrames = Math.max(1, cfg.windowFrames || 90);
   slot.maxTimer = windowFrames;
 
   // Resolve the root attacking fighter entity so the combo banner can reflect their signature color theme
-  const fIdx = resolveAttackerFighterIndex(attacker);
   let attackerFighter = null;
   if (fIdx >= 0 && Array.isArray(state.fighters) && state.fighters[fIdx]) {
     attackerFighter = state.fighters[fIdx];

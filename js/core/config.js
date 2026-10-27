@@ -22,6 +22,7 @@ import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { meguminConfig } from '../configs/characters/meguminConfig.js';
 import { crazyDaveConfig } from '../configs/characters/crazyDaveConfig.js';
+import { zombieConfig } from '../configs/characters/zombieConfig.js';
 import { pekkaConfig } from '../configs/characters/pekkaConfig.js';
 import { sansConfig } from '../configs/characters/sansConfig.js';
 import { namelessDeityConfig } from '../configs/characters/namelessDeityConfig.js';
@@ -103,6 +104,9 @@ export const CONFIG = {
   crazydave: crazyDaveConfig,
   crazy_dave: crazyDaveConfig,
   CrazyDave: crazyDaveConfig,
+  zombie: zombieConfig,
+  Zombie: zombieConfig,
+  ZOMBIE: zombieConfig,
   pekka: pekkaConfig,
   sans: sansConfig,
   Sans: sansConfig,
@@ -1791,6 +1795,31 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: ashConfig.ability || 'Pokémon Master & Honeycomb Barrier',
     desc: ashConfig.desc || 'World Monarch Pokémon Trainer from Pallet Town. Summons Pikachu, Charizard, Greninja, and Lucario while projecting an impenetrable hexagonal Honeycomb Forcefield Barrier, and awakens Mega Evolution & 10,000,000 Volt Thunderbolt.',
+  },
+  {
+    id: 63,
+    name: zombieConfig.name || 'Zombie',
+    grade: zombieConfig.grade ?? DEFAULT_GRADE,
+    displayName: zombieConfig.displayName || zombieConfig.name || 'Zombie',
+    category: 'Gaming',
+    color: zombieConfig.color || '#65A30D',
+    themeColor: zombieConfig.themeColor || '#65A30D',
+    secondaryColor: zombieConfig.secondaryColor || '#EA580C',
+    startX: 300,
+    startY: 250,
+    startVx: 1.0,
+    startVy: 0.9,
+    radius: zombieConfig.radius || zombieConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'zombie',
+    hp: zombieConfig.hp || 420,
+    damage: zombieConfig.damage || 26,
+    cooldown: zombieConfig.cooldown || 32,
+    moveSpeed: zombieConfig.moveSpeed || zombieConfig.speed || 4.8,
+    projectileSpeedMultiplier: 1.0,
+    ability: zombieConfig.ability || 'Brain Feast & Undead Horde ("BRAAAINS!")',
+    desc: zombieConfig.desc || 'The iconic lawn invader from Plants vs. Zombies. Shambles toward opponents with savage Chomp combos that feast on target vitality, equips reinforced Conehead & Buckethead armor to shrug off blows, and summons gravestones that raise a relentless zombie wave.',
   }
 ];
 

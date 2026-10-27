@@ -45,6 +45,13 @@ export const AUDIO_CONFIG = {
   'crazydave_pea_splat': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
   'splat3': 'Assets/Sound Effects/SkillEffects/splat3.ogg',
   'crazydave_planting': 'Assets/Sound Effects/SkillEffects/crazydave-Planting.ogg',
+  'zombie_chomp': 'Assets/Sound Effects/SkillEffects/zombie-chomp.wav',
+  'zombie_groan': 'Assets/Sound Effects/SkillEffects/zombie-groan.wav',
+  'zombie_brains': 'Assets/Sound Effects/SkillEffects/zombie-brains.wav',
+  'zombie_metal_clank': 'Assets/Sound Effects/SkillEffects/zombie-metal-clank.wav',
+  'zombie_hugewave': 'Assets/Sound Effects/SkillEffects/zombie-hugewave.wav',
+  'zombie_newspaper_rip': 'Assets/Sound Effects/SkillEffects/zombie-newspaper-rip.wav',
+  'zombie_vault': 'Assets/Sound Effects/SkillEffects/zombie-vault.wav',
 
   // Skills
   'skill_backstab': 'Assets/Sound Effects/Skills/backstab.mp3',

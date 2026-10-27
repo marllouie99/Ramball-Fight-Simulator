@@ -31,6 +31,25 @@ export function updateEntityVisualScale(entity, speed = 0.12) {
   entity.visualScaleTarget = 1.0;
 }
 
+/**
+ * Opacity of the underfoot team indicator ring during the battle intro.
+ * Fighters are NOT on the arena yet while the FIGHT! banner plays
+ * (battleStartDelayTimer > 44), so the ring must stay hidden until the summon starts,
+ * then fade in with the Poke Ball materialization instead of popping in early.
+ * @param {Object} [stateRef] Game state (defaults to the live module state).
+ * @returns {number} 0..1 ring opacity
+ */
+export function getTeamRingIntroOpacity(stateRef) {
+  const s = stateRef || (typeof state !== 'undefined' ? state : null);
+  if (!s) return 1;
+  if (s.gameState !== 'playing') return 1;
+  const delay = s.battleStartDelayTimer || 0;
+  if (delay <= 0) return 1;
+  if (delay > 44) return 0; // FIGHT! banner phase: fighters are not summoned yet
+  const summonP = Math.max(0, Math.min(1, 1 - (delay / 44)));
+  return Math.max(0, Math.min(1, summonP / 0.5)); // fully visible halfway through the summon
+}
+
 export function drawFighters() {
   if (typeof state !== 'undefined' && state && state.gameState === 'countdown') {
     return;
@@ -95,6 +114,11 @@ export function drawFighters() {
 
     const teamColor = team === 0 ? '#ff4d4d' : '#4da3ff';
 
+    // Battle intro: hide the ring entirely while fighters are still off-arena, then fade it
+    // in with the summon so it appears together with the fighter, never before.
+    const ringOpacity = getTeamRingIntroOpacity(state);
+    if (ringOpacity <= 0) return;
+
     const drawX = fighter.x;
     const drawY = fighter.y - (fighter.z || 0);
 
@@ -105,20 +129,20 @@ export function drawFighters() {
     ctx.beginPath();
     ctx.arc(0, 0, fighter.r + 8, 0, Math.PI * 2);
     ctx.fillStyle = teamColor;
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = ringOpacity;
     ctx.fill();
     
     // Crisp outline
     ctx.strokeStyle = '#000'; // Black outline for contrast
     ctx.lineWidth = 2;
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = ringOpacity;
     ctx.stroke();
 
     // Draw team silhouette/glow
     ctx.beginPath();
     ctx.arc(0, 0, fighter.r + 4, 0, Math.PI * 2);
     ctx.fillStyle = teamColor;
-    ctx.globalAlpha = 0.2;
+    ctx.globalAlpha = 0.2 * ringOpacity;
     ctx.fill();
 
     ctx.restore();

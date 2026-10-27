@@ -124,16 +124,16 @@ function _getRayArenaIntersection(startX, startY, angle, arena, innerMargin = 4)
  * Exists in state.fighters while deployed so enemies target and clash with the Pokémon.
  */
 export class PokemonCompanionEntity extends Fighter {
-  constructor(owner, speciesKey, spawnX, spawnY, isMega = false) {
+  constructor(owner, speciesKey, spawnX, spawnY) {
     const cfg = _getAshCfg();
     const spec = cfg.pokemonRoster?.[speciesKey] || ashConfig.pokemonRoster.pikachu;
     super({
       id: `pokemon_${speciesKey}`,
-      name: isMega && spec.megaName ? spec.megaName : spec.name,
-      displayName: isMega && spec.megaName ? spec.megaName : spec.name,
+      name: spec.name,
+      displayName: spec.name,
       type: `pokemon_${speciesKey}`,
-      color: isMega && spec.megaColor ? spec.megaColor : spec.themeColor,
-      themeColor: isMega && spec.megaColor ? spec.megaColor : spec.themeColor,
+      color: spec.themeColor,
+      themeColor: spec.themeColor,
       radius: spec.radius || 22,
       hp: spec.hp || 170,
       damage: spec.meleeDamage || 20,
@@ -157,11 +157,9 @@ export class PokemonCompanionEntity extends Fighter {
 
     this.speciesId = speciesKey;
     this.spec = spec;
-    this.isMega = Boolean(isMega);
-    this.name = isMega && spec.megaName ? spec.megaName : spec.name;
+    this.name = spec.name;
     this.displayName = this.name;
-    this.themeColor = isMega && spec.megaColor ? spec.megaColor : spec.themeColor;
-    this.megaColor = spec.megaColor || '#38BDF8';
+    this.themeColor = spec.themeColor;
     this.color = this.themeColor;
     this.damageNumberColor = owner.damageNumberColor || '#FACC15';
 
@@ -169,12 +167,22 @@ export class PokemonCompanionEntity extends Fighter {
     this.y = spawnY;
     this.r = spec.radius || 22;
     this.radius = this.r;
-    const hpMult = this.isMega ? 1.25 : 1.0;
-    this.hp = Math.round((spec.hp || 170) * hpMult);
+    this.hp = Math.round((spec.hp || 170) * 1.0);
     this.maxHp = this.hp;
-    this.speed = (spec.speed || 5.8) * (this.isMega ? 1.18 : 1.0);
+    this.speed = (spec.speed || 5.8) * 1.0;
     this.baseSpeed = this.speed;
     this.spriteScale = spec.scale || 1.5;
+    this.meleeMoveMaxTicks = 0;
+    this.meleeMoveKey = null;
+    this.meleeMoveTick = 0;
+    this.meleeMoveState = null;
+    this.meleeHitDone = new Set();
+    this.meleeTarget = null;
+    this.meleeCastAngle = 0;
+    this.comboStep = 0;
+    this.isTrainerCommandMove = false;
+    this.z = 0;
+    this.shockwaveEmerbs = [];
 
     const launchTarget = owner?._findBestTarget ? owner._findBestTarget() : null;
     const launchAngle = (launchTarget && launchTarget.hp > 0)
@@ -205,6 +213,12 @@ export class PokemonCompanionEntity extends Fighter {
     this.thunderboltState = null;
     this.thunderboltTimer = 0;
     this.thunderboltHitEnemies = new Set();
+    this.flamethrowerState = null;
+    this.flamethrowerTimer = 0;
+    this.flamethrowerHitEnemies = new Set();
+    this.flamethrowerCurrentBeamLen = null;
+    this.flamethrowerClosestEnemy = null;
+    this.flamethrowerImpactTimer = undefined;
   }
 
   shoot() {
@@ -212,19 +226,19 @@ export class PokemonCompanionEntity extends Fighter {
   }
 
   /**
-   * Rule 1.4: Lock aim rotation while Pikachu is casting Thunderbolt (windup, active beam, or recovery).
+   * Rule 1.4: Lock aim rotation while Pikachu or Charizard is channeling special beams/flames.
    */
   canAim() {
-    if (this.thunderboltState) return false;
+    if (this.thunderboltState || this.flamethrowerState) return false;
     return super.canAim();
   }
 
   isStationarySkillActive() {
-    return Boolean(this.thunderboltState || super.isStationarySkillActive?.());
+    return Boolean(this.thunderboltState || this.flamethrowerState || super.isStationarySkillActive?.());
   }
 
   isChannelingSkill() {
-    return Boolean(this.thunderboltState || super.isChannelingSkill?.());
+    return Boolean(this.thunderboltState || this.flamethrowerState || super.isChannelingSkill?.());
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -235,6 +249,14 @@ export class PokemonCompanionEntity extends Fighter {
     this.thunderboltImpactTimer = undefined;
     if (this.thunderboltHitEnemies) {
       this.thunderboltHitEnemies.clear();
+    }
+    this.flamethrowerState = null;
+    this.flamethrowerTimer = 0;
+    this.flamethrowerCurrentBeamLen = null;
+    this.flamethrowerClosestEnemy = null;
+    this.flamethrowerImpactTimer = undefined;
+    if (this.flamethrowerHitEnemies) {
+      this.flamethrowerHitEnemies.clear();
     }
     if (typeof super.interruptAttacks === 'function') {
       super.interruptAttacks(forceCancelAll);
@@ -289,23 +311,52 @@ export class PokemonCompanionEntity extends Fighter {
     }
   }
 
-  awakenMega() {
-    if (this.hp <= 0) return;
-    this.isMega = true;
-    if (this.spec.megaName) {
-      this.name = this.spec.megaName;
-      this.displayName = this.spec.megaName;
+  /**
+   * Initiates Charizard's canonical Flamethrower:
+   * Phase 1 (Windup / "CHAR..."): Deep inhale & throat fire gathering (~0.45s), feet planted steady, aim locked.
+   * Phase 2 (Active Fire Stream / "...ROOOAAAR!"): Sustained 2-second continuous raging flame torrent (120 frames at 60 FPS) with multi-tick damage & burn status!
+   * Phase 3 (Breather / Smoke Exhale Recovery): Stationary breather settle (~0.40s) cooling down before moving again.
+   */
+  startFlamethrower(target, isTrainerCommand = false) {
+    if (this.hp <= 0 || this.flamethrowerState || this.thunderboltState) return;
+    const specSkill = this.spec.skills?.special;
+    const castAngle = target
+      ? Math.atan2(target.y - this.y, target.x - this.x)
+      : (this.gunAngle || this.angle || 0);
+
+    this.flamethrowerState = 'windup';
+    this.flamethrowerTimer = specSkill?.windupFrames || 28;
+    this.flamethrowerMaxWindup = this.flamethrowerTimer;
+    this.flamethrowerTarget = target;
+    this.flamethrowerCastAngle = castAngle;
+    this.gunAngle = castAngle;
+    this.angle = castAngle;
+    this.animState = 'special';
+    this.actionAnimTimer = this.flamethrowerTimer + (specSkill?.streamDurationFrames || 120) + (specSkill?.recoveryFrames || 24);
+    this.animTick = 0;
+    this.flamethrowerCmdMult = isTrainerCommand ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0;
+    const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+    this.specialCooldown = cd;
+    if (this.owner) {
+      this.owner.commandCooldown = cd;
     }
-    if (this.spec.megaColor) {
-      this.themeColor = this.spec.megaColor;
-      this.color = this.spec.megaColor;
+    this.flamethrowerCurrentBeamLen = null;
+    this.flamethrowerClosestEnemy = null;
+    this.flamethrowerImpactTimer = undefined;
+    if (this.flamethrowerHitEnemies) {
+      this.flamethrowerHitEnemies.clear();
     }
-    const healAmt = Math.round(this.maxHp * (_getAshCfg().ultimatePokemonHealRatio || 0.50));
-    this.hp = Math.min(this.maxHp, this.hp + healAmt);
-    this.speed = (this.spec.speed || 5.8) * 1.22;
-    this.baseSpeed = this.speed;
-    if (this.spec.megaCryKey) {
-      _playAshSound(this.spec.megaCryKey);
+
+    // Steady planted stance: Charizard plants feet firmly on the ground
+    this.vx = 0;
+    this.vy = 0;
+    this.z = 0;
+
+    // Iconic Phase 1 Callout: "CHAR..."
+    const windupCallout = specSkill?.windupCallout || 'CHAR...';
+    spawnFloatingText(this.x, this.y - this.r - 20, windupCallout, this.themeColor || '#F97316');
+    if (this.owner) {
+      this.owner._playMoveAudioSequence(specSkill?.specialSfx || 'flamethrower');
     }
   }
 
@@ -366,13 +417,6 @@ export class PokemonCompanionEntity extends Fighter {
     // Initial fainting momentum: slide gently to a stop
     this.vx *= 0.35;
     this.vy *= 0.35;
-
-    // Mega evolution reverts on faint
-    if (this.isMega) {
-      this.isMega = false;
-      this.name = this.spec.name || this.speciesId;
-      this.displayName = this.name;
-    }
   }
 
   updateFaint(arena) {
@@ -431,7 +475,7 @@ export class PokemonCompanionEntity extends Fighter {
 
     this.handleStatusEffects();
     if (this.meleeCooldown > 0) this.meleeCooldown--;
-    if (!this.thunderboltState && this.specialCooldown > 0) this.specialCooldown--;
+    if (!this.thunderboltState && !this.flamethrowerState && this.specialCooldown > 0) this.specialCooldown--;
     if (this.actionAnimTimer > 0) this.actionAnimTimer--;
     if (this.hurtAnimTimer > 0) {
       this.hurtAnimTimer--;
@@ -439,6 +483,9 @@ export class PokemonCompanionEntity extends Fighter {
     }
     if (typeof this.thunderboltImpactTimer === 'number') {
       this.thunderboltImpactTimer++;
+    }
+    if (typeof this.flamethrowerImpactTimer === 'number') {
+      this.flamethrowerImpactTimer++;
     }
 
     // ── Pikachu Thunderbolt Windup, Sustained Active Beam, and Recovery Lifecycle ──
@@ -539,7 +586,7 @@ export class PokemonCompanionEntity extends Fighter {
         // Multi-tick continuous lightning collision on the hit target
         const tickRate = specSkill?.beamTickRate || 5;
         if (this.thunderboltTimer % tickRate === 0 && this.owner && closestHitEnemy) {
-          const bonusMult = (this.thunderboltCmdMult || 1.0) * (this.isMega ? 1.25 : 1.0);
+          const bonusMult = (this.thunderboltCmdMult || 1.0);
           const dmg = Math.round((specSkill?.beamDamagePerTick || 4) * bonusMult);
 
           if (this.thunderboltHitEnemies) {
@@ -617,6 +664,180 @@ export class PokemonCompanionEntity extends Fighter {
       return;
     }
 
+    // ── Charizard Flamethrower Windup, Steady 2-Second Active Flame Torrent, and Breather Lifecycle ──
+    if (this.flamethrowerState) {
+      const specSkill = this.spec.skills?.special;
+      const target = this.flamethrowerTarget || opponent;
+
+      if (this.flamethrowerState === 'windup') {
+        this.flamethrowerTimer--;
+        this.animState = 'special';
+        this.gunAngle = this.flamethrowerCastAngle;
+        this.angle = this.flamethrowerCastAngle;
+        this.vx = 0;
+        this.vy = 0;
+        this.z = 0;
+
+        // Throat fire gathering micro-rumble
+        if (this.flamethrowerTimer % 6 === 0) {
+          triggerGlobalScreenShake(1.6, 2);
+        }
+
+        if (this.flamethrowerTimer <= 0) {
+          this.flamethrowerState = 'active';
+          this.flamethrowerTimer = specSkill?.streamDurationFrames || 120;
+          this.flamethrowerMaxActive = this.flamethrowerTimer;
+
+          // Iconic Phase 2 Callout: "...ROOOAAAR!"
+          const attackCallout = specSkill?.attackCallout || '...ROOOAAAR!';
+          spawnFloatingText(this.x, this.y - this.r - 20, attackCallout, '#F97316');
+          triggerGlobalScreenShake(specSkill?.screenShake || 4.5, 12);
+        }
+      } else if (this.flamethrowerState === 'active') {
+        this.flamethrowerTimer--;
+        this.animState = 'special';
+
+        // Rule 1.4: Steady aim lock — angle strictly clamped to committed castAngle
+        this.gunAngle = this.flamethrowerCastAngle;
+        this.angle = this.flamethrowerCastAngle;
+
+        // Steady planted stance: Charizard plants feet firmly on the ground with zero drift or recoil slip
+        this.vx = 0;
+        this.vy = 0;
+        this.z = 0;
+
+        if (this.flamethrowerTimer % 4 === 0) {
+          triggerGlobalScreenShake(specSkill?.screenShake || 4.5, 3);
+        }
+
+        // Calculate flame stream length: stops at first enemy hit or arena walls (zero clipping outside arena)
+        const maxSkillRange = specSkill?.streamRange || 680;
+        const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+        const cosA = Math.cos(this.flamethrowerCastAngle);
+        const sinA = Math.sin(this.flamethrowerCastAngle);
+        const startX = this.x + cosA * (this.r * 0.85);
+        const startY = this.y - 26 + sinA * (this.r * 0.65);
+        const wallDist = curArena ? _getRayArenaIntersection(startX, startY, this.flamethrowerCastAngle, curArena, 8) : maxSkillRange;
+        const streamRange = Math.min(maxSkillRange, Math.max(10, wallDist));
+        const streamW = specSkill?.streamWidth || 48;
+
+        // Find closest enemy along the flame path
+        let closestHitEnemy = null;
+        let closestHitDist = streamRange;
+        const validEnemies = this.owner ? this.owner._getValidEnemyTargets(this.flamethrowerTarget) : [];
+
+        for (const enemy of validEnemies) {
+          if (!enemy || enemy.hp <= 0) continue;
+          const enemyR = enemy.r || 25;
+          const edx = enemy.x - startX;
+          const edy = enemy.y - startY;
+          const projDist = edx * cosA + edy * sinA;
+          if (projDist >= -enemyR && projDist <= streamRange + enemyR) {
+            const perpDist = Math.abs(-edx * sinA + edy * cosA);
+            if (perpDist <= (streamW / 2) + enemyR) {
+              const hitContactDist = Math.max(0, projDist);
+              if (hitContactDist < closestHitDist) {
+                closestHitDist = hitContactDist;
+                closestHitEnemy = enemy;
+              }
+            }
+          }
+        }
+
+        this.flamethrowerCurrentBeamLen = closestHitEnemy ? closestHitDist : streamRange;
+        this.flamethrowerClosestEnemy = closestHitEnemy;
+
+        if (closestHitEnemy && this.flamethrowerImpactTimer === undefined) {
+          this.flamethrowerImpactTimer = 0;
+        }
+
+        // Multi-tick continuous flame damage & burning on the hit target
+        const tickRate = specSkill?.streamTickRate || 6;
+        if (this.flamethrowerTimer % tickRate === 0 && this.owner && closestHitEnemy) {
+          const bonusMult = (this.flamethrowerCmdMult || 1.0);
+          const dmg = Math.round((specSkill?.streamDamagePerTick || 3) * bonusMult);
+
+          if (this.flamethrowerHitEnemies) {
+            this.flamethrowerHitEnemies.add(closestHitEnemy);
+          }
+          this.owner._dealPokemonDamage(closestHitEnemy, dmg, {
+            angle: this.flamethrowerCastAngle,
+            knockback: specSkill?.streamKnockbackPerTick || 1.2,
+            isSpecial: true
+          });
+
+          // Apply burning status condition
+          const burnDps = specSkill?.burnDps || 6;
+          const burnFrames = specSkill?.burnDurationFrames || 180;
+          closestHitEnemy.burnTimer = Math.max(closestHitEnemy.burnTimer || 0, burnFrames);
+          closestHitEnemy.burnDps = burnDps;
+          closestHitEnemy.isBurning = true;
+
+          spawnSparks(closestHitEnemy.x, closestHitEnemy.y, 5, 'fire', '#F97316');
+        }
+
+        if (this.flamethrowerTimer <= 0) {
+          this.flamethrowerState = 'recovery';
+          this.flamethrowerTimer = specSkill?.recoveryFrames || 24;
+          spawnFloatingText(this.x, this.y - this.r - 20, '*PHEW...*', '#94A3B8');
+          if (this.flamethrowerHitEnemies) {
+            this.flamethrowerHitEnemies.clear();
+          }
+        }
+      } else if (this.flamethrowerState === 'recovery') {
+        // Phase 3: Breather first before moving again
+        this.flamethrowerTimer--;
+        this.animState = 'special';
+        this.gunAngle = this.flamethrowerCastAngle;
+        this.angle = this.flamethrowerCastAngle;
+        this.vx = 0;
+        this.vy = 0;
+        this.z = 0;
+
+        if (this.flamethrowerTimer <= 0) {
+          this.flamethrowerState = null;
+          this.flamethrowerCurrentBeamLen = null;
+          this.flamethrowerClosestEnemy = null;
+          this.flamethrowerImpactTimer = undefined;
+          const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+          this.specialCooldown = cd;
+          if (this.owner) {
+            this.owner.commandCooldown = cd;
+          }
+          // Resume natural bounce velocity immediately upon completing breather
+          const resumeAngle = this.flamethrowerCastAngle + (Math.random() - 0.5) * 1.0;
+          this.vx = Math.cos(resumeAngle) * this.speed;
+          this.vy = Math.sin(resumeAngle) * this.speed;
+        }
+      }
+
+      // Steady planted stance: zero velocity and zero recoil displacement while casting Flamethrower
+      this.vx = 0;
+      this.vy = 0;
+      this.z = 0;
+      if (this.flamethrowerState) {
+        this.gunAngle = this.flamethrowerCastAngle;
+        this.angle = this.flamethrowerCastAngle;
+      }
+      this.resolveWallBounce(arena, target);
+      return;
+    }
+
+    // ── Dedicated Close Combat Multi-Phase Combo Lifecycles (Rule 30) ──
+    if (this.meleeMoveState) {
+      const target = this.owner?._findBestTarget(opponent) || opponent;
+      this._updateMeleeMove(target, arena);
+      if (this.meleeMoveState) {
+        if (this.meleeMoveState === 'lock') {
+          this.vx = 0;
+          this.vy = 0;
+        }
+        this.applyMovementPhysics(1.0);
+        this.resolveWallBounce(arena, target);
+        return;
+      }
+    }
+
     // Acquire nearest valid enemy target
     const target = this.owner?._findBestTarget(opponent) || opponent;
     if (target && target.hp > 0) {
@@ -627,37 +848,69 @@ export class PokemonCompanionEntity extends Fighter {
       this.gunAngle = targetAngle;
       this.angle = targetAngle;
 
+      const reach = (this.spec.meleeReach || 68) + (target.r || 25);
+      const closeCombatRushReach = reach * 2.2; // ~200px rush engagement zone
 
-
-      // Autonomous Signature Special Skill (e.g. Pikachu's THUNDERBOLT!) when ready
-      if (this.specialCooldown <= 0 && !this.thunderboltState && dist <= 550 && this.owner) {
-        const cd = Math.max(this.specialCooldownMax, this.owner.commandCooldownMax || 0);
-        this.specialCooldown = cd;
-        this.owner.commandCooldown = cd;
-        if (this.speciesId === 'pikachu') {
-          this.startThunderbolt(target, false);
+      // 1. Point-Blank / Close Range (dist <= reach + 20px) -> Melee Combo Priority!
+      if (dist <= reach + 20 && this.meleeCooldown <= 0) {
+        this._startCloseCombatMove(target);
+      }
+      // 2. Medium-Range Combat Zone (reach + 20 < dist <= 240px)
+      else if (dist <= closeCombatRushReach) {
+        // High likelihood to initiate Close Combat Rush (Quick Attack dash, Dragon Claw lunge, etc.)
+        if (this.meleeCooldown <= 0 && (this.specialCooldown > 0 || Math.random() < 0.60)) {
+          this._startCloseCombatMove(target);
+        } else if (this.specialCooldown <= 0 && !this.thunderboltState && !this.flamethrowerState && this.owner) {
+          const cd = Math.max(this.specialCooldownMax, this.owner.commandCooldownMax || 0);
+          this.specialCooldown = cd;
+          this.owner.commandCooldown = cd;
+          if (this.speciesId === 'pikachu') {
+            this.startThunderbolt(target, false);
+          } else if (this.speciesId === 'charizard') {
+            this.startFlamethrower(target, false);
+          } else {
+            this.owner._executePokemonSpecial(this, target, false);
+          }
         } else {
-          this.owner._executePokemonSpecial(this, target, false);
+          // Actively advance towards target to enter close combat
+          const approachAngle = targetAngle + (Math.sin(this.animTick * 0.1) * 0.25);
+          this.vx = Math.cos(approachAngle) * this.speed;
+          this.vy = Math.sin(approachAngle) * this.speed;
         }
-      } else {
-        // Melee Attack when within reach
-        const reach = (this.spec.meleeReach || 68) + (target.r || 25);
-        if (dist <= reach && this.meleeCooldown <= 0) {
-          this._performMeleeStrike(target, targetAngle);
+      }
+      // 3. Long-Range Engagement (dist > 240px)
+      else {
+        if (this.specialCooldown <= 0 && !this.thunderboltState && !this.flamethrowerState && dist <= 550 && this.owner) {
+          const cd = Math.max(this.specialCooldownMax, this.owner.commandCooldownMax || 0);
+          this.specialCooldown = cd;
+          this.owner.commandCooldown = cd;
+          if (this.speciesId === 'pikachu') {
+            this.startThunderbolt(target, false);
+          } else if (this.speciesId === 'charizard') {
+            this.startFlamethrower(target, false);
+          } else {
+            this.owner._executePokemonSpecial(this, target, false);
+          }
+        } else {
+          // Special on cooldown: actively hunt and close in on target
+          const huntAngle = targetAngle + (Math.sin(this.animTick * 0.08) * 0.30);
+          this.vx = Math.cos(huntAngle) * this.speed;
+          this.vy = Math.sin(huntAngle) * this.speed;
         }
       }
     }
 
     // Natural bounce momentum: if velocity ever stalls or drops to zero, recover natural speed immediately
-    if (Math.hypot(this.vx, this.vy) < 0.2 && !this.thunderboltState) {
+    if (Math.hypot(this.vx, this.vy) < 0.2 && !this.thunderboltState && !this.flamethrowerState && !this.meleeMoveState) {
       const resumeAngle = this.gunAngle || (Math.random() * Math.PI * 2);
       this.vx = Math.cos(resumeAngle) * this.speed;
       this.vy = Math.sin(resumeAngle) * this.speed;
     }
-    if (this.hurtAnimTimer > 0 && !this.thunderboltState) {
+    if (this.hurtAnimTimer > 0 && !this.thunderboltState && !this.flamethrowerState) {
       this.animState = 'hurt';
-    } else if (this.actionAnimTimer > 0) {
+    } else if (this.actionAnimTimer > 0 || this.meleeMoveState) {
       // Keep active 'attack' or 'special' state
+      this.animState = 'attack';
     } else if (Math.hypot(this.vx, this.vy) > 0.6) {
       this.animState = 'walk';
     } else {
@@ -667,47 +920,418 @@ export class PokemonCompanionEntity extends Fighter {
     super.update(target, ownerIndex, arena);
   }
 
-  _performMeleeStrike(target, angle) {
+  interruptAttacks(forceCancelAll = false) {
+    if (super.interruptAttacks) super.interruptAttacks(forceCancelAll);
+    this.meleeMoveState = null;
+    this.meleeMoveKey = null;
+    this.z = 0;
+  }
+
+  _startCloseCombatMove(target, forcedMoveKey = null, isTrainerCommand = false) {
+    if (!target || target.hp <= 0) return;
     this.meleeCooldown = this.meleeCooldownMax;
-    this.animState = 'attack';
-    this.actionAnimTimer = 18;
-    this.animTick = 0;
+    const dx = target.x - this.x;
+    const dy = target.y - this.y;
+    const angle = Math.atan2(dy, dx);
+    this.gunAngle = angle;
+    this.angle = angle;
+    this.meleeCastAngle = angle;
+    this.meleeTarget = target;
+    this.meleeMoveTick = 0;
+    this.meleeHitDone = new Set();
+    this.isTrainerCommandMove = isTrainerCommand;
     this.comboStep = (this.comboStep || 0) + 1;
+    this.z = 0; // Reset airborne offset upon initiating any melee skill
 
-    // Pikachu alternates between Quick Attack (high-speed dash blitz) and Iron Tail (heavy tail cleave)
-    const isPikachuQuickAttack = this.speciesId === 'pikachu' && (this.comboStep % 2 === 1);
-    const dashMult = isPikachuQuickAttack ? 1.60 : 1.35;
-    this.vx = Math.cos(angle) * (this.speed * dashMult);
-    this.vy = Math.sin(angle) * (this.speed * dashMult);
+    let moveKey = forcedMoveKey;
+    if (!moveKey) {
+      if (this.speciesId === 'pikachu') {
+        moveKey = (this.comboStep % 2 === 1) ? 'quickAttack' : 'ironTail';
+      } else if (this.speciesId === 'charizard') {
+        moveKey = 'dragonClaw';
+      } else if (this.speciesId === 'greninja') {
+        moveKey = 'nightSlash';
+      } else {
+        moveKey = 'closeCombat';
+      }
+    }
+    this.meleeMoveKey = moveKey;
+    this.meleeMoveState = 'windup';
+    this.animState = 'attack';
+    this.actionAnimTimer = 40;
+    this.animTick = 0;
 
-    const moveSfxKey = isPikachuQuickAttack
-      ? (this.spec.altMeleeSfx || 'quickAttack')
-      : (this.spec.meleeSfx || 'hitStrong');
-
-    if (this.owner) {
-      this.owner._playMoveAudioSequence(moveSfxKey);
-    } else {
-      _playAshSound(moveSfxKey);
+    let calloutText = null;
+    if (moveKey === 'quickAttack') {
+      calloutText = 'QUICK ATTACK!';
+      _playAshSound('quickAttack');
+    } else if (moveKey === 'ironTail') {
+      calloutText = 'IRON TAIL!';
+      _playAshSound('ironTail');
+    } else if (moveKey === 'dragonClaw') {
+      calloutText = 'DRAGON CLAW!';
+      _playAshSound('dragonClaw');
+    } else if (moveKey === 'nightSlash') {
+      calloutText = 'NIGHT SLASH!';
+      _playAshSound('nightSlash');
+    } else if (moveKey === 'closeCombat') {
+      calloutText = 'CLOSE COMBAT!';
+      _playAshSound('machPunch');
     }
 
-    const dmgMult = (this.isMega ? 1.30 : 1.0) * (this.speciesId === 'pikachu' && !isPikachuQuickAttack ? 1.15 : 1.0);
-    const dmg = Math.round((this.spec.meleeDamage || 20) * dmgMult);
-
-    if (this.owner) {
-      this.owner._dealPokemonDamage(target, dmg, {
-        knockback: isPikachuQuickAttack ? 8 : 12,
-        angle,
-        isSpecial: false
-      });
-      this.owner._spawnRippleEffect(
-        target.x,
-        target.y,
-        isPikachuQuickAttack ? 36 : 46,
-        isPikachuQuickAttack ? '#FFFFFF' : this.themeColor,
-        'rgba(250, 204, 21, 0.16)',
-        14
-      );
+    if (calloutText) {
+      spawnFloatingText(this.x, this.y - this.r - 22, calloutText, this.themeColor || '#FACC15');
     }
+  }
+
+  _updateMeleeMove(target, arena) {
+    this.meleeMoveTick = (this.meleeMoveTick || 0) + 1;
+    this.animState = 'attack';
+    const tick = this.meleeMoveTick;
+    const key = this.meleeMoveKey || 'quickAttack';
+    const tgt = (target && target.hp > 0) ? target : (this.meleeTarget || target);
+    const angle = this.meleeCastAngle || (tgt ? Math.atan2(tgt.y - this.y, tgt.x - this.x) : 0);
+
+    const dmgMult = (this.isTrainerCommandMove ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0);
+
+    if (key === 'quickAttack') {
+      this.meleeMoveMaxTicks = 38;
+
+      // ── Stage 1: Crouch & Initial Bounding Hop (ticks 1–12) ──
+      if (tick <= 4) {
+        this.meleeMoveState = 'windup';
+        this.z = 0;
+        this.vx = 0;
+        this.vy = 0;
+      } else if (tick <= 12) {
+        // The Hop: Low-altitude springy bound forward into rhythm
+        this.meleeMoveState = 'windup';
+        const hopProgress = (tick - 4) / 8; // 0.0 to 1.0
+        this.z = Math.sin(hopProgress * Math.PI) * 11; // 0 -> 11px -> 0
+        const hopSpeed = this.speed * 1.4;
+        this.vx = Math.cos(angle) * hopSpeed;
+        this.vy = Math.sin(angle) * hopSpeed;
+        if (tick === 12) {
+          this.z = 0;
+          _playAshSound('quickAttack');
+        }
+      }
+      // ── Stage 2: The Leapforth & Supersonic Strike Dash (ticks 13–24) ──
+      else if (tick <= 24) {
+        this.meleeMoveState = 'strike';
+        const leapProgress = (tick - 12) / 12; // 0.0 to 1.0
+        this.z = Math.sin(leapProgress * Math.PI) * 19; // 0 -> 19px -> 0 (soaring forward leap)
+
+        const leapSpeed = this.speed * 2.6;
+        this.vx = Math.cos(angle) * leapSpeed;
+        this.vy = Math.sin(angle) * leapSpeed;
+
+        const dist = tgt ? Math.hypot(tgt.x - this.x, tgt.y - this.y) : 999;
+        const hitReach = (this.r || 22) + (tgt?.r || 25) + 16;
+        if ((dist <= hitReach || tick === 18) && !this.meleeHitDone.has('quickAttack') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('quickAttack');
+          _playAshSound('hitStrong');
+          triggerGlobalScreenShake(3.5, 6);
+          const dmg = Math.round(18 * dmgMult);
+          if (this.owner) {
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 10, isSpecial: false });
+            this.owner._spawnRippleEffect(tgt.x, tgt.y, 44, '#FFFFFF', 'rgba(255, 255, 255, 0.24)', 14);
+          }
+          spawnImpactFlash(tgt.x, tgt.y, '#FFFFFF');
+          spawnSparks(tgt.x, tgt.y, 6, 'gold', '#FACC15');
+        }
+      }
+      // ── Stage 3: Impact Lock & Ground Touchdown (ticks 25–32) ──
+      else if (tick <= 32) {
+        this.meleeMoveState = 'lock';
+        this.z = 0;
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // ── Stage 4: Recovery Settle (ticks 33–38) ──
+      else if (tick <= 38) {
+        this.meleeMoveState = 'recovery';
+        this.z = 0;
+        this.vx *= 0.8;
+        this.vy *= 0.8;
+      } else {
+        this.meleeMoveState = null;
+        this.meleeMoveKey = null;
+        this.z = 0;
+        this.actionAnimTimer = 0;
+      }
+    }
+    else if (key === 'ironTail') {
+      this.meleeMoveMaxTicks = 48;
+      // Phase 1: Air Flip Leap & Hardened Steel Charge (ticks 1–14)
+      if (tick <= 14) {
+        this.meleeMoveState = 'windup';
+        const p = tick / 14;
+        this.z = Math.sin(p * Math.PI) * 22;
+        this.vx = Math.cos(angle) * (this.speed * 0.7);
+        this.vy = Math.sin(angle) * (this.speed * 0.7);
+        if (tick === 14) {
+          _playAshSound('ironTailCast');
+        }
+      }
+      // Phase 2: Poised Hold at Apex (ticks 15–17)
+      else if (tick <= 17) {
+        this.meleeMoveState = 'windup';
+        this.z = 22;
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // Phase 3: Heavy Tail Cleave Strike (ticks 18–25)
+      else if (tick <= 25) {
+        this.meleeMoveState = 'strike';
+        const strikeP = (tick - 17) / 8;
+        this.z = Math.max(0, 22 * (1 - strikeP));
+        this.vx = Math.cos(angle) * (this.speed * 1.5);
+        this.vy = Math.sin(angle) * (this.speed * 1.5);
+
+        if (tick === 20 && !this.meleeHitDone.has('ironTail') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('ironTail');
+          _playAshSound('hitStrong');
+          triggerGlobalScreenShake(5.0, 10);
+          const dmg = Math.round(28 * dmgMult);
+          if (this.owner) {
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 14, isSpecial: false });
+            this.owner._spawnRippleEffect(tgt.x, tgt.y, 56, '#E2E8F0', 'rgba(226, 232, 240, 0.28)', 18);
+          }
+          if (typeof tgt.applyHitStun === 'function') tgt.applyHitStun(16);
+          spawnImpactFlash(tgt.x, tgt.y, '#E2E8F0');
+          spawnSparks(tgt.x, tgt.y, 7, 'silver', '#F8FAFC');
+        }
+      }
+      // Phase 4: Impact Lock (ticks 26–36)
+      else if (tick <= 36) {
+        this.meleeMoveState = 'lock';
+        this.z = 0;
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // Phase 5: Recovery Settle (ticks 37–48)
+      else if (tick <= 48) {
+        this.meleeMoveState = 'recovery';
+        this.z = 0;
+        this.vx *= 0.8;
+        this.vy *= 0.8;
+      } else {
+        this.meleeMoveState = null;
+        this.meleeMoveKey = null;
+        this.z = 0;
+        this.actionAnimTimer = 0;
+      }    } else if (key === 'dragonClaw') {
+      this.meleeMoveMaxTicks = 52;
+      this.z = 0; // Charizard remains firmly grounded throughout Dragon Claw combo (zero airborne hopping)
+      // Phase 1: Coil & Lunge (ticks 1–13)
+      if (tick <= 13) {
+        this.meleeMoveState = 'windup';
+        this.z = 0;
+        this.vx = Math.cos(angle) * (this.speed * 1.25);
+        this.vy = Math.sin(angle) * (this.speed * 1.25);
+      }
+
+      // Phase 2: Poised Hold (ticks 14–16)
+      else if (tick <= 16) {
+        this.meleeMoveState = 'windup';
+        this.z = 0;
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // Phase 3: Double Rending Claw Cleave (ticks 17–28)
+      else if (tick <= 28) {
+        this.meleeMoveState = 'strike';
+        this.z = 0;
+        this.vx = Math.cos(angle) * (this.speed * 0.9);
+        this.vy = Math.sin(angle) * (this.speed * 0.9);
+
+        // Sub-hit 1: Right Claw (tick 19)
+        if (tick === 19 && !this.meleeHitDone.has('dragonClaw1') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('dragonClaw1');
+          _playAshSound('hitWeak');
+          triggerGlobalScreenShake(2.5, 4);
+          const dmg = Math.round(14 * dmgMult);
+          if (this.owner) {
+            this.owner._dealPokemonDamage(tgt, dmg, { angle: angle - 0.25, knockback: 4, isSpecial: false });
+          }
+          if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(6);
+          spawnImpactFlash(tgt.x, tgt.y, '#10B981');
+          spawnSparks(tgt.x, tgt.y, 4, 'green', '#10B981');
+        }
+
+        // Sub-hit 2: Left Claw Cross-Rend (tick 25)
+        if (tick === 25 && !this.meleeHitDone.has('dragonClaw2') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('dragonClaw2');
+          _playAshSound('hitStrong');
+          triggerGlobalScreenShake(5.5, 10);
+          const dmg = Math.round(20 * dmgMult);
+          if (this.owner) {
+            this.owner._dealPokemonDamage(tgt, dmg, { angle: angle + 0.25, knockback: 12, isSpecial: false });
+            this.owner._spawnRippleEffect(tgt.x, tgt.y, 60, '#10B981', 'rgba(16, 185, 129, 0.22)', 18);
+          }
+          if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(12);
+          spawnImpactFlash(tgt.x, tgt.y, '#10B981');
+          spawnSparks(tgt.x, tgt.y, 8, 'green', '#10B981');
+        }
+      }
+      // Phase 4: Impact Lock (ticks 29–40)
+      else if (tick <= 40) {
+        this.meleeMoveState = 'lock';
+        this.z = 0;
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // Phase 5: Recovery Settle (ticks 41–52)
+      else if (tick <= 52) {
+        this.meleeMoveState = 'recovery';
+        this.z = 0;
+        this.vx *= 0.8;
+        this.vy *= 0.8;
+      } else {
+        this.meleeMoveState = null;
+        this.meleeMoveKey = null;
+        this.z = 0;
+        this.actionAnimTimer = 0;
+      }
+    }
+    else if (key === 'nightSlash') {
+      this.meleeMoveMaxTicks = 42;
+      // Phase 1: Shadow Step Dash (ticks 1–8)
+      if (tick <= 8) {
+        this.meleeMoveState = 'windup';
+        this.vx = Math.cos(angle) * (this.speed * 2.2);
+        this.vy = Math.sin(angle) * (this.speed * 2.2);
+        if (tick === 8) {
+          _playAshSound('nightSlashCast');
+        }
+      }
+      // Phase 2: Poised Hold (ticks 9–11)
+      else if (tick <= 11) {
+        this.meleeMoveState = 'windup';
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // Phase 3: Dual Dark-Blade Cross-Cleave (ticks 12–20)
+      else if (tick <= 20) {
+        this.meleeMoveState = 'strike';
+        this.vx = Math.cos(angle) * (this.speed * 1.1);
+        this.vy = Math.sin(angle) * (this.speed * 1.1);
+
+        if (tick === 16 && !this.meleeHitDone.has('nightSlash') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('nightSlash');
+          _playAshSound('hitStrong');
+          triggerGlobalScreenShake(4.5, 8);
+          const dmg = Math.round(26 * dmgMult);
+          if (this.owner) {
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 10, isSpecial: false });
+            this.owner._spawnRippleEffect(tgt.x, tgt.y, 52, '#8B5CF6', 'rgba(139, 92, 246, 0.24)', 16);
+          }
+          if (typeof tgt.applyHitStun === 'function') tgt.applyHitStun(14);
+          spawnImpactFlash(tgt.x, tgt.y, '#8B5CF6');
+          spawnSparks(tgt.x, tgt.y, 6, 'violet', '#C084FC');
+        }
+      }
+      // Phase 4: Impact Lock (ticks 21–30)
+      else if (tick <= 30) {
+        this.meleeMoveState = 'lock';
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // Phase 5: Recovery Settle (ticks 31–42)
+      else if (tick <= 42) {
+        this.meleeMoveState = 'recovery';
+        this.vx *= 0.8;
+        this.vy *= 0.8;
+      } else {
+        this.meleeMoveState = null;
+        this.meleeMoveKey = null;
+        this.actionAnimTimer = 0;
+      }
+    }
+    else {
+      // Lucario Close Combat (Infight 4-Hit Flurry Barrage)
+      this.meleeMoveMaxTicks = 54;
+      // Phase 1: Combat Rush (ticks 1–6)
+      if (tick <= 6) {
+        this.meleeMoveState = 'windup';
+        this.vx = Math.cos(angle) * (this.speed * 1.8);
+        this.vy = Math.sin(angle) * (this.speed * 1.8);
+      }
+      // Phase 3: Flurry Barrage (ticks 7–30)
+      else if (tick <= 30) {
+        this.meleeMoveState = 'strike';
+        this.vx = Math.cos(angle) * (this.speed * 0.4);
+        this.vy = Math.sin(angle) * (this.speed * 0.4);
+
+        // Hit 1: Left Aura Jab (tick 9)
+        if (tick === 9 && !this.meleeHitDone.has('cc1') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('cc1');
+          _playAshSound('machPunch');
+          triggerGlobalScreenShake(2.0, 3);
+          const dmg = Math.round(5 * dmgMult);
+          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle: angle - 0.15, knockback: 2, isSpecial: false });
+          if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(4);
+          spawnSparks(tgt.x, tgt.y, 3, 'cyan', '#22D3EE');
+        }
+        // Hit 2: Right Aura Hook (tick 16)
+        if (tick === 16 && !this.meleeHitDone.has('cc2') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('cc2');
+          _playAshSound('bulletPunch');
+          triggerGlobalScreenShake(2.0, 3);
+          const dmg = Math.round(5 * dmgMult);
+          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle: angle + 0.15, knockback: 2, isSpecial: false });
+          if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(4);
+          spawnSparks(tgt.x, tgt.y, 3, 'cyan', '#22D3EE');
+        }
+        // Hit 3: Spinning Roundhouse Kick (tick 23)
+        if (tick === 23 && !this.meleeHitDone.has('cc3') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('cc3');
+          _playAshSound('machPunch');
+          triggerGlobalScreenShake(3.0, 4);
+          const dmg = Math.round(6 * dmgMult);
+          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 4, isSpecial: false });
+          if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(5);
+          spawnSparks(tgt.x, tgt.y, 4, 'cyan', '#22D3EE');
+        }
+        // Hit 4: Two-Handed Finisher Aura Palm Blast (tick 30)
+        if (tick === 30 && !this.meleeHitDone.has('cc4') && tgt && tgt.hp > 0) {
+          this.meleeHitDone.add('cc4');
+          _playAshSound('closeCombat');
+          _playAshSound('hitStrong');
+          triggerGlobalScreenShake(6.0, 12);
+          const dmg = Math.round(18 * dmgMult);
+          if (this.owner) {
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 16, isSpecial: false });
+            this.owner._spawnRippleEffect(tgt.x, tgt.y, 65, '#22D3EE', 'rgba(34, 211, 238, 0.28)', 22);
+          }
+          if (typeof tgt.applyHitStun === 'function') tgt.applyHitStun(20);
+          const auraCol = '#22D3EE';
+          spawnImpactFlash(tgt.x, tgt.y, auraCol);
+          spawnSparks(tgt.x, tgt.y, 8, 'cyan', auraCol);
+        }
+      }
+      // Phase 4: Impact Lock (ticks 31–41)
+      else if (tick <= 41) {
+        this.meleeMoveState = 'lock';
+        this.vx = 0;
+        this.vy = 0;
+      }
+      // Phase 5: Recovery Settle (ticks 42–54)
+      else if (tick <= 54) {
+        this.meleeMoveState = 'recovery';
+        this.vx *= 0.8;
+        this.vy *= 0.8;
+      } else {
+        this.meleeMoveState = null;
+        this.meleeMoveKey = null;
+        this.actionAnimTimer = 0;
+      }
+    }
+  }
+
+  _performMeleeStrike(target, angle) {
+    this._startCloseCombatMove(target);
   }
 
   draw(ctx) {
@@ -774,10 +1398,8 @@ export class AshFighter extends Fighter {
     this.commandCooldownMax = cfg.commandCooldownFrames || 150;
     this.commandCooldown = 48;
 
-    // Ultimate: Bond Awakening / Mega Evolution & 10,000,000 Volt Thunderbolt
-    this.ultimateCooldownMax = cfg.ultimateCooldownFrames || 780;
-    this.ultimateCooldown = 240;
-    this.ultimateActiveTimer = 0;
+    // Ultimate: 10,000,000 Volt Thunderbolt Barrage
+    this.ultimateCooldownMax = cfg.ultimateCooldownFrames || 780;    this.ultimateCooldown = 240;
     this.ultimateDurationMax = cfg.ultimateDurationFrames || 420;
 
     // Non-Freezing Visual Effects, Projectiles & Queued Move Cast SFX (Rule 25)
@@ -798,7 +1420,6 @@ export class AshFighter extends Fighter {
     this.summonCooldown = _getAshCfg().initialSummonDelayFrames ?? 24;
     this.commandCooldown = 48;
     this.ultimateCooldown = 240;
-    this.ultimateActiveTimer = 0;
     if (this.activeVisualEffects) this.activeVisualEffects.length = 0;
     else this.activeVisualEffects = [];
     if (this.activeElementalProjectiles) this.activeElementalProjectiles.length = 0;
@@ -1092,7 +1713,6 @@ export class AshFighter extends Fighter {
       targetY,
       timer: flightFrames,
       maxTimer: flightFrames,
-      isMega: this.ultimateActiveTimer > 0 && (speciesKey === 'charizard' || speciesKey === 'lucario')
     };
 
     // Stop moving & activate Honeycomb Forcefield Barrier immediately upon throwing
@@ -1110,8 +1730,7 @@ export class AshFighter extends Fighter {
    */
   _spawnPokemonFromBall(ball) {
     this._cleanupActivePokemon();
-    const isMega = Boolean(ball.isMega || (this.ultimateActiveTimer > 0 && (ball.speciesKey === 'charizard' || ball.speciesKey === 'lucario')));
-    const pokemon = new PokemonCompanionEntity(this, ball.speciesKey, ball.targetX, ball.targetY, isMega);
+    const pokemon = new PokemonCompanionEntity(this, ball.speciesKey, ball.targetX, ball.targetY);
     this.activePokemon = pokemon;
     // Synchronize commandCooldown with the spawned Pokémon's initial cooldown
     this.commandCooldown = Math.max(this.commandCooldown, pokemon.specialCooldown);
@@ -1124,7 +1743,7 @@ export class AshFighter extends Fighter {
     }
 
     _playAshSound('pbRelease');
-    const cryToPlay = (isMega && pokemon.spec.megaCryKey) ? pokemon.spec.megaCryKey : pokemon.spec.cryKey;
+    const cryToPlay = pokemon.spec.cryKey;
     if (cryToPlay) {
       _playAshSound(cryToPlay);
     }
@@ -1194,11 +1813,13 @@ export class AshFighter extends Fighter {
   }
 
   /**
-   * Skill 1: Trainer Command — Orders the active Pokémon to unleash its signature elemental move!
+   * Skill 1: Trainer Command — Orders the active Pokémon to unleash its signature move!
+   * - Close Combat (<= 180px): Orders high-speed empowered melee combo (Iron Tail, Dragon Claw, Night Slash, Close Combat)!
+   * - Long Range (> 180px): Orders signature ranged elemental special (Thunderbolt, Flamethrower, Water Shuriken, Aura Sphere)!
    */
   _executeTrainerCommand(opponent) {
     if (!this.activePokemon || this.activePokemon.hp <= 0) return;
-    if (this.activePokemon.specialCooldown > 0 || this.activePokemon.thunderboltState || this.activePokemon.isChannelingSkill?.()) return;
+    if (this.activePokemon.thunderboltState || this.activePokemon.isChannelingSkill?.()) return;
     if (this.commandCooldown > 0) return;
 
     const cd = Math.max(this.commandCooldownMax, this.activePokemon.specialCooldownMax || 0);
@@ -1206,7 +1827,14 @@ export class AshFighter extends Fighter {
     this.activePokemon.specialCooldown = cd;
 
     const target = this._findBestTarget(opponent);
-    this._executePokemonSpecial(this.activePokemon, target, true);
+    if (!target) return;
+
+    const dist = Math.hypot(target.x - this.activePokemon.x, target.y - this.activePokemon.y);
+    if (dist <= 180 && typeof this.activePokemon._startCloseCombatMove === 'function') {
+      this.activePokemon._startCloseCombatMove(target, null, true);
+    } else {
+      this._executePokemonSpecial(this.activePokemon, target, true);
+    }
   }
 
   /**
@@ -1227,6 +1855,11 @@ export class AshFighter extends Fighter {
         p.startThunderbolt(target, isTrainerCommand);
         return;
       }
+    } else if (p.speciesId === 'charizard') {
+      if (typeof p.startFlamethrower === 'function') {
+        p.startFlamethrower(target, isTrainerCommand);
+        return;
+      }
     }
 
     const spec = p.spec;
@@ -1240,19 +1873,18 @@ export class AshFighter extends Fighter {
     p.actionAnimTimer = 28;
     p.animTick = 0;
 
-    const moveTitle = (p.isMega && spec.megaSpecialName) ? spec.megaSpecialName : (spec.specialName || 'THUNDERBOLT!');
+    const moveTitle = spec.specialName || 'THUNDERBOLT!';
     spawnFloatingText(p.x, p.y - p.r - 22, moveTitle, p.themeColor);
 
     // Play canonical 2-stage Empress move audio sequence (e.g. thunderbolt-1.ogg -> thunderbolt-2.ogg)
     this._playMoveAudioSequence(spec.specialSfx || 'thunderbolt');
 
-    const cmdMult = isTrainerCommand ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0;
-    const bonusMult = cmdMult * (p.isMega ? 1.25 : 1.0);
+    const bonusMult = isTrainerCommand ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0;
 
     if (p.speciesId === 'charizard') {
-      // Flamethrower / Blue Flare Blitz Fire Stream + AOE Burst
+      // Flamethrower Fire Stream + AOE Burst
       const rad = spec.specialRadius || 120;
-      const fireColor = p.isMega ? '#38BDF8' : '#F97316';
+      const fireColor = '#F97316';
       const burstX = p.x + Math.cos(castAngle) * 70;
       const burstY = p.y + Math.sin(castAngle) * 70;
       this._spawnRippleEffect(burstX, burstY, rad, fireColor, 'rgba(249, 115, 22, 0.22)', 22);
@@ -1262,7 +1894,6 @@ export class AshFighter extends Fighter {
         const a = castAngle + i * 0.20;
         this.activeElementalProjectiles.push({
           kind: 'fireBlast',
-          isMega: p.isMega,
           x: p.x + Math.cos(a) * (p.r + 8),
           y: p.y + Math.sin(a) * (p.r + 8),
           vx: Math.cos(a) * 9.2,
@@ -1307,7 +1938,7 @@ export class AshFighter extends Fighter {
         y: p.y + Math.sin(castAngle) * (p.r + 8),
         vx: Math.cos(castAngle) * spd,
         vy: Math.sin(castAngle) * spd,
-        r: p.isMega ? 19 : 15,
+        r: 15,
         life: 65,
         damage: Math.round((spec.specialDamage || 30) * bonusMult),
         knockback: 16,
@@ -1317,7 +1948,7 @@ export class AshFighter extends Fighter {
   }
 
   /**
-   * Ultimate: Bond Awakening / Mega Evolution & 10,000,000 Volt Thunderbolt Barrage!
+   * Ultimate: 10,000,000 Volt Thunderbolt Barrage!
    */
   _activateMegaAwakening(opponent, arena) {
     const cfg = _getAshCfg();
@@ -1333,8 +1964,6 @@ export class AshFighter extends Fighter {
     if ((!this.activePokemon || this.activePokemon.hp <= 0) && !this.thrownPokeball) {
       this.summonCooldown = 0;
       this._throwPokeball(opponent, arena);
-    } else if (this.activePokemon && this.activePokemon.hp > 0) {
-      this.activePokemon.awakenMega();
     }
 
     spawnFloatingText(this.x, this.y - this.r - 28, '10,000,000 VOLT AWAKENING!', '#FACC15');
@@ -1421,7 +2050,7 @@ export class AshFighter extends Fighter {
     const cfg = _getAshCfg();
 
     // 4. Ultimate Trigger
-    if (isSkillEnabled(cfg.enableMegaAwakening, true) && this.ultimateCooldown <= 0 && bestTarget) {
+    if (isSkillEnabled(cfg.enableUltimate, true) && this.ultimateCooldown <= 0 && bestTarget) {
       this._activateMegaAwakening(bestTarget, arena);
     }
 

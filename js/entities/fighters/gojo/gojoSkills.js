@@ -155,16 +155,19 @@ export function stopGojoRedAudio(fighter) {
   stopSoundBySrc('redchanneling');
   stopSoundBySrc('redcharging');
   stopSoundBySrc('reddeploy');
+  stopSoundBySrc('redflare');
   stopSoundBySrc('redblast');
   stopSoundBySrc('red_channeling');
   stopSoundBySrc('red_charging');
   stopSoundBySrc('red_deploy');
+  stopSoundBySrc('red_flare');
   stopSoundBySrc('red_blast');
 
   // Fallback fast fade-out for any scheduled instances
   fadeOutSoundBySrc('redchanneling', 50);
   fadeOutSoundBySrc('redcharging', 50);
   fadeOutSoundBySrc('reddeploy', 50);
+  fadeOutSoundBySrc('redflare', 50);
   fadeOutSoundBySrc('redblast', 50);
 }
 
@@ -207,7 +210,7 @@ export function detonateRed(fighter) {
   fighter.gunAngle = pushAngle;
   fighter.angle = pushAngle;
 
-  const frontalReach = CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650;
+  const frontalReach = CONFIG.gojo?.redBlastRadius || CONFIG.gojo?.redFrontalReach || CONFIG.gojo?.redRange || 650;
   const frontalArc = CONFIG.gojo?.redFrontalArc || 0.76;
   const halfArc = frontalArc / 2; // 0.38 (~21.8 deg, ~43.5 deg total cone)
   const redDamage = CONFIG.gojo?.redDamage || 100;

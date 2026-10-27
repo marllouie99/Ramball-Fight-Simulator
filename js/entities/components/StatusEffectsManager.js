@@ -185,31 +185,45 @@ export class StatusEffectsManager {
   }
 
   // --- Burn ---
-  applyBurn(attacker, duration) {
+  applyBurn(attacker, duration, damage, interval) {
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive || this.fighter.isImmuneToBurn || this.fighter.characterId === 'escanor') return;
     const finalDuration = duration ?? CONFIG.orange?.burnDuration ?? 180;
     this.fighter.burnTimer = Math.max(this.fighter.burnTimer || 0, finalDuration);
     this.fighter.burnDamageTimer = 0;
     this.fighter.lastBurnAttacker = attacker;
+    if (damage !== undefined && damage !== null) {
+      this.fighter.burnDamagePerTick = damage;
+    }
+    if (interval !== undefined && interval !== null) {
+      this.fighter.burnInterval = interval;
+    }
   }
 
   handleBurn() {
     if (this.fighter.isBaguvixActive || this.fighter.isGodModeActive) {
       this.fighter.burnTimer = 0;
       this.fighter.burnDamageTimer = 0;
+      this.fighter.burnDamagePerTick = null;
+      this.fighter.burnInterval = null;
       return;
     }
     if (this.fighter.burnTimer > 0) {
       this.fighter.burnTimer--;
       this.fighter.burnDamageTimer++;
-      const damageInterval = CONFIG.orange?.burnDamageInterval || 30;
+      const damageInterval = this.fighter.burnInterval || CONFIG.orange?.burnDamageInterval || 30;
       
       if (this.fighter.burnDamageTimer >= damageInterval) {
-        const damage = CONFIG.orange?.burnDamagePerSecond || 5;
+        const damage = (this.fighter.burnDamagePerTick !== undefined && this.fighter.burnDamagePerTick !== null)
+          ? this.fighter.burnDamagePerTick
+          : (CONFIG.orange?.burnDamagePerSecond || 5);
         if (typeof this.fighter.takeDamage === 'function') {
           this.fighter.takeDamage(damage, this.fighter.lastBurnAttacker, { isBurn: true });
         }
         this.fighter.burnDamageTimer = 0;
+      }
+      if (this.fighter.burnTimer <= 0) {
+        this.fighter.burnDamagePerTick = null;
+        this.fighter.burnInterval = null;
       }
     }
   }

@@ -14,7 +14,7 @@ import { spawnDroppedMahoragaWheel } from '../../graphics/particles/mahoragaDrop
 // ── Refactored Mahoraga Modules ──
 import { handleAdaptationDamage, triggerAdaptation, handleInfinityFreeze, adaptToPureLoveBeam, adaptToYutaFlurry, adaptToThinIceBreaker, adaptToSoulDisfigurement, adaptToSaitamaCounter } from './mahoraga/mahoragaAdaptation.js';
 import { gojoPurpleTeleportDodge, gojoRedTeleportDodge, startAdaptationFlashDash, spawnTeleportAfterimages, sukunaFugaTeleportDodge, generalSkillShotTeleportDodge } from './mahoraga/mahoragaSkills.js';
-import { performMeleeAttack, executeCleave, shootBladeBarrage, executeShout, getFrontRadiusTargets, playRandomHeavyPunchSound, initiateLevel8WallSlam, updateLevel8WallSlam } from './mahoraga/mahoragaCombat.js';
+import { performMeleeAttack, executeSwordHit, executeCleave, shootBladeBarrage, executeShout, getFrontRadiusTargets, playRandomHeavyPunchSound, initiateLevel8WallSlam, updateLevel8WallSlam } from './mahoraga/mahoragaCombat.js';
 import { drawMahoragaFighter } from './mahoraga/mahoragaVisuals.js';
 import { SKILL_REGISTRY } from '../../configs/skills/skillRegistry.js';
 import { registerMahoragaClass } from './sukuna/sukunaMahoragaSummon.js';
@@ -108,6 +108,10 @@ export class MahoragaFighter extends Fighter {
     this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown || 600;
     this.isCleaving = false;
     this.cleaveWindupTimer = 0;
+    this.isSwordWindingUp = false;
+    this.swordWindupTimer = 0;
+    this.swordWindupMaxTimer = 0;
+    this.swordWindupTarget = null;
     this.adaptationPauseTimer = 0;
     this._pendingCounterTarget = null;
 
@@ -211,6 +215,10 @@ export class MahoragaFighter extends Fighter {
     this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown || 600;
     this.isCleaving = false;
     this.cleaveWindupTimer = 0;
+    this.isSwordWindingUp = false;
+    this.swordWindupTimer = 0;
+    this.swordWindupMaxTimer = 0;
+    this.swordWindupTarget = null;
     this.adaptationPauseTimer = 0;
     this._pendingCounterTarget = null;
 
@@ -428,6 +436,7 @@ export class MahoragaFighter extends Fighter {
   _startAdaptationFlashDash(attacker) { startAdaptationFlashDash(this, attacker); }
   _spawnTeleportAfterimages(oldX, oldY, newX, newY, customAngle) { spawnTeleportAfterimages(this, oldX, oldY, newX, newY, customAngle); }
   _performMeleeAttack(opponent) { performMeleeAttack(this, opponent); }
+  _executeSwordHit(opponent, isDoubleDamage) { executeSwordHit(this, opponent, isDoubleDamage); }
   _executeCleave(opponent) { executeCleave(this, opponent); }
   _executeShout(opponent, ownerIndex) { executeShout(this, opponent, ownerIndex); }
   _updateSonicBooms() {
@@ -540,6 +549,13 @@ export class MahoragaFighter extends Fighter {
       super.interruptAttacks(forceCancelAll);
       this.isCleaving = false;
       this.cleaveWindupTimer = 0;
+      this.isSwordWindingUp = false;
+      this.swordWindupTimer = 0;
+      this.swordWindupMaxTimer = 0;
+      this.swordWindupTarget = null;
+      if (this.isShouting) {
+        this.shoutCooldown = Math.max(this.shoutCooldown || 0, 180);
+      }
       this.isShouting = false;
       this.shoutPhase = null;
       this.shoutWindupTimer = 0;
@@ -686,6 +702,7 @@ export class MahoragaFighter extends Fighter {
    */
   isStationarySkillActive() {
     return Boolean(
+      this.isSwordWindingUp ||
       this.isDraggedByGetsuga ||
       this.isPulledOrDragged() ||
       this.isWallSlamActive ||
@@ -816,6 +833,11 @@ export class MahoragaFighter extends Fighter {
     return bounced;
   }
 
+  canPerformBasicAttack(target = null, arena = null) {
+    if (this.isSwordWindingUp) return false;
+    return super.canPerformBasicAttack(target, arena);
+  }
+
   shoot(ownerIndex) {
     if (!this.canPerformBasicAttack()) return false;
     const opponent = this._findClosestEnemy();
@@ -826,7 +848,7 @@ export class MahoragaFighter extends Fighter {
     const swordRange = CONFIG.mahoraga?.swordRange ?? 110;
     const meleeDist = this.r + (opponent ? opponent.r : 25) + swordRange;
 
-    if (distToOpponent <= meleeDist && this.swordCooldown <= 0) {
+    if (distToOpponent <= meleeDist && this.swordCooldown <= 0 && !this.isSwordWindingUp) {
       if (this.isWallReboundDashing) {
         this.isWallReboundDashing = false;
         this.postDashPauseTimer = 0;
@@ -849,7 +871,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     this.aim(opponent);
-    if ((this.swordCooldown || 0) <= 0) {
+    if ((this.swordCooldown || 0) <= 0 && !this.isSwordWindingUp) {
       this._performMeleeAttack(opponent);
     }
   }
@@ -970,6 +992,9 @@ export class MahoragaFighter extends Fighter {
       this.shoutWindupTimer = 0;
       this.shoutRecoveryTimer = 0;
       this.isCleaving = false;
+      this.isSwordWindingUp = false;
+      this.swordWindupTimer = 0;
+      this.swordWindupTarget = null;
       this.isThrowing = false;
       this.isWallSlamActive = false;
       this.isWallReboundDashing = false;
@@ -988,6 +1013,9 @@ export class MahoragaFighter extends Fighter {
     if (isInsideGojoDomain || isFrozen) {
       this.interruptAttacks(true);
       this.isCleaving = false;
+      this.isSwordWindingUp = false;
+      this.swordWindupTimer = 0;
+      this.swordWindupTarget = null;
       this.isShouting = false;
       this.isThrowing = false;
       this.isBlitzActive = false;
@@ -1212,8 +1240,6 @@ export class MahoragaFighter extends Fighter {
           triggerGlobalScreenShake(10, 18);
           this._playRandomHeavyPunchSound();
 
-          this._executeShout(target, ownerIndex);
-
           const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
           const kbForce = CONFIG.mahoraga?.adaptationStrikeKnockbackForce ?? 42.0;
           const kbVx = Math.cos(kbAngle) * kbForce;
@@ -1247,8 +1273,10 @@ export class MahoragaFighter extends Fighter {
           if (this.teleportCounterPending) {
             this.teleportCounterPending = false;
             if (target && !target.isDead) {
+              const isDoubleDmg = (this.wheelDoubleDamageTimer || 0) > 0;
               this.attackCount = (this.attackCount || 0) + 1;
-              if (this.attackCount % 2 === 0) {
+              const isPunch = !isDoubleDmg && (this.attackCount % 2 === 0);
+              if (isPunch) {
                 this.leftPunchTimer = 18;
                 this.leftPunchMaxTimer = 18;
                 this._playRandomHeavyPunchSound();
@@ -1268,7 +1296,7 @@ export class MahoragaFighter extends Fighter {
                   counterTargets.push(target);
                 }
               }
-              const counterDmgMult = this.wheelDoubleDamageTimer > 0 ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+              const counterDmgMult = (!isPunch && isDoubleDmg) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
               const counterDmg = (CONFIG.mahoraga?.teleportCounterDamage ?? 22) * counterDmgMult;
               for (const t of counterTargets) {
                 t.takeDamage(counterDmg, this, { isMelee: true, isSkill: true });
@@ -1365,6 +1393,37 @@ export class MahoragaFighter extends Fighter {
     if (this.infinityBlitzCooldownTimer > 0) this.infinityBlitzCooldownTimer--;
     if (this.defensePoseTimer > 0) this.defensePoseTimer--;
 
+    // ── Sword of Extermination 2X Damage Windup Progress ──
+    if (this.isSwordWindingUp) {
+      const isHardInterrupted = (this.timeStopTimer || 0) > 0 || (this.electricStunTimer || 0) > 0 || 
+                                (this.dubstepStunTimer || 0) > 0 || (this.paralyzeTimer || 0) > 0 ||
+                                this.isFrozenByInfinity;
+      if (isHardInterrupted) {
+        this.isSwordWindingUp = false;
+        this.swordWindupTimer = 0;
+        this.swordWindupTarget = null;
+      } else {
+        const target = this.swordWindupTarget || opponent;
+        if (target && !target.isDead) {
+          this.aim(target);
+        }
+        if (Math.random() < 0.45) {
+          const facingAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+          const handX = this.x + Math.cos(facingAngle + 0.35) * (this.r * 0.85);
+          const handY = this.y + Math.sin(facingAngle + 0.35) * (this.r * 0.85);
+          spawnSparks(handX, handY, 2, 'gold', '#FFFFFF');
+        }
+
+        this.swordWindupTimer--;
+        if (this.swordWindupTimer <= 0) {
+          this.isSwordWindingUp = false;
+          const targetToHit = this.swordWindupTarget || opponent;
+          this._executeSwordHit(targetToHit, true);
+          this.swordWindupTarget = null;
+        }
+      }
+    }
+
 
     const isLevel8 = totalStages >= 8 || this.isMaxAdapted || ((this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0) >= 8);
 
@@ -1422,11 +1481,11 @@ export class MahoragaFighter extends Fighter {
         this.shoutWindupTimer--;
         if (this.shoutWindupTimer <= 0) {
           // 2. FIRE THE DIVINE SHOUT
+          this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
           this._executeShout(opponent, ownerIndex);
           this.shoutPhase = 'recovery';
           this.shoutRecoveryTimer = CONFIG.mahoraga?.shoutRecoveryFrames ?? 18;
           this.shoutRecoveryMax = this.shoutRecoveryTimer;
-          this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
 
           // Kinetic backward recoil impulse pushing opposite to roar (Rule 30)
           const recoil = 4.2;
@@ -1620,7 +1679,9 @@ export class MahoragaFighter extends Fighter {
 
         // 2. Perform Hand-to-Hand Martial Arts Strike / Sword Finisher
         if (hitIndex < totalHits) {
-          const blitzMult = this.wheelDoubleDamageTimer > 0 ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
+          const isPunch = (hitIndex % 2 === 1);
+          // 2X double damage applies ONLY to the sword, never the punch
+          const blitzMult = (!isPunch && this.wheelDoubleDamageTimer > 0) ? (CONFIG.mahoraga?.wheelDoubleDamageMultiplier ?? 2.0) : 1.0;
           const blitzDamage = (CONFIG.mahoraga?.blitzHitDamage ?? 15) * blitzMult;
           target.takeDamage(blitzDamage, this, { isMelee: true, isSkill: true });
           if (typeof target.applyHitStun === 'function') {
@@ -1781,10 +1842,9 @@ export class MahoragaFighter extends Fighter {
     this.isMeleeMode = false;
 
     const isCurrentlyDragged = this.isPulledOrDragged();
-    if (this.postDashPauseTimer > 0 || isCurrentlyDragged) {
-      // Zero out Mahoraga's own movement drive so external pull forces (Getsuga drag,
-      // Gojo Blue/Purple suction, Ruby Hook, Black Hole, Reze Pin Pull, etc.) are NOT
-      // immediately cancelled by Mahoraga's high natural speed auto-recovery each frame.
+    if (this.isSwordWindingUp || this.postDashPauseTimer > 0 || isCurrentlyDragged) {
+      // Zero out Mahoraga's own movement drive so he stays firmly stationed during sword windup,
+      // and external pull forces (Getsuga drag, Gojo Blue/Purple, etc.) are respected.
       this.vx = 0;
       this.vy = 0;
       this.applyMovementPhysics(0);
@@ -1834,13 +1894,14 @@ export class MahoragaFighter extends Fighter {
       const isTargetReforming = Boolean(target && (target.isRevivingFromContract || target.isShatterReviving));
       // Priority 0: Close-Quarters Proximity Attack (Instantly strikes when in melee contact/reach)
       // Mahoraga always counter-cleaves enemies who enter his melee reach as long as he isn't in hard stasis
-      const canMeleeStrike = !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && (this.timeStopTimer || 0) <= 0 && !this.isFrozenByInfinity && (this.paralyzeTimer || 0) <= 0;
+      const canMeleeStrike = !this.isSwordWindingUp && !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && (this.timeStopTimer || 0) <= 0 && !this.isFrozenByInfinity && (this.paralyzeTimer || 0) <= 0;
       if (this.isSkillEnabled(CONFIG.mahoraga?.enableSwordOfExtermination, true) && isAnyTargetInRange && this.swordCooldown <= 0 && canMeleeStrike) {
         this._performMeleeAttack(target);
       } else {
-        const canActSkills = !isInHitReaction && !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isPulledOrDragged();
+        const canActSkills = !this.isSwordWindingUp && !isInHitReaction && !isTargetReforming && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz && !this.isPulledOrDragged();
 
         if (canActSkills) {
+          const isDoubleDmg = (this.wheelDoubleDamageTimer || 0) > 0;
           const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;
           const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
           const hasWallSlam = totalStages >= 8 || this.isMaxAdapted || (this.goldStages >= 8);
@@ -1853,6 +1914,7 @@ export class MahoragaFighter extends Fighter {
           this.shoutPhase = 'windup';
           this.shoutWindupTimer = CONFIG.mahoraga?.shoutWindupFrames ?? 24;
           this.shoutWindupMax = this.shoutWindupTimer;
+          this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
           this.vx = 0;
           this.vy = 0;
           if (this.knockbackVx !== undefined) this.knockbackVx = 0;
@@ -1875,7 +1937,8 @@ export class MahoragaFighter extends Fighter {
           this.cleaveWindupTimer = 0;
         }
         // Priority 3: Throw Skill (Debris Throw at Level 1-7 OR Wall Slam & Dash Execute at Level 8+)
-        else if (this.throwCooldown <= 0 && (distToOpponent >= minThrowDist || hasWallSlam) && !isAnyTargetInRange) {
+        // During 2x double damage, Mahoraga focuses exclusively on sword attacks (no throwing debris)
+        else if (!isDoubleDmg && this.throwCooldown <= 0 && (distToOpponent >= minThrowDist || hasWallSlam) && !isAnyTargetInRange) {
           if (hasWallSlam && this.isSkillEnabled(CONFIG.mahoraga?.enableWallSlam, true)) {
             this.initiateLevel8WallSlam(target);
           } else if (this.isSkillEnabled(CONFIG.mahoraga?.enableThrowBarrage, true)) {
@@ -1885,7 +1948,7 @@ export class MahoragaFighter extends Fighter {
           }
         }
         // Priority 4: Active Close-Quarters Attack-Teleport Stance
-        else if (this.isSkillEnabled(CONFIG.mahoraga?.enableCloseQuartersTeleport, true) && this.neutralStanceTimer > 0 && this.swordCooldown <= 0 && isAnyTargetInRange) {
+        else if (!this.isSwordWindingUp && this.isSkillEnabled(CONFIG.mahoraga?.enableCloseQuartersTeleport, true) && this.neutralStanceTimer > 0 && this.swordCooldown <= 0 && isAnyTargetInRange) {
           this._performMeleeAttack(target);
         }
       }
@@ -1926,7 +1989,8 @@ export class MahoragaFighter extends Fighter {
     const bladeLength = 58;
 
     let swingAngle = 0;
-    let extendDist = 0;
+    let lunge = 0;
+    let offY = 0;
 
     const punchAnimTimer = this.punchAnimTimer || 0;
     const maxAnimTimer = this.punchAnimMaxTimer || 18;
@@ -1944,60 +2008,74 @@ export class MahoragaFighter extends Fighter {
       const progress = Math.min(1.0, Math.max(0.0, elapsed / maxTimer));
       const comboIndex = this.isInfinityBlitz ? (1 + (swordCombo % 2)) : (swordCombo % 3);
 
-      const coilP = 0.23;
-      const holdP = 0.32;
-      const strikeP = 0.55;
-      const lockP = 0.73;
+      const isDoubleDamage = Boolean(this.wheelDoubleDamageTimer > 0 || this.isSwordWindingUp);
+      const coilP = isDoubleDamage ? 0.28 : 0.23;
+      const holdP = isDoubleDamage ? 0.39 : 0.32;
+      const strikeP = isDoubleDamage ? 0.62 : 0.55;
+      const lockP = isDoubleDamage ? 0.78 : 0.73;
 
-      let startAngle = -0.45;
-      let impactAngle = 0.65;
-      let coilLunge = -10.0;
+      let startAngle = -0.58;
+      let impactAngle = 0.68;
+      let coilLunge = -14.0;
+      let coilLiftY = -12.0;
       let maxLunge = 32.0;
+      let cleaveDipY = 10.0;
 
       if (comboIndex === 1) {
-        startAngle = 0.75;
-        impactAngle = -0.55;
-        coilLunge = -8.0;
+        startAngle = 0.78;
+        impactAngle = -0.62;
+        coilLunge = -12.0;
+        coilLiftY = 14.0;
         maxLunge = 30.0;
-      } else if (comboIndex === 2) {
-        startAngle = -0.95;
-        impactAngle = 0.85;
-        coilLunge = -14.0;
-        maxLunge = 36.0;
+        cleaveDipY = -12.0;
+      } else if (comboIndex === 2 || isDoubleDamage) {
+        startAngle = isDoubleDamage ? -1.25 : -1.05;
+        impactAngle = isDoubleDamage ? 1.05 : 0.90;
+        coilLunge = isDoubleDamage ? -18.0 : -15.0;
+        coilLiftY = isDoubleDamage ? -8.0 : -6.0;
+        maxLunge = isDoubleDamage ? 42.0 : 36.0;
+        cleaveDipY = isDoubleDamage ? 12.0 : 8.0;
       }
 
       if (progress < coilP) {
         const wp = progress / coilP;
         const easeW = Math.sin(wp * Math.PI * 0.5);
         swingAngle = startAngle * easeW;
-        extendDist = coilLunge * easeW;
+        lunge = coilLunge * easeW;
+        offY = coilLiftY * easeW;
       } else if (progress < holdP) {
         swingAngle = startAngle;
-        extendDist = coilLunge;
+        lunge = coilLunge;
+        offY = coilLiftY;
       } else if (progress < strikeP) {
         const sp = (progress - holdP) / (strikeP - holdP);
         const whipEase = Math.pow(sp, 2.5);
         swingAngle = startAngle + (impactAngle - startAngle) * whipEase;
-        extendDist = coilLunge + (maxLunge - coilLunge) * whipEase;
+        lunge = coilLunge + (maxLunge - coilLunge) * whipEase;
+        offY = coilLiftY + (cleaveDipY - coilLiftY) * whipEase;
       } else if (progress < lockP) {
         swingAngle = impactAngle;
-        extendDist = maxLunge;
+        lunge = maxLunge;
+        offY = cleaveDipY;
       } else {
         const rp = (progress - lockP) / (1.0 - lockP);
         const settleEase = Math.pow(1.0 - rp, 1.8);
         const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
-        swingAngle = impactAngle * settleEase - 0.20 * springWave;
-        extendDist = maxLunge * settleEase - 5.0 * springWave;
+        swingAngle = impactAngle * settleEase - 0.18 * springWave;
+        lunge = maxLunge * settleEase - 5.0 * springWave;
+        offY = cleaveDipY * settleEase + 3.0 * springWave;
       }
     } else if (isParrying) {
       const maxT = this.defensePoseMaxTimer || 25;
       const t = 1.0 - (this.defensePoseTimer / maxT);
       const p = Math.sin(t * Math.PI);
-      swingAngle = Math.PI * 0.25 - p * (Math.PI * 0.45);
-      extendDist = 18 + p * 15;
+      swingAngle = Math.PI * 0.28 - p * (Math.PI * 0.45);
+      lunge = 8 + p * 16;
+      offY = -6 + p * 12;
     } else if (isGuarding) {
       swingAngle = -Math.PI * 0.35;
-      extendDist = -12;
+      lunge = -8;
+      offY = -6;
     } else if (isThrowing) {
       const shotsLeft = this.throwBarrageShotsLeft || 0;
       const isRightArmTurn = (shotsLeft % 2 === 0);
@@ -2006,10 +2084,12 @@ export class MahoragaFighter extends Fighter {
         const t = (this.throwBarrageTimer || 0) / interval;
         const p = Math.sin(t * Math.PI);
         swingAngle = -Math.PI * 0.25 + p * 0.45;
-        extendDist = 10 + p * 38;
+        lunge = 6 + p * 28;
+        offY = -4 + p * 6;
       } else {
         swingAngle = -Math.PI * 0.25;
-        extendDist = 10;
+        lunge = 6;
+        offY = -4;
       }
     } else if (this.isWallSlamActive && (this.wallSlamPhase === 'post_throw_delay' || this.wallSlamPhase === 'dash')) {
       let p = 1.0;
@@ -2019,7 +2099,8 @@ export class MahoragaFighter extends Fighter {
       }
       const easeP = p * p * (3 - 2 * p);
       swingAngle = easeP * (-Math.PI * 0.65);
-      extendDist = easeP * 15;
+      lunge = easeP * 16;
+      offY = -easeP * 6;
     }
 
     const shoulderX = r * 0.55;
@@ -2038,25 +2119,45 @@ export class MahoragaFighter extends Fighter {
         verticalLift = opponentObj.z || 0;
         const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
         const liftP = Math.min(1.0, Math.max(0.0, (this.wallSlamTimer - 12) / (holdFrames - 12)));
-        liftTilt = -0.22 * liftP;
+        liftTilt = -0.32 * liftP;
+        offY -= liftP * 10;
       }
     }
 
     const gunAngle = this.gunAngle || 0;
     const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
-    const effectiveSwingAngle = (facingLeft && !this.isSpinning) ? -swingAngle : swingAngle;
-    const totalAngle = gunAngle + effectiveSwingAngle + liftTilt;
+
+    const baseHandX = r * 0.72;
+    const baseHandY = r * 0.22;
+    let hx = baseHandX + lunge;
+    let hy = baseHandY + offY;
+    hx = Math.max(r * 0.18, hx);
 
     const retractScale = isGuarding ? 0.45 : (isParrying ? 1.0 : (bladeRetractProgress !== undefined ? Math.max(0, Math.min(1, bladeRetractProgress)) : (isThrowing ? 0.0 : 1.0)));
 
-    const localTipX = r * 0.3 + extendDist + bladeLength * retractScale;
-    const localBaseX = localTipX - 16 * retractScale;
+    const effectiveSwing = (facingLeft && !this.isSpinning) ? -swingAngle : swingAngle;
+    const localBladeAngle = effectiveSwing + liftTilt;
+    const effHy = (facingLeft && !this.isSpinning) ? -hy : hy;
 
-    const worldTipX = this.x + rotatedShoulderX + Math.cos(totalAngle) * localTipX;
-    const worldTipY = this.y + rotatedShoulderY - verticalLift + Math.sin(totalAngle) * localTipX;
+    const bladeLen = bladeLength * retractScale;
+    const tipOffX = Math.cos(localBladeAngle) * bladeLen;
+    const tipOffY = Math.sin(localBladeAngle) * bladeLen;
 
-    const worldBaseX = this.x + rotatedShoulderX + Math.cos(totalAngle) * localBaseX;
-    const worldBaseY = this.y + rotatedShoulderY - verticalLift + Math.sin(totalAngle) * localBaseX;
+    const cosG = Math.cos(gunAngle);
+    const sinG = Math.sin(gunAngle);
+
+    const fullLocalTipX = hx + tipOffX;
+    const fullLocalTipY = effHy + tipOffY;
+    const worldTipX = this.x + rotatedShoulderX + (fullLocalTipX * cosG - fullLocalTipY * sinG);
+    const worldTipY = this.y + rotatedShoulderY - verticalLift + (fullLocalTipX * sinG + fullLocalTipY * cosG);
+
+    const baseLen = Math.max(0, bladeLen - 16 * retractScale);
+    const baseOffX = Math.cos(localBladeAngle) * baseLen;
+    const baseOffY = Math.sin(localBladeAngle) * baseLen;
+    const fullLocalBaseX = hx + baseOffX;
+    const fullLocalBaseY = effHy + baseOffY;
+    const worldBaseX = this.x + rotatedShoulderX + (fullLocalBaseX * cosG - fullLocalBaseY * sinG);
+    const worldBaseY = this.y + rotatedShoulderY - verticalLift + (fullLocalBaseX * sinG + fullLocalBaseY * cosG);
 
     return {
       outer: { x: worldTipX, y: worldTipY },

@@ -926,6 +926,16 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.7,
     delay: 0,
   },
+  'zombie': {
+    src: 'Assets/Sound Effects/SkillEffects/zombie-chomp.wav',
+    volume: 0.85,
+    delay: 0,
+  },
+  'zombie_pvz': {
+    src: 'Assets/Sound Effects/SkillEffects/zombie-chomp.wav',
+    volume: 0.85,
+    delay: 0,
+  },
   'crazydave_pvz': {
     src: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
     volume: 0.7,

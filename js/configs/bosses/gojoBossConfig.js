@@ -49,9 +49,10 @@ export const gojoBossConfig = {
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
   blueCooldown: 300,        // Fire rate for basic attack (Blue orb)
   blueSpeed: 10.5,          // Speed of Blue orb projectile
-  blueRadius: 50,           // Pull radius & base size of Blue projectile
-  blueProjectileRadius: 15, // Base visual & collision radius of Blue projectile orb
-  blueScale: 1.5,           // Explicit scale multiplier for Blue projectile visual size and hitbox
+  blueRadius: 50,           // Radius of Blue projectile orb (hitbox & visual sprite) - Directly configurable
+  bluePullRadius: 150,      // Gravitational pull radius of Blue vortex
+  blueProjectileRadius: 50, // Base visual & collision radius of Blue projectile orb
+  blueScale: 1.0,           // Explicit scale multiplier for Blue projectile visual size and hitbox
   bluePullForce: 0.1,       // Pull strength of Blue
   blueDPS: 10,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
   blueDPSInterval: 10,      // Frames between DPS ticks
@@ -68,6 +69,7 @@ export const gojoBossConfig = {
   redFrontalReach: 650,     // Long frontal reach corridor in pixels
   redFrontalArc: 0.40,      // Frontal cone angle in radians
   redTriggerRange: 350,     // Range in pixels to trigger Red against enemies
+  redRadius: 35,            // Radius of Reversal Red orb during manifestation / buildup (at fingertip) - Directly configurable
   redBlastRadius: 650,      // Frontal blast reach in pixels
   redVerticalDetectionAngle: Math.PI * 0.08,
   redVerticalCorridorHalfWidth: 40,
@@ -166,9 +168,10 @@ export const gojoBossConfig = {
     redChanneling: 'Assets/Sound Effects/Skills/redchanneling.mp3',
     redCharging: 'Assets/Sound Effects/Skills/redcharging.mp3',
     redDeploy: 'Assets/Sound Effects/Skills/reddeploy.mp3',
+    redFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
     redBlast: 'Assets/Sound Effects/Skills/redblast.mp3',
     purpleCharge: 'Assets/Sound Effects/Skills/mixing.mp3',
-    purpleFlare: 'Assets/Sound Effects/Skills/dash3.mp3',
+    purpleFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
     purpleDeploy: 'Assets/Sound Effects/Skills/purpledeploy.mp3',
     purpleFire: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
     domainChannel: 'Assets/Sound Effects/Skills/gojodomain.mp3',
@@ -184,9 +187,10 @@ export const gojoBossConfig = {
     redChanneling: 2.50,
     redCharging: 2.50,
     redDeploy: 2.50,
+    redFlare: 0.85,
     redBlast: 0.80,
     purpleCharge: 2.50,
-    purpleFlare: 0.45,
+    purpleFlare: 0.85,
     purpleDeploy: 2.50,
     purpleFire: 0.55,
     domainChannel: 2.70,
@@ -202,6 +206,7 @@ export const gojoBossConfig = {
     redChanneling: 0,
     redCharging: 0,
     redDeploy: 0,
+    redFlare: 0,
     redBlast: 0,
     purpleCharge: -0.10,
     purpleFlare: 0,

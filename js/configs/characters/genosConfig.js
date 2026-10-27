@@ -122,6 +122,11 @@ export const genosConfig = {
   ultTriggerMinRange: 180, // AI minimum distance to initiate beam
   ultTriggerMaxRange: 450, // AI maximum distance to initiate beam
 
+  // Ultimate Post-Beam Burn Mechanic
+  ultBurnDuration: 180,        // Burn duration in frames (180 frames = 3.0 seconds) applied after beam expires to hit targets
+  ultBurnDamagePerTick: 6,     // Burn damage per interval tick (6 damage every 0.5s = 36 total burn damage)
+  ultBurnInterval: 30,         // Interval between burn damage ticks (30 frames = 0.5s)
+
   // Ultimate Screen Shake & Recovery Tuning
   ultWindupShakeIntensity: 0,   // Windup channeling shake intensity (0 = disabled)
   ultWindupShakeDuration: 0,    // Windup channeling shake duration in frames

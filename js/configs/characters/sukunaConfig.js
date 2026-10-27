@@ -137,7 +137,7 @@ export const sukunaConfig = {
     // Toggle `enableMahoragaSummon` off to disable the skill entirely (HUD card disappears too).
     enableMahoragaSummon: true,       // MASTER TOGGLE for the Mahoraga summon skill
     mahoragaSummonCooldown: 500,     // Frames before Mahoraga can be re-summoned after being slain
-    mahoragaSummonInitialCooldown: 420, // First summon availability delay (7.0s at 60fps)
+    mahoragaSummonInitialCooldown: 15, // Immediate opening summon (0.25s after match start) so it triggers every match
     // NOTE: the summon has NO duration — Mahoraga stays in the arena until he is slain or Sukuna dies.
     mahoragaSummonMaxActive: 1,       // Maximum simultaneous Mahoraga minions
     // The minion inherits ALL of Mahoraga's fighter attributes 1:1 (see CONFIG.mahoraga):
@@ -145,6 +145,7 @@ export const sukunaConfig = {
     // Divine Shout and the Eight-Handled Wheel adaptation stack. This scale is the only override.
     mahoragaSummonStatScale: 1.0,     // 1.0 = identical to the arena Mahoraga fighter
     mahoragaSummonVolumeScale: 1.0,   // 1.0 = Mahoraga's own combat sound volumes
+    mahoragaSummonWindupFrames: 28,   // Windup mudra animation frames on Sukuna's hands before Mahoraga emerges
     mahoragaSummonSpawnFrames: 45,    // Shadow-rise emergence duration
     mahoragaSummonShakeIntensity: 5,  // Screen shake on emergence
     mahoragaSummonShakeDuration: 10,  // Screen shake duration on emergence
@@ -174,6 +175,8 @@ export const sukunaConfig = {
       spiderweb: 'Assets/Sound Effects/Skills/hookchain.mp3',
       mahoragaSummon: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
       mahoragaArise: 'Assets/Sound Effects/Skills/mahoraga-wheelclick.mp3',
+      mahoragaChainRattle: 'Assets/Sound Effects/Skills/hookchain.mp3',
+      mahoragaChainBreak: 'Assets/Sound Effects/SkillEffects/shield-break.mp3',
       mahoragaAttack: 'Assets/Sound Effects/Attacks/swordswing.mp3',
       mahoragaImpact: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
       mahoragaDispel: 'Assets/Sound Effects/Skills/enhance.mp3',
@@ -200,6 +203,8 @@ export const sukunaConfig = {
       spiderweb: 0.40,
       mahoragaSummon: 1.60,
       mahoragaArise: 1.40,
+      mahoragaChainRattle: 0.90,
+      mahoragaChainBreak: 1.35,
       mahoragaAttack: 0.70,
       mahoragaImpact: 0.85,
       mahoragaDispel: 0.60,
@@ -222,6 +227,8 @@ export const sukunaConfig = {
       fugaExplosion: 0,
       mahoragaSummon: 0,
       mahoragaArise: 0,
+      mahoragaChainRattle: 0,
+      mahoragaChainBreak: 0,
       mahoragaAttack: 0,
       mahoragaImpact: 0,
       mahoragaDispel: 0,

@@ -25,6 +25,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   john_wick: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 6, angleOffset: 0, flipX: false, flipY: false },
   gunslinger: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   crazydave: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
+  zombie: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   megumin: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   zeus: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -11, angleOffset: 0, flipX: false, flipY: false, handScale: 0.75 },
   tanjiro: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },

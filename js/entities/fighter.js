@@ -2223,7 +2223,7 @@ export class Fighter {
   handleBleed() { this.handleStatusEffects(); }
 
   applyPoison(attacker) { this.statusEffects.applyPoison(attacker); }
-  applyBurn(attacker, duration) { this.statusEffects.applyBurn(attacker, duration); }
+  applyBurn(attacker, duration, damage, interval) { this.statusEffects.applyBurn(attacker, duration, damage, interval); }
   applyBleed(attacker, duration, damagePerTick, intervalFrames) {
     this.statusEffects.applyBleed(attacker, duration, damagePerTick, intervalFrames);
   }

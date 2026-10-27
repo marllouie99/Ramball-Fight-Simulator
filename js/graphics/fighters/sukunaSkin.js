@@ -312,7 +312,7 @@ export function drawSukunaBody(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y - z);
 
-  const isChannelingDomain = Boolean(fighter.isChannelingDomainExpansion);
+  const isChannelingDomain = Boolean(fighter.isChannelingDomainExpansion || fighter.isSummoningMahoraga || (fighter.mahoragaSummonWindupTimer > 0));
   const angle = (fighter._isWinnerReveal || isChannelingDomain) ? 0 : (fighter.gunAngle || fighter.angle || 0);
   ctx.rotate(angle);
 

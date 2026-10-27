@@ -877,10 +877,11 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     let currentTailOffset = startOffset;
     let trailAlpha = 1.0;
 
-    const coilP = 0.23;
-    const holdP = 0.32;
-    const strikeP = 0.55;
-    const lockP = 0.73;
+    const isDoubleDamage = Boolean(fighterObj && (fighterObj.wheelDoubleDamageTimer > 0 || fighterObj.isSwordWindingUp));
+    const coilP = isDoubleDamage ? 0.28 : 0.23;
+    const holdP = isDoubleDamage ? 0.39 : 0.32;
+    const strikeP = isDoubleDamage ? 0.62 : 0.55;
+    const lockP = isDoubleDamage ? 0.78 : 0.73;
 
     if (rawP < holdP) {
       currentTipOffset = startOffset;
@@ -1043,7 +1044,9 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   const bladeWidth = 12;
 
   let swingAngle = 0;
-  let extendDist = 0;
+  let lunge = 0;
+  let offY = 0;
+  let armFlexDir = 1;
 
   const isParrying = (fighterObj && fighterObj.defensePoseType === 'parry' && (fighterObj.defensePoseTimer || 0) > 0);
   const isGuarding = (fighterObj && fighterObj.defensePoseType === 'guard' && (fighterObj.defensePoseTimer || 0) > 0);
@@ -1054,68 +1057,98 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     const progress = Math.min(1.0, Math.max(0.0, elapsed / maxTimer));
     const comboIndex = (fighterObj && fighterObj.isInfinityBlitz) ? (1 + ((swordCombo || 0) % 2)) : ((swordCombo || 0) % 3);
 
-    const coilP = 0.23;
-    const holdP = 0.32;
-    const strikeP = 0.55;
-    const lockP = 0.73;
+    const isDoubleDamage = Boolean(fighterObj && (fighterObj.wheelDoubleDamageTimer > 0 || fighterObj.isSwordWindingUp));
+    const coilP = isDoubleDamage ? 0.28 : 0.23;
+    const holdP = isDoubleDamage ? 0.39 : 0.32;
+    const strikeP = isDoubleDamage ? 0.62 : 0.55;
+    const lockP = isDoubleDamage ? 0.78 : 0.73;
 
-    let startAngle = -0.45;
-    let impactAngle = 0.65;
-    let coilLunge = -10.0;
+    let startAngle = -0.58;
+    let impactAngle = 0.68;
+    let coilLunge = -14.0;
+    let coilLiftY = -12.0;
     let maxLunge = 32.0;
+    let cleaveDipY = 10.0;
+    armFlexDir = 1;
 
     if (comboIndex === 1) {
-      startAngle = 0.75;
-      impactAngle = -0.55;
-      coilLunge = -8.0;
+      // Combo 1: Low Rising Scoop Cleave
+      startAngle = 0.78;
+      impactAngle = -0.62;
+      coilLunge = -12.0;
+      coilLiftY = 14.0;
       maxLunge = 30.0;
-    } else if (comboIndex === 2) {
-      startAngle = -0.95;
-      impactAngle = 0.85;
-      coilLunge = -14.0;
-      maxLunge = 36.0;
+      cleaveDipY = -12.0;
+      armFlexDir = -1; // Lower elbow flexion into rising scoop
+    } else if (comboIndex === 2 || isDoubleDamage) {
+      // Combo 2 / 2x Double Damage: Massive Horizontal Heavy Cleave
+      startAngle = isDoubleDamage ? -1.25 : -1.05;
+      impactAngle = isDoubleDamage ? 1.05 : 0.90;
+      coilLunge = isDoubleDamage ? -18.0 : -15.0;
+      coilLiftY = isDoubleDamage ? -8.0 : -6.0;
+      maxLunge = isDoubleDamage ? 42.0 : 36.0;
+      cleaveDipY = isDoubleDamage ? 12.0 : 8.0;
+      armFlexDir = 1;
     }
 
     if (progress < coilP) {
+      // Phase 1: Coil / Lift (smooth sine acceleration into potential tension)
       const wp = progress / coilP;
       const easeW = Math.sin(wp * Math.PI * 0.5);
       swingAngle = startAngle * easeW;
-      extendDist = coilLunge * easeW;
+      lunge = coilLunge * easeW;
+      offY = coilLiftY * easeW;
     } else if (progress < holdP) {
+      // Phase 2: Poised Hold (maximum tension hold before release)
       swingAngle = startAngle;
-      extendDist = coilLunge;
+      lunge = coilLunge;
+      offY = coilLiftY;
+      if (isDoubleDamage) {
+        lunge += (Math.random() - 0.5) * 1.2;
+        offY += (Math.random() - 0.5) * 1.2;
+      }
     } else if (progress < strikeP) {
+      // Phase 3: Hypersonic Whip Strike (Math.pow(sp, 2.5) exponential power ease)
       const sp = (progress - holdP) / (strikeP - holdP);
       const whipEase = Math.pow(sp, 2.5);
       swingAngle = startAngle + (impactAngle - startAngle) * whipEase;
-      extendDist = coilLunge + (maxLunge - coilLunge) * whipEase;
+      lunge = coilLunge + (maxLunge - coilLunge) * whipEase;
+      offY = coilLiftY + (cleaveDipY - coilLiftY) * whipEase;
     } else if (progress < lockP) {
+      // Phase 4: Impact Lock / Latch (weapon & arm locked at full extension with micro-tremor)
       const pp = (progress - strikeP) / (lockP - strikeP);
       const tremor = (1.0 - pp) * (CONFIG.mahoraga?.swordTremorIntensity ?? 1.8);
       swingAngle = impactAngle + (Math.random() - 0.5) * 0.06 * tremor;
-      extendDist = maxLunge + (Math.random() - 0.5) * tremor;
+      lunge = maxLunge + (Math.random() - 0.5) * tremor;
+      offY = cleaveDipY + (Math.random() - 0.5) * tremor;
       if (fighterObj && (fighterObj.knockbackStunTimer || 0) <= 0) {
         fighterObj.vx = 0;
         fighterObj.vy = 0;
       }
     } else {
+      // Phase 5: Recovery Settle (spring-damped muscle recoil oscillation)
       const rp = (progress - lockP) / (1.0 - lockP);
       const settleEase = Math.pow(1.0 - rp, 1.8);
       const springWave = Math.sin(rp * Math.PI * 2.2) * Math.exp(-rp * 4.2);
-      swingAngle = impactAngle * settleEase - 0.20 * springWave;
-      extendDist = maxLunge * settleEase - 5.0 * springWave;
+      swingAngle = impactAngle * settleEase - 0.18 * springWave;
+      lunge = maxLunge * settleEase - 5.0 * springWave;
+      offY = cleaveDipY * settleEase + 3.0 * springWave;
     }
   } else if (isParrying) {
     // Parry Pose: snappy blade deflection swing
     const maxT = fighterObj.defensePoseMaxTimer || 25;
     const t = 1.0 - (fighterObj.defensePoseTimer / maxT);
     const p = Math.sin(t * Math.PI); // 0 -> 1 -> 0 sweep
-    swingAngle = Math.PI * 0.25 - p * (Math.PI * 0.45);
-    extendDist = 18 + p * 15;
+    swingAngle = Math.PI * 0.28 - p * (Math.PI * 0.45);
+    lunge = 8 + p * 16;
+    offY = -6 + p * 12;
+    armFlexDir = -1;
   } else if (isGuarding) {
     // Guard / Block Pose: sword hand pulled in close covering face
     swingAngle = -Math.PI * 0.35;
-    extendDist = -12;
+    lunge = -8;
+    offY = -6;
+    armFlexDir = 1;
   } else if (isThrowing) {
     // Alternating right hand throw swing (blade remains retracted into forearm gauntlet)
     const shotsLeft = fighterObj ? (fighterObj.throwBarrageShotsLeft || 0) : 0;
@@ -1127,11 +1160,14 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       const p = Math.sin(t * Math.PI); // Smooth 0 -> 1 -> 0 lunge
       
       swingAngle = -Math.PI * 0.25 + p * 0.45;
-      extendDist = 10 + p * 38;
+      lunge = 6 + p * 28;
+      offY = -4 + p * 6;
     } else {
       swingAngle = -Math.PI * 0.25;
-      extendDist = 10;
+      lunge = 6;
+      offY = -4;
     }
+    armFlexDir = 1;
   } else if (fighterObj && fighterObj.isWallSlamActive && (fighterObj.wallSlamPhase === 'post_throw_delay' || fighterObj.wallSlamPhase === 'dash')) {
     let p = 1.0;
     if (fighterObj.wallSlamPhase === 'post_throw_delay') {
@@ -1140,11 +1176,15 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     }
     const easeP = p * p * (3 - 2 * p); // Smooth ease-in-out transition
     swingAngle = easeP * (-Math.PI * 0.65); // Wide arm open wind-up
-    extendDist = easeP * 15; // Extend arm out widely
+    lunge = easeP * 16; // Extend arm out widely
+    offY = -easeP * 6;
+    armFlexDir = 1;
   } else {
     // Statically follow gunAngle when idle/resting
     swingAngle = 0;
-    extendDist = 0;
+    lunge = 0;
+    offY = 0;
+    armFlexDir = 1;
   }
 
   // Right shoulder is statically positioned on the right side of his chest (aligned for front hand convention)
@@ -1157,8 +1197,9 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     fighterObj?.owner?._isWinnerReveal ||
     (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
   );
-  const bodyAngle = isWinnerScreen ? 0 : ((fighterObj && fighterObj.angle) || 0);
-  const effGunAngle = isWinnerScreen ? 0 : gunAngle;
+  const isAscending = Boolean(fighterObj && (fighterObj.isAscending || (fighterObj.spawnTimer && fighterObj.spawnTimer > 0)));
+  const bodyAngle = (isWinnerScreen || isAscending) ? 0 : ((fighterObj && fighterObj.angle) || 0);
+  const effGunAngle = (isWinnerScreen || isAscending) ? 0 : gunAngle;
   const cosB = Math.cos(bodyAngle);
   const sinB = Math.sin(bodyAngle);
   const rotatedShoulderX = shoulderX * cosB - shoulderY * sinB;
@@ -1170,13 +1211,14 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     const liftP = Math.min(1.0, Math.max(0.0, (fighterObj.wallSlamTimer - 12) / (holdFrames - 12)));
     const easeLift = Math.sin(liftP * Math.PI * 0.5);
     liftTilt = -0.32 * easeLift; // Upward tilt of arm (~18 degrees)
+    offY -= easeLift * 10;
   }
 
   ctx.save();
   ctx.translate(rotatedShoulderX, rotatedShoulderY);
   
-  // Rotate by effGunAngle, swingAngle, and the upward lift tilt
-  ctx.rotate(effGunAngle + swingAngle + liftTilt);
+  // Rotate by effGunAngle toward target
+  ctx.rotate(effGunAngle);
 
   // Flip Y when facing left so sword faces target correctly
   const facingLeft = Math.abs(effGunAngle) > Math.PI / 2;
@@ -1184,39 +1226,27 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 
   const isDark = _isDarkMode();
   const fistColor = isDark ? '#FFFFFF' : (fighterObj?.skinColor || (color !== '#FFD700' && color !== '#FFEE58' ? color : '#F4F4EC'));
-  const handDist = r * 0.3 + extendDist;
 
-  // Render Dynamic Muscular Kinematic Arm connecting right shoulder (0, 0) to wrist (handDist, 0)
-  _drawMahoragaKinematicArm(ctx, 0, 0, handDist, 0, true, r, fistColor, true, 1);
+  // 2D Hand Position in local shoulder coordinate frame
+  const baseHandX = r * 0.72;
+  const baseHandY = r * 0.22;
+  let hx = baseHandX + lunge;
+  let hy = baseHandY + offY;
 
-  ctx.translate(handDist, 0);
+  // Guarantee hand never collapses into or behind the shoulder socket
+  hx = Math.max(r * 0.18, hx);
+
+  // Render Dynamic Muscular 2-Bone Kinematic Arm connecting right shoulder (0, 0) to wrist (hx, hy)
+  _drawMahoragaKinematicArm(ctx, 0, 0, hx, hy, true, r, fistColor, true, armFlexDir);
+
+  // Translate to wrist/grip position and rotate by sword swing angle + lift tilt
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(swingAngle + liftTilt);
 
   // ── SWORD PIXEL ART HELPERS (P = 2.0px grid) ──
   const sP = 2.0;
   const sSnap = (v) => Math.round(v / sP) * sP;
-
-  // 1. Pixel Art White Bandaged Forearm
-  const armX0 = -20, armY0 = -8, armW = 14, armH = 16;
-  for (let gy = 0; gy < Math.ceil(armH / sP); gy++) {
-    for (let gx = 0; gx < Math.ceil(armW / sP); gx++) {
-      const px = sSnap(armX0 + gx * sP);
-      const py = sSnap(armY0 + gy * sP);
-      // Border pixels
-      if (gx === 0 || gx >= Math.ceil(armW / sP) - 1 || gy === 0 || gy >= Math.ceil(armH / sP) - 1) {
-        ctx.fillStyle = '#000000';
-      } else {
-        ctx.fillStyle = '#EBEBE6';
-      }
-      ctx.fillRect(px, py, sP, sP);
-    }
-  }
-  // Bandage texture pixel lines
-  for (let gy = 0; gy < Math.ceil(armH / sP); gy++) {
-    const py = sSnap(armY0 + gy * sP);
-    ctx.fillStyle = '#AFAFA5';
-    ctx.fillRect(sSnap(-16), py, sP, sP);
-    ctx.fillRect(sSnap(-11), py, sP, sP);
-  }
 
   // 2. Pixel Art Clenched Fist
   const fistRadius = 14.0;
@@ -1383,8 +1413,9 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 
   // (Attack tip sparkle removed)
 
-  ctx.restore();
-  ctx.restore();
+  ctx.restore(); // Restore from hand (hx, hy)
+  ctx.restore(); // Restore from shoulder
+  ctx.restore(); // Restore from fighter center
 }
 
 /**
@@ -1494,8 +1525,9 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     fighter.owner?._isWinnerReveal ||
     (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
   );
-  const bodyAngle = isWinnerScreen ? 0 : (fighter.angle || 0);
-  const effGunAngle = isWinnerScreen ? 0 : gunAngle;
+  const isAscending = Boolean(fighter.isAscending || (fighter.spawnTimer && fighter.spawnTimer > 0));
+  const bodyAngle = (isWinnerScreen || isAscending) ? 0 : (fighter.angle || 0);
+  const effGunAngle = (isWinnerScreen || isAscending) ? 0 : gunAngle;
   const cosB = Math.cos(bodyAngle);
   const sinB = Math.sin(bodyAngle);
   const rotatedShoulderX = leftShoulderX * cosB - leftShoulderY * sinB;

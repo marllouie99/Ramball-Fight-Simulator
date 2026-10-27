@@ -133,8 +133,8 @@ export const gutsConfig = {
 
   // Sequence 1 Timing & Combat Values (Frames 1–6)
   calamityWindupFrames: 28,      // Frames 1–3: Frame 2 ready tilt (12f) & Frame 3 deep coil (16f) - smooth buildup
-  calamityStrikeFrames: 5,       // Frame 4: Visible, sweeping cleave stroke (smooth cleave, not snappy!)
-  calamityLockFrames: 15,        // Frames 5–6: Solid follow-through lock over opposite shoulder (-140°) while Wave 1 flies
+  calamityStrikeFrames: 9,       // Frame 4: Visible, sweeping cleave stroke (Rule 30: Strike >= 8-12f)
+  calamityLockFrames: 18,        // Frames 5–6: Solid follow-through lock over opposite shoulder (-140°) while Wave 1 flies (Rule 30: Impact Lock >= 12-18f)
   calamityRecoveryFrames: 0,     // 0 recovery frames on Seq 1 so sword angle does NOT reset before Sequence 2 follow-up!
   calamityMeleeDamage: 65,       // Direct point-blank cleave damage
   calamityWaveDamage: 45,        // Ejected travelling crescent wave damage
@@ -144,11 +144,11 @@ export const gutsConfig = {
   calamityHitStunFrames: 3,     // Target hit stun
   calamityWaveSpeed: 10.5,       // Fluid crescent travel speed (px/frame)
   calamityWaveMaxAge: 42,        // Travel lifetime (~440px reach, perfectly synced with Guts' recovery settle)
-  calamityWaveWidth: 140,        // Crescent width (px)
+  calamityWaveWidth: 100,        // Crescent width (px)
 
   // Sequence 2 Timing & Combat Values (Frames 7–12)
   calamitySeq2WindupFrames: 18,    // Frame 7: High left coil & golden vortex energy surge (never < 16f)
-  calamitySeq2StrikeFrames: 5,    // Frames 8–9: Blinding horizontal counter-cleave (5f) -> rising skyward scoop (6f) (11f total - NOT snappy!)
+  calamitySeq2StrikeFrames: 9,    // Frames 8–9: Blinding horizontal counter-cleave -> rising skyward scoop (Rule 30: >= 8-12f)
   calamitySeq2LockFrames: 18,      // Frames 10–11: Apex impact lock & radiant blade hold at high-right
   calamitySeq2RecoveryFrames: 24,  // Frame 12: Poised settle back to neutral battle stance
   calamitySeq2MeleeDamage: 85,     // Heavy finisher melee damage

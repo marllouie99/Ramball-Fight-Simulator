@@ -9,6 +9,9 @@ export const gojoConfig = {
     skillIcons: 'Assets/model/gojo/Gojo-Skill-icons.png',
     domainOverlay: 'Assets/Overlays/gojo-domainexpansion.png',
     purpleExplosion: 'Assets/model/gojo/purple_explosion/purple_explosion-b.png',
+    purpleTravel: 'Assets/model/gojo/Purple_idle_travel/purple_travel-b.png',
+    redReversal: 'Assets/model/gojo/Red_reversal/red_reversal-b.png',
+    blueTravel: 'Assets/model/gojo/Blue_projectile/blue_travel-b.png',
   },
 
   name: 'Gojo',
@@ -58,9 +61,10 @@ export const gojoConfig = {
   enableBlue: true,                        // Master toggle for Basic Attack: Lapse Blue
   blueCooldown: 300,         // Fire rate for basic attack (Blue orb) - Lower is faster
   blueSpeed: 10.5,          // Speed of Blue orb projectile
-  blueRadius: 50,           // Pull radius & base size of Blue projectile (scaling blueRadius dynamically adjusts Blue projectile size)
-  blueProjectileRadius: 15,  // Base visual & collision radius of Blue projectile orb (at default blueRadius: 50)
-  blueScale: 1.5,           // Explicit scale multiplier for Blue projectile visual size and hitbox
+  blueRadius: 100,           // Radius of Blue projectile orb (hitbox & visual sprite) - Directly configurable
+  bluePullRadius: 100,      // Gravitational pull radius of Blue vortex (pulls enemies within this area)
+  blueProjectileRadius: 25, // Base visual & collision radius of Blue projectile orb (alias for blueRadius)
+  blueScale: 1.0,           // Explicit scale multiplier for Blue projectile visual size and hitbox
   bluePullForce: 0.1,       // Pull strength of Blue
   blueDPS: 10,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
   blueDPSInterval: 10,      // Frames between DPS ticks (~6 ticks/sec)
@@ -79,6 +83,7 @@ export const gojoConfig = {
   redFrontalReach: 650,     // Long frontal reach corridor in pixels
   redFrontalArc: 0.40,      // Frontal cone angle in radians (~44 degrees, halfArc = 0.38) matching visual cone width
   redTriggerRange: 350,     // Range in pixels to trigger Red against enemies
+  redRadius: 100,            // Radius of Reversal Red orb during manifestation / buildup (at fingertip) - Directly configurable
   redBlastRadius: 650,      // Frontal blast reach in pixels
   redVerticalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from vertical Up/Down for straight alignment
   redVerticalCorridorHalfWidth: 40, // Strict horizontal corridor half-width (40px) within which enemies trigger vertical Red
@@ -97,15 +102,15 @@ export const gojoConfig = {
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
   enablePurple: true,                      // Master toggle for Secret Technique: Hollow Purple
-  purpleCooldown: 1500,      // Cooldown of Hollow Purple
+  purpleCooldown: 200,      // Cooldown of Hollow Purple
   purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
   purpleDamage: 35,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
-  purpleRadius: 50,         // Radius of Purple orb
+  purpleRadius: 150,         // Radius of Purple orb
   purpleLife: 200,         // How long Purple orb stays in arena (frames - 8.0s)
   purpleTravelTime: 20,    // Frames the orb travels before stopping
-  purpleDPS: 30,            // Damage per second dealt to enemies inside the orb
+  purpleDPS: 50,            // Damage per second dealt to enemies inside the orb
   purpleDPSInterval: 10,   // Frames between DPS ticks
   purpleSlowDuration: 60,  // Frames the slow effect lasts
   purpleSlowMultiplier: 0.20, // Speed multiplier while slowed (0.20 = 20% speed, very heavy slow)
@@ -186,11 +191,12 @@ export const gojoConfig = {
     redChanneling: 'Assets/Sound Effects/Skills/redchanneling.mp3',
     redCharging: 'Assets/Sound Effects/Skills/redcharging.mp3',
     redDeploy: 'Assets/Sound Effects/Skills/reddeploy.mp3',
+    redFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
     redBlast: 'Assets/Sound Effects/Skills/redblast.mp3',
 
     // Skill 2: Secret Technique: Hollow Purple
     purpleCharge: 'Assets/Sound Effects/Skills/mixing.mp3',
-    purpleFlare: 'Assets/Sound Effects/Skills/dash3.mp3',
+    purpleFlare: 'Assets/Sound Effects/SkillEffects/flare.mp3',
     purpleDeploy: 'Assets/Sound Effects/Skills/purpledeploy.mp3',
     purpleFire: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
 
@@ -210,9 +216,10 @@ export const gojoConfig = {
     redChanneling: 2.50,
     redCharging: 2.50,
     redDeploy: 2.50,
+    redFlare: 0.85,
     redBlast: 0.80,
     purpleCharge: 2.50,
-    purpleFlare: 0.45,
+    purpleFlare: 0.85,
     purpleDeploy: 2.50,
     purpleFire: 0.55,
     domainChannel: 2.70,
@@ -228,6 +235,7 @@ export const gojoConfig = {
     redChanneling: 0,
     redCharging: 0,
     redDeploy: 0,
+    redFlare: 0,
     redBlast: 0,
     purpleCharge: -0.10,
     purpleFlare: 0,

@@ -526,7 +526,8 @@ export class GojoRenderer {
         const handDistance = r + 10;
         const moveP = Math.min(1.0, mergeProgress / 0.70);
         const easeMove = Math.sin(moveP * Math.PI * 0.5);
-        const handSpread = (mergeProgress < 0.70) ? 22 * (1 - easeMove) : 0;
+        const maxSpread = Math.max(34, ((typeof CONFIG !== 'undefined' && CONFIG.gojo?.redRadius) || 35) * 1.0);
+        const handSpread = (mergeProgress < 0.70) ? maxSpread * (1 - easeMove) : 0;
         const fHand = toGlobal(handDistance, handSpread);
         const bHand = toGlobal(handDistance, -handSpread);
         return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
@@ -1160,9 +1161,13 @@ export class GojoRenderer {
       const buildProg  = elapsed / buildupEnd;       // 0 → 1
       const eased      = buildProg * buildProg;       // smooth ease-in
 
-      const baseR = getHandSize(6) * (0.2 + eased * 1.8);
+      const targetRadius = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.redRadius === 'number')
+        ? CONFIG.gojo.redRadius
+        : (getHandSize(6) * 2.0);
+      const baseR = targetRadius * (0.2 + eased * 0.8);
       const pulse  = Math.sin(time / 120) * 0.08;
       const r2     = baseR * (1 + pulse);
+      const dynamicFingerDist = fingerDist + Math.max(0, (r2 - 15) * 0.5);
 
       // Draw Gojo's pointing hand extending along gun angle towards the red orb
       const handRadius = getHandSize(7.0, fighter);
@@ -1173,19 +1178,21 @@ export class GojoRenderer {
       }
 
       // Manifest red orb at Gojo's fingertip
-      drawGojoOrb(ctx, fingerDist, 0, r2, time, 'red', 0);
+      drawGojoOrb(ctx, dynamicFingerDist, 0, r2, time, 'red', 0);
 
       // Draw Anamorphic Red Lens Flare Beam delayed until right before explosion (final 25% of orb charge)
       if (buildProg > 0.75) {
         const flareP = (buildProg - 0.75) / 0.25; // 0.0 to 1.0 fast intense ignition right before explosion
-        drawAnamorphicLensFlare(ctx, fingerDist, 0, flareP, 'red');
+        drawAnamorphicLensFlare(ctx, dynamicFingerDist, 0, flareP, 'red');
 
         if (!fighter._hasPlayedRedFlareSound) {
           fighter._hasPlayedRedFlareSound = true;
           triggerGlobalScreenShake(8, 12); // Pre-detonation flare tremor
           const fId = fighter.characterId || fighter.id || fighter._def?.id;
-          const sDep = getSkillSound(fId, 'red_deploy');
-          audioSystem.playSFX(sDep?.src || 'Assets/Sound Effects/Skills/reddeploy.mp3', sDep?.volume ?? 2.0);
+          const sDep = getSkillSound(fId, 'red_flare') || getSkillSound(fId, 'red_deploy');
+          const flareSrc = sDep?.src || CONFIG.gojo?.sounds?.redFlare || 'Assets/Sound Effects/SkillEffects/flare.mp3';
+          const flareVol = sDep?.volume ?? (CONFIG.gojo?.soundVolumes?.redFlare ?? 0.85);
+          audioSystem.playSFX(flareSrc, flareVol);
         }
       }
     }

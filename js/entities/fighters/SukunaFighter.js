@@ -166,6 +166,7 @@ export class SukunaFighter extends Fighter {
       (this.domainChargeTimer > 0) ||
       (this.domainChannelTimer > 0) ||
       (this.spiderwebChannelTimer > 0) ||
+      this.isSummoningMahoraga ||
       super.isStationarySkillActive?.()
     );
   }
@@ -193,6 +194,10 @@ export class SukunaFighter extends Fighter {
     this.cleaveCutTimer = 0;
     if (this.afterImages) this.afterImages.length = 0;
     if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
+    if (forceCancelAll || shouldCancelFuga) {
+      this.isSummoningMahoraga = false;
+      this.mahoragaSummonWindupTimer = 0;
+    }
 
 
     if (shouldCancelFuga) {
@@ -422,6 +427,7 @@ export class SukunaFighter extends Fighter {
     return !!(
       this.isChannelingDivineFlame ||
       this.isChannelingDomainExpansion ||
+      this.isSummoningMahoraga ||
       this.isTargetOfAmbush
     );
   }
@@ -863,6 +869,16 @@ export class SukunaFighter extends Fighter {
       if (this.cleaveSwingTimer > 0) this.cleaveSwingTimer--;
       this.shootCooldown = 60;
       this.applyMovementPhysics();
+      this.resolveWallBounce(arena);
+      return;
+    }
+
+    // Handle Mahoraga Summon Windup Mudra Channeling
+    if (this.isSummoningMahoraga) {
+      this.vx = 0;
+      this.vy = 0;
+      this.gunAngle = 0; // Lock facing angle directly towards player/camera (0)
+      this.angle = 0;
       this.resolveWallBounce(arena);
       return;
     }

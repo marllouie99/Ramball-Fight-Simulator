@@ -377,8 +377,9 @@ export function drawHUD() {
   const topContainer = _cachedTopContainer;
   const bottomContainer = _cachedBottomContainer;
 
-  const isBossBattleMode = mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === 'STAND_OFF_1V2';
-  const is1v2Mode = mode === GAME_MODES.ONE_VS_TWO || mode === '1v2' || isBossBattleMode;
+  const isRegular1v2 = mode === GAME_MODES.ONE_VS_TWO || mode === '1v2';
+  const isBossBattleMode = (mode === GAME_MODES.STAND_OFF_1V2 || mode === GAME_MODES.BOSS_BATTLE || mode === 'Boss Battle' || mode === '1v2 Stand Off' || mode === 'STAND_OFF_1V2');
+  const is1v2Mode = isRegular1v2 || isBossBattleMode;
 
   const isHorizontal = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
   const isTactical = isTacticalMatch(state);
@@ -388,9 +389,9 @@ export function drawHUD() {
   const is2v2Mode = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFSMode = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
-  const isTeamMode = is2v2Mode || (is1v2Mode && !isBossBattleMode) || (mainFighters && mainFighters.length > 2 && !isFfaMode);
+  const isTeamMode = is2v2Mode || (mainFighters && mainFighters.length > 2 && !isFfaMode && !isBossBattleMode && !isRegular1v2);
   const isSoloBoss = isBossBattleMode && Boolean(state.bossBattleNoTeammate) && (mainFighters && mainFighters.length === 2);
-  const isDuelTopHud = (!isBossBattleMode || isSoloBoss) && !isTeamMode && !isFfaMode && mainFighters.length === 2;
+  const isDuelTopHud = (!isBossBattleMode || isSoloBoss) && !isTeamMode && !isFfaMode && (mainFighters.length === 2 || isRegular1v2);
   const isSideHud1v1 = isHorizontal && !isDuelTopHud && (is1v1Mode || isStandOffMode || isTLFSMode || isFfaMode || (mainFighters && mainFighters.length <= 4 && !is2v2Mode && !is1v2Mode));
 
   // FOC & Tactical modes HUD visibility
@@ -400,6 +401,9 @@ export function drawHUD() {
   }
 
   if (topContainer) {
+    if (topContainer.classList && typeof topContainer.classList.toggle === 'function') {
+      topContainer.classList.toggle('hud-top-1v2', Boolean(isRegular1v2));
+    }
     if ((isBossBattleMode || isDuelTopHud) && topHudOpacity > 0 && !CONFIG.hudHideAll && !CONFIG.hudHideHealthBars) {
       topContainer.style.display = 'flex';
       topContainer.style.visibility = 'visible';
@@ -888,6 +892,35 @@ export function getFighterComboTierColors(fighter, fallbackBase = '#38BDF8', cfg
   return [tier0, tier1, tier2, tier3];
 }
 
+// Cached canvas-space bottom edge of the DOM top HUD. In 1v2 the teammate column stacks
+// two cards, so the combo banners must start under that taller stack. Measuring is
+// throttled so the per-frame render never forces a layout read.
+let _comboTopHudBottomCache = 0;
+let _comboTopHudMeasuredAt = null;
+
+function _getTopHudBottomInCanvasSpace(canvasH) {
+  const frame = (typeof state !== 'undefined' && typeof state.frameCount === 'number') ? state.frameCount : null;
+  if (frame !== null && _comboTopHudMeasuredAt !== null && frame - _comboTopHudMeasuredAt < 20) {
+    return _comboTopHudBottomCache;
+  }
+  _comboTopHudMeasuredAt = (frame !== null) ? frame : null;
+  _comboTopHudBottomCache = 0;
+  try {
+    if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return 0;
+    const hudEl = document.getElementById('hudTopContainer');
+    const canvasEl = document.getElementById('arena');
+    if (!hudEl || !canvasEl) return 0;
+    if (typeof hudEl.getBoundingClientRect !== 'function' || typeof canvasEl.getBoundingClientRect !== 'function') return 0;
+    const hudRect = hudEl.getBoundingClientRect();
+    const canvasRect = canvasEl.getBoundingClientRect();
+    if (!hudRect || !canvasRect || !(hudRect.height > 0) || !(canvasRect.height > 0)) return 0;
+    _comboTopHudBottomCache = (hudRect.bottom - canvasRect.top) * (canvasH / canvasRect.height);
+  } catch (_) {
+    _comboTopHudBottomCache = 0;
+  }
+  return _comboTopHudBottomCache;
+}
+
 /**
  * Draws the mirrored beat-'em-up combo banners (left/right window edges, just below the TOP HUD).
  * Rendered with high-contrast floating arcade typography (heavy comic ink stroke + white crown glint)
@@ -927,6 +960,23 @@ export function drawComboCounter(ctx) {
   const tierColors = cfg.tierColors || ['#E11D2E', '#FF3B30', '#FF7A00', '#FFD400'];
   const CARD_H = 68;
 
+  const is1v2 = Boolean(
+    state &&
+    (state.mode === '1v2' || state.mode === 'ONE_VS_TWO' || state.mode === GAME_MODES?.ONE_VS_TWO) &&
+    Array.isArray(state.fighters) &&
+    state.fighters.length >= 3
+  );
+
+  // 1v2: the top HUD's right column stacks two teammate cards, so tuck the whole banner
+  // row just underneath that stack instead of overlapping it. All three banners share
+  // one row, keeping the solo and teammate counters perfectly aligned.
+  let stackTop = cardTop;
+  if (is1v2) {
+    const canvasH = (state.canvas && Number.isFinite(state.canvas.height)) ? state.canvas.height : (CONFIG.canvasHeight || 960);
+    const hudBottom = _getTopHudBottomInCanvasSpace(canvasH);
+    if (hudBottom > 0) stackTop = Math.max(cardTop, Math.round(hudBottom) + 4);
+  }
+
   const numFont = 'italic 900 38px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif';
   const hitFont = 'italic 900 18px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif';
   const dmgFont = '900 14px "Press Start 2P", "Silkscreen", "Rajdhani", monospace, sans-serif';
@@ -945,7 +995,7 @@ export function drawComboCounter(ctx) {
       fighter = state.fighters[slot.attackerFighterIndex];
     }
     if (!fighter && Array.isArray(state.fighters)) {
-      fighter = state.fighters[slot.side] || state.fighters[0];
+      fighter = state.fighters[i] || state.fighters[slot.side] || state.fighters[0];
     }
 
     // Resolve tiered color theme derived dynamically from the fighter's signature color theme
@@ -989,11 +1039,23 @@ export function drawComboCounter(ctx) {
 
     const isRight = slot.side === 1;
 
+    // 1v2: the two right-side (teammate) banners form a flush stacked column that starts
+    // level with the solo left banner and never overlaps itself (full card height + a
+    // small breathing gap between the two rows).
+    let slotTop = stackTop;
+    if (is1v2 && i === 2) {
+      slotTop = stackTop + CARD_H + 6;
+    }
+
     ctx.save();
     ctx.globalAlpha = eased;
-    ctx.translate(x + CARD_W / 2, cardTop + CARD_H / 2);
+    // Anchor the impact pop on the screen-edge side of the card (right cards grow inward
+    // from the arena's right edge, left cards from the left edge). This keeps every banner
+    // pixel-flush with its own edge during the pop, even though cards size to their content.
+    const anchorX = isRight ? (x + CARD_W) : x;
+    ctx.translate(anchorX, slotTop + CARD_H / 2);
     ctx.scale(scale, scale);
-    ctx.translate(-CARD_W / 2, -CARD_H / 2); // local origin = card top-left
+    ctx.translate(isRight ? -CARD_W : 0, -CARD_H / 2); // local origin = card top-left
 
     // ZERO dark background: no placard polygon and no dark drop-shadow rectangle.
     // Instead, rendering uses high-contrast floating arcade typography with heavy ink strokes,
@@ -1427,6 +1489,9 @@ export function clearHealthHud(force = false) {
     _cachedContainerBottom.innerHTML = '';
     _cachedContainerBottom.style.display = 'none';
     _cachedContainerBottom.style.visibility = 'hidden';
+    if (_cachedContainerBottom.classList && typeof _cachedContainerBottom.classList.remove === 'function') {
+      _cachedContainerBottom.classList.remove('boss-battle-hud', 'one-vs-two-hud');
+    }
   }
   if (_cachedContainerLeft) {
     _cachedContainerLeft.innerHTML = '';
@@ -1442,6 +1507,9 @@ export function clearHealthHud(force = false) {
     _cachedTopContainer.innerHTML = '';
     _cachedTopContainer.style.display = 'none';
     _cachedTopContainer.style.visibility = 'hidden';
+    if (_cachedTopContainer.classList && typeof _cachedTopContainer.classList.remove === 'function') {
+      _cachedTopContainer.classList.remove('hud-top-1v2');
+    }
   }
   if (_cachedBottomContainer) {
     _cachedBottomContainer.innerHTML = '';
@@ -1888,13 +1956,15 @@ function getTopDuelTimerSecondsString() {
 /**
  * Builds the HTML structure for the Top Duel Combat HUD (Pop-Out Portrait Badge + Connected Top Health Bar + Lower Fighter Name & Win Badges + Center Timer).
  */
-export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2SkillsHTML = '') {
+export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2SkillsHTML = '', f3 = null, f3SkillsHTML = '') {
   if (!f1 || !f2) return '';
 
   const isF1Sans = Boolean(f1.characterId === 'sans' || f1.type === 'sans');
   const isF2Sans = Boolean(f2.characterId === 'sans' || f2.type === 'sans');
+  const isF3Sans = Boolean(f3 && (f3.characterId === 'sans' || f3.type === 'sans'));
   const isF1NamelessDeity = Boolean(f1.characterId === 'namelessdeity' || f1.characterId === 'nameless_deity' || f1.type === 'namelessdeity' || f1.type === 'nameless_deity');
   const isF2NamelessDeity = Boolean(f2.characterId === 'namelessdeity' || f2.characterId === 'nameless_deity' || f2.type === 'namelessdeity' || f2.type === 'nameless_deity');
+  const isF3NamelessDeity = Boolean(f3 && (f3.characterId === 'namelessdeity' || f3.characterId === 'nameless_deity' || f3.type === 'namelessdeity' || f3.type === 'nameless_deity'));
 
   let f1Percent, f1BarColor, f1HpText;
   if (isF1Sans) {
@@ -1936,10 +2006,34 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
     f2HpText = `${Math.floor(Math.max(0, Number(f2Hp) || 0))}`;
   }
 
+  let f3Percent, f3BarColor, f3HpText;
+  if (f3) {
+    if (isF3Sans) {
+      const isF3Dead = f3.hp <= 0;
+      const curStam = isF3Dead ? 0 : ((f3.stamina !== undefined) ? f3.stamina : 100);
+      const maxStam = f3.maxStamina || 100;
+      const stamRatio = (!isF3Dead && maxStam > 0) ? Math.min(1.0, Math.max(0, curStam / maxStam)) : 0;
+      f3Percent = isF3Dead ? 0 : Math.min(100, Math.max(0, Math.round(stamRatio * 100)));
+      f3BarColor = (stamRatio < 0.25)
+        ? 'linear-gradient(180deg, #fef08a 0%, #facc15 25%, #eab308 60%, #a16207 100%)'
+        : 'linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%)';
+      f3HpText = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
+    } else {
+      const f3Hp = (typeof f3.getDisplayHp === 'function') ? f3.getDisplayHp() : f3.hp;
+      const f3MaxHp = f3._originalMaxHp || f3.maxHp || 1000;
+      const f3Ratio = f3MaxHp > 0 ? Math.min(1.0, Math.max(0, Number(f3Hp) / Number(f3MaxHp))) : 0;
+      f3Percent = Math.min(100, Math.max(0, Math.round(f3Ratio * 100)));
+      f3BarColor = getFighterHealthBarColor(f3, f3Ratio, isDark);
+      f3HpText = `${Math.floor(Math.max(0, Number(f3Hp) || 0))}`;
+    }
+  }
+
   const f1ThemeColor = getFighterThemeColor(f1, '#38BDF8');
   const f2ThemeColor = getFighterThemeColor(f2, '#EF4444');
+  const f3ThemeColor = f3 ? getFighterThemeColor(f3, '#EF4444') : '#EF4444';
   const f1Name = getFighterDisplayName(f1, true);
   const f2Name = getFighterDisplayName(f2, true);
+  const f3Name = f3 ? getFighterDisplayName(f3, true) : '';
   const isF1Boss = Boolean(f1.isBoss || (state.mode && (state.mode === 'Boss Battle' || state.mode === GAME_MODES.BOSS_BATTLE || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === 'STAND_OFF_1V2') && f1 === state.fighters?.[0]));
   const f1Subname = isF1Boss ? getBossSubName(f1) : '';
   let f1NameHtml = (typeof f1Name === 'string' && f1Name.includes('『')) ? formatFighterNameHTML(f1Name) : f1Name;
@@ -1947,13 +2041,17 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
     f1NameHtml = `${f1NameHtml} <span style="font-size: 10px; opacity: 0.85; color: ${f1ThemeColor}; font-weight: 700;">[${f1Subname}]</span>`;
   }
   const f2NameHtml = (typeof f2Name === 'string' && f2Name.includes('『')) ? formatFighterNameHTML(f2Name) : f2Name;
+  const f3NameHtml = (typeof f3Name === 'string' && f3Name.includes('『')) ? formatFighterNameHTML(f3Name) : f3Name;
   const f1SansClass = isF1Sans ? ' hud-sans-name' : '';
   const f2SansClass = isF2Sans ? ' hud-sans-name' : '';
+  const f3SansClass = isF3Sans ? ' hud-sans-name' : '';
 
   const f1Grade = getFighterGrade(f1);
   const f2Grade = getFighterGrade(f2);
+  const f3Grade = f3 ? getFighterGrade(f3) : 'A';
   const f1GradeMeta = getGradeMeta(f1Grade);
   const f2GradeMeta = getGradeMeta(f2Grade);
+  const f3GradeMeta = getGradeMeta(f3Grade);
 
   // Gauntlet Mode: Ghost TOP HUD stacking cards for queued challengers
   const isGauntlet = (state.mode === 'TLFS' || state.mode === GAME_MODES.TLFS);
@@ -2022,7 +2120,7 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
   const timerStr = getTopDuelTimerSecondsString();
 
   return `
-    <div class="hud-top-duel">
+    <div class="hud-top-duel${f3 ? ' hud-top-duel-1v2' : ''}">
       <!-- Player 1 (Left): Portrait on Outer Left -> Connected Top Health Bar -> Lower Name -->
       <div class="hud-top-player hud-top-p1" style="--fighter-theme: ${f1ThemeColor}; --grade-color: ${f1GradeMeta.color};" data-grade="${f1Grade}"${isF1NamelessDeity ? ' data-character="namelessdeity"' : ''}>
         <div class="hud-top-profile" data-grade="${f1Grade}"${isF1NamelessDeity ? ' data-character="namelessdeity"' : ''}>
@@ -2078,6 +2176,92 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
         ${isGauntlet ? `<span class="hud-top-mode-label">GAUNLET</span>` : ''}
       </div>
 
+      ${f3 ? `
+      <!-- Player 2 & 3 (Right): 2 Stacked Team Cards for Teammates -->
+      <div class="hud-top-player hud-top-p2 hud-top-team-col">
+        <!-- Teammate 1 (Player 2) -->
+        <div class="hud-top-team-card hud-top-team-p2" style="--fighter-theme: ${f2ThemeColor}; --grade-color: ${f2GradeMeta.color};" data-grade="${f2Grade}"${isF2NamelessDeity ? ' data-character="namelessdeity"' : ''}>
+          <div class="hud-top-content">
+            <div class="health-card__bar hud-top-bar${isF2Sans ? ' hud-bar-sans-stamina' : ''}">
+              ${isF2Sans ? `
+              <div class="sans-bolt-wrapper">
+                <svg class="sans-bolt-icon" width="16" height="22" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 1L2 14H10L3 29L20 14H12L17 1H12Z" fill="#000000" stroke="#000000" stroke-width="2.5" stroke-linejoin="miter"/>
+                  <path d="M12 2L3 14H10L4 27L19 14H12L16 2H12Z" fill="url(#sansBoltGradTopP2)"/>
+                  <path d="M12 3L5 14H10L6 22L16 14H11L14 3H12Z" fill="#ffffff" opacity="0.6"/>
+                  <defs>
+                    <linearGradient id="sansBoltGradTopP2" x1="3" y1="2" x2="19" y2="28" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#93c5fd"/>
+                      <stop offset="25%" stop-color="#38bdf8"/>
+                      <stop offset="60%" stop-color="#2c4de0"/>
+                      <stop offset="100%" stop-color="#1e3a8a"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div class="health-card__ghost" style="width: ${f2Percent}%;"></div>
+              <div class="health-card__fill" style="width: ${f2Percent}%; background: ${f2BarColor};"></div>
+              <span class="health-card__bar-text">${f2HpText}</span>
+              ` : `
+              <div class="health-card__ghost" style="width: ${f2Percent}%;"></div>
+              <div class="health-card__fill" style="width: ${f2Percent}%; background: ${f2BarColor};"></div>
+              <span class="health-card__bar-text">${f2HpText}</span>
+              `}
+            </div>
+            <div class="hud-top-header">
+              ${f2SkillsHTML ? `<div class="hud-top-skills">${f2SkillsHTML}</div>` : ''}
+              <span class="hud-top-name${f2SansClass}">${f2NameHtml}</span>
+            </div>
+          </div>
+          <div class="hud-top-profile" data-grade="${f2Grade}"${isF2NamelessDeity ? ' data-character="namelessdeity"' : ''}>
+            <div class="hud-top-profile__bg"></div>
+            <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
+            <canvas class="hud-top-profile__grade-canvas" data-grade="${f2Grade}" width="128" height="88"></canvas>
+          </div>
+        </div>
+
+        <!-- Teammate 2 (Player 3) -->
+        <div class="hud-top-team-card hud-top-team-p3" style="--fighter-theme: ${f3ThemeColor}; --grade-color: ${f3GradeMeta.color};" data-grade="${f3Grade}"${isF3NamelessDeity ? ' data-character="namelessdeity"' : ''}>
+          <div class="hud-top-content">
+            <div class="health-card__bar hud-top-bar${isF3Sans ? ' hud-bar-sans-stamina' : ''}">
+              ${isF3Sans ? `
+              <div class="sans-bolt-wrapper">
+                <svg class="sans-bolt-icon" width="16" height="22" viewBox="0 0 22 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 1L2 14H10L3 29L20 14H12L17 1H12Z" fill="#000000" stroke="#000000" stroke-width="2.5" stroke-linejoin="miter"/>
+                  <path d="M12 2L3 14H10L4 27L19 14H12L16 2H12Z" fill="url(#sansBoltGradTopP3)"/>
+                  <path d="M12 3L5 14H10L6 22L16 14H11L14 3H12Z" fill="#ffffff" opacity="0.6"/>
+                  <defs>
+                    <linearGradient id="sansBoltGradTopP3" x1="3" y1="2" x2="19" y2="28" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stop-color="#93c5fd"/>
+                      <stop offset="25%" stop-color="#38bdf8"/>
+                      <stop offset="60%" stop-color="#2c4de0"/>
+                      <stop offset="100%" stop-color="#1e3a8a"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+              </div>
+              <div class="health-card__ghost" style="width: ${f3Percent}%;"></div>
+              <div class="health-card__fill" style="width: ${f3Percent}%; background: ${f3BarColor};"></div>
+              <span class="health-card__bar-text">${f3HpText}</span>
+              ` : `
+              <div class="health-card__ghost" style="width: ${f3Percent}%;"></div>
+              <div class="health-card__fill" style="width: ${f3Percent}%; background: ${f3BarColor};"></div>
+              <span class="health-card__bar-text">${f3HpText}</span>
+              `}
+            </div>
+            <div class="hud-top-header">
+              ${f3SkillsHTML ? `<div class="hud-top-skills">${f3SkillsHTML}</div>` : ''}
+              <span class="hud-top-name${f3SansClass}">${f3NameHtml}</span>
+            </div>
+          </div>
+          <div class="hud-top-profile" data-grade="${f3Grade}"${isF3NamelessDeity ? ' data-character="namelessdeity"' : ''}>
+            <div class="hud-top-profile__bg"></div>
+            <canvas class="hud-top-profile__canvas" width="1400" height="1400"></canvas>
+            <canvas class="hud-top-profile__grade-canvas" data-grade="${f3Grade}" width="128" height="88"></canvas>
+          </div>
+        </div>
+      </div>
+      ` : `
       <!-- Player 2 (Right): Connected Top Health Bar -> Lower Name -> Portrait on Outer Right -->
       <div class="hud-top-player hud-top-p2" style="--fighter-theme: ${f2ThemeColor}; --grade-color: ${f2GradeMeta.color};" data-grade="${f2Grade}"${isF2NamelessDeity ? ' data-character="namelessdeity"' : ''}>
         <div class="hud-top-content">
@@ -2125,6 +2309,7 @@ export function buildTopDuelHUD(f1, f2, isDark = false, f1SkillsHTML = '', f2Ski
         </div>
         ${ghostStackHtml}
       </div>
+      `}
     </div>
   `;
 }
@@ -2575,6 +2760,18 @@ function updateHealthHud() {
     } else if (f.characterId === 'crazydave' || f.type === 'crazydave' || f._def?.id === 'crazydave' || f._def?.type === 'crazydave' || f.isCrazyDave) {
       const sun = Math.max(0, Math.round(f.sunCount || 0));
       info.push(`<b>$UN:</b> ${sun}`);
+    } else if (f.characterId === 'zombie' || f.type === 'zombie' || f._def?.id === 'zombie' || f._def?.type === 'zombie') {
+      const elapsedSec = Math.floor((f.survivalTimer || 0) / 60);
+      const minStr = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const secStr = String(elapsedSec % 60).padStart(2, '0');
+      const waveLabel = (f.waveNumber >= 4 || f.isFinalWaveActive) ? '<span style="color:#ef4444;font-weight:bold;">FINAL WAVE</span>' : `Wave ${f.waveNumber || 1}/3`;
+      info.push(`<b>PvZ:</b> ${waveLabel} (${minStr}:${secStr})`);
+      if (f.armorShieldHp > 0) {
+        const armorName = f.armorType === 'bucket' ? 'Bucket' : 'Cone';
+        info.push(`<b>ARMOR:</b> ${armorName} (${Math.round(f.armorShieldHp)})`);
+      }
+      const minionCount = Array.isArray(f.minions) ? f.minions.length : 0;
+      info.push(`<b>HORDE:</b> ${minionCount} Undead`);
     } else if (f.characterId === 'shiro' || f.type === 'shiro' || fType === 'shiro' || f.characterId === 'sora' || f.type === 'sora') {
       const cfg = (typeof CONFIG !== 'undefined' && (CONFIG.shiro || CONFIG.Shiro)) ? (CONFIG.shiro || CONFIG.Shiro) : {};
       const baseDmg = f.damage || cfg.damage || 24;
@@ -2861,15 +3058,21 @@ function updateHealthHud() {
           info.push(`<b>Regen:</b> 0%`);
         }
 
-        // DEF (Damage Reduction) stat
-        const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent || 0.01;
-        const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent || 0.50;
-        const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
-        const defPercent = Math.round(defReduction * 100);
-        if (defPercent > 0) {
-          info.push(`<b>DEF:</b> +${defPercent}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        // ATK (Double Damage Buff) / DEF stat
+        const defBuffPerStage = (CONFIG.mahoraga?.defBuffPerClickPercent !== undefined) ? CONFIG.mahoraga.defBuffPerClickPercent : 0.0;
+        if (defBuffPerStage > 0) {
+          const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent ?? 0.50;
+          const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
+          const defPercent = Math.round(defReduction * 100);
+          if (defPercent > 0) {
+            info.push(`<b>DEF:</b> +${defPercent}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+          } else {
+            info.push(`<b>DEF:</b> 0%`);
+          }
+        } else if (f.wheelDoubleDamageTimer > 0) {
+          info.push(`<b>ATK:</b> <span style="color: #FFD700; font-weight: bold;">2X</span> <span style="color: #00FF66; font-size: 10px;">▲</span>`);
         } else {
-          info.push(`<b>DEF:</b> 0%`);
+          info.push(`<b>ATK:</b> 1X`);
         }
       } else if (f.characterId === 'berserker' || f.type === 'berserker') {
         const rage = Math.round((f.rage || 0) * 100);
@@ -3468,7 +3671,7 @@ function updateHealthHud() {
     };
   };
 
-  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null, titleAlign = 'left', singleColumn = false, customHeaderHTML = '', hideHealthBar = false }) => {
+  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null, titleAlign = 'left', singleColumn = false, customHeaderHTML = '', hideHealthBar = false, skillsOnly = false }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
     const winnerStyle = '';
     const isTactical = isTacticalMatch(state) || (targetFighter && isTacticalFighter(targetFighter)) || (members && members.some(m => isTacticalFighter(m)));
@@ -3630,9 +3833,11 @@ function updateHealthHud() {
       const { className } = getGlowStyles(targetFighter);
       
       const isDummy = targetFighter && (targetFighter.characterId === 'dummy' || targetFighter.type === 'dummy');
-      const showDescription = CONFIG.hudShowFighterDescription || isDummy;
-      const skillsHTML = targetFighter && !showDescription ? generateFighterSkillsHTML(targetFighter, 'left', singleColumn) : '';
-      const infoHTML = targetFighter ? generateFighterInfoHTML(targetFighter, singleColumn) : '';
+      // skillsOnly (1v2 bottom strip) always renders skill bars and never the long
+      // description/stat block, so the three columns stay compact and evenly aligned.
+      const showDescription = (CONFIG.hudShowFighterDescription || isDummy) && !skillsOnly;
+      const skillsHTML = targetFighter && (skillsOnly || !showDescription) ? generateFighterSkillsHTML(targetFighter, 'left', singleColumn) : '';
+      const infoHTML = targetFighter && !skillsOnly ? generateFighterInfoHTML(targetFighter, singleColumn) : '';
 
       const barShakeTimer = targetFighter ? (targetFighter._healthBarShakeTimer || 0) : 0;
       const barShakeAmount = barShakeTimer > 0 ? Math.sin((12 - barShakeTimer) * 0.75) * 3 : 0;
@@ -3735,12 +3940,22 @@ function updateHealthHud() {
     `;
   };
 
-  const isTeamHudMode = is2v2 || isRegular1v2;
+  const isTeamHudMode = is2v2;
   const isCacheEmpty = isTeamHudMode ? (_hudCache.teams.size === 0) : (_hudCache.fighters.size === 0);
 
   if (isCacheEmpty) {
     syncHudPosition();
-    if (containerBottom) containerBottom.innerHTML = '';
+    if (containerBottom) {
+      containerBottom.innerHTML = '';
+      if (containerBottom.classList) {
+        if (typeof containerBottom.classList.toggle === 'function') {
+          containerBottom.classList.toggle('one-vs-two-hud', Boolean(isRegular1v2));
+        }
+        if ((!isBossBattle || isSoloBoss) && typeof containerBottom.classList.remove === 'function') {
+          containerBottom.classList.remove('boss-battle-hud');
+        }
+      }
+    }
     if (containerLeft) containerLeft.innerHTML = '';
     if (containerRight) containerRight.innerHTML = '';
 
@@ -3970,12 +4185,9 @@ function updateHealthHud() {
           lastChecked: null
         });
       });
-    } else if (is2v2 || isRegular1v2) {
-      // 2v2 / Regular 1v2 Team Mode
-      const teamLabels = isRegular1v2 ? [
-        { title: 'RED TEAM', color: '#ff4d4d', indexes: [0], key: 'red' },
-        { title: 'BLUE TEAM', color: '#4da3ff', indexes: [1, 2], key: 'blue' },
-      ] : [
+    } else if (is2v2) {
+      // 2v2 Team Mode
+      const teamLabels = [
         { title: 'RED TEAM', color: '#ff4d4d', indexes: [0, 1], key: 'red' },
         { title: 'BLUE TEAM', color: '#4da3ff', indexes: [2, 3], key: 'blue' },
       ];
@@ -4050,22 +4262,31 @@ function updateHealthHud() {
       });
     } else {
       // 1v1 / FFA Individual Mode
-      const isDuelTopHud = (!isBossBattle || isSoloBoss) && !isTeamHudMode && !isFfa && mainFighters.length === 2;
+      const isDuelTopHud = (!isBossBattle || isSoloBoss) && !isTeamHudMode && !isFfa && (mainFighters.length === 2 || isRegular1v2);
       const isSideHud = isH && !isDuelTopHud && (is1v1 || isStandOff || isTLFS || isFfa || mainFighters.length <= 4);
 
       if (isDuelTopHud && _cachedTopContainer) {
         const showSkills = isH && !CONFIG.hudHideAll && !CONFIG.hudHideSkillBars;
         const f1Skills = showSkills ? generateFighterSkillsHTML(mainFighters[0], 'left', false) : '';
         const f2Skills = showSkills ? generateFighterSkillsHTML(mainFighters[1], 'right', false) : '';
-        _cachedTopContainer.innerHTML = buildTopDuelHUD(mainFighters[0], mainFighters[1], isDarkTheme, f1Skills, f2Skills);
+        const f3Fighter = (isRegular1v2 && mainFighters.length >= 3) ? mainFighters[2] : null;
+        const f3Skills = (showSkills && f3Fighter) ? generateFighterSkillsHTML(f3Fighter, 'right', false) : '';
+        if (_cachedTopContainer.classList && typeof _cachedTopContainer.classList.toggle === 'function') {
+          _cachedTopContainer.classList.toggle('hud-top-1v2', Boolean(isRegular1v2));
+        }
+        _cachedTopContainer.innerHTML = buildTopDuelHUD(mainFighters[0], mainFighters[1], isDarkTheme, f1Skills, f2Skills, f3Fighter, f3Skills);
         _cachedTopContainer.style.display = 'flex';
         _cachedTopContainer.style.visibility = 'visible';
         _cachedTopContainer.style.opacity = '1';
 
-        const p1Canvas = _cachedTopContainer.querySelector('.hud-top-p1 > .hud-top-profile > .hud-top-profile__canvas') || _cachedTopContainer.querySelector('.hud-top-p1 .hud-top-profile__canvas');
-        const p2Canvas = _cachedTopContainer.querySelector('.hud-top-p2 > .hud-top-profile > .hud-top-profile__canvas');
+        const p1Canvas = _cachedTopContainer.querySelector('.hud-top-p1 .hud-top-profile__canvas');
+        const p2Canvas = _cachedTopContainer.querySelector('.hud-top-team-p2 .hud-top-profile__canvas') || _cachedTopContainer.querySelector('.hud-top-p2 .hud-top-profile__canvas');
         if (p1Canvas) renderTopHudProfileCanvas(p1Canvas, mainFighters[0]);
         if (p2Canvas) renderTopHudProfileCanvas(p2Canvas, mainFighters[1]);
+        if (f3Fighter) {
+          const p3Canvas = _cachedTopContainer.querySelector('.hud-top-team-p3 .hud-top-profile__canvas');
+          if (p3Canvas) renderTopHudProfileCanvas(p3Canvas, f3Fighter);
+        }
 
         const ghostCanvas = _cachedTopContainer.querySelector('.hud-top-ghost-stack .hud-top-ghost-canvas');
         if (ghostCanvas) {
@@ -4136,7 +4357,7 @@ function updateHealthHud() {
         } else {
           extraClassStr = isFfa ? 'single-column ffa-card' : (isSingleColumnMode ? 'single-column' : '');
         }
-        const playerSlotClass = (index % 2 === 0) ? 'hud-player-p1' : 'hud-player-p2';
+        const playerSlotClass = (isRegular1v2 ? (index === 0 ? 'hud-player-p1' : 'hud-player-p2') : ((index % 2 === 0) ? 'hud-player-p1' : 'hud-player-p2'));
         extraClassStr = `${extraClassStr} ${playerSlotClass}`.trim();
         const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel');
         const maxBulletsCount = (is1v1Mode && !isSideHud) ? 2 : 0;
@@ -4177,7 +4398,8 @@ function updateHealthHud() {
           titleAlign: ffaAlign,
           singleColumn: isSingleColumnMode,
           customHeaderHTML: fighterHeaderHTML,
-          hideHealthBar: isDuelTopHud
+          hideHealthBar: isDuelTopHud,
+          skillsOnly: isRegular1v2
         });
 
         const tempDiv = document.createElement('div');
@@ -4219,7 +4441,15 @@ function updateHealthHud() {
 
         const mainIdx = mainFighters.indexOf(fighter);
         if (isDuelTopHud && _cachedTopContainer && mainIdx >= 0) {
-          topPlayerEl = _cachedTopContainer.querySelector(mainIdx === 0 ? '.hud-top-p1' : '.hud-top-p2');
+          if (mainIdx === 0) {
+            topPlayerEl = _cachedTopContainer.querySelector('.hud-top-p1');
+          } else if (isRegular1v2 && mainFighters.length >= 3 && mainIdx === 1) {
+            topPlayerEl = _cachedTopContainer.querySelector('.hud-top-team-p2') || _cachedTopContainer.querySelector('.hud-top-p2');
+          } else if (isRegular1v2 && mainFighters.length >= 3 && mainIdx === 2) {
+            topPlayerEl = _cachedTopContainer.querySelector('.hud-top-team-p3');
+          } else {
+            topPlayerEl = _cachedTopContainer.querySelector('.hud-top-p2');
+          }
           if (topPlayerEl) {
             hpBar = topPlayerEl.querySelector(':scope > .hud-top-content .hud-top-bar') || topPlayerEl.querySelector('.hud-top-bar') || hpBar;
             hpBarFill = topPlayerEl.querySelector(':scope > .hud-top-content .health-card__fill') || topPlayerEl.querySelector('.health-card__fill') || hpBarFill;
@@ -4546,6 +4776,7 @@ function updateHealthHud() {
       const isCj = isCjCustomHudActive(fighter);
       const isSans = fighter && (fighter.characterId === 'sans' || fighter.type === 'sans' );
       const isBossBar = Boolean(isBossBattle && _cachedTopContainer && cachedCard.hpBar && _cachedTopContainer.contains(cachedCard.hpBar));
+      const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
       let percent, barColor, metaValue;
 
       if (isSans) {
@@ -4559,7 +4790,6 @@ function updateHealthHud() {
           : 'linear-gradient(180deg, #93c5fd 0%, #38bdf8 20%, #2c4de0 60%, #1e3a8a 100%)';
         metaValue = `${Math.floor(Math.max(0, curStam))} / ${Math.floor(maxStam)}`;
       } else {
-        const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
         const maxHp = fighter._originalMaxHp || fighter.maxHp;
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
@@ -4627,7 +4857,6 @@ function updateHealthHud() {
       }
 
       if (cachedCard.topPlayerEl) {
-        const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
         const isDead = curHp <= 0;
         const targetOpacity = isDead ? 0.45 : 1;
         if (cachedCard.lastTopOpacity !== targetOpacity) {
@@ -4681,7 +4910,7 @@ function updateHealthHud() {
           (typeof GAME_MODES !== 'undefined' && (mode === GAME_MODES.FFA || mode === GAME_MODES.TACTICAL_FFA)));
         const _curHpElim = isSans
           ? ((fighter.stamina !== undefined) ? fighter.stamina : 1)
-          : ((typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp);
+          : curHp;
         const _isEliminated = _isFfaHud && (_curHpElim <= 0);
 
         if (_isFfaHud && cachedCard.cardElement) {
@@ -4860,7 +5089,9 @@ function updateHealthHud() {
 
       // 4. Skills updates (Optimized: Dirty-check variables and remove inline style resets to completely prevent layout reflows)
       const isDummy = fighter.characterId === 'dummy' || fighter.type === 'dummy';
-      const showDescription = CONFIG.hudShowFighterDescription || isDummy;
+      // 1v2 bottom cards are skills-only regardless of the description toggle, so their
+      // progress fills must keep updating in that mode too.
+      const showDescription = (CONFIG.hudShowFighterDescription || isDummy) && !isRegular1v2;
 
       if (!showDescription && (cachedCard.skillsContainer || cachedCard.skillBars.size > 0)) {
         const rawSkills = getSkillDataForFighter(fighter) || [];

@@ -293,12 +293,10 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     }
   }
 
-  // ── General Defense Buff per Wheel Click ──
-  // Each wheel click (adaptation stage) increases defense by defBuffPerClickPercent (reduces incoming damage), capped at maxDefBuffPercent.
-  // Only applies to unadapted attacks so adapted abilities cleanly take strictly 25% damage without double-dipping reductions.
-  if (!isAdaptedAbility) {
-    const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent ?? 0.01;
-    const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent ?? 0.50;
+  // ── General Defense Buff per Wheel Click (Removed: defBuffPerClickPercent defaults to 0.0) ──
+  const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent ?? 0.0;
+  if (defBuffPerStage > 0 && !isAdaptedAbility) {
+    const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent ?? 0.0;
     const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
     const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
     finalAmount *= (1.0 - defReduction);

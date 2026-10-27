@@ -2923,9 +2923,7 @@ export const HUD_SKILL_PROVIDERS = {
     if (isSkillEnabled(cfg.enableTrainerCommand, cfg.enableSkill1, true)) {
       const activeSpec = f.activePokemon?.spec;
       const moveLabel = hasPokemon
-        ? ((f.activePokemon.isMega && activeSpec?.megaHudSkillLabel)
-            ? activeSpec.megaHudSkillLabel
-            : (activeSpec?.hudSkillLabel || activeSpec?.specialName?.replace(/!$/, '') || 'THUNDERBOLT'))
+        ? (activeSpec?.hudSkillLabel || activeSpec?.specialName?.replace(/!$/, '') || 'THUNDERBOLT')
         : 'THUNDERBOLT';
       const pokeSpecMax = f.activePokemon?.specialCooldownMax || activeSpec?.specialCooldown || 135;
       const pokeSpecTimer = f.activePokemon?.specialCooldown ?? 0;
@@ -2946,16 +2944,16 @@ export const HUD_SKILL_PROVIDERS = {
       });
     }
 
-    if (isSkillEnabled(cfg.enableMegaAwakening, cfg.enableBondAwakening, cfg.enableUltimate, true)) {
+    if (isSkillEnabled(cfg.enableUltimate, true)) {
       const ultMax = cfg.ultimateCooldownFrames || cfg.ultimateCooldown || 780;
       const ultTimer = f.ultimateCooldown || 0;
       const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
       skills.push({
-        id: 'mega_awakening',
+        id: '10m_volt_ultimate',
         pct: ultPct,
         ready: ultPct >= 99 && ultTimer <= 0,
         color: themeColor,
-        label: f.activePokemon?.isMega ? 'MEGA AWAKENED!' : 'BOND AWAKENING',
+        label: '10,000,000 VOLT',
         isSignature: true,
         signature: true,
         isUltimate: true
@@ -3094,7 +3092,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     spartan: ['javelin_throw', 'javelin', 'JAVELIN'],
     guts: ['calamity', 'calamitycleave', 'calamity_cleave', 'CALAMITY', 'CALAMITY CLEAVE', 'berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
     choso: ['laser_matrix', 'convergence', 'blood manipulation: convergence', 'laser', 'matrix', 'laser matrix', 'piercing_blood', 'PIERCING BLOOD'],
-    ash: ['mega_awakening', 'BOND AWAKENING', 'MEGA AWAKENED!', '10,000,000 VOLT'],
+    ash: ['10m_volt_ultimate', '10,000,000 VOLT'],
     eye_of_cthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM'],
     eyeofcthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM']
   };

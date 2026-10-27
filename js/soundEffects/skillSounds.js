@@ -286,8 +286,8 @@ export const SKILL_SOUNDS = {
     get purplecharge() { return this.purple_charge; },
     get purple_flare() {
       return {
-        src: CONFIG.gojo?.sounds?.purpleFlare || 'Assets/Sound Effects/Skills/dash3.mp3',
-        volume: CONFIG.gojo?.soundVolumes?.purpleFlare !== undefined ? CONFIG.gojo.soundVolumes.purpleFlare : 0.45,
+        src: CONFIG.gojo?.sounds?.purpleFlare || 'Assets/Sound Effects/SkillEffects/flare.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.purpleFlare !== undefined ? CONFIG.gojo.soundVolumes.purpleFlare : 0.85,
         delay: CONFIG.gojo?.soundDelays?.purpleFlare || 0
       };
     },
@@ -334,6 +334,14 @@ export const SKILL_SOUNDS = {
       };
     },
     get reddeploy() { return this.red_deploy; },
+    get red_flare() {
+      return {
+        src: CONFIG.gojo?.sounds?.redFlare || 'Assets/Sound Effects/SkillEffects/flare.mp3',
+        volume: CONFIG.gojo?.soundVolumes?.redFlare !== undefined ? CONFIG.gojo.soundVolumes.redFlare : 0.85,
+        delay: CONFIG.gojo?.soundDelays?.redFlare || 0
+      };
+    },
+    get redflare() { return this.red_flare; },
     get red_blast() {
       return {
         src: CONFIG.gojo?.sounds?.redBlast || 'Assets/Sound Effects/Skills/redblast.mp3',

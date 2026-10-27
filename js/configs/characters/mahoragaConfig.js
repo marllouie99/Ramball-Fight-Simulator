@@ -32,7 +32,7 @@ export const mahoragaConfig = {
     ability: 'Wheel of Adaptation',
     bossTitle: 'Divine General',
     title: 'Divine General',
-    desc: 'Adapts to damage types, gaining speed, defense, and health regeneration with each wheel rotation.',
+    desc: 'Adapts to damage types, gaining speed, temporary double damage, and health regeneration with each wheel rotation.',
 
     // ── Neutral Close-Quarters Attack-Teleport Stance ──
     enableCloseQuartersTeleport: true, // Toggle on/off close-quarters teleporting
@@ -70,11 +70,15 @@ export const mahoragaConfig = {
     rctHealPercent: 0.35,           // Percentage of max HP healed on each wheel rotation click (12% max HP)
     maxRctHealingPool: Infinity,    // Uncapped RCT healing capacity across a match
     rctCombatDamagePauseFrames: 45, // Duration (frames) passive RCT is paused upon taking direct damage (45 frames = 0.75s)
-    defBuffPerClickPercent: 0.01,   // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
-    maxDefBuffPercent: 0.50,        // Maximum defense damage reduction cap (0.50 = 50% max reduction)
+    defBuffPerClickPercent: 0.00,   // Defense boost per wheel click (0.00 = general defense scaling removed)
+    maxDefBuffPercent: 0.00,        // Maximum defense damage reduction cap (0.00 = 0% reduction)
     adaptedDamageMultiplier: 0.25,  // Damage multiplier taken when adapted to an attack/skill (0.25 = 25% damage taken / 75% reduction)
     wheelDoubleDamageDurationFrames: 240, // Duration (frames) of temporary double damage buff on wheel click (240 frames = 4.0s @ 60fps)
     wheelDoubleDamageMultiplier: 2.0,     // Damage multiplier during temporary wheel click buff (2.0 = 2x damage)
+    wheelDoubleDamageAttackSpeedSlowMultiplier: 1.8, // Attack speed slowdown factor during 2x damage (1.8x cooldown / 45% slower attack cadence)
+    wheelDoubleDamageWindupFrames: 14,               // Smooth windup anticipation frames before releasing the 2x damage sword strike
+    wheelDoubleDamageSwordAnimFrames: 36,            // Total swing animation duration (frames) during 2x damage
+    wheelDoubleDamageCooldownFrames: 36,             // Cooldown (frames) between strikes during 2x damage
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,     // Maximum speed/KB resistance factor under stasis (60% max)
     fatalAdaptWindowFrames: 400,    // Rolling damage accumulator window (~6.6 seconds at 60fps)
@@ -101,8 +105,9 @@ export const mahoragaConfig = {
     // ── Sword of Extermination & Basic Melee Attacks ──
     enableSwordOfExtermination: true, // Master toggle for Sword of Extermination basic attacks
     swordRange: 50,               // Melee reach (110px frontal arc) for Sword of Extermination
-    swordCooldown: 20,              // Frames between sword strikes (0.5s at 60fps)
+    swordCooldown: 30,              // Frames between sword strikes (0.5s at 60fps)
     swordDamage: 6,                // True damage dealt by Sword of Extermination
+    punchDamage: 6,                // True damage dealt by left off-hand heavy punch (never doubled)
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
     swordAnimFrames: 22,            // Duration (frames) of 5-phase sword chop swing animation
     punchAnimFrames: 22,            // Duration (frames) of 5-phase off-hand heavy punch animation

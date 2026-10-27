@@ -162,8 +162,34 @@ export class SukunaRenderer {
       fighter._drawSukunaCursedEnergyAura(ctx, 'fuga');
     } else if (fighter.isChannelingDomainExpansion && !fighter.domainActive && !isParalyzed) {
       fighter._drawSukunaCursedEnergyAura(ctx, 'domain');
+    } else if ((fighter.isSummoningMahoraga || (fighter.mahoragaSummonWindupTimer > 0)) && !isParalyzed) {
+      fighter._drawSukunaCursedEnergyAura(ctx, 'domain');
     } else if (!isFrozenByDomain && (fighter.combatAuraOpacity > 0 || fighter._isWinnerReveal)) {
       fighter._drawSukunaCursedEnergyAura(ctx, 'red');
+    }
+
+    // Liquid shadow ground puddle expanding beneath Sukuna during Mahoraga summon ritual
+    if (fighter.isSummoningMahoraga || (fighter.mahoragaSummonWindupTimer > 0)) {
+      const maxW = fighter.mahoragaSummonWindupMax || 28;
+      const curW = fighter.mahoragaSummonWindupTimer || 0;
+      const p = Math.max(0, Math.min(1.0, 1.0 - (curW / maxW)));
+      const poolR = (fighter.r || 25) * (1.1 + p * 0.7);
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.fillStyle = `rgba(15, 5, 20, ${(0.45 + p * 0.45).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.ellipse(fighter.x, (fighter.y - (fighter.z || 0)) + (fighter.r || 25) * 0.8, poolR, poolR * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      ctx.save();
+      ctx.strokeStyle = `rgba(255, 215, 0, ${(0.3 + p * 0.5).toFixed(2)})`;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.ellipse(fighter.x, (fighter.y - (fighter.z || 0)) + (fighter.r || 25) * 0.8, poolR * (0.8 + 0.2 * Math.sin(p * Math.PI * 4)), poolR * 0.35 * (0.8 + 0.2 * Math.sin(p * Math.PI * 4)), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
 
     // 1. Draw Back Hand BEHIND body
@@ -257,8 +283,9 @@ export class SukunaRenderer {
     }
 
     const isChannelingDomain = Boolean(fighter.isChannelingDomainExpansion);
-    const angle = (isWinnerScreen || isChannelingDomain) ? 0 : (fighter.gunAngle || 0);
-    const facingLeft = !isChannelingDomain && Math.abs(angle) > Math.PI / 2;
+    const isSummoningMahoraga = Boolean(fighter.isSummoningMahoraga || (fighter.mahoragaSummonWindupTimer > 0));
+    const angle = (isWinnerScreen || isChannelingDomain || isSummoningMahoraga) ? 0 : (fighter.gunAngle || 0);
+    const facingLeft = !isChannelingDomain && !isSummoningMahoraga && Math.abs(angle) > Math.PI / 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
     
@@ -276,6 +303,46 @@ export class SukunaRenderer {
     const r = fighter.r || 25;
 
     let frontHandX_loc, frontHandY_loc, backHandX_loc, backHandY_loc;
+
+    // 0. Ten Shadows Mahoraga Summon Windup Mudra Animation Frames
+    if (isSummoningMahoraga) {
+      const maxW = fighter.mahoragaSummonWindupMax || 28;
+      const curW = fighter.mahoragaSummonWindupTimer || 0;
+      const p = Math.max(0, Math.min(1.0, 1.0 - (curW / maxW)));
+
+      // Multi-phase windup animation frames on Sukuna's hands:
+      // Neutral flank anchors (Rule 20):
+      // Left hand (back hand):  (-r * 0.82, r * 0.38)
+      // Right hand (front hand): (+r * 0.82, r * 0.38)
+      if (p < 0.35) {
+        // Phase 1 (p: 0 -> 0.35): Anticipation Lift & Inward Sweep
+        const t1 = p / 0.35;
+        const ease1 = Math.sin(t1 * Math.PI * 0.5);
+        backHandX_loc  = (-r * 0.82) + ease1 * (r * 0.70);
+        backHandY_loc  = ( r * 0.38) - ease1 * (r * 0.14);
+        frontHandX_loc = ( r * 0.82) - ease1 * (r * 0.70);
+        frontHandY_loc = ( r * 0.38) - ease1 * (r * 0.14);
+      } else if (p < 0.75) {
+        // Phase 2 (p: 0.35 -> 0.75): Mudra Clasp & Shadow Tension Hold
+        const t2 = (p - 0.35) / 0.40;
+        const breathPulse = Math.sin(t2 * Math.PI * 3) * (r * 0.035);
+        backHandX_loc  = -r * 0.10 - breathPulse;
+        backHandY_loc  =  r * 0.22;
+        frontHandX_loc =  r * 0.10 + breathPulse;
+        frontHandY_loc =  r * 0.22;
+      } else {
+        // Phase 3 (p: 0.75 -> 1.0): Peak Ritual Climax & Micro-Tremor Lock
+        const t3 = (p - 0.75) / 0.25;
+        const jitter = (Math.random() - 0.5) * 2.2 * t3;
+        backHandX_loc  = -r * 0.07 + jitter;
+        backHandY_loc  =  r * 0.20 + jitter * 0.5;
+        frontHandX_loc =  r * 0.07 - jitter;
+        frontHandY_loc =  r * 0.20 - jitter * 0.5;
+      }
+
+      hideBackHand  = true; // Rendered together on front layer
+      hideFrontHand = false;
+    } else
 
     // 1. Dynamic Slash Swing Chop Animation
     if ((fighter.slashSwingTimer > 0 || fighter.slashGlowTimer > 0) && !fighter.isChannelingDomainExpansion && !fighter.isChannelingDivineFlame) {
@@ -377,7 +444,7 @@ export class SukunaRenderer {
     ctx.imageSmoothingEnabled = false;
 
     // Back hand (behind body circle)
-    if ((layer === 'all' || layer === 'back') && !hideBackHand && !isChannelingDomain) {
+    if ((layer === 'all' || layer === 'back') && !hideBackHand && !isChannelingDomain && !isSummoningMahoraga) {
       _drawPixelFist(backHandX, backHandY);
     }
 
@@ -400,11 +467,66 @@ export class SukunaRenderer {
         ctx.arc((frontHandX + backHandX) / 2, (frontHandY + backHandY) / 2, pulseR * 0.45, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
+      } else if (isSummoningMahoraga) {
+        _drawPixelFist(backHandX, backHandY);
+        _drawPixelFist(frontHandX, frontHandY);
+
+        const maxW = fighter.mahoragaSummonWindupMax || 28;
+        const curW = fighter.mahoragaSummonWindupTimer || 0;
+        const progress = Math.max(0, Math.min(1.0, 1.0 - (curW / maxW)));
+
+        const midX = (frontHandX + backHandX) / 2;
+        const midY = (frontHandY + backHandY) / 2;
+
+        ctx.save();
+        const pulseR = (3.0 + Math.sin(progress * Math.PI * 8) * 1.6) * (0.8 + progress * 1.2);
+
+        // Dark cursed shadow ring
+        ctx.fillStyle = `rgba(20, 0, 30, ${(0.55 + progress * 0.35).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(midX, midY, pulseR * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Golden wheel divine core
+        ctx.fillStyle = `rgba(255, 215, 0, ${(0.7 + progress * 0.3).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(midX, midY, pulseR, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White core
+        ctx.fillStyle = "#FFFFFF";
+        ctx.beginPath();
+        ctx.arc(midX, midY, pulseR * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       } else {
         _drawPixelFist(frontHandX, frontHandY);
       }
     }
     ctx.restore();
+
+    // Golden cursed energy & dark shadow aura wisps on hands during Mahoraga summon windup
+    if (isSummoningMahoraga && !hideFrontHand) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const maxW = fighter.mahoragaSummonWindupMax || 28;
+      const curW = fighter.mahoragaSummonWindupTimer || 0;
+      const progress = Math.max(0, Math.min(1.0, 1.0 - (curW / maxW)));
+      const auraR = handRadius * (1.3 + progress * 0.7);
+
+      ctx.fillStyle = `rgba(255, 215, 0, ${(0.35 * progress).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(frontHandX, frontHandY, auraR, 0, Math.PI * 2);
+      ctx.arc(backHandX, backHandY, auraR, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(180, 20, 20, ${(0.28 * progress).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(frontHandX, frontHandY, auraR * 0.7, 0, Math.PI * 2);
+      ctx.arc(backHandX, backHandY, auraR * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     // Subtle hand flame glow on Sukuna's front and back hands during Fuga charge
     if (fighter.isChannelingDivineFlame && !hideFrontHand && !hideBackHand) {

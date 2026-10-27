@@ -113,7 +113,7 @@ export function executeThinIceBreaker(fighter, angle) {
   // Check if any opponent is Mahoraga and adapted to Thin Ice Breaker -> Auto-trigger Divine Shout!
   state.fighters.forEach(target => {
     if (target !== fighter && target.hp > 0 && (target.characterId === 'mahoraga' || target.type === 'mahoraga' || target._def?.id === 'mahoraga')) {
-      if (target.adaptedThinIceBreaker) {
+      if (target.adaptedThinIceBreaker && (target.shoutCooldown || 0) <= 0 && !target.isShouting) {
         if (typeof target._executeShout === 'function') {
           target._executeShout(fighter);
         }

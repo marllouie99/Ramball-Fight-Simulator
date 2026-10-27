@@ -22,7 +22,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.y = y;
     proj.vx = vx;
     proj.vy = vy;
-    proj.r = 45;
+    proj.r = CONFIG.gojo?.purpleRadius ?? 50;
     proj.life = CONFIG.gojo?.purpleLife ?? 480;
     proj.maxLife = proj.life;
     const isGreen = Boolean(opts.colorTheme === 'green' || opts.isRubbick || opts.isTrickster);
@@ -570,10 +570,13 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         if (d + halfR >= ar && d > 0) {
           const nx = (projectile.x - cx) / d;
           const ny = (projectile.y - cy) / d;
-          projectile.x = cx + nx * (ar - halfR);
-          projectile.y = cy + ny * (ar - halfR);
-          projectile.vx = 0;
-          projectile.vy = 0;
+          const movingOutward = (projectile.vx * nx + projectile.vy * ny) > 0;
+          if (movingOutward) {
+            projectile.x = cx + nx * (ar - halfR);
+            projectile.y = cy + ny * (ar - halfR);
+            projectile.vx = 0;
+            projectile.vy = 0;
+          }
         }
       } else {
         const hitLeft = projectile.x - halfR <= arena.x;
@@ -581,7 +584,12 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const hitTop = projectile.y - halfR <= arena.y;
         const hitBottom = projectile.y + halfR >= arena.y + arena.height;
 
-        if (hitLeft || hitRight || hitTop || hitBottom) {
+        const collidesLeft = hitLeft && projectile.vx < 0;
+        const collidesRight = hitRight && projectile.vx > 0;
+        const collidesTop = hitTop && projectile.vy < 0;
+        const collidesBottom = hitBottom && projectile.vy > 0;
+
+        if (collidesLeft || collidesRight || collidesTop || collidesBottom) {
           if (hitLeft) projectile.x = arena.x + halfR;
           if (hitRight) projectile.x = arena.x + arena.width - halfR;
           if (hitTop) projectile.y = arena.y + halfR;

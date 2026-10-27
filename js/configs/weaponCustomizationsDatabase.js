@@ -87,6 +87,7 @@ export const WEAPON_CUSTOMIZATIONS_DATABASE = {
   },
   engineer: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   crazydave: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
+  zombie: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   maki: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   ichigo: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0 },
   denji: { offsetX: 0, offsetY: 0, scale: 1.00, widthScale: 1.00, lengthScale: 1.00, angleOffset: 0, parts: {"base_body":{"offsetX":0,"offsetY":0,"scale":1,"widthScale":1,"lengthScale":1,"angleOffset":0,"visible":true},"sprocket":{"offsetX":0,"offsetY":0,"scale":1,"widthScale":1,"lengthScale":1,"angleOffset":0,"visible":true,"rotationSpeed":1},"drive_pocket":{"offsetX":0,"offsetY":0,"scale":1,"widthScale":1,"lengthScale":1,"angleOffset":0,"visible":true},"bracket":{"offsetX":22.111111111111114,"offsetY":12.037037037037036,"scale":1,"widthScale":1,"lengthScale":1,"angleOffset":0,"visible":true},"teeth_top":{"offsetX":0,"offsetY":0,"scale":1,"widthScale":1,"lengthScale":1,"angleOffset":0,"visible":true,"scrollSpeed":1},"teeth_bottom":{"offsetX":0,"offsetY":0,"scale":1,"widthScale":1,"lengthScale":1,"angleOffset":0,"visible":true,"scrollSpeed":1},"ripcord":{"offsetX":0,"offsetY":0,"scale":1,"widthScale":1,"lengthScale":1,"angleOffset":0,"visible":true}} },

@@ -602,15 +602,13 @@ class ProjectileSystem {
   }
 
   fireGojoBlue(fighter, ownerIndex, damage, customSpawnX, customSpawnY, customAngle) {
-    const pullRadius = CONFIG.gojo?.blueRadius ?? 50;
+    const pullRadius = CONFIG.gojo?.bluePullRadius ?? Math.max(100, (CONFIG.gojo?.blueRadius || 50) * 1.5);
     const speed = CONFIG.gojo?.blueSpeed || (CONFIG.projectile.speed * (fighter.projectileSpeedMultiplier || 1.5));
     const projDamage = Number(damage);
 
     // Calculate Blue projectile radius dynamically based on blueRadius / blueScale / blueProjectileRadius
-    const baseProjR = CONFIG.gojo?.blueProjectileRadius ?? 10;
-    const scaleMultiplier = (CONFIG.gojo?.blueScale !== undefined)
-      ? CONFIG.gojo.blueScale
-      : (pullRadius / 50);
+    const baseProjR = (typeof CONFIG.gojo?.blueRadius === 'number') ? CONFIG.gojo.blueRadius : (CONFIG.gojo?.blueProjectileRadius ?? 25);
+    const scaleMultiplier = (typeof CONFIG.gojo?.blueScale === 'number') ? CONFIG.gojo.blueScale : 1.0;
     const radius = Math.max(2, baseProjR * scaleMultiplier);
 
     let spawnX, spawnY, dirX, dirY;

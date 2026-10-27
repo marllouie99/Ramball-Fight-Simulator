@@ -34,9 +34,6 @@ export function drawGojoWeapon(ctx, fighter) {
             if (mergeProgress < 0.70) {
                 const moveP = mergeProgress / 0.70; // 0.0 -> 1.0
                 const easeMove = Math.sin(moveP * Math.PI * 0.5);
-                const handSpreadX = r * 2.8;
-                const spreadX = handSpreadX * (1 - easeMove);
-
                 const fadeInP = Math.min(1.0, mergeProgress / 0.22);
                 const orbAlpha = Math.sin(fadeInP * Math.PI * 0.5);
 
@@ -44,7 +41,11 @@ export function drawGojoWeapon(ctx, fighter) {
                 const easeGrow = Math.sin(growP * Math.PI * 0.5);
                 const scale = 0.15 + 0.85 * easeGrow;
                 const surgeScale = 1.0 + Math.sin(moveP * Math.PI) * 0.15;
-                const currentOrbR = handRadius * 2.8 * scale * surgeScale;
+                const baseOrbR = Math.max((typeof CONFIG !== 'undefined' && CONFIG.gojo?.purpleRadius) ? CONFIG.gojo.purpleRadius * 0.95 : 48, handRadius * 4.8);
+                const currentOrbR = baseOrbR * scale * surgeScale;
+
+                const handSpreadX = Math.max(r * 3.2, currentOrbR * 2.2);
+                const spreadX = handSpreadX * (1 - easeMove);
 
                 ctx.save();
                 ctx.globalAlpha *= orbAlpha;
@@ -82,22 +83,17 @@ export function drawGojoWeapon(ctx, fighter) {
                 // Fused into colossal 200% Purple orb above head
                 const purpleGrowP = Math.min(1.0, (mergeProgress - 0.70) / 0.12);
                 const easePurpleGrow = Math.sin(purpleGrowP * Math.PI * 0.5);
-                const baseFusionR = handRadius * 2.8;
-                const maxEmpoweredR = handRadius * 4.2;
+                const baseFusionR = Math.max((typeof CONFIG !== 'undefined' && CONFIG.gojo?.purpleRadius) ? CONFIG.gojo.purpleRadius * 1.15 : 60, handRadius * 4.5);
+                const maxEmpoweredR = baseFusionR * 1.35;
                 const orbR = baseFusionR + (maxEmpoweredR - baseFusionR) * easePurpleGrow;
 
-                // Pulsating energy ring around 200% Purple orb
                 ctx.save();
                 ctx.translate(0, headY);
-                ctx.rotate(t * 0.004);
-                ctx.strokeStyle = `rgba(200, 100, 255, 0.45)`;
-                ctx.lineWidth = 2.5;
-                ctx.beginPath();
-                ctx.arc(0, 0, orbR * 1.8 * (1.0 + Math.sin(t * 0.007) * 0.06), 0, Math.PI * 1.5);
-                ctx.stroke();
+                const renderedFused200 = drawGojoPurpleTravelSprite(ctx, orbR * 0.85, t, true, false, 1.0);
+                if (!renderedFused200) {
+                    drawGojoOrb(ctx, 0, 0, orbR, t, 'purple', 5);
+                }
                 ctx.restore();
-
-                drawGojoOrb(ctx, 0, headY, orbR, t, 'purple', 5);
                 drawAnamorphicLensFlare(ctx, 0, headY, 1.0);
                 drawAnamorphicLensFlare(ctx, 0, headY, 0.5, 'red');
             }
@@ -111,14 +107,22 @@ export function drawGojoWeapon(ctx, fighter) {
             if (mergeProgress < 0.70) {
                 const moveP = mergeProgress / 0.70; // 0.0 -> 1.0
                 const easeMove = Math.sin(moveP * Math.PI * 0.5);
-                const handSpread = 22 * (1 - easeMove);
-                const rightY = handSpread;
-                const leftY = -handSpread;
 
                 const fadeInP = Math.min(1.0, mergeProgress / 0.22);
                 const orbAlpha = Math.sin(fadeInP * Math.PI * 0.5);
-                const redR = handRadius * (1.0 + moveP * 0.4);
-                const blueR = handRadius * (1.0 + moveP * 0.4);
+                const redConfigR = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.redRadius === 'number')
+                    ? (CONFIG.gojo.redRadius * 1.05)
+                    : (handRadius * 3.6);
+                const blueConfigR = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueRadius === 'number')
+                    ? (CONFIG.gojo.blueRadius * 1.40)
+                    : (handRadius * 3.6);
+                const redR = redConfigR * (0.85 + moveP * 0.35);
+                const blueR = blueConfigR * (0.85 + moveP * 0.35);
+
+                const maxSpread = Math.max(34, (redR + blueR) * 0.65);
+                const handSpread = maxSpread * (1 - easeMove);
+                const rightY = handSpread;
+                const leftY = -handSpread;
 
                 ctx.save();
                 ctx.globalAlpha *= orbAlpha;
@@ -155,8 +159,15 @@ export function drawGojoWeapon(ctx, fighter) {
                 // Fused into 100% Purple orb between hands with lens flares
                 const purpleGrowP = Math.min(1.0, (mergeProgress - 0.70) / 0.30);
                 const pScale = purpleGrowP;
-                const orbR = handRadius * 2.6 * (0.8 + 0.2 * pScale);
-                drawGojoOrb(ctx, handDistance, 0, orbR, t, 'purple', pScale * 4);
+                const targetPurpleR = Math.max((typeof CONFIG !== 'undefined' && CONFIG.gojo?.purpleRadius) ? CONFIG.gojo.purpleRadius * 0.90 : 45, handRadius * 3.8);
+                const orbR = targetPurpleR * (0.85 + 0.15 * pScale);
+                ctx.save();
+                ctx.translate(handDistance, 0);
+                const renderedFused100 = drawGojoPurpleTravelSprite(ctx, orbR, t, false, false, 1.0);
+                if (!renderedFused100) {
+                    drawGojoOrb(ctx, 0, 0, orbR, t, 'purple', pScale * 4);
+                }
+                ctx.restore();
                 drawAnamorphicLensFlare(ctx, handDistance, 0, pScale);
             }
         }
@@ -240,7 +251,10 @@ export function drawGojoWeapon(ctx, fighter) {
             const currentDist = handDistance + 5 + attackPush + chargePull;
             const attackFlashValue = attackFlash > 0 ? attackFlash : 0;
             const scaleGrowth = 0.4 + 0.6 * Math.sin((fighter._blueOrbDisplayAlpha || 0) * Math.PI * 0.5);
-            const effectiveRadius = handRadius * Math.sqrt(transition) * chargeScale * scaleGrowth;
+            const baseBlueR = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueRadius === 'number')
+                ? (CONFIG.gojo.blueRadius * 0.55)
+                : ((typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueProjectileRadius === 'number') ? CONFIG.gojo.blueProjectileRadius * 0.55 : handRadius);
+            const effectiveRadius = baseBlueR * Math.sqrt(transition) * chargeScale * scaleGrowth;
             
             // Draw Lapse Blue Orb with firing launch spin
             ctx.save();
@@ -296,6 +310,16 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
     ctx.translate(x, y);
 
     const pulse = Math.sin(time / 130) * 0.08;
+    const targetR = r * (1 + pulse) + attackFlash * 0.3;
+
+    // 1. Try high-definition animated sprite (Purple, Red, Blue)
+    const renderedSprite = drawGojoPurpleTravelSprite(ctx, targetR, time, false, colorType, 1.0);
+    if (renderedSprite) {
+        ctx.restore();
+        return;
+    }
+
+    // 2. Procedural stepped retro anime fallback
     const baseR = r * 1.50 * (1 + pulse) + attackFlash * 0.5;
     const px = Math.max(1.8, Math.min(4.5, baseR / 8.5)); // Snapped pixel unit
 
@@ -699,4 +723,172 @@ export function drawGojoPurpleExplosion(ctx, blast) {
 
   ctx.restore();
 }
+
+// ============================================================================
+// CURSED TECHNIQUE ANIMATED SPRITES (Purple, Red, Blue - 18-Frame High-Fidelity)
+// ============================================================================
+const GOJO_PURPLE_TRAVEL_FRAME_COUNT = 18;
+const GOJO_PURPLE_TRAVEL_FRAME_PATHS = Array.from(
+  { length: GOJO_PURPLE_TRAVEL_FRAME_COUNT },
+  (_, i) => `Assets/model/gojo/Purple_idle_travel/purple_travel-${i + 1}.png`
+);
+
+const GOJO_RED_REVERSAL_FRAME_COUNT = 18;
+const GOJO_RED_REVERSAL_FRAME_PATHS = Array.from(
+  { length: GOJO_RED_REVERSAL_FRAME_COUNT },
+  (_, i) => `Assets/model/gojo/Red_reversal/red_reversal-${i + 1}.png`
+);
+
+const GOJO_BLUE_TRAVEL_FRAME_COUNT = 18;
+const GOJO_BLUE_TRAVEL_FRAME_PATHS = Array.from(
+  { length: GOJO_BLUE_TRAVEL_FRAME_COUNT },
+  (_, i) => `Assets/model/gojo/Blue_projectile/blue_travel-${i + 1}.png`
+);
+
+let _gojoPurpleTravelFrames = [];
+let _gojoPurpleTravelFramesLoading = false;
+let _gojoRedReversalFrames = [];
+let _gojoRedReversalFramesLoading = false;
+let _gojoBlueTravelFrames = [];
+let _gojoBlueTravelFramesLoading = false;
+
+function _loadFrames(paths, targetArr, count, setLoadingFlag) {
+  if (typeof Image === 'undefined') return targetArr;
+  setLoadingFlag(true);
+  targetArr.length = 0;
+  paths.forEach((src, idx) => {
+    const img = new Image();
+    img.onload = () => {
+      targetArr[idx] = img;
+    };
+    img.onerror = (e) => {
+      console.warn(`Failed to load frame ${idx + 1} at ${src}:`, e);
+    };
+    img.src = `${src}?v=1`;
+    targetArr[idx] = img;
+  });
+  return targetArr;
+}
+
+export function _getGojoPurpleTravelFrames() {
+  if (
+    _gojoPurpleTravelFrames.length === GOJO_PURPLE_TRAVEL_FRAME_COUNT &&
+    _gojoPurpleTravelFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _gojoPurpleTravelFrames;
+  }
+  if (!_gojoPurpleTravelFramesLoading) {
+    _loadFrames(GOJO_PURPLE_TRAVEL_FRAME_PATHS, _gojoPurpleTravelFrames, GOJO_PURPLE_TRAVEL_FRAME_COUNT, v => { _gojoPurpleTravelFramesLoading = v; });
+  }
+  return _gojoPurpleTravelFrames;
+}
+
+export function _getGojoRedReversalFrames() {
+  if (
+    _gojoRedReversalFrames.length === GOJO_RED_REVERSAL_FRAME_COUNT &&
+    _gojoRedReversalFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _gojoRedReversalFrames;
+  }
+  if (!_gojoRedReversalFramesLoading) {
+    _loadFrames(GOJO_RED_REVERSAL_FRAME_PATHS, _gojoRedReversalFrames, GOJO_RED_REVERSAL_FRAME_COUNT, v => { _gojoRedReversalFramesLoading = v; });
+  }
+  return _gojoRedReversalFrames;
+}
+
+export function _getGojoBlueTravelFrames() {
+  if (
+    _gojoBlueTravelFrames.length === GOJO_BLUE_TRAVEL_FRAME_COUNT &&
+    _gojoBlueTravelFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _gojoBlueTravelFrames;
+  }
+  if (!_gojoBlueTravelFramesLoading) {
+    _loadFrames(GOJO_BLUE_TRAVEL_FRAME_PATHS, _gojoBlueTravelFrames, GOJO_BLUE_TRAVEL_FRAME_COUNT, v => { _gojoBlueTravelFramesLoading = v; });
+  }
+  return _gojoBlueTravelFrames;
+}
+
+// Proactive eager initialization in browser environment
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getGojoPurpleTravelFrames();
+  _getGojoRedReversalFrames();
+  _getGojoBlueTravelFrames();
+}
+
+/**
+ * Draws the 18-frame authentic Limitless technique animation sprite (Purple, Red, or Blue).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} drawR Target radius in arena pixels
+ * @param {number} time High-resolution timestamp
+ * @param {boolean} is200 True if 200% empowered
+ * @param {string|boolean} colorTypeOrGreen 'purple' | 'red' | 'blue' | 'green' | boolean
+ * @param {number} alpha Opacity multiplier
+ * @returns {boolean} True if frame was successfully rendered
+ */
+export function drawGojoPurpleTravelSprite(ctx, drawR, time = Date.now(), is200 = false, colorTypeOrGreen = 'purple', alpha = 1.0) {
+  let color = 'purple';
+  if (typeof colorTypeOrGreen === 'string') {
+    color = colorTypeOrGreen;
+  } else if (colorTypeOrGreen === true) {
+    color = 'green';
+  }
+
+  let frames;
+  if (color === 'red') {
+    frames = _getGojoRedReversalFrames();
+  } else if (color === 'blue') {
+    frames = _getGojoBlueTravelFrames();
+  } else {
+    frames = _getGojoPurpleTravelFrames();
+  }
+
+  if (!frames || frames.length === 0) return false;
+
+  // 18-frame fluid cycle at 20 FPS (50ms per frame) for authentic anime VFX pacing
+  const fps = 20;
+  const frameIndex = Math.floor(time / (1000 / fps)) % frames.length;
+  const frameImg = frames[frameIndex];
+
+  if (!frameImg || !frameImg.complete || ((frameImg.naturalWidth || frameImg.width || 0) <= 0)) {
+    return false;
+  }
+
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  const prevAlpha = ctx.globalAlpha;
+  ctx.imageSmoothingEnabled = true;
+
+  ctx.globalAlpha = Math.max(0, Math.min(1.0, prevAlpha * alpha));
+
+  // Frame is 256x256px centered at (128, 128)
+  // Calibrated to 1:1 match CONFIG.gojo.purpleRadius (50px):
+  // The dense spherical orb core in the 256x256 frame has radius R = 94px.
+  // Setting drawW = drawR * (256.0 / 94.0) guarantees that the visible dense sphere
+  // of the orb exactly matches drawR in arena pixels.
+  // Outer crackling electric streamers extend naturally to ~1.2 * drawR.
+  const SPRITE_CORE_RADIUS = 94.0;
+  const drawW = drawR * (256.0 / SPRITE_CORE_RADIUS);
+  const drawH = drawW;
+  const anchorX = drawW / 2;
+  const anchorY = drawH / 2;
+
+  if (color === 'green') {
+    ctx.save();
+    ctx.filter = 'hue-rotate(240deg)';
+    ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+    ctx.restore();
+  } else {
+    ctx.drawImage(frameImg, -anchorX, -anchorY, drawW, drawH);
+  }
+
+  // Restore context state cleanly (Rule 2.4 Stack Integrity)
+  ctx.imageSmoothingEnabled = prevSmoothing;
+  ctx.globalAlpha = prevAlpha;
+  return true;
+}
+
+// Convenience export aliases
+export const drawGojoRedOrbSprite = (ctx, drawR, time, alpha) => drawGojoPurpleTravelSprite(ctx, drawR, time, false, 'red', alpha);
+export const drawGojoBlueOrbSprite = (ctx, drawR, time, alpha) => drawGojoPurpleTravelSprite(ctx, drawR, time, false, 'blue', alpha);
+export const drawGojoOrbSprite = (ctx, drawR, time, colorType, alpha) => drawGojoPurpleTravelSprite(ctx, drawR, time, false, colorType, alpha);
 
