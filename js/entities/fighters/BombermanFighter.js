@@ -51,7 +51,8 @@ export class BombermanFighter extends Fighter {
     this.maxBombsCap = cfg.maxBombsCap ?? 10;
     this.maxBombs = Math.min(this.maxBombsCap, Math.max(1, cfg.initialMaxBombs ?? 1));
     this.plantCooldown = Math.max(30, cfg.plantCooldown ?? 90);
-    this.plantCooldownTimer = 0; // Ready immediately for the 1st lay (1 active bomb)
+    this.plantInitialCooldown = cfg.plantInitialCooldown ?? 0;
+    this.plantCooldownTimer = this.plantInitialCooldown;
     this.layStepInterval = Math.max(12, cfg.layStepInterval ?? 28);
     this.layStepTimer = 0;
     this._bombsLaidInCurrentCycle = 0;
@@ -61,7 +62,8 @@ export class BombermanFighter extends Fighter {
     this.maxFireLevelCap = cfg.maxFireLevelCap ?? 10;
     this.fireLevel = Math.min(this.maxFireLevelCap, Math.max(1, cfg.initialFireLevel ?? 1));
     this.fireUpCooldown = Math.max(60, cfg.fireUpCooldown ?? 210);
-    this.fireUpTimer = 90;
+    this.fireUpInitialCooldown = cfg.fireUpInitialCooldown ?? 120;
+    this.fireUpTimer = this.fireUpInitialCooldown;
     this.baseBlastRadius = cfg.baseBlastRadius ?? 65;
     this.blastRadiusPerLevel = cfg.blastRadiusPerLevel ?? 20;
     this.damagePerFireLevel = cfg.damagePerFireLevel ?? 2.5;
@@ -73,16 +75,18 @@ export class BombermanFighter extends Fighter {
     this.kickHitPauseFrames = cfg.kickHitPauseFrames ?? 5;
     this.kickHitPauseTimer = 0;
     this.bombKickCooldown = Math.max(45, cfg.bombKickCooldown ?? 150);
-    this.bombKickTimer = 75;
+    this.bombKickInitialCooldown = cfg.bombKickInitialCooldown ?? 90;
+    this.bombKickTimer = this.bombKickInitialCooldown;
     this.bombKickSpeed = cfg.bombKickSpeed ?? 9.5;
     this.bombKickImpactDamage = cfg.bombKickImpactDamage ?? 12;
     this.bombKickKnockback = cfg.bombKickKnockback ?? 10;
     this.kickAnimTimer = 0;
 
     // ── Ultimate: Invincible (30 Seconds = 1800 Frames) ──
-    this.invincibleDuration = cfg.invincibleDuration ?? 1800;
-    this.invincibleCooldown = Math.max(300, cfg.invincibleCooldown ?? 2400);
-    this.invincibleCooldownTimer = cfg.invincibleInitialCooldown ?? 720;
+    this.invincibleDuration = cfg.invincibleDuration ?? 500;
+    this.invincibleCooldown = Math.max(300, cfg.invincibleCooldown ?? 1000);
+    this.invincibleInitialCooldown = cfg.invincibleInitialCooldown ?? 720;
+    this.invincibleCooldownTimer = this.invincibleInitialCooldown;
     this.invincibleTimer = 0;
     this.isInvincibleUltimate = false;
     this.invincibleSpeedMultiplier = cfg.invincibleSpeedMultiplier ?? 1.15;
@@ -98,6 +102,8 @@ export class BombermanFighter extends Fighter {
     this.chainBonusDamage = cfg.chainBonusDamage ?? 8;
     this.bombKnockback = cfg.bombKnockback ?? 14;
     this.explosionDuration = cfg.explosionDuration ?? 28;
+    this.bombSlowDuration = cfg.bombSlowDuration ?? 75;
+    this.bombSlowMultiplier = cfg.bombSlowMultiplier ?? 0.5;
 
     this.activeBombs = [];
     this.activeVisualExplosions = [];
@@ -149,7 +155,9 @@ export class BombermanFighter extends Fighter {
     for (let i = 0; i < this.activeVisualExplosions.length; i++) {
       const exp = this.activeVisualExplosions[i];
       if (!exp || exp.timer <= 4) continue;
-      const halfThick = (exp.thickness || 36) * 0.5;
+      const halfThick = (exp.thickness || 42) * 0.5;
+      const dist = Math.hypot(tx - exp.x, ty - exp.y);
+      if (dist <= (exp.centerRadius || 36)) return true;
       const inHoriz =
         Math.abs(ty - exp.y) <= halfThick &&
         tx >= exp.x - (exp.reachLeft || 65) &&
@@ -619,7 +627,8 @@ export class BombermanFighter extends Fighter {
   _detonateBomb(bomb, arena = state.arena, isChain = false) {
     if (!bomb) return;
     const blastR = bomb.blastRadius || this.getCurrentBlastRadius();
-    const halfThick = (this.flameArmThickness || 36) * 0.5;
+    const thickness = this.flameArmThickness || 42;
+    const halfThick = thickness * 0.5;
 
     const minX = arena ? arena.x : 0;
     const maxX = arena ? arena.x + arena.width : 540;
@@ -631,7 +640,7 @@ export class BombermanFighter extends Fighter {
     const reachDown = Math.max(12, Math.min(blastR, maxY - bomb.y));
     const reachUp = Math.max(12, Math.min(blastR, bomb.y - minY));
 
-    this.activeVisualExplosions.push({
+    const expObj = {
       x: bomb.x,
       y: bomb.y,
       blastRadius: blastR,
@@ -639,66 +648,133 @@ export class BombermanFighter extends Fighter {
       reachLeft,
       reachDown,
       reachUp,
-      thickness: this.flameArmThickness || 36,
+      thickness,
+      centerRadius: Math.max(bomb.r || 22, thickness * 0.95),
       timer: this.explosionDuration,
       maxTimer: this.explosionDuration,
-    });
+      isChain: isChain || bomb.isChainTriggered,
+      damage: this.getCurrentBombDamage(isChain || bomb.isChainTriggered),
+      hitEntities: new Set(),
+    };
 
-    this._playSfx(isChain || bomb.isChainTriggered ? 'chainExplode' : 'bombExplode');
-    triggerGlobalScreenShake(isChain ? 4.0 : 2.8, 6);
+    this.activeVisualExplosions.push(expObj);
+
+    this._playSfx(expObj.isChain ? 'chainExplode' : 'bombExplode');
+
+    const cfg = CONFIG.bomberman || {};
+    const shakeIntensity = expObj.isChain
+      ? (cfg.chainExplosionShakeIntensity ?? 8.5)
+      : (cfg.bombExplosionShakeIntensity ?? 6.0);
+    const shakeDuration = expObj.isChain
+      ? (cfg.chainExplosionShakeDuration ?? 16)
+      : (cfg.bombExplosionShakeDuration ?? 12);
+
+    if (typeof triggerGlobalScreenShake === 'function') {
+      triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+    }
 
     // 1. Chain-Reaction Check on other active bombs in the cross-blast arms
     for (let i = 0; i < this.activeBombs.length; i++) {
       const other = this.activeBombs[i];
       if (!other || other === bomb || other.fuseTimer <= 0) continue;
 
-      const inHorizArm =
-        Math.abs(other.y - bomb.y) <= halfThick + other.r * 0.6 &&
-        other.x >= bomb.x - reachLeft - other.r * 0.5 &&
-        other.x <= bomb.x + reachRight + other.r * 0.5;
-      const inVertArm =
-        Math.abs(other.x - bomb.x) <= halfThick + other.r * 0.6 &&
-        other.y >= bomb.y - reachUp - other.r * 0.5 &&
-        other.y <= bomb.y + reachDown + other.r * 0.5;
+      const otherR = other.r || 22;
+      const dxOther = other.x - bomb.x;
+      const dyOther = other.y - bomb.y;
+      const distOther = Math.hypot(dxOther, dyOther);
 
-      if (inHorizArm || inVertArm) {
+      const inCenterOther = distOther <= (expObj.centerRadius + otherR);
+      const inHorizArm =
+        Math.abs(dyOther) <= (halfThick + otherR) &&
+        other.x >= bomb.x - reachLeft - otherR &&
+        other.x <= bomb.x + reachRight + otherR;
+      const inVertArm =
+        Math.abs(dxOther) <= (halfThick + otherR) &&
+        other.y >= bomb.y - reachUp - otherR &&
+        other.y <= bomb.y + reachDown + otherR;
+
+      if (inCenterOther || inHorizArm || inVertArm) {
         other.isChainTriggered = true;
-        // Domino chain delay of 10 frames so chained explosions cascade visibly rather than all on 1 frame
-        other.fuseTimer = Math.min(other.fuseTimer, 10);
+        // Domino chain delay of 8 frames so chained explosions cascade visibly
+        other.fuseTimer = Math.min(other.fuseTimer, 8);
       }
     }
 
-    // 2. Hit Detection against Enemy Fighters & Illusions
-    const dmg = this.getCurrentBombDamage(isChain || bomb.isChainTriggered);
+    // 2. Immediate hit check on frame 0
+    this._checkExplosionHits(expObj);
+  }
+
+  /**
+   * Evaluates collision and applies damage & slow debuff to all enemy entities
+   * caught inside the cross flame arms ('+') or central epicenter disc of an explosion.
+   * Uses continuous active-blast window tracking (each entity is hit at most once per explosion).
+   */
+  _checkExplosionHits(exp) {
+    if (!exp) return;
+    exp.hitEntities = exp.hitEntities || new Set();
+
+    const blastR = exp.blastRadius || this.getCurrentBlastRadius();
+    const halfThick = (exp.thickness || this.flameArmThickness || 42) * 0.5;
+    const centerRadius = Math.max(exp.centerRadius || 36, halfThick * 1.5);
+    const reachRight = exp.reachRight ?? blastR;
+    const reachLeft = exp.reachLeft ?? blastR;
+    const reachDown = exp.reachDown ?? blastR;
+    const reachUp = exp.reachUp ?? blastR;
+
+    const dmg = exp.damage || this.getCurrentBombDamage(exp.isChain);
     const candidates = [...(state.fighters || []), ...(state.illusions || [])];
 
     for (let i = 0; i < candidates.length; i++) {
       const target = candidates[i];
       if (!target || target === this || target.hp <= 0) continue;
-      if (typeof this.isTeammate === 'function' && this.isTeammate(target)) continue;
+
+      // Teammate immunity check
+      if (typeof this.isTeammate === 'function') {
+        if (this.isTeammate(target)) continue;
+      } else if (typeof state.getFighterTeam === 'function' && state.fighters) {
+        const myIdx = state.fighters.indexOf(this);
+        const tgtIdx = state.fighters.indexOf(target);
+        if (myIdx >= 0 && tgtIdx >= 0 && state.getFighterTeam(myIdx) === state.getFighterTeam(tgtIdx)) {
+          continue;
+        }
+      }
+
+      if (exp.hitEntities.has(target)) continue;
 
       const tr = target.r || 25;
-      const inHoriz =
-        Math.abs(target.y - bomb.y) <= halfThick + tr * 0.75 &&
-        target.x >= bomb.x - reachLeft - tr * 0.6 &&
-        target.x <= bomb.x + reachRight + tr * 0.6;
-      const inVert =
-        Math.abs(target.x - bomb.x) <= halfThick + tr * 0.75 &&
-        target.y >= bomb.y - reachUp - tr * 0.6 &&
-        target.y <= bomb.y + reachDown + tr * 0.6;
+      const dx = target.x - exp.x;
+      const dy = target.y - exp.y;
+      const distToCenter = Math.hypot(dx, dy);
 
-      if (!inHoriz && !inVert) continue;
+      // 1. Central Epicenter Disc check (guarantees hit for enemies adjacent to or touching the bomb core)
+      const inCenter = distToCenter <= (centerRadius + tr);
+
+      // 2. Horizontal Flame Arm check (full circle-to-box collision along +X / -X)
+      const inHoriz =
+        Math.abs(dy) <= (halfThick + tr) &&
+        target.x >= (exp.x - reachLeft - tr) &&
+        target.x <= (exp.x + reachRight + tr);
+
+      // 3. Vertical Flame Arm check (full circle-to-box collision along +Y / -Y)
+      const inVert =
+        Math.abs(dx) <= (halfThick + tr) &&
+        target.y >= (exp.y - reachUp - tr) &&
+        target.y <= (exp.y + reachDown + tr);
+
+      if (!inCenter && !inHoriz && !inVert) continue;
+
+      // Mark target as hit by this explosion so damage is not dealt multiple times
+      exp.hitEntities.add(target);
 
       if (this._isBlockedByGojoInfinity(target)) {
         spawnFloatingText(target.x, target.y - tr - 10, 'INFINITY', '#38BDF8');
         continue;
       }
 
-      const pushAngle = Math.atan2(target.y - bomb.y, target.x - bomb.x);
+      const pushAngle = Math.atan2(dy, dx) || 0;
       const kb = this.bombKnockback || 14;
 
       // 2a. Global Hit Effects on hit target:
-      // Global 12-Frame Punch/Hit Impact Animation (Assets/effects/Punch Attack/)
       if (typeof spawnAnimePunchImpactFrame === 'function') {
         spawnAnimePunchImpactFrame(target.x, target.y, 65, pushAngle, 'orange');
       }
@@ -710,7 +786,7 @@ export class BombermanFighter extends Fighter {
       }
       target.hitFlashTimer = 8; // Global white hit-flash on target body
       if (typeof triggerGlobalScreenShake === 'function') {
-        triggerGlobalScreenShake(3.0, 8);
+        triggerGlobalScreenShake(exp.isChain ? 5.5 : 4.5, exp.isChain ? 12 : 10);
       }
       if (audioSystem && typeof audioSystem.playSFX === 'function') {
         audioSystem.playSFX('attack_fleshhit', 0.65);
@@ -745,6 +821,19 @@ export class BombermanFighter extends Fighter {
       if (typeof target.applyHitStun === 'function') {
         target.applyHitStun(12);
       }
+
+      // 2c. Slow Debuff Mechanic on hit entities:
+      const slowDur = this.bombSlowDuration || 75;
+      const slowMult = this.bombSlowMultiplier || 0.5;
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(slowDur, slowMult, { isBombermanExplosion: true });
+      } else if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+        target.statusEffects.applySlow(slowDur, slowMult, { isBombermanExplosion: true });
+      } else {
+        target.slowTimer = Math.max(target.slowTimer || 0, slowDur);
+        target.slowMultiplier = slowMult;
+      }
+      spawnFloatingText(target.x, target.y - tr - 14, 'SLOWED!', '#38BDF8');
     }
   }
 
@@ -1015,11 +1104,18 @@ export class BombermanFighter extends Fighter {
 
   /**
    * Rule 25: Decays active visual explosions before freeze guard so visuals NEVER freeze in mid-air.
+   * Also continues active flame hit detection while the cross flames are visibly burning.
    */
   _updateVisualExplosions() {
     for (let i = this.activeVisualExplosions.length - 1; i >= 0; i--) {
       const exp = this.activeVisualExplosions[i];
       exp.timer--;
+
+      // Active flame damage window: while flame arms are blazing (first ~65% of animation)
+      if (exp.timer >= (exp.maxTimer || 28) * 0.35) {
+        this._checkExplosionHits(exp);
+      }
+
       if (exp.timer <= 0) {
         this.activeVisualExplosions.splice(i, 1);
       }

@@ -2972,56 +2972,87 @@ export const HUD_SKILL_PROVIDERS = {
     const themeColor = f.color || cfg.themeColor || '#2563EB';
     const skills = [];
 
-    const maxBombsCap = f.maxBombsCap || cfg.maxBombsCap || 10;
-    const curMaxBombs = f.maxBombs || 1;
-    const bombUpPct = Math.max(0, Math.min(100, (curMaxBombs / maxBombsCap) * 100));
-    skills.push({
-      id: 'bomb_up',
-      pct: bombUpPct,
-      ready: curMaxBombs >= maxBombsCap,
-      color: themeColor,
-      label: `PASSIVE: BOMB UP (${curMaxBombs}/${maxBombsCap})`,
-    });
+    // 1. Passive: Bomb Up (Max. 10 — Scales +1 Every Basic Attack Cooldown)
+    if (isSkillEnabled(cfg.enableBombUp, true)) {
+      const maxBombsCap = f.maxBombsCap || cfg.maxBombsCap || 10;
+      const curMaxBombs = f.maxBombs || 1;
+      const isBombCapMax = curMaxBombs >= maxBombsCap;
+      const bombUpPct = Math.max(0, Math.min(100, (curMaxBombs / maxBombsCap) * 100));
+      const cdLeft = f.plantCooldownTimer > 0 ? (f.plantCooldownTimer / 60).toFixed(1) : null;
+      const label = isBombCapMax
+        ? `BOMB UP (${maxBombsCap} MAX)`
+        : (cdLeft ? `BOMB UP (${curMaxBombs}/${maxBombsCap} - ${cdLeft}S)` : `BOMB UP (${curMaxBombs}/${maxBombsCap})`);
+      skills.push({
+        id: 'bomb_up',
+        pct: bombUpPct,
+        ready: isBombCapMax || (f.plantCooldownTimer || 0) <= 0,
+        color: themeColor,
+        label: label,
+      });
+    }
 
-    const maxFireCap = f.maxFireLevelCap || cfg.maxFireLevelCap || 10;
-    const curFireLv = f.fireLevel || 1;
-    const fireUpPct = Math.max(0, Math.min(100, (curFireLv / maxFireCap) * 100));
-    skills.push({
-      id: 'fire_up',
-      pct: fireUpPct,
-      ready: curFireLv >= maxFireCap,
-      color: themeColor,
-      label: `FIRE UP (LV.${curFireLv}/${maxFireCap})`,
-    });
+    // 2. Skill 1: Fire Up (Max. 10)
+    if (isSkillEnabled(cfg.enableFireUp, true)) {
+      const maxFireCap = f.maxFireLevelCap || cfg.maxFireLevelCap || 10;
+      const curFireLv = f.fireLevel || 1;
+      const isFireMax = curFireLv >= maxFireCap;
+      const fireCd = f.fireUpCooldown || cfg.fireUpCooldown || 210;
+      const fireTimer = f.fireUpTimer || 0;
+      const firePct = isFireMax ? 100 : (fireTimer <= 0 ? 100 : Math.max(0, Math.min(100, (1 - fireTimer / fireCd) * 100)));
+      const fireSecLeft = (fireTimer / 60).toFixed(1);
+      skills.push({
+        id: 'fire_up',
+        pct: firePct,
+        ready: isFireMax || fireTimer <= 0,
+        color: themeColor,
+        label: isFireMax
+          ? `FIRE UP (${maxFireCap} MAX)`
+          : (fireTimer > 0 ? `FIRE UP (${fireSecLeft}S)` : `FIRE UP (LV.${curFireLv}/${maxFireCap})`),
+      });
+    }
 
-    const kickCd = f.bombKickCooldown || cfg.bombKickCooldown || 150;
-    const kickPct = Math.max(0, Math.min(100, (1 - (f.bombKickTimer || 0) / kickCd) * 100));
-    const hasTravelingBomb = Array.isArray(f.activeBombs) && f.activeBombs.some((b) => b && b.isTraveling);
-    skills.push({
-      id: 'bomb_kick',
-      pct: hasTravelingBomb ? 100 : kickPct,
-      ready: hasTravelingBomb || kickPct >= 99,
-      color: themeColor,
-      label: hasTravelingBomb ? 'KICK (TRAVELING!)' : 'KICK',
-    });
+    // 3. Skill 2: Kick (Bomb Kick)
+    if (isSkillEnabled(cfg.enableBombKick, cfg.canKickBombs, true)) {
+      const kickCd = f.bombKickCooldown || cfg.bombKickCooldown || 150;
+      const kickTimer = f.bombKickTimer || 0;
+      const kickPct = Math.max(0, Math.min(100, (1 - kickTimer / kickCd) * 100));
+      const hasTravelingBomb = Array.isArray(f.activeBombs) && f.activeBombs.some((b) => b && b.isTraveling);
+      const kickSecLeft = (kickTimer / 60).toFixed(1);
+      skills.push({
+        id: 'bomb_kick',
+        pct: hasTravelingBomb ? 100 : kickPct,
+        ready: hasTravelingBomb || kickTimer <= 0,
+        color: themeColor,
+        label: hasTravelingBomb
+          ? 'BOMB KICK (TRAVELING)'
+          : (kickTimer > 0 ? `BOMB KICK (${kickSecLeft}S)` : 'BOMB KICK'),
+      });
+    }
 
-    const invDur = f.invincibleDuration || cfg.invincibleDuration || 1800;
-    const invCd = f.invincibleCooldown || cfg.invincibleCooldown || 2400;
-    const isInvincible = (f.invincibleTimer || 0) > 0;
-    const invSecLeft = Math.ceil((f.invincibleTimer || 0) / 60);
-    const invPct = isInvincible
-      ? Math.max(0, Math.min(100, (f.invincibleTimer / invDur) * 100))
-      : Math.max(0, Math.min(100, (1 - (f.invincibleCooldownTimer || 0) / invCd) * 100));
-    skills.push({
-      id: 'invincible',
-      pct: invPct,
-      ready: isInvincible || invPct >= 99,
-      color: themeColor,
-      label: isInvincible ? `INVINCIBLE (${invSecLeft}S)` : 'INVINCIBLE (30S)',
-      isSignature: true,
-      signature: true,
-      isUltimate: true,
-    });
+    // 4. Ultimate: Invincible (30.0s Incoming Attack Immunity)
+    if (isSkillEnabled(cfg.enableInvincible, true)) {
+      const invDur = f.invincibleDuration || cfg.invincibleDuration || 500;
+      const invCd = f.invincibleCooldown || cfg.invincibleCooldown || 1000;
+      const isInvincible = (f.invincibleTimer || 0) > 0;
+      const invSecLeft = Math.ceil((f.invincibleTimer || 0) / 60);
+      const cdTimer = f.invincibleCooldownTimer || 0;
+      const cdSecLeft = (cdTimer / 60).toFixed(1);
+      const invPct = isInvincible
+        ? Math.max(0, Math.min(100, (f.invincibleTimer / invDur) * 100))
+        : Math.max(0, Math.min(100, (1 - cdTimer / invCd) * 100));
+      skills.push({
+        id: 'invincible',
+        pct: invPct,
+        ready: isInvincible || cdTimer <= 0,
+        color: themeColor,
+        label: isInvincible
+          ? `INVINCIBLE (${invSecLeft}S)`
+          : (cdTimer > 0 ? `INVINCIBLE (${cdSecLeft}S)` : 'INVINCIBLE'),
+        isSignature: true,
+        signature: true,
+        isUltimate: true,
+      });
+    }
 
     return skills;
   },

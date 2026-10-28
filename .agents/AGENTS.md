@@ -199,10 +199,24 @@ After completing ANY code modification, update, or fix in the project, the agent
 - Recurring environmental/domain hazards that tick rapidly (e.g. slashes every 8 frames) MUST NOT invoke `applyHitStun(duration)` to prevent unintended perma-freeze.
 - Companion entities (Rika, clones, summons) evaluate status effects independently of their owner's transient `hitStunTimer`.
 
-### 2.8 UI, DOM Caching & HUD Palette Consistency
-- NEVER query DOM (`document.getElementById`) inside per-frame update loops. Cache references at file level.
-- All HUD skill progress bars for a fighter MUST use the **exact same consistent color theme** (`themeColor = f.color || ...`).
-- Floating Heal Text: Unified format `+<amount>` in neon emerald green (`#00FF66`) with `this._healthBarHealTimer = 16` for top health card pulse.
+### 2.8 Mandatory HUD Skill Bar Theme Consistency & Clean Architecture Standard (Rule 18)
+- **Unified Character Palette Standard**:
+  - All HUD skill progress bars for a fighter (Passive, Skill 1, Skill 2, Ultimate/Domain, Stances) **MUST ALWAYS** use the exact same consistent character theme color (`themeColor = f.color || cfg.themeColor || ...`).
+  - **STRICT PROHIBITION of Mismatched / Ad-Hoc Accent Colors**: NEVER assign mismatched, ad-hoc, or hardcoded accent colors to individual skill bars in `hudSkillProviders.js` or `hudManager.js`. Every skill bar returned in a fighter's HUD array MUST reference `themeColor` to preserve visual elegance and strong character identity.
+- **Mandatory Config Toggle Gating (`isSkillEnabled`)**:
+  - Every individual skill entry in `hudSkillProviders.js` **MUST** be gated by `isSkillEnabled(cfg.enable[Skill], ...)`.
+  - Disabling a skill toggle in `js/configs/characters/<name>Config.js` (`CONFIG.<characterId>`) MUST cleanly hide its corresponding HUD skill bar without orphaned UI elements or runtime exceptions.
+- **Clean Label Standard (Prohibition of Redundant Parenthetical Status Suffixes)**:
+  - Skill labels MUST NEVER include redundant status suffixes like `(READY)`, `(ACTIVE)`, `(CASTING)`, `(THROWING)`, `(SUMMONING)`, or `(EXECUTING)` when the skill is idle or ready. The HUD engine automatically provides visual feedback by applying the glowing `hud-skill-ready` CSS class and 100% fill width.
+  - Parenthetical dynamic indicators are strictly reserved for live countdown timers (e.g. `(2.5S)`), remaining resource charges/levels (e.g. `(LV.3/10)`, `(3/10)`), or active duration drain (e.g. `(30.0S)`).
+- **Percentage Clamping & Progression ($0\% - 100\%$)**:
+  - Progress percentages (`pct`) MUST strictly be clamped between $0$ and $100$ using `Math.max(0, Math.min(100, ...))`.
+  - The `ready` boolean MUST cleanly represent cast readiness (`pct >= 99 && cooldown <= 0`).
+- **Signature & Ultimate Registration (`isSkillExceptionInDarkMode`)**:
+  - Ultimate and signature skills MUST declare `isSignature: true, signature: true, isUltimate: true` and register their character ID and ability key in `signatureMap` inside `isSkillExceptionInDarkMode()` in `js/graphics/ui/hudSkillProviders.js`.
+- **Zero DOM Queries in Per-Frame Loops**:
+  - NEVER query DOM (`document.getElementById`) inside per-frame update loops or HUD skill providers. Cache references at file level.
+- **Floating Heal Text**: Unified format `+<amount>` in neon emerald green (`#00FF66`) with `this._healthBarHealTimer = 16` for top health card pulse.
 
 ### 2.9 Mandatory In-Game Overlay HP & Status Drawing (Rule 21)
 - **Mandatory Overhead HP Layer**: Whenever creating, scaffolding, or overriding a fighter's `draw(ctx, opponent)` rendering pipeline:

@@ -429,6 +429,17 @@ export const BASIC_ATTACK_SOUNDS = {
     src: 'Assets/Sound Effects/Avatar/RiftShoot1.ogg',
     volume: 0.85,
     delay: 0,
+  },
+
+  // ── Bomber Man (ID 65) ──────────
+  65: {
+    get src() {
+      return CONFIG.bomberman?.sounds?.plantBomb || 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav';
+    },
+    get volume() {
+      return CONFIG.bomberman?.soundVolumes?.plantBomb ?? 0.85;
+    },
+    delay: 0,
   }
 };
 
@@ -1266,6 +1277,15 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   'berserker': {
     src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     volume: 1.0,
+    delay: 0,
+  },
+  'bomberman': {
+    get src() {
+      return CONFIG.bomberman?.sounds?.plantBomb || 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav';
+    },
+    get volume() {
+      return CONFIG.bomberman?.soundVolumes?.plantBomb ?? 0.85;
+    },
     delay: 0,
   }
 };

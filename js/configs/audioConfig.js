@@ -271,10 +271,13 @@ export const AUDIO_CONFIG = {
   'unarmed_wallbounce': 'Assets/Sound Effects/UnarmedSFX/unarmed_wall_bump.mp3',
 
   // Bomberman (Classic Arcade)
-  'bomberman_bomb_explode': 'Assets/Sound Effects/BombermanSFX/Bomb Explodes.wav',
+  'bomberman_bomb_explode': 'Assets/Sound Effects/Attacks/explosion.mp3',
   'bomberman_place_bomb': 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav',
   'bomberman_walking': 'Assets/Sound Effects/BombermanSFX/Walking 1.wav',
-  'bomberman_walk': 'Assets/Sound Effects/BombermanSFX/Walking 1.wav'
+  'bomberman_walk': 'Assets/Sound Effects/BombermanSFX/Walking 1.wav',
+  'bomberman_bomb_kick': 'Assets/Sound Effects/BombermanSFX/Kick - Pressure Block.wav',
+  'bomberman_kick': 'Assets/Sound Effects/BombermanSFX/Kick - Pressure Block.wav',
+  'bomberman_fire_up': 'Assets/Sound Effects/BombermanSFX/era_vera-easter22-gun-melee-summon.wav'
 };
 
 

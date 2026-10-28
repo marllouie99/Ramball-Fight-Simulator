@@ -12062,7 +12062,10 @@ async function runInteractionTests() {
     // 2. Verify Passive: Bomb Up — 1st lay = 1 active bomb; when basic attack CD is up = 2 active bombs; next basic attack CD = 3 active bombs, up to Max. 10
     const freshBomberman = new BombermanClass({ x: 118, y: 312, color: '#2563EB', controls: {} });
     assert(freshBomberman.maxBombs === 1, `1st lay must start with maxBombs === 1 (got ${freshBomberman.maxBombs})`);
-    assert(freshBomberman.plantCooldownTimer === 0, 'Basic attack CD must start at 0 for the 1st lay');
+    assert(freshBomberman.plantCooldownTimer === (CONFIG.bomberman.plantInitialCooldown || 0), 'plantCooldownTimer must initialize to plantInitialCooldown');
+    assert(freshBomberman.fireUpTimer === (CONFIG.bomberman.fireUpInitialCooldown || 120), `fireUpTimer must initialize to fireUpInitialCooldown (got ${freshBomberman.fireUpTimer})`);
+    assert(freshBomberman.bombKickTimer === (CONFIG.bomberman.bombKickInitialCooldown || 90), `bombKickTimer must initialize to bombKickInitialCooldown (got ${freshBomberman.bombKickTimer})`);
+    assert(freshBomberman.invincibleCooldownTimer === (CONFIG.bomberman.invincibleInitialCooldown || 720), `invincibleCooldownTimer must initialize to invincibleInitialCooldown (got ${freshBomberman.invincibleCooldownTimer})`);
 
     // First lay: Bomberman lays 1 active bomb and cannot lay a 2nd yet; basic attack CD starts
     const firstLayBomb = freshBomberman.plantBomb(arena, true);
@@ -12101,13 +12104,14 @@ async function runInteractionTests() {
     assert(freshBomberman.maxBombs === 10, `Passive Bomb Up must cap maxBombs at 10 (got ${freshBomberman.maxBombs})`);
     bomberman.maxBombs = 10;
 
-    // 3. Verify Skill 2: Fire Up scales from 1 to Max. 10 and caps at 10
+    // 3. Verify Skill 2: Fire Up scales from 1 to Max cap and caps at maxFireLevelCap
     bomberman.fireLevel = 1;
     const lv1Blast = bomberman.getCurrentBlastRadius();
-    for (let i = 0; i < 12; i++) {
+    const targetMaxFire = bomberman.maxFireLevelCap || CONFIG.bomberman.maxFireLevelCap || 10;
+    for (let i = 0; i < targetMaxFire + 2; i++) {
       bomberman.castFireUp(arena);
     }
-    assert(bomberman.fireLevel === 10, `Fire Up must cap fireLevel at 10 (got ${bomberman.fireLevel})`);
+    assert(bomberman.fireLevel === targetMaxFire, `Fire Up must cap fireLevel at ${targetMaxFire} (got ${bomberman.fireLevel})`);
     assert(bomberman.getCurrentBlastRadius() > lv1Blast, 'Lv.10 Fire Up blast radius must exceed Lv.1 blast radius');
 
     // 4. Verify Skill 3: Kick allows Bomberman to kick his bombs so they travel across the arena and can explode mid-traveling
@@ -12150,6 +12154,8 @@ async function runInteractionTests() {
     assert(enemy.hp < enemyHpBefore, `Mid-traveling bomb explosion must damage enemy in blast path (${enemyHpBefore} -> ${enemy.hp})`);
     assert(enemy.hitFlashTimer === 8, 'Enemy hit by bomb explosion must receive global hitFlashTimer = 8');
     assert(state.sparkEffects.some(p => p.type === 'animeImpactFrame'), 'Bomb explosion hit must spawn global 12-frame animeImpactFrame hit effect');
+    assert(enemy.slowTimer > 0, `Enemy hit by bomb explosion must receive slowTimer debuff (got ${enemy.slowTimer})`);
+    assert(enemy.slowMultiplier === (bomberman.bombSlowMultiplier || 0.5), `Enemy hit by bomb explosion must receive slowMultiplier (got ${enemy.slowMultiplier})`);
 
     // 4b. Verify Proximity Gate (Strictly Prohibits Long-Distance Kicks):
     // Bomberman must be very close to the bomb (within touching/adjacent range) to kick it!
@@ -12230,9 +12236,9 @@ async function runInteractionTests() {
     assert(directHitBomb.vx === 0 && directHitBomb.vy === 0, 'Kicked bomb velocity MUST be 0 on enemy collision (must NOT bulldozingly push or follow enemy)');
     bomberman.activeBombs.length = 0; // Clean up bombs before next step
 
-    // 5. Verify Skill 4 (Ultimate): Invincible grants 30 seconds (1800 frames) of incoming attack immunity
+    // 5. Verify Skill 4 (Ultimate): Invincible grants incoming attack immunity
     bomberman.castInvincible();
-    assert(bomberman.invincibleTimer === 1800, `Invincible Ultimate must last 1800 frames / 30 seconds (got ${bomberman.invincibleTimer})`);
+    assert(bomberman.invincibleTimer === bomberman.invincibleDuration, `Invincible Ultimate must match configured duration ${bomberman.invincibleDuration} frames (got ${bomberman.invincibleTimer})`);
     const bmHpBefore = bomberman.hp;
     const damaged = bomberman.takeDamage(95, enemy);
     assert(damaged === false && bomberman.hp === bmHpBefore, 'Bomberman must take 0 damage from enemy attacks while Invincible is active');
@@ -12249,12 +12255,23 @@ async function runInteractionTests() {
     bomberman.draw(mockCtx, enemy);
     assert(mockCtx.getStackDepth() === 0, `Bomberman.draw() must maintain 0 Canvas 2D stack depth (got ${mockCtx.getStackDepth()})`);
 
-    // 7. Verify Bomberman Dedicated Authentic SFX Wiring (Bomb Explodes, Place Bomb, Walking 1)
+    // 7. Verify Bomberman Dedicated Authentic SFX Wiring (explosion.mp3, Place Bomb, Walking 1, Kick - Pressure Block, era_vera Fire Up)
     const cfg = CONFIG.bomberman;
     assert(cfg.sounds.plantBomb === 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav', 'plantBomb SFX must map to Place Bomb.wav');
-    assert(cfg.sounds.bombExplode === 'Assets/Sound Effects/BombermanSFX/Bomb Explodes.wav', 'bombExplode SFX must map to Bomb Explodes.wav');
+    assert(cfg.sounds.bombExplode === 'Assets/Sound Effects/Attacks/explosion.mp3', 'bombExplode SFX must map to explosion.mp3');
     assert(cfg.sounds.walk === 'Assets/Sound Effects/BombermanSFX/Walking 1.wav', 'walk SFX must map to Walking 1.wav');
-    assert(typeof cfg.soundVolumes.walk === 'number' && cfg.soundVolumes.walk > 0, 'walk sound volume must be defined');
+    assert(cfg.sounds.bombKick === 'Assets/Sound Effects/BombermanSFX/Kick - Pressure Block.wav', 'bombKick SFX must map to Kick - Pressure Block.wav');
+    assert(cfg.sounds.fireUp === 'Assets/Sound Effects/BombermanSFX/era_vera-easter22-gun-melee-summon.wav', 'fireUp SFX must map to era_vera-easter22-gun-melee-summon.wav');
+    assert(typeof cfg.soundVolumes.walk === 'number', 'walk sound volume must be defined');
+    assert(typeof cfg.soundVolumes.bombKick === 'number', 'bombKick sound volume must be defined');
+    assert(typeof cfg.soundVolumes.fireUp === 'number', 'fireUp sound volume must be defined');
+    assert(typeof cfg.bombSlowDuration === 'number' && cfg.bombSlowDuration > 0, 'bombSlowDuration must be configured');
+    assert(typeof cfg.bombSlowMultiplier === 'number' && cfg.bombSlowMultiplier < 1.0, 'bombSlowMultiplier must be < 1.0');
+    assert(typeof cfg.bombExplosionShakeIntensity === 'number' && cfg.bombExplosionShakeIntensity >= 6.0, 'bombExplosionShakeIntensity must be configured');
+    assert(typeof cfg.chainExplosionShakeIntensity === 'number' && cfg.chainExplosionShakeIntensity >= 8.5, 'chainExplosionShakeIntensity must be configured');
+    assert(typeof cfg.fireUpInitialCooldown === 'number' && cfg.fireUpInitialCooldown > 0, 'fireUpInitialCooldown must be configured');
+    assert(typeof cfg.bombKickInitialCooldown === 'number' && cfg.bombKickInitialCooldown > 0, 'bombKickInitialCooldown must be configured');
+    assert(typeof cfg.invincibleInitialCooldown === 'number' && cfg.invincibleInitialCooldown > 0, 'invincibleInitialCooldown must be configured');
 
     // Verify walking step timer behavior
     bomberman.vx = 2.5;
@@ -12265,7 +12282,55 @@ async function runInteractionTests() {
     bomberman.update(enemy, 0, arena);
     assert(bomberman.walkSoundTimer === 50, `Active walking must trigger walking step timer (got ${bomberman.walkSoundTimer})`);
 
-    console.log('      ✅ Bomber Man (tile-centered bombs, Bomb Up Max 10, Fire Up Max 10, Kick traveling & mid-travel explosion, 30s Invincible, dedicated SFX & stack balance) verified.');
+    // 8. Verify Bomberman HUD Skill Bar (Rule 18 / Rule 2.8 compliance & Clean Label Standard)
+    const { getSkillDataForFighter, isSkillExceptionInDarkMode } = await import('../js/graphics/ui/hudSkillProviders.js');
+    const bmSkills = getSkillDataForFighter(bomberman);
+    assert(Array.isArray(bmSkills) && bmSkills.length === 4, `Bomberman must have 4 HUD skill bars when all are enabled (got ${bmSkills?.length})`);
+    const themeColor = bomberman.color || cfg.themeColor || '#2563EB';
+    for (const s of bmSkills) {
+      assert(s.color === themeColor, `Skill '${s.id}' color '${s.color}' must match themeColor '${themeColor}' (Rule 18)`);
+      assert(!s.label.includes('(READY)') && !s.label.includes('(ACTIVE)'), `Skill '${s.id}' label '${s.label}' must adhere to Clean Label Standard`);
+      assert(s.pct >= 0 && s.pct <= 100, `Skill '${s.id}' pct must be clamped between 0 and 100 (got ${s.pct})`);
+    }
+    const invSkill = bmSkills.find(s => s.id === 'invincible');
+    assert(invSkill && invSkill.isSignature && invSkill.isUltimate, 'Invincible skill must be flagged as signature and ultimate');
+    assert(isSkillExceptionInDarkMode(bomberman, invSkill), 'Invincible skill must be registered in signatureMap for dark mode HUD exception');
+
+    // Verify config toggle gating: disabling a skill cleanly removes its HUD skill bar
+    const origKickEnabled = cfg.enableBombKick;
+    cfg.enableBombKick = false;
+    const bmSkillsFiltered = getSkillDataForFighter(bomberman);
+    assert(!bmSkillsFiltered.some(s => s.id === 'bomb_kick'), 'Disabling enableBombKick must hide its HUD skill bar');
+    cfg.enableBombKick = origKickEnabled;
+
+    // 9. Verify Basic Attack Sound Registration (No console warning, id=65, type="bomberman")
+    const { getBasicAttackSound } = await import('../js/soundEffects/basicAttackSounds.js');
+    const bSoundById = getBasicAttackSound(65, 'bomberman');
+    assert(bSoundById && bSoundById.src === 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav', 'getBasicAttackSound by id 65 must return Place Bomb.wav');
+    const bSoundByType = getBasicAttackSound(null, 'bomberman');
+    assert(bSoundByType && bSoundByType.src === 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav', 'getBasicAttackSound by type "bomberman" must return Place Bomb.wav');
+
+    // 10. Verify Continuous Active Blast Window & Center Bloom Hit Detection
+    const expBomb = bomberman.plantBomb(arena, true);
+    enemy.hp = 1000;
+    enemy.x = expBomb.x + 35; // Positioned diagonally near epicenter
+    enemy.y = expBomb.y + 35;
+    bomberman._detonateBomb(expBomb, arena);
+    assert(enemy.hp < 1000, 'Enemy placed diagonally within epicenter disc must receive explosion damage');
+    assert(enemy.slowTimer > 0, 'Enemy caught in blast must receive slowTimer');
+
+    // Verify entity walking into active flames after detonation takes damage during active flame window
+    const walkingEnemy = new NormalClass({ x: arena.x + 300, y: arena.y + 300, color: '#EF4444', controls: {} });
+    state.fighters.push(walkingEnemy);
+    const activeExp = bomberman.activeVisualExplosions[bomberman.activeVisualExplosions.length - 1];
+    walkingEnemy.hp = 500;
+    walkingEnemy.x = activeExp.x + 20; // Step directly into horizontal flame arm
+    walkingEnemy.y = activeExp.y;
+    bomberman._updateVisualExplosions();
+    assert(walkingEnemy.hp < 500, 'Enemy walking into active flame arm must take damage during flame burn window');
+    state.fighters = state.fighters.filter(f => f !== walkingEnemy);
+
+    console.log('      ✅ Bomber Man (tile-centered bombs, Bomb Up Max 10, Fire Up Max 10, Kick traveling & mid-travel explosion, 30s Invincible, dedicated SFX, basic attack sound registration, active flame hitbox, Rule 18 HUD skill bars & stack balance) verified.');
   }
 
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');

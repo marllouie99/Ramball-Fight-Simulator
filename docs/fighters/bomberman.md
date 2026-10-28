@@ -118,8 +118,9 @@ Bomber Man's body model, helmet visor, tunic, belt, and boots strictly adhere to
   - **4-Way Cross Blast (`+` Pattern) & Chain Reactions**:
     - When the fuse reaches `0`, the bomb detonates in an iconic 4-directional cardinal/aligned cross pillar (`0°`, `90°`, `180°`, `270°`) plus a central concentric shockwave disc (Rule 26).
     - **Chain Reaction Ignition**: Any other planted bomb caught within the blast arm of an exploding bomb has its fuse immediately reduced to `2 frames`, triggering instantaneous domino chain detonations across the arena!
-  - **Damage & Knockback**:
-    - **Single Bomb Hit**: `28 Explosive Damage` + `16 Knockback Impulse`.
+  - **Damage, Knockback & Slow Debuff Mechanic**:
+    - **Single Bomb Hit**: `28 Explosive Damage` + `14 Knockback Impulse`.
+    - **Slow Debuff**: Entities struck by a bomb explosion cross blast are afflicted with a **`1.25s` (`75 frames`) Slow Debuff** (`slowMultiplier: 0.50`), cutting their movement speed in half ($50\%$) and displaying overhead `"SLOWED!"` floating text (`#38BDF8`).
     - **Multi-Bomb Chain Overlap**: Enemies caught in intersecting chain blasts take full primary damage from the first bomb plus `+8 Bonus Chain Damage` per additional overlapping bomb blast (preventing instant 1-frame 100%-to-0 cheese while heavily rewarding multi-bomb traps).
 
 ---
@@ -145,7 +146,8 @@ Bomber Man's body model, helmet visor, tunic, belt, and boots strictly adhere to
 > *"Increase the blast radius all bombs can make (Max. 10)."*
 
 * **Type**: Permanent Match Blast Radius Scaling Upgrade
-* **Cooldown**: `5.0 seconds` (`300 frames`)
+* **Cooldown**: `3.5 seconds` (`210 frames`)
+* **Initial Cooldown**: `2.0 seconds` (`120 frames` at match start before first upgrade cast)
 * **Maximum Stack Cap**: **`Level 10`** (`fireLevel = Math.min(10, this.fireLevel + 1)`)
 * **Blast Radius Scaling Formula**:
   $$R_{\text{blast}}(\text{level}) = 65\text{px} + (\text{level} - 1) \times 20\text{px} \quad (\text{Level } 1 = 65\text{px} \longrightarrow \text{Level } 10 = 245\text{px})$$
@@ -173,6 +175,7 @@ Bomber Man's body model, helmet visor, tunic, belt, and boots strictly adhere to
 
 * **Type**: Active & Contact Bomb Kick (Sliding Bomb Projectile & Mid-Travel Explosion)
 * **Cooldown**: `2.5 seconds` (`150 frames` for active kick command; contact kick triggers automatically when colliding with a stationary planted bomb)
+* **Initial Cooldown**: `1.5 seconds` (`90 frames` at match start before first kick command)
 * **Kick Range (Proximity Rule)**: `64px` (`bombKickRange: 64` — Bomberman must be in touching or immediately adjacent boot range to kick a bomb; long-distance kicks are strictly prohibited)
 * **Travel Direction Standard**: **Strict 4-Way Orthogonal Cardinal Directions (UP, DOWN, LEFT, RIGHT only)**. Arbitrary or diagonal angles snap strictly to the nearest cardinal vector with the perpendicular velocity component locked strictly to `0` (`vx = ±speed, vy = 0` or `vx = 0, vy = ±speed`).
 * **Kick Travel Speed**: `9.5px / frame`
@@ -199,7 +202,7 @@ Bomber Man's body model, helmet visor, tunic, belt, and boots strictly adhere to
       - **12-Frame Anime Punch Impact Frame**: Renders the canonical retro anime impact sequence from `Assets/effects/Punch Attack/` (`spawnAnimePunchImpactFrame(target.x, target.y, 65, pushAngle, 'orange')` or `'gold'`).
       - **Impact Flash & Sparks**: Concentric radial impact bloom (`spawnImpactFlash`, 38px, `#F97316` / `#FACC15`) with spark ember burst (`spawnSparks`, 10 particles).
       - **Global Hit-Flash Overlay**: Triggers `target.hitFlashTimer = 8` for the universal white body flash.
-      - **Impact Audio & Camera Shake**: Heavy flesh impact sound (`audioSystem.playSFX('attack_fleshhit', 0.65)`) and global screen rumble (`triggerGlobalScreenShake(3.0, 8)`).
+      - **Impact Audio & Camera Shake**: Heavy flesh impact sound (`audioSystem.playSFX('attack_fleshhit', 0.65)`) and concussive arena rumble (`triggerGlobalScreenShake(6.0, 12)` on base detonation; `8.5, 16` on chain reactions).
       - **Standardized Damage Pipeline**: Uses `applyDamageToTarget` with directional knockback impulse.
   - **Can Explode Mid-Traveling**:
     - A kicked bomb's fuse (`fuseTimer`) continues counting down every frame while it slides across the floor.
@@ -242,17 +245,21 @@ Bomber Man's body model, helmet visor, tunic, belt, and boots strictly adhere to
 
 ## 📊 HUD Skill Layout & Visual Theme
 
-All HUD skill progress bars and status indicators strictly use Bomber Man's unified **Classic Cobalt Blue** theme color (`#2563EB`) in compliance with **Rule 2.8**:
+All HUD skill progress bars and status indicators strictly use Bomber Man's unified **Classic Cobalt Blue** theme color (`#2563EB`) adhering to **Rule 18 / Rule 2.8**:
+- **Rule 18 Theme Consistency**: Every skill bar (`bomb_up`, `fire_up`, `bomb_kick`, `invincible`) uses `#2563EB`.
+- **Config Toggle Gating**: Each skill checks `isSkillEnabled(cfg.enable[Skill], ...)` so toggling off a skill in `bombermanConfig.js` cleanly hides its HUD bar.
+- **Clean Label Standard**: Zero redundant parenthetical `(READY)` or `(ACTIVE)` suffixes. Dynamic values (`LV.X/10`, `(30S)`, `(TRAVELING)`) communicate state cleanly.
+- **Signature & Ultimate Registration**: `invincible` registers in `signatureMap` inside `isSkillExceptionInDarkMode()` to remain visible in Signature/Dark Mode HUD filters.
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
 │ BOMBER MAN (THE CLASSIC MAZE BOMBER)                HP: 360 / 360 │
 │ [███████████████████████████████████████████████████████████████] │
 │                                                                   │
-│ [Passive: Bomb Up (Max 10)]      [ PASSIVE ] #2563EB (Bombs: 10)  │
-│ [Skill 1: Fire Up (Max 10)]      [  READY  ] #2563EB (Fire: Lv10) │
-│ [Skill 2: Kick]                  [  READY  ] #2563EB (Bomb Kick)  │
-│ [Ultimate: Invincible (30.0s)]   [ 24.5s ⚡ ] #2563EB (IMMUNE!)    │
+│ [Passive: Bomb Up]       [██████████] #2563EB BOMB UP (10 MAX)    │
+│ [Skill 1: Fire Up]       [██████████] #2563EB FIRE UP (10 MAX)    │
+│ [Skill 2: Bomb Kick]     [██████████] #2563EB BOMB KICK           │
+│ [Ultimate: Invincible]   [████████░░] #2563EB INVINCIBLE (24S)    │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -263,11 +270,11 @@ All HUD skill progress bars and status indicators strictly use Bomber Man's unif
 | Combat Event / Action | Primary Audio Path / Synth | Volume / Pitch | Description & Auditory Feel |
 | :--- | :--- | :--- | :--- |
 | **Plant Bomb (`Basic`)** | `Assets/Sound Effects/BombermanSFX/Place Bomb.wav` | `0.85 Vol` / `1.00x` | Authentic retro arcade bomb drop placement audio |
-| **Bomb Cross Detonation** | `Assets/Sound Effects/BombermanSFX/Bomb Explodes.wav` | `0.85 Vol` (Base) / `0.90 Vol` (Chain) | Authentic punchy arcade cross explosion detonation |
+| **Bomb Cross Detonation** | `Assets/Sound Effects/Attacks/explosion.mp3` | `0.85 Vol` (Base) / `0.90 Vol` (Chain) | Punchy concussive combat blast audio |
 | **Walking Cadence** | `Assets/Sound Effects/BombermanSFX/Walking 1.wav` | `0.50 Vol` / `1.00x` | Authentic rhythmic 50-frame step loop while moving |
 | **Skill 1: Bomb Up** | `Assets/Sound Effects/Sprites SFX/crazydave-sun-pickup.mp3` | `0.75 Vol` / `1.10x` | Bright retro arcade power-up collection chime |
-| **Skill 2: Fire Up** | `Assets/Sound Effects/Skills/enhance.mp3` | `0.75 Vol` / `1.20x` | Fiery power-up surge and flame level-up tone |
-| **Bomb Kick** | `Assets/Sound Effects/Skills/dash1.mp3` | `0.75 Vol` / `1.00x` | Crisp contact kick impulse audio |
+| **Skill 2: Fire Up** | `Assets/Sound Effects/BombermanSFX/era_vera-easter22-gun-melee-summon.wav` | `0.85 Vol` / `1.00x` | High-impact weapon melee summon audio on Fire Up surge |
+| **Bomb Kick** | `Assets/Sound Effects/BombermanSFX/Kick - Pressure Block.wav` | `0.85 Vol` / `1.00x` | Authentic retro arcade pressure block kick contact audio |
 | **Ultimate: Invincible Cast** | `Assets/Sound Effects/Skills/shieldcharge.mp3` | `0.90 Vol` / `1.05x` | Iconic invincibility barrier activation fanfare |
 | **Invincible Attack Deflect** | `Assets/Sound Effects/Skills/parry.mp3` | `0.65 Vol` / `1.35x` | Crisp metallic retro ping when nullifying incoming enemy attacks |
 

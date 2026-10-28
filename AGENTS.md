@@ -1,5 +1,30 @@
 # AI Coding Agent Instructions
 
+## Mandatory HUD Skill Bar Theme Consistency & Clean Architecture Standard (Rule 18)
+
+Whenever creating, scaffolding, updating, or maintaining HUD skill progress bars for any fighter (in `js/graphics/ui/hudSkillProviders.js` or `js/graphics/hudManager.js`):
+- **Unified Character Palette Standard**:
+  - All HUD skill progress bars for a fighter (Passive, Skill 1, Skill 2, Ultimate/Domain, Stances) **MUST ALWAYS** use the exact same consistent character theme color (`themeColor = f.color || cfg.themeColor || ...`).
+  - **STRICT PROHIBITION of Mismatched / Ad-Hoc Accent Colors**: NEVER assign mismatched, ad-hoc, or hardcoded accent colors to individual skill bars in `hudSkillProviders.js` or `hudManager.js` (e.g. setting one bar yellow, another pink, or another cyan for the same fighter). Every skill bar returned in a fighter's HUD array MUST reference `themeColor` to preserve visual elegance and strong character identity.
+- **Mandatory Config Toggle Gating (`isSkillEnabled`)**:
+  - Every individual skill entry in `hudSkillProviders.js` **MUST** be gated by `isSkillEnabled(cfg.enable[Skill], ...)`:
+    ```javascript
+    if (isSkillEnabled(cfg.enableFireUp, true)) {
+      skills.push({ id: 'fire_up', ... });
+    }
+    ```
+  - Disabling a skill toggle in `js/configs/characters/<name>Config.js` (`CONFIG.<characterId>`) MUST cleanly hide its corresponding HUD skill bar without orphaned UI elements or runtime exceptions.
+- **Clean Label Standard (Prohibition of Redundant Parenthetical Status Suffixes)**:
+  - Skill labels MUST NEVER include redundant status suffixes like `(READY)`, `(ACTIVE)`, `(CASTING)`, `(THROWING)`, `(SUMMONING)`, or `(EXECUTING)` when the skill is idle or ready. The HUD engine automatically provides visual feedback by applying the glowing `hud-skill-ready` CSS class and 100% fill width.
+  - Parenthetical dynamic indicators are strictly reserved for live countdown timers (e.g. `(2.5S)`), remaining resource charges/levels (e.g. `(LV.3/10)`, `(3/10)`), or active duration drain (e.g. `(30.0S)`).
+- **Percentage Clamping & Progression ($0\% - 100\%$)**:
+  - Progress percentages (`pct`) MUST strictly be clamped between $0$ and $100$ using `Math.max(0, Math.min(100, ...))`.
+  - The `ready` boolean MUST cleanly represent cast readiness (`pct >= 99 && cooldown <= 0`).
+- **Signature & Ultimate Registration (`isSkillExceptionInDarkMode`)**:
+  - Ultimate and signature skills MUST declare `isSignature: true, signature: true, isUltimate: true` and register their character ID and ability key in `signatureMap` inside `isSkillExceptionInDarkMode()` in `js/graphics/ui/hudSkillProviders.js` so they remain visible when Signature/Dark Mode HUD filters are engaged.
+- **Zero DOM Queries in Per-Frame Loops**:
+  - HUD skill providers MUST strictly return pure declarative data structures (`{ id, pct, ready, color, label, isSignature }`). Never invoke `document.getElementById` or perform direct DOM mutation inside HUD skill provider functions.
+
 ## Canonical Default Model Hand Positioning & Weapon Wielding (Rule 20)
 
 When creating or rendering new characters and model skins, ALWAYS use the approved default hand positioning standard:
