@@ -57,7 +57,7 @@ export const unarmedConfig = {
 
   // ── 1. Official Earclacks Gimmick: Permanent Momentum & Speed Scaling ──
   enableMomentumScaling: true,      // Master toggle for Permanent Momentum & Speed Scaling
-  enableBallSteering: true,         // Master toggle for dynamic trajectory steering towards opponent
+  enableBallSteering: false,        // Pure natural physical ricochets without artificial steering towards opponent
   maxMomentumStacks: 22,            // 22 stacks scales from base speed (5.0) to terminal velocity (18.0)
   speedPerHit: 1.00,                // +1.00 permanent max speed per enemy hit
   damagePerHit: 1.0,                // +1.0 permanent damage per momentum level
@@ -112,7 +112,7 @@ export const unarmedConfig = {
 
   // ── 8. Rebound Damage Mechanic (Earclacks Standard) ──
   requireWallBounceForDamage: true,   // Damage strictly requires rebouncing off the wall first
-  wallBounceHoming: 0.85,             // Homing angle bias towards opponent after bouncing off a wall (0.0 = pure specular, 1.0 = direct)
+  wallBounceHoming: 0.0,              // Pure natural specular reflection (0.0 = 100% natural, no homing)
 
   // Melee & Punch parameters
   punchReach: 52,

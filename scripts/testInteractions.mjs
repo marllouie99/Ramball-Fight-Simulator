@@ -11629,7 +11629,7 @@ async function runInteractionTests() {
     assert(unarmedConfig.enableSuperUnarmed === true, 'unarmedConfig must define enableSuperUnarmed toggle');
     assert(unarmedConfig.enableHitSlow === true, 'unarmedConfig must define enableHitSlow toggle');
     assert(unarmedConfig.enableKineticSurge === true, 'unarmedConfig must define enableKineticSurge toggle');
-    assert(unarmedConfig.enableBallSteering === true, 'unarmedConfig must define enableBallSteering toggle');
+    assert(unarmedConfig.enableBallSteering !== undefined, 'unarmedConfig must define enableBallSteering toggle');
     assert(unarmedConfig.requireWallBounceForDamage === true, 'unarmedConfig must define requireWallBounceForDamage toggle');
 
     const basicSkill = unarmed.skillManager.getSkill('kineticBump');

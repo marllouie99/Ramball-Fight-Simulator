@@ -88,9 +88,9 @@ export class UnarmedFighter extends Fighter {
         cooldownKey: 'collisionCooldown',
         cooldownMax: () => this.collisionCooldownMax,
         color: this.themeColor,
-        description: cfg.basicAttackDesc || 'Every bump into an enemy deals kinetic damage and permanently increases speed and damage.',
+        description: cfg.basicAttackDesc || 'Deals kinetic damage when naturally colliding with an enemy after rebouncing off the arena walls.',
         onActivate: (fighter, opponent) => {
-          fighter.shoot(0, opponent);
+          // Passive physical body collision — zero artificial homing or steering
         }
       });
     }
@@ -278,22 +278,8 @@ export class UnarmedFighter extends Fighter {
       if (spd >= 0.5) return;
     }
 
-    const target = opponent || (state.fighters && state.fighters.find(f => f !== this && !f.isDead && !this.isTeammate(f)));
-    const cfg = CONFIG.unarmed || {};
-    const requireRebound = this.isSkillEnabled(cfg.requireWallBounceForDamage, true);
-
-    let launchAngle;
-    if (requireRebound && !this.hasWallRebounded && target) {
-      // Must rebounce to a wall first: launch towards a wall at an angle away from direct line to target
-      const toTarget = Math.atan2(target.y - this.y, target.x - this.x);
-      const side = Math.random() < 0.5 ? 1 : -1;
-      launchAngle = toTarget + side * (Math.PI * 0.40 + Math.random() * 0.30);
-    } else if (target) {
-      launchAngle = Math.atan2(target.y - this.y, target.x - this.x) + (Math.random() - 0.5) * 0.4;
-    } else {
-      launchAngle = Math.random() * Math.PI * 2;
-    }
-
+    // Natural diagonal launch trajectory into the arena without artificial aimbot steering
+    const launchAngle = Math.random() * Math.PI * 2;
     const slowFactor = (this.slowTimer > 0 && this.slowMultiplier) ? this.slowMultiplier : 1.0;
     const currentSpeed = Math.max(this.baseSpeed, this.baseSpeed + this.momentumStacks * this.speedPerHit) * slowFactor;
     this.vx = Math.cos(launchAngle) * currentSpeed;
@@ -498,34 +484,17 @@ export class UnarmedFighter extends Fighter {
       this.hasWallRebounded = true;
 
       // Natural wall bounce: reflects velocity along collision normal (conserves current kinetic speed)
-      // Note: Momentum, speed, and damage are ONLY gained when hitting an enemy, NOT arena walls!
+      // Pure natural specular reflection with billiard cushion dispersion — zero artificial steering or homing!
       const curSpeed = Math.hypot(this.vx, this.vy) || this.speed;
       const targetSpeed = Math.min(
         this.maxTerminalVelocity,
         Math.max(curSpeed, this.speed)
       );
 
-      // Ricochet homing towards enemy if enabled
-      const cfg = CONFIG.unarmed || {};
-      const target = opponent || (state.fighters && state.fighters.find(f => f !== this && !f.isDead && !this.isTeammate(f)));
-      const homing = cfg.wallBounceHoming !== undefined ? cfg.wallBounceHoming : 0.85;
-
-      if (target && !target.isDead && homing > 0) {
-        const toTargetAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        const curAngle = Math.atan2(this.vy, this.vx);
-        let diff = toTargetAngle - curAngle;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        const finalAngle = curAngle + diff * homing + (Math.random() - 0.5) * 0.12;
-        this.vx = Math.cos(finalAngle) * targetSpeed;
-        this.vy = Math.sin(finalAngle) * targetSpeed;
-        this.gunAngle = finalAngle;
-      } else {
-        const curAngle = Math.atan2(this.vy, this.vx);
-        this.vx = Math.cos(curAngle) * targetSpeed;
-        this.vy = Math.sin(curAngle) * targetSpeed;
-        this.gunAngle = curAngle;
-      }
+      const curAngle = Math.atan2(this.vy, this.vx);
+      this.vx = Math.cos(curAngle) * targetSpeed;
+      this.vy = Math.sin(curAngle) * targetSpeed;
+      this.gunAngle = curAngle;
 
       // Concussive audio: Official Earclacks wall bump THUD & screen shake feedback
       const wallSound = CONFIG.unarmed?.sounds?.wallBounce || 'Assets/Sound Effects/UnarmedSFX/unarmed_wall_bump.mp3';
@@ -760,30 +729,10 @@ export class UnarmedFighter extends Fighter {
 
   /**
    * Overrides base Fighter.shoot() to suppress default generic bullet projectiles (Rule 23).
-   * Unarmed's Basic Attack: Hurtle towards the enemy to deliver a kinetic body bump!
+   * Unarmed relies strictly on pure natural physical ricochets with zero artificial steering.
    */
   shoot(ownerIndex, opponent) {
-    if (!this.isSkillEnabled(CONFIG.unarmed?.enableKineticBump, true)) return;
-    const requireRebound = this.isSkillEnabled(CONFIG.unarmed?.requireWallBounceForDamage, true);
-    if (requireRebound && !this.hasWallRebounded) {
-      // Must rebounce to the wall first: preserve natural ricochet velocity towards the walls!
-      return;
-    }
-    const target = opponent || (state.fighters && state.fighters.find(f => f !== this && !f.isDead && !this.isTeammate(f)));
-    if (!target || target.isDead) return;
-
-    // Direct momentum towards the opponent to deliver the body bump
-    const dx = target.x - this.x;
-    const dy = target.y - this.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 0) {
-      const angle = Math.atan2(dy, dx);
-      this.gunAngle = angle;
-      const curSpeed = Math.hypot(this.vx, this.vy);
-      const targetSpeed = Math.max(curSpeed, this.speed);
-      this.vx = Math.cos(angle) * targetSpeed;
-      this.vy = Math.sin(angle) * targetSpeed;
-    }
+    // Intentionally empty (Rule 23): suppresses default bullets and prevents artificial aimbot steering
   }
 
   update(opponent, ownerIndex, arena) {
