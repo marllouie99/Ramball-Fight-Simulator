@@ -588,25 +588,43 @@ function updateMinionAI(fighter, minion, arena, c) {
   minion._updateSonicBooms?.();
   _updateShatteredChains(minion);
 
-  // If match or round ended (e.g. Sukuna won), immediately halt combat and lock facing upright (Rule 19)
+  // If match or round ended (e.g. Sukuna won), halt combat actions but preserve smooth victory movement
   const isMatchEnded = typeof state !== 'undefined' && (
     state.gameState === 'roundEnd' || 
     state.gameState === 'matchEnd'
   );
   if (isMatchEnded) {
-    minion.interruptAttacks?.(true);
+    minion.interruptAttacks?.(false);
     minion.isShouting = false;
     minion.shoutPhase = null;
     minion.shoutWindupTimer = 0;
     minion.shoutRecoveryTimer = 0;
     minion.isCleaving = false;
     minion.isThrowing = false;
-    minion.vx = 0;
-    minion.vy = 0;
-    minion.angle = 0;
-    minion.gunAngle = 0;
+    minion.isWallSlamActive = false;
+    minion.isWallReboundDashing = false;
+    minion.isBlitzActive = false;
+    minion.isInfinityBlitz = false;
+    minion.shootCooldown = 60;
     if (minion.activeSonicBooms) minion.activeSonicBooms.length = 0;
     if (minion.shatteredChains) minion.shatteredChains.length = 0;
+
+    const cruiseSpeed = minion.speed || 6.5;
+    const currentSpeed = Math.hypot(minion.vx || 0, minion.vy || 0);
+    if (currentSpeed < 0.2) {
+      const moveAngle = (minion.angle !== undefined && minion.angle !== 0) ? minion.angle : (minion.gunAngle || (Math.random() * Math.PI * 2));
+      minion.vx = Math.cos(moveAngle) * cruiseSpeed * 0.5;
+      minion.vy = Math.sin(moveAngle) * cruiseSpeed * 0.5;
+    } else if (currentSpeed > cruiseSpeed) {
+      minion.vx *= 0.94;
+      minion.vy *= 0.94;
+    }
+
+    if (typeof minion.turnToNormalPosition === 'function') {
+      minion.turnToNormalPosition(0.035);
+    }
+    minion.applyMovementPhysics?.();
+    if (state.arena) minion.resolveWallBounce?.(state.arena, null);
     return;
   }
 

@@ -1313,6 +1313,7 @@ export class SansFighter extends Fighter {
       beamHeight: beamHeight,
       beamWidth: beamHeight,
       reach: reach,
+      maxReach: reach,
       length: reach,
       isCharging: true,
       isFiring: false,
@@ -1372,6 +1373,7 @@ export class SansFighter extends Fighter {
         beamHeight: beamHeight,
         beamWidth: beamHeight,
         reach: reach,
+        maxReach: reach,
         length: reach,
         isCharging: true,
         isFiring: false,
@@ -1425,6 +1427,7 @@ export class SansFighter extends Fighter {
       beamHeight: beamHeight,
       beamWidth: beamHeight,
       reach: reach,
+      maxReach: reach,
       length: reach,
       isCharging: true,
       isFiring: false,
@@ -1432,6 +1435,98 @@ export class SansFighter extends Fighter {
       hitTargets: new Set(),
       targetLastHitFrame: new Map()
     });
+  }
+
+  /**
+   * Returns the active barrier/shield blocking radius if the target currently has
+   * Gojo's Limitless Infinity active or Knight's Shield active. Otherwise returns 0.
+   */
+  _getTargetBeamBlockRadius(target) {
+    if (!target || target.hp <= 0) return 0;
+
+    // 1. Gojo's Limitless Infinity barrier
+    const isGojo =
+      target.characterId === 'gojo' ||
+      target.type === 'gojo' ||
+      target._def?.id === 'gojo' ||
+      target.constructor?.name === 'GojoFighter' ||
+      typeof target.hasActiveInfinity === 'function';
+    if (isGojo && !target.domainActive) {
+      const infinityActive = (typeof target.hasActiveInfinity === 'function')
+        ? target.hasActiveInfinity()
+        : Boolean(
+            target.infinityActive &&
+            (target.infinityCooldown || 0) <= 0 &&
+            !target.isMeleeMode &&
+            !target.isChainedByMakima &&
+            !target.isChannelingPurple &&
+            (target.infinityBarrierHp === undefined || target.infinityBarrierHp > 0)
+          );
+      if (infinityActive) {
+        return CONFIG.gojo?.infinityRadius ?? ((target.r || 25) + 30);
+      }
+    }
+
+    // 2. Knight's Shield
+    const isKnight =
+      target.characterId === 'knight' ||
+      target.type === 'knight' ||
+      target._def?.id === 'knight' ||
+      target.constructor?.name === 'KnightFighter' ||
+      target.shieldMaxHp !== undefined;
+    if (isKnight && !target.isShieldBroken && (target.shieldHp === undefined || target.shieldHp > 0)) {
+      return (target.r || 25) + 14;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Computes the effective laser beam reach for a Gaster Blaster, clamping the beam
+   * so it does not pass through a player with Gojo's Infinity or Knight's Shield active.
+   */
+  _getEffectiveBlasterBeamLength(blaster, opponent = null) {
+    if (!blaster) return 0;
+    const cfg = (CONFIG && CONFIG.sans) ? CONFIG.sans : sansConfig;
+    const maxReach = blaster.maxReach || blaster.reach || blaster.length || cfg.blasterLaserHeight || cfg.blasterLaserReach || 800;
+    let effectiveReach = maxReach;
+
+    const beamH = blaster.beamHeight || blaster.beamWidth || cfg.blasterBeamHeight || cfg.blasterBeamWidth || 32;
+    const cosA = Math.cos(blaster.angle || 0);
+    const sinA = Math.sin(blaster.angle || 0);
+
+    const targets = [];
+    if (state.fighters && Array.isArray(state.fighters)) {
+      targets.push(...state.fighters);
+    }
+    if (state.illusions && Array.isArray(state.illusions)) {
+      targets.push(...state.illusions);
+    }
+    if (opponent && !targets.includes(opponent)) {
+      targets.push(opponent);
+    }
+
+    for (const target of targets) {
+      if (!target || target === this || (target.team !== undefined && target.team !== null && target.team === this.team) || target.hp <= 0) continue;
+      if (typeof this.isTeammate === 'function' && this.isTeammate(target)) continue;
+
+      const blockRadius = this._getTargetBeamBlockRadius(target);
+      if (blockRadius <= 0) continue;
+
+      const dx = target.x - blaster.x;
+      const dy = (target.y - (target.z || 0)) - blaster.y;
+      const projDist = dx * cosA + dy * sinA;
+      const perpDist = Math.abs(-dx * sinA + dy * cosA);
+
+      if (projDist > 0 && perpDist <= (beamH * 0.5 + blockRadius)) {
+        const stopDist = Math.max(0, projDist - blockRadius);
+        if (stopDist < effectiveReach) {
+          effectiveReach = stopDist;
+        }
+      }
+    }
+
+    return effectiveReach;
   }
 
   /**
@@ -1490,8 +1585,10 @@ export class SansFighter extends Fighter {
         b.fireTimer--;
         b.fireProgress = 1.0 - (b.fireTimer / b.fireMax);
 
-        // Laser ray collision
-        const reach = b.reach || b.length || cfg.blasterLaserHeight || cfg.blasterLaserReach || 800;
+        // Laser ray collision (clamped if Gojo's Infinity or Knight's Shield is active in the beam path)
+        b.maxReach = b.maxReach || b.reach || b.length || cfg.blasterLaserHeight || cfg.blasterLaserReach || 800;
+        const reach = this._getEffectiveBlasterBeamLength(b, opponent);
+        b.effectiveReach = reach;
         const beamH = b.beamHeight || b.beamWidth || cfg.blasterBeamHeight || cfg.blasterBeamWidth || 32;
         const cosA = Math.cos(b.angle);
         const sinA = Math.sin(b.angle);
@@ -1518,79 +1615,94 @@ export class SansFighter extends Fighter {
 
         for (const target of targets) {
           if (!target || target === this || (target.team && target.team === this.team) || target.hp <= 0) continue;
+          if (typeof this.isTeammate === 'function' && this.isTeammate(target)) continue;
 
           // Ray-to-point distance check
           const dx = target.x - b.x;
-          const dy = target.y - b.y;
+          const dy = (target.y - (target.z || 0)) - b.y;
           const projDist = dx * cosA + dy * sinA;
+          const perpDist = Math.abs(-dx * sinA + dy * cosA);
+          const blockRadius = this._getTargetBeamBlockRadius(target);
+          const targetR = target.r || 25;
 
-          if (projDist > 0 && projDist < reach) {
-            const perpDist = Math.abs(-dx * sinA + dy * cosA);
-            if (perpDist <= (beamH * 0.5 + target.r)) {
-              const baseDmg = b.damage || cfg.blasterBeamDamage || 20;
-              const hasTakenFirstImpact = b.hitTargets.has(target);
+          const isWithinReach = blockRadius > 0
+            ? (projDist > 0 && Math.max(0, projDist - blockRadius) <= reach + 0.5 && perpDist <= (beamH * 0.5 + blockRadius))
+            : (projDist > 0 && projDist < reach && (projDist - targetR) < reach && perpDist <= (beamH * 0.5 + targetR));
 
-              if (!hasTakenFirstImpact) {
-                // 1. FIRST IMPACT: Deals 100% Damage
-                b.hitTargets.add(target);
+          if (isWithinReach) {
+            const baseDmg = b.damage || cfg.blasterBeamDamage || 20;
+            const hasTakenFirstImpact = b.hitTargets.has(target);
+
+            if (!hasTakenFirstImpact) {
+              // 1. FIRST IMPACT: Deals 100% Damage
+              b.hitTargets.add(target);
+              b.targetLastHitFrame.set(target, b.fireTimer);
+              b.damageDealt = true;
+
+              const firstImpactDmg = Math.round(baseDmg * firstImpactRatio);
+              let didDamage = true;
+              if (target.takeDamage) {
+                didDamage = target.takeDamage(firstImpactDmg, this, {
+                  isProjectile: true,
+                  isLaser: true,
+                  isGasterBlaster: true,
+                  isSkill: true,
+                  isFirstImpact: true,
+                  hitX: b.x,
+                  hitY: b.y,
+                  damageNumberColor: this.damageNumberColor || '#03d5f1ff'
+                });
+              }
+              if (didDamage !== false) {
+                this.applyKarma(target);
+              }
+
+              // Recover stamina whenever Gaster Blaster strikes an enemy
+              const recoverAmount = (b.pattern === 2)
+                ? (cfg.blasterGigaStaminaRecoverOnHit ?? 8)
+                : (cfg.blasterStaminaRecoverOnHit ?? cfg.blasterHitStaminaRecover ?? 4);
+              this.recoverStamina(recoverAmount, 'blaster_impact');
+
+              // Concussive first impact screen shake & knockback
+              if (b.scale >= 2.0) {
+                triggerGlobalScreenShake(4.0, 10);
+              }
+              if (didDamage !== false && target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {
+                target.applyKnockback(cosA * cfg.blasterKnockback, sinA * cfg.blasterKnockback);
+              }
+            } else {
+              // 2. CONTINUOUS DAMAGE: Deals 50% Damage every tick interval
+              const lastHit = b.targetLastHitFrame.get(target);
+              if (lastHit === undefined || (lastHit - b.fireTimer) >= tickInterval) {
                 b.targetLastHitFrame.set(target, b.fireTimer);
-                b.damageDealt = true;
 
-                const firstImpactDmg = Math.round(baseDmg * firstImpactRatio);
+                const continuousDmg = Math.max(1, Math.round(baseDmg * continuousRatio));
+                let didDamage = true;
                 if (target.takeDamage) {
-                  target.takeDamage(firstImpactDmg, this, {
+                  didDamage = target.takeDamage(continuousDmg, this, {
                     isProjectile: true,
                     isLaser: true,
                     isGasterBlaster: true,
                     isSkill: true,
-                    isFirstImpact: true,
+                    isContinuousDamage: true,
+                    hitX: b.x,
+                    hitY: b.y,
                     damageNumberColor: this.damageNumberColor || '#03d5f1ff'
                   });
                 }
-                this.applyKarma(target);
-
-                // Recover stamina whenever Gaster Blaster strikes an enemy
-                const recoverAmount = (b.pattern === 2)
-                  ? (cfg.blasterGigaStaminaRecoverOnHit ?? 8)
-                  : (cfg.blasterStaminaRecoverOnHit ?? cfg.blasterHitStaminaRecover ?? 4);
-                this.recoverStamina(recoverAmount, 'blaster_impact');
-
-                // Concussive first impact screen shake & knockback
-                if (b.scale >= 2.0) {
-                  triggerGlobalScreenShake(4.0, 10);
-                }
-                if (target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {
-                  target.applyKnockback(cosA * cfg.blasterKnockback, sinA * cfg.blasterKnockback);
-                }
-              } else {
-                // 2. CONTINUOUS DAMAGE: Deals 50% Damage every tick interval
-                const lastHit = b.targetLastHitFrame.get(target);
-                if (lastHit === undefined || (lastHit - b.fireTimer) >= tickInterval) {
-                  b.targetLastHitFrame.set(target, b.fireTimer);
-
-                  const continuousDmg = Math.max(1, Math.round(baseDmg * continuousRatio));
-                  if (target.takeDamage) {
-                    target.takeDamage(continuousDmg, this, {
-                      isProjectile: true,
-                      isLaser: true,
-                      isGasterBlaster: true,
-                      isSkill: true,
-                      isContinuousDamage: true,
-                      damageNumberColor: this.damageNumberColor || '#03d5f1ff'
-                    });
-                  }
+                if (didDamage !== false) {
                   this.applyKarma(target);
+                }
 
-                  // Recover stamina on continuous beam contact ticks
-                  const contRecover = (b.pattern === 2)
-                    ? (cfg.blasterGigaContinuousStaminaRecover ?? 2)
-                    : (cfg.blasterContinuousStaminaRecover ?? 1);
-                  this.recoverStamina(contRecover, 'blaster_continuous');
+                // Recover stamina on continuous beam contact ticks
+                const contRecover = (b.pattern === 2)
+                  ? (cfg.blasterGigaContinuousStaminaRecover ?? 2)
+                  : (cfg.blasterContinuousStaminaRecover ?? 1);
+                this.recoverStamina(contRecover, 'blaster_continuous');
 
-                  // Continuous subtle beam knockback
-                  if (target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {
-                    target.applyKnockback(cosA * (cfg.blasterKnockback * 0.5), sinA * (cfg.blasterKnockback * 0.5));
-                  }
+                // Continuous subtle beam knockback
+                if (didDamage !== false && target.applyKnockback && (cfg.blasterKnockback || 0) > 0) {
+                  target.applyKnockback(cosA * (cfg.blasterKnockback * 0.5), sinA * (cfg.blasterKnockback * 0.5));
                 }
               }
             }
@@ -2099,11 +2211,12 @@ export class SansFighter extends Fighter {
     // 3. Draw active Gaster Blasters & Beams in world coordinates
     for (const blaster of this.gasterBlasters) {
       if (blaster.isFiring) {
+        const effectiveLength = this._getEffectiveBlasterBeamLength(blaster);
         drawGasterBeam(ctx, {
           startX: blaster.x,
           startY: blaster.y,
           angle: blaster.angle,
-          length: blaster.reach || blaster.length || (CONFIG.sans?.blasterLaserHeight || CONFIG.sans?.blasterLaserReach || sansConfig.blasterLaserHeight || sansConfig.blasterLaserReach),
+          length: effectiveLength,
           height: blaster.beamHeight || blaster.beamWidth || (CONFIG.sans?.blasterBeamHeight || CONFIG.sans?.blasterBeamWidth || sansConfig.blasterBeamHeight || sansConfig.blasterBeamWidth),
           width: blaster.beamHeight || blaster.beamWidth || (CONFIG.sans?.blasterBeamHeight || CONFIG.sans?.blasterBeamWidth || sansConfig.blasterBeamHeight || sansConfig.blasterBeamWidth),
           alpha: Math.min(1.0, blaster.fireTimer / (blaster.fireMax * 0.2))

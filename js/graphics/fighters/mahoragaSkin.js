@@ -361,8 +361,7 @@ export function drawMahoragaChestNecklace(ctx, fighter) {
   
   const isWinnerScreen = Boolean(
     fighter._isWinnerReveal || 
-    fighter.owner?._isWinnerReveal ||
-    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+    fighter.owner?._isWinnerReveal
   );
   const isAscending = Boolean(fighter.isAscending || (fighter.spawnTimer && fighter.spawnTimer > 0));
   const rotAngle = (isWinnerScreen || isAscending) ? 0 : (fighter.angle || 0);
@@ -616,8 +615,7 @@ export function drawMahoragaSkin(ctx, fighter) {
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
   const isWinnerScreen = Boolean(
     fighter._isWinnerReveal || 
-    fighter.owner?._isWinnerReveal ||
-    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+    fighter.owner?._isWinnerReveal
   );
   const isAscending = Boolean(fighter.isAscending || (fighter.spawnTimer && fighter.spawnTimer > 0));
   const angle = (isWinnerScreen || isAscending) ? 0 : (fighter.angle || 0);

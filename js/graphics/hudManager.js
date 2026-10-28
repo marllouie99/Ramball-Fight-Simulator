@@ -950,7 +950,7 @@ export function drawComboCounter(ctx) {
 
   // In horizontal widescreen mode with the top header HUD (arena Y = 84),
   // position neatly below the top HUD frame and corner brackets inside the arena's top corners (Y = 92).
-  // In vertical mode (arena Y = 240), preserve exact legacy behavior (arenaY - topGapBelowHud = 196).
+  // In vertical mode (arena Y = 240), banners sit just below the TOP HUD (arenaY - topGapBelowHud = 218).
   const isHArenaHeader = isH && Number.isFinite(arena.y) && arena.y >= 60;
   const cardTop = isHArenaHeader
     ? (Number.isFinite(cfg.horizontalTop) ? cfg.horizontalTop : (arenaY + 8))
@@ -2805,6 +2805,52 @@ function updateHealthHud() {
       } else {
         info.push(`<b>DMG:</b> ${dmgDisplay}`);
       }
+    } else if (f.characterId === 'unarmed' || f.type === 'unarmed' || fType === 'unarmed') {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.unarmed) ? CONFIG.unarmed : {};
+      const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+      const baseSpd = (f.baseSpeed || cfg.speed || 5.0) * modeMult;
+      const currentSpd = (f.speed || baseSpd) * modeMult;
+      const spdDiff = Math.max(0, currentSpd - baseSpd);
+      const stacks = f.momentumStacks || 0;
+      const maxStacks = f.maxMomentumStacks || cfg.maxMomentumStacks || 22;
+      const isSuper = Boolean(f.isSuperUnarmed || f.isTerminalVelocity);
+
+      // 1. Dynamic Collision DMG: Base + Momentum Stacks + Speed Scale (+ Super Unarmed Multiplier)
+      const baseDmg = cfg.baseCollisionDamage || cfg.damage || 30;
+      const stackBonusDmg = stacks * (f.damagePerHit || cfg.damagePerHit || 1.0);
+      const speedScale = cfg.speedDamageScale !== undefined ? cfg.speedDamageScale : 1.0;
+      const speedBonusDmg = Math.max(0, (f.speed || baseSpd) - (f.baseSpeed || 5.0)) * speedScale;
+      let totalDmg = Math.round(baseDmg + stackBonusDmg + speedBonusDmg);
+      if (isSuper) {
+        totalDmg = Math.round(totalDmg * (cfg.superUnarmedDamageMult || 1.6));
+      }
+      if (typeof f.damage === 'number' && f.damage > totalDmg) {
+        totalDmg = Math.round(f.damage);
+      }
+      const dmgDiff = totalDmg - baseDmg;
+
+      const stackTag = isSuper
+        ? `<span style="color: #FFFFFF; font-size: 10px; font-weight: bold;">▲ (SUPER)</span>`
+        : `<span style="color: #76E042; font-size: 10px;">▲ (x${stacks}/${maxStacks})</span>`;
+
+      if (dmgDiff > 0 && (stacks > 0 || isSuper)) {
+        info.push(`<b>DMG:</b> ${baseDmg} + ${dmgDiff} ${stackTag}`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
+
+      // 2. Dynamic Momentum SPD: Base + Momentum Speed Boost
+      if (spdDiff > 0.05 && (stacks > 0 || isSuper)) {
+        info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)} + ${spdDiff.toFixed(1)} ${stackTag}`);
+      } else {
+        info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)}`);
+      }
+
+      // 3. Dynamic EVADE: Base + Hit Stacks
+      const evadePct = Math.round((f.evadeChance ?? (cfg.baseEvadeChance || 0.05)) * 100);
+      if (evadePct > 0) {
+        info.push(`<b>EVADE:</b> ${evadePct}% <span style="color: #00F2FE; font-size: 10px;">▲</span>`);
+      }
     } else {
       const isTacticalChar = ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType);
       if (!isTacticalChar) {
@@ -3564,7 +3610,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>') || line.includes('<b>$UN:</b>') || line.includes('<b>SUN:</b>') || line.includes('<b>Plants:</b>') || line.includes('<b>Troops:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>EVADE:</b>') || line.includes('<b>Evade:</b>') || line.includes('<b>Evade Chance:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>') || line.includes('<b>$UN:</b>') || line.includes('<b>SUN:</b>') || line.includes('<b>Plants:</b>') || line.includes('<b>Troops:</b>'));
     }
     if (info.length === 0) return '';
     

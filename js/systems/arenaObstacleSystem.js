@@ -519,6 +519,8 @@ export function resolveProjectilePlusObstacleCollision(p, arena) {
     px = p.x + Math.cos(ang) * apexDist;
     py = p.y + Math.sin(ang) * apexDist;
     pr = p.stoppingRadius || 12;
+  } else if (p.isGojoBlue || p.behaviorType === 'gojo_blue') {
+    pr = p.stoppingRadius || 22;
   }
 
   const prevX = (typeof pvx === 'number' && Number.isFinite(pvx)) ? (px - pvx) : px;
@@ -550,7 +552,7 @@ export function drawArenaObstacles(ctx, arena, isDark = false) {
   if (!obstacles || obstacles.length === 0) return;
 
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
-  const outerBg = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+  const outerBg = isDark ? (CONFIG.darkArenaOuterBgColor || '#000000') : (CONFIG.arenaOuterBgColor || '#141622');
 
   ctx.save();
   ctx.fillStyle = outerBg;
@@ -588,7 +590,7 @@ function _legacyDrawSinglePlus(ctx, arena, isDark = false) {
   const T = obs.halfThick;
 
   const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
-  const outerBg = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+  const outerBg = isDark ? (CONFIG.darkArenaOuterBgColor || '#000000') : (CONFIG.arenaOuterBgColor || '#141622');
 
   ctx.save();
 

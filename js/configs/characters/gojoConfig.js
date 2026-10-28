@@ -65,6 +65,7 @@ export const gojoConfig = {
   bluePullRadius: 100,      // Gravitational pull radius of Blue vortex (pulls enemies within this area)
   blueProjectileRadius: 25, // Base visual & collision radius of Blue projectile orb (alias for blueRadius)
   blueScale: 1.0,           // Explicit scale multiplier for Blue projectile visual size and hitbox
+  blueHandScale: 1.5,       // Explicit scale multiplier for Blue orb on Gojo's hands (increased visual presence)
   bluePullForce: 0.1,       // Pull strength of Blue
   blueDPS: 10,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
   blueDPSInterval: 10,      // Frames between DPS ticks (~6 ticks/sec)
@@ -84,6 +85,7 @@ export const gojoConfig = {
   redFrontalArc: 0.40,      // Frontal cone angle in radians (~44 degrees, halfArc = 0.38) matching visual cone width
   redTriggerRange: 350,     // Range in pixels to trigger Red against enemies
   redRadius: 100,            // Radius of Reversal Red orb during manifestation / buildup (at fingertip) - Directly configurable
+  redHandScale: 0.28,       // Explicit scale multiplier for Reversal Red orb size on his hand when channeling (~28px compact fingertip pearl)
   redBlastRadius: 650,      // Frontal blast reach in pixels
   redVerticalDetectionAngle: Math.PI * 0.08, // Strict max angle deviation (~14 degrees) from vertical Up/Down for straight alignment
   redVerticalCorridorHalfWidth: 40, // Strict horizontal corridor half-width (40px) within which enemies trigger vertical Red
@@ -102,7 +104,7 @@ export const gojoConfig = {
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
   enablePurple: true,                      // Master toggle for Secret Technique: Hollow Purple
-  purpleCooldown: 200,      // Cooldown of Hollow Purple
+  purpleCooldown: 1500,      // Cooldown of Hollow Purple
   purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Hollow Purple
   purpleDamage: 35,         // Continuous piercing damage per tick

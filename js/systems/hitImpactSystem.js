@@ -692,7 +692,7 @@ export const HitImpactSystem = {
       return false; // Pierce
     } 
     
-    if (projectile.isGojoBlue) {
+    if (projectile.isGojoBlue || projectile.behaviorType === 'gojo_blue' || projectile.visual === 'gojoBlue') {
       if (!projectile.hitFighters) projectile.hitFighters = new Set();
       if (!projectile.hitFighters.has(target)) {
         projectile.hitFighters.add(target);

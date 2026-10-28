@@ -365,7 +365,7 @@
       "themeColor": "#D4AF37",
       "keySkills": {
         "ratioTechnique": {
-          "critMultiplier": 2.0,
+          "critMultiplier": 2,
           "baseCritChance": 0.15,
           "sweetSpotAngleBonusMax": 0.15,
           "internalCooldown": 120,
@@ -605,19 +605,19 @@
         "basicAttack": {
           "damage": 7,
           "jackalDamage": 8,
-          "speed": 32.0,
+          "speed": 32,
           "cooldown": 14,
           "lifestealPercent": 0.25
         },
         "criticalPassive": {
           "baseChance": 0.15,
-          "baseMultiplier": 1.50,
-          "maxChance": 0.50,
-          "maxMultiplier": 2.20
+          "baseMultiplier": 1.5,
+          "maxChance": 0.5,
+          "maxMultiplier": 2.2
         },
         "level1Release": {
-          "damage": 5.0,
-          "houndDamage": 18.0,
+          "damage": 5,
+          "houndDamage": 18,
           "burstCount": 6,
           "cooldown": 340
         }
@@ -658,7 +658,7 @@
         "lawnMower": {
           "cost": 250,
           "damage": 85,
-          "speed": 14.0,
+          "speed": 14,
           "cooldown": 800
         }
       }
@@ -830,6 +830,21 @@
           "duration": 600,
           "cooldown": 1800
         }
+      }
+    },
+    "unarmed": {
+      "name": "Unarmed",
+      "archetype": "brawler",
+      "color": "#9CA3AF",
+      "hp": 1200,
+      "speed": 4.8,
+      "baseRange": 75,
+      "baseDamage": 38,
+      "multipliers": {
+        "damage": 1,
+        "speed": 1,
+        "knockback": 1,
+        "cooldown": 1
       }
     }
   }

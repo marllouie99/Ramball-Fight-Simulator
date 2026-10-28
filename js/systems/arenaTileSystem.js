@@ -366,12 +366,13 @@ function _pixelLBracket(ctx, x, y, len, thick, dirX, dirY, color) {
 // ─────────────────────────────────────────────
 
 function _renderNoTilesFloor(oc, width, height, isDark) {
-  const bgColor = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff');
+  const bgColor = isDark ? (CONFIG.darkArenaInnerBgColor || '#000000') : (CONFIG.arenaInnerBgColor || '#919298ff');
   _pixelRect(oc, 0, 0, width, height, bgColor);
 }
 
 function _renderPixelCleanFloor(oc, width, height, cols, rows, cellW, cellH, isDark) {
-  const bgColor = isDark ? '#080B14' : '#F6F8FC';
+  const customInnerBg = isDark ? (CONFIG.darkArenaInnerBgColor || null) : (CONFIG.arenaInnerBgColor || null);
+  const bgColor = customInnerBg || (isDark ? '#080B14' : '#F6F8FC');
   const crossColor = isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.22)';
   const crossDotColor = isDark ? 'rgba(255, 255, 255, 0.38)' : 'rgba(15, 23, 42, 0.38)';
   const centerEmblemColor = isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(15, 23, 42, 0.18)';
@@ -923,7 +924,8 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
     const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
     const height = Math.max(64, Math.ceil(arena.height + fBleed * 2));
     const shape = arena.shape || 'rect';
-    const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}`;
+    const activeInnerBg = isDark ? (CONFIG.darkArenaInnerBgColor || 'dark') : (CONFIG.arenaInnerBgColor || 'light');
+    const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}_${activeInnerBg}`;
     if (state._arenaFloorCanvasCache && state._arenaFloorCanvasCache[key]) {
       return state._arenaFloorCanvasCache[key];
     }
@@ -961,7 +963,8 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
   const width = Math.max(64, Math.ceil(arena.width + fBleed * 2));
   const height = Math.max(64, Math.ceil(arena.height + fBleed * 2));
   const shape = arena.shape || 'rect';
-  const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}_v2`;
+  const activeInnerBg = isDark ? (CONFIG.darkArenaInnerBgColor || 'dark') : (CONFIG.arenaInnerBgColor || 'light');
+  const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}_${activeInnerBg}_v3`;
 
   if (!state._arenaFloorCanvasCache) {
     state._arenaFloorCanvasCache = {};
@@ -1048,7 +1051,7 @@ export function renderActiveArenaFloor(ctx, arena, isDark = false, fBleed = 0) {
   if (floorCanvas) {
     ctx.drawImage(floorCanvas, arena.x - fBleed, arena.y - fBleed, arena.width + fBleed * 2, arena.height + fBleed * 2);
   } else {
-    ctx.fillStyle = isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff');
+    ctx.fillStyle = isDark ? (CONFIG.darkArenaInnerBgColor || '#000000') : (CONFIG.arenaInnerBgColor || '#919298ff');
     if (arena.shape === 'circle') {
       const cx = arena.x + arena.width / 2;
       const cy = arena.y + arena.height / 2;
@@ -1069,7 +1072,7 @@ export function renderActiveArenaFloor(ctx, arena, isDark = false, fBleed = 0) {
 // ─────────────────────────────────────────────
 
 function getOrCreateMiniPreviewCanvas(floorDef, w, h) {
-  const key = `${floorDef.id}_${w}x${h}`;
+  const key = `${floorDef.id}_${w}x${h}_${CONFIG.arenaInnerBgColor || 'def'}`;
   if (_miniPreviewCache[key]) return _miniPreviewCache[key];
 
   const off = document.createElement('canvas');
@@ -1081,7 +1084,7 @@ function getOrCreateMiniPreviewCanvas(floorDef, w, h) {
   oc.imageSmoothingEnabled = false;
 
   if (floorDef.id === 'none') {
-    oc.fillStyle = '#ffffff';
+    oc.fillStyle = CONFIG.arenaInnerBgColor || '#ffffff';
     oc.fillRect(0, 0, w, h);
     oc.strokeStyle = '#94a3b8';
     oc.lineWidth = 1.4;

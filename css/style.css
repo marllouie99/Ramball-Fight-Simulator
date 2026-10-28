@@ -855,7 +855,17 @@ canvas {
   font-weight: 700 !important;
   text-transform: uppercase !important;
   letter-spacing: 0.4px !important;
-  text-shadow: 1px 1px 0 #050609 !important;
+  -webkit-text-stroke: 1px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0   -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0   0 #000000,
+     1px  0   0 #000000,
+    -1px  1px 0 #000000,
+     0    1px 0 #000000,
+     1px  1px 0 #000000 !important;
 }
 
 .health-hud .health-card:not(.tactical-card) .health-card__info .hud-stat-val,
@@ -865,7 +875,17 @@ canvas {
   font-size: 13.5px !important;
   font-weight: 700 !important;
   letter-spacing: 0.5px !important;
-  text-shadow: 1px 1px 0 #050609 !important;
+  -webkit-text-stroke: 1px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0   -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0   0 #000000,
+     1px  0   0 #000000,
+    -1px  1px 0 #000000,
+     0    1px 0 #000000,
+     1px  1px 0 #000000 !important;
 }
 
 .health-hud .health-card:not(.tactical-card) .health-card__info > div.hud-chip-cyan,
@@ -877,12 +897,34 @@ canvas {
 
 .health-hud .health-card:not(.tactical-card) .health-card__info > div.hud-chip-cyan .hud-stat-val {
   color: #38BDF8 !important;
-  text-shadow: 0 0 6px rgba(56, 189, 248, 0.6), 1px 1px 0 #050609 !important;
+  -webkit-text-stroke: 1px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0   -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0   0 #000000,
+     1px  0   0 #000000,
+    -1px  1px 0 #000000,
+     0    1px 0 #000000,
+     1px  1px 0 #000000,
+     0 0 6px rgba(56, 189, 248, 0.6) !important;
 }
 
 .health-hud .health-card:not(.tactical-card) .health-card__info > div.hud-chip-gold .hud-stat-val {
   color: #FFE145 !important;
-  text-shadow: 0 0 6px rgba(255, 225, 69, 0.5), 1px 1px 0 #050609 !important;
+  -webkit-text-stroke: 1px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0   -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0   0 #000000,
+     1px  0   0 #000000,
+    -1px  1px 0 #000000,
+     0    1px 0 #000000,
+     1px  1px 0 #000000,
+     0 0 6px rgba(255, 225, 69, 0.5) !important;
 }
 
 /* Win Bullets Alignment */
@@ -1332,7 +1374,7 @@ canvas {
 ───────────────────────────────────────────── */
 .hud-top-container {
   position: absolute;
-  top: 13.8%;
+  top: 17.5%;
   left: 6.5%;
   right: 6.5%;
   display: flex;
@@ -1344,7 +1386,7 @@ canvas {
 }
 
 .hud-top-container.hud-top-1v2 {
-  top: 11% !important;
+  top: 14.5% !important;
 }
 
 .horizontal-viewport-mode .hud-top-container.hud-top-1v2 {
@@ -2273,17 +2315,31 @@ canvas {
 
 .tactical-card .hud-stat-label,
 .tactical-hud .hud-stat-label {
-  color: #64748b !important;
+  color: #94a3b8 !important;
   font-weight: 700 !important;
   text-transform: uppercase !important;
   font-size: 8px !important;
+  -webkit-text-stroke: 0.8px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  1px 0 #000000,
+     1px  1px 0 #000000 !important;
 }
 
 .tactical-card .hud-stat-val,
 .tactical-hud .hud-stat-val {
-  color: #cbd5e1 !important;
+  color: #ffffff !important;
   font-weight: 700 !important;
   font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
+  -webkit-text-stroke: 0.8px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  1px 0 #000000,
+     1px  1px 0 #000000 !important;
 }
 
 /* 5. Bullet & Win Indicators (Hidden in Tactical HUD) */
@@ -2335,6 +2391,17 @@ canvas {
 .health-card__info span,
 .health-card__info > div {
   font-weight: normal !important;
+  -webkit-text-stroke: 1px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0   -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0   0 #000000,
+     1px  0   0 #000000,
+    -1px  1px 0 #000000,
+     0    1px 0 #000000,
+     1px  1px 0 #000000 !important;
 }
 
 .health-card__info > div {
@@ -2794,7 +2861,17 @@ body.arena-dark-mode {
 .health-card.arena-dark-mode .health-card__info b,
 .health-card.arena-dark-mode .health-card__info span {
   color: #f0f2f5;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  -webkit-text-stroke: 1px #000000;
+  paint-order: stroke fill;
+  text-shadow:
+    -1px -1px 0 #000000,
+     0   -1px 0 #000000,
+     1px -1px 0 #000000,
+    -1px  0   0 #000000,
+     1px  0   0 #000000,
+    -1px  1px 0 #000000,
+     0    1px 0 #000000,
+     1px  1px 0 #000000 !important;
 }
 
 .arena-dark-mode .health-card__desc,

@@ -110,12 +110,15 @@ export function drawGojoWeapon(ctx, fighter) {
 
                 const fadeInP = Math.min(1.0, mergeProgress / 0.22);
                 const orbAlpha = Math.sin(fadeInP * Math.PI * 0.5);
+                const blueHandScale = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueHandScale === 'number')
+                    ? CONFIG.gojo.blueHandScale
+                    : 1.5;
                 const redConfigR = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.redRadius === 'number')
                     ? (CONFIG.gojo.redRadius * 1.05)
                     : (handRadius * 3.6);
-                const blueConfigR = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueRadius === 'number')
+                const blueConfigR = ((typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueRadius === 'number')
                     ? (CONFIG.gojo.blueRadius * 1.40)
-                    : (handRadius * 3.6);
+                    : (handRadius * 3.6)) * blueHandScale;
                 const redR = redConfigR * (0.85 + moveP * 0.35);
                 const blueR = blueConfigR * (0.85 + moveP * 0.35);
 
@@ -248,12 +251,15 @@ export function drawGojoWeapon(ctx, fighter) {
                 }
             }
 
-            const currentDist = handDistance + 5 + attackPush + chargePull;
+            const blueHandScale = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueHandScale === 'number')
+                ? CONFIG.gojo.blueHandScale
+                : 1.5;
+            const currentDist = handDistance + 8 + attackPush + chargePull;
             const attackFlashValue = attackFlash > 0 ? attackFlash : 0;
             const scaleGrowth = 0.4 + 0.6 * Math.sin((fighter._blueOrbDisplayAlpha || 0) * Math.PI * 0.5);
-            const baseBlueR = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueRadius === 'number')
+            const baseBlueR = ((typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueRadius === 'number')
                 ? (CONFIG.gojo.blueRadius * 0.55)
-                : ((typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueProjectileRadius === 'number') ? CONFIG.gojo.blueProjectileRadius * 0.55 : handRadius);
+                : ((typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.blueProjectileRadius === 'number') ? CONFIG.gojo.blueProjectileRadius * 0.55 : handRadius)) * blueHandScale;
             const effectiveRadius = baseBlueR * Math.sqrt(transition) * chargeScale * scaleGrowth;
             
             // Draw Lapse Blue Orb with firing launch spin

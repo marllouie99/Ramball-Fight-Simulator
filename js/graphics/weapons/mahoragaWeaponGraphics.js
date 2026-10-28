@@ -351,8 +351,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
 
   const isWinnerScreen = Boolean(
     fighter._isWinnerReveal || 
-    fighter.owner?._isWinnerReveal ||
-    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+    fighter.owner?._isWinnerReveal
   );
   const rotAngle = isWinnerScreen ? 0 : (fighter.angle || 0);
   ctx.rotate(rotAngle);
@@ -1194,8 +1193,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   // Rotate shoulder position by bodyAngle (fighter.angle) so arm stays attached to the spinning body
   const isWinnerScreen = Boolean(
     fighterObj?._isWinnerReveal || 
-    fighterObj?.owner?._isWinnerReveal ||
-    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+    fighterObj?.owner?._isWinnerReveal
   );
   const isAscending = Boolean(fighterObj && (fighterObj.isAscending || (fighterObj.spawnTimer && fighterObj.spawnTimer > 0)));
   const bodyAngle = (isWinnerScreen || isAscending) ? 0 : ((fighterObj && fighterObj.angle) || 0);
@@ -1522,8 +1520,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   // Rotate shoulder position by bodyAngle (fighter.angle) so arm stays attached to the spinning body
   const isWinnerScreen = Boolean(
     fighter._isWinnerReveal || 
-    fighter.owner?._isWinnerReveal ||
-    (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd'))
+    fighter.owner?._isWinnerReveal
   );
   const isAscending = Boolean(fighter.isAscending || (fighter.spawnTimer && fighter.spawnTimer > 0));
   const bodyAngle = (isWinnerScreen || isAscending) ? 0 : (fighter.angle || 0);

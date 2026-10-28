@@ -1,4 +1,5 @@
-import { state } from '../../core/state.js';
+import { state, getProjectiles } from '../../core/state.js';
+import { CONFIG } from '../../core/config.js';
 import { fastCleanArray } from '../particles/visualTrailSystem.js';
 
 const _cachedDiscreteSlashCanvases = {
@@ -337,6 +338,178 @@ export function drawSukunaCleave(ctx, p) {
   ctx.restore();
 }
 
+/**
+ * Renders the radiant ambient arena floor / ground illumination wash beneath Fuga (Furnace / Divine Flame).
+ * Casts a soft, radiant pool of warm golden and fiery scarlet lighting onto the arena floor.
+ * Matches the multi-tiered floor lighting architecture used in Zenitsu and Escanor.
+ * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
+ */
+export function drawFugaFloorLighting(ctx, cx, cy, radius, alpha = 1.0, isFlying = false, isExplosion = false, explosionProgress = 0, isFrozenByInfinity = false) {
+  if (!ctx || radius <= 0 || alpha <= 0.02) return;
+  const isDark = _isDarkMode();
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  let floorR;
+  let intensity;
+
+  if (isExplosion) {
+    const expP = Math.max(0, Math.min(1.0, explosionProgress));
+    // Detonation flash expands rapidly outward during peak burst (frames 1-4), then dims
+    floorR = Math.min(380, radius * (1.1 + expP * 2.4));
+    intensity = (isDark ? 0.70 : 0.50) * Math.max(0, 1.0 - Math.pow(expP, 1.35)) * alpha;
+  } else if (isFlying) {
+    floorR = Math.min(220, radius * (isDark ? 1.35 : 1.15));
+    intensity = (isDark ? 0.38 : 0.26) * alpha;
+  } else {
+    // Charging / channeling continuous thermal pulse
+    const pulse = Math.sin(Date.now() * 0.007) * 0.08;
+    floorR = Math.min(260, radius * (1.0 + pulse));
+    intensity = (isDark ? 0.42 : 0.28) * alpha;
+  }
+
+  if (floorR > 2 && intensity > 0.01) {
+    const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, floorR);
+    if (isFrozenByInfinity) {
+      glow.addColorStop(0.00, `rgba(240, 255, 255, ${Math.min(1.0, intensity * 1.0)})`);
+      glow.addColorStop(0.25, `rgba(180, 245, 255, ${intensity * 0.80})`);
+      glow.addColorStop(0.55, `rgba(0, 210, 255, ${intensity * 0.42})`);
+      glow.addColorStop(0.82, `rgba(0, 100, 240, ${intensity * 0.16})`);
+      glow.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    } else {
+      glow.addColorStop(0.00, `rgba(255, 252, 220, ${Math.min(1.0, intensity * 1.0)})`);
+      glow.addColorStop(0.24, `rgba(255, 210, 80, ${intensity * 0.80})`);
+      glow.addColorStop(0.55, `rgba(255, 110, 15, ${intensity * 0.45})`);
+      glow.addColorStop(0.82, `rgba(215, 30, 5, ${intensity * 0.18})`);
+      glow.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    }
+
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, cy, floorR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders directional thermal bloom & specular rim lighting on entities near Fuga (Divine Flame).
+ * Casts a warm golden specular rim highlight on fighters and illusions facing the flame arrow / explosion.
+ * Rule 11 (Zero shadowBlur) & Rule 2.4 (Canvas stack balance) compliant.
+ */
+export function drawFugaProximityEntityLighting(ctx, lightX, lightY, lightRadius, alpha = 1.0, isFrozenByInfinity = false) {
+  if (!ctx || lightRadius <= 0 || alpha <= 0.05) return;
+  const entities = [];
+  if (typeof state !== 'undefined') {
+    if (Array.isArray(state.fighters)) entities.push(...state.fighters);
+    if (Array.isArray(state.illusions)) entities.push(...state.illusions);
+  }
+  if (entities.length === 0) return;
+
+  const lightRadiusSq = lightRadius * lightRadius;
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  for (let i = 0; i < entities.length; i++) {
+    const ent = entities[i];
+    if (!ent || ent.hp <= 0 || (ent.dead && !ent._isWinnerReveal)) continue;
+    const dx = lightX - ent.x;
+    const dy = lightY - (ent.y - (ent.z || 0));
+    const distSq = dx * dx + dy * dy;
+    if (distSq > lightRadiusSq || distSq <= 4) continue;
+
+    const dist = Math.sqrt(distSq);
+    const norm = 1.0 - (dist / lightRadius);
+    const rimIntensity = Math.pow(norm, 1.25) * 0.45 * alpha;
+    if (rimIntensity <= 0.02) continue;
+
+    const entR = ent.r || 25;
+    const angleToLight = Math.atan2(dy, dx);
+
+    ctx.save();
+    ctx.translate(ent.x, ent.y - (ent.z || 0));
+
+    // Directional Solar Rim Arc
+    ctx.strokeStyle = isFrozenByInfinity
+      ? `rgba(0, 229, 255, ${rimIntensity * 0.85})`
+      : `rgba(255, 150, 20, ${rimIntensity * 0.85})`;
+    ctx.lineWidth = Math.max(1.5, entR * 0.12);
+    ctx.beginPath();
+    ctx.arc(0, 0, entR * 1.05, angleToLight - Math.PI * 0.35, angleToLight + Math.PI * 0.35);
+    ctx.stroke();
+
+    // Secondary White-Hot Glint on leading edge
+    ctx.strokeStyle = `rgba(255, 255, 250, ${rimIntensity * 0.70})`;
+    ctx.lineWidth = Math.max(1.0, entR * 0.06);
+    ctx.beginPath();
+    ctx.arc(0, 0, entR * 1.05, angleToLight - Math.PI * 0.15, angleToLight + Math.PI * 0.15);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders ground-layer lighting wash beneath all active Fuga sources (charging fighters, flying arrows).
+ * Called on the ground layer before fighters are drawn.
+ */
+export function drawFugaGroundIllumination(ctx) {
+  if (!ctx || typeof state === 'undefined') return;
+
+  // 1. Sukuna / Yuji fighters actively channeling Divine Flame or in recovery
+  if (state.fighters) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (!f || f.hp <= 0 || (f.dead && !f._isWinnerReveal)) continue;
+      const isCharging = Boolean(f.isChannelingDivineFlame && f.divineFlameChargeTimer > 0);
+      const isRecovery = Boolean(f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0);
+      if (!isCharging && !isRecovery) continue;
+
+      let progress = 0;
+      let alpha = 1.0;
+      if (isCharging) {
+        progress = Math.min(1.0, f.divineFlameChargeTimer / Math.max(1, f.divineFlameChargeMax || 90));
+        alpha = 0.35 + 0.65 * progress;
+      } else {
+        const maxRec = (CONFIG.sukuna && CONFIG.sukuna.divineFlameRecoveryTime) ? CONFIG.sukuna.divineFlameRecoveryTime : 60;
+        progress = Math.min(1.0, f.divineFlameRecoveryTimer / maxRec);
+        alpha = 0.55 * progress;
+      }
+
+      if (alpha <= 0.02) continue;
+
+      const angle = f.gunAngle !== undefined ? f.gunAngle : (f.angle || 0);
+      const r = f.r || 25;
+      const lightDist = r * 1.2 + 35 * progress;
+      const lightX = f.x + Math.cos(angle) * lightDist;
+      const lightY = f.y - (f.z || 0) + Math.sin(angle) * lightDist;
+      const radius = 95 + 95 * progress;
+
+      drawFugaFloorLighting(ctx, lightX, lightY, radius, alpha, false, false, 0, false);
+      drawFugaProximityEntityLighting(ctx, lightX, lightY, radius * 1.5, alpha * 0.9, false);
+    }
+  }
+
+  // 2. Flying Fuga projectiles on the ground layer
+  const projectiles = (typeof getProjectiles === 'function' ? getProjectiles() : state.projectiles);
+  if (projectiles) {
+    for (let i = 0; i < projectiles.length; i++) {
+      const p = projectiles[i];
+      if (!p || p.life <= 0) continue;
+      const isFuga = Boolean(p.isSukunaFurnace || p.visual === 'sukunaFurnaceArrow' || p.behaviorType === 'sukuna_furnace');
+      if (!isFuga) continue;
+
+      drawFugaFloorLighting(ctx, p.x, p.y, 130, 1.0, true, false, 0, p.isFrozenByInfinity);
+      drawFugaProximityEntityLighting(ctx, p.x, p.y, 190, 0.85, p.isFrozenByInfinity);
+    }
+  }
+}
+
 export function drawSukunaFurnaceArrow(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
@@ -395,6 +568,9 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   const maxEmbers = isLowQuality ? 6 : 24;
   while (p.flameParticles.length > maxFlames) p.flameParticles.shift();
   while (p.emberParticles.length > maxEmbers) p.emberParticles.shift();
+
+  // Dynamic directional proximity entity lighting for flying fire arrow
+  drawFugaProximityEntityLighting(ctx, p.x, p.y, 185, 0.85, p.isFrozenByInfinity);
 
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -570,31 +746,59 @@ export function drawDivineFlameArrowConstruct(ctx, {
     // Nose tip is at x = 96.25%, bright cone core at x = 83.6%, shaft nock at x = 57.0%, vertical axis at y = 50.0%
     const drawX = isFlying ? (-drawW * 0.82) : (-drawW * 0.70);
     const drawY = -drawH * 0.50;
+    const tipX = drawX + drawW * 0.962;
 
-    // 1. Soft parabolic nose heat bloom (Rule 11 & Rule 31 compliant)
+    // ── 1. LAYER 1: RADIANT VOLUMETRIC HEAT BLOOM & SOLAR CORONA (Rule 11 & Rule 31 compliant) ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // A. Concentric nose heat bloom
     const glowCx = drawX + drawW * 0.84;
-    const glowR = (isFlying ? 46 : 40) * pScale;
+    const glowR = (isFlying ? 58 : 48) * pScale;
     const auraGrad = ctx.createRadialGradient(glowCx, 0, 2, glowCx, 0, glowR);
     if (isFrozenByInfinity) {
-      auraGrad.addColorStop(0, `rgba(224, 255, 255, ${0.52 * progress})`);
-      auraGrad.addColorStop(0.45, `rgba(0, 229, 255, ${0.28 * progress})`);
-      auraGrad.addColorStop(1, 'rgba(0, 100, 255, 0)');
+      auraGrad.addColorStop(0.00, `rgba(235, 255, 255, ${0.72 * progress})`);
+      auraGrad.addColorStop(0.35, `rgba(0, 230, 255, ${0.45 * progress})`);
+      auraGrad.addColorStop(0.70, `rgba(0, 120, 255, ${0.18 * progress})`);
+      auraGrad.addColorStop(1.00, 'rgba(0, 100, 255, 0)');
     } else {
-      auraGrad.addColorStop(0, `rgba(255, 245, 175, ${0.46 * progress})`);
-      auraGrad.addColorStop(0.45, `rgba(255, 105, 15, ${0.24 * progress})`);
-      auraGrad.addColorStop(1, 'rgba(200, 20, 0, 0)');
+      auraGrad.addColorStop(0.00, `rgba(255, 252, 215, ${0.75 * progress})`);
+      auraGrad.addColorStop(0.32, `rgba(255, 175, 30, ${0.52 * progress})`);
+      auraGrad.addColorStop(0.70, `rgba(255, 70, 10, ${0.22 * progress})`);
+      auraGrad.addColorStop(1.00, 'rgba(200, 20, 0, 0)');
     }
     ctx.fillStyle = auraGrad;
     ctx.beginPath();
-    ctx.arc(glowCx, 0, glowR, 0, Math.PI * 2);
+    ctx.ellipse(glowCx, 0, glowR * 1.35, glowR * 0.90, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Render 12-frame firearrowvfx.mp4 RGBA frame
+    // B. Atmospheric flame body heat wash along arrow shaft
+    const bodyAuraCx = drawX + drawW * 0.52;
+    const bodyAuraRx = drawW * 0.44;
+    const bodyAuraRy = drawH * 0.68;
+    const bodyGrad = ctx.createRadialGradient(bodyAuraCx, 0, 4, bodyAuraCx, 0, bodyAuraRx);
+    if (isFrozenByInfinity) {
+      bodyGrad.addColorStop(0.00, `rgba(0, 210, 255, ${0.28 * progress})`);
+      bodyGrad.addColorStop(0.60, `rgba(0, 100, 255, ${0.10 * progress})`);
+      bodyGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    } else {
+      bodyGrad.addColorStop(0.00, `rgba(255, 140, 20, ${0.32 * progress})`);
+      bodyGrad.addColorStop(0.60, `rgba(220, 35, 5, ${0.12 * progress})`);
+      bodyGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    }
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.ellipse(bodyAuraCx, 0, bodyAuraRx, bodyAuraRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // ── 2. LAYER 2: 12-FRAME PIXEL-ART FIRE ARROW SPRITE ──
+    ctx.save();
     ctx.globalAlpha = Math.min(1.0, 0.42 + 0.58 * progress);
     ctx.drawImage(frameImg, drawX, drawY, drawW, drawH);
+    ctx.restore();
 
-    // 3. Crisp firearrowvfx.mp4 Structural Core Overlay:
-    // Parabolic nose rim highlight + dark interior arrow shaft & barbed spine + helical flame coil + pinpoint sparks
+    // ── 3. LAYER 3: CRISP STRUCTURAL CORE OVERLAY ──
     _renderFireArrowVfxCoreOverlay(ctx, {
       drawX,
       drawW,
@@ -605,6 +809,73 @@ export function drawDivineFlameArrowConstruct(ctx, {
       time,
       isFrozenByInfinity
     });
+
+    // ── 4. LAYER 4: OVER-SPRITE RADIANT ARROWHEAD BLOOM & ANAMORPHIC GLARE ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // A. Blinding incandescent tip point flash
+    const tipCoreR = (isFlying ? 15 : 12) * pScale;
+    const tipBloom = ctx.createRadialGradient(tipX, 0, 0, tipX, 0, tipCoreR * 2.4);
+    if (isFrozenByInfinity) {
+      tipBloom.addColorStop(0.00, `rgba(255, 255, 255, ${0.98 * progress})`);
+      tipBloom.addColorStop(0.35, `rgba(180, 245, 255, ${0.75 * progress})`);
+      tipBloom.addColorStop(0.70, `rgba(0, 210, 255, ${0.32 * progress})`);
+      tipBloom.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    } else {
+      tipBloom.addColorStop(0.00, `rgba(255, 255, 255, ${0.98 * progress})`);
+      tipBloom.addColorStop(0.35, `rgba(255, 240, 160, ${0.82 * progress})`);
+      tipBloom.addColorStop(0.70, `rgba(255, 130, 20, ${0.38 * progress})`);
+      tipBloom.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    }
+    ctx.fillStyle = tipBloom;
+    ctx.beginPath();
+    ctx.arc(tipX, 0, tipCoreR * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // B. Cinematic Anamorphic Horizontal Lens Flare Streak (along the flight vector)
+    const streakLen = (isFlying ? 46 : 34) * pScale;
+    const streakThick = (isFlying ? 6.0 : 4.5) * pScale;
+    const streakGrad = ctx.createRadialGradient(tipX, 0, 0, tipX, 0, streakLen);
+    if (isFrozenByInfinity) {
+      streakGrad.addColorStop(0.00, `rgba(255, 255, 255, ${0.95 * progress})`);
+      streakGrad.addColorStop(0.30, `rgba(160, 240, 255, ${0.65 * progress})`);
+      streakGrad.addColorStop(0.75, `rgba(0, 190, 255, ${0.18 * progress})`);
+      streakGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    } else {
+      streakGrad.addColorStop(0.00, `rgba(255, 255, 255, ${0.95 * progress})`);
+      streakGrad.addColorStop(0.30, `rgba(255, 225, 120, ${0.70 * progress})`);
+      streakGrad.addColorStop(0.75, `rgba(255, 110, 15, ${0.22 * progress})`);
+      streakGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    }
+    ctx.fillStyle = streakGrad;
+    ctx.beginPath();
+    ctx.ellipse(tipX, 0, streakLen, streakThick, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // C. Forward Radiant Illumination Cone (projecting forward into space ahead of the arrow)
+    const coneReach = (isFlying ? 72 : 48) * pScale;
+    const coneSpread = (isFlying ? 26 : 18) * pScale;
+    const fwdGrad = ctx.createLinearGradient(tipX, 0, tipX + coneReach, 0);
+    if (isFrozenByInfinity) {
+      fwdGrad.addColorStop(0.00, `rgba(210, 250, 255, ${0.65 * progress})`);
+      fwdGrad.addColorStop(0.40, `rgba(0, 220, 255, ${0.30 * progress})`);
+      fwdGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    } else {
+      fwdGrad.addColorStop(0.00, `rgba(255, 245, 180, ${0.70 * progress})`);
+      fwdGrad.addColorStop(0.40, `rgba(255, 145, 25, ${0.35 * progress})`);
+      fwdGrad.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    }
+    ctx.fillStyle = fwdGrad;
+    ctx.beginPath();
+    ctx.moveTo(tipX, -streakThick * 0.5);
+    ctx.lineTo(tipX + coneReach, -coneSpread);
+    ctx.lineTo(tipX + coneReach, coneSpread);
+    ctx.lineTo(tipX, streakThick * 0.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
 
     ctx.restore();
     return;
@@ -799,6 +1070,35 @@ export function drawSukunaFugaExplosionSprite(ctx, exp, explosionProgress) {
   ctx.imageSmoothingEnabled = false;
   ctx.globalAlpha = alpha;
   ctx.drawImage(frameImg, -drawW * 0.50, -drawH * 0.50, drawW, drawH);
+
+  // Radiant Additive Thermobaric Explosion Bloom (Rule 11 & Rule 31 compliant)
+  if (clampedP < 0.80) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const bloomFade = Math.pow(1.0 - clampedP / 0.80, 1.35) * alpha;
+    const bloomR = drawW * 0.48;
+    const expBloom = ctx.createRadialGradient(0, 0, 0, 0, 0, bloomR);
+    if (clampedP < 0.28) {
+      // Peak incandescent detonation flash
+      const flashA = (1.0 - clampedP / 0.28) * bloomFade;
+      expBloom.addColorStop(0.00, `rgba(255, 255, 250, ${flashA * 0.95})`);
+      expBloom.addColorStop(0.20, `rgba(255, 235, 160, ${flashA * 0.80})`);
+      expBloom.addColorStop(0.50, `rgba(255, 120, 20, ${bloomFade * 0.50})`);
+      expBloom.addColorStop(0.80, `rgba(220, 40, 5, ${bloomFade * 0.20})`);
+      expBloom.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    } else {
+      expBloom.addColorStop(0.00, `rgba(255, 210, 80, ${bloomFade * 0.65})`);
+      expBloom.addColorStop(0.40, `rgba(255, 100, 15, ${bloomFade * 0.40})`);
+      expBloom.addColorStop(0.75, `rgba(200, 30, 0, ${bloomFade * 0.15})`);
+      expBloom.addColorStop(1.00, 'rgba(0, 0, 0, 0)');
+    }
+    ctx.fillStyle = expBloom;
+    ctx.beginPath();
+    ctx.arc(0, 0, bloomR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.restore();
   return true;
 }

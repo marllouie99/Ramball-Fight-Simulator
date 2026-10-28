@@ -25,7 +25,7 @@ const COMBO_DEFAULTS = Object.freeze({
   windowFrames: 90,        // 1.5 s at fixed 60 FPS before the chain expires
   minHits: 1,              // Shows from the first hit with active duration drain bar
   edgeInset: 45,           // px from window edge aligned with Top HUD frame & arena bounds
-  topGapBelowHud: 44,      // card top = arena.y - this (sits below the TOP HUD)
+  topGapBelowHud: 22,      // card top = arena.y - this (smaller value = banner sits lower, clearing the TOP HUD)
   slideFrames: 10,         // slide-in / slide-out duration
   popFrames: 8,            // impact pop duration on every new hit
   tierThresholds: [1, 5, 10, 20],

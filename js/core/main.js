@@ -469,10 +469,10 @@ startGameLoop();
 // HTML UI DOM LISTENERS: DOOM ETERNAL TACTICAL TERMINAL
 // ─────────────────────────────────────────────
 
-// Capture initial light mode colors from CONFIG so custom user configuration is preserved
-const _initialLightCanvasBg = CONFIG.lightCanvasBgColor || CONFIG.canvasBgColor || '#F5EEDC';
-const _initialLightArenaOuterBg = CONFIG.lightArenaOuterBgColor || CONFIG.arenaOuterBgColor || '#F5EEDC';
-const _initialLightArenaInnerBg = CONFIG.lightArenaInnerBgColor || CONFIG.arenaInnerBgColor || '#F5EEDC';
+// Capture initial configuration from CONFIG so custom user configuration is preserved
+const _initialArenaOuterBg = CONFIG.arenaOuterBgColor || CONFIG.lightArenaOuterBgColor || '#141622';
+const _initialArenaInnerBg = CONFIG.arenaInnerBgColor || CONFIG.lightArenaInnerBgColor || '#919298ff';
+const _initialCanvasBg = CONFIG.canvasBgColor || CONFIG.lightCanvasBgColor || _initialArenaOuterBg;
 const _initialLightHudTextColor = CONFIG.hudTextColor || '#131313ff';
 
 // Function to apply Arena Theme (Dark / Light)
@@ -483,16 +483,30 @@ export function applyArenaTheme(theme) {
   localStorage.setItem('arenaTheme', effectiveTheme);
 
   const isDark = (effectiveTheme === 'dark');
-  CONFIG.canvasBgColor = isDark ? '#000000' : (CONFIG.lightCanvasBgColor || _initialLightCanvasBg);
-  CONFIG.arenaOuterBgColor = isDark ? '#000000' : (CONFIG.lightArenaOuterBgColor || _initialLightArenaOuterBg);
-  CONFIG.arenaInnerBgColor = isDark ? '#000000' : (CONFIG.lightArenaInnerBgColor || _initialLightArenaInnerBg);
+  CONFIG.canvasBgColor = isDark
+    ? (CONFIG.darkCanvasBgColor || '#000000')
+    : (CONFIG.arenaOuterBgColor || CONFIG.lightCanvasBgColor || _initialCanvasBg);
+  CONFIG.arenaOuterBgColor = isDark
+    ? (CONFIG.darkArenaOuterBgColor || '#000000')
+    : (CONFIG.arenaOuterBgColor || CONFIG.lightArenaOuterBgColor || _initialArenaOuterBg);
+  CONFIG.arenaInnerBgColor = isDark
+    ? (CONFIG.darkArenaInnerBgColor || '#000000')
+    : (CONFIG.arenaInnerBgColor || CONFIG.lightArenaInnerBgColor || _initialArenaInnerBg);
   CONFIG.hudTextColor = isDark ? '#f0f2f5' : (CONFIG.lightHudTextColor || _initialLightHudTextColor);
 
   // Invalidate cached canvases
   state._arenaBorderCanvas = null;
   state._arenaOuterDetailsCanvas = null;
+  state._arenaFloorCanvasCache = null;
   state._titleHeaderCanvas = null;
   state._titleHeaderCanvasTheme = null;
+
+  const rawOuter = CONFIG.arenaOuterBgColor;
+  const cleanOuter = (typeof rawOuter === 'string' && rawOuter.startsWith('#') && rawOuter.length === 9 && rawOuter.endsWith('ff'))
+    ? rawOuter.substring(0, 7)
+    : rawOuter;
+  const gameBox = document.querySelector('.game-box');
+  if (gameBox) gameBox.style.backgroundColor = cleanOuter;
 
   // Toggle DOM classes
   const _themeEls = [

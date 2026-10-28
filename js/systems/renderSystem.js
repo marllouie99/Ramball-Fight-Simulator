@@ -36,6 +36,7 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { updateHybridProjectiles, updateHybridRika, updateHybridSukunaFuga } from '../graphics/renderers/hybridProjectileRenderer.js';
+import { drawFugaGroundIllumination } from '../graphics/weapons/sukunaWeaponGraphics.js';
 import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
 import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { updateCamera, applyCameraToCtx, drawCameraToast } from './cameraSystem.js';
@@ -386,6 +387,7 @@ export function renderGame() {
         // Draw thermobaric explosion shockwaves (Fuga) on the ground, before fighters
         if (!isGojoDomainActive) {
           drawThermobaricExplosions(state.ctx); 
+          drawFugaGroundIllumination(state.ctx);
         }
 
         // Draw drive-by skid marks, burnout oil puddle & headlights on the ground, before fighters

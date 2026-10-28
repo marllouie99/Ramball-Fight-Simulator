@@ -192,8 +192,17 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       (target._counterWindupTimer && target._counterWindupTimer > 0) || (target._postCounterRecoveryTimer && target._postCounterRecoveryTimer > 0)
     );
 
+    if (!isChanneling && typeof target.interruptAttacks === 'function') {
+      target.interruptAttacks();
+    }
 
-    return HitImpactSystem.processProjectileHit(target, projectile, attacker, fighters, { skipInterrupt: isChanneling, isBlue: true });
+    if (typeof target.applyParalyze === 'function') {
+      const paralyzeDuration = CONFIG.gojo?.blueParalyzeDuration ?? 15;
+      target.applyParalyze(paralyzeDuration);
+    }
+
+    HitImpactSystem.processProjectileHit(target, projectile, attacker, fighters);
+    return false; // Gojo Blue is piercing and travels through targets until reaching an arena wall
   }
 
   _releasePulledTargets(projectile) {
@@ -214,54 +223,11 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       return true;
     }
 
-    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    if (!arena) {
-      if (projectile.life <= 0) {
-        this._releasePulledTargets(projectile);
-        return true;
-      }
-      return false;
-    }
-
-    const pr = projectile.r || 15;
-    const obsHit = resolveProjectilePlusObstacleCollision(projectile, arena);
-    let isHittingWall = false;
-
-    if (obsHit) {
-      projectile.x = obsHit.wallX;
-      projectile.y = obsHit.wallY;
-      isHittingWall = true;
-    } else {
-      const hitLeft   = projectile.x - pr <= arena.x;
-      const hitRight  = projectile.x + pr >= arena.x + arena.width;
-      const hitTop    = projectile.y - pr <= arena.y;
-      const hitBottom = projectile.y + pr >= arena.y + arena.height;
-
-      isHittingWall = hitLeft || hitRight || hitTop || hitBottom;
-
-      if (isHittingWall) {
-        if (hitLeft)   { projectile.x = arena.x + pr; }
-        if (hitRight)  { projectile.x = arena.x + arena.width - pr; }
-        if (hitTop)    { projectile.y = arena.y + pr; }
-        if (hitBottom) { projectile.y = arena.y + arena.height - pr; }
-      }
-    }
-
-    if (isHittingWall) {
-      // Halt linear travel so it stays pinned to the wall
+    // If already pinned to an arena wall or obstacle, process linger countdown
+    if (projectile.isWallLingering) {
       projectile.vx = 0;
       projectile.vy = 0;
-
-      if (!projectile.isWallLingering) {
-        projectile.isWallLingering = true;
-        const lingerDuration = CONFIG.gojo?.blueWallLingerDuration ?? 90;
-        projectile.wallLingerTimer = lingerDuration;
-        spawnSparks(projectile.x, projectile.y, 8, 'lightningTrail', '#00FFFF');
-        spawnImpactFlash(projectile.x, projectile.y, 25, 'lightningTrail');
-        triggerGlobalScreenShake(2.5, 8);
-      }
-
-      projectile.wallLingerTimer -= 1;
+      projectile.wallLingerTimer = (projectile.wallLingerTimer ?? 0) - 1;
       if (projectile.wallLingerTimer <= 0) {
         this._releasePulledTargets(projectile);
         return true; // Expire after lingering on the wall
@@ -269,7 +235,73 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       return false; // Stay active on the wall!
     }
 
-    return false; // In flight, not expired
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    if (!arena) {
+      return false;
+    }
+
+    // Physical core radius of the Blue orb for wall contact (not full 100px gravitational pull field)
+    const wallR = Math.min(22, (CONFIG.gojo?.blueProjectileRadius ?? 25));
+    let isHittingWall = false;
+
+    // 1. Center plus obstacle swept-collision check
+    const tempP = { x: projectile.x, y: projectile.y, vx: projectile.vx, vy: projectile.vy, r: wallR };
+    const obsHit = resolveProjectilePlusObstacleCollision(tempP, arena);
+    if (obsHit && (obsHit.normalX * projectile.vx + obsHit.normalY * projectile.vy < 0)) {
+      projectile.x = obsHit.wallX;
+      projectile.y = obsHit.wallY;
+      isHittingWall = true;
+    } else if (arena.shape === 'circle') {
+      // 2. Circular arena perimeter collision
+      const cx = arena.x + arena.width / 2;
+      const cy = arena.y + arena.height / 2;
+      const ar = arena.radius || (arena.width / 2);
+      const d = Math.hypot(projectile.x - cx, projectile.y - cy);
+      if (d + wallR >= ar && d > 0) {
+        const nx = (projectile.x - cx) / d;
+        const ny = (projectile.y - cy) / d;
+        const movingOutward = (projectile.vx * nx + projectile.vy * ny) > 0;
+        if (movingOutward) {
+          projectile.x = cx + nx * (ar - wallR);
+          projectile.y = cy + ny * (ar - wallR);
+          isHittingWall = true;
+        }
+      }
+    } else {
+      // 3. Rectangular arena boundary collision with directional velocity gating
+      const hitLeft   = projectile.x - wallR <= arena.x;
+      const hitRight  = projectile.x + wallR >= arena.x + arena.width;
+      const hitTop    = projectile.y - wallR <= arena.y;
+      const hitBottom = projectile.y + wallR >= arena.y + arena.height;
+
+      const collidesLeft   = hitLeft && projectile.vx < 0;
+      const collidesRight  = hitRight && projectile.vx > 0;
+      const collidesTop    = hitTop && projectile.vy < 0;
+      const collidesBottom = hitBottom && projectile.vy > 0;
+
+      if (collidesLeft || collidesRight || collidesTop || collidesBottom) {
+        if (collidesLeft)   projectile.x = arena.x + wallR;
+        if (collidesRight)  projectile.x = arena.x + arena.width - wallR;
+        if (collidesTop)    projectile.y = arena.y + wallR;
+        if (collidesBottom) projectile.y = arena.y + arena.height - wallR;
+        isHittingWall = true;
+      }
+    }
+
+    if (isHittingWall) {
+      // Halt linear travel and pin to the wall
+      projectile.vx = 0;
+      projectile.vy = 0;
+      projectile.isWallLingering = true;
+      const lingerDuration = CONFIG.gojo?.blueWallLingerDuration ?? 90;
+      projectile.wallLingerTimer = lingerDuration;
+      spawnSparks(projectile.x, projectile.y, 8, 'lightningTrail', '#00FFFF');
+      spawnImpactFlash(projectile.x, projectile.y, 25, 'lightningTrail');
+      triggerGlobalScreenShake(2.5, 8);
+      return false; // Stay active on the wall!
+    }
+
+    return false; // In flight, traveling toward wall
   }
 }
 

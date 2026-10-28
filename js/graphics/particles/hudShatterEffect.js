@@ -1143,12 +1143,22 @@ export function drawBottomHudShatters(ctx, isDark, arena) {
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       if (st.label && st.value) {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(st.label, -st.w / 2, 0);
         ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.70)' : '#444444';
         ctx.fillText(st.label, -st.w / 2, 0);
+
         const labelW = ctx.measureText(st.label).width;
+        ctx.strokeText(` ${st.value}`, -st.w / 2 + labelW, 0);
         ctx.fillStyle = isDark ? '#FFFFFF' : '#000000';
         ctx.fillText(` ${st.value}`, -st.w / 2 + labelW, 0);
       } else {
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(st.text || '', -st.w / 2, 0);
         ctx.fillStyle = isDark ? '#FFFFFF' : '#000000';
         ctx.fillText(st.text || '', -st.w / 2, 0);
       }

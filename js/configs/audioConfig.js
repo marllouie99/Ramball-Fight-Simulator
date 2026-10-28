@@ -264,7 +264,11 @@ export const AUDIO_CONFIG = {
 
   // Ash Ketchum & Pokémon Companions
   'pokemon_faint': 'Assets/Sound Effects/PokemonSFX/faint.ogg',
-  'ash_pokemon_faint': 'Assets/Sound Effects/PokemonSFX/faint.ogg'
+  'ash_pokemon_faint': 'Assets/Sound Effects/PokemonSFX/faint.ogg',
+
+  // Unarmed (Earclacks Fighting)
+  'unarmed_wall_bump': 'Assets/Sound Effects/UnarmedSFX/unarmed_wall_bump.mp3',
+  'unarmed_wallbounce': 'Assets/Sound Effects/UnarmedSFX/unarmed_wall_bump.mp3'
 };
 
 

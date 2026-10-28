@@ -725,8 +725,8 @@ export class GojoFighter extends Fighter {
       if (!hasAdapted) {
         const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
         const gojoY = this.y - (this.z || 0);
-        let srcX = opts?.projectile ? opts.projectile.x : (attacker ? attacker.x : this.x);
-        let srcY = opts?.projectile ? opts.projectile.y : (attacker ? (attacker.y - (attacker.z || 0)) : gojoY);
+        let srcX = opts?.projectile ? opts.projectile.x : (opts?.hitX !== undefined ? opts.hitX : (attacker ? attacker.x : this.x));
+        let srcY = opts?.projectile ? opts.projectile.y : (opts?.hitY !== undefined ? opts.hitY : (attacker ? (attacker.y - (attacker.z || 0)) : gojoY));
         let dx = srcX - this.x;
         let dy = srcY - gojoY;
         let dist = Math.hypot(dx, dy);

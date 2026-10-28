@@ -95,7 +95,7 @@ export { spawnTojiCleaveHitEffect, drawTojiImpactEffects, updateTojiImpactEffect
 
 
 import { drawProjectiles as modDrawProjectiles, drawBlackHoleVisual } from './renderers/projectileRenderer.js';
-import { drawDivineFlameArrowConstruct } from './weapons/sukunaWeaponGraphics.js';
+import { drawDivineFlameArrowConstruct, drawFugaFloorLighting, drawFugaProximityEntityLighting, drawFugaGroundIllumination } from './weapons/sukunaWeaponGraphics.js';
 
 let _cachedTime = 0;
 let _sortedFightersBuffer = [];
@@ -115,7 +115,7 @@ export function getNow() {
   return _cachedTime;
 }
 
-export { drawDivineFlameArrowConstruct };
+export { drawDivineFlameArrowConstruct, drawFugaFloorLighting, drawFugaProximityEntityLighting, drawFugaGroundIllumination };
 export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere, drawCjBaguvixDimScreen, renderCjBaguvixBackground, getCjBaguvixOverlayImage };
 export { drawArena, drawArenaBorder, drawArenaWatermark, drawArenaMatchNames, applyDomainArenaVignetteCutout, isCrazyDavePresent, renderCrazyDaveGrassFloor, loadGrassTileSpriteSheet, getGrassTileSpriteSheet, drawPurpleDimScreen, drawRedDimScreen, drawGojoDomainDimScreen, drawRubbickDomainDimScreen, drawSukunaDomainDimScreen, drawYutaDomainDimScreen, drawMahitoDomainDimScreen, drawTojiUltimateOverlay, drawNanamiOvertimeArenaOverlay, loadNanamiOvertimeOverlayImage, getNanamiOvertimeOverlayImage, drawGenosUltimateArenaOverlay, loadGenosUltimateOverlayImage, getGenosUltimateOverlayImage, drawMahoragaAdaptationDimScreen, drawMahoragaWheelArenaOverlay, loadMahoragaWheelOverlayImage, getMahoragaWheelOverlayImage, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen, drawJohnWickAssassinationDimScreen, drawZenitsuChannelDimScreen, getZenitsuChannelDimOpacity, resetZenitsuChannelDimOpacity };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawDroppedMagazines, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };

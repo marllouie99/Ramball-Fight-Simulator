@@ -1161,21 +1161,27 @@ export class GojoRenderer {
       const buildProg  = elapsed / buildupEnd;       // 0 → 1
       const eased      = buildProg * buildProg;       // smooth ease-in
 
-      const targetRadius = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.redRadius === 'number')
+      const redHandScale = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.redHandScale === 'number')
+        ? CONFIG.gojo.redHandScale
+        : ((typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.redScale === 'number') ? CONFIG.gojo.redScale : 0.28);
+      const rawTargetRadius = (typeof CONFIG !== 'undefined' && typeof CONFIG.gojo?.redRadius === 'number')
         ? CONFIG.gojo.redRadius
-        : (getHandSize(6) * 2.0);
+        : 100;
+      const targetRadius = rawTargetRadius * redHandScale;
       const baseR = targetRadius * (0.2 + eased * 0.8);
       const pulse  = Math.sin(time / 120) * 0.08;
       const r2     = baseR * (1 + pulse);
-      const dynamicFingerDist = fingerDist + Math.max(0, (r2 - 15) * 0.5);
 
       // Draw Gojo's pointing hand extending along gun angle towards the red orb
       const handRadius = getHandSize(7.0, fighter);
       const skinColor = fighter.skinColor || '#FFE0BD';
       const handCanvas = GojoRenderer._getGojoHandCanvas(handRadius, skinColor);
+      const handAnchorX = Math.round(fighter.r * 0.88);
       if (handCanvas) {
-        ctx.drawImage(handCanvas, Math.round((fighter.r * 0.88) - handCanvas.width / 2), Math.round(-handCanvas.height / 2));
+        ctx.drawImage(handCanvas, Math.round(handAnchorX - handCanvas.width / 2), Math.round(-handCanvas.height / 2));
       }
+
+      const dynamicFingerDist = handAnchorX + handRadius + Math.max(2, r2 * 0.55);
 
       // Manifest red orb at Gojo's fingertip
       drawGojoOrb(ctx, dynamicFingerDist, 0, r2, time, 'red', 0);

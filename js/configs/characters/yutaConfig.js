@@ -196,7 +196,7 @@ export const yutaConfig = {
   pureLoveBeamDuration: 450,               // Frames the beam stays active (3 seconds)
   pureLoveBeamActiveDuration: 350,         // Alias matching pureLoveBeamDuration for skill and HUD consistency
   pureLoveBeamDamagePerTick: 7,           // Rapid multi-hit damage
-  pureLoveBeamWidth: 250,                  // Massive beam radius/width
+  pureLoveBeamWidth: 250,                  // Massive beam size: the sprite renders exactly this many px wide (1:1) and the hitbox scales off it
   pureLoveBeamLength: 2500,                // Screen spanning length
   pureLoveBeamKnockback: 2,                // Outward shove per tick (only for targets immune to beam suction)
   pureLoveBeamPullStrength: 3.4,           // Inward suction drag per frame toward Yuta while caught in the beam (px/frame)

@@ -956,7 +956,7 @@ export function drawSaitamaWallShatters(ctx, isDark, arena) {
       )) || (state.previewFighter && (state.previewFighter.isChargingStorm || state.previewFighter.stormActive))
     );
     const suppressArenaFloor = hasActiveDomain || isStorming;
-    const wallBgColor = isDark ? '#000000' : (suppressArenaFloor ? '#080808' : (CONFIG.arenaOuterBgColor || '#fff8ceff'));
+    const wallBgColor = isDark ? (CONFIG.darkArenaOuterBgColor || '#000000') : (suppressArenaFloor ? '#080808' : (CONFIG.arenaOuterBgColor || '#141622'));
     const inkColor = isDark ? 'rgba(255, 255, 255, 0.92)' : 'rgba(15, 15, 18, 0.95)';
     const crackAccentColor = isDark ? 'rgba(255, 255, 255, 0.70)' : 'rgba(40, 40, 45, 0.75)';
 

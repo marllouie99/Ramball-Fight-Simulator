@@ -985,8 +985,16 @@ export class MahoragaFighter extends Fighter {
       state.gameState === 'roundEnd' || 
       state.gameState === 'matchEnd'
     );
-    if (isMatchEnded) {
-      this.interruptAttacks(true);
+    const hasLivingEnemies = Boolean(
+      (opponent && !opponent.isDead && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving)) ||
+      (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+        f && f !== this && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving) && 
+        (!this.isTeammate || !this.isTeammate(f)) && f !== this.owner
+      ))
+    );
+
+    if (isMatchEnded || !hasLivingEnemies) {
+      this.interruptAttacks(false);
       this.isShouting = false;
       this.shoutPhase = null;
       this.shoutWindupTimer = 0;
@@ -996,13 +1004,42 @@ export class MahoragaFighter extends Fighter {
       this.swordWindupTimer = 0;
       this.swordWindupTarget = null;
       this.isThrowing = false;
+      this.throwBarrageShotsLeft = 0;
+      this.throwBarrageTimer = 0;
       this.isWallSlamActive = false;
+      this.wallSlamPhase = null;
+      this.wallSlamTimer = 0;
       this.isWallReboundDashing = false;
-      this.vx = 0;
-      this.vy = 0;
-      this.angle = 0;
-      this.gunAngle = 0;
+      this.isBlitzActive = false;
+      this.isInfinityBlitz = false;
+      this.isWallSlamBlitz = false;
+      this.wallSlamBlitzInterval = 0;
+      this.blitzHitsLeft = 0;
+      this.adaptationDashTimer = 0;
+      this.adaptationPauseTimer = 0;
+      this.postDashPauseTimer = 0;
+      this.defensePoseTimer = 0;
+      this.shootCooldown = 60;
+      this._bounceTarget = null;
       if (this.activeSonicBooms) this.activeSonicBooms.length = 0;
+
+      // Unstoppable post-match continuous victory movement standard:
+      const cruiseSpeed = this.speed || 6.5;
+      const currentSpeed = Math.hypot(this.vx || 0, this.vy || 0);
+      if (currentSpeed < 0.2) {
+        const moveAngle = (this.angle !== undefined && this.angle !== 0) ? this.angle : (this.gunAngle || (Math.random() * Math.PI * 2));
+        this.vx = Math.cos(moveAngle) * cruiseSpeed * 0.5;
+        this.vy = Math.sin(moveAngle) * cruiseSpeed * 0.5;
+      } else if (currentSpeed > cruiseSpeed) {
+        this.vx *= 0.94;
+        this.vy *= 0.94;
+      }
+
+      if (typeof this.turnToNormalPosition === 'function') {
+        this.turnToNormalPosition(0.035);
+      }
+      this.applyMovementPhysics();
+      if (arena) this.resolveWallBounce(arena, null);
       return;
     }
 

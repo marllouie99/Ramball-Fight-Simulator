@@ -72,7 +72,7 @@ export function syncHudPosition() {
   _cachedGameBox.style.maxWidth = `${canvasWidth}px`;
   
   const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-  const outerBgColor = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#fff8ceff');
+  const outerBgColor = isDark ? (CONFIG.darkArenaOuterBgColor || '#000000') : (CONFIG.arenaOuterBgColor || '#141622');
   _cachedGameBox.style.backgroundColor = (typeof outerBgColor === 'string' && outerBgColor.startsWith('#') && outerBgColor.length === 9 && outerBgColor.endsWith('ff'))
     ? outerBgColor.substring(0, 7)
     : outerBgColor;
@@ -125,7 +125,7 @@ export function syncHudPosition() {
   // 1. Position Top HUD Container
   const topRatio = isHorizontal
     ? (6 / canvasHeight)
-    : (is1v2 ? ((arena.y - 100) / canvasHeight) : ((arena.y - 90) / canvasHeight));
+    : (is1v2 ? ((arena.y - 82) / canvasHeight) : ((arena.y - 72) / canvasHeight));
   const topPx = canvasTopInBox + canvasRect.height * topRatio;
   const topPercent = (topPx / boxRect.height) * 100;
   

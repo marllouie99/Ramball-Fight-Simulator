@@ -1,5 +1,5 @@
 import { state } from '../../core/state.js';
-import { drawSukunaFugaExplosionSprite } from '../weapons/sukunaWeaponGraphics.js';
+import { drawSukunaFugaExplosionSprite, drawFugaFloorLighting } from '../weapons/sukunaWeaponGraphics.js';
 
 function _isDarkMode() {
   return Boolean(
@@ -221,7 +221,10 @@ export function drawThermobaricExplosions(ctx) {
       }
       ctx.restore();
 
-      // 2. Render 12-Frame Pixel-Art Fuga Explosion Sprite (with procedural fallback if not yet loaded)
+      // 2. Thermonuclear ground-flash floor illumination bloom
+      drawFugaFloorLighting(ctx, 0, 0, R, 1.0, false, true, explosionProgress);
+
+      // 3. Render 12-Frame Pixel-Art Fuga Explosion Sprite (with procedural fallback if not yet loaded)
       const drewSprite = drawSukunaFugaExplosionSprite(ctx, exp, explosionProgress);
 
       if (!drewSprite) {

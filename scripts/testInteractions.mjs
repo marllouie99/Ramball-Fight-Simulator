@@ -11289,6 +11289,477 @@ async function runInteractionTests() {
     console.log('      ✅ Gojo Limitless Cursed Techniques (Purple, Red, Blue) 18-Frame Animated Sprite Pipeline & Canonical Flare Audio verified successfully.');
   }
 
+  // ── TEST: Sans Gaster Blaster Beam Stopped by Active Gojo Infinity & Knight Shield ──
+  console.log('   Testing Sans Gaster Blaster Beam Clamping against Active Gojo Infinity & Knight Shield...');
+  {
+    const SansClass = FIGHTER_CLASS_MAP['sans'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const KnightClass = FIGHTER_CLASS_MAP['knight'];
+    const NormalClass = FIGHTER_CLASS_MAP['normal'];
+    assert(SansClass && GojoClass && KnightClass && NormalClass, 'Sans, Gojo, Knight, and Normal classes must exist');
+
+    const sans = new SansClass({ x: 100, y: 300, team: 0 });
+    const gojo = new GojoClass({ x: 350, y: 300, team: 1 });
+    const knight = new KnightClass({ x: 350, y: 300, team: 1 });
+    const bystanderBehind = new NormalClass({ x: 550, y: 300, team: 1 });
+    sans.x = 100; sans.y = 300; sans.team = 0;
+    gojo.x = 350; gojo.y = 300; gojo.team = 1;
+    knight.x = 350; knight.y = 300; knight.team = 1;
+    bystanderBehind.x = 550; bystanderBehind.y = 300; bystanderBehind.team = 1;
+
+    const blaster = {
+      x: 150,
+      y: 300,
+      angle: 0, // Aiming right (+X) toward x=350 and x=550
+      scale: 1.0,
+      spawnScale: 1.0,
+      chargeTimer: 0,
+      chargeMax: 16,
+      fireTimer: 20,
+      fireMax: 20,
+      damage: 20,
+      pattern: 0,
+      beamHeight: 32,
+      beamWidth: 32,
+      reach: 800,
+      maxReach: 800,
+      length: 800,
+      isCharging: false,
+      isFiring: true,
+      damageDealt: false,
+      hitTargets: new Set(),
+      targetLastHitFrame: new Map()
+    };
+
+    // 1. Usually (normal target without Infinity or Shield): beam passes straight through at full reach (800)
+    state.fighters = [sans, bystanderBehind];
+    state.illusions = [];
+    const unblockedLength = sans._getEffectiveBlasterBeamLength(blaster, bystanderBehind);
+    assert(unblockedLength === 800, `Gaster Blaster beam must pass through normal targets at full reach 800 (got ${unblockedLength})`);
+
+    // 2. Gojo with active Limitless Infinity: beam stops at Gojo's Infinity barrier edge and does not pass through
+    gojo.infinityActive = true;
+    gojo.infinityCooldown = 0;
+    gojo.domainActive = false;
+    gojo.isMeleeMode = false;
+    state.fighters = [sans, gojo, bystanderBehind];
+    const expectedInfinityRadius = CONFIG.gojo?.infinityRadius ?? ((gojo.r || 25) + 30);
+    const expectedGojoStopDist = (gojo.x - blaster.x) - expectedInfinityRadius; // 200 - 80 = 120
+    const gojoClampedLength = sans._getEffectiveBlasterBeamLength(blaster, gojo);
+    assert(
+      Math.abs(gojoClampedLength - expectedGojoStopDist) < 0.01,
+      `Gaster Blaster beam must stop at Gojo's active Infinity barrier (${expectedGojoStopDist}px), got ${gojoClampedLength}px`
+    );
+
+    sans.gasterBlasters = [{ ...blaster, hitTargets: new Set(), targetLastHitFrame: new Map() }];
+    const gojoInitialHp = gojo.hp;
+    const bystanderInitialHp = bystanderBehind.hp;
+    sans._updateGasterBlasters(gojo);
+    assert(
+      Math.abs(sans.gasterBlasters[0].effectiveReach - expectedGojoStopDist) < 0.01,
+      'Active blaster effectiveReach must be clamped to Gojo Infinity edge during update'
+    );
+    assert(gojo.hp === gojoInitialHp, 'Gojo with active Infinity must take 0 HP damage from Gaster Blaster');
+    assert((gojo.karmaDamage || 0) === 0, 'Gojo with active Infinity must not accumulate Karma poison from blocked Gaster Blaster');
+    assert(bystanderBehind.hp === bystanderInitialHp, 'Target behind Gojo with active Infinity must not be hit by Gaster Blaster beam');
+
+    // When Gojo's Infinity is on cooldown / inactive, the beam passes through normally
+    gojo.infinityCooldown = 60;
+    const gojoInactiveLength = sans._getEffectiveBlasterBeamLength(blaster, gojo);
+    assert(gojoInactiveLength === 800, `Gaster Blaster beam must pass through when Gojo Infinity is on cooldown (got ${gojoInactiveLength})`);
+    gojo.infinityCooldown = 0;
+
+    // 3. Knight with active Shield: beam stops at Knight's shield edge and does not pass through
+    knight.isShieldBroken = false;
+    knight.shieldHp = 100;
+    state.fighters = [sans, knight, bystanderBehind];
+    const expectedShieldRadius = (knight.r || 25) + 14;
+    const expectedKnightStopDist = (knight.x - blaster.x) - expectedShieldRadius; // 200 - 39 = 161
+    const knightClampedLength = sans._getEffectiveBlasterBeamLength(blaster, knight);
+    assert(
+      Math.abs(knightClampedLength - expectedKnightStopDist) < 0.01,
+      `Gaster Blaster beam must stop at Knight's active shield (${expectedKnightStopDist}px), got ${knightClampedLength}px`
+    );
+
+    sans.gasterBlasters = [{ ...blaster, hitTargets: new Set(), targetLastHitFrame: new Map() }];
+    const knightInitialHp = knight.hp;
+    const knightInitialShieldHp = knight.shieldHp;
+    sans._updateGasterBlasters(knight);
+    assert(knight.shieldHp < knightInitialShieldHp, 'Knight shield must absorb Gaster Blaster impact damage');
+    assert(knight.hp === knightInitialHp, 'Knight HP must remain undamaged while shield blocks Gaster Blaster');
+    assert((knight.karmaDamage || 0) === 0, 'Knight must not accumulate Karma poison while shield blocks Gaster Blaster');
+    assert(bystanderBehind.hp === bystanderInitialHp, 'Target behind Knight with active shield must not be hit by Gaster Blaster beam');
+
+    // When Knight's shield is broken, the beam passes through normally
+    knight.isShieldBroken = true;
+    knight.shieldHp = 0;
+    const knightBrokenLength = sans._getEffectiveBlasterBeamLength(blaster, knight);
+    assert(knightBrokenLength === 800, `Gaster Blaster beam must pass through when Knight shield is broken (got ${knightBrokenLength})`);
+
+    mockCtx.resetStackDepth();
+    sans.draw(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Sans.draw must maintain 0 Canvas 2D stack depth');
+    sans.gasterBlasters = [];
+    console.log('      ✅ Sans Gaster Blaster beam clamping against Gojo Infinity & Knight Shield verified.');
+  }
+
+  // ── Test 96: Gojo Blue Projectile Trajectory, Pierce Through Enemies & Wall Linger Standard ──
+  {
+    console.log('🧪 Test 96: Gojo Blue Projectile Trajectory, Pierce & Arena Wall Linger Standard...');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    state.arena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+    state.gameState = 'playing';
+
+    const gojo = new GojoFighter({ characterId: 'gojo', name: 'Gojo', x: 135, y: 465, color: '#00F0FF', radius: 25, hp: 500, maxHp: 500, controls: {} });
+    const sukuna = new SukunaFighter({ characterId: 'sukuna', name: 'Sukuna', x: 270, y: 465, color: '#FF0055', radius: 25, hp: 500, maxHp: 500, controls: {} });
+    gojo.team = 0;
+    sukuna.team = 1;
+    state.fighters = [gojo, sukuna];
+    projectileSystem.projectiles = [];
+
+    gojo.gunAngle = 0; // Aiming right across the arena
+    projectileSystem.fireGojoBlue(gojo, 0, 25);
+
+    assert(projectileSystem.projectiles.length === 1, 'Gojo Blue projectile must spawn in projectileSystem');
+    const blue = projectileSystem.projectiles[0];
+
+    // Frame 1 check: Blue must not be trapped on the left wall despite large pull radius
+    assert(blue.isWallLingering === false, 'Gojo Blue must NOT trigger wall linger on Frame 1 near spawn');
+    assert(blue.vx > 0, `Gojo Blue must possess positive travel velocity vx, got ${blue.vx}`);
+
+    let hitSukuna = false;
+    let reachedRightWall = false;
+
+    // Simulate flight across the arena
+    for (let f = 0; f < 60; f++) {
+      projectileSystem.update(state.fighters, mockCtx);
+      if (projectileSystem.projectiles.length === 0) break;
+
+      const currentBlue = projectileSystem.projectiles[0];
+      if (sukuna.isCaughtInBlue) {
+        hitSukuna = true;
+      }
+      if (currentBlue.isWallLingering) {
+        reachedRightWall = true;
+        break;
+      }
+    }
+
+    assert(hitSukuna, 'Gojo Blue must pierce and pull Sukuna along its flight path');
+    assert(reachedRightWall, 'Gojo Blue must travel all the way across the arena to the right wall');
+    assert(blue.isWallLingering === true, 'Gojo Blue must enter wall lingering state upon contacting arena wall');
+    assert(blue.x >= 470, `Gojo Blue must reach right wall perimeter (x >= 470), got ${blue.x}`);
+    assert(blue.vx === 0 && blue.vy === 0, 'Gojo Blue travel velocity must be halted while lingering on wall');
+
+    // Simulate lingering duration
+    const initialLingerTimer = blue.wallLingerTimer;
+    assert(initialLingerTimer > 0, 'Wall linger timer must be initialized to positive value');
+
+    for (let f = 0; f < initialLingerTimer + 5; f++) {
+      projectileSystem.update(state.fighters, mockCtx);
+    }
+
+    assert(projectileSystem.projectiles.length === 0, 'Gojo Blue must cleanly expire after wall linger duration elapses');
+    assert(sukuna.isCaughtInBlue === false, 'Sukuna isCaughtInBlue flag must be cleared when Blue expires');
+    assert(sukuna.isCaughtInBluePull === false, 'Sukuna isCaughtInBluePull flag must be cleared when Blue expires');
+
+    projectileSystem.projectiles = [];
+    console.log('      ✅ Gojo Blue projectile travel, enemy pierce, wall latch and clean expiration verified.');
+  }
+
+  // ── Test 97: Gojo Hand VFX Scaling: Increased Blue Hand Scale & Decreased Reversal Red Channeling Scale ──
+  {
+    console.log('🧪 Test 97: Gojo Hand VFX Scaling (Increased Blue & Decreased Reversal Red)...');
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { drawGojoWeapon } = await import('../js/graphics/weapons/gojoWeaponGraphics.js');
+    const { GojoRenderer } = await import('../js/graphics/fighters/gojoRenderer.js');
+
+    const gojo = new GojoFighter({ characterId: 'gojo', name: 'Gojo', x: 200, y: 300, radius: 25, hp: 500, maxHp: 500, controls: {} });
+    gojo.gunAngle = 0;
+    gojo.isMeleeMode = false;
+    gojo.orbTransition = 1.0;
+    gojo._blueOrbDisplayAlpha = 1.0;
+
+    // 1. Verify Blue Hand Scale config is increased
+    assert(typeof CONFIG.gojo?.blueHandScale === 'number' && CONFIG.gojo.blueHandScale >= 1.4, 'CONFIG.gojo.blueHandScale must be configured >= 1.4');
+
+    // 2. Verify Reversal Red Hand Scale config is decreased for channeling
+    assert(typeof CONFIG.gojo?.redHandScale === 'number' && CONFIG.gojo.redHandScale <= 0.35, 'CONFIG.gojo.redHandScale must be configured <= 0.35');
+
+    // 3. Render Blue on hands with mockCtx and verify stack balance
+    mockCtx.resetStackDepth();
+    drawGojoWeapon(mockCtx, gojo);
+    assert(mockCtx.getStackDepth() === 0, 'drawGojoWeapon with Blue on hands must maintain 0 Canvas 2D stack depth');
+
+    // 4. Set up Gojo in Reversal Red buildup channeling phase
+    gojo.redEffectTimer = 125;
+    gojo.redEffectMaxTimer = 125;
+    gojo.redBuildupPhase = true;
+
+    mockCtx.resetStackDepth();
+    GojoRenderer._drawReversalRedEffect(mockCtx, gojo);
+    assert(mockCtx.getStackDepth() === 0, 'GojoRenderer._drawReversalRedEffect during channeling must maintain 0 Canvas 2D stack depth');
+
+    // Clean up
+    gojo.redEffectTimer = 0;
+    gojo.redBuildupPhase = false;
+    console.log('      ✅ Gojo increased Blue hand scale and decreased Reversal Red channeling hand scale verified.');
+  }
+
+  // 🧪 Test 98: Unarmed Earclacks Ball Fight Mechanics (Momentum Scaling, Wall Ricochets, Afterimages, Shockwaves & Canvas 2D Stack Balance) 🧪
+  {
+    console.log('🧪 Test 98: Unarmed Earclacks Ball Fight Mechanics (Momentum Scaling, Wall Ricochets, Afterimages, Shockwaves & Stack Balance)...');
+    const { UnarmedFighter } = await import('../js/entities/fighters/UnarmedFighter.js');
+    const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    const arena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+    const unarmed = new UnarmedFighter({ characterId: 'unarmed', name: 'Unarmed', x: 200, y: 300, radius: 25, hp: 1100, maxHp: 1100 });
+    const dummy = new NormalFighter({ characterId: 'normal', name: 'Dummy', x: 260, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    state.fighters = [unarmed, dummy];
+
+    // 1. Initial State & Official Wiki Traits
+    assert(unarmed.momentumStacks === 0, 'Unarmed must initialize with 0 momentum stacks');
+    assert(unarmed.isTerminalVelocity === false, 'Terminal velocity overdrive must be inactive initially');
+    assert(unarmed.isUnparriable === true, 'Unarmed must be unparriable as hits connect directly with body');
+
+    // 2. Wall Ricochet Physics (Conserves natural velocity without gaining momentum stacks; only enemy hits scale momentum)
+    unarmed.x = arena.x - 5; // Force wall contact on left arena wall
+    unarmed.vx = -4.0;
+    unarmed.vy = 2.0;
+    unarmed.resolveWallBounce(arena, dummy);
+    assert(unarmed.momentumStacks === 0, 'Unarmed must NOT gain momentum stacks on wall bounce (only on enemy hits)');
+    assert(unarmed.vx > 0, 'Unarmed horizontal velocity must reflect outward after left wall bounce');
+    assert(unarmed.visualShockwaves.length > 0, 'Wall bounce must spawn concentric shockwave visual effect');
+
+    // 2.5 Hit Deceleration & Permanent Speed Scaling (Wiki: "Typically slows down slightly after being hit by an opponent")
+    unarmed.momentumStacks = 3;
+    unarmed.vx = 8.0;
+    unarmed.vy = 0;
+    unarmed.takeDamage(10, dummy, 0);
+    assert(unarmed.momentumStacks === 3, 'Unarmed momentum stacks must be PERMANENT and never lost on hit');
+    assert(unarmed.vx < 8.0, 'Unarmed must decelerate slightly in current velocity when hit by opponent');
+
+    // 2.6 Permanent Speed Retention across frames (zero decay over time)
+    const initialStacks = unarmed.momentumStacks;
+    for (let f = 0; f < 180; f++) {
+      unarmed.update(dummy, 0, arena);
+    }
+    assert(unarmed.momentumStacks >= initialStacks, 'Unarmed momentum stacks and gained speed must remain permanent with ZERO decay over time');
+
+    // 3. Kinetic Surge Activation
+    unarmed._castKineticSurge(dummy);
+    assert(unarmed.surgeTimer > 0, 'Kinetic surge must activate active surge timer');
+    assert(unarmed.momentumStacks >= 2, 'Kinetic surge must grant bonus momentum stacks');
+    assert(Math.hypot(unarmed.vx, unarmed.vy) >= 15.0, 'Kinetic surge must rocket Unarmed forward at high speed');
+
+    // 4. Super Unarmed Overdrive (Wiki: White ball with light grey outline, top speed throughout duration)
+    unarmed._castSuperUnarmed(dummy);
+    assert(unarmed.isSuperUnarmed === true, 'Super Unarmed must activate');
+    assert(unarmed.momentumStacks === unarmed.maxMomentumStacks, 'Super Unarmed must instantly maximize momentum stacks');
+    assert(Math.hypot(unarmed.vx, unarmed.vy) >= 17.5, 'Super Unarmed must propel Unarmed at top terminal velocity');
+
+    // 5. Update Loop, Afterimages & Visual Decay (Rule 25)
+    unarmed.update(dummy, 0, arena);
+    assert(unarmed.afterimages.length > 0, 'High-velocity movement must spawn ghost afterimages');
+
+    // 6. Projectile Suppression & Basic Attack Lunge (Rule 23)
+    const initialBullets = projectileSystem.bullets ? projectileSystem.bullets.length : 0;
+    unarmed.shoot(0, dummy);
+    const afterBullets = projectileSystem.bullets ? projectileSystem.bullets.length : 0;
+    assert(initialBullets === afterBullets, 'Unarmed shoot() must suppress default generic projectile bullets (Rule 23)');
+
+    // 7. Wall Rebounce Requirement: Must Rebounce to Wall to Deal Damage (Earclacks Standard)
+    state.gameState = 'playing';
+    const collisionDummy = new NormalFighter({ characterId: 'normal', name: 'CollisionDummy', x: 260, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    state.fighters = [unarmed, collisionDummy];
+    const dummyInitialHp = collisionDummy.hp;
+    unarmed.isSuperUnarmed = false;
+    unarmed.momentumStacks = 3;
+    unarmed.speed = unarmed.baseSpeed + unarmed.momentumStacks * unarmed.speedPerHit;
+    const initialUnarmedSpeed = unarmed.speed;
+    const initialMomentum = unarmed.momentumStacks;
+
+    // 7.1 Without wall rebounce: deals ZERO damage and gains ZERO momentum
+    unarmed.hasWallRebounded = false;
+    unarmed.x = collisionDummy.x - 5;
+    unarmed.y = collisionDummy.y;
+    unarmed.vx = 15.0;
+    unarmed.vy = 0;
+    unarmed.collisionCooldown = 0;
+    unarmed._checkFighterCollision(collisionDummy);
+    assert(collisionDummy.hp === dummyInitialHp, 'Unarmed must NOT deal damage without rebouncing off the wall first');
+    assert(unarmed.momentumStacks === initialMomentum, 'Unarmed must NOT gain momentum without rebouncing off the wall first');
+
+    // 7.2 Rebounce off arena wall: primes Unarmed for damage
+    unarmed.x = arena.x - 5;
+    unarmed.vx = -4.0;
+    unarmed.vy = 0;
+    unarmed.resolveWallBounce(arena, collisionDummy);
+    assert(unarmed.hasWallRebounded === true, 'Wall bounce must prime Unarmed with wall rebound charge (hasWallRebounded = true)');
+
+    // 7.3 Primed collision after wall rebounce: deals full kinetic damage, scales momentum & consumes charge
+    unarmed.x = collisionDummy.x - 5;
+    unarmed.y = collisionDummy.y;
+    unarmed.vx = 15.0;
+    unarmed.vy = 0;
+    unarmed.collisionCooldown = 0;
+    unarmed._checkFighterCollision(collisionDummy);
+    assert(collisionDummy.hp < dummyInitialHp, 'High-velocity body collision after wall rebounce must deal kinetic impact damage');
+    assert(collisionDummy.vx > 0, 'High-velocity body collision must apply directional knockback to opponent');
+    assert(unarmed.momentumStacks > initialMomentum, 'Primed collision into enemy must gain momentum stacks');
+    assert(unarmed.speed > initialUnarmedSpeed, 'Primed collision into enemy must permanently increase Unarmed speed');
+    assert(unarmed.hasWallRebounded === false, 'Wall rebound charge must be consumed upon dealing damage');
+
+    // 7.5 Hit Slow Movement Verification for both Unarmed and Opponent
+    assert(collisionDummy.slowTimer > 0, 'Opponent must experience a brief movement slow upon collision hit');
+    assert(collisionDummy.slowMultiplier <= 0.5, 'Opponent must have reduced movement speed multiplier during hit slow');
+    assert(unarmed.slowTimer > 0, 'Unarmed must experience a brief movement slow upon collision hit');
+    assert(unarmed.slowMultiplier <= 0.5, 'Unarmed must have reduced movement speed multiplier during hit slow');
+    assert(unarmed.punchAnimTimer > 0, 'Unarmed must trigger dynamic martial arts fist punch animation on collision impact');
+
+    // 7.6 Basic Skill HUD Registration & Config Ability Toggles
+    const { unarmedConfig } = await import('../js/configs/characters/unarmedConfig.js');
+    assert(unarmedConfig.enableKineticBump === true, 'unarmedConfig must define enableKineticBump toggle');
+    assert(unarmedConfig.enableMomentumScaling === true, 'unarmedConfig must define enableMomentumScaling toggle');
+    assert(unarmedConfig.enableSuperUnarmed === true, 'unarmedConfig must define enableSuperUnarmed toggle');
+    assert(unarmedConfig.enableHitSlow === true, 'unarmedConfig must define enableHitSlow toggle');
+    assert(unarmedConfig.enableKineticSurge === true, 'unarmedConfig must define enableKineticSurge toggle');
+    assert(unarmedConfig.enableBallSteering === true, 'unarmedConfig must define enableBallSteering toggle');
+    assert(unarmedConfig.requireWallBounceForDamage === true, 'unarmedConfig must define requireWallBounceForDamage toggle');
+
+    const basicSkill = unarmed.skillManager.getSkill('kineticBump');
+    assert(Boolean(basicSkill), 'Unarmed must register Kinetic Bump as its declarative basic attack skill in SkillManager');
+    assert(basicSkill.type === 'basic', 'Kinetic Bump skill must have type basic');
+
+    // 7.7 Direct Physics onCollide Hook Verification (requires wall rebounce)
+    const onCollideDummy = new NormalFighter({ characterId: 'normal', name: 'OnCollideDummy', x: 260, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    const onCollideInitialHp = onCollideDummy.hp;
+
+    // Unprimed onCollide: zero damage
+    unarmed.hasWallRebounded = false;
+    unarmed.collisionCooldown = 0;
+    unarmed.onCollide(onCollideDummy);
+    assert(onCollideDummy.hp === onCollideInitialHp, 'onCollide hook must NOT deal damage without rebouncing off the wall first');
+
+    // Primed onCollide after wall bounce: deals damage
+    unarmed.x = arena.x - 5;
+    unarmed.vx = -4.0;
+    unarmed.resolveWallBounce(arena, onCollideDummy);
+    assert(unarmed.hasWallRebounded === true, 'Wall bounce must prime Unarmed before onCollide');
+
+    unarmed.collisionCooldown = 0;
+    unarmed.onCollide(onCollideDummy);
+    assert(onCollideDummy.hp < onCollideInitialHp, 'onCollide hook must trigger kinetic bump damage after wall rebounce');
+    assert(unarmed.collisionCooldown > 0, 'onCollide hook must initiate collision cooldown to prevent multi-hit glitching');
+    assert(unarmed.hasWallRebounded === false, 'onCollide damage must consume wall rebounce charge');
+
+    // Verify toggle gating
+    unarmed.isSuperUnarmed = false;
+    unarmedConfig.enableSuperUnarmed = false;
+    unarmed._castSuperUnarmed(dummy);
+    assert(unarmed.isSuperUnarmed === false, '_castSuperUnarmed must be gated when enableSuperUnarmed is false');
+    unarmedConfig.enableSuperUnarmed = true;
+
+    // 8. Real-Time HUD Stats (DMG & SPD Dynamic Scaling with Momentum)
+    const { drawHUD, clearHealthHud } = await import('../js/graphics/hudManager.js');
+    unarmed.momentumStacks = 0;
+    unarmed.isSuperUnarmed = false;
+    unarmed.isTerminalVelocity = false;
+    unarmed._syncLiveDamageAndSpeed();
+    assert(unarmed.damage === (unarmedConfig.baseCollisionDamage || 30), 'Unarmed damage at 0 momentum must equal base collision damage');
+    assert(unarmed.speed === (unarmedConfig.speed || 5.0), 'Unarmed speed at 0 momentum must equal base speed');
+
+    state.fighters = [unarmed, dummy];
+    state.mode = '1v1';
+    state.gameState = 'running';
+    const origStatsToggle = CONFIG.darkModeShowHudStats;
+    const origHideStats = CONFIG.hudHideStats;
+    const origHideAll = CONFIG.hudHideAll;
+    CONFIG.darkModeShowHudStats = 1;
+    CONFIG.hudHideStats = false;
+    CONFIG.hudHideAll = false;
+    clearHealthHud();
+    drawHUD();
+
+    let hudContent = (document.getElementById('healthHudLeft')?.innerHTML || '') +
+                     (document.getElementById('healthHudRight')?.innerHTML || '') +
+                     (document.getElementById('healthHud')?.innerHTML || '');
+    let hudText = hudContent.replace(/<[^>]*>/g, '');
+    assert(hudText.includes('DMG:') && hudText.includes('SPD:') && hudText.includes('EVADE:'), 'Unarmed HUD must display DMG, SPD, and EVADE stats');
+
+    // Gain 5 momentum stacks and verify live scaling
+    unarmed.momentumStacks = 5;
+    unarmed.evadeHits = 5;
+    unarmed._syncEvadeChance();
+    unarmed._syncLiveDamageAndSpeed();
+    assert(unarmed.damage > (unarmedConfig.baseCollisionDamage || 30), 'Unarmed dynamic damage must increase when gaining momentum');
+    assert(unarmed.speed > (unarmedConfig.speed || 5.0), 'Unarmed dynamic speed must increase when gaining momentum');
+    assert(unarmed.evadeChance >= 0.20, 'Unarmed evade chance must increase with hit stacks');
+
+    clearHealthHud(true);
+    drawHUD();
+    hudContent = (document.getElementById('healthHudLeft')?.innerHTML || '') +
+                 (document.getElementById('healthHudRight')?.innerHTML || '') +
+                 (document.getElementById('healthHud')?.innerHTML || '');
+    assert(hudContent.includes('x5/22'), 'Unarmed HUD stats must display live momentum stack count x5/22');
+    assert(hudContent.includes('EVADE:'), 'Unarmed HUD stats must display EVADE stat');
+
+    // Super Unarmed Overdrive HUD Stats
+    unarmed._castSuperUnarmed(dummy);
+    clearHealthHud(true);
+    drawHUD();
+    hudContent = (document.getElementById('healthHudLeft')?.innerHTML || '') +
+                 (document.getElementById('healthHudRight')?.innerHTML || '') +
+                 (document.getElementById('healthHud')?.innerHTML || '');
+    assert(hudContent.includes('SUPER'), 'Unarmed HUD stats must display SUPER overdrive indicator when Super Unarmed is active');
+
+    // 8.5 Evade Mechanic & Anti-Summon Afterimage Bug Verification
+    const origRandom = Math.random;
+    Math.random = () => 0.01; // Force evade check success
+    const didEvade = !unarmed._filterDamageImmunityAndEvade(25, dummy, { isBasicAttack: true });
+    Math.random = origRandom;
+    assert(didEvade, 'Unarmed must successfully evade basic attack when evade chance succeeds');
+
+    // Anti-Summon Bug: Ensure distance teleport/summon never creates rogue afterimages
+    unarmed.clearAllAfterimages();
+    assert(unarmed.afterimages.length === 0, 'clearAllAfterimages must clear all afterimages');
+    unarmed._lastTrailX = 100;
+    unarmed._lastTrailY = 100;
+    unarmed.x = 400; // 300px jump simulating summon / tag-in spawn
+    unarmed.y = 400;
+    state.gameState = 'playing';
+    unarmed.update(dummy, 0, arena);
+    assert(unarmed.afterimages.length === 0, 'Distance jump upon summon/teleport must NEVER spawn rogue afterimages across the arena');
+
+    // Verify reduced afterimage cap (<= 8 in normal mode)
+    unarmed.isSuperUnarmed = false;
+    unarmed.vx = 8.0;
+    unarmed.vy = 4.0;
+    for (let f = 0; f < 25; f++) {
+      unarmed.update(dummy, 0, arena);
+    }
+    assert(unarmed.afterimages.length <= 8, `Unarmed active afterimages must be strictly capped to 8 or fewer (got ${unarmed.afterimages.length})`);
+
+    CONFIG.hudHideStats = origHideStats;
+    CONFIG.hudHideAll = origHideAll;
+    CONFIG.darkModeShowHudStats = origStatsToggle;
+
+    // 9. Canvas 2D Stack Depth Integrity (Rule 21, 24, 20)
+    mockCtx.resetStackDepth();
+    unarmed.draw(mockCtx, dummy);
+    assert(mockCtx.getStackDepth() === 0, 'Unarmed.draw() must strictly maintain 0 Canvas 2D stack depth');
+
+    mockCtx.resetStackDepth();
+    unarmed.drawBody(mockCtx);
+    assert(mockCtx.getStackDepth() === 0, 'Unarmed.drawBody() must strictly maintain 0 Canvas 2D stack depth');
+
+    console.log('      ✅ Unarmed momentum scaling, wall ricochets, afterimages, shockwaves and stack balance verified.');
+  }
+
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }
 

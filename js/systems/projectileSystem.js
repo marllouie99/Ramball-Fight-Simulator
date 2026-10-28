@@ -2933,7 +2933,10 @@ class ProjectileSystem {
               p.behaviorType === 'sukuna_furnace' ||
               p.behaviorType === 'yuta_pure_love_beam' ||
               p.visual === 'yuta_pure_love_beam' ||
-              p.isPureLoveBeam
+              p.isPureLoveBeam ||
+              p.isGojoBlue ||
+              p.behaviorType === 'gojo_blue' ||
+              p.visual === 'gojoBlue'
             );
             if (p && !isCriticalSlash) {
               this._returnProjectile(p);
@@ -3898,8 +3901,12 @@ class ProjectileSystem {
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
           continue;
-        } else if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
+        } else if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.isGojoBlue || p.behaviorType === 'gojo_blue') {
           p.fadingOut = false;
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
         } else {
           // Trail shrinks from the tail toward the impact point
           // Just consume old tail positions — do NOT move p.x/p.y
@@ -4561,7 +4568,8 @@ class ProjectileSystem {
           }
         }
 
-        if (!p.isGetsuga && p.behaviorType !== 'getsuga_tensho' && p.history && p.history.length > 1) {
+        const isFadingExempt = p.isGetsuga || p.behaviorType === 'getsuga_tensho' || p.isGojoBlue || p.behaviorType === 'gojo_blue' || p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple';
+        if (!isFadingExempt && p.history && p.history.length > 1) {
           p.fadingOut = true;
           // Store velocity before setting to 0 so visual angle is maintained during fade out
           p._resumeVx = p.vx;

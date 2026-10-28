@@ -67,6 +67,7 @@ import { doppelgangerConfig } from '../configs/characters/doppelgangerConfig.js'
 import { rubyConfig } from '../configs/characters/rubyConfig.js';
 import { musashiConfig } from '../configs/characters/musashiConfig.js';
 import { hydraConfig } from '../configs/characters/hydraConfig.js';
+import { unarmedConfig } from '../configs/characters/unarmedConfig.js';
 import { DEFAULT_GRADE } from '../configs/gradeConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
@@ -79,6 +80,8 @@ export const CONFIG = {
   Spike: spikeConfig,
   melee: spikeConfig,
   saitama: saitamaConfig,
+  unarmed: unarmedConfig,
+  Unarmed: unarmedConfig,
   genos: genosConfig,
   mahito: mahitoConfig,
   nanami: nanamiConfig,
@@ -224,7 +227,7 @@ export const CONFIG = {
     windowFrames: 90,          // Frames without a hit before the chain expires (90 = 1.5s at 60 FPS)
     minHits: 1,                // Minimum chain length before a card is shown
     edgeInset: 45,             // Horizontal inset aligned with the Top HUD frame & arena bounds (in canvas px)
-    topGapBelowHud: 44,        // Card top = arena.y - this value (keeps it below the TOP HUD)
+    topGapBelowHud: 22,        // Card top = arena.y - this value (smaller value = banner sits lower, clearing the TOP HUD)
     slideFrames: 10,           // Slide-in / slide-out animation duration, in frames
     popFrames: 8,              // Impact pop animation duration on every new hit, in frames
     tierThresholds: [1, 5, 10, 20],               // Hit counts that promote the beat-'em-up color tier
@@ -262,12 +265,14 @@ export const CONFIG = {
   arenaXOverride: 45,              // Absolute X override (px) - Rule 28 locked at 45
   arenaYOverride: 240,             // Absolute Y override (px) - Rule 28 locked at 240
   arenaTheme: 'light',               // Arena visual theme: 'light' | 'dark'
-  canvasBgColor: '#141622',          // Canvas background color (hex string or hex number)
-  arenaOuterBgColor: '#141622',      // Background color of the container area outside the arena (under HUD and sides)
-  arenaInnerBgColor: '#919298ff',      // Background color inside the arena boundaries
+  canvasBgColor: '#ffffffff',          // Canvas background color (hex string or hex number)
+  arenaOuterBgColor: '#ffffffff',      // Background color of the container area outside the arena (under HUD and sides)
+  arenaInnerBgColor: '#ffffffff',      // Background color inside the arena boundaries
   lightCanvasBgColor: '#141622',
   lightArenaOuterBgColor: '#141622',
-  lightArenaInnerBgColor: '#3d3f51ff',
+  lightArenaInnerBgColor: '#919298ff',
+  darkArenaOuterBgColor: '#000000',  // Dark mode arena outer background color (defaults to #000000)
+  darkArenaInnerBgColor: '#000000',  // Dark mode arena inner background color (defaults to #000000)
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 22,              // Font size for fighter name in HUD (px)
   hudDescFontSize: 20,               // Font size for fighter description in HUD (px)
@@ -1820,6 +1825,31 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: zombieConfig.ability || 'Brain Feast & Undead Horde ("BRAAAINS!")',
     desc: zombieConfig.desc || 'The iconic lawn invader from Plants vs. Zombies. Shambles toward opponents with savage Chomp combos that feast on target vitality, equips reinforced Conehead & Buckethead armor to shrug off blows, and summons gravestones that raise a relentless zombie wave.',
+  },
+  {
+    id: 64,
+    name: unarmedConfig.name || 'Unarmed',
+    grade: unarmedConfig.grade ?? DEFAULT_GRADE,
+    displayName: unarmedConfig.displayName || unarmedConfig.name || 'Unarmed',
+    category: 'Gaming',
+    color: unarmedConfig.color || '#A1A1AA',
+    themeColor: unarmedConfig.themeColor || '#9CA3AF',
+    secondaryColor: unarmedConfig.secondaryColor || '#71717A',
+    startX: 300,
+    startY: 250,
+    startVx: 2.2,
+    startVy: 1.8,
+    radius: unarmedConfig.radius || unarmedConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'unarmed',
+    hp: unarmedConfig.hp || 1100,
+    damage: unarmedConfig.damage || 35,
+    cooldown: unarmedConfig.cooldown || 50,
+    moveSpeed: unarmedConfig.moveSpeed || unarmedConfig.speed || 5.5,
+    projectileSpeedMultiplier: 1.0,
+    ability: unarmedConfig.ability || 'Momentum & Terminal Velocity',
+    desc: unarmedConfig.desc || 'The infamous weaponless sphere from Earclacks Ball Fights. Relies on pure kinetic energy, building exponential momentum and collision damage with every wall ricochet to obliterate opponents at terminal velocity.',
   }
 ];
 

@@ -11,6 +11,17 @@
 import { CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
+// ── Sprite calibration constants (measured from Assets/model/yuta/Love_beam/*.png) ──
+// Each active beam frame is a 640x440 uncropped canvas with the animated shaft centred on the
+// y=220 centreline. Measured across all 12 frames the visible animated shaft spans ~47px of that
+// 440px frame height, so scaling the whole frame by (beam size / 47) makes the rendered beam
+// exactly CONFIG.yuta.pureLoveBeamWidth pixels across (1:1 with the config, zero fudge factors).
+const YUTA_LOVE_BEAM_SRC_FRAME_H = 440;
+const YUTA_LOVE_BEAM_SRC_SHAFT_H = 47;
+const YUTA_LOVE_BEAM_SRC_SHAFT_X = 300;
+const YUTA_LOVE_BEAM_SRC_SHAFT_W = 320;
+const YUTA_LOVE_BEAM_SRC_PORTAL_W = 300;
+
 const YUTA_LOVE_BEAM_FRAME_COUNT = 12;
 const YUTA_LOVE_BEAM_FRAME_PATHS = Array.from(
   { length: 12 },
@@ -145,7 +156,7 @@ export function drawYutaPureLoveBeam(ctx, p) {
   ctx.rotate(p.angle);
 
   const length = p.length || (CONFIG?.yuta?.pureLoveBeamLength) || 2500;
-  const configuredWidth = p.r || (CONFIG?.yuta?.pureLoveBeamWidth) || 200;
+  const beamSize = p.r || (CONFIG?.yuta?.pureLoveBeamWidth) || 200;
   const P = 4.0; // Pixel art unit grid
 
   let beamAlpha = 0.95;
@@ -179,10 +190,11 @@ export function drawYutaPureLoveBeam(ctx, p) {
 
     // Sprite calibration (640x440 full uncropped frame with generous transparent padding)
     // Centerline is at y=220 (exactly 440/2) with zero pixels touching top, bottom, or left borders.
-    // Target core width scales directly and dynamically with CONFIG.yuta.pureLoveBeamWidth (p.r):
-    const targetCoreWidth = Math.max(16, configuredWidth * 0.70) * sizeScale;
-    const shaftDrawH = targetCoreWidth / 0.159; // Scales frame height proportionally to pureLoveBeamWidth
-    const shaftScale = shaftDrawH / 440.0;
+    // The whole sprite is scaled off the frame's measured 47px shaft so the rendered beam is exactly
+    // CONFIG.yuta.pureLoveBeamWidth (p.r) pixels wide; every glow/orb/particle below follows it.
+    const targetCoreWidth = Math.max(16, beamSize) * sizeScale;
+    const shaftScale = targetCoreWidth / YUTA_LOVE_BEAM_SRC_SHAFT_H;
+    const shaftDrawH = YUTA_LOVE_BEAM_SRC_FRAME_H * shaftScale;
 
     // ── 1. ATMOSPHERIC AMBIENT ENERGY AURA (Back Layer) ──
     const auraH = targetCoreWidth * 1.30;
@@ -214,9 +226,9 @@ export function drawYutaPureLoveBeam(ctx, p) {
 
     // ── 2. CONTINUOUS STREAM OF ANIMATED BEAM SHAFT BODIES (x=300..620) ──
     // Clean horizontal energy stream with generous vertical transparent padding (zero box edges)
-    const shaftSrcX = 300;
-    const shaftSrcW = 320;
-    const shaftSrcH = 440;
+    const shaftSrcX = YUTA_LOVE_BEAM_SRC_SHAFT_X;
+    const shaftSrcW = YUTA_LOVE_BEAM_SRC_SHAFT_W;
+    const shaftSrcH = YUTA_LOVE_BEAM_SRC_FRAME_H;
     const shaftDrawW = shaftSrcW * shaftScale * 0.90;
 
     const numSegments = Math.max(1, Math.ceil(length / (shaftDrawW - 4)));
@@ -232,8 +244,8 @@ export function drawYutaPureLoveBeam(ctx, p) {
 
     // ── 3. MUZZLE ACCELERATOR & CHARGING PORTAL (At Origin, Drawn ONCE) ──
     // Full uncropped energy orb and accelerator swirl centered directly at Yuta's hands
-    const portalSrcW = 300;
-    const portalSrcH = 440;
+    const portalSrcW = YUTA_LOVE_BEAM_SRC_PORTAL_W;
+    const portalSrcH = YUTA_LOVE_BEAM_SRC_FRAME_H;
     const portalScale = (targetCoreWidth * 2.50) / portalSrcH;
     const portalDrawW = portalSrcW * portalScale;
     const portalDrawH = portalSrcH * portalScale;
@@ -253,7 +265,8 @@ export function drawYutaPureLoveBeam(ctx, p) {
     }
 
     // ── 5. MUZZLE CORE GLINT (Blinding Diamond Center Spark at Hands) ──
-    const coreR = Math.max(4, Math.round(10 * sizeScale));
+    // Scaled off the beam size so the glint keeps its proportion as the beam thickens.
+    const coreR = Math.max(4, Math.round(targetCoreWidth * 0.057));
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
     ctx.arc(0, 0, coreR, 0, Math.PI * 2);
@@ -267,7 +280,7 @@ export function drawYutaPureLoveBeam(ctx, p) {
     ctx.imageSmoothingEnabled = prevSmoothing;
   } else {
     // Procedural Fallback if assets are loading
-    _drawProceduralLoveBeamFallback(ctx, length, configuredWidth, sizeScale, beamAlpha, P);
+    _drawProceduralLoveBeamFallback(ctx, length, beamSize, sizeScale, beamAlpha, P);
   }
 
   ctx.restore();

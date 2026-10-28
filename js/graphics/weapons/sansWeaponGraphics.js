@@ -171,7 +171,9 @@ export function drawGasterBlaster(ctx, blaster) {
  */
 export function drawGasterBeam(ctx, beam) {
   if (!beam) return;
-  const length = beam.length || beam.reach || beam.laserHeight || 800;
+  const length = (beam.length !== undefined && beam.length !== null)
+    ? beam.length
+    : ((beam.reach !== undefined && beam.reach !== null) ? beam.reach : (beam.laserHeight || 800));
   if (length <= 0) return;
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
