@@ -2812,7 +2812,10 @@ function updateHealthHud() {
       const currentSpd = (f.speed || baseSpd) * modeMult;
       const spdDiff = Math.max(0, currentSpd - baseSpd);
       const stacks = f.momentumStacks || 0;
-      const maxStacks = f.maxMomentumStacks || cfg.maxMomentumStacks || 22;
+      const maxStacks = (f.maxMomentumStacks !== undefined && f.maxMomentumStacks !== null)
+        ? f.maxMomentumStacks
+        : cfg.maxMomentumStacks;
+      const hasCap = maxStacks !== null && maxStacks !== undefined && isFinite(maxStacks);
       const isSuper = Boolean(f.isSuperUnarmed || f.isTerminalVelocity);
 
       // 1. Dynamic Collision DMG: Base + Momentum Stacks + Speed Scale (+ Super Unarmed Multiplier)
@@ -2831,7 +2834,9 @@ function updateHealthHud() {
 
       const stackTag = isSuper
         ? `<span style="color: #FFFFFF; font-size: 10px; font-weight: bold;">▲ (SUPER)</span>`
-        : `<span style="color: #76E042; font-size: 10px;">▲ (x${stacks}/${maxStacks})</span>`;
+        : (hasCap
+            ? `<span style="color: #76E042; font-size: 10px;">▲ (x${stacks}/${maxStacks})</span>`
+            : `<span style="color: #76E042; font-size: 10px;">▲ (x${stacks})</span>`);
 
       if (dmgDiff > 0 && (stacks > 0 || isSuper)) {
         info.push(`<b>DMG:</b> ${baseDmg} + ${dmgDiff} ${stackTag}`);

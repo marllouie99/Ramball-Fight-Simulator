@@ -58,10 +58,10 @@ export const unarmedConfig = {
   // ── 1. Official Earclacks Gimmick: Permanent Momentum & Speed Scaling ──
   enableMomentumScaling: true,      // Master toggle for Permanent Momentum & Speed Scaling
   enableBallSteering: false,        // Pure natural physical ricochets without artificial steering towards opponent
-  maxMomentumStacks: 22,            // 22 stacks scales from base speed (5.0) to terminal velocity (18.0)
+  maxMomentumStacks: null,          // Uncapped: Momentum stacks scale infinitely with every hit connected (zero cap)
   speedPerHit: 1.00,                // +1.00 permanent max speed per enemy hit
   damagePerHit: 1.0,                // +1.0 permanent damage per momentum level
-  maxTerminalVelocity: 18.0,        // Max capped kinetic speed
+  maxTerminalVelocity: null,        // Uncapped: Speed scales infinitely without terminal velocity limits (zero cap)
   wallBounceMultiplier: 1.0,        // Wall bounces conserve natural velocity without artificial acceleration
   permanentSpeedScaling: true,      // Gained speed and momentum never decay over time
   baseCollisionDamage: 30,          // Base kinetic damage on opponent collision

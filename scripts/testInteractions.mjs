@@ -11560,7 +11560,7 @@ async function runInteractionTests() {
     // 4. Super Unarmed Overdrive (Wiki: White ball with light grey outline, top speed throughout duration)
     unarmed._castSuperUnarmed(dummy);
     assert(unarmed.isSuperUnarmed === true, 'Super Unarmed must activate');
-    assert(unarmed.momentumStacks === unarmed.maxMomentumStacks, 'Super Unarmed must instantly maximize momentum stacks');
+    assert(unarmed.momentumStacks >= 22, 'Super Unarmed must elevate momentum stacks into overdrive');
     assert(Math.hypot(unarmed.vx, unarmed.vy) >= 17.5, 'Super Unarmed must propel Unarmed at top terminal velocity');
 
     // 5. Update Loop, Afterimages & Visual Decay (Rule 25)
@@ -11706,8 +11706,15 @@ async function runInteractionTests() {
     hudContent = (document.getElementById('healthHudLeft')?.innerHTML || '') +
                  (document.getElementById('healthHudRight')?.innerHTML || '') +
                  (document.getElementById('healthHud')?.innerHTML || '');
-    assert(hudContent.includes('x5/22'), 'Unarmed HUD stats must display live momentum stack count x5/22');
+    assert(hudContent.includes('x5'), 'Unarmed HUD stats must display live momentum stack count x5');
     assert(hudContent.includes('EVADE:'), 'Unarmed HUD stats must display EVADE stat');
+
+    // Uncapped Momentum, Speed & Damage Scaling Verification
+    unarmed.momentumStacks = 45;
+    unarmed._syncLiveDamageAndSpeed();
+    assert(unarmed.momentumStacks === 45, 'Unarmed momentum stacks must be uncapped');
+    assert(unarmed.speed >= 45.0, 'Unarmed speed must scale with all momentum stacks without being capped');
+    assert(unarmed.damage >= 100, 'Unarmed damage must scale with all momentum stacks without being capped');
 
     // Super Unarmed Overdrive HUD Stats
     unarmed._castSuperUnarmed(dummy);

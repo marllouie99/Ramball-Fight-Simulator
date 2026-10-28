@@ -29,13 +29,17 @@ export class UnarmedFighter extends Fighter {
     this.cannotBeParried = true;
     this.hideHands = true; // Earclacks weaponless and handless physics ball model
 
-    // 2. Momentum & Scaling (+0.60 permanent max speed & +5 damage with every wall bounce & hit)
+    // 2. Momentum & Scaling (+1.00 permanent max speed & +1 damage with every hit connected)
     this.momentumStacks = 0;
-    this.maxMomentumStacks = cfg.maxMomentumStacks || 10;
+    this.maxMomentumStacks = (cfg.maxMomentumStacks !== undefined && cfg.maxMomentumStacks !== null)
+      ? cfg.maxMomentumStacks
+      : Infinity;
     this.speedPerHit = cfg.speedPerHit || 1.00;
     this.damagePerHit = cfg.damagePerHit || 1.0;
-    this.maxTerminalVelocity = cfg.maxTerminalVelocity || 18.0;
-    this.wallBounceMultiplier = cfg.wallBounceMultiplier || 1.12;
+    this.maxTerminalVelocity = (cfg.maxTerminalVelocity !== undefined && cfg.maxTerminalVelocity !== null)
+      ? cfg.maxTerminalVelocity
+      : Infinity;
+    this.wallBounceMultiplier = cfg.wallBounceMultiplier || 1.0;
     this.damage = cfg.baseCollisionDamage || cfg.damage || 30;
 
     // 3. Kinetic Evade Mechanic (Gains evade chance for each hit)
@@ -246,10 +250,10 @@ export class UnarmedFighter extends Fighter {
    */
   _syncLiveDamageAndSpeed() {
     const cfg = CONFIG.unarmed || {};
-    this.speed = Math.min(
-      this.maxTerminalVelocity,
-      this.baseSpeed + this.momentumStacks * this.speedPerHit
-    );
+    const scaledSpeed = this.baseSpeed + this.momentumStacks * this.speedPerHit;
+    this.speed = (this.maxTerminalVelocity && isFinite(this.maxTerminalVelocity))
+      ? Math.min(this.maxTerminalVelocity, scaledSpeed)
+      : scaledSpeed;
 
     const baseDmg = cfg.baseCollisionDamage || cfg.damage || 30;
     const speedScale = cfg.speedDamageScale !== undefined ? cfg.speedDamageScale : 1.0;
@@ -322,13 +326,17 @@ export class UnarmedFighter extends Fighter {
     this.gunAngle = this.surgeAngle;
 
     this.surgeTimer = this.surgeDuration;
-    this.momentumStacks = Math.min(this.maxMomentumStacks, this.momentumStacks + 2);
+    const maxStacks = (this.maxMomentumStacks && isFinite(this.maxMomentumStacks))
+      ? this.maxMomentumStacks
+      : Infinity;
+    this.momentumStacks = Math.min(maxStacks, this.momentumStacks + 2);
     this.hasWallRebounded = true; // Empowers burst dash with primed wall-rebound force
     this._syncLiveDamageAndSpeed();
 
     // Rocket forward impulse
-    this.vx = Math.cos(this.surgeAngle) * this.surgeSpeed;
-    this.vy = Math.sin(this.surgeAngle) * this.surgeSpeed;
+    const surgeImpulse = Math.max(this.surgeSpeed, this.speed);
+    this.vx = Math.cos(this.surgeAngle) * surgeImpulse;
+    this.vy = Math.sin(this.surgeAngle) * surgeImpulse;
 
     spawnFloatingText(this.x, this.y - this.r - 20, 'KINETIC SURGE!', '#F4F4F5');
     triggerGlobalScreenShake(4, 6);
@@ -345,15 +353,23 @@ export class UnarmedFighter extends Fighter {
     this.isTerminalVelocity = true;
     this.superUnarmedTimer = this.superUnarmedDuration;
     this.terminalVelocityTimer = this.superUnarmedDuration;
-    this.momentumStacks = this.maxMomentumStacks;
+    if (this.maxMomentumStacks && isFinite(this.maxMomentumStacks)) {
+      this.momentumStacks = Math.max(this.momentumStacks, this.maxMomentumStacks);
+    } else {
+      this.momentumStacks = Math.max(this.momentumStacks, 22);
+    }
     this.evadeHits = (CONFIG.unarmed?.maxEvadeStacks || 20);
     this.hasWallRebounded = true; // Super form enters primed with explosive force
     this._syncEvadeChance();
     this._syncLiveDamageAndSpeed();
 
+    const topSpeed = (this.maxTerminalVelocity && isFinite(this.maxTerminalVelocity))
+      ? this.maxTerminalVelocity
+      : Math.max(18.0, this.speed);
     const angle = this.gunAngle !== undefined ? this.gunAngle : (Math.atan2(this.vy, this.vx) || 0);
-    this.vx = Math.cos(angle) * this.maxTerminalVelocity;
-    this.vy = Math.sin(angle) * this.maxTerminalVelocity;
+    const superImpulse = Math.max(topSpeed, Math.hypot(this.vx, this.vy));
+    this.vx = Math.cos(angle) * superImpulse;
+    this.vy = Math.sin(angle) * superImpulse;
 
     spawnFloatingText(this.x, this.y - this.r - 25, 'SUPER UNARMED!', '#FFFFFF');
     triggerGlobalScreenShake(9, 14);
@@ -486,10 +502,10 @@ export class UnarmedFighter extends Fighter {
       // Natural wall bounce: reflects velocity along collision normal (conserves current kinetic speed)
       // Pure natural specular reflection with billiard cushion dispersion — zero artificial steering or homing!
       const curSpeed = Math.hypot(this.vx, this.vy) || this.speed;
-      const targetSpeed = Math.min(
-        this.maxTerminalVelocity,
-        Math.max(curSpeed, this.speed)
-      );
+      const uncappedTarget = Math.max(curSpeed, this.speed);
+      const targetSpeed = (this.maxTerminalVelocity && isFinite(this.maxTerminalVelocity))
+        ? Math.min(this.maxTerminalVelocity, uncappedTarget)
+        : uncappedTarget;
 
       const curAngle = Math.atan2(this.vy, this.vx);
       this.vx = Math.cos(curAngle) * targetSpeed;
@@ -652,8 +668,11 @@ export class UnarmedFighter extends Fighter {
       let sVx = (nx * superNormal + tx * v1t) * slowMult;
       let sVy = (ny * superNormal + ty * v1t) * slowMult;
       const sSpd = Math.hypot(sVx, sVy) || 1;
-      this.vx = (sVx / sSpd) * this.maxTerminalVelocity * slowMult;
-      this.vy = (sVy / sSpd) * this.maxTerminalVelocity * slowMult;
+      const superTopSpeed = (this.maxTerminalVelocity && isFinite(this.maxTerminalVelocity))
+        ? this.maxTerminalVelocity
+        : Math.max(reboundBaseSpeed, 18.0);
+      this.vx = (sVx / sSpd) * superTopSpeed * slowMult;
+      this.vy = (sVy / sSpd) * superTopSpeed * slowMult;
     } else {
       // Normal Unarmed rebounds elastically off target normal while retaining full tangential momentum
       const reboundNormal = -Math.max(Math.abs(v1n) * 0.85, 4.0);
@@ -669,7 +688,10 @@ export class UnarmedFighter extends Fighter {
     this.collisionCooldown = Math.max(14, slowDur + 2);
 
     if (this.isSkillEnabled(CONFIG.unarmed?.enableMomentumScaling, true)) {
-      this.momentumStacks = Math.min(this.maxMomentumStacks, this.momentumStacks + 1);
+      const maxStacks = (this.maxMomentumStacks && isFinite(this.maxMomentumStacks))
+        ? this.maxMomentumStacks
+        : Infinity;
+      this.momentumStacks = Math.min(maxStacks, this.momentumStacks + 1);
       this._syncLiveDamageAndSpeed();
     }
 
@@ -800,7 +822,7 @@ export class UnarmedFighter extends Fighter {
       const dist = Math.hypot(dx, dy);
 
       // If distance jumped unnaturally (teleport, summon, arena wrap, respawn), snap immediately without spawning trails
-      if (dist > 25.0) {
+      if (dist > Math.max(100.0, this.speed * 2.5)) {
         this._lastTrailX = this.x;
         this._lastTrailY = this.y;
         if (this.afterimages) this.afterimages.length = 0;
