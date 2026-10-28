@@ -28,6 +28,7 @@ export class UnarmedFighter extends Fighter {
     this.isUnparriable = true;
     this.cannotBeParried = true;
     this.hideHands = true; // Earclacks weaponless and handless physics ball model
+    this.hideWeapon = true; // Suppresses default gun and hand weapon rendering
 
     // 2. Momentum & Scaling (+1.00 permanent max speed & +1 damage with every hit connected)
     this.momentumStacks = 0;
@@ -129,6 +130,8 @@ export class UnarmedFighter extends Fighter {
 
   reset() {
     super.reset();
+    this.hideHands = true;
+    this.hideWeapon = true;
     this.momentumStacks = 0;
     this.speed = this.baseSpeed;
     this.isSuperUnarmed = false;
@@ -755,6 +758,14 @@ export class UnarmedFighter extends Fighter {
    */
   shoot(ownerIndex, opponent) {
     // Intentionally empty (Rule 23): suppresses default bullets and prevents artificial aimbot steering
+  }
+
+  /**
+   * Overrides base Fighter.drawGun() to suppress default generic gun & hand rendering (Rule 20 / Rule 23).
+   * Unarmed is a pure weaponless and handless physics ball.
+   */
+  drawGun(ctx) {
+    // Intentionally empty: Unarmed is a pure weaponless and handless physics ball
   }
 
   update(opponent, ownerIndex, arena) {

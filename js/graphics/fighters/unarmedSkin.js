@@ -292,10 +292,9 @@ export function drawUnarmedSkin(ctx, fighter) {
   // 3. Hair Asset Overlay (Rule 22) - Bald by default, supports skin customizations
   _drawUnarmedHair(ctx, r, facingLeft);
 
-  // 4. Canonical Default Fists (Rule 20)
-  // Official Earclacks Canon: Unarmed is a pure weaponless & handless ball (fighter.hideHands = true)
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
-  if (!shouldHideHands) {
+  // 4. Default Hands: Strictly hidden for Unarmed (official weaponless and handless Earclacks physics ball)
+  const showHands = Boolean(fighter.showHands || CONFIG.unarmed?.showHands);
+  if (showHands) {
     ctx.save();
     ctx.rotate(angle);
     if (facingLeft && !fighter.isSpinning) {

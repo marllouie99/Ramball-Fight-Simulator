@@ -11526,6 +11526,8 @@ async function runInteractionTests() {
     assert(unarmed.momentumStacks === 0, 'Unarmed must initialize with 0 momentum stacks');
     assert(unarmed.isTerminalVelocity === false, 'Terminal velocity overdrive must be inactive initially');
     assert(unarmed.isUnparriable === true, 'Unarmed must be unparriable as hits connect directly with body');
+    assert(unarmed.hideHands === true, 'Unarmed default model hands must be hidden');
+    assert(unarmed.hideWeapon === true, 'Unarmed default weapons must be hidden');
 
     // 2. Wall Ricochet Physics (Conserves natural velocity without gaining momentum stacks; only enemy hits scale momentum)
     unarmed.x = arena.x - 5; // Force wall contact on left arena wall

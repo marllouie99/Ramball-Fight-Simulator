@@ -1840,6 +1840,8 @@ export const FIGHTER_DEFS = [
     startVx: 2.2,
     startVy: 1.8,
     radius: unarmedConfig.radius || unarmedConfig.r || 25,
+    hideHands: true,
+    hideWeapon: true,
     aimbot: false,
     spinRate: 0,
     type: 'unarmed',

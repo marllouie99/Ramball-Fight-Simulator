@@ -138,12 +138,15 @@ function _draw1v1HeroPod(ctx, x, y, w, h, fighter, pal, isP1) {
   ctx.stroke();
 
   // Symmetrical pixel hands (Rule 20)
-  const handR = Math.max(4, Math.round(avatarR * 0.30));
-  const handOffsetX = Math.round(avatarR * 0.82);
-  const handOffsetY = Math.round(avatarR * 0.38);
-  const handColor = fighter.handColor || fighter.color || pal.color;
-  drawPixelHand(ctx, avatarX - handOffsetX, avatarY + handOffsetY, handR, handColor, '#0E0F14');
-  drawPixelHand(ctx, avatarX + handOffsetX, avatarY + handOffsetY, handR, handColor, '#0E0F14');
+  const isHandless = Boolean(fighter.hideHands || (fighter.characterId === 'unarmed' || fighter.type === 'unarmed') || (typeof CONFIG !== 'undefined' && CONFIG.unarmed?.hideHands));
+  if (!isHandless) {
+    const handR = Math.max(4, Math.round(avatarR * 0.30));
+    const handOffsetX = Math.round(avatarR * 0.82);
+    const handOffsetY = Math.round(avatarR * 0.38);
+    const handColor = fighter.handColor || fighter.color || pal.color;
+    drawPixelHand(ctx, avatarX - handOffsetX, avatarY + handOffsetY, handR, handColor, '#0E0F14');
+    drawPixelHand(ctx, avatarX + handOffsetX, avatarY + handOffsetY, handR, handColor, '#0E0F14');
+  }
 
   // Initial letter
   ctx.fillStyle = '#FFFFFF';

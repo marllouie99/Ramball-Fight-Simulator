@@ -17,6 +17,8 @@ export const unarmedConfig = {
   moveSpeed: 5.0,
   r: 25,
   radius: 25,
+  hideHands: true,                  // Official Earclacks standard: Unarmed is a pure weaponless & handless physics ball
+  hideWeapon: true,                 // Suppresses default gun and hand weapon rendering
   color: '#CFCFCF', // Official Earclacks neutral grey sphere (#CFCFCF)
   themeColor: '#71717A', // Muted steel silver
   superColor: '#FFFFFF', // Super Unarmed white ball
