@@ -84,7 +84,7 @@ export const unarmedConfig = {
   enemyHitSlowMultiplier: 0.35,     // 35% speed multiplier for enemy
 
   // ── 4. Skill 1: Kinetic Surge (Rapid directional rocket propulsion) ──
-  enableKineticSurge: 0,         // Master toggle for Skill: Kinetic Surge burst dash
+  enableKineticSurge: true,         // Master toggle for Skill: Kinetic Surge burst dash
   kineticSurgeCooldownMax: 280,     // ~4.6s cooldown
   kineticSurgeSpeed: 16.0,          // Burst speed
   kineticSurgeDuration: 18,         // Surge active frames (~0.30s)
@@ -92,7 +92,7 @@ export const unarmedConfig = {
   kineticSurgeBonusStacks: 2,       // Immediately adds 2 momentum stacks
 
   // ── 5. Skill 2 / Ultimate: Super Unarmed (Official Earclacks Super Form) ──
-  enableSuperUnarmed: 0,         // Master toggle for Ultimate: Super Unarmed Overdrive
+  enableSuperUnarmed: true,         // Master toggle for Ultimate: Super Unarmed Overdrive
   superUnarmedCooldownMax: 600,     // 10.0s cooldown
   superUnarmedDuration: 240,        // 4.0s overdrive duration
   superUnarmedSpeed: 18.0,          // Top speed throughout Super Form

@@ -11517,6 +11517,7 @@ async function runInteractionTests() {
     const { projectileSystem } = await import('../js/systems/projectileSystem.js');
 
     const arena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+    state.gameState = 'playing';
     const unarmed = new UnarmedFighter({ characterId: 'unarmed', name: 'Unarmed', x: 200, y: 300, radius: 25, hp: 1100, maxHp: 1100 });
     const dummy = new NormalFighter({ characterId: 'normal', name: 'Dummy', x: 260, y: 300, radius: 25, hp: 500, maxHp: 500 });
     state.fighters = [unarmed, dummy];
@@ -11743,6 +11744,19 @@ async function runInteractionTests() {
       unarmed.update(dummy, 0, arena);
     }
     assert(unarmed.afterimages.length <= 8, `Unarmed active afterimages must be strictly capped to 8 or fewer (got ${unarmed.afterimages.length})`);
+
+    // 8.6 Winning Match Body HP Consistency (Number must NEVER jump to 100 on victory)
+    const { getUnarmedHpText } = await import('../js/graphics/fighters/unarmedSkin.js');
+    unarmed.hp = 352;
+    unarmed.maxHp = 1100; // 352 / 1100 = 32%
+    assert(getUnarmedHpText(unarmed) === '32', 'getUnarmedHpText must return 32% during active combat');
+
+    // Win the match: matchEnd / roundEnd / winner reveal
+    state.gameState = 'matchEnd';
+    state.matchWinner = unarmed;
+    state.roundWinner = unarmed;
+    unarmed._isWinnerReveal = true;
+    assert(getUnarmedHpText(unarmed) === '32', 'Unarmed body HP number must strictly remain at actual remaining HP (32) and NEVER jump to 100 on match win');
 
     CONFIG.hudHideStats = origHideStats;
     CONFIG.hudHideAll = origHideAll;

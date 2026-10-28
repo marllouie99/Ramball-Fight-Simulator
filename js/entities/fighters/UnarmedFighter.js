@@ -907,11 +907,11 @@ export class UnarmedFighter extends Fighter {
    * Mandatory In-Game Overlay HP Drawing (Rule 21):
    * Unarmed uses the iconic Earclacks centered HP overlay directly in the middle of its body.
    * Suppresses the default floating text underneath the body and renders the centered HP number on the top layer.
+   * Preserved across roundEnd, matchEnd, and winner reveal states so the winning HP number remains solid.
    */
   drawHealth(ctx) {
     if (typeof state !== 'undefined' && (state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
     if (CONFIG.hudHideOverheadHp) return;
-    if (this._isWinnerReveal || this._isFaceOff) return;
 
     drawUnarmedCenterHpOverlay(ctx, this);
   }

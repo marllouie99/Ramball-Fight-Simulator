@@ -118,6 +118,28 @@ export function drawUnarmedPixelBody(ctx, r, isSuper = false, text = null) {
 }
 
 /**
+ * Resolves the display health text for Unarmed.
+ * Supports both percentage (100 -> 0) and actual numerical HP (e.g. 1100 -> 0) via config.
+ * When fighter has valid HP, consistently displays its current HP across all match states
+ * (playing, roundEnd, matchEnd, winner reveal, celebration) so the number never suddenly jumps.
+ */
+export function getUnarmedHpText(fighter) {
+  if (!fighter) return '100';
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.unarmed) || {};
+  const mode = cfg.hpOverlayMode || 'percentage';
+
+  if (typeof fighter.hp === 'number' && !isNaN(fighter.hp)) {
+    if (mode === 'actual') {
+      return String(Math.max(0, Math.ceil(fighter.hp)));
+    }
+    const maxHp = fighter.maxHp || 1;
+    const pct = Math.max(0, Math.ceil((fighter.hp / maxHp) * 100));
+    return String(pct);
+  }
+  return '100';
+}
+
+/**
  * Official Earclacks Centered HP Overlay (Rule 21):
  * Renders the live health number directly in the center of Unarmed's body.
  * Supports both percentage (100 -> 0) and actual numerical HP (e.g. 1100 -> 0) via config.
@@ -128,19 +150,7 @@ export function drawUnarmedCenterHpOverlay(ctx, fighter) {
   const r = fighter.r || 25;
   const isSuper = fighter.isSuperUnarmed || fighter.isTerminalVelocity;
 
-  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.unarmed) || {};
-  const mode = cfg.hpOverlayMode || 'percentage'; // 'percentage' (100 -> 0) or 'actual' (e.g. 1100 -> 0)
-
-  let text = '100';
-  if (fighter.hp !== undefined) {
-    if (mode === 'actual') {
-      text = String(Math.max(0, Math.ceil(fighter.hp)));
-    } else {
-      const maxHp = fighter.maxHp || 1;
-      const pct = Math.max(0, Math.ceil((fighter.hp / maxHp) * 100));
-      text = String(pct);
-    }
-  }
+  const text = getUnarmedHpText(fighter);
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
@@ -273,11 +283,11 @@ export function drawUnarmedSkin(ctx, fighter) {
   const facingLeft = Math.abs(normAngle) > Math.PI / 2;
 
   // 2. Earclacks Model Body (Flat Gray Sphere with Solid Jet-Black Border)
-  // In preview states (character selector, HUD cards, countdown), render default '100' so preview is never blank.
-  // During active gameplay, drawHealth() renders the live dynamic HP overlay on the top layer (Rule 21).
-  const isPlaying = typeof state !== 'undefined' && state.gameState === 'playing';
-  const previewText = !isPlaying ? '100' : null;
-  drawUnarmedPixelBody(ctx, r, isSuper, previewText);
+  // Consistently uses fighter's actual live HP across all match states (playing, roundEnd, matchEnd, victory reveal).
+  // In preview states without an active fighter HP, gracefully defaults to '100'.
+  // This guarantees the body number never suddenly resets or jumps to 100 upon winning!
+  const hpText = getUnarmedHpText(fighter);
+  drawUnarmedPixelBody(ctx, r, isSuper, hpText);
 
   // 3. Hair Asset Overlay (Rule 22) - Bald by default, supports skin customizations
   _drawUnarmedHair(ctx, r, facingLeft);
