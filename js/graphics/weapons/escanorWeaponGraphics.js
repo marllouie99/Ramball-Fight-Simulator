@@ -760,6 +760,118 @@ export function drawDivineSwordEscanorBlade(ctx, x, y, angle, r = 28, reach = 16
   ctx.restore();
 }
 
+// ─── Escanor Cruel Sun 18-Frame High-Fidelity Animated Sprite Pipeline ───
+export const ESCANOR_CRUEL_SUN_18_FRAME_COUNT = 18;
+export const ESCANOR_CRUEL_SUN_18_FRAME_PATHS = Array.from(
+  { length: ESCANOR_CRUEL_SUN_18_FRAME_COUNT },
+  (_, i) => `Assets/model/escanor/Cruel_Sun/cruel_sun-${i + 1}.png`
+);
+export const ESCANOR_CRUEL_SUN_THE_ONE_18_FRAME_PATHS = Array.from(
+  { length: ESCANOR_CRUEL_SUN_18_FRAME_COUNT },
+  (_, i) => `Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-${i + 1}.png`
+);
+
+let _escanorCruelSun18Frames = [];
+let _escanorCruelSun18FramesLoading = false;
+let _escanorCruelSunTheOne18Frames = [];
+let _escanorCruelSunTheOne18FramesLoading = false;
+
+function _loadCruelSunFrames(paths, targetArr, count, setLoadingFlag) {
+  if (typeof Image === 'undefined') return targetArr;
+  setLoadingFlag(true);
+  targetArr.length = 0;
+  paths.forEach((src, idx) => {
+    const img = new Image();
+    img.onload = () => {
+      targetArr[idx] = img;
+    };
+    img.onerror = (e) => {
+      console.warn(`Failed to load Cruel Sun frame ${idx + 1} at ${src}:`, e);
+    };
+    img.src = `${src}?v=1`;
+    targetArr[idx] = img;
+  });
+  return targetArr;
+}
+
+export function _getEscanorCruelSun18Frames(isTheOne = false) {
+  if (isTheOne) {
+    if (
+      _escanorCruelSunTheOne18Frames.length === ESCANOR_CRUEL_SUN_18_FRAME_COUNT &&
+      _escanorCruelSunTheOne18Frames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+    ) {
+      return _escanorCruelSunTheOne18Frames;
+    }
+    if (!_escanorCruelSunTheOne18FramesLoading) {
+      _loadCruelSunFrames(ESCANOR_CRUEL_SUN_THE_ONE_18_FRAME_PATHS, _escanorCruelSunTheOne18Frames, ESCANOR_CRUEL_SUN_18_FRAME_COUNT, v => { _escanorCruelSunTheOne18FramesLoading = v; });
+    }
+    return _escanorCruelSunTheOne18Frames;
+  }
+
+  if (
+    _escanorCruelSun18Frames.length === ESCANOR_CRUEL_SUN_18_FRAME_COUNT &&
+    _escanorCruelSun18Frames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _escanorCruelSun18Frames;
+  }
+  if (!_escanorCruelSun18FramesLoading) {
+    _loadCruelSunFrames(ESCANOR_CRUEL_SUN_18_FRAME_PATHS, _escanorCruelSun18Frames, ESCANOR_CRUEL_SUN_18_FRAME_COUNT, v => { _escanorCruelSun18FramesLoading = v; });
+  }
+  return _escanorCruelSun18Frames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getEscanorCruelSun18Frames(false);
+  _getEscanorCruelSun18Frames(true);
+}
+
+// ─── Escanor Cruel Sun Smoke Trail 18-Frame Animated Sprite Pipeline ───
+export const ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT = 18;
+export const ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_PATHS = Array.from(
+  { length: ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT },
+  (_, i) => `Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-${i + 1}.png`
+);
+export const ESCANOR_CRUEL_SUN_SMOKE_THE_ONE_18_FRAME_PATHS = Array.from(
+  { length: ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT },
+  (_, i) => `Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-${i + 1}.png`
+);
+
+let _escanorCruelSunSmoke18Frames = [];
+let _escanorCruelSunSmoke18FramesLoading = false;
+let _escanorCruelSunSmokeTheOne18Frames = [];
+let _escanorCruelSunSmokeTheOne18FramesLoading = false;
+
+export function _getEscanorCruelSunSmokeFrames(isTheOne = false) {
+  if (isTheOne) {
+    if (
+      _escanorCruelSunSmokeTheOne18Frames.length === ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT &&
+      _escanorCruelSunSmokeTheOne18Frames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+    ) {
+      return _escanorCruelSunSmokeTheOne18Frames;
+    }
+    if (!_escanorCruelSunSmokeTheOne18FramesLoading) {
+      _loadCruelSunFrames(ESCANOR_CRUEL_SUN_SMOKE_THE_ONE_18_FRAME_PATHS, _escanorCruelSunSmokeTheOne18Frames, ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT, v => { _escanorCruelSunSmokeTheOne18FramesLoading = v; });
+    }
+    return _escanorCruelSunSmokeTheOne18Frames;
+  }
+
+  if (
+    _escanorCruelSunSmoke18Frames.length === ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT &&
+    _escanorCruelSunSmoke18Frames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))
+  ) {
+    return _escanorCruelSunSmoke18Frames;
+  }
+  if (!_escanorCruelSunSmoke18FramesLoading) {
+    _loadCruelSunFrames(ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_PATHS, _escanorCruelSunSmoke18Frames, ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT, v => { _escanorCruelSunSmoke18FramesLoading = v; });
+  }
+  return _escanorCruelSunSmoke18Frames;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getEscanorCruelSunSmokeFrames(false);
+  _getEscanorCruelSunSmokeFrames(true);
+}
+
 // ─── Escanor Cruel Sun Pixel Art Sprite Sheet Asset Loader ───
 let _escanorCruelSunSpriteImage = null;
 let _escanorCruelSunStandardCanvas = null;
@@ -1332,6 +1444,61 @@ export function drawPixelCruelSunSphere(ctx, cx, cy, radius, isTheOne = false, n
 
   const snapCx = snap(cx);
   const snapCy = snap(cy);
+
+  // ── 18-FRAME HIGH-FIDELITY ANIMATED CRUEL SUN SPRITE PASS ──
+  const frames18 = _getEscanorCruelSun18Frames(isTheOne);
+  if (frames18 && frames18.length === ESCANOR_CRUEL_SUN_18_FRAME_COUNT && frames18.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0))) {
+    const fps = 20;
+    const frameIdx = Math.floor(currentNow / (1000 / fps)) % frames18.length;
+    const frameImg = frames18[frameIdx];
+
+    // In the 512x512 frame, the central solar core radius is 100px and outer corona reaches 145px.
+    // drawSize = (radius / 100) * 512 = radius * 5.12 maps the star core cleanly to `radius`.
+    const drawSize = radius * 5.12;
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.translate(snapCx, snapCy);
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, alpha));
+
+    // ── TIER 1: ADDITIVE SOLAR CORONA BLOOM (Aura glowing around the sides/perimeter) ──
+    if (showCorona) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const bloomScale = 1.08;
+      const bloomAlpha = (isTheOne ? 0.32 : 0.22) * alpha;
+      ctx.globalAlpha = bloomAlpha;
+      ctx.drawImage(frameImg, -drawSize * bloomScale / 2, -drawSize * bloomScale / 2, drawSize * bloomScale, drawSize * bloomScale);
+
+      // Tight inner bloom core
+      const innerBloomScale = 1.03;
+      const innerBloomAlpha = (isTheOne ? 0.40 : 0.28) * alpha;
+      ctx.globalAlpha = innerBloomAlpha;
+      ctx.drawImage(frameImg, -drawSize * innerBloomScale / 2, -drawSize * innerBloomScale / 2, drawSize * innerBloomScale, drawSize * innerBloomScale);
+      ctx.restore();
+    }
+
+    // ── TIER 2: CRISP FOREGROUND SOLAR STAR PASS ──
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.drawImage(frameImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+    ctx.restore();
+
+    // ── TIER 3: WHITE-HOT OPTICAL CORE SPARKLE (Cross-glint) ──
+    if (radius >= 14) {
+      ctx.save();
+      ctx.fillStyle = '#FFFFFF';
+      const glintTick = Math.floor(currentNow / 110) % 2;
+      const glintSize = snap(Math.max(P, radius * 0.14 * (glintTick ? 1.25 : 0.85)));
+      ctx.fillRect(-glintSize, -P / 2, glintSize * 2, P);
+      ctx.fillRect(-P / 2, -glintSize, P, glintSize * 2);
+      ctx.restore();
+    }
+
+    ctx.restore();
+    return;
+  }
+
   const spriteImg = _getEscanorCruelSunSpriteImage(isTheOne);
 
   if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0) {
@@ -1603,48 +1770,99 @@ export function drawCruelSunOrb(ctx, x, y, r = 48, now = Date.now(), sun = null)
     drawCruelSunProximityEntityLighting(ctx, x, y, snap(r), isTheOne, 1.0);
   }
 
-  // 1. Draw High-Performance O(1) Discrete Pixel Art Fire Trail (Zero O(N*r^2) nested loop stalls!)
+  // 1. Draw 18-Frame High-Fidelity Animated Smoke Trail Along Flight History
   if (!isExpiring && sun && sun.history && sun.history.length > 1) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false;
+    const smokeFrames = _getEscanorCruelSunSmokeFrames(isTheOne);
+    const hasSmokeFrames = smokeFrames && smokeFrames.length === ESCANOR_CRUEL_SUN_SMOKE_18_FRAME_COUNT && smokeFrames.every(img => img && img.complete && ((img.naturalWidth || img.width || 0) > 0));
     const len = sun.history.length;
-    // Step by 2 along history to keep trail clean and lightweight
-    for (let k = 0; k < len; k += 2) {
-      const pt = sun.history[k];
-      const trailRatio = (k + 1) / len; // 0 (oldest) to 1.0 (newest)
-      const baseNodeR = snap(r * (0.20 + 0.45 * trailRatio));
-      const alpha = (0.12 + 0.55 * trailRatio);
-      const snapPtX = snap(pt.x);
-      const snapPtY = snap(pt.y);
 
-      ctx.globalAlpha = alpha;
+    if (hasSmokeFrames) {
+      ctx.save();
+      ctx.imageSmoothingEnabled = true;
 
-      // Tier 1: Outer Ember Diamond Outline (Deep Crimson Red)
-      const outR = Math.max(P * 2, snap(baseNodeR));
-      ctx.fillStyle = isTheOne ? '#B45309' : '#DC2626';
-      ctx.fillRect(snapPtX - outR, snapPtY - P, outR * 2, P * 2);
-      ctx.fillRect(snapPtX - P, snapPtY - outR, P * 2, outR * 2);
-      ctx.fillRect(snapPtX - snap(outR * 0.65), snapPtY - snap(outR * 0.65), snap(outR * 1.3), snap(outR * 1.3));
+      // Draw from oldest to newest so younger smoke near the sun layers on top
+      for (let k = 0; k < len; k++) {
+        const pt = sun.history[k];
+        // trailRatio: 0.0 (oldest/tail) to 1.0 (newest/head right behind sun)
+        const trailRatio = (k + 1) / len;
+        // Age progress: 0.0 (newest puff, hot ignition) to 1.0 (oldest puff, dissolving)
+        const ageProg = Math.max(0.0, Math.min(0.99, 1.0 - trailRatio));
+        const frameIdx = Math.min(17, Math.max(0, Math.floor(ageProg * 18)));
+        const frameImg = smokeFrames[frameIdx];
 
-      // Tier 2: Mid Plasma Solar Core (Fiery Amber)
-      const midR = Math.max(P, snap(baseNodeR * 0.58));
-      ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
-      ctx.fillRect(snapPtX - midR, snapPtY - P / 2, midR * 2, P);
-      ctx.fillRect(snapPtX - P / 2, snapPtY - midR, P, midR * 2);
-      ctx.fillRect(snapPtX - snap(midR * 0.6), snapPtY - snap(midR * 0.6), snap(midR * 1.2), snap(midR * 1.2));
+        if (!frameImg) continue;
 
-      // Tier 3: Nuclear White-Hot Core Pixel
-      const coreR = Math.max(P, snap(baseNodeR * 0.25));
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(snapPtX - coreR, snapPtY - coreR, coreR * 2, coreR * 2);
+        // Smoke puff scale expands as it billows outward
+        const basePuffR = (r * 0.90) * (0.80 + ageProg * 1.10);
+        const drawSize = basePuffR * 2.0;
+        const snapPtX = snap(pt.x);
+        const snapPtY = snap(pt.y);
 
-      // Trailing upward drift spark mote
-      const sparkDriftY = snap((1.0 - trailRatio) * 6);
-      const sparkDriftX = snap(Math.sin(k * 1.4) * 4);
-      ctx.fillStyle = (k % 4 === 0) ? '#FFFFFF' : (isTheOne ? '#FEF08A' : '#FBBF24');
-      ctx.fillRect(snapPtX + sparkDriftX, snapPtY - sparkDriftY, P, P);
+        // Alpha fades as smoke dissolves into the air
+        const puffAlpha = Math.sin((1.0 - ageProg) * Math.PI * 0.5) * (0.35 + 0.65 * (1.0 - ageProg));
+
+        ctx.save();
+        ctx.translate(snapPtX, snapPtY);
+        // Subtle rotational variety per history index
+        ctx.rotate((k * 1.37) % (Math.PI * 2));
+        ctx.globalAlpha = puffAlpha;
+        ctx.drawImage(frameImg, -drawSize / 2, -drawSize / 2, drawSize, drawSize);
+        ctx.restore();
+
+        // Pinpoint glowing ember spark drifting upward
+        if (k % 2 === 0) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          const sparkDriftY = snap((1.0 - trailRatio) * 10);
+          const sparkDriftX = snap(Math.sin(k * 1.4) * 6);
+          ctx.globalAlpha = (1.0 - ageProg) * 0.85;
+          ctx.fillStyle = (k % 4 === 0) ? '#FFFFFF' : (isTheOne ? '#FEF08A' : '#FBBF24');
+          ctx.fillRect(snapPtX + sparkDriftX, snapPtY - sparkDriftY, P, P);
+          ctx.restore();
+        }
+      }
+      ctx.restore();
+    } else {
+      ctx.save();
+      ctx.imageSmoothingEnabled = false;
+      // Step by 2 along history to keep trail clean and lightweight
+      for (let k = 0; k < len; k += 2) {
+        const pt = sun.history[k];
+        const trailRatio = (k + 1) / len; // 0 (oldest) to 1.0 (newest)
+        const baseNodeR = snap(r * (0.20 + 0.45 * trailRatio));
+        const alpha = (0.12 + 0.55 * trailRatio);
+        const snapPtX = snap(pt.x);
+        const snapPtY = snap(pt.y);
+
+        ctx.globalAlpha = alpha;
+
+        // Tier 1: Outer Ember Diamond Outline (Deep Crimson Red)
+        const outR = Math.max(P * 2, snap(baseNodeR));
+        ctx.fillStyle = isTheOne ? '#B45309' : '#DC2626';
+        ctx.fillRect(snapPtX - outR, snapPtY - P, outR * 2, P * 2);
+        ctx.fillRect(snapPtX - P, snapPtY - outR, P * 2, outR * 2);
+        ctx.fillRect(snapPtX - snap(outR * 0.65), snapPtY - snap(outR * 0.65), snap(outR * 1.3), snap(outR * 1.3));
+
+        // Tier 2: Mid Plasma Solar Core (Fiery Amber)
+        const midR = Math.max(P, snap(baseNodeR * 0.58));
+        ctx.fillStyle = isTheOne ? '#FEF08A' : '#F59E0B';
+        ctx.fillRect(snapPtX - midR, snapPtY - P / 2, midR * 2, P);
+        ctx.fillRect(snapPtX - P / 2, snapPtY - midR, P, midR * 2);
+        ctx.fillRect(snapPtX - snap(midR * 0.6), snapPtY - snap(midR * 0.6), snap(midR * 1.2), snap(midR * 1.2));
+
+        // Tier 3: Nuclear White-Hot Core Pixel
+        const coreR = Math.max(P, snap(baseNodeR * 0.25));
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(snapPtX - coreR, snapPtY - coreR, coreR * 2, coreR * 2);
+
+        // Trailing upward drift spark mote
+        const sparkDriftY = snap((1.0 - trailRatio) * 6);
+        const sparkDriftX = snap(Math.sin(k * 1.4) * 4);
+        ctx.fillStyle = (k % 4 === 0) ? '#FFFFFF' : (isTheOne ? '#FEF08A' : '#FBBF24');
+        ctx.fillRect(snapPtX + sparkDriftX, snapPtY - sparkDriftY, P, P);
+      }
+      ctx.restore();
     }
-    ctx.restore();
   }
 
   // 2. Draw Main Cruel Sun Sphere (Flight Sprite) or Sun Explosion Animation (Expiration Sprite)

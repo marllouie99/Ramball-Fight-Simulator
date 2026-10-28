@@ -2,9 +2,10 @@
 // Escanor Fighter Skin & Body Model (Authentic Pixel Art Edition)
 // The Seven Deadly Sins: Lion's Sin of Pride
 // Adheres strictly to:
+// - Rule 24 (Mandatory Universal Character Body Model & Scale Standard — Toji Baseline)
 // - Rule 19 (Upright Front POV Camera Orientation, Zero Eyes/Mouth/Nose)
-// - Rule 19.1 (Proportional Vertical Bands & Swept-Back Anime Hair Spikes)
-// - Rule 20 (Hand Visibility & Skin Only Guard)
+// - Rule 19.1 & 24 (4-Zone Proportional Vertical Bands & Swept-Back Anime Hair Spikes)
+// - Rule 20 (Canonical Symmetrical Hand Placement & Skin Only Guard)
 // - Rule 11 (Zero shadowBlur CPU Performance Preservation)
 // ─────────────────────────────────────────────
 
@@ -12,8 +13,13 @@ import { getHandSize, CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawDivineAxeRhitta, drawRhittaSlashArc, drawRhittaSolarFlash, drawCruelSunChargingExpansion } from '../weapons/escanorWeaponGraphics.js';
 
-const P = 2.0; // 2.0px authentic retro pixel grid
+const P = 2.0; // 2.0px authentic retro pixel grid (Rule 24 Toji Standard)
 const snap = (v) => Math.round(v / P) * P;
+
+// ── Rule 24 Offscreen Canvas Caches (Toji Baseline Standard) ──
+let _cachedEscanorNormalCanvas = null;
+let _cachedEscanorTheOneCanvas = null;
+let _cachedEscanorBodyR = 0;
 
 let _escanorHairImage = null;
 let _escanorHairImageLoading = false;
@@ -91,15 +97,15 @@ export function _drawEscanorHair(ctx, r, facingLeft = false) {
     // Escanor-hair.png (500x500). Visible hair bounding box:
     // X: [112, 391] (width 280, horizontal center at 251.5)
     // Y: [122, 341] (height 220, top crown at 122)
-    // Scales to cover the upper head circle hemisphere seamlessly with crown spikes at -1.35r
-    const targetHairWidth = r * 2.29 * wMult;
-    const targetHairHeight = r * 1.49 * hMult;
+    // Scales to cover the upper head circle hemisphere seamlessly with crown spikes at -1.30r (Rule 24 Toji Standard)
+    const targetHairWidth = r * 2.85 * wMult;
+    const targetHairHeight = r * 2.05 * hMult;
     const scaleX = targetHairWidth / 280;
     const scaleY = targetHairHeight / 220;
     const drawW = 500 * scaleX;
     const drawH = 500 * scaleY;
     const drawX = -251.5 * scaleX + offX;
-    const drawY = -r * 1.15 - 122 * scaleY + 4 + offY;
+    const drawY = -r * 1.30 - 122 * scaleY + offY;
 
     if (rot !== 0 || flipX !== 1 || flipY !== 1) {
       ctx.translate(drawX + drawW / 2, drawY + drawH / 2);
@@ -207,7 +213,7 @@ export function drawEscanorSkin(ctx, fighter) {
   // 3. Attack & Swing States
   const chopState = (!isPodiumPreview && !isSuppressed)
     ? _getEscanorChopAnimationState(fighter)
-    : { isSwinging: false, phase: 'idle', axeAngle: 0.14, handX: -r * 0.85, handY: r * 0.40, backHandX: r * 0.65, backHandY: -r * 0.18, strikeP: 0 };
+    : { isSwinging: false, phase: 'idle', axeAngle: 0.14, handX: -r * 0.82, handY: r * 0.38, backHandX: r * 0.82, backHandY: r * 0.38, strikeP: 0 };
   const isPunching = !isPodiumPreview && !isSuppressed && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
   const punchPhase = isPunching ? Math.min(1.0, 1.0 - (fighter.punchAnimTimer / (fighter.punchMaxTime || 14))) : 0;
 
@@ -233,23 +239,17 @@ export function drawEscanorSkin(ctx, fighter) {
     }
   }
 
-  // 4. LAYER 0: BACK HAND & RESTING WEAPON (Behind Body Layer)
-  const showBackHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideBackHand && !fighter.hideWeapon;
-  if (showBackHand) {
-    _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase);
-  }
-
-  // 5. LAYER 1: MAIN BODY (Pixel Head/Neck Skin + Lowered Holy Knight Armor)
+  // 4. LAYER 1: MAIN BODY (Toji Reference Standard Rule 24 Offscreen Canvas Cache)
   drawEscanorPixelBody(ctx, r, fighter.isTheOneActive);
 
-  // 6. LAYER 2: MUSTACHE ASSET OVERLAY (Assets/model/escanor/Escanor-mustache.png)
+  // 5. LAYER 2: MUSTACHE ASSET OVERLAY (Assets/model/escanor/Escanor-mustache.png)
   _drawEscanorMustache(ctx, r, facingLeft);
 
-  // 7. LAYER 3: HAIR ASSET OVERLAY (Assets/model/escanor/Escanor-hair.png)
+  // 6. LAYER 3: HAIR ASSET OVERLAY (Assets/model/escanor/Escanor-hair.png)
   _drawEscanorHair(ctx, r, facingLeft);
 
-  // 8. LAYER 4: FRONT HAND / POINTING GAUNTLET (On Top of Body, Mustache & Hair)
-  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideFrontHand && !fighter.hideWeapon;
+  // 7. LAYER 4: FRONT HANDS & WEAPON (Rule 20 Canonical Symmetrical Front Placement)
+  const showFrontHand = !isPodiumPreview && !Boolean(state.showSkinOnly) && !fighter.hideHands && !fighter.hideFrontHand;
   if (showFrontHand) {
     _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhase, now, facingLeft);
   }
@@ -524,22 +524,25 @@ function _drawEscanorSolarAura(ctx, r, fighter, now = Date.now()) {
 }
 
 /**
- * Draws the procedural pixel art body of Escanor (Lion's Sin of Pride).
- * Authentic 2D Discrete Grid Rasterization Engine (P = 2.0px)
- * Features Lowered Holy Knight Armor with exposed muscular neck/collarbone.
- * Adheres strictly to:
- * - Rule 19 (Upright Front POV Camera Orientation, Zero Eyes/Mouth/Nose)
- * - Rule 19.1 (Proportional Vertical Bands, Chiseled Muscular Neck, Lowered Holy Knight Armor)
- * - Rule 11 (Zero shadowBlur CPU performance preservation)
- * @param {CanvasRenderingContext2D} ctx
+ * Procedural Pixel Art Render Function (Rule 24 - Toji Reference Standard Architecture)
+ * Renders Escanor's authentic manga ink body onto an axis-aligned canvas:
+ * - Perfectly circular 4-neighbor manga ink outer outline (#0E0F14 / #78350F)
+ * - Zone 1 (ry < 0.28r): Pure Face & Cheeks Tan Skin Dome (faceless, clean base for mustache/hair)
+ * - Zone 2 (0.28r <= ry < 0.64r): Full-width Holy Knight Armor (Gorget, Royal Blue Pauldrons, Gold Cuirass)
+ * - Zone 3 (0.64r <= ry < 0.78r): Waistband & Golden Sun Buckle
+ * - Zone 4 (ry >= 0.78r): Segmented Golden Tassets & Greaves (Luminance Y >= 24)
+ * @param {CanvasRenderingContext2D} destCtx
  * @param {number} r - Character radius
  * @param {boolean} [isTheOne=false] - Whether "The One" transformation is active
  */
-export function drawEscanorPixelBody(ctx, r, isTheOne = false) {
-  ctx.save();
-  ctx.imageSmoothingEnabled = false;
+function _renderEscanorPixelBodyToCanvas(destCtx, r, isTheOne = false) {
+  destCtx.save();
+  destCtx.imageSmoothingEnabled = false;
+  destCtx.translate(destCtx.canvas.width / 2, destCtx.canvas.height / 2);
+  const P = 2.0;
   const steps = Math.ceil((r + P) / P);
 
+  // 100% 4-Way Symmetrical Circular Pixel Body Fill & Outer Border (Toji Standard)
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -547,168 +550,189 @@ export function drawEscanorPixelBody(ctx, r, isTheOne = false) {
       const dist = Math.hypot(rx, ry);
       if (dist > r) continue;
 
-      const px = snap(rx);
-      const py = snap(ry);
-      const normY = ry / r;
-      const normX = rx / r;
+      const px = rx - P / 2;
+      const py = ry - P / 2;
 
-      // ── 1. Stepped Outer Dark Manga Ink Shell (4-Neighbor Attached Boundary Test) ──
-      const isOutline = (
+      // 4-neighbor boundary test for clean 1-pixel outer manga ink outline (Rule 24 Toji Standard)
+      const isBorder = (
         Math.hypot((gx + 1) * P, gy * P) > r ||
         Math.hypot((gx - 1) * P, gy * P) > r ||
         Math.hypot(gx * P, (gy + 1) * P) > r ||
         Math.hypot(gx * P, (gy - 1) * P) > r
       );
 
-      if (isOutline) {
-        ctx.fillStyle = isTheOne ? '#78350F' : '#0E0F14';
-        ctx.fillRect(px, py, P, P);
+      if (isBorder) {
+        destCtx.fillStyle = isTheOne ? '#78350F' : '#0E0F14';
+        destCtx.fillRect(px, py, P, P);
         continue;
       }
 
-      // ── 2. CHISELED FACE & MUSCULAR NECK ZONE (Head, Face & Throat: normY < 0.36) ──
-      if (normY < 0.36) {
-        // Chiseled Tanned Warrior Face & Neck Skin (Clean base under hair & mustache assets)
-        if (normY < -0.40) {
-          ctx.fillStyle = '#FFF0E2'; // Upper crown/head skin highlight under hair
-        } else if (normY < -0.05) {
-          ctx.fillStyle = '#FEE8D6'; // Pale anime face skin
-        } else if (normY < 0.10) {
-          ctx.fillStyle = '#FDD3B2'; // Warm peach cheek tone
-        } else if (normY < 0.22) {
-          ctx.fillStyle = '#F9B786'; // Chin & jawline shadow
-        } else {
-          // Muscular Neck & Collarbone Contours (0.22 <= normY < 0.36)
-          if (Math.abs(normX) < 0.16) {
-            ctx.fillStyle = '#FDD3B2'; // Center muscular throat & collarbone hollow
-          } else if (Math.abs(normX) < 0.35) {
-            ctx.fillStyle = '#F9B786'; // Sternocleidomastoid muscle highlight
+      // ──────────────────────────────────────────
+      // ZONE 1: Pure Face & Cheeks Tan Skin Dome (ry < r * 0.28)
+      // Pure facial dome without baked hair (Rule 18 / 19 / 24)
+      // ──────────────────────────────────────────
+      if (ry < r * 0.28) {
+        let col = isTheOne ? '#FFF5EA' : '#FEE8D6'; // Fair warrior skin tone
+        if (ry < -r * 0.45) {
+          col = isTheOne ? '#FFFFFF' : '#FFF0E2'; // Forehead highlight under hair
+        } else if (Math.abs(rx) > r * 0.65) {
+          col = isTheOne ? '#F6C8A4' : '#F9B786'; // Side cheek contour
+        } else if (ry >= r * 0.18) {
+          if (Math.abs(rx) <= r * 0.18) {
+            col = '#FDD3B2'; // Center muscular throat & collarbone hollow
+          } else if (Math.abs(rx) <= r * 0.36) {
+            col = isTheOne ? '#F6C8A4' : '#F9B786'; // Sternocleidomastoid highlight
           } else {
-            ctx.fillStyle = '#E4966A'; // Deep neck & trap muscle shadow
+            col = isTheOne ? '#EAA478' : '#E4966A'; // Deep neck shadow
           }
         }
-        ctx.fillRect(px, py, P, P);
-        continue;
+        destCtx.fillStyle = col;
+        destCtx.fillRect(px, py, P, P);
       }
-
-      // ── 3. LOWERED GOLDEN HOLY KNIGHT ARMOR (+r*0.36 to +r*1.00) ──
-      // Reference: Lowered Segmented Golden Sun-Plate Cuirass with Royal Blue Pauldrons & White Sun Crest
-
-      // A. Royal Blue Shoulder Pauldrons (|normX| >= 0.42 && normY >= 0.36 && normY <= 0.80)
-      const isShoulderPauldron = Math.abs(normX) >= 0.42 && normY >= 0.36 && normY <= 0.80;
-      if (isShoulderPauldron) {
-        const isPauldronGoldRim = Math.abs(normX) >= 0.78 || normY <= 0.40 || (normY >= 0.76 && normY <= 0.80);
-        if (isPauldronGoldRim) {
-          ctx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24'; // Polished Gold Pauldron Rim
-          ctx.fillRect(px, py, P, P);
-          continue;
+      // ──────────────────────────────────────────
+      // ZONE 2: Collar & Upper Torso / Holy Knight Armor (r * 0.28 <= ry < r * 0.64)
+      // Full-width upper armor covering -r to +r with Gorget, Pauldrons, and Cuirass
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.64) {
+        // A. High-Collar Golden Gorget Rim (Neck opening: ry < r * 0.35)
+        if (ry < r * 0.35) {
+          if (Math.abs(rx) <= P) {
+            destCtx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A'; // Center gorget sheen
+          } else if (ry > r * 0.32) {
+            destCtx.fillStyle = isTheOne ? '#B45309' : '#D97706'; // Gorget seam shadow
+          } else {
+            destCtx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24'; // High collar gold plate
+          }
         }
-
-        // White Lion / Sun Heraldic Crest Pixels inside the Blue Field
-        const isPauldronCrest = (
-          (Math.abs(gx) === 6 && (gy === 7 || gy === 8)) ||
-          (Math.abs(gx) === 7 && (gy === 6 || gy === 7 || gy === 8 || gy === 9)) ||
-          (Math.abs(gx) === 8 && (gy === 7 || gy === 8))
-        );
-        if (isPauldronCrest) {
-          ctx.fillStyle = '#FFFFFF'; // Pure white heraldic sun crest
-          ctx.fillRect(px, py, P, P);
-          continue;
+        // B. Royal Blue Shoulder Pauldrons on Flanks (|rx| >= r * 0.44)
+        else if (Math.abs(rx) >= r * 0.44) {
+          if (Math.abs(rx) >= r * 0.74 || ry <= r * 0.39) {
+            destCtx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24'; // Polished gold pauldron rim
+          } else if (Math.abs(rx) >= r * 0.54 && Math.abs(rx) <= r * 0.66 && ry >= r * 0.45 && ry <= r * 0.55) {
+            destCtx.fillStyle = '#FFFFFF'; // Pure white heraldic sun crest pixels
+          } else if (ry < r * 0.48) {
+            destCtx.fillStyle = '#3B82F6'; // Lighter royal blue highlight
+          } else if (ry < r * 0.56) {
+            destCtx.fillStyle = '#2563EB'; // Vibrant royal blue
+          } else {
+            destCtx.fillStyle = '#1D4ED8'; // Deep blue shadow
+          }
         }
-
-        // Royal Blue Main Pauldron Plate
-        if (normY < 0.52) {
-          ctx.fillStyle = '#3B82F6'; // Lighter royal blue highlight
-        } else if (normY < 0.68) {
-          ctx.fillStyle = '#2563EB'; // Vibrant royal blue
+        // C. Tiered Scalloped Golden Sun Breastplate Cuirass (|rx| < r * 0.44)
+        else {
+          const isTierSeam = (ry >= r * 0.46 && ry <= r * 0.48) || (ry >= r * 0.56 && ry <= r * 0.58);
+          if (isTierSeam) {
+            destCtx.fillStyle = isTheOne ? '#B45309' : '#78350F'; // Dark bronze-gold plate seam
+          } else if (Math.abs(rx) <= P) {
+            destCtx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A'; // Blazing solar gleam along ridge
+          } else if (Math.abs(rx) <= r * 0.20) {
+            destCtx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24'; // Brilliant polished gold center
+          } else {
+            destCtx.fillStyle = isTheOne ? '#FBBF24' : '#F59E0B'; // Rich gold midtone
+          }
+        }
+        destCtx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 3: Waistband / Belt / Fauld Band (r * 0.64 <= ry < r * 0.78)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.78) {
+        // Central Sun Buckle / Medallion (|rx| <= r * 0.16)
+        if (Math.abs(rx) <= r * 0.16) {
+          if (Math.abs(rx) <= P * 0.8 && ry >= r * 0.68 && ry <= r * 0.74) {
+            destCtx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A'; // Core gem / buckle sheen
+          } else {
+            destCtx.fillStyle = isTheOne ? '#FBBF24' : '#D97706'; // Buckle frame
+          }
         } else {
-          ctx.fillStyle = '#1D4ED8'; // Deep blue shadow
+          // Belt band with edge trim
+          if (ry < r * 0.67 || ry > r * 0.75) {
+            destCtx.fillStyle = isTheOne ? '#78350F' : '#92400E'; // Belt seam outline
+          } else {
+            destCtx.fillStyle = isTheOne ? '#D97706' : '#B45309'; // Rich leather/bronze belt body
+          }
         }
-        ctx.fillRect(px, py, P, P);
-        continue;
+        destCtx.fillRect(px, py, P, P);
       }
-
-      // B. Lowered Golden Gorget & Neck Collarplate (normY >= 0.36 && normY <= 0.46 && |normX| < 0.42)
-      const isGorget = normY >= 0.36 && normY <= 0.46;
-      if (isGorget) {
-        if (Math.abs(gx) <= 1) {
-          ctx.fillStyle = '#FEF08A'; // Center gorget sheen
-        } else if (gy === 5 || gy === 6) {
-          ctx.fillStyle = '#FBBF24'; // High collar gold plate
-        } else {
-          ctx.fillStyle = '#D97706'; // Gorget rim shadow
+      // ──────────────────────────────────────────
+      // ZONE 4: Lower Faulds / Tassets / Greaves (ry >= r * 0.78)
+      // Segmented golden tassets & greaves with luminance Y >= 24
+      // ──────────────────────────────────────────
+      else {
+        // Center inseam / tasset split
+        if (Math.abs(rx) <= P * 0.7) {
+          destCtx.fillStyle = isTheOne ? '#78350F' : '#0E0F14'; // Center seam shadow
         }
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
-
-      // C. Tiered Scalloped Golden Sun Cuirass / Breastplate (normY > 0.46 && normY <= 0.78)
-      const isBreastplate = normY > 0.46 && normY <= 0.78;
-      if (isBreastplate) {
-        // Scalloped Tier Overlap Seams (gy = 7, 10, 13)
-        const isTierSeam = (
-          (gy === 7 && Math.abs(gx) <= 4) ||
-          (gy === 10 && Math.abs(gx) <= 3) ||
-          (gy === 13 && Math.abs(gx) <= 3)
-        );
-        if (isTierSeam) {
-          ctx.fillStyle = '#78350F'; // Dark bronze-gold plate seam
-          ctx.fillRect(px, py, P, P);
-          continue;
+        // Central tasset plate (|rx| <= r * 0.28)
+        else if (Math.abs(rx) <= r * 0.28) {
+          if (Math.abs(rx) <= P * 1.5) {
+            destCtx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24'; // Central tasset sheen
+          } else {
+            destCtx.fillStyle = isTheOne ? '#FBBF24' : '#F59E0B'; // Main tasset gold
+          }
         }
-
-        // Center Vertical Golden Sheen (Specular Highlight along breastplate ridge)
-        if (Math.abs(gx) <= 1) {
-          ctx.fillStyle = isTheOne ? '#FFFFFF' : '#FEF08A'; // Blazing solar gleam
-          ctx.fillRect(px, py, P, P);
-          continue;
+        // Side hip plates & greaves
+        else {
+          if (Math.abs(rx) >= r * 0.40 && Math.abs(rx) <= r * 0.46) {
+            destCtx.fillStyle = isTheOne ? '#92400E' : '#78350F'; // Articulated plate crease
+          } else {
+            destCtx.fillStyle = isTheOne ? '#D97706' : '#B45309'; // Armored greave flank
+          }
         }
-
-        // Main Golden Plate Shading
-        if (Math.abs(gx) <= 3) {
-          ctx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24'; // Brilliant polished gold
-        } else {
-          ctx.fillStyle = '#F59E0B'; // Rich gold midtone
-        }
-        ctx.fillRect(px, py, P, P);
-        continue;
+        destCtx.fillRect(px, py, P, P);
       }
-
-      // D. Golden Armored Faulds & Segmented Tassets (normY > 0.78 to +r*1.00)
-      // Articulated hip plates and scalloped groin tasset
-      const isFauldSeam = (gy === steps - 3 || gy === steps - 1);
-      if (isFauldSeam) {
-        ctx.fillStyle = '#92400E'; // Segmented fauld seam
-        ctx.fillRect(px, py, P, P);
-        continue;
-      }
-
-      if (Math.abs(gx) <= 2) {
-        ctx.fillStyle = isTheOne ? '#FEF08A' : '#FBBF24'; // Central tasset plate
-      } else {
-        ctx.fillStyle = '#D97706'; // Side hip plate shadow
-      }
-      ctx.fillRect(px, py, P, P);
     }
   }
 
-  // Extra Lowered Shoulder Pauldron Plates breaking side boundaries for imposing armor silhouette
-  const sideY = Math.round(r * 0.38);
-  ctx.fillStyle = '#FBBF24'; // Gold top rim
-  ctx.fillRect(-r - 3, sideY, 4, 3);
-  ctx.fillRect(r - 1, sideY, 4, 3);
-  ctx.fillStyle = '#2563EB'; // Royal Blue flare
-  ctx.fillRect(-r - 2, sideY + 3, 3, 6);
-  ctx.fillRect(r - 1, sideY + 3, 3, 6);
+  destCtx.restore();
+}
 
-  // Solar glint overlay for "The One" transformation
+/**
+ * Draws Escanor's procedural pixel-art body with 1:1 offscreen canvas caching (Rule 24 Toji Standard).
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - Character radius
+ * @param {boolean} [isTheOne=false] - Whether "The One" transformation is active
+ */
+export function drawEscanorPixelBody(ctx, r, isTheOne = false) {
+  if (typeof document === 'undefined') {
+    _renderEscanorPixelBodyToCanvas(ctx, r, isTheOne);
+    return;
+  }
+
+  const intR = Math.round(r);
+  if (!_cachedEscanorNormalCanvas || !_cachedEscanorTheOneCanvas || _cachedEscanorBodyR !== intR) {
+    const P = 2.0;
+    const steps = Math.ceil((intR + P) / P);
+    const size = (steps * 2 + 1) * P;
+
+    _cachedEscanorNormalCanvas = document.createElement('canvas');
+    _cachedEscanorNormalCanvas.width = size;
+    _cachedEscanorNormalCanvas.height = size;
+    const normCtx = _cachedEscanorNormalCanvas.getContext('2d');
+    _renderEscanorPixelBodyToCanvas(normCtx, intR, false);
+
+    _cachedEscanorTheOneCanvas = document.createElement('canvas');
+    _cachedEscanorTheOneCanvas.width = size;
+    _cachedEscanorTheOneCanvas.height = size;
+    const theOneCtx = _cachedEscanorTheOneCanvas.getContext('2d');
+    _renderEscanorPixelBodyToCanvas(theOneCtx, intR, true);
+
+    _cachedEscanorBodyR = intR;
+  }
+
+  const cachedCanvas = isTheOne ? _cachedEscanorTheOneCanvas : _cachedEscanorNormalCanvas;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const size = cachedCanvas.width;
+  ctx.drawImage(cachedCanvas, -size / 2, -size / 2);
+
+  // Solar glint overlay for "The One" transformation (pure circle)
   if (isTheOne) {
     ctx.fillStyle = 'rgba(254, 240, 138, 0.15)';
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
   }
-
   ctx.restore();
 }
 
@@ -863,12 +887,12 @@ function _drawEscanorPointingGauntlet(ctx, cx, cy, radius, isTheOne = false, poi
  */
 export function _getEscanorChopAnimationState(fighter) {
   const r = fighter.r || 28;
-  // Frame 1: Resting stance (Weapon held in hand on the LEFT-LOWER side of body -X/+Y, pointing down-forward to the right)
+  // Frame 1: Canonical Symmetrical Resting Stance (Rule 20 Lower-Flank Placement)
   const idleAxeAngle = 0.14;
-  const idleHandX = -r * 0.85;
-  const idleHandY = r * 0.40;
-  const idleBackHandX = r * 0.65;
-  const idleBackHandY = -r * 0.18;
+  const idleHandX = -r * 0.82;
+  const idleHandY = r * 0.38;
+  const idleBackHandX = r * 0.82;
+  const idleBackHandY = r * 0.38;
 
   if (!fighter.slashSwingTimer || fighter.slashSwingTimer <= 0) {
     if (!fighter.chopHitPauseTimer || fighter.chopHitPauseTimer <= 0) {
@@ -903,8 +927,6 @@ export function _getEscanorChopAnimationState(fighter) {
     const axeAngle = (typeof fighter.chopHitAxeAngle === 'number') ? fighter.chopHitAxeAngle : strikeEndAngle;
     const handX = (typeof fighter.chopHitHandX === 'number') ? fighter.chopHitHandX : strikeEndHandX;
     const handY = (typeof fighter.chopHitHandY === 'number') ? fighter.chopHitHandY : strikeEndHandY;
-    const backHandX = (typeof fighter.chopHitBackHandX === 'number') ? fighter.chopHitBackHandX : strikeEndBackHandX;
-    const backHandY = (typeof fighter.chopHitBackHandY === 'number') ? fighter.chopHitBackHandY : strikeEndBackHandY;
 
     // High-frequency kinetic micro-tremor during hit-pause (simulating massive weapon friction biting into enemy)
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.escanor) ? CONFIG.escanor : {};
@@ -917,8 +939,8 @@ export function _getEscanorChopAnimationState(fighter) {
       axeAngle: axeAngle + tremor * 0.02,
       handX: handX + tremor * 0.4,
       handY: handY + tremor * 0.8,
-      backHandX: backHandX + tremor * 0.4,
-      backHandY: backHandY + tremor * 0.8,
+      backHandX: idleBackHandX,
+      backHandY: idleBackHandY,
       strikeP: hitP,
       pauseP,
       recP: 0,
@@ -936,11 +958,10 @@ export function _getEscanorChopAnimationState(fighter) {
   const elapsed = Math.max(0, totalFrames - fighter.slashSwingTimer);
 
   // Frame 2: Lift stance (hand at upper-left, weapon shaft pointing up-left over back shoulder)
+  // Escanor is a 1-handed battle axe wielder: Free right hand stays grounded at lower-right flank!
   const overheadAngle = -2.45; // ~-140° pointing up-left
   const overheadHandX = -r * 0.48; // Shifted to left side
   const overheadHandY = -r * 0.42; // Upper area
-  const overheadBackHandX = r * 0.35;
-  const overheadBackHandY = -r * 0.10;
 
   let axeAngle = idleAxeAngle;
   let handX = idleHandX;
@@ -953,6 +974,7 @@ export function _getEscanorChopAnimationState(fighter) {
 
   if (elapsed < liftFrames) {
     // 1. LIFT: Raise weapon up from Frame 1 resting pose to Frame 2 overhead stance
+    // Free right hand remains stationary at lower-right flank (Rule 20)
     phase = 'lift';
     const p = Math.min(1.0, elapsed / Math.max(1, liftFrames));
     // Smooth sine ease-in-out: starts slow (heavy weapon), flows through, decelerates at top
@@ -960,8 +982,8 @@ export function _getEscanorChopAnimationState(fighter) {
     axeAngle = idleAxeAngle + (overheadAngle - idleAxeAngle) * ease;
     handX = idleHandX + ease * (overheadHandX - idleHandX);
     handY = idleHandY + ease * (overheadHandY - idleHandY);
-    backHandX = idleBackHandX + ease * (overheadBackHandX - idleBackHandX);
-    backHandY = idleBackHandY + ease * (overheadBackHandY - idleBackHandY);
+    backHandX = idleBackHandX;
+    backHandY = idleBackHandY;
   } else if (elapsed < liftFrames + holdFrames) {
     // 2. POISED OVERHEAD HOLD: STAYS POISED IN HIGH OVERHEAD CHOP POSITION FOR EXACT chopLiftHoldFrames!
     phase = 'hold';
@@ -970,8 +992,8 @@ export function _getEscanorChopAnimationState(fighter) {
     axeAngle = overheadAngle + tensionTremor;
     handX = overheadHandX;
     handY = overheadHandY + Math.sin(holdElapsed * 0.3) * 0.8;
-    backHandX = overheadBackHandX;
-    backHandY = overheadBackHandY + Math.sin(holdElapsed * 0.3) * 0.8;
+    backHandX = idleBackHandX;
+    backHandY = idleBackHandY;
   } else if (elapsed < liftFrames + holdFrames + strikeFrames) {
     // 3. EXPLOSIVE DOWNWARD CHOP STRIKE: Snaps from overheadAngle down to strikeEndAngle
     phase = 'strike';
@@ -981,8 +1003,8 @@ export function _getEscanorChopAnimationState(fighter) {
     axeAngle = overheadAngle + (strikeEndAngle - overheadAngle) * ease;
     handX = overheadHandX + ease * (strikeEndHandX - overheadHandX);
     handY = overheadHandY + ease * (strikeEndHandY - overheadHandY);
-    backHandX = overheadBackHandX + ease * (strikeEndBackHandX - overheadBackHandX);
-    backHandY = overheadBackHandY + ease * (strikeEndBackHandY - overheadBackHandY);
+    backHandX = idleBackHandX;
+    backHandY = idleBackHandY;
   } else {
     // 4. RECOVERY (BREATHER): Divine Axe Rhitta STAYS completely planted in the downward chop slam pose!
     // NO lift-up animation during recovery — stays grounded in follow-through pose while taking a breather!
@@ -993,58 +1015,18 @@ export function _getEscanorChopAnimationState(fighter) {
     axeAngle = strikeEndAngle;
     handX = strikeEndHandX;
     handY = strikeEndHandY;
-    backHandX = strikeEndBackHandX;
-    backHandY = strikeEndBackHandY;
+    backHandX = idleBackHandX;
+    backHandY = idleBackHandY;
   }
 
   return { isSwinging: true, phase, axeAngle, handX, handY, backHandX, backHandY, strikeP, pauseP: 0, recP, hitConnected: Boolean(fighter._chopHitConnected) };
 }
 
 /**
- * Escanor Layer 0: Back Hand & Resting Weapon — (Behind Body Layer)
+ * Escanor Layer 0: Back Hand (Rule 20 Deprecated - Single Source of Truth on Front Layer)
  */
 function _drawEscanorBackHand(ctx, fighter, r, chopState, isPunching, punchPhase) {
-  const handR = Math.max(r * 0.28, getHandSize(6.5));
-
-  // While actively channeling Cruel Sun, back hand is hidden
-  if (fighter.isChannelingCruelSun) {
-    return;
-  }
-
-  // During post-throw recovery, back hand smoothly fades in as pointing hand hides
-  if (fighter.cruelSunRecoveryTimer && fighter.cruelSunRecoveryTimer > 0) {
-    const maxRecTimer = fighter.cruelSunMaxRecoveryTimer || 180;
-    const recRemaining = fighter.cruelSunRecoveryTimer || 0;
-    const recElapsed = Math.max(0, maxRecTimer - recRemaining);
-    const recP = Math.max(0, Math.min(1.0, recElapsed / maxRecTimer));
-
-    if (recP < 0.25) {
-      return; // Fully hidden while pointing hand is visible
-    }
-
-    const backHandAlpha = Math.min(1.0, (recP - 0.25) / 0.30);
-    ctx.save();
-    ctx.globalAlpha *= backHandAlpha;
-    let handX = r * 0.65;
-    let handY = -r * 0.18;
-    _drawEscanorGoldenGauntlet(ctx, handX, handY, handR, fighter.isTheOneActive);
-    ctx.restore();
-    return;
-  }
-
-  let handX = r * 0.65;
-  let handY = -r * 0.18;
-
-  if (chopState.isSwinging) {
-    handX = chopState.backHandX;
-    handY = chopState.backHandY;
-  } else if (isPunching) {
-    handX = r * 0.85 + Math.sin(punchPhase * Math.PI) * (r * 0.35);
-    handY = -r * 0.20;
-  }
-
-  // Golden Plate Gauntlet (Forward guard hand on the right side +X)
-  _drawEscanorGoldenGauntlet(ctx, handX, handY, handR, fighter.isTheOneActive);
+  // Intentionally empty: Hand rendering is strictly unified on Layer 4 with canonical symmetrical placement (Rule 20)
 }
 
 /**
@@ -1202,18 +1184,35 @@ function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhas
     handY = chopState.handY;
     axeAngle = chopState.axeAngle;
   } else if (isPunching) {
-    handX = -r * 0.40 + Math.sin(punchPhase * Math.PI) * (r * 0.40);
-    handY = r * 0.35;
+    const punchExt = Math.sin(punchPhase * Math.PI) * (r * 0.50);
+    handX = -r * 0.82;
+    handY = r * 0.38;
+    const rightPunchX = r * 0.82 + punchExt;
+    const rightPunchY = r * 0.38 - punchExt * 0.25;
     axeAngle = 0.14;
+
+    if (!fighter.hideWeapon) {
+      drawDivineAxeRhitta(ctx, handX, handY, axeAngle, r, {
+        isSwinging: false,
+        isTheOne: fighter.isTheOneActive,
+        prideStacks: fighter.prideStacks || 0,
+        heatLevel: 1.0 + (fighter.prideStacks || 0) * 0.2
+      });
+    }
+    _drawEscanorGoldenGauntlet(ctx, handX, handY, handR, fighter.isTheOneActive);
+    _drawEscanorGoldenGauntlet(ctx, rightPunchX, rightPunchY, handR, fighter.isTheOneActive);
+    return;
   }
 
   // Draw Divine Axe Rhitta held firmly in hand on the lower-left side of the body (-X, +Y)
-  drawDivineAxeRhitta(ctx, handX, handY, axeAngle, r, {
-    isSwinging: chopState.isSwinging,
-    isTheOne: fighter.isTheOneActive,
-    prideStacks: fighter.prideStacks || 0,
-    heatLevel: 1.0 + (fighter.prideStacks || 0) * 0.2
-  });
+  if (!fighter.hideWeapon) {
+    drawDivineAxeRhitta(ctx, handX, handY, axeAngle, r, {
+      isSwinging: chopState.isSwinging,
+      isTheOne: fighter.isTheOneActive,
+      prideStacks: fighter.prideStacks || 0,
+      heatLevel: 1.0 + (fighter.prideStacks || 0) * 0.2
+    });
+  }
 
   // Axe Head Solar Flash Sync at Full Arc Extension (Hit-Pause Impact Frame)
   if (chopState.isSwinging && chopState.phase === 'hitPause') {
@@ -1225,6 +1224,13 @@ function _drawEscanorFrontHand(ctx, fighter, r, chopState, isPunching, punchPhas
     drawRhittaSolarFlash(ctx, hubX, hubY, fighter.isTheOneActive, intensity);
   }
 
-  // Golden Gauntlet gripping the axe blue hilt on the lower-left side of the body
+  // Left Golden Gauntlet gripping the axe blue hilt at lower-left flank
   _drawEscanorGoldenGauntlet(ctx, handX, handY, handR, fighter.isTheOneActive);
+
+  // Right Golden Gauntlet: driving/guiding during swing or resting symmetrically at (+r * 0.82, +r * 0.38) (Rule 20)
+  if (chopState.isSwinging) {
+    _drawEscanorGoldenGauntlet(ctx, chopState.backHandX, chopState.backHandY, handR, fighter.isTheOneActive);
+  } else {
+    _drawEscanorGoldenGauntlet(ctx, r * 0.82, r * 0.38, handR, fighter.isTheOneActive);
+  }
 }

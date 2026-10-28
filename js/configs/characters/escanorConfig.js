@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Escanor Character Config
 // The Seven Deadly Sins (Nanatsu no Taizai) — Lion's Sin of Pride
 // ─────────────────────────────────────────────
@@ -10,7 +10,11 @@ export const escanorConfig = {
     modelMustache: 'Assets/model/escanor/Escanor-model-mustache.png',
     skin: 'Assets/model/escanor/Escanor-skin-model.png',
     weapon: 'Assets/model/escanor/Escanor-Weapon.png',
-    cruelSun: 'Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png',
+    cruelSun: 'Assets/model/escanor/Cruel_Sun/cruel_sun-b.png',
+    cruelSunTheOne: 'Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-b.png',
+    cruelSunSmoke: 'Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-b.png',
+    cruelSunSmokeTheOne: 'Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-b.png',
+    cruelSunLegacy: 'Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png',
     sunExplosion: 'Assets/model/escanor/Escanor-Sun-Explosion-Sprite-Sheet.png',
     attackEffect: 'Assets/model/Attack-Effects/Attack-Effect-1.png',
   },

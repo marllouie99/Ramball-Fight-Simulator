@@ -54,18 +54,15 @@ function _getEscanorBladeWorldSegment(fighter, strikeP) {
   const overheadHandY = -r * 0.42;
   const strikeEndHandX = r * 1.15;
   const strikeEndHandY = r * 0.42;
-  const overheadBackHandX = r * 0.35;
-  const overheadBackHandY = -r * 0.10;
-  const strikeEndBackHandX = r * 1.35;
-  const strikeEndBackHandY = -r * 0.05;
+  // Free right hand stays grounded at lower-right flank (Rule 20)
+  const localBackHandX = r * 0.82;
+  const localBackHandY = r * 0.38;
 
   const clampedP = Math.max(0, Math.min(1.0, strikeP));
   const ease = 1 - Math.pow(1 - clampedP, 3);
   const localAxeAngle = overheadAngle + (strikeEndAngle - overheadAngle) * ease;
   const localHandX = overheadHandX + ease * (strikeEndHandX - overheadHandX);
   const localHandY = overheadHandY + ease * (strikeEndHandY - overheadHandY);
-  const localBackHandX = overheadBackHandX + ease * (strikeEndBackHandX - overheadBackHandX);
-  const localBackHandY = overheadBackHandY + ease * (strikeEndBackHandY - overheadBackHandY);
 
   const aimAngle = (fighter.chopCastAngle !== undefined)
     ? fighter.chopCastAngle
@@ -1669,7 +1666,7 @@ export class EscanorFighter extends Fighter {
       aoeDamage: (cfg.cruelSunAoeDamage || 65) * (this.isTheOneActive ? 1.4 : 1.0),
       owner: this,
       history: [],
-      historyMax: 16,
+      historyMax: 24,
       lastDPSTick: 0
     };
 
@@ -1712,7 +1709,7 @@ export class EscanorFighter extends Fighter {
       // Record flight history for flame trail rendering
       if (!sun.history) sun.history = [];
       sun.history.push({ x: sun.x, y: sun.y });
-      if (sun.history.length > (sun.historyMax || 16)) {
+      if (sun.history.length > (sun.historyMax || 24)) {
         sun.history.shift();
       }
 
@@ -2548,6 +2545,10 @@ export class EscanorFighter extends Fighter {
 
     // 5. Draw Escanor Main Skin Model
     drawEscanorSkin(ctx, this);
+
+    // Rule 21 Mandatory Overhead Health & Status
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
   }
 
   /**

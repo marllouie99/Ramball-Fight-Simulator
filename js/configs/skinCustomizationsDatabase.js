@@ -1,7 +1,7 @@
 /**
  * CIRCLE MINI-BATTLE — MASTER SKIN & HAIR CUSTOMIZATIONS DATABASE
  * =============================================================================
- * Generated from Skin Studio on 2026-10-19T16:55:24.037Z
+ * Generated from Skin Studio on 2026-10-28T04:16:48.175Z
  * =============================================================================
  */
 
@@ -21,7 +21,7 @@ export const SKIN_CUSTOMIZATIONS_DATABASE = {
   naoya: { widthScale: 0.80, heightScale: 0.78, offsetX: 0, offsetY: 8, angleOffset: 0.0349, flipX: false, flipY: false },
   maki: { widthScale: 0.80, heightScale: 1.04, offsetX: 1, offsetY: 2, angleOffset: 0, flipX: false, flipY: false },
   genos: { widthScale: 0.94, heightScale: 0.82, offsetX: 0, offsetY: 3, angleOffset: 0, flipX: false, flipY: false },
-  escanor: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: -3, angleOffset: 0, flipX: false, flipY: false },
+  escanor: { widthScale: 0.86, heightScale: 0.82, offsetX: -1, offsetY: -1, angleOffset: 0, flipX: false, flipY: false },
   john_wick: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 6, angleOffset: 0, flipX: false, flipY: false },
   gunslinger: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
   crazydave: { widthScale: 1.00, heightScale: 1.00, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false },
@@ -128,7 +128,8 @@ export const DEFAULT_SKIN_CUSTOMIZATIONS = SKIN_CUSTOMIZATIONS_DATABASE;
 
 export function getDatabaseDefault(key) {
   if (SKIN_CUSTOMIZATIONS_DATABASE[key]) return { ...SKIN_CUSTOMIZATIONS_DATABASE[key] };
-  return { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false };
+  const baseHandScale = (typeof CONFIG !== 'undefined' && CONFIG[key]?.handScale) ? CONFIG[key].handScale : (key === 'zeus' ? 0.75 : 1.0);
+  return { widthScale: 1.0, heightScale: 1.0, offsetX: 0, offsetY: 0, angleOffset: 0, flipX: false, flipY: false, handScale: baseHandScale };
 }
 
 export function getAllDatabaseDefaults() {
