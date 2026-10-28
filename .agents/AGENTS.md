@@ -358,6 +358,22 @@ Whenever creating, extracting, formatting, or rendering visual effects, sprite a
   - Scale character hair to `targetHairWidth = r * 2.80 - r * 3.10` and `targetHairHeight = r * 2.10 - r * 2.30`.
   - Set crown apex anchor to `drawY = -r * 1.30` to `-r * 1.45` so the hair frames the head seamlessly with full anime volume matching Toji, Gojo, and Makima.
 
+### 3.10 Mandatory Universal Character Black Outline Standard (Rule 32)
+- **Always Add Outer Black Outline**: Whenever creating, scaffolding, designing, or rendering any character or model skin, the agent **MUST ALWAYS** render a crisp, bold black manga ink outline (`#0E0F14` or `#000000`, 2.0px stroke) around the character's body circle and pixel hands:
+  ```javascript
+  // Layer 1.5: Mandatory Universal Character Black Outline Standard (Rule 32)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.lineWidth = 2.0;
+  ctx.strokeStyle = '#0E0F14';
+  ctx.stroke();
+  ctx.restore();
+  ```
+- **Arena Background Contrast Standard**: The canonical arena floor in Circle Mini-Battle is bright/white (`#FFFFFF` / `#F8FAFC`). Any fighter with fair skin, white helmets (e.g. Bomber Man), light/blonde hair, or bright clothing MUST have a crisp black outline so the character geometry never bleeds into or vanishes against the arena floor.
+- **Canonical Hand Outline**: Canonical default hands (`drawPixelHand`) MUST always use `outlineColor = '#0E0F14'` (or `#000000`) so fists remain sharply defined against the body.
+- **Reference Playbook & Skill**: Activate the dedicated skill `character-black-outline` (`.agents/skills/character-black-outline/SKILL.md`).
+
 ---
 
 ## 4. Systems Architecture (Weapon Studio, Tactical Force, Configs)

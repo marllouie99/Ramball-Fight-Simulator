@@ -846,6 +846,40 @@
         "knockback": 1,
         "cooldown": 1
       }
+    },
+    "bomberman": {
+      "name": "Bomber Man",
+      "archetype": "zoner",
+      "hp": 360,
+      "speed": 4.8,
+      "radius": 25,
+      "baseDamage": 28,
+      "baseCooldown": 24,
+      "themeColor": "#2563EB",
+      "keySkills": {
+        "bombUp": {
+          "initialMaxBombs": 1,
+          "maxBombsCap": 10,
+          "cooldown": 195
+        },
+        "fireUp": {
+          "initialFireLevel": 1,
+          "maxFireLevelCap": 10,
+          "baseBlastRadius": 65,
+          "blastRadiusPerLevel": 20,
+          "cooldown": 210
+        },
+        "bombKick": {
+          "canKickBombs": true,
+          "speed": 9.5,
+          "impactDamage": 12,
+          "cooldown": 150
+        },
+        "invincible": {
+          "duration": 1800,
+          "cooldown": 2400
+        }
+      }
     }
   }
 }

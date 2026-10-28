@@ -220,6 +220,24 @@ Whenever creating, extracting, formatting, or rendering visual effects, sprite a
 - **Calibrated Centroid Anchor for Origin Portals**:
   - When drawing origin portals, muzzle accelerator rings, or charging spheres at a fighter's hands `(0, 0)`, the draw origin MUST be anchored to the true visual centroid of the orb/swirl (`portalOriginX = orbCentroidX * scale`, `portalOriginY = portalDrawH / 2`), ensuring the circular geometry blooms symmetrically from the hands without flat rectangular clipping.
 
+## Mandatory Universal Character Black Outline Standard (Rule 32)
+
+Whenever creating, scaffolding, designing, or rendering any character or model skin:
+- **MANDATORY INSTRUCTION — ALWAYS ADD OUTER BLACK OUTLINE**: The agent **MUST ALWAYS** render a crisp, bold black manga ink outline (`#0E0F14` or `#000000`, 2.0px stroke) around the character's body circle and pixel hands:
+  ```javascript
+  // Layer 1.5: Mandatory Universal Character Black Outline Standard (Rule 32)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.lineWidth = 2.0;
+  ctx.strokeStyle = '#0E0F14';
+  ctx.stroke();
+  ctx.restore();
+  ```
+- **Arena Background Contrast & Anti-Blend Standard**: The canonical arena floor in Circle Mini-Battle is bright/white (`#FFFFFF` / `#F8FAFC`). Any fighter with fair skin, white helmets (e.g. Bomber Man), light/blonde hair, or bright clothing MUST have a crisp black outline so the character geometry never bleeds into or vanishes against the arena floor.
+- **Canonical Hand Outline**: Canonical default hands (`drawPixelHand`) MUST always use `outlineColor = '#0E0F14'` (or `#000000`) so fists remain sharply defined against the body.
+- **Reference Playbook & Skill**: Activate the dedicated skill `character-black-outline` (`.agents/skills/character-black-outline/SKILL.md`).
+
 ## Post-Change Suggestions
 
 This applies to any chat-based AI coding assistant working in this repository, regardless of IDE, extension, model, or provider, whenever these project instructions are loaded.

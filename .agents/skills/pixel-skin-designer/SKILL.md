@@ -154,3 +154,21 @@ Use this skill when designing or coding character skins, hair silhouettes, headw
    - Apply `state.skinCustomizations?.[characterId]` scaling and offsets.
    - Calibrate visible bounds to frame crown at `-1.15r` to `-1.30r`.
 
+## Phase 6: Mandatory Universal Character Black Outline Standard (Rule 32)
+Whenever creating, scaffolding, designing, or rendering any character skin, ALWAYS apply a crisp black manga ink outline around the body circle and pixel hands:
+1. **Body Circle Black Outline (`Layer 1.5`)**:
+   ```javascript
+   ctx.save();
+   ctx.beginPath();
+   ctx.arc(0, 0, r, 0, Math.PI * 2);
+   ctx.lineWidth = 2.0;
+   ctx.strokeStyle = '#0E0F14';
+   ctx.stroke();
+   ctx.restore();
+   ```
+2. **Canonical Pixel Hand Black Outlines (`Layer 2`)**:
+   - `drawPixelHand` MUST always receive `outlineColor = '#0E0F14'` so the hands maintain sharp manga ink borders against the torso.
+3. **Reference Playbook**:
+   - See dedicated skill `character-black-outline` (`.agents/skills/character-black-outline/SKILL.md`).
+
+

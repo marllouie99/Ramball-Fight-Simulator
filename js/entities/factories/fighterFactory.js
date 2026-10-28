@@ -69,9 +69,14 @@ import { ChosoFighter } from '../fighters/ChosoFighter.js?v=81';
 import { AshFighter } from '../fighters/AshFighter.js';
 import { ZombieFighter } from '../fighters/ZombieFighter.js';
 import { UnarmedFighter } from '../fighters/UnarmedFighter.js';
+import { BombermanFighter } from '../fighters/BombermanFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'unarmed':    UnarmedFighter,
+  'bomberman':  BombermanFighter,
+  'Bomberman':  BombermanFighter,
+  'BOMBERMAN':  BombermanFighter,
+  'bomber_man': BombermanFighter,
   'Unarmed':    UnarmedFighter,
   'UNARMED':    UnarmedFighter,
   'zombie':     ZombieFighter,

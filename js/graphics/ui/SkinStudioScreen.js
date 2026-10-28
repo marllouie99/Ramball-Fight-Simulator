@@ -13,7 +13,7 @@ import {
 } from '../../core/state.js';
 import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawChamferedRect } from './uiFramework.js';
-import { getFighterPreview } from './FighterPreviewCache.js';
+import { getFighterPreview, getFighterStickerPreview } from './FighterPreviewCache.js';
 import { drawIchigoSkin, _drawIchigoHair, _getIchigoHairImage } from '../fighters/ichigoSkin.js';
 import { drawGojoBody, _drawGojoHair, _getGojoHairImage } from '../fighters/gojoSkin.js';
 import { drawMakimaSkin, _drawMakimaHair, _getMakimaHairImage } from '../fighters/makimaSkin.js';
@@ -57,6 +57,7 @@ import { drawUryuSkin, _drawUryuHair, _getUryuHairImage, _drawUryuGlasses, _getU
 import { drawAlucardSkin, _drawAlucardHat, _getAlucardHatImage, _drawAlucardGlasses, _getAlucardGlassesImage } from '../fighters/gunSlingerSkin.js';
 import { drawGutsSkin, _drawGutsHelmet, _getGutsHelmetImage, _drawGutsHair, _getGutsHairImage } from '../fighters/gutsSkin.js';
 import { drawAshSkin, _drawAshHair, _getAshHairImage } from '../fighters/ashSkin.js';
+import { drawBombermanSkin, _drawBombermanHair, _getBombermanHairImage } from '../fighters/bombermanSkin.js';
 
 
 
@@ -141,7 +142,7 @@ export const SKIN_STUDIO_CATEGORIES = [
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
   { id: 'BERSERK', label: 'BERSERK', filter: (f) => f.key === 'guts' },
-  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu', 'guts'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'bomberman', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu', 'guts', 'ash'].includes(f.key) }
 ];
 
 
@@ -469,6 +470,23 @@ export const SKIN_STUDIO_FIGHTERS = [
     themeColor: '#F59E0B',
     forms: [
       { id: 'default', label: 'DEMOLITIONIST' }
+    ]
+  },
+  {
+    key: 'bomberman',
+    label: 'BOMBER MAN',
+    asset: 'Bomberman-hair.png',
+    assetDims: 'Procedural / PNG',
+    baseW: 2.90,
+    baseH: 2.20,
+    baseCrownY: -1.32,
+    visW: 300,
+    visH: 260,
+    centerX: 150,
+    topY: 20,
+    themeColor: '#2563EB',
+    forms: [
+      { id: 'default', label: 'MAZE BOMBER' }
     ]
   },
   {
@@ -1643,6 +1661,9 @@ export function drawSkinStudioScreen() {
       } else if (fDef.key === 'ash') {
         dummyFighter._isStudioDummy = true;
         drawAshSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'bomberman') {
+        dummyFighter._isStudioDummy = true;
+        drawBombermanSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -1715,6 +1736,8 @@ export function drawSkinStudioScreen() {
       }
     } else if (fDef.key === 'ash') {
       _drawAshHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'bomberman') {
+      _drawBombermanHair(ctx, baseRadius, isFacingLeft);
     }
 
     ctx.restore();
@@ -3440,10 +3463,22 @@ export function drawSkinStudioScreen() {
       ctx.stroke();
       ctx.clip();
 
-      const fIndex = FIGHTER_DEFS.findIndex(d => d.type === f.key);
-      const previewCanvas = (fIndex >= 0) ? getFighterPreview(fIndex) : null;
+      const cleanKey = (f.key || '').toLowerCase().replace(/_/g, '');
+      const fIndex = FIGHTER_DEFS.findIndex(d => {
+        if (!d) return false;
+        const cleanType = (d.type || '').toLowerCase().replace(/_/g, '');
+        const cleanName = (d.name || '').toLowerCase().replace(/_/g, '');
+        return cleanType === cleanKey || cleanName === cleanKey;
+      });
+      const previewCanvas = (fIndex >= 0) ? (getFighterStickerPreview(fIndex) || getFighterPreview(fIndex)) : null;
       if (previewCanvas) {
-        ctx.drawImage(previewCanvas, 0, 0, 128, 128, avatarX - avatarR, avatarY - avatarR, avatarR * 2, avatarR * 2);
+        const pW = previewCanvas.width || 256;
+        const pH = previewCanvas.height || 256;
+        const cropSize = Math.round(pW * 0.38); // ~96px centered on the fighter model
+        const sx = Math.round((pW - cropSize) / 2);
+        const sy = Math.round((pH - cropSize) / 2) - Math.round(pW * 0.02); // Optical centering for hair
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(previewCanvas, sx, sy, cropSize, cropSize, avatarX - avatarR, avatarY - avatarR, avatarR * 2, avatarR * 2);
       } else {
         ctx.fillStyle = f.themeColor;
         ctx.beginPath();

@@ -12019,6 +12019,255 @@ async function runInteractionTests() {
     }
   }
 
+  // 🧪 Test 102: Bomber Man — Tile-Centered Bomb Planting, Bomb Up (Max 10), Fire Up (Max 10), Kick (Traveling & Mid-Travel Explosion) & 30s Invincible Ultimate
+  {
+    console.log('🧪 Test 102: Bomber Man — Tile-Centered Bomb Planting, Bomb Up (Max 10), Fire Up (Max 10), Kick (Traveling & Mid-Travel Explosion) & 30s Invincible Ultimate...');
+    const BombermanClass = FIGHTER_CLASS_MAP['bomberman'];
+    const NormalClass = FIGHTER_CLASS_MAP['normal'];
+    const { getTileGridInfo } = await import('../js/systems/arenaTileSystem.js');
+
+    assert(typeof BombermanClass === 'function', 'BombermanFighter must be registered in FIGHTER_CLASS_MAP');
+
+    const arena = { x: 45, y: 240, width: 450, height: 450 };
+    state.arena = arena;
+    const grid = getTileGridInfo(arena); // 8x8 grid, cellW = 56.25, cellH = 56.25
+
+    const bomberman = new BombermanClass({ x: 118, y: 312, color: '#2563EB', controls: {} });
+    const enemy = new NormalClass({ x: 320, y: 312, color: '#EF4444', controls: {} });
+    state.fighters = [bomberman, enemy];
+    state.illusions = [];
+
+    // 1. Verify Tile-Centered Bomb Planting across arbitrary off-center coordinates
+    const testPositions = [
+      { x: 48, y: 245, expectedCol: 0, expectedRow: 0 },
+      { x: 120, y: 310, expectedCol: 1, expectedRow: 1 },
+      { x: 269, y: 464, expectedCol: 3, expectedRow: 3 },
+      { x: 490, y: 685, expectedCol: 7, expectedRow: 7 },
+    ];
+
+    bomberman.maxBombs = 10;
+    for (const pos of testPositions) {
+      bomberman.x = pos.x;
+      bomberman.y = pos.y;
+      const bomb = bomberman.plantBomb(arena, false);
+      assert(bomb !== null, `plantBomb must succeed at (${pos.x}, ${pos.y})`);
+      const expectedCenterX = arena.x + (pos.expectedCol + 0.5) * grid.cellW;
+      const expectedCenterY = arena.y + (pos.expectedRow + 0.5) * grid.cellH;
+      assert(bomb.col === pos.expectedCol && bomb.row === pos.expectedRow, `Bomb tile (${bomb.col},${bomb.row}) must match (${pos.expectedCol},${pos.expectedRow})`);
+      assert(Math.abs(bomb.x - expectedCenterX) < 1e-6, `Bomb x (${bomb.x}) must equal exact tile center (${expectedCenterX})`);
+      assert(Math.abs(bomb.y - expectedCenterY) < 1e-6, `Bomb y (${bomb.y}) must equal exact tile center (${expectedCenterY})`);
+    }
+    bomberman.activeBombs.length = 0;
+
+    // 2. Verify Passive: Bomb Up — 1st lay = 1 active bomb; when basic attack CD is up = 2 active bombs; next basic attack CD = 3 active bombs, up to Max. 10
+    const freshBomberman = new BombermanClass({ x: 118, y: 312, color: '#2563EB', controls: {} });
+    assert(freshBomberman.maxBombs === 1, `1st lay must start with maxBombs === 1 (got ${freshBomberman.maxBombs})`);
+    assert(freshBomberman.plantCooldownTimer === 0, 'Basic attack CD must start at 0 for the 1st lay');
+
+    // First lay: Bomberman lays 1 active bomb and cannot lay a 2nd yet; basic attack CD starts
+    const firstLayBomb = freshBomberman.plantBomb(arena, true);
+    assert(firstLayBomb !== null && freshBomberman.activeBombs.length === 1, 'On 1st lay, Bomberman must lay 1 active bomb');
+    assert(freshBomberman.plantBomb(arena, true) === null, 'On 1st lay, Bomberman cannot lay a 2nd active bomb before basic attack CD finishes');
+    assert(freshBomberman.plantCooldownTimer > 0, 'Basic attack CD must start after laying the 1st active bomb');
+
+    // Tick basic attack CD until it is up (#1) -> maxBombs must automatically increase to 2!
+    while (freshBomberman.plantCooldownTimer > 0) {
+      freshBomberman._tickBasicAttackAndPassiveBombUp();
+    }
+    assert(freshBomberman.maxBombs === 2, `When 1st basic attack CD is up, Bomberman must be able to lay 2 active bombs (got ${freshBomberman.maxBombs})`);
+    freshBomberman.activeBombs.length = 0;
+    assert(freshBomberman.plantBomb(arena, true) !== null, '2nd lay cycle: bomb 1 of 2');
+    assert(freshBomberman.plantBomb(arena, true) !== null, '2nd lay cycle: bomb 2 of 2');
+    assert(freshBomberman.activeBombs.length === 2, 'Bomberman must have 2 active bombs on the arena during 2nd lay cycle');
+    assert(freshBomberman.plantCooldownTimer > 0, 'Basic attack CD must start again after laying 2 active bombs');
+
+    // Tick basic attack CD until it is up (#2) -> maxBombs must automatically increase to 3!
+    while (freshBomberman.plantCooldownTimer > 0) {
+      freshBomberman._tickBasicAttackAndPassiveBombUp();
+    }
+    assert(freshBomberman.maxBombs === 3, `When 2nd basic attack CD is up, Bomberman must be able to lay 3 active bombs (got ${freshBomberman.maxBombs})`);
+    freshBomberman.activeBombs.length = 0;
+    assert(freshBomberman.plantBomb(arena, true) !== null, '3rd lay cycle: bomb 1 of 3');
+    assert(freshBomberman.plantBomb(arena, true) !== null, '3rd lay cycle: bomb 2 of 3');
+    assert(freshBomberman.plantBomb(arena, true) !== null, '3rd lay cycle: bomb 3 of 3');
+    assert(freshBomberman.activeBombs.length === 3, 'Bomberman must have 3 active bombs on the arena during 3rd lay cycle');
+
+    // Continue ticking basic attack CD cycles up to Max. 10 and verify cap at 10
+    for (let cycle = 0; cycle < 10; cycle++) {
+      freshBomberman.plantCooldownTimer = 1;
+      freshBomberman._waitingForPassiveBombUp = true;
+      freshBomberman._tickBasicAttackAndPassiveBombUp();
+    }
+    assert(freshBomberman.maxBombs === 10, `Passive Bomb Up must cap maxBombs at 10 (got ${freshBomberman.maxBombs})`);
+    bomberman.maxBombs = 10;
+
+    // 3. Verify Skill 2: Fire Up scales from 1 to Max. 10 and caps at 10
+    bomberman.fireLevel = 1;
+    const lv1Blast = bomberman.getCurrentBlastRadius();
+    for (let i = 0; i < 12; i++) {
+      bomberman.castFireUp(arena);
+    }
+    assert(bomberman.fireLevel === 10, `Fire Up must cap fireLevel at 10 (got ${bomberman.fireLevel})`);
+    assert(bomberman.getCurrentBlastRadius() > lv1Blast, 'Lv.10 Fire Up blast radius must exceed Lv.1 blast radius');
+
+    // 4. Verify Skill 3: Kick allows Bomberman to kick his bombs so they travel across the arena and can explode mid-traveling
+    assert(bomberman.canKickBombs === true, 'Bomberman must have canKickBombs === true');
+    bomberman.x = arena.x + 1.5 * grid.cellW;
+    bomberman.y = arena.y + 2.5 * grid.cellH;
+    enemy.x = arena.x + 4.5 * grid.cellW;
+    enemy.y = arena.y + 2.5 * grid.cellH;
+    const kickedBomb = bomberman.plantBomb(arena, false);
+    assert(kickedBomb !== null && kickedBomb.isTraveling === false, 'Newly planted bomb must start centered on its tile block');
+    const startBombX = kickedBomb.x;
+
+    // Kick the bomb toward the enemy along +X
+    const kickedOk = bomberman.castKick(enemy, arena);
+    assert(kickedOk === true && kickedBomb.isTraveling === true, 'castKick() must set bomb.isTraveling = true');
+    assert(kickedBomb.vx > 0, `Kicked bomb must travel toward enemy along +X (vx=${kickedBomb.vx})`);
+    assert(kickedBomb.kickHitPauseTimer > 0, 'Kicked bomb must enter kick hit pause');
+    assert(bomberman.kickHitPauseTimer > 0, 'Bomberman must enter kick hit pause');
+
+    // Advance past kick hit pause (5 frames) and verify the bomb moves across coordinates
+    kickedBomb.fuseTimer = 8;
+    for (let f = 0; f < 6; f++) {
+      bomberman._updateBombs(arena);
+    }
+    assert(kickedBomb.x > startBombX, `Kicked bomb must travel across arena floor (${startBombX} -> ${kickedBomb.x})`);
+    assert(kickedBomb.isTraveling === true, 'Kicked bomb must remain in traveling state');
+
+    // Position enemy flanking the traveling bomb path (within 245px blast radius but outside 52px direct collision) and let fuse expire mid-traveling (2 more ticks)
+    enemy.x = kickedBomb.x + 20;
+    enemy.y = kickedBomb.y + 60;
+    const enemyHpBefore = enemy.hp;
+    kickedBomb.fuseTimer = 2;
+    bomberman._updateBombs(arena); // fuseTimer = 1, still traveling
+    const midTravelXBeforeDetonation = kickedBomb.x;
+    bomberman._updateBombs(arena); // fuseTimer = 0 -> explodes mid-traveling!
+    const lastExp = bomberman.activeVisualExplosions[bomberman.activeVisualExplosions.length - 1];
+    assert(bomberman.activeBombs.length === 0, 'Kicked bomb must detonate when fuseTimer reaches 0 mid-travel');
+    assert(bomberman.activeVisualExplosions.length >= 1, 'Mid-travel detonation must spawn a 4-way cross explosion');
+    assert(lastExp.x > midTravelXBeforeDetonation, 'Mid-travel explosion must occur at the bomb traveling position, not its original plant tile');
+    assert(enemy.hp < enemyHpBefore, `Mid-traveling bomb explosion must damage enemy in blast path (${enemyHpBefore} -> ${enemy.hp})`);
+    assert(enemy.hitFlashTimer === 8, 'Enemy hit by bomb explosion must receive global hitFlashTimer = 8');
+    assert(state.sparkEffects.some(p => p.type === 'animeImpactFrame'), 'Bomb explosion hit must spawn global 12-frame animeImpactFrame hit effect');
+
+    // 4b. Verify Proximity Gate (Strictly Prohibits Long-Distance Kicks):
+    // Bomberman must be very close to the bomb (within touching/adjacent range) to kick it!
+    const distantBomb = bomberman.plantBomb(arena, true);
+    distantBomb.x = arena.x + 380;
+    distantBomb.y = arena.y + 380;
+    distantBomb.fuseTimer = 80;
+    bomberman.x = arena.x + 80;
+    bomberman.y = arena.y + 80;
+    assert(bomberman.kickBomb(distantBomb) === false, 'kickBomb must return false when Bomberman is far from the bomb');
+    assert(distantBomb.isTraveling === false, 'Distant bomb must not begin traveling');
+    assert(bomberman.castKick(enemy, arena) === false, 'castKick must return false when no planted bomb is within kicking range');
+    bomberman.activeBombs = bomberman.activeBombs.filter(b => b !== distantBomb);
+
+    // 4c. Verify Strict 4-Way Orthogonal Cardinal Directions (UP, DOWN, LEFT, RIGHT Only):
+    // Diagonal or arbitrary float angles MUST snap strictly to cardinal directions with one component locked to 0!
+    const cardinalBomb = bomberman.plantBomb(arena, true);
+    cardinalBomb.x = arena.x + 150;
+    cardinalBomb.y = arena.y + 150;
+    bomberman.x = cardinalBomb.x - 30; // Close range to left (within 64px)
+    bomberman.y = cardinalBomb.y;
+
+    // Test Right snap (angle ~ 0.4 rad = 23 deg)
+    bomberman.kickBomb(cardinalBomb, 0.4);
+    assert(cardinalBomb.isTraveling === true, 'Nearby bomb should successfully kick');
+    assert(cardinalBomb.vx > 0 && cardinalBomb.vy === 0, `Kicking at 0.4 rad must snap strictly to RIGHT (vx=${cardinalBomb.vx}, vy=${cardinalBomb.vy})`);
+
+    // Test Down snap (angle ~ 1.2 rad = 69 deg)
+    cardinalBomb.isTraveling = false;
+    bomberman.kickBomb(cardinalBomb, 1.2);
+    assert(cardinalBomb.vx === 0 && cardinalBomb.vy > 0, `Kicking at 1.2 rad must snap strictly to DOWN (vx=${cardinalBomb.vx}, vy=${cardinalBomb.vy})`);
+
+    // Test Left snap (angle ~ 2.6 rad = 149 deg)
+    cardinalBomb.isTraveling = false;
+    bomberman.kickBomb(cardinalBomb, 2.6);
+    assert(cardinalBomb.vx < 0 && cardinalBomb.vy === 0, `Kicking at 2.6 rad must snap strictly to LEFT (vx=${cardinalBomb.vx}, vy=${cardinalBomb.vy})`);
+
+    // Test Up snap (angle ~ -1.8 rad = -103 deg)
+    cardinalBomb.isTraveling = false;
+    bomberman.kickBomb(cardinalBomb, -1.8);
+    assert(cardinalBomb.vx === 0 && cardinalBomb.vy < 0, `Kicking at -1.8 rad must snap strictly to UP (vx=${cardinalBomb.vx}, vy=${cardinalBomb.vy})`);
+    bomberman.activeBombs = bomberman.activeBombs.filter(b => b !== cardinalBomb);
+
+    // 4d. Verify Wall Impact Stop & Strict No-Rebounce Guarantee:
+    // When a kicked bomb reaches the arena boundary, it MUST stop sliding and NEVER rebounce!
+    const wallBomb = bomberman.plantBomb(arena, true);
+    wallBomb.x = arena.x + arena.width - wallBomb.r - 5;
+    wallBomb.y = arena.y + 200;
+    wallBomb.fuseTimer = 80;
+    bomberman.x = wallBomb.x - bomberman.r - 5; // Close proximity
+    bomberman.y = wallBomb.y;
+    bomberman.kickBomb(wallBomb, 0); // Kick toward right wall (+X)
+    assert(wallBomb.isTraveling === true && wallBomb.vx > 0, 'Wall bomb must begin traveling toward right wall');
+    for (let f = 0; f < 8; f++) {
+      bomberman._updateBombs(arena); // Advances past kickHitPause and moves into or past maxX boundary
+    }
+    assert(wallBomb.isTraveling === false, 'Kicked bomb MUST stop traveling upon hitting arena wall');
+    assert(wallBomb.vx === 0 && wallBomb.vy === 0, `Kicked bomb velocity MUST be zeroed on wall hit (vx=${wallBomb.vx}, vy=${wallBomb.vy}) — STRICTLY NO REBOUNCE`);
+    assert(wallBomb.x <= arena.x + arena.width - wallBomb.r, 'Kicked bomb must remain clamped inside arena wall boundary');
+
+    // 4e. Verify Direct Enemy Collision Stop & Anti-Following / Anti-Bulldozing Guarantee:
+    // When a kicked bomb directly strikes an enemy, it deals impact damage and STOPS immediately
+    const directHitBomb = bomberman.plantBomb(arena, true);
+    directHitBomb.x = arena.x + 100;
+    directHitBomb.y = arena.y + 200;
+    directHitBomb.fuseTimer = 80;
+    bomberman.x = directHitBomb.x - bomberman.r - 5; // Close proximity
+    bomberman.y = directHitBomb.y;
+    enemy.x = directHitBomb.x + 30; // Within minDist (22 + 25 = 47px)
+    enemy.y = directHitBomb.y;
+    const hpBeforeDirectHit = enemy.hp;
+    bomberman.kickBomb(directHitBomb, 0); // Kick straight at enemy
+    for (let f = 0; f < 8; f++) {
+      bomberman._updateBombs(arena);
+    }
+    assert(enemy.hp < hpBeforeDirectHit, `Direct collision must deal kinetic impact damage (${hpBeforeDirectHit} -> ${enemy.hp})`);
+    assert(directHitBomb.isTraveling === false, 'Kicked bomb MUST STOP traveling on direct enemy collision');
+    assert(directHitBomb.vx === 0 && directHitBomb.vy === 0, 'Kicked bomb velocity MUST be 0 on enemy collision (must NOT bulldozingly push or follow enemy)');
+    bomberman.activeBombs.length = 0; // Clean up bombs before next step
+
+    // 5. Verify Skill 4 (Ultimate): Invincible grants 30 seconds (1800 frames) of incoming attack immunity
+    bomberman.castInvincible();
+    assert(bomberman.invincibleTimer === 1800, `Invincible Ultimate must last 1800 frames / 30 seconds (got ${bomberman.invincibleTimer})`);
+    const bmHpBefore = bomberman.hp;
+    const damaged = bomberman.takeDamage(95, enemy);
+    assert(damaged === false && bomberman.hp === bmHpBefore, 'Bomberman must take 0 damage from enemy attacks while Invincible is active');
+    bomberman.applyHitStun(30);
+    assert((bomberman.hitStunTimer || 0) === 0, 'Bomberman must be immune to hitStun while Invincible is active');
+
+    // 6. Verify Canvas 2D transform stack balance during rendering (with traveling bomb + explosion + Invincible aura + 12-frame kick spark)
+    const renderBomb = bomberman.plantBomb(arena, true);
+    bomberman.x = renderBomb.x - 20;
+    bomberman.y = renderBomb.y;
+    bomberman.kickBomb(renderBomb, enemy);
+    assert(bomberman.activeVisualEffects.some(v => v.type === 'kickSpark'), 'kickBomb must spawn a 12-frame kickSpark visual effect');
+    mockCtx.resetStackDepth();
+    bomberman.draw(mockCtx, enemy);
+    assert(mockCtx.getStackDepth() === 0, `Bomberman.draw() must maintain 0 Canvas 2D stack depth (got ${mockCtx.getStackDepth()})`);
+
+    // 7. Verify Bomberman Dedicated Authentic SFX Wiring (Bomb Explodes, Place Bomb, Walking 1)
+    const cfg = CONFIG.bomberman;
+    assert(cfg.sounds.plantBomb === 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav', 'plantBomb SFX must map to Place Bomb.wav');
+    assert(cfg.sounds.bombExplode === 'Assets/Sound Effects/BombermanSFX/Bomb Explodes.wav', 'bombExplode SFX must map to Bomb Explodes.wav');
+    assert(cfg.sounds.walk === 'Assets/Sound Effects/BombermanSFX/Walking 1.wav', 'walk SFX must map to Walking 1.wav');
+    assert(typeof cfg.soundVolumes.walk === 'number' && cfg.soundVolumes.walk > 0, 'walk sound volume must be defined');
+
+    // Verify walking step timer behavior
+    bomberman.vx = 2.5;
+    bomberman.vy = 0;
+    bomberman.hp = bomberman.maxHp;
+    bomberman.kickHitPauseTimer = 0;
+    bomberman.walkSoundTimer = 0;
+    bomberman.update(enemy, 0, arena);
+    assert(bomberman.walkSoundTimer === 50, `Active walking must trigger walking step timer (got ${bomberman.walkSoundTimer})`);
+
+    console.log('      ✅ Bomber Man (tile-centered bombs, Bomb Up Max 10, Fire Up Max 10, Kick traveling & mid-travel explosion, 30s Invincible, dedicated SFX & stack balance) verified.');
+  }
+
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }
 

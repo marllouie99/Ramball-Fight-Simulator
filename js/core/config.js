@@ -68,6 +68,7 @@ import { rubyConfig } from '../configs/characters/rubyConfig.js';
 import { musashiConfig } from '../configs/characters/musashiConfig.js';
 import { hydraConfig } from '../configs/characters/hydraConfig.js';
 import { unarmedConfig } from '../configs/characters/unarmedConfig.js';
+import { bombermanConfig } from '../configs/characters/bombermanConfig.js';
 import { DEFAULT_GRADE } from '../configs/gradeConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
@@ -82,6 +83,9 @@ export const CONFIG = {
   saitama: saitamaConfig,
   unarmed: unarmedConfig,
   Unarmed: unarmedConfig,
+  bomberman: bombermanConfig,
+  Bomberman: bombermanConfig,
+  bomber_man: bombermanConfig,
   genos: genosConfig,
   mahito: mahitoConfig,
   nanami: nanamiConfig,
@@ -1853,6 +1857,31 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: unarmedConfig.ability || 'Momentum & Terminal Velocity',
     desc: unarmedConfig.desc || 'The infamous weaponless sphere from Earclacks Ball Fights. Relies on pure kinetic energy, building exponential momentum and collision damage with every wall ricochet to obliterate opponents at terminal velocity.',
+  },
+  {
+    id: 65,
+    name: bombermanConfig.name || 'Bomber Man',
+    grade: bombermanConfig.grade ?? DEFAULT_GRADE,
+    displayName: bombermanConfig.displayName || bombermanConfig.name || 'Bomber Man',
+    category: 'Gaming',
+    color: bombermanConfig.color || '#2563EB',
+    themeColor: bombermanConfig.themeColor || '#2563EB',
+    secondaryColor: bombermanConfig.secondaryColor || '#EC4899',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.1,
+    radius: bombermanConfig.radius || bombermanConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'bomberman',
+    hp: bombermanConfig.hp || 360,
+    damage: bombermanConfig.baseBombDamage || 28,
+    cooldown: bombermanConfig.plantCooldown || 24,
+    moveSpeed: bombermanConfig.moveSpeed || bombermanConfig.speed || 4.8,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Bomb Up, Fire Up, Kick & Invincible',
+    desc: bombermanConfig.description || 'Tactical grid trap-zoner who plants tile-centered time-fuse bombs across the 8x8 arena grid, upgrades Bomb Up (Max 10) & Fire Up (Max 10), kicks his bombs across the arena where they can explode mid-traveling, and activates a 30-second Invincible Ultimate.',
   }
 ];
 

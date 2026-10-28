@@ -93,22 +93,25 @@ export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0B
 
       if (isBorder) {
         ctx.fillStyle = outlineColor || '#000000';
-      } else if (ry < -radius * 0.35 && rx > -radius * 0.3) {
-        ctx.fillStyle = '#FFFFFF';
-        ctx.globalAlpha = 0.45;
         ctx.fillRect(px, py, P, P);
-        ctx.globalAlpha = 1.0;
-        continue;
-      } else if (ry > radius * 0.35 || rx < -radius * 0.45) {
-        ctx.fillStyle = '#000000';
-        ctx.globalAlpha = 0.30;
-        ctx.fillRect(px, py, P, P);
-        ctx.globalAlpha = 1.0;
-        continue;
       } else {
+        // 1. Solid opaque base hand color (guarantees ZERO transparency / no holes)
         ctx.fillStyle = color || '#FFE0BD';
+        ctx.fillRect(px, py, P, P);
+
+        // 2. Overlay subtle highlight / shadow tints ON TOP of solid base color
+        if (ry < -radius * 0.35 && rx > -radius * 0.3) {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.globalAlpha = 0.45;
+          ctx.fillRect(px, py, P, P);
+          ctx.globalAlpha = 1.0;
+        } else if (ry > radius * 0.35 || rx < -radius * 0.45) {
+          ctx.fillStyle = '#000000';
+          ctx.globalAlpha = 0.30;
+          ctx.fillRect(px, py, P, P);
+          ctx.globalAlpha = 1.0;
+        }
       }
-      ctx.fillRect(px, py, P, P);
     }
   }
   ctx.restore();

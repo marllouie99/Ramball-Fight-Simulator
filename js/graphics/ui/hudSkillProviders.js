@@ -2966,6 +2966,65 @@ export const HUD_SKILL_PROVIDERS = {
   doppleganger(f) {
     return [];
   },
+
+  bomberman(f) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.bomberman) ? CONFIG.bomberman : {};
+    const themeColor = f.color || cfg.themeColor || '#2563EB';
+    const skills = [];
+
+    const maxBombsCap = f.maxBombsCap || cfg.maxBombsCap || 10;
+    const curMaxBombs = f.maxBombs || 1;
+    const bombUpPct = Math.max(0, Math.min(100, (curMaxBombs / maxBombsCap) * 100));
+    skills.push({
+      id: 'bomb_up',
+      pct: bombUpPct,
+      ready: curMaxBombs >= maxBombsCap,
+      color: themeColor,
+      label: `PASSIVE: BOMB UP (${curMaxBombs}/${maxBombsCap})`,
+    });
+
+    const maxFireCap = f.maxFireLevelCap || cfg.maxFireLevelCap || 10;
+    const curFireLv = f.fireLevel || 1;
+    const fireUpPct = Math.max(0, Math.min(100, (curFireLv / maxFireCap) * 100));
+    skills.push({
+      id: 'fire_up',
+      pct: fireUpPct,
+      ready: curFireLv >= maxFireCap,
+      color: themeColor,
+      label: `FIRE UP (LV.${curFireLv}/${maxFireCap})`,
+    });
+
+    const kickCd = f.bombKickCooldown || cfg.bombKickCooldown || 150;
+    const kickPct = Math.max(0, Math.min(100, (1 - (f.bombKickTimer || 0) / kickCd) * 100));
+    const hasTravelingBomb = Array.isArray(f.activeBombs) && f.activeBombs.some((b) => b && b.isTraveling);
+    skills.push({
+      id: 'bomb_kick',
+      pct: hasTravelingBomb ? 100 : kickPct,
+      ready: hasTravelingBomb || kickPct >= 99,
+      color: themeColor,
+      label: hasTravelingBomb ? 'KICK (TRAVELING!)' : 'KICK',
+    });
+
+    const invDur = f.invincibleDuration || cfg.invincibleDuration || 1800;
+    const invCd = f.invincibleCooldown || cfg.invincibleCooldown || 2400;
+    const isInvincible = (f.invincibleTimer || 0) > 0;
+    const invSecLeft = Math.ceil((f.invincibleTimer || 0) / 60);
+    const invPct = isInvincible
+      ? Math.max(0, Math.min(100, (f.invincibleTimer / invDur) * 100))
+      : Math.max(0, Math.min(100, (1 - (f.invincibleCooldownTimer || 0) / invCd) * 100));
+    skills.push({
+      id: 'invincible',
+      pct: invPct,
+      ready: isInvincible || invPct >= 99,
+      color: themeColor,
+      label: isInvincible ? `INVINCIBLE (${invSecLeft}S)` : 'INVINCIBLE (30S)',
+      isSignature: true,
+      signature: true,
+      isUltimate: true,
+    });
+
+    return skills;
+  },
 };
 
 /**
@@ -3093,6 +3152,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     guts: ['calamity', 'calamitycleave', 'calamity_cleave', 'CALAMITY', 'CALAMITY CLEAVE', 'berserker', 'berserker_armor', 'ARMOR', 'BERSERKER', 'CANNON'],
     choso: ['laser_matrix', 'convergence', 'blood manipulation: convergence', 'laser', 'matrix', 'laser matrix', 'piercing_blood', 'PIERCING BLOOD'],
     ash: ['10m_volt_ultimate', '10,000,000 VOLT'],
+    bomberman: ['invincible', 'INVINCIBLE'],
     eye_of_cthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM'],
     eyeofcthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM']
   };

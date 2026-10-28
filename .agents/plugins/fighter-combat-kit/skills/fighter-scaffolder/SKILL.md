@@ -114,3 +114,19 @@ super.update(opponent, ownerIndex, arena);
 - **Layered Fleshy Slap Audio**: Stack `attack_fleshhit` (1.0) + blade slice (0.90) + finisher concussive punch (0.95) on impact.
 - **Reference Playbook**: See dedicated skill `melee-attack-animator` (`.agents/skills/melee-attack-animator/SKILL.md`).
 
+### 11. Mandatory Universal Character Black Outline Standard (Rule 32)
+- **Always Add Outer Black Outline**: Whenever scaffolding or creating a new fighter character skin, ALWAYS render a crisp, bold black manga ink outline (`#0E0F14` or `#000000`, 2.0px stroke) around the character's body circle and pixel hands:
+  ```javascript
+  // Layer 1.5: Mandatory Universal Character Black Outline Standard (Rule 32)
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.lineWidth = 2.0;
+  ctx.strokeStyle = '#0E0F14';
+  ctx.stroke();
+  ctx.restore();
+  ```
+- **Pixel Hand Outlines**: Canonical hands (`drawPixelHand`) MUST always use `outlineColor = '#0E0F14'` so fists remain sharply defined against the body.
+- **Reference Playbook**: See dedicated skill `character-black-outline` (`.agents/skills/character-black-outline/SKILL.md`).
+
+

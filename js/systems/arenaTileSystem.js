@@ -211,6 +211,8 @@ export function getTileGridInfo(arena) {
   const cellH = arena.height / rows;
 
   return {
+    arenaX: arena.x,
+    arenaY: arena.y,
     cols,
     rows,
     cellW,
