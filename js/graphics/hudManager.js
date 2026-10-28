@@ -321,6 +321,15 @@ let _cachedBottomRight = null;
 
 export function drawHUD() {
   _isHudAlreadyCleared = false;
+
+  // Mirror the preferred HUD layout onto <body> so CSS can switch the bar skin between the
+  // classic light outlined bars and the arcade duel dark comic pills (see style.css "CLASSIC HUD SKIN").
+  if (typeof document !== 'undefined' && document.body && document.body.classList) {
+    const wantClassicSkin = CONFIG.hudLayoutStyle === 'classic';
+    if (document.body.classList.contains('hud-layout-classic') !== wantClassicSkin) {
+      document.body.classList.toggle('hud-layout-classic', wantClassicSkin);
+    }
+  }
   const { ctx, canvas, fighters, scores, roundNum, mode, gameState, matchEndTimer, roundEndTimer, roundWinner, ffaMatchComplete } = state;
 
 
@@ -391,7 +400,10 @@ export function drawHUD() {
   const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
   const isTeamMode = is2v2Mode || (mainFighters && mainFighters.length > 2 && !isFfaMode && !isBossBattleMode && !isRegular1v2);
   const isSoloBoss = isBossBattleMode && Boolean(state.bossBattleNoTeammate) && (mainFighters && mainFighters.length === 2);
-  const isDuelTopHud = (!isBossBattleMode || isSoloBoss) && !isTeamMode && !isFfaMode && (mainFighters.length === 2 || isRegular1v2);
+  // Preferred HUD layout: 'classic' keeps the match names on the canvas above the arena wall and the
+  // HP bar inside each bottom card, instead of the top duel cards owning names + health.
+  const isClassicHudLayout = CONFIG.hudLayoutStyle === 'classic';
+  const isDuelTopHud = !isClassicHudLayout && (!isBossBattleMode || isSoloBoss) && !isTeamMode && !isFfaMode && (mainFighters.length === 2 || isRegular1v2);
   const isSideHud1v1 = isHorizontal && !isDuelTopHud && (is1v1Mode || isStandOffMode || isTLFSMode || isFfaMode || (mainFighters && mainFighters.length <= 4 && !is2v2Mode && !is1v2Mode));
 
   // FOC & Tactical modes HUD visibility
@@ -437,6 +449,8 @@ export function drawHUD() {
 
     containerBottom.classList.toggle('ffa-hud', isFfaMode && !isTactical);
     containerBottom.classList.toggle('tactical-hud', isTactical);
+    containerBottom.classList.toggle('classic-hud', isClassicHudLayout);
+    containerBottom.classList.toggle('arcade-hud', !isClassicHudLayout);
     const isCameraTracking = (!state.camera || state.camera.mode === 'dynamic');
     if (isSideHud1v1 || (isHorizontal && isDuelTopHud)) {
       containerBottom.style.visibility = 'hidden';
@@ -2330,6 +2344,7 @@ function updateHealthHud() {
   // OPTIMIZATION: Auto-rebuild if HUD display mode, Arena Theme, or Camera Mode changed.
   const currentCameraMode = state.camera ? state.camera.mode : 'dynamic';
   const hudModeChanged = state._lastHudShowFighterDescription !== CONFIG.hudShowFighterDescription ||
+                         state._lastHudLayoutStyle !== CONFIG.hudLayoutStyle ||
                          state._lastDarkModeShowHudSkillBars !== CONFIG.darkModeShowHudSkillBars ||
                          state._lastDarkModeShowHudStats !== CONFIG.darkModeShowHudStats ||
                          state._lastHudHideAll !== CONFIG.hudHideAll ||
@@ -2341,6 +2356,7 @@ function updateHealthHud() {
   const themeChanged = state._lastArenaTheme !== (state.arenaTheme || 'light');
   const cameraModeChanged = state._lastCameraMode !== currentCameraMode;
   state._lastHudShowFighterDescription = CONFIG.hudShowFighterDescription;
+  state._lastHudLayoutStyle = CONFIG.hudLayoutStyle;
   state._lastDarkModeShowHudSkillBars = CONFIG.darkModeShowHudSkillBars;
   state._lastDarkModeShowHudStats = CONFIG.darkModeShowHudStats;
   state._lastHudHideAll = CONFIG.hudHideAll;
@@ -3670,12 +3686,18 @@ function updateHealthHud() {
       if (splitIdx !== -1) {
         const cleanLabel = label.replace(/<\/?b>/g, '');
         const cleanVal = displayVal.replace(/<\/?b>/g, '').trim();
+        if (CONFIG.hudLayoutStyle === 'classic') {
+          return `<div class="${spanClass}"><span class="hud-stat-label" style="font-weight: normal;">${cleanLabel}</span> <span class="hud-stat-val" style="font-size: ${valFontSize.toFixed(1)}px; font-weight: normal;">${cleanVal}</span></div>`;
+        }
         const upperLabel = cleanLabel.toUpperCase();
         const upperVal = cleanVal.toUpperCase();
         const isCyanAccent = upperLabel.includes('INFINITY') || upperVal.includes('ACTIVE') || upperLabel.includes('BARRIER') || upperLabel.includes('SHIELD');
         const isGoldAccent = upperLabel.includes('CRIT') || upperLabel.includes('DMG') || upperLabel.includes('ATK') || upperLabel.includes('KILL');
         const accentClass = isCyanAccent ? ' hud-chip-cyan' : (isGoldAccent ? ' hud-chip-gold' : '');
         return `<div class="${spanClass}${accentClass}"><span class="hud-stat-label">${cleanLabel}</span> <span class="hud-stat-val">${cleanVal}</span></div>`;
+      }
+      if (CONFIG.hudLayoutStyle === 'classic') {
+        return `<div class="${spanClass}" style="font-size: ${valFontSize.toFixed(1)}px; font-weight: normal;">${line.replace(/<\/?b>/g, '')}</div>`;
       }
       return `<div class="${spanClass}"><span class="hud-stat-val">${line.replace(/<\/?b>/g, '')}</span></div>`;
     }).join('');
@@ -3788,7 +3810,9 @@ function updateHealthHud() {
         const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol) : '';
         const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
         const skillsGridStyle = isSingleCol ? 'grid-template-columns: 1fr;' : '';
-        const infoGridStyle = `grid-template-columns: 1fr;`;
+        const infoGridStyle = CONFIG.hudLayoutStyle === 'classic'
+          ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; ${isSingleCol ? 'grid-template-columns: 1fr;' : ''}`
+          : `grid-template-columns: 1fr;`;
 
         const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta');
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
@@ -3895,7 +3919,9 @@ function updateHealthHud() {
       const barShakeStyle = barShakeTimer > 0 ? `transform: translateX(${barShakeAmount}px);` : '';
 
       const skillsGridStyle = singleColumn ? 'grid-template-columns: 1fr;' : '';
-      const infoGridStyle = `grid-template-columns: 1fr;`;
+      const infoGridStyle = CONFIG.hudLayoutStyle === 'classic'
+        ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; ${singleColumn ? 'grid-template-columns: 1fr;' : ''}`
+        : `grid-template-columns: 1fr;`;
 
       const hideHb = Boolean(CONFIG.hudHideHealthBars || CONFIG.hudHideAll || hideHealthBar);
 
@@ -4313,8 +4339,14 @@ function updateHealthHud() {
       });
     } else {
       // 1v1 / FFA Individual Mode
-      const isDuelTopHud = (!isBossBattle || isSoloBoss) && !isTeamHudMode && !isFfa && (mainFighters.length === 2 || isRegular1v2);
+      const isClassicHudLayout = CONFIG.hudLayoutStyle === 'classic';
+      const isDuelTopHud = !isClassicHudLayout && (!isBossBattle || isSoloBoss) && !isTeamHudMode && !isFfa && (mainFighters.length === 2 || isRegular1v2);
       const isSideHud = isH && !isDuelTopHud && (is1v1 || isStandOff || isTLFS || isFfa || mainFighters.length <= 4);
+
+      if (containerBottom && containerBottom.classList && typeof containerBottom.classList.toggle === 'function') {
+        containerBottom.classList.toggle('classic-hud', isClassicHudLayout);
+        containerBottom.classList.toggle('arcade-hud', !isClassicHudLayout);
+      }
 
       if (isDuelTopHud && _cachedTopContainer) {
         const showSkills = isH && !CONFIG.hudHideAll && !CONFIG.hudHideSkillBars;
@@ -4366,6 +4398,11 @@ function updateHealthHud() {
 
         _cachedTopTimerEl = _cachedTopContainer.querySelector('.hud-top-timer-text');
         _lastTopTimerText = _cachedTopTimerEl ? _cachedTopTimerEl.textContent : '';
+      } else if (!isBossBattle && _cachedTopContainer) {
+        _cachedTopContainer.style.display = 'none';
+        _cachedTopContainer.style.visibility = 'hidden';
+        _cachedTopContainer.style.opacity = '0';
+        _cachedTopContainer.innerHTML = '';
       }
 
       fighters.forEach((fighter, index) => {
@@ -4410,6 +4447,9 @@ function updateHealthHud() {
         }
         const playerSlotClass = (isRegular1v2 ? (index === 0 ? 'hud-player-p1' : 'hud-player-p2') : ((index % 2 === 0) ? 'hud-player-p1' : 'hud-player-p2'));
         extraClassStr = `${extraClassStr} ${playerSlotClass}`.trim();
+        if (isClassicHudLayout) {
+          extraClassStr = `${extraClassStr} classic-card`.trim();
+        }
         const is1v1Mode = (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.HORIZONTAL_1V1 || mode === '1v1 Widescreen Duel');
         const maxBulletsCount = (is1v1Mode && !isSideHud) ? 2 : 0;
 

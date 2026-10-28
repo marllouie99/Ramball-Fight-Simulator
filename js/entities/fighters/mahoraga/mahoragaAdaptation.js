@@ -148,6 +148,25 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     isAdaptedAbility = true;
   }
 
+  // ── 25% Damage Taken (75% Reduction) when Adapted to Lapse Blue ──
+  const isBlueHit = Boolean(
+    opts.isBlueDPS || 
+    (opts.projectile && (opts.projectile.isGojoBlue || opts.projectile.behaviorType === 'gojo_blue' || opts.projectile.skillShotId === 'blue')) || 
+    opts.skillShotId === 'blue'
+  );
+  const isBlueAdapted = Boolean(
+    (fighter.gojoAdapted && fighter.gojoAdapted.blue) ||
+    fighter.gojoBlueDragImmune ||
+    (fighter.adaptedGojo && fighter.adaptedGojo.blue) ||
+    (fighter.adaptedSkills && fighter.adaptedSkills['blue']) ||
+    (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#00FFFF'))
+  );
+
+  if (isBlueHit && isBlueAdapted) {
+    finalAmount = amount * adaptedMult; // 25% damage taken (75% reduction) when adapted to Blue!
+    isAdaptedAbility = true;
+  }
+
   // ── 25% Damage Taken (75% Reduction) when Adapted to Hollow Purple ──
   const isPurpleHit = Boolean(
     opts.isPurpleDPS || 

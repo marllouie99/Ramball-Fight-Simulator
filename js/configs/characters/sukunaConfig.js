@@ -69,7 +69,7 @@ export const sukunaConfig = {
     teleportSpeed: 15,                // Teleport movement slide speed
 
     // Teleport Dodge / Evade Mechanic
-    enableTeleportDodge: true,        // Master toggle for Teleport Dodge / Evade Mechanic
+    enableTeleportDodge: 0,        // Master toggle for Teleport Dodge / Evade Mechanic
     teleportDodgeChance: 0.10,               // 10% chance to teleport dodge incoming attacks
     teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
     teleportDodgeDistance: 85,               // Distance teleported on dodge
@@ -92,7 +92,7 @@ export const sukunaConfig = {
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     enableFurnace: true,              // Master toggle for Furnace (Divine Flame / Fuga)
-    divineFlameCooldown: 200,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
+    divineFlameCooldown: 2000,      // Cooldown between Furnace uses outside Domain (~11.6 seconds at 60fps)
     divineFlameChannelTurnRate: 0.045, // Smooth aim rotation turn rate while channeling Furnace / Fuga
     divineFlameCorridorHalfWidth: 45, // Straight corridor half-width for cardinal alignment detection (Up, Down, Left, Straight/Right)
     divineFlameDetectionAngle: Math.PI * 0.08, // Maximum angular deviation from cardinal angle (~14.4 deg)
@@ -135,7 +135,7 @@ export const sukunaConfig = {
     // ── OPTIONAL SKILL: Ten Shadows — Summon Mahoraga (Divine General Minion) ──
     // Sukuna summons the Divine General Mahoraga as a temporary allied minion.
     // Toggle `enableMahoragaSummon` off to disable the skill entirely (HUD card disappears too).
-    enableMahoragaSummon: true,       // MASTER TOGGLE for the Mahoraga summon skill
+    enableMahoragaSummon: 0,       // MASTER TOGGLE for the Mahoraga summon skill
     mahoragaSummonCooldown: 500,     // Frames before Mahoraga can be re-summoned after being slain
     mahoragaSummonInitialCooldown: 15, // Immediate opening summon (0.25s after match start) so it triggers every match
     // NOTE: the summon has NO duration — Mahoraga stays in the arena until he is slain or Sukuna dies.

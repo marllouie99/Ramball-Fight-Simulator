@@ -13,7 +13,7 @@ import {
   drawWhiteRailgun, drawWhiteChargeEffect, drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee,
   drawGrayShield, drawGraySword, drawGrayBrokenSword, drawBerserkerDualAxes,
   drawCronosCrescentBlade, drawSpikeWeapon, drawSingleSpike, drawGunSlingerDualRevolver,
-  drawEngineer, drawEngineerShotgun, drawEngineerWrench, drawTurret, drawDispenser, drawZeusWeapon, drawInvertedSpear, drawSplitSoulKatana,
+  drawEngineer, drawEngineerShotgun, drawEngineerWrench, drawTurret, drawDispenser, drawZeusWeapon, drawInvertedSpear, drawSplitSoulKatana, drawTojiPistol,
   drawMahoragaSword, drawMahoraga3DWheel, drawMahoragaChestNecklace, drawMahoragaLeftPunch,
   drawMahitoClawWeapon
 } from '../weaponVisuals.js';
@@ -642,9 +642,9 @@ function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, curre
   if (def.type === 'toji') {
     state.tojiWeaponIndex = state.tojiWeaponIndex || 0;
     buttons.push({
-      text: '🗡️ INVERTED SPEAR',
+      text: '🔫 TACTICAL PISTOL',
       active: state.tojiWeaponIndex === 0,
-      width: 150,
+      width: 155,
       action: () => {
         state.tojiWeaponIndex = 0;
         if (state.previewFighter) state.previewFighter.tojiWeaponIndex = 0;
@@ -652,12 +652,22 @@ function drawMultiWeaponSwitcher(ctx, def, stageX, stageY, stageW, stageH, curre
       }
     });
     buttons.push({
-      text: '⚔️ SPLIT SOUL KATANA',
+      text: '🗡️ INVERTED SPEAR',
       active: state.tojiWeaponIndex === 1,
-      width: 165,
+      width: 150,
       action: () => {
         state.tojiWeaponIndex = 1;
         if (state.previewFighter) state.previewFighter.tojiWeaponIndex = 1;
+        try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
+      }
+    });
+    buttons.push({
+      text: '⚔️ SPLIT SOUL KATANA',
+      active: state.tojiWeaponIndex === 2,
+      width: 165,
+      action: () => {
+        state.tojiWeaponIndex = 2;
+        if (state.previewFighter) state.previewFighter.tojiWeaponIndex = 2;
         try { audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85); } catch (e) {}
       }
     });
@@ -2177,6 +2187,8 @@ function drawWeaponPreview(ctx, type, color) {
       case 'toji': {
         const activeIndex = (state.tojiWeaponIndex || 0);
         if (activeIndex === 0) {
+          drawTojiPistol(ctx, 0, 0, gunAngle, r);
+        } else if (activeIndex === 1) {
           drawInvertedSpear(ctx, 0, 0, gunAngle, r);
         } else {
           drawSplitSoulKatana(ctx, 0, 0, gunAngle, r);

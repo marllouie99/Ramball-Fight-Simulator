@@ -980,8 +980,10 @@ export function drawArena() {
       ctx.restore();
     } else {
       renderShiroChessboardFloor(null, arena);
-      if (hasActiveDomain && !state.pixiApp) {
-        // In native Canvas 2D mode, render active domain background under camera transform
+      if (hasActiveDomain && !state.pixiApp && state.disableDimEffects) {
+        // In native Canvas 2D mode with dim effects disabled, render active domain background here.
+        // When dim effects are enabled, renderSystem.js repaints the active domain background ON TOP of the dim wash,
+        // so skipping it here eliminates a duplicate full-screen domain background render pass every frame.
         const activeDomainFighter = state.fighters?.find(f => f && (f.domainActive || f.stolenDomainActive || f._mahitoDomainActive || (f.characterId === 'cj' && (f.isBaguvixActive || f.isGodModeActive))) && typeof f.drawDomainBackground === 'function');
         if (activeDomainFighter) {
           ctx.save();
@@ -1526,8 +1528,10 @@ export function drawArenaMatchNames(ctx, alreadyInCameraSpace = false) {
   const isDuel1v1 = (mainFighters.length === 2 && !is2v2 && !is4v4 && !is1v2);
 
   // In Boss Battle and 1v1 Duel modes, fighter names and healthbars are rendered in DOM (#hudTopContainer).
-  // Skip canvas names to prevent duplicate clashing behind the Top HUD.
-  if (is1v2 || isDuel1v1) {
+  // Skip canvas names to prevent duplicate clashing behind the Top HUD — except when the player's preferred
+  // HUD layout is 'classic', which uses this canvas name strip above the arena wall plus HP inside the cards.
+  const isClassicHudLayout = CONFIG.hudLayoutStyle === 'classic';
+  if (is1v2 || (isDuel1v1 && !isClassicHudLayout)) {
     ctx.restore();
     return;
   }

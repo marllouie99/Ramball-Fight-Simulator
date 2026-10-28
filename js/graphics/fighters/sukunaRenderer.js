@@ -1008,21 +1008,27 @@ export class SukunaRenderer {
   }
 
   // Helper method to render the Malevolent Shrine structure (Using authentic pixel-art model from Assets/model/sukuna/sukuna-shrine.png)
-  static _drawShrineBody(ctx, fighter) {
+  static _drawShrineBody(ctx, fighter, skipGlow = false) {
     const drawW = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineWidth) || 380;
     const glowRadius = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.shrineGlowRadius) || 210;
 
-    // 1. Ambient crimson glow behind shrine
-    ctx.save();
-    const bgGlow = ctx.createRadialGradient(0, -65, 18, 0, -65, glowRadius);
-    bgGlow.addColorStop(0, 'rgba(255, 30, 0, 0.55)');
-    bgGlow.addColorStop(0.4, 'rgba(160, 0, 0, 0.30)');
-    bgGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = bgGlow;
-    ctx.beginPath();
-    ctx.arc(0, -65, glowRadius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+    // 1. Ambient crimson glow behind shrine (cached radial gradient)
+    if (!skipGlow) {
+      ctx.save();
+      if (!SukunaRenderer._cachedShrineBgGlow || SukunaRenderer._cachedGlowRadius !== glowRadius) {
+        SukunaRenderer._cachedGlowRadius = glowRadius;
+        const bgGlow = ctx.createRadialGradient(0, -65, 18, 0, -65, glowRadius);
+        bgGlow.addColorStop(0, 'rgba(255, 30, 0, 0.55)');
+        bgGlow.addColorStop(0.4, 'rgba(160, 0, 0, 0.30)');
+        bgGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        SukunaRenderer._cachedShrineBgGlow = bgGlow;
+      }
+      ctx.fillStyle = SukunaRenderer._cachedShrineBgGlow;
+      ctx.beginPath();
+      ctx.arc(0, -65, glowRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
 
     const shrineImg = _getSukunaShrineImage();
     if (shrineImg && shrineImg.complete && shrineImg.naturalWidth > 0) {

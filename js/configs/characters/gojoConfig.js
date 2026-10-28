@@ -68,7 +68,7 @@ export const gojoConfig = {
   blueHandScale: 1.5,       // Explicit scale multiplier for Blue orb on Gojo's hands (increased visual presence)
   bluePullForce: 0.1,       // Pull strength of Blue
   blueDPS: 10,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
-  blueDPSInterval: 10,      // Frames between DPS ticks (~6 ticks/sec)
+  blueDPSInterval: 12,      // Frames between DPS ticks (~5 ticks/sec, smooth non-spammed cadence)
   blueParalyzeDuration: 15,  // Duration in frames of Paralyze debuff applied while caught in Blue's gravitational field
   blueWallLingerDuration: 50, // Frames (~1.5s) Blue orb stays pinned on the wall after colliding, pulling & grinding enemies
   modeSwitchBreatherDuration: 45, // Breather pause (frames) when Gojo switches to Ranged/Blue mode (~0.75s)

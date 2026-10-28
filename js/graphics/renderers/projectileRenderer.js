@@ -19,6 +19,7 @@ import { drawMahoragaThrow } from '../weapons/mahoragaWeaponGraphics.js';
 import { drawGetsugaSlash, drawCeroBeam } from '../weapons/ichigoWeaponGraphics.js';
 import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
+import { drawTojiBullet } from '../weapons/tojiWeaponGraphics.js';
 import { drawCjUziBullet, drawCjMinigunBullet } from '../weapons/cjWeaponGraphics.js';
 import { drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet } from '../weapons/crazyDaveWeaponGraphics.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -530,6 +531,12 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     // John Wick rifle bullet visual - supersonic 5.56 green-tip
     if (p.visual === 'johnWickRifleBullet') {
       drawJohnWickRifleBullet(ctx, p);
+      return;
+    }
+
+    // Toji Tactical Pistol bullet visual - supersonic 9mm ballistic round
+    if (p.visual === 'tojiBullet') {
+      drawTojiBullet(ctx, p);
       return;
     }
 

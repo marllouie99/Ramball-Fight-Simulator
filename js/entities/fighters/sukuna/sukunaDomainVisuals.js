@@ -82,43 +82,43 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   ctx.fillStyle = fighter._cachedSkyGrad;
   ctx.fillRect(0, 0, screenW, Math.max(0, waterLineY));
 
-  // Dramatic volumetric crimson storm clouds in upper sky
+  // Dramatic volumetric crimson storm clouds in upper sky (batched fills)
   if (!isLowQuality && waterLineY > 20) {
     ctx.save();
-    // Layer 1: Large dark black cloud masses
     const cloudCount = isMultiDomain ? 4 : 8;
+    // Layer 1: Large dark black cloud masses
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.38)';
+    ctx.beginPath();
     for (let c = 0; c < cloudCount; c++) {
       const ccx = (sx - 550 + (c * 155) + Math.sin(time * 0.0006 + c * 0.8) * 25);
       const ccy = (waterLineY * (0.30 + (c % 3) * 0.12)) + Math.sin(time * 0.001 + c * 1.3) * 10;
       const rx = 160 + (c % 4) * 35;
       const ry = 40 + (c % 3) * 18;
-      const baseAlpha = (0.35 + (c % 3) * 0.08);
-      ctx.fillStyle = `rgba(0, 0, 0, ${baseAlpha.toFixed(2)})`;
-      ctx.beginPath();
       ctx.ellipse(ccx, ccy, rx, ry, 0, 0, Math.PI * 2);
-      ctx.fill();
     }
-    // Layer 2: Vivid crimson-red cloud rim highlights (brighter than before)
+    ctx.fill();
+
+    // Layer 2: Vivid crimson-red cloud rim highlights
+    ctx.fillStyle = 'rgba(160, 10, 25, 0.14)';
+    ctx.beginPath();
     for (let c = 0; c < cloudCount; c++) {
       const ccx = (sx - 500 + (c * 155) + Math.sin(time * 0.0006 + c * 0.8) * 25);
       const ccy = (waterLineY * (0.35 + (c % 3) * 0.10)) + Math.sin(time * 0.001 + c * 1.3) * 10;
       const rx = 120 + (c % 3) * 30;
       const ry = 25 + (c % 2) * 12;
-      const rimAlpha = (0.12 + (c % 2) * 0.06);
-      ctx.fillStyle = `rgba(160, 10, 25, ${rimAlpha.toFixed(2)})`;
-      ctx.beginPath();
       ctx.ellipse(ccx, ccy, rx, ry, 0, 0, Math.PI * 2);
-      ctx.fill();
     }
+    ctx.fill();
+
     // Layer 3: Hot crimson inner glow on key clouds
+    ctx.fillStyle = 'rgba(200, 15, 30, 0.08)';
+    ctx.beginPath();
     for (let c = 0; c < cloudCount; c += 2) {
       const ccx = (sx - 480 + (c * 155) + Math.sin(time * 0.0006 + c * 0.8) * 25);
       const ccy = (waterLineY * 0.42) + Math.sin(time * 0.001 + c * 1.3) * 10;
-      ctx.fillStyle = 'rgba(200, 15, 30, 0.08)';
-      ctx.beginPath();
       ctx.ellipse(ccx, ccy, 90, 20, 0, 0, Math.PI * 2);
-      ctx.fill();
     }
+    ctx.fill();
     ctx.restore();
   }
 
@@ -126,84 +126,98 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   ctx.fillRect(0, Math.max(0, waterLineY), screenW, Math.max(0, screenH - waterLineY));
   ctx.restore();
 
-  // ── 2. VIVID GLOWING CYAN LIGHT PILLARS (BRIGHT AGAINST DARK WATER) ──
+  // ── 2. VIVID GLOWING CYAN LIGHT PILLARS (BRIGHT AGAINST DARK WATER — CACHED GRADIENTS) ──
   const pillarOffsets = isLowQuality ? [-350, 350] : [-480, -240, 240, 480];
   const pillarW = isLowQuality ? 100 : 120;
   const halfPW = pillarW / 2;
   const pillarWaterTop = Math.max(0, waterLineY);
   const pillarWaterH = Math.max(0, screenH - pillarWaterTop);
 
-  for (let i = 0; i < pillarOffsets.length; i++) {
-    const colX = sx + pillarOffsets[i];
-    if (colX + halfPW < 0 || colX - halfPW > screenW) continue;
+  if (!fighter._cachedPillars || fighter._cachedPillarsSx !== sx || fighter._cachedPillarsW !== pillarW || fighter._cachedPillarsLow !== isLowQuality) {
+    fighter._cachedPillarsSx = sx;
+    fighter._cachedPillarsW = pillarW;
+    fighter._cachedPillarsLow = isLowQuality;
+    fighter._cachedPillars = pillarOffsets.map(offset => {
+      const colX = sx + offset;
+      const outerW = pillarW * 1.8;
+      const outerHalf = outerW / 2;
+      const outerGrad = ctx.createLinearGradient(colX - outerHalf, 0, colX + outerHalf, 0);
+      outerGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
+      outerGrad.addColorStop(0.35, 'rgba(0, 180, 220, 0.04)');
+      outerGrad.addColorStop(0.50, 'rgba(0, 229, 255, 0.10)');
+      outerGrad.addColorStop(0.65, 'rgba(0, 180, 220, 0.04)');
+      outerGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
 
-    ctx.save();
-    // Wider outer glow halo (faint cyan atmospheric bloom)
-    const outerW = pillarW * 1.8;
-    const outerHalf = outerW / 2;
-    const outerGrad = ctx.createLinearGradient(colX - outerHalf, 0, colX + outerHalf, 0);
-    outerGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
-    outerGrad.addColorStop(0.35, 'rgba(0, 180, 220, 0.04)');
-    outerGrad.addColorStop(0.50, 'rgba(0, 229, 255, 0.10)');
-    outerGrad.addColorStop(0.65, 'rgba(0, 180, 220, 0.04)');
-    outerGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
-    ctx.fillStyle = outerGrad;
-    ctx.fillRect(colX - outerHalf, pillarWaterTop, outerW, pillarWaterH);
+      const colGrad = ctx.createLinearGradient(colX - halfPW, 0, colX + halfPW, 0);
+      colGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
+      colGrad.addColorStop(0.25, 'rgba(0, 180, 210, 0.12)');
+      colGrad.addColorStop(0.42, 'rgba(0, 229, 255, 0.32)');
+      colGrad.addColorStop(0.50, 'rgba(60, 240, 255, 0.42)'); // Bright vivid cyan core
+      colGrad.addColorStop(0.58, 'rgba(0, 229, 255, 0.32)');
+      colGrad.addColorStop(0.75, 'rgba(0, 180, 210, 0.12)');
+      colGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
 
-    // Bright inner pillar core (vivid cyan — stands out against dark water)
-    const colGrad = ctx.createLinearGradient(colX - halfPW, 0, colX + halfPW, 0);
-    colGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
-    colGrad.addColorStop(0.25, 'rgba(0, 180, 210, 0.12)');
-    colGrad.addColorStop(0.42, 'rgba(0, 229, 255, 0.32)');
-    colGrad.addColorStop(0.50, 'rgba(60, 240, 255, 0.42)'); // Bright vivid cyan core
-    colGrad.addColorStop(0.58, 'rgba(0, 229, 255, 0.32)');
-    colGrad.addColorStop(0.75, 'rgba(0, 180, 210, 0.12)');
-    colGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
-
-    ctx.fillStyle = colGrad;
-    ctx.fillRect(colX - halfPW, pillarWaterTop, pillarW, pillarWaterH);
-    ctx.restore();
+      return { colX, outerW, outerHalf, outerGrad, colGrad };
+    });
   }
 
-  // ── 3. WATER SURFACE HORIZON GLOW ──
+  for (let i = 0; i < fighter._cachedPillars.length; i++) {
+    const p = fighter._cachedPillars[i];
+    if (p.colX + halfPW < 0 || p.colX - halfPW > screenW) continue;
+    ctx.fillStyle = p.outerGrad;
+    ctx.fillRect(p.colX - p.outerHalf, pillarWaterTop, p.outerW, pillarWaterH);
+    ctx.fillStyle = p.colGrad;
+    ctx.fillRect(p.colX - halfPW, pillarWaterTop, pillarW, pillarWaterH);
+  }
+
+  // ── 3. WATER SURFACE HORIZON GLOW (CACHED GRADIENT) ──
   ctx.save();
   const mistH = 25;
-  const mistGrad = ctx.createLinearGradient(0, waterLineY - mistH, 0, waterLineY + mistH);
-  mistGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
-  mistGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.14)');
-  mistGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
-  ctx.fillStyle = mistGrad;
+  if (!fighter._cachedMistGrad || fighter._cachedMistY !== waterLineY) {
+    fighter._cachedMistY = waterLineY;
+    fighter._cachedMistGrad = ctx.createLinearGradient(0, waterLineY - mistH, 0, waterLineY + mistH);
+    fighter._cachedMistGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0)');
+    fighter._cachedMistGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.14)');
+    fighter._cachedMistGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0)');
+  }
+  ctx.fillStyle = fighter._cachedMistGrad;
   ctx.fillRect(0, waterLineY - mistH, screenW, mistH * 2);
   ctx.restore();
 
-  // ── 4. DARK VIGNETTE OVERLAY ON WATER (darkens edges, brightens pillars by contrast) ──
+  // ── 4. DARK VIGNETTE OVERLAY ON WATER (CACHED RADIAL GRADIENT) ──
   if (!isLowQuality) {
     ctx.save();
     const vigCx = sx;
     const vigCy = (waterLineY + screenH) / 2;
     const vigR = Math.max(screenW, screenH) * 0.7;
-    const vigGrad = ctx.createRadialGradient(vigCx, vigCy, vigR * 0.15, vigCx, vigCy, vigR);
-    vigGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-    vigGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.15)');
-    vigGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.40)');
-    ctx.fillStyle = vigGrad;
+    if (!fighter._cachedWaterVigGrad || fighter._cachedVigCx !== vigCx || fighter._cachedVigCy !== vigCy || fighter._cachedVigR !== vigR) {
+      fighter._cachedVigCx = vigCx;
+      fighter._cachedVigCy = vigCy;
+      fighter._cachedVigR = vigR;
+      fighter._cachedWaterVigGrad = ctx.createRadialGradient(vigCx, vigCy, vigR * 0.15, vigCx, vigCy, vigR);
+      fighter._cachedWaterVigGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
+      fighter._cachedWaterVigGrad.addColorStop(0.6, 'rgba(0, 0, 0, 0.15)');
+      fighter._cachedWaterVigGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.40)');
+    }
+    ctx.fillStyle = fighter._cachedWaterVigGrad;
     ctx.fillRect(0, Math.max(0, waterLineY), screenW, Math.max(0, screenH - waterLineY));
     ctx.restore();
   }
 
-  // ── 5. FLOATING BIOLUMINESCENT AQUATIC MOTES / PARTICLES ──
+  // ── 5. FLOATING BIOLUMINESCENT AQUATIC MOTES / PARTICLES (BATCHED PATH) ──
   if (!isLowQuality) {
     const moteCount = isMultiDomain ? 6 : 12;
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.28)';
+    ctx.beginPath();
     for (let m = 0; m < moteCount; m++) {
       const seedX = (sx - 500 + (m * 83) % 1000);
       const seedY = waterLineY + 30 + ((m * 67 + time * 0.03) % Math.max(100, screenH - waterLineY));
       const moteR = 1.0 + (m % 3) * 0.5;
-      const moteAlpha = 0.25 + (m % 4) * 0.08;
-      ctx.fillStyle = `rgba(0, 229, 255, ${moteAlpha.toFixed(2)})`;
-      ctx.beginPath();
-      ctx.arc(seedX + Math.sin(time * 0.002 + m) * 12, seedY, moteR, 0, Math.PI * 2);
-      ctx.fill();
+      const mx = seedX + Math.sin(time * 0.002 + m) * 12;
+      ctx.moveTo(mx + moteR, seedY);
+      ctx.arc(mx, seedY, moteR, 0, Math.PI * 2);
     }
+    ctx.fill();
   }
 
   // ── DOMAIN CLASH: Cyan/crimson water ripples radiating toward opponent domain ──
@@ -288,7 +302,7 @@ export function renderSukunaDomainForeground(fighter, ctx) {
     ctx.scale(1, -0.85); // 85% natural perspective reflection
     ctx.translate(0, -localSkullBaseY);
     ctx.globalAlpha = 0.38; // Clean translucent water reflection
-    fighter._drawShrineBody(ctx);
+    fighter._drawShrineBody(ctx, true);
     ctx.restore();
 
     ctx.restore();
@@ -297,7 +311,7 @@ export function renderSukunaDomainForeground(fighter, ctx) {
   // ── 2. REAL SHRINE STRUCTURE (Above Water Level) ──
   ctx.save();
   ctx.translate(sx, sy + shrineYOffset);
-  fighter._drawShrineBody(ctx);
+  fighter._drawShrineBody(ctx, false);
   ctx.restore();
 
   // ── DOMAIN CLASH: Crimson energy border on Sukuna's domain edge ──
@@ -580,6 +594,11 @@ function _getPixelArcadeBuffer(w, h, scale = 2.5) {
   return { canvas: _pixelArcadeCanvas, ctx: _pixelArcadeCtx, lowW, lowH, scale };
 }
 
+// Pre-warm buffer eagerly on startup to eliminate first-frame allocation latency
+if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
+  try { _getPixelArcadeBuffer(450, 450); } catch (e) {}
+}
+
 /**
  * Render all active domain slash cut lines, clipped to arena bounds.
  * Uses the Low-Res Nearest-Neighbor Arcade Buffer technique (locked 60 FPS).
@@ -698,8 +717,16 @@ export function renderSukunaDomainSlashLines(fighter, ctx) {
 }
 
 /**
- * Clear all domain slash lines (called when domain ends).
+ * Clear all domain slash lines and cached gradients (called when domain ends).
+ * @param {object} [fighter] - Optional Sukuna fighter instance to clear gradient caches
  */
-export function clearDomainSlashLines() {
+export function clearDomainSlashLines(fighter) {
   _domainSlashLines.length = 0;
+  if (fighter) {
+    fighter._cachedSkyGrad = null;
+    fighter._cachedWaterGrad = null;
+    fighter._cachedPillars = null;
+    fighter._cachedMistGrad = null;
+    fighter._cachedWaterVigGrad = null;
+  }
 }

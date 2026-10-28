@@ -531,7 +531,8 @@ export function updateHybridEnvironment() {
   
   // Performance: Throttle & stagger domain texture updates to eliminate CPU-to-GPU VRAM bandwidth stalls (especially during Multi-Domain clashes)
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-  const baseInterval = isLowQuality ? 18 : 6;
+  const isPerformanceConstrained = isLowQuality || (typeof state !== 'undefined' && state.fps && state.fps < 55);
+  const baseInterval = isPerformanceConstrained ? 18 : 6;
   const updateInterval = isMultiDomain ? baseInterval * 2 : baseInterval;
 
   const updateGojo = (domainUpdateTick % updateInterval === 0);

@@ -1,5 +1,6 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { drawPixelHand } from '../renderers/fighterRenderer.js';
 
 /**
  * Visual & Animation Speed Configuration for Toji's Weapons.
@@ -149,7 +150,7 @@ export function drawPhysicsChain(ctx, chainNodes) {
 /**
  * Draws Toji's Inverted Spear of Heaven (Accurate to anime reference in Authentic Pixel Art Style).
  */
-export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null, handColor = '#242722', baseAngle = null) {
+export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null, handColor = '#242722', baseAngle = null, drawHand = true) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(cx, cy);
@@ -231,7 +232,7 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
   }
 
   // 3.5. Single hand gripping the dagger handle (Pixel Art assassin grip)
-  drawTojiPixelWeaponGrip(ctx, 22, 1, getHandSize(6.0), handColor || '#E8BD9B');
+  if (drawHand) drawTojiPixelWeaponGrip(ctx, 22, 1, getHandSize(6.0), handColor || '#E8BD9B');
 
   // 4. Stepped Pixel-Art Golden Collar / Habaki (X=34 to X=38)
   ctx.fillStyle = '#0E0F14';
@@ -627,7 +628,296 @@ export function drawRestedInvertedSpearAtHip(ctx, cx, cy, angle, r = 25, chainNo
     ctx.scale(0.60, 0.60);
   }
 
-  drawInvertedSpear(ctx, 0, 0, 0, 0, chainNodes, handColor);
+  drawInvertedSpear(ctx, 0, 0, 0, 0, chainNodes, handColor, null, false);
+
+  ctx.restore();
+}
+
+/**
+ * Gradient caches for Toji bullet rendering (Rule 11 compliant: zero shadowBlur).
+ */
+let _tojiBulletTrailGrad = null;
+let _tojiBulletCoreGrad = null;
+
+function _getTojiBulletTrailGrad(ctx) {
+  const g = ctx.createLinearGradient(-26, 0, 0, 0);
+  g.addColorStop(0, 'rgba(168, 85, 247, 0)');
+  g.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+  g.addColorStop(1.0, 'rgba(254, 240, 138, 0.9)');
+  return g;
+}
+
+function _getTojiBulletCoreGrad(ctx) {
+  const g = ctx.createLinearGradient(-7, 0, 7, 0);
+  g.addColorStop(0, '#78350F');    // Dark copper base
+  g.addColorStop(0.3, '#D97706');  // Amber copper jacket
+  g.addColorStop(0.7, '#F59E0B');  // Polished brass core
+  g.addColorStop(1.0, '#FEF08A');  // Hot pointed tip
+  return g;
+}
+
+let _tojiPistolGunImage = null;
+let _tojiPistolGunLoading = false;
+
+/**
+ * Lazy-loads and caches Alucard's authentic pixel-art pistol sprite for Toji's tactical sidearm.
+ */
+export function _getTojiPistolGunImage() {
+  if (_tojiPistolGunImage && _tojiPistolGunImage.complete && _tojiPistolGunImage.naturalWidth > 0) {
+    return _tojiPistolGunImage;
+  }
+  if (!_tojiPistolGunLoading && typeof Image !== 'undefined') {
+    _tojiPistolGunLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _tojiPistolGunImage = img;
+      _tojiPistolGunLoading = false;
+    };
+    img.onerror = () => {
+      _tojiPistolGunLoading = false;
+    };
+    img.src = 'Assets/model/alucard/Alucard-pistol-gun.png?v=1';
+    _tojiPistolGunImage = img;
+  }
+  return _tojiPistolGunImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getTojiPistolGunImage();
+}
+
+/**
+ * Draws Toji's Tactical Handgun / Pistol using Alucard's authentic pixel-art firearm sprite
+ * (Assets/model/alucard/Alucard-pistol-gun.png) with complete procedural discrete fallback.
+ * 
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} cx - Character center X
+ * @param {number} cy - Character center Y
+ * @param {number} angle - Aim / firing angle
+ * @param {number} r - Body radius (standard 25)
+ * @param {string} handColor - Hand skin tone
+ * @param {number|null} baseAngle - Base facing angle for scale flipping
+ * @param {Object} opts - Optional animation states { recoilTimer, flashTimer }
+ */
+export function drawTojiPistol(ctx, cx, cy, angle, r = 25, handColor = '#E8BD9B', baseAngle = null, opts = {}) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+
+  const flipAngle = baseAngle !== null ? baseAngle : angle;
+  const normAngle = Math.atan2(Math.sin(flipAngle), Math.cos(flipAngle));
+  if (Math.abs(normAngle) > Math.PI / 2) {
+    ctx.scale(1, -1);
+  }
+
+  // Position gun directly at Canonical Right Hand Anchor (Rule 20 Standard)
+  const handAnchorX = r * 0.82;
+  const handAnchorY = r * 0.38;
+  ctx.translate(handAnchorX, handAnchorY);
+
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.toji) ? state.weaponCustomizations.toji : null;
+  const customScale = custom ? (custom.scale ?? 1.0) : 1.0;
+  const customLen = custom ? (custom.lengthScale ?? 1.0) : 1.0;
+  const customWid = custom ? (custom.widthScale ?? 1.0) : 1.0;
+  if (custom) {
+    ctx.translate(custom.offsetX || 0, custom.offsetY || 0);
+    ctx.rotate(custom.angleOffset || 0);
+    ctx.scale(customScale * customLen, customScale * customWid);
+  }
+
+  const recoilTimer = opts.recoilTimer || 0;
+  const recoilProgress = recoilTimer > 0 ? recoilTimer / 8 : 0;
+  const recoilKickX = -recoilProgress * 4.5; // Physical kickback
+  const muzzleRecoilAngle = -recoilProgress * 0.08; // Muzzle rise
+
+  ctx.save();
+  ctx.translate(recoilKickX, 0);
+  ctx.rotate(muzzleRecoilAngle);
+
+  // Alucard Pistol Sprite Dimensions: 703 x 355
+  // Grip Anchor: X=554, Y=220; Muzzle Tip: X=41, Y=129
+  const s = 0.105;
+  const gunImg = _getTojiPistolGunImage();
+
+  if (gunImg && gunImg.complete && gunImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.scale(-1, 1);
+    ctx.drawImage(gunImg, -554 * s, -220 * s, 703 * s, 355 * s);
+    ctx.restore();
+  } else {
+    // ── Procedural Fallback (headless test harness / pre-load state) ──
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const P_FALL = 1.35;
+    const rect = (gx, gy, gw, gh, color) => {
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(gx * P_FALL), Math.round(gy * P_FALL), Math.round(gw * P_FALL), Math.round(gh * P_FALL));
+    };
+
+    // 1. Grip
+    rect(-10, 2, 9, 16, '#0E0F14');
+    rect(-9, 3, 7, 14, '#1A1C22');
+    rect(-8, 4, 5, 12, '#2C303B');
+
+    // 2. Trigger Guard
+    rect(-4, 4, 2, 7, '#0E0F14');
+    rect(-2, 10, 7, 2, '#0E0F14');
+    rect(4, 4, 2, 7, '#0E0F14');
+    rect(-1, 5, 2, 4, '#CBD5E1');
+
+    // 3. Frame & Slide
+    rect(-11, -7, 48, 11, '#0E0F14');
+    rect(-10, -6, 46, 9, '#1E293B');
+    rect(-9, -6, 45, 2, '#475569');
+    rect(-9, 1, 45, 2, '#0F172A');
+    for (let sg = -7; sg <= -1; sg += 2) rect(sg, -5, 1, 6, '#0F172A');
+    rect(33, -7, 3, 3, '#0E0F14');
+    rect(36, -4, 2, 5, '#0E0F14');
+
+    ctx.restore();
+  }
+
+  ctx.restore(); // End recoil transform
+
+  // 5. Toji's Canonical Hand holding the grip directly at (0, 0) (Rule 20 compliant)
+  // Scaled proportionally to body radius (4.8px radius = ~10px diameter at base r=25)
+  const handRadius = Math.max(3.5, (r / 25) * 4.8);
+  drawPixelHand(ctx, 0, 0, handRadius, handColor || '#E8BD9B', '#0E0F14');
+
+  // 6. Muzzle Flash (When firing)
+  const flashTimer = opts.flashTimer || 0;
+  if (flashTimer > 0) {
+    const flashScale = Math.min(1.0, flashTimer / 3) * 1.4;
+    const fx = 513 * s + recoilKickX;
+    const fy = (129 - 220) * s;
+
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.scale(flashScale, flashScale);
+
+    // Sharp anime 4-point yellow starburst (Rule 11 compliant: zero shadowBlur)
+    ctx.fillStyle = '#F59E0B';
+    ctx.beginPath();
+    ctx.moveTo(0, -4);
+    ctx.lineTo(6, -1.5);
+    ctx.lineTo(20, 0);
+    ctx.lineTo(6, 1.5);
+    ctx.lineTo(0, 4);
+    ctx.lineTo(-3, 1.5);
+    ctx.lineTo(-5, 0);
+    ctx.lineTo(-3, -1.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Cross spikes
+    ctx.beginPath();
+    ctx.moveTo(4, -11);
+    ctx.lineTo(5, -2.5);
+    ctx.lineTo(11, 0);
+    ctx.lineTo(5, 2.5);
+    ctx.lineTo(4, 11);
+    ctx.lineTo(1.5, 2.5);
+    ctx.lineTo(-1.5, 0);
+    ctx.lineTo(1.5, -2.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Inner bright white-yellow core
+    ctx.fillStyle = '#FEF08A';
+    ctx.beginPath();
+    ctx.arc(4, 0, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(2, -1.5, 4, 3);
+
+    // Ejected discrete spark pixels
+    ctx.fillStyle = '#FDE047';
+    ctx.fillRect(22, -5, 2.5, 2.5);
+    ctx.fillRect(19, 6, 2.5, 2.5);
+    ctx.fillRect(14, -8, 2, 2);
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws Toji's high-velocity ballistic bullet projectile (Non-Cursed Tactical 9mm).
+ * 
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Object} p - Projectile instance
+ */
+export function drawTojiBullet(ctx, p) {
+  const vx = (p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined) ? p._resumeVx : (p.vx || 0);
+  const vy = (p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined) ? p._resumeVy : (p.vy || 0);
+  const angle = (vx !== 0 || vy !== 0) ? Math.atan2(vy, vx) : (p.lastAngle !== undefined ? p.lastAngle : (p.angle || 0));
+  const len = 13;
+  const width = 3.2;
+
+  // 1. Persistent World-Space Tracer Trail
+  if (p.history && p.history.length > 1) {
+    ctx.save();
+    // Subtle shadow purple outer streak (Toji's theme color)
+    ctx.beginPath();
+    ctx.moveTo(p.history[0].x, p.history[0].y);
+    for (let i = 1; i < p.history.length; i++) {
+      ctx.lineTo(p.history[i].x, p.history[i].y);
+    }
+    ctx.strokeStyle = 'rgba(168, 85, 247, 0.45)';
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Hot golden-yellow core line on final segments
+    const sliceCount = Math.max(1, p.history.length - 4);
+    ctx.beginPath();
+    ctx.moveTo(p.history[sliceCount - 1].x, p.history[sliceCount - 1].y);
+    for (let i = sliceCount; i < p.history.length; i++) {
+      ctx.lineTo(p.history[i].x, p.history[i].y);
+    }
+    ctx.strokeStyle = 'rgba(254, 240, 138, 0.85)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(angle);
+
+  // 2. High-speed supersonic motion trail
+  const trailLen = 28;
+  ctx.fillStyle = _getTojiBulletTrailGrad(ctx);
+  ctx.beginPath();
+  ctx.moveTo(-trailLen, 0);
+  ctx.lineTo(-len * 0.5, -width * 0.9);
+  ctx.lineTo(0, 0);
+  ctx.lineTo(-len * 0.5, width * 0.9);
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Bullet Core (Sharp metal jacket bullet)
+  ctx.fillStyle = _getTojiBulletCoreGrad(ctx);
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 0.8;
+
+  ctx.beginPath();
+  ctx.moveTo(-len / 2, -width / 2);
+  ctx.lineTo(len * 0.15, -width / 2);
+  ctx.quadraticCurveTo(len * 0.5, -width * 0.3, len * 0.55, 0);
+  ctx.quadraticCurveTo(len * 0.5, width * 0.3, len * 0.15, width / 2);
+  ctx.lineTo(-len / 2, width / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // 4. Razor specular shine line
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(-len * 0.3, -width * 0.35, len * 0.5, 0.9);
 
   ctx.restore();
 }

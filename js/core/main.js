@@ -588,6 +588,10 @@ if (localStorage.getItem('hudHideOverheadHp') !== null) {
   CONFIG.hudHideOverheadHp = localStorage.getItem('hudHideOverheadHp') === 'true';
 }
 
+if (localStorage.getItem('hudLayoutStyle') !== null) {
+  CONFIG.hudLayoutStyle = localStorage.getItem('hudLayoutStyle') === 'classic' ? 'classic' : 'duel';
+}
+
 if (localStorage.getItem('hudSkillBarsMode') !== null) {
   CONFIG.hudSkillBarsMode = localStorage.getItem('hudSkillBarsMode');
 } else {
@@ -598,6 +602,11 @@ export function syncHudButtons() {
   const masterBtn = document.getElementById('btn-hud-master');
   if (masterBtn) {
     masterBtn.innerText = CONFIG.hudHideAll ? 'HIDDEN' : 'VISIBLE';
+  }
+
+  const layoutBtn = document.getElementById('btn-hud-layout');
+  if (layoutBtn) {
+    layoutBtn.innerText = CONFIG.hudLayoutStyle === 'classic' ? 'CLASSIC' : 'ARCADE DUEL';
   }
 
   const healthBarsBtn = document.getElementById('btn-hud-healthbars');
@@ -1161,6 +1170,11 @@ export function executeTacticalAction(action) {
       localStorage.setItem('hudHideAll', 'true');
     }
     syncHudButtons();
+  } else if (action === 'toggle-hud-layout') {
+    CONFIG.hudLayoutStyle = (CONFIG.hudLayoutStyle === 'classic') ? 'duel' : 'classic';
+    localStorage.setItem('hudLayoutStyle', CONFIG.hudLayoutStyle);
+    clearHealthHud(true);
+    syncHudButtons();
   } else if (action === 'toggle-hud-healthbars') {
     CONFIG.hudHideHealthBars = !CONFIG.hudHideHealthBars;
     if (!CONFIG.hudHideHealthBars) {
@@ -1376,6 +1390,11 @@ document.getElementById('quick-toggle-theme')?.addEventListener('click', () => {
 document.getElementById('btn-hud-master')?.addEventListener('click', (e) => {
   e.stopPropagation();
   executeTacticalAction('toggle-hud-master');
+});
+
+document.getElementById('btn-hud-layout')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  executeTacticalAction('toggle-hud-layout');
 });
 
 document.getElementById('btn-hud-healthbars')?.addEventListener('click', (e) => {

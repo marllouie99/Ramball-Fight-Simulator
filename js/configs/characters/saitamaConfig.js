@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -155,7 +155,9 @@ export const saitamaConfig = {
   counterPunchImpactEnabled: true,
 
   // Arena Wall & Environmental Destruction
-  enableWallShatter: true,       // Saitama shatters and breaches arena walls on punches
+  enableWallInteraction: false,   // Master toggle: disables all custom interactions between Saitama and arena walls
+  enableWallShatter: false,       // Saitama shatters and breaches arena walls on punches (disabled)
+  enableWallPin: false,           // Saitama pins enemies against arena walls on punch knockback (disabled)
   enableHudShatter: false,        // Strictly disabled: Saitama only destroys arena walls, never the HUD
 
   // Audio configuration, volume & timing delay adjustments (delays measured in frames @ 60fps)

@@ -41,7 +41,7 @@ let _cfgSource = null;
  */
 export function getComboConfig() {
   const src = (CONFIG && CONFIG.comboCounter) || null;
-  if (src !== _cfgSource) {
+  if (src !== _cfgSource || (src && _cfgCache && src.enabled !== _cfgCache.enabled)) {
     _cfgSource = src;
     _cfgCache = Object.assign({}, COMBO_DEFAULTS, src || {});
     if (typeof _cfgCache.minHits !== 'number' || _cfgCache.minHits < 1) {

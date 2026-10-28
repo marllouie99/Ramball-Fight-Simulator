@@ -35,7 +35,7 @@ export { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapo
 export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';
 export { drawEngineer, drawEngineerShotgun, drawEngineerWrench, drawTurret, drawDispenser } from './weapons/engineerWeaponGraphics.js';
 export { drawZeusWeapon } from './weapons/zeusWeaponGraphics.js';
-export { drawInvertedSpear, drawSplitSoulKatana } from './weapons/tojiWeaponGraphics.js';
+export { drawInvertedSpear, drawSplitSoulKatana, drawTojiPistol } from './weapons/tojiWeaponGraphics.js';
 export { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch, MAHORAGA_WEAPON_GRAPHICS } from './weapons/mahoragaWeaponGraphics.js';
 export { drawMahoragaFaceWings, drawMahoragaChestNecklace, drawMahoragaSkin, drawMahoragaPixelBody } from './fighters/mahoragaSkin.js';
 export { drawMahitoClawWeapon, drawMahitoMaceCannon } from './weapons/mahitoWeaponGraphics.js';

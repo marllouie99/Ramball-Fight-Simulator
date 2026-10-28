@@ -502,6 +502,7 @@ function generateWallSegments(hit, span, punchAngle) {
  * @param {number} [customHalfArc] - Optional custom frontal half arc (defaults to counterFrontalArc / 2)
  */
 export function triggerSaitamaWallShatter(originX, originY, punchAngle, arena, customHalfArc) {
+  if (CONFIG.saitama?.enableWallShatter === false || CONFIG.saitama?.enableWallInteraction === false) return;
   if (!arena && typeof state !== 'undefined') arena = state.arena;
   if (!arena) return;
 

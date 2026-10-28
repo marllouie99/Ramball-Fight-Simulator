@@ -69,7 +69,7 @@ export class GojoBlueBehavior extends ProjectileBehavior {
           p.pulledTargets.add(f);
           const isWallLingering = p.isWallLingering;
           if (dist > 0) {
-            const pullStrength = isWallLingering ? 4.8 : 3.5;
+            const pullStrength = isWallLingering ? 6.5 : 5.5;
             const force = (pullRadius - dist) / pullRadius * pullStrength;
             f.x += (dx / dist) * force;
             f.y += (dy / dist) * force;
@@ -133,35 +133,44 @@ export class GojoBlueBehavior extends ProjectileBehavior {
       }
     }
 
-    // 2. Periodic DPS Tick Damage (like Hollow Purple)
-    const dpsInterval = p.blueDPSInterval || CONFIG.gojo?.blueDPSInterval || 10;
+    // 2. Periodic DPS Tick Damage (smooth continuous vortex grinding)
+    const dpsInterval = p.blueDPSInterval || CONFIG.gojo?.blueDPSInterval || 12;
     p.blueLastDPSTick = (p.blueLastDPSTick || 0) + 1;
     if (p.blueLastDPSTick >= dpsInterval) {
       p.blueLastDPSTick = 0;
-      const blueDPS = p.blueDPS || CONFIG.gojo?.blueDPS || 65;
-      const tickDamage = blueDPS * (dpsInterval / 60);
+      const blueDPS = (p.blueDPS !== undefined) ? p.blueDPS : (CONFIG.gojo?.blueDPS ?? 10);
+      const tickDamage = Number((blueDPS * (dpsInterval / 60)).toFixed(1));
 
-      for (let i = 0; i < allTargets.length; i++) {
-        const ent = allTargets[i];
-        if (!ent || ent.hp <= 0 || ent.dead || ent === ownerFighter) continue;
-        if (ent.owner && ent.owner === ownerFighter) continue;
+      if (tickDamage > 0) {
+        for (let i = 0; i < allTargets.length; i++) {
+          const ent = allTargets[i];
+          if (!ent || ent.hp <= 0 || ent.dead || ent === ownerFighter) continue;
+          if (ent.owner && ent.owner === ownerFighter) continue;
 
-        if (ownerFighter && typeof ownerFighter.isTeammate === 'function') {
-          if (ownerFighter.isTeammate(ent) || (ent.owner && ownerFighter.isTeammate(ent.owner))) continue;
-        }
-        const checkFighter = ent.owner || ent;
-        const fi = state.fighters ? state.fighters.indexOf(checkFighter) : -1;
-        if (ownerIndex !== -1 && fi !== -1 && areOnSameTeam(ownerIndex, fi)) continue;
-
-        const dx = ent.x - p.x;
-        const dy = ent.y - p.y;
-        const dist = Math.hypot(dx, dy);
-
-        if (dist < pullRadius) {
-          if (typeof ent.takeDamage === 'function') {
-            ent.takeDamage(tickDamage, ownerFighter, { isBlueDPS: true, isProjectile: true, projectile: p });
+          if (ownerFighter && typeof ownerFighter.isTeammate === 'function') {
+            if (ownerFighter.isTeammate(ent) || (ent.owner && ownerFighter.isTeammate(ent.owner))) continue;
           }
-          spawnSparks(ent.x, ent.y, 3, 'lightningTrail', '#00D4CC');
+          const checkFighter = ent.owner || ent;
+          const fi = state.fighters ? state.fighters.indexOf(checkFighter) : -1;
+          if (ownerIndex !== -1 && fi !== -1 && areOnSameTeam(ownerIndex, fi)) continue;
+
+          const dx = ent.x - p.x;
+          const dy = ent.y - p.y;
+          const dist = Math.hypot(dx, dy);
+
+          if (dist < pullRadius) {
+            if (typeof ent.takeDamage === 'function') {
+              ent.takeDamage(tickDamage, ownerFighter, {
+                isBlueDPS: true,
+                isProjectile: true,
+                projectile: p,
+                isContinuous: true,
+                suppressBlood: true,
+                damageNumberColor: '#00FFFF'
+              });
+            }
+            spawnSparks(ent.x, ent.y, 3, 'lightningTrail', '#00D4CC');
+          }
         }
       }
     }

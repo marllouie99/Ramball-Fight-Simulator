@@ -685,6 +685,14 @@ export function drawRubbickDomainDimScreen() {
 }
 
 let currentSukunaDomainDimOpacity = 0;
+let _cachedSukunaDimGrad = null;
+let _cachedSukunaDimGradH = 0;
+let _cachedSukunaDimGradAlpha = -1;
+let _cachedSukunaClearGrad = null;
+let _cachedSukunaClearCx = -999;
+let _cachedSukunaClearCy = -999;
+let _cachedSukunaClearDim = 0;
+let _cachedSukunaClearAlpha = -1;
 
 /**
  * Draws a gradient dim screen overlay when Sukuna's Domain Expansion (Malevolent Shrine) is active.
@@ -730,39 +738,60 @@ export function drawSukunaDomainDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // 1. Vertical gradient dim: Crimson Red (top) → Dark transition → Teal Cyan (bottom)
-  const dimGrad = createSafeLinearGradient(ctx, 0, 0, 0, h);
+  // 1. Vertical gradient dim: Crimson Red (top) → Dark transition → Teal Cyan (bottom) (cached)
+  const quantizedOpacity = Math.round(opacity * 40) / 40;
+  if (!_cachedSukunaDimGrad || _cachedSukunaDimGradH !== h || _cachedSukunaDimGradAlpha !== quantizedOpacity) {
+    _cachedSukunaDimGradH = h;
+    _cachedSukunaDimGradAlpha = quantizedOpacity;
+    _cachedSukunaDimGrad = createSafeLinearGradient(ctx, 0, 0, 0, h);
+    if (_cachedSukunaDimGrad) {
+      _cachedSukunaDimGrad.addColorStop(0.0, `rgba(8, 0, 2, ${(quantizedOpacity * 0.96).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(0.15, `rgba(50, 3, 8, ${(quantizedOpacity * 0.92).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(0.30, `rgba(80, 5, 14, ${(quantizedOpacity * 0.88).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(0.42, `rgba(35, 2, 6, ${(quantizedOpacity * 0.93).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(0.50, `rgba(4, 4, 8, ${(quantizedOpacity * 0.95).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(0.58, `rgba(2, 12, 20, ${(quantizedOpacity * 0.94).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(0.72, `rgba(2, 22, 35, ${(quantizedOpacity * 0.92).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(0.88, `rgba(1, 16, 28, ${(quantizedOpacity * 0.94).toFixed(3)})`);
+      _cachedSukunaDimGrad.addColorStop(1.0, `rgba(1, 6, 12, ${(quantizedOpacity * 0.97).toFixed(3)})`);
+    }
+  }
+  const dimGrad = _cachedSukunaDimGrad;
   if (dimGrad) {
-    dimGrad.addColorStop(0.0, `rgba(8, 0, 2, ${(opacity * 0.96).toFixed(3)})`);      // Pitch black-red void (top)
-    dimGrad.addColorStop(0.15, `rgba(50, 3, 8, ${(opacity * 0.92).toFixed(3)})`);     // Deep dark crimson
-    dimGrad.addColorStop(0.30, `rgba(80, 5, 14, ${(opacity * 0.88).toFixed(3)})`);    // Sinister crimson cloud band
-    dimGrad.addColorStop(0.42, `rgba(35, 2, 6, ${(opacity * 0.93).toFixed(3)})`);     // Dark maroon transition
-    dimGrad.addColorStop(0.50, `rgba(4, 4, 8, ${(opacity * 0.95).toFixed(3)})`);      // Dark neutral crossover
-    dimGrad.addColorStop(0.58, `rgba(2, 12, 20, ${(opacity * 0.94).toFixed(3)})`);    // Dark teal transition
-    dimGrad.addColorStop(0.72, `rgba(2, 22, 35, ${(opacity * 0.92).toFixed(3)})`);    // Deep dark teal
-    dimGrad.addColorStop(0.88, `rgba(1, 16, 28, ${(opacity * 0.94).toFixed(3)})`);    // Abyssal dark cyan
-    dimGrad.addColorStop(1.0, `rgba(1, 6, 12, ${(opacity * 0.97).toFixed(3)})`);      // Pitch dark cyan floor (bottom)
     ctx.fillStyle = dimGrad;
     ctx.fillRect(0, 0, w, h);
   }
 
   // 2. Subtle radial lighter pocket centered on Sukuna (so the action area isn't completely crushed)
-  const screenPos = sukunaFighter ? worldToScreen(sukunaFighter.x, sukunaFighter.y - (sukunaFighter.z || 0)) : { x: w / 2, y: h / 2 };
-  const cx = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : w / 2;
-  const cy = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : h / 2;
-  const maxDim = Math.max(10, Math.max(w, h) * 0.85);
+  if (opacity * 0.12 >= 0.01) {
+    const screenPos = sukunaFighter ? worldToScreen(sukunaFighter.x, sukunaFighter.y - (sukunaFighter.z || 0)) : { x: w / 2, y: h / 2 };
+    const rawCx = (screenPos && Number.isFinite(screenPos.x)) ? screenPos.x : w / 2;
+    const rawCy = (screenPos && Number.isFinite(screenPos.y)) ? screenPos.y : h / 2;
+    const qCx = Math.round(rawCx / 4) * 4;
+    const qCy = Math.round(rawCy / 4) * 4;
+    const qDim = Math.round(Math.max(10, Math.max(w, h) * 0.85) / 8) * 8;
 
-  ctx.globalCompositeOperation = 'destination-out';
-  const clearGrad = createSafeRadialGradient(ctx, cx, cy, 0, cx, cy, maxDim);
-  if (clearGrad) {
-    clearGrad.addColorStop(0.0, `rgba(0, 0, 0, ${(opacity * 0.12).toFixed(3)})`);
-    clearGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(opacity * 0.06).toFixed(3)})`);
-    clearGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
-    clearGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = clearGrad;
-    ctx.fillRect(0, 0, w, h);
+    if (!_cachedSukunaClearGrad || _cachedSukunaClearCx !== qCx || _cachedSukunaClearCy !== qCy || _cachedSukunaClearDim !== qDim || _cachedSukunaClearAlpha !== quantizedOpacity) {
+      _cachedSukunaClearCx = qCx;
+      _cachedSukunaClearCy = qCy;
+      _cachedSukunaClearDim = qDim;
+      _cachedSukunaClearAlpha = quantizedOpacity;
+      _cachedSukunaClearGrad = createSafeRadialGradient(ctx, qCx, qCy, 0, qCx, qCy, qDim);
+      if (_cachedSukunaClearGrad) {
+        _cachedSukunaClearGrad.addColorStop(0.0, `rgba(0, 0, 0, ${(quantizedOpacity * 0.12).toFixed(3)})`);
+        _cachedSukunaClearGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(quantizedOpacity * 0.06).toFixed(3)})`);
+        _cachedSukunaClearGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
+        _cachedSukunaClearGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+      }
+    }
+
+    if (_cachedSukunaClearGrad) {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.fillStyle = _cachedSukunaClearGrad;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalCompositeOperation = 'source-over';
+    }
   }
-  ctx.globalCompositeOperation = 'source-over';
 
   // 3. Clear arena interior with subtle edge vignette so Malevolent Shrine artwork is 100% visible
   if (sukunaFighter && sukunaFighter.domainActive) {

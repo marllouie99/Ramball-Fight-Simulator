@@ -107,7 +107,7 @@ export class SukunaFighter extends Fighter {
         allowFrozenTick: true,
         allowsFrozenCooldownTick: true,
         onExpire: (fighter) => {
-          clearDomainSlashLines();
+          clearDomainSlashLines(this);
           if (fighter) {
             fighter._hasPlayedDomainChannelSound = false;
             fighter._hasPlayedDomainActivateSound = false;
@@ -594,7 +594,7 @@ export class SukunaFighter extends Fighter {
       }
       if (this.domainTimer <= 0) {
         this.domainActive = false;
-        clearDomainSlashLines();
+        clearDomainSlashLines(this);
         this._hasFiredFugaInDomain = false;
         this._isFiringDomainFuga = false;
         const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
@@ -1321,7 +1321,7 @@ export class SukunaFighter extends Fighter {
   _drawRealisticSkull(ctx, sx, sy, scale = 1.0, isDemon = false) {
     SukunaRenderer._drawRealisticSkull(ctx, this, sx, sy, scale, isDemon);
   }
-  _drawShrineBody(ctx) { SukunaRenderer._drawShrineBody(ctx, this); }
+  _drawShrineBody(ctx, skipGlow = false) { SukunaRenderer._drawShrineBody(ctx, this, skipGlow); }
   _createSaitamaPixelShrineCanvas(sourceCanvas) { return SukunaRenderer._createSaitamaPixelShrineCanvas(sourceCanvas); }
   _renderFullShrineToContext(ctx) { SukunaRenderer._renderFullShrineToContext(ctx, this); }
 

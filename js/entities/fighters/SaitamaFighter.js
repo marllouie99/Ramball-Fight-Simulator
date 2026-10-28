@@ -1795,9 +1795,12 @@ export class SaitamaFighter extends Fighter {
           
           const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
           if (!isTargetImmune) {
-            target._knockedBackBySaitamaBasicPunch = true;
-            target.preventKnockbackBounce = true;
-            target.isWallPinnedBySaitama = true;
+            const enableWallPin = Boolean(CONFIG.saitama?.enableWallPin && CONFIG.saitama?.enableWallInteraction !== false);
+            if (enableWallPin) {
+              target._knockedBackBySaitamaBasicPunch = true;
+              target.preventKnockbackBounce = true;
+              target.isWallPinnedBySaitama = true;
+            }
             target.vx = kx;
             target.vy = ky;
           }
@@ -1885,9 +1888,12 @@ export class SaitamaFighter extends Fighter {
             const colKy = Math.sin(pushAngle) * (knockbackForce * 1.05);
             const isEnemyImmune = Boolean(enemy && (enemy.characterId === 'escanor' || enemy.type === 'escanor' || enemy.immuneToKnockback || enemy.immuneToPush));
             if (!isEnemyImmune) {
-              enemy._knockedBackBySaitamaBasicPunch = true;
-              enemy.preventKnockbackBounce = true;
-              enemy.isWallPinnedBySaitama = true;
+              const enableWallPin = Boolean(CONFIG.saitama?.enableWallPin && CONFIG.saitama?.enableWallInteraction !== false);
+              if (enableWallPin) {
+                enemy._knockedBackBySaitamaBasicPunch = true;
+                enemy.preventKnockbackBounce = true;
+                enemy.isWallPinnedBySaitama = true;
+              }
               enemy.vx = colKx;
               enemy.vy = colKy;
             }
@@ -1918,8 +1924,9 @@ export class SaitamaFighter extends Fighter {
       }
 
       // Unique Interaction: Shatter the arena line wall in the punch direction (HUD destruction disabled)
+      const enableWallShatter = Boolean(CONFIG.saitama?.enableWallShatter && CONFIG.saitama?.enableWallInteraction !== false);
       const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-      if (arena && typeof triggerSaitamaWallShatter === 'function') {
+      if (enableWallShatter && arena && typeof triggerSaitamaWallShatter === 'function') {
         triggerSaitamaWallShatter(this.x, this.y, pushAngle, arena);
       }
       this._blowAwayCrazyDaveLawnmowers(this._counterReleaseOriginX, this._counterReleaseOriginY, pushAngle, frontalReach, halfArc);
@@ -2494,8 +2501,9 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Unique Interaction: Shatter the arena line wall in normal punch trajectory (HUD destruction disabled)
+    const enableWallShatter = Boolean(CONFIG.saitama?.enableWallShatter && CONFIG.saitama?.enableWallInteraction !== false);
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    if (arena && typeof triggerSaitamaWallShatter === 'function') {
+    if (enableWallShatter && arena && typeof triggerSaitamaWallShatter === 'function') {
       triggerSaitamaWallShatter(fistX, fistY, aimAngle, arena);
     }
     this._blowAwayCrazyDaveLawnmowers(this._normalPunchReleaseOriginX, this._normalPunchReleaseOriginY, aimAngle, punchBlastReach, halfBlastArc);
@@ -2542,9 +2550,12 @@ export class SaitamaFighter extends Fighter {
         const ky = Math.sin(aimAngle) * knockbackForce;
         const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
         if (!isTargetImmune) {
-          target._knockedBackBySaitamaBasicPunch = true;
-          target.preventKnockbackBounce = true; // Pin and stick target to wall for 1 second on wall impact instead of bouncing!
-          target.isWallPinnedBySaitama = true;
+          const enableWallPin = Boolean(CONFIG.saitama?.enableWallPin && CONFIG.saitama?.enableWallInteraction !== false);
+          if (enableWallPin) {
+            target._knockedBackBySaitamaBasicPunch = true;
+            target.preventKnockbackBounce = true; // Pin and stick target to wall for 1 second on wall impact instead of bouncing!
+            target.isWallPinnedBySaitama = true;
+          }
         }
         if (typeof target.applyKnockback === 'function') {
           target.applyKnockback(kx, ky);
@@ -3099,9 +3110,12 @@ export class SaitamaFighter extends Fighter {
                   const ky = Math.sin(aimAngle) * knockbackForce;
                   const isTargetImmune = Boolean(target && (target.characterId === 'escanor' || target.type === 'escanor' || target.immuneToKnockback || target.immuneToPush));
                   if (!isTargetImmune) {
-                    target._knockedBackBySaitamaBasicPunch = true;
-                    target.preventKnockbackBounce = true;
-                    target.isWallPinnedBySaitama = true;
+                    const enableWallPin = Boolean(CONFIG.saitama?.enableWallPin && CONFIG.saitama?.enableWallInteraction !== false);
+                    if (enableWallPin) {
+                      target._knockedBackBySaitamaBasicPunch = true;
+                      target.preventKnockbackBounce = true;
+                      target.isWallPinnedBySaitama = true;
+                    }
                     target.vx = kx;
                     target.vy = ky;
                   }
@@ -3179,8 +3193,9 @@ export class SaitamaFighter extends Fighter {
           this._flurryAccumulatedDamage = 0;
 
           // Unique Interaction: Shatter the arena line wall on flurry final blow (HUD destruction disabled)
+          const enableWallShatter = Boolean(CONFIG.saitama?.enableWallShatter && CONFIG.saitama?.enableWallInteraction !== false);
           const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-          if (arena && typeof triggerSaitamaWallShatter === 'function') {
+          if (enableWallShatter && arena && typeof triggerSaitamaWallShatter === 'function') {
             triggerSaitamaWallShatter(this.x, this.y, this._flurryFinalPunchReleaseAngle, arena);
           }
           this._blowAwayArenaDecorations(this.x, this.y, this._flurryFinalPunchReleaseAngle, 500, Math.PI * 0.45, 2.0);

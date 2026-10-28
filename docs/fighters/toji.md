@@ -20,8 +20,13 @@ Having zero Cursed Energy grants Toji unparalleled physical speed and makes him 
   * **2nd Sequence (Split Soul Katana Execution):** Chases behind the target, holds a windup stance, and unleashes the wide **Void Purple & Pitch-Black Jagged Anime Crescent Wave**, launching the target into ricochet wall bouncing!
   * **3rd Sequence (Phantom Flurry Finale):** Toji vanishes into 6 phantom afterimages encircling the ricocheting enemy, delivering **6 rapid flash-teleport Void-Purple Crescent Slashes** (`6 × 8 = 48` True Damage) before stepping back into stealth!
 
-### 🗡️ Basic Attack & Skill 2: Inverted Spear & Split Soul Katana
-Toji fights up close using his signature cursed tool arsenal, featuring unified **Void Purple & Pitch-Black Jagged Crescent Wave** slash visuals:
+### 🔫 Basic Attack: Tactical Handgun / Pistol
+Toji leverages non-cursed conventional firearms from his assassin arsenal to bypass sorcerer cursed energy detection at range:
+* **Tactical Pistol (High-Velocity Ballistic Fire):** Fires rapid semi-automatic 9mm rounds (`14 True Damage`) with supersonic purple-amber tracer trails and crisp physical recoil from an authentic scaled sidearm.
+* **Curse Inventory Stowage:** While wielding the handgun for basic attacks, cursed tools remain sealed away inside his Inventory Curse worm until unleashed during Ambush and Ultimate skills.
+
+### 🗡️ Skills: Inverted Spear & Split Soul Katana
+When engaging in stealth strikes and close-quarters execution, Toji draws his signature cursed tools:
 * **Inverted Spear of Heaven (Skill Channel Interruption & Barrier Pierce):** Strikes ignore defensive barriers (like Gojo's Infinity). During the **1st Sequence Ambush Thrust**, if the target is actively channeling a skill or ultimate (like Gojo casting Hollow Purple/Domain), the skill is instantly **Interrupted**, forced onto **Full Cooldown**, and afflicts them with a 1.5s **`"SILENCED!"`** debuff!
 * **Split Soul Katana (Soul Slash & True Damage):** Cuts directly into the target's soul, ignoring all damage reduction and shields to deal massive True Damage.
 * **Soul Wound Anti-Heal:** Inflicts a 3.0s anti-heal debuff on hit, preventing health regeneration and life-steal.

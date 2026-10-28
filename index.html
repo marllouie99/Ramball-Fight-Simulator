@@ -16,7 +16,7 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Bangers&family=Permanent+Marker&family=Outfit:wght@800;900&family=Press+Start+2P&family=Rajdhani:wght@700;900&family=Silkscreen:wght@400;700&display=swap"
     rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=37" />
+  <link rel="stylesheet" href="css/style.css?v=42" />
   <style>
     /* Optimize HTML & Body for Responsive Canvas Preview & Web Scrolling */
     html {
@@ -979,6 +979,22 @@
                       <div class="card-title-row">
                         <span class="card-title">ALL HUD ELEMENTS</span>
                         <button id="btn-hud-master" class="tactical-chip-btn">VISIBLE</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 2. Prefer HUD Layout (Arcade Duel vs Classic) -->
+                  <div class="tactical-card system-card" data-action="toggle-hud-layout" id="card-hud-layout">
+                    <div class="card-left-emblem">
+                      <svg class="pixel-icon" viewBox="0 0 16 16" width="20" height="20" fill="none" shape-rendering="crispEdges">
+                        <path d="M1 2h14v3H1V2z M1 6h6v8H1V6z M9 6h6v8H9V6z" fill="#ffffff"/>
+                        <path d="M2 3h12v1H2V3z M2 7h4v6H2V7z M10 7h4v6h-4V7z" fill="#ffb8cb"/>
+                      </svg>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-title-row">
+                        <span class="card-title">HUD LAYOUT</span>
+                        <button id="btn-hud-layout" class="tactical-chip-btn">ARCADE DUEL</button>
                       </div>
                     </div>
                   </div>

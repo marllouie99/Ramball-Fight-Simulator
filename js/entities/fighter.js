@@ -2385,6 +2385,10 @@ export class Fighter {
     this.isWallPinnedBySaitama = false;
     this.preventKnockbackBounce = false;
 
+    if (CONFIG.saitama?.enableWallPin === false || CONFIG.saitama?.enableWallInteraction === false) {
+      return;
+    }
+
     // Apply slow debuff
     const slowFrames = CONFIG.saitama?.wallBounceSlowFrames ?? 120;
     const slowMult = CONFIG.saitama?.wallBounceSlowMultiplier ?? 0.35;
@@ -2628,7 +2632,8 @@ export class Fighter {
             this.knockbackVy = 0;
           }
 
-          const wasSaitamaPin = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
+          const enableSaitamaWallPin = Boolean(CONFIG.saitama?.enableWallPin !== false && CONFIG.saitama?.enableWallInteraction !== false);
+          const wasSaitamaPin = enableSaitamaWallPin && Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
           const wasMakimaPin = Boolean(this.isWallPinnedByMakima);
           const wasEscanorPin = Boolean(this._knockedBackByEscanorBasicAttack || this.isWallPinnedByEscanor);
           if (wasSaitamaPin) {
@@ -2846,7 +2851,7 @@ export class Fighter {
     }
 
     const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
-    const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isBloodSuppressedEntity(this) || isRatioPauseActive;
+    const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isBlueDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isBloodSuppressedEntity(this) || isRatioPauseActive;
     if (!isBloodSuppressedEntity(this) && !isExplosionOrFlame && !isSecondTurretHit) {
       const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
       if (typeof spawnBloodEffect === 'function') {
@@ -3440,7 +3445,8 @@ export class Fighter {
     if (!arena && typeof state !== 'undefined') arena = state.arena;
     if (!arena) return false;
 
-    const isSaitamaHit = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
+    const enableSaitamaWallPin = Boolean(CONFIG.saitama?.enableWallPin !== false && CONFIG.saitama?.enableWallInteraction !== false);
+    const isSaitamaHit = enableSaitamaWallPin && Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
     const isEscanorHit = Boolean(this._knockedBackByEscanorBasicAttack || this.isWallPinnedByEscanor);
     const isGenosTrapped = Boolean(this.caughtInGenosFlurry);
     const isMakimaPinned = Boolean(this.isWallPinnedByMakima || this.isCurrentlyWallPinnedByMakima || ((this.makimaWallPinTimer || 0) > 0));

@@ -5,7 +5,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave, spawnArcaneSmoke, spawnTojiWhirlingWindDebris, spawnGroundScorch } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
-import { drawInvertedSpear, drawSplitSoulKatana, drawPhysicsChain, drawRestedKatanaOverShoulder, drawRestedInvertedSpearAtHip, TOJI_WEAPON_CONFIG } from '../../graphics/weapons/tojiWeaponGraphics.js';
+import { drawInvertedSpear, drawSplitSoulKatana, drawPhysicsChain, drawRestedKatanaOverShoulder, drawRestedInvertedSpearAtHip, drawTojiPistol, TOJI_WEAPON_CONFIG } from '../../graphics/weapons/tojiWeaponGraphics.js';
 import { drawTojiSkin, drawTojiGhostSkin } from '../../graphics/fighters/tojiSkin.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
@@ -47,7 +47,14 @@ export class TojiFighter extends Fighter {
     this.ambushPhase = null;
     this.ambushTimer = 0;
 
-    // Inverted Spear of Heaven (Basic Attack)
+    // Primary Weapon: Tactical Handgun / Pistol (Basic Attack)
+    this.pistolCooldown = 0;
+    this.pistolCooldownMax = CONFIG.toji?.pistolCooldown ?? 22;
+    this.pistolRange = CONFIG.toji?.pistolRange ?? 460;
+    this.pistolRecoilTimer = 0;
+    this.pistolFlashTimer = 0;
+
+    // Inverted Spear of Heaven (Ambush Thrust & Secondary Cursed Tool)
     this.spearCooldown = 0;
     this.spearCooldownMax = CONFIG.toji?.spearCooldown || 32;
     this.spearRange = CONFIG.toji?.spearRange || 50;
@@ -124,9 +131,10 @@ export class TojiFighter extends Fighter {
       opp = target;
     }
     if (!opp) {
+      const range = CONFIG.toji?.pistolRange || 460;
       opp = {
-        x: this.x + Math.cos(this.gunAngle || 0) * (CONFIG.toji?.spearRange || 50),
-        y: this.y + Math.sin(this.gunAngle || 0) * (CONFIG.toji?.spearRange || 50),
+        x: this.x + Math.cos(this.gunAngle || 0) * range,
+        y: this.y + Math.sin(this.gunAngle || 0) * range,
         r: 25,
         hp: 100,
         maxHp: 100,
@@ -146,21 +154,11 @@ export class TojiFighter extends Fighter {
         this.angle = this.gunAngle;
       }
     }
-    const attackAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    this.spearCastAngle = attackAngle;
-    this._slashStartAngle = attackAngle;
-    this._slashStartFlipSign = Math.abs(Math.atan2(Math.sin(attackAngle), Math.cos(attackAngle))) > Math.PI / 2 ? -1 : 1;
-    this._slashOriginX = this.x;
-    this._slashOriginY = this.y;
-    this._lastSpearTimer = 0;
-    this.spearComboStep = 1;
-    this.spearComboResetTimer = 0;
-    this.spearCooldown = 0;
     this.postUltimateRecoveryTimer = 0;
     this.isAmbushing = false;
     this.isStealthed = false;
     this.stealthActive = false;
-    this.performInvertedSpearStrike(opp, 0, false);
+    this.firePistol(opp, 0);
   }
 
   triggerDemoAttack(step = null) {
@@ -263,6 +261,9 @@ export class TojiFighter extends Fighter {
     this.ambushTarget = null;
     this.ambushPhase = null;
     this.ambushTimer = 0;
+    this.pistolCooldown = 0;
+    this.pistolRecoilTimer = 0;
+    this.pistolFlashTimer = 0;
     this.spearCooldown = 0;
     this.spearSwingTimer = 0;
     this.katanaActiveTimer = 0;
@@ -1705,6 +1706,9 @@ export class TojiFighter extends Fighter {
     }
 
     // Tick timers
+    if (this.pistolCooldown > 0) this.pistolCooldown--;
+    if (this.pistolRecoilTimer > 0) this.pistolRecoilTimer--;
+    if (this.pistolFlashTimer > 0) this.pistolFlashTimer--;
     if (this.spearCooldown > 0) this.spearCooldown--;
     if (this.spearSwingTimer > 0) {
       this.spearSwingTimer--;
@@ -1820,18 +1824,18 @@ export class TojiFighter extends Fighter {
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);
 
-    // Inverted Spear of Heaven Melee Strike Logic
+    // Tactical Pistol Basic Attack Logic
     if (this.isCaughtInBeam()) {
       this.spearSwingTimer = 0;
       this.katanaSlashTimer = 0;
-    } else if (this.isSkillEnabled(CONFIG.toji?.enableSpear, true) && (this.postUltimateRecoveryTimer || 0) <= 0 && !tojiIsTargetDeadOrRemoved(this, opponent)) {
+    } else if (this.isSkillEnabled(CONFIG.toji?.enablePistol, true) && (this.postUltimateRecoveryTimer || 0) <= 0 && !tojiIsTargetDeadOrRemoved(this, opponent)) {
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;
       const dist = Math.hypot(dx, dy);
-      const attackReach = this.r + opponent.r + this.spearRange;
+      const pistolRange = this.pistolRange || CONFIG.toji?.pistolRange || 460;
 
-      if (dist <= attackReach && this.spearCooldown <= 0) {
-        this.performInvertedSpearStrike(opponent, ownerIndex);
+      if (dist <= pistolRange && this.pistolCooldown <= 0 && this.canPerformBasicAttack(opponent)) {
+        this.firePistol(opponent, ownerIndex);
       }
     }
   }
@@ -1856,8 +1860,8 @@ export class TojiFighter extends Fighter {
                      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
                      (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
     if (isHardCC) return false;
-    // Basic Inverted Spear strike commits strictly to its locked thrust/rip trajectory during active swings
-    if (this.spearSwingTimer > 0) return false;
+    // Ambush Inverted Spear strike commits strictly to its locked thrust/rip trajectory during active swings
+    if (this.isAmbushThrust && this.spearSwingTimer > 0) return false;
     // Sequence 2 (KATANA_SLASH / KATANA_CHARGE) commits to its locked swing trajectory in normal ambush and must NOT auto-aim
     if (!this.ultimateActive && (this.ambushPhase === 'KATANA_SLASH' || this.ambushPhase === 'KATANA_CHARGE')) return false;
     // Ultimate slide strikes commit strictly to their forward rush angles (prevents reverse aim flips)
@@ -1968,23 +1972,90 @@ export class TojiFighter extends Fighter {
   }
 
   /**
-   * Overrides base Fighter.shoot() to trigger Inverted Spear melee dagger attack (Rule 23).
-   * Suppresses generic gun/bullet projectiles.
+   * Fires Tactical Handgun / Pistol for basic attack (Rule 23 compliant).
    */
+  firePistol(target, ownerIndex = 0) {
+    if ((this.postUltimateRecoveryTimer || 0) > 0) return false;
+    if (this.ultimateActive || this.isAmbushing) return false;
+    if (this.isCaughtInBeam()) return false;
+    if (this.hp <= 0 || this.isDead) return false;
+
+    if (target) {
+      this.lastTarget = target;
+      const dx = target.x - this.x;
+      const dy = target.y - this.y;
+      if (Math.hypot(dx, dy) > 0.001) {
+        this.gunAngle = Math.atan2(dy, dx);
+        this.angle = this.gunAngle;
+      }
+    }
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.toji) ? CONFIG.toji : {};
+    const angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    const damage = cfg.pistolDamage ?? (cfg.damage ?? 14);
+    const speed = cfg.pistolBulletSpeed ?? 18;
+    const recoil = cfg.pistolRecoil ?? 1.4;
+
+    const muzzleDist = this.r + (cfg.pistolMuzzleLength ?? 49);
+    const spawnX = this.x + Math.cos(angle) * muzzleDist;
+    const spawnY = this.y + Math.sin(angle) * muzzleDist;
+
+    if (projectileSystem) {
+      projectileSystem.fireProjectile(
+        this,
+        ownerIndex,
+        damage,
+        false,
+        speed,
+        false,
+        'tojiBullet',
+        spawnX,
+        spawnY,
+        angle
+      );
+    }
+
+    const sfxSrc = cfg.sounds?.pistolShot || 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3';
+    const sfxVol = cfg.soundVolumes?.pistolShot !== undefined ? cfg.soundVolumes.pistolShot : 0.95;
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX(sfxSrc, sfxVol);
+    }
+
+    this.vx -= Math.cos(angle) * recoil;
+    this.vy -= Math.sin(angle) * recoil;
+
+    this.pistolRecoilTimer = 8;
+    this.pistolFlashTimer = 3;
+    const cd = cfg.pistolCooldown ?? (cfg.cooldown ?? 22);
+    this.pistolCooldown = cd;
+    this.shootCooldown = cd;
+    this.spearCooldown = cd;
+
+    if (typeof triggerGlobalScreenShake === 'function') {
+      triggerGlobalScreenShake(1.5, 4);
+    }
+
+    return true;
+  }
+
   shoot(ownerIndex) {
     if ((this.postUltimateRecoveryTimer || 0) > 0) return;
     if (this.ultimateActive || this.isAmbushing) return;
-    if (this.spearCooldown <= 0) {
+    if (this.pistolCooldown <= 0) {
       const target = this.lastTarget || this.spearSwingTarget;
-      this.performInvertedSpearStrike(target, ownerIndex);
+      this.firePistol(target, ownerIndex);
     }
   }
 
   /**
-   * Override base gun rendering to prevent drawing the default gray gun.
+   * Renders Toji's Tactical Handgun / Pistol in standard preview hooks and weapon passes.
    */
   drawGun(ctx) {
-    // Intentionally empty: Toji uses custom cursed tools (Inverted Spear & Split Soul Katana)
+    const angle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    drawTojiPistol(ctx, this.x, this.y, angle, this.r, '#E8BD9B', angle, {
+      recoilTimer: this.pistolRecoilTimer || 0,
+      flashTimer: this.pistolFlashTimer || 0
+    });
   }
 
   /**
@@ -2563,13 +2634,16 @@ export class TojiFighter extends Fighter {
         // Dual-wield pose with Katana over shoulder only shown in showoff screen / countdown / preview cards
         drawRestedKatanaOverShoulder(ctx, this.x, this.y, baseAngle, this.r, '#E8BD9B');
       }
+      // Note: In neutral combat while wielding pistol for basic attack, cursed tools remain stored in Inventory Curse
     }
 
     // 2. Draw Toji's signature skin model (Rule 19 & 20 compliant)
     drawTojiSkin(ctx, this);
 
-    // 3. Draw physics chain trailing naturally in world space
-    if (!shouldHideWeapons) {
+    // 3. Draw physics chain trailing naturally in world space ONLY when Inverted Spear is actively wielded in hand
+    const isSpearWielded = (this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH' || this.isAmbushThrust || this.ambushPhase === 'FRONT_PAUSE')) ||
+                           (this.isAmbushing && this.ambushPhase === 'PHANTOM_FLURRY' && (this.phantomStrikeCount % 2) !== 0);
+    if (!shouldHideWeapons && isSpearWielded) {
       modUpdateChain(this);
       drawPhysicsChain(ctx, this.chainNodes);
     }
@@ -3037,8 +3111,16 @@ export class TojiFighter extends Fighter {
       // Disable scale flipping during spinning final blow (baseAngle = 0) so the blade cutting edge naturally leads the clockwise rotation
       const finalBaseAngle = isSpinningFinalBlow ? 0 : baseAngle;
       drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, '#E8BD9B', finalBaseAngle);
-    } else {
+    } else if (this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH' || this.isAmbushThrust || this.ambushPhase === 'FRONT_PAUSE')) {
+      // Sequence 1 Ambush: Inverted Spear piercing backstab thrust
       drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, '#E8BD9B', baseAngle);
+    } else {
+      // Primary Basic Attack: Tactical Handgun / Pistol
+      const recoilDist = (this.pistolRecoilTimer && this.pistolRecoilTimer > 0) ? -2.5 * (this.pistolRecoilTimer / 8) : 0;
+      drawTojiPistol(ctx, this.x, this.y, baseAngle, this.r + recoilDist, '#E8BD9B', baseAngle, {
+        recoilTimer: this.pistolRecoilTimer || 0,
+        flashTimer: this.pistolFlashTimer || 0
+      });
     }
     ctx.restore();
 

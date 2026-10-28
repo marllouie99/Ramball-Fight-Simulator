@@ -586,6 +586,10 @@ canvas {
   will-change: top, transform;
 }
 
+.health-hud.classic-hud {
+  gap: 48px;
+}
+
 .health-card {
   flex: 1;
   min-width: 120px;
@@ -599,7 +603,7 @@ canvas {
    ───────────────────────────────────────────────────────── */
 
 /* 1. Base Comic Card Frame (Card hidden/frameless - floating bars and stats) */
-.health-hud .health-card:not(.tactical-card) {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) {
   min-width: 130px;
   background: transparent !important;
   border: none !important;
@@ -617,19 +621,19 @@ canvas {
 }
 
 /* Halftone Corner Accents (Hidden when card frame is removed) */
-.health-hud .health-card.hud-player-p1:not(.tactical-card)::before,
-.health-hud .health-card.hud-player-p2:not(.tactical-card)::before {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card)::before,
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card)::before {
   display: none !important;
 }
 
 /* Top Accent Rim based on fighter theme color (Removed when card frame is hidden) */
-.health-hud .health-card.hud-player-p1:not(.tactical-card),
-.health-hud .health-card.hud-player-p2:not(.tactical-card) {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card),
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) {
   border-top: none !important;
 }
 
 /* 2. Heavy-Gauge Slanted Life Bar */
-.health-hud .health-card:not(.tactical-card) .health-card__bar {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__bar {
   position: relative;
   width: 100%;
   height: 22px;
@@ -642,49 +646,49 @@ canvas {
 }
 
 /* P1: Inward Slant (Skew -10deg) */
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__bar {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .health-card__bar {
   transform: skewX(-10deg);
   border-radius: 3px;
 }
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__fill {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .health-card__fill {
   left: 0;
   right: auto;
   border-radius: 2px;
 }
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__ghost {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .health-card__ghost {
   left: 0;
   right: auto;
   border-radius: 2px;
 }
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__bar-text {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .health-card__bar-text {
   right: 8px;
   left: auto;
   transform: translateY(-50%) skewX(10deg);
 }
 
 /* P2: Inward Slant (Skew +10deg - Mirrored!) */
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__bar {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .health-card__bar {
   transform: skewX(10deg);
   border-radius: 3px;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__fill {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .health-card__fill {
   right: 0;
   left: auto;
   border-radius: 2px;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__ghost {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .health-card__ghost {
   right: 0;
   left: auto;
   border-radius: 2px;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__bar-text {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .health-card__bar-text {
   left: 8px;
   right: auto;
   transform: translateY(-50%) skewX(-10deg);
 }
 
 /* Life Bar Text: Bold High-Contrast Comic Font */
-.health-hud .health-card:not(.tactical-card) .health-card__bar-text {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__bar-text {
   font-family: 'Rajdhani', 'Outfit', sans-serif !important;
   font-size: 13px !important;
   font-weight: 900 !important;
@@ -697,7 +701,7 @@ canvas {
 }
 
 /* Life Bar Fill Specular Highlight */
-.health-hud .health-card:not(.tactical-card) .health-card__fill::after {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__fill::after {
   content: '' !important;
   display: block !important;
   position: absolute !important;
@@ -710,7 +714,7 @@ canvas {
 }
 
 /* 3. Slanted Comic Skill Boxes */
-.health-hud .health-card:not(.tactical-card) .hud-skill-box {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box {
   position: relative;
   background: #0B0D14;
   border: 2px solid #050609 !important;
@@ -724,32 +728,32 @@ canvas {
   margin-top: 1px;
 }
 
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box {
   transform: skewX(-10deg);
   border-radius: 2px;
   justify-content: flex-start;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box {
   transform: skewX(10deg);
   border-radius: 2px;
   justify-content: flex-end;
 }
 
 /* Un-skew text so font glyphs are 100% upright */
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box-text {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box-text {
   transform: skewX(10deg);
   margin-left: 8px;
   margin-right: 0;
   text-align: left;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box-text {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box-text {
   transform: skewX(-10deg);
   margin-right: 8px;
   margin-left: 0;
   text-align: right;
 }
 
-.health-hud .health-card:not(.tactical-card) .hud-skill-box-text {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box-text {
   font-family: 'Outfit', 'Rajdhani', sans-serif !important;
   font-size: 11.5px !important;
   font-weight: 800 !important;
@@ -765,39 +769,39 @@ canvas {
 }
 
 /* Skill Fills */
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box-fill {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box-fill {
   left: 0;
   right: auto;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box-fill {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box-fill {
   right: 0;
   left: auto;
 }
-.health-hud .health-card:not(.tactical-card) .hud-skill-box-fill {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box-fill {
   opacity: 0.70 !important;
 }
 
 /* Ready State Glowing Border & Golden Badge */
-.health-hud .health-card:not(.tactical-card) .hud-skill-box.hud-skill-ready {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box.hud-skill-ready {
   border-color: #050609 !important;
 }
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box.hud-skill-ready {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .hud-skill-box.hud-skill-ready {
   box-shadow: 0 0 6px rgba(56, 189, 248, 0.45), 2px 2px 0px #050609 !important;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box.hud-skill-ready {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .hud-skill-box.hud-skill-ready {
   box-shadow: 0 0 6px rgba(239, 68, 68, 0.45), 2px 2px 0px #050609 !important;
 }
 
 /* Remove Ready Banner / Badge on Skill Bars */
 .hud-skill-box::after,
 .hud-skill-box.hud-skill-ready::after,
-.health-hud .health-card:not(.tactical-card) .hud-skill-box.hud-skill-ready::after {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box.hud-skill-ready::after {
   display: none !important;
   content: none !important;
 }
 
 /* Label-Only Skill Box (e.g. passive indicators) */
-.health-hud .health-card:not(.tactical-card) .hud-skill-box.label-only {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box.label-only {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
@@ -806,8 +810,8 @@ canvas {
 }
 
 /* 4. Comic Tactical Stats: 1-Column Grid, Clean Text (No Cards) */
-.health-hud .health-card:not(.tactical-card) .health-card__info,
-.health-card__info {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info,
+body:not(.hud-layout-classic) .health-card__info {
   display: grid !important;
   grid-template-columns: 1fr !important;
   gap: 3.5px !important;
@@ -819,13 +823,13 @@ canvas {
   padding: 0 !important;
 }
 
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__info,
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__info {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .health-card__info,
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .health-card__info {
   justify-items: flex-start !important;
 }
 
-.health-hud .health-card:not(.tactical-card) .health-card__info > div,
-.health-card__info > div {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info > div,
+body:not(.hud-layout-classic) .health-card__info > div {
   background: transparent !important;
   border: none !important;
   border-radius: 0 !important;
@@ -841,14 +845,14 @@ canvas {
   grid-column: 1 / -1 !important;
 }
 
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__info > div,
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__info > div {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .health-card__info > div,
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .health-card__info > div {
   justify-content: flex-start !important;
   text-align: left !important;
 }
 
-.health-hud .health-card:not(.tactical-card) .health-card__info .hud-stat-label,
-.health-card__info .hud-stat-label {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info .hud-stat-label,
+body:not(.hud-layout-classic) .health-card__info .hud-stat-label {
   color: #94A3B8 !important;
   font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
   font-size: 13.5px !important;
@@ -868,8 +872,8 @@ canvas {
      1px  1px 0 #000000 !important;
 }
 
-.health-hud .health-card:not(.tactical-card) .health-card__info .hud-stat-val,
-.health-card__info .hud-stat-val {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info .hud-stat-val,
+body:not(.hud-layout-classic) .health-card__info .hud-stat-val {
   color: #FFFFFF !important;
   font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
   font-size: 13.5px !important;
@@ -888,14 +892,14 @@ canvas {
      1px  1px 0 #000000 !important;
 }
 
-.health-hud .health-card:not(.tactical-card) .health-card__info > div.hud-chip-cyan,
-.health-hud .health-card:not(.tactical-card) .health-card__info > div.hud-chip-gold {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info > div.hud-chip-cyan,
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info > div.hud-chip-gold {
   border: none !important;
   box-shadow: none !important;
   background: transparent !important;
 }
 
-.health-hud .health-card:not(.tactical-card) .health-card__info > div.hud-chip-cyan .hud-stat-val {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info > div.hud-chip-cyan .hud-stat-val {
   color: #38BDF8 !important;
   -webkit-text-stroke: 1px #000000;
   paint-order: stroke fill;
@@ -911,7 +915,7 @@ canvas {
      0 0 6px rgba(56, 189, 248, 0.6) !important;
 }
 
-.health-hud .health-card:not(.tactical-card) .health-card__info > div.hud-chip-gold .hud-stat-val {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__info > div.hud-chip-gold .hud-stat-val {
   color: #FFE145 !important;
   -webkit-text-stroke: 1px #000000;
   paint-order: stroke fill;
@@ -928,10 +932,10 @@ canvas {
 }
 
 /* Win Bullets Alignment */
-.health-hud .health-card.hud-player-p1:not(.tactical-card) .health-card__wins {
+.health-hud:not(.classic-hud) .health-card.hud-player-p1:not(.tactical-card) .health-card__wins {
   justify-content: flex-start !important;
 }
-.health-hud .health-card.hud-player-p2:not(.tactical-card) .health-card__wins {
+.health-hud:not(.classic-hud) .health-card.hud-player-p2:not(.tactical-card) .health-card__wins {
   justify-content: flex-end !important;
 }
 
@@ -1754,6 +1758,7 @@ canvas {
 
 /* Character-card grade lettering on the top outer corner of each profile frame */
 .hud-top-profile__grade-canvas {
+  display: none !important;
   position: absolute;
   z-index: 7;
   top: -15px;
@@ -2404,6 +2409,18 @@ canvas {
      1px  1px 0 #000000 !important;
 }
 
+/* Classic HUD Mode: Clean flat pixel text without black comic stroke */
+body.hud-layout-classic .health-card b,
+body.hud-layout-classic .health-card__info,
+body.hud-layout-classic .health-card__info *,
+body.hud-layout-classic .health-card__info b,
+body.hud-layout-classic .health-card__info span,
+body.hud-layout-classic .health-card__info > div {
+  font-weight: normal !important;
+  -webkit-text-stroke: 0px !important;
+  text-shadow: none !important;
+}
+
 .health-card__info > div {
   white-space: nowrap;
   overflow: visible;
@@ -2818,9 +2835,9 @@ body.arena-dark-mode {
 /* Comic Manga Combat HUD Typography Override (Outfit & Rajdhani high-impact fonts) */
 #hudTopContainer .hud-top-duel,
 #hudTopContainer .hud-top-duel *:not(.hud-sans-name),
-.health-hud .health-card:not(.tactical-card) .hud-skill-box-text,
-.health-hud .health-card:not(.tactical-card) .hud-skill-box-text *,
-.health-hud .health-card:not(.tactical-card) .health-card__bar-text {
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box-text,
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .hud-skill-box-text *,
+.health-hud:not(.classic-hud) .health-card:not(.tactical-card) .health-card__bar-text {
   font-family: 'Outfit', 'Rajdhani', 'Impact', sans-serif !important;
 }
 
@@ -5636,3 +5653,17 @@ body.arena-dark-mode {
 .hud-top-bar.hud-bar-sans-stamina .health-card__bar-text {
   text-shadow: 1.5px 1.5px 0 #050609, -1px -1px 0 #050609, 1px -1px 0 #050609, -1px 1px 0 #050609, 0 0 8px rgba(56, 189, 248, 0.8) !important;
 }
+
+body.hud-layout-classic.arena-dark-mode .health-card__info,
+body.hud-layout-classic.arena-dark-mode .health-card__info > div,
+body.hud-layout-classic.arena-dark-mode .health-card__info b,
+body.hud-layout-classic.arena-dark-mode .health-card__info span,
+body.hud-layout-classic .health-card.arena-dark-mode .health-card__info,
+body.hud-layout-classic .health-card.arena-dark-mode .health-card__info > div,
+body.hud-layout-classic .health-card.arena-dark-mode .health-card__info b,
+body.hud-layout-classic .health-card.arena-dark-mode .health-card__info span {
+  color: #f0f2f5;
+  -webkit-text-stroke: 0px !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7) !important;
+}
+

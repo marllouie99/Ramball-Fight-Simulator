@@ -353,10 +353,10 @@ export const BASIC_ATTACK_SOUNDS = {
   // ── Toji (ID 99) ──────────────────────
   99: {
     get src() {
-      return CONFIG.toji?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+      return CONFIG.toji?.sounds?.pistolShot || 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3';
     },
     get volume() {
-      return CONFIG.toji?.soundVolumes?.swordSwing !== undefined ? CONFIG.toji.soundVolumes.swordSwing : 0.8;
+      return CONFIG.toji?.soundVolumes?.pistolShot !== undefined ? CONFIG.toji.soundVolumes.pistolShot : 0.95;
     },
     delay: 0,
   },
@@ -700,10 +700,10 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   // Toji — ISOH & Split Soul Katana Slashes
   'toji': {
     get src() {
-      return CONFIG.toji?.sounds?.swordSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3';
+      return CONFIG.toji?.sounds?.pistolShot || 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3';
     },
     get volume() {
-      return CONFIG.toji?.soundVolumes?.swordSwing !== undefined ? CONFIG.toji.soundVolumes.swordSwing : 0.8;
+      return CONFIG.toji?.soundVolumes?.pistolShot !== undefined ? CONFIG.toji.soundVolumes.pistolShot : 0.95;
     },
     delay: 0,
   },

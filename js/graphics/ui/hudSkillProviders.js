@@ -3151,7 +3151,13 @@ export function shouldShowHudSkillBars() {
  * @returns {boolean}
  */
 export function shouldShowHudStats() {
-  if (CONFIG.hudHideAll || CONFIG.hudHideStats || CONFIG.darkModeShowHudStats === 0) {
+  if (CONFIG.hudHideAll || CONFIG.hudHideStats) {
+    return false;
+  }
+  if (CONFIG.hudLayoutStyle === 'classic') {
+    return true;
+  }
+  if (CONFIG.darkModeShowHudStats === 0) {
     return false;
   }
   if (CONFIG.darkModeShowHudStats !== undefined) return Boolean(CONFIG.darkModeShowHudStats);

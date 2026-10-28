@@ -311,8 +311,8 @@ export class MahoragaFighter extends Fighter {
 
     if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain)) return false;
 
-    // Pause passive RCT regeneration upon taking direct combat damage
-    if (amount > 0) {
+    // Pause passive RCT regeneration upon taking direct combat damage (skipping continuous vortex ticks)
+    if (amount > 0 && !opts.isBlueDPS && !opts.isContinuous) {
       this.rctRegenDamagePauseTimer = CONFIG.mahoraga?.rctCombatDamagePauseFrames ?? 45;
     }
 

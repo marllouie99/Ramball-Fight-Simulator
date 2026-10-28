@@ -7,6 +7,7 @@ export const tojiConfig = {
     hair: 'Assets/model/toji/toji-hair.png',
     skin: 'Assets/model/toji/Toji-skin.png',
     ultimateOverlay: 'Assets/Overlays/toji-ultimate-overlay.png',
+    pistol: 'Assets/model/alucard/Alucard-pistol-gun.png',
   },
 
   name: 'Toji',
@@ -53,8 +54,18 @@ export const tojiConfig = {
   postUltimateInitialSlowMultiplier: 0.20, // Initial slow movement multiplier (20% speed) immediately after final blow before accelerating back to normal
   ultimateCraterSlashFadeFrames: 28, // Smooth visual follow-through and dissipation fadeout duration (frames) for 360 final blow crescent slash
 
-  // Primary Melee: Inverted Spear of Heaven (Amanosakahoko)
-  enableSpear: true,                 // Master toggle for Primary Melee: Inverted Spear of Heaven
+  // Primary Weapon: Tactical Pistol (Basic Attack)
+  enablePistol: true,                // Master toggle for Primary Weapon: Tactical Handgun / Pistol (Basic Attack)
+  pistolDamage: 14,                  // Base ballistic true damage per pistol bullet
+  pistolCooldown: 22,                // Crisp semi-automatic cadence (~2.7 shots/sec at 60fps)
+  pistolRange: 460,                  // Tactical shooting engagement range (px)
+  pistolBulletSpeed: 18,             // High-velocity ballistic bullet speed (px/frame)
+  pistolRecoil: 1.4,                 // Physical recoil impulse kicking backward on fire
+  pistolBulletRadius: 3.5,           // Projectile collision hit radius
+  pistolMuzzleLength: 49,            // Distance from center to pistol muzzle tip
+
+  // Secondary Cursed Tool: Inverted Spear of Heaven (Amanosakahoko — Ambush Thrust & Skills)
+  enableSpear: true,                 // Master toggle for Inverted Spear of Heaven
   spearRange: 50,                    // Distance required to land melee hit (50px reach)
   spearReach: 50,                    // Alias for reach
   spearCooldown: 32,                 // Crisp assassin attack cooldown (~0.53s swing cadence)
@@ -166,6 +177,7 @@ export const tojiConfig = {
 
   // Audio Configuration, Volume & Timing Delay Adjustments
   sounds: {
+    pistolShot: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
     spearSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     spearBackstab: 'Assets/Sound Effects/Skills/backstab.mp3',
     parryDodge: 'Assets/Sound Effects/Skills/parry.mp3',
@@ -181,6 +193,7 @@ export const tojiConfig = {
     groundSmash: 'Assets/Sound Effects/Attacks/groundSmash.mp3'
   },
   soundVolumes: {
+    pistolShot: 0.95,
     spearSwing: 0.90,
     spearBackstab: 0.85,
     parryDodge: 0.65,
@@ -204,6 +217,7 @@ export const tojiConfig = {
     phantomFlurry: 0.0              // 50% chance for 3rd sequence Phantom Flurry voiceline
   },
   soundDelays: {
+    pistolShot: 0,
     spearSwing: 0,
     spearBackstab: 0,
     parryDodge: 0,

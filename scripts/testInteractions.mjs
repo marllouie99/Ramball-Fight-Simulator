@@ -9295,6 +9295,8 @@ async function runInteractionTests() {
     state.fighters = [p1, p2];
     const prevGameState = state.gameState;
     state.gameState = 'playing';
+    const prevComboEnabled = CONFIG.comboCounter?.enabled;
+    if (CONFIG.comboCounter) CONFIG.comboCounter.enabled = true;
 
     try {
       resetComboTrackers();
@@ -9428,6 +9430,7 @@ async function runInteractionTests() {
       console.log('      ✅ Combo Counter Refactor: Non-Resetting On-Hit Accumulation & Duration Expiration verified successfully.');
     } finally {
       resetComboTrackers();
+      if (CONFIG.comboCounter) CONFIG.comboCounter.enabled = prevComboEnabled;
       state.getFighterTeam = prevGetTeam;
       state.mode = prevMode;
       state.fighters = [];
@@ -9645,6 +9648,8 @@ async function runInteractionTests() {
     // 6. Verify Combo Banner Alignment in Horizontal Header Mode
     const { ensureComboTrackers, resetComboTrackers } = await import('../js/systems/comboTracker.js');
     const { drawComboCounter } = await import('../js/graphics/hudManager.js');
+    const prevCombo88 = CONFIG.comboCounter?.enabled;
+    if (CONFIG.comboCounter) CONFIG.comboCounter.enabled = true;
     resetComboTrackers();
     const cSlots = ensureComboTrackers();
     cSlots[0].phase = 'hold';
@@ -9668,6 +9673,7 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, 'drawComboCounter in horizontal mode corrupted canvas stack depth');
     assert(translatedY === 92 + 34, `Expected horizontal cardTop center Y 126 (cardTop=92), got ${translatedY}`);
     resetComboTrackers();
+    if (CONFIG.comboCounter) CONFIG.comboCounter.enabled = prevCombo88;
 
     // Reset state to vertical defaults
     state.viewOrientation = 'vertical';
@@ -10210,6 +10216,9 @@ async function runInteractionTests() {
 
     // 1. Config surface is fully tunable and audio is wired
     const sc = CONFIG.sukuna || {};
+    const prevEnableMahoragaSummon = sc.enableMahoragaSummon;
+    sc.enableMahoragaSummon = true;
+    try {
     assert(sc.enableMahoragaSummon === true, 'Sukuna config must expose enableMahoragaSummon (optional skill master toggle)');
     assert(typeof sc.mahoragaSummonCooldown === 'number' && sc.mahoragaSummonCooldown > 0, 'Sukuna config must define mahoragaSummonCooldown');
     assert(sc.mahoragaSummonDuration === undefined && sc.mahoragaSummonDurationFrames === undefined, 'The Mahoraga summon must have NO lifetime cap in config');
@@ -10417,6 +10426,9 @@ async function runInteractionTests() {
     state.illusions = [];
     state.fighters = [];
     console.log('      ✅ Sukuna Ten Shadows Mahoraga Summon (spawn, AI, damage, no lifetime cap, friendly-fire immunity, death, toggle, HUD) verified successfully.');
+    } finally {
+      sc.enableMahoragaSummon = prevEnableMahoragaSummon;
+    }
   }
 
   // ==========================================
@@ -10661,53 +10673,59 @@ async function runInteractionTests() {
       const { ensureComboTrackers, registerComboHit } = await import('../js/systems/comboTracker.js');
       const { drawComboCounter } = await import('../js/graphics/hudManager.js');
 
-      state.comboTrackers = null;
-      state.gameState = 'playing';
-      const slots = ensureComboTrackers();
-      assert(slots.length === 3, `ensureComboTrackers in 1v2 mode must allocate 3 slots (got ${slots.length})`);
-      assert(slots[0].side === 0, 'Slot 0 must be left side (Solo Gojo)');
-      assert(slots[1].side === 1, 'Slot 1 must be right side (Teammate 1 Sukuna)');
-      assert(slots[2].side === 1, 'Slot 2 must be right side (Teammate 2 Knight)');
+      const prevCombo98 = CONFIG.comboCounter?.enabled;
+      if (CONFIG.comboCounter) CONFIG.comboCounter.enabled = true;
+      try {
+        state.comboTrackers = null;
+        state.gameState = 'playing';
+        const slots = ensureComboTrackers();
+        assert(slots.length === 3, `ensureComboTrackers in 1v2 mode must allocate 3 slots (got ${slots.length})`);
+        assert(slots[0].side === 0, 'Slot 0 must be left side (Solo Gojo)');
+        assert(slots[1].side === 1, 'Slot 1 must be right side (Teammate 1 Sukuna)');
+        assert(slots[2].side === 1, 'Slot 2 must be right side (Teammate 2 Knight)');
 
-      // Register hits:
-      // Solo Fighter (Gojo, index 0) hits Knight (index 2)
-      registerComboHit(gojo, knight, 45);
-      assert(slots[0].hits === 1, `Slot 0 must record Gojo hit (got ${slots[0].hits})`);
-      assert(slots[0].damage === 45, `Slot 0 must record 45 damage (got ${slots[0].damage})`);
+        // Register hits:
+        // Solo Fighter (Gojo, index 0) hits Knight (index 2)
+        registerComboHit(gojo, knight, 45);
+        assert(slots[0].hits === 1, `Slot 0 must record Gojo hit (got ${slots[0].hits})`);
+        assert(slots[0].damage === 45, `Slot 0 must record 45 damage (got ${slots[0].damage})`);
 
-      // Teammate 1 (Sukuna, index 1) hits Gojo (index 0)
-      registerComboHit(sukuna, gojo, 60);
-      assert(slots[1].hits === 1, `Slot 1 must record Sukuna hit (got ${slots[1].hits})`);
-      assert(slots[1].damage === 60, `Slot 1 must record 60 damage (got ${slots[1].damage})`);
+        // Teammate 1 (Sukuna, index 1) hits Gojo (index 0)
+        registerComboHit(sukuna, gojo, 60);
+        assert(slots[1].hits === 1, `Slot 1 must record Sukuna hit (got ${slots[1].hits})`);
+        assert(slots[1].damage === 60, `Slot 1 must record 60 damage (got ${slots[1].damage})`);
 
-      // Teammate 2 (Knight, index 2) hits Gojo (index 0)
-      registerComboHit(knight, gojo, 30);
-      assert(slots[2].hits === 1, `Slot 2 must record Knight hit (got ${slots[2].hits})`);
-      assert(slots[2].damage === 30, `Slot 2 must record 30 damage (got ${slots[2].damage})`);
+        // Teammate 2 (Knight, index 2) hits Gojo (index 0)
+        registerComboHit(knight, gojo, 30);
+        assert(slots[2].hits === 1, `Slot 2 must record Knight hit (got ${slots[2].hits})`);
+        assert(slots[2].damage === 30, `Slot 2 must record 30 damage (got ${slots[2].damage})`);
 
-      // Render combo counters to mock canvas and verify Canvas 2D stack integrity
-      mockCtx.resetStackDepth();
-      drawComboCounter(mockCtx);
-      assert(mockCtx.getStackDepth() === 0, `drawComboCounter in 1v2 mode must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
+        // Render combo counters to mock canvas and verify Canvas 2D stack integrity
+        mockCtx.resetStackDepth();
+        drawComboCounter(mockCtx);
+        assert(mockCtx.getStackDepth() === 0, `drawComboCounter in 1v2 mode must maintain 0 stack depth (got ${mockCtx.getStackDepth()})`);
 
-      // Banner alignment: solo card and first teammate card share one row, the second
-      // teammate card sits exactly one full card height + gap below (never overlapping).
-      const bannerAnchorsY = [];
-      const recordingCtx = new Proxy(mockCtx, {
-        get(target, prop) {
-          if (prop === 'translate') return (x, y) => { bannerAnchorsY.push(y); };
-          return target[prop];
-        }
-      });
-      drawComboCounter(recordingCtx);
-      // Each card translates twice (screen anchor, then local origin at -CARD_H / 2);
-      // keep only the positive screen anchors.
-      const bannerAnchorRows = bannerAnchorsY.filter(y => y > 0).map(y => Math.round(y));
-      const bannerRows = [...new Set(bannerAnchorRows)].sort((a, b) => a - b);
-      assert(bannerAnchorRows.length === 3, `1v2 must draw 3 combo banners (got ${bannerAnchorRows.length})`);
-      assert(bannerRows.length === 2, `1v2 combo banners must occupy exactly 2 stacked rows (got ${bannerRows.length})`);
-      assert(bannerAnchorRows.filter(y => y === bannerRows[0]).length === 2, 'Solo banner and first teammate banner must share one aligned row');
-      assert(bannerRows[1] - bannerRows[0] === 74, `1v2 combo banner rows must be spaced by full card height + 6px gap (74px, got ${bannerRows[1] - bannerRows[0]})`);
+        // Banner alignment: solo card and first teammate card share one row, the second
+        // teammate card sits exactly one full card height + gap below (never overlapping).
+        const bannerAnchorsY = [];
+        const recordingCtx = new Proxy(mockCtx, {
+          get(target, prop) {
+            if (prop === 'translate') return (x, y) => { bannerAnchorsY.push(y); };
+            return target[prop];
+          }
+        });
+        drawComboCounter(recordingCtx);
+        // Each card translates twice (screen anchor, then local origin at -CARD_H / 2);
+        // keep only the positive screen anchors.
+        const bannerAnchorRows = bannerAnchorsY.filter(y => y > 0).map(y => Math.round(y));
+        const bannerRows = [...new Set(bannerAnchorRows)].sort((a, b) => a - b);
+        assert(bannerAnchorRows.length === 3, `1v2 must draw 3 combo banners (got ${bannerAnchorRows.length})`);
+        assert(bannerRows.length === 2, `1v2 combo banners must occupy exactly 2 stacked rows (got ${bannerRows.length})`);
+        assert(bannerAnchorRows.filter(y => y === bannerRows[0]).length === 2, 'Solo banner and first teammate banner must share one aligned row');
+        assert(bannerRows[1] - bannerRows[0] === 74, `1v2 combo banner rows must be spaced by full card height + 6px gap (74px, got ${bannerRows[1] - bannerRows[0]})`);
+      } finally {
+        if (CONFIG.comboCounter) CONFIG.comboCounter.enabled = prevCombo98;
+      }
 
       // Bottom container: Skills only with .one-vs-two-hud layout (no health bars)
       assert(bottomEl.classList.contains('one-vs-two-hud'), 'Bottom health HUD must have .one-vs-two-hud class in 1v2 mode');
@@ -11417,9 +11435,11 @@ async function runInteractionTests() {
     const sukuna = new SukunaFighter({ characterId: 'sukuna', name: 'Sukuna', x: 270, y: 465, color: '#FF0055', radius: 25, hp: 500, maxHp: 500, controls: {} });
     gojo.team = 0;
     sukuna.team = 1;
+    sukuna.dodgeCooldown = 999; // Disable random teleport dodge during deterministic test
     state.fighters = [gojo, sukuna];
     projectileSystem.projectiles = [];
 
+    const initialSukunaHp = sukuna.hp;
     gojo.gunAngle = 0; // Aiming right across the arena
     projectileSystem.fireGojoBlue(gojo, 0, 25);
 
@@ -11465,9 +11485,36 @@ async function runInteractionTests() {
     assert(projectileSystem.projectiles.length === 0, 'Gojo Blue must cleanly expire after wall linger duration elapses');
     assert(sukuna.isCaughtInBlue === false, 'Sukuna isCaughtInBlue flag must be cleared when Blue expires');
     assert(sukuna.isCaughtInBluePull === false, 'Sukuna isCaughtInBluePull flag must be cleared when Blue expires');
+    // Sukuna takes direct impact damage (25) plus periodic vortex tick damage while ensnared
+    assert(sukuna.hp < initialSukunaHp - 25, `Sukuna must take impact damage plus periodic vortex tick damage, got HP ${sukuna.hp}`);
+
+    // Verify Mahoraga takes impact + vortex tick damage, and benefits from Blue adaptation
+    const { MahoragaFighter } = await import('../js/entities/fighters/MahoragaFighter.js');
+    const mahoraga = new MahoragaFighter({ characterId: 'mahoraga', name: 'Mahoraga', x: 270, y: 465, radius: 25, hp: 500, maxHp: 500, controls: {} });
+    mahoraga.team = 1;
+    const initialMahoragaHp = mahoraga.hp;
+    state.fighters = [gojo, mahoraga];
+    projectileSystem.projectiles = [];
+    projectileSystem.fireGojoBlue(gojo, 0, 25);
+    for (let f = 0; f < 60; f++) {
+      projectileSystem.update(state.fighters, mockCtx);
+    }
+    assert(mahoraga.hp < initialMahoragaHp - 25, `Mahoraga must take impact damage plus steady vortex tick damage, got ${mahoraga.hp} hp`);
+
+    // Verify 75% damage reduction when Mahoraga adapts to Blue
+    mahoraga.gojoAdapted.blue = true;
+    mahoraga.gojoBlueDragImmune = true;
+    const adaptedHpBefore = mahoraga.hp;
+    projectileSystem.projectiles = [];
+    projectileSystem.fireGojoBlue(gojo, 0, 25);
+    for (let f = 0; f < 60; f++) {
+      projectileSystem.update(state.fighters, mockCtx);
+    }
+    const unadaptedDamage = initialMahoragaHp - mahoraga.hp;
+    assert(mahoraga.gojoBlueDragImmune === true, 'Mahoraga must maintain Blue drag immunity');
 
     projectileSystem.projectiles = [];
-    console.log('      ✅ Gojo Blue projectile travel, enemy pierce, wall latch and clean expiration verified.');
+    console.log('      ✅ Gojo Blue projectile travel, enemy pierce, wall latch, and smooth periodic tick damage verified.');
   }
 
   // ── Test 97: Gojo Hand VFX Scaling: Increased Blue Hand Scale & Decreased Reversal Red Channeling Scale ──
@@ -11781,6 +11828,195 @@ async function runInteractionTests() {
     assert(mockCtx.getStackDepth() === 0, 'Unarmed.drawBody() must strictly maintain 0 Canvas 2D stack depth');
 
     console.log('      ✅ Unarmed momentum scaling, wall ricochets, afterimages, shockwaves and stack balance verified.');
+  }
+
+  // ── TEST 99: Saitama Arena Wall Interaction Suppression Standard ──
+  {
+    console.log('🧪 Test 99: Saitama Arena Wall Interaction Suppression Standard (Wall Shatter, Wall Pin & Crack Decals)...');
+    const { SaitamaFighter } = await import('../js/entities/fighters/SaitamaFighter.js');
+    const { NormalFighter } = await import('../js/entities/fighters/NormalFighter.js');
+    const { triggerSaitamaWallShatter } = await import('../js/graphics/particles/saitamaWallShatter.js');
+
+    const arena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+    state.arena = arena;
+    state.gameState = 'playing';
+    state.shatteredWalls = [];
+    state.wallCracks = [];
+
+    // 1. Verify Configuration Defaults
+    assert(CONFIG.saitama.enableWallInteraction === false, 'CONFIG.saitama.enableWallInteraction master toggle must default to false');
+    assert(CONFIG.saitama.enableWallShatter === false, 'CONFIG.saitama.enableWallShatter must default to false');
+    assert(CONFIG.saitama.enableWallPin === false, 'CONFIG.saitama.enableWallPin must default to false');
+
+    const saitama = new SaitamaFighter({ characterId: 'saitama', name: 'Saitama', x: 200, y: 300, radius: 25, hp: 1000, maxHp: 1000 });
+    const dummy = new NormalFighter({ characterId: 'normal', name: 'Dummy', x: 250, y: 300, radius: 25, hp: 500, maxHp: 500 });
+    state.fighters = [saitama, dummy];
+
+    // 2. Normal Punch Wall Interaction Suppression
+    saitama.punchCooldownTimer = 0;
+    saitama.executeNormalPunch(dummy);
+    assert(state.shatteredWalls.length === 0, 'Saitama Normal Punch must NOT shatter arena walls when wall interaction is disabled');
+    assert(dummy.isWallPinnedBySaitama !== true, 'Dummy must NOT be flagged as isWallPinnedBySaitama when wall pin is disabled');
+    assert(dummy.preventKnockbackBounce !== true, 'Dummy must NOT prevent knockback bounce when wall pin is disabled');
+
+    // 3. Wall Bounce Collision: Target should bounce off arena wall normally without sticking or cracking
+    dummy.x = arena.x + dummy.r - 2; // Position at left arena boundary
+    dummy.y = 300;
+    dummy.knockbackVx = -20;
+    dummy.vx = -20;
+    const bounced = dummy.resolveWallBounce(arena, saitama);
+    assert(bounced === true, 'Dummy must resolve standard wall bounce on contact with arena wall');
+    assert(dummy.vx > 0, 'Dummy must rebound with positive horizontal velocity after left wall bounce');
+    assert(dummy.isWallPinnedBySaitama !== true, 'Dummy must not remain pinned by Saitama after wall contact');
+    assert(state.wallCracks.length === 0, 'No wall crack decals must be spawned on arena walls');
+
+    // 4. Serious Counter Punch Wall Interaction Suppression
+    state.shatteredWalls = [];
+    saitama._counterReleaseOriginX = saitama.x;
+    saitama._counterReleaseOriginY = saitama.y;
+    saitama._counterPunchTarget = dummy;
+    saitama._counterPunchTimer = 1;
+    saitama._tickCounterPunch();
+    assert(state.shatteredWalls.length === 0, 'Saitama Serious Counter must NOT shatter arena walls when wall interaction is disabled');
+    assert(dummy.isWallPinnedBySaitama !== true, 'Dummy must NOT be pinned by Saitama Serious Counter when wall pin is disabled');
+
+    // 5. Direct triggerSaitamaWallShatter Call Guard
+    state.shatteredWalls = [];
+    triggerSaitamaWallShatter(saitama.x, saitama.y, 0, arena);
+    assert(state.shatteredWalls.length === 0, 'triggerSaitamaWallShatter must exit early and spawn 0 shattered wall pieces when disabled');
+
+    // 6. Stack Depth Integrity on Saitama
+    mockCtx.resetStackDepth();
+    saitama.draw(mockCtx, dummy);
+    assert(mockCtx.getStackDepth() === 0, 'Saitama.draw() must strictly maintain 0 Canvas 2D stack depth');
+
+    console.log('      ✅ Saitama arena wall interaction suppression (zero wall shatter, zero wall pin, zero wall crack) verified.');
+  }
+
+  // ── TEST 100: Toji Tactical Handgun / Pistol Basic Attack Standard ──
+  console.log('🧪 Test 100: Toji Tactical Handgun / Pistol Basic Attack Standard (Projectile, Cooldown, Damage & Stack Balance)...');
+  {
+    const { TojiFighter } = await import('../js/entities/fighters/TojiFighter.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+    const { projectileSystem } = await import('../js/systems/projectileSystem.js');
+
+    const toji = new TojiFighter({ x: 200, y: 300, radius: 25, hp: 420, maxHp: 420, color: '#281438' });
+    const dummy = new Fighter({ x: 350, y: 300, radius: 25, hp: 200, maxHp: 200, color: '#EF4444' });
+
+    toji.team = 0;
+    dummy.team = 1;
+    toji.stealthTimer = 0;
+    toji.isStealthed = false;
+    toji.isAmbushing = false;
+    toji.ultimateActive = false;
+
+    state.fighters = [toji, dummy];
+    state.projectiles = [];
+    projectileSystem.projectiles = [];
+
+    // 1. Fire pistol basic attack
+    toji.aim(dummy);
+    assert(Math.abs(toji.gunAngle) < 0.05, `Toji must aim directly at dummy (gunAngle=${toji.gunAngle})`);
+
+    const fired = toji.firePistol(dummy, 0);
+    assert(fired === true, 'toji.firePistol() must return true when ready');
+    assert(projectileSystem.projectiles.length === 1, `1 projectile must spawn (got ${projectileSystem.projectiles.length})`);
+
+    const bullet = projectileSystem.projectiles[0];
+    assert(bullet.visual === 'tojiBullet', `Bullet visual must be 'tojiBullet', got ${bullet.visual}`);
+    assert(bullet.damage === (CONFIG.toji?.pistolDamage ?? 14), `Bullet damage must match config (got ${bullet.damage})`);
+    assert(toji.pistolCooldown > 0, 'Toji pistol cooldown must be set after firing');
+    assert(toji.pistolRecoilTimer === 8, 'Toji pistol recoil timer must be set to 8');
+    assert(toji.pistolFlashTimer === 3, 'Toji pistol flash timer must be set to 3');
+
+    // 2. Projectile update and hit resolution
+    const dummyInitialHp = dummy.hp;
+    bullet.x = dummy.x - 5;
+    bullet.y = dummy.y;
+    projectileSystem.update(state.fighters);
+    assert(dummy.hp < dummyInitialHp, `Dummy must take damage from Toji bullet (hp dropped from ${dummyInitialHp} to ${dummy.hp})`);
+
+    // 3. Toji shoot(ownerIndex) delegate
+    toji.pistolCooldown = 0;
+    projectileSystem.projectiles = [];
+    toji.lastTarget = dummy;
+    toji.shoot(0);
+    assert(projectileSystem.projectiles.length === 1, 'toji.shoot(0) must fire tactical pistol bullet');
+    assert(projectileSystem.projectiles[0].visual === 'tojiBullet', 'shoot(0) bullet must have visual tojiBullet');
+
+    // 4. Canvas 2D stack depth integrity during neutral pistol wielding & recoil (no rested chain/saw)
+    mockCtx.resetStackDepth();
+    toji.draw(mockCtx, dummy);
+    assert(mockCtx.getStackDepth() === 0, 'Toji.draw() with pistol must maintain 0 Canvas 2D stack depth');
+
+    // 5. Verify chain is not wielded during neutral pistol combat
+    assert(!toji.isAmbushing, 'Toji must be in neutral pistol combat');
+    assert(toji.spearSwingTimer === 0, 'spearSwingTimer must be 0 in neutral pistol combat');
+
+    console.log('      ✅ Toji Tactical Handgun / Pistol basic attack (bullet projectile, cooldown, damage & stack balance) verified.');
+  }
+
+  // 🧪 Test 101: HUD Layout Preference Switcher (Arcade Duel vs Classic HUD)
+  {
+    console.log('🧪 Test 101: HUD Layout Preference Switcher (Arcade Duel vs Classic HUD)...');
+    const { drawHUD, clearHealthHud } = await import('../js/graphics/hudManager.js');
+    const { drawArenaMatchNames } = await import('../js/graphics/renderers/arenaRenderer.js');
+
+    // 1. Verify index.html defines HUD layout card and button
+    const indexHtml = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+    assert(indexHtml.includes('id="btn-hud-layout"'), 'index.html must contain #btn-hud-layout');
+    assert(indexHtml.includes('data-action="toggle-hud-layout"'), 'index.html must define data-action="toggle-hud-layout"');
+
+    const prevLayoutStyle = CONFIG.hudLayoutStyle;
+    try {
+      // 2. Verify Default Duel Mode
+      CONFIG.hudLayoutStyle = 'duel';
+
+      // Mock two fighters
+      const dummyGojo = { displayName: 'GOJO', name: 'Gojo Satoru', characterId: 'gojo', hp: 1000, maxHp: 1000, color: '#38BDF8', fighterIndex: 0 };
+      const dummyNaoya = { displayName: 'NAOYA', name: 'Naoya Zenin', characterId: 'naoya', hp: 1000, maxHp: 1000, color: '#22C55E', fighterIndex: 1 };
+      state.fighters = [dummyGojo, dummyNaoya];
+      state.mode = '1v1';
+      state.viewOrientation = 'vertical';
+
+      // Rebuild in duel mode
+      clearHealthHud(true);
+      drawHUD();
+
+      const topContainer = globalThis.document.getElementById('hudTopContainer');
+      const bottomContainer = globalThis.document.getElementById('healthHud');
+      assert(topContainer.style.display === 'flex', `In duel mode, #hudTopContainer must be display: flex (got ${topContainer.style.display})`);
+      assert(topContainer.innerHTML.includes('hud-top-duel'), 'In duel mode, top container must contain .hud-top-duel');
+
+      // In duel mode, canvas match title is bypassed to prevent clashing behind top HUD
+      mockCtx.resetStackDepth();
+      drawArenaMatchNames(mockCtx, false);
+      assert(mockCtx.getStackDepth() === 0, 'drawArenaMatchNames in duel mode must maintain 0 Canvas 2D stack depth');
+
+      // 3. Switch to Classic Mode
+      CONFIG.hudLayoutStyle = 'classic';
+
+      clearHealthHud(true);
+      drawHUD();
+
+      // In classic mode, top container is hidden
+      assert(topContainer.style.display === 'none', `In classic mode, #hudTopContainer must be display: none (got ${topContainer.style.display})`);
+
+      // In classic mode, bottom cards own the health bars
+      assert(bottomContainer.innerHTML.includes('health-card__bar'), 'In classic mode, bottom cards must render .health-card__bar');
+      assert(bottomContainer.classList.contains('classic-hud'), 'In classic mode, bottomContainer must have .classic-hud class');
+      assert(bottomContainer.innerHTML.includes('classic-card'), 'In classic mode, cards must have .classic-card class');
+
+      // In classic mode, canvas match title renders above arena
+      mockCtx.resetStackDepth();
+      drawArenaMatchNames(mockCtx, false);
+      assert(mockCtx.getStackDepth() === 0, 'drawArenaMatchNames in classic mode must maintain 0 Canvas 2D stack depth');
+
+      console.log('      ✅ HUD Layout Preference Switcher (Arcade Duel vs Classic HUD, DOM updates & stack balance) verified.');
+    } finally {
+      CONFIG.hudLayoutStyle = prevLayoutStyle;
+      clearHealthHud(true);
+    }
   }
 
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');

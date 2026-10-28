@@ -203,6 +203,7 @@ export const CONFIG = {
   },
   blackFlash: blackFlashConfig,
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
+  hudLayoutStyle: 'duel',       // Preferred HUD layout (Settings → HUD & INTERFACE): 'duel' = top portrait/HP cards own the match names + health, 'classic' = match names drawn above the arena wall + HP bar inside each bottom card
   darkModeShowHudSkillBars: 0,  // Toggle on/off to display HUD skill progress bars across Light and Dark mode (1 = show all, 0 = signature skills only, -1/hide = hide all)
   darkModeShowHudStats: 0,      // Toggle on/off to display HUD fighter stats info (DMG, SPD, ATK, etc.) across Light and Dark mode (1 = show, 0 = hide)
   hudHideAll: false,            // Master toggle: completely hide all top screen HUD cards/elements (health cards, skill bars, stats, descriptions)
@@ -222,7 +223,7 @@ export const CONFIG = {
   // Mirrored "COMBO" cards that slide in at each window edge, just below the TOP HUD,
   // counting consecutive damaging hits per side (see js/systems/comboTracker.js).
   comboCounter: {
-    enabled: true,             // Master toggle for the on-screen combo counter
+    enabled: false,            // Master toggle for the on-screen combo counter (hidden for now)
     useFighterTheme: true,     // Dynamically adapt banner color theme to attacking fighter's signature colors
     windowFrames: 90,          // Frames without a hit before the chain expires (90 = 1.5s at 60 FPS)
     minHits: 1,                // Minimum chain length before a card is shown

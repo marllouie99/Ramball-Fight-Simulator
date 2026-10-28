@@ -468,6 +468,9 @@ class ProjectileSystem {
     if (!visualType && fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {
       visualType = 'johnWickBullet';
     }
+    if (!visualType && (fighter.characterId === 'toji' || fighter.type === 'toji' || fighter._def?.type === 'toji')) {
+      visualType = 'tojiBullet';
+    }
 
 
 
@@ -505,6 +508,12 @@ class ProjectileSystem {
         proj.life = CONFIG.john_wick.bulletLife;
         proj.maxLife = CONFIG.john_wick.bulletLife;
       }
+    }
+
+    if (visualType === 'tojiBullet' && CONFIG.toji) {
+      proj.isTojiBullet = true;
+      if (CONFIG.toji.pistolBulletRadius) proj.r = CONFIG.toji.pistolBulletRadius;
+      proj.historyMax = 12;
     }
 
     if (willBecomeBlackHole) {
@@ -658,8 +667,8 @@ class ProjectileSystem {
     proj.hitTargets = new Set();
     proj.hitFighters = new Set();
     proj.piercing = true;
-    proj.blueDPS = CONFIG.gojo?.blueDPS ?? 65;
-    proj.blueDPSInterval = CONFIG.gojo?.blueDPSInterval ?? 10;
+    proj.blueDPS = (typeof CONFIG.gojo?.blueDPS === 'number') ? CONFIG.gojo.blueDPS : 10;
+    proj.blueDPSInterval = (typeof CONFIG.gojo?.blueDPSInterval === 'number') ? CONFIG.gojo.blueDPSInterval : 12;
     proj.blueLastDPSTick = 0;
     proj.isWallLingering = false;
     proj.wallLingerTimer = 0;
@@ -1764,6 +1773,12 @@ class ProjectileSystem {
             }
             if (attacker && typeof attacker.onDamageDealt === 'function') {
               attacker.onDamageDealt(fighter, projectile, projectile.owner);
+            }
+            if (projectile.visual === 'tojiBullet') {
+              const knockbackForce = 1.2; 
+              const hitAngle = Math.atan2(projectile.vy, projectile.vx);
+              fighter.vx += Math.cos(hitAngle) * knockbackForce;
+              fighter.vy += Math.sin(hitAngle) * knockbackForce;
             }
             if (projectile.visual === 'EngineerBullet') {
               // Apply small knockback from shotgun pellets
@@ -4221,6 +4236,32 @@ class ProjectileSystem {
             }
           }
 
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          continue;
+        }
+
+        const isTojiBullet = p.isTojiBullet || p.visual === 'tojiBullet';
+        if (isTojiBullet && expired && !hit) {
+          const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+          let wallX = p.x;
+          let wallY = p.y;
+          if (arena) {
+            const minX = arena.x + p.r;
+            const maxX = arena.x + arena.width - p.r;
+            const minY = arena.y + p.r;
+            const maxY = arena.y + arena.height - p.r;
+            wallX = Math.max(minX, Math.min(maxX, p.x));
+            wallY = Math.max(minY, Math.min(maxY, p.y));
+          }
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(wallX, wallY, 7, 'gold', '#F59E0B');
+            spawnSparks(wallX, wallY, 4, 'silverStreak', '#CBD5E1');
+          }
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(wallX, wallY, 15, '#F59E0B');
+          }
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
