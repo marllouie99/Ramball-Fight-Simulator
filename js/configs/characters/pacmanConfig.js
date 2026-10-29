@@ -12,8 +12,8 @@ export const pacmanConfig = {
     'Retro arcade legend who navigates the arena eating dots on every tile. Once all arena dots are consumed, Pac-Man enters Super Chomp mode, gaining temporary attack power to hunt and bite enemies for 30% damage before refilling the arena with dots.',
 
   // ── Base Stats (Rule 24 Universal Baseline Radius: 25) ──
-  r: 25,
-  radius: 25,
+  r: 32,
+  radius: 32,
   hp: 350,
   maxHp: 350,
   speed: 4.8,

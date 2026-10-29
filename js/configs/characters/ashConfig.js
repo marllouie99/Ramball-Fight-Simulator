@@ -48,19 +48,39 @@ export const ashConfig = {
   honeycombBarrierColor: '#38BDF8',
   honeycombBarrierGold: '#FACC15',
 
+  // Trainer Sideline Repositioning (Safe Vantage Points: Top-Middle, Left-Middle, Right-Middle)
+  trainerSlowMoveMultiplier: 0.28, // Slow, deliberate trainer walk speed multiplier (~1.5 px/frame)
+  trainerVantagePad: 42,           // Sideline wall offset padding in pixels
+
   // ──────────────────────────────────────────
   // Skill 1: Trainer Command — Signature Elemental Move (Thunderbolt / Flamethrower / Water Shuriken / Aura Sphere)
   // ──────────────────────────────────────────
   enableTrainerCommand: true,
-  commandCooldownFrames: 150,   // 2.5s cooldown between special move commands
-  commandDamageBonus: 1.25,     // +25% damage on commanded signature attacks
+  commandCooldownFrames: 150,        // 2.5s cooldown between special move commands
+  initialCommandCooldownFrames: 180, // Initial delay before first trainer command (~3.0s at 60 FPS)
+  commandDamageBonus: 1.25,          // +25% damage on commanded signature attacks
 
   // ──────────────────────────────────────────
   // Ultimate: 10,000,000 Volt Thunderbolt Barrage
   // ──────────────────────────────────────────
-  ultimateCooldownFrames: 780,  // 13.0s cooldown
-  ultimateDurationFrames: 420,  // 7.0s duration
+  enableUltimate: false,
+  ultimateCooldownFrames: 780,        // 13.0s cooldown
+  initialUltimateCooldownFrames: 240, // 4.0s initial cooldown at match start
+  ultimateDurationFrames: 420,        // 7.0s duration
   ultimateBoltDamage: 18,
+
+  // ──────────────────────────────────────────
+  // Pokémon Aces Deployment Toggles (Enable / Disable Specific Pokémon Summons)
+  // ──────────────────────────────────────────
+  enablePikachu: true,
+  enableCharizard: true,
+  enableGreninja: true,
+  enableLucario: true,
+
+  // ──────────────────────────────────────────
+  // Combat Stance & Cast Immunities
+  // ──────────────────────────────────────────
+  enablePokemonSkillImmunity: true, // Grants push back, pull, drag, and knockback immunity to Pokémon while casting skills
 
   // ──────────────────────────────────────────
   // Ash's 4 Anime Aces Roster Stats & Movesets (Canonical Empress catalog.bytes specs)
@@ -69,15 +89,18 @@ export const ashConfig = {
   pokemonRoster: {
     pikachu: {
       id: 'pikachu',
+      enabled: true,
       dexNumber: '0025',
       name: 'PIKACHU',
       themeColor: '#FACC15',
       secondaryColor: '#FEF08A',
-      hp: 155,
+      hp: 300,
       radius: 25,
       speed: 5.4,
       scale: 2.00,
-      cryKey: 'cryPikachu',
+      cryKey: 'cryPikachuStarter',
+      starterCryKey: 'cryPikachuStarter',
+      battleCryKey: 'cryPikachu',
       megaCryKey: 'cryPikachuStarter',
       get megaHudSkillLabel() { return null; },
 
@@ -89,6 +112,8 @@ export const ashConfig = {
           damage: 18,
           reach: 64,
           cooldown: 34,
+          initialCooldown: 20,       // Initial delay before first melee strike (~0.33s)
+          initialCooldownFrames: 20,
           knockback: 6,
           hitStun: 12,
           dashMultiplier: 1.60,
@@ -101,7 +126,9 @@ export const ashConfig = {
           hudLabel: 'THUNDERBOLT',
           windupCallout: 'PIKA...',
           attackCallout: '...CHUUUUUU!',
-          cooldown: 500,             // Autonomous Thunderbolt cooldown (2.25s at 60 FPS)
+          cooldown: 135,             // Autonomous Thunderbolt cooldown (2.25s at 60 FPS)
+          initialCooldown: 180,      // Initial cooldown before first Thunderbolt (~3.0s at 60 FPS)
+          initialCooldownFrames: 180,
           windupFrames: 24,          // High-voltage cheek charging & spark gathering (~0.40s)
           beamDurationFrames: 58,    // Continuous sustained lightning torrent (~0.97s)
           beamTickRate: 5,           // Multi-tick damage delivered every 5 frames (~11 ticks)
@@ -128,7 +155,10 @@ export const ashConfig = {
       get meleeDamage() { return this.skills.melee.damage; },
       get meleeReach() { return this.skills.melee.reach; },
       get meleeCooldown() { return this.skills.melee.cooldown; },
+      get initialMeleeCooldown() { return this.skills.melee.initialCooldown; },
       get specialCooldown() { return this.skills.special.cooldown; },
+      get initialSpecialCooldown() { return this.skills.special.initialCooldown; },
+      get initialSpecialDelayFrames() { return this.skills.special.initialCooldown; },
       get specialName() { return this.skills.special.name; },
       get hudSkillLabel() { return this.skills.special.hudLabel; },
       get windupCallout() { return this.skills.special.windupCallout; },
@@ -145,11 +175,12 @@ export const ashConfig = {
     },
     charizard: {
       id: 'charizard',
+      enabled: true,
       dexNumber: '0006',
       name: 'CHARIZARD',
       themeColor: '#F97316',
       secondaryColor: '#EF4444',
-      hp: 210,
+      hp: 350,
       radius: 50,
       speed: 5.0,
       scale: 3.65,
@@ -163,6 +194,8 @@ export const ashConfig = {
           damage: 24,
           reach: 78,
           cooldown: 42,
+          initialCooldown: 24,          // Initial delay before first melee strike (~0.40s)
+          initialCooldownFrames: 24,
           knockback: 8,
           hitStun: 14,
           meleeSfx: 'dragonClaw'
@@ -173,10 +206,14 @@ export const ashConfig = {
           hudLabel: 'FLAMETHROWER',
           windupCallout: 'CHAR...',
           attackCallout: '...ROOOAAAR!',
-          cooldown: 520,                // Autonomous Flamethrower cooldown
+          cooldown: 200,                // Autonomous Flamethrower cooldown
+          initialCooldown: 200,         // Initial cooldown before first Flamethrower (~3.0s at 60 FPS)
+          initialCooldownFrames: 200,
           windupFrames: 28,             // Deep inhale & throat fire gathering (~0.45s)
           streamDurationFrames: 120,    // Steady 2.0s continuous raging flame torrent (120 frames at 60 FPS)
           beamDurationFrames: 120,      // Alias for streamDurationFrames
+          streamTurnRate: 0.085,        // Dynamic aim tracking speed while firing Flamethrower (~4.9°/frame at 60 FPS)
+          turnRate: 0.085,              // Alias for streamTurnRate
           streamTickRate: 6,            // Multi-tick damage delivered every 6 frames (~20 ticks across 2s)
           streamDamagePerTick: 3,       // Damage per tick (~60 total damage across full stream)
           streamWidth: 48,              // Width/thickness of expanding raging fire jet
@@ -200,7 +237,10 @@ export const ashConfig = {
       get meleeDamage() { return this.skills.melee.damage; },
       get meleeReach() { return this.skills.melee.reach; },
       get meleeCooldown() { return this.skills.melee.cooldown; },
+      get initialMeleeCooldown() { return this.skills.melee.initialCooldown; },
       get specialCooldown() { return this.skills.special.cooldown; },
+      get initialSpecialCooldown() { return this.skills.special.initialCooldown; },
+      get initialSpecialDelayFrames() { return this.skills.special.initialCooldown; },
       get specialName() { return this.skills.special.name; },
       get hudSkillLabel() { return this.skills.special.hudLabel; },
       get windupCallout() { return this.skills.special.windupCallout; },
@@ -224,6 +264,7 @@ export const ashConfig = {
     },
     greninja: {
       id: 'greninja',
+      enabled: true,
       dexNumber: '0658',
       name: 'ASH-GRENINJA',
       themeColor: '#3B82F6',
@@ -242,6 +283,8 @@ export const ashConfig = {
           damage: 20,
           reach: 70,
           cooldown: 30,
+          initialCooldown: 18,          // Initial delay before first melee strike (~0.30s)
+          initialCooldownFrames: 18,
           knockback: 6,
           hitStun: 10,
           meleeSfx: 'nightSlash'
@@ -251,6 +294,8 @@ export const ashConfig = {
           name: 'WATER SHURIKEN!',
           hudLabel: 'WATER SHURIKEN',
           cooldown: 135,
+          initialCooldown: 100,         // Initial cooldown before first Water Shuriken (~1.67s at 60 FPS)
+          initialCooldownFrames: 100,
           windupFrames: 14,
           damage: 14,
           shurikenCount: 3,
@@ -264,7 +309,10 @@ export const ashConfig = {
       get meleeDamage() { return this.skills.melee.damage; },
       get meleeReach() { return this.skills.melee.reach; },
       get meleeCooldown() { return this.skills.melee.cooldown; },
+      get initialMeleeCooldown() { return this.skills.melee.initialCooldown; },
       get specialCooldown() { return this.skills.special.cooldown; },
+      get initialSpecialCooldown() { return this.skills.special.initialCooldown; },
+      get initialSpecialDelayFrames() { return this.skills.special.initialCooldown; },
       get specialName() { return this.skills.special.name; },
       get hudSkillLabel() { return this.skills.special.hudLabel; },
       get specialDamage() { return this.skills.special.damage; },
@@ -275,6 +323,7 @@ export const ashConfig = {
     },
     lucario: {
       id: 'lucario',
+      enabled: true,
       dexNumber: '0448',
       name: 'LUCARIO',
       themeColor: '#06B6D4',
@@ -293,6 +342,8 @@ export const ashConfig = {
           damage: 22,
           reach: 68,
           cooldown: 35,
+          initialCooldown: 20,          // Initial delay before first melee strike (~0.33s)
+          initialCooldownFrames: 20,
           knockback: 9,
           hitStun: 16,
           meleeSfx: 'closeCombat'
@@ -302,6 +353,8 @@ export const ashConfig = {
           name: 'AURA SPHERE!',
           hudLabel: 'AURA SPHERE',
           cooldown: 145,
+          initialCooldown: 100,         // Initial cooldown before first Aura Sphere (~1.67s at 60 FPS)
+          initialCooldownFrames: 100,
           windupFrames: 22,
           damage: 30,
           auraSphereSpeed: 9.5,
@@ -315,7 +368,10 @@ export const ashConfig = {
       get meleeDamage() { return this.skills.melee.damage; },
       get meleeReach() { return this.skills.melee.reach; },
       get meleeCooldown() { return this.skills.melee.cooldown; },
+      get initialMeleeCooldown() { return this.skills.melee.initialCooldown; },
       get specialCooldown() { return this.skills.special.cooldown; },
+      get initialSpecialCooldown() { return this.skills.special.initialCooldown; },
+      get initialSpecialDelayFrames() { return this.skills.special.initialCooldown; },
       get specialName() { return this.skills.special.name; },
       get hudSkillLabel() { return this.skills.special.hudLabel; },
       get specialDamage() { return this.skills.special.damage; },
@@ -340,6 +396,9 @@ export const ashConfig = {
       hurt: 'Assets/model/ash/pokemon/pikachu/Hurt-Anim.png',
       faint: 'Assets/model/ash/pokemon/pikachu/Faint-Anim.png',
       charge: 'Assets/model/ash/pokemon/pikachu/Charge-Anim.png',
+      pose: 'Assets/model/ash/pokemon/pikachu/Pose-Anim.png',
+      sleep: 'Assets/model/ash/pokemon/pikachu/Sleep-Anim.png',
+      victory: 'Assets/model/ash/pokemon/pikachu/Pose-Anim.png',
       thunderbolt: 'Assets/model/ash/pokemon/pikachu/Thunderbolt/thunderbolt-b.png',
       thunderboltImpact: 'Assets/model/ash/pokemon/pikachu/Thunderbolt_impact/impact-b.png'
     },
@@ -352,7 +411,14 @@ export const ashConfig = {
       hurt: 'Assets/model/ash/pokemon/charizard/Hurt-Anim.png',
       faint: 'Assets/model/ash/pokemon/charizard/Faint-Anim.png',
       charge: 'Assets/model/ash/pokemon/charizard/Charge-Anim.png',
-      flame: 'Assets/model/ash/pokemon/charizard/Flame/12-Frame Pixel Fire Projectile Animation.png'
+      sleep: 'Assets/model/ash/pokemon/charizard/Sleep-Anim.png',
+      victory: 'Assets/model/ash/pokemon/charizard/Sleep-Anim.png',
+      flame: 'Assets/model/ash/pokemon/charizard/Flame/flamethrower-sheet.png',
+      flameStrip: 'Assets/model/ash/pokemon/charizard/Flame/flamethrower-b.png',
+      flameFrames: Array.from({ length: 18 }, (_, i) => `Assets/model/ash/pokemon/charizard/Flame/flamethrower-${i + 1}.png`),
+      flameCharge: 'Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-b.png',
+      flameChargeSheet: 'Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-sheet.png',
+      flameChargeFrames: Array.from({ length: 12 }, (_, i) => `Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-${i + 1}.png`)
     },
     greninja: {
       idle: 'Assets/model/ash/pokemon/greninja/Idle-Anim.png',
@@ -362,7 +428,10 @@ export const ashConfig = {
       shoot: 'Assets/model/ash/pokemon/greninja/Shoot-Anim.png',
       hurt: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',
       faint: 'Assets/model/ash/pokemon/greninja/Hurt-Anim.png',
-      charge: 'Assets/model/ash/pokemon/greninja/Charge-Anim.png'
+      charge: 'Assets/model/ash/pokemon/greninja/Charge-Anim.png',
+      rearUp: 'Assets/model/ash/pokemon/greninja/RearUp-Anim.png',
+      sleep: 'Assets/model/ash/pokemon/greninja/Sleep-Anim.png',
+      victory: 'Assets/model/ash/pokemon/greninja/RearUp-Anim.png'
     },
     lucario: {
       idle: 'Assets/model/ash/pokemon/lucario/Idle-Anim.png',
@@ -373,6 +442,10 @@ export const ashConfig = {
       hurt: 'Assets/model/ash/pokemon/lucario/Hurt-Anim.png',
       faint: 'Assets/model/ash/pokemon/lucario/Faint-Anim.png',
       charge: 'Assets/model/ash/pokemon/lucario/Charge-Anim.png',
+      rearUp: 'Assets/model/ash/pokemon/lucario/RearUp-Anim.png',
+      sleep: 'Assets/model/ash/pokemon/lucario/Sleep-Anim.png',
+      tumbleBack: 'Assets/model/ash/pokemon/lucario/TumbleBack-Anim.png',
+      victory: 'Assets/model/ash/pokemon/lucario/TumbleBack-Anim.png'
     }
   },
 
@@ -382,7 +455,9 @@ export const ashConfig = {
   sounds: {
     faint: 'Assets/Sound Effects/PokemonSFX/faint.ogg',
     pokeballThrow: 'Assets/Sound Effects/PokemonSFX/pb_throw.ogg',
+    pbThrow: 'Assets/Sound Effects/PokemonSFX/pb_throw.ogg',
     pokeballRelease: 'Assets/Sound Effects/PokemonSFX/pb_rel.ogg',
+    pbRelease: 'Assets/Sound Effects/PokemonSFX/pb_rel.ogg',
     hitStrong: 'Assets/Sound Effects/PokemonSFX/hit_strong.ogg',
     hitWeak: 'Assets/Sound Effects/PokemonSFX/hit.ogg',
 
@@ -424,11 +499,13 @@ export const ashConfig = {
   soundVolumes: {
     faint: 0.90,
     pokeballThrow: 0.85,
+    pbThrow: 0.85,
     pokeballRelease: 0.90,
+    pbRelease: 0.90,
     hitStrong: 0.85,
     hitWeak: 0.70,
     cryPikachu: 0.85,
-    cryPikachuStarter: 0.85,
+    cryPikachuStarter: 0.95,
     cryCharizard: 0.90,
     cryGreninja: 0.85,
     cryLucario: 0.85,

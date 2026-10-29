@@ -128,49 +128,123 @@ export function drawCreeperPixelBody(ctx, r, fighter = null) {
 }
 
 /**
- * Draws the Charged Creeper Electric Plasma Aura.
- * Rule 11: Uses discrete geometric rings and spark motes (zero shadowBlur).
+ * Draws the Minecraft Charged Creeper Electric Armor Shell & Floating Spark Voxels.
+ * Modeled strictly after the canonical Minecraft creeper_armor.png energy swirl (Rule 11: zero shadowBlur).
+ * Features:
+ * - Stepped Minecraft pixel voxels around the body perimeter (r * 1.05 to r * 1.40).
+ * - Continuous diagonal wave scrolling simulating high-voltage electrical charge.
+ * - Floating detached Minecraft spark voxels (3x3 to 5x5 squares) drifting upwards with electrical micro-jitter.
  */
-function _drawChargedElectricAura(ctx, r, fighter) {
+function _drawChargedMinecraftElectricArmor(ctx, r, fighter) {
   if (!fighter || (!fighter.isChargedCreeper && !(fighter.chargedCreeperTimer > 0))) return;
 
   ctx.save();
-  const tick = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.018;
-  const pulse = 1.0 + Math.sin(tick * 1.5) * 0.08;
-  const auraR = r * 1.42 * pulse;
+  const tick = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.012;
+  const pulse = 1.0 + Math.sin(tick * 2.0) * 0.05;
 
-  // 1. Translucent cyan electric disc
-  ctx.fillStyle = 'rgba(56, 189, 248, 0.16)';
+  // 1. Soft volumetric electric halo wash
+  ctx.fillStyle = 'rgba(56, 189, 248, 0.14)';
   ctx.beginPath();
-  ctx.arc(0, 0, auraR, 0, Math.PI * 2);
+  ctx.arc(0, 0, r * 1.38 * pulse, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Rotating polygonal lightning cage ring
-  ctx.save();
-  ctx.rotate(tick * 0.7);
-  ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  const pts = 8;
-  for (let i = 0; i <= pts; i++) {
-    const a = (i / pts) * Math.PI * 2;
-    const jitter = (i % 2 === 0 ? 3 : -3);
-    const px = Math.cos(a) * (auraR + jitter);
-    const py = Math.sin(a) * (auraR + jitter);
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
-  ctx.closePath();
-  ctx.stroke();
-  ctx.restore();
+  // 2. Stepped Minecraft Voxel Energy Armor (Outer Shell)
+  const P = 2.5;
+  const steps = Math.ceil((r * 1.40) / P);
+  const rMin = r * 0.98;
+  const rMax = r * 1.36 * pulse;
 
-  // 3. Orbiting discrete electric spark motes (Rule 26: standalone shapes, zero radial spokes)
-  for (let i = 0; i < 4; i++) {
-    const angle = tick * 1.2 + i * (Math.PI * 0.5);
-    const mx = Math.cos(angle) * (auraR + 4);
-    const my = Math.sin(angle) * (auraR + 4);
-    ctx.fillStyle = i % 2 === 0 ? '#FFFFFF' : '#38BDF8';
-    ctx.fillRect(mx - 2, my - 2, 4, 4);
+  for (let gy = -steps; gy <= steps; gy++) {
+    const ry = gy * P;
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist < rMin || dist > rMax) continue;
+
+      // Authentic Minecraft energy swirl wave function
+      const w1 = Math.sin(gx * 0.38 + gy * 0.38 - tick * 2.2);
+      const w2 = Math.cos(gx * 0.30 - gy * 0.44 + tick * 1.6);
+      const val = (w1 + w2) * 0.5;
+
+      if (val > 0.22) {
+        if (val > 0.65) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+        } else if (val > 0.42) {
+          ctx.fillStyle = 'rgba(159, 246, 254, 0.82)';
+        } else {
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.55)';
+        }
+        ctx.fillRect(rx - P * 0.5, ry - P * 0.5, P, P);
+      }
+    }
+  }
+
+  // 3. Floating Minecraft Spark Voxels (Detached motes drifting upward like in Charged_Creeper.gif)
+  const motes = [
+    { baseAngle: 0.25, distMul: 1.25, size: 4, speed: 1.1, color: '#9FF6FE' },
+    { baseAngle: 0.85, distMul: 1.35, size: 5, speed: 0.9, color: '#AFEDFE' },
+    { baseAngle: 1.55, distMul: 1.28, size: 4, speed: 1.3, color: '#FFFFFF' },
+    { baseAngle: 2.15, distMul: 1.42, size: 5, speed: 1.0, color: '#88E5F8' },
+    { baseAngle: 2.90, distMul: 1.30, size: 4, speed: 1.2, color: '#9FF6FE' },
+    { baseAngle: 3.65, distMul: 1.36, size: 5, speed: 0.8, color: '#FFFFFF' },
+    { baseAngle: 4.35, distMul: 1.26, size: 4, speed: 1.4, color: '#9FD3F8' },
+    { baseAngle: 5.05, distMul: 1.40, size: 5, speed: 1.1, color: '#AFEDFE' },
+    { baseAngle: 5.75, distMul: 1.32, size: 4, speed: 0.95, color: '#9FF6FE' },
+    { baseAngle: 6.20, distMul: 1.45, size: 3, speed: 1.25, color: '#FFFFFF' },
+  ];
+
+  for (let i = 0; i < motes.length; i++) {
+    const m = motes[i];
+    const driftY = -((tick * 24 * m.speed + i * 28) % (r * 3.2)) + r * 1.6;
+    const jitterX = Math.sin(tick * 3.5 + i * 1.7) * 2.5;
+    const rad = r * m.distMul;
+    const mx = Math.cos(m.baseAngle) * rad + jitterX;
+    const my = driftY;
+
+    if (Math.hypot(mx, my) <= r * 1.65) {
+      ctx.fillStyle = m.color;
+      ctx.fillRect(mx - m.size * 0.5, my - m.size * 0.5, m.size, m.size);
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Overlays the scrolling Minecraft Creeper Armor electric matrix across the body.
+ * Faithfully maps the creeper_armor.png energy swirl over Creeper's face and green moss camouflage.
+ */
+function _drawChargedMinecraftBodySwirl(ctx, r, fighter) {
+  if (!fighter || (!fighter.isChargedCreeper && !(fighter.chargedCreeperTimer > 0))) return;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r - 1.2, 0, Math.PI * 2);
+  ctx.clip();
+
+  const tick = (typeof performance !== 'undefined' ? performance.now() : Date.now()) * 0.012;
+  const P = 2.0;
+  const steps = Math.ceil(r / P);
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    const ry = gy * P;
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      if (Math.hypot(rx, ry) >= r - 1.2) continue;
+
+      const w1 = Math.sin(gx * 0.38 + gy * 0.38 - tick * 2.2);
+      const w2 = Math.cos(gx * 0.30 - gy * 0.44 + tick * 1.6);
+      const val = (w1 + w2) * 0.5;
+
+      if (val > 0.32) {
+        if (val > 0.65) {
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
+        } else {
+          ctx.fillStyle = 'rgba(159, 246, 254, 0.38)';
+        }
+        ctx.fillRect(rx - P * 0.5, ry - P * 0.5, P, P);
+      }
+    }
   }
 
   ctx.restore();
@@ -246,9 +320,9 @@ export function drawCreeperSkin(ctx, fighter) {
     ctx.translate(jx, jy);
   }
 
-  // Charged Creeper Electric Plasma Matrix (suppressed during silhouette pass)
+  // Charged Creeper Minecraft Energy Armor Outer Shell (suppressed during silhouette pass)
   if (!fighter._isSilhouettePass) {
-    _drawChargedElectricAura(ctx, r, fighter);
+    _drawChargedMinecraftElectricArmor(ctx, r, fighter);
   }
 
   // Priming Detonation Visual Inflation (1.0 -> 1.28x)
@@ -274,6 +348,11 @@ export function drawCreeperSkin(ctx, fighter) {
 
   // Layer 1: Toji-standard pixel body circle with authentic Minecraft frown
   drawCreeperPixelBody(ctx, r, fighter);
+
+  // Layer 1.2: Overlaid Minecraft creeper_armor.png energy swirl across body
+  if (!fighter._isSilhouettePass) {
+    _drawChargedMinecraftBodySwirl(ctx, r, fighter);
+  }
 
   // Layer 1.5: Mandatory Universal Character Black Outline Standard (Rule 32)
   // Guarantees circular body geometry & green camouflage sharply pop off the white arena floor

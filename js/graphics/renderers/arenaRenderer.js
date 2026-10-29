@@ -707,6 +707,74 @@ function _renderComicArenaBorder(oc, padding, arena, isDark) {
 }
 
 /**
+ * Renders the classic minimalist pixel arena border frame (outer 2.5px mitered border,
+ * inner 2px slate frame, and 4 stepped L-brackets in the corners) onto an offscreen canvas.
+ */
+function _renderClassicArenaBorder(oc, padding, arena, isDark) {
+  const shape = arena.shape || 'rect';
+  const x = padding;
+  const y = padding;
+  const w = arena.width;
+  const h = arena.height;
+  const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
+
+  oc.save();
+  if (shape === 'circle') {
+    const cx = padding + w / 2;
+    const cy = padding + h / 2;
+    const ar = (arena.radius !== undefined ? arena.radius : (w / 2));
+    oc.strokeStyle = borderColor;
+    oc.lineWidth = 2.5;
+    oc.lineJoin = 'miter';
+    oc.lineCap = 'square';
+    oc.beginPath();
+    oc.arc(cx, cy, ar, 0, Math.PI * 2);
+    oc.stroke();
+  } else {
+    // 1. Inner 2px frame at pad = 6
+    const frameColor = isDark ? '#334155' : '#cbd5e1';
+    const bracketColor = isDark ? '#64748b' : '#475569';
+    const pad = 6;
+    oc.fillStyle = frameColor;
+    oc.fillRect(Math.round(x + pad), Math.round(y + pad), Math.round(w - pad * 2), 2);
+    oc.fillRect(Math.round(x + pad), Math.round(y + h - pad - 2), Math.round(w - pad * 2), 2);
+    oc.fillRect(Math.round(x + pad), Math.round(y + pad), 2, Math.round(h - pad * 2));
+    oc.fillRect(Math.round(x + w - pad - 2), Math.round(y + pad), 2, Math.round(h - pad * 2));
+
+    // 2. 4 Corner L-Brackets at pad + 2 = 8
+    const bLen = 14;
+    const bThick = 3;
+    const drawLBracket = (bx, by, dirX, dirY) => {
+      bx = Math.round(bx);
+      by = Math.round(by);
+      oc.fillStyle = bracketColor;
+      if (dirX > 0) {
+        oc.fillRect(bx, by, bLen, bThick);
+      } else {
+        oc.fillRect(bx - bLen + bThick, by, bLen, bThick);
+      }
+      if (dirY > 0) {
+        oc.fillRect(bx, by, bThick, bLen);
+      } else {
+        oc.fillRect(bx, by - bLen + bThick, bThick, bLen);
+      }
+    };
+    drawLBracket(x + pad + 2, y + pad + 2, 1, 1);
+    drawLBracket(x + w - pad - 2 - bThick, y + pad + 2, -1, 1);
+    drawLBracket(x + pad + 2, y + h - pad - 2 - bThick, 1, -1);
+    drawLBracket(x + w - pad - 2 - bThick, y + h - pad - 2 - bThick, -1, -1);
+
+    // 3. Outer 2.5px crisp mitered border
+    oc.strokeStyle = borderColor;
+    oc.lineWidth = 2.5;
+    oc.lineJoin = 'miter';
+    oc.lineCap = 'square';
+    oc.strokeRect(x, y, w, h);
+  }
+  oc.restore();
+}
+
+/**
  * Renders the high-octane comic arena border, turnbuckle cleats, center obstacles,
  * wall cracks, and Saitama wall breaches.
  * Can be called during background setup and/or on the foreground layer to guarantee
@@ -724,14 +792,19 @@ export function drawArenaBorder(ctx = state.ctx, alreadyInCameraSpace = false) {
   );
 
   const shape = arena.shape || 'rect';
-  const borderKey = `${arena.width}_${arena.height}_${shape}_${isDark ? 'dark_comic' : 'light_comic'}_v2`;
+  const isClassic = typeof CONFIG !== 'undefined' && CONFIG.hudLayoutStyle === 'classic';
+  const borderKey = `${arena.width}_${arena.height}_${shape}_${isDark ? 'dark' : 'light'}_${isClassic ? 'classic' : 'comic'}_v2`;
   if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
     const padding = 60;
     const offCanvas = document.createElement('canvas');
     offCanvas.width = arena.width + padding * 2;
     offCanvas.height = arena.height + padding * 2;
     const oc = offCanvas.getContext('2d');
-    _renderComicArenaBorder(oc, padding, arena, isDark);
+    if (isClassic) {
+      _renderClassicArenaBorder(oc, padding, arena, isDark);
+    } else {
+      _renderComicArenaBorder(oc, padding, arena, isDark);
+    }
     offCanvas._key = borderKey;
     state._arenaBorderCanvas = offCanvas;
   }

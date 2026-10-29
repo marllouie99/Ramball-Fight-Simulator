@@ -23,7 +23,7 @@ import { drawAshSkin } from '../../graphics/fighters/ashSkin.js';
 import {
   drawAshHoneycombBarrier,
   drawAshVisualEffects,
-  drawPokemonCompanion
+  drawPokemonCompanion, getCharizardMouthLocalOffset, updateCharizardFlameChain
 } from '../../graphics/weapons/ashPokemonGraphics.js';
 import { spawnImpactFlash, spawnSparks } from '../../graphics/particles/sparkEffect.js';
 
@@ -196,11 +196,15 @@ export class PokemonCompanionEntity extends Fighter {
     this.animState = 'idle';
     this.animTick = 0;
     this.actionAnimTimer = 0;
-    this.meleeCooldown = 14;
-    this.meleeCooldownMax = spec.meleeCooldown || 34;
+    const meleeInitialCd = spec.skills?.melee?.initialCooldown ?? spec.skills?.melee?.initialCooldownFrames ?? spec.initialMeleeCooldown ?? 20;
+    this.meleeCooldown = meleeInitialCd;
+    this.meleeCooldownMax = spec.skills?.melee?.cooldown ?? spec.meleeCooldown ?? 34;
     const specialCooldownCfg = spec.skills?.special?.cooldown ?? spec.specialCooldown ?? (_getAshCfg().pokemonRoster?.[speciesKey]?.skills?.special?.cooldown ?? 135);
     this.specialCooldownMax = specialCooldownCfg;
-    this.specialCooldown = spec.initialSpecialDelayFrames ?? Math.min(28, this.specialCooldownMax);
+    const specialInitialCd = spec.skills?.special?.initialCooldown ?? spec.skills?.special?.initialCooldownFrames ?? spec.initialSpecialCooldown ?? spec.initialSpecialDelayFrames ?? 180;
+    this.specialInitialCooldown = specialInitialCd;
+    this.specialCooldown = specialInitialCd;
+    this.isSpecialOnInitialCooldown = this.specialCooldown > 0;
     this.comboStep = 0;
     this.hurtAnimTimer = 0;
     this.hurtTick = 0;
@@ -218,7 +222,8 @@ export class PokemonCompanionEntity extends Fighter {
     this.flamethrowerHitEnemies = new Set();
     this.flamethrowerCurrentBeamLen = null;
     this.flamethrowerClosestEnemy = null;
-    this.flamethrowerImpactTimer = undefined;
+    this.flamethrowerImpactTimer = undefined; this.flamethrowerChainAngles = new Array(28).fill(this.flamethrowerCastAngle || 0); this.flamethrowerFlipY = Math.cos(this.flamethrowerCastAngle || 0) < -0.15 ? -1 : 1; this._smoothMouthX = undefined; this._smoothMouthY = undefined;
+    this.specialCastTimer = 0;
   }
 
   shoot() {
@@ -226,19 +231,154 @@ export class PokemonCompanionEntity extends Fighter {
   }
 
   /**
-   * Rule 1.4: Lock aim rotation while Pikachu or Charizard is channeling special beams/flames.
+   * Rule 1.4: Aim rotation rules for Pokémon specials and melee moves:
+   * - Pikachu locks aim during entire Thunderbolt channel.
+   * - Charizard locks aim during Flamethrower windup and recovery, but actively tracks targets while firing.
+   * - Close combat melee moves lock aim during execution.
    */
   canAim() {
-    if (this.thunderboltState || this.flamethrowerState) return false;
+    if (this.thunderboltState || this.meleeMoveState) return false;
+    if (this.flamethrowerState === 'windup' || this.flamethrowerState === 'recovery') return false;
     return super.canAim();
   }
 
   isStationarySkillActive() {
-    return Boolean(this.thunderboltState || this.flamethrowerState || super.isStationarySkillActive?.());
+    return Boolean(this.thunderboltState || this.flamethrowerState || (this.meleeMoveState === 'lock') || (this.animState === 'special' && (this.actionAnimTimer > 0 || (this.specialCastTimer || 0) > 0)) || super.isStationarySkillActive?.());
   }
 
   isChannelingSkill() {
-    return Boolean(this.thunderboltState || this.flamethrowerState || super.isChannelingSkill?.());
+    return Boolean(this.thunderboltState || this.flamethrowerState || (this.animState === 'special' && (this.actionAnimTimer > 0 || (this.specialCastTimer || 0) > 0)) || super.isChannelingSkill?.());
+  }
+
+  /**
+   * Evaluates if this Pokémon is actively casting or executing any special or melee skill:
+   * - Pikachu: Thunderbolt (windup, active beam)
+   * - Charizard: Flamethrower (windup, active fire stream, recovery breather)
+   * - Greninja: Water Shuriken (special casting frames)
+   * - Lucario: Aura Sphere (special casting frames)
+   * - All Pokémon: Close combat melee combos (windup, strike, lock, recovery)
+   */
+  isCastingSkill() {
+    return Boolean(
+      this.thunderboltState ||
+      this.flamethrowerState ||
+      this.meleeMoveState ||
+      (this.specialCastTimer && this.specialCastTimer > 0) ||
+      (this.animState === 'special' && (this.actionAnimTimer > 0 || (this.specialCastTimer || 0) > 0)) ||
+      (this.animState === 'attack' && this.actionAnimTimer > 0)
+    );
+  }
+
+  // ── Push Back, Pull, Drag, and Knockback Immunity while Casting Skills ──
+
+  get immuneToKnockback() {
+    return this.isCastingSkill() || Boolean(this._immuneToKnockback);
+  }
+  set immuneToKnockback(v) {
+    this._immuneToKnockback = v;
+  }
+
+  get immuneToPush() {
+    return this.isCastingSkill() || Boolean(this._immuneToPush);
+  }
+  set immuneToPush(v) {
+    this._immuneToPush = v;
+  }
+
+  get immuneToPull() {
+    return this.isCastingSkill() || Boolean(this._immuneToPull);
+  }
+  set immuneToPull(v) {
+    this._immuneToPull = v;
+  }
+
+  get cannotBeKnockbacked() {
+    return this.isCastingSkill() || Boolean(this._cannotBeKnockbacked);
+  }
+  set cannotBeKnockbacked(v) {
+    this._cannotBeKnockbacked = v;
+  }
+
+  get cannotBePushed() {
+    return this.isCastingSkill() || Boolean(this._cannotBePushed);
+  }
+  set cannotBePushed(v) {
+    this._cannotBePushed = v;
+  }
+
+  get gojoBlueDragImmune() {
+    return this.isCastingSkill() || Boolean(this._gojoBlueDragImmune);
+  }
+  set gojoBlueDragImmune(v) {
+    this._gojoBlueDragImmune = v;
+  }
+
+  get isDraggedByGetsuga() {
+    return !this.isCastingSkill() && Boolean(this._isDraggedByGetsuga);
+  }
+  set isDraggedByGetsuga(v) {
+    if (this.isCastingSkill()) {
+      this._isDraggedByGetsuga = false;
+      return;
+    }
+    this._isDraggedByGetsuga = v;
+  }
+
+  get _draggedByCruelSun() {
+    return !this.isCastingSkill() && Boolean(this.__draggedByCruelSun);
+  }
+  set _draggedByCruelSun(v) {
+    if (this.isCastingSkill()) {
+      this.__draggedByCruelSun = false;
+      return;
+    }
+    this.__draggedByCruelSun = v;
+  }
+
+  get isCaughtInCruelSun() {
+    return !this.isCastingSkill() && Boolean(this.__isCaughtInCruelSun);
+  }
+  set isCaughtInCruelSun(v) {
+    if (this.isCastingSkill()) {
+      this.__isCaughtInCruelSun = false;
+      return;
+    }
+    this.__isCaughtInCruelSun = v;
+  }
+
+  isCaughtInBeam() {
+    if (this.isCastingSkill()) return false;
+    return super.isCaughtInBeam();
+  }
+
+  isPulledOrDragged() {
+    if (this.isCastingSkill()) return false;
+    return typeof super.isPulledOrDragged === 'function' ? super.isPulledOrDragged() : false;
+  }
+
+  isImmuneToGravitationalPull(vortexType = 'purple') {
+    if (this.isCastingSkill()) return true;
+    return super.isImmuneToGravitationalPull(vortexType);
+  }
+
+  applyKnockback(vx, vy, stunFrames = 0) {
+    if (this.isCastingSkill()) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    return super.applyKnockback(vx, vy, stunFrames);
+  }
+
+  applySuction(vx, vy) {
+    if (this.isCastingSkill()) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    if (typeof super.applySuction === 'function') {
+      super.applySuction(vx, vy);
+    }
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -254,10 +394,18 @@ export class PokemonCompanionEntity extends Fighter {
     this.flamethrowerTimer = 0;
     this.flamethrowerCurrentBeamLen = null;
     this.flamethrowerClosestEnemy = null;
-    this.flamethrowerImpactTimer = undefined;
+    this.flamethrowerImpactTimer = undefined; this.flamethrowerChainAngles = new Array(28).fill(this.flamethrowerCastAngle || 0); this.flamethrowerFlipY = Math.cos(this.flamethrowerCastAngle || 0) < -0.15 ? -1 : 1; this._smoothMouthX = undefined; this._smoothMouthY = undefined;
     if (this.flamethrowerHitEnemies) {
       this.flamethrowerHitEnemies.clear();
     }
+    this.meleeMoveState = null;
+    this.meleeMoveKey = null;
+    this.specialCastTimer = 0;
+    this.actionAnimTimer = 0;
+    if (this.animState === 'special' || this.animState === 'attack') {
+      this.animState = 'idle';
+    }
+    this.z = 0;
     if (typeof super.interruptAttacks === 'function') {
       super.interruptAttacks(forceCancelAll);
     }
@@ -269,6 +417,43 @@ export class PokemonCompanionEntity extends Fighter {
    * Phase 2 (Beam / "...CHUUUUUU!"): Massive concentrated beam of yellow lightning blasts toward target for ~1s with multi-tick damage & pushback!
    * Phase 3 (Aftermath Stun & Recovery): All victims caught in the beam suffer full electric shock stun aftermath (~0.75s).
    */
+  /**
+   * Evaluates if Ash has won the match or round.
+   */
+  _isOwnerVictory(opponent = null) {
+    if (!this.owner || this.owner.hp <= 0 || this.owner.dead || this.owner.isDead) return false;
+    if (this.hp <= 0 || this.isFainting) return false;
+
+    if (typeof state !== 'undefined' && state) {
+      if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
+        const winner = state.matchWinner || state.roundWinner;
+        if (!winner) return true;
+        if (winner === this.owner || winner === this) return true;
+        if (typeof state.getFighterTeam === 'function' && Array.isArray(state.fighters)) {
+          const ownerIdx = state.fighters.indexOf(this.owner);
+          const winnerIdx = state.fighters.indexOf(winner);
+          if (ownerIdx !== -1 && winnerIdx !== -1) {
+            return state.getFighterTeam(ownerIdx) === state.getFighterTeam(winnerIdx);
+          }
+        }
+        return true;
+      }
+
+      if (Array.isArray(state.fighters) && state.fighters.length > 1) {
+        const enemies = this.owner._getValidEnemyTargets ? this.owner._getValidEnemyTargets(opponent) : [];
+        if (enemies.length === 0) {
+          return true;
+        }
+      }
+    }
+
+    if (opponent && (opponent.dead || opponent.isDead || opponent.hp <= 0)) {
+      return true;
+    }
+
+    return false;
+  }
+
   startThunderbolt(target, isTrainerCommand = false) {
     if (this.hp <= 0 || this.thunderboltState) return;
     const specSkill = this.spec.skills?.special;
@@ -287,8 +472,9 @@ export class PokemonCompanionEntity extends Fighter {
     this.actionAnimTimer = this.thunderboltTimer + (specSkill?.beamDurationFrames || 58) + 16;
     this.animTick = 0;
     this.thunderboltCmdMult = isTrainerCommand ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0;
-    const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+    const cd = this.specialCooldownMax || this.owner?.commandCooldownMax || 135;
     this.specialCooldown = cd;
+    this.isSpecialOnInitialCooldown = false;
     if (this.owner) {
       this.owner.commandCooldown = cd;
     }
@@ -335,14 +521,15 @@ export class PokemonCompanionEntity extends Fighter {
     this.actionAnimTimer = this.flamethrowerTimer + (specSkill?.streamDurationFrames || 120) + (specSkill?.recoveryFrames || 24);
     this.animTick = 0;
     this.flamethrowerCmdMult = isTrainerCommand ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0;
-    const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+    const cd = this.specialCooldownMax || this.owner?.commandCooldownMax || 135;
     this.specialCooldown = cd;
+    this.isSpecialOnInitialCooldown = false;
     if (this.owner) {
       this.owner.commandCooldown = cd;
     }
     this.flamethrowerCurrentBeamLen = null;
     this.flamethrowerClosestEnemy = null;
-    this.flamethrowerImpactTimer = undefined;
+    this.flamethrowerImpactTimer = undefined; this.flamethrowerChainAngles = new Array(28).fill(this.flamethrowerCastAngle || 0); this.flamethrowerFlipY = Math.cos(this.flamethrowerCastAngle || 0) < -0.15 ? -1 : 1; this._smoothMouthX = undefined; this._smoothMouthY = undefined;
     if (this.flamethrowerHitEnemies) {
       this.flamethrowerHitEnemies.clear();
     }
@@ -370,12 +557,16 @@ export class PokemonCompanionEntity extends Fighter {
     if (attacker && (attacker === this.owner || (attacker.teamId !== undefined && this.teamId !== undefined && attacker.teamId === this.teamId))) {
       return false;
     }
-    const landed = super.takeDamage(amount, attacker, opts);
+    const isCasting = this.isCastingSkill();
+    const effectiveOpts = isCasting
+      ? { ...opts, skipKnockback: true, skipInterrupt: true, skipHitStun: true }
+      : opts;
+    const landed = super.takeDamage(amount, attacker, effectiveOpts);
     if (landed) {
       this.hitFlashTimer = 0; // PMD sprite sheets handle their own Hurt-Anim / Faint-Anim without circular 2D flash artifacts
       if (this.hp <= 0) {
         this.startFaint();
-      } else {
+      } else if (!isCasting) {
         this.hurtAnimTimer = 14;
         this.hurtTick = 0;
         this.animState = 'hurt';
@@ -473,10 +664,49 @@ export class PokemonCompanionEntity extends Fighter {
       return;
     }
 
+    // Match Victory Check: Active Pokémon stays in arena and plays its victory animation
+    if (this._isOwnerVictory(opponent)) {
+      this.vx = 0;
+      this.vy = 0;
+      this.z = 0;
+      this.interruptAttacks();
+
+      // Specific victory animation per Pokémon requested:
+      // Pikachu: "POSE", Charizard: "SLEEP", Greninja: "RearUp", Lucario: "Tumbleback"
+      if (this.speciesId === 'pikachu') {
+        this.animState = 'pose';
+      } else if (this.speciesId === 'charizard') {
+        this.animState = 'sleep';
+      } else if (this.speciesId === 'greninja') {
+        this.animState = 'rearUp';
+      } else if (this.speciesId === 'lucario') {
+        this.animState = 'tumbleback';
+      } else {
+        this.animState = 'victory';
+      }
+
+      if (opponent && typeof opponent.x === 'number') {
+        const winAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.gunAngle = winAngle;
+        this.angle = winAngle;
+      }
+      return;
+    }
+
     this.handleStatusEffects();
     if (this.meleeCooldown > 0) this.meleeCooldown--;
-    if (!this.thunderboltState && !this.flamethrowerState && this.specialCooldown > 0) this.specialCooldown--;
+    if (!this.thunderboltState && !this.flamethrowerState && this.specialCooldown > 0) {
+      this.specialCooldown--;
+      if (this.specialCooldown <= 0) {
+        this.isSpecialOnInitialCooldown = false;
+      }
+    }
     if (this.actionAnimTimer > 0) this.actionAnimTimer--;
+    if (this.specialCastTimer > 0) this.specialCastTimer--;
+    if (this.isCastingSkill()) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+    }
     if (this.hurtAnimTimer > 0) {
       this.hurtAnimTimer--;
       this.hurtTick = (this.hurtTick || 0) + 1;
@@ -641,7 +871,7 @@ export class PokemonCompanionEntity extends Fighter {
           this.thunderboltCurrentBeamLen = null;
           this.thunderboltClosestEnemy = null;
           this.thunderboltImpactTimer = undefined;
-          const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+          const cd = this.specialCooldownMax || this.owner?.commandCooldownMax || 135;
           this.specialCooldown = cd;
           if (this.owner) {
             this.owner.commandCooldown = cd;
@@ -697,9 +927,20 @@ export class PokemonCompanionEntity extends Fighter {
         this.flamethrowerTimer--;
         this.animState = 'special';
 
-        // Rule 1.4: Steady aim lock — angle strictly clamped to committed castAngle
-        this.gunAngle = this.flamethrowerCastAngle;
-        this.angle = this.flamethrowerCastAngle;
+        // Dynamic 360° aim tracking while firing Flamethrower
+        const activeTarget = (this.flamethrowerTarget && this.flamethrowerTarget.hp > 0 && !this.flamethrowerTarget.isDead)
+          ? this.flamethrowerTarget
+          : (this.owner?._findBestTarget(opponent) || opponent);
+
+        if (activeTarget && activeTarget.hp > 0 && !activeTarget.isDead && (this.timeStopTimer || 0) <= 0 && !this.isTargetOfAmbush) {
+          this.channelTurnRate = specSkill?.streamTurnRate ?? specSkill?.turnRate ?? 0.085;
+          this.aim(activeTarget);
+          this.flamethrowerCastAngle = this.gunAngle;
+          this.flamethrowerTarget = activeTarget;
+        } else {
+          this.gunAngle = this.flamethrowerCastAngle;
+          this.angle = this.flamethrowerCastAngle;
+        }
 
         // Steady planted stance: Charizard plants feet firmly on the ground with zero drift or recoil slip
         this.vx = 0;
@@ -715,8 +956,8 @@ export class PokemonCompanionEntity extends Fighter {
         const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
         const cosA = Math.cos(this.flamethrowerCastAngle);
         const sinA = Math.sin(this.flamethrowerCastAngle);
-        const startX = this.x + cosA * (this.r * 0.85);
-        const startY = this.y - 26 + sinA * (this.r * 0.65);
+        const mouthOffset = (updateCharizardFlameChain(this, this.flamethrowerCastAngle), getCharizardMouthLocalOffset(this, this.flamethrowerCastAngle)); const startX = this.x + mouthOffset.originX;
+        const startY = this.y - (this.z || 0) + mouthOffset.originY;
         const wallDist = curArena ? _getRayArenaIntersection(startX, startY, this.flamethrowerCastAngle, curArena, 8) : maxSkillRange;
         const streamRange = Math.min(maxSkillRange, Math.max(10, wallDist));
         const streamW = specSkill?.streamWidth || 48;
@@ -798,8 +1039,8 @@ export class PokemonCompanionEntity extends Fighter {
           this.flamethrowerState = null;
           this.flamethrowerCurrentBeamLen = null;
           this.flamethrowerClosestEnemy = null;
-          this.flamethrowerImpactTimer = undefined;
-          const cd = Math.max(this.specialCooldownMax, this.owner?.commandCooldownMax || 0);
+          this.flamethrowerImpactTimer = undefined; this.flamethrowerChainAngles = new Array(28).fill(this.flamethrowerCastAngle || 0); this.flamethrowerFlipY = Math.cos(this.flamethrowerCastAngle || 0) < -0.15 ? -1 : 1; this._smoothMouthX = undefined; this._smoothMouthY = undefined;
+          const cd = this.specialCooldownMax || this.owner?.commandCooldownMax || 135;
           this.specialCooldown = cd;
           if (this.owner) {
             this.owner.commandCooldown = cd;
@@ -851,26 +1092,30 @@ export class PokemonCompanionEntity extends Fighter {
       const reach = (this.spec.meleeReach || 68) + (target.r || 25);
       const closeCombatRushReach = reach * 2.2; // ~200px rush engagement zone
 
-      // 1. Point-Blank / Close Range (dist <= reach + 20px) -> Melee Combo Priority!
-      if (dist <= reach + 20 && this.meleeCooldown <= 0) {
+      // 1. Signature Special Skill Priority: When the skill is ready, ALWAYS unleash the signature special move!
+      if (this.specialCooldown <= 0 && !this.thunderboltState && !this.flamethrowerState && !this.meleeMoveState) {
+        if (this.owner && typeof this.owner._executePokemonSpecial === 'function') {
+          this.owner._executePokemonSpecial(this, target, false);
+        } else {
+          const cd = this.specialCooldownMax || this.owner?.commandCooldownMax || 135;
+          this.specialCooldown = cd;
+          this.isSpecialOnInitialCooldown = false;
+          if (this.owner) this.owner.commandCooldown = cd;
+          if (this.speciesId === 'pikachu' && typeof this.startThunderbolt === 'function') {
+            this.startThunderbolt(target, false);
+          } else if (this.speciesId === 'charizard' && typeof this.startFlamethrower === 'function') {
+            this.startFlamethrower(target, false);
+          }
+        }
+      }
+      // 2. Point-Blank / Close Range (Special on cooldown) -> Melee Combo Priority!
+      else if (dist <= reach + 20 && this.meleeCooldown <= 0) {
         this._startCloseCombatMove(target);
       }
-      // 2. Medium-Range Combat Zone (reach + 20 < dist <= 240px)
+      // 3. Medium-Range Combat Zone (Special on cooldown, reach + 20 < dist <= closeCombatRushReach)
       else if (dist <= closeCombatRushReach) {
-        // High likelihood to initiate Close Combat Rush (Quick Attack dash, Dragon Claw lunge, etc.)
-        if (this.meleeCooldown <= 0 && (this.specialCooldown > 0 || Math.random() < 0.60)) {
+        if (this.meleeCooldown <= 0) {
           this._startCloseCombatMove(target);
-        } else if (this.specialCooldown <= 0 && !this.thunderboltState && !this.flamethrowerState && this.owner) {
-          const cd = Math.max(this.specialCooldownMax, this.owner.commandCooldownMax || 0);
-          this.specialCooldown = cd;
-          this.owner.commandCooldown = cd;
-          if (this.speciesId === 'pikachu') {
-            this.startThunderbolt(target, false);
-          } else if (this.speciesId === 'charizard') {
-            this.startFlamethrower(target, false);
-          } else {
-            this.owner._executePokemonSpecial(this, target, false);
-          }
         } else {
           // Actively advance towards target to enter close combat
           const approachAngle = targetAngle + (Math.sin(this.animTick * 0.1) * 0.25);
@@ -878,25 +1123,12 @@ export class PokemonCompanionEntity extends Fighter {
           this.vy = Math.sin(approachAngle) * this.speed;
         }
       }
-      // 3. Long-Range Engagement (dist > 240px)
+      // 4. Long-Range Engagement (Special on cooldown, dist > closeCombatRushReach)
       else {
-        if (this.specialCooldown <= 0 && !this.thunderboltState && !this.flamethrowerState && dist <= 550 && this.owner) {
-          const cd = Math.max(this.specialCooldownMax, this.owner.commandCooldownMax || 0);
-          this.specialCooldown = cd;
-          this.owner.commandCooldown = cd;
-          if (this.speciesId === 'pikachu') {
-            this.startThunderbolt(target, false);
-          } else if (this.speciesId === 'charizard') {
-            this.startFlamethrower(target, false);
-          } else {
-            this.owner._executePokemonSpecial(this, target, false);
-          }
-        } else {
-          // Special on cooldown: actively hunt and close in on target
-          const huntAngle = targetAngle + (Math.sin(this.animTick * 0.08) * 0.30);
-          this.vx = Math.cos(huntAngle) * this.speed;
-          this.vy = Math.sin(huntAngle) * this.speed;
-        }
+        // Special on cooldown: actively hunt and close in on target
+        const huntAngle = targetAngle + (Math.sin(this.animTick * 0.08) * 0.30);
+        this.vx = Math.cos(huntAngle) * this.speed;
+        this.vy = Math.sin(huntAngle) * this.speed;
       }
     }
 
@@ -920,12 +1152,14 @@ export class PokemonCompanionEntity extends Fighter {
     super.update(target, ownerIndex, arena);
   }
 
-  interruptAttacks(forceCancelAll = false) {
-    if (super.interruptAttacks) super.interruptAttacks(forceCancelAll);
-    this.meleeMoveState = null;
-    this.meleeMoveKey = null;
-    this.z = 0;
-  }
+  /**
+   * Overrides base Fighter._decrementSkillCooldowns() and _tickCooldowns() to prevent
+   * generic property scanning (key.endsWith('Cooldown')) from double-decrementing companion cooldowns.
+   * Companion cooldowns (melee, special, initial) are updated with precise channeling & stasis gating in update().
+   */
+  _decrementSkillCooldowns() {}
+
+  _tickCooldowns() {}
 
   _startCloseCombatMove(target, forcedMoveKey = null, isTrainerCommand = false) {
     if (!target || target.hp <= 0) return;
@@ -937,6 +1171,9 @@ export class PokemonCompanionEntity extends Fighter {
     this.angle = angle;
     this.meleeCastAngle = angle;
     this.meleeTarget = target;
+    if (target && typeof target.x === 'number') {
+      this.meleeTargetLastPos = { x: target.x, y: target.y };
+    }
     this.meleeMoveTick = 0;
     this.meleeHitDone = new Set();
     this.isTrainerCommandMove = isTrainerCommand;
@@ -990,6 +1227,10 @@ export class PokemonCompanionEntity extends Fighter {
     const tick = this.meleeMoveTick;
     const key = this.meleeMoveKey || 'quickAttack';
     const tgt = (target && target.hp > 0) ? target : (this.meleeTarget || target);
+    if (tgt && typeof tgt.x === 'number') {
+      this.meleeTarget = tgt;
+      this.meleeTargetLastPos = { x: tgt.x, y: tgt.y };
+    }
     const angle = this.meleeCastAngle || (tgt ? Math.atan2(tgt.y - this.y, tgt.x - this.x) : 0);
 
     const dmgMult = (this.isTrainerCommandMove ? (_getAshCfg().commandDamageBonus || 1.25) : 1.0);
@@ -1390,16 +1631,20 @@ export class AshFighter extends Fighter {
     this.barrierAngle = 0;
     this._barrierTextCooldown = 0;
 
+    // Trainer Sideline Vantage Point (Top-Middle, Left-Middle, or Right-Middle)
+    this.trainerVantagePoint = null;
+
     // Summon Cooldown (Mobile Evasion State when > 0 and no Pokémon active)
     this.summonCooldownMax = cfg.summonCooldownFrames || 210;
     this.summonCooldown = cfg.initialSummonDelayFrames ?? 24;
 
     // Skill 1: Trainer Command (Signature Pokémon Special Attack)
     this.commandCooldownMax = cfg.commandCooldownFrames || 150;
-    this.commandCooldown = 48;
+    this.commandCooldown = cfg.initialCommandCooldownFrames ?? 180;
 
     // Ultimate: 10,000,000 Volt Thunderbolt Barrage
-    this.ultimateCooldownMax = cfg.ultimateCooldownFrames || 780;    this.ultimateCooldown = 240;
+    this.ultimateCooldownMax = cfg.ultimateCooldownFrames || 780;
+    this.ultimateCooldown = cfg.initialUltimateCooldownFrames ?? 240;
     this.ultimateDurationMax = cfg.ultimateDurationFrames || 420;
 
     // Non-Freezing Visual Effects, Projectiles & Queued Move Cast SFX (Rule 25)
@@ -1407,19 +1652,25 @@ export class AshFighter extends Fighter {
     this.activeElementalProjectiles = [];
     this._queuedSoundEffects = [];
     this._animTick = 0;
+    this.isSteady = true;
+    this._ashSteadyTick = 0;
   }
 
   reset() {
     super.reset();
     this._cleanupActivePokemon();
     this.thrownPokeball = null;
+    this.trainerVantagePoint = null;
+    this.nextPokemonIndex = 0;
     this.isProtectedByHoneycombBarrier = false;
     this.barrierHitFlashTimer = 0;
     this.barrierActiveTimer = 0;
     this.barrierAngle = 0;
     this.summonCooldown = _getAshCfg().initialSummonDelayFrames ?? 24;
-    this.commandCooldown = 48;
-    this.ultimateCooldown = 240;
+    this.commandCooldown = _getAshCfg().initialCommandCooldownFrames ?? 180;
+    this.ultimateCooldown = _getAshCfg().initialUltimateCooldownFrames ?? 240;
+    this.isSteady = true;
+    this._ashSteadyTick = 0;
     if (this.activeVisualEffects) this.activeVisualEffects.length = 0;
     else this.activeVisualEffects = [];
     if (this.activeElementalProjectiles) this.activeElementalProjectiles.length = 0;
@@ -1459,6 +1710,10 @@ export class AshFighter extends Fighter {
    * and commanding an active Pokémon or throwing a Poké Ball).
    */
   isStationarySkillActive() {
+    // If Ash is currently walking towards his sideline vantage point, he is actively moving
+    if (this.trainerVantagePoint && Math.hypot(this.trainerVantagePoint.x - this.x, this.trainerVantagePoint.y - this.y) > 6) {
+      return false;
+    }
     return Boolean(
       this.isProtectedByHoneycombBarrier ||
       (this.activePokemon && this.activePokemon.hp > 0) ||
@@ -1626,6 +1881,38 @@ export class AshFighter extends Fighter {
     return targets;
   }
 
+  _isMatchWon(opponent = null) {
+    if (this.hp <= 0 || this.dead || this.isDead) return false;
+    if (typeof state !== 'undefined' && state) {
+      if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd') {
+        const winner = state.matchWinner || state.roundWinner;
+        if (!winner) return true;
+        if (winner === this) return true;
+        if (typeof state.getFighterTeam === 'function' && Array.isArray(state.fighters)) {
+          const ownerIdx = state.fighters.indexOf(this);
+          const winnerIdx = state.fighters.indexOf(winner);
+          if (ownerIdx !== -1 && winnerIdx !== -1) {
+            return state.getFighterTeam(ownerIdx) === state.getFighterTeam(winnerIdx);
+          }
+        }
+        return true;
+      }
+
+      if (Array.isArray(state.fighters) && state.fighters.length > 1) {
+        const enemies = this._getValidEnemyTargets(opponent);
+        if (enemies.length === 0) {
+          return true;
+        }
+      }
+    }
+
+    if (opponent && (opponent.dead || opponent.isDead || opponent.hp <= 0)) {
+      return true;
+    }
+
+    return false;
+  }
+
   _findBestTarget(fallbackOpponent = null) {
     const enemies = this._getValidEnemyTargets(fallbackOpponent);
     let best = null;
@@ -1651,7 +1938,7 @@ export class AshFighter extends Fighter {
       // Play canonical Empress impact SFX: hit_strong.ogg on specials/heavy hits, hit.ogg on standard strikes
       _playAshSound((opts.isSpecial || amount >= 24) ? 'hitStrong' : 'hit');
       spawnImpactFlash(target.x, target.y, this.themeColor, 16);
-      if (opts.knockback && target.hp > 0) {
+      if (opts.knockback && target.hp > 0 && !target.immuneToKnockback && !target.immuneToPush && target.characterId !== 'escanor') {
         const a = opts.angle ?? Math.atan2(target.y - this.y, target.x - this.x);
         target.vx = (target.vx || 0) + Math.cos(a) * opts.knockback * 0.35;
         target.vy = (target.vy || 0) + Math.sin(a) * opts.knockback * 0.35;
@@ -1678,13 +1965,53 @@ export class AshFighter extends Fighter {
   }
 
   /**
+   * Evaluates whether a specific Pokémon species is enabled for deployment.
+   * Supports both top-level config flags (e.g. enablePikachu, enableSummonPikachu)
+   * and roster-level flags (e.g. pokemonRoster.pikachu.enabled).
+   *
+   * @param {string} speciesKey - 'pikachu' | 'charizard' | 'greninja' | 'lucario'
+   * @returns {boolean}
+   */
+  _isPokemonEnabled(speciesKey) {
+    if (!speciesKey) return false;
+    const cfg = _getAshCfg();
+    const capitalized = speciesKey.charAt(0).toUpperCase() + speciesKey.slice(1).toLowerCase();
+    const enableKey = `enable${capitalized}`;
+    const enableSummonKey = `enableSummon${capitalized}`;
+    const rosterEnabled = cfg.pokemonRoster?.[speciesKey]?.enabled;
+
+    return isSkillEnabled(
+      cfg[enableKey],
+      cfg[enableSummonKey],
+      rosterEnabled,
+      true
+    );
+  }
+
+  /**
+   * Retrieves the active list of enabled Pokémon species according to rotation order.
+   *
+   * @returns {string[]}
+   */
+  _getAvailablePokemonList() {
+    const cfg = _getAshCfg();
+    const rawOrder = cfg.pokemonOrder || this.pokemonOrder || ['pikachu', 'charizard', 'greninja', 'lucario'];
+    return rawOrder.filter(species => this._isPokemonEnabled(species));
+  }
+
+  /**
    * Throws a Poké Ball to deploy the next Pokémon in Ash's rotation.
    * Immediately locks Ash into his stationary Honeycomb Barrier Commander state!
    */
   _throwPokeball(opponent, arena) {
     const cfg = _getAshCfg();
-    const speciesKey = this.pokemonOrder[this.nextPokemonIndex % this.pokemonOrder.length] || 'pikachu';
-    this.nextPokemonIndex = (this.nextPokemonIndex + 1) % this.pokemonOrder.length;
+    const available = this._getAvailablePokemonList();
+    if (available.length === 0) {
+      // All Pokémon summons are disabled
+      return;
+    }
+    const speciesKey = available[this.nextPokemonIndex % available.length] || available[0];
+    this.nextPokemonIndex = (this.nextPokemonIndex + 1) % available.length;
 
     const target = this._findBestTarget(opponent);
     const throwAngle = target
@@ -1738,12 +2065,19 @@ export class AshFighter extends Fighter {
     this.vx = 0;
     this.vy = 0;
 
+    // Pick safest trainer sideline vantage point (Top-Middle, Left-Middle, or Right-Middle)
+    const curArena = (typeof state !== 'undefined' ? state.arena : null);
+    const target = this._findBestTarget();
+    this.trainerVantagePoint = this._pickTrainerVantagePoint(curArena, target);
+
     if (typeof state !== 'undefined' && Array.isArray(state.fighters) && state.fighters.includes(this)) {
       state.fighters.push(pokemon);
     }
 
     _playAshSound('pbRelease');
-    const cryToPlay = pokemon.spec.cryKey;
+    const cryToPlay = (pokemon.speciesId === 'pikachu')
+      ? (pokemon.spec.starterCryKey || pokemon.spec.cryKey || 'cryPikachuStarter')
+      : pokemon.spec.cryKey;
     if (cryToPlay) {
       _playAshSound(cryToPlay);
     }
@@ -1792,6 +2126,7 @@ export class AshFighter extends Fighter {
     if (!fainted) return;
 
     this._cleanupActivePokemon();
+    this.trainerVantagePoint = null;
 
     // Drop Honeycomb Barrier & Resume Ash's Mobile Evasion!
     this.isProtectedByHoneycombBarrier = false;
@@ -1803,6 +2138,7 @@ export class AshFighter extends Fighter {
   }
 
   _cleanupActivePokemon() {
+    this.trainerVantagePoint = null;
     if (this.activePokemon) {
       if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
         const idx = state.fighters.indexOf(this.activePokemon);
@@ -1813,28 +2149,100 @@ export class AshFighter extends Fighter {
   }
 
   /**
+   * Selects the safest sideline vantage point (top-middle, left-middle, or right-middle edge)
+   * for Ash to slowly move to and oversee the battle while his summoned Pokémon fights in the center.
+   *
+   * @param {Object} arena - Current arena bounds
+   * @param {Object} [opponent] - Primary target/opponent to avoid
+   * @returns {{ type: string, x: number, y: number }}
+   */
+  _pickTrainerVantagePoint(arena, opponent = null) {
+    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+    const cfg = _getAshCfg();
+    const pad = cfg.trainerVantagePad || 42;
+
+    if (!curArena) {
+      return { type: 'top', x: this.x, y: Math.max(30, this.y - 120) };
+    }
+
+    const isCircle = curArena.shape === 'circle' || curArena.radius !== undefined;
+    const midX = curArena.x + curArena.width * 0.5;
+    const midY = curArena.y + curArena.height * 0.5;
+
+    let candidates = [];
+    if (isCircle) {
+      const ar = (curArena.radius !== undefined ? curArena.radius : curArena.width * 0.5) - pad;
+      candidates = [
+        { type: 'top', x: midX, y: midY - ar },
+        { type: 'left', x: midX - ar, y: midY },
+        { type: 'right', x: midX + ar, y: midY }
+      ];
+    } else {
+      const minX = curArena.x + pad;
+      const maxX = curArena.x + curArena.width - pad;
+      const minY = curArena.y + pad;
+      candidates = [
+        { type: 'top', x: midX, y: minY },
+        { type: 'left', x: minX, y: midY },
+        { type: 'right', x: maxX, y: midY }
+      ];
+    }
+
+    // If no opponent exists or opponent is defeated, select candidate closest to Ash's current spot
+    if (!opponent || opponent.hp <= 0 || opponent.dead) {
+      let closest = candidates[0];
+      let minDist = Infinity;
+      for (const cand of candidates) {
+        const d = Math.hypot(cand.x - this.x, cand.y - this.y);
+        if (d < minDist) {
+          minDist = d;
+          closest = cand;
+        }
+      }
+      return closest;
+    }
+
+    // Score candidates: maximize distance from opponent while minimizing travel distance from Ash
+    let bestCand = candidates[0];
+    let bestScore = -Infinity;
+
+    for (const cand of candidates) {
+      const distToEnemy = Math.hypot(cand.x - opponent.x, cand.y - opponent.y);
+      const distFromAsh = Math.hypot(cand.x - this.x, cand.y - this.y);
+
+      // Reward distance from opponent (1.5x weight) and deduct travel distance from Ash
+      let score = distToEnemy * 1.5 - distFromAsh;
+
+      // Heavy penalty if candidate point is within close danger zone (< 120px) of enemy
+      if (distToEnemy < 120) {
+        score -= 500;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestCand = cand;
+      }
+    }
+
+    return bestCand;
+  }
+
+  /**
    * Skill 1: Trainer Command — Orders the active Pokémon to unleash its signature move!
    * - Close Combat (<= 180px): Orders high-speed empowered melee combo (Iron Tail, Dragon Claw, Night Slash, Close Combat)!
    * - Long Range (> 180px): Orders signature ranged elemental special (Thunderbolt, Flamethrower, Water Shuriken, Aura Sphere)!
    */
   _executeTrainerCommand(opponent) {
     if (!this.activePokemon || this.activePokemon.hp <= 0) return;
-    if (this.activePokemon.thunderboltState || this.activePokemon.isChannelingSkill?.()) return;
+    if (this.activePokemon.thunderboltState || this.activePokemon.flamethrowerState || this.activePokemon.meleeMoveState || this.activePokemon.isChannelingSkill?.()) return;
     if (this.commandCooldown > 0) return;
-
-    const cd = Math.max(this.commandCooldownMax, this.activePokemon.specialCooldownMax || 0);
-    this.commandCooldown = cd;
-    this.activePokemon.specialCooldown = cd;
+    if ((this.activePokemon.specialCooldown || 0) > 0) return;
 
     const target = this._findBestTarget(opponent);
     if (!target) return;
 
-    const dist = Math.hypot(target.x - this.activePokemon.x, target.y - this.activePokemon.y);
-    if (dist <= 180 && typeof this.activePokemon._startCloseCombatMove === 'function') {
-      this.activePokemon._startCloseCombatMove(target, null, true);
-    } else {
-      this._executePokemonSpecial(this.activePokemon, target, true);
-    }
+    // Always unleash the active Pokémon's signature special skill when the command/skill is ready!
+    this._executePokemonSpecial(this.activePokemon, target, true);
   }
 
   /**
@@ -1846,8 +2254,9 @@ export class AshFighter extends Fighter {
    */
   _executePokemonSpecial(p, target, isTrainerCommand = false) {
     if (!p || p.hp <= 0) return;
-    const cd = Math.max(p.specialCooldownMax || 0, this.commandCooldownMax || 0);
+    const cd = p.specialCooldownMax || this.commandCooldownMax || 135;
     p.specialCooldown = cd;
+    p.isSpecialOnInitialCooldown = false;
     this.commandCooldown = cd;
 
     if (p.speciesId === 'pikachu') {
@@ -1871,6 +2280,7 @@ export class AshFighter extends Fighter {
     p.angle = castAngle;
     p.animState = 'special';
     p.actionAnimTimer = 28;
+    p.specialCastTimer = 28;
     p.animTick = 0;
 
     const moveTitle = spec.specialName || 'THUNDERBOLT!';
@@ -1960,10 +2370,12 @@ export class AshFighter extends Fighter {
     this._playMoveAudioSequence('voltTackle');
     triggerGlobalScreenShake(9, 16);
 
-    // If Ash has no active Pokémon out, instantly summon one!
+    // If Ash has no active Pokémon out, instantly summon one if available!
     if ((!this.activePokemon || this.activePokemon.hp <= 0) && !this.thrownPokeball) {
-      this.summonCooldown = 0;
-      this._throwPokeball(opponent, arena);
+      if (this._getAvailablePokemonList().length > 0) {
+        this.summonCooldown = 0;
+        this._throwPokeball(opponent, arena);
+      }
     }
 
     spawnFloatingText(this.x, this.y - this.r - 28, '10,000,000 VOLT AWAKENING!', '#FACC15');
@@ -2002,9 +2414,33 @@ export class AshFighter extends Fighter {
       return;
     }
 
+    // Match Victory Check: If match is won, Ash stays proudly on sideline and halts movement
+    if (this._isMatchWon(opponent)) {
+      this.vx = 0;
+      this.vy = 0;
+      if (this.activePokemon && this.activePokemon.hp > 0) {
+        if (this.activePokemon.speciesId === 'pikachu') {
+          this.activePokemon.animState = 'pose';
+        } else if (this.activePokemon.speciesId === 'charizard') {
+          this.activePokemon.animState = 'sleep';
+        } else if (this.activePokemon.speciesId === 'greninja') {
+          this.activePokemon.animState = 'rearUp';
+        } else if (this.activePokemon.speciesId === 'lucario') {
+          this.activePokemon.animState = 'tumbleback';
+        } else {
+          this.activePokemon.animState = 'victory';
+        }
+        this.activePokemon.vx = 0;
+        this.activePokemon.vy = 0;
+      }
+      this.isSteady = true;
+      return;
+    }
+
     this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
+    this.isSteady = Boolean(Math.hypot(this.vx || 0, this.vy || 0) < 0.45);
 
     if (this.activePokemon && this.activePokemon.hp > 0) {
       this.commandCooldown = this.activePokemon.specialCooldown;
@@ -2055,11 +2491,46 @@ export class AshFighter extends Fighter {
     }
 
     // 5. CORE STATE MACHINE:
-    // STATE A: Pokémon is Active (or Poké Ball in flight or fainting/recalling) -> ASH STOPS MOVING & PROJECTS HONEYCOMB BARRIER!
+    // STATE A: Pokémon is Active (or Poké Ball in flight or fainting/recalling) -> ASH REPOSITIONS TO SIDELINE & PROJECTS HONEYCOMB BARRIER!
     if ((this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting)) || this.thrownPokeball) {
       this.isProtectedByHoneycombBarrier = true;
-      this.vx = 0;
-      this.vy = 0;
+
+      // If Pokémon has been summoned, slowly walk toward the safest sideline vantage point (Top-Middle, Left-Middle, or Right-Middle)
+      if (this.activePokemon && !this.thrownPokeball) {
+        if (!this.trainerVantagePoint) {
+          this.trainerVantagePoint = this._pickTrainerVantagePoint(arena, bestTarget);
+        }
+
+        if (this.trainerVantagePoint) {
+          const dx = this.trainerVantagePoint.x - this.x;
+          const dy = this.trainerVantagePoint.y - this.y;
+          const dist = Math.hypot(dx, dy);
+
+          const slowMult = cfg.trainerSlowMoveMultiplier ?? 0.28;
+          const slowSpeed = Math.max(1.0, this.speed * slowMult);
+
+          if (dist <= 6 || dist <= slowSpeed) {
+            this.vx = 0;
+            this.vy = 0;
+          } else {
+            this.vx = (dx / dist) * slowSpeed;
+            this.vy = (dy / dist) * slowSpeed;
+            this.applyMovementPhysics(slowMult);
+            // Settle immediately upon arriving within the sideline threshold
+            if (Math.hypot(this.trainerVantagePoint.x - this.x, this.trainerVantagePoint.y - this.y) <= 6) {
+              this.vx = 0;
+              this.vy = 0;
+            }
+          }
+        } else {
+          this.vx = 0;
+          this.vy = 0;
+        }
+      } else {
+        // Poké Ball is in mid-throw flight -> hold still during throw animation
+        this.vx = 0;
+        this.vy = 0;
+      }
 
       // Trigger Trainer Command Special Move when ready (both Ash and Pokémon must be ready and not mid-cast)
       if (this.activePokemon &&
@@ -2068,6 +2539,8 @@ export class AshFighter extends Fighter {
           this.commandCooldown <= 0 &&
           this.activePokemon.specialCooldown <= 0 &&
           !this.activePokemon.thunderboltState &&
+          !this.activePokemon.flamethrowerState &&
+          !this.activePokemon.meleeMoveState &&
           !this.activePokemon.isChannelingSkill?.()) {
         this._executeTrainerCommand(bestTarget);
       }
@@ -2095,13 +2568,26 @@ export class AshFighter extends Fighter {
         this.vy = Math.sin(moveAngle) * this.speed;
       }
     } else {
-      // Cooldown finished! Throw next Poké Ball & enter stationary Honeycomb Barrier state
-      this._throwPokeball(bestTarget, arena);
-      return;
+      // Cooldown finished! Throw next Poké Ball & enter stationary Honeycomb Barrier state if summons are enabled
+      const available = this._getAvailablePokemonList();
+      if (available.length > 0) {
+        this._throwPokeball(bestTarget, arena);
+        return;
+      }
+      // If all Pokémon summons are disabled, keep Ash evading with standard movement
+      const curSpd = Math.hypot(this.vx, this.vy);
+      if (curSpd < this.speed * 0.75) {
+        const moveAngle = bestTarget
+          ? Math.atan2(this.y - bestTarget.y, this.x - bestTarget.x) + 0.55
+          : (this.gunAngle || 0);
+        this.vx = Math.cos(moveAngle) * this.speed;
+        this.vy = Math.sin(moveAngle) * this.speed;
+      }
     }
 
     // Centralized Movement Physics & Wall Bounce (Rule 1.2)
     super.update(bestTarget, ownerIndex, arena);
+    this.isSteady = Boolean(Math.hypot(this.vx || 0, this.vy || 0) < 0.45);
   }
 
   /**

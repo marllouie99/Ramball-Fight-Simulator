@@ -431,6 +431,35 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: 0,
   },
 
+  // ── Ash Ketchum (ID 62) ──────────
+  62: {
+    get src() {
+      return CONFIG.ash?.sounds?.pokeballThrow || 'Assets/Sound Effects/PokemonSFX/pb_throw.ogg';
+    },
+    get volume() {
+      return CONFIG.ash?.soundVolumes?.pokeballThrow ?? 0.85;
+    },
+    delay: 0,
+  },
+
+  // ── Zombie (ID 63) ──────────
+  63: {
+    src: 'Assets/Sound Effects/SkillEffects/zombie-chomp.wav',
+    volume: 0.85,
+    delay: 0,
+  },
+
+  // ── Unarmed (ID 64) ──────────
+  64: {
+    get src() {
+      return CONFIG.unarmed?.sounds?.slam || 'Assets/Sound Effects/Attacks/heavypunch2.mp3';
+    },
+    get volume() {
+      return CONFIG.unarmed?.soundVolumes?.slam ?? 0.95;
+    },
+    delay: 0,
+  },
+
   // ── Bomber Man (ID 65) ──────────
   65: {
     get src() {
@@ -441,15 +470,7 @@ export const BASIC_ATTACK_SOUNDS = {
     },
     delay: 0,
   },
-  66: {
-    get src() {
-      return CONFIG.pacman?.sounds?.chomp || 'Assets/Sound Effects/PacmanSFX/chomp.wav';
-    },
-    get volume() {
-      return CONFIG.pacman?.soundVolumes?.chomp ?? 0.90;
-    },
-    delay: 0,
-  },
+
   // ── Pac-Man (ID 66) ──────────
   66: {
     get src() {
@@ -461,6 +482,7 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: 0,
   },
 
+  // ── Creeper (ID 67) ──────────
   67: {
     get src() {
       return CONFIG.creeper?.sounds?.headbutt || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
@@ -1308,21 +1330,32 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 1.0,
     delay: 0,
   },
+  // Ash Ketchum — Poké Ball Throw & Commands
+  'ash': {
+    get src() {
+      return CONFIG.ash?.sounds?.pokeballThrow || 'Assets/Sound Effects/PokemonSFX/pb_throw.ogg';
+    },
+    get volume() {
+      return CONFIG.ash?.soundVolumes?.pokeballThrow ?? 0.85;
+    },
+    delay: 0,
+  },
+  // Unarmed — Momentum Slam
+  'unarmed': {
+    get src() {
+      return CONFIG.unarmed?.sounds?.slam || 'Assets/Sound Effects/Attacks/heavypunch2.mp3';
+    },
+    get volume() {
+      return CONFIG.unarmed?.soundVolumes?.slam ?? 0.95;
+    },
+    delay: 0,
+  },
   'bomberman': {
     get src() {
       return CONFIG.bomberman?.sounds?.plantBomb || 'Assets/Sound Effects/BombermanSFX/Place Bomb.wav';
     },
     get volume() {
       return CONFIG.bomberman?.soundVolumes?.plantBomb ?? 0.85;
-    },
-    delay: 0,
-  },
-  'pacman': {
-    get src() {
-      return CONFIG.pacman?.sounds?.chomp || 'Assets/Sound Effects/PacmanSFX/chomp.wav';
-    },
-    get volume() {
-      return CONFIG.pacman?.soundVolumes?.chomp ?? 0.90;
     },
     delay: 0,
   },

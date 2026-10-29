@@ -2902,39 +2902,52 @@ export const HUD_SKILL_PROVIDERS = {
 
   ash(f) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.ash) ? CONFIG.ash : {};
-    const themeColor = f.themeColor || cfg.themeColor || '#E53935';
     const skills = [];
 
+    const anyPokemonEnabled = isSkillEnabled(cfg.enablePikachu, cfg.enableSummonPikachu, cfg.pokemonRoster?.pikachu?.enabled, true) ||
+      isSkillEnabled(cfg.enableCharizard, cfg.enableSummonCharizard, cfg.pokemonRoster?.charizard?.enabled, true) ||
+      isSkillEnabled(cfg.enableGreninja, cfg.enableSummonGreninja, cfg.pokemonRoster?.greninja?.enabled, true) ||
+      isSkillEnabled(cfg.enableLucario, cfg.enableSummonLucario, cfg.pokemonRoster?.lucario?.enabled, true);
+
     const hasPokemon = Boolean(f.activePokemon && !f.activePokemon.isDead && f.activePokemon.hp > 0);
-    if (isSkillEnabled(cfg.enableHoneycombSummon, cfg.enableSummon, true)) {
-      const pokeName = hasPokemon ? (f.activePokemon.spec?.name || f.activePokemon.name || 'PIKACHU') : '';
+    const activeSpec = f.activePokemon?.spec;
+    const themeColor = (hasPokemon && activeSpec?.themeColor)
+      ? activeSpec.themeColor
+      : (f.themeColor || cfg.themeColor || '#E53935');
+
+    // 1. Poké Ball Summon Bar: Displayed ONLY when Ash has NO active Pokémon in the arena
+    if (!hasPokemon && anyPokemonEnabled && isSkillEnabled(cfg.enableHoneycombSummon, cfg.enableSummon, true)) {
       const sumMax = cfg.summonCooldownFrames || cfg.summonCooldown || 210;
       const sumTimer = f.summonCooldown || 0;
-      const sumPct = hasPokemon ? 100 : Math.max(0, Math.min(100, (1 - (sumTimer / sumMax)) * 100));
+      const sumPct = Math.max(0, Math.min(100, (1 - (sumTimer / sumMax)) * 100));
       skills.push({
         id: 'honeycomb_summon',
         pct: sumPct,
-        ready: hasPokemon || (sumPct >= 99 && sumTimer <= 0),
+        ready: sumPct >= 99 && sumTimer <= 0,
         color: themeColor,
-        label: hasPokemon ? `SHIELD + ${pokeName}` : 'POKEBALL SUMMON'
+        label: 'POKEBALL SUMMON'
       });
     }
 
-    if (isSkillEnabled(cfg.enableTrainerCommand, cfg.enableSkill1, true)) {
-      const activeSpec = f.activePokemon?.spec;
-      const moveLabel = hasPokemon
-        ? (activeSpec?.hudSkillLabel || activeSpec?.specialName?.replace(/!$/, '') || 'THUNDERBOLT')
-        : 'THUNDERBOLT';
-      const pokeSpecMax = f.activePokemon?.specialCooldownMax || activeSpec?.specialCooldown || 135;
-      const pokeSpecTimer = f.activePokemon?.specialCooldown ?? 0;
-      const cmdMax = Math.max(cfg.commandCooldownFrames || cfg.commandSkillCooldown || 150, pokeSpecMax);
-      const effectiveTimer = Math.max(pokeSpecTimer, f.commandCooldown ?? f.commandSkillCooldown ?? 0);
-      const effectiveMax = Math.max(cmdMax, pokeSpecMax);
-      const isChanneling = Boolean(f.activePokemon?.thunderboltState || f.activePokemon?.isChannelingSkill?.());
-      const cmdPct = hasPokemon
-        ? (isChanneling ? 0 : Math.max(0, Math.min(100, (1 - (effectiveTimer / effectiveMax)) * 100)))
-        : Math.max(0, Math.min(100, (1 - ((f.commandCooldown ?? f.commandSkillCooldown ?? 0) / cmdMax)) * 100));
-      const isReady = hasPokemon && !isChanneling && cmdPct >= 99 && (f.activePokemon?.specialCooldown || 0) <= 0 && (f.commandCooldown || 0) <= 0;
+    // 2. Active Pokémon Skill Bar: Displayed ONLY when a Pokémon is actively summoned on the field
+    if (hasPokemon && isSkillEnabled(cfg.enableTrainerCommand, cfg.enableSkill1, true)) {
+      const p = f.activePokemon;
+      const moveLabel = activeSpec?.hudSkillLabel || activeSpec?.specialName?.replace(/!$/, '') || (
+        p.speciesId === 'charizard' ? 'FLAMETHROWER' :
+        p.speciesId === 'greninja' ? 'WATER SHURIKEN' :
+        p.speciesId === 'lucario' ? 'AURA SPHERE' : 'THUNDERBOLT'
+      );
+      const isInitial = Boolean(p.isSpecialOnInitialCooldown);
+      const pokeSpecMax = isInitial
+        ? (p.specialInitialCooldown || 180)
+        : (p.specialCooldownMax || activeSpec?.specialCooldown || 135);
+      const pokeSpecTimer = Math.max(0, p.specialCooldown ?? 0);
+      const cmdTimer = Math.max(0, f.commandCooldown ?? f.commandSkillCooldown ?? 0);
+      const effectiveTimer = Math.max(pokeSpecTimer, cmdTimer);
+      const effectiveMax = Math.max(pokeSpecMax, effectiveTimer, 1);
+      const cmdPct = Math.max(0, Math.min(100, (1 - (effectiveTimer / effectiveMax)) * 100));
+      const isChannelingSpecial = Boolean(p.thunderboltState || p.flamethrowerState);
+      const isReady = !isChannelingSpecial && cmdPct >= 99 && (p.specialCooldown || 0) <= 0 && (f.commandCooldown || 0) <= 0;
       skills.push({
         id: 'trainer_command',
         pct: cmdPct,
@@ -2944,6 +2957,7 @@ export const HUD_SKILL_PROVIDERS = {
       });
     }
 
+    // 3. Ultimate: 10,000,000 Volt Thunderbolt Barrage
     if (isSkillEnabled(cfg.enableUltimate, true)) {
       const ultMax = cfg.ultimateCooldownFrames || cfg.ultimateCooldown || 780;
       const ultTimer = f.ultimateCooldown || 0;

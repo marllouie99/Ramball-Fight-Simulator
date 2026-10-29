@@ -307,6 +307,7 @@ function _drawHeldPokeball(ctx, ballR, isUltra = false) {
 
 /**
  * Main skin renderer for Ash Ketchum (Rule 19, 20, 22, 24).
+ * Features retro arcade character breathing animation when steady (Zenitsu Breathing Rhythm Standard).
  */
 export function drawAshSkin(ctx, fighter) {
   if (!fighter) return;
@@ -322,15 +323,38 @@ export function drawAshSkin(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // Layer 1: Toji-Standard 4-Zone Pixel Body
-  drawAshPixelBody(ctx, r);
+  // ── Retro Arcade Character Breathing Animation when Steady (Zenitsu Rhythm Standard) ──
+  const isMovingFast = !fighter._isWinnerReveal && (Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.45);
+  const isSteady = Boolean(fighter.isSteady !== undefined ? fighter.isSteady : !isMovingFast);
 
-  // Layer 2: League Cap & Spiky Hair Asset
+  if (isSteady) {
+    fighter._ashSteadyTick = (fighter._ashSteadyTick || 0) + 1;
+  }
+  const steadyTick = fighter._ashSteadyTick || 0;
+  const breathFreq = 0.16; // Exact Zenitsu breathing cadence (Rule 19 / Zenitsu Standard)
+  const rawBreath = Math.sin(steadyTick * breathFreq);
+  const breathQuantized = isSteady ? (rawBreath > 0.3 ? 1.0 : (rawBreath < -0.3 ? -1.0 : 0.0)) : 0.0;
+  const breathLiftY = breathQuantized * 1.5;
+  const chestExpansionX = Math.max(0, breathQuantized) * 1.0;
+
+  // Layer 1: Toji-Standard 4-Zone Pixel Body (Applies chest expansion & breathing lift)
+  ctx.save();
+  ctx.translate(chestExpansionX * 0.3, breathLiftY * 0.4);
+  drawAshPixelBody(ctx, r);
+  ctx.restore();
+
+  // Layer 2: League Cap & Spiky Hair Asset (Upper head secondary breathing motion)
+  ctx.save();
+  ctx.translate(chestExpansionX * 0.5, breathLiftY * 0.6);
   _drawAshHair(ctx, r, facingLeft);
+  ctx.restore();
 
   // Layer 3: Symmetrical Lower-Flank Canonical Hands & Held Poké Ball (Rule 20)
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   if (!shouldHideHands) {
+    ctx.save();
+    ctx.translate(chestExpansionX * 0.4, breathLiftY * 0.5);
+
     const handR = getHandSize(r * 0.30);
     const leftHandX = -r * 0.82;
     const leftHandY = r * 0.38;
@@ -347,6 +371,8 @@ export function drawAshSkin(ctx, fighter) {
       _drawHeldPokeball(ctx, handR * 1.12, Boolean(fighter.ultimateActiveTimer > 0));
     }
     drawPixelHand(ctx, 0, 0, handR * 0.88, '#16A34A', '#0E0F14');
+    ctx.restore();
+
     ctx.restore();
   }
 

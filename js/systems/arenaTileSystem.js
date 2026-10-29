@@ -373,6 +373,38 @@ function _renderNoTilesFloor(oc, width, height, isDark) {
 }
 
 function _renderPixelCleanFloor(oc, width, height, cols, rows, cellW, cellH, isDark) {
+  if (typeof CONFIG !== 'undefined' && CONFIG.hudLayoutStyle === 'classic') {
+    const bgColor = isDark ? '#070a13' : '#f8fafc';
+    const gridDotColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(15, 23, 42, 0.12)';
+    const frameColor = isDark ? '#334155' : '#cbd5e1';
+    const bracketColor = isDark ? '#64748b' : '#475569';
+
+    _pixelRect(oc, 0, 0, width, height, bgColor);
+
+    for (let r = 1; r < rows; r++) {
+      for (let c = 1; c < cols; c++) {
+        const gx = Math.round(c * cellW);
+        const gy = Math.round(r * cellH);
+        _pixelRect(oc, gx - 1, gy, 3, 1, gridDotColor);
+        _pixelRect(oc, gx, gy - 1, 1, 3, gridDotColor);
+      }
+    }
+
+    const pad = 6;
+    _pixelRect(oc, pad, pad, width - pad * 2, 2, frameColor);
+    _pixelRect(oc, pad, height - pad - 2, width - pad * 2, 2, frameColor);
+    _pixelRect(oc, pad, pad, 2, height - pad * 2, frameColor);
+    _pixelRect(oc, width - pad - 2, pad, 2, height - pad * 2, frameColor);
+
+    const bLen = 14;
+    const bThick = 3;
+    _pixelLBracket(oc, pad + 2, pad + 2, bLen, bThick, 1, 1, bracketColor);
+    _pixelLBracket(oc, width - pad - 2 - bThick, pad + 2, bLen, bThick, -1, 1, bracketColor);
+    _pixelLBracket(oc, pad + 2, height - pad - 2 - bThick, bLen, bThick, 1, -1, bracketColor);
+    _pixelLBracket(oc, width - pad - 2 - bThick, height - pad - 2 - bThick, bLen, bThick, -1, -1, bracketColor);
+    return;
+  }
+
   const customInnerBg = isDark ? (CONFIG.darkArenaInnerBgColor || null) : (CONFIG.arenaInnerBgColor || null);
   const bgColor = customInnerBg || (isDark ? '#080B14' : '#F6F8FC');
   const crossColor = isDark ? 'rgba(255, 255, 255, 0.22)' : 'rgba(15, 23, 42, 0.22)';
@@ -966,7 +998,8 @@ export function getOrCreateFloorCanvas(floorId, arena, isDark = false, fBleed = 
   const height = Math.max(64, Math.ceil(arena.height + fBleed * 2));
   const shape = arena.shape || 'rect';
   const activeInnerBg = isDark ? (CONFIG.darkArenaInnerBgColor || 'dark') : (CONFIG.arenaInnerBgColor || 'light');
-  const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}_${activeInnerBg}_v3`;
+  const isClassicLayout = typeof CONFIG !== 'undefined' && CONFIG.hudLayoutStyle === 'classic';
+  const key = `${floorId}_${width}_${height}_${shape}_${isDark ? 'dark' : 'light'}_${activeInnerBg}_${isClassicLayout ? 'classic' : 'duel'}_v3`;
 
   if (!state._arenaFloorCanvasCache) {
     state._arenaFloorCanvasCache = {};

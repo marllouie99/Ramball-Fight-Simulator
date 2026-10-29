@@ -80,6 +80,11 @@ export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple')
     return true;
   }
 
+  // Pokémon companions casting skills (Thunderbolt, Flamethrower, close combat combos, elemental specials)
+  if (typeof entity.isCastingSkill === 'function' && entity.isCastingSkill()) {
+    return true;
+  }
+
   // Specific vortex type checks:
   if (vortexType === 'blue' && entity.gojoBlueDragImmune) {
     return true;

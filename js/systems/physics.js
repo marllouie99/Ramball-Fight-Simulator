@@ -512,8 +512,11 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless || a.isProtectedByHoneycombBarrier;
-  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless || b.isProtectedByHoneycombBarrier;
+  const aIsPokemonCasting = Boolean(a && typeof a.isCastingSkill === 'function' && a.isCastingSkill());
+  const bIsPokemonCasting = Boolean(b && typeof b.isCastingSkill === 'function' && b.isCastingSkill());
+
+  const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless || a.isProtectedByHoneycombBarrier || aIsPokemonCasting;
+  const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless || b.isProtectedByHoneycombBarrier || bIsPokemonCasting;
 
   let aIsImmovable = aIsAbsoluteImmovable || (a.isMeleeMode && !bIsAbsoluteImmovable);
   let bIsImmovable = bIsAbsoluteImmovable || (b.isMeleeMode && !aIsAbsoluteImmovable);
@@ -581,14 +584,19 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isImmovable || aIsNameless || a.isProtectedByHoneycombBarrier || (aIsGojoInfinity && !b.gojoInfinityImmune);
-  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isImmovable || bIsNameless || b.isProtectedByHoneycombBarrier || (bIsGojoInfinity && !a.gojoInfinityImmune);
+  const aIsAnchor = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isImmovable || aIsNameless || a.isProtectedByHoneycombBarrier || aIsPokemonCasting || (aIsGojoInfinity && !b.gojoInfinityImmune);
+  const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isImmovable || bIsNameless || b.isProtectedByHoneycombBarrier || bIsPokemonCasting || (bIsGojoInfinity && !a.gojoInfinityImmune);
 
   if (aIsAnchor) {
-    a.vx = 0;
-    a.vy = 0;
-    a.knockbackVx = 0;
-    a.knockbackVy = 0;
+    if (aIsPokemonCasting && a.meleeMoveState) {
+      a.knockbackVx = 0;
+      a.knockbackVy = 0;
+    } else {
+      a.vx = 0;
+      a.vy = 0;
+      a.knockbackVx = 0;
+      a.knockbackVy = 0;
+    }
   } else {
     // Fighters in melee mode, rage, active Infinity, counter-lock, or Genos ultimate beam ignore bounce impulse so they hold their ground
     // When bouncing off an immovable entity (e.g. counter lock, Genos beam, or barrier), the mobile entity does not damp the bounce
@@ -629,10 +637,15 @@ export function resolveFighterCollision(a, b) {
   }
   
   if (bIsAnchor) {
-    b.vx = 0;
-    b.vy = 0;
-    b.knockbackVx = 0;
-    b.knockbackVy = 0;
+    if (bIsPokemonCasting && b.meleeMoveState) {
+      b.knockbackVx = 0;
+      b.knockbackVy = 0;
+    } else {
+      b.vx = 0;
+      b.vy = 0;
+      b.knockbackVx = 0;
+      b.knockbackVy = 0;
+    }
   } else {
     if (b.isMeleeMode || bIsGenosBeam) {
       b.vx = 0;
