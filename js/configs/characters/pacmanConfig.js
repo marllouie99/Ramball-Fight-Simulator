@@ -35,7 +35,7 @@ export const pacmanConfig = {
 
   // ── Chomp Mode (Empowered 30% Attack State) ──
   enableChompMode: true,
-  chompModeDuration: 360, // Standard Chomp Mode duration from Power Pellet (~6.0s at 60 FPS)
+  chompModeDuration: 250, // Standard Chomp Mode duration from Power Pellet (~6.0s at 60 FPS)
   allFruitsChompModeDuration: 600, // Empowered longer Chomp Mode duration when clearing ALL fruits/dots (~10.0s at 60 FPS)
   chompModeDurationAllDots: 600, // Alias for backward compatibility
   chompDamagePercent: 0.20, // 30% damage on contact

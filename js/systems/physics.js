@@ -1184,6 +1184,10 @@ export function updateFighters() {
         if (typeof fighter._healthBarShakeTimer === 'number' && fighter._healthBarShakeTimer > 0) {
           fighter._healthBarShakeTimer--;
         }
+        // Update persistent deployed arena objects (e.g. Bomberman active bombs & cross explosions) even after defeat
+        if (typeof fighter.updateDeployedObjects === 'function') {
+          fighter.updateDeployedObjects(state.arena);
+        }
         // If fighter is paralyzed by Mahito's Soul Disfigurement, let shivering finish and explode before match ends!
         if (fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
           if (fighter.paralyzeTimer % 3 === 0 && typeof spawnMahitoSoulBubbles === 'function') {
@@ -1217,6 +1221,10 @@ export function updateFighters() {
           fighter.y = fighter.swallowedBy.y;
           fighter.vx = 0;
           fighter.vy = 0;
+          // Update persistent deployed arena objects (e.g. Bomberman active bombs & cross explosions)
+          if (typeof fighter.updateDeployedObjects === 'function') {
+            fighter.updateDeployedObjects(state.arena);
+          }
           return;
         }
       }
@@ -1255,6 +1263,10 @@ export function updateFighters() {
         }
         fighter.applyMovementPhysics?.();
         fighter.resolveWallBounce?.(state.arena, opponent);
+        // Update persistent deployed arena objects (e.g. Bomberman active bombs & cross explosions)
+        if (typeof fighter.updateDeployedObjects === 'function') {
+          fighter.updateDeployedObjects(state.arena);
+        }
         return;
       }
 

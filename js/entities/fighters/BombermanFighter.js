@@ -260,6 +260,8 @@ export class BombermanFighter extends Fighter {
     this.activeVisualExplosions = [];
     this.activeVisualEffects = [];
     this.walkSoundTimer = 0;
+    this._deployedObjectsUpdatedFrame = -1;
+    this._deployedObjectsRenderedFrame = -1;
   }
 
   /**
@@ -1018,7 +1020,7 @@ export class BombermanFighter extends Fighter {
     const fighters = state.fighters || [];
     for (let i = 0; i < fighters.length; i++) {
       const f = fighters[i];
-      if (!f || f.hp <= 0) continue;
+      if (!f || f.hp <= 0 || f.isSwallowedByPacman) continue;
 
       const fr = f.r || 25;
       const minDist = bomb.r + fr;
@@ -1037,6 +1039,9 @@ export class BombermanFighter extends Fighter {
 
       if (f === this) {
         if (
+          !this.isSwallowedByPacman &&
+          !this.isPacmanGhost &&
+          this.hp > 0 &&
           !bomb.isTraveling &&
           this.canKickBombs &&
           this.bombKickTimer <= 0 &&
@@ -1334,12 +1339,22 @@ export class BombermanFighter extends Fighter {
   }
 
   /**
+   * Updates all deployed ground entities (planted bombs, traveling bombs, cross explosions & vfx)
+   * on the arena floor. Runs every frame even if Bomberman is swallowed by Pac-Man,
+   * transformed into a ghost, or knocked out, ensuring deployed bombs never vanish or freeze.
+   */
+  updateDeployedObjects(arena = state.arena) {
+    this._updateVisualExplosions();
+    this._updateVisualEffects();
+    this._updateBombs(arena);
+  }
+
+  /**
    * Main 60 FPS combat update loop for Bomber Man.
    */
   update(opponent, ownerIndex, arena = state.arena) {
-    // 0. Rule 25: Update visual effects & explosion lifecycles BEFORE freeze guard
-    this._updateVisualExplosions();
-    this._updateVisualEffects();
+    // 0. Rule 25: Update visual effects, explosions & planted bomb lifecycles BEFORE freeze guard
+    this.updateDeployedObjects(arena);
 
     if (this._invincibleDeflectTextCooldown > 0) {
       this._invincibleDeflectTextCooldown--;
@@ -1348,9 +1363,6 @@ export class BombermanFighter extends Fighter {
       this.kickAnimTimer--;
     }
     this.isInvincibleUltimate = (this.invincibleTimer || 0) > 0;
-
-    // Planted & traveling bombs continue ticking on the arena floor
-    this._updateBombs(arena);
 
     // 1. Mandatory Rule 1.1 Freeze & TimeStop Guard
     const isFrozen = this._handleTimeStop();
@@ -1465,6 +1477,20 @@ export class BombermanFighter extends Fighter {
   }
 
   /**
+   * Renders all deployed ground entities (planted & traveling bombs, 4-way cross explosions)
+   * on the arena floor. Persists even if Bomberman is swallowed by Pac-Man, in ghost form, or knocked out.
+   */
+  drawDeployedObjects(ctx) {
+    if (!ctx) return;
+    for (let i = 0; i < this.activeBombs.length; i++) {
+      drawPlantedBomb(ctx, this.activeBombs[i]);
+    }
+    for (let i = 0; i < this.activeVisualExplosions.length; i++) {
+      drawBombExplosion(ctx, this.activeVisualExplosions[i]);
+    }
+  }
+
+  /**
    * Rule 21: Custom fighter draw pipeline.
    * Renders tile-centered & traveling bombs, 4-way cross explosions, Bomberman's body,
    * power-up popups, and MANDATORY overhead HP & freeze timer overlays at the end.
@@ -1472,11 +1498,10 @@ export class BombermanFighter extends Fighter {
   draw(ctx, opponent) {
     if (!ctx) return;
 
-    for (let i = 0; i < this.activeBombs.length; i++) {
-      drawPlantedBomb(ctx, this.activeBombs[i]);
-    }
-    for (let i = 0; i < this.activeVisualExplosions.length; i++) {
-      drawBombExplosion(ctx, this.activeVisualExplosions[i]);
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : null;
+    if (currentFrame === null || this._deployedObjectsRenderedFrame !== currentFrame) {
+      if (currentFrame !== null) this._deployedObjectsRenderedFrame = currentFrame;
+      this.drawDeployedObjects(ctx);
     }
 
     this.drawBody(ctx);

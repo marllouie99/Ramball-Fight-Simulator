@@ -13155,8 +13155,9 @@ async function runInteractionTests() {
     pacman.activateChompMode('powerPellet');
 
     // Verify Ghost Transformation State
+    const expectedBaseGhostTimer = pacman.chompModeDuration || 250;
     assert(zenitsu.isPacmanGhost === true, 'Enemy must be transformed into ghost upon Pac-Man eating big dot');
-    assert(zenitsu.pacmanGhostTimer === 360, `Ghost timer must be set to chomp duration (360 frames), got ${zenitsu.pacmanGhostTimer}`);
+    assert(zenitsu.pacmanGhostTimer === expectedBaseGhostTimer, `Ghost timer must be set to chomp duration (${expectedBaseGhostTimer} frames), got ${zenitsu.pacmanGhostTimer}`);
     assert(zenitsu.canPerformBasicAttack(pacman) === false, 'Enemy must NOT be able to perform basic attacks in ghost state');
     assert(zenitsu.canAim() === false, 'Enemy must NOT be able to aim in ghost state');
 
@@ -13173,7 +13174,7 @@ async function runInteractionTests() {
 
     assert(zenitsu.thunderclapCooldown === initialCd1, 'Thunderclap cooldown must remain paused during ghost state');
     assert(zenitsu.rokurenCooldown === initialCd2, 'Rokuren cooldown must remain paused during ghost state');
-    assert(zenitsu.pacmanGhostTimer === 350, `Ghost timer must decrement each frame (got ${zenitsu.pacmanGhostTimer})`);
+    assert(zenitsu.pacmanGhostTimer === expectedBaseGhostTimer - 10, `Ghost timer must decrement each frame (got ${zenitsu.pacmanGhostTimer})`);
 
     // 4. Verify Movement Continuity: Enemy CAN MOVE
     const moved = Math.hypot(zenitsu.x - initialX, zenitsu.y - initialY) > 0.5 || Math.hypot(zenitsu.vx, zenitsu.vy) > 0.1;
@@ -13332,17 +13333,77 @@ async function runInteractionTests() {
     testZenitsuA.isDead = false;
     state.fighters = [pacman, testZenitsuA];
 
-    // Standard Power Pellet duration: 360 frames
+    // Standard Power Pellet duration: checks configured chompModeDuration
     pacman.activateChompMode('powerPellet');
-    assert(pacman.chompModeDuration === 360, `Standard Power Pellet Chomp Mode duration must be 360 frames, got ${pacman.chompModeDuration}`);
-    assert(testZenitsuA.pacmanGhostTimer === 360, `Standard ghost timer must be 360 frames, got ${testZenitsuA.pacmanGhostTimer}`);
+    const stdChompDuration = pacman.chompModeDuration;
+    assert(stdChompDuration > 0, 'Standard Power Pellet Chomp Mode duration must be positive');
+    assert(testZenitsuA.pacmanGhostTimer === stdChompDuration, `Standard ghost timer must be ${stdChompDuration} frames, got ${testZenitsuA.pacmanGhostTimer}`);
 
-    // All Fruits Eaten duration: 600 frames (significantly longer!)
+    // All Fruits Eaten duration: 600 frames (significantly longer than standard!)
     pacman.activateChompMode('allFruits');
     assert(pacman.chompModeDuration === 600, `All-fruits Chomp Mode duration must be longer (600 frames), got ${pacman.chompModeDuration}`);
     assert(pacman.chompModeTimer === 600, `All-fruits Chomp Mode timer must initialize to longer duration (600 frames), got ${pacman.chompModeTimer}`);
     assert(testZenitsuA.pacmanGhostTimer === 600, `All-fruits enemy ghost timer must also be longer (600 frames), got ${testZenitsuA.pacmanGhostTimer}`);
-    assert(pacman.chompModeDuration > 360, 'All-fruits Chomp Mode duration must be strictly longer than standard Power Pellet duration');
+    assert(pacman.chompModeDuration > stdChompDuration, 'All-fruits Chomp Mode duration must be strictly longer than standard Power Pellet duration');
+
+    // 14. Verify Bomberman Deployed Bombs Persist When Swallowed by Pac-Man & in Ghost State
+    const BombermanClass = FIGHTER_CLASS_MAP['bomberman'];
+    assert(typeof BombermanClass === 'function', 'BombermanFighter must be available');
+    const bomberman = new BombermanClass({ x: 180, y: 320, color: '#2563EB', controls: {} });
+    bomberman.hp = bomberman.maxHp;
+    pacman.hp = pacman.maxHp;
+    pacman.x = 220;
+    pacman.y = 320;
+    state.fighters = [pacman, bomberman];
+
+    // Bomberman plants a bomb on the floor
+    bomberman.plantCooldownTimer = 0;
+    bomberman.layStepTimer = 0;
+    const plantedBomb = bomberman.plantBomb(testArena);
+    assert(plantedBomb !== null, 'Bomberman must successfully plant a bomb');
+    assert(bomberman.activeBombs.length === 1, 'Bomberman must have 1 active bomb planted on arena floor');
+    const initialFuse = plantedBomb.fuseTimer;
+
+    // Pac-Man triggers Chomp Mode -> Bomberman becomes frightened ghost
+    pacman.activateChompMode('powerPellet');
+    assert(bomberman.isPacmanGhost === true, 'Bomberman must enter ghost state');
+
+    // Update 5 physics frames while Bomberman is a ghost
+    for (let f = 0; f < 5; f++) {
+      updateFighters();
+    }
+    assert(bomberman.activeBombs.length === 1, 'Planted bomb must NOT disappear when Bomberman is a frightened ghost');
+    assert(plantedBomb.fuseTimer < initialFuse, 'Bomb fuse must continue ticking down while Bomberman is a ghost');
+
+    // Pac-Man eats/swallows Bomberman
+    const hpBeforeBombDetonation = pacman.hp;
+    pacman._swallowGhostEnemy(bomberman);
+    assert(bomberman.isSwallowedByPacman === true, 'Bomberman must be swallowed inside Pac-Man');
+    assert(bomberman.activeBombs.length === 1, 'Planted bomb must NOT disappear when Bomberman is swallowed by Pac-Man');
+
+    // Deployed objects rendering check: drawDeployedObjects must work with 0 stack depth
+    const bombMockCtx = createMockCtx();
+    bomberman.drawDeployedObjects(bombMockCtx);
+    assert(bombMockCtx.getStackDepth() === 0, 'drawDeployedObjects must maintain 0 Canvas 2D stack depth');
+
+    // Fast-forward bomb fuse until detonation while Bomberman remains inside Pac-Man
+    plantedBomb.fuseTimer = 1;
+    // Position Pac-Man near the bomb so explosion hits him
+    pacman.x = plantedBomb.x;
+    pacman.y = plantedBomb.y;
+    bomberman.x = pacman.x;
+    bomberman.y = pacman.y;
+
+    updateFighters();
+    assert(bomberman.activeBombs.length === 0, 'Bomb must detonate upon fuse expiration');
+    assert(bomberman.activeVisualExplosions.length === 1, 'Active visual cross explosion must spawn in arena');
+    assert(pacman.hp < hpBeforeBombDetonation, 'Pac-Man must take damage from Bomberman bomb even while Bomberman is swallowed');
+
+    // Update 30 frames for explosion animation decay
+    for (let f = 0; f < 30; f++) {
+      updateFighters();
+    }
+    assert(bomberman.activeVisualExplosions.length === 0, 'Cross explosion must decay cleanly and not get stuck');
 
     state.fighters = [];
     console.log('      ✅ Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State verified.');

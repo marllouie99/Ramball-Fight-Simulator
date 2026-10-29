@@ -269,6 +269,21 @@ export function drawFighters() {
     });
   }
 
+  // ── GROUND PASS: Deployed arena objects (e.g. Bomberman planted bombs & cross explosions) ──
+  // Rendered on the arena floor before fighter bodies so bombs sit on the ground
+  // and persist even if the owner is swallowed by Pac-Man, in ghost state, or knocked out.
+  if (fighters) {
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : null;
+    fighters.forEach((f) => {
+      if (f && typeof f.drawDeployedObjects === 'function') {
+        if (currentFrame === null || f._deployedObjectsRenderedFrame !== currentFrame) {
+          if (currentFrame !== null) f._deployedObjectsRenderedFrame = currentFrame;
+          f.drawDeployedObjects(ctx);
+        }
+      }
+    });
+  }
+
   // Check once per frame if any Mahoraga is currently adapting (wheel clicking)
   const activeMaho = fighters ? fighters.find(f => f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0)) : null;
   let mahoDimAlpha = 0;
