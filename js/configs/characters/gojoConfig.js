@@ -23,8 +23,8 @@ export const gojoConfig = {
   moveSpeed: 5.5,
   r: 25,
   radius: 25,
-  color: '#E0FFFF', // Light Cyan
-  themeColor: '#E0FFFF',
+  color: '#3bc7ffff', // Light Cyan
+  themeColor: '#3bc7ffff',
   startX: 300,
   startY: 250,
   startVx: 1.1,
@@ -134,7 +134,7 @@ export const gojoConfig = {
   purple200DimOpacity: 0.98,        // Opacity of the full-screen dim effect during 200% Hollow Purple
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
-  purpleSecondCastDamageMultiplier: 4.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
+  purpleSecondCastDamageMultiplier: 3.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
   purpleSecondCastChargeMax: 120,           // Channeling duration in frames for 200% Hollow Purple (~3.0s at 60fps)
   purpleSecondCastTextBanner: '200% HOLLOW PURPLE!', // Floating text displayed on 2nd cast release
   purpleSecondCastTextHeader100: 'PURPLE 100%',     // Skill HUD bar label for 100% cast

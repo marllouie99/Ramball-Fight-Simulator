@@ -3313,6 +3313,7 @@ function updateHealthHud() {
 
     return info;
   };
+  updateHealthHud.getAdditionalInfoForFighter = getAdditionalInfoForFighter;
 
   const formatSkillLabel = (label, isTac = false) => {
     if (!label) return '';
@@ -3548,7 +3549,7 @@ function updateHealthHud() {
     return generateCjGtaHudWidgetHTML(fighter, align);
   };
 
-  const generateFighterSkillsHTML = (f, align, singleColumn = false) => {
+  const generateFighterSkillsHTML = (f, align, singleColumn = false, filterFn = null) => {
     if (CONFIG.hudHideAll || CONFIG.hudHideSkillBars || CONFIG.hudSkillBarsMode === 'none' || CONFIG.darkModeShowHudSkillBars === -1) {
       return '';
     }
@@ -3559,7 +3560,10 @@ function updateHealthHud() {
     if (!allSkills || allSkills.length === 0) return '';
 
     // Filter skills based on Dark Mode settings & fighter-specific exceptions (e.g. Ichigo Bankai, Toji Ultimate)
-    const skills = allSkills.filter(s => shouldShowFighterSkill(f, s));
+    let skills = allSkills.filter(s => shouldShowFighterSkill(f, s));
+    if (typeof filterFn === 'function') {
+      skills = skills.filter(filterFn);
+    }
     if (!skills || skills.length === 0) return '';
 
     const isDarkTheme = isDarkModeActive();
@@ -3622,7 +3626,7 @@ function updateHealthHud() {
     }).join('');
   };
 
-  const generateFighterInfoHTML = (f, singleColumn = false, isTeam = false) => {
+  const generateFighterInfoHTML = (f, singleColumn = false, isTeam = false, filterFn = null) => {
     if (CONFIG.hudHideAll || CONFIG.hudHideStats || !shouldShowHudStats()) return '';
     if (!f) return '';
     const isTacFighter = isTacticalFighter(f) || isTacticalMatch(state);
@@ -3631,7 +3635,10 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>EVADE:</b>') || line.includes('<b>Evade:</b>') || line.includes('<b>Evade Chance:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>') || line.includes('<b>$UN:</b>') || line.includes('<b>SUN:</b>') || line.includes('<b>Plants:</b>') || line.includes('<b>Troops:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>EVADE:</b>') || line.includes('<b>Evade:</b>') || line.includes('<b>Evade Chance:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>') || line.includes('<b>$UN:</b>') || line.includes('<b>SUN:</b>') || line.includes('<b>Plants:</b>') || line.includes('<b>Troops:</b>') || line.includes('<b>Crit') || line.includes('<b>Maho'));
+    }
+    if (typeof filterFn === 'function') {
+      info = info.filter(filterFn);
     }
     if (info.length === 0) return '';
     
@@ -3692,7 +3699,7 @@ function updateHealthHud() {
         const upperLabel = cleanLabel.toUpperCase();
         const upperVal = cleanVal.toUpperCase();
         const isCyanAccent = upperLabel.includes('INFINITY') || upperVal.includes('ACTIVE') || upperLabel.includes('BARRIER') || upperLabel.includes('SHIELD');
-        const isGoldAccent = upperLabel.includes('CRIT') || upperLabel.includes('DMG') || upperLabel.includes('ATK') || upperLabel.includes('KILL');
+        const isGoldAccent = upperLabel.includes('CRIT') || upperLabel.includes('DMG') || upperLabel.includes('ATK') || upperLabel.includes('KILL') || upperLabel.includes('MAHO');
         const accentClass = isCyanAccent ? ' hud-chip-cyan' : (isGoldAccent ? ' hud-chip-gold' : '');
         return `<div class="${spanClass}${accentClass}"><span class="hud-stat-label">${cleanLabel}</span> <span class="hud-stat-val">${cleanVal}</span></div>`;
       }
@@ -3807,12 +3814,38 @@ function updateHealthHud() {
         const isDummy = m && (m.characterId === 'dummy' || m.type === 'dummy');
         const showDescription = CONFIG.hudShowFighterDescription || isDummy;
         const isSingleCol = singleColumn;
-        const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol) : '';
-        const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
+        const hasMemberMinion = Boolean(m && m.mahoragaSummonActive && m.mahoragaMinion && m.mahoragaMinion.hp > 0 && !m.mahoragaMinion.isDead);
         const skillsGridStyle = isSingleCol ? 'grid-template-columns: 1fr;' : '';
         const infoGridStyle = CONFIG.hudLayoutStyle === 'classic'
           ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; ${isSingleCol ? 'grid-template-columns: 1fr;' : ''}`
           : `grid-template-columns: 1fr;`;
+        const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol, s => !s.id.startsWith('mahoraga_')) : '';
+        const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
+        const memberMinionSkillsHTML = (hasMemberMinion && !showDescription) ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol, s => s.id.startsWith('mahoraga_')) : '';
+        const memberMinionInfoHTML = hasMemberMinion ? generateFighterInfoHTML(m.mahoragaMinion, isSingleCol, true) : '';
+        const mfMember = hasMemberMinion ? m.mahoragaMinion : null;
+        const mfMemberCurHp = mfMember ? ((typeof mfMember.getDisplayHp === 'function') ? mfMember.getDisplayHp() : mfMember.hp) : 0;
+        const mfMemberMaxHp = mfMember ? (mfMember._originalMaxHp || mfMember.maxHp || 1000) : 1000;
+        const mfMemberRatio = (mfMember && mfMemberMaxHp > 0) ? Math.min(1.0, Math.max(0, Number(mfMemberCurHp) / Number(mfMemberMaxHp))) : 1.0;
+        const mfMemberPct = Math.min(100, Math.max(0, Math.round(mfMemberRatio * 100)));
+        const mfMemberBarColor = mfMember ? getFighterHealthBarColor(mfMember, mfMemberRatio, isDarkTheme) : '#FFD700';
+        const mfMemberHpText = mfMember ? `${Math.floor(Math.max(0, Number(mfMemberCurHp) || 0))}` : '0';
+        const mfMemberGlow = mfMember ? getGlowStyles(mfMember) : { className: 'health-card__fill' };
+        const mfMemberShakeTimer = mfMember ? (mfMember._healthBarShakeTimer || 0) : 0;
+        const mfMemberShakeAmount = mfMemberShakeTimer > 0 ? Math.sin((12 - mfMemberShakeTimer) * 0.75) * 3 : 0;
+        const mfMemberShakeStyle = mfMemberShakeTimer > 0 ? `transform: translateX(${mfMemberShakeAmount}px);` : '';
+        const hideMemberMinionHb = Boolean(CONFIG.hudHideHealthBars || CONFIG.hudHideAll);
+        const memberMinionBlockHTML = `
+          <div class="health-card__minion-container" style="${hasMemberMinion ? '' : 'display: none;'} margin-top: 6px;">
+            <div class="health-card__bar health-card__minion-bar" style="${mfMemberShakeStyle} ${hideMemberMinionHb ? 'display: none;' : ''} margin-bottom: 6px;">
+              <div class="health-card__ghost health-card__minion-ghost" style="width:${mfMemberPct}%;"></div>
+              <div class="${mfMemberGlow.className} health-card__minion-fill" style="width:${mfMemberPct}%; background:${mfMemberBarColor};"></div>
+              <span class="health-card__bar-text health-card__minion-bar-text">${mfMemberHpText}</span>
+            </div>
+            <div class="health-card__skills health-card__minion-skills" style="${skillsGridStyle}">${memberMinionSkillsHTML}</div>
+            <div class="health-card__info health-card__minion-info" style="${infoGridStyle} margin-top: 3px;">${memberMinionInfoHTML}</div>
+          </div>
+        `;
 
         const isMemberYuta = m && (m.characterId === 'yuta' || m.type === 'yuta');
         let memberNameColor = isDarkTheme ? (isMemberYuta ? '#FF1493' : defaultNameColor) : defaultNameColor;
@@ -3836,8 +3869,9 @@ function updateHealthHud() {
             <div class="health-card__member" style="margin-top: ${memberMarginTop};">
               ${memberHeaderHTML}
               ${generateCjGtaHudWidgetHTML(m, titleAlign, hpText, memberShakeStyle)}
-              ${memberSkillsHTML ? `<div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>` : ''}
-              ${memberInfoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>` : ''}
+              <div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>
+              <div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>
+              ${memberMinionBlockHTML}
             </div>
           `;
         }
@@ -3881,8 +3915,9 @@ function updateHealthHud() {
               <span class="health-card__bar-text">${hpText}</span>
             `}
             </div>
-            ${memberSkillsHTML ? `<div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>` : ''}
-            ${memberInfoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>` : ''}
+            <div class="health-card__skills" style="${skillsGridStyle}">${memberSkillsHTML}</div>
+            <div class="health-card__info" style="${infoGridStyle}">${memberInfoHTML}</div>
+            ${memberMinionBlockHTML}
           </div>
         `;
       }).join('');
@@ -3911,17 +3946,44 @@ function updateHealthHud() {
       // skillsOnly (1v2 bottom strip) always renders skill bars and never the long
       // description/stat block, so the three columns stay compact and evenly aligned.
       const showDescription = (CONFIG.hudShowFighterDescription || isDummy) && !skillsOnly;
-      const skillsHTML = targetFighter && (skillsOnly || !showDescription) ? generateFighterSkillsHTML(targetFighter, 'left', singleColumn) : '';
-      const infoHTML = targetFighter && !skillsOnly ? generateFighterInfoHTML(targetFighter, singleColumn) : '';
-
-      const barShakeTimer = targetFighter ? (targetFighter._healthBarShakeTimer || 0) : 0;
-      const barShakeAmount = barShakeTimer > 0 ? Math.sin((12 - barShakeTimer) * 0.75) * 3 : 0;
-      const barShakeStyle = barShakeTimer > 0 ? `transform: translateX(${barShakeAmount}px);` : '';
-
+      const hasMinion = Boolean(targetFighter && targetFighter.mahoragaSummonActive && targetFighter.mahoragaMinion && targetFighter.mahoragaMinion.hp > 0 && !targetFighter.mahoragaMinion.isDead);
       const skillsGridStyle = singleColumn ? 'grid-template-columns: 1fr;' : '';
       const infoGridStyle = CONFIG.hudLayoutStyle === 'classic'
         ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; ${singleColumn ? 'grid-template-columns: 1fr;' : ''}`
         : `grid-template-columns: 1fr;`;
+      const skillsHTML = targetFighter && (skillsOnly || !showDescription) ? generateFighterSkillsHTML(targetFighter, 'left', singleColumn, s => !s.id.startsWith('mahoraga_')) : '';
+      const infoHTML = targetFighter && !skillsOnly ? generateFighterInfoHTML(targetFighter, singleColumn, false) : '';
+      const minionSkillsHTML = (hasMinion && (skillsOnly || !showDescription)) ? generateFighterSkillsHTML(targetFighter, 'left', singleColumn, s => s.id.startsWith('mahoraga_')) : '';
+      const minionInfoHTML = (hasMinion && !skillsOnly) ? generateFighterInfoHTML(targetFighter.mahoragaMinion, singleColumn, false) : '';
+      const mf = hasMinion ? targetFighter.mahoragaMinion : null;
+      const mfCurHp = mf ? ((typeof mf.getDisplayHp === 'function') ? mf.getDisplayHp() : mf.hp) : 0;
+      const mfMaxHp = mf ? (mf._originalMaxHp || mf.maxHp || 1000) : 1000;
+      const mfRatio = (mf && mfMaxHp > 0) ? Math.min(1.0, Math.max(0, Number(mfCurHp) / Number(mfMaxHp))) : 1.0;
+      const mfPct = Math.min(100, Math.max(0, Math.round(mfRatio * 100)));
+      const mfBarColor = mf ? getFighterHealthBarColor(mf, mfRatio, isDarkTheme) : '#FFD700';
+      const mfHpText = mf ? `${Math.floor(Math.max(0, Number(mfCurHp) || 0))}` : '0';
+      const mfGlow = mf ? getGlowStyles(mf) : { className: 'health-card__fill' };
+      const mfShakeTimer = mf ? (mf._healthBarShakeTimer || 0) : 0;
+      const mfShakeAmount = mfShakeTimer > 0 ? Math.sin((12 - mfShakeTimer) * 0.75) * 3 : 0;
+      const mfShakeStyle = mfShakeTimer > 0 ? `transform: translateX(${mfShakeAmount}px);` : '';
+      const hideMinionHb = Boolean(CONFIG.hudHideHealthBars || CONFIG.hudHideAll);
+      const minionBlockHTML = `
+        <div class="health-card__minion-container" style="${hasMinion ? '' : 'display: none;'} margin-top: 6px;">
+          ${!skillsOnly ? `
+          <div class="health-card__bar health-card__minion-bar" style="${mfShakeStyle} ${hideMinionHb ? 'display: none;' : ''} margin-bottom: 6px;">
+            <div class="health-card__ghost health-card__minion-ghost" style="width:${mfPct}%;"></div>
+            <div class="${mfGlow.className} health-card__minion-fill" style="width:${mfPct}%; background:${mfBarColor};"></div>
+            <span class="health-card__bar-text health-card__minion-bar-text">${mfHpText}</span>
+          </div>
+          ` : ''}
+          <div class="health-card__skills health-card__minion-skills" style="${skillsGridStyle}">${minionSkillsHTML}</div>
+          ${!skillsOnly ? `<div class="health-card__info health-card__minion-info" style="${infoGridStyle} margin-top: 3px;">${minionInfoHTML}</div>` : ''}
+        </div>
+      `;
+
+      const barShakeTimer = targetFighter ? (targetFighter._healthBarShakeTimer || 0) : 0;
+      const barShakeAmount = barShakeTimer > 0 ? Math.sin((12 - barShakeTimer) * 0.75) * 3 : 0;
+      const barShakeStyle = barShakeTimer > 0 ? `transform: translateX(${barShakeAmount}px);` : '';
 
       const hideHb = Boolean(CONFIG.hudHideHealthBars || CONFIG.hudHideAll || hideHealthBar);
 
@@ -3931,7 +3993,8 @@ function updateHealthHud() {
           <div class="health-card__skills" style="${skillsGridStyle}">
             ${skillsHTML}
           </div>
-          ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
+          ${!skillsOnly ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
+          ${minionBlockHTML}
         `;
       } else {
         const hpBarHTML = hideHealthBar ? '' : `
@@ -3973,15 +4036,17 @@ function updateHealthHud() {
         barsHTML = `
           ${hpBarHTML}
           ${showDescription ? `
-            ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
+            ${!skillsOnly ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
             <div class="health-card__desc" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudDescFontSize || 16}px; line-height: 1.4; margin-top: 8px; ${(CONFIG.hudHideAll) ? 'display: none;' : ''}">
               ${description.replace(/(\d+(?:\.\d+)?%?)/g, '<span class="hud-number">$1</span>')}
             </div>
+            ${minionBlockHTML}
           ` : `
             <div class="health-card__skills" style="${skillsGridStyle}">
               ${skillsHTML}
             </div>
-            ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
+            ${!skillsOnly ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
+            ${minionBlockHTML}
           `}
         `;
       }
@@ -4202,10 +4267,10 @@ function updateHealthHud() {
         const cardElement = tempDiv.firstElementChild;
         containerBottom.appendChild(cardElement);
 
-        const hpBar = cardElement.querySelector('.health-card__bar');
-        const hpBarFill = cardElement.querySelector('.health-card__fill');
-        const hpBarGhost = cardElement.querySelector('.health-card__ghost');
-        const hpBarText = cardElement.querySelector('.health-card__bar-text');
+        const hpBar = cardElement.querySelector('.health-card__bar:not(.health-card__minion-bar)');
+        const hpBarFill = cardElement.querySelector('.health-card__fill:not(.health-card__minion-fill)');
+        const hpBarGhost = cardElement.querySelector('.health-card__ghost:not(.health-card__minion-ghost)');
+        const hpBarText = cardElement.querySelector('.health-card__bar-text:not(.health-card__minion-bar-text)');
         const starsContainer = cardElement.querySelector('.hud-cj-stars');
         const moneyTextEl = cardElement.querySelector('.hud-cj-money-text');
         const weaponIconEl = cardElement.querySelector('.hud-cj-weapon-icon');
@@ -4217,6 +4282,13 @@ function updateHealthHud() {
         const checkbox = cardElement.querySelector('input[type="checkbox"]');
 
         const skillsContainer = cardElement.querySelector('.health-card__skills');
+        const minionContainer = cardElement.querySelector('.health-card__minion-container');
+        const minionHpBar = cardElement.querySelector('.health-card__minion-bar');
+        const minionHpBarFill = cardElement.querySelector('.health-card__minion-fill');
+        const minionHpBarGhost = cardElement.querySelector('.health-card__minion-ghost');
+        const minionHpBarText = cardElement.querySelector('.health-card__minion-bar-text');
+        const minionSkillsContainer = cardElement.querySelector('.health-card__minion-skills');
+        const minionInfoContainer = cardElement.querySelector('.health-card__minion-info');
         const skillBars = new Map();
         cardElement.querySelectorAll('.hud-skill-box').forEach(box => {
           const id = box.getAttribute('data-skill-id');
@@ -4230,6 +4302,19 @@ function updateHealthHud() {
         _hudCache.fighters.set(chFighter, {
           cardElement,
           skillsContainer,
+          minionContainer,
+          minionHpBar,
+          minionHpBarFill,
+          minionHpBarGhost,
+          minionHpBarText,
+          minionSkillsContainer,
+          minionInfoContainer,
+          lastMinionInfoHTML: '',
+          lastMinionHpPct: -1,
+          lastMinionBarColor: '',
+          lastMinionHpText: '',
+          minionGhostTracker: null,
+          lastHasMinion: false,
           hpBar,
           hpBarFill,
           hpBarGhost,
@@ -4305,10 +4390,10 @@ function updateHealthHud() {
         const cachedMembers = [];
         cardElement.querySelectorAll('.health-card__member').forEach((memberEl, i) => {
           const nameEl = memberEl.querySelector('.health-card__member-name') || memberEl.querySelector('.health-card__name');
-          const fill = memberEl.querySelector('.health-card__fill');
-          const text = memberEl.querySelector('.health-card__bar-text');
-          const bar = memberEl.querySelector('.health-card__bar');
-          const ghost = memberEl.querySelector('.health-card__ghost');
+          const fill = memberEl.querySelector('.health-card__fill:not(.health-card__minion-fill)');
+          const text = memberEl.querySelector('.health-card__bar-text:not(.health-card__minion-bar-text)');
+          const bar = memberEl.querySelector('.health-card__bar:not(.health-card__minion-bar)');
+          const ghost = memberEl.querySelector('.health-card__ghost:not(.health-card__minion-ghost)');
           const starsContainer = memberEl.querySelector('.hud-cj-stars');
           const moneyTextEl = memberEl.querySelector('.hud-cj-money-text');
           const weaponIconEl = memberEl.querySelector('.hud-cj-weapon-icon');
@@ -4317,6 +4402,13 @@ function updateHealthHud() {
           const armorFillEl = memberEl.querySelector('.hud-cj-armor-fill');
           const skillsContainer = memberEl.querySelector('.health-card__skills');
           const infoContainer = memberEl.querySelector('.health-card__info') || cardElement.querySelector('.health-card__info');
+          const minionContainer = memberEl.querySelector('.health-card__minion-container');
+          const minionHpBar = memberEl.querySelector('.health-card__minion-bar');
+          const minionHpBarFill = memberEl.querySelector('.health-card__minion-fill');
+          const minionHpBarGhost = memberEl.querySelector('.health-card__minion-ghost');
+          const minionHpBarText = memberEl.querySelector('.health-card__minion-bar-text');
+          const minionSkillsContainer = memberEl.querySelector('.health-card__minion-skills');
+          const minionInfoContainer = memberEl.querySelector('.health-card__minion-info');
           const skillBars = new Map();
           memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
             const id = box.getAttribute('data-skill-id');
@@ -4325,9 +4417,11 @@ function updateHealthHud() {
             skillBars.set(id, { box, fill: fillEl, text: textEl });
           });
           cachedMembers.push({
-            nameEl, fill, ghost, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
+            memberEl, nameEl, fill, ghost, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
             lastMoneyText: '', lastStarCount: -1, lastWeaponIcon: '', lastWeaponAmmo: '', lastClockText: '',
-            infoContainer, skillsContainer, skillBars, fighter: members[i], lastInfoHTML: '',
+            infoContainer, skillsContainer, minionContainer, minionHpBar, minionHpBarFill, minionHpBarGhost, minionHpBarText,
+            minionSkillsContainer, minionInfoContainer, lastMinionInfoHTML: '', lastMinionHpPct: -1, lastMinionBarColor: '', lastMinionHpText: '', minionGhostTracker: null,
+            skillBars, fighter: members[i], lastInfoHTML: '',
             lastMemberName: '', lastMemberColor: ''
           });
         });
@@ -4350,10 +4444,10 @@ function updateHealthHud() {
 
       if (isDuelTopHud && _cachedTopContainer) {
         const showSkills = isH && !CONFIG.hudHideAll && !CONFIG.hudHideSkillBars;
-        const f1Skills = showSkills ? generateFighterSkillsHTML(mainFighters[0], 'left', false) : '';
-        const f2Skills = showSkills ? generateFighterSkillsHTML(mainFighters[1], 'right', false) : '';
+        const f1Skills = showSkills ? generateFighterSkillsHTML(mainFighters[0], 'left', false, s => !s.id.startsWith('mahoraga_')) : '';
+        const f2Skills = showSkills ? generateFighterSkillsHTML(mainFighters[1], 'right', false, s => !s.id.startsWith('mahoraga_')) : '';
         const f3Fighter = (isRegular1v2 && mainFighters.length >= 3) ? mainFighters[2] : null;
-        const f3Skills = (showSkills && f3Fighter) ? generateFighterSkillsHTML(f3Fighter, 'right', false) : '';
+        const f3Skills = (showSkills && f3Fighter) ? generateFighterSkillsHTML(f3Fighter, 'right', false, s => !s.id.startsWith('mahoraga_')) : '';
         if (_cachedTopContainer.classList && typeof _cachedTopContainer.classList.toggle === 'function') {
           _cachedTopContainer.classList.toggle('hud-top-1v2', Boolean(isRegular1v2));
         }
@@ -4520,10 +4614,10 @@ function updateHealthHud() {
           containerRight.appendChild(cardElement);
         }
 
-        let hpBar = cardElement.querySelector('.health-card__bar');
-        let hpBarFill = cardElement.querySelector('.health-card__fill');
-        let hpBarGhost = cardElement.querySelector('.health-card__ghost');
-        let hpBarText = cardElement.querySelector('.health-card__bar-text');
+        let hpBar = cardElement.querySelector('.health-card__bar:not(.health-card__minion-bar)');
+        let hpBarFill = cardElement.querySelector('.health-card__fill:not(.health-card__minion-fill)');
+        let hpBarGhost = cardElement.querySelector('.health-card__ghost:not(.health-card__minion-ghost)');
+        let hpBarText = cardElement.querySelector('.health-card__bar-text:not(.health-card__minion-bar-text)');
         let winBullets = Array.from(cardElement.querySelectorAll('.health-card__win-bullet'));
         let topPlayerEl = null;
         let topNameEl = null;
@@ -4564,6 +4658,13 @@ function updateHealthHud() {
 
         const topSkillsEl = (isDuelTopHud && topPlayerEl) ? topPlayerEl.querySelector('.hud-top-skills') : null;
         const skillsContainer = topSkillsEl || cardElement.querySelector('.health-card__skills');
+        const minionContainer = cardElement.querySelector('.health-card__minion-container');
+        const minionHpBar = cardElement.querySelector('.health-card__minion-bar');
+        const minionHpBarFill = cardElement.querySelector('.health-card__minion-fill');
+        const minionHpBarGhost = cardElement.querySelector('.health-card__minion-ghost');
+        const minionHpBarText = cardElement.querySelector('.health-card__minion-bar-text');
+        const minionSkillsContainer = cardElement.querySelector('.health-card__minion-skills');
+        const minionInfoContainer = cardElement.querySelector('.health-card__minion-info');
         const skillBars = new Map();
         const skillSourceEl = topSkillsEl || cardElement;
         skillSourceEl.querySelectorAll('.hud-skill-box').forEach(box => {
@@ -4581,6 +4682,19 @@ function updateHealthHud() {
           lastMemberName: fighterName,
           lastMemberColor: fighterThemeColor,
           skillsContainer,
+          minionContainer,
+          minionHpBar,
+          minionHpBarFill,
+          minionHpBarGhost,
+          minionHpBarText,
+          minionSkillsContainer,
+          minionInfoContainer,
+          lastMinionInfoHTML: '',
+          lastMinionHpPct: -1,
+          lastMinionBarColor: '',
+          lastMinionHpText: '',
+          minionGhostTracker: null,
+          lastHasMinion: false,
           hpBar,
           hpBarFill,
           hpBarGhost,
@@ -4618,6 +4732,50 @@ function updateHealthHud() {
       });
     }
   }
+
+  const updateMinionHealthBar = (mf, targetCache) => {
+    if (!mf || !targetCache) return;
+    if (mf._lastHealAmount && mf._lastHealAmount > 0 && targetCache.minionHpBar) {
+      triggerHudHealBubble(targetCache.minionHpBar, mf._lastHealAmount);
+      mf._lastHealAmount = 0;
+    }
+    const mfCurHp = (typeof mf.getDisplayHp === 'function') ? mf.getDisplayHp() : mf.hp;
+    const mfMaxHp = mf._originalMaxHp || mf.maxHp || 1000;
+    const mfRatio = mfMaxHp > 0 ? Math.min(1.0, Math.max(0, Number(mfCurHp) / Number(mfMaxHp))) : 0;
+    const mfPct = Math.min(100, Math.max(0, Math.round(mfRatio * 100)));
+    const mfBarColor = getFighterHealthBarColor(mf, mfRatio, isDarkTheme);
+    const mfHpText = `${Math.floor(Math.max(0, Number(mfCurHp) || 0))}`;
+    const mfGlow = getGlowStyles(mf);
+
+    if (targetCache.minionHpBarFill) {
+      if (targetCache.lastMinionHpPct !== mfPct) {
+        targetCache.minionHpBarFill.style.width = `${mfPct}%`;
+        targetCache.lastMinionHpPct = mfPct;
+      }
+      if (targetCache.lastMinionBarColor !== mfBarColor) {
+        targetCache.minionHpBarFill.style.background = mfBarColor;
+        targetCache.lastMinionBarColor = mfBarColor;
+      }
+      targetCache.minionHpBarFill.style.boxShadow = mfGlow.boxShadow || '';
+      targetCache.minionHpBarFill.style.filter = mfGlow.filter || '';
+      targetCache.minionHpBarFill.className = `${mfGlow.className || 'health-card__fill'} health-card__minion-fill`;
+    }
+    if (targetCache.minionHpBarGhost) {
+      if (!targetCache.minionGhostTracker) targetCache.minionGhostTracker = {};
+      updateHealthBarGhost(targetCache.minionHpBarGhost, mfPct, targetCache.minionGhostTracker, false);
+    }
+    if (targetCache.minionHpBar) {
+      const glowSuffix = mfGlow.className?.includes('hit-glow') ? ' hit-glow' : mfGlow.className?.includes('heal-glow') ? ' heal-glow' : '';
+      targetCache.minionHpBar.className = `health-card__bar health-card__minion-bar${glowSuffix}`;
+      const mfShakeTimer = mf._healthBarShakeTimer || 0;
+      const mfShakeAmount = mfShakeTimer > 0 ? Math.sin((12 - mfShakeTimer) * 0.75) * 3 : 0;
+      targetCache.minionHpBar.style.transform = mfShakeTimer > 0 ? `translateX(${mfShakeAmount}px)` : '';
+    }
+    if (targetCache.minionHpBarText && targetCache.lastMinionHpText !== mfHpText) {
+      targetCache.minionHpBarText.textContent = mfHpText;
+      targetCache.lastMinionHpText = mfHpText;
+    }
+  };
 
   if (_hudCache.teams.size > 0) {
     _hudCache.teams.forEach((cachedCard, teamIndex) => {
@@ -4769,16 +4927,34 @@ function updateHealthHud() {
         }
 
         // Skill Bars Update for Team Member
+        const hasMemberMinion = Boolean(fighter.mahoragaSummonActive && fighter.mahoragaMinion && fighter.mahoragaMinion.hp > 0 && !fighter.mahoragaMinion.isDead);
+        if (hasMemberMinion) {
+          if (!m.lastHasMinion) {
+            m.minionGhostTracker = null;
+            m.lastMinionHpPct = -1;
+            m.lastMinionBarColor = '';
+            m.lastMinionHpText = '';
+          }
+          updateMinionHealthBar(fighter.mahoragaMinion, m);
+        }
         if (m.skillsContainer || (m.skillBars && m.skillBars.size > 0)) {
           const rawSkills = getSkillDataForFighter(fighter) || [];
           const skills = rawSkills.filter(s => shouldShowFighterSkill(fighter, s));
-          if (m.skillsContainer && (skills.length !== m.skillBars.size || skills.some(s => !m.skillBars.has(s.id)))) {
+          if (m.skillsContainer && (skills.length !== m.skillBars.size || skills.some(s => !m.skillBars.has(s.id)) || m.lastHasMinion !== hasMemberMinion)) {
             const isRight = (cachedCard.cardElement.classList.contains('align-right') || cachedCard.cardElement.parentElement?.id === 'hud-top-right' || cachedCard.cardElement.parentElement?.id === 'hud-bottom-right');
             const align = isRight ? 'right' : 'left';
             const isSingleCol = Boolean(isTeamSingleColumn);
-            m.skillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol);
+            m.skillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol, s => !s.id.startsWith('mahoraga_'));
+            if (m.minionSkillsContainer) {
+              m.minionSkillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol, s => s.id.startsWith('mahoraga_'));
+            }
+            if (m.minionContainer) {
+              m.minionContainer.style.display = hasMemberMinion ? 'block' : 'none';
+            }
+            m.lastHasMinion = hasMemberMinion;
             m.skillBars.clear();
-            m.skillsContainer.querySelectorAll('.hud-skill-box').forEach(box => {
+            const skillRoot = m.memberEl || cachedCard.cardElement;
+            skillRoot.querySelectorAll('.hud-skill-box').forEach(box => {
               const id = box.getAttribute('data-skill-id');
               const fillEl = box.querySelector('.hud-skill-box-fill');
               const textEl = box.querySelector('.hud-skill-box-text');
@@ -4842,10 +5018,18 @@ function updateHealthHud() {
         // Stats Info Update for Team Member
         if (m.infoContainer) {
           const isSingleCol = isSingleColumnMode;
-          const infoHTML = generateFighterInfoHTML(fighter, isSingleCol, true);
-          if (m.lastInfoHTML !== infoHTML) {
-            m.infoContainer.innerHTML = infoHTML;
-            m.lastInfoHTML = infoHTML;
+          const ownerInfoHTML = generateFighterInfoHTML(fighter, isSingleCol, true);
+          if (m.lastInfoHTML !== ownerInfoHTML) {
+            m.infoContainer.innerHTML = ownerInfoHTML;
+            m.lastInfoHTML = ownerInfoHTML;
+          }
+          if (m.minionInfoContainer) {
+            const hasMemberMinion = Boolean(fighter.mahoragaSummonActive && fighter.mahoragaMinion && fighter.mahoragaMinion.hp > 0 && !fighter.mahoragaMinion.isDead);
+            const minionInfoHTML = hasMemberMinion ? generateFighterInfoHTML(fighter.mahoragaMinion, isSingleCol, true) : '';
+            if (m.lastMinionInfoHTML !== minionInfoHTML) {
+              m.minionInfoContainer.innerHTML = minionInfoHTML;
+              m.lastMinionInfoHTML = minionInfoHTML;
+            }
           }
         }
       });
@@ -5184,21 +5368,49 @@ function updateHealthHud() {
       // progress fills must keep updating in that mode too.
       const showDescription = (CONFIG.hudShowFighterDescription || isDummy) && !isRegular1v2;
 
+      const hasMinion = Boolean(fighter.mahoragaSummonActive && fighter.mahoragaMinion && fighter.mahoragaMinion.hp > 0 && !fighter.mahoragaMinion.isDead);
+      if (hasMinion) {
+        if (!cachedCard.lastHasMinion) {
+          cachedCard.minionGhostTracker = null;
+          cachedCard.lastMinionHpPct = -1;
+          cachedCard.lastMinionBarColor = '';
+          cachedCard.lastMinionHpText = '';
+        }
+        updateMinionHealthBar(fighter.mahoragaMinion, cachedCard);
+      }
+      if (cachedCard.minionContainer && cachedCard.lastHasMinion !== hasMinion) {
+        cachedCard.minionContainer.style.display = hasMinion ? 'block' : 'none';
+      }
+
       if (!showDescription && (cachedCard.skillsContainer || cachedCard.skillBars.size > 0)) {
         const rawSkills = getSkillDataForFighter(fighter) || [];
         const skills = rawSkills.filter(s => shouldShowFighterSkill(fighter, s));
-        if (cachedCard.skillsContainer && (skills.length !== cachedCard.skillBars.size || skills.some(s => !cachedCard.skillBars.has(s.id)))) {
+        if (cachedCard.skillsContainer && (skills.length !== cachedCard.skillBars.size || skills.some(s => !cachedCard.skillBars.has(s.id)) || cachedCard.lastHasMinion !== hasMinion)) {
           const isRight = (cachedCard.cardElement.classList.contains('align-right') || cachedCard.cardElement.parentElement?.id === 'hud-top-right' || cachedCard.cardElement.parentElement?.id === 'hud-bottom-right');
           const align = isRight ? 'right' : 'left';
           const isSingleCol = isSingleColumnMode || (is1v2 && index === 0);
-          cachedCard.skillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol);
+          cachedCard.skillsContainer.innerHTML = generateFighterSkillsHTML(fighter, align, isSingleCol, s => !s.id.startsWith('mahoraga_'));
+          if (cachedCard.minionSkillsContainer) {
+            cachedCard.minionSkillsContainer.innerHTML = hasMinion ? generateFighterSkillsHTML(fighter, align, isSingleCol, s => s.id.startsWith('mahoraga_')) : '';
+          }
+          if (cachedCard.minionContainer) {
+            cachedCard.minionContainer.style.display = hasMinion ? 'block' : 'none';
+          }
+          cachedCard.lastHasMinion = hasMinion;
           cachedCard.skillBars.clear();
-          cachedCard.skillsContainer.querySelectorAll('.hud-skill-box').forEach(box => {
-            const id = box.getAttribute('data-skill-id');
-            const fill = box.querySelector('.hud-skill-box-fill');
-            const text = box.querySelector('.hud-skill-box-text');
-            cachedCard.skillBars.set(id, { box, fill, text });
-          });
+          const collectBoxes = (rootEl) => {
+            if (!rootEl) return;
+            rootEl.querySelectorAll('.hud-skill-box').forEach(box => {
+              const id = box.getAttribute('data-skill-id');
+              const fill = box.querySelector('.hud-skill-box-fill');
+              const text = box.querySelector('.hud-skill-box-text');
+              cachedCard.skillBars.set(id, { box, fill, text });
+            });
+          };
+          collectBoxes(cachedCard.skillsContainer);
+          collectBoxes(cachedCard.cardElement);
+        } else {
+          cachedCard.lastHasMinion = hasMinion;
         }
         skills.forEach(s => {
           const cachedSkill = cachedCard.skillBars.get(s.id);
@@ -5252,15 +5464,24 @@ function updateHealthHud() {
             }
           }
         });
+      } else {
+        cachedCard.lastHasMinion = hasMinion;
       }
 
       // 5. Additional Info (stats) — only write to DOM if text changed
       if (cachedCard.infoContainer) {
         const isSingleCol = isSingleColumnMode || (is1v2 && index === 0);
-        const infoHTML = generateFighterInfoHTML(fighter, isSingleCol);
-        if (cachedCard.lastInfoHTML !== infoHTML) {
-          cachedCard.infoContainer.innerHTML = infoHTML;
-          cachedCard.lastInfoHTML = infoHTML;
+        const ownerInfoHTML = generateFighterInfoHTML(fighter, isSingleCol, false);
+        if (cachedCard.lastInfoHTML !== ownerInfoHTML) {
+          cachedCard.infoContainer.innerHTML = ownerInfoHTML;
+          cachedCard.lastInfoHTML = ownerInfoHTML;
+        }
+        if (cachedCard.minionInfoContainer) {
+          const minionInfoHTML = hasMinion ? generateFighterInfoHTML(fighter.mahoragaMinion, isSingleCol, false) : '';
+          if (cachedCard.lastMinionInfoHTML !== minionInfoHTML) {
+            cachedCard.minionInfoContainer.innerHTML = minionInfoHTML;
+            cachedCard.lastMinionInfoHTML = minionInfoHTML;
+          }
         }
       }
 
@@ -5316,6 +5537,13 @@ function updateHealthHud() {
   } else if (_cachedRoundBanner) {
     _cachedRoundBanner.style.display = 'none';
   }
+}
+
+export function getAdditionalInfoForFighter(f) {
+  if (typeof updateHealthHud.getAdditionalInfoForFighter === 'function') {
+    return updateHealthHud.getAdditionalInfoForFighter(f);
+  }
+  return [];
 }
 
 export { updateHealthHud };

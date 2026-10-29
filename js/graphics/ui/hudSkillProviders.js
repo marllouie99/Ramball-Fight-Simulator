@@ -452,6 +452,26 @@ export const HUD_SKILL_PROVIDERS = {
       skills.push({ id: 'mahoraga', pct: summonPct, ready: summonLive || (summonPct >= 99 && (f.mahoragaSummonCooldown || 0) <= 0), color: '#FFD700', label: 'MAHORAGA', active: summonLive });
     }
 
+    // 5. Minion Mahoraga Skill Bars (when actively summoned)
+    if (f.mahoragaSummonActive && f.mahoragaMinion && f.mahoragaMinion.hp > 0 && !f.mahoragaMinion.isDead) {
+      const mahoSkills = (typeof HUD_SKILL_PROVIDERS !== 'undefined' && typeof HUD_SKILL_PROVIDERS.mahoraga === 'function')
+        ? HUD_SKILL_PROVIDERS.mahoraga(f.mahoragaMinion)
+        : [];
+
+      for (const ms of mahoSkills) {
+        const isSig = Boolean(ms.isSignature || ms.id === 'wheel');
+        skills.push({
+          ...ms,
+          id: 'mahoraga_' + ms.id,
+          color: ms.color || '#FFD700',
+          label: ms.label,
+          isSignature: isSig,
+          signature: isSig,
+          isUltimate: isSig
+        });
+      }
+    }
+
     return skills;
   },
 
@@ -492,7 +512,7 @@ export const HUD_SKILL_PROVIDERS = {
         wheelReady = wheelPct >= 99;
         wheelLabel = `WOA - LVL ${lvlStr}`;
       }
-      skills.push({ id: 'wheel', pct: wheelPct, ready: wheelReady, color: themeColor, label: wheelLabel });
+      skills.push({ id: 'wheel', pct: wheelPct, ready: wheelReady, color: themeColor, label: wheelLabel, isSignature: true, signature: true, isUltimate: true });
     }
 
     // 2. Debris Throw / Wall Slam
@@ -3320,7 +3340,7 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     ichigo: ['bankai'],
     toji: ['ult', 'ultimate', 'CURSE INVENTORY', 'INVENTORY'],
     gojo: ['uv', 'domain', 'UNLIMITED VOID', 'VOID'],
-    sukuna: ['ms', 'domain', 'MALEVOLENT SHRINE', 'SHRINE'],
+    sukuna: ['ms', 'domain', 'MALEVOLENT SHRINE', 'SHRINE', 'mahoraga_wheel', 'wheel', 'WOA'],
     yuta: ['domain', 'AUTHENTIC MUTUAL LOVE', 'MUTUAL LOVE'],
     mahito: ['domain_expansion', 'domain', 'SELF-EMBODIMENT', 'PERFECTION'],
     saitama: ['punish', 'counter', 'SERIOUS PUNCH', 'SERIOUS'],

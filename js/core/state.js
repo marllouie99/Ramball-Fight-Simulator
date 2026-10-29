@@ -250,8 +250,9 @@ export const state = {
     shakeY: 0,
     smoothing: 0.08,
     zoomSmoothing: 0.06,
-    minZoom: 1.0,
-    maxZoom: 1.15,
+    // Camera tracking zoom limits come from CONFIG.camera so tuning lives in one place
+    minZoom: (CONFIG.camera && CONFIG.camera.minZoom) ?? 1.0,
+    maxZoom: (CONFIG.camera && CONFIG.camera.maxZoom) ?? 1.10,
     toastText: '',
     toastTimer: 0
   },

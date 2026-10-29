@@ -371,9 +371,8 @@ export function executeSwordHit(fighter, opponent, isDoubleDamage = false) {
     const flashRadius = isDoubleDamage ? 60 : 45;
     spawnImpactFlash(targetObj.x, targetObj.y, flashRadius, '#FFD700');
     triggerGlobalScreenShake(isDoubleDamage ? 7 : 5, isDoubleDamage ? 12 : 8);
-    // Rule 30 Layered Fleshy Slap Audio Palette
+    // Impact audio: flesh hit only
     audioSystem.playSFX('attack_fleshhit', 1.0);
-    audioSystem.playSFX('sukuna_slice', isDoubleDamage ? 0.98 : 0.88);
   }
 }
 

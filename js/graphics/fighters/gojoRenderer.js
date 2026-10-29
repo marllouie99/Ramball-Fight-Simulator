@@ -398,22 +398,21 @@ export class GojoRenderer {
       fighter.drawGun(ctx);
     }
 
-    // 3. Draw physical circle hands + flare ON TOP of body
-    fighter._drawHandCursedEnergy(ctx, 'front');
-
-    // Draw Hollow Purple Red & Blue fusing orbs ON TOP of hands so hands don't cover them
-    if (fighter.isChannelingPurple) {
-      fighter.drawGun(ctx);
-    }
-
-    // Draw Reversal Red Orb + blast ON TOP of body and hands (hidden during Mahoraga wheel click pause or under counter)
-    const isMahoAdapting = (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-      f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga') || f.characterId === 'mahoraga') && 
-      ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0)
-    )) || ((fighter.mahoragaAdaptationFreezeTimer || 0) > 0);
-
-    if (fighter.redEffectTimer > 0 && !isMahoAdapting) {
-      fighter._drawReversalRedEffect(ctx);
+    // 3. Front hands + Hollow Purple Red & Blue fusing orbs + Reversal Red orb/blast.
+    // During live arena rendering these are deferred to a foreground pass drawn AFTER every
+    // fighter, illusion & minion body, so no enemy body (e.g. Minion Mahoraga or a lower-Y
+    // opponent) can ever overlay the mixing animation.
+    const deferSkillFx = GojoRenderer._shouldDeferSkillFx(fighter);
+    if (!deferSkillFx) {
+      GojoRenderer._drawSkillOrbLayer(ctx, fighter);
+    } else {
+      if (!fighter.isChannelingPurple) {
+        // Hands not involved in the mixing gesture stay on the fighter's own layer
+        fighter._drawHandCursedEnergy(ctx, 'front');
+      }
+      if (GojoRenderer._hasForegroundSkillFx(fighter)) {
+        state._deferredForegroundFx.push({ fighter, draw: GojoRenderer.drawForegroundSkillFx });
+      }
     }
 
     fighter.drawHealth(ctx);
@@ -425,6 +424,58 @@ export class GojoRenderer {
     }
 
     // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
+  }
+
+  /**
+   * Whether skill orbs should be deferred to the post-fighter foreground pass.
+   * Only true inside the live arena frame window opened by renderSystem;
+   * previews, champion reveals and offscreen renders always draw inline.
+   */
+  static _shouldDeferSkillFx(fighter) {
+    return Boolean(
+      typeof state !== 'undefined' && state._deferFighterForegroundFx &&
+      Array.isArray(state._deferredForegroundFx) &&
+      !fighter._isPreview && !fighter._isWinnerReveal
+    );
+  }
+
+  static _isMahoragaAdaptingPause(fighter) {
+    const anyMahoAdapting = typeof state !== 'undefined' && state.fighters && state.fighters.some(f =>
+      f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga') || f.characterId === 'mahoraga') &&
+      ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0)
+    );
+    return Boolean(anyMahoAdapting || (fighter.mahoragaAdaptationFreezeTimer || 0) > 0);
+  }
+
+  static _hasForegroundSkillFx(fighter) {
+    return Boolean(fighter.isChannelingPurple || (fighter.redEffectTimer || 0) > 0);
+  }
+
+  /**
+   * Front hands -> Hollow Purple fusing orbs (on top of hands) -> Reversal Red orb/blast.
+   */
+  static _drawSkillOrbLayer(ctx, fighter) {
+    fighter._drawHandCursedEnergy(ctx, 'front');
+    if (fighter.isChannelingPurple) {
+      fighter.drawGun(ctx);
+    }
+    if ((fighter.redEffectTimer || 0) > 0 && !GojoRenderer._isMahoragaAdaptingPause(fighter)) {
+      fighter._drawReversalRedEffect(ctx);
+    }
+  }
+
+  /**
+   * Foreground pass entry point (called by renderSystem after fighters, illusions & projectiles).
+   */
+  static drawForegroundSkillFx(ctx, fighter) {
+    if (!fighter || fighter.isDead || fighter.hp <= 0) return;
+    ctx.save();
+    if (fighter.isChannelingPurple) {
+      GojoRenderer._drawSkillOrbLayer(ctx, fighter);
+    } else if ((fighter.redEffectTimer || 0) > 0 && !GojoRenderer._isMahoragaAdaptingPause(fighter)) {
+      fighter._drawReversalRedEffect(ctx);
+    }
+    ctx.restore();
   }
 
   /**

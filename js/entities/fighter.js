@@ -185,7 +185,9 @@ export function suppressAfterimagesAndAttackEffects(target) {
  */
 export function resolveDamageNumberColor(attacker, opts = {}, fallback = '#EF4444') {
   if (opts && typeof opts === 'object') {
-    if (opts.isPurpleDPS) return '#bf5af2';
+    // NOTE: Purple DPS ticks deliberately do NOT force a local purple tint here.
+    // They fall through to the attacker's own damage number color so the damage
+    // numbers always match the caster's theme color (e.g. Gojo's #00E5FF).
     if (opts.damageNumberColor) return opts.damageNumberColor;
     if (opts.projectile && opts.projectile.damageNumberColor) return opts.projectile.damageNumberColor;
   }
@@ -1520,7 +1522,6 @@ export class Fighter {
    * @returns {string}
    */
   getDamageNumberColor(opts = {}) {
-    if (opts.isPurpleDPS) return '#bf5af2';
     if (opts.isGetsuga || (opts.projectile && opts.projectile.isGetsuga)) {
       return (typeof CONFIG !== 'undefined' && (CONFIG.ichigo?.damageNumberColor || CONFIG.ichigo?.themeColor)) || '#FF5500';
     }

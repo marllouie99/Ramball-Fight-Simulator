@@ -1345,7 +1345,7 @@ export function adaptToThinIceBreaker(fighter) {
 
 /**
  * Adapt Mahoraga to Mahito's Soul Disfigurement mechanic.
- * - Grants 50% damage reduction on Soul Disfigurement hits.
+ * - Grants 75% damage reduction on Soul Disfigurement hits.
  * - Grants total immunity to Soul Disfigurement stacks, shivering, and paralyze debuffs.
  */
 export function adaptToSoulDisfigurement(fighter) {
@@ -1422,7 +1422,7 @@ export function adaptToSoulDisfigurement(fighter) {
 /**
  * Adapt Mahoraga to Saitama's Serious Skill Counter (Teleport Behind Punch).
  * - Triggers wheel click when Mahoraga recovers from Saitama's counter stagger / slow debuff.
- * - Grants 50% damage reduction on Serious Counter hits.
+ * - Grants 75% damage reduction on Serious Counter hits.
  * - Wheel sphere glows fiery crimson red (#FF3300).
  */
 export function adaptToSaitamaCounter(fighter, attacker) {

@@ -1476,61 +1476,21 @@ export class GojoFighter extends Fighter {
         this.vy = 0;
 
         // Slide complete -> Stop move -> Channel Domain (facing the opponent)
-        this.isChannelingDomainExpansion = true;
-        this.domainChargeTimer = 0;
-        const domainTarget = (opponent && this._isValidCombatTarget(opponent)) || (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null);
-        let domainAimAngle = this.gunAngle || 0;
-        if (domainTarget && Number.isFinite(domainTarget.x) && Number.isFinite(domainTarget.y)) {
-          const tdx = domainTarget.x - this.x;
-          const tdy = (domainTarget.y - (domainTarget.z || 0)) - (this.y - (this.z || 0));
-          if (Math.abs(tdx) > 0.1 || Math.abs(tdy) > 0.1) {
-            domainAimAngle = Math.atan2(tdy, tdx);
-          }
-        }
-        if (!Number.isFinite(domainAimAngle)) domainAimAngle = 0;
-        this.gunAngle = domainAimAngle;
-        this.angle = domainAimAngle;
-        this._domainChannelAngle = domainAimAngle;
-        this._playedDeployAudio = false;
-        if (!this._hasPlayedDomainChannelSound) {
-          this._hasPlayedDomainChannelSound = true;
-          const channelSound = getSkillSound(this._def?.id, 'domain_channel');
-          const chanSrc = channelSound?.src || CONFIG.gojo?.sounds?.domainChannel || 'Assets/Sound Effects/Skills/gojodomain.mp3';
-          const chanVol = channelSound?.volume ?? (CONFIG.gojo?.soundVolumes?.domainChannel ?? 5.0);
-          audioSystem.playSFX(chanSrc, chanVol);
-        }
+        this._beginDomainChannel((opponent && this._isValidCombatTarget(opponent)) ? opponent : ((typeof this._findClosestEnemy === 'function') ? this._findClosestEnemy() : null));
       }
       return;
     }
 
     const validDomainOpponent = (opponent && this._isValidCombatTarget(opponent) && this.hasSpottedEnemy(opponent, arena)) || (typeof this._findSpottedEnemy === 'function' ? this._findSpottedEnemy() : null);
-    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && (this.forcedMeleeTimer || 0) <= 0 && validDomainOpponent && !validDomainOpponent.isDead) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && validDomainOpponent && !validDomainOpponent.isDead) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
 
-      // Initiate smooth Pre-Domain Slide Phase before stopping to channel
-      this.isDomainPreSlide = true;
-      this.domainPreSlideTimer = 8; // Gentle short brake glide (~8 frames) rather than launching across the map
-
-      // Smoothly preserve existing momentum with a gentle brake rather than shooting across the arena
-      const currentSpeed = Number.isFinite(this.vx) && Number.isFinite(this.vy) ? Math.hypot(this.vx, this.vy) : 0;
-      if (currentSpeed > 0.1) {
-        this.vx = (this.vx / currentSpeed) * Math.min(currentSpeed, 3.5);
-        this.vy = (this.vy / currentSpeed) * Math.min(currentSpeed, 3.5);
-      } else {
-        this.vx = 0;
-        this.vy = 0;
-      }
-
-      if (validDomainOpponent && Number.isFinite(validDomainOpponent.x) && Number.isFinite(validDomainOpponent.y)) {
-        this.aim(validDomainOpponent);
-      }
-
-      const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
-      const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.6;
-      audioSystem.playSFX(dashSnd, dashVol);
-      return;
+      // Zero-lag Domain Expansion: no pre-slide brake or windup frames. The instant
+      // Unlimited Void becomes ready, Gojo snaps straight into the hand-sign channel and
+      // begins charging on this very frame (falls through to the channeling block below).
+      this._beginDomainChannel(validDomainOpponent);
     }
 
     // Handle Domain Expansion Channeling (locked stance in hand sign pose after stopping)
@@ -2843,6 +2803,47 @@ export class GojoFighter extends Fighter {
     return modDeletePurpleProj(this);
   }
 
+
+  /**
+   * Zero-lag Unlimited Void entry: snaps Gojo directly into the hand-sign channel on the
+   * exact frame the domain becomes ready (no pre-slide brake / windup frames).
+   * @param {Object} [target] Preferred opponent to lock the channel stance onto.
+   */
+  _beginDomainChannel(target = null) {
+    this.vx = 0;
+    this.vy = 0;
+
+    const domainTarget = (target && this._isValidCombatTarget(target))
+      ? target
+      : ((this._lastOpponent && this._isValidCombatTarget(this._lastOpponent)) ? this._lastOpponent : null);
+
+    let domainAimAngle = this.gunAngle || 0;
+    if (domainTarget && Number.isFinite(domainTarget.x) && Number.isFinite(domainTarget.y)) {
+      const tdx = domainTarget.x - this.x;
+      const tdy = (domainTarget.y - (domainTarget.z || 0)) - (this.y - (this.z || 0));
+      if (Math.abs(tdx) > 0.1 || Math.abs(tdy) > 0.1) {
+        domainAimAngle = Math.atan2(tdy, tdx);
+      }
+    }
+    if (!Number.isFinite(domainAimAngle)) domainAimAngle = 0;
+    this.gunAngle = domainAimAngle;
+    this.angle = domainAimAngle;
+    this._domainChannelAngle = domainAimAngle;
+
+    this.isDomainPreSlide = false;
+    this.domainPreSlideTimer = 0;
+    this.isChannelingDomainExpansion = true;
+    this.domainChargeTimer = 0;
+    this._playedDeployAudio = false;
+
+    if (!this._hasPlayedDomainChannelSound) {
+      this._hasPlayedDomainChannelSound = true;
+      const channelSound = getSkillSound(this._def?.id, 'domain_channel');
+      const chanSrc = channelSound?.src || CONFIG.gojo?.sounds?.domainChannel || 'Assets/Sound Effects/Skills/gojodomain.mp3';
+      const chanVol = channelSound?.volume ?? (CONFIG.gojo?.soundVolumes?.domainChannel ?? 5.0);
+      audioSystem.playSFX(chanSrc, chanVol);
+    }
+  }
 
   _activateDomain(arena) {
     if (this.isPurpleActive()) return;

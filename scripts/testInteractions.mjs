@@ -6141,10 +6141,10 @@ async function runInteractionTests() {
   }
 
   // ─────────────────────────────────────────────
-  // TEST 56: Mahoraga Hollow Purple Adaptation: 50% Damage & Continuous Gravitational Pull
+  // TEST 56: Mahoraga Hollow Purple Adaptation: 25% Damage & Continuous Gravitational Pull
   // ─────────────────────────────────────────────
   {
-    console.log('   56. Testing Mahoraga Hollow Purple Adaptation: 50% Damage Reduction & Continuous Gravitational Pull...');
+    console.log('   56. Testing Mahoraga Hollow Purple Adaptation: 25% Damage Taken (75% Reduction) & Continuous Gravitational Pull...');
     const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
     const GojoClass = FIGHTER_CLASS_MAP['gojo'];
     const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
@@ -6186,7 +6186,9 @@ async function runInteractionTests() {
     assert(mahoraga.isPulledOrDragged() === true, 'Adapted Mahoraga isPulledOrDragged() must evaluate to true while inside Purple');
     assert(mahoraga.x < initialMahoragaX, `Mahoraga must be pulled left towards the Purple orb at x=200 (initial x=${initialMahoragaX}, new x=${mahoraga.x})`);
 
-    // D. Verify 25% damage reduction (takes 25% damage) on Purple DPS and Purple Explosion damage
+    // D. Verify 75% damage reduction (takes 25% damage) on Purple DPS and Purple Explosion damage
+    // Lock the Wheel of Adaptation so a fresh wheel-click heal cannot mask the raw damage numbers.
+    mahoraga.fatalAdaptCooldown = 9999;
     const hpBefore = mahoraga.hp;
     mahoraga.takeDamage(100, gojo, { isPurpleDPS: true, projectile: purple });
     assert(mahoraga.hp === hpBefore - 25, `Adapted Mahoraga must take exactly 25% damage (expected 25 dmg, lost ${hpBefore - mahoraga.hp})`);
@@ -6214,7 +6216,7 @@ async function runInteractionTests() {
     mahoraga.reset();
     state.fighters = [];
 
-    console.log('      ✅ Mahoraga Hollow Purple adaptation: 25% damage reduction, continuous gravitational pull, and wheel double damage verified successfully.');
+    console.log('      ✅ Mahoraga Hollow Purple adaptation: 75% damage reduction (25% damage taken) applied uniformly, continuous gravitational pull, and wheel double damage verified successfully.');
   }
 
   // ── TEST 58: Horizontal FFA Game Mode Select, 4-Fighter Roster, and HUD Integration ──
@@ -13672,10 +13674,11 @@ async function runInteractionTests() {
       state.fighters = [sukuna, target];
 
       // Activate Sukuna Domain
+      const sukunaDomainMax = CONFIG.sukuna?.domainCooldown || 1200;
       sukuna._activateDomain(testArena);
       assert(sukuna.domainActive === true, 'Sukuna domainActive must be true after _activateDomain()');
       assert(sukuna.domainTimer === 500, 'Sukuna domainTimer must be initialized to 500');
-      assert(sukuna.domainCooldown === 1200, 'Sukuna domainCooldown must be initialized to 1200');
+      assert(sukuna.domainCooldown === sukunaDomainMax, `Sukuna domainCooldown must be initialized to ${sukunaDomainMax}`);
 
       // Tick 20 frames while domain is active: domainTimer drains, domainCooldown MUST NOT prematurely tick down
       for (let f = 0; f < 20; f++) {
@@ -13683,7 +13686,7 @@ async function runInteractionTests() {
         sukuna.update(target, 0, testArena);
       }
       assert(sukuna.domainTimer === 480, `Sukuna domainTimer must decrement (expected 480, got ${sukuna.domainTimer})`);
-      assert(sukuna.domainCooldown === 1200, `Sukuna domainCooldown must NOT tick down while domain is active (expected 1200, got ${sukuna.domainCooldown})`);
+      assert(sukuna.domainCooldown === sukunaDomainMax, `Sukuna domainCooldown must NOT tick down while domain is active (expected ${sukunaDomainMax}, got ${sukuna.domainCooldown})`);
 
       // Fast-forward to domain expiry
       sukuna.domainTimer = 1;
@@ -13693,7 +13696,7 @@ async function runInteractionTests() {
       // Verify domain has expired
       assert(sukuna.domainActive === false, 'Sukuna domainActive must be false after expiry');
       assert(sukuna.domainTimer <= 0, 'Sukuna domainTimer must be <= 0');
-      assert(sukuna.domainCooldown === 1200, `Sukuna domainCooldown MUST reset to 1200 upon expiry (got ${sukuna.domainCooldown})`);
+      assert(sukuna.domainCooldown === sukunaDomainMax, `Sukuna domainCooldown MUST reset to ${sukunaDomainMax} upon expiry (got ${sukuna.domainCooldown})`);
 
       // Check HUD skill provider output
       const sukunaSkills = HUD_SKILL_PROVIDERS.sukuna(sukuna);
@@ -13707,10 +13710,11 @@ async function runInteractionTests() {
         state.frameCount = (state.frameCount || 0) + 1;
         sukuna.update(target, 0, testArena);
       }
-      assert(sukuna.domainCooldown === 1080, `Sukuna domainCooldown must tick down naturally after domain ends (expected 1080, got ${sukuna.domainCooldown})`);
+      assert(sukuna.domainCooldown === sukunaDomainMax - 120, `Sukuna domainCooldown must tick down naturally after domain ends (expected ${sukunaDomainMax - 120}, got ${sukuna.domainCooldown})`);
       const sukunaSkillsPost120 = HUD_SKILL_PROVIDERS.sukuna(sukuna);
       const msPost120 = sukunaSkillsPost120.find(s => s.id === 'ms');
-      assert(Math.abs(msPost120.pct - 10) < 0.001, `Sukuna MS HUD pct must be ~10% after 120 frames (got ${msPost120.pct}%)`);
+      const expectedPct = Math.max(0, Math.min(100, (1 - ((sukunaDomainMax - 120) / sukunaDomainMax)) * 100));
+      assert(Math.abs(msPost120.pct - expectedPct) < 0.001, `Sukuna MS HUD pct must be ~${expectedPct.toFixed(1)}% after 120 frames (got ${msPost120.pct}%)`);
       assert(msPost120.ready === false, 'Sukuna MS HUD ready must remain false until 100%');
 
       // Complete cooldown to 0
@@ -14059,6 +14063,225 @@ async function runInteractionTests() {
     state.fighters = [];
     state.illusions = [];
     console.log('      ✅ Gojo melee mode duration, automatic disengage on expiry, Infinity re-arm, and separation cooldown verified cleanly.');
+  }
+
+  // ─── Test 113: Sukuna Minion Mahoraga HUD Skill Bars & Combat Stats Standard ───
+  {
+    console.log('🧪 Test 113: Sukuna Minion Mahoraga HUD Skill Bars & Combat Stats Standard...');
+    const { trySummonMahoraga, dispelMahoragaSummon } = await import('../js/entities/fighters/sukuna/sukunaMahoragaSummon.js');
+    const { getSkillDataForFighter, isSkillExceptionInDarkMode } = await import('../js/graphics/ui/hudSkillProviders.js');
+    const { getAdditionalInfoForFighter, updateHealthHud, clearHealthHud } = await import('../js/graphics/hudManager.js');
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const sukuna = new SukunaClass({ x: 220, y: 300, controls: {} });
+    const dummyEnemy = new GojoClass({ x: 320, y: 300, controls: {} });
+
+    state.fighters = [sukuna, dummyEnemy];
+    state.illusions = [];
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = testArena;
+
+    // Initialize updateHealthHud so getAdditionalInfoForFighter is bound
+    updateHealthHud();
+
+    // 1. Initial State: Mahoraga is NOT summoned
+    sukuna.mahoragaSummonActive = false;
+    sukuna.mahoragaMinion = null;
+
+    const baseSkills = getSkillDataForFighter(sukuna);
+    assert(baseSkills.length === 4, `Sukuna without summoned Mahoraga must return exactly 4 skill bars (got: ${baseSkills.length})`);
+    assert(baseSkills.some(s => s.id === 'ms'), 'Sukuna base skills must include Malevolent Shrine (ms)');
+    assert(baseSkills.some(s => s.id === 'fuga'), 'Sukuna base skills must include Fuga (fuga)');
+    assert(baseSkills.some(s => s.id === 'rct'), 'Sukuna base skills must include RCT (rct)');
+    assert(baseSkills.some(s => s.id === 'mahoraga'), 'Sukuna base skills must include Mahoraga summon bar (mahoraga)');
+    assert(!baseSkills.some(s => s.id.startsWith('mahoraga_')), 'Sukuna without active minion must NOT contain minion mahoraga_ bars');
+
+    const baseStats = getAdditionalInfoForFighter(sukuna);
+    assert(baseStats.some(line => line.includes('<b>Crit Rate:</b>')), 'Sukuna base stats must include Crit Rate');
+    assert(baseStats.some(line => line.includes('<b>Crit DMG:</b>')), 'Sukuna base stats must include Crit DMG');
+    assert(!baseStats.some(line => line.includes('<b>Maho')), 'Sukuna base stats must NOT include Maho stats when not summoned');
+
+    // 2. Summon Mahoraga Minion
+    sukuna.mahoragaSummonCooldown = 0;
+    const summoned = trySummonMahoraga(sukuna, 0, testArena);
+    assert(summoned === true, 'Sukuna must summon Mahoraga successfully');
+    assert(sukuna.mahoragaSummonActive === true, 'sukuna.mahoragaSummonActive must be true');
+    assert(sukuna.mahoragaMinion !== null, 'sukuna.mahoragaMinion must exist');
+    const minion = sukuna.mahoragaMinion;
+
+    // 3. Verify Summoned State: 7 HUD Skill Bars
+    const summonedSkills = getSkillDataForFighter(sukuna);
+    assert(summonedSkills.length === 7, `Sukuna with active Mahoraga must return exactly 7 skill bars (got: ${summonedSkills.length})`);
+
+    const wheelSkill = summonedSkills.find(s => s.id === 'mahoraga_wheel');
+    const throwSkill = summonedSkills.find(s => s.id === 'mahoraga_throw');
+    const shoutSkill = summonedSkills.find(s => s.id === 'mahoraga_shout');
+
+    assert(wheelSkill, 'Summoned skills must contain mahoraga_wheel');
+    assert(throwSkill, 'Summoned skills must contain mahoraga_throw');
+    assert(shoutSkill, 'Summoned skills must contain mahoraga_shout');
+
+    // Theme color and clean Mahoraga labels (no [MAHO] prefix)
+    assert(wheelSkill.color === '#FFD700', `mahoraga_wheel color must be #FFD700 (got: ${wheelSkill.color})`);
+    assert(throwSkill.color === '#FFD700', `mahoraga_throw color must be #FFD700 (got: ${throwSkill.color})`);
+    assert(shoutSkill.color === '#FFD700', `mahoraga_shout color must be #FFD700 (got: ${shoutSkill.color})`);
+
+    assert(wheelSkill.label === 'WOA - LVL 1', `mahoraga_wheel label must be 'WOA - LVL 1' (got: ${wheelSkill.label})`);
+    assert(throwSkill.label === 'THROW', `mahoraga_throw label must be 'THROW' (got: ${throwSkill.label})`);
+    assert(shoutSkill.label === 'DIVINE SHOUT', `mahoraga_shout label must be 'DIVINE SHOUT' (got: ${shoutSkill.label})`);
+
+    // Signature skill exception in dark mode: ONLY mahoraga_wheel (WOA) is the signature skill
+    assert(wheelSkill.isSignature === true && throwSkill.isSignature === false && shoutSkill.isSignature === false, 'Only mahoraga_wheel must be marked isSignature: true');
+    assert(isSkillExceptionInDarkMode(sukuna, wheelSkill) === true, 'mahoraga_wheel must pass isSkillExceptionInDarkMode for Sukuna');
+    assert(isSkillExceptionInDarkMode(sukuna, throwSkill) === false, 'mahoraga_throw must NOT pass isSkillExceptionInDarkMode for Sukuna');
+    assert(isSkillExceptionInDarkMode(sukuna, shoutSkill) === false, 'mahoraga_shout must NOT pass isSkillExceptionInDarkMode for Sukuna');
+
+    // 4. Verify Summoned State: Minion Mahoraga Combat Stats (DMG: 6, Regen: 0%, ATK: 1X)
+    const minionStats = getAdditionalInfoForFighter(minion);
+    assert(minionStats.some(line => line.includes('<b>DMG:</b>')), 'Minion stats must include DMG');
+    assert(minionStats.some(line => line.includes('<b>Regen:</b>')), 'Minion stats must include Regen');
+    assert(minionStats.some(line => line.includes('<b>DEF:</b>') || line.includes('<b>ATK:</b>')), 'Minion stats must include DEF or ATK');
+
+    // 4b. Verify DOM Layout: Mahoraga minion healthbar, skill bars, and stats render UNDER Sukuna stats
+    const prevDesc = CONFIG.hudShowFighterDescription;
+    const prevStats = CONFIG.darkModeShowHudStats;
+    const prevSkillsMode = CONFIG.hudSkillBarsMode;
+    const prevDarkSkills = CONFIG.darkModeShowHudSkillBars;
+    CONFIG.hudShowFighterDescription = false;
+    CONFIG.darkModeShowHudStats = 1;
+    CONFIG.hudSkillBarsMode = 'all';
+    CONFIG.darkModeShowHudSkillBars = 1;
+    clearHealthHud(true);
+    updateHealthHud();
+
+    try {
+      const bottomContainer = globalThis.document.getElementById('healthHud');
+      assert(bottomContainer !== null, 'healthHud container must exist');
+      const html = bottomContainer.innerHTML;
+      assert(html.includes('health-card__minion-container'), 'Minion container must be rendered in HTML');
+      assert(html.includes('health-card__minion-bar'), 'Minion health bar must be rendered in HTML');
+      assert(html.includes('health-card__minion-skills'), 'Minion skills must be rendered in HTML');
+      assert(html.includes('health-card__minion-info'), 'Minion info must be rendered in HTML');
+      assert(html.includes('WOA - LVL'), 'Minion skills HTML must include WOA - LVL in All Skills mode');
+      assert(html.includes('THROW'), 'Minion skills HTML must include THROW in All Skills mode');
+      assert(html.includes('DIVINE SHOUT'), 'Minion skills HTML must include DIVINE SHOUT in All Skills mode');
+
+      const skillsIdx = html.indexOf('class="health-card__skills"');
+      const infoIdx = html.indexOf('class="health-card__info"');
+      const minionContainerIdx = html.indexOf('health-card__minion-container');
+      const minionBarIdx = html.indexOf('health-card__minion-bar');
+      const minionSkillsIdx = html.indexOf('health-card__minion-skills');
+      const minionInfoIdx = html.indexOf('health-card__minion-info');
+
+      assert(skillsIdx !== -1, 'Sukuna skills container must be present in card HTML');
+      assert(infoIdx !== -1, 'Sukuna stats container must be present in card HTML');
+      assert(skillsIdx < infoIdx, 'Sukuna skills must appear before Sukuna stats');
+      assert(infoIdx < minionContainerIdx, 'Mahoraga minion block MUST appear UNDER Sukuna stats');
+      assert(minionBarIdx > minionContainerIdx && minionBarIdx < minionSkillsIdx, 'Minion health bar must appear above Minion skills inside minion container');
+      assert(minionSkillsIdx < minionInfoIdx, 'Minion skills must appear before Minion stats inside minion container');
+
+      // 4c. Verify Signature Skill Only Mode: Only mahoraga_wheel (WOA) is rendered for Minion Mahoraga
+      CONFIG.hudSkillBarsMode = 'signature';
+      clearHealthHud(true);
+      updateHealthHud();
+      const sigHtml = bottomContainer.innerHTML;
+      assert(sigHtml.includes('health-card__minion-bar'), 'Minion health bar must still render in Signature Skill Only mode');
+      assert(sigHtml.includes('WOA - LVL'), 'Signature Skill Only mode must render WOA - LVL');
+      assert(!sigHtml.includes('DIVINE SHOUT'), 'Signature Skill Only mode must NOT render DIVINE SHOUT');
+      assert(!sigHtml.includes('data-skill-id="mahoraga_throw"'), 'Signature Skill Only mode must NOT render mahoraga_throw');
+    } finally {
+      CONFIG.hudShowFighterDescription = prevDesc;
+      CONFIG.darkModeShowHudStats = prevStats;
+      CONFIG.hudSkillBarsMode = prevSkillsMode;
+      CONFIG.darkModeShowHudSkillBars = prevDarkSkills;
+    }
+
+    // 5. Dispel / Slay Mahoraga Minion
+    dispelMahoragaSummon(sukuna, { silent: true });
+    assert(sukuna.mahoragaSummonActive === false, 'sukuna.mahoragaSummonActive must be false after dispel');
+    assert(sukuna.mahoragaMinion === null, 'sukuna.mahoragaMinion must be null after dispel');
+
+    // 6. Verify Post-Dispel State: Reverts to 4 skills and base stats
+    const postSkills = getSkillDataForFighter(sukuna);
+    assert(postSkills.length === 4, `Sukuna after dispel must revert to 4 skill bars (got: ${postSkills.length})`);
+    assert(!postSkills.some(s => s.id.startsWith('mahoraga_')), 'Minion skill bars must be cleanly removed after dispel');
+
+    const postStats = getAdditionalInfoForFighter(sukuna);
+    assert(!postStats.some(line => line.includes('<b>Maho')), 'Maho stats must be cleanly removed after dispel');
+
+    // Cleanup
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Sukuna Minion Mahoraga dynamic HUD skill bars, theme consistency, dark mode registration, and combat stats verified cleanly.');
+  }
+
+  // ─── Test 114: Gojo Red/Blue/Purple Mixing Orbs Render Above Enemy Bodies (Foreground FX Pass) ───
+  {
+    console.log('🧪 Test 114: Gojo Red/Blue/Purple Mixing Orbs Foreground FX Pass (Never Overlaid by Enemy Bodies)...');
+    const { beginForegroundFxPass, flushForegroundFxPass, endForegroundFxPass } = await import('../js/graphics/renderers/foregroundFxPass.js');
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const gojo = new GojoClass({ x: 220, y: 300, controls: {} });
+    const enemy = new SukunaClass({ x: 240, y: 320, controls: {} });
+    state.fighters = [gojo, enemy];
+    state.illusions = [];
+    state.gameState = 'playing';
+
+    const ctx = createMockCtx();
+    const drawLog = [];
+    const origGojoDrawGun = gojo.drawGun.bind(gojo);
+    gojo.drawGun = (c) => { drawLog.push(gojo.isChannelingPurple ? 'gojo_orbs' : 'gojo_gun'); origGojoDrawGun(c); };
+    const origRed = gojo._drawReversalRedEffect.bind(gojo);
+    gojo._drawReversalRedEffect = (c) => { drawLog.push('gojo_red'); origRed(c); };
+    const origEnemyDraw = enemy.draw.bind(enemy);
+    enemy.draw = (c, o) => { drawLog.push('enemy_body'); origEnemyDraw(c, o); };
+
+    gojo.isChannelingPurple = true;
+    gojo.purpleChargeTimer = 40;
+
+    try {
+      // 1. Live arena frame: Gojo drawn first, enemy body drawn after, orbs flushed last
+      beginForegroundFxPass();
+      gojo.draw(ctx);
+      enemy.draw(ctx);
+      assert(!drawLog.includes('gojo_orbs'), 'Gojo mixing orbs must be deferred while the foreground window is open');
+      flushForegroundFxPass(ctx);
+      const orbsIdx = drawLog.indexOf('gojo_orbs');
+      const enemyIdx = drawLog.indexOf('enemy_body');
+      assert(orbsIdx !== -1, 'Gojo mixing orbs must be drawn by the foreground FX pass');
+      assert(orbsIdx > enemyIdx, 'Gojo mixing orbs must render AFTER (on top of) the enemy body');
+      assert(state._deferredForegroundFx.length === 0, 'Foreground FX queue must be empty after flush');
+      assert(state._deferFighterForegroundFx === false, 'Foreground deferral window must close after flush');
+
+      // 2. Reversal Red is deferred too
+      drawLog.length = 0;
+      gojo.isChannelingPurple = false;
+      gojo.redEffectTimer = 20;
+      beginForegroundFxPass();
+      gojo.draw(ctx);
+      enemy.draw(ctx);
+      flushForegroundFxPass(ctx);
+      assert(drawLog.indexOf('gojo_red') > drawLog.indexOf('enemy_body'), 'Reversal Red must render on top of the enemy body');
+      gojo.redEffectTimer = 0;
+
+      // 3. Outside the window (previews / champion screens), orbs draw inline
+      drawLog.length = 0;
+      gojo.isChannelingPurple = true;
+      endForegroundFxPass();
+      gojo.draw(ctx);
+      assert(drawLog.includes('gojo_orbs'), 'Gojo mixing orbs must draw inline outside the foreground FX window');
+      assert(ctx.getStackDepth() === 0, `Canvas stack must be balanced (depth: ${ctx.getStackDepth()})`);
+    } finally {
+      endForegroundFxPass();
+      gojo.isChannelingPurple = false;
+      gojo.purpleChargeTimer = 0;
+      state.fighters = [];
+      state.illusions = [];
+    }
+    console.log('      ✅ Gojo Red/Blue/Purple mixing orbs deferred to foreground pass, rendered above enemy bodies, inline fallback & stack balance verified.');
   }
 
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');

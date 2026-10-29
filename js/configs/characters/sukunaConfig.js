@@ -119,7 +119,7 @@ export const sukunaConfig = {
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
     enableDomain: true,               // Master toggle for Ultimate: Malevolent Shrine
-    domainCooldown: 1200,         // Cooldown before domain can trigger (~16.6s at 60 fps)
+    domainCooldown: 1100,         // Cooldown before domain can trigger (~16.6s at 60 fps)
     domainChargeMax: 125,         // Channeling duration before domain opens (2.0s at 60 fps)
     domainDuration: 500,          // Domain active duration (~8.33s at 60 fps)
     domainDamage: 7,             // Base damage per slash line hit (legacy fallback)
@@ -138,7 +138,7 @@ export const sukunaConfig = {
     // Toggle `enableMahoragaSummon` off to disable the skill entirely (HUD card disappears too).
     enableMahoragaSummon: 1,       // MASTER TOGGLE for the Mahoraga summon skill
     mahoragaSummonCooldown: 2500,     // Frames before Mahoraga can be re-summoned after being slain
-    mahoragaSummonInitialCooldown: 3000, // Immediate opening summon (0.25s after match start) so it triggers every match
+    mahoragaSummonInitialCooldown: 2500, // Immediate opening summon (0.25s after match start) so it triggers every match
     // NOTE: the summon has NO duration — Mahoraga stays in the arena until he is slain or Sukuna dies.
     mahoragaSummonMaxActive: 1,       // Maximum simultaneous Mahoraga minions
     // The minion inherits ALL of Mahoraga's fighter attributes 1:1 (see CONFIG.mahoraga):
@@ -146,7 +146,7 @@ export const sukunaConfig = {
     // Divine Shout and the Eight-Handled Wheel adaptation stack. This scale is the only override.
     mahoragaSummonStatScale: 1.0,     // 1.0 = identical to the arena Mahoraga fighter
     mahoragaSummonVolumeScale: 1.0,   // 1.0 = Mahoraga's own combat sound volumes
-    mahoragaSummonWindupFrames: 28,   // Windup mudra animation frames on Sukuna's hands before Mahoraga emerges
+    mahoragaSummonWindupFrames: 50,   // Windup mudra animation frames on Sukuna's hands before Mahoraga emerges
     mahoragaSummonSpawnFrames: 45,    // Shadow-rise emergence duration
     mahoragaSummonShakeIntensity: 5,  // Screen shake on emergence
     mahoragaSummonShakeDuration: 10,  // Screen shake duration on emergence

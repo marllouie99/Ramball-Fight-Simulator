@@ -25,17 +25,17 @@ function isTeleportDisabled(fighter) {
 }
 
 /**
- * Gojo Purple Teleport Dodge (Removed: Mahoraga tanks Purple with 50% damage reduction & vortex immunity instead of teleporting away).
+ * Gojo Purple Teleport Dodge (Removed: Mahoraga tanks Purple with only 75% damage reduction & vortex immunity instead of teleporting away).
  */
 export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
-  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks with 50% damage reduction
+  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks Purple at 75% damage taken
 }
 
 /**
- * Gojo Red Teleport Dodge (Removed: Mahoraga tanks Red with 50% damage reduction instead of teleporting away).
+ * Gojo Red Teleport Dodge (Removed: Mahoraga tanks Red with 75% damage reduction instead of teleporting away).
  */
 export function gojoRedTeleportDodge(fighter, gojo) {
-  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks with 50% damage reduction
+  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks with 75% damage reduction
 }
 
 /**
@@ -133,16 +133,16 @@ export function startAdaptationFlashDash(fighter, attacker) {
 }
 
 /**
- * Sukuna Fuga Teleport Dodge (Removed: Mahoraga tanks Fuga with 50% damage reduction instead of teleporting away).
+ * Sukuna Fuga Teleport Dodge (Removed: Mahoraga tanks Fuga with 75% damage reduction instead of teleporting away).
  */
 export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
-  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks with 50% damage reduction
+  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks with 75% damage reduction
 }
 
 /**
- * General Skill Shot Teleport Dodge (Removed: Mahoraga tanks adapted skill shots with 50% damage reduction instead of teleporting away).
+ * General Skill Shot Teleport Dodge (Removed: Mahoraga tanks adapted skill shots with 75% damage reduction instead of teleporting away).
  */
 export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
-  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks with 50% damage reduction
+  // Teleport-away removed on adaptation: Mahoraga marches forward and tanks with 75% damage reduction
 }
 

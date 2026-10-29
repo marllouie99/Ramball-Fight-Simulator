@@ -30,6 +30,7 @@ import { drawGetsugaImpactEffects, updateGetsugaImpactEffects } from '../graphic
 import { drawTojiImpactEffects, updateTojiImpactEffects } from '../graphics/particles/tojiImpactEffect.js';
 import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaDomainVisuals.js';
 import { drawFightBanner } from '../graphics/renderers/PokeBallSummonRenderer.js';
+import { beginForegroundFxPass, flushForegroundFxPass, endForegroundFxPass } from '../graphics/renderers/foregroundFxPass.js';
 import { drawHorizontalTeamSelectScreen } from '../graphics/ui/HorizontalTeamSelectScreen.js';
 import { drawHorizontalPanoramicHud } from '../graphics/ui/horizontalHudManager.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -438,6 +439,9 @@ export function renderGame() {
           }
         }
 
+        // Open the foreground-FX deferral window: fighters may queue skill VFX (e.g. Gojo's
+        // Red/Blue/Purple mixing orbs) that must render above ALL bodies, illusions & minions.
+        beginForegroundFxPass();
         if (state.gameState !== 'countdown') {
           // Draw survivor horde mobs BEFORE hero fighters so player renders on top
           if (state.mode === GAME_MODES.SURVIVOR || state.mode === 'Survivor') {
@@ -461,6 +465,7 @@ export function renderGame() {
         drawIllusions(); // Draw Doppleganger illusions
         drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
         drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
+        flushForegroundFxPass(state.ctx); // Deferred skill VFX on top of every fighter/illusion/minion body
         updateHybridProjectiles();
         updateHybridRika();
         updateHybridSukunaFuga();
@@ -514,6 +519,7 @@ export function renderGame() {
         drawFloatingTexts(); 
         drawUltimateChannelingTexts();
       } finally {
+        endForegroundFxPass();
         state.ctx.restore();
         state.ctx.setTransform(1, 0, 0, 1, 0, 0); // Always reset transform matrix cleanly
       }

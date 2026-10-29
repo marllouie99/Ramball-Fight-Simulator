@@ -216,6 +216,15 @@ export function drawFighters() {
     // Fast-path: Survivor horde mobs sort purely by Y depth (HoloCure pattern)
     if (a.f.isSurvivorMob && b.f.isSurvivorMob) return a.f.y - b.f.y;
 
+    // Gojo's Hollow Purple mixing animation (Red + Blue fusing into Purple) MUST ALWAYS render
+    // above every other fighter body. Checked before ALL other rules (ambush targets, counters,
+    // domain holders, attack casts, Y depth) so an opponent can never occlude the fusing orbs.
+    const isPurpleMixing = (f) => Boolean(f.isChannelingPurple || (f.purpleChargeTimer || 0) > 0);
+    const aMixingP = isPurpleMixing(a.f);
+    const bMixingP = isPurpleMixing(b.f);
+    if (aMixingP && !bMixingP) return 1;
+    if (!aMixingP && bMixingP) return -1;
+
     // Target of ambush / counter MUST always render underneath the ambush/counter attacker
     const aIsTarget = a.f.isTargetOfAmbush;
     const bIsTarget = b.f.isTargetOfAmbush;

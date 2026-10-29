@@ -12,7 +12,7 @@ export const mahoragaConfig = {
     name: 'Mahoraga',
     displayName: 'Mahoraga',
     // ── Base Attributes ──
-    hp: 1000,
+    hp: 500,
     speed: 6.5,
     moveSpeed: 6.5,
     spinRate: 0,
@@ -72,7 +72,7 @@ export const mahoragaConfig = {
     rctCombatDamagePauseFrames: 45, // Duration (frames) passive RCT is paused upon taking direct damage (45 frames = 0.75s)
     defBuffPerClickPercent: 0.00,   // Defense boost per wheel click (0.00 = general defense scaling removed)
     maxDefBuffPercent: 0.00,        // Maximum defense damage reduction cap (0.00 = 0% reduction)
-    adaptedDamageMultiplier: 0.25,  // Damage multiplier taken when adapted to an attack/skill (0.25 = 25% damage taken / 75% reduction)
+    adaptedDamageMultiplier: 0.25,  // Damage multiplier taken when adapted to an attack/skill (0.25 = 25% damage taken / 75% reduction, applies to EVERY adapted skill)
     wheelDoubleDamageDurationFrames: 240, // Duration (frames) of temporary double damage buff on wheel click (240 frames = 4.0s @ 60fps)
     wheelDoubleDamageMultiplier: 2.0,     // Damage multiplier during temporary wheel click buff (2.0 = 2x damage)
     wheelDoubleDamageAttackSpeedSlowMultiplier: 1.8, // Attack speed slowdown factor during 2x damage (1.8x cooldown / 45% slower attack cadence)

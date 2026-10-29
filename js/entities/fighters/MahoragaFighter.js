@@ -1203,7 +1203,7 @@ export class MahoragaFighter extends Fighter {
 
 
     if (this.gojoRedDodgeReady) {
-      this.gojoRedDodgeReady = false; // Mahoraga tanks Red with 50% damage reduction instead of dodging
+      this.gojoRedDodgeReady = false; // Mahoraga tanks Red with 75% damage reduction instead of dodging
     }
 
     // ── HIGH-SPEED DIVINE FLASH-DASH TICK ──
