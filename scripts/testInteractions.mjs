@@ -13185,15 +13185,30 @@ async function runInteractionTests() {
     drawPacmanFrightenedGhost(mockCtx, zenitsu);
     assert(mockCtx.getStackDepth() === 0, 'drawPacmanFrightenedGhost must leave 0 Canvas 2D stack depth');
 
-    // 6. Verify Dot & Power Pellet Consumption is Prevented During Active Chomp Mode
+    // 6. Verify Small Dot Eating is Enabled During Active Chomp Mode (while Big Dots / Power Pellets are Preserved)
     pacman.initDots(testArena);
     assert(pacman.dots.length > 0, 'Pacman dots must be initialized');
-    pacman.x = pacman.dots[0].x;
-    pacman.y = pacman.dots[0].y;
+
+    const smallDot = pacman.dots.find(d => !d.isPowerPellet && !d.eaten);
+    const powerPellet = pacman.dots.find(d => d.isPowerPellet && !d.eaten);
+    assert(smallDot !== undefined, 'Small dot must exist');
+    assert(powerPellet !== undefined, 'Power pellet must exist');
+
+    // A) Verify Pac-Man CAN eat small dots during active Chomp Mode
+    pacman.x = smallDot.x;
+    pacman.y = smallDot.y;
     const dotsEatenBefore = pacman.dotsEaten;
     pacman._checkDotEating();
-    assert(pacman.dots[0].eaten === false, 'Pac-Man must NOT eat dots while Chomp Mode is active');
-    assert(pacman.dotsEaten === dotsEatenBefore, 'dotsEaten count must not increase while in Chomp Mode');
+    assert(smallDot.eaten === true, 'Pac-Man must be able to eat small dots during active Chomp Mode');
+    assert(pacman.dotsEaten === dotsEatenBefore + 1, 'dotsEaten count must increment when eating small dot during Chomp Mode');
+
+    // B) Verify Big Dot (Power Pellet) is preserved during active Chomp Mode so it is not wasted
+    pacman.x = powerPellet.x;
+    pacman.y = powerPellet.y;
+    const dotsEatenBeforePellet = pacman.dotsEaten;
+    pacman._checkDotEating();
+    assert(powerPellet.eaten === false, 'Pac-Man must preserve Power Pellets during active Chomp Mode');
+    assert(pacman.dotsEaten === dotsEatenBeforePellet, 'dotsEaten count must not increment for preserved Power Pellet');
 
     // 7. Verify Pac-Man Swallows Ghosted Enemy on Contact & Deals 30% Damage
     pacman.x = zenitsu.x;
@@ -13235,12 +13250,12 @@ async function runInteractionTests() {
     assert(zenitsu.canPerformBasicAttack(pacman) === true, 'Enemy must regain ability to attack after being spit out');
     assert(zenitsu.canAim() === true, 'Enemy must regain ability to aim after being spit out');
 
-    // 10. Verify Dot Consumption Resumes After Chomp Mode Expires
-    pacman.x = pacman.dots[0].x;
-    pacman.y = pacman.dots[0].y;
+    // 10. Verify Power Pellet Consumption Resumes After Chomp Mode Expires
+    pacman.x = powerPellet.x;
+    pacman.y = powerPellet.y;
     pacman._checkDotEating();
-    assert(pacman.dots[0].eaten === true, 'Pac-Man must resume eating dots once Chomp Mode has expired');
-    assert(pacman.dotsEaten > dotsEatenBefore, 'dotsEaten must increment now that Chomp Mode is inactive');
+    assert(powerPellet.eaten === true, 'Pac-Man must resume eating Power Pellets once Chomp Mode has expired');
+    assert(pacman.dotsEaten > dotsEatenBeforePellet, 'dotsEaten must increment now that Chomp Mode is inactive');
 
     // 11. Verify Pac-Man Dedicated Audio SFX Configuration
     assert(pacman.sounds.death === 'Assets/Sound Effects/PacmanSFX/pac-man-death-sound.mp3', 'Pac-Man death sound path must match');

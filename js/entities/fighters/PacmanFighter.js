@@ -442,15 +442,28 @@ export class PacmanFighter extends Fighter {
    * Checks for dots eaten by Pac-Man during this frame.
    * Eating ANY of the 4 big Power Pellets immediately activates Super Chomp Mode (30% damage bite).
    * Consuming all dots across the arena also triggers Super Chomp Mode and prepares the arena refill.
+   * During Chomp Mode, Pac-Man is able to eat small dots across the arena.
    */
   _checkDotEating() {
     if (!this.dots || this.dots.length === 0) return;
-    // When Chomp Mode is active, prevent consuming dots and big dots until the duration expires
-    if (this.isChompModeActive && this.chompModeTimer > 0) return;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
+    const canEatSmallDotsInChomp = cfg.canEatSmallDotsDuringChompMode !== false;
+    const canEatBigDotsInChomp = cfg.canEatPowerPelletsDuringChompMode === true;
 
     for (let i = 0; i < this.dots.length; i++) {
       const dot = this.dots[i];
       if (dot.eaten) continue;
+
+      // During active Chomp Mode:
+      if (this.isChompModeActive && this.chompModeTimer > 0) {
+        if (dot.isPowerPellet && !canEatBigDotsInChomp) {
+          continue; // Preserve big dots (Power Pellets) so they are not wasted while Chomp Mode is already active
+        }
+        if (!dot.isPowerPellet && !canEatSmallDotsInChomp) {
+          continue;
+        }
+      }
 
       const d = Math.hypot(dot.x - this.x, dot.y - this.y);
       const eatThreshold = this.r + dot.r + 6;
