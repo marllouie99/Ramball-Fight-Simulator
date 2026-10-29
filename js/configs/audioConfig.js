@@ -32,6 +32,9 @@ export const AUDIO_CONFIG = {
   'attack_escanor': 'Assets/Sound Effects/Attacks/Escanor-attack.mp3',
   'attack_sukunaslice': 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3',
   'sukuna_slice': 'Assets/Sound Effects/Attacks/Sukuna-slice.mp3',
+  'sukuna_mahoraga_summon': 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3',
+  'skill_sukuna_mahoraga_summon': 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3',
+  'mahoraga_summon': 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3',
   
   // Effects
   'effect_flare': 'Assets/Sound Effects/SkillEffects/flare.mp3',
@@ -283,7 +286,13 @@ export const AUDIO_CONFIG = {
   'pacman_waka': 'Assets/Sound Effects/PacmanSFX/waka.wav',
   'pacman_chomp': 'Assets/Sound Effects/PacmanSFX/chomp.wav',
   'pacman_power_pellet': 'Assets/Sound Effects/PacmanSFX/power_pellet.wav',
-  'pacman_refill': 'Assets/Sound Effects/PacmanSFX/refill.wav'
+  'pacman_refill': 'Assets/Sound Effects/PacmanSFX/refill.wav',
+  'pacman_eat_fruits': 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3',
+  'pacman_eat_fruits2': 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3',
+  'pacman_eating_big_fruit': 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Big Fruit.mp3',
+  'pacman_eating_ghost': 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Ghost.mp3',
+  'pacman_ghost_turn_to_blue': 'Assets/Sound Effects/PacmanSFX/Ghost - Turn to Blue.mp3',
+  'pacman_death_sound': 'Assets/Sound Effects/PacmanSFX/pac-man-death-sound.mp3'
 };
 
 

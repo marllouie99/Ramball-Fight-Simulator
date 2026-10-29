@@ -67,6 +67,7 @@ export class PacmanFighter extends Fighter {
     this._mouthAnimTicks = 0;
     this.activeVisualEffects = [];
     this._wakaSoundDebounce = 0;
+    this._wakaSoundToggle = false;
 
     // ── Sound Configuration ──
     this.sounds = { ...(cfg.sounds || {}) };
@@ -75,6 +76,8 @@ export class PacmanFighter extends Fighter {
     // ── Ghost State & Audio Tracking ──
     this._ghostAudioHandle = null;
     this._ghostSoundPlaying = false;
+    this.suppressFaahDeathSound = true;
+    this.suppressFaahOnDeath = true;
 
     // Declarative registration with SkillManager
     this._registerSkills();
@@ -153,6 +156,7 @@ export class PacmanFighter extends Fighter {
     this.chompAttackCooldown = 0;
     this._mouthAnimTicks = 0;
     this._wakaSoundDebounce = 0;
+    this._wakaSoundToggle = false;
     this.activeVisualEffects = [];
 
     this.dots = [];
@@ -354,8 +358,11 @@ export class PacmanFighter extends Fighter {
    * Internal sound trigger helper with safe volume resolution.
    */
   _playSfx(type) {
-    const sfxPath = this.sounds?.[type] || CONFIG.pacman?.sounds?.[type];
-    const volume = this.soundVolumes?.[type] ?? CONFIG.pacman?.soundVolumes?.[type] ?? 0.8;
+    let sfxPath = this.sounds?.[type] || CONFIG.pacman?.sounds?.[type];
+    if (!sfxPath && (type === 'eatDot2' || type === 'eatFruit2' || type === 'waka2' || type === 'eatSmallFruit2')) {
+      sfxPath = 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3';
+    }
+    const volume = this.soundVolumes?.[type] ?? CONFIG.pacman?.soundVolumes?.[type] ?? 0.70;
     if (sfxPath && typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
       return audioSystem.playSFX(sfxPath, volume);
     }
@@ -429,13 +436,23 @@ export class PacmanFighter extends Fighter {
   }
 
   /**
-   * Plays the iconic waka munch sound with a small frame debounce to prevent audio clipping.
+   * Plays the iconic waka munch sound when eating small fruits/dots with a small frame debounce to prevent audio clipping.
+   * Alternates back and forth between pac-man_eat_fruits.mp3 and pac-man_eat_fruits2.mp3.
    */
   _playWakaSfx() {
     if (this._wakaSoundDebounce <= 0) {
-      this._playSfx('eatDot');
-      this._wakaSoundDebounce = 6;
+      const soundKey = this._wakaSoundToggle ? 'eatDot2' : 'eatDot';
+      this._playSfx(soundKey);
+      this._wakaSoundToggle = !this._wakaSoundToggle;
+      this._wakaSoundDebounce = 5;
     }
+  }
+
+  /**
+   * Dedicated small fruit eating SFX helper, alternating back and forth between the two munch audio tones.
+   */
+  _playSmallFruitSfx() {
+    this._playWakaSfx();
   }
 
   /**

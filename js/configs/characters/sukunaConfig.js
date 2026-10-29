@@ -5,13 +5,14 @@ export const sukunaConfig = {
   grade: 'SSR',                 // Fighter Grade: 'B' | 'A' | 'S' | 'SS' (cosmetic — see js/configs/gradeConfig.js)
   assets: {
     hair: 'Assets/model/sukuna/Sukuna-hair.png',
+    hairBlack: 'Assets/model/sukuna/Sukuna-hair-black.png',
     shrine: 'Assets/model/sukuna/sukuna-shrine.png',
     fugaTravel: 'Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-b.png',
     fugaExplosion: 'Assets/model/sukuna/Fuga_explosion/Fuga_explosion-b.png',
   },
 
     name: 'Sukuna',
-    displayName: 'Sukuna',
+    displayName: 'Meguna',
     // ── Base Attributes ──
     hp: 200,
     speed: 5.8,
@@ -43,17 +44,17 @@ export const sukunaConfig = {
     // Stacking Slash Crit Passive
     enableCritPassive: true,          // Master toggle for Stacking Slash Crit Passive
     baseCritChance: 0.01,             // 10% base crit chance
-    baseCritMultiplier: 1.00,         // 1.50x base crit damage multiplier
+    baseCritMultiplier: 0.50,         // 1.50x base crit damage multiplier
     critChancePerSlashHit: 0.01 ,      // +2% crit chance per landed slash hit
     critMultiplierPerSlashHit: 0.01,  // +0.05x crit multiplier per landed slash hit
     maxCritChance: 0.50,              // 80% max crit chance cap
-    maxCritMultiplier: 1.50,          // 3.50x max crit damage multiplier cap
+    maxCritMultiplier: 1.00,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
     enableRCT: true,                  // Master toggle for Reverse Cursed Technique (Passive)
     reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 25% or below
     reverseCursedTechniqueHealAmount: 0.50,   // % of Max HP healed per RCT trigger (0.50 = 50% Max HP)
-    reverseCursedTechniqueCooldown: 1500,      // 20 second cooldown before it can trigger again
+    reverseCursedTechniqueCooldown: 1000,      // 20 second cooldown before it can trigger again
     rctRevivalHealAmount: 0.50,               // % of Max HP restored on emergency revival (0.50 = 50% Max HP)
 
     // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
@@ -135,9 +136,9 @@ export const sukunaConfig = {
     // ── OPTIONAL SKILL: Ten Shadows — Summon Mahoraga (Divine General Minion) ──
     // Sukuna summons the Divine General Mahoraga as a temporary allied minion.
     // Toggle `enableMahoragaSummon` off to disable the skill entirely (HUD card disappears too).
-    enableMahoragaSummon: 0,       // MASTER TOGGLE for the Mahoraga summon skill
-    mahoragaSummonCooldown: 500,     // Frames before Mahoraga can be re-summoned after being slain
-    mahoragaSummonInitialCooldown: 15, // Immediate opening summon (0.25s after match start) so it triggers every match
+    enableMahoragaSummon: 1,       // MASTER TOGGLE for the Mahoraga summon skill
+    mahoragaSummonCooldown: 2500,     // Frames before Mahoraga can be re-summoned after being slain
+    mahoragaSummonInitialCooldown: 3000, // Immediate opening summon (0.25s after match start) so it triggers every match
     // NOTE: the summon has NO duration — Mahoraga stays in the arena until he is slain or Sukuna dies.
     mahoragaSummonMaxActive: 1,       // Maximum simultaneous Mahoraga minions
     // The minion inherits ALL of Mahoraga's fighter attributes 1:1 (see CONFIG.mahoraga):
@@ -173,7 +174,7 @@ export const sukunaConfig = {
       domainExpansion: 'Assets/Sound Effects/Skills/shrine.mp3',
       domainDeploy: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
       spiderweb: 'Assets/Sound Effects/Skills/hookchain.mp3',
-      mahoragaSummon: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
+      mahoragaSummon: 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3',
       mahoragaArise: 'Assets/Sound Effects/Skills/mahoraga-wheelclick.mp3',
       mahoragaChainRattle: 'Assets/Sound Effects/Skills/hookchain.mp3',
       mahoragaChainBreak: 'Assets/Sound Effects/SkillEffects/shield-break.mp3',
@@ -201,7 +202,7 @@ export const sukunaConfig = {
       domainExpansion: 2.75,
       domainDeploy: 2.55,
       spiderweb: 0.40,
-      mahoragaSummon: 1.60,
+      mahoragaSummon: 2.20,
       mahoragaArise: 1.40,
       mahoragaChainRattle: 0.90,
       mahoragaChainBreak: 1.35,

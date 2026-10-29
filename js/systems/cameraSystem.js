@@ -238,8 +238,10 @@ export function updateCamera() {
 
   const isPrimaryCombatant = (f) => Boolean(
     f &&
-    !f.isDead &&
-    (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0)) &&
+    (
+      (!f.isDead && (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0))) ||
+      ((f.characterId === 'sukuna' || f.type === 'sukuna') && f.mahoragaMinion && f.mahoragaMinion.hp > 0 && !f.mahoragaMinion.isDead && !f.mahoragaMinion.dead)
+    ) &&
     !f.isIllusion &&
     !f.isTurret &&
     !f.isMinion &&
@@ -258,6 +260,13 @@ export function updateCamera() {
     if (f && (f.characterId === 'ash' || f.type === 'ash' || (f._def && (f._def.id === 'ash' || f._def.type === 'ash')))) {
       if (f.activePokemon && f.activePokemon.hp > 0 && !f.activePokemon.isDead && !f.activePokemon.dead) {
         return f.activePokemon;
+      }
+    }
+    if (f && (f.characterId === 'sukuna' || f.type === 'sukuna' || (f._def && (f._def.id === 'sukuna' || f._def.type === 'sukuna')))) {
+      if (f.mahoragaMinion && f.mahoragaMinion.hp > 0 && !f.mahoragaMinion.isDead && !f.mahoragaMinion.dead) {
+        if (f.hp <= 0 || f.isDead || f.dead) {
+          return f.mahoragaMinion;
+        }
       }
     }
     return f;

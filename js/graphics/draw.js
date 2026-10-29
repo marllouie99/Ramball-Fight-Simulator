@@ -68,7 +68,7 @@ export { drawUlquiorraMurcielago, drawLanzaDelRelampago, drawUlquiorraSlashArc }
 export { drawYutaSkin, drawYutaGhostSkin, drawYutaPixelBody, _drawYutaHair, _getYutaHairImage } from './fighters/yutaSkin.js';
 export { drawYujiSkin, drawYujiGhostSkin, drawYujiPixelBody, _drawYujiHair, _getYujiHairImage } from './fighters/yujiSkin.js';
 export { drawTodoSkin, drawTodoPixelBody, _drawTodoHair, _getTodoHairImage } from './fighters/todoSkin.js';
-export { drawSukunaBody, drawSukunaPixelBody, _drawSukunaHair, _getSukunaHairImage } from './fighters/sukunaSkin.js';
+export { drawSukunaBody, drawSukunaPixelBody, _drawSukunaHair, _getSukunaHairImage, _getSukunaBlackHairImage } from './fighters/sukunaSkin.js';
 export { drawGojoBody, drawGojoPixelBody, _drawGojoHair, _getGojoHairImage } from './fighters/gojoSkin.js';
 export { drawEngineerSkin } from './fighters/engineerSkin.js';
 export { drawTanjiroSkin } from './fighters/tanjiroSkin.js';

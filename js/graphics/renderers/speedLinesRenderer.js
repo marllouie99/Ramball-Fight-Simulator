@@ -330,9 +330,23 @@ function _initMahoragaSpeedLineSeeds() {
 }
 
 export function drawMahoragaSpeedLines() {
-  if (!state.fighters) return;
-  const mahoraga = state.fighters.find(f => {
-    if (!f || f.hp <= 0 || (f.characterId !== 'mahoraga' && f.type !== 'mahoraga')) return false;
+  if (typeof state === 'undefined') return;
+  const allMahoragas = [];
+  if (Array.isArray(state.fighters)) {
+    for (const f of state.fighters) {
+      if (f && f.hp > 0 && (f.characterId === 'mahoraga' || f.type === 'mahoraga')) allMahoragas.push(f);
+      if (f?.mahoragaMinion && f.mahoragaMinion.hp > 0 && !allMahoragas.includes(f.mahoragaMinion)) allMahoragas.push(f.mahoragaMinion);
+    }
+  }
+  if (Array.isArray(state.illusions)) {
+    for (const ill of state.illusions) {
+      if (ill && ill.hp > 0 && (ill.isMahoragaSummon || ill.characterId === 'mahoraga' || ill.type === 'mahoraga')) {
+        if (!allMahoragas.includes(ill)) allMahoragas.push(ill);
+      }
+    }
+  }
+
+  const mahoraga = allMahoragas.find(f => {
     const isSuppressed = typeof f.areAttackEffectsSuppressed === 'function' ? f.areAttackEffectsSuppressed() : isSuppressedByGetsuga(f);
     if (isSuppressed) return false;
     // Draw speed lines during: Wall Slam Dash, Strike, AND the Wall Slam Execution Blitz Flurry only

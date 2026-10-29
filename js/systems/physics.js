@@ -126,6 +126,14 @@ export function isFighterEffectivelyAlive(fighter) {
   if (isMahitoEvading) {
     return state.illusions && state.illusions.some(ill => ill && ill.owner === fighter && ill.isEvasionMinion && ill.hp > 0);
   }
+  const isSukuna = fighter.characterId === 'sukuna' || fighter.type === 'sukuna' || fighter._def?.type === 'sukuna';
+  if (isSukuna) {
+    const hasLiveMahoraga = Boolean(
+      (fighter.mahoragaMinion && fighter.mahoragaMinion.hp > 0 && !fighter.mahoragaMinion.isDead && !fighter.mahoragaMinion.dead) ||
+      (state.illusions && state.illusions.some(ill => ill && ill.owner === fighter && ill.isMahoragaSummon && ill.hp > 0 && !ill.isDead && !ill.dead))
+    );
+    if (hasLiveMahoraga) return true;
+  }
   const isMakima = (fighter.characterId === 'makima' || fighter.type === 'makima');
   if (isMakima) {
     if (fighter.isRevivingFromContract || fighter.isShatterReviving) {
@@ -721,7 +729,7 @@ export function getClosestOpponent(fighter) {
   // Check regular fighters (Pure FOC targeting without obstacle overhead)
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
-    const isOtherAlive = other && (other.hp > 0 || other.isRevivingFromContract || other.isShatterReviving || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(other)));
+    const isOtherAlive = other && (other.hp > 0 || other.isRevivingFromContract || other.isShatterReviving);
     if (!other || other === fighter || !isOtherAlive) continue;
     if (other.isLawnmower || other.isUntargetable || other.untargetable || other.cannotBeTargeted || other.isTargetable === false) continue;
     if (fighter.isTeammate(other)) continue;
@@ -761,7 +769,7 @@ export function getClosestOpponent(fighter) {
     for (let i = 0; i < state.illusions.length; i++) {
       const illusion = state.illusions[i];
       if (!illusion || illusion.hp <= 0 || (illusion.vanishTimer && illusion.vanishTimer > 0) || illusion.isLawnmower || illusion.isUntargetable || illusion.untargetable || illusion.cannotBeTargeted || illusion.isTargetable === false) continue;
-      if (typeof illusion.isValidAimTarget === 'function' && !illusion.isValidAimTarget()) continue;
+      if (typeof fighter.isValidAimTarget === 'function' && !fighter.isValidAimTarget(illusion)) continue;
       if (fighter.isTeammate(illusion)) continue;
       if (!fighter.isChainedByMakima && !illusion.isChainedByMakima && illusion.owner === fighter) continue;
       if (!fighter.isChainedByMakima && !illusion.isChainedByMakima && isTeamMode && fighterTeam !== null && illusion.owner) {
@@ -1188,6 +1196,10 @@ export function updateFighters() {
         if (typeof fighter.updateDeployedObjects === 'function') {
           fighter.updateDeployedObjects(state.arena);
         }
+        // Update surviving autonomous summons/minions even if owner is dead
+        if (typeof fighter.updateAutonomousMinions === 'function') {
+          fighter.updateAutonomousMinions(fi, state.arena);
+        }
         // If fighter is paralyzed by Mahito's Soul Disfigurement, let shivering finish and explode before match ends!
         if (fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
           if (fighter.paralyzeTimer % 3 === 0 && typeof spawnMahitoSoulBubbles === 'function') {
@@ -1278,7 +1290,7 @@ export function updateFighters() {
       // Post-Kill / Round End / Match End Continuous Movement:
       // If the round or match has ended (or all opponents are dead), ensure the living winner smoothly coasts!
       const isFinishingAbility = Boolean(fighter && typeof fighter.hasActiveFinishingAbility === 'function' && fighter.hasActiveFinishingAbility());
-      const hasLivingEnemies = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== fighter && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving) && (!fighter.isTeammate || !fighter.isTeammate(f)));
+      const hasLivingEnemies = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== fighter && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(f))) && (!fighter.isTeammate || !fighter.isTeammate(f)));
       const isRoundOrMatchOver = (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || !hasLivingEnemies);
       if (isRoundOrMatchOver && fighter.hp > 0 && !state._isChampionLayoutActive && !isFinishingAbility) {
         // Clear stationary strike locks / melee stasis / channel freezes

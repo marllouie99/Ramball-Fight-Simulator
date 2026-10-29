@@ -1630,6 +1630,69 @@ export function drawGenosUltimateArenaOverlay() {
   state.globalDimEdgeColor = `rgba(5, 1, 0, ${(opacity * 0.98).toFixed(3)})`;
 }
 
+/**
+ * Resolves the active Mahoraga entity in the arena, checking:
+ * 1. Primary fighters (state.fighters)
+ * 2. Minions / summons in state.illusions (including Sukuna's Mahoraga)
+ * 3. Minions bound to fighters (e.g. fighter.mahoragaMinion)
+ * 4. Preview / studio fighter (state.previewFighter)
+ * Prioritizes any Mahoraga currently in a wheel click / adaptation pause,
+ * followed by living Mahoragas.
+ */
+export function getActiveMahoragaEntity() {
+  if (typeof state === 'undefined') return null;
+
+  const candidates = [];
+
+  // Check state.fighters
+  if (Array.isArray(state.fighters)) {
+    for (const f of state.fighters) {
+      if (!f) continue;
+      if (f.characterId === 'mahoraga' || f.type === 'mahoraga' || f._def?.id === 'mahoraga' || f._def?.type === 'mahoraga') {
+        candidates.push(f);
+      }
+      if (f.mahoragaMinion && !candidates.includes(f.mahoragaMinion)) {
+        candidates.push(f.mahoragaMinion);
+      }
+    }
+  }
+
+  // Check state.illusions (minions / summons)
+  if (Array.isArray(state.illusions)) {
+    for (const ill of state.illusions) {
+      if (!ill) continue;
+      if (ill.isMahoragaSummon || ill.characterId === 'mahoraga' || ill.type === 'mahoraga' || ill._def?.id === 'mahoraga' || ill._def?.type === 'mahoraga') {
+        if (!candidates.includes(ill)) {
+          candidates.push(ill);
+        }
+      }
+    }
+  }
+
+  // Check preview fighter
+  if (state.previewFighter) {
+    const pf = state.previewFighter;
+    if (pf.characterId === 'mahoraga' || pf.type === 'mahoraga' || pf._def?.id === 'mahoraga' || pf._def?.type === 'mahoraga') {
+      if (!candidates.includes(pf)) {
+        candidates.push(pf);
+      }
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  // 1. Prioritize any Mahoraga currently in wheel click or adaptation pause
+  const clicking = candidates.find(m => (m.wheelClickTimer && m.wheelClickTimer > 0) || (m.adaptationPauseTimer && m.adaptationPauseTimer > 0));
+  if (clicking) return clicking;
+
+  // 2. Prioritize any living Mahoraga
+  const alive = candidates.find(m => m.hp > 0 && !m.isDead && !m.dead);
+  if (alive) return alive;
+
+  // 3. Fallback
+  return candidates[0];
+}
+
 let currentMahoragaAdaptationDimOpacity = 0;
 
 /**
@@ -1649,7 +1712,7 @@ export function drawMahoragaAdaptationDimScreen() {
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
-  const mahoraga = state.fighters?.find(f => f && (f.characterId === 'mahoraga' || f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')));
+  const mahoraga = getActiveMahoragaEntity();
   const isClicking = Boolean(mahoraga && ((mahoraga.wheelClickTimer && mahoraga.wheelClickTimer > 0) || (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0)));
 
   let targetOpacity = 0;
@@ -1762,9 +1825,7 @@ export function drawMahoragaWheelArenaOverlay() {
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
-  const mahoraga = (state.fighters?.find(f =>
-    f && (f.characterId === 'mahoraga' || f.type === 'mahoraga' || f._def?.id === 'mahoraga' || f._def?.type === 'mahoraga')
-  )) || (state.previewFighter && (state.previewFighter.characterId === 'mahoraga' || state.previewFighter.type === 'mahoraga') ? state.previewFighter : null);
+  const mahoraga = getActiveMahoragaEntity();
 
   const isClicking = Boolean(mahoraga && ((mahoraga.wheelClickTimer && mahoraga.wheelClickTimer > 0) || (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0)));
 
@@ -2163,13 +2224,15 @@ export function drawMahoragaLevel8DimScreen() {
   if (!ctx || !canvas || !arena) return;
 
   const isPlaying = state.gameState === 'playing';
-  const mahoraga = state.fighters?.find(f => {
-    if (!f || f.hp <= 0) return false;
-    const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
-    return totalStages >= 8 || f.isMaxAdapted || f.isInfinityBlitz || (f.goldStages >= 8);
-  });
+  const mahoraga = getActiveMahoragaEntity();
+  const isLevel8 = Boolean(mahoraga && mahoraga.hp > 0 && (
+    ((mahoraga.adaptationStage?.melee || 0) + (mahoraga.adaptationStage?.ranged || 0) + (mahoraga.adaptationStage?.skill || 0) >= 8) ||
+    mahoraga.isMaxAdapted ||
+    mahoraga.isInfinityBlitz ||
+    (mahoraga.goldStages >= 8)
+  ));
 
-  const shouldDim = isPlaying && !!mahoraga;
+  const shouldDim = isPlaying && isLevel8;
   const targetOpacity = shouldDim ? 1.0 : 0.0;
 
   currentMahoLevel8DimOpacity += (targetOpacity - currentMahoLevel8DimOpacity) * 0.035;
@@ -2182,7 +2245,7 @@ export function drawMahoragaLevel8DimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  const activeMaho = mahoraga || state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')));
+  const activeMaho = mahoraga;
   let sumX = 0, sumY = 0, targetCount = 0;
   let maxTargetDist = 80;
 

@@ -46,10 +46,11 @@ export class SukunaFighter extends Fighter {
     this.divineFlameChargeTimer = 0;
     this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 100;
     this.divineFlameRecoveryTimer = 0;
+    this.enableMahoragaSummon = CONFIG.sukuna?.enableMahoragaSummon ?? 1;
     this.divineFlameCastAngle = 0;
 
     // Domain Expansion: Malevolent Shrine (Ultimate)
-    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000; // Delay initial cast reads from CONFIG
+    this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200; // Delay initial cast reads from CONFIG
     this.domainActive = false;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
@@ -98,17 +99,21 @@ export class SukunaFighter extends Fighter {
         name: 'MALEVOLENT SHRINE',
         type: 'domain',
         cooldownKey: 'domainCooldown',
-        cooldownMax: CONFIG.sukuna?.domainCooldown ?? 1000,
+        cooldownMax: () => (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200,
         durationKey: 'domainTimer',
-        durationMax: CONFIG.sukuna?.domainDuration || 500,
+        durationMax: () => (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainDuration !== undefined) ? CONFIG.sukuna.domainDuration : 500,
         activeKey: 'domainActive',
         channelingKey: 'isChannelingDomainExpansion',
         isDomain: true,
         allowFrozenTick: true,
         allowsFrozenCooldownTick: true,
+        resetCooldownOnExpire: true,
+        canTickCooldown: (fighter) => !fighter.domainActive && (fighter.domainTimer || 0) <= 0,
         onExpire: (fighter) => {
           clearDomainSlashLines(this);
           if (fighter) {
+            fighter.domainActive = false;
+            fighter.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200;
             fighter._hasPlayedDomainChannelSound = false;
             fighter._hasPlayedDomainActivateSound = false;
             fighter._hasFiredFugaInDomain = false;
@@ -157,6 +162,32 @@ export class SukunaFighter extends Fighter {
     this.skillManager.registerSkills(skills);
   }
 
+  /**
+   * Checks whether Sukuna or his summoned Mahoraga minion is still active in combat.
+   * If Sukuna dies while Mahoraga is alive, the match continues until one prevails.
+   */
+  isEffectivelyAlive() {
+    if (this.mahoragaMinion && this.mahoragaMinion.hp > 0 && !this.mahoragaMinion.isDead && !this.mahoragaMinion.dead) {
+      return true;
+    }
+    if (typeof state !== 'undefined' && Array.isArray(state.illusions)) {
+      const hasLiveMahoraga = state.illusions.some(
+        (m) => m && m.isMahoragaSummon && m.owner === this && m.hp > 0 && !m.isDead && !m.dead
+      );
+      if (hasLiveMahoraga) return true;
+    }
+    return super.isEffectivelyAlive();
+  }
+
+  /**
+   * Keeps Mahoraga minion updated and active in combat even if Sukuna is defeated.
+   */
+  updateAutonomousMinions(ownerIndex, arena) {
+    if (this.mahoragaMinion && this.mahoragaMinion.hp > 0 && !this.mahoragaMinion.isDead && !this.mahoragaMinion.dead) {
+      updateMahoragaSummon(this, ownerIndex, arena);
+    }
+  }
+
   isStationarySkillActive() {
     return Boolean(
       this.isChannelingDivineFlame ||
@@ -181,7 +212,10 @@ export class SukunaFighter extends Fighter {
     const isAmbushOrSilence = this.isTargetOfAmbush || ((this.silenceTimer || 0) > 0);
     const isBeamTrapped = this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0);
     const isDead = (this.hp !== undefined && this.hp <= 0) || this.isDead || this.dead;
-    const shouldCancelFuga = isDead || isAmbushOrSilence || isBeamTrapped;
+    const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+    );
+    const shouldCancelFuga = isDead || isAmbushOrSilence || isBeamTrapped || forceCancelAll || isInsideGojoDomain;
     const preserveFuga = !shouldCancelFuga && this.isChannelingDivineFlame;
     const savedChargeTimer = this.divineFlameChargeTimer;
     const savedFugaKey = this.fugaSoundKey;
@@ -291,7 +325,7 @@ export class SukunaFighter extends Fighter {
     this.divineFlameRecoveryTimer = 0;
     this.divineFlameCastAngle = null;
 
-    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000;
+    this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
     this._hasPlayedDomainActivateSound = false;
@@ -594,9 +628,12 @@ export class SukunaFighter extends Fighter {
       }
       if (this.domainTimer <= 0) {
         this.domainActive = false;
+        this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200;
         clearDomainSlashLines(this);
         this._hasFiredFugaInDomain = false;
         this._isFiringDomainFuga = false;
+        this.furnaceChargingEffectTimer = 0;
+        this.furnaceReleaseEffectTimer = 0;
         const normalCd = (CONFIG.sukuna && CONFIG.sukuna.divineFlameCooldown) ? CONFIG.sukuna.divineFlameCooldown : 1500;
         this.divineFlameCooldown = Math.max(this.divineFlameCooldown, normalCd);
       } else {
@@ -888,7 +925,7 @@ export class SukunaFighter extends Fighter {
       if ((this.silenceTimer || 0) > 0) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
-        this.domainCooldown = CONFIG.sukuna?.domainCooldown || 1000;
+        this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200;
         this._hasPlayedDomainChannelSound = false;
         this._hasPlayedDomainActivateSound = false;
         return;
@@ -931,7 +968,10 @@ export class SukunaFighter extends Fighter {
     if (this.domainActive) {
 
 
-      const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
+      const isInsideGojoVoid = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+        f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+      );
+      const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive) || isInsideGojoVoid;
 
       // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine when enemy is in range!
       if (this.isSkillEnabled(CONFIG.sukuna?.enableFurnace, true) && !isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
@@ -973,7 +1013,10 @@ export class SukunaFighter extends Fighter {
       this._checkSpiderwebTrigger(arena);
     }
 
-    const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive);
+    const isInsideGojoVoid = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+    );
+    const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && opponent.ultimateActive) || isInsideGojoVoid;
 
     // Check for Divine Flame (Skill 2 - disabled in demo mode)
     if (this.isSkillEnabled(CONFIG.sukuna?.enableFurnace, true) && !this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
@@ -1200,7 +1243,7 @@ export class SukunaFighter extends Fighter {
     this.domainActivationTime = Date.now();
     this.domainUseCount++;
     this.domainTimer = CONFIG.sukuna.domainDuration || 500;
-    this.domainCooldown = CONFIG.sukuna.domainCooldown || 1000;
+    this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200;
     this.rapidSlashTimer = 0; // Ready for first slash immediately upon domain opening!
 
     // Position closer to the center of the arena so the top of the shrine isn't clipped

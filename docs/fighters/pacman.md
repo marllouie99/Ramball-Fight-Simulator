@@ -84,8 +84,11 @@ Pac-Man's body model is rendered in `js/graphics/fighters/pacmanSkin.js` adherin
 ## 🔊 Audio SFX Architecture
 
 All sound assets are located in `Assets/Sound Effects/PacmanSFX/`:
-- `waka.wav`: Retro dual-tone rhythmic munch sound played while clearing standard pellets.
-- `power_pellet.wav`: Pulsing arcade energizer siren triggered upon collecting corner power pellets or entering Super Chomp Mode.
+- `pac-man_eat_fruits.mp3` & `pac-man_eat_fruits2.mp3`: Iconic dual-tone retro munch sounds played alternating back and forth when consuming small fruits/dots.
+- `PAC-MAN - Eating The Big Fruit.mp3`: Energizer big fruit sound triggered upon eating power pellets or entering Super Chomp Mode.
+- `Ghost - Turn to Blue.mp3`: Retro siren sound played when opposing fighters transform into frightened ghosts.
+- `PAC-MAN - Eating The Ghost.mp3`: Chomp sound played when swallowing a frightened ghost opponent.
+- `pac-man-death-sound.mp3`: Dedicated retro arcade defeat sound triggered on Pac-Man elimination (with standard `faah.mp3` suppressed).
 - `chomp.wav`: Heavy, crunchy cartoon chomp SFX triggered upon biting an enemy.
 - `refill.wav`: Melodic ascending arpeggio chime played when arena dots are replenished.
 

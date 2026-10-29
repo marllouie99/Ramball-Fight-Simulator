@@ -210,6 +210,9 @@ export function drawSukunaPixelBody(ctx, r, fighter = null) {
 
 let _sukunaHairImage = null;
 let _sukunaHairImageLoading = false;
+let _sukunaBlackHairImage = null;
+let _sukunaBlackHairImageLoading = false;
+let _cachedSukunaBlackHairCanvas = null;
 
 export function _getSukunaHairImage() {
   if (_sukunaHairImage && _sukunaHairImage.complete && _sukunaHairImage.naturalWidth > 0) {
@@ -232,19 +235,120 @@ export function _getSukunaHairImage() {
   return _sukunaHairImage;
 }
 
+export function _getSukunaBlackHairImage() {
+  if (_sukunaBlackHairImage && _sukunaBlackHairImage.complete && _sukunaBlackHairImage.naturalWidth > 0) {
+    return _sukunaBlackHairImage;
+  }
+  if (!_sukunaBlackHairImageLoading && typeof Image !== 'undefined') {
+    _sukunaBlackHairImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _sukunaBlackHairImage = img;
+      _sukunaBlackHairImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Sukuna black hair image at Assets/model/sukuna/Sukuna-hair-black.png', e);
+      _sukunaBlackHairImageLoading = false;
+    };
+    img.src = 'Assets/model/sukuna/Sukuna-hair-black.png?v=1';
+    _sukunaBlackHairImage = img;
+  }
+  return _sukunaBlackHairImage;
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getSukunaHairImage();
+  _getSukunaBlackHairImage();
 }
 
 /**
- * Draws Sukuna's authentic pixel-art spiky hair from Assets/model/sukuna/Sukuna-hair.png.
+ * Creates dynamic in-memory offscreen black hair canvas as instant fallback if image is loading.
+ */
+function _getOrCreateBlackHairCanvas(pinkImg) {
+  if (_cachedSukunaBlackHairCanvas) return _cachedSukunaBlackHairCanvas;
+  if (!pinkImg || !pinkImg.complete || pinkImg.naturalWidth <= 0 || typeof document === 'undefined') return null;
+
+  try {
+    const w = pinkImg.naturalWidth || pinkImg.width || 500;
+    const h = pinkImg.naturalHeight || pinkImg.height || 500;
+    const c = document.createElement('canvas');
+    c.width = w;
+    c.height = h;
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(pinkImg, 0, 0);
+    const imgData = cx.getImageData(0, 0, w, h);
+    const d = imgData.data;
+
+    const PALETTE = [
+      { t: 0.00, rgb: [14, 15, 20] },    // #0E0F14 Outline
+      { t: 0.20, rgb: [18, 20, 28] },    // Deep crease
+      { t: 0.45, rgb: [26, 29, 40] },    // Base hair shadow
+      { t: 0.70, rgb: [36, 41, 56] },    // Main hair body
+      { t: 0.88, rgb: [50, 58, 78] },    // Subtle blue-black sheen
+      { t: 1.00, rgb: [68, 78, 104] }    // Specular tip highlight
+    ];
+
+    function lerp(a, b, f) { return Math.round(a + (b - a) * f); }
+
+    for (let i = 0; i < d.length; i += 4) {
+      const a = d[i + 3];
+      if (a > 5) {
+        const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+        const t = Math.max(0, Math.min(1, (lum - 12) / (205 - 12)));
+        for (let p = 0; p < PALETTE.length - 1; p++) {
+          const p1 = PALETTE[p], p2 = PALETTE[p + 1];
+          if (t >= p1.t && t <= p2.t) {
+            const frac = (t - p1.t) / (p2.t - p1.t);
+            d[i] = lerp(p1.rgb[0], p2.rgb[0], frac);
+            d[i + 1] = lerp(p1.rgb[1], p2.rgb[1], frac);
+            d[i + 2] = lerp(p1.rgb[2], p2.rgb[2], frac);
+            break;
+          }
+        }
+      }
+    }
+    cx.putImageData(imgData, 0, 0);
+    _cachedSukunaBlackHairCanvas = c;
+    return _cachedSukunaBlackHairCanvas;
+  } catch (err) {
+    return null;
+  }
+}
+
+/**
+ * Draws Sukuna's authentic pixel-art spiky hair.
+ * When Ten Shadows / Mahoraga summon is enabled, draws Megumi Sukuna's signature black hair.
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} r - Character body radius
  * @param {boolean} [facingLeft=false]
+ * @param {boolean|object} [blackHairOrFighter=false]
  */
-export function _drawSukunaHair(ctx, r, facingLeft = false) {
-  const hairImg = _getSukunaHairImage();
-  if (hairImg && hairImg.complete && hairImg.naturalWidth > 0) {
+export function _drawSukunaHair(ctx, r, facingLeft = false, blackHairOrFighter = false) {
+  let isBlackHair = false;
+  if (typeof blackHairOrFighter === 'boolean') {
+    isBlackHair = blackHairOrFighter;
+  } else {
+    const f = (blackHairOrFighter && typeof blackHairOrFighter === 'object') ? blackHairOrFighter : null;
+    const cfgVal = typeof CONFIG !== 'undefined' ? CONFIG.sukuna?.enableMahoragaSummon : undefined;
+    const fVal = f ? (f.enableMahoragaSummon !== undefined ? f.enableMahoragaSummon : f.isMahoragaSummonEnabled) : undefined;
+    const val = fVal !== undefined ? fVal : cfgVal;
+    isBlackHair = Boolean(val !== false && val !== 0 && val !== 'false' && val !== '0' && val !== undefined);
+  }
+
+  let hairImg = _getSukunaHairImage();
+  if (isBlackHair) {
+    const blackImg = _getSukunaBlackHairImage();
+    if (blackImg && blackImg.complete && blackImg.naturalWidth > 0) {
+      hairImg = blackImg;
+    } else {
+      const blackCanvas = _getOrCreateBlackHairCanvas(hairImg);
+      if (blackCanvas) {
+        hairImg = blackCanvas;
+      }
+    }
+  }
+
+  if (hairImg && (hairImg.complete || (typeof HTMLCanvasElement !== 'undefined' && hairImg instanceof HTMLCanvasElement)) && ((hairImg.naturalWidth && hairImg.naturalWidth > 0) || hairImg.width > 0)) {
     ctx.save();
     ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for crisp pixel art fidelity (Rule #19)
 
@@ -325,8 +429,8 @@ export function drawSukunaBody(ctx, fighter) {
   // 1. Procedural Pixel Art Body with Stepped Outer Black Stroke
   drawSukunaPixelBody(ctx, r, fighter);
 
-  // 2. Authentic Pixel-Art Spiky Hair (Assets/model/sukuna/Sukuna-hair.png)
-  _drawSukunaHair(ctx, r, facingLeft);
+  // 2. Authentic Pixel-Art Spiky Hair (Black when Ten Shadows / Mahoraga summon is enabled, otherwise Pink)
+  _drawSukunaHair(ctx, r, facingLeft, fighter);
 
   // 3. Status Overlays
   if (typeof fighter.drawStatusOverlays === 'function') {

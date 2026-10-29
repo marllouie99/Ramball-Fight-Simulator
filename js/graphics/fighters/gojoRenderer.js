@@ -1195,10 +1195,18 @@ export class GojoRenderer {
           fighter._hasPlayedRedFlareSound = true;
           triggerGlobalScreenShake(8, 12); // Pre-detonation flare tremor
           const fId = fighter.characterId || fighter.id || fighter._def?.id;
-          const sDep = getSkillSound(fId, 'red_flare') || getSkillSound(fId, 'red_deploy');
-          const flareSrc = sDep?.src || CONFIG.gojo?.sounds?.redFlare || 'Assets/Sound Effects/SkillEffects/flare.mp3';
-          const flareVol = sDep?.volume ?? (CONFIG.gojo?.soundVolumes?.redFlare ?? 0.85);
+          const sFlare = getSkillSound(fId, 'red_flare');
+          const flareSrc = sFlare?.src || CONFIG.gojo?.sounds?.redFlare || 'Assets/Sound Effects/SkillEffects/flare.mp3';
+          const flareVol = sFlare?.volume ?? (CONFIG.gojo?.soundVolumes?.redFlare ?? 0.85);
           audioSystem.playSFX(flareSrc, flareVol);
+        }
+        if (!fighter._hasPlayedRedDeploySound) {
+          fighter._hasPlayedRedDeploySound = true;
+          const fId = fighter.characterId || fighter.id || fighter._def?.id;
+          const sDeploy = getSkillSound(fId, 'red_deploy');
+          const deploySrc = sDeploy?.src || CONFIG.gojo?.sounds?.redDeploy || 'Assets/Sound Effects/Skills/reddeploy.mp3';
+          const deployVol = sDeploy?.volume ?? (CONFIG.gojo?.soundVolumes?.redDeploy ?? 2.5);
+          fighter._redDeploySoundHandle = audioSystem.playSFX(deploySrc, deployVol);
         }
       }
     }

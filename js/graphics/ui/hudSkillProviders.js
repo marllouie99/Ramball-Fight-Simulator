@@ -270,19 +270,20 @@ export const HUD_SKILL_PROVIDERS = {
 
     // 1. Unlimited Void (uv)
     if (isSkillEnabled(cfg.enableDomain, true)) {
-      const domainMax = cfg.domainCooldown || 2000;
+      const domainMax = cfg.domainCooldown || 1200;
       const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
       let domainPct;
       if (f.isChannelingDomainExpansion) {
         domainPct = 100;
       } else if (f.domainActive) {
-        const domainDuration = cfg.domainDuration || 400;
+        const domainDuration = cfg.domainDuration || 300;
         const remaining = f.domainTimer || 0;
         domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
       } else {
         domainPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
       }
-      skills.push({ id: 'uv', pct: domainPct, ready: domainPct >= 99, color: themeColor, label: 'UNLIMITED VOID' });
+      const isDomainReady = domainPct >= 99 && !f.domainActive && !f.isChannelingDomainExpansion && (f.domainCooldown || 0) <= 0;
+      skills.push({ id: 'uv', pct: domainPct, ready: isDomainReady, color: themeColor, label: 'UNLIMITED VOID' });
     }
 
     // 2. Hollow Purple (purple)
@@ -398,7 +399,7 @@ export const HUD_SKILL_PROVIDERS = {
 
     // 1. Malevolent Shrine (ms)
     if (isSkillEnabled(cfg.enableDomain, true)) {
-      const domainMax = cfg.domainCooldown || 1000;
+      const domainMax = cfg.domainCooldown || 1200;
       const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
       let domainPct;
       if (f.isChannelingDomainExpansion) {
@@ -410,7 +411,8 @@ export const HUD_SKILL_PROVIDERS = {
       } else {
         domainPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
       }
-      skills.push({ id: 'ms', pct: domainPct, ready: domainPct >= 99, color: themeColor, label: 'MALEVOLENT SHRINE' });
+      const isDomainReady = domainPct >= 99 && !f.domainActive && !f.isChannelingDomainExpansion && (f.domainCooldown || 0) <= 0;
+      skills.push({ id: 'ms', pct: domainPct, ready: isDomainReady, color: themeColor, label: 'MALEVOLENT SHRINE' });
     }
 
     // 2. Fuga / Furnace (fuga)

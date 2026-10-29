@@ -49,6 +49,7 @@ export class Skill {
     this.onFrozenTick = def.onFrozenTick || null;
     this.canCast = def.canCast || null;
     this.canTickCooldown = def.canTickCooldown || null;
+    this.resetCooldownOnExpire = Boolean(def.resetCooldownOnExpire);
     this._isChannelingFn = typeof def.isChanneling === 'function' ? def.isChanneling : null;
     this.canTickDuration = def.canTickDuration || null;
     this.getHudData = def.getHudData || null;
@@ -298,13 +299,20 @@ export class SkillManager {
       ? (CONFIG.blackFlash?.zone?.cooldownDecayMultiplier ?? 1.20)
       : 1.0;
 
+    const hasActiveDomain = Boolean(this.fighter.domainActive || this.fighter.stolenDomainActive || this.fighter._mahitoDomainActive || this.fighter.isDomainActive);
+
     // 1. Tick all explicitly registered skills
     for (const skill of this.skills.values()) {
-      if (isFrozen && !skill.canTickCooldownInFreeze) continue;
-      if (isParalyzed && !skill.bypassParalyze) continue;
+      if (isFrozen && !skill.canTickCooldownInFreeze && !hasActiveDomain) continue;
+      if (isParalyzed && !skill.bypassParalyze && !hasActiveDomain) continue;
       if (isSilenced && !skill.isImmuneToSilence) continue;
-      // Do not tick cooldown while the skill is actively channeling / charging
+      // Do not tick cooldown while the skill is actively channeling / charging or if canTickCooldown forbids it
       if (skill.isChanneling()) continue;
+      if (typeof skill.canTickCooldown === 'function' && !skill.canTickCooldown(this.fighter, skill)) continue;
+      if (skill._expiredThisTick) {
+        skill._expiredThisTick = false;
+        continue;
+      }
 
       if (skill.cooldownKey) {
         const curCd = skill.getCooldown();
@@ -316,7 +324,7 @@ export class SkillManager {
     }
 
     // 2. Dynamic discovery for legacy unregistered cooldown keys on fighter instance (100% backward compatibility)
-    if (!isParalyzed && !isSilenced) {
+    if ((!isParalyzed && !isSilenced) || hasActiveDomain) {
       for (const key in this.fighter) {
         if (this.cooldownKeyMap.has(key)) continue; // Already processed above
         if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer') || key.endsWith('CD') || key === 'shootCooldown' || key === 'attackCooldown' || key === 'meleeCooldown') {
@@ -361,6 +369,13 @@ export class SkillManager {
             if (typeof skill.onExpire === 'function') {
               skill.onExpire(this.fighter, skill);
             }
+            if (skill.resetCooldownOnExpire && skill.cooldownKey) {
+              const maxCd = skill.getMaxCooldown();
+              if (maxCd > 0) {
+                skill.setCooldown(maxCd);
+              }
+            }
+            skill._expiredThisTick = true;
             skill.setActive(false);
           }
         }

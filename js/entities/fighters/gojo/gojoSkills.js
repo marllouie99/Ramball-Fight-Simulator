@@ -41,6 +41,7 @@ export function activateRed(fighter) {
   fighter.redDetonated = false;
   fighter._hasPlayedRedFlareSound = false;
   fighter._hasPlayedRedChannelingSound = false;
+  fighter._hasPlayedRedDeploySound = false;
 
   // Prevent simultaneous attacks during the buildup & blast
   fighter.shootCooldown = fighter.shootCooldownMax || 40;
@@ -136,6 +137,7 @@ export function stopGojoRedAudio(fighter) {
   if (!fighter) return;
   fighter._hasPlayedRedChannelingSound = false;
   fighter._hasPlayedRedFlareSound = false;
+  fighter._hasPlayedRedDeploySound = false;
 
   // Immediately cut and stop all Red audio handles
   if (fighter._redChannelingSoundHandle) {
@@ -145,6 +147,10 @@ export function stopGojoRedAudio(fighter) {
   if (fighter._redChargingSoundHandle) {
     stopSound(fighter._redChargingSoundHandle);
     fighter._redChargingSoundHandle = null;
+  }
+  if (fighter._redDeploySoundHandle) {
+    stopSound(fighter._redDeploySoundHandle);
+    fighter._redDeploySoundHandle = null;
   }
   if (fighter._redBlastSoundHandle) {
     stopSound(fighter._redBlastSoundHandle);
@@ -196,6 +202,15 @@ export function detonateRed(fighter) {
   stopSoundBySrc('redcharging');
   fadeOutSoundBySrc('redchanneling', 50);
   fadeOutSoundBySrc('redcharging', 50);
+
+  if (!fighter._hasPlayedRedDeploySound) {
+    fighter._hasPlayedRedDeploySound = true;
+    const fId = fighter.characterId || fighter.id || fighter._def?.id;
+    const sDeploy = getSkillSound(fId, 'red_deploy');
+    const deploySrc = sDeploy?.src || CONFIG.gojo?.sounds?.redDeploy || 'Assets/Sound Effects/Skills/reddeploy.mp3';
+    const deployVol = sDeploy?.volume ?? (CONFIG.gojo?.soundVolumes?.redDeploy ?? 2.5);
+    fighter._redDeploySoundHandle = audioSystem.playSFX(deploySrc, deployVol);
+  }
 
   // Detonate Red strictly at current facing gunAngle, no instant snapping recalculation to target
   let pushAngle;

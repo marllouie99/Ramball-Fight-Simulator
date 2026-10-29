@@ -808,9 +808,10 @@ export class MahoragaFighter extends Fighter {
           this.knockbackStunTimer = 0;
           this.swordCooldown = 0;
 
-          // Apply high-speed physical forward dash surge directly toward the target
+          // Apply physical forward dash surge directly toward the target with bounded ceiling
           const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed || 6.5;
-          const dashSpeed = Math.max(currentSpeed * 1.5, (this.speed || 6.5) * 2.2, 16.0);
+          const maxReboundSpeed = Math.max(22.0, (this.speed || 6.5) * 2.5);
+          const dashSpeed = Math.min(maxReboundSpeed, Math.max(currentSpeed * 1.5, (this.speed || 6.5) * 2.2, 16.0));
           this.vx = (dx / dist) * dashSpeed;
           this.vy = (dy / dist) * dashSpeed;
           this.isWallReboundDashing = true;

@@ -7,6 +7,7 @@ import { renderMahitoDomainBackground, renderCjBaguvixBackground } from './envir
 import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
 import { drawCronosSphereVisual } from '../draw.js';
 import { isTodoTakadaOverlayActive } from './specialOverlayRenderer.js';
+import { getActiveMahoragaEntity } from './domainDimOverlays.js';
 import { syncPixiCanvasTextureSize } from '../../core/viewportManager.js';
 
 let furnaceDimSprite = null;
@@ -940,9 +941,10 @@ export function updateHybridEnvironment() {
   }
   
   // 3. Mahoraga
-  const mahoraga = state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0));
+  const mahoraga = getActiveMahoragaEntity();
+  const isClickingMaho = Boolean(mahoraga && ((mahoraga.wheelClickTimer && mahoraga.wheelClickTimer > 0) || (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0)));
   let opacityMaho = 0, cxMaho = state.canvas.width / 2, cyMaho = state.canvas.height / 2;
-  if (mahoraga && CONFIG.mahoraga?.enableGoldenScreenDim !== false) {
+  if (isClickingMaho && CONFIG.mahoraga?.enableGoldenScreenDim !== false) {
     const timer = (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0) ? mahoraga.adaptationPauseTimer : mahoraga.wheelClickTimer;
     const clickMax = mahoraga.adaptationPauseMax || mahoraga.wheelClickMax || CONFIG.mahoraga?.wheelClickDuration || 25;
     const rawProgress = (clickMax - timer) / clickMax;

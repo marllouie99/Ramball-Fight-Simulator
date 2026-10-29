@@ -519,6 +519,12 @@ export class MahitoFighter extends Fighter {
       this.isWallSlammed = false;
     }
 
+    // Self-Embodiment of Perfection Domain Progression & Cooldown:
+    // When Domain is active, domainTimer MUST tick down every frame and drain naturally even if Mahito is stunned, paralyzed, or frozen!
+    if (this.domainActive) {
+      updateMahitoDomainExpansion(this);
+    }
+
     // ── 1. RULE #1: Freeze / TimeStop Early Exit Guard ──
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -530,9 +536,9 @@ export class MahitoFighter extends Fighter {
       return;
     }
 
-    // Self-Embodiment of Perfection Domain Progression & Cooldown:
-    // When Domain is active, domainTimer MUST tick down every frame and drain naturally even if Mahito is stunned, paralyzed, or frozen!
-    updateMahitoDomainExpansion(this);
+    if (!this.domainActive) {
+      updateMahitoDomainExpansion(this);
+    }
 
     // Domain Cooldown Exception: domainCooldown MUST ALWAYS tick down every frame when not active
     if (this.domainCooldown > 0 && !this.domainActive && (this.domainChargeTimer || 0) <= 0) {

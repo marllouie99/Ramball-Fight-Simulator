@@ -134,7 +134,7 @@ export const gojoConfig = {
   purple200DimOpacity: 0.98,        // Opacity of the full-screen dim effect during 200% Hollow Purple
   // 200% Empowered Second Cast Mechanics
   enablePurpleSecondCastBoost: true,        // Enable 200% damage boost on 2nd Hollow Purple cast
-  purpleSecondCastDamageMultiplier: 2.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
+  purpleSecondCastDamageMultiplier: 4.0,   // Damage multiplier for 2nd cast (2.0 = 200%)
   purpleSecondCastChargeMax: 120,           // Channeling duration in frames for 200% Hollow Purple (~3.0s at 60fps)
   purpleSecondCastTextBanner: '200% HOLLOW PURPLE!', // Floating text displayed on 2nd cast release
   purpleSecondCastTextHeader100: 'PURPLE 100%',     // Skill HUD bar label for 100% cast
@@ -142,7 +142,7 @@ export const gojoConfig = {
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
   enableDomain: true,                      // Master toggle for Ultimate: Domain Expansion
-  domainCooldown: 2000,     // 20s Ultimate cooldown
+  domainCooldown: 1200,     // 20s Ultimate cooldown
   domainChargeMax: 130,     // 2s Channeling duration before domain opens
   domainDuration: 300,      // Domain lasts ~6.6 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
@@ -155,7 +155,7 @@ export const gojoConfig = {
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.10, // Triggers RCT when HP drops to 25% or below
   reverseCursedTechniqueHealPercent: 0.50, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
-  reverseCursedTechniqueCooldown: 1500,     // 15 second cooldown between RCT heals
+  reverseCursedTechniqueCooldown: 1000,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
   passiveRctHealRate: 0,                   // Disabled

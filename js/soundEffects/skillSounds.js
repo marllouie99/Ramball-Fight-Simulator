@@ -313,7 +313,7 @@ export const SKILL_SOUNDS = {
     get red_charging() {
       return {
         src: CONFIG.gojo?.sounds?.redCharging || 'Assets/Sound Effects/Skills/redcharging.mp3',
-        volume: CONFIG.gojo?.soundVolumes?.redCharging !== undefined ? CONFIG.gojo.soundVolumes.redCharging : 0.0,
+        volume: CONFIG.gojo?.soundVolumes?.redCharging !== undefined ? CONFIG.gojo.soundVolumes.redCharging : 2.50,
         delay: CONFIG.gojo?.soundDelays?.redCharging || 0
       };
     },
@@ -321,7 +321,7 @@ export const SKILL_SOUNDS = {
     get red_channeling() {
       return {
         src: CONFIG.gojo?.sounds?.redChanneling || 'Assets/Sound Effects/Skills/redchanneling.mp3',
-        volume: CONFIG.gojo?.soundVolumes?.redChanneling !== undefined ? CONFIG.gojo.soundVolumes.redChanneling : 0.0,
+        volume: CONFIG.gojo?.soundVolumes?.redChanneling !== undefined ? CONFIG.gojo.soundVolumes.redChanneling : 2.50,
         delay: CONFIG.gojo?.soundDelays?.redChanneling || 0
       };
     },
@@ -329,7 +329,7 @@ export const SKILL_SOUNDS = {
     get red_deploy() {
       return {
         src: CONFIG.gojo?.sounds?.redDeploy || 'Assets/Sound Effects/Skills/reddeploy.mp3',
-        volume: CONFIG.gojo?.soundVolumes?.redDeploy !== undefined ? CONFIG.gojo.soundVolumes.redDeploy : 0.0,
+        volume: CONFIG.gojo?.soundVolumes?.redDeploy !== undefined ? CONFIG.gojo.soundVolumes.redDeploy : 2.50,
         delay: CONFIG.gojo?.soundDelays?.redDeploy || 0
       };
     },
@@ -559,7 +559,15 @@ export const SKILL_SOUNDS = {
       };
     },
     get ricochethit() { return this.ricochet_hit; },
-    get ricochet() { return this.ricochet_hit; }
+    get ricochet() { return this.ricochet_hit; },
+    get mahoraga_summon() {
+      return {
+        src: CONFIG.sukuna?.sounds?.mahoragaSummon || 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3',
+        volume: CONFIG.sukuna?.soundVolumes?.mahoragaSummon !== undefined ? CONFIG.sukuna.soundVolumes.mahoragaSummon : 2.20,
+        delay: CONFIG.sukuna?.soundDelays?.mahoragaSummon || 0
+      };
+    },
+    get mahoragasummon() { return this.mahoraga_summon; }
   },
 
   // ── Yuta ─────────────────────────────

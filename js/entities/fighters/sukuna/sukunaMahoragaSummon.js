@@ -158,8 +158,11 @@ function clampToArena(entity, arena) {
     if (dist > maxR && dist > 0) {
       entity.x = cx + (dx / dist) * maxR;
       entity.y = cy + (dy / dist) * maxR;
-      entity.vx = 0;
-      entity.vy = 0;
+      // Only zero velocity if directed outward into the barrier, preserving rebound velocity
+      if ((entity.vx * dx + entity.vy * dy) > 0) {
+        entity.vx = 0;
+        entity.vy = 0;
+      }
     }
     return;
   }
@@ -167,10 +170,10 @@ function clampToArena(entity, arena) {
   const maxX = ar.x + ar.width - radius;
   const minY = ar.y + radius;
   const maxY = ar.y + ar.height - radius;
-  if (entity.x < minX) { entity.x = minX; entity.vx = 0; }
-  else if (entity.x > maxX) { entity.x = maxX; entity.vx = 0; }
-  if (entity.y < minY) { entity.y = minY; entity.vy = 0; }
-  else if (entity.y > maxY) { entity.y = maxY; entity.vy = 0; }
+  if (entity.x < minX) { entity.x = minX; if (entity.vx < 0) entity.vx = 0; }
+  else if (entity.x > maxX) { entity.x = maxX; if (entity.vx > 0) entity.vx = 0; }
+  if (entity.y < minY) { entity.y = minY; if (entity.vy < 0) entity.vy = 0; }
+  else if (entity.y > maxY) { entity.y = maxY; if (entity.vy > 0) entity.vy = 0; }
 }
 
 export function initMahoragaSummon(fighter) {
@@ -179,6 +182,7 @@ export function initMahoragaSummon(fighter) {
   fighter.mahoragaSummonActive = false;
   fighter.mahoragaSummonCooldown = c.mahoragaSummonInitialCooldown ?? c.mahoragaSummonCooldown ?? 420;
   fighter.mahoragaMinion = null;
+  fighter._hasPlayedMahoragaSummonSound = false;
 }
 
 export function resetMahoragaSummon(fighter) {
@@ -262,11 +266,12 @@ function buildMinion(fighter, ownerIndex, target, arena) {
   minion.isMahoragaSummon = true;
   minion.isTeammateWithSummoner = true;
 
-  // Aliases and backward-compatible getters/setters
+  // Aliases and backward-compatible getters/setters (non-enumerable so SkillManager does not double-tick)
   minion.attackInterval = attrs.swordCooldown;
   Object.defineProperty(minion, 'attackCooldown', {
     get() { return this.swordCooldown || 0; },
     set(v) { this.swordCooldown = v; },
+    enumerable: false,
     configurable: true
   });
   Object.defineProperty(minion, 'adaptStage', {
@@ -277,26 +282,31 @@ function buildMinion(fighter, ownerIndex, target, arena) {
       if (!this.goldAdaptationStage) this.goldAdaptationStage = { melee: 0, ranged: 0, skill: 0 };
       this.goldAdaptationStage.melee = v;
     },
+    enumerable: false,
     configurable: true
   });
   Object.defineProperty(minion, 'adaptCooldown', {
     get() { return this.fatalAdaptCooldown || 0; },
     set(v) { this.fatalAdaptCooldown = v; },
+    enumerable: false,
     configurable: true
   });
   Object.defineProperty(minion, 'cleaveTimer', {
     get() { return this.cleaveCooldown || 0; },
     set(v) { this.cleaveCooldown = v; },
+    enumerable: false,
     configurable: true
   });
   Object.defineProperty(minion, 'shoutTimer', {
     get() { return this.shoutCooldown || 0; },
     set(v) { this.shoutCooldown = v; },
+    enumerable: false,
     configurable: true
   });
   Object.defineProperty(minion, 'doubleDamageTimer', {
     get() { return this.wheelDoubleDamageTimer || 0; },
     set(v) { this.wheelDoubleDamageTimer = v; },
+    enumerable: false,
     configurable: true
   });
 
@@ -383,7 +393,10 @@ export function trySummonMahoraga(fighter, ownerIndex, arena) {
   spawnSparks(minion.x, minion.y, 26, 'crimsonSniper');
   triggerGlobalScreenShake(c.mahoragaSummonShakeIntensity ?? 5, c.mahoragaSummonShakeDuration ?? 10);
 
-  playSummonSound('mahoragaSummon', 'Assets/Sound Effects/Skills/domainexpansion.mp3', 1.6);
+  if (!fighter._hasPlayedMahoragaSummonSound) {
+    fighter._hasPlayedMahoragaSummonSound = true;
+    playSummonSound('mahoragaSummon', 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3', 2.2);
+  }
   return true;
 }
 
@@ -446,6 +459,7 @@ export function dispelMahoragaSummon(fighter, opts = {}) {
     fighter.mahoragaSummonActive = false;
     fighter.isSummoningMahoraga = false;
     fighter.mahoragaSummonWindupTimer = 0;
+    fighter._hasPlayedMahoragaSummonSound = false;
     fighter.mahoragaSummonCooldown = opts.instantCooldown
       ? 0
       : (c.mahoragaSummonCooldown ?? 1500);
@@ -466,6 +480,12 @@ export function handleMahoragaSummonDeath(minion) {
   if (owner && owner.mahoragaMinion === minion) {
     owner.mahoragaMinion = null;
     owner.mahoragaSummonActive = false;
+  }
+  // When Mahoraga dies and Sukuna was already dead, finalize the round/match if currently playing
+  if (owner && (owner.hp <= 0 || owner.isDead || owner.dead || owner._hasDied)) {
+    if (typeof state !== 'undefined' && state.gameState === 'playing' && typeof owner.checkRoundOrMatchEnd === 'function') {
+      owner.checkRoundOrMatchEnd();
+    }
   }
 }
 
@@ -510,11 +530,8 @@ export function updateMahoragaSummon(fighter, ownerIndex, arena) {
       fighter.mahoragaSummonWindupTimer = 0;
       return;
     }
-    if (!isOwnerAlive(fighter)) {
-      dispelMahoragaSummon(fighter, { silent: true });
-      return;
-    }
 
+    // Minion continues fighting until one prevails even if Sukuna has died!
     updateMinionAI(fighter, minion, arena, c);
     return;
   }
@@ -577,7 +594,8 @@ export function updateMahoragaSummon(fighter, ownerIndex, arena) {
     fighter.angle = 0;
 
     spawnFloatingText(fighter.x, fighter.y - (fighter.r || 25) - 44, 'WITH THIS TREASURE...', '#FFD700');
-    playSummonSound('mahoragaSummon', 'Assets/Sound Effects/Skills/enhance.mp3', 1.0);
+    fighter._hasPlayedMahoragaSummonSound = true;
+    playSummonSound('mahoragaSummon', 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3', 2.2);
   }
 }
 
@@ -722,6 +740,16 @@ function updateMinionAI(fighter, minion, arena, c) {
       minion.angle = fighter.gunAngle || fighter.angle || 0;
       minion.gunAngle = fighter.gunAngle || fighter.angle || 0;
     }
+    // Also tick wheel rotation and adaptation pause timer so minion never freezes adaptation mid-tick
+    if (minion.wheelClickTimer > 0) {
+      minion.wheelClickTimer--;
+      minion.wheelRotation += (minion.wheelTargetRotation - minion.wheelRotation) * 0.25;
+    } else if (minion.wheelTargetRotation !== undefined) {
+      minion.wheelRotation = minion.wheelTargetRotation;
+    }
+    if (minion.adaptationPauseTimer > 0) {
+      minion.adaptationPauseTimer--;
+    }
     minion.applyMovementPhysics(0.5);
     clampToArena(minion, arena);
     return;
@@ -731,16 +759,16 @@ function updateMinionAI(fighter, minion, arena, c) {
   const distToTarget = Math.hypot(target.x - minion.x, (target.y - (target.z || 0)) - minion.y);
   minion.aim(target);
 
-  // Skill priority checks when off cooldown
-  if (attrs.shoutEnabled && minion.shoutCooldown <= 0 && distToTarget <= (attrs.shoutRange || 350)) {
+  // Priority skill checks when off cooldown (Cleave & Divine Shout)
+  if (attrs.shoutEnabled && minion.shoutCooldown <= 0 && distToTarget <= (attrs.shoutRange || 350) && !minion.isShouting && !minion.isCleaving) {
     minion.shoutCooldown = attrs.shoutCooldown;
     minion._executeShout(target, minion.ownerIndex);
-  } else if (attrs.cleaveEnabled && minion.cleaveCooldown <= 0 && distToTarget <= (attrs.cleaveRadius || 150) + (target.r || 0)) {
+  } else if (attrs.cleaveEnabled && minion.cleaveCooldown <= 0 && distToTarget <= (attrs.cleaveRadius || 150) + (target.r || 0) && !minion.isCleaving && !minion.isShouting) {
     minion.cleaveCooldown = attrs.cleaveCooldown;
     minion._executeCleave(target);
   }
 
-  // Run full MahoragaFighter combat update
+  // Run authentic MahoragaFighter combat update (handles AI decision tree, animations & melee combos)
   minion.update(target, minion.ownerIndex, arena);
   clampToArena(minion, arena);
 }

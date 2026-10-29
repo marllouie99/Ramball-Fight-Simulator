@@ -2,11 +2,11 @@
   "project": "Circle Mini-Battle (Fight of Larpers 101)",
   "schemaVersion": "1.0.0",
   "summary": {
-    "totalFiles": 1581,
-    "totalSizeMB": 340.56,
-    "fighterCount": 44,
-    "imageFiles": 996,
-    "audioFiles": 556,
+    "totalFiles": 1962,
+    "totalSizeMB": 385.16,
+    "fighterCount": 48,
+    "imageFiles": 1319,
+    "audioFiles": 614,
     "fontFiles": 4
   },
   "fighters": [
@@ -57,20 +57,55 @@
       "index": "0002",
       "id": "ash",
       "sourcePath": "Assets/model/ash",
-      "fileCount": 93,
-      "totalBytes": 4632777,
+      "fileCount": 132,
+      "totalBytes": 5787928,
       "assets": {
         "hair": "Assets/model/ash/Ash-hair.png",
         "skin": null,
         "weapons": [],
         "animations": {
           "pokemon": {
-            "frameCount": 91,
+            "frameCount": 130,
             "frames": [
               "Assets/model/ash/pokemon/charizard/animData.json",
               "Assets/model/ash/pokemon/charizard/Attack-Anim.png",
               "Assets/model/ash/pokemon/charizard/Charge-Anim.png",
               "Assets/model/ash/pokemon/charizard/Faint-Anim.png",
+              "Assets/model/ash/pokemon/charizard/Flame/12-Frame Pixel Fire Projectile Animation.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-1.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-10.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-11.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-12.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-13.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-14.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-15.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-16.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-17.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-18.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-2.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-3.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-4.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-5.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-6.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-7.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-8.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-9.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-b.png",
+              "Assets/model/ash/pokemon/charizard/Flame/flamethrower-sheet.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-1.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-10.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-11.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-12.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-2.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-3.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-4.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-5.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-6.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-7.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-8.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-9.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-b.png",
+              "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-sheet.png",
               "Assets/model/ash/pokemon/charizard/Hurt-Anim.png",
               "Assets/model/ash/pokemon/charizard/Idle-Anim.png",
               "Assets/model/ash/pokemon/charizard/mega/animData.json",
@@ -89,6 +124,7 @@
               "Assets/model/ash/pokemon/greninja/Charge-Anim.png",
               "Assets/model/ash/pokemon/greninja/Hurt-Anim.png",
               "Assets/model/ash/pokemon/greninja/Idle-Anim.png",
+              "Assets/model/ash/pokemon/greninja/RearUp-Anim.png",
               "Assets/model/ash/pokemon/greninja/Shoot-Anim.png",
               "Assets/model/ash/pokemon/greninja/Sleep-Anim.png",
               "Assets/model/ash/pokemon/greninja/Walk-Anim.png",
@@ -105,9 +141,11 @@
               "Assets/model/ash/pokemon/lucario/mega/Idle-Anim.png",
               "Assets/model/ash/pokemon/lucario/mega/RearUp-Anim.png",
               "Assets/model/ash/pokemon/lucario/mega/Sleep-Anim.png",
+              "Assets/model/ash/pokemon/lucario/mega/TumbleBack-Anim.png",
               "Assets/model/ash/pokemon/lucario/mega/Walk-Anim.png",
               "Assets/model/ash/pokemon/lucario/RearUp-Anim.png",
               "Assets/model/ash/pokemon/lucario/Sleep-Anim.png",
+              "Assets/model/ash/pokemon/lucario/TumbleBack-Anim.png",
               "Assets/model/ash/pokemon/lucario/Walk-Anim.png",
               "Assets/model/ash/pokemon/pikachu/animData.json",
               "Assets/model/ash/pokemon/pikachu/Attack-Anim.png",
@@ -115,6 +153,7 @@
               "Assets/model/ash/pokemon/pikachu/Faint-Anim.png",
               "Assets/model/ash/pokemon/pikachu/Hurt-Anim.png",
               "Assets/model/ash/pokemon/pikachu/Idle-Anim.png",
+              "Assets/model/ash/pokemon/pikachu/Pose-Anim.png",
               "Assets/model/ash/pokemon/pikachu/Shock-Anim.png",
               "Assets/model/ash/pokemon/pikachu/Shoot-Anim.png",
               "Assets/model/ash/pokemon/pikachu/Sleep-Anim.png",
@@ -167,6 +206,41 @@
           "Assets/model/ash/pokemon/charizard/Attack-Anim.png",
           "Assets/model/ash/pokemon/charizard/Charge-Anim.png",
           "Assets/model/ash/pokemon/charizard/Faint-Anim.png",
+          "Assets/model/ash/pokemon/charizard/Flame/12-Frame Pixel Fire Projectile Animation.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-1.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-10.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-11.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-12.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-13.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-14.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-15.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-16.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-17.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-18.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-2.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-3.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-4.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-5.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-6.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-7.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-8.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-9.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-b.png",
+          "Assets/model/ash/pokemon/charizard/Flame/flamethrower-sheet.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-1.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-10.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-11.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-12.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-2.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-3.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-4.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-5.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-6.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-7.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-8.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-9.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-b.png",
+          "Assets/model/ash/pokemon/charizard/Flame_charge/flame_charge-sheet.png",
           "Assets/model/ash/pokemon/charizard/Hurt-Anim.png",
           "Assets/model/ash/pokemon/charizard/Idle-Anim.png",
           "Assets/model/ash/pokemon/charizard/mega/animData.json",
@@ -185,6 +259,7 @@
           "Assets/model/ash/pokemon/greninja/Charge-Anim.png",
           "Assets/model/ash/pokemon/greninja/Hurt-Anim.png",
           "Assets/model/ash/pokemon/greninja/Idle-Anim.png",
+          "Assets/model/ash/pokemon/greninja/RearUp-Anim.png",
           "Assets/model/ash/pokemon/greninja/Shoot-Anim.png",
           "Assets/model/ash/pokemon/greninja/Sleep-Anim.png",
           "Assets/model/ash/pokemon/greninja/Walk-Anim.png",
@@ -201,9 +276,11 @@
           "Assets/model/ash/pokemon/lucario/mega/Idle-Anim.png",
           "Assets/model/ash/pokemon/lucario/mega/RearUp-Anim.png",
           "Assets/model/ash/pokemon/lucario/mega/Sleep-Anim.png",
+          "Assets/model/ash/pokemon/lucario/mega/TumbleBack-Anim.png",
           "Assets/model/ash/pokemon/lucario/mega/Walk-Anim.png",
           "Assets/model/ash/pokemon/lucario/RearUp-Anim.png",
           "Assets/model/ash/pokemon/lucario/Sleep-Anim.png",
+          "Assets/model/ash/pokemon/lucario/TumbleBack-Anim.png",
           "Assets/model/ash/pokemon/lucario/Walk-Anim.png",
           "Assets/model/ash/pokemon/pikachu/animData.json",
           "Assets/model/ash/pokemon/pikachu/Attack-Anim.png",
@@ -211,6 +288,7 @@
           "Assets/model/ash/pokemon/pikachu/Faint-Anim.png",
           "Assets/model/ash/pokemon/pikachu/Hurt-Anim.png",
           "Assets/model/ash/pokemon/pikachu/Idle-Anim.png",
+          "Assets/model/ash/pokemon/pikachu/Pose-Anim.png",
           "Assets/model/ash/pokemon/pikachu/Shock-Anim.png",
           "Assets/model/ash/pokemon/pikachu/Shoot-Anim.png",
           "Assets/model/ash/pokemon/pikachu/Sleep-Anim.png",
@@ -308,6 +386,100 @@
     },
     {
       "index": "0004",
+      "id": "bomberman",
+      "sourcePath": "Assets/model/bomberman",
+      "fileCount": 33,
+      "totalBytes": 280335,
+      "assets": {
+        "hair": "Assets/model/bomberman/Bomberman-hair.png",
+        "skin": null,
+        "weapons": [],
+        "animations": {
+          "bomb": {
+            "frameCount": 4,
+            "frames": [
+              "Assets/model/bomberman/bomb/bomb-1.png",
+              "Assets/model/bomberman/bomb/bomb-2.png",
+              "Assets/model/bomberman/bomb/bomb-3.png",
+              "Assets/model/bomberman/bomb/bomb-sheet.png"
+            ]
+          },
+          "explosion": {
+            "frameCount": 13,
+            "frames": [
+              "Assets/model/bomberman/explosion/explosion-1.png",
+              "Assets/model/bomberman/explosion/explosion-10.png",
+              "Assets/model/bomberman/explosion/explosion-11.png",
+              "Assets/model/bomberman/explosion/explosion-12.png",
+              "Assets/model/bomberman/explosion/explosion-2.png",
+              "Assets/model/bomberman/explosion/explosion-3.png",
+              "Assets/model/bomberman/explosion/explosion-4.png",
+              "Assets/model/bomberman/explosion/explosion-5.png",
+              "Assets/model/bomberman/explosion/explosion-6.png",
+              "Assets/model/bomberman/explosion/explosion-7.png",
+              "Assets/model/bomberman/explosion/explosion-8.png",
+              "Assets/model/bomberman/explosion/explosion-9.png",
+              "Assets/model/bomberman/explosion/explosion-b.png"
+            ]
+          },
+          "kick": {
+            "frameCount": 13,
+            "frames": [
+              "Assets/model/bomberman/kick/kick-1.png",
+              "Assets/model/bomberman/kick/kick-10.png",
+              "Assets/model/bomberman/kick/kick-11.png",
+              "Assets/model/bomberman/kick/kick-12.png",
+              "Assets/model/bomberman/kick/kick-2.png",
+              "Assets/model/bomberman/kick/kick-3.png",
+              "Assets/model/bomberman/kick/kick-4.png",
+              "Assets/model/bomberman/kick/kick-5.png",
+              "Assets/model/bomberman/kick/kick-6.png",
+              "Assets/model/bomberman/kick/kick-7.png",
+              "Assets/model/bomberman/kick/kick-8.png",
+              "Assets/model/bomberman/kick/kick-9.png",
+              "Assets/model/bomberman/kick/kick-b.png"
+            ]
+          }
+        },
+        "allFiles": [
+          "Assets/model/bomberman/ADHWK1.gif",
+          "Assets/model/bomberman/bomb/bomb-1.png",
+          "Assets/model/bomberman/bomb/bomb-2.png",
+          "Assets/model/bomberman/bomb/bomb-3.png",
+          "Assets/model/bomberman/bomb/bomb-sheet.png",
+          "Assets/model/bomberman/Bomberman-hair.png",
+          "Assets/model/bomberman/dFOsRT.gif",
+          "Assets/model/bomberman/explosion/explosion-1.png",
+          "Assets/model/bomberman/explosion/explosion-10.png",
+          "Assets/model/bomberman/explosion/explosion-11.png",
+          "Assets/model/bomberman/explosion/explosion-12.png",
+          "Assets/model/bomberman/explosion/explosion-2.png",
+          "Assets/model/bomberman/explosion/explosion-3.png",
+          "Assets/model/bomberman/explosion/explosion-4.png",
+          "Assets/model/bomberman/explosion/explosion-5.png",
+          "Assets/model/bomberman/explosion/explosion-6.png",
+          "Assets/model/bomberman/explosion/explosion-7.png",
+          "Assets/model/bomberman/explosion/explosion-8.png",
+          "Assets/model/bomberman/explosion/explosion-9.png",
+          "Assets/model/bomberman/explosion/explosion-b.png",
+          "Assets/model/bomberman/kick/kick-1.png",
+          "Assets/model/bomberman/kick/kick-10.png",
+          "Assets/model/bomberman/kick/kick-11.png",
+          "Assets/model/bomberman/kick/kick-12.png",
+          "Assets/model/bomberman/kick/kick-2.png",
+          "Assets/model/bomberman/kick/kick-3.png",
+          "Assets/model/bomberman/kick/kick-4.png",
+          "Assets/model/bomberman/kick/kick-5.png",
+          "Assets/model/bomberman/kick/kick-6.png",
+          "Assets/model/bomberman/kick/kick-7.png",
+          "Assets/model/bomberman/kick/kick-8.png",
+          "Assets/model/bomberman/kick/kick-9.png",
+          "Assets/model/bomberman/kick/kick-b.png"
+        ]
+      }
+    },
+    {
+      "index": "0005",
       "id": "choso",
       "sourcePath": "Assets/model/choso",
       "fileCount": 1,
@@ -323,7 +495,7 @@
       }
     },
     {
-      "index": "0005",
+      "index": "0006",
       "id": "cj",
       "sourcePath": "Assets/model/cj",
       "fileCount": 4,
@@ -344,7 +516,7 @@
       }
     },
     {
-      "index": "0006",
+      "index": "0007",
       "id": "crazyDave",
       "sourcePath": "Assets/model/crazyDave",
       "fileCount": 13,
@@ -405,7 +577,7 @@
       }
     },
     {
-      "index": "0007",
+      "index": "0008",
       "id": "denji",
       "sourcePath": "Assets/model/denji",
       "fileCount": 11,
@@ -458,7 +630,7 @@
       }
     },
     {
-      "index": "0008",
+      "index": "0009",
       "id": "enderDragon",
       "sourcePath": "Assets/model/enderDragon",
       "fileCount": 14,
@@ -520,7 +692,7 @@
       }
     },
     {
-      "index": "0009",
+      "index": "0010",
       "id": "engineer",
       "sourcePath": "Assets/model/engineer",
       "fileCount": 1,
@@ -536,11 +708,11 @@
       }
     },
     {
-      "index": "0010",
+      "index": "0011",
       "id": "escanor",
       "sourcePath": "Assets/model/escanor",
-      "fileCount": 7,
-      "totalBytes": 4684716,
+      "fileCount": 87,
+      "totalBytes": 22695071,
       "assets": {
         "hair": "Assets/model/escanor/Escanor-hair.png",
         "skin": "Assets/model/escanor/Escanor-model-mustache.png",
@@ -548,6 +720,96 @@
           "Assets/model/escanor/Escanor-Weapon.png"
         ],
         "animations": {
+          "Cruel_Sun": {
+            "frameCount": 40,
+            "frames": [
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-1.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-10.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-11.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-12.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-13.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-14.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-15.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-16.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-17.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-18.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-2.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-3.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-4.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-5.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-6.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-7.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-8.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-9.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-b-12.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun-b.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-1.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-10.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-11.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-12.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-13.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-14.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-15.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-16.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-17.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-18.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-2.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-3.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-4.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-5.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-6.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-7.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-8.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-9.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-b-12.png",
+              "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-b.png"
+            ]
+          },
+          "Cruel_Sun_Smoke": {
+            "frameCount": 40,
+            "frames": [
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-1.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-10.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-11.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-12.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-13.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-14.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-15.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-16.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-17.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-18.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-2.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-3.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-4.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-5.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-6.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-7.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-8.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-9.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-b-12.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-b.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-1.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-10.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-11.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-12.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-13.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-14.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-15.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-16.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-17.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-18.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-2.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-3.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-4.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-5.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-6.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-7.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-8.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-9.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-b-12.png",
+              "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-b.png"
+            ]
+          },
           "Escanor-Cruel Sun-Pixel Art Sprite Sheet": {
             "type": "spritesheet",
             "path": "Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png"
@@ -558,6 +820,86 @@
           }
         },
         "allFiles": [
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-1.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-10.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-11.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-12.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-13.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-14.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-15.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-16.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-17.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-18.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-2.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-3.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-4.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-5.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-6.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-7.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-8.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-9.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-b-12.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun-b.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-1.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-10.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-11.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-12.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-13.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-14.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-15.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-16.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-17.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-18.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-2.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-3.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-4.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-5.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-6.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-7.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-8.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-9.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-b-12.png",
+          "Assets/model/escanor/Cruel_Sun/cruel_sun_the_one-b.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-1.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-10.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-11.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-12.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-13.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-14.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-15.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-16.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-17.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-18.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-2.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-3.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-4.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-5.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-6.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-7.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-8.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-9.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-b-12.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail-b.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-1.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-10.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-11.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-12.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-13.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-14.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-15.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-16.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-17.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-18.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-2.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-3.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-4.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-5.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-6.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-7.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-8.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-9.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-b-12.png",
+          "Assets/model/escanor/Cruel_Sun_Smoke/smoke_trail_the_one-b.png",
           "Assets/model/escanor/Escanor-Cruel Sun-Pixel Art Sprite Sheet.png",
           "Assets/model/escanor/Escanor-hair.png",
           "Assets/model/escanor/Escanor-model-mustache.png",
@@ -569,7 +911,7 @@
       }
     },
     {
-      "index": "0011",
+      "index": "0012",
       "id": "exoMech",
       "sourcePath": "Assets/model/exoMech",
       "fileCount": 28,
@@ -617,7 +959,7 @@
       }
     },
     {
-      "index": "0012",
+      "index": "0013",
       "id": "eyeOfCthulhu",
       "sourcePath": "Assets/model/eyeOfCthulhu",
       "fileCount": 4,
@@ -645,28 +987,91 @@
       }
     },
     {
-      "index": "0013",
+      "index": "0014",
       "id": "genos",
       "sourcePath": "Assets/model/genos",
-      "fileCount": 2,
-      "totalBytes": 1960388,
+      "fileCount": 28,
+      "totalBytes": 5049353,
       "assets": {
         "hair": "Assets/model/genos/Genos-hair.png",
         "skin": null,
         "weapons": [],
-        "animations": {},
+        "animations": {
+          "spiral_incineration_cannon": {
+            "frameCount": 13,
+            "frames": [
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-1.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-10.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-11.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-12.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-2.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-3.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-4.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-5.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-6.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-7.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-8.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-9.png",
+              "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-b.png"
+            ]
+          },
+          "spiral_incineration_cannon_out": {
+            "frameCount": 13,
+            "frames": [
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-1.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-10.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-11.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-12.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-2.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-3.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-4.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-5.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-6.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-7.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-8.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-9.png",
+              "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-b.png"
+            ]
+          }
+        },
         "allFiles": [
           "Assets/model/genos/Genos-fist.png",
-          "Assets/model/genos/Genos-hair.png"
+          "Assets/model/genos/Genos-hair.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-1.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-10.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-11.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-12.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-2.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-3.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-4.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-5.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-6.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-7.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-8.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-9.png",
+          "Assets/model/genos/spiral_incineration_cannon/spiral_incineration_cannon-b.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-1.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-10.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-11.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-12.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-2.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-3.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-4.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-5.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-6.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-7.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-8.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-9.png",
+          "Assets/model/genos/spiral_incineration_cannon_out/spiral_incineration_cannon_out-b.png"
         ]
       }
     },
     {
-      "index": "0014",
+      "index": "0015",
       "id": "gojo",
       "sourcePath": "Assets/model/gojo",
-      "fileCount": 33,
-      "totalBytes": 3760608,
+      "fileCount": 94,
+      "totalBytes": 13319905,
       "assets": {
         "hair": "Assets/model/gojo/gojo-hair.png",
         "skin": "Assets/model/gojo/Saturo-Gojo-PIXEL-SKIN.png",
@@ -677,6 +1082,31 @@
             "frames": [
               "Assets/model/gojo/BattleIntro/BattleIntro.jpg",
               "Assets/model/gojo/BattleIntro/gojo-battle-intro-pose.jpg"
+            ]
+          },
+          "Blue_projectile": {
+            "frameCount": 20,
+            "frames": [
+              "Assets/model/gojo/Blue_projectile/blue_travel-1.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-10.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-11.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-12.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-13.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-14.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-15.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-16.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-17.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-18.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-2.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-3.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-4.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-5.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-6.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-7.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-8.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-9.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-b-12.png",
+              "Assets/model/gojo/Blue_projectile/blue_travel-b.png"
             ]
           },
           "gojo-doll-animation": {
@@ -713,11 +1143,82 @@
               "Assets/model/gojo/purple_explosion/purple_explosion-9.png",
               "Assets/model/gojo/purple_explosion/purple_explosion-b.png"
             ]
+          },
+          "Purple_idle_travel": {
+            "frameCount": 21,
+            "frames": [
+              "Assets/model/gojo/Purple_idle_travel/Purple Lightning Orb Sprite Sheet.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-1.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-10.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-11.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-12.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-13.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-14.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-15.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-16.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-17.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-18.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-2.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-3.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-4.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-5.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-6.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-7.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-8.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-9.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-b-12.png",
+              "Assets/model/gojo/Purple_idle_travel/purple_travel-b.png"
+            ]
+          },
+          "Red_reversal": {
+            "frameCount": 20,
+            "frames": [
+              "Assets/model/gojo/Red_reversal/red_reversal-1.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-10.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-11.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-12.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-13.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-14.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-15.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-16.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-17.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-18.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-2.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-3.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-4.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-5.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-6.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-7.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-8.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-9.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-b-12.png",
+              "Assets/model/gojo/Red_reversal/red_reversal-b.png"
+            ]
           }
         },
         "allFiles": [
           "Assets/model/gojo/BattleIntro/BattleIntro.jpg",
           "Assets/model/gojo/BattleIntro/gojo-battle-intro-pose.jpg",
+          "Assets/model/gojo/Blue_projectile/blue_travel-1.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-10.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-11.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-12.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-13.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-14.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-15.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-16.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-17.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-18.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-2.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-3.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-4.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-5.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-6.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-7.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-8.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-9.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-b-12.png",
+          "Assets/model/gojo/Blue_projectile/blue_travel-b.png",
           "Assets/model/gojo/gojo-doll-animation.png",
           "Assets/model/gojo/gojo-hair.png",
           "Assets/model/gojo/Gojo-Skill-icons.png",
@@ -747,13 +1248,54 @@
           "Assets/model/gojo/purple_explosion/purple_explosion-8.png",
           "Assets/model/gojo/purple_explosion/purple_explosion-9.png",
           "Assets/model/gojo/purple_explosion/purple_explosion-b.png",
+          "Assets/model/gojo/Purple_idle_travel/Purple Lightning Orb Sprite Sheet.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-1.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-10.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-11.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-12.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-13.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-14.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-15.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-16.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-17.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-18.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-2.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-3.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-4.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-5.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-6.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-7.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-8.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-9.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-b-12.png",
+          "Assets/model/gojo/Purple_idle_travel/purple_travel-b.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-1.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-10.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-11.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-12.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-13.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-14.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-15.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-16.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-17.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-18.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-2.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-3.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-4.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-5.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-6.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-7.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-8.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-9.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-b-12.png",
+          "Assets/model/gojo/Red_reversal/red_reversal-b.png",
           "Assets/model/gojo/Saturo Gojo.png",
           "Assets/model/gojo/Saturo-Gojo-PIXEL-SKIN.png"
         ]
       }
     },
     {
-      "index": "0015",
+      "index": "0016",
       "id": "gunslinger",
       "sourcePath": "Assets/model/gunslinger",
       "fileCount": 1,
@@ -771,7 +1313,7 @@
       }
     },
     {
-      "index": "0016",
+      "index": "0017",
       "id": "guts",
       "sourcePath": "Assets/model/guts",
       "fileCount": 8,
@@ -798,7 +1340,7 @@
       }
     },
     {
-      "index": "0017",
+      "index": "0018",
       "id": "ichigo",
       "sourcePath": "Assets/model/ichigo",
       "fileCount": 48,
@@ -916,7 +1458,7 @@
       }
     },
     {
-      "index": "0018",
+      "index": "0019",
       "id": "johnWick",
       "sourcePath": "Assets/model/johnWick",
       "fileCount": 4,
@@ -935,7 +1477,7 @@
       }
     },
     {
-      "index": "0019",
+      "index": "0020",
       "id": "knight",
       "sourcePath": "Assets/model/knight",
       "fileCount": 10,
@@ -965,7 +1507,7 @@
       }
     },
     {
-      "index": "0020",
+      "index": "0021",
       "id": "mahito",
       "sourcePath": "Assets/model/mahito",
       "fileCount": 2,
@@ -984,7 +1526,7 @@
       }
     },
     {
-      "index": "0021",
+      "index": "0022",
       "id": "mahoraga",
       "sourcePath": "Assets/model/mahoraga",
       "fileCount": 14,
@@ -1032,7 +1574,7 @@
       }
     },
     {
-      "index": "0022",
+      "index": "0023",
       "id": "maki",
       "sourcePath": "Assets/model/maki",
       "fileCount": 2,
@@ -1051,7 +1593,7 @@
       }
     },
     {
-      "index": "0023",
+      "index": "0024",
       "id": "makima",
       "sourcePath": "Assets/model/makima",
       "fileCount": 4,
@@ -1075,7 +1617,7 @@
       }
     },
     {
-      "index": "0024",
+      "index": "0025",
       "id": "megumin",
       "sourcePath": "Assets/model/megumin",
       "fileCount": 1,
@@ -1091,7 +1633,7 @@
       }
     },
     {
-      "index": "0025",
+      "index": "0026",
       "id": "namelessDeity",
       "sourcePath": "Assets/model/namelessDeity",
       "fileCount": 177,
@@ -1296,7 +1838,7 @@
       }
     },
     {
-      "index": "0026",
+      "index": "0027",
       "id": "nanami",
       "sourcePath": "Assets/model/nanami",
       "fileCount": 4,
@@ -1317,7 +1859,7 @@
       }
     },
     {
-      "index": "0027",
+      "index": "0028",
       "id": "naoya",
       "sourcePath": "Assets/model/naoya",
       "fileCount": 1,
@@ -1333,7 +1875,7 @@
       }
     },
     {
-      "index": "0028",
+      "index": "0029",
       "id": "nezuko",
       "sourcePath": "Assets/model/nezuko",
       "fileCount": 1,
@@ -1349,7 +1891,25 @@
       }
     },
     {
-      "index": "0029",
+      "index": "0030",
+      "id": "pacman",
+      "sourcePath": "Assets/model/pacman",
+      "fileCount": 3,
+      "totalBytes": 987,
+      "assets": {
+        "hair": "Assets/model/pacman/Pacman-hair.png",
+        "skin": null,
+        "weapons": [],
+        "animations": {},
+        "allFiles": [
+          "Assets/model/pacman/pacman-ghost-flash.png",
+          "Assets/model/pacman/pacman-ghost.png",
+          "Assets/model/pacman/Pacman-hair.png"
+        ]
+      }
+    },
+    {
+      "index": "0031",
       "id": "power",
       "sourcePath": "Assets/model/power",
       "fileCount": 3,
@@ -1367,7 +1927,7 @@
       }
     },
     {
-      "index": "0030",
+      "index": "0032",
       "id": "reze",
       "sourcePath": "Assets/model/reze",
       "fileCount": 29,
@@ -1450,7 +2010,7 @@
       }
     },
     {
-      "index": "0031",
+      "index": "0033",
       "id": "sans",
       "sourcePath": "Assets/model/sans",
       "fileCount": 101,
@@ -1681,7 +2241,7 @@
       }
     },
     {
-      "index": "0032",
+      "index": "0034",
       "id": "shiro",
       "sourcePath": "Assets/model/shiro",
       "fileCount": 3,
@@ -1704,7 +2264,7 @@
       }
     },
     {
-      "index": "0033",
+      "index": "0035",
       "id": "sora",
       "sourcePath": "Assets/model/sora",
       "fileCount": 1,
@@ -1720,7 +2280,7 @@
       }
     },
     {
-      "index": "0034",
+      "index": "0036",
       "id": "spartan",
       "sourcePath": "Assets/model/spartan",
       "fileCount": 6,
@@ -1744,18 +2304,86 @@
       }
     },
     {
-      "index": "0035",
+      "index": "0037",
       "id": "sukuna",
       "sourcePath": "Assets/model/sukuna",
-      "fileCount": 4,
-      "totalBytes": 719935,
+      "fileCount": 33,
+      "totalBytes": 8490782,
       "assets": {
-        "hair": "Assets/model/sukuna/Sukuna-hair.png",
+        "hair": "Assets/model/sukuna/Sukuna-hair-black.png",
         "skin": null,
         "weapons": [],
-        "animations": {},
+        "animations": {
+          "Fuga_explosion": {
+            "frameCount": 14,
+            "frames": [
+              "Assets/model/sukuna/Fuga_explosion/12-Frame Pixel Art Explosion Sprite Sheet.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-1.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-10.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-11.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-12.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-2.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-3.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-4.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-5.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-6.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-7.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-8.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-9.png",
+              "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-b.png"
+            ]
+          },
+          "Fuga_idle_travel": {
+            "frameCount": 14,
+            "frames": [
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-1.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-10.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-11.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-12.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-2.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-3.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-4.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-5.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-6.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-7.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-8.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-9.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-b.png",
+              "Assets/model/sukuna/Fuga_idle_travel/Pixel Fireball Projectile Sprite Sheet.png"
+            ]
+          }
+        },
         "allFiles": [
+          "Assets/model/sukuna/Fuga_explosion/12-Frame Pixel Art Explosion Sprite Sheet.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-1.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-10.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-11.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-12.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-2.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-3.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-4.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-5.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-6.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-7.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-8.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-9.png",
+          "Assets/model/sukuna/Fuga_explosion/Fuga_explosion-b.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-1.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-10.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-11.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-12.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-2.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-3.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-4.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-5.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-6.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-7.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-8.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-9.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Fuga_idle_travel-b.png",
+          "Assets/model/sukuna/Fuga_idle_travel/Pixel Fireball Projectile Sprite Sheet.png",
           "Assets/model/sukuna/Sukuna-battle-intro-pose.jpg",
+          "Assets/model/sukuna/Sukuna-hair-black.png",
           "Assets/model/sukuna/Sukuna-hair.png",
           "Assets/model/sukuna/sukuna-shrine.png",
           "Assets/model/sukuna/SUKUNA.png"
@@ -1763,7 +2391,7 @@
       }
     },
     {
-      "index": "0036",
+      "index": "0038",
       "id": "tanjiro",
       "sourcePath": "Assets/model/tanjiro",
       "fileCount": 2,
@@ -1780,7 +2408,7 @@
       }
     },
     {
-      "index": "0037",
+      "index": "0039",
       "id": "todo",
       "sourcePath": "Assets/model/todo",
       "fileCount": 1,
@@ -1796,7 +2424,7 @@
       }
     },
     {
-      "index": "0038",
+      "index": "0040",
       "id": "toji",
       "sourcePath": "Assets/model/toji",
       "fileCount": 2,
@@ -1813,7 +2441,7 @@
       }
     },
     {
-      "index": "0039",
+      "index": "0041",
       "id": "ulquiorra",
       "sourcePath": "Assets/model/ulquiorra",
       "fileCount": 1,
@@ -1831,7 +2459,23 @@
       }
     },
     {
-      "index": "0040",
+      "index": "0042",
+      "id": "unarmed",
+      "sourcePath": "Assets/model/unarmed",
+      "fileCount": 1,
+      "totalBytes": 68,
+      "assets": {
+        "hair": "Assets/model/unarmed/Unarmed-hair.png",
+        "skin": null,
+        "weapons": [],
+        "animations": {},
+        "allFiles": [
+          "Assets/model/unarmed/Unarmed-hair.png"
+        ]
+      }
+    },
+    {
+      "index": "0043",
       "id": "uryu",
       "sourcePath": "Assets/model/uryu",
       "fileCount": 9,
@@ -1860,7 +2504,7 @@
       }
     },
     {
-      "index": "0041",
+      "index": "0044",
       "id": "yuji",
       "sourcePath": "Assets/model/yuji",
       "fileCount": 2,
@@ -1877,17 +2521,111 @@
       }
     },
     {
-      "index": "0042",
+      "index": "0045",
       "id": "yuta",
       "sourcePath": "Assets/model/yuta",
-      "fileCount": 3,
-      "totalBytes": 365075,
+      "fileCount": 42,
+      "totalBytes": 3650610,
       "assets": {
         "hair": "Assets/model/yuta/Yuta-hair.png",
         "skin": "Assets/model/yuta/Yuta-Pixel-Skin.png",
         "weapons": [],
-        "animations": {},
+        "animations": {
+          "Love_beam": {
+            "frameCount": 13,
+            "frames": [
+              "Assets/model/yuta/Love_beam/Love_beam-1.png",
+              "Assets/model/yuta/Love_beam/Love_beam-10.png",
+              "Assets/model/yuta/Love_beam/Love_beam-11.png",
+              "Assets/model/yuta/Love_beam/Love_beam-12.png",
+              "Assets/model/yuta/Love_beam/Love_beam-2.png",
+              "Assets/model/yuta/Love_beam/Love_beam-3.png",
+              "Assets/model/yuta/Love_beam/Love_beam-4.png",
+              "Assets/model/yuta/Love_beam/Love_beam-5.png",
+              "Assets/model/yuta/Love_beam/Love_beam-6.png",
+              "Assets/model/yuta/Love_beam/Love_beam-7.png",
+              "Assets/model/yuta/Love_beam/Love_beam-8.png",
+              "Assets/model/yuta/Love_beam/Love_beam-9.png",
+              "Assets/model/yuta/Love_beam/Love_beam-b.png"
+            ]
+          },
+          "love_beam_out": {
+            "frameCount": 13,
+            "frames": [
+              "Assets/model/yuta/love_beam_out/love_beam_out-1.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-10.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-11.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-12.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-2.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-3.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-4.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-5.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-6.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-7.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-8.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-9.png",
+              "Assets/model/yuta/love_beam_out/love_beam_out-b.png"
+            ]
+          },
+          "Love_beam_windup": {
+            "frameCount": 13,
+            "frames": [
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-1.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-10.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-11.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-12.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-2.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-3.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-4.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-5.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-6.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-7.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-8.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-9.png",
+              "Assets/model/yuta/Love_beam_windup/Love_beam_windup-b.png"
+            ]
+          }
+        },
         "allFiles": [
+          "Assets/model/yuta/Love_beam/Love_beam-1.png",
+          "Assets/model/yuta/Love_beam/Love_beam-10.png",
+          "Assets/model/yuta/Love_beam/Love_beam-11.png",
+          "Assets/model/yuta/Love_beam/Love_beam-12.png",
+          "Assets/model/yuta/Love_beam/Love_beam-2.png",
+          "Assets/model/yuta/Love_beam/Love_beam-3.png",
+          "Assets/model/yuta/Love_beam/Love_beam-4.png",
+          "Assets/model/yuta/Love_beam/Love_beam-5.png",
+          "Assets/model/yuta/Love_beam/Love_beam-6.png",
+          "Assets/model/yuta/Love_beam/Love_beam-7.png",
+          "Assets/model/yuta/Love_beam/Love_beam-8.png",
+          "Assets/model/yuta/Love_beam/Love_beam-9.png",
+          "Assets/model/yuta/Love_beam/Love_beam-b.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-1.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-10.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-11.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-12.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-2.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-3.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-4.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-5.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-6.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-7.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-8.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-9.png",
+          "Assets/model/yuta/love_beam_out/love_beam_out-b.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-1.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-10.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-11.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-12.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-2.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-3.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-4.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-5.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-6.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-7.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-8.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-9.png",
+          "Assets/model/yuta/Love_beam_windup/Love_beam_windup-b.png",
           "Assets/model/yuta/Yuta-bossmap.png",
           "Assets/model/yuta/Yuta-hair.png",
           "Assets/model/yuta/Yuta-Pixel-Skin.png"
@@ -1895,7 +2633,7 @@
       }
     },
     {
-      "index": "0043",
+      "index": "0046",
       "id": "zenitsu",
       "sourcePath": "Assets/model/zenitsu",
       "fileCount": 23,
@@ -1965,7 +2703,7 @@
       }
     },
     {
-      "index": "0044",
+      "index": "0047",
       "id": "zeus",
       "sourcePath": "Assets/model/zeus",
       "fileCount": 23,
@@ -2031,6 +2769,42 @@
           "Assets/model/zeus/thunderstrike/thunderstrike-b.png",
           "Assets/model/zeus/Zeus-crown.png",
           "Assets/model/zeus/Zeus-hair.png"
+        ]
+      }
+    },
+    {
+      "index": "0048",
+      "id": "zombie",
+      "sourcePath": "Assets/model/zombie",
+      "fileCount": 12,
+      "totalBytes": 42023,
+      "assets": {
+        "hair": "Assets/model/zombie/zombie-hair.png",
+        "skin": null,
+        "weapons": [],
+        "animations": {
+          "zombie-attack-sprite-sheet": {
+            "type": "spritesheet",
+            "path": "Assets/model/zombie/zombie-attack-sprite-sheet.png"
+          },
+          "zombie-walk-sprite-sheet": {
+            "type": "spritesheet",
+            "path": "Assets/model/zombie/zombie-walk-sprite-sheet.png"
+          }
+        },
+        "allFiles": [
+          "Assets/model/zombie/zombie-attack-sprite-sheet.png",
+          "Assets/model/zombie/zombie-bucket.png",
+          "Assets/model/zombie/zombie-cone.png",
+          "Assets/model/zombie/zombie-flag.png",
+          "Assets/model/zombie/zombie-football-helmet.png",
+          "Assets/model/zombie/zombie-gravestone.png",
+          "Assets/model/zombie/zombie-hair.png",
+          "Assets/model/zombie/zombie-newspaper.png",
+          "Assets/model/zombie/zombie-pole.png",
+          "Assets/model/zombie/zombie-screendoor.png",
+          "Assets/model/zombie/zombie-trophy.png",
+          "Assets/model/zombie/zombie-walk-sprite-sheet.png"
         ]
       }
     }
@@ -2593,7 +3367,14 @@
       "Assets/Sound Effects/SkillEffects/splat3.ogg",
       "Assets/Sound Effects/SkillEffects/thundercloudcoming.mp3",
       "Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3",
-      "Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3"
+      "Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3",
+      "Assets/Sound Effects/SkillEffects/zombie-brains.wav",
+      "Assets/Sound Effects/SkillEffects/zombie-chomp.wav",
+      "Assets/Sound Effects/SkillEffects/zombie-groan.wav",
+      "Assets/Sound Effects/SkillEffects/zombie-hugewave.wav",
+      "Assets/Sound Effects/SkillEffects/zombie-metal-clank.wav",
+      "Assets/Sound Effects/SkillEffects/zombie-newspaper-rip.wav",
+      "Assets/Sound Effects/SkillEffects/zombie-vault.wav"
     ],
     "environment": [
       "Assets/Sound Effects/Boss Voiceline SFX/crazydave-noise1 (1).ogg",
@@ -2753,6 +3534,17 @@
           "Assets/Sound Effects/Avatar/UniversalAnnihilationLoop.ogg"
         ]
       },
+      "Bomberman": {
+        "folder": "Assets/Sound Effects/BombermanSFX",
+        "count": 5,
+        "files": [
+          "Assets/Sound Effects/BombermanSFX/Bomb Explodes.wav",
+          "Assets/Sound Effects/BombermanSFX/era_vera-easter22-gun-melee-summon.wav",
+          "Assets/Sound Effects/BombermanSFX/Kick - Pressure Block.wav",
+          "Assets/Sound Effects/BombermanSFX/Place Bomb.wav",
+          "Assets/Sound Effects/BombermanSFX/Walking 1.wav"
+        ]
+      },
       "Denji": {
         "folder": "Assets/Sound Effects/DenjiSFX",
         "count": 4,
@@ -2908,6 +3700,67 @@
           "Assets/Sound Effects/NaoyaSFX/Naoya_takeoff_knife.mp3"
         ]
       },
+      "New folder": {
+        "folder": "Assets/Sound Effects/New folder",
+        "count": 0,
+        "files": []
+      },
+      "Pacman": {
+        "folder": "Assets/Sound Effects/PacmanSFX",
+        "count": 10,
+        "files": [
+          "Assets/Sound Effects/PacmanSFX/chomp.wav",
+          "Assets/Sound Effects/PacmanSFX/Ghost - Turn to Blue.mp3",
+          "Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Big Fruit.mp3",
+          "Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Ghost.mp3",
+          "Assets/Sound Effects/PacmanSFX/pac-man-death-sound.mp3",
+          "Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3",
+          "Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3",
+          "Assets/Sound Effects/PacmanSFX/power_pellet.wav",
+          "Assets/Sound Effects/PacmanSFX/refill.wav",
+          "Assets/Sound Effects/PacmanSFX/waka.wav"
+        ]
+      },
+      "Pokemon": {
+        "folder": "Assets/Sound Effects/PokemonSFX",
+        "count": 34,
+        "files": [
+          "Assets/Sound Effects/PokemonSFX/aerialace.ogg",
+          "Assets/Sound Effects/PokemonSFX/aurasphere-1.ogg",
+          "Assets/Sound Effects/PokemonSFX/aurasphere-2.ogg",
+          "Assets/Sound Effects/PokemonSFX/bulletpunch.ogg",
+          "Assets/Sound Effects/PokemonSFX/charizard-megax.ogg",
+          "Assets/Sound Effects/PokemonSFX/charizard.ogg",
+          "Assets/Sound Effects/PokemonSFX/closecombat.ogg",
+          "Assets/Sound Effects/PokemonSFX/dragonclaw.ogg",
+          "Assets/Sound Effects/PokemonSFX/faint.ogg",
+          "Assets/Sound Effects/PokemonSFX/fireblast.ogg",
+          "Assets/Sound Effects/PokemonSFX/Flamethrower.mp3",
+          "Assets/Sound Effects/PokemonSFX/flamethrower.ogg",
+          "Assets/Sound Effects/PokemonSFX/greninja.ogg",
+          "Assets/Sound Effects/PokemonSFX/hit.ogg",
+          "Assets/Sound Effects/PokemonSFX/hit_strong.ogg",
+          "Assets/Sound Effects/PokemonSFX/hit_weak.ogg",
+          "Assets/Sound Effects/PokemonSFX/irontail-1.ogg",
+          "Assets/Sound Effects/PokemonSFX/irontail-2.ogg",
+          "Assets/Sound Effects/PokemonSFX/lucario-mega.ogg",
+          "Assets/Sound Effects/PokemonSFX/lucario.ogg",
+          "Assets/Sound Effects/PokemonSFX/machpunch.ogg",
+          "Assets/Sound Effects/PokemonSFX/nightslash-1.ogg",
+          "Assets/Sound Effects/PokemonSFX/nightslash-2.ogg",
+          "Assets/Sound Effects/PokemonSFX/pb_rel.ogg",
+          "Assets/Sound Effects/PokemonSFX/pb_throw.ogg",
+          "Assets/Sound Effects/PokemonSFX/pikachu-starter.ogg",
+          "Assets/Sound Effects/PokemonSFX/pikachu.ogg",
+          "Assets/Sound Effects/PokemonSFX/quickattack.ogg",
+          "Assets/Sound Effects/PokemonSFX/thunderbolt-1.ogg",
+          "Assets/Sound Effects/PokemonSFX/thunderbolt-2.ogg",
+          "Assets/Sound Effects/PokemonSFX/volttackle-1.ogg",
+          "Assets/Sound Effects/PokemonSFX/volttackle-2.ogg",
+          "Assets/Sound Effects/PokemonSFX/waterpulse-1.ogg",
+          "Assets/Sound Effects/PokemonSFX/waterpulse-2.ogg"
+        ]
+      },
       "Reze": {
         "folder": "Assets/Sound Effects/RezeSFX",
         "count": 2,
@@ -2952,6 +3805,20 @@
           "Assets/Sound Effects/Shiro/shiro_chessboard_turnon.mp3",
           "Assets/Sound Effects/Shiro/shiro_troop_buff_voiceline.mp3",
           "Assets/Sound Effects/Shiro/StarblessedPlatformActivate.ogg"
+        ]
+      },
+      "Sukuna": {
+        "folder": "Assets/Sound Effects/SukunaSFX",
+        "count": 1,
+        "files": [
+          "Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3"
+        ]
+      },
+      "Unarmed": {
+        "folder": "Assets/Sound Effects/UnarmedSFX",
+        "count": 1,
+        "files": [
+          "Assets/Sound Effects/UnarmedSFX/unarmed_wall_bump.mp3"
         ]
       }
     }

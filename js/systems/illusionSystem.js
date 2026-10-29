@@ -534,7 +534,7 @@ export function updateIllusions() {
     }
 
     // Ten Shadows: Sukuna's summoned Mahoraga drives its own movement, attacks, and lifetime
-    // inside sukunaMahoragaSummon.js (its HP/stun/knockback timers are still ticked above).
+    // inside sukunaMahoragaSummon.js (physics.js handles autonomous updating if owner is dead).
     if (illusion.isMahoragaSummon) {
       continue;
     }

@@ -25,6 +25,8 @@ export const pacmanConfig = {
   hideHands: true, // Classic round arcade ball body (hands hidden)
   hideWeapon: true,
   hideHair: true, // Classic faceless 8-bit sphere (no headband)
+  suppressFaahDeathSound: true, // Retro Pac-Man uses dedicated pac-man-death-sound.mp3 instead of generic faah announcer audio
+  suppressFaahOnDeath: true,
 
   // ── Core Dot-Eating & Arena Tile Mechanic ──
   dotRadius: 4,
@@ -60,8 +62,13 @@ export const pacmanConfig = {
   // ── Audio SFX Configuration ──
   sounds: {
     waka: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3',
+    waka2: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3',
     eatDot: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3',
+    eatDot2: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3',
     eatFruit: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3',
+    eatFruit2: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3',
+    eatSmallFruit: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3',
+    eatSmallFruit2: 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3',
     powerPellet: 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Big Fruit.mp3',
     eatBigFruit: 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Big Fruit.mp3',
     ghostTurnBlue: 'Assets/Sound Effects/PacmanSFX/Ghost - Turn to Blue.mp3',
@@ -72,8 +79,13 @@ export const pacmanConfig = {
   },
   soundVolumes: {
     waka: 0.70,
+    waka2: 0.70,
     eatDot: 0.70,
+    eatDot2: 0.70,
     eatFruit: 0.70,
+    eatFruit2: 0.70,
+    eatSmallFruit: 0.70,
+    eatSmallFruit2: 0.70,
     powerPellet: 0.90,
     eatBigFruit: 0.90,
     ghostTurnBlue: 0.85,
@@ -92,6 +104,14 @@ export const pacmanConfig = {
   set eatDotSound(v) { this.sounds.eatDot = v; },
   get eatDotVolume() { return this.soundVolumes.eatDot; },
   set eatDotVolume(v) { this.soundVolumes.eatDot = v; },
+  get eatDot2Sound() { return this.sounds.eatDot2; },
+  set eatDot2Sound(v) { this.sounds.eatDot2 = v; },
+  get eatDot2Volume() { return this.soundVolumes.eatDot2; },
+  set eatDot2Volume(v) { this.soundVolumes.eatDot2 = v; },
+  get eatFruitSound() { return this.sounds.eatFruit; },
+  set eatFruitSound(v) { this.sounds.eatFruit = v; },
+  get eatFruit2Sound() { return this.sounds.eatFruit2; },
+  set eatFruit2Sound(v) { this.sounds.eatFruit2 = v; },
   get eatBigFruitSound() { return this.sounds.eatBigFruit; },
   set eatBigFruitSound(v) { this.sounds.eatBigFruit = v; },
   get eatBigFruitVolume() { return this.soundVolumes.eatBigFruit; },

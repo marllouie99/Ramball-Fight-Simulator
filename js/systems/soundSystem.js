@@ -121,6 +121,8 @@ export function isVoicelineAudio(src) {
          s.includes('yutadomainexpansion') ||
          s.includes('domainexpansion') ||
          s.includes('shrine') ||
+         s.includes('sukuna_mahoraga_summon') ||
+         s.includes('mahoraga_summon') ||
          (s.includes('fuga') && !s.includes('travel') && !s.includes('explode') && !s.includes('ignite')) ||
          s.includes('mybestfriend') ||
          s.includes('bestfriend') ||

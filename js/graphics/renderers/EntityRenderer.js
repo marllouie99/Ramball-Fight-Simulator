@@ -285,7 +285,8 @@ export function drawFighters() {
   }
 
   // Check once per frame if any Mahoraga is currently adapting (wheel clicking)
-  const activeMaho = fighters ? fighters.find(f => f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0)) : null;
+  const activeMaho = (fighters ? fighters.find(f => f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0)) : null)
+    || (state.illusions ? state.illusions.find(ill => ill && ill.hp > 0 && (ill.isMahoragaSummon || ill.type === 'mahoraga') && (ill.wheelClickTimer > 0 || ill.adaptationPauseTimer > 0)) : null);
   let mahoDimAlpha = 0;
   if (activeMaho) {
     const timer = (activeMaho.adaptationPauseTimer && activeMaho.adaptationPauseTimer > 0) ? activeMaho.adaptationPauseTimer : activeMaho.wheelClickTimer;

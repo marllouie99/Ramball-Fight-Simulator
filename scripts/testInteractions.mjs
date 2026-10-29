@@ -10259,8 +10259,8 @@ async function runInteractionTests() {
     assert(sc.mahoragaSummonDuration === undefined && sc.mahoragaSummonDurationFrames === undefined, 'The Mahoraga summon must have NO lifetime cap in config');
     assert(typeof sc.mahoragaSummonStatScale === 'number' && sc.mahoragaSummonStatScale > 0, 'Sukuna config must define mahoragaSummonStatScale (Mahoraga attribute inheritance multiplier)');
     assert(CONFIG.mahoraga && CONFIG.mahoraga.hp > 0 && CONFIG.mahoraga.swordDamage > 0, 'CONFIG.mahoraga must expose the fighter attributes the summon inherits');
-    assert(sc.sounds && sc.sounds.mahoragaSummon, 'Sukuna config must register the Mahoraga summon audio source');
-    assert(sc.soundVolumes && typeof sc.soundVolumes.mahoragaSummon === 'number', 'Sukuna config must register the Mahoraga summon audio volume');
+    assert(sc.sounds && sc.sounds.mahoragaSummon === 'Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3', 'Sukuna config must register the Mahoraga summon audio source pointing to Assets/Sound Effects/SukunaSFX/sukuna_mahoraga_summon.mp3');
+    assert(sc.soundVolumes && typeof sc.soundVolumes.mahoragaSummon === 'number' && sc.soundVolumes.mahoragaSummon > 0, 'Sukuna config must register the Mahoraga summon audio volume > 0');
 
     const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
     const sukuna = new SukunaClass({ x: 150, y: 420, type: 'sukuna' });
@@ -10357,6 +10357,20 @@ async function runInteractionTests() {
     assert(minion.hp > hpBeforeAdapt - expectedHit, `Wheel click must restore RCT HP (from ${hpBeforeAdapt} to ${minion.hp})`);
     assert(minion.doubleDamageTimer > 0, 'Wheel click must open the double-damage window');
 
+    // 6b. Verify Arena Wheel Overlay and Golden Dim Screen recognize Sukuna's summoned Mahoraga minion
+    const { getActiveMahoragaEntity, drawMahoragaWheelArenaOverlay, drawMahoragaAdaptationDimScreen } = await import('../js/graphics/renderers/domainDimOverlays.js');
+    const resolvedMaho = getActiveMahoragaEntity();
+    assert(resolvedMaho === minion, 'getActiveMahoragaEntity must resolve Sukuna summoned Mahoraga minion during wheel click');
+    assert(minion.wheelClickTimer > 0 || minion.adaptationPauseTimer > 0, 'Minion must be flagged as clicking or in adaptation pause');
+    drawCtx.resetStackDepth();
+    state.ctx = drawCtx;
+    state.arena = arena;
+    state.canvas = { width: 800, height: 600 };
+    drawMahoragaWheelArenaOverlay();
+    assert(drawCtx.getStackDepth() === 0, `drawMahoragaWheelArenaOverlay must balance canvas stack for summoned minion, got ${drawCtx.getStackDepth()}`);
+    drawMahoragaAdaptationDimScreen();
+    assert(drawCtx.getStackDepth() === 0, `drawMahoragaAdaptationDimScreen must balance canvas stack for summoned minion, got ${drawCtx.getStackDepth()}`);
+
     // 7. Inherited AoE Cleave
     minion.adaptCooldown = 0;
     minion.cleaveTimer = 0;
@@ -10445,14 +10459,14 @@ async function runInteractionTests() {
     assert(!getSkillDataForFighter(sukuna, () => []).some((s) => s && s.id === 'mahoraga'), 'Disabled skill must be hidden from the Sukuna HUD');
     CONFIG.sukuna.enableMahoragaSummon = originalToggle;
 
-    // 13. Owner death dismisses the minion
+    // 13. Owner death does NOT dismiss the minion — Mahoraga continues fighting until one prevails
     sukuna.mahoragaSummonCooldown = 0;
     trySummonMahoraga(sukuna, 0, arena);
     assert(state.illusions.some((m) => m && m.isMahoragaSummon), 'Precondition: Mahoraga must be alive before owner death check');
     sukuna.hp = 0;
     sukuna.isDead = true;
     updateMahoragaSummon(sukuna, 0, arena);
-    assert(state.illusions.filter((m) => m && m.isMahoragaSummon).length === 0, 'Mahoraga must vanish when Sukuna dies');
+    assert(state.illusions.filter((m) => m && m.isMahoragaSummon).length === 1, 'Mahoraga must persist and keep fighting when Sukuna dies');
 
     // Cleanup
     dispelMahoragaSummon(sukuna, { silent: true, instantCooldown: true });
@@ -10460,6 +10474,7 @@ async function runInteractionTests() {
     sukuna._updateMeleeCombat = originalMelee;
     state.illusions = [];
     state.fighters = [];
+    state.gameState = 'playing';
     console.log('      ✅ Sukuna Ten Shadows Mahoraga Summon (spawn, AI, damage, no lifetime cap, friendly-fire immunity, death, toggle, HUD) verified successfully.');
     } finally {
       sc.enableMahoragaSummon = prevEnableMahoragaSummon;
@@ -10692,7 +10707,8 @@ async function runInteractionTests() {
       assert(topEl.innerHTML.includes('hud-top-player hud-top-p2 hud-top-team-col'), 'hudTopContainer must render .hud-top-team-col for teammates on the right side');
       assert(topEl.innerHTML.includes('hud-top-team-card hud-top-team-p2'), 'hud-top-team-col must contain .hud-top-team-p2 (Teammate 1)');
       assert(topEl.innerHTML.includes('hud-top-team-card hud-top-team-p3'), 'hud-top-team-col must contain .hud-top-team-p3 (Teammate 2)');
-      assert(topEl.innerHTML.includes('SUKUNA'), 'Teammate 1 must render Sukuna name');
+      const expectedSukunaName = (CONFIG.sukuna?.displayName || CONFIG.sukuna?.name || 'SUKUNA').toUpperCase();
+      assert(topEl.innerHTML.includes(expectedSukunaName), `Teammate 1 must render ${expectedSukunaName} name`);
       assert(topEl.innerHTML.includes('KNIGHT'), 'Teammate 2 must render Knight name');
 
       // Container and Duel modifier classes
@@ -11339,7 +11355,35 @@ async function runInteractionTests() {
     assert(pFlareSnd?.src !== 'Assets/Sound Effects/Skills/dash3.mp3', 'purple_flare must NOT use dash3.mp3');
     assert(rFlareSnd?.src !== 'Assets/Sound Effects/Skills/dash3.mp3', 'red_flare must NOT use dash3.mp3');
 
-    console.log('      ✅ Gojo Limitless Cursed Techniques (Purple, Red, Blue) 18-Frame Animated Sprite Pipeline & Canonical Flare Audio verified successfully.');
+    // 8. Reversal Red Deploy Audio Pipeline (redDeploy: Assets/Sound Effects/Skills/reddeploy.mp3)
+    assert(CONFIG.gojo?.sounds?.redDeploy === 'Assets/Sound Effects/Skills/reddeploy.mp3', 'Gojo redDeploy SFX must be Assets/Sound Effects/Skills/reddeploy.mp3');
+    const rDeploySnd = getSkillSound('gojo', 'red_deploy');
+    assert(rDeploySnd?.src === 'Assets/Sound Effects/Skills/reddeploy.mp3', 'getSkillSound("gojo", "red_deploy") must resolve to reddeploy.mp3');
+    assert((rDeploySnd?.volume ?? 0) > 0, 'redDeploy volume must be > 0');
+
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const redGojo = new GojoClass({ radius: 25, x: 200, y: 300, hp: 200 });
+    const redEnemy = new SukunaClass({ radius: 25, x: 400, y: 300, hp: 300 });
+    redGojo.reset();
+    redGojo._activateRed();
+    assert(redGojo.redBuildupPhase === true, 'Gojo must be in redBuildupPhase');
+    assert(redGojo._hasPlayedRedDeploySound === false, 'redDeploy sound must not play at start of buildup');
+
+    const RED_BUILDUP = CONFIG.gojo?.redBuildupFrames || 100;
+    const maxTimer = redGojo.redEffectMaxTimer || (RED_BUILDUP + 25);
+    redGojo.redEffectTimer = maxTimer - Math.floor(RED_BUILDUP * 0.75);
+    redGojo.update(redEnemy, 0, state.arena);
+    assert(redGojo._hasPlayedRedDeploySound === true, 'redDeploy sound must trigger at 75% buildup');
+
+    redGojo.cancelRed(false);
+    assert(redGojo._hasPlayedRedDeploySound === false, 'redDeploy flag must reset on cancelRed');
+
+    redGojo._activateRed();
+    assert(redGojo._hasPlayedRedDeploySound === false);
+    redGojo._detonateRed();
+    assert(redGojo._hasPlayedRedDeploySound === true, 'direct detonateRed must trigger redDeploy if not already played');
+
+    console.log('      ✅ Gojo Limitless Cursed Techniques (Purple, Red, Blue) 18-Frame Animated Sprite Pipeline, Canonical Flare & Red Deploy Audio verified successfully.');
   }
 
   // ── TEST: Sans Gaster Blaster Beam Stopped by Active Gojo Infinity & Knight Shield ──
@@ -13260,14 +13304,57 @@ async function runInteractionTests() {
     // 11. Verify Pac-Man Dedicated Audio SFX Configuration
     assert(pacman.sounds.death === 'Assets/Sound Effects/PacmanSFX/pac-man-death-sound.mp3', 'Pac-Man death sound path must match');
     assert(pacman.sounds.eatDot === 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3', 'Pac-Man eatDot sound path must match');
+    assert(pacman.sounds.eatDot2 === 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits2.mp3', 'Pac-Man eatDot2 sound path must match');
     assert(pacman.sounds.eatBigFruit === 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Big Fruit.mp3', 'Pac-Man eatBigFruit sound path must match');
     assert(pacman.sounds.ghostTurnBlue === 'Assets/Sound Effects/PacmanSFX/Ghost - Turn to Blue.mp3', 'Pac-Man ghostTurnBlue sound path must match');
     assert(pacman.sounds.eatGhost === 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Ghost.mp3', 'Pac-Man eatGhost sound path must match');
 
     let playedDeathSfx = null;
+    const origPacmanPlaySfx = pacman._playSfx;
     pacman._playSfx = (type) => { playedDeathSfx = type; };
     pacman.onDeath();
     assert(playedDeathSfx === 'death', 'Pac-Man onDeath must trigger death SFX');
+    pacman._playSfx = origPacmanPlaySfx;
+
+    // 11b. Verify faah.mp3 is SUPPRESSED upon Pac-Man death
+    let playedFaahAudio = false;
+    const origPlaySFX = audioSystem.playSFX;
+    audioSystem.playSFX = (src, ...args) => {
+      if (typeof src === 'string' && src.includes('faah')) {
+        playedFaahAudio = true;
+      }
+      return origPlaySFX ? origPlaySFX.call(audioSystem, src, ...args) : null;
+    };
+    pacman.hp = 10;
+    pacman.dead = false;
+    pacman.isDead = false;
+    pacman._hasDied = false;
+    state.gameState = 'playing';
+    pacman.takeDamage(100, zenitsu);
+    audioSystem.playSFX = origPlaySFX;
+    assert(playedFaahAudio === false, 'faah.mp3 announcer audio must NOT be played upon Pac-Man death');
+    state.gameState = 'playing';
+
+    // 11c. Verify Small Fruit Back-and-Forth Audio Alternation (pac-man_eat_fruits.mp3 <-> pac-man_eat_fruits2.mp3)
+    const playedMunchSounds = [];
+    pacman._playSfx = (type) => { playedMunchSounds.push(type); };
+    pacman._wakaSoundDebounce = 0;
+    pacman._wakaSoundToggle = false;
+
+    pacman._playWakaSfx(); // Munch 1: eatDot
+    pacman._wakaSoundDebounce = 0;
+    pacman._playWakaSfx(); // Munch 2: eatDot2
+    pacman._wakaSoundDebounce = 0;
+    pacman._playWakaSfx(); // Munch 3: eatDot
+    pacman._wakaSoundDebounce = 0;
+    pacman._playWakaSfx(); // Munch 4: eatDot2
+
+    pacman._playSfx = origPacmanPlaySfx;
+    assert(playedMunchSounds.length === 4, 'Must have played 4 munch sounds');
+    assert(playedMunchSounds[0] === 'eatDot', 'First small fruit munch must play eatDot');
+    assert(playedMunchSounds[1] === 'eatDot2', 'Second small fruit munch must play eatDot2');
+    assert(playedMunchSounds[2] === 'eatDot', 'Third small fruit munch must alternate back to eatDot');
+    assert(playedMunchSounds[3] === 'eatDot2', 'Fourth small fruit munch must alternate back to eatDot2');
 
     // 12. Verify Ghost Audio ("Ghost - Turn to Blue.mp3") Cutoff Mechanics
     const testZenitsuA = new ZenitsuFighter(100, 200, 1);
@@ -13366,7 +13453,12 @@ async function runInteractionTests() {
     assert(typeof BombermanClass === 'function', 'BombermanFighter must be available');
     const bomberman = new BombermanClass({ x: 180, y: 320, color: '#2563EB', controls: {} });
     bomberman.hp = bomberman.maxHp;
+    bomberman.isDead = false;
+    bomberman.dead = false;
     pacman.hp = pacman.maxHp;
+    pacman.isDead = false;
+    pacman.dead = false;
+    pacman._hasDied = false;
     pacman.x = 220;
     pacman.y = 320;
     state.fighters = [pacman, bomberman];
@@ -13425,6 +13517,549 @@ async function runInteractionTests() {
   }
 
   
+
+  // ─── Test 106: Domain Clash: Gojo Domain Expansion vs Active Domain Skill Durations ───
+  {
+    console.log('🧪 Test 106: Domain Clash: Gojo Domain Expansion vs Other Active Domain Skills Progression...');
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const YutaClass = FIGHTER_CLASS_MAP['yuta'];
+    const ZenitsuClass = FIGHTER_CLASS_MAP['zenitsu'];
+
+    assert(GojoClass && SukunaClass && YutaClass && ZenitsuClass, 'Required fighter classes must exist');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450 };
+    state.arena = testArena;
+
+    // 1. Sukuna Domain Active -> Gojo Opens Unlimited Void
+    const gojo = new GojoClass({ x: 200, y: 300, controls: {} });
+    const sukuna = new SukunaClass({ x: 280, y: 300, controls: {} });
+    state.fighters = [gojo, sukuna];
+
+    // Sukuna expands Malevolent Shrine
+    sukuna.domainActive = true;
+    sukuna.domainTimer = 500;
+    sukuna.divineFlameCooldown = 300;
+    const initialSukunaDomainTimer = sukuna.domainTimer;
+    const initialSukunaFlameCd = sukuna.divineFlameCooldown;
+    const sukunaStartX = sukuna.x;
+    const sukunaStartY = sukuna.y;
+
+    // Gojo expands Unlimited Void while Sukuna's domain is active
+    gojo._activateDomain(testArena);
+    assert(gojo.domainActive === true, 'Gojo domain must be active');
+    assert(sukuna.domainActive === true, 'Sukuna domain must remain active');
+
+    // Verify Sukuna IS FROZEN by Gojo domain cognitive overload (cannot move or cast skills)
+    assert(sukuna.timeStopTimer > 0, 'Sukuna MUST receive timeStopTimer from Gojo domain');
+    assert(sukuna._handleTimeStop() === true, 'Sukuna _handleTimeStop() must return true so fighter is frozen');
+    assert(sukuna.canAim() === false, 'Sukuna auto-aim must be disabled inside Gojo domain');
+    assert(sukuna.isChannelingDivineFlame === false, 'Sukuna must NOT be able to cast Fuga inside Gojo domain');
+
+    // Advance 10 frames
+    for (let f = 0; f < 10; f++) {
+      state.frameCount = (state.frameCount || 0) + 1;
+      sukuna.update(gojo, 1, testArena);
+      gojo.update(sukuna, 0, testArena);
+    }
+
+    // Verify Sukuna did NOT move or cast Fuga while inside Gojo's domain
+    assert(sukuna.vx === 0 && sukuna.vy === 0, 'Sukuna must NOT move (vx=0, vy=0) while frozen inside Gojo domain');
+    assert(sukuna.x === sukunaStartX && sukuna.y === sukunaStartY, 'Sukuna position must remain frozen in place inside Gojo domain');
+    assert(sukuna.isChannelingDivineFlame === false, 'Sukuna must NOT channel Fuga while inside Gojo domain');
+
+    // Verify Sukuna's domain timer and skill cooldowns CONTINUED to drain down without pausing
+    assert(sukuna.domainTimer < initialSukunaDomainTimer, `Sukuna domainTimer must drain down during domain clash (${initialSukunaDomainTimer} -> ${sukuna.domainTimer})`);
+    assert(sukuna.domainTimer <= initialSukunaDomainTimer - 10, 'Sukuna domainTimer must decrement across frames without pausing');
+    assert(sukuna.divineFlameCooldown < initialSukunaFlameCd, `Sukuna skill cooldown must drain down during domain clash (${initialSukunaFlameCd} -> ${sukuna.divineFlameCooldown})`);
+
+    // 2. Yuta Domain Active -> Gojo Opens Unlimited Void
+    const yuta = new YutaClass({ x: 320, y: 300, controls: {} });
+    state.fighters = [gojo, yuta];
+    yuta.domainActive = true;
+    yuta.domainTimer = 400;
+    const initialYutaDomainTimer = yuta.domainTimer;
+
+    gojo._applyDomainEffect();
+    assert(yuta.timeStopTimer > 0, 'Yuta MUST receive timeStopTimer from Gojo domain');
+    assert(yuta._handleTimeStop() === true, 'Yuta _handleTimeStop() must return true so Yuta is frozen inside Gojo domain');
+
+    // 3. Normal Fighter Without Active Domain (Zenitsu) -> MUST be frozen by Gojo Unlimited Void
+    const zenitsu = new ZenitsuClass(360, 300, 1);
+    state.fighters = [gojo, zenitsu];
+    gojo._applyDomainEffect();
+
+    assert(zenitsu.timeStopTimer > 0, 'Normal enemy without active domain MUST be frozen by Gojo Unlimited Void');
+    assert(zenitsu._handleTimeStop() === true, 'Normal enemy without active domain MUST have _handleTimeStop() return true inside Gojo domain');
+
+    state.fighters = [];
+    console.log('      ✅ Sukuna frozen stasis (zero movement, zero Fuga casting) and non-pausing skill durations verified.');
+  }
+
+  // ─── Test 107: Domain Expansion Cooldown Reset & HUD Progression (Gojo & Sukuna) ───
+  {
+    console.log('🧪 Test 107: Domain Expansion Cooldown Reset & HUD Progression (Gojo & Sukuna)...');
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const { HUD_SKILL_PROVIDERS } = await import('../js/graphics/ui/hudSkillProviders.js');
+
+    assert(GojoClass && SukunaClass, 'Required fighter classes must exist');
+    assert(HUD_SKILL_PROVIDERS, 'HUD_SKILL_PROVIDERS must exist');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450 };
+    state.arena = testArena;
+
+    // 1. Test Gojo Unlimited Void Cooldown Reset & Progression
+    {
+      const gojo = new GojoClass({ x: 200, y: 300, controls: {} });
+      const target = new SukunaClass({ x: 280, y: 300, controls: {} });
+      state.fighters = [gojo, target];
+
+      // Activate Gojo Domain
+      gojo._activateDomain(testArena);
+      assert(gojo.domainActive === true, 'Gojo domainActive must be true after _activateDomain()');
+      assert(gojo.domainTimer === 300, 'Gojo domainTimer must be initialized to 300');
+      assert(gojo.domainCooldown === 1200, 'Gojo domainCooldown must be initialized to 1200');
+
+      // Tick 15 frames while domain is active: domainTimer drains, domainCooldown MUST NOT prematurely tick down
+      for (let f = 0; f < 15; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        gojo.update(target, 0, testArena);
+      }
+      assert(gojo.domainTimer === 285, `Gojo domainTimer must decrement (expected 285, got ${gojo.domainTimer})`);
+      assert(gojo.domainCooldown === 1200, `Gojo domainCooldown must NOT tick down while domain is active (expected 1200, got ${gojo.domainCooldown})`);
+
+      // Fast-forward to domain expiry
+      gojo.domainTimer = 1;
+      state.frameCount = (state.frameCount || 0) + 1;
+      gojo.update(target, 0, testArena);
+
+      // Verify domain has expired
+      assert(gojo.domainActive === false, 'Gojo domainActive must be false after expiry');
+      assert(gojo.domainTimer <= 0, 'Gojo domainTimer must be <= 0');
+      assert(gojo.domainCooldown === 1200, `Gojo domainCooldown MUST reset to 1200 upon expiry (got ${gojo.domainCooldown})`);
+
+      // Check HUD skill provider output
+      const gojoSkills = HUD_SKILL_PROVIDERS.gojo(gojo);
+      const uvSkill = gojoSkills.find(s => s.id === 'uv');
+      assert(uvSkill, 'Gojo HUD must contain Unlimited Void (uv) skill bar');
+      assert(uvSkill.pct === 0, `Gojo UV HUD pct must be 0% immediately upon domain expiry (got ${uvSkill.pct}%)`);
+      assert(uvSkill.ready === false, 'Gojo UV HUD ready must be false while on cooldown');
+
+      // Advance 120 frames of cooldown
+      for (let f = 0; f < 120; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        gojo.update(target, 0, testArena);
+      }
+      assert(gojo.domainCooldown === 1080, `Gojo domainCooldown must tick down naturally after domain ends (expected 1080, got ${gojo.domainCooldown})`);
+      const gojoSkillsPost120 = HUD_SKILL_PROVIDERS.gojo(gojo);
+      const uvPost120 = gojoSkillsPost120.find(s => s.id === 'uv');
+      assert(Math.abs(uvPost120.pct - 10) < 0.001, `Gojo UV HUD pct must be ~10% after 120 frames (got ${uvPost120.pct}%)`);
+      assert(uvPost120.ready === false, 'Gojo UV HUD ready must remain false until 100%');
+
+      // Complete cooldown to 0
+      gojo.domainCooldown = 0;
+      const gojoSkillsReady = HUD_SKILL_PROVIDERS.gojo(gojo);
+      const uvReady = gojoSkillsReady.find(s => s.id === 'uv');
+      assert(uvReady.pct === 100, `Gojo UV HUD pct must be 100% when off cooldown (got ${uvReady.pct}%)`);
+      assert(uvReady.ready === true, 'Gojo UV HUD ready must be true when off cooldown');
+    }
+
+    // 2. Test Sukuna Malevolent Shrine Cooldown Reset & Progression
+    {
+      const sukuna = new SukunaClass({ x: 280, y: 300, controls: {} });
+      const target = new GojoClass({ x: 200, y: 300, controls: {} });
+      state.fighters = [sukuna, target];
+
+      // Activate Sukuna Domain
+      sukuna._activateDomain(testArena);
+      assert(sukuna.domainActive === true, 'Sukuna domainActive must be true after _activateDomain()');
+      assert(sukuna.domainTimer === 500, 'Sukuna domainTimer must be initialized to 500');
+      assert(sukuna.domainCooldown === 1200, 'Sukuna domainCooldown must be initialized to 1200');
+
+      // Tick 20 frames while domain is active: domainTimer drains, domainCooldown MUST NOT prematurely tick down
+      for (let f = 0; f < 20; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        sukuna.update(target, 0, testArena);
+      }
+      assert(sukuna.domainTimer === 480, `Sukuna domainTimer must decrement (expected 480, got ${sukuna.domainTimer})`);
+      assert(sukuna.domainCooldown === 1200, `Sukuna domainCooldown must NOT tick down while domain is active (expected 1200, got ${sukuna.domainCooldown})`);
+
+      // Fast-forward to domain expiry
+      sukuna.domainTimer = 1;
+      state.frameCount = (state.frameCount || 0) + 1;
+      sukuna.update(target, 0, testArena);
+
+      // Verify domain has expired
+      assert(sukuna.domainActive === false, 'Sukuna domainActive must be false after expiry');
+      assert(sukuna.domainTimer <= 0, 'Sukuna domainTimer must be <= 0');
+      assert(sukuna.domainCooldown === 1200, `Sukuna domainCooldown MUST reset to 1200 upon expiry (got ${sukuna.domainCooldown})`);
+
+      // Check HUD skill provider output
+      const sukunaSkills = HUD_SKILL_PROVIDERS.sukuna(sukuna);
+      const msSkill = sukunaSkills.find(s => s.id === 'ms');
+      assert(msSkill, 'Sukuna HUD must contain Malevolent Shrine (ms) skill bar');
+      assert(msSkill.pct === 0, `Sukuna MS HUD pct must be 0% immediately upon domain expiry (got ${msSkill.pct}%)`);
+      assert(msSkill.ready === false, 'Sukuna MS HUD ready must be false while on cooldown');
+
+      // Advance 120 frames of cooldown
+      for (let f = 0; f < 120; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        sukuna.update(target, 0, testArena);
+      }
+      assert(sukuna.domainCooldown === 1080, `Sukuna domainCooldown must tick down naturally after domain ends (expected 1080, got ${sukuna.domainCooldown})`);
+      const sukunaSkillsPost120 = HUD_SKILL_PROVIDERS.sukuna(sukuna);
+      const msPost120 = sukunaSkillsPost120.find(s => s.id === 'ms');
+      assert(Math.abs(msPost120.pct - 10) < 0.001, `Sukuna MS HUD pct must be ~10% after 120 frames (got ${msPost120.pct}%)`);
+      assert(msPost120.ready === false, 'Sukuna MS HUD ready must remain false until 100%');
+
+      // Complete cooldown to 0
+      sukuna.domainCooldown = 0;
+      const sukunaSkillsReady = HUD_SKILL_PROVIDERS.sukuna(sukuna);
+      const msReady = sukunaSkillsReady.find(s => s.id === 'ms');
+      assert(msReady.pct === 100, `Sukuna MS HUD pct must be 100% when off cooldown (got ${msReady.pct}%)`);
+      assert(msReady.ready === true, 'Sukuna MS HUD ready must be true when off cooldown');
+    }
+
+    state.fighters = [];
+    console.log('      ✅ Gojo Unlimited Void & Sukuna Malevolent Shrine domain cooldown reset (1200 frames / 20s), freeze prevention, and HUD 0%->100% progression verified.');
+  }
+
+  // ─── Test 108: Sukuna Ten Shadows (Mahoraga Summon) Black Hair Toggle ───
+  {
+    console.log('🧪 Test 108: Sukuna Ten Shadows (Mahoraga Summon) Black Hair Toggle Standard...');
+    const { _drawSukunaHair, _getSukunaHairImage, _getSukunaBlackHairImage, drawSukunaBody } = await import('../js/graphics/fighters/sukunaSkin.js');
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    assert(SukunaClass, 'SukunaClass must exist');
+    assert(typeof _drawSukunaHair === 'function', '_drawSukunaHair must be a function');
+    assert(typeof _getSukunaBlackHairImage === 'function', '_getSukunaBlackHairImage must be a function');
+
+    const blackImg = _getSukunaBlackHairImage();
+    const pinkImg = _getSukunaHairImage();
+    assert(blackImg, 'Black hair image loader must return an image object');
+    assert(pinkImg, 'Pink hair image loader must return an image object');
+    assert(blackImg.src.includes('Sukuna-hair-black.png'), 'Black hair image src must point to Sukuna-hair-black.png');
+
+    const mockCtx = createMockCtx();
+
+    // 1. Test with fighter instance having enableMahoragaSummon = 1 (Black Hair)
+    const sukunaWithMahoraga = new SukunaClass({ x: 200, y: 300, controls: {} });
+    sukunaWithMahoraga.enableMahoragaSummon = 1;
+    drawSukunaBody(mockCtx, sukunaWithMahoraga);
+    assert(mockCtx.getStackDepth() === 0, 'Canvas stack depth must be 0 after drawSukunaBody with black hair');
+
+    // 2. Test with fighter instance having enableMahoragaSummon = 0 (Pink Hair)
+    const sukunaWithoutMahoraga = new SukunaClass({ x: 200, y: 300, controls: {} });
+    sukunaWithoutMahoraga.enableMahoragaSummon = 0;
+    drawSukunaBody(mockCtx, sukunaWithoutMahoraga);
+    assert(mockCtx.getStackDepth() === 0, 'Canvas stack depth must be 0 after drawSukunaBody with pink hair');
+
+    // 3. Test direct _drawSukunaHair calls
+    _drawSukunaHair(mockCtx, 25, false, true); // Explicit black hair
+    assert(mockCtx.getStackDepth() === 0, 'Canvas stack depth must be 0 after _drawSukunaHair(black=true)');
+
+    _drawSukunaHair(mockCtx, 25, false, false); // Explicit pink hair
+    assert(mockCtx.getStackDepth() === 0, 'Canvas stack depth must be 0 after _drawSukunaHair(black=false)');
+
+    console.log('      ✅ Sukuna Ten Shadows (Mahoraga summon) black hair toggle and stack balance verified.');
+  }
+
+  // ─── Test 109: Sukuna Mahoraga Minion Outlives Summoner — Match Continues Until One Prevails ───
+  {
+    console.log('🧪 Test 109: Sukuna Mahoraga Minion Outlives Summoner — Match Continues Until One Prevails...');
+    const { trySummonMahoraga, handleMahoragaSummonDeath } = await import('../js/entities/fighters/sukuna/sukunaMahoragaSummon.js');
+    const { isFighterEffectivelyAlive, getClosestOpponent, updateFighters } = await import('../js/systems/physics.js');
+    const { updateIllusions } = await import('../js/systems/illusionSystem.js');
+
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    assert(SukunaClass && GojoClass, 'Fighter classes must exist');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+    const sukuna = new SukunaClass({ x: 200, y: 300, controls: {}, fighterIndex: 0 });
+    const gojo = new GojoClass({ x: 400, y: 300, controls: {}, fighterIndex: 1 });
+    sukuna.target = gojo;
+    gojo.target = sukuna;
+    sukuna.mahoragaSummonCooldown = 0;
+
+    state.fighters = [sukuna, gojo];
+    state.illusions = [];
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.scores = [0, 0];
+    state.arena = testArena;
+
+    // 1. Sukuna summons Mahoraga minion
+    const summoned = trySummonMahoraga(sukuna, 0, testArena);
+    assert(summoned === true, 'trySummonMahoraga must return true');
+    assert(sukuna.mahoragaMinion, 'sukuna.mahoragaMinion must exist');
+    assert(state.illusions.includes(sukuna.mahoragaMinion), 'Mahoraga minion must be in state.illusions');
+    assert(sukuna.mahoragaMinion.hp > 0, 'Mahoraga minion must have HP > 0');
+
+    // Finish emergence
+    sukuna.mahoragaMinion.spawnTimer = 0;
+    sukuna.mahoragaMinion.isAscending = false;
+
+    // 2. Sukuna dies while Mahoraga is alive!
+    sukuna.hp = 0;
+    sukuna._processFighterDeath(gojo, {});
+    assert(sukuna.dead === true, 'Sukuna must be marked as dead');
+    assert(sukuna.hp <= 0, 'Sukuna HP must be 0');
+
+    // 3. Mahoraga MUST NOT be dispelled and Sukuna must remain effectively alive
+    assert(sukuna.mahoragaMinion !== null, 'Mahoraga minion must NOT be dispelled upon Sukuna death');
+    assert(state.illusions.includes(sukuna.mahoragaMinion), 'Mahoraga minion must remain in state.illusions');
+    assert(sukuna.mahoragaMinion.hp > 0, 'Mahoraga minion must still have positive HP');
+    assert(sukuna.isEffectivelyAlive() === true, 'Sukuna isEffectivelyAlive() must return true while Mahoraga is alive');
+    assert(isFighterEffectivelyAlive(sukuna) === true, 'isFighterEffectivelyAlive(sukuna) must return true');
+
+    // 4. Match must NOT end
+    updateFighters();
+    updateIllusions();
+    assert(state.gameState === 'playing', `Match must remain 'playing' while Mahoraga fights (got ${state.gameState})`);
+
+    // 5. Opponent (Gojo) must target Mahoraga instead of dead Sukuna
+    const opponentTarget = getClosestOpponent(gojo);
+    assert(opponentTarget === sukuna.mahoragaMinion, 'Gojo must target Mahoraga minion when Sukuna is dead');
+    assert(gojo._isValidCombatTarget(sukuna.mahoragaMinion) === true, 'Mahoraga must be a valid combat target for Gojo');
+
+    // 6. Branch A: Mahoraga defeats Gojo -> Sukuna's team wins the round
+    gojo.hp = 0;
+    gojo._processFighterDeath(sukuna.mahoragaMinion, {});
+    updateFighters();
+    assert(state.gameState === 'roundEnd' || state.gameState === 'matchEnd', 'Round/match must end when Gojo is defeated');
+    assert(state.roundWinner === sukuna, 'Sukuna (team) must be declared roundWinner when Mahoraga prevails');
+
+    // 7. Branch B: Opponent defeats Mahoraga after Sukuna is already dead -> Opponent wins
+    // Reset state for Branch B
+    sukuna.hp = 0;
+    sukuna.dead = true;
+    sukuna.isDead = true;
+    sukuna._hasDied = true;
+    gojo.hp = 500;
+    gojo.dead = false;
+    gojo.isDead = false;
+    gojo._hasDied = false;
+    state.gameState = 'playing';
+    state.scores = [0, 0];
+    state.roundWinner = null;
+    state.matchWinner = null;
+
+    // Resummon Mahoraga for Branch B
+    sukuna.mahoragaSummonActive = false;
+    sukuna.mahoragaMinion = null;
+    state.illusions = [];
+    // Reset _hasDied temporarily so trySummonMahoraga can create the minion
+    sukuna._hasDied = false;
+    sukuna.dead = false;
+    sukuna.isDead = false;
+    sukuna.hp = 100;
+    trySummonMahoraga(sukuna, 0, testArena);
+    sukuna.hp = 0;
+    sukuna.dead = true;
+    sukuna.isDead = true;
+    sukuna._hasDied = true;
+    assert(sukuna.mahoragaMinion, 'Mahoraga must be re-summoned');
+    assert(sukuna.isEffectivelyAlive() === true, 'Sukuna must be effectively alive with Mahoraga');
+
+    // Gojo kills Mahoraga
+    sukuna.mahoragaMinion.hp = 0;
+    handleMahoragaSummonDeath(sukuna.mahoragaMinion);
+
+    assert(sukuna.mahoragaMinion === null, 'Mahoraga minion must be cleared on death');
+    assert(sukuna.isEffectivelyAlive() === false, 'Sukuna isEffectivelyAlive must be false after Mahoraga dies');
+    assert(isFighterEffectivelyAlive(sukuna) === false, 'isFighterEffectivelyAlive(sukuna) must be false');
+
+    updateFighters();
+    assert(state.gameState === 'roundEnd' || state.gameState === 'matchEnd', 'Round must end after Mahoraga is slain');
+    assert(state.roundWinner === gojo, 'Gojo must be declared roundWinner after defeating Mahoraga');
+
+    // Clean up
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Sukuna Mahoraga minion outlives summoner, fight continues, targeting verified, and both win outcomes verified.');
+  }
+
+  // ─── Test 110: Gojo Teleports Away From Enemy When Unlimited Void Domain Expires ───
+  {
+    console.log('🧪 Test 110: Gojo Teleports Away From Enemy When Unlimited Void Domain Expires...');
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    assert(GojoClass && SukunaClass, 'Fighter classes must exist');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+    const gojo = new GojoClass({ x: 270, y: 465, controls: {}, fighterIndex: 0 });
+    const sukuna = new SukunaClass({ x: 270, y: 465, controls: {}, fighterIndex: 1 });
+    gojo.target = sukuna;
+    sukuna.target = gojo;
+
+    state.fighters = [gojo, sukuna];
+    state.illusions = [];
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = testArena;
+
+    // 1. Activate Gojo's Domain (Unlimited Void)
+    gojo._activateDomain(testArena);
+    assert(gojo.domainActive === true, 'Gojo domainActive must be true after activation');
+    assert(gojo.isMeleeMode === true, 'Gojo isMeleeMode must be true during domain');
+    assert(gojo.forcedMeleeTimer > 0, 'Gojo forcedMeleeTimer must be > 0 during domain');
+    assert(sukuna.timeStopTimer > 0, 'Enemy must be trapped in time-stop during domain');
+
+    // Record pre-expiration positions
+    const initialDist = Math.hypot(gojo.x - sukuna.x, gojo.y - sukuna.y);
+
+    // 2. Set domain timer to 1 and tick update to trigger expiration
+    gojo.domainTimer = 1;
+    gojo.update(sukuna, 0, testArena);
+
+    // 3. Verify domain expired cleanly
+    assert(gojo.domainActive === false, 'Gojo domainActive must be false after expiry');
+    assert(gojo.isMeleeMode === false, 'Gojo isMeleeMode must be false after expiry');
+    assert(gojo.forcedMeleeTimer === 0, 'Gojo forcedMeleeTimer must be 0 after expiry');
+
+    // 4. Verify Gojo teleported away to long range
+    const postExpiryDist = Math.hypot(gojo.x - sukuna.x, gojo.y - sukuna.y);
+    assert(postExpiryDist >= 180, `Gojo must teleport away from enemy upon domain expiry (distance: ${postExpiryDist}px >= 180px)`);
+    assert(gojo.afterImages && gojo.afterImages.length > 0, 'Gojo must spawn teleport afterimage trail upon disengaging');
+
+    // 5. Verify arena boundary safety (inside playable arena)
+    assert(gojo.x >= testArena.x && gojo.x <= testArena.x + testArena.width, 'Gojo X must remain within arena bounds');
+    assert(gojo.y >= testArena.y && gojo.y <= testArena.y + testArena.height, 'Gojo Y must remain within arena bounds');
+
+    // 6. Verify enemy unfreeze & slow debuff
+    assert(sukuna.timeStopTimer === 0, 'Enemy must be unfrozen when Gojo domain expires');
+    assert((sukuna.slowTimer > 0) || (sukuna.slowMultiplier < 1.0), 'Enemy must receive post-domain slow debuff');
+
+    // Clean up
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Gojo automatically teleports away to long range, unfreezes enemy, and resets melee lock upon domain expiration.');
+  }
+
+  // ─── Test 111: Minion Mahoraga Speed Parity, Adaptation Scaling & Attack Cadence ───
+  {
+    console.log('🧪 Test 111: Minion Mahoraga Speed Parity, Adaptation Scaling & Attack Cadence...');
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const MahoragaClass = FIGHTER_CLASS_MAP['mahoraga'];
+    assert(SukunaClass && MahoragaClass, 'Fighter classes must exist');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+    const sukuna = new SukunaClass({ x: 270, y: 350, controls: {}, fighterIndex: 0 });
+    const dummyOpponent = new SukunaClass({ x: 270, y: 550, controls: {}, fighterIndex: 1 });
+    const standaloneMahoraga = new MahoragaClass({ x: 270, y: 400, controls: {}, fighterIndex: 2 });
+
+    state.fighters = [sukuna, dummyOpponent, standaloneMahoraga];
+    state.illusions = [];
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = testArena;
+    state.frameCount = 100;
+
+    // A. Verify Minion Spawn & Base Speed Parity
+    const { trySummonMahoraga, updateMahoragaSummon } = await import('../js/entities/fighters/sukuna/sukunaMahoragaSummon.js');
+    sukuna.target = dummyOpponent;
+    sukuna.mahoragaSummonCooldown = 0;
+    const summoned = trySummonMahoraga(sukuna, 0, testArena);
+    assert(summoned === true, 'Sukuna must summon Mahoraga successfully');
+    const minion = sukuna.mahoragaMinion;
+    assert(minion, 'Mahoraga minion instance must exist');
+    assert(Math.abs(minion.speed - standaloneMahoraga.speed) < 0.01, `Minion speed (${minion.speed}) must match Fighter Mahoraga (${standaloneMahoraga.speed})`);
+
+    // B. Verify Cooldown Rate of Decay Parity (Minion matches Fighter Mahoraga exactly)
+    minion.swordCooldown = 20;
+    standaloneMahoraga.swordCooldown = 20;
+    state.frameCount = 101;
+    minion._lastCooldownTickFrame = undefined;
+    standaloneMahoraga._lastCooldownTickFrame = undefined;
+
+    minion.update(dummyOpponent, 0, testArena);
+    standaloneMahoraga.update(dummyOpponent, 2, testArena);
+
+    assert(minion.swordCooldown === standaloneMahoraga.swordCooldown, `Minion swordCooldown (${minion.swordCooldown}) must match Fighter Mahoraga (${standaloneMahoraga.swordCooldown})`);
+    assert(minion.swordCooldown === 17, `Mahoraga swordCooldown must decrement at his authentic 3-tick combat rate (was: ${minion.swordCooldown})`);
+
+    // C. Verify Multi-Stage Adaptation Speed Scaling Parity & Bounded Wall Rebounds
+    const { triggerAdaptation } = await import('../js/entities/fighters/mahoraga/mahoragaAdaptation.js');
+    // Apply 4 adaptations to both
+    for (let i = 0; i < 4; i++) {
+      triggerAdaptation(minion, 'melee', dummyOpponent);
+      triggerAdaptation(standaloneMahoraga, 'melee', dummyOpponent);
+    }
+    assert(Math.abs(minion.speed - standaloneMahoraga.speed) < 0.1, `After 4 adaptations, Minion speed (${minion.speed.toFixed(2)}) must match Fighter Mahoraga (${standaloneMahoraga.speed.toFixed(2)})`);
+    assert(minion.speed < 15.0, `Minion speed must scale reasonably without runaway compounding (was: ${minion.speed})`);
+
+    // D. Verify Wall Rebound Dash Speed Bounds & Attack Cooldown Reset
+    minion.x = testArena.x + 2; // Against left wall
+    minion.vx = -10;
+    minion.swordCooldown = 15;
+    minion.resolveWallBounce(testArena, dummyOpponent);
+    const reboundSpeed = Math.hypot(minion.vx, minion.vy);
+    assert(reboundSpeed <= 25.0, `Wall rebound dash speed must be bounded (got: ${reboundSpeed.toFixed(2)} <= 25.0)`);
+    assert(minion.swordCooldown === 0, 'Wall bounce dash resets sword cooldown for authentic rebound strike');
+
+    // Clean up
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Minion Mahoraga base speed parity, authentic rapid cooldown decay, adaptation speed scaling, and bounded wall rebound dash verified.');
+  }
+
+  // 🧪 Test 112: Gojo Melee Mode Duration, Expiry Disengage, Infinity Re-Arm & Separation Cooldown Standard
+  {
+    console.log('🧪 Test 112: Gojo Melee Mode Duration, Expiry Disengage, Infinity Re-Arm & Separation Cooldown Standard...');
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4, shape: 'rect' };
+    const GojoClass = FIGHTER_CLASS_MAP.gojo;
+    const SukunaClass = FIGHTER_CLASS_MAP.sukuna;
+    assert(GojoClass && SukunaClass, 'Fighter classes must exist');
+
+    const gojo = new GojoClass({ x: 270, y: 465, controls: {}, fighterIndex: 0 });
+    const sukuna = new SukunaClass({ x: 270, y: 500, controls: {}, fighterIndex: 1 }); // 35px away (close contact)
+    gojo.target = sukuna;
+    sukuna.target = gojo;
+
+    state.fighters = [gojo, sukuna];
+    state.illusions = [];
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.arena = testArena;
+    state.frameCount = 100;
+
+    // 1. Enter Melee Mode
+    gojo.meleeModeCooldown = 0;
+    gojo.update(sukuna, 0, testArena);
+    assert(gojo.isMeleeMode === true, 'Gojo must enter Melee Mode when in close contact');
+    assert(gojo.forcedMeleeTimer > 0, `Gojo forcedMeleeTimer must be initialized (got: ${gojo.forcedMeleeTimer})`);
+    assert(gojo.infinityActive === false, 'Gojo Limitless Infinity must be down during Melee Mode');
+
+    // 2. While duration is active, Gojo stays in melee mode despite close proximity
+    gojo.forcedMeleeTimer = 50;
+    gojo.update(sukuna, 0, testArena);
+    assert(gojo.isMeleeMode === true, 'Gojo must remain in Melee Mode while forcedMeleeTimer > 0');
+    assert(gojo.forcedMeleeTimer === 49, `forcedMeleeTimer must decrement each frame (got: ${gojo.forcedMeleeTimer})`);
+
+    // 3. When duration expires (forcedMeleeTimer reaches 0), Gojo MUST disengage immediately
+    gojo.forcedMeleeTimer = 1;
+    gojo.update(sukuna, 0, testArena);
+    assert(gojo.isMeleeMode === false, 'Gojo MUST exit Melee Mode when forcedMeleeTimer expires');
+    assert(gojo.forcedMeleeTimer === 0, 'forcedMeleeTimer must be 0 after disengage');
+    assert(gojo.meleeModeCooldown >= 180, `meleeModeCooldown must be set to mandatory separation cooldown (got: ${gojo.meleeModeCooldown})`);
+
+    // 4. Verify Gojo teleported away to long range
+    const postDisengageDist = Math.hypot(gojo.x - sukuna.x, gojo.y - sukuna.y);
+    assert(postDisengageDist >= 180, `Gojo must teleport away from enemy upon melee mode expiry (distance: ${postDisengageDist.toFixed(1)}px >= 180px)`);
+    assert(gojo.infinityActive === true, 'Gojo Limitless Infinity must re-arm upon disengaging to Ranged Mode');
+
+    // 5. During meleeModeCooldown, close contact must NOT re-enter melee mode
+    gojo.x = sukuna.x + 30; // Close contact again
+    gojo.y = sukuna.y;
+    gojo.update(sukuna, 0, testArena);
+    assert(gojo.isMeleeMode === false, 'Gojo must NOT re-enter Melee Mode while meleeModeCooldown is active');
+
+    // Clean up
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Gojo melee mode duration, automatic disengage on expiry, Infinity re-arm, and separation cooldown verified cleanly.');
+  }
 
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');
 }

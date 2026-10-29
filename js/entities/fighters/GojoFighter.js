@@ -49,7 +49,7 @@ export class GojoFighter extends Fighter {
     this._hasPlayedPurpleChannelSound = false;
     this._purpleChargeSoundHandle = null;
 
-    this.domainCooldown = CONFIG.gojo.domainCooldown ?? 2000; // Initial cast delay reads from CONFIG
+    this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainCooldown !== undefined) ? CONFIG.gojo.domainCooldown : 1200; // Initial cast delay reads from CONFIG
     this.domainActive = false;
     this.domainTimer = 0;
     this.domainChargeTimer = 0;
@@ -148,15 +148,21 @@ export class GojoFighter extends Fighter {
         name: 'Unlimited Void',
         type: 'domain',
         cooldownKey: 'domainCooldown',
-        cooldownMax: () => CONFIG.gojo?.domainCooldown || 2000,
+        cooldownMax: () => (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainCooldown !== undefined) ? CONFIG.gojo.domainCooldown : 1200,
         durationKey: 'domainTimer',
-        durationMax: () => CONFIG.gojo?.domainDuration || 400,
+        durationMax: () => (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainDuration !== undefined) ? CONFIG.gojo.domainDuration : 300,
         activeKey: 'domainActive',
         channelingKey: 'isChannelingDomainExpansion',
         channelTimerKey: 'domainChargeTimer',
+        resetCooldownOnExpire: true,
+        canTickCooldown: (fighter) => !fighter.domainActive && (fighter.domainTimer || 0) <= 0,
         canTickCooldownInFreeze: true,
         onExpire: (fighter) => {
-          fighter.domainActive = false;
+          const opp = (fighter.target && fighter._isValidCombatTarget(fighter.target))
+            ? fighter.target
+            : (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
+          const currentArena = (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+          fighter._onDomainExpired(opp, currentArena);
         }
       });
     }
@@ -208,9 +214,11 @@ export class GojoFighter extends Fighter {
     this.is200PercentChannel = false;
     this.purpleChargeTimer = 0;
     this.purpleChargeMax = CONFIG.gojo.purpleChargeMax || 120;
-    this.domainCooldown = CONFIG.gojo.domainCooldown ?? 2000;
+    this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainCooldown !== undefined) ? CONFIG.gojo.domainCooldown : 1200;
     this.domainActive = false;
     this.domainTimer = 0;
+    this._hasHandledDomainExpiry = false;
+    this._wasDomainActiveLastTick = false;
     this.domainChargeTimer = 0;
     this.domainChargeMax = CONFIG.gojo.domainChargeMax || 130;
     this.isChannelingDomainExpansion = false;
@@ -254,6 +262,9 @@ export class GojoFighter extends Fighter {
     if (typeof modStopGojoRedAudio === 'function') {
       modStopGojoRedAudio(this);
     }
+    this._hasPlayedRedChannelingSound = false;
+    this._hasPlayedRedFlareSound = false;
+    this._hasPlayedRedDeploySound = false;
     if (this._redChannelingSoundHandle) {
       stopSound(this._redChannelingSoundHandle);
       this._redChannelingSoundHandle = null;
@@ -261,6 +272,10 @@ export class GojoFighter extends Fighter {
     if (this._redChargingSoundHandle) {
       stopSound(this._redChargingSoundHandle);
       this._redChargingSoundHandle = null;
+    }
+    if (this._redDeploySoundHandle) {
+      stopSound(this._redDeploySoundHandle);
+      this._redDeploySoundHandle = null;
     }
     if (this._redBlastSoundHandle) {
       stopSound(this._redBlastSoundHandle);
@@ -293,6 +308,8 @@ export class GojoFighter extends Fighter {
       this.redCommittedSide = null;
       this._redTargetRef = null;
       this._hasPlayedRedChannelingSound = false;
+      this._hasPlayedRedFlareSound = false;
+      this._hasPlayedRedDeploySound = false;
       if (applyPenalty) {
         const penaltyCD = CONFIG.gojo?.interruptCooldown ?? 270;
         this.redCooldown = Math.max(this.redCooldown || 0, penaltyCD);
@@ -1012,57 +1029,7 @@ export class GojoFighter extends Fighter {
         this.domainTimer--;
       }
       if (this.domainTimer <= 0) {
-        this.domainActive = false;
-        this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
-        this.isMeleeMode = false;
-        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Enforce separation
-        this.postDomainFadeInTimer = 90; // ~1.5 seconds of fade-in after domain ends
-
-        // Unfreeze all enemy fighters when Gojo's domain expires and apply slow movement debuff!
-        const slowDur = CONFIG.gojo?.domainPostSlowDuration ?? 180; // 3.0s slow
-        const slowMult = CONFIG.gojo?.domainPostSlowMultiplier ?? 0.35; // 35% movement speed
-
-        if (state.fighters) {
-          const myIdx = state.fighters.indexOf(this);
-          const currentTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : (this.team !== undefined ? this.team : null);
-          state.fighters.forEach(f => {
-            if (f && f !== this && f.hp > 0) {
-              const isEnemy = currentTeam === null || (state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(f)) !== currentTeam : f.team !== this.team);
-              f.timeStopTimer = 0;
-              f.hitStunTimer = 0;
-              delete f._timeStopOriginalDuration;
-              delete f._timeStopStartTime;
-              delete f._timeStopFrozenAngle;
-              delete f._timeStopFrozenGunAngle;
-
-              if (isEnemy && (!f.domainImmunity && !f.gojoDomainAdapted && !f.gojoAdapted?.domain && f.characterId !== 'toji' && f.type !== 'toji')) {
-                if (typeof f.applySlow === 'function') {
-                  f.applySlow(slowDur, slowMult, { isDomainSlow: true });
-                } else {
-                  f.slowTimer = Math.max(f.slowTimer || 0, slowDur);
-                  f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMult);
-                }
-                if (typeof spawnFloatingText === 'function') {
-                  spawnFloatingText(f.x, f.y - f.r - 20, 'SLOWED!', '#BF5AF2', 20);
-                }
-              }
-            }
-          });
-        }
-        if (state.illusions) {
-          state.illusions.forEach(ill => {
-            if (ill && ill.owner !== this && ill.hp > 0) {
-              ill.timeStopTimer = 0;
-              ill.hitStunTimer = 0;
-              if (typeof ill.applySlow === 'function') {
-                ill.applySlow(slowDur, slowMult, { isDomainSlow: true });
-              } else {
-                ill.slowTimer = Math.max(ill.slowTimer || 0, slowDur);
-                ill.slowMultiplier = Math.min(ill.slowMultiplier || 1.0, slowMult);
-              }
-            }
-          });
-        }
+        this._onDomainExpired(opponent, arena);
       } else {
         // Force hand-to-hand combat during domain expansion!
         this.isMeleeMode = true;
@@ -1070,7 +1037,10 @@ export class GojoFighter extends Fighter {
         this.meleeModeCooldown = 0;
         this._applyDomainEffect();
       }
+    } else if (this._wasDomainActiveLastTick && (this.domainTimer || 0) <= 0) {
+      this._onDomainExpired(opponent, arena);
     }
+    this._wasDomainActiveLastTick = Boolean(this.domainActive);
 
     if (this.redEffectTimer > 0) {
       this.redEffectTimer--;
@@ -1173,8 +1143,8 @@ export class GojoFighter extends Fighter {
       // Rule #1: Cancel active channeling/skills
       this.interruptAttacks(true);
       // Ensure Gojo resets to Ranged mode with Infinity active when distanced from enemy only after forced melee expires
-      const leaveDistCheck = CONFIG.gojo?.leaveMeleeRadius ?? 130;
-      if (this.isMeleeMode && (this.forcedMeleeTimer <= 0) && (!opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > leaveDistCheck || this.paralyzeTimer > 0)) {
+      const leaveDistCheck = CONFIG.gojo?.leaveMeleeRadius ?? 150;
+      if (this.isMeleeMode && ((this.forcedMeleeTimer || 0) <= 0 || !opponent || Math.hypot(opponent.x - this.x, opponent.y - this.y) > leaveDistCheck || this.paralyzeTimer > 0)) {
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
       }
@@ -1197,7 +1167,29 @@ export class GojoFighter extends Fighter {
       // Detonation threshold — trigger exactly once when buildup window ends
       const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 100;
       const redRemaining = this.redEffectTimer;
-      const redMax = this.redEffectMaxTimer;
+      const redMax = this.redEffectMaxTimer || (RED_BUILDUP_FRAMES + 25);
+      const elapsed = redMax - redRemaining;
+      const buildProg = elapsed / RED_BUILDUP_FRAMES;
+
+      if (buildProg >= 0.75 && this.redBuildupPhase && !this.redDetonated) {
+        if (!this._hasPlayedRedFlareSound) {
+          this._hasPlayedRedFlareSound = true;
+          const fId = this.characterId || this.id || this._def?.id;
+          const sFlare = getSkillSound(fId, 'red_flare');
+          const flareSrc = sFlare?.src || CONFIG.gojo?.sounds?.redFlare || 'Assets/Sound Effects/SkillEffects/flare.mp3';
+          const flareVol = sFlare?.volume ?? (CONFIG.gojo?.soundVolumes?.redFlare ?? 0.85);
+          audioSystem.playSFX(flareSrc, flareVol);
+        }
+        if (!this._hasPlayedRedDeploySound) {
+          this._hasPlayedRedDeploySound = true;
+          const fId = this.characterId || this.id || this._def?.id;
+          const sDeploy = getSkillSound(fId, 'red_deploy');
+          const deploySrc = sDeploy?.src || CONFIG.gojo?.sounds?.redDeploy || 'Assets/Sound Effects/Skills/reddeploy.mp3';
+          const deployVol = sDeploy?.volume ?? (CONFIG.gojo?.soundVolumes?.redDeploy ?? 2.5);
+          this._redDeploySoundHandle = audioSystem.playSFX(deploySrc, deployVol);
+        }
+      }
+
       if (this.redBuildupPhase && redRemaining <= redMax - RED_BUILDUP_FRAMES && !this.redDetonated) {
         this.redBuildupPhase = false;
         this._detonateRed();
@@ -1231,7 +1223,11 @@ export class GojoFighter extends Fighter {
 
     if (!this.isChannelingDomainExpansion) this._hasPlayedDomainChannelSound = false;
     if (!this.isChannelingPurple) this._hasPlayedPurpleChannelSound = false;
-    if (this.redEffectTimer <= 0) this._hasPlayedRedChannelingSound = false;
+    if (this.redEffectTimer <= 0) {
+      this._hasPlayedRedChannelingSound = false;
+      this._hasPlayedRedFlareSound = false;
+      this._hasPlayedRedDeploySound = false;
+    }
 
     if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
     if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
@@ -1396,6 +1392,19 @@ export class GojoFighter extends Fighter {
       }
     }
 
+    if (!hasLivingEnemies && state.illusions) {
+      for (let i = 0; i < state.illusions.length; i++) {
+        const ill = state.illusions[i];
+        if (ill && this._isValidCombatTarget(ill) && (ill.vanishTimer || 0) <= 0) {
+          const isEnemy = myTeam === null || (ill.owner && state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(ill.owner)) !== myTeam : ill.team !== this.team);
+          if (isEnemy) {
+            hasLivingEnemies = true;
+            break;
+          }
+        }
+      }
+    }
+
     if (isMatchEnded || !hasLivingEnemies) {
       this.cancelRed(false);
       this.interruptAttacks(false); // Cancel channeling skills without hard-canceling punch animation
@@ -1423,7 +1432,7 @@ export class GojoFighter extends Fighter {
       if (isSilenced && this.isTargetOfAmbush) {
         this.isDomainPreSlide = false;
         this.domainPreSlideTimer = 0;
-        this.domainCooldown = CONFIG.gojo?.domainCooldown || 2000;
+        this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainCooldown !== undefined) ? CONFIG.gojo.domainCooldown : 1200;
         return;
       }
 
@@ -1495,7 +1504,7 @@ export class GojoFighter extends Fighter {
     }
 
     const validDomainOpponent = (opponent && this._isValidCombatTarget(opponent) && this.hasSpottedEnemy(opponent, arena)) || (typeof this._findSpottedEnemy === 'function' ? this._findSpottedEnemy() : null);
-    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && validDomainOpponent && !validDomainOpponent.isDead) {
+    if (this.isSkillEnabled(CONFIG.gojo?.enableDomain, true) && !this.isDemoFighter && !isSilenced && !inRubbickVoid && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0 && !this.isChannelingAnySkill() && !this.isPurpleActive() && !this.domainActive && this.domainCooldown <= 0 && (this.globalSkillCooldown || 0) <= 0 && (this.forcedMeleeTimer || 0) <= 0 && validDomainOpponent && !validDomainOpponent.isDead) {
       this.isMeleeMode = false;
       this.forcedMeleeTimer = 0;
       this.punchAnimTimer = 0;
@@ -1530,7 +1539,7 @@ export class GojoFighter extends Fighter {
       if (isSilenced && this.isTargetOfAmbush) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
-        this.domainCooldown = CONFIG.gojo?.domainCooldown || 1500;
+        this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainCooldown !== undefined) ? CONFIG.gojo.domainCooldown : 1200;
         return;
       }
       this.domainChargeTimer++;
@@ -1841,11 +1850,11 @@ export class GojoFighter extends Fighter {
     // Handle Melee / Ranged transitions
     if (!this.domainActive && !this.isChannelingAnySkill() && !this.isPurpleActive() && (this.purpleRecoveryTimer || 0) <= 0) {
       if (this.isMeleeMode) {
-        if (this.forcedMeleeTimer <= 0 && closestEnemyDist > leaveMeleeRadius) {
+        if ((this.forcedMeleeTimer || 0) <= 0) {
           this.isMeleeMode = false;
           this.forcedMeleeTimer = 0;
           this.meleeComboCount = 0;
-          this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 180;
+          this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 240;
           this._teleportAwayFrom(opponent, arena);
         }
       } else if (this.isSkillEnabled(CONFIG.gojo?.enableMeleeMode, true) && isBeingMeleed && (this.meleeModeCooldown || 0) <= 0 && !this.isCaughtInNaoyaStasisOrUlt()) {
@@ -2213,11 +2222,11 @@ export class GojoFighter extends Fighter {
     if (!this.domainActive) {
       const currentDist = Math.hypot(this.x - opponent.x, (this.y - (this.z || 0)) - (opponent.y - (opponent.z || 0)));
       const leaveMeleeRadius = CONFIG.gojo?.leaveMeleeRadius ?? ((CONFIG.gojo?.closeRangeRadius ?? 80) + 40);
-      if (this.forcedMeleeTimer <= 0 && currentDist > leaveMeleeRadius) {
+      if ((this.forcedMeleeTimer || 0) <= 0) {
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
         this.meleeComboCount = 0;
-        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 180;
+        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 240;
         this._teleportAwayFrom(opponent, arena);
         return;
       }
@@ -2275,7 +2284,7 @@ export class GojoFighter extends Fighter {
       if (!this.domainActive && (this.forcedMeleeTimer || 0) <= 0) {
         this.isMeleeMode = false;
         this.forcedMeleeTimer = 0;
-        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 180; // Mandatory ranged separation!
+        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 240; // Mandatory ranged separation!
         this._teleportAwayFrom(opponent, arena);
         return;
       }
@@ -2286,20 +2295,108 @@ export class GojoFighter extends Fighter {
   }
 
   /**
-   * Teleports Gojo away to range when transitioning out of melee mode
+   * Cleans up Unlimited Void upon expiration:
+   * - Resets domainActive and melee lock
+   * - Restores domain cooldown
+   * - Immediately teleports Gojo away from the opponent to range
+   * - Unfreezes all trapped fighters/illusions and applies post-domain slow
    */
-  _teleportAwayFrom(opponent, arena) {
+  _onDomainExpired(opponent = null, arena = null) {
+    if (this._hasHandledDomainExpiry) return;
+    this._hasHandledDomainExpiry = true;
+
+    this.domainActive = false;
+    this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainCooldown !== undefined) ? CONFIG.gojo.domainCooldown : 1200;
+    this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
+    this.isMeleeMode = false;
+    this.meleeComboCount = 0;
+    this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Enforce separation
+    this.postDomainFadeInTimer = 90; // ~1.5 seconds of fade-in after domain ends
+
+    const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
     const opp = (opponent && this._isValidCombatTarget(opponent))
       ? opponent
       : ((this.target && this._isValidCombatTarget(this.target))
         ? this.target
         : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
-    if (!opp || this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0) return;
+
+    // Teleport Gojo away from the enemy upon domain expiration!
+    if (!this.isDead && this.hp > 0) {
+      this._teleportAwayFrom(opp, currentArena, true);
+    }
+
+    // Unfreeze all enemy fighters when Gojo's domain expires and apply slow movement debuff!
+    const slowDur = CONFIG.gojo?.domainPostSlowDuration ?? 180; // 3.0s slow
+    const slowMult = CONFIG.gojo?.domainPostSlowMultiplier ?? 0.35; // 35% movement speed
+
+    if (state.fighters) {
+      const myIdx = state.fighters.indexOf(this);
+      const currentTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : (this.team !== undefined ? this.team : null);
+      state.fighters.forEach(f => {
+        if (f && f !== this && f.hp > 0) {
+          const isEnemy = currentTeam === null || (state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(f)) !== currentTeam : f.team !== this.team);
+          f.timeStopTimer = 0;
+          f.hitStunTimer = 0;
+          delete f._timeStopOriginalDuration;
+          delete f._timeStopStartTime;
+          delete f._timeStopFrozenAngle;
+          delete f._timeStopFrozenGunAngle;
+
+          if (isEnemy && (!f.domainImmunity && !f.gojoDomainAdapted && !f.gojoAdapted?.domain && f.characterId !== 'toji' && f.type !== 'toji')) {
+            if (typeof f.applySlow === 'function') {
+              f.applySlow(slowDur, slowMult, { isDomainSlow: true });
+            } else {
+              f.slowTimer = Math.max(f.slowTimer || 0, slowDur);
+              f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMult);
+            }
+            if (typeof spawnFloatingText === 'function') {
+              spawnFloatingText(f.x, f.y - f.r - 20, 'SLOWED!', '#BF5AF2', 20);
+                }
+              }
+            }
+          });
+        }
+        if (state.illusions) {
+          state.illusions.forEach(ill => {
+            if (ill && ill.owner !== this && ill.hp > 0) {
+              ill.timeStopTimer = 0;
+              ill.hitStunTimer = 0;
+              if (typeof ill.applySlow === 'function') {
+                ill.applySlow(slowDur, slowMult, { isDomainSlow: true });
+              } else {
+                ill.slowTimer = Math.max(ill.slowTimer || 0, slowDur);
+                ill.slowMultiplier = Math.min(ill.slowMultiplier || 1.0, slowMult);
+              }
+            }
+          });
+        }
+  }
+
+  /**
+   * Teleports Gojo away to range when transitioning out of melee mode or when domain expires
+   */
+  _teleportAwayFrom(opponent, arena, forceDisengage = false) {
+    if (this.isDead || this.hp <= 0) return;
+    const opp = (opponent && this._isValidCombatTarget(opponent))
+      ? opponent
+      : ((this.target && this._isValidCombatTarget(this.target))
+        ? this.target
+        : (typeof this._findClosestEnemy === 'function' ? this._findClosestEnemy() : null));
+    if (!opp || this.isTargetOfAmbush) return;
+    if (!forceDisengage && (this.timeStopTimer || 0) > 0) return;
     const oldX = this.x;
     const oldY = this.y;
 
-    const angle = Math.atan2(this.y - opp.y, this.x - opp.x) + (Math.random() - 0.5);
-    const dist = Math.max(240, CONFIG.gojo.comboDisengageDistance ?? 260);
+    let angle;
+    if (this.x !== opp.x || this.y !== opp.y) {
+      angle = Math.atan2(this.y - opp.y, this.x - opp.x) + (Math.random() - 0.5) * 0.4;
+    } else if (this.gunAngle !== undefined) {
+      angle = this.gunAngle + Math.PI;
+    } else {
+      angle = Math.random() * Math.PI * 2;
+    }
+
+    const dist = Math.max(240, CONFIG.gojo?.comboDisengageDistance ?? 260);
     let targetX = opp.x + Math.cos(angle) * dist;
     let targetY = opp.y + Math.sin(angle) * dist;
 
@@ -2319,6 +2416,30 @@ export class GojoFighter extends Fighter {
       } else {
         targetX = Math.max(currentArena.x + this.r, Math.min(currentArena.x + currentArena.width - this.r, targetX));
         targetY = Math.max(currentArena.y + this.r, Math.min(currentArena.y + currentArena.height - this.r, targetY));
+      }
+
+      // If wall clamping left Gojo too close to opponent (e.g. cornered against perimeter),
+      // re-aim disengage from opponent towards arena center so Gojo is guaranteed open space!
+      const postClampDist = Math.hypot(targetX - opp.x, targetY - opp.y);
+      if (postClampDist < 180) {
+        const acx = currentArena.x + currentArena.width / 2;
+        const acy = currentArena.y + currentArena.height / 2;
+        const centerAngle = Math.atan2(acy - opp.y, acx - opp.x);
+        targetX = opp.x + Math.cos(centerAngle) * dist;
+        targetY = opp.y + Math.sin(centerAngle) * dist;
+        if (currentArena.shape === 'circle') {
+          const ar = Math.max(10, (currentArena.radius || (currentArena.width / 2)) - this.r);
+          const cdx = targetX - acx;
+          const cdy = targetY - acy;
+          const cdist = Math.hypot(cdx, cdy);
+          if (cdist > ar && cdist > 0) {
+            targetX = acx + (cdx / cdist) * ar;
+            targetY = acy + (cdy / cdist) * ar;
+          }
+        } else {
+          targetX = Math.max(currentArena.x + this.r, Math.min(currentArena.x + currentArena.width - this.r, targetX));
+          targetY = Math.max(currentArena.y + this.r, Math.min(currentArena.y + currentArena.height - this.r, targetY));
+        }
       }
     }
 
@@ -2365,6 +2486,10 @@ export class GojoFighter extends Fighter {
     const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
     const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.8;
     audioSystem.playSFX(dashSnd, dashVol);
+
+    if (!this.isTargetOfAmbush && (this.infinityCooldown || 0) <= 0 && (this.infinityBarrierHp === undefined || this.infinityBarrierHp > 0)) {
+      this.infinityActive = true;
+    }
   }
 
   canAim() {
@@ -2726,6 +2851,8 @@ export class GojoFighter extends Fighter {
     this.domainChargeTimer = 0;
     this._hasPlayedDomainChannelSound = false;
     this.domainActive = true;
+    this._hasHandledDomainExpiry = false;
+    this._wasDomainActiveLastTick = true;
     this.domainActivationTime = Date.now();
     this.domainUseCount++;
     this.hasFiredDomain = true;
@@ -2733,7 +2860,7 @@ export class GojoFighter extends Fighter {
     this.lastCastSkill = 'domain';
     this.triggerSkillReleaseCooldown();
     this.domainTimer = CONFIG.gojo.domainDuration || 300;
-    this.domainCooldown = CONFIG.gojo.domainCooldown || 1200;
+    this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.domainCooldown !== undefined) ? CONFIG.gojo.domainCooldown : 1200;
     this.domainExpansionAudioDelay = CONFIG.gojo.domainExpansionAudioDelay ?? 90; // Delay (in frames) after deployment before gojodomainexpansion.mp3 plays
     this.postDomainFadeInTimer = 0; // Reset fade-in timer when domain activates
 
@@ -2778,6 +2905,7 @@ export class GojoFighter extends Fighter {
     state.fighters.forEach((f, idx) => {
       if (f && f !== this && f.hp > 0) {
         // Heavenly Restriction & Mahoraga Domain Adaptation: Immune to domain sure-hit effects & traps!
+        // Heavenly Restriction & Mahoraga Domain Adaptation: Immune to domain sure-hit effects & traps!
         if (f.domainImmunity || f.gojoDomainAdapted || (f.gojoAdapted && f.gojoAdapted.domain) || f.characterId === 'toji' || f.type === 'toji') return;
 
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
@@ -2821,6 +2949,8 @@ export class GojoFighter extends Fighter {
             }
           }
           
+          if (ill.domainImmunity || ill.gojoDomainAdapted) return;
+
           if (true) { // Freeze EVERYONE (including teammates' illusions)
             if (typeof ill.interruptAttacks === 'function') ill.interruptAttacks(true);
             if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15, { isDomain: true, isUltimate: true });

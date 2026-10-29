@@ -920,7 +920,10 @@ export class Fighter {
         f && f !== this && (f.isParalyzingDomain || f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
       );
       const isImmune = this.domainImmunity || this.isDomainImmune || this.isParalyzeImmune || this.gojoDomainAdapted || (this.gojoAdapted && this.gojoAdapted.domain) || this.characterId === 'toji' || this.type === 'toji';
-      if (isInsideGojoDomain && !isImmune) return true;
+      if (isInsideGojoDomain && !isImmune) {
+        this._handleFrozenSkillCooldowns();
+        return true;
+      }
     }
 
     return false;
@@ -3058,7 +3061,14 @@ export class Fighter {
       (realAttacker && (realAttacker.characterId === 'sans' || realAttacker.type === 'sans'))
     );
 
-    if (!isNamelessBeamDeath && !isSansDeath) {
+    const isPacmanDeath = !isMinionOrSummon && Boolean(
+      this.characterId === 'pacman' ||
+      this.type === 'pacman' ||
+      this.suppressFaahDeathSound ||
+      this.suppressFaahOnDeath
+    );
+
+    if (!isNamelessBeamDeath && !isSansDeath && !isPacmanDeath) {
       const faah = getAnnouncerSound('faah');
       if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
     }

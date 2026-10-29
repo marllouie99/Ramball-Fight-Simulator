@@ -333,6 +333,9 @@ export class StatusEffectsManager {
 
     if (isInsideGojoDomain) {
       fighter.timeStopTimer = Math.max(fighter.timeStopTimer || 0, 15);
+      if (typeof fighter._handleFrozenSkillCooldowns === 'function') {
+        fighter._handleFrozenSkillCooldowns();
+      }
       return true;
     }
 
