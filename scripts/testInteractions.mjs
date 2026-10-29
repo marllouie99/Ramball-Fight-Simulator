@@ -12412,11 +12412,19 @@ async function runInteractionTests() {
     // 10. Verify Continuous Active Blast Window & Center Bloom Hit Detection
     const expBomb = bomberman.plantBomb(arena, true);
     enemy.hp = 1000;
+    enemy.vx = 0;
+    enemy.vy = 0;
+    enemy.knockbackVx = 0;
+    enemy.knockbackVy = 0;
     enemy.x = expBomb.x + 35; // Positioned diagonally near epicenter
     enemy.y = expBomb.y + 35;
     bomberman._detonateBomb(expBomb, arena);
     assert(enemy.hp < 1000, 'Enemy placed diagonally within epicenter disc must receive explosion damage');
     assert(enemy.slowTimer > 0, 'Enemy caught in blast must receive slowTimer');
+    assert(bomberman.bombKnockback === 0, 'bomberman.bombKnockback must be 0 (knockback removed from bomb explosion)');
+    assert(bomberman.bombStunDuration > 0, 'bomberman.bombStunDuration must be configured to stun duration');
+    assert(enemy.paralyzeTimer > 0 || enemy.hitStunTimer > 0, 'Enemy caught in blast must receive stun effect');
+    assert((enemy.knockbackVx || 0) === 0 && (enemy.knockbackVy || 0) === 0, 'Bomb explosion must not deal knockback impulse');
 
     // Verify entity walking into active flames after detonation takes damage during active flame window
     const walkingEnemy = new NormalClass({ x: arena.x + 300, y: arena.y + 300, color: '#EF4444', controls: {} });
@@ -12443,6 +12451,10 @@ async function runInteractionTests() {
     const enemy = new NormalClass({ x: 240, y: 300, hp: 1000, maxHp: 1000, controls: {} });
     enemy.maxHp = 1000;
     enemy.hp = 1000;
+    enemy.vx = 0;
+    enemy.vy = 0;
+    enemy.knockbackVx = 0;
+    enemy.knockbackVy = 0;
     state.fighters = [creeper, enemy];
 
     const { creeperConfig } = await import('../js/configs/characters/creeperConfig.js');
@@ -13082,6 +13094,144 @@ async function runInteractionTests() {
     ash._cleanupActivePokemon?.();
     state.fighters = [];
     console.log('      ✅ Ash Pokémon Push Back, Pull, Drag & Knockback Immunity while Casting Skills verified.');
+  }
+
+  // ⚡ 112. Testing Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State ⚡
+  {
+    console.log('   112. Testing Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State...');
+    const { PacmanFighter } = await import('../js/entities/fighters/PacmanFighter.js');
+    const { ZenitsuFighter } = await import('../js/entities/fighters/ZenitsuFighter.js');
+    const { drawPacmanFrightenedGhost } = await import('../js/graphics/fighters/pacmanSkin.js');
+    const { updateFighters } = await import('../js/systems/physics.js');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450 };
+    state.arena = testArena;
+    state.gameState = 'playing';
+
+    const pacman = new PacmanFighter({
+      id: 'pacman',
+      name: 'Pac-Man',
+      type: 'pacman',
+      x: 80,
+      y: 280,
+      speed: 4.8,
+      hp: 350,
+      maxHp: 350
+    });
+
+    const zenitsu = new ZenitsuFighter({
+      id: 'zenitsu',
+      name: 'Zenitsu',
+      type: 'zenitsu',
+      x: 360,
+      y: 360,
+      speed: 4.5,
+      hp: 300,
+      maxHp: 300
+    });
+
+    state.fighters = [pacman, zenitsu];
+    state.getFighterTeam = (idx) => idx;
+
+    // 1. Initial State: Zenitsu can act, aim, and has cooldowns
+    zenitsu.thunderclapCooldown = 50;
+    zenitsu.rokurenCooldown = 80;
+    assert(zenitsu.isPacmanGhost === false, 'Enemy must not start as ghost');
+    assert(zenitsu.canPerformBasicAttack(pacman) === true, 'Enemy must be able to perform basic attacks initially');
+    assert(zenitsu.canAim() === true, 'Enemy must be able to aim initially');
+
+    // 2. Pac-Man eats the Power Pellet (big dot)
+    pacman.activateChompMode('powerPellet');
+
+    // Verify Ghost Transformation State
+    assert(zenitsu.isPacmanGhost === true, 'Enemy must be transformed into ghost upon Pac-Man eating big dot');
+    assert(zenitsu.pacmanGhostTimer === 360, 'Ghost timer must be set to chomp duration (360 frames)');
+    assert(zenitsu.canPerformBasicAttack(pacman) === false, 'Enemy must NOT be able to perform basic attacks in ghost state');
+    assert(zenitsu.canAim() === false, 'Enemy must NOT be able to aim in ghost state');
+
+    // 3. Verify Skill Cooldowns are PAUSED (Do not tick down)
+    const initialCd1 = zenitsu.thunderclapCooldown;
+    const initialCd2 = zenitsu.rokurenCooldown;
+    const initialX = zenitsu.x;
+    const initialY = zenitsu.y;
+
+    // Simulate 10 physics frames
+    for (let f = 0; f < 10; f++) {
+      updateFighters();
+    }
+
+    assert(zenitsu.thunderclapCooldown === initialCd1, 'Thunderclap cooldown must remain paused during ghost state');
+    assert(zenitsu.rokurenCooldown === initialCd2, 'Rokuren cooldown must remain paused during ghost state');
+    assert(zenitsu.pacmanGhostTimer === 350, `Ghost timer must decrement each frame (got ${zenitsu.pacmanGhostTimer})`);
+
+    // 4. Verify Movement Continuity: Enemy CAN MOVE
+    const moved = Math.hypot(zenitsu.x - initialX, zenitsu.y - initialY) > 0.5 || Math.hypot(zenitsu.vx, zenitsu.vy) > 0.1;
+    assert(moved, 'Enemy must be able to move and apply movement physics in ghost state');
+
+    // 5. Verify Visual Rendering (drawPacmanFrightenedGhost)
+    const mockCtx = createMockCtx();
+    drawPacmanFrightenedGhost(mockCtx, zenitsu);
+    assert(mockCtx.getStackDepth() === 0, 'drawPacmanFrightenedGhost must leave 0 Canvas 2D stack depth');
+
+    // 6. Verify Dot & Power Pellet Consumption is Prevented During Active Chomp Mode
+    pacman.initDots(testArena);
+    assert(pacman.dots.length > 0, 'Pacman dots must be initialized');
+    pacman.x = pacman.dots[0].x;
+    pacman.y = pacman.dots[0].y;
+    const dotsEatenBefore = pacman.dotsEaten;
+    pacman._checkDotEating();
+    assert(pacman.dots[0].eaten === false, 'Pac-Man must NOT eat dots while Chomp Mode is active');
+    assert(pacman.dotsEaten === dotsEatenBefore, 'dotsEaten count must not increase while in Chomp Mode');
+
+    // 7. Verify Pac-Man Swallows Ghosted Enemy on Contact & Deals 30% Damage
+    pacman.x = zenitsu.x;
+    pacman.y = zenitsu.y;
+    pacman.chompAttackCooldown = 0;
+    const hpBeforeSwallow = zenitsu.hp;
+    const swallowed = pacman._executeChompAttack(zenitsu);
+    assert(swallowed === true, 'Chomp attack must successfully execute against ghosted enemy');
+    assert(zenitsu.isSwallowedByPacman === true, 'Enemy must be flagged as swallowed by Pac-Man');
+    assert(zenitsu.swallowedBy === pacman, 'swallowedBy reference must point to Pac-Man');
+    assert(pacman.swallowedEnemies.includes(zenitsu), 'Pac-Man must track swallowed enemy in swallowedEnemies');
+    assert(zenitsu.hp === hpBeforeSwallow - Math.round((zenitsu.maxHp || 1000) * pacman.chompDamagePercent), 'Swallowed enemy must take 30% max HP damage');
+
+    // 8. Verify Swallowed Enemy Position is Locked inside Pac-Man (physics.js containment)
+    pacman.x = 180;
+    pacman.y = 280;
+    updateFighters();
+    assert(zenitsu.x === pacman.x && zenitsu.y === pacman.y, 'Swallowed enemy position must sync with Pac-Man in physics.js');
+    assert(zenitsu.vx === 0 && zenitsu.vy === 0, 'Swallowed enemy velocity must be 0 while contained');
+
+    // 8b. Verify Swallowed Enemy Takes Digestion Damage Per Second (60 frames)
+    const hpBeforeDps = zenitsu.hp;
+    for (let f = 0; f < 60; f++) {
+      pacman._updateSwallowedEnemiesDigestionDps();
+    }
+    const expectedDps = Math.max(1, Math.round((zenitsu.maxHp || 1000) * 0.05));
+    assert(zenitsu.hp === hpBeforeDps - expectedDps, 'Swallowed enemy must take digestion damage per second');
+
+    // 9. Verify Spit Out when Chomp Mode Expires
+    pacman.chompModeTimer = 0;
+    pacman.update(zenitsu, 0, testArena);
+    assert(pacman.isChompModeActive === false, 'Chomp Mode must be deactivated upon expiration');
+    assert(zenitsu.isSwallowedByPacman === false, 'Swallowed enemy must be spit out when Chomp Mode expires');
+    assert(zenitsu.swallowedBy === null, 'swallowedBy must be reset to null upon spit out');
+    assert(zenitsu.isPacmanGhost === false, 'Enemy ghost state must be cleared when spit out');
+    assert(Math.hypot(zenitsu.vx, zenitsu.vy) > 1.0, 'Spit out enemy must receive forward propulsion velocity');
+
+    // Verify abilities and cooldowns resume after being spit out
+    assert(zenitsu.canPerformBasicAttack(pacman) === true, 'Enemy must regain ability to attack after being spit out');
+    assert(zenitsu.canAim() === true, 'Enemy must regain ability to aim after being spit out');
+
+    // 10. Verify Dot Consumption Resumes After Chomp Mode Expires
+    pacman.x = pacman.dots[0].x;
+    pacman.y = pacman.dots[0].y;
+    pacman._checkDotEating();
+    assert(pacman.dots[0].eaten === true, 'Pac-Man must resume eating dots once Chomp Mode has expired');
+    assert(pacman.dotsEaten > dotsEatenBefore, 'dotsEaten must increment now that Chomp Mode is inactive');
+
+    state.fighters = [];
+    console.log('      ✅ Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State verified.');
   }
 
   

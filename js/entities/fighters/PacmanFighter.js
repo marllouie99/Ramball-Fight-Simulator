@@ -36,6 +36,7 @@ export class PacmanFighter extends Fighter {
     this.radius = this.r;
     this.hideHands = true; // Classic arcade ball form (hands hidden)
     this.hideWeapon = true;
+    this.hideHair = cfg.hideHair ?? true;
 
     // ── Dot-Eating & Arena Tile Parameters ──
     this.dotRadius = cfg.dotRadius ?? 4;
@@ -58,6 +59,8 @@ export class PacmanFighter extends Fighter {
     this.chompAttackCooldown = 0;
     this.chompKnockback = cfg.chompKnockback ?? 14;
     this.chompHitStun = cfg.chompHitStun ?? 24;
+    this.swallowedEnemies = [];
+    this._swallowedDpsTimer = 0;
 
     // ── Visual & Animation State ──
     this._mouthAnimTicks = 0;
@@ -103,6 +106,7 @@ export class PacmanFighter extends Fighter {
       activeKey: 'isChompModeActive',
       onExpire: (fighter) => {
         fighter.isChompModeActive = false;
+        fighter._spitOutSwallowedEnemies?.(state.arena);
         if (fighter.dotsEaten >= fighter.totalDots) {
           fighter.refillDots(state.arena);
         }
@@ -118,6 +122,9 @@ export class PacmanFighter extends Fighter {
    * Resets Pac-Man's match state, dots grid, and timers for new rounds.
    */
   reset() {
+    this._spitOutSwallowedEnemies?.();
+    this.swallowedEnemies = [];
+    this._swallowedDpsTimer = 0;
     super.reset();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
 
@@ -134,6 +141,15 @@ export class PacmanFighter extends Fighter {
     this.powerPelletsEaten = 0;
     this.totalDots = 0;
     this._dotsInitialized = false;
+
+    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      for (const f of state.fighters) {
+        if (f && f.isPacmanGhost) {
+          f.isPacmanGhost = false;
+          f.pacmanGhostTimer = 0;
+        }
+      }
+    }
 
     if (state.arena) {
       this.initDots(state.arena);
@@ -224,14 +240,16 @@ export class PacmanFighter extends Fighter {
    * @param {string} [source='powerPellet'] - Activation trigger source ('powerPellet' or 'allDots')
    */
   activateChompMode(source = 'powerPellet') {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
     this.isChompModeActive = true;
+    this.chompModeDuration = cfg.chompModeDuration ?? 360;
     this.chompModeTimer = this.chompModeDuration;
     this.chompAttackCooldown = 0;
 
     this._playSfx('powerPellet');
     triggerGlobalScreenShake(4.5, 10);
     const label = source === 'allDots' ? 'ALL DOTS CLEARED! (30% CHOMP)' : 'POWER PELLET! (30% CHOMP)';
-    spawnFloatingText(this.x, this.y - this.r - 22, label, '#FACC15');
+    spawnFloatingText(this.x, this.y - this.r - 22, label, cfg.themeColor || '#F2F000');
 
     // Flashy energizer shockwave (Rule 26)
     this.activeVisualEffects.push({
@@ -242,6 +260,59 @@ export class PacmanFighter extends Fighter {
       maxTimer: 30,
       radius: this.r * 2.8,
     });
+
+    // Transform living enemies into frightened ghosts (Rule: no skills, paused CDs, move-only)
+    this._transformEnemiesIntoGhosts();
+  }
+
+  /**
+   * Transforms all living opposing enemies into frightened ghosts.
+   * While in this state, enemies cannot cast skills, skill cooldowns are paused,
+   * all abilities are disabled, and all they can do is move until the duration expires.
+   */
+  _transformEnemiesIntoGhosts() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
+    if (cfg.enableGhostTransformation === false) return;
+
+    const duration = cfg.ghostDuration || this.chompModeDuration || 360;
+    const candidates = [];
+
+    const myTeam = (typeof state !== 'undefined' && state.fighters && typeof state.getFighterTeam === 'function')
+      ? state.getFighterTeam(state.fighters.indexOf(this))
+      : null;
+
+    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0 || f.isDead) continue;
+        if (myTeam !== null && typeof state.getFighterTeam === 'function' && state.getFighterTeam(i) === myTeam) continue;
+        candidates.push(f);
+        if (f.activePokemon && f.activePokemon.hp > 0) {
+          candidates.push(f.activePokemon);
+        }
+      }
+    }
+    if (candidates.length === 0 && this.opponent && this.opponent.hp > 0 && this.opponent !== this) {
+      candidates.push(this.opponent);
+    }
+    if (candidates.length === 0 && this._lastOpponent && this._lastOpponent.hp > 0 && this._lastOpponent !== this) {
+      candidates.push(this._lastOpponent);
+    }
+
+    for (const enemy of candidates) {
+      enemy.isPacmanGhost = true;
+      enemy.pacmanGhostTimer = duration;
+      enemy.pacmanGhostMaxTimer = duration;
+
+      if (typeof enemy.interruptAttacks === 'function') {
+        enemy.interruptAttacks(true);
+      }
+      if (enemy.skillManager && typeof enemy.skillManager.interruptAll === 'function') {
+        enemy.skillManager.interruptAll(true);
+      }
+
+      spawnFloatingText(enemy.x, enemy.y - (enemy.r || 25) - 22, 'GHOST TRANSFORM!', '#3B82F6');
+    }
   }
 
   /**
@@ -272,6 +343,8 @@ export class PacmanFighter extends Fighter {
    */
   _checkDotEating() {
     if (!this.dots || this.dots.length === 0) return;
+    // When Chomp Mode is active, prevent consuming dots and big dots until the duration expires
+    if (this.isChompModeActive && this.chompModeTimer > 0) return;
 
     for (let i = 0; i < this.dots.length; i++) {
       const dot = this.dots[i];
@@ -314,15 +387,23 @@ export class PacmanFighter extends Fighter {
   /**
    * The ONLY offensive mechanic of Pac-Man:
    * Executes a devastating 30% damage chomp attack upon contacting the enemy during Chomp Mode.
+   * If the enemy is in a ghost state, Pac-Man swallows them into his belly until Chomp Mode expires!
    */
   _executeChompAttack(opponent) {
     if (!opponent || opponent.hp <= 0 || !this.isChompModeActive) return false;
+    if (opponent.isSwallowedByPacman) return false;
     if (this.chompAttackCooldown > 0) return false;
 
     const contactDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     const hitReach = this.r + (opponent.r || 25) + 14;
 
     if (contactDist > hitReach) return false;
+
+    // If opponent is currently in a frightened ghost state, swallow them into Pac-Man's belly!
+    const isGhosted = Boolean(opponent.isPacmanGhost && (opponent.pacmanGhostTimer || 0) > 0);
+    if (isGhosted) {
+      return this._swallowGhostEnemy(opponent);
+    }
 
     // 1. Calculate 30% damage (based on opponent maxHp)
     const targetMaxHp = opponent.maxHp || 1000;
@@ -360,7 +441,7 @@ export class PacmanFighter extends Fighter {
     this.vy = -Math.sin(pushAngle) * reboundSpeed;
 
     // 5. Floating combat text & visual bite fx
-    spawnFloatingText(opponent.x, opponent.y - (opponent.r || 25) - 18, `30% CHOMP! (-${dmg})`, '#FACC15');
+    spawnFloatingText(opponent.x, opponent.y - (opponent.r || 25) - 18, `30% CHOMP! (-${dmg})`, '#F2F000');
 
     const contactX = (this.x + opponent.x) * 0.5;
     const contactY = (this.y + opponent.y) * 0.5;
@@ -377,6 +458,190 @@ export class PacmanFighter extends Fighter {
     this.chompAttackCooldown = 45; // ~0.75s between bites
     this._mouthAnimTicks += 18;
     return true;
+  }
+
+  /**
+   * Swallows a ghosted enemy into Pac-Man's belly.
+   * Inflicts 30% Max HP chomp damage, conceals the enemy inside Pac-Man,
+   * and holds them until Super Chomp Mode expires.
+   */
+  _swallowGhostEnemy(opponent) {
+    if (!opponent || opponent.hp <= 0 || opponent.isSwallowedByPacman) return false;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
+
+    // 1. Calculate 30% damage (based on opponent maxHp)
+    const targetMaxHp = opponent.maxHp || 1000;
+    const dmg = Math.max(1, Math.round(targetMaxHp * this.chompDamagePercent));
+
+    // 2. Deliver damage
+    if (typeof opponent.takeDamage === 'function') {
+      opponent.takeDamage(dmg, this, { isChomp: true, isMelee: true });
+    } else {
+      opponent.hp = Math.max(0, opponent.hp - dmg);
+    }
+
+    // 3. Mark enemy as swallowed and position inside Pac-Man
+    opponent.isSwallowedByPacman = true;
+    opponent.swallowedBy = this;
+    opponent.x = this.x;
+    opponent.y = this.y;
+    opponent.vx = 0;
+    opponent.vy = 0;
+
+    if (!this.swallowedEnemies) this.swallowedEnemies = [];
+    if (!this.swallowedEnemies.includes(opponent)) {
+      this.swallowedEnemies.push(opponent);
+    }
+    this._swallowedDpsTimer = 0;
+
+    // 4. Audio & Haptic Feedback
+    this._playSfx('chomp');
+    triggerGlobalScreenShake(5.0, 14);
+    opponent.hitFlashTimer = 12;
+
+    // 5. Visual gulp impact & floating combat text
+    spawnFloatingText(this.x, this.y - this.r - 20, `GHOST SWALLOWED! (-${dmg})`, cfg.themeColor || '#F2F000');
+
+    this.activeVisualEffects.push({
+      type: 'chompImpact',
+      x: this.x,
+      y: this.y,
+      angle: this.gunAngle || 0,
+      timer: 20,
+      maxTimer: 20,
+      radius: 60,
+    });
+
+    this.chompAttackCooldown = 45;
+    this._mouthAnimTicks += 28;
+    return true;
+  }
+
+  /**
+   * Ticks digestion damage per second on all swallowed enemies while held inside Pac-Man.
+   */
+  _updateSwallowedEnemiesDigestionDps() {
+    if (!this.swallowedEnemies || this.swallowedEnemies.length === 0) return;
+
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
+    if (cfg.enableSwallowedDps === false) return;
+
+    const interval = cfg.swallowedDpsInterval ?? 60; // 60 frames = 1.0 second per tick
+    this._swallowedDpsTimer = (this._swallowedDpsTimer || 0) + 1;
+
+    if (this._swallowedDpsTimer < interval) return;
+    this._swallowedDpsTimer = 0;
+
+    const dpsPercent = cfg.swallowedDamagePercentPerSecond ?? 0.05; // 5% max HP / sec
+    const flatDps = cfg.swallowedDpsFlatDamage ?? 25;
+
+    for (let i = this.swallowedEnemies.length - 1; i >= 0; i--) {
+      const enemy = this.swallowedEnemies[i];
+      if (!enemy || !enemy.isSwallowedByPacman) {
+        this.swallowedEnemies.splice(i, 1);
+        continue;
+      }
+
+      if (enemy.hp <= 0) continue;
+
+      const targetMaxHp = enemy.maxHp || 1000;
+      const dpsDmg = Math.max(1, Math.round(targetMaxHp * dpsPercent)) || flatDps;
+
+      if (typeof enemy.takeDamage === 'function') {
+        enemy.takeDamage(dpsDmg, this, { isDigestion: true, isDamageOverTime: true });
+      } else {
+        enemy.hp = Math.max(0, enemy.hp - dpsDmg);
+      }
+
+      enemy.hitFlashTimer = 8;
+      // Floating digestion damage number above Pac-Man
+      spawnFloatingText(this.x + (Math.random() * 20 - 10), this.y - this.r - 20, `-${dpsDmg}`, '#EF4444');
+
+      // Subtle digestion munch/spark VFX
+      this.activeVisualEffects.push({
+        type: 'munchSpark',
+        x: this.x + (Math.random() * 16 - 8),
+        y: this.y + (Math.random() * 16 - 8),
+        timer: 10,
+        maxTimer: 10,
+        color: '#EF4444',
+      });
+
+      // Check if enemy was completely digested inside
+      if (enemy.hp <= 0) {
+        spawnFloatingText(this.x, this.y - this.r - 32, 'DIGESTED!', '#EF4444');
+        enemy.isSwallowedByPacman = false;
+        enemy.swallowedBy = null;
+        enemy.isPacmanGhost = false;
+        enemy.pacmanGhostTimer = 0;
+        this.swallowedEnemies.splice(i, 1);
+        if (typeof enemy.onDeath === 'function') {
+          enemy.onDeath();
+        }
+        if (typeof enemy.checkRoundOrMatchEnd === 'function') {
+          enemy.checkRoundOrMatchEnd();
+        }
+      }
+    }
+  }
+
+  /**
+   * Spits out all swallowed enemies when Super Chomp Mode duration expires.
+   * Propels enemies forward onto the arena floor, clears their ghost state, and restores normal combat.
+   */
+  _spitOutSwallowedEnemies(arena = state.arena) {
+    if (!this.swallowedEnemies || this.swallowedEnemies.length === 0) return;
+
+    const activeArena = arena || state.arena || { x: 45, y: 240, width: 450, height: 450 };
+    const spitAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
+
+    for (const enemy of this.swallowedEnemies) {
+      if (!enemy) continue;
+
+      enemy.isSwallowedByPacman = false;
+      enemy.swallowedBy = null;
+      enemy.isPacmanGhost = false;
+      enemy.pacmanGhostTimer = 0;
+
+      if (enemy.hp <= 0) continue; // Already eliminated inside
+
+      // Position enemy in front of Pac-Man's mouth
+      const dist = this.r + (enemy.r || 25) + 18;
+      let targetX = this.x + Math.cos(spitAngle) * dist;
+      let targetY = this.y + Math.sin(spitAngle) * dist;
+
+      // Clamp inside arena walls
+      const pad = (enemy.r || 25) + 6;
+      enemy.x = Math.max(activeArena.x + pad, Math.min(activeArena.x + activeArena.width - pad, targetX));
+      enemy.y = Math.max(activeArena.y + pad, Math.min(activeArena.y + activeArena.height - pad, targetY));
+
+      // Propel outward with spit velocity
+      const spitSpeed = 8.5;
+      enemy.vx = Math.cos(spitAngle) * spitSpeed;
+      enemy.vy = Math.sin(spitAngle) * spitSpeed;
+
+      // Aim enemy back at Pac-Man
+      if (typeof enemy.aim === 'function') {
+        enemy.aim(this);
+      }
+
+      spawnFloatingText(enemy.x, enemy.y - (enemy.r || 25) - 22, 'SPIT OUT!', '#38BDF8');
+
+      // Visual spit puff effect
+      this.activeVisualEffects.push({
+        type: 'spitPuff',
+        x: enemy.x,
+        y: enemy.y,
+        timer: 16,
+        maxTimer: 16,
+        radius: 42,
+      });
+    }
+
+    this._playSfx('refill');
+    triggerGlobalScreenShake(4.0, 10);
+    this.swallowedEnemies.length = 0;
   }
 
   /**
@@ -408,6 +673,7 @@ export class PacmanFighter extends Fighter {
     super.interruptAttacks?.(forceCancelAll);
     if (forceCancelAll || this.hp <= 0) {
       this.activeVisualEffects.length = 0;
+      this._spitOutSwallowedEnemies?.();
     }
   }
 
@@ -454,13 +720,24 @@ export class PacmanFighter extends Fighter {
       // Check for expiration
       if (this.chompModeTimer <= 0) {
         this.isChompModeActive = false;
+        // Spit out any swallowed enemies when chomp mode ends!
+        this._spitOutSwallowedEnemies(activeArena);
         // When Chomp Mode expires, if all arena dots were cleared, refill the whole arena grid
         if (this.dotsEaten >= this.totalDots) {
           this.refillDots(activeArena);
         }
-      } else if (opponent && opponent.hp > 0) {
-        // If Pac-Man makes contact with the enemy during Chomp Mode, deliver the 30% chomp
-        this._executeChompAttack(opponent);
+      } else {
+        // Contact check with all active enemy targets in the match
+        const targets = (typeof state !== 'undefined' && Array.isArray(state.fighters))
+          ? state.fighters.filter(f => f && f !== this && f.hp > 0 && !f.isSwallowedByPacman)
+          : (opponent && opponent.hp > 0 && !opponent.isSwallowedByPacman ? [opponent] : []);
+
+        for (const target of targets) {
+          this._executeChompAttack(target);
+        }
+
+        // Ticks digestion damage per second on all swallowed enemies
+        this._updateSwallowedEnemiesDigestionDps();
       }
     }
 
@@ -572,6 +849,22 @@ export class PacmanFighter extends Fighter {
       } else if (vfx.type === 'munchSpark') {
         ctx.fillStyle = vfx.color || '#FFE082';
         ctx.fillRect(vfx.x - 2, vfx.y - 2, 4, 4);
+      } else if (vfx.type === 'spitPuff') {
+        const currentR = vfx.radius * Math.pow(p, 0.5);
+        ctx.strokeStyle = `rgba(56, 189, 248, ${0.9 * (1.0 - p)})`;
+        ctx.lineWidth = 3.0 * (1.0 - p);
+        ctx.beginPath();
+        ctx.arc(vfx.x, vfx.y, currentR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.7 * (1.0 - p)})`;
+        for (let j = 0; j < 6; j++) {
+          const spAngle = (j / 6) * Math.PI * 2 + p * 2.0;
+          const spDist = currentR * 0.85;
+          ctx.beginPath();
+          ctx.arc(vfx.x + Math.cos(spAngle) * spDist, vfx.y + Math.sin(spAngle) * spDist, 3 * (1.0 - p), 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
       ctx.restore();
     }

@@ -100,7 +100,8 @@ export class BombermanFighter extends Fighter {
     this.bombRadius = cfg.bombRadius ?? 22;
     this.baseBombDamage = cfg.baseBombDamage ?? 28;
     this.chainBonusDamage = cfg.chainBonusDamage ?? 8;
-    this.bombKnockback = cfg.bombKnockback ?? 14;
+    this.bombKnockback = cfg.bombKnockback ?? 0;
+    this.bombStunDuration = cfg.bombStunDuration ?? 45;
     this.explosionDuration = cfg.explosionDuration ?? 28;
     this.bombSlowDuration = cfg.bombSlowDuration ?? 75;
     this.bombSlowMultiplier = cfg.bombSlowMultiplier ?? 0.5;
@@ -925,7 +926,6 @@ export class BombermanFighter extends Fighter {
       }
 
       const pushAngle = Math.atan2(dy, dx) || 0;
-      const kb = this.bombKnockback || 14;
 
       // 2a. Global Hit Effects on hit target:
       if (typeof spawnAnimePunchImpactFrame === 'function') {
@@ -945,37 +945,54 @@ export class BombermanFighter extends Fighter {
         audioSystem.playSFX('attack_fleshhit', 0.65);
       }
 
-      // 2b. Centralized damage application with explosion options
+      // 2b. Centralized damage application with explosion options (knockback suppressed)
       if (typeof applyDamageToTarget === 'function') {
         applyDamageToTarget(target, dmg, this, {
           isExplosion: true,
           isAOE: true,
           damageAngle: pushAngle,
-          knockbackForce: kb,
+          knockbackForce: 0,
+          skipKnockback: true,
         });
       } else if (typeof target.takeDamage === 'function') {
         target.takeDamage(dmg, this, {
           isExplosion: true,
           isAOE: true,
           damageAngle: pushAngle,
-          knockbackForce: kb,
+          knockbackForce: 0,
+          skipKnockback: true,
         });
       } else {
         target.hp = Math.max(0, target.hp - dmg);
       }
 
-      if (typeof target.applyKnockback === 'function') {
-        target.applyKnockback(Math.cos(pushAngle) * kb, Math.sin(pushAngle) * kb);
-      } else if (typeof target.vx === 'number' && typeof target.vy === 'number') {
-        target.vx += Math.cos(pushAngle) * kb * 0.6;
-        target.vy += Math.sin(pushAngle) * kb * 0.6;
-      }
+      // Halt the victim in place directly upon blast contact (zero knockback impulse)
+      target.vx = 0;
+      target.vy = 0;
+      target.knockbackVx = 0;
+      target.knockbackVy = 0;
 
+      // 2c. Stun Effect on hit target (replaces explosion knockback)
+      const stunDur = this.bombStunDuration || 45;
+      if (typeof target.interruptAttacks === 'function') {
+        target.interruptAttacks(true);
+      }
+      if (typeof target.applyParalyze === 'function') {
+        target.applyParalyze(stunDur, { isBombStun: true });
+      } else {
+        target.paralyzeTimer = Math.max(target.paralyzeTimer || 0, stunDur);
+      }
       if (typeof target.applyHitStun === 'function') {
-        target.applyHitStun(12);
+        target.applyHitStun(stunDur, { isBombStun: true });
+      } else {
+        target.hitStunTimer = Math.max(target.hitStunTimer || 0, stunDur);
       }
+      if (typeof target.applyTimeStop === 'function') {
+        target.applyTimeStop(stunDur, { isBombStun: true });
+      }
+      target.stunTimer = Math.max(target.stunTimer || 0, stunDur);
 
-      // 2c. Slow Debuff Mechanic on hit entities:
+      // 2d. Slow Debuff Mechanic on hit entities:
       const slowDur = this.bombSlowDuration || 75;
       const slowMult = this.bombSlowMultiplier || 0.5;
       if (typeof target.applySlow === 'function') {
@@ -986,7 +1003,7 @@ export class BombermanFighter extends Fighter {
         target.slowTimer = Math.max(target.slowTimer || 0, slowDur);
         target.slowMultiplier = slowMult;
       }
-      spawnFloatingText(target.x, target.y - tr - 14, 'SLOWED!', '#38BDF8');
+      spawnFloatingText(target.x, target.y - tr - 14, 'STUNNED!', '#FACC15');
     }
   }
 

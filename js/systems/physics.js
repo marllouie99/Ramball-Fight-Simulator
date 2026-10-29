@@ -244,6 +244,9 @@ export function resolveFighterCollision(a, b) {
   // Telekinesis: lifted entity is in 3D air stasis and moved directly by Rubbick; skip ground circle collision push
   if (a.isCaughtInTelekinesis || b.isCaughtInTelekinesis) return;
 
+  // Swallowed by Pac-Man: entity is contained inside Pac-Man's belly; skip physical circle collision and pushback
+  if (a.isSwallowedByPacman || b.isSwallowedByPacman) return;
+
   // Maki Zen'in Dragon-Bone Skewer & Throw: pinned enemy is physically impaled on Maki's blade; skip circle collision push
   if (a.isPinnedByMaki || b.isPinnedByMaki) return;
   const aIsMakiSkewer = (a.characterId === 'maki' || a.type === 'maki') && a.dragonBoneActive && a.dragonBoneTarget === b && (a.dragonBonePhase === 'lift' || a.dragonBonePhase === 'throw');
@@ -1203,6 +1206,52 @@ export function updateFighters() {
         // Survivor horde mobs are managed exclusively by survivorSystem to provide locked 60 FPS horde physics
         return;
       }
+      // Swallowed by Pac-Man state:
+      // While inside Pac-Man's belly, position tracks Pac-Man and physics/skills are contained
+      if (fighter.isSwallowedByPacman && fighter.swallowedBy) {
+        if (fighter.swallowedBy.hp <= 0 || !fighter.swallowedBy.isChompModeActive) {
+          fighter.isSwallowedByPacman = false;
+          fighter.swallowedBy = null;
+        } else {
+          fighter.x = fighter.swallowedBy.x;
+          fighter.y = fighter.swallowedBy.y;
+          fighter.vx = 0;
+          fighter.vy = 0;
+          return;
+        }
+      }
+      // Pac-Man Frightened Ghost State:
+      // While transformed, the enemy cannot cast any skills, skill cooldowns are paused,
+      // all abilities are disabled, and all they can do is move until the duration expires!
+      if (fighter.isPacmanGhost && (fighter.pacmanGhostTimer || 0) > 0) {
+        fighter.pacmanGhostTimer--;
+        if (fighter.pacmanGhostTimer <= 0) {
+          fighter.isPacmanGhost = false;
+          fighter.pacmanGhostTimer = 0;
+        }
+        fighter.interruptAttacks?.(true);
+        if (fighter.skillManager) {
+          fighter.skillManager.interruptAll?.(true);
+        }
+        const opponent = getClosestOpponent(fighter);
+        const pacmanFighter = state.fighters?.find(f => f && f.characterId === 'pacman' && f.hp > 0);
+        if (pacmanFighter && pacmanFighter !== fighter) {
+          const dx = fighter.x - pacmanFighter.x;
+          const dy = fighter.y - pacmanFighter.y;
+          const dist = Math.hypot(dx, dy);
+          const currentSpeed = Math.hypot(fighter.vx || 0, fighter.vy || 0);
+          if (dist > 0.1 && currentSpeed < 1.0) {
+            const fleeAngle = Math.atan2(dy, dx);
+            const targetSpd = fighter.speed || 3.5;
+            fighter.vx = Math.cos(fleeAngle) * targetSpd;
+            fighter.vy = Math.sin(fleeAngle) * targetSpd;
+          }
+        }
+        fighter.applyMovementPhysics?.();
+        fighter.resolveWallBounce?.(state.arena, opponent);
+        return;
+      }
+
       const opponent = getClosestOpponent(fighter);
       if (typeof fighter.update === 'function') {
         fighter.update(opponent, fi, state.arena);
@@ -1288,8 +1337,8 @@ export function updateFighters() {
         // Skip physical collision between horde mobs in survivor mode (HoloCure / Vampire Survivors swarm pattern)
         if (a.isSurvivorMob && b.isSurvivorMob) continue;
 
-        // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, Naoya ult runway stasis, or when submerged/erupting in liquid shadow
-        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush || a.isCaughtInNaoyaUlt || b.isCaughtInNaoyaUlt || a._isFlyingToWallPin || b._isFlyingToWallPin || a.isCurrentlyWallPinnedByNaoya || b.isCurrentlyWallPinnedByNaoya || (a.isExecutingUlt && (a.characterId === 'naoya' || a.type === 'naoya')) || (b.isExecutingUlt && (b.characterId === 'naoya' || b.type === 'naoya'))) continue;
+        // Skip physical collision resolution during Wall Slam grabs, active ambush stasis, Naoya ult runway stasis, when submerged/erupting in liquid shadow, or swallowed by Pac-Man
+        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting || a.isTargetOfAmbush || b.isTargetOfAmbush || a.isCaughtInNaoyaUlt || b.isCaughtInNaoyaUlt || a._isFlyingToWallPin || b._isFlyingToWallPin || a.isCurrentlyWallPinnedByNaoya || b.isCurrentlyWallPinnedByNaoya || (a.isExecutingUlt && (a.characterId === 'naoya' || a.type === 'naoya')) || (b.isExecutingUlt && (b.characterId === 'naoya' || b.type === 'naoya')) || a.isSwallowedByPacman || b.isSwallowedByPacman) continue;
 
         resolveFighterCollision(a, b);
       }
@@ -1298,8 +1347,8 @@ export function updateFighters() {
     // 2. Fighter-Illusion Collisions
     for (const fighter of state.fighters) {
       if (!fighter || fighter.hp <= 0) continue;
-      // Skip during Wall Slam grab or when submerged/erupting in liquid shadow
-      if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga || fighter.isSubmerged || fighter.isErupting) continue;
+      // Skip during Wall Slam grab, when submerged/erupting in liquid shadow, or swallowed by Pac-Man
+      if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga || fighter.isSubmerged || fighter.isErupting || fighter.isSwallowedByPacman) continue;
       // Cronos / Rubbick phases through illusions while sphere is active; Mahito phases during Phantom Soul Slip; Zenitsu phases during Thunderclap dashes
       const isFighterSpherePhasing = fighter._isInsideOwnSphere?.() || fighter.sphereActive;
       if (isFighterSpherePhasing || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0) || fighter.isDashingThunderclap) continue;

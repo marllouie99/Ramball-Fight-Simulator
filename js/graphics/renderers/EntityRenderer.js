@@ -15,6 +15,7 @@ import { drawMahoragaSummon } from '../../entities/fighters/sukuna/sukunaMahorag
 import { drawMeguminExplosionScreenOverlay } from '../fighters/meguminSkin.js';
 import { drawFighterInkOutline, drawFighterFloorShadow } from './fighterOutlineRenderer.js';
 import { drawPokeBallSummonUnder, drawPokeBallSummonOver } from './PokeBallSummonRenderer.js';
+import { drawPacmanFrightenedGhost } from '../fighters/pacmanSkin.js';
 
 let _sortedFightersBuffer = [];
 
@@ -292,6 +293,7 @@ export function drawFighters() {
     const isPokemonFainting = Boolean(
       fighter && (fighter.isPokemon || fighter.isPokemonCompanion) && fighter.hp <= 0 && (fighter.isFainting || fighter.animState === 'faint')
     );
+    if (fighter && fighter.isSwallowedByPacman) return;
     if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement && !isMakimaReviving && !isPokemonFainting) || (fighter.vanishTimer && fighter.vanishTimer > 0) || fighter._hideInBush) return;
 
     // Only skip drawing living fighter when GameOverScreen is actively rendering the in-arena champion layout
@@ -387,13 +389,24 @@ export function drawFighters() {
         drawPokeBallSummonUnder(ctx, fighter, summonP);
       }
 
-      if (isHeroFighter) {
+      const isPacmanGhost = Boolean(fighter.isPacmanGhost && (fighter.pacmanGhostTimer || 0) > 0);
+
+      if (isPacmanGhost) {
         drawFighterFloorShadow(ctx, fighter);
-        if (!fighter.hasUnderBodyAura) {
-          drawFighterInkOutline(ctx, fighter);
+        drawPacmanFrightenedGhost(ctx, fighter);
+        fighter.drawHealth(ctx);
+        if (typeof fighter.drawFreezeTimer === 'function') {
+          fighter.drawFreezeTimer(ctx);
         }
+      } else {
+        if (isHeroFighter) {
+          drawFighterFloorShadow(ctx, fighter);
+          if (!fighter.hasUnderBodyAura) {
+            drawFighterInkOutline(ctx, fighter);
+          }
+        }
+        fighter.draw(ctx, opponent);
       }
-      fighter.draw(ctx, opponent);
 
       if (isSummoning) {
         drawPokeBallSummonOver(ctx, fighter, summonP);
@@ -404,6 +417,7 @@ export function drawFighters() {
       if (fighter._statusOverlaysRenderedFrame !== currentFrame) {
         fighter._statusOverlaysRenderedFrame = currentFrame;
         const isDebuffSuppressed = Boolean(
+          isPacmanGhost ||
           fighter.suppressDebuffs ||
           fighter.suppressStatusOverlays ||
           fighter.isPokemon ||

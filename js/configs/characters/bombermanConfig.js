@@ -32,7 +32,8 @@ export const bombermanConfig = {
   bombRadius: 22, // Visual & physical obstacle collision radius for enemies
   baseBombDamage: 28, // Base damage per cross-explosion hit
   chainBonusDamage: 8, // Bonus damage when triggered via chain reaction
-  bombKnockback: 14, // Outward blast impulse
+  bombKnockback: 0, // Knockback removed; replaced with stun effect
+  bombStunDuration: 10, // 0.75s stun duration (45 frames at 60 FPS) applied to entities caught in bomb explosions
   explosionDuration: 28, // Visual duration of cross-flame & shockwave rings
   bombSlowDuration: 75, // 1.25s slow debuff applied to entities struck by bomb explosions (~75 frames at 60 FPS)
   bombSlowMultiplier: 0.50, // 50% movement speed reduction during slow debuff (target moves at half speed)

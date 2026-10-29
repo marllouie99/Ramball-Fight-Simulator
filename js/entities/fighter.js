@@ -746,6 +746,11 @@ export class Fighter {
     this.lastBleedAttacker = null;
     // Silence effect state
     this.silenceTimer = 0;
+    this.isPacmanGhost = false;
+    this.pacmanGhostTimer = 0;
+    this.pacmanGhostMaxTimer = 0;
+    this.isSwallowedByPacman = false;
+    this.swallowedBy = null;
     this.blackFlashDebuffTimer = 0;
     this.pureLoveBeamRegenDebuffTimer = 0;
     this.tojiRegenDebuffTimer = 0;
@@ -861,6 +866,7 @@ export class Fighter {
    */
   areAttackEffectsSuppressed() {
     if (this.hp <= 0 || this.isDead) return true;
+    if (this.isPacmanGhost && (this.pacmanGhostTimer || 0) > 0) return true;
     if (this.characterId === 'escanor' || this.type === 'escanor') {
       if (this.isTargetOfAmbush) return true;
       return false;
@@ -2260,6 +2266,10 @@ export class Fighter {
     const currentFrame = this._getFrameId();
     if (this._lastCooldownTickFrame === currentFrame && currentFrame !== undefined) return;
     this._lastCooldownTickFrame = currentFrame;
+
+    if (this.isPacmanGhost && (this.pacmanGhostTimer || 0) > 0) {
+      return; // All cooldowns are in pause while in Pac-Man ghost state!
+    }
 
     if (this.skillManager) {
       const isFrozen = Boolean(this.timeStopTimer > 0 || this.isTimeStopped || (this.statusEffects && this.statusEffects.isTimeStopped));
@@ -3753,6 +3763,7 @@ export class Fighter {
    */
   canAim() {
     if (this.hp <= 0 || this.isDead) return false;
+    if (this.isPacmanGhost && (this.pacmanGhostTimer || 0) > 0) return false;
     if (this.isTargetOfAmbush || this.isCaughtInNaoyaUlt || this.isCurrentlyWallPinnedByNaoya || (this.naoyaWallPinTimer > 0) || (this._carCrashRagdollTimer > 0) || (this.timeStopTimer > 0 && !this.isChainedByMakima)) return false;
     const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) ||
                      (this.statusEffects && this.statusEffects.paralyzeTimer && this.statusEffects.paralyzeTimer > 0) ||
@@ -4174,6 +4185,25 @@ export class Fighter {
     if (this.scytheSwingTimer > 0) this.scytheSwingTimer--;
     if (this.swipeTimer > 0) this.swipeTimer--;
     if (this.recoilTimer > 0) this.recoilTimer--;
+
+    // Pac-Man Frightened Ghost State Guard:
+    // While transformed, the enemy cannot cast any skills, skill cooldowns are paused,
+    // all abilities are disabled, and all they can do is move until the duration expires!
+    if (this.isPacmanGhost && (this.pacmanGhostTimer || 0) > 0) {
+      this.pacmanGhostTimer--;
+      if (this.pacmanGhostTimer <= 0) {
+        this.isPacmanGhost = false;
+        this.pacmanGhostTimer = 0;
+      }
+      this.interruptAttacks?.(true);
+      if (this.skillManager) {
+        this.skillManager.interruptAll?.(true);
+      }
+      this.applyMovementPhysics();
+      this.resolveWallBounce(arena, opponent);
+      this._inSuperUpdate = false;
+      return;
+    }
 
     // Stop initiating NEW attacks if round/match has ended
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
