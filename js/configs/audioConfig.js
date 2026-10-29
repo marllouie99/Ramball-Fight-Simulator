@@ -277,7 +277,13 @@ export const AUDIO_CONFIG = {
   'bomberman_walk': 'Assets/Sound Effects/BombermanSFX/Walking 1.wav',
   'bomberman_bomb_kick': 'Assets/Sound Effects/BombermanSFX/Kick - Pressure Block.wav',
   'bomberman_kick': 'Assets/Sound Effects/BombermanSFX/Kick - Pressure Block.wav',
-  'bomberman_fire_up': 'Assets/Sound Effects/BombermanSFX/era_vera-easter22-gun-melee-summon.wav'
+  'bomberman_fire_up': 'Assets/Sound Effects/BombermanSFX/era_vera-easter22-gun-melee-summon.wav',
+
+  // Pac-Man (Retro Arcade Legend)
+  'pacman_waka': 'Assets/Sound Effects/PacmanSFX/waka.wav',
+  'pacman_chomp': 'Assets/Sound Effects/PacmanSFX/chomp.wav',
+  'pacman_power_pellet': 'Assets/Sound Effects/PacmanSFX/power_pellet.wav',
+  'pacman_refill': 'Assets/Sound Effects/PacmanSFX/refill.wav'
 };
 
 

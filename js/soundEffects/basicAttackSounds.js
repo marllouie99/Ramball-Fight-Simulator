@@ -440,6 +440,35 @@ export const BASIC_ATTACK_SOUNDS = {
       return CONFIG.bomberman?.soundVolumes?.plantBomb ?? 0.85;
     },
     delay: 0,
+  },
+  66: {
+    get src() {
+      return CONFIG.pacman?.sounds?.chomp || 'Assets/Sound Effects/PacmanSFX/chomp.wav';
+    },
+    get volume() {
+      return CONFIG.pacman?.soundVolumes?.chomp ?? 0.90;
+    },
+    delay: 0,
+  },
+  // ── Pac-Man (ID 66) ──────────
+  66: {
+    get src() {
+      return CONFIG.pacman?.sounds?.chomp || 'Assets/Sound Effects/PacmanSFX/chomp.wav';
+    },
+    get volume() {
+      return CONFIG.pacman?.soundVolumes?.chomp ?? 0.85;
+    },
+    delay: 0,
+  },
+
+  67: {
+    get src() {
+      return CONFIG.creeper?.sounds?.headbutt || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+    },
+    get volume() {
+      return CONFIG.creeper?.soundVolumes?.headbutt ?? 0.85;
+    },
+    delay: 0,
   }
 };
 
@@ -1285,6 +1314,33 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     },
     get volume() {
       return CONFIG.bomberman?.soundVolumes?.plantBomb ?? 0.85;
+    },
+    delay: 0,
+  },
+  'pacman': {
+    get src() {
+      return CONFIG.pacman?.sounds?.chomp || 'Assets/Sound Effects/PacmanSFX/chomp.wav';
+    },
+    get volume() {
+      return CONFIG.pacman?.soundVolumes?.chomp ?? 0.90;
+    },
+    delay: 0,
+  },
+  'pacman': {
+    get src() {
+      return CONFIG.pacman?.sounds?.chomp || 'Assets/Sound Effects/PacmanSFX/chomp.wav';
+    },
+    get volume() {
+      return CONFIG.pacman?.soundVolumes?.chomp ?? 0.85;
+    },
+    delay: 0,
+  },
+  'creeper': {
+    get src() {
+      return CONFIG.creeper?.sounds?.headbutt || 'Assets/Sound Effects/Attacks/fleshhit.mp3';
+    },
+    get volume() {
+      return CONFIG.creeper?.soundVolumes?.headbutt ?? 0.85;
     },
     delay: 0,
   }

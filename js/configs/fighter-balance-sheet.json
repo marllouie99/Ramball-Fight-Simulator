@@ -847,6 +847,27 @@
         "cooldown": 1
       }
     },
+    "pacman": {
+      "name": "Pac-Man",
+      "archetype": "brawler",
+      "hp": 350,
+      "speed": 4.8,
+      "radius": 25,
+      "baseDamage": 30,
+      "baseCooldown": 45,
+      "themeColor": "#FACC15",
+      "keySkills": {
+        "dots": {
+          "totalDots": 64,
+          "dotEatRadius": 28
+        },
+        "chompMode": {
+          "duration": 360,
+          "damagePercent": 0.30,
+          "speedMultiplier": 1.25
+        }
+      }
+    },
     "bomberman": {
       "name": "Bomber Man",
       "archetype": "zoner",
@@ -879,6 +900,21 @@
           "duration": 500,
           "cooldown": 1000
         }
+      }
+    },
+    "creeper": {
+      "name": "Creeper",
+      "archetype": "brawler",
+      "color": "#22C55E",
+      "hp": 1200,
+      "speed": 4.8,
+      "baseRange": 75,
+      "baseDamage": 38,
+      "multipliers": {
+        "damage": 1,
+        "speed": 1,
+        "knockback": 1,
+        "cooldown": 1
       }
     }
   }

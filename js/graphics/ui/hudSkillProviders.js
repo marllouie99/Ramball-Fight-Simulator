@@ -3056,6 +3056,165 @@ export const HUD_SKILL_PROVIDERS = {
 
     return skills;
   },
+
+  creeper(f) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.creeper) ? CONFIG.creeper : {};
+    const themeColor = f.color || cfg.themeColor || '#22C55E';
+    const skills = [];
+
+    // 1. Passive: Silent Stalker & Gunpowder Core
+    if (isSkillEnabled(cfg.enableSilentStalker, true)) {
+      skills.push({
+        id: 'silent_stalker',
+        pct: 100,
+        ready: true,
+        color: themeColor,
+        label: 'SILENT STALKER',
+      });
+    }
+
+    // 2. Skill 1: "Tssssss..." (Primed Detonation)
+    if (isSkillEnabled(cfg.enablePrimedDetonation, true)) {
+      const cdMax = f.detonationCooldownMax || cfg.detonationCooldown || 540;
+      const cdTimer = f.detonationCooldownTimer || 0;
+      const isPriming = (f.isPrimingDetonation || (f.primeDetonationTimer || 0) > 0);
+      const primeTimer = f.primeDetonationTimer || 0;
+      const primeMax = f.maxPrimeTimer || cfg.primeDurationFrames || 60;
+
+      let pct = 100;
+      let label = 'DETONATION';
+      let ready = false;
+
+      if (isPriming) {
+        pct = Math.max(0, Math.min(100, (1 - primeTimer / primeMax) * 100));
+        ready = true;
+        const primeSec = (primeTimer / 60).toFixed(1);
+        label = `DETONATION (${primeSec}S)`;
+      } else if (cdTimer > 0) {
+        pct = Math.max(0, Math.min(100, (1 - cdTimer / cdMax) * 100));
+        ready = false;
+        const secLeft = (cdTimer / 60).toFixed(1);
+        label = `DETONATION (${secLeft}S)`;
+      } else {
+        pct = 100;
+        ready = true;
+        label = 'DETONATION';
+      }
+
+      skills.push({
+        id: 'detonation',
+        pct,
+        ready,
+        color: themeColor,
+        label,
+      });
+    }
+
+    // 3. Skill 2: Primed TNT Block Toss
+    if (isSkillEnabled(cfg.enableTntToss, true)) {
+      const tntCdMax = f.tntCooldownMax || cfg.tntCooldown || 450;
+      const tntTimer = f.tntCooldownTimer || 0;
+      const tntPct = Math.max(0, Math.min(100, (1 - tntTimer / tntCdMax) * 100));
+      const tntSecLeft = (tntTimer / 60).toFixed(1);
+      const ready = tntTimer <= 0;
+      const label = tntTimer > 0 ? `TNT TOSS (${tntSecLeft}S)` : 'TNT TOSS';
+
+      skills.push({
+        id: 'tnt_toss',
+        pct: tntPct,
+        ready,
+        color: themeColor,
+        label,
+      });
+    }
+
+    // 4. Ultimate: Charged Creeper (Lightning Awakening)
+    if (isSkillEnabled(cfg.enableChargedCreeper, true)) {
+      const isCharged = Boolean(f.isChargedCreeper || (f.chargedCreeperTimer || 0) > 0);
+      const chargedDur = f.chargedDuration || cfg.chargedDuration || 1200;
+      const chargedTimer = f.chargedCreeperTimer || 0;
+      const chargedCdMax = f.chargedCooldownMax || cfg.chargedCooldown || 1800;
+      const cdTimer = f.chargedCooldownTimer || 0;
+
+      let pct = 100;
+      let label = 'CHARGED CREEPER';
+      let ready = false;
+
+      if (isCharged) {
+        pct = Math.max(0, Math.min(100, (chargedTimer / chargedDur) * 100));
+        ready = true;
+        const drainSec = Math.ceil(chargedTimer / 60);
+        label = `CHARGED CREEPER (${drainSec}S)`;
+      } else if (cdTimer > 0) {
+        pct = Math.max(0, Math.min(100, (1 - cdTimer / chargedCdMax) * 100));
+        ready = false;
+        const secLeft = (cdTimer / 60).toFixed(1);
+        label = `CHARGED CREEPER (${secLeft}S)`;
+      } else {
+        pct = 100;
+        ready = true;
+        label = 'CHARGED CREEPER';
+      }
+
+      skills.push({
+        id: 'charged_creeper',
+        pct,
+        ready,
+        color: themeColor,
+        label,
+        isSignature: true,
+        signature: true,
+        isUltimate: true,
+      });
+    }
+
+    return skills;
+  },
+
+  pacman(f) {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : {};
+    const themeColor = f.color || cfg.themeColor || '#FACC15';
+    const skills = [];
+
+    // 1. Passive: Pac-Dots (Tracks dot consumption progress across arena tiles)
+    const totalDots = f.totalDots || 64;
+    const dotsEaten = f.dotsEaten || 0;
+    const isCleared = dotsEaten >= totalDots;
+    const dotPct = Math.max(0, Math.min(100, (dotsEaten / totalDots) * 100));
+    const dotLabel = isCleared ? `DOTS (${totalDots} CLEARED)` : `DOTS (${dotsEaten}/${totalDots})`;
+    skills.push({
+      id: 'dots',
+      pct: dotPct,
+      ready: isCleared,
+      color: themeColor,
+      label: dotLabel,
+    });
+
+    // 2. Ultimate: Super Chomp Mode (30% Damage Empowered Attack State)
+    if (isSkillEnabled(cfg.enableChompMode, true)) {
+      const isChomp = Boolean(f.isChompModeActive);
+      const chompDur = f.chompModeDuration || cfg.chompModeDuration || 360;
+      const chompTimer = f.chompModeTimer || 0;
+      const secLeft = (chompTimer / 60).toFixed(1);
+      const chompPct = isChomp
+        ? Math.max(0, Math.min(100, (chompTimer / chompDur) * 100))
+        : (isCleared ? 100 : 0);
+      const chompLabel = isChomp ? `CHOMP MODE (${secLeft}S)` : 'CHOMP MODE';
+
+      skills.push({
+        id: 'chomp_mode',
+        pct: chompPct,
+        ready: isChomp || isCleared,
+        color: themeColor,
+        label: chompLabel,
+        isSignature: true,
+        signature: true,
+        isUltimate: true,
+      });
+    }
+
+    return skills;
+  },
 };
 
 /**
@@ -3184,6 +3343,8 @@ export function isSkillExceptionInDarkMode(fighter, skill) {
     choso: ['laser_matrix', 'convergence', 'blood manipulation: convergence', 'laser', 'matrix', 'laser matrix', 'piercing_blood', 'PIERCING BLOOD'],
     ash: ['10m_volt_ultimate', '10,000,000 VOLT'],
     bomberman: ['invincible', 'INVINCIBLE'],
+    creeper: ['charged_creeper', 'CHARGED CREEPER'],
+    pacman: ['chomp_mode', 'CHOMP MODE', 'chomp'],
     eye_of_cthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM'],
     eyeofcthulhu: ['servants', 'servants_of_cthulhu', 'SERVANTS OF CTHULHU', 'SERVANTS', 'SERVANT OF CTHULHU', 'SERVANT', 'chain_dash', 'BERSERK RAM']
   };

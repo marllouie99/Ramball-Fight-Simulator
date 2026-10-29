@@ -70,13 +70,23 @@ import { AshFighter } from '../fighters/AshFighter.js';
 import { ZombieFighter } from '../fighters/ZombieFighter.js';
 import { UnarmedFighter } from '../fighters/UnarmedFighter.js';
 import { BombermanFighter } from '../fighters/BombermanFighter.js';
+import { PacmanFighter } from '../fighters/PacmanFighter.js';
+import { CreeperFighter } from '../fighters/CreeperFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'unarmed':    UnarmedFighter,
+  'pacman':     PacmanFighter,
+  'Pacman':     PacmanFighter,
+  'PACMAN':     PacmanFighter,
+  'pac-man':    PacmanFighter,
+  'Pac-Man':    PacmanFighter,
   'bomberman':  BombermanFighter,
   'Bomberman':  BombermanFighter,
   'BOMBERMAN':  BombermanFighter,
   'bomber_man': BombermanFighter,
+  'creeper':    CreeperFighter,
+  'Creeper':    CreeperFighter,
+  'CREEPER':    CreeperFighter,
   'Unarmed':    UnarmedFighter,
   'UNARMED':    UnarmedFighter,
   'zombie':     ZombieFighter,

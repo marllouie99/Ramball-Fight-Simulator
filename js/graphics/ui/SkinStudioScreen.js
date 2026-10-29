@@ -58,6 +58,8 @@ import { drawAlucardSkin, _drawAlucardHat, _getAlucardHatImage, _drawAlucardGlas
 import { drawGutsSkin, _drawGutsHelmet, _getGutsHelmetImage, _drawGutsHair, _getGutsHairImage } from '../fighters/gutsSkin.js';
 import { drawAshSkin, _drawAshHair, _getAshHairImage } from '../fighters/ashSkin.js';
 import { drawBombermanSkin, _drawBombermanHair, _getBombermanHairImage } from '../fighters/bombermanSkin.js';
+import { drawPacmanSkin, _drawPacmanHair, _getPacmanHairImage } from '../fighters/pacmanSkin.js';
+import { drawCreeperSkin, _drawCreeperHair } from '../fighters/creeperSkin.js';
 
 
 
@@ -142,7 +144,7 @@ export const SKIN_STUDIO_CATEGORIES = [
   { id: 'CHAINSAW', label: 'CSM', filter: (f) => ['makima', 'reze', 'power'].includes(f.key) },
   { id: 'SLAYER', label: 'SLAYER', filter: (f) => ['tanjiro', 'zenitsu', 'nezuko'].includes(f.key) },
   { id: 'BERSERK', label: 'BERSERK', filter: (f) => f.key === 'guts' },
-  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'bomberman', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu', 'guts', 'ash'].includes(f.key) }
+  { id: 'ARCADE', label: 'ARCADE', filter: (f) => ['genos', 'escanor', 'engineer', 'zeus', 'cronus', 'bomber', 'bomberman', 'pacman', 'creeper', 'black', 'knight', 'john_wick', 'gunslinger', 'doppleganger', 'orange', 'megumin', 'crazydave', 'pekka', 'sans', 'nameless_deity', 'avatar_of_emptiness', 'avatarofemptiness', 'eye_of_cthulhu', 'guts', 'ash'].includes(f.key) }
 ];
 
 
@@ -487,6 +489,41 @@ export const SKIN_STUDIO_FIGHTERS = [
     themeColor: '#2563EB',
     forms: [
       { id: 'default', label: 'MAZE BOMBER' }
+    ]
+  },
+  {
+    key: 'pacman',
+    label: 'PAC-MAN',
+    asset: 'Pacman-hair.png',
+    assetDims: 'Procedural / PNG',
+    baseW: 2.90,
+    baseH: 2.20,
+    baseCrownY: -1.32,
+    visW: 300,
+    visH: 260,
+    centerX: 150,
+    topY: 20,
+    themeColor: '#FBBF24',
+    forms: [
+      { id: 'default', label: 'YELLOW CHOMPER' }
+    ]
+  },
+  {
+    key: 'creeper',
+    label: 'CREEPER',
+    asset: 'Procedural Minecraft Pixel Art',
+    assetDims: '56 x 56 Pixel Model',
+    baseW: 2.40,
+    baseH: 2.00,
+    baseCrownY: -1.25,
+    visW: 300,
+    visH: 260,
+    centerX: 150,
+    topY: 20,
+    themeColor: '#22C55E',
+    forms: [
+      { id: 'default', label: 'MOSS STALKER' },
+      { id: 'charged', label: 'CHARGED CREEPER' }
     ]
   },
   {
@@ -1664,6 +1701,14 @@ export function drawSkinStudioScreen() {
       } else if (fDef.key === 'bomberman') {
         dummyFighter._isStudioDummy = true;
         drawBombermanSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'pacman') {
+        dummyFighter._isStudioDummy = true;
+        drawPacmanSkin(ctx, dummyFighter);
+      } else if (fDef.key === 'creeper') {
+        dummyFighter._isStudioDummy = true;
+        dummyFighter.isChargedCreeper = (state.studioSkinForm === 'charged');
+        dummyFighter.chargedCreeperTimer = dummyFighter.isChargedCreeper ? 1200 : 0;
+        drawCreeperSkin(ctx, dummyFighter);
       }
     } catch (renderErr) {
       console.error('Skin render error in studio:', renderErr);
@@ -1738,6 +1783,10 @@ export function drawSkinStudioScreen() {
       _drawAshHair(ctx, baseRadius, isFacingLeft);
     } else if (fDef.key === 'bomberman') {
       _drawBombermanHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'pacman') {
+      _drawPacmanHair(ctx, baseRadius, isFacingLeft);
+    } else if (fDef.key === 'creeper') {
+      _drawCreeperHair(ctx, baseRadius, isFacingLeft);
     }
 
     ctx.restore();

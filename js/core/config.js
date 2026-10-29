@@ -69,6 +69,8 @@ import { musashiConfig } from '../configs/characters/musashiConfig.js';
 import { hydraConfig } from '../configs/characters/hydraConfig.js';
 import { unarmedConfig } from '../configs/characters/unarmedConfig.js';
 import { bombermanConfig } from '../configs/characters/bombermanConfig.js';
+import { pacmanConfig } from '../configs/characters/pacmanConfig.js';
+import { creeperConfig } from '../configs/characters/creeperConfig.js';
 import { DEFAULT_GRADE } from '../configs/gradeConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
@@ -86,6 +88,11 @@ export const CONFIG = {
   bomberman: bombermanConfig,
   Bomberman: bombermanConfig,
   bomber_man: bombermanConfig,
+  pacman: pacmanConfig,
+  Pacman: pacmanConfig,
+  pac_man: pacmanConfig,
+  creeper: creeperConfig,
+  Creeper: creeperConfig,
   genos: genosConfig,
   mahito: mahitoConfig,
   nanami: nanamiConfig,
@@ -1882,6 +1889,58 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: 'Bomb Up, Fire Up, Kick & Invincible',
     desc: bombermanConfig.description || 'Tactical grid trap-zoner who plants tile-centered time-fuse bombs across the 8x8 arena grid, upgrades Bomb Up (Max 10) & Fire Up (Max 10), kicks his bombs across the arena where they can explode mid-traveling, and activates an Invincible Ultimate.',
+  },
+  {
+    id: 66,
+    name: pacmanConfig.name || 'Pac-Man',
+    grade: pacmanConfig.grade ?? DEFAULT_GRADE,
+    displayName: pacmanConfig.displayName || pacmanConfig.name || 'Pac-Man',
+    category: 'Gaming',
+    color: pacmanConfig.color || '#FACC15',
+    themeColor: pacmanConfig.themeColor || '#FACC15',
+    secondaryColor: pacmanConfig.secondaryColor || '#EF4444',
+    startX: 150,
+    startY: 250,
+    startVx: -1.2,
+    startVy: 1.1,
+    radius: pacmanConfig.radius || pacmanConfig.r || 25,
+    hideHands: true,
+    hideWeapon: true,
+    aimbot: false,
+    spinRate: 0,
+    type: 'pacman',
+    hp: pacmanConfig.hp || 350,
+    damage: 30,
+    cooldown: pacmanConfig.chompAttackCooldown || 45,
+    moveSpeed: pacmanConfig.moveSpeed || pacmanConfig.speed || 4.8,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Dot Eater & Super Chomp',
+    desc: pacmanConfig.description || 'Retro arcade legend who eats dots across all arena tiles. Once every dot is cleared, enters Super Chomp mode to bite enemies for 30% damage before refilling the dots.',
+  },
+  {
+    id: 67,
+    name: creeperConfig.name || 'Creeper',
+    grade: creeperConfig.grade ?? DEFAULT_GRADE,
+    displayName: creeperConfig.displayName || creeperConfig.name || 'Creeper',
+    category: 'Gaming',
+    color: creeperConfig.color || '#22C55E',
+    themeColor: creeperConfig.themeColor || '#22C55E',
+    secondaryColor: creeperConfig.secondaryColor || '#38BDF8',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.1,
+    radius: creeperConfig.radius || creeperConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'creeper',
+    hp: creeperConfig.hp || 380,
+    damage: creeperConfig.basicAttackDamage || 24,
+    cooldown: creeperConfig.basicAttackCooldown || 65,
+    moveSpeed: creeperConfig.moveSpeed || creeperConfig.speed || 4.2,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Tssssss..., TNT Toss & Charged Creeper',
+    desc: creeperConfig.description || 'Iconic silent Minecraft stalker that sneaks up on targets, primes a devastating white-flashing concussive explosion with its signature hiss, tosses volatile bouncing TNT blocks, and channels celestial lightning to awaken as Charged Creeper.',
   }
 ];
 

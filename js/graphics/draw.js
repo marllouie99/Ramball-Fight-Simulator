@@ -52,6 +52,9 @@ export { drawMeguminSkin, drawMeguminPixelBody, _drawMeguminHair, _getMeguminHai
 export { drawCrazyDaveSkin, drawCrazyDavePixelBody, _drawCrazyDaveHair, _getCrazyDaveHairImage } from './fighters/crazyDaveSkin.js';
 export { drawZombieSkin, drawZombiePixelBody, _drawZombieHair, _getZombieHairImage } from './fighters/zombieSkin.js';
 export { drawBombermanSkin, drawBombermanPixelBody, _drawBombermanHair, _getBombermanHairImage } from './fighters/bombermanSkin.js';
+export { drawPacmanSkin, drawPacmanPixelBody, _drawPacmanHair, _getPacmanHairImage } from './fighters/pacmanSkin.js';
+export { drawCreeperSkin, drawCreeperPixelBody, _drawCreeperHair } from './fighters/creeperSkin.js';
+export { drawMinecraftTntBlock, drawCreeperExplosion } from './weapons/creeperWeaponGraphics.js';
 export { drawHeldBomb, drawPlantedBomb, drawBombExplosion, drawBombermanPowerupPopup, drawBombermanKickEffectSprite, _getBombermanKickFrames } from './weapons/bombermanWeaponGraphics.js';
 export { drawZombieChompEffect, drawZombieGravestone, drawZombieMinion, drawZombieHugeWaveBanner, drawZombieWaveProgressBar, drawZombieWaveAlertBanner, drawZombieVictoryBanner, drawZombiesAteYourBrains } from './weapons/zombieWeaponGraphics.js';
 export { drawCrazyDaveShovel, drawSunDrop, drawWallnut, drawPeashooter, drawSnowPea, drawTorchwood, drawLawnmower, drawPeaBullet, drawSnowPeaBullet, drawFirePeaBullet, drawCrazyDaveWeapon, CrazyDave_WEAPON_GRAPHICS } from './weapons/crazyDaveWeaponGraphics.js';
