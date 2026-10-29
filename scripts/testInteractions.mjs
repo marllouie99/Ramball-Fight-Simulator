@@ -13156,7 +13156,7 @@ async function runInteractionTests() {
 
     // Verify Ghost Transformation State
     assert(zenitsu.isPacmanGhost === true, 'Enemy must be transformed into ghost upon Pac-Man eating big dot');
-    assert(zenitsu.pacmanGhostTimer === 360, 'Ghost timer must be set to chomp duration (360 frames)');
+    assert(zenitsu.pacmanGhostTimer === 360, `Ghost timer must be set to chomp duration (360 frames), got ${zenitsu.pacmanGhostTimer}`);
     assert(zenitsu.canPerformBasicAttack(pacman) === false, 'Enemy must NOT be able to perform basic attacks in ghost state');
     assert(zenitsu.canAim() === false, 'Enemy must NOT be able to aim in ghost state');
 
@@ -13252,6 +13252,97 @@ async function runInteractionTests() {
     pacman._playSfx = (type) => { playedDeathSfx = type; };
     pacman.onDeath();
     assert(playedDeathSfx === 'death', 'Pac-Man onDeath must trigger death SFX');
+
+    // 12. Verify Ghost Audio ("Ghost - Turn to Blue.mp3") Cutoff Mechanics
+    const testZenitsuA = new ZenitsuFighter(100, 200, 1);
+    const testZenitsuB = new ZenitsuFighter(150, 250, 1);
+    pacman.hp = pacman.maxHp;
+    pacman.isDead = false;
+    pacman.dead = false;
+    testZenitsuA.hp = testZenitsuA.maxHp;
+    testZenitsuB.hp = testZenitsuB.maxHp;
+    state.fighters = [pacman, testZenitsuA, testZenitsuB];
+
+    // Case 1: Both enemies transformed into ghosts -> Audio starts and active ghost check returns true
+    pacman.activateChompMode('powerPellet');
+    assert(testZenitsuA.isPacmanGhost === true, 'Enemy A must be a ghost');
+    assert(testZenitsuB.isPacmanGhost === true, 'Enemy B must be a ghost');
+    assert(pacman.hasActiveGhostInArena() === true, 'Must detect active ghosts in arena');
+    assert(pacman._ghostSoundPlaying === true, 'Ghost audio must be marked playing');
+
+    // Case 2: Swallowing 1 of 2 ghosts leaves 1 ghost still active in the arena -> Audio continues
+    pacman._swallowGhostEnemy(testZenitsuA);
+    assert(testZenitsuA.isSwallowedByPacman === true, 'Enemy A is now swallowed inside Pac-Man');
+    assert(pacman.hasActiveGhostInArena() === true, 'Enemy B is still active in the arena, so audio must NOT be cut off yet');
+    assert(pacman._ghostSoundPlaying === true, 'Ghost audio remains playing while Enemy B roams');
+
+    // Case 3: Swallowing the LAST ghost in the arena -> Audio cuts off immediately
+    pacman._swallowGhostEnemy(testZenitsuB);
+    assert(testZenitsuB.isSwallowedByPacman === true, 'Enemy B is now swallowed inside Pac-Man');
+    assert(pacman.hasActiveGhostInArena() === false, 'Zero active ghosts roaming in arena after swallowing last ghost');
+    assert(pacman._ghostSoundPlaying === false, 'Ghost audio must be CUT OFF when no more ghosts are active in arena');
+
+    // Case 4: Ghost duration expiration -> Audio cuts off when timer hits 0
+    pacman.swallowedEnemies = [];
+    testZenitsuA.isSwallowedByPacman = false;
+    testZenitsuB.isSwallowedByPacman = false;
+    state.fighters = [pacman, testZenitsuA];
+    pacman.activateChompMode('powerPellet');
+    assert(pacman.hasActiveGhostInArena() === true, 'Active ghost present after new power pellet');
+    assert(pacman._ghostSoundPlaying === true, 'Ghost audio playing');
+
+    // Expire the ghost timer
+    testZenitsuA.pacmanGhostTimer = 1;
+    testZenitsuA.update(pacman, 1, testArena);
+    assert(testZenitsuA.isPacmanGhost === false, 'Ghost state must expire when pacmanGhostTimer reaches 0');
+    pacman.update(testZenitsuA, 0, testArena);
+    assert(pacman.hasActiveGhostInArena() === false, 'Zero active ghosts remain after expiration');
+    assert(pacman._ghostSoundPlaying === false, 'Ghost audio must be CUT OFF after ghost timer expires');
+
+    // Case 5: Ghost death in combat -> Audio cuts off immediately when the last ghost dies
+    state.fighters = [pacman, testZenitsuA];
+    pacman.activateChompMode('powerPellet');
+    assert(pacman.hasActiveGhostInArena() === true, 'Active ghost present before kill');
+    assert(pacman._ghostSoundPlaying === true, 'Ghost audio playing before kill');
+
+    testZenitsuA.hp = 0;
+    testZenitsuA.onDeath();
+    pacman.update(testZenitsuA, 0, testArena);
+    assert(pacman.hasActiveGhostInArena() === false, 'Zero active ghosts remain after death');
+    assert(pacman._ghostSoundPlaying === false, 'Ghost audio must be CUT OFF when all ghosts are eliminated');
+
+    // Case 6: Pac-Man death -> Ghost audio cut off immediately
+    testZenitsuA.hp = testZenitsuA.maxHp;
+    testZenitsuA.dead = false;
+    testZenitsuA.isDead = false;
+    state.fighters = [pacman, testZenitsuA];
+    pacman.activateChompMode('powerPellet');
+    assert(pacman._ghostSoundPlaying === true, 'Ghost audio playing');
+
+    pacman.hp = 0;
+    pacman.onDeath();
+    assert(pacman._ghostSoundPlaying === false, 'Ghost audio must be CUT OFF immediately when Pac-Man dies');
+
+    // 13. Verify Eating All Fruits Yields Longer Chomp Mode & Ghost Duration
+    pacman.hp = pacman.maxHp;
+    pacman.isDead = false;
+    pacman.dead = false;
+    testZenitsuA.hp = testZenitsuA.maxHp;
+    testZenitsuA.dead = false;
+    testZenitsuA.isDead = false;
+    state.fighters = [pacman, testZenitsuA];
+
+    // Standard Power Pellet duration: 360 frames
+    pacman.activateChompMode('powerPellet');
+    assert(pacman.chompModeDuration === 360, `Standard Power Pellet Chomp Mode duration must be 360 frames, got ${pacman.chompModeDuration}`);
+    assert(testZenitsuA.pacmanGhostTimer === 360, `Standard ghost timer must be 360 frames, got ${testZenitsuA.pacmanGhostTimer}`);
+
+    // All Fruits Eaten duration: 600 frames (significantly longer!)
+    pacman.activateChompMode('allFruits');
+    assert(pacman.chompModeDuration === 600, `All-fruits Chomp Mode duration must be longer (600 frames), got ${pacman.chompModeDuration}`);
+    assert(pacman.chompModeTimer === 600, `All-fruits Chomp Mode timer must initialize to longer duration (600 frames), got ${pacman.chompModeTimer}`);
+    assert(testZenitsuA.pacmanGhostTimer === 600, `All-fruits enemy ghost timer must also be longer (600 frames), got ${testZenitsuA.pacmanGhostTimer}`);
+    assert(pacman.chompModeDuration > 360, 'All-fruits Chomp Mode duration must be strictly longer than standard Power Pellet duration');
 
     state.fighters = [];
     console.log('      ✅ Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State verified.');

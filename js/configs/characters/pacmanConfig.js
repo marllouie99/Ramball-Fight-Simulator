@@ -35,7 +35,9 @@ export const pacmanConfig = {
 
   // ── Chomp Mode (Empowered 30% Attack State) ──
   enableChompMode: true,
-  chompModeDuration: 150, // ~6.0s duration at 60 FPS
+  chompModeDuration: 360, // Standard Chomp Mode duration from Power Pellet (~6.0s at 60 FPS)
+  allFruitsChompModeDuration: 600, // Empowered longer Chomp Mode duration when clearing ALL fruits/dots (~10.0s at 60 FPS)
+  chompModeDurationAllDots: 600, // Alias for backward compatibility
   chompDamagePercent: 0.20, // 30% damage on contact
   chompSpeedMultiplier: 1.25, // 25% movement speed boost while chasing enemies
   chompAttackCooldown: 45, // Delay between consecutive chomps (~0.75s)
@@ -44,7 +46,8 @@ export const pacmanConfig = {
 
   // ── Ghost Transformation Debuff (Enemy Frightened State) ──
   enableGhostTransformation: true,
-  ghostDuration: 360, // Duration enemy remains in ghost state (matching Chomp Mode)
+  ghostDuration: 360, // Standard duration enemy remains in ghost state (matching Chomp Mode)
+  allFruitsGhostDuration: 600, // Extended duration when all fruits are cleared (matching allFruitsChompModeDuration)
 
   // ── Swallowed Enemy Digestion (Damage Per Second) ──
   enableSwallowedDps: true,

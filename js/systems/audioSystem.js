@@ -122,6 +122,14 @@ class AudioEventEmitter {
     }
   }
 
+  stopSoundBySrc(src, force = false) {
+    stopSoundBySrc(src, force);
+  }
+
+  fadeOutSFXBySrc(src, fadeMs = 350) {
+    fadeOutSoundBySrc(src, fadeMs);
+  }
+
   preload(src, options = {}) {
     return preloadSound(src, options);
   }

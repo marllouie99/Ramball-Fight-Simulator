@@ -11,6 +11,7 @@ import {
   triggerGlobalScreenShake,
 } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
+import { stopSound, stopSoundBySrc } from '../../systems/soundSystem.js';
 import { getTileGridInfo } from '../../systems/arenaTileSystem.js';
 import { drawPacmanSkin } from '../../graphics/fighters/pacmanSkin.js';
 
@@ -71,6 +72,10 @@ export class PacmanFighter extends Fighter {
     this.sounds = { ...(cfg.sounds || {}) };
     this.soundVolumes = { ...(cfg.soundVolumes || {}) };
 
+    // ── Ghost State & Audio Tracking ──
+    this._ghostAudioHandle = null;
+    this._ghostSoundPlaying = false;
+
     // Declarative registration with SkillManager
     this._registerSkills();
   }
@@ -81,6 +86,16 @@ export class PacmanFighter extends Fighter {
   }
   set chompModeDurationMax(val) {
     if (typeof val === 'number') this.chompModeDuration = val;
+  }
+  get allFruitsChompModeDuration() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
+    return cfg.allFruitsChompModeDuration ?? cfg.chompModeDurationAllDots ?? 600;
+  }
+  set allFruitsChompModeDuration(val) {
+    if (typeof val === 'number') {
+      const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
+      cfg.allFruitsChompModeDuration = val;
+    }
   }
 
   /**
@@ -107,6 +122,7 @@ export class PacmanFighter extends Fighter {
       onExpire: (fighter) => {
         fighter.isChompModeActive = false;
         fighter._spitOutSwallowedEnemies?.(state.arena);
+        fighter.cutoffGhostAudio?.();
         if (fighter.dotsEaten >= fighter.totalDots) {
           fighter.refillDots(state.arena);
         }
@@ -122,9 +138,12 @@ export class PacmanFighter extends Fighter {
    * Resets Pac-Man's match state, dots grid, and timers for new rounds.
    */
   reset() {
+    this.cutoffGhostAudio?.();
     this._spitOutSwallowedEnemies?.();
     this.swallowedEnemies = [];
     this._swallowedDpsTimer = 0;
+    this._ghostAudioHandle = null;
+    this._ghostSoundPlaying = false;
     super.reset();
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
 
@@ -235,20 +254,25 @@ export class PacmanFighter extends Fighter {
   }
 
   /**
-   * Triggers or refreshes Super Chomp Mode when Pac-Man eats a Power Pellet (big dot) or clears all dots.
-   * Enables the 30% Max HP chomp bite attack upon physical contact with an enemy.
-   * @param {string} [source='powerPellet'] - Activation trigger source ('powerPellet' or 'allDots')
+   * Triggers or refreshes Super Chomp Mode when Pac-Man eats a Power Pellet (big fruit) or clears all fruits/dots.
+   * When Pac-Man successfully eats all the fruits, the duration of Chomp Mode will be significantly longer!
+   * @param {string} [source='powerPellet'] - Activation trigger source ('powerPellet' or 'allDots'/'allFruits')
    */
   activateChompMode(source = 'powerPellet') {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
     this.isChompModeActive = true;
-    this.chompModeDuration = cfg.chompModeDuration ?? 360;
+
+    const isAllFruits = (source === 'allDots' || source === 'allFruits');
+    const baseDuration = cfg.chompModeDuration ?? 360;
+    const longerDuration = cfg.allFruitsChompModeDuration ?? cfg.chompModeDurationAllDots ?? Math.max(600, Math.round(baseDuration * 1.67));
+
+    this.chompModeDuration = isAllFruits ? longerDuration : baseDuration;
     this.chompModeTimer = this.chompModeDuration;
     this.chompAttackCooldown = 0;
 
     this._playSfx('eatBigFruit');
-    triggerGlobalScreenShake(4.5, 10);
-    const label = source === 'allDots' ? 'ALL DOTS CLEARED! (30% CHOMP)' : 'POWER PELLET! (30% CHOMP)';
+    triggerGlobalScreenShake(isAllFruits ? 6.0 : 4.5, isAllFruits ? 14 : 10);
+    const label = isAllFruits ? 'ALL FRUITS EATEN! (EXTENDED CHOMP)' : 'POWER PELLET! (30% CHOMP)';
     spawnFloatingText(this.x, this.y - this.r - 22, label, cfg.themeColor || '#F2F000');
 
     // Flashy energizer shockwave (Rule 26)
@@ -256,27 +280,26 @@ export class PacmanFighter extends Fighter {
       type: 'energizerBloom',
       x: this.x,
       y: this.y,
-      timer: 30,
-      maxTimer: 30,
-      radius: this.r * 2.8,
+      timer: isAllFruits ? 40 : 30,
+      maxTimer: isAllFruits ? 40 : 30,
+      radius: this.r * (isAllFruits ? 3.4 : 2.8),
     });
 
-    // Transform living enemies into frightened ghosts (Rule: no skills, paused CDs, move-only)
-    this._transformEnemiesIntoGhosts();
+    // Transform living enemies into frightened ghosts with matching duration
+    this._transformEnemiesIntoGhosts(this.chompModeDuration);
   }
 
   /**
    * Transforms all living opposing enemies into frightened ghosts.
    * While in this state, enemies cannot cast skills, skill cooldowns are paused,
    * all abilities are disabled, and all they can do is move until the duration expires.
+   * @param {number} [durationOverride=null] - Optional duration override (e.g. for longer all-fruits chomp)
    */
-  _transformEnemiesIntoGhosts() {
+  _transformEnemiesIntoGhosts(durationOverride = null) {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
     if (cfg.enableGhostTransformation === false) return;
 
-    this._playSfx('ghostTurnBlue');
-
-    const duration = cfg.ghostDuration || this.chompModeDuration || 360;
+    const duration = durationOverride || this.chompModeDuration || cfg.ghostDuration || 360;
     const candidates = [];
 
     const myTeam = (typeof state !== 'undefined' && state.fighters && typeof state.getFighterTeam === 'function')
@@ -289,7 +312,7 @@ export class PacmanFighter extends Fighter {
         if (!f || f === this || f.hp <= 0 || f.isDead) continue;
         if (myTeam !== null && typeof state.getFighterTeam === 'function' && state.getFighterTeam(i) === myTeam) continue;
         candidates.push(f);
-        if (f.activePokemon && f.activePokemon.hp > 0) {
+        if (f.activePokemon && f.activePokemon.hp > 0 && !f.activePokemon.isDead) {
           candidates.push(f.activePokemon);
         }
       }
@@ -300,6 +323,16 @@ export class PacmanFighter extends Fighter {
     if (candidates.length === 0 && this._lastOpponent && this._lastOpponent.hp > 0 && this._lastOpponent !== this) {
       candidates.push(this._lastOpponent);
     }
+
+    if (candidates.length === 0) {
+      this.cutoffGhostAudio();
+      return;
+    }
+
+    // Cut off any previously playing ghost audio before starting fresh
+    this.cutoffGhostAudio();
+    this._ghostAudioHandle = this._playSfx('ghostTurnBlue');
+    this._ghostSoundPlaying = true;
 
     for (const enemy of candidates) {
       enemy.isPacmanGhost = true;
@@ -324,7 +357,74 @@ export class PacmanFighter extends Fighter {
     const sfxPath = this.sounds?.[type] || CONFIG.pacman?.sounds?.[type];
     const volume = this.soundVolumes?.[type] ?? CONFIG.pacman?.soundVolumes?.[type] ?? 0.8;
     if (sfxPath && typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
-      audioSystem.playSFX(sfxPath, volume);
+      return audioSystem.playSFX(sfxPath, volume);
+    }
+    return null;
+  }
+
+  /**
+   * Checks whether there is at least one active (un-swallowed, living) ghost in the arena.
+   * @returns {boolean}
+   */
+  hasActiveGhostInArena() {
+    if (this.hp <= 0 || this.isDead || (typeof state !== 'undefined' && (state.matchEnded || state.roundOver))) {
+      return false;
+    }
+
+    const isEntityActiveGhost = (entity) => {
+      if (!entity || entity === this) return false;
+      if (entity.hp <= 0 || entity.isDead || entity.dead) return false;
+      if (entity.isSwallowedByPacman) return false; // Swallowed ghosts are inside Pac-Man, not active in the arena
+      return Boolean(entity.isPacmanGhost && (entity.pacmanGhostTimer || 0) > 0);
+    };
+
+    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+      for (const f of state.fighters) {
+        if (isEntityActiveGhost(f)) return true;
+        if (f && f.activePokemon && isEntityActiveGhost(f.activePokemon)) return true;
+      }
+    }
+
+    if (isEntityActiveGhost(this.opponent)) return true;
+    if (isEntityActiveGhost(this._lastOpponent)) return true;
+
+    return false;
+  }
+
+  /**
+   * Immediately cuts off the "Ghost - Turn to Blue" audio when there are no more active ghosts in the arena.
+   */
+  cutoffGhostAudio() {
+    if (this._ghostAudioHandle) {
+      try {
+        stopSound(this._ghostAudioHandle, true);
+      } catch (e) {}
+      this._ghostAudioHandle = null;
+    }
+
+    const ghostSfx = this.sounds?.ghostTurnBlue || 'Assets/Sound Effects/PacmanSFX/Ghost - Turn to Blue.mp3';
+    try {
+      stopSoundBySrc(ghostSfx, true);
+      stopSoundBySrc('Ghost - Turn to Blue', true);
+    } catch (e) {}
+
+    if (typeof audioSystem !== 'undefined' && typeof audioSystem.stopSoundBySrc === 'function') {
+      try {
+        audioSystem.stopSoundBySrc(ghostSfx, true);
+        audioSystem.stopSoundBySrc('Ghost - Turn to Blue', true);
+      } catch (e) {}
+    }
+
+    this._ghostSoundPlaying = false;
+  }
+
+  /**
+   * Checks if ghost audio is currently active and cuts it off if no active ghosts remain in the arena.
+   */
+  _checkGhostAudioCutoff() {
+    if (!this._ghostSoundPlaying && !this._ghostAudioHandle) return;
+    if (!this.hasActiveGhostInArena()) {
+      this.cutoffGhostAudio();
     }
   }
 
@@ -360,7 +460,11 @@ export class PacmanFighter extends Fighter {
         this.dotsEaten++;
         this._mouthAnimTicks += 6;
 
-        if (dot.isPowerPellet) {
+        if (this.dotsEaten >= this.totalDots) {
+          // When all fruits/dots are eaten, activate the extended longer Chomp Mode!
+          this.activateChompMode('allFruits');
+          break;
+        } else if (dot.isPowerPellet) {
           this.powerPelletsEaten = (this.powerPelletsEaten || 0) + 1;
           this.activateChompMode('powerPellet');
         } else {
@@ -376,12 +480,6 @@ export class PacmanFighter extends Fighter {
           maxTimer: 10,
           color: dot.isPowerPellet ? '#FACC15' : '#FFE082',
         });
-
-        // Check if all dots have been eaten!
-        if (this.dotsEaten >= this.totalDots) {
-          this.activateChompMode('allDots');
-          break;
-        }
       }
     }
   }
@@ -497,6 +595,11 @@ export class PacmanFighter extends Fighter {
     }
     this._swallowedDpsTimer = 0;
 
+    // Immediately cut off "Ghost - Turn to Blue" audio if no active ghosts remain roaming in the arena
+    if (!this.hasActiveGhostInArena()) {
+      this.cutoffGhostAudio();
+    }
+
     // 4. Audio & Haptic Feedback
     this._playSfx('eatGhost');
     triggerGlobalScreenShake(5.0, 14);
@@ -584,6 +687,9 @@ export class PacmanFighter extends Fighter {
         if (typeof enemy.checkRoundOrMatchEnd === 'function') {
           enemy.checkRoundOrMatchEnd();
         }
+        if (!this.hasActiveGhostInArena()) {
+          this.cutoffGhostAudio();
+        }
       }
     }
   }
@@ -593,7 +699,10 @@ export class PacmanFighter extends Fighter {
    * Propels enemies forward onto the arena floor, clears their ghost state, and restores normal combat.
    */
   _spitOutSwallowedEnemies(arena = state.arena) {
-    if (!this.swallowedEnemies || this.swallowedEnemies.length === 0) return;
+    if (!this.swallowedEnemies || this.swallowedEnemies.length === 0) {
+      this.cutoffGhostAudio();
+      return;
+    }
 
     const activeArena = arena || state.arena || { x: 45, y: 240, width: 450, height: 450 };
     const spitAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
@@ -644,6 +753,7 @@ export class PacmanFighter extends Fighter {
     this._playSfx('refill');
     triggerGlobalScreenShake(4.0, 10);
     this.swallowedEnemies.length = 0;
+    this.cutoffGhostAudio();
   }
 
   /**
@@ -676,6 +786,7 @@ export class PacmanFighter extends Fighter {
     if (forceCancelAll || this.hp <= 0) {
       this.activeVisualEffects.length = 0;
       this._spitOutSwallowedEnemies?.();
+      this.cutoffGhostAudio();
     }
   }
 
@@ -686,8 +797,9 @@ export class PacmanFighter extends Fighter {
   update(opponent, ownerIndex, arena = state.arena) {
     const activeArena = arena || state.arena || { x: 45, y: 240, width: 450, height: 450 };
 
-    // 0. Rule 25: Update visual effects lifecycles BEFORE freeze guard
+    // 0. Rule 25: Update visual effects lifecycles & ghost audio cutoff BEFORE freeze guard
     this._updateVisualEffects();
+    this._checkGhostAudioCutoff();
 
     if (!this._dotsInitialized) {
       this.initDots(activeArena);
@@ -724,6 +836,7 @@ export class PacmanFighter extends Fighter {
         this.isChompModeActive = false;
         // Spit out any swallowed enemies when chomp mode ends!
         this._spitOutSwallowedEnemies(activeArena);
+        this.cutoffGhostAudio();
         // When Chomp Mode expires, if all arena dots were cleared, refill the whole arena grid
         if (this.dotsEaten >= this.totalDots) {
           this.refillDots(activeArena);
@@ -763,6 +876,7 @@ export class PacmanFighter extends Fighter {
    * Overrides base Fighter.onDeath() to play the iconic retro Pac-Man death sound.
    */
   onDeath() {
+    this.cutoffGhostAudio();
     this._playSfx('death');
     super.onDeath();
   }

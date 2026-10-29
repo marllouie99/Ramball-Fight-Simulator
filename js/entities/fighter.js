@@ -1,4 +1,4 @@
-import { stopAllSounds, stopAllLoopingSounds, stopSound, fadeOutSound, stopLoopingSound } from '../systems/soundSystem.js';
+import { stopAllSounds, stopAllLoopingSounds, stopSound, stopSoundBySrc, fadeOutSound, stopLoopingSound } from '../systems/soundSystem.js';
 import { stopArenaBgm } from '../systems/arenaBgmSystem.js';
 // ─────────────────────────────────────────────
 // BASE FIGHTER CLASS
@@ -2189,6 +2189,17 @@ export class Fighter {
     this.interruptAttacks(true);
     this.hitFlashTimer = 0; // Clear residual white hit-flash so corpses don't render white
 
+    if (this.isPacmanGhost) {
+      this.isPacmanGhost = false;
+      this.pacmanGhostTimer = 0;
+      if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+        const anyGhostLeft = state.fighters.some(f => f && f !== this && f.hp > 0 && !f.isDead && !f.dead && !f.isSwallowedByPacman && f.isPacmanGhost && (f.pacmanGhostTimer || 0) > 0);
+        if (!anyGhostLeft) {
+          stopSoundBySrc('Ghost - Turn to Blue', true);
+        }
+      }
+    }
+
     // If the fighter is currently building up in Mahito's Soul Disfigurement paralysis, defer death shatter and fatal blood splash until the soul rupture explosion detonates!
     if (this.isParalyzedByMahito && (this.paralyzeTimer || 0) > 0) {
       return;
@@ -4194,6 +4205,12 @@ export class Fighter {
       if (this.pacmanGhostTimer <= 0) {
         this.isPacmanGhost = false;
         this.pacmanGhostTimer = 0;
+        if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+          const anyGhostLeft = state.fighters.some(f => f && f !== this && f.hp > 0 && !f.isDead && !f.dead && !f.isSwallowedByPacman && f.isPacmanGhost && (f.pacmanGhostTimer || 0) > 0);
+          if (!anyGhostLeft) {
+            stopSoundBySrc('Ghost - Turn to Blue', true);
+          }
+        }
       }
       this.interruptAttacks?.(true);
       if (this.skillManager) {

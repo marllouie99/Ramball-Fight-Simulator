@@ -166,7 +166,6 @@ export function drawHeldBomb(ctx, fighter) {
 
 /**
  * Draws a tile-centered or kicked traveling bomb on the arena floor.
- * When stationary, displays a subtle tile-center lock reticle.
  * When kicked (`bomb.isTraveling === true`), displays kinetic afterimage rings
  * and discrete dust motes trailing behind the sliding bomb.
  */
@@ -216,29 +215,9 @@ export function drawPlantedBomb(ctx, bomb) {
     ctx.beginPath();
     ctx.arc(0, 0, r + 4, 0, Math.PI * 2);
     ctx.stroke();
-  } else {
-    // 1. Subtle tile-center lock reticle on floor when stationary on its tile block
-    const tileHalf = Math.min(24, (bomb.cellW || 56.25) * 0.42);
-    ctx.strokeStyle = isDanger ? 'rgba(239, 68, 68, 0.45)' : 'rgba(59, 130, 246, 0.28)';
-    ctx.lineWidth = 1.5;
-    const cornerLen = 6;
-    ctx.beginPath();
-    ctx.moveTo(-tileHalf, -tileHalf + cornerLen);
-    ctx.lineTo(-tileHalf, -tileHalf);
-    ctx.lineTo(-tileHalf + cornerLen, -tileHalf);
-    ctx.moveTo(tileHalf - cornerLen, -tileHalf);
-    ctx.lineTo(tileHalf, -tileHalf);
-    ctx.lineTo(tileHalf, -tileHalf + cornerLen);
-    ctx.moveTo(-tileHalf, tileHalf - cornerLen);
-    ctx.lineTo(-tileHalf, tileHalf);
-    ctx.lineTo(-tileHalf + cornerLen, tileHalf);
-    ctx.moveTo(tileHalf - cornerLen, tileHalf);
-    ctx.lineTo(tileHalf, tileHalf);
-    ctx.lineTo(tileHalf, tileHalf - cornerLen);
-    ctx.stroke();
   }
 
-  // 2. Ground contact shadow ellipse
+  // 1. Ground contact shadow ellipse
   ctx.fillStyle = 'rgba(14, 15, 20, 0.34)';
   ctx.beginPath();
   ctx.ellipse(0, baseR * 0.72, r * 0.85, r * 0.32, 0, 0, Math.PI * 2);

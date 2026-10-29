@@ -1228,6 +1228,12 @@ export function updateFighters() {
         if (fighter.pacmanGhostTimer <= 0) {
           fighter.isPacmanGhost = false;
           fighter.pacmanGhostTimer = 0;
+          if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
+            const anyGhostLeft = state.fighters.some(f => f && f !== fighter && f.hp > 0 && !f.isDead && !f.dead && !f.isSwallowedByPacman && f.isPacmanGhost && (f.pacmanGhostTimer || 0) > 0);
+            if (!anyGhostLeft) {
+              stopSoundBySrc('Ghost - Turn to Blue', true);
+            }
+          }
         }
         fighter.interruptAttacks?.(true);
         if (fighter.skillManager) {
