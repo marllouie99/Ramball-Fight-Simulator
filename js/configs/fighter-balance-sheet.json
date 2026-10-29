@@ -876,8 +876,8 @@
           "cooldown": 150
         },
         "invincible": {
-          "duration": 1800,
-          "cooldown": 2400
+          "duration": 500,
+          "cooldown": 1000
         }
       }
     }

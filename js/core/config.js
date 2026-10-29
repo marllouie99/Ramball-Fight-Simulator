@@ -1881,7 +1881,7 @@ export const FIGHTER_DEFS = [
     moveSpeed: bombermanConfig.moveSpeed || bombermanConfig.speed || 4.8,
     projectileSpeedMultiplier: 1.0,
     ability: 'Bomb Up, Fire Up, Kick & Invincible',
-    desc: bombermanConfig.description || 'Tactical grid trap-zoner who plants tile-centered time-fuse bombs across the 8x8 arena grid, upgrades Bomb Up (Max 10) & Fire Up (Max 10), kicks his bombs across the arena where they can explode mid-traveling, and activates a 30-second Invincible Ultimate.',
+    desc: bombermanConfig.description || 'Tactical grid trap-zoner who plants tile-centered time-fuse bombs across the 8x8 arena grid, upgrades Bomb Up (Max 10) & Fire Up (Max 10), kicks his bombs across the arena where they can explode mid-traveling, and activates an Invincible Ultimate.',
   }
 ];
 

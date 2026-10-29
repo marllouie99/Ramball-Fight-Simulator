@@ -12245,6 +12245,18 @@ async function runInteractionTests() {
     bomberman.applyHitStun(30);
     assert((bomberman.hitStunTimer || 0) === 0, 'Bomberman must be immune to hitStun while Invincible is active');
 
+    // Verify multi-cast cooldown consistency: 1st, 2nd, and 3rd casts must keep exact fixed cooldown
+    const expectedCd = bomberman.invincibleCooldown || CONFIG.bomberman.invincibleCooldown || 1000;
+    assert(bomberman.invincibleCooldownTimer === expectedCd, '1st cast cooldown must match expectedCd');
+    bomberman.invincibleTimer = 0;
+    bomberman.invincibleCooldownTimer = 0;
+    bomberman.castInvincible();
+    assert(bomberman.invincibleCooldownTimer === expectedCd, '2nd cast cooldown must match expectedCd');
+    bomberman.invincibleTimer = 0;
+    bomberman.invincibleCooldownTimer = 0;
+    bomberman.castInvincible();
+    assert(bomberman.invincibleCooldownTimer === expectedCd, '3rd cast cooldown must match expectedCd and NEVER scale up');
+
     // 6. Verify Canvas 2D transform stack balance during rendering (with traveling bomb + explosion + Invincible aura + 12-frame kick spark)
     const renderBomb = bomberman.plantBomb(arena, true);
     bomberman.x = renderBomb.x - 20;

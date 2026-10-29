@@ -237,7 +237,7 @@ export function drawBombermanPixelBody(ctx, r, fighter = null) {
 }
 
 /**
- * Draws the 30-second Invincible Ultimate Golden Shield Aura around Bomber Man.
+ * Draws the Invincible Ultimate Golden Shield Aura around Bomber Man.
  * Rule 11: Uses concentric translucent shapes and radial rings (zero shadowBlur).
  */
 function _drawInvincibleShieldAura(ctx, r, fighter) {
@@ -300,7 +300,7 @@ export function drawBombermanSkin(ctx, fighter) {
     ctx.stroke();
   }
 
-  // Ultimate: Invincible 30-second Golden Barrier Aura
+  // Ultimate: Invincible Golden Barrier Aura
   _drawInvincibleShieldAura(ctx, r, fighter);
 
   // Rule 19: Upright Front POV orientation & vertical flip when facing left

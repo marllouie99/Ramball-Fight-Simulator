@@ -3029,7 +3029,7 @@ export const HUD_SKILL_PROVIDERS = {
       });
     }
 
-    // 4. Ultimate: Invincible (30.0s Incoming Attack Immunity)
+    // 4. Ultimate: Invincible (Incoming Attack Immunity)
     if (isSkillEnabled(cfg.enableInvincible, true)) {
       const invDur = f.invincibleDuration || cfg.invincibleDuration || 500;
       const invCd = f.invincibleCooldown || cfg.invincibleCooldown || 1000;

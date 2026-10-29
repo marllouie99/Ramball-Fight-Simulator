@@ -14,7 +14,7 @@
 
 Hailing from Planet Bomber, **White Bomberman** (*Shirobon*) is the legendary robotic hero who has defended the galaxy across decades of classic arcade and console battles. Armed with an inexhaustible supply of round black time-bombs and an iconic arsenal of stage power-up panels, Bomberman turns every battlefield into a high-stakes tactical labyrinth of interlocking blast zones.
 
-In the *Circle Mini-Battle* arena, **Bomber Man** starts rounds with modest single-bomb placement and compact blast reach, then rapidly scales into a screen-filling demolition powerhouse by stacking his signature **Bomb Up** (up to **10 concurrent bombs**) and **Fire Up** (up to **Level 10 blast radius**) upgrades. Using his passive/active **Bomb Pass** ability to glide effortlessly through his own planted bombs while enemies are physically blocked and cornered by them, he orchestrates devastating chain-reaction cross-explosions—culminating in his **Ultimate: Invincible**, which renders him completely immune to all incoming enemy attacks for a full **30 seconds**.
+In the *Circle Mini-Battle* arena, **Bomber Man** starts rounds with modest single-bomb placement and compact blast reach, then rapidly scales into a screen-filling demolition powerhouse by stacking his signature **Bomb Up** (up to **10 concurrent bombs**) and **Fire Up** (up to **Level 10 blast radius**) upgrades. Using his passive/active **Bomb Pass** ability to glide effortlessly through his own planted bombs while enemies are physically blocked and cornered by them, he orchestrates devastating chain-reaction cross-explosions—culminating in his **Ultimate: Invincible**, which renders him completely immune to all incoming enemy attacks while active (configured ~8.3s / 500 frames with a fixed 16.7s / 1000 frames cooldown).
 
 ---
 
@@ -233,11 +233,11 @@ Bomber Man's body model, helmet visor, tunic, belt, and boots strictly adhere to
 
 ```
 +================================================================================+
-|                    ULTIMATE: INVINCIBLE (30.0s / 1800 FRAMES)                  |
+|                    ULTIMATE: INVINCIBLE (CONFIGURED DURATION)                  |
 |                                                                                |
 |   [Incoming Enemy Melee / Projectile / Laser / Skill] ──►  0 DMG (NULLIFIED!)  |
 |   [10 Planted Bombs + Level 10 Fire Up Chain Blast]   ──►  Bomberman Unharmed! |
-|   [Active Duration Timer: 1800 frames (30.0 seconds)] ──►  Golden Prism Aura   |
+|   [Active Duration Timer: 500 frames (~8.3 seconds)]  ──►  Golden Prism Aura   |
 +================================================================================+
 ```
 
@@ -288,8 +288,8 @@ All HUD skill progress bars and status indicators strictly use Bomber Man's unif
    - Because Bomber Man can freely walk through his own bombs (**Skill 3: Bomb Pass**) while opponents are blocked by them, the AI plants lines of 3–6 bombs and steps *back through* the bomb line, baiting enemies into colliding with the solid bomb barrier right as the chain detonation fires.
 3. **Late-Game 10-Bomb / Level-10 Fire Carpet**:
    - At `10 Bombs` and `Level 10 Fire Up`, Bomber Man carpets the arena in interlocking cross-blast grids where one detonation triggers an unavoidable 10-bomb chain reaction across the entire `450×450` arena.
-4. **30-Second Invincible Overdrive**:
-   - As soon as **Ultimate: Invincible** is ready, Bomber Man activates his **30-second immunity**, ignores all enemy zoning/combos, and aggressively plants max-level bombs directly in the opponent's path without any fear of counter-attacks.
+4. **Invincible Overdrive**:
+   - As soon as **Ultimate: Invincible** is ready, Bomber Man activates his **incoming attack immunity**, ignores all enemy zoning/combos, and aggressively plants max-level bombs directly in the opponent's path without any fear of counter-attacks.
 
 ---
 

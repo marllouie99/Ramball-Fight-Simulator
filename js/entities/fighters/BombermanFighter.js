@@ -6,7 +6,7 @@
 //             next basic attack CD = 3 active bombs, scaling up to Max. 10)
 //  - Skill 1: Fire Up (Increases bomb blast radius up to Max. 10)
 //  - Skill 2: Kick (Allows Bomberman to kick his bombs so they travel across the arena and can explode mid-traveling)
-//  - Ultimate: Invincible (Immune to incoming enemy attacks for 30 seconds / 1800f)
+//  - Ultimate: Invincible (Immune to incoming enemy attacks while active)
 // ═══════════════════════════════════════════════════════════════════════════
 
 import { Fighter, applyDamageToTarget } from '../fighter.js';
@@ -82,10 +82,10 @@ export class BombermanFighter extends Fighter {
     this.bombKickKnockback = cfg.bombKickKnockback ?? 10;
     this.kickAnimTimer = 0;
 
-    // ── Ultimate: Invincible (30 Seconds = 1800 Frames) ──
+    // ── Ultimate: Invincible (Incoming Attack Immunity) ──
     this.invincibleDuration = cfg.invincibleDuration ?? 500;
-    this.invincibleCooldown = Math.max(300, cfg.invincibleCooldown ?? 1000);
-    this.invincibleInitialCooldown = cfg.invincibleInitialCooldown ?? 720;
+    this.invincibleCooldown = Math.max(60, cfg.invincibleCooldown ?? 1000);
+    this.invincibleInitialCooldown = cfg.invincibleInitialCooldown ?? 1000;
     this.invincibleCooldownTimer = this.invincibleInitialCooldown;
     this.invincibleTimer = 0;
     this.isInvincibleUltimate = false;
@@ -549,12 +549,12 @@ export class BombermanFighter extends Fighter {
 
   /**
    * Ultimate — Invincible:
-   * Allows Bomberman to be immune to INCOMING ATTACKS from enemies for 30 seconds (1800 frames).
+   * Allows Bomberman to be immune to INCOMING ATTACKS from enemies while active.
    */
   castInvincible() {
-    this.invincibleTimer = this.invincibleDuration; // 1800 frames = 30.0 seconds at 60 FPS
+    this.invincibleTimer = this.invincibleDuration;
     this.isInvincibleUltimate = true;
-    this.invincibleCooldownTimer = Math.max(300, this.invincibleCooldown || 2400);
+    this.invincibleCooldownTimer = Math.max(60, this.invincibleCooldown ?? 1000);
 
     this.hitStunTimer = 0;
     this.paralyzeTimer = 0;
@@ -562,7 +562,9 @@ export class BombermanFighter extends Fighter {
 
     this._playSfx('invincibleStart');
     triggerGlobalScreenShake(4.5, 10);
-    spawnFloatingText(this.x, this.y - this.r - 22, 'INVINCIBLE! (30S)', '#FACC15');
+    const durSec = Math.round(this.invincibleDuration / 60);
+    const floatLabel = durSec > 0 ? ('INVINCIBLE! (' + durSec + 'S)') : 'INVINCIBLE!';
+    spawnFloatingText(this.x, this.y - this.r - 22, floatLabel, '#FACC15');
     this.activeVisualEffects.push({
       type: 'invincible',
       x: this.x,
@@ -1217,7 +1219,7 @@ export class BombermanFighter extends Fighter {
     }
 
     // 4. Skill Execution Priorities
-    // Ultimate: Invincible (30s incoming attack immunity)
+    // Ultimate: Invincible (incoming attack immunity)
     if (this.invincibleTimer <= 0 && this.invincibleCooldownTimer <= 0) {
       this.castInvincible();
     }

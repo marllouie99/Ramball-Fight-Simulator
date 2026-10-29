@@ -9,7 +9,7 @@ export const bombermanConfig = {
   grade: 'S',
   category: 'Gaming',
   description:
-    'Tactical grid trap-zoner whose Passive (Bomb Up) increases his active bomb limit by +1 every time his basic attack cooldown finishes (1 -> 2 -> 3 -> Max 10), upgrades blast radius with Fire Up (Max 10), kicks bombs so they travel and can explode mid-traveling, and activates a 30-second Invincible Ultimate.',
+    'Tactical grid trap-zoner whose Passive (Bomb Up) increases his active bomb limit by +1 every time his basic attack cooldown finishes (1 -> 2 -> 3 -> Max 10), upgrades blast radius with Fire Up (Max 10), kicks bombs so they travel and can explode mid-traveling, and activates an Invincible Ultimate.',
 
   // ── Base Stats (Rule 24 Universal Baseline Radius: 25) ──
   r: 30,
@@ -68,11 +68,11 @@ export const bombermanConfig = {
   bombKickImpactDamage: 12, // Direct collision damage when a traveling bomb hits an enemy
   bombKickKnockback: 10, // Knockback dealt on direct traveling bomb collision
 
-  // ── Ultimate: Invincible (30 Seconds Incoming Attack Immunity) ──
+  // ── Ultimate: Invincible (Incoming Attack Immunity) ──
   enableInvincible: true,
-  invincibleDuration: 500, // 30.0 seconds at 60 FPS (30 * 60 = 1800 frames)
-  invincibleCooldown: 1000, // 40.0s cooldown after activation
-  invincibleInitialCooldown: 1000, // 12.0s initial charge before first Ultimate cast
+  invincibleDuration: 200, // ~8.33s incoming attack immunity at 60 FPS (500 frames)
+  invincibleCooldown: 1500, // ~16.67s cooldown after activation (1000 frames)
+  invincibleInitialCooldown: 1000, // ~16.67s initial charge before first Ultimate cast (1000 frames)
   invincibleSpeedMultiplier: 1.15, // Slight heroic pace boost during Invincible
 
   // ── Assets (Rule 22 & 12-Frame Animation Standard) ──
