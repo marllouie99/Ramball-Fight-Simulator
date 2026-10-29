@@ -2996,7 +2996,7 @@ export const HUD_SKILL_PROVIDERS = {
       const maxFireCap = f.maxFireLevelCap || cfg.maxFireLevelCap || 10;
       const curFireLv = f.fireLevel || 1;
       const isFireMax = curFireLv >= maxFireCap;
-      const fireCd = f.fireUpCooldown || cfg.fireUpCooldown || 210;
+      const fireCd = f.fireUpCooldownMax || f.fireUpCooldown || cfg.fireUpCooldown || 210;
       const fireTimer = f.fireUpTimer || 0;
       const firePct = isFireMax ? 100 : (fireTimer <= 0 ? 100 : Math.max(0, Math.min(100, (1 - fireTimer / fireCd) * 100)));
       const fireSecLeft = (fireTimer / 60).toFixed(1);
@@ -3013,7 +3013,7 @@ export const HUD_SKILL_PROVIDERS = {
 
     // 3. Skill 2: Kick (Bomb Kick)
     if (isSkillEnabled(cfg.enableBombKick, cfg.canKickBombs, true)) {
-      const kickCd = f.bombKickCooldown || cfg.bombKickCooldown || 150;
+      const kickCd = f.bombKickCooldownMax || f.bombKickCooldown || cfg.bombKickCooldown || 150;
       const kickTimer = f.bombKickTimer || 0;
       const kickPct = Math.max(0, Math.min(100, (1 - kickTimer / kickCd) * 100));
       const hasTravelingBomb = Array.isArray(f.activeBombs) && f.activeBombs.some((b) => b && b.isTraveling);
@@ -3032,7 +3032,7 @@ export const HUD_SKILL_PROVIDERS = {
     // 4. Ultimate: Invincible (Incoming Attack Immunity)
     if (isSkillEnabled(cfg.enableInvincible, true)) {
       const invDur = f.invincibleDuration || cfg.invincibleDuration || 500;
-      const invCd = f.invincibleCooldown || cfg.invincibleCooldown || 1000;
+      const invCd = f.invincibleCooldownMax || f.invincibleCooldown || cfg.invincibleCooldown || 1000;
       const isInvincible = (f.invincibleTimer || 0) > 0;
       const invSecLeft = Math.ceil((f.invincibleTimer || 0) / 60);
       const cdTimer = f.invincibleCooldownTimer || 0;

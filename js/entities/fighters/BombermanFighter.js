@@ -50,7 +50,7 @@ export class BombermanFighter extends Fighter {
     // ── Passive: Bomb Up (Max. 10 — +1 Active Bomb Capacity Every Basic Attack CD) ──
     this.maxBombsCap = cfg.maxBombsCap ?? 10;
     this.maxBombs = Math.min(this.maxBombsCap, Math.max(1, cfg.initialMaxBombs ?? 1));
-    this.plantCooldown = Math.max(30, cfg.plantCooldown ?? 90);
+    this.plantCooldownMax = Math.max(30, cfg.plantCooldown ?? 90);
     this.plantInitialCooldown = cfg.plantInitialCooldown ?? 0;
     this.plantCooldownTimer = this.plantInitialCooldown;
     this.layStepInterval = Math.max(12, cfg.layStepInterval ?? 28);
@@ -61,7 +61,7 @@ export class BombermanFighter extends Fighter {
     // ── Skill 1: Fire Up (Max. 10) ──
     this.maxFireLevelCap = cfg.maxFireLevelCap ?? 10;
     this.fireLevel = Math.min(this.maxFireLevelCap, Math.max(1, cfg.initialFireLevel ?? 1));
-    this.fireUpCooldown = Math.max(60, cfg.fireUpCooldown ?? 210);
+    this.fireUpCooldownMax = Math.max(60, cfg.fireUpCooldown ?? 210);
     this.fireUpInitialCooldown = cfg.fireUpInitialCooldown ?? 120;
     this.fireUpTimer = this.fireUpInitialCooldown;
     this.baseBlastRadius = cfg.baseBlastRadius ?? 65;
@@ -74,7 +74,7 @@ export class BombermanFighter extends Fighter {
     this.bombKickRange = cfg.bombKickRange ?? 64;
     this.kickHitPauseFrames = cfg.kickHitPauseFrames ?? 5;
     this.kickHitPauseTimer = 0;
-    this.bombKickCooldown = Math.max(45, cfg.bombKickCooldown ?? 150);
+    this.bombKickCooldownMax = Math.max(45, cfg.bombKickCooldown ?? 150);
     this.bombKickInitialCooldown = cfg.bombKickInitialCooldown ?? 90;
     this.bombKickTimer = this.bombKickInitialCooldown;
     this.bombKickSpeed = cfg.bombKickSpeed ?? 9.5;
@@ -84,7 +84,7 @@ export class BombermanFighter extends Fighter {
 
     // ── Ultimate: Invincible (Incoming Attack Immunity) ──
     this.invincibleDuration = cfg.invincibleDuration ?? 500;
-    this.invincibleCooldown = Math.max(60, cfg.invincibleCooldown ?? 1000);
+    this.invincibleCooldownMax = Math.max(60, cfg.invincibleCooldown ?? 1000);
     this.invincibleInitialCooldown = cfg.invincibleInitialCooldown ?? 1000;
     this.invincibleCooldownTimer = this.invincibleInitialCooldown;
     this.invincibleTimer = 0;
@@ -109,6 +109,155 @@ export class BombermanFighter extends Fighter {
     this.activeVisualExplosions = [];
     this.activeVisualEffects = [];
     this._bombIdCounter = 0;
+    this.walkSoundTimer = 0;
+
+    // Register skills with universal SkillManager
+    this._registerSkills();
+  }
+
+  // ── Backward-compatible static max cooldown getters & decay guards ──
+  get invincibleCooldown() {
+    return this.invincibleCooldownMax;
+  }
+  set invincibleCooldown(val) {
+    if (typeof val === 'number' && val >= 60 && Math.abs(val - this.invincibleCooldownMax) > 1) {
+      this.invincibleCooldownMax = val;
+    }
+  }
+
+  get plantCooldown() {
+    return this.plantCooldownMax;
+  }
+  set plantCooldown(val) {
+    if (typeof val === 'number' && val >= 30 && Math.abs(val - this.plantCooldownMax) > 1) {
+      this.plantCooldownMax = val;
+    }
+  }
+
+  get fireUpCooldown() {
+    return this.fireUpCooldownMax;
+  }
+  set fireUpCooldown(val) {
+    if (typeof val === 'number' && val >= 60 && Math.abs(val - this.fireUpCooldownMax) > 1) {
+      this.fireUpCooldownMax = val;
+    }
+  }
+
+  get bombKickCooldown() {
+    return this.bombKickCooldownMax;
+  }
+  set bombKickCooldown(val) {
+    if (typeof val === 'number' && val >= 45 && Math.abs(val - this.bombKickCooldownMax) > 1) {
+      this.bombKickCooldownMax = val;
+    }
+  }
+
+  /**
+   * Universal SkillManager declarative skill registration.
+   */
+  _registerSkills() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.bomberman) ? CONFIG.bomberman : bombermanConfig;
+    const skills = [];
+
+    if (this.isSkillEnabled(cfg.enableBombUp, true)) {
+      skills.push({
+        id: 'bomb_up',
+        name: 'Bomb Up',
+        type: 'passive',
+        cooldownKey: 'plantCooldownTimer',
+        cooldownMaxKey: 'plantCooldownMax',
+        cooldownDecayMultiplier: 0, // Handled exclusively by _tickBasicAttackAndPassiveBombUp
+      });
+    }
+
+    if (this.isSkillEnabled(cfg.enableFireUp, true)) {
+      skills.push({
+        id: 'fire_up',
+        name: 'Fire Up',
+        type: 'active',
+        cooldownKey: 'fireUpTimer',
+        cooldownMaxKey: 'fireUpCooldownMax',
+      });
+    }
+
+    if (this.isSkillEnabled(cfg.enableBombKick, cfg.canKickBombs, true)) {
+      skills.push({
+        id: 'bomb_kick',
+        name: 'Bomb Kick',
+        type: 'active',
+        cooldownKey: 'bombKickTimer',
+        cooldownMaxKey: 'bombKickCooldownMax',
+      });
+    }
+
+    if (this.isSkillEnabled(cfg.enableInvincible, true)) {
+      skills.push({
+        id: 'invincible',
+        name: 'Invincible',
+        type: 'ultimate',
+        cooldownKey: 'invincibleCooldownTimer',
+        cooldownMaxKey: 'invincibleCooldownMax',
+        durationKey: 'invincibleTimer',
+        durationMaxKey: 'invincibleDuration',
+        activeKey: 'isInvincibleUltimate',
+        canTickCooldown: (fighter) => (fighter.invincibleTimer || 0) <= 0,
+        onExpire: (fighter) => {
+          fighter.isInvincibleUltimate = false;
+        },
+      });
+    }
+
+    if (skills.length > 0) {
+      this.skillManager.registerSkills(skills);
+      // Map static max cooldown property aliases so dynamic discovery NEVER touches them
+      this.skillManager.cooldownKeyMap.set('invincibleCooldown', skills.find((s) => s.id === 'invincible') || true);
+      this.skillManager.cooldownKeyMap.set('plantCooldown', skills.find((s) => s.id === 'bomb_up') || true);
+      this.skillManager.cooldownKeyMap.set('fireUpCooldown', skills.find((s) => s.id === 'fire_up') || true);
+      this.skillManager.cooldownKeyMap.set('bombKickCooldown', skills.find((s) => s.id === 'bomb_kick') || true);
+    }
+  }
+
+  /**
+   * Resets Bomberman's match state, skill arrays, and active cooldowns for new rounds.
+   */
+  reset() {
+    super.reset();
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.bomberman) ? CONFIG.bomberman : bombermanConfig;
+
+    this.maxFireLevelCap = cfg.maxFireLevelCap ?? 10;
+    this.fireLevel = Math.min(this.maxFireLevelCap, Math.max(1, cfg.initialFireLevel ?? 1));
+    this.fireUpCooldownMax = Math.max(60, cfg.fireUpCooldown ?? 210);
+    this.fireUpInitialCooldown = cfg.fireUpInitialCooldown ?? 120;
+    this.fireUpTimer = this.fireUpInitialCooldown;
+
+    this.maxBombsCap = cfg.maxBombsCap ?? 10;
+    this.maxBombs = Math.min(this.maxBombsCap, Math.max(1, cfg.initialMaxBombs ?? 1));
+    this.plantCooldownMax = Math.max(30, cfg.plantCooldown ?? 90);
+    this.plantInitialCooldown = cfg.plantInitialCooldown ?? 0;
+    this.plantCooldownTimer = this.plantInitialCooldown;
+    this.layStepInterval = Math.max(12, cfg.layStepInterval ?? 28);
+    this.layStepTimer = 0;
+    this._bombsLaidInCurrentCycle = 0;
+    this._waitingForPassiveBombUp = false;
+
+    this.canKickBombs = cfg.canKickBombs !== false;
+    this.bombKickCooldownMax = Math.max(45, cfg.bombKickCooldown ?? 150);
+    this.bombKickInitialCooldown = cfg.bombKickInitialCooldown ?? 90;
+    this.bombKickTimer = this.bombKickInitialCooldown;
+    this.kickAnimTimer = 0;
+    this.kickHitPauseTimer = 0;
+
+    this.invincibleDuration = cfg.invincibleDuration ?? 500;
+    this.invincibleCooldownMax = Math.max(60, cfg.invincibleCooldown ?? 1000);
+    this.invincibleInitialCooldown = cfg.invincibleInitialCooldown ?? 1000;
+    this.invincibleCooldownTimer = this.invincibleInitialCooldown;
+    this.invincibleTimer = 0;
+    this.isInvincibleUltimate = false;
+    this._invincibleDeflectTextCooldown = 0;
+
+    this.activeBombs = [];
+    this.activeVisualExplosions = [];
+    this.activeVisualEffects = [];
     this.walkSoundTimer = 0;
   }
 
@@ -387,7 +536,7 @@ export class BombermanFighter extends Fighter {
       b.damage = newDamage;
     }
 
-    this.fireUpTimer = Math.max(60, this.fireUpCooldown || 210);
+    this.fireUpTimer = Math.max(60, this.fireUpCooldownMax || this.fireUpCooldown || 210);
     return true;
   }
 
@@ -475,7 +624,7 @@ export class BombermanFighter extends Fighter {
     }
 
     this.kickAnimTimer = 18;
-    this.bombKickTimer = Math.max(45, this.bombKickCooldown || 150);
+    this.bombKickTimer = Math.max(45, this.bombKickCooldownMax || this.bombKickCooldown || 150);
     this._playSfx('bombKick');
     spawnFloatingText(bomb.x, bomb.y - bomb.r - 12, 'KICK!', '#EC4899');
 
@@ -552,9 +701,11 @@ export class BombermanFighter extends Fighter {
    * Allows Bomberman to be immune to INCOMING ATTACKS from enemies while active.
    */
   castInvincible() {
+    const cfg = (typeof CONFIG !== 'undefined' && CONFIG.bomberman) ? CONFIG.bomberman : bombermanConfig;
     this.invincibleTimer = this.invincibleDuration;
     this.isInvincibleUltimate = true;
-    this.invincibleCooldownTimer = Math.max(60, this.invincibleCooldown ?? 1000);
+    const cd = this.invincibleCooldownMax || cfg.invincibleCooldown || 1000;
+    this.invincibleCooldownTimer = Math.max(60, cd);
 
     this.hitStunTimer = 0;
     this.paralyzeTimer = 0;
@@ -1179,12 +1330,7 @@ export class BombermanFighter extends Fighter {
     if (this.kickAnimTimer > 0) {
       this.kickAnimTimer--;
     }
-    if (this.invincibleTimer > 0) {
-      this.invincibleTimer--;
-      this.isInvincibleUltimate = this.invincibleTimer > 0;
-    } else {
-      this.isInvincibleUltimate = false;
-    }
+    this.isInvincibleUltimate = (this.invincibleTimer || 0) > 0;
 
     // Planted & traveling bombs continue ticking on the arena floor
     this._updateBombs(arena);
@@ -1200,16 +1346,24 @@ export class BombermanFighter extends Fighter {
 
     // 2. Decrement Basic Attack CD (which triggers Passive: Bomb Up when CD is up!) & Skill Cooldowns
     this._tickBasicAttackAndPassiveBombUp();
-    if (this.fireUpTimer > 0) this.fireUpTimer--;
-    if (this.bombKickTimer > 0) this.bombKickTimer--;
     if (this.kickHitPauseTimer > 0) {
       this.kickHitPauseTimer--;
       this.vx = 0;
       this.vy = 0;
       this.kickAnimTimer = Math.max(this.kickAnimTimer, 18);
     }
-    if (this.invincibleCooldownTimer > 0 && this.invincibleTimer <= 0) {
-      this.invincibleCooldownTimer--;
+
+    // Fallback cooldown & duration decay only when SkillManager is not present
+    if (!this.skillManager) {
+      if (this.invincibleTimer > 0) {
+        this.invincibleTimer--;
+        this.isInvincibleUltimate = this.invincibleTimer > 0;
+      }
+      if (this.fireUpTimer > 0) this.fireUpTimer--;
+      if (this.bombKickTimer > 0) this.bombKickTimer--;
+      if (this.invincibleCooldownTimer > 0 && this.invincibleTimer <= 0) {
+        this.invincibleCooldownTimer--;
+      }
     }
 
     // 3. Aim toward valid target
@@ -1289,6 +1443,10 @@ export class BombermanFighter extends Fighter {
     drawBombermanSkin(ctx, this);
   }
 
+  drawSkin(ctx) {
+    drawBombermanSkin(ctx, this);
+  }
+
   /**
    * Rule 21: Custom fighter draw pipeline.
    * Renders tile-centered & traveling bombs, 4-way cross explosions, Bomberman's body,
@@ -1304,10 +1462,7 @@ export class BombermanFighter extends Fighter {
       drawBombExplosion(ctx, this.activeVisualExplosions[i]);
     }
 
-    ctx.save();
-    ctx.translate(this.x, this.y);
     this.drawBody(ctx);
-    ctx.restore();
 
     for (let i = 0; i < this.activeVisualEffects.length; i++) {
       const vfx = this.activeVisualEffects[i];

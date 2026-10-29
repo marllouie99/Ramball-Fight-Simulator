@@ -273,9 +273,9 @@ export const CONFIG = {
   canvasBgColor: '#ffffffff',          // Canvas background color (hex string or hex number)
   arenaOuterBgColor: '#ffffffff',      // Background color of the container area outside the arena (under HUD and sides)
   arenaInnerBgColor: '#ffffffff',      // Background color inside the arena boundaries
-  lightCanvasBgColor: '#141622',
-  lightArenaOuterBgColor: '#141622',
-  lightArenaInnerBgColor: '#919298ff',
+  lightCanvasBgColor: '#f4f4f4ff',
+  lightArenaOuterBgColor: '#fcfcfcff',
+  lightArenaInnerBgColor: '#fbfcfdff',
   darkArenaOuterBgColor: '#000000',  // Dark mode arena outer background color (defaults to #000000)
   darkArenaInnerBgColor: '#000000',  // Dark mode arena inner background color (defaults to #000000)
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)

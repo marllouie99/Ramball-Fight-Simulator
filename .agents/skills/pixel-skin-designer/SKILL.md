@@ -166,9 +166,15 @@ Whenever creating, scaffolding, designing, or rendering any character skin, ALWA
    ctx.stroke();
    ctx.restore();
    ```
-2. **Canonical Pixel Hand Black Outlines (`Layer 2`)**:
+2. **Canonical Pixel Hand Black Outlines (`Layer 2` / Rule 20)**:
    - `drawPixelHand` MUST always receive `outlineColor = '#0E0F14'` so the hands maintain sharp manga ink borders against the torso.
-3. **Reference Playbook**:
+3. **Canonical World-Space Coordinate Translation Contract**:
+   - `draw[Name]Skin(ctx, fighter)` **MUST ALWAYS** translate to `ctx.translate(fighter.x || 0, (fighter.y || 0) - (fighter.z || 0));` at the top of the skin function after `ctx.save()`.
+   - Fighter class `draw(ctx, opponent)` **MUST ALWAYS** call `this.drawBody(ctx);` directly in world space without an outer `ctx.translate(this.x, this.y)`.
+   - **Why**: `fighterOutlineRenderer.js` (`drawFighterInkOutline`) creates a $160 \times 160$ silhouette buffer offset by `HALF_BUFFER - fighter.x, HALF_BUFFER - fighter.y`. If `draw[Name]Skin` does not translate internally to `(fighter.x, fighter.y)`, the character is drawn completely offscreen outside the buffer ($80 - x, 80 - y$), producing an empty silhouette and zero in-game black outline!
+4. **Silhouette Pass Filtering**:
+   - Transient glowing auras, energy shields, and attack sparkles MUST check `if (!fighter._isSilhouettePass)` to avoid contaminating the 2.2px manga outline silhouette.
+5. **Reference Playbook**:
    - See dedicated skill `character-black-outline` (`.agents/skills/character-black-outline/SKILL.md`).
 
 

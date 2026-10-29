@@ -263,6 +263,7 @@ export class ShiroFighter extends Fighter {
   shoot(ownerIndex, opponent) {
     if (this.isCaughtInBeam()) return;
     if (this.shootCooldown > 0) return;
+    if ((this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || this._isShiroStunned()) return;
 
     this.shootCooldown = this.shootCooldownMax;
     this._flickChessTroop(opponent);
@@ -1843,11 +1844,16 @@ export class ShiroFighter extends Fighter {
 
     // 1. Mandatory Freeze & TimeStop Guard (Rule 1.1)
     const isFrozen = this._handleTimeStop();
-    const isStunned = isFrozen || this.isTargetOfAmbush || this._isShiroStunned();
-    if (isStunned) {
+    if (isFrozen || this.isTargetOfAmbush) {
       this._cutOffBlankVoiceline('stunnedDuringUpdate');
       this.interruptAttacks(true);
       return;
+    }
+
+    // Interrupt attacks and cut off troop buff voiceline if in hit-stun, knockback or CC
+    if (this._isShiroStunned()) {
+      this._cutOffBlankVoiceline('stunnedDuringUpdate');
+      this.interruptAttacks(false);
     }
 
     this.handleStatusEffects();

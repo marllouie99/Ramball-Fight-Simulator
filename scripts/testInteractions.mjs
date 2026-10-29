@@ -7582,7 +7582,33 @@ async function runInteractionTests() {
       assert(shiro.blankWindupTimer === 0, 'Windup timer must reset on interruptAttacks');
       assert(shiro._blankWindupStarted === false, 'Windup started flag must reset on interruptAttacks');
 
-      console.log('      ✅ Shiro voiceline stun cut-off (knockback stun, paralyze, time-stop, hit-stun, heavy damage, update stasis & interrupt) verified.');
+      // 8. Explosion Hit Recovery: Shiro hit by an explosion (hitStunTimer, knockbackStunTimer & slowTimer) must decay timers and recover movement
+      shiro.reset();
+      state.fighters = [shiro, enemy];
+      shiro.applyHitStun(12);
+      shiro.knockbackStunTimer = 10;
+      shiro.slowTimer = 20;
+      shiro.slowMultiplier = 0.5;
+      shiro.vx = 8;
+      shiro.vy = -6;
+      assert(shiro.hitStunTimer === 12, 'Initial hitStunTimer must be 12');
+      assert(shiro._isShiroStunned() === true, 'Shiro must initially register as stunned');
+      for (let f = 1; f <= 12; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        shiro.update(enemy, 0, arena);
+      }
+      assert(shiro.hitStunTimer === 0, 'hitStunTimer must decay to 0 after 12 frames');
+      assert(shiro.knockbackStunTimer === 0, 'knockbackStunTimer must decay to 0');
+      assert(shiro._isShiroStunned() === false, 'Shiro must no longer be stunned after hitStun expires');
+      for (let f = 1; f <= 10; f++) {
+        state.frameCount = (state.frameCount || 0) + 1;
+        shiro.update(enemy, 0, arena);
+      }
+      assert(shiro.slowTimer === 0, 'slowTimer must decay to 0');
+      assert(shiro.slowMultiplier === 1.0, 'slowMultiplier must reset to 1.0');
+      assert(Math.hypot(shiro.vx, shiro.vy) > 0, 'Shiro must actively move after explosion hit recovery');
+
+      console.log('      ✅ Shiro voiceline stun cut-off & explosion hit recovery (hitStunTimer, knockbackStunTimer, slow recovery & active movement) verified.');
     } finally {
       audioSystem.playSFX = origPlaySFX;
       shiro.reset();
@@ -12256,6 +12282,59 @@ async function runInteractionTests() {
     bomberman.invincibleCooldownTimer = 0;
     bomberman.castInvincible();
     assert(bomberman.invincibleCooldownTimer === expectedCd, '3rd cast cooldown must match expectedCd and NEVER scale up');
+
+    // 5b. Verify multi-frame combat simulation cooldown integrity (Rule 0.2: zero decay to 0, zero double-decrementing)
+    const simBomberman = new BombermanClass({ x: 118, y: 312, color: '#2563EB', controls: {} });
+    const simEnemy = new NormalClass({ x: 300, y: 300, hp: 500, maxHp: 500, controls: {} });
+    state.fighters = [simBomberman, simEnemy];
+    assert(simBomberman.invincibleCooldownMax === expectedCd, 'simBomberman.invincibleCooldownMax must initialize to expectedCd');
+    assert(simBomberman.invincibleCooldown === expectedCd, 'simBomberman.invincibleCooldown getter must return expectedCd');
+    assert(simBomberman.invincibleCooldownTimer === (CONFIG.bomberman.invincibleInitialCooldown || 1500), 'Initial cooldown timer must match config');
+
+    // Simulate 60 frames of combat during initial cooldown
+    const initialTimer = simBomberman.invincibleCooldownTimer;
+    for (let f = 0; f < 60; f++) {
+      state.frameCount = (state.frameCount || 0) + 1;
+      simBomberman.update(simEnemy, 0, arena);
+    }
+    assert(simBomberman.invincibleCooldownMax === expectedCd, 'invincibleCooldownMax MUST NOT decay during combat frames');
+    assert(simBomberman.invincibleCooldown === expectedCd, 'invincibleCooldown getter MUST NOT decay during combat frames');
+    assert(simBomberman.invincibleCooldownTimer === initialTimer - 60, `Cooldown timer must decrement strictly 1 tick per frame (expected ${initialTimer - 60}, got ${simBomberman.invincibleCooldownTimer})`);
+
+    // Fast-forward initial cooldown to 0 and trigger first live combat cast via update()
+    simBomberman.invincibleCooldownTimer = 0;
+    state.frameCount = (state.frameCount || 0) + 1;
+    simBomberman.update(simEnemy, 0, arena);
+    assert(simBomberman.invincibleTimer === simBomberman.invincibleDuration, 'simBomberman must cast Invincible when cooldown is up');
+    assert(simBomberman.invincibleCooldownTimer === expectedCd, `simBomberman.invincibleCooldownTimer must be set to expectedCd on 1st live cast (got ${simBomberman.invincibleCooldownTimer})`);
+
+    // Simulate 30 frames while Invincible is active: cooldown timer MUST NOT decrement
+    for (let f = 0; f < 30; f++) {
+      state.frameCount = (state.frameCount || 0) + 1;
+      simBomberman.update(simEnemy, 0, arena);
+    }
+    assert(simBomberman.invincibleCooldownTimer === expectedCd, 'Cooldown timer MUST NOT tick down while Invincible is actively running');
+
+    // Fast-forward active Invincible duration to expiration
+    simBomberman.invincibleTimer = 0;
+    simBomberman.isInvincibleUltimate = false;
+    for (let f = 0; f < 30; f++) {
+      state.frameCount = (state.frameCount || 0) + 1;
+      simBomberman.update(simEnemy, 0, arena);
+    }
+    assert(simBomberman.invincibleCooldownTimer === expectedCd - 30, `Cooldown timer must count down from expectedCd once Invincible expires (expected ${expectedCd - 30}, got ${simBomberman.invincibleCooldownTimer})`);
+
+    // Fast-forward cooldown to 0 and verify 2nd and 3rd live casts strictly honor expectedCd
+    simBomberman.invincibleCooldownTimer = 0;
+    state.frameCount = (state.frameCount || 0) + 1;
+    simBomberman.update(simEnemy, 0, arena);
+    assert(simBomberman.invincibleCooldownTimer === expectedCd, `2nd live cast must reset to full expectedCd ${expectedCd} (got ${simBomberman.invincibleCooldownTimer})`);
+    simBomberman.invincibleTimer = 0;
+    simBomberman.invincibleCooldownTimer = 0;
+    state.frameCount = (state.frameCount || 0) + 1;
+    simBomberman.update(simEnemy, 0, arena);
+    assert(simBomberman.invincibleCooldownTimer === expectedCd, `3rd live cast must reset to full expectedCd ${expectedCd} (got ${simBomberman.invincibleCooldownTimer})`);
+    assert(simBomberman.invincibleCooldownMax === expectedCd, 'invincibleCooldownMax must remain strictly intact across all casts');
 
     // 6. Verify Canvas 2D transform stack balance during rendering (with traveling bomb + explosion + Invincible aura + 12-frame kick spark)
     const renderBomb = bomberman.plantBomb(arena, true);

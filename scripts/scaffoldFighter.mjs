@@ -424,6 +424,16 @@ export function draw${capitalize(id)}Skin(ctx, fighter) {
   ctx.fill();
   ctx.restore();
 
+  // Layer 1.5: Mandatory Universal Character Black Outline Standard (Rule 32)
+  // Guarantees circular body geometry & pale/white helmets sharply pop off the white arena floor
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.lineWidth = 2.0;
+  ctx.strokeStyle = '#0E0F14';
+  ctx.stroke();
+  ctx.restore();
+
   // 2. Head & Hair Silhouettes (-Y Top - Rule 22)
   _draw${capitalize(id)}Hair(ctx, r, facingLeft);
 

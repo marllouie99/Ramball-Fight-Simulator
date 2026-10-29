@@ -290,9 +290,10 @@ export function drawBombermanSkin(ctx, fighter) {
   const r = fighter.r || 25;
 
   ctx.save();
+  ctx.translate(fighter.x || 0, (fighter.y || 0) - (fighter.z || 0));
 
-  // Kick Boot Activation Shimmer Ring
-  if (fighter.kickAnimTimer > 0) {
+  // Kick Boot Activation Shimmer Ring (suppressed during silhouette pass)
+  if (fighter.kickAnimTimer > 0 && !fighter._isSilhouettePass) {
     ctx.strokeStyle = 'rgba(236, 72, 153, 0.72)';
     ctx.lineWidth = 2.4;
     ctx.beginPath();
@@ -300,8 +301,10 @@ export function drawBombermanSkin(ctx, fighter) {
     ctx.stroke();
   }
 
-  // Ultimate: Invincible Golden Barrier Aura
-  _drawInvincibleShieldAura(ctx, r, fighter);
+  // Ultimate: Invincible Golden Barrier Aura (suppressed during silhouette pass)
+  if (!fighter._isSilhouettePass) {
+    _drawInvincibleShieldAura(ctx, r, fighter);
+  }
 
   // Rule 19: Upright Front POV orientation & vertical flip when facing left
   const angle = fighter._isWinnerReveal ? 0 : fighter.gunAngle || 0;
@@ -329,24 +332,27 @@ export function drawBombermanSkin(ctx, fighter) {
 
   // Layer 3: Canonical Default Symmetrical Hands (Rule 20) with Crisp Black Ink Outline
   // Left Hand: (-r * 0.82, +r * 0.38), Right Hand: (+r * 0.82, +r * 0.38)
-  const handRadius = getHandSize(r * 0.30, fighter);
-  const gloveFill = fighter.invincibleTimer > 0 ? '#FACC15' : '#EC4899';
-  const handOutline = '#0E0F14';
+  const shouldHideHands = fighter.hideHands || fighter.hideHand;
+  if (!shouldHideHands) {
+    const handRadius = getHandSize(r * 0.30, fighter);
+    const gloveFill = fighter.invincibleTimer > 0 ? '#FACC15' : '#EC4899';
+    const handOutline = '#0E0F14';
 
-  // Off-hand (Left Hand) — 100% Solid Canonical Glove with Black Ink Outline
-  drawPixelHand(ctx, -r * 0.82, r * 0.38, handRadius, gloveFill, handOutline);
+    // Off-hand (Left Hand) — 100% Solid Canonical Glove with Black Ink Outline
+    drawPixelHand(ctx, -r * 0.82, r * 0.38, handRadius, gloveFill, handOutline);
 
-  // Main-hand (Right Hand) — 100% Solid Canonical Glove with Black Ink Outline (Drawn FIRST so hand NEVER slices or overlays the bomb)
-  const rightHandX = r * 0.82;
-  const rightHandY = r * 0.38;
-  drawPixelHand(ctx, rightHandX, rightHandY, handRadius, gloveFill, handOutline);
+    // Main-hand (Right Hand) — 100% Solid Canonical Glove with Black Ink Outline (Drawn FIRST so hand NEVER slices or overlays the bomb)
+    const rightHandX = r * 0.82;
+    const rightHandY = r * 0.38;
+    drawPixelHand(ctx, rightHandX, rightHandY, handRadius, gloveFill, handOutline);
 
-  // Held Bomb: Rendered cleanly held in the palm / in front of the hand (Zero overlaying/clipping)
-  if (fighter.showHeldBomb !== false) {
-    ctx.save();
-    ctx.translate(rightHandX, rightHandY);
-    drawHeldBomb(ctx, fighter);
-    ctx.restore();
+    // Held Bomb: Rendered cleanly held in the palm / in front of the hand (Zero overlaying/clipping)
+    if (fighter.showHeldBomb !== false && !fighter._isSilhouettePass && !fighter.hideWeapon && !(typeof state !== 'undefined' && state.showSkinOnly)) {
+      ctx.save();
+      ctx.translate(rightHandX, rightHandY);
+      drawHeldBomb(ctx, fighter);
+      ctx.restore();
+    }
   }
 
   ctx.restore();
