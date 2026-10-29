@@ -246,7 +246,7 @@ export class PacmanFighter extends Fighter {
     this.chompModeTimer = this.chompModeDuration;
     this.chompAttackCooldown = 0;
 
-    this._playSfx('powerPellet');
+    this._playSfx('eatBigFruit');
     triggerGlobalScreenShake(4.5, 10);
     const label = source === 'allDots' ? 'ALL DOTS CLEARED! (30% CHOMP)' : 'POWER PELLET! (30% CHOMP)';
     spawnFloatingText(this.x, this.y - this.r - 22, label, cfg.themeColor || '#F2F000');
@@ -273,6 +273,8 @@ export class PacmanFighter extends Fighter {
   _transformEnemiesIntoGhosts() {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.pacman) ? CONFIG.pacman : pacmanConfig;
     if (cfg.enableGhostTransformation === false) return;
+
+    this._playSfx('ghostTurnBlue');
 
     const duration = cfg.ghostDuration || this.chompModeDuration || 360;
     const candidates = [];
@@ -331,7 +333,7 @@ export class PacmanFighter extends Fighter {
    */
   _playWakaSfx() {
     if (this._wakaSoundDebounce <= 0) {
-      this._playSfx('waka');
+      this._playSfx('eatDot');
       this._wakaSoundDebounce = 6;
     }
   }
@@ -496,7 +498,7 @@ export class PacmanFighter extends Fighter {
     this._swallowedDpsTimer = 0;
 
     // 4. Audio & Haptic Feedback
-    this._playSfx('chomp');
+    this._playSfx('eatGhost');
     triggerGlobalScreenShake(5.0, 14);
     opponent.hitFlashTimer = 12;
 
@@ -755,6 +757,14 @@ export class PacmanFighter extends Fighter {
       this.angle = moveAngle;
       this._mouthAnimTicks += this.isChompModeActive ? 1.6 : 1.0;
     }
+  }
+
+  /**
+   * Overrides base Fighter.onDeath() to play the iconic retro Pac-Man death sound.
+   */
+  onDeath() {
+    this._playSfx('death');
+    super.onDeath();
   }
 
   /**

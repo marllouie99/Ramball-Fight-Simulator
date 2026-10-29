@@ -9869,6 +9869,7 @@ async function runInteractionTests() {
     assert(charizardConfig.skills.special.windupFrames === 28, `Expected windupFrames 28, got ${charizardConfig.skills.special.windupFrames}`);
     assert(charizardConfig.skills.special.streamDurationFrames === 120, `Expected 2-second streamDurationFrames 120, got ${charizardConfig.skills.special.streamDurationFrames}`);
     assert(charizardConfig.skills.special.recoveryFrames === 24, `Expected breather recoveryFrames 24, got ${charizardConfig.skills.special.recoveryFrames}`);
+    assert(ashConfig.sounds.flamethrower === 'Assets/Sound Effects/PokemonSFX/Flamethrower.mp3', 'flamethrower sound path must match Flamethrower.mp3');
 
     const charizard = new PokemonCompanionEntity(ash, 'charizard', 150, 250);
     ash.activePokemon = charizard;
@@ -12811,7 +12812,7 @@ async function runInteractionTests() {
       assert(ash.activePokemon !== null, `Ash must deploy ${species}`);
       assert(ash.activePokemon.speciesId === species, `Active pokemon must be ${species}`);
 
-      // Run update cycle under matchEnd victory condition
+      // Run update cycle under matchEnd victory condition (Frame 1: victory delay active)
       ash.update(enemy, 0, testArena);
       ash.activePokemon.update(enemy, 0, testArena);
 
@@ -12819,7 +12820,17 @@ async function runInteractionTests() {
       assert(ash.activePokemon !== null, `${species} must STAY on the field when Ash wins the match`);
       assert(ash.activePokemon.hp > 0, `${species} must remain alive`);
 
-      // Verify dedicated victory animation
+      // Verify that it does NOT snap immediately on frame 1 (delay timer active)
+      assert(ash.activePokemon.victoryPoseDelayTimer > 0, `${species} victoryPoseDelayTimer must be counting down on frame 1`);
+      assert(ash.activePokemon.animState !== expectedAnim, `${species} must NOT immediately snap to '${expectedAnim}' on victory frame 1`);
+
+      // Advance through victory pose delay window (~45 frames)
+      for (let f = 0; f < 50; f++) {
+        ash.update(enemy, 0, testArena);
+        ash.activePokemon.update(enemy, 0, testArena);
+      }
+
+      // Verify dedicated victory animation after delay
       assert(
         ash.activePokemon.animState === expectedAnim || ash.activePokemon.animState === 'victory',
         `${species} must use '${expectedAnim}' animation upon match victory, got '${ash.activePokemon.animState}'`
@@ -13229,6 +13240,18 @@ async function runInteractionTests() {
     pacman._checkDotEating();
     assert(pacman.dots[0].eaten === true, 'Pac-Man must resume eating dots once Chomp Mode has expired');
     assert(pacman.dotsEaten > dotsEatenBefore, 'dotsEaten must increment now that Chomp Mode is inactive');
+
+    // 11. Verify Pac-Man Dedicated Audio SFX Configuration
+    assert(pacman.sounds.death === 'Assets/Sound Effects/PacmanSFX/pac-man-death-sound.mp3', 'Pac-Man death sound path must match');
+    assert(pacman.sounds.eatDot === 'Assets/Sound Effects/PacmanSFX/pac-man_eat_fruits.mp3', 'Pac-Man eatDot sound path must match');
+    assert(pacman.sounds.eatBigFruit === 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Big Fruit.mp3', 'Pac-Man eatBigFruit sound path must match');
+    assert(pacman.sounds.ghostTurnBlue === 'Assets/Sound Effects/PacmanSFX/Ghost - Turn to Blue.mp3', 'Pac-Man ghostTurnBlue sound path must match');
+    assert(pacman.sounds.eatGhost === 'Assets/Sound Effects/PacmanSFX/PAC-MAN - Eating The Ghost.mp3', 'Pac-Man eatGhost sound path must match');
+
+    let playedDeathSfx = null;
+    pacman._playSfx = (type) => { playedDeathSfx = type; };
+    pacman.onDeath();
+    assert(playedDeathSfx === 'death', 'Pac-Man onDeath must trigger death SFX');
 
     state.fighters = [];
     console.log('      ✅ Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State verified.');

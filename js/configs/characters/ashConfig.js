@@ -78,6 +78,11 @@ export const ashConfig = {
   enableLucario: true,
 
   // ──────────────────────────────────────────
+  // Match Victory & Celebration Settings
+  // ──────────────────────────────────────────
+  victoryPoseDelayFrames: 45, // Delay frames (~0.75s) before active Pokémon transitions into victory pose animation
+
+  // ──────────────────────────────────────────
   // Combat Stance & Cast Immunities
   // ──────────────────────────────────────────
   enablePokemonSkillImmunity: true, // Grants push back, pull, drag, and knockback immunity to Pokémon while casting skills
@@ -479,7 +484,7 @@ export const ashConfig = {
 
     // Charizard Moves
     dragonClaw: 'Assets/Sound Effects/PokemonSFX/dragonclaw.ogg',
-    flamethrower: 'Assets/Sound Effects/PokemonSFX/flamethrower.ogg',
+    flamethrower: 'Assets/Sound Effects/PokemonSFX/Flamethrower.mp3',
     fireBlast: 'Assets/Sound Effects/PokemonSFX/fireblast.ogg',
 
     // Greninja Moves

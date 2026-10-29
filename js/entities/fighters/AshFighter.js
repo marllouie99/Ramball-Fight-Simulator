@@ -208,6 +208,8 @@ export class PokemonCompanionEntity extends Fighter {
     this.comboStep = 0;
     this.hurtAnimTimer = 0;
     this.hurtTick = 0;
+    this.victoryPoseDelayTimer = -1;
+    this._lastVictoryFrame = -1;
     this.faintTimer = 0;
     this.faintTick = 0;
     this.maxFaintTicks = 48;
@@ -454,6 +456,59 @@ export class PokemonCompanionEntity extends Fighter {
     return false;
   }
 
+  /**
+   * Handles active Pokémon victory celebration state.
+   * Introduces a natural pause/delay (~45 frames, 0.75s) before triggering the pose animation,
+   * preventing abrupt instantaneous pose snaps immediately upon landing the KO.
+   */
+  handleVictoryState(opponent = null) {
+    this.interruptAttacks();
+    this.z = 0;
+
+    const cfg = _getAshCfg();
+    const delayFrames = cfg?.victoryPoseDelayFrames ?? 45;
+
+    // Initialize victory delay countdown on first victory frame
+    if (this.victoryPoseDelayTimer === -1 || this.victoryPoseDelayTimer === undefined) {
+      this.victoryPoseDelayTimer = delayFrames;
+    }
+
+    if (this.victoryPoseDelayTimer > 0) {
+      this.victoryPoseDelayTimer--;
+      this.vx *= 0.82;
+      this.vy *= 0.82;
+      if (Math.hypot(this.vx, this.vy) < 0.1) {
+        this.vx = 0;
+        this.vy = 0;
+      }
+      if (this.animState !== 'idle' && this.animState !== 'walk') {
+        this.animState = 'idle';
+      }
+      return;
+    }
+
+    // Victory delay elapsed: halt completely and trigger dedicated victory animation
+    this.vx = 0;
+    this.vy = 0;
+    if (this.speciesId === 'pikachu') {
+      this.animState = 'pose';
+    } else if (this.speciesId === 'charizard') {
+      this.animState = 'sleep';
+    } else if (this.speciesId === 'greninja') {
+      this.animState = 'rearUp';
+    } else if (this.speciesId === 'lucario') {
+      this.animState = 'tumbleback';
+    } else {
+      this.animState = 'victory';
+    }
+
+    if (opponent && typeof opponent.x === 'number') {
+      const winAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      this.gunAngle = winAngle;
+      this.angle = winAngle;
+    }
+  }
+
   startThunderbolt(target, isTrainerCommand = false) {
     if (this.hp <= 0 || this.thunderboltState) return;
     const specSkill = this.spec.skills?.special;
@@ -542,9 +597,7 @@ export class PokemonCompanionEntity extends Fighter {
     // Iconic Phase 1 Callout: "CHAR..."
     const windupCallout = specSkill?.windupCallout || 'CHAR...';
     spawnFloatingText(this.x, this.y - this.r - 20, windupCallout, this.themeColor || '#F97316');
-    if (this.owner) {
-      this.owner._playMoveAudioSequence(specSkill?.specialSfx || 'flamethrower');
-    }
+    _playAshSound(specSkill?.specialSfx || 'flamethrower');
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -664,32 +717,9 @@ export class PokemonCompanionEntity extends Fighter {
       return;
     }
 
-    // Match Victory Check: Active Pokémon stays in arena and plays its victory animation
+    // Match Victory Check: Active Pokémon stays in arena and plays its victory animation after a brief delay
     if (this._isOwnerVictory(opponent)) {
-      this.vx = 0;
-      this.vy = 0;
-      this.z = 0;
-      this.interruptAttacks();
-
-      // Specific victory animation per Pokémon requested:
-      // Pikachu: "POSE", Charizard: "SLEEP", Greninja: "RearUp", Lucario: "Tumbleback"
-      if (this.speciesId === 'pikachu') {
-        this.animState = 'pose';
-      } else if (this.speciesId === 'charizard') {
-        this.animState = 'sleep';
-      } else if (this.speciesId === 'greninja') {
-        this.animState = 'rearUp';
-      } else if (this.speciesId === 'lucario') {
-        this.animState = 'tumbleback';
-      } else {
-        this.animState = 'victory';
-      }
-
-      if (opponent && typeof opponent.x === 'number') {
-        const winAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        this.gunAngle = winAngle;
-        this.angle = winAngle;
-      }
+      this.handleVictoryState(opponent);
       return;
     }
 
@@ -2418,21 +2448,6 @@ export class AshFighter extends Fighter {
     if (this._isMatchWon(opponent)) {
       this.vx = 0;
       this.vy = 0;
-      if (this.activePokemon && this.activePokemon.hp > 0) {
-        if (this.activePokemon.speciesId === 'pikachu') {
-          this.activePokemon.animState = 'pose';
-        } else if (this.activePokemon.speciesId === 'charizard') {
-          this.activePokemon.animState = 'sleep';
-        } else if (this.activePokemon.speciesId === 'greninja') {
-          this.activePokemon.animState = 'rearUp';
-        } else if (this.activePokemon.speciesId === 'lucario') {
-          this.activePokemon.animState = 'tumbleback';
-        } else {
-          this.activePokemon.animState = 'victory';
-        }
-        this.activePokemon.vx = 0;
-        this.activePokemon.vy = 0;
-      }
       this.isSteady = true;
       return;
     }
