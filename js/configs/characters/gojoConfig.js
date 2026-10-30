@@ -67,7 +67,7 @@ export const gojoConfig = {
   blueScale: 1.0,           // Explicit scale multiplier for Blue projectile visual size and hitbox
   blueHandScale: 1.5,       // Explicit scale multiplier for Blue orb on Gojo's hands (increased visual presence)
   bluePullForce: 0.1,       // Pull strength of Blue
-  blueDPS: 10,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
+  blueDPS: 20,              // Continuous damage per second dealt to enemies caught in Blue's gravitational vortex
   blueDPSInterval: 12,      // Frames between DPS ticks (~5 ticks/sec, smooth non-spammed cadence)
   blueParalyzeDuration: 15,  // Duration in frames of Paralyze debuff applied while caught in Blue's gravitational field
   blueWallLingerDuration: 50, // Frames (~1.5s) Blue orb stays pinned on the wall after colliding, pulling & grinding enemies
@@ -112,7 +112,7 @@ export const gojoConfig = {
   purpleRadius: 150,         // Radius of Purple orb
   purpleLife: 200,         // How long Purple orb stays in arena (frames - 8.0s)
   purpleTravelTime: 20,    // Frames the orb travels before stopping
-  purpleDPS: 50,            // Damage per second dealt to enemies inside the orb
+  purpleDPS: 70,            // Damage per second dealt to enemies inside the orb
   purpleDPSInterval: 10,   // Frames between DPS ticks
   purpleSlowDuration: 60,  // Frames the slow effect lasts
   purpleSlowMultiplier: 0.20, // Speed multiplier while slowed (0.20 = 20% speed, very heavy slow)
@@ -154,8 +154,8 @@ export const gojoConfig = {
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.10, // Triggers RCT when HP drops to 25% or below
-  reverseCursedTechniqueHealPercent: 0.50, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
-  reverseCursedTechniqueCooldown: 1000,     // 15 second cooldown between RCT heals
+  reverseCursedTechniqueHealPercent: 0.30, // Percentage of Max HP healed per RCT trigger (0.50 = 50% = 100 HP)
+  reverseCursedTechniqueCooldown: 1200,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
   passiveRctHealRate: 0,                   // Disabled

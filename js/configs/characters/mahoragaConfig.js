@@ -12,7 +12,7 @@ export const mahoragaConfig = {
     name: 'Mahoraga',
     displayName: 'Mahoraga',
     // ── Base Attributes ──
-    hp: 500,
+    hp: 700,
     speed: 6.5,
     moveSpeed: 6.5,
     spinRate: 0,

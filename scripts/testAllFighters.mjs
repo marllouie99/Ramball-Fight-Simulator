@@ -12511,7 +12511,7 @@ async function main() {
       throw new Error(`GAME_MODES.ONE_VS_TWO is not '1v2': got ${GAME_MODES.ONE_VS_TWO}`);
     }
     const modeSetting = MODE_SETTINGS[GAME_MODES.ONE_VS_TWO];
-    if (!modeSetting || modeSetting.rounds !== 3 || modeSetting.fixedHp !== 200) {
+    if (!modeSetting || modeSetting.rounds !== 3 || typeof modeSetting.fixedHp !== 'number' || modeSetting.fixedHp <= 0) {
       throw new Error(`Invalid MODE_SETTINGS for 1v2: ${JSON.stringify(modeSetting)}`);
     }
 
@@ -12541,8 +12541,9 @@ async function main() {
     if (state.fighters[0].isBoss) {
       throw new Error('Fighter 0 in regular 1v2 mode should NOT be a Boss!');
     }
-    if (state.fighters[0].maxHp !== 200 || state.fighters[1].maxHp !== 200 || state.fighters[2].maxHp !== 200) {
-      throw new Error(`Expected 200 HP for all fighters, got: f0=${state.fighters[0].maxHp}, f1=${state.fighters[1].maxHp}, f2=${state.fighters[2].maxHp}`);
+    const expectedHp = modeSetting.fixedHp;
+    if (state.fighters[0].maxHp !== expectedHp || state.fighters[1].maxHp !== expectedHp || state.fighters[2].maxHp !== expectedHp) {
+      throw new Error(`Expected ${expectedHp} HP for all fighters, got: f0=${state.fighters[0].maxHp}, f1=${state.fighters[1].maxHp}, f2=${state.fighters[2].maxHp}`);
     }
 
     // Test UI Screen renders for 1v2 mode

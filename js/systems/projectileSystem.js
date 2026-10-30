@@ -1746,7 +1746,7 @@ class ProjectileSystem {
           );
 
           if (isSukunaSlashProj && attacker && typeof attacker.evaluateSlashCrit === 'function') {
-            const critRes = attacker.evaluateSlashCrit(fighter, damageAmount, { isProjectile: true });
+            const critRes = attacker.evaluateSlashCrit(fighter, damageAmount, { isProjectile: true, isDomain: Boolean(projectile.isDomain || projectile.isDomainSlash) });
             finalProjDmg = critRes.finalDamage;
             isSlashCrit = critRes.isCrit;
           }

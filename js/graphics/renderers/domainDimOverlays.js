@@ -1693,10 +1693,18 @@ export function getActiveMahoragaEntity() {
   return candidates[0];
 }
 
+/**
+ * Resolves any fighter currently winding up to summon Mahoraga (e.g. Sukuna).
+ */
+export function getSukunaMahoragaSummoner() {
+  if (typeof state === 'undefined' || !Array.isArray(state.fighters)) return null;
+  return state.fighters.find(f => f && (f.isSummoningMahoraga || (f.mahoragaSummonWindupTimer > 0))) || null;
+}
+
 let currentMahoragaAdaptationDimOpacity = 0;
 
 /**
- * Draws a dark golden cinematic dim screen overlay when Mahoraga adapts and rotates his 3D Dharma Wheel.
+ * Draws a dark golden cinematic dim screen overlay when Mahoraga adapts or when Sukuna winds up to summon him.
  * Features smooth fade-in and graceful exponential fade-out.
  */
 export function drawMahoragaAdaptationDimScreen() {
@@ -1713,7 +1721,10 @@ export function drawMahoragaAdaptationDimScreen() {
   if (!ctx || !canvas || !arena) return;
 
   const mahoraga = getActiveMahoragaEntity();
+  const summoner = getSukunaMahoragaSummoner();
+
   const isClicking = Boolean(mahoraga && ((mahoraga.wheelClickTimer && mahoraga.wheelClickTimer > 0) || (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0)));
+  const isSummoning = Boolean(summoner && (summoner.isSummoningMahoraga || (summoner.mahoragaSummonWindupTimer > 0)) && (CONFIG.sukuna?.enableMahoragaSummonDim !== false));
 
   let targetOpacity = 0;
   if (isClicking) {
@@ -1730,6 +1741,21 @@ export function drawMahoragaAdaptationDimScreen() {
       targetOpacity = maxOpacity;
     } else {
       targetOpacity = Math.max(0, 1.0 - (progress - 0.70) / 0.30) * maxOpacity;
+    }
+  } else if (isSummoning) {
+    const timer = summoner.mahoragaSummonWindupTimer || 0;
+    const maxTimer = summoner.mahoragaSummonWindupMax || 50;
+    const rawProgress = (maxTimer - timer) / Math.max(1, maxTimer);
+    const progress = Math.min(1.0, Math.max(0.0, rawProgress));
+    const maxOpacity = CONFIG.mahoraga?.goldenDimOpacity ?? 0.88;
+
+    // Fast pop-in during first 25%, sustained hold during chant, smooth fade out at windup end
+    if (progress < 0.25) {
+      targetOpacity = (progress / 0.25) * maxOpacity;
+    } else if (progress < 0.75) {
+      targetOpacity = maxOpacity;
+    } else {
+      targetOpacity = Math.max(0, 1.0 - (progress - 0.75) / 0.25) * maxOpacity;
     }
   }
 
@@ -1751,25 +1777,26 @@ export function drawMahoragaAdaptationDimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  const drawX = mahoraga ? worldToScreen(mahoraga.x, mahoraga.y - mahoraga.r - 28).x : canvas.width / 2;
-  const wheelY = mahoraga ? worldToScreen(mahoraga.x, mahoraga.y - mahoraga.r - 28).y : canvas.height / 2;
+  const centerEntity = isClicking ? mahoraga : (isSummoning ? summoner : (mahoraga || summoner));
+  const drawX = centerEntity ? worldToScreen(centerEntity.x, centerEntity.y - (centerEntity.r || 25) - 28).x : canvas.width / 2;
+  const wheelY = centerEntity ? worldToScreen(centerEntity.x, centerEntity.y - (centerEntity.r || 25) - 28).y : canvas.height / 2;
   const maxRadius = Math.max(arena.width, arena.height) * 0.70;
   const grad = ctx.createRadialGradient(
     drawX, wheelY, 15,
     drawX, wheelY, maxRadius
   );
-  grad.addColorStop(0, `rgba(255, 215, 0, ${opacity * 0.55})`);
-  grad.addColorStop(0.20, `rgba(218, 165, 32, ${opacity * 0.48})`);
-  grad.addColorStop(0.50, `rgba(130, 85, 12, ${opacity * 0.72})`);
-  grad.addColorStop(0.80, `rgba(45, 28, 5, ${opacity * 0.88})`);
-  grad.addColorStop(1.0, `rgba(18, 10, 2, ${opacity * 0.95})`);
+  grad.addColorStop(0, `rgba(255, 215, 0, ${opacity * 0.50})`);
+  grad.addColorStop(0.20, `rgba(218, 165, 32, ${opacity * 0.45})`);
+  grad.addColorStop(0.50, `rgba(40, 25, 10, ${opacity * 0.75})`);
+  grad.addColorStop(0.80, `rgba(15, 10, 8, ${opacity * 0.90})`);
+  grad.addColorStop(1.0, `rgba(5, 5, 5, ${opacity * 0.96})`);
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.restore();
   
-  state.globalDimEdgeColor = `rgba(18, 10, 2, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(15, 10, 8, ${opacity * 0.95})`;
 }
 
 let mahoragaWheelOverlayImg = null;
@@ -1826,8 +1853,10 @@ export function drawMahoragaWheelArenaOverlay() {
   if (!ctx || !canvas || !arena) return;
 
   const mahoraga = getActiveMahoragaEntity();
+  const summoner = getSukunaMahoragaSummoner();
 
   const isClicking = Boolean(mahoraga && ((mahoraga.wheelClickTimer && mahoraga.wheelClickTimer > 0) || (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0)));
+  const isSummoning = Boolean(summoner && (summoner.isSummoningMahoraga || (summoner.mahoragaSummonWindupTimer > 0)) && (CONFIG.sukuna?.enableMahoragaSummonWheelOverlay !== false));
 
   if (!mahoragaWheelOverlayImg && !mahoragaWheelOverlayImgLoading) {
     loadMahoragaWheelOverlayImage();
@@ -1867,6 +1896,31 @@ export function drawMahoragaWheelArenaOverlay() {
 
     const rotMultiplier = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayRotationMultiplier !== undefined) ? CONFIG.mahoraga.wheelOverlayRotationMultiplier : 1.0;
     lastMahoragaWheelOverlayRotation = startRot + (targetRot - startRot) * rotProgress * rotMultiplier;
+  } else if (isSummoning) {
+    const timer = summoner.mahoragaSummonWindupTimer || 0;
+    const maxTimer = summoner.mahoragaSummonWindupMax || 50;
+    const rawProgress = (maxTimer - timer) / Math.max(1, maxTimer);
+    const summonProgress = Math.min(1.0, Math.max(0.0, rawProgress));
+
+    const baseAlpha = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wheelOverlayOpacity !== undefined) ? CONFIG.mahoraga.wheelOverlayOpacity : 0.85;
+
+    // Fast snappy pop-in during first 25%, sustained peak during chant, smooth fade out at windup end
+    if (summonProgress < 0.25) {
+      targetOpacity = (summonProgress / 0.25) * baseAlpha;
+    } else if (summonProgress < 0.75) {
+      targetOpacity = baseAlpha;
+    } else {
+      targetOpacity = Math.max(0, 1.0 - (summonProgress - 0.75) / 0.25) * baseAlpha;
+    }
+
+    // Smooth mechanical rotation animation: turns 45 degrees as the wheel emerges in the arena
+    const easeOutCubic = (t) => 1 - Math.pow(1 - t, 3);
+    const rotProgress = easeOutCubic(summonProgress);
+
+    if (summoner._summonWheelStartRot === undefined) {
+      summoner._summonWheelStartRot = lastMahoragaWheelOverlayRotation || 0;
+    }
+    lastMahoragaWheelOverlayRotation = summoner._summonWheelStartRot + rotProgress * (Math.PI / 4);
   } else if (mahoraga && mahoraga.wheelRotation !== undefined) {
     lastMahoragaWheelOverlayRotation = mahoraga.wheelRotation;
   }

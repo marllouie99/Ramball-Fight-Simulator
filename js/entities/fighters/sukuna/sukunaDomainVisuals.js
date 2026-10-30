@@ -416,10 +416,12 @@ export function spawnDomainSlashLines(fighter, count) {
     });
   }
 
-  const slashCount = Math.min(3, count || (CONFIG.sukuna?.domainSlashesPerTick || 2));
-  const baseDamage = CONFIG.sukuna?.domainSlashDamage ?? CONFIG.sukuna?.domainDamage ?? 15;
-  const damageInterval = CONFIG.sukuna?.domainDamageInterval || 18;
-  const rampRate = CONFIG.sukuna?.domainRampRatePerSec ?? 0.10;
+  const cfg = (fighter?.characterId && CONFIG[fighter.characterId]) || fighter?.customConfig || CONFIG.sukuna || {};
+  const slashCount = Math.min(3, count || (cfg.domainSlashesPerTick || 2));
+  const baseDamage = cfg.domainSlashDamage ?? cfg.domainDamage ?? 7;
+  const damageInterval = cfg.domainDamageInterval || 8;
+  const enableRamp = Boolean(cfg.enableDomainDamageRamp);
+  const rampRate = enableRamp ? (cfg.domainRampRatePerSec ?? 0) : 0;
 
   let hitAny = false;
   const hitTargetsThisWave = new Set();
@@ -490,16 +492,12 @@ export function spawnDomainSlashLines(fighter, count) {
         const timeInside = (fighter.domainTimeInsideMap.get(target) || 0) + damageInterval;
         fighter.domainTimeInsideMap.set(target, timeInside);
 
-        const rampMultiplier = 1 + (timeInside / 60) * rampRate;
-        const rawDamage = baseDamage * rampMultiplier;
+        const rampMultiplier = (enableRamp && rampRate > 0) ? (1 + (timeInside / 60) * rampRate) : 1;
+        const rawDamage = (enableRamp && rampRate > 0) ? (baseDamage * rampMultiplier) : baseDamage;
 
-        let finalDamage = rawDamage;
-        let isCrit = false;
-        if (typeof fighter.evaluateSlashCrit === 'function') {
-          const res = fighter.evaluateSlashCrit(target, rawDamage, { isDomain: true });
-          finalDamage = res.finalDamage;
-          isCrit = res.isCrit;
-        }
+        // Domain shrine slashes do not benefit from or contribute to Sukuna's crit mechanics and deal consistent flat damage
+        const finalDamage = rawDamage;
+        const isCrit = false;
 
         let tookDamage = true;
         if (typeof target.takeDamage === 'function') {
@@ -519,7 +517,7 @@ export function spawnDomainSlashLines(fighter, count) {
             cx,
             cy,
             thickness,
-            isCrit
+            isCrit: false
           });
           if (dmgResult === false) {
             tookDamage = false;
@@ -723,6 +721,9 @@ export function renderSukunaDomainSlashLines(fighter, ctx) {
 export function clearDomainSlashLines(fighter) {
   _domainSlashLines.length = 0;
   if (fighter) {
+    if (fighter.domainTimeInsideMap) {
+      fighter.domainTimeInsideMap.clear();
+    }
     fighter._cachedSkyGrad = null;
     fighter._cachedWaterGrad = null;
     fighter._cachedPillars = null;

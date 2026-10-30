@@ -658,11 +658,45 @@ function _getTojiBulletCoreGrad(ctx) {
 
 let _tojiPistolGunImage = null;
 let _tojiPistolGunLoading = false;
+let _tojiPistolKeyedCanvas = null;
 
 /**
- * Lazy-loads and caches Alucard's authentic pixel-art pistol sprite for Toji's tactical sidearm.
+ * Offscreen chroma-key fallback in case the raw .jpg asset is loaded directly.
+ */
+function _keyTojiPistolBackground(img) {
+  if (typeof document === 'undefined') return img;
+  try {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth;
+    c.height = img.naturalHeight;
+    const kCtx = c.getContext('2d', { willReadFrequently: true });
+    kCtx.drawImage(img, 0, 0);
+    const imgData = kCtx.getImageData(0, 0, c.width, c.height);
+    const data = imgData.data;
+    // Neutral gray background is ~[79, 79, 79]
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const dist = Math.hypot(r - 79, g - 79, b - 80);
+      if (dist < 10) {
+        data[i + 3] = 0;
+      } else if (dist < 22) {
+        data[i + 3] = Math.round(((dist - 10) / 12) * 255);
+      }
+    }
+    kCtx.putImageData(imgData, 0, 0);
+    return c;
+  } catch (e) {
+    return img;
+  }
+}
+
+/**
+ * Lazy-loads and caches Toji's dedicated tactical pistol firearm sprite (Assets/model/toji/toji_pistol.jpg / .png).
  */
 export function _getTojiPistolGunImage() {
+  if (_tojiPistolKeyedCanvas) return _tojiPistolKeyedCanvas;
   if (_tojiPistolGunImage && _tojiPistolGunImage.complete && _tojiPistolGunImage.naturalWidth > 0) {
     return _tojiPistolGunImage;
   }
@@ -672,11 +706,18 @@ export function _getTojiPistolGunImage() {
     img.onload = () => {
       _tojiPistolGunImage = img;
       _tojiPistolGunLoading = false;
+      if (img.src && img.src.includes('.jpg')) {
+        _tojiPistolKeyedCanvas = _keyTojiPistolBackground(img);
+      }
     };
     img.onerror = () => {
-      _tojiPistolGunLoading = false;
+      if (!img.src.includes('.jpg')) {
+        img.src = 'Assets/model/toji/toji_pistol.jpg?v=1';
+      } else {
+        _tojiPistolGunLoading = false;
+      }
     };
-    img.src = 'Assets/model/alucard/Alucard-pistol-gun.png?v=1';
+    img.src = 'Assets/model/toji/toji_pistol.png?v=1';
     _tojiPistolGunImage = img;
   }
   return _tojiPistolGunImage;
@@ -687,8 +728,8 @@ if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
 }
 
 /**
- * Draws Toji's Tactical Handgun / Pistol using Alucard's authentic pixel-art firearm sprite
- * (Assets/model/alucard/Alucard-pistol-gun.png) with complete procedural discrete fallback.
+ * Draws Toji's Tactical Handgun / Pistol using Toji's dedicated tactical firearm sprite
+ * (Assets/model/toji/toji_pistol.jpg / toji_pistol.png) with complete procedural discrete fallback.
  * 
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} cx - Character center X
@@ -735,17 +776,31 @@ export function drawTojiPistol(ctx, cx, cy, angle, r = 25, handColor = '#E8BD9B'
   ctx.translate(recoilKickX, 0);
   ctx.rotate(muzzleRecoilAngle);
 
-  // Alucard Pistol Sprite Dimensions: 703 x 355
-  // Grip Anchor: X=554, Y=220; Muzzle Tip: X=41, Y=129
-  const s = 0.105;
+  // Toji Dedicated Tactical Pistol Sprite (Assets/model/toji/toji_pistol.jpg / .png)
   const gunImg = _getTojiPistolGunImage();
+  const renderSource = _tojiPistolKeyedCanvas || gunImg;
 
-  if (gunImg && gunImg.complete && gunImg.naturalWidth > 0) {
+  let fx = 49 + recoilKickX;
+  let fy = -9.5;
+
+  if (renderSource && renderSource.complete !== false && ((renderSource.naturalWidth && renderSource.naturalWidth > 0) || renderSource.width > 0)) {
+    const isFullJpg = (renderSource.naturalWidth || renderSource.width) >= 2000;
+    const imgW = renderSource.naturalWidth || renderSource.width || (isFullJpg ? 2752 : 800);
+    const imgH = renderSource.naturalHeight || renderSource.height || (isFullJpg ? 1536 : 517);
+    const gripX = isFullJpg ? 1897 : 635;
+    const gripY = isFullJpg ? 850 : 320;
+    const muzzleX = isFullJpg ? 336 : 8;
+    const muzzleY = isFullJpg ? 324.5 : 93;
+    const s = isFullJpg ? 0.027 : 0.082;
+
     ctx.save();
     ctx.imageSmoothingEnabled = false;
     ctx.scale(-1, 1);
-    ctx.drawImage(gunImg, -554 * s, -220 * s, 703 * s, 355 * s);
+    ctx.drawImage(renderSource, -gripX * s, -gripY * s, imgW * s, imgH * s);
     ctx.restore();
+
+    fx = (gripX - muzzleX) * s + recoilKickX;
+    fy = (muzzleY - gripY) * s;
   } else {
     // ── Procedural Fallback (headless test harness / pre-load state) ──
     ctx.save();
@@ -790,8 +845,6 @@ export function drawTojiPistol(ctx, cx, cy, angle, r = 25, handColor = '#E8BD9B'
   const flashTimer = opts.flashTimer || 0;
   if (flashTimer > 0) {
     const flashScale = Math.min(1.0, flashTimer / 3) * 1.4;
-    const fx = 513 * s + recoilKickX;
-    const fy = (129 - 220) * s;
 
     ctx.save();
     ctx.translate(fx, fy);

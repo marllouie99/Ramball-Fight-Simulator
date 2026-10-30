@@ -118,7 +118,8 @@ export const sukunaBossConfig = {
   domainSlashRicochetForce: 6.5,
   domainRapidSlashCooldown: 20,
   domainRadius: 240,
-  domainRampRatePerSec: 0.10,
+  enableDomainDamageRamp: false,    // Strict toggle: domain slash damage stays flat and consistent without scaling over time
+  domainRampRatePerSec: 0,
 
   // Audio configuration, volume & timing delays
   sounds: {

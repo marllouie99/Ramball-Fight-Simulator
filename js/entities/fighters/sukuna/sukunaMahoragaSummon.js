@@ -183,6 +183,8 @@ export function initMahoragaSummon(fighter) {
   fighter.mahoragaSummonCooldown = c.mahoragaSummonInitialCooldown ?? c.mahoragaSummonCooldown ?? 420;
   fighter.mahoragaMinion = null;
   fighter._hasPlayedMahoragaSummonSound = false;
+  fighter.hasSummonedMahoraga = false;
+  fighter.mahoragaSummonCount = 0;
 }
 
 export function resetMahoragaSummon(fighter) {
@@ -359,6 +361,8 @@ export function trySummonMahoraga(fighter, ownerIndex, arena) {
   const c = SUMMON_CFG();
   if (!fighter) return false;
   if (!fighter.isSkillEnabled(c.enableMahoragaSummon, true)) return false;
+  const oncePerMatch = c.mahoragaSummonOncePerMatch !== false;
+  if (oncePerMatch && (fighter.hasSummonedMahoraga || (fighter.mahoragaSummonCount || 0) >= 1)) return false;
   if (fighter.isDemoFighter) return false;
   if ((fighter.mahoragaSummonCooldown || 0) > 0) return false;
   if (fighter.mahoragaSummonActive && fighter.mahoragaMinion) return false;
@@ -383,6 +387,8 @@ export function trySummonMahoraga(fighter, ownerIndex, arena) {
   if (!Array.isArray(state.illusions)) state.illusions = [];
   state.illusions.push(minion);
 
+  fighter.hasSummonedMahoraga = true;
+  fighter.mahoragaSummonCount = (fighter.mahoragaSummonCount || 0) + 1;
   fighter.mahoragaMinion = minion;
   fighter.mahoragaSummonActive = true;
   fighter.isSummoningMahoraga = false;
@@ -459,10 +465,16 @@ export function dispelMahoragaSummon(fighter, opts = {}) {
     fighter.mahoragaSummonActive = false;
     fighter.isSummoningMahoraga = false;
     fighter.mahoragaSummonWindupTimer = 0;
+    delete fighter._summonWheelStartRot;
     fighter._hasPlayedMahoragaSummonSound = false;
-    fighter.mahoragaSummonCooldown = opts.instantCooldown
-      ? 0
-      : (c.mahoragaSummonCooldown ?? 1500);
+    const oncePerMatch = c.mahoragaSummonOncePerMatch !== false;
+    if (oncePerMatch && !opts.instantCooldown && fighter.hasSummonedMahoraga) {
+      fighter.mahoragaSummonCooldown = Infinity;
+    } else {
+      fighter.mahoragaSummonCooldown = opts.instantCooldown
+        ? 0
+        : (c.mahoragaSummonCooldown ?? 1500);
+    }
   }
 }
 
@@ -493,6 +505,8 @@ function canInitiateMahoragaSummon(fighter) {
   const c = SUMMON_CFG();
   if (!fighter) return false;
   if (!fighter.isSkillEnabled(c.enableMahoragaSummon, true)) return false;
+  const oncePerMatch = c.mahoragaSummonOncePerMatch !== false;
+  if (oncePerMatch && (fighter.hasSummonedMahoraga || (fighter.mahoragaSummonCount || 0) >= 1)) return false;
   if (fighter.isDemoFighter) return false;
   if ((fighter.mahoragaSummonCooldown || 0) > 0) return false;
   if (fighter.mahoragaSummonActive && fighter.mahoragaMinion) return false;
@@ -541,6 +555,7 @@ export function updateMahoragaSummon(fighter, ownerIndex, arena) {
     if (!isOwnerAlive(fighter) || fighter.isTargetOfAmbush || (fighter.silenceTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.isChannelingDivineFlame) {
       fighter.isSummoningMahoraga = false;
       fighter.mahoragaSummonWindupTimer = 0;
+      delete fighter._summonWheelStartRot;
       return;
     }
 
@@ -577,6 +592,7 @@ export function updateMahoragaSummon(fighter, ownerIndex, arena) {
     // Windup completed: unleash the Divine General!
     if (fighter.mahoragaSummonWindupTimer <= 0) {
       fighter.isSummoningMahoraga = false;
+      delete fighter._summonWheelStartRot;
       trySummonMahoraga(fighter, ownerIndex, arena);
     }
     return;

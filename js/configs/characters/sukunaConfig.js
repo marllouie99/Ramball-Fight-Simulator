@@ -19,8 +19,8 @@ export const sukunaConfig = {
     moveSpeed: 5.8,
     r: 25,
     radius: 25,
-    color: '#8B0000', // Dark Crimson
-    themeColor: '#8B0000',
+    color: '#0f0000ff', // Dark Crimson
+    themeColor: '#0f0000ff',
     startX: 300,
     startY: 250,
     startVx: 1.2,
@@ -44,17 +44,17 @@ export const sukunaConfig = {
     // Stacking Slash Crit Passive
     enableCritPassive: true,          // Master toggle for Stacking Slash Crit Passive
     baseCritChance: 0.01,             // 10% base crit chance
-    baseCritMultiplier: 0.50,         // 1.50x base crit damage multiplier
+    baseCritMultiplier: 1.00,         // 1.50x base crit damage multiplier
     critChancePerSlashHit: 0.01 ,      // +2% crit chance per landed slash hit
     critMultiplierPerSlashHit: 0.01,  // +0.05x crit multiplier per landed slash hit
     maxCritChance: 0.50,              // 80% max crit chance cap
-    maxCritMultiplier: 1.00,          // 3.50x max crit damage multiplier cap
+    maxCritMultiplier: 1.50,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
     enableRCT: true,                  // Master toggle for Reverse Cursed Technique (Passive)
     reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 25% or below
-    reverseCursedTechniqueHealAmount: 0.50,   // % of Max HP healed per RCT trigger (0.50 = 50% Max HP)
-    reverseCursedTechniqueCooldown: 1000,      // 20 second cooldown before it can trigger again
+    reverseCursedTechniqueHealAmount: 0.30,   // % of Max HP healed per RCT trigger (0.50 = 50% Max HP)
+    reverseCursedTechniqueCooldown: 1200,      // 20 second cooldown before it can trigger again
     rctRevivalHealAmount: 0.50,               // % of Max HP restored on emergency revival (0.50 = 50% Max HP)
 
     // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
@@ -103,7 +103,7 @@ export const sukunaConfig = {
     divineFlameDomainCooldown: 500, // Cooldown between Fuga uses inside Domain (~3.5 seconds at 60fps)
     domainFugaCooldownTickRate: 0.2,  // Rate multiplier for cooldown ticks inside Domain (4x faster recharge)
     divineFlameChargeMax: 100,      // Charge up duration (1.5 seconds)
-    divineFlameDamage: 500,         // Primary direct hit nuke damage
+    divineFlameDamage: 300,         // Primary direct hit nuke damage
     divineFlameExplosionRadius: 400, // Thermobaric nuke explosion AOE blast radius in pixels
     divineFlameExplosionDamage: 100, // Thermobaric nuke radius explosion AOE damage dealt to all surrounding enemies
     thermobaricSplashRadius: 220,  // Thermobaric explosion splash damage radius
@@ -122,8 +122,8 @@ export const sukunaConfig = {
     domainCooldown: 1100,         // Cooldown before domain can trigger (~16.6s at 60 fps)
     domainChargeMax: 125,         // Channeling duration before domain opens (2.0s at 60 fps)
     domainDuration: 500,          // Domain active duration (~8.33s at 60 fps)
-    domainDamage: 7,             // Base damage per slash line hit (legacy fallback)
-    domainSlashDamage: 7,        // Base damage dealt by each individual spatial cut line hit
+    domainDamage: 15,             // Base damage per slash line hit (legacy fallback)
+    domainSlashDamage: 15,        // Base damage dealt by each individual spatial cut line hit
     domainDamageInterval: 8,     // Frames between slash barrages (~3.3 waves per second)
     domainSlashesPerTick: 3,      // Number of spatial cut lines spawned per barrage
     domainSlashShakeIntensity: 1.8, // Small arena screen shake when Malevolent Shrine cut lines slash
@@ -131,13 +131,15 @@ export const sukunaConfig = {
     domainSlashRicochetForce: 6.5,  // Kinetic deflection ricochet push force applied to sliced enemies
     domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
     domainRadius: 240,            // Target proximity radius around shrine (0 or arena-wide if open-barrier)
-    domainRampRatePerSec: 0.10,   // Damage ramp multiplier per second target stays inside domain (10% per sec)
+    enableDomainDamageRamp: false, // Strict toggle: domain slash damage stays flat and consistent without scaling over time
+    domainRampRatePerSec: 0,      // Damage ramp multiplier per second target stays inside domain (0 = static flat damage)
 
     // ── OPTIONAL SKILL: Ten Shadows — Summon Mahoraga (Divine General Minion) ──
     // Sukuna summons the Divine General Mahoraga as a temporary allied minion.
     // Toggle `enableMahoragaSummon` off to disable the skill entirely (HUD card disappears too).
     enableMahoragaSummon: 1,       // MASTER TOGGLE for the Mahoraga summon skill
-    mahoragaSummonCooldown: 2500,     // Frames before Mahoraga can be re-summoned after being slain
+    mahoragaSummonOncePerMatch: true, // Strict limit: Sukuna can only summon Mahoraga once per match/round
+    mahoragaSummonCooldown: 2500,     // Frames before Mahoraga can be summoned (~41.6s)
     mahoragaSummonInitialCooldown: 2500, // Immediate opening summon (0.25s after match start) so it triggers every match
     // NOTE: the summon has NO duration — Mahoraga stays in the arena until he is slain or Sukuna dies.
     mahoragaSummonMaxActive: 1,       // Maximum simultaneous Mahoraga minions
@@ -147,6 +149,8 @@ export const sukunaConfig = {
     mahoragaSummonStatScale: 1.0,     // 1.0 = identical to the arena Mahoraga fighter
     mahoragaSummonVolumeScale: 1.0,   // 1.0 = Mahoraga's own combat sound volumes
     mahoragaSummonWindupFrames: 50,   // Windup mudra animation frames on Sukuna's hands before Mahoraga emerges
+    enableMahoragaSummonDim: true,     // Cinematic smooth dark dim screen during summon windup
+    enableMahoragaSummonWheelOverlay: true, // Arena wheel overlay pop up display during summon windup
     mahoragaSummonSpawnFrames: 45,    // Shadow-rise emergence duration
     mahoragaSummonShakeIntensity: 5,  // Screen shake on emergence
     mahoragaSummonShakeDuration: 10,  // Screen shake duration on emergence

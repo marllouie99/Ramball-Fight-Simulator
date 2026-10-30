@@ -7,7 +7,8 @@ export const tojiConfig = {
     hair: 'Assets/model/toji/toji-hair.png',
     skin: 'Assets/model/toji/Toji-skin.png',
     ultimateOverlay: 'Assets/Overlays/toji-ultimate-overlay.png',
-    pistol: 'Assets/model/alucard/Alucard-pistol-gun.png',
+    pistol: 'Assets/model/toji/toji_pistol.png',
+    pistolJpg: 'Assets/model/toji/toji_pistol.jpg',
   },
 
   name: 'Toji',

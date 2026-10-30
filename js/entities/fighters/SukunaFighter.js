@@ -80,8 +80,8 @@ export class SukunaFighter extends Fighter {
 
     // Stacking Slash Crit Passive
     this.slashHitCount = 0;
-    this.critChance = CONFIG.sukuna?.baseCritChance || 0.25;
-    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 0.25;
+    this.critChance = CONFIG.sukuna?.baseCritChance ?? 0.10;
+    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier ?? 1.50;
     this.damageNumberColor = '#ff4455';
     this.hasUnderBodyAura = true;
 
@@ -156,7 +156,8 @@ export class SukunaFighter extends Fighter {
         cooldownKey: 'mahoragaSummonCooldown',
         cooldownMax: CONFIG.sukuna?.mahoragaSummonCooldown ?? 1500,
         activeKey: 'mahoragaSummonActive',
-        allowsFrozenCooldownTick: false
+        allowsFrozenCooldownTick: false,
+        canTickCooldown: (fighter) => !fighter.hasSummonedMahoraga && !fighter.mahoragaSummonActive
       });
     }
     this.skillManager.registerSkills(skills);
@@ -351,8 +352,8 @@ export class SukunaFighter extends Fighter {
 
     // Reset Stacking Slash Crit Passive
     this.slashHitCount = 0;
-    this.critChance = CONFIG.sukuna?.baseCritChance || 0.10;
-    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 1.50;
+    this.critChance = CONFIG.sukuna?.baseCritChance ?? 0.10;
+    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier ?? 1.50;
 
     // Reset Optional Skill: Ten Shadows — Mahoraga summon
     resetMahoragaSummon(this);
@@ -366,19 +367,23 @@ export class SukunaFighter extends Fighter {
     if (!target || target.hp <= 0 || target.isDead) {
       return { finalDamage: baseDamage, isCrit: false };
     }
+    // Domain shrine slashes do not benefit from or contribute to crit mechanics
+    if (opts.isDomain || opts.isDomainSlash || opts.isSukunaDomainSliceLine) {
+      return { finalDamage: baseDamage, isCrit: false };
+    }
 
     // Increment landed slash hit count
     this.slashHitCount = (this.slashHitCount || 0) + 1;
 
     // Calculate dynamic Crit Rate & Crit DMG
-    const baseChance = CONFIG.sukuna?.baseCritChance || 0.10;
-    const chancePerHit = CONFIG.sukuna?.critChancePerSlashHit || 0.02;
-    const maxChance = CONFIG.sukuna?.maxCritChance || 0.80;
+    const baseChance = CONFIG.sukuna?.baseCritChance ?? 0.10;
+    const chancePerHit = CONFIG.sukuna?.critChancePerSlashHit ?? 0.02;
+    const maxChance = CONFIG.sukuna?.maxCritChance ?? 0.80;
     this.critChance = Math.min(maxChance, baseChance + this.slashHitCount * chancePerHit);
 
-    const baseMult = CONFIG.sukuna?.baseCritMultiplier || 1.50;
-    const multPerHit = CONFIG.sukuna?.critMultiplierPerSlashHit || 0.05;
-    const maxMult = CONFIG.sukuna?.maxCritMultiplier || 3.50;
+    const baseMult = CONFIG.sukuna?.baseCritMultiplier ?? 1.50;
+    const multPerHit = CONFIG.sukuna?.critMultiplierPerSlashHit ?? 0.05;
+    const maxMult = CONFIG.sukuna?.maxCritMultiplier ?? 3.50;
     this.critMultiplier = Math.min(maxMult, baseMult + this.slashHitCount * multPerHit);
 
     // Roll for critical hit
@@ -630,6 +635,9 @@ export class SukunaFighter extends Fighter {
         this.domainActive = false;
         this.domainCooldown = (typeof CONFIG !== 'undefined' && CONFIG.sukuna?.domainCooldown !== undefined) ? CONFIG.sukuna.domainCooldown : 1200;
         clearDomainSlashLines(this);
+        if (this.domainTimeInsideMap) {
+          this.domainTimeInsideMap.clear();
+        }
         this._hasFiredFugaInDomain = false;
         this._isFiringDomainFuga = false;
         this.furnaceChargingEffectTimer = 0;
@@ -1238,6 +1246,9 @@ export class SukunaFighter extends Fighter {
     this.isChannelingDomainExpansion = false;
     this.domainChargeTimer = 0;
     this.domainActive = true;
+    if (this.domainTimeInsideMap) {
+      this.domainTimeInsideMap.clear();
+    }
     this._hasFiredFugaInDomain = false;
     this._isFiringDomainFuga = false;
     this.domainActivationTime = Date.now();

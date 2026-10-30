@@ -241,7 +241,7 @@ export function updateCamera() {
     f &&
     (
       (!f.isDead && (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0))) ||
-      ((f.characterId === 'sukuna' || f.type === 'sukuna') && f.mahoragaMinion && f.mahoragaMinion.hp > 0 && !f.mahoragaMinion.isDead && !f.mahoragaMinion.dead)
+      ((f.characterId === 'sukuna' || f.type === 'sukuna' || f.characterId === 'sukunaBoss' || f.type === 'sukunaBoss') && f.mahoragaMinion && f.mahoragaMinion.hp > 0 && !f.mahoragaMinion.isDead && !f.mahoragaMinion.dead)
     ) &&
     !f.isIllusion &&
     !f.isTurret &&
@@ -257,22 +257,47 @@ export function updateCamera() {
   const aliveFighters = (state.fighters || []).filter(isPrimaryCombatant);
 
   // When Ash summons an active Pokémon companion, focus dynamic camera tracking on the active Pokémon and enemy
-  const getCombatCameraTarget = (f) => {
+  // When Sukuna summons minion Mahoraga, also focus dynamic camera tracking on the minion Mahoraga
+  const combatFighters = [];
+  for (const f of aliveFighters) {
     if (isPokemonTrainer(f)) {
       if (f.activePokemon && f.activePokemon.hp > 0 && !f.activePokemon.isDead && !f.activePokemon.dead) {
-        return f.activePokemon;
+        combatFighters.push(f.activePokemon);
+        continue;
       }
     }
-    if (f && (f.characterId === 'sukuna' || f.type === 'sukuna' || (f._def && (f._def.id === 'sukuna' || f._def.type === 'sukuna')))) {
-      if (f.mahoragaMinion && f.mahoragaMinion.hp > 0 && !f.mahoragaMinion.isDead && !f.mahoragaMinion.dead) {
-        if (f.hp <= 0 || f.isDead || f.dead) {
-          return f.mahoragaMinion;
+    const isSukuna = Boolean(
+      f && (
+        f.characterId === 'sukuna' ||
+        f.type === 'sukuna' ||
+        f.characterId === 'sukunaBoss' ||
+        f.type === 'sukunaBoss' ||
+        (f._def && (f._def.id === 'sukuna' || f._def.type === 'sukuna' || f._def.id === 'sukunaBoss' || f._def.type === 'sukunaBoss'))
+      )
+    );
+    if (isSukuna) {
+      const maho = f.mahoragaMinion;
+      const isMahoAlive = Boolean(maho && maho.hp > 0 && !maho.isDead && !maho.dead);
+      const isSukunaAlive = !f.isDead && !f.dead && (f.hp > 0 || (typeof f.getDisplayHp === 'function' && f.getDisplayHp() > 0));
+      if (isSukunaAlive) {
+        combatFighters.push(f);
+      }
+      if (isMahoAlive && !combatFighters.includes(maho)) {
+        combatFighters.push(maho);
+      }
+      continue;
+    }
+    combatFighters.push(f);
+  }
+  if (Array.isArray(state.illusions)) {
+    for (const ill of state.illusions) {
+      if (ill && ill.isMahoragaSummon && ill.hp > 0 && !ill.isDead && !ill.dead) {
+        if (!combatFighters.includes(ill)) {
+          combatFighters.push(ill);
         }
       }
     }
-    return f;
-  };
-  const combatFighters = aliveFighters.map(getCombatCameraTarget);
+  }
   const minZ = camera.minZoom ?? camCfg.minZoom ?? 0.65;
   const maxZ = camera.maxZoom ?? camCfg.maxZoom ?? 1.18;
 
@@ -579,8 +604,15 @@ export function updateCamera() {
         camera.targetZoom = holdZoom;
       } else {
         const isH = (typeof state !== 'undefined' && state.viewOrientation === 'horizontal');
-        const winX = Number.isFinite(winner.x) ? winner.x : arenaCenterX;
-        const winY = Number.isFinite(winner.y) ? (winner.y - (winner.z ? winner.z * 0.35 : 0)) : arenaCenterY;
+        let winX = Number.isFinite(winner.x) ? winner.x : arenaCenterX;
+        let winY = Number.isFinite(winner.y) ? (winner.y - (winner.z ? winner.z * 0.35 : 0)) : arenaCenterY;
+        if (winner && (winner.characterId === 'sukuna' || winner.type === 'sukuna' || winner.characterId === 'sukunaBoss' || winner.type === 'sukunaBoss') && winner.mahoragaMinion && (winner.hp <= 0 || winner.isDead || winner.dead)) {
+          const maho = winner.mahoragaMinion;
+          if (Number.isFinite(maho.x) && Number.isFinite(maho.y)) {
+            winX = maho.x;
+            winY = maho.y - (maho.z ? maho.z * 0.35 : 0);
+          }
+        }
 
         camera.targetX = Math.max(minCamX, Math.min(maxCamX, winX));
         camera.targetY = Math.max(minCamY, Math.min(maxCamY, winY));

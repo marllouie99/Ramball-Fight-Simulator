@@ -10252,6 +10252,7 @@ async function runInteractionTests() {
       trySummonMahoraga,
       updateMahoragaSummon,
       dispelMahoragaSummon,
+      resetMahoragaSummon,
       drawMahoragaSummon
     } = await import('../js/entities/fighters/sukuna/sukunaMahoragaSummon.js');
     const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
@@ -10407,15 +10408,23 @@ async function runInteractionTests() {
     updateMahoragaSummon(sukuna, 0, arena);
     assert(hpBeforeShout - prey.hp >= mahAttr.shoutDamage * statScale, `Inherited Divine Shout must deal at least Mahoraga shoutDamage (${mahAttr.shoutDamage}) - dealt ${hpBeforeShout - prey.hp}`);
 
-    // 9. Slaying the minion removes it, clears Sukuna's state, and starts the cooldown
+    // 9. Slaying the minion removes it, clears Sukuna's state, and marks skill consumed for this round
     minion.takeDamage(99999, prey, { isPlayer: true });
     updateIllusions();
     assert(state.illusions.filter((m) => m && m.isMahoragaSummon).length === 0, 'Slain Mahoraga must be removed from state.illusions');
     assert(sukuna.mahoragaSummonActive === false, 'Sukuna must clear mahoragaSummonActive when Mahoraga is slain');
     assert(sukuna.mahoragaMinion === null, 'Sukuna must drop the dead minion reference');
-    assert(sukuna.mahoragaSummonCooldown === sc.mahoragaSummonCooldown, `Slaying Mahoraga must start the config cooldown (${sc.mahoragaSummonCooldown}), got ${sukuna.mahoragaSummonCooldown}`);
+    assert(sukuna.hasSummonedMahoraga === true, 'Sukuna must record that Mahoraga was summoned');
+    assert(sukuna.mahoragaSummonCooldown === Infinity, 'Slaying Mahoraga must lock cooldown to Infinity (single-use per match/round)');
+
+    // Verify Sukuna cannot re-summon Mahoraga in the same round
+    sukuna.mahoragaSummonCooldown = 0;
+    assert(trySummonMahoraga(sukuna, 0, arena) === false, 'Sukuna cannot re-summon Mahoraga in the same match/round');
 
     // 10. No lifetime cap: Mahoraga persists until slain (or his summoner dies)
+    // Reset summon state to simulate a fresh round
+    resetMahoragaSummon(sukuna);
+    assert(sukuna.hasSummonedMahoraga === false, 'resetMahoragaSummon must reset hasSummonedMahoraga for a new round');
     prey.hp = 4000;
     prey.maxHp = 4000;
     prey.isDead = false;
@@ -10423,7 +10432,7 @@ async function runInteractionTests() {
     prey.x = 400;
     prey.y = 420;
     sukuna.mahoragaSummonCooldown = 0;
-    assert(trySummonMahoraga(sukuna, 0, arena) === true, 'Mahoraga must be re-summonable once the cooldown has elapsed');
+    assert(trySummonMahoraga(sukuna, 0, arena) === true, 'Mahoraga must be summonable in a new round');
     const persistent = sukuna.mahoragaMinion;
     for (let frame = 0; frame < 420; frame++) {
       // Keep the dummy alive so the round never flips to matchEnd while we test persistence
@@ -10474,6 +10483,7 @@ async function runInteractionTests() {
     CONFIG.sukuna.enableMahoragaSummon = originalToggle;
 
     // 13. Owner death does NOT dismiss the minion — Mahoraga continues fighting until one prevails
+    resetMahoragaSummon(sukuna);
     sukuna.mahoragaSummonCooldown = 0;
     trySummonMahoraga(sukuna, 0, arena);
     assert(state.illusions.some((m) => m && m.isMahoragaSummon), 'Precondition: Mahoraga must be alive before owner death check');
@@ -14346,6 +14356,9 @@ async function runInteractionTests() {
     sukuna.dead = false;
     sukuna.isDead = false;
     sukuna.hp = 100;
+    sukuna.hasSummonedMahoraga = false;
+    sukuna.mahoragaSummonCount = 0;
+    sukuna.mahoragaSummonCooldown = 0;
     trySummonMahoraga(sukuna, 0, testArena);
     sukuna.hp = 0;
     sukuna.dead = true;
@@ -14778,6 +14791,278 @@ async function runInteractionTests() {
       state.illusions = [];
     }
     console.log('      ✅ Gojo Red/Blue/Purple mixing orbs deferred to foreground pass, rendered above enemy bodies, inline fallback & stack balance verified.');
+  }
+
+  // ─── Test 115: Sukuna Malevolent Shrine Domain Slashes Do Not Benefit or Stack Crit Mechanics ───
+  {
+    console.log('🧪 Test 115: Sukuna Malevolent Shrine Domain Slashes Do Not Benefit or Stack Crit Mechanics...');
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const { Fighter } = await import('../js/entities/fighter.js');
+    const { spawnDomainSlashLines } = await import('../js/entities/fighters/sukuna/sukunaDomainVisuals.js');
+
+    const sukuna = new SukunaClass({ x: 200, y: 300, controls: {} });
+    const dummy = new Fighter({ x: 220, y: 300, radius: 25, hp: 500, maxHp: 500, color: '#FFFFFF' });
+    sukuna.team = 0;
+    dummy.team = 1;
+    state.fighters = [sukuna, dummy];
+    state.illusions = [];
+
+    const baseChance = CONFIG.sukuna?.baseCritChance ?? 0.10;
+    const baseMult = CONFIG.sukuna?.baseCritMultiplier ?? 1.50;
+
+    // 1. Initial crit values
+    assert(sukuna.slashHitCount === 0, `Initial slashHitCount must be 0 (got ${sukuna.slashHitCount})`);
+    assert(Math.abs(sukuna.critChance - baseChance) < 0.0001, `Initial critChance must equal baseCritChance (${baseChance})`);
+    assert(Math.abs(sukuna.critMultiplier - baseMult) < 0.0001, `Initial critMultiplier must equal baseCritMultiplier (${baseMult})`);
+
+    // 2. Direct evaluateSlashCrit with isDomain: true or isDomainSlash: true
+    const domainCritRes = sukuna.evaluateSlashCrit(dummy, 25, { isDomain: true });
+    assert(domainCritRes.finalDamage === 25, `Domain slash finalDamage must match base damage without crit multiplier (got ${domainCritRes.finalDamage})`);
+    assert(domainCritRes.isCrit === false, `Domain slash must never be critical (isCrit must be false)`);
+    assert(sukuna.slashHitCount === 0, `Domain slash must not increment slashHitCount (still ${sukuna.slashHitCount})`);
+    assert(Math.abs(sukuna.critChance - baseChance) < 0.0001, `critChance must remain unchanged after domain slash`);
+
+    const sliceLineCritRes = sukuna.evaluateSlashCrit(dummy, 30, { isSukunaDomainSliceLine: true });
+    assert(sliceLineCritRes.isCrit === false, `isSukunaDomainSliceLine must never crit`);
+    assert(sukuna.slashHitCount === 0, `isSukunaDomainSliceLine must not increment slashHitCount`);
+
+    // 3. Malevolent Shrine wave slashes (spawnDomainSlashLines)
+    sukuna.domainActive = true;
+    sukuna.domainTimeInsideMap = new Map();
+    const initialDummyHp = dummy.hp;
+    spawnDomainSlashLines(sukuna, 4);
+
+    const firstWaveDamage = initialDummyHp - dummy.hp;
+    assert(dummy.hp < initialDummyHp, `Dummy must take damage from domain slash lines (hp dropped from ${initialDummyHp} to ${dummy.hp})`);
+    assert(sukuna.slashHitCount === 0, `Domain shrine slashes must not increment slashHitCount (still ${sukuna.slashHitCount})`);
+    assert(Math.abs(sukuna.critChance - baseChance) < 0.0001, `critChance must remain strictly at base after domain shrine slashes`);
+    assert(Math.abs(sukuna.critMultiplier - baseMult) < 0.0001, `critMultiplier must remain strictly at base after domain shrine slashes`);
+
+    // Verify domain slash damage remains strictly flat & constant across waves (zero increasing damage)
+    const hpBeforeSecondWave = dummy.hp;
+    spawnDomainSlashLines(sukuna, 4);
+    const secondWaveDamage = hpBeforeSecondWave - dummy.hp;
+    assert(Math.abs(firstWaveDamage - secondWaveDamage) < 0.001, `Domain slash damage must remain strictly flat & constant without increasing (wave 1: ${firstWaveDamage}, wave 2: ${secondWaveDamage})`);
+
+    // 4. Normal combat slash (e.g. melee punch/cleave or ranged projectile) DOES increment crit mechanics
+    const meleeCritRes = sukuna.evaluateSlashCrit(dummy, 20, { isMelee: true });
+    assert(sukuna.slashHitCount === 1, `Normal combat strike must increment slashHitCount to 1 (got ${sukuna.slashHitCount})`);
+    const expectedChance = Math.min(CONFIG.sukuna?.maxCritChance ?? 0.80, baseChance + 1 * (CONFIG.sukuna?.critChancePerSlashHit ?? 0.02));
+    assert(Math.abs(sukuna.critChance - expectedChance) < 0.0001, `critChance must scale with combat hit (got ${sukuna.critChance})`);
+
+    // Cleanup
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Sukuna Malevolent Shrine domain slashes do not benefit from or contribute to crit mechanics verified.');
+  }
+
+  // ─── Test 116: Sukuna Mahoraga Summon Windup Dark Dim Effect & Wheel Arena Overlay Pop-Up ───
+  {
+    console.log('🧪 Test 116: Sukuna Mahoraga Summon Windup Dark Dim Effect & Wheel Arena Overlay Pop-Up...');
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const { getSukunaMahoragaSummoner, drawMahoragaAdaptationDimScreen, drawMahoragaWheelArenaOverlay } = await import('../js/graphics/renderers/domainDimOverlays.js');
+
+    const sukuna = new SukunaClass({ x: 250, y: 300, controls: {} });
+    state.fighters = [sukuna];
+    state.illusions = [];
+    state.arena = { x: 45, y: 240, width: 450, height: 450, shape: 'rect', wallWidth: 4 };
+
+    // 1. When not summoning, getSukunaMahoragaSummoner returns null
+    assert(getSukunaMahoragaSummoner() === null, 'getSukunaMahoragaSummoner must be null when Sukuna is not summoning');
+
+    // 2. Put Sukuna into Mahoraga summon windup phase
+    sukuna.isSummoningMahoraga = true;
+    sukuna.mahoragaSummonWindupTimer = 25;
+    sukuna.mahoragaSummonWindupMax = 50;
+
+    const detectedSummoner = getSukunaMahoragaSummoner();
+    assert(detectedSummoner === sukuna, 'getSukunaMahoragaSummoner must detect Sukuna during summon windup');
+
+    // 3. Render dark dim screen and wheel overlay during windup
+    mockCtx.resetStackDepth();
+    drawMahoragaAdaptationDimScreen();
+    assert(mockCtx.getStackDepth() === 0, 'drawMahoragaAdaptationDimScreen must maintain 0 Canvas 2D stack depth');
+
+    mockCtx.resetStackDepth();
+    drawMahoragaWheelArenaOverlay();
+    assert(mockCtx.getStackDepth() === 0, 'drawMahoragaWheelArenaOverlay must maintain 0 Canvas 2D stack depth');
+
+    // 4. Windup completion and graceful fade out
+    sukuna.isSummoningMahoraga = false;
+    sukuna.mahoragaSummonWindupTimer = 0;
+    delete sukuna._summonWheelStartRot;
+
+    // Fade out frames
+    for (let frame = 0; frame < 15; frame++) {
+      mockCtx.resetStackDepth();
+      drawMahoragaAdaptationDimScreen();
+      drawMahoragaWheelArenaOverlay();
+      assert(mockCtx.getStackDepth() === 0, `Fade out frame ${frame} must maintain 0 Canvas stack depth`);
+    }
+
+    // Cleanup
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Sukuna Mahoraga summon windup dark dim effect & wheel arena overlay pop-up verified.');
+  }
+
+  // ─── Test 117: Sukuna Ten Shadows: Mahoraga Summon Single-Use Per Match/Round Standard ───
+  {
+    console.log('🧪 Test 117: Sukuna Ten Shadows: Mahoraga Summon Single-Use Per Match/Round Standard...');
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const { trySummonMahoraga, dispelMahoragaSummon, resetMahoragaSummon, updateMahoragaSummon } = await import('../js/entities/fighters/sukuna/sukunaMahoragaSummon.js');
+    const { getSkillDataForFighter } = await import('../js/graphics/ui/hudSkillProviders.js');
+    const { Fighter } = await import('../js/entities/fighter.js');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+    state.arena = testArena;
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.illusions = [];
+
+    const sukuna = new SukunaClass({ x: 200, y: 300, controls: {} });
+    const prey = new Fighter({ id: 'dummy', name: 'DUMMY', type: 'dummy', hp: 500, maxHp: 500, x: 300, y: 300 });
+    state.fighters = [sukuna, prey];
+
+    // 1. Initial State: Mahoraga has not been summoned
+    assert(sukuna.hasSummonedMahoraga === false, 'Fresh Sukuna must have hasSummonedMahoraga === false');
+    assert(sukuna.mahoragaSummonCount === 0, 'Fresh Sukuna must have mahoragaSummonCount === 0');
+    sukuna.mahoragaSummonCooldown = 0;
+
+    let hud = getSkillDataForFighter(sukuna, () => []);
+    let mahoBar = hud.find(s => s && s.id === 'mahoraga');
+    assert(mahoBar, 'Sukuna HUD must have MAHORAGA bar');
+    assert(mahoBar.ready === true, 'MAHORAGA bar must be ready before summon when cooldown is 0');
+
+    // 2. First Summon: Successfully summons Mahoraga
+    const firstSummon = trySummonMahoraga(sukuna, 0, testArena);
+    assert(firstSummon === true, 'Sukuna must successfully summon Mahoraga on first use');
+    assert(sukuna.hasSummonedMahoraga === true, 'Sukuna must record hasSummonedMahoraga === true');
+    assert(sukuna.mahoragaSummonCount === 1, 'Sukuna must record mahoragaSummonCount === 1');
+    assert(sukuna.mahoragaMinion !== null, 'sukuna.mahoragaMinion must exist');
+    assert(sukuna.mahoragaSummonActive === true, 'sukuna.mahoragaSummonActive must be true');
+
+    // 3. Duplicate Summon Attempt While Active: Blocked
+    assert(trySummonMahoraga(sukuna, 0, testArena) === false, 'Cannot summon Mahoraga while minion is already active');
+
+    // 4. Mahoraga is Slain / Dispelled: Cooldown locked to Infinity and skill is permanently consumed
+    dispelMahoragaSummon(sukuna, { reason: 'slain' });
+    assert(sukuna.mahoragaMinion === null, 'Minion must be dispelled');
+    assert(sukuna.mahoragaSummonActive === false, 'Summon active must be false');
+    assert(sukuna.hasSummonedMahoraga === true, 'hasSummonedMahoraga must remain true after dispel');
+    assert(sukuna.mahoragaSummonCooldown === Infinity, 'Cooldown must be set to Infinity once consumed');
+
+    // 5. Subsequent Summon Attempts in Same Match: STRICTLY BLOCKED even with cooldown forced to 0
+    sukuna.mahoragaSummonCooldown = 0;
+    assert(trySummonMahoraga(sukuna, 0, testArena) === false, 'Sukuna cannot re-summon Mahoraga in the same match/round');
+
+    // Running updateMahoragaSummon must never initiate a second summon windup
+    for (let i = 0; i < 60; i++) {
+      updateMahoragaSummon(sukuna, 0, testArena);
+    }
+    assert(sukuna.isSummoningMahoraga === false, 'Sukuna must never start summon windup after single use is consumed');
+    assert(sukuna.mahoragaMinion === null, 'No minion may be spawned');
+
+    // 6. HUD Card Feedback: Consumed skill shows 0% fill and is NOT ready
+    hud = getSkillDataForFighter(sukuna, () => []);
+    mahoBar = hud.find(s => s && s.id === 'mahoraga');
+    assert(mahoBar, 'MAHORAGA bar still exists on HUD');
+    assert(mahoBar.pct === 0, `Consumed MAHORAGA bar must be 0% fill (got ${mahoBar.pct}%)`);
+    assert(mahoBar.ready === false, 'Consumed MAHORAGA bar must not be ready');
+    assert(mahoBar.active === false, 'Consumed MAHORAGA bar must not be active');
+
+    // 7. Round Reset / Match Reset: Restores the single summon for the new round
+    resetMahoragaSummon(sukuna);
+    assert(sukuna.hasSummonedMahoraga === false, 'resetMahoragaSummon must reset hasSummonedMahoraga for a new round');
+    assert(sukuna.mahoragaSummonCount === 0, 'resetMahoragaSummon must reset mahoragaSummonCount');
+    sukuna.mahoragaSummonCooldown = 0;
+    assert(trySummonMahoraga(sukuna, 0, testArena) === true, 'Sukuna can summon Mahoraga once in the new round');
+
+    // Cleanup
+    dispelMahoragaSummon(sukuna, { silent: true, instantCooldown: true });
+    state.fighters = [];
+    state.illusions = [];
+    console.log('      ✅ Sukuna Ten Shadows: Mahoraga single-use per match/round and HUD consumption verified.');
+  }
+
+  // ─── Test 118: Dynamic Camera Tracking Focus on Sukuna Minion Mahoraga & Opponent ───
+  {
+    console.log('🧪 Test 118: Dynamic Camera Tracking Focus on Sukuna Minion Mahoraga & Opponent...');
+    const { updateCamera } = await import('../js/systems/cameraSystem.js');
+    const { trySummonMahoraga, dispelMahoragaSummon } = await import('../js/entities/fighters/sukuna/sukunaMahoragaSummon.js');
+
+    const SukunaClass = FIGHTER_CLASS_MAP['sukuna'];
+    const GojoClass = FIGHTER_CLASS_MAP['gojo'];
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450, wallWidth: 4 };
+    state.arena = testArena;
+    state.gameState = 'playing';
+    state.mode = '1v1';
+    state.illusions = [];
+
+    const sukuna = new SukunaClass({ x: 100, y: 300, controls: {} });
+    sukuna.x = 100;
+    sukuna.y = 300;
+
+    const gojo = new GojoClass({ x: 500, y: 300, controls: {} });
+    gojo.x = 500;
+    gojo.y = 300;
+
+    state.fighters = [sukuna, gojo];
+    state.camera = state.camera || {};
+    state.camera.enabled = true;
+    state.camera.mode = 'dynamic';
+
+    // 1. Before Summon: Camera must center between Sukuna (100) and Gojo (500) -> targetX = 300
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 300) < 5, `Expected camera.targetX ~300 for Sukuna & Gojo, got ${state.camera.targetX}`);
+
+    // 2. Sukuna summons Mahoraga and Mahoraga positions at x: 650, y: 300
+    sukuna.mahoragaSummonCooldown = 0;
+    const summoned = trySummonMahoraga(sukuna, 0, testArena);
+    assert(summoned === true, 'Sukuna must summon Mahoraga successfully');
+    const minion = sukuna.mahoragaMinion;
+    assert(minion, 'Mahoraga minion must exist');
+    minion.x = 650;
+    minion.y = 300;
+
+    // Camera envelope now spans [100 (Sukuna), 650 (Mahoraga)], including Gojo (500) -> midpoint = (100 + 650) / 2 = 375
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 375) < 10, `Expected camera.targetX ~375 focusing on Sukuna, Gojo, and minion Mahoraga, got ${state.camera.targetX}`);
+
+    // 3. Sukuna dies while Mahoraga is alive: Camera tracks Minion Mahoraga and Gojo
+    sukuna.hp = 0;
+    sukuna.dead = true;
+    sukuna.isDead = true;
+    minion.x = 200;
+    minion.y = 300;
+    gojo.x = 400;
+    gojo.y = 300;
+
+    // Envelope spans [200 (Mahoraga), 400 (Gojo)] -> midpoint = 300
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 300) < 5, `Expected camera.targetX ~300 focusing on alive Mahoraga and Gojo after Sukuna death, got ${state.camera.targetX}`);
+
+    // 4. Gojo defeated: Only Mahoraga survives -> Winner camera focus locks onto Mahoraga
+    gojo.hp = 0;
+    gojo.dead = true;
+    gojo.isDead = true;
+    state.gameState = 'matchEnd';
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 200) < 5, `Expected winner camera.targetX ~200 focusing on victorious Mahoraga, got ${state.camera.targetX}`);
+
+    // 5. Fixed Camera Mode: Locks strictly to arena center (270)
+    state.camera.mode = 'fixed';
+    updateCamera();
+    assert(Math.abs(state.camera.targetX - 270) < 1, `Expected camera.targetX locked to arena center 270 in fixed mode, got ${state.camera.targetX}`);
+
+    // Cleanup
+    dispelMahoragaSummon(sukuna, { silent: true, instantCooldown: true });
+    state.camera.mode = 'dynamic';
+    state.fighters = [];
+    state.illusions = [];
+    state.gameState = 'playing';
+    console.log('      ✅ Dynamic camera tracking focus on Sukuna minion Mahoraga & opponent verified successfully.');
   }
 
   console.log('🎉 ALL MULTI-FIGHTER INTERACTION TESTS PASSED SUCCESSFULLY!\n');

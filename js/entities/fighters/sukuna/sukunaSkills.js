@@ -211,13 +211,9 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
 
     const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
     const baseDamage = CONFIG.sukuna?.slashDamage ?? fighter.damage;
-    let slashDamage = baseDamage;
-    let isCrit = false;
-    if (typeof fighter.evaluateSlashCrit === 'function') {
-      const res = fighter.evaluateSlashCrit(target, baseDamage, { isMelee: false, isDomain: true });
-      slashDamage = res.finalDamage;
-      isCrit = res.isCrit;
-    }
+    // Domain shrine slashes do not benefit from or contribute to Sukuna's crit mechanics
+    const slashDamage = baseDamage;
+    const isCrit = false;
 
     const actualOwnerIndex = (typeof ownerIndex === 'number') ? ownerIndex : (state.fighters ? state.fighters.indexOf(fighter) : 0);
 
@@ -234,7 +230,7 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
         isDomain: true,
         isDomainSlash: true,
         noHitSound: true,
-        isCrit
+        isCrit: false
       });
     }
     const damageLanded = (dmgResult && (dmgResult === true || dmgResult > 0)) || (preHp !== null && target.hp < preHp);
