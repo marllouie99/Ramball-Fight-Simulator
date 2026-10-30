@@ -26,6 +26,27 @@ import {
   drawPokemonCompanion, getCharizardMouthLocalOffset, updateCharizardFlameChain
 } from '../../graphics/weapons/ashPokemonGraphics.js';
 import { spawnImpactFlash, spawnSparks } from '../../graphics/particles/sparkEffect.js';
+import {
+  initPokemonTrainerState,
+  resetPokemonTrainerState,
+  pickRandomPokemonSpecies,
+  getOtherPokemonTrainers,
+  isTrainerVantagePointOccupied,
+  hasTrainerVantagePointConflict,
+  pickTrainerVantagePoint,
+  isTrainerMovingToVantagePoint,
+  updateTrainerCornerMovement,
+  checkTrainerIncomingThreats,
+  startTrainerPokeballThrow,
+  updateTrainerThrowPhysics,
+  isActivePokemonTarget,
+  getValidTrainerEnemyTargets,
+  findBestPokemonTarget,
+  isPokemonStationarySkill,
+  updatePokemonCompanionMovement,
+  updatePokemonCompanionAnimState,
+  applyPokemonDamageHitEffects
+} from '../../systems/pokemonTrainerSystem.js';
 
 function _getAshCfg() {
   return (typeof CONFIG !== 'undefined' && CONFIG.ash) ? CONFIG.ash : ashConfig;
@@ -184,18 +205,22 @@ export class PokemonCompanionEntity extends Fighter {
     this.z = 0;
     this.shockwaveEmerbs = [];
 
-    const launchTarget = owner?._findBestTarget ? owner._findBestTarget() : null;
+    const launchTarget = owner?._findBestTarget ? owner._findBestTarget(null, { x: spawnX, y: spawnY }) : null;
     const launchAngle = (launchTarget && launchTarget.hp > 0)
       ? Math.atan2(launchTarget.y - spawnY, launchTarget.x - spawnX)
       : (owner.gunAngle || 0);
     this.vx = Math.cos(launchAngle) * this.speed;
     this.vy = Math.sin(launchAngle) * this.speed;
+    this.launchAngle = launchAngle;
     this.gunAngle = launchAngle;
     this.angle = launchAngle;
 
     this.animState = 'idle';
     this.animTick = 0;
     this.actionAnimTimer = 0;
+    this.summonIntroMaxTimer = _getAshCfg().pokemonSummonIntroFrames ?? 28;
+    this.summonIntroTimer = 0;
+    this.isSummonIntro = false;
     const meleeInitialCd = spec.skills?.melee?.initialCooldown ?? spec.skills?.melee?.initialCooldownFrames ?? spec.initialMeleeCooldown ?? 20;
     this.meleeCooldown = meleeInitialCd;
     this.meleeCooldownMax = spec.skills?.melee?.cooldown ?? spec.meleeCooldown ?? 34;
@@ -230,6 +255,43 @@ export class PokemonCompanionEntity extends Fighter {
 
   shoot() {
     // Intentionally empty (Rule 23): Pokémon uses dedicated melee blitz & elemental specials
+  }
+
+  /**
+   * Acquires the highest-priority enemy target for this Pokémon:
+   * Always focuses on active enemy Pokémon first when a Pokémon battle is underway,
+   * falling back to the nearest enemy fighter only when no enemy Pokémon are active.
+   */
+  _acquireTarget(opponent = null) {
+    if (this.owner && typeof this.owner._findBestTarget === 'function') {
+      const best = this.owner._findBestTarget(opponent, this);
+      if (best) return best;
+    }
+    if (opponent && opponent.activePokemon && isActivePokemonTarget(opponent.activePokemon)) {
+      return opponent.activePokemon;
+    }
+    return opponent;
+  }
+
+  /**
+   * Starts the Pokémon summon entrance animation & visual effect sequence before moving.
+   */
+  startSummonIntro(durationFrames) {
+    const dur = Math.max(1, durationFrames ?? (_getAshCfg().pokemonSummonIntroFrames ?? 28));
+    this.summonIntroMaxTimer = dur;
+    this.summonIntroTimer = dur;
+    this.isSummonIntro = true;
+    this.vx = 0;
+    this.vy = 0;
+    if (this.speciesId === 'pikachu') {
+      this.animState = 'pose';
+    } else if (this.speciesId === 'charizard') {
+      this.animState = 'special';
+    } else if (this.speciesId === 'greninja' || this.speciesId === 'lucario') {
+      this.animState = 'rearUp';
+    } else {
+      this.animState = 'idle';
+    }
   }
 
   /**
@@ -616,7 +678,7 @@ export class PokemonCompanionEntity extends Fighter {
       : opts;
     const landed = super.takeDamage(amount, attacker, effectiveOpts);
     if (landed) {
-      this.hitFlashTimer = 0; // PMD sprite sheets handle their own Hurt-Anim / Faint-Anim without circular 2D flash artifacts
+      applyPokemonDamageHitEffects(this, attacker, effectiveOpts);
       if (this.hp <= 0) {
         this.startFaint();
       } else if (!isCasting) {
@@ -723,8 +785,56 @@ export class PokemonCompanionEntity extends Fighter {
       return;
     }
 
+    // ── Pokémon Summon Entrance Animation & VFX Phase (Stationary Pose Before Moving) ──
+    if (this.summonIntroTimer > 0) {
+      // Allow synthetic Frame-1 test overrides (where specialCooldown or meleeCooldown is forced to 0) to bypass intro
+      if (this.specialCooldown <= 0 || this.meleeCooldown <= 0) {
+        this.summonIntroTimer = 0;
+        this.isSummonIntro = false;
+      } else {
+        this.handleStatusEffects();
+        this.summonIntroTimer--;
+        this.isSummonIntro = this.summonIntroTimer > 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+        this.z = 0;
+
+        const introTarget = this._acquireTarget(opponent);
+        if (introTarget && introTarget.hp > 0) {
+          const introAngle = Math.atan2(introTarget.y - this.y, introTarget.x - this.x);
+          this.gunAngle = introAngle;
+          this.angle = introAngle;
+        }
+
+        if (this.summonIntroTimer > 0) {
+          if (this.speciesId === 'pikachu') {
+            this.animState = 'pose';
+          } else if (this.speciesId === 'charizard') {
+            this.animState = 'special';
+          } else if (this.speciesId === 'greninja' || this.speciesId === 'lucario') {
+            this.animState = 'rearUp';
+          } else {
+            this.animState = 'idle';
+          }
+          return;
+        }
+
+        // Summon entrance finished: transition to combat pursuit & launch movement
+        this.isSummonIntro = false;
+        this.animState = 'idle';
+        const moveAngle = this.gunAngle || this.launchAngle || 0;
+        this.vx = Math.cos(moveAngle) * this.speed;
+        this.vy = Math.sin(moveAngle) * this.speed;
+        return;
+      }
+    }
+
     this.handleStatusEffects();
-    if (this.meleeCooldown > 0) this.meleeCooldown--;
+    if (!this.meleeMoveState && !this.thunderboltState && !this.flamethrowerState && this.meleeCooldown > 0) {
+      this.meleeCooldown--;
+    }
     if (!this.thunderboltState && !this.flamethrowerState && this.specialCooldown > 0) {
       this.specialCooldown--;
       if (this.specialCooldown <= 0) {
@@ -740,6 +850,9 @@ export class PokemonCompanionEntity extends Fighter {
     if (this.hurtAnimTimer > 0) {
       this.hurtAnimTimer--;
       this.hurtTick = (this.hurtTick || 0) + 1;
+    }
+    if (this.hitFlashTimer > 0) {
+      this.hitFlashTimer--;
     }
     if (typeof this.thunderboltImpactTimer === 'number') {
       this.thunderboltImpactTimer++;
@@ -810,9 +923,11 @@ export class PokemonCompanionEntity extends Fighter {
         const beamRange = Math.min(maxSkillRange, Math.max(10, wallDist));
         const beamW = specSkill?.beamWidth || 42;
 
-        // Find closest enemy along the beam path
+        // Find closest enemy along the beam path (prioritizing active enemy Pokémon in Pokémon battles)
         let closestHitEnemy = null;
         let closestHitDist = beamRange;
+        let closestHitPokemon = null;
+        let closestHitPokemonDist = beamRange;
         const validEnemies = this.owner ? this.owner._getValidEnemyTargets(this.thunderboltTarget) : [];
 
         for (const enemy of validEnemies) {
@@ -826,12 +941,21 @@ export class PokemonCompanionEntity extends Fighter {
             const perpDist = Math.abs(-edx * sinA + edy * cosA);
             if (perpDist <= (beamW / 2) + enemyR) {
               const hitContactDist = Math.max(0, projDist);
-              if (hitContactDist < closestHitDist) {
+              if (isActivePokemonTarget(enemy)) {
+                if (hitContactDist < closestHitPokemonDist) {
+                  closestHitPokemonDist = hitContactDist;
+                  closestHitPokemon = enemy;
+                }
+              } else if (hitContactDist < closestHitDist) {
                 closestHitDist = hitContactDist;
                 closestHitEnemy = enemy;
               }
             }
           }
+        }
+        if (closestHitPokemon) {
+          closestHitEnemy = closestHitPokemon;
+          closestHitDist = closestHitPokemonDist;
         }
         // Cache beam length for rendering so visual lightning terminates exactly at the hit enemy
         // or strictly at the arena wall boundary (zero clipping outside arena)
@@ -957,10 +1081,19 @@ export class PokemonCompanionEntity extends Fighter {
         this.flamethrowerTimer--;
         this.animState = 'special';
 
-        // Dynamic 360° aim tracking while firing Flamethrower
-        const activeTarget = (this.flamethrowerTarget && this.flamethrowerTarget.hp > 0 && !this.flamethrowerTarget.isDead)
-          ? this.flamethrowerTarget
-          : (this.owner?._findBestTarget(opponent) || opponent);
+        // Dynamic 360° aim tracking while firing Flamethrower (prioritizing active enemy Pokémon)
+        const priorityTarget = this._acquireTarget(opponent);
+        const activeTarget = (
+          priorityTarget &&
+          isActivePokemonTarget(priorityTarget) &&
+          !isActivePokemonTarget(this.flamethrowerTarget)
+        )
+          ? priorityTarget
+          : (
+            (this.flamethrowerTarget && this.flamethrowerTarget.hp > 0 && !this.flamethrowerTarget.isDead && !this.flamethrowerTarget.isFainting)
+              ? this.flamethrowerTarget
+              : priorityTarget
+          );
 
         if (activeTarget && activeTarget.hp > 0 && !activeTarget.isDead && (this.timeStopTimer || 0) <= 0 && !this.isTargetOfAmbush) {
           this.channelTurnRate = specSkill?.streamTurnRate ?? specSkill?.turnRate ?? 0.085;
@@ -981,20 +1114,21 @@ export class PokemonCompanionEntity extends Fighter {
           triggerGlobalScreenShake(specSkill?.screenShake || 4.5, 3);
         }
 
-        // Calculate flame stream length: stops at first enemy hit or arena walls (zero clipping outside arena)
-        const maxSkillRange = specSkill?.streamRange || 680;
-        const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+        // Fixed-size Flamethrower stream: constant length & width (never resizes based on enemy or wall distance)
+        const fixedStreamLen = specSkill?.fixedStreamLength || 260;
         const cosA = Math.cos(this.flamethrowerCastAngle);
         const sinA = Math.sin(this.flamethrowerCastAngle);
-        const mouthOffset = (updateCharizardFlameChain(this, this.flamethrowerCastAngle), getCharizardMouthLocalOffset(this, this.flamethrowerCastAngle)); const startX = this.x + mouthOffset.originX;
+        const mouthOffset = (updateCharizardFlameChain(this, this.flamethrowerCastAngle), getCharizardMouthLocalOffset(this, this.flamethrowerCastAngle));
+        const startX = this.x + mouthOffset.originX;
         const startY = this.y - (this.z || 0) + mouthOffset.originY;
-        const wallDist = curArena ? _getRayArenaIntersection(startX, startY, this.flamethrowerCastAngle, curArena, 8) : maxSkillRange;
-        const streamRange = Math.min(maxSkillRange, Math.max(10, wallDist));
+        const streamRange = fixedStreamLen;
         const streamW = specSkill?.streamWidth || 48;
 
-        // Find closest enemy along the flame path
+        // Find closest enemy along the fixed-length flame path (prioritizing active enemy Pokémon in Pokémon battles)
         let closestHitEnemy = null;
         let closestHitDist = streamRange;
+        let closestHitPokemon = null;
+        let closestHitPokemonDist = streamRange;
         const validEnemies = this.owner ? this.owner._getValidEnemyTargets(this.flamethrowerTarget) : [];
 
         for (const enemy of validEnemies) {
@@ -1007,22 +1141,44 @@ export class PokemonCompanionEntity extends Fighter {
             const perpDist = Math.abs(-edx * sinA + edy * cosA);
             if (perpDist <= (streamW / 2) + enemyR) {
               const hitContactDist = Math.max(0, projDist);
-              if (hitContactDist < closestHitDist) {
+              if (isActivePokemonTarget(enemy)) {
+                if (hitContactDist < closestHitPokemonDist) {
+                  closestHitPokemonDist = hitContactDist;
+                  closestHitPokemon = enemy;
+                }
+              } else if (hitContactDist < closestHitDist) {
                 closestHitDist = hitContactDist;
                 closestHitEnemy = enemy;
               }
             }
           }
         }
-
-        this.flamethrowerCurrentBeamLen = closestHitEnemy ? closestHitDist : streamRange;
-        this.flamethrowerClosestEnemy = closestHitEnemy;
-
-        if (closestHitEnemy && this.flamethrowerImpactTimer === undefined) {
-          this.flamethrowerImpactTimer = 0;
+        if (closestHitPokemon) {
+          closestHitEnemy = closestHitPokemon;
+          closestHitDist = closestHitPokemonDist;
         }
 
-        // Multi-tick continuous flame damage & burning on the hit target
+        this.flamethrowerCurrentBeamLen = fixedStreamLen;
+        this.flamethrowerClosestEnemy = closestHitEnemy;
+
+        const slowFrames = specSkill?.slowDurationFrames || 90;
+        const slowMult = specSkill?.slowMultiplier ?? 0.45;
+
+        if (closestHitEnemy) {
+          if (this.flamethrowerImpactTimer === undefined) {
+            this.flamethrowerImpactTimer = 0;
+          }
+          // Continuously apply slow debuff to enemy caught in Charizard's Flamethrower
+          if (closestHitEnemy.statusEffects && typeof closestHitEnemy.statusEffects.applySlow === 'function') {
+            closestHitEnemy.statusEffects.applySlow(slowFrames, slowMult);
+          } else if (typeof closestHitEnemy.applySlow === 'function') {
+            closestHitEnemy.applySlow(slowFrames, slowMult);
+          }
+          closestHitEnemy.slowTimer = Math.max(closestHitEnemy.slowTimer || 0, slowFrames);
+          closestHitEnemy.slowMultiplier = slowMult;
+        }
+
+        // Multi-tick continuous flame damage, burning & slow debuff on the hit target
         const tickRate = specSkill?.streamTickRate || 6;
         if (this.flamethrowerTimer % tickRate === 0 && this.owner && closestHitEnemy) {
           const bonusMult = (this.flamethrowerCmdMult || 1.0);
@@ -1034,6 +1190,8 @@ export class PokemonCompanionEntity extends Fighter {
           this.owner._dealPokemonDamage(closestHitEnemy, dmg, {
             angle: this.flamethrowerCastAngle,
             knockback: specSkill?.streamKnockbackPerTick || 1.2,
+            slowFrames,
+            slowMultiplier: slowMult,
             isSpecial: true
           });
 
@@ -1095,22 +1253,14 @@ export class PokemonCompanionEntity extends Fighter {
     }
 
     // ── Dedicated Close Combat Multi-Phase Combo Lifecycles (Rule 30) ──
+    // Pokémon continues moving and rebouncing off walls & entity collisions like a standard Fighter while executing melee attacks
     if (this.meleeMoveState) {
-      const target = this.owner?._findBestTarget(opponent) || opponent;
+      const target = this._acquireTarget(opponent);
       this._updateMeleeMove(target, arena);
-      if (this.meleeMoveState) {
-        if (this.meleeMoveState === 'lock') {
-          this.vx = 0;
-          this.vy = 0;
-        }
-        this.applyMovementPhysics(1.0);
-        this.resolveWallBounce(arena, target);
-        return;
-      }
     }
 
-    // Acquire nearest valid enemy target
-    const target = this.owner?._findBestTarget(opponent) || opponent;
+    // Acquire priority enemy target (focusing active enemy Pokémon first in Pokémon battles)
+    const target = this._acquireTarget(opponent);
     if (target && target.hp > 0) {
       const dx = target.x - this.x;
       const dy = target.y - this.y;
@@ -1120,7 +1270,6 @@ export class PokemonCompanionEntity extends Fighter {
       this.angle = targetAngle;
 
       const reach = (this.spec.meleeReach || 68) + (target.r || 25);
-      const closeCombatRushReach = reach * 2.2; // ~200px rush engagement zone
 
       // 1. Signature Special Skill Priority: When the skill is ready, ALWAYS unleash the signature special move!
       if (this.specialCooldown <= 0 && !this.thunderboltState && !this.flamethrowerState && !this.meleeMoveState) {
@@ -1138,46 +1287,15 @@ export class PokemonCompanionEntity extends Fighter {
           }
         }
       }
-      // 2. Point-Blank / Close Range (Special on cooldown) -> Melee Combo Priority!
-      else if (dist <= reach + 20 && this.meleeCooldown <= 0) {
+      // 2. Close Range (Special on cooldown) -> Melee Combo Strike while preserving natural bounce physics!
+      else if (dist <= reach + 20 && this.meleeCooldown <= 0 && !this.meleeMoveState) {
         this._startCloseCombatMove(target);
-      }
-      // 3. Medium-Range Combat Zone (Special on cooldown, reach + 20 < dist <= closeCombatRushReach)
-      else if (dist <= closeCombatRushReach) {
-        if (this.meleeCooldown <= 0) {
-          this._startCloseCombatMove(target);
-        } else {
-          // Actively advance towards target to enter close combat
-          const approachAngle = targetAngle + (Math.sin(this.animTick * 0.1) * 0.25);
-          this.vx = Math.cos(approachAngle) * this.speed;
-          this.vy = Math.sin(approachAngle) * this.speed;
-        }
-      }
-      // 4. Long-Range Engagement (Special on cooldown, dist > closeCombatRushReach)
-      else {
-        // Special on cooldown: actively hunt and close in on target
-        const huntAngle = targetAngle + (Math.sin(this.animTick * 0.08) * 0.30);
-        this.vx = Math.cos(huntAngle) * this.speed;
-        this.vy = Math.sin(huntAngle) * this.speed;
       }
     }
 
-    // Natural bounce momentum: if velocity ever stalls or drops to zero, recover natural speed immediately
-    if (Math.hypot(this.vx, this.vy) < 0.2 && !this.thunderboltState && !this.flamethrowerState && !this.meleeMoveState) {
-      const resumeAngle = this.gunAngle || (Math.random() * Math.PI * 2);
-      this.vx = Math.cos(resumeAngle) * this.speed;
-      this.vy = Math.sin(resumeAngle) * this.speed;
-    }
-    if (this.hurtAnimTimer > 0 && !this.thunderboltState && !this.flamethrowerState) {
-      this.animState = 'hurt';
-    } else if (this.actionAnimTimer > 0 || this.meleeMoveState) {
-      // Keep active 'attack' or 'special' state
-      this.animState = 'attack';
-    } else if (Math.hypot(this.vx, this.vy) > 0.6) {
-      this.animState = 'walk';
-    } else {
-      this.animState = 'idle';
-    }
+    // Centralized Pokémon companion movement physics & animation state (pokemonTrainerSystem.js)
+    updatePokemonCompanionMovement(this, target, arena);
+    updatePokemonCompanionAnimState(this);
 
     super.update(target, ownerIndex, arena);
   }
@@ -1272,16 +1390,11 @@ export class PokemonCompanionEntity extends Fighter {
       if (tick <= 4) {
         this.meleeMoveState = 'windup';
         this.z = 0;
-        this.vx = 0;
-        this.vy = 0;
       } else if (tick <= 12) {
         // The Hop: Low-altitude springy bound forward into rhythm
         this.meleeMoveState = 'windup';
         const hopProgress = (tick - 4) / 8; // 0.0 to 1.0
         this.z = Math.sin(hopProgress * Math.PI) * 11; // 0 -> 11px -> 0
-        const hopSpeed = this.speed * 1.4;
-        this.vx = Math.cos(angle) * hopSpeed;
-        this.vy = Math.sin(angle) * hopSpeed;
         if (tick === 12) {
           this.z = 0;
           _playAshSound('quickAttack');
@@ -1292,10 +1405,6 @@ export class PokemonCompanionEntity extends Fighter {
         this.meleeMoveState = 'strike';
         const leapProgress = (tick - 12) / 12; // 0.0 to 1.0
         this.z = Math.sin(leapProgress * Math.PI) * 19; // 0 -> 19px -> 0 (soaring forward leap)
-
-        const leapSpeed = this.speed * 2.6;
-        this.vx = Math.cos(angle) * leapSpeed;
-        this.vy = Math.sin(angle) * leapSpeed;
 
         const dist = tgt ? Math.hypot(tgt.x - this.x, tgt.y - this.y) : 999;
         const hitReach = (this.r || 22) + (tgt?.r || 25) + 16;
@@ -1316,15 +1425,11 @@ export class PokemonCompanionEntity extends Fighter {
       else if (tick <= 32) {
         this.meleeMoveState = 'lock';
         this.z = 0;
-        this.vx = 0;
-        this.vy = 0;
       }
       // ── Stage 4: Recovery Settle (ticks 33–38) ──
       else if (tick <= 38) {
         this.meleeMoveState = 'recovery';
         this.z = 0;
-        this.vx *= 0.8;
-        this.vy *= 0.8;
       } else {
         this.meleeMoveState = null;
         this.meleeMoveKey = null;
@@ -1339,8 +1444,6 @@ export class PokemonCompanionEntity extends Fighter {
         this.meleeMoveState = 'windup';
         const p = tick / 14;
         this.z = Math.sin(p * Math.PI) * 22;
-        this.vx = Math.cos(angle) * (this.speed * 0.7);
-        this.vy = Math.sin(angle) * (this.speed * 0.7);
         if (tick === 14) {
           _playAshSound('ironTailCast');
         }
@@ -1349,16 +1452,12 @@ export class PokemonCompanionEntity extends Fighter {
       else if (tick <= 17) {
         this.meleeMoveState = 'windup';
         this.z = 22;
-        this.vx = 0;
-        this.vy = 0;
       }
       // Phase 3: Heavy Tail Cleave Strike (ticks 18–25)
       else if (tick <= 25) {
         this.meleeMoveState = 'strike';
         const strikeP = (tick - 17) / 8;
         this.z = Math.max(0, 22 * (1 - strikeP));
-        this.vx = Math.cos(angle) * (this.speed * 1.5);
-        this.vy = Math.sin(angle) * (this.speed * 1.5);
 
         if (tick === 20 && !this.meleeHitDone.has('ironTail') && tgt && tgt.hp > 0) {
           this.meleeHitDone.add('ironTail');
@@ -1378,44 +1477,34 @@ export class PokemonCompanionEntity extends Fighter {
       else if (tick <= 36) {
         this.meleeMoveState = 'lock';
         this.z = 0;
-        this.vx = 0;
-        this.vy = 0;
       }
       // Phase 5: Recovery Settle (ticks 37–48)
       else if (tick <= 48) {
         this.meleeMoveState = 'recovery';
         this.z = 0;
-        this.vx *= 0.8;
-        this.vy *= 0.8;
       } else {
         this.meleeMoveState = null;
         this.meleeMoveKey = null;
         this.z = 0;
         this.actionAnimTimer = 0;
-      }    } else if (key === 'dragonClaw') {
+      }
+    } else if (key === 'dragonClaw') {
       this.meleeMoveMaxTicks = 52;
       this.z = 0; // Charizard remains firmly grounded throughout Dragon Claw combo (zero airborne hopping)
       // Phase 1: Coil & Lunge (ticks 1–13)
       if (tick <= 13) {
         this.meleeMoveState = 'windup';
         this.z = 0;
-        this.vx = Math.cos(angle) * (this.speed * 1.25);
-        this.vy = Math.sin(angle) * (this.speed * 1.25);
       }
-
       // Phase 2: Poised Hold (ticks 14–16)
       else if (tick <= 16) {
         this.meleeMoveState = 'windup';
         this.z = 0;
-        this.vx = 0;
-        this.vy = 0;
       }
       // Phase 3: Double Rending Claw Cleave (ticks 17–28)
       else if (tick <= 28) {
         this.meleeMoveState = 'strike';
         this.z = 0;
-        this.vx = Math.cos(angle) * (this.speed * 0.9);
-        this.vy = Math.sin(angle) * (this.speed * 0.9);
 
         // Sub-hit 1: Right Claw (tick 19)
         if (tick === 19 && !this.meleeHitDone.has('dragonClaw1') && tgt && tgt.hp > 0) {
@@ -1450,15 +1539,11 @@ export class PokemonCompanionEntity extends Fighter {
       else if (tick <= 40) {
         this.meleeMoveState = 'lock';
         this.z = 0;
-        this.vx = 0;
-        this.vy = 0;
       }
       // Phase 5: Recovery Settle (ticks 41–52)
       else if (tick <= 52) {
         this.meleeMoveState = 'recovery';
         this.z = 0;
-        this.vx *= 0.8;
-        this.vy *= 0.8;
       } else {
         this.meleeMoveState = null;
         this.meleeMoveKey = null;
@@ -1471,8 +1556,6 @@ export class PokemonCompanionEntity extends Fighter {
       // Phase 1: Shadow Step Dash (ticks 1–8)
       if (tick <= 8) {
         this.meleeMoveState = 'windup';
-        this.vx = Math.cos(angle) * (this.speed * 2.2);
-        this.vy = Math.sin(angle) * (this.speed * 2.2);
         if (tick === 8) {
           _playAshSound('nightSlashCast');
         }
@@ -1480,14 +1563,10 @@ export class PokemonCompanionEntity extends Fighter {
       // Phase 2: Poised Hold (ticks 9–11)
       else if (tick <= 11) {
         this.meleeMoveState = 'windup';
-        this.vx = 0;
-        this.vy = 0;
       }
       // Phase 3: Dual Dark-Blade Cross-Cleave (ticks 12–20)
       else if (tick <= 20) {
         this.meleeMoveState = 'strike';
-        this.vx = Math.cos(angle) * (this.speed * 1.1);
-        this.vy = Math.sin(angle) * (this.speed * 1.1);
 
         if (tick === 16 && !this.meleeHitDone.has('nightSlash') && tgt && tgt.hp > 0) {
           this.meleeHitDone.add('nightSlash');
@@ -1506,14 +1585,10 @@ export class PokemonCompanionEntity extends Fighter {
       // Phase 4: Impact Lock (ticks 21–30)
       else if (tick <= 30) {
         this.meleeMoveState = 'lock';
-        this.vx = 0;
-        this.vy = 0;
       }
       // Phase 5: Recovery Settle (ticks 31–42)
       else if (tick <= 42) {
         this.meleeMoveState = 'recovery';
-        this.vx *= 0.8;
-        this.vy *= 0.8;
       } else {
         this.meleeMoveState = null;
         this.meleeMoveKey = null;
@@ -1526,14 +1601,10 @@ export class PokemonCompanionEntity extends Fighter {
       // Phase 1: Combat Rush (ticks 1–6)
       if (tick <= 6) {
         this.meleeMoveState = 'windup';
-        this.vx = Math.cos(angle) * (this.speed * 1.8);
-        this.vy = Math.sin(angle) * (this.speed * 1.8);
       }
       // Phase 3: Flurry Barrage (ticks 7–30)
       else if (tick <= 30) {
         this.meleeMoveState = 'strike';
-        this.vx = Math.cos(angle) * (this.speed * 0.4);
-        this.vy = Math.sin(angle) * (this.speed * 0.4);
 
         // Hit 1: Left Aura Jab (tick 9)
         if (tick === 9 && !this.meleeHitDone.has('cc1') && tgt && tgt.hp > 0) {
@@ -1585,14 +1656,10 @@ export class PokemonCompanionEntity extends Fighter {
       // Phase 4: Impact Lock (ticks 31–41)
       else if (tick <= 41) {
         this.meleeMoveState = 'lock';
-        this.vx = 0;
-        this.vy = 0;
       }
       // Phase 5: Recovery Settle (ticks 42–54)
       else if (tick <= 54) {
         this.meleeMoveState = 'recovery';
-        this.vx *= 0.8;
-        this.vy *= 0.8;
       } else {
         this.meleeMoveState = null;
         this.meleeMoveKey = null;
@@ -1608,7 +1675,6 @@ export class PokemonCompanionEntity extends Fighter {
   draw(ctx) {
     drawPokemonCompanion(ctx, this);
     if (this.hp > 0) {
-      this.drawHealth(ctx);
       this.drawFreezeTimer(ctx);
     }
   }
@@ -1649,20 +1715,12 @@ export class AshFighter extends Fighter {
     this.speed = cfg.speed || 5.5;
     this.baseSpeed = this.speed;
 
-    // Core Mechanic State: Honeycomb Barrier & Pokémon Deployment
+    // Core Mechanic State: Honeycomb Barrier & Pokémon Deployment (Centralized Trainer System)
     this.pokemonOrder = cfg.pokemonOrder || ['pikachu', 'charizard', 'greninja', 'lucario'];
     this.nextPokemonIndex = 0;
     this.activePokemon = null;
     this.thrownPokeball = null;
-    this.isProtectedByHoneycombBarrier = false;
-    this.honeycombBarrierRadius = cfg.honeycombBarrierRadius || 46;
-    this.barrierHitFlashTimer = 0;
-    this.barrierActiveTimer = 0;
-    this.barrierAngle = 0;
-    this._barrierTextCooldown = 0;
-
-    // Trainer Sideline Vantage Point (Top-Middle, Left-Middle, or Right-Middle)
-    this.trainerVantagePoint = null;
+    initPokemonTrainerState(this, cfg);
 
     // Summon Cooldown (Mobile Evasion State when > 0 and no Pokémon active)
     this.summonCooldownMax = cfg.summonCooldownFrames || 210;
@@ -1690,12 +1748,8 @@ export class AshFighter extends Fighter {
     super.reset();
     this._cleanupActivePokemon();
     this.thrownPokeball = null;
-    this.trainerVantagePoint = null;
     this.nextPokemonIndex = 0;
-    this.isProtectedByHoneycombBarrier = false;
-    this.barrierHitFlashTimer = 0;
-    this.barrierActiveTimer = 0;
-    this.barrierAngle = 0;
+    resetPokemonTrainerState(this);
     this.summonCooldown = _getAshCfg().initialSummonDelayFrames ?? 24;
     this.commandCooldown = _getAshCfg().initialCommandCooldownFrames ?? 180;
     this.ultimateCooldown = _getAshCfg().initialUltimateCooldownFrames ?? 240;
@@ -1740,8 +1794,8 @@ export class AshFighter extends Fighter {
    * and commanding an active Pokémon or throwing a Poké Ball).
    */
   isStationarySkillActive() {
-    // If Ash is currently walking towards his sideline vantage point, he is actively moving
-    if (this.trainerVantagePoint && Math.hypot(this.trainerVantagePoint.x - this.x, this.trainerVantagePoint.y - this.y) > 6) {
+    // If Trainer is currently walking towards their corner vantage point, they are actively moving
+    if (isTrainerMovingToVantagePoint(this, 6)) {
       return false;
     }
     return Boolean(
@@ -1796,6 +1850,9 @@ export class AshFighter extends Fighter {
     if (this.barrierActiveTimer > 0) this.barrierActiveTimer--;
     if (this._barrierTextCooldown > 0) this._barrierTextCooldown--;
 
+    // Advance smooth Poké Ball throw animation & spring-damped hand physics (Rule 25)
+    updateTrainerThrowPhysics(this);
+
     // Process 2-stage Empress move cast audio followups (-2.ogg)
     if (Array.isArray(this._queuedSoundEffects)) {
       for (let i = this._queuedSoundEffects.length - 1; i >= 0; i--) {
@@ -1824,6 +1881,12 @@ export class AshFighter extends Fighter {
       p.life--;
 
       // Homing steering for Lucario's Aura Sphere & slight electric tracking on Thunderbolt
+      if (p.homing) {
+        if (!p.target || p.target.hp <= 0 || p.target.isFainting || !isActivePokemonTarget(p.target)) {
+          const priorityTarget = this._findBestTarget(p.target, p);
+          if (priorityTarget) p.target = priorityTarget;
+        }
+      }
       if (p.homing && p.target && p.target.hp > 0) {
         const desiredAngle = Math.atan2(p.target.y - p.y, p.target.x - p.x);
         const spd = Math.hypot(p.vx, p.vy) || 9.5;
@@ -1896,19 +1959,7 @@ export class AshFighter extends Fighter {
   }
 
   _getValidEnemyTargets(fallbackOpponent = null) {
-    const targets = [];
-    if (typeof state !== 'undefined' && Array.isArray(state.fighters)) {
-      for (const f of state.fighters) {
-        if (!f || f === this || f === this.activePokemon || f.hp <= 0 || f.dead || f.isDead) continue;
-        if (f.owner === this) continue;
-        if (this.teamId !== undefined && f.teamId !== undefined && this.teamId === f.teamId) continue;
-        targets.push(f);
-      }
-    }
-    if (targets.length === 0 && fallbackOpponent && fallbackOpponent !== this && fallbackOpponent !== this.activePokemon && fallbackOpponent.hp > 0) {
-      targets.push(fallbackOpponent);
-    }
-    return targets;
+    return getValidTrainerEnemyTargets(this, fallbackOpponent);
   }
 
   _isMatchWon(opponent = null) {
@@ -1943,18 +1994,8 @@ export class AshFighter extends Fighter {
     return false;
   }
 
-  _findBestTarget(fallbackOpponent = null) {
-    const enemies = this._getValidEnemyTargets(fallbackOpponent);
-    let best = null;
-    let bestDist = Infinity;
-    for (const e of enemies) {
-      const d = Math.hypot(e.x - this.x, e.y - this.y);
-      if (d < bestDist) {
-        bestDist = d;
-        best = e;
-      }
-    }
-    return best;
+  _findBestTarget(fallbackOpponent = null, originEntity = null) {
+    return findBestPokemonTarget(this, fallbackOpponent, originEntity);
   }
 
   _dealPokemonDamage(target, amount, opts = {}) {
@@ -1989,6 +2030,16 @@ export class AshFighter extends Fighter {
       if (opts.burnDps && opts.burnFrames) {
         target.burnTimer = Math.max(target.burnTimer || 0, opts.burnFrames);
         target.burnDps = opts.burnDps;
+      }
+      if (opts.slowFrames) {
+        const slowMult = opts.slowMultiplier ?? 0.45;
+        if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+          target.statusEffects.applySlow(opts.slowFrames, slowMult);
+        } else if (typeof target.applySlow === 'function') {
+          target.applySlow(opts.slowFrames, slowMult);
+        }
+        target.slowTimer = Math.max(target.slowTimer || 0, opts.slowFrames);
+        target.slowMultiplier = slowMult;
       }
     }
     return landed;
@@ -2030,7 +2081,7 @@ export class AshFighter extends Fighter {
   }
 
   /**
-   * Throws a Poké Ball to deploy the next Pokémon in Ash's rotation.
+   * Throws a Poké Ball to randomly deploy a Pokémon from Ash's enabled roster.
    * Immediately locks Ash into his stationary Honeycomb Barrier Commander state!
    */
   _throwPokeball(opponent, arena) {
@@ -2040,8 +2091,8 @@ export class AshFighter extends Fighter {
       // All Pokémon summons are disabled
       return;
     }
-    const speciesKey = available[this.nextPokemonIndex % available.length] || available[0];
-    this.nextPokemonIndex = (this.nextPokemonIndex + 1) % available.length;
+    const speciesKey = pickRandomPokemonSpecies(this, available);
+    if (!speciesKey) return;
 
     const target = this._findBestTarget(opponent);
     const throwAngle = target
@@ -2062,15 +2113,13 @@ export class AshFighter extends Fighter {
     }
 
     const flightFrames = cfg.pokeballThrowFrames || 18;
-    this.thrownPokeball = {
+    startTrainerPokeballThrow(this, {
       speciesKey,
-      startX: this.x + Math.cos(throwAngle) * (this.r * 0.85),
-      startY: this.y + Math.sin(throwAngle) * (this.r * 0.85),
       targetX,
       targetY,
-      timer: flightFrames,
-      maxTimer: flightFrames,
-    };
+      throwAngle,
+      flightFrames
+    });
 
     // Stop moving & activate Honeycomb Forcefield Barrier immediately upon throwing
     this.vx = 0;
@@ -2086,8 +2135,10 @@ export class AshFighter extends Fighter {
    * Pops open the landed Poké Ball and spawns the active PokemonCompanionEntity into state.fighters.
    */
   _spawnPokemonFromBall(ball) {
+    const cfg = _getAshCfg();
     this._cleanupActivePokemon();
     const pokemon = new PokemonCompanionEntity(this, ball.speciesKey, ball.targetX, ball.targetY);
+    pokemon.startSummonIntro(cfg.pokemonSummonIntroFrames ?? 28);
     this.activePokemon = pokemon;
     // Synchronize commandCooldown with the spawned Pokémon's initial cooldown
     this.commandCooldown = Math.max(this.commandCooldown, pokemon.specialCooldown);
@@ -2179,82 +2230,39 @@ export class AshFighter extends Fighter {
   }
 
   /**
-   * Selects the safest sideline vantage point (top-middle, left-middle, or right-middle edge)
-   * for Ash to slowly move to and oversee the battle while his summoned Pokémon fights in the center.
+   * Returns all other living Pokémon Trainers currently in the arena via centralized trainer system.
+   */
+  _getOtherPokemonTrainers() {
+    return getOtherPokemonTrainers(this);
+  }
+
+  /**
+   * Checks whether a candidate corner spot is already claimed or occupied by another Pokémon Trainer.
+   */
+  _isVantagePointOccupied(cand, minSeparation = 95) {
+    return isTrainerVantagePointOccupied(this, cand, minSeparation);
+  }
+
+  /**
+   * Checks if this trainer's current vantage point conflicts with another trainer who has priority.
+   */
+  _hasVantagePointConflict(vp, minSeparation = 95) {
+    return hasTrainerVantagePointConflict(this, vp, minSeparation);
+  }
+
+  /**
+   * Selects the safest unoccupied corner vantage point ('top-left', 'top-right', 'bottom-left', 'bottom-right')
+   * via the centralized Pokémon Trainer system.
    *
    * @param {Object} arena - Current arena bounds
    * @param {Object} [opponent] - Primary target/opponent to avoid
    * @returns {{ type: string, x: number, y: number }}
    */
   _pickTrainerVantagePoint(arena, opponent = null) {
-    const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
     const cfg = _getAshCfg();
-    const pad = cfg.trainerVantagePad || 42;
-
-    if (!curArena) {
-      return { type: 'top', x: this.x, y: Math.max(30, this.y - 120) };
-    }
-
-    const isCircle = curArena.shape === 'circle' || curArena.radius !== undefined;
-    const midX = curArena.x + curArena.width * 0.5;
-    const midY = curArena.y + curArena.height * 0.5;
-
-    let candidates = [];
-    if (isCircle) {
-      const ar = (curArena.radius !== undefined ? curArena.radius : curArena.width * 0.5) - pad;
-      candidates = [
-        { type: 'top', x: midX, y: midY - ar },
-        { type: 'left', x: midX - ar, y: midY },
-        { type: 'right', x: midX + ar, y: midY }
-      ];
-    } else {
-      const minX = curArena.x + pad;
-      const maxX = curArena.x + curArena.width - pad;
-      const minY = curArena.y + pad;
-      candidates = [
-        { type: 'top', x: midX, y: minY },
-        { type: 'left', x: minX, y: midY },
-        { type: 'right', x: maxX, y: midY }
-      ];
-    }
-
-    // If no opponent exists or opponent is defeated, select candidate closest to Ash's current spot
-    if (!opponent || opponent.hp <= 0 || opponent.dead) {
-      let closest = candidates[0];
-      let minDist = Infinity;
-      for (const cand of candidates) {
-        const d = Math.hypot(cand.x - this.x, cand.y - this.y);
-        if (d < minDist) {
-          minDist = d;
-          closest = cand;
-        }
-      }
-      return closest;
-    }
-
-    // Score candidates: maximize distance from opponent while minimizing travel distance from Ash
-    let bestCand = candidates[0];
-    let bestScore = -Infinity;
-
-    for (const cand of candidates) {
-      const distToEnemy = Math.hypot(cand.x - opponent.x, cand.y - opponent.y);
-      const distFromAsh = Math.hypot(cand.x - this.x, cand.y - this.y);
-
-      // Reward distance from opponent (1.5x weight) and deduct travel distance from Ash
-      let score = distToEnemy * 1.5 - distFromAsh;
-
-      // Heavy penalty if candidate point is within close danger zone (< 120px) of enemy
-      if (distToEnemy < 120) {
-        score -= 500;
-      }
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestCand = cand;
-      }
-    }
-
-    return bestCand;
+    return pickTrainerVantagePoint(this, arena, opponent, {
+      pad: cfg.trainerVantagePad || 42
+    });
   }
 
   /**
@@ -2510,37 +2518,12 @@ export class AshFighter extends Fighter {
     if ((this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting)) || this.thrownPokeball) {
       this.isProtectedByHoneycombBarrier = true;
 
-      // If Pokémon has been summoned, slowly walk toward the safest sideline vantage point (Top-Middle, Left-Middle, or Right-Middle)
+      // If Pokémon has been summoned, slowly walk toward the safest unoccupied corner vantage point
       if (this.activePokemon && !this.thrownPokeball) {
-        if (!this.trainerVantagePoint) {
-          this.trainerVantagePoint = this._pickTrainerVantagePoint(arena, bestTarget);
-        }
-
-        if (this.trainerVantagePoint) {
-          const dx = this.trainerVantagePoint.x - this.x;
-          const dy = this.trainerVantagePoint.y - this.y;
-          const dist = Math.hypot(dx, dy);
-
-          const slowMult = cfg.trainerSlowMoveMultiplier ?? 0.28;
-          const slowSpeed = Math.max(1.0, this.speed * slowMult);
-
-          if (dist <= 6 || dist <= slowSpeed) {
-            this.vx = 0;
-            this.vy = 0;
-          } else {
-            this.vx = (dx / dist) * slowSpeed;
-            this.vy = (dy / dist) * slowSpeed;
-            this.applyMovementPhysics(slowMult);
-            // Settle immediately upon arriving within the sideline threshold
-            if (Math.hypot(this.trainerVantagePoint.x - this.x, this.trainerVantagePoint.y - this.y) <= 6) {
-              this.vx = 0;
-              this.vy = 0;
-            }
-          }
-        } else {
-          this.vx = 0;
-          this.vy = 0;
-        }
+        updateTrainerCornerMovement(this, arena, bestTarget, {
+          pad: cfg.trainerVantagePad || 42,
+          slowMoveMultiplier: cfg.trainerSlowMoveMultiplier ?? 0.28
+        });
       } else {
         // Poké Ball is in mid-throw flight -> hold still during throw animation
         this.vx = 0;
@@ -2609,52 +2592,7 @@ export class AshFighter extends Fighter {
    * Evaluates incoming projectile threats or approaching enemies to activate the directional barrier shield.
    */
   _checkIncomingThreats(primaryTarget = null) {
-    if (!this.isProtectedByHoneycombBarrier) return;
-    const bRadius = this.honeycombBarrierRadius || 46;
-    const threatDist = bRadius + 110;
-
-    // 1. Check incoming projectiles moving toward Ash
-    if (typeof state !== 'undefined' && Array.isArray(state.projectiles)) {
-      for (let i = 0; i < state.projectiles.length; i++) {
-        const p = state.projectiles[i];
-        if (!p || p.dead || p.life <= 0) continue;
-        if (p.owner === this || p.owner === this.activePokemon) continue;
-        if (this.teamId !== undefined && p.teamId !== undefined && this.teamId === p.teamId) continue;
-
-        const pdx = this.x - p.x;
-        const pdy = this.y - p.y;
-        const pDist = Math.hypot(pdx, pdy);
-        if (pDist <= threatDist) {
-          // Check if projectile is flying toward Ash
-          const dot = (p.vx || 0) * pdx + (p.vy || 0) * pdy;
-          if (dot > 0 || pDist <= bRadius + 25) {
-            const incomingAngle = Math.atan2(p.y - this.y, p.x - this.x);
-            this.barrierAngle = incomingAngle;
-            this.barrierActiveTimer = Math.max(this.barrierActiveTimer || 0, 12);
-            return;
-          }
-        }
-      }
-    }
-
-    // 2. Check nearby enemy fighters attacking or moving toward Ash
-    const enemies = this._getValidEnemyTargets(primaryTarget);
-    for (const enemy of enemies) {
-      if (!enemy || enemy.hp <= 0) continue;
-      const edx = enemy.x - this.x;
-      const edy = enemy.y - this.y;
-      const dist = Math.hypot(edx, edy);
-      if (dist <= threatDist) {
-        const enemyAimingAtAsh = Math.abs(Math.atan2(-edy, -edx) - (enemy.gunAngle || 0)) < 1.0;
-        const enemyMovingToAsh = ((enemy.vx || 0) * -edx + (enemy.vy || 0) * -edy) > 0;
-        if (enemyAimingAtAsh || enemyMovingToAsh || dist <= bRadius + 30) {
-          const enemyAngle = Math.atan2(edy, edx);
-          this.barrierAngle = enemyAngle;
-          this.barrierActiveTimer = Math.max(this.barrierActiveTimer || 0, 10);
-          return;
-        }
-      }
-    }
+    checkTrainerIncomingThreats(this, primaryTarget);
   }
 
   onDeath() {

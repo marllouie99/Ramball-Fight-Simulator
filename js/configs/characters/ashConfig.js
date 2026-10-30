@@ -44,6 +44,7 @@ export const ashConfig = {
   summonCooldownFrames: 210,    // 3.5s mobile evasion window after active Pokémon faints
   pokeballThrowFrames: 18,      // Flight duration of thrown Poké Ball before popping open
   pokeballThrowDistance: 95,    // Distance in front of Ash where Poké Ball lands
+  pokemonSummonIntroFrames: 28, // ~0.47s Pokémon summon entrance animation & VFX before moving
   honeycombBarrierRadius: 46,   // Radius of hexagonal honeycomb dome shielding Ash
   honeycombBarrierColor: '#38BDF8',
   honeycombBarrierGold: '#FACC15',
@@ -72,10 +73,10 @@ export const ashConfig = {
   // ──────────────────────────────────────────
   // Pokémon Aces Deployment Toggles (Enable / Disable Specific Pokémon Summons)
   // ──────────────────────────────────────────
-  enablePikachu: true,
-  enableCharizard: true,
-  enableGreninja: true,
-  enableLucario: true,
+  enablePikachu: 0,
+  enableCharizard: 1,
+  enableGreninja: 0,
+  enableLucario: 0,
 
   // ──────────────────────────────────────────
   // Match Victory & Celebration Settings
@@ -220,12 +221,14 @@ export const ashConfig = {
           streamTurnRate: 0.085,        // Dynamic aim tracking speed while firing Flamethrower (~4.9°/frame at 60 FPS)
           turnRate: 0.085,              // Alias for streamTurnRate
           streamTickRate: 6,            // Multi-tick damage delivered every 6 frames (~20 ticks across 2s)
-          streamDamagePerTick: 3,       // Damage per tick (~60 total damage across full stream)
+          streamDamagePerTick: 15,       // Damage per tick (~60 total damage across full stream)
           streamWidth: 48,              // Width/thickness of expanding raging fire jet
           streamRange: 680,             // Screen-spanning reach across arena
           streamKnockbackPerTick: 1.2,  // Sustained thermal push driving enemies back
           burnDps: 6,                   // Searing burn damage over time
           burnDurationFrames: 180,      // 3.0s burn status aftermath
+          slowMultiplier: 0.45,         // 55% movement speed reduction while scorched by Flamethrower
+          slowDurationFrames: 90,       // 1.5s slow debuff duration (refreshed on each Flamethrower tick)
           recoveryFrames: 24,           // Breather recovery settle: stationary smoke cooling (~0.40s)
           breatherFrames: 24,           // Alias for recoveryFrames
           recoilPush: 0,                // Steady planted stance: Charizard plants feet firmly with zero backward drift
@@ -264,6 +267,8 @@ export const ashConfig = {
       get specialRadius() { return this.skills.special.specialRadius; },
       get burnDps() { return this.skills.special.burnDps; },
       get burnDurationFrames() { return this.skills.special.burnDurationFrames; },
+      get slowMultiplier() { return this.skills.special.slowMultiplier; },
+      get slowDurationFrames() { return this.skills.special.slowDurationFrames; },
       get meleeSfx() { return this.skills.melee.meleeSfx; },
       get specialSfx() { return this.skills.special.specialSfx; }
     },
@@ -507,7 +512,7 @@ export const ashConfig = {
     pbThrow: 0.85,
     pokeballRelease: 0.90,
     pbRelease: 0.90,
-    hitStrong: 0.85,
+    hitStrong: 0.00,
     hitWeak: 0.70,
     cryPikachu: 0.85,
     cryPikachuStarter: 0.95,
@@ -521,11 +526,11 @@ export const ashConfig = {
     thunderboltCast: 0.90,
     voltTackle: 0.95,
     voltTackleCast: 0.95,
-    dragonClaw: 0.90,
+    dragonClaw: 0.20,
     flamethrower: 0.85,
     fireBlast: 0.85,
     nightSlash: 0.90,
-    nightSlashCast: 0.90,
+    nightSlashCast: 0.20,
     aerialAce: 0.85,
     waterShuriken: 0.85,
     waterShurikenCast: 0.85,

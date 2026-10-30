@@ -10,6 +10,7 @@
 import { ashConfig } from '../../configs/characters/ashConfig.js';
 import { drawMinionHealthBar } from '../statusEffects.js';
 import { POKEMON_FRAME_ANCHORS } from './pokemonAnchors.js';
+import { renderPokemonHitFlash } from '../../systems/pokemonTrainerSystem.js';
 
 /**
  * Computes maximum ray distance from (startX, startY) along angle to the arena walls.
@@ -221,7 +222,7 @@ export function _getCharizardFlameSheet() {
     const img = new Image();
     img.onload = () => { _charizardFlameSheet = img; };
     img.onerror = (e) => { console.warn('Failed to load Charizard flame sheet:', e); };
-    img.src = 'Assets/model/ash/pokemon/charizard/Flame/flamethrower-sheet.png';
+    img.src = 'Assets/model/ash/pokemon/charizard/Flame/flamethrower-sheet.png?v=3';
     _charizardFlameSheet = img;
   }
   return _charizardFlameSheet;
@@ -236,7 +237,7 @@ export function _getCharizardFlameFrames() {
       const img = new Image();
       img.onload = () => { _charizardFlameFrames[i] = img; };
       img.onerror = (e) => { console.warn(`Failed to load Charizard flamethrower-${i + 1}.png:`, e); };
-      img.src = `Assets/model/ash/pokemon/charizard/Flame/flamethrower-${i + 1}.png`;
+      img.src = `Assets/model/ash/pokemon/charizard/Flame/flamethrower-${i + 1}.png?v=3`;
       _charizardFlameFrames[i] = img;
     }
   }
@@ -478,100 +479,352 @@ export function updateCharizardFlameChain(pokemon, castAngle) {
 }
 
 /**
- * Renders Charizard's 18-Frame 16-Bit Spread Flamethrower VFX along a 28-link articulated
- * chain spine anchored at Charizard's open jaws, so the flame whips and curves like a flexible
- * fire chain when Charizard moves his aim while firing.
+ * Draws a crisp axis-aligned 16-bit pixel-stepped disc (3 overlapping axis-aligned rectangles
+ * snapped to the P-pixel grid) so every curve has authentic SNES/GBA staircase pixelation.
  */
-function _drawCharizardSpreadFlameSprite(ctx, pokemon, originX, originY, castAngle, streamLen, streamW, frameIdx, alpha = 1.0) {
-  const clampedIdx = Math.max(0, Math.min(17, Math.floor(frameIdx)));
-  const frames = _getCharizardFlameFrames();
-  const frameImg = frames[clampedIdx];
-  const hasFrame = frameImg && frameImg.complete && ((frameImg.naturalWidth || frameImg.width || 0) > 0);
-  const sheetImg = _getCharizardFlameSheet();
-  const hasSheet = sheetImg && sheetImg.complete && ((sheetImg.naturalWidth || sheetImg.width || 0) > 0);
+function _fill16BitPixelDisc(ctx, cx, cy, radius, P = 3) {
+  const r = Math.max(P, Math.round(radius / P) * P);
+  const bx = Math.round(cx / P) * P;
+  const by = Math.round(cy / P) * P;
 
-  if (!hasFrame && !hasSheet) return false;
-
-  const cellW = 512;
-  const cellH = 512;
-  const startX = 24;
-  const endX = 452;
-  const spanX = endX - startX;
-  const numLinks = CHARIZARD_FLAME_CHAIN_LINKS;
-  const sliceW = spanX / numLinks;
-
-  // Consistent pixel-art scale (prevents rubber-band accordion stretching when sweeping across targets)
-  const scaleX = 0.62;
-  const scaleY = 0.62 * Math.max(0.85, (streamW || 48) / 48);
-  const stepLen = sliceW * scaleX;
-  const dh = Math.round(cellH * scaleY);
-  const flipY = (pokemon && pokemon.flamethrowerFlipY === -1) ? -1 : 1;
-
-  const chainAngles = (pokemon && Array.isArray(pokemon.flamethrowerChainAngles) && pokemon.flamethrowerChainAngles.length === numLinks)
-    ? pokemon.flamethrowerChainAngles
-    : new Array(numLinks).fill(castAngle);
-
-  // Build 28-link chain joint positions starting at Charizard's mouth (originX, originY)
-  const ptsX = new Float32Array(numLinks + 1);
-  const ptsY = new Float32Array(numLinks + 1);
-  ptsX[0] = originX;
-  ptsY[0] = originY;
-
-  for (let k = 0; k < numLinks; k++) {
-    const a = chainAngles[k];
-    ptsX[k + 1] = ptsX[k] + Math.cos(a) * stepLen;
-    ptsY[k + 1] = ptsY[k] + Math.sin(a) * stepLen;
+  if (r <= P) {
+    ctx.fillRect(bx - P, by - P, P * 2, P * 2);
+    return;
   }
 
-  const col = clampedIdx % 6;
-  const row = Math.floor(clampedIdx / 6);
-  const sheetOffsetX = col * cellW;
-  const sheetOffsetY = row * cellH;
+  const rMid = Math.max(P, Math.round((r * 0.78) / P) * P);
+  const rCore = Math.max(P, Math.round((r * 0.46) / P) * P);
+
+  // Horizontal wide band, vertical tall band, and diagonal mid-step band
+  ctx.fillRect(bx - r, by - rCore, r * 2, rCore * 2);
+  ctx.fillRect(bx - rCore, by - r, rCore * 2, r * 2);
+  ctx.fillRect(bx - rMid, by - rMid, rMid * 2, rMid * 2);
+}
+
+/**
+ * Draws a crisp 16-bit pixel-art diamond/square ember with a dark 16-bit pixel border.
+ */
+function _draw16BitFireEmber(ctx, cx, cy, size, fillColor, P = 2) {
+  const bx = Math.round(cx / P) * P;
+  const by = Math.round(cy / P) * P;
+  const s = Math.max(P, Math.round(size / P) * P);
+
+  ctx.fillStyle = '#14080E';
+  ctx.fillRect(bx - s - P, by - P, (s + P) * 2, P * 2);
+  ctx.fillRect(bx - P, by - s - P, P * 2, (s + P) * 2);
+
+  ctx.fillStyle = fillColor;
+  ctx.fillRect(bx - s, by - P, s * 2, P * 2);
+  ctx.fillRect(bx - P, by - s, P * 2, s * 2);
+}
+
+/**
+ * Hardcoded 16-Bit Pixel-Art Charging Flame for Charizard's reared-up jaws during Windup.
+ * Fixed size (never resizes while charging) with multi-pass stepped pixel discs and
+ * cel-shaded SNES/GBA fire bands (#14080E -> #991B1B -> #EF4444 -> #F97316 -> #FACC15 -> #FFFBEB).
+ */
+function _drawCharizard16BitWindupFlame(ctx, originX, originY, flameAngle, windupProgress, tick) {
+  const P = 3;
+  const cosA = Math.cos(flameAngle);
+  const sinA = Math.sin(flameAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
+
+  // Fixed-size windup flame dimensions
+  const baseR = 14;
+  const fixedFlameLen = 28;
+  const nodes = [];
+
+  // Central jaw core + 4 flickering skyward 16-bit flame tongues at fixed size
+  const tongueCount = 5;
+  for (let i = 0; i < tongueCount; i++) {
+    const u = i / (tongueCount - 1);
+    const dist = u * fixedFlameLen;
+    const wave = Math.sin(u * 6.0 - tick * 0.55 + i) * (4 * u);
+    const nx = originX + cosA * dist + perpX * wave;
+    const ny = originY + sinA * dist + perpY * wave;
+    const nr = baseR * (1.0 - 0.58 * Math.pow(u, 0.85));
+    nodes.push({ x: nx, y: ny, r: Math.max(P, nr), u });
+  }
+
+  // Side cheek overflow flame puffs at fixed radius
+  for (const side of [-1, 1]) {
+    const puffWave = Math.sin(tick * 0.5 + side * 1.4);
+    const px = originX + cosA * 4 + perpX * side * (11 + puffWave * 1.5);
+    const py = originY + sinA * 4 + perpY * side * (11 + puffWave * 1.5);
+    nodes.push({ x: px, y: py, r: Math.max(P, baseR * 0.62), u: 0.35 });
+  }
 
   ctx.save();
-  ctx.imageSmoothingEnabled = false;
+  // Pass 0: Unified 16-Bit Outer Dark Ink Outline (#14080E)
+  ctx.fillStyle = '#14080E';
+  for (let i = 0; i < nodes.length; i++) {
+    _fill16BitPixelDisc(ctx, nodes[i].x, nodes[i].y, nodes[i].r + P, P);
+  }
+
+  // Pass 1: Deep Crimson Scorch (#991B1B)
+  ctx.fillStyle = '#991B1B';
+  for (let i = 0; i < nodes.length; i++) {
+    _fill16BitPixelDisc(ctx, nodes[i].x, nodes[i].y, nodes[i].r, P);
+  }
+
+  // Pass 2: Blazing Vermilion Red (#EF4444)
+  ctx.fillStyle = '#EF4444';
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].r * 0.82 >= P) {
+      _fill16BitPixelDisc(ctx, nodes[i].x, nodes[i].y, nodes[i].r * 0.82, P);
+    }
+  }
+
+  // Pass 3: Roaring Flame Orange (#F97316)
+  ctx.fillStyle = '#F97316';
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].u < 0.85) {
+      _fill16BitPixelDisc(ctx, nodes[i].x, nodes[i].y, Math.max(P, nodes[i].r * 0.64), P);
+    }
+  }
+
+  // Pass 4: Solar Amber Gold (#FACC15)
+  ctx.fillStyle = '#FACC15';
+  for (let i = 0; i < nodes.length; i++) {
+    if (nodes[i].u < 0.65) {
+      _fill16BitPixelDisc(ctx, nodes[i].x, nodes[i].y, Math.max(P, nodes[i].r * 0.44), P);
+    }
+  }
+
+  // Pass 5: Incandescent White-Hot Maw Core (#FFFBEB)
+  ctx.fillStyle = '#FFFBEB';
+  _fill16BitPixelDisc(ctx, originX, originY, Math.max(P, baseR * 0.34), P);
+
+  // Pass 6: Orbiting 16-Bit Pixel Embers at Jaws
+  for (let s = 0; s < 5; s++) {
+    const sa = ((Math.PI * 2) / 5) * s + (tick * 0.28);
+    const moteDist = 18 + (s % 2) * 4;
+    const mx = originX + Math.cos(sa) * moteDist;
+    const my = originY + Math.sin(sa) * moteDist;
+    _draw16BitFireEmber(ctx, mx, my, s % 2 === 0 ? 4 : 2, s % 2 === 0 ? '#FACC15' : '#F97316', 2);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Hardcoded 16-Bit Pixel-Art Flamethrower Stream along Charizard's 28-link articulated chain spine.
+ * Strictly fixed length (260px) and fixed width (48px) at all times while firing — never stretches,
+ * shrinks, or resizes based on target distance, walls, or frame timers.
+ */
+function _drawCharizard16BitFlamethrower(ctx, pokemon, originX, originY, castAngle, fixedStreamLen, fixedStreamW, tick, opts = {}) {
+  const P = 3;
+  const alpha = opts.alpha ?? 1.0;
+  const isRecovery = Boolean(opts.isRecovery);
+
+  // Strictly locked geometry: 28 nodes, constant step length, constant width profile
+  const totalNodes = CHARIZARD_FLAME_CHAIN_LINKS;
+  const constantLen = 260;
+  const constantW = 48;
+  const stepLen = constantLen / totalNodes;
+
+  const chainAngles = (pokemon && Array.isArray(pokemon.flamethrowerChainAngles) && pokemon.flamethrowerChainAngles.length === CHARIZARD_FLAME_CHAIN_LINKS)
+    ? pokemon.flamethrowerChainAngles
+    : null;
+
+  // 1. Reconstruct articulated spine coordinates with constant step length
+  const spineX = new Float32Array(totalNodes + 1);
+  const spineY = new Float32Array(totalNodes + 1);
+  const spineAngle = new Float32Array(totalNodes + 1);
+  spineX[0] = originX;
+  spineY[0] = originY;
+
+  for (let i = 0; i <= totalNodes; i++) {
+    const idx = Math.min(CHARIZARD_FLAME_CHAIN_LINKS - 1, i);
+    const a = chainAngles ? chainAngles[idx] : castAngle;
+    spineAngle[i] = a;
+    if (i < totalNodes) {
+      spineX[i + 1] = spineX[i] + Math.cos(a) * stepLen;
+      spineY[i + 1] = spineY[i] + Math.sin(a) * stepLen;
+    }
+  }
+
+  // 2. Build fixed-size 16-bit billowing fire nodes + licking side flame tongues
+  const halfW = constantW * 0.52;
+  const billows = [];
+
+  for (let i = 0; i <= totalNodes; i++) {
+    const u = i / totalNodes;
+    const a = spineAngle[i];
+    const cosA = Math.cos(a);
+    const sinA = Math.sin(a);
+    const perpX = -sinA;
+    const perpY = cosA;
+
+    // Travelling thermal wave phase (animates wave motion without resizing node radius)
+    const phase1 = u * 10.5 - tick * 0.62;
+    const phase2 = u * 17.0 - tick * 0.88 + i * 0.65;
+    const wave1 = Math.sin(phase1);
+    const wave2 = Math.cos(phase2);
+
+    // Fixed cone envelope: tight nozzle at jaws -> full fixed width body -> rounded head
+    const nozzleTaper = 0.32 + 0.68 * Math.pow(Math.min(1, u / 0.65), 0.55);
+    const headRound = u > 0.86 ? (1.0 - 0.32 * ((u - 0.86) / 0.14)) : 1.0;
+    const rBillow = Math.max(P * 2, halfW * nozzleTaper * headRound);
+
+    // Lateral whip undulation along the stream
+    const lateralAmp = 2.0 + halfW * 0.28 * Math.pow(u, 0.72);
+    const latOff = (wave1 * 0.68 + wave2 * 0.32) * lateralAmp;
+
+    const bx = spineX[i] + perpX * latOff;
+    const by = spineY[i] + perpY * latOff;
+
+    billows.push({
+      x: bx,
+      y: by,
+      r: rBillow,
+      u,
+      hasCore: !isRecovery || (i % 2 === 0)
+    });
+
+    // Fixed-size licking 16-bit side flame tongues along the flanks
+    if (i > 1 && i < totalNodes && (i + Math.floor(tick * 0.5)) % 2 === 0) {
+      const side = (i % 4 < 2) ? 1 : -1;
+      const tongueDist = rBillow * 0.82;
+      const tx = bx - cosA * (rBillow * 0.30) + perpX * side * tongueDist;
+      const ty = by - sinA * (rBillow * 0.30) + perpY * side * tongueDist;
+      const tr = Math.max(P, rBillow * 0.48);
+      billows.push({
+        x: tx,
+        y: ty,
+        r: tr,
+        u: Math.min(1, u + 0.15),
+        isTongue: true,
+        hasCore: false
+      });
+    }
+  }
+
+  // 3. Fixed-size 16-Bit Impact Fireball Head at the tip of the stream
+  const tipX = spineX[totalNodes];
+  const tipY = spineY[totalNodes];
+  const tipAngle = spineAngle[totalNodes];
+  const impactBaseR = halfW * 0.76;
+  billows.push({
+    x: tipX,
+    y: tipY,
+    r: impactBaseR,
+    u: 0.35,
+    hasCore: true
+  });
+  for (let lobe = 0; lobe < 4; lobe++) {
+    const la = tipAngle + (lobe * Math.PI * 0.5) + tick * 0.38;
+    const lDist = impactBaseR * 0.58;
+    billows.push({
+      x: tipX + Math.cos(la) * lDist,
+      y: tipY + Math.sin(la) * lDist,
+      r: Math.max(P * 2, impactBaseR * 0.54),
+      u: 0.50,
+      hasCore: lobe % 2 === 0
+    });
+  }
+
+  ctx.save();
   if (alpha < 0.999) {
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
   }
 
-  // Draw chain links from tail to head with seamless 3px overlap so nozzle core sits cleanly on top at the jaws
-  for (let k = numLinks - 1; k >= 0; k--) {
-    const sx0 = Math.max(0, Math.round(startX + k * sliceW) - 3);
-    const sx1 = Math.min(cellW, Math.round(startX + (k + 1) * sliceW) + 3);
-    const sw = sx1 - sx0;
-    if (sw <= 0) continue;
+  // ── PASS 0: Unified 16-Bit Outer Dark Ink Outline (#14080E) ──
+  ctx.fillStyle = '#14080E';
+  for (let i = 0; i < billows.length; i++) {
+    const b = billows[i];
+    _fill16BitPixelDisc(ctx, b.x, b.y, b.r + P, P);
+  }
 
-    const dw = Math.max(2, Math.round(sw * scaleX));
-    const jx = (ptsX[k] + ptsX[k + 1]) * 0.5;
-    const jy = (ptsY[k] + ptsY[k + 1]) * 0.5;
+  // ── PASS 1: Deep Crimson-Maroon Scorch Envelope (#991B1B) ──
+  ctx.fillStyle = '#991B1B';
+  for (let i = 0; i < billows.length; i++) {
+    const b = billows[i];
+    _fill16BitPixelDisc(ctx, b.x, b.y, b.r, P);
+  }
 
-    ctx.save();
-    ctx.translate(jx, jy);
-    ctx.rotate(chainAngles[k]);
-    if (flipY === -1) {
-      ctx.scale(1, -1);
+  // ── PASS 2: Blazing Vermilion-Red Mid Body (#EF4444) ──
+  ctx.fillStyle = '#EF4444';
+  for (let i = 0; i < billows.length; i++) {
+    const b = billows[i];
+    const r2 = b.r * (b.isTongue ? 0.72 : 0.84);
+    if (r2 >= P) {
+      _fill16BitPixelDisc(ctx, b.x, b.y, r2, P);
     }
+  }
 
-    if (hasFrame) {
-      ctx.drawImage(frameImg, sx0, 0, sw, cellH, -dw * 0.5, -dh * 0.5, dw, dh);
-    } else {
-      ctx.drawImage(sheetImg, sheetOffsetX + sx0, sheetOffsetY, sw, cellH, -dw * 0.5, -dh * 0.5, dw, dh);
+  // ── PASS 3: Roaring Arcade Flame Orange (#F97316) ──
+  ctx.fillStyle = '#F97316';
+  for (let i = 0; i < billows.length; i++) {
+    const b = billows[i];
+    const r3 = b.r * (b.isTongue ? 0.46 : 0.66);
+    if (r3 >= P) {
+      _fill16BitPixelDisc(ctx, b.x, b.y, r3, P);
     }
-    ctx.restore();
+  }
+
+  // ── PASS 4: High-Velocity Solar Amber Gold Core (#FACC15) ──
+  ctx.fillStyle = '#FACC15';
+  for (let i = 0; i < billows.length; i++) {
+    const b = billows[i];
+    if (!b.hasCore) continue;
+    const r4 = b.r * (0.48 - 0.10 * b.u);
+    if (r4 >= P) {
+      _fill16BitPixelDisc(ctx, b.x, b.y, r4, P);
+    }
+  }
+
+  // ── PASS 5: Incandescent White-Hot Nozzle Jet & Thermal Core (#FFFBEB) ──
+  if (!isRecovery) {
+    ctx.fillStyle = '#FFFBEB';
+    for (let i = 0; i < billows.length; i++) {
+      const b = billows[i];
+      if (!b.hasCore) continue;
+      const isNozzle = b.u <= 0.28;
+      const isPulseNode = ((i + Math.floor(tick * 0.6)) % 3 === 0);
+      if (isNozzle || isPulseNode) {
+        const r5 = b.r * (isNozzle ? 0.34 : 0.25);
+        if (r5 >= P) {
+          _fill16BitPixelDisc(ctx, b.x, b.y, r5, P);
+        }
+      }
+    }
+  }
+
+  // ── PASS 6: Detached 16-Bit Pixel Embers & Impact Sparks ──
+  const emberCount = 6;
+  for (let e = 0; e < emberCount; e++) {
+    const ep = ((e / emberCount) + (tick * 0.038)) % 1.0;
+    const nodeIdx = Math.min(totalNodes, Math.floor(ep * totalNodes));
+    const a = spineAngle[nodeIdx];
+    const perpX = -Math.sin(a);
+    const perpY = Math.cos(a);
+    const side = (e % 2 === 0) ? 1 : -1;
+    const spread = (halfW * (0.55 + 0.55 * ep)) + Math.sin(tick * 0.35 + e * 2.1) * 6;
+    const ex = spineX[nodeIdx] + perpX * side * spread;
+    const ey = spineY[nodeIdx] + perpY * side * spread;
+    const emberCol = (e % 3 === 0) ? '#FFFBEB' : (e % 2 === 0 ? '#FACC15' : '#F97316');
+    _draw16BitFireEmber(ctx, ex, ey, (e % 2 === 0) ? 4 : 2, emberCol, 2);
+  }
+
+  if (!isRecovery) {
+    for (let s = 0; s < 5; s++) {
+      const splashA = tipAngle + Math.PI + (s - 2) * 0.52 + Math.sin(tick * 0.4 + s) * 0.2;
+      const splashR = (halfW * 0.65) + ((tick * 3 + s * 9) % 16);
+      const sx = tipX + Math.cos(splashA) * splashR;
+      const sy = tipY + Math.sin(splashA) * splashR;
+      _draw16BitFireEmber(ctx, sx, sy, s % 2 === 0 ? 4 : 2, s % 2 === 0 ? '#FACC15' : '#EF4444', 2);
+    }
   }
 
   ctx.restore();
-  return true;
 }
 
 // Proactive eager initialization in browser environment
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getThunderboltFrames();
   _getThunderboltImpactFrames();
-  _getCharizardFlameSheet();
-  _getCharizardFlameFrames();
-  _getCharizardFlameChargeSheet();
-  _getCharizardFlameChargeFrames();
 }
 
 /**
@@ -770,53 +1023,73 @@ export function drawAshHoneycombBarrier(ctx, fighter) {
 export function drawAshVisualEffects(ctx, fighter) {
   if (!fighter) return;
 
-  // 1. Thrown Poké Ball in Flight
+  // 1. Thrown Poké Ball in Flight (Launches from Trainer's Whipping Hand at releaseRatio)
   if (fighter.thrownPokeball) {
     const ball = fighter.thrownPokeball;
-    const p = Math.max(0, Math.min(1, 1 - ball.timer / Math.max(1, ball.maxTimer)));
-    const curX = ball.startX + (ball.targetX - ball.startX) * p;
-    const curY = ball.startY + (ball.targetY - ball.startY) * p;
-    const arcZ = Math.sin(p * Math.PI) * 34;
-    const rot = p * Math.PI * 6;
-    const ballR = 9;
+    const rawP = Math.max(0, Math.min(1, 1 - ball.timer / Math.max(1, ball.maxTimer)));
+    const releaseRatio = ball.releaseRatio ?? 0.28;
 
-    ctx.save();
-    // Ground shadow
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.32)';
-    ctx.beginPath();
-    ctx.ellipse(curX, curY + 6, 8, 3.5, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // Only draw the airborne projectile once the trainer's hand reaches the release apex
+    if (rawP >= releaseRatio) {
+      const p = Math.max(0, Math.min(1, (rawP - releaseRatio) / Math.max(0.01, 1 - releaseRatio)));
+      const curX = ball.startX + (ball.targetX - ball.startX) * p;
+      const curY = ball.startY + (ball.targetY - ball.startY) * p;
+      const arcZ = Math.sin(p * Math.PI) * 36;
+      const rot = p * Math.PI * 6;
+      const ballR = 9;
 
-    ctx.translate(curX, curY - arcZ);
-    ctx.rotate(rot);
+      ctx.save();
+      // Ground shadow
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.32)';
+      ctx.beginPath();
+      ctx.ellipse(curX, curY + 6, Math.max(4, 8 - (arcZ / 36) * 2.5), 3.5, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-    ctx.fillStyle = '#F8FAFC';
-    ctx.beginPath();
-    ctx.arc(0, 0, ballR, 0, Math.PI * 2);
-    ctx.fill();
+      // Parabolic flight motion ribbon behind spinning Poké Ball
+      if (p > 0.04 && p < 0.94) {
+        const prevP = Math.max(0, p - 0.14);
+        const prevX = ball.startX + (ball.targetX - ball.startX) * prevP;
+        const prevY = ball.startY + (ball.targetY - ball.startY) * prevP - Math.sin(prevP * Math.PI) * 36;
+        ctx.strokeStyle = 'rgba(248, 250, 252, 0.45)';
+        ctx.lineWidth = 3.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(prevX, prevY);
+        ctx.lineTo(curX, curY - arcZ);
+        ctx.stroke();
+      }
 
-    ctx.fillStyle = '#EF4444';
-    ctx.beginPath();
-    ctx.arc(0, 0, ballR, Math.PI, Math.PI * 2);
-    ctx.closePath();
-    ctx.fill();
+      ctx.translate(curX, curY - arcZ);
+      ctx.rotate(rot);
 
-    ctx.strokeStyle = '#0E0F14';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(-ballR, 0);
-    ctx.lineTo(ballR, 0);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(0, 0, ballR, 0, Math.PI * 2);
-    ctx.stroke();
+      ctx.fillStyle = '#F8FAFC';
+      ctx.beginPath();
+      ctx.arc(0, 0, ballR, 0, Math.PI * 2);
+      ctx.fill();
 
-    ctx.fillStyle = '#F8FAFC';
-    ctx.beginPath();
-    ctx.arc(0, 0, 3.2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+      ctx.fillStyle = '#EF4444';
+      ctx.beginPath();
+      ctx.arc(0, 0, ballR, Math.PI, Math.PI * 2);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.strokeStyle = '#0E0F14';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-ballR, 0);
+      ctx.lineTo(ballR, 0);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, ballR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#F8FAFC';
+      ctx.beginPath();
+      ctx.arc(0, 0, 3.2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // 2. Active Elemental Projectiles (Thunderbolt, Water Shuriken, Aura Sphere, Flamethrower Fireballs)
@@ -1530,6 +1803,174 @@ function _drawPokemonMeleeAttackEffects(ctx, pokemon, r, groundY, scale) {
 }
 
 /**
+ * Renders the Rule 26 staggered concentric water-ripple summon shockwave rings under the Pokémon's feet.
+ */
+function _drawPokemonSummonIntroGroundRings(ctx, pokemon, r, shadowY, introP) {
+  const themeColor = pokemon.themeColor || '#FACC15';
+  const ringColors = ['#EF4444', themeColor, '#FFFFFF'];
+  const maxRx = r * 2.55;
+  const maxRy = r * 1.05;
+
+  ctx.save();
+  for (let k = 0; k < 3; k++) {
+    const tOffset = k * 0.14;
+    const rawLp = (introP - tOffset) / Math.max(0.01, 1.0 - tOffset);
+    if (rawLp <= 0 || rawLp >= 1) continue;
+
+    const lp = Math.max(0, Math.min(1, rawLp));
+    const popIn = Math.min(1.0, lp / 0.10);
+    const fadeOut = Math.pow(1.0 - lp, 1.25);
+    const waveAlpha = popIn * fadeOut;
+    const easeR = Math.pow(lp, 0.58);
+    const curRx = Math.max(1, maxRx * easeR);
+    const curRy = Math.max(1, maxRy * easeR);
+
+    // Expanding translucent interior wash on leading ring
+    if (k === 0) {
+      ctx.globalAlpha = 0.22 * waveAlpha;
+      ctx.fillStyle = '#EF4444';
+      ctx.beginPath();
+      ctx.ellipse(0, shadowY, curRx, curRy, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.globalAlpha = 0.90 * waveAlpha;
+    ctx.strokeStyle = ringColors[k % ringColors.length];
+    ctx.lineWidth = Math.max(1.2, (3.2 - k * 0.6) * (1.0 - lp * 0.35));
+    ctx.beginPath();
+    ctx.ellipse(0, shadowY, curRx, curRy, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/**
+ * Renders the popping-open Poké Ball halves, 16-bit materialization beam, and species elemental sparkles during summon intro.
+ */
+function _drawPokemonSummonIntroOverlayEffects(ctx, pokemon, r, groundY, drawW, drawH, ay, scale, introP) {
+  const themeColor = pokemon.themeColor || '#FACC15';
+  const centerY = groundY - (ay * scale * 0.52);
+
+  ctx.save();
+
+  // 1. 16-bit vertical materialization energy pillar & crimson/white flash silhouette (first 55% of intro)
+  if (introP < 0.55) {
+    const beamP = introP / 0.55;
+    const beamAlpha = Math.sin(beamP * Math.PI) * (1.0 - beamP * 0.35);
+    const beamW = Math.max(4, r * 1.45 * (1.0 - beamP * 0.55));
+    const beamTopY = groundY - r * 3.1;
+
+    // Outer crimson release pillar
+    ctx.globalAlpha = 0.42 * beamAlpha;
+    ctx.fillStyle = '#EF4444';
+    ctx.fillRect(-beamW * 0.5, beamTopY, beamW, groundY - beamTopY);
+
+    // Mid species theme pillar
+    ctx.globalAlpha = 0.55 * beamAlpha;
+    ctx.fillStyle = themeColor;
+    ctx.fillRect(-beamW * 0.32, beamTopY, beamW * 0.64, groundY - beamTopY);
+
+    // Inner white core pillar
+    ctx.globalAlpha = 0.85 * beamAlpha;
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(-beamW * 0.16, beamTopY, beamW * 0.32, groundY - beamTopY);
+
+    // Glowing materialization aura envelope around the emerging Pokémon
+    ctx.globalAlpha = 0.50 * (1.0 - beamP);
+    ctx.fillStyle = '#EF4444';
+    ctx.beginPath();
+    ctx.ellipse(0, centerY, drawW * 0.36, drawH * 0.34, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.65 * Math.pow(1.0 - beamP, 1.4);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.ellipse(0, centerY, drawW * 0.24, drawH * 0.24, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Popping-open Poké Ball halves separating above the Pokémon
+    const ballBaseY = groundY - r * 1.65 - beamP * 14;
+    const splitDist = 3 + beamP * 13;
+    const ballR = 8.5;
+    const ballAlpha = Math.max(0, 1.0 - Math.pow(beamP, 1.35));
+
+    ctx.globalAlpha = ballAlpha;
+    // Top Red Cap (tilted backward as it pops open)
+    ctx.save();
+    ctx.translate(0, ballBaseY - splitDist);
+    ctx.rotate(-0.35 * beamP);
+    ctx.fillStyle = '#EF4444';
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, ballR, Math.PI, 0, false);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Bottom White Cap (tilted downward)
+    ctx.save();
+    ctx.translate(0, ballBaseY + splitDist * 0.65);
+    ctx.rotate(0.28 * beamP);
+    ctx.fillStyle = '#F8FAFC';
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, ballR, 0, Math.PI, false);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Center clasp button
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 2. 16-bit Pixel Diamond Starburst Sparkles & Species Elemental Motes
+  const sparkCount = 6;
+  const sparkFade = Math.pow(1.0 - introP, 0.85);
+  for (let i = 0; i < sparkCount; i++) {
+    const angle = (i / sparkCount) * Math.PI * 2 + introP * 1.2;
+    const radialDist = (r * 0.35) + Math.pow(introP, 0.65) * (r * 1.55) + (i % 2) * 5;
+    const sx = Math.cos(angle) * radialDist;
+    const sy = centerY + Math.sin(angle) * (radialDist * 0.68) - introP * 10;
+    const sparkSize = Math.max(2.0, (5.5 - (i % 2) * 1.5) * sparkFade);
+
+    ctx.globalAlpha = Math.min(1.0, sparkFade * 1.1);
+    // 4-point pixel diamond sparkle
+    ctx.fillStyle = (i % 2 === 0) ? '#FFFFFF' : themeColor;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - sparkSize);
+    ctx.lineTo(sx + sparkSize * 0.45, sy - sparkSize * 0.45);
+    ctx.lineTo(sx + sparkSize, sy);
+    ctx.lineTo(sx + sparkSize * 0.45, sy + sparkSize * 0.45);
+    ctx.lineTo(sx, sy + sparkSize);
+    ctx.lineTo(sx - sparkSize * 0.45, sy + sparkSize * 0.45);
+    ctx.lineTo(sx - sparkSize, sy);
+    ctx.lineTo(sx - sparkSize * 0.45, sy - sparkSize * 0.45);
+    ctx.closePath();
+    ctx.fill();
+
+    // 16-bit pixel ember/mote accent
+    const mx = Math.cos(angle + 0.5) * (radialDist * 0.78);
+    const my = groundY - ((introP * 36 + i * 7) % 34);
+    const moteColor = pokemon.speciesId === 'charizard'
+      ? (i % 2 === 0 ? '#FF9E00' : '#E63946')
+      : (pokemon.speciesId === 'greninja' || pokemon.speciesId === 'lucario' ? '#38BDF8' : '#FACC15');
+    ctx.fillStyle = '#0E0F14';
+    ctx.fillRect(Math.round(mx) - 2, Math.round(my) - 2, 4, 4);
+    ctx.fillStyle = moteColor;
+    ctx.fillRect(Math.round(mx) - 1, Math.round(my) - 1, 2, 2);
+  }
+
+  ctx.restore();
+}
+
+/**
  * Renders the active Pokémon companion with 8-directional PMD sprite sheets & overhead minion HP bar.
  */
 export function drawPokemonCompanion(ctx, pokemon) {
@@ -1546,6 +1987,12 @@ export function drawPokemonCompanion(ctx, pokemon) {
   // Ground plane contact baseline: feet anchor squarely on the ground plane at groundY
   const groundY = r * 0.45;
   const z = Math.max(0, pokemon.z || 0);
+
+  const isSummonIntro = Boolean(!isFainting && pokemon.isSummonIntro && (pokemon.summonIntroTimer || 0) > 0);
+  const summonIntroMax = Math.max(1, pokemon.summonIntroMaxTimer || 28);
+  const summonIntroP = isSummonIntro
+    ? Math.max(0, Math.min(1, 1.0 - ((pokemon.summonIntroTimer || 0) / summonIntroMax)))
+    : 1.0;
 
   const faintTick = pokemon.faintTick || 0;
   const maxFaintTicks = pokemon.maxFaintTicks || 48;
@@ -1572,12 +2019,8 @@ export function drawPokemonCompanion(ctx, pokemon) {
   ctx.ellipse(0, shadowY, shadowRx, shadowRy, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  if (!isFainting) {
-    ctx.strokeStyle = pokemon.themeColor || '#FACC15';
-    ctx.lineWidth = 1.6 * heightFactor;
-    ctx.beginPath();
-    ctx.ellipse(0, shadowY, shadowRx * 1.15, shadowRy * 1.20, 0, 0, Math.PI * 2);
-    ctx.stroke();
+  if (isSummonIntro) {
+    _drawPokemonSummonIntroGroundRings(ctx, pokemon, r, shadowY, summonIntroP);
   }
 
   // 2. Render 8-Directional PMD Sprite Sheet Frame (anchored 1:1 at ground feet position)
@@ -1616,6 +2059,8 @@ export function drawPokemonCompanion(ctx, pokemon) {
       } else {
         frameCol = Math.min(clipSpec.frames - 1, Math.floor(hTick / (clipSpec.ticksPerFrame || 6)));
       }
+    } else if (stateKey === 'special' && pokemon.speciesId === 'charizard' && isSummonIntro && !pokemon.flamethrowerState) {
+      frameCol = summonIntroP < 0.45 ? 0 : 1;
     } else if (stateKey === 'special' && pokemon.speciesId === 'charizard' && pokemon.flamethrowerState) {
       if (pokemon.flamethrowerState === 'windup') {
         const p = 1.0 - Math.max(0, pokemon.flamethrowerTimer / Math.max(1, pokemon.flamethrowerMaxWindup || 28));
@@ -1715,17 +2160,59 @@ export function drawPokemonCompanion(ctx, pokemon) {
 
     ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = spriteAlpha;
-    ctx.drawImage(
-      sheetImg,
-      sx,
-      sy,
-      clipSpec.fw,
-      clipSpec.fh,
-      -ax * scale,
-      groundY - (ay * scale),
-      drawW,
-      drawH
-    );
+    if (isSummonIntro) {
+      let popScaleX = 1.0;
+      let popScaleY = 1.0;
+      if (summonIntroP < 0.35) {
+        const p = summonIntroP / 0.35;
+        const s = 0.25 + 0.90 * Math.pow(p, 0.65);
+        popScaleX = s * 0.94;
+        popScaleY = s * 1.06;
+      } else if (summonIntroP < 0.65) {
+        const p = (summonIntroP - 0.35) / 0.30;
+        popScaleX = 1.08 - 0.10 * p;
+        popScaleY = 1.15 - 0.19 * p;
+      } else {
+        const p = (summonIntroP - 0.65) / 0.35;
+        popScaleX = 0.98 + 0.02 * p;
+        popScaleY = 0.96 + 0.04 * p;
+      }
+      ctx.save();
+      ctx.translate(0, groundY);
+      ctx.scale(popScaleX, popScaleY);
+      ctx.drawImage(
+        sheetImg,
+        sx,
+        sy,
+        clipSpec.fw,
+        clipSpec.fh,
+        -ax * scale,
+        -ay * scale,
+        drawW,
+        drawH
+      );
+      // 1:1 Pixel-Perfect Model-Accurate Sprite White Hit-Flash Silhouette
+      renderPokemonHitFlash(ctx, pokemon, sheetImg, sx, sy, clipSpec.fw, clipSpec.fh, -ax * scale, -ay * scale, drawW, drawH);
+      ctx.restore();
+    } else {
+      ctx.drawImage(
+        sheetImg,
+        sx,
+        sy,
+        clipSpec.fw,
+        clipSpec.fh,
+        -ax * scale,
+        groundY - (ay * scale),
+        drawW,
+        drawH
+      );
+      // 1:1 Pixel-Perfect Model-Accurate Sprite White Hit-Flash Silhouette
+      renderPokemonHitFlash(ctx, pokemon, sheetImg, sx, sy, clipSpec.fw, clipSpec.fh, -ax * scale, groundY - (ay * scale), drawW, drawH);
+    }
+
+    if (isSummonIntro) {
+      _drawPokemonSummonIntroOverlayEffects(ctx, pokemon, r, groundY, drawW, drawH, ay, scale, summonIntroP);
+    }
 
     // Dedicated Close Combat Attack Effects (Quick Attack, Iron Tail, Dragon Claw, Night Slash, Close Combat)
     _drawPokemonMeleeAttackEffects(ctx, pokemon, r, groundY, scale);
@@ -1759,6 +2246,25 @@ export function drawPokemonCompanion(ctx, pokemon) {
     ctx.arc(0, 0, r * 0.85, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+
+    // Procedural Fallback Hit Flash (Only when sprite image is not yet loaded)
+    renderPokemonHitFlash(ctx, pokemon);
+
+    if (isSummonIntro) {
+      const scale = pokemon.spriteScale || 1.5;
+      const ay = clipSpec.ay !== undefined ? clipSpec.ay : (clipSpec.fh * 0.6);
+      _drawPokemonSummonIntroOverlayEffects(
+        ctx,
+        pokemon,
+        r,
+        groundY,
+        clipSpec.fw * scale,
+        clipSpec.fh * scale,
+        ay,
+        scale,
+        summonIntroP
+      );
+    }
   }
 
   // 3. Pikachu Thunderbolt Charging Windup & Continuous Lightning Torrent Beam
@@ -1894,7 +2400,7 @@ export function drawPokemonCompanion(ctx, pokemon) {
     }
   }
 
-  // 4. Charizard Flamethrower Charging Windup, Steady 2-Second Flame Torrent & Breather
+  // 4. Charizard Hardcoded 16-Bit Pixel-Art Flamethrower (Charging Windup, Roaring Flame Torrent & Breather)
   if (pokemon.flamethrowerState) {
     const castAngle = pokemon.flamethrowerCastAngle || pokemon.gunAngle || 0;
     const cosA = Math.cos(castAngle);
@@ -1907,144 +2413,49 @@ export function drawPokemonCompanion(ctx, pokemon) {
     if (pokemon.flamethrowerState === 'windup') {
       const p = Math.max(0, Math.min(1.0, 1.0 - Math.max(0, pokemon.flamethrowerTimer / Math.max(1, pokemon.flamethrowerMaxWindup || 28))));
       const windupMouth = getCharizardWindupMouthLocalOffset(pokemon, castAngle, p);
-      const wX = windupMouth.originX;
-      const wY = windupMouth.originY;
-      const chargeFrameIdx = Math.min(CHARIZARD_FLAME_CHARGE_FRAME_COUNT - 1, Math.max(0, Math.floor(p * CHARIZARD_FLAME_CHARGE_FRAME_COUNT)));
-
-      // 12-Frame 12-Bit Charging Flame Animation erupting from Charizard's reared-up jaws
-      const drawnChargeSprite = _drawCharizardFlameChargeSprite(ctx, wX, wY, windupMouth.flameAngle, chargeFrameIdx, 1.0);
-
-      // Inhaling 12-bit pixel fire motes spiraling into Charizard's reared-up maw
-      for (let s = 0; s < 5; s++) {
-        const sa = ((Math.PI * 2) / 5) * s + (tick * 0.25);
-        const moteDist = (r * 1.45) * (1.0 - 0.68 * p);
-        const mx = wX + Math.cos(sa) * moteDist;
-        const my = wY + Math.sin(sa) * moteDist;
-        ctx.fillStyle = s % 2 === 0 ? '#FF7711' : '#FFEE55';
-        ctx.fillRect(Math.round(mx - 2), Math.round(my - 2), 4, 4);
-      }
-
-      // Fallback stepped 12-bit pixel throat spark only while sprite is loading
-      if (!drawnChargeSprite) {
-        const coreSize = Math.max(4, Math.round(6 + 8 * p));
-        const halfCore = Math.round(coreSize / 2);
-        ctx.fillStyle = '#220011';
-        ctx.fillRect(Math.round(wX - halfCore - 2), Math.round(wY - halfCore - 2), coreSize + 4, coreSize + 4);
-        ctx.fillStyle = '#FF7711';
-        ctx.fillRect(Math.round(wX - halfCore), Math.round(wY - halfCore), coreSize, coreSize);
-        ctx.fillStyle = '#FFFFEE';
-        ctx.fillRect(Math.round(wX - Math.max(2, halfCore - 3)), Math.round(wY - Math.max(2, halfCore - 3)), Math.max(4, coreSize - 6), Math.max(4, coreSize - 6));
-      }
+      _drawCharizard16BitWindupFlame(ctx, windupMouth.originX, windupMouth.originY, windupMouth.flameAngle, p, tick);
     } else if (pokemon.flamethrowerState === 'active') {
-      const streamW = specSkill?.streamWidth || 48;
-      const maxSkillRange = specSkill?.streamRange || 680;
-      let streamLen = maxSkillRange;
-
-      if (typeof pokemon.flamethrowerCurrentBeamLen === 'number' && pokemon.flamethrowerCurrentBeamLen > 20) {
-        streamLen = pokemon.flamethrowerCurrentBeamLen;
-      } else {
-        const curArena = typeof state !== 'undefined' ? state.arena : null;
-        const worldStartX = pokemon.x + originX;
-        const worldStartY = pokemon.y - z + originY;
-        const wallDist = curArena ? _getRayArenaIntersection(worldStartX, worldStartY, castAngle, curArena, 8) : maxSkillRange;
-        streamLen = Math.min(maxSkillRange, wallDist);
-        if (pokemon.flamethrowerTarget && pokemon.flamethrowerTarget.hp > 0) {
-          const distToTgt = Math.hypot(pokemon.flamethrowerTarget.x - pokemon.x, pokemon.flamethrowerTarget.y - pokemon.y);
-          streamLen = Math.min(streamLen, distToTgt);
-        }
-      }
-      const endX = originX + cosA * streamLen;
-      const endY = originY + sinA * streamLen;
-
-      // Layer 1: Dedicated 18-Frame 16-Bit Spread Flamethrower VFX (Assets/model/ash/pokemon/charizard/Flame/)
-      const maxActive = Math.max(1, pokemon.flamethrowerMaxActive || specSkill?.streamDurationFrames || 120);
-      const activeElapsed = Math.max(0, maxActive - pokemon.flamethrowerTimer);
-
-      let primaryFrameIdx = 0;
-      if (activeElapsed < 15) {
-        // Ignition launch & rapid conical spread unfurling (frames 0..4)
-        primaryFrameIdx = Math.min(4, Math.floor(activeElapsed / 3));
-      } else if (activeElapsed < maxActive - 18) {
-        // Sustained roaring spread firestorm cycle (frames 5..10 at 15 FPS sakuga cadence)
-        const loopStep = Math.floor((activeElapsed - 15) / 4);
-        primaryFrameIdx = 5 + (loopStep % 6);
-      } else {
-        // Nozzle tapering cutoff & forward-rolling vortex surge (frames 11..13)
-        const tailElapsed = Math.max(0, activeElapsed - (maxActive - 18));
-        primaryFrameIdx = Math.min(13, 11 + Math.floor(tailElapsed / 6));
-      }
-
-      let drawnSprite = false;
-      if (streamLen > 10) {
-        drawnSprite = _drawCharizardSpreadFlameSprite(ctx, pokemon, originX, originY, castAngle, streamLen, streamW, primaryFrameIdx, 1.0);
-      }
-
-      // Layer 2: Fallback Procedural Flame Stream (only when sprite assets are still loading in headless/early boot)
-      if (!drawnSprite && streamLen > 12) {
-        ctx.strokeStyle = '#0E0F14';
-        ctx.lineWidth = streamW * 0.85;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(originX, originY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#EF4444';
-        ctx.lineWidth = streamW * 0.70;
-        ctx.beginPath();
-        ctx.moveTo(originX, originY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#F97316';
-        ctx.lineWidth = streamW * 0.48;
-        ctx.beginPath();
-        ctx.moveTo(originX, originY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#FFFBEB';
-        ctx.lineWidth = streamW * 0.22;
-        ctx.beginPath();
-        ctx.moveTo(originX, originY);
-        ctx.lineTo(endX, endY);
-        ctx.stroke();
-      }
-
-      // Layer 3: Discrete 16-bit thermal fire embers downstream (Rule 26 compliant)
-      if (streamLen > 12) {
-        const emberCount = Math.max(3, Math.floor(streamLen / 65));
-        for (let e = 1; e <= emberCount; e++) {
-          const ep = (e / (emberCount + 1)) + Math.sin(tick * 0.3 + e) * 0.04;
-          const spreadFactor = 0.25 + 0.55 * ep;
-          const wobble = Math.sin(tick * 0.4 + e * 1.5) * (streamW * spreadFactor);
-          const ex = originX + cosA * (streamLen * ep) - sinA * wobble;
-          const ey = originY + sinA * (streamLen * ep) + cosA * wobble;
-          ctx.fillStyle = e % 2 === 0 ? '#FFEA56' : '#E84A1B';
-          ctx.fillRect(Math.round(ex - 2), Math.round(ey - 2), 4, 4);
-        }
-      }
+      const fixedStreamLen = 260;
+      const fixedStreamW = 48;
+      _drawCharizard16BitFlamethrower(ctx, pokemon, originX, originY, castAngle, fixedStreamLen, fixedStreamW, tick, {
+        alpha: 1.0,
+        isRecovery: false
+      });
     } else if (pokemon.flamethrowerState === 'recovery') {
-      // Phase 3: Breather / Cooling Smoke Exhale + Final 4 Dissipation Frames (frames 14..17)
+      // Phase 3: Breather / Fixed-Size Flame Fade + 16-Bit Pixel Smoke Puffs
       const maxRec = Math.max(1, specSkill?.recoveryFrames || 24);
-      const p = 1.0 - Math.max(0, pokemon.flamethrowerTimer / maxRec);
-      const streamW = specSkill?.streamWidth || 48;
-      const dissLen = pokemon.flamethrowerCurrentBeamLen || 320;
-      const dissFrameIdx = Math.min(17, 14 + Math.floor(p * 4));
-      _drawCharizardSpreadFlameSprite(ctx, pokemon, originX, originY, castAngle, dissLen, streamW, dissFrameIdx, Math.max(0, 1.0 - p * 0.35));
+      const p = Math.max(0, Math.min(1, 1.0 - Math.max(0, pokemon.flamethrowerTimer / maxRec)));
+      const fixedStreamLen = 260;
+      const fixedStreamW = 48;
 
-      const smokeCount = 4;
-      for (let s = 0; s < smokeCount; s++) {
-        const driftDist = (16 + s * 14) * (0.4 + 0.6 * p);
-        const smokeX = originX + cosA * driftDist + Math.sin(tick * 0.15 + s) * 6;
-        const smokeY = originY + sinA * driftDist - (s * 8 * p);
-        const smokeR = (6 + s * 4) * (1.0 + 0.5 * p);
-        const smokeAlpha = Math.max(0, (0.42 - s * 0.08) * (1.0 - p));
-        ctx.fillStyle = `rgba(148, 163, 184, ${smokeAlpha.toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(smokeX, smokeY, smokeR, 0, Math.PI * 2);
-        ctx.fill();
+      if (p < 0.75) {
+        _drawCharizard16BitFlamethrower(ctx, pokemon, originX, originY, castAngle, fixedStreamLen, fixedStreamW, tick, {
+          alpha: Math.max(0, 1.0 - (p / 0.75)),
+          isRecovery: true
+        });
       }
+
+      // 16-Bit Stepped Pixel-Art Cooling Smoke Puffs Rising from Jaws (Fixed Radius)
+      const P = 3;
+      const smokeCount = 4;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1.0 - p * 0.85);
+      for (let s = 0; s < smokeCount; s++) {
+        const driftDist = (14 + s * 14) * (0.35 + 0.65 * p);
+        const sx = originX + cosA * driftDist + Math.sin(tick * 0.18 + s) * 6;
+        const sy = originY + sinA * driftDist - (6 + s * 9) * p;
+        const sr = Math.max(P, 6 + s * 3);
+
+        ctx.fillStyle = '#0E0F14';
+        _fill16BitPixelDisc(ctx, sx, sy, sr + P, P);
+        ctx.fillStyle = '#475569';
+        _fill16BitPixelDisc(ctx, sx, sy, sr, P);
+        if (sr * 0.68 >= P) {
+          ctx.fillStyle = '#94A3B8';
+          _fill16BitPixelDisc(ctx, sx - 1, sy - 1, sr * 0.68, P);
+        }
+      }
+      ctx.restore();
     }
   }
 

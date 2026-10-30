@@ -220,19 +220,8 @@ export function resolveFighterCollision(a, b) {
     if (isFriendly) return;
   }
 
-  // Ash's Honeycomb Barrier: allows friendly Pokemon and teammates to pass freely, while enemies collide with the barrier
-  const aIsAshBarrier = Boolean(a.isProtectedByHoneycombBarrier);
-  const bIsAshBarrier = Boolean(b.isProtectedByHoneycombBarrier);
-  if (aIsAshBarrier || bIsAshBarrier) {
-    const ash = aIsAshBarrier ? a : b;
-    const other = aIsAshBarrier ? b : a;
-    const isFriendly = (other === ash) ||
-      (other.owner === ash) ||
-      (other.isPokemon || other.isPokemonMinion) ||
-      (typeof ash.isTeammate === 'function' && ash.isTeammate(other)) ||
-      (typeof other.isTeammate === 'function' && other.isTeammate(ash));
-    if (isFriendly) return;
-  }
+  // Pokémon Trainers & Summoned Pokémon physically body-block all entities (friendly Pokémon, teammates, and enemies alike)
+  // No pass-through exception is granted so Pokémon, trainers, and fighters always maintain solid body-blocking collision.
 
   // Toji's stealth ambush and ultimate (assault strikes & final blow dive) drive target displacement directly; skip fighter collision solver
   const aIsTojiAssault = (a.characterId === 'toji' || a.type === 'toji') && (a.isAmbushing || a.ultimateActive || a._wasFinalBlowSpin || (a.postUltimateRecoveryTimer && a.postUltimateRecoveryTimer > 0));
@@ -523,8 +512,13 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsPokemonCasting = Boolean(a && typeof a.isCastingSkill === 'function' && a.isCastingSkill());
-  const bIsPokemonCasting = Boolean(b && typeof b.isCastingSkill === 'function' && b.isCastingSkill());
+  // Only stationary special skills / summon intro plant a Pokémon in place; during normal movement and melee strikes, Pokémon rebounce off all collisions like standard Fighters
+  const aIsPokemonCasting = Boolean(
+    a && a.isPokemonCompanion && (a.thunderboltState || a.flamethrowerState || (a.specialCastTimer || 0) > 0 || a.isSummonIntro)
+  );
+  const bIsPokemonCasting = Boolean(
+    b && b.isPokemonCompanion && (b.thunderboltState || b.flamethrowerState || (b.specialCastTimer || 0) > 0 || b.isSummonIntro)
+  );
 
   const aIsAbsoluteImmovable = a.isTurret || a.isDispenser || a.isPlantBarrier || a.isWallnut || a.isChessTroop || a.isChessMinion || a.isTypingCheat || aIsFlurrying || aIsYutaBeam || aIsGenosBeam || aIsCounterLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || aIsEscanor || aIsEye || aIsDragon || aIsNameless || a.isProtectedByHoneycombBarrier || aIsPokemonCasting;
   const bIsAbsoluteImmovable = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isTypingCheat || bIsFlurrying || bIsYutaBeam || bIsGenosBeam || bIsCounterLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || bIsEscanor || bIsEye || bIsDragon || bIsNameless || b.isProtectedByHoneycombBarrier || bIsPokemonCasting;
@@ -548,6 +542,20 @@ export function resolveFighterCollision(a, b) {
     } else if (bIsImmovable && !aIsImmovable) {
       a.x -= nx * effectiveOverlap * 2;
       a.y -= ny * effectiveOverlap * 2;
+    } else if (a.isProtectedByHoneycombBarrier && !b.isProtectedByHoneycombBarrier) {
+      b.x += nx * effectiveOverlap * 2;
+      b.y += ny * effectiveOverlap * 2;
+    } else if (b.isProtectedByHoneycombBarrier && !a.isProtectedByHoneycombBarrier) {
+      a.x -= nx * effectiveOverlap * 2;
+      a.y -= ny * effectiveOverlap * 2;
+    } else if (
+      (a.isProtectedByHoneycombBarrier && b.isProtectedByHoneycombBarrier) ||
+      (aIsPokemonCasting && bIsPokemonCasting)
+    ) {
+      a.x -= nx * effectiveOverlap;
+      a.y -= ny * effectiveOverlap;
+      b.x += nx * effectiveOverlap;
+      b.y += ny * effectiveOverlap;
     }
   } else {
     a.x -= nx * effectiveOverlap;
@@ -562,29 +570,36 @@ export function resolveFighterCollision(a, b) {
     if (typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
   }
 
-  // Only apply impulse if fighters are moving toward each other
+  const aIsMobilePokemon = Boolean(a && a.isPokemonCompanion && !aIsPokemonCasting);
+  const bIsMobilePokemon = Boolean(b && b.isPokemonCompanion && !bIsPokemonCasting);
+
+  // Only apply impulse if fighters are moving toward each other (or if a mobile Pokémon is moving into the other entity)
   const dvx = b.vx - a.vx;
   const dvy = b.vy - a.vy;
   const dotN = dvx * nx + dvy * ny;
-  if (dotN >= 0) {
+  const aMovingIntoB = aIsMobilePokemon && ((a.vx || 0) * nx + (a.vy || 0) * ny > 0);
+  const bMovingIntoA = bIsMobilePokemon && ((b.vx || 0) * nx + (b.vy || 0) * ny < 0);
+  if (dotN >= 0 && !aMovingIntoB && !bMovingIntoA) {
     if (a.isMeleeMode) { a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0; }
     if (b.isMeleeMode) { b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0; }
     return;
   }
 
   // Prevent bounce response while brawlers are delivering combo flurries so they don't bounce apart
-  if (isBrawlerCombo) {
+  if (isBrawlerCombo && !aIsMobilePokemon && !bIsMobilePokemon) {
     if (a.isMeleeMode) { a.vx = 0; a.vy = 0; a.knockbackVx = 0; a.knockbackVy = 0; }
     if (b.isMeleeMode) { b.vx = 0; b.vy = 0; b.knockbackVx = 0; b.knockbackVy = 0; }
     return;
   }
 
   // Laser slow & Infinity barrier contact should feel like a drag, not a push.
-  // When either fighter is slowed or in contact with Infinity, damp the collision impulse heavily.
-  const slowActive = (a.slowTimer > 0) || (b.slowTimer > 0) || (aIsGojoInfinity && !b.gojoInfinityImmune) || (bIsGojoInfinity && !a.gojoInfinityImmune);
+  // When either fighter is slowed or in contact with Infinity, damp the collision impulse heavily
+  // (except for mobile Pokémon, which must always rebounce cleanly off collisions).
+  const slowActive = (!aIsMobilePokemon && !bIsMobilePokemon && ((a.slowTimer > 0) || (b.slowTimer > 0))) || (aIsGojoInfinity && !b.gojoInfinityImmune) || (bIsGojoInfinity && !a.gojoInfinityImmune);
 
   const { restitution } = CONFIG.collision;
-  const rawImpulse = -(1 + restitution) * dotN / 2;
+  const effectiveDotN = dotN < 0 ? dotN : -Math.max(a.speed || 5.0, b.speed || 5.0);
+  const rawImpulse = -(1 + restitution) * effectiveDotN / 2;
   const impulse = slowActive ? rawImpulse * 0.15 : rawImpulse;
 
 
@@ -599,15 +614,10 @@ export function resolveFighterCollision(a, b) {
   const bIsAnchor = b.isTurret || b.isDispenser || b.isPlantBarrier || b.isWallnut || b.isChessTroop || b.isChessMinion || b.isImmovable || bIsNameless || b.isProtectedByHoneycombBarrier || bIsPokemonCasting || (bIsGojoInfinity && !a.gojoInfinityImmune);
 
   if (aIsAnchor) {
-    if (aIsPokemonCasting && a.meleeMoveState) {
-      a.knockbackVx = 0;
-      a.knockbackVy = 0;
-    } else {
-      a.vx = 0;
-      a.vy = 0;
-      a.knockbackVx = 0;
-      a.knockbackVy = 0;
-    }
+    a.vx = 0;
+    a.vy = 0;
+    a.knockbackVx = 0;
+    a.knockbackVy = 0;
   } else {
     // Fighters in melee mode, rage, active Infinity, counter-lock, or Genos ultimate beam ignore bounce impulse so they hold their ground
     // When bouncing off an immovable entity (e.g. counter lock, Genos beam, or barrier), the mobile entity does not damp the bounce
@@ -638,6 +648,15 @@ export function resolveFighterCollision(a, b) {
       const mult = bIsImmovable ? 2.0 : 1.0;
       a.vx -= (impulse * mult * nx + randA * impulse * tx);
       a.vy -= (impulse * mult * ny + randA * impulse * ty);
+      if (aIsMobilePokemon) {
+        const aVn = a.vx * nx + a.vy * ny;
+        const minOutward = (a.speed || 5.0) * 0.55;
+        if (aVn > -minOutward) {
+          const targetVn = -Math.max(Math.abs(aVn), minOutward);
+          a.vx += (targetVn - aVn) * nx + randA * (a.speed || 5.0) * tx;
+          a.vy += (targetVn - aVn) * ny + randA * (a.speed || 5.0) * ty;
+        }
+      }
       a.normalizeSpeed();
     } else if (aIsCounterLocked) {
       a.vx = 0;
@@ -648,15 +667,10 @@ export function resolveFighterCollision(a, b) {
   }
   
   if (bIsAnchor) {
-    if (bIsPokemonCasting && b.meleeMoveState) {
-      b.knockbackVx = 0;
-      b.knockbackVy = 0;
-    } else {
-      b.vx = 0;
-      b.vy = 0;
-      b.knockbackVx = 0;
-      b.knockbackVy = 0;
-    }
+    b.vx = 0;
+    b.vy = 0;
+    b.knockbackVx = 0;
+    b.knockbackVy = 0;
   } else {
     if (b.isMeleeMode || bIsGenosBeam) {
       b.vx = 0;
@@ -685,6 +699,15 @@ export function resolveFighterCollision(a, b) {
       const mult = aIsImmovable ? 2.0 : 1.0;
       b.vx += (impulse * mult * nx + randB * impulse * tx);
       b.vy += (impulse * mult * ny + randB * impulse * ty);
+      if (bIsMobilePokemon) {
+        const bVn = b.vx * nx + b.vy * ny;
+        const minOutward = (b.speed || 5.0) * 0.55;
+        if (bVn < minOutward) {
+          const targetVn = Math.max(Math.abs(bVn), minOutward);
+          b.vx += (targetVn - bVn) * nx + randB * (b.speed || 5.0) * tx;
+          b.vy += (targetVn - bVn) * ny + randB * (b.speed || 5.0) * ty;
+        }
+      }
       b.normalizeSpeed();
     } else if (bIsCounterLocked) {
       b.vx = 0;
@@ -707,6 +730,8 @@ export function updateProjectiles() {
 export function getClosestOpponent(fighter) {
   let closest = null;
   let bestDistance = Infinity;
+  let closestPokemon = null;
+  let bestPokemonDistance = Infinity;
 
   const fighterIndex = fighter._stateIdx !== undefined ? fighter._stateIdx : state.fighters.indexOf(fighter);
   const fighterTeam = state.getFighterTeam ? state.getFighterTeam(fighterIndex) : null;
@@ -758,10 +783,22 @@ export function getClosestOpponent(fighter) {
       dSq += 2000000;
     }
 
+    if (fighter.isPokemonCompanion && other.isPokemonCompanion && !other.isFainting && other.hp > 0) {
+      if (dSq < bestPokemonDistance) {
+        bestPokemonDistance = dSq;
+        closestPokemon = other;
+      }
+    }
+
     if (dSq < bestDistance) {
       bestDistance = dSq;
       closest = other;
     }
+  }
+
+  // Pokémon Battle Priority: Active Pokémon companions always focus on attacking active enemy Pokémon first
+  if (fighter.isPokemonCompanion && closestPokemon) {
+    return closestPokemon;
   }
 
   // Also check illusions - they are valid targets (including own illusions if mind-controlled)

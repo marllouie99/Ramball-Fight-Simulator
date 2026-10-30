@@ -12,6 +12,7 @@
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawPixelHand } from '../renderers/fighterRenderer.js';
+import { getTrainerHandRenderState, drawTrainerArmLinkage } from '../../systems/pokemonTrainerSystem.js';
 
 let _ashHairImage = null;
 let _ashHairImageLoading = false;
@@ -337,40 +338,88 @@ export function drawAshSkin(ctx, fighter) {
   const breathLiftY = breathQuantized * 1.5;
   const chestExpansionX = Math.max(0, breathQuantized) * 1.0;
 
-  // Layer 1: Toji-Standard 4-Zone Pixel Body (Applies chest expansion & breathing lift)
+  // Query centralized Pokémon Trainer Throw Animation & Spring-Damped Hand Physics (Rule 20 & Rule 30)
+  const handState = getTrainerHandRenderState(fighter, r);
+  const torsoX = chestExpansionX * 0.3 + handState.torso.x;
+  const torsoY = breathLiftY * 0.4 + handState.torso.y;
+  const torsoRot = handState.torso.rot || 0;
+
+  // Layer 1: Toji-Standard 4-Zone Pixel Body (Applies chest expansion, breathing lift & throw coil/lunge)
   ctx.save();
-  ctx.translate(chestExpansionX * 0.3, breathLiftY * 0.4);
+  ctx.translate(torsoX, torsoY);
+  if (torsoRot !== 0) ctx.rotate(torsoRot * 0.55);
   drawAshPixelBody(ctx, r);
   ctx.restore();
 
-  // Layer 2: League Cap & Spiky Hair Asset (Upper head secondary breathing motion)
+  // Layer 2: League Cap & Spiky Hair Asset (Upper head secondary breathing & throw follow-through)
   ctx.save();
-  ctx.translate(chestExpansionX * 0.5, breathLiftY * 0.6);
+  ctx.translate(chestExpansionX * 0.5 + handState.torso.x * 1.15, breathLiftY * 0.6 + handState.torso.y * 0.9);
+  if (torsoRot !== 0) ctx.rotate(torsoRot * 0.75);
   _drawAshHair(ctx, r, facingLeft);
   ctx.restore();
 
-  // Layer 3: Symmetrical Lower-Flank Canonical Hands & Held Poké Ball (Rule 20)
+  // Layer 3: Symmetrical Lower-Flank Canonical Hands, 2-Bone Arm Linkages & Held Poké Ball (Rule 20 & Rule 30)
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   if (!shouldHideHands) {
     ctx.save();
     ctx.translate(chestExpansionX * 0.4, breathLiftY * 0.5);
 
     const handR = getHandSize(r * 0.30);
-    const leftHandX = -r * 0.82;
-    const leftHandY = r * 0.38;
-    const rightHandX = r * 0.82;
-    const rightHandY = r * 0.38;
+    const armPalette = {
+      sleeveColor: '#1D4ED8',
+      cuffColor: '#F8FAFC',
+      skinColor: '#E8BD9B',
+      outlineColor: '#0E0F14'
+    };
 
-    // Left Hand (Green fingerless trainer glove)
-    drawPixelHand(ctx, leftHandX, leftHandY, handR, '#16A34A', '#0E0F14');
-
-    // Right Hand + Held Poké Ball anchored at canonical right hand
-    ctx.save();
-    ctx.translate(rightHandX, rightHandY);
-    if (!fighter.activePokemon || fighter.activePokemon.hp <= 0 || fighter._isWinnerReveal) {
-      _drawHeldPokeball(ctx, handR * 1.12, Boolean(fighter.ultimateActiveTimer > 0));
+    // Muscular 2-Segment Sleeve & Forearm Linkages when arms extend during Poké Ball throw
+    if (handState.isThrowing) {
+      drawTrainerArmLinkage(ctx, handState.leftShoulder, handState.leftElbow, handState.leftHand, r, armPalette);
+      drawTrainerArmLinkage(ctx, handState.rightShoulder, handState.rightElbow, handState.rightHand, r, armPalette);
     }
-    drawPixelHand(ctx, 0, 0, handR * 0.88, '#16A34A', '#0E0F14');
+
+    // Whip Motion Arc Trail during Forward Throw Whip Phase (Rule 11 compliant)
+    if (handState.whipIntensity > 0.05) {
+      ctx.save();
+      ctx.globalAlpha = Math.min(0.75, handState.whipIntensity * 0.85);
+      ctx.strokeStyle = '#F8FAFC';
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.35, -r * 0.42);
+      ctx.quadraticCurveTo(r * 0.45, -r * 0.78, handState.rightHand.x, handState.rightHand.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#EF4444';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.20, -r * 0.36);
+      ctx.quadraticCurveTo(r * 0.50, -r * 0.68, handState.rightHand.x, handState.rightHand.y);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Left Hand (Green fingerless trainer glove with counter-balance physics)
+    drawPixelHand(
+      ctx,
+      handState.leftHand.x,
+      handState.leftHand.y,
+      handR * (handState.leftHand.scale || 1.0),
+      '#16A34A',
+      '#0E0F14'
+    );
+
+    // Right Hand + Held Poké Ball (Hand drawn first, Poké Ball drawn cleanly on top in palm)
+    ctx.save();
+    ctx.translate(handState.rightHand.x, handState.rightHand.y);
+    const rScale = handState.rightHand.scale || 1.0;
+    drawPixelHand(ctx, 0, 0, handR * rScale, '#16A34A', '#0E0F14');
+    if (handState.isBallInHand) {
+      ctx.save();
+      ctx.translate(handR * 0.28 * rScale, -handR * 0.14 * rScale);
+      _drawHeldPokeball(ctx, handR * 0.95 * rScale, Boolean(fighter.ultimateActiveTimer > 0));
+      ctx.restore();
+    }
     ctx.restore();
 
     ctx.restore();

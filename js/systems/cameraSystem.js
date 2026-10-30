@@ -8,6 +8,7 @@ import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import { interactionManager } from '../interactions/index.js';
 import { isFfaMode } from '../core/viewportManager.js';
+import { isPokemonTrainer } from './pokemonTrainerSystem.js';
 
 /**
  * Camera System for Circle Mini-Battle
@@ -257,7 +258,7 @@ export function updateCamera() {
 
   // When Ash summons an active Pokémon companion, focus dynamic camera tracking on the active Pokémon and enemy
   const getCombatCameraTarget = (f) => {
-    if (f && (f.characterId === 'ash' || f.type === 'ash' || (f._def && (f._def.id === 'ash' || f._def.type === 'ash')))) {
+    if (isPokemonTrainer(f)) {
       if (f.activePokemon && f.activePokemon.hp > 0 && !f.activePokemon.isDead && !f.activePokemon.dead) {
         return f.activePokemon;
       }

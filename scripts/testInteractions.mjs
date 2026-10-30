@@ -9877,6 +9877,14 @@ async function runInteractionTests() {
     ash.activePokemon = charizard;
     state.fighters.push(charizard);
 
+    // Refresh dummy target HP so CJ survives the multi-hit torrent & burn throughout the entire 2-second stream
+    cj.hp = 600;
+    cj.maxHp = 600;
+    cj.dead = false;
+    cj.isDead = false;
+    cj.burnTimer = 0;
+    cj.isBurning = false;
+
     // Phase 1: Windup
     charizard.startFlamethrower(cj, false);
     assert(charizard.flamethrowerState === 'windup', `Expected flamethrowerState 'windup', got ${charizard.flamethrowerState}`);
@@ -9898,6 +9906,7 @@ async function runInteractionTests() {
     assert(cj.hp < preFlameCjHp, `CJ must take damage from active Flamethrower stream! (Before: ${preFlameCjHp}, After: ${cj.hp})`);
     assert(charizard.vx === 0 && charizard.vy === 0, 'Charizard must remain steady with zero velocity drift while firing flames');
     assert(cj.isBurning === true, 'Enemy must be inflicted with burning status during Flamethrower');
+    assert(cj.slowTimer > 0 && cj.slowMultiplier < 1.0, `Enemy must be inflicted with a slow debuff during Charizard's Flamethrower (slowTimer=${cj.slowTimer}, slowMultiplier=${cj.slowMultiplier})`);
 
     // Test dynamic aim tracking while firing Flamethrower: reposition target to an offset angle
     const initialCastAngle = charizard.flamethrowerCastAngle;
@@ -9908,6 +9917,8 @@ async function runInteractionTests() {
     assert(charizard.gunAngle === charizard.flamethrowerCastAngle, 'gunAngle and flamethrowerCastAngle must remain synchronized during active stream');
 
     // Advance through remaining active frames into Phase 3: Breather
+    cj.hp = 9999;
+    cj.maxHp = 9999;
     while (charizard.flamethrowerState === 'active') {
       charizard.update(cj, 0, testArena);
     }
@@ -10123,16 +10134,17 @@ async function runInteractionTests() {
     assert(enemy.vx > 0, `Enemy must rebound backward on colliding with Pikachu, got vx: ${enemy.vx}`);
     assert(pikachu.x < enemy.x, 'Collision resolution must physically separate Pikachu and enemy bodies');
 
-    // 3. Ash Honeycomb Barrier: Friendly Pokémon Pass-Through & Enemy Anchor Block
+    // 3. Ash / Pokémon Trainer & Pokémon / Fighter Solid Body Block (Zero Pass-Through)
     pikachu.x = ash.x + 5;
     pikachu.y = ash.y;
-    pikachu.vx = 4.0;
+    pikachu.vx = -4.0;
     pikachu.vy = 0.0;
     ash.vx = 0;
     ash.vy = 0;
 
     resolveFighterCollision(ash, pikachu);
-    assert(ash.vx === 0 && ash.vy === 0, 'Ash must remain completely stationary when friendly Pokémon passes through barrier');
+    assert(ash.vx === 0 && ash.vy === 0, 'Ash must remain stationary when Pokémon collides with his Honeycomb Barrier');
+    assert(pikachu.x > ash.x + 5, `Pikachu must be physically body-blocked and pushed outside Ash's body circle, got pikachu.x=${pikachu.x}`);
 
     enemy.x = ash.x + 10;
     enemy.y = ash.y;
@@ -10141,7 +10153,7 @@ async function runInteractionTests() {
 
     resolveFighterCollision(ash, enemy);
     assert(ash.vx === 0 && ash.vy === 0, 'Ash must remain an immovable anchor against enemy collisions while Honeycomb Barrier is active');
-    assert(enemy.x > ash.x, 'Enemy must be physically pushed outside Ash Honeycomb Barrier');
+    assert(enemy.x > ash.x + 10, 'Enemy must be physically body-blocked and pushed outside Ash Honeycomb Barrier');
 
     // Cleanup state
     ash._cleanupActivePokemon?.();
@@ -12579,10 +12591,10 @@ async function runInteractionTests() {
     assert(ash.trainerVantagePoint !== null, 'Ash must select a sideline vantage point upon summoning Pokémon');
 
     const vp = ash.trainerVantagePoint;
-    assert(['top', 'left', 'right'].includes(vp.type), `Vantage point type must be 'top', 'left', or 'right', got ${vp.type}`);
+    assert(['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(vp.type), `Vantage point type must be a corner ('top-left', 'top-right', 'bottom-left', 'bottom-right'), got ${vp.type}`);
 
-    // Since enemy is at bottom-right (420, 620), top or left must be selected for safety
-    assert(vp.type === 'top' || vp.type === 'left', `Safe vantage point must be top or left to avoid bottom-right enemy, got ${vp.type}`);
+    // Since enemy is at bottom-right (420, 620), top-left must be selected as the safest corner
+    assert(vp.type === 'top-left', `Safe corner vantage point must be top-left to avoid bottom-right enemy, got ${vp.type}`);
 
     // 3. Ash updates and begins slowly moving toward the chosen sideline vantage point
     ash.update(enemy, 0, testArena);
@@ -12611,7 +12623,138 @@ async function runInteractionTests() {
     const evadeSpeed = Math.hypot(ash.vx, ash.vy);
     assert(evadeSpeed >= ash.speed * 0.70, `Ash must resume brisk mobile evasion speed (>= ${ash.speed * 0.70}), got ${evadeSpeed}`);
 
-    // 6. Canvas 2D Stack Balance Check
+    // 6. Multi-Trainer Unoccupied Sideline Selection (2, 3 & 4 Pokémon Trainers simultaneously)
+    const ash1 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 0 });
+    const ash2 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 1 });
+    const ash3 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 2 });
+    const ash4 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 3 });
+    state.fighters = [ash1, ash2, ash3, ash4, enemy];
+
+    ash1._spawnPokemonFromBall({ speciesKey: 'pikachu', targetX: 250, targetY: 450 });
+    ash2._spawnPokemonFromBall({ speciesKey: 'charizard', targetX: 260, targetY: 450 });
+    ash3._spawnPokemonFromBall({ speciesKey: 'greninja', targetX: 270, targetY: 450 });
+    ash4._spawnPokemonFromBall({ speciesKey: 'lucario', targetX: 280, targetY: 450 });
+
+    const trainers = [ash1, ash2, ash3, ash4];
+    const pad = 42;
+    const minX = testArena.x + pad;
+    const maxX = testArena.x + testArena.width - pad;
+    const minY = testArena.y + pad;
+    const maxY = testArena.y + testArena.height - pad;
+
+    for (let i = 0; i < trainers.length; i++) {
+      const vpI = trainers[i].trainerVantagePoint;
+      assert(vpI !== null, `Trainer ${i + 1} must select a corner vantage point`);
+      const isCorner = (
+        (Math.abs(vpI.x - minX) <= 1 || Math.abs(vpI.x - maxX) <= 1) &&
+        (Math.abs(vpI.y - minY) <= 1 || Math.abs(vpI.y - maxY) <= 1)
+      );
+      assert(isCorner, `Trainer ${i + 1} vantage point (${vpI.x}, ${vpI.y}) must be in a corner of the arena`);
+      for (let j = i + 1; j < trainers.length; j++) {
+        const vpJ = trainers[j].trainerVantagePoint;
+        const dist = Math.hypot(vpI.x - vpJ.x, vpI.y - vpJ.y);
+        assert(dist >= 90, `Trainer ${i + 1} and Trainer ${j + 1} must NOT occupy the same corner (dist=${dist})`);
+      }
+    }
+
+    // Also verify dynamic conflict resolution during update() if two trainers were forced onto the same target spot
+    ash2.trainerVantagePoint = { ...ash1.trainerVantagePoint };
+    ash2.update(enemy, 1, testArena);
+    const resolvedDist = Math.hypot(ash1.trainerVantagePoint.x - ash2.trainerVantagePoint.x, ash1.trainerVantagePoint.y - ash2.trainerVantagePoint.y);
+    assert(resolvedDist >= 90, `Trainer 2 must automatically re-pick an unoccupied sideline spot on conflict (dist=${resolvedDist})`);
+
+    // Verify centralized pokemonTrainerSystem cross-character interoperability (e.g. Ash + future Red & Cynthia trainers)
+    const {
+      initPokemonTrainerState,
+      isPokemonTrainer,
+      updateTrainerCornerMovement
+    } = await import('../js/systems/pokemonTrainerSystem.js');
+    const redTrainer = new NormalClass({ x: 260, y: 455, hp: 360, maxHp: 360, teamId: 4 });
+    redTrainer.characterId = 'red';
+    redTrainer.type = 'red';
+    initPokemonTrainerState(redTrainer, { trainerVantagePad: 42, trainerSlowMoveMultiplier: 0.28 });
+
+    const cynthiaTrainer = new NormalClass({ x: 265, y: 460, hp: 360, maxHp: 360, teamId: 5 });
+    cynthiaTrainer.characterId = 'cynthia';
+    cynthiaTrainer.type = 'cynthia';
+    initPokemonTrainerState(cynthiaTrainer, { trainerVantagePad: 42, trainerSlowMoveMultiplier: 0.28 });
+
+    assert(isPokemonTrainer(ash1) === true, 'Ash must be recognized by centralized isPokemonTrainer()');
+    assert(isPokemonTrainer(redTrainer) === true, 'Future trainer Red must be recognized by centralized isPokemonTrainer()');
+    assert(isPokemonTrainer(cynthiaTrainer) === true, 'Future trainer Cynthia must be recognized by centralized isPokemonTrainer()');
+
+    state.fighters = [ash1, redTrainer, cynthiaTrainer, enemy];
+    ash1.trainerVantagePoint = null;
+    updateTrainerCornerMovement(ash1, testArena, enemy);
+    updateTrainerCornerMovement(redTrainer, testArena, enemy);
+    updateTrainerCornerMovement(cynthiaTrainer, testArena, enemy);
+
+    const mixedTrainers = [ash1, redTrainer, cynthiaTrainer];
+    for (let i = 0; i < mixedTrainers.length; i++) {
+      for (let j = i + 1; j < mixedTrainers.length; j++) {
+        const dMixed = Math.hypot(
+          mixedTrainers[i].trainerVantagePoint.x - mixedTrainers[j].trainerVantagePoint.x,
+          mixedTrainers[i].trainerVantagePoint.y - mixedTrainers[j].trainerVantagePoint.y
+        );
+        assert(dMixed >= 90, `Cross-character trainers (${mixedTrainers[i].characterId} & ${mixedTrainers[j].characterId}) must pick distinct corners (dist=${dMixed})`);
+      }
+    }
+
+    trainers.forEach(t => t._cleanupActivePokemon?.());
+
+    // 7. Verify Centralized Smooth Poké Ball Throw Animation & Spring-Damped Hand Physics
+    const {
+      startTrainerPokeballThrow,
+      updateTrainerThrowPhysics,
+      getTrainerHandRenderState
+    } = await import('../js/systems/pokemonTrainerSystem.js');
+
+    ash.reset();
+    startTrainerPokeballThrow(ash, {
+      speciesKey: 'pikachu',
+      targetX: 350,
+      targetY: 465,
+      throwAngle: 0,
+      flightFrames: 18
+    });
+    assert(ash.pokeballThrowAnimTimer > 0, 'pokeballThrowAnimTimer must be initialized on throw start');
+    assert(ash.pokeballThrowPhase === 'windup', `Initial throw phase must be 'windup', got ${ash.pokeballThrowPhase}`);
+
+    const seenPhases = new Set([ash.pokeballThrowPhase]);
+    let sawBallInHandDuringWindup = false;
+    let sawBallReleasedInFlight = false;
+    let maxRightHandDisp = 0;
+
+    for (let f = 0; f < 34; f++) {
+      updateTrainerThrowPhysics(ash);
+      if (ash.thrownPokeball && ash.thrownPokeball.timer > 0) {
+        ash.thrownPokeball.timer--;
+      }
+      const renderState = getTrainerHandRenderState(ash, ash.r);
+      if (renderState.phase && renderState.phase !== 'idle') {
+        seenPhases.add(renderState.phase);
+      }
+      if (renderState.isBallInHand && ash.thrownPokeball && ash.thrownPokeball.timer > 14) {
+        sawBallInHandDuringWindup = true;
+      }
+      if (!renderState.isBallInHand && ash.thrownPokeball && ash.thrownPokeball.timer <= 10 && ash.thrownPokeball.timer > 0) {
+        sawBallReleasedInFlight = true;
+      }
+      const disp = Math.hypot(renderState.rightHand.x - ash.r * 0.82, renderState.rightHand.y - ash.r * 0.38);
+      if (disp > maxRightHandDisp) maxRightHandDisp = disp;
+
+      mockCtx.resetStackDepth();
+      ash.draw(mockCtx, enemy);
+      assert(mockCtx.getStackDepth() === 0, `Ash throw animation frame ${f} corrupted canvas stack depth`);
+    }
+
+    assert(seenPhases.has('windup') && seenPhases.has('whip') && seenPhases.has('followThrough') && seenPhases.has('settle'),
+      `Throw animation must transition through windup -> whip -> followThrough -> settle (saw: ${Array.from(seenPhases).join(', ')})`);
+    assert(sawBallInHandDuringWindup, 'Poké Ball must remain gripped in the trainer right hand during windup coil');
+    assert(sawBallReleasedInFlight, 'Poké Ball must detach from the trainer right hand once launched into airborne flight');
+    assert(maxRightHandDisp > 15, `Right throwing hand must displace significantly with spring physics during throw (maxDisp=${maxRightHandDisp})`);
+
+    // 8. Canvas 2D Stack Balance Check
     mockCtx.resetStackDepth();
     ash.draw(mockCtx, enemy);
     assert(mockCtx.getStackDepth() === 0, 'Ash rendering corrupted canvas stack depth');
@@ -12644,25 +12787,42 @@ async function runInteractionTests() {
     const origLucario = ashCfg.enableLucario;
 
     try {
-      // 1. By default, all 4 are enabled
-      assert(ash._isPokemonEnabled('pikachu') === true, 'Pikachu must be enabled by default');
-      assert(ash._isPokemonEnabled('charizard') === true, 'Charizard must be enabled by default');
-      assert(ash._isPokemonEnabled('greninja') === true, 'Greninja must be enabled by default');
-      assert(ash._isPokemonEnabled('lucario') === true, 'Lucario must be enabled by default');
-      assert(ash._getAvailablePokemonList().length === 4, 'All 4 Pokémon must be available by default');
+      // 1. When all 4 toggles are enabled, all 4 Pokémon are available
+      ashCfg.enablePikachu = true;
+      ashCfg.enableCharizard = true;
+      ashCfg.enableGreninja = true;
+      ashCfg.enableLucario = true;
+      assert(ash._isPokemonEnabled('pikachu') === true, 'Pikachu must be enabled when enablePikachu is true');
+      assert(ash._isPokemonEnabled('charizard') === true, 'Charizard must be enabled when enableCharizard is true');
+      assert(ash._isPokemonEnabled('greninja') === true, 'Greninja must be enabled when enableGreninja is true');
+      assert(ash._isPokemonEnabled('lucario') === true, 'Lucario must be enabled when enableLucario is true');
+      assert(ash._getAvailablePokemonList().length === 4, 'All 4 Pokémon must be available when all 4 toggles are true');
 
-      // 2. Disable Pikachu -> rotation should skip Pikachu and throw Charizard first
+      // 2. Disable Pikachu -> random summon pool must skip Pikachu and randomly pick from enabled Pokémon
       ashCfg.enablePikachu = false;
       ash.reset();
       const listWithoutPika = ash._getAvailablePokemonList();
       assert(listWithoutPika.length === 3, 'Available list must contain 3 Pokémon when Pikachu is disabled');
       assert(!listWithoutPika.includes('pikachu'), 'Available list must NOT contain Pikachu when disabled');
-      assert(listWithoutPika[0] === 'charizard', 'First Pokémon in rotation must now be Charizard');
+      assert(listWithoutPika[0] === 'charizard', 'First Pokémon in available pool must now be Charizard');
 
-      ash._throwPokeball(enemy, testArena);
-      assert(ash.thrownPokeball !== null, 'Ash must throw Poké Ball for next available Pokémon');
-      assert(ash.thrownPokeball.speciesKey === 'charizard', `Thrown ball must contain Charizard, got ${ash.thrownPokeball.speciesKey}`);
-      ash.thrownPokeball = null;
+      let prevSpecies = null;
+      for (let t = 0; t < 12; t++) {
+        ash._throwPokeball(enemy, testArena);
+        assert(ash.thrownPokeball !== null, 'Ash must throw Poké Ball for next available Pokémon');
+        assert(
+          listWithoutPika.includes(ash.thrownPokeball.speciesKey) && ash.thrownPokeball.speciesKey !== 'pikachu',
+          `Thrown ball must randomly pick from enabled Pokémon (${listWithoutPika.join(', ')}), got ${ash.thrownPokeball.speciesKey}`
+        );
+        if (prevSpecies !== null) {
+          assert(
+            ash.thrownPokeball.speciesKey !== prevSpecies,
+            `Random Pokémon summon must avoid immediate back-to-back repeat when >1 species are enabled (${prevSpecies})`
+          );
+        }
+        prevSpecies = ash.thrownPokeball.speciesKey;
+        ash.thrownPokeball = null;
+      }
 
       // 3. Enable only Lucario
       ashCfg.enableCharizard = false;
@@ -13148,9 +13308,158 @@ async function runInteractionTests() {
     assert(gren.isCastingSkill() === true, 'Greninja must report isCastingSkill=true while casting Water Shuriken');
     assert(gren.immuneToKnockback === true && gren.immuneToPull === true, 'Greninja must have knockback & pull immunity');
 
+    // 6. Pokémon Summon Entrance Animation & Visual Effects Before Moving
+    const { drawPokemonCompanion } = await import('../js/graphics/weapons/ashPokemonGraphics.js');
+    ash._spawnPokemonFromBall({
+      speciesKey: 'charizard',
+      targetX: 250,
+      targetY: 440
+    });
+    const summonedPoke = ash.activePokemon;
+    assert(summonedPoke && summonedPoke.isSummonIntro === true, 'Summoned Pokémon must start in summon entrance animation state');
+    assert(summonedPoke.summonIntroTimer === 28, `Summoned Pokémon summonIntroTimer must start at 28, got ${summonedPoke.summonIntroTimer}`);
+    assert(summonedPoke.vx === 0 && summonedPoke.vy === 0, 'Summoned Pokémon must stay stationary (vx=0, vy=0) during summon entrance animation');
+    assert(summonedPoke.animState === 'special', 'Summoned Charizard must play its reared-up entrance roar animation before moving');
+
+    const summonCtx = createMockCtx();
+    for (let t = 0; t < 27; t++) {
+      summonedPoke.update(enemy, 0, testArena);
+      assert(summonedPoke.isSummonIntro === true, `Pokémon must remain in summon intro at tick ${t}`);
+      assert(summonedPoke.vx === 0 && summonedPoke.vy === 0, `Pokémon must not move before summon intro finishes (tick ${t})`);
+      drawPokemonCompanion(summonCtx, summonedPoke);
+      assert(summonCtx.getStackDepth() === 0, 'drawPokemonCompanion during summon intro must maintain 0 Canvas 2D stack depth');
+    }
+
+    // Final tick (tick 28) completes summon intro and launches movement
+    summonedPoke.update(enemy, 0, testArena);
+    assert(summonedPoke.isSummonIntro === false && summonedPoke.summonIntroTimer === 0, 'Summon intro must complete after 28 frames');
+    assert(Math.hypot(summonedPoke.vx, summonedPoke.vy) > 0, 'Pokémon must begin moving once summon entrance animation completes');
+
+    // 7. Pokémon Battle Targeting Priority: Focus Active Enemy Pokémon Instead of Nearest Fighter
+    const { getClosestOpponent } = await import('../js/systems/physics.js');
+    const rivalAsh = new AshFighter({
+      id: 'ash2',
+      name: 'Rival Ash',
+      type: 'ash',
+      x: 265, // Very close to summonedPoke (250, 440) -> dist ~15px!
+      y: 440,
+      hp: 360,
+      maxHp: 360
+    });
+    rivalAsh.teamId = 1;
+    ash.teamId = 0;
+    summonedPoke.teamId = 0;
+    enemy.teamId = 1;
+    enemy.x = 260; // Also very close to summonedPoke -> dist ~10px!
+    enemy.y = 440;
+
+    // Rival Ash summons an active Pokémon far across the arena (dist ~200px)
+    const rivalPokemon = new PokemonCompanionEntity(rivalAsh, 'pikachu', 450, 440);
+    rivalPokemon.teamId = 1;
+    rivalAsh.activePokemon = rivalPokemon;
+    state.fighters = [ash, summonedPoke, rivalAsh, rivalPokemon, enemy];
+
+    const acquiredTarget = summonedPoke._acquireTarget(enemy);
+    assert(
+      acquiredTarget === rivalPokemon,
+      `Pokémon must prioritize active enemy Pokémon (${rivalPokemon.name}) over closer fighter/trainer, got ${acquiredTarget?.name}`
+    );
+    const physicsOpponent = getClosestOpponent(summonedPoke);
+    assert(
+      physicsOpponent === rivalPokemon,
+      `getClosestOpponent for a Pokémon must prioritize active enemy Pokémon over closer fighter/trainer`
+    );
+
+    // When enemy Pokémon faints, targeting falls back to the nearest enemy fighter
+    rivalPokemon.hp = 0;
+    rivalPokemon.isFainting = true;
+    const fallbackTarget = summonedPoke._acquireTarget(enemy);
+    assert(
+      fallbackTarget === enemy || fallbackTarget === rivalAsh,
+      'When no active enemy Pokémon remain alive, Pokémon must fall back to nearest enemy fighter'
+    );
+
+    // 8. Pokémon Fighter-Style Collision Rebounce (Walls, Fighters, Trainers & Other Pokémon)
+    const { resolveFighterCollision } = await import('../js/systems/physics.js');
+    summonedPoke.interruptAttacks();
+    summonedPoke.summonIntroTimer = 0;
+    summonedPoke.isSummonIntro = false;
+    summonedPoke.specialCooldown = 200;
+    summonedPoke.meleeCooldown = 200;
+
+    // 8a. Collision rebounce against an enemy Fighter (even if enemy is slowed or moving in same direction)
+    summonedPoke.x = 250;
+    summonedPoke.y = 350;
+    summonedPoke.vx = summonedPoke.speed; // Moving right (+vx)
+    summonedPoke.vy = 0;
+    enemy.x = 250 + summonedPoke.r + enemy.r - 4; // Overlapping on the right
+    enemy.y = 350;
+    enemy.vx = 1.5; // Moving slowly right (same direction!)
+    enemy.vy = 0;
+    enemy.slowTimer = 60; // Slowed by Flamethrower!
+
+    resolveFighterCollision(summonedPoke, enemy);
+    assert(
+      summonedPoke.vx < -0.5,
+      `Pokémon must rebounce to the left (vx < 0) after colliding with fighter on its right, got vx=${summonedPoke.vx}`
+    );
+
+    // Advance update() and verify the rebounced velocity is PRESERVED (not overwritten back toward enemy on the right!)
+    summonedPoke.update(enemy, 0, testArena);
+    assert(
+      summonedPoke.vx < -0.5,
+      `Pokémon must preserve its rebounced velocity on subsequent update() ticks instead of overwriting vx toward target, got vx=${summonedPoke.vx}`
+    );
+
+    // 8b. Collision rebounce against Trainer with active Honeycomb Barrier
+    summonedPoke.x = 200;
+    summonedPoke.y = 350;
+    summonedPoke.vx = -summonedPoke.speed; // Moving left (-vx) into Ash
+    summonedPoke.vy = 0;
+    ash.x = 200 - (summonedPoke.r + ash.r - 4); // Ash on the left
+    ash.y = 350;
+    ash.isProtectedByHoneycombBarrier = true;
+
+    resolveFighterCollision(ash, summonedPoke);
+    assert(
+      summonedPoke.vx > 0.5,
+      `Pokémon must rebounce to the right (vx > 0) after colliding with Trainer on its left, got vx=${summonedPoke.vx}`
+    );
+
+    // 9. Centralized Companion Systems, Global Hit Flash & Zero Numeric HP Text Overlay
+    const {
+      isPokemonStationarySkill,
+      updatePokemonCompanionMovement,
+      updatePokemonCompanionAnimState,
+      applyPokemonDamageHitEffects,
+      renderPokemonHitFlash
+    } = await import('../js/systems/pokemonTrainerSystem.js');
+
+    assert(typeof isPokemonStationarySkill === 'function', 'isPokemonStationarySkill must be exported');
+    assert(typeof updatePokemonCompanionMovement === 'function', 'updatePokemonCompanionMovement must be exported');
+    assert(typeof updatePokemonCompanionAnimState === 'function', 'updatePokemonCompanionAnimState must be exported');
+    assert(typeof applyPokemonDamageHitEffects === 'function', 'applyPokemonDamageHitEffects must be exported');
+    assert(typeof renderPokemonHitFlash === 'function', 'renderPokemonHitFlash must be exported');
+
+    // Verify global hit effect: takes damage -> hitFlashTimer becomes 8 -> updates & decays
+    summonedPoke.hitFlashTimer = 0;
+    summonedPoke.takeDamage(15, enemy, {});
+    assert(summonedPoke.hitFlashTimer === 8, `Pokémon hitFlashTimer must be 8 on taking damage, got ${summonedPoke.hitFlashTimer}`);
+
+    summonedPoke.update(enemy, 0, testArena);
+    assert(summonedPoke.hitFlashTimer === 7, `Pokémon hitFlashTimer must decrement on update, got ${summonedPoke.hitFlashTimer}`);
+
+    // Verify numeric HP overlay is suppressed (Pokémon uses floating minion health bar only)
+    summonedPoke.drawHealth = () => {
+      throw new Error('Numeric drawHealth() overlay must NOT be called on Pokémon companion!');
+    };
+    summonedPoke.draw(summonCtx);
+    assert(summonCtx.getStackDepth() === 0, 'Pokémon draw() must maintain 0 Canvas 2D stack depth');
+
     ash._cleanupActivePokemon?.();
+    rivalAsh._cleanupActivePokemon?.();
     state.fighters = [];
-    console.log('      ✅ Ash Pokémon Push Back, Pull, Drag & Knockback Immunity while Casting Skills verified.');
+    console.log('      ✅ Ash Pokémon Push Back, Pull, Drag, Knockback Immunity, Summon Entrance VFX, Pokémon Battle Targeting, Collision Rebounce, Centralized Physics, Global Hit Flash & Zero HP Overlay verified.');
   }
 
   // ⚡ 112. Testing Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State ⚡
