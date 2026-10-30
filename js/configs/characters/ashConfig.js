@@ -41,7 +41,7 @@ export const ashConfig = {
   // Core Mechanic: Poké Ball Deployment & Honeycomb Barrier
   // ──────────────────────────────────────────
   initialSummonDelayFrames: 30, // 0.5s at match start before throwing first Poké Ball
-  summonCooldownFrames: 210,    // 3.5s mobile evasion window after active Pokémon faints
+  summonCooldownFrames: 500,    // 3.5s mobile evasion window after active Pokémon faints
   pokeballThrowFrames: 18,      // Flight duration of thrown Poké Ball before popping open
   pokeballThrowDistance: 95,    // Distance in front of Ash where Poké Ball lands
   pokemonSummonIntroFrames: 28, // ~0.47s Pokémon summon entrance animation & VFX before moving

@@ -402,9 +402,10 @@ export class YutaFighter extends Fighter {
   }
 
   _getValidFlurryTarget(opponent) {
-    if (this.flurryTarget && !this.flurryTarget.isDead && (this.flurryTarget.hp || 0) > 0 && (!this.flurryTarget.vanishTimer || this.flurryTarget.vanishTimer <= 0)) {
+    if (this.flurryTarget && !this.flurryTarget.isDead && (this.flurryTarget.hp || 0) > 0 && (!this.flurryTarget.vanishTimer || this.flurryTarget.vanishTimer <= 0) && this.isValidAimTarget(this.flurryTarget)) {
       return this.flurryTarget;
     }
+    this.flurryTarget = null;
     const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
     let candidates = [];
     if (state && state.fighters) {
@@ -428,7 +429,7 @@ export class YutaFighter extends Fighter {
       candidates.sort((a, b) => Math.hypot(a.x - this.x, a.y - this.y) - Math.hypot(b.x - this.x, b.y - this.y));
       return candidates[0];
     }
-    if (opponent && !opponent.isDead && (opponent.hp || 0) > 0) return opponent;
+    if (opponent && !opponent.isDead && (opponent.hp || 0) > 0 && this.isValidAimTarget(opponent)) return opponent;
     return null;
   }
 
@@ -1713,6 +1714,13 @@ export class YutaFighter extends Fighter {
     if (!targetEntity || targetEntity.isDead || (targetEntity.hp || 0) <= 0) return false;
     if (this.isChannelingDomain || this.domainActive) return false;
 
+    // Strict untargetable / outside arena guard: Never flurry or teleport outside the arena onto a jumped-out target!
+    if (!this.isValidAimTarget(targetEntity) || targetEntity.isUntargetable || targetEntity.untargetable || targetEntity.cannotBeTargeted || targetEntity.isJumpedOut || targetEntity.jumpState === 'outside' || targetEntity.jumpState === 'jumping_out' || targetEntity.jumpState === 'jumping_in') {
+      const altTarget = this._getValidFlurryTarget();
+      if (!altTarget || !this.isValidAimTarget(altTarget)) return false;
+      targetEntity = altTarget;
+    }
+
     if (isParry) {
       this.parryCount = 0;
       this.targetParriesForFlurry = this._getRandomParryThreshold();
@@ -1796,10 +1804,10 @@ export class YutaFighter extends Fighter {
 
     if (this.basicAttackHitCount >= requiredHits) {
       this.basicAttackHitCount = 0;
-      const validTarget = (target && (!target.isDead || target.isRevivingFromContract || target.isShatterReviving) && ((target.hp || 0) > 0 || target.isRevivingFromContract || target.isShatterReviving))
+      const validTarget = (target && this.isValidAimTarget(target) && (!target.isDead || target.isRevivingFromContract || target.isShatterReviving) && ((target.hp || 0) > 0 || target.isRevivingFromContract || target.isShatterReviving))
         ? target
-        : ((state.fighters && state.fighters.find(f => f && f !== this && (!f.isDead || f.isRevivingFromContract || f.isShatterReviving) && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving))) || null);
-      if (validTarget) {
+        : this._getValidFlurryTarget();
+      if (validTarget && this.isValidAimTarget(validTarget)) {
         this.triggerPhantomFlurry(validTarget, false);
       }
     }
@@ -1849,11 +1857,11 @@ export class YutaFighter extends Fighter {
         this.parryCount++;
       }
       
-      const validCounterTarget = (attacker && !attacker.isDead && (attacker.hp > 0)) 
+      const validCounterTarget = (attacker && !attacker.isDead && (attacker.hp > 0) && this.isValidAimTarget(attacker)) 
         ? attacker 
-        : ((state.fighters && state.fighters.find(f => f && f !== this && f.hp > 0)) || null);
+        : this._getValidFlurryTarget();
 
-      if (this.parryCount >= this.targetParriesForFlurry && validCounterTarget && !validCounterTarget.isDead && !this.isChannelingDomain) {
+      if (this.parryCount >= this.targetParriesForFlurry && validCounterTarget && !validCounterTarget.isDead && this.isValidAimTarget(validCounterTarget) && !this.isChannelingDomain) {
         this.triggerPhantomFlurry(validCounterTarget, true);
         return 0; // Return early, damage blocked, flurry + thin ice breaker combo started
       }

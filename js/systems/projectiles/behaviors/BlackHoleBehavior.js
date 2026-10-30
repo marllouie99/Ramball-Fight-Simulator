@@ -72,6 +72,20 @@ export class BlackHoleBehavior extends ProjectileBehavior {
       if (!fighters[fi] || fi === ownerIndex) continue;
       if (areOnSameTeam(ownerIndex, fi)) continue;
       const f = fighters[fi];
+      if (
+        f.isUntargetable ||
+        f.untargetable ||
+        f.cannotBeTargeted ||
+        f.isTargetable === false ||
+        f.isJumpedOut ||
+        f.jumpState === 'outside' ||
+        f.jumpState === 'jumping_out' ||
+        f.jumpState === 'jumping_in' ||
+        f.isInvulnerable ||
+        f.isInvincible ||
+        f.invincible ||
+        (f.isPokemonTrainer && (f.jumpState !== 'inside' || f.isJumpedOut))
+      ) continue;
       const dx = p.x - f.x;
       const dy = p.y - f.y;
       const effectiveRadius = p.r + f.r;

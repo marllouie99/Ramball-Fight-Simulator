@@ -1,5 +1,6 @@
 import { state } from '../core/state.js';
 import { spawnImpactFlash, spawnSparks } from '../graphics/particles/sparkEffect.js';
+import { audioSystem } from './audioSystem.js';
 
 /**
  * Centralized Pokémon Trainer System
@@ -80,6 +81,22 @@ export function initPokemonTrainerState(trainer, cfg = {}) {
   trainer.pokeballThrowPhase = null;
   trainer.pokeballThrowAngle = 0;
   trainer.handPhysics = createTrainerHandPhysicsState();
+  trainer.jumpState = 'inside'; // 'inside' | 'jumping_out' | 'outside' | 'jumping_in'
+  trainer.isJumpedOut = false;
+  trainer.sidelineX = null;
+  trainer.sidelineY = null;
+  trainer.jumpTimer = 0;
+  trainer.jumpDuration = 30;
+  trainer.jumpStartX = trainer.x || 0;
+  trainer.jumpStartY = trainer.y || 0;
+  trainer.jumpTargetX = trainer.x || 0;
+  trainer.jumpTargetY = trainer.y || 0;
+  trainer.isUntargetable = false;
+  trainer.untargetable = false;
+  trainer.cannotBeTargeted = false;
+  trainer.isTargetable = true;
+  trainer.isInvulnerable = false;
+  trainer.z = 0;
 }
 
 /**
@@ -101,6 +118,22 @@ export function resetPokemonTrainerState(trainer) {
   trainer.pokeballThrowPhase = null;
   trainer.pokeballThrowAngle = 0;
   trainer.handPhysics = createTrainerHandPhysicsState();
+  trainer.jumpState = 'inside'; // 'inside' | 'jumping_out' | 'outside' | 'jumping_in'
+  trainer.isJumpedOut = false;
+  trainer.sidelineX = null;
+  trainer.sidelineY = null;
+  trainer.jumpTimer = 0;
+  trainer.jumpDuration = 30;
+  trainer.jumpStartX = trainer.x || 0;
+  trainer.jumpStartY = trainer.y || 0;
+  trainer.jumpTargetX = trainer.x || 0;
+  trainer.jumpTargetY = trainer.y || 0;
+  trainer.isUntargetable = false;
+  trainer.untargetable = false;
+  trainer.cannotBeTargeted = false;
+  trainer.isTargetable = true;
+  trainer.isInvulnerable = false;
+  trainer.z = 0;
 }
 
 /**
@@ -449,6 +482,482 @@ export function updateTrainerCornerMovement(trainer, arena, opponent = null, opt
 }
 
 /**
+ * Calculates a safe, designated sideline vantage point located OUTSIDE the arena perimeter
+ * at either the LEFT or RIGHT arena wall (whichever is nearer to the trainer) where a
+ * Pokémon Trainer stands while their summoned Pokémon battles in the arena.
+ *
+ * @param {Object} trainer - The Pokémon Trainer fighter instance
+ * @param {Object} [arena] - Current arena bounds
+ * @param {Object} [opponent=null] - Primary enemy target
+ * @returns {{ type: string, wall: string, x: number, y: number }}
+ */
+export function pickTrainerOutsideSidelineSpot(trainer, arena, opponent = null) {
+  const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || { x: 45, y: 240, width: 450, height: 450 };
+  const isCircle = curArena.shape === 'circle' || curArena.radius !== undefined;
+
+  const fighters = (typeof state !== 'undefined' && Array.isArray(state.fighters)) ? state.fighters : [];
+  const otherTrainers = fighters.filter(f => f && f !== trainer && isPokemonTrainer(f));
+  if (opponent && isPokemonTrainer(opponent) && !otherTrainers.includes(opponent)) {
+    otherTrainers.push(opponent);
+  }
+
+  // Determine whether another trainer is an ENEMY (versus teammate)
+  const isEnemyTrainer = (ot) => {
+    if (!ot || ot === trainer) return false;
+    if (typeof trainer?.isTeammate === 'function' && trainer.isTeammate(ot)) return false;
+    if (typeof ot?.isTeammate === 'function' && ot.isTeammate(trainer)) return false;
+    const myTeam = trainer?.teamId ?? trainer?.team;
+    const otherTeam = ot?.teamId ?? ot?.team;
+    if (myTeam !== undefined && otherTeam !== undefined) {
+      return myTeam !== otherTeam;
+    }
+    if (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && Array.isArray(state.fighters)) {
+      const myIdx = state.fighters.indexOf(trainer);
+      const otherIdx = state.fighters.indexOf(ot);
+      if (myIdx !== -1 && otherIdx !== -1) {
+        const t1 = state.getFighterTeam(myIdx);
+        const t2 = state.getFighterTeam(otherIdx);
+        if (t1 !== null && t2 !== null) {
+          return t1 !== t2;
+        }
+      }
+    }
+    // Default in 1v1 / FFA matches: other trainers are enemies
+    return true;
+  };
+
+  const getTrainerOccupiedWall = (ot, centerX) => {
+    if (!ot) return null;
+    if (ot.trainerVantagePoint && (ot.trainerVantagePoint.wall === 'left' || ot.trainerVantagePoint.wall === 'right')) {
+      return ot.trainerVantagePoint.wall;
+    }
+    if (ot.isJumpedOut || ot.jumpState === 'outside' || ot.jumpState === 'jumping_out') {
+      const ox = ot.trainerVantagePoint?.x ?? ot.jumpTargetX ?? ot.x;
+      return ox < centerX ? 'left' : 'right';
+    }
+    return null;
+  };
+
+  const enemyTrainers = otherTrainers.filter(ot => isEnemyTrainer(ot));
+
+  if (isCircle) {
+    const cx = curArena.x + curArena.width * 0.5;
+    const cy = curArena.y + curArena.height * 0.5;
+    const r = (curArena.radius !== undefined ? curArena.radius : curArena.width * 0.5);
+    const outsideR = r + 28;
+
+    const tx = typeof trainer?.x === 'number' ? trainer.x : cx;
+    const ty = typeof trainer?.y === 'number' ? trainer.y : cy;
+
+    // Count enemy trainers occupying each side flank
+    let enemyLeftCount = 0;
+    let enemyRightCount = 0;
+    for (const ot of enemyTrainers) {
+      const occWall = getTrainerOccupiedWall(ot, cx);
+      if (occWall === 'left') enemyLeftCount++;
+      else if (occWall === 'right') enemyRightCount++;
+    }
+
+    // Strictly leap to either the LEFT or RIGHT flank of the circle.
+    // If an enemy trainer is occupying one side, leap to the opposite side!
+    let isLeft = (tx < cx);
+    if (enemyLeftCount > enemyRightCount) {
+      isLeft = false; // Enemy occupies the left flank -> leap to right flank!
+    } else if (enemyRightCount > enemyLeftCount) {
+      isLeft = true;  // Enemy occupies the right flank -> leap to left flank!
+    } else if (enemyLeftCount === 0 && enemyRightCount === 0 && enemyTrainers.length > 0) {
+      const primaryEnemy = (opponent && isPokemonTrainer(opponent)) ? opponent : enemyTrainers[0];
+      if (primaryEnemy && typeof primaryEnemy.x === 'number') {
+        if (primaryEnemy.x < cx && tx >= cx) isLeft = false;
+        else if (primaryEnemy.x > cx && tx <= cx) isLeft = true;
+      }
+    }
+
+    let baseAngle = isLeft ? Math.PI : 0;
+    const dy = ty - cy;
+    const normalizedY = Math.max(-0.55, Math.min(0.55, dy / r));
+    baseAngle += (isLeft ? -normalizedY * 0.75 : normalizedY * 0.75);
+
+    // Check separation against other trainers outside the circle
+    let chosenAngle = baseAngle;
+    const angleOffsets = [0, 0.35, -0.35, 0.70, -0.70, 1.05, -1.05];
+    for (const offset of angleOffsets) {
+      const testAng = baseAngle + offset;
+      const testX = cx + Math.cos(testAng) * outsideR;
+      const testY = cy + Math.sin(testAng) * outsideR;
+      const conflict = otherTrainers.some(ot => {
+        const ox = ot.trainerVantagePoint?.x ?? ot.jumpTargetX ?? ot.x;
+        const oy = ot.trainerVantagePoint?.y ?? ot.jumpTargetY ?? ot.y;
+        return (ot.isJumpedOut || ot.jumpState === 'outside' || ot.jumpState === 'jumping_out') && Math.hypot(ox - testX, oy - testY) < 55;
+      });
+      if (!conflict) {
+        chosenAngle = testAng;
+        break;
+      }
+    }
+
+    return {
+      type: isLeft ? 'outside-left' : 'outside-right',
+      wall: isLeft ? 'left' : 'right',
+      x: cx + Math.cos(chosenAngle) * outsideR,
+      y: cy + Math.sin(chosenAngle) * outsideR
+    };
+  }
+
+  // Rectangular Arena: Evaluate ONLY the LEFT and RIGHT walls
+  const cx = curArena.x + curArena.width * 0.5;
+  const tx = typeof trainer?.x === 'number' ? trainer.x : cx;
+  const ty = typeof trainer?.y === 'number' ? trainer.y : (curArena.y + curArena.height * 0.5);
+
+  const distLeft = Math.max(0, tx - curArena.x);
+  const distRight = Math.max(0, (curArena.x + curArena.width) - tx);
+
+  // Count enemy trainers occupying each side wall
+  let enemyLeftCount = 0;
+  let enemyRightCount = 0;
+  for (const ot of enemyTrainers) {
+    const occWall = getTrainerOccupiedWall(ot, cx);
+    if (occWall === 'left') enemyLeftCount++;
+    else if (occWall === 'right') enemyRightCount++;
+  }
+
+  let candidateWalls = [];
+  if (enemyLeftCount > enemyRightCount) {
+    // Enemy occupies the left sideline -> Leap to the opposite (right) wall!
+    candidateWalls = [
+      { wall: 'right', dist: distRight },
+      { wall: 'left', dist: distLeft }
+    ];
+  } else if (enemyRightCount > enemyLeftCount) {
+    // Enemy occupies the right sideline -> Leap to the opposite (left) wall!
+    candidateWalls = [
+      { wall: 'left', dist: distLeft },
+      { wall: 'right', dist: distRight }
+    ];
+  } else {
+    // Neither side is occupied by an enemy (or equal enemies on both sides).
+    // If no enemy is outside yet, but primary enemy trainer is positioned on one side, prefer opposite side
+    if (enemyLeftCount === 0 && enemyRightCount === 0 && enemyTrainers.length > 0) {
+      const primaryEnemy = (opponent && isPokemonTrainer(opponent)) ? opponent : enemyTrainers[0];
+      if (primaryEnemy && typeof primaryEnemy.x === 'number') {
+        if (primaryEnemy.x < cx && tx >= cx) {
+          candidateWalls = [
+            { wall: 'right', dist: distRight },
+            { wall: 'left', dist: distLeft }
+          ];
+        } else if (primaryEnemy.x > cx && tx <= cx) {
+          candidateWalls = [
+            { wall: 'left', dist: distLeft },
+            { wall: 'right', dist: distRight }
+          ];
+        }
+      }
+    }
+    if (candidateWalls.length === 0) {
+      candidateWalls = [
+        { wall: 'left', dist: distLeft },
+        { wall: 'right', dist: distRight }
+      ];
+      candidateWalls.sort((a, b) => a.dist - b.dist);
+    }
+  }
+
+  const wallMargin = 26; // Distance outside the arena side wall
+  const cornerPad = 38;  // Margin from top/bottom arena corners
+
+  // Helper to compute coordinate for a side wall with vertical shift along the wall
+  const computeSpotOnWall = (wallName, shift = 0) => {
+    const clampedY = Math.max(curArena.y + cornerPad, Math.min(curArena.y + curArena.height - cornerPad, ty + shift));
+    if (wallName === 'left') {
+      return {
+        type: 'outside-left',
+        wall: 'left',
+        x: curArena.x - wallMargin,
+        y: clampedY
+      };
+    }
+    return {
+      type: 'outside-right',
+      wall: 'right',
+      x: curArena.x + curArena.width + wallMargin,
+      y: clampedY
+    };
+  };
+
+  // Test candidate side walls in order of nearest distance, with along-wall shifts for multi-trainer separation
+  const shifts = [0, 65, -65, 130, -130, 195, -195];
+
+  for (const cand of candidateWalls) {
+    for (const shift of shifts) {
+      const spot = computeSpotOnWall(cand.wall, shift);
+      // Check if spot conflicts with another trainer who is outside or leaping out
+      const hasConflict = otherTrainers.some(ot => {
+        const ox = ot.trainerVantagePoint?.x ?? ot.jumpTargetX ?? ot.x;
+        const oy = ot.trainerVantagePoint?.y ?? ot.jumpTargetY ?? ot.y;
+        return (ot.isJumpedOut || ot.jumpState === 'outside' || ot.jumpState === 'jumping_out') && Math.hypot(ox - spot.x, oy - spot.y) < 55;
+      });
+
+      if (!hasConflict) {
+        return spot;
+      }
+    }
+  }
+
+  // Fallback: Use unshifted spot on the nearest side wall
+  return computeSpotOnWall(candidateWalls[0].wall, 0);
+}
+
+/**
+ * Calculates a safe landing coordinate inside the arena perimeter when a Pokémon Trainer
+ * jumps back into combat after their Pokémon has fainted.
+ * Leaps back in across the side wall (left or right) where the trainer was stationed.
+ *
+ * @param {Object} trainer
+ * @param {Object} [arena]
+ * @returns {{ x: number, y: number }}
+ */
+export function pickTrainerInsideLandingSpot(trainer, arena) {
+  const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || { x: 45, y: 240, width: 450, height: 450 };
+  const isCircle = curArena.shape === 'circle' || curArena.radius !== undefined;
+
+  const tx = typeof trainer?.x === 'number' ? trainer.x : (curArena.x + curArena.width * 0.5);
+  const ty = typeof trainer?.y === 'number' ? trainer.y : (curArena.y + curArena.height * 0.5);
+
+  if (isCircle) {
+    const cx = curArena.x + curArena.width * 0.5;
+    const cy = curArena.y + curArena.height * 0.5;
+    const r = (curArena.radius !== undefined ? curArena.radius : curArena.width * 0.5);
+    const insideR = Math.max(30, r - 55);
+    const ang = Math.atan2((trainer.y || cy) - cy, (trainer.x || cx) - cx);
+    return {
+      x: cx + Math.cos(ang) * insideR,
+      y: cy + Math.sin(ang) * insideR
+    };
+  }
+
+  const landingMargin = 50; // Distance inside the arena perimeter
+  const cornerPad = 45;
+  const vpWall = trainer?.trainerVantagePoint?.wall;
+
+  // Determine whether the trainer is stationed on the left or right sideline:
+  if (vpWall === 'left' || tx < curArena.x + curArena.width * 0.5) {
+    return {
+      x: curArena.x + landingMargin,
+      y: Math.max(curArena.y + cornerPad, Math.min(curArena.y + curArena.height - cornerPad, ty))
+    };
+  }
+
+  // Right wall
+  return {
+    x: curArena.x + curArena.width - landingMargin,
+    y: Math.max(curArena.y + cornerPad, Math.min(curArena.y + curArena.height - cornerPad, ty))
+  };
+}
+
+/**
+ * Initiates a high-parabolic leap for a Pokémon Trainer jumping out of the arena to the sideline.
+ * Grants immediate untargetability, invulnerability, and detection immunity.
+ *
+ * @param {Object} trainer - The Pokémon Trainer fighter instance
+ * @param {Object} [arena] - Current arena bounds
+ * @param {Object} [opponent=null] - Primary opponent
+ */
+export function startTrainerJumpOut(trainer, arena, opponent = null) {
+  if (!trainer || trainer.jumpState === 'jumping_out' || trainer.jumpState === 'outside') return;
+  const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+  const outSpot = pickTrainerOutsideSidelineSpot(trainer, curArena, opponent);
+
+  trainer.jumpState = 'jumping_out';
+  trainer.isJumpedOut = true;
+  trainer.isUntargetable = true;
+  trainer.untargetable = true;
+  trainer.cannotBeTargeted = true;
+  trainer.isTargetable = false;
+  trainer.isInvulnerable = true;
+  trainer.isInvincible = true;
+  trainer.invincible = true;
+  trainer.invincibilityTimer = 999999;
+  trainer.isProtectedByHoneycombBarrier = false;
+
+  const jumpDist = Math.hypot(outSpot.x - trainer.x, outSpot.y - trainer.y);
+  trainer.jumpTimer = 0;
+  trainer.jumpDuration = Math.round(Math.max(18, Math.min(30, jumpDist * 0.18 + 14)));
+  trainer.jumpPeakZ = Math.min(75, Math.max(45, jumpDist * 0.55));
+  trainer.jumpStartX = trainer.x;
+  trainer.jumpStartY = trainer.y;
+  trainer.jumpTargetX = outSpot.x;
+  trainer.jumpTargetY = outSpot.y;
+  trainer.sidelineX = outSpot.x;
+  trainer.sidelineY = outSpot.y;
+  trainer.trainerVantagePoint = { type: outSpot.type, wall: outSpot.wall, x: outSpot.x, y: outSpot.y };
+
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash1', 0.5);
+  }
+  if (typeof spawnSparks === 'function') {
+    spawnSparks(trainer.x, trainer.y, 6, '#F8FAFC');
+  }
+}
+
+/**
+ * Initiates a high-parabolic leap for a Pokémon Trainer jumping from the outside sideline back into the arena
+ * once their summoned Pokémon has fainted.
+ *
+ * @param {Object} trainer - The Pokémon Trainer fighter instance
+ * @param {Object} [arena] - Current arena bounds
+ */
+export function startTrainerJumpIn(trainer, arena) {
+  if (!trainer || trainer.jumpState === 'jumping_in' || trainer.jumpState === 'inside') return;
+  const curArena = arena || (typeof state !== 'undefined' ? state.arena : null);
+  const inSpot = pickTrainerInsideLandingSpot(trainer, curArena);
+
+  const jumpDist = Math.hypot(inSpot.x - trainer.x, inSpot.y - trainer.y);
+  trainer.jumpState = 'jumping_in';
+  trainer.jumpTimer = 0;
+  trainer.jumpDuration = Math.round(Math.max(18, Math.min(28, jumpDist * 0.18 + 14)));
+  trainer.jumpPeakZ = Math.min(72, Math.max(45, jumpDist * 0.55));
+  trainer.jumpStartX = trainer.x;
+  trainer.jumpStartY = trainer.y;
+  trainer.jumpTargetX = inSpot.x;
+  trainer.jumpTargetY = inSpot.y;
+  trainer.sidelineX = null;
+  trainer.sidelineY = null;
+  trainer.trainerVantagePoint = null;
+
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash1', 0.5);
+  }
+  if (typeof spawnSparks === 'function') {
+    spawnSparks(trainer.x, trainer.y, 4, '#F8FAFC');
+  }
+}
+
+/**
+ * Integrates per-frame 3D parabolic trajectory physics for a Pokémon Trainer jumping out or back into the arena.
+ *
+ * @param {Object} trainer - The Pokémon Trainer fighter instance
+ * @param {Object} [arena] - Current arena bounds
+ * @param {Object} [opponent=null] - Primary opponent
+ */
+export function updateTrainerJumpPhysics(trainer, arena, opponent = null) {
+  if (!trainer) return;
+
+  if (trainer.jumpState === 'jumping_out') {
+    trainer.jumpTimer++;
+    const p = Math.min(1.0, trainer.jumpTimer / Math.max(1, trainer.jumpDuration));
+    const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+    trainer.x = trainer.jumpStartX + (trainer.jumpTargetX - trainer.jumpStartX) * e;
+    trainer.y = trainer.jumpStartY + (trainer.jumpTargetY - trainer.jumpStartY) * e;
+    trainer.z = Math.sin(p * Math.PI) * (trainer.jumpPeakZ || 75); // Soaring 3D parabolic arc over arena wall
+
+    trainer.vx = (trainer.jumpTargetX - trainer.jumpStartX) / trainer.jumpDuration;
+    trainer.vy = (trainer.jumpTargetY - trainer.jumpStartY) / trainer.jumpDuration;
+
+    if (trainer.activePokemon) {
+      trainer.aim(trainer.activePokemon);
+    } else if (opponent) {
+      trainer.aim(opponent);
+    }
+
+    if (p >= 1.0) {
+      trainer.x = trainer.jumpTargetX;
+      trainer.y = trainer.jumpTargetY;
+      trainer.z = 0;
+      trainer.vx = 0;
+      trainer.vy = 0;
+      trainer.jumpState = 'outside';
+      trainer.isJumpedOut = true;
+      trainer.isUntargetable = true;
+      trainer.untargetable = true;
+      trainer.cannotBeTargeted = true;
+      trainer.isTargetable = false;
+      trainer.isInvulnerable = true;
+      trainer.isInvincible = true;
+      trainer.invincible = true;
+      trainer.invincibilityTimer = 999999;
+
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(trainer.x, trainer.y, 6, '#F8FAFC');
+      }
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(trainer.x, trainer.y, 25, '#FFFFFF');
+      }
+    }
+    return;
+  }
+
+  if (trainer.jumpState === 'jumping_in') {
+    trainer.jumpTimer++;
+    const p = Math.min(1.0, trainer.jumpTimer / Math.max(1, trainer.jumpDuration));
+    const e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+    trainer.x = trainer.jumpStartX + (trainer.jumpTargetX - trainer.jumpStartX) * e;
+    trainer.y = trainer.jumpStartY + (trainer.jumpTargetY - trainer.jumpStartY) * e;
+    trainer.z = Math.sin(p * Math.PI) * (trainer.jumpPeakZ || 72);
+
+    trainer.vx = (trainer.jumpTargetX - trainer.jumpStartX) / trainer.jumpDuration;
+    trainer.vy = (trainer.jumpTargetY - trainer.jumpStartY) / trainer.jumpDuration;
+
+    if (opponent) {
+      trainer.aim(opponent);
+    }
+
+    if (p >= 1.0) {
+      trainer.x = trainer.jumpTargetX;
+      trainer.y = trainer.jumpTargetY;
+      trainer.z = 0;
+      trainer.vx = 0;
+      trainer.vy = 0;
+      trainer.jumpState = 'inside';
+      trainer.isJumpedOut = false;
+      trainer.isUntargetable = false;
+      trainer.untargetable = false;
+      trainer.cannotBeTargeted = false;
+      trainer.isTargetable = true;
+      trainer.isInvulnerable = false;
+      trainer.isInvincible = false;
+      trainer.invincible = false;
+      trainer.invincibilityTimer = 0;
+      trainer.trainerVantagePoint = null;
+
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(trainer.x, trainer.y, 35, '#FFFFFF');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(trainer.x, trainer.y, 8, '#F8FAFC');
+      }
+    }
+    return;
+  }
+}
+
+/**
+ * Checks whether a Pokémon Trainer is currently jumped out or leaping outside the arena
+ * and therefore completely untargetable and immune to incoming damage/detection.
+ *
+ * @param {Object} trainer
+ * @returns {boolean}
+ */
+export function isTrainerUntargetable(trainer) {
+  if (!trainer) return false;
+  return Boolean(
+    trainer.isJumpedOut ||
+    trainer.jumpState === 'outside' ||
+    trainer.jumpState === 'jumping_out' ||
+    trainer.isUntargetable ||
+    trainer.untargetable ||
+    trainer.cannotBeTargeted ||
+    trainer.isTargetable === false ||
+    trainer.isInvulnerable ||
+    trainer.isInvincible ||
+    trainer.invincible ||
+    (trainer.invincibilityTimer && trainer.invincibilityTimer > 0) ||
+    (trainer.isPokemonTrainer && trainer.activePokemon && (trainer.activePokemon.hp > 0 || trainer.activePokemon.isFainting))
+  );
+}
+
+/**
  * Evaluates incoming projectile threats or approaching enemies to orient a Pokémon Trainer's
  * directional Honeycomb Barrier shield.
  *
@@ -720,21 +1229,12 @@ export function updateTrainerThrowPhysics(trainer) {
   const targetKin = computeTrainerThrowTargetKinematics(throwProgress, r);
   trainer.pokeballThrowPhase = targetKin.phase === 'idle' ? null : targetKin.phase;
 
-  // Add subtle velocity-driven arm swing & inertial lag when trainer is walking/evading in idle state
-  let moveLagX = 0;
-  let moveLagY = 0;
-  const speed = Math.hypot(trainer.vx || 0, trainer.vy || 0);
-  if (speed > 0.35 && targetKin.phase === 'idle') {
-    hp.swingTick = (hp.swingTick || 0) + Math.min(1.4, speed * 0.22);
-    const swing = Math.sin(hp.swingTick * 0.32) * Math.min(r * 0.16, speed * 0.65);
-    moveLagX = swing;
-    moveLagY = Math.cos(hp.swingTick * 0.64) * (r * 0.05);
-  }
-
-  const targetLeftX = targetKin.leftOffsetX - moveLagX;
-  const targetLeftY = targetKin.leftOffsetY + moveLagY;
-  const targetRightX = targetKin.rightOffsetX + moveLagX;
-  const targetRightY = targetKin.rightOffsetY - moveLagY;
+  // Trainer hands remain strictly stationary at canonical Rule 20 flanks during walk/evade/movement.
+  // Arms and hands only move during active Poké Ball throws (targetKin.phase !== 'idle').
+  const targetLeftX = targetKin.leftOffsetX;
+  const targetLeftY = targetKin.leftOffsetY;
+  const targetRightX = targetKin.rightOffsetX;
+  const targetRightY = targetKin.rightOffsetY;
 
   // Hooke's Law spring-damper integration (stiffer during active whip for crisp responsiveness, softer on settle)
   const stiffness = (targetKin.phase === 'whip' || targetKin.phase === 'windup') ? 0.42 : 0.24;
@@ -758,6 +1258,38 @@ export function updateTrainerThrowPhysics(trainer) {
   hp.torsoOffsetX += hp.torsoVx;
   hp.torsoOffsetY += hp.torsoVy;
   hp.torsoRot += hp.torsoVRot;
+
+  // Snap idle spring offsets cleanly when small so spring oscillation terminates completely (Anti-Jitter)
+  if (targetKin.phase === 'idle') {
+    if (Math.abs(hp.torsoOffsetX) < 0.05 && Math.abs(hp.torsoVx) < 0.05) {
+      hp.torsoOffsetX = 0;
+      hp.torsoVx = 0;
+    }
+    if (Math.abs(hp.torsoOffsetY) < 0.05 && Math.abs(hp.torsoVy) < 0.05) {
+      hp.torsoOffsetY = 0;
+      hp.torsoVy = 0;
+    }
+    if (Math.abs(hp.torsoRot) < 0.02 && Math.abs(hp.torsoVRot) < 0.02) {
+      hp.torsoRot = 0;
+      hp.torsoVRot = 0;
+    }
+    if (Math.abs(hp.leftOffsetX) < 0.05 && Math.abs(hp.leftVx) < 0.05) {
+      hp.leftOffsetX = 0;
+      hp.leftVx = 0;
+    }
+    if (Math.abs(hp.leftOffsetY) < 0.05 && Math.abs(hp.leftVy) < 0.05) {
+      hp.leftOffsetY = 0;
+      hp.leftVy = 0;
+    }
+    if (Math.abs(hp.rightOffsetX) < 0.05 && Math.abs(hp.rightVx) < 0.05) {
+      hp.rightOffsetX = 0;
+      hp.rightVx = 0;
+    }
+    if (Math.abs(hp.rightOffsetY) < 0.05 && Math.abs(hp.rightVy) < 0.05) {
+      hp.rightOffsetY = 0;
+      hp.rightVy = 0;
+    }
+  }
 
   // Keep thrownPokeball launch origin synchronized with the trainer's right hand until the release frame
   if (trainer.thrownPokeball) {
@@ -1024,7 +1556,19 @@ export function getValidTrainerEnemyTargets(trainer, fallbackOpponent = null) {
   const addCandidate = (candidate) => {
     if (!candidate || candidate.hp <= 0 || candidate.dead || candidate.isDead || candidate.isFainting) return;
     if (isFriendly(candidate)) return;
-    if (!targets.includes(candidate)) {
+
+    // Do not target trainers or entities who are untargetable / jumped out outside the arena
+    const isUntargetableCandidate = Boolean(
+      candidate.isUntargetable ||
+      candidate.untargetable ||
+      candidate.cannotBeTargeted ||
+      candidate.isTargetable === false ||
+      candidate.isJumpedOut ||
+      candidate.jumpState === 'outside' ||
+      candidate.jumpState === 'jumping_out'
+    );
+
+    if (!isUntargetableCandidate && !targets.includes(candidate)) {
       targets.push(candidate);
     }
     // If this enemy is a Pokémon Trainer with an active Pokémon out, ensure their active Pokémon is also in the candidate list

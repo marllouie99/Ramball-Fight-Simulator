@@ -168,8 +168,15 @@ export function resolveFighterCollision(a, b) {
   // Guard: ensure both fighters exist
   if (!a || !b) return;
 
-  // Servants of Cthulhu, End Crystals, Lawnmowers, and non-barrier Plant Minions phase through fighters without physical collision or pushback
-  if (a.isServantOfCthulhu || b.isServantOfCthulhu || a.isEndCrystal || b.isEndCrystal || a.isLawnmower || b.isLawnmower) return;
+  // Servants of Cthulhu, End Crystals, Lawnmowers, jumped-out trainers (without active barrier), and non-barrier Plant Minions phase through fighters without physical collision or pushback
+  const aIsJumped = Boolean((a.isJumpedOut || a.jumpState === 'outside' || a.jumpState === 'jumping_out' || a.jumpState === 'jumping_in') && !a.isProtectedByHoneycombBarrier);
+  const bIsJumped = Boolean((b.isJumpedOut || b.jumpState === 'outside' || b.jumpState === 'jumping_out' || b.jumpState === 'jumping_in') && !b.isProtectedByHoneycombBarrier);
+  if (
+    a.isServantOfCthulhu || b.isServantOfCthulhu ||
+    a.isEndCrystal || b.isEndCrystal ||
+    a.isLawnmower || b.isLawnmower ||
+    aIsJumped || bIsJumped
+  ) return;
   const aIsPlant = a.isPlant || a.isPlantMinion;
   const bIsPlant = b.isPlant || b.isPlantMinion;
   const aIsBarrier = a.isPlantBarrier || a.isWallnut;
@@ -756,7 +763,22 @@ export function getClosestOpponent(fighter) {
     const other = state.fighters[i];
     const isOtherAlive = other && (other.hp > 0 || other.isRevivingFromContract || other.isShatterReviving);
     if (!other || other === fighter || !isOtherAlive) continue;
-    if (other.isLawnmower || other.isUntargetable || other.untargetable || other.cannotBeTargeted || other.isTargetable === false) continue;
+    if (
+      other.isLawnmower ||
+      other.isUntargetable ||
+      other.untargetable ||
+      other.cannotBeTargeted ||
+      other.isTargetable === false ||
+      other.isJumpedOut ||
+      other.jumpState === 'outside' ||
+      other.jumpState === 'jumping_out' ||
+      other.isInvulnerable ||
+      other.isInvincible ||
+      other.invincible ||
+      (other.invincibilityTimer && other.invincibilityTimer > 0) ||
+      (other.isPokemonTrainer && other.activePokemon && (other.activePokemon.hp > 0 || other.activePokemon.isFainting)) ||
+      (state.arena && isEntityOutsideArena && isEntityOutsideArena(other, state.arena))
+    ) continue;
     if (fighter.isTeammate(other)) continue;
     if (!fighter.isChainedByMakima && !other.isChainedByMakima && isTeamMode && fighterTeam !== null && state.getFighterTeam && state.getFighterTeam(i) === fighterTeam) continue;
     
@@ -779,8 +801,8 @@ export function getClosestOpponent(fighter) {
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;
     let dSq = dx * dx + dy * dy;
-    if (isEntityOutsideArena(other, state.arena)) {
-      dSq += 2000000;
+    if (state.arena && isEntityOutsideArena(other, state.arena)) {
+      continue;
     }
 
     if (fighter.isPokemonCompanion && other.isPokemonCompanion && !other.isFainting && other.hp > 0) {
@@ -817,8 +839,8 @@ export function getClosestOpponent(fighter) {
       const dx = illusion.x - fighter.x;
       const dy = illusion.y - fighter.y;
       let dSq = dx * dx + dy * dy;
-      if (isEntityOutsideArena(illusion, state.arena)) {
-        dSq += 2000000;
+      if (state.arena && isEntityOutsideArena(illusion, state.arena)) {
+        continue;
       }
 
       if (dSq < bestDistance) {
@@ -842,8 +864,8 @@ export function getClosestOpponent(fighter) {
       const dx = car.x - fighter.x;
       const dy = car.y - fighter.y;
       let dSq = dx * dx + dy * dy;
-      if (isEntityOutsideArena(car, state.arena)) {
-        dSq += 2000000;
+      if (state.arena && isEntityOutsideArena(car, state.arena)) {
+        continue;
       }
       if (dSq < bestDistance) {
         bestDistance = dSq;
@@ -1329,7 +1351,7 @@ export function updateFighters() {
       const isFinishingAbility = Boolean(fighter && typeof fighter.hasActiveFinishingAbility === 'function' && fighter.hasActiveFinishingAbility());
       const hasLivingEnemies = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== fighter && (f.hp > 0 || f.isRevivingFromContract || f.isShatterReviving || (typeof isFighterEffectivelyAlive === 'function' && isFighterEffectivelyAlive(f))) && (!fighter.isTeammate || !fighter.isTeammate(f)));
       const isRoundOrMatchOver = (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || !hasLivingEnemies);
-      if (isRoundOrMatchOver && fighter.hp > 0 && !state._isChampionLayoutActive && !isFinishingAbility) {
+      if (isRoundOrMatchOver && fighter.hp > 0 && !fighter.isJumpedOut && fighter.jumpState !== 'outside' && !state._isChampionLayoutActive && !isFinishingAbility) {
         // Clear stationary strike locks / melee stasis / channel freezes
         fighter.isMeleeMode = false;
         fighter.meleePunchCooldown = 0;
@@ -1416,9 +1438,9 @@ export function updateFighters() {
       if (!fighter || fighter.hp <= 0) continue;
       // Skip during Wall Slam grab, when submerged/erupting in liquid shadow, or swallowed by Pac-Man
       if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga || fighter.isSubmerged || fighter.isErupting || fighter.isSwallowedByPacman) continue;
-      // Cronos / Rubbick phases through illusions while sphere is active; Mahito phases during Phantom Soul Slip; Zenitsu phases during Thunderclap dashes
+      // Cronos / Rubbick phases through illusions while sphere is active; Mahito phases during Phantom Soul Slip; Zenitsu phases during Thunderclap dashes; Trainers outside/jumping phase through
       const isFighterSpherePhasing = fighter._isInsideOwnSphere?.() || fighter.sphereActive;
-      if (isFighterSpherePhasing || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0) || fighter.isDashingThunderclap) continue;
+      if (isFighterSpherePhasing || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0) || fighter.isDashingThunderclap || fighter.isJumpedOut || fighter.jumpState === 'outside' || fighter.jumpState === 'jumping_out' || fighter.jumpState === 'jumping_in') continue;
 
       const nearbyEntities = spatialGrid.getNearby(fighter.x, fighter.y, fighter.r * 2 + 50);
       for (const entity of nearbyEntities) {

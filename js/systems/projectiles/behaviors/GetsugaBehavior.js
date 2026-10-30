@@ -399,6 +399,20 @@ export class GetsugaBehavior extends ProjectileBehavior {
     for (let i = 0; i < _candidatePool.length; i++) {
       const f = _candidatePool[i];
       if (!f || f.hp <= 0 || f.isDead || f.dead || f.isRespawning || f === attacker || f.owner === attacker) continue;
+      if (
+        f.isUntargetable ||
+        f.untargetable ||
+        f.cannotBeTargeted ||
+        f.isTargetable === false ||
+        f.isJumpedOut ||
+        f.jumpState === 'outside' ||
+        f.jumpState === 'jumping_out' ||
+        f.jumpState === 'jumping_in' ||
+        f.isInvulnerable ||
+        f.isInvincible ||
+        f.invincible ||
+        (f.isPokemonTrainer && (f.jumpState !== 'inside' || f.isJumpedOut))
+      ) continue;
 
       const fIdx = (fighters || []).indexOf(f);
       let isEnemy = true;

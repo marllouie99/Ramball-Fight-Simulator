@@ -1096,7 +1096,7 @@ export class SukunaFighter extends Fighter {
     const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 85;
     const leaveMeleeRadius = closeRangeRadius + 30;
 
-    if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && !opponent.dead && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving) && (!opponent.isStealthed || this.domainActive)) {
+    if (opponent && (!opponent.isDead || opponent.isRevivingFromContract || opponent.isShatterReviving) && !opponent.dead && (opponent.hp > 0 || opponent.isRevivingFromContract || opponent.isShatterReviving) && (!opponent.isStealthed || this.domainActive) && !opponent.isJumpedOut && opponent.jumpState !== 'outside' && !opponent.isUntargetable) {
       const d = Math.hypot(this.x - opponent.x, this.y - opponent.y);
       if (d < closestEnemyDist) closestEnemyDist = d;
       const isOpponentGojoChanneling = (opponent.characterId === 'gojo' || opponent.type === 'gojo' || opponent._def?.id === 'gojo' || opponent._def?.type === 'gojo') &&
@@ -1110,8 +1110,8 @@ export class SukunaFighter extends Fighter {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
         if (!f || f === this || (f.hp <= 0 && !f.isRevivingFromContract && !f.isShatterReviving) || (f.isStealthed && !this.domainActive)) continue;
-        const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
-        if (targetTeam !== null && targetTeam === myTeam) continue;
+        if (f.isJumpedOut || f.jumpState === 'outside' || f.isUntargetable) continue;
+        if (this.isTeammate(f)) continue;
         const d = Math.hypot(this.x - f.x, this.y - f.y);
         if (d < closestEnemyDist) closestEnemyDist = d;
         const isFGojoChanneling = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo') &&

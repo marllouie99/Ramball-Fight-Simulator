@@ -37,6 +37,12 @@ import {
   isTrainerMovingToVantagePoint,
   updateTrainerCornerMovement,
   checkTrainerIncomingThreats,
+  pickTrainerOutsideSidelineSpot,
+  pickTrainerInsideLandingSpot,
+  startTrainerJumpOut,
+  startTrainerJumpIn,
+  updateTrainerJumpPhysics,
+  isTrainerUntargetable,
   startTrainerPokeballThrow,
   updateTrainerThrowPhysics,
   isActivePokemonTarget,
@@ -1414,7 +1420,7 @@ export class PokemonCompanionEntity extends Fighter {
           triggerGlobalScreenShake(3.5, 6);
           const dmg = Math.round(18 * dmgMult);
           if (this.owner) {
-            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 10, isSpecial: false });
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 10, isSpecial: false, isMelee: true, attacker: this });
             this.owner._spawnRippleEffect(tgt.x, tgt.y, 44, '#FFFFFF', 'rgba(255, 255, 255, 0.24)', 14);
           }
           spawnImpactFlash(tgt.x, tgt.y, '#FFFFFF');
@@ -1465,7 +1471,7 @@ export class PokemonCompanionEntity extends Fighter {
           triggerGlobalScreenShake(5.0, 10);
           const dmg = Math.round(28 * dmgMult);
           if (this.owner) {
-            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 14, isSpecial: false });
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 14, isSpecial: false, isMelee: true, attacker: this });
             this.owner._spawnRippleEffect(tgt.x, tgt.y, 56, '#E2E8F0', 'rgba(226, 232, 240, 0.28)', 18);
           }
           if (typeof tgt.applyHitStun === 'function') tgt.applyHitStun(16);
@@ -1513,7 +1519,7 @@ export class PokemonCompanionEntity extends Fighter {
           triggerGlobalScreenShake(2.5, 4);
           const dmg = Math.round(14 * dmgMult);
           if (this.owner) {
-            this.owner._dealPokemonDamage(tgt, dmg, { angle: angle - 0.25, knockback: 4, isSpecial: false });
+            this.owner._dealPokemonDamage(tgt, dmg, { angle: angle - 0.25, knockback: 4, isSpecial: false, isMelee: true, attacker: this });
           }
           if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(6);
           spawnImpactFlash(tgt.x, tgt.y, '#10B981');
@@ -1527,7 +1533,7 @@ export class PokemonCompanionEntity extends Fighter {
           triggerGlobalScreenShake(5.5, 10);
           const dmg = Math.round(20 * dmgMult);
           if (this.owner) {
-            this.owner._dealPokemonDamage(tgt, dmg, { angle: angle + 0.25, knockback: 12, isSpecial: false });
+            this.owner._dealPokemonDamage(tgt, dmg, { angle: angle + 0.25, knockback: 12, isSpecial: false, isMelee: true, attacker: this });
             this.owner._spawnRippleEffect(tgt.x, tgt.y, 60, '#10B981', 'rgba(16, 185, 129, 0.22)', 18);
           }
           if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(12);
@@ -1574,7 +1580,7 @@ export class PokemonCompanionEntity extends Fighter {
           triggerGlobalScreenShake(4.5, 8);
           const dmg = Math.round(26 * dmgMult);
           if (this.owner) {
-            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 10, isSpecial: false });
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 10, isSpecial: false, isMelee: true, attacker: this });
             this.owner._spawnRippleEffect(tgt.x, tgt.y, 52, '#8B5CF6', 'rgba(139, 92, 246, 0.24)', 16);
           }
           if (typeof tgt.applyHitStun === 'function') tgt.applyHitStun(14);
@@ -1612,7 +1618,7 @@ export class PokemonCompanionEntity extends Fighter {
           _playAshSound('machPunch');
           triggerGlobalScreenShake(2.0, 3);
           const dmg = Math.round(5 * dmgMult);
-          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle: angle - 0.15, knockback: 2, isSpecial: false });
+          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle: angle - 0.15, knockback: 2, isSpecial: false, isMelee: true, attacker: this });
           if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(4);
           spawnSparks(tgt.x, tgt.y, 3, 'cyan', '#22D3EE');
         }
@@ -1622,7 +1628,7 @@ export class PokemonCompanionEntity extends Fighter {
           _playAshSound('bulletPunch');
           triggerGlobalScreenShake(2.0, 3);
           const dmg = Math.round(5 * dmgMult);
-          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle: angle + 0.15, knockback: 2, isSpecial: false });
+          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle: angle + 0.15, knockback: 2, isSpecial: false, isMelee: true, attacker: this });
           if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(4);
           spawnSparks(tgt.x, tgt.y, 3, 'cyan', '#22D3EE');
         }
@@ -1632,7 +1638,7 @@ export class PokemonCompanionEntity extends Fighter {
           _playAshSound('machPunch');
           triggerGlobalScreenShake(3.0, 4);
           const dmg = Math.round(6 * dmgMult);
-          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 4, isSpecial: false });
+          if (this.owner) this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 4, isSpecial: false, isMelee: true, attacker: this });
           if (typeof tgt.applyTimeStop === 'function') tgt.applyTimeStop(5);
           spawnSparks(tgt.x, tgt.y, 4, 'cyan', '#22D3EE');
         }
@@ -1644,7 +1650,7 @@ export class PokemonCompanionEntity extends Fighter {
           triggerGlobalScreenShake(6.0, 12);
           const dmg = Math.round(18 * dmgMult);
           if (this.owner) {
-            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 16, isSpecial: false });
+            this.owner._dealPokemonDamage(tgt, dmg, { angle, knockback: 16, isSpecial: false, isMelee: true, attacker: this });
             this.owner._spawnRippleEffect(tgt.x, tgt.y, 65, '#22D3EE', 'rgba(34, 211, 238, 0.28)', 22);
           }
           if (typeof tgt.applyHitStun === 'function') tgt.applyHitStun(20);
@@ -1706,6 +1712,8 @@ export class AshFighter extends Fighter {
     this.color = cfg.color || '#EF4444';
     this.secondaryColor = cfg.secondaryColor || '#2563EB';
     this.damageNumberColor = cfg.damageNumberColor || '#FACC15';
+    this.teamId = def?.teamId ?? def?.team;
+    if (this.team === undefined && this.teamId !== undefined) this.team = this.teamId;
 
     // Universal Humanoid Radius (Rule 24)
     this.r = cfg.radius || cfg.r || 25;
@@ -1794,6 +1802,9 @@ export class AshFighter extends Fighter {
    * and commanding an active Pokémon or throwing a Poké Ball).
    */
   isStationarySkillActive() {
+    if (this.isJumpedOut || this.jumpState === 'outside' || this.jumpState === 'jumping_out' || this.jumpState === 'jumping_in') {
+      return true;
+    }
     // If Trainer is currently walking towards their corner vantage point, they are actively moving
     if (isTrainerMovingToVantagePoint(this, 6)) {
       return false;
@@ -1807,7 +1818,217 @@ export class AshFighter extends Fighter {
   }
 
   /**
-   * Honeycomb Forcefield Barrier Damage Interception:
+   * Dynamic Targeting & Absolute Invincibility Getters:
+   * While Ash has jumped outside the arena (or is leaping out) or has an active Pokémon deployed,
+   * he is completely untargetable, immune to all combat detection, time-stops, hitstuns, knockbacks, and damage.
+   */
+  get isUntargetable() {
+    return Boolean(
+      this._isUntargetable ||
+      this.isJumpedOut ||
+      this.jumpState === 'outside' ||
+      this.jumpState === 'jumping_out' ||
+      (this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting))
+    );
+  }
+
+  set isUntargetable(val) {
+    this._isUntargetable = val;
+  }
+
+  get untargetable() {
+    return this.isUntargetable;
+  }
+
+  set untargetable(val) {
+    this._isUntargetable = val;
+  }
+
+  get cannotBeTargeted() {
+    return this.isUntargetable;
+  }
+
+  set cannotBeTargeted(val) {
+    this._cannotBeTargeted = val;
+  }
+
+  get isTargetable() {
+    return !this.isUntargetable;
+  }
+
+  set isTargetable(val) {
+    this._isTargetable = val;
+  }
+
+  get isInvulnerable() {
+    return this.isUntargetable || Boolean(this._isInvulnerable);
+  }
+
+  set isInvulnerable(val) {
+    this._isInvulnerable = val;
+  }
+
+  get isInvincible() {
+    return this.isUntargetable || Boolean(this._isInvincible);
+  }
+
+  set isInvincible(val) {
+    this._isInvincible = val;
+  }
+
+  get invincible() {
+    return this.isUntargetable || Boolean(this._invincible);
+  }
+
+  set invincible(val) {
+    this._invincible = val;
+  }
+
+  get invincibilityTimer() {
+    return this.isUntargetable ? 999999 : (this._invincibilityTimer || 0);
+  }
+
+  set invincibilityTimer(val) {
+    this._invincibilityTimer = val;
+  }
+
+  get isStealthed() {
+    return this.isUntargetable || Boolean(this._isStealthed);
+  }
+
+  set isStealthed(val) {
+    this._isStealthed = val;
+  }
+
+  /**
+   * Universal evaluation of whether Ash is in untargetable/invincible God-Mode on the sideline
+   * or leaping in/out of the arena.
+   */
+  _isGodModeOrOutside() {
+    return Boolean(
+      this.isUntargetable ||
+      this.untargetable ||
+      this.cannotBeTargeted ||
+      this.isTargetable === false ||
+      this.isJumpedOut ||
+      this.jumpState === 'outside' ||
+      this.jumpState === 'jumping_out' ||
+      this.jumpState === 'jumping_in' ||
+      this.isInvulnerable ||
+      this.isInvincible ||
+      this.invincible
+    );
+  }
+
+  /**
+   * Total immunity to gravitational vortexes and suction fields (Gojo Purple/Blue, Black Hole, Pure Love Beam).
+   */
+  isImmuneToGravitationalPull(vortexType = 'purple') {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      return true;
+    }
+    return super.isImmuneToGravitationalPull ? super.isImmuneToGravitationalPull(vortexType) : false;
+  }
+
+  /**
+   * Total immunity to beam entrapment and displacement while outside or jumping.
+   */
+  isCaughtInBeam() {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      return false;
+    }
+    return super.isCaughtInBeam ? super.isCaughtInBeam() : false;
+  }
+
+  /**
+   * Total immunity to pull and drag states while outside or jumping.
+   */
+  isPulledOrDragged() {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      return false;
+    }
+    return typeof super.isPulledOrDragged === 'function' ? super.isPulledOrDragged() : false;
+  }
+
+  /**
+   * Suppresses all knockback while untargetable outside the arena or jumping.
+   */
+  applyKnockback(vx, vy, stunFrames = 0) {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    super.applyKnockback(vx, vy, stunFrames);
+  }
+
+  /**
+   * Suppresses all hitstun while untargetable outside the arena or jumping.
+   */
+  applyHitStun(duration) {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      this.hitStunTimer = 0;
+      return;
+    }
+    super.applyHitStun(duration);
+  }
+
+  /**
+   * Suppresses all time-stop effects while untargetable outside the arena or jumping.
+   */
+  applyTimeStop(duration) {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      this.timeStopTimer = 0;
+      return;
+    }
+    super.applyTimeStop(duration);
+  }
+
+  /**
+   * Suppresses all suction displacement while outside or jumping.
+   */
+  applySuction(vx, vy) {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    if (typeof super.applySuction === 'function') {
+      super.applySuction(vx, vy);
+    }
+  }
+
+  /**
+   * Suppresses all pull displacement while outside or jumping.
+   */
+  applyPull(vx, vy) {
+    if (this._isGodModeOrOutside() || (typeof this.isCastingSkill === 'function' && this.isCastingSkill())) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
+    if (typeof super.applyPull === 'function') {
+      super.applyPull(vx, vy);
+    }
+  }
+
+  /**
+   * Suppresses all movement slow debuffs while outside or jumping.
+   */
+  applySlow(duration, mult, opts = {}) {
+    if (this._isGodModeOrOutside()) {
+      this.slowTimer = 0;
+      this.slowMultiplier = 1.0;
+      return;
+    }
+    if (typeof super.applySlow === 'function') {
+      super.applySlow(duration, mult, opts);
+    }
+  }
+
+  /**
+   * Honeycomb Forcefield Barrier Damage Interception & Untargetable Sideline Immunity:
+   * While Ash has jumped out outside the arena, he is completely untargetable and immune to all attacks.
    * While Ash's Pokémon is deployed (or being thrown out), the Hexagonal Honeycomb Barrier blocks enemy attacks!
    * Only Toji's Inverted Spear of Heaven (Rule 1.7 lore exception) can pierce barriers directly.
    */
@@ -1838,7 +2059,23 @@ export class AshFighter extends Fighter {
         return false;
       }
     }
+
+    // If Ash is outside the arena, leaping out, jumping in, untargetable, or has an active Pokémon, he is completely immune!
+    if (this._isGodModeOrOutside() || (this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting))) {
+      return false;
+    }
+
     return super.takeDamage(amount, attacker, opts);
+  }
+
+  /**
+   * Prevents bouncing or clamping Ash against arena walls while he has jumped outside onto the sideline.
+   */
+  resolveWallBounce(arena, opponent) {
+    if (this._isGodModeOrOutside()) {
+      return;
+    }
+    return super.resolveWallBounce(arena, opponent);
   }
 
   /**
@@ -2001,7 +2238,8 @@ export class AshFighter extends Fighter {
   _dealPokemonDamage(target, amount, opts = {}) {
     if (!target || target.hp <= 0) return false;
     const unifiedColor = this.damageNumberColor || '#FACC15';
-    const landed = applyDamageToTarget(target, amount, this, {
+    const attackerEntity = opts.attacker || this.activePokemon || this;
+    const landed = applyDamageToTarget(target, amount, attackerEntity, {
       ...opts,
       damageNumberColor: unifiedColor
     });
@@ -2010,7 +2248,7 @@ export class AshFighter extends Fighter {
       _playAshSound((opts.isSpecial || amount >= 24) ? 'hitStrong' : 'hit');
       spawnImpactFlash(target.x, target.y, this.themeColor, 16);
       if (opts.knockback && target.hp > 0 && !target.immuneToKnockback && !target.immuneToPush && target.characterId !== 'escanor') {
-        const a = opts.angle ?? Math.atan2(target.y - this.y, target.x - this.x);
+        const a = opts.angle ?? Math.atan2(target.y - attackerEntity.y, target.x - attackerEntity.x);
         target.vx = (target.vx || 0) + Math.cos(a) * opts.knockback * 0.35;
         target.vy = (target.vy || 0) + Math.sin(a) * opts.knockback * 0.35;
       }
@@ -2146,10 +2384,10 @@ export class AshFighter extends Fighter {
     this.vx = 0;
     this.vy = 0;
 
-    // Pick safest trainer sideline vantage point (Top-Middle, Left-Middle, or Right-Middle)
+    // Pick safest trainer sideline vantage point and initiate high-arc Jump Out of the arena
     const curArena = (typeof state !== 'undefined' ? state.arena : null);
     const target = this._findBestTarget();
-    this.trainerVantagePoint = this._pickTrainerVantagePoint(curArena, target);
+    startTrainerJumpOut(this, curArena, target);
 
     if (typeof state !== 'undefined' && Array.isArray(state.fighters) && state.fighters.includes(this)) {
       state.fighters.push(pokemon);
@@ -2209,13 +2447,17 @@ export class AshFighter extends Fighter {
     this._cleanupActivePokemon();
     this.trainerVantagePoint = null;
 
+    // Trigger Jump Back In inside the arena now that the active Pokémon has fainted!
+    const curArena = (typeof state !== 'undefined' ? state.arena : null);
+    startTrainerJumpIn(this, curArena);
+
     // Drop Honeycomb Barrier & Resume Ash's Mobile Evasion!
     this.isProtectedByHoneycombBarrier = false;
     this.summonCooldown = this.summonCooldownMax;
 
-    const evadeAngle = (this.gunAngle || 0) + Math.PI + (Math.random() - 0.5) * 0.9;
-    this.vx = Math.cos(evadeAngle) * this.speed;
-    this.vy = Math.sin(evadeAngle) * this.speed;
+    // Do NOT assign random movement impulse while mid-jump trajectory is active!
+    this.vx = 0;
+    this.vy = 0;
   }
 
   _cleanupActivePokemon() {
@@ -2502,7 +2744,7 @@ export class AshFighter extends Fighter {
     }
 
     const bestTarget = this._findBestTarget(opponent);
-    if (bestTarget) {
+    if (bestTarget && this.jumpState !== 'outside') {
       this.aim(bestTarget);
     }
 
@@ -2513,21 +2755,83 @@ export class AshFighter extends Fighter {
       this._activateMegaAwakening(bestTarget, arena);
     }
 
-    // 5. CORE STATE MACHINE:
-    // STATE A: Pokémon is Active (or Poké Ball in flight or fainting/recalling) -> ASH REPOSITIONS TO SIDELINE & PROJECTS HONEYCOMB BARRIER!
-    if ((this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting)) || this.thrownPokeball) {
-      this.isProtectedByHoneycombBarrier = true;
+    // 4.5. Advance Jump Out / Jump In Trajectory Physics
+    if (this.jumpState === 'jumping_out' || this.jumpState === 'jumping_in') {
+      updateTrainerJumpPhysics(this, arena, bestTarget);
+      return;
+    }
 
-      // If Pokémon has been summoned, slowly walk toward the safest unoccupied corner vantage point
-      if (this.activePokemon && !this.thrownPokeball) {
-        updateTrainerCornerMovement(this, arena, bestTarget, {
-          pad: cfg.trainerVantagePad || 42,
-          slowMoveMultiplier: cfg.trainerSlowMoveMultiplier ?? 0.28
-        });
+    // 5. CORE STATE MACHINE:
+    if (this.jumpState === 'outside') {
+      // While jumped out outside the arena:
+      // Ash is in absolute God-Mode: 100% UNTARGETABLE, IMMUNE to all attacks, suction, and pull!
+      this.isJumpedOut = true;
+      this.isUntargetable = true;
+      this.untargetable = true;
+      this.cannotBeTargeted = true;
+      this.isTargetable = false;
+      this.isInvulnerable = true;
+      this.isInvincible = true;
+      this.invincible = true;
+      this.invincibilityTimer = 999999;
+      this.isProtectedByHoneycombBarrier = false;
+      this.vx = 0;
+      this.vy = 0;
+      this.z = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      this.isCaughtInPurple = false;
+      this.isCaughtInPurpleVortex = false;
+      this.purpleHitTimer = 0;
+      this.isCaughtInBlue = false;
+      this.isCaughtInBluePull = false;
+      this.isCaughtInBlackHole = false;
+      this.isDraggedByGetsuga = false;
+      this.caughtInPureLoveBeam = false;
+      this.wasCaughtInPureLoveBeam = false;
+      this.pureLoveBeamTimer = 0;
+      this.pureLoveBeamRecoveryTimer = 0;
+      this.timeStopTimer = 0;
+      this.hitStunTimer = 0;
+      this.freezeTimer = 0;
+      this.slowTimer = 0;
+      this.slowMultiplier = 1.0;
+      this.preventKnockbackBounce = false;
+
+      // Position Lock: strictly anchor Ash to his designated sideline vantage point
+      if (typeof this.sidelineX === 'number' && typeof this.sidelineY === 'number') {
+        this.x = this.sidelineX;
+        this.y = this.sidelineY;
+      } else if (this.trainerVantagePoint && typeof this.trainerVantagePoint.x === 'number') {
+        this.sidelineX = this.trainerVantagePoint.x;
+        this.sidelineY = this.trainerVantagePoint.y;
+        this.x = this.sidelineX;
+        this.y = this.sidelineY;
+      }
+
+      // Stable Sideline Spectator Aim (Stably face inward toward arena, tracking active Pokémon without flipping)
+      const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || { x: 45, y: 240, width: 450, height: 450 };
+      const isLeftWall = this.trainerVantagePoint?.wall === 'left' || this.x < (curArena.x + curArena.width * 0.5);
+      const lookTarget = (this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting)) ? this.activePokemon : bestTarget;
+
+      if (isLeftWall) {
+        // Left sideline: Facing right (base angle 0) into arena
+        let targetAngle = 0;
+        if (lookTarget) {
+          targetAngle = Math.atan2((lookTarget.y || this.y) - this.y, (lookTarget.x || this.x + 100) - this.x);
+        }
+        this.gunAngle = Math.max(-0.60, Math.min(0.60, targetAngle));
+        this.angle = this.gunAngle;
       } else {
-        // Poké Ball is in mid-throw flight -> hold still during throw animation
-        this.vx = 0;
-        this.vy = 0;
+        // Right sideline: Facing left (base angle PI) into arena
+        let targetAngle = Math.PI;
+        if (lookTarget) {
+          targetAngle = Math.atan2((lookTarget.y || this.y) - this.y, (lookTarget.x || this.x - 100) - this.x);
+        }
+        let diffFromPI = targetAngle > 0 ? (targetAngle - Math.PI) : (targetAngle + Math.PI);
+        diffFromPI = Math.max(-0.60, Math.min(0.60, diffFromPI));
+        this.gunAngle = Math.PI + diffFromPI;
+        this.angle = this.gunAngle;
       }
 
       // Trigger Trainer Command Special Move when ready (both Ash and Pokémon must be ready and not mid-cast)
@@ -2543,12 +2847,25 @@ export class AshFighter extends Fighter {
         this._executeTrainerCommand(bestTarget);
       }
 
-      // Check for incoming attacks or nearby threatening enemies to project the directional barrier
-      this._checkIncomingThreats(bestTarget);
-
-      // Clamp Ash within arena walls while stationary
-      this.resolveWallBounce(arena, bestTarget);
+      // Outside arena: do not clamp or bounce against arena walls!
       return;
+    }
+
+    // STATE A: Pokémon is Active (or Poké Ball in flight or fainting/recalling)
+    if ((this.activePokemon && (this.activePokemon.hp > 0 || this.activePokemon.isFainting)) || this.thrownPokeball) {
+      if (this.activePokemon && !this.thrownPokeball && this.jumpState === 'inside') {
+        // Pokémon has spawned: Trainer leaps up and out of the arena to the sideline!
+        startTrainerJumpOut(this, arena, bestTarget);
+        return;
+      } else {
+        // Poké Ball is in mid-throw flight -> hold still during throw animation
+        this.vx = 0;
+        this.vy = 0;
+        this.isProtectedByHoneycombBarrier = true;
+        this._checkIncomingThreats(bestTarget);
+        this.resolveWallBounce(arena, bestTarget);
+        return;
+      }
     }
 
     // STATE B: No Active Pokémon -> Honeycomb Barrier OFF, Ash Moves Around Waiting for Summon Cooldown!

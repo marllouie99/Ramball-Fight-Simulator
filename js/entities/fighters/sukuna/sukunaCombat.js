@@ -9,6 +9,29 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
+import { isEntityOutsideArena } from '../../fighter.js';
+
+export function isValidMeleeTarget(f, arena) {
+  if (!f || f.hp <= 0 || f.isDead || f.dead || f._hasDied) return false;
+  if (
+    f.isLawnmower ||
+    f.isUntargetable ||
+    f.untargetable ||
+    f.cannotBeTargeted ||
+    f.isTargetable === false ||
+    f.isJumpedOut ||
+    f.jumpState === 'outside' ||
+    f.jumpState === 'jumping_out' ||
+    f.jumpState === 'jumping_in' ||
+    f.isInvulnerable ||
+    f.isInvincible ||
+    f.invincible ||
+    (f.invincibilityTimer && f.invincibilityTimer > 0) ||
+    (f.isPokemonTrainer && (f.jumpState !== 'inside' || f.isJumpedOut || (f.activePokemon && (f.activePokemon.hp > 0 || f.activePokemon.isFainting))))
+  ) return false;
+  if (arena && isEntityOutsideArena(f, arena)) return false;
+  return true;
+}
 
 export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) {
   if (!fighter.afterImages) fighter.afterImages = [];
@@ -157,7 +180,7 @@ export function teleportToMeleeAngle(fighter, opponent, arena) {
     fighter.isWallPinnedByEscanor ||
     fighter.isCurrentlyWallPinnedByEscanor
   );
-  if (!opponent || opponent.isDead || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0 || isDraggedOrTrapped || Math.hypot(fighter.knockbackVx || 0, fighter.knockbackVy || 0) > 0.5) return;
+  if (!isValidMeleeTarget(opponent, arena) || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0 || isDraggedOrTrapped || Math.hypot(fighter.knockbackVx || 0, fighter.knockbackVy || 0) > 0.5) return;
 
   const oldX = fighter.x;
   const oldY = fighter.y;
@@ -247,15 +270,15 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   }
 
   // Dynamic target selection in multi-enemy/1v2 mode: prioritize closest living enemy
-  let activeTarget = opponent;
+  let activeTarget = (opponent && isValidMeleeTarget(opponent, arena)) ? opponent : null;
   const myTeam = state.getFighterTeam(state.fighters ? state.fighters.indexOf(fighter) : 0);
-  let minDist = (activeTarget && activeTarget.hp > 0) ? Math.hypot(activeTarget.x - fighter.x, activeTarget.y - fighter.y) : Infinity;
+  let minDist = activeTarget ? Math.hypot(activeTarget.x - fighter.x, activeTarget.y - fighter.y) : Infinity;
 
   if (state.fighters && state.fighters.length > 1) {
     for (let i = 0; i < state.fighters.length; i++) {
       const f = state.fighters[i];
-      if (f && f !== fighter && f.hp > 0) {
-        const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
+      if (f && f !== fighter && isValidMeleeTarget(f, arena)) {
+        const isEnemy = !fighter.isTeammate(f);
         if (isEnemy) {
           const d = Math.hypot(f.x - fighter.x, f.y - fighter.y);
           if (d < minDist) {
@@ -268,6 +291,13 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   }
 
   opponent = activeTarget;
+  if (!opponent || !isValidMeleeTarget(opponent, arena)) {
+    fighter.vx = 0;
+    fighter.vy = 0;
+    fighter.isMeleeMode = false;
+    fighter.meleeComboCount = 0;
+    return;
+  }
   fighter.vx = 0;
   fighter.vy = 0;
 
@@ -317,7 +347,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   ];
 
   for (const ent of allEntities) {
-    if (!ent || ent.hp <= 0 || ent === fighter || (ent.invincibilityTimer || 0) > 0 || ent.owner === fighter) continue;
+    if (!ent || !isValidMeleeTarget(ent, arena) || ent === fighter || ent.owner === fighter) continue;
 
     if (ent.owner) {
       const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));

@@ -1794,7 +1794,7 @@ export class GojoFighter extends Fighter {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
         if (!this._isValidCombatTarget(f) || (f.isStealthed && !this.domainActive)) continue;
-        const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
+        const isEnemy = !this.isTeammate(f);
         if (!isEnemy) continue;
 
         const d = Math.hypot(this.x - f.x, this.y - f.y);
@@ -2084,7 +2084,22 @@ export class GojoFighter extends Fighter {
   _isValidCombatTarget(target) {
     if (!target || target === this) return false;
     if (target.isLawnmower || target.characterId === 'crazydave_lawnmower') return false;
-    if (target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
+    if (
+      target.isUntargetable ||
+      target.untargetable ||
+      target.cannotBeTargeted ||
+      target.isTargetable === false ||
+      target.isJumpedOut ||
+      target.jumpState === 'outside' ||
+      target.jumpState === 'jumping_out' ||
+      target.jumpState === 'jumping_in' ||
+      target.isInvulnerable ||
+      target.isInvincible ||
+      target.invincible ||
+      (target.invincibilityTimer && target.invincibilityTimer > 0) ||
+      (target.isPokemonTrainer && (target.jumpState !== 'inside' || target.isJumpedOut || (target.activePokemon && (target.activePokemon.hp > 0 || target.activePokemon.isFainting))))
+    ) return false;
+    if (typeof state !== 'undefined' && state?.arena && isEntityOutsideArena(target, state.arena)) return false;
     if (target.isDead || target.dead || target._hasDied) return false;
     const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
     if (target.hp <= 0 && !isReforming) return false;
@@ -2130,7 +2145,7 @@ export class GojoFighter extends Fighter {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
         if (f && f !== this && this._isValidCombatTarget(f)) {
-          const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
+          const isEnemy = !this.isTeammate(f);
           if (isEnemy) {
             const d = Math.hypot(f.x - this.x, f.y - this.y);
             if (d < minDist) {

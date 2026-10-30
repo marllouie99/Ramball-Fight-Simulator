@@ -12581,126 +12581,139 @@ async function runInteractionTests() {
     const enemy = new NormalClass({ x: 420, y: 620, hp: 1000, maxHp: 1000, teamId: 1 });
     state.fighters = [ash, enemy];
 
-    // 1. Initial State: Ash has no active Pokemon initially
-    assert(ash.trainerVantagePoint === null, 'Ash trainerVantagePoint must be null before summoning');
+    // 1. Sideline wall constraint: Pokémon Trainers ONLY leap to the left or right wall!
+    // Near left flank -> leaps to left outside wall
+    const {
+      pickTrainerOutsideSidelineSpot,
+      pickTrainerInsideLandingSpot,
+      isTrainerUntargetable
+    } = await import('../js/systems/pokemonTrainerSystem.js');
+    const { getClosestOpponent } = await import('../js/systems/physics.js');
+    const { isEntityOutsideArena, applyDamageToTarget } = await import('../js/entities/fighter.js');
 
-    // 2. Summon Pikachu from Pokeball
-    ash._spawnPokemonFromBall({ speciesKey: 'pikachu', targetX: 270, targetY: 465 });
+    const leftTrainer = new AshFighter({ x: 100, y: 465, hp: 360, maxHp: 360, teamId: 0 });
+    const leftSpot = pickTrainerOutsideSidelineSpot(leftTrainer, testArena, null);
+    assert(leftSpot.wall === 'left', `Trainer near left flank must leap to left wall, got ${leftSpot.wall}`);
+    assert(leftSpot.x === testArena.x - 26, `Left sideline X must be arena.x - 26, got ${leftSpot.x}`);
+
+    // Near right flank -> leaps to right outside wall
+    const rightTrainer = new AshFighter({ x: 400, y: 465, hp: 360, maxHp: 360, teamId: 0 });
+    const rightSpot = pickTrainerOutsideSidelineSpot(rightTrainer, testArena, null);
+    assert(rightSpot.wall === 'right', `Trainer near right flank must leap to right wall, got ${rightSpot.wall}`);
+    assert(rightSpot.x === testArena.x + testArena.width + 26, `Right sideline X must be arena.x + arena.width + 26, got ${rightSpot.x}`);
+
+    // Top/Bottom bias test: even if trainer is closer to top or bottom wall, they MUST ONLY leap to left or right wall!
+    const topTrainer = new AshFighter({ x: 200, y: 245, hp: 360, maxHp: 360, teamId: 0 });
+    const topSpot = pickTrainerOutsideSidelineSpot(topTrainer, testArena, null);
+    assert(topSpot.wall === 'left' || topSpot.wall === 'right', `Trainer near top edge must leap to left or right wall only, got ${topSpot.wall}`);
+
+    const bottomTrainer = new AshFighter({ x: 300, y: 685, hp: 360, maxHp: 360, teamId: 0 });
+    const bottomSpot = pickTrainerOutsideSidelineSpot(bottomTrainer, testArena, null);
+    assert(bottomSpot.wall === 'left' || bottomSpot.wall === 'right', `Trainer near bottom edge must leap to left or right wall only, got ${bottomSpot.wall}`);
+
+    // 2. Active Summoning & Leap Out execution
+    ash._spawnPokemonFromBall({ speciesKey: 'pikachu', targetX: 250, targetY: 465 });
     assert(ash.activePokemon !== null, 'Ash must have an active Pokémon after spawning');
-    assert(ash.isProtectedByHoneycombBarrier === true, 'Ash must be protected by Honeycomb Barrier when Pokémon is active');
-    assert(ash.trainerVantagePoint !== null, 'Ash must select a sideline vantage point upon summoning Pokémon');
+    assert(ash.jumpState === 'jumping_out', `Ash must enter jumping_out state on summon, got ${ash.jumpState}`);
+    assert(ash.isJumpedOut === true, 'Ash isJumpedOut must be true immediately on leap initiation');
+    assert(ash.isUntargetable === true, 'Ash must be untargetable during jump out');
+    assert(ash.isInvulnerable === true, 'Ash must be invulnerable during jump out');
+    assert(ash.isInvincible === true, 'Ash must be invincible during jump out');
+    assert(ash.invincibilityTimer > 0, 'Ash invincibilityTimer must be > 0 during jump out');
 
-    const vp = ash.trainerVantagePoint;
-    assert(['top-left', 'top-right', 'bottom-left', 'bottom-right'].includes(vp.type), `Vantage point type must be a corner ('top-left', 'top-right', 'bottom-left', 'bottom-right'), got ${vp.type}`);
-
-    // Since enemy is at bottom-right (420, 620), top-left must be selected as the safest corner
-    assert(vp.type === 'top-left', `Safe corner vantage point must be top-left to avoid bottom-right enemy, got ${vp.type}`);
-
-    // 3. Ash updates and begins slowly moving toward the chosen sideline vantage point
-    ash.update(enemy, 0, testArena);
-    const moveSpeed = Math.hypot(ash.vx, ash.vy);
-    assert(moveSpeed > 0.8 && moveSpeed < 2.5, `Ash must move at slow deliberate trainer pace (~1.5 px/f), got ${moveSpeed}`);
-    assert(ash.isProtectedByHoneycombBarrier === true, 'Honeycomb Barrier must remain active while Ash slowly moves to sideline');
-
-    // 4. Advance updates until Ash arrives at the sideline vantage point
-    for (let f = 0; f < 300; f++) {
+    // 3. Step physics until jump finishes and Ash lands on the outside sideline
+    for (let f = 0; f < 40; f++) {
       ash.update(enemy, 0, testArena);
-      const d = Math.hypot(vp.x - ash.x, vp.y - ash.y);
-      if (d <= 6) break;
+      if (ash.jumpState === 'outside') break;
     }
+    assert(ash.jumpState === 'outside', `Ash must arrive at outside sideline, got ${ash.jumpState}`);
+    assert(isEntityOutsideArena(ash, testArena) === true, 'Ash must be confirmed outside arena bounds');
+    assert(isTrainerUntargetable(ash) === true, 'isTrainerUntargetable(ash) must return true');
 
-    const arriveDist = Math.hypot(vp.x - ash.x, vp.y - ash.y);
-    assert(arriveDist <= 6.5, `Ash must arrive at sideline vantage point within 6.5px, got distance ${arriveDist}`);
-    assert(ash.vx === 0 && ash.vy === 0, `Ash must stop with vx = 0, vy = 0 upon reaching sideline, got vx=${ash.vx}, vy=${ash.vy}`);
-    assert(ash.isProtectedByHoneycombBarrier === true, 'Honeycomb Barrier must remain active while holding sideline');
+    // 4. Absolute Invincibility & Undetectability Verification
+    // Enemy targeting: getClosestOpponent must target the active Pokémon, NOT Ash!
+    const target = getClosestOpponent(enemy);
+    assert(target !== ash, 'Enemy AI getClosestOpponent must NEVER return an untargetable/jumped-out Pokémon Trainer!');
+    assert(target === ash.activePokemon, 'Enemy AI must target the active summoned Pokémon instead');
+    assert(enemy.isValidAimTarget(ash) === false, 'Enemy isValidAimTarget(ash) must return false');
 
-    // 5. Test fainting: When active Pokémon faints, Ash clears vantage point, drops barrier & enters mobile evasion
+    // Damage & CC immunity
+    const preHp = ash.hp;
+    const dmgLanded = ash.takeDamage(50, enemy);
+    assert(dmgLanded === false, 'takeDamage on jumped-out trainer must return false');
+    assert(ash.hp === preHp, 'Trainer HP must not decrease while outside the arena');
+
+    const appDmgLanded = applyDamageToTarget(ash, 50, enemy);
+    assert(appDmgLanded === false, 'applyDamageToTarget on jumped-out trainer must return false');
+    assert(ash.hp === preHp, 'Trainer HP must remain intact after applyDamageToTarget');
+
+    ash.applyKnockback(50, 50);
+    assert(ash.vx === 0 && ash.vy === 0, 'Trainer must be immune to knockback while outside the arena');
+
+    ash.applyHitStun(60);
+    assert((ash.hitStunTimer || 0) === 0, 'Trainer must be immune to hitstun while outside the arena');
+
+    ash.applyTimeStop(60);
+    assert((ash.timeStopTimer || 0) === 0, 'Trainer must be immune to timestop while outside the arena');
+
+    // 5. When active Pokémon faints, Trainer jumps back into the arena
+    const landingSpot = pickTrainerInsideLandingSpot(ash, testArena);
+    assert(landingSpot.x > testArena.x && landingSpot.x < testArena.x + testArena.width, 'Landing spot must be inside the arena');
+
     ash._onActivePokemonFainted(ash.activePokemon);
     assert(ash.activePokemon === null, 'Active Pokémon must be cleaned up on faint');
-    assert(ash.trainerVantagePoint === null, 'trainerVantagePoint must be reset to null when Pokémon faints');
-    assert(ash.isProtectedByHoneycombBarrier === false, 'Honeycomb Barrier must drop when Pokémon faints');
-    assert(ash.summonCooldown > 0, 'Ash summonCooldown must start ticking down after faint');
-    const evadeSpeed = Math.hypot(ash.vx, ash.vy);
-    assert(evadeSpeed >= ash.speed * 0.70, `Ash must resume brisk mobile evasion speed (>= ${ash.speed * 0.70}), got ${evadeSpeed}`);
+    assert(ash.jumpState === 'jumping_in', `Ash must enter jumping_in state on pokemon faint, got ${ash.jumpState}`);
 
-    // 6. Multi-Trainer Unoccupied Sideline Selection (2, 3 & 4 Pokémon Trainers simultaneously)
-    const ash1 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 0 });
-    const ash2 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 1 });
-    const ash3 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 2 });
-    const ash4 = new AshFighter({ x: 250, y: 450, hp: 360, maxHp: 360, teamId: 3 });
-    state.fighters = [ash1, ash2, ash3, ash4, enemy];
-
-    ash1._spawnPokemonFromBall({ speciesKey: 'pikachu', targetX: 250, targetY: 450 });
-    ash2._spawnPokemonFromBall({ speciesKey: 'charizard', targetX: 260, targetY: 450 });
-    ash3._spawnPokemonFromBall({ speciesKey: 'greninja', targetX: 270, targetY: 450 });
-    ash4._spawnPokemonFromBall({ speciesKey: 'lucario', targetX: 280, targetY: 450 });
-
-    const trainers = [ash1, ash2, ash3, ash4];
-    const pad = 42;
-    const minX = testArena.x + pad;
-    const maxX = testArena.x + testArena.width - pad;
-    const minY = testArena.y + pad;
-    const maxY = testArena.y + testArena.height - pad;
-
-    for (let i = 0; i < trainers.length; i++) {
-      const vpI = trainers[i].trainerVantagePoint;
-      assert(vpI !== null, `Trainer ${i + 1} must select a corner vantage point`);
-      const isCorner = (
-        (Math.abs(vpI.x - minX) <= 1 || Math.abs(vpI.x - maxX) <= 1) &&
-        (Math.abs(vpI.y - minY) <= 1 || Math.abs(vpI.y - maxY) <= 1)
-      );
-      assert(isCorner, `Trainer ${i + 1} vantage point (${vpI.x}, ${vpI.y}) must be in a corner of the arena`);
-      for (let j = i + 1; j < trainers.length; j++) {
-        const vpJ = trainers[j].trainerVantagePoint;
-        const dist = Math.hypot(vpI.x - vpJ.x, vpI.y - vpJ.y);
-        assert(dist >= 90, `Trainer ${i + 1} and Trainer ${j + 1} must NOT occupy the same corner (dist=${dist})`);
-      }
+    // Step physics until jump back in completes
+    for (let f = 0; f < 40; f++) {
+      ash.update(enemy, 0, testArena);
+      if (ash.jumpState === 'inside') break;
     }
+    assert(ash.jumpState === 'inside', `Ash must land back inside the arena, got ${ash.jumpState}`);
+    assert(ash.isJumpedOut === false, 'Ash isJumpedOut must be false after landing inside');
+    assert(ash.isUntargetable === false, 'Ash must become targetable again after landing inside');
+    assert(ash.isInvulnerable === false, 'Ash must lose invulnerability after landing inside');
+    assert(isEntityOutsideArena(ash, testArena) === false, 'Ash must be inside arena bounds');
+    assert(enemy.isValidAimTarget(ash) === true, 'Enemy must now be able to target Ash once inside');
 
-    // Also verify dynamic conflict resolution during update() if two trainers were forced onto the same target spot
-    ash2.trainerVantagePoint = { ...ash1.trainerVantagePoint };
-    ash2.update(enemy, 1, testArena);
-    const resolvedDist = Math.hypot(ash1.trainerVantagePoint.x - ash2.trainerVantagePoint.x, ash1.trainerVantagePoint.y - ash2.trainerVantagePoint.y);
-    assert(resolvedDist >= 90, `Trainer 2 must automatically re-pick an unoccupied sideline spot on conflict (dist=${resolvedDist})`);
+    // 6. Enemy Trainer Sideline Leap Opposition:
+    // When Pokémon Trainers are enemies, if one side is occupied by an enemy, the other trainer MUST leap to the opposite side!
+    const ashRed = new AshFighter({ x: 100, y: 465, hp: 360, maxHp: 360, teamId: 0 }); // Ash on left
+    const rivalBlue = new AshFighter({ x: 120, y: 465, hp: 360, maxHp: 360, teamId: 1 }); // Enemy Blue, also near left wall (x: 120)
+    state.fighters = [ashRed, rivalBlue];
 
-    // Verify centralized pokemonTrainerSystem cross-character interoperability (e.g. Ash + future Red & Cynthia trainers)
-    const {
-      initPokemonTrainerState,
-      isPokemonTrainer,
-      updateTrainerCornerMovement
-    } = await import('../js/systems/pokemonTrainerSystem.js');
-    const redTrainer = new NormalClass({ x: 260, y: 455, hp: 360, maxHp: 360, teamId: 4 });
-    redTrainer.characterId = 'red';
-    redTrainer.type = 'red';
-    initPokemonTrainerState(redTrainer, { trainerVantagePad: 42, trainerSlowMoveMultiplier: 0.28 });
+    // Case 6A: Ash occupies the left sideline (outside-left)
+    ashRed.isJumpedOut = true;
+    ashRed.jumpState = 'outside';
+    ashRed.trainerVantagePoint = { type: 'outside-left', wall: 'left', x: testArena.x - 26, y: 465 };
 
-    const cynthiaTrainer = new NormalClass({ x: 265, y: 460, hp: 360, maxHp: 360, teamId: 5 });
-    cynthiaTrainer.characterId = 'cynthia';
-    cynthiaTrainer.type = 'cynthia';
-    initPokemonTrainerState(cynthiaTrainer, { trainerVantagePad: 42, trainerSlowMoveMultiplier: 0.28 });
+    // Blue is closer to the left wall (distLeft = 75, distRight = 375), BUT Ash (enemy) occupies left!
+    const blueSpot = pickTrainerOutsideSidelineSpot(rivalBlue, testArena, ashRed);
+    assert(blueSpot.wall === 'right', `Enemy trainer Blue must leap to the opposite (right) wall when enemy occupies left, got ${blueSpot.wall}`);
+    assert(blueSpot.x === testArena.x + testArena.width + 26, `Blue spot must be on the right sideline outside arena, got ${blueSpot.x}`);
 
-    assert(isPokemonTrainer(ash1) === true, 'Ash must be recognized by centralized isPokemonTrainer()');
-    assert(isPokemonTrainer(redTrainer) === true, 'Future trainer Red must be recognized by centralized isPokemonTrainer()');
-    assert(isPokemonTrainer(cynthiaTrainer) === true, 'Future trainer Cynthia must be recognized by centralized isPokemonTrainer()');
+    // Case 6B: Ash occupies the right sideline (outside-right)
+    ashRed.trainerVantagePoint = { type: 'outside-right', wall: 'right', x: testArena.x + testArena.width + 26, y: 465 };
+    rivalBlue.x = 420; // Blue is near right wall
+    const blueSpot2 = pickTrainerOutsideSidelineSpot(rivalBlue, testArena, ashRed);
+    assert(blueSpot2.wall === 'left', `Enemy trainer Blue must leap to the opposite (left) wall when enemy occupies right, got ${blueSpot2.wall}`);
+    assert(blueSpot2.x === testArena.x - 26, `Blue spot must be on the left sideline outside arena, got ${blueSpot2.x}`);
 
-    state.fighters = [ash1, redTrainer, cynthiaTrainer, enemy];
-    ash1.trainerVantagePoint = null;
-    updateTrainerCornerMovement(ash1, testArena, enemy);
-    updateTrainerCornerMovement(redTrainer, testArena, enemy);
-    updateTrainerCornerMovement(cynthiaTrainer, testArena, enemy);
+    // Case 6C: Circular Arena Enemy Sideline Opposition
+    const circleArena = { x: 45, y: 240, width: 450, height: 450, shape: 'circle', radius: 225 };
+    ashRed.trainerVantagePoint = { type: 'outside-left', wall: 'left', x: circleArena.x - 26, y: 465 };
+    rivalBlue.x = circleArena.x + 50; // Near left flank
+    const circleSpot = pickTrainerOutsideSidelineSpot(rivalBlue, circleArena, ashRed);
+    assert(circleSpot.wall === 'right', `In circle arena, enemy trainer must leap to right flank when left is occupied, got ${circleSpot.wall}`);
+    assert(circleSpot.type === 'outside-right', `Spot type must be outside-right, got ${circleSpot.type}`);
 
-    const mixedTrainers = [ash1, redTrainer, cynthiaTrainer];
-    for (let i = 0; i < mixedTrainers.length; i++) {
-      for (let j = i + 1; j < mixedTrainers.length; j++) {
-        const dMixed = Math.hypot(
-          mixedTrainers[i].trainerVantagePoint.x - mixedTrainers[j].trainerVantagePoint.x,
-          mixedTrainers[i].trainerVantagePoint.y - mixedTrainers[j].trainerVantagePoint.y
-        );
-        assert(dMixed >= 90, `Cross-character trainers (${mixedTrainers[i].characterId} & ${mixedTrainers[j].characterId}) must pick distinct corners (dist=${dMixed})`);
-      }
-    }
-
-    trainers.forEach(t => t._cleanupActivePokemon?.());
+    // Case 6D: Ally/Teammate Trainers (same team) are NOT forced to opposite side if not desired
+    const allyTrainer = new AshFighter({ x: 120, y: 465, hp: 360, maxHp: 360, teamId: 0 }); // Teammate!
+    ashRed.trainerVantagePoint = { type: 'outside-left', wall: 'left', x: testArena.x - 26, y: 465 };
+    state.fighters = [ashRed, allyTrainer];
+    const allySpot = pickTrainerOutsideSidelineSpot(allyTrainer, testArena, null);
+    assert(allySpot.wall === 'left', `Teammate trainer should be able to share left flank (with vertical separation), got ${allySpot.wall}`);
+    assert(Math.abs(allySpot.y - ashRed.trainerVantagePoint.y) >= 55, 'Teammate must be vertically separated along the wall');
 
     // 7. Verify Centralized Smooth Poké Ball Throw Animation & Spring-Damped Hand Physics
     const {
@@ -13460,6 +13473,172 @@ async function runInteractionTests() {
     rivalAsh._cleanupActivePokemon?.();
     state.fighters = [];
     console.log('      ✅ Ash Pokémon Push Back, Pull, Drag, Knockback Immunity, Summon Entrance VFX, Pokémon Battle Targeting, Collision Rebounce, Centralized Physics, Global Hit Flash & Zero HP Overlay verified.');
+  }
+
+  // ⚡ 111b. Testing Pokémon Trainer Absolute God-Mode & Sideline Immunity ⚡
+  {
+    console.log('   111b. Testing Pokémon Trainer Absolute God-Mode & Sideline Immunity (Zero Yuta Flurry, Zero Gravitational Pull, Zero Drag, Strict Position Locking)...');
+    const { AshFighter } = await import('../js/entities/fighters/AshFighter.js');
+    const { YutaFighter } = await import('../js/entities/fighters/YutaFighter.js');
+    const { GojoPurpleBehavior } = await import('../js/systems/projectiles/behaviors/GojoPurpleBehavior.js');
+    const { GojoBlueBehavior } = await import('../js/systems/projectiles/behaviors/GojoBlueBehavior.js');
+    const { YutaPureLoveBeamBehavior } = await import('../js/systems/projectiles/behaviors/YutaPureLoveBeamBehavior.js');
+
+    const testArena = { x: 45, y: 240, width: 450, height: 450 };
+    state.arena = testArena;
+    state.gameState = 'playing';
+
+    const ash = new AshFighter({
+      id: 'ash',
+      name: 'Ash Ketchum',
+      type: 'ash',
+      x: 18,
+      y: 450,
+      hp: 350,
+      maxHp: 350,
+      r: 25
+    });
+    const initialAshHp = ash.hp;
+
+    const yuta = new YutaFighter({
+      id: 'yuta',
+      name: 'Yuta Okkotsu',
+      type: 'yuta',
+      x: 200,
+      y: 450,
+      hp: 350,
+      maxHp: 350,
+      r: 25
+    });
+
+    state.fighters = [ash, yuta];
+
+    // Set Ash to jumped-out sideline state
+    ash.jumpState = 'outside';
+    ash.isJumpedOut = true;
+    ash.sidelineX = 18;
+    ash.sidelineY = 450;
+    ash.update(yuta, 0, testArena);
+
+    // 1. Verify Ash is NOT a valid aim or flurry target for Yuta
+    assert(yuta.isValidAimTarget(ash) === false, 'Yuta must consider jumped-out Ash invalid aim target');
+    assert(yuta._getValidFlurryTarget(ash) === null, 'Yuta _getValidFlurryTarget must return null for jumped-out Ash');
+
+    // 2. Verify Yuta Phantom Flurry CANNOT trigger or teleport to jumped-out Ash
+    const flurryTriggered = yuta.triggerPhantomFlurry(ash);
+    assert(flurryTriggered === false, 'Yuta must NOT trigger Phantom Flurry on jumped-out Ash');
+    assert(yuta.x !== ash.x, 'Yuta must NOT teleport outside arena to Ash');
+
+    // 3. Verify Hollow Purple Gravitational Suction does NOT displace jumped-out Ash
+    const purpleBehavior = new GojoPurpleBehavior();
+    const purpleProj = {
+      x: 35,
+      y: 450,
+      vx: 0,
+      vy: 0,
+      r: 50,
+      owner: 1,
+      ownerFighter: yuta,
+      pulledTargets: new Set(),
+      purpleDPS: 50,
+      purpleDPSInterval: 6
+    };
+    purpleBehavior.update(purpleProj, [ash, yuta], { projectiles: [] });
+    assert(ash.x === 18 && ash.y === 450, `Hollow Purple must NOT pull jumped-out Ash, got (${ash.x}, ${ash.y})`);
+    assert(ash.isCaughtInPurple !== true, 'Ash must not be caught in purple');
+
+    // 4. Verify Gojo Blue Gravitational Suction does NOT displace jumped-out Ash
+    const blueBehavior = new GojoBlueBehavior();
+    const blueProj = {
+      x: 35,
+      y: 450,
+      vx: 0,
+      vy: 0,
+      r: 30,
+      owner: 1,
+      ownerFighter: yuta,
+      pulledTargets: new Set()
+    };
+    blueBehavior.update(blueProj, [ash, yuta], { projectiles: [] });
+    assert(ash.x === 18 && ash.y === 450, `Gojo Blue must NOT pull jumped-out Ash, got (${ash.x}, ${ash.y})`);
+
+    // 5. Verify Pure Love Beam does NOT pull, displace or damage jumped-out Ash
+    const beamBehavior = new YutaPureLoveBeamBehavior();
+    const beamProj = {
+      x: yuta.x,
+      y: yuta.y,
+      angle: Math.PI, // Firing directly left through Ash at (18, 450)
+      owner: 1,
+      ownerFighter: yuta,
+      damage: 100,
+      hitTargets: new Set()
+    };
+    yuta.gunAngle = Math.PI;
+    yuta.pureLoveBeamLockedAngle = Math.PI;
+    beamBehavior.update(beamProj, [ash, yuta], { projectiles: [] });
+    assert(ash.x === 18 && ash.y === 450, `Pure Love Beam must NOT pull jumped-out Ash, got (${ash.x}, ${ash.y})`);
+    assert(ash.hp === initialAshHp, `Ash must not take damage from Pure Love Beam while outside, got HP ${ash.hp}`);
+
+    // 6. Verify absolute damage & CC immunity (God-Mode)
+    const dmgResult = ash.takeDamage(100, yuta, { isGuaranteedHit: true, isDomain: true });
+    assert(dmgResult === false && ash.hp === initialAshHp, 'Ash must block all incoming damage while outside');
+    ash.applyKnockback(100, 100);
+    assert(ash.knockbackVx === 0 && ash.knockbackVy === 0, 'Ash must ignore knockback while outside');
+    ash.applySuction(100, 100);
+    assert(ash.knockbackVx === 0 && ash.knockbackVy === 0, 'Ash must ignore suction while outside');
+    ash.applySlow(60, 0.2);
+    assert(ash.slowTimer === 0 && ash.slowMultiplier === 1.0, 'Ash must ignore slow while outside');
+
+    // 7. Testing Gojo and Sukuna Melee Mode against Pokémon
+    const { GojoFighter } = await import('../js/entities/fighters/GojoFighter.js');
+    const { SukunaFighter } = await import('../js/entities/fighters/SukunaFighter.js');
+    const { updateFighters } = await import('../js/systems/physics.js');
+
+    // 4. Verify Gojo and Sukuna trigger Melee Mode against summoned Pokémon
+    ash.activePokemon = null;
+    ash._spawnPokemonFromBall({ speciesKey: 'pikachu', targetX: 250, targetY: 450 });
+    const pika = ash.activePokemon;
+    pika.x = 250;
+    pika.y = 450;
+    pika.vx = 0;
+    pika.vy = 0;
+    pika.isSummonIntro = false;
+    pika.summonIntroTimer = 0;
+
+    const testGojo = new GojoFighter({ id: 'gojo', x: 215, y: 450 }); // 35px close contact
+    testGojo.meleeModeCooldown = 0;
+    state.fighters = [testGojo, ash, pika];
+    for (let f = 0; f < 30; f++) {
+      updateFighters();
+      if (testGojo.isMeleeMode) break;
+    }
+    assert(testGojo.isMeleeMode === true, 'Gojo must trigger Melee Mode when in close contact with active enemy Pokémon');
+
+    // Reset Pikachu position & HP for Sukuna test
+    pika.x = 250;
+    pika.y = 450;
+    pika.vx = 0;
+    pika.vy = 0;
+    pika.hp = pika.maxHp;
+
+    const testSukuna = new SukunaFighter({ id: 'sukuna', x: 215, y: 450 }); // 35px close contact
+    testSukuna.meleeModeCooldown = 0;
+    state.fighters = [testSukuna, ash, pika];
+    for (let f = 0; f < 30; f++) {
+      updateFighters();
+      if (testSukuna.isMeleeMode) break;
+    }
+    assert(testSukuna.isMeleeMode === true, 'Sukuna must trigger Melee Mode when in close contact with active enemy Pokémon');
+
+    // 5. Verify direct Pokémon melee attacks trigger Melee Mode on Sukuna & Gojo
+    const meleeSukuna = new SukunaFighter({ id: 'sukuna', x: 250, y: 450 });
+    meleeSukuna.isMeleeMode = false;
+    meleeSukuna.meleeModeCooldown = 0;
+    ash._dealPokemonDamage(meleeSukuna, 15, { isMelee: true, attacker: pika });
+    assert(meleeSukuna.isMeleeMode === true, 'Sukuna must enter Melee Mode when struck by Pokémon close-range melee attack');
+
+    state.fighters = [];
+    console.log('      ✅ Pokémon Trainer Absolute God-Mode, Sideline Immunity & Gojo/Sukuna Melee Mode on Pokémon verified.');
   }
 
   // ⚡ 112. Testing Pac-Man Power Pellet Eating, Enemy Frightened Ghost Transformation, Paused Cooldowns & Move-Only State ⚡
@@ -14280,6 +14459,14 @@ async function runInteractionTests() {
     assert(Math.abs(minion.speed - standaloneMahoraga.speed) < 0.01, `Minion speed (${minion.speed}) must match Fighter Mahoraga (${standaloneMahoraga.speed})`);
 
     // B. Verify Cooldown Rate of Decay Parity (Minion matches Fighter Mahoraga exactly)
+    minion.x = 270;
+    minion.y = 400;
+    minion.vx = 0;
+    minion.vy = 0;
+    standaloneMahoraga.x = 270;
+    standaloneMahoraga.y = 400;
+    standaloneMahoraga.vx = 0;
+    standaloneMahoraga.vy = 0;
     minion.swordCooldown = 20;
     standaloneMahoraga.swordCooldown = 20;
     state.frameCount = 101;

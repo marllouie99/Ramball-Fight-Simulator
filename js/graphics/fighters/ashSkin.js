@@ -315,6 +315,17 @@ export function drawAshSkin(ctx, fighter) {
   const r = fighter.r || 25;
   const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
 
+  // 0. Floor Shadow Ellipse when airborne / leaping over arena walls
+  if (fighter.z > 0) {
+    const shadowScale = Math.max(0.35, 1.0 - fighter.z / 120);
+    ctx.save();
+    ctx.fillStyle = `rgba(15, 23, 42, ${(0.42 * shadowScale).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.ellipse(fighter.x, fighter.y, r * shadowScale, r * 0.40 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
   ctx.rotate(angle);
@@ -336,15 +347,14 @@ export function drawAshSkin(ctx, fighter) {
   const rawBreath = Math.sin(steadyTick * breathFreq);
   const breathQuantized = isSteady ? (rawBreath > 0.3 ? 1.0 : (rawBreath < -0.3 ? -1.0 : 0.0)) : 0.0;
   const breathLiftY = breathQuantized * 1.5;
-  const chestExpansionX = Math.max(0, breathQuantized) * 1.0;
 
   // Query centralized Pokémon Trainer Throw Animation & Spring-Damped Hand Physics (Rule 20 & Rule 30)
   const handState = getTrainerHandRenderState(fighter, r);
-  const torsoX = chestExpansionX * 0.3 + handState.torso.x;
+  const torsoX = handState.torso.x;
   const torsoY = breathLiftY * 0.4 + handState.torso.y;
   const torsoRot = handState.torso.rot || 0;
 
-  // Layer 1: Toji-Standard 4-Zone Pixel Body (Applies chest expansion, breathing lift & throw coil/lunge)
+  // Layer 1: Toji-Standard 4-Zone Pixel Body (Applies natural vertical breathing lift & throw coil/lunge)
   ctx.save();
   ctx.translate(torsoX, torsoY);
   if (torsoRot !== 0) ctx.rotate(torsoRot * 0.55);
@@ -353,7 +363,7 @@ export function drawAshSkin(ctx, fighter) {
 
   // Layer 2: League Cap & Spiky Hair Asset (Upper head secondary breathing & throw follow-through)
   ctx.save();
-  ctx.translate(chestExpansionX * 0.5 + handState.torso.x * 1.15, breathLiftY * 0.6 + handState.torso.y * 0.9);
+  ctx.translate(handState.torso.x * 1.15, breathLiftY * 0.6 + handState.torso.y * 0.9);
   if (torsoRot !== 0) ctx.rotate(torsoRot * 0.75);
   _drawAshHair(ctx, r, facingLeft);
   ctx.restore();
@@ -362,7 +372,7 @@ export function drawAshSkin(ctx, fighter) {
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   if (!shouldHideHands) {
     ctx.save();
-    ctx.translate(chestExpansionX * 0.4, breathLiftY * 0.5);
+    ctx.translate(0, breathLiftY * 0.5);
 
     const handR = getHandSize(r * 0.30);
     const armPalette = {

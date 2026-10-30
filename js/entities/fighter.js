@@ -54,6 +54,22 @@ export function isSuppressedByFuga(fighter) {
  */
 export function isEntityImmuneToGravitationalPull(entity, vortexType = 'purple') {
   if (!entity) return true;
+  if (
+    entity.isUntargetable ||
+    entity.untargetable ||
+    entity.cannotBeTargeted ||
+    entity.isTargetable === false ||
+    entity.isJumpedOut ||
+    entity.jumpState === 'outside' ||
+    entity.jumpState === 'jumping_out' ||
+    entity.jumpState === 'jumping_in' ||
+    entity.isInvulnerable ||
+    entity.isInvincible ||
+    entity.invincible ||
+    (entity.isPokemonTrainer && (entity.jumpState !== 'inside' || entity.isJumpedOut))
+  ) {
+    return true;
+  }
   const isPlantEntity = entity.isPlant || entity.isPlantMinion;
   if (entity.isBaguvixActive || entity.isGodModeActive) return true;
   if ((isPlantEntity || entity.isImmovable) && vortexType !== 'purple') return true;
@@ -122,6 +138,9 @@ export function hasActiveInfinity(entity) {
  */
 export function isEntityOutsideArena(entity, arena) {
   if (!entity) return false;
+  if (entity.isJumpedOut || entity.jumpState === 'outside' || entity.jumpState === 'jumping_out') {
+    return true;
+  }
   const curArena = arena || (typeof state !== 'undefined' ? state.arena : null) || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null);
   if (!curArena) return false;
 
@@ -238,7 +257,22 @@ function isFriendlyToSummon(summoned, source) {
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
-  if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
+  if (
+    target.isLawnmower ||
+    target.isUntargetable ||
+    target.untargetable ||
+    target.cannotBeTargeted ||
+    target.isTargetable === false ||
+    target.isJumpedOut ||
+    target.jumpState === 'outside' ||
+    target.jumpState === 'jumping_out' ||
+    target.isInvulnerable ||
+    target.isInvincible ||
+    target.invincible ||
+    (target.invincibilityTimer && target.invincibilityTimer > 0) ||
+    (target.isPokemonTrainer && target.activePokemon && (target.activePokemon.hp > 0 || target.activePokemon.isFainting)) ||
+    (target.isPokemonTrainer && typeof state !== 'undefined' && state?.arena && isEntityOutsideArena(target, state.arena))
+  ) return false;
   if (typeof opts === 'string') {
     opts = { source: opts, isBleed: opts === 'bleed', isCurse: opts === 'curse' };
   } else if (!opts || typeof opts !== 'object') {
@@ -2747,6 +2781,22 @@ export class Fighter {
     if (isHeal) {
       if (this.hp <= 0) return false;
     } else {
+      if (
+        this.isUntargetable ||
+        this.untargetable ||
+        this.cannotBeTargeted ||
+        this.isTargetable === false ||
+        this.isJumpedOut ||
+        this.jumpState === 'outside' ||
+        this.jumpState === 'jumping_out' ||
+        this.jumpState === 'jumping_in' ||
+        this.isInvulnerable ||
+        this.isInvincible ||
+        this.invincible ||
+        (this.isPokemonTrainer && (this.jumpState !== 'inside' || this.isJumpedOut))
+      ) {
+        return false;
+      }
       if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain && !isGuaranteedHit) || (this.vanishTimer && this.vanishTimer > 0 && !isGuaranteedHit) || (this.invincibilityTimer && this.invincibilityTimer > 0 && !isGuaranteedHit && !opts.isDomain)) return false;
     }
 
@@ -3633,7 +3683,23 @@ export class Fighter {
    */
   isValidAimTarget(target) {
     if (!target || target === this) return false;
-    if (target.isLawnmower || target.isUntargetable || target.untargetable || target.cannotBeTargeted || target.isTargetable === false) return false;
+    if (
+      target.isLawnmower ||
+      target.isUntargetable ||
+      target.untargetable ||
+      target.cannotBeTargeted ||
+      target.isTargetable === false ||
+      target.isJumpedOut ||
+      target.jumpState === 'outside' ||
+      target.jumpState === 'jumping_out' ||
+      target.jumpState === 'jumping_in' ||
+      target.isInvulnerable ||
+      target.isInvincible ||
+      target.invincible ||
+      (target.invincibilityTimer && target.invincibilityTimer > 0) ||
+      (target.isPokemonTrainer && (target.jumpState !== 'inside' || target.isJumpedOut || (target.activePokemon && (target.activePokemon.hp > 0 || target.activePokemon.isFainting)))) ||
+      (target.isPokemonTrainer && typeof state !== 'undefined' && state?.arena && isEntityOutsideArena(target, state.arena))
+    ) return false;
     const isReforming = Boolean(target.isRevivingFromContract || target.isShatterReviving);
     const isAlive = (target.hp > 0 && !target.isDead && !target._hasDied) || isReforming || (typeof target.isEffectivelyAlive === 'function' && target.isEffectivelyAlive());
     if (!isAlive) return false;

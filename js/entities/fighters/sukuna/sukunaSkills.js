@@ -11,6 +11,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
 import { spawnDomainSlashLines } from './sukunaDomainVisuals.js';
+import { isEntityOutsideArena } from '../../fighter.js';
 
 export function checkSpiderwebTrigger(fighter, arena) {
   if (!fighter.isSkillEnabled(CONFIG.sukuna?.enableSpiderweb, true) || fighter.spiderwebCooldown > 0) return;
@@ -23,7 +24,7 @@ export function checkSpiderwebTrigger(fighter, arena) {
   let totalDist = 0;
 
   state.fighters.forEach((f, idx) => {
-    if (f && f !== fighter && f.hp > 0) {
+    if (f && f !== fighter && f.hp > 0 && !f.isUntargetable && !f.isJumpedOut && (f.invincibilityTimer || 0) <= 0 && (!state.arena || !isEntityOutsideArena(f, state.arena))) {
       const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
       if (isEnemy) {
         const dist = Math.hypot(fighter.x - f.x, fighter.y - f.y);
@@ -56,7 +57,7 @@ export function activateSpiderweb(fighter) {
   const slowMultiplier = CONFIG.sukuna?.spiderwebSlowMultiplier || 0.3;
 
   state.fighters.forEach((f, idx) => {
-    if (f && f !== fighter && f.hp > 0) {
+    if (f && f !== fighter && f.hp > 0 && !f.isUntargetable && !f.isJumpedOut && (f.invincibilityTimer || 0) <= 0 && (!state.arena || !isEntityOutsideArena(f, state.arena))) {
       const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
       if (isEnemy) {
         const dist = Math.hypot(fighter.x - f.x, fighter.y - f.y);
@@ -171,11 +172,18 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
   let target = opponent;
   const myTeam = (typeof state !== 'undefined' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
 
-  if (!target || target.isDead || target.hp <= 0 || target.invincibilityTimer > 0 || target.isStealthed) {
+  const isInvalidTarget = (t) => {
+    if (!t || t.isDead || t.hp <= 0 || (t.invincibilityTimer && t.invincibilityTimer > 0) || t.isStealthed || t.isUntargetable || t.untargetable || t.cannotBeTargeted || t.isTargetable === false || t.isJumpedOut || t.jumpState === 'outside' || t.jumpState === 'jumping_out' || t.isInvulnerable || t.isInvincible) return true;
+    if (t.isPokemonTrainer && t.activePokemon && (t.activePokemon.hp > 0 || t.activePokemon.isFainting)) return true;
+    if (typeof state !== 'undefined' && state.arena && isEntityOutsideArena(t, state.arena)) return true;
+    return false;
+  };
+
+  if (isInvalidTarget(target)) {
     const validTargets = [];
     if (typeof state !== 'undefined' && state.fighters) {
       state.fighters.forEach((f, idx) => {
-        if (f && f !== fighter && f.hp > 0 && f.invincibilityTimer <= 0 && !f.isStealthed) {
+        if (f && f !== fighter && !isInvalidTarget(f)) {
           const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
           if (isEnemy) validTargets.push(f);
         }
@@ -183,7 +191,7 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     }
     if (typeof state !== 'undefined' && state.illusions) {
       state.illusions.forEach(ill => {
-        if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) return;
+        if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika || isInvalidTarget(ill)) return;
         if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
         validTargets.push(ill);
       });

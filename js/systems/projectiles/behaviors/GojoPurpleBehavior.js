@@ -144,6 +144,20 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     for (let i = 0; i < allTargets.length; i++) {
       const ent = allTargets[i];
       if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
+      if (
+        ent.isUntargetable ||
+        ent.untargetable ||
+        ent.cannotBeTargeted ||
+        ent.isTargetable === false ||
+        ent.isJumpedOut ||
+        ent.jumpState === 'outside' ||
+        ent.jumpState === 'jumping_out' ||
+        ent.jumpState === 'jumping_in' ||
+        ent.isInvulnerable ||
+        ent.isInvincible ||
+        ent.invincible ||
+        (ent.isPokemonTrainer && (ent.jumpState !== 'inside' || ent.isJumpedOut))
+      ) continue;
       if (ent.owner && ent.owner === ownerFighter) continue;
       if (ownerFighter && typeof ownerFighter.isTeammate === 'function') {
         if (ownerFighter.isTeammate(ent) || (ent.owner && ownerFighter.isTeammate(ent.owner))) continue;
@@ -273,6 +287,20 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       for (let i = 0; i < allTargets.length; i++) {
         const ent = allTargets[i];
         if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
+        if (
+          ent.isUntargetable ||
+          ent.untargetable ||
+          ent.cannotBeTargeted ||
+          ent.isTargetable === false ||
+          ent.isJumpedOut ||
+          ent.jumpState === 'outside' ||
+          ent.jumpState === 'jumping_out' ||
+          ent.jumpState === 'jumping_in' ||
+          ent.isInvulnerable ||
+          ent.isInvincible ||
+          ent.invincible ||
+          (ent.isPokemonTrainer && (ent.jumpState !== 'inside' || ent.isJumpedOut))
+        ) continue;
         if (ent.owner && ent.owner === ownerFighter) continue;
         if (ownerFighter && typeof ownerFighter.isTeammate === 'function') {
           if (ownerFighter.isTeammate(ent) || (ent.owner && ownerFighter.isTeammate(ent.owner))) continue;
@@ -443,6 +471,20 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     for (let i = 0; i < allTargets.length; i++) {
       const ent = allTargets[i];
       if (!ent || ent.hp <= 0 || ent.dead || ent === ownerFighter) continue;
+      if (
+        ent.isUntargetable ||
+        ent.untargetable ||
+        ent.cannotBeTargeted ||
+        ent.isTargetable === false ||
+        ent.isJumpedOut ||
+        ent.jumpState === 'outside' ||
+        ent.jumpState === 'jumping_out' ||
+        ent.jumpState === 'jumping_in' ||
+        ent.isInvulnerable ||
+        ent.isInvincible ||
+        ent.invincible ||
+        (ent.isPokemonTrainer && (ent.jumpState !== 'inside' || ent.isJumpedOut))
+      ) continue;
       if (ent.owner && ent.owner === ownerFighter) continue;
 
       let isEnemy = true;
